@@ -1,0 +1,3467 @@
+{
+  "freqs": [
+    60,
+    250,
+    1000,
+    4000,
+    10000
+  ],
+  "baselineRms": [
+    0.08957,
+    0.089585,
+    0.089584,
+    0.089583,
+    0.089583
+  ],
+  "results": {
+    "Compressor": {
+      "type": "Compressor",
+      "category": "tonejs",
+      "label": "Compressor",
+      "gainsDb": [
+        1.8,
+        0.9,
+        0.9,
+        0.9,
+        0.9
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:46:10.906Z"
+    },
+    "Multiband Compressor": {
+      "type": "MultibandComp",
+      "category": "wasm",
+      "label": "Multiband Compressor",
+      "gainsDb": [
+        3.7,
+        3.5,
+        3,
+        3.5,
+        2.9
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:47:06.468Z"
+    },
+    "Exciter": {
+      "type": "Exciter",
+      "category": "wasm",
+      "label": "Exciter",
+      "gainsDb": [
+        0.8,
+        0,
+        0,
+        1.6,
+        2.8
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:46:52.634Z"
+    },
+    "3-Band EQ": {
+      "type": "EQ3",
+      "category": "tonejs",
+      "label": "3-Band EQ",
+      "gainsDb": [
+        -1.3,
+        -0.3,
+        0,
+        -0.4,
+        -1.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:47:46.442Z"
+    },
+    "Graphic EQ (WAM)": {
+      "type": "WAMGraphicEQ",
+      "category": "wam",
+      "label": "Graphic EQ (WAM)",
+      "gainsDb": [
+        6,
+        6,
+        6,
+        6,
+        6.1
+      ],
+      "flags": [
+        "boost 6.1 dB"
+      ],
+      "at": "2026-09-29T13:43:42.622Z"
+    },
+    "Sidechain Compressor": {
+      "type": "SidechainCompressor",
+      "category": "tonejs",
+      "label": "Sidechain Compressor",
+      "gainsDb": [
+        -2.3,
+        -4.5,
+        -4.5,
+        -4.5,
+        -4.6
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:48:18.684Z"
+    },
+    "Distortion": {
+      "type": "Distortion",
+      "category": "tonejs",
+      "label": "Distortion",
+      "gainsDb": [
+        1.9,
+        1.9,
+        1.9,
+        1.8,
+        1.9
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:48:32.635Z"
+    },
+    "Bit Crusher": {
+      "type": "BitCrusher",
+      "category": "tonejs",
+      "label": "Bit Crusher",
+      "gainsDb": [
+        -2.3,
+        -2.2,
+        -2,
+        -1.3,
+        -1.9
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:48:46.469Z"
+    },
+    "Chebyshev": {
+      "type": "Chebyshev",
+      "category": "tonejs",
+      "label": "Chebyshev",
+      "gainsDb": [
+        -11.2,
+        -11.2,
+        -11.2,
+        -11.2,
+        -11.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:49:00.473Z"
+    },
+    "Tape Saturation": {
+      "type": "TapeSaturation",
+      "category": "tonejs",
+      "label": "Tape Saturation",
+      "gainsDb": [
+        -2.1,
+        -2.3,
+        -2.3,
+        -1.9,
+        -0.6
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:43:56.468Z"
+    },
+    "Big Muff (WAM)": {
+      "type": "WAMBigMuff",
+      "category": "wam",
+      "label": "Big Muff (WAM)",
+      "gainsDb": [
+        -11.5,
+        -9.4,
+        -15.8,
+        -9.9,
+        -14.2
+      ],
+      "flags": [
+        "tilt 6.4 dB"
+      ],
+      "at": "2026-09-29T13:44:14.830Z"
+    },
+    "TS-9 Overdrive (WAM)": {
+      "type": "WAMTS9",
+      "category": "wam",
+      "label": "TS-9 Overdrive (WAM)",
+      "gainsDb": [
+        -7.5,
+        -6.8,
+        -12.7,
+        -23.9,
+        -30.8
+      ],
+      "flags": [
+        "tilt 24.0 dB"
+      ],
+      "at": "2026-09-29T13:44:33.167Z"
+    },
+    "QuadraFuzz (WAM)": {
+      "type": "WAMQuadraFuzz",
+      "category": "wam",
+      "label": "QuadraFuzz (WAM)",
+      "gainsDb": [
+        9.1,
+        3.6,
+        9,
+        5,
+        9.6
+      ],
+      "flags": [
+        "boost 9.6 dB",
+        "tilt 6.0 dB"
+      ],
+      "at": "2026-09-29T13:44:51.494Z"
+    },
+    "Reverb": {
+      "type": "Reverb",
+      "category": "tonejs",
+      "label": "Reverb",
+      "gainsDb": [
+        -5.9,
+        -10,
+        -12.7,
+        -5.2,
+        -16.3
+      ],
+      "flags": [
+        "tilt 11.1 dB"
+      ],
+      "at": "2026-09-29T11:50:23.916Z"
+    },
+    "JC Reverb": {
+      "type": "JCReverb",
+      "category": "tonejs",
+      "label": "JC Reverb",
+      "gainsDb": [
+        -158.9,
+        -6,
+        -6.6,
+        -3.1,
+        -2.1
+      ],
+      "flags": [
+        "tilt 156.8 dB"
+      ],
+      "at": "2026-09-29T13:45:24.796Z"
+    },
+    "Delay": {
+      "type": "Delay",
+      "category": "tonejs",
+      "label": "Delay",
+      "gainsDb": [
+        -0.5,
+        -0.8,
+        -4.4,
+        -4.2,
+        -4.4
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:50:52.618Z"
+    },
+    "Feedback Delay": {
+      "type": "FeedbackDelay",
+      "category": "tonejs",
+      "label": "Feedback Delay",
+      "gainsDb": [
+        -0.5,
+        -0.8,
+        -4.3,
+        -4.3,
+        -4.3
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:51:06.852Z"
+    },
+    "Ping Pong Delay": {
+      "type": "PingPongDelay",
+      "category": "tonejs",
+      "label": "Ping Pong Delay",
+      "gainsDb": [
+        0,
+        -29.3,
+        -4.4,
+        -4.5,
+        -4.5
+      ],
+      "flags": [
+        "tilt 29.2 dB"
+      ],
+      "at": "2026-09-29T13:45:38.650Z"
+    },
+    "Space Echo": {
+      "type": "SpaceEcho",
+      "category": "tonejs",
+      "label": "Space Echo",
+      "gainsDb": [
+        0.6,
+        -26.4,
+        -7.7,
+        1.5,
+        -0.2
+      ],
+      "flags": [
+        "tilt 27.9 dB"
+      ],
+      "at": "2026-09-29T13:45:52.561Z"
+    },
+    "Spacey Delayer": {
+      "type": "SpaceyDelayer",
+      "category": "tonejs",
+      "label": "Spacey Delayer",
+      "gainsDb": [
+        10.4,
+        -6.4,
+        10.2,
+        10,
+        8.5
+      ],
+      "flags": [
+        "boost 10.4 dB",
+        "tilt 16.8 dB"
+      ],
+      "at": "2026-09-29T13:46:06.546Z"
+    },
+    "RE Tape Echo": {
+      "type": "RETapeEcho",
+      "category": "tonejs",
+      "label": "RE Tape Echo",
+      "gainsDb": [
+        4.6,
+        5.3,
+        6.6,
+        4.1,
+        2.1
+      ],
+      "flags": [
+        "boost 6.6 dB"
+      ],
+      "at": "2026-09-29T13:46:20.390Z"
+    },
+    "RE-201 Space Echo": {
+      "type": "RE201",
+      "category": "tonejs",
+      "label": "RE-201 Space Echo",
+      "gainsDb": [
+        -29,
+        -15.1,
+        4.2,
+        4.5,
+        1.1
+      ],
+      "flags": [
+        "tilt 33.5 dB"
+      ],
+      "at": "2026-09-29T13:46:34.213Z"
+    },
+    "Another Delay": {
+      "type": "AnotherDelay",
+      "category": "tonejs",
+      "label": "Another Delay",
+      "gainsDb": [
+        -1.1,
+        6.8,
+        12.5,
+        9.1,
+        7.1
+      ],
+      "flags": [
+        "boost 12.5 dB",
+        "tilt 13.6 dB"
+      ],
+      "at": "2026-09-29T13:46:48.050Z"
+    },
+    "Ping Pong Delay (WAM)": {
+      "type": "WAMPingPongDelay",
+      "category": "wam",
+      "label": "Ping Pong Delay (WAM)",
+      "gainsDb": [
+        3.1,
+        1.3,
+        1.2,
+        1.2,
+        1.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:52:50.592Z"
+    },
+    "Faust Delay (WAM)": {
+      "type": "WAMFaustDelay",
+      "category": "wam",
+      "label": "Faust Delay (WAM)",
+      "gainsDb": [
+        6.5,
+        6.7,
+        6.6,
+        6.6,
+        6.4
+      ],
+      "flags": [
+        "boost 6.7 dB"
+      ],
+      "at": "2026-09-29T13:47:06.363Z"
+    },
+    "Ambient Delay": {
+      "type": "AmbientDelay",
+      "category": "tonejs",
+      "label": "Ambient Delay",
+      "gainsDb": [
+        4.1,
+        3.1,
+        -3.9,
+        6.6,
+        5.1
+      ],
+      "flags": [
+        "boost 6.6 dB",
+        "tilt 10.5 dB"
+      ],
+      "at": "2026-09-29T13:47:20.184Z"
+    },
+    "Bi-Phase": {
+      "type": "BiPhase",
+      "category": "tonejs",
+      "label": "Bi-Phase",
+      "gainsDb": [
+        5.2,
+        4.4,
+        -2.2,
+        4,
+        5
+      ],
+      "flags": [
+        "tilt 7.3 dB"
+      ],
+      "at": "2026-09-29T13:47:34.004Z"
+    },
+    "Chorus": {
+      "type": "Chorus",
+      "category": "tonejs",
+      "label": "Chorus",
+      "gainsDb": [
+        2.7,
+        2,
+        1.5,
+        0.8,
+        0.4
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:53:51.557Z"
+    },
+    "Phaser": {
+      "type": "Phaser",
+      "category": "tonejs",
+      "label": "Phaser",
+      "gainsDb": [
+        -3,
+        -3,
+        -3.5,
+        -7.4,
+        -7.8
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:54:05.556Z"
+    },
+    "Tremolo": {
+      "type": "Tremolo",
+      "category": "tonejs",
+      "label": "Tremolo",
+      "gainsDb": [
+        -4.5,
+        -4.5,
+        -4.5,
+        -4.5,
+        -4.5
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:54:19.551Z"
+    },
+    "Vibrato": {
+      "type": "Vibrato",
+      "category": "tonejs",
+      "label": "Vibrato",
+      "gainsDb": [
+        -2.5,
+        -2.5,
+        -2.5,
+        -2.7,
+        -3.7
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:54:33.520Z"
+    },
+    "Auto Panner": {
+      "type": "AutoPanner",
+      "category": "tonejs",
+      "label": "Auto Panner",
+      "gainsDb": [
+        -5.4,
+        -5.5,
+        -5.6,
+        -5.2,
+        -5.3
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:54:47.544Z"
+    },
+    "Stone Phaser (WAM)": {
+      "type": "WAMStonePhaser",
+      "category": "wam",
+      "label": "Stone Phaser (WAM)",
+      "gainsDb": [
+        2,
+        -6.8,
+        -0.9,
+        -1.2,
+        2.6
+      ],
+      "flags": [
+        "tilt 9.4 dB"
+      ],
+      "at": "2026-09-29T13:47:52.328Z"
+    },
+    "Filter": {
+      "type": "Filter",
+      "category": "tonejs",
+      "label": "Filter",
+      "gainsDb": [
+        1.7,
+        1.5,
+        1.7,
+        3.5,
+        -11.7
+      ],
+      "flags": [
+        "tilt 15.2 dB"
+      ],
+      "at": "2026-09-29T13:48:06.174Z"
+    },
+    "Dub Filter": {
+      "type": "DubFilter",
+      "category": "tonejs",
+      "label": "Dub Filter",
+      "gainsDb": [
+        2.6,
+        1.9,
+        1.9,
+        1.9,
+        1.9
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:55:34.220Z"
+    },
+    "Auto Filter": {
+      "type": "AutoFilter",
+      "category": "tonejs",
+      "label": "Auto Filter",
+      "gainsDb": [
+        1.9,
+        2.1,
+        -2,
+        -26,
+        -42.5
+      ],
+      "flags": [
+        "tilt 44.5 dB"
+      ],
+      "at": "2026-09-29T13:48:20.005Z"
+    },
+    "Auto Wah": {
+      "type": "AutoWah",
+      "category": "tonejs",
+      "label": "Auto Wah",
+      "gainsDb": [
+        -2.8,
+        -2.7,
+        2.2,
+        -39.8,
+        -85.1
+      ],
+      "flags": [
+        "tilt 87.2 dB"
+      ],
+      "at": "2026-09-29T13:48:33.834Z"
+    },
+    "Pitch Shift": {
+      "type": "PitchShift",
+      "category": "tonejs",
+      "label": "Pitch Shift",
+      "gainsDb": [
+        -3,
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:56:15.932Z"
+    },
+    "Frequency Shifter": {
+      "type": "FrequencyShifter",
+      "category": "tonejs",
+      "label": "Frequency Shifter",
+      "gainsDb": [
+        -3,
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:56:29.815Z"
+    },
+    "Pitch Shifter (WAM)": {
+      "type": "WAMPitchShifter",
+      "category": "wam",
+      "label": "Pitch Shifter (WAM)",
+      "gainsDb": [
+        -16,
+        -0.3,
+        0,
+        0,
+        0
+      ],
+      "flags": [
+        "tilt 16.0 dB"
+      ],
+      "at": "2026-09-29T13:48:52.155Z"
+    },
+    "Stereo Widener": {
+      "type": "StereoWidener",
+      "category": "tonejs",
+      "label": "Stereo Widener",
+      "gainsDb": [
+        -3,
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:57:02.283Z"
+    },
+    "Disto Machine (WAM)": {
+      "type": "WAMDistoMachine",
+      "category": "wam",
+      "label": "Disto Machine (WAM)",
+      "gainsDb": [
+        2.5,
+        10.3,
+        1.5,
+        -7.6,
+        -9.3
+      ],
+      "flags": [
+        "boost 10.3 dB",
+        "tilt 19.5 dB"
+      ],
+      "at": "2026-09-29T13:49:10.495Z"
+    },
+    "Vox Amp 30 (WAM)": {
+      "type": "WAMVoxAmp",
+      "category": "wam",
+      "label": "Vox Amp 30 (WAM)",
+      "gainsDb": [
+        2.6,
+        6.7,
+        9.8,
+        15,
+        16.1
+      ],
+      "flags": [
+        "boost 16.1 dB",
+        "tilt 13.5 dB"
+      ],
+      "at": "2026-09-29T13:49:28.818Z"
+    },
+    "Pedalboard (WAM)": {
+      "type": "WAMPedalboard",
+      "category": "wam",
+      "label": "Pedalboard (WAM)",
+      "gainsDb": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T11:57:57.935Z"
+    },
+    "Tape Degradation": {
+      "type": "TapeDegradation",
+      "category": "tonejs",
+      "label": "Tape Degradation",
+      "gainsDb": [
+        -0.6,
+        -0.8,
+        -0.7,
+        0.2,
+        -6.9
+      ],
+      "flags": [
+        "tilt 7.2 dB"
+      ],
+      "at": "2026-09-29T13:49:42.643Z"
+    },
+    "Ibanez TS9": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Ibanez TS9",
+      "gainsDb": [
+        -11.1,
+        -3.8,
+        4,
+        -5.2,
+        -6.5
+      ],
+      "flags": [
+        "tilt 15.2 dB"
+      ],
+      "at": "2026-09-29T14:00:59.486Z"
+    },
+    "TS808": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "TS808",
+      "gainsDb": [
+        -36.9,
+        -17.9,
+        -16,
+        -16.9,
+        -19.4
+      ],
+      "flags": [
+        "tilt 20.9 dB"
+      ],
+      "at": "2026-09-29T14:01:18.056Z"
+    },
+    "Prince Of Tone OD": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Prince Of Tone OD",
+      "gainsDb": [
+        0.7,
+        1.9,
+        6.8,
+        1.9,
+        -1.6
+      ],
+      "flags": [
+        "boost 6.8 dB",
+        "tilt 8.3 dB"
+      ],
+      "at": "2026-09-29T14:01:36.755Z"
+    },
+    "Pork Loin": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Pork Loin",
+      "gainsDb": [
+        -10.3,
+        -6.6,
+        -11.2,
+        -32.6,
+        -23.2
+      ],
+      "flags": [
+        "tilt 26.0 dB"
+      ],
+      "at": "2026-09-29T14:01:55.329Z"
+    },
+    "Protein Blue": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Protein Blue",
+      "gainsDb": [
+        -4.8,
+        -10.8,
+        -3.6,
+        -2.9,
+        -3.2
+      ],
+      "flags": [
+        "tilt 7.9 dB"
+      ],
+      "at": "2026-09-29T14:02:13.747Z"
+    },
+    "Mostortion": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Mostortion",
+      "gainsDb": [
+        -7.5,
+        -8.3,
+        -8,
+        -7.3,
+        -9.3
+      ],
+      "flags": [],
+      "at": "2026-09-29T14:02:32.123Z"
+    },
+    "CaliMkIV": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "CaliMkIV",
+      "gainsDb": [
+        -2.1,
+        -2.2,
+        5.9,
+        -11.7,
+        -11.7
+      ],
+      "flags": [
+        "tilt 17.6 dB"
+      ],
+      "at": "2026-09-29T14:02:50.459Z"
+    },
+    "Boss MT-2": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Boss MT-2",
+      "gainsDb": [
+        -20.5,
+        -19.4,
+        4.3,
+        -11.2,
+        -21.9
+      ],
+      "flags": [
+        "tilt 26.2 dB"
+      ],
+      "at": "2026-09-29T14:03:09.016Z"
+    },
+    "ProCo RAT": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "ProCo RAT",
+      "gainsDb": [
+        7.3,
+        5.4,
+        10.6,
+        -12.5,
+        -17.9
+      ],
+      "flags": [
+        "boost 10.6 dB",
+        "tilt 28.4 dB"
+      ],
+      "at": "2026-09-29T14:03:27.427Z"
+    },
+    "MXR 78": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "MXR 78",
+      "gainsDb": [
+        -2,
+        -1.3,
+        3.2,
+        -6.1,
+        -5.5
+      ],
+      "flags": [
+        "tilt 9.4 dB"
+      ],
+      "at": "2026-09-29T14:03:45.814Z"
+    },
+    "Revv G3": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Revv G3",
+      "gainsDb": [
+        -13.4,
+        -21.6,
+        -6.4,
+        -4.7,
+        -10.2
+      ],
+      "flags": [
+        "tilt 16.9 dB"
+      ],
+      "at": "2026-09-29T14:04:04.203Z"
+    },
+    "Jekyll & Hyde": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Jekyll & Hyde",
+      "gainsDb": [
+        -12,
+        -6.1,
+        0.5,
+        6.1,
+        1.2
+      ],
+      "flags": [
+        "boost 6.1 dB",
+        "tilt 18.1 dB"
+      ],
+      "at": "2026-09-29T14:04:22.899Z"
+    },
+    "Friedman BEOD": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Friedman BEOD",
+      "gainsDb": [
+        -11.1,
+        -10.6,
+        -7.7,
+        -3.8,
+        -7
+      ],
+      "flags": [
+        "tilt 7.3 dB"
+      ],
+      "at": "2026-09-29T14:04:41.301Z"
+    },
+    "Mudhoney + Pork Loin": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Mudhoney + Pork Loin",
+      "gainsDb": [
+        -7,
+        7.3,
+        3.7,
+        -14.3,
+        -20
+      ],
+      "flags": [
+        "boost 7.3 dB",
+        "tilt 27.3 dB"
+      ],
+      "at": "2026-09-29T14:04:59.766Z"
+    },
+    "Prince Of Tone Dist": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Prince Of Tone Dist",
+      "gainsDb": [
+        0.7,
+        3.4,
+        6.7,
+        2.2,
+        -0.4
+      ],
+      "flags": [
+        "boost 6.7 dB",
+        "tilt 7.0 dB"
+      ],
+      "at": "2026-09-29T14:05:18.148Z"
+    },
+    "Aguilar Agro Bright": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Aguilar Agro Bright",
+      "gainsDb": [
+        -7.4,
+        -9.8,
+        1.4,
+        -8.6,
+        -13
+      ],
+      "flags": [
+        "tilt 14.4 dB"
+      ],
+      "at": "2026-09-29T14:05:36.646Z"
+    },
+    "Aguilar Agro Dark": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Aguilar Agro Dark",
+      "gainsDb": [
+        -18,
+        -8.7,
+        -5.2,
+        -18.5,
+        -19.7
+      ],
+      "flags": [
+        "tilt 14.5 dB"
+      ],
+      "at": "2026-09-29T14:05:55.031Z"
+    },
+    "Goat Pedal": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Goat Pedal",
+      "gainsDb": [
+        -16.1,
+        -18.7,
+        -6.9,
+        -12.8,
+        -26.2
+      ],
+      "flags": [
+        "tilt 19.2 dB"
+      ],
+      "at": "2026-09-29T14:06:13.402Z"
+    },
+    "Little Big Muff": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Little Big Muff",
+      "gainsDb": [
+        -3.2,
+        1.3,
+        -2,
+        -25.1,
+        -29.7
+      ],
+      "flags": [
+        "tilt 31.0 dB"
+      ],
+      "at": "2026-09-29T14:06:31.855Z"
+    },
+    "Big Muff V6": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Big Muff V6",
+      "gainsDb": [
+        -12.3,
+        -14.4,
+        -15,
+        -20.7,
+        -20.1
+      ],
+      "flags": [
+        "tilt 8.4 dB"
+      ],
+      "at": "2026-09-29T14:06:50.217Z"
+    },
+    "Blackstar HT40 Clean": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Blackstar HT40 Clean",
+      "gainsDb": [
+        -22.7,
+        -26.1,
+        -11.6,
+        -25.8,
+        -31.7
+      ],
+      "flags": [
+        "tilt 20.1 dB"
+      ],
+      "at": "2026-09-29T14:07:08.630Z"
+    },
+    "Mesa Mini Rec": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Mesa Mini Rec",
+      "gainsDb": [
+        2.2,
+        2.8,
+        -1.5,
+        1.7,
+        1.7
+      ],
+      "flags": [],
+      "at": "2026-09-29T14:07:27.133Z"
+    },
+    "Splawn OD": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Splawn OD",
+      "gainsDb": [
+        -17.9,
+        -4,
+        0.5,
+        -2.1,
+        -12.6
+      ],
+      "flags": [
+        "tilt 18.5 dB"
+      ],
+      "at": "2026-09-29T14:07:45.700Z"
+    },
+    "Ethos Lead": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Ethos Lead",
+      "gainsDb": [
+        -12,
+        -5.5,
+        4.7,
+        -5,
+        -4.5
+      ],
+      "flags": [
+        "tilt 16.7 dB"
+      ],
+      "at": "2026-09-29T14:08:04.184Z"
+    },
+    "Princeton Clean": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Princeton Clean",
+      "gainsDb": [
+        -22.8,
+        -19.6,
+        3.4,
+        -16.3,
+        -27.1
+      ],
+      "flags": [
+        "tilt 30.6 dB"
+      ],
+      "at": "2026-09-29T14:08:22.665Z"
+    },
+    "Dumble High Gain": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Dumble High Gain",
+      "gainsDb": [
+        -15.6,
+        -15.2,
+        -14.5,
+        -21.8,
+        -31
+      ],
+      "flags": [
+        "tilt 16.5 dB"
+      ],
+      "at": "2026-09-29T14:08:41.042Z"
+    },
+    "Blackstar HT40 Gain": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Blackstar HT40 Gain",
+      "gainsDb": [
+        -0.1,
+        -0.5,
+        -0.9,
+        0.2,
+        -0.4
+      ],
+      "flags": [],
+      "at": "2026-09-29T14:08:59.411Z"
+    },
+    "BadCat 50": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "BadCat 50",
+      "gainsDb": [
+        -16.2,
+        -18.9,
+        2.8,
+        -17.8,
+        -18
+      ],
+      "flags": [
+        "tilt 21.7 dB"
+      ],
+      "at": "2026-09-29T14:09:17.840Z"
+    },
+    "ShiftTwin Clean": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "ShiftTwin Clean",
+      "gainsDb": [
+        -25.2,
+        -31.9,
+        -13.1,
+        0.6,
+        -5.8
+      ],
+      "flags": [
+        "tilt 32.5 dB"
+      ],
+      "at": "2026-09-29T14:09:36.293Z"
+    },
+    "Sovtek 50 Med": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Sovtek 50 Med",
+      "gainsDb": [
+        -19.2,
+        -12.2,
+        -3.1,
+        -0.6,
+        -4.4
+      ],
+      "flags": [
+        "tilt 18.6 dB"
+      ],
+      "at": "2026-09-29T14:09:54.638Z"
+    },
+    "ShiftTwin Stampede": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "ShiftTwin Stampede",
+      "gainsDb": [
+        -17.1,
+        -21.9,
+        1.2,
+        -7.6,
+        -12.7
+      ],
+      "flags": [
+        "tilt 23.1 dB"
+      ],
+      "at": "2026-09-29T14:10:12.953Z"
+    },
+    "Sovtek + DOD": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Sovtek + DOD",
+      "gainsDb": [
+        -13.5,
+        -5.1,
+        2.5,
+        -10.1,
+        -20.5
+      ],
+      "flags": [
+        "tilt 23.1 dB"
+      ],
+      "at": "2026-09-29T14:10:31.266Z"
+    },
+    "ENGL E645 Clean": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "ENGL E645 Clean",
+      "gainsDb": [
+        -4.7,
+        -4.7,
+        -4.6,
+        -4.7,
+        -4.7
+      ],
+      "flags": [],
+      "at": "2026-09-29T14:10:49.590Z"
+    },
+    "Filmosound": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Filmosound",
+      "gainsDb": [
+        0.6,
+        0.5,
+        0.6,
+        0.5,
+        0.5
+      ],
+      "flags": [],
+      "at": "2026-09-29T14:11:07.902Z"
+    },
+    "ENGL E430 Clean": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "ENGL E430 Clean",
+      "gainsDb": [
+        10.9,
+        10.9,
+        10.9,
+        10.9,
+        10.9
+      ],
+      "flags": [
+        "boost 10.9 dB"
+      ],
+      "at": "2026-09-29T14:11:26.220Z"
+    },
+    "El Coyote Crunch": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "El Coyote Crunch",
+      "gainsDb": [
+        -15.4,
+        -18.5,
+        -2.4,
+        -2.1,
+        -14.6
+      ],
+      "flags": [
+        "tilt 16.4 dB"
+      ],
+      "at": "2026-09-29T14:11:44.540Z"
+    },
+    "Supro Bold": {
+      "type": "Neural",
+      "category": "neural",
+      "label": "Supro Bold",
+      "gainsDb": [
+        -5.6,
+        -8.1,
+        -4.8,
+        -6.3,
+        -5.9
+      ],
+      "flags": [],
+      "at": "2026-09-29T14:12:02.882Z"
+    },
+    "Moog Filter": {
+      "type": "MoogFilter",
+      "category": "wasm",
+      "label": "Moog Filter",
+      "gainsDb": [
+        2.1,
+        1.9,
+        -7.9,
+        -47.4,
+        -81
+      ],
+      "flags": [
+        "tilt 83.1 dB"
+      ],
+      "at": "2026-09-29T13:50:14.812Z"
+    },
+    "Vocoder": {
+      "type": "Vocoder",
+      "category": "wasm",
+      "label": "Vocoder",
+      "gainsDb": [
+        0.8,
+        11.5,
+        10.6,
+        0.8,
+        -3.5
+      ],
+      "flags": [
+        "boost 11.5 dB",
+        "tilt 15.0 dB"
+      ],
+      "at": "2026-09-29T13:50:28.644Z"
+    },
+    "Auto-Tune": {
+      "type": "AutoTune",
+      "category": "wasm",
+      "label": "Auto-Tune",
+      "gainsDb": [
+        -0.4,
+        -1,
+        0.6,
+        0.8,
+        -1.1
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:13:07.508Z"
+    },
+    "MVerb Plate": {
+      "type": "MVerb",
+      "category": "wasm",
+      "label": "MVerb Plate",
+      "gainsDb": [
+        3.4,
+        -3.5,
+        -0.3,
+        -4.8,
+        -11.7
+      ],
+      "flags": [
+        "tilt 15.1 dB"
+      ],
+      "at": "2026-09-29T13:50:42.481Z"
+    },
+    "Mad Professor Plate": {
+      "type": "MadProfessorPlate",
+      "category": "wasm",
+      "label": "Mad Professor Plate",
+      "gainsDb": [
+        -20.3,
+        -4.5,
+        3.8,
+        -0.4,
+        -15.3
+      ],
+      "flags": [
+        "tilt 24.1 dB"
+      ],
+      "at": "2026-09-29T13:50:56.321Z"
+    },
+    "Dattorro Plate": {
+      "type": "DattorroPlate",
+      "category": "wasm",
+      "label": "Dattorro Plate",
+      "gainsDb": [
+        -0.3,
+        9.9,
+        0.3,
+        -0.7,
+        -1.8
+      ],
+      "flags": [
+        "boost 9.9 dB",
+        "tilt 11.7 dB"
+      ],
+      "at": "2026-09-29T13:51:10.162Z"
+    },
+    "Leslie Speaker": {
+      "type": "Leslie",
+      "category": "wasm",
+      "label": "Leslie Speaker",
+      "gainsDb": [
+        -9.4,
+        -9.6,
+        -8.6,
+        -12.6,
+        -13.7
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:14:02.939Z"
+    },
+    "Spring Reverb": {
+      "type": "SpringReverb",
+      "category": "wasm",
+      "label": "Spring Reverb",
+      "gainsDb": [
+        -7.2,
+        -9.1,
+        -4.3,
+        -5.8,
+        -17
+      ],
+      "flags": [
+        "tilt 12.8 dB"
+      ],
+      "at": "2026-09-29T13:51:23.995Z"
+    },
+    "Ælapse Tape+Springs": {
+      "type": "Aelapse",
+      "category": "wasm",
+      "label": "Ælapse Tape+Springs",
+      "gainsDb": [
+        -6.4,
+        -4.5,
+        -6.5,
+        -0.5,
+        -4.6
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:14:30.682Z"
+    },
+    "Vinyl Noise": {
+      "type": "VinylNoise",
+      "category": "wasm",
+      "label": "Vinyl Noise",
+      "gainsDb": [
+        -0.9,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:14:44.573Z"
+    },
+    "ToneArm": {
+      "type": "ToneArm",
+      "category": "wasm",
+      "label": "ToneArm",
+      "gainsDb": [
+        -0.5,
+        -0.8,
+        0.6,
+        3.6,
+        4.5
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:51:37.839Z"
+    },
+    "Tumult": {
+      "type": "Tumult",
+      "category": "wasm",
+      "label": "Tumult",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:15:12.292Z"
+    },
+    "Tape Simulator": {
+      "type": "TapeSimulator",
+      "category": "wasm",
+      "label": "Tape Simulator",
+      "gainsDb": [
+        3,
+        3.8,
+        2.2,
+        0.3,
+        -5.7
+      ],
+      "flags": [
+        "tilt 9.5 dB"
+      ],
+      "at": "2026-09-29T13:51:51.694Z"
+    },
+    "Masha Beat Stutter": {
+      "type": "Masha",
+      "category": "wasm",
+      "label": "Masha Beat Stutter",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:15:40.019Z"
+    },
+    "Artistic Delay": {
+      "type": "ArtisticDelay",
+      "category": "wasm",
+      "label": "Artistic Delay",
+      "gainsDb": [
+        -6.1,
+        -3.4,
+        0.5,
+        0.4,
+        0.1
+      ],
+      "flags": [
+        "tilt 6.7 dB"
+      ],
+      "at": "2026-09-29T13:52:05.540Z"
+    },
+    "Della Delay": {
+      "type": "Della",
+      "category": "wasm",
+      "label": "Della Delay",
+      "gainsDb": [
+        0.5,
+        0.3,
+        0.3,
+        0.4,
+        0.4
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:16:07.713Z"
+    },
+    "Reverse Delay": {
+      "type": "ReverseDelay",
+      "category": "wasm",
+      "label": "Reverse Delay",
+      "gainsDb": [
+        1.9,
+        2.3,
+        1.4,
+        -3.7,
+        0.5
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:52:19.369Z"
+    },
+    "Slapback Delay": {
+      "type": "SlapbackDelay",
+      "category": "wasm",
+      "label": "Slapback Delay",
+      "gainsDb": [
+        -6.4,
+        5.2,
+        5.1,
+        5,
+        4.8
+      ],
+      "flags": [
+        "tilt 11.5 dB"
+      ],
+      "at": "2026-09-29T13:52:33.231Z"
+    },
+    "Vintage Delay": {
+      "type": "VintageDelay",
+      "category": "wasm",
+      "label": "Vintage Delay",
+      "gainsDb": [
+        1,
+        0.9,
+        0.7,
+        -0.5,
+        -1
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:16:49.217Z"
+    },
+    "ZAM Delay": {
+      "type": "ZamDelay",
+      "category": "wasm",
+      "label": "ZAM Delay",
+      "gainsDb": [
+        -0.3,
+        0.4,
+        0.4,
+        0.3,
+        -0.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:17:03.185Z"
+    },
+    "Tape Delay": {
+      "type": "TapeDelay",
+      "category": "wasm",
+      "label": "Tape Delay",
+      "gainsDb": [
+        7.4,
+        7.3,
+        7.2,
+        6.6,
+        6.3
+      ],
+      "flags": [
+        "boost 7.4 dB"
+      ],
+      "at": "2026-09-29T13:52:47.076Z"
+    },
+    "Auto Saturator": {
+      "type": "AutoSat",
+      "category": "wasm",
+      "label": "Auto Saturator",
+      "gainsDb": [
+        0.4,
+        0.3,
+        0.3,
+        0.3,
+        0.3
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:17:30.877Z"
+    },
+    "Cabinet Simulator": {
+      "type": "CabinetSim",
+      "category": "wasm",
+      "label": "Cabinet Simulator",
+      "gainsDb": [
+        -3,
+        4.8,
+        4.6,
+        4,
+        -19.5
+      ],
+      "flags": [
+        "tilt 24.3 dB"
+      ],
+      "at": "2026-09-29T13:53:00.915Z"
+    },
+    "Distortion Shaper": {
+      "type": "DistortionShaper",
+      "category": "wasm",
+      "label": "Distortion Shaper",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        -0.2,
+        -1
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:17:58.581Z"
+    },
+    "Driva": {
+      "type": "Driva",
+      "category": "wasm",
+      "label": "Driva",
+      "gainsDb": [
+        9.3,
+        9.9,
+        9.9,
+        8.7,
+        5.7
+      ],
+      "flags": [
+        "boost 9.9 dB"
+      ],
+      "at": "2026-09-29T13:53:14.739Z"
+    },
+    "Overdrive": {
+      "type": "Overdrive",
+      "category": "wasm",
+      "label": "Overdrive",
+      "gainsDb": [
+        8.3,
+        8.3,
+        8.1,
+        6.8,
+        3.5
+      ],
+      "flags": [
+        "boost 8.3 dB"
+      ],
+      "at": "2026-09-29T13:53:28.586Z"
+    },
+    "Satma": {
+      "type": "Satma",
+      "category": "wasm",
+      "label": "Satma",
+      "gainsDb": [
+        7.5,
+        7.3,
+        7.3,
+        5.6,
+        7.2
+      ],
+      "flags": [
+        "boost 7.5 dB"
+      ],
+      "at": "2026-09-29T13:53:42.411Z"
+    },
+    "Saturator": {
+      "type": "Saturator",
+      "category": "wasm",
+      "label": "Saturator",
+      "gainsDb": [
+        5.3,
+        5.2,
+        5.2,
+        5,
+        4.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:18:54.024Z"
+    },
+    "Tube Amplifier": {
+      "type": "TubeAmp",
+      "category": "wasm",
+      "label": "Tube Amplifier",
+      "gainsDb": [
+        5.4,
+        5.4,
+        5.4,
+        5.3,
+        5.4
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:19:07.964Z"
+    },
+    "Swedish Chainsaw (Boss HM-2 + JCM800)": {
+      "type": "SwedishChainsaw",
+      "category": "wasm",
+      "label": "Swedish Chainsaw (Boss HM-2 + JCM800)",
+      "gainsDb": [
+        10.8,
+        7.9,
+        6.8,
+        7.9,
+        -6.2
+      ],
+      "flags": [
+        "boost 10.8 dB",
+        "tilt 17.0 dB"
+      ],
+      "at": "2026-09-29T13:53:56.240Z"
+    },
+    "Auto Gain Control": {
+      "type": "AGC",
+      "category": "wasm",
+      "label": "Auto Gain Control",
+      "gainsDb": [
+        8.4,
+        7.4,
+        7.3,
+        7.3,
+        7.3
+      ],
+      "flags": [
+        "boost 8.4 dB"
+      ],
+      "at": "2026-09-29T13:54:10.079Z"
+    },
+    "Beat Breather": {
+      "type": "BeatBreather",
+      "category": "wasm",
+      "label": "Beat Breather",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:19:49.614Z"
+    },
+    "Clipper": {
+      "type": "Clipper",
+      "category": "wasm",
+      "label": "Clipper",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:20:03.545Z"
+    },
+    "De-Esser": {
+      "type": "DeEsser",
+      "category": "wasm",
+      "label": "De-Esser",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:20:17.459Z"
+    },
+    "Ducka": {
+      "type": "Ducka",
+      "category": "wasm",
+      "label": "Ducka",
+      "gainsDb": [
+        0,
+        -0.1,
+        -0.1,
+        -0.1,
+        -0.1
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:20:31.467Z"
+    },
+    "Dynamics Processor": {
+      "type": "DynamicsProc",
+      "category": "wasm",
+      "label": "Dynamics Processor",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:20:45.510Z"
+    },
+    "Expander": {
+      "type": "Expander",
+      "category": "wasm",
+      "label": "Expander",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:20:59.394Z"
+    },
+    "GOTT Compressor": {
+      "type": "GOTTComp",
+      "category": "wasm",
+      "label": "GOTT Compressor",
+      "gainsDb": [
+        5.3,
+        5.1,
+        5.2,
+        5.1,
+        5.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:21:13.279Z"
+    },
+    "Limiter": {
+      "type": "Limiter",
+      "category": "wasm",
+      "label": "Limiter",
+      "gainsDb": [
+        -0.2,
+        -0.3,
+        -0.3,
+        -0.3,
+        -0.3
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:21:27.175Z"
+    },
+    "Maximizer": {
+      "type": "Maximizer",
+      "category": "wasm",
+      "label": "Maximizer",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:21:41.036Z"
+    },
+    "Mono Compressor": {
+      "type": "MonoComp",
+      "category": "wasm",
+      "label": "Mono Compressor",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:21:54.913Z"
+    },
+    "Multiband Clipper": {
+      "type": "MultibandClipper",
+      "category": "wasm",
+      "label": "Multiband Clipper",
+      "gainsDb": [
+        -0.1,
+        -0.4,
+        -0.2,
+        -0.2,
+        -0.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:22:08.780Z"
+    },
+    "Multiband Dynamics": {
+      "type": "MultibandDynamics",
+      "category": "wasm",
+      "label": "Multiband Dynamics",
+      "gainsDb": [
+        0.2,
+        0,
+        0.1,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:22:22.657Z"
+    },
+    "Multiband Expander": {
+      "type": "MultibandExpander",
+      "category": "wasm",
+      "label": "Multiband Expander",
+      "gainsDb": [
+        0.2,
+        0,
+        0.2,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:22:36.497Z"
+    },
+    "Multiband Gate": {
+      "type": "MultibandGate",
+      "category": "wasm",
+      "label": "Multiband Gate",
+      "gainsDb": [
+        1.1,
+        1.1,
+        1,
+        1.1,
+        1.1
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:22:50.338Z"
+    },
+    "Multiband Limiter": {
+      "type": "MultibandLimiter",
+      "category": "wasm",
+      "label": "Multiband Limiter",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:23:04.173Z"
+    },
+    "Noise Gate": {
+      "type": "NoiseGate",
+      "category": "wasm",
+      "label": "Noise Gate",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:23:18.003Z"
+    },
+    "Panda Comp/Expand": {
+      "type": "Panda",
+      "category": "wasm",
+      "label": "Panda Comp/Expand",
+      "gainsDb": [
+        0.5,
+        0.4,
+        0.4,
+        0.3,
+        0.4
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:23:31.853Z"
+    },
+    "Sidechain Gate": {
+      "type": "SidechainGate",
+      "category": "wasm",
+      "label": "Sidechain Gate",
+      "gainsDb": [
+        0.2,
+        0,
+        -58.2,
+        -159,
+        -159
+      ],
+      "flags": [
+        "tilt 159.2 dB"
+      ],
+      "at": "2026-09-29T13:54:24.153Z"
+    },
+    "Sidechain Limiter": {
+      "type": "SidechainLimiter",
+      "category": "wasm",
+      "label": "Sidechain Limiter",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:23:59.637Z"
+    },
+    "Transient Designer": {
+      "type": "TransientDesigner",
+      "category": "wasm",
+      "label": "Transient Designer",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:24:13.517Z"
+    },
+    "X42 Compressor": {
+      "type": "X42Comp",
+      "category": "wasm",
+      "label": "X42 Compressor",
+      "gainsDb": [
+        0.7,
+        0.8,
+        0.9,
+        0.9,
+        0.9
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:24:27.423Z"
+    },
+    "Parametric EQ (Fil4)": {
+      "type": "Fil4EQ",
+      "category": "wasm",
+      "label": "Parametric EQ (Fil4)",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:24:41.312Z"
+    },
+    "Parametric EQ": {
+      "type": "ParametricEQ",
+      "category": "wasm",
+      "label": "Parametric EQ",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:24:55.163Z"
+    },
+    "5-Band EQ": {
+      "type": "EQ5Band",
+      "category": "wasm",
+      "label": "5-Band EQ",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:25:09.034Z"
+    },
+    "8-Band EQ": {
+      "type": "EQ8Band",
+      "category": "wasm",
+      "label": "8-Band EQ",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:25:22.866Z"
+    },
+    "12-Band EQ": {
+      "type": "EQ12Band",
+      "category": "wasm",
+      "label": "12-Band EQ",
+      "gainsDb": [
+        -0.2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:25:36.716Z"
+    },
+    "31-Band Graphic EQ": {
+      "type": "GEQ31",
+      "category": "wasm",
+      "label": "31-Band Graphic EQ",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:25:50.596Z"
+    },
+    "Dynamic EQ": {
+      "type": "DynamicEQ",
+      "category": "wasm",
+      "label": "Dynamic EQ",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:26:04.458Z"
+    },
+    "Resonance Tamer": {
+      "type": "ResonanceTamer",
+      "category": "wasm",
+      "label": "Resonance Tamer",
+      "gainsDb": [
+        0,
+        -0.1,
+        -0.1,
+        -0.2,
+        -0.1
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:26:18.315Z"
+    },
+    "Kuiza EQ": {
+      "type": "Kuiza",
+      "category": "wasm",
+      "label": "Kuiza EQ",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:26:32.283Z"
+    },
+    "ZAM EQ2": {
+      "type": "ZamEQ2",
+      "category": "wasm",
+      "label": "ZAM EQ2",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:26:46.145Z"
+    },
+    "Bass Enhancer": {
+      "type": "BassEnhancer",
+      "category": "wasm",
+      "label": "Bass Enhancer",
+      "gainsDb": [
+        1.5,
+        0.1,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:27:00.005Z"
+    },
+    "Phono Filter (RIAA)": {
+      "type": "PhonoFilter",
+      "category": "wasm",
+      "label": "Phono Filter (RIAA)",
+      "gainsDb": [
+        10.2,
+        2.3,
+        -4.1,
+        -12.3,
+        -16.8
+      ],
+      "flags": [
+        "boost 10.2 dB",
+        "tilt 27.0 dB"
+      ],
+      "at": "2026-09-29T13:54:37.980Z"
+    },
+    "Granular Freeze": {
+      "type": "GranularFreeze",
+      "category": "wasm",
+      "label": "Granular Freeze",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:27:27.920Z"
+    },
+    "Bitta Crusher": {
+      "type": "Bitta",
+      "category": "wasm",
+      "label": "Bitta Crusher",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:27:41.764Z"
+    },
+    "Vinyl Simulator": {
+      "type": "Vinyl",
+      "category": "wasm",
+      "label": "Vinyl Simulator",
+      "gainsDb": [
+        0.1,
+        0,
+        -0.1,
+        -1.3,
+        -4.7
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:27:55.593Z"
+    },
+    "Calf Phaser": {
+      "type": "CalfPhaser",
+      "category": "wasm",
+      "label": "Calf Phaser",
+      "gainsDb": [
+        2.3,
+        1.9,
+        -0.6,
+        -8.9,
+        -7.6
+      ],
+      "flags": [
+        "tilt 11.1 dB"
+      ],
+      "at": "2026-09-29T13:54:51.825Z"
+    },
+    "Flanger": {
+      "type": "Flanger",
+      "category": "wasm",
+      "label": "Flanger",
+      "gainsDb": [
+        -0.6,
+        -0.3,
+        -4,
+        -1.9,
+        -2.1
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:28:23.339Z"
+    },
+    "Juno-60 Chorus": {
+      "type": "JunoChorus",
+      "category": "wasm",
+      "label": "Juno-60 Chorus",
+      "gainsDb": [
+        1,
+        -8.9,
+        -3,
+        -3,
+        -3.1
+      ],
+      "flags": [
+        "tilt 9.9 dB"
+      ],
+      "at": "2026-09-29T13:55:05.679Z"
+    },
+    "Multi Chorus": {
+      "type": "MultiChorus",
+      "category": "wasm",
+      "label": "Multi Chorus",
+      "gainsDb": [
+        -7.4,
+        0.5,
+        -3.2,
+        -1.6,
+        -1.7
+      ],
+      "flags": [
+        "tilt 7.8 dB"
+      ],
+      "at": "2026-09-29T13:55:19.553Z"
+    },
+    "Pulsator": {
+      "type": "Pulsator",
+      "category": "wasm",
+      "label": "Pulsator",
+      "gainsDb": [
+        -1.4,
+        -1.5,
+        -1.5,
+        -1.5,
+        -1.5
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:29:04.900Z"
+    },
+    "Ring Modulator": {
+      "type": "RingMod",
+      "category": "wasm",
+      "label": "Ring Modulator",
+      "gainsDb": [
+        -2.1,
+        -2.2,
+        -2.2,
+        -2.2,
+        -2.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:29:18.754Z"
+    },
+    "Dragonfly Hall": {
+      "type": "DragonflyHall",
+      "category": "wasm",
+      "label": "Dragonfly Hall",
+      "gainsDb": [
+        8.4,
+        14.9,
+        16.8,
+        10.3,
+        16.8
+      ],
+      "flags": [
+        "boost 16.8 dB",
+        "tilt 8.4 dB"
+      ],
+      "at": "2026-09-29T13:55:33.459Z"
+    },
+    "Dragonfly Plate": {
+      "type": "DragonflyPlate",
+      "category": "wasm",
+      "label": "Dragonfly Plate",
+      "gainsDb": [
+        12.6,
+        9,
+        11.2,
+        19.4,
+        2.8
+      ],
+      "flags": [
+        "boost 19.4 dB",
+        "tilt 16.5 dB"
+      ],
+      "at": "2026-09-29T13:55:47.295Z"
+    },
+    "Dragonfly Room": {
+      "type": "DragonflyRoom",
+      "category": "wasm",
+      "label": "Dragonfly Room",
+      "gainsDb": [
+        20.4,
+        -4.4,
+        6.2,
+        9.4,
+        13.2
+      ],
+      "flags": [
+        "boost 20.4 dB",
+        "tilt 24.8 dB"
+      ],
+      "at": "2026-09-29T13:56:01.139Z"
+    },
+    "Early Reflections": {
+      "type": "EarlyReflections",
+      "category": "wasm",
+      "label": "Early Reflections",
+      "gainsDb": [
+        -4.8,
+        -2.4,
+        2.5,
+        2.2,
+        1.3
+      ],
+      "flags": [
+        "tilt 7.2 dB"
+      ],
+      "at": "2026-09-29T13:56:14.963Z"
+    },
+    "Roomy Reverb": {
+      "type": "Roomy",
+      "category": "wasm",
+      "label": "Roomy Reverb",
+      "gainsDb": [
+        -1.5,
+        -1.3,
+        -1.5,
+        -1,
+        -1.7
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:30:28.260Z"
+    },
+    "Shimmer Reverb": {
+      "type": "ShimmerReverb",
+      "category": "wasm",
+      "label": "Shimmer Reverb",
+      "gainsDb": [
+        -17.4,
+        -15.8,
+        -17.2,
+        -17.5,
+        -22.5
+      ],
+      "flags": [
+        "tilt 6.7 dB"
+      ],
+      "at": "2026-09-29T13:56:28.804Z"
+    },
+    "Binaural Panner": {
+      "type": "BinauralPanner",
+      "category": "wasm",
+      "label": "Binaural Panner",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        -0.2,
+        -0.9
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:30:56.032Z"
+    },
+    "Haas Stereo Enhancer": {
+      "type": "HaasEnhancer",
+      "category": "wasm",
+      "label": "Haas Stereo Enhancer",
+      "gainsDb": [
+        -5.2,
+        -93,
+        4.8,
+        4.8,
+        4.8
+      ],
+      "flags": [
+        "tilt 97.8 dB"
+      ],
+      "at": "2026-09-29T13:56:42.659Z"
+    },
+    "Multi Spread": {
+      "type": "MultiSpread",
+      "category": "wasm",
+      "label": "Multi Spread",
+      "gainsDb": [
+        0.6,
+        -1,
+        -2.4,
+        -0.1,
+        -3
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:31:23.941Z"
+    },
+    "Multiband Enhancer": {
+      "type": "MultibandEnhancer",
+      "category": "wasm",
+      "label": "Multiband Enhancer",
+      "gainsDb": [
+        1.3,
+        1.2,
+        1.2,
+        1.2,
+        1.2
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:31:38.044Z"
+    },
+    "Vihda Stereo": {
+      "type": "Vihda",
+      "category": "wasm",
+      "label": "Vihda Stereo",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:31:52.058Z"
+    },
+    "Arguru Distortion": {
+      "type": "ArguruDistortion",
+      "category": "wasm",
+      "label": "Arguru Distortion",
+      "gainsDb": [
+        -2.9,
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:32:05.957Z"
+    },
+    "Elak SVF Filter": {
+      "type": "ElakSVF",
+      "category": "wasm",
+      "label": "Elak SVF Filter",
+      "gainsDb": [
+        -2.9,
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:32:19.959Z"
+    },
+    "Elak Dist2": {
+      "type": "ElakDist2",
+      "category": "wasm",
+      "label": "Elak Dist2",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:32:33.861Z"
+    },
+    "Jeskola Distortion": {
+      "type": "JeskolaDistortion",
+      "category": "wasm",
+      "label": "Jeskola Distortion",
+      "gainsDb": [
+        0.1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:32:47.769Z"
+    },
+    "Geonik Overdrive": {
+      "type": "GeonikOverdrive",
+      "category": "wasm",
+      "label": "Geonik Overdrive",
+      "gainsDb": [
+        -2.9,
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:33:01.797Z"
+    },
+    "Graue SoftSat": {
+      "type": "GraueSoftSat",
+      "category": "wasm",
+      "label": "Graue SoftSat",
+      "gainsDb": [
+        0.2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:56:56.534Z"
+    },
+    "WhiteNoise StereoDist": {
+      "type": "WhiteNoiseStereoDist",
+      "category": "wasm",
+      "label": "WhiteNoise StereoDist",
+      "gainsDb": [
+        -2.9,
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "flags": [],
+      "at": "2026-09-29T12:33:29.536Z"
+    },
+    "CyanPhase Notch": {
+      "type": "CyanPhaseNotch",
+      "category": "wasm",
+      "label": "CyanPhase Notch",
+      "gainsDb": [
+        0.2,
+        0,
+        -0.1,
+        -0.1,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:57:10.390Z"
+    },
+    "Q Zfilter": {
+      "type": "QZfilter",
+      "category": "wasm",
+      "label": "Q Zfilter",
+      "gainsDb": [
+        -41.9,
+        -29.7,
+        -17.7,
+        -5.7,
+        1.7
+      ],
+      "flags": [
+        "tilt 43.6 dB"
+      ],
+      "at": "2026-09-29T13:57:24.223Z"
+    },
+    "FSM Philta": {
+      "type": "FSMPhilta",
+      "category": "wasm",
+      "label": "FSM Philta",
+      "gainsDb": [
+        -5.8,
+        -5.3,
+        8,
+        -48.6,
+        -85.1
+      ],
+      "flags": [
+        "boost 8.0 dB",
+        "tilt 93.1 dB"
+      ],
+      "at": "2026-09-29T13:57:38.066Z"
+    },
+    "Jeskola Delay": {
+      "type": "JeskolaDelay",
+      "category": "wasm",
+      "label": "Jeskola Delay",
+      "gainsDb": [
+        -2.4,
+        -1.1,
+        4.4,
+        4.4,
+        4.4
+      ],
+      "flags": [
+        "tilt 6.9 dB"
+      ],
+      "at": "2026-09-29T13:57:51.921Z"
+    },
+    "Jeskola CrossDelay": {
+      "type": "JeskolaCrossDelay",
+      "category": "wasm",
+      "label": "Jeskola CrossDelay",
+      "gainsDb": [
+        -2.4,
+        -1.1,
+        4.4,
+        4.4,
+        4.4
+      ],
+      "flags": [
+        "tilt 6.9 dB"
+      ],
+      "at": "2026-09-29T13:58:05.789Z"
+    },
+    "Jeskola Freeverb": {
+      "type": "JeskolaFreeverb",
+      "category": "wasm",
+      "label": "Jeskola Freeverb",
+      "gainsDb": [
+        10.5,
+        21.5,
+        23.1,
+        26.4,
+        26.3
+      ],
+      "flags": [
+        "boost 26.4 dB",
+        "tilt 15.9 dB"
+      ],
+      "at": "2026-09-29T13:58:19.649Z"
+    },
+    "FSM PanzerDelay": {
+      "type": "FSMPanzerDelay",
+      "category": "wasm",
+      "label": "FSM PanzerDelay",
+      "gainsDb": [
+        -49.3,
+        0.9,
+        7.9,
+        7.9,
+        7.9
+      ],
+      "flags": [
+        "boost 7.9 dB",
+        "tilt 57.2 dB"
+      ],
+      "at": "2026-09-29T13:58:33.496Z"
+    },
+    "FSM Chorus": {
+      "type": "FSMChorus",
+      "category": "wasm",
+      "label": "FSM Chorus",
+      "gainsDb": [
+        4.1,
+        3.1,
+        3.6,
+        3.4,
+        3.4
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:58:47.337Z"
+    },
+    "FSM Chorus2": {
+      "type": "FSMChorus2",
+      "category": "wasm",
+      "label": "FSM Chorus2",
+      "gainsDb": [
+        -7.2,
+        -3.5,
+        -9.7,
+        -8.2,
+        -7.2
+      ],
+      "flags": [
+        "tilt 6.2 dB"
+      ],
+      "at": "2026-09-29T13:59:01.205Z"
+    },
+    "WhiteNoise WhiteChorus": {
+      "type": "WhiteNoiseWhiteChorus",
+      "category": "wasm",
+      "label": "WhiteNoise WhiteChorus",
+      "gainsDb": [
+        1.8,
+        -1.7,
+        -5.5,
+        -7.2,
+        -6.1
+      ],
+      "flags": [
+        "tilt 9.0 dB"
+      ],
+      "at": "2026-09-29T13:59:15.139Z"
+    },
+    "Bigyo FrequencyShifter": {
+      "type": "BigyoFrequencyShifter",
+      "category": "wasm",
+      "label": "Bigyo FrequencyShifter",
+      "gainsDb": [
+        0.2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:59:29.039Z"
+    },
+    "Geonik Compressor": {
+      "type": "GeonikCompressor",
+      "category": "wasm",
+      "label": "Geonik Compressor",
+      "gainsDb": [
+        3.2,
+        3,
+        3,
+        3,
+        3
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:59:42.934Z"
+    },
+    "Ld SLimit": {
+      "type": "LdSLimit",
+      "category": "wasm",
+      "label": "Ld SLimit",
+      "gainsDb": [
+        0.2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T13:59:56.828Z"
+    },
+    "Oomek Exciter": {
+      "type": "OomekExciter",
+      "category": "wasm",
+      "label": "Oomek Exciter",
+      "gainsDb": [
+        0.2,
+        -0.2,
+        -2,
+        5.3,
+        9.1
+      ],
+      "flags": [
+        "boost 9.1 dB",
+        "tilt 11.1 dB"
+      ],
+      "at": "2026-09-29T14:00:10.816Z"
+    },
+    "DedaCode StereoGain": {
+      "type": "DedaCodeStereoGain",
+      "category": "wasm",
+      "label": "DedaCode StereoGain",
+      "gainsDb": [
+        0.2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "flags": [],
+      "at": "2026-09-29T14:00:24.706Z"
+    }
+  },
+  "broadband": {
+    "baseline": {
+      "rms": 0.029528,
+      "bands": {
+        "63": -49.2,
+        "125": -48.4,
+        "250": -44.5,
+        "500": -51.1,
+        "1000": -51.3,
+        "2000": -45.8,
+        "4000": -50.9,
+        "8000": -52.8,
+        "16000": -50.2
+      }
+    },
+    "results": {
+      "Reverb": {
+        "type": "Reverb",
+        "category": "tonejs",
+        "label": "Reverb",
+        "levelDb": -7.2,
+        "bandsDb": {
+          "63": -7.4,
+          "125": -8.5,
+          "250": -9.2,
+          "500": -10.9,
+          "1000": -11.7,
+          "2000": -4.8,
+          "4000": -4.8,
+          "8000": -6.7,
+          "16000": -6.9
+        },
+        "flags": [
+          "level -7.2 dB"
+        ],
+        "at": "2026-09-29T14:12:50.217Z"
+      },
+      "JC Reverb": {
+        "type": "JCReverb",
+        "category": "tonejs",
+        "label": "JC Reverb",
+        "levelDb": -2.3,
+        "bandsDb": {
+          "63": -6.6,
+          "125": -1,
+          "250": -3.1,
+          "500": -5.6,
+          "1000": -2,
+          "2000": 0.2,
+          "4000": -2.8,
+          "8000": -2.1,
+          "16000": -3.8
+        },
+        "flags": [],
+        "at": "2026-09-29T14:12:57.581Z"
+      },
+      "Ping Pong Delay": {
+        "type": "PingPongDelay",
+        "category": "tonejs",
+        "label": "Ping Pong Delay",
+        "levelDb": -0.1,
+        "bandsDb": {
+          "63": 0.6,
+          "125": -3.4,
+          "250": -12.8,
+          "500": -1.6,
+          "1000": -3.7,
+          "2000": 3.4,
+          "4000": 0.6,
+          "8000": 2,
+          "16000": 2
+        },
+        "flags": [
+          "band spread 16.2 dB"
+        ],
+        "at": "2026-09-29T14:13:04.917Z"
+      },
+      "Space Echo": {
+        "type": "SpaceEcho",
+        "category": "tonejs",
+        "label": "Space Echo",
+        "levelDb": -2.5,
+        "bandsDb": {
+          "63": 0.9,
+          "125": 2.1,
+          "250": -18.6,
+          "500": -5.1,
+          "1000": -1.2,
+          "2000": -8.9,
+          "4000": 0.5,
+          "8000": -1.4,
+          "16000": -2.7
+        },
+        "flags": [
+          "band spread 20.7 dB"
+        ],
+        "at": "2026-09-29T14:13:12.253Z"
+      },
+      "Spacey Delayer": {
+        "type": "SpaceyDelayer",
+        "category": "tonejs",
+        "label": "Spacey Delayer",
+        "levelDb": 8.7,
+        "bandsDb": {
+          "63": 10.4,
+          "125": 10.4,
+          "250": 0.8,
+          "500": 10.5,
+          "1000": 7.9,
+          "2000": 10,
+          "4000": 9.6,
+          "8000": 11.2,
+          "16000": 5.8
+        },
+        "flags": [
+          "level 8.7 dB",
+          "band spread 10.4 dB"
+        ],
+        "at": "2026-09-29T14:13:19.597Z"
+      },
+      "RE Tape Echo": {
+        "type": "RETapeEcho",
+        "category": "tonejs",
+        "label": "RE Tape Echo",
+        "levelDb": 5.5,
+        "bandsDb": {
+          "63": 4.1,
+          "125": 3.6,
+          "250": 5.7,
+          "500": 5,
+          "1000": 7.4,
+          "2000": 7.6,
+          "4000": 4.4,
+          "8000": 2.4,
+          "16000": 0
+        },
+        "flags": [],
+        "at": "2026-09-29T14:13:26.940Z"
+      },
+      "RE-201 Space Echo": {
+        "type": "RE201",
+        "category": "tonejs",
+        "label": "RE-201 Space Echo",
+        "levelDb": 3.4,
+        "bandsDb": {
+          "63": -28.6,
+          "125": -22.7,
+          "250": -14,
+          "500": 1.7,
+          "1000": 4.2,
+          "2000": 5.8,
+          "4000": 11.8,
+          "8000": 6.9,
+          "16000": -1.4
+        },
+        "flags": [
+          "band spread 40.4 dB"
+        ],
+        "at": "2026-09-29T14:13:34.292Z"
+      },
+      "Another Delay": {
+        "type": "AnotherDelay",
+        "category": "tonejs",
+        "label": "Another Delay",
+        "levelDb": 8.9,
+        "bandsDb": {
+          "63": 0.7,
+          "125": 4.5,
+          "250": 7.9,
+          "500": 11.6,
+          "1000": 13.3,
+          "2000": 10.4,
+          "4000": 13.1,
+          "8000": 6.5,
+          "16000": -1.3
+        },
+        "flags": [
+          "level 8.9 dB",
+          "band spread 14.6 dB"
+        ],
+        "at": "2026-09-29T14:13:41.631Z"
+      },
+      "MVerb Plate": {
+        "type": "MVerb",
+        "category": "wasm",
+        "label": "MVerb Plate",
+        "levelDb": -2.7,
+        "bandsDb": {
+          "63": -0.9,
+          "125": 2.4,
+          "250": -2.6,
+          "500": -2.2,
+          "1000": -5.3,
+          "2000": -10.1,
+          "4000": -7.4,
+          "8000": -11,
+          "16000": -12
+        },
+        "flags": [
+          "band spread 14.4 dB"
+        ],
+        "at": "2026-09-29T14:13:48.973Z"
+      },
+      "Mad Professor Plate": {
+        "type": "MadProfessorPlate",
+        "category": "wasm",
+        "label": "Mad Professor Plate",
+        "levelDb": -6.4,
+        "bandsDb": {
+          "63": -16.3,
+          "125": -7.5,
+          "250": -4.3,
+          "500": -6.5,
+          "1000": -3.8,
+          "2000": -5.8,
+          "4000": -5.2,
+          "8000": -14.4,
+          "16000": -28.2
+        },
+        "flags": [
+          "level -6.4 dB",
+          "band spread 24.4 dB"
+        ],
+        "at": "2026-09-29T14:13:56.330Z"
+      },
+      "Dattorro Plate": {
+        "type": "DattorroPlate",
+        "category": "wasm",
+        "label": "Dattorro Plate",
+        "levelDb": 10.9,
+        "bandsDb": {
+          "63": 13,
+          "125": 9.3,
+          "250": 9.6,
+          "500": 19.8,
+          "1000": 6.9,
+          "2000": -0.2,
+          "4000": 3.8,
+          "8000": 0.5,
+          "16000": -2.5
+        },
+        "flags": [
+          "level 10.9 dB",
+          "band spread 22.3 dB"
+        ],
+        "at": "2026-09-29T14:14:03.675Z"
+      },
+      "Spring Reverb": {
+        "type": "SpringReverb",
+        "category": "wasm",
+        "label": "Spring Reverb",
+        "levelDb": -3.6,
+        "bandsDb": {
+          "63": -2.9,
+          "125": -12.1,
+          "250": -8.6,
+          "500": -6.4,
+          "1000": -4.4,
+          "2000": 0.8,
+          "4000": -6.5,
+          "8000": -6.8,
+          "16000": -6.3
+        },
+        "flags": [
+          "band spread 12.9 dB"
+        ],
+        "at": "2026-09-29T14:14:11.046Z"
+      },
+      "Ambient Delay": {
+        "type": "AmbientDelay",
+        "category": "tonejs",
+        "label": "Ambient Delay",
+        "levelDb": 3.4,
+        "bandsDb": {
+          "63": -0.8,
+          "125": 2.1,
+          "250": 4.5,
+          "500": 1.1,
+          "1000": 2.6,
+          "2000": 5.2,
+          "4000": 3.5,
+          "8000": 2.3,
+          "16000": 3.3
+        },
+        "flags": [],
+        "at": "2026-09-29T14:14:18.409Z"
+      },
+      "Artistic Delay": {
+        "type": "ArtisticDelay",
+        "category": "wasm",
+        "label": "Artistic Delay",
+        "levelDb": -2.2,
+        "bandsDb": {
+          "63": -0.8,
+          "125": -3.2,
+          "250": -3,
+          "500": 0.9,
+          "1000": -0.2,
+          "2000": -4.7,
+          "4000": -3.6,
+          "8000": -3.7,
+          "16000": -0.9
+        },
+        "flags": [],
+        "at": "2026-09-29T14:14:25.747Z"
+      },
+      "Reverse Delay": {
+        "type": "ReverseDelay",
+        "category": "wasm",
+        "label": "Reverse Delay",
+        "levelDb": 1.2,
+        "bandsDb": {
+          "63": 2.4,
+          "125": -0.6,
+          "250": 3,
+          "500": 4.5,
+          "1000": -1.4,
+          "2000": -6.9,
+          "4000": -0.9,
+          "8000": 1.1,
+          "16000": 0.8
+        },
+        "flags": [
+          "band spread 11.4 dB"
+        ],
+        "at": "2026-09-29T14:14:33.084Z"
+      },
+      "Slapback Delay": {
+        "type": "SlapbackDelay",
+        "category": "wasm",
+        "label": "Slapback Delay",
+        "levelDb": 4.4,
+        "bandsDb": {
+          "63": -1,
+          "125": 4.4,
+          "250": 5,
+          "500": 5.1,
+          "1000": 5.8,
+          "2000": 5.1,
+          "4000": 5.2,
+          "8000": 4.2,
+          "16000": 4.2
+        },
+        "flags": [],
+        "at": "2026-09-29T14:14:40.426Z"
+      },
+      "Tape Delay": {
+        "type": "TapeDelay",
+        "category": "wasm",
+        "label": "Tape Delay",
+        "levelDb": 7.1,
+        "bandsDb": {
+          "63": 7.3,
+          "125": 7.3,
+          "250": 7.3,
+          "500": 7.5,
+          "1000": 8,
+          "2000": 7.1,
+          "4000": 6.9,
+          "8000": 5.8,
+          "16000": 5.8
+        },
+        "flags": [
+          "level 7.1 dB"
+        ],
+        "at": "2026-09-29T14:14:47.762Z"
+      },
+      "Dragonfly Hall": {
+        "type": "DragonflyHall",
+        "category": "wasm",
+        "label": "Dragonfly Hall",
+        "levelDb": 19.2,
+        "bandsDb": {
+          "63": 16,
+          "125": 13.7,
+          "250": 18.3,
+          "500": 23.7,
+          "1000": 21,
+          "2000": 22.3,
+          "4000": 14.7,
+          "8000": 9.4,
+          "16000": 5.5
+        },
+        "flags": [
+          "level 19.2 dB",
+          "band spread 18.2 dB"
+        ],
+        "at": "2026-09-29T14:14:55.104Z"
+      },
+      "Dragonfly Plate": {
+        "type": "DragonflyPlate",
+        "category": "wasm",
+        "label": "Dragonfly Plate",
+        "levelDb": 13.8,
+        "bandsDb": {
+          "63": 20.4,
+          "125": 5.3,
+          "250": 9,
+          "500": 14.7,
+          "1000": 14.2,
+          "2000": 10,
+          "4000": 6.8,
+          "8000": 3.1,
+          "16000": 4.5
+        },
+        "flags": [
+          "level 13.8 dB",
+          "band spread 17.3 dB"
+        ],
+        "at": "2026-09-29T14:15:02.439Z"
+      },
+      "Dragonfly Room": {
+        "type": "DragonflyRoom",
+        "category": "wasm",
+        "label": "Dragonfly Room",
+        "levelDb": 18,
+        "bandsDb": {
+          "63": 24.3,
+          "125": 22,
+          "250": 4.3,
+          "500": -0.6,
+          "1000": 0.4,
+          "2000": 14,
+          "4000": 11.1,
+          "8000": 11.1,
+          "16000": 8.4
+        },
+        "flags": [
+          "level 18 dB",
+          "band spread 24.9 dB"
+        ],
+        "at": "2026-09-29T14:15:09.777Z"
+      },
+      "Early Reflections": {
+        "type": "EarlyReflections",
+        "category": "wasm",
+        "label": "Early Reflections",
+        "levelDb": -3.3,
+        "bandsDb": {
+          "63": -3.8,
+          "125": -2.3,
+          "250": -2.4,
+          "500": -1.2,
+          "1000": -2.8,
+          "2000": -10.5,
+          "4000": -6.7,
+          "8000": -3.7,
+          "16000": -0.2
+        },
+        "flags": [
+          "band spread 10.3 dB"
+        ],
+        "at": "2026-09-29T14:15:17.111Z"
+      },
+      "Shimmer Reverb": {
+        "type": "ShimmerReverb",
+        "category": "wasm",
+        "label": "Shimmer Reverb",
+        "levelDb": -15.6,
+        "bandsDb": {
+          "63": -16.5,
+          "125": -13.9,
+          "250": -15.7,
+          "500": -14.5,
+          "1000": -14.6,
+          "2000": -17.3,
+          "4000": -11.6,
+          "8000": -17.2,
+          "16000": -23.2
+        },
+        "flags": [
+          "level -15.6 dB",
+          "band spread 11.6 dB"
+        ],
+        "at": "2026-09-29T14:15:24.455Z"
+      },
+      "Jeskola Delay": {
+        "type": "JeskolaDelay",
+        "category": "wasm",
+        "label": "Jeskola Delay",
+        "levelDb": 0.5,
+        "bandsDb": {
+          "63": 1.8,
+          "125": -2,
+          "250": 1.1,
+          "500": 2.2,
+          "1000": 2.4,
+          "2000": -4,
+          "4000": -2.3,
+          "8000": 3.4,
+          "16000": 0.9
+        },
+        "flags": [],
+        "at": "2026-09-29T14:15:31.797Z"
+      },
+      "Jeskola Freeverb": {
+        "type": "JeskolaFreeverb",
+        "category": "wasm",
+        "label": "Jeskola Freeverb",
+        "levelDb": 11.1,
+        "bandsDb": {
+          "63": 5.1,
+          "125": -0.2,
+          "250": -0.8,
+          "500": 1,
+          "1000": 0.3,
+          "2000": 0,
+          "4000": 0.2,
+          "8000": -0.2,
+          "16000": -2
+        },
+        "flags": [
+          "level 11.1 dB"
+        ],
+        "at": "2026-09-29T14:15:39.134Z"
+      },
+      "FSM PanzerDelay": {
+        "type": "FSMPanzerDelay",
+        "category": "wasm",
+        "label": "FSM PanzerDelay",
+        "levelDb": 0.9,
+        "bandsDb": {
+          "63": 0.7,
+          "125": 0.7,
+          "250": -0.8,
+          "500": 4,
+          "1000": 4.6,
+          "2000": 2,
+          "4000": 1.5,
+          "8000": 3.4,
+          "16000": 0.5
+        },
+        "flags": [],
+        "at": "2026-09-29T14:15:46.466Z"
+      },
+      "Bi-Phase": {
+        "type": "BiPhase",
+        "category": "tonejs",
+        "label": "Bi-Phase",
+        "levelDb": 3.3,
+        "bandsDb": {
+          "63": 5,
+          "125": 4.8,
+          "250": 3.8,
+          "500": 1.6,
+          "1000": -0.6,
+          "2000": -1.2,
+          "4000": 3.1,
+          "8000": 4.9,
+          "16000": 4.9
+        },
+        "flags": [],
+        "at": "2026-09-29T14:15:53.805Z"
+      },
+      "Calf Phaser": {
+        "type": "CalfPhaser",
+        "category": "wasm",
+        "label": "Calf Phaser",
+        "levelDb": 0.2,
+        "bandsDb": {
+          "63": 2.1,
+          "125": 2,
+          "250": 1.7,
+          "500": 2.3,
+          "1000": -0.5,
+          "2000": -3.4,
+          "4000": -9.4,
+          "8000": -7.3,
+          "16000": -7.8
+        },
+        "flags": [
+          "band spread 11.7 dB"
+        ],
+        "at": "2026-09-29T14:16:01.141Z"
+      },
+      "Juno-60 Chorus": {
+        "type": "JunoChorus",
+        "category": "wasm",
+        "label": "Juno-60 Chorus",
+        "levelDb": -2.5,
+        "bandsDb": {
+          "63": 0.2,
+          "125": -0.8,
+          "250": -7.2,
+          "500": -1.8,
+          "1000": -2.6,
+          "2000": -2.7,
+          "4000": -2.7,
+          "8000": -0.2,
+          "16000": -3.6
+        },
+        "flags": [],
+        "at": "2026-09-29T14:16:08.482Z"
+      },
+      "Multi Chorus": {
+        "type": "MultiChorus",
+        "category": "wasm",
+        "label": "Multi Chorus",
+        "levelDb": -1.4,
+        "bandsDb": {
+          "63": -4.1,
+          "125": -0.1,
+          "250": 0.2,
+          "500": -1.8,
+          "1000": -1,
+          "2000": -2.7,
+          "4000": -1.7,
+          "8000": -2.2,
+          "16000": -2.2
+        },
+        "flags": [],
+        "at": "2026-09-29T14:16:15.819Z"
+      }
+    }
+  }
+}

@@ -1287,6 +1287,7 @@ function stopAllTestTones() {
 /**
  * Start/stop a test tone routed through the master effects chain.
  * mode='sine' (default): single sine wave
+ * mode='pink': pink noise (equal energy per octave) - for frequency responses
  * mode='rich': full-spectrum signal — sub bass (saw 55Hz), bass (saw 110Hz),
  *   mid (square 440Hz), upper-mid (triangle 1760Hz), presence (saw 3520Hz),
  *   plus white noise for transient/air content. Exercises EQ, compressors,
@@ -1363,6 +1364,19 @@ export function testTone(params: Record<string, unknown>): Record<string, unknow
     _richToneNodes.push(noise, noiseGain);
 
     return { status: 'playing', mode: 'rich', levelDb: level, durationMs, layers: layers.length + 1 };
+  }
+
+  if (mode === 'pink') {
+    // Pink noise: equal energy per octave and no steady tone for a delay or
+    // modulation effect to comb, so a band level is the effect's response
+    // (the rich tone's oscillators read as notches through every delay).
+    const mix = new Tone.Gain(masterGain);
+    mix.connect(engine.masterEffectsInput);
+    const noise = new Tone.Noise('pink');
+    noise.connect(mix);
+    noise.start();
+    _richToneNodes.push(mix, noise);
+    return { status: 'playing', mode: 'pink', levelDb: level, durationMs };
   }
 
   // Simple sine mode
