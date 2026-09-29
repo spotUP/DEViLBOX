@@ -130,7 +130,7 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 - [x] L4.1 [x] L4.2 [x] L4.3
 - [x] L5.1 [x] L5.2 [x] L5.3
 - [ ] L5.4 (usePatternPlayback builds on liveTrackerSong)
-- [ ] L6.1 [ ] L6.2 [ ] L6.3
+- [x] L6.1 [x] L6.2 [x] L6.3
 
 ## Owner questions
 
@@ -221,3 +221,10 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   on liveTrackerSong with its playback overrides (effective order/patterns).
   Playback core; needs an in-app pass across formats. Manual: export native
   after an edit WITHOUT playing - the edit must be in the file. 20 of 23.
+- L6.1-L6.3 done: singleLoadPath.contract.test.ts - song-replacing setters
+  (loadPatterns / loadInstruments / applyEditorMode / setOriginalModuleData)
+  only in applySong, their defining stores, and 7 named partial updates
+  (subsong switch, TFMX re-read, UADE read-backs, GoatTracker engine sync,
+  the loader's TD-3 / DB303 / GoatTracker); only snapshotSong reads native
+  engine data to save. Probed: a planted loadPatterns call fails it. All new
+  tests wired into test:ci. 22 of 23 - L5.4 open.
