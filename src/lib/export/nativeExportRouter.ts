@@ -204,63 +204,10 @@ async function exportCinterCrunchedFromStores(): Promise<RawExportResult | null>
  * jamcracker session, rebuild a minimal `TrackerSong` from the stores so the
  * dedicated serializers can run (parity with the former MCP-only reconstruction).
  */
+/** The current song, live from the stores (the one builder encoders use). */
 async function reconstructSongFromFormatStore(): Promise<TrackerSong | null> {
-  const { useFormatStore } = await import('@stores/useFormatStore');
-  const fmt = useFormatStore.getState();
-
-  // Magic-dispatched formats that never load into a replayer (e.g. MaxTrax — UADE can't play
-  // it) still hold their editable bytes in the store. Rebuild a minimal song carrying them so
-  // the magic exporters (isMaxTrax / isSynTracker) fire.
-  if ((fmt.uadeEditableFileData || fmt.maxTraxFileData) &&
-      !(fmt.editorMode === 'hively' || fmt.editorMode === 'klystrack' || fmt.editorMode === 'jamcracker')) {
-    const { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore } = await import('@stores');
-    const ts = useTrackerStore.getState();
-    return {
-      name: useProjectStore.getState().metadata?.name ?? 'Untitled',
-      format: 'MOD',
-      patterns: ts.patterns,
-      instruments: useInstrumentStore.getState().instruments,
-      songPositions: ts.patternOrder ?? ts.patterns.map((_: unknown, i: number) => i),
-      songLength: ts.patternOrder?.length ?? ts.patterns.length,
-      restartPosition: 0,
-      numChannels: ts.patterns[0]?.channels?.length ?? 4,
-      initialSpeed: useTransportStore.getState().speed ?? 6,
-      initialBPM: useTransportStore.getState().bpm ?? 125,
-      uadeEditableFileData: fmt.uadeEditableFileData ?? undefined,
-      uadeEditableFileName: fmt.uadeEditableFileName ?? undefined,
-      maxTraxFileData: fmt.maxTraxFileData ?? undefined,
-      maxTraxFileName: fmt.maxTraxFileName ?? undefined,
-    } as TrackerSong;
-  }
-
-  if (!(fmt.editorMode === 'hively' || fmt.editorMode === 'klystrack' || fmt.editorMode === 'jamcracker')) {
-    return null;
-  }
-  const { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore } = await import('@stores');
-  const trackerState = useTrackerStore.getState();
-  const transportState = useTransportStore.getState();
-  const metadata = useProjectStore.getState().metadata;
-  const format = (fmt.editorMode === 'hively' ? (fmt.hivelyMeta?.version === 0 ? 'AHX' : 'HVL')
-    : fmt.editorMode === 'klystrack' ? 'KT'
-      : 'JamCracker') as TrackerSong['format'];
-  return {
-    name: metadata?.name ?? 'Untitled',
-    format,
-    patterns: trackerState.patterns,
-    instruments: useInstrumentStore.getState().instruments,
-    songPositions: trackerState.patternOrder ?? trackerState.patterns.map((_: unknown, i: number) => i),
-    songLength: trackerState.patternOrder?.length ?? trackerState.patterns.length,
-    restartPosition: 0,
-    numChannels: trackerState.patterns[0]?.channels?.length ?? 4,
-    initialSpeed: transportState.speed ?? 6,
-    initialBPM: transportState.bpm ?? 125,
-    hivelyNative: fmt.hivelyNative ?? undefined,
-    hivelyFileData: fmt.hivelyFileData ?? undefined,
-    hivelyMeta: fmt.hivelyMeta ?? undefined,
-    klysNative: fmt.klysNative ?? undefined,
-    klysFileData: fmt.klysFileData ?? undefined,
-    jamCrackerFileData: fmt.jamCrackerFileData ?? undefined,
-  } as TrackerSong;
+  const { liveTrackerSong } = await import('@/lib/song/liveSong');
+  return liveTrackerSong();
 }
 
 // ── The dedicated-serializer dispatch (formerly duplicated in UI + MCP) ────────

@@ -2646,21 +2646,19 @@ export async function exportMod(params: Record<string, unknown>): Promise<Record
   try {
     const format = ((params.format as string) ?? 'mod') as 'mod' | 'xm' | 'it' | 's3m';
 
-    const trackerState = useTrackerStore.getState();
-    const instrumentState = useInstrumentStore.getState();
-    const transportState = (await import('../../stores/useTransportStore')).useTransportStore.getState();
-    const projectState = useProjectStore.getState();
-
+    // The current song as encoders take it (sample buffers intact).
+    const { liveTrackerSong } = await import('../../lib/song/liveSong');
+    const song = liveTrackerSong();
     const { exportWithOpenMPT } = await import('../../lib/export/OpenMPTExporter');
     const result = await exportWithOpenMPT(
-      trackerState.patterns,
-      instrumentState.instruments,
-      trackerState.patternOrder,
+      song.patterns,
+      song.instruments,
+      song.songPositions,
       {
         format,
-        moduleName: projectState.metadata?.name ?? 'Untitled',
-        initialBPM:   transportState.bpm,
-        initialSpeed: transportState.speed,
+        moduleName: song.name,
+        initialBPM:   song.initialBPM,
+        initialSpeed: song.initialSpeed,
       },
     );
 
@@ -2691,19 +2689,17 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
   try {
     // All dispatch (dedicated serializers + the layoutFormatId map + the chip-RAM
     // readback that captures live pattern edits + the raw fallback) lives in the
-    // shared router. Passing the replayer song lets the router use the full parsed
-    // data; when there's no song it reconstructs from the stores itself.
-    const { getTrackerReplayer } = await import('../../engine/TrackerReplayer');
-    const song = getTrackerReplayer().getSong();
-
+    // shared router, which takes the song live from the stores.
     const { useFormatStore } = await import('../../stores/useFormatStore');
     const fmt = useFormatStore.getState();
     const trackerState = useTrackerStore.getState();
 
-    if (!song && trackerState.patterns.length === 0) return { error: 'No song loaded' };
+    if (trackerState.patterns.length === 0) return { error: 'No song loaded' };
 
+    // The song from the stores (null): the replayer's copy is only rebuilt when
+    // playback starts, so an edit made since the last play was missing.
     const { exportNativeSong } = await import('../../lib/export/nativeExportRouter');
-    const result = await exportNativeSong(song, {});
+    const result = await exportNativeSong(null, {});
 
     if (!result) {
       return { error: `No native exporter available. editorMode="${fmt.editorMode}" hasUadeFileData=${!!fmt.uadeEditableFileData} uadeFileName="${fmt.uadeEditableFileName || ''}"` };
@@ -2727,7 +2723,7 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
 
     return {
       ok: true,
-      format: song?.format ?? fmt.editorMode,
+      format: trackerState.patterns[0]?.importMetadata?.sourceFormat ?? fmt.editorMode,
       filename: result.filename,
       sizeBytes: result.data.byteLength,
       warnings: result.warnings,
