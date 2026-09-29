@@ -214,3 +214,46 @@ above and the resolver reachability test.
 Manual, by the owner: labelling (P0.3). Then a listening pass with Auto Dub
 and Chip Metal on 3 songs of their choice after P1b, to check the targeted
 channels are the right ones.
+
+## Owner decisions (2026-09-29)
+
+- Q1: owner labels by ear, conversationally: the agent loads each song in the owner's tab, lists its current verdict per channel, the owner solos channels and replies with corrections only. Answers recorded in the corpus file as they arrive (resumable).
+- Q2: categories drums / bass / lead / harmony / fx-vocal, with skank and arpeggio as sub-labels - accepted.
+- Q3: per song first - accepted.
+
+## Draft corpus (owner may swap in favourites)
+
+| # | Format | Song | Source |
+|---|--------|------|--------|
+| 1 | MOD | micro15.mod (goto80) | src/__tests__/fixtures/micro15-goto80.mod |
+| 2 | MOD | world class dub.mod | public/data/songs/mod |
+| 3 | MOD | break the box.mod | public/data/songs/mod |
+| 4 | MOD | a sleep so deep.mod | public/data/songs/formats |
+| 5 | MOD | chuck rock - chuckrock.mod | public/data/songs/chiptracker |
+| 6 | MOD | the funny farm.mod | public/data/songs/his-masters-noise |
+| 7 | MOD | Virgill-redrum redrum.mod | public/data/songs/amigaklang |
+| 8 | MOD | space_debris.mod (Captain) | Modland pub/modules/Protracker/Captain |
+| 9 | XM | flo boarding - level 1.xm | public/data/songs/xm |
+| 10 | XM | space debris.xm (Candybag) | Modland |
+| 11 | XM | cranked & torn.xm (Jester's Mind) | Modland |
+| 12 | XM | human scheme.xm (Jester's Mind) | Modland |
+| 13 | XM | the jester race.xm (Betrayer) | Modland |
+| 14 | XM | crysalide.xm (Jester's Mind) | Modland |
+| 15 | S3M | andante.s3m | public/data/songs/s3m |
+| 16 | S3M | nightmare on acid.s3m | public/data/songs/formats |
+| 17 | S3M | a touch of spring.s3m (Purple Motion) | Modland |
+| 18 | S3M | alien incident - entity.s3m (Purple Motion) | Modland |
+| 19 | IT | absm chain mod.it | public/data/songs/it |
+| 20 | IT | dreaming in green.it (Necros) | Modland |
+| 21 | IT | orchard street.it (Necros) | Modland |
+| 22 | IT | dirty walk.it (Necros) | Modland |
+| 23 | AHX | amanda.ahx | public/data/songs/ahx |
+| 24 | AHX | aces_high.ahx | public/data/songs/formats |
+| 25 | HVL | hexplosion.hvl | public/data/songs/formats |
+| 26 | HVL | waiting for a message.hvl | public/data/songs/hivelytracker |
+| 27 | Furnace | one Genesis song | public/data/songs/furnace/genesis |
+| 28 | Furnace | one C64 song | public/data/songs/furnace/c64 |
+| 29 | SoundMon | nicktune1.bp | public/data/songs/bp-soundmon-2 |
+| 30 | MOD 8ch | follow me to hell.mod (Octalyser) | public/data/songs/octalyser |
+
+Modland files are downloaded once into src/__tests__/fixtures/classifier-corpus/ so the scored eval runs headless in CI.
