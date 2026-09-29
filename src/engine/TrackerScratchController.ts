@@ -23,7 +23,7 @@
 
 import * as Tone from 'tone';
 import { getTrackerReplayer, type TrackerReplayer } from './TrackerReplayer';
-import { DeckScratchBuffer } from './dj/DeckScratchBuffer';
+import { DeckScratchBuffer, TRACKER_SCRATCH_BUFFER_ID } from './dj/DeckScratchBuffer';
 import { getToneEngine } from './ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
 import { useUIStore } from '@/stores/useUIStore';
@@ -163,8 +163,9 @@ export class TrackerScratchController {
 
     console.log('[TrackerScratch] Initializing scratch buffer...');
     const ctx = Tone.getContext().rawContext as AudioContext;
-    // Use bufferId 0 (Deck A slot) — tracker scratch doesn't coexist with DJ mode
-    this.scratchBuffer = new DeckScratchBuffer(ctx, 0);
+    // Its own ring: DJ deck A's capture node lives on after a view switch, and
+    // two captures on one ring interleave into one tape.
+    this.scratchBuffer = new DeckScratchBuffer(ctx, TRACKER_SCRATCH_BUFFER_ID);
     await this.scratchBuffer.init();
 
     // Wire: tap ToneEngine buses into capture, and wire playback into masterInput

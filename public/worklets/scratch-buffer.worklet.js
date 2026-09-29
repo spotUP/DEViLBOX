@@ -34,16 +34,24 @@ const RATE_SMOOTH_SEC = 0.005;
  */
 const ZERO_FADE_SAMPLES = 48;
 
-// Module-level shared state (one AudioWorkletGlobalScope per context)
-const rings        = [];            // Float32Array per bufferId, lazy-initialized
-const writePoss    = [0, 0];        // Current write position per bufferId (mod bufLen)
-const totalWritten = [0, 0];        // Total frames ever written per bufferId (never wraps)
-const frozen       = [false, false]; // Per-buffer freeze state
+// Module-level shared state (one AudioWorkletGlobalScope per context), one
+// slot per bufferId: each DeckScratchBuffer owns its id (DJ decks A/B/C = 0/1/2,
+// tracker scratch = 3). Two capture nodes on one id interleave their blocks
+// into one tape, so ids must never be shared.
+const rings         = [];  // Float32Array per bufferId, lazy-initialized
+const writePoss     = [];  // Current write position per bufferId (mod bufLen)
+const totalWritten  = [];  // Total frames ever written per bufferId (never wraps)
+const frozen        = [];  // Per-buffer freeze state (scratch in progress)
+const sourceStopped = [];  // Per-buffer: the source is not playing, so its silence is not recorded
 
 function getOrCreateRing(bufferId, sr) {
   if (!rings[bufferId]) {
     const frames = Math.round(sr * BUFFER_SECONDS);
     rings[bufferId] = new Float32Array(frames * 2); // interleaved L/R
+    writePoss[bufferId] = 0;
+    totalWritten[bufferId] = 0;
+    frozen[bufferId] = false;
+    sourceStopped[bufferId] = false;
   }
   return rings[bufferId];
 }
@@ -88,6 +96,10 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
         frozen[this.bufferId] = true;
       } else if (d.type === 'unfreeze') {
         frozen[this.bufferId] = false;
+      } else if (d.type === 'sourceRunning') {
+        // A stopped deck's capture would otherwise fill the tape with silence
+        // and carry the write position (the needle) away from its last audio.
+        sourceStopped[this.bufferId] = !d.running;
       } else if (d.type === 'reset') {
         // Clear the ring buffer and reset counters — call when a new song starts
         // so scratch never plays back audio from a previous song.
@@ -106,7 +118,7 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
     const frames = (out[0] && out[0].length) ? out[0].length : 128;
     const ring   = this.ring;
     const bf     = this.bufferFrames;
-    const isFrozen = frozen[this.bufferId];
+    const isFrozen = frozen[this.bufferId] || sourceStopped[this.bufferId];
     let   wp     = writePoss[this.bufferId];
 
     let blockPeak = 0;
@@ -214,7 +226,11 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           break;
 
         case 'startFromWrite': {
-          // Position the read head at the MIDPOINT of all captured valid content.
+          // anchor 'write': start AT the write position — the needle. A DJ
+          // deck scratches backward from here while its forward motion comes
+          // from the deck's own source (DeckEngine._switchToBackward).
+          //
+          // anchor 'middle' (default): position the read head at the MIDPOINT of all captured valid content.
           // This gives equal forward and backward scratch range:
           //   - Rate +1.0: reads from midpoint → WP (forward through recent audio)
           //   - Rate -1.0: reads from midpoint → history (backward through older audio)
@@ -232,7 +248,7 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           // Half of valid content — symmetric range in both directions.
           const halfValid   = Math.floor(captured / 2);
           this.startPos     = wp;
-          this.readPosF     = (wp - halfValid + bufLen) % bufLen;
+          this.readPosF     = d.anchor === 'write' ? wp : (wp - halfValid + bufLen) % bufLen;
           this.targetRate   = d.rate ?? 0;
           this.smoothRate   = d.rate ?? 0;
           this.prevSign     = Math.sign(this.smoothRate);

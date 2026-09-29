@@ -9,7 +9,8 @@
  *   - No forward/backward path switching — rate sign determines direction
  *
  * Loads scratch-buffer.worklet.js (two processors sharing module-level ring buffers).
- * One instance per deck. bufferId 0 = Deck A, bufferId 1 = Deck B.
+ * One instance per deck, each with its own ring: bufferId 0/1/2 = Deck A/B/C,
+ * 3 = tracker scratch (TRACKER_SCRATCH_BUFFER_ID).
  *
  * Gain transitions use 3ms linearRamp for click-free on/off.
  */
@@ -19,6 +20,9 @@ import { getNativeAudioNode } from '@/utils/audio-context';
 
 /** Gain ramp time for click-free transitions (seconds) */
 const GAIN_RAMP_SEC = 0.003;
+
+/** Ring id of the tracker view's scratch buffer — never a DJ deck's (0..2). */
+export const TRACKER_SCRATCH_BUFFER_ID = 3;
 
 export class DeckScratchBuffer {
   private captureNode!: AudioWorkletNode;
@@ -141,6 +145,16 @@ export class DeckScratchBuffer {
     this.captureNode.port.postMessage({ type: 'unfreeze' });
   }
 
+  /**
+   * Whether the source is playing. While it is not, capture records nothing,
+   * so the write position stays at the last audio played — the needle — and a
+   * scratch on a stopped deck reads the track instead of silence.
+   */
+  setSourceRunning(running: boolean): void {
+    if (!this.initialized) return;
+    this.captureNode.port.postMessage({ type: 'sourceRunning', running });
+  }
+
   // ==========================================================================
   // UNIFIED SCRATCH API
   //
@@ -154,9 +168,13 @@ export class DeckScratchBuffer {
    * Begin scratch playback. Freezes capture, starts reading from near the
    * current write position with forward headroom.
    *
-   * @param rate Initial signed rate (+1.0 = normal speed forward)
+   * @param rate   Initial signed rate (+1.0 = normal speed forward)
+   * @param anchor 'middle' reads from the midpoint of the capture (forward and
+   *               backward range from the tape alone, TrackerScratchController);
+   *               'write' reads from the write position — the needle — for a
+   *               backward scratch whose forward motion comes from the source.
    */
-  startScratch(rate: number): void {
+  startScratch(rate: number, anchor: 'middle' | 'write' = 'middle'): void {
     if (!this.initialized) return;
     this.freezeCapture();
 
@@ -167,7 +185,7 @@ export class DeckScratchBuffer {
     this.playbackGain.gain.linearRampToValueAtTime(1, now + GAIN_RAMP_SEC);
 
     // Start from the current write position — worklet reads shared state directly
-    this.playbackNode.port.postMessage({ type: 'startFromWrite', rate });
+    this.playbackNode.port.postMessage({ type: 'startFromWrite', rate, anchor });
   }
 
   /**
@@ -239,8 +257,8 @@ export class DeckScratchBuffer {
 
   startScratchPlayback(rate: number): void { this.startScratch(rate); }
   stopScratchPlayback(): void { void this.stopScratch(); }
-  startReverseFromWritePos(rate: number): void { this.startScratch(-Math.abs(rate)); }
-  startReverse(rate: number): void { this.startScratch(-Math.abs(rate)); }
+  startReverseFromWritePos(rate: number): void { this.startScratch(-Math.abs(rate), 'write'); }
+  startReverse(rate: number): void { this.startScratch(-Math.abs(rate), 'write'); }
   setRate(rate: number): void { this.setScratchRate(rate); }
   stopReverse(): Promise<number> { return this.stopScratch(); }
 
