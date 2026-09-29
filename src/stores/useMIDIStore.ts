@@ -288,12 +288,13 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   // The BUS tab's own tone controls. They became routable on 2026-09-23 —
   // until then a controller could drive the echo and the spring but not the
   // tone, so these had no default CC either. 79-84 is the first free run.
-  { ccNumber: 79, parameter: 'dub.bassShelfGainDb',   min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 79, parameter: 'dub.masterBassDb',      min: 0, max: 1, curve: 'linear' },
   { ccNumber: 80, parameter: 'dub.midScoopGainDb',    min: 0, max: 1, curve: 'linear' },
   { ccNumber: 81, parameter: 'dub.stereoWidth',       min: 0, max: 1, curve: 'linear' },
   { ccNumber: 82, parameter: 'dub.sweepAmount',       min: 0, max: 1, curve: 'linear' },
   { ccNumber: 83, parameter: 'dub.sweepRateHz',       min: 0, max: 1, curve: 'linear' },
   { ccNumber: 84, parameter: 'dub.plateStageMix',     min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 85, parameter: 'dub.bassShelfGainDb',   min: 0, max: 1, curve: 'linear' },
 
   // Dub bus continuous params — min/max are documentary; the actual
   // normalisation is handled by DUB_BUS_PARAMS transforms in

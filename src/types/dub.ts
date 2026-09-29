@@ -114,13 +114,21 @@ export interface DubBusSettings {
   throwQuantize: 'off' | '1/16' | '1/8' | 'offbeat' | 'bar';
 
   // ─── Sound coloring (research doc 2026-04-20_dub-sound-coloring.md) ──────
-  // King Tubby bass shelf — resonant lowshelf at 90 Hz for the dub "weight."
-  // Gain in dB (negative = cut), Q around 0.7-1.0 for musical shelf.
+  // King Tubby bass shelf on the ECHO INPUT (what the echo and spring get) —
+  // resonant lowshelf for the tail's "weight." The whole mix's bass is
+  // `masterBassDb`. Gain in dB (negative = cut), Q around 0.7-1.0.
   // Default +3 dB to give the bus some inherent dub heft out of the box.
   bassShelfGainDb: number;
   bassShelfFreqHz: number;
   bassShelfQ: number;
-  /** Master-only bass enhancer (dB). Stacks on top of `bassShelfGainDb` for
+  /** The whole mix's bass (dB, -12..+12; 0 = unchanged): the deck's Master
+   *  BASS fader. Drives only the master insert's low end - shelf, low-band
+   *  drive and the trim that pays for it. `bassShelfGainDb` used to drive it
+   *  too, so the fader also re-voiced what went into the echo: "the bass
+   *  shelf knob makes a huge difference on reverb ... should it not just add
+   *  or remove bass?" (2026-09-30; the return moved ~6 dB over -6..+6). */
+  masterBassDb: number;
+  /** Master-only bass enhancer (dB). Stacks on top of `masterBassDb` for
    *  the master-insert dry path ONLY — does not affect the wet bus's
    *  feedback-loop bass shelf. Use this to add punch without triggering the
    *  feedback-runaway "BWOOOOOOOOO" that high `bassShelfGainDb` produces.
@@ -403,6 +411,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // control at its top, "everything gets muddled" (2026-09-22). At 60 Hz the
   // same bump sat under the programme and went unheard.
   bassShelfGainDb:  2,
+  masterBassDb:     0,
   bassShelfFreqHz:  150,
   bassShelfQ:       0.7,
   masterBassPunchDb: 0,

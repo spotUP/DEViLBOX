@@ -85,7 +85,7 @@ describe('encoders carry continuous parameters, pushes carry momentary ones', ()
   it('the top row is the bus tone and FX controls', () => {
     expect(Array.from({ length: 8 }, (_, i) => ccOf(10 + i)?.param)).toEqual([
       'dub.returnGain', 'dub.echoIntensity', 'dub.echoRateMs', 'dub.springWet',
-      'dub.bassShelfGainDb', 'dub.midScoopGainDb', 'dub.stereoWidth', 'dub.hpfCutoff',
+      'dub.masterBassDb', 'dub.midScoopGainDb', 'dub.stereoWidth', 'dub.hpfCutoff',
     ]);
   });
 

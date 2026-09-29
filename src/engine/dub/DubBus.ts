@@ -5211,7 +5211,9 @@ export class DubBus {
    */
   private _applyMasterTrim(m: DubBusSettings, now: number): void {
     const masterActive = this.enabled && this.masterInsertActive;
-    const safeBassGain = Math.max(-12, Math.min(12, m.bassShelfGainDb));
+    // The whole mix's bass is its own control (masterBassDb); the echo-input
+    // shelf (bassShelfGainDb) no longer moves it.
+    const safeBassGain = Math.max(-12, Math.min(12, m.masterBassDb ?? 0));
     // The ride spends the boost first; only what the boost could not pay
     // reaches the trim, so the rest of the mix stays where it was.
     const { costDb, rideRemainderDb } = this._resolveMasterLowEnd(safeBassGain, m);
@@ -5248,8 +5250,10 @@ export class DubBus {
     const m = settings ?? this.settings;
     const now = this.context.currentTime;
     // Same clamp the wet bus applies to its own shelf: the master low shelf
-    // tracks the BASS control, and the punch stage sits on top of it.
-    const safeBassGain = Math.max(-12, Math.min(12, m.bassShelfGainDb));
+    // tracks the Master BASS control (masterBassDb), the punch stage on top.
+    // The whole mix's bass is its own control (masterBassDb); the echo-input
+    // shelf (bassShelfGainDb) no longer moves it.
+    const safeBassGain = Math.max(-12, Math.min(12, m.masterBassDb ?? 0));
     const masterActive = this.enabled && this.masterInsertActive;
     // masterBassPunchDb is dry-path bass weight. The master path is OUTSIDE
     // the echo feedback loop, so it can be pushed far harder than the wet

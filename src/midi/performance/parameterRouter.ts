@@ -158,7 +158,8 @@ export const DUB_BUS_PARAMS: Record<string, DubBusParamDef> = {
   // controller could drive the echo and the spring but not the tone — and the
   // X-Touch's encoder row had nothing worth assigning past the seventh knob
   // (2026-09-23). Ranges match the faders in the deck's BUS tab.
-  'dub.bassShelfGainDb': { field: 'bassShelfGainDb', min: -12, max: 12,   label: 'Bass Shelf', unit: 'dB' },
+  'dub.bassShelfGainDb': { field: 'bassShelfGainDb', min: -12, max: 12,   label: 'Echo Bass Shelf', unit: 'dB' },
+  'dub.masterBassDb':    { field: 'masterBassDb',    min: -12, max: 12,   label: 'Master Bass', unit: 'dB' },
   'dub.midScoopGainDb':  { field: 'midScoopGainDb',  min: -12, max: 6,    label: 'Mid Scoop', unit: 'dB' },
   'dub.stereoWidth':     { field: 'stereoWidth',     min: 0,   max: 2,    label: 'Stereo Width' },
   'dub.sweepAmount':     { field: 'sweepAmount',     min: 0,   max: 1,    label: 'Sweep Amount' },

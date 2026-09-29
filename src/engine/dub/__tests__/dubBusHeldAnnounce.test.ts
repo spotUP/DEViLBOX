@@ -102,7 +102,7 @@ describe('only performed controls are wired to the live channel', () => {
     // builds its own parallel nodes instead of touching stereoWidth — so
     // animating them would invent motion the audio is not making.
     const strip = read('components/dub/DubDeckStrip.tsx');
-    expect(strip).toContain('value={dubBusSettings.bassShelfGainDb}');
+    expect(strip).toContain('value={dubBusSettings.masterBassDb ?? 0}');
     expect(strip).toContain('value={dubBusSettings.midScoopGainDb}');
     expect(strip).toContain('value={dubBusSettings.stereoWidth}');
     const bus = read('engine/dub/DubBus.ts');

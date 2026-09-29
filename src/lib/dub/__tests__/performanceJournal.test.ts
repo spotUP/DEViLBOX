@@ -173,18 +173,22 @@ describe('M1 persistence — additive in both directions', () => {
   const migrations = readFileSync(
     join(__dirname, '..', '..', 'persistence', 'migrations', 'index.ts'), 'utf8',
   );
+  // Saves are written by the one serializer and loads applied by the one
+  // apply (single load/save path, 2026-09-29) - that is where the journal is.
+  const snapshot = readFileSync(join(__dirname, '..', '..', 'song', 'snapshotSong.ts'), 'utf8');
+  const apply = readFileSync(join(__dirname, '..', '..', 'song', 'applySong.ts'), 'utf8');
 
   it('saves the journal beside the project, not inside the lanes', () => {
     expect(persistence).toContain('performanceJournal?: import(');
-    expect(persistence).toContain('performanceJournal: (() => {');
+    expect(snapshot).toContain('performanceJournal: (() => {');
   });
 
   it('does not write an empty journal into every project file', () => {
-    expect(persistence).toContain('journal.entries.length > 0 ? journal : undefined');
+    expect(snapshot).toContain('journal.entries.length > 0 ? journal : undefined');
   });
 
   it('restores through the forgiving parser, so bad notes cannot break a load', () => {
-    expect(persistence).toContain('loadPerformanceJournal(parseJournal(project.performanceJournal))');
+    expect(apply).toContain('loadPerformanceJournal(parseJournal(x.performanceJournal');
   });
 
   it('bumps the schema without raising the minimum loadable version', () => {

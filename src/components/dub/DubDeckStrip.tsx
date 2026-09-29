@@ -2418,11 +2418,11 @@ export const DubDeckStrip: React.FC = () => {
               <Fader
                 label="BASS" size="md" color="accent-primary"
                 min={-12} max={12}
-                value={dubBusSettings.bassShelfGainDb}
-                onChange={(v) => setDubBus({ bassShelfGainDb: Math.round(v * 2) / 2, characterPreset: 'custom' })}
+                value={dubBusSettings.masterBassDb ?? 0}
+                onChange={(v) => setDubBus({ masterBassDb: Math.round(v * 2) / 2 })}
                 formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`}
                 disabled={!busEnabled}
-                title={`Bass shelf at ${dubBusSettings.bassShelfFreqHz}Hz · classic Tubby bass lift`}
+                title={`Adds or removes bass on the whole mix (shelf at ${dubBusSettings.bassShelfFreqHz} Hz) - the echo's own bass is the bus panel's Bass Shelf`}
                 doubleClickValue={0}
               />
               <Fader
