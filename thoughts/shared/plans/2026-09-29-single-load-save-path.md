@@ -125,7 +125,7 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 
 - [x] L0.1 [x] L0.2 [ ] L0.3
 - [x] L1.1 [x] L1.2 [ ] L1.3
-- [x] L2.1 [ ] L2.2 [ ] L2.3
+- [x] L2.1 [x] L2.2 [ ] L2.3
 - [ ] L3.1 [ ] L3.2 [ ] L3.3 [ ] L3.4
 - [x] L4.1 [ ] L4.2 [ ] L4.3
 - [ ] L5.1 [ ] L5.2 [ ] L5.3
@@ -168,3 +168,13 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   .dbx never restored mixer or hybrid instruments; a revision never ran the
   schema migration it now runs when needed. applySavedProject is async now.
   Test savedProjectAfterAhx (fails on the old code: 'hively'). 6 of 22.
+- L2.2 done: loadSongFile's .dbx, MIDI and both SunVox branches -> applySong.
+  SunVox builds its instruments with the extracted pure buildInstrumentConfig
+  (was createInstrument into the store, then patterns by hand; the
+  mono-synth list is shared now instead of duplicated). The up-front reset
+  moved into the TD-3 branch, the one path left that manages the stores
+  itself (pattern import: replace or append - allowlist candidate for L6.1,
+  with GoatTracker, whose engine holds its own song). applySong now waits for
+  loadInstruments' queued store write before loading patterns (the MIDI
+  branch's setTimeout(0) workaround, made a guarantee for every load).
+  8 of 22.
