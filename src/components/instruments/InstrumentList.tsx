@@ -712,10 +712,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 {(() => {
                   const verdict = analysis?.instruments.get(instrument.id);
                   const label = ownerLabels?.[instrument.id];
-                  if (!verdict && !label) return null;
-                  const role = label?.role ?? verdict!.role;
+                  // Not played anywhere in the song: nothing to judge it by
+                  // but its sound - say so, and let the owner label it.
+                  const unused = !verdict && !label;
+                  if (unused && !analysis) return null;
+                  const role = label?.role ?? verdict?.role;
                   const part = label?.drumPart ?? verdict?.drumPart;
-                  const text = role === 'drums' && part && part !== 'mixed' ? part : role;
+                  const text = unused ? 'unused' : role === 'drums' && part && part !== 'mixed' ? part : role!;
                   const open = rolePickerFor === instrument.id;
                   const toggle = (e: React.MouseEvent) => { e.stopPropagation(); setRolePickerFor(open ? null : instrument.id); };
                   return (
@@ -726,11 +729,11 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                             ? 'bg-ft2-bg/20 text-ft2-bg border-ft2-bg/30'
                             : label
                               ? 'bg-accent-highlight/15 text-accent-highlight border-accent-highlight/40'
-                              : verdict && verdict.confidence < 0.6
+                              : unused || (verdict && verdict.confidence < 0.6)
                                 ? 'text-text-muted border-dark-borderLight'
                                 : 'bg-accent-success/10 text-accent-success border-accent-success/30'
                         }`}
-                        title={label ? 'Labelled by you — click to change' : `Analyzer ${Math.round((verdict?.confidence ?? 0) * 100)} % — click to hear and label`}
+                        title={label ? 'Labelled by you — click to change' : unused ? 'Not played in this song — click to hear and label' : `Analyzer ${Math.round((verdict?.confidence ?? 0) * 100)} % — click to hear and label`}
                         onClick={toggle}
                       >
                         {text.toUpperCase()}
