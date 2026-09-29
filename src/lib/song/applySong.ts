@@ -154,7 +154,7 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   }
 
   const tracker = useTrackerStore.getState();
-  useInstrumentStore.getState().loadInstruments(song.instruments, { skipPreload: true });
+  useInstrumentStore.getState().loadInstruments(song.instruments, { skipPreload: true, sourceSong: song.metadata.name });
   // loadInstruments writes the store in a queued microtask; patterns go in
   // after it, so nothing that reacts to new patterns (the playback effect)
   // sees the previous song's - or no - instruments.

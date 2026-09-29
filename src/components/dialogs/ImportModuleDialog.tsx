@@ -9,18 +9,15 @@ import { countCinterModInstruments } from '@engine/cinter4/cinter4Recognize';
 import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import {
-  loadModuleFile,
   getSupportedExtensions,
   isSupportedModule,
   type ModuleInfo,
 } from '@lib/import/ModuleLoader';
-import { isUADEFormat } from '@lib/import/formats/UADEParser';
-import { getNativeFormatMetadata, getNativeFormatExtendedMetadata } from '@lib/import/NativeFormatMetadata';
+import { prepareModuleImport, detectNativeFormat } from '@lib/import/prepareModuleImport';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
-import { detectFormat, type FormatDefinition } from '@lib/import/FormatRegistry';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@lib/songdb';
-import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
+import type { SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 import { SIDInfoPanel } from './SIDInfoPanel';
 import { getFormatCapabilities, type FormatCapabilityInfo } from '@lib/import/FormatCapabilities';
 import { Info } from 'lucide-react';
@@ -46,29 +43,6 @@ interface ImportModuleDialogProps {
   initialFile?: File | null; // Pre-loaded file (from drag-drop)
   companionFiles?: File[];    // Additional files for multi-file formats (e.g. SMUS instruments)
 }
-
-// ── Format detection (backed by FormatRegistry) ──────────────────────────────
-
-/** Detect a format with a native parser (non-libopenmpt, non-UADE-only). */
-function detectNativeFormat(filename: string): FormatDefinition | null {
-  const fmt = detectFormat(filename);
-  if (!fmt) return null;
-  // Only return formats that have native parsers or are furnace/chip-dump
-  if (fmt.nativeParser || fmt.family === 'furnace' || fmt.family === 'chip-dump' || fmt.family === 'c64-chip') return fmt;
-  return null;
-}
-
-/** Furnace / DefleMask — always use native parser, no libopenmpt or UADE option. */
-const isFurnaceFormat = (filename: string): boolean => {
-  const fmt = detectFormat(filename);
-  return fmt?.family === 'furnace';
-};
-
-/** Chip-dump formats with dedicated native parsers — no UADE mode selector needed. */
-const isChipDumpFormat = (filename: string): boolean => {
-  const fmt = detectFormat(filename);
-  return fmt?.family === 'chip-dump' || fmt?.family === 'c64-chip';
-};
 
 /**
  * For two-file Amiga formats, derive the expected companion filename from the main file.
@@ -166,17 +140,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     activeMainFileRef.current = file;
 
     const fname = file.name.toLowerCase();
-    const nativeFmtForFile = detectNativeFormat(fname);
-    const isFurnace = isFurnaceFormat(fname);
-    const isChipDumpFile = isChipDumpFormat(fname);
-    // isUADEFormat only checks file extensions — prefix-named formats like
-    // cust.songname / custom.songname are missed.  Also check the FormatRegistry
-    // which understands prefix matching (family 'uade-only' or uadeFallback
-    // without a native parser).
-    const fmtForFile = detectFormat(fname);
-    const isUADEByRegistry = !!fmtForFile && !fmtForFile.nativeParser &&
-      (fmtForFile.family === 'uade-only' || (fmtForFile.uadeFallback && !fmtForFile.nativeOnly));
-    const isUADEExclusive = !nativeFmtForFile && !isFurnace && !isChipDumpFile && (isUADEFormat(fname) || isUADEByRegistry);
 
     setIsLoading(true);
     setError(null);
@@ -192,159 +155,28 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     // Yield to React so the loading state renders before async work starts
     await new Promise(r => setTimeout(r, 10));
 
-    if (isUADEExclusive) {
-      // UADE-exclusive format: libopenmpt cannot parse it; use UADEEngine directly
-      try {
-        const buf = await file.arrayBuffer();
-        // Fire-and-forget songdb lookup (non-blocking)
-        lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo);
-
-        // Skip pre-scan for synthetic/compiled 68k formats — the enhanced scan
-        // corrupts UADE engine state, causing subsequent loads to fail.
-        // Initialize UADE engine with progress reporting
-        const { UADEEngine } = await import('@engine/uade/UADEEngine');
-        const engine = UADEEngine.getInstance();
-        const unsubProgress = engine.onInitProgress((progress, phase) => {
-          setUadeInitProgress(progress);
-          setUadeInitPhase(phase);
-        });
-        // First init or reinit after playback — progress bar shows during this
-        await engine.ready();
-        // Reinit if engine played a song before — this is the slow part (~50ms with pre-compiled module)
-        await engine.reinitIfNeeded();
-        unsubProgress();
-        setUadeInitProgress(100);
-
-        const isSynthFormat = /\.(sun|tsm)$/i.test(fname);
-        if (isSynthFormat) {
-          setModuleInfo({
-            metadata: {
-              title: fname.replace(/\.[^/.]+$/, ''),
-              type: 'SunTronic/TSM',
-              channels: 4,
-              patterns: 1,
-              orders: 1,
-              instruments: 0,
-              samples: 0,
-              duration: 0,
-            },
-            arrayBuffer: buf,
-            file,
-          });
-          uadeScanActiveRef.current = false;
-        } else {
-        uadeScanActiveRef.current = true;
-        // Register all companion files into UADE's virtual FS before loading the module
-        for (const companion of companions) {
-          const companionBuf = await companion.arrayBuffer();
-          const cfName = companionRelativeName(file, companion);
-          await engine.addCompanionFile(cfName, companionBuf);
-        }
-        // Enable CIA tick snapshot capture so pattern reconstruction works
-        // when parseUADEFile is called later with this preScannedMeta.
-        engine.enableTickSnapshots(true);
-        engine.resetTickSnapshots();
-        const uadeMeta = await engine.load(buf, file.name);
-        setUadeMetadata(uadeMeta);
-        // Create a minimal ModuleInfo so the Import button is enabled
-        setModuleInfo({
-          metadata: {
-            title: file.name.replace(/\.[^/.]+$/, ''),
-            type: uadeMeta.formatName || 'UADE',
-            channels: 4,
-            patterns: 1,
-            orders: uadeMeta.subsongCount,
-            instruments: 0,
-            samples: 0,
-            duration: 0,
-          },
-          arrayBuffer: buf,
-          file,
-        });
-        } // close else (non-synth format)
-      } catch (err) {
-        // Don't show "Scan cancelled" as an error — that's expected from handleClose
-        if (!(err instanceof Error && err.message === 'Scan cancelled')) {
-          setError(err instanceof Error ? err.message : 'Failed to load UADE format');
-        }
-      } finally {
-        uadeScanActiveRef.current = false;
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    // Native-parser formats + Furnace: skip libopenmpt (it can't parse these correctly).
-    // Create a minimal ModuleInfo so the Import button is enabled; the actual parsing
-    // happens via parseModuleToSong() in the handleModuleImport callback.
-    // Extract what header counts we can without running a full simulation.
-    if (nativeFmtForFile || isFurnace) {
-      try {
-        const buf = await file.arrayBuffer();
-        // Fire-and-forget songdb lookup (non-blocking)
-        lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo);
-
-        // SID-specific: extract header metadata (title, author, chip, subsongs)
-        const sidInfo = parseSIDHeader(new Uint8Array(buf));
-        if (sidInfo) {
-          setSidHeader(sidInfo);
-          setSelectedSubsong(sidInfo.defaultSubsong);
-        }
-
-        // Only call loadModuleFile for formats libopenmpt can handle
-        const canUseLibopenmpt = nativeFmtForFile?.nativeParser &&
-          (nativeFmtForFile.libopenmptFallback || nativeFmtForFile.libopenmptPlayable);
-        if (canUseLibopenmpt) {
-          const info = await loadModuleFile(file);
-          setModuleInfo(info);
-        } else {
-          // Furnace and other native formats without nativeParser - use header metadata only
-          const meta = nativeFmtForFile
-            ? getNativeFormatMetadata(nativeFmtForFile.key, buf)
-            : { channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1 };
-
-          // Extended metadata (title, composer, year) for formats that support it
-          const extMeta = nativeFmtForFile
-            ? getNativeFormatExtendedMetadata(nativeFmtForFile.key, buf)
-            : null;
-
-          // Build title: prefer extMeta title, then SID title, then filename
-          let displayTitle = sidInfo?.title || extMeta?.title || file.name.replace(/\.[^/.]+$/, '');
-          if (extMeta?.composer) displayTitle += ` — ${extMeta.composer}`;
-
-          setModuleInfo({
-            metadata: {
-              title: displayTitle,
-              type: isFurnace ? 'Furnace' : nativeFmtForFile!.label,
-              channels:    meta.channels,
-              patterns:    meta.patterns,
-              orders:      meta.orders,
-              instruments: meta.instruments,
-              samples:     meta.samples,
-              duration: 0,
-              message: extMeta?.year ? `Year: ${extMeta.year}` : undefined,
-            },
-            arrayBuffer: buf,
-            file,
-          });
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to read file');
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    // Standard path: libopenmpt (MOD, XM, IT, S3M, etc.)
     try {
-      // Fire-and-forget songdb lookup (non-blocking)
+      // Fire-and-forget songdb lookup (non-blocking, display only)
       file.arrayBuffer().then(buf => lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo));
-      const info = await loadModuleFile(file);
-      setModuleInfo(info);
+      // How the file is read for import is prepareModuleImport's - the same
+      // for this dialog and every dialog-free way in (importModuleFile).
+      const prepared = await prepareModuleImport(file, companions, {
+        onUadeProgress: (progress, phase) => { setUadeInitProgress(progress); setUadeInitPhase(phase); },
+        onUadeScanStart: () => { uadeScanActiveRef.current = true; },
+      });
+      if (prepared.uadeMetadata) setUadeMetadata(prepared.uadeMetadata);
+      if (prepared.sidInfo) {
+        setSidHeader(prepared.sidInfo);
+        setSelectedSubsong(prepared.sidInfo.defaultSubsong);
+      }
+      setModuleInfo(prepared.info);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load module');
+      // Don't show "Scan cancelled" as an error — that's expected from handleClose
+      if (!(err instanceof Error && err.message === 'Scan cancelled')) {
+        setError(err instanceof Error ? err.message : 'Failed to load module');
+      }
     } finally {
+      uadeScanActiveRef.current = false;
       setIsLoading(false);
     }
   }, []);

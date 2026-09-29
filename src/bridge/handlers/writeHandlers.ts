@@ -1092,108 +1092,15 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
       // unless explicitly disabled. The old code required useLibopenmpt=true which
       // the MCP load_modland/load_file callers never set, causing MODs to silently
       // fall through to parseModuleToSong which could fail.
-      const libopenmptExts = /\.(mod|xm|s3m|it|stm|669|far|ult|mtm|med|mmd[0-3]|okt|okta|gdm|psm|m15)$/i;
-      const canUseLibopenmpt = params.useLibopenmpt !== false && libopenmptExts.test(filename);
-
-      // Formats that loadModuleFile handles via its own native parser (useNativeParser):
-      // .fur, .dmf, .xrns — plus .xm/.mod which are covered by canUseLibopenmpt above.
-      // Other nativeOnly formats (Organya, PxTone, Eupmini, etc.) do NOT have parsers
-      // in loadModuleFile — they are routed via AmigaFormatParsers in parseModuleToSong.
-      const moduleLoaderNativeExts = /\.(fur|dmf|xrns)$/i;
-      const needsModuleLoader = canUseLibopenmpt || moduleLoaderNativeExts.test(filename);
-      if (needsModuleLoader) {
-        // Use the standard import pipeline for libopenmpt formats AND formats
-        // with native parsers in ModuleLoader (Furnace, DefleMask, XRNS).
-        const { loadModuleFile } = await import('../../lib/import/ModuleLoader');
-        const moduleInfo = await loadModuleFile(file);
-
-        // DefleMask: parseFurnaceFile already produced a full TrackerSong — load it directly
-        if (moduleInfo.dmfSong) {
-          const { useTrackerStore: ts } = await import('../../stores/useTrackerStore');
-          const { useInstrumentStore: is } = await import('../../stores/useInstrumentStore');
-          const { useTransportStore: trs } = await import('../../stores/useTransportStore');
-          const { useProjectStore: ps } = await import('../../stores/useProjectStore');
-          const { useFormatStore: fs } = await import('../../stores/useFormatStore');
-          const { getToneEngine } = await import('../../engine/ToneEngine');
-          const engine = getToneEngine();
-          if (trs.getState().isPlaying) trs.getState().stop();
-          engine.releaseAll();
-          trs.getState().reset();
-          ts.getState().reset();
-          is.getState().reset();
-          engine.disposeAllInstruments();
-          const song = moduleInfo.dmfSong;
-          is.getState().loadInstruments(song.instruments);
-          ts.getState().loadPatterns(song.patterns);
-          ts.getState().setCurrentPattern(0);
-          if (song.songPositions?.length) ts.getState().setPatternOrder(song.songPositions);
-          ps.getState().setMetadata({ name: song.name || filename, author: '', description: `Imported DefleMask: ${filename}` });
-          trs.getState().setBPM(song.initialBPM || 125);
-          trs.getState().setSpeed(song.initialSpeed || 6);
-          fs.getState().applyEditorMode(song);
-        } else {
-          const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
-          await importTrackerModule(moduleInfo, {
-            useLibopenmpt: canUseLibopenmpt,
-            subsong,
-            companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
-          });
-        }
-      } else if (format?.nativeParser?.parseFn === 'parseAdPlugFile') {
-        // Direct AdPlug OPL parser path — only for formats whose registered
-        // nativeParser is explicitly the AdPlug parser. Other formats with
-        // nativeParsers (MOD, XM, IT, S3M, HVL, FC, JAM, etc.) fall through
-        // to the parseModuleToSong pipeline which routes them correctly.
-        const { parseAdPlugFile } = await import('../../lib/import/formats/AdPlugParser');
-        const song = parseAdPlugFile(arrayBuffer, filename);
-
-        const { useTrackerStore: ts } = await import('../../stores/useTrackerStore');
-        const { useInstrumentStore: is } = await import('../../stores/useInstrumentStore');
-        const { useTransportStore: trs } = await import('../../stores/useTransportStore');
-        const { useProjectStore: ps } = await import('../../stores/useProjectStore');
-        const { useFormatStore: fs } = await import('../../stores/useFormatStore');
-        const { getToneEngine } = await import('../../engine/ToneEngine');
-        const engine = getToneEngine();
-
-        if (trs.getState().isPlaying) trs.getState().stop();
-        engine.releaseAll();
-        trs.getState().reset();
-        ts.getState().reset();
-        is.getState().reset();
-        engine.disposeAllInstruments();
-
-        is.getState().loadInstruments(song.instruments);
-        ts.getState().loadPatterns(song.patterns);
-        if (song.songPositions) ts.getState().setPatternOrder(song.songPositions);
-        trs.getState().setBPM(song.initialBPM ?? 125);
-        ps.getState().setMetadata({ name: song.name });
-        fs.getState().applyEditorMode(song);
-      } else {
-        // Native parser path for Amiga/UADE formats that libopenmpt can't read
-        const { parseModuleToSong } = await import('../../lib/import/parseModuleToSong');
-        const song = await parseModuleToSong(file, subsong, undefined, undefined, companionFiles.size > 0 ? companionFiles : undefined);
-        const { useTrackerStore: ts } = await import('../../stores/useTrackerStore');
-        const { useInstrumentStore: is } = await import('../../stores/useInstrumentStore');
-        const { useTransportStore: trs } = await import('../../stores/useTransportStore');
-        const { useProjectStore: ps } = await import('../../stores/useProjectStore');
-        const { useFormatStore: fs } = await import('../../stores/useFormatStore');
-        const { getToneEngine } = await import('../../engine/ToneEngine');
-        const engine = getToneEngine();
-
-        if (trs.getState().isPlaying) trs.getState().stop();
-        engine.releaseAll();
-        trs.getState().reset();
-        ts.getState().reset();
-        is.getState().reset();
-        engine.disposeAllInstruments();
-
-        is.getState().loadInstruments(song.instruments);
-        ts.getState().loadPatterns(song.patterns);
-        if (song.songPositions) ts.getState().setPatternOrder(song.songPositions);
-        trs.getState().setBPM(song.initialBPM ?? 125);
-        ps.getState().setMetadata({ name: song.name });
-        fs.getState().applyEditorMode(song);
-      }
+      // Read and imported exactly as the import dialog does it (drag and
+      // drop). This handler read files its own way and applied three kinds of
+      // song by hand; the same file loaded differently from here.
+      const { importModuleFile } = await import('../../lib/file/UnifiedFileLoader');
+      await importModuleFile(file, {
+        ...(params.useLibopenmpt === false ? { useLibopenmpt: false } : {}),
+        subsong,
+        companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
+      });
       } finally {
         restoreFormatChecks();
       }

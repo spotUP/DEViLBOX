@@ -133,6 +133,22 @@ export async function importTrackerModule(
   // the current song in place instead of an emptied one.
   const describe = (fmtName?: string) => `Imported from ${info.file?.name || 'module'}${fmtName ? ` (${fmtName})` : ''}`;
 
+  // ── Already parsed: DefleMask (loadModuleFile runs Furnace's loader and
+  //    hands back the whole song) ──
+  if (info.dmfSong) {
+    const song = info.dmfSong;
+    await applySong({
+      instruments: song.instruments, patterns: song.patterns, order: song.songPositions ?? [],
+      bpm: song.initialBPM || 125, speed: song.initialSpeed || 6,
+      metadata: { name: song.name || info.metadata.title, description: describe('DefleMask') },
+      originalModuleData: null,
+      engine: song,
+    }, 'import');
+    notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+    if (info.file) checkModlandFileWithPatternHash(info.file, null);
+    return;
+  }
+
   // ── Try OpenMPT WASM soundlib for PC tracker formats ──
   // Skip OpenMPT when native parser data exists — native XM/MOD parser extracts
   // volume envelopes correctly, OpenMPT WASM loses them.
@@ -474,6 +490,24 @@ export async function importTrackerModule(
   } finally {
     restoreFormatChecks();
   }
+}
+
+/**
+ * Import a module file without the confirmation dialog - read and imported
+ * exactly as the dialog does it (prepareModuleImport, then
+ * importTrackerModule), for the file browser, MCP load_file and the tour.
+ * Each of those read and applied the song its own way before (2026-09-29
+ * audit), so the same file loaded differently depending on how it arrived.
+ */
+export async function importModuleFile(file: File, options: Partial<ImportOptions> = {}): Promise<void> {
+  const companions = options.companionFiles
+    ? Array.from(options.companionFiles, ([name, data]) => new File([data], name))
+    : [];
+  const { prepareModuleImport } = await import('@/lib/import/prepareModuleImport');
+  const { info, uadeMetadata } = await prepareModuleImport(file, companions);
+  // The dialog imports with libopenmpt on; importTrackerModule still keeps
+  // native-only formats off it.
+  await importTrackerModule(info, { useLibopenmpt: true, subsong: 0, uadeMetadata, ...options });
 }
 
 /**
@@ -1216,6 +1250,8 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     const detectBuf = preReadBuffer ?? await file.arrayBuffer();
     const { isSupportedByHeader } = await import('../import/FormatRegistry');
     if (isSupportedByHeader(new Uint8Array(detectBuf))) {
+      // The name says nothing, so name-based preparation cannot read it:
+      // straight to the importer's native-parser path with what we know.
       const info: ModuleInfo = {
         metadata: { title: file.name, type: 'Amiga', channels: 4, patterns: 0, orders: 0, instruments: 0, samples: 0, duration: 0 },
         arrayBuffer: detectBuf,

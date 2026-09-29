@@ -1197,32 +1197,9 @@ function App() {
                 const file = new File([buffer], filename);
                 const result = await loadFile(file, { requireConfirmation: false, companionFiles });
                 if (result.success === 'pending-import') {
-                  // Auto-import without showing dialog — use parseModuleToSong
-                  // which correctly routes UADE/TFMX formats with companion files
-                  const { suppressFormatChecks: sfc, restoreFormatChecks: rfc } = await import('@/lib/formatCompatibility');
-                  sfc();
-                  try {
-                  const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-                  const song = await parseModuleToSong(file, 0, undefined, undefined, companionFiles);
-                  const { useTrackerStore: ts } = await import('./stores/useTrackerStore');
-                  const { useInstrumentStore: is } = await import('./stores/useInstrumentStore');
-                  const { useTransportStore: trs } = await import('./stores/useTransportStore');
-                  const { useProjectStore: ps } = await import('./stores/useProjectStore');
-                  const { useFormatStore: fs } = await import('./stores/useFormatStore');
-                  const { getToneEngine } = await import('./engine/ToneEngine');
-                  const engine = getToneEngine();
-                  if (trs.getState().isPlaying) trs.getState().stop();
-                  engine.releaseAll();
-                  trs.getState().reset();
-                  ts.getState().reset();
-                  is.getState().reset();
-                  is.getState().loadInstruments(song.instruments, { sourceSong: song.name });
-                  ts.getState().loadPatterns(song.patterns);
-                  if (song.songPositions) ts.getState().setPatternOrder(song.songPositions);
-                  trs.getState().setBPM(song.initialBPM ?? 125);
-                  ps.getState().setMetadata({ name: song.name });
-                  fs.getState().applyEditorMode(song);
-                  } finally { rfc(); }
+                  // Auto-import without the dialog: the same import it runs.
+                  const { importModuleFile } = await import('@lib/file/UnifiedFileLoader');
+                  await importModuleFile(file, { companionFiles });
                 } else if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {

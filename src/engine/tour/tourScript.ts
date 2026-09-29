@@ -38,60 +38,16 @@ async function loadTrackerSong(path: string): Promise<void> {
     const filename = path.split('/').pop() || 'song';
     const file = new File([buf], filename, { type: 'application/octet-stream' });
 
-    const { detectFormat } = await import('@/lib/import/FormatRegistry');
-    const fmt = detectFormat(filename);
-
-    // Formats with a nativeParser (AHX/HVL, FC, Symphonie, etc.) must go
-    // through parseModuleToSong directly — loadModuleFile would try libopenmpt
-    // which doesn't support them.
-    if (fmt?.nativeParser) {
-      const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-      const { useTrackerStore } = await import('@/stores/useTrackerStore');
-      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-      const { useTransportStore } = await import('@/stores/useTransportStore');
-      const { useProjectStore } = await import('@/stores/useProjectStore');
-      const { useFormatStore } = await import('@/stores/useFormatStore');
-      const { getToneEngine } = await import('@/engine/ToneEngine');
-
-      const song = await parseModuleToSong(file);
-      const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
-      const { loadInstruments } = useInstrumentStore.getState();
-      const { setBPM, setSpeed } = useTransportStore.getState();
-      const { setMetadata } = useProjectStore.getState();
-      const { applyEditorMode, setOriginalModuleData } = useFormatStore.getState();
-
-      loadInstruments(song.instruments);
-      loadPatterns(song.patterns);
-      setCurrentPattern(0);
-      if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-      setOriginalModuleData({
-        base64: '',
-        format: (song.format || 'UNKNOWN') as any,
-        initialBPM: song.initialBPM,
-        initialSpeed: song.initialSpeed,
-        songLength: song.songLength,
-      } as any);
-      setBPM(song.initialBPM);
-      setSpeed(song.initialSpeed);
-      setMetadata({ name: song.name, author: '', description: `Imported from ${filename}` });
-      applyEditorMode(song);
-
-      const engine = getToneEngine();
-      const hasWasmSynths = song.instruments.some(i => i.synthType && i.synthType !== 'Sampler' && i.synthType !== 'Synth');
-      if (hasWasmSynths) await engine.preloadInstruments(song.instruments);
-    } else {
-      // Standard formats (MOD/XM/IT/S3M) — use loadFile + importTrackerModule
-      const { loadFile, importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
-      const result = await loadFile(file, { requireConfirmation: false });
-
-      if (result.success === 'pending-import') {
-        const { loadModuleFile } = await import('@/lib/import/ModuleLoader');
-        const info = await loadModuleFile(file);
-        await importTrackerModule(info, { useLibopenmpt: true });
-      } else if (!result.success) {
-        console.warn('[Tour] loadFile failed:', result.error);
-      }
+    // The same load as drag and drop: loadFile, and for a module the import
+    // the dialog runs (this parsed and applied native formats by hand).
+    const { loadFile, importModuleFile } = await import('@/lib/file/UnifiedFileLoader');
+    const result = await loadFile(file, { requireConfirmation: false });
+    if (result.success === 'pending-import') {
+      await importModuleFile(file);
+    } else if (!result.success) {
+      console.warn('[Tour] loadFile failed:', result.error);
     }
+
 
     // Give the engine a moment to finish setting up channels/instruments
     await new Promise(r => setTimeout(r, 500));
@@ -762,25 +718,8 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-setup',
     narration: 'Loading a 303 acid demo with TR-909 drums. The sound that started a revolution.',
     action: async () => {
-      const { useTransportStore } = await import('@/stores/useTransportStore');
-
-      // Stop anything playing
-      useTransportStore.getState().stop();
-
-      // Stop native WASM engines from previous song
-      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-      const { clearRunningEngineKeys } = await import('@/engine/replayer/NativeEngineRouting');
-      getTrackerReplayer().stop(false);
-      clearRunningEngineKeys();
-
-      // Clear format-specific data from previous AHX song
-      const { useFormatStore } = await import('@/stores/useFormatStore');
-      useFormatStore.getState().applyEditorMode({});
-
-      // Clear old instruments
-      const { getToneEngine } = await import('@/engine/ToneEngine');
-      getToneEngine().disposeAllInstruments();
-
+      // Stopping the AHX, clearing its native data and the old instruments is
+      // the load's own job now (applySong).
       // Load the pre-made 303 demo song
       await loadTrackerSong('/data/songs/303-Demo.dbx');
 
