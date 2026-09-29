@@ -26,6 +26,7 @@ import { getToneEngine } from '../../engine/ToneEngine';
 import { suppressFormatChecks, restoreFormatChecks } from '../../lib/formatCompatibility';
 import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
+import { getDevilboxAudioContext } from '../../utils/audio-context';
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
 import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths, testMAMESynths } from '../../utils/synthTester';
 
@@ -1413,13 +1414,31 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
       let peakMax = 0;
 
       const startTime = performance.now();
-      // Use MessageChannel for timing — setInterval gets throttled to 1/sec
-      // in background tabs, making audio measurement useless. MessageChannel
-      // postMessage fires on the microtask queue and isn't throttled.
+      // bands: mean linear power per FFT bin over the window, reported as dB
+      // per octave band - a real spectrum measurement (the VJ band energies
+      // are display values: peak-weighted, boosted, clamped at 1).
+      const wantBands = params.bands === true;
+      let binPower: Float64Array | null = null;
+      let bandFrames = 0;
+      // Paced ~100 updates/s: a back-to-back MessageChannel loop kept the
+      // page's main thread busy for the whole measurement. setTimeout is
+      // throttled in hidden tabs, so those still use the (unthrottled) channel.
       const channel = new MessageChannel();
+      const schedule = () => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') setTimeout(tick, 10);
+        else channel.port2.postMessage(null);
+      };
       const tick = () => {
         const frame = bus.update();
         framesAnalyzed++;
+        if (wantBands && frame.fft && frame.fft.length > 0) {
+          if (!binPower) binPower = new Float64Array(frame.fft.length);
+          for (let i = 0; i < frame.fft.length; i++) {
+            const db = frame.fft[i];
+            if (Number.isFinite(db)) binPower[i] += Math.pow(10, db / 10);
+          }
+          bandFrames++;
+        }
         // Guard against NaN from smoothing — NaN poisons rmsSum permanently
         const rms = Number.isFinite(frame.rms) ? frame.rms : 0;
         const peak = Number.isFinite(frame.peak) ? frame.peak : 0;
@@ -1430,18 +1449,32 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
         if (performance.now() - startTime >= durationMs) {
           channel.port1.onmessage = null;
           const rmsAvg = framesAnalyzed > 0 ? rmsSum / framesAnalyzed : 0;
-          resolve({
+          const result: Record<string, unknown> = {
             rmsAvg: +rmsAvg.toFixed(6),
             rmsMax: +rmsMax.toFixed(6),
             peakMax: +peakMax.toFixed(6),
             framesAnalyzed,
             durationMs: Math.round(performance.now() - startTime),
             silent: rmsMax < 0.001,
-          });
+          };
+          if (wantBands && binPower && bandFrames > 0) {
+            const sr = getDevilboxAudioContext().sampleRate;
+            const binHz = sr / (2 * binPower.length);
+            const bands: Record<string, number> = {};
+            for (const fc of [63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]) {
+              let p = 0;
+              for (let i = 0; i < binPower.length; i++) {
+                const f = i * binHz;
+                if (f >= fc / Math.SQRT2 && f < fc * Math.SQRT2) p += binPower[i] / bandFrames;
+              }
+              bands[String(fc)] = p > 0 ? +(10 * Math.log10(p)).toFixed(1) : -200;
+            }
+            result.bandsDb = bands;
+          }
+          resolve(result);
           return;
         }
-        // Schedule next tick via MessageChannel (not throttled in background tabs)
-        channel.port2.postMessage(null);
+        schedule();
       };
       channel.port1.onmessage = tick;
       // Kick off the first tick
