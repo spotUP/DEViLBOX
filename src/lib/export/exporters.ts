@@ -9,11 +9,9 @@ import type { ProjectMetadata } from '@typedefs/project';
 import { APP_VERSION } from '@constants/version';
 import type { AutomationCurve } from '@typedefs/automation';
 import { useFormatStore } from '@stores/useFormatStore';
-import { useMixerStore } from '@stores/useMixerStore';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { snapshotSong } from '@/lib/song/snapshotSong';
 import type { DubBusSettings } from '@/types/dub';
-import { useDubStore, type AutoDubPersonaId } from '@/stores/useDubStore';
-import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import type { AutoDubPersonaId } from '@/stores/useDubStore';
 import { compressProject, decompressProject } from '@/lib/projectCompression';
 import { FILE_DATA_FIELDS } from '@engine/formatFileDataFields';
 import { encodeMaxTrax, parseMaxTrax } from '@lib/import/formats/maxtrax/maxtraxFormat';
@@ -288,106 +286,19 @@ export interface ExportOptions {
 }
 
 /**
- * Export full song (all patterns, instruments, sequence)
+ * Download the current song as a .dbx - the snapshot every save uses
+ * (snapshotSong), in the 'devilbox-song' envelope. Its two callers assembled
+ * the song by hand, one without the groove (2026-09-29 audit).
  */
-export function exportSong(
-  metadata: ProjectMetadata,
-  bpm: number,
-  instruments: InstrumentConfig[],
-  patterns: Pattern[],
-  sequence: string[],
-  automation: Record<string, unknown> | undefined,
-  masterEffects: EffectConfig[] | undefined,
-  automationCurves: AutomationCurve[] | undefined,
-  options: ExportOptions = {},
-  grooveTemplateId?: string,
-  playbackState?: { speed?: number; trackerFormat?: string; linearPeriods?: boolean; restartPosition?: number },
-  patternOrder?: number[],
-  originalModuleData?: { base64: string; format: string; sourceFile?: string } | null,
-): void {
+export function exportSong(options: ExportOptions = {}): void {
+  const song = snapshotSong();
   const songData: SongExport = {
     format: 'devilbox-song',
     version: APP_VERSION,
-    metadata,
-    bpm,
-    instruments,
-    patterns,
-    sequence,
-    // Actual playback order (may have repeats — sequence is just unique pattern IDs)
-    ...(patternOrder && patternOrder.length > 0 ? { patternOrder } : {}),
-    // Always include automation data (both formats for compatibility)
-    ...(automation && Object.keys(automation).length > 0 ? { automation } : {}),
-    ...(automationCurves && automationCurves.length > 0 ? { automationCurves } : {}),
-    ...(masterEffects && masterEffects.length > 0 ? { masterEffects } : {}),
-    // Include groove template if not the default
-    ...(grooveTemplateId && grooveTemplateId !== 'straight' ? { grooveTemplateId } : {}),
-    // Playback parameters for format-accurate reload
-    ...(playbackState?.speed != null && playbackState.speed !== 6 ? { speed: playbackState.speed } : {}),
-    ...(playbackState?.trackerFormat ? { trackerFormat: playbackState.trackerFormat } : {}),
-    ...(playbackState?.linearPeriods ? { linearPeriods: playbackState.linearPeriods } : {}),
-    ...(playbackState?.restartPosition ? { restartPosition: playbackState.restartPosition } : {}),
-    // Original module data for libopenmpt-based playback roundtrip
-    ...(originalModuleData?.base64 ? { originalModuleData } : {}),
-    // Native engine binary data (all WASM engine formats)
-    ...(() => {
-      const ned = getNativeEngineDataForExport();
-      return ned ? { nativeEngineData: ned } : {};
-    })(),
-    ...(() => {
-      const nem = getNativeEngineMetaForExport();
-      return nem ? { nativeEngineMeta: nem } : {};
-    })(),
-    // Companion/sidecar files for two-file UADE formats (Sonix .instr/.ss, TFMX smpl, …)
-    ...(() => {
-      const ncf = getNativeCompanionFilesForExport();
-      return ncf ? { nativeCompanionFiles: ncf } : {};
-    })(),
-    // Replaced instrument IDs for hybrid WASM/ToneEngine playback
-    ...(() => {
-      try {
-        const replayer = getTrackerReplayer();
-        if (replayer.hasReplacedInstruments) {
-          return { replacedInstruments: replayer.replacedInstrumentIds };
-        }
-      } catch { /* replayer not initialized */ }
-      return {};
-    })(),
-    // Dub bus tuning snapshot — character preset + all 30+ coloring params.
-    // Captures whatever the user has tuned so reload restores every knob.
-    ...(() => {
-      try {
-        const dubBus = useDrumPadStore.getState().dubBus;
-        return dubBus ? { dubBus } : {};
-      } catch { return {}; }
-    })(),
-    // Mixer state — channel volumes, pans, mutes, solos, dub sends, send buses.
-    ...(() => {
-      try {
-        const state = useMixerStore.getState();
-        return {
-          mixer: {
-            channels: state.channels,
-            master: state.master,
-            sendBuses: state.sendBuses,
-          },
-        };
-      } catch { return {}; }
-    })(),
-    // Auto Dub state — enabled, persona, intensity, move blacklist.
-    ...(() => {
-      try {
-        const s = useDubStore.getState();
-        return {
-          autoDub: {
-            enabled: s.autoDubEnabled,
-            persona: s.autoDubPersona,
-            intensity: s.autoDubIntensity,
-            moveBlacklist: s.autoDubMoveBlacklist ?? [],
-          },
-        };
-      } catch { return {}; }
-    })(),
-  };
+    ...song,
+    // Pattern ids in order, for readers from before patternOrder existed.
+    sequence: (song.patternOrder ?? []).map((i) => song.patterns[i]?.id).filter((id): id is string => !!id),
+  } as SongExport;
 
   const json = options.prettify
     ? JSON.stringify(songData, null, 2)
@@ -395,7 +306,7 @@ export function exportSong(
 
   const compressed = compressProject(json);
   const blob = new Blob([compressed], { type: 'application/octet-stream' });
-  const filename = `${sanitizeFilename(metadata.name)}.dbx`;
+  const filename = `${sanitizeFilename(song.metadata.name)}.dbx`;
 
   saveAs(blob, filename);
 }

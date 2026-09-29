@@ -123,12 +123,12 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 
 ## Checklist
 
-- [x] L0.1 [x] L0.2 [ ] L0.3
-- [x] L1.1 [x] L1.2 [ ] L1.3
+- [x] L0.1 [x] L0.2 [x] L0.3
+- [x] L1.1 [x] L1.2 [x] L1.3
 - [x] L2.1 [x] L2.2 [x] L2.3
 - [x] L3.1 [x] L3.2 [x] L3.3 [x] L3.4
-- [x] L4.1 [x] L4.2 [ ] L4.3
-- [ ] L5.1 [ ] L5.2 [ ] L5.3
+- [x] L4.1 [x] L4.2 [x] L4.3
+- [x] L5.1 [ ] L5.2 [ ] L5.3
 - [ ] L6.1 [ ] L6.2 [ ] L6.3
 
 ## Owner questions
@@ -197,3 +197,12 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   The header-detected (extensionless) import keeps its explicit ModuleInfo:
   its name says nothing, so name-based preparation cannot read it. 13 of 22.
 - L4.2 done: the Export dialog's song import -> savedSongToApply + applySong; its legacy nested-automation reader moved into the one parser. 14 of 22.
+- L1.3, L4.3, L5.1, L0.3 done: snapshotSong (src/lib/song/snapshotSong.ts) is
+  the one reader of the current song - buildSavedProject (autosave, recovery,
+  revisions), exportSong (.dbx download; its two callers built their own
+  arguments and the Export dialog dropped the groove), song tabs (kept only
+  patterns/instruments/automation/metadata/BPM - an AHX tab came back empty
+  classic; test fails on the old code) and collaboration full_sync (patterns,
+  instruments, BPM, master chain, metadata, order only). Round-trip test
+  (MOD, and AHX with native data + mixer): snapshot -> savedSongToApply ->
+  applySong -> snapshot is identical except metadata.modifiedAt. 18 of 22.

@@ -14,7 +14,7 @@ import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
-import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useEditorStore } from '@stores';
+import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -35,7 +35,7 @@ import { DropdownButton, type MenuItemType } from '@components/common/ContextMen
 
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
-import { exportSong, getOriginalModuleDataForExport } from '@lib/export/exporters';
+import { exportSong } from '@lib/export/exporters';
 import { hasAnyConfirmedFormatViolation } from '@/lib/formatCompatibility';
 import { type ModuleInfo } from '@lib/import/ModuleLoader';
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
@@ -257,9 +257,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       const { patterns, patternOrder: order } = useTrackerStore.getState();
       const { instruments } = useInstrumentStore.getState();
       const { metadata } = useProjectStore.getState();
-      const { masterEffects } = useAudioStore.getState();
-      const { curves } = useAutomationStore.getState();
-      const { bpm, grooveTemplateId } = useTransportStore.getState();
+      const { bpm } = useTransportStore.getState();
       const srcFmt = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
       const isCinterSong = instruments.some(
         (i) => (i.parameters as Record<string, unknown> | undefined)?.cinter === 1,
@@ -294,45 +292,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       }
 
       // Also download as .dbx file
-      const sequence = order.map(idx => patterns[idx]?.id).filter(Boolean);
-      const automationData: Record<string, Record<number, Record<string, unknown>>> = {};
-      patterns.forEach((pattern) => {
-        pattern.channels.forEach((_channel, channelIndex) => {
-          const channelCurves = curves.filter(
-            (c) => c.patternId === pattern.id && c.channelIndex === channelIndex
-          );
-          if (channelCurves.length > 0) {
-            if (!automationData[pattern.id]) {
-              automationData[pattern.id] = {};
-            }
-            automationData[pattern.id][channelIndex] = channelCurves.reduce(
-              (acc, curve) => {
-                acc[curve.parameter] = curve;
-                return acc;
-              },
-              {} as Record<string, unknown>
-            );
-          }
-        });
-      });
-      const { speed } = useTransportStore.getState();
-      const { linearPeriods } = useEditorStore.getState();
-      const trackerFormat = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
-      exportSong(
-        metadata,
-        bpm,
-        instruments,
-        patterns,
-        sequence,
-        Object.keys(automationData).length > 0 ? automationData : undefined,
-        masterEffects.length > 0 ? masterEffects : undefined,
-        curves.length > 0 ? curves : undefined,
-        { prettify: true },
-        grooveTemplateId,
-        { speed, trackerFormat, linearPeriods },
-        order,
-        getOriginalModuleDataForExport(),
-      );
+      exportSong({ prettify: true });
 
       notify.success(saved ? 'Saved & downloaded!' : 'Downloaded!', 2000);
     } catch (error) {
