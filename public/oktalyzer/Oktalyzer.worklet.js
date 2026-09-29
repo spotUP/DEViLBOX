@@ -18,10 +18,13 @@ class OktalyzerProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
+    this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
   async handleMessage(data) {
+    if (this._outs && this._outs.handleMessage(data)) return;
     if (data.type !== 'init' && !this.module && this.initializing) return;
     switch (data.type) {
       case 'init':
@@ -153,15 +156,19 @@ class OktalyzerProcessor extends AudioWorkletProcessor {
       this.chPtrs[4], this.chPtrs[5], this.chPtrs[6], this.chPtrs[7], numSamples);
 
     if (rendered > 0) {
-      // Mix to stereo by each channel's side, as okt_render does.
+      // Mix to stereo by each channel's side, as okt_render does. A voice in
+      // an isolation slot leaves the mix; channel-outputs.js carries it.
       const n = this.numChannels;
       outputL.fill(0, 0, rendered);
       outputR.fill(0, 0, rendered);
       for (let ch = 0; ch < n; ch++) {
+        if (this._outs && this._outs.isIsolated(ch)) continue;
         const buf = this.chBufs[ch];
         const out = this.pans[ch] === 0 ? outputL : outputR;
         for (let i = 0; i < rendered; i++) out[i] += buf[i];
       }
+
+      if (this._outs) this._outs.write(outputs, this.chBufs.slice(0, n), rendered, (ch) => (this.pans[ch] === 0 ? 0 : 1));
 
       // Every sample of each voice, for the oscilloscopes and the per-channel
       // role classifiers (worklets/channel-stream.js).

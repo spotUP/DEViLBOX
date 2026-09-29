@@ -11,10 +11,8 @@
  * Drives each engine's real worklet and WASM with a real song, headless.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { startWorklet, loadSharedWorkletScripts, songBuffer, type JsTransform, type WorkletMsg } from './workletHarness';
 
-const ROOT = resolve(__dirname, '../../..');
 const SONGS = 'public/data/songs';
 
 /**
@@ -22,8 +20,6 @@ const SONGS = 'public/data/songs';
  * share WASMSingletonBase's loadModule + play; the rest say how.
  */
 type Load = (song: ArrayBuffer) => Array<Record<string, unknown>>;
-/** The rewrite an engine applies to its Emscripten JS before the worklet sees it. */
-type JsTransform = (code: string) => string | Promise<string>;
 const SHARED: Load = (song) => [{ type: 'loadModule', moduleData: song }, { type: 'play' }];
 const ENGINES: Array<[string, string, string, Load?, JsTransform?]> = [
   ['davidwhittaker', 'DavidWhittaker', `${SONGS}/formats/apb.dw`],
@@ -61,40 +57,12 @@ const ENGINES: Array<[string, string, string, Load?, JsTransform?]> = [
     async (code) => (await import('../uade/UADEEngine')).uadeTransform(code)],
 ];
 
-type Msg = { type?: string; channels?: Int16Array[]; frame?: number; sampleRate?: number; message?: string };
-type Proc = {
-  handleMessage?(d: unknown): Promise<void>;
-  _handleMessage?(d: unknown): Promise<void>;   // UADE's name for it
-  process(i: Float32Array[][], o: Float32Array[][]): boolean;
-};
+beforeAll(loadSharedWorkletScripts);
 
-beforeAll(() => {
-  new Function(readFileSync(resolve(ROOT, 'public/worklets/channel-stream.js'), 'utf8'))();
-});
-
-async function run(dir: string, stem: string, song: string, load: Load = SHARED, transform?: JsTransform): Promise<Msg[]> {
-  let Processor!: new () => Proc;
-  const posted: Msg[] = [];
-  const scope: Record<string, unknown> = {
-    AudioWorkletProcessor: class { port = { postMessage: (m: Msg) => posted.push(m), onmessage: null }; },
-    registerProcessor: (_n: string, cls: new () => Proc) => { Processor = cls; },
-    sampleRate: 48000, currentTime: 0,
-  };
-  new Function(...Object.keys(scope), readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8'))(...Object.values(scope));
-  const p = new Processor();
-  const send = (m: unknown) => (p.handleMessage ?? p._handleMessage)!.call(p, m);
-  const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
-  Object.defineProperty(process, 'versions', { value: {}, configurable: true });
-  try {
-    await send({
-      type: 'init', sampleRate: 48000,
-      wasmBinary: readFileSync(resolve(ROOT, `public/${dir}/${stem}.wasm`)),
-      jsCode: await (transform ?? ((c: string) => c))(readFileSync(resolve(ROOT, `public/${dir}/${stem}.js`), 'utf8')),
-    });
-  } finally { Object.defineProperty(process, 'versions', versions); }
-  const b = readFileSync(resolve(ROOT, song));
-  for (const m of load(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength))) await send(m);
-  for (let i = 0; i < 750; i++) p.process([], [[new Float32Array(128), new Float32Array(128)]]); // 2 s
+async function run(dir: string, stem: string, song: string, load: Load = SHARED, transform?: JsTransform): Promise<WorkletMsg[]> {
+  const { proc, send, posted } = await startWorklet(dir, stem, transform);
+  for (const m of load(songBuffer(song))) await send(m);
+  for (let i = 0; i < 750; i++) proc.process([], [[new Float32Array(128), new Float32Array(128)]]); // 2 s
   return posted;
 }
 

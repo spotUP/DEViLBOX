@@ -7,7 +7,8 @@
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
-  WASMSingletonBase,
+  WASMChannelOutputsEngine,
+  channelOutputNodeOptions,
   createWASMAssetsCache,
   type WASMAssetsCache,
   type WASMLoaderConfig,
@@ -24,7 +25,7 @@ function oktalyzerTransform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
-export class OktalyzerEngine extends WASMSingletonBase {
+export class OktalyzerEngine extends WASMChannelOutputsEngine {
   private static instance: OktalyzerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
@@ -67,15 +68,16 @@ export class OktalyzerEngine extends WASMSingletonBase {
 
   protected createNode(): void {
     const ctx = this.audioContext;
-    this.workletNode = new AudioWorkletNode(ctx, 'oktalyzer-processor', {
-      outputChannelCount: [2], numberOfOutputs: 1,
-    });
+    // Output 0 is the mix; 1..4 isolation slots and 5..36 per-channel dub
+    // sends (worklets/channel-outputs.js).
+    this.workletNode = new AudioWorkletNode(ctx, 'oktalyzer-processor', channelOutputNodeOptions());
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
       switch (data.type) {
         case 'ready':
           console.log('[OktalyzerEngine] WASM ready');
+          this.markNodeReady();
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
@@ -100,7 +102,7 @@ export class OktalyzerEngine extends WASMSingletonBase {
       type: 'init', sampleRate: ctx.sampleRate,
       wasmBinary: OktalyzerEngine.cache.wasmBinary, jsCode: OktalyzerEngine.cache.jsCode,
     });
-    this.workletNode.connect(this.output);
+    this.workletNode.connect(this.output, 0);
   }
 
   async loadTune(buffer: ArrayBuffer): Promise<void> {
@@ -109,7 +111,10 @@ export class OktalyzerEngine extends WASMSingletonBase {
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
-  play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
+  play(): void {
+    this.workletNode?.port.postMessage({ type: 'play' });
+    this.afterPlay();
+  }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
 

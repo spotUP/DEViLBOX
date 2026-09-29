@@ -114,6 +114,13 @@ export async function loadWASMAssets(
     } catch {
       /* Already in this scope — not fatal. */
     }
+    // Per-channel dub sends / isolation slots (DevilboxChannelOutputs), used
+    // by engines extending WASMChannelOutputsEngine.
+    try {
+      await context.audioWorklet.addModule(`${baseUrl}worklets/channel-outputs.js`);
+    } catch {
+      /* Already in this scope — not fatal. */
+    }
     try {
       await context.audioWorklet.addModule(workletUrl);
     } catch {
@@ -224,5 +231,72 @@ export abstract class WASMSingletonBase {
     try { this.workletNode?.port.postMessage({ type: 'dispose' }); } catch { /* port closed */ }
     try { this.workletNode?.disconnect(); } catch { /* already disconnected */ }
     this.workletNode = null;
+  }
+}
+
+/** Main mix + 4 isolation slots + 32 dub sends, all stereo (ChannelRoutedEffects contract). */
+export const CHANNEL_OUTPUT_COUNT = 1 + 4 + 32;
+
+/** AudioWorkletNode options for an engine that exposes per-channel outputs. */
+export function channelOutputNodeOptions(): AudioWorkletNodeOptions {
+  return {
+    numberOfOutputs: CHANNEL_OUTPUT_COUNT,
+    outputChannelCount: new Array(CHANNEL_OUTPUT_COUNT).fill(2),
+  };
+}
+
+/**
+ * A WASMSingletonBase engine whose worklet renders every voice into its own
+ * buffer and exposes them through worklets/channel-outputs.js: per-channel
+ * dub sends (outputs 5..36) and isolation slots (1..4). Implements
+ * IsolationCapableEngine; NativeEngineRouting registers it as the playing
+ * isolation engine when it starts a song.
+ *
+ * Subclass contract, on top of WASMSingletonBase's:
+ *   • create the node with `channelOutputNodeOptions()` and connect only
+ *     output 0 to `this.output`;
+ *   • the worklet hands its voice buffers to a DevilboxChannelOutputs and
+ *     leaves isolated voices out of output 0;
+ *   • call `this.afterPlay()` from play().
+ */
+export abstract class WASMChannelOutputsEngine extends WASMSingletonBase {
+  private _nodeReady = false;
+
+  /** Called by the subclass when its worklet reports ready. */
+  protected markNodeReady(): void {
+    this._nodeReady = true;
+  }
+
+  getWorkletNode(): AudioWorkletNode | null {
+    return this.workletNode;
+  }
+
+  getAudioContext(): AudioContext | null {
+    return this.audioContext;
+  }
+
+  isAvailable(): boolean {
+    return this._nodeReady && !!this.workletNode && !this._disposed;
+  }
+
+  addIsolation(slotIndex: number, channelMask: number): void {
+    this.workletNode?.port.postMessage({ type: 'addIsolation', slotIndex, channelMask });
+  }
+
+  removeIsolation(slotIndex: number): void {
+    this.workletNode?.port.postMessage({ type: 'removeIsolation', slotIndex });
+  }
+
+  /**
+   * After a song starts: re-post the open dub sends and effect isolation, the
+   * way libopenmpt/Hively/UADE do on play.
+   */
+  protected afterPlay(): void {
+    void import('@engine/tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
+      try { void getChannelRoutedEffectsManager()?.rebuildDubConnections(); } catch { /* ok */ }
+    }).catch(() => {});
+    void import('@stores/useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
+      scheduleWasmEffectRebuild();
+    }).catch(() => {});
   }
 }
