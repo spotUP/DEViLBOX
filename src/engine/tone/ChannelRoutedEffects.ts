@@ -594,6 +594,9 @@ export class ChannelRoutedEffectsManager {
     // Dual-convention envelope: LibOpenMPT worklet switches on `cmd`, UADE /
     // Hively / Furnace worklets switch on `type`. Send both so a single
     // postMessage reaches any engine without branching per-engine here.
+    // Engines declare only the dub outputs their voices can fill (each costs
+    // audio-thread time, connected or not); a channel beyond them has no send.
+    if (DUB_OUTPUT_BASE + channelIndex >= worklet.numberOfOutputs) return 'unavailable';
     worklet.port.postMessage(dubChannelMessage('dubChannelEnable', channelIndex));
     try {
       worklet.connect(gain, DUB_OUTPUT_BASE + channelIndex);
@@ -742,6 +745,7 @@ export class ChannelRoutedEffectsManager {
 
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       if (this.effectiveDubSendOf(ch) <= 0) continue;
+      if (DUB_OUTPUT_BASE + ch >= worklet.numberOfOutputs) continue;
       const gain = this._ensureDubChannel(ch);
       if (!gain) continue;
       // Fire enable + reconnect. Safe to disconnect first even if not
