@@ -17,7 +17,7 @@ import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
-import { resolveMaxTraxLoadBytes } from '@/lib/import/formats/maxtrax/maxtraxFormat';
+import { liveTrackerSong } from '@/lib/song/liveSong';
 import { computePlaybackFollow } from '@/lib/tracker/playbackFollow';
 import { computeEffectiveSongOrder } from '@/lib/tracker/playbackOrder';
 
@@ -30,81 +30,11 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, c64MemPatches, cheeseCutterFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, sawteethFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, cinter4FileData, cinter4RawData, fmplayerFileData, qsfFileData, bdFileData, sd2FileData, symphonieFileData, v2mFileData, sonicArrangerFileData, soundMonFileData, digMugFileData, davidWhittakerFileData, soundControlFileData, deltaMusic1FileData, deltaMusic2FileData, soundFxFileData, gmcFileData, voodooFileData, fredReplayerFileData, oktalyzerFileData, futureComposerFileData, quadraComposerFileData, ronKlarenFileData, actionamicsFileData, activisionProFileData, synthesisFileData, dssFileData, soundFactoryFileData, faceTheMusicFileData, klysFileData, maxTraxFileData, uadeEditableFileData, uadePatternLayout, nativeSamplePlayback, adplugFileData, adplugFileName, adplugTicksPerRow, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable, sonixSidecarFiles, sunTronicSongFileData, sunTronicCompanionPcm } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, musiclineFileData, jamCrackerFileData, furnaceNative, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
-    channelSpeeds: s.channelSpeeds,
-    channelGrooves: s.channelGrooves,
-    hivelyNative: s.hivelyNative,
-    hivelyFileData: s.hivelyFileData,
-    hivelyMeta: s.hivelyMeta,
     musiclineFileData: s.musiclineFileData,
-    c64SidFileData: s.c64SidFileData,
-    c64MemPatches: s.c64MemPatches,
-    cheeseCutterFileData: s.cheeseCutterFileData,
     jamCrackerFileData: s.jamCrackerFileData,
-    futurePlayerFileData: s.futurePlayerFileData,
-    preTrackerFileData: s.preTrackerFileData,
-    maFileData: s.maFileData,
-    hippelFileData: s.hippelFileData,
-    sonixFileData: s.sonixFileData,
-    sonixSidecarFiles: s.sonixSidecarFiles,
-    pxtoneFileData: s.pxtoneFileData,
-    organyaFileData: s.organyaFileData,
-    sawteethFileData: s.sawteethFileData,
-    eupFileData: s.eupFileData,
-    ixsFileData: s.ixsFileData,
-    psycleFileData: s.psycleFileData,
-    sc68FileData: s.sc68FileData,
-    zxtuneFileData: s.zxtuneFileData,
-    pumaTrackerFileData: s.pumaTrackerFileData,
-    steveTurnerFileData: s.steveTurnerFileData,
-    sidmon1WasmFileData: s.sidmon1WasmFileData,
-    fredEditorWasmFileData: s.fredEditorWasmFileData,
-    artOfNoiseFileData: s.artOfNoiseFileData,
-    cinter4FileData: s.cinter4FileData,
-    cinter4RawData: s.cinter4RawData,
-    fmplayerFileData: s.fmplayerFileData,
-    qsfFileData: s.qsfFileData,
-    bdFileData: s.bdFileData,
-    sd2FileData: s.sd2FileData,
-    symphonieFileData: s.symphonieFileData,
-    v2mFileData: s.v2mFileData,
-    sonicArrangerFileData: s.sonicArrangerFileData,
-    soundMonFileData: s.soundMonFileData,
-    digMugFileData: s.digMugFileData,
-    davidWhittakerFileData: s.davidWhittakerFileData,
-    soundControlFileData: s.soundControlFileData,
-    deltaMusic1FileData: s.deltaMusic1FileData,
-    deltaMusic2FileData: s.deltaMusic2FileData,
-    soundFxFileData: s.soundFxFileData,
-    gmcFileData: s.gmcFileData,
-    voodooFileData: s.voodooFileData,
-    fredReplayerFileData: s.fredReplayerFileData,
-    oktalyzerFileData: s.oktalyzerFileData,
-    futureComposerFileData: s.futureComposerFileData,
-    quadraComposerFileData: s.quadraComposerFileData,
-    ronKlarenFileData: s.ronKlarenFileData,
-    actionamicsFileData: s.actionamicsFileData,
-    activisionProFileData: s.activisionProFileData,
-    synthesisFileData: s.synthesisFileData,
-    dssFileData: s.dssFileData,
-    soundFactoryFileData: s.soundFactoryFileData,
-    faceTheMusicFileData: s.faceTheMusicFileData,
-    klysFileData: s.klysFileData,
-    maxTraxFileData: s.maxTraxFileData,
-    uadeEditableFileData: s.uadeEditableFileData,
-    sunTronicSongFileData: s.sunTronicSongFileData,
-    sunTronicCompanionPcm: s.sunTronicCompanionPcm,
-    uadePatternLayout: s.uadePatternLayout,
-    nativeSamplePlayback: s.nativeSamplePlayback,
-    adplugFileData: s.adplugFileData,
-    adplugFileName: s.adplugFileName,
-    adplugTicksPerRow: s.adplugTicksPerRow,
-    tfmxFileData: s.tfmxFileData,
-    tfmxSmplData: s.tfmxSmplData,
-    libopenmptFileData: s.libopenmptFileData,
     furnaceNative: s.furnaceNative,
-    furnaceActiveSubsong: s.furnaceActiveSubsong,
     tfmxTimingTable: s.tfmxTimingTable,
   })));
   const linearPeriods = useEditorStore((s) => s.linearPeriods);
@@ -396,11 +326,10 @@ export const usePatternPlayback = () => {
           // Build the song config and start the engine via the normal path
           // (loadSong → replayer.play → startNativeEngines → JamCracker loadTune+play)
           const modData = pattern.importMetadata?.modData;
-          replayer.loadSong({
+          replayer.loadSong(liveTrackerSong({
             name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
             format,
             patterns,
-            instruments: instrumentsRef.current,
             songPositions: patternOrderRef.current,
             songLength: modData?.songLength ?? patternOrderRef.current.length,
             restartPosition: modData?.restartPosition ?? 0,
@@ -408,8 +337,8 @@ export const usePatternPlayback = () => {
             initialSpeed: modData?.initialSpeed ?? transportSpeed,
             initialBPM: modData?.initialBPM ?? bpmRef.current,
             linearPeriods,
-            jamCrackerFileData,
-          });
+            instruments: instrumentsRef.current,
+          }));
           getTrackerScratchController().notifyPlaybackStarted();
           replayer.play().catch((err) => {
             console.error('Failed to start JamCracker playback:', err);
@@ -433,11 +362,10 @@ export const usePatternPlayback = () => {
           if (!mlLoadedRef.current) {
             mlLoadedRef.current = true;
             const modData = pattern.importMetadata?.modData;
-            replayer.loadSong({
+            replayer.loadSong(liveTrackerSong({
               name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
               format,
               patterns,
-              instruments: instrumentsRef.current,
               songPositions: patternOrderRef.current,
               songLength: modData?.songLength ?? patternOrderRef.current.length,
               restartPosition: modData?.restartPosition ?? 0,
@@ -445,9 +373,8 @@ export const usePatternPlayback = () => {
               initialSpeed: modData?.initialSpeed ?? transportSpeed,
               initialBPM: modData?.initialBPM ?? bpmRef.current,
               linearPeriods,
-              channelTrackTables: channelTrackTables ?? undefined,
-              musiclineFileData,
-            });
+              instruments: instrumentsRef.current,
+            }));
           }
           getTrackerScratchController().notifyPlaybackStarted();
           replayer.play().catch((err) => {
@@ -510,7 +437,9 @@ export const usePatternPlayback = () => {
 
         // Load song into TrackerReplayer
         const furnaceData = pattern.importMetadata?.furnaceData;
-        replayer.loadSong({
+        replayer.loadSong(liveTrackerSong({
+          // Playback's choices over the current song (liveTrackerSong - the
+          // same song the exporters take; this listed ~80 store fields inline).
           name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
           format,
           patterns: effectivePatterns,
@@ -521,98 +450,9 @@ export const usePatternPlayback = () => {
           numChannels: effectiveNumChannels,
           initialSpeed: modData?.initialSpeed ?? transportSpeed,
           initialBPM: modData?.initialBPM ?? bpmRef.current,
-          // Period frequency mode (set by XM, IT, FTM, XTracker, etc. parsers)
           linearPeriods,
-          // Per-channel track tables (MusicLine Editor and similar formats)
-          channelTrackTables: channelTrackTables ?? undefined,
-          channelSpeeds: channelSpeeds ?? undefined,
-          channelGrooves: channelGrooves ?? undefined,
-          // Hively/AHX native data (required for WASM replayer)
-          hivelyNative: hivelyNative ?? undefined,
-          hivelyFileData: hivelyFileData ?? undefined,
-          hivelyMeta: hivelyMeta ?? undefined,
-          // MusicLine Editor raw binary (required for MusicLineEngine WASM)
-          musiclineFileData: musiclineFileData ?? undefined,
-          // C64 SID raw binary (required for C64SIDEngine)
-          c64SidFileData: c64SidFileData ?? undefined,
-          c64MemPatches: c64MemPatches ?? undefined,
-          cheeseCutterFileData: cheeseCutterFileData ?? undefined,
-          // JamCracker raw binary (required for JamCrackerEngine WASM)
-          jamCrackerFileData: jamCrackerFileData ?? undefined,
-          futurePlayerFileData: futurePlayerFileData ?? undefined,
-          preTrackerFileData: preTrackerFileData ?? undefined,
-          maFileData: maFileData ?? undefined,
-          hippelFileData: hippelFileData ?? undefined,
-          sonixFileData: sonixFileData ?? undefined,
-          sonixSidecarFiles: sonixSidecarFiles ?? undefined,
-          pxtoneFileData: pxtoneFileData ?? undefined,
-          organyaFileData: organyaFileData ?? undefined,
-          sawteethFileData: sawteethFileData ?? undefined,
-          eupFileData: eupFileData ?? undefined,
-          ixsFileData: ixsFileData ?? undefined,
-          psycleFileData: psycleFileData ?? undefined,
-          sc68FileData: sc68FileData ?? undefined,
-          zxtuneFileData: zxtuneFileData ?? undefined,
-          pumaTrackerFileData: pumaTrackerFileData ?? undefined,
-          steveTurnerFileData: steveTurnerFileData ?? undefined,
-          sidmon1WasmFileData: sidmon1WasmFileData ?? undefined,
-          fredEditorWasmFileData: fredEditorWasmFileData ?? undefined,
-          artOfNoiseFileData: artOfNoiseFileData ?? undefined,
-          cinter4FileData: cinter4FileData ?? undefined,
-          cinter4RawData: cinter4RawData ?? undefined,
-          fmplayerFileData: fmplayerFileData ?? undefined,
-          qsfFileData: qsfFileData ?? undefined,
-          bdFileData: bdFileData ?? undefined,
-          sd2FileData: sd2FileData ?? undefined,
-          symphonieFileData: symphonieFileData ?? undefined,
-          sonicArrangerFileData: sonicArrangerFileData ?? undefined,
-          soundMonFileData: soundMonFileData ?? undefined,
-          digMugFileData: digMugFileData ?? undefined,
-          davidWhittakerFileData: davidWhittakerFileData ?? undefined,
-          soundControlFileData: soundControlFileData ?? undefined,
-          deltaMusic1FileData: deltaMusic1FileData ?? undefined,
-          deltaMusic2FileData: deltaMusic2FileData ?? undefined,
-          soundFxFileData: soundFxFileData ?? undefined,
-          gmcFileData: gmcFileData ?? undefined,
-          voodooFileData: voodooFileData ?? undefined,
-          fredReplayerFileData: fredReplayerFileData ?? undefined,
-          oktalyzerFileData: oktalyzerFileData ?? undefined,
-          futureComposerFileData: futureComposerFileData ?? undefined,
-          quadraComposerFileData: quadraComposerFileData ?? undefined,
-          ronKlarenFileData: ronKlarenFileData ?? undefined,
-          actionamicsFileData: actionamicsFileData ?? undefined,
-          activisionProFileData: activisionProFileData ?? undefined,
-          synthesisFileData: synthesisFileData ?? undefined,
-          dssFileData: dssFileData ?? undefined,
-          soundFactoryFileData: soundFactoryFileData ?? undefined,
-          faceTheMusicFileData: faceTheMusicFileData ?? undefined,
-          klysFileData: klysFileData ?? undefined,
-          maxTraxFileData: resolveMaxTraxLoadBytes(useFormatStore.getState().maxTraxData, maxTraxFileData),
-          uadeEditableFileData: uadeEditableFileData ?? undefined,
-          sunTronicSongFileData: sunTronicSongFileData ?? undefined,
-          sunTronicCompanionPcm: sunTronicCompanionPcm ?? undefined,
-          uadePatternLayout: uadePatternLayout ?? undefined,
-          nativeSamplePlayback: nativeSamplePlayback ?? undefined,
-          v2mFileData: v2mFileData ?? undefined,
-          adplugFileData: adplugFileData ?? undefined,
-          adplugFileName: adplugFileName ?? undefined,
-          adplugTicksPerRow: adplugTicksPerRow ?? undefined,
-          tfmxFileData: tfmxFileData ?? undefined,
-          tfmxSmplData: tfmxSmplData ?? undefined,
-          libopenmptFileData: libopenmptFileData ?? undefined,
-          // Furnace-specific timing data (only set for .fur imports)
-          speed2: furnaceData?.speed2,
-          hz: furnaceData?.hz,
-          virtualTempoN: furnaceData?.virtualTempoN,
-          virtualTempoD: furnaceData?.virtualTempoD,
-          compatFlags: furnaceData?.compatFlags as any,
-          grooves: furnaceData?.grooves,
-          // Furnace native data (required for WASM sequencer bypass)
-          furnaceNative: furnaceNative ?? undefined,
-          furnaceActiveSubsong: furnaceActiveSubsong ?? undefined,
-          // TFMX timing table for position sync
           tfmxTimingTable: tfmxTimingTableRef.current ?? undefined,
-        });
+        }));
 
         // Apply Furnace compat flags, chip flags, and tuning to the dispatch engine
         const hasCompatFlags = furnaceData?.compatFlags && Object.keys(furnaceData.compatFlags).length > 0;

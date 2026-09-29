@@ -17,6 +17,7 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useEditorStore } from '@/stores/useEditorStore';
+import { resolveMaxTraxLoadBytes } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 
 /** The format a song plays as: its import tag, else what its editor mode implies. */
 function formatOf(fmt: ReturnType<typeof useFormatStore.getState>, sourceFormat: string | undefined): TrackerFormat {
@@ -29,7 +30,11 @@ function formatOf(fmt: ReturnType<typeof useFormatStore.getState>, sourceFormat:
   }
 }
 
-export function liveTrackerSong(): TrackerSong {
+/**
+ * The current song. `overrides` are playback's choices (the effective order,
+ * the looped pattern, the module's initial tempo) laid over it.
+ */
+export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSong {
   const tracker = useTrackerStore.getState();
   const transport = useTransportStore.getState();
   const fmt = useFormatStore.getState();
@@ -74,5 +79,18 @@ export function liveTrackerSong(): TrackerSong {
     const value = store[field];
     if (value != null) song[field] = value;
   }
-  return song as unknown as TrackerSong;
+  // MaxTrax: the edited model re-encoded, not the bytes as loaded.
+  const maxTrax = resolveMaxTraxLoadBytes(fmt.maxTraxData, fmt.maxTraxFileData);
+  if (maxTrax) song.maxTraxFileData = maxTrax;
+  // Furnace timing, carried on the first pattern's import metadata.
+  const furnaceData = tracker.patterns[0]?.importMetadata?.furnaceData;
+  if (furnaceData) {
+    song.speed2 = furnaceData.speed2;
+    song.hz = furnaceData.hz;
+    song.virtualTempoN = furnaceData.virtualTempoN;
+    song.virtualTempoD = furnaceData.virtualTempoD;
+    song.compatFlags = furnaceData.compatFlags;
+    song.grooves = furnaceData.grooves;
+  }
+  return { ...(song as unknown as TrackerSong), ...overrides };
 }

@@ -129,7 +129,7 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 - [x] L3.1 [x] L3.2 [x] L3.3 [x] L3.4
 - [x] L4.1 [x] L4.2 [x] L4.3
 - [x] L5.1 [x] L5.2 [x] L5.3
-- [ ] L5.4 (usePatternPlayback builds on liveTrackerSong)
+- [x] L5.4 (usePatternPlayback builds on liveTrackerSong)
 - [x] L6.1 [x] L6.2 [x] L6.3
 
 ## Owner questions
@@ -228,3 +228,13 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   the loader's TD-3 / DB303 / GoatTracker); only snapshotSong reads native
   engine data to save. Probed: a planted loadPatterns call fails it. All new
   tests wired into test:ci. 22 of 23 - L5.4 open.
+- L5.4 done: usePatternPlayback's three loadSong calls are liveTrackerSong
+  with playback's overrides (effective order/patterns/channels, the module's
+  initial tempo, the TFMX timing table); ~60 unused format-store
+  subscriptions removed (they only re-rendered; none were effect deps).
+  liveTrackerSong gained the Furnace timing fields and the re-encoded MaxTrax
+  bytes the playback song carried - export gets them too now. In-app after a
+  hard reload: amanda.ahx plays (-17.5 dBFS RMS), micro15.mod after it loads
+  classic and plays, nicktune1.bp (SoundMon) plays; no console errors.
+  Found on the way: automation curve ids collided within a millisecond
+  (b4d6262f8). 23 of 23.
