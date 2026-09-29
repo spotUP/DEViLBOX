@@ -3,7 +3,7 @@
  * Extracted from InstrumentFactory.ts
  */
 
-import { paramNumber } from '../registry/effects/paramNumber';
+import { paramNumber, paramOptional } from '../registry/effects/paramNumber';
 import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
@@ -406,7 +406,7 @@ export async function createEffect(
       break;
 
     case 'BitCrusher':
-      node = createBitCrusher(Number(p.bits) || 4, wetValue);
+      node = createBitCrusher(paramNumber(p.bits, 4), wetValue);
       break;
 
     case 'Chebyshev':
@@ -504,7 +504,7 @@ export async function createEffect(
     case 'JCReverb': {
       // Use Tone.Reverb (ConvolverNode-based) instead of Tone.JCReverb which
       // depends on FeedbackCombFilter AudioWorklets that fail to initialize.
-      const roomVal = Math.max(0, Math.min(Number(p.roomSize) || 0.5, 0.99));
+      const roomVal = Math.max(0, Math.min(paramNumber(p.roomSize, 0.5), 0.99));
       const jcr = new Tone.Reverb({
         decay: 0.5 + roomVal * 9.5,  // roomSize 0-1 → decay 0.5-10s
         preDelay: 0.01,
@@ -543,24 +543,24 @@ export async function createEffect(
 
     case 'SpaceEcho':
       node = new SpaceEchoEffect({
-        mode: Number(p.mode) || 4,
-        rate: Number(p.rate) || 300,
-        intensity: Number(p.intensity) || 0.5,
-        echoVolume: Number(p.echoVolume) || 0.8,
-        reverbVolume: Number(p.reverbVolume) || 0.3,
-        bass: Number(p.bass) || 0,
-        treble: Number(p.treble) || 0,
+        mode: paramNumber(p.mode, 4),
+        rate: paramNumber(p.rate, 300),
+        intensity: paramNumber(p.intensity, 0.5),
+        echoVolume: paramNumber(p.echoVolume, 0.8),
+        reverbVolume: paramNumber(p.reverbVolume, 0.3),
+        bass: paramNumber(p.bass, 0),
+        treble: paramNumber(p.treble, 0),
         wet: wetValue,
       });
       break;
 
     case 'SpaceyDelayer':
       node = new SpaceyDelayerEffect({
-        firstTap: Number(p.firstTap) || 250,
-        tapSize: Number(p.tapSize) || 150,
-        feedback: Number(p.feedback) || 40,
+        firstTap: paramNumber(p.firstTap, 250),
+        tapSize: paramNumber(p.tapSize, 150),
+        feedback: paramNumber(p.feedback, 40),
         multiTap: p.multiTap != null ? Number(p.multiTap) : 1,
-        tapeFilter: Number(p.tapeFilter) || 0,
+        tapeFilter: paramNumber(p.tapeFilter, 0),
         wet: wetValue,
       });
       break;
@@ -568,14 +568,14 @@ export async function createEffect(
     case 'RETapeEcho':
       node = new RETapeEchoEffect({
         mode: p.mode != null ? Number(p.mode) : 3,
-        repeatRate: Number(p.repeatRate) || 0.5,
-        intensity: Number(p.intensity) || 0.5,
-        echoVolume: Number(p.echoVolume) || 0.8,
-        wow: Number(p.wow) || 0,
-        flutter: Number(p.flutter) || 0,
-        dirt: Number(p.dirt) || 0,
+        repeatRate: paramNumber(p.repeatRate, 0.5),
+        intensity: paramNumber(p.intensity, 0.5),
+        echoVolume: paramNumber(p.echoVolume, 0.8),
+        wow: paramNumber(p.wow, 0),
+        flutter: paramNumber(p.flutter, 0),
+        dirt: paramNumber(p.dirt, 0),
         inputBleed: p.inputBleed != null ? Number(p.inputBleed) : 0,
-        loopAmount: Number(p.loopAmount) || 0,
+        loopAmount: paramNumber(p.loopAmount, 0),
         playheadFilter: p.playheadFilter != null ? Number(p.playheadFilter) : 1,
         wet: wetValue,
       });
@@ -583,32 +583,32 @@ export async function createEffect(
 
     case 'RE201':
       node = new RE201Effect({
-        bass: Number(p.bass) || 0.5,
-        treble: Number(p.treble) || 0.5,
+        bass: paramNumber(p.bass, 0.5),
+        treble: paramNumber(p.treble, 0.5),
         delayMode: p.delayMode != null ? Number(p.delayMode) : 7,
-        repeatRate: Number(p.repeatRate) || 0.5,
-        intensity: Number(p.intensity) || 0.5,
-        echoVolume: Number(p.echoVolume) || 0.8,
-        reverbVolume: Number(p.reverbVolume) || 0.3,
-        inputLevel: Number(p.inputLevel) || 1,
+        repeatRate: paramNumber(p.repeatRate, 0.5),
+        intensity: paramNumber(p.intensity, 0.5),
+        echoVolume: paramNumber(p.echoVolume, 0.8),
+        reverbVolume: paramNumber(p.reverbVolume, 0.3),
+        inputLevel: paramNumber(p.inputLevel, 1),
         wet: wetValue,
       });
       break;
 
     case 'AnotherDelay':
       node = new AnotherDelayEffect({
-        delayTime: Number(p.delayTime) || 300,
-        feedback: Number(p.feedback) || 0.3,
-        gain: Number(p.gain) || 1,
-        lowpass: Number(p.lowpass) || 12000,
-        highpass: Number(p.highpass) || 80,
-        flutterFreq: Number(p.flutterFreq) || 3.5,
-        flutterDepth: Number(p.flutterDepth) || 0,
-        wowFreq: Number(p.wowFreq) || 0.5,
-        wowDepth: Number(p.wowDepth) || 0,
+        delayTime: paramNumber(p.delayTime, 300),
+        feedback: paramNumber(p.feedback, 0.3),
+        gain: paramNumber(p.gain, 1),
+        lowpass: paramNumber(p.lowpass, 12000),
+        highpass: paramNumber(p.highpass, 80),
+        flutterFreq: paramNumber(p.flutterFreq, 3.5),
+        flutterDepth: paramNumber(p.flutterDepth, 0),
+        wowFreq: paramNumber(p.wowFreq, 0.5),
+        wowDepth: paramNumber(p.wowDepth, 0),
         reverbEnabled: p.reverbEnabled != null ? Number(p.reverbEnabled) > 0 : true,
-        roomSize: Number(p.roomSize) || 0.5,
-        damping: Number(p.damping) || 0.5,
+        roomSize: paramNumber(p.roomSize, 0.5),
+        damping: paramNumber(p.damping, 0.5),
         width: p.width != null ? Number(p.width) : 1,
         wet: wetValue,
       });
@@ -616,11 +616,11 @@ export async function createEffect(
 
     case 'BiPhase':
       node = new BiPhaseEffect({
-        rateA: Number(p.rateA) || 0.5,
-        depthA: Number(p.depthA) || 0.6,
-        rateB: Number(p.rateB) || 4.0,
-        depthB: Number(p.depthB) || 0.4,
-        feedback: Number(p.feedback) || 0.3,
+        rateA: paramNumber(p.rateA, 0.5),
+        depthA: paramNumber(p.depthA, 0.6),
+        rateB: paramNumber(p.rateB, 4.0),
+        depthB: paramNumber(p.depthB, 0.4),
+        feedback: paramNumber(p.feedback, 0.3),
         routing: Number(p.routing) === 1 ? 'series' : 'parallel',
         wet: wetValue,
       });
@@ -628,9 +628,9 @@ export async function createEffect(
 
     case 'DubFilter':
       node = new DubFilterEffect({
-        cutoff: Number(p.cutoff) || 20,
-        resonance: Number(p.resonance) || 30,
-        gain: Number(p.gain) || 1,
+        cutoff: paramNumber(p.cutoff, 20),
+        resonance: paramNumber(p.resonance, 30),
+        gain: paramNumber(p.gain, 1),
         wet: wetValue,
       });
       break;
@@ -640,12 +640,12 @@ export async function createEffect(
       const { SwedishChainsawEffect } = await import('../effects/SwedishChainsawEffect');
       node = new SwedishChainsawEffect({
         tight: Number(p.tight) > 50 ? 1 : 0,
-        pedalGain: (Number(p.pedalGain) || 50) / 100,
-        ampGain: (Number(p.ampGain) || 50) / 100,
-        bass: (Number(p.bass) || 5) / 100,
-        middle: (Number(p.middle) || 50) / 100,
-        treble: (Number(p.treble) || 50) / 100,
-        volume: (Number(p.volume) || 50) / 100,
+        pedalGain: (paramNumber(p.pedalGain, 50)) / 100,
+        ampGain: (paramNumber(p.ampGain, 50)) / 100,
+        bass: (paramNumber(p.bass, 5)) / 100,
+        middle: (paramNumber(p.middle, 50)) / 100,
+        treble: (paramNumber(p.treble, 50)) / 100,
+        volume: (paramNumber(p.volume, 50)) / 100,
         wet: wetValue,
       });
       break;
@@ -653,9 +653,9 @@ export async function createEffect(
 
     case 'MoogFilter':
       node = new MoogFilterEffect({
-        cutoff: Number(p.cutoff) || 1000,
-        resonance: (Number(p.resonance) || 10) / 100,  // 0-100 -> 0-1
-        drive: Number(p.drive) || 1.0,
+        cutoff: paramNumber(p.cutoff, 1000),
+        resonance: (paramNumber(p.resonance, 10)) / 100,  // 0-100 -> 0-1
+        drive: paramNumber(p.drive, 1.0),
         model: (Number(p.model) || MoogFilterModel.Hyperion) as MoogFilterModel,
         filterMode: (Number(p.filterMode) || MoogFilterMode.LP4) as MoogFilterMode,
         wet: wetValue,
@@ -664,66 +664,66 @@ export async function createEffect(
 
     case 'MVerb':
       node = new MVerbEffect({
-        damping: Number(p.damping),
-        density: Number(p.density),
-        bandwidth: Number(p.bandwidth),
-        decay: Number(p.decay),
-        predelay: Number(p.predelay),
-        size: Number(p.size),
-        gain: Number(p.gain),
-        mix: Number(p.mix),
-        earlyMix: Number(p.earlyMix),
+        damping: paramOptional(p.damping),
+        density: paramOptional(p.density),
+        bandwidth: paramOptional(p.bandwidth),
+        decay: paramOptional(p.decay),
+        predelay: paramOptional(p.predelay),
+        size: paramOptional(p.size),
+        gain: paramOptional(p.gain),
+        mix: paramOptional(p.mix),
+        earlyMix: paramOptional(p.earlyMix),
         wet: wetValue,
       });
       break;
 
     case 'MadProfessorPlate':
       node = new MadProfessorPlateEffect({
-        decay: Number(p.decay),
-        damping: Number(p.damping),
-        density: Number(p.density),
-        predelay: Number(p.predelay),
-        size: Number(p.size),
-        hpfHz: Number(p.hpfHz),
-        lpfHz: Number(p.lpfHz),
+        decay: paramOptional(p.decay),
+        damping: paramOptional(p.damping),
+        density: paramOptional(p.density),
+        predelay: paramOptional(p.predelay),
+        size: paramOptional(p.size),
+        hpfHz: paramOptional(p.hpfHz),
+        lpfHz: paramOptional(p.lpfHz),
         wet: wetValue,
       });
       break;
 
     case 'DattorroPlate':
       node = new DattorroPlateEffect({
-        predelay: Number(p.predelay),
-        preFilter: Number(p.preFilter),
-        inputDiffusion: Number(p.inputDiffusion),
-        decayDiffusion: Number(p.decayDiffusion),
-        decay: Number(p.decay),
-        damping: Number(p.damping),
+        predelay: paramOptional(p.predelay),
+        preFilter: paramOptional(p.preFilter),
+        inputDiffusion: paramOptional(p.inputDiffusion),
+        decayDiffusion: paramOptional(p.decayDiffusion),
+        decay: paramOptional(p.decay),
+        damping: paramOptional(p.damping),
         wet: wetValue,
       });
       break;
 
     case 'Leslie':
       node = new LeslieEffect({
-        speed: Number(p.speed),
-        hornRate: Number(p.hornRate),
-        drumRate: Number(p.drumRate),
-        hornDepth: Number(p.hornDepth),
-        drumDepth: Number(p.drumDepth),
-        doppler: Number(p.doppler),
-        width: Number(p.width),
-        acceleration: Number(p.acceleration),
+        speed: paramOptional(p.speed),
+        hornRate: paramOptional(p.hornRate),
+        drumRate: paramOptional(p.drumRate),
+        hornDepth: paramOptional(p.hornDepth),
+        drumDepth: paramOptional(p.drumDepth),
+        doppler: paramOptional(p.doppler),
+        width: paramOptional(p.width),
+        acceleration: paramOptional(p.acceleration),
         wet: wetValue,
       });
       break;
 
     case 'SpringReverb':
       node = new SpringReverbEffect({
-        decay: Number(p.decay),
-        damping: Number(p.damping),
-        tension: Number(p.tension),
-        mix: Number(p.mix),
-        drip: Number(p.drip),
-        diffusion: Number(p.diffusion),
+        decay: paramOptional(p.decay),
+        damping: paramOptional(p.damping),
+        tension: paramOptional(p.tension),
+        mix: paramOptional(p.mix),
+        drip: paramOptional(p.drip),
+        diffusion: paramOptional(p.diffusion),
         wet: wetValue,
       });
       break;
@@ -773,12 +773,12 @@ export async function createEffect(
     case 'TapeDegradation': {
       const { TapeDegradationEffect } = await import('@engine/effects/TapeDegradationEffect');
       node = new TapeDegradationEffect({
-        wow: (Number(p.wow) || 30) / 100,
-        flutter: (Number(p.flutter) || 20) / 100,
-        hiss: (Number(p.hiss) || 15) / 100,
-        dropouts: (Number(p.dropouts) || 0) / 100,
-        saturation: (Number(p.saturation) || 30) / 100,
-        toneShift: (Number(p.toneShift) || 50) / 100,
+        wow: (paramNumber(p.wow, 30)) / 100,
+        flutter: (paramNumber(p.flutter, 20)) / 100,
+        hiss: (paramNumber(p.hiss, 15)) / 100,
+        dropouts: (paramNumber(p.dropouts, 0)) / 100,
+        saturation: (paramNumber(p.saturation, 30)) / 100,
+        toneShift: (paramNumber(p.toneShift, 50)) / 100,
         wet: wetValue,
       });
       break;
@@ -786,16 +786,16 @@ export async function createEffect(
     case 'AmbientDelay': {
       const { AmbientDelayEffect } = await import('@engine/effects/AmbientDelayEffect');
       node = new AmbientDelayEffect({
-        time: (Number(p.time) || 375) / 1000,
-        feedback: (Number(p.feedback) || 55) / 100,
-        taps: Number(p.taps) || 2,
+        time: (paramNumber(p.time, 375)) / 1000,
+        feedback: (paramNumber(p.feedback, 55)) / 100,
+        taps: paramNumber(p.taps, 2),
         filterType: (p.filterType as 'lowpass' | 'highpass' | 'bandpass') || 'lowpass',
-        filterFreq: Number(p.filterFreq) || 2500,
-        filterQ: Number(p.filterQ) || 1.5,
-        modRate: (Number(p.modRate) || 30) / 100,
-        modDepth: (Number(p.modDepth) || 15) / 100,
-        stereoSpread: (Number(p.stereoSpread) || 50) / 100,
-        diffusion: (Number(p.diffusion) || 20) / 100,
+        filterFreq: paramNumber(p.filterFreq, 2500),
+        filterQ: paramNumber(p.filterQ, 1.5),
+        modRate: (paramNumber(p.modRate, 30)) / 100,
+        modDepth: (paramNumber(p.modDepth, 15)) / 100,
+        stereoSpread: (paramNumber(p.stereoSpread, 50)) / 100,
+        diffusion: (paramNumber(p.diffusion, 20)) / 100,
         wet: wetValue,
       });
       break;
@@ -803,14 +803,14 @@ export async function createEffect(
     case 'ShimmerReverb': {
       const { ShimmerReverbEffect } = await import('@engine/effects/ShimmerReverbEffect');
       node = new ShimmerReverbEffect({
-        decay: (Number(p.decay) || 70) / 100,
-        shimmer: (Number(p.shimmer) || 50) / 100,
+        decay: (paramNumber(p.decay, 70)) / 100,
+        shimmer: (paramNumber(p.shimmer, 50)) / 100,
         pitch: paramNumber(p.pitch, 12),
-        damping: (Number(p.damping) || 50) / 100,
-        size: (Number(p.size) || 70) / 100,
-        predelay: (Number(p.predelay) || 40) / 1000,
-        modRate: (Number(p.modRate) || 30) / 100,
-        modDepth: (Number(p.modDepth) || 20) / 100,
+        damping: (paramNumber(p.damping, 50)) / 100,
+        size: (paramNumber(p.size, 70)) / 100,
+        predelay: (paramNumber(p.predelay, 40)) / 1000,
+        modRate: (paramNumber(p.modRate, 30)) / 100,
+        modDepth: (paramNumber(p.modDepth, 20)) / 100,
         wet: wetValue,
       });
       break;
@@ -818,19 +818,19 @@ export async function createEffect(
     case 'GranularFreeze': {
       const { GranularFreezeEffect } = await import('@engine/effects/GranularFreezeEffect');
       node = new GranularFreezeEffect({
-        freeze: Number(p.freeze) || 0,
-        grainSize: (Number(p.grainSize) || 80) / 1000,
-        density: Number(p.density) || 12,
-        scatter: (Number(p.scatter) || 30) / 100,
+        freeze: paramNumber(p.freeze, 0),
+        grainSize: (paramNumber(p.grainSize, 80)) / 1000,
+        density: paramNumber(p.density, 12),
+        scatter: (paramNumber(p.scatter, 30)) / 100,
         pitch: paramNumber(p.pitch, 0),
-        spray: (Number(p.spray) || 20) / 100,
-        shimmer: (Number(p.shimmer) || 0) / 100,
-        stereoWidth: (Number(p.stereoWidth) || 70) / 100,
-        feedback: (Number(p.feedback) || 0) / 100,
-        captureLength: (Number(p.captureLen) || 500) / 1000,
-        attack: (Number(p.attack) || 5) / 1000,
-        release: (Number(p.release) || 40) / 1000,
-        thru: Number(p.thru) || 0,
+        spray: (paramNumber(p.spray, 20)) / 100,
+        shimmer: (paramNumber(p.shimmer, 0)) / 100,
+        stereoWidth: (paramNumber(p.stereoWidth, 70)) / 100,
+        feedback: (paramNumber(p.feedback, 0)) / 100,
+        captureLength: (paramNumber(p.captureLen, 500)) / 1000,
+        attack: (paramNumber(p.attack, 5)) / 1000,
+        release: (paramNumber(p.release, 40)) / 1000,
+        thru: paramNumber(p.thru, 0),
         wet: wetValue,
       });
       break;
