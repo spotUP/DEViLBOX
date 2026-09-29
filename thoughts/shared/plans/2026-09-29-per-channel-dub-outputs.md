@@ -72,23 +72,23 @@ Known defects found on the way:
 
 ## Phases (checklist)
 
-- [ ] P0 D1+D2: active-engine registration in NativeEngineRouting,
+- [x] P0 D1+D2: active-engine registration in NativeEngineRouting,
       `supportsDubSends`, getActiveIsolationEngine checks the playing engine
       first. Test: Hippel-after-MOD resolves to the playing engine or null.
-- [ ] P1 channel-outputs.js + WASMSingletonBase implements
+- [x] P1 channel-outputs.js + WASMSingletonBase implements
       IsolationCapableEngine (37 outputs, addIsolation/removeIsolation,
       dub messages, rebuildDubConnections after play). Convert ONE template
       worklet (Oktalyzer: 8 voices, already fixed today) and prove it live:
       dub send on channel N correlates with channel N's stream and not with
       the others.
-- [ ] P2 Convert the remaining 19 routed + 3 unwired template worklets
+- [x] P2 Convert the remaining 19 routed + 3 unwired template worklets
       (mechanical; engineChannelStreams-style harness test per worklet:
       output[5+ch] equals voice ch).
-- [ ] P3 TFMX (Hippel/TFMX/7V) dub copies from gScope; Sonix; Cinter4.
+- [x] P3 (f7fec3d82 TFMX, 53c0f12a5 Sonix, e10e13512 Cinter4; dub sends only, supportsIsolationSlots false; TFMX verified live) TFMX (Hippel/TFMX/7V) dub copies from gScope; Sonix; Cinter4.
       Isolation for these needs the voice removed from the C mix (C change) -
       separate item P3b.
 - [ ] P4 SunTronic per-voice rings to its resampler worklet.
-- [ ] P5 UADE: remove isolated channels from output 0.
+- [x] P5 (272565b54) UADE: remove isolated channels from output 0 (C isolation mask; capture FIFO not render-aligned, so no worklet subtraction).
 - [ ] P6 Measure: audio-thread cost of 32 dub outputs per engine with no
       sends open (outputs unconnected are cheap; verify with thcpu.py).
 
