@@ -20,7 +20,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters; const wet = c.wet / 100;
-      return new Tone.Distortion({ distortion: Number(p.drive) || 0.4, oversample: (p.oversample as OverSampleType) || 'none', wet });
+      return new Tone.Distortion({ distortion: paramNumber(p.drive, 0.4), oversample: (p.oversample as OverSampleType) || 'none', wet });
     },
     getDefaultParameters: () => ({ drive: 0.4, oversample: 'none' }),
     presets: [
@@ -36,7 +36,7 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const { TapeSaturation } = await import('@engine/effects/TapeSaturation');
       const p = c.parameters;
-      return new TapeSaturation({ drive: (Number(p.drive) || 50) / 100, tone: Number(p.tone) || 12000, wet: c.wet / 100 });
+      return new TapeSaturation({ drive: (paramNumber(p.drive, 50)) / 100, tone: paramNumber(p.tone, 12000), wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ drive: 50, tone: 12000 }),
     presets: [
@@ -65,7 +65,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.Chebyshev({ order: Number(p.order) || 2, oversample: (p.oversample as OverSampleType) || 'none', wet: c.wet / 100 });
+      return new Tone.Chebyshev({ order: paramNumber(p.order, 2), oversample: (p.oversample as OverSampleType) || 'none', wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ order: 2, oversample: 'none' }),
     presets: [
@@ -83,8 +83,8 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const p = c.parameters;
       return new Tone.Filter({
-        type: (p.type as BiquadFilterType) || 'lowpass', frequency: Number(p.frequency) || 5000,
-        rolloff: (Number(p.rolloff) || -12) as -12 | -24 | -48 | -96, Q: Number(p.Q) || 1, gain: Number(p.gain) || 0,
+        type: (p.type as BiquadFilterType) || 'lowpass', frequency: paramNumber(p.frequency, 5000),
+        rolloff: (paramNumber(p.rolloff, -12)) as -12 | -24 | -48 | -96, Q: paramNumber(p.Q, 1), gain: paramNumber(p.gain, 0),
       });
     },
     getDefaultParameters: () => ({ type: 'lowpass', frequency: 5000, rolloff: -12, Q: 1, gain: 0 }),
@@ -101,8 +101,8 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const p = c.parameters;
       const af = new Tone.AutoFilter({
-        frequency: Number(p.frequency) || 1, baseFrequency: Number(p.baseFrequency) || 200,
-        octaves: Number(p.octaves) || 2.6,
+        frequency: paramNumber(p.frequency, 1), baseFrequency: paramNumber(p.baseFrequency, 200),
+        octaves: paramNumber(p.octaves, 2.6),
         filter: { type: (p.filterType as BiquadFilterType) || 'lowpass', rolloff: -12, Q: 1 },
         wet: c.wet / 100,
       });
@@ -122,9 +122,9 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const p = c.parameters;
       return new Tone.AutoWah({
-        baseFrequency: Number(p.baseFrequency) || 100, octaves: Number(p.octaves) || 6,
-        sensitivity: Number(p.sensitivity) || 0, Q: Number(p.Q) || 2,
-        gain: Number(p.gain) || 2, follower: Number(p.follower) || 0.1, wet: c.wet / 100,
+        baseFrequency: paramNumber(p.baseFrequency, 100), octaves: paramNumber(p.octaves, 6),
+        sensitivity: paramNumber(p.sensitivity, 0), Q: paramNumber(p.Q, 2),
+        gain: paramNumber(p.gain, 2), follower: paramNumber(p.follower, 0.1), wet: c.wet / 100,
       });
     },
     getDefaultParameters: () => ({ baseFrequency: 100, octaves: 6, sensitivity: 0, Q: 2, gain: 2, follower: 0.1 }),
@@ -141,8 +141,8 @@ const tonejs: EffectDescriptor[] = [
       const { DubFilterEffect } = await import('@engine/effects/DubFilterEffect');
       const p = c.parameters;
       return new DubFilterEffect({
-        cutoff: Number(p.cutoff) || 20, resonance: Number(p.resonance) || 30,
-        gain: Number(p.gain) || 1, wet: c.wet / 100,
+        cutoff: paramNumber(p.cutoff, 20), resonance: paramNumber(p.resonance, 30),
+        gain: paramNumber(p.gain, 1), wet: c.wet / 100,
       });
     },
     getDefaultParameters: () => ({ cutoff: 20, resonance: 30, gain: 1 }),
@@ -159,7 +159,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const reverb = new Tone.Reverb({ decay: Number(p.decay) || 8.6, preDelay: Number(p.preDelay) || 0.4, wet: c.wet / 100 });
+      const reverb = new Tone.Reverb({ decay: paramNumber(p.decay, 8.6), preDelay: paramNumber(p.preDelay, 0.4), wet: c.wet / 100 });
       await reverb.ready;
       return reverb;
     },
@@ -178,7 +178,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const roomVal = Math.max(0, Math.min(Number(p.roomSize) || 0.7, 0.99));
+      const roomVal = Math.max(0, Math.min(paramNumber(p.roomSize, 0.7), 0.99));
       const jcr = new Tone.Reverb({ decay: 0.5 + roomVal * 9.5, preDelay: 0.01, wet: c.wet / 100 });
       await jcr.ready;
       return jcr;
@@ -196,7 +196,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager', bpmSyncParams: ['time'],
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.FeedbackDelay({ delayTime: Number(p.time) || 0.25, feedback: Number(p.feedback) || 0.5, wet: c.wet / 100 });
+      return new Tone.FeedbackDelay({ delayTime: paramNumber(p.time, 0.25), feedback: paramNumber(p.feedback, 0.5), wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ time: 0.25, feedback: 0.5 }),
     presets: [
@@ -213,7 +213,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager', bpmSyncParams: ['time'],
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.FeedbackDelay({ delayTime: Number(p.time) || 0.25, feedback: Number(p.feedback) || 0.5, wet: c.wet / 100 });
+      return new Tone.FeedbackDelay({ delayTime: paramNumber(p.time, 0.25), feedback: paramNumber(p.feedback, 0.5), wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ time: 0.25, feedback: 0.5 }),
     presets: [
@@ -230,7 +230,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager', bpmSyncParams: ['time'],
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.PingPongDelay({ delayTime: Number(p.time) || 0.25, feedback: Number(p.feedback) || 0.5, wet: c.wet / 100 });
+      return new Tone.PingPongDelay({ delayTime: paramNumber(p.time, 0.25), feedback: paramNumber(p.feedback, 0.5), wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ time: 0.25, feedback: 0.5 }),
     presets: [
@@ -248,10 +248,10 @@ const tonejs: EffectDescriptor[] = [
       const { SpaceEchoEffect } = await import('@engine/effects/SpaceEchoEffect');
       const p = c.parameters;
       return new SpaceEchoEffect({
-        mode: Number(p.mode) || 8, rate: Number(p.rate) || 300,
-        intensity: Number(p.intensity) || 0.74, echoVolume: Number(p.echoVolume) || 0.8,
-        reverbVolume: Number(p.reverbVolume) || 0.4, bass: Number(p.bass) || 4,
-        treble: Number(p.treble) || 4, wet: c.wet / 100,
+        mode: paramNumber(p.mode, 8), rate: paramNumber(p.rate, 300),
+        intensity: paramNumber(p.intensity, 0.74), echoVolume: paramNumber(p.echoVolume, 0.8),
+        reverbVolume: paramNumber(p.reverbVolume, 0.4), bass: paramNumber(p.bass, 4),
+        treble: paramNumber(p.treble, 4), wet: c.wet / 100,
       });
     },
     getDefaultParameters: () => ({ mode: 8, rate: 300, intensity: 0.74, echoVolume: 0.8, reverbVolume: 0.4, bass: 4, treble: 4, bpmSync: 1, syncDivision: '1/8' }),
@@ -273,9 +273,9 @@ const tonejs: EffectDescriptor[] = [
       const { SpaceyDelayerEffect } = await import('@engine/effects/SpaceyDelayerEffect');
       const p = c.parameters;
       return new SpaceyDelayerEffect({
-        firstTap: Number(p.firstTap) || 250, tapSize: Number(p.tapSize) || 150,
-        feedback: Number(p.feedback) || 40, multiTap: p.multiTap != null ? Number(p.multiTap) : 1,
-        tapeFilter: Number(p.tapeFilter) || 0, wet: c.wet / 100,
+        firstTap: paramNumber(p.firstTap, 250), tapSize: paramNumber(p.tapSize, 150),
+        feedback: paramNumber(p.feedback, 40), multiTap: p.multiTap != null ? Number(p.multiTap) : 1,
+        tapeFilter: paramNumber(p.tapeFilter, 0), wet: c.wet / 100,
       });
     },
     getDefaultParameters: () => ({ firstTap: 250, tapSize: 150, feedback: 40, multiTap: 1, tapeFilter: 0 }),
@@ -294,11 +294,11 @@ const tonejs: EffectDescriptor[] = [
       const { RETapeEchoEffect } = await import('@engine/effects/RETapeEchoEffect');
       const p = c.parameters;
       return new RETapeEchoEffect({
-        mode: p.mode != null ? Number(p.mode) : 3, repeatRate: Number(p.repeatRate) || 0.5,
-        intensity: Number(p.intensity) || 0.5, echoVolume: Number(p.echoVolume) || 0.8,
-        wow: Number(p.wow) || 0, flutter: Number(p.flutter) || 0, dirt: Number(p.dirt) || 0,
+        mode: p.mode != null ? Number(p.mode) : 3, repeatRate: paramNumber(p.repeatRate, 0.5),
+        intensity: paramNumber(p.intensity, 0.5), echoVolume: paramNumber(p.echoVolume, 0.8),
+        wow: paramNumber(p.wow, 0), flutter: paramNumber(p.flutter, 0), dirt: paramNumber(p.dirt, 0),
         inputBleed: p.inputBleed != null ? Number(p.inputBleed) : 0,
-        loopAmount: Number(p.loopAmount) || 0,
+        loopAmount: paramNumber(p.loopAmount, 0),
         playheadFilter: p.playheadFilter != null ? Number(p.playheadFilter) : 1,
         wet: c.wet / 100,
       });
@@ -325,8 +325,8 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const p = c.parameters;
       const chorus = new Tone.Chorus({
-        frequency: Number(p.frequency) || 1.5, delayTime: Number(p.delayTime) || 3.5,
-        depth: Number(p.depth) || 0.7, wet: c.wet / 100,
+        frequency: paramNumber(p.frequency, 1.5), delayTime: paramNumber(p.delayTime, 3.5),
+        depth: paramNumber(p.depth, 0.7), wet: c.wet / 100,
       });
       chorus.start();
       return chorus;
@@ -344,8 +344,8 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const p = c.parameters;
       return new Tone.Phaser({
-        frequency: Number(p.frequency) || 0.5, octaves: Number(p.octaves) || 3,
-        baseFrequency: Number(p.baseFrequency) || 1000, Q: Number(p.Q) || 10, wet: c.wet / 100,
+        frequency: paramNumber(p.frequency, 0.5), octaves: paramNumber(p.octaves, 3),
+        baseFrequency: paramNumber(p.baseFrequency, 1000), Q: paramNumber(p.Q, 10), wet: c.wet / 100,
       });
     },
     getDefaultParameters: () => ({ frequency: 0.5, octaves: 3, baseFrequency: 1000, Q: 10 }),
@@ -360,7 +360,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const t = new Tone.Tremolo({ frequency: Number(p.frequency) || 10, depth: Number(p.depth) || 0.5, wet: c.wet / 100 });
+      const t = new Tone.Tremolo({ frequency: paramNumber(p.frequency, 10), depth: paramNumber(p.depth, 0.5), wet: c.wet / 100 });
       t.start();
       return t;
     },
@@ -376,7 +376,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.Vibrato({ frequency: Number(p.frequency) || 5, depth: Number(p.depth) || 0.1, wet: c.wet / 100 });
+      return new Tone.Vibrato({ frequency: paramNumber(p.frequency, 5), depth: paramNumber(p.depth, 0.1), wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ frequency: 5, depth: 0.1 }),
     presets: [
@@ -390,7 +390,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const ap = new Tone.AutoPanner({ frequency: Number(p.frequency) || 1, depth: Number(p.depth) || 1, wet: c.wet / 100 });
+      const ap = new Tone.AutoPanner({ frequency: paramNumber(p.frequency, 1), depth: paramNumber(p.depth, 1), wet: c.wet / 100 });
       ap.start();
       return ap;
     },
@@ -408,9 +408,9 @@ const tonejs: EffectDescriptor[] = [
       const { BiPhaseEffect } = await import('@engine/effects/BiPhaseEffect');
       const p = c.parameters;
       return new BiPhaseEffect({
-        rateA: Number(p.rateA) || 0.5, depthA: Number(p.depthA) || 0.6,
-        rateB: Number(p.rateB) || 4.0, depthB: Number(p.depthB) || 0.4,
-        feedback: Number(p.feedback) || 0.3,
+        rateA: paramNumber(p.rateA, 0.5), depthA: paramNumber(p.depthA, 0.6),
+        rateB: paramNumber(p.rateB, 4.0), depthB: paramNumber(p.depthB, 0.4),
+        feedback: paramNumber(p.feedback, 0.3),
         routing: Number(p.routing) === 1 ? 'series' : 'parallel', wet: c.wet / 100,
       });
     },
@@ -429,8 +429,8 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const p = c.parameters;
       return new Tone.Compressor({
-        threshold: Number(p.threshold) || -24, ratio: Number(p.ratio) || 12,
-        attack: Number(p.attack) || 0.003, release: Number(p.release) || 0.25,
+        threshold: paramNumber(p.threshold, -24), ratio: paramNumber(p.ratio, 12),
+        attack: paramNumber(p.attack, 0.003), release: paramNumber(p.release, 0.25),
       });
     },
     getDefaultParameters: () => ({ threshold: -24, ratio: 12, attack: 0.003, release: 0.25 }),
@@ -479,27 +479,27 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const lowFreq = Number(p.lowFrequency) || 250;
-      const highFreq = Number(p.highFrequency) || 3500;
+      const lowFreq = paramNumber(p.lowFrequency, 250);
+      const highFreq = paramNumber(p.highFrequency, 3500);
       // Use three serial peaking filters instead of Tone.EQ3's multiband split,
       // which has inherent phase cancellation causing ~11dB insertion loss.
       const eqInput = new Tone.Gain(1);
       const lowFilter = new Tone.Filter({
         type: 'peaking' as BiquadFilterType,
         frequency: lowFreq,
-        gain: Number(p.low) || 0,
+        gain: paramNumber(p.low, 0),
         Q: 0.5,
       });
       const midFilter = new Tone.Filter({
         type: 'peaking' as BiquadFilterType,
         frequency: Math.sqrt(lowFreq * highFreq),
-        gain: Number(p.mid) || 0,
+        gain: paramNumber(p.mid, 0),
         Q: 0.7,
       });
       const highFilter = new Tone.Filter({
         type: 'peaking' as BiquadFilterType,
         frequency: highFreq,
-        gain: Number(p.high) || 0,
+        gain: paramNumber(p.high, 0),
         Q: 0.5,
       });
       eqInput.chain(lowFilter, midFilter, highFilter);
@@ -561,7 +561,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.StereoWidener({ width: Math.min(0.85, Number(p.width) || 0.5), wet: c.wet / 100 });
+      return new Tone.StereoWidener({ width: Math.min(0.85, paramNumber(p.width, 0.5)), wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ width: 0.5 }),
     presets: [
@@ -577,7 +577,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.FrequencyShifter({ frequency: Number(p.frequency) || 0, wet: c.wet / 100 });
+      return new Tone.FrequencyShifter({ frequency: paramNumber(p.frequency, 0), wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ frequency: 5 }),
     presets: [
@@ -592,8 +592,8 @@ const tonejs: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const p = c.parameters;
       return new Tone.PitchShift({
-        pitch: Number(p.pitch) || 0, windowSize: Number(p.windowSize) || 0.1,
-        delayTime: Number(p.delayTime) || 0, feedback: Number(p.feedback) || 0, wet: c.wet / 100,
+        pitch: paramNumber(p.pitch, 0), windowSize: paramNumber(p.windowSize, 0.1),
+        delayTime: paramNumber(p.delayTime, 0), feedback: paramNumber(p.feedback, 0), wet: c.wet / 100,
       });
     },
     getDefaultParameters: () => ({ pitch: 0, windowSize: 0.1, delayTime: 0, feedback: 0 }),
@@ -613,12 +613,12 @@ const tonejs: EffectDescriptor[] = [
       const { TapeDegradationEffect } = await import('@engine/effects/TapeDegradationEffect');
       const p = c.parameters;
       return new TapeDegradationEffect({
-        wow: (Number(p.wow) || 30) / 100,
-        flutter: (Number(p.flutter) || 20) / 100,
-        hiss: (Number(p.hiss) || 15) / 100,
-        dropouts: (Number(p.dropouts) || 0) / 100,
-        saturation: (Number(p.saturation) || 30) / 100,
-        toneShift: (Number(p.toneShift) || 50) / 100,
+        wow: (paramNumber(p.wow, 30)) / 100,
+        flutter: (paramNumber(p.flutter, 20)) / 100,
+        hiss: (paramNumber(p.hiss, 15)) / 100,
+        dropouts: (paramNumber(p.dropouts, 0)) / 100,
+        saturation: (paramNumber(p.saturation, 30)) / 100,
+        toneShift: (paramNumber(p.toneShift, 50)) / 100,
         wet: c.wet / 100,
       });
     },
@@ -637,16 +637,16 @@ const tonejs: EffectDescriptor[] = [
       const { AmbientDelayEffect } = await import('@engine/effects/AmbientDelayEffect');
       const p = c.parameters;
       return new AmbientDelayEffect({
-        time: (Number(p.time) || 375) / 1000,
-        feedback: (Number(p.feedback) || 55) / 100,
-        taps: Number(p.taps) || 2,
+        time: (paramNumber(p.time, 375)) / 1000,
+        feedback: (paramNumber(p.feedback, 55)) / 100,
+        taps: paramNumber(p.taps, 2),
         filterType: (p.filterType as 'lowpass' | 'highpass' | 'bandpass') || 'lowpass',
-        filterFreq: Number(p.filterFreq) || 2500,
-        filterQ: Number(p.filterQ) || 1.5,
-        modRate: (Number(p.modRate) || 30) / 100,
-        modDepth: (Number(p.modDepth) || 15) / 100,
-        stereoSpread: (Number(p.stereoSpread) || 50) / 100,
-        diffusion: (Number(p.diffusion) || 20) / 100,
+        filterFreq: paramNumber(p.filterFreq, 2500),
+        filterQ: paramNumber(p.filterQ, 1.5),
+        modRate: (paramNumber(p.modRate, 30)) / 100,
+        modDepth: (paramNumber(p.modDepth, 15)) / 100,
+        stereoSpread: (paramNumber(p.stereoSpread, 50)) / 100,
+        diffusion: (paramNumber(p.diffusion, 20)) / 100,
         wet: c.wet / 100,
       });
     },
