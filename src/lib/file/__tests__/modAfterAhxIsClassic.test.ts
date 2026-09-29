@@ -80,4 +80,25 @@ describe('MOD after AHX', () => {
     expect(useFormatStore.getState().editorMode).toBe('classic');
     expect(useFormatStore.getState().hivelyNative).toBeNull();
   }, 60000);
+
+  it('a V2M replaces the song: its instruments only, not stacked on the previous song', async () => {
+    // loadV2MFile added the V2M's instruments on top of whatever was loaded
+    // and reset nothing (2026-09-29 audit); it goes through applySong now.
+    const { importTrackerModule, loadFile } = await import('../UnifiedFileLoader');
+    const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+    const mod = fileOf('src/__tests__/fixtures/micro15-goto80.mod', 'micro15.mod');
+    await importTrackerModule({
+      metadata: { title: 'micro15', type: 'MOD', channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1, duration: 0 },
+      arrayBuffer: await mod.arrayBuffer(), file: mod,
+    } as never, { useLibopenmpt: true } as never);
+    const modInstruments = useInstrumentStore.getState().instruments.length;
+    expect(modInstruments).toBeGreaterThan(0);
+
+    const v2m = fileOf('public/data/songs/v2/gamma projection.v2m', 'gamma projection.v2m');
+    const result = await loadFile(v2m);
+    expect(result.success).toBe(true);
+    const { importV2M } = await import('@/lib/import/V2MToPattern');
+    const expected = importV2M(await v2m.arrayBuffer(), { rowsPerPattern: 64, bpm: 120, speed: 6, createInstruments: true }).instruments.length;
+    expect(useInstrumentStore.getState().instruments.length).toBe(expected);
+  }, 60000);
 });

@@ -1447,31 +1447,17 @@ async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<
       createInstruments: true,
     });
     
-    // Update song state using existing stores
-    const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
-    const { setBPM } = useTransportStore.getState();
-    const { setMetadata } = useProjectStore.getState();
-    const { addInstrument } = useInstrumentStore.getState();
-    
-    // Set song metadata
-    setMetadata({ name: file.name.replace(/\.v2m$/i, '') });
-    setBPM(result.bpm);
-    
-    // Load patterns
-    loadPatterns(result.patterns);
-    
-    // Set pattern order
-    const patternIds = result.patterns.map((_p, i) => i);
-    setPatternOrder(patternIds);
-    setCurrentPattern(0);
-    
-    // Add instruments
-    for (const inst of result.instruments) {
-      addInstrument(inst);
-    }
-
-    // Store raw V2M data for WASM streaming playback
-    useFormatStore.setState({ v2mFileData: arrayBuffer.slice(0) });
+    // It used to add its instruments on top of the previous song's and reset
+    // nothing; a V2M is a whole song like any other.
+    await applySong({
+      instruments: result.instruments, patterns: result.patterns,
+      order: result.patterns.map((_p, i) => i),
+      bpm: result.bpm, speed: 6,
+      metadata: { name: file.name.replace(/\.v2m$/i, '') },
+      originalModuleData: null,
+      // Raw V2M data for WASM streaming playback.
+      engine: { v2mFileData: arrayBuffer.slice(0) } as never,
+    }, 'import');
 
     notify.success(`Imported V2M: ${result.patterns.length} patterns, ${result.instruments.length} instruments`);
     
@@ -1543,6 +1529,30 @@ function promptForCompanionFile(ext: string, mainFileName: string): Promise<File
   });
 }
 
+/** An extracted AdPlug song, applied as the current song. */
+async function applyAdPlugSong(song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string): Promise<void> {
+  if (song.patterns.length > 0 && song.format) {
+    song.patterns[0].importMetadata = {
+      ...song.patterns[0].importMetadata,
+      sourceFormat: song.format,
+    } as typeof song.patterns[0]['importMetadata'];
+  }
+  await applySong({
+    instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
+    bpm: song.initialBPM, speed: song.initialSpeed,
+    metadata: { name: song.name, description: `Imported from ${fileName}` },
+    originalModuleData: null,
+    engine: {
+      adplugFileData: song.adplugFileData,
+      adplugFileName: song.adplugFileName,
+      adplugTicksPerRow: (song as { adplugTicksPerRow?: number }).adplugTicksPerRow,
+    },
+    // OPL3Synth is created on demand at play; creating it during the drop
+    // makes an audible transient.
+    preload: false,
+  }, 'import');
+}
+
 async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuffer>): Promise<FileLoadResult> {
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -1605,58 +1615,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
       const extractCompanions = companions.length > 0 ? companions : undefined;
       const song = await extractAdPlugPatterns(arrayBuffer, file.name, extractCompanions);
       if (song) {
-        // Route through the standard tracker import path
-        const { useTrackerStore } = await import('@stores/useTrackerStore');
-        const { useInstrumentStore } = await import('@stores/useInstrumentStore');
-        const { useTransportStore } = await import('@stores/useTransportStore');
-        const { useProjectStore } = await import('@stores/useProjectStore');
-        const { useFormatStore } = await import('@stores/useFormatStore');
-        const { useAutomationStore } = await import('@stores/useAutomationStore');
-        const { getToneEngine } = await import('@/engine/ToneEngine');
-        const engine = getToneEngine();
-
-        const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
-        const { loadInstruments, reset: resetInstruments } = useInstrumentStore.getState();
-        const { setBPM, setSpeed, stop, reset: resetTransport } = useTransportStore.getState();
-        const { setMetadata } = useProjectStore.getState();
-        const { reset: resetAutomation } = useAutomationStore.getState();
-        const { setOriginalModuleData, applyEditorMode } = useFormatStore.getState();
-
-        stop();
-        engine.releaseAll();
-
-        resetAutomation();
-        resetTransport();
-        resetInstruments();
-        engine.disposeAllInstruments();
-
-        if (song.patterns.length > 0 && song.format) {
-          song.patterns[0].importMetadata = {
-            ...song.patterns[0].importMetadata,
-            sourceFormat: song.format,
-          } as typeof song.patterns[0]['importMetadata'];
-        }
-
-        // Skip preload — OPL3Synth is created on-demand by ensureWASMSynthsReady()
-        // in play(). Creating it here during drop causes an audio transient.
-        loadInstruments(song.instruments, { skipPreload: true });
-        loadPatterns(song.patterns);
-        setCurrentPattern(0);
-        if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-        setOriginalModuleData(null);
-        setBPM(song.initialBPM);
-        setSpeed(song.initialSpeed);
-        setMetadata({
-          name: song.name,
-          author: '',
-          description: `Imported from ${file.name}`,
-        });
-        applyEditorMode({
-          adplugFileData: song.adplugFileData,
-          adplugFileName: song.adplugFileName,
-          adplugTicksPerRow: (song as any).adplugTicksPerRow,
-        });
-
+        await applyAdPlugSong(song, file.name);
         notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
         return { success: true, message: `Imported editable: ${song.name}` };
       }
@@ -1693,53 +1652,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
             const { extractAdPlugPatterns } = await import('@/lib/import/formats/AdPlugWasmExtractor');
             const song = await extractAdPlugPatterns(arrayBuffer, file.name, companions);
             if (song) {
-              const { useTrackerStore } = await import('@stores/useTrackerStore');
-              const { useInstrumentStore } = await import('@stores/useInstrumentStore');
-              const { useTransportStore } = await import('@stores/useTransportStore');
-              const { useProjectStore } = await import('@stores/useProjectStore');
-              const { useFormatStore } = await import('@stores/useFormatStore');
-              const { useAutomationStore } = await import('@stores/useAutomationStore');
-              const { getToneEngine } = await import('@/engine/ToneEngine');
-              const engine = getToneEngine();
-
-              const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
-              const { loadInstruments, reset: resetInstruments } = useInstrumentStore.getState();
-              const { setBPM, setSpeed, stop, reset: resetTransport } = useTransportStore.getState();
-              const { setMetadata } = useProjectStore.getState();
-              const { reset: resetAutomation } = useAutomationStore.getState();
-              const { setOriginalModuleData, applyEditorMode } = useFormatStore.getState();
-
-              stop();
-              engine.releaseAll();
-              resetAutomation();
-              resetTransport();
-              resetInstruments();
-              engine.disposeAllInstruments();
-
-              if (song.patterns.length > 0 && song.format) {
-                song.patterns[0].importMetadata = {
-                  ...song.patterns[0].importMetadata,
-                  sourceFormat: song.format,
-                } as typeof song.patterns[0]['importMetadata'];
-              }
-
-              loadInstruments(song.instruments);
-              loadPatterns(song.patterns);
-              setCurrentPattern(0);
-              if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-              setOriginalModuleData(null);
-              setBPM(song.initialBPM);
-              setSpeed(song.initialSpeed);
-              setMetadata({
-                name: song.name,
-                author: '',
-                description: `Imported from ${file.name}`,
-              });
-              applyEditorMode({
-                adplugFileData: song.adplugFileData,
-                adplugFileName: song.adplugFileName,
-                adplugTicksPerRow: (song as any).adplugTicksPerRow,
-              });
+              await applyAdPlugSong(song, file.name);
               notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
               return { success: true, message: `Imported editable: ${song.name}` };
             }
