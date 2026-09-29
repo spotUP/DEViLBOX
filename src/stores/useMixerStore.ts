@@ -77,12 +77,14 @@ export function scheduleWasmEffectRebuild(): void {
           }
         }
 
-        // 2. Master effects with selectedChannels (per-channel targeting from master FX panel)
+        // 2. Master effects aimed at channels (selectedChannels from the master
+        //    FX panel, or a channelRole a preset gives, resolved for this song)
         const { useAudioStore } = await import('./useAudioStore');
+        const { targetsChannels, channelRoleTargets } = await import('../engine/tone/sidechainKey');
         const masterEffects = useAudioStore.getState().masterEffects;
         for (const fx of masterEffects) {
-          if (fx.enabled && Array.isArray(fx.selectedChannels) && fx.selectedChannels.length > 0) {
-            for (const ch of fx.selectedChannels) {
+          if (fx.enabled && targetsChannels(fx)) {
+            for (const ch of await channelRoleTargets(fx)) {
               const existing = channelEffects.get(ch) ?? [];
               existing.push({ ...fx, parameters: { ...fx.parameters } });
               channelEffects.set(ch, existing);

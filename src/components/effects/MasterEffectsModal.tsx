@@ -78,8 +78,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const editorMode = useFormatStore(s => s.editorMode);
   const isolationSupported = supportsChannelIsolation(editorMode);
 
+  // Picking channels by hand ends a preset's role-based targeting.
   const handleChannelSelect = useCallback((effectId: string, channels: number[] | undefined) => {
-    updateMasterEffect(effectId, { selectedChannels: channels });
+    updateMasterEffect(effectId, { selectedChannels: channels, channelRole: undefined });
+  }, [updateMasterEffect]);
+  const handleChannelRole = useCallback((effectId: string, role: EffectConfig['channelRole']) => {
+    updateMasterEffect(effectId, { selectedChannels: undefined, channelRole: role });
   }, [updateMasterEffect]);
 
   // Derive editingEffect from store (never stale)
@@ -469,6 +473,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         onRemove={() => removeMasterEffect(effect.id)}
                         onWetChange={(wet) => handleWetChange(effect.id, wet)}
                         onChannelSelect={(channels) => handleChannelSelect(effect.id, channels)}
+                        onChannelRole={(role) => handleChannelRole(effect.id, role)}
                         onKeyChange={(source) => updateMasterEffect(effect.id, { parameters: { ...effect.parameters, sidechainSource: source } })}
                         numChannels={numChannels}
                         channelNames={channelNames}
@@ -610,6 +615,8 @@ export interface SortableEffectItemProps {
   onRemove: () => void;
   onWetChange: (wet: number) => void;
   onChannelSelect: (channels: number[] | undefined) => void;
+  /** Aim the effect at a channel role ('nonDrums'), or clear it with undefined. */
+  onChannelRole: (role: EffectConfig['channelRole']) => void;
   /** Sidechain-keyed effects only: the channel that triggers it, or -1 for its own input. */
   onKeyChange: (source: number) => void;
   numChannels: number;
@@ -617,8 +624,10 @@ export interface SortableEffectItemProps {
   isolationSupported: boolean;
 }
 
-export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onKeyChange, numChannels, channelNames, isolationSupported }: SortableEffectItemProps) {
+export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onChannelRole, onKeyChange, numChannels, channelNames, isolationSupported }: SortableEffectItemProps) {
   const sidechainKeyed = EffectRegistry.get(effect.type)?.sidechainKeyed === true;
+  const nonDrums = effect.channelRole === 'nonDrums';
+  const allChannels = !nonDrums && !Array.isArray(effect.selectedChannels);
   const keySource = Math.round(Number(effect.parameters?.sidechainSource ?? -1));
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
@@ -813,20 +822,34 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
           <button
             onClick={(e) => { e.stopPropagation(); onChannelSelect(undefined); }}
             className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
-              !Array.isArray(effect.selectedChannels)
+              allChannels
                 ? 'text-white/90 border'
                 : 'text-white/30 hover:text-white/50 border border-transparent'
             }`}
-            style={!Array.isArray(effect.selectedChannels) ? { background: `${enc.accent}30`, borderColor: `${enc.accent}60` } : {}}
+            style={allChannels ? { background: `${enc.accent}30`, borderColor: `${enc.accent}60` } : {}}
           >
             ALL
           </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onChannelRole(nonDrums ? undefined : 'nonDrums'); }}
+            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
+              nonDrums
+                ? 'text-white/90 border'
+                : 'text-white/30 hover:text-white/50 border border-transparent'
+            }`}
+            style={nonDrums ? { background: `${enc.accent}30`, borderColor: `${enc.accent}60` } : {}}
+            title="Every channel except the drums, found for each song"
+          >
+            NO DRUMS
+          </button>
           <span className="text-[9px] ml-auto" style={{ color: `${enc.accent}60` }}>
-            {Array.isArray(effect.selectedChannels) && effect.selectedChannels.length === 0
-              ? 'No channels'
-              : Array.isArray(effect.selectedChannels)
-                ? `${effect.selectedChannels.length}/${numChannels} ch`
-                : 'All channels'}
+            {nonDrums
+              ? 'All but drums (auto)'
+              : Array.isArray(effect.selectedChannels) && effect.selectedChannels.length === 0
+                ? 'No channels'
+                : Array.isArray(effect.selectedChannels)
+                  ? `${effect.selectedChannels.length}/${numChannels} ch`
+                  : 'All channels'}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-1">

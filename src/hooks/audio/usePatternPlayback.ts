@@ -205,10 +205,10 @@ export const usePatternPlayback = () => {
   // Sync master effects — only rebuild when the list structure changes
   // (add/remove/enable/disable/reorder), NOT on parameter or wet changes.
   // Parameter updates are handled by updateMasterEffectParams in the store.
-  // Note: selectedChannels is included so that toggling channel routing
+  // Note: selectedChannels and channelRole are included so that toggling channel routing
   // triggers a rebuild (channel-targeted effects are routed via WASM isolation).
   const masterEffectsKey = useMemo(
-    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}:${(e.selectedChannels || []).join(',')}`).join('|'),
+    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}:${(e.selectedChannels || []).join(',')}:${e.channelRole ?? ''}`).join('|'),
     [masterEffects]
   );
   useEffect(() => {
