@@ -69,6 +69,11 @@ export interface DubDeckControlApi {
    * See `src/engine/dub/latchingMoves.ts`.
    */
   latchToggle: (moveId: string, channelId?: number) => void;
+  /** Start / end a held move without any pointer handling - for an encoder,
+   *  whose pointer belongs to its knob (the turn). The same callbacks
+   *  `holdButtonProps` wraps. */
+  holdStart: (moveId: string, channelId?: number) => void;
+  holdEnd: (moveId: string, channelId?: number) => void;
   handleToggle: (moveId: string) => void;
   handleRatePreset: (moveId: string) => void;
   setChannelSend: (channelId: number, value: number) => void;
@@ -168,6 +173,56 @@ const BUTTON_ROW_TRACK = '2rem';
 
 /** Past this much movement the gesture was a turn, not a press. */
 const TURN_SLOP = 4;
+/**
+ * How long an encoder must be held still before its press fires a HELD move.
+ * Grabbing a knob and pressing it start the same way; a turn leaves
+ * TURN_SLOP within the first frames of the drag, a press stays put.
+ */
+const ENCODER_PRESS_MS = 180;
+
+/** One encoder press being timed or held. */
+export interface EncoderHold { x: number; y: number; engaged: boolean; timer: ReturnType<typeof setTimeout> | null }
+
+/**
+ * Pointer handlers that make an encoder's HELD press work without taking the
+ * knob's pointer: the hold engages after ENCODER_PRESS_MS of the pointer held
+ * still, a move past TURN_SLOP first is a turn (nothing fires), and release
+ * ends an engaged hold. No pointer capture - the knob keeps its drag.
+ */
+export function encoderHoldGesture(
+  ref: { current: EncoderHold | null },
+  moveId: string,
+  api: Pick<DubDeckControlApi, 'holdStart' | 'holdEnd'>,
+  busEnabled: boolean,
+) {
+  const release = () => {
+    const g = ref.current;
+    ref.current = null;
+    if (!g) return;
+    if (g.timer) clearTimeout(g.timer);
+    if (g.engaged) api.holdEnd(moveId);
+  };
+  return {
+    onPointerDown: (e: { clientX: number; clientY: number }) => {
+      release();
+      const g: EncoderHold = { x: e.clientX, y: e.clientY, engaged: false, timer: null };
+      g.timer = setTimeout(() => {
+        g.timer = null;
+        if (ref.current !== g || !busEnabled) return;
+        g.engaged = true;
+        api.holdStart(moveId);
+      }, ENCODER_PRESS_MS);
+      ref.current = g;
+    },
+    onPointerMove: (e: { clientX: number; clientY: number }) => {
+      const g = ref.current;
+      if (!g || g.engaged) return;
+      if (Math.abs(e.clientX - g.x) > TURN_SLOP || Math.abs(e.clientY - g.y) > TURN_SLOP) release(); // a turn
+    },
+    onPointerUp: release,
+    onPointerCancel: release,
+  };
+}
 
 /**
  * A readable name for a target this deck does not own.
@@ -204,6 +259,8 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
 }) => {
   /** Where a press on a knob started, so a turn is not mistaken for a press. */
   const pressOrigin = React.useRef<{ x: number; y: number } | null>(null);
+  /** The encoder press being timed or held (one pointer at a time). */
+  const encoderHold = React.useRef<EncoderHold | null>(null);
 
   const overrides = useMIDIPresetStore(
     useCallback((s) => s.overrides[layout.id], [layout.id]),
@@ -289,19 +346,15 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
    */
   const pressGesture = (move: DeckMove) => {
     if (move.interaction === 'hold') {
-      const hold = api.holdButtonProps(move.moveId);
-      return {
-        onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
-          pressOrigin.current = { x: e.clientX, y: e.clientY };
-          hold.onPointerDown(e as unknown as React.PointerEvent<HTMLButtonElement>);
-        },
-        onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
-          hold.onPointerUp(e as unknown as React.PointerEvent<HTMLButtonElement>);
-        },
-        onPointerCancel: (e: React.PointerEvent<HTMLElement>) => {
-          hold.onPointerCancel(e as unknown as React.PointerEvent<HTMLButtonElement>);
-        },
-      };
+      // The encoder's pointer belongs to its knob. This used to spread the
+      // hold button's props on the knob's wrapper, which took pointer capture
+      // on the grab: the knob never saw its drag or its release again - stuck
+      // in drag mode with the up/down cursor - and every grab started the
+      // held move ("the echo wet knob seems broken ... i get stuck with an
+      // arrow up/down mouse pointer", "the sidechain knob is the same",
+      // 2026-09-30). Now a hold engages only when the knob is pressed and
+      // held still, never captures, and ends on release.
+      return encoderHoldGesture(encoderHold, move.moveId, api, busEnabled);
     }
     return {
       onPointerDown: (e: React.PointerEvent<HTMLElement>) => {

@@ -1244,6 +1244,8 @@ export const DubDeckStrip: React.FC = () => {
   const deckApi = useMemo<DubDeckControlApi>(() => ({
     fireTrigger,
     holdButtonProps,
+    holdStart,
+    holdEnd,
     latchToggle,
     handleToggle,
     handleRatePreset,
@@ -1259,7 +1261,7 @@ export const DubDeckStrip: React.FC = () => {
     },
     setBusParam: (field: string, value: number) =>
       setDubBus({ [field]: value, characterPreset: 'custom' }),
-  }), [fireTrigger, holdButtonProps, latchToggle, handleToggle, handleRatePreset, setArmed,
+  }), [fireTrigger, holdButtonProps, holdStart, holdEnd, latchToggle, handleToggle, handleRatePreset, setArmed,
        setChannelDubSend, visibleChannelCount, setDubBus]);
 
   /**
