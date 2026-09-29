@@ -414,6 +414,7 @@ export type DubMoveParameter =
   | 'dub.sidechainAmount'
   // The BUS tab's tone controls — routable since 2026-09-23
   | 'dub.bassShelfGainDb'
+  | 'dub.masterBassDb'
   | 'dub.midScoopGainDb'
   | 'dub.stereoWidth'
   | 'dub.sweepAmount'
