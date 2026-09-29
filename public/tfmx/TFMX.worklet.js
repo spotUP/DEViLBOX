@@ -11,6 +11,15 @@
  * Follows the SoundMon worklet pattern exactly (SoundMon → TFMX renaming).
  */
 
+/**
+ * Scale from a voice's Int16 scope sample to its level in the float main mix.
+ * The scope holds sample × volume × 4 (LamePaulaMixer::scopeWrite, full
+ * scale); the 16-bit mix tables divide each voice by voicesPerChannel (2 for
+ * the 4 Paula voices, also 2 in 7V mode) before panning. Checked against the
+ * real output in engineChannelOutputs.test.ts.
+ */
+const TFMX_VOICE_GAIN = 1 / (32768 * 2);
+
 class TFMXProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -21,12 +30,16 @@ class TFMXProcessor extends AudioWorkletProcessor {
     // Per-player state: { outPtrL, outPtrR }
     this.players = {};
 
+    // Per-voice dub sends (worklets/channel-outputs.js).
+    this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
   }
 
   async handleMessage(data) {
+    if (this._outs && this._outs.handleMessage(data)) return;
     switch (data.type) {
       case 'init':
         await this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode);
@@ -346,15 +359,19 @@ class TFMXProcessor extends AudioWorkletProcessor {
         outputR[i] += heapF32[offR + i];
       }
 
-      // Every sample of each voice's own output, for the oscilloscopes and
-      // the per-channel role classifiers (worklets/channel-stream.js).
-      if (this.wasm._tfmx_module_scope && this._moduleVoices > 0 && globalThis.DevilboxChannelStream) {
-        this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+      // Every sample of each voice's own output: for the oscilloscopes and
+      // per-channel role classifiers (worklets/channel-stream.js), and as
+      // each voice's dub send (worklets/channel-outputs.js, outputs 5+v).
+      if (this.wasm._tfmx_module_scope && this._moduleVoices > 0) {
         const base = this.wasm._tfmx_module_scope(this.ctx) >> 1;
         const heap16 = new Int16Array(this.wasm.HEAPU8.buffer);
         const views = [];
         for (let v = 0; v < this._moduleVoices; v++) views.push(heap16.subarray(base + v * 128, base + v * 128 + numSamples));
-        this._stream.writeInt16(views, numSamples);
+        if (globalThis.DevilboxChannelStream) {
+          this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+          this._stream.writeInt16(views, numSamples);
+        }
+        if (this._outs) this._outs.write(outputs, views, numSamples, (v) => (v % 4 === 1 || v % 4 === 2 ? 1 : 0), TFMX_VOICE_GAIN);
       }
 
       // Report the position every 1024 samples (~21 ms at 48 kHz). The

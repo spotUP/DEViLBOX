@@ -97,6 +97,12 @@ export interface IsolationCapableEngine {
    * Absent means yes. PreTracker isolates (outputs 1..4) but has no dub outputs.
    */
   supportsDubSends?(): boolean;
+  /**
+   * Whether isolation slots (outputs 1..4, the channel taken out of the main
+   * mix) work. Absent means yes. TFMX has dub sends only: its decoder mixes
+   * in C.
+   */
+  supportsIsolationSlots?(): boolean;
   addIsolation(slotIndex: number, channelMask: number): void;
   removeIsolation(slotIndex: number): void;
   diagIsolation?(): void;
@@ -264,7 +270,7 @@ export class ChannelRoutedEffectsManager {
   /** Allocate an isolation slot for a sidechain tap, connect worklet output → consumers. */
   private async _allocateSidechainSlot(channelIndex: number, engine?: IsolationCapableEngine): Promise<boolean> {
     if (!engine) engine = (await getActiveIsolationEngine()) ?? undefined;
-    if (!engine?.isAvailable()) return false;
+    if (!engine?.isAvailable() || engine.supportsIsolationSlots?.() === false) return false;
 
     const workletNode = engine.getWorkletNode();
     const audioContext = engine.getAudioContext();
@@ -781,6 +787,10 @@ export class ChannelRoutedEffectsManager {
 
     const workletNode = engine.getWorkletNode();
     if (!workletNode) { console.warn('[ChannelRoutedEffects] No worklet node'); return; }
+    if (engine.supportsIsolationSlots?.() === false) {
+      console.warn('[ChannelRoutedEffects] Engine has no isolation slots — per-channel effects stay on the master chain');
+      return;
+    }
 
     // Tear down existing slots
     this.teardown(engine);
