@@ -25,6 +25,9 @@ const SRC_RATE = 44100;               // the fixed native render rate
 const RING_BITS = 19;                 // 524288 samples (~11.9 s @44100) per channel
 const RING_SIZE = 1 << RING_BITS;
 const RING_MASK = RING_SIZE - 1;
+// Per-voice rings for the dub sends: the lookahead is ~350 ms, so 1.5 s is ample.
+const VRING_SIZE = 1 << 16;
+const VRING_MASK = VRING_SIZE - 1;
 
 class SunTronicResamplerProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -38,11 +41,16 @@ class SunTronicResamplerProcessor extends AudioWorkletProcessor {
     this.ratio = SRC_RATE / sampleRate; // 44100 per output sample
     this._lastConsumedPost = 0;
     this._underrunPosted = false;
+    // Per-voice dub sends (worklets/channel-outputs.js).
+    this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
+    this.vring = [0, 1, 2, 3].map(() => new Float32Array(VRING_SIZE));
+    this.vbuf = [0, 1, 2, 3].map(() => new Float32Array(128));
 
     this.port.onmessage = (e) => this._onMessage(e.data);
   }
 
   _onMessage(msg) {
+    if (this._outs && this._outs.handleMessage(msg)) return;
     switch (msg.type) {
       case 'init':
         this.port.postMessage({ type: 'ready' });
@@ -54,6 +62,13 @@ class SunTronicResamplerProcessor extends AudioWorkletProcessor {
           const w = (this.writeTotal + i) & RING_MASK;
           this.ringL[w] = l[i];
           this.ringR[w] = r[i];
+        }
+        if (msg.voices) {
+          for (let v = 0; v < 4; v++) {
+            const src = msg.voices[v], dst = this.vring[v];
+            if (!src) continue;
+            for (let i = 0; i < n; i++) dst[(this.writeTotal + i) & VRING_MASK] = src[i];
+          }
         }
         this.writeTotal += n;
         break;
@@ -94,6 +109,9 @@ class SunTronicResamplerProcessor extends AudioWorkletProcessor {
     }
 
     const g = this.gain;
+    const o = this._outs;
+    const wantVoices = !!o && o.dubEnabled.some(Boolean);
+    let voiced = 0;
     for (let i = 0; i < frames; i++) {
       const base = Math.floor(this.readPos);
       // Need base and base+1 available in the ring for interpolation.
@@ -113,8 +131,19 @@ class SunTronicResamplerProcessor extends AudioWorkletProcessor {
       outL[i] = (this.ringL[a] + (this.ringL[b] - this.ringL[a]) * frac) * g;
       const rv = (this.ringR[a] + (this.ringR[b] - this.ringR[a]) * frac) * g;
       if (outR !== outL) outR[i] = rv;
+      if (wantVoices) {
+        const va = base & VRING_MASK, vb = (base + 1) & VRING_MASK;
+        for (let v = 0; v < 4; v++) {
+          const r = this.vring[v];
+          this.vbuf[v][i] = r[va] + (r[vb] - r[va]) * frac;
+        }
+        voiced = i + 1;
+      }
       this.readPos += this.ratio;
     }
+    // Each voice's dub send, at the level the mix gives it (L = (v0+v3)×0.5,
+    // R = (v1+v2)×0.5 in SunTronicNativeRender) and the master gain.
+    if (wantVoices && voiced > 0) o.write(outputs, this.vbuf, voiced, (v) => (v === 1 || v === 2 ? 1 : 0), 0.5 * g);
 
     // Report consumed 44100-samples ~every 21 ms so the follow-cursor tracks
     // what is AUDIBLE (worklet read progress), not what the pump has queued.
