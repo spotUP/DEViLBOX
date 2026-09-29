@@ -33,6 +33,7 @@ import { useFormatStore } from '@stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
 import { EffectParameterEditor } from './EffectParameterEditor';
+import { sidechainKeyOptions } from './sidechainKeyOptions';
 import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
@@ -819,13 +820,7 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
           <CustomSelect
             value={String(keySource)}
             onChange={(v) => onKeyChange(Number(v))}
-            options={[
-              { value: '-1', label: 'Own input' },
-              ...Array.from({ length: numChannels }, (_, i) => ({
-                value: String(i),
-                label: channelNames[i] && !/^(ch|channel)\s*\d+$/i.test(channelNames[i].trim()) ? `CH ${i + 1} ${channelNames[i]}` : `CH ${i + 1}`,
-              })),
-            ]}
+            options={sidechainKeyOptions(numChannels, channelNames)}
             className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-0.5 text-[10px] font-mono text-text-primary"
           />
           </span>
