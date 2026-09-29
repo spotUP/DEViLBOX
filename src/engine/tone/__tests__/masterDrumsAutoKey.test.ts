@@ -39,4 +39,12 @@ describe('master sidechain "Drums (auto)"', () => {
     expect(addSidechainTap).toHaveBeenCalledWith(1, scInput);
     expect(setSelfSidechain).toHaveBeenLastCalledWith(false);
   });
+
+  it('never keys on its own input while the drum channel is not playing (it became a bass compressor)', async () => {
+    addSidechainTap.mockResolvedValueOnce(false);   // engine stopped: no tap yet
+    const setSelfSidechain = vi.fn();
+    const node = { getSidechainInput: () => ({ id: 'sc-2' }), setSelfSidechain };
+    await wireMasterSidechain(node as never, SIDECHAIN_KEY_DRUMS);
+    expect(setSelfSidechain).not.toHaveBeenCalledWith(true);
+  });
 });

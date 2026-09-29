@@ -1,50 +1,30 @@
 #include <cmath>
+#include "lr4_crossover.h"
 #include <cstring>
 #include <algorithm>
 #include <emscripten/emscripten.h>
 
 static constexpr int MAX_INSTANCES = 16;
 
-struct OnePoleHP {
-    float coeff = 0.0f;
-    float z1L = 0.0f, z1R = 0.0f;
-    float prevInL = 0.0f, prevInR = 0.0f;
-
-    void setFreq(float freq, float sr) {
-        float w = 2.0f * 3.14159265f * freq / sr;
-        coeff = 1.0f / (1.0f + w);
-    }
-    void reset() { z1L = z1R = prevInL = prevInR = 0.0f; }
-    void processHP(const float* in, float* out, int n, bool isLeft) {
-        float& z = isLeft ? z1L : z1R;
-        float& prev = isLeft ? prevInL : prevInR;
-        for (int i = 0; i < n; i++) {
-            float x = in[i];
-            z = coeff * (z + x - prev);
-            prev = x;
-            out[i] = z;
-        }
-    }
-};
-
-struct OnePoleLP {
-    float coeff = 0.0f;
-    float z1L = 0.0f, z1R = 0.0f;
-
-    void setFreq(float freq, float sr) {
-        float w = 2.0f * 3.14159265f * freq / sr;
-        coeff = 1.0f - std::exp(-w);
-    }
-    void reset() { z1L = z1R = 0.0f; }
-    void processLP(float* buf, int n, bool isLeft) {
-        float& z = isLeft ? z1L : z1R;
-        for (int i = 0; i < n; i++) {
-            z += coeff * (buf[i] - z);
-            buf[i] = z;
-        }
-    }
-};
-
+/**
+ * Harmonic exciter: generates harmonics from the band above `frequency` and
+ * ADDS them to the dry signal at `amount` level.
+ *
+ *   hp1 (2nd-order, at frequency)  - the band to excite; the lows never enter
+ *   drive + shaper (even / odd by blend), bounded to +-1
+ *   shaper keeps NO linear term, so it adds harmonics, never the band itself
+ *   hp2 (30 Hz)                    - blocks the DC the even harmonics make;
+ *                                    at the band edge it adds no phase (a
+ *                                    second high-pass AT frequency put the
+ *                                    edge 180 degrees out and cut it 6.9 dB)
+ *   ceiling low-pass (ceil)
+ *   out = dry + mix * amount * 0.5 * harmonics
+ *
+ * Replaces a version that added the DRIVEN band itself back to the dry signal
+ * (+10.5 dB on a full-spectrum signal, 2026-09-29) and then a first fix that
+ * subtracted the band at high drive and took 2.2 dB off 100 Hz through a
+ * leaky 1-pole high-pass.
+ */
 struct ExciterInstance {
     bool active = false;
     float sampleRate = 48000.0f;
@@ -53,58 +33,46 @@ struct ExciterInstance {
     float blend = 0.5f;
     float ceil = 16000.0f;
     float mix = 1.0f;
-    OnePoleHP hpFilt;
-    OnePoleLP ceilFilt;
+
+    lr4::Biquad hp1L, hp1R, hp2L, hp2R, lpL, lpR;
+    float setFreq = -1.0f, setCeil = -1.0f;
 
     void init(float sr) {
         sampleRate = sr;
-        hpFilt.reset();
-        ceilFilt.reset();
-        hpFilt.setFreq(frequency, sr);
-        ceilFilt.setFreq(ceil, sr);
+        setFreq = setCeil = -1.0f;
+        hp1L.reset(); hp1R.reset(); hp2L.reset(); hp2R.reset(); lpL.reset(); lpR.reset();
+    }
+
+    void updateFilters() {
+        if (frequency != setFreq) {
+            hp1L.setHP(frequency, sampleRate); hp1R.setHP(frequency, sampleRate);
+            hp2L.setHP(30.0f, sampleRate); hp2R.setHP(30.0f, sampleRate);
+            setFreq = frequency;
+        }
+        if (ceil != setCeil) {
+            const float c = std::min(ceil, sampleRate * 0.45f);
+            lpL.setLP(c, sampleRate); lpR.setLP(c, sampleRate);
+            setCeil = ceil;
+        }
+    }
+
+    float shape(float d) const {
+        const float even = 0.5f * d * std::fabs(d);                       // 2nd-order products
+        const float d3 = d * d * d;
+        const float odd = d3 / (1.0f + std::fabs(d3));                    // 3rd-order, bounded
+        const float y = (1.0f - blend) * even + blend * odd;
+        return y / (1.0f + std::fabs(y));
     }
 
     void process(const float* inL, const float* inR, float* outL, float* outR, int n) {
-        float driveGain = 1.0f + amount * 20.0f;
-
+        updateFilters();
+        const float drive = 1.0f + amount * 10.0f;
+        const float level = mix * amount * 0.5f;
         for (int i = 0; i < n; i++) {
-            float dryL = inL[i], dryR = inR[i];
-
-            // HP filter to isolate highs
-            float hL = inL[i], hR = inR[i];
-            hpFilt.z1L = hpFilt.coeff * (hpFilt.z1L + hL - hpFilt.prevInL);
-            hpFilt.prevInL = hL; hL = hpFilt.z1L;
-            hpFilt.z1R = hpFilt.coeff * (hpFilt.z1R + hR - hpFilt.prevInR);
-            hpFilt.prevInR = hR; hR = hpFilt.z1R;
-
-            // Drive the highs
-            float dL = hL * driveGain;
-            float dR = hR * driveGain;
-
-            // Generate harmonics: blend between even (asymmetric) and odd (tanh)
-            float evenL = dL + 0.5f * dL * std::fabs(dL);
-            float evenR = dR + 0.5f * dR * std::fabs(dR);
-            float oddL = std::tanh(dL);
-            float oddR = std::tanh(dR);
-            // Keep ONLY what the shaper generated: shaped minus the linear
-            // drive, back at input scale. The linear term used to stay in, so
-            // the driven high band itself (x1+20*amount, +15 dB at amount
-            // 0.25) was added to the dry signal - a treble boost that read
-            // +10 dB on a full-spectrum signal, not an exciter (2026-09-29).
-            hL = ((1.0f - blend) * evenL + blend * oddL - dL) / driveGain;
-            hR = ((1.0f - blend) * evenR + blend * oddR - dR) / driveGain;
-
-            // Ceiling LP filter
-            ceilFilt.z1L += ceilFilt.coeff * (hL - ceilFilt.z1L); hL = ceilFilt.z1L;
-            ceilFilt.z1R += ceilFilt.coeff * (hR - ceilFilt.z1R); hR = ceilFilt.z1R;
-
-            // Normalize excited signal
-            float excL = hL / (1.0f + std::fabs(hL));
-            float excR = hR / (1.0f + std::fabs(hR));
-
-            // Mix: add excited highs to dry
-            outL[i] = dryL + mix * excL;
-            outR[i] = dryR + mix * excR;
+            const float hL = lpL.process(hp2L.process(shape(hp1L.process(inL[i]) * drive)));
+            const float hR = lpR.process(hp2R.process(shape(hp1R.process(inR[i]) * drive)));
+            outL[i] = inL[i] + level * hL;
+            outR[i] = inR[i] + level * hR;
         }
     }
 };
@@ -138,7 +106,6 @@ EMSCRIPTEN_KEEPALIVE void exciter_process(int h, float* iL, float* iR, float* oL
 EMSCRIPTEN_KEEPALIVE void exciter_set_frequency(int h, float v) {
     if (h >= 0 && h < MAX_INSTANCES && instances[h].active) {
         instances[h].frequency = std::clamp(v, 1000.0f, 10000.0f);
-        instances[h].hpFilt.setFreq(instances[h].frequency, instances[h].sampleRate);
     }
 }
 
@@ -155,7 +122,6 @@ EMSCRIPTEN_KEEPALIVE void exciter_set_blend(int h, float v) {
 EMSCRIPTEN_KEEPALIVE void exciter_set_ceil(int h, float v) {
     if (h >= 0 && h < MAX_INSTANCES && instances[h].active) {
         instances[h].ceil = std::clamp(v, 1000.0f, 20000.0f);
-        instances[h].ceilFilt.setFreq(instances[h].ceil, instances[h].sampleRate);
     }
 }
 

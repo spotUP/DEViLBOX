@@ -3,6 +3,7 @@ project(MultibandGate VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 
 add_executable(MultibandGate MultibandGateWASM.cpp)
+target_include_directories(MultibandGate PRIVATE ${CMAKE_SOURCE_DIR}/../wasm-common)
 set_target_properties(MultibandGate PROPERTIES
   OUTPUT_NAME "MultibandGate"
   SUFFIX ".js"
