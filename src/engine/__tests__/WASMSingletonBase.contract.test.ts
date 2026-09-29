@@ -58,7 +58,7 @@ function findEngineFiles(): string[] {
   const files: string[] = [];
   for (const full of walkTs(join(REPO_ROOT, 'src/engine'))) {
     const src = readFileSync(full, 'utf-8');
-    if (/extends\s+WASMSingletonBase\b/.test(src)) {
+    if (/extends\s+(?:WASMSingletonBase|WASMChannelOutputsEngine)\b/.test(src)) {
       files.push(full);
     }
   }
@@ -91,7 +91,7 @@ function extractLoaderConfig(engineFile: string): LoaderConfig | null {
 
   if (!dir || !workletFile || !wasmFile) return null;
 
-  const classMatch = src.match(/export\s+class\s+(\w+)\s+extends\s+WASMSingletonBase\b/);
+  const classMatch = src.match(/export\s+class\s+(\w+)\s+extends\s+(?:WASMSingletonBase|WASMChannelOutputsEngine)\b/);
   return {
     engineFile,
     className: classMatch?.[1] ?? null,

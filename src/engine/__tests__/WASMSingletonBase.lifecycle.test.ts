@@ -46,7 +46,7 @@ function findEngineFiles(): EngineFile[] {
   const out: EngineFile[] = [];
   for (const full of walkTs(join(REPO_ROOT, 'src/engine'))) {
     const src = readFileSync(full, 'utf-8');
-    const m = src.match(/export\s+class\s+(\w+)\s+extends\s+WASMSingletonBase\b/);
+    const m = src.match(/export\s+class\s+(\w+)\s+extends\s+(?:WASMSingletonBase|WASMChannelOutputsEngine)\b/);
     if (!m) continue;
     out.push({ path: full, src, className: m[1] });
   }
