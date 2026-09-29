@@ -11,7 +11,8 @@
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import {
-  WASMSingletonBase,
+  WASMChannelOutputsEngine,
+  channelOutputNodeOptions,
   createWASMAssetsCache,
   type WASMAssetsCache,
   type WASMLoaderConfig,
@@ -37,7 +38,7 @@ export interface TFMXModulePosition {
   patternOffset?: number;
 }
 
-export class TFMXEngine extends WASMSingletonBase {
+export class TFMXEngine extends WASMChannelOutputsEngine {
   private static instance: TFMXEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
@@ -79,15 +80,16 @@ export class TFMXEngine extends WASMSingletonBase {
   protected createNode(): void {
     const ctx = this.audioContext;
 
-    this.workletNode = new AudioWorkletNode(ctx, 'tfmx-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
-    });
+    // Output 0 is the mix; 5..36 carry each voice as a dub send
+    // (worklets/channel-outputs.js). No isolation slots: the decoder mixes in
+    // C, so a voice cannot be taken out of output 0 from the worklet.
+    this.workletNode = new AudioWorkletNode(ctx, 'tfmx-processor', channelOutputNodeOptions());
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
       switch (data.type) {
         case 'ready':
+          this.markNodeReady();
           if (this._resolveInit) {
             this._resolveInit();
             this._resolveInit = null;
@@ -148,7 +150,7 @@ export class TFMXEngine extends WASMSingletonBase {
       jsCode: TFMXEngine.cache.jsCode,
     });
 
-    this.workletNode.connect(this.output);
+    this.workletNode.connect(this.output, 0);
   }
 
   sendMessage(msg: Record<string, unknown>, transfers?: Transferable[]): void {
@@ -217,6 +219,12 @@ export class TFMXEngine extends WASMSingletonBase {
 
   play(): void {
     this.sendMessage({ type: 'modulePlay' });
+    this.afterPlay();
+  }
+
+  /** Dub sends only: the C decoder mixes the voices, so none can leave output 0. */
+  override supportsIsolationSlots(): boolean {
+    return false;
   }
 
   pause(): void {
