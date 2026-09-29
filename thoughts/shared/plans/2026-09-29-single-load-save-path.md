@@ -123,9 +123,9 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 
 ## Checklist
 
-- [ ] L0.1 [ ] L0.2 [ ] L0.3
-- [ ] L1.1 [ ] L1.2 [ ] L1.3
-- [ ] L2.1 [ ] L2.2 [ ] L2.3
+- [x] L0.1 [x] L0.2 [ ] L0.3
+- [x] L1.1 [x] L1.2 [ ] L1.3
+- [x] L2.1 [ ] L2.2 [ ] L2.3
 - [ ] L3.1 [ ] L3.2 [ ] L3.3 [ ] L3.4
 - [ ] L4.1 [ ] L4.2 [ ] L4.3
 - [ ] L5.1 [ ] L5.2 [ ] L5.3
@@ -140,3 +140,21 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
    the loaded file is a saved project that carries its own.
 2. Undo history across a load: cleared (recommended - undoing into the
    previous song is not meaningful) or kept?
+
+## Decisions (2026-09-29, owner said "proceed" with the questions open - recommendations taken)
+
+- Q1: a load KEEPS the master FX chain; per-song state (dub sends, automation,
+  channel settings) resets; a saved project restores its own master chain.
+- Q2: a load CLEARS undo history.
+
+## Progress
+
+- 2026-09-29: L0.1, L0.2, L1.1, L1.2, L2.1 done (5 of 22). applySong at
+  src/lib/song/applySong.ts; importTrackerModule's five branches only parse now.
+  L0.1 runs the real importTrackerModule headless (dialog-shaped ModuleInfo:
+  the libopenmpt metadata worklet cannot run in node; OpenMPT WASM fails and
+  falls back to the native parser, as it would on a real failure). Reverting
+  the classic-branch clearNative makes it fail (hivelyNative left behind) -
+  the likely real cause of the owner's AHX layout, since something downstream
+  derives the editor from hivelyNative. preloadRace.contract re-pointed to
+  scan applySong.ts as well.

@@ -8,7 +8,7 @@
  * FX channel selector). Resolved from the channel classifier on the loaded
  * song; an empty result leaves the effect on the whole mix.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,11 @@ import { parseMODFile } from '@/lib/import/formats/MODParser';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { channelRoleTargets, pickNonDrumChannels, targetsChannels } from '../sidechainKey';
+
+// The CED instrument classifier runs in a web worker; no worker server in node.
+vi.mock('@stores/useInstrumentTypeStore', () => ({
+  useInstrumentTypeStore: { getState: () => ({ resetClassified: () => {}, classifyInstruments: () => {} }) },
+}));
 
 const FIXTURE = resolve(dirname(fileURLToPath(import.meta.url)), '../../../__tests__/fixtures/micro15-goto80.mod');
 
