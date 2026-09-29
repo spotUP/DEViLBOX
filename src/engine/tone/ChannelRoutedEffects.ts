@@ -92,6 +92,11 @@ export const MAX_DUB_CHANNELS = 32;
  * the per-channel effects routing system.
  */
 export interface IsolationCapableEngine {
+  /**
+   * Whether the engine renders per-channel dub sends (outputs DUB_OUTPUT_BASE+).
+   * Absent means yes. PreTracker isolates (outputs 1..4) but has no dub outputs.
+   */
+  supportsDubSends?(): boolean;
   addIsolation(slotIndex: number, channelMask: number): void;
   removeIsolation(slotIndex: number): void;
   diagIsolation?(): void;
@@ -566,7 +571,7 @@ export class ChannelRoutedEffectsManager {
     // The user let go of the throw while we were resolving the engine. Do not
     // spin up a slot for a send that is already closed.
     if (!this.dubLifecycle.isDesired(channelIndex)) return 'cancelled';
-    if (!engine?.isAvailable() || !engine.getWorkletNode()) {
+    if (!engine?.isAvailable() || !engine.getWorkletNode() || engine.supportsDubSends?.() === false) {
       // An engine that will never expose per-channel outputs leaves the send
       // to the shared whole-mix tap; nothing to retry.
       try {
@@ -1063,7 +1068,30 @@ const _fallbackResolvers: (() => Promise<IsolationCapableEngine | null>)[] = [];
  * Uses the format store's editorMode to pick the right engine directly,
  * avoiding false positives from stale singleton instances.
  */
+/**
+ * The engine NativeEngineRouting started for the current song, when it can
+ * isolate channels. Checked before the editor-mode resolvers: a mode names the
+ * USUAL engine, not the one playing (classic mode plays libopenmpt and some
+ * twenty native engines).
+ */
+let _playingIsolationEngine: IsolationCapableEngine | null = null;
+
+export function setPlayingIsolationEngine(engine: IsolationCapableEngine | null): void {
+  _playingIsolationEngine = engine;
+}
+
+/** Duck-typed: whether a started engine instance implements IsolationCapableEngine. */
+export function asIsolationCapable(instance: unknown): IsolationCapableEngine | null {
+  const e = instance as Partial<IsolationCapableEngine> | null;
+  return e && typeof e.addIsolation === 'function' && typeof e.removeIsolation === 'function'
+    && typeof e.getWorkletNode === 'function' && typeof e.getAudioContext === 'function'
+    && typeof e.isAvailable === 'function'
+    ? (e as IsolationCapableEngine) : null;
+}
+
 export async function getActiveIsolationEngine(): Promise<IsolationCapableEngine | null> {
+  if (_playingIsolationEngine?.isAvailable()) return _playingIsolationEngine;
+
   // Get current editor mode from format store
   let editorMode = 'classic';
   try {

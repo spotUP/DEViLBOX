@@ -28,4 +28,10 @@ describe('dub bus isolation follows the playing engine', () => {
     await reportPlaybackIsolation(bus, async () => ({ isAvailable: () => true }));
     expect(bus.setEngineIsolation).toHaveBeenCalledWith(true);
   });
+
+  it('reports "cannot isolate" for an engine without dub sends (PreTracker)', async () => {
+    const bus = { setEngineIsolation: vi.fn() };
+    await reportPlaybackIsolation(bus, async () => ({ isAvailable: () => true, supportsDubSends: () => false }));
+    expect(bus.setEngineIsolation).toHaveBeenCalledWith(false);
+  });
 });
