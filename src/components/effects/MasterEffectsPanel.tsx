@@ -27,6 +27,7 @@ import { useFormatStore } from '@stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { Settings, Volume2, X, ChevronDown, Save } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
+import { MasterPresetMenu } from './MasterPresetMenu';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
@@ -375,15 +376,6 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     return null;
   }, [masterEffects, userPresets]);
 
-  // Group factory presets by category, sorted alphabetically
-  const presetsByCategory = MASTER_FX_PRESETS.reduce((acc, preset) => {
-    if (!acc[preset.category]) {
-      acc[preset.category] = [];
-    }
-    acc[preset.category].push(preset);
-    return acc;
-  }, {} as Record<string, MasterFxPreset[]>);
-  const sortedCategories = Object.keys(presetsByCategory).sort();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -557,67 +549,15 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
 
       {/* Preset dropdown — rendered outside header so it works in both modes */}
       {showPresetMenu && (
-        <div className="absolute right-0 top-0 mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[99990] max-h-[70vh] overflow-y-auto"
-          style={hideHeader ? { top: 0, right: 8 } : { top: '100%', right: 16 }}>
-          {/* None / Clear */}
-          <button
-            onClick={handleClearEffects}
-            className="w-full px-3 py-2 text-left text-xs font-mono text-text-muted hover:bg-dark-bgHover hover:text-text-primary border-b border-dark-border transition-colors"
-          >
-            None (clear all)
-          </button>
-          {/* User Presets */}
-          {userPresets.length > 0 && (
-            <>
-              <div className="px-3 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary">
-                User Presets
-              </div>
-              {userPresets.map((preset) => (
-                <div
-                  key={preset.name}
-                  className="flex items-center justify-between px-3 py-2 hover:bg-dark-bgHover cursor-pointer group"
-                >
-                  <span
-                    onClick={() => handleLoadUserPreset(preset)}
-                    className="text-sm text-text-primary flex-1"
-                  >
-                    {preset.name}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteUserPreset(preset.name);
-                    }}
-                    className="text-text-muted hover:text-accent-error opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Delete preset"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-              <div className="border-t border-dark-border my-1" />
-            </>
-          )}
-
-          {/* Factory Presets by Category */}
-          {sortedCategories.map((category) => (
-            <div key={category}>
-              <div className="px-3 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary">
-                {category}
-              </div>
-              {[...presetsByCategory[category]].sort((a, b) => a.name.localeCompare(b.name)).map((preset) => (
-                <div
-                  key={preset.name}
-                  onClick={() => handleLoadPreset(preset)}
-                  className="px-3 py-2 hover:bg-dark-bgHover cursor-pointer"
-                >
-                  <div className="text-sm text-text-primary">{preset.name}</div>
-                  <div className="text-xs text-text-muted">{preset.description}</div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+        <MasterPresetMenu
+          userPresets={userPresets}
+          onLoadPreset={handleLoadPreset}
+          onLoadUserPreset={handleLoadUserPreset}
+          onDeleteUserPreset={handleDeleteUserPreset}
+          onClear={handleClearEffects}
+          className="absolute right-0 top-0 mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[99990] max-h-[70vh]"
+          style={hideHeader ? { top: 0, right: 8 } : { top: '100%', right: 16 }}
+        />
       )}
 
       {/* Save Preset Dialog */}
