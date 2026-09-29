@@ -14,8 +14,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 describe('preload race prevention (contract)', () => {
-  const filePath = path.resolve(__dirname, '../../file/UnifiedFileLoader.ts');
-  const source = fs.readFileSync(filePath, 'utf-8');
+  // The song apply lives in applySong (the single load path, 2026-09-29); the
+  // loader keeps its non-module loaders until they move there too.
+  const source = ['../../file/UnifiedFileLoader.ts', '../../song/applySong.ts']
+    .map((f) => fs.readFileSync(path.resolve(__dirname, f), 'utf-8'))
+    .join('\n');
   const lines = source.split('\n');
 
   it('every loadInstruments + preloadInstruments pair uses skipPreload', () => {
@@ -58,8 +61,8 @@ describe('preload race prevention (contract)', () => {
       expect.fail(`loadInstruments calls without skipPreload followed by preloadInstruments:\n${msg}`);
     }
 
-    // Sanity: we should find at least 4 pairs (the known import paths)
-    expect(loadCalls.length).toBeGreaterThanOrEqual(4);
+    // Sanity: the canonical apply (applySong) is one of them
+    expect(loadCalls.length).toBeGreaterThanOrEqual(1);
   });
 
   it('preload conditions cover all WASM synth types, not just Samplers', () => {
@@ -102,6 +105,6 @@ describe('preload race prevention (contract)', () => {
     }
 
     // Sanity: we should find preload calls
-    expect(preloadLines.length).toBeGreaterThanOrEqual(4);
+    expect(preloadLines.length).toBeGreaterThanOrEqual(1);
   });
 });
