@@ -69,6 +69,8 @@ export class TrackerScratchController {
 
   /** Whether we're actively scratching (user has interacted during playback) */
   private _isActive = false;
+  /** The replayer's note suppression before this scratch began (restored on exit). */
+  private _priorSuppressNotes = false;
   private _pendingStop = false;  // Set when e-brake/power-cut stop is in progress
 
   /** Timestamp when playback last started — scratch is suppressed during grace period */
@@ -547,6 +549,11 @@ export class TrackerScratchController {
 
    private enterScratchMode(replayer: TrackerReplayer): void {
     this._isActive = true;
+    // Whether the replayer's own notes were suppressed BEFORE the scratch -
+    // for songs a WASM engine plays (libopenmpt, UADE, ...), they are, and
+    // the replayer's row then feeds the engine position the pattern view
+    // follows. Leaving scratch restores this, never a blanket `false`.
+    this._priorSuppressNotes = replayer.isSuppressNotes;
     this.originalGainValue = 1;
     this.lastEventTime = performance.now();
 
@@ -603,7 +610,7 @@ export class TrackerScratchController {
         // Restore audio on failure
         gainParam.setValueAtTime(this.originalGainValue, Tone.getContext().rawContext.currentTime);
         replayer.resumeNativeEnginesAfterScratch();
-        replayer.setSuppressNotes(false);
+        replayer.setSuppressNotes(this._priorSuppressNotes);
       });
     } else {
       this.engageScratchAudio(replayer);
@@ -675,7 +682,13 @@ export class TrackerScratchController {
     replayer.resyncSchedulerToNow();
     replayer.setTempoMultiplier(1.0);
     replayer.setPitchMultiplier(1.0);
-    replayer.setSuppressNotes(false);
+    // Restore, not clear: forcing `false` on a song a WASM engine plays
+    // stopped the replayer's row from feeding the engine position the
+    // pattern view follows - the view froze on the last row while the song
+    // played on ("the pattern stops after the scratches", 2026-09-30, log:
+    // wasmActive=true, engine position stuck at row 43) - and let the
+    // replayer fire the song's notes itself on top of the engine.
+    replayer.setSuppressNotes(this._priorSuppressNotes);
 
     // Crossfade — scratch buffer out, live tracker in.
     // Restore the full output gain (covers all formats, including native WASM engines).
