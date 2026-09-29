@@ -58,6 +58,12 @@ export interface SongToApply {
   engine: SongEngineData;
   /** What a saved project carries beyond the song itself (none for an imported module). */
   extras?: ProjectExtras;
+  /**
+   * Preload the song's synth instruments now (default). AdPlug passes false:
+   * its OPL3 synth is created on demand at play, and creating it during the
+   * drop makes an audible transient.
+   */
+  preload?: boolean;
 }
 
 /** A saved project's state beyond the song (see savedSong.ts). */
@@ -175,7 +181,7 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   // Undoing into the previous song is not meaningful.
   useHistoryStore.getState().clearHistory();
 
-  if (song.instruments.some((i) => i.synthType && i.synthType !== 'Synth')) {
+  if (song.preload !== false && song.instruments.some((i) => i.synthType && i.synthType !== 'Synth')) {
     await engine.preloadInstruments(song.instruments);
   }
   console.log(`[applySong] ${source}: "${song.metadata.name}" - ${song.patterns.length} patterns, ${song.instruments.length} instruments, editor ${useFormatStore.getState().editorMode}`);

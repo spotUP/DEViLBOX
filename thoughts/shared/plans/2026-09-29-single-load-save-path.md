@@ -125,7 +125,7 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 
 - [x] L0.1 [x] L0.2 [ ] L0.3
 - [x] L1.1 [x] L1.2 [ ] L1.3
-- [x] L2.1 [x] L2.2 [ ] L2.3
+- [x] L2.1 [x] L2.2 [x] L2.3
 - [ ] L3.1 [ ] L3.2 [ ] L3.3 [ ] L3.4
 - [x] L4.1 [ ] L4.2 [ ] L4.3
 - [ ] L5.1 [ ] L5.2 [ ] L5.3
@@ -178,3 +178,10 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   loadInstruments' queued store write before loading patterns (the MIDI
   branch's setTimeout(0) workaround, made a guarantee for every load).
   8 of 22.
+- L2.3 done: V2M and AdPlug (both copies, merged into applyAdPlugSong) ->
+  applySong. applySong gained `preload: false` (AdPlug: the OPL3 synth is
+  created at play; creating it during the drop is an audible transient).
+  Found: the V2M import reset nothing and stacked its instruments on the
+  previous song's (test: 16 instead of 11 on the old code). The file loader
+  now calls loadPatterns only for the TD-3 import and the DB303 pattern
+  append (partial updates). 9 of 22.
