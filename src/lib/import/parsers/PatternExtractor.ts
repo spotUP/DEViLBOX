@@ -34,7 +34,7 @@ export async function parseTrackerModule(buffer: ArrayBuffer, fileName: string):
 
   const { loadModuleFile } = await import('@lib/import/ModuleLoader');
   const { convertModule, convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
-  const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
+  const { convertParsedInstruments } = await import('@lib/import/InstrumentConverter');
 
   const moduleInfo = await loadModuleFile(new File([buffer], fileName));
   if (!moduleInfo) throw new Error(`Failed to load ${fileName}`);
@@ -78,14 +78,7 @@ export async function parseTrackerModule(buffer: ArrayBuffer, fileName: string):
     }
 
     if (nativeInstruments) {
-      for (let i = 0; i < nativeInstruments.length; i++) {
-        // Use the parsed instrument's original slot ID (not array index) so pattern
-        // data references match correctly. The MOD/XM parsers skip empty slots, so
-        // nativeInstruments[i] may not correspond to slot i+1.
-        const slotId = nativeInstruments[i].id;
-        const converted = convertToInstrument(nativeInstruments[i], slotId, format);
-        instruments.push(...converted);
-      }
+      instruments.push(...convertParsedInstruments(nativeInstruments, format));
     }
   } else if (moduleInfo.metadata.song) {
     result = convertModule(moduleInfo.metadata.song);

@@ -428,7 +428,8 @@ async function loadWithNativeParser(
       const instruments: ParsedInstrument[] = xrns.instruments.map((inst, i) => {
         const synthType = getXRNSSynthType(inst);
         return {
-          id: i,
+          id: i + 1, // slot number, as the pattern cells name it
+
           name: inst.name,
           samples: [],
           fadeout: 0,

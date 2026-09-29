@@ -183,7 +183,7 @@ export async function importTrackerModule(
   // ── Native TS parser data (XM/MOD/FUR/DMF from ModuleLoader) ──
   if (info.nativeData) {
     const { convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
-    const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
+    const { convertParsedInstruments } = await import('@lib/import/InstrumentConverter');
     const { format: nativeFormat, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
     format = nativeFormat;
 
@@ -339,23 +339,7 @@ export async function importTrackerModule(
       return;
     }
 
-    const instruments: InstrumentConfig[] = [];
-    let nextId = 1;
-    for (const parsed of parsedInstruments) {
-      // Debug: log what we're passing to convertToInstrument
-      if (parsed.xrnsSynth) {
-        console.log(`[Import] Converting XRNS instrument ${nextId}: hasChunk=${!!parsed.xrnsSynth.parameterChunk} chunkLen=${parsed.xrnsSynth.parameterChunk?.length ?? 0}`);
-      }
-      const converted = convertToInstrument(parsed, nextId, format as any);
-      // Debug: log what we got back
-      for (const inst of converted) {
-        if (inst.xrns) {
-          console.log(`[Import] Converted instrument ${inst.id}: synthType=${inst.synthType} xrns.hasChunk=${!!inst.xrns.parameterChunk}`);
-        }
-      }
-      instruments.push(...converted);
-      nextId += converted.length;
-    }
+    const instruments = convertParsedInstruments(parsedInstruments, format as any);
 
     const xmFreqType = importMetadata?.xmData?.frequencyType;
     const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;

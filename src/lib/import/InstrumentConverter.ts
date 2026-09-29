@@ -23,6 +23,31 @@ import {
 } from './EnvelopeConverter';
 
 /**
+ * Convert a parser's instrument list, each under its own slot number.
+ *
+ * Pattern cells name slots (a MOD cell says "sample 16"), and the MOD parser
+ * skips empty slots, so the list's index is not the slot: in a song whose
+ * samples 14, 15 and 17 are empty, the sixteenth entry is slot 19. Numbering
+ * by index made channel 2 of micro15.mod play sample 19 (a tone) where the
+ * song says 16 (the hi-hat). A parser that has no slot (id < 1) is numbered
+ * after the last slot given out.
+ */
+export function convertParsedInstruments(
+  parsed: readonly ParsedInstrument[],
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'DMF' | 'XRNS',
+): InstrumentConfig[] {
+  const instruments: InstrumentConfig[] = [];
+  let nextId = 1;
+  for (const inst of parsed) {
+    const id = inst.id >= 1 ? inst.id : nextId;
+    const converted = convertToInstrument(inst, id, sourceFormat);
+    instruments.push(...converted);
+    nextId = Math.max(nextId, id + Math.max(1, converted.length));
+  }
+  return instruments;
+}
+
+/**
  * Convert parsed instrument to DEViLBOX instrument config
  * Handles both sample-based (MOD/XM) and synth-based (Furnace) instruments
  */
