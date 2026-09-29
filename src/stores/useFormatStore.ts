@@ -1114,6 +1114,9 @@ export const useFormatStore = create<FormatStore>()(
           clearNative(state);
         } else {
           state.editorMode = 'classic';
+          // Like every native branch: a plain song leaves no native data from
+          // the previous one (a MOD after an AHX kept hivelyNative).
+          clearNative(state);
         }
       });
       // Ensure the tracker window is in tracker sub-view for all custom editor

@@ -11,7 +11,6 @@ import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
-import { useMixerStore } from '@stores/useMixerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
@@ -35,6 +34,7 @@ import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
 import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
 
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
+import { applySong } from '@/lib/song/applySong';
 
 export interface FileLoadOptions {
   /** Whether to show confirmation dialog before replacing project (song formats only) */
@@ -132,30 +132,10 @@ export async function importTrackerModule(
     useFormatStore.getState().setSidMetadata(null);
   }
 
-  // Full state reset
-  //
-  // The dub sends belong in here and were not. They are fader positions on the
-  // desk for one song, and they are also written back from the audio graph by
-  // the mixer's ratchet — so loading a new module inherited whatever the last
-  // song's moves happened to leave behind. Reported 2026-09-22 as a freshly
-  // loaded jennipha.ahx opening the Dub Deck at 45% / 25% / 43% / 25% before
-  // anything had played.
-  useMixerStore.getState().resetDubSends();
-
-  const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
-  const { loadInstruments, reset: resetInstruments } = useInstrumentStore.getState();
-  const { setBPM, setSpeed, reset: resetTransport } = useTransportStore.getState();
-  const { setMetadata } = useProjectStore.getState();
-  const { reset: resetAutomation } = useAutomationStore.getState();
-  const { setOriginalModuleData, applyEditorMode } = useFormatStore.getState();
-  const engine = getToneEngine();
-
-  await stopActivePlaybackForIncomingSong(engine);
-
-  resetAutomation();
-  resetTransport();
-  resetInstruments();
-  engine.disposeAllInstruments();
+  // The whole-song apply (reset, stores, editor mode, undo, preload) is
+  // applySong's; each branch below only parses. A parse failure now leaves
+  // the current song in place instead of an emptied one.
+  const describe = (fmtName?: string) => `Imported from ${info.file?.name || 'module'}${fmtName ? ` (${fmtName})` : ''}`;
 
   // ── Try OpenMPT WASM soundlib for PC tracker formats ──
   // Skip OpenMPT when native parser data exists — native XM/MOD parser extracts
@@ -173,22 +153,13 @@ export async function importTrackerModule(
           sourceFormat: song.format,
         } as typeof song.patterns[0]['importMetadata'];
       }
-      loadInstruments(song.instruments, { skipPreload: true });
-      loadPatterns(song.patterns);
-      setCurrentPattern(0);
-      if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-      setOriginalModuleData(null);
-      setBPM(song.initialBPM);
-      setSpeed(song.initialSpeed);
-      setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
-      applyEditorMode({
-        linearPeriods: song.linearPeriods,
-        libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
-      });
-      const needsPreload = song.instruments.some(i => i.synthType && i.synthType !== 'Synth');
-      if (needsPreload) {
-        await engine.preloadInstruments(song.instruments);
-      }
+      await applySong({
+        instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
+        bpm: song.initialBPM, speed: song.initialSpeed,
+        metadata: { name: song.name, description: describe() },
+        originalModuleData: null,
+        engine: { ...song, libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined },
+      }, 'import');
       notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
       if (info.file) checkModlandFileWithPatternHash(info.file, null);
       return;
@@ -374,26 +345,19 @@ export async function importTrackerModule(
       nextId += converted.length;
     }
 
-    loadInstruments(instruments, { skipPreload: true });
-    loadPatterns(result.patterns);
-    setCurrentPattern(0);
-    if (result.order?.length > 0) setPatternOrder(result.order);
-    if (result.originalModuleData) setOriginalModuleData(result.originalModuleData);
-    else setOriginalModuleData(null);
-    setMetadata({ name: info.metadata.title, author: '', description: `Imported from ${info.file?.name || 'module'} (${format})` });
-    setBPM(importMetadata.modData?.initialBPM || 125);
-    setSpeed(importMetadata.modData?.initialSpeed || 6);
-
     const xmFreqType = importMetadata?.xmData?.frequencyType;
     const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
-    applyEditorMode({
-      linearPeriods,
-      furnaceNative: info.nativeData.furnaceNative,
-      libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
-    });
-
-    const needsPreload = instruments.some(i => i.synthType && i.synthType !== 'Synth');
-    if (needsPreload) await engine.preloadInstruments(instruments);
+    await applySong({
+      instruments, patterns: result.patterns, order: result.order ?? [],
+      bpm: importMetadata.modData?.initialBPM || 125, speed: importMetadata.modData?.initialSpeed || 6,
+      metadata: { name: info.metadata.title, description: describe(format) },
+      originalModuleData: result.originalModuleData ?? null,
+      engine: {
+        linearPeriods,
+        furnaceNative: info.nativeData.furnaceNative,
+        libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
+      },
+    }, 'import');
     notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
     if (info.file) checkModlandFileWithPatternHash(info.file, null);
     return;
@@ -438,24 +402,20 @@ export async function importTrackerModule(
       }
       if (rawData) (song as { cinter4RawData?: ArrayBuffer }).cinter4RawData = rawData;
     }
-    loadInstruments(song.instruments, { skipPreload: true });
-    loadPatterns(song.patterns);
-    setCurrentPattern(0);
-    if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-    // Store BPM/speed metadata so usePatternPlayback can read them via modData
-    setOriginalModuleData({
-      base64: '',
-      format: (song.format || 'UNKNOWN') as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
-      initialBPM: song.initialBPM,
-      initialSpeed: song.initialSpeed,
-      songLength: song.songLength,
-    } as any);
-    setBPM(song.initialBPM);
-    setSpeed(song.initialSpeed);
-    setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
-    applyEditorMode(song);
-    const needsPreload = song.instruments.some(i => i.synthType && i.synthType !== 'Synth');
-    if (needsPreload) await engine.preloadInstruments(song.instruments);
+    await applySong({
+      instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
+      bpm: song.initialBPM, speed: song.initialSpeed,
+      metadata: { name: song.name, description: describe() },
+      // BPM/speed metadata so usePatternPlayback can read them via modData
+      originalModuleData: {
+        base64: '',
+        format: (song.format || 'UNKNOWN') as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
+        initialBPM: song.initialBPM,
+        initialSpeed: song.initialSpeed,
+        songLength: song.songLength,
+      } as any,
+      engine: song,
+    }, 'import');
     notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
     if (info.file) checkModlandFileWithPatternHash(info.file, null);
     return;
@@ -474,17 +434,13 @@ export async function importTrackerModule(
       console.warn('[Import] convertModule produced no patterns, trying parseModuleToSong');
       const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
       const song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
-      loadInstruments(song.instruments, { skipPreload: true });
-      loadPatterns(song.patterns);
-      setCurrentPattern(0);
-      if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-      setOriginalModuleData(null);
-      setBPM(song.initialBPM);
-      setSpeed(song.initialSpeed);
-      setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
-      applyEditorMode(song);
-      const needsPreload = song.instruments.some(i => i.synthType && i.synthType !== 'Synth');
-      if (needsPreload) await engine.preloadInstruments(song.instruments);
+      await applySong({
+        instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
+        bpm: song.initialBPM, speed: song.initialSpeed,
+        metadata: { name: song.name, description: describe() },
+        originalModuleData: null,
+        engine: song,
+      }, 'import');
       notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
       if (info.file) checkModlandFileWithPatternHash(info.file, null);
       return;
@@ -508,15 +464,15 @@ export async function importTrackerModule(
   }
 
   const instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, sampleUrls);
-  loadInstruments(instruments, { skipPreload: true });
-  loadPatterns(result.patterns);
-  setCurrentPattern(0);
-  if (result.order?.length > 0) setPatternOrder(result.order);
-  setMetadata({ name: info.metadata.title, author: '', description: `Imported from ${info.file?.name || 'module'}` });
-  setBPM(125);
-
-  const needsPreload = instruments.some(i => i.synthType && i.synthType !== 'Synth');
-  if (needsPreload) await engine.preloadInstruments(instruments);
+  // This branch applied the song by hand and never set the editor mode: a MOD
+  // after an AHX kept the AHX editor (2026-09-29).
+  await applySong({
+    instruments, patterns: result.patterns, order: result.order ?? [],
+    bpm: 125, speed: 6,
+    metadata: { name: info.metadata.title, description: describe() },
+    originalModuleData: null,
+    engine: {},
+  }, 'import');
   notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
   if (info.file) checkModlandFileWithPatternHash(info.file, null);
   } finally {
