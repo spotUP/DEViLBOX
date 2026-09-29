@@ -11,10 +11,8 @@ import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
 import { getSynthBadge } from '@constants/channelTypeCompat';
-import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
-import { instrumentTypeLabel } from '@/bridge/analysis/AudioSetInstrumentMap';
-import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
-import { classifyInstrument } from '@/bridge/analysis/ChannelNaming';
+
+const isSamplePlayer = (synthType: string): boolean => synthType === 'Sampler' || synthType === 'Player';
 import { analyzeSong, type InstrumentRole, type DrumPart, type InstrumentVerdict } from '@/bridge/analysis/songAnalyzer';
 import { useInstrumentLabelStore, songLabelKey, type InstrumentLabel } from '@stores/useInstrumentLabelStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -110,9 +108,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     showNewInstrumentBrowser: s.showNewInstrumentBrowser,
     setShowNewInstrumentBrowser: s.setShowNewInstrumentBrowser,
   })));
-  const cedResults = useInstrumentTypeStore(s => s.results);
-  const cedPending = useInstrumentTypeStore(s => s.pendingIds);
-  const setManualType = useInstrumentTypeStore(s => s.setManualType);
 
   // The song analyzer's word on every instrument (what it IS, from how the
   // song plays it), and the owner's labels that overrule it.
@@ -140,7 +135,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       engine.triggerNoteRelease(inst.id, note, now + 0.6, inst);
     } catch (err) { console.warn('[InstrumentList] could not audition instrument', inst.id, err); }
   }, []);
-  const [typePickerFor, setTypePickerFor] = useState<number | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -584,8 +578,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         style={!isFT2 ? { maxHeight } : undefined}
       >
         <div className={`flex flex-col${artMode ? ' w-max min-w-full' : ''}`}>
-        {visibleInstruments.map((instrument, index) => {
-          const displayNum = index + 1; // 1-based display number
+        {visibleInstruments.map((instrument) => {
+          // The slot number the pattern cells name - not the list position:
+          // a song with empty slots keeps its gaps (micro15.mod: 13, 16, 18).
+          const displayNum = instrument.id;
           const synthInfo = getSynthInfo(instrument.synthType);
           const isSelected = instrument.id === currentInstrumentId;
           const IconComponent = getIcon(synthInfo?.icon || 'Music2');
@@ -696,6 +692,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 {/* Channel Type Badge (hardware affinity) */}
                 {(() => {
                   const badge = getSynthBadge(instrument.synthType);
+                  // A sample player's channel type is PCM by definition: the
+                  // synth type badge already says it.
+                  if (isSamplePlayer(instrument.synthType)) return null;
                   return (
                     <span
                       className="instrument-badge text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0"
@@ -706,126 +705,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     >
                       {badge.label}
                     </span>
-                  );
-                })()}
-
-                {/* Instrument type tag — clickable to assign/override manually */}
-                {(() => {
-                  const ced = cedResults.get(instrument.id);
-                  const isPending = cedPending.has(instrument.id);
-                  const isManual = ced?.confidence === 1.0 && ced.topLabels[0]?.label === ced.instrumentType;
-                  const open = typePickerFor === instrument.id;
-                  const toggle = (e: React.MouseEvent) => { e.stopPropagation(); setTypePickerFor(open ? null : instrument.id); };
-
-                  let badgeEl: React.ReactNode = null;
-
-                  /**
-                   * `synthesizer` is a true answer that says nothing.
-                   *
-                   * `AudioSetInstrumentMap` maps 58 synth types — every chip
-                   * and WASM replayer — straight to `synthesizer`, and the CED
-                   * branch below wins on any confidence at all. So every
-                   * instrument of every AHX, HVL, SID or Furnace tune showed
-                   * the same badge: SYNTH, at 100%, correct and useless.
-                   * Reported 2026-09-22: "all jennipha's instruments say synth,
-                   * but what kind of synth? drum? bass?"
-                   *
-                   * When CED has only that to offer and the classifier — which
-                   * reads the synth's own envelope, waveforms and pitch
-                   * behaviour — has a confident answer, the classifier's is the
-                   * one worth showing.
-                   */
-                  const cedIsGeneric = ced?.instrumentType === 'synthesizer';
-                  const classified = classifyInstrument(instrument);
-                  const classifierBeatsCed = cedIsGeneric
-                    && classified.role !== 'empty'
-                    && classified.confidence >= 0.6;
-
-                  if (ced && ced.instrumentType !== 'unknown' && ced.confidence >= 0.05 && !classifierBeatsCed) {
-                    badgeEl = (
-                      <span
-                        className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border shrink-0 cursor-pointer ${
-                          isSelected
-                            ? 'bg-ft2-bg/20 text-ft2-bg border-ft2-bg/30'
-                            : isManual
-                              ? 'bg-accent-highlight/15 text-accent-highlight border-accent-highlight/40'
-                              : 'bg-accent-primary/10 text-accent-primary border-accent-primary/30'
-                        }`}
-                        title={isManual ? 'Manual — click to change' : `CED ${Math.round(ced.confidence * 100)}% — click to override`}
-                        onClick={toggle}
-                      >
-                        {instrumentTypeLabel(ced.instrumentType)}
-                      </span>
-                    );
-                  } else if (isPending) {
-                    badgeEl = (
-                      <span
-                        className={`text-[9px] px-1 py-0.5 rounded font-mono border shrink-0 ${
-                          isSelected ? 'text-ft2-bg/50 border-ft2-bg/20' : 'text-text-muted border-dark-border'
-                        }`}
-                        title="Analysing…"
-                      >
-                        ···
-                      </span>
-                    );
-                  } else {
-                    // The full classifier, not the spectrum alone.
-                    //
-                    // This used to call `analyzeSampleForClassification`
-                    // directly, which is one of the five signals
-                    // `classifyInstrument` weighs — so the badge could not see
-                    // an explicit drum type, a sample filename, the synth
-                    // parameters, or the instrument name. On
-                    // `a sleep so deep.mod` that left `jstbell3`, `jsttom1`,
-                    // `jstharpsi1`, `jstpiano3` and `jstminor` blank while the
-                    // classifier had an answer for several of them, and it
-                    // meant a synth-only format like AHX could never show a
-                    // badge at all, having no PCM to analyse.
-                    const spec = classified;
-                    {
-                      if (spec && spec.role !== 'empty' && spec.confidence >= 0.6) {
-                        const label = spec.role === 'bass'
-                          ? (spec.subrole === 'sub' ? 'SUB' : 'BASS')
-                          : spec.subrole ? spec.subrole.toUpperCase() : spec.role.toUpperCase();
-                        badgeEl = (
-                          <span
-                            className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border shrink-0 cursor-pointer ${
-                              isSelected ? 'bg-ft2-bg/20 text-ft2-bg/80 border-ft2-bg/20' : 'bg-accent-secondary/10 text-accent-secondary border-accent-secondary/30'
-                            }`}
-                            title={`Classifier ${Math.round(spec.confidence * 100)}% — click to override`}
-                            onClick={toggle}
-                          >
-                            {label}
-                          </span>
-                        );
-                      }
-                    }
-                    if (!badgeEl) {
-                      badgeEl = (
-                        <span
-                          className={`text-[9px] px-1 py-0.5 rounded font-mono border shrink-0 cursor-pointer opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity ${
-                            isSelected ? 'text-ft2-bg border-ft2-bg/30' : 'text-text-muted border-dark-borderLight'
-                          }`}
-                          title="Click to classify"
-                          onClick={toggle}
-                        >
-                          ?
-                        </span>
-                      );
-                    }
-                  }
-
-                  return (
-                    <div className="instrument-badge instrument-badge--role relative shrink-0">
-                      {badgeEl}
-                      {open && (
-                        <InstrumentTypePicker
-                          current={isManual ? ced!.instrumentType : null}
-                          onSelect={type => { setManualType(instrument.id, type); setTypePickerFor(null); }}
-                          onClose={() => setTypePickerFor(null)}
-                        />
-                      )}
-                    </div>
                   );
                 })()}
 
@@ -869,18 +748,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   );
                 })()}
 
-                {/* CED scan progress bar — sweeps across the row bottom while pending */}
-                {cedPending.has(instrument.id) && (
-                  <span
-                    className="absolute bottom-0 left-0 h-[2px] w-1/5 pointer-events-none"
-                    style={{
-                      background: isSelected
-                        ? 'rgba(255,255,255,0.5)'
-                        : 'var(--color-accent-primary, #6366f1)',
-                      animation: 'ced-scan 1.4s ease-in-out infinite',
-                    }}
-                  />
-                )}
 
                 {/* Actions (visible on hover, always visible when selected) */}
                 {showActions && (
@@ -1023,6 +890,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 {/* Channel Type Badge (non-compact only) */}
                 {!compact && (() => {
                   const badge = getSynthBadge(instrument.synthType);
+                  // A sample player's channel type is PCM by definition: the
+                  // synth type badge already says it.
+                  if (isSamplePlayer(instrument.synthType)) return null;
                   return (
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded font-bold border"
@@ -1037,16 +907,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   );
                 })()}
 
-                {/* CED scan progress bar (default variant) */}
-                {cedPending.has(instrument.id) && (
-                  <span
-                    className="absolute bottom-0 left-0 h-[2px] w-1/5 pointer-events-none"
-                    style={{
-                      background: 'var(--color-accent-primary, #6366f1)',
-                      animation: 'ced-scan 1.4s ease-in-out infinite',
-                    }}
-                  />
-                )}
 
                 {/* Sample loop indicator - enhanced visibility */}
                 {instrument.sample?.loop && (
@@ -1204,72 +1064,3 @@ const InstrumentRolePicker: React.FC<InstrumentRolePickerProps> = ({ current, ve
   );
 };
 
-// ── Instrument Type Picker ────────────────────────────────────────────────────
-
-const TYPE_GROUPS: Array<{ label: string; types: InstrumentType[] }> = [
-  { label: 'Drums', types: ['kick', 'snare', 'hihat', 'cymbal', 'drum', 'percussion'] },
-  { label: 'Melodic', types: ['bass', 'guitar', 'piano', 'keyboard', 'organ', 'synthesizer', 'pad', 'strings', 'brass', 'wind', 'voice'] },
-  { label: 'Other', types: ['sampler'] },
-];
-
-const TYPE_NAMES: Record<InstrumentType, string> = {
-  kick: 'Kick', snare: 'Snare', hihat: 'Hi-hat', cymbal: 'Cymbal', drum: 'Drum', percussion: 'Perc',
-  bass: 'Bass', guitar: 'Guitar', piano: 'Piano', keyboard: 'Keys', organ: 'Organ',
-  synthesizer: 'Synth', pad: 'Pad', strings: 'Strings', brass: 'Brass', wind: 'Wind',
-  voice: 'Voice', sampler: 'Sampler', unknown: 'Unknown',
-};
-
-interface InstrumentTypePickerProps {
-  current: InstrumentType | null | undefined;
-  onSelect: (type: InstrumentType | null) => void;
-  onClose: () => void;
-}
-
-const InstrumentTypePicker: React.FC<InstrumentTypePickerProps> = ({ current, onSelect, onClose }) => {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener('pointerdown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
-
-  return (
-    <div
-      ref={ref}
-      className="absolute right-0 top-full mt-1 z-[9999] bg-dark-bg border border-dark-border rounded shadow-xl p-2 min-w-[160px]"
-      onClick={e => e.stopPropagation()}
-    >
-      {TYPE_GROUPS.map(group => (
-        <div key={group.label} className="mb-1.5 last:mb-0">
-          <div className="text-[9px] text-text-muted font-mono uppercase px-1 mb-0.5">{group.label}</div>
-          <div className="flex flex-wrap gap-1">
-            {group.types.map(type => (
-              <button
-                key={type}
-                onClick={() => onSelect(type)}
-                className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border transition-colors ${
-                  current === type
-                    ? 'bg-accent-highlight/20 text-accent-highlight border-accent-highlight/50'
-                    : 'bg-dark-bgSecondary text-text-secondary border-dark-border hover:border-accent-primary hover:text-accent-primary'
-                }`}
-              >
-                {TYPE_NAMES[type]}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-      {current && (
-        <button
-          onClick={() => onSelect(null)}
-          className="mt-1.5 w-full text-[9px] px-1.5 py-0.5 rounded font-mono border border-dark-borderLight text-text-muted hover:text-accent-error hover:border-accent-error/40 transition-colors"
-        >
-          ✕ Reset to auto
-        </button>
-      )}
-    </div>
-  );
-};
