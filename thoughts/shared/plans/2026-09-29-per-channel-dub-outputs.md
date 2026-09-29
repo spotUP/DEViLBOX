@@ -2,7 +2,7 @@
 date: 2026-09-29
 topic: Per-channel dub sends (and isolation) for every engine
 tags: [dub, audio, engines, worklets, isolation]
-status: draft
+status: implemented
 ---
 
 # Per-channel dub outputs for every engine
@@ -87,10 +87,17 @@ Known defects found on the way:
 - [x] P3 (f7fec3d82 TFMX, 53c0f12a5 Sonix, e10e13512 Cinter4; dub sends only, supportsIsolationSlots false; TFMX verified live) TFMX (Hippel/TFMX/7V) dub copies from gScope; Sonix; Cinter4.
       Isolation for these needs the voice removed from the C mix (C change) -
       separate item P3b.
-- [ ] P4 SunTronic per-voice rings to its resampler worklet.
+- [x] P4 (10df8f28e) SunTronic per-voice rings to its resampler worklet. Harness-verified against the real renderer; not live-verified (native SunTronic is not the default engine, UADE is).
 - [x] P5 (272565b54) UADE: remove isolated channels from output 0 (C isolation mask; capture FIFO not render-aligned, so no worklet subtraction).
-- [ ] P6 Measure: audio-thread cost of 32 dub outputs per engine with no
-      sends open (outputs unconnected are cheap; verify with thcpu.py).
+- [x] P6 (3d9059155) Measured in Chrome (OfflineAudioContext, 20 nodes x
+      30 s): ~0.73 us per declared output per quantum, connected or not -
+      1 output 1.8 us, 9 outputs 7.2 us, 37 outputs 28.2 us. The assumption
+      "unconnected outputs are cheap" was WRONG, and stopped engines are never
+      disposed, so every format opened kept a 37-output node alive. Fix:
+      channelOutputNodeOptions(voices) declares 5 + voices (4; 8 for TFMX and
+      Oktalyzer). Live: SoundMon node 9 outputs, channel send feeds the bus.
+      Open: libopenmpt / Hively / UADE / Furnace still declare 37 (they can
+      have up to 32 channels); disposing stopped engines is a separate item.
 
 ## Verification
 
