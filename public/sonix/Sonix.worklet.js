@@ -32,12 +32,17 @@ class SonixProcessor extends AudioWorkletProcessor {
     this.posPostCounter = 0;
     this.lastPostedRow = -1;
 
+    // Per-channel dub sends (worklets/channel-outputs.js). No isolation
+    // slots: the C mixes the channels, so none can leave output 0 here.
+    this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
   }
 
   async handleMessage(data) {
+    if (this._outs && this._outs.handleMessage(data)) return;
     if (data.type !== 'init' && !this.module && this.initializing) {
       return;
     }
@@ -432,7 +437,7 @@ class SonixProcessor extends AudioWorkletProcessor {
             outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
           // Every render: the scope samples cover only the last render.
-          this.postChannelScopes();
+          this.postChannelScopes(outputs);
           if (++this.posPostCounter >= this.posPostDivider) {
             this.posPostCounter = 0;
             this.postDisplayRow();
@@ -445,7 +450,7 @@ class SonixProcessor extends AudioWorkletProcessor {
 
   // Read the per-channel scope samples captured during the last _sonix_render()
   // and post them to the main thread for the oscilloscope / VU meters.
-  postChannelScopes() {
+  postChannelScopes(outputs) {
     const m = this.module;
     if (!m || !this.scopePtr || this.numChannels <= 0) return;
     if (typeof m._sonix_get_scope_count !== 'function') return;
@@ -458,8 +463,7 @@ class SonixProcessor extends AudioWorkletProcessor {
     if (!heapU8) return;
     const buffer = heapU8.buffer;
 
-    if (!globalThis.DevilboxChannelStream) return;
-    this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+    if (!globalThis.DevilboxChannelStream && !this._outs) return;
     const views = new Array(this.numChannels);
     for (let ch = 0; ch < this.numChannels; ch++) {
       m._sonix_get_channel_scope(ch, this.scopePtr, n);
@@ -468,7 +472,14 @@ class SonixProcessor extends AudioWorkletProcessor {
     }
     // Streamed per render into 1024-sample chunks for the oscilloscopes and
     // the per-channel role classifiers (worklets/channel-stream.js).
-    this._stream.writeInt16(views, n);
+    if (globalThis.DevilboxChannelStream) {
+      this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+      this._stream.writeInt16(views, n);
+    }
+    // Each channel's dub send. The scope holds the DAC-scaled sample × 32767
+    // and the mix adds that sample × its pan (sonix.c snx_mix_frames), so
+    // 1/32767 puts the send at the channel's level.
+    if (this._outs && outputs) this._outs.write(outputs, views, n, (ch) => (ch === 1 || ch === 2 ? 1 : 0), 1 / 32767);
   }
 
   // Post the driver's current grid row so the main thread can drive the editor
