@@ -42,6 +42,25 @@ struct Biquad {
         a1 = -2.0f * cw / a0; a2 = (1.0f - alpha) / a0;
     }
 
+    /** RBJ peaking EQ: `dB` boost/cut around f with quality q. */
+    void setPeak(float f, float sr, float q, float dB) {
+        const float A = std::pow(10.0f, dB / 40.0f);
+        const float w0 = 2.0f * kPi * f / sr;
+        const float cw = std::cos(w0), alpha = std::sin(w0) / (2.0f * q);
+        const float a0 = 1.0f + alpha / A;
+        b0 = (1.0f + alpha * A) / a0; b1 = -2.0f * cw / a0; b2 = (1.0f - alpha * A) / a0;
+        a1 = -2.0f * cw / a0; a2 = (1.0f - alpha / A) / a0;
+    }
+
+    /** Magnitude at frequency f (for normalising a cascade). */
+    float magnitude(float f, float sr) const {
+        const float w = 2.0f * kPi * f / sr;
+        const float c1 = std::cos(w), s1 = std::sin(w), c2 = std::cos(2 * w), s2 = std::sin(2 * w);
+        const float nr = b0 + b1 * c1 + b2 * c2, ni = -(b1 * s1 + b2 * s2);
+        const float dr = 1.0f + a1 * c1 + a2 * c2, di = -(a1 * s1 + a2 * s2);
+        return std::sqrt((nr * nr + ni * ni) / (dr * dr + di * di));
+    }
+
     float process(float x) {
         const float y = b0 * x + z1;
         z1 = b1 * x - a1 * y + z2;
