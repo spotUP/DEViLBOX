@@ -449,23 +449,9 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
         this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
       if (trackValsPtr) {
-        if (!this.fsmKickXPInitialized) {
-          this.writeByte(trackValsPtr + 0, 255);   // pitchlimit = no value
-          this.writeByte(trackValsPtr + 2, 145);   // startfrq default
-          this.writeByte(trackValsPtr + 3, 50);    // endfrq default
-          this.writeByte(trackValsPtr + 4, 55);    // buzz default
-          this.writeByte(trackValsPtr + 5, 28);    // click default
-          this.writeByte(trackValsPtr + 6, 47);    // punch default
-          this.writeByte(trackValsPtr + 7, 30);    // tdecay default
-          this.writeByte(trackValsPtr + 8, 27);    // tshape default
-          this.writeByte(trackValsPtr + 9, 55);    // bdecay default
-          this.writeByte(trackValsPtr + 10, 55);   // cdecay default
-          this.writeByte(trackValsPtr + 11, 1);    // dslope default
-          this.writeByte(trackValsPtr + 12, 32);   // dtime default
-          this.writeByte(trackValsPtr + 13, 105);  // rslope default
-          this.writeByte(trackValsPtr + 14, 0);    // ndelay default
-          this.fsmKickXPInitialized = true;
-        }
+        // Defaults come from the machine itself: the host writes every parameter's
+        // DefValue at init (BuzzmachineWrapper writeParameterDefaults). A first-note
+        // block here used to overwrite them - and any change made in the UI.
         // Trigger with volume at offset 1
         const vol = Math.min(240, Math.round(this.triggerVelocity * 1.9));
         this.writeByte(trackValsPtr + 1, vol);
@@ -478,14 +464,9 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
         this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
       if (trackValsPtr) {
-        if (!this.fsmKickInitialized) {
-          this.writeByte(trackValsPtr + 1, 198);   // startfrq default
-          this.writeByte(trackValsPtr + 2, 64);    // endfrq default
-          this.writeByte(trackValsPtr + 3, 46);    // tdecay default
-          this.writeByte(trackValsPtr + 4, 27);    // tshape default
-          this.writeByte(trackValsPtr + 5, 55);    // adecay default
-          this.fsmKickInitialized = true;
-        }
+        // Defaults come from the machine itself: the host writes every parameter's
+        // DefValue at init (BuzzmachineWrapper writeParameterDefaults). A first-note
+        // block here used to overwrite them - and any change made in the UI.
         const vol = Math.min(240, Math.round(this.triggerVelocity * 1.9));
         this.writeByte(trackValsPtr, vol);
         console.log('[BuzzmachineWorklet] FSMKick triggered with volume:', vol);
@@ -496,11 +477,9 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       // Switch type: SWITCH_ON=1, SWITCH_OFF=0, SWITCH_NO=255
       if (this.globalValsPtr) {
         // Set defaults first
-        if (!this.trilokInitialized) {
-          this.writeByte(this.globalValsPtr + 1, 64);  // bd_tone default
-          this.writeByte(this.globalValsPtr + 2, 64);  // bd_decay default
-          this.trilokInitialized = true;
-        }
+        // Defaults come from the machine itself: the host writes every parameter's
+        // DefValue at init (BuzzmachineWrapper writeParameterDefaults). A first-note
+        // block here used to overwrite them - and any change made in the UI.
         // Set volume based on velocity
         const vol = Math.min(254, Math.round(this.triggerVelocity * 2));
         this.writeByte(this.globalValsPtr + 3, vol);  // bd_volume
@@ -637,34 +616,9 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
 
       if (trackValsPtr) {
         // Initialize global params on first trigger (if not already initialized)
-        if (!this.aggressorInitialized && this.globalValsPtr) {
-          // Set default global params (matching 303.cpp defaults)
-          this.writeByte(this.globalValsPtr + 0, 0xFF);   // osctype = no value (keep current)
-          this.writeByte(this.globalValsPtr + 1, 0x78);   // cutoff default
-          this.writeByte(this.globalValsPtr + 2, 0x40);   // resonance default
-          this.writeByte(this.globalValsPtr + 3, 0x40);   // envmod default
-          this.writeByte(this.globalValsPtr + 4, 0x40);   // decay default
-          this.writeByte(this.globalValsPtr + 5, 0x40);   // acclevel default
-          this.writeByte(this.globalValsPtr + 6, 0x64);   // finetune = 100 (center, 0 cents)
-          this.writeByte(this.globalValsPtr + 7, 0x64);   // volume = 100%
-
-          // Devil Fish extra params (offsets 8-16) - only for DF variant
-          if (machineType.includes('OomekAggressorDF')) {
-            this.writeByte(this.globalValsPtr + 8, 0x40);   // accentDecay default
-            this.writeByte(this.globalValsPtr + 9, 0x60);   // vegDecay default (longer than filter decay)
-            this.writeByte(this.globalValsPtr + 10, 0x00);  // vegSustain = 0 (normal 303)
-            this.writeByte(this.globalValsPtr + 11, 0x00);  // softAttack = 0 (0.3ms, normal 303)
-            this.writeByte(this.globalValsPtr + 12, 0x00);  // filterTracking = 0 (off)
-            this.writeByte(this.globalValsPtr + 13, 0xFF);  // highResonance = no value (keep current/off)
-            this.writeByte(this.globalValsPtr + 14, 0x1E);  // slideTime = 30 (~60ms, original 303)
-            this.writeByte(this.globalValsPtr + 15, 0x00);  // muffler = 0 (off)
-            this.writeByte(this.globalValsPtr + 16, 0x01);  // sweepSpeed = 1 (normal)
-            console.log('[BuzzmachineWorklet] OomekAggressorDF Devil Fish params initialized');
-          }
-
-          this.aggressorInitialized = true;
-          console.log('[BuzzmachineWorklet] OomekAggressor global params initialized');
-        }
+        // Defaults come from the machine itself: the host writes every parameter's
+        // DefValue at init (BuzzmachineWrapper writeParameterDefaults). A first-note
+        // block here used to overwrite them - and any change made in the UI.
 
         // Convert frequency to Buzz note format
         const midiNote = Math.round(12 * Math.log2(this.noteFrequency / 440) + 69);
@@ -743,26 +697,9 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
         // Initialize params on first trigger (use actual defaults from source)
         // Most params default to 0xFF (NoValue), meaning "don't change"
         // Volume MUST be set on first trigger because machine starts with default from Reset()
-        if (!this.makkM3Initialized) {
-          // Set all params to NoValue (0xFF) first
-          for (let i = 0; i < 35; i++) {
-            this.writeByte(trackValsPtr + i, 0xFF);
-          }
-          // Then set critical params with sensible values
-          this.writeByte(trackValsPtr + 1, 0);     // Wave1: saw (default)
-          this.writeByte(trackValsPtr + 3, 0);     // Wave2: saw
-          this.writeByte(trackValsPtr + 5, 0x40);  // DetuneSemi (centered)
-          this.writeByte(trackValsPtr + 6, 0x40);  // DetuneFine (centered)
-          this.writeByte(trackValsPtr + 16, 0x60); // Volume - above default for louder sound
-          this.writeByte(trackValsPtr + 17, 5);    // AEGAttack (fast)
-          this.writeByte(trackValsPtr + 18, 40);   // AEGSustain
-          this.writeByte(trackValsPtr + 19, 30);   // AEGRelease
-          this.writeByte(trackValsPtr + 20, 1);    // FilterType: lowpass
-          this.writeByte(trackValsPtr + 21, 80);   // Cutoff
-          this.writeByte(trackValsPtr + 22, 30);   // Resonance
-          this.makkM3Initialized = true;
-          console.log('[BuzzmachineWorklet] MakkM3 initialized with default params');
-        }
+        // Defaults come from the machine itself: the host writes every parameter's
+        // DefValue at init (BuzzmachineWrapper writeParameterDefaults). A first-note
+        // block here used to overwrite them - and any change made in the UI.
 
         // Set note - ALWAYS set this to trigger sound
         this.writeByte(trackValsPtr, Math.max(1, Math.min(0x9C, buzzNote))); // NOTE_MAX is 156 (0x9C)
@@ -815,16 +752,10 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       // Volume: NoValue=0xFF, default=0x80 (100%)
       // CRITICAL: Dynamite6 has uninitialized 'final_amp' - need to set global 'amplification' param!
 
-      // Initialize global params on first trigger
-      if (!this.dynamite6Initialized && this.globalValsPtr) {
-        // Global vals struct:
-        // offset 0: coarse_tune (byte)
-        // offset 1: fine_tune (byte)
-        // offset 2: amplification (byte) - CRITICAL: final_amp = pow(2,(amp-128)/8), 128=unity gain
-        this.writeByte(this.globalValsPtr + 2, 0x80); // amplification = 128 = unity gain
-        this.dynamite6Initialized = true;
-        console.log('[BuzzmachineWorklet] Dynamite6 global params initialized');
-      }
+      // Amplification is the machine's own default (0x20: final_amp 2^-12 - its
+      // oscillators run at a large internal scale), written by the host
+      // (BuzzmachineWrapper writeParameterDefaults). Forcing 0x80 here as
+      // "unity" was 4096x: a full-scale square, 98 % of samples clipped.
 
       const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
         this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
@@ -854,38 +785,9 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       // initializes to 0x10000000 (very low). Must set osc volumes to their actual defaults!
 
       // Initialize global params on first trigger
-      if (!this.fm4fm2fInitialized && this.globalValsPtr) {
-        // Global vals struct (41 bytes total):
-        // offset 0: routing (default 1)
-        // offset 1-8: Osc4 (wave, freq, fine, vol, a, d, s, r)
-        // offset 9-16: Osc3 (same)
-        // offset 17-24: Osc2 (same)
-        // offset 25-32: Osc1 (same)
-        // offset 33-40: LPF (cutoff, reso, kf, env, a, d, s, r)
-
-        // Set routing to algorithm 1 (4->3->2->1)
-        this.writeByte(this.globalValsPtr + 0, 1);
-
-        // Set oscillator volumes to defaults (vol is 4th param in each osc group)
-        // Osc4: vol default=32 at offset 4 (1 + 3)
-        this.writeByte(this.globalValsPtr + 4, 32);
-        // Osc3: vol default=32 at offset 12 (9 + 3)
-        this.writeByte(this.globalValsPtr + 12, 32);
-        // Osc2: vol default=32 at offset 20 (17 + 3)
-        this.writeByte(this.globalValsPtr + 20, 32);
-        // Osc1: vol default=56 (carrier, louder) at offset 28 (25 + 3)
-        this.writeByte(this.globalValsPtr + 28, 56);
-
-        // Set reasonable ADSR defaults for Osc1 (carrier)
-        // a=16, d=16, s=16, r=16 (moderate envelope)
-        this.writeByte(this.globalValsPtr + 29, 16); // a
-        this.writeByte(this.globalValsPtr + 30, 16); // d
-        this.writeByte(this.globalValsPtr + 31, 16); // s
-        this.writeByte(this.globalValsPtr + 32, 16); // r
-
-        this.fm4fm2fInitialized = true;
-        console.log('[BuzzmachineWorklet] 4FM2F global params initialized');
-      }
+      // Defaults come from the machine itself: the host writes every parameter's
+      // DefValue at init (BuzzmachineWrapper writeParameterDefaults). A first-note
+      // block here used to overwrite them - and any change made in the UI.
 
       const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
         this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
@@ -922,56 +824,9 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       // Track vals (offsets 0-1): 0:Note, 1:Volume
 
       // Initialize global params on first trigger
-      if (!this.makkM4Initialized && this.globalValsPtr) {
-        // Set all global params to NoValue (0xFF) first
-        for (let i = 0; i < 35; i++) {
-          this.writeByte(this.globalValsPtr + i, 0xFF);
-        }
-        // Oscillators
-        this.writeByte(this.globalValsPtr + 0, 0);      // Wave1: Saw
-        this.writeByte(this.globalValsPtr + 1, 0x40);   // PW1
-        this.writeByte(this.globalValsPtr + 2, 0);      // Wave2: Saw
-        this.writeByte(this.globalValsPtr + 3, 0x40);   // PW2
-        this.writeByte(this.globalValsPtr + 4, 0x40);   // SemiDetune (centered)
-        this.writeByte(this.globalValsPtr + 5, 0x50);   // FineDetune
-        this.writeByte(this.globalValsPtr + 6, 0);      // Sync off
-        // Mix
-        this.writeByte(this.globalValsPtr + 7, 0);      // MixType
-        this.writeByte(this.globalValsPtr + 8, 0x40);   // Mix (centered)
-        this.writeByte(this.globalValsPtr + 9, 0);      // SubOscWave
-        this.writeByte(this.globalValsPtr + 10, 0x40);  // SubOscVol
-        // Pitch envelope
-        this.writeByte(this.globalValsPtr + 11, 7);     // PitchAttack
-        this.writeByte(this.globalValsPtr + 12, 0x0b);  // PitchDecay
-        this.writeByte(this.globalValsPtr + 13, 96);    // PitchEnvMod (0x40+32)
-        this.writeByte(this.globalValsPtr + 14, 0);     // Glide off
-        // Amp envelope
-        this.writeByte(this.globalValsPtr + 15, 5);     // AmpAttack (fast)
-        this.writeByte(this.globalValsPtr + 16, 0x10);  // AmpSustain
-        this.writeByte(this.globalValsPtr + 17, 0x20);  // AmpRelease
-        // Filter
-        this.writeByte(this.globalValsPtr + 18, 2);     // FilterType
-        this.writeByte(this.globalValsPtr + 19, 32);    // Cutoff
-        this.writeByte(this.globalValsPtr + 20, 32);    // Resonance
-        this.writeByte(this.globalValsPtr + 21, 7);     // FilterAttack
-        this.writeByte(this.globalValsPtr + 22, 0x0e);  // FilterSustain
-        this.writeByte(this.globalValsPtr + 23, 0x0f);  // FilterRelease
-        this.writeByte(this.globalValsPtr + 24, 96);    // FilterEnvMod
-        // LFO1 (disabled)
-        this.writeByte(this.globalValsPtr + 25, 0);     // LFO1Dest
-        this.writeByte(this.globalValsPtr + 26, 0);     // LFO1Wave
-        this.writeByte(this.globalValsPtr + 27, 0);     // LFO1Freq
-        this.writeByte(this.globalValsPtr + 28, 0);     // LFO1Amount
-        this.writeByte(this.globalValsPtr + 29, 0x40);  // LFO1PhaseDiff
-        // LFO2 (disabled)
-        this.writeByte(this.globalValsPtr + 30, 0);     // LFO2Dest
-        this.writeByte(this.globalValsPtr + 31, 0);     // LFO2Wave
-        this.writeByte(this.globalValsPtr + 32, 0);     // LFO2Freq
-        this.writeByte(this.globalValsPtr + 33, 0);     // LFO2Amount
-        this.writeByte(this.globalValsPtr + 34, 0x40);  // LFO2PhaseDiff
-        this.makkM4Initialized = true;
-        console.log('[BuzzmachineWorklet] MakkM4 initialized with default global params');
-      }
+      // Defaults come from the machine itself: the host writes every parameter's
+      // DefValue at init (BuzzmachineWrapper writeParameterDefaults). A first-note
+      // block here used to overwrite them - and any change made in the UI.
 
       const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
         this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
@@ -1308,10 +1163,13 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
         const leftOut = output[0];
         const rightOut = output[1] || leftOut;
 
-        // Read stereo interleaved: L0,R0,L1,R1,...
+        // Read stereo interleaved: L0,R0,L1,R1,... Not clamped: Buzz machines
+        // produce float audio that may pass full scale (Buzz mixes in float);
+        // the instrument / effect chain trims it. Clamping to +-1 here turned
+        // a hot synth into hard clipping (Makk M3: 24 % of samples).
         for (let i = 0; i < numSamples; i++) {
-          leftOut[i] = Math.max(-1.0, Math.min(1.0, this.wasmAudioView[i * 2] / 32768.0));
-          rightOut[i] = Math.max(-1.0, Math.min(1.0, this.wasmAudioView[i * 2 + 1] / 32768.0));
+          leftOut[i] = this.wasmAudioView[i * 2] / 32768.0;
+          rightOut[i] = this.wasmAudioView[i * 2 + 1] / 32768.0;
         }
       } else {
         // Machine returned false = silence
