@@ -1342,7 +1342,7 @@ export async function clearAutoDubFireLog(): Promise<Record<string, unknown>> {
 export async function getChannelRoles(): Promise<Record<string, unknown>> {
   const { useTrackerStore } = await import('../../stores/useTrackerStore');
   const { useInstrumentStore } = await import('../../stores/useInstrumentStore');
-  const { classifySongRoles } = await import('../analysis/ChannelNaming');
+  const { classifySongRoles, ownerLabelsFor } = await import('../analysis/ChannelNaming');
   const { getAllRuntimeChannelRoles, mergeOfflineAndRuntimeRoles } = await import('../analysis/ChannelAudioClassifier');
   const tracker = useTrackerStore.getState();
   const patterns = tracker.patterns;
@@ -1361,7 +1361,7 @@ export async function getChannelRoles(): Promise<Record<string, unknown>> {
   // The instrument-first analysis the roles come from: what each instrument
   // is (with its evidence) and what each channel plays in each section.
   const { analyzeSong } = await import('../analysis/songAnalyzer');
-  const analysis = analyzeSong(patterns, tracker.patternOrder, lookup);
+  const analysis = analyzeSong(patterns, tracker.patternOrder, lookup, ownerLabelsFor(lookup));
   const instruments = [...analysis.instruments.values()].map((v) => ({
     id: v.id, name: v.name, role: v.role, confidence: Math.round(v.confidence * 100) / 100,
     ...(v.drumPart ? { drumPart: v.drumPart } : {}), ...(v.harmonyKind ? { harmonyKind: v.harmonyKind } : {}),
@@ -2064,4 +2064,35 @@ export function getFullState(): Record<string, unknown> {
 
 export function getConsoleErrors(): Record<string, unknown> {
   return { entries: getConsoleEntries() };
+}
+
+/**
+ * The owner's instrument labels for the loaded song, next to the analyzer's
+ * verdict for every instrument - the corpus answer key is pulled from here.
+ */
+export async function getInstrumentLabels(): Promise<Record<string, unknown>> {
+  const { useTrackerStore } = await import('../../stores/useTrackerStore');
+  const { useInstrumentStore } = await import('../../stores/useInstrumentStore');
+  const { useProjectStore } = await import('../../stores/useProjectStore');
+  const { useInstrumentLabelStore, songLabelKey } = await import('../../stores/useInstrumentLabelStore');
+  const { analyzeSong } = await import('../analysis/songAnalyzer');
+  const tracker = useTrackerStore.getState();
+  const insts = useInstrumentStore.getState().instruments;
+  const lookup = new Map(insts.map((i) => [i.id, i]));
+  const songKey = songLabelKey(useProjectStore.getState().metadata?.name, lookup.size);
+  const labels = useInstrumentLabelStore.getState().labelsFor(songKey);
+  const analysis = tracker.patterns.length ? analyzeSong(tracker.patterns, tracker.patternOrder, lookup) : null;
+  return {
+    songKey,
+    song: useProjectStore.getState().metadata?.name ?? '',
+    labels,
+    instruments: insts.map((i) => {
+      const v = analysis?.instruments.get(i.id);
+      return {
+        id: i.id, name: i.name, used: !!v,
+        analyzer: v ? { role: v.role, confidence: Math.round(v.confidence * 100) / 100, drumPart: v.drumPart, harmonyKind: v.harmonyKind, onsets: v.usage.onsets, pitches: v.usage.pitches, channels: v.usage.channels } : null,
+        label: labels[i.id] ?? null,
+      };
+    }),
+  };
 }

@@ -809,6 +809,24 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_instrument_labels',
+    "The owner's instrument labels for the loaded song (drums / bass / lead / harmony / fx, with a drum part) next to the song analyzer's verdict for every instrument. The corpus answer key is pulled from here after a labelling session.",
+    {},
+    () => call('get_instrument_labels'),
+  );
+
+  server.tool(
+    'set_instrument_label',
+    "Label an instrument of the loaded song: what it IS - drums (kick / snare / hat / perc), bass, lead, harmony or fx. The analyzer takes it as settled, so the song's channel roles follow at once. role null clears the label.",
+    {
+      id: z.number().int().describe('Instrument id'),
+      role: z.enum(['drums', 'bass', 'lead', 'harmony', 'fx']).nullable().describe('The role, or null to clear'),
+      drumPart: z.enum(['kick', 'snare', 'hat', 'perc', 'mixed']).optional().describe('For drums: which part'),
+    },
+    (p) => call('set_instrument_label', p),
+  );
+
+  server.tool(
     'get_channel_evidence',
     "Per-pattern measurements of what each channel is actually doing: pitch range and median, stepwise vs leaping motion, note density, on/off-beat split and skank confidence, onset regularity, polyphony, instruments used and effect types. Walks the song ORDER, so a pattern played twice appears twice. This is evidence, not a label - use get_channel_roles for the classifier's verdict, and this when that verdict looks wrong or when you need to see a channel change character across the song.",
     { channel: z.number().optional() },

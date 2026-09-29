@@ -20,7 +20,17 @@ import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
 import { analyzeSampleForClassification, sampleLoopOf } from './SampleSpectrum';
-import { analyzeSong, channelInstrument, legacySubrole } from './songAnalyzer';
+import { analyzeSong, channelInstrument, legacySubrole, type OwnerLabel } from './songAnalyzer';
+import { useInstrumentLabelStore, songLabelKey } from '@/stores/useInstrumentLabelStore';
+import { useProjectStore } from '@/stores/useProjectStore';
+
+/** The owner's instrument labels for the loaded song, if any. */
+export function ownerLabelsFor(instruments: ReadonlyMap<number, InstrumentConfig>): ReadonlyMap<number, OwnerLabel> | undefined {
+  const key = songLabelKey(useProjectStore.getState().metadata?.name, instruments.size);
+  const labels = useInstrumentLabelStore.getState().labelsFor(key);
+  const entries = Object.entries(labels).map(([id, l]) => [Number(id), l] as [number, OwnerLabel]);
+  return entries.length ? new Map(entries) : undefined;
+}
 import { extractSynthTimbre, classifyBySynthParams, classifyByNativeSynth, soundingNotes } from './synthEvidence';
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -486,7 +496,8 @@ export function classifySongChannels(
   instruments: Map<number, InstrumentConfig>,
   order?: number[],
 ): EnhancedChannelAnalysis[] {
-  const key = order ? order.join(',') : '';
+  const ownerLabels = ownerLabelsFor(instruments);
+  const key = `${order ? order.join(',') : ''}|${ownerLabels ? [...ownerLabels.entries()].map(([id, l]) => `${id}:${l.role}`).join(',') : ''}`;
   const cached = _songRolesCache.get(patterns);
   if (cached && cached.key === key) return cached.value;
 
@@ -494,7 +505,7 @@ export function classifySongChannels(
   const schema = patterns[0];
   if (!schema || !Array.isArray(schema.channels)) return [];
 
-  const analysis = analyzeSong(patterns, order ?? patterns.map((_, i) => i), instruments);
+  const analysis = analyzeSong(patterns, order ?? patterns.map((_, i) => i), instruments, ownerLabels);
   const analyses: EnhancedChannelAnalysis[] = schema.channels.map((_, idx) => {
     const notes: number[] = [];
     let rows = 0;
@@ -524,7 +535,8 @@ export function classifySongRoles(
   instruments: Map<number, InstrumentConfig>,
   order?: number[],
 ): ChannelRole[] {
-  const key = order ? order.join(',') : '';
+  const ownerLabels = ownerLabelsFor(instruments);
+  const key = `${order ? order.join(',') : ''}|${ownerLabels ? [...ownerLabels.entries()].map(([id, l]) => `${id}:${l.role}`).join(',') : ''}`;
   const cached = _songRolesProjectionCache.get(patterns);
   if (cached && cached.key === key) return cached.value;
   const roles = classifySongChannels(patterns, instruments, order).map(a => a.role);

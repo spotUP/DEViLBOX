@@ -73,6 +73,8 @@ export interface InstrumentUsage {
   /** Distinct sounding pitches. */
   pitches: number;
   medianPitch: number;
+  /** Median WRITTEN note (tracker numbering), to play the instrument as the song does. */
+  writtenMedian: number;
   /** Semitones above the song's lowest instrument median. */
   register: number;
   /** Share of consecutive onsets (same channel, same position) moving <= 2 semitones. */
@@ -129,7 +131,7 @@ export interface SongAnalysis {
 
 // ─── 1. Usage walk ──────────────────────────────────────────────────────────
 
-interface Onset { position: number; channel: number; row: number; instrument: number; pitch: number; arp: boolean }
+interface Onset { position: number; channel: number; row: number; instrument: number; pitch: number; written: number; arp: boolean }
 
 interface Walk {
   onsets: Onset[];
@@ -160,7 +162,7 @@ function walkSong(patterns: Pattern[], order: number[], offsets: ReadonlyMap<num
           const pitch = cell.note + (offsets.get(inst) ?? 0);
           // 0xy on a note: the classic tracker chord (arpeggio effect).
           const arp = (cell.effTyp === 0 && cell.eff > 0) || (cell.effTyp2 === 0 && cell.eff2 > 0);
-          onsets.push({ position, channel: ch, row, instrument: inst, pitch, arp });
+          onsets.push({ position, channel: ch, row, instrument: inst, pitch, written: cell.note, arp });
         }
       }
     }
@@ -215,6 +217,7 @@ function usageOf(id: number, walk: Walk, lowestMedian: number, channel?: number)
     onsets: mine.length,
     pitches: pitches.size,
     medianPitch,
+    writtenMedian: median(mine.map((o) => o.written)),
     register: mine.length ? medianPitch - lowestMedian : 0,
     stepwise: pairs ? steps / pairs : 0,
     leaps: pairs ? leaps / pairs : 0,
@@ -493,9 +496,14 @@ function fuse(ev: Evidence[]): RoleScores {
   return s;
 }
 
-function verdictOf(id: number, inst: InstrumentConfig | undefined, usage: InstrumentUsage, sound: ReturnType<typeof timbreOf>, trustNames: boolean): InstrumentVerdict {
+function verdictOf(id: number, inst: InstrumentConfig | undefined, usage: InstrumentUsage, sound: ReturnType<typeof timbreOf>, trustNames: boolean, label?: OwnerLabel): InstrumentVerdict {
   const hints: { drumPart?: DrumPart; harmonyKind?: HarmonyKind } = {};
   const evidence: Evidence[] = [];
+  // The owner's word settles it; the other evidence is still listed.
+  if (label) {
+    evidence.push({ source: 'explicit', scores: { [label.role]: 3 }, note: 'labelled by the owner' });
+    if (label.drumPart) hints.drumPart = label.drumPart;
+  }
   if (inst) {
     evidence.push(...timbreEvidence(inst, sound, hints));
     if (trustNames) {
@@ -513,7 +521,7 @@ function verdictOf(id: number, inst: InstrumentConfig | undefined, usage: Instru
   const scores = fuse(evidence);
   let role: InstrumentRole = 'lead';
   if (explicit) {
-    role = 'drums';
+    role = (Object.keys(explicit.scores) as InstrumentRole[])[0];
   } else {
     let best = -Infinity;
     for (const r of ROLES) if (scores[r] > best) { best = scores[r]; role = r; }
@@ -522,7 +530,7 @@ function verdictOf(id: number, inst: InstrumentConfig | undefined, usage: Instru
   const positive = ROLES.reduce((sum, r) => sum + Math.max(0, scores[r]), 0);
   const confidence = positive > 0 ? Math.max(0, scores[role]) / positive : 0;
 
-  const v: InstrumentVerdict = { id, name: inst?.name ?? '', role, confidence, scores, evidence, usage };
+  const v: InstrumentVerdict = { id, name: inst?.name ?? '', role, confidence: label ? 1 : confidence, scores, evidence, usage };
   if (role === 'drums') {
     // Beat position names a part only when it is decisive.
     v.drumPart = hints.drumPart ?? (usage.barStart >= 0.7 ? 'kick' : usage.barMid >= 0.7 ? 'snare' : usage.density >= 0.5 ? 'hat' : 'perc');
@@ -599,11 +607,20 @@ export function legacySubrole(v: InstrumentVerdict | undefined): ChannelSubrole 
 
 // ─── Entry point ────────────────────────────────────────────────────────────
 
-const _cache = new WeakMap<Pattern[], SongAnalysis>();
+const _cache = new WeakMap<Pattern[], { key: string; value: SongAnalysis }>();
 
-export function analyzeSong(patterns: Pattern[], order: number[], instruments: ReadonlyMap<number, InstrumentConfig>): SongAnalysis {
+/** The owner's word on an instrument, as explicit evidence. */
+export interface OwnerLabel { role: InstrumentRole; drumPart?: DrumPart }
+
+export function analyzeSong(
+  patterns: Pattern[],
+  order: number[],
+  instruments: ReadonlyMap<number, InstrumentConfig>,
+  labels?: ReadonlyMap<number, OwnerLabel>,
+): SongAnalysis {
+  const cacheKey = `${order.join(',')}|${labels ? [...labels.entries()].map(([id, l]) => `${id}:${l.role}:${l.drumPart ?? ''}`).join(',') : ''}`;
   const cached = _cache.get(patterns);
-  if (cached) return cached;
+  if (cached && cached.key === cacheKey) return cached.value;
   const channelCount = patterns[0]?.channels?.length ?? 0;
 
   // Every instrument's sound and, from it, what its notes sound like.
@@ -634,9 +651,10 @@ export function analyzeSong(patterns: Pattern[], order: number[], instruments: R
   const parts = new Map<string, InstrumentVerdict>();
   for (const id of [...used].sort((a, b) => a - b)) {
     const sound = sounds.get(id) ?? { timbre: UNKNOWN_TIMBRE };
-    verdicts.set(id, verdictOf(id, instruments.get(id), usageOf(id, walk, lowest), sound, trustNames));
+    const label = labels?.get(id);
+    verdicts.set(id, verdictOf(id, instruments.get(id), usageOf(id, walk, lowest), sound, trustNames, label));
     for (const ch of new Set(walk.onsets.filter((o) => o.instrument === id).map((o) => o.channel))) {
-      parts.set(`${id}:${ch}`, verdictOf(id, instruments.get(id), usageOf(id, walk, lowest, ch), sound, trustNames));
+      parts.set(`${id}:${ch}`, verdictOf(id, instruments.get(id), usageOf(id, walk, lowest, ch), sound, trustNames, label));
     }
   }
 
@@ -661,7 +679,7 @@ export function analyzeSong(patterns: Pattern[], order: number[], instruments: R
   });
 
   const analysis: SongAnalysis = { instruments: verdicts, parts, timeline, channelRoles, legacyRoles, namesInformative: trustNames };
-  _cache.set(patterns, analysis);
+  _cache.set(patterns, { key: cacheKey, value: analysis });
   return analysis;
 }
 

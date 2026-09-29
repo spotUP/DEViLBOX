@@ -2785,3 +2785,18 @@ export async function evaluateScript(params: Record<string, unknown>): Promise<u
     return { error: (e as Error).message };
   }
 }
+
+/** Label an instrument of the loaded song (drums / bass / lead / harmony / fx); role null clears it. */
+export async function setInstrumentLabel(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const id = params.id as number;
+  const role = params.role as string | null;
+  const drumPart = params.drumPart as string | undefined;
+  const ROLES = ['drums', 'bass', 'lead', 'harmony', 'fx'];
+  if (typeof id !== 'number') return { error: 'id required' };
+  if (role !== null && !ROLES.includes(role)) return { error: `role must be one of ${ROLES.join(', ')} or null` };
+  const { useProjectStore } = await import('../../stores/useProjectStore');
+  const { useInstrumentLabelStore, songLabelKey } = await import('../../stores/useInstrumentLabelStore');
+  const songKey = songLabelKey(useProjectStore.getState().metadata?.name, useInstrumentStore.getState().instruments.length);
+  useInstrumentLabelStore.getState().setLabel(songKey, id, role ? { role: role as never, ...(drumPart ? { drumPart: drumPart as never } : {}) } : null);
+  return { ok: true, songKey, id, label: role ? { role, drumPart } : null };
+}
