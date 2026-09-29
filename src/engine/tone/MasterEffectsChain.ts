@@ -6,7 +6,7 @@ import { getNativeAudioNode } from '@utils/audio-context';
 import { getEffectGainCompensation } from '../factories/effectGainCompensation';
 import { useFormatStore } from '../../stores/useFormatStore';
 import { supportsChannelIsolation } from './ChannelRoutedEffects';
-import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel } from './sidechainKey';
+import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel, channelRoleTargets } from './sidechainKey';
 
 export interface MasterEffectsContext {
   masterEffectsInput: Tone.Gain;
@@ -55,12 +55,29 @@ export function getPostEffectsInput(): Tone.Gain | null {
   return _getPostEffectsInput?.() ?? null;
 }
 
+/**
+ * The channels each channelRole effect resolved to at the last rebuild, by
+ * effect id. An effect whose role finds no channel in this song (no drums
+ * classified, or nothing but drums) runs on the whole mix instead of
+ * vanishing.
+ */
+const roleTargets = new Map<string, number[]>();
+
+/** Whether an effect runs on some channels (via isolation) rather than the whole mix. */
+function isChannelTargeted(fx: EffectConfig): boolean {
+  if (fx.channelRole !== undefined) return (roleTargets.get(fx.id)?.length ?? 0) > 0;
+  return Array.isArray(fx.selectedChannels) && fx.selectedChannels.length > 0;
+}
+
 /** Nodes keyed on SIDECHAIN_KEY_DRUMS, re-resolved when a song loads. */
 const autoKeyedNodes = new Set<Tone.ToneAudioNode>();
 let songWatchInstalled = false;
 
-/** When the song changes, point every "Drums (auto)" key at its new drum channel. */
-function watchSongForAutoKeys(): void {
+/**
+ * When the song changes, point every "Drums (auto)" key at its new drum
+ * channel, and re-route effects aimed at a channel role.
+ */
+function watchSongForAutoRouting(): void {
   if (songWatchInstalled) return;
   songWatchInstalled = true;
   void import('../../stores/useTrackerStore').then(({ useTrackerStore }) => {
@@ -77,6 +94,13 @@ function watchSongForAutoKeys(): void {
           if ((node as { disposed?: boolean }).disposed) { autoKeyedNodes.delete(node); continue; }
           void wireMasterSidechain(node, SIDECHAIN_KEY_DRUMS);
         }
+        // A channel role resolves differently per song, and may move its
+        // effect between the whole mix and the channel-routed set.
+        void Promise.all([import('../../stores/useAudioStore'), import('../ToneEngine')])
+          .then(([{ useAudioStore }, { getToneEngine }]) => {
+            const effects = useAudioStore.getState().masterEffects;
+            if (effects.some((fx) => fx.enabled && fx.channelRole !== undefined)) void getToneEngine().rebuildMasterEffects(effects);
+          });
       }, 500);
     });
   });
@@ -100,7 +124,7 @@ export async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChanne
   const ownInput = sourceChannel < 0 && sourceChannel !== SIDECHAIN_KEY_DRUMS;
   if (sourceChannel === SIDECHAIN_KEY_DRUMS) {
     autoKeyedNodes.add(node);
-    watchSongForAutoKeys();
+    watchSongForAutoRouting();
     sourceChannel = await resolveDrumKeyChannel();
   } else {
     autoKeyedNodes.delete(node);
@@ -237,12 +261,18 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
 
   // Separate global effects from channel-targeted effects.
   // When isolation isn't available, treat all effects as global (ignore selectedChannels).
+  // A channelRole is resolved against the song, and again when one loads.
+  const resolved = new Map<string, number[]>();
+  for (const fx of enabledEffects) {
+    if (fx.channelRole !== undefined) resolved.set(fx.id, await channelRoleTargets(fx));
+  }
+  roleTargets.clear();
+  for (const [id, chs] of resolved) roleTargets.set(id, chs);
+  if (resolved.size > 0) watchSongForAutoRouting();
   const globalEffects = isolationAvailable
-    ? enabledEffects.filter(fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0)
+    ? enabledEffects.filter(fx => !isChannelTargeted(fx))
     : enabledEffects;
-  const hasChannelTargeted = isolationAvailable && enabledEffects.some(
-    fx => Array.isArray(fx.selectedChannels) && fx.selectedChannels.length > 0
-  );
+  const hasChannelTargeted = isolationAvailable && enabledEffects.some(isChannelTargeted);
 
   // Channel-targeted effects are handled by the WASM isolation system
   if (hasChannelTargeted) {
@@ -466,7 +496,7 @@ export function canUseParameterUpdatePath(ctx: MasterEffectsContext, newEffects:
     }
   }
   const globalNew = isolationAvailable
-    ? enabledNew.filter(fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0)
+    ? enabledNew.filter(fx => !isChannelTargeted(fx))
     : enabledNew;
   const currentIds = Array.from(ctx.masterEffectConfigs.keys());
 

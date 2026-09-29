@@ -186,6 +186,13 @@ export interface EffectConfig {
   // the selected channels instead of the full master chain.
   selectedChannels?: number[];
 
+  // Role-based targeting, for presets - they cannot know a song's channel
+  // numbers. 'nonDrums' = every channel the classifier does not call
+  // percussion, resolved when the effect is routed and again when a song
+  // loads (see channelRoleTargets in engine/tone/sidechainKey.ts). Takes the
+  // place of selectedChannels while set.
+  channelRole?: 'nonDrums';
+
   // DJ master-chain bass-lock: when true, the effect is inserted on a
   // high-pass split at ~150 Hz and the low end bypasses the effect
   // entirely (keeps the bassline clean while phaser/reverb/delay

@@ -28,6 +28,7 @@ function renderCard() {
           onRemove={() => {}}
           onWetChange={() => {}}
           onChannelSelect={onChannelSelect}
+          onChannelRole={() => {}}
           onKeyChange={() => {}}
           numChannels={4}
           channelNames={[]}

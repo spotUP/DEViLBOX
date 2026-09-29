@@ -29,8 +29,9 @@ describe("'Chip Metal' master preset", () => {
     }
   });
 
-  it('runs the Swedish Chainsaw everything-max, tight, in parallel', () => {
+  it('runs the Swedish Chainsaw everything-max, tight, in parallel, on every channel but the drums', () => {
     const saw = preset.effects.find((fx) => fx.type === 'SwedishChainsaw')!;
+    expect(saw.channelRole).toBe('nonDrums');
     expect(saw.parameters).toMatchObject({ tight: 100, pedalGain: 100, ampGain: 100, bass: 100, middle: 100, treble: 100 });
     expect(saw.wet).toBeGreaterThan(0);
     expect(saw.wet).toBeLessThan(100);

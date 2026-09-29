@@ -123,17 +123,20 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'wasm', type: 'SwedishChainsaw', enabled: true, wet: 100, parameters: { tight: 0, pedalGain: 100, ampGain: 100, bass: 100, middle: 100, treble: 100, volume: 50 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
     ] },
-  // Chip song -> metal. A whole mix through a maxed HM-2 turns bass and drums
-  // to mush, so the Chainsaw runs TIGHT (700 Hz high-pass before the pedal)
-  // and in PARALLEL (wet 65 %): the distorted wall carries the mids and top,
-  // the clean path keeps the bass line and kick defined underneath - the
-  // metal-bus trick. Before it, the chip top above 12 kHz is rolled off so
-  // square waves do not fizz; after it, a scooped metal EQ, drum-keyed ducking
-  // so the kick punches through the wall, punch, a small dry room, a ceiling.
-  { name: 'Chip Metal', description: 'Makes chip songs metal: HM-2 everything-max wall in parallel, tight lows, scooped mids, kick punching through', tags: ['Loud', 'Grit', 'Guitar', 'Genre'], gainCompensationDb: -1.7,
+  // Chip song -> metal. The Chainsaw (everything max) runs on every channel
+  // EXCEPT the drums (channelRole 'nonDrums', found by the classifier for
+  // each song), so the kit stays clean and punchy as in a metal mix. It runs
+  // TIGHT (700 Hz high-pass before the pedal) and in PARALLEL (wet 65 %): the
+  // distorted wall carries the mids and top while the clean path keeps the
+  // bass line's fundamental. Before it, the chip top above 12 kHz is rolled
+  // off so square waves do not fizz; after it, a scooped metal EQ, drum-keyed
+  // ducking so the kick punches through the wall, glue, punch, a small dry
+  // room, a ceiling. Engines without per-channel outputs run it on the whole
+  // mix.
+  { name: 'Chip Metal', description: 'Makes chip songs metal: HM-2 everything-max wall on every channel but the drums, tight lows, scooped mids, kick punching through', tags: ['Loud', 'Grit', 'Guitar', 'Genre'], gainCompensationDb: -1.7,
     effects: [
       { category: 'wasm', type: 'EQ8Band', enabled: true, wet: 100, parameters: { hpFreq: 35, lpFreq: 12000, lowShelfFreq: 90, lowShelfGain: 0, peak1Freq: 250, peak1Gain: 0, peak1Q: 1, peak2Freq: 900, peak2Gain: 0, peak2Q: 1, peak3Freq: 3000, peak3Gain: 0, peak3Q: 1, peak4Freq: 8000, peak4Gain: -2, peak4Q: 1, highShelfFreq: 10000, highShelfGain: -3, mix: 1 } },
-      { category: 'wasm', type: 'SwedishChainsaw', enabled: true, wet: 65, parameters: { tight: 100, pedalGain: 100, ampGain: 100, bass: 100, middle: 100, treble: 100, volume: 50 } },
+      { category: 'wasm', type: 'SwedishChainsaw', enabled: true, wet: 65, channelRole: 'nonDrums', parameters: { tight: 100, pedalGain: 100, ampGain: 100, bass: 100, middle: 100, treble: 100, volume: 50 } },
       { category: 'wasm', type: 'EQ8Band', enabled: true, wet: 100, parameters: { hpFreq: 30, lpFreq: 16000, lowShelfFreq: 90, lowShelfGain: 3, peak1Freq: 400, peak1Gain: -3, peak1Q: 1, peak2Freq: 900, peak2Gain: 0, peak2Q: 1, peak3Freq: 2500, peak3Gain: 1.5, peak3Q: 1.2, peak4Freq: 8000, peak4Gain: 0, peak4Q: 1, highShelfFreq: 9000, highShelfGain: -2, mix: 1 } },
       { category: 'tonejs', type: 'SidechainCompressor', enabled: true, wet: 100, parameters: { threshold: -24, ratio: 3, attack: 0.003, release: 0.12, knee: 6, sidechainGain: 100, scFreq: 150, scQ: 0.7, scFilterType: 'lowpass', sidechainSource: -2 } },
       { category: 'wasm', type: 'MultibandComp', enabled: true, wet: 100, parameters: { lowCrossover: 150, highCrossover: 4000, lowThreshold: -20, midThreshold: -22, highThreshold: -22, lowRatio: 3, midRatio: 2.5, highRatio: 2, lowGain: 1, midGain: 1, highGain: 1 } },
