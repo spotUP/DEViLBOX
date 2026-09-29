@@ -484,21 +484,56 @@ const MAX_CACHE_ENTRIES = 256;
  *  repeated calls for the same instrument (AutoDub ticking, auto-naming
  *  passes) only do the FFT once. Returns null when the URL isn't a WAV
  *  data URL or is too short to analyse. */
+/** A sample's loop, in frames, when it has one: `{ loop, loopStart, loopEnd }` of a sample config. */
+export function sampleLoopOf(
+  sample: { loop?: boolean; loopStart?: number; loopEnd?: number } | undefined | null,
+): SampleLoop | undefined {
+  if (!sample?.loop) return undefined;
+  const start = Math.max(0, Math.floor(sample.loopStart ?? 0));
+  const end = Math.floor(sample.loopEnd ?? 0);
+  return end - start >= 2 ? { start, end } : undefined;
+}
+
+export interface SampleLoop { start: number; end: number }
+
+/**
+ * What a sample SOUNDS like: the frames up to its loop end, then the loop
+ * repeated for at least half a second. A looped sample is heard as its loop
+ * repeating, and a 32-frame single-cycle chip waveform repeated is a pitched
+ * tone - analysed as stored it is a burst of a few cycles, which the spectrum
+ * read as a snare (every channel of micro15.mod came back percussion,
+ * 2026-09-29).
+ */
+export function soundingPcm(pcm: Float32Array, sampleRate: number, loop: SampleLoop | undefined): Float32Array {
+  if (!loop) return pcm;
+  const end = Math.min(loop.end, pcm.length);
+  const start = Math.min(loop.start, end - 2);
+  if (start < 0) return pcm;
+  const len = end - start;
+  const total = Math.max(end + len, Math.ceil(sampleRate * 0.5));
+  const out = new Float32Array(total);
+  out.set(pcm.subarray(0, end));
+  for (let i = end; i < total; i++) out[i] = pcm[start + ((i - end) % len)];
+  return out;
+}
+
 export function analyzeSampleForClassification(
   url: string | undefined | null,
+  loop?: SampleLoop,
 ): SampleClassification | null {
   if (!url) return null;
-  const cached = _dataUrlCache.get(url);
+  const key = loop ? `${loop.start}:${loop.end}:${url}` : url;
+  const cached = _dataUrlCache.get(key);
   if (cached !== undefined) return cached;
 
   const decoded = decodeWavDataUrl(url);
   if (!decoded) {
-    _dataUrlCache.set(url, null);
+    _dataUrlCache.set(key, null);
     return null;
   }
-  const features = extractSampleFeatures(decoded.pcm, decoded.sampleRate);
+  const features = extractSampleFeatures(soundingPcm(decoded.pcm, decoded.sampleRate, loop), decoded.sampleRate);
   if (!features) {
-    _dataUrlCache.set(url, null);
+    _dataUrlCache.set(key, null);
     return null;
   }
   const decision = classifyBySpectralFeatures(features);
@@ -514,7 +549,7 @@ export function analyzeSampleForClassification(
     const firstKey = _dataUrlCache.keys().next().value;
     if (firstKey !== undefined) _dataUrlCache.delete(firstKey);
   }
-  _dataUrlCache.set(url, result);
+  _dataUrlCache.set(key, result);
   return result;
 }
 
