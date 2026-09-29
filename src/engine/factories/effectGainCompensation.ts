@@ -17,7 +17,7 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   Saturator:        -9.3,
   Distortion:       -4.5,
   // TapeSaturation: 0 - its curve now passes quiet signals at unity (2026-09-29).
-  TapeDegradation:  -5.0,
+  // TapeDegradation: 0 - shares TapeSaturation's unity-gain curve (2026-09-29).
   DragonflyPlate:   -4.5,
   Overdrive:        -4.4,
   CabinetSim:       +4.6,   // was quiet, boost
