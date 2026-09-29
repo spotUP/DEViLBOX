@@ -127,7 +127,7 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 - [x] L1.1 [x] L1.2 [ ] L1.3
 - [x] L2.1 [ ] L2.2 [ ] L2.3
 - [ ] L3.1 [ ] L3.2 [ ] L3.3 [ ] L3.4
-- [ ] L4.1 [ ] L4.2 [ ] L4.3
+- [x] L4.1 [ ] L4.2 [ ] L4.3
 - [ ] L5.1 [ ] L5.2 [ ] L5.3
 - [ ] L6.1 [ ] L6.2 [ ] L6.3
 
@@ -158,3 +158,13 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   the likely real cause of the owner's AHX layout, since something downstream
   derives the editor from hivelyNative. preloadRace.contract re-pointed to
   scan applySong.ts as well.
+- L4.1 done + the .dbx branch of L2.2 + the parse half of L1.3: savedSongToApply
+  (src/lib/song/savedSong.ts) reads both saved shapes (SavedProject and .dbx
+  SongExport); applySong gained ProjectExtras (automation, master chain, groove,
+  mixer, dub bus, Auto Dub, journal, hybrid instruments). The three persistence
+  restores and the .dbx branch are parse -> applySong. restoreNativeEngineData
+  became the pure decodeNativeEngineFields (it returned early without native
+  data, so projects never reset the editor mode). Found and fixed on the way:
+  .dbx never restored mixer or hybrid instruments; a revision never ran the
+  schema migration it now runs when needed. applySavedProject is async now.
+  Test savedProjectAfterAhx (fails on the old code: 'hively'). 6 of 22.

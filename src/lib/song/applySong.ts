@@ -22,7 +22,16 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useHistoryStore } from '@/stores/useHistoryStore';
+import { useAudioStore } from '@/stores/useAudioStore';
+import { useEditorStore } from '@/stores/useEditorStore';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { useDubStore } from '@/stores/useDubStore';
 import { getToneEngine } from '@/engine/ToneEngine';
+import type { AutomationCurve } from '@typedefs/automation';
+import type { EffectConfig } from '@typedefs/instrument';
+import type { MixerSnapshot } from '@stores/useMixerStore';
+import type { DubBusSettings } from '@/types/dub';
+import { migrateDubLaneEvents } from './migrateDubLaneEvents';
 
 type FormatState = ReturnType<typeof useFormatStore.getState>;
 
@@ -47,6 +56,63 @@ export interface SongToApply {
    * hand-picked subset, so a field is never dropped on the way to the engine.
    */
   engine: SongEngineData;
+  /** What a saved project carries beyond the song itself (none for an imported module). */
+  extras?: ProjectExtras;
+}
+
+/** A saved project's state beyond the song (see savedSong.ts). */
+export interface ProjectExtras {
+  automation?: AutomationCurve[];
+  /** A project restores its own master chain; an import keeps the user's. */
+  masterEffects?: EffectConfig[];
+  grooveTemplateId?: string;
+  linearPeriods?: boolean;
+  /** Instrument ids replaced with synths for hybrid playback. */
+  replacedInstruments?: number[];
+  mixer?: MixerSnapshot;
+  dubBus?: Partial<DubBusSettings>;
+  autoDub?: { enabled: boolean; persona: string; intensity: number; moveBlacklist?: string[] };
+  performanceJournal?: unknown;
+}
+
+/** Restore a project's state beyond the song, after the song is in place. */
+async function applyProjectExtras(x: ProjectExtras, patterns: Pattern[]): Promise<void> {
+  if (x.linearPeriods != null) useEditorStore.getState().setLinearPeriods(x.linearPeriods);
+  if (x.automation && x.automation.length > 0) useAutomationStore.getState().loadCurves(x.automation);
+  // Old dubLane.events[] -> automation curves (one-time conversion).
+  for (const p of patterns) migrateDubLaneEvents(p as Parameters<typeof migrateDubLaneEvents>[0]);
+  if (x.masterEffects) useAudioStore.getState().setMasterEffects(x.masterEffects);
+  useTransportStore.getState().setGrooveTemplate(x.grooveTemplateId || 'straight');
+  if (x.mixer) useMixerStore.getState().loadMixerState(x.mixer);
+  // setDubBus merges over defaults, so an older file missing newer fields loads.
+  if (x.dubBus) useDrumPadStore.getState().setDubBus(x.dubBus as never);
+  if (x.autoDub) {
+    const dub = useDubStore.getState();
+    dub.setAutoDubPersona(x.autoDub.persona as never);
+    dub.setAutoDubIntensity(x.autoDub.intensity);
+    dub.setAutoDubMoveBlacklist(x.autoDub.moveBlacklist ?? []);
+    dub.setAutoDubEnabled(x.autoDub.enabled);
+  }
+  // The performer's notes - commentary only, never a replay source.
+  try {
+    const [{ loadPerformanceJournal }, { parseJournal }] = await Promise.all([
+      import('@/engine/dub/performanceJournalBridge'),
+      import('@/lib/dub/performanceJournal'),
+    ]);
+    loadPerformanceJournal(parseJournal(x.performanceJournal as never));
+  } catch (err) {
+    console.warn('[applySong] performance journal could not be restored:', err);
+  }
+  void useInstrumentStore.getState().autoBakeInstruments();
+  if (x.replacedInstruments?.length) {
+    const ids = x.replacedInstruments;
+    setTimeout(() => {
+      void import('@/engine/TrackerReplayer').then(({ getTrackerReplayer }) => {
+        try { getTrackerReplayer().restoreReplacedInstruments(ids); }
+        catch (e) { console.warn('[applySong] Failed to restore replaced instruments:', e); }
+      });
+    }, 500);
+  }
 }
 
 /** Stop everything that plays the outgoing song. */
@@ -95,6 +161,8 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
     author: song.metadata.author ?? '',
     description: song.metadata.description ?? '',
   });
+
+  if (song.extras) await applyProjectExtras(song.extras, song.patterns);
 
   // Undoing into the previous song is not meaningful.
   useHistoryStore.getState().clearHistory();
