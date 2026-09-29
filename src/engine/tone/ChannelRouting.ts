@@ -168,6 +168,21 @@ export function getRealtimeChannelLevels(state: ChannelMeterState, numChannels: 
  * The effect chain is always present (passthrough when empty) so effects can be
  * added/removed dynamically without reconnecting external nodes.
  */
+/**
+ * Mixer volume/pan set for channels whose chain is not built yet, applied when
+ * it is. Setting a value used to BUILD the chain: the mixer re-applies all 16
+ * channels' state, so every song got 16 chains - input, Tone.Channel, meter,
+ * effect chain and HPF/LPF each - processed every quantum, on a 4-channel MOD
+ * about 150 nodes nobody used (2026-09-29 audio trace).
+ */
+const pendingMix = new WeakMap<ChannelRoutingContext, Map<number, { volumeDb?: number; pan?: number }>>();
+
+function pendingMixOf(ctx: ChannelRoutingContext): Map<number, { volumeDb?: number; pan?: number }> {
+  let m = pendingMix.get(ctx);
+  if (!m) { m = new Map(); pendingMix.set(ctx, m); }
+  return m;
+}
+
 export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: number): Tone.Gain {
   if (!ctx.channelOutputs.has(channelIndex)) {
     // Create channel audio chain with metering
@@ -197,6 +212,15 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
       channel,
       meter,
     });
+
+    // State the mixer set before the chain existed.
+    channel.mute = ctx.channelMuteStates.get(channelIndex) ?? false;
+    const pending = pendingMixOf(ctx).get(channelIndex);
+    if (pending) {
+      if (pending.volumeDb !== undefined) channel.volume.value = pending.volumeDb;
+      if (pending.pan !== undefined) channel.pan.value = pending.pan;
+      pendingMixOf(ctx).delete(channelIndex);
+    }
   }
 
   return ctx.channelOutputs.get(channelIndex)!.input;
@@ -569,10 +593,7 @@ export function clearChannelPitch(ctx: ChannelRoutingContext, channelIndex: numb
 export function setChannelMute(ctx: ChannelRoutingContext, channelIndex: number, muted: boolean): void {
   // Update quick lookup map (used by isChannelMuted during note triggering)
   ctx.channelMuteStates.set(channelIndex, muted);
-  // Ensure channel exists
-  if (!ctx.channelOutputs.has(channelIndex)) {
-    getChannelOutput(ctx, channelIndex);
-  }
+  // An unbuilt channel reads its mute from channelMuteStates when it is built.
   const channelOutput = ctx.channelOutputs.get(channelIndex);
   if (channelOutput) {
     channelOutput.channel.mute = muted;
@@ -583,23 +604,23 @@ export function setChannelMute(ctx: ChannelRoutingContext, channelIndex: number,
  *  Unlike setChannelVolume (which affects active voice gains), this sets
  *  the channel's Tone.Channel node directly — persists across notes. */
 export function setMixerChannelVolume(ctx: ChannelRoutingContext, channelIndex: number, volumeDb: number): void {
-  if (!ctx.channelOutputs.has(channelIndex)) {
-    getChannelOutput(ctx, channelIndex);
-  }
   const channelOutput = ctx.channelOutputs.get(channelIndex);
   if (channelOutput) {
     channelOutput.channel.volume.value = volumeDb;
+  } else {
+    const m = pendingMixOf(ctx);
+    m.set(channelIndex, { ...m.get(channelIndex), volumeDb });
   }
 }
 
 /** Sets the persistent mixer pan on the channel output (-1..1). */
 export function setMixerChannelPan(ctx: ChannelRoutingContext, channelIndex: number, pan: number): void {
-  if (!ctx.channelOutputs.has(channelIndex)) {
-    getChannelOutput(ctx, channelIndex);
-  }
   const channelOutput = ctx.channelOutputs.get(channelIndex);
   if (channelOutput) {
     channelOutput.channel.pan.value = pan;
+  } else {
+    const m = pendingMixOf(ctx);
+    m.set(channelIndex, { ...m.get(channelIndex), pan });
   }
 }
 
