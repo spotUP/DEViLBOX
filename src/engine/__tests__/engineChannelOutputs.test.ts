@@ -89,3 +89,41 @@ describe('per-channel engine outputs', { timeout: 120000 }, () => {
     expect(mainLeak).toBe(0);
   });
 });
+
+describe('TFMX (Hippel) per-voice dub sends', { timeout: 120000 }, () => {
+  it('each dub output is its voice at the level it has in the main mix', async () => {
+    const { parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
+    const song = await parseHippelCoSoFile(songBuffer('public/data/songs/formats/prehistoric_tale.hipc'), 'prehistoric_tale.hipc');
+    const { proc, send } = await startWorklet('tfmx', 'TFMX');
+    await send({ type: 'loadModule', mdatBuffer: (song.hippelFileData as ArrayBuffer).slice(0), smplBuffer: null });
+    await send({ type: 'modulePlay' });
+    const voices = proc._moduleVoices as number;
+    expect(voices).toBeGreaterThanOrEqual(4);
+    for (let v = 0; v < voices; v++) await send({ type: 'dubChannelEnable', cmd: 'dubChannelEnable', val: { channel: v }, channel: v });
+
+    // Fit main-left against the sum of the left voices' dub outputs.
+    let xy = 0, xx = 0, yy = 0, heard = 0;
+    for (let q = 0; q < 1000; q++) {
+      const out = stereoOutputs(37);
+      proc.process([], out);
+      for (let i = 0; i < 128; i++) {
+        let left = 0;
+        for (let v = 0; v < voices; v++) {
+          expect(out[5 + v][1][i]).toBe(out[5 + v][0][i]);   // mono on both sides
+          if (v % 4 === 0 || v % 4 === 3) left += out[5 + v][0][i];
+        }
+        const main = out[0][0][i];
+        xy += main * left; xx += left * left; yy += main * main;
+        if (left !== 0) heard++;
+      }
+    }
+    expect(heard).toBeGreaterThan(10000);
+    const gain = xy / xx;                        // main ≈ gain × Σ left dub outputs
+    const corr = xy / Math.sqrt(xx * yy);
+    // The dub outputs are the voices, pre LED filter: they track the main mix
+    // closely and at its level.
+    expect(corr, `corr ${corr}`).toBeGreaterThan(0.9);
+    expect(gain, `gain ${gain}`).toBeGreaterThan(0.5);
+    expect(gain, `gain ${gain}`).toBeLessThan(2);
+  });
+});

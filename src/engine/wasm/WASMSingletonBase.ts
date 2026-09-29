@@ -279,6 +279,11 @@ export abstract class WASMChannelOutputsEngine extends WASMSingletonBase {
     return this._nodeReady && !!this.workletNode && !this._disposed;
   }
 
+  /** Whether outputs 1..4 can carry a voice taken out of the main mix. */
+  supportsIsolationSlots(): boolean {
+    return true;
+  }
+
   addIsolation(slotIndex: number, channelMask: number): void {
     this.workletNode?.port.postMessage({ type: 'addIsolation', slotIndex, channelMask });
   }

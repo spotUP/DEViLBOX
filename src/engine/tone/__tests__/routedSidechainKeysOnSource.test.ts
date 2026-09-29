@@ -32,3 +32,19 @@ describe('channel-routed sidechain effects', () => {
     expect(wireMasterSidechain).toHaveBeenCalledWith(scNode, 2);
   });
 });
+
+describe('engines without isolation slots', () => {
+  it('get no isolation request: the channel cannot leave their main mix (TFMX)', async () => {
+    const mgr = new ChannelRoutedEffectsManager({} as unknown as Tone.Gain);
+    const engine = {
+      isAvailable: () => true,
+      supportsIsolationSlots: () => false,
+      getWorkletNode: () => ({ connect: vi.fn(), disconnect: vi.fn(), port: { postMessage: vi.fn() } }),
+      getAudioContext: () => ({ createGain: () => ({ gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() }) }),
+      addIsolation: vi.fn(), removeIsolation: vi.fn(),
+    };
+    const cfg = { id: 'c', category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: {} };
+    await mgr.rebuild(new Map([[0, [cfg as never]]]), engine as never);
+    expect(engine.addIsolation).not.toHaveBeenCalled();
+  });
+});
