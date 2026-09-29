@@ -63,15 +63,19 @@ public:
 
 /**
  * Gain for the SUM of n parallel combs of feedback g, so the tail's level
- * does not follow the decay knob. The damped tail keeps its lows, where the
- * combs add in phase and each one's gain approaches 1/(1-g), so the level
- * that matters for music (and pink noise) goes with (1-g); an incoherent
- * sqrt(1-g^2) left a +-6 dB spread across decay on pink noise.
- * Scaled to sqrt((1-0.64)/n) at g = 0.8, the value the reverbs' makeups were
+ * does not follow the decay knob. Across the audible band the combs'
+ * resonances add incoherently, so each comb's power gain goes with
+ * 1/(1-g^2) and the sum is normalised by sqrt(1-g^2).
+ *
+ * (Only at DC do the combs add in phase, with gain 1/(1-g): a (1-g)
+ * normalisation calibrated on unfiltered pink noise - whose Kellet filter
+ * keeps rising below 20 Hz - matched that sub-audio part and left the
+ * reverbs 10-20 dB quiet on music, falling with decay. 2026-09-29.)
+ * Scaled to sqrt((1-0.64)/n) at g = 0.8, the value the reverbs' makeups are
  * measured against.
  */
 inline float combSumNorm(float g, int n) {
     const float atDefault = std::sqrt((1.0f - 0.64f) / (float)n);
     const float gc = g < 0.999f ? g : 0.999f;
-    return atDefault * (1.0f - gc) / 0.2f;
+    return atDefault * std::sqrt((1.0f - gc * gc) / (1.0f - 0.64f));
 }

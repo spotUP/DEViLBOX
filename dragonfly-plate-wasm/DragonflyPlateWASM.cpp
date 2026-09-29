@@ -124,10 +124,12 @@ struct PlateReverbInstance {
             lpfStateR = sumR * (1.0f - lpfCoeff) + lpfStateR * lpfCoeff;
 
             // Stereo width
-            // Makeup to the input's level at the default settings on PINK noise
-            // (music-like; measured 2026-09-29). The damped tail keeps its lows,
-            // where the combs add in phase, so white noise under-reads it.
-            constexpr float kMakeup = 0.3273f;
+            // Makeup to the input's level at the app's default settings on mono
+            // (centre, L = R) pink noise high-passed at 20 Hz - music-like;
+            // measured 2026-09-29.
+            // Unfiltered pink over-reads a reverb: its sub-audio part lands on
+            // the combs' in-phase DC gain.
+            constexpr float kMakeup = 1.5486f;
             float mid = (lpfStateL + lpfStateR) * 0.5f * kMakeup;
             float side = (lpfStateL - lpfStateR) * 0.5f * width * kMakeup;
             outL[i] = mid + side;

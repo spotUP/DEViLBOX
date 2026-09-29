@@ -63,13 +63,20 @@ export async function multitoneGainDb(
   return freqs.map((f) => 20 * Math.log10(goertzel(y, f) / amp));
 }
 
-/** Deterministic noise source: 'white', or 'pink' (Paul Kellet's filter, equal energy per octave - closer to music). */
+/**
+ * Deterministic noise source: 'white', or 'pink' (Paul Kellet's filter, equal
+ * energy per octave - closer to music), high-passed at 20 Hz (24 dB/oct).
+ * Kellet's filter keeps rising below 20 Hz, and a reverb's combs have their
+ * largest gain there (all in phase at DC): unfiltered, the sub-audio part
+ * decided the reading, and the Dragonfly reverbs calibrated on it came out
+ * 13-17 dB quiet on music (2026-09-29).
+ */
 export function noiseSource(color: 'white' | 'pink', seed0: number): () => number {
   let seed = seed0;
   const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return (seed / 2 ** 32) * 2 - 1; };
   if (color === 'white') return rnd;
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-  return () => {
+  const pink = () => {
     const w = rnd();
     b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
     b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
@@ -77,16 +84,29 @@ export function noiseSource(color: 'white' | 'pink', seed0: number): () => numbe
     b6 = w * 0.115926;
     return out * 0.11;
   };
+  // Two Butterworth high-pass biquads at 20 Hz (48 kHz).
+  const k = Math.tan(Math.PI * 20 / 48000), q = Math.SQRT1_2, nrm = 1 / (1 + k / q + k * k);
+  const a1 = 2 * (k * k - 1) * nrm, a2 = (1 - k / q + k * k) * nrm;
+  const stages = [[0, 0, 0, 0], [0, 0, 0, 0]];
+  return () => {
+    let x = pink();
+    for (const st of stages) {
+      const y = nrm * (x - 2 * st[0] + st[1]) - a1 * st[2] - a2 * st[3];
+      st[1] = st[0]; st[0] = x; st[3] = st[2]; st[2] = y; x = y;
+    }
+    return x;
+  };
 }
 
 /**
- * Broadband gain in dB: stereo white noise (rms `amp`) through effect
+ * Broadband gain in dB: stereo white noise (rms `amp`; `centre` = the same
+ * noise on both channels, as a mix's centre) through effect
  * `prefix`, output RMS over the second half vs input RMS. The level test for
  * reverbs and delays, where a steady tone lands on resonances.
  */
 export async function noiseGainDb(
   dir: string, stem: string, prefix: string, params: Record<string, number>, seconds = 3, amp = 0.1,
-  color: 'white' | 'pink' = 'white',
+  color: 'white' | 'pink' = 'white', centre = false,
 ): Promise<number> {
   const { m, heap } = await loadWasmEffect(dir, stem);
   const h = m[`_${prefix}_create`](48000);
@@ -102,7 +122,7 @@ export async function noiseGainDb(
   const scale = color === 'white' ? amp * Math.sqrt(3) : amp * 4;
   for (let off = 0; off < n; off += block) {
     const L = new Float32Array(block), R = new Float32Array(block);
-    for (let i = 0; i < block; i++) { L[i] = nl() * scale; R[i] = nr() * scale; }
+    for (let i = 0; i < block; i++) { L[i] = nl() * scale; R[i] = centre ? L[i] : nr() * scale; }
     heap().set(L, iL >> 2); heap().set(R, iR >> 2);
     m[`_${prefix}_process`](h, iL, iR, oL, oR, block);
     if (off >= n / 2) {
