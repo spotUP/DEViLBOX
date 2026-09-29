@@ -65,9 +65,9 @@ function callOnce(method: string, params: Record<string, unknown>, timeoutMs: nu
 
 const BANDS = ['63', '125', '250', '500', '1000', '2000', '4000', '8000', '16000'];
 
-/** Rich tone: overall RMS and dB per octave band (get_audio_level bands: true). */
+/** Pink noise: overall RMS and dB per octave band (get_audio_level bands: true). */
 async function broadband(): Promise<{ rms: number; bands: Record<string, number> }> {
-  await call('test_tone', { action: 'start', mode: 'rich', level: -18, durationMs: 6000 });
+  await call('test_tone', { action: 'start', mode: 'pink', level: -18, durationMs: 6000 });
   await sleep(1500);
   const lvl = await call('get_audio_level', { durationMs: 2000, bands: true });
   await call('test_tone', { action: 'stop' });
