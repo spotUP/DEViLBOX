@@ -104,10 +104,10 @@ bool revmodel::processreplace(float *inputL, float *inputR, float *outputL, floa
     // apply hi and lowcut
 	if (skip==2) {
 		DSP_BW_WorkStereo(histate, inputL, numsamples2, WM_READWRITE); 
-		DSP_BW_WorkStereo(lostate, inputL, numsamples2, WM_READWRITE); 
+		if (locutOn) DSP_BW_WorkStereo(lostate, inputL, numsamples2, WM_READWRITE); 
 	} else {
 		DSP_BW_Work(histate, inputL, numsamples2, WM_READWRITE);
-		DSP_BW_Work(lostate, inputL, numsamples2, WM_READWRITE);
+		if (locutOn) DSP_BW_Work(lostate, inputL, numsamples2, WM_READWRITE);
 	}
 
 	while(numsamples-- > 0)
@@ -322,8 +322,12 @@ void revmodel::sethicut(float v) {
 }
 
 void revmodel::setlocut(float v) {
-	if (v==0.0) v=0.001;
-	//DSP_BW_Reset(lostate);
+	// LowCut 0 (the default) is OFF. It set a 0.001 Hz high-pass, whose
+	// float coefficients put a pole on z = 1: the filter integrated the
+	// input's DC and lows, +21 dB at 63 Hz and a sub-bass runaway
+	// (2026-09-29).
+	locutOn = v >= 1.0f;
+	if (!locutOn) { DSP_BW_Reset(lostate); return; }
 
 	// lo cut, is same as high pass
 	DSP_BW_InitHighpass(lostate, v);
