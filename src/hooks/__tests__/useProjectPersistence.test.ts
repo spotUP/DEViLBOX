@@ -10,8 +10,22 @@
  * `explicitlySaved` gate are covered too.
  */
 
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import 'fake-indexeddb/auto'; // Installs a working IDBFactory on globalThis.
+
+// A load goes through applySong, which stops and resets the Tone engine; node
+// has no AudioContext. Mocked at that boundary only, so the load succeeds and
+// the round-trip assertions below run instead of being skipped.
+vi.mock('@/engine/ToneEngine', () => {
+  const engine = {
+    releaseAll: vi.fn(), disposeAllInstruments: vi.fn(), preloadInstruments: vi.fn(async () => {}),
+    invalidateInstrument: vi.fn(), setBPM: vi.fn(),
+  };
+  return { getToneEngine: () => engine };
+});
+vi.mock('@stores/useInstrumentTypeStore', () => ({
+  useInstrumentTypeStore: { getState: () => ({ resetClassified: () => {}, classifyInstruments: () => {} }) },
+}));
 
 beforeAll(() => {
   // Make sure happy-dom's `window` sees the same IDBFactory — some
@@ -54,8 +68,12 @@ const SLOW_MS = 60_000;
 
 describe('useProjectPersistence — IDB round-trip', () => {
   beforeEach(async () => {
+    // Close the module's cached connection first: an open connection blocks
+    // deleteDatabase, and the previous test's project stayed behind.
+    const { closeCachedDBForTest } = await import('../useProjectPersistence');
+    closeCachedDBForTest();
     await resetIDB();
-  });
+  }, SLOW_MS);
 
   it('exports the save/load/explicit-save API surface', async () => {
     const mod = await import('../useProjectPersistence');
@@ -89,11 +107,8 @@ describe('useProjectPersistence — IDB round-trip', () => {
     expect(useProjectStore.getState().metadata.name).toBe('something-else');
 
     const loaded = await loadProjectFromStorage();
-    // Load may return false if schema-mismatch / missing fields — accept
-    // either outcome but if it returned true, the name must be restored.
-    if (loaded) {
-      expect(useProjectStore.getState().metadata.name).toBe('persistence-probe-A');
-    }
+    expect(loaded, 'the saved project should load').toBe(true);
+    expect(useProjectStore.getState().metadata.name).toBe('persistence-probe-A');
   });
 
   it('load with no saved data returns false without crashing', async () => {
@@ -114,10 +129,11 @@ describe('useProjectPersistence — IDB round-trip', () => {
 
   // ── Phase 1 Dub Studio — Pattern.dubLane round-trip (schema v20) ──────
   // Guards the bug class where a schema bump silently drops a new field.
-  // useProjectPersistence.ts:117 notes: "v20: Pattern.dubLane added for
-  // per-pattern ... Purely additive; patterns without dubLane load
-  // identically to v19." This test proves it.
-  it('explicit save → load cycle preserves Pattern.dubLane events', async () => {
+  // Pattern.dubLane events (v20) are legacy: the recorder writes automation
+  // curves now, and every load converts saved events into curves
+  // (migrateDubLaneEvents, 2026-04-27). This test used to expect the events
+  // back unchanged and only passed because its load failed silently.
+  it('explicit save → load converts Pattern.dubLane events into automation curves', async () => {
     const { saveProjectToStorage, loadProjectFromStorage, clearExplicitlySaved } =
       await import('../useProjectPersistence');
     const { useTrackerStore } = await import('@stores/useTrackerStore');
@@ -166,23 +182,16 @@ describe('useProjectPersistence — IDB round-trip', () => {
     expect(useTrackerStore.getState().patterns[0].dubLane).toBeUndefined();
 
     const loaded = await loadProjectFromStorage();
-    // If load skips (happy-dom stored state doesn't round-trip through
-    // some legacy code path), we don't fail the test — we only assert
-    // positively when load succeeds.
-    if (!loaded) return;
+    expect(loaded, 'the saved project should load').toBe(true);
 
-    const restored = useTrackerStore.getState().patterns[0].dubLane;
-    expect(restored, 'dubLane should be restored by load').toBeDefined();
-    expect(restored?.events).toHaveLength(2);
-    // Spot-check the trigger and the hold round-trip their key fields.
-    const trig = restored?.events.find((e) => e.id === 'evt-trigger-probe');
-    expect(trig?.moveId).toBe('echoThrow');
-    expect(trig?.row).toBe(4);
-    expect(trig?.channelId).toBe(0);
-    const hold = restored?.events.find((e) => e.id === 'evt-hold-probe');
-    expect(hold?.moveId).toBe('dubSiren');
-    expect(hold?.durationRows).toBe(8);
-    expect(hold?.params?.feedback).toBe(0.65);
+    const pattern = useTrackerStore.getState().patterns[0];
+    expect(pattern.dubLane?.events ?? [], 'events are consumed by the conversion').toHaveLength(0);
+    const { useAutomationStore } = await import('@stores/useAutomationStore');
+    const automation = useAutomationStore.getState();
+    const trig = automation.getCurvesForPattern(pattern.id, 0).find((c) => c.parameter === 'dub.echoThrow');
+    expect(trig?.points.map((pt) => [pt.row, pt.value])).toEqual([[4, 1], [4.05, 0]]);
+    const hold = automation.getCurvesForPattern(pattern.id, 1).find((c) => c.parameter === 'dub.dubSiren');
+    expect(hold?.points.map((pt) => [pt.row, pt.value])).toEqual([[12, 1], [20, 0]]);
   }, SLOW_MS);
 
   it('load of a pre-v20 project without dubLane does not crash', async () => {
