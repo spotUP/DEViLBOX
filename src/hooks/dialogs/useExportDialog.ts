@@ -313,54 +313,13 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
         case 'song': {
           const data = await importSong(file);
           if (data) {
-            setMetadata(data.metadata);
-            setBPM(data.bpm);
-            loadPatterns(data.patterns);
-            loadInstruments(data.instruments);
-
-            // Load automation curves - prefer flat array format, fall back to nested
-            if (data.automationCurves && data.automationCurves.length > 0) {
-              loadCurves(data.automationCurves);
-            } else if (data.automation) {
-              const allCurves: AutomationCurve[] = [];
-              Object.entries(data.automation).forEach(([, channels]) => {
-                Object.entries(channels as Record<number, Record<string, AutomationCurve>>).forEach(([, params]) => {
-                  Object.values(params).forEach((curve) => allCurves.push(curve));
-                });
-              });
-              if (allCurves.length > 0) loadCurves(allCurves);
-            }
-
-            if (data.masterEffects && data.masterEffects.length > 0) setMasterEffects(data.masterEffects);
-
-            // Restore dub bus tuning (character preset + 30+ coloring params).
-            // Spread over whatever's currently in the store so older .dbx
-            // files missing newer fields inherit current defaults — shape
-            // evolves as dub coloring params land.
-            if (data.dubBus) {
-              const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
-              useDrumPadStore.getState().setDubBus(data.dubBus);
-            }
-
-            // Restore Auto Dub state (enabled, persona, intensity, blacklist).
-            // Uses individual setters rather than a bulk replace so the
-            // engine's useEffect in AutoDubPanel re-fires on the enabled
-            // flag and starts/stops the tick loop appropriately.
-            if (data.autoDub) {
-              const { useDubStore } = await import('@/stores/useDubStore');
-              const s = useDubStore.getState();
-              s.setAutoDubPersona(data.autoDub.persona);
-              s.setAutoDubIntensity(data.autoDub.intensity);
-              s.setAutoDubMoveBlacklist(data.autoDub.moveBlacklist ?? []);
-              s.setAutoDubEnabled(data.autoDub.enabled);
-            }
-
-            // Restore mixer state (channel volumes, pans, mutes, solos, dub sends, send buses)
-            if (data.mixer) {
-              const { useMixerStore } = await import('@/stores/useMixerStore');
-              useMixerStore.getState().loadMixerState(data.mixer);
-            }
-
+            // One parser, one apply for every saved song (this restored its
+            // own subset of the project by hand).
+            const [{ applySong }, { savedSongToApply }] = await Promise.all([
+              import('@/lib/song/applySong'),
+              import('@/lib/song/savedSong'),
+            ]);
+            await applySong(savedSongToApply(data), 'project');
             notify.success(`Song "${data.metadata.name}" imported!`);
           }
           break;

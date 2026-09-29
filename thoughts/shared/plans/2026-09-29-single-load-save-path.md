@@ -127,7 +127,7 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 - [x] L1.1 [x] L1.2 [ ] L1.3
 - [x] L2.1 [x] L2.2 [x] L2.3
 - [x] L3.1 [x] L3.2 [x] L3.3 [x] L3.4
-- [x] L4.1 [ ] L4.2 [ ] L4.3
+- [x] L4.1 [x] L4.2 [ ] L4.3
 - [ ] L5.1 [ ] L5.2 [ ] L5.3
 - [ ] L6.1 [ ] L6.2 [ ] L6.3
 
@@ -196,3 +196,4 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   song name on harvested presets for every load (was only the App path).
   The header-detected (extensionless) import keeps its explicit ModuleInfo:
   its name says nothing, so name-based preparation cannot read it. 13 of 22.
+- L4.2 done: the Export dialog's song import -> savedSongToApply + applySong; its legacy nested-automation reader moved into the one parser. 14 of 22.
