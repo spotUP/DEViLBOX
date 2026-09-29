@@ -188,6 +188,9 @@ export class BuzzmachineSynth implements DevilboxSynth {
     this.output.disconnect();
 
     if (this.workletNode) {
+      // Free the machine in the worklet and stop its processor; a disconnected
+      // node alone kept its WASM instance and process() alive.
+      try { this.workletNode.port.postMessage({ type: 'dispose' }); } catch { /* port closed */ }
       this.workletNode.disconnect();
       this.workletNode = null;
     }

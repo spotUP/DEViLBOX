@@ -39,4 +39,10 @@ describe('Buzz effect machines', () => {
       expect(res.outRms).toBeGreaterThan(0.005);
     }, 15000);
   }
+
+  it('a disposed machine stops its processor (disposed nodes ran for the rest of the session)', () => {
+    const r = spawnSync(process.execPath, [RUNNER, 'JeskolaFreeverb', 'Jeskola_Freeverb', 'dispose'], { timeout: 8000, encoding: 'utf8' });
+    const res = JSON.parse(r.stdout.split('\n').reverse().find((l) => l.startsWith('{'))!);
+    expect(res.keepsRunning).toBe(false);
+  }, 15000);
 });
