@@ -33,7 +33,7 @@ export async function parseTrackerModule(buffer: ArrayBuffer, fileName: string):
   }).catch(() => { /* dispatch engine not available — OK for non-Furnace files */ });
 
   const { loadModuleFile } = await import('@lib/import/ModuleLoader');
-  const { convertModule, convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
+  const { convertModule, convertXMModule, convertMODModule, convertXRNSModule } = await import('@lib/import/ModuleConverter');
   const { convertParsedInstruments } = await import('@lib/import/InstrumentConverter');
 
   const moduleInfo = await loadModuleFile(new File([buffer], fileName));
@@ -73,6 +73,9 @@ export async function parseTrackerModule(buffer: ArrayBuffer, fileName: string):
     } else if (format === 'MOD') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       result = convertMODModule(nativePatterns as any, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+    } else if (format === 'XRNS') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      result = convertXRNSModule(nativePatterns as any, importMetadata, instrumentNames);
     } else if (moduleInfo.metadata.song) {
       result = convertModule(moduleInfo.metadata.song);
     }

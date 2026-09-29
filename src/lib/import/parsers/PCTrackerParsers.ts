@@ -25,7 +25,30 @@ export async function tryPCTrackerParse(
   _preScannedMeta?: UADEMetadata,
 ): Promise<TrackerSong | null> {
 
-  // ── Primary path: OpenMPT WASM soundlib ──────────────────────────────────
+  // ── MOD and XM: the native parsers, the one converter each ───────────────
+  // They keep what OpenMPT's conversion loses - MOD sample slots, finetune,
+  // default volume, each cell's period; XM envelopes, auto-vibrato, fadeout,
+  // multi-sample maps - and every path that opens a MOD or XM (the tracker's
+  // import, the DJ decks) gets the same song. libopenmpt still plays them:
+  // the file's bytes ride along as libopenmptFileData, as on the OpenMPT path.
+  if (/\.(mod|m15)$/i.test(filename) || /\.xm$/i.test(filename)) {
+    try {
+      const song = /\.xm$/i.test(filename)
+        ? await (async () => {
+            const { isXMFormat, parseXMFile } = await import('@lib/import/formats/XMParser');
+            return isXMFormat(buffer) ? parseXMFile(buffer, originalFileName) : null;
+          })()
+        : await (async () => {
+            const { isMODFormat, parseMODFile } = await import('@lib/import/formats/MODParser');
+            return isMODFormat(buffer) ? parseMODFile(buffer, originalFileName) : null;
+          })();
+      if (song) return { ...song, libopenmptFileData: buffer.slice(0) };
+    } catch (err) {
+      console.warn(`[PCTrackerParsers] Native parse failed for ${filename}, trying OpenMPT:`, err);
+    }
+  }
+
+  // ── Primary path for the rest: OpenMPT WASM soundlib ─────────────────────
   if (OPENMPT_EXTENSIONS.test(filename)) {
     try {
       const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
@@ -54,26 +77,6 @@ export async function tryPCTrackerParse(
       if (isITFormat(buffer)) return parseITFile(buffer, originalFileName);
     } catch (err) {
       console.warn(`[ITParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
-    }
-  }
-
-  // XM (FastTracker II)
-  if (/\.xm$/i.test(filename)) {
-    try {
-      const { isXMFormat, parseXMFile } = await import('@lib/import/formats/XMParser');
-      if (isXMFormat(buffer)) return await parseXMFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[XMParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
-    }
-  }
-
-  // MOD (ProTracker / compatible)
-  if (/\.(mod|m15)$/i.test(filename)) {
-    try {
-      const { isMODFormat, parseMODFile } = await import('@lib/import/formats/MODParser');
-      if (isMODFormat(buffer)) return await parseMODFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[MODParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
     }
   }
 

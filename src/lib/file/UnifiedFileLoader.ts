@@ -95,11 +95,9 @@ export async function importTrackerModule(
   try {
   clearExplicitlySaved();
 
-  let format = info.metadata.type;
-  
   // Determine if libopenmpt should be used based on format, not dialog options.
   // nativeOnly formats (XRNS, Furnace, chip-dump, etc.) can't use libopenmpt.
-  const filename = info.file?.name || '';
+  const filename = info.file?.name || info.metadata.title || '';
   const fmt = detectFormat(filename);
   const useLibopenmpt = options.useLibopenmpt && !fmt?.nativeOnly;
   console.log('[UnifiedFileLoader] importTrackerModule:', filename, 'nativeOnly:', fmt?.nativeOnly, 'useLibopenmpt:', useLibopenmpt);
@@ -128,349 +126,49 @@ export async function importTrackerModule(
     useFormatStore.getState().setSidMetadata(null);
   }
 
-  // The whole-song apply (reset, stores, editor mode, undo, preload) is
-  // applySong's; each branch below only parses. A parse failure now leaves
-  // the current song in place instead of an emptied one.
-  const describe = (fmtName?: string) => `Imported from ${info.file?.name || 'module'}${fmtName ? ` (${fmtName})` : ''}`;
-
-  // ── Already parsed: DefleMask (loadModuleFile runs Furnace's loader and
-  //    hands back the whole song) ──
-  if (info.dmfSong) {
-    const song = info.dmfSong;
-    await applySong({
-      instruments: song.instruments, patterns: song.patterns, order: song.songPositions ?? [],
-      bpm: song.initialBPM || 125, speed: song.initialSpeed || 6,
-      metadata: { name: song.name || info.metadata.title, description: describe('DefleMask') },
-      originalModuleData: null,
-      engine: song,
-    }, 'import');
-    notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-    if (info.file) checkModlandFileWithPatternHash(info.file, null);
+  // ONE parse per format: parseModuleToSong, the parser the DJ decks, the
+  // corpus and every other opener use; then applySong, the one apply. This
+  // function kept five parse branches of its own (DefleMask, OpenMPT, the
+  // native MOD/XM/FUR/XRNS converters, libopenmpt metadata, and this one),
+  // so a .mod dropped on the tracker and the same .mod loaded on a DJ deck
+  // came out as different songs (2026-09-29).
+  const file = info.file ?? (info.arrayBuffer ? new File([info.arrayBuffer], filename || 'module') : null);
+  if (!file) {
+    notify.error('File reference lost — cannot import');
     return;
   }
-
-  // ── Try OpenMPT WASM soundlib for PC tracker formats ──
-  // Skip OpenMPT when native parser data exists — native XM/MOD parser extracts
-  // volume envelopes correctly, OpenMPT WASM loses them.
-  const isOpenMPTFormat = /^(MOD|XM|IT|S3M)$/i.test(format) || /\.(mod|xm|it|s3m|mptm|mo3|med|mmd[0-3]|okt|okta)$/i.test(info.file?.name || '');
-  if (info.arrayBuffer && isOpenMPTFormat && !info.nativeData) {
-    try {
-      const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
-      const song = await parseWithOpenMPT(info.arrayBuffer, info.file?.name || 'module');
-      console.log(`[Import] OpenMPT parsed: ${song.patterns.length} patterns, ${song.instruments.length} instruments, format=${song.format}`);
-      // Tag first pattern with sourceFormat so it's preserved in .dbx saves
-      if (song.patterns.length > 0 && song.format) {
-        song.patterns[0].importMetadata = {
-          ...song.patterns[0].importMetadata,
-          sourceFormat: song.format,
-        } as typeof song.patterns[0]['importMetadata'];
-      }
-      await applySong({
-        instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
-        bpm: song.initialBPM, speed: song.initialSpeed,
-        metadata: { name: song.name, description: describe() },
-        originalModuleData: null,
-        engine: { ...song, libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined },
-      }, 'import');
-      notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-      if (info.file) checkModlandFileWithPatternHash(info.file, null);
-      return;
-    } catch (err) {
-      console.warn('[Import] OpenMPT WASM parse failed, falling back:', err);
-    }
-  }
-
-  // ── Native TS parser data (XM/MOD/FUR/DMF from ModuleLoader) ──
-  if (info.nativeData) {
-    const { convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
-    const { convertParsedInstruments } = await import('@lib/import/InstrumentConverter');
-    const { format: nativeFormat, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
-    format = nativeFormat;
-
-    if (isOpenMPTFormat && !useLibopenmpt) {
-      console.warn(`[Import] WARNING: ${format} file using native TS parser without libopenmpt fallback`);
-    }
-
-    console.log(`[Import] Using native ${format} parser: ${parsedInstruments.length} instruments, ${patterns.length} patterns`);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let result: any;
-    if (format === 'XM') {
-      result = convertXMModule(
-        patterns as any, importMetadata.originalChannelCount,
-        importMetadata, parsedInstruments.map(i => i.name),
-        useLibopenmpt ? info.arrayBuffer : undefined,
-      );
-    } else if (format === 'MOD') {
-      result = convertMODModule(
-        patterns as any, importMetadata.originalChannelCount,
-        importMetadata, parsedInstruments.map(i => i.name),
-        // Always keep the original .mod bytes — needed for byte-exact Cinter
-        // crunching (out-of-range period cells can't survive an OpenMPT rebuild)
-        // and lossless re-export, regardless of which parser was used.
-        info.arrayBuffer,
-      );
-    } else if (format === 'FUR' || format === 'DMF') {
-      const { getChannelMetadataFromFurnace } = await import('@components/tracker/trackerImportHelpers');
-      const patternOrder = importMetadata.modData?.patternOrderTable || [];
-      const patLen = patterns[0]?.length || 64;
-      const numChannels = importMetadata.originalChannelCount || (patterns[0]?.[0] as unknown[] | undefined)?.length || 4;
-      const furnaceData = importMetadata.furnaceData;
-      const channelMetadata = (furnaceData?.systems && furnaceData?.systemChans)
-        ? getChannelMetadataFromFurnace(furnaceData.systems, furnaceData.systemChans, numChannels, furnaceData.channelShortNames, furnaceData.effectColumns)
-        : null;
-      result = {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        patterns: (patterns as any[]).map((pat: any[][], idx: number) => ({
-          id: `pattern-${idx}`, name: `Pattern ${idx}`, length: patLen, importMetadata,
-          channels: Array.from({ length: numChannels }, (_, ch) => {
-            const meta = channelMetadata?.[ch];
-            return {
-              id: `channel-${ch}`, name: meta?.name || `Channel ${ch + 1}`,
-              shortName: meta?.shortName, muted: false, solo: false, collapsed: false,
-              volume: 100, pan: 0, instrumentId: null, color: meta?.color || null,
-              channelMeta: meta?.channelMeta,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              rows: pat.map((row: any[]) => {
-                const cell = row[ch] || {};
-                return {
-                  note: cell.note || 0, instrument: cell.instrument || 0,
-                  volume: cell.volume || 0, effTyp: cell.effectType || 0,
-                  eff: cell.effectParam || 0, effTyp2: cell.effectType2 || 0,
-                  eff2: cell.effectParam2 || 0,
-                  effects: cell.effects?.map((e: { type: number; param: number }) => ({ type: e.type, param: e.param })),
-                };
-              }),
-            };
-          }),
-        })),
-        order: patternOrder.length > 0 ? patternOrder : [0],
-        instrumentNames: parsedInstruments.map(i => i.name),
-      };
-    } else if (format === 'XRNS') {
-      // XRNS patterns are already in the correct format from XRNSParser
-      const patternOrder = importMetadata.modData?.patternOrderTable || [];
-      const patLen = patterns[0]?.length || 64;
-      const numChannels = importMetadata.originalChannelCount || (patterns[0]?.[0] as unknown[] | undefined)?.length || 4;
-      
-      console.log('[Import] XRNS conversion:', {
-        patternCount: patterns.length,
-        patLen,
-        numChannels,
-        patternOrder: patternOrder.slice(0, 10),
-        firstPatternRows: patterns[0]?.length,
-        firstRowCells: (patterns[0]?.[0] as unknown[])?.length,
-      });
-      
-      // Debug: Sample first pattern's data structure
-      if (patterns[0]) {
-        const firstPat = patterns[0] as unknown[][];
-        console.log('[Import] XRNS Pattern 0 sample:', {
-          rowCount: firstPat.length,
-          row0: firstPat[0],
-          row0Type: typeof firstPat[0],
-          row0IsArray: Array.isArray(firstPat[0]),
-        });
-        // Find first non-empty cell
-        for (let row = 0; row < Math.min(64, firstPat.length); row++) {
-          const rowData = firstPat[row] as { note?: number }[];
-          if (Array.isArray(rowData)) {
-            for (let ch = 0; ch < rowData.length; ch++) {
-              const cell = rowData[ch];
-              if (cell?.note && cell.note > 0) {
-                console.log(`[Import] XRNS first note found: row=${row} ch=${ch}`, cell);
-                break;
-              }
-            }
-          }
-        }
-      }
-      
-      result = {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        patterns: (patterns as any[]).map((pat: any[][], idx: number) => ({
-          id: `pattern-${idx}`, name: `Pattern ${idx}`, length: pat.length || patLen, importMetadata,
-          channels: Array.from({ length: numChannels }, (_, ch) => ({
-            id: `channel-${ch}`, name: `Track ${ch + 1}`,
-            muted: false, solo: false, collapsed: false,
-            volume: 100, pan: 0, instrumentId: null, color: null,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            rows: pat.map((row: any[]) => {
-              const cell = row[ch] || {};
-              return {
-                note: cell.note || 0, instrument: cell.instrument || 0,
-                volume: cell.volume || 0, effTyp: cell.effTyp || 0,
-                eff: cell.eff || 0, effTyp2: 0, eff2: 0,
-              };
-            }),
-          })),
-        })),
-        order: patternOrder.length > 0 ? patternOrder : [0],
-        instrumentNames: parsedInstruments.map(i => i.name),
-      };
-      
-      // Debug: Check if any patterns have notes
-      let totalNotes = 0;
-      result.patterns.forEach((p: any, pIdx: number) => {
-        let patNotes = 0;
-        p.channels.forEach((c: any) => {
-          c.rows.forEach((r: any) => {
-            if (r.note > 0) {
-              totalNotes++;
-              patNotes++;
-            }
-          });
-        });
-        if (pIdx < 5) {
-          console.log(`[Import] XRNS Pattern ${pIdx}: ${patNotes} notes, ${p.channels.length} channels, ${p.channels[0]?.rows?.length} rows`);
-        }
-      });
-      console.log('[Import] XRNS total notes in converted patterns:', totalNotes);
-    } else {
-      result = convertMODModule(
-        patterns as any, importMetadata.originalChannelCount,
-        importMetadata, parsedInstruments.map(i => i.name),
-        info.arrayBuffer, // always keep source bytes (byte-exact Cinter crunch / re-export)
-      );
-    }
-
-    if (!result.patterns.length) {
-      notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
-      return;
-    }
-
-    const instruments = convertParsedInstruments(parsedInstruments, format as any);
-
-    const xmFreqType = importMetadata?.xmData?.frequencyType;
-    const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
-    await applySong({
-      instruments, patterns: result.patterns, order: result.order ?? [],
-      bpm: importMetadata.modData?.initialBPM || 125, speed: importMetadata.modData?.initialSpeed || 6,
-      metadata: { name: info.metadata.title, description: describe(format) },
-      originalModuleData: result.originalModuleData ?? null,
-      engine: {
-        linearPeriods,
-        furnaceNative: info.nativeData.furnaceNative,
-        libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
-      },
-    }, 'import');
-    notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
-    if (info.file) checkModlandFileWithPatternHash(info.file, null);
+  const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+  const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
+  if (!song.patterns.length) {
+    notify.error(`Module "${song.name || filename}" contains no patterns to import.`);
     return;
   }
-
-  // ── UADE / exotic Amiga / parseModuleToSong path ──
-  // Also route here when metadata.song exists but has no pattern data.
-  // CRITICAL: formats with a nativeParser MUST use parseModuleToSong so their
-  // native parser runs and assigns the correct synthType to instruments (e.g.
-  // SymphonieSynth, FCSynth). Without this, libopenmpt metadata.song causes
-  // the fallback path below to create generic 'Synth' instruments instead.
-  const songHasPatterns = (info.metadata.song?.patterns?.length ?? 0) > 0;
-  const hasNativeParser = !!fmt?.nativeParser;
-  // nativeOnly formats (PxTone, Organya, chip-dump etc.) must always go through
-  // parseModuleToSong even if the server returned libopenmpt-parsed metadata.
-  const isNativeOnly = !!fmt?.nativeOnly;
-  if (!info.metadata.song || !songHasPatterns || hasNativeParser || isNativeOnly) {
-    if (hasNativeParser) console.log(`[UnifiedFileLoader] Format has nativeParser — using parseModuleToSong for ${filename}`);
-    if (isNativeOnly && !hasNativeParser) console.log(`[UnifiedFileLoader] nativeOnly format — using parseModuleToSong for ${filename}`);
-    if (!info.file) {
-      notify.error('File reference lost — cannot import');
-      return;
-    }
-    const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-    const song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
-    // Cinter4 with raw instruments needs its `.raw` companion PCM (the WASM engine
-    // populates the raw instruments from it before synthesizing). A negative first
-    // word in the .cinter4 means it has raw instruments. The .raw may arrive as a
-    // companion (server auto-discovery / multi-file drop); if it didn't, prompt for
-    // it — otherwise the raw sample instruments play silence.
-    const c4Data = (song as { cinter4FileData?: ArrayBuffer }).cinter4FileData;
-    if (c4Data && new DataView(c4Data).getInt16(0, false) < 0) {
-      let rawData: ArrayBuffer | undefined;
-      if (options.companionFiles) {
-        for (const [name, data] of options.companionFiles) {
-          if (/\.raw$/i.test(name)) { rawData = data; break; }
-        }
+  const c4Data = (song as { cinter4FileData?: ArrayBuffer }).cinter4FileData;
+  if (c4Data && new DataView(c4Data).getInt16(0, false) < 0) {
+    let rawData: ArrayBuffer | undefined;
+    if (options.companionFiles) {
+      for (const [name, data] of options.companionFiles) {
+        if (/\.raw$/i.test(name)) { rawData = data; break; }
       }
-      if (!rawData) {
-        const rawFile = await promptForCompanionFile('.raw', filename);
-        if (rawFile) rawData = await rawFile.arrayBuffer();
-      }
-      if (rawData) (song as { cinter4RawData?: ArrayBuffer }).cinter4RawData = rawData;
     }
-    await applySong({
-      instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
-      bpm: song.initialBPM, speed: song.initialSpeed,
-      metadata: { name: song.name, description: describe() },
-      // BPM/speed metadata so usePatternPlayback can read them via modData
-      originalModuleData: {
-        base64: '',
-        format: (song.format || 'UNKNOWN') as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
-        initialBPM: song.initialBPM,
-        initialSpeed: song.initialSpeed,
-        songLength: song.songLength,
-      } as any,
-      engine: song,
-    }, 'import');
-    notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-    if (info.file) checkModlandFileWithPatternHash(info.file, null);
-    return;
-  }
-
-  // ── Fallback: libopenmpt metadata-based import ──
-  const { convertModule } = await import('@lib/import/ModuleConverter');
-  const { extractSamples, canExtractSamples } = await import('@lib/import/SampleExtractor');
-  const { encodeWav } = await import('@lib/import/WavEncoder');
-  const { createInstrumentsForModule } = await import('@components/tracker/trackerImportHelpers');
-
-  const result = convertModule(info.metadata.song);
-  if (!result.patterns.length) {
-    // convertModule produced no patterns — fall back to parseModuleToSong
-    if (info.file) {
-      console.warn('[Import] convertModule produced no patterns, trying parseModuleToSong');
-      const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-      const song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
-      await applySong({
-        instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
-        bpm: song.initialBPM, speed: song.initialSpeed,
-        metadata: { name: song.name, description: describe() },
-        originalModuleData: null,
-        engine: song,
-      }, 'import');
-      notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-      if (info.file) checkModlandFileWithPatternHash(info.file, null);
-      return;
+    if (!rawData) {
+      const rawFile = await promptForCompanionFile('.raw', filename);
+      if (rawFile) rawData = await rawFile.arrayBuffer();
     }
-    notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
-    return;
+    if (rawData) (song as { cinter4RawData?: ArrayBuffer }).cinter4RawData = rawData;
   }
-
-  let sampleUrls: Map<number, string> | undefined;
-  if (info.file && canExtractSamples(info.file.name)) {
-    try {
-      const extraction = await extractSamples(info.file);
-      sampleUrls = new Map();
-      for (let i = 0; i < extraction.samples.length; i++) {
-        const sample = extraction.samples[i];
-        if (sample.pcmData.length > 0) sampleUrls.set(i + 1, encodeWav(sample));
-      }
-    } catch (err) {
-      console.warn('[Import] Could not extract samples:', err);
-    }
-  }
-
-  const instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, sampleUrls);
-  // This branch applied the song by hand and never set the editor mode: a MOD
-  // after an AHX kept the AHX editor (2026-09-29).
+  const knownFormat = (['MOD', 'XM', 'IT', 'S3M'] as const).find((f) => f === song.format) ?? 'UNKNOWN';
   await applySong({
-    instruments, patterns: result.patterns, order: result.order ?? [],
-    bpm: 125, speed: 6,
-    metadata: { name: info.metadata.title, description: describe() },
-    originalModuleData: null,
-    engine: {},
+    instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
+    bpm: song.initialBPM, speed: song.initialSpeed,
+    metadata: { name: song.name, description: `Imported from ${file.name}` },
+    // The parser's copy of the original bytes when it keeps one (MOD, XM).
+    originalModuleData: song.originalModuleData ?? { base64: '', format: knownFormat },
+    // Asked not to play through libopenmpt: the parse still carries the bytes.
+    engine: useLibopenmpt ? song : { ...song, libopenmptFileData: undefined },
   }, 'import');
-  notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
-  if (info.file) checkModlandFileWithPatternHash(info.file, null);
+  notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+  checkModlandFileWithPatternHash(file, null);
   } finally {
     restoreFormatChecks();
   }

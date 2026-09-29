@@ -387,6 +387,11 @@ export async function parseWithOpenMPT(
       } as InstrumentConfig);
     }
 
+    // The song's format rides on its first pattern (TrackerSong.format is not
+    // kept by the stores): playback, saves and exports read it from there.
+    if (patterns.length > 0) {
+      patterns[0].importMetadata = { ...patterns[0].importMetadata, sourceFormat: format } as typeof patterns[0]['importMetadata'];
+    }
     const song: TrackerSong = {
       name: info.title || filename.replace(/\.[^.]+$/, ''),
       format,
