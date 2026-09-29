@@ -8,6 +8,7 @@
  */
 
 #include <cmath>
+#include "lr4_crossover.h"
 #include <cstring>
 #include <algorithm>
 #include <emscripten/emscripten.h>
@@ -17,37 +18,6 @@ static constexpr float PI = 3.14159265358979323846f;
 
 // ─── Linkwitz-Riley 2nd-order (cascaded Butterworth) ────────────────────────
 
-struct LR2Filter {
-    // Two cascaded 1st-order Butterworth = LR2
-    float a1 = 0, b0 = 0, b1 = 0;
-    float z1_1 = 0, z1_2 = 0; // Two filter stages
-
-    void setLP(float freq, float sr) {
-        float w = std::tan(PI * freq / sr);
-        float n = 1.0f / (1.0f + w);
-        b0 = w * n; b1 = b0; a1 = (w - 1.0f) * n;
-    }
-
-    void setHP(float freq, float sr) {
-        float w = std::tan(PI * freq / sr);
-        float n = 1.0f / (1.0f + w);
-        b0 = n; b1 = -n; a1 = (w - 1.0f) * n;
-    }
-
-    float process(float in) {
-        // First stage
-        float out1 = b0 * in + b1 * z1_1 - a1 * z1_1;
-        // Simplified: use direct form
-        float y1 = b0 * in + z1_1;
-        z1_1 = b1 * in - a1 * y1;
-        // Second stage
-        float y2 = b0 * y1 + z1_2;
-        z1_2 = b1 * y1 - a1 * y2;
-        return y2;
-    }
-
-    void reset() { z1_1 = z1_2 = 0; }
-};
 
 // ─── Band Compressor ────────────────────────────────────────────────────────
 
@@ -100,11 +70,8 @@ struct MultibandCompInstance {
     float lowCrossover = 200.0f;
     float highCrossover = 3000.0f;
 
-    // Filters (stereo)
-    LR2Filter lpL1, lpR1;   // Low band
-    LR2Filter hpL1, hpR1;   // Above low
-    LR2Filter lpL2, lpR2;   // Mid band (from above-low)
-    LR2Filter hpL2, hpR2;   // High band
+    // Flat-summing LR4 band split per channel (wasm-common/lr4_crossover.h)
+    lr4::Split3 splitL, splitR;
 
     // Band compressors (stereo linked)
     BandCompressor compLow, compMid, compHigh;
@@ -122,29 +89,21 @@ struct MultibandCompInstance {
     }
 
     void updateCrossover() {
-        lpL1.setLP(lowCrossover, sampleRate); lpR1.setLP(lowCrossover, sampleRate);
-        hpL1.setHP(lowCrossover, sampleRate); hpR1.setHP(lowCrossover, sampleRate);
-        lpL2.setLP(highCrossover, sampleRate); lpR2.setLP(highCrossover, sampleRate);
-        hpL2.setHP(highCrossover, sampleRate); hpR2.setHP(highCrossover, sampleRate);
+        splitL.set(lowCrossover, highCrossover, sampleRate);
+        splitR.set(lowCrossover, highCrossover, sampleRate);
     }
 
     void reset() {
-        lpL1.reset(); lpR1.reset(); hpL1.reset(); hpR1.reset();
-        lpL2.reset(); lpR2.reset(); hpL2.reset(); hpR2.reset();
+        splitL.reset(); splitR.reset();
         compLow.reset(); compMid.reset(); compHigh.reset();
     }
 
     void process(const float* inL, const float* inR, float* outL, float* outR, int n) {
         for (int i = 0; i < n; i++) {
             // Split into 3 bands
-            float lowL = lpL1.process(inL[i]);
-            float lowR = lpR1.process(inR[i]);
-            float aboveLowL = hpL1.process(inL[i]);
-            float aboveLowR = hpR1.process(inR[i]);
-            float midL = lpL2.process(aboveLowL);
-            float midR = lpR2.process(aboveLowR);
-            float highL = hpL2.process(aboveLowL);
-            float highR = hpR2.process(aboveLowR);
+            float lowL, midL, highL, lowR, midR, highR;
+            splitL.split(inL[i], lowL, midL, highL);
+            splitR.split(inR[i], lowR, midR, highR);
 
             // Compress each band (stereo linked via max)
             float lowPeak = std::max(std::abs(lowL), std::abs(lowR));

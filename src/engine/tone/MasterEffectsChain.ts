@@ -92,6 +92,12 @@ export async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChanne
 
   // "Drums (auto)": key on whichever channel the classifier calls the drums,
   // and look again when the song changes.
+  // Only an explicit "Own input" (-1) keys the effect on itself. A channel or
+  // drums key that cannot be tapped (nothing playing yet, no drum channel)
+  // leaves the key SILENT: self-keying there turned a kick ducker with a
+  // 150 Hz key filter into a permanent bass compressor (-11.4 dB at 100 Hz,
+  // measured 2026-09-29).
+  const ownInput = sourceChannel < 0 && sourceChannel !== SIDECHAIN_KEY_DRUMS;
   if (sourceChannel === SIDECHAIN_KEY_DRUMS) {
     autoKeyedNodes.add(node);
     watchSongForAutoKeys();
@@ -121,7 +127,7 @@ export async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChanne
 
   // Enable/disable self-route (input→sidechain) based on mode
   if ('setSelfSidechain' in node) {
-    (node as any).setSelfSidechain(sourceChannel < 0);
+    (node as any).setSelfSidechain(ownInput);
   }
 
   if (sourceChannel < 0 || isNaN(sourceChannel)) return;
@@ -162,10 +168,11 @@ export async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChanne
     }
   }
 
-  // Fallback: self-routing so the compressor still works
-  if (!connected && 'setSelfSidechain' in node) {
-    console.warn('[wireMasterSidechain] Channel', sourceChannel, 'not available — falling back to self-routing');
-    (node as any).setSelfSidechain(true);
+  // Not connected yet: the manager keeps this key registered and connects it
+  // when the channel's engine starts (ChannelRoutedEffects.rebuild). Until
+  // then the key is silent - no ducking - never the effect's own input.
+  if (!connected) {
+    console.info('[wireMasterSidechain] Channel', sourceChannel, 'not playing yet - key waits for it');
   }
 }
 

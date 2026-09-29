@@ -39,7 +39,10 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   Vibrato:          -2.5,
   Reverb:           -2.6,
   X42Comp:          +2.4,   // was quiet, boost
-  Exciter:          -2.2,
+  // Exciter: 0 - rebuilt 2026-09-29 to add only harmonics above its band (the
+  // old one boosted the band itself); a static cut here took 2.2 dB off the
+  // whole signal, lows included.
+  Exciter:          0,
   Flanger:          +2.2,   // was quiet, boost
   RingMod:          +2.1,   // was quiet, boost
   AGC:              -2.1,

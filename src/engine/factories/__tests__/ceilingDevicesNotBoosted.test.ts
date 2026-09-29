@@ -16,4 +16,8 @@ describe('ceiling devices', () => {
       expect(getEffectGainCompensationDb(type), type).toBe(0);
     }
   });
+
+  it('the Exciter gets no static cut (it took 2.2 dB off the lows after the rebuild)', () => {
+    expect(getEffectGainCompensationDb('Exciter')).toBe(0);
+  });
 });

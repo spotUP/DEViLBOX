@@ -3,6 +3,7 @@ project(MultibandEnhancer VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 
 add_executable(MultibandEnhancer MultibandEnhancerWASM.cpp)
+target_include_directories(MultibandEnhancer PRIVATE ${CMAKE_SOURCE_DIR}/../wasm-common)
 set_target_properties(MultibandEnhancer PROPERTIES
   OUTPUT_NAME "MultibandEnhancer"
   SUFFIX ".js"

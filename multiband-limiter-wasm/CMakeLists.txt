@@ -3,6 +3,7 @@ project(MultibandLimiter VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 
 add_executable(MultibandLimiter MultibandLimiterWASM.cpp)
+target_include_directories(MultibandLimiter PRIVATE ${CMAKE_SOURCE_DIR}/../wasm-common)
 set_target_properties(MultibandLimiter PROPERTIES
   OUTPUT_NAME "MultibandLimiter"
   SUFFIX ".js"

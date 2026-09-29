@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(MultibandComp VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 add_executable(MultibandComp MultibandCompWASM.cpp)
+target_include_directories(MultibandComp PRIVATE ${CMAKE_SOURCE_DIR}/../wasm-common)
 set_target_properties(MultibandComp PROPERTIES OUTPUT_NAME "MultibandComp" SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/multiband-comp")
 target_link_options(MultibandComp PRIVATE
   "SHELL:-s WASM=1" "SHELL:-s MODULARIZE=1" "SHELL:-s EXPORT_NAME='createMultibandComp'"
