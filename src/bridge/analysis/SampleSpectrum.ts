@@ -50,6 +50,10 @@ export interface SampleSpectrumFeatures {
   decayMs: number;
   /** Peak / RMS ratio. High → transient. Low → sustained. */
   crestFactor: number;
+  /** RMS of the final envelope window / peak RMS, 0..1. A one-shot that is
+   *  dying away ends well below its peak even when the sample is cut before
+   *  its tail; a sustained tone ends near 1. */
+  tailRatio: number;
   /** Duration of the analysed sample (before any loop), seconds. */
   durationSec: number;
 }
@@ -161,9 +165,11 @@ export function decodeWavBytes(bytes: Uint8Array): DecodedPcm | null {
 // ─── Tiny radix-2 Cooley-Tukey FFT ──────────────────────────────────────────
 
 /** Next power of two ≥ n. */
-function nextPow2(n: number): number {
+/** Largest power of two that is <= n (0 for n < 1). */
+function floorPow2(n: number): number {
+  if (n < 1) return 0;
   let p = 1;
-  while (p < n) p <<= 1;
+  while (p * 2 <= n) p <<= 1;
   return p;
 }
 
@@ -299,9 +305,9 @@ function peakFrequency(mag: Float32Array, binHz: number): number {
 /** Envelope analysis: attack (time-to-peak) + decay (peak to 10%) + crest.
  *  Uses windowed RMS at ~200 windows across the buffer. */
 function envelopeAnalysis(pcm: Float32Array, sampleRate: number): {
-  attackMs: number; decayMs: number; crestFactor: number;
+  attackMs: number; decayMs: number; crestFactor: number; tailRatio: number;
 } {
-  if (pcm.length === 0) return { attackMs: 0, decayMs: 0, crestFactor: 0 };
+  if (pcm.length === 0) return { attackMs: 0, decayMs: 0, crestFactor: 0, tailRatio: 0 };
   const windows = Math.min(200, Math.max(8, Math.floor(pcm.length / 64)));
   const windowSize = Math.max(1, Math.floor(pcm.length / windows));
   const rms = new Float32Array(windows);
@@ -341,7 +347,8 @@ function envelopeAnalysis(pcm: Float32Array, sampleRate: number): {
   }
 
   const crestFactor = meanRms > 0 ? peakSample / meanRms : 0;
-  return { attackMs, decayMs, crestFactor };
+  const tailRatio = peakRms > 0 ? rms[windows - 1] / peakRms : 0;
+  return { attackMs, decayMs, crestFactor, tailRatio };
 }
 
 /** Extract all features from a decoded PCM buffer. Returns null if the
@@ -352,7 +359,11 @@ export function extractSampleFeatures(
   fftSize: number = DEFAULT_FFT_SIZE,
 ): SampleSpectrumFeatures | null {
   if (pcm.length === 0 || sampleRate <= 0) return null;
-  const fft = nextPow2(Math.min(fftSize, pcm.length));
+  // The window must FIT the sample. Rounding the size UP gave a 2048-point
+  // window to every sample shorter than 2048 frames - which is most Amiga
+  // drum samples (a kick at 8287 Hz is ~1500 frames) - and the spectrum then
+  // returned nothing for them.
+  const fft = floorPow2(Math.min(fftSize, pcm.length));
   if (fft < 64) return null;
 
   // Skip the first ~20 ms to bypass the attack transient for spectral measurement.
@@ -374,6 +385,7 @@ export function extractSampleFeatures(
     attackMs: env.attackMs,
     decayMs: env.decayMs,
     crestFactor: env.crestFactor,
+    tailRatio: env.tailRatio,
     durationSec: pcm.length / sampleRate,
   };
 }
@@ -407,6 +419,16 @@ export function classifyBySpectralFeatures(f: SampleSpectrumFeatures): {
   if (f.centroidHz < 400 && isNoisy && isShort) {
     return { role: 'percussion', subrole: 'kick', confidence: 0.85 };
   }
+  // Kick, tonal: a sub-bass thump that dies away inside a short one-shot. A
+  // sampled kick is mostly its sine body, so it is NOT noisy (measured: the
+  // ST-41 'FCBDDRUM03' kick in nicktune1.bp - centroid 38 Hz, flatness 0.28,
+  // decay 118 ms, 0.18 s long). A bass note sits higher (a C-3 sample is
+  // 130 Hz and up) or sustains. The tail, not the decay time alone: a
+  // sustained tone in a short buffer (the runtime classifier's live-audio
+  // window) reports the rest of the buffer as its decay but ends at full level.
+  if (f.centroidHz < 120 && isShort && f.tailRatio < 0.5 && f.durationSec < 0.6) {
+    return { role: 'percussion', subrole: 'kick', confidence: 0.8 };
+  }
   // Hat: high centroid + noisy + very short
   if (f.centroidHz > 3000 && isNoisy && isVeryShort) {
     return { role: 'percussion', subrole: 'hat', confidence: 0.85 };
@@ -414,7 +436,11 @@ export function classifyBySpectralFeatures(f: SampleSpectrumFeatures): {
   // Snare: mid centroid + noisy + short + transient crest. Slightly lower
   // confidence (0.8) because mid-centroid + noisy can also be a vocal
   // chop or a filtered stab.
-  if (f.centroidHz >= 400 && f.centroidHz <= 3500 && isNoisy && isShort && f.crestFactor >= 3) {
+  // Strong noise (flatness >= 0.5) is no vocal or stab, so it needs no
+  // transient check - an 8-bit Amiga snare can be close to flat-topped
+  // (measured: ST-41 'FCSDDRUM01' - flatness 0.78, crest 2.6).
+  if (f.centroidHz >= 400 && f.centroidHz <= 3500 && isNoisy && isShort
+      && (f.crestFactor >= 3 || f.flatness >= 0.5)) {
     return { role: 'percussion', subrole: 'snare', confidence: 0.8 };
   }
   // Generic percussion fallback — noisy + transient + short
