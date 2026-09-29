@@ -74,13 +74,22 @@ function hpfHzToNormalized(hz: number): number {
  * charged the whole mix for the boost. That is exactly the reported symptom —
  * "the music gets quieter but no more bass" (2026-09-22).
  *
- * At rest the dry mix is therefore left whole. The control still sweeps the
- * full mix above the resting position, which is where a Tubby filter sweep
- * actually lives and where it is audible.
+ * At rest the dry mix is therefore left whole - at ANY setting of the knob,
+ * not only the lowest. The knob's steady value is the bus-input / return HPF
+ * (the presets set 120-300 Hz to "roll off more bass so the tail sits above
+ * the mix", and the parameter is described as the bus input HPF); following
+ * it on the full mix high-passed the whole song at 240 Hz whenever such a
+ * preset was loaded - "a lot of bass is lost when i turn dub bus on"
+ * (2026-09-30). The full mix follows only a filter MOVE (Rise) while it is
+ * above the knob's setting, which is where a Tubby sweep is heard, and comes
+ * back to transparent when the move ends.
+ *
+ * @param hz        the filter position now
+ * @param originHz  the knob's steady setting (the move's origin)
  */
 const MASTER_HPF_IDLE_HZ = 20;
-function masterHpfHzFor(hz: number): number {
-  return hz <= ALTEC_HPF_STEPS[0] ? MASTER_HPF_IDLE_HZ : hz;
+function masterHpfHzFor(hz: number, originHz: number): number {
+  return hz > originHz && hz > ALTEC_HPF_STEPS[0] ? hz : MASTER_HPF_IDLE_HZ;
 }
 import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
@@ -1917,7 +1926,7 @@ export class DubBus {
     // is enabled AND the user's TONE settings are non-neutral.
     this.masterHpf = this.context.createBiquadFilter();
     this.masterHpf.type = 'highpass';
-    this.masterHpf.frequency.value = masterHpfHzFor(initialHpfFreq);  // idle transparent; swept by startHpfRise
+    this.masterHpf.frequency.value = masterHpfHzFor(initialHpfFreq, initialHpfFreq);  // idle transparent; swept by startHpfRise
     this.masterHpf.Q.value = 0.5;  // Butterworth — no resonance on the full mix
     // LR4 crossover: two cascaded Butterworth sections per band. The bands
     // sum flat and in phase, so at BASS 0 the split is inaudible.
@@ -3851,7 +3860,7 @@ export class DubBus {
       rampBiquadParam(this.hpf2.frequency, hz, now);
       rampBiquadParam(this.hpf3.frequency, hz, now);
       rampBiquadParam(this.hpfResonance.frequency, hz, now);
-      rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(hz), now);  // full-mix HPF for audibility
+      rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(hz, originHz), now);  // full-mix HPF, only above the knob's setting
       // Every step of the Altec climb, so the slider does the sweep with it
       // rather than sitting still while the whole mix filters.
       this.announce('dub.hpfCutoff', hpfHzToNormalized(hz));
@@ -3902,7 +3911,7 @@ export class DubBus {
       rampBiquadParam(this.hpf2.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpf3.frequency, targetHz, now, 0.4);
       rampBiquadParam(this.hpfResonance.frequency, targetHz, now, 0.4);
-      rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(targetHz), now, 0.4);
+      rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(targetHz, originHz), now, 0.4);
       // Resonance gain boost at peak — same as stepped mode.
       const peakTimer = setTimeout(() => {
         timers.splice(timers.indexOf(peakTimer), 1);
@@ -3916,7 +3925,7 @@ export class DubBus {
         rampBiquadParam(this.hpf2.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpf3.frequency, originHz, n, 0.6);
         rampBiquadParam(this.hpfResonance.frequency, originHz, n, 0.6);
-        rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(originHz), n, 0.6);
+        rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(originHz, originHz), n, 0.6);
         rampBiquadParam(this.hpfResonance.gain, baseDb, n, 0.15);
       }, 400 + holdMs);
       timers.push(restoreTimer);
@@ -4227,8 +4236,9 @@ export class DubBus {
     // Resonance node tracks the same frequency so the peak follows the sweep.
     rampBiquadParam(this.hpfResonance.frequency, hpfFreq, now);
     rampBiquadParam(this.hpfResonance.gain, merged.hpfResonanceDb ?? 0, now);
-    // Master insert HPF tracks the same cutoff — makes Rise audible on the dry mix.
-    rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(hpfFreq), now);
+    // The knob's steady value filters the bus only; the full mix rests
+    // transparent at any setting (a Rise move sweeps it above the setting).
+    rampBiquadParam(this.masterHpf.frequency, masterHpfHzFor(hpfFreq, hpfFreq), now);
     // Guard: skip return_.gain write when a mute hold is active (swap
     // or warmup). A re-entrant setSettings call (PadGrid mirror, DJ sync)
     // would insert a setTargetAtTime event that defeats the warmup hold,
@@ -7685,9 +7695,13 @@ export class DubBus {
     for (const link of this.chorusLinks) link.set(on, 400);
   }
 
-  /** Enable/disable the Club Simulator convolver. Uses the full generateIR
-   *  soundSystem preset (2.5 s, 20 early reflections, 25 ms pre-delay) so
-   *  the effect is unmistakably audible — not the old 350 ms noise blob. */
+  /** Enable/disable the Club Simulator convolver on the WHOLE mix (the deck's
+   *  CLUB button; a venue check). Uses the full generateIR soundSystem preset
+   *  (2.5 s, 20 early reflections, 25 ms pre-delay), added at 0.82 on top of
+   *  the dry mix. Not the same thing as `settings.clubSimEnabled`, which is a
+   *  room on the echo RETURN only (return_ -> clubDry/clubWet). Measured
+   *  2026-09-30: CLUB + master chorus on lifted 2-8 kHz by ~20 dB against the
+   *  dry mix - "very reverby", and the bass reads as lost under it. */
   setClubSim(on: boolean): void {
     if (!this.masterConvolverWet) return;
     const ctx = this.context;
