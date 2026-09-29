@@ -41,6 +41,7 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { periodToPtNote } from '@/lib/amiga/periodNotes';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -84,15 +85,6 @@ const PATTERN_BYTES    = NUM_CHANNELS * ROWS_PER_PATTERN * 4;  // 1024
 // Index 0 = C-1 (period 856), index 35 = B-3 (period 113)
 // Used to convert raw period values to note numbers.
 
-const AMIGA_PERIOD_TABLE = [
-  // Octave 1: C-1 to B-1
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  // Octave 2: C-2 to B-2
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  // Octave 3: C-3 to B-3
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-];
-
 /**
  * Convert Amiga period to XM-style note number.
  * Returns 0 if period is 0 (empty).
@@ -100,19 +92,8 @@ const AMIGA_PERIOD_TABLE = [
  * ProTracker C-1 (period 856) = XM note 13.
  */
 function periodToNote(period: number): number {
-  if (period === 0) return 0;
-  // Find closest period in table
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < AMIGA_PERIOD_TABLE.length; i++) {
-    const d = Math.abs(AMIGA_PERIOD_TABLE[i] - period);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx  = i;
-    }
-  }
-  // Index 0 in table = C-1 = XM note 13 (displays "C-1")
-  return bestIdx + 13;
+  // ProTracker naming, one table: src/lib/amiga/periodNotes.ts.
+  return periodToPtNote(period);
 }
 
 // ── Format detection ──────────────────────────────────────────────────────────

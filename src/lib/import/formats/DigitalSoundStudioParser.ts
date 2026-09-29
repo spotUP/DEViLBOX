@@ -186,8 +186,10 @@ function readString(buf: Uint8Array, off: number, len: number): string {
  * The table has 48 entries covering 4 octaves (C-0 to B-3 in Amiga conventions).
  * We find the closest period. Returns 0 if period is 0 or out of range.
  *
- * DSS table starts at the highest period (lowest pitch), index 0 = C-1 in
- * ProTracker octave convention (period 1712). This maps to XM note 13 (C-1).
+ * DSS table starts at period 1712, the octave below ProTracker's C-1 (856):
+ * index 0 = C-0 = note 1 in ProTracker naming (src/lib/amiga/periodNotes.ts),
+ * the naming every Amiga reader and writer uses. (It used to be named note 13,
+ * an octave above where the replayer and every other Amiga path put it.)
  */
 function periodToXMNote(period: number): number {
   if (period === 0 || period === 0x7ff) return 0;
@@ -203,8 +205,8 @@ function periodToXMNote(period: number): number {
       bestIdx = i;
     }
   }
-  // bestIdx 0 = C-1 in ProTracker → XM note 13 (displays "C-1")
-  const xmNote = bestIdx + 13;
+  // bestIdx 0 = period 1712 = C-0 = note 1
+  const xmNote = bestIdx + 1;
   return Math.max(1, Math.min(96, xmNote));
 }
 

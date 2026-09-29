@@ -10,30 +10,21 @@
  *   byte[2] = ((instrLo & 0x0F) << 4) | (effTyp & 0x0F)
  *   byte[3] = eff & 0xFF
  *
- * Note mapping: XM note → Amiga period via standard ProTracker period table.
- *   XM note 37 = C-3 = period 856, XM note 48 = B-3 = period 453, etc.
+ * Note mapping: ProTracker naming via src/lib/amiga/periodNotes.ts -
+ *   note 13 = C-1 = period 856, note 25 = C-2 = 428, note 37 = C-3 = 214.
  */
 
 import type { TrackerCell } from '@/types';
-import { registerPatternEncoder } from '../UADEPatternEncoder';
-
-// Standard ProTracker period table (finetune 0), 36 entries: C-1 to B-3
-const MOD_PERIODS = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-];
+import { registerPatternEncoder, decodeModCell } from '../UADEPatternEncoder';
+import { noteToPeriod, cellPeriod } from '@/lib/amiga/periodNotes';
 
 /**
- * Convert XM note number to Amiga period.
- * XM note 37 = C-3 → period index 0 → period 856
- * Returns 0 for no note or out-of-range.
+ * Note -> Amiga period in ProTracker naming (note 13 = C-1 = 856); 0 for no
+ * note. One table for every MOD-style reader and writer:
+ * src/lib/amiga/periodNotes.ts.
  */
 function xmNoteToPeriod(xmNote: number): number {
-  if (xmNote === 0) return 0;
-  const periodIdx = xmNote - 37; // XM 37 = C-3 = index 0 (FT2 convention)
-  if (periodIdx < 0 || periodIdx >= MOD_PERIODS.length) return 0;
-  return MOD_PERIODS[periodIdx];
+  return noteToPeriod(xmNote);
 }
 
 /**
@@ -41,7 +32,9 @@ function xmNoteToPeriod(xmNote: number): number {
  */
 export function encodeMODCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
-  const period = xmNoteToPeriod(cell.note ?? 0);
+  // The cell's own period while it still names the note (off-table and
+  // finetuned periods survive byte-exact), else the note's.
+  const period = cellPeriod(cell);
   const instr = cell.instrument ?? 0;
   const effTyp = cell.effTyp ?? 0;
   const eff = cell.eff ?? 0;
@@ -55,54 +48,10 @@ export function encodeMODCell(cell: TrackerCell): Uint8Array {
 }
 
 /**
- * Find the closest period in the table and return the 1-based index.
- */
-function periodToNoteIndex(period: number): number {
-  if (period === 0) return 0;
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < MOD_PERIODS.length; i++) {
-    const d = Math.abs(MOD_PERIODS[i] - period);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
-  }
-  return bestIdx + 1; // 1-based
-}
-
-/**
  * Decode standard ProTracker MOD binary (4 bytes) back to a TrackerCell.
- * Exact inverse of encodeMODCell.
+ * Exact inverse of encodeMODCell for table periods; the one MOD decoder.
  */
-export function decodeMODCell(bytes: Uint8Array): TrackerCell {
-  const b0 = bytes[0];
-  const b1 = bytes[1];
-  const b2 = bytes[2];
-  const b3 = bytes[3];
-
-  const instrHi = b0 & 0xF0;
-  const period  = ((b0 & 0x0F) << 8) | b1;
-  const instrLo = (b2 >> 4) & 0x0F;
-  const effTyp  = b2 & 0x0F;
-  const eff     = b3;
-
-  const instrument = instrHi | instrLo;
-  const amigaIdx   = periodToNoteIndex(period);
-  // amigaNoteToXM: amigaNote + 12, but PT period index 1 = C-1 = XM 37
-  // periodToNoteIndex returns 1-based, XM note = index + 36
-  const note = amigaIdx > 0 ? amigaIdx + 36 : 0;
-
-  return {
-    note,
-    instrument,
-    volume: 0,
-    effTyp: (effTyp !== 0 || eff !== 0) ? effTyp : 0,
-    eff:    (effTyp !== 0 || eff !== 0) ? eff : 0,
-    effTyp2: 0,
-    eff2: 0,
-  };
-}
+export const decodeMODCell = decodeModCell;
 
 // Register for all MOD-compatible formats
 registerPatternEncoder('mod', () => encodeMODCell);
