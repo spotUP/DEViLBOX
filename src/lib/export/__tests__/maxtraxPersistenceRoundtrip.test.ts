@@ -8,7 +8,7 @@
  *   1. getNativeEngineDataForExport — must re-encode the live `maxTraxData` into
  *      the persisted `maxTraxFileData` bytes (else the pristine loaded bytes are
  *      saved and the edit is lost).
- *   2. restoreNativeEngineData — must re-parse `maxTraxFileData` back into
+ *   2. decodeNativeEngineFields — must re-parse `maxTraxFileData` back into
  *      `maxTraxData` (else applyEditorMode's editor-mode dispatch, which keys on
  *      `maxTraxData`, falls through to `classic` with an empty grid).
  *
@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseMaxTrax } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { setNoteDuration } from '@/lib/maxtrax/maxtraxGrid';
-import { getNativeEngineDataForExport, restoreNativeEngineData } from '@/lib/export/exporters';
+import { getNativeEngineDataForExport, decodeNativeEngineFields } from '@/lib/export/exporters';
 import { useFormatStore } from '@/stores/useFormatStore';
 
 const FIXTURE_PATH = join(process.cwd(), 'public/data/songs/maxtrax', 'contraptionzack-march.mxtx');
@@ -64,7 +64,7 @@ describe('MaxTrax project persistence — edits survive save + reload', () => {
     useFormatStore.getState().setMaxTraxData(null);
 
     // RELOAD: restore from the persisted binaries.
-    restoreNativeEngineData(nativeData!, undefined);
+    useFormatStore.getState().applyEditorMode(decodeNativeEngineFields(nativeData!, undefined) as never);
 
     const restored = useFormatStore.getState();
     expect(restored.editorMode).toBe('maxtrax');
