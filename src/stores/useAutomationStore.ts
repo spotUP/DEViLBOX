@@ -249,7 +249,10 @@ export const useAutomationStore = create<AutomationStore>()(
         // Parameter CAN be baked on export — no warning needed
       }
       const newCurve: AutomationCurve = {
-        id: `curve-${Date.now()}`,
+        // Unique, not a timestamp: two curves made in the same millisecond (the
+        // dub-lane conversion makes them in a loop) shared an id, and every
+        // later edit to the second landed on the first (2026-09-29).
+        id: `curve-${crypto.randomUUID()}`,
         patternId,
         channelIndex,
         parameter,
