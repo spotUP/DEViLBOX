@@ -184,3 +184,30 @@ describe('Cinter4 per-channel dub sends', { timeout: 120000 }, () => {
     expect(worst).toBeLessThan(4 / 32767);
   });
 });
+
+describe('UADE isolation slots', { timeout: 120000 }, () => {
+  it('take their channels out of the main mix (they played twice)', async () => {
+    const { proc, send } = await startWorklet('uade', 'UADE', async (c) => (await import('../uade/UADEEngine')).uadeTransform(c));
+    await send({ type: 'load', buffer: songBuffer('public/data/songs/formats/prehistoric_tale.hipc'), filenameHint: 'prehistoric_tale.hipc', skipScan: true });
+    await send({ type: 'play' });
+    const energy = (n: number) => {
+      let main = 0, slots = 0;
+      for (let q = 0; q < n; q++) {
+        const out = stereoOutputs(37);
+        proc.process([], out);
+        for (let i = 0; i < 128; i++) {
+          main += out[0][0][i] ** 2 + out[0][1][i] ** 2;
+          for (let s = 1; s <= 4; s++) slots += out[s][0][i] ** 2 + out[s][1][i] ** 2;
+        }
+      }
+      return { main, slots };
+    };
+    const before = energy(300);
+    expect(before.main).toBeGreaterThan(0);
+    for (let s = 0; s < 4; s++) await send({ type: 'addIsolation', slotIndex: s, channelMask: 1 << s });
+    energy(50);                                   // let the capture FIFO settle
+    const isolated = energy(300);
+    expect(isolated.slots).toBeGreaterThan(0);    // the channels are in their slots…
+    expect(isolated.main).toBeLessThan(before.main * 1e-6);  // …and nowhere else
+  });
+});
