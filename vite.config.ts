@@ -60,7 +60,10 @@ function reloadOnEngineChange() {
       });
     },
     handleHotUpdate(ctx: { file: string; server: { ws: { send(p: { type: string; path?: string }): void } } }) {
-      if (!ENGINE_CODE.test(ctx.file) || /\.test\.tsx?$/.test(ctx.file)) return;
+      // Test files and everything under __tests__ (fixtures, helpers) are
+      // never app code: a labels JSON under src/bridge/.../__tests__/fixtures
+      // reloaded the tab on every write (2026-09-29).
+      if (!ENGINE_CODE.test(ctx.file) || /\.test\.tsx?$/.test(ctx.file) || /[\\/]__tests__[\\/]/.test(ctx.file)) return;
       ctx.server.ws.send({ type: 'full-reload', path: '*' });
       return [];
     },
