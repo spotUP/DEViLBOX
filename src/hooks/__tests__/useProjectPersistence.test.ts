@@ -139,6 +139,10 @@ describe('useProjectPersistence — IDB round-trip', () => {
     const { useTrackerStore } = await import('@stores/useTrackerStore');
 
     clearExplicitlySaved();
+    // The save captures the automation store as it is: start it empty, so a
+    // curve left by another test file in the same run is not saved as well.
+    const { useAutomationStore } = await import('@stores/useAutomationStore');
+    useAutomationStore.getState().reset();
 
     // Seed pattern 0 with a known dub lane: one trigger + one hold.
     const tracker = useTrackerStore.getState();
@@ -186,7 +190,6 @@ describe('useProjectPersistence — IDB round-trip', () => {
 
     const pattern = useTrackerStore.getState().patterns[0];
     expect(pattern.dubLane?.events ?? [], 'events are consumed by the conversion').toHaveLength(0);
-    const { useAutomationStore } = await import('@stores/useAutomationStore');
     const automation = useAutomationStore.getState();
     const trig = automation.getCurvesForPattern(pattern.id, 0).find((c) => c.parameter === 'dub.echoThrow');
     expect(trig?.points.map((pt) => [pt.row, pt.value])).toEqual([[4, 1], [4.05, 0]]);

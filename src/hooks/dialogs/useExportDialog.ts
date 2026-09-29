@@ -14,7 +14,6 @@ import {
   useTransportStore,
   useAutomationStore,
   useAudioStore,
-  useEditorStore,
   notify,
   useFormatStore,
 } from '@stores';
@@ -28,12 +27,10 @@ import {
   importSFX,
   importInstrument,
   detectFileFormat,
-  getOriginalModuleDataForExport,
   type ExportOptions,
 } from '@lib/export/exporters';
 import { NanoExporter } from '@lib/export/NanoExporter';
 import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
-import type { AutomationCurve } from '@typedefs/automation';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -173,40 +170,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   // ── Shared handler: export song ─────────────────────────────────────────────
 
   const handleExportSong = useCallback((onClose: () => void) => {
-    const { patternOrder } = useTrackerStore.getState();
-    const sequence = patternOrder.map((idx: number) => patterns[idx]?.id).filter(Boolean);
-
-    // Convert automation curves to export format (nested structure for legacy compat)
-    const automationData: Record<string, Record<number, Record<string, AutomationCurve>>> = {};
-    patterns.forEach((pattern) => {
-      pattern.channels.forEach((_channel, channelIndex) => {
-        const channelCurves = curves.filter(
-          (c) => c.patternId === pattern.id && c.channelIndex === channelIndex,
-        );
-        if (channelCurves.length > 0) {
-          if (!automationData[pattern.id]) automationData[pattern.id] = {};
-          automationData[pattern.id][channelIndex] = channelCurves.reduce(
-            (acc, curve) => { acc[curve.parameter] = curve; return acc; },
-            {} as Record<string, AutomationCurve>,
-          );
-        }
-      });
-    });
-
-    const { speed } = useTransportStore.getState();
-    const { linearPeriods } = useEditorStore.getState();
-    const trackerFormat = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
-
-    exportSong(
-      metadata, bpm, instruments, patterns, sequence,
-      automationData, masterEffects, curves, options,
-      undefined,
-      { speed, trackerFormat, linearPeriods },
-      patternOrder,
-      getOriginalModuleDataForExport(),
-    );
+    exportSong(options);
     onClose();
-  }, [patterns, curves, metadata, bpm, instruments, masterEffects, options]);
+  }, [options]);
 
   // ── Shared handler: export SFX ──────────────────────────────────────────────
 

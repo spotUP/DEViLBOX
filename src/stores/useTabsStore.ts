@@ -6,24 +6,20 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { useTrackerStore } from './useTrackerStore';
 import { useInstrumentStore } from './useInstrumentStore';
-import { useAutomationStore } from './useAutomationStore';
 import { useProjectStore } from './useProjectStore';
-import { useTransportStore } from './useTransportStore';
-import { getToneEngine } from '@engine/ToneEngine';
-import type { Pattern } from '@typedefs';
-import type { InstrumentConfig } from '@typedefs/instrument';
-import type { AutomationCurve } from '@typedefs/automation';
-import type { ProjectMetadata } from '@typedefs/project';
+import { applySong } from '@/lib/song/applySong';
+import { savedSongToApply, type SavedSongFields } from '@/lib/song/savedSong';
+import { snapshotSong } from '@/lib/song/snapshotSong';
 
-// State snapshot for a tab
+// A tab's song while another tab is active: the same snapshot every save uses
+// (snapshotSong), plus the tab's editing position. Tabs kept only patterns,
+// instruments, automation, metadata and BPM, so switching away from an AHX (or
+// any native-engine song) and back lost its engine data, order, speed, mixer
+// and master chain (2026-09-29 audit).
 interface TabState {
-  patterns: Pattern[];
+  song: SavedSongFields;
   currentPatternIndex: number;
-  instruments: InstrumentConfig[];
   currentInstrumentId: number | null;
-  automationCurves: AutomationCurve[];
-  metadata: ProjectMetadata;
-  bpm: number;
 }
 
 export interface ProjectTab {
@@ -46,89 +42,31 @@ interface TabsStore {
   markTabDirty: (tabId: string, isDirty: boolean) => void;
 }
 
-/**
- * Capture current state from all stores
- */
-const captureCurrentState = (): TabState => {
-  const trackerState = useTrackerStore.getState();
-  const instrumentState = useInstrumentStore.getState();
-  const automationState = useAutomationStore.getState();
-  const projectState = useProjectStore.getState();
-  const transportState = useTransportStore.getState();
-
-  return {
-    patterns: structuredClone(trackerState.patterns),
-    currentPatternIndex: trackerState.currentPatternIndex,
-    instruments: structuredClone(instrumentState.instruments),
-    currentInstrumentId: instrumentState.currentInstrumentId,
-    automationCurves: structuredClone(automationState.curves),
-    metadata: structuredClone(projectState.metadata),
-    bpm: transportState.bpm,
-  };
-};
+/** The active tab's song and editing position. */
+const captureCurrentState = (): TabState => ({
+  song: structuredClone(snapshotSong()),
+  currentPatternIndex: useTrackerStore.getState().currentPatternIndex,
+  currentInstrumentId: useInstrumentStore.getState().currentInstrumentId,
+});
 
 /**
- * Restore state to all stores
+ * Make a tab's song the current song - applySong, like every load: stops the
+ * outgoing song (native replayers included), resets per-song state, applies
+ * the song and its editor mode.
  */
 const restoreState = (state: TabState) => {
-  // Stop any playback first.
-  //
-  // `getToneEngine()` CONSTRUCTS the engine, and construction can throw — it
-  // opens an AudioContext. It sat outside this try, so a failure there took
-  // the whole tab switch with it and the new tab never opened.
-  try {
-    getToneEngine().stop();
-  } catch {
-    // Ignore errors if engine not initialized
-  }
-
-  // Tear down the NATIVE replayer too, and clear the format data that selected
-  // it.
-  //
-  // `engine.stop()` reaches the Tone.js graph only. A song played by a WASM
-  // replayer — AHX, UADE, Sonix, TFMX and the rest — lives in its own worklet,
-  // which holds the tune and keeps rendering regardless of what the stores
-  // say. Reported 2026-09-22: creating a new empty song over amanda.ahx left
-  // amanda playing under an empty pattern grid, because the tab reset emptied
-  // every store while `useFormatStore` still held `hivelyFileData` and the
-  // worklet still had the tune loaded.
-  //
-  // Fire-and-forget: the engine registry's own stop is async, and a tab switch
-  // must not block on it. `stopNativeEngines` clears its running-engine guard
-  // synchronously, so the next `play()` cannot start a stale engine even if
-  // the worklet messages land afterwards.
   void (async () => {
     try {
-      const [{ stopNativeEngines }, { useFormatStore }] = await Promise.all([
-        import('@engine/replayer/NativeEngineRouting'),
-        import('./useFormatStore'),
-      ]);
-      stopNativeEngines(null, new Set<string>(), null);
-      useFormatStore.getState().reset();
-    } catch { /* engine or store not loaded — nothing native is playing */ }
+      await applySong(savedSongToApply(structuredClone(state.song)), 'tab');
+      useTrackerStore.getState().setCurrentPattern(state.currentPatternIndex);
+      if (state.currentInstrumentId !== null) {
+        useInstrumentStore.getState().setCurrentInstrument(state.currentInstrumentId);
+      }
+      useProjectStore.getState().setIsDirty(false);
+    } catch (err) {
+      console.error('[Tabs] could not restore the tab\'s song:', err);
+    }
   })();
-
-  // Reset transport
-  useTransportStore.getState().reset();
-  useTransportStore.getState().setBPM(state.bpm);
-
-  // Restore project metadata
-  useProjectStore.getState().setMetadata(state.metadata);
-  useProjectStore.getState().setIsDirty(false);
-
-  // Restore tracker (patterns)
-  useTrackerStore.getState().loadPatterns(state.patterns);
-  useTrackerStore.getState().setCurrentPattern(state.currentPatternIndex);
-
-  // Restore instruments
-  useInstrumentStore.getState().loadInstruments(state.instruments);
-  if (state.currentInstrumentId !== null) {
-    useInstrumentStore.getState().setCurrentInstrument(state.currentInstrumentId);
-  }
-
-  // Restore automation
-  useAutomationStore.getState().loadCurves(state.automationCurves);
-
 };
 
 /**
@@ -136,6 +74,8 @@ const restoreState = (state: TabState) => {
  */
 const getInitialState = (): TabState => {
   return {
+    song: {
+    patternOrder: [0],
     patterns: [{
       id: `pattern-${Date.now()}`,
       name: 'Untitled Pattern',
@@ -161,10 +101,8 @@ const getInitialState = (): TabState => {
         color: null,
       })),
     }],
-    currentPatternIndex: 0,
     instruments: [],
-    currentInstrumentId: 0,
-    automationCurves: [],
+    automation: [],
     metadata: {
       id: `project-${Date.now()}`,
       name: 'Untitled',
@@ -175,6 +113,9 @@ const getInitialState = (): TabState => {
       version: '1.0.0',
     },
     bpm: 125,
+    },
+    currentPatternIndex: 0,
+    currentInstrumentId: 0,
   };
 };
 

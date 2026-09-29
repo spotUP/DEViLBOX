@@ -10,19 +10,15 @@
 
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { shouldWriteRecovery, hasProjectContent, postLoadFlags, decideBootRestore } from '@/lib/persistence/recoveryGate';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/persistence/migrations';
-import { getPerformanceJournal } from '@/engine/dub/performanceJournalBridge';
-import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, getNativeCompanionFilesForExport, type SerializedCompanionFiles } from '@/lib/export/exporters';
+import type { SerializedCompanionFiles } from '@/lib/export/exporters';
 import { applySong } from '@/lib/song/applySong';
 import { savedSongToApply } from '@/lib/song/savedSong';
+import { snapshotSong } from '@/lib/song/snapshotSong';
 import { compressProject } from '@/lib/projectCompression';
-import { useMixerStore } from '@stores/useMixerStore';
-import { useDrumPadStore } from '@stores/useDrumPadStore';
-import { useDubStore } from '@stores/useDubStore';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 
 const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
@@ -372,128 +368,12 @@ function idbPruneRevisions(max: number): Promise<void> {
 // ============================================================================
 
 function buildSavedProject(): SavedProject {
-  const trackerState = useTrackerStore.getState();
-  const instrumentState = useInstrumentStore.getState();
-  const projectState = useProjectStore.getState();
-  const transportState = useTransportStore.getState();
-  const automationState = useAutomationStore.getState();
-  const audioState = useAudioStore.getState();
-  const editorState = useEditorStore.getState();
-
-  // Derive trackerFormat from first pattern's importMetadata
-  const firstPattern = trackerState.patterns[0];
-  const trackerFormat = firstPattern?.importMetadata?.sourceFormat as string | undefined;
-
   return {
     version: '1.0.0',
     schemaVersion: SCHEMA_VERSION,
     savedAt: new Date().toISOString(),
-    metadata: projectState.metadata,
-    bpm: transportState.bpm,
-    patterns: trackerState.patterns,
-    patternOrder: trackerState.patternOrder,
-    instruments: instrumentState.instruments.map(inst => {
-      // Don't save blob URLs for baked instruments — re-calculated on load
-      if (inst.metadata?.preservedSynth && inst.sample?.url?.startsWith('blob:')) {
-        const cleanedInst = { ...inst };
-        cleanedInst.sample = { ...inst.sample, url: '' };
-        return cleanedInst;
-      }
-      // Strip raw ArrayBuffer fields before saving — data URLs (sample.url) are
-      // the serializable equivalent and survive both IDB and JSON round-trips.
-      const needsClean =
-        inst.sample?.audioBuffer ||
-        inst.metadata?.preservedSample?.audioBuffer ||
-        inst.metadata?.multiSamples?.some(ms => ms.sample?.audioBuffer);
-      if (needsClean) {
-        const cleanedInst = { ...inst };
-        if (cleanedInst.sample?.audioBuffer) {
-          cleanedInst.sample = { ...cleanedInst.sample, audioBuffer: undefined };
-        }
-        if (cleanedInst.metadata) {
-          const cleanedMeta = { ...cleanedInst.metadata };
-          if (cleanedMeta.preservedSample?.audioBuffer) {
-            cleanedMeta.preservedSample = {
-              ...cleanedMeta.preservedSample,
-              audioBuffer: undefined as unknown as ArrayBuffer,
-            };
-          }
-          if (cleanedMeta.multiSamples) {
-            cleanedMeta.multiSamples = cleanedMeta.multiSamples.map(ms =>
-              ms.sample?.audioBuffer
-                ? { ...ms, sample: { ...ms.sample, audioBuffer: undefined } }
-                : ms
-            );
-          }
-          cleanedInst.metadata = cleanedMeta;
-        }
-        return cleanedInst;
-      }
-      return inst;
-    }),
-    automation: automationState.curves,
-    masterEffects: audioState.masterEffects,
-    ...(transportState.grooveTemplateId !== 'straight' ? { grooveTemplateId: transportState.grooveTemplateId } : {}),
-    ...(transportState.speed !== 6 ? { speed: transportState.speed } : {}),
-    ...(trackerFormat ? { trackerFormat } : {}),
-    ...(editorState.linearPeriods ? { linearPeriods: editorState.linearPeriods } : {}),
-    ...(() => {
-      const omd = getOriginalModuleDataForExport();
-      return omd ? { originalModuleData: omd } : {};
-    })(),
-    ...(() => {
-      const ned = getNativeEngineDataForExport();
-      return ned ? { nativeEngineData: ned } : {};
-    })(),
-    ...(() => {
-      const nem = getNativeEngineMetaForExport();
-      return nem ? { nativeEngineMeta: nem } : {};
-    })(),
-    ...(() => {
-      const ncf = getNativeCompanionFilesForExport();
-      return ncf ? { nativeCompanionFiles: ncf } : {};
-    })(),
-    // Save replaced instrument IDs for hybrid playback persistence
-    ...(() => {
-      try {
-        const replayer = getTrackerReplayer();
-        if (replayer.hasReplacedInstruments) {
-          return { replacedInstruments: replayer.replacedInstrumentIds };
-        }
-      } catch { /* replayer not initialized */ }
-      return {};
-    })(),
-    // Mixer state — channel volumes, pans, mutes, solos, dub sends, send buses
-    mixer: {
-      channels: useMixerStore.getState().channels,
-      master: useMixerStore.getState().master,
-      sendBuses: useMixerStore.getState().sendBuses,
-    },
-    // Dub bus tuning — character preset + coloring params
-    dubBus: useDrumPadStore.getState().dubBus,
-    // Only save a journal that has something in it — an empty one is noise in
-    // every project file that never ran the performer.
-    performanceJournal: (() => {
-      try {
-        const journal = getPerformanceJournal();
-        return journal.entries.length > 0 ? journal : undefined;
-      } catch {
-        return undefined;
-      }
-    })(),
-    // Auto Dub state
-    ...(() => {
-      const s = useDubStore.getState();
-      return {
-        autoDub: {
-          enabled: s.autoDubEnabled,
-          persona: s.autoDubPersona,
-          intensity: s.autoDubIntensity,
-          moveBlacklist: s.autoDubMoveBlacklist ?? [],
-        },
-      };
-    })(),
-  };
+    ...snapshotSong(),
+  } as SavedProject;
 }
 
 // ============================================================================
