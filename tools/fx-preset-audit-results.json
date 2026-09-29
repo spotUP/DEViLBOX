@@ -12,6 +12,131 @@
         "Tremolo"
       ],
       "status": "error"
+    },
+    {
+      "name": "Modern Precision",
+      "rmsDb": -19.093618675877337,
+      "diffDb": -0.5766306195983404,
+      "compensationDb": 0.6,
+      "effectTypes": [
+        "EQ8Band",
+        "ResonanceTamer",
+        "DynamicEQ",
+        "SidechainCompressor",
+        "MultibandComp",
+        "TransientDesigner",
+        "Exciter",
+        "MultibandEnhancer",
+        "Maximizer"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Modern Club Pump",
+      "rmsDb": -19.176332324921606,
+      "diffDb": -0.6593442686426094,
+      "compensationDb": 0.7,
+      "effectTypes": [
+        "EQ8Band",
+        "ResonanceTamer",
+        "SidechainCompressor",
+        "BassEnhancer",
+        "MultibandComp",
+        "TransientDesigner",
+        "Exciter",
+        "MultibandEnhancer",
+        "Clipper",
+        "Maximizer"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Modern Glue & Air",
+      "rmsDb": -19.039169823442915,
+      "diffDb": -0.522181767163918,
+      "compensationDb": 0.5,
+      "effectTypes": [
+        "EQ8Band",
+        "ResonanceTamer",
+        "SidechainCompressor",
+        "GOTTComp",
+        "Exciter",
+        "MultibandEnhancer",
+        "Maximizer"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Modern Amiga Master",
+      "rmsDb": -18.976949551052375,
+      "diffDb": -0.45996149477337767,
+      "compensationDb": 0.5,
+      "effectTypes": [
+        "EQ8Band",
+        "ResonanceTamer",
+        "BassEnhancer",
+        "SidechainCompressor",
+        "MultibandComp",
+        "TransientDesigner",
+        "MultibandEnhancer",
+        "Maximizer"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Tracker Dance Floor",
+      "rmsDb": -18.478702276169805,
+      "diffDb": 0.05081641420287397,
+      "compensationDb": -0.1,
+      "effectTypes": [
+        "EQ3",
+        "Exciter",
+        "Compressor",
+        "TapeSaturation"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Chipgold",
+      "rmsDb": -18.439713542704155,
+      "diffDb": 0.08980514766852465,
+      "compensationDb": -0.1,
+      "effectTypes": [
+        "BassEnhancer",
+        "EQ3",
+        "Exciter",
+        "Compressor",
+        "MVerb"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Paula Sings",
+      "rmsDb": -18.55765013998248,
+      "diffDb": -0.028131449609801962,
+      "compensationDb": 0,
+      "effectTypes": [
+        "BassEnhancer",
+        "Exciter",
+        "TapeSaturation",
+        "Compressor",
+        "MVerb"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Paula's Revenge",
+      "rmsDb": -17.113809938423753,
+      "diffDb": 1.4146088499211835,
+      "compensationDb": -1.4,
+      "effectTypes": [
+        "BassEnhancer",
+        "Exciter",
+        "TapeSaturation",
+        "Compressor",
+        "Limiter"
+      ],
+      "status": "ok"
     }
   ]
 }
