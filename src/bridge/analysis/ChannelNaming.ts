@@ -357,15 +357,25 @@ export function classifyChannelWithInstruments(
   // snareCrack.chN) and note-stats can FALSELY tag a mixed pad+kick
   // channel as 'bass' via the avgOctave<=3 fallback — we want 'percussion'
   // to win over that.
+  //
+  // The drum parts count TOGETHER. A kit spreads its hits over several
+  // instruments - a kick on beats 1 and 3 is two hits in a 16-row pattern -
+  // so no single drum clears the bar while the kit as a whole is half the
+  // channel (measured: nicktune1.bp channel 2, 8 hits a pattern: a synth 4,
+  // the kick 2, the snare 2 - classified 'pad').
   if (enhanced.role !== 'percussion') {
+    let drumHits = 0;
+    const drumParts = new Set<ChannelSubrole | undefined>();
     for (const [id, count] of sorted) {
-      if (count < minUses) break;
       const cls = classifyInstrument(lookup.get(id));
       if (cls.role === 'percussion' && cls.confidence >= 0.8) {
-        enhanced.role = 'percussion';
-        enhanced.subrole = cls.subrole;
-        break;
+        drumHits += count;
+        drumParts.add(cls.subrole);
       }
+    }
+    if (drumHits >= minUses) {
+      enhanced.role = 'percussion';
+      enhanced.subrole = drumParts.size > 1 ? 'mixed' : [...drumParts][0];
     }
   }
 
