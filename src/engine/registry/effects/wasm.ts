@@ -1973,11 +1973,17 @@ const wasmEffects: EffectDescriptor[] = [
     getDefaultParameters: () => ({ tight: 0, pedalGain: 50, ampGain: 50, bass: 50, middle: 50, treble: 50, volume: 50 }),
     presets: [
       // ── Guitar presets ──
-      { name: 'Gothenburg Sound', params: { tight: 0, pedalGain: 75, ampGain: 60, bass: 70, middle: 30, treble: 65, volume: 50 } },
-      { name: 'Sunlight Studio', params: { tight: 0, pedalGain: 85, ampGain: 70, bass: 80, middle: 20, treble: 60, volume: 45 } },
-      { name: 'Entombed Buzz', params: { tight: 0, pedalGain: 90, ampGain: 75, bass: 90, middle: 15, treble: 55, volume: 40 } },
-      { name: 'Dismember Grind', params: { tight: 100, pedalGain: 80, ampGain: 65, bass: 60, middle: 25, treble: 70, volume: 50 } },
-      { name: 'HM-2 Clean Boost', params: { tight: 0, pedalGain: 30, ampGain: 20, bass: 50, middle: 50, treble: 50, volume: 60 } },
+      // The classic Gothenburg tone: every setting at max (the HM-2's EQ is
+      // modelled at max already). Volume only sets the output level, so it
+      // stays centred - maxed it just drives the output clipper.
+      { name: 'Gothenburg (Everything Max)', params: { tight: 0, pedalGain: 100, ampGain: 100, bass: 100, middle: 100, treble: 100, volume: 50 } },
+      // HM-2 at max into differently set amps.
+      { name: 'Gothenburg Sound', params: { tight: 0, pedalGain: 100, ampGain: 60, bass: 70, middle: 30, treble: 65, volume: 50 } },
+      { name: 'Sunlight Studio', params: { tight: 0, pedalGain: 100, ampGain: 70, bass: 80, middle: 20, treble: 60, volume: 45 } },
+      { name: 'Entombed Buzz', params: { tight: 0, pedalGain: 100, ampGain: 75, bass: 90, middle: 15, treble: 55, volume: 40 } },
+      { name: 'Dismember Grind', params: { tight: 100, pedalGain: 100, ampGain: 65, bass: 60, middle: 25, treble: 70, volume: 50 } },
+      // The HM-2's gain starts at 20 dB, so its lowest setting is not clean.
+      { name: 'HM-2 Low Gain', params: { tight: 0, pedalGain: 0, ampGain: 20, bass: 50, middle: 50, treble: 50, volume: 60 } },
       { name: 'Crust Punk', params: { tight: 100, pedalGain: 70, ampGain: 55, bass: 55, middle: 40, treble: 75, volume: 55 } },
       { name: 'Doom Sludge', params: { tight: 0, pedalGain: 65, ampGain: 50, bass: 95, middle: 35, treble: 30, volume: 55 } },
       { name: 'Shoegaze Wall', params: { tight: 0, pedalGain: 55, ampGain: 40, bass: 65, middle: 45, treble: 60, volume: 50 } },
