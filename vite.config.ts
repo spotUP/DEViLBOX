@@ -38,6 +38,35 @@ function generateVersionFile() {
 }
 
 // Plugin to copy ONNX Runtime WASM files from node_modules to public/onnx-wasm/
+/**
+ * Dev: reload the page, not hot-swap, when audio-engine code changes.
+ *
+ * An AudioContext registers each worklet processor once, so an edited worklet
+ * keeps running its old code until the page reloads. Engine, store and bridge
+ * modules hot-swapped under a React component become second copies beside the
+ * ones the running audio graph holds - two stores, two engine singletons, a UI
+ * that reads one while audio uses the other. Both showed up as "stale" state
+ * that only a manual reload cleared (2026-09-29). UI components keep HMR.
+ */
+function reloadOnEngineChange() {
+  const ENGINE_CODE = /[\\/]src[\\/](engine|stores|bridge|audio|midi)[\\/]/;
+  const WORKLET_CODE = /[\\/]public[\\/].*\.(worklet\.js|js)$/;
+  return {
+    name: 'devilbox-reload-on-engine-change',
+    apply: 'serve' as const,
+    configureServer(server: { watcher: { on(e: string, cb: (f: string) => void): void }; ws: { send(p: { type: string; path?: string }): void } }) {
+      server.watcher.on('change', (file: string) => {
+        if (WORKLET_CODE.test(file) && /worklet/i.test(file)) server.ws.send({ type: 'full-reload', path: '*' });
+      });
+    },
+    handleHotUpdate(ctx: { file: string; server: { ws: { send(p: { type: string; path?: string }): void } } }) {
+      if (!ENGINE_CODE.test(ctx.file) || /\.test\.tsx?$/.test(ctx.file)) return;
+      ctx.server.ws.send({ type: 'full-reload', path: '*' });
+      return [];
+    },
+  };
+}
+
 function copyOnnxWasmFiles() {
   return {
     name: 'copy-onnx-wasm',
@@ -77,7 +106,7 @@ function copyOnnxWasmFiles() {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), generateVersionFile(), copyOnnxWasmFiles()],
+  plugins: [react(), generateVersionFile(), copyOnnxWasmFiles(), reloadOnEngineChange()],
   // Force root base path for subdomain deployment (Docker/live site)
   // GitHub Pages deployment uses separate workflow with --base flag
   base: '/',
