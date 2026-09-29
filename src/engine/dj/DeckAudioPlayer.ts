@@ -21,6 +21,9 @@ export interface AudioFileInfo {
 }
 
 export class DeckAudioPlayer {
+  /** Called after play / pause / resume / stop change whether the source runs. */
+  onRunningChange: (() => void) | null = null;
+
   private player: Tone.Player;
   private _duration = 0;
   private _sampleRate = 0;
@@ -176,6 +179,7 @@ export class DeckAudioPlayer {
     this._rateChangePos = startOffset;
     this._rateChangeTime = Tone.now();
     this._rateTrackingActive = true;
+    this.onRunningChange?.();
   }
 
   pause(): void {
@@ -186,6 +190,7 @@ export class DeckAudioPlayer {
       this.player.stop();
       this._rateTrackingActive = false;
     }
+    this.onRunningChange?.();
   }
 
   /** Resume from pending offset (set by seek while paused). Single start, no overlapping sources. */
@@ -198,6 +203,7 @@ export class DeckAudioPlayer {
     this._rateChangePos = offset;
     this._rateChangeTime = Tone.now();
     this._rateTrackingActive = true;
+    this.onRunningChange?.();
   }
 
   stop(): void {
@@ -208,6 +214,7 @@ export class DeckAudioPlayer {
     this._pendingOffset = null;
     this._rateTrackingActive = false;
     this.player.seek(0);
+    this.onRunningChange?.();
   }
 
   /**

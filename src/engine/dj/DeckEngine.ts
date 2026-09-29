@@ -396,6 +396,19 @@ export class DeckEngine {
   // SCRATCH BUFFER INIT (async, non-blocking)
   // ==========================================================================
 
+  /**
+   * Capture records the deck only while its source plays. A stopped deck's
+   * capture would fill the tape with silence and carry the needle (the write
+   * position) away from the last audio, so a backward scratch on a stopped
+   * deck read silence. DJ decks always sound through the audio / stem player.
+   */
+  private _syncCaptureRunning(): void {
+    const running = this._playbackMode !== 'audio'
+      || this.audioPlayer.isCurrentlyPlaying()
+      || this.stemPlayer.isPlaying();
+    this.scratchBuffer?.setSourceRunning(running);
+  }
+
   private async _initScratchBuffer(): Promise<void> {
     try {
       const ctx = Tone.getContext().rawContext as AudioContext;
@@ -405,6 +418,9 @@ export class DeckEngine {
       // Capture from LPF output, play back directly to channelGain.
       this.scratchBuffer.wireIntoChain(this.filterLPF, this.channelGain);
       this.scratchBufferReady = true;
+      this.audioPlayer.onRunningChange = () => this._syncCaptureRunning();
+      this.stemPlayer.onRunningChange = () => this._syncCaptureRunning();
+      this._syncCaptureRunning();
     } catch (err) {
       console.warn('[DeckEngine] Scratch buffer init failed, reverse scratch disabled:', err);
     }
@@ -1016,6 +1032,9 @@ export class DeckEngine {
             this.scratchBuffer?.setScratchRate(-0.15);
           }
         } else {
+          // A forward push on a stopped deck plays the record, as a backward
+          // pull does; release (stopScratch) pauses it again at once.
+          if (!this.audioPlayer.isCurrentlyPlaying()) this.audioPlayer.resume();
           this.audioPlayer.setPlaybackRate(Math.max(0.15, v));
         }
       } else {
