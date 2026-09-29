@@ -19,12 +19,18 @@ class Cinter4Processor extends AudioWorkletProcessor {
     // the hard Amiga LRRL panning; default 25% matches useSettingsStore.
     this.stereoSep = 0.25;
 
+    // Per-channel dub sends (worklets/channel-outputs.js), read from the Paula
+    // scope ring into these each render. No isolation slots: the C mixes.
+    this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
+    this._voices = [0, 1, 2, 3].map(() => new Float32Array(128));
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
   }
 
   async handleMessage(data) {
+    if (this._outs && this._outs.handleMessage(data)) return;
     if (data.type !== 'init' && !this.module && this.initializing) {
       return;
     }
@@ -290,6 +296,19 @@ class Cinter4Processor extends AudioWorkletProcessor {
           const bases = [0, 1, 2, 3].map((ch) => this.module._paula_scope_ptr(ch) >> 1);
           // pos is the next write index: the newest n samples end just before it.
           this._stream.write(4, n, (ch, i) => H16[bases[ch] + ((pos - n + i + len) & (len - 1))] / 32768);
+        }
+        // Each channel's dub send: the ring holds the channel × 32767 and the
+        // mix adds it × 0.5 on its side (paula_soft.c paula_render).
+        if (this._outs && H16 && typeof this.module._paula_scope_ptr === 'function') {
+          const len = this.module._paula_scope_len();
+          const pos = this.module._paula_scope_pos();
+          const n = Math.min(fresh, len, 128);
+          for (let ch = 0; ch < 4; ch++) {
+            const base = this.module._paula_scope_ptr(ch) >> 1;
+            const v = this._voices[ch];
+            for (let i = 0; i < n; i++) v[i] = H16[base + ((pos - n + i + len) & (len - 1))];
+          }
+          this._outs.write(outputs, this._voices, n, (ch) => (ch === 1 || ch === 2 ? 1 : 0), 0.5 / 32767);
         }
         this.scopeAccum = (this.scopeAccum || 0) + fresh;
         if (this.scopeAccum >= 768) {

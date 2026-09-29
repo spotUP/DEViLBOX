@@ -159,3 +159,28 @@ describe('Sonix per-channel dub sends', { timeout: 120000 }, () => {
     expect(worst).toBeLessThan(4 / 32767);   // Int16 scope rounding, four channels
   });
 });
+
+describe('Cinter4 per-channel dub sends', { timeout: 120000 }, () => {
+  it('each dub output is its Paula channel: L + R of the mix is the sum of the sends', async () => {
+    const { proc, send, posted } = await startWorklet('cinter4', 'Cinter4');
+    await send({ type: 'loadModule', moduleData: songBuffer('public/back_in_space.cinter4') });
+    expect(posted.filter((m) => m.type === 'error').map((m) => m.message)).toEqual([]);
+    for (let ch = 0; ch < 4; ch++) await send({ type: 'dubChannelEnable', cmd: 'dubChannelEnable', val: { channel: ch }, channel: ch });
+
+    // The mix is 0.5 × (ch0+ch3) | 0.5 × (ch1+ch2), narrowed mid/side — which
+    // keeps L + R — so L + R equals the four sends summed.
+    let heard = 0, worst = 0;
+    for (let q = 0; q < 750; q++) {
+      const out = stereoOutputs(37);
+      proc.process([], out);
+      for (let i = 0; i < 128; i++) {
+        let sends = 0;
+        for (let ch = 0; ch < 4; ch++) sends += out[5 + ch][0][i];
+        worst = Math.max(worst, Math.abs(out[0][0][i] + out[0][1][i] - sends));
+        if (sends !== 0) heard++;
+      }
+    }
+    expect(heard).toBeGreaterThan(1000);
+    expect(worst).toBeLessThan(4 / 32767);
+  });
+});

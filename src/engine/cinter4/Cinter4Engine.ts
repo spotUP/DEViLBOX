@@ -9,7 +9,8 @@ import { getDevilboxAudioContext } from "@/utils/audio-context";
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import {
-  WASMSingletonBase,
+  WASMChannelOutputsEngine,
+  channelOutputNodeOptions,
   createWASMAssetsCache,
   type WASMAssetsCache,
   type WASMLoaderConfig,
@@ -18,7 +19,7 @@ import {
 /** Position config for mapping the WASM tick → decompiled (song position, row). */
 interface Cinter4PosConfig { spd: number; ticksPerTrack: number; restartTick: number }
 
-export class Cinter4Engine extends WASMSingletonBase {
+export class Cinter4Engine extends WASMChannelOutputsEngine {
   private static instance: Cinter4Engine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
   private posConfig: Cinter4PosConfig | null = null;
@@ -59,15 +60,15 @@ export class Cinter4Engine extends WASMSingletonBase {
   protected createNode(): void {
     const ctx = this.audioContext;
 
-    this.workletNode = new AudioWorkletNode(ctx, 'cinter4-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
-    });
+    // Output 0 is the mix; 5..8 carry each Paula channel as a dub send
+    // (worklets/channel-outputs.js).
+    this.workletNode = new AudioWorkletNode(ctx, 'cinter4-processor', channelOutputNodeOptions());
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
       switch (data.type) {
         case 'ready':
+          this.markNodeReady();
           if (this._resolveInit) {
             this._resolveInit();
             this._resolveInit = null;
@@ -75,6 +76,8 @@ export class Cinter4Engine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          // Playback starts with the load: re-post the open dub sends now.
+          this.afterPlay();
           break;
 
         case 'oscData':
@@ -101,7 +104,7 @@ export class Cinter4Engine extends WASMSingletonBase {
       jsCode: Cinter4Engine.cache.jsCode,
     });
 
-    this.workletNode.connect(this.output);
+    this.workletNode.connect(this.output, 0);
   }
 
   async loadTune(buffer: ArrayBuffer, rawData?: ArrayBuffer, posConfig?: Cinter4PosConfig): Promise<void> {
@@ -168,6 +171,11 @@ export class Cinter4Engine extends WASMSingletonBase {
 
   play(): void {
     // Playback starts automatically on load for sequencer-based formats
+  }
+
+  /** Dub sends only: the C mixes the Paula channels. */
+  override supportsIsolationSlots(): boolean {
+    return false;
   }
 
   stop(): void {
