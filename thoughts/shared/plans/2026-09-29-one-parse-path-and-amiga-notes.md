@@ -3,7 +3,7 @@ date: 2026-09-29
 topic: One parse path per format, one Amiga note naming
 tags: [import, load-path, mod, xm, amiga, periods, single-source-of-truth]
 status: draft
-progress: 14 of 23 (commit: see git log 'one Amiga note naming')
+progress: 20 of 23 - open P3.5 (one MOD writer), P4.2 (synth pitch, needs listening), P6.3 (live)
 ---
 
 # One parse path per format, one Amiga note naming
@@ -84,20 +84,20 @@ Ledger: tick here as items land, with the commit.
       below its sample otherwise).
 
 ### P5 - one parse path
-- [ ] P5.1 `parseModuleToSong` owns what the import branches added: the
+- [x] P5.1 `parseModuleToSong` owns what the import branches added: the
       `patterns[0].importMetadata.sourceFormat` tag, `originalModuleData` with
       the real bytes (MOD always, XM when kept), the Cinter `.raw` prompt stays
       in the importer (UI).
-- [ ] P5.2 MOD and XM route to the native parsers + converters
+- [x] P5.2 MOD and XM route to the native parsers + converters
       (`parseMOD` + `convertMODModule` + `convertParsedInstruments`;
       `parseXM` + `convertXMModule`), OpenMPT as fallback. `parseMODFile` /
       `parseXMFile` become those same calls (one converter each).
-- [ ] P5.3 XRNS route in `parseModuleToSong` (moves the dead branch-3 code into
+- [x] P5.3 XRNS route in `parseModuleToSong` (moves the dead branch-3 code into
       a parser function).
-- [ ] P5.4 `importTrackerModule` = `parseModuleToSong` + `applySong` (+ the
+- [x] P5.4 `importTrackerModule` = `parseModuleToSong` + `applySong` (+ the
       `useLibopenmpt: false` strip, notify, modland check). Branches 1, 2, 3, 5
       deleted.
-- [ ] P5.5 Contract test: the same file through `importModuleFile` (tracker)
+- [x] P5.5 Contract test: the same file through `importModuleFile` (tracker)
       and `parseModuleToSong` (DJ) gives identical cells and instrument ids,
       for MOD, XM, S3M, IT. Plus: `importTrackerModule` source has no parser
       calls of its own (static check like singleLoadPath.contract).
@@ -105,7 +105,7 @@ Ledger: tick here as items land, with the commit.
 ### P6 - tests and live
 - [x] P6.1 MOD round trip: parse -> native export -> parse, same periods;
       after a note edit, the exported period is the edited note's.
-- [ ] P6.2 Update pinned tests: MODParser.test (XM labels), modRoundtrip,
+- [x] P6.2 Update pinned tests: MODParser.test (XM labels), modRoundtrip,
       samplePlaybackRate, instrumentSlotIds / instrumentLabelScore (nativeData
       path gone), ImportExportFlow, soundFXRoundtrip, channelEvidence.
 - [ ] P6.3 Type-check, affected suites, live: micro15 loads, plays, shows C-3
@@ -121,3 +121,14 @@ Ledger: tick here as items land, with the commit.
 - `loadSongFile`'s own MIDI parser (`MIDIImporter`) vs `MidiToSong` - a second
   duplicate parse path; next plan.
 - `prepareModuleImport` still runs `loadModuleFile` for dialog metadata.
+
+## Implementation notes (2026-09-29)
+- P5.3 XRNS: routed (PatternExtractor + ModuleConverter.convertXRNSModule; ModuleLoader's
+  nativeData format was typed 'XRNS' as 'XM', which hid the branch). Headless happy-dom
+  cannot read Renoise's pattern pool; in Chrome wavesabre-punqtured.xrns opens with 22
+  patterns / 872 notes (MCP).
+- Classifier baseline re-measured, not silently lowered: the corpus now parses MODs as the
+  app does. accuracy 0.75 -> 0.8125, drums-vs-not 1.0 -> 0.9375 (break the box ch2,
+  'sound effects', now reads drums instead of harmony). Told the owner.
+- XM: the tracker's convertXMModule duplicates volume-column effects into effTyp2 (the
+  replayer reads them only there); kept as the one XM converter.

@@ -58,7 +58,7 @@ export interface ModuleInfo {
   file: File;  // Original file for sample extraction
   // Native parser data (if available)
   nativeData?: {
-    format: 'XM' | 'MOD' | 'FUR' | 'DMF';
+    format: 'XM' | 'MOD' | 'FUR' | 'DMF' | 'XRNS';
     importMetadata: ImportMetadata;
     instruments: ParsedInstrument[];
     patterns: unknown[][];  // XMNote[][] or MODNote[][] or converted patterns
@@ -465,7 +465,7 @@ async function loadWithNativeParser(
       };
       
       return {
-        format: 'XRNS' as 'XM', // Use XM type for compatibility
+        format: 'XRNS' as const,
         importMetadata: metadata,
         instruments,
         patterns: convertedPatterns,

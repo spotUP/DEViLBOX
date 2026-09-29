@@ -572,3 +572,48 @@ export function convertMODModule(
     originalModuleData,
   };
 }
+
+/**
+ * Convert Renoise XRNS pattern data (ModuleLoader's native XRNS parse: rows of
+ * per-track cells with extra note columns) to patterns. Its only converter
+ * used to sit inside a tracker-import branch nothing reached, so .xrns fell
+ * through to UADE; it is now parseModuleToSong's (PatternExtractor).
+ */
+export function convertXRNSModule(
+  patterns: Array<Array<Array<Record<string, number | undefined>>>>,
+  metadata: ImportMetadata,
+  instrumentNames: string[],
+): ConversionResult {
+  const order = metadata.modData?.patternOrderTable ?? [];
+  const patLen = patterns[0]?.length || 64;
+  const channelCount = metadata.originalChannelCount || patterns[0]?.[0]?.length || 4;
+  const converted: Pattern[] = patterns.map((pat, idx) => ({
+    id: `pattern-${idx}`, name: `Pattern ${idx}`, length: pat.length || patLen, importMetadata: metadata,
+    channels: Array.from({ length: channelCount }, (_, ch): ChannelData => ({
+      id: `channel-${ch}`, name: `Track ${ch + 1}`,
+      muted: false, solo: false, collapsed: false,
+      volume: 100, pan: 0, instrumentId: null, color: null,
+      rows: pat.map((row): TrackerCell => {
+        const c = row[ch] ?? {};
+        const cell: TrackerCell = {
+          note: c.note || 0, instrument: c.instrument || 0,
+          volume: c.volume || 0, effTyp: c.effTyp || 0,
+          eff: c.eff || 0, effTyp2: 0, eff2: 0,
+        };
+        // Renoise's extra note columns (a chord on one track).
+        for (const k of ['note2', 'instrument2', 'volume2', 'note3', 'instrument3', 'volume3', 'note4', 'instrument4', 'volume4'] as const) {
+          if (c[k] !== undefined) (cell as unknown as Record<string, number>)[k] = c[k]!;
+        }
+        return cell;
+      }),
+    })),
+  }));
+  return {
+    patterns: converted,
+    order: order.length > 0 ? order : [0],
+    instrumentNames,
+    sampleNames: instrumentNames,
+    channelCount,
+    metadata,
+  };
+}

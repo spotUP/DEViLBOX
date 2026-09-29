@@ -48,7 +48,7 @@ describe('song instrument triggers', () => {
   beforeEach(() => clearInstrumentAttack(9));
 
   it('a note in the playing row reports its instrument at the speed it plays', () => {
-    play(pattern({ 0: cell(61, 9) }));
+    play(pattern({ 0: cell(37, 9) }));  // C-3 = period 214
     const heard: number[] = [];
     const off = subscribeInstrumentAttacks((id) => heard.push(id));
     row(0);
@@ -59,7 +59,7 @@ describe('song instrument triggers', () => {
   });
 
   it('rows skipped by the throttled display are still read', () => {
-    play(pattern({ 0: cell(49, 9), 2: cell(49) }));
+    play(pattern({ 0: cell(25, 9), 2: cell(25) }));
     row(0);
     clearInstrumentAttack(9);
     row(3);   // rows 1-3 in one update: row 2's note, no instrument, plays the channel's 9
@@ -67,7 +67,7 @@ describe('song instrument triggers', () => {
   });
 
   it('a tone portamento is no attack; a note-off releases', () => {
-    play(pattern({ 0: cell(49, 9), 1: cell(52, 0, 3), 2: cell(97) }));
+    play(pattern({ 0: cell(25, 9), 1: cell(28, 0, 3), 2: cell(97) }));
     row(0);
     clearInstrumentAttack(9);
     row(1);
