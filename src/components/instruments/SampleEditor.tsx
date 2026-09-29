@@ -54,7 +54,7 @@ import { UADELiveParamsBar } from './controls/UADELiveParamsBar';
 import { UADEDebuggerPanel } from './controls/UADEDebuggerPanel';
 import { SampleLoopEditor } from './SampleLoopEditor';
 import { useInstrumentPlaybackState } from '../../hooks/useInstrumentPlaybackState';
-import { getInstrumentLastAttack, isInstrumentReleased } from '@/engine/instrumentPlaybackTracker';
+import { getInstrumentLastAttack, getInstrumentLastAttackRate, isInstrumentReleased } from '@/engine/instrumentPlaybackTracker';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -424,7 +424,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
 
       if (lastSeenAttack > 0) {
         const ctx = Tone.getContext().rawContext as AudioContext;
-        const elapsed = ctx.currentTime - attackCtxTime;
+        // Seconds of the sample played: a note an octave up plays it twice as fast.
+        const elapsed = (ctx.currentTime - attackCtxTime) * getInstrumentLastAttackRate(instrument.id);
 
         let progress = 0;
         if (loopEnabled) {

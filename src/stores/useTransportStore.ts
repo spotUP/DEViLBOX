@@ -140,6 +140,10 @@ function ensureRowHooksLoaded(): void {
   void import('@engine/dub/DubLanePlayer')
     .then(() => import('@engine/dub/DubEffectScanner'))
     .catch((err) => console.error('[transport] per-row dub hooks failed to load:', err));
+  // Which instruments each row triggers, for the editor playhead and the
+  // instrument lists. Independent of the dub hooks' order.
+  void import('@engine/songInstrumentTriggers')
+    .catch((err) => console.error('[transport] instrument trigger hook failed to load:', err));
 }
 
 /** One warning, not one per row, when the cursor store is not up yet. */
