@@ -14,10 +14,10 @@ import type {
   ImportMetadata,
 } from '../../../types/tracker';
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell } from '@/types';
-import type { InstrumentConfig } from '@/types/instrument';
+import type { Pattern, TrackerCell } from '@/types';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { convertToInstrument } from '../InstrumentConverter';
+import { convertParsedInstruments } from '../InstrumentConverter';
+import { convertXMModule } from '../ModuleConverter';
 import { xmEncoder } from '@/engine/uade/encoders/XMEncoder';
 
 /**
@@ -613,7 +613,7 @@ export function isXMFormat(buffer: ArrayBuffer): boolean {
 
 /** Parse XM and return a TrackerSong with real PCM instruments. */
 export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
-  const { header, patterns: xmPatterns, instruments: parsedInstruments } = await parseXM(buffer);
+  const { header, patterns: xmPatterns, instruments: parsedInstruments, metadata } = await parseXM(buffer);
 
   // Re-scan pattern headers to get file offsets and packed data sizes for uadeVariableLayout.
   const filePatternAddrs: number[] = [];
@@ -633,55 +633,15 @@ export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promis
     }
   }
 
-  const emptyInst = (id: number, name: string): InstrumentConfig => ({
-    id,
-    name: name || `Instrument ${id}`,
-    type:      'sample' as const,
-    synthType: 'Sampler' as const,
-    effects:   [],
-    volume:    -60,
-    pan:       0,
-  } as InstrumentConfig);
-
-  const instruments: InstrumentConfig[] = parsedInstruments.map((inst, i) => {
-    const id = i + 1;
-    const converted = convertToInstrument(inst, id, 'XM');
-    return converted.length > 0 ? { ...converted[0], id } : emptyInst(id, inst.name);
-  });
-
-  const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-
-  const patterns: Pattern[] = xmPatterns.map((xmPat, patIdx) => ({
-    id:     `pattern-${patIdx}`,
-    name:   `Pattern ${patIdx}`,
-    length: xmPat.length,
-    channels: Array.from({ length: header.channelCount }, (_, ch): ChannelData => ({
-      id:           `channel-${ch}`,
-      name:         `Channel ${ch + 1}`,
-      muted:        false,
-      solo:         false,
-      collapsed:    false,
-      volume:       100,
-      pan:          0,
-      instrumentId: null,
-      color:        null,
-      rows: xmPat.map((row): TrackerCell => {
-        const n = row[ch];
-        if (!n || (n.note === 0 && n.instrument === 0 && n.volume === 0 && n.effectType === 0 && n.effectParam === 0)) {
-          return emptyCell();
-        }
-        return {
-          note:       n.note,        // 0=none, 1-96=notes, 97=key off
-          instrument: n.instrument,
-          volume:     n.volume,
-          effTyp:     n.effectType,
-          eff:        n.effectParam,
-          effTyp2:    0,
-          eff2:       0,
-        };
-      }),
-    })),
-  }));
+  // The one XM converter (the tracker's import used it alone before): cells
+  // with the volume column's effects in the second effect column, channel
+  // metadata, the parse metadata on every pattern (envelopes, samples) for
+  // the XM exporter; instruments by slot with envelopes, vibrato, fadeout.
+  const converted = convertXMModule(
+    xmPatterns, header.channelCount, metadata, parsedInstruments.map((i) => i.name), buffer,
+  );
+  const patterns: Pattern[] = converted.patterns;
+  const instruments = convertParsedInstruments(parsedInstruments, 'XM');
 
   const songPositions = header.patternOrderTable.slice(0, header.songLength);
 
@@ -732,5 +692,6 @@ export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promis
     initialBPM:      header.defaultBPM,
     linearPeriods:   !!(header.flags & 0x01),
     uadeVariableLayout,
+    originalModuleData: converted.originalModuleData,
   };
 }
