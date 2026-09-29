@@ -1264,6 +1264,8 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
 let _testToneOsc: Tone.Oscillator | null = null;
 let _testToneGain: Tone.Gain | null = null;
 let _richToneNodes: Tone.ToneAudioNode[] = [];
+/** Linear gain that brings test_tone pink's RMS up to its `level` (+14.3 dB). */
+const PINK_TONE_RMS_MAKEUP = Math.pow(10, 14.3 / 20);
 
 /** Auto-stop timer for the current tone. Cleared on any start or stop. */
 let _testToneTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1370,12 +1372,29 @@ export function testTone(params: Record<string, unknown>): Record<string, unknow
     // Pink noise: equal energy per octave and no steady tone for a delay or
     // modulation effect to comb, so a band level is the effect's response
     // (the rich tone's oscillators read as notches through every delay).
-    const mix = new Tone.Gain(masterGain);
+    // High-passed at 20 Hz: the pink filter keeps rising below it, and that
+    // sub-audio part landed on reverbs' in-phase DC gain and decided their
+    // reading (+4..+8 dB over their audible bands, 2026-09-29). Mono - the
+    // same noise on both sides, like a mix's centre - so a stereo effect is
+    // read as music drives it.
+    // Scaled so its RMS IS `level` dBFS: Tone's pink buffer, high-passed and
+    // downmixed as below, reads 14.3 dB under unity (measured at the master
+    // effects input). Unscaled, "-18" played at -32 dBFS and every
+    // level-dependent effect (drive, saturation, dynamics) read as if fed a
+    // near-silent mix - Satma +18.5 dB (2026-09-29).
+    const mix = new Tone.Gain(masterGain * PINK_TONE_RMS_MAKEUP);
     mix.connect(engine.masterEffectsInput);
     const noise = new Tone.Noise('pink');
-    noise.connect(mix);
+    const highPass = new Tone.Filter({ type: 'highpass', frequency: 20, rolloff: -24 });
+    // One channel, explicit: the stereo noise is downmixed here and the mono
+    // result is upmixed to both sides by the stereo input after it.
+    // (x sqrt 2 keeps the level: the downmix of two uncorrelated sides halves it.)
+    const mono = new Tone.Gain(Math.SQRT2);
+    mono.channelCount = 1;
+    mono.channelCountMode = 'explicit';
+    noise.chain(highPass, mono, mix);
     noise.start();
-    _richToneNodes.push(mix, noise);
+    _richToneNodes.push(mix, noise, highPass, mono);
     return { status: 'playing', mode: 'pink', levelDb: level, durationMs };
   }
 
