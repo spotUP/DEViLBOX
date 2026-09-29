@@ -70,7 +70,7 @@ export class OktalyzerEngine extends WASMChannelOutputsEngine {
     const ctx = this.audioContext;
     // Output 0 is the mix; 1..4 isolation slots and 5..36 per-channel dub
     // sends (worklets/channel-outputs.js).
-    this.workletNode = new AudioWorkletNode(ctx, 'oktalyzer-processor', channelOutputNodeOptions());
+    this.workletNode = new AudioWorkletNode(ctx, 'oktalyzer-processor', channelOutputNodeOptions(8));
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;

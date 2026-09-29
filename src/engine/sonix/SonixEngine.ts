@@ -90,7 +90,7 @@ export class SonixEngine extends WASMChannelOutputsEngine {
 
     // Output 0 is the mix; 5..36 carry each channel as a dub send
     // (worklets/channel-outputs.js).
-    this.workletNode = new AudioWorkletNode(ctx, 'sonix-processor', channelOutputNodeOptions());
+    this.workletNode = new AudioWorkletNode(ctx, 'sonix-processor', channelOutputNodeOptions(4));
 
     // Param bridge: normalizes reported params + posts edits back to this worklet. Its
     // onParams delegates to the static callback the store bridge registers.

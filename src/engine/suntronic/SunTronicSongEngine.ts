@@ -125,7 +125,7 @@ export class SunTronicSongEngine {
       try { await this.audioContext.audioWorklet.addModule(`${base}worklets/channel-outputs.js`); } catch { /* already loaded */ }
       await this.audioContext.audioWorklet.addModule(`${base}suntronic/SunTronicResampler.worklet.js`);
       // Output 0 is the mix; 5..8 carry each Paula voice as a dub send.
-      this.workletNode = new AudioWorkletNode(this.audioContext, 'suntronic-resampler', channelOutputNodeOptions());
+      this.workletNode = new AudioWorkletNode(this.audioContext, 'suntronic-resampler', channelOutputNodeOptions(4));
       this.workletNode.port.onmessage = (e) => {
         const d = e.data;
         if (d.type === 'ready') {

@@ -83,7 +83,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
     // Output 0 is the mix; 5..36 carry each voice as a dub send
     // (worklets/channel-outputs.js). No isolation slots: the decoder mixes in
     // C, so a voice cannot be taken out of output 0 from the worklet.
-    this.workletNode = new AudioWorkletNode(ctx, 'tfmx-processor', channelOutputNodeOptions());
+    this.workletNode = new AudioWorkletNode(ctx, 'tfmx-processor', channelOutputNodeOptions(8));
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;

@@ -68,7 +68,7 @@ export class DigMugEngine extends WASMChannelOutputsEngine {
 
   protected createNode(): void {
     const ctx = this.audioContext;
-    this.workletNode = new AudioWorkletNode(ctx, 'digmug-processor', channelOutputNodeOptions());
+    this.workletNode = new AudioWorkletNode(ctx, 'digmug-processor', channelOutputNodeOptions(4));
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
