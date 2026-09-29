@@ -83,45 +83,27 @@ export class TapeSaturation extends Tone.ToneAudioNode {
   }
 
   /**
-   * Create asymmetric saturation curve simulating tape
-   * Tape compresses positive peaks harder than negative
+   * Asymmetric tape saturation curve. Each side is divided by its own slope
+   * at zero, so a quiet signal passes at unity and `drive` only moves the
+   * KNEE: more drive, earlier saturation, more harmonics on the loud parts.
+   * Positive peaks saturate harder than negative ones (even harmonics).
+   *
+   * The curve used to keep the drive as gain (tanh(x*k) with k up to 9, after
+   * an input boost of up to 3x): a -18 dBFS signal came out +14.7 dB louder
+   * at the default drive (measured 2026-09-29), and a static -5 dB table
+   * entry only half hid it.
    */
   private createSaturationCurve(drive: number): Float32Array {
-    const curve = new Float32Array(4096);
-    const driveAmount = 1 + drive * 8; // 1-9x drive
-
-    for (let i = 0; i < 4096; i++) {
-      const x = (i / 4096) * 2 - 1; // -1 to 1
-
-      if (x >= 0) {
-        // Positive: harder compression with subtle 2nd harmonic
-        curve[i] = Math.tanh(x * driveAmount) * 0.95 + x * 0.02;
-      } else {
-        // Negative: softer compression (asymmetry adds even harmonics)
-        curve[i] = Math.tanh(x * driveAmount * 0.85);
-      }
-    }
-
-    return curve;
+    return tapeSaturationCurve(drive);
   }
 
-  /**
-   * Calculate input gain based on drive
-   */
   private calculateInputGain(drive: number): number {
-    return 1 + drive * 2; // 1-3x input boost
+    return tapeSaturationInputGain(drive);
   }
 
-  /**
-   * Calculate makeup gain to compensate for saturation and input boost.
-   * tanh(x*driveAmount) compresses peaks, but the input gain boost plus
-   * harmonic content means net output is louder. Compensate more aggressively.
-   */
+  /** Undo the input boost: with the unity-slope curve, small signals end at unity. */
   private calculateMakeupGain(drive: number): number {
-    // At drive=0: inputGain=1, makeup=1 → unity
-    // At drive=0.5: inputGain=2, makeup≈0.5 → unity
-    // At drive=1: inputGain=3, makeup≈0.4 → slight reduction (tanh adds energy)
-    return 1 / (1 + drive * 1.5);
+    return 1 / tapeSaturationInputGain(drive);
   }
 
   // Getters and setters
@@ -168,4 +150,24 @@ export class TapeSaturation extends Tone.ToneAudioNode {
     this.wetGain.dispose();
     return this;
   }
+}
+
+/** Input boost into the curve: 1x at drive 0 to 3x at drive 1. */
+export function tapeSaturationInputGain(drive: number): number {
+  return 1 + drive * 2;
+}
+
+/** The 4096-point curve over [-1, 1]; unity slope at zero on both sides. */
+export function tapeSaturationCurve(drive: number): Float32Array {
+  const curve = new Float32Array(4096);
+  const k = 1 + drive * 8;
+  const posSlope = 0.95 * k + 0.02;   // d/dx of tanh(kx)*0.95 + 0.02x at 0
+  const negSlope = 0.85 * k;          // d/dx of tanh(0.85kx) at 0
+  for (let i = 0; i < 4096; i++) {
+    const x = (i / 4095) * 2 - 1;
+    curve[i] = x >= 0
+      ? (Math.tanh(x * k) * 0.95 + x * 0.02) / posSlope
+      : Math.tanh(x * 0.85 * k) / negSlope;
+  }
+  return curve;
 }
