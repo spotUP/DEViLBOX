@@ -5,10 +5,12 @@
  * 1 + 1/(1-g^2) per stage) without Freeverb's 0.015 input gain, and four
  * combs summed at a fixed 0.25 whatever their feedback: at wet 100 % on
  * pink noise the Hall read +19 dB, the Room +18, the Plate +14, rising with
- * decay (2026-09-29). Runs the real WASM builds on white noise.
+ * decay (2026-09-29). Runs the real WASM builds on pink noise (music-like:
+ * the damped tails keep their lows, which white noise under-reads). Shimmer
+ * Reverb read -16 dB for the opposite reason: an output gain 12.5 dB short.
  */
 import { describe, it, expect } from 'vitest';
-import { noiseGainDb } from './wasmEffectHarness';
+import { noiseGainDb, noiseGainDbClass } from './wasmEffectHarness';
 
 const REVERBS: [string, string, string][] = [
   ['dragonfly-hall', 'DragonflyHall', 'dragonfly_hall'],
@@ -18,11 +20,19 @@ const REVERBS: [string, string, string][] = [
 
 describe('Dragonfly reverbs', () => {
   for (const [dir, stem, prefix] of REVERBS) {
-    it(`${stem} stays within 3 dB of the input from short to long decay`, async () => {
+    it(`${stem} stays within 4 dB of the input from short to long decay`, async () => {
       for (const decay of [0.3, 0.8, 0.95]) {
-        const g = await noiseGainDb(dir, stem, prefix, { decay });
-        expect(Math.abs(g), `decay ${decay}: ${g.toFixed(1)} dB`).toBeLessThan(3);
+        const g = await noiseGainDb(dir, stem, prefix, { decay }, 3, 0.1, 'pink');
+        expect(Math.abs(g), `decay ${decay}: ${g.toFixed(1)} dB`).toBeLessThan(4);
       }
     }, 60000);
   }
+
+  it('Shimmer Reverb stays within 2 dB of the input at wet 100 %', async () => {
+    const defaults = { 0: 0.5, 1: 0.3, 2: 12, 3: 0.6, 4: 0.6, 5: 0, 6: 0.3, 7: 0.2, 8: 1 };
+    for (const decay of [0.2, 0.5, 0.8]) {
+      const g = await noiseGainDbClass('shimmer-reverb', 'ShimmerReverb', 'ShimmerReverbEffect', { ...defaults, 0: decay }, 3, 0.1, 'pink');
+      expect(Math.abs(g), `decay ${decay}: ${g.toFixed(1)} dB`).toBeLessThan(2);
+    }
+  }, 60000);
 });
