@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(Exciter VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 add_executable(Exciter ExciterWASM.cpp)
+target_include_directories(Exciter PRIVATE ${CMAKE_SOURCE_DIR}/../wasm-common)
 set_target_properties(Exciter PROPERTIES OUTPUT_NAME "Exciter" SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/exciter")
 target_link_options(Exciter PRIVATE
   "SHELL:-s WASM=1" "SHELL:-s MODULARIZE=1" "SHELL:-s EXPORT_NAME='createExciter'"

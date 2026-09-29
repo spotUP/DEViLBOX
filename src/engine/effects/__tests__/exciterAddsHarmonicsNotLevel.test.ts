@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ROOT } from '@engine/__tests__/workletHarness';
+import { multitoneGainDb } from './wasmEffectHarness';
 
 type ExciterModule = {
   _malloc(n: number): number; _free(p: number): void;
@@ -65,5 +66,11 @@ describe('Exciter', () => {
     const gainDb = 20 * Math.log10(rms(out) / rms(input));
     expect(Math.abs(gainDb)).toBeLessThan(2.5);
     expect(out.some((v, i) => v !== input[i])).toBe(true); // it still does something
+  });
+
+  it('leaves everything below its band alone', async () => {
+    const freqs = [40, 100, 250, 1000];
+    const gains = await multitoneGainDb('exciter', 'Exciter', 'exciter', { frequency: 5000, amount: 0.3, blend: 0.45 }, freqs, 0.2);
+    for (let i = 0; i < freqs.length; i++) expect(Math.abs(gains[i]), `${freqs[i]} Hz`).toBeLessThan(0.3);
   });
 });

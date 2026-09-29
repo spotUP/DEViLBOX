@@ -3,6 +3,7 @@
  * LR2 (Linkwitz-Riley 2nd order) crossover splits into low/mid/high.
  */
 #include <cmath>
+#include "lr4_crossover.h"
 #include <cstring>
 #include <algorithm>
 #include <emscripten/emscripten.h>
@@ -10,43 +11,6 @@
 static constexpr int MAX_INSTANCES = 16;
 static constexpr float PI = 3.14159265f;
 
-struct LR2Filter {
-    // 2nd-order Butterworth LP/HP cascaded = LR2
-    float b0 = 0, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
-    float x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-
-    void setLowpass(float freq, float sr) {
-        float w0 = 2.0f * PI * freq / sr;
-        float cosw = std::cos(w0), sinw = std::sin(w0);
-        float alpha = sinw / (2.0f * 0.7071f); // Q=0.7071 for Butterworth
-        float a0inv = 1.0f / (1.0f + alpha);
-        b0 = ((1.0f - cosw) * 0.5f) * a0inv;
-        b1 = (1.0f - cosw) * a0inv;
-        b2 = b0;
-        a1 = (-2.0f * cosw) * a0inv;
-        a2 = (1.0f - alpha) * a0inv;
-    }
-
-    void setHighpass(float freq, float sr) {
-        float w0 = 2.0f * PI * freq / sr;
-        float cosw = std::cos(w0), sinw = std::sin(w0);
-        float alpha = sinw / (2.0f * 0.7071f);
-        float a0inv = 1.0f / (1.0f + alpha);
-        b0 = ((1.0f + cosw) * 0.5f) * a0inv;
-        b1 = -(1.0f + cosw) * a0inv;
-        b2 = b0;
-        a1 = (-2.0f * cosw) * a0inv;
-        a2 = (1.0f - alpha) * a0inv;
-    }
-
-    float process(float x) {
-        float y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-        x2 = x1; x1 = x; y2 = y1; y1 = y;
-        return y;
-    }
-
-    void reset() { x1 = x2 = y1 = y2 = 0; }
-};
 
 struct BandGate {
     float envLin = 0.0f;
@@ -75,8 +39,7 @@ struct Instance {
     float mix     = 1.0f;
 
     // Filter state (L/R × low LP, low HP, high LP, high HP)
-    LR2Filter lpLowL, lpLowR, hpLowL, hpLowR;
-    LR2Filter lpHighL, lpHighR, hpHighL, hpHighR;
+    lr4::Split3 splitL, splitR;   // flat-summing LR4 split (wasm-common/lr4_crossover.h)
     BandGate gates[3]; // low, mid, high
 
     float attackCoeff = 0.0f, releaseCoeff = 0.0f;
@@ -89,17 +52,14 @@ struct Instance {
     }
 
     void resetFilters() {
-        lpLowL.reset(); lpLowR.reset(); hpLowL.reset(); hpLowR.reset();
-        lpHighL.reset(); lpHighR.reset(); hpHighL.reset(); hpHighR.reset();
+        splitL.reset(); splitR.reset();
     }
 
     void updateCoeffs() {
         attackCoeff  = (attack  > 0.001f) ? std::exp(-1.0f / (attack  * 0.001f * sampleRate)) : 0.0f;
         releaseCoeff = (release > 0.001f) ? std::exp(-1.0f / (release * 0.001f * sampleRate)) : 0.0f;
-        lpLowL.setLowpass(lowCross, sampleRate); lpLowR.setLowpass(lowCross, sampleRate);
-        hpLowL.setHighpass(lowCross, sampleRate); hpLowR.setHighpass(lowCross, sampleRate);
-        lpHighL.setLowpass(highCross, sampleRate); lpHighR.setLowpass(highCross, sampleRate);
-        hpHighL.setHighpass(highCross, sampleRate); hpHighR.setHighpass(highCross, sampleRate);
+        splitL.set(lowCross, highCross, sampleRate);
+        splitR.set(lowCross, highCross, sampleRate);
     }
 
     void gateEnv(BandGate& g, float peak, float threshDb) {
@@ -121,14 +81,9 @@ struct Instance {
     void process(const float* inL, const float* inR, float* outL, float* outR, int n) {
         for (int i = 0; i < n; i++) {
             // Split into 3 bands
-            float lowL = lpLowL.process(inL[i]);
-            float lowR = lpLowR.process(inR[i]);
-            float highRestL = hpLowL.process(inL[i]);
-            float highRestR = hpLowR.process(inR[i]);
-            float midL = lpHighL.process(highRestL);
-            float midR = lpHighR.process(highRestR);
-            float highL = hpHighL.process(highRestL);
-            float highR = hpHighR.process(highRestR);
+            float lowL, midL, highL, lowR, midR, highR;
+            splitL.split(inL[i], lowL, midL, highL);
+            splitR.split(inR[i], lowR, midR, highR);
 
             // Per-band gating
             float peakLow  = std::max(std::abs(lowL), std::abs(lowR));
