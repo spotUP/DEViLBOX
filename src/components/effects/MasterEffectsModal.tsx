@@ -31,10 +31,12 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
-import type { MasterFxPreset } from '@constants/fxPresets';
+import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
+import { useClickOutside } from '@hooks/useClickOutside';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { sidechainKeyOptions } from './sidechainKeyOptions';
 import { MasterPresetMenu } from './MasterPresetMenu';
+import { matchMasterPresetName, masterPresetButtonLabel } from './masterPresetSearch';
 import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
@@ -143,24 +145,27 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     setShowSaveDialog(false);
   }, [presetName, masterEffects, getUserPresets]);
 
-  // Load a factory preset
+  // Load a factory preset — the menu stays open so the owner can audition presets.
   const handleLoadPreset = useCallback((preset: MasterFxPreset) => {
     const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
     setMasterEffects(effects, preset.gainCompensationDb);
-    setShowPresetMenu(false);
   }, [setMasterEffects]);
 
-  // Load user preset
+  // Load user preset — the menu stays open so the owner can audition presets.
   const handleLoadUserPreset = useCallback((preset: UserMasterFxPreset) => {
     const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
     setMasterEffects(effects, 0);
-    setShowPresetMenu(false);
+  }, [setMasterEffects]);
+
+  // Clear the whole master chain — the menu stays open so the owner can audition presets.
+  const handleClearEffects = useCallback(() => {
+    setMasterEffects([], 0);
   }, [setMasterEffects]);
 
   // Delete user preset
@@ -251,6 +256,19 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
   const userPresets = getUserPresets();
 
+  // Derive activePresetName from the current effects chain via fingerprinting
+  // (shared with MasterEffectsPanel — see masterPresetSearch.ts).
+  const presetMenuRef = useRef<HTMLDivElement>(null);
+  const activePresetName = useMemo(
+    () => matchMasterPresetName(masterEffects, MASTER_FX_PRESETS, userPresets),
+    [masterEffects, userPresets]
+  );
+  const presetButtonLabel = masterPresetButtonLabel(masterEffects.length > 0, activePresetName);
+
+  useClickOutside(presetMenuRef, () => setShowPresetMenu(false), {
+    enabled: showPresetMenu,
+    portalSelector: '[data-master-preset-toggle]',
+  });
 
   // Group effects by category for the add menu, filtered by search
   const effectsByGroup = getEffectsByGroup();
@@ -297,19 +315,25 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
             {/* Presets Dropdown */}
             <div className="relative">
               <button
+                data-master-preset-toggle
                 onClick={() => setShowPresetMenu(!showPresetMenu)}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-dark-bgTertiary text-text-primary
-                         hover:bg-dark-bgHover transition-colors flex items-center gap-2"
+                         hover:bg-dark-bgHover transition-colors flex items-center gap-2 max-w-[240px]"
               >
-                Presets <ChevronDown size={14} />
+                <span className="truncate">{`Presets: ${presetButtonLabel}`}</span> <ChevronDown size={14} className="shrink-0" />
               </button>
 
               {showPresetMenu && (
                 <MasterPresetMenu
+                  containerRef={presetMenuRef}
                   userPresets={userPresets}
                   onLoadPreset={handleLoadPreset}
                   onLoadUserPreset={handleLoadUserPreset}
                   onDeleteUserPreset={handleDeleteUserPreset}
+                  onClear={handleClearEffects}
+                  currentPresetName={activePresetName}
+                  noFxActive={masterEffects.length === 0}
+                  onRequestClose={() => setShowPresetMenu(false)}
                   className="absolute left-0 top-full mt-2 w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[99990] max-h-[60vh]"
                 />
               )}

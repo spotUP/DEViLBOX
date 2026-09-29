@@ -27,7 +27,9 @@ import { useFormatStore } from '@stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { Settings, Volume2, X, ChevronDown, Save } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
+import { useClickOutside } from '@hooks/useClickOutside';
 import { MasterPresetMenu } from './MasterPresetMenu';
+import { matchMasterPresetName, masterPresetButtonLabel } from './masterPresetSearch';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
@@ -321,30 +323,27 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     setShowSaveDialog(false);
   }, [presetName, masterEffects, getUserPresets, syncPresetsToServer]);
 
-  // Load a factory preset
+  // Load a factory preset — the menu stays open so the owner can audition presets.
   const handleLoadPreset = useCallback((preset: MasterFxPreset) => {
     const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
     setMasterEffects(effects, preset.gainCompensationDb);
-    setShowPresetMenu(false);
   }, [setMasterEffects]);
 
-  // Load user preset
+  // Load user preset — the menu stays open so the owner can audition presets.
   const handleLoadUserPreset = useCallback((preset: UserMasterFxPreset) => {
     const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
     setMasterEffects(effects, 0);
-    setShowPresetMenu(false);
   }, [setMasterEffects]);
 
-  // Clear all effects
+  // Clear all effects — the menu stays open so the owner can audition presets.
   const handleClearEffects = useCallback(() => {
     setMasterEffects([], 0);
-    setShowPresetMenu(false);
   }, [setMasterEffects]);
 
   // Delete user preset
@@ -357,25 +356,20 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   const userPresets = getUserPresets();
 
   // Derive activePresetName from the current effects chain via fingerprinting
-  // (survives reloads, manual edits, cloud sync — matches DJFxQuickPresets pattern)
-  const activePresetName = useMemo(() => {
-    if (masterEffects.length === 0) return null;
-    const fingerprint = (effects: Array<{ type: string; enabled?: boolean; parameters?: Record<string, number | string> }>): string =>
-      effects.map(fx => {
-        const params = fx.parameters ?? {};
-        const sortedParams = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join(',');
-        return `${fx.type}|${fx.enabled !== false ? 1 : 0}|${sortedParams}`;
-      }).join('~');
-    const current = fingerprint(masterEffects);
-    for (const p of MASTER_FX_PRESETS) {
-      if (fingerprint(p.effects) === current) return p.name;
-    }
-    for (const p of userPresets) {
-      if (fingerprint(p.effects) === current) return p.name;
-    }
-    return null;
-  }, [masterEffects, userPresets]);
+  // (survives reloads, manual edits, cloud sync — matches DJFxQuickPresets pattern).
+  // The fingerprint algorithm itself lives in masterPresetSearch.ts, shared with
+  // MasterEffectsModal, so both show the same "Presets: <name>" label.
+  const activePresetName = useMemo(
+    () => matchMasterPresetName(masterEffects, MASTER_FX_PRESETS, userPresets),
+    [masterEffects, userPresets]
+  );
+  const presetButtonLabel = masterPresetButtonLabel(masterEffects.length > 0, activePresetName);
 
+  const presetMenuRef = useRef<HTMLDivElement>(null);
+  useClickOutside(presetMenuRef, () => setShowPresetMenu(false), {
+    enabled: showPresetMenu,
+    portalSelector: '[data-master-preset-toggle]',
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -516,6 +510,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
             {/* Presets Dropdown */}
             <div className="relative">
               <button
+                data-master-preset-toggle
                 onClick={() => setShowPresetMenu(!showPresetMenu)}
                 className={`px-3 py-1 text-xs font-medium rounded flex items-center gap-1 border transition-colors truncate max-w-[180px]
                   ${activePresetName
@@ -523,7 +518,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                     : 'bg-dark-bg text-text-primary hover:bg-dark-bgHover border-dark-border'
                   }`}
               >
-                <span className="truncate">{activePresetName || 'Presets'}</span> <ChevronDown size={12} className="shrink-0" />
+                <span className="truncate">{`Presets: ${presetButtonLabel}`}</span> <ChevronDown size={12} className="shrink-0" />
               </button>
             </div>
 
@@ -550,11 +545,15 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       {/* Preset dropdown — rendered outside header so it works in both modes */}
       {showPresetMenu && (
         <MasterPresetMenu
+          containerRef={presetMenuRef}
           userPresets={userPresets}
           onLoadPreset={handleLoadPreset}
           onLoadUserPreset={handleLoadUserPreset}
           onDeleteUserPreset={handleDeleteUserPreset}
           onClear={handleClearEffects}
+          currentPresetName={activePresetName}
+          noFxActive={masterEffects.length === 0}
+          onRequestClose={() => setShowPresetMenu(false)}
           className="absolute right-0 top-0 mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[99990] max-h-[70vh]"
           style={hideHeader ? { top: 0, right: 8 } : { top: '100%', right: 16 }}
         />
