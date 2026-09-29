@@ -934,6 +934,25 @@ function registerWholeMixDubSend(key: string, source: AudioNode | null | undefin
   }
 }
 
+/**
+ * Tell the dub bus whether the engine now playing exposes per-channel outputs,
+ * asking the same resolvers the channel taps use. Hippel plays in "classic"
+ * mode through TFMXEngine, which does not; the mode alone said it did, so the
+ * whole-mix fallback stayed silent and the dub bus got no input.
+ */
+export async function reportPlaybackIsolation(
+  bus: { setEngineIsolation(canIsolate: boolean | null): void } | null = getActiveDubBus(),
+  resolveEngine: () => Promise<{ isAvailable(): boolean } | null> = async () =>
+    (await import('../tone/ChannelRoutedEffects')).getActiveIsolationEngine(),
+): Promise<void> {
+  try {
+    const engine = await resolveEngine();
+    bus?.setEngineIsolation(!!engine?.isAvailable());
+  } catch (e) {
+    console.warn('[NativeEngineRouting] isolation report skipped:', e);
+  }
+}
+
 function unregisterWholeMixDubSend(key: string): void {
   try {
     getActiveDubBus()?.unregisterWholeMixTap(key);
@@ -1202,12 +1221,14 @@ export async function startNativeEngines(
             }
             routedNativeEngines.add(desc.synthType);
             registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
+            void reportPlaybackIsolation();
           } else {
             // Fallback: connect directly to audio context destination
             const ctx = instance.output.context;
             instance.output.connect(ctx.destination);
             routedNativeEngines.add(desc.synthType);
             registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
+            void reportPlaybackIsolation();
             console.log(`[NativeEngineRouting] ${desc.key} output → destination (fallback)`);
           }
         }
@@ -1526,6 +1547,8 @@ export function stopNativeEngines(
   routedNativeEngines: Set<string>,
   c64SidEngine: C64SIDEngine | null,
 ): C64SIDEngine | null {
+  // The next song's engine reports its own isolation capability.
+  try { getActiveDubBus()?.setEngineIsolation(null); } catch { /* ok */ }
   // Save running keys before clearing (needed for async engine stop below)
   const wasRunning = new Set(_runningEngineKeys);
   // Clear the running engine guard so next play() can start fresh
