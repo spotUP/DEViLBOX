@@ -43,6 +43,12 @@ static void (*sample_prehandler) (unsigned long best_evtime);
  * Default 0x0F = all channels active. Set from entry.c via uade_wasm_mute_channels(). */
 extern unsigned char uade_wasm_channel_mute_mask;
 
+/* Per-channel isolation mask: bit set = the channel leaves the stereo mix but
+ * is still captured below (its isolation slot carries it). Set from entry.c via
+ * uade_wasm_isolate_channels(). Unlike the mute mask, the capture keeps it. */
+extern unsigned char uade_wasm_channel_isolate_mask;
+#define UADE_MIX(i) ((uade_wasm_channel_isolate_mask & (1 << (i))) ? 0 : output[i])
+
 /* Per-channel isolation buffers: capture each Paula channel's output separately.
  * Written by the three sample handlers alongside the stereo mix.
  * Read by uade_wasm_get_channel_samples() after each render pass. */
@@ -280,7 +286,7 @@ static void sample16s_handler (void)
     }
 
     write_channel_samples(output[0], output[1], output[2], output[3]);
-    sample_backend(output[0] + output[3], output[1] + output[2]);
+    sample_backend(UADE_MIX(0) + UADE_MIX(3), UADE_MIX(1) + UADE_MIX(2));
 }
 
 
@@ -302,7 +308,7 @@ static void sample16si_anti_handler (void)
     }
 
     write_channel_samples(output[0], output[1], output[2], output[3]);
-    sample_backend(output[0] + output[3], output[1] + output[2]);
+    sample_backend(UADE_MIX(0) + UADE_MIX(3), UADE_MIX(1) + UADE_MIX(2));
 }
 
 /* this interpolator performs BLEP mixing (bleps are shaped like integrated sinc
@@ -342,8 +348,8 @@ static void sample16si_sinc_handler (void)
 
     write_channel_samples(output[0], output[1], output[2], output[3]);
 
-    const int left = clamp_sample(output[0] + output[3]);
-    const int right = clamp_sample(output[1] + output[2]);
+    const int left = clamp_sample(UADE_MIX(0) + UADE_MIX(3));
+    const int right = clamp_sample(UADE_MIX(1) + UADE_MIX(2));
 
     write_left_right(left, right);
 }
