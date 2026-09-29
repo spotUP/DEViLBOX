@@ -1983,7 +1983,7 @@ export const DubDeckStrip: React.FC = () => {
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setClubSim(!clubSim)}
-          title={clubSim ? 'Club Simulator ON — 350 ms convolution IR on the master (audition how the mix lands in a venue)' : 'Club Simulator — add a small-room impulse response as master insert for venue-check'}
+          title={clubSim ? 'Club Simulator ON — a 2.5 s sound-system room on the whole mix, 82 % added on top of the dry (venue check; turn off to mix)' : 'Club Simulator — hear the whole mix in a 2.5 s sound-system room (venue check)'}
           disabled={!busEnabled}
         >
           CLUB
