@@ -78,6 +78,8 @@ export interface InstrumentUsage {
   medianPitch: number;
   /** Median WRITTEN note (tracker numbering), to play the instrument as the song does. */
   writtenMedian: number;
+  /** Median Amiga period of its notes, when the cells carry one (MOD); 0 otherwise. */
+  periodMedian: number;
   /** Semitones above the song's lowest instrument median. */
   register: number;
   /** Share of consecutive onsets (same channel, same position) moving <= 2 semitones. */
@@ -134,7 +136,7 @@ export interface SongAnalysis {
 
 // ─── 1. Usage walk ──────────────────────────────────────────────────────────
 
-interface Onset { position: number; channel: number; row: number; instrument: number; pitch: number; written: number; arp: boolean }
+interface Onset { position: number; channel: number; row: number; instrument: number; pitch: number; written: number; period?: number; arp: boolean }
 
 interface Walk {
   onsets: Onset[];
@@ -165,7 +167,7 @@ function walkSong(patterns: Pattern[], order: number[], offsets: ReadonlyMap<num
           const pitch = cell.note + (offsets.get(inst) ?? 0);
           // 0xy on a note: the classic tracker chord (arpeggio effect).
           const arp = (cell.effTyp === 0 && cell.eff > 0) || (cell.effTyp2 === 0 && cell.eff2 > 0);
-          onsets.push({ position, channel: ch, row, instrument: inst, pitch, written: cell.note, arp });
+          onsets.push({ position, channel: ch, row, instrument: inst, pitch, written: cell.note, period: cell.period || undefined, arp });
         }
       }
     }
@@ -221,6 +223,7 @@ function usageOf(id: number, walk: Walk, lowestMedian: number, channel?: number)
     pitches: pitches.size,
     medianPitch,
     writtenMedian: median(mine.map((o) => o.written)),
+    periodMedian: median(mine.flatMap((o) => (o.period ? [o.period] : []))),
     register: mine.length ? medianPitch - lowestMedian : 0,
     stepwise: pairs ? steps / pairs : 0,
     leaps: pairs ? leaps / pairs : 0,
@@ -558,7 +561,7 @@ function verdictOf(id: number, inst: InstrumentConfig | undefined, usage: Instru
 function soundingDrumPart(inst: InstrumentConfig | undefined, sound: ReturnType<typeof timbreOf>, usage: InstrumentUsage): { part: DrumPart; heardCentroidHz: number; evidence: Evidence } | undefined {
   const f = sound.features;
   if (!f || usage.onsets === 0) return undefined;
-  const rate = samplePlaybackRate(inst, usage.writtenMedian);
+  const rate = samplePlaybackRate(inst, usage.writtenMedian, usage.periodMedian || undefined);
   const heard: SampleSpectrumFeatures = {
     ...f,
     centroidHz: f.centroidHz * rate, peakHz: f.peakHz * rate,

@@ -16,6 +16,10 @@ describe('samplePlaybackRate', () => {
   it('a MOD sample at XM 61 (ProTracker C-3, period 214) plays twice as fast', () => {
     expect(samplePlaybackRate(mod, 61)).toBeCloseTo(3546895 / 214 / 8363, 6);
   });
+  it('the cell\'s own period wins over its note: import paths number notes differently', () => {
+    // convertMODModule names period 214 note 37; the MOD codec names it 61.
+    expect(samplePlaybackRate(mod, 37, 214)).toBeCloseTo(3546895 / 214 / 8363, 6);
+  });
   it('a sample without period playback is pitched against its base note', () => {
     expect(samplePlaybackRate(xm, 49)).toBeCloseTo(1, 9);   // C-4 on a C4 sample
     expect(samplePlaybackRate(xm, 61)).toBeCloseTo(2, 9);
