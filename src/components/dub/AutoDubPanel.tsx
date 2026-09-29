@@ -164,7 +164,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
                 for (const inst of insts) {
                   if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
                 }
-                roles = classifySongRoles(patterns, lookup);
+                roles = classifySongRoles(patterns, lookup, useTrackerStore.getState().patternOrder);
               }
             } catch { /* fall back to flat sends */ }
           }

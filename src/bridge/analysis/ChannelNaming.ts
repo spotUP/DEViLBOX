@@ -20,6 +20,7 @@ import { categorizeSample } from '@/lib/import/maxForLiveImport';
 import { DRUM_SYNTHS } from '@/midi/performance/lightGuide';
 import { analyzeEnvelopeShape } from '@/lib/import/EnvelopeConverter';
 import { analyzeSampleForClassification, sampleLoopOf } from './SampleSpectrum';
+import { analyzeSong, channelInstrument, legacySubrole } from './songAnalyzer';
 import { extractSynthTimbre, classifyBySynthParams, classifyByNativeSynth, soundingNotes } from './synthEvidence';
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -463,110 +464,57 @@ export function suggestChannelName(analysis: EnhancedChannelAnalysis): string | 
  *  and produce a fresh `patterns` array, so the cache invalidates on any edit.
  *  `instruments` identity is ignored — instrument renames are rare and roles
  *  are only loosely tied to instrument metadata. */
-const _songRolesCache = new WeakMap<Pattern[], EnhancedChannelAnalysis[]>();
+const _songRolesCache = new WeakMap<Pattern[], { key: string; value: EnhancedChannelAnalysis[] }>();
 
 /**
- * Classify every channel of a song by picking the pattern where that channel
- * has the most notes and running `classifyChannelWithInstruments` on it.
+ * Classify every channel of a song: THE role resolver.
  *
- * Use this when you need STABLE song-wide roles (auto-dub rule targeting,
- * auto-DJ bass-swap gating, analysis) — classifying the currently-playing
- * pattern alone risks hitting a sparse intro and returning `empty` for every
- * channel that isn't yet active. For per-pattern visualization,
- * `classifyPattern` in MusicAnalysis is the right call.
+ * The roles come from the instrument-first song analyzer (songAnalyzer.ts):
+ * what each instrument is, from how it is played across the play order and
+ * what it sounds like, and from that what each channel plays for most of the
+ * song. The statistics on the result (note count, octave, density) are the
+ * channel's over every pattern. `order` is the play order; without it every
+ * pattern counts once, in index order.
+ *
+ * The old classifier judged each channel one pattern at a time from a
+ * first-hit chain of instrument heuristics and scored 9 of 28 labelled
+ * channels (2026-09-29). For per-pattern visualization, `classifyPattern` in
+ * MusicAnalysis is the right call.
  */
 export function classifySongChannels(
   patterns: Pattern[],
   instruments: Map<number, InstrumentConfig>,
+  order?: number[],
 ): EnhancedChannelAnalysis[] {
+  const key = order ? order.join(',') : '';
   const cached = _songRolesCache.get(patterns);
-  if (cached) return cached;
+  if (cached && cached.key === key) return cached.value;
 
   if (patterns.length === 0) return [];
   const schema = patterns[0];
   if (!schema || !Array.isArray(schema.channels)) return [];
 
-  // Sample up to 50 patterns evenly distributed across the song so mid-song
-  // instrument changes (e.g. intro pad → chorus skank) are captured.
-  const MAX_PATTERNS = 50;
-  const step = patterns.length <= MAX_PATTERNS ? 1 : Math.floor(patterns.length / MAX_PATTERNS);
-  const sampled: Pattern[] = [];
-  for (let i = 0; i < patterns.length; i += step) sampled.push(patterns[i]);
-
-  // The song's register map, computed before any channel is classified.
-  //
-  // `bass` describes a channel's place in the arrangement, and asking that
-  // question needs the other channels. Measured on jennipha.ahx, the four
-  // channel medians are 25, 34, 10 and 29 — and without this every one of them
-  // classified as bass, including the channel sitting two octaves above the
-  // actual bassline.
-  const channelMedians: number[] = schema.channels.map((_, idx) => {
-    const all: number[] = [];
-    for (const pat of sampled) {
-      const ch = pat.channels?.[idx];
-      if (!ch) continue;
-      all.push(...collectNotes(ch, instruments));
-    }
-    if (all.length === 0) return Number.POSITIVE_INFINITY;
-    all.sort((a, b) => a - b);
-    const mid = all.length >> 1;
-    return all.length % 2 ? all[mid] : (all[mid - 1] + all[mid]) / 2;
-  });
-  const sounding = channelMedians.filter(m => Number.isFinite(m));
-  const ctx: ChannelSongContext | undefined = sounding.length > 1
-    ? { songLowestMedian: Math.min(...sounding) }
-    : undefined;   // one sounding channel cannot be high or low relative to anything
-
+  const analysis = analyzeSong(patterns, order ?? patterns.map((_, i) => i), instruments);
   const analyses: EnhancedChannelAnalysis[] = schema.channels.map((_, idx) => {
-    // Collect role votes across all sampled patterns for this channel.
-    // Use highest-confidence result per pattern; skip empty-role patterns.
-    const votes = new Map<ChannelRole, number>();
-    let bestResult: EnhancedChannelAnalysis | null = null;
-
-    for (const pat of sampled) {
+    const notes: number[] = [];
+    let rows = 0;
+    for (const pat of patterns) {
       const ch = pat.channels?.[idx];
       if (!ch) continue;
-      const result = classifyChannelWithInstruments(ch, idx, instruments, ctx);
-      if (result.role === 'empty') continue;
-
-      votes.set(result.role, (votes.get(result.role) ?? 0) + 1);
-
-      // Track first non-empty result as fallback
-      if (!bestResult) bestResult = result;
+      notes.push(...collectNotes(ch, instruments));
+      rows += ch.rows.length;
     }
-
-    if (!bestResult) {
-      // All patterns were empty for this channel
-      return classifyChannelWithInstruments(schema.channels[idx], idx, instruments, ctx);
-    }
-
-    // Majority vote — pick the role that appeared most often
-    let winnerRole: ChannelRole = bestResult.role;
-    let winnerCount = 0;
-    for (const [role, count] of votes) {
-      if (count > winnerCount) { winnerCount = count; winnerRole = role; }
-    }
-
-    // If the majority role matches bestResult, use it; otherwise re-run
-    // classifyChannelWithInstruments on the pattern where that role appeared
-    // to get the full EnhancedChannelAnalysis (subrole, etc.).
-    if (winnerRole === bestResult.role) return bestResult;
-
-    // Find the pattern where the majority role was produced and return that result
-    for (const pat of sampled) {
-      const ch = pat.channels?.[idx];
-      if (!ch) continue;
-      const result = classifyChannelWithInstruments(ch, idx, instruments, ctx);
-      if (result.role === winnerRole) return result;
-    }
-    return bestResult;
+    const stats = classifyChannel(idx, notes, rows);
+    const verdict = channelInstrument(analysis, idx);
+    const subrole = legacySubrole(verdict);
+    return { ...stats, role: analysis.legacyRoles[idx], ...(subrole ? { subrole } : {}) };
   });
 
-  _songRolesCache.set(patterns, analyses);
+  _songRolesCache.set(patterns, { key, value: analyses });
   return analyses;
 }
 
-const _songRolesProjectionCache = new WeakMap<Pattern[], ChannelRole[]>();
+const _songRolesProjectionCache = new WeakMap<Pattern[], { key: string; value: ChannelRole[] }>();
 
 /** Convenience: song-wide roles only (no subrole/density). Cached alongside
  *  `classifySongChannels` so repeated calls (AutoDub ticks 4× per second)
@@ -574,11 +522,13 @@ const _songRolesProjectionCache = new WeakMap<Pattern[], ChannelRole[]>();
 export function classifySongRoles(
   patterns: Pattern[],
   instruments: Map<number, InstrumentConfig>,
+  order?: number[],
 ): ChannelRole[] {
+  const key = order ? order.join(',') : '';
   const cached = _songRolesProjectionCache.get(patterns);
-  if (cached) return cached;
-  const roles = classifySongChannels(patterns, instruments).map(a => a.role);
-  _songRolesProjectionCache.set(patterns, roles);
+  if (cached && cached.key === key) return cached.value;
+  const roles = classifySongChannels(patterns, instruments, order).map(a => a.role);
+  _songRolesProjectionCache.set(patterns, { key, value: roles });
   return roles;
 }
 

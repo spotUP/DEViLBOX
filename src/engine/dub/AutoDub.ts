@@ -1491,7 +1491,7 @@ function getCurrentPatternBundle(): {
     // Trigger CED instrument classification in the background (no-op if already running).
     useInstrumentTypeStore.getState().classifyInstruments(insts);
 
-    const offlineRoles = classifySongRoles(patterns, lookup);
+    const offlineRoles = classifySongRoles(patterns, lookup, useTrackerStore.getState().patternOrder);
     const runtimeHints = getAllRuntimeChannelRoles(offlineRoles.length);
     let mergedRoles = mergeOfflineAndRuntimeRoles(offlineRoles, runtimeHints);
 

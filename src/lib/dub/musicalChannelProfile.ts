@@ -137,6 +137,7 @@ const ROLE_TO_FAMILY: Record<ChannelRole, InstrumentFamily> = {
   arpeggio: 'synth',
   pad: 'synth',
   lead: 'synth',
+  fx: 'unknown',
   empty: 'unknown',
 };
 
@@ -227,6 +228,7 @@ const ROLE_TO_FUNCTION: Record<ChannelRole, MusicalFunction> = {
   lead: 'melody',
   arpeggio: 'texture',
   pad: 'texture',
+  fx: 'texture',
   empty: 'unknown',
 };
 

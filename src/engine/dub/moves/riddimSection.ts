@@ -51,7 +51,7 @@ export const riddimSection: DubMove = {
       for (const inst of insts) {
         if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
       }
-      roles = classifySongRoles(patterns, lookup);
+      roles = classifySongRoles(patterns, lookup, useTrackerStore.getState().patternOrder);
     }
 
     // Mute every melodic channel; respect user dubRole overrides
