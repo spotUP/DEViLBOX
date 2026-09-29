@@ -12,13 +12,13 @@
 
 const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   // ── Measured hot — reduce output ──
-  DragonflyHall:    -6.0,
+  // Dragonfly Hall / Plate / Room: 0 - their reverbs are level-neutral since
+  // 2026-09-29 (true all-passes, decay-normalised combs, measured makeup).
   Driva:            -10.0,
   Saturator:        -9.3,
   Distortion:       -4.5,
   // TapeSaturation: 0 - its curve now passes quiet signals at unity (2026-09-29).
   // TapeDegradation: 0 - shares TapeSaturation's unity-gain curve (2026-09-29).
-  DragonflyPlate:   -4.5,
   Overdrive:        -4.4,
   CabinetSim:       +4.6,   // was quiet, boost
   BitCrusher:       -3.5,
@@ -62,7 +62,6 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   Roomy:            +1.4,   // was quiet, boost
   CalfPhaser:       -1.4,
   ZamDelay:         -1.3,
-  DragonflyRoom:    -3.0,
   MultibandGate:    +1.1,   // was quiet, boost
   AutoPanner:       -1.0,
   BiPhase:          -1.0,
