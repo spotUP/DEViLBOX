@@ -845,7 +845,7 @@ export function createMcpServer(): McpServer {
       durationMs: z.number().optional(),
       gain: z.number().optional(),
       level: z.number().optional(),
-      mode: z.enum(['sine', 'rich']).optional(),
+      mode: z.enum(['sine', 'rich', 'pink']).optional(),
     },
     (p) => call('test_tone', p),
   );
