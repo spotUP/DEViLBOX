@@ -137,6 +137,34 @@
         "Limiter"
       ],
       "status": "ok"
+    },
+    {
+      "name": "Swedish Chainsaw",
+      "rmsDb": -18.567440376590604,
+      "diffDb": 0.08191817938019952,
+      "compensationDb": -0.1,
+      "effectTypes": [
+        "SwedishChainsaw",
+        "Compressor"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Chip Metal",
+      "rmsDb": -18.523287753024672,
+      "diffDb": 0.12607080294613127,
+      "compensationDb": -0.1,
+      "effectTypes": [
+        "EQ8Band",
+        "SwedishChainsaw",
+        "EQ8Band",
+        "SidechainCompressor",
+        "MultibandComp",
+        "TransientDesigner",
+        "DragonflyRoom",
+        "Maximizer"
+      ],
+      "status": "ok"
     }
   ]
 }
