@@ -48,6 +48,17 @@ export interface SavedSongFields {
   performanceJournal?: unknown;
 }
 
+/** Legacy .dbx automation: { [patternId]: { [channel]: { [param]: curve } } }. */
+function flattenNestedAutomation(nested: Record<string, unknown>): AutomationCurve[] {
+  const curves: AutomationCurve[] = [];
+  for (const channels of Object.values(nested)) {
+    for (const params of Object.values(channels as Record<number, Record<string, AutomationCurve>>)) {
+      curves.push(...Object.values(params));
+    }
+  }
+  return curves;
+}
+
 /** The song a saved project or .dbx describes. Migrates old pattern/instrument formats in place. */
 export function savedSongToApply(data: SavedSongFields): SongToApply {
   let { patterns, instruments } = data;
@@ -71,8 +82,9 @@ export function savedSongToApply(data: SavedSongFields): SongToApply {
     order = data.sequence.map((id) => indexById.get(id)).filter((i): i is number => i !== undefined);
   }
 
-  const curves = Array.isArray(data.automationCurves) ? data.automationCurves
+  const curves = Array.isArray(data.automationCurves) && data.automationCurves.length > 0 ? data.automationCurves
     : Array.isArray(data.automation) ? data.automation
+    : data.automation && typeof data.automation === 'object' ? flattenNestedAutomation(data.automation)
     : undefined;
 
   const extras: ProjectExtras = {
