@@ -22,6 +22,7 @@ import { SilenceDetector } from './SilenceDetector';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 import { getActiveDubBus } from '../dub/DubBus';
+import { asIsolationCapable, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
 import { needsPaulaOutputStage } from '@engine/paulaOutput';
 
 export { C64SIDEngine };
@@ -942,15 +943,20 @@ function registerWholeMixDubSend(key: string, source: AudioNode | null | undefin
  */
 export async function reportPlaybackIsolation(
   bus: { setEngineIsolation(canIsolate: boolean | null): void } | null = getActiveDubBus(),
-  resolveEngine: () => Promise<{ isAvailable(): boolean } | null> = async () =>
+  resolveEngine: () => Promise<{ isAvailable(): boolean; supportsDubSends?(): boolean } | null> = async () =>
     (await import('../tone/ChannelRoutedEffects')).getActiveIsolationEngine(),
 ): Promise<void> {
   try {
-    const engine = await resolveEngine();
-    bus?.setEngineIsolation(!!engine?.isAvailable());
+    const engine = await resolveEngine() as ({ isAvailable(): boolean; supportsDubSends?(): boolean } | null);
+    bus?.setEngineIsolation(!!engine?.isAvailable() && engine.supportsDubSends?.() !== false);
   } catch (e) {
     console.warn('[NativeEngineRouting] isolation report skipped:', e);
   }
+}
+
+/** Make a started native engine the dub/isolation engine for this song, when it can be one. */
+function registerPlayingEngine(instance: unknown): void {
+  setPlayingIsolationEngine(asIsolationCapable(instance));
 }
 
 function unregisterWholeMixDubSend(key: string): void {
@@ -1221,6 +1227,7 @@ export async function startNativeEngines(
             }
             routedNativeEngines.add(desc.synthType);
             registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
+            registerPlayingEngine(instance);
             void reportPlaybackIsolation();
           } else {
             // Fallback: connect directly to audio context destination
@@ -1228,6 +1235,7 @@ export async function startNativeEngines(
             instance.output.connect(ctx.destination);
             routedNativeEngines.add(desc.synthType);
             registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
+            registerPlayingEngine(instance);
             void reportPlaybackIsolation();
             console.log(`[NativeEngineRouting] ${desc.key} output → destination (fallback)`);
           }
@@ -1549,6 +1557,7 @@ export function stopNativeEngines(
 ): C64SIDEngine | null {
   // The next song's engine reports its own isolation capability.
   try { getActiveDubBus()?.setEngineIsolation(null); } catch { /* ok */ }
+  setPlayingIsolationEngine(null);
   // Save running keys before clearing (needed for async engine stop below)
   const wasRunning = new Set(_runningEngineKeys);
   // Clear the running engine guard so next play() can start fresh

@@ -40,7 +40,7 @@ describe('ChannelRoutedEffects — G6 pending dub-channel activation retry', () 
     // it reports 'unavailable', the channel parks, and _scheduleDubRetry
     // marks it pending for its single retry. Adding from each branch AND
     // reconciling immediately was a retry loop per channel.
-    expect(SOURCE).toMatch(/if \(!engine\?\.isAvailable\(\) \|\| !engine\.getWorkletNode\(\)\) \{[\s\S]{0,500}return 'unavailable';/);
+    expect(SOURCE).toMatch(/if \(!engine\?\.isAvailable\(\) \|\| !engine\.getWorkletNode\(\)[^{]*\) \{[\s\S]{0,500}return 'unavailable';/);
     expect(SOURCE).toMatch(/private _scheduleDubRetry[\s\S]{0,400}this\.channelDubPendingActivation\.add\(channelIndex\)/);
   });
 
