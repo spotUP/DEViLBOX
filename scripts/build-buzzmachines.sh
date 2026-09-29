@@ -1,4 +1,7 @@
 #!/bin/bash
+# Stop at the first failed compile: each step's [ -f *.wasm ] check passes on
+# the PREVIOUS build's file, so a broken compile used to exit 0 unnoticed.
+set -e
 
 # Buzzmachines Build Script for DEViLBOX
 # Compiles selected buzzmachines to WASM modules
@@ -47,6 +50,9 @@ COMMON_FLAGS=(
     -I "$BUZZ_BASE/common/dsplib"         # DSP utilities
     -I "$BUZZ_BASE/common/windef"         # Windows compatibility
     -DEMSCRIPTEN                          # Define for conditional compilation
+    -DNDEBUG                              # Release build, as the machines shipped: the MDK's
+                                          # input-iterator assert aborts machines that override
+                                          # WorkMonoToStereo (WhiteNoise WhiteChorus)
     -Wno-deprecated-declarations          # Suppress warnings
     -Wno-array-bounds                     # Suppress array bounds warning (we know the array size)
 )

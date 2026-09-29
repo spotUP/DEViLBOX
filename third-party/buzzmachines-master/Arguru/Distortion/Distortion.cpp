@@ -209,8 +209,12 @@ inline void mi::Saturate(float * psamplesleft, float const threshold,
 
 bool mi::Work(float *psamples, int numsamples, int const mode)
 {
-  float const threshold = (float)(Vals[0]) / float(0x8000);
-  float const negthreshold = -(float)(Vals[5]) / float(0x8000);
+  // Buzz samples are in 16-bit units (+-32768), so the thresholds are too.
+  // This port divided them by 0x8000 for a host with +-1 floats; in the Buzz
+  // host that put the default clip at 512/32768 of a sample - silence
+  // (DEViLBOX, 2026-09-29).
+  float const threshold = (float)(Vals[0]);
+  float const negthreshold = -(float)(Vals[5]);
 
   float const wet = (float)Vals[1] * 0.00390625f;
 

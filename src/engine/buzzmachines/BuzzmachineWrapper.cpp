@@ -104,6 +104,11 @@ static CWaveLevel g_WaveLevel = { 0, nullptr, 60, 44100, 0, 0 };
  * Stub implementation of CMICallbacks
  * Provides minimal functionality needed by most machines
  */
+// One machine per WASM module instance (one per worklet node), so the host
+// state below is the machine's own.
+static int g_OutputChannels = 1;
+static CMachineInterfaceEx *g_MachineEx = nullptr;
+
 class StubCallbacks : public CMICallbacks {
 public:
     virtual CWaveInfo const *GetWave(int const i) override {
@@ -170,7 +175,9 @@ public:
     virtual CPattern *GetSequenceData(int const row) override { return nullptr; }
     virtual void SetSequenceData(int const row, CPattern *ppat) override {}
 
-    virtual void SetMachineInterfaceEx(CMachineInterfaceEx *pex) override {}
+    // Buzz 1.2 machines hand the host their extended interface here (MDK: in
+    // Init); AddInput / Input live on it.
+    virtual void SetMachineInterfaceEx(CMachineInterfaceEx *pex) override { g_MachineEx = pex; }
     virtual void ControlChange__obsolete__(int group, int track, int param, int value) override {}
 
     virtual int ADGetnumChannels(bool input) override { return 2; }
@@ -185,7 +192,8 @@ public:
 
     virtual int GetStateFlags() override { return SF_PLAYING; }
 
-    virtual void SetnumOutputChannels(CMachine *pmac, int n) override {}
+    // The channel count an MDK machine asks for: 1 = Work(), 2 = WorkMonoToStereo().
+    virtual void SetnumOutputChannels(CMachine *pmac, int n) override { g_OutputChannels = n; }
     virtual void SetEventHandler(CMachine *pmac, BEventType et, EVENT_HANDLER_PTR p, void *param) override {}
 
     virtual char const *GetWaveName(int const i) override { return ""; }
@@ -253,6 +261,48 @@ extern "C" EXPORT void buzz_set_bpm(int bpm) {
  * @param machine Pointer to machine instance
  * @param data Optional initialization data (can be NULL)
  */
+/**
+ * The Buzz host contract: a machine's values start at their defaults.
+ * Attributes take DefValue before Init; after Init every state parameter
+ * (MPF_STATE) takes DefValue and notes/triggers take NoValue, in the packed
+ * global values and in every track's values (maxTracks of them).
+ *
+ * This host skipped it, so every value started at 0: Jeskola Delay's track
+ * length was 0 and its WorkTrack loop never advanced (the whole audio thread
+ * hung - the browser tab froze), and machines whose gain or mix defaulted to
+ * 0 were silent (2026-09-29).
+ */
+static void writeParamDefault(unsigned char *&p, CMachineParameter const *par) {
+    const int v = (par->Flags & MPF_STATE) ? par->DefValue : par->NoValue;
+    if (par->Type == pt_word) {
+        const unsigned short w = (unsigned short)v;
+        std::memcpy(p, &w, 2);
+        p += 2;
+    } else {
+        *p = (unsigned char)v;
+        p += 1;
+    }
+}
+
+static void writeAttributeDefaults(CMachineInterface *machine, CMachineInfo const *info) {
+    if (!machine->AttrVals || !info) return;
+    for (int i = 0; i < info->numAttributes; i++) machine->AttrVals[i] = info->Attributes[i]->DefValue;
+}
+
+static void writeParameterDefaults(CMachineInterface *machine, CMachineInfo const *info) {
+    if (!info) return;
+    if (machine->GlobalVals) {
+        unsigned char *p = (unsigned char *)machine->GlobalVals;
+        for (int i = 0; i < info->numGlobalParameters; i++) writeParamDefault(p, info->Parameters[i]);
+    }
+    if (machine->TrackVals && info->numTrackParameters > 0) {
+        unsigned char *p = (unsigned char *)machine->TrackVals;
+        for (int t = 0; t < info->maxTracks; t++)
+            for (int i = 0; i < info->numTrackParameters; i++)
+                writeParamDefault(p, info->Parameters[info->numGlobalParameters + i]);
+    }
+}
+
 extern "C" EXPORT void buzz_init(CMachineInterface *machine, CMachineDataInput *data) {
     if (machine) {
         // Ensure host environment is set up
@@ -262,7 +312,17 @@ extern "C" EXPORT void buzz_init(CMachineInterface *machine, CMachineDataInput *
         if (!machine->pCB) {
             machine->pCB = &g_Callbacks;
         }
+        CMachineInfo const *info = GetInfo();
+        writeAttributeDefaults(machine, info);
         machine->Init(data);
+        writeParameterDefaults(machine, info);
+        // The host announces the attribute values after loading them; machines
+        // size their buffers here (Jeskola Delay / CrossDelay: MaxDelay stayed 0,
+        // every track length clamped to 0, and WorkTrack never advanced).
+        if (info && info->numAttributes > 0) machine->AttributesChanged();
+        // An input-mixing (MDK) machine receives its audio through Input(), from
+        // inputs it has been told about: this host feeds it one stereo input.
+        if (info && (info->Flags & MIF_DOES_INPUT_MIXING) && g_MachineEx) g_MachineEx->AddInput("DEViLBOX", true);
     }
 }
 
@@ -286,11 +346,49 @@ extern "C" EXPORT void buzz_tick(CMachineInterface *machine) {
  * @param mode WM_NOIO=0, WM_READ=1, WM_WRITE=2, WM_READWRITE=3
  * @return true if machine produced audio, false if silent
  */
+/*
+ * `samples` is always interleaved stereo (numSamples pairs), in and out. Each
+ * machine gets the buffer shape its flags ask for:
+ *   MIF_DOES_INPUT_MIXING  Input(stereo) then Work (mono) or
+ *                          WorkMonoToStereo, as the machine chose through
+ *                          SetnumOutputChannels
+ *   MIF_MONO_TO_STEREO     WorkMonoToStereo(mono in, stereo out)
+ *   otherwise              Work(mono) - Buzz machines are mono
+ * This host used to call Work() on every machine with the interleaved buffer:
+ * input-mixing machines never received audio (silent), mono-to-stereo ones
+ * never ran, and mono ones processed L,R,L,R... as consecutive samples.
+ */
+static float g_Mono[1024];
+
+static void monoToStereo(float *samples, int n) {
+    for (int i = n - 1; i >= 0; i--) { samples[2 * i] = g_Mono[i]; samples[2 * i + 1] = g_Mono[i]; }
+}
+
 extern "C" EXPORT bool buzz_work(CMachineInterface *machine, float *samples, int numSamples, int mode) {
-    if (machine) {
-        return machine->Work(samples, numSamples, mode);
+    if (!machine || numSamples <= 0) return false;
+    const int n = numSamples > 1024 ? 1024 : numSamples;
+    CMachineInfo const *info = GetInfo();
+    const int flags = info ? info->Flags : 0;
+    const bool reads = (mode & WM_READ) != 0;
+
+    for (int i = 0; i < n; i++) g_Mono[i] = reads ? 0.5f * (samples[2 * i] + samples[2 * i + 1]) : 0.0f;
+
+    if ((flags & MIF_DOES_INPUT_MIXING) && g_MachineEx) {
+        g_MachineEx->Input(reads ? samples : nullptr, n, 1.0f);
+        // The mono input goes in `pin` too: the MDK's own WorkMonoToStereo
+        // ignores it (it mixed Input() into a buffer), but a machine that
+        // overrides WorkMonoToStereo (WhiteNoise WhiteChorus) reads it.
+        if (g_OutputChannels >= 2) return machine->WorkMonoToStereo(g_Mono, samples, n, mode);
+        const bool ret = machine->Work(g_Mono, n, mode);
+        monoToStereo(samples, n);
+        return ret;
     }
-    return false;
+
+    if (flags & MIF_MONO_TO_STEREO) return machine->WorkMonoToStereo(g_Mono, samples, n, mode);
+
+    const bool ret = machine->Work(g_Mono, n, mode);
+    monoToStereo(samples, n);
+    return ret;
 }
 
 /**
