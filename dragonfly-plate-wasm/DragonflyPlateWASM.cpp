@@ -8,59 +8,15 @@
  */
 
 #include <cmath>
+#include "reverb_blocks.h"
 #include <cstring>
 #include <algorithm>
 #include <emscripten/emscripten.h>
 
 static constexpr int MAX_INSTANCES = 16;
 
-// ─── Allpass filter ─────────────────────────────────────────────────────────
+// Allpass (true Schroeder) and Comb: wasm-common/reverb_blocks.h
 
-class Allpass {
-    float* buf;
-    int size, pos;
-    float feedback;
-public:
-    Allpass() : buf(nullptr), size(0), pos(0), feedback(0.5f) {}
-    ~Allpass() { delete[] buf; }
-    void init(int sz, float fb) {
-        delete[] buf;
-        size = sz; buf = new float[sz](); pos = 0; feedback = fb;
-    }
-    float process(float in) {
-        float delayed = buf[pos];
-        float out = -in + delayed;
-        buf[pos] = in + delayed * feedback;
-        pos = (pos + 1) % size;
-        return out;
-    }
-    void clear() { if (buf) std::memset(buf, 0, size * sizeof(float)); pos = 0; }
-};
-
-// ─── Comb filter (LBCF) ────────────────────────────────────────────────────
-
-class Comb {
-    float* buf;
-    int size, pos;
-    float feedback, damp, filterState;
-public:
-    Comb() : buf(nullptr), size(0), pos(0), feedback(0.5f), damp(0.5f), filterState(0) {}
-    ~Comb() { delete[] buf; }
-    void init(int sz, float fb, float dp) {
-        delete[] buf;
-        size = sz; buf = new float[sz](); pos = 0; feedback = fb; damp = dp; filterState = 0;
-    }
-    void setFeedback(float fb) { feedback = fb; }
-    void setDamp(float dp) { damp = dp; }
-    float process(float in) {
-        float out = buf[pos];
-        filterState = out * (1.0f - damp) + filterState * damp;
-        buf[pos] = in + filterState * feedback;
-        pos = (pos + 1) % size;
-        return out;
-    }
-    void clear() { if (buf) std::memset(buf, 0, size * sizeof(float)); filterState = 0; pos = 0; }
-};
 
 // ─── Plate Reverb Instance ──────────────────────────────────────────────────
 
@@ -154,8 +110,10 @@ struct PlateReverbInstance {
                 sumL += combL[c].process(diff);
                 sumR += combR[c].process(diff);
             }
-            sumL *= 0.25f;
-            sumR *= 0.25f;
+            // Unity broadband level whatever the decay (was a fixed 0.25).
+            const float norm = combSumNorm(decay, 4);
+            sumL *= norm;
+            sumR *= norm;
 
             // Tank allpasses
             sumL = tankAPL.process(sumL);
@@ -166,8 +124,12 @@ struct PlateReverbInstance {
             lpfStateR = sumR * (1.0f - lpfCoeff) + lpfStateR * lpfCoeff;
 
             // Stereo width
-            float mid = (lpfStateL + lpfStateR) * 0.5f;
-            float side = (lpfStateL - lpfStateR) * 0.5f * width;
+            // Makeup to the input's level at the default settings (white noise,
+            // measured 2026-09-29: the mono input sum, feedback damping and this
+            // output low-pass left the tail 10.0 dB under the dry signal).
+            constexpr float kMakeup = 3.162f;
+            float mid = (lpfStateL + lpfStateR) * 0.5f * kMakeup;
+            float side = (lpfStateL - lpfStateR) * 0.5f * width * kMakeup;
             outL[i] = mid + side;
             outR[i] = mid - side;
         }
