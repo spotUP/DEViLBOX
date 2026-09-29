@@ -88,6 +88,15 @@ function hpfHzToNormalized(hz: number): number {
  * @param originHz  the knob's steady setting (the move's origin)
  */
 const MASTER_HPF_IDLE_HZ = 20;
+
+/** The sidechain pump's compressor curve (knee dB, ratio) and its threshold for a SIDECHAIN amount. */
+const SIDECHAIN_KNEE_DB = 6;
+const SIDECHAIN_RATIO = 6;
+const sidechainThresholdDb = (amount: number | undefined) => -6 - (amount ?? 0.15) * 30;
+/** The glue compressor's curve when engaged. */
+const GLUE_THRESHOLD_DB = -14;
+const GLUE_KNEE_DB = 8;
+const GLUE_RATIO = 3;
 function masterHpfHzFor(hz: number, originHz: number): number {
   return hz > originHz && hz > ALTEC_HPF_STEPS[0] ? hz : MASTER_HPF_IDLE_HZ;
 }
@@ -107,6 +116,8 @@ import { ChannelTapBaselines } from '@/lib/dub/channelTapBaseline';
 import { makeSoftClipCurve } from '@/lib/dub/softClipCurve';
 import { AuditionHold } from '@/lib/dub/auditionHold';
 import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
+import { compressorMakeupTrim } from '@/lib/dub/compressorMakeup';
+import { makeTapeSatCurve } from '@/lib/dub/tapeSatCurve';
 import { generatedPeak, getProgrammeLevel } from './programmeReference';
 import {
   SILENT_PROGRAMME_PEAK,
@@ -288,30 +299,6 @@ function applyDubSendCurve(x: number): number {
   return x * (1 - 0.3 * x * x);
 }
 
-/**
- * Asymmetric tanh curve for WaveShaper — models transformer-coupled magnetic
- * tape saturation. Positive half compresses a touch harder than the negative
- * half; that asymmetry is the audible signature of tape vs. digital clipping.
- * Called once at engine init; curve is static after that.
- */
-function makeTapeSatCurve(drive: number): Float32Array<ArrayBuffer> {
-  const n = 4096;
-  // Construct with an explicit ArrayBuffer (not ArrayBufferLike) so the
-  // resulting typed array matches what WaveShaperNode.curve expects under
-  // TS strict lib types.
-  const curve = new Float32Array(new ArrayBuffer(n * 4));
-  const kPos = drive * 4;
-  const kNeg = drive * 4.4;  // +10% on negative half — asymmetric
-  const normPos = Math.tanh(kPos);
-  const normNeg = Math.tanh(kNeg);
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1;
-    curve[i] = x >= 0
-      ? Math.tanh(x * kPos) / normPos
-      : Math.tanh(x * kNeg) / normNeg;
-  }
-  return curve;
-}
 
 /**
  * Generate a pink noise AudioBuffer using Paul Kellet's three-stage filter.
@@ -1025,7 +1012,7 @@ export class DubBus {
        otherwise the DynamicsCompressorNode enters deep gain reduction
        (attack 2ms, release 180ms exponential) and takes 1-2s to recover,
        killing audible reverb even after return_ unmutes. */
-    const targetThreshold = -6 - (settings.sidechainAmount ?? 0.15) * 30;
+    const targetThreshold = sidechainThresholdDb(settings.sidechainAmount);
     try {
       const now = ctx.currentTime;
       this.return_.gain.cancelScheduledValues(now);
@@ -1120,13 +1107,13 @@ export class DubBus {
         // settled by now and the compressors start from a clean state.
         this.sidechain.ratio.cancelScheduledValues(now2);
         this.sidechain.ratio.setValueAtTime(1, now2);
-        this.sidechain.ratio.setTargetAtTime(6, now2 + WARMUP_SEC, 0.02);
+        this.sidechain.ratio.setTargetAtTime(SIDECHAIN_RATIO, now2 + WARMUP_SEC, 0.02);
         this.glue.ratio.cancelScheduledValues(now2);
         this.glue.ratio.setValueAtTime(1, now2);
         // Respect glueBypass — Scientist mode must stay at 1:1 even after warmup.
-        this.glue.ratio.setTargetAtTime(this.settings.glueBypass ? 1 : 3, now2 + WARMUP_SEC, 0.02);
+        this.glue.ratio.setTargetAtTime(this.settings.glueBypass ? 1 : GLUE_RATIO, now2 + WARMUP_SEC, 0.02);
         if (!this.settings.glueBypass) {
-          this.glue.threshold.setTargetAtTime(-14, now2 + WARMUP_SEC, 0.02);
+          this.glue.threshold.setTargetAtTime(GLUE_THRESHOLD_DB, now2 + WARMUP_SEC, 0.02);
         }
         // Also restore the sidechain threshold (it was set during
         // setSettings but the swap's immediate write may have overridden it).
@@ -1159,8 +1146,8 @@ export class DubBus {
           this.feedback.gain.setValueAtTime(priorFeedbackGain, t);
           this.return_.gain.setValueAtTime(this.enabled ? settings.returnGain : 0, t);
           this.sidechain.threshold.setValueAtTime(targetThreshold, t);
-          this.sidechain.ratio.setValueAtTime(6, t);
-          this.glue.ratio.setValueAtTime(this.settings.glueBypass ? 1 : 3, t);
+          this.sidechain.ratio.setValueAtTime(SIDECHAIN_RATIO, t);
+          this.glue.ratio.setValueAtTime(this.settings.glueBypass ? 1 : GLUE_RATIO, t);
         } catch { /* ok */ }
       }
     }, RAMP_SEC * 1000 + 5);
@@ -1476,6 +1463,9 @@ export class DubBus {
   private _currentEchoEngine: DubBusSettings['echoEngine'] = DEFAULT_DUB_BUS.echoEngine;
   private sidechain: DynamicsCompressorNode;  // fast (pumping)
   private glue: DynamicsCompressorNode;       // slow (dubplate glue)
+  /** Cancel each compressor's automatic make-up gain (see compressorMakeup.ts). */
+  private sidechainTrim!: GainNode;
+  private glueTrim!: GainNode;
   private lpf: BiquadFilterNode;      // sweep-able LPF on return
   private return_: GainNode;
   private feedback: GainNode;         // echo → feedback → input (siren)
@@ -2380,11 +2370,11 @@ export class DubBus {
     // routing) but the fast-attack/release compression produces the same
     // "duck on every hit" feel.
     this.sidechain = this.context.createDynamicsCompressor();
-    this.sidechain.threshold.value = -28;
-    this.sidechain.ratio.value = 6;
+    this.sidechain.threshold.value = sidechainThresholdDb(this.settings.sidechainAmount);
+    this.sidechain.ratio.value = SIDECHAIN_RATIO;
     this.sidechain.attack.value = 0.002;
     this.sidechain.release.value = 0.18;
-    this.sidechain.knee.value = 6;
+    this.sidechain.knee.value = SIDECHAIN_KNEE_DB;
 
     // Glue compressor — slow: models the compression character of cutting
     // a dub straight to acetate lathe. Soft attack (30ms) lets transients
@@ -2393,11 +2383,22 @@ export class DubBus {
     // This is the "finished dub record" texture that modern digital chains
     // miss when they stop at the pumping compressor.
     this.glue = this.context.createDynamicsCompressor();
-    this.glue.threshold.value = -14;
-    this.glue.ratio.value = 3;
+    this.glue.threshold.value = GLUE_THRESHOLD_DB;
+    this.glue.ratio.value = GLUE_RATIO;
     this.glue.attack.value = 0.030;
     this.glue.release.value = 0.300;
-    this.glue.knee.value = 8;
+    this.glue.knee.value = GLUE_KNEE_DB;
+
+    // A DynamicsCompressorNode applies the spec's automatic make-up gain and
+    // cannot be told not to: at the dub defaults each of these two ADDED about
+    // 4 dB, and the sidechain at full depth about 17 dB - "the echo/reverb is
+    // still on overdrive drowning everything" (2026-09-30). A trim after each
+    // cancels exactly that gain (compressorMakeup.ts, matched to Chrome within
+    // 0.01 dB), so each is a compressor again: unity below its threshold.
+    this.sidechainTrim = this.context.createGain();
+    this.glueTrim = this.context.createGain();
+    this.sidechainTrim.gain.value = this._sidechainTrimFor(this.settings);
+    this.glueTrim.gain.value = this._glueTrimFor(this.settings);
 
     // Sweepable LPF on the return — drops dub into "underwater" muffle.
     // Open position (~20 kHz) is effectively transparent.
@@ -2595,8 +2596,10 @@ export class DubBus {
     // chosen order (echoSpring / springEcho / parallel).
     this._applyCoreRouting(this.settings.chainOrder);
     // ─── Common downstream wiring (all chain orders) ─────────────────────
-    this.sidechain.connect(this.glue);
-    this.glue.connect(this.midScoop);
+    this.sidechain.connect(this.sidechainTrim);
+    this.sidechainTrim.connect(this.glue);
+    this.glue.connect(this.glueTrim);
+    this.glueTrim.connect(this.midScoop);
     // Return EQ: midScoop → returnEQ → lpf
     Tone.connect(this.midScoop as unknown as Tone.OutputNode, this.returnEQ.input);
     Tone.connect(this.returnEQ.output, this.lpf as unknown as Tone.InputNode);
@@ -4295,9 +4298,12 @@ export class DubBus {
     // transition and schedules its own restoration. Writing here would
     // override that protection.
     if (!engineChanging && !this._muteHoldActive) {
-      const threshold = -6 - merged.sidechainAmount * 30;
+      const threshold = sidechainThresholdDb(merged.sidechainAmount);
       this._settle(this.sidechain.threshold, threshold, now, 0.05);
     }
+    // Each compressor's make-up gain follows its settings; so does its trim.
+    this._settle(this.sidechainTrim.gain, this._sidechainTrimFor(merged), now, 0.05);
+    this._settle(this.glueTrim.gain, this._glueTrimFor(merged), now, 0.05);
 
     // Glue compressor bypass — Scientist mode. The research quotes him:
     // "If you want to see a goddamn monster come out of me, try mastering
@@ -4308,8 +4314,8 @@ export class DubBus {
         this.glue.ratio.setTargetAtTime(1, now, 0.05);
         this.glue.threshold.setTargetAtTime(0, now, 0.05);
       } else {
-        this.glue.ratio.setTargetAtTime(3, now, 0.05);
-        this.glue.threshold.setTargetAtTime(-14, now, 0.05);
+        this.glue.ratio.setTargetAtTime(GLUE_RATIO, now, 0.05);
+        this.glue.threshold.setTargetAtTime(GLUE_THRESHOLD_DB, now, 0.05);
       }
     }
 
@@ -4674,7 +4680,7 @@ export class DubBus {
     const WARMUP_SEC = 0.40; // spring I/O mute handles burst; 400ms for settle
     const priorFeedback = this.feedback.gain.value;
     const priorReturn = this.return_.gain.value;
-    const targetThreshold = -6 - sidechainAmount * 30;
+    const targetThreshold = sidechainThresholdDb(sidechainAmount);
     console.log(`[DubBusCtrl] _warmupMute fired | feedback ${priorFeedback.toFixed(3)}→0→${priorFeedback.toFixed(3)} return_ ${priorReturn.toFixed(3)}→0→${priorReturn.toFixed(3)} hold=${(WARMUP_SEC*1000).toFixed(0)}ms`);
     this._muteHoldActive = true;
     this._pendingPostHoldSettings = null;
@@ -4700,12 +4706,12 @@ export class DubBus {
 
       this.sidechain.ratio.cancelScheduledValues(now);
       this.sidechain.ratio.setValueAtTime(1, now);
-      this.sidechain.ratio.setTargetAtTime(6, now + WARMUP_SEC, 0.02);
+      this.sidechain.ratio.setTargetAtTime(SIDECHAIN_RATIO, now + WARMUP_SEC, 0.02);
       this.glue.ratio.cancelScheduledValues(now);
       this.glue.ratio.setValueAtTime(1, now);
-      this.glue.ratio.setTargetAtTime(this.settings.glueBypass ? 1 : 3, now + WARMUP_SEC, 0.02);
+      this.glue.ratio.setTargetAtTime(this.settings.glueBypass ? 1 : GLUE_RATIO, now + WARMUP_SEC, 0.02);
       if (!this.settings.glueBypass) {
-        this.glue.threshold.setTargetAtTime(-14, now + WARMUP_SEC, 0.02);
+        this.glue.threshold.setTargetAtTime(GLUE_THRESHOLD_DB, now + WARMUP_SEC, 0.02);
       }
       this.sidechain.threshold.cancelScheduledValues(now);
       this.sidechain.threshold.setValueAtTime(0, now);
@@ -5963,6 +5969,16 @@ export class DubBus {
    * the new curve starts from the last SCHEDULED value rather than the one
    * actually sounding.
    */
+  /** The gain that cancels the sidechain compressor's make-up at these settings. */
+  private _sidechainTrimFor(settings: Pick<DubBusSettings, 'sidechainAmount'>): number {
+    return compressorMakeupTrim(sidechainThresholdDb(settings.sidechainAmount), SIDECHAIN_KNEE_DB, SIDECHAIN_RATIO);
+  }
+
+  /** The gain that cancels the glue compressor's make-up (none when bypassed at 1:1). */
+  private _glueTrimFor(settings: Pick<DubBusSettings, 'glueBypass'>): number {
+    return settings.glueBypass ? 1 : compressorMakeupTrim(GLUE_THRESHOLD_DB, GLUE_KNEE_DB, GLUE_RATIO);
+  }
+
   private _settle(param: AudioParam, target: number, now: number, tc: number): void {
     try {
       param.cancelScheduledValues(now);
@@ -8060,6 +8076,8 @@ export class DubBus {
     try { this.feedback.disconnect(); } catch { /* ok */ }
     try { this.sidechain.disconnect(); } catch { /* ok */ }
     try { this.glue.disconnect(); } catch { /* ok */ }
+    try { this.sidechainTrim.disconnect(); } catch { /* ok */ }
+    try { this.glueTrim.disconnect(); } catch { /* ok */ }
     try { this.lpf.disconnect(); } catch { /* ok */ }
     try { this.return_.disconnect(); } catch { /* ok */ }
     try { this.extFeedbackDelay.disconnect(); } catch { /* ok */ }
