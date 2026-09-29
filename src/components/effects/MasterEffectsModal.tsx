@@ -682,7 +682,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 };
 
 // Sortable Effect Item Component
-interface SortableEffectItemProps {
+export interface SortableEffectItemProps {
   effect: EffectConfig;
   isSelected: boolean;
   onSelect: () => void;
@@ -697,7 +697,7 @@ interface SortableEffectItemProps {
   isolationSupported: boolean;
 }
 
-function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onKeyChange, numChannels, channelNames, isolationSupported }: SortableEffectItemProps) {
+export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onKeyChange, numChannels, channelNames, isolationSupported }: SortableEffectItemProps) {
   const sidechainKeyed = EffectRegistry.get(effect.type)?.sidechainKeyed === true;
   const keySource = Math.round(Number(effect.parameters?.sidechainSource ?? -1));
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -858,7 +858,7 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
           channel pickers with nothing to tell them apart, and the one on the
           card was the wrong one (2026-09-29). */}
       {sidechainKeyed && (
-        <div className="mt-2 pt-2 border-t flex items-center gap-2" style={{ borderColor: `${enc.border}` }} onClick={(e) => e.stopPropagation()}>
+        <div className="mt-2 pt-2 border-t flex items-center gap-2" style={{ borderColor: `${enc.border}` }}>
           <span
             className="text-[10px] font-semibold uppercase tracking-wider"
             style={{ color: `${enc.accent}80` }}
@@ -866,6 +866,7 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
           >
             Key
           </span>
+          <span className="flex-1" onClick={(e) => e.stopPropagation()}>
           <CustomSelect
             value={String(keySource)}
             onChange={(v) => onKeyChange(Number(v))}
@@ -876,13 +877,17 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
                 label: channelNames[i] && !/^(ch|channel)\s*\d+$/i.test(channelNames[i].trim()) ? `CH ${i + 1} ${channelNames[i]}` : `CH ${i + 1}`,
               })),
             ]}
-            className="flex-1 bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-0.5 text-[10px] font-mono text-text-primary"
+            className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-0.5 text-[10px] font-mono text-text-primary"
           />
+          </span>
         </div>
       )}
 
       {/* Channel routing selector — only for formats with multi-output isolation */}
-      {isolationSupported && <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }} onClick={(e) => e.stopPropagation()}>
+      {/* Only the controls stop the click: the row's empty space selects the
+          card like the rest of it. The whole row used to swallow clicks, so
+          the lower half of every card did nothing (2026-09-29). */}
+      {isolationSupported && <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <span
             className="text-[10px] font-semibold uppercase tracking-wider"
@@ -892,7 +897,7 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
             Apply to
           </span>
           <button
-            onClick={() => onChannelSelect(undefined)}
+            onClick={(e) => { e.stopPropagation(); onChannelSelect(undefined); }}
             className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
               !Array.isArray(effect.selectedChannels)
                 ? 'text-white/90 border'
@@ -917,7 +922,8 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
             return (
               <button
                 key={i}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   const current = new Set(sel ?? []);
                   if (current.has(i)) {
                     current.delete(i);
