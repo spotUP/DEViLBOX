@@ -57,3 +57,27 @@ Spring, Early Reflections.
 ## WAM (third-party): compensation only
 Graphic EQ +6 flat, QuadraFuzz +4..10, Vox Amp 30 +2..16, Disto Machine,
 Faust Delay +6..7, Big Muff, TS-9, Stone Phaser, Pitch Shifter -16 at 60 Hz.
+
+## Measurement correction (2026-09-29, afternoon)
+
+Two measurement defects made earlier broadband results wrong:
+
+1. **test_tone pink played 14 dB under its level.** "level -18" put Tone's pink
+   buffer at -32 dBFS RMS at the master effects input, so every
+   level-dependent effect (drive, saturation, dynamics) was measured as if fed
+   a near-silent mix. Satma read +18.5 dB in-app vs +7.6 headless for this
+   reason alone. Fixed in 13b61ebce: RMS = level, 20 Hz high-pass, centre (L = R).
+2. **Unfiltered pink noise over-reads comb reverbs.** Kellet's pink filter
+   keeps rising below 20 Hz, where parallel combs add in phase (gain
+   1/(1-g) each). The headless calibration of the Dragonfly reverbs was
+   dominated by that sub-audio part, so they came out 12-16 dB quiet on
+   music. The harness now high-passes its pink at 20 Hz (24 dB/oct) and the
+   reverb level test drives the centre (2bb4d306a).
+
+Also found: Jeskola Freeverb's LowCut 0 was a 0.001 Hz Butterworth high-pass
+whose float coefficients put a pole on z = 1 - a DC integrator, +18 dB on pink,
+all below 63 Hz (b427aaf14). Satma folded back past its clipper's peak, had no
+drive makeup and a -6 dB tone centre (30510c049).
+
+All broadband rows recorded before 13b61ebce are invalid; the sweep was re-run
+from scratch with the corrected tone.
