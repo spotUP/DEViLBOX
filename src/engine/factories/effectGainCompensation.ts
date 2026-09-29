@@ -16,7 +16,7 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   Driva:            -10.0,
   Saturator:        -9.3,
   Distortion:       -4.5,
-  TapeSaturation:   -5.0,
+  // TapeSaturation: 0 - its curve now passes quiet signals at unity (2026-09-29).
   TapeDegradation:  -5.0,
   DragonflyPlate:   -4.5,
   Overdrive:        -4.4,
