@@ -15,6 +15,11 @@ import { useInstrumentTypeStore } from '@stores/useInstrumentTypeStore';
 import { instrumentTypeLabel } from '@/bridge/analysis/AudioSetInstrumentMap';
 import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 import { classifyInstrument } from '@/bridge/analysis/ChannelNaming';
+import { analyzeSong, type InstrumentRole, type DrumPart, type InstrumentVerdict } from '@/bridge/analysis/songAnalyzer';
+import { useInstrumentLabelStore, songLabelKey, type InstrumentLabel } from '@stores/useInstrumentLabelStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
+import { useProjectStore } from '@stores/useProjectStore';
+import { xmNoteToNoteName } from '@engine/replayer/PeriodTables';
 import { Plus, Trash2, Copy, Repeat, Repeat1, Pencil, ExternalLink, Download, Upload } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
@@ -108,6 +113,33 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   const cedResults = useInstrumentTypeStore(s => s.results);
   const cedPending = useInstrumentTypeStore(s => s.pendingIds);
   const setManualType = useInstrumentTypeStore(s => s.setManualType);
+
+  // The song analyzer's word on every instrument (what it IS, from how the
+  // song plays it), and the owner's labels that overrule it.
+  const patterns = useTrackerStore(s => s.patterns);
+  const patternOrder = useTrackerStore(s => s.patternOrder);
+  const songName = useProjectStore(s => s.metadata?.name);
+  const songKey = songLabelKey(songName, instruments.length);
+  const ownerLabels = useInstrumentLabelStore(s => s.labels[songKey]);
+  const setOwnerLabel = useInstrumentLabelStore(s => s.setLabel);
+  // Memoised: the analysis walks the whole song; it must not run per render.
+  const analysis = useMemo(() => {
+    if (!patterns.length) return null;
+    const lookup = new Map(instruments.map(i => [i.id, i]));
+    const labels = ownerLabels ? new Map(Object.entries(ownerLabels).map(([id, l]) => [Number(id), l])) : undefined;
+    try { return analyzeSong(patterns, patternOrder, lookup, labels); } catch { return null; }
+  }, [patterns, patternOrder, instruments, ownerLabels]);
+  const [rolePickerFor, setRolePickerFor] = useState<number | null>(null);
+  const hearInstrument = useCallback(async (inst: InstrumentConfig, verdict: InstrumentVerdict | undefined) => {
+    try {
+      const engine = getToneEngine();
+      await engine.ensureInstrumentReady(inst);
+      const note = xmNoteToNoteName(Math.max(1, Math.round(verdict?.usage.writtenMedian || 49)));
+      const now = Tone.now();
+      engine.triggerNoteAttack(inst.id, note, now, 0.8, inst);
+      engine.triggerNoteRelease(inst.id, note, now + 0.6, inst);
+    } catch (err) { console.warn('[InstrumentList] could not audition instrument', inst.id, err); }
+  }, []);
   const [typePickerFor, setTypePickerFor] = useState<number | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -797,6 +829,46 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   );
                 })()}
 
+                {/* Role chip — what the song analyzer says this instrument IS; click to hear it and label it */}
+                {(() => {
+                  const verdict = analysis?.instruments.get(instrument.id);
+                  const label = ownerLabels?.[instrument.id];
+                  if (!verdict && !label) return null;
+                  const role = label?.role ?? verdict!.role;
+                  const part = label?.drumPart ?? verdict?.drumPart;
+                  const text = role === 'drums' && part && part !== 'mixed' ? part : role;
+                  const open = rolePickerFor === instrument.id;
+                  const toggle = (e: React.MouseEvent) => { e.stopPropagation(); setRolePickerFor(open ? null : instrument.id); };
+                  return (
+                    <div className="instrument-badge instrument-badge--part relative shrink-0">
+                      <span
+                        className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border shrink-0 cursor-pointer ${
+                          isSelected
+                            ? 'bg-ft2-bg/20 text-ft2-bg border-ft2-bg/30'
+                            : label
+                              ? 'bg-accent-highlight/15 text-accent-highlight border-accent-highlight/40'
+                              : verdict && verdict.confidence < 0.6
+                                ? 'text-text-muted border-dark-borderLight'
+                                : 'bg-accent-success/10 text-accent-success border-accent-success/30'
+                        }`}
+                        title={label ? 'Labelled by you — click to change' : `Analyzer ${Math.round((verdict?.confidence ?? 0) * 100)} % — click to hear and label`}
+                        onClick={toggle}
+                      >
+                        {text.toUpperCase()}
+                      </span>
+                      {open && (
+                        <InstrumentRolePicker
+                          current={label ?? null}
+                          verdict={verdict}
+                          onHear={() => void hearInstrument(instrument, verdict)}
+                          onSelect={l => { setOwnerLabel(songKey, instrument.id, l); setRolePickerFor(null); }}
+                          onClose={() => setRolePickerFor(null)}
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* CED scan progress bar — sweeps across the row bottom while pending */}
                 {cedPending.has(instrument.id) && (
                   <span
@@ -1056,6 +1128,81 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 });
 
 InstrumentList.displayName = 'InstrumentList';
+
+// ── Instrument Role Picker ────────────────────────────────────────────────────
+
+const ROLE_OPTIONS: Array<{ role: InstrumentRole; name: string }> = [
+  { role: 'bass', name: 'Bass' }, { role: 'lead', name: 'Lead' }, { role: 'harmony', name: 'Harmony' }, { role: 'fx', name: 'Effects' },
+];
+const DRUM_OPTIONS: Array<{ part: DrumPart; name: string }> = [
+  { part: 'kick', name: 'Kick' }, { part: 'snare', name: 'Snare' }, { part: 'hat', name: 'Hi-hat' }, { part: 'perc', name: 'Percussion' }, { part: 'mixed', name: 'Drum kit' },
+];
+
+interface InstrumentRolePickerProps {
+  current: InstrumentLabel | null;
+  verdict: InstrumentVerdict | undefined;
+  onHear: () => void;
+  onSelect: (label: InstrumentLabel | null) => void;
+  onClose: () => void;
+}
+
+/** Hear the instrument, then say what it is. The analyzer's own evidence is listed under it. */
+const InstrumentRolePicker: React.FC<InstrumentRolePickerProps> = ({ current, verdict, onHear, onSelect, onClose }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, [onClose]);
+  const chip = (active: boolean, onClick: () => void, name: string) => (
+    <button
+      key={name}
+      onClick={onClick}
+      className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border transition-colors ${
+        active
+          ? 'bg-accent-highlight/20 text-accent-highlight border-accent-highlight/50'
+          : 'bg-dark-bgSecondary text-text-secondary border-dark-border hover:border-accent-primary hover:text-accent-primary'
+      }`}
+    >
+      {name}
+    </button>
+  );
+  return (
+    <div
+      ref={ref}
+      className="absolute right-0 top-full mt-1 z-[9999] bg-dark-bg border border-dark-border rounded shadow-xl p-2 min-w-[200px]"
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[9px] text-text-muted font-mono uppercase px-1">What is it?</span>
+        <button onClick={onHear} className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border border-accent-primary/40 text-accent-primary hover:bg-accent-primary/10 transition-colors" title="Play the instrument at the pitch the song uses">
+          Hear
+        </button>
+      </div>
+      <div className="text-[9px] text-text-muted font-mono uppercase px-1 mb-0.5">Drums</div>
+      <div className="flex flex-wrap gap-1 mb-1.5">
+        {DRUM_OPTIONS.map(d => chip(current?.role === 'drums' && current.drumPart === d.part, () => onSelect({ role: 'drums', drumPart: d.part }), d.name))}
+      </div>
+      <div className="text-[9px] text-text-muted font-mono uppercase px-1 mb-0.5">Pitched</div>
+      <div className="flex flex-wrap gap-1">
+        {ROLE_OPTIONS.map(r => chip(current?.role === r.role, () => onSelect({ role: r.role }), r.name))}
+      </div>
+      {verdict && (
+        <div className="mt-1.5 text-[9px] font-mono text-text-muted px-1 max-w-[260px]">
+          Analyzer: {verdict.role}{verdict.drumPart ? ` (${verdict.drumPart})` : ''} {Math.round(verdict.confidence * 100)} % — {verdict.usage.onsets} notes, {verdict.usage.pitches} pitch{verdict.usage.pitches === 1 ? '' : 'es'}, channel{verdict.usage.channels.length === 1 ? '' : 's'} {verdict.usage.channels.map(c => c + 1).join(', ')}
+        </div>
+      )}
+      {current && (
+        <button
+          onClick={() => onSelect(null)}
+          className="mt-1.5 w-full text-[9px] px-1.5 py-0.5 rounded font-mono border border-dark-borderLight text-text-muted hover:text-accent-error hover:border-accent-error/40 transition-colors"
+        >
+          Clear label
+        </button>
+      )}
+    </div>
+  );
+};
 
 // ── Instrument Type Picker ────────────────────────────────────────────────────
 
