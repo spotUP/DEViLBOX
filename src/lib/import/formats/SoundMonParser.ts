@@ -453,8 +453,17 @@ export async function parseSoundMonFile(
       // LFO table provides vibrato parameters
       const hasLfo = synthInst.lfoControl > 0 && synthInst.lfoDepth > 0;
 
+      // The envelope as the replayer plays it (soundmon.c do_adsr): table
+      // bytes at adsrTable, (byte + 128) / 4 per step.
+      const adsrLevels: number[] = [];
+      for (let k = 0; k < synthInst.adsrLen && adsrTableOff + k < synthTableData.length; k++) {
+        const b = synthTableData[adsrTableOff + k];
+        adsrLevels.push(((b < 128 ? b : b - 256) + 128) >> 2);
+      }
+
       const smConfig: SoundMonConfig = {
         type: 'synth',
+        adsr: { control: synthInst.adsrControl, speed: synthInst.adsrSpeed, levels: adsrLevels },
         waveType: synthInst.table & 0x0F, // lower nibble as wave type index
         waveSpeed: 0,
         arpTable: new Array(16).fill(0), // SoundMon MOD table could populate this
