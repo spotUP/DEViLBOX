@@ -3,7 +3,7 @@ date: 2026-09-29
 topic: One parse path per format, one Amiga note naming
 tags: [import, load-path, mod, xm, amiga, periods, single-source-of-truth]
 status: draft
-progress: 21 of 23 - open P4.2 (synth pitch, needs listening), P6.3 (live)
+progress: 22 of 23 - open P4.2 (synth pitch in MOD songs; needs a listening check)
 ---
 
 # One parse path per format, one Amiga note naming
@@ -108,7 +108,7 @@ Ledger: tick here as items land, with the commit.
 - [x] P6.2 Update pinned tests: MODParser.test (XM labels), modRoundtrip,
       samplePlaybackRate, instrumentSlotIds / instrumentLabelScore (nativeData
       path gone), ImportExportFlow, soundFXRoundtrip, channelEvidence.
-- [ ] P6.3 Type-check, affected suites, live: micro15 loads, plays, shows C-3
+- [x] P6.3 (automated + live 2026-09-30: micro15 via MCP load_file = importModuleFile -> cells C-3/214 drums, G-1/570 bass, ids 1-13,16,18,19, sourceFormat MOD, plays, roles/drum parts as owner-labelled; pitch-by-ear = owner) Type-check, affected suites, live: micro15 loads, plays, shows C-3
       for its drums, exports a .mod that plays at the same pitch.
 
 ## Decisions
