@@ -139,7 +139,7 @@ export async function noiseGainDb(
  */
 export async function noiseGainDbClass(
   dir: string, stem: string, className: string, params: Record<number, number>, seconds = 3, amp = 0.1,
-  color: 'white' | 'pink' = 'white',
+  color: 'white' | 'pink' = 'white', centre = false,
 ): Promise<number> {
   const { m, heap } = await loadWasmEffect(dir, stem);
   const Cls = (m as unknown as Record<string, new () => {
@@ -156,7 +156,7 @@ export async function noiseGainDbClass(
   const scale = color === 'white' ? amp * Math.sqrt(3) : amp * 4;
   for (let off = 0; off < n; off += block) {
     const L = new Float32Array(block), R = new Float32Array(block);
-    for (let i = 0; i < block; i++) { L[i] = nl() * scale; R[i] = nr() * scale; }
+    for (let i = 0; i < block; i++) { L[i] = nl() * scale; R[i] = centre ? L[i] : nr() * scale; }
     heap().set(L, iL >> 2); heap().set(R, iR >> 2);
     fx.process(iL, iR, oL, oR, block);
     if (off >= n / 2) {
