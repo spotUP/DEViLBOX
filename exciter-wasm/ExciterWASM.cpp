@@ -78,16 +78,21 @@ struct ExciterInstance {
             hpFilt.prevInR = hR; hR = hpFilt.z1R;
 
             // Drive the highs
-            hL *= driveGain;
-            hR *= driveGain;
+            float dL = hL * driveGain;
+            float dR = hR * driveGain;
 
             // Generate harmonics: blend between even (asymmetric) and odd (tanh)
-            float evenL = hL + 0.5f * hL * std::fabs(hL);
-            float evenR = hR + 0.5f * hR * std::fabs(hR);
-            float oddL = std::tanh(hL);
-            float oddR = std::tanh(hR);
-            hL = (1.0f - blend) * evenL + blend * oddL;
-            hR = (1.0f - blend) * evenR + blend * oddR;
+            float evenL = dL + 0.5f * dL * std::fabs(dL);
+            float evenR = dR + 0.5f * dR * std::fabs(dR);
+            float oddL = std::tanh(dL);
+            float oddR = std::tanh(dR);
+            // Keep ONLY what the shaper generated: shaped minus the linear
+            // drive, back at input scale. The linear term used to stay in, so
+            // the driven high band itself (x1+20*amount, +15 dB at amount
+            // 0.25) was added to the dry signal - a treble boost that read
+            // +10 dB on a full-spectrum signal, not an exciter (2026-09-29).
+            hL = ((1.0f - blend) * evenL + blend * oddL - dL) / driveGain;
+            hR = ((1.0f - blend) * evenR + blend * oddR - dR) / driveGain;
 
             // Ceiling LP filter
             ceilFilt.z1L += ceilFilt.coeff * (hL - ceilFilt.z1L); hL = ceilFilt.z1L;

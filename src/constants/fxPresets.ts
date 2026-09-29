@@ -22,7 +22,9 @@ export type FxTag =
   // Dub sub-categories — used alongside 'Dub' so users can drill into a
   // specific dub flavour from the tag filter pills in the master FX dropdown.
   | 'Dub Echo' | 'Dub Reverb' | 'Dub Filter' | 'Dub Siren' | 'Dub Mod'
-  | 'Amiga' | 'C64';
+  | 'Amiga' | 'C64'
+  // Precision mastering chains keyed on the song's drums (2026-09-29).
+  | 'Modern';
 
 export interface FxPreset {
   name: string;
@@ -120,6 +122,60 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'wasm', type: 'SwedishChainsaw', enabled: true, wet: 80, parameters: { tight: 0, pedalGain: 55, ampGain: 45, bass: 50, middle: 60, treble: 50, volume: 50 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
+    ] },
+
+  // ═══ MODERN ═══
+  // Precision mastering chains, in mastering order: correct (EQ) -> tame
+  // resonance -> control boom dynamically -> duck on the drums (sidechain
+  // keyed 'Drums (auto)', -2: the channel the classifier calls the kick/kit)
+  // -> glue (multiband) -> punch -> air -> lows folded to mono -> ceiling.
+  // No widening anywhere ([[feedback-amiga-stereo-gigs]]); the only width move
+  // NARROWS. Levels provisional until the owner's listening pass.
+  { name: 'Modern Precision', description: 'Surgical EQ, resonance control, drum-keyed ducking, multiband glue, mono lows, true-peak ceiling — clean modern master', tags: ['Modern', 'Clean'], gainCompensationDb: -5.6,
+    effects: [
+      { category: 'wasm', type: 'EQ8Band', enabled: true, wet: 100, parameters: { hpFreq: 30, lpFreq: 19000, lowShelfFreq: 90, lowShelfGain: 1, peak1Freq: 260, peak1Gain: -1.5, peak1Q: 1.1, peak2Freq: 900, peak2Gain: 0, peak2Q: 1, peak3Freq: 3400, peak3Gain: -1, peak3Q: 1.8, peak4Freq: 8000, peak4Gain: 0, peak4Q: 1, highShelfFreq: 11000, highShelfGain: 1.5, mix: 1 } },
+      { category: 'wasm', type: 'ResonanceTamer', enabled: true, wet: 100, parameters: { amount: 0.35, character: 'transparent', mix: 1 } },
+      { category: 'wasm', type: 'DynamicEQ', enabled: true, wet: 100, parameters: { detectFreq: 190, detectQ: 1.2, processFreq: 190, processQ: 1.2, threshold: -26, maxGain: -4, attack: 10, release: 120, mix: 1 } },
+      { category: 'tonejs', type: 'SidechainCompressor', enabled: true, wet: 100, parameters: { threshold: -26, ratio: 3, attack: 0.004, release: 0.14, knee: 6, sidechainGain: 100, scFreq: 150, scQ: 0.7, scFilterType: 'lowpass', sidechainSource: -2 } },
+      { category: 'wasm', type: 'MultibandComp', enabled: true, wet: 100, parameters: { lowCrossover: 150, highCrossover: 4500, lowThreshold: -22, midThreshold: -20, highThreshold: -24, lowRatio: 2.5, midRatio: 2, highRatio: 2, lowGain: 1, midGain: 1, highGain: 1 } },
+      { category: 'wasm', type: 'TransientDesigner', enabled: true, wet: 100, parameters: { attack: 0.15, sustain: -0.05, output: 1 } },
+      { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 6000, amount: 0.25, blend: 0.4, ceil: 16000, mix: 1 } },
+      { category: 'wasm', type: 'MultibandEnhancer', enabled: true, wet: 100, parameters: { lowCross: 150, midCross: 2000, highCross: 8000, lowWidth: 0, midWidth: 1, highWidth: 1, topWidth: 1, harmonics: 0.08, mix: 1 } },
+      { category: 'wasm', type: 'Maximizer', enabled: true, wet: 100, parameters: { ceiling: -1, release: 60, mix: 1 } },
+    ] },
+  { name: 'Modern Club Pump', description: 'Kick-keyed pump, weighty sub, dense multiband, soft clip into the ceiling — loud modern club master', tags: ['Modern', 'Loud', 'DJ'], gainCompensationDb: -3.7,
+    effects: [
+      { category: 'wasm', type: 'EQ8Band', enabled: true, wet: 100, parameters: { hpFreq: 28, lpFreq: 19000, lowShelfFreq: 70, lowShelfGain: 2, peak1Freq: 300, peak1Gain: -2, peak1Q: 1, peak2Freq: 900, peak2Gain: 0, peak2Q: 1, peak3Freq: 3000, peak3Gain: -0.5, peak3Q: 1.5, peak4Freq: 8000, peak4Gain: 0, peak4Q: 1, highShelfFreq: 10000, highShelfGain: 2, mix: 1 } },
+      { category: 'wasm', type: 'ResonanceTamer', enabled: true, wet: 100, parameters: { amount: 0.3, character: 'transparent', mix: 1 } },
+      { category: 'tonejs', type: 'SidechainCompressor', enabled: true, wet: 100, parameters: { threshold: -30, ratio: 6, attack: 0.002, release: 0.18, knee: 3, sidechainGain: 100, scFreq: 150, scQ: 0.7, scFilterType: 'lowpass', sidechainSource: -2 } },
+      { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 60, amount: 0.35, drive: 0.1, mix: 1 } },
+      { category: 'wasm', type: 'MultibandComp', enabled: true, wet: 100, parameters: { lowCrossover: 140, highCrossover: 4000, lowThreshold: -24, midThreshold: -22, highThreshold: -24, lowRatio: 4, midRatio: 3, highRatio: 2.5, lowGain: 1, midGain: 1, highGain: 1 } },
+      { category: 'wasm', type: 'TransientDesigner', enabled: true, wet: 100, parameters: { attack: 0.25, sustain: -0.1, output: 1 } },
+      { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 5000, amount: 0.3, blend: 0.45, ceil: 16000, mix: 1 } },
+      { category: 'wasm', type: 'MultibandEnhancer', enabled: true, wet: 100, parameters: { lowCross: 140, midCross: 2000, highCross: 8000, lowWidth: 0, midWidth: 1, highWidth: 1, topWidth: 1, harmonics: 0.12, mix: 1 } },
+      { category: 'wasm', type: 'Clipper', enabled: true, wet: 100, parameters: { inputGain: 1.5, ceiling: -1.5, softness: 0.6 } },
+      { category: 'wasm', type: 'Maximizer', enabled: true, wet: 100, parameters: { ceiling: -0.8, release: 50, mix: 1 } },
+    ] },
+  { name: 'Modern Glue & Air', description: 'Gentle multiband glue, light drum-keyed breathing, silky top, mono lows — open, polished master', tags: ['Modern', 'Clean'], gainCompensationDb: -7.7,
+    effects: [
+      { category: 'wasm', type: 'EQ8Band', enabled: true, wet: 100, parameters: { hpFreq: 25, lpFreq: 20000, lowShelfFreq: 100, lowShelfGain: 0.5, peak1Freq: 240, peak1Gain: -1, peak1Q: 0.9, peak2Freq: 900, peak2Gain: 0, peak2Q: 1, peak3Freq: 3500, peak3Gain: -0.5, peak3Q: 1.5, peak4Freq: 8000, peak4Gain: 0, peak4Q: 1, highShelfFreq: 12000, highShelfGain: 2, mix: 1 } },
+      { category: 'wasm', type: 'ResonanceTamer', enabled: true, wet: 100, parameters: { amount: 0.25, character: 'transparent', mix: 1 } },
+      { category: 'tonejs', type: 'SidechainCompressor', enabled: true, wet: 100, parameters: { threshold: -24, ratio: 2, attack: 0.006, release: 0.1, knee: 8, sidechainGain: 100, scFreq: 150, scQ: 0.7, scFilterType: 'lowpass', sidechainSource: -2 } },
+      { category: 'wasm', type: 'GOTTComp', enabled: true, wet: 100, parameters: { lowCross: 160, highCross: 5000, lowThresh: -20, midThresh: -20, highThresh: -22, lowRatio: 2, midRatio: 1.8, highRatio: 2, attack: 15, release: 150, mix: 0.7 } },
+      { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 8000, amount: 0.3, blend: 0.35, ceil: 18000, mix: 1 } },
+      { category: 'wasm', type: 'MultibandEnhancer', enabled: true, wet: 100, parameters: { lowCross: 160, midCross: 2000, highCross: 8000, lowWidth: 0, midWidth: 1, highWidth: 1, topWidth: 1, harmonics: 0.05, mix: 1 } },
+      { category: 'wasm', type: 'Maximizer', enabled: true, wet: 100, parameters: { ceiling: -1, release: 80, mix: 1 } },
+    ] },
+  { name: 'Modern Amiga Master', description: 'For Paula output: fuller lows, 8-bit harshness and aliasing tamed, hard-panned mids pulled toward mono, drum-keyed ducking', tags: ['Modern', 'Amiga'], gainCompensationDb: 0.2,
+    effects: [
+      { category: 'wasm', type: 'EQ8Band', enabled: true, wet: 100, parameters: { hpFreq: 35, lpFreq: 16000, lowShelfFreq: 90, lowShelfGain: 2.5, peak1Freq: 280, peak1Gain: -1, peak1Q: 1, peak2Freq: 900, peak2Gain: 0, peak2Q: 1, peak3Freq: 3500, peak3Gain: -1.5, peak3Q: 1.5, peak4Freq: 8000, peak4Gain: 0, peak4Q: 1, highShelfFreq: 10000, highShelfGain: 1, mix: 1 } },
+      { category: 'wasm', type: 'ResonanceTamer', enabled: true, wet: 100, parameters: { amount: 0.45, character: 'warm', mix: 1 } },
+      { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 80, amount: 0.3, drive: 0.05, mix: 1 } },
+      { category: 'tonejs', type: 'SidechainCompressor', enabled: true, wet: 100, parameters: { threshold: -26, ratio: 3, attack: 0.004, release: 0.14, knee: 6, sidechainGain: 100, scFreq: 150, scQ: 0.7, scFilterType: 'lowpass', sidechainSource: -2 } },
+      { category: 'wasm', type: 'MultibandComp', enabled: true, wet: 100, parameters: { lowCrossover: 150, highCrossover: 4000, lowThreshold: -22, midThreshold: -20, highThreshold: -24, lowRatio: 3, midRatio: 2, highRatio: 2.5, lowGain: 2, midGain: 2, highGain: 2 } },
+      { category: 'wasm', type: 'TransientDesigner', enabled: true, wet: 100, parameters: { attack: 0.2, sustain: 0, output: 1 } },
+      { category: 'wasm', type: 'MultibandEnhancer', enabled: true, wet: 100, parameters: { lowCross: 150, midCross: 2000, highCross: 8000, lowWidth: 0, midWidth: 0.8, highWidth: 0.9, topWidth: 1, harmonics: 0.12, mix: 1 } },
+      { category: 'wasm', type: 'Maximizer', enabled: true, wet: 100, parameters: { ceiling: -1, release: 60, mix: 1 } },
     ] },
 
   // ═══ WIDE ═══
@@ -810,14 +866,14 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 6, attack: 0.005, release: 0.1 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -0.5, high: -1.0, lowFrequency: 100, highFrequency: 5000 } },
     ] },
-  { name: 'Tracker Dance Floor', description: 'ProTracker rave — aggressive compression, bass, hihat sizzle', tags: ['Amiga', 'DJ', 'Loud'], gainCompensationDb: 5.3,
+  { name: 'Tracker Dance Floor', description: 'ProTracker rave — aggressive compression, bass, hihat sizzle', tags: ['Amiga', 'DJ', 'Loud'], gainCompensationDb: -0.2,
     effects: [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -0.5, high: -0.5, lowFrequency: 150, highFrequency: 8000 } },
       { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 7500, amount: 0.25, blend: 0.25, ceil: 14000 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 10, parameters: { drive: 30, tone: 10000 } },
     ] },
-  { name: "Paula's Revenge", description: 'Maximum energy — exciter, bass boost, hard limiting, tape grit', tags: ['Amiga', 'Loud', 'Grit'],
+  { name: "Paula's Revenge", description: 'Maximum energy — exciter, bass boost, hard limiting, tape grit', tags: ['Amiga', 'Loud', 'Grit'], gainCompensationDb: -1.4,
     effects: [
       { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 90, amount: 0.5, drive: 0.3, mix: 0.4 } },
       { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 7000, amount: 0.3, blend: 0.3, ceil: 13000 } },
@@ -845,7 +901,7 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
 
   // ═══ RETRO HARDWARE — AMIGA CHIPTUNE / EXOTIC ═══
-  { name: 'Chipgold', description: 'Fat bass + harmonic sparkle — clean chip enhancement with sub weight', tags: ['Amiga', 'Clean', 'Bass'], gainCompensationDb: 3.1,
+  { name: 'Chipgold', description: 'Fat bass + harmonic sparkle — clean chip enhancement with sub weight', tags: ['Amiga', 'Clean', 'Bass'], gainCompensationDb: -2.7,
     effects: [
       { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 80, amount: 0.55, drive: 0.2, mix: 0.5 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1, mid: 1.5, high: 0.5, lowFrequency: 200, highFrequency: 5000 } },
@@ -853,7 +909,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 } },
       { category: 'wasm', type: 'MVerb', enabled: true, wet: 10, parameters: { damping: 0.5, density: 0.5, bandwidth: 0.7, decay: 0.25, predelay: 0.0, size: 0.35, gain: 1.0, mix: 0.3, earlyMix: 0.7 } },
     ] },
-  { name: 'Paula Sings', description: '8-bit made gorgeous — fat low end, air restoration, tape warmth, space', tags: ['Amiga', 'Warm', 'Bass'], gainCompensationDb: 7.2,
+  { name: 'Paula Sings', description: '8-bit made gorgeous — fat low end, air restoration, tape warmth, space', tags: ['Amiga', 'Warm', 'Bass'], gainCompensationDb: 2.7,
     effects: [
       { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 85, amount: 0.5, drive: 0.2, mix: 0.45 } },
       { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 5500, amount: 0.2, blend: 0.2, ceil: 12000 } },

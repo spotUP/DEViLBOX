@@ -9,7 +9,12 @@
  *   npx tsx tools/fx-preset-audit.ts                    # both phases
  *   npx tsx tools/fx-preset-audit.ts --phase 1          # individual effects only
  *   npx tsx tools/fx-preset-audit.ts --phase 2          # presets only
- *   npx tsx tools/fx-preset-audit.ts --only "DJ Booth"  # single preset
+ *   npx tsx tools/fx-preset-audit.ts --only "DJ Booth"  # single preset (repeatable)
+ *   npx tsx tools/fx-preset-audit.ts --phase 2 --tag Modern  # presets with a tag
+ *
+ * Results MERGE into fx-preset-audit-results.json (an entry per effect type /
+ * preset name), so a subset run keeps every earlier measurement. The browser's
+ * master chain is saved first and put back at the end.
  *
  * Prerequisites: npm run dev running, browser open at localhost:5173
  */
@@ -56,6 +61,7 @@ const ALL_EFFECTS = [
 
 interface PresetDef {
   name: string;
+  tags: string[];
   gainCompensationDb?: number;
   effects: Array<{
     category: string;
@@ -84,12 +90,13 @@ function loadPresets(): PresetDef[] {
   const arrayBody = src.slice(arrayStart);
 
   // Split by `{ name:` — each segment is one preset
-  const segments = arrayBody.split(/(?=\{\s*name:\s*')/);
+  // Names are quoted either way ("Paula's Revenge" needs double quotes).
+  const segments = arrayBody.split(/(?=\{\s*name:\s*['"])/);
 
   for (const seg of segments) {
-    m = /^\{\s*name:\s*'([^']+)'/.exec(seg);
+    m = /^\{\s*name:\s*(?:'([^']+)'|"([^"]+)")/.exec(seg);
     if (!m) continue;
-    const name = m[1];
+    const name = m[1] ?? m[2];
 
     // Extract gainCompensationDb if present
     const compMatch = seg.match(/gainCompensationDb:\s*(-?\d+(?:\.\d+)?)/);
@@ -132,7 +139,9 @@ function loadPresets(): PresetDef[] {
     }
 
     if (effects.length > 0) {
-      presets.push({ name, gainCompensationDb, effects });
+      const tagMatch = seg.match(/tags:\s*\[([^\]]*)\]/);
+      const tags = tagMatch ? [...tagMatch[1].matchAll(/'([^']+)'/g)].map(t => t[1]) : [];
+      presets.push({ name, tags, gainCompensationDb, effects });
     }
   }
 
@@ -181,7 +190,9 @@ async function clearFx() {
 }
 
 async function startRichTone() {
-  await mcpCall('test_tone', { action: 'start', mode: 'rich', level: -6 });
+  // test_tone stops itself after durationMs (default 3 s): hold it for the whole
+  // audit, or every measurement after the baseline reads silence.
+  await mcpCall('test_tone', { action: 'start', mode: 'rich', level: -6, durationMs: 3_600_000 });
   await sleep(2000); // let signal stabilize
 }
 
@@ -250,14 +261,13 @@ interface PresetResult {
   status: 'ok' | 'hot' | 'quiet' | 'silent' | 'error';
 }
 
-async function auditPresets(baseRms: number, only?: string): Promise<PresetResult[]> {
+async function auditPresets(baseRms: number, only: string[], tag?: string): Promise<PresetResult[]> {
   const presets = loadPresets();
   const results: PresetResult[] = [];
   const baseDb = toDb(baseRms);
 
-  const toTest = only
-    ? presets.filter(p => p.name === only)
-    : presets;
+  const toTest = presets.filter(p =>
+    (only.length === 0 || only.includes(p.name)) && (!tag || p.tags.includes(tag)));
 
   console.log(`\n═══ PHASE 2: FX Presets (${toTest.length} presets, rich tone) ═══\n`);
   console.log(`Baseline: ${baseDb.toFixed(1)} dBFS\n`);
@@ -391,9 +401,20 @@ function printSummary(
     }
   }
 
-  // Write full results JSON
+  // Merge into the results JSON: this run's entries replace their own names,
+  // every other earlier measurement stays.
   const outPath = path.join(__dirname, 'fx-preset-audit-results.json');
-  fs.writeFileSync(outPath, JSON.stringify({ effectResults, presetResults }, null, 2));
+  let prev: { effectResults?: EffectResult[]; presetResults?: PresetResult[] } = {};
+  try { prev = JSON.parse(fs.readFileSync(outPath, 'utf-8')); } catch { /* first run */ }
+  const merge = <T,>(old: T[] | undefined, fresh: T[], key: (r: T) => string): T[] => {
+    const byKey = new Map((old ?? []).map(r => [key(r), r] as const));
+    for (const r of fresh) byKey.set(key(r), r);
+    return [...byKey.values()];
+  };
+  fs.writeFileSync(outPath, JSON.stringify({
+    effectResults: merge(prev.effectResults, effectResults, r => r.type),
+    presetResults: merge(prev.presetResults, presetResults, r => r.name),
+  }, null, 2));
   console.log(`\nFull results: ${outPath}`);
 }
 
@@ -403,8 +424,9 @@ async function main() {
   const args = process.argv.slice(2);
   const phaseIdx = args.indexOf('--phase');
   const phase = phaseIdx >= 0 ? parseInt(args[phaseIdx + 1]) : 0; // 0 = both
-  const onlyIdx = args.indexOf('--only');
-  const only = onlyIdx >= 0 ? args[onlyIdx + 1] : undefined;
+  const only = args.flatMap((a, i) => (a === '--only' && args[i + 1] ? [args[i + 1]] : []));
+  const tagIdx = args.indexOf('--tag');
+  const tag = tagIdx >= 0 ? args[tagIdx + 1] : undefined;
 
   console.log('FX Preset Volume Audit');
   console.log('Test signal: Rich (5 oscillators + white noise, -12 dBFS)\n');
@@ -414,6 +436,9 @@ async function main() {
     ws.on('open', resolve);
     ws.on('error', (e) => reject(new Error('Cannot connect to MCP relay at ' + WS_URL + ': ' + e.message)));
   });
+
+  // The chain the user had, put back when the audit ends.
+  const savedChain = ((await mcpCall('get_audio_state'))?.masterEffects ?? []) as unknown[];
 
   // Stop any playback, start rich test tone
   try { await mcpCall('stop'); } catch { /* not playing */ }
@@ -447,11 +472,12 @@ async function main() {
   }
 
   if (phase === 0 || phase === 2) {
-    presetResults = await auditPresets(baseline.rmsAvg, only);
+    presetResults = await auditPresets(baseline.rmsAvg, only, tag);
   }
 
   await clearFx();
   await stopTone();
+  await mcpCall('set_master_effects', { effects: savedChain });
 
   printSummary(effectResults, presetResults);
 
