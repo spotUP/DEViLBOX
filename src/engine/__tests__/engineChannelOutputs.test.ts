@@ -9,7 +9,7 @@
  * renders. Drives the real worklet and WASM with a real song.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { startWorklet, loadSharedWorkletScripts, songBuffer, stereoOutputs } from './workletHarness';
+import { startWorklet, loadSharedWorkletScripts, songBuffer, stereoOutputs, ROOT as ROOT_DIR } from './workletHarness';
 
 beforeAll(loadSharedWorkletScripts);
 
@@ -125,5 +125,37 @@ describe('TFMX (Hippel) per-voice dub sends', { timeout: 120000 }, () => {
     expect(corr, `corr ${corr}`).toBeGreaterThan(0.9);
     expect(gain, `gain ${gain}`).toBeGreaterThan(0.5);
     expect(gain, `gain ${gain}`).toBeLessThan(2);
+  });
+});
+
+describe('Sonix per-channel dub sends', { timeout: 120000 }, () => {
+  it('each dub output is its channel: left + right of the mix is the sum of the sends', async () => {
+    const { readdirSync } = await import('node:fs');
+    const dir = 'public/data/songs/sonix/tiny/Where in Europe is Carmen Sandiego';
+    const sidecarFiles = readdirSync(`${ROOT_DIR}/${dir}/Instruments`)
+      .map((f) => ({ path: `sonix/Instruments/${f}`, data: songBuffer(`${dir}/Instruments/${f}`) }));
+    const { proc, send, posted } = await startWorklet('sonix', 'Sonix');
+    await send({ type: 'loadModule', moduleData: songBuffer(`${dir}/tiny.ingame 17`), sidecarFiles, songPath: 'sonix/song' });
+    expect(posted.filter((m) => m.type === 'error').map((m) => m.message)).toEqual([]);
+    for (let ch = 0; ch < 4; ch++) await send({ type: 'dubChannelEnable', cmd: 'dubChannelEnable', val: { channel: ch }, channel: ch });
+
+    // Whatever the stereo mix, each channel's left and right gains sum to 1
+    // (sonix.c snx_mix_frames), so L + R of the mix is the sum of the channels.
+    let heard = 0, worst = 0;
+    for (let q = 0; q < 750; q++) {
+      const out = stereoOutputs(37);
+      proc.process([], out);
+      for (let i = 0; i < 128; i++) {
+        let sends = 0;
+        for (let ch = 0; ch < 4; ch++) {
+          expect(out[5 + ch][1][i]).toBe(out[5 + ch][0][i]);
+          sends += out[5 + ch][0][i];
+        }
+        worst = Math.max(worst, Math.abs(out[0][0][i] + out[0][1][i] - sends));
+        if (sends !== 0) heard++;
+      }
+    }
+    expect(heard).toBeGreaterThan(1000);
+    expect(worst).toBeLessThan(4 / 32767);   // Int16 scope rounding, four channels
   });
 });

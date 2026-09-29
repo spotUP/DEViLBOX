@@ -8,7 +8,8 @@
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import {
-  WASMSingletonBase,
+  WASMChannelOutputsEngine,
+  channelOutputNodeOptions,
   createWASMAssetsCache,
   type WASMAssetsCache,
   type WASMLoaderConfig,
@@ -35,7 +36,7 @@ export interface SonixMeta {
   numSamples: number;
 }
 
-export class SonixEngine extends WASMSingletonBase {
+export class SonixEngine extends WASMChannelOutputsEngine {
   private static instance: SonixEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
@@ -87,10 +88,9 @@ export class SonixEngine extends WASMSingletonBase {
   protected createNode(): void {
     const ctx = this.audioContext;
 
-    this.workletNode = new AudioWorkletNode(ctx, 'sonix-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
-    });
+    // Output 0 is the mix; 5..36 carry each channel as a dub send
+    // (worklets/channel-outputs.js).
+    this.workletNode = new AudioWorkletNode(ctx, 'sonix-processor', channelOutputNodeOptions());
 
     // Param bridge: normalizes reported params + posts edits back to this worklet. Its
     // onParams delegates to the static callback the store bridge registers.
@@ -106,6 +106,7 @@ export class SonixEngine extends WASMSingletonBase {
       switch (data.type) {
         case 'ready':
           console.log('[SonixEngine] WASM ready');
+          this.markNodeReady();
           if (this._resolveInit) {
             this._resolveInit();
             this._resolveInit = null;
@@ -115,6 +116,8 @@ export class SonixEngine extends WASMSingletonBase {
         case 'moduleLoaded': {
           this._meta = data.meta || null;
           console.log('[SonixEngine] Module loaded:', this._meta);
+          // Playback starts with the load: re-post the open dub sends now.
+          this.afterPlay();
           const numChannels = this._meta?.numChannels ?? 0;
           if (numChannels > 0) {
             useOscilloscopeStore.getState().setChipInfo(
@@ -161,7 +164,12 @@ export class SonixEngine extends WASMSingletonBase {
       jsCode: SonixEngine.cache.jsCode,
     });
 
-    this.workletNode.connect(this.output);
+    this.workletNode.connect(this.output, 0);
+  }
+
+  /** Dub sends only: the C mixes the channels. */
+  override supportsIsolationSlots(): boolean {
+    return false;
   }
 
   async loadTune(
