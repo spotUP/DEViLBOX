@@ -63,6 +63,22 @@ export async function multitoneGainDb(
   return freqs.map((f) => 20 * Math.log10(goertzel(y, f) / amp));
 }
 
+/** Deterministic noise source: 'white', or 'pink' (Paul Kellet's filter, equal energy per octave - closer to music). */
+export function noiseSource(color: 'white' | 'pink', seed0: number): () => number {
+  let seed = seed0;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return (seed / 2 ** 32) * 2 - 1; };
+  if (color === 'white') return rnd;
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+  return () => {
+    const w = rnd();
+    b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+    b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+    const out = b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362;
+    b6 = w * 0.115926;
+    return out * 0.11;
+  };
+}
+
 /**
  * Broadband gain in dB: stereo white noise (rms `amp`) through effect
  * `prefix`, output RMS over the second half vs input RMS. The level test for
@@ -70,6 +86,7 @@ export async function multitoneGainDb(
  */
 export async function noiseGainDb(
   dir: string, stem: string, prefix: string, params: Record<string, number>, seconds = 3, amp = 0.1,
+  color: 'white' | 'pink' = 'white',
 ): Promise<number> {
   const { m, heap } = await loadWasmEffect(dir, stem);
   const h = m[`_${prefix}_create`](48000);
@@ -80,12 +97,12 @@ export async function noiseGainDb(
   }
   const n = 48000 * seconds, block = 128, bytes = block * 4;
   const iL = m._malloc(bytes), iR = m._malloc(bytes), oL = m._malloc(bytes), oR = m._malloc(bytes);
-  let seed = 12345, inSq = 0, outSq = 0, count = 0;
-  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return (seed / 2 ** 32) * 2 - 1; };
-  const scale = amp * Math.sqrt(3);   // uniform noise of rms `amp`
+  let inSq = 0, outSq = 0, count = 0;
+  const nl = noiseSource(color, 12345), nr = noiseSource(color, 67890);
+  const scale = color === 'white' ? amp * Math.sqrt(3) : amp * 4;
   for (let off = 0; off < n; off += block) {
     const L = new Float32Array(block), R = new Float32Array(block);
-    for (let i = 0; i < block; i++) { L[i] = rnd() * scale; R[i] = rnd() * scale; }
+    for (let i = 0; i < block; i++) { L[i] = nl() * scale; R[i] = nr() * scale; }
     heap().set(L, iL >> 2); heap().set(R, iR >> 2);
     m[`_${prefix}_process`](h, iL, iR, oL, oR, block);
     if (off >= n / 2) {
@@ -102,6 +119,7 @@ export async function noiseGainDb(
  */
 export async function noiseGainDbClass(
   dir: string, stem: string, className: string, params: Record<number, number>, seconds = 3, amp = 0.1,
+  color: 'white' | 'pink' = 'white',
 ): Promise<number> {
   const { m, heap } = await loadWasmEffect(dir, stem);
   const Cls = (m as unknown as Record<string, new () => {
@@ -113,12 +131,12 @@ export async function noiseGainDbClass(
   for (const [id, v] of Object.entries(params)) fx.setParameter(Number(id), v);
   const n = 48000 * seconds, block = 128, bytes = block * 4;
   const iL = m._malloc(bytes), iR = m._malloc(bytes), oL = m._malloc(bytes), oR = m._malloc(bytes);
-  let seed = 12345, inSq = 0, outSq = 0;
-  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return (seed / 2 ** 32) * 2 - 1; };
-  const scale = amp * Math.sqrt(3);
+  let inSq = 0, outSq = 0;
+  const nl = noiseSource(color, 12345), nr = noiseSource(color, 67890);
+  const scale = color === 'white' ? amp * Math.sqrt(3) : amp * 4;
   for (let off = 0; off < n; off += block) {
     const L = new Float32Array(block), R = new Float32Array(block);
-    for (let i = 0; i < block; i++) { L[i] = rnd() * scale; R[i] = rnd() * scale; }
+    for (let i = 0; i < block; i++) { L[i] = nl() * scale; R[i] = nr() * scale; }
     heap().set(L, iL >> 2); heap().set(R, iR >> 2);
     fx.process(iL, iR, oL, oR, block);
     if (off >= n / 2) {
