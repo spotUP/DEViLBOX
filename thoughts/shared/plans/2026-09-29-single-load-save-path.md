@@ -126,7 +126,7 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
 - [x] L0.1 [x] L0.2 [ ] L0.3
 - [x] L1.1 [x] L1.2 [ ] L1.3
 - [x] L2.1 [x] L2.2 [x] L2.3
-- [ ] L3.1 [ ] L3.2 [ ] L3.3 [ ] L3.4
+- [x] L3.1 [x] L3.2 [x] L3.3 [x] L3.4
 - [x] L4.1 [ ] L4.2 [ ] L4.3
 - [ ] L5.1 [ ] L5.2 [ ] L5.3
 - [ ] L6.1 [ ] L6.2 [ ] L6.3
@@ -185,3 +185,14 @@ Manual (owner, at http://localhost:5174, after P2 and after P4):
   previous song's (test: 16 instead of 11 on the old code). The file loader
   now calls loadPatterns only for the TD-3 import and the DB303 pattern
   append (partial updates). 9 of 22.
+- P3 done (L3.1-L3.4). New: prepareModuleImport (src/lib/import) - how a
+  module is READ for import (UADE pre-scan / native header / libopenmpt),
+  extracted from ImportModuleDialog; importModuleFile = prepare + import, the
+  dialog-free import used by the App file browser, MCP load_file and the tour.
+  importTrackerModule gained a branch for an already-parsed DefleMask song
+  (MCP's loadModuleFile hands one back). The tour's hand-written "clear the
+  previous AHX" workaround is gone. FT2Toolbar's file-browser handler (its own
+  DB303 XML / MIDI / JSON importers) is loadFile now. applySong records the
+  song name on harvested presets for every load (was only the App path).
+  The header-detected (extensionless) import keeps its explicit ModuleInfo:
+  its name says nothing, so name-based preparation cannot read it. 13 of 22.
