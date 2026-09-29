@@ -20,6 +20,7 @@ extern "C" {
 
 #include <cstring>
 #include <algorithm>
+#include <cmath>
 
 namespace devilbox {
 
@@ -84,8 +85,8 @@ public:
         for (int i = 0; i < numSamples; ++i) {
             double mono = 0.5 * (static_cast<double>(inputL[i]) + static_cast<double>(inputR[i]));
             DattorroVerb_process(verb_, mono);
-            outputL[i] = static_cast<float>(DattorroVerb_getLeft(verb_));
-            outputR[i] = static_cast<float>(DattorroVerb_getRight(verb_));
+            outputL[i] = static_cast<float>(DattorroVerb_getLeft(verb_) * outNorm_);
+            outputR[i] = static_cast<float>(DattorroVerb_getRight(verb_) * outNorm_);
         }
     }
 
@@ -121,6 +122,26 @@ public:
 private:
     struct sDattorroVerb* verb_;
     float params_[PARAM_COUNT];
+    /**
+     * Output normalisation: the plate passes its level through at any decay.
+     *
+     * The tank's output energy grows with its feedback g, and its damping
+     * loses some of each pass, so the growth is 1/(1 - rho*g^2) rather than
+     * 1/(1 - g^2), on top of a fixed tap gain. Measured 2026-09-30 (headless,
+     * the real WASM, pink noise, 100 % wet, 8 s so the long tails settle,
+     * default damping 0.35): +4.2 dB at decay 0.1 rising to +11.4 dB at 0.95;
+     * 4.2 dB - 10*log10(1 - 0.897*g^2) fits every decay within 0.35 dB. That
+     * made the dub bus's plate drown the mix ("the echo/reverb is still on
+     * overdrive drowning everything"). The inverse is applied here, as the
+     * Dragonfly reverbs are scaled at source (combSumNorm).
+     */
+    double outNorm_ = 1.0;
+    static constexpr double PLATE_TAP_GAIN_DB = 4.2;
+    static constexpr double TANK_LOSS_RHO = 0.897;
+    void updateOutNorm() {
+        const double g = std::min(1.0, std::max(0.0, static_cast<double>(params_[PARAM_DECAY])));
+        outNorm_ = std::sqrt(1.0 - TANK_LOSS_RHO * g * g) * std::pow(10.0, -PLATE_TAP_GAIN_DB / 20.0);
+    }
 
     void applyAllParams() {
         for (int i = 0; i < PARAM_COUNT; ++i) applyParam(i);
@@ -148,6 +169,7 @@ private:
                 break;
             case PARAM_DECAY:
                 DattorroVerb_setDecay(verb_, v);
+                updateOutNorm();
                 break;
             case PARAM_DAMPING:
                 DattorroVerb_setDamping(verb_, v);
