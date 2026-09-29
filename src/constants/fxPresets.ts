@@ -879,7 +879,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 7000, amount: 0.3, blend: 0.3, ceil: 13000 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 15, parameters: { drive: 35, tone: 9000 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 6, attack: 0.003, release: 0.1 } },
-      { category: 'wasm', type: 'Limiter', enabled: true, wet: 100, parameters: { threshold: -2, ceiling: -0.3, attack: 0.001, release: 0.05, lookahead: 0.005, knee: 0 } },
+      { category: 'wasm', type: 'Limiter', enabled: true, wet: 100, parameters: { threshold: -2, ceiling: -0.3, attack: 1, release: 50, lookahead: 5, knee: 0 } },
     ] },
   { name: 'Amiga Tape Warmth', description: 'Vintage club warmth — tape sim, gentle compression, soft rolloff', tags: ['Amiga', 'Warm', 'Vinyl'],
     effects: [
