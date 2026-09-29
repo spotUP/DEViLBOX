@@ -33,34 +33,51 @@ const source = readFileSync(
 
 /** Exactly the mapping `masterHpfHzFor` performs. */
 const MASTER_HPF_IDLE_HZ = 20;
-function masterHpfHzFor(hz: number): number {
-  return hz <= ALTEC_HPF_STEPS[0] ? MASTER_HPF_IDLE_HZ : hz;
+function masterHpfHzFor(hz: number, originHz: number): number {
+  return hz > originHz && hz > ALTEC_HPF_STEPS[0] ? hz : MASTER_HPF_IDLE_HZ;
 }
+
+it('the mapping here is the one in DubBus', () => {
+  expect(source).toContain('return hz > originHz && hz > ALTEC_HPF_STEPS[0] ? hz : MASTER_HPF_IDLE_HZ;');
+});
 
 describe('the full-mix HPF', () => {
   it('idles transparent at the control\'s resting position', () => {
     const resting = snapToAltecStep(DEFAULT_DUB_BUS.hpfCutoff);
     expect(resting).toBe(70);
-    expect(masterHpfHzFor(resting)).toBe(20);
+    expect(masterHpfHzFor(resting, resting)).toBe(20);
   });
 
   it('idles transparent below the resting position too', () => {
     // Continuous mode reaches down to the control minimum.
-    expect(masterHpfHzFor(20)).toBe(20);
-    expect(masterHpfHzFor(65)).toBe(20);
+    expect(masterHpfHzFor(20, 20)).toBe(20);
+    expect(masterHpfHzFor(65, 65)).toBe(20);
+  });
+
+  it('leaves the whole song alone at ANY steady setting - a preset\'s 240 Hz filters the bus, not the mix', () => {
+    // "it feels like a lot of bass is lost when i turn dub bus on" (2026-09-30):
+    // the loaded preset had hpfCutoff 265 and the full mix was high-passed there.
+    for (const steady of [120, 240, 265, 300, 1000]) expect(masterHpfHzFor(steady, steady)).toBe(20);
+    // ... and the steady write in setSettings passes the setting as its own origin.
+    expect(source).toContain('masterHpfHzFor(hpfFreq, hpfFreq)');
   });
 
   it('still sweeps the full mix above the resting position', () => {
     // A Tubby filter sweep has to be audible on the dry mix — that is the
     // whole reason the master insert has an HPF at all.
     for (const step of ALTEC_HPF_STEPS.filter(s => s > 70)) {
-      expect(masterHpfHzFor(step)).toBe(step);
+      expect(masterHpfHzFor(step, 70)).toBe(step);
     }
+    // A Rise from a preset's 240 Hz still sweeps the full mix above 240 ...
+    expect(masterHpfHzFor(1000, 240)).toBe(1000);
+    // ... and lands back transparent, not at 240.
+    expect(masterHpfHzFor(240, 240)).toBe(20);
   });
 
   it('leaves the low end alone at rest, so the BASS shelf has something to lift', () => {
     // The shelf corner. An idle HPF above it makes the control inaudible.
-    expect(masterHpfHzFor(snapToAltecStep(DEFAULT_DUB_BUS.hpfCutoff)))
+    const rest = snapToAltecStep(DEFAULT_DUB_BUS.hpfCutoff);
+    expect(masterHpfHzFor(rest, rest))
       .toBeLessThan(DEFAULT_DUB_BUS.bassShelfFreqHz);
   });
 
