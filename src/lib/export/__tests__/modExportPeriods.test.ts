@@ -51,3 +51,19 @@ describe('MOD export periods', () => {
     expect(b.patterns[song.songPositions[0]][row][0].period).toBe(214);
   });
 });
+
+describe('one MOD writer (exportAsMOD is exportSongToMOD)', () => {
+  it('keeps the song order, the effects and empty cells empty', async () => {
+    const { exportAsMOD } = await import('../MODExporter');
+    const song = await parseMODFile(bytesOf(MICRO15), 'micro15.mod');
+    const res = await exportAsMOD(song.patterns, song.instruments, { moduleName: 'micro15', songPositions: song.songPositions });
+    const out = await u8(res.data);
+    const a = await parseMOD(bytesOf(MICRO15)), b = await parseMOD(out.buffer.slice(0) as ArrayBuffer);
+    // The old writer wrote 0, 1, 2 ... here, read effects from a legacy field (all lost)
+    // and put C00 into every cell without an effect.
+    expect(b.header.patternOrderTable.slice(0, b.header.songLength)).toEqual(a.header.patternOrderTable.slice(0, a.header.songLength));
+    a.patterns.forEach((pat, p) => pat.forEach((row, r) => row.forEach((cell, c) => {
+      expect([b.patterns[p][r][c].effect, b.patterns[p][r][c].effectParam], `p${p} r${r} c${c}`).toEqual([cell.effect, cell.effectParam]);
+    })));
+  });
+});

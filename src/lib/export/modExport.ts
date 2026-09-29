@@ -22,7 +22,13 @@ import { cellPeriod } from '@/lib/amiga/periodNotes';
 
 export interface ModExportOptions {
   bakeSynths?: boolean;
+  /** 4 (M.K., default), 6 (6CHN) or 8 (8CHN) channels. */
+  channelCount?: 4 | 6 | 8;
+  /** Title (20 characters); defaults to the song's name. */
+  moduleName?: string;
 }
+
+const FORMAT_TAGS: Record<4 | 6 | 8, string> = { 4: 'M.K.', 6: '6CHN', 8: '8CHN' };
 
 export interface ModExportResult {
   blob: Blob;
@@ -55,7 +61,26 @@ export async function exportSongToMOD(
   options?: ModExportOptions,
 ): Promise<ModExportResult> {
   const warnings: string[] = [];
-  const NUM_CHANNELS = 4;
+  const NUM_CHANNELS = options?.channelCount ?? 4;
+  if (![4, 6, 8].includes(NUM_CHANNELS)) throw new Error(`MOD supports 4, 6 or 8 channels (got ${NUM_CHANNELS})`);
+  const title = options?.moduleName ?? song.name ?? 'untitled';
+  const importMetadata = song.patterns[0]?.importMetadata;
+
+  // Automation curves become effect commands (MOD has no automation).
+  let patterns = song.patterns;
+  try {
+    const { useAutomationStore } = await import('@stores/useAutomationStore');
+    const curves = useAutomationStore.getState().curves;
+    if (curves.length > 0) {
+      const { bakeAutomationForExport } = await import('./AutomationBaker');
+      const { FORMAT_LIMITS } = await import('@/lib/formatCompatibility');
+      const baked = bakeAutomationForExport(song.patterns, curves, FORMAT_LIMITS.MOD);
+      patterns = baked.patterns;
+      if (baked.bakedCount > 0) warnings.push(`${baked.bakedCount} automation curve(s) baked into effect commands.`);
+      if (baked.overflowRows > 0) warnings.push(`${baked.overflowRows} row(s) had no free effect slot - automation data lost on those rows.`);
+      for (const w of baked.warnings) warnings.push(w);
+    }
+  } catch { /* automation store not available (headless) */ }
   const ROWS = 64;
   const MAX_SAMPLES = 31;
 
@@ -65,6 +90,21 @@ export async function exportSongToMOD(
   for (let i = 0; i < MAX_SAMPLES; i++) {
     // Slot i+1 is the instrument with that id - not the i-th in the list.
     const inst = song.instruments.find((x) => x.id === i + 1);
+    // The sample as the import kept it (8-bit, lossless) wins over a decode of the WAV.
+    const original = importMetadata?.originalSamples?.[i + 1];
+    if (original && original.bitDepth === 8 && original.pcmData.byteLength > 0) {
+      const pcm = new Int8Array(original.pcmData);
+      const even = (pcm.length & 1) ? (() => { const p = new Int8Array(pcm.length + 1); p.set(pcm); return p; })() : pcm;
+      slots.push({
+        name: (original.name || inst?.name || '').slice(0, 22),
+        pcm: even,
+        finetune: original.finetune,
+        volume: original.volume,
+        loopStart: original.loopType === 'none' ? 0 : original.loopStart,
+        loopLen: original.loopType === 'none' ? 0 : original.loopLength,
+      });
+      continue;
+    }
     const pcm = extractPCM8(inst);
     if (inst && pcm.length === 0 && options?.bakeSynths && inst.type !== 'sample') {
       warnings.push(`Instrument ${i + 1} "${inst.name ?? ''}" is a synth without baked PCM; exported silent.`);
@@ -99,7 +139,10 @@ export async function exportSongToMOD(
   for (const p of order) if (p > maxOrder) maxOrder = p;
   const numPatterns = Math.max(song.patterns.length, maxOrder + 1);
   if (song.songPositions.length > 128) warnings.push(`Song has ${song.songPositions.length} positions; truncated to 128.`);
-  if (song.numChannels > NUM_CHANNELS) warnings.push(`ProTracker MOD is 4-channel; extra channels were dropped.`);
+  patterns.forEach((pat, i) => {
+    if ((pat?.length ?? 0) > ROWS) warnings.push(`Pattern ${i} has ${pat.length} rows but MOD holds 64; extra rows truncated.`);
+  });
+  if (song.numChannels > NUM_CHANNELS) warnings.push(`Exported as ${NUM_CHANNELS}-channel MOD; extra channels were dropped.`);
 
   // ── Size + allocate ─────────────────────────────────────────────────────────
   const HEADER = 1084;
@@ -108,7 +151,7 @@ export async function exportSongToMOD(
   const output = new Uint8Array(HEADER + patternBytes + pcmBytes);
 
   // ── Header ──────────────────────────────────────────────────────────────────
-  writeStr(output, 0, (song.name ?? 'untitled').slice(0, 20), 20);
+  writeStr(output, 0, title.slice(0, 20), 20);
   for (let i = 0; i < MAX_SAMPLES; i++) {
     const base = 20 + i * 30;
     const s = slots[i];
@@ -122,19 +165,30 @@ export async function exportSongToMOD(
   output[950] = songLength & 0xFF;
   output[951] = 127; // restart position (standard)
   for (let i = 0; i < 128; i++) output[952 + i] = i < order.length ? order[i] : 0;
-  writeStr(output, 1080, 'M.K.', 4);
+  writeStr(output, 1080, FORMAT_TAGS[NUM_CHANNELS as 4 | 6 | 8], 4);
 
   // ── Patterns: 4-byte ProTracker cells (sample split across byte0/byte2) ──────
   let pos = HEADER;
   for (let p = 0; p < numPatterns; p++) {
-    const pat = song.patterns[p];
+    const pat = patterns[p];
     for (let row = 0; row < ROWS; row++) {
       for (let ch = 0; ch < NUM_CHANNELS; ch++) {
         const cell: TrackerCell | undefined = pat?.channels[ch]?.rows[row];
         const period = cellPeriod(cell);
         const sample = (cell?.instrument ?? 0) & 0x1F;
-        const effect = (cell?.effTyp ?? 0) & 0x0F;
-        const param = (cell?.eff ?? 0) & 0xFF;
+        let effect = (cell?.effTyp ?? 0) & 0x0F;
+        let param = (cell?.eff ?? 0) & 0xFF;
+        if (cell && (cell.effTyp ?? 0) > 0x0F) {
+          warnings.push(`Effect ${cell.effTyp} has no MOD equivalent (row ${row}, channel ${ch + 1}); dropped.`);
+          effect = 0; param = 0;
+        }
+        // MOD has no volume column: a set-volume (0x10-0x50) becomes Cxx when
+        // the effect column is free; a note-off becomes C00.
+        const vol = cell?.volume ?? 0;
+        if (effect === 0 && param === 0) {
+          if (cell?.note === 97) { effect = 0x0C; param = 0; }
+          else if (vol >= 0x10 && vol <= 0x50) { effect = 0x0C; param = vol - 0x10; }
+        }
         output[pos] = (sample & 0xF0) | ((period >> 8) & 0x0F);
         output[pos + 1] = period & 0xFF;
         output[pos + 2] = ((sample & 0x0F) << 4) | effect;
@@ -152,7 +206,7 @@ export async function exportSongToMOD(
     }
   }
 
-  const baseName = (song.name ?? 'untitled').replace(/[^a-zA-Z0-9_\-. ]/g, '').slice(0, 40) || 'untitled';
+  const baseName = title.replace(/[^a-zA-Z0-9_\-. ]/g, '').slice(0, 40) || 'untitled';
   return {
     blob: new Blob([output], { type: 'application/octet-stream' }),
     filename: `${baseName}.mod`,
