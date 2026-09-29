@@ -40,6 +40,14 @@ describe('Buzz effect machines', () => {
     }, 15000);
   }
 
+  it('Jeskola Freeverb at its defaults stays within 3 dB of the input (its LowCut 0 integrated sub-bass)', () => {
+    // LowCut 0 set a 0.001 Hz high-pass whose float coefficients put a pole
+    // on z = 1: +18 dB overall on pink noise, all of it below 63 Hz.
+    const r = spawnSync(process.execPath, [RUNNER, 'JeskolaFreeverb', 'Jeskola_Freeverb', 'pink'], { timeout: 15000, encoding: 'utf8' });
+    const res = JSON.parse(r.stdout.split('\n').reverse().find((l) => l.startsWith('{'))!);
+    expect(Math.abs(res.gainDb), `${res.gainDb.toFixed(1)} dB`).toBeLessThan(3);
+  }, 20000);
+
   it('a disposed machine stops its processor (disposed nodes ran for the rest of the session)', () => {
     const r = spawnSync(process.execPath, [RUNNER, 'JeskolaFreeverb', 'Jeskola_Freeverb', 'dispose'], { timeout: 8000, encoding: 'utf8' });
     const res = JSON.parse(r.stdout.split('\n').reverse().find((l) => l.startsWith('{'))!);

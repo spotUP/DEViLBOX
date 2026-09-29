@@ -90,6 +90,8 @@ public:
 	float buffer[512];
 	CBWState histate;
 	CBWState lostate;
+	// LowCut 0 is OFF: see setlocut.
+	bool locutOn = false;
 
 	void setlocut(float v);
 	void sethicut(float v);
