@@ -1,15 +1,30 @@
 /**
  * SwedishChainsaw.cpp — Boss HM-2 "Swedish death metal" distortion + JCM800 tonestack
  *
- * 1:1 port of https://github.com/Barabas5532/SwedishChainsaw (GPL v3)
- * Signal chain: input gain → 60Hz HPF → optional 700Hz tight HPF → 4× oversample →
- *   tanh clip → HM2 graphic EQ (3 biquads) → 7kHz LPF → 600Hz amp HPF →
- *   amp gain → 4× oversample → tanh clip → FMV tonestack (JCM800) →
- *   7kHz LPF → output volume
+ * Port of https://github.com/Barabas5532/SwedishChainsaw (GPL v3)
+ * Signal chain: HM-2 gain (20-40 dB) → 60Hz HPF → optional 700Hz tight HPF →
+ *   4× oversampled tanh clip → HM2 graphic EQ (3 biquads, every knob at max) →
+ *   7kHz LPF → 600Hz amp HPF → amp gain (0-30 dB) → 4× oversampled tanh clip →
+ *   FMV tonestack (JCM800) → 7kHz LPF → 4x12 speaker → output volume
  *
- * Skips convolution IR (external file dependency).
+ * The classic Swedish death metal tone is an HM-2 with every setting at max
+ * into an amp. The gain ranges are upstream's again: this port had capped the
+ * pedal at 24 dB (for an assumed -30 dBFS guitar) and the amp at 18 dB, and
+ * both clippers ran without the 4x oversampling upstream has, so the
+ * harmonics of a 40 dB tanh folded back as fizz.
+ *
+ * Differences from upstream, each deliberate:
+ *   - upstream's prepareToPlay overwrites the 600 Hz amp input high-pass with
+ *     a 7 kHz low-pass meant for the amp low-pass (which then has none); here
+ *     both filters are what its comments say they are.
+ *   - upstream convolves a user-chosen speaker IR file; here the speaker is
+ *     the 4x12 closed-back curve shared with CabinetSim.
+ *   - the HM-2 biquads are MATLAB-fitted at 48 kHz; at other rates they are
+ *     carried over through their analog prototype.
  */
 #include "WASMEffectBase.h"
+#include "cabinet_curves.h"
+#include "owOversampler.h"
 #include <cstring>
 #include <cmath>
 #include <algorithm>
@@ -19,12 +34,12 @@ namespace devilbox {
 // ─── Parameters ─────────────────────────────────────────────────────────
 enum Param {
     PARAM_TIGHT      = 0,  // bool: 0 or 1
-    PARAM_PEDAL_GAIN = 1,  // 0-1 → 20-40 dB
-    PARAM_AMP_GAIN   = 2,  // 0-1 → 0-30 dB
+    PARAM_PEDAL_GAIN = 1,  // 0-1 → 20-40 dB (upstream's range)
+    PARAM_AMP_GAIN   = 2,  // 0-1 → 0-30 dB (upstream's range)
     PARAM_BASS       = 3,  // 0-1 tonestack
     PARAM_MIDDLE     = 4,  // 0-1 tonestack
     PARAM_TREBLE     = 5,  // 0-1 tonestack
-    PARAM_VOLUME     = 6,  // 0-1 → 10-40 dB (applied as vol - 30)
+    PARAM_VOLUME     = 6,  // 0-1 → upstream's 10-40, applied as vol - 30 dB
     PARAM_COUNT      = 7,
 };
 
@@ -111,26 +126,66 @@ static constexpr int MAX_BLOCK = 128;
 // These coefficients are from the original SwedishChainsaw MATLAB analysis
 // of the HM-2 graphic EQ with all knobs at max.
 
-static void initHM2Biquads(Biquad hm2[3]) {
-    // Filter 1
-    hm2[0].b0 = 1.016224171805848f;
-    hm2[0].b1 = -1.996244766867333f;
-    hm2[0].b2 = 0.980170456681741f;
-    hm2[0].a1 = -1.996244766867333f;
-    hm2[0].a2 = 0.996394628487589f;
-    // Filter 2
-    hm2[1].b0 = 1.048098514125369f;
-    hm2[1].b1 = -1.946884930731663f;
-    hm2[1].b2 = 0.914902628855116f;
-    hm2[1].a1 = -1.946884930731663f;
-    hm2[1].a2 = 0.963001142980485f;
-    // Filter 3
-    hm2[2].b0 = 1.260798129602192f;
-    hm2[2].b1 = -1.896438187817481f;
-    hm2[2].b2 = 0.674002337997260f;
-    hm2[2].a1 = -1.896438187817481f;
-    hm2[2].a2 = 0.934800467599452f;
+static void setBiquad(Biquad& f, double b0, double b1, double b2, double a1, double a2) {
+    f.b0 = (float)b0; f.b1 = (float)b1; f.b2 = (float)b2; f.a1 = (float)a1; f.a2 = (float)a2;
 }
+
+/**
+ * A biquad designed at fs0, carried to fs through its analog prototype: the
+ * inverse bilinear transform at fs0, then the bilinear transform at fs.
+ * Identity when fs == fs0.
+ */
+static void carryBiquad(Biquad& f, const double c[5], double fs0, double fs) {
+    const double b0 = c[0], b1 = c[1], b2 = c[2], a0 = 1.0, a1 = c[3], a2 = c[4];
+    // H(z) with z = (1 + s/k0) / (1 - s/k0), k0 = 2 fs0: numerator/denominator in s.
+    const double k0 = 2.0 * fs0;
+    auto toS = [k0](double p0, double p1, double p2, double out[3]) {
+        // p0 + p1 z^-1 + p2 z^-2, times (1 + s/k0)^2 (z^-1 = (1 - s/k0)/(1 + s/k0))
+        out[0] = p0 + p1 + p2;                        // s^0
+        out[1] = (2.0 * p0 - 2.0 * p2) / k0;          // s^1
+        out[2] = (p0 - p1 + p2) / (k0 * k0);          // s^2
+    };
+    double B[3], A[3];
+    toS(b0, b1, b2, B);
+    toS(a0, a1, a2, A);
+    const double k = 2.0 * fs, k2 = k * k;
+    // Bilinear at fs: s = k (1 - z^-1) / (1 + z^-1)
+    const double nb0 = B[0] + B[1] * k + B[2] * k2;
+    const double nb1 = 2.0 * B[0] - 2.0 * B[2] * k2;
+    const double nb2 = B[0] - B[1] * k + B[2] * k2;
+    const double na0 = A[0] + A[1] * k + A[2] * k2;
+    const double na1 = 2.0 * A[0] - 2.0 * A[2] * k2;
+    const double na2 = A[0] - A[1] * k + A[2] * k2;
+    setBiquad(f, nb0 / na0, nb1 / na0, nb2 / na0, na1 / na0, na2 / na0);
+}
+
+// HM-2 graphic EQ with every knob at max: 3 peaking biquads from the
+// original SwedishChainsaw MATLAB fit (at 48 kHz).
+static const double HM2_COEFFS[3][5] = {
+    { 1.016224171805848, -1.996244766867333, 0.980170456681741, -1.996244766867333, 0.996394628487589 },
+    { 1.048098514125369, -1.946884930731663, 0.914902628855116, -1.946884930731663, 0.963001142980485 },
+    { 1.260798129602192, -1.896438187817481, 0.674002337997260, -1.896438187817481, 0.934800467599452 },
+};
+
+static void initHM2Biquads(Biquad hm2[3], float fs) {
+    for (int i = 0; i < 3; ++i) carryBiquad(hm2[i], HM2_COEFFS[i], 48000.0, fs);
+}
+
+/** 4x oversampling: two 2x polyphase IIR half-band stages (openWurli). */
+struct Oversampler4x {
+    openWurli::Oversampler stage1, stage2;
+    void init() { stage1.init(); stage2.init(); }
+    void reset() { stage1.reset(); stage2.reset(); }
+    template <typename F> float process(float x, F&& shape) {
+        double in = x, x2[2], x4[4], y2[2], y;
+        stage1.upsample2x(&in, x2, 1);
+        stage2.upsample2x(x2, x4, 2);
+        for (double& v : x4) v = shape(v);
+        stage2.downsample2x(x4, y2, 2);
+        stage1.downsample2x(y2, &y, 1);
+        return (float)y;
+    }
+};
 
 // ─── FMV Tonestack: JCM800 component values, Yeh & Smith bilinear ──────
 
@@ -219,10 +274,14 @@ public:
 
         makeFirstOrderHPF(pedalInputHPF_, 60.0f, fs);
         makeFirstOrderHPF(tightHPF_, 700.0f, fs);
-        initHM2Biquads(hm2_);
+        initHM2Biquads(hm2_, fs);
         makeLowPass2(pedalLPF_, 7000.0f, fs);
-        makeFirstOrderHPF(ampInputHPF_, 100.0f, fs);
+        // Tube Screamer-style amp input high-pass (upstream's stated intent).
+        makeFirstOrderHPF(ampInputHPF_, 600.0f, fs);
         makeLowPass2(ampLPF_, 7000.0f, fs);
+        speakerL_.build(cabinet::CLOSED_4X12, fs);
+        speakerR_.build(cabinet::CLOSED_4X12, fs);
+        for (Oversampler4x* o : { &pedalOsL_, &pedalOsR_, &ampOsL_, &ampOsR_ }) o->init();
 
         pedalInputHPF_R_ = pedalInputHPF_;
         tightHPF_R_ = tightHPF_;
@@ -248,12 +307,11 @@ public:
         }
 
         const bool tight = params_[PARAM_TIGHT] > 0.5f;
-        // Pedal drive: 0-1 → 0-24 dB (original was 20-40 but that assumed -30dBFS guitar input)
-        const float pedalGainLin = dBtoLinear(params_[PARAM_PEDAL_GAIN] * 24.0f);
-        // Amp drive: 0-1 → 0-18 dB
-        const float ampGainLin   = dBtoLinear(params_[PARAM_AMP_GAIN] * 18.0f);
-        // Volume: 0-1 → -30 to 0 dB
-        const float volLin       = dBtoLinear(-30.0f + params_[PARAM_VOLUME] * 30.0f);
+        const float pedalGainLin = dBtoLinear(20.0f + params_[PARAM_PEDAL_GAIN] * 20.0f);
+        const float ampGainLin   = dBtoLinear(params_[PARAM_AMP_GAIN] * 30.0f);
+        // Upstream's volume is 10-40 dB applied as (volume - 30) dB.
+        const float volLin       = dBtoLinear(kOutputTrimDb + (10.0f + params_[PARAM_VOLUME] * 30.0f) - 30.0f);
+        const auto shape = [](double v) { return std::tanh(v); };
 
         updateTonestack();
 
@@ -271,9 +329,9 @@ public:
                 sR = tightHPF_R_.process(sR);
             }
 
-            // 3. Pedal drive + waveshaper
-            sL = tanhf(sL * pedalGainLin);
-            sR = tanhf(sR * pedalGainLin);
+            // 3. Pedal drive + 4x oversampled waveshaper
+            sL = pedalOsL_.process(sL * pedalGainLin, shape);
+            sR = pedalOsR_.process(sR * pedalGainLin, shape);
 
             // 4. HM-2 graphic EQ (3 cascaded biquads)
             for (int f = 0; f < 3; ++f) {
@@ -289,9 +347,9 @@ public:
             sL = ampInputHPF_.process(sL);
             sR = ampInputHPF_R_.process(sR);
 
-            // 7. Amp drive + waveshaper
-            sL = tanhf(sL * ampGainLin);
-            sR = tanhf(sR * ampGainLin);
+            // 7. Amp drive + 4x oversampled waveshaper
+            sL = ampOsL_.process(sL * ampGainLin, shape);
+            sR = ampOsR_.process(sR * ampGainLin, shape);
 
             // 8. FMV tonestack (passive — attenuates)
             sL = tonestackL_.process(sL);
@@ -305,7 +363,11 @@ public:
             sL = ampLPF_.process(sL);
             sR = ampLPF_R_.process(sR);
 
-            // 11. Output volume + soft clip
+            // 11. Speaker (4x12 closed back)
+            sL = speakerL_.process(sL);
+            sR = speakerR_.process(sR);
+
+            // 12. Output volume + soft clip
             outputL[i] = tanhf(sL * volLin);
             outputR[i] = tanhf(sR * volLin);
         }
@@ -335,7 +397,15 @@ public:
     }
 
 private:
+    // Output trim so the default settings come out at the input's level: a
+    // dry guitar DI (test-data/audio/dry-guitar.wav, -24.7 dBFS RMS) read
+    // +17 dB without it, deep into the output soft clip, and +4 dB with the
+    // clip relieved (2026-09-29).
+    static constexpr float kOutputTrimDb = -21.0f;
+
     float params_[PARAM_COUNT];
+    Oversampler4x pedalOsL_, pedalOsR_, ampOsL_, ampOsR_;
+    cabinet::Curve speakerL_, speakerR_;
 
     // Left channel filters
     FirstOrderFilter pedalInputHPF_{};
@@ -375,6 +445,7 @@ private:
         ampInputHPF_.reset(); ampInputHPF_R_.reset();
         ampLPF_.reset(); ampLPF_R_.reset();
         tonestackL_.reset(); tonestackR_.reset();
+        for (Oversampler4x* o : { &pedalOsL_, &pedalOsR_, &ampOsL_, &ampOsR_ }) o->reset();
     }
 };
 

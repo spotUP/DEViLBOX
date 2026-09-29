@@ -6,6 +6,8 @@ add_executable(SwedishChainsawWASM SwedishChainsaw.cpp)
 target_include_directories(SwedishChainsawWASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../wasm-common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/retromulator/source/openWurliLib
 )
 
 set_target_properties(SwedishChainsawWASM PROPERTIES
