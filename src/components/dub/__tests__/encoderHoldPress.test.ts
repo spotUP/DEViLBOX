@@ -39,12 +39,25 @@ describe('encoder held press', () => {
   it('a press held still starts the move, and release ends it', () => {
     const { api, g } = setup();
     g.onPointerDown(at(100, 100));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(350);
     expect(api.holdStart).toHaveBeenCalledWith('oscBass');
-    g.onPointerMove(at(100, 80));      // moving while held does not end it
+    g.onPointerMove(at(101, 99));      // a tremor inside the slop does not end it
     expect(api.holdEnd).not.toHaveBeenCalled();
     g.onPointerUp();
     expect(api.holdEnd).toHaveBeenCalledWith('oscBass');
+  });
+
+  it('a slow twist that started still ends the drone as soon as it turns (no hum under the turn)', () => {
+    // "the echo wet and sidechain produce a humming sound while twisted" (2026-09-30)
+    const { api, g } = setup();
+    g.onPointerDown(at(100, 100));
+    vi.advanceTimersByTime(400);       // still long enough to engage
+    expect(api.holdStart).toHaveBeenCalledTimes(1);
+    g.onPointerMove(at(100, 90));      // the twist begins
+    expect(api.holdEnd).toHaveBeenCalledWith('oscBass');
+    g.onPointerMove(at(100, 60));
+    g.onPointerUp();
+    expect(api.holdEnd).toHaveBeenCalledTimes(1);
   });
 
   it('a quick click fires nothing held', () => {
