@@ -1,0 +1,1011 @@
+[
+ {
+  "song": "src/__tests__/fixtures/micro15-goto80.mod",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "lead",
+    "sub": "arpeggio"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "lead"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/mod/world class dub.mod",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/mod/break the box.mod",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/formats/a sleep so deep.mod",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/amigaklang/Virgill-redrum redrum.mod",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/amigaklang/JosSs-Cream.mod",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/amigaklang/Virgill-80s architecture.mod",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/space_debris-captain.mod",
+  "channels": [
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/octalyser/follow me to hell.mod",
+  "channels": [
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "lead"
+   },
+   {
+    "label": "bass"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/xm/flo boarding - level 1.xm",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/airwolf-jogeir liljedahl.xm",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/cold summer nights-jogeir liljedahl.xm",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/1 for me-jogeir liljedahl.xm",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "lead"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/banana boat ii-jogeir liljedahl.xm",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/s3m/andante.s3m",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/formats/nightmare on acid.s3m",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/a touch of spring-purple motion.s3m",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/alien incident - entity-purple motion.s3m",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/it/absm chain mod.it",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "lead"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/bookworm-skaven.it",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "drums"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/martian lovesong-necros.it",
+  "channels": [
+   {
+    "label": "lead"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   },
+   {
+    "label": "silent"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "src/__tests__/fixtures/classifier-corpus/dirty walk-necros.it",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/ahx/amanda.ahx",
+  "channels": [
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/formats/aces_high.ahx",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/formats/hexplosion.hvl",
+  "channels": [
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony",
+    "sub": "skank"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/hivelytracker/waiting for a message.hvl",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "harmony"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ },
+ {
+  "song": "public/data/songs/bp-soundmon-2/nicktune1.bp",
+  "channels": [
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "drums"
+   },
+   {
+    "label": "harmony"
+   },
+   {
+    "label": "bass"
+   }
+  ],
+  "labelledBy": "draft",
+  "date": "2026-09-29"
+ }
+]
