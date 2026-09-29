@@ -21,28 +21,13 @@
  */
 
 #include <cmath>
-#include "lr4_crossover.h"
+#include "cabinet_curves.h"
 #include <cstring>
 #include <algorithm>
 #include <emscripten/emscripten.h>
 
 static constexpr int MAX_INSTANCES = 16;
-static constexpr int NUM_CABINETS = 4;
-static constexpr int MAX_STAGES = 8;
-
-struct Stage { char kind; float f, q, dB; };   // kind: 'h' high-pass, 'l' low-pass, 'p' peak
-
-// One row per cabinet; unused stages have f = 0.
-static const Stage CABINETS[NUM_CABINETS][MAX_STAGES] = {
-    // 1x12 combo: modest low end, 2.5 kHz bite, rolls off from ~5.5 kHz
-    { {'h', 90, 0.7f, 0}, {'p', 130, 1.0f, 2.5f}, {'p', 2500, 1.2f, 4}, {'l', 5500, 0.7f, 0}, {'l', 6000, 0.7f, 0} },
-    // 2x12 open back: warm lows, scooped mids, 4 kHz presence
-    { {'h', 70, 0.7f, 0}, {'p', 110, 0.9f, 3}, {'p', 800, 0.8f, -3}, {'p', 4000, 1.2f, 3}, {'l', 6500, 0.7f, 0}, {'l', 7000, 0.7f, 0} },
-    // 4x12 closed back: tight thump, 1.8 / 3.5 kHz presence, early roll-off
-    { {'h', 70, 0.7f, 0}, {'p', 95, 1.2f, 5}, {'p', 1800, 1.0f, 2}, {'p', 3500, 1.4f, 3}, {'l', 5000, 0.7f, 0}, {'l', 5500, 0.7f, 0} },
-    // DI: flat
-    { },
-};
+static constexpr int NUM_CABINETS = cabinet::NUM_CABINETS;
 
 struct CabinetSimInstance {
     bool active = false;
@@ -52,9 +37,7 @@ struct CabinetSimInstance {
     float mix = 1.0f;         // 0-1 dry/wet
     float brightness = 0.5f;  // 0-1
 
-    lr4::Biquad stagesL[MAX_STAGES], stagesR[MAX_STAGES];
-    int stageCount = 0;
-    float norm = 1.0f;        // 0 dB at 1 kHz
+    cabinet::Curve curveL, curveR;
     lr4::Biquad brightL, brightR, presL, presR;
     int builtCabinet = -1;
     float builtBrightness = -1.0f;
@@ -66,21 +49,8 @@ struct CabinetSimInstance {
 
     void rebuild() {
         if (cabinetType != builtCabinet) {
-            stageCount = 0;
-            norm = 1.0f;
-            for (int s = 0; s < MAX_STAGES; s++) {
-                const Stage& st = CABINETS[cabinetType][s];
-                if (st.f <= 0) break;
-                lr4::Biquad& b = stagesL[stageCount];
-                if (st.kind == 'h') b.setHP(st.f, sampleRate);
-                else if (st.kind == 'l') b.setLP(st.f, sampleRate);
-                else b.setPeak(st.f, sampleRate, st.q, st.dB);
-                b.reset();
-                stagesR[stageCount] = b;
-                norm *= b.magnitude(1000.0f, sampleRate);
-                stageCount++;
-            }
-            norm = norm > 1e-6f ? 1.0f / norm : 1.0f;
+            curveL.build(cabinetType, sampleRate);
+            curveR.build(cabinetType, sampleRate);
             builtCabinet = cabinetType;
         }
         if (brightness != builtBrightness) {
@@ -97,9 +67,8 @@ struct CabinetSimInstance {
         rebuild();
         for (int i = 0; i < n; i++) {
             float l = inL[i], r = inR[i];
-            for (int s = 0; s < stageCount; s++) { l = stagesL[s].process(l); r = stagesR[s].process(r); }
-            l = presL.process(brightL.process(l * norm));
-            r = presR.process(brightR.process(r * norm));
+            l = presL.process(brightL.process(curveL.process(l)));
+            r = presR.process(brightR.process(curveR.process(r)));
             outL[i] = inL[i] * (1.0f - mix) + l * mix;
             outR[i] = inR[i] * (1.0f - mix) + r * mix;
         }
