@@ -7,7 +7,8 @@
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
-  WASMSingletonBase,
+  WASMChannelOutputsEngine,
+  channelOutputNodeOptions,
   createWASMAssetsCache,
   type WASMAssetsCache,
   type WASMLoaderConfig,
@@ -24,7 +25,7 @@ function gmcTransform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
-export class GmcEngine extends WASMSingletonBase {
+export class GmcEngine extends WASMChannelOutputsEngine {
   private static instance: GmcEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
@@ -67,15 +68,14 @@ export class GmcEngine extends WASMSingletonBase {
 
   protected createNode(): void {
     const ctx = this.audioContext;
-    this.workletNode = new AudioWorkletNode(ctx, 'gmc-processor', {
-      outputChannelCount: [2], numberOfOutputs: 1,
-    });
+    this.workletNode = new AudioWorkletNode(ctx, 'gmc-processor', channelOutputNodeOptions());
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
       switch (data.type) {
         case 'ready':
           console.log('[GmcEngine] WASM ready');
+          this.markNodeReady();
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
@@ -98,7 +98,7 @@ export class GmcEngine extends WASMSingletonBase {
       type: 'init', sampleRate: ctx.sampleRate,
       wasmBinary: GmcEngine.cache.wasmBinary, jsCode: GmcEngine.cache.jsCode,
     });
-    this.workletNode.connect(this.output);
+    this.workletNode.connect(this.output, 0);
   }
 
   async loadTune(buffer: ArrayBuffer): Promise<void> {
@@ -107,7 +107,10 @@ export class GmcEngine extends WASMSingletonBase {
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
-  play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
+  play(): void {
+    this.workletNode?.port.postMessage({ type: 'play' });
+    this.afterPlay();
+  }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
 
