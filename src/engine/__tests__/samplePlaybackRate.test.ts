@@ -10,15 +10,17 @@ const mod = { synthType: 'Sampler', sample: { sampleRate: 8363, baseNote: 'C3' }
 const xm = { synthType: 'Sampler', sample: { sampleRate: 44100, baseNote: 'C4' } } as unknown as InstrumentConfig;
 
 describe('samplePlaybackRate', () => {
-  it('a MOD sample at XM 49 (period 428) plays at about its recorded speed', () => {
-    expect(samplePlaybackRate(mod, 49)).toBeCloseTo(3546895 / 428 / 8363, 6);
+  it('a MOD sample at note 25 (C-2, period 428) plays at about its recorded speed', () => {
+    expect(samplePlaybackRate(mod, 25)).toBeCloseTo(3546895 / 428 / 8363, 6);
   });
-  it('a MOD sample at XM 61 (ProTracker C-3, period 214) plays twice as fast', () => {
-    expect(samplePlaybackRate(mod, 61)).toBeCloseTo(3546895 / 214 / 8363, 6);
+  it('a MOD sample at note 37 (C-3, period 214) plays twice as fast', () => {
+    expect(samplePlaybackRate(mod, 37)).toBeCloseTo(3546895 / 214 / 8363, 6);
   });
-  it('the cell\'s own period wins over its note: import paths number notes differently', () => {
-    // convertMODModule names period 214 note 37; the MOD codec names it 61.
-    expect(samplePlaybackRate(mod, 37, 214)).toBeCloseTo(3546895 / 214 / 8363, 6);
+  it('the cell\'s own period counts while it names the note (a finetuned or off-table period)', () => {
+    expect(samplePlaybackRate(mod, 25, 430)).toBeCloseTo(3546895 / 430 / 8363, 6);
+  });
+  it('a stale period from before an edit does not count: the note decides', () => {
+    expect(samplePlaybackRate(mod, 37, 428)).toBeCloseTo(3546895 / 214 / 8363, 6);
   });
   it('a sample without period playback is pitched against its base note', () => {
     expect(samplePlaybackRate(xm, 49)).toBeCloseTo(1, 9);   // C-4 on a C4 sample

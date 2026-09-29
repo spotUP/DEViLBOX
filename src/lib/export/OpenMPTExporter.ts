@@ -9,6 +9,7 @@ import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument';
 import * as osl from '@lib/import/wasm/OpenMPTSoundlib';
 import type { SaveFormat, PatternCell } from '@lib/import/wasm/OpenMPTSoundlib';
+import { mapNoteToOpenMPT } from '@lib/import/wasm/OpenMPTConverter';
 
 export interface OpenMPTExportOptions {
   format: SaveFormat;
@@ -55,14 +56,6 @@ function mapEffectToOpenMPT(effTyp: number, eff: number): { cmd: number; param: 
     case 33: return { cmd: 28, param: eff }; // ExtraFine → CMD_XFINEPORTAUPDOWN
     default: return { cmd: 0, param: 0 };
   }
-}
-
-/** Map DEViLBOX note → OpenMPT note value */
-function mapNoteToOpenMPT(note: number): number {
-  if (note === 0) return 0;       // Empty
-  if (note === 97) return 255;    // Note-off → NOTE_KEYOFF
-  if (note >= 1 && note <= 96) return note; // Direct mapping
-  return 0;
 }
 
 /** Map DEViLBOX volume column byte → OpenMPT volcmd + vol */
@@ -133,7 +126,8 @@ export async function exportWithOpenMPT(
     await osl.setInitialSpeed(options.initialSpeed ?? 6);
     await osl.setInitialTempo(options.initialBPM ?? 125);
 
-    // Write pattern data
+    // Write pattern data. Cells are named by their song's own format.
+    const cellFormat = patterns[0]?.importMetadata?.sourceFormat;
     for (let p = 0; p < patterns.length; p++) {
       const pat = patterns[p];
       const numRows = pat.length || 64;
@@ -147,7 +141,7 @@ export async function exportWithOpenMPT(
           const cell = pat.channels[c]?.rows[r];
           if (!cell) continue;
 
-          const note = mapNoteToOpenMPT(cell.note);
+          const note = mapNoteToOpenMPT(cell.note, cellFormat);
           const { volcmd, volval } = mapVolumeToOpenMPT(cell.volume);
           const fx = mapEffectToOpenMPT(cell.effTyp, cell.eff);
 

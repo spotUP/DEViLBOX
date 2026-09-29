@@ -4,6 +4,7 @@
  * Conversion between DEViLBOX formats and XM binary formats
  */
 
+import { periodToNote as amigaPeriodToNote, noteToPeriod as amigaNoteToPeriod, AMIGA_PERIODS } from '@/lib/amiga/periodNotes';
 import { sunEffectToString } from './import/formats/sunEffectGlyphs';
 import { sonixEffectToString } from './import/formats/sonixEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
@@ -357,47 +358,9 @@ export function formatVolumeColumn(volume: number): string {
  */
 export function periodToXMNote(period: number, finetune: number = 0): number {
   void finetune;
-  // Period 0 = empty cell (no note)
-  if (period === 0) {
-    return 0;
-  }
-
-  // ProTracker period table (Extended range C-0 to B-5)
-  // 1-based index is the XM note number: 1712 = C-0 (Note 1), 428 = C-2 (Note 25), 214 = C-3 (Note 37)
-  const PT_PERIODS = [
-    // Octave 0 (Extended)
-    1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 961, 907,
-    // Octave 1
-    856,  808,  762,  720,  678,  640,  604,  570,  538,  508,  480, 453,
-    // Octave 2
-    428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240, 226,
-    // Octave 3
-    214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120, 113,
-    // Octave 4 (Extended)
-    107,  101,  95,   90,   85,   80,   75,   71,   67,   63,   60,   56,
-    // Octave 5 (Extended)
-    53,   50,   47,   45,   42,   40,   37,   35,   33,   31,   30,   28
-  ];
-
-  // Find closest period
-  let closestNote = 0;
-  let closestDiff = Infinity;
-
-  for (let i = 0; i < PT_PERIODS.length; i++) {
-    const diff = Math.abs(PT_PERIODS[i] - period);
-    if (diff < closestDiff) {
-      closestDiff = diff;
-      closestNote = i + 1; // 1-indexed in this array
-    }
-  }
-
-  // Convert to XM note
-  // Index 1 (period 1712) = XM note 1 (C-0), index 13 (period 856) = XM note 13 (C-1),
-  // index 25 (period 428) = XM note 25 (C-2), index 37 (period 214) = XM note 37 (C-3)
-  // This matches UADEParser and amigaNoteToXM conventions — base 'C3' produces correct rates.
-  const xmNote = closestNote;
-
-  return Math.min(96, Math.max(1, xmNote));
+  // One table, ProTracker naming: src/lib/amiga/periodNotes.ts.
+  const note = amigaPeriodToNote(period);
+  return note === 0 ? 0 : Math.min(96, Math.max(1, note));
 }
 
 /**
@@ -409,18 +372,11 @@ export function periodToXMNote(period: number, finetune: number = 0): number {
  * @returns Amiga period (113-856)
  */
 export function xmNoteToPeriod(xmNote: number, finetune: number = 0): number {
-  void finetune;
-  if (xmNote === 0 || xmNote === 97) {
-    return 0; // No note or note off
-  }
-
-  // Calculate period using Amiga formula
-  // Anchor: XM note 1 (C-0) = period 1712, note 25 (C-2) = period 428, note 37 (C-3) = period 214
-  // Consistent with the periodToXMNote convention (1-based index = XM note).
-  const semitonesFromC0 = xmNote - 1;
-  const period = 1712 * Math.pow(2, -semitonesFromC0 / 12);
-
-  return Math.max(28, Math.min(1712, Math.round(period)));
+  if (xmNote === 0 || xmNote === 97) return 0; // No note or note off
+  // One table, ProTracker naming (src/lib/amiga/periodNotes.ts); notes above
+  // its range clamp to its shortest period, as the formula here used to.
+  if (xmNote > AMIGA_PERIODS.length) return AMIGA_PERIODS[AMIGA_PERIODS.length - 1];
+  return amigaNoteToPeriod(xmNote, finetune);
 }
 
 // Pre-computed XM note → Tone.js note string lookup (avoids string alloc + replace per call)

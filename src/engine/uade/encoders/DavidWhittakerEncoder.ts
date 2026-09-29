@@ -24,25 +24,8 @@
 
 import type { TrackerCell } from '@/types';
 import { registerVariableEncoder, type VariableLengthEncoder } from '../UADEPatternEncoder';
-
-// Standard ProTracker period table (finetune 0), 36 entries: C-1 to B-3
-const MOD_PERIODS = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-];
-
-/**
- * Convert XM note number to Amiga period.
- * XM note 37 = C-3 → period index 0 → period 856
- * Returns 0 for no note or out-of-range.
- */
-function xmNoteToPeriod(xmNote: number): number {
-  if (xmNote === 0) return 0;
-  const periodIdx = xmNote - 37;
-  if (periodIdx < 0 || periodIdx >= MOD_PERIODS.length) return 0;
-  return MOD_PERIODS[periodIdx];
-}
+// ProTracker naming (note 13 = C-1 = 856), one table: src/lib/amiga/periodNotes.ts.
+import { noteToPeriod as xmNoteToPeriod } from '@/lib/amiga/periodNotes';
 
 /**
  * Best-effort ProTracker MOD 4-byte cell encoder — retained ONLY for the

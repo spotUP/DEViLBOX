@@ -29,6 +29,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
+import { periodToPtNote } from '@/lib/amiga/periodNotes';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -36,16 +37,6 @@ const MIN_FILE_SIZE = 60;
 const NUM_CHANNELS = 4;
 const ROWS_PER_PATTERN = 64;
 const MAX_EVENTS = 16384;
-
-/**
- * Standard Amiga period table (3 octaves, 12 notes each).
- * Used to convert RH ST period values to tracker note indices.
- */
-const AMIGA_PERIODS = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,  // C-1 to B-1
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,  // C-2 to B-2
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,  // C-3 to B-3
-];
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -81,19 +72,8 @@ function u32BE(buf: Uint8Array, off: number): number {
  * Period table index 0 = C-1 (ProTracker) = note 13 in FT2 mapping.
  */
 function periodToNote(period: number): number {
-  if (period === 0) return 0;
-  let bestIdx = -1;
-  let bestDist = Infinity;
-  for (let i = 0; i < AMIGA_PERIODS.length; i++) {
-    const dist = Math.abs(AMIGA_PERIODS[i] - period);
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestIdx = i;
-    }
-  }
-  if (bestIdx < 0) return 0;
-  const note = bestIdx + 13; // C-1 (PT) = note 13 (FT2)
-  return (note >= 1 && note <= 96) ? note : 0;
+  // ProTracker naming, one table: src/lib/amiga/periodNotes.ts.
+  return periodToPtNote(period);
 }
 
 /**

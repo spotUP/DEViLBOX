@@ -11,10 +11,11 @@ import type {
   ImportMetadata,
 } from '../../../types/tracker';
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell } from '@/types';
-import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { convertToInstrument } from '../InstrumentConverter';
+import { convertParsedInstruments } from '../InstrumentConverter';
+import { convertMODModule } from '../ModuleConverter';
+import { periodToNote as amigaPeriodToNote, AMIGA_PERIODS } from '@/lib/amiga/periodNotes';
+import { xmNoteToString } from '@/lib/xmConversions';
 import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 /**
@@ -452,42 +453,11 @@ function readString(view: DataView, offset: number, maxLength: number): string {
  * Amiga period table (C-1 to B-3)
  */
 export function periodToNote(period: number): string | null {
-  if (period === 0) return null;
-
-  // Amiga/ProTracker period table — XM octave naming (single source of truth
-  // with the MOD codec: encodeMODCell/decodeMODCell treat XM note 37 = C-3 =
-  // period 856). ProTracker's own "C-1=856" naming is two octaves below XM, so
-  // the display grid must use the XM labels here or the grid note fails to invert
-  // through encodeMODCell (period written back two octaves off). noteNameToIndex
-  // then yields XM 37 for period 856, matching the encoder exactly (byte-exact).
-  const PERIOD_TABLE: { [key: number]: string } = {
-    1712: 'C-2', 1616: 'C#2', 1525: 'D-2', 1440: 'D#2', 1357: 'E-2', 1281: 'F-2',
-    1209: 'F#2', 1141: 'G-2', 1077: 'G#2', 1017: 'A-2', 960: 'A#2', 907: 'B-2',
-    856: 'C-3', 808: 'C#3', 762: 'D-3', 720: 'D#3', 678: 'E-3', 640: 'F-3',
-    604: 'F#3', 570: 'G-3', 538: 'G#3', 508: 'A-3', 480: 'A#3', 453: 'B-3',
-    428: 'C-4', 404: 'C#4', 381: 'D-4', 360: 'D#4', 339: 'E-4', 320: 'F-4',
-    302: 'F#4', 285: 'G-4', 269: 'G#4', 254: 'A-4', 240: 'A#4', 226: 'B-4',
-    214: 'C-5', 202: 'C#5', 190: 'D-5', 180: 'D#5', 170: 'E-5', 160: 'F-5',
-    151: 'F#5', 143: 'G-5', 135: 'G#5', 127: 'A-5', 120: 'A#5', 113: 'B-5',
-  };
-
-  // Find closest period
-  let closest = null;
-  let minDiff = Infinity;
-
-  for (const [periodStr, note] of Object.entries(PERIOD_TABLE)) {
-    const tablePeriod = parseInt(periodStr);
-    const diff = Math.abs(tablePeriod - period);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closest = note;
-    }
-  }
-
-  // Reject wildly invalid periods (threshold: 100 semitones off nearest)
-  if (minDiff > 100) return null;
-
-  return closest;
+  if (!(period > 0)) return null;
+  const note = amigaPeriodToNote(period);
+  // Reject wildly invalid periods (more than 100 off the nearest table entry).
+  if (note === 0 || Math.abs(AMIGA_PERIODS[note - 1] - period) > 100) return null;
+  return xmNoteToString(note);
 }
 
 /**
@@ -515,77 +485,21 @@ export function isMODFormat(buffer: ArrayBuffer): boolean {
   return MOD_FORMAT_TAGS.has(tag);
 }
 
-const NOTE_SEMITONES: Record<string, number> = {
-  'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
-  'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
-};
 
-function noteNameToIndex(name: string): number {
-  // Matches "C-3", "C#3", "A#2", etc.
-  const match = name.match(/^([A-G]#?)[-]?(\d)$/);
-  if (!match) return 0;
-  const semitone = NOTE_SEMITONES[match[1]] ?? 0;
-  const octave = parseInt(match[2]);
-  return octave * 12 + semitone + 1; // 1-based, C-0 = 1
-}
-
-/** Parse a MOD file and return a TrackerSong with real PCM instruments. */
+/**
+ * Parse a MOD file into a TrackerSong: `parseMOD`, then the one MOD
+ * converter (`convertMODModule`: ProTracker note naming, each cell's period
+ * kept, channel metadata, the original bytes) and `convertParsedInstruments`
+ * (ids = sample slots, finetune, default volume). Every path that opens a MOD
+ * with the native parser - the tracker's import, the DJ decks, the corpus -
+ * gets this same song.
+ */
 export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
   const { header, patterns: modPatterns, instruments: parsedInstruments, metadata } = await parseMOD(buffer);
-
-  const emptyInst = (id: number, name: string): InstrumentConfig => ({
-    id,
-    name: name || `Sample ${id}`,
-    type:      'sample' as const,
-    synthType: 'Sampler' as const,
-    effects:   [],
-    volume:    -60,
-    pan:       0,
-  } as InstrumentConfig);
-
-  const instruments: InstrumentConfig[] = parsedInstruments.map((inst) => {
-    const id = inst.id;
-    const converted = convertToInstrument(inst, id, 'S3M'); // MOD has no envelopes
-    return converted.length > 0 ? { ...converted[0], id } : emptyInst(id, inst.name);
-  });
-
-  const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-
-  const patterns: Pattern[] = modPatterns.map((modPat, patIdx) => ({
-    id:     `pattern-${patIdx}`,
-    name:   `Pattern ${patIdx}`,
-    length: modPat.length, // 64 rows
-    channels: Array.from({ length: header.channelCount }, (_, ch): ChannelData => ({
-      id:           `channel-${ch}`,
-      name:         `Channel ${ch + 1}`,
-      muted:        false,
-      solo:         false,
-      collapsed:    false,
-      volume:       100,
-      pan:          [-50, 50, 50, -50][ch % 4] ?? 0, // Amiga L-R-R-L stereo
-      instrumentId: null,
-      color:        null,
-      rows: modPat.map((row): TrackerCell => {
-        const n = row[ch];
-        if (!n || (n.period === 0 && n.instrument === 0 && n.effect === 0 && n.effectParam === 0)) {
-          return emptyCell();
-        }
-        const noteName = periodToNote(n.period);
-        const noteIdx  = noteName ? noteNameToIndex(noteName) : 0;
-        return {
-          note:       noteIdx,
-          instrument: n.instrument,
-          volume:     0, // MOD has no per-note volume column
-          effTyp:     n.effect,
-          eff:        n.effectParam,
-          effTyp2:    0,
-          eff2:       0,
-        };
-      }),
-    })),
-  }));
-
-  const songPositions = header.patternOrderTable.slice(0, header.songLength);
+  const converted = convertMODModule(
+    modPatterns, header.channelCount, metadata, parsedInstruments.map((i) => i.name), buffer,
+  );
+  const instruments = convertParsedInstruments(parsedInstruments, 'MOD');
   const initialSpeed  = metadata.modData?.initialSpeed ?? 6;
   const initialBPM    = metadata.modData?.initialBPM ?? 125;
 
@@ -606,9 +520,9 @@ export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promi
   return {
     name:            header.title.replace(/\0/g, '').trim() || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
-    patterns,
+    patterns:        converted.patterns,
     instruments,
-    songPositions,
+    songPositions:   converted.order,
     songLength:      header.songLength,
     restartPosition: header.restartPosition,
     numChannels:     header.channelCount,
@@ -616,5 +530,6 @@ export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promi
     initialBPM,
     linearPeriods:   false, // MOD always uses Amiga periods
     uadePatternLayout,
+    originalModuleData: converted.originalModuleData,
   };
 }

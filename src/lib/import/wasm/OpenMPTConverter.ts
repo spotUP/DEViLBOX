@@ -40,7 +40,7 @@ function mapFormat(type: string): TrackerFormat {
  * We subtract the format-specific offset so notes display as they do in
  * the native tracker (e.g. PT Clone shows C-3, we show C-3).
  */
-function mapNote(openmptNote: number, format: TrackerFormat): number {
+export function mapNote(openmptNote: number, format: TrackerFormat): number {
   if (openmptNote === 0) return 0;         // Empty
   if (openmptNote === 255) return 97;      // Note Off → XM note-off
   if (openmptNote === 254) return 97;      // Note Cut → treat as note-off
@@ -53,6 +53,22 @@ function mapNote(openmptNote: number, format: TrackerFormat): number {
     return Math.max(1, Math.min(adjusted, 96));
   }
   return 0;
+}
+
+/**
+ * DEViLBOX note -> OpenMPT note: the exact inverse of `mapNote`, by the
+ * format the CELL was named in (its song's source format), not the format
+ * being written. OpenMPT's note is format-free - 61 plays a sample at its
+ * base speed in every format - so a MOD cell (ProTracker naming, 25 = C-2)
+ * gains 36 and an XM/IT/S3M cell (FT2 naming, 49 = C-4) gains 12. Writing
+ * the note unchanged, as the edit bridge and the exporter did, put MOD notes
+ * three octaves and XM notes one octave low.
+ */
+export function mapNoteToOpenMPT(note: number, cellFormat: TrackerFormat | string | undefined): number {
+  if (note === 0) return 0;
+  if (note === 97) return 255;            // Note-off -> NOTE_KEYOFF
+  if (note < 1 || note > 96) return 0;
+  return Math.min(120, note + (String(cellFormat).toUpperCase() === 'MOD' ? 36 : 12));
 }
 
 /** Map OpenMPT volume command + value → DEViLBOX volume column byte */

@@ -16,6 +16,7 @@
 
 import type { TrackerCell } from '@/types/tracker';
 import type { SaveFormat } from '@lib/import/wasm/OpenMPTSoundlib';
+import { mapNoteToOpenMPT } from '@lib/import/wasm/OpenMPTConverter';
 
 let _dirty = false;
 let _loaded = false;
@@ -42,14 +43,6 @@ function scheduleHotReload(): void {
       // Serialization or engine not available
     }
   }, HOT_RELOAD_DEBOUNCE_MS);
-}
-
-/** Map DEViLBOX note → OpenMPT note value */
-function mapNoteToOpenMPT(note: number): number {
-  if (note === 0) return 0;
-  if (note === 97) return 255;    // Note-off → NOTE_KEYOFF
-  if (note >= 1 && note <= 96) return note;
-  return 0;
 }
 
 /** Map DEViLBOX volume byte → OpenMPT volcmd + vol */
@@ -168,7 +161,7 @@ export async function syncCellEdit(
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
 
-  const note = mapNoteToOpenMPT(fullCell.note);
+  const note = mapNoteToOpenMPT(fullCell.note, _format);
   const { volcmd, volval } = mapVolumeToOpenMPT(fullCell.volume);
 
   let cmdFinal: number;
@@ -243,7 +236,7 @@ export async function syncFullPattern(
     const rows = channels[ch].rows;
     for (let row = 0; row < rows.length; row++) {
       const cell = rows[row];
-      const note = mapNoteToOpenMPT(cell.note);
+      const note = mapNoteToOpenMPT(cell.note, _format);
       const { volcmd, volval } = mapVolumeToOpenMPT(cell.volume);
       const fx = mapEffectToOpenMPT(cell.effTyp, cell.eff);
       await osl.setPatternCell(patternIndex, row, ch, {

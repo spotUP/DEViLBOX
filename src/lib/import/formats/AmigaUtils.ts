@@ -6,47 +6,26 @@
  */
 
 import type { InstrumentConfig } from '@/types/instrument';
+import { periodToPtNote } from '@/lib/amiga/periodNotes';
 
-// ── Amiga period table (octave 0-5, C to B) ──────────────────────────────
-// Standard ProTracker period table. Index 0 = no note, 1-36 = C-1 to B-3
-// Periods correspond to PAL Amiga (3546895 Hz / 2 / period = Hz)
-
-const AMIGA_PERIODS = [
-  // Octave 1 (C-1 to B-1)
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  // Octave 2 (C-2 to B-2)
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  // Octave 3 (C-3 to B-3)
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-];
+// ── Amiga period -> note ───────────────────────────────────────────────
+// One table for every Amiga reader and writer: src/lib/amiga/periodNotes.ts
+// (ProTracker naming, note 13 = C-1 = 856).
 
 /**
- * Convert an Amiga period value to a note index (1-based, C-0 = 1 in HVL convention,
- * C-1 = 1 in ProTracker convention).
- * Returns 0 if not found or period is 0.
+ * An Amiga period as an index into ProTracker's three octaves (1 = C-1 ...
+ * 36 = B-3), nearest match, clamped to that range; 0 for no period.
  */
 export function periodToNoteIndex(period: number): number {
   if (period === 0) return 0;
-  // Find closest period
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < AMIGA_PERIODS.length; i++) {
-    const d = Math.abs(AMIGA_PERIODS[i] - period);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
-  }
-  return bestIdx + 1; // 1-based
+  return periodToPtNote(period) - 12;
 }
 
 /**
- * Convert an Amiga note index (1-based into ProTracker period table) to an XM note number.
- * ProTracker index 1 = C-1 (period 856) → XM note 13 (displays as "C-1").
+ * ProTracker index (1 = C-1) to tracker note (13 = C-1).
  */
 export function amigaNoteToXM(amigaNote: number): number {
   if (amigaNote === 0) return 0;
-  // ProTracker: index 1 = C-1 (period 856) → XM note 13 = "C-1"
   return amigaNote + 12;
 }
 

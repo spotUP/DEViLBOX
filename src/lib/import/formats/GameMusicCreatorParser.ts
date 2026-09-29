@@ -43,6 +43,7 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamIn
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeGameMusicCreatorCell } from '@/engine/uade/encoders/GameMusicCreatorEncoder';
+import { periodToPtNote } from '@/lib/amiga/periodNotes';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
@@ -63,30 +64,14 @@ const HEADER_SIZE     = NUM_SAMPLES * SAMPLE_HDR_SIZE + 3 + 1 + 100 * 2; // = 44
 // Index 0 = C-1 (period 856) ... index 35 = B-3 (period 113)
 // Matches Load_gmc.cpp's use of ReadMODPatternEntry which uses this table.
 
-const MOD_PERIODS: number[] = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,  // C-1 to B-1
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,  // C-2 to B-2
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,  // C-3 to B-3
-];
-
 /**
  * Convert a ProTracker period value to a TrackerCell note number.
  * XM/DEViLBOX: note 1 = C-0. ProTracker octave 1 starts at note 13 (C-1).
  * Returns 0 (empty) if period is 0 or out of range.
  */
 function periodToNote(period: number): number {
-  if (period === 0) return 0;
-  let best = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < MOD_PERIODS.length; i++) {
-    const d = Math.abs(MOD_PERIODS[i] - period);
-    if (d < bestDist) {
-      bestDist = d;
-      best = i;
-    }
-  }
-  // best = 0-based index into period table → index 0 = C-1 = XM note 13
-  return best + 13;
+  // ProTracker naming, one table: src/lib/amiga/periodNotes.ts.
+  return periodToPtNote(period);
 }
 
 // ── Format detection ───────────────────────────────────────────────────────────
