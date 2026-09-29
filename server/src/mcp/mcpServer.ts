@@ -1503,9 +1503,10 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'get_audio_level',
-    'Measure audio output level over a time window. Returns RMS average/max, peak max, and whether audio is silent. Useful for verifying a loaded file produces sound.',
+    'Measure audio output level over a time window. Returns RMS average/max, peak max, and whether audio is silent. Useful for verifying a loaded file produces sound. With bands: true it also returns bandsDb - the mean power per octave band (63 Hz ... 16 kHz, dB) over the window, for measuring an effect\'s frequency response with a broadband signal.',
     {
       durationMs: z.number().optional().describe('Measurement duration in milliseconds (default 2000)'),
+      bands: z.boolean().optional().describe('Also return bandsDb: mean power per octave band over the window'),
     },
     (p) => call('get_audio_level', p),
   );
