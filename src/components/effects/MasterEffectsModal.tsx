@@ -3,11 +3,10 @@
  * Now supports both Tone.js and Neural effects in a single unified list
  */
 
-import { previewToRemoveOnSelect } from './chainSelection';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { EffectRegistry } from '@engine/registry/EffectRegistry';
 import React, { useState, useCallback, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
-import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink, Plus } from 'lucide-react';
+import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import {
@@ -59,7 +58,6 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [editingEffectId, setEditingEffectId] = useState<string | null>(null);
-  const [previewEffectId, setPreviewEffectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
@@ -172,13 +170,9 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   // Count neural effects for performance warning
   const neuralEffectCount = masterEffects.filter(fx => fx.category === 'neural').length;
 
-  // Preview an effect — temporarily adds to audio chain so user hears it
-  const handlePreviewEffect = useCallback((availableEffect: AvailableEffect) => {
-    // Remove previous preview if any
-    if (previewEffectId) {
-      removeMasterEffect(previewEffectId);
-    }
-
+  // Clicking an effect in the browser adds it to the chain and opens its
+  // editor; the chain card's remove button takes it out again.
+  const handleAddEffect = useCallback((availableEffect: AvailableEffect) => {
     // Warn before adding 4th neural effect
     if (availableEffect.category === 'neural' && neuralEffectCount >= 3) {
       const proceed = confirm(
@@ -186,7 +180,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
         'Adding a 4th neural effect. Multiple neural effects can cause high CPU usage and audio glitches.\n\n' +
         'Continue anyway?'
       );
-      if (!proceed) { setPreviewEffectId(null); setEditingEffectId(null); return; }
+      if (!proceed) return;
     }
 
     const type = (availableEffect.type as EffectType) || 'Distortion';
@@ -220,26 +214,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
     // Store generates its own ID — read it back
     const added = useAudioStore.getState().masterEffects;
-    const newId = added[added.length - 1]?.id ?? null;
-    setPreviewEffectId(newId);
-    setEditingEffectId(newId);
-  }, [previewEffectId, neuralEffectCount, addMasterEffectConfig, removeMasterEffect]);
-
-  // Confirm: keep the preview effect in the chain permanently
-  const handleConfirmAdd = useCallback(() => {
-    if (!previewEffectId) return;
-    setPreviewEffectId(null);
-    // editingEffectId already points to the effect — it just stays in the chain
-  }, [previewEffectId]);
-
-  // Cancel/remove the preview effect
-  const handleCancelPreview = useCallback(() => {
-    if (previewEffectId) {
-      removeMasterEffect(previewEffectId);
-    }
-    setPreviewEffectId(null);
-    setEditingEffectId(null);
-  }, [previewEffectId, removeMasterEffect]);
+    setEditingEffectId(added[added.length - 1]?.id ?? null);
+  }, [neuralEffectCount, addMasterEffectConfig]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -517,11 +493,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         key={effect.id}
                         effect={effect}
                         isSelected={editingEffectId === effect.id}
-                        onSelect={() => {
-                          const stale = previewToRemoveOnSelect(previewEffectId, effect.id);
-                          if (stale) { removeMasterEffect(stale); setPreviewEffectId(null); }
-                          setEditingEffectId(effect.id);
-                        }}
+                        onSelect={() => setEditingEffectId(effect.id)}
                         onToggle={() => handleToggle(effect.id)}
                         onRemove={() => removeMasterEffect(effect.id)}
                         onWetChange={(wet) => handleWetChange(effect.id, wet)}
@@ -542,32 +514,9 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
           <div className="w-1/2 border-r border-dark-border flex flex-col">
             {editingEffect ? (
               <>
-                <div className="p-4 border-b border-dark-border bg-dark-bgSecondary flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-text-primary">{editingEffect.neuralModelName || editingEffect.type} Parameters</h3>
-                    <p className="text-xs text-text-muted">
-                      {previewEffectId === editingEffectId ? 'Preview — tweak knobs to hear changes' : 'Adjust effect settings'}
-                    </p>
-                  </div>
-                  {previewEffectId === editingEffectId && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleCancelPreview}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-dark-border
-                                 text-text-muted hover:text-text-primary hover:border-dark-borderLight transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleConfirmAdd}
-                        className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-lg
-                                 bg-accent-primary text-text-primary hover:bg-accent-primary/80 transition-colors"
-                      >
-                        <Plus size={12} />
-                        Add to Chain
-                      </button>
-                    </div>
-                  )}
+                <div className="p-4 border-b border-dark-border bg-dark-bgSecondary">
+                  <h3 className="text-sm font-bold text-text-primary">{editingEffect.neuralModelName || editingEffect.type} Parameters</h3>
+                  <p className="text-xs text-text-muted">Adjust effect settings</p>
                 </div>
                 <div className="flex-1 overflow-y-auto scrollbar-modern p-4">
                   <EffectParameterEditor
@@ -655,7 +604,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                       {groupEffects.map((effect) => (
                         <button
                           key={effect.label}
-                          onClick={() => handlePreviewEffect(effect)}
+                          onClick={() => handleAddEffect(effect)}
                           className="w-full px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
                                    hover:bg-accent-primary/80 hover:text-text-primary hover:border-accent-primary
                                    transition-colors text-left flex items-center justify-between gap-2"
