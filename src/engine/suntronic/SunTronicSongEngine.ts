@@ -19,6 +19,7 @@
  * 'native' (default stays UADE until Gate E locks whole-song fidelity).
  */
 
+import { channelOutputNodeOptions } from '@engine/wasm/WASMSingletonBase';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { parseSunTronicV13Score, type SunV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicNativeRenderer, NATIVE_SAMPLE_RATE, voiceScopeToInt16, type RenderChannels } from './SunTronicNativeRender';
@@ -71,6 +72,7 @@ export class SunTronicSongEngine {
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
   private _disposed = false;
+  private _nodeReady = false;
 
   // Song render state (rebuilt on each loadTune; recreated to restart from top).
   private score: SunV13Score | null = null;
@@ -119,14 +121,15 @@ export class SunTronicSongEngine {
   private async initialize(): Promise<void> {
     try {
       const base = import.meta.env.BASE_URL || '/';
+      // Per-voice dub sends (DevilboxChannelOutputs) — loaded before the resampler.
+      try { await this.audioContext.audioWorklet.addModule(`${base}worklets/channel-outputs.js`); } catch { /* already loaded */ }
       await this.audioContext.audioWorklet.addModule(`${base}suntronic/SunTronicResampler.worklet.js`);
-      this.workletNode = new AudioWorkletNode(this.audioContext, 'suntronic-resampler', {
-        outputChannelCount: [2],
-        numberOfOutputs: 1,
-      });
+      // Output 0 is the mix; 5..8 carry each Paula voice as a dub send.
+      this.workletNode = new AudioWorkletNode(this.audioContext, 'suntronic-resampler', channelOutputNodeOptions());
       this.workletNode.port.onmessage = (e) => {
         const d = e.data;
         if (d.type === 'ready') {
+          this._nodeReady = true;
           this._resolveInit?.();
           this._resolveInit = null;
         } else if (d.type === 'consumed') {
@@ -137,7 +140,7 @@ export class SunTronicSongEngine {
           console.warn('[SunTronicSongEngine] worklet underrun — ring ran dry');
         }
       };
-      this.workletNode.connect(this.output);
+      this.workletNode.connect(this.output, 0);
       this.workletNode.port.postMessage({ type: 'init' });
     } catch (err) {
       console.error('[SunTronicSongEngine] init failed:', err);
@@ -180,7 +183,20 @@ export class SunTronicSongEngine {
     this.workletNode.port.postMessage({ type: 'play' });
     this.playing = true;
     this.startPump();
+    // Re-post the open dub sends to the fresh stream.
+    void import('@engine/tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
+      try { void getChannelRoutedEffectsManager()?.rebuildDubConnections(); } catch { /* ok */ }
+    }).catch(() => {});
   }
+
+  // ── IsolationCapableEngine: per-voice dub sends, no isolation slots (the
+  //    mix is summed on the main thread, so a voice cannot leave output 0). ──
+  getWorkletNode(): AudioWorkletNode | null { return this.workletNode; }
+  getAudioContext(): AudioContext | null { return this.audioContext; }
+  isAvailable(): boolean { return this._nodeReady && !!this.workletNode && !this._disposed; }
+  supportsIsolationSlots(): boolean { return false; }
+  addIsolation(): void { /* no isolation slots */ }
+  removeIsolation(): void { /* no isolation slots */ }
 
   /** Render + post chunks until ~LOOKAHEAD samples are queued ahead of playback. */
   private produceUntilLookahead(): void {
@@ -202,8 +218,11 @@ export class SunTronicSongEngine {
       // ahead of playback by the lookahead, which analysis does not mind;
       // `generated` restarts at 0 on play, which the tap reads as a new stream.
       pushChannelAudio(ch.map((v) => voiceScopeToInt16(v, CHUNK)), this.generated, NATIVE_SAMPLE_RATE);
+      // The four voices ride along (copied, not transferred: the scope below
+      // still reads the last chunk's) so the worklet can resample each into
+      // its dub-send output in step with the mix.
       this.workletNode.port.postMessage(
-        { type: 'chunk', left, right },
+        { type: 'chunk', left, right, voices: ch },
         [left.buffer, right.buffer],
       );
       this.generated += CHUNK;
