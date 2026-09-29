@@ -39,14 +39,12 @@ import { exportSong, getOriginalModuleDataForExport } from '@lib/export/exporter
 import { hasAnyConfirmedFormatViolation } from '@/lib/formatCompatibility';
 import { type ModuleInfo } from '@lib/import/ModuleLoader';
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
-import { clearSavedProject, clearExplicitlySaved, saveProjectToStorage } from '@hooks/useProjectPersistence';
+import { clearSavedProject, saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { useHistoryStore } from '@stores/useHistoryStore';
-import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
+import { exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useAIStore } from '@stores/useAIStore';
-import type { TB303Config } from '@typedefs/instrument';
-import type { Pattern } from '@typedefs';
 
 import { CURRENT_VERSION } from '@generated/changelog';
 import { useFT2ToolbarActions } from '@stores/useFT2ToolbarActions';
@@ -72,7 +70,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     currentPatternIndex,
     setCurrentPattern,
     resizePattern,
-    loadPatterns,
     setPatternOrder,
     patternOrder,
     currentPositionIndex,
@@ -84,7 +81,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     currentPatternIndex: s.currentPatternIndex,
     setCurrentPattern: s.setCurrentPattern,
     resizePattern: s.resizePattern,
-    loadPatterns: s.loadPatterns,
     setPatternOrder: s.setPatternOrder,
     patternOrder: s.patternOrder,
     currentPositionIndex: s.currentPositionIndex,
@@ -143,7 +139,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     play,
     stop,
     setCurrentRow,
-    setGrooveTemplate,
     reset: resetTransport,
   } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
@@ -156,22 +151,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     play: s.play,
     stop: s.stop,
     setCurrentRow: s.setCurrentRow,
-    setGrooveTemplate: s.setGrooveTemplate,
     reset: s.reset,
   })));
 
-  const { setMetadata, resetProject } = useProjectStore(useShallow((s) => ({
-    setMetadata: s.setMetadata,
+  const { resetProject } = useProjectStore(useShallow((s) => ({
     resetProject: s.resetProject,
   })));
-  const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore(useShallow((s) => ({
-    instruments: s.instruments,
-    loadInstruments: s.loadInstruments,
-    updateInstrument: s.updateInstrument,
-    addInstrument: s.addInstrument,
-    reset: s.reset,
-  })));
-  const { reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
+  const { reset: resetInstruments } = useInstrumentStore(useShallow((s) => ({
     reset: s.reset,
   })));
 
@@ -773,191 +759,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         companionFiles={pendingCompanions}
       />
       <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} mode="load" onLoad={async (data, filename) => {
-        // Loading from file browser — prevent auto-save from overwriting user's saved project
-        clearExplicitlySaved();
-        if (isPlaying) { stop(); engine.releaseAll(); }
+        // The file loader handles every one of these (DB303 XML preset or
+        // pattern, MIDI, JSON / .dbx project). This handler parsed and applied
+        // each itself, differently from a drop (2026-09-29 audit).
         try {
-          // Handle XML files (DB303 patterns or presets)
-          const dataStr = typeof (data as unknown) === 'string' ? (data as unknown as string) : null;
-          if (dataStr && filename.toLowerCase().endsWith('.xml')) {
-            try {
-              // Detect XML type
-              const isPreset = dataStr.includes('<db303-preset');
-              const isPattern = dataStr.includes('<db303-pattern');
-              
-              if (isPreset) {
-                // Import as TB-303 preset
-                const { parseDb303Preset } = await import('@lib/import/Db303PresetConverter');
-                const presetConfig = parseDb303Preset(dataStr);
-                
-                // Find or create TB-303 instrument and apply preset
-                let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
-                if (!tb303Instrument) {
-                  // Auto-create TB-303 instrument
-                  const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
-                  const newInst = createDefaultTB303Instrument();
-                  addInstrument(newInst);
-                  tb303Instrument = newInst;
-                }
-                
-                // Update the instrument with the preset using updateInstrument
-                const mergedConfig = { ...tb303Instrument.tb303, ...presetConfig } as TB303Config;
-                updateInstrument(tb303Instrument.id, { tb303: mergedConfig });
-                
-                notify.success(`Loaded DB303 preset: ${filename.replace('.xml', '')}`);
-                console.log('[XML Import] Applied preset to instrument:', tb303Instrument.id, presetConfig);
-                return;
-              } else if (isPattern) {
-                // Import as TB-303 pattern
-                const patternName = filename.replace('.xml', '') || 'Imported Pattern';
-                
-                // Find or create TB-303 instrument
-                let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
-                if (!tb303Instrument) {
-                  // Auto-create TB-303 instrument
-                  const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
-                  const newInst = createDefaultTB303Instrument();
-                  addInstrument(newInst);
-                  tb303Instrument = newInst;
-                }
-                
-                // Parse pattern with instrument ID
-                const { pattern: importedPattern, tempo } = parseDb303Pattern(dataStr, patternName, tb303Instrument.id);
-                
-                console.log('[XML Import] Parsed pattern:', {
-                  name: importedPattern.name,
-                  length: importedPattern.length,
-                  channels: importedPattern.channels.length,
-                  rows: importedPattern.channels[0]?.rows.length,
-                  instrumentId: tb303Instrument.id,
-                  tempo
-                });
-                
-                // Assign instrument to channel
-                importedPattern.channels[0].instrumentId = tb303Instrument.id;
-                console.log('[XML Import] Assigned TB-303 instrument:', tb303Instrument.id);
-                
-                const newPatterns = [...patterns, importedPattern];
-                loadPatterns(newPatterns);
-                setCurrentPattern(newPatterns.length - 1);
-                
-                // Set pattern order to loop the imported pattern
-                setPatternOrder([newPatterns.length - 1]);
-                
-                // Apply tempo and swing if specified
-                if (tempo !== undefined) {
-                  setBPM(tempo);
-                  console.log('[XML Import] Set tempo to:', tempo);
-                }
-                // NOTE: We intentionally DO NOT apply swing from DB303 XML to avoid
-                // double-swing with tracker's global groove/swing system.
-                // Users can manually adjust swing via the tracker's transport settings.
-                // The swing parameter in DB303 XML affects slide timing in the original,
-                // but applying it here would conflict with tracker groove and cause
-                // incorrect slide behavior.
-                // Original code (now disabled):
-                // if (swing !== undefined) {
-                //   const swingValue = 100 + (swing * 100);
-                //   setSwing(swingValue);
-                //   setGrooveSteps(2);
-                //   console.log('[XML Import] Set swing:', swing, '→', swingValue);
-                // }
-                
-                
-                notify.success(`Loaded DB303 pattern: ${importedPattern.name} (${importedPattern.length} steps${tempo ? `, ${tempo} BPM` : ''})`);
-                return;
-              } else {
-                notify.error('Unknown XML format. Expected db303-pattern or db303-preset.');
-                return;
-              }
-            } catch (xmlError) {
-              console.error('[XML Import] Parse error:', xmlError);
-              notify.error(`Failed to parse XML: ${xmlError instanceof Error ? xmlError.message : 'Unknown error'}`);
-              return;
-            }
-          }
-
-          // Handle MIDI files
-          if (filename.toLowerCase().endsWith('.mid') || filename.toLowerCase().endsWith('.midi')) {
-            try {
-              // Import as MIDI file
-              const { importMIDIFile } = await import('@lib/import/MIDIImporter');
-
-              // Convert data to File object if it's ArrayBuffer
-              const fileBlob = data instanceof ArrayBuffer
-                ? new Blob([data], { type: 'audio/midi' })
-                : data instanceof Blob
-                ? data
-                : new Blob([JSON.stringify(data)], { type: 'audio/midi' });
-
-              const file = new File([fileBlob], filename, { type: 'audio/midi' });
-
-              const result = await importMIDIFile(file, {
-                quantize: 1,
-                velocityToVolume: true,
-                defaultPatternLength: 64
-              });
-
-              console.log('[MIDI Import] Imported:', {
-                patterns: result.patterns.length,
-                bpm: result.bpm,
-                tracks: result.metadata.tracks
-              });
-
-              resetAutomation();
-              resetTransport();
-              resetInstruments();
-              engine.disposeAllInstruments();
-
-              // Load patterns and set BPM
-              const midiOrder = result.patterns.map((_: Pattern, i: number) => i);
-              loadPatterns(result.patterns);
-              if (result.instruments.length > 0) {
-                loadInstruments(result.instruments);
-              }
-              setBPM(result.bpm);
-              setSpeed(6);
-              setCurrentPattern(0);
-              setPatternOrder(midiOrder);
-              setMetadata({
-                name: result.metadata.name,
-                author: '',
-                description: `Imported from ${filename} (${result.metadata.tracks} track${result.metadata.tracks !== 1 ? 's' : ''})`,
-              });
-
-              notify.success(
-                `Imported: ${result.metadata.name || filename} — ${result.instruments.length} instrument(s), BPM: ${result.bpm}`
-              );
-              return;
-            } catch (midiError) {
-              console.error('[MIDI Import] Failed:', midiError);
-              notify.error(`Failed to import MIDI: ${midiError instanceof Error ? midiError.message : 'Unknown error'}`);
-              return;
-            }
-          }
-
-          // Handle JSON project files
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const proj = data as any;
-          const { needsMigration, migrateProject } = await import('@/lib/migration');
-          let projectPatterns = proj.patterns, projectInstruments = proj.instruments;
-          if (needsMigration(projectPatterns, projectInstruments)) {
-            const migrated = migrateProject(projectPatterns, projectInstruments);
-            projectPatterns = migrated.patterns; projectInstruments = migrated.instruments;
-          }
-          if (projectPatterns) {
-            loadPatterns(projectPatterns);
-            if (proj.sequence && Array.isArray(proj.sequence)) {
-              const patternIdToIndex = new Map((projectPatterns as Array<{ id: string }>).map((p, i) => [p.id, i]));
-              const order = (proj.sequence as string[]).map((id: string) => patternIdToIndex.get(id)).filter((idx: unknown): idx is number => idx !== undefined);
-              if (order.length > 0) setPatternOrder(order);
-            }
-          }
-          if (projectInstruments) loadInstruments(projectInstruments);
-          if (proj.metadata) setMetadata(proj.metadata);
-          if (proj.bpm) setBPM(proj.bpm);
-          setGrooveTemplate(proj.grooveTemplateId || 'straight');
-          notify.success(`Loaded: ${proj.metadata?.name || filename}`);
+          const body = typeof (data as unknown) === 'string' || data instanceof ArrayBuffer || data instanceof Blob
+            ? (data as unknown as BlobPart)
+            : JSON.stringify(data);
+          const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+          const result = await loadFile(new File([body], filename), { requireConfirmation: false });
+          if (result.success === true) notify.success(result.message);
+          else if (result.success === false) notify.error(result.error);
         } catch { notify.error('Failed to load file'); }
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
         const { loadFile } = await import('@lib/file/UnifiedFileLoader');
