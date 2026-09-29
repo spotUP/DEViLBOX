@@ -11,6 +11,7 @@ import type { ToneEngine } from '@engine/ToneEngine';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
 import { createBatchedSet } from '@/utils/batchedSet';
+import { targetsChannels } from '@engine/tone/sidechainKey';
 
 interface AudioStore {
   // State
@@ -239,7 +240,7 @@ export const useAudioStore = create<AudioStore>()(
           const fx = state.masterEffects.find((e) => e.id === effectId);
           if (fx) Object.assign(fx, updates);
         });
-        if (Array.isArray(effect.selectedChannels) && effect.selectedChannels.length > 0) {
+        if (targetsChannels(effect)) {
           import('./useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
             scheduleWasmEffectRebuild();
           }).catch(() => {});
@@ -262,8 +263,8 @@ export const useAudioStore = create<AudioStore>()(
         }
       }
 
-      // When selectedChannels changes, trigger WASM isolation rebuild
-      if ('selectedChannels' in updates) {
+      // When the channels it targets change, trigger WASM isolation rebuild
+      if ('selectedChannels' in updates || 'channelRole' in updates) {
         import('./useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
           scheduleWasmEffectRebuild();
         }).catch(() => {});
