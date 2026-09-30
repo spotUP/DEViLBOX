@@ -42,6 +42,8 @@ export class BuzzmachineGenerator implements DevilboxSynth {
   private pendingNoteMessages: Array<Record<string, unknown>> = [];
   /** Parameters set before the worklet was ready (index -> latest value). */
   private pendingParams = new Map<number, number>();
+  /** Stop the machine after the pending parameters (they came from applyConfig). */
+  private stopAfterPendingParams = false;
 
   // Error tracking - no fallback synths, report errors instead
   private initError: Error | null = null;
@@ -201,6 +203,8 @@ export class BuzzmachineGenerator implements DevilboxSynth {
       console.log(`[BuzzmachineGenerator] ${this.machineType} WASM engine active`);
       for (const [index, value] of this.pendingParams) this.engine.setParameter(this.workletNode, index, value);
       this.pendingParams.clear();
+      if (this.stopAfterPendingParams) this.engine.stop(this.workletNode);
+      this.stopAfterPendingParams = false;
       for (const msg of this.pendingNoteMessages) this.workletNode.port.postMessage({ ...msg, time: undefined });
       this.pendingNoteMessages = [];
     } catch (err) {
@@ -312,9 +316,15 @@ export class BuzzmachineGenerator implements DevilboxSynth {
    * started on its machine's defaults.
    */
   public applyConfig(buzzmachine: { parameters?: Record<number, number> } | undefined): void {
-    for (const [index, value] of Object.entries(buzzmachine?.parameters ?? {})) {
-      this.setParameter(Number(index), value);
-    }
+    const entries = Object.entries(buzzmachine?.parameters ?? {});
+    for (const [index, value] of entries) this.setParameter(Number(index), value);
+    // Setting a Buzz machine's parameters runs its tick, and a drone generator
+    // (Elenzil FrequencyBomb) starts sounding on it: an instrument restored
+    // with its settings played on its own after a reload and never stopped
+    // (2026-09-30). Settings are not a note - stop the machine after them.
+    if (entries.length === 0) return;
+    if (this.useWasmEngine && this.workletNode) this.engine.stop(this.workletNode);
+    else this.stopAfterPendingParams = true;
   }
 
   public setParameter(paramIndex: number, value: number): void {

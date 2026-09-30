@@ -38,7 +38,7 @@ import {
   DEFAULT_STRING_MACHINE,
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_FURNACE,
-  DEFAULT_BUZZMACHINE,
+  defaultBuzzmachineFor,
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DRUMKIT,
   DEFAULT_DUB_SIREN,
@@ -193,7 +193,7 @@ function handleSynthTypeChange(
   }
   // Buzzmachine types get default buzzmachine config
   if (newType === 'Buzzmachine' || newType.startsWith('Buzz')) {
-    updates.buzzmachine = { ...DEFAULT_BUZZMACHINE };
+    updates.buzzmachine = defaultBuzzmachineFor(newType);
   }
 
   onChange(updates);
@@ -363,6 +363,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
 
             <PresetDropdown
               synthType={instrument.synthType}
+              machineType={instrument.buzzmachine?.machineType}
               currentPresetName={instrument.name}
               onChange={onChange}
             />

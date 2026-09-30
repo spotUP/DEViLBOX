@@ -1341,9 +1341,29 @@ export const DEFAULT_WOBBLE_BASS: WobbleBassConfig = {
 };
 
 export const DEFAULT_BUZZMACHINE: BuzzmachineConfig = {
-  machineType: 'ArguruDistortion',
+  // A generator: an instrument makes sound from notes. The default was Arguru
+  // Distortion, an effect - with no input it is silent ("the buzzmachine synth
+  // is silent", 2026-09-30).
+  machineType: 'MakkM3' as BuzzmachineConfig['machineType'],
   parameters: {},
 };
+
+/** The Buzz machine each Buzz synth type plays - the one mapping the create dialog and the editor header use. */
+const BUZZ_SYNTH_MACHINES: Record<string, string> = {
+  Buzzmachine: 'MakkM3', BuzzDTMF: 'CyanPhaseDTMF', BuzzFreqBomb: 'ElenzilFrequencyBomb',
+  BuzzKick: 'FSMKick', BuzzKickXP: 'FSMKickXP', BuzzNoise: 'JeskolaNoise', BuzzTrilok: 'JeskolaTrilok',
+  Buzz4FM2F: 'MadBrain4FM2F', BuzzDynamite6: 'MadBrainDynamite6', BuzzM3: 'MakkM3', BuzzM4: 'MakkM4',
+  Buzz3o3: 'OomekAggressor', Buzz3o3DF: 'OomekAggressorDF',
+};
+
+/** A fresh Buzz machine config for a Buzz synth type. */
+export function defaultBuzzmachineFor(synthType: string): BuzzmachineConfig {
+  return {
+    ...DEFAULT_BUZZMACHINE,
+    machineType: (BUZZ_SYNTH_MACHINES[synthType] ?? DEFAULT_BUZZMACHINE.machineType) as BuzzmachineConfig['machineType'],
+    parameters: {},
+  };
+}
 
 export const DEFAULT_FURNACE: FurnaceConfig = {
   chipType: 1, // FM (OPN2/Genesis)

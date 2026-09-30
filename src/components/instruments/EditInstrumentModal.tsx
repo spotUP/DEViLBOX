@@ -42,6 +42,7 @@ import {
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_FURNACE,
   DEFAULT_BUZZMACHINE,
+  defaultBuzzmachineFor,
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DUB_SIREN,
   DEFAULT_SPACE_LASER,
@@ -779,18 +780,7 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
       base.furnace.chipType = chipTypeMap[synthType]!;
     }
   } else if (isBuzzmachineType(synthType)) {
-    base.buzzmachine = { ...DEFAULT_BUZZMACHINE };
-    const machineTypeMap: Partial<Record<SynthType, string>> = {
-      'Buzzmachine': 'ArguruDistortion', 'BuzzDTMF': 'CyanPhaseDTMF',
-      'BuzzFreqBomb': 'ElenzilFrequencyBomb', 'BuzzKick': 'FSMKick',
-      'BuzzKickXP': 'FSMKickXP', 'BuzzNoise': 'JeskolaNoise',
-      'BuzzTrilok': 'JeskolaTrilok', 'Buzz4FM2F': 'MadBrain4FM2F',
-      'BuzzDynamite6': 'MadBrainDynamite6', 'BuzzM3': 'MakkM3',
-      'Buzz3o3': 'OomekAggressor',
-    };
-    if (machineTypeMap[synthType]) {
-      base.buzzmachine.machineType = machineTypeMap[synthType] as BuzzmachineType;
-    }
+    base.buzzmachine = defaultBuzzmachineFor(synthType);
   } else if (synthType === 'GranularSynth') {
     base.granular = { ...DEFAULT_GRANULAR };
   } else if (synthType === 'DrumKit') {

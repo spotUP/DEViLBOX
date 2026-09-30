@@ -30,6 +30,7 @@ vi.mock('../BuzzmachineEngine', async () => {
       getInstance: () => ({
         init: () => new Promise<void>((r) => { releaseInit = r; }),
         setParameter: (_n: unknown, index: number, value: number) => posted.push({ type: 'param', index, value }),
+        stop: () => posted.push({ type: 'stop' }),
         createMachineNode: async () => ({ connect() {}, port: { postMessage: (m: Record<string, unknown>) => posted.push(m) } }),
       }),
     },
@@ -47,7 +48,9 @@ describe('Buzz generator first note', () => {
     synth.triggerRelease();
     expect(posted).toHaveLength(0); // not ready yet
     releaseInit();
-    await vi.waitFor(() => expect(posted.map((m) => m.type)).toEqual(['param', 'noteOn', 'noteOff']));
+    // Settings, then a stop (a drone machine starts on a parameter tick and a
+    // restored FrequencyBomb played forever), then the queued note.
+    await vi.waitFor(() => expect(posted.map((m) => m.type)).toEqual(['param', 'stop', 'noteOn', 'noteOff']));
     expect(posted[0]).toMatchObject({ index: 2, value: 77 });
   });
 

@@ -56,6 +56,28 @@ for (const type of GENERATOR_TYPES) {
   }
 }
 
+// Every machine's presets also under the generic 'Buzzmachine' synth type,
+// which is what an instrument built on any Buzz machine (the effects -
+// Arguru Distortion, Elak SVF ... - and generators loaded generically) uses.
+// The header preset dropdown filters these by the instrument's machine. Only
+// the generators were listed before, under their own synth types, so the
+// dropdown was empty for every other Buzz machine and the Buzz editor grew a
+// second, local preset box instead (2026-09-30).
+export const BUZZMACHINE_GENERIC_PRESETS: InstrumentPreset['config'][] = [];
+for (const [type, presets] of Object.entries(BUZZMACHINE_PRESETS)) {
+  for (const [presetName, config] of Object.entries(presets ?? {})) {
+    BUZZMACHINE_GENERIC_PRESETS.push({
+      name: `Buzz ${presetName}`,
+      type: 'synth',
+      synthType: 'Buzzmachine' as SynthType,
+      volume: -10,
+      pan: 0,
+      effects: [],
+      buzzmachine: { machineType: type as BuzzmachineType, parameters: { ...config.parameters } },
+    });
+  }
+}
+
 // Helper to map BuzzmachineType to InstrumentFactory SynthType string
 // e.g. 'FSMKick' -> 'BuzzKick'
 function getShortName(type: string): string {
