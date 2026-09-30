@@ -102,6 +102,18 @@ export class HivelySynth implements DevilboxSynth {
 
 
   /**
+   * Remember the instrument without setting up its player yet: the first note
+   * sets it up (triggerAttack's lazy branch). For a synth created while a tune
+   * is loaded - setting up a player per instrument then interfered with the
+   * tune, so the factory skipped the config entirely, and a note on that
+   * synth fell through to song mode and played the WHOLE SONG ("when i play an
+   * instrument the whole song plays", 2026-09-30).
+   */
+  setPendingInstrument(config: HivelyConfig): void {
+    if (!this._instrumentMode && !this._setupPromise) this._pendingConfig = config;
+  }
+
+  /**
    * Set up this synth for standalone instrument playback.
    * Call this with a HivelyConfig to enable per-note triggering.
    */

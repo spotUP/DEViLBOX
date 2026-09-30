@@ -113,7 +113,7 @@ included the post gains being calibrated.
 - [x] O14 Preset keys audit (bcd192938): 14 delay times (delayTime vs time), 6
       distortion drives, Spacey Delay; make-up tool read presets stale (fixed).
 - [ ] O15 Chip Metal preset level not measured (Swedish Chainsaw slow to load).
-- [ ] O16 AHX regression? Playing an instrument (preview) plays the whole song -
+- [x] O16 (factory skipped setInstrument while a tune was loaded; the note fell to song mode -> engine.play()) AHX regression? Playing an instrument (preview) plays the whole song -
       used to play only the instrument. Is the Hively WASM instrument player used?
       (Recent: eced26399 "the tune gets back its only route into the mixer",
       79316f666 "instrument players get their own output"; the test
@@ -124,3 +124,6 @@ included the post gains being calibrated.
       machine after applyConfig. UNCONFIRMED live - owner to retest.
 - [x] O18 Oomek Aggressor 3o3 shows no UI: header type switch set no tb303 (the 303
       panel needs it); fixed + the editor repairs a saved one on open.
+- NOTE: src/engine/hively/__tests__/instrumentPlayersHaveTheirOwnOutput.test.ts fails
+      on main since eced26399 re-added the tune bridge on purpose; the contract was
+      not updated. Not in test:ci. Needs its owner's decision, not touched.
