@@ -177,6 +177,34 @@ export class AnotherDelayAdapter implements DubEchoEngine {
 
 // ─── RETapeEcho adapter ─────────────────────────────────────────────────
 
+/**
+ * Peak gain of the RE-Tape Echo's playhead EQ, which sits INSIDE its feedback
+ * loop: +8.7 dB near 1.5 kHz at the slowest tape speed (every dub-length echo
+ * clamps there), +6.5 dB at the fastest. Measured from the C++ biquads
+ * (`PlayheadEQ`, re-tape-echo-wasm), 2026-09-30.
+ */
+export const RE_TAPE_LOOP_EQ_PEAK_DB = 8.73;
+/** The loop gain the bus's intensity reaches at 1 - below unity, as the other engines stop (Space Echo 0.95, RE-201 0.85). */
+export const RE_TAPE_MAX_LOOP_GAIN = 0.9;
+
+/**
+ * The engine intensity that gives the bus intensity's loop gain.
+ *
+ * The bus's intensity is a loop gain, the way the other engines read it. The
+ * RE-Tape Echo reads its own as a dB scale (fbGain = 10^((30 i - 30) / 20),
+ * from the Pure Data patch) and its playhead EQ adds up to 8.7 dB inside the
+ * loop, so the bus's intensity passed straight in crossed unity at ~0.71 and
+ * self-oscillated: +25.5 dB over the input at 0.85, measured live 2026-09-30.
+ * The C++ stays as the machine is - the master-effect RE-Tape Echo keeps its
+ * authentic runaway at the top of its knob; the bus asks for a loop gain.
+ */
+export function reTapeEchoIntensity(busIntensity: number): number {
+  const loop = Math.max(0, Math.min(1, busIntensity)) * RE_TAPE_MAX_LOOP_GAIN;
+  if (loop <= 0) return 0;
+  const fbGainDb = 20 * Math.log10(loop) - RE_TAPE_LOOP_EQ_PEAK_DB;
+  return Math.max(0, Math.min(1, 1 + fbGainDb / 30));
+}
+
 export class RETapeEchoAdapter implements DubEchoEngine {
   private fx: RETapeEchoEffect;
   get input() { return this.fx.input; }
@@ -186,7 +214,7 @@ export class RETapeEchoAdapter implements DubEchoEngine {
     this.fx = new RETapeEchoEffect({
       mode: 3,
       repeatRate: this.msToRepeatRate(settings.echoRateMs),
-      intensity: settings.echoIntensity,
+      intensity: reTapeEchoIntensity(settings.echoIntensity),
       echoVolume: 0.85,
       wow: 0.3,
       flutter: 0.25,
@@ -209,11 +237,11 @@ export class RETapeEchoAdapter implements DubEchoEngine {
     this.fx.setRepeatRate(this.msToRepeatRate(ms));
   }
 
-  setIntensity(amount: number): void { this.fx.setIntensity(amount); }
+  setIntensity(amount: number): void { this.fx.setIntensity(reTapeEchoIntensity(amount)); }
 
   setIntensityInstant(amount: number): void {
     // No instant variant — use normal setIntensity
-    this.fx.setIntensity(amount);
+    this.fx.setIntensity(reTapeEchoIntensity(amount));
   }
 
   // RETapeEcho's playheadFilter is binary (4 kHz on/off); no per-Hz HPF.
