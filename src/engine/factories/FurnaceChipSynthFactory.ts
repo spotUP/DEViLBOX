@@ -75,6 +75,7 @@ export function createBuzzmachine(config: InstrumentConfig): BuzzmachineGenerato
   const synth = new BuzzmachineGenerator(machineType);
   const normalizedVolume = getNormalizedVolume('Buzzmachine', config.volume);
   synth.output.gain.value = Tone.dbToGain(normalizedVolume);
+  synth.applyConfig(config.buzzmachine);
   return synth;
 }
 
