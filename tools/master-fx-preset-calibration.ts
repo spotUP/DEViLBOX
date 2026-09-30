@@ -79,7 +79,9 @@ ws.on('open', async () => {
   const only = listArg('--only');
   const containing = listArg('--containing');
   const presets = (await call('evaluate_script', { code: `(async () => {
-    const p = await import('/src/constants/fxPresets.ts');
+    // Cache-busted: a plain import returns the module the page loaded at
+    // start, so presets edited since were measured with their OLD parameters.
+    const p = await import('/src/constants/fxPresets.ts?t=' + Date.now());
     return p.FX_PRESETS.map((x) => ({ name: x.name, gainCompensationDb: x.gainCompensationDb ?? 0, effects: x.effects }));
   })()` })).result as { name: string; gainCompensationDb: number; effects: { type: string }[] }[];
   for (const p of presets) {
