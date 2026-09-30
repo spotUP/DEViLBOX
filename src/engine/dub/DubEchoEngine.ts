@@ -17,7 +17,7 @@ import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
 import { RETapeEchoEffect } from '../effects/RETapeEchoEffect';
 import type { DubBusSettings } from '../../types/dub';
-import { DEFAULT_DUB_BUS } from '../../types/dub';
+import { DEFAULT_DUB_BUS, RE201_DELAY_MODES } from '../../types/dub';
 
 export interface DubEchoEngine {
   readonly input: Tone.Gain;
@@ -96,16 +96,35 @@ export class SpaceEchoAdapter implements DubEchoEngine {
 
 // ─── RE-201 adapter ─────────────────────────────────────────────────────
 
+/**
+ * The RE-201 engine intensity for the bus's intensity in a delay mode.
+ *
+ * The RE-201 sums every active head into its feedback at intensity x 0.85
+ * each, so the loop gain grows with the head count: three heads at the bus's
+ * 0.62 is ~1.6, and the echo built up until the tape saturation held it -
+ * "re-201 it self oscillates? it gets stronger and stronger" (2026-09-30,
+ * Tubby's mode 9). The bus's intensity is a loop gain; it is shared out over
+ * the heads. The C++ keeps the machine's behaviour for the master effect.
+ */
+export function re201Intensity(busIntensity: number, delayMode: number): number {
+  const heads = RE201_DELAY_MODES.find((m) => m.value === delayMode)?.heads ?? 1;
+  return Math.max(0, Math.min(1, busIntensity)) / Math.max(1, heads);
+}
+
 export class RE201Adapter implements DubEchoEngine {
   private fx: RE201Effect;
+  private busIntensity: number;
+  private delayMode: number;
   get input() { return this.fx.input; }
   get output() { return this.fx.output; }
 
   constructor(settings: DubBusSettings) {
+    this.busIntensity = settings.echoIntensity;
+    this.delayMode = settings.re201DelayMode ?? DEFAULT_DUB_BUS.re201DelayMode;
     this.fx = new RE201Effect({
-      delayMode: settings.re201DelayMode ?? DEFAULT_DUB_BUS.re201DelayMode, // RE201_DELAY_MODES
+      delayMode: this.delayMode, // RE201_DELAY_MODES
       repeatRate: this.msToRepeatRate(settings.echoRateMs),
-      intensity: settings.echoIntensity,
+      intensity: re201Intensity(this.busIntensity, this.delayMode),
       echoVolume: 0.90,
       reverbVolume: 0.20,    // light internal spring — adds body without clashing with DubBus spring
       bass: 0.7,
@@ -125,13 +144,16 @@ export class RE201Adapter implements DubEchoEngine {
     this.fx.setRepeatRate(this.msToRepeatRate(ms));
   }
 
-  setIntensity(amount: number): void { this.fx.setIntensity(amount); }
+  setIntensity(amount: number): void {
+    this.busIntensity = amount;
+    this.fx.setIntensity(re201Intensity(amount, this.delayMode));
+  }
 
   describe(): Record<string, unknown> { return { engine: 're201', ...this.fx.describe() }; }
 
   setIntensityInstant(amount: number): void {
     // RE-201 has no instant variant — use normal setIntensity
-    this.fx.setIntensity(amount);
+    this.setIntensity(amount);
   }
 
   // RE-201 WASM doesn't expose per-Hz feedback filter controls — its
@@ -142,7 +164,11 @@ export class RE201Adapter implements DubEchoEngine {
   setFeedbackHpf(_hz: number): void { /* RE-201 handles internally */ }
   setFeedbackLpf(_hz: number): void { /* RE-201 handles internally */ }
   // RE-201 uses 0-10 mode range. Clamp and pass through to the effect.
-  setMode(mode: number): void { this.fx.setDelayMode(Math.max(0, Math.min(10, Math.round(mode)))); }
+  setMode(mode: number): void {
+    this.delayMode = Math.max(0, Math.min(10, Math.round(mode)));
+    this.fx.setDelayMode(this.delayMode);
+    this.fx.setIntensity(re201Intensity(this.busIntensity, this.delayMode)); // the head count changed
+  }
 
   get wet() { return this.fx.wet; }
   set wet(v: number) { this.fx.wet = v; }

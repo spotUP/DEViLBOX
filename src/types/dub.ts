@@ -356,18 +356,18 @@ export interface DubBusSettings {
  * read - the old copies called 9 "H2 + H3 + Reverb", but 9 is all three heads
  * with no reverb.
  */
-export const RE201_DELAY_MODES: readonly { value: number; label: string }[] = [
-  { value: 0, label: 'Reverb only' },
-  { value: 1, label: 'Head 1' },
-  { value: 2, label: 'Head 2' },
-  { value: 3, label: 'Head 3' },
-  { value: 4, label: 'Heads 1 + 2' },
-  { value: 5, label: 'Heads 1 + 3' },
-  { value: 6, label: 'Heads 2 + 3' },
-  { value: 7, label: 'Head 1 + Reverb' },
-  { value: 8, label: 'Heads 1 + 2 + Reverb' },
-  { value: 9, label: 'Heads 1 + 2 + 3' },
-  { value: 10, label: 'Heads 1 + 2 + 3 + Reverb' },
+export const RE201_DELAY_MODES: readonly { value: number; label: string; heads: number }[] = [
+  { value: 0, label: 'Reverb only', heads: 0 },
+  { value: 1, label: 'Head 1', heads: 1 },
+  { value: 2, label: 'Head 2', heads: 1 },
+  { value: 3, label: 'Head 3', heads: 1 },
+  { value: 4, label: 'Heads 1 + 2', heads: 2 },
+  { value: 5, label: 'Heads 1 + 3', heads: 2 },
+  { value: 6, label: 'Heads 2 + 3', heads: 2 },
+  { value: 7, label: 'Head 1 + Reverb', heads: 1 },
+  { value: 8, label: 'Heads 1 + 2 + Reverb', heads: 2 },
+  { value: 9, label: 'Heads 1 + 2 + 3', heads: 3 },
+  { value: 10, label: 'Heads 1 + 2 + 3 + Reverb', heads: 3 },
 ];
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
