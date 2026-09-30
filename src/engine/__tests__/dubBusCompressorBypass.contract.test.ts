@@ -50,7 +50,9 @@ describe('DubBus compressor bypass during echo swap — contract', () => {
   });
 
   it('restores sidechain ratio to 6 after warmup in _swapEchoEngine', () => {
-    expect(swapBody).toMatch(/sidechain\.ratio\.setTargetAtTime\(6/);
+    expect(swapBody).toMatch(/sidechain\.ratio\.setTargetAtTime\(SIDECHAIN_RATIO/);
+    // The named ratio is still 6:1.
+    expect(dubBusSrc).toContain('const SIDECHAIN_RATIO = 6;');
   });
 
   it('restores glue ratio respecting glueBypass in _swapEchoEngine', () => {
@@ -73,7 +75,7 @@ describe('DubBus compressor bypass during echo swap — contract', () => {
   });
 
   it('restores both ratios in _warmupMute (glue respects glueBypass)', () => {
-    expect(warmupBody).toMatch(/sidechain\.ratio\.setTargetAtTime\(6/);
+    expect(warmupBody).toMatch(/sidechain\.ratio\.setTargetAtTime\(SIDECHAIN_RATIO/);
     // Glue restore is now conditional on glueBypass — assert the branch exists.
     expect(warmupBody).toMatch(/glueBypass/);
     expect(warmupBody).toMatch(/glue\.ratio\.setTargetAtTime/);
