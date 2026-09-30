@@ -5,6 +5,7 @@
 
 import { paramNumber, paramOptional } from '../registry/effects/paramNumber';
 import * as Tone from 'tone';
+import { getWetPathGain } from './effectGainCompensation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
 import { TapeSaturation } from '../effects/TapeSaturation';
@@ -197,6 +198,45 @@ const GAIN_COMPENSATION_DB: Record<string, number> = {
   // (which breaks instanceof checks in EffectParameterEngine).
 };
 
+/**
+ * Put the type's wet-path calibration (WET_PATH_GAIN_DB) on the wet signal
+ * only: Tone.js effects scale their wet return, the wrappers take it through
+ * `setWetPathGain`. Exported for the reachability test.
+ */
+export function applyWetPathGain(node: unknown, type: string): 'effectReturn' | 'setWetPathGain' | 'none' {
+  const g = getWetPathGain(type);
+  if (g === 1) return 'none';
+  // Tone.Effect / Tone.StereoEffect (not exported from Tone's index): the wet
+  // signal reaches the dry/wet crossfade's `b` input from `effectReturn`
+  // (mono) or `_merge` (stereo). A gain goes in between. Not ON effectReturn:
+  // Tone's feedback effects feed their loop from it, so scaling it there
+  // shortened the repeats (FeedbackDelay read -1.8 dB for a -3.9 dB trim).
+  const tone = node as { effectReturn?: unknown; _merge?: unknown; _dryWet?: { b?: unknown }; _wetPathGainNode?: Tone.Gain; dispose?: () => unknown };
+  const wetSource = tone.effectReturn instanceof Tone.Gain ? tone.effectReturn : tone._merge;
+  const crossfadeB = tone._dryWet?.b;
+  if (wetSource instanceof Tone.ToneAudioNode && crossfadeB instanceof Tone.ToneAudioNode) {
+    if (tone._wetPathGainNode) {
+      tone._wetPathGainNode.gain.value = g;
+    } else {
+      const cal = new Tone.Gain(g);
+      wetSource.disconnect(crossfadeB);
+      wetSource.connect(cal);
+      cal.connect(crossfadeB);
+      tone._wetPathGainNode = cal;
+      const dispose = tone.dispose?.bind(node);
+      tone.dispose = () => { cal.dispose(); return dispose?.(); };
+    }
+    return 'effectReturn';
+  }
+  const settable = node as { setWetPathGain?: (gain: number) => void };
+  if (typeof settable.setWetPathGain === 'function') {
+    settable.setWetPathGain(g);
+    return 'setWetPathGain';
+  }
+  console.warn(`[EffectFactory] ${type} has a wet-path calibration but no wet path to put it on`);
+  return 'none';
+}
+
 /** dB → linear gain */
 function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
@@ -219,6 +259,7 @@ export async function createEffect(
 
   /** Wrap an effect node with gain compensation if needed for its type. */
   function applyGainCompensation(effectNode: Tone.ToneAudioNode | DevilboxSynth): Tone.ToneAudioNode | DevilboxSynth {
+    applyWetPathGain(effectNode, config.type);
     const effectType = config.category === 'neural' ? 'Neural' : config.type;
     const compensationDb = GAIN_COMPENSATION_DB[effectType];
     if (!compensationDb) return effectNode;

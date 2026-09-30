@@ -23,6 +23,7 @@ export class DragonflyRoomEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -149,10 +150,16 @@ export class DragonflyRoomEffect extends Tone.ToneAudioNode {
   setEarlyLevel(v: number): void { this._earlyLevel = clamp(v, 0, 1); this.sendParam('early_level', this._earlyLevel); }
   setSize(v: number): void { this._size = clamp(v, 0.3, 1.5); this.sendParam('size', this._size); }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp(value, 0, 1);
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._wet;
   }
 

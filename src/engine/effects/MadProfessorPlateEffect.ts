@@ -42,6 +42,7 @@ export class MadProfessorPlateEffect extends Tone.ToneAudioNode {
   private mverb: MVerbEffect;
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
 
   private _options: Required<MadProfessorPlateOptions>;
 
@@ -102,11 +103,17 @@ export class MadProfessorPlateEffect extends Tone.ToneAudioNode {
     this.wetGain.connect(this.output);
   }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     const v = clamp01(value);
     this._options.wet = v;
-    this.wetGain.gain.value = v;
+    this.wetGain.gain.value = v * this._wetPathGain;
     this.dryGain.gain.value = 1 - v;
   }
 

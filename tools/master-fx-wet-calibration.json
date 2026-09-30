@@ -1,0 +1,418 @@
+{
+  "Reverb": {
+    "type": "Reverb",
+    "category": "tonejs",
+    "effectDb": -0.4,
+    "chainDb": -0.4,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:29:21.189Z"
+  },
+  "JCReverb": {
+    "type": "JCReverb",
+    "category": "tonejs",
+    "effectDb": 0.4,
+    "chainDb": 0.4,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:29:30.441Z"
+  },
+  "Delay": {
+    "type": "Delay",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:29:39.681Z"
+  },
+  "FeedbackDelay": {
+    "type": "FeedbackDelay",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:29:48.924Z"
+  },
+  "PingPongDelay": {
+    "type": "PingPongDelay",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:29:58.178Z"
+  },
+  "SpaceEcho": {
+    "type": "SpaceEcho",
+    "category": "tonejs",
+    "effectDb": -1.8,
+    "chainDb": -1.8,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:21:05.118Z"
+  },
+  "SpaceyDelayer": {
+    "type": "SpaceyDelayer",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:21:14.340Z"
+  },
+  "RETapeEcho": {
+    "type": "RETapeEcho",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:21:23.573Z"
+  },
+  "RE201": {
+    "type": "RE201",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:21:32.797Z"
+  },
+  "AnotherDelay": {
+    "type": "AnotherDelay",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:21:42.035Z"
+  },
+  "MVerb": {
+    "type": "MVerb",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:21:51.401Z"
+  },
+  "MadProfessorPlate": {
+    "type": "MadProfessorPlate",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:22:00.571Z"
+  },
+  "DattorroPlate": {
+    "type": "DattorroPlate",
+    "category": "wasm",
+    "effectDb": -0.1,
+    "chainDb": -0.1,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:22:09.817Z"
+  },
+  "SpringReverb": {
+    "type": "SpringReverb",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:22:19.036Z"
+  },
+  "Aelapse": {
+    "type": "Aelapse",
+    "category": "wasm",
+    "effectDb": 0.1,
+    "chainDb": 0.1,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:22:28.274Z"
+  },
+  "WAMPingPongDelay": {
+    "type": "WAMPingPongDelay",
+    "category": "wam",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:22:42.029Z"
+  },
+  "WAMFaustDelay": {
+    "type": "WAMFaustDelay",
+    "category": "wam",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:22:55.784Z"
+  },
+  "AmbientDelay": {
+    "type": "AmbientDelay",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:23:05.029Z"
+  },
+  "ArtisticDelay": {
+    "type": "ArtisticDelay",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:23:14.270Z"
+  },
+  "Della": {
+    "type": "Della",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:23:23.557Z"
+  },
+  "ReverseDelay": {
+    "type": "ReverseDelay",
+    "category": "wasm",
+    "effectDb": -0.5,
+    "chainDb": -0.5,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:23:32.820Z"
+  },
+  "SlapbackDelay": {
+    "type": "SlapbackDelay",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:23:42.065Z"
+  },
+  "VintageDelay": {
+    "type": "VintageDelay",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:23:51.449Z"
+  },
+  "ZamDelay": {
+    "type": "ZamDelay",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:24:00.709Z"
+  },
+  "TapeDelay": {
+    "type": "TapeDelay",
+    "category": "wasm",
+    "effectDb": 3.3,
+    "chainDb": 3.3,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:24:09.961Z"
+  },
+  "DragonflyHall": {
+    "type": "DragonflyHall",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:24:19.201Z"
+  },
+  "DragonflyPlate": {
+    "type": "DragonflyPlate",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:24:28.449Z"
+  },
+  "DragonflyRoom": {
+    "type": "DragonflyRoom",
+    "category": "wasm",
+    "effectDb": 0.1,
+    "chainDb": 0.1,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:24:37.677Z"
+  },
+  "EarlyReflections": {
+    "type": "EarlyReflections",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:24:46.916Z"
+  },
+  "Roomy": {
+    "type": "Roomy",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:24:56.161Z"
+  },
+  "ShimmerReverb": {
+    "type": "ShimmerReverb",
+    "category": "wasm",
+    "effectDb": 1,
+    "chainDb": 1,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:10:53.052Z"
+  },
+  "JeskolaDelay": {
+    "type": "JeskolaDelay",
+    "category": "wasm",
+    "effectDb": 1,
+    "chainDb": 1,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:11:02.303Z"
+  },
+  "JeskolaCrossDelay": {
+    "type": "JeskolaCrossDelay",
+    "category": "wasm",
+    "effectDb": 0.7,
+    "chainDb": 0.7,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:11:11.555Z"
+  },
+  "JeskolaFreeverb": {
+    "type": "JeskolaFreeverb",
+    "category": "wasm",
+    "effectDb": -0.2,
+    "chainDb": -0.2,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:11:20.889Z"
+  },
+  "FSMPanzerDelay": {
+    "type": "FSMPanzerDelay",
+    "category": "wasm",
+    "effectDb": 3.6,
+    "chainDb": 1,
+    "compensationDb": -2.6,
+    "at": "2026-09-30T01:25:05.407Z"
+  },
+  "WhiteNoiseWhiteChorus": {
+    "type": "WhiteNoiseWhiteChorus",
+    "category": "wasm",
+    "effectDb": -0.7,
+    "chainDb": -0.7,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:11:39.395Z"
+  },
+  "BiPhase": {
+    "type": "BiPhase",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:25:14.647Z"
+  },
+  "Chorus": {
+    "type": "Chorus",
+    "category": "tonejs",
+    "effectDb": -0.3,
+    "chainDb": -0.3,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:25:23.931Z"
+  },
+  "Phaser": {
+    "type": "Phaser",
+    "category": "tonejs",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:25:33.170Z"
+  },
+  "Tremolo": {
+    "type": "Tremolo",
+    "category": "tonejs",
+    "effectDb": -2.3,
+    "chainDb": -2.3,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:25:42.416Z"
+  },
+  "Vibrato": {
+    "type": "Vibrato",
+    "category": "tonejs",
+    "effectDb": -0.3,
+    "chainDb": -0.3,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:25:51.716Z"
+  },
+  "AutoPanner": {
+    "type": "AutoPanner",
+    "category": "tonejs",
+    "effectDb": -3,
+    "chainDb": -3,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:26:00.982Z"
+  },
+  "Leslie": {
+    "type": "Leslie",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:26:10.267Z"
+  },
+  "WAMStonePhaser": {
+    "type": "WAMStonePhaser",
+    "category": "wam",
+    "effectDb": 0.7,
+    "chainDb": 0.7,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:26:24.031Z"
+  },
+  "CalfPhaser": {
+    "type": "CalfPhaser",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:26:33.296Z"
+  },
+  "Flanger": {
+    "type": "Flanger",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:26:42.538Z"
+  },
+  "JunoChorus": {
+    "type": "JunoChorus",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:26:51.855Z"
+  },
+  "MultiChorus": {
+    "type": "MultiChorus",
+    "category": "wasm",
+    "effectDb": 0,
+    "chainDb": 0,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:27:01.098Z"
+  },
+  "Pulsator": {
+    "type": "Pulsator",
+    "category": "wasm",
+    "effectDb": -2.2,
+    "chainDb": -2.2,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:27:10.330Z"
+  },
+  "RingMod": {
+    "type": "RingMod",
+    "category": "wasm",
+    "effectDb": 0.1,
+    "chainDb": 0.1,
+    "compensationDb": 0,
+    "at": "2026-09-30T01:27:19.581Z"
+  },
+  "FSMChorus": {
+    "type": "FSMChorus",
+    "category": "wasm",
+    "effectDb": 3.5,
+    "chainDb": 0,
+    "compensationDb": -3.5,
+    "at": "2026-09-30T01:27:28.829Z"
+  },
+  "FSMChorus2": {
+    "type": "FSMChorus2",
+    "category": "wasm",
+    "effectDb": -4,
+    "chainDb": 0.1,
+    "compensationDb": 4.1,
+    "at": "2026-09-30T01:27:38.076Z"
+  }
+}

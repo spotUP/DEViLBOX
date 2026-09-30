@@ -33,6 +33,7 @@ export class RingModEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -160,10 +161,16 @@ export class RingModEffect extends Tone.ToneAudioNode {
   setLfoRate(v: number): void { this._lfoRate = clamp(v, 0, 20); this.sendParam('lfoRate', this._lfoRate); }
   setLfoDepth(v: number): void { this._lfoDepth = clamp(v, 0, 1); this.sendParam('lfoDepth', this._lfoDepth); }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp(value, 0, 1);
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._wet;
   }
 

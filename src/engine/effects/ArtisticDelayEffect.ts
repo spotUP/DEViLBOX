@@ -22,6 +22,7 @@ export class ArtisticDelayEffect extends Tone.ToneAudioNode {
   readonly output: Tone.Gain;
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -155,8 +156,14 @@ export class ArtisticDelayEffect extends Tone.ToneAudioNode {
   get mixAmount(): number { return this._mix; }
   set mixAmount(v: number) { this._mix = clamp(v, 0, 1); this.sendParam('mix', this._mix); }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
-  set wet(value: number) { this._wet = clamp(value, 0, 1); this.wetGain.gain.value = this._wet; this.dryGain.gain.value = 1 - this._wet; }
+  set wet(value: number) { this._wet = clamp(value, 0, 1); this.wetGain.gain.value = this._wet * this._wetPathGain; this.dryGain.gain.value = 1 - this._wet; }
 
   setParam(param: string, value: number): void {
     switch (param) {

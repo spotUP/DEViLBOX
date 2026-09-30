@@ -517,6 +517,92 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
 }
 
 /**
+ * Measure one master effect's level: stereo pink noise (the same on both
+ * channels, as a mix's centre) straight into the master effects input, with
+ * the chain temporarily set to just this effect. Reports the effect's own
+ * output (before its post-effect compensation gain) and the chain's output
+ * (after it), in dB relative to the input, energy of both channels.
+ *
+ * get_audio_level reads a mono downmix after the master volume; a reverb's
+ * decorrelated stereo read up to 3 dB low there, and its level included the
+ * compensation gain being calibrated. Refuses while playing. The user's
+ * master chain is put back afterwards.
+ */
+export async function measureMasterEffect(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (useTransportStore.getState().isPlaying) return { error: 'Transport is playing - stop playback first (the song would be in the measurement).' };
+  const type = params.type as string;
+  if (!type) return { error: 'type is required' };
+  const seconds = Math.min(10, Math.max(1, Number(params.seconds ?? 3)));
+  const settleMs = Math.min(15000, Math.max(0, Number(params.settleMs ?? 3000)));
+  const engine = getToneEngine() as unknown as Record<string, unknown>;
+  const input = (engine.masterEffectsInput as { input?: AudioNode } & Tone.Gain);
+  const output = engine.blepInput as Tone.Gain;
+  const store = useAudioStore.getState();
+  const saved = JSON.parse(JSON.stringify(store.masterEffects));
+  const savedPresetDb = store.presetGainCompensationDb;
+  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  const ctx = Tone.getContext().rawContext as AudioContext;
+  const taps: Array<{ name: string; node: AudioNode; split: ChannelSplitterNode; a: AnalyserNode[] }> = [];
+  let src: AudioBufferSourceNode | null = null;
+  const id = `measure-fx-${Date.now()}`;
+  try {
+    const { getDefaultEffectParameters } = await import('../../engine/InstrumentFactory');
+    const parameters = (params.parameters as Record<string, unknown>) ?? getDefaultEffectParameters(type) ?? {};
+    const before = engine.masterEffectsRebuildVersion as number;
+    store.setMasterEffects([{
+      id, category: (params.category as string) ?? 'tonejs', type, enabled: true,
+      wet: Number(params.wet ?? 100), parameters,
+      ...(params.neuralModelIndex !== undefined ? { neuralModelIndex: params.neuralModelIndex } : {}),
+    }] as never, 0);
+    for (let i = 0; i < 100 && (engine.masterEffectsRebuildVersion as number) === before; i++) await wait(50);
+    await wait(settleMs);
+    const entry = (engine.masterEffectConfigs as Map<string, { node: Tone.ToneAudioNode }>).get(id);
+    if (!entry) return { error: `${type}: the effect was not built (unknown type, or it failed to load)` };
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, seed = 12345;
+    for (let i = 0; i < len; i++) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      const w = (seed / 2 ** 32) * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.011; b6 = w * 0.115926;
+    }
+    buf.copyToChannel(d, 1);
+    src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const nativeOut = (n: Tone.ToneAudioNode | Tone.Gain): AudioNode => {
+      const o = (n as unknown as { output?: unknown }).output;
+      const inner = o && typeof (o as { input?: unknown }).input === 'object' ? (o as { input: AudioNode }).input : o;
+      return (inner ?? n) as AudioNode;
+    };
+    const nativeIn = (g: Tone.Gain): AudioNode => (g as unknown as { input: AudioNode }).input;
+    for (const [name, node] of [['input', nativeIn(input)], ['effect', nativeOut(entry.node)], ['chain', nativeIn(output)]] as const) {
+      const split = ctx.createChannelSplitter(2);
+      node.connect(split);
+      const a = [0, 1].map((ch) => { const an = ctx.createAnalyser(); an.fftSize = 4096; split.connect(an, ch); return an; });
+      taps.push({ name, node, split, a });
+    }
+    src.connect(nativeIn(input));
+    src.start();
+    await wait(seconds * 1000);
+    const f = new Float32Array(4096);
+    const energy: Record<string, number> = {};
+    for (let i = 0; i < 20; i++) {
+      await wait(80);
+      for (const t of taps) for (const an of t.a) { an.getFloatTimeDomainData(f); let e = 0; for (const x of f) e += x * x; energy[t.name] = (energy[t.name] ?? 0) + e; }
+    }
+    const ref = energy.input || 1e-12;
+    const db = (k: string) => Math.round(10 * Math.log10((energy[k] || 1e-12) / ref) * 10) / 10;
+    return { ok: true, type, wet: Number(params.wet ?? 100), effectDb: db('effect'), chainDb: db('chain'), compensationDb: Math.round((db('chain') - db('effect')) * 10) / 10 };
+  } finally {
+    try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
+    for (const t of taps) { try { t.node.disconnect(t.split); } catch { /* ok */ } }
+    useAudioStore.getState().setMasterEffects(saved, savedPresetDb);
+  }
+}
+
+/**
  * Bus audition (X6) — hold the colour stages down to hear the send itself.
  *
  * `{ on: true }` ducks plate, ring modulator, lo-fi, the sweep and the
