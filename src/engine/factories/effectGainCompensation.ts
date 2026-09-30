@@ -92,7 +92,8 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   Filter:              +1.5,
   AutoFilter:          +1.5,
   MoogFilter:          +2.0,
-  Neural:              -1.0,
+  // Neural: 0 - each model's level is corrected at its output since 2026-09-30
+  // (NEURAL_MODEL_OUTPUT_DB in guitarMLRegistry.ts).
   WAMBigMuff:       +9.5,
   WAMTS9:           +14.6,
   WAMDistoMachine:  +1.9,

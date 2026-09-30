@@ -45,7 +45,8 @@ if (args.includes('--write')) {
   for (const r of Object.values(store)) {
     if (except.includes(r.name)) { console.log(`kept: ${r.name}`); continue; }
     const esc = r.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, "\\\\'");
-    const re = new RegExp(`(\\{ name: '${esc}',[^\\n]*?)(, gainCompensationDb: -?[0-9.]+)?(,\\n)`);
+    // The make-up sits after the tags, before a line break or an inline `effects:`.
+    const re = new RegExp(`(\\{ name: '${esc}',[^\\n]*?)(, gainCompensationDb: -?[0-9.]+)?(,\\n|, effects:)`);
     const m = re.exec(src);
     if (!m) { console.log(`not found in fxPresets.ts: ${r.name}`); continue; }
     const next = r.makeUpDb === 0 ? `${m[1]}${m[3]}` : `${m[1]}, gainCompensationDb: ${r.makeUpDb}${m[3]}`;
@@ -83,16 +84,16 @@ ws.on('open', async () => {
     const types = p.effects.map((e) => e.type);
     if (only.length && !only.includes(p.name)) continue;
     if (containing.length && !types.some((t) => containing.includes(t))) continue;
+    const slow = types.some((t) => t === 'Neural' || t.startsWith('WAM'));
     const songMode = args.includes('--song');
     if (songMode) {
-      const r = await call('measure_master_effect', { effects: p.effects, gainCompensationDb: p.gainCompensationDb, source: 'song', seconds: 10, settleMs: 3000 }).catch((e) => ({ error: (e as Error).message }));
+      const r = await call('measure_master_effect', { effects: p.effects, gainCompensationDb: p.gainCompensationDb, source: 'song', seconds: 10, settleMs: slow || types.includes('SwedishChainsaw') ? 8000 : 4000 }).catch((e) => ({ error: (e as Error).message }));
       if (r.error) { console.log(`ERR ${p.name}: ${r.error}`); if (/No browser|song playing/.test(r.error)) break; continue; }
       if (store[p.name]) { store[p.name].songDb = r.chainDb; fs.writeFileSync(OUT, JSON.stringify(store, null, 2)); }
       console.log(`${p.name.padEnd(28)} song ${String(r.chainDb).padStart(6)} dB with make-up ${p.gainCompensationDb}  [${types.join('+')}]`);
       continue;
     }
     if (!args.includes('--redo') && store[p.name]) continue;
-    const slow = types.some((t) => t === 'Neural' || t.startsWith('WAM'));
     const r = await call('measure_master_effect', { effects: p.effects, gainCompensationDb: 0, seconds: 4, settleMs: slow ? 8000 : 4000 }).catch((e) => ({ error: (e as Error).message }));
     if (r.error) {
       console.log(`ERR ${p.name}: ${r.error}`);
