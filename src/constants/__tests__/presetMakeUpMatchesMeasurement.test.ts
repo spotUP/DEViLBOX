@@ -7,8 +7,8 @@
  * Hall Reverb carried +3.2 dB for a chain that measures -0.4 dB. Re-measured
  * with stereo pink noise at -18 dBFS (tools/master-fx-preset-calibration.ts);
  * each preset now reads within 0.1 dB of its input with its make-up.
- * Kept as they were: the Neural presets (their amp models are 6-18 dB off
- * unity on their own - a per-model calibration comes first) and RE-201
+ * The guitar (Neural) presets were measured after each amp model's own
+ * level was corrected (NEURAL_MODEL_OUTPUT_DB). Kept as it was: RE-201
  * Runaway (self-oscillates by design; its level does not follow the input).
  */
 import { describe, it, expect } from 'vitest';
@@ -18,7 +18,7 @@ import { FX_PRESETS } from '../fxPresets';
 
 type Row = { name: string; types: string[]; chainDb: number; makeUpDb: number };
 const measured = JSON.parse(readFileSync(join(process.cwd(), 'tools/master-fx-preset-calibration.json'), 'utf8')) as Record<string, Row>;
-const kept = (r: Row) => r.types.includes('Neural') || r.name === 'RE-201 Runaway';
+const kept = (r: Row) => r.name === 'RE-201 Runaway';
 
 describe('master FX preset make-up gains', () => {
   it('match their measured chains', () => {

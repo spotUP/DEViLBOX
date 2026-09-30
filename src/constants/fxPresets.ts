@@ -765,28 +765,28 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
 
   // ═══ NEURAL ═══
-  { name: 'Princeton Glow', description: 'Fender Princeton — shimmery tube warmth', tags: ['Neural', 'Warm', 'Amp'], gainCompensationDb: 0.5,
+  { name: 'Princeton Glow', description: 'Fender Princeton — shimmery tube warmth', tags: ['Neural', 'Warm', 'Amp'], gainCompensationDb: 4.5,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 25, neuralModelIndex: 14, parameters: { drive: 20, level: 100, presence: 50 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 } },
     ] },
-  { name: 'Blackstar Clean', description: 'Blackstar HT40 clean — British tube console', tags: ['Neural', 'Warm', 'Amp'], gainCompensationDb: 0.9,
+  { name: 'Blackstar Clean', description: 'Blackstar HT40 clean — British tube console', tags: ['Neural', 'Warm', 'Amp'], gainCompensationDb: 3.5,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 20, neuralModelIndex: 10, parameters: { drive: 15, level: 100, presence: 55 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1, mid: 0.5, high: 0.5 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 } },
     ] },
-  { name: 'Tube Screamer Glue', description: 'TS808 low gain — mid-hump saturation glue', tags: ['Neural', 'Warm'], gainCompensationDb: 0.5,
+  { name: 'Tube Screamer Glue', description: 'TS808 low gain — mid-hump saturation glue', tags: ['Neural', 'Warm'], gainCompensationDb: 4.1,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 18, neuralModelIndex: 6, parameters: { drive: 20, tone: 55, level: 100 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -15, ratio: 3, attack: 0.01, release: 0.2 } },
     ] },
-  { name: 'Sovtek Warmth', description: 'Sovtek 50 + tape — thick Russian tube harmonics', tags: ['Neural', 'Warm'], effects: [
+  { name: 'Sovtek Warmth', description: 'Sovtek 50 + tape — thick Russian tube harmonics', tags: ['Neural', 'Warm'], gainCompensationDb: 5.6, effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 22, neuralModelIndex: 25, parameters: { drive: 35, level: 100, presence: 45 } },
       { category: 'wasm', type: 'TapeSimulator', enabled: true, wet: 20, parameters: { drive: 20, character: 30, bias: 45, shame: 10, hiss: 3, speed: 1 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 } },
     ] },
-  { name: 'Filmosound Master', description: 'Filmosound projector amp — unique vintage', tags: ['Neural', 'Vinyl'], gainCompensationDb: 0.9,
+  { name: 'Filmosound Master', description: 'Filmosound projector amp — unique vintage', tags: ['Neural', 'Vinyl'], gainCompensationDb: 3.5,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 30, neuralModelIndex: 29, parameters: { drive: 25, level: 100, presence: 40 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 1, high: -1 } },
@@ -794,7 +794,7 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
 
   // ═══ AMP ═══
-  { name: 'Clean Fender', description: 'Princeton clean — sparkling tube shimmer', tags: ['Amp', 'Guitar'], gainCompensationDb: -2.7,
+  { name: 'Clean Fender', description: 'Princeton clean — sparkling tube shimmer', tags: ['Amp', 'Guitar'], gainCompensationDb: 8.5,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 14, parameters: { drive: 25, level: 85, presence: 55 } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.4, damping: 0.5, tension: 0.4, mix: 0.3, drip: 0.3, diffusion: 0.6 } },
@@ -804,29 +804,29 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 10, parameters: { drive: 55, level: 75, presence: 50 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: 0.5, high: -0.5 } },
     ] },
-  { name: 'High Gain Mesa', description: 'Splawn OD high gain — tight modern crunch', tags: ['Amp', 'Guitar', 'Loud'],
+  { name: 'High Gain Mesa', description: 'Splawn OD high gain — tight modern crunch', tags: ['Amp', 'Guitar', 'Loud'], gainCompensationDb: 4.2,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 12, parameters: { drive: 40, level: 75, presence: 45 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
     ] },
-  { name: 'Dumble Lead', description: 'Dumble — smooth singing lead tones', tags: ['Amp', 'Guitar'], gainCompensationDb: 3.9,
+  { name: 'Dumble Lead', description: 'Dumble — smooth singing lead tones', tags: ['Amp', 'Guitar'], gainCompensationDb: -1.4,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 15, parameters: { drive: 65, level: 80, presence: 50 } },
       { category: 'tonejs', type: 'FeedbackDelay', enabled: true, wet: 20, parameters: { delayTime: 0.35, feedback: 0.3 } },
       { category: 'wasm', type: 'MVerb', enabled: true, wet: 20, parameters: { damping: 0.4, density: 0.6, bandwidth: 0.6, decay: 0.4, predelay: 0.02, size: 0.5, gain: 1.0, mix: 0.35, earlyMix: 0.5 } },
     ] },
-  { name: 'Sovtek Doom', description: 'Sovtek 50 + DOD — massive Russian tube doom', tags: ['Amp', 'Guitar', 'Loud'],
+  { name: 'Sovtek Doom', description: 'Sovtek 50 + DOD — massive Russian tube doom', tags: ['Amp', 'Guitar', 'Loud'], gainCompensationDb: -1.1,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 27, parameters: { drive: 60, level: 85, presence: 40 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 0.5, high: -1.0 } },
     ] },
-  { name: 'BadCat Jazz', description: 'BadCat 50 clean — warm round jazz tones', tags: ['Amp', 'Guitar'],
+  { name: 'BadCat Jazz', description: 'BadCat 50 clean — warm round jazz tones', tags: ['Amp', 'Guitar'], gainCompensationDb: 9.1,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 60, neuralModelIndex: 23, parameters: { drive: 10, level: 70, presence: 35 } },
       { category: 'tonejs', type: 'Chorus', enabled: true, wet: 15, parameters: { frequency: 0.3, depth: 0.2 } },
       { category: 'wasm', type: 'MVerb', enabled: true, wet: 30, parameters: { damping: 0.3, density: 0.7, bandwidth: 0.5, decay: 0.5, predelay: 0.03, size: 0.6, gain: 1.0, mix: 0.4, earlyMix: 0.4 } },
     ] },
-  { name: 'El Coyote Blues', description: 'El Coyote crunch + spring + tremolo — desert blues', tags: ['Amp', 'Guitar'], gainCompensationDb: -3.9,
+  { name: 'El Coyote Blues', description: 'El Coyote crunch + spring + tremolo — desert blues', tags: ['Amp', 'Guitar'], gainCompensationDb: 2.9,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 31, parameters: { drive: 45, level: 85, presence: 50 } },
       { category: 'tonejs', type: 'Tremolo', enabled: true, wet: 25, parameters: { frequency: 4, depth: 0.4 } },
@@ -834,39 +834,39 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
 
   // ═══ GUITAR ═══
-  { name: 'ENGL Metal', description: 'ENGL E645 — tight European metal', tags: ['Guitar', 'Amp', 'Loud'], gainCompensationDb: 2.2,
+  { name: 'ENGL Metal', description: 'ENGL E645 — tight European metal', tags: ['Guitar', 'Amp', 'Loud'], gainCompensationDb: 2.5,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 28, parameters: { drive: 55, level: 80, presence: 55 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: 0.5, high: -0.5 } },
     ] },
-  { name: 'TS9 + Spring', description: 'Tube Screamer + spring — blues/rock pedalboard', tags: ['Guitar'], gainCompensationDb: -5.2,
+  { name: 'TS9 + Spring', description: 'Tube Screamer + spring — blues/rock pedalboard', tags: ['Guitar'], gainCompensationDb: 4.7,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 70, neuralModelIndex: 0, parameters: { drive: 50, tone: 55, level: 85 } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.5, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.6 } },
     ] },
-  { name: 'Big Muff Doom', description: 'Big Muff V6 + massive reverb — fuzzy doom', tags: ['Guitar', 'Loud'], gainCompensationDb: 4.2,
+  { name: 'Big Muff Doom', description: 'Big Muff V6 + massive reverb — fuzzy doom', tags: ['Guitar', 'Loud'], gainCompensationDb: -3.4,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 36, parameters: { drive: 70, tone: 40, level: 80 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 0.5, high: -0.5 } },
       { category: 'tonejs', type: 'Reverb', enabled: true, wet: 35, parameters: { decay: 5, preDelay: 0.04 } },
     ] },
-  { name: 'RAT + Delay', description: 'ProCo RAT + delay — aggressive post-punk', tags: ['Guitar', 'Grit'],
+  { name: 'RAT + Delay', description: 'ProCo RAT + delay — aggressive post-punk', tags: ['Guitar', 'Grit'], gainCompensationDb: 1.5,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 4, parameters: { drive: 60, tone: 50, level: 80 } },
       { category: 'tonejs', type: 'FeedbackDelay', enabled: true, wet: 30, parameters: { delayTime: 0.35, feedback: 0.45 } },
     ] },
-  { name: 'Revv G3 Chug', description: 'Revv G3 — modern metal chug machine', tags: ['Guitar', 'Loud'],
+  { name: 'Revv G3 Chug', description: 'Revv G3 — modern metal chug machine', tags: ['Guitar', 'Loud'], gainCompensationDb: 4.1,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 7, parameters: { drive: 70, tone: 55, level: 80 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.08 } },
     ] },
-  { name: 'Goat + Leslie', description: 'Goat fuzz + Leslie rotary — psychedelic swirl', tags: ['Guitar', 'Modulation'], gainCompensationDb: 3.5,
+  { name: 'Goat + Leslie', description: 'Goat fuzz + Leslie rotary — psychedelic swirl', tags: ['Guitar', 'Modulation'], gainCompensationDb: 1.5,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 75, neuralModelIndex: 33, parameters: { drive: 55, tone: 50, level: 85 } },
       { category: 'wasm', type: 'Leslie', enabled: true, wet: 45, parameters: { speed: 1.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.6, width: 0.8, acceleration: 0.5 } },
     ] },
-  { name: 'Aguilar Bass Grit', description: 'Aguilar Agro + compressor — punchy bass', tags: ['Guitar', 'Bass'], gainCompensationDb: 2.5,
+  { name: 'Aguilar Bass Grit', description: 'Aguilar Agro + compressor — punchy bass', tags: ['Guitar', 'Bass'], gainCompensationDb: 2.3,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 70, neuralModelIndex: 21, parameters: { drive: 45, tone: 55, level: 85 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.12 } },
@@ -954,7 +954,7 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
 
   // ═══ RETRO HARDWARE — C64 SID ═══
-  { name: 'SID Shredder', description: 'SID as guitar lead — Mesa high gain, compression, spring reverb', tags: ['C64', 'Amp', 'Guitar'], gainCompensationDb: 0.9,
+  { name: 'SID Shredder', description: 'SID as guitar lead — Mesa high gain, compression, spring reverb', tags: ['C64', 'Amp', 'Guitar'], gainCompensationDb: 5.3,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 45, neuralModelIndex: 12, parameters: { drive: 50, level: 80, presence: 55 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
@@ -988,7 +988,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 6, attack: 0.003, release: 0.1 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 12, parameters: { drive: 30, tone: 11000 } },
     ] },
-  { name: 'SID Crunch Box', description: 'Aggressive SID — Friedman BE-OD crunch, tight compression, presence', tags: ['C64', 'Grit', 'Amp'], gainCompensationDb: 2.6,
+  { name: 'SID Crunch Box', description: 'Aggressive SID — Friedman BE-OD crunch, tight compression, presence', tags: ['C64', 'Grit', 'Amp'], gainCompensationDb: 6.3,
     effects: [
       { category: 'neural', type: 'Neural', enabled: true, wet: 35, neuralModelIndex: 9, parameters: { drive: 45, tone: 55, level: 100 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 1.0, high: 1.5 } },
