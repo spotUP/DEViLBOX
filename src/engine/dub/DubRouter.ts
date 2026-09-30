@@ -190,6 +190,14 @@ const _liveEcho = new LiveEchoGuard();
 /** Set by the TrackerView mount effect. Null when no tracker view is active. */
 export function setDubBusForRouter(bus: DubBus | null): void {
   _bus = bus;
+  // Measure what every fire does (moveAudibilityLog): meters on this bus's
+  // input and return and on the master output.
+  void Promise.all([import('./moveAudibilityLog'), import('../ToneEngine')]).then(([{ installMoveAudibilityLog }, { getToneEngine }]) => {
+    if (_bus !== bus) return;
+    if (!bus) { installMoveAudibilityLog(null); return; }
+    const master = (getToneEngine() as unknown as { blepInput: { input: AudioNode } }).blepInput.input;
+    installMoveAudibilityLog({ ...bus.getAuditNodes(), master });
+  }).catch((e) => console.warn('[DubRouter] move audibility log not installed:', e));
 }
 
 /** Subscribe to fire events. Returns an unsubscribe fn. */

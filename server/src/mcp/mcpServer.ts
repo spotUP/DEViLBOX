@@ -798,6 +798,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_dub_move_audit',
+    'The recent dub move fires (Auto Dub and user) and what each measurably did: bus input, dub return and master level before the fire vs the loudest 100 ms during it, and a verdict (OK / SILENT). silent lists the silent move ids.',
+    { last: z.number().optional().describe('How many recent fires (default 30, max 100)') },
+    (p) => call('get_dub_move_audit', p),
+  );
+
+  server.tool(
     'set_dub_bus_audition',
     "Hold the dub bus's PARALLEL colour stages down so you can hear the send itself - plate, ring modulator, lo-fi, the phaser/comb sweep and the external feedback loop all duck, leaving the core wet chain (echo, spring, sidechain, glue, EQ) audible. { on: true } starts it, { on: false } hands the colour back at whatever values it had, including any changed while held. Never writes characterPreset, so a voicing survives being auditioned. Use it to check what a gesture is actually doing without dismantling the user's sound.",
     { on: z.boolean().optional() },

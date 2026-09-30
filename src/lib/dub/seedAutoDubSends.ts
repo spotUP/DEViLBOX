@@ -28,14 +28,21 @@ export function autoDubSeedChannelCount(patternChannelCount: number | undefined,
   return Math.max(0, Math.min(fromPattern, mixerChannelCount, 16));
 }
 
-/** A role's send level as Auto Dub's starting point: 80 %, never under 0.3, never over 0.8. */
+/**
+ * A role's send level as Auto Dub's starting point: half, between 0.15 and
+ * 0.45. Low on purpose - the moves OPEN sends, and a move only stands out
+ * against a quiet return. Raised to 80 % / 0.8 on 2026-09-30 while the return
+ * was stuck at 0 after reloads (the real cause of "almost none"), which made
+ * the return a constant wash: measured, the owner's 29 presses raised the
+ * return peak 0-3 dB for most moves. Back to the original levels.
+ */
 export function autoDubSeedSendLevel(level: number): number {
   const clamped = Math.max(0, Math.min(1, level));
-  return Math.max(0.3, Math.min(clamped * 0.8, 0.8));
+  return Math.max(0.15, Math.min(clamped * 0.5, 0.45));
 }
 
 /** Flat starting send when there is no persona preset to take roles from. */
-export const AUTO_DUB_FLAT_SEND = 0.4;
+export const AUTO_DUB_FLAT_SEND = 0.15;
 
 /** Seed the closed channel sends of the loaded song for Auto Dub. */
 export function seedAutoDubSends(): void {

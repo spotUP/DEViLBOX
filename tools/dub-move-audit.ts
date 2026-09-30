@@ -1,18 +1,11 @@
 /**
- * Dub move audibility audit: for every dub move, what it adds to the dub
- * return and the master output on the playing song.
- *
- * Each move is measured against a baseline recorded right before it (no move
- * fired), 3 s each, with measure_dub_echo_response (stages return_ + master).
- * A move whose return and master both stay within 1 dB of the baseline did
- * nothing audible. Auto Dub is paused for the run (its own moves would land in
- * the recordings) and restored after; the song is played for the run and
- * stopped after.
- *
- * Resumable: results go to tools/dub-move-audit.json as they complete.
- *   npx tsx tools/dub-move-audit.ts                # every move not yet measured
- *   npx tsx tools/dub-move-audit.ts --only echoThrow --only snareCrack
- *   npx tsx tools/dub-move-audit.ts --redo
+ * Dub move audibility audit, from the per-fire log (moveAudibilityLog):
+ * every dub move fired once on the playing song, 4 s apart (held moves
+ * released after 1.5 s), then each fire's measured effect on the dub return
+ * (peak vs peak) and the master (average vs average) with its verdict.
+ * Auto Dub is paused for the run and restored after; the song is played for
+ * the run and stopped after. Results go to tools/dub-move-audit.json.
+ *   npx tsx tools/dub-move-audit.ts [--only echoThrow --only snareCrack] [--channel 2]
  * Needs: dev stack, DEViLBOX open with a song loaded and the dub bus on.
  */
 import WebSocket from 'ws';
@@ -22,17 +15,17 @@ import { fileURLToPath } from 'url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(DIR, 'dub-move-audit.json');
-const MOVES = fs.readdirSync(path.join(DIR, '../src/engine/dub/moves'))
-  .filter((f) => f.endsWith('.ts') && !f.startsWith('_') && f !== 'index.ts').map((f) => f.replace(/\.ts$/, ''));
 const args = process.argv.slice(2);
 const only = args.flatMap((a, i) => (a === '--only' && args[i + 1] ? [args[i + 1]] : []));
-const CHANNEL = Number(args[args.indexOf('--channel') + 1] ?? 2) || 2;
-type Row = { move: string; returnDeltaDb: number; masterDeltaDb: number; audible: boolean; at: string };
-let store: Record<string, Row> = {};
-try { store = JSON.parse(fs.readFileSync(OUT, 'utf8')); } catch { /* first run */ }
+const ci = args.indexOf('--channel');
+const CHANNEL = ci >= 0 ? Number(args[ci + 1]) : 2;
+const MOVES = fs.readdirSync(path.join(DIR, '../src/engine/dub/moves'))
+  .filter((f) => f.endsWith('.ts') && !f.startsWith('_') && f !== 'index.ts').map((f) => f.replace(/\.ts$/, ''))
+  .filter((m) => !only.length || only.includes(m));
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const ws = new WebSocket('ws://localhost:4003/mcp');
-function call(method: string, params: Record<string, unknown> = {}, timeoutMs = 60000): Promise<any> {
+function call(method: string, params: Record<string, unknown> = {}, timeoutMs = 30000): Promise<any> {
   return new Promise((resolve, reject) => {
     const id = `mv-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const t = setTimeout(() => { ws.off('message', h); reject(new Error('timeout ' + method)); }, timeoutMs);
@@ -46,27 +39,27 @@ function call(method: string, params: Record<string, unknown> = {}, timeoutMs = 
     ws.send(JSON.stringify({ id, type: 'call', method, params }));
   });
 }
-const rec = (move: string) => call('measure_dub_echo_response', { move, channel: CHANNEL, stages: ['return_', 'master'], seconds: 3, gapMs: 300 });
 
 ws.on('open', async () => {
   const autoDub = await call('get_auto_dub_state');
   await call('set_auto_dub_config', { enabled: false }).catch(() => {});
   await call('play');
-  await new Promise((r) => setTimeout(r, 1500));
+  await wait(2000);
   try {
     for (const move of MOVES) {
-      if (only.length && !only.includes(move)) continue;
-      if (!args.includes('--redo') && store[move]) continue;
-      const base = await rec('none');
-      const hit = await rec(move);
-      if (base.error || hit.error) { console.log(`ERR ${move}: ${base.error ?? hit.error}`); continue; }
-      const d = (k: string) => Math.round((hit.stages[k].rmsDb - base.stages[k].rmsDb) * 10) / 10;
-      const row: Row = { move, returnDeltaDb: d('return_'), masterDeltaDb: d('master'), audible: false, at: new Date().toISOString() };
-      row.audible = Math.abs(row.returnDeltaDb) >= 1 || Math.abs(row.masterDeltaDb) >= 1;
-      store[move] = row;
-      fs.writeFileSync(OUT, JSON.stringify(store, null, 2));
-      console.log(`${row.audible ? 'ok    ' : 'SILENT'} ${move.padEnd(20)} return ${String(row.returnDeltaDb).padStart(6)} dB  master ${String(row.masterDeltaDb).padStart(6)} dB`);
+      const r = await call('fire_dub_move', { moveId: move, channelId: CHANNEL }).catch((e) => ({ error: (e as Error).message }));
+      await wait(1500);
+      if (r?.heldHandle) await call('release_dub_move', { heldHandle: r.heldHandle }).catch(() => {});
+      await wait(2500);
     }
+    await wait(3000);
+    const audit = await call('get_dub_move_audit', { last: 100 });
+    const mine = (audit.results as Array<Record<string, any>>).filter((x) => x.origin !== 'ai' && MOVES.includes(x.moveId)).slice(-MOVES.length);
+    fs.writeFileSync(OUT, JSON.stringify(mine, null, 2));
+    for (const x of mine) {
+      console.log(`${x.verdict.padEnd(6)} ${x.moveId.padEnd(20)} return peak ${x.beforeRetPeak} -> ${x.peak.ret} (${x.delta.ret >= 0 ? '+' : ''}${x.delta.ret})  master avg ${x.before.master} -> ${x.peak.master} (${x.delta.master >= 0 ? '+' : ''}${x.delta.master})`);
+    }
+    console.log(`SILENT: ${mine.filter((x) => x.verdict === 'SILENT').map((x) => x.moveId).join(', ')}`);
   } finally {
     await call('stop').catch(() => {});
     await call('set_auto_dub_config', { enabled: !!autoDub.enabled }).catch(() => {});
