@@ -414,11 +414,10 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
     return this.workletNode;
   }
 
-  getAudioContext(): AudioContext | null {
-    try {
-      return (getDevilboxAudioContext() as any)?.rawContext ?? null;
-    } catch { return null; }
-  }
+  // getAudioContext(): WASMSingletonBase's - the engine's own context. The
+  // override here read `.rawContext` off the native AudioContext, which has
+  // none, so it always returned null and every channel-targeted effect on a
+  // song played by this engine was dropped without a word (2026-09-30).
 
   addIsolation(slotIndex: number, channelMask: number): void {
     if (!this.workletNode || slotIndex < 0 || slotIndex >= HivelyEngine.MAX_ISOLATION_SLOTS) return;

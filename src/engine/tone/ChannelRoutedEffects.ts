@@ -890,7 +890,12 @@ export class ChannelRoutedEffectsManager {
 
       // Create output gain for this slot
       const audioContext = engine.getAudioContext();
-      if (!audioContext) { engine.removeIsolation(slotIdx); continue; }
+      if (!audioContext) {
+        console.warn(`[ChannelRoutedEffects] ${engine.constructor.name} gave no AudioContext - ch${channelIndex + 1}'s effects are not playing`);
+        engine.removeIsolation(slotIdx);
+        for (const n of effectNodes) { try { n.dispose(); } catch { /* */ } }
+        continue;
+      }
       const outputGain = audioContext.createGain();
       outputGain.gain.value = 1;
 
@@ -1141,7 +1146,31 @@ const _fallbackResolvers: (() => Promise<IsolationCapableEngine | null>)[] = [];
 let _playingIsolationEngine: IsolationCapableEngine | null = null;
 
 export function setPlayingIsolationEngine(engine: IsolationCapableEngine | null): void {
+  const changed = engine !== _playingIsolationEngine;
   _playingIsolationEngine = engine;
+  if (changed && engine) void rebuildForNewEngine();
+}
+
+/**
+ * A song's engine started: effects aimed at channels move onto its isolation
+ * slots. The master chain decides at each rebuild which effects stay on the
+ * whole mix (no engine could isolate them) and which run in slots, and the
+ * slots were built only then - so effects aimed at channels before the song
+ * played stayed wrong until the chain was touched: on a Hively song the three
+ * master effects aimed at channels 2-4 played nowhere (2026-09-30, with the
+ * engine's context bug). Rebuild both now.
+ */
+async function rebuildForNewEngine(): Promise<void> {
+  try {
+    const [{ useAudioStore }, { getToneEngine }, { scheduleWasmEffectRebuild }, { targetsChannels }] = await Promise.all([
+      import('../../stores/useAudioStore'), import('../ToneEngine'), import('../../stores/useMixerStore'), import('./sidechainKey'),
+    ]);
+    const effects = useAudioStore.getState().masterEffects;
+    if (effects.some((fx) => fx.enabled && targetsChannels(fx))) await getToneEngine().rebuildMasterEffects(effects);
+    scheduleWasmEffectRebuild(); // mixer inserts, and the slots themselves
+  } catch (e) {
+    console.warn('[ChannelRoutedEffects] rebuild for the new engine failed:', e);
+  }
 }
 
 /** Duck-typed: whether a started engine instance implements IsolationCapableEngine. */

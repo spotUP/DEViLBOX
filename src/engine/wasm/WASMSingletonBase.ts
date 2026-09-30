@@ -226,6 +226,11 @@ export abstract class WASMSingletonBase {
    * node reference. Subclasses should override to also null their own
    * `static instance` field so the next getInstance() builds a fresh engine.
    */
+  /** The context this engine's worklet runs in (the isolation slots connect to it). */
+  getAudioContext(): AudioContext | null {
+    return this.audioContext;
+  }
+
   dispose(): void {
     this._disposed = true;
     try { this.workletNode?.port.postMessage({ type: 'dispose' }); } catch { /* port closed */ }
@@ -276,10 +281,6 @@ export abstract class WASMChannelOutputsEngine extends WASMSingletonBase {
 
   getWorkletNode(): AudioWorkletNode | null {
     return this.workletNode;
-  }
-
-  getAudioContext(): AudioContext | null {
-    return this.audioContext;
   }
 
   isAvailable(): boolean {
