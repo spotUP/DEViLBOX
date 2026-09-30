@@ -40,6 +40,8 @@ export class BuzzmachineGenerator implements DevilboxSynth {
    * queues attacks the same way).
    */
   private pendingNoteMessages: Array<Record<string, unknown>> = [];
+  /** Parameters set before the worklet was ready (index -> latest value). */
+  private pendingParams = new Map<number, number>();
 
   // Error tracking - no fallback synths, report errors instead
   private initError: Error | null = null;
@@ -197,6 +199,8 @@ export class BuzzmachineGenerator implements DevilboxSynth {
 
       this.useWasmEngine = true;
       console.log(`[BuzzmachineGenerator] ${this.machineType} WASM engine active`);
+      for (const [index, value] of this.pendingParams) this.engine.setParameter(this.workletNode, index, value);
+      this.pendingParams.clear();
       for (const msg of this.pendingNoteMessages) this.workletNode.port.postMessage({ ...msg, time: undefined });
       this.pendingNoteMessages = [];
     } catch (err) {
@@ -302,11 +306,26 @@ export class BuzzmachineGenerator implements DevilboxSynth {
   /**
    * Set a parameter value
    */
+  /**
+   * Apply an instrument's saved machine settings (a preset, or the user's own
+   * tweaks). The factories created generators without them, so every one
+   * started on its machine's defaults.
+   */
+  public applyConfig(buzzmachine: { parameters?: Record<number, number> } | undefined): void {
+    for (const [index, value] of Object.entries(buzzmachine?.parameters ?? {})) {
+      this.setParameter(Number(index), value);
+    }
+  }
+
   public setParameter(paramIndex: number, value: number): void {
     if (this.useWasmEngine && this.workletNode) {
       this.engine.setParameter(this.workletNode, paramIndex, value);
+    } else if (this.initInProgress || !this.initError) {
+      // Not loaded yet: the instrument's saved settings arrive right after
+      // creation, and were dropped here - every Buzz generator started on its
+      // machine defaults, presets included. Applied on ready.
+      this.pendingParams.set(paramIndex, value);
     }
-    // Fallback parameter mapping could be added here
   }
 
   /**

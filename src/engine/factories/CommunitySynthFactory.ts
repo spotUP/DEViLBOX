@@ -155,6 +155,7 @@ export function createBuzzGenerator(
   const synth = new BuzzmachineGenerator(machineType);
   const normalizedVolume = getNormalizedVolume(synthType, config.volume);
   synth.output.gain.value = Tone.dbToGain(normalizedVolume);
+  synth.applyConfig(config.buzzmachine);
   return synth;
 }
 

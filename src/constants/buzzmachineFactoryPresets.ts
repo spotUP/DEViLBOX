@@ -48,7 +48,9 @@ for (const type of GENERATOR_TYPES) {
         // often just takes parameters directly or uses the 'Buzzmachine' generic path.
         // Let's rely on InstrumentFactory handling 'BuzzKick', 'BuzzNoise' etc.
         // which it does by looking at config.parameters
-        parameters: config.parameters as Record<string, number>,
+        // Where the Buzz editors and createBuzzGenerator read them. A top-level
+        // `parameters` was read by neither: loading a preset changed nothing.
+        buzzmachine: { machineType: type, parameters: { ...config.parameters } },
       });
     }
   }
