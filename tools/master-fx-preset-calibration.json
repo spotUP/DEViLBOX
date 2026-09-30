@@ -204,11 +204,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": -3.9,
-    "makeUpDb": 3.9,
-    "oldMakeUpDb": 9.5,
-    "at": "2026-09-30T05:33:06.789Z",
-    "songDb": 0.7
+    "chainDb": -4.6,
+    "makeUpDb": 4.6,
+    "oldMakeUpDb": 3.9,
+    "at": "2026-09-30T12:37:29.092Z"
   },
   "Echo Out": {
     "name": "Echo Out",
