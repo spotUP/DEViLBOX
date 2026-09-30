@@ -46,7 +46,7 @@ describe('generatedPeakFor — referenced to the music, not to full scale', () =
     const siren = generatedPeakFor('siren', LOUD);
     expect(siren).toBeLessThan(LOUD.peak / 2);
     expect(siren).toBeGreaterThan(LOUD.rms);          // still audible over it
-    expect(siren).toBeLessThan(LOUD.rms * 1.5);       // but only just
+    expect(siren).toBeLessThan(LOUD.rms * 1.7);       // but not dominating (1.5 -> 1.7 with the 2026-09-30 "louder" verdict)
   });
 
   it('keeps a transient referenced to peak', () => {
@@ -57,7 +57,7 @@ describe('generatedPeakFor — referenced to the music, not to full scale', () =
   it('puts the siren well below where the peak reference put it', () => {
     // What the first pass produced, for the record.
     const oldBehaviour = LOUD.peak * 0.75;
-    expect(generatedPeakFor('siren', LOUD)).toBeLessThan(oldBehaviour / 2);
+    expect(generatedPeakFor('siren', LOUD)).toBeLessThan(oldBehaviour * 0.6); // > 4 dB under it
   });
 
   it('holds a sustained low end under the mix rather than over it', () => {
@@ -71,7 +71,7 @@ describe('generatedPeakFor — referenced to the music, not to full scale', () =
     expect(generatedPeakFor('sonarPing', SILENT))
       .toBeCloseTo(SILENT_PROGRAMME_PEAK * GENERATED_PRESENCE.sonarPing, 6);
     const siren = generatedPeakFor('siren', SILENT);
-    expect(siren).toBeLessThan(0.1);
+    expect(siren).toBeLessThan(0.125);
     expect(siren).toBeGreaterThan(0.01);
   });
 
@@ -258,10 +258,11 @@ describe('levels asked for by ear, 2026-09-21', () => {
 
   it('nudges the siren up without reopening the 2026-09-18 regression', () => {
     // It used to be referenced to programme PEAK and was reported "MUCH louder
-    // than the music". The bound that guards that is worth more than any
-    // further increase here.
+    // than the music". The owner asked for it louder again on 2026-09-30
+    // ("crack, siren, radio -> louder"); it stays more than 4 dB under the
+    // peak-referenced level that drew that verdict.
     expect(GENERATED_PRESENCE.siren).toBeGreaterThan(1.15);
-    expect(generatedPeakFor('siren', LOUD)).toBeLessThan((LOUD.peak * 0.75) / 2);
+    expect(generatedPeakFor('siren', LOUD)).toBeLessThan(LOUD.peak * 0.75 * 0.6);
   });
 
   it('keeps every generated move under full scale on a loud programme', () => {

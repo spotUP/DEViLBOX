@@ -92,7 +92,10 @@ export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
    *  the siren was referenced to programme PEAK and came out "MUCH louder than
    *  the music". That guard is worth more than the extra 0.1, so the value
    *  moved rather than the test. */
-  siren: 1.25,
+  siren: 1.6,   // 1.25 -> 1.6 (+2 dB), 2026-09-30: owner "crack, siren, radio -> louder".
+                // Less than the transients' step: a sustained tone reads louder,
+                // and 2.0 sat 2.6 dB from the level of the 2026-09-18 "MUCH louder
+                // than the music" regression.
   /** A marker, not an event. */
   sonarPing: 0.45,
   /** A shriek — the loudest thing here by design, still bounded.
@@ -131,7 +134,7 @@ export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
   springSlam: 0.8,
   springKick: 0.95,
   /** Rises into the mix rather than over it. */
-  radioRiser: 0.55,
+  radioRiser: 0.9,   // 0.55 -> 0.9 (+4 dB), 2026-09-30: owner "louder".
   /**
    * The CAPTURED moves — reverse echo and backward reverb.
    *
@@ -152,7 +155,9 @@ export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
    *  near the programme's own peak rather than under it. The move already
    *  asks for full intent (`snareCrack` level 1.0), so this table was the only
    *  lever left. */
-  noiseBurst: 0.9,
+  noiseBurst: 1.45,  // 0.9 -> 1.45 (+4 dB), 2026-09-30: owner "crack, siren, radio -> louder";
+                     // above the programme's peak on purpose - an accent over the drums
+                     // (the 0.95 ceiling still holds it on a loud tune).
 };
 
 /**
