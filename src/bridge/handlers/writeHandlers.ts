@@ -529,7 +529,12 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
  * master chain is put back afterwards.
  */
 export async function measureMasterEffect(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  if (useTransportStore.getState().isPlaying) return { error: 'Transport is playing - stop playback first (the song would be in the measurement).' };
+  // song: measure on the playing song (the mix at the master effects input)
+  // instead of pink noise - what the ear hears, dynamics and stereo included.
+  const song = params.source === 'song';
+  const playing = useTransportStore.getState().isPlaying;
+  if (song && !playing) return { error: 'source "song" needs a song playing.' };
+  if (!song && playing) return { error: 'Transport is playing - stop playback first (the song would be in the measurement).' };
   const chain = Array.isArray(params.effects) ? (params.effects as Record<string, unknown>[]) : null;
   const type = (params.type as string) ?? (chain ? 'chain' : '');
   if (!type) return { error: 'type or effects is required' };
@@ -597,14 +602,19 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
       const a = [0, 1].map((ch) => { const an = ctx.createAnalyser(); an.fftSize = 4096; split.connect(an, ch); return an; });
       taps.push({ name, node, split, a });
     }
-    src.connect(nativeIn(input));
     const startTime = ctx.currentTime;
-    src.start();
-    await wait(seconds * 1000);
+    if (!song) {
+      src.connect(nativeIn(input));
+      src.start();
+      await wait(seconds * 1000);
+    }
     const f = new Float32Array(4096);
     const energy: Record<string, number> = {};
-    for (let i = 0; i < 20; i++) {
-      await wait(80);
+    // Noise is steady: 20 reads. A song is not: read back-to-back windows
+    // (4096 samples = 85 ms) for `seconds`, input and output together.
+    const reads = song ? Math.round((seconds * 1000) / 85) : 20;
+    for (let i = 0; i < reads; i++) {
+      await wait(song ? 85 : 80);
       for (const t of taps) for (const an of t.a) { an.getFloatTimeDomainData(f); let e = 0; for (const x of f) e += x * x; energy[t.name] = (energy[t.name] ?? 0) + e; }
     }
     const ref = energy.input || 1e-12;

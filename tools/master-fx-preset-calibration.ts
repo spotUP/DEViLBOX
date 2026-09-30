@@ -14,6 +14,7 @@
  *   npx tsx tools/master-fx-preset-calibration.ts --containing Reverb --containing Delay  # presets using these types
  *   npx tsx tools/master-fx-preset-calibration.ts --only "Hall Reverb"                    # one (repeatable)
  *   npx tsx tools/master-fx-preset-calibration.ts --redo ...                              # re-measure
+ *   npx tsx tools/master-fx-preset-calibration.ts --song --only "Ambient"                # with its make-up, on the PLAYING song (records songDb)
  *   npx tsx tools/master-fx-preset-calibration.ts --write [--except "Name"]               # put measured make-ups into fxPresets.ts
  * Needs: npm run dev:fullstack, DEViLBOX open and clicked once, transport stopped.
  */
@@ -25,7 +26,9 @@ import { fileURLToPath } from 'url';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(DIR, 'master-fx-preset-calibration.json');
 const PRESETS_TS = path.join(DIR, '../src/constants/fxPresets.ts');
-type Row = { name: string; types: string[]; chainDb: number; makeUpDb: number; oldMakeUpDb: number; at: string };
+type Row = { name: string; types: string[]; chainDb: number; makeUpDb: number; oldMakeUpDb: number; at: string;
+  /** --song: the chain's level (with its make-up) on the playing song, dB. */
+  songDb?: number };
 
 const args = process.argv.slice(2);
 const listArg = (flag: string) => args.flatMap((a, i) => (a === flag && args[i + 1] ? [args[i + 1]] : []));
@@ -80,6 +83,14 @@ ws.on('open', async () => {
     const types = p.effects.map((e) => e.type);
     if (only.length && !only.includes(p.name)) continue;
     if (containing.length && !types.some((t) => containing.includes(t))) continue;
+    const songMode = args.includes('--song');
+    if (songMode) {
+      const r = await call('measure_master_effect', { effects: p.effects, gainCompensationDb: p.gainCompensationDb, source: 'song', seconds: 10, settleMs: 3000 }).catch((e) => ({ error: (e as Error).message }));
+      if (r.error) { console.log(`ERR ${p.name}: ${r.error}`); if (/No browser|song playing/.test(r.error)) break; continue; }
+      if (store[p.name]) { store[p.name].songDb = r.chainDb; fs.writeFileSync(OUT, JSON.stringify(store, null, 2)); }
+      console.log(`${p.name.padEnd(28)} song ${String(r.chainDb).padStart(6)} dB with make-up ${p.gainCompensationDb}  [${types.join('+')}]`);
+      continue;
+    }
     if (!args.includes('--redo') && store[p.name]) continue;
     const slow = types.some((t) => t === 'Neural' || t.startsWith('WAM'));
     const r = await call('measure_master_effect', { effects: p.effects, gainCompensationDb: 0, seconds: 4, settleMs: slow ? 8000 : 4000 }).catch((e) => ({ error: (e as Error).message }));
