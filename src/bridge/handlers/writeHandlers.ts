@@ -727,7 +727,11 @@ export async function measureDubEchoResponse(params: Record<string, unknown>): P
       await wait(1500);
     }
     for (const name of names) {
-      const node = bus[name] as AudioNode | undefined;
+      // 'master': the whole output after the master chain - moves that act on
+      // the dry mix (mutes, drops, filters) show there, not on the return.
+      const node = (name === 'master'
+        ? (getToneEngine() as unknown as { blepInput: { input: AudioNode } }).blepInput.input
+        : bus[name]) as AudioNode | undefined;
       if (!node || typeof node.connect !== 'function') { out[name] = { error: 'no such stage' }; continue; }
       await wait(Number(params.gapMs ?? 3000)); // let the previous tail die
       const burst = ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.005), ctx.sampleRate);
@@ -740,7 +744,8 @@ export async function measureDubEchoResponse(params: Record<string, unknown>): P
       // was left running once, and the owner heard "siren never stops".
       let held: { dispose(): void } | null = null;
       const recorded = await captureLiveAudio(node, () => {
-        if (moveId) { held = fire(moveId, undefined, (params.moveParams as Record<string, number> | undefined) ?? {}, 'live'); return; }
+        if (moveId === 'none') return; // a baseline recording: nothing fired
+        if (moveId) { held = fire(moveId, params.channel as number | undefined, (params.moveParams as Record<string, number> | undefined) ?? {}, 'live'); return; }
         const src = ctx.createBufferSource(); src.buffer = burst; src.connect(input); src.start();
       }, () => { /* released below, after the whole recording */ }, seconds);
       try { (held as { dispose(): void } | null)?.dispose(); } catch { /* already gone */ }
@@ -771,8 +776,10 @@ export async function measureDubEchoResponse(params: Record<string, unknown>): P
         if (k >= 1 && Math.abs(ms - k * echoMs) <= 25) onRep += v;
       });
       let pk = 0; for (const v of x) pk = Math.max(pk, Math.abs(v));
+      let sumSq = 0; for (const v of x) sumSq += v * v;
       out[name] = {
         recordedMs: Math.round((x.length / ctx.sampleRate) * 1000), echoMs,
+        rmsDb: Math.round(10 * Math.log10(sumSq / Math.max(1, x.length) || 1e-20) * 10) / 10,
         peakDbfs: Math.round(20 * Math.log10(pk || 1e-9) * 10) / 10,
         onRepeats: Math.round((onRep / (after || 1e-20)) * 100) / 100,
         clarity: Math.round((near / total) * 100) / 100, peaks: peaks.filter((p) => p.db > -40).slice(0, 16),

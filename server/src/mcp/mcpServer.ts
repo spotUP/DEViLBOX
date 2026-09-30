@@ -792,7 +792,8 @@ export function createMcpServer(): McpServer {
     'measure_dub_echo_response',
     'The dub echo impulse response: a 5 ms burst into the bus, each stage recorded; reports the repeats (time ms, level dB) and clarity (share of energy within 20 ms of a repeat: near 1 = distinct echoes, low = a wash). Uses the current bus settings unless settings overrides (restored after). Refuses while playing. Default stages: postEchoSatBypass (echo out), return_ (the whole wet return).',
     { settings: z.record(z.string(), z.unknown()).optional(), stages: z.array(z.string()).optional(), seconds: z.number().optional(), gapMs: z.number().optional(),
-      move: z.string().optional().describe('Fire this dub move (e.g. snareCrack) instead of the test burst'), moveParams: z.record(z.string(), z.number()).optional() },
+      move: z.string().optional().describe("Fire this dub move (e.g. snareCrack) instead of the test burst; 'none' records a baseline"), moveParams: z.record(z.string(), z.number()).optional(),
+      channel: z.number().optional().describe('Channel (0-based) for a channel move') },
     (p) => call('measure_dub_echo_response', p),
   );
 

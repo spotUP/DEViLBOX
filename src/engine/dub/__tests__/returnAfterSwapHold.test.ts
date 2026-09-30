@@ -28,4 +28,19 @@ describe('dub bus after a swap hold', () => {
   it('a song loaded while Auto Dub runs gets its starting sends', () => {
     expect(src('lib/song/applySong.ts')).toMatch(/if \(isAutoDubRunning\(\)\) \(await import\('@\/lib\/dub\/seedAutoDubSends'\)\)\.seedAutoDubSends\(\);/);
   });
+
+  it('setSettings writes the return with _settle, clearing ramps scheduled earlier for later', () => {
+    // At boot the audio clock is frozen: a swap's / splice's restore ramps sit
+    // in its future and outlived a bare setTargetAtTime - the return stayed 0.
+    expect(src('engine/dub/DubBus.ts')).toContain('this._settle(this.return_.gain, this.enabled ? merged.returnGain : 0, now, 0.02);');
+  });
+
+  it('the siren reaches the return directly and at the level it is asked for', () => {
+    // Measured 2026-09-30: siren alone at the master -44.9 dBFS rms (the music
+    // plays ~-24): only through the echo/spring, and the synth 7.7 dB under
+    // the generated peak. After: -26.8 dBFS.
+    const bus = src('engine/dub/DubBus.ts');
+    expect(bus).toContain('this._sirenLevelGain.connect(this.return_ as unknown as AudioNode);');
+    expect(bus).toContain("const peak = generatedPeak('siren') / SIREN_SYNTH_PEAK;");
+  });
 });
