@@ -9,7 +9,7 @@
     "makeUpDb": -3.4,
     "oldMakeUpDb": 4.7,
     "at": "2026-09-30T05:30:30.149Z",
-    "songDb": 0.8
+    "songDb": 1.4
   },
   "Chip Metal": {
     "name": "Chip Metal",
@@ -52,7 +52,7 @@
     "makeUpDb": 4.6,
     "oldMakeUpDb": 4.2,
     "at": "2026-09-30T05:30:59.636Z",
-    "songDb": 0
+    "songDb": -0.1
   },
   "Leslie Cabinet": {
     "name": "Leslie Cabinet",
@@ -63,7 +63,7 @@
     "makeUpDb": 0.8,
     "oldMakeUpDb": 5.5,
     "at": "2026-09-30T05:31:09.477Z",
-    "songDb": -0.2
+    "songDb": -0.4
   },
   "Hall Reverb": {
     "name": "Hall Reverb",
@@ -74,7 +74,7 @@
     "makeUpDb": 0.5,
     "oldMakeUpDb": 3.2,
     "at": "2026-09-30T05:31:19.275Z",
-    "songDb": 0
+    "songDb": 0.3
   },
   "VHS Tape": {
     "name": "VHS Tape",
@@ -99,7 +99,7 @@
     "makeUpDb": 1.7,
     "oldMakeUpDb": 0.8,
     "at": "2026-09-30T05:31:38.794Z",
-    "songDb": -0.2
+    "songDb": -0.5
   },
   "Cassette Deck": {
     "name": "Cassette Deck",
@@ -111,7 +111,8 @@
     "chainDb": 5,
     "makeUpDb": -5,
     "oldMakeUpDb": 1,
-    "at": "2026-09-30T05:31:48.578Z"
+    "at": "2026-09-30T05:31:48.578Z",
+    "songDb": 0
   },
   "Lo-Fi Radio": {
     "name": "Lo-Fi Radio",
@@ -122,7 +123,8 @@
     "chainDb": 4.2,
     "makeUpDb": -4.2,
     "oldMakeUpDb": 0.9,
-    "at": "2026-09-30T05:31:58.345Z"
+    "at": "2026-09-30T05:31:58.345Z",
+    "songDb": 0.2
   },
   "Dub / Reggae": {
     "name": "Dub / Reggae",
@@ -134,7 +136,8 @@
     "chainDb": -1.9,
     "makeUpDb": 1.9,
     "oldMakeUpDb": 4.5,
-    "at": "2026-09-30T05:32:08.120Z"
+    "at": "2026-09-30T05:32:08.120Z",
+    "songDb": 0.5
   },
   "Ambient": {
     "name": "Ambient",
@@ -146,7 +149,8 @@
     "chainDb": -4.9,
     "makeUpDb": 4.9,
     "oldMakeUpDb": 9.4,
-    "at": "2026-09-30T05:32:17.911Z"
+    "at": "2026-09-30T05:32:17.911Z",
+    "songDb": 0.5
   },
   "Psychedelic": {
     "name": "Psychedelic",
@@ -158,7 +162,8 @@
     "chainDb": 0,
     "makeUpDb": 0,
     "oldMakeUpDb": 9.9,
-    "at": "2026-09-30T05:32:27.688Z"
+    "at": "2026-09-30T05:32:27.688Z",
+    "songDb": -1.2
   },
   "Synthwave": {
     "name": "Synthwave",
@@ -170,7 +175,8 @@
     "chainDb": -1.3,
     "makeUpDb": 1.3,
     "oldMakeUpDb": -1,
-    "at": "2026-09-30T05:32:37.463Z"
+    "at": "2026-09-30T05:32:37.463Z",
+    "songDb": -1.1
   },
   "Shoegaze": {
     "name": "Shoegaze",
@@ -182,7 +188,8 @@
     "chainDb": 2.3,
     "makeUpDb": -2.3,
     "oldMakeUpDb": 3.6,
-    "at": "2026-09-30T05:32:47.247Z"
+    "at": "2026-09-30T05:32:47.247Z",
+    "songDb": -0.3
   },
   "Garage / 2-Step": {
     "name": "Garage / 2-Step",
@@ -194,7 +201,8 @@
     "chainDb": -1.1,
     "makeUpDb": 1.1,
     "oldMakeUpDb": 3.2,
-    "at": "2026-09-30T05:32:57.010Z"
+    "at": "2026-09-30T05:32:57.010Z",
+    "songDb": 0.4
   },
   "Big Room": {
     "name": "Big Room",
@@ -207,7 +215,8 @@
     "chainDb": -3.9,
     "makeUpDb": 3.9,
     "oldMakeUpDb": 9.5,
-    "at": "2026-09-30T05:33:06.789Z"
+    "at": "2026-09-30T05:33:06.789Z",
+    "songDb": 0.7
   },
   "Echo Out": {
     "name": "Echo Out",
@@ -218,7 +227,8 @@
     "chainDb": -5.6,
     "makeUpDb": 5.6,
     "oldMakeUpDb": -0.1,
-    "at": "2026-09-30T05:33:16.565Z"
+    "at": "2026-09-30T05:33:16.565Z",
+    "songDb": 0.7
   },
   "Dub Echo": {
     "name": "Dub Echo",
@@ -229,7 +239,8 @@
     "chainDb": -0.3,
     "makeUpDb": 0,
     "oldMakeUpDb": -3.4,
-    "at": "2026-09-30T05:33:26.344Z"
+    "at": "2026-09-30T05:33:26.344Z",
+    "songDb": -0.3
   },
   "Phaser Wash": {
     "name": "Phaser Wash",
@@ -239,7 +250,8 @@
     "chainDb": 1.9,
     "makeUpDb": -1.9,
     "oldMakeUpDb": 2.3,
-    "at": "2026-09-30T05:33:36.117Z"
+    "at": "2026-09-30T05:33:36.117Z",
+    "songDb": -1.1
   },
   "Auto-Pan": {
     "name": "Auto-Pan",
@@ -249,7 +261,8 @@
     "chainDb": 0.6,
     "makeUpDb": -0.6,
     "oldMakeUpDb": 1,
-    "at": "2026-09-30T05:33:45.918Z"
+    "at": "2026-09-30T05:33:45.918Z",
+    "songDb": 0.1
   },
   "Vibrato Wobble": {
     "name": "Vibrato Wobble",
@@ -259,7 +272,8 @@
     "chainDb": 1.3,
     "makeUpDb": -1.3,
     "oldMakeUpDb": 1.3,
-    "at": "2026-09-30T05:33:55.686Z"
+    "at": "2026-09-30T05:33:55.686Z",
+    "songDb": 0
   },
   "Feedback Loop": {
     "name": "Feedback Loop",
@@ -269,7 +283,8 @@
     "chainDb": 1.5,
     "makeUpDb": -1.5,
     "oldMakeUpDb": 0.7,
-    "at": "2026-09-30T05:34:05.451Z"
+    "at": "2026-09-30T05:34:05.451Z",
+    "songDb": -1.8
   },
   "Stone Phaser": {
     "name": "Stone Phaser",
@@ -279,7 +294,8 @@
     "chainDb": 0,
     "makeUpDb": 0,
     "oldMakeUpDb": 0.6,
-    "at": "2026-09-30T05:34:19.231Z"
+    "at": "2026-09-30T05:34:19.231Z",
+    "songDb": -0.6
   },
   "Small Room": {
     "name": "Small Room",
@@ -289,7 +305,8 @@
     "chainDb": -1.7,
     "makeUpDb": 1.7,
     "oldMakeUpDb": 3.9,
-    "at": "2026-09-30T05:34:29.007Z"
+    "at": "2026-09-30T05:34:29.007Z",
+    "songDb": 0.3
   },
   "Plate Shimmer": {
     "name": "Plate Shimmer",
@@ -299,7 +316,8 @@
     "chainDb": -2.2,
     "makeUpDb": 2.2,
     "oldMakeUpDb": 4.7,
-    "at": "2026-09-30T05:34:38.782Z"
+    "at": "2026-09-30T05:34:38.782Z",
+    "songDb": 1
   },
   "Cathedral": {
     "name": "Cathedral",
@@ -310,7 +328,8 @@
     "chainDb": 1.5,
     "makeUpDb": -1.5,
     "oldMakeUpDb": 1,
-    "at": "2026-09-30T05:34:48.539Z"
+    "at": "2026-09-30T05:34:48.539Z",
+    "songDb": -0.8
   },
   "Spring Tank": {
     "name": "Spring Tank",
@@ -320,7 +339,8 @@
     "chainDb": -3.1,
     "makeUpDb": 3.1,
     "oldMakeUpDb": -10.2,
-    "at": "2026-09-30T05:34:58.310Z"
+    "at": "2026-09-30T05:34:58.310Z",
+    "songDb": -0.1
   },
   "Ping Pong Hall": {
     "name": "Ping Pong Hall",
@@ -331,7 +351,8 @@
     "chainDb": -0.2,
     "makeUpDb": 0,
     "oldMakeUpDb": 2.6,
-    "at": "2026-09-30T05:35:08.077Z"
+    "at": "2026-09-30T05:35:08.077Z",
+    "songDb": -0.8
   },
   "Dark Plate": {
     "name": "Dark Plate",
@@ -341,7 +362,8 @@
     "chainDb": -2.6,
     "makeUpDb": 2.6,
     "oldMakeUpDb": 5.3,
-    "at": "2026-09-30T05:35:17.837Z"
+    "at": "2026-09-30T05:35:17.837Z",
+    "songDb": 1.1
   },
   "Tight Room": {
     "name": "Tight Room",
@@ -351,7 +373,8 @@
     "chainDb": -2,
     "makeUpDb": 2,
     "oldMakeUpDb": 3.5,
-    "at": "2026-09-30T05:35:27.589Z"
+    "at": "2026-09-30T05:35:27.589Z",
+    "songDb": 0.3
   },
   "Spacey Delay": {
     "name": "Spacey Delay",
@@ -362,7 +385,8 @@
     "chainDb": -4.6,
     "makeUpDb": 4.6,
     "oldMakeUpDb": -1.7,
-    "at": "2026-09-30T05:35:37.365Z"
+    "at": "2026-09-30T05:35:37.365Z",
+    "songDb": 0.2
   },
   "Dub Siren Echo": {
     "name": "Dub Siren Echo",
@@ -373,7 +397,8 @@
     "chainDb": -6.3,
     "makeUpDb": 6.3,
     "oldMakeUpDb": -30.8,
-    "at": "2026-09-30T05:35:47.125Z"
+    "at": "2026-09-30T05:35:47.125Z",
+    "songDb": -0.2
   },
   "King Tubby Filter": {
     "name": "King Tubby Filter",
@@ -384,7 +409,8 @@
     "chainDb": 0,
     "makeUpDb": 0,
     "oldMakeUpDb": 1.1,
-    "at": "2026-09-30T05:35:56.897Z"
+    "at": "2026-09-30T05:35:56.897Z",
+    "songDb": 0.2
   },
   "Phaser Dub": {
     "name": "Phaser Dub",
@@ -395,7 +421,8 @@
     "chainDb": -3.6,
     "makeUpDb": 3.6,
     "oldMakeUpDb": 0,
-    "at": "2026-09-30T05:36:06.642Z"
+    "at": "2026-09-30T05:36:06.642Z",
+    "songDb": -1.1
   },
   "Tape Echo Wash": {
     "name": "Tape Echo Wash",
@@ -405,7 +432,8 @@
     "chainDb": -3.6,
     "makeUpDb": 3.6,
     "oldMakeUpDb": -2.4,
-    "at": "2026-09-30T05:36:16.425Z"
+    "at": "2026-09-30T05:36:16.425Z",
+    "songDb": 0.8
   },
   "Dub Chamber": {
     "name": "Dub Chamber",
@@ -416,7 +444,8 @@
     "chainDb": -6.2,
     "makeUpDb": 6.2,
     "oldMakeUpDb": -15.4,
-    "at": "2026-09-30T05:36:26.182Z"
+    "at": "2026-09-30T05:36:26.182Z",
+    "songDb": -0.8
   },
   "Aelapse Dub": {
     "name": "Aelapse Dub",
@@ -426,7 +455,8 @@
     "chainDb": 1.2,
     "makeUpDb": -1.2,
     "oldMakeUpDb": 1.2,
-    "at": "2026-09-30T05:36:35.944Z"
+    "at": "2026-09-30T05:36:35.944Z",
+    "songDb": 0.2
   },
   "Mad Professor Studio": {
     "name": "Mad Professor Studio",
@@ -436,7 +466,8 @@
     "chainDb": -2.6,
     "makeUpDb": 2.6,
     "oldMakeUpDb": -2.4,
-    "at": "2026-09-30T05:36:45.698Z"
+    "at": "2026-09-30T05:36:45.698Z",
+    "songDb": 1
   },
   "Mad Professor Cathedral": {
     "name": "Mad Professor Cathedral",
@@ -446,7 +477,8 @@
     "chainDb": -2.2,
     "makeUpDb": 2.2,
     "oldMakeUpDb": -4.2,
-    "at": "2026-09-30T05:36:55.592Z"
+    "at": "2026-09-30T05:36:55.592Z",
+    "songDb": 1.1
   },
   "Mad Professor + Tape": {
     "name": "Mad Professor + Tape",
@@ -457,7 +489,8 @@
     "chainDb": -5.8,
     "makeUpDb": 5.8,
     "oldMakeUpDb": -3.1,
-    "at": "2026-09-30T05:37:05.347Z"
+    "at": "2026-09-30T05:37:05.347Z",
+    "songDb": 1.2
   },
   "Dattorro Tubby": {
     "name": "Dattorro Tubby",
@@ -467,7 +500,8 @@
     "chainDb": -3,
     "makeUpDb": 3,
     "oldMakeUpDb": -1.8,
-    "at": "2026-09-30T05:37:15.101Z"
+    "at": "2026-09-30T05:37:15.101Z",
+    "songDb": 0.5
   },
   "Dattorro Infinite": {
     "name": "Dattorro Infinite",
@@ -477,7 +511,8 @@
     "chainDb": -1.7,
     "makeUpDb": 1.7,
     "oldMakeUpDb": -5.4,
-    "at": "2026-09-30T05:37:24.877Z"
+    "at": "2026-09-30T05:37:24.877Z",
+    "songDb": -1.7
   },
   "Dattorro Steel": {
     "name": "Dattorro Steel",
@@ -487,7 +522,8 @@
     "chainDb": -3.3,
     "makeUpDb": 3.3,
     "oldMakeUpDb": -2.9,
-    "at": "2026-09-30T05:37:34.701Z"
+    "at": "2026-09-30T05:37:34.701Z",
+    "songDb": -0.3
   },
   "Dattorro + King Tubby": {
     "name": "Dattorro + King Tubby",
@@ -498,7 +534,8 @@
     "chainDb": -0.6,
     "makeUpDb": 0.6,
     "oldMakeUpDb": -1.2,
-    "at": "2026-09-30T05:37:44.497Z"
+    "at": "2026-09-30T05:37:44.497Z",
+    "songDb": 0.1
   },
   "Dattorro + Tape Wash": {
     "name": "Dattorro + Tape Wash",
@@ -509,7 +546,8 @@
     "chainDb": -5.9,
     "makeUpDb": 5.9,
     "oldMakeUpDb": -3.6,
-    "at": "2026-09-30T05:37:54.246Z"
+    "at": "2026-09-30T05:37:54.246Z",
+    "songDb": -0.5
   },
   "Moog Acid": {
     "name": "Moog Acid",
@@ -520,7 +558,8 @@
     "chainDb": -3.1,
     "makeUpDb": 3.1,
     "oldMakeUpDb": 5.6,
-    "at": "2026-09-30T05:38:04.002Z"
+    "at": "2026-09-30T05:38:04.002Z",
+    "songDb": -1.8
   },
   "Gated Snare": {
     "name": "Gated Snare",
@@ -531,7 +570,8 @@
     "chainDb": -2.4,
     "makeUpDb": 2.4,
     "oldMakeUpDb": 3.8,
-    "at": "2026-09-30T05:38:13.799Z"
+    "at": "2026-09-30T05:38:13.799Z",
+    "songDb": 0
   },
   "Chorus Lead": {
     "name": "Chorus Lead",
@@ -542,7 +582,8 @@
     "chainDb": -1.5,
     "makeUpDb": 1.5,
     "oldMakeUpDb": 4.4,
-    "at": "2026-09-30T05:38:23.571Z"
+    "at": "2026-09-30T05:38:23.571Z",
+    "songDb": 0.6
   },
   "Phaser Lead": {
     "name": "Phaser Lead",
@@ -552,7 +593,8 @@
     "chainDb": 2.3,
     "makeUpDb": -2.3,
     "oldMakeUpDb": 1.1,
-    "at": "2026-09-30T05:38:33.338Z"
+    "at": "2026-09-30T05:38:33.338Z",
+    "songDb": -0.2
   },
   "Shimmer Pad": {
     "name": "Shimmer Pad",
@@ -563,7 +605,8 @@
     "chainDb": 4.2,
     "makeUpDb": -4.2,
     "oldMakeUpDb": -1.6,
-    "at": "2026-09-30T05:38:43.086Z"
+    "at": "2026-09-30T05:38:43.086Z",
+    "songDb": 0.1
   },
   "Thick Chorus": {
     "name": "Thick Chorus",
@@ -574,7 +617,8 @@
     "chainDb": -0.8,
     "makeUpDb": 0.8,
     "oldMakeUpDb": 1.5,
-    "at": "2026-09-30T05:38:52.916Z"
+    "at": "2026-09-30T05:38:52.916Z",
+    "songDb": 0
   },
   "Phaser Jet": {
     "name": "Phaser Jet",
@@ -584,7 +628,8 @@
     "chainDb": -2.9,
     "makeUpDb": 2.9,
     "oldMakeUpDb": 2,
-    "at": "2026-09-30T05:39:02.671Z"
+    "at": "2026-09-30T05:39:02.671Z",
+    "songDb": 0
   },
   "Tremolo Gate": {
     "name": "Tremolo Gate",
@@ -595,7 +640,8 @@
     "chainDb": 1.5,
     "makeUpDb": -1.5,
     "oldMakeUpDb": 1.8,
-    "at": "2026-09-30T05:39:12.459Z"
+    "at": "2026-09-30T05:39:12.459Z",
+    "songDb": 0.2
   },
   "Wah Sweep": {
     "name": "Wah Sweep",
@@ -606,7 +652,8 @@
     "chainDb": 1.7,
     "makeUpDb": -1.7,
     "oldMakeUpDb": 1.7,
-    "at": "2026-09-30T05:39:22.223Z"
+    "at": "2026-09-30T05:39:22.223Z",
+    "songDb": 1.2
   },
   "Ambient Space": {
     "name": "Ambient Space",
@@ -617,7 +664,8 @@
     "chainDb": -0.8,
     "makeUpDb": 0.8,
     "oldMakeUpDb": 4.6,
-    "at": "2026-09-30T05:39:32.030Z"
+    "at": "2026-09-30T05:39:32.030Z",
+    "songDb": -0.1
   },
   "Dreamy Haze": {
     "name": "Dreamy Haze",
@@ -629,7 +677,8 @@
     "chainDb": 0.4,
     "makeUpDb": 0,
     "oldMakeUpDb": 0,
-    "at": "2026-09-30T05:39:41.816Z"
+    "at": "2026-09-30T05:39:41.816Z",
+    "songDb": 0.7
   },
   "Underwater": {
     "name": "Underwater",
@@ -641,7 +690,8 @@
     "chainDb": -0.6,
     "makeUpDb": 0.6,
     "oldMakeUpDb": 0,
-    "at": "2026-09-30T05:39:51.581Z"
+    "at": "2026-09-30T05:39:51.581Z",
+    "songDb": -0.2
   },
   "Frozen": {
     "name": "Frozen",
@@ -653,7 +703,8 @@
     "chainDb": -1.6,
     "makeUpDb": 1.6,
     "oldMakeUpDb": 6.1,
-    "at": "2026-09-30T05:40:01.403Z"
+    "at": "2026-09-30T05:40:01.403Z",
+    "songDb": 0
   },
   "*Wave Landscape": {
     "name": "*Wave Landscape",
@@ -664,7 +715,8 @@
     "chainDb": -3.8,
     "makeUpDb": 3.8,
     "oldMakeUpDb": 5.5,
-    "at": "2026-09-30T05:40:11.185Z"
+    "at": "2026-09-30T05:40:11.185Z",
+    "songDb": -0.3
   },
   "Radiowave": {
     "name": "Radiowave",
@@ -676,7 +728,8 @@
     "chainDb": -8.1,
     "makeUpDb": 8.1,
     "oldMakeUpDb": 20.2,
-    "at": "2026-09-30T05:40:21.006Z"
+    "at": "2026-09-30T05:40:21.006Z",
+    "songDb": 6
   },
   "Haunted": {
     "name": "Haunted",
@@ -688,7 +741,8 @@
     "chainDb": -4,
     "makeUpDb": 4,
     "oldMakeUpDb": -2,
-    "at": "2026-09-30T05:40:30.791Z"
+    "at": "2026-09-30T05:40:30.791Z",
+    "songDb": -0.2
   },
   "Cosmic": {
     "name": "Cosmic",
@@ -700,7 +754,8 @@
     "chainDb": -0.7,
     "makeUpDb": 0.7,
     "oldMakeUpDb": 7,
-    "at": "2026-09-30T05:40:40.573Z"
+    "at": "2026-09-30T05:40:40.573Z",
+    "songDb": -0.5
   },
   "Tape Delay Machine": {
     "name": "Tape Delay Machine",
@@ -710,7 +765,8 @@
     "chainDb": 2.6,
     "makeUpDb": -2.6,
     "oldMakeUpDb": -4,
-    "at": "2026-09-30T05:40:50.344Z"
+    "at": "2026-09-30T05:40:50.344Z",
+    "songDb": -0.4
   },
   "Ambient Echo": {
     "name": "Ambient Echo",
@@ -720,7 +776,8 @@
     "chainDb": -2.5,
     "makeUpDb": 2.5,
     "oldMakeUpDb": -3.7,
-    "at": "2026-09-30T05:41:00.139Z"
+    "at": "2026-09-30T05:41:00.139Z",
+    "songDb": -0.8
   },
   "Tape Echo": {
     "name": "Tape Echo",
@@ -730,7 +787,8 @@
     "chainDb": -3.5,
     "makeUpDb": 3.5,
     "oldMakeUpDb": -1.9,
-    "at": "2026-09-30T05:41:09.909Z"
+    "at": "2026-09-30T05:41:09.909Z",
+    "songDb": 0.8
   },
   "Stereo Ping Pong": {
     "name": "Stereo Ping Pong",
@@ -740,7 +798,8 @@
     "chainDb": 0,
     "makeUpDb": 0,
     "oldMakeUpDb": -0.9,
-    "at": "2026-09-30T05:41:19.755Z"
+    "at": "2026-09-30T05:41:19.755Z",
+    "songDb": -0.9
   },
   "Space Echo": {
     "name": "Space Echo",
@@ -750,7 +809,8 @@
     "chainDb": -4.8,
     "makeUpDb": 4.8,
     "oldMakeUpDb": 6.6,
-    "at": "2026-09-30T05:41:29.571Z"
+    "at": "2026-09-30T05:41:29.571Z",
+    "songDb": -0.1
   },
   "RE-201 King Tubby": {
     "name": "RE-201 King Tubby",
@@ -760,7 +820,8 @@
     "chainDb": -2.7,
     "makeUpDb": 2.7,
     "oldMakeUpDb": -2,
-    "at": "2026-09-30T05:41:39.346Z"
+    "at": "2026-09-30T05:41:39.346Z",
+    "songDb": 2.6
   },
   "RE-201 Spring Only": {
     "name": "RE-201 Spring Only",
@@ -770,7 +831,8 @@
     "chainDb": -5.6,
     "makeUpDb": 5.6,
     "oldMakeUpDb": -3,
-    "at": "2026-09-30T05:41:49.136Z"
+    "at": "2026-09-30T05:41:49.136Z",
+    "songDb": 0.8
   },
   "RE-201 Runaway": {
     "name": "RE-201 Runaway",
@@ -780,7 +842,8 @@
     "chainDb": 16.6,
     "makeUpDb": -16.6,
     "oldMakeUpDb": -1.5,
-    "at": "2026-09-30T05:41:58.987Z"
+    "at": "2026-09-30T05:41:58.987Z",
+    "songDb": 15
   },
   "Dub Plate Special": {
     "name": "Dub Plate Special",
@@ -790,7 +853,8 @@
     "chainDb": 4.2,
     "makeUpDb": -4.2,
     "oldMakeUpDb": -1.8,
-    "at": "2026-09-30T05:42:08.773Z"
+    "at": "2026-09-30T05:42:08.773Z",
+    "songDb": 0.1
   },
   "Midnight Dub Delay": {
     "name": "Midnight Dub Delay",
@@ -800,7 +864,8 @@
     "chainDb": 1.3,
     "makeUpDb": -1.3,
     "oldMakeUpDb": -2.2,
-    "at": "2026-09-30T05:42:18.566Z"
+    "at": "2026-09-30T05:42:18.566Z",
+    "songDb": 0.5
   },
   "RE-201 + Dattorro": {
     "name": "RE-201 + Dattorro",
@@ -811,7 +876,8 @@
     "chainDb": -7,
     "makeUpDb": 7,
     "oldMakeUpDb": -4,
-    "at": "2026-09-30T05:42:28.372Z"
+    "at": "2026-09-30T05:42:28.372Z",
+    "songDb": 2.1
   },
   "Clean Fender": {
     "name": "Clean Fender",
@@ -819,10 +885,10 @@
       "Neural",
       "SpringReverb"
     ],
-    "chainDb": -9.7,
-    "makeUpDb": 9.7,
+    "chainDb": -8.5,
+    "makeUpDb": 8.5,
     "oldMakeUpDb": -2.7,
-    "at": "2026-09-30T05:42:42.194Z"
+    "at": "2026-09-30T06:35:47.882Z"
   },
   "Dumble Lead": {
     "name": "Dumble Lead",
@@ -831,10 +897,10 @@
       "FeedbackDelay",
       "MVerb"
     ],
-    "chainDb": -15.2,
-    "makeUpDb": 15.2,
+    "chainDb": 1.4,
+    "makeUpDb": -1.4,
     "oldMakeUpDb": 3.9,
-    "at": "2026-09-30T05:42:56.043Z"
+    "at": "2026-09-30T06:36:29.480Z"
   },
   "BadCat Jazz": {
     "name": "BadCat Jazz",
@@ -843,10 +909,10 @@
       "Chorus",
       "MVerb"
     ],
-    "chainDb": -9.6,
-    "makeUpDb": 9.6,
+    "chainDb": -9.1,
+    "makeUpDb": 9.1,
     "oldMakeUpDb": 0,
-    "at": "2026-09-30T05:43:09.818Z"
+    "at": "2026-09-30T06:36:57.269Z"
   },
   "El Coyote Blues": {
     "name": "El Coyote Blues",
@@ -855,10 +921,10 @@
       "Tremolo",
       "SpringReverb"
     ],
-    "chainDb": -8.3,
-    "makeUpDb": 8.3,
+    "chainDb": -2.9,
+    "makeUpDb": 2.9,
     "oldMakeUpDb": -3.9,
-    "at": "2026-09-30T05:43:23.595Z"
+    "at": "2026-09-30T06:37:11.095Z"
   },
   "TS9 + Spring": {
     "name": "TS9 + Spring",
@@ -866,10 +932,10 @@
       "Neural",
       "SpringReverb"
     ],
-    "chainDb": -7.5,
-    "makeUpDb": 7.5,
+    "chainDb": -4.7,
+    "makeUpDb": 4.7,
     "oldMakeUpDb": -5.2,
-    "at": "2026-09-30T05:43:37.344Z"
+    "at": "2026-09-30T06:37:38.712Z"
   },
   "Big Muff Doom": {
     "name": "Big Muff Doom",
@@ -878,10 +944,10 @@
       "EQ3",
       "Reverb"
     ],
-    "chainDb": -17.9,
-    "makeUpDb": 17.9,
+    "chainDb": 3.4,
+    "makeUpDb": -3.4,
     "oldMakeUpDb": 4.2,
-    "at": "2026-09-30T05:43:51.106Z"
+    "at": "2026-09-30T06:37:52.527Z"
   },
   "RAT + Delay": {
     "name": "RAT + Delay",
@@ -889,10 +955,10 @@
       "Neural",
       "FeedbackDelay"
     ],
-    "chainDb": 6.1,
-    "makeUpDb": -6.1,
+    "chainDb": -1.5,
+    "makeUpDb": 1.5,
     "oldMakeUpDb": 0,
-    "at": "2026-09-30T05:44:04.895Z"
+    "at": "2026-09-30T06:38:06.351Z"
   },
   "Goat + Leslie": {
     "name": "Goat + Leslie",
@@ -900,10 +966,10 @@
       "Neural",
       "Leslie"
     ],
-    "chainDb": -9.4,
-    "makeUpDb": 9.4,
+    "chainDb": -1.5,
+    "makeUpDb": 1.5,
     "oldMakeUpDb": 3.5,
-    "at": "2026-09-30T05:44:18.678Z"
+    "at": "2026-09-30T06:38:34.109Z"
   },
   "Paula Dub Sirens": {
     "name": "Paula Dub Sirens",
@@ -916,7 +982,8 @@
     "chainDb": -4.9,
     "makeUpDb": 4.9,
     "oldMakeUpDb": -3.6,
-    "at": "2026-09-30T05:44:28.468Z"
+    "at": "2026-09-30T05:44:28.468Z",
+    "songDb": 0.6
   },
   "Chipgold": {
     "name": "Chipgold",
@@ -930,7 +997,8 @@
     "chainDb": -1.8,
     "makeUpDb": 1.8,
     "oldMakeUpDb": -2.7,
-    "at": "2026-09-30T05:44:38.230Z"
+    "at": "2026-09-30T05:44:38.230Z",
+    "songDb": 0.5
   },
   "Paula Sings": {
     "name": "Paula Sings",
@@ -944,7 +1012,8 @@
     "chainDb": 1.2,
     "makeUpDb": -1.2,
     "oldMakeUpDb": 2.7,
-    "at": "2026-09-30T05:44:47.983Z"
+    "at": "2026-09-30T05:44:47.983Z",
+    "songDb": 0.3
   },
   "Exotic Shimmer": {
     "name": "Exotic Shimmer",
@@ -957,7 +1026,8 @@
     "chainDb": -3,
     "makeUpDb": 3,
     "oldMakeUpDb": 2.3,
-    "at": "2026-09-30T05:44:57.751Z"
+    "at": "2026-09-30T05:44:57.751Z",
+    "songDb": 0.7
   },
   "SID Shredder": {
     "name": "SID Shredder",
@@ -967,10 +1037,10 @@
       "SpringReverb",
       "EQ3"
     ],
-    "chainDb": -6.2,
-    "makeUpDb": 6.2,
+    "chainDb": -5.3,
+    "makeUpDb": 5.3,
     "oldMakeUpDb": 0.9,
-    "at": "2026-09-30T05:45:11.515Z"
+    "at": "2026-09-30T06:39:01.701Z"
   },
   "SID Stadium": {
     "name": "SID Stadium",
@@ -983,7 +1053,8 @@
     "chainDb": -5.2,
     "makeUpDb": 5.2,
     "oldMakeUpDb": 11.4,
-    "at": "2026-09-30T05:45:21.287Z"
+    "at": "2026-09-30T05:45:21.287Z",
+    "songDb": 0.8
   },
   "SID Acid Trip": {
     "name": "SID Acid Trip",
@@ -996,7 +1067,8 @@
     "chainDb": -3.3,
     "makeUpDb": 3.3,
     "oldMakeUpDb": 6.2,
-    "at": "2026-09-30T05:45:31.078Z"
+    "at": "2026-09-30T05:45:31.078Z",
+    "songDb": 0
   },
   "SID Neon Nights": {
     "name": "SID Neon Nights",
@@ -1010,6 +1082,145 @@
     "chainDb": 4.2,
     "makeUpDb": -4.2,
     "oldMakeUpDb": 2.9,
-    "at": "2026-09-30T05:45:40.842Z"
+    "at": "2026-09-30T05:45:40.842Z",
+    "songDb": -0.7
+  },
+  "Princeton Glow": {
+    "name": "Princeton Glow",
+    "types": [
+      "Neural",
+      "Compressor"
+    ],
+    "chainDb": -4.5,
+    "makeUpDb": 4.5,
+    "oldMakeUpDb": 0.5,
+    "at": "2026-09-30T06:34:38.789Z"
+  },
+  "Blackstar Clean": {
+    "name": "Blackstar Clean",
+    "types": [
+      "Neural",
+      "EQ3",
+      "Compressor"
+    ],
+    "chainDb": -3.5,
+    "makeUpDb": 3.5,
+    "oldMakeUpDb": 0.9,
+    "at": "2026-09-30T06:34:52.609Z"
+  },
+  "Tube Screamer Glue": {
+    "name": "Tube Screamer Glue",
+    "types": [
+      "Neural",
+      "Compressor"
+    ],
+    "chainDb": -4.1,
+    "makeUpDb": 4.1,
+    "oldMakeUpDb": 0.5,
+    "at": "2026-09-30T06:35:06.411Z"
+  },
+  "Sovtek Warmth": {
+    "name": "Sovtek Warmth",
+    "types": [
+      "Neural",
+      "TapeSimulator",
+      "Compressor"
+    ],
+    "chainDb": -5.6,
+    "makeUpDb": 5.6,
+    "oldMakeUpDb": 0,
+    "at": "2026-09-30T06:35:20.275Z"
+  },
+  "Filmosound Master": {
+    "name": "Filmosound Master",
+    "types": [
+      "Neural",
+      "EQ3",
+      "Compressor"
+    ],
+    "chainDb": -3.5,
+    "makeUpDb": 3.5,
+    "oldMakeUpDb": 0.9,
+    "at": "2026-09-30T06:35:34.065Z"
+  },
+  "Crunch Marshall": {
+    "name": "Crunch Marshall",
+    "types": [
+      "Neural",
+      "EQ3"
+    ],
+    "chainDb": -0.4,
+    "makeUpDb": 0,
+    "oldMakeUpDb": 0,
+    "at": "2026-09-30T06:36:01.784Z"
+  },
+  "High Gain Mesa": {
+    "name": "High Gain Mesa",
+    "types": [
+      "Neural",
+      "Compressor"
+    ],
+    "chainDb": -4.2,
+    "makeUpDb": 4.2,
+    "oldMakeUpDb": 0,
+    "at": "2026-09-30T06:36:15.612Z"
+  },
+  "Sovtek Doom": {
+    "name": "Sovtek Doom",
+    "types": [
+      "Neural",
+      "EQ3"
+    ],
+    "chainDb": 1.1,
+    "makeUpDb": -1.1,
+    "oldMakeUpDb": 0,
+    "at": "2026-09-30T06:36:43.476Z"
+  },
+  "ENGL Metal": {
+    "name": "ENGL Metal",
+    "types": [
+      "Neural",
+      "Compressor",
+      "EQ3"
+    ],
+    "chainDb": -2.5,
+    "makeUpDb": 2.5,
+    "oldMakeUpDb": 2.2,
+    "at": "2026-09-30T06:37:24.920Z"
+  },
+  "Revv G3 Chug": {
+    "name": "Revv G3 Chug",
+    "types": [
+      "Neural",
+      "Compressor"
+    ],
+    "chainDb": -4.1,
+    "makeUpDb": 4.1,
+    "oldMakeUpDb": 0,
+    "at": "2026-09-30T06:38:20.257Z"
+  },
+  "Aguilar Bass Grit": {
+    "name": "Aguilar Bass Grit",
+    "types": [
+      "Neural",
+      "Compressor",
+      "EQ3"
+    ],
+    "chainDb": -2.3,
+    "makeUpDb": 2.3,
+    "oldMakeUpDb": 2.5,
+    "at": "2026-09-30T06:38:47.919Z"
+  },
+  "SID Crunch Box": {
+    "name": "SID Crunch Box",
+    "types": [
+      "Neural",
+      "EQ3",
+      "Compressor"
+    ],
+    "chainDb": -6.3,
+    "makeUpDb": 6.3,
+    "oldMakeUpDb": 2.6,
+    "at": "2026-09-30T06:39:15.490Z"
   }
 }

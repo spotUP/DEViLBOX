@@ -14,6 +14,8 @@
  * - DC blocking and filtering
  */
 
+import { neuralModelOutputGain } from '@/constants/guitarMLRegistry';
+
 export interface GuitarMLModel {
   name: string;
   fileName: string;
@@ -160,6 +162,10 @@ export class GuitarMLEngine {
       });
 
       this.currentModel = model;
+      // Each model comes out at its training level (-17.5 to +8.9 dB at
+      // defaults); correct it to unity here, where the master effect and the
+      // instrument pedalboard both pass (NEURAL_MODEL_OUTPUT_DB).
+      this.outputGain.gain.value = neuralModelOutputGain(modelIndex);
 
       console.log(`[GuitarMLEngine] Loading model: ${model.name}`);
     } catch (error) {
@@ -194,6 +200,7 @@ export class GuitarMLEngine {
         fileName: url,
         type: 'pedal',
       };
+      this.outputGain.gain.value = 1; // an unmeasured model: no correction
 
       console.log(`[GuitarMLEngine] Loading custom model: ${modelName}`);
     } catch (error) {
