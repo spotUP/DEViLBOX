@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { RE201_DELAY_MODES, DEFAULT_DUB_BUS } from '@/types/dub';
+import { RE201_DELAY_MODES, DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS } from '@/types/dub';
 
 const cpp = readFileSync(join(process.cwd(), 're201-wasm/RE201WASM.cpp'), 'utf8');
 
@@ -33,5 +33,28 @@ describe('RE-201 delay modes', () => {
   it('the bus defaults to head 1 alone, no second spring', () => {
     expect(DEFAULT_DUB_BUS.re201DelayMode).toBe(1);
     expect(DEFAULT_DUB_BUS.chainOrder).toBe('echoSpring');
+  });
+});
+
+describe('persona presets', () => {
+  // A preset merges over the bus's current settings, so a field it leaves out
+  // is inherited: Scientist, Jammy and Mad Professor ran Perry's spring-first
+  // order once he had been loaded, and the owner heard every echo as a wash.
+  it('every persona sets its chain order', () => {
+    for (const [name, p] of Object.entries(DUB_CHARACTER_PRESETS)) {
+      expect((p.overrides as { chainOrder?: string }).chainOrder, name).toBeDefined();
+    }
+  });
+  it('every RE-201 persona sets its head mode', () => {
+    for (const [name, p] of Object.entries(DUB_CHARACTER_PRESETS)) {
+      const o = p.overrides as { echoEngine?: string; re201DelayMode?: number };
+      if (o.echoEngine === 're201') expect(o.re201DelayMode, name).toBeDefined();
+    }
+  });
+  it('only Perry puts the spring before the echo', () => {
+    for (const [name, p] of Object.entries(DUB_CHARACTER_PRESETS)) {
+      const order = (p.overrides as { chainOrder?: string }).chainOrder;
+      expect(order, name).toBe(name === 'perry' ? 'springEcho' : 'echoSpring');
+    }
   });
 });
