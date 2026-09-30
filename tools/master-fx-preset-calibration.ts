@@ -44,9 +44,11 @@ if (args.includes('--write')) {
   const except = listArg('--except');
   for (const r of Object.values(store)) {
     if (except.includes(r.name)) { console.log(`kept: ${r.name}`); continue; }
-    const esc = r.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, "\\\\'");
-    // The make-up sits after the tags, before a line break or an inline `effects:`.
-    const re = new RegExp(`(\\{ name: '${esc}',[^\\n]*?)(, gainCompensationDb: -?[0-9.]+)?(,\\n|, effects:)`);
+    const esc = r.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // The name is quoted '...' (an apostrophe escaped \') or "..."; the make-up
+    // sits after the tags, before a line break or an inline `effects:`.
+    const quoted = `(?:'${esc.replace(/'/g, "\\\\'")}'|"${esc}")`;
+    const re = new RegExp(`(\\{ name: ${quoted},[^\\n]*?)(, gainCompensationDb: -?[0-9.]+)?(,\\n|, effects:)`);
     const m = re.exec(src);
     if (!m) { console.log(`not found in fxPresets.ts: ${r.name}`); continue; }
     const next = r.makeUpDb === 0 ? `${m[1]}${m[3]}` : `${m[1]}, gainCompensationDb: ${r.makeUpDb}${m[3]}`;
