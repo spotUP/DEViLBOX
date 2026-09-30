@@ -3,45 +3,45 @@
     "moveId": "backwardReverb",
     "channelId": 2,
     "origin": "user",
-    "atMs": 76979.60499999672,
+    "atMs": 305099.424999997,
     "before": {
-      "input": -35.5,
-      "ret": -43,
-      "master": -29.6
+      "input": -45.5,
+      "ret": -51.9,
+      "master": -29.9
     },
     "peak": {
-      "input": -27,
-      "ret": -36.3,
-      "master": -28.7
+      "input": -32.5,
+      "ret": -39.3,
+      "master": -28.8
     },
-    "beforeRetPeak": -36.2,
+    "beforeRetPeak": -44.8,
     "delta": {
-      "input": 8.5,
-      "ret": -0.1,
-      "master": 0.9
+      "input": 13,
+      "ret": 5.5,
+      "master": 1.1
     },
-    "verdict": "SILENT"
+    "verdict": "OK"
   },
   {
     "moveId": "bassEmphasis",
     "channelId": 2,
     "origin": "user",
-    "atMs": 80991.99499999732,
+    "atMs": 309106.1949999966,
     "before": {
-      "input": -34.2,
-      "ret": -41.3,
-      "master": -27.6
+      "input": -43.4,
+      "ret": -51.7,
+      "master": -27.9
     },
     "peak": {
-      "input": -27,
-      "ret": -33.6,
-      "master": -28.6
+      "input": -37.8,
+      "ret": -43.6,
+      "master": -29.1
     },
-    "beforeRetPeak": -34.5,
+    "beforeRetPeak": -46.3,
     "delta": {
-      "input": 7.2,
-      "ret": 0.9,
-      "master": -1
+      "input": 5.6,
+      "ret": 2.7,
+      "master": -1.2
     },
     "verdict": "SILENT"
   },
@@ -49,22 +49,22 @@
     "moveId": "channelMute",
     "channelId": 2,
     "origin": "user",
-    "atMs": 85003.33499999717,
+    "atMs": 313112.32499999925,
     "before": {
-      "input": -34,
-      "ret": -41.9,
-      "master": -27.5
+      "input": -44,
+      "ret": -50.6,
+      "master": -28
     },
     "peak": {
-      "input": -27.2,
-      "ret": -33.8,
-      "master": -27.8
+      "input": -36.3,
+      "ret": -44,
+      "master": -28.9
     },
-    "beforeRetPeak": -36.1,
+    "beforeRetPeak": -45,
     "delta": {
-      "input": 6.8,
-      "ret": 2.3,
-      "master": -0.3
+      "input": 7.7,
+      "ret": 1,
+      "master": -0.9
     },
     "verdict": "SILENT"
   },
@@ -72,45 +72,22 @@
     "moveId": "channelThrow",
     "channelId": 2,
     "origin": "user",
-    "atMs": 89025.44999999925,
+    "atMs": 317141.39499999955,
     "before": {
-      "input": -32.3,
-      "ret": -41.1,
-      "master": -26.1
+      "input": -41.2,
+      "ret": -50.8,
+      "master": -26.5
     },
     "peak": {
-      "input": -20.5,
-      "ret": -33,
-      "master": -28
+      "input": -20,
+      "ret": -30.3,
+      "master": -28.2
     },
-    "beforeRetPeak": -35.1,
+    "beforeRetPeak": -46,
     "delta": {
-      "input": 11.8,
-      "ret": 2.1,
-      "master": -1.9
-    },
-    "verdict": "SILENT"
-  },
-  {
-    "moveId": "combSweep",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 93038.29499999806,
-    "before": {
-      "input": -33.4,
-      "ret": -40.4,
-      "master": -26.8
-    },
-    "peak": {
-      "input": -23.9,
-      "ret": -29.7,
-      "master": -25.2
-    },
-    "beforeRetPeak": -35.4,
-    "delta": {
-      "input": 9.5,
-      "ret": 5.7,
-      "master": 1.6
+      "input": 21.2,
+      "ret": 15.7,
+      "master": -1.7
     },
     "verdict": "OK"
   },
@@ -118,206 +95,91 @@
     "moveId": "crushBass",
     "channelId": 2,
     "origin": "user",
-    "atMs": 97047.59499999881,
+    "atMs": 321150.4699999988,
     "before": {
-      "input": -29.6,
-      "ret": -33.6,
-      "master": -23.2
+      "input": -42.3,
+      "ret": -48.1,
+      "master": -27.1
     },
     "peak": {
-      "input": -24.6,
-      "ret": -32.4,
-      "master": -24
+      "input": -31.1,
+      "ret": -34.2,
+      "master": -25.2
     },
-    "beforeRetPeak": -29.7,
+    "beforeRetPeak": -44.1,
     "delta": {
-      "input": 5,
-      "ret": -2.7,
-      "master": -0.8
+      "input": 11.2,
+      "ret": 9.9,
+      "master": 1.9
     },
-    "verdict": "SILENT"
+    "verdict": "OK"
   },
   {
     "moveId": "delayTimeThrow",
     "channelId": 2,
     "origin": "user",
-    "atMs": 105061.48999999836,
+    "atMs": 325158.8999999985,
     "before": {
-      "input": -32.2,
-      "ret": -36.5,
-      "master": -25.1
+      "input": -38.6,
+      "ret": -41.5,
+      "master": -23.8
     },
     "peak": {
-      "input": -23.8,
-      "ret": -30.7,
-      "master": -23.4
+      "input": -33.1,
+      "ret": -40.2,
+      "master": -24.7
     },
-    "beforeRetPeak": -32.8,
+    "beforeRetPeak": -36.8,
     "delta": {
-      "input": 8.4,
-      "ret": 2.1,
-      "master": 1.7
+      "input": 5.5,
+      "ret": -3.4,
+      "master": -0.9
     },
     "verdict": "SILENT"
-  },
-  {
-    "moveId": "dubSiren",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 109068.94499999657,
-    "before": {
-      "input": -29.1,
-      "ret": -35.2,
-      "master": -23.7
-    },
-    "peak": {
-      "input": -22.6,
-      "ret": -26.1,
-      "master": -23.9
-    },
-    "beforeRetPeak": -30.4,
-    "delta": {
-      "input": 6.5,
-      "ret": 4.3,
-      "master": -0.2
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "dubStab",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 113096.97999999672,
-    "before": {
-      "input": -32.8,
-      "ret": -36.7,
-      "master": -27
-    },
-    "peak": {
-      "input": -26.4,
-      "ret": -32.2,
-      "master": -24.8
-    },
-    "beforeRetPeak": -31.7,
-    "delta": {
-      "input": 6.4,
-      "ret": -0.5,
-      "master": 2.2
-    },
-    "verdict": "OK"
   },
   {
     "moveId": "echoBuildUp",
     "channelId": 2,
     "origin": "user",
-    "atMs": 117111.72999999672,
+    "atMs": 329163.2749999985,
     "before": {
-      "input": -30.8,
-      "ret": -37.5,
-      "master": -24.2
+      "input": -40.4,
+      "ret": -47.1,
+      "master": -24.6
     },
     "peak": {
-      "input": -23.8,
-      "ret": -33.5,
-      "master": -23.7
+      "input": -36,
+      "ret": -41,
+      "master": -27
     },
-    "beforeRetPeak": -32.8,
+    "beforeRetPeak": -40.5,
     "delta": {
-      "input": 7,
-      "ret": -0.7,
-      "master": 0.5
+      "input": 4.4,
+      "ret": -0.5,
+      "master": -2.4
     },
-    "verdict": "SILENT"
+    "verdict": "OK"
   },
   {
     "moveId": "echoThrow",
     "channelId": 2,
     "origin": "user",
-    "atMs": 121129.85499999672,
+    "atMs": 333174.0249999985,
     "before": {
-      "input": -32,
-      "ret": -38.8,
+      "input": -41.7,
+      "ret": -45.4,
       "master": -25.6
     },
     "peak": {
-      "input": -26.1,
-      "ret": -32,
-      "master": -24.9
+      "input": -20.8,
+      "ret": -36.9,
+      "master": -23.3
     },
-    "beforeRetPeak": -35.5,
+    "beforeRetPeak": -41.2,
     "delta": {
-      "input": 5.9,
-      "ret": 3.5,
-      "master": 0.7
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "eqSweep",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 125137.65499999747,
-    "before": {
-      "input": -33,
-      "ret": -41.5,
-      "master": -26.3
-    },
-    "peak": {
-      "input": -26.1,
-      "ret": -28.8,
-      "master": -23.6
-    },
-    "beforeRetPeak": -35.9,
-    "delta": {
-      "input": 6.9,
-      "ret": 7.1,
-      "master": 2.7
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "filterDrop",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 129145.38499999791,
-    "before": {
-      "input": -29.7,
-      "ret": -36.8,
-      "master": -23.5
-    },
-    "peak": {
-      "input": -25.2,
-      "ret": -33.7,
-      "master": -26.8
-    },
-    "beforeRetPeak": -34.4,
-    "delta": {
-      "input": 4.5,
-      "ret": 0.7,
-      "master": -3.3
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "ghostReverb",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 133154.125,
-    "before": {
-      "input": -31.7,
-      "ret": -36.6,
-      "master": -25
-    },
-    "peak": {
-      "input": -22.5,
-      "ret": -29,
-      "master": -23.2
-    },
-    "beforeRetPeak": -33.3,
-    "delta": {
-      "input": 9.2,
+      "input": 20.9,
       "ret": 4.3,
-      "master": 1.8
+      "master": 2.3
     },
     "verdict": "OK"
   },
@@ -325,91 +187,45 @@
     "moveId": "hpfRise",
     "channelId": 2,
     "origin": "user",
-    "atMs": 137176.97999999672,
+    "atMs": 337185.66000000015,
     "before": {
-      "input": -31.2,
-      "ret": -38,
-      "master": -24.6
+      "input": -37.9,
+      "ret": -44.4,
+      "master": -23.9
     },
     "peak": {
-      "input": -24.1,
-      "ret": -34.6,
-      "master": -22.7
+      "input": -33.1,
+      "ret": -43.3,
+      "master": -24.4
     },
-    "beforeRetPeak": -32.6,
+    "beforeRetPeak": -39.4,
     "delta": {
-      "input": 7.1,
-      "ret": -2,
-      "master": 1.9
+      "input": 4.8,
+      "ret": -3.9,
+      "master": -0.5
     },
     "verdict": "SILENT"
-  },
-  {
-    "moveId": "madProfPingPong",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 141185.25499999896,
-    "before": {
-      "input": -34.3,
-      "ret": -42,
-      "master": -27.1
-    },
-    "peak": {
-      "input": -24.1,
-      "ret": -31.8,
-      "master": -24.3
-    },
-    "beforeRetPeak": -38.5,
-    "delta": {
-      "input": 10.2,
-      "ret": 6.7,
-      "master": 2.8
-    },
-    "verdict": "OK"
   },
   {
     "moveId": "masterDrop",
     "channelId": 2,
     "origin": "user",
-    "atMs": 145200.44499999657,
+    "atMs": 341193.299999997,
     "before": {
-      "input": -29.8,
-      "ret": -34.6,
-      "master": -23.6
+      "input": -41.6,
+      "ret": -47.2,
+      "master": -26.2
     },
     "peak": {
-      "input": -24,
-      "ret": -30.8,
-      "master": -25.4
+      "input": -36,
+      "ret": -41.4,
+      "master": -28.7
     },
-    "beforeRetPeak": -29.8,
+    "beforeRetPeak": -43.1,
     "delta": {
-      "input": 5.8,
-      "ret": -1,
-      "master": -1.8
-    },
-    "verdict": "SILENT"
-  },
-  {
-    "moveId": "oscBass",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 149210.1649999991,
-    "before": {
-      "input": -31.2,
-      "ret": -38.3,
-      "master": -23.7
-    },
-    "peak": {
-      "input": -26.6,
-      "ret": -22.6,
-      "master": -23.8
-    },
-    "beforeRetPeak": -34.1,
-    "delta": {
-      "input": 4.6,
-      "ret": 11.5,
-      "master": -0.1
+      "input": 5.6,
+      "ret": 1.7,
+      "master": -2.5
     },
     "verdict": "OK"
   },
@@ -417,68 +233,45 @@
     "moveId": "radioRiser",
     "channelId": 2,
     "origin": "user",
-    "atMs": 153226.08999999985,
+    "atMs": 345202.26999999955,
     "before": {
-      "input": -29.4,
-      "ret": -36.5,
-      "master": -23
+      "input": -40,
+      "ret": -45.6,
+      "master": -24.5
     },
     "peak": {
-      "input": -25.9,
-      "ret": -31.8,
-      "master": -24.2
+      "input": -33.4,
+      "ret": -38,
+      "master": -23.8
     },
-    "beforeRetPeak": -31.5,
+    "beforeRetPeak": -41.4,
     "delta": {
-      "input": 3.5,
-      "ret": -0.3,
-      "master": -1.2
+      "input": 6.6,
+      "ret": 3.4,
+      "master": 0.7
     },
-    "verdict": "SILENT"
+    "verdict": "OK"
   },
   {
     "moveId": "reverseEcho",
     "channelId": 2,
     "origin": "user",
-    "atMs": 157229.375,
+    "atMs": 349207.6949999966,
     "before": {
-      "input": -29.9,
-      "ret": -36.1,
-      "master": -24.1
+      "input": -40.8,
+      "ret": -49.4,
+      "master": -25.2
     },
     "peak": {
-      "input": -25.2,
-      "ret": -29.7,
-      "master": -24.1
+      "input": -35.9,
+      "ret": -28,
+      "master": -24.7
     },
-    "beforeRetPeak": -32.6,
+    "beforeRetPeak": -46.5,
     "delta": {
-      "input": 4.7,
-      "ret": 2.9,
-      "master": 0
-    },
-    "verdict": "SILENT"
-  },
-  {
-    "moveId": "riddimSection",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 161244.70999999717,
-    "before": {
-      "input": -33.5,
-      "ret": -39.6,
-      "master": -27.3
-    },
-    "peak": {
-      "input": -24.4,
-      "ret": -31,
-      "master": -25
-    },
-    "beforeRetPeak": -31.3,
-    "delta": {
-      "input": 9.1,
-      "ret": 0.3,
-      "master": 2.3
+      "input": 4.9,
+      "ret": 18.5,
+      "master": 0.5
     },
     "verdict": "OK"
   },
@@ -486,45 +279,22 @@
     "moveId": "ringMod",
     "channelId": 2,
     "origin": "user",
-    "atMs": 165279.6499999985,
+    "atMs": 353215.6649999991,
     "before": {
-      "input": -30.2,
-      "ret": -36.1,
-      "master": -23.9
+      "input": -42.1,
+      "ret": -48.6,
+      "master": -27.1
     },
     "peak": {
-      "input": -25.7,
-      "ret": -31.5,
-      "master": -23.3
+      "input": -33.9,
+      "ret": -38.9,
+      "master": -23.6
     },
-    "beforeRetPeak": -31.7,
+    "beforeRetPeak": -42.8,
     "delta": {
-      "input": 4.5,
-      "ret": 0.2,
-      "master": 0.6
-    },
-    "verdict": "SILENT"
-  },
-  {
-    "moveId": "echoThrow",
-    "channelId": 1,
-    "origin": "user",
-    "atMs": 161487.00499999896,
-    "before": {
-      "input": -34,
-      "ret": -39.8,
-      "master": -27.9
-    },
-    "peak": {
-      "input": -24.4,
-      "ret": -31,
-      "master": -24.1
-    },
-    "beforeRetPeak": -31.3,
-    "delta": {
-      "input": 9.6,
-      "ret": 0.3,
-      "master": 3.8
+      "input": 8.2,
+      "ret": 3.9,
+      "master": 3.5
     },
     "verdict": "OK"
   },
@@ -532,344 +302,45 @@
     "moveId": "skankEchoThrow",
     "channelId": 2,
     "origin": "user",
-    "atMs": 169301.63999999687,
+    "atMs": 357232.45999999717,
     "before": {
-      "input": -30.1,
-      "ret": -35.2,
-      "master": -23.9
+      "input": -38.4,
+      "ret": -46.6,
+      "master": -23.5
     },
     "peak": {
-      "input": -24.8,
-      "ret": -32.3,
-      "master": -24.8
+      "input": -24.2,
+      "ret": -36.1,
+      "master": -27
     },
-    "beforeRetPeak": -32.3,
+    "beforeRetPeak": -44.2,
     "delta": {
-      "input": 5.3,
-      "ret": 0,
-      "master": -0.9
+      "input": 14.2,
+      "ret": 8.1,
+      "master": -3.5
     },
-    "verdict": "SILENT"
+    "verdict": "OK"
   },
   {
     "moveId": "skankFloatThrow",
     "channelId": 2,
     "origin": "user",
-    "atMs": 173313.99499999732,
+    "atMs": 361257.21499999985,
     "before": {
-      "input": -33.7,
-      "ret": -41.6,
-      "master": -26.2
+      "input": -40.3,
+      "ret": -44.4,
+      "master": -24.9
     },
     "peak": {
-      "input": -26.8,
-      "ret": -35,
-      "master": -26.3
-    },
-    "beforeRetPeak": -37.8,
-    "delta": {
-      "input": 6.9,
-      "ret": 2.8,
-      "master": -0.1
-    },
-    "verdict": "SILENT"
-  },
-  {
-    "moveId": "snareCrack",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 177322.74499999732,
-    "before": {
-      "input": -30,
-      "ret": -39.8,
-      "master": -23.8
-    },
-    "peak": {
-      "input": -26.9,
-      "ret": -29,
-      "master": -25.9
-    },
-    "beforeRetPeak": -38.1,
-    "delta": {
-      "input": 3.1,
-      "ret": 9.1,
-      "master": -2.1
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "sonarPing",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 181328.46499999985,
-    "before": {
-      "input": -33.9,
-      "ret": -39.4,
-      "master": -26.6
-    },
-    "peak": {
-      "input": -27.2,
-      "ret": -35.1,
-      "master": -29
-    },
-    "beforeRetPeak": -34.5,
-    "delta": {
-      "input": 6.7,
-      "ret": -0.6,
-      "master": -2.4
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "springKick",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 185334.05999999866,
-    "before": {
-      "input": -33.9,
-      "ret": -43.5,
-      "master": -28
-    },
-    "peak": {
-      "input": -27.2,
+      "input": -19.5,
       "ret": -32.7,
-      "master": -28.2
+      "master": -22.6
     },
-    "beforeRetPeak": -36.7,
+    "beforeRetPeak": -41.1,
     "delta": {
-      "input": 6.7,
-      "ret": 4,
-      "master": -0.2
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "springSlam",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 189347.1649999991,
-    "before": {
-      "input": -34.4,
-      "ret": -44.6,
-      "master": -28
-    },
-    "peak": {
-      "input": -10.9,
-      "ret": -11.3,
-      "master": -25.4
-    },
-    "beforeRetPeak": -40.2,
-    "delta": {
-      "input": 23.5,
-      "ret": 28.9,
-      "master": 2.6
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "stereoDoubler",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 193355.08999999985,
-    "before": {
-      "input": -33.4,
-      "ret": -41,
-      "master": -27.4
-    },
-    "peak": {
-      "input": -26.7,
-      "ret": -28.1,
-      "master": -26.6
-    },
-    "beforeRetPeak": -35.9,
-    "delta": {
-      "input": 6.7,
-      "ret": 7.8,
-      "master": 0.8
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "subHarmonic",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 197371.08499999717,
-    "before": {
-      "input": -38.8,
-      "ret": -45,
-      "master": -32.8
-    },
-    "peak": {
-      "input": -28.5,
-      "ret": -32.5,
-      "master": -26.3
-    },
-    "beforeRetPeak": -38.8,
-    "delta": {
-      "input": 10.3,
-      "ret": 6.3,
-      "master": 6.5
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "subSwell",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 201384.58499999717,
-    "before": {
-      "input": -31.6,
-      "ret": -39.1,
-      "master": -25.7
-    },
-    "peak": {
-      "input": -24.1,
-      "ret": -21.4,
-      "master": -23.5
-    },
-    "beforeRetPeak": -32.8,
-    "delta": {
-      "input": 7.5,
-      "ret": 11.4,
-      "master": 2.2
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "tapeStop",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 205389.76999999955,
-    "before": {
-      "input": -29,
-      "ret": -35.7,
-      "master": -22.9
-    },
-    "peak": {
-      "input": -25.5,
-      "ret": -35.5,
-      "master": -25.9
-    },
-    "beforeRetPeak": -31.7,
-    "delta": {
-      "input": 3.5,
-      "ret": -3.8,
-      "master": -3
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "tapeWobble",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 209419.5,
-    "before": {
-      "input": -33.2,
-      "ret": -41.3,
-      "master": -26.8
-    },
-    "peak": {
-      "input": -23.8,
-      "ret": -29.3,
-      "master": -23.9
-    },
-    "beforeRetPeak": -33.6,
-    "delta": {
-      "input": 9.4,
-      "ret": 4.3,
-      "master": 2.9
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "toast",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 213432.11499999836,
-    "before": {
-      "input": -30.1,
-      "ret": -35.7,
-      "master": -22.5
-    },
-    "peak": {
-      "input": -24.4,
-      "ret": -30.5,
-      "master": -26.1
-    },
-    "beforeRetPeak": -32.3,
-    "delta": {
-      "input": 5.7,
-      "ret": 1.8,
-      "master": -3.6
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "transportTapeStop",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 217441.5,
-    "before": {
-      "input": -31.7,
-      "ret": -39.3,
-      "master": -25.4
-    },
-    "peak": {
-      "input": -27.1,
-      "ret": -32.5,
-      "master": -27.9
-    },
-    "beforeRetPeak": -36.1,
-    "delta": {
-      "input": 4.6,
-      "ret": 3.6,
-      "master": -2.5
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "tubbyScream",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 221454.3449999988,
-    "before": {
-      "input": -30.6,
-      "ret": -36.5,
-      "master": -23
-    },
-    "peak": {
-      "input": -26.9,
-      "ret": -20.3,
-      "master": -23.7
-    },
-    "beforeRetPeak": -31.9,
-    "delta": {
-      "input": 3.7,
-      "ret": 11.6,
-      "master": -0.7
-    },
-    "verdict": "OK"
-  },
-  {
-    "moveId": "versionDrop",
-    "channelId": 2,
-    "origin": "user",
-    "atMs": 225462.18499999866,
-    "before": {
-      "input": -30.5,
-      "ret": -32.3,
-      "master": -24.5
-    },
-    "peak": {
-      "input": -27.1,
-      "ret": -32.3,
-      "master": -27
-    },
-    "beforeRetPeak": -26.1,
-    "delta": {
-      "input": 3.4,
-      "ret": -6.2,
-      "master": -2.5
+      "input": 20.8,
+      "ret": 8.4,
+      "master": 2.3
     },
     "verdict": "OK"
   },
@@ -877,23 +348,23 @@
     "moveId": "voltageStarve",
     "channelId": 2,
     "origin": "user",
-    "atMs": 229492.59999999776,
+    "atMs": 365266.09999999776,
     "before": {
-      "input": -31.3,
-      "ret": -38.5,
+      "input": -40.2,
+      "ret": -47.8,
       "master": -25.2
     },
     "peak": {
-      "input": -27,
-      "ret": -32.9,
-      "master": -25.5
+      "input": -33.1,
+      "ret": -42.9,
+      "master": -22.8
     },
-    "beforeRetPeak": -33.6,
+    "beforeRetPeak": -41.9,
     "delta": {
-      "input": 4.3,
-      "ret": 0.7,
-      "master": -0.3
+      "input": 7.1,
+      "ret": -1,
+      "master": 2.4
     },
-    "verdict": "SILENT"
+    "verdict": "OK"
   }
 ]
