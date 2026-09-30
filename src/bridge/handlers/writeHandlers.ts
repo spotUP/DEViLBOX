@@ -530,8 +530,9 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
  */
 export async function measureMasterEffect(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (useTransportStore.getState().isPlaying) return { error: 'Transport is playing - stop playback first (the song would be in the measurement).' };
-  const type = params.type as string;
-  if (!type) return { error: 'type is required' };
+  const chain = Array.isArray(params.effects) ? (params.effects as Record<string, unknown>[]) : null;
+  const type = (params.type as string) ?? (chain ? 'chain' : '');
+  if (!type) return { error: 'type or effects is required' };
   const seconds = Math.min(10, Math.max(1, Number(params.seconds ?? 3)));
   const settleMs = Math.min(15000, Math.max(0, Number(params.settleMs ?? 3000)));
   const engine = getToneEngine() as unknown as Record<string, unknown>;
@@ -549,15 +550,21 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
     const { getDefaultEffectParameters } = await import('../../engine/InstrumentFactory');
     const parameters = (params.parameters as Record<string, unknown>) ?? getDefaultEffectParameters(type) ?? {};
     const before = engine.masterEffectsRebuildVersion as number;
-    store.setMasterEffects([{
-      id, category: (params.category as string) ?? 'tonejs', type, enabled: true,
-      wet: Number(params.wet ?? 100), parameters,
-      ...(params.neuralModelIndex !== undefined ? { neuralModelIndex: params.neuralModelIndex } : {}),
-    }] as never, 0);
+    // A whole chain (a preset) with its make-up gain, or one effect with none.
+    const configs = chain
+      ? chain.map((fx, i) => ({ ...fx, id: `${id}-${i}`, type: String(fx.type), enabled: fx.enabled !== false, category: (fx.category as string) ?? 'tonejs', parameters: (fx.parameters as Record<string, unknown>) ?? {} }))
+      : [{
+        id, category: (params.category as string) ?? 'tonejs', type, enabled: true,
+        wet: Number(params.wet ?? 100), parameters,
+        ...(params.neuralModelIndex !== undefined ? { neuralModelIndex: params.neuralModelIndex } : {}),
+      }];
+    store.setMasterEffects(configs as never, chain ? Number(params.gainCompensationDb ?? 0) : 0);
     for (let i = 0; i < 100 && (engine.masterEffectsRebuildVersion as number) === before; i++) await wait(50);
     await wait(settleMs);
-    const entry = (engine.masterEffectConfigs as Map<string, { node: Tone.ToneAudioNode }>).get(id);
-    if (!entry) return { error: `${type}: the effect was not built (unknown type, or it failed to load)` };
+    const built = engine.masterEffectConfigs as Map<string, { node: Tone.ToneAudioNode }>;
+    const missing = configs.filter((c) => !built.get(c.id)).map((c) => c.type);
+    if (missing.length) return { error: `not built: ${missing.join(', ')} (unknown type, or it failed to load)` };
+    const entry = built.get(configs[configs.length - 1].id)!;
     const len = ctx.sampleRate * 2;
     const buf = ctx.createBuffer(2, len, ctx.sampleRate);
     const d = buf.getChannelData(0);
@@ -584,6 +591,7 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
       taps.push({ name, node, split, a });
     }
     src.connect(nativeIn(input));
+    const startTime = ctx.currentTime;
     src.start();
     await wait(seconds * 1000);
     const f = new Float32Array(4096);
@@ -594,6 +602,7 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
     }
     const ref = energy.input || 1e-12;
     const db = (k: string) => Math.round(10 * Math.log10((energy[k] || 1e-12) / ref) * 10) / 10;
+    if (ctx.currentTime === startTime) return { error: 'The audio clock is not running - click the DEViLBOX tab once to start audio.' };
     return { ok: true, type, wet: Number(params.wet ?? 100), effectDb: db('effect'), chainDb: db('chain'), compensationDb: Math.round((db('chain') - db('effect')) * 10) / 10 };
   } finally {
     try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
