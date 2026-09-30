@@ -647,6 +647,9 @@ export class InstrumentFactory {
         if (config.hively && !hvlSynth.getEngine().hasLoadedTune()) {
           hvlSynth.setInstrument(config.hively).catch(err =>
             console.warn('[InstrumentFactory] HivelySynth.setInstrument failed:', err));
+        } else if (config.hively) {
+          // A tune is loaded: set the player up on the first note, not now.
+          hvlSynth.setPendingInstrument(config.hively);
         }
         instrument = hvlSynth;
         break;
