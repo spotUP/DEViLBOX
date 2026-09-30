@@ -321,6 +321,10 @@ export class GuitarMLEngine {
    */
   dispose(): void {
     if (this.workletNode) {
+      // Stop the processor: disconnecting alone left it alive, holding its
+      // model, for the rest of the session.
+      this.workletNode.port.postMessage({ type: 'dispose' });
+      this.workletNode.port.onmessage = null;
       this.workletNode.disconnect();
       this.workletNode = null;
     }
