@@ -682,9 +682,13 @@ export function getAudioState(): Record<string, unknown> {
     } catch { /* DJ engine not available */ }
   }
 
+  let engineIsPlaying: boolean | undefined;
+  try { engineIsPlaying = (getToneEngine() as unknown as { _isPlaying?: boolean })._isPlaying; } catch { /* not ready */ }
   return {
     initialized: audio.initialized,
     contextState: audio.contextState,
+    /** ToneEngine's own playing flag - it gates the vinyl / Tumult noise layers. */
+    engineIsPlaying,
     masterVolume: audio.masterVolume,
     masterMuted: audio.masterMuted,
     sampleBusGain: audio.sampleBusGain,
