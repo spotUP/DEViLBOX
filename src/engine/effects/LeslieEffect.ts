@@ -39,6 +39,7 @@ export class LeslieEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
 
   private workletNode: AudioWorkletNode | null = null;
@@ -96,10 +97,16 @@ export class LeslieEffect extends Tone.ToneAudioNode {
   setWidth(v: number) { this._options.width = clamp01(v); this.sendParam(PARAM_WIDTH, v); }
   setAcceleration(v: number) { this._options.acceleration = clamp01(v); this.sendParam(PARAM_ACCELERATION, v); }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     this._options.wet = clamp01(value);
-    this.wetGain.gain.value = this._options.wet;
+    this.wetGain.gain.value = this._options.wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 

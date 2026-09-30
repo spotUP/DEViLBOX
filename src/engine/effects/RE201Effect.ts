@@ -45,6 +45,7 @@ export class RE201Effect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private workletNode: AudioWorkletNode | null = null;
   private _disposed = false;
   private _wasmReady = false;
@@ -343,6 +344,12 @@ export class RE201Effect extends Tone.ToneAudioNode {
     this.sendParam('inputLevel', this._options.inputLevel);
   }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     this._options.wet = Math.max(0, Math.min(1, value));
@@ -353,8 +360,7 @@ export class RE201Effect extends Tone.ToneAudioNode {
       this.dryGain.gain,
       this.wetGain.gain,
       this._options.wet,
-      this.dryGain.context.currentTime,
-    );
+      this.dryGain.context.currentTime, undefined, this._wetPathGain);
   }
 
   dispose(): this {

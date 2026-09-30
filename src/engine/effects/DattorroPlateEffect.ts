@@ -38,6 +38,7 @@ export class DattorroPlateEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
 
   private workletNode: AudioWorkletNode | null = null;
@@ -90,11 +91,17 @@ export class DattorroPlateEffect extends Tone.ToneAudioNode {
   setDecay(v: number)          { this._options.decay          = clamp01(v); this.sendParam(PARAM_DECAY, v); }
   setDamping(v: number)        { this._options.damping        = clamp01(v); this.sendParam(PARAM_DAMPING, v); }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     const v = clamp01(value);
     this._options.wet = v;
-    this.wetGain.gain.value = v;
+    this.wetGain.gain.value = v * this._wetPathGain;
     this.dryGain.gain.value = 1 - v;
   }
 

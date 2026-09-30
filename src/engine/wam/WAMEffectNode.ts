@@ -56,6 +56,8 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
   // Internal routing
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wet = 1;
+  private _wetPathGain = 1;
 
   // WAM state
   private _wamInstance: WAMInstance | null = null;
@@ -72,6 +74,7 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
     this._audioContext = getDevilboxAudioContext();
 
     const wet = options.wet ?? 1.0;
+    this._wet = wet;
 
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
@@ -255,8 +258,15 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
    */
   setWet(wet: number): void {
     const w = Math.max(0, Math.min(1, wet));
-    this.wetGain.gain.value = w;
+    this._wet = w;
+    this.wetGain.gain.value = w * this._wetPathGain;
     this.dryGain.gain.value = 1 - w;
+  }
+
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.setWet(this._wet);
   }
 
   /**
