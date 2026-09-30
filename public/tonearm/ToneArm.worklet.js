@@ -189,6 +189,7 @@ class ToneArmProcessor extends AudioWorkletProcessor {
 
     // ── Message handler ──────────────────────────────────────────────────────
     this.port.onmessage = (e) => {
+      if (e.data && e.data.type === 'dispose') { this._disposed = true; return; } // removed: stop (process returns false)
       const { param, value } = e.data;
       switch (param) {
         case 'wow':     this._wow     = value; break;
@@ -206,6 +207,7 @@ class ToneArmProcessor extends AudioWorkletProcessor {
 
   // ─── process ────────────────────────────────────────────────────────────────
   process(inputs, outputs) {
+    if (this._disposed) return false;
     const input  = inputs[0]  || [];
     const output = outputs[0] || [];
 

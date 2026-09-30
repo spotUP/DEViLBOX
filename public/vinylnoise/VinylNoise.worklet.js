@@ -321,6 +321,7 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
   }
 
   _handleMessage(data) {
+    if (data && data.type === 'dispose') { this._disposed = true; return; } // removed: stop (process returns false)
     switch (data.param) {
       case 'hiss':    this._hissVolume = data.value; break;
       case 'dust':    this._dustVolume = data.value; break;
@@ -549,6 +550,7 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
+    if (this._disposed) return false;
     const output = outputs[0];
     const outL = output[0];
     const outR = output[1] || output[0];
