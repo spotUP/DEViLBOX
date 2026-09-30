@@ -640,6 +640,42 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
 }
 
 /**
+ * The per-channel effect slots: effects aimed at channels (a master effect's
+ * selectedChannels / channelRole, or a mixer insert) leave the master chain
+ * and run in an isolation slot of the playing engine. Reports the engine, the
+ * slots and which master effects target channels; `rebuild: true` rebuilds
+ * the slots first and waits for it. Read from the app's own modules - an
+ * evaluate_script import can load a second copy with its own empty state.
+ */
+export async function getChannelEffectSlots(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const routed = await import('../../engine/tone/ChannelRoutedEffects');
+  const { scheduleWasmEffectRebuild } = await import('../../stores/useMixerStore');
+  const { targetsChannels, channelRoleTargets } = await import('../../engine/tone/sidechainKey');
+  const { getTrackerReplayer } = await import('../../engine/TrackerReplayer');
+  if (params.rebuild === true) {
+    scheduleWasmEffectRebuild();
+    await new Promise((r) => setTimeout(r, Number(params.waitMs ?? 3000)));
+  }
+  const engine = await routed.getActiveIsolationEngine();
+  const mgr = routed.getChannelRoutedEffectsManager(getToneEngine().masterEffectsInput) as unknown as {
+    slots: Array<{ channels: number[]; effectConfigs: { type: string }[]; effectNodes: unknown[] } | null>;
+  };
+  const targeted = [];
+  for (const fx of useAudioStore.getState().masterEffects) {
+    if (fx.enabled && targetsChannels(fx)) targeted.push({ type: fx.type, channels: await channelRoleTargets(fx) });
+  }
+  return {
+    ok: true,
+    engine: engine ? engine.constructor.name : null,
+    engineAvailable: engine?.isAvailable() ?? false,
+    slotsSupported: engine?.supportsIsolationSlots?.() ?? null,
+    hasReplacedInstruments: getTrackerReplayer().hasReplacedInstruments,
+    targetedMasterEffects: targeted,
+    slots: mgr.slots.map((sl) => sl && { channels: sl.channels, effects: sl.effectConfigs.map((c) => c.type), built: sl.effectNodes.length }),
+  };
+}
+
+/**
  * Bus audition (X6) — hold the colour stages down to hear the send itself.
  *
  * `{ on: true }` ducks plate, ring modulator, lo-fi, the sweep and the

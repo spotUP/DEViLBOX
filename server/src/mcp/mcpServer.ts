@@ -782,6 +782,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_channel_effect_slots',
+    'The per-channel effect slots: effects aimed at channels (master effect selectedChannels / channelRole, mixer inserts) leave the master chain and run in isolation slots of the playing engine. Reports the engine, slot support, which master effects target which channels (0-based) and what each slot holds. rebuild: true rebuilds the slots first.',
+    { rebuild: z.boolean().optional(), waitMs: z.number().optional() },
+    (p) => call('get_channel_effect_slots', p),
+  );
+
+  server.tool(
     'set_dub_bus_audition',
     "Hold the dub bus's PARALLEL colour stages down so you can hear the send itself - plate, ring modulator, lo-fi, the phaser/comb sweep and the external feedback loop all duck, leaving the core wet chain (echo, spring, sidechain, glue, EQ) audible. { on: true } starts it, { on: false } hands the colour back at whatever values it had, including any changed while held. Never writes characterPreset, so a voicing survives being auditioned. Use it to check what a gesture is actually doing without dismantling the user's sound.",
     { on: z.boolean().optional() },
