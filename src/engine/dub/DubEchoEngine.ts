@@ -38,6 +38,24 @@ export interface DubEchoEngine {
   describe?(): Record<string, unknown>;
 }
 
+/**
+ * Echo level per engine on the bus, matched to the Space Echo (the default
+ * engine, the level the owner judged right on 2026-09-30: "the reverb/echo
+ * wash seems fixed").
+ *
+ * Measured live 2026-09-30 with measure_dub_bus_stages, pink noise, echoWet 1,
+ * intensity 0.3, echo output over echo input: Space Echo -9.4 dB, RE-201
+ * +0.8, AnotherDelay +5.2, RE-Tape Echo -2.9. Choosing another engine jumped
+ * the echo up to 15 dB. Each adapter puts its trim on the engine's wet path.
+ */
+export const ECHO_ENGINE_TRIM_DB = {
+  spaceEcho: 0,
+  re201: -10.2,
+  anotherDelay: -14.6,
+  reTapeEcho: -6.5,
+} as const;
+const trimGain = (engine: keyof typeof ECHO_ENGINE_TRIM_DB) => 10 ** (ECHO_ENGINE_TRIM_DB[engine] / 20);
+
 // ─── SpaceEcho adapter (native — all methods already match) ─────────────
 
 export class SpaceEchoAdapter implements DubEchoEngine {
@@ -92,6 +110,7 @@ export class RE201Adapter implements DubEchoEngine {
       inputLevel: 1.0,       // unity gain — DubBus handles levels
       wet: settings.echoWet,
     });
+    this.fx.setWetPathGain(trimGain('re201'));
   }
 
   /** RE-201 repeatRate 0→700ms, 1→50ms. Inverse: ms→rate */
@@ -152,6 +171,7 @@ export class AnotherDelayAdapter implements DubEchoEngine {
       width: 1,
       wet: settings.echoWet,
     });
+    this.fx.setWetPathGain(trimGain('anotherDelay'));
   }
 
   setRate(ms: number): void { this.fx.setDelayTime(ms); }
@@ -222,6 +242,7 @@ export class RETapeEchoAdapter implements DubEchoEngine {
       playheadFilter: 1,  // enable 4kHz lowpass — tames BBD treble ringing
       wet: settings.echoWet,
     });
+    this.fx.setWetPathGain(trimGain('reTapeEcho'));
   }
 
   /**

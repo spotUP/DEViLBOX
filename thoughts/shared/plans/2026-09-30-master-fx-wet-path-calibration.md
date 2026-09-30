@@ -46,5 +46,5 @@ included the post gains being calibrated.
 - [x] C6 post compensation entries for the two groups removed; buzz posts set
 - [x] C7 contract test: every table type reaches a wet-path setter; test:ci
 - [x] C8 re-measured live: every calibrated effect within 0.5 dB; Tone feedback delays needed the gain AFTER effectReturn (their loop feeds from it)
-- [ ] C9 dub bus echo engines matched at intensity 0.3 (adapter trims), live
+- [x] C9 dub bus echo engines matched to Space Echo (the default, owner-approved level) on their wet path; live within 1.5 dB at 0.3
 - [ ] C10 presets containing changed effects re-measured
