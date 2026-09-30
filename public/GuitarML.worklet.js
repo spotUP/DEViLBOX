@@ -20,9 +20,24 @@
  * - Fast sigmoid approximation (avoids Math.exp per sample)
  */
 
+/**
+ * Logistic sigmoid, 0.5 + 0.5 tanh(x / 2), with the same Pade tanh the cell
+ * uses. It replaced 0.5 + 0.5 x / (1 + |x|), which is 0.33 where the logistic
+ * is 0.27 (x = -1) and 0.83 where it is 0.88 (x = 2) - every gate of the LSTM
+ * was off by that much.
+ */
+function sigmoid(x) {
+  const hx = 0.5 * x;
+  if (hx < -4.5) return 0.0;
+  if (hx > 4.5) return 1.0;
+  const x2 = hx * hx;
+  return 0.5 + 0.5 * (hx * (135135 + x2 * (17325 + x2 * (378 + x2))) / (135135 + x2 * (62370 + x2 * (3150 + 28 * x2))));
+}
+
 class GuitarMLProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
+    this.skip = 0;
 
     // Model state
     this.modelLoaded = false;
@@ -120,6 +135,12 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
     try {
       const { model_data, state_dict } = modelData;
 
+      // skip = 1: the network learned the DIFFERENCE between the amp and its
+      // input, and the input is added back at the output (SimpleRNN in
+      // Automated-GuitarAmpModelling: `return self.lin(x) + res`). All 37 bundled
+      // models have it. Ignoring it played the difference alone: mostly an
+      // inverted copy of the input, -17.5 to +8.9 dB off unity (2026-09-30).
+      this.skip = model_data.skip ? 1 : 0;
       this.inputSize = model_data.input_size || 1;
       this.hiddenSize = model_data.hidden_size || 40;
       this.modelSampleRate = model_data.sample_rate || 44100.0;
@@ -382,6 +403,7 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
     const isCond = this.inputSize === 2;
     const dryWet = this.dryWet;
     const useSRC = this.useSRCFilter;
+    const skip = this.skip;
 
     let prevOut = this.prevLSTMOut;
     let currOut = this.currLSTMOut;
@@ -421,11 +443,11 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
         for (let i = 0; i < H; i++) {
           // Inline sigmoid: 0.5 + 0.5 * x / (1 + |x|)
           let x = gates[i];
-          const ig = 0.5 + 0.5 * x / (1.0 + (x > 0 ? x : -x));
+          const ig = sigmoid(x);
           x = gates[H + i];
-          const fg = 0.5 + 0.5 * x / (1.0 + (x > 0 ? x : -x));
+          const fg = sigmoid(x);
           x = gates[H * 3 + i];
-          const og = 0.5 + 0.5 * x / (1.0 + (x > 0 ? x : -x));
+          const og = sigmoid(x);
           // Inline fastTanh for cell gate
           x = gates[H * 2 + i];
           let gg;
@@ -454,6 +476,9 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
       }
 
       phase = 1 - phase; // toggle 0/1
+
+      // Skip connection: the model's output is its residual plus its input.
+      if (skip) sample += dry * inputGain;
 
       // Sample rate correction filter
       if (useSRC) {

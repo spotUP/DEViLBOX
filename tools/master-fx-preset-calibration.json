@@ -888,10 +888,10 @@
       "Neural",
       "SpringReverb"
     ],
-    "chainDb": -8.5,
-    "makeUpDb": 8.5,
-    "oldMakeUpDb": -2.7,
-    "at": "2026-09-30T06:35:47.882Z"
+    "chainDb": -8.3,
+    "makeUpDb": 8.3,
+    "oldMakeUpDb": 8.5,
+    "at": "2026-09-30T08:17:48.930Z"
   },
   "Dumble Lead": {
     "name": "Dumble Lead",
@@ -900,10 +900,10 @@
       "FeedbackDelay",
       "MVerb"
     ],
-    "chainDb": 1.4,
-    "makeUpDb": -1.4,
-    "oldMakeUpDb": 3.9,
-    "at": "2026-09-30T06:36:29.480Z"
+    "chainDb": -2.2,
+    "makeUpDb": 2.2,
+    "oldMakeUpDb": -1.4,
+    "at": "2026-09-30T08:18:30.081Z"
   },
   "BadCat Jazz": {
     "name": "BadCat Jazz",
@@ -912,10 +912,10 @@
       "Chorus",
       "MVerb"
     ],
-    "chainDb": -9.1,
-    "makeUpDb": 9.1,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T06:36:57.269Z"
+    "chainDb": -5.4,
+    "makeUpDb": 5.4,
+    "oldMakeUpDb": 9.1,
+    "at": "2026-09-30T08:18:57.512Z"
   },
   "El Coyote Blues": {
     "name": "El Coyote Blues",
@@ -924,10 +924,10 @@
       "Tremolo",
       "SpringReverb"
     ],
-    "chainDb": -2.9,
-    "makeUpDb": 2.9,
-    "oldMakeUpDb": -3.9,
-    "at": "2026-09-30T06:37:11.095Z"
+    "chainDb": -1.3,
+    "makeUpDb": 1.3,
+    "oldMakeUpDb": 2.9,
+    "at": "2026-09-30T08:19:11.235Z"
   },
   "TS9 + Spring": {
     "name": "TS9 + Spring",
@@ -935,10 +935,10 @@
       "Neural",
       "SpringReverb"
     ],
-    "chainDb": -4.7,
-    "makeUpDb": 4.7,
-    "oldMakeUpDb": -5.2,
-    "at": "2026-09-30T06:37:38.712Z"
+    "chainDb": -3.4,
+    "makeUpDb": 3.4,
+    "oldMakeUpDb": 4.7,
+    "at": "2026-09-30T08:19:38.672Z"
   },
   "Big Muff Doom": {
     "name": "Big Muff Doom",
@@ -947,10 +947,10 @@
       "EQ3",
       "Reverb"
     ],
-    "chainDb": 3.4,
-    "makeUpDb": -3.4,
-    "oldMakeUpDb": 4.2,
-    "at": "2026-09-30T06:37:52.527Z"
+    "chainDb": 0.2,
+    "makeUpDb": 0,
+    "oldMakeUpDb": -3.4,
+    "at": "2026-09-30T08:19:52.389Z"
   },
   "RAT + Delay": {
     "name": "RAT + Delay",
@@ -958,10 +958,10 @@
       "Neural",
       "FeedbackDelay"
     ],
-    "chainDb": -1.5,
-    "makeUpDb": 1.5,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T06:38:06.351Z"
+    "chainDb": -1.2,
+    "makeUpDb": 1.2,
+    "oldMakeUpDb": 1.5,
+    "at": "2026-09-30T08:20:06.113Z"
   },
   "Goat + Leslie": {
     "name": "Goat + Leslie",
@@ -971,8 +971,8 @@
     ],
     "chainDb": -1.5,
     "makeUpDb": 1.5,
-    "oldMakeUpDb": 3.5,
-    "at": "2026-09-30T06:38:34.109Z"
+    "oldMakeUpDb": 1.5,
+    "at": "2026-09-30T08:20:33.554Z"
   },
   "Paula Dub Sirens": {
     "name": "Paula Dub Sirens",
@@ -1040,10 +1040,10 @@
       "SpringReverb",
       "EQ3"
     ],
-    "chainDb": -5.3,
-    "makeUpDb": 5.3,
-    "oldMakeUpDb": 0.9,
-    "at": "2026-09-30T06:39:01.701Z"
+    "chainDb": -5,
+    "makeUpDb": 5,
+    "oldMakeUpDb": 5.3,
+    "at": "2026-09-30T08:21:00.972Z"
   },
   "SID Stadium": {
     "name": "SID Stadium",
@@ -1094,10 +1094,10 @@
       "Neural",
       "Compressor"
     ],
-    "chainDb": -4.5,
-    "makeUpDb": 4.5,
-    "oldMakeUpDb": 0.5,
-    "at": "2026-09-30T06:34:38.789Z"
+    "chainDb": -4.4,
+    "makeUpDb": 4.4,
+    "oldMakeUpDb": 4.5,
+    "at": "2026-09-30T08:16:40.325Z"
   },
   "Blackstar Clean": {
     "name": "Blackstar Clean",
@@ -1106,10 +1106,10 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -3.5,
-    "makeUpDb": 3.5,
-    "oldMakeUpDb": 0.9,
-    "at": "2026-09-30T06:34:52.609Z"
+    "chainDb": -2.8,
+    "makeUpDb": 2.8,
+    "oldMakeUpDb": 3.5,
+    "at": "2026-09-30T08:16:54.040Z"
   },
   "Tube Screamer Glue": {
     "name": "Tube Screamer Glue",
@@ -1117,10 +1117,10 @@
       "Neural",
       "Compressor"
     ],
-    "chainDb": -4.1,
-    "makeUpDb": 4.1,
-    "oldMakeUpDb": 0.5,
-    "at": "2026-09-30T06:35:06.411Z"
+    "chainDb": -3.3,
+    "makeUpDb": 3.3,
+    "oldMakeUpDb": 4.1,
+    "at": "2026-09-30T08:17:07.770Z"
   },
   "Sovtek Warmth": {
     "name": "Sovtek Warmth",
@@ -1129,10 +1129,10 @@
       "TapeSimulator",
       "Compressor"
     ],
-    "chainDb": -5.6,
-    "makeUpDb": 5.6,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T06:35:20.275Z"
+    "chainDb": -5.3,
+    "makeUpDb": 5.3,
+    "oldMakeUpDb": 5.6,
+    "at": "2026-09-30T08:17:21.488Z"
   },
   "Filmosound Master": {
     "name": "Filmosound Master",
@@ -1141,10 +1141,10 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -3.5,
-    "makeUpDb": 3.5,
-    "oldMakeUpDb": 0.9,
-    "at": "2026-09-30T06:35:34.065Z"
+    "chainDb": -3.7,
+    "makeUpDb": 3.7,
+    "oldMakeUpDb": 3.5,
+    "at": "2026-09-30T08:17:35.201Z"
   },
   "Crunch Marshall": {
     "name": "Crunch Marshall",
@@ -1152,10 +1152,10 @@
       "Neural",
       "EQ3"
     ],
-    "chainDb": -0.4,
-    "makeUpDb": 0,
+    "chainDb": 0.6,
+    "makeUpDb": -0.6,
     "oldMakeUpDb": 0,
-    "at": "2026-09-30T06:36:01.784Z"
+    "at": "2026-09-30T08:18:02.647Z"
   },
   "High Gain Mesa": {
     "name": "High Gain Mesa",
@@ -1163,10 +1163,10 @@
       "Neural",
       "Compressor"
     ],
-    "chainDb": -4.2,
-    "makeUpDb": 4.2,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T06:36:15.612Z"
+    "chainDb": -3.5,
+    "makeUpDb": 3.5,
+    "oldMakeUpDb": 4.2,
+    "at": "2026-09-30T08:18:16.368Z"
   },
   "Sovtek Doom": {
     "name": "Sovtek Doom",
@@ -1174,10 +1174,10 @@
       "Neural",
       "EQ3"
     ],
-    "chainDb": 1.1,
-    "makeUpDb": -1.1,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T06:36:43.476Z"
+    "chainDb": 1,
+    "makeUpDb": -1,
+    "oldMakeUpDb": -1.1,
+    "at": "2026-09-30T08:18:43.793Z"
   },
   "ENGL Metal": {
     "name": "ENGL Metal",
@@ -1186,10 +1186,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": -2.5,
-    "makeUpDb": 2.5,
-    "oldMakeUpDb": 2.2,
-    "at": "2026-09-30T06:37:24.920Z"
+    "chainDb": -1,
+    "makeUpDb": 1,
+    "oldMakeUpDb": 2.5,
+    "at": "2026-09-30T08:19:24.957Z"
   },
   "Revv G3 Chug": {
     "name": "Revv G3 Chug",
@@ -1197,10 +1197,10 @@
       "Neural",
       "Compressor"
     ],
-    "chainDb": -4.1,
-    "makeUpDb": 4.1,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T06:38:20.257Z"
+    "chainDb": -2.5,
+    "makeUpDb": 2.5,
+    "oldMakeUpDb": 4.1,
+    "at": "2026-09-30T08:20:19.831Z"
   },
   "Aguilar Bass Grit": {
     "name": "Aguilar Bass Grit",
@@ -1209,10 +1209,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": -2.3,
-    "makeUpDb": 2.3,
-    "oldMakeUpDb": 2.5,
-    "at": "2026-09-30T06:38:47.919Z"
+    "chainDb": -1.8,
+    "makeUpDb": 1.8,
+    "oldMakeUpDb": 2.3,
+    "at": "2026-09-30T08:20:47.253Z"
   },
   "SID Crunch Box": {
     "name": "SID Crunch Box",
@@ -1221,9 +1221,9 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -6.3,
-    "makeUpDb": 6.3,
-    "oldMakeUpDb": 2.6,
-    "at": "2026-09-30T06:39:15.490Z"
+    "chainDb": -2.5,
+    "makeUpDb": 2.5,
+    "oldMakeUpDb": 6.3,
+    "at": "2026-09-30T08:21:14.680Z"
   }
 }
