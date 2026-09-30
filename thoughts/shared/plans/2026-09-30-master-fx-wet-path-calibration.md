@@ -63,3 +63,22 @@ included the post gains being calibrated.
   Vite dep cache did not change. The owner's master chain before the run was
   held only in the audit's memory and is lost; the tab came back with VHS Tape,
   cleared to empty.
+
+## Open (owner reports, 2026-09-30 afternoon)
+- [ ] O1 Generated dub moves inaudible after the bus reset to defaults:
+      snareCrack, radio, siren ("a crack was fired inaudible", "silent siren
+      fired"). They are sized by generatedPeak() from the programme level
+      (AudioDataBus rms/peak). Bus gains read sane (input 1, return 0.85).
+      Next: measure with measure_dub_echo_response {move} while playing.
+- [ ] O2 "Modern Glue & Air" very low volume. Make-up -7.7 dB predates today
+      (not in the 2026-09-30 re-measure); chain ends in a Maximizer (ceiling
+      device) - a cut after a ceiling is the suspect. Measure on music.
+- [ ] O3 "*Wave Landscape" (ShimmerReverb + AmbientDelay) sounds metallic.
+- [ ] O4 BadCat Jazz reported silent - not reproduced (plays +8 dB on the
+      Hively song, also after fast preset switching). Need the owner's steps.
+- [x] O5 "siren never stops": measure_dub_echo_response {move: dubSiren} fired the
+      held move and dropped its release. Released live; the tool now disposes it.
+- O1 finding: on the playing song the moves are sized to the programme
+      (generatedPeak = presence x programme peak: crack 0.13 vs peak 0.26) and
+      land at the song sends' level on the return (-15..-18 dBFS). The bus
+      reset took echoWet 0.9 -> 0.5 (-5 dB on every move's echo tail).

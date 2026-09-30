@@ -684,7 +684,9 @@ export async function getChannelEffectSlots(params: Record<string, unknown>): Pr
  * unless `settings` overrides (restored afterwards). Refuses while playing.
  */
 export async function measureDubEchoResponse(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  if (useTransportStore.getState().isPlaying) return { error: 'Transport is playing - stop playback first.' };
+  // A move may be measured while the song plays (the performer fires them on
+  // a playing song, and moves are sized to its level); the test burst may not.
+  if (useTransportStore.getState().isPlaying && !params.move) return { error: 'Transport is playing - stop playback first.' };
   const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
   const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
   const { captureLiveAudio } = await import('../../lib/audio/LiveCapture');
@@ -715,9 +717,17 @@ export async function measureDubEchoResponse(params: Record<string, unknown>): P
       const burst = ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.005), ctx.sampleRate);
       const d = burst.getChannelData(0);
       let seed = 1; for (let i = 0; i < d.length; i++) { seed = (seed * 1103515245 + 12345) >>> 0; d[i] = ((seed / 2 ** 32) * 2 - 1) * 0.5; }
+      // `move`: fire that dub move (as the performer does) instead of the burst.
+      const moveId = params.move as string | undefined;
+      const { fire } = await import('../../engine/dub/DubRouter');
+      // A held move (siren, ...) is released at the end of the recording - it
+      // was left running once, and the owner heard "siren never stops".
+      let held: { dispose(): void } | null = null;
       const recorded = await captureLiveAudio(node, () => {
+        if (moveId) { held = fire(moveId, undefined, (params.moveParams as Record<string, number> | undefined) ?? {}, 'live'); return; }
         const src = ctx.createBufferSource(); src.buffer = burst; src.connect(input); src.start();
-      }, () => { /* nothing held */ }, seconds);
+      }, () => { /* released below, after the whole recording */ }, seconds);
+      try { (held as { dispose(): void } | null)?.dispose(); } catch { /* already gone */ }
       const x = recorded.getChannelData(0);
       const frame = Math.round(ctx.sampleRate * 0.01);
       const env: number[] = [];
@@ -744,13 +754,20 @@ export async function measureDubEchoResponse(params: Record<string, unknown>): P
         const k = Math.round(ms / echoMs);
         if (k >= 1 && Math.abs(ms - k * echoMs) <= 25) onRep += v;
       });
+      let pk = 0; for (const v of x) pk = Math.max(pk, Math.abs(v));
       out[name] = {
         recordedMs: Math.round((x.length / ctx.sampleRate) * 1000), echoMs,
+        peakDbfs: Math.round(20 * Math.log10(pk || 1e-9) * 10) / 10,
         onRepeats: Math.round((onRep / (after || 1e-20)) * 100) / 100,
         clarity: Math.round((near / total) * 100) / 100, peaks: peaks.filter((p) => p.db > -40).slice(0, 16),
       };
     }
-    return { ok: true, echoEngine: (bus.settings as Record<string, unknown> | undefined)?.echoEngine, stages: out };
+    const { getProgrammeLevel, generatedPeak } = await import('../../engine/dub/programmeReference');
+    const programme = getProgrammeLevel();
+    return {
+      ok: true, echoEngine: (bus.settings as Record<string, unknown> | undefined)?.echoEngine, stages: out,
+      programme, generatedPeak: params.move ? generatedPeak(params.move as string) : undefined,
+    };
   } finally {
     useDrumPadStore.getState().setDubBus(saved);
   }
