@@ -676,7 +676,9 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
   { name: 'Cosmic', description: 'Frequency shifter + delay + reverb — alien', tags: ['Texture', 'Creative'], gainCompensationDb: 1.2,
     effects: [
-      { category: 'tonejs', type: 'FrequencyShifter', enabled: true, wet: 35, parameters: { frequency: 50 } },
+      // 7 Hz, not 50: the shifted copy beats against the dry at the shift rate - 50 Hz
+      // was a rough flutter the owner heard as "microstutters" (2026-09-30); 7 Hz swirls.
+      { category: 'tonejs', type: 'FrequencyShifter', enabled: true, wet: 35, parameters: { frequency: 7 } },
       { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 35, parameters: { time: 0.3, feedback: 0.5 } },
       { category: 'tonejs', type: 'Reverb', enabled: true, wet: 40, parameters: { decay: 5, preDelay: 0.04 } },
     ] },
