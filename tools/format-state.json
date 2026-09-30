@@ -10757,12 +10757,12 @@
     "deepNotes": "Delta Music 2: full patterns + DeltaMusic2Synth + chip RAM editing"
   },
   "desire": {
-    "status": "works",
-    "notes": "smoke-test PASS -- rms=0.0010 [audio=ok, inst=8/ok, export=ok] (2026-04-11)",
+    "status": "silent",
+    "notes": "Silent — batmanreturns.dsr · (jukebox 2026-09-24 06:49)",
     "auditStatus": "fixed",
     "rmsAvg": 0.001048,
     "instrumentCount": 8,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -11414,8 +11414,8 @@
     "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
   },
   "actionamics": {
-    "status": "works",
-    "notes": "Incorrect Pattern Data — dynablaster.ast · (jukebox 2026-09-24 05:09)",
+    "status": "silent",
+    "notes": "Silent — dynablaster.ast · (jukebox 2026-09-24 09:23)",
     "auditStatus": "fixed",
     "rmsAvg": 0.000093,
     "instrumentCount": 39,
@@ -12846,14 +12846,15 @@
   },
   "art-of-noise": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). Dedicated WASM engine, needs re-test.",
+    "notes": "Good — inside.blipp.aon · (jukebox 2026-09-24 06:45)",
     "rmsAvg": 0,
     "instrumentCount": 7,
     "patternQuality": "full",
     "synthIntegration": "ArtOfNoiseSynth",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Art of Noise: full pattern extraction + WASM engine"
+    "deepNotes": "Art of Noise: full pattern extraction + WASM engine",
+    "status": "works"
   },
   "audio-sculpt": {
     "auditStatus": "fixed",
@@ -12890,14 +12891,15 @@
   },
   "composer-667": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). UADE-backed, needs re-test.",
+    "notes": "Good — speed fighter.667 · (jukebox 2026-09-24 06:47)",
     "rmsAvg": 0,
     "instrumentCount": 0,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Composer667Parser has uadePatternLayout + decodeCell | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Composer667Parser has uadePatternLayout + decodeCell | Enhanced scan: runtime PCM from chip RAM",
+    "status": "works"
   },
   "composer-670": {
     "auditStatus": "fixed",
@@ -12912,10 +12914,10 @@
   },
   "core-design": {
     "auditStatus": "fixed",
-    "notes": "Native parser routing fixed (8d29c9f9e). Uses withNativeThenUADE pattern.",
+    "notes": "Incorrect Pattern Data — dynamite dux.core · (jukebox 2026-09-24 06:47)",
     "rmsAvg": 0,
     "instrumentCount": 8,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -12923,10 +12925,10 @@
   },
   "custommade": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). UADE-backed, needs re-test.",
+    "notes": "Incorrect Pattern Data — the viking child crack.cm · (jukebox 2026-09-24 06:47)",
     "rmsAvg": 0,
     "instrumentCount": 9,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -12967,10 +12969,10 @@
   },
   "delta-music": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.3690 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — triplex1.dm · (jukebox 2026-09-24 06:49)",
     "rmsAvg": 0.368991,
     "instrumentCount": 6,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -13044,10 +13046,10 @@
   },
   "earache": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0336 [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — bladerunner.ea · (jukebox 2026-09-24 06:51)",
     "rmsAvg": 0.033558,
     "instrumentCount": 4,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -13055,7 +13057,7 @@
   },
   "fm-tracker": {
     "auditStatus": "fixed",
-    "notes": "Silent — fm dance.fmt · (jukebox 2026-09-24 05:15)",
+    "notes": "Load Failed — fm dance.fmt · loadFile failed: UADE could not play: fm dance.fmt (ret=-1) | uade: protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Cannot play file: fm dance.fmt (ret=0) | /uade: unreadable (Aborted('FS' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the Emscripten FAQ))) · (jukebox 2026-09-24 06:51)",
     "rmsAvg": 0,
     "instrumentCount": 0,
     "patternQuality": "none",
@@ -13063,7 +13065,7 @@
     "sampleExtraction": "names-only",
     "editability": "none",
     "deepNotes": "Forced classic — compiled 68k FM synth replayer",
-    "status": "silent"
+    "status": "crashes"
   },
   "face-the-mus": {
     "auditStatus": "fixed",
@@ -15006,54 +15008,58 @@
   },
   "ahx": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0358 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "notes": "Good — amanda.ahx · (jukebox 2026-09-24 06:45)",
     "rmsAvg": 0.035775,
     "instrumentCount": 13,
     "patternQuality": "full",
     "synthIntegration": "HivelySynth",
     "sampleExtraction": "full",
     "editability": "read-only",
-    "deepNotes": "WASM engine synthesizes all audio — full integration"
+    "deepNotes": "WASM engine synthesizes all audio — full integration",
+    "status": "works"
   },
   "ay-amadeus": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0364 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "notes": "Load Failed — aztec theme.amad · loadFile failed: Unsupported file format: aztec theme.amad · (jukebox 2026-09-24 06:46)",
     "rmsAvg": 0.03635,
     "instrumentCount": 13,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM",
+    "status": "crashes"
   },
   "ay-emul": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0368 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "notes": "Load Failed — spring.emul · loadFile failed: Unsupported file format: spring.emul · (jukebox 2026-09-24 06:46)",
     "rmsAvg": 0.036786,
     "instrumentCount": 13,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM",
+    "status": "crashes"
   },
   "ay-strc": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0375 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "notes": "Load Failed — mega mix 1.strc · loadFile failed: Unsupported file format: mega mix 1.strc · (jukebox 2026-09-24 06:46)",
     "rmsAvg": 0.037469,
     "instrumentCount": 13,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM",
+    "status": "crashes"
   },
   "ashley-hogg": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0003 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — ash.nobby the aardvark · (jukebox 2026-09-24 06:46)",
     "rmsAvg": 0.000266,
     "instrumentCount": 1,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -15061,10 +15067,10 @@
   },
   "ben-daglish": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0345 [audio=ok, inst=3/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — motorhead-titleandingame.bd · (jukebox 2026-09-24 06:46)",
     "rmsAvg": 0.03455,
     "instrumentCount": 3,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -15072,32 +15078,34 @@
   },
   "chiptracker": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0675 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "notes": "Good — chuck rock - chuckrock.mod · (jukebox 2026-09-24 06:47)",
     "rmsAvg": 0.067505,
     "instrumentCount": 31,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM",
+    "status": "works"
   },
   "composer-669": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0139 [audio=ok, inst=10/ok, export=ok] (2026-04-11)",
+    "notes": "Good — speed fighter.669 · (jukebox 2026-09-24 06:47)",
     "rmsAvg": 0.013921,
     "instrumentCount": 10,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM",
+    "status": "works"
   },
   "dave-lowe": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.2377 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — incredibleshrinkingsphere.dl · (jukebox 2026-09-24 06:47)",
     "rmsAvg": 0.237703,
     "instrumentCount": 6,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -15116,10 +15124,10 @@
   },
   "david-hanney": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0448 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — tearaway thomas unused.dh · (jukebox 2026-09-24 06:48)",
     "rmsAvg": 0.044781,
     "instrumentCount": 1,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -15127,36 +15135,39 @@
   },
   "deflemask": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.3750 [audio=ok, inst=4/ok] (2026-04-11)",
+    "notes": "Load Failed — Darude - Sandstorm.dmf · loadFile failed: Failed to parse DefleMask file: DefleMask import requires Furnace WASM engine (WASM error: Furnace WASM load failed: load failed: incomplete file) · (jukebox 2026-09-24 06:48)",
     "rmsAvg": 0.375014,
     "instrumentCount": 4,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM",
+    "status": "crashes"
   },
   "digi-trakker": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0255 [audio=ok, inst=16/ok, export=ok] (2026-04-11)",
+    "notes": "Good — rohadtjo.mdl · (jukebox 2026-09-24 06:49)",
     "rmsAvg": 0.025505,
     "instrumentCount": 16,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM",
+    "status": "works"
   },
   "digibooster": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0195 [audio=ok, inst=22/ok, export=ok] (2026-04-11)",
+    "notes": "Good — the day after.digi · (jukebox 2026-09-24 06:49)",
     "rmsAvg": 0.019534,
     "instrumentCount": 22,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM",
+    "status": "works"
   },
   "digiBooster": {
     "patternQuality": "full",
@@ -16069,31 +16080,344 @@
     "status": "silent"
   },
   "activision-pro": {
-    "notes": "Incorrect Pattern Data — gettysburg.avp · (jukebox 2026-09-24 05:09)",
-    "patternQuality": "incorrect"
-  },
-  "amigaklang": {
-    "notes": "Wrong Sound — JosSs-Cream.mod · (jukebox 2026-09-24 05:10)",
+    "notes": "Wrong Sound — gettysburg.avp · (jukebox 2026-09-24 06:35)",
+    "patternQuality": "incorrect",
     "status": "partial"
   },
+  "amigaklang": {
+    "notes": "Good — JosSs-Cream.mod · (jukebox 2026-09-24 06:45)",
+    "status": "works"
+  },
   "face-the-music": {
-    "notes": "Good — rock.ftm · (jukebox 2026-09-24 05:14)",
+    "notes": "Good — rock.ftm · (jukebox 2026-09-24 06:51)",
     "status": "works"
   },
   "farandole-composer": {
-    "notes": "Good — dark dreams.far · (jukebox 2026-09-24 05:15)",
+    "notes": "Good — dark dreams.far · (jukebox 2026-09-24 06:51)",
     "status": "works"
   },
   "fashion-tracker": {
-    "notes": "Incorrect Pattern Data — ivory tover ii.ex · (jukebox 2026-09-24 05:15)",
+    "notes": "Incorrect Pattern Data — ivory tover ii.ex · (jukebox 2026-09-24 06:51)",
     "patternQuality": "incorrect"
   },
   "follin-player-ii": {
-    "notes": "Load Failed — sly spy title.tf · (jukebox 2026-09-24 05:15)",
-    "status": "crashes"
+    "notes": "Incorrect Pattern Data — sly spy title.tf · (jukebox 2026-09-24 06:52)",
+    "status": "crashes",
+    "patternQuality": "incorrect"
   },
   "bp-soundmon-2": {
     "notes": "Good — nicktune1.bp · (jukebox 2026-09-24 05:17)",
     "status": "works"
+  },
+  "ben-daglish-sid": {
+    "notes": "Incorrect Pattern Data — terramex.bds · (jukebox 2026-09-24 05:17)",
+    "patternQuality": "incorrect"
+  },
+  "behringer-td-3": {
+    "notes": "Good — Acid Pattern 1.seq · (jukebox 2026-09-24 05:17)",
+    "status": "works"
+  },
+  "bp-soundmon-3": {
+    "notes": "Incorrect Pattern Data — testmod.bp3 · (jukebox 2026-09-24 06:46)",
+    "patternQuality": "incorrect"
+  },
+  "cheesecutter": {
+    "notes": "Incorrect Pattern Data — abaddon-trouble.ct · (jukebox 2026-09-24 05:17)",
+    "patternQuality": "incorrect"
+  },
+  "darius-zendeh": {
+    "notes": "Incorrect Pattern Data — crash and burn.dz · (jukebox 2026-09-24 06:47)",
+    "patternQuality": "incorrect"
+  },
+  "dave-lowe-new": {
+    "notes": "Incorrect Pattern Data — m-bison.dln · (jukebox 2026-09-24 06:47)",
+    "patternQuality": "incorrect"
+  },
+  "david-whittaker": {
+    "notes": "Incorrect Pattern Data — garfield2+.dw · (jukebox 2026-09-24 06:48)",
+    "patternQuality": "incorrect"
+  },
+  "digibooster-pro": {
+    "notes": "Good — invisibility.dbm · (jukebox 2026-09-24 06:50)",
+    "status": "works"
+  },
+  "digital-mugician": {
+    "notes": "Incorrect Pattern Data — believe.dmu · (jukebox 2026-09-24 06:50)",
+    "patternQuality": "incorrect"
+  },
+  "digital-sonix-and-chrome": {
+    "notes": "Incorrect Pattern Data — dragon'sbreath ingame 1.dsc · (jukebox 2026-09-24 06:50)",
+    "patternQuality": "incorrect"
+  },
+  "digital-sonix-and-chrome-David Hanlon": {
+    "notes": "Incorrect Pattern Data — dragon'sbreath dbfx.dsc · (jukebox 2026-09-24 06:50)",
+    "status": "silent",
+    "patternQuality": "incorrect"
+  },
+  "digital-symphony": {
+    "notes": "Incorrect Pattern Data — binary reality.dss · (jukebox 2026-09-24 06:50)",
+    "patternQuality": "incorrect"
+  },
+  "audio-sculpture": {
+    "notes": "Good — m.mod · (jukebox 2026-09-24 06:35)",
+    "status": "works"
+  },
+  "composer-670-cdfm": {
+    "notes": "Load Failed — black glass ][ - muzik0.670 · loadFile failed: Unsupported file format: black glass ][ - muzik0.670 · (jukebox 2026-09-24 06:47)",
+    "status": "crashes"
+  },
+  "forgotten-worlds": {
+    "notes": "Incorrect Pattern Data — forgotten worlds intro.fw · (jukebox 2026-09-24 06:52)",
+    "status": "silent",
+    "patternQuality": "incorrect"
+  },
+  "formats-uade_ast": {
+    "notes": "Incorrect Pattern Data — dynablaster.ast · (jukebox 2026-09-24 06:52)",
+    "patternQuality": "incorrect"
+  },
+  "beathoven-synthesizer": {
+    "notes": "Good — tristar cracktro.bss · (jukebox 2026-09-24 06:46)",
+    "status": "works"
+  },
+  "deflemask-0xfroman": {
+    "notes": "Silent — Product01.dmf · (jukebox 2026-09-24 06:48)",
+    "status": "silent"
+  },
+  "deflemask-220hertz": {
+    "notes": "Silent — Andrew_haggles.dmf · (jukebox 2026-09-24 06:48)",
+    "status": "silent"
+  },
+  "deflemask-85NESplayer": {
+    "notes": "Silent — BA Round 1.dmf · (jukebox 2026-09-24 06:48)",
+    "status": "silent"
+  },
+  "delitracker-custom": {
+    "notes": "Load Failed — Skyfox.cus · loadFile failed: UADE could not play: cus.skyfox (ret=-1) | uade: protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / Illegal instruction: 4afc at 00001344 / uade warning: Song ended prematurely due to error: score crashed / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] exit(1) intercepted via longjmp / [uade-wasm] exit(1) during uade_play / protocol error: sending in R state is forbidden / Can not send score name. / [uade-wasm] Cannot play file: cus.skyfox (ret=-1) | /uade: unreadable (Aborted('FS' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the Emscripten FAQ))) · (jukebox 2026-09-24 06:48)",
+    "status": "crashes"
+  },
+  "digital-mugician-2": {
+    "notes": "Silent — snickle.mug · (jukebox 2026-09-24 06:50)",
+    "status": "silent"
+  },
+  "digital-sound-studio": {
+    "notes": "Good — zrimay.dss · (jukebox 2026-09-24 06:50)",
+    "status": "works"
+  },
+  "digital-tracker-dtm": {
+    "notes": "Load Failed — sonic subspace.dtm · loadFile failed: AdPlug could not load: sonic subspace.dtm · (jukebox 2026-09-24 06:50)",
+    "status": "crashes"
+  },
+  "digital-tracker-mod": {
+    "notes": "Good — essai_18.mod · (jukebox 2026-09-24 06:51)",
+    "status": "works"
+  },
+  "disorder-tracker-2": {
+    "notes": "Good — hyper geckoo.plm · (jukebox 2026-09-24 06:51)",
+    "status": "works"
+  },
+  "formats-activisionPro": {
+    "notes": "Incorrect Pattern Data — gettysburg.avp · (jukebox 2026-09-24 06:52)",
+    "patternQuality": "incorrect"
+  },
+  "formats-adplug": {
+    "notes": "Load Failed — astaris.imf · loadFile failed: AdPlug could not load: astaris.imf · (jukebox 2026-09-24 06:52)",
+    "status": "crashes"
+  },
+  "formats-amf": {
+    "notes": "Good — avoid.amf · (jukebox 2026-09-24 06:53)",
+    "status": "works"
+  },
+  "formats-amiga_formats_catchall": {
+    "notes": "Silent — audiosculpture_smallest.adsc · (jukebox 2026-09-24 06:53)",
+    "status": "silent"
+  },
+  "formats-ams": {
+    "notes": "Good — kernel.ams · (jukebox 2026-09-24 06:53)",
+    "status": "works"
+  },
+  "formats-anders0land": {
+    "notes": "Incorrect Pattern Data — hot.primemover_01 · (jukebox 2026-09-24 06:53)",
+    "patternQuality": "incorrect"
+  },
+  "formats-artOfNoise": {
+    "notes": "Good — action_section.aon · (jukebox 2026-09-24 06:54)",
+    "status": "works"
+  },
+  "formats-ashleyHogg": {
+    "notes": "Incorrect Pattern Data — ash.nobby_the_aardvark · (jukebox 2026-09-24 06:54)",
+    "patternQuality": "incorrect"
+  },
+  "formats-uade_bss": {
+    "notes": "Incorrect Pattern Data — beathoven_smallest.bss · (jukebox 2026-09-24 06:54)",
+    "patternQuality": "incorrect"
+  },
+  "formats-benDaglish": {
+    "notes": "Silent — mickey_mouse.bd · (jukebox 2026-09-24 06:54)",
+    "status": "silent"
+  },
+  "formats-benDaglishSID": {
+    "notes": "Incorrect Pattern Data — terramex.bds · (jukebox 2026-09-24 06:54)",
+    "patternQuality": "incorrect"
+  },
+  "formats-cdfm67": {
+    "notes": "Load Failed — amnesia_credits.c67 · loadFile failed: UADE could not play: amnesia_credits.c67 (ret=-1) | uade: protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Cannot play file: amnesia_credits.c67 (ret=0) | /uade: unreadable (Aborted('FS' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the Emscripten FAQ))) · (jukebox 2026-09-24 06:54)",
+    "status": "crashes"
+  },
+  "formats-669": {
+    "notes": "Good — fonetag.669 · (jukebox 2026-09-24 06:55)",
+    "status": "works"
+  },
+  "formats-coreDesign": {
+    "notes": "Incorrect Pattern Data — dynamite_dux.core · (jukebox 2026-09-24 08:02)",
+    "patternQuality": "incorrect"
+  },
+  "formats-uade_cus": {
+    "notes": "Silent — skyfox.cus · (jukebox 2026-09-24 08:02)",
+    "patternQuality": "incorrect",
+    "status": "silent"
+  },
+  "formats-customMade": {
+    "notes": "Incorrect Pattern Data — cm.viking_child · (jukebox 2026-09-24 08:02)",
+    "patternQuality": "incorrect"
+  },
+  "formats-daveLowe": {
+    "notes": "Incorrect Pattern Data — incredibleshrinkingsphere.dl · (jukebox 2026-09-24 08:04)",
+    "patternQuality": "incorrect"
+  },
+  "formats-uade_dh": {
+    "notes": "Incorrect Pattern Data — tearaway_thomas.dh · (jukebox 2026-09-24 08:04)",
+    "patternQuality": "incorrect"
+  },
+  "formats-davidWhittaker": {
+    "notes": "Incorrect Pattern Data — apb.dw · (jukebox 2026-09-24 08:04)",
+    "patternQuality": "incorrect"
+  },
+  "formats-deltaMusic1": {
+    "notes": "Wrong Sound — crusaders1.dm · (jukebox 2026-09-24 08:05)",
+    "status": "partial"
+  },
+  "formats-deltaMusic2": {
+    "notes": "Good — anthrox_intro.dm2 · (jukebox 2026-09-24 08:06)",
+    "status": "works"
+  },
+  "formats-desire": {
+    "notes": "Silent — batmanreturns.dsr · (jukebox 2026-09-24 08:06)",
+    "status": "silent"
+  },
+  "formats-digi": {
+    "notes": "Good — the_day_after.digi · (jukebox 2026-09-24 08:06)",
+    "status": "works"
+  },
+  "formats-digiBoosterPro": {
+    "notes": "Good — invisibility.dbm · (jukebox 2026-09-24 08:06)",
+    "status": "works"
+  },
+  "formats-mugician": {
+    "notes": "Silent — cockwise.mug · (jukebox 2026-09-24 08:06)",
+    "status": "silent"
+  },
+  "formats-digitalSonixChrome": {
+    "notes": "Incorrect Pattern Data — dragon'sbreath_fanfares.dsc · (jukebox 2026-09-24 08:06)",
+    "patternQuality": "incorrect"
+  },
+  "formats-digitalSoundStudio": {
+    "notes": "Incorrect Pattern Data — doxtro3.dss · (jukebox 2026-09-24 08:06)",
+    "patternQuality": "incorrect"
+  },
+  "formats-digitalSymphony": {
+    "notes": "Good — drwho_final4.dsym · (jukebox 2026-09-24 08:07)",
+    "status": "works"
+  },
+  "formats-mdl": {
+    "notes": "Good — mayday.mdl · (jukebox 2026-09-24 08:07)",
+    "status": "works"
+  },
+  "formats-plm": {
+    "notes": "Good — parity_error.plm · (jukebox 2026-09-24 08:07)",
+    "status": "works"
+  },
+  "formats-earAche": {
+    "notes": "Incorrect Pattern Data — skythebest.ea · (jukebox 2026-09-24 08:07)",
+    "patternQuality": "incorrect"
+  },
+  "formats-faceTheMusic": {
+    "notes": "Good — staticoscillations.ftm · (jukebox 2026-09-24 08:07)",
+    "status": "works"
+  },
+  "formats-far": {
+    "notes": "Good — m31.far · (jukebox 2026-09-24 08:08)",
+    "status": "works"
+  },
+  "formats-xm": {
+    "notes": "Good — flo boarding - level 1.xm · (jukebox 2026-09-24 08:08)",
+    "status": "works"
+  },
+  "formats-fred": {
+    "notes": "Incorrect Pattern Data — bomb jack.fred · (jukebox 2026-09-24 08:08)",
+    "patternQuality": "incorrect"
+  },
+  "formats-fredGray": {
+    "notes": "Incorrect Pattern Data — eco.gray · (jukebox 2026-09-24 08:08)",
+    "patternQuality": "incorrect"
+  },
+  "formats-fc": {
+    "notes": "Incorrect Pattern Data — adept.smod · (jukebox 2026-09-24 08:08)",
+    "patternQuality": "incorrect"
+  },
+  "formats-futurePlayer": {
+    "notes": "Incorrect Pattern Data — hybris.fp · (jukebox 2026-09-24 08:08)",
+    "patternQuality": "incorrect"
+  },
+  "formats-gameMusicCreator": {
+    "notes": "Good — knights_of_sky.gmc · (jukebox 2026-09-24 08:09)",
+    "status": "works"
+  },
+  "formats-gdm": {
+    "notes": "Good — breakin's chipsong.gdm · (jukebox 2026-09-24 08:09)",
+    "status": "works"
+  },
+  "formats-gluemon": {
+    "notes": "Incorrect Pattern Data — memphis.glue · (jukebox 2026-09-24 08:10)",
+    "patternQuality": "incorrect"
+  },
+  "formats-graoumfTracker2": {
+    "notes": "Good — gimmekuh.gt2 · (jukebox 2026-09-24 08:10)",
+    "status": "works"
+  },
+  "formats-hippelCoso": {
+    "notes": "Silent — prehistoric_tale.hipc · (jukebox 2026-09-24 08:10)",
+    "status": "silent"
+  },
+  "formats-hvl": {
+    "notes": "Good — aces_high.ahx · (jukebox 2026-09-24 08:10)",
+    "status": "works"
+  },
+  "formats-iffSmus": {
+    "notes": "Silent — radiokomppi.smus · (jukebox 2026-09-24 08:10)",
+    "status": "silent"
+  },
+  "formats-it": {
+    "notes": "Good — absm chain mod.it · (jukebox 2026-09-24 09:23)",
+    "status": "works"
+  },
+  "formats-imagesMusicSystem": {
+    "notes": "Good — redoctober-sub-docking.ims · (jukebox 2026-09-24 09:23)",
+    "status": "works"
+  },
+  "deflemask-adaMills": {
+    "notes": "Good — Smooth Rider.dmf · (jukebox 2026-09-25 10:17)",
+    "status": "works"
+  },
+  "deflemask-AphoticJezter": {
+    "notes": "Good — Sonic3-MarbleGarden-Act1.dmf · (jukebox 2026-09-25 10:18)",
+    "status": "works"
+  },
+  "formats-infogrames": {
+    "notes": "Empty Patterns — bob4e.dum · (jukebox 2026-09-25 10:19)",
+    "patternQuality": "empty"
+  },
+  "formats-inStereoAmbiguous": {
+    "notes": "Incorrect Pattern Data — fantasi8.is · (jukebox 2026-09-25 10:19)",
+    "patternQuality": "incorrect"
   }
 }
