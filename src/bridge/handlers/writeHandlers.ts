@@ -576,6 +576,13 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
       b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
       d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.011; b6 = w * 0.115926;
     }
+    // At a mix's level (default -18 dBFS RMS): drive, saturation and feedback
+    // limiting are level-dependent, and at the -35 dBFS this noise came out at
+    // the Neural amps read 10-18 dB quiet and a runaway delay +32 dB.
+    const targetRms = 10 ** (Number(params.levelDb ?? -18) / 20);
+    let sq = 0; for (const v of d) sq += v * v;
+    const k = targetRms / Math.sqrt(sq / len);
+    for (let i = 0; i < len; i++) d[i] *= k;
     buf.copyToChannel(d, 1);
     src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
     const nativeOut = (n: Tone.ToneAudioNode | Tone.Gain): AudioNode => {

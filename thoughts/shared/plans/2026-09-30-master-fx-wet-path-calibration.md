@@ -2,7 +2,7 @@
 date: 2026-09-30
 topic: Master FX wet-path calibration (delays, reverbs, modulation) and dub echo engine levels
 tags: [effects, master-fx, dub, levels, calibration]
-status: draft
+status: implemented
 progress: see checklist
 ---
 
@@ -47,4 +47,19 @@ included the post gains being calibrated.
 - [x] C7 contract test: every table type reaches a wet-path setter; test:ci
 - [x] C8 re-measured live: every calibrated effect within 0.5 dB; Tone feedback delays needed the gain AFTER effectReturn (their loop feeds from it)
 - [x] C9 dub bus echo engines matched to Space Echo (the default, owner-approved level) on their wet path; live within 1.5 dB at 0.3
-- [ ] C10 presets containing changed effects re-measured
+- [x] C10 90 presets re-measured (stereo pink noise, -18 dBFS); 80 make-ups written, 5 spot-checked at 0.0 +-0.1 dB with make-up. Kept: 9 Neural presets (amp models 6-18 dB off unity alone - per-model neural calibration first) and RE-201 Runaway (self-oscillates by design)
+
+## C10 notes (2026-09-30)
+- tools/fx-preset-audit.ts is not fit for time-based presets: five steady sines
+  through get_audio_level; a sine interferes with its own delayed copy (Hall
+  Reverb read -4.1 dB after its +3.2 dB make-up). Replaced for this job by
+  tools/master-fx-preset-calibration.ts (measure_master_effect with the whole
+  chain, stereo pink noise). Run: `--containing <each changed type>`, check,
+  then `--write`.
+- Two audit runs lost the browser around the VHS Tape preset
+  (BitCrusher+Vibrato+Filter): run 1 read silent from VHS Tape on, run 2
+  measured VHS Tape then lost the browser at the next call. Cause unconfirmed
+  (crash or a manual reload); nothing in the app reloads by itself and the
+  Vite dep cache did not change. The owner's master chain before the run was
+  held only in the audit's memory and is lost; the tab came back with VHS Tape,
+  cleared to empty.

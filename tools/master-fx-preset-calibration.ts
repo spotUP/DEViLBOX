@@ -14,7 +14,7 @@
  *   npx tsx tools/master-fx-preset-calibration.ts --containing Reverb --containing Delay  # presets using these types
  *   npx tsx tools/master-fx-preset-calibration.ts --only "Hall Reverb"                    # one (repeatable)
  *   npx tsx tools/master-fx-preset-calibration.ts --redo ...                              # re-measure
- *   npx tsx tools/master-fx-preset-calibration.ts --write                                 # put measured make-ups into fxPresets.ts
+ *   npx tsx tools/master-fx-preset-calibration.ts --write [--except "Name"]               # put measured make-ups into fxPresets.ts
  * Needs: npm run dev:fullstack, DEViLBOX open and clicked once, transport stopped.
  */
 import WebSocket from 'ws';
@@ -33,12 +33,14 @@ let store: Record<string, Row> = {};
 try { store = JSON.parse(fs.readFileSync(OUT, 'utf8')); } catch { /* first run */ }
 
 /** Round to 0.1 dB; readings within 0.5 dB of unity need no make-up. */
-const makeUp = (chainDb: number) => (Math.abs(chainDb) < 0.5 ? 0 : Math.round(-chainDb * 10) / 10);
+const makeUp = (chainDb: number): number => (Math.abs(chainDb) < 0.5 ? 0 : Math.round(-chainDb * 10) / 10);
 
 if (args.includes('--write')) {
   let src = fs.readFileSync(PRESETS_TS, 'utf8');
   let changed = 0;
+  const except = listArg('--except');
   for (const r of Object.values(store)) {
+    if (except.includes(r.name)) { console.log(`kept: ${r.name}`); continue; }
     const esc = r.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, "\\\\'");
     const re = new RegExp(`(\\{ name: '${esc}',[^\\n]*?)(, gainCompensationDb: -?[0-9.]+)?(,\\n)`);
     const m = re.exec(src);
