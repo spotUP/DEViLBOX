@@ -51,7 +51,6 @@ const config = {
 } as unknown as HivelyConfig;
 
 const noteOns = () => sent.filter((m) => m.type === 'noteOn');
-const noteOffs = () => sent.filter((m) => m.type === 'noteOff');
 
 async function settle(): Promise<void> {
   // The queued attack runs on `_setupPromise.then`; a few microtask turns.
