@@ -609,6 +609,8 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
       await wait(seconds * 1000);
     }
     const f = new Float32Array(4096);
+    const fIn = new Float32Array(4096), fFx = new Float32Array(4096);
+    let xy = 0, xx = 0, yy = 0;
     const energy: Record<string, number> = {};
     // Noise is steady: 20 reads. A song is not: read back-to-back windows
     // (4096 samples = 85 ms) for `seconds`, input and output together.
@@ -616,11 +618,20 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
     for (let i = 0; i < reads; i++) {
       await wait(song ? 85 : 80);
       for (const t of taps) for (const an of t.a) { an.getFloatTimeDomainData(f); let e = 0; for (const x of f) e += x * x; energy[t.name] = (energy[t.name] ?? 0) + e; }
+      // Polarity: lag-0 correlation of the input and the effect output, left
+      // channel, read in the same render quantum. Near -1 = inverted: blending
+      // it with the dry signal cancels.
+      const inTap = taps.find((t) => t.name === 'input'), fxTap = taps.find((t) => t.name === 'effect');
+      if (inTap && fxTap) {
+        inTap.a[0].getFloatTimeDomainData(fIn); fxTap.a[0].getFloatTimeDomainData(fFx);
+        for (let k = 0; k < fIn.length; k++) { xy += fIn[k] * fFx[k]; xx += fIn[k] * fIn[k]; yy += fFx[k] * fFx[k]; }
+      }
     }
+    const correlation = Math.round((xy / Math.sqrt(xx * yy || 1e-24)) * 100) / 100;
     const ref = energy.input || 1e-12;
     const db = (k: string) => Math.round(10 * Math.log10((energy[k] || 1e-12) / ref) * 10) / 10;
     if (ctx.currentTime === startTime) return { error: 'The audio clock is not running - click the DEViLBOX tab once to start audio.' };
-    return { ok: true, type, wet: Number(params.wet ?? 100), effectDb: db('effect'), chainDb: db('chain'), compensationDb: Math.round((db('chain') - db('effect')) * 10) / 10 };
+    return { ok: true, type, wet: Number(params.wet ?? 100), correlation, effectDb: db('effect'), chainDb: db('chain'), compensationDb: Math.round((db('chain') - db('effect')) * 10) / 10 };
   } finally {
     try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
     for (const t of taps) { try { t.node.disconnect(t.split); } catch { /* ok */ } }
