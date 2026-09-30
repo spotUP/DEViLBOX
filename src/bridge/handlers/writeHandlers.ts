@@ -727,9 +727,9 @@ export async function measureDubEchoResponse(params: Record<string, unknown>): P
       await wait(1500);
     }
     for (const name of names) {
-      // 'master': the whole output after the master chain - moves that act on
+      // 'engineOut': the tracker engine's output (blepInput) - moves that act on
       // the dry mix (mutes, drops, filters) show there, not on the return.
-      const node = (name === 'master'
+      const node = (name === 'engineOut'
         ? (getToneEngine() as unknown as { blepInput: { input: AudioNode } }).blepInput.input
         : bus[name]) as AudioNode | undefined;
       if (!node || typeof node.connect !== 'function') { out[name] = { error: 'no such stage' }; continue; }
