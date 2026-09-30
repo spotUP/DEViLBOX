@@ -63,3 +63,10 @@ process real audio behind a muted return.
 - `npm run type-check`; targeted tests.
 - MCP get_audio_worklet_profile before/after; `sample` of the renderer.
 - Owner: dub moves sound as before (manual).
+
+## 2026-09-29 per-node attribution (chrome://tracing, disabled-by-default-webaudio.audionode, 4-ch MOD playing, dub bus on)
+Untraced main-context load: 0.90 ms per 128-frame quantum (34 %), p99 2.46 ms of 2.67 ms.
+Nodes processed per quantum (trace trace_dbxdbg3.json.gz):
+GainNode 363 · BiquadFilter 57 · Analyser 42 · AudioWorklet 30 · ChannelSplitter 25 · StereoPanner 24 · WaveShaper 14 (2x oversampled) · ConstantSource 14 · Delay 8 · Oscillator 4 · DynamicsCompressor 3 · Convolver 2 (always processing: dub feedback floor keeps inputs non-silent).
+Traced self-time shares (inflated by per-event tracing cost): per-node overhead 44 %, AudioWorklet calls 29 % (idle-gated worklets still pay the call + buffer copy), convolver FFT 10 %, gains 6 %, biquads 4 %.
+Next (P9, proposed): size per-channel structures to the song's channel count, built lazily - ChannelRouting (64 gains/16 splitters/16 analysers/16 panners), ChannelEffectsManager (32 gains), TrackerReplayer (36 gains), SendBusManager (12), ChannelFilterManager (34 biquads). Then: fewer always-on worklets (30), convolvers that stop when their tail is done.
