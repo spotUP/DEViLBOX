@@ -70,7 +70,7 @@ included the post gains being calibrated.
       fired"). They are sized by generatedPeak() from the programme level
       (AudioDataBus rms/peak). Bus gains read sane (input 1, return 0.85).
       Next: measure with measure_dub_echo_response {move} while playing.
-- [ ] O2 "Modern Glue & Air" very low volume. Make-up -7.7 dB predates today
+- [x] O2 (make-up -7.7 -> -2.8 dB after the drive/dynamics corrections moved to the wet path, re-measured) "Modern Glue & Air" very low volume. Make-up -7.7 dB predates today
       (not in the 2026-09-30 re-measure); chain ends in a Maximizer (ceiling
       device) - a cut after a ceiling is the suspect. Measure on music.
 - [ ] O3 "*Wave Landscape" (ShimmerReverb + AmbientDelay) sounds metallic.
@@ -94,7 +94,7 @@ included the post gains being calibrated.
 - [ ] O10 "Big Muff Doom" sounds stuck in a jar, muffled (Neural Big Muff V6 +
       EQ3 + Reverb). Check after today's skip-connection fix: the model's own
       tone vs the preset's EQ3/tone settings.
-- [ ] O11 "Vox Amp Crunch" low volume, very thin, all bass gone. DIAGNOSED: the
+- [x] O11 (2a6ea0a46 + preset re-measure: -2.1 dB at wet 40, make-up +2.1) "Vox Amp Crunch" low volume, very thin, all bass gone. DIAGNOSED: the
       preset runs WAMVoxAmp at wet 40 and its -13.9 dB post compensation sits
       AFTER the dry/wet mix, so the 60 % dry is cut 13.9 dB too - what is left
       is mostly the thin amp. Same class as the time-based fix: every drive /
