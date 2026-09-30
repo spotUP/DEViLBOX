@@ -121,6 +121,7 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
   // Dry/Wet
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
 
   // Internal State
   private _options: Required<SpaceEchoOptions>;
@@ -340,6 +341,12 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.eq.setHigh(val);
   }
 
+  /** Level calibration of the wet signal (WET_PATH_GAIN_DB, or the dub bus's echo trim). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number {
     return this._options.wet;
   }
@@ -354,6 +361,8 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
       this.wetGain.gain,
       this._options.wet,
       this.dryGain.context.currentTime,
+      undefined,
+      this._wetPathGain,
     );
   }
 
