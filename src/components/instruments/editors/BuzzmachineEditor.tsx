@@ -5,16 +5,14 @@
  * parameters based on BUZZMACHINE_INFO.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import {
   BuzzmachineType,
   BUZZMACHINE_INFO,
   type BuzzmachineParameter,
 } from '@engine/buzzmachines/BuzzmachineEngine';
-import { BUZZMACHINE_PRESETS, getBuzzmachinePresetNames } from '@constants/buzzmachinePresets';
 import { Knob } from '@components/controls/Knob';
-import { CustomSelect } from '@components/common/CustomSelect';
 import { SectionHeader } from '@components/instruments/shared';
 
 interface BuzzmachineEditorProps {
@@ -44,10 +42,6 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
   // Get current parameter values
   const parameters = config.buzzmachine?.parameters || {};
 
-  // Get available presets for this machine type
-  const presetNames = useMemo(() => getBuzzmachinePresetNames(machineType), [machineType]);
-  const hasPresets = presetNames.length > 0;
-
   // Handle parameter change
   const handleParameterChange = useCallback(
     (paramIndex: number, value: number) => {
@@ -63,23 +57,6 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
       });
     },
     [config.buzzmachine, machineTypeStr, parameters, onChange]
-  );
-
-  // Handle preset selection
-  const handlePresetChange = useCallback(
-    (presetName: string) => {
-      if (!presetName) return;
-
-      const presets = BUZZMACHINE_PRESETS[machineType];
-      const presetConfig = presets?.[presetName];
-
-      if (presetConfig) {
-        onChange({
-          buzzmachine: presetConfig,
-        });
-      }
-    },
-    [machineType, onChange]
   );
 
   // Format parameter value for display
@@ -160,20 +137,9 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Preset Selector (if available) */}
-      {hasPresets && (
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
-          <SectionHeader color="#06b6d4" title="Presets" />
-          <CustomSelect
-            onChange={(v) => handlePresetChange(v)}
-            className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-highlight focus:border-transparent transition-all"
-            placeholder="Select preset..."
-            value=""
-            options={presetNames.map((name) => ({ value: name, label: name }))}
-          />
-        </section>
-      )}
-
+      {/* Presets: the editor header's dropdown, filtered to this machine (one
+          preset list; this box duplicated it with a selector stuck on its
+          placeholder). */}
       {/* Parameters */}
       <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
         <SectionHeader color="#8b5cf6" title={`${machineInfo.name} Parameters`} />

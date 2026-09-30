@@ -21,7 +21,7 @@ import { DX7_FACTORY_PRESETS, OBXD_FACTORY_PRESETS } from '../jucePresets';
 import { FURNACE_CHIP_PRESETS } from '../furnaceChipPresets';
 import { SAMPLE_PACK_PRESETS, WAVETABLE_PACK_PRESETS } from '../samplePresets';
 import { AMI_PRESETS } from '../amiPresets';
-import { BUZZMACHINE_FACTORY_PRESETS } from '../buzzmachineFactoryPresets';
+import { BUZZMACHINE_FACTORY_PRESETS, BUZZMACHINE_GENERIC_PRESETS } from '../buzzmachineFactoryPresets';
 import { MAKK_FACTORY_PRESETS } from '../makkPresets';
 import { HARMONIC_PRESETS } from '../harmonicPresets';
 import { DJ_ONE_SHOT_PRESETS } from '../djOneShotPresets';
@@ -100,6 +100,10 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...SAMPLE_PACK_PRESETS,
   ...WAVETABLE_PACK_PRESETS,
   ...BUZZMACHINE_FACTORY_PRESETS,
+  // The same presets under the generic 'Buzzmachine' type (any Buzz machine
+  // instrument); the header dropdown filters them by machine. Not in the 'Buzz'
+  // category below, which lists each generator preset once.
+  ...BUZZMACHINE_GENERIC_PRESETS,
   ...MAKK_FACTORY_PRESETS,
   ...DJ_ONE_SHOT_PRESETS,
   ...ZYNTHIAN_PRESETS,

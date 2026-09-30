@@ -13,12 +13,19 @@ import { usePresetStore } from '@stores/usePresetStore';
 
 interface PresetDropdownProps {
   synthType: SynthType;
+  /**
+   * For synth types that host several machines (the generic 'Buzzmachine'),
+   * the loaded machine: only its presets are listed - another machine's preset
+   * would swap the machine.
+   */
+  machineType?: string;
   currentPresetName?: string;
   onChange: (updates: Partial<InstrumentConfig>) => void;
 }
 
 export const PresetDropdown: React.FC<PresetDropdownProps> = ({
   synthType,
+  machineType,
   currentPresetName,
   onChange,
 }) => {
@@ -38,7 +45,8 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
   // store their playable data under `config` in the same flattened shape the
   // factory presets use, so they slot straight into the list.
   const presets = useMemo(() => {
-    const factory = FACTORY_PRESETS.filter(p => p.synthType === synthType);
+    const factory = FACTORY_PRESETS.filter(p => p.synthType === synthType
+      && (!machineType || !p.buzzmachine || p.buzzmachine.machineType === machineType));
     // Ripped presets are auto-harvested snapshots of song instruments, so the
     // same instrument re-harvested across sessions piles up near-identical
     // entries ("Speak & Spell", "Speak & Spell (song)", ...). Collapse by
@@ -56,7 +64,7 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
     const ripped = [...newestByName.values()]
       .map(p => p.config as InstrumentPreset['config']);
     return [...factory, ...ripped];
-  }, [synthType, rippedPresets]);
+  }, [synthType, machineType, rippedPresets]);
 
   // Close dropdown when clicking outside
   useClickOutside(dropdownRef, () => setIsOpen(false));

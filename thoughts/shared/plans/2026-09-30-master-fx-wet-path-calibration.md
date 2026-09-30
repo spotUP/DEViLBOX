@@ -113,3 +113,12 @@ included the post gains being calibrated.
 - [x] O14 Preset keys audit (bcd192938): 14 delay times (delayTime vs time), 6
       distortion drives, Spacey Delay; make-up tool read presets stale (fixed).
 - [ ] O15 Chip Metal preset level not measured (Swedish Chainsaw slow to load).
+- [ ] O16 AHX regression? Playing an instrument (preview) plays the whole song -
+      used to play only the instrument. Is the Hively WASM instrument player used?
+      (Recent: eced26399 "the tune gets back its only route into the mixer",
+      79316f666 "instrument players get their own output"; the test
+      instrumentPlayersHaveTheirOwnOutput already FAILS on main.)
+- [~] O17 A Jeskola/Elenzil FrequencyBomb instrument added to an AHX song plays by
+      itself after a reload and never stops. Likely d32f52032 (saved settings now
+      applied at creation: a parameter tick starts the drone). Fix: stop the
+      machine after applyConfig. UNCONFIRMED live - owner to retest.
