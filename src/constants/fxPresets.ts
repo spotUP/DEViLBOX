@@ -660,7 +660,7 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
 
   // ═══ TEXTURE ═══
-  { name: 'Radiowave', description: 'Bandpass + bit-crush + tremolo — AM radio', tags: ['Texture', 'Lo-Fi'], gainCompensationDb: 8.1,
+  { name: 'Radiowave', description: 'Bandpass + bit-crush + tremolo — AM radio', tags: ['Texture', 'Lo-Fi'], gainCompensationDb: 2.1,
     effects: [
       { category: 'tonejs', type: 'Filter', enabled: true, wet: 100, parameters: { frequency: 2000, type: 'bandpass', Q: 3 } },
       { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 20, parameters: { bits: 10 } },
@@ -738,7 +738,7 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 60, parameters: { mode: 3, rate: 350, intensity: 0.55, echoVolume: 0.8, reverbVolume: 0.3, bass: 0.5, treble: 0.6 } },
     ] },
-  { name: 'RE-201 King Tubby', description: 'Full RE-201 model — warm tape + spring, all 3 heads', tags: ['Delay', 'Dub', 'Dub Echo', 'Dub Reverb', 'Space'], gainCompensationDb: 2.7,
+  { name: 'RE-201 King Tubby', description: 'Full RE-201 model — warm tape + spring, all 3 heads', tags: ['Delay', 'Dub', 'Dub Echo', 'Dub Reverb', 'Space'], gainCompensationDb: 0.1,
     effects: [
       { category: 'wasm', type: 'RE201', enabled: true, wet: 55, parameters: { bass: 0.8, treble: 0.25, delayMode: 7, repeatRate: 0.25, intensity: 0.72, echoVolume: 0.9, reverbVolume: 0.55, inputLevel: 1.2 } },
     ] },
@@ -758,7 +758,7 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'wasm', type: 'AnotherDelay', enabled: true, wet: 50, parameters: { delayTime: 600, feedback: 0.7, gain: 1.3, lowpass: 1800, highpass: 250, flutterFreq: 2, flutterDepth: 0.04, wowFreq: 0.1, wowDepth: 0.02, reverbEnabled: 1, roomSize: 0.7, damping: 0.25, width: 1 } },
     ] },
-  { name: 'RE-201 + Dattorro', description: 'RE-201 tape echo into metallic plate — massive dub wash', tags: ['Delay', 'Reverb', 'Dub', 'Dub Echo', 'Dub Reverb', 'Creative'], gainCompensationDb: 7,
+  { name: 'RE-201 + Dattorro', description: 'RE-201 tape echo into metallic plate — massive dub wash', tags: ['Delay', 'Reverb', 'Dub', 'Dub Echo', 'Dub Reverb', 'Creative'], gainCompensationDb: 4.9,
     effects: [
       { category: 'wasm', type: 'RE201', enabled: true, wet: 50, parameters: { bass: 0.7, treble: 0.3, delayMode: 7, repeatRate: 0.3, intensity: 0.65, echoVolume: 0.8, reverbVolume: 0.3, inputLevel: 1.1 } },
       { category: 'wasm', type: 'DattorroPlate', enabled: true, wet: 35, parameters: { predelay: 0.12, preFilter: 0.65, inputDiffusion: 0.78, decayDiffusion: 0.55, decay: 0.82, damping: 0.25 } },
