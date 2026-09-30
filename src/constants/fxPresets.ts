@@ -370,9 +370,11 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 15, parameters: { drive: 30, tone: 11000 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 3.5, attack: 0.005, release: 0.12 } },
     ] },
-  { name: 'Big Room', description: 'Plate reverb + wide stereo + comp — festival main stage', tags: ['DJ', 'Wide'], gainCompensationDb: 3.9,
+  { name: 'Big Room', description: 'Plate reverb + wide stereo + comp — festival main stage', tags: ['DJ', 'Wide'], gainCompensationDb: 4.6,
     effects: [
-      { category: 'wasm', type: 'MVerb', enabled: true, wet: 12, parameters: { damping: 0.5, density: 0.6, bandwidth: 0.7, decay: 0.35, predelay: 0.0, size: 0.5, gain: 1.0, mix: 0.35, earlyMix: 0.7 } },
+      // A big room: 2026-09-30 "big room fx preset does not sound like a big room at all".
+      // It ran wet 12 with MVerb's own mix at 0.35 - about 4 % reverb, short decay.
+      { category: 'wasm', type: 'MVerb', enabled: true, wet: 25, parameters: { damping: 0.5, density: 0.6, bandwidth: 0.7, decay: 0.6, predelay: 0.02, size: 0.8, gain: 1.0, mix: 1.0, earlyMix: 0.6 } },
       { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 100, parameters: { width: 0.6 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 4, attack: 0.005, release: 0.12 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -0.5, high: 1.5 } },
