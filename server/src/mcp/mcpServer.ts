@@ -754,7 +754,7 @@ export function createMcpServer(): McpServer {
     'measure_dub_bus_stages',
     'Measure the dub bus stage by stage: pink noise into the bus input, level at each named stage in dB relative to the input (energy of both channels), with optional temporary `settings` (any DubBusSettings fields) restored afterwards. Refuses while playing. Default stages: inputClip, tapeSat, tapeSatBypass, postEchoSatBypass (echo out), _forwardScrubber (spring out), sidechainTrim, glueTrim, lpf, stereoMerge, plateSend, return_.',
     {
-      settings: z.record(z.unknown()).optional().describe('Temporary dub bus settings, e.g. { echoEngine: "re201", echoWet: 1, echoIntensity: 0.62 }'),
+      settings: z.record(z.string(), z.unknown()).optional().describe('Temporary dub bus settings, e.g. { echoEngine: "re201", echoWet: 1, echoIntensity: 0.62 }'),
       stages: z.array(z.string()).optional().describe('DubBus node field names to read'),
       seconds: z.number().optional().describe('Noise run before reading (1-10, default 3)'),
       settleMs: z.number().optional().describe('Wait after applying settings (default 2500)'),
@@ -767,12 +767,12 @@ export function createMcpServer(): McpServer {
     "Measure one master effect's level: stereo pink noise into the master effects input with the chain set to just this effect, level in dB relative to the input (energy of both channels). effectDb = the effect's own output, chainDb = after its compensation gain, compensationDb = the difference. With effects, measures a whole chain (a preset) instead: effectDb is its last effect's output. Refuses while playing or while the audio clock is stopped; the user's master chain is restored afterwards.",
     {
       type: z.string().optional().describe('Effect type, e.g. "SpaceEcho" (or pass effects)'),
-      effects: z.array(z.record(z.unknown())).optional().describe('A whole chain (a preset\'s effects); chainDb is then the chain\'s output after gainCompensationDb'),
+      effects: z.array(z.record(z.string(), z.unknown())).optional().describe('A whole chain (a preset\'s effects); chainDb is then the chain\'s output after gainCompensationDb'),
       gainCompensationDb: z.number().optional().describe('Preset make-up gain applied with effects (default 0)'),
       levelDb: z.number().optional().describe('Noise level, dBFS RMS per channel (default -18, a mix)'),
       source: z.enum(['noise', 'song']).optional().describe('noise (default, transport stopped) or song: the playing song through the chain, input vs output'),
       category: z.string().optional().describe('tonejs | wasm | buzzmachine | neural | wam (default tonejs)'),
-      parameters: z.record(z.unknown()).optional().describe('Effect parameters (default: the effect\'s defaults)'),
+      parameters: z.record(z.string(), z.unknown()).optional().describe('Effect parameters (default: the effect\'s defaults)'),
       wet: z.number().optional().describe('Wet percent (default 100)'),
       neuralModelIndex: z.number().optional(),
       seconds: z.number().optional().describe('Noise run before reading (1-10, default 3)'),
@@ -791,8 +791,8 @@ export function createMcpServer(): McpServer {
   server.tool(
     'measure_dub_echo_response',
     'The dub echo impulse response: a 5 ms burst into the bus, each stage recorded; reports the repeats (time ms, level dB) and clarity (share of energy within 20 ms of a repeat: near 1 = distinct echoes, low = a wash). Uses the current bus settings unless settings overrides (restored after). Refuses while playing. Default stages: postEchoSatBypass (echo out), return_ (the whole wet return).',
-    { settings: z.record(z.unknown()).optional(), stages: z.array(z.string()).optional(), seconds: z.number().optional(), gapMs: z.number().optional(),
-      move: z.string().optional().describe('Fire this dub move (e.g. snareCrack) instead of the test burst'), moveParams: z.record(z.number()).optional() },
+    { settings: z.record(z.string(), z.unknown()).optional(), stages: z.array(z.string()).optional(), seconds: z.number().optional(), gapMs: z.number().optional(),
+      move: z.string().optional().describe('Fire this dub move (e.g. snareCrack) instead of the test burst'), moveParams: z.record(z.string(), z.number()).optional() },
     (p) => call('measure_dub_echo_response', p),
   );
 
