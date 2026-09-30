@@ -77,15 +77,12 @@ describe('AutoDubPanel — channel seeding regression', () => {
     expect(getAutoDubSeedChannelCount(undefined, 16)).toBe(16);
   });
 
-  // Low on purpose: moves open sends, and stand out only against a quiet return
-  // (2026-09-30: at 0.8 the owner's presses raised the return 0-3 dB).
-  it('seeds half the role level, capped at 0.45 so moves have contrast', () => {
-    expect(getAutoDubSeedSendLevel(1.0)).toBe(0.45);
-    expect(getAutoDubSeedSendLevel(0.85)).toBeCloseTo(0.425, 6);
-  });
-
-  it('keeps low preset sends audible, never under 0.15', () => {
-    expect(getAutoDubSeedSendLevel(0.2)).toBe(0.15);
+  // Low on purpose: moves open sends, and are heard only against a quiet
+  // return (2026-09-30: sends at ~0.43 -> throws +2 dB; at 0.15 -> +8..+18 dB).
+  it('seeds a fifth of the role level, between 0.1 and 0.2, so moves have contrast', () => {
+    expect(getAutoDubSeedSendLevel(1.0)).toBe(0.2);
+    expect(getAutoDubSeedSendLevel(0.85)).toBeCloseTo(0.17, 6);
+    expect(getAutoDubSeedSendLevel(0.2)).toBe(0.1);
   });
 
   it('seeds on every Auto Dub start, not only from the panel toggle', () => {
