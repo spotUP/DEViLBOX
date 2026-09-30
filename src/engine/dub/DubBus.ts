@@ -1010,7 +1010,6 @@ export class DubBus {
        the new RE-201's fallback-start produced NaN in the biquad chain
        (state is bad, permanent). Transactional swap: mute input gate,
        zero external feedback, then splice, then unmute. */
-    const priorInputGain = this.input.gain.value;
     const priorFeedbackGain = this.feedback.gain.value;
     /* Capture the target sidechain threshold so we can restore it after
        the warmup. During the burst the compressor must be disabled —
@@ -1084,7 +1083,12 @@ export class DubBus {
         const now2 = ctx.currentTime;
         this.input.gain.cancelScheduledValues(now2);
         this.input.gain.setValueAtTime(0, now2);
-        this.input.gain.linearRampToValueAtTime(priorInputGain, now2 + RAMP_SEC);
+        // The gain the bus should have NOW, not the value read when the swap
+        // began: a settings change that enables the bus AND swaps the engine
+        // read 0 there (the enable ramp had not moved yet) and restored 0 -
+        // choosing AnotherDelay on a bus being switched on left it silent
+        // (measured 2026-09-30: input gain 0 for as long as it was selected).
+        this.input.gain.linearRampToValueAtTime(this._inputGainTarget(), now2 + RAMP_SEC);
 
         this.feedback.gain.cancelScheduledValues(now2);
         this.feedback.gain.setValueAtTime(0, now2);
@@ -1147,7 +1151,7 @@ export class DubBus {
            silenced by a swap failure. */
         try {
           const t = ctx.currentTime;
-          this.input.gain.setValueAtTime(priorInputGain, t);
+          this.input.gain.setValueAtTime(this._inputGainTarget(), t);
           this.feedback.gain.setValueAtTime(priorFeedbackGain, t);
           this.return_.gain.setValueAtTime(this.enabled ? settings.returnGain : 0, t);
           this.sidechain.threshold.setValueAtTime(targetThreshold, t);
@@ -6004,6 +6008,21 @@ export class DubBus {
    * Announcement only — it changes no state and no audio. `settings` still
    * holds what the USER set, which is what a move restores to.
    */
+  /** The input gate's gain for the bus as it is now: open when enabled, shut while disabled or draining. */
+  private _inputGainTarget(): number {
+    return this.enabled && !this._draining ? 1 : 0;
+  }
+
+  /** The gain that cancels the sidechain compressor's make-up at these settings. */
+  private _sidechainTrimFor(settings: Pick<DubBusSettings, 'sidechainAmount'>): number {
+    return compressorMakeupTrim(sidechainThresholdDb(settings.sidechainAmount), SIDECHAIN_KNEE_DB, SIDECHAIN_RATIO);
+  }
+
+  /** The gain that cancels the glue compressor's make-up (none when bypassed at 1:1). */
+  private _glueTrimFor(settings: Pick<DubBusSettings, 'glueBypass'>): number {
+    return settings.glueBypass ? 1 : compressorMakeupTrim(GLUE_THRESHOLD_DB, GLUE_KNEE_DB, GLUE_RATIO);
+  }
+
   /**
    * `setTargetAtTime` after clearing whatever was already scheduled.
    *
@@ -6017,16 +6036,6 @@ export class DubBus {
    * the new curve starts from the last SCHEDULED value rather than the one
    * actually sounding.
    */
-  /** The gain that cancels the sidechain compressor's make-up at these settings. */
-  private _sidechainTrimFor(settings: Pick<DubBusSettings, 'sidechainAmount'>): number {
-    return compressorMakeupTrim(sidechainThresholdDb(settings.sidechainAmount), SIDECHAIN_KNEE_DB, SIDECHAIN_RATIO);
-  }
-
-  /** The gain that cancels the glue compressor's make-up (none when bypassed at 1:1). */
-  private _glueTrimFor(settings: Pick<DubBusSettings, 'glueBypass'>): number {
-    return settings.glueBypass ? 1 : compressorMakeupTrim(GLUE_THRESHOLD_DB, GLUE_KNEE_DB, GLUE_RATIO);
-  }
-
   private _settle(param: AudioParam, target: number, now: number, tc: number): void {
     try {
       param.cancelScheduledValues(now);
@@ -7666,7 +7675,7 @@ export class DubBus {
 
         this.input.gain.cancelScheduledValues(now2);
         this.input.gain.setValueAtTime(0, now2);
-        this.input.gain.linearRampToValueAtTime(priorInputGain, now2 + RAMP_SEC);
+        this.input.gain.linearRampToValueAtTime(this._inputGainTarget(), now2 + RAMP_SEC);
 
         this.feedback.gain.cancelScheduledValues(now2);
         this.feedback.gain.setValueAtTime(0, now2);

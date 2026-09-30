@@ -500,11 +500,19 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
     const db: Record<string, number> = {};
     for (const t of taps) db[t.name] = Math.round(10 * Math.log10((energy[t.name] || 1e-12) / ref) * 10) / 10;
     const live = bus.settings as Record<string, unknown> | undefined;
-    return { ok: true, relativeToInputDb: db, applied: override, liveEchoEngine: bus._currentEchoEngine ?? live?.echoEngine, liveEchoIntensity: live?.echoIntensity };
+    const inputRmsDb = Math.round(10 * Math.log10((energy.input || 1e-12) / (20 * 2 * 4096)) * 10) / 10;
+    return {
+      ok: true, relativeToInputDb: db, inputRmsDb, inputGain: (bus.input as GainNode).gain.value,
+      applied: override, liveEchoEngine: bus._currentEchoEngine ?? live?.echoEngine, liveEchoIntensity: live?.echoIntensity,
+    };
   } finally {
     try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
     for (const t of taps) { try { t.node.disconnect(t.split); } catch { /* ok */ } }
     useDrumPadStore.getState().setDubBus(saved);
+    // Let a restoring echo-engine swap finish before the next call can start
+    // another: two swaps overlapping read the input gain mid-mute.
+    await wait(50);
+    for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
   }
 }
 

@@ -78,19 +78,24 @@ describe('DubBus._swapEchoEngine — transactional quiesce contract', () => {
     expect(fn).toMatch(/this\.feedback\.gain\.linearRampToValueAtTime\(\s*0\s*,/);
   });
 
-  it('restores `input.gain` after the splice', () => {
-    /* The unmute ramp rises from 0 back to a non-zero captured value. */
-    expect(fn).toMatch(/this\.input\.gain\.linearRampToValueAtTime\(\s*priorInputGain/);
+  it('restores `input.gain` after the splice to the gain the bus should have NOW', () => {
+    /* Not a value captured when the swap began. A settings write that enables
+       the bus AND picks another engine (AnotherDelay on a bus being switched
+       on, 2026-09-30) read 0 there - the enable ramp had not moved yet - and
+       restored 0: the bus stayed silent for as long as that engine was on. */
+    expect(fn).toMatch(/this\.input\.gain\.linearRampToValueAtTime\(\s*this\._inputGainTarget\(\)/);
+    expect(fn).not.toMatch(/priorInputGain/);
+    const target = extractFn(src, '_inputGainTarget');
+    expect(target).toMatch(/this\.enabled\s*&&\s*!this\._draining\s*\?\s*1\s*:\s*0/);
   });
 
   it('restores `feedback.gain` after the splice', () => {
     expect(fn).toMatch(/this\.feedback\.gain\.linearRampToValueAtTime\(\s*priorFeedbackGain/);
   });
 
-  it('captures prior input + feedback gain values BEFORE scheduling the mute ramp', () => {
+  it('captures the prior feedback gain BEFORE scheduling the mute ramp', () => {
     /* Capture must be from `.value`, not the post-ramp scheduled values,
        so the restore targets the value the user sees in the UI. */
-    expect(fn).toMatch(/const\s+priorInputGain\s*=\s*this\.input\.gain\.value/);
     expect(fn).toMatch(/const\s+priorFeedbackGain\s*=\s*this\.feedback\.gain\.value/);
   });
 
@@ -105,7 +110,7 @@ describe('DubBus._swapEchoEngine — transactional quiesce contract', () => {
   it('has a recovery path that restores gains on swap failure', () => {
     /* If the try/catch inside setTimeout throws, the bus would otherwise
        stay permanently muted (input + feedback + return all at 0). */
-    expect(fn).toMatch(/catch\s*\(\s*err[^)]*\)[\s\S]*priorInputGain/);
+    expect(fn).toMatch(/catch\s*\(\s*err[^)]*\)[\s\S]*this\.input\.gain\.setValueAtTime\(this\._inputGainTarget\(\)/);
   });
 });
 
