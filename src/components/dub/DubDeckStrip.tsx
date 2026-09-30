@@ -2022,13 +2022,13 @@ export const DubDeckStrip: React.FC = () => {
             setDubBus({ chainOrder: next, characterPreset: dubBusSettings.characterPreset });
           }}
           title={
-            chainOrder === 'echoSpring' ? 'Signal order: ECHO → SPRING (default). Click to cycle chain order.'
-            : chainOrder === 'springEcho' ? 'Signal order: SPRING → ECHO (reverb-first). Click to cycle to parallel.'
-            : 'Signal order: PARALLEL (echo + spring independent). Click to cycle to default.'
+            chainOrder === 'echoSpring' ? 'Chain order: echo, then spring (default) - distinct repeats, each with a little room. Click to cycle.'
+            : chainOrder === 'springEcho' ? 'Chain order: spring, then echo (Lee Perry) - each repeat is a repeated room, a wash rather than distinct repeats. Click to cycle.'
+            : 'Chain order: echo and spring side by side. Click to cycle back to echo, then spring.'
           }
           disabled={!busEnabled}
         >
-          {chainOrder === 'echoSpring' ? 'DLY→VRB' : chainOrder === 'springEcho' ? 'VRB→DLY' : 'PARALLEL'}
+          {chainOrder === 'echoSpring' ? 'Echo → Spring' : chainOrder === 'springEcho' ? 'Spring → Echo' : 'Echo + Spring'}
         </button>
         {/* ── Mic controls ─────────────────────────────────────────────── */}
         <div className="flex items-center gap-1.5 ml-2">
