@@ -770,6 +770,7 @@ export function createMcpServer(): McpServer {
       effects: z.array(z.record(z.unknown())).optional().describe('A whole chain (a preset\'s effects); chainDb is then the chain\'s output after gainCompensationDb'),
       gainCompensationDb: z.number().optional().describe('Preset make-up gain applied with effects (default 0)'),
       levelDb: z.number().optional().describe('Noise level, dBFS RMS per channel (default -18, a mix)'),
+      source: z.enum(['noise', 'song']).optional().describe('noise (default, transport stopped) or song: the playing song through the chain, input vs output'),
       category: z.string().optional().describe('tonejs | wasm | buzzmachine | neural | wam (default tonejs)'),
       parameters: z.record(z.unknown()).optional().describe('Effect parameters (default: the effect\'s defaults)'),
       wet: z.number().optional().describe('Wet percent (default 100)'),
