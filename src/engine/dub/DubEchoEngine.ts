@@ -17,6 +17,7 @@ import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
 import { RETapeEchoEffect } from '../effects/RETapeEchoEffect';
 import type { DubBusSettings } from '../../types/dub';
+import { DEFAULT_DUB_BUS } from '../../types/dub';
 
 export interface DubEchoEngine {
   readonly input: Tone.Gain;
@@ -100,7 +101,7 @@ export class RE201Adapter implements DubEchoEngine {
 
   constructor(settings: DubBusSettings) {
     this.fx = new RE201Effect({
-      delayMode: settings.re201DelayMode ?? 7, // configurable — Tubby mode 9 = H2+H3+reverb
+      delayMode: settings.re201DelayMode ?? DEFAULT_DUB_BUS.re201DelayMode, // RE201_DELAY_MODES
       repeatRate: this.msToRepeatRate(settings.echoRateMs),
       intensity: settings.echoIntensity,
       echoVolume: 0.90,

@@ -13,6 +13,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import type { DubBusSettings } from '@/types/dub';
+import { DEFAULT_DUB_BUS, RE201_DELAY_MODES } from '@/types/dub';
 import { Speaker } from 'lucide-react';
 import { useLiveDubParam } from '@/hooks/useLiveDubParam';
 
@@ -233,20 +234,8 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
           {dubBus.echoEngine === 're201' && (
           <Choice
             label="RE-201 Mode"
-            value={String(dubBus.re201DelayMode ?? 7)}
-            options={[
-              { value: '0',  label: '0 — Reverb only' },
-              { value: '1',  label: '1 — Head 1 only' },
-              { value: '2',  label: '2 — Head 2 only' },
-              { value: '3',  label: '3 — Head 3 only' },
-              { value: '4',  label: '4 — H1 + H2' },
-              { value: '5',  label: '5 — H1 + H3' },
-              { value: '6',  label: '6 — H2 + H3' },
-              { value: '7',  label: '7 — H1 + Reverb (default)' },
-              { value: '8',  label: '8 — H1 + H2 + Reverb' },
-              { value: '9',  label: '9 — H2 + H3 + Reverb (Tubby)' },
-              { value: '10', label: '10 — All heads + Reverb' },
-            ] as const}
+            value={String(dubBus.re201DelayMode ?? DEFAULT_DUB_BUS.re201DelayMode)}
+            options={RE201_DELAY_MODES.map((m) => ({ value: String(m.value), label: `${m.value} — ${m.label}` }))}
             onChange={(v) => patch({ re201DelayMode: Number(v) })}
           />
           )}
