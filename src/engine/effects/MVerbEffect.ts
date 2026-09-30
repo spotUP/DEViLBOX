@@ -140,6 +140,7 @@ export class MVerbEffect extends Tone.ToneAudioNode {
       console.log('[MVerb] ⚡ AudioWorkletNode created, sending init message');
 
       this.workletNode.port.onmessage = (event) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (event.data.type === 'ready') {
           console.log('[MVerb] ⚡ WASM ready! Connecting worklet to audio chain');
           this.isWasmReady = true;

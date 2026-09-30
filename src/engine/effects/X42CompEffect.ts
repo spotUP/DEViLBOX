@@ -35,6 +35,7 @@ export class X42CompEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -88,6 +89,7 @@ export class X42CompEffect extends Tone.ToneAudioNode {
       });
 
       this.workletNode.port.onmessage = (e) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (e.data.type === 'ready') {
           this.isWasmReady = true;
           for (const p of this.pendingParams) {
@@ -171,10 +173,16 @@ export class X42CompEffect extends Tone.ToneAudioNode {
   set holdEnabled(v: number) { this._hold = v > 0.5 ? 1 : 0; this.sendParam('hold', this._hold); }
   get inputGainDb(): number { return this._inputGain; }
   set inputGainDb(v: number) { this._inputGain = clamp(v, -10, 30); this.sendParam('inputGain', this._inputGain); }
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp(value, 0, 1);
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._wet;
   }
 

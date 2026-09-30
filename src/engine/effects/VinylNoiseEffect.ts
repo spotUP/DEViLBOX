@@ -39,6 +39,7 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private workletNode: AudioWorkletNode | null = null;
   private _pendingParams = new Map<string, number>();
 
@@ -189,13 +190,19 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
     this._send('editorOpen', open ? 1 : 0);
   }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp01(value);
     // Ramped: this chain sits post-master on the WHOLE MIX, so the JA Press
     // slider crossing zero was a full-scale step on everything the user hears,
     // not a send-level tweak. Reported 2026-09-21 as crackle on the sliders.
-    rampParam(this.wetGain.gain, this._wet, this.wetGain.context.currentTime);
+    rampParam(this.wetGain.gain, this._wet * this._wetPathGain, this.wetGain.context.currentTime);
   }
 
   setParam(param: string, value: number): void {

@@ -150,6 +150,7 @@ export class ResonanceTamerEffect extends Tone.ToneAudioNode {
       });
 
       this.workletNode.port.onmessage = (event) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
           // Push initial param values so the worklet starts with the config,

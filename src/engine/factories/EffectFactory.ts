@@ -206,6 +206,18 @@ const GAIN_COMPENSATION_DB: Record<string, number> = {
 export function applyWetPathGain(node: unknown, type: string): 'effectReturn' | 'setWetPathGain' | 'none' {
   const g = getWetPathGain(type);
   if (g === 1) return 'none';
+  const mode = applyWetGain(node, g);
+  if (mode === 'none') console.warn(`[EffectFactory] ${type} has a wet-path calibration but no wet path to put it on`);
+  return mode;
+}
+
+/**
+ * Put gain `g` on an effect's WET signal only - the dry signal stays at unity
+ * at any wet %. 'none' when the effect has no separate wet path (its dry/wet
+ * mix happens inside it, or it has no dry at all): the caller then scales the
+ * whole output instead.
+ */
+export function applyWetGain(node: unknown, g: number): 'effectReturn' | 'setWetPathGain' | 'none' {
   // Tone.Effect / Tone.StereoEffect (not exported from Tone's index): the wet
   // signal reaches the dry/wet crossfade's `b` input from `effectReturn`
   // (mono) or `_merge` (stereo). A gain goes in between. Not ON effectReturn:
@@ -233,7 +245,6 @@ export function applyWetPathGain(node: unknown, type: string): 'effectReturn' | 
     settable.setWetPathGain(g);
     return 'setWetPathGain';
   }
-  console.warn(`[EffectFactory] ${type} has a wet-path calibration but no wet path to put it on`);
   return 'none';
 }
 
