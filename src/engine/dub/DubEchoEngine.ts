@@ -40,20 +40,21 @@ export interface DubEchoEngine {
 }
 
 /**
- * Echo level per engine on the bus, matched to the Space Echo (the default
- * engine, the level the owner judged right on 2026-09-30: "the reverb/echo
- * wash seems fixed").
+ * Echo level per engine on the bus: each engine's echo at unity with its
+ * input (intensity 0.3, echoWet 1, measured live 2026-09-30 with
+ * measure_dub_bus_stages: Space Echo -9.4 dB, RE-201 +0.8, AnotherDelay
+ * +5.2, RE-Tape Echo -2.9). Put on the engine's wet path.
  *
- * Measured live 2026-09-30 with measure_dub_bus_stages, pink noise, echoWet 1,
- * intensity 0.3, echo output over echo input: Space Echo -9.4 dB, RE-201
- * +0.8, AnotherDelay +5.2, RE-Tape Echo -2.9. Choosing another engine jumped
- * the echo up to 15 dB. Each adapter puts its trim on the engine's wet path.
+ * These first matched the engines DOWN to the Space Echo; the RE-201 lost
+ * 10.2 dB and every move a RE-201 persona (Tubby) threw into the echo with
+ * it - "i can hardly hear any of the moves etc the persona performs now".
+ * Unity is the rule the bus's other stages follow.
  */
 export const ECHO_ENGINE_TRIM_DB = {
-  spaceEcho: 0,
-  re201: -10.2,
-  anotherDelay: -14.6,
-  reTapeEcho: -6.5,
+  spaceEcho: 9.4,
+  re201: -0.8,
+  anotherDelay: -5.2,
+  reTapeEcho: 2.9,
 } as const;
 const trimGain = (engine: keyof typeof ECHO_ENGINE_TRIM_DB) => 10 ** (ECHO_ENGINE_TRIM_DB[engine] / 20);
 
@@ -78,6 +79,7 @@ export class SpaceEchoAdapter implements DubEchoEngine {
       feedbackHpfHz: settings.echoFeedbackHpfHz,
       feedbackLpfHz: settings.echoFeedbackLpfHz,
     });
+    this.fx.setWetPathGain(trimGain('spaceEcho'));
   }
 
   setRate(ms: number): void { this.fx.setRate(ms); }
