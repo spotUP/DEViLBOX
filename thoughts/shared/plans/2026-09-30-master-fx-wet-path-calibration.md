@@ -82,3 +82,8 @@ included the post gains being calibrated.
       (generatedPeak = presence x programme peak: crack 0.13 vs peak 0.26) and
       land at the song sends' level on the return (-15..-18 dBFS). The bus
       reset took echoWet 0.9 -> 0.5 (-5 dB on every move's echo tail).
+- [ ] O6 RE-201 on the bus self-oscillates, "gets stronger and stronger": mode 9
+      (Tubby, set today) sums three heads into the feedback - loop gain ~1.6 at
+      intensity 0.62. Fix: RE201Adapter shares the bus intensity over the heads.
+- [ ] O7 "Big Room" preset (MVerb+StereoWidener+Compressor+EQ3) does not sound
+      like a big room - broken?
