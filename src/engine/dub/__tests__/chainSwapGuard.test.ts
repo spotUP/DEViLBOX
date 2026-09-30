@@ -47,9 +47,9 @@ describe('DubBus.setChainOrder — self-oscillation guard', () => {
     expect(body).toMatch(/setTimeout\(/);
   });
 
-  it('ramps gains back to prior levels after the splice', () => {
+  it('ramps the return back to where the bus is now (the captured value only while a move owns it)', () => {
     expect(body).toMatch(/priorReturnGain\s*=\s*this\.return_\.gain\.value/);
-    expect(body).toMatch(/linearRampToValueAtTime\(\s*priorReturnGain/);
+    expect(body).toMatch(/this\._ownedSettingKeys\.has\('returnGain'\) \? priorReturnGain : this\._returnGainTarget\(\)/);
   });
 
   it('has a race guard via routing version token', () => {

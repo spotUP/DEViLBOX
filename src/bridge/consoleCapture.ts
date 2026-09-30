@@ -52,7 +52,7 @@ function argsToString(args: unknown[]): string {
  * holds 500 entries and a general log capture would evict the errors it exists
  * to hold.
  */
-const CAPTURED_LOG_PREFIXES = /^\[(DubRouter|DubBus|DubBusCtrl|DubPanic|DubLane|DubRecorder|FurnaceDispatch|FurnaceDispatchSynth|NativeEngineRouting|ChannelRoutedEffects|MixerStore)\]/;
+const CAPTURED_LOG_PREFIXES = /^\[(DubRouter|DubBus|DubBusCtrl|DubPanic|DubLane|DubRecorder|FurnaceDispatch|FurnaceDispatchSynth|NativeEngineRouting|ChannelRoutedEffects|MixerStore|DubBusSnap)\]/;
 
 /** Start capturing console errors/warnings and unhandled rejections */
 export function startConsoleCapture(): void {

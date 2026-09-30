@@ -376,6 +376,15 @@ if (typeof window !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }
   (window as unknown as Record<string, unknown>).__dubBus = () => _activeDubBus;
 }
 
+
+/**
+ * The dub siren synth's output peak, as a fraction of full scale, at the
+ * level it is triggered with. Measured 2026-09-30: asked for a 0.085 peak, the
+ * bus input read 0.035 - the synth peaks at ~0.41. generatedPeak's number is
+ * the peak the siren should HAVE, so the level gain divides by this.
+ */
+const SIREN_SYNTH_PEAK = 0.41;
+
 export class DubBus {
   // ─── Shared Dub Bus — Vintage King Tubby / Scientist chain ─────────────────
   // Sources fanning into `input`:
@@ -3447,6 +3456,12 @@ export class DubBus {
           if (!this._sirenLevelGain) {
             this._sirenLevelGain = this.context.createGain();
             this._sirenLevelGain.connect(this.input);
+            // Straight to the return too, as the snare crack goes: into the
+            // bus input alone the siren was heard only through the echo and
+            // spring, 10.7 dB down, and reached the master ~21 dB under the
+            // music - "i saw siren light up but there was no siren sound"
+            // (2026-09-30, measured with measure_dub_echo_response).
+            this._sirenLevelGain.connect(this.return_ as unknown as AudioNode);
           }
           synth.output.connect(this._sirenLevelGain);
           this._sirenSynthConnected = true;
@@ -3457,7 +3472,10 @@ export class DubBus {
       // Set per attack: the programme's level now is what matters, not what it
       // was when the siren was first connected.
       if (this._sirenLevelGain) {
-        const peak = generatedPeak('siren');
+        // The synth's own peak at this note is SIREN_SYNTH_PEAK of full scale:
+        // scale so the siren reaches the peak generatedPeak asks for (it came
+        // out 7.7 dB under it).
+        const peak = generatedPeak('siren') / SIREN_SYNTH_PEAK;
         this._sirenLevelGain.gain.setTargetAtTime(peak, this.context.currentTime, 0.01);
       }
       try { synth.triggerAttack(undefined, midiNote, 1.0); } catch { /* ok */ }
@@ -4313,9 +4331,12 @@ export class DubBus {
     if (this._muteHoldActive) {
       this._pendingPostHoldSettings = merged;
     } else {
-      this.return_.gain.setTargetAtTime(
-        this.enabled ? merged.returnGain : 0, now, 0.02,
-      );
+      // _settle, not a bare setTargetAtTime: a ramp scheduled earlier for a
+      // later time (a swap's or a chain-order splice's restore, scheduled at
+      // boot while the audio clock was still frozen) outlived it and pinned
+      // the return at 0 - the bus enabled, fed and silent after every reload
+      // ("i still hear almost none of the dub moves", 2026-09-30).
+      this._settle(this.return_.gain, this.enabled ? merged.returnGain : 0, now, 0.02);
     }
     // ── Echo engine swap ──────────────────────────────────────────────────
     // When echoEngine changes (character preset or manual selection), tear
@@ -7689,7 +7710,16 @@ export class DubBus {
         const now2 = ctx.currentTime;
         this.return_.gain.cancelScheduledValues(now2);
         this.return_.gain.setValueAtTime(0, now2);
-        this.return_.gain.linearRampToValueAtTime(priorReturnGain, now2 + RAMP_SEC);
+        // The return the bus should have NOW - unless a move is driving it,
+        // then what it was. The value captured before the splice was the bus
+        // state of that moment: at boot the chain order is set while the bus
+        // is still off, the enable lands inside these 25 ms, and restoring the
+        // captured 0 left the bus on and silent (returnGainNode 0, store 0.9;
+        // 2026-09-30).
+        this.return_.gain.linearRampToValueAtTime(
+          this._ownedSettingKeys.has('returnGain') ? priorReturnGain : this._returnGainTarget(),
+          now2 + RAMP_SEC,
+        );
 
         this.input.gain.cancelScheduledValues(now2);
         this.input.gain.setValueAtTime(0, now2);
