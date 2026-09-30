@@ -122,3 +122,5 @@ included the post gains being calibrated.
       itself after a reload and never stops. Likely d32f52032 (saved settings now
       applied at creation: a parameter tick starts the drone). Fix: stop the
       machine after applyConfig. UNCONFIRMED live - owner to retest.
+- [x] O18 Oomek Aggressor 3o3 shows no UI: header type switch set no tb303 (the 303
+      panel needs it); fixed + the editor repairs a saved one on open.

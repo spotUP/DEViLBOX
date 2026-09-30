@@ -122,6 +122,9 @@ function handleSynthTypeChange(
   // Initialize appropriate default config
   switch (newType) {
     case 'TB303': updates.tb303 = { ...DEFAULT_TB303 }; break;
+    // The Oomek Aggressor 3o3 is edited with the 303 panel, which needs tb303:
+    // switching to it cleared tb303 above and set none - "shows no ui".
+    case 'Buzz3o3': updates.tb303 = { ...DEFAULT_TB303 }; break;
     case 'DrumMachine': updates.drumMachine = { ...DEFAULT_DRUM_MACHINE }; break;
     case 'ChipSynth': updates.chipSynth = { ...DEFAULT_CHIP_SYNTH }; break;
     case 'PWMSynth': updates.pwmSynth = { ...DEFAULT_PWM_SYNTH }; break;

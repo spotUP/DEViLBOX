@@ -8,6 +8,7 @@
 import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
+import { DEFAULT_TB303 } from '@typedefs/instrument';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
@@ -727,6 +728,13 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       } catch { /* engine not ready */ }
     })();
   }, [instrument?.id, instrument?.synthType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A 303-panel synth (TB303, Buzz3o3) saved without its tb303 config - e.g.
+  // switched to Buzz3o3 in the header before that set one - rendered no
+  // editor at all. Give it the default once, so the panel appears.
+  useEffect(() => {
+    if (editorMode === 'tb303' && instrument && !instrument.tb303) onChange({ tb303: { ...DEFAULT_TB303 } });
+  }, [editorMode, instrument?.id, !!instrument?.tb303]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============================================================================
   // TB-303 EDITOR
