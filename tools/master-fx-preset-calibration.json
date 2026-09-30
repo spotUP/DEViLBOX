@@ -8,7 +8,8 @@
     "chainDb": 3.4,
     "makeUpDb": -3.4,
     "oldMakeUpDb": 4.7,
-    "at": "2026-09-30T05:30:30.149Z"
+    "at": "2026-09-30T05:30:30.149Z",
+    "songDb": 0.8
   },
   "Chip Metal": {
     "name": "Chip Metal",
@@ -36,7 +37,8 @@
     "chainDb": -3.2,
     "makeUpDb": 3.2,
     "oldMakeUpDb": 4.3,
-    "at": "2026-09-30T05:30:49.799Z"
+    "at": "2026-09-30T05:30:49.799Z",
+    "songDb": 0.2
   },
   "Immersive": {
     "name": "Immersive",
@@ -49,7 +51,8 @@
     "chainDb": -4.6,
     "makeUpDb": 4.6,
     "oldMakeUpDb": 4.2,
-    "at": "2026-09-30T05:30:59.636Z"
+    "at": "2026-09-30T05:30:59.636Z",
+    "songDb": 0
   },
   "Leslie Cabinet": {
     "name": "Leslie Cabinet",
@@ -59,7 +62,8 @@
     "chainDb": -0.8,
     "makeUpDb": 0.8,
     "oldMakeUpDb": 5.5,
-    "at": "2026-09-30T05:31:09.477Z"
+    "at": "2026-09-30T05:31:09.477Z",
+    "songDb": -0.2
   },
   "Hall Reverb": {
     "name": "Hall Reverb",
@@ -69,7 +73,8 @@
     "chainDb": -0.5,
     "makeUpDb": 0.5,
     "oldMakeUpDb": 3.2,
-    "at": "2026-09-30T05:31:19.275Z"
+    "at": "2026-09-30T05:31:19.275Z",
+    "songDb": 0
   },
   "VHS Tape": {
     "name": "VHS Tape",
@@ -81,7 +86,8 @@
     "chainDb": 4.6,
     "makeUpDb": -4.6,
     "oldMakeUpDb": 0.8,
-    "at": "2026-09-30T05:31:29.023Z"
+    "at": "2026-09-30T05:31:29.023Z",
+    "songDb": 0.2
   },
   "Cassette Dub": {
     "name": "Cassette Dub",
@@ -92,7 +98,8 @@
     "chainDb": -1.7,
     "makeUpDb": 1.7,
     "oldMakeUpDb": 0.8,
-    "at": "2026-09-30T05:31:38.794Z"
+    "at": "2026-09-30T05:31:38.794Z",
+    "songDb": -0.2
   },
   "Cassette Deck": {
     "name": "Cassette Deck",
