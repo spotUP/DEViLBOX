@@ -796,6 +796,16 @@ export async function measureDubEchoResponse(params: Record<string, unknown>): P
   }
 }
 
+/** The recent dub move fires and what each did to the bus input, return and master (moveAudibilityLog). */
+export async function getDubMoveAudit(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { getMoveAudit } = await import('../../engine/dub/moveAudibilityLog');
+  const all = getMoveAudit();
+  const n = Math.max(1, Math.min(100, Number(params.last ?? 30)));
+  const recent = all.slice(-n);
+  const silent = recent.filter((r) => r.verdict === 'SILENT').map((r) => r.moveId);
+  return { ok: true, count: recent.length, silent, results: recent };
+}
+
 /**
  * Bus audition (X6) — hold the colour stages down to hear the send itself.
  *

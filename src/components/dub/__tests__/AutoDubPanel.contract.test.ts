@@ -77,15 +77,15 @@ describe('AutoDubPanel — channel seeding regression', () => {
     expect(getAutoDubSeedChannelCount(undefined, 16)).toBe(16);
   });
 
-  // 2026-09-30: the bus input measured 14-36 dB under the mix with the old
-  // halved-and-capped-at-0.45 sends; the owner heard "almost none" of the dub.
-  it('seeds 80 % of the role level, capped at 0.8 so startup does not flood the return', () => {
-    expect(getAutoDubSeedSendLevel(1.0)).toBe(0.8);
-    expect(getAutoDubSeedSendLevel(0.85)).toBeCloseTo(0.68, 6);
+  // Low on purpose: moves open sends, and stand out only against a quiet return
+  // (2026-09-30: at 0.8 the owner's presses raised the return 0-3 dB).
+  it('seeds half the role level, capped at 0.45 so moves have contrast', () => {
+    expect(getAutoDubSeedSendLevel(1.0)).toBe(0.45);
+    expect(getAutoDubSeedSendLevel(0.85)).toBeCloseTo(0.425, 6);
   });
 
-  it('keeps low preset sends audible, never under 0.3', () => {
-    expect(getAutoDubSeedSendLevel(0.2)).toBe(0.3);
+  it('keeps low preset sends audible, never under 0.15', () => {
+    expect(getAutoDubSeedSendLevel(0.2)).toBe(0.15);
   });
 
   it('seeds on every Auto Dub start, not only from the panel toggle', () => {

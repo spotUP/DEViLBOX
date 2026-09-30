@@ -6042,6 +6042,11 @@ export class DubBus {
    * Announcement only — it changes no state and no audio. `settings` still
    * holds what the USER set, which is what a move restores to.
    */
+  /** The bus input and return, for the move audibility log's meters (moveAudibilityLog.ts). */
+  getAuditNodes(): { input: AudioNode; ret: AudioNode } {
+    return { input: this.input, ret: this.return_ };
+  }
+
   /** The input gate's gain for the bus as it is now: open when enabled, shut while disabled or draining. */
   private _inputGainTarget(): number {
     return this.enabled && !this._draining ? 1 : 0;
