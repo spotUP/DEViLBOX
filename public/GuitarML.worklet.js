@@ -101,6 +101,15 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
       case 'reset':
         this.reset();
         break;
+
+      case 'dispose':
+        // The effect was removed: stop, and let process() return false so the
+        // browser can collect the node. Removed amp models used to keep their
+        // processor for the rest of the session - every preset change and
+        // every measured model added one.
+        this.modelLoaded = false;
+        this.disposed = true;
+        break;
     }
   }
 
@@ -337,6 +346,7 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
    * Odd-numbered samples: linear interpolate between previous and next LSTM output.
    */
   process(inputs, outputs) {
+    if (this.disposed) return false;
     const input = inputs[0];
     const output = outputs[0];
 
