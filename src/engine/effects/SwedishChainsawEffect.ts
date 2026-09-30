@@ -30,6 +30,7 @@ export class SwedishChainsawEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
 
   private workletNode: AudioWorkletNode | null = null;
@@ -80,10 +81,16 @@ export class SwedishChainsawEffect extends Tone.ToneAudioNode {
   setTreble(v: number)    { this._options.treble = clamp01(v); this.sendParam(PARAM_TREBLE, v); }
   setVolume(v: number)    { this._options.volume = clamp01(v); this.sendParam(PARAM_VOLUME, v); }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     this._options.wet = clamp01(value);
-    this.wetGain.gain.value = this._options.wet;
+    this.wetGain.gain.value = this._options.wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 
@@ -95,6 +102,7 @@ export class SwedishChainsawEffect extends Tone.ToneAudioNode {
       this.workletNode = new AudioWorkletNode(rawCtx, 'swedishchainsaw-processor');
 
       this.workletNode.port.onmessage = (event) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
           this.sendParam(PARAM_TIGHT, this._options.tight);

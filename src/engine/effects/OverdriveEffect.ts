@@ -29,6 +29,7 @@ export class OverdriveEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -80,6 +81,7 @@ export class OverdriveEffect extends Tone.ToneAudioNode {
       });
 
       this.workletNode.port.onmessage = (e) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (e.data.type === 'ready') {
           console.log('[Overdrive] ⚡ WASM ready! Swapping');
           this.isWasmReady = true;
@@ -153,10 +155,16 @@ export class OverdriveEffect extends Tone.ToneAudioNode {
   setMix(v: number): void { this._mix = clamp01(v); this.sendParam('mix', this._mix); }
   setLevel(v: number): void { this._level = clamp01(v); this.sendParam('level', this._level); }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp01(value);
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._wet;
   }
 

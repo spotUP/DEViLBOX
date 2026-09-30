@@ -42,6 +42,7 @@ export class TapeDegradationEffect extends Tone.ToneAudioNode {
   // Dry/wet mixing
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
 
   // Wow: slow pitch drift
   private wowLFO: Tone.LFO;
@@ -280,10 +281,16 @@ export class TapeDegradationEffect extends Tone.ToneAudioNode {
     this.toneFilter.frequency.rampTo(this.toneShiftToFreq(this._toneShift), 0.1);
   }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp01(value);
-    this.wetGain.gain.rampTo(this._wet, 0.05);
+    this.wetGain.gain.rampTo(this._wet * this._wetPathGain, 0.05);
     this.dryGain.gain.rampTo(1 - this._wet, 0.05);
   }
 

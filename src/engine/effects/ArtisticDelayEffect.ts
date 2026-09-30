@@ -72,6 +72,7 @@ export class ArtisticDelayEffect extends Tone.ToneAudioNode {
         numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
       });
       this.workletNode.port.onmessage = (e) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (e.data.type === 'ready') {
           this.isWasmReady = true;
           for (const p of this.pendingParams) this.workletNode!.port.postMessage({ type: 'parameter', param: p.param, value: p.value });

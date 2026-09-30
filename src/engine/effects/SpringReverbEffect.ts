@@ -117,6 +117,7 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
       this.workletNode = new AudioWorkletNode(rawCtx, 'springreverb-processor');
 
       this.workletNode.port.onmessage = (event) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
           this.sendParam(PARAM_DECAY, this._options.decay);

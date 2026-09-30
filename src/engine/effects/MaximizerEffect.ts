@@ -65,6 +65,7 @@ export class MaximizerEffect extends Tone.ToneAudioNode {
       });
 
       this.workletNode.port.onmessage = (e) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (e.data.type === 'ready') {
           this.isWasmReady = true;
           for (const p of this.pendingParams) {

@@ -130,6 +130,7 @@ export class DattorroPlateEffect extends Tone.ToneAudioNode {
       this.workletNode = new AudioWorkletNode(rawCtx, 'dattorro-plate-processor');
 
       this.workletNode.port.onmessage = (event) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
           this.sendParam(PARAM_PREDELAY,        this._options.predelay);

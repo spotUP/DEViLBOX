@@ -28,6 +28,7 @@ export class DubFilterEffect extends Tone.ToneAudioNode {
   // Dry/Wet
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
 
   // Internal State
   private _options: Required<DubFilterOptions>;
@@ -96,13 +97,19 @@ export class DubFilterEffect extends Tone.ToneAudioNode {
     this.gainNode.gain.rampTo(val, 0.1);
   }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number {
     return this._options.wet;
   }
 
   set wet(value: number) {
     this._options.wet = Math.max(0, Math.min(1, value));
-    this.wetGain.gain.value = this._options.wet;
+    this.wetGain.gain.value = this._options.wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 

@@ -61,6 +61,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
   // Internal routing
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
 
   // WASM worklet
@@ -137,13 +138,19 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
     this.sendParam(PARAM_FILTER_MODE, mode);
   }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number {
     return this._options.wet;
   }
 
   set wet(value: number) {
     this._options.wet = Math.max(0, Math.min(1, value));
-    this.wetGain.gain.value = this._options.wet;
+    this.wetGain.gain.value = this._options.wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 
@@ -173,6 +180,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       this.workletNode = new AudioWorkletNode(rawContext, 'moogfilters-processor');
 
       this.workletNode.port.onmessage = (event) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
           this.sendParam(PARAM_MODEL, this._options.model);

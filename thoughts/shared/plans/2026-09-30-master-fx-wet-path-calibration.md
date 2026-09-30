@@ -87,3 +87,26 @@ included the post gains being calibrated.
       intensity 0.62. Fix: RE201Adapter shares the bus intensity over the heads.
 - [ ] O7 "Big Room" preset (MVerb+StereoWidener+Compressor+EQ3) does not sound
       like a big room - broken?
+- [ ] O8 "Cosmic" preset (FrequencyShifter+PingPongDelay+Reverb) sounds very dirty.
+- [ ] O9 Vinyl-related master FX (VinylNoise, ToneArm, Vinyl, Cassette/VHS/Lo-Fi
+      presets): hiss, pops, crackle and wet far too low - the vinyl character is
+      not audible.
+- [ ] O10 "Big Muff Doom" sounds stuck in a jar, muffled (Neural Big Muff V6 +
+      EQ3 + Reverb). Check after today's skip-connection fix: the model's own
+      tone vs the preset's EQ3/tone settings.
+- [ ] O11 "Vox Amp Crunch" low volume, very thin, all bass gone. DIAGNOSED: the
+      preset runs WAMVoxAmp at wet 40 and its -13.9 dB post compensation sits
+      AFTER the dry/wet mix, so the 60 % dry is cut 13.9 dB too - what is left
+      is mostly the thin amp. Same class as the time-based fix: every drive /
+      amp / EQ entry in EFFECT_GAIN_COMPENSATION_DB is a wet-100 % calibration
+      applied to dry + wet. Fix: in MasterEffectsChain put the compensation on
+      the effect's wet path when it has one (reuse applyWetPathGain as a
+      generic applyWetGain(node, gain)); post gain only for effects with no
+      wet path (buzz machines). Master chain only, as today's post gains are.
+      Then re-measure presets containing those types. Needs the owner's pause:
+      editing these modules reloads the page.
+- [ ] O12 "Aelapse Dub" sounds raw - Aelapse not working? (wet-path gain +1.9 dB
+      added today; check the effect is actually processing).
+- [ ] O13 Jeskola (Buzz) synths: do not sound on the first key press; many have no
+      presets; all use an odd custom preset selector (should be the design-system
+      CustomSelect).

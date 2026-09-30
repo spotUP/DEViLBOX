@@ -20,6 +20,7 @@ export class CabinetSimEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -65,6 +66,7 @@ export class CabinetSimEffect extends Tone.ToneAudioNode {
         numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
       });
       this.workletNode.port.onmessage = (ev) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (ev.data.type === 'ready') {
           this.isWasmReady = true;
           for (const p of this.pendingParams)
@@ -134,10 +136,16 @@ export class CabinetSimEffect extends Tone.ToneAudioNode {
   setMix(v: number): void { this._mix = clamp(v, 0, 1); this.sendParam('mix', this._mix); }
   setBrightness(v: number): void { this._brightness = clamp(v, 0, 1); this.sendParam('brightness', this._brightness); }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp(value, 0, 1);
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._wet;
   }
 

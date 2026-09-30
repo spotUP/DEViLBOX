@@ -23,6 +23,7 @@ export class TapeSaturation extends Tone.ToneAudioNode {
   private outputGain: Tone.Gain;
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
 
   // Parameters
   private _drive: number;
@@ -127,13 +128,19 @@ export class TapeSaturation extends Tone.ToneAudioNode {
     this.toneFilter.frequency.value = this._tone;
   }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number {
     return this._wet;
   }
 
   set wet(value: number) {
     this._wet = Math.max(0, Math.min(1, value));
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._wet;
   }
 
