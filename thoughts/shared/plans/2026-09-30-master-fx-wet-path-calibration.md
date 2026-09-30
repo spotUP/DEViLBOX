@@ -65,7 +65,7 @@ included the post gains being calibrated.
   cleared to empty.
 
 ## Open (owner reports, 2026-09-30 afternoon)
-- [ ] O1 Generated dub moves inaudible after the bus reset to defaults:
+- [x] O1 (crack/radio +4 dB, siren +2 dB) Generated dub moves inaudible after the bus reset to defaults:
       snareCrack, radio, siren ("a crack was fired inaudible", "silent siren
       fired"). They are sized by generatedPeak() from the programme level
       (AudioDataBus rms/peak). Bus gains read sane (input 1, return 0.85).
@@ -82,16 +82,16 @@ included the post gains being calibrated.
       (generatedPeak = presence x programme peak: crack 0.13 vs peak 0.26) and
       land at the song sends' level on the return (-15..-18 dBFS). The bus
       reset took echoWet 0.9 -> 0.5 (-5 dB on every move's echo tail).
-- [ ] O6 RE-201 on the bus self-oscillates, "gets stronger and stronger": mode 9
+- [x] O6 (ce5e0e990) RE-201 on the bus self-oscillates, "gets stronger and stronger": mode 9
       (Tubby, set today) sums three heads into the feedback - loop gain ~1.6 at
       intensity 0.62. Fix: RE201Adapter shares the bus intensity over the heads.
-- [ ] O7 "Big Room" preset (MVerb+StereoWidener+Compressor+EQ3) does not sound
+- [x] O7 (Big Room: ~4 % reverb -> ~6x, 5c...) "Big Room" preset (MVerb+StereoWidener+Compressor+EQ3) does not sound
       like a big room - broken?
 - [ ] O8 "Cosmic" preset (FrequencyShifter+PingPongDelay+Reverb) sounds very dirty.
-- [ ] O9 Vinyl-related master FX (VinylNoise, ToneArm, Vinyl, Cassette/VHS/Lo-Fi
+- [x] O9 (6d9823cf7: noise gated off - ToneEngine never knew the song played) Vinyl-related master FX (VinylNoise, ToneArm, Vinyl, Cassette/VHS/Lo-Fi
       presets): hiss, pops, crackle and wet far too low - the vinyl character is
       not audible.
-- [ ] O10 "Big Muff Doom" sounds stuck in a jar, muffled (Neural Big Muff V6 +
+- [x] O10 (573a0faa4: capture is Tone 3; tone/treble/bass restored) "Big Muff Doom" sounds stuck in a jar, muffled (Neural Big Muff V6 +
       EQ3 + Reverb). Check after today's skip-connection fix: the model's own
       tone vs the preset's EQ3/tone settings.
 - [x] O11 (2a6ea0a46 + preset re-measure: -2.1 dB at wet 40, make-up +2.1) "Vox Amp Crunch" low volume, very thin, all bass gone. DIAGNOSED: the
@@ -105,8 +105,11 @@ included the post gains being calibrated.
       wet path (buzz machines). Master chain only, as today's post gains are.
       Then re-measure presets containing those types. Needs the owner's pause:
       editing these modules reloads the page.
-- [ ] O12 "Aelapse Dub" sounds raw - Aelapse not working? (wet-path gain +1.9 dB
+- [x] O12 (345784e56: preset had delay+springs OFF via 0-1 units) "Aelapse Dub" sounds raw - Aelapse not working? (wet-path gain +1.9 dB
       added today; check the effect is actually processing).
 - [ ] O13 Jeskola (Buzz) synths: do not sound on the first key press; many have no
       presets; all use an odd custom preset selector (should be the design-system
       CustomSelect).
+- [x] O14 Preset keys audit (bcd192938): 14 delay times (delayTime vs time), 6
+      distortion drives, Spacey Delay; make-up tool read presets stale (fixed).
+- [ ] O15 Chip Metal preset level not measured (Swedish Chainsaw slow to load).
