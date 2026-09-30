@@ -764,9 +764,11 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'measure_master_effect',
-    "Measure one master effect's level: stereo pink noise into the master effects input with the chain set to just this effect, level in dB relative to the input (energy of both channels). effectDb = the effect's own output, chainDb = after its compensation gain, compensationDb = the difference. Refuses while playing; the user's master chain is restored afterwards.",
+    "Measure one master effect's level: stereo pink noise into the master effects input with the chain set to just this effect, level in dB relative to the input (energy of both channels). effectDb = the effect's own output, chainDb = after its compensation gain, compensationDb = the difference. With effects, measures a whole chain (a preset) instead: effectDb is its last effect's output. Refuses while playing or while the audio clock is stopped; the user's master chain is restored afterwards.",
     {
-      type: z.string().describe('Effect type, e.g. "SpaceEcho"'),
+      type: z.string().optional().describe('Effect type, e.g. "SpaceEcho" (or pass effects)'),
+      effects: z.array(z.record(z.unknown())).optional().describe('A whole chain (a preset\'s effects); chainDb is then the chain\'s output after gainCompensationDb'),
+      gainCompensationDb: z.number().optional().describe('Preset make-up gain applied with effects (default 0)'),
       category: z.string().optional().describe('tonejs | wasm | buzzmachine | neural | wam (default tonejs)'),
       parameters: z.record(z.unknown()).optional().describe('Effect parameters (default: the effect\'s defaults)'),
       wet: z.number().optional().describe('Wet percent (default 100)'),
