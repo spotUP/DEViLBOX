@@ -87,7 +87,7 @@ included the post gains being calibrated.
       intensity 0.62. Fix: RE201Adapter shares the bus intensity over the heads.
 - [x] O7 (Big Room: ~4 % reverb -> ~6x, 5c...) "Big Room" preset (MVerb+StereoWidener+Compressor+EQ3) does not sound
       like a big room - broken?
-- [ ] O8 "Cosmic" preset (FrequencyShifter+PingPongDelay+Reverb) sounds very dirty.
+- [x] O8 (4a31c356f, owner: "cosmic is good") "Cosmic" preset (FrequencyShifter+PingPongDelay+Reverb) sounds very dirty.
 - [x] O9 (6d9823cf7: noise gated off - ToneEngine never knew the song played) Vinyl-related master FX (VinylNoise, ToneArm, Vinyl, Cassette/VHS/Lo-Fi
       presets): hiss, pops, crackle and wet far too low - the vinyl character is
       not audible.
@@ -107,7 +107,7 @@ included the post gains being calibrated.
       editing these modules reloads the page.
 - [x] O12 (345784e56: preset had delay+springs OFF via 0-1 units) "Aelapse Dub" sounds raw - Aelapse not working? (wet-path gain +1.9 dB
       added today; check the effect is actually processing).
-- [ ] O13 Jeskola (Buzz) synths: do not sound on the first key press; many have no
+- [~] O13 (c6a34352f first note, d32f52032 presets apply; selector: which one? asked) Jeskola (Buzz) synths: do not sound on the first key press; many have no
       presets; all use an odd custom preset selector (should be the design-system
       CustomSelect).
 - [x] O14 Preset keys audit (bcd192938): 14 delay times (delayTime vs time), 6
