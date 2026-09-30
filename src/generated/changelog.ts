@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-09-23T19:40:13.216Z
+ * Generated: 2026-09-30T11:54:22.183Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.7354';
-export const BUILD_NUMBER = '7354';
-export const BUILD_HASH = '80a8c0b0b';
-export const BUILD_DATE = '2026-09-23';
+export const BUILD_VERSION = '1.0.7587';
+export const BUILD_NUMBER = '7587';
+export const BUILD_HASH = '49556bb4f';
+export const BUILD_DATE = '2026-09-30';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,208 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.7354',
-    date: '2026-09-23',
+    version: '1.0.7587',
+    date: '2026-09-30',
     changes: [
       {
         type: 'fix',
-        "description": "Four more dead classes, and the hovers that repainted their own base"
+        "description": "Tool schemas valid for zod 4 - the tool list loads again"
       },
       {
         type: 'fix',
-        "description": "Give the long tail's dead class names a token that exists"
-      },
-      {
-        type: 'improvement',
-        "description": "Correct the mapping — a hover that repaints the base does nothing"
+        "description": "The make-up writer finds double-quoted preset names"
       },
       {
         type: 'fix',
-        "description": "The effects modals and the dialogs get colours that exist"
+        "description": "Drive, amp and dynamics presets levelled after the wet-path move"
       },
       {
         type: 'fix',
-        "description": "The synth panels name colours the theme actually has"
+        "description": "Drive and amp corrections on the wet signal; late worklet messages ignored"
       },
       {
         type: 'fix',
-        "description": "The DJ panels' dead class names become real tokens"
+        "description": "The RE-201 shares the bus's intensity over its heads"
       },
       {
         type: 'fix',
-        "description": "The EQ tab's gain sliders are the design system's fader"
+        "description": "Measure_dub_echo_response fires moves and releases held ones"
       },
       {
         type: 'fix',
-        "description": "A fader occupies the channel's column, down to the mute below it"
+        "description": "Every persona sets its own chain order and head mode"
       },
       {
-        type: 'improvement',
-        "description": "Test(dub): the sweep checks a released move stops driving the bus"
+        type: 'fix',
+        "description": "Echo engines trimmed to unity, not down to the quietest"
       },
       {
-        type: 'improvement',
-        "description": "The mapping for the 222 classes that render as nothing"
+        type: 'fix',
+        "description": "The chain order button says what it does"
       },
       {
-        type: 'improvement',
-        "description": "Chore: drop the PixiJS notice and the last page that loaded it"
+        type: 'fix',
+        "description": "RE-201 modes named as the engine runs them; the bus default is head 1"
       },
       {
         type: 'feature',
-        "description": "The deck drives the controller's lamps"
+        "description": "Measure_dub_echo_response - the dub echo's impulse response"
+      },
+      {
+        type: 'fix',
+        "description": "Master effects aimed at channels play on Hively and UADE songs"
+      },
+      {
+        type: 'fix',
+        "description": "The amp models add their input back, as they were trained"
+      },
+      {
+        type: 'fix',
+        "description": "Removed TapeDelay, ToneArm, Tumult and VinylNoise stop their processors"
+      },
+      {
+        type: 'fix',
+        "description": "A removed guitar amp model stops its audio processor"
+      },
+      {
+        type: 'feature',
+        "description": "Measure_master_effect reports the effect's polarity"
+      },
+      {
+        type: 'fix',
+        "description": "Radiowave and two RE-201 presets levelled on music"
+      },
+      {
+        type: 'fix',
+        "description": "Every guitar amp model comes out at its input's level"
+      },
+      {
+        type: 'feature',
+        "description": "Measure_master_effect can measure on the playing song"
+      },
+      {
+        type: 'fix',
+        "description": "Master FX preset make-ups measured on the calibrated effects"
+      },
+      {
+        type: 'feature',
+        "description": "Measure_master_effect measures whole preset chains"
+      },
+      {
+        type: 'fix',
+        "description": "The four echo engines come out at the same level"
+      },
+      {
+        type: 'fix',
+        "description": "Calibrate delays, reverbs and modulation in their wet path"
+      },
+      {
+        type: 'fix',
+        "description": "The RE-Tape Echo engine no longer self-oscillates at high intensity"
+      },
+      {
+        type: 'fix',
+        "description": "An echo-engine swap restores the bus input the bus should have now"
+      },
+      {
+        type: 'fix',
+        "description": "The liquid sweep colours without adding level; measure_dub_bus_stages"
       },
       {
         type: 'improvement',
-        "description": "The build config and the FPS probe stop naming Pixi"
+        "description": "Test(dub): compressor-bypass contract reads the named sidechain ratio"
       },
       {
         type: 'improvement',
-        "description": "The manual stops teaching a render mode the app does not have"
+        "description": "Test(ci): run this session's regression tests in test:ci"
       },
       {
-        type: 'feature',
-        "description": "The controller's buttons light up to show what is latched"
+        type: 'fix',
+        "description": "Leaving a scratch restores note suppression - the pattern scrolls again"
+      },
+      {
+        type: 'fix',
+        "description": "One control per setting on screen; a twist ends a held drone"
+      },
+      {
+        type: 'fix',
+        "description": "Wet stages pass level through - the return no longer drowns the mix"
+      },
+      {
+        type: 'fix',
+        "description": "The pattern scrolls again after a scratch"
+      },
+      {
+        type: 'fix',
+        "description": "Encoders with a held press turn like every other knob"
+      },
+      {
+        type: 'fix',
+        "description": "Master BASS adds or removes bass on the whole mix - nothing else"
+      },
+      {
+        type: 'fix',
+        "description": "The bus HPF knob filters the bus, not the whole song"
       },
       {
         type: 'improvement',
-        "description": "The comments stop describing a renderer that no longer exists"
+        "description": "One parse path + Amiga notes - 22 of 23, live check done"
+      },
+      {
+        type: 'fix',
+        "description": "One MOD writer - exportAsMOD is exportSongToMOD"
+      }
+    ]
+  },
+  {
+    version: '2026-09-29',
+    date: '2026-09-29',
+    changes: [
+      {
+        type: 'fix',
+        "description": "One parse per format - the tracker and the DJ decks open the same song"
+      },
+      {
+        type: 'fix',
+        "description": "One note naming for every Amiga period - ProTracker's"
+      },
+      {
+        type: 'feature',
+        "description": "The song lights up its instruments and moves the editor playhead"
+      },
+      {
+        type: 'fix',
+        "description": "A MOD note's speed comes from its period, not its number"
+      },
+      {
+        type: 'fix',
+        "description": "Judge a drum as the song plays it, and within its kit"
+      },
+      {
+        type: 'fix',
+        "description": "One role chip, slot numbers, no redundant PCM badge"
+      },
+      {
+        type: 'fix',
+        "description": "Opening the editor no longer switches an imported loop off"
+      },
+      {
+        type: 'feature',
+        "description": "Owner instrument labels as evidence, in the list and over MCP"
+      },
+      {
+        type: 'fix',
+        "description": "Instruments keep the slot number the pattern cells name"
+      },
+      {
+        type: 'feature',
+        "description": "Instrument-first song analyzer"
+      },
+      {
+        type: 'fix',
+        "description": "Changes under __tests__ no longer reload the app tab"
       },
       {
         type: 'improvement',
-        "description": "Remove the last dead Pixi surfaces — a flag nobody sets, tint fields nobody reads"
-      },
-      {
-        type: 'feature',
-        "description": "Controls take a colour by name, not by hex"
+        "description": "Test(classifier): labelled corpus and a scored accuracy ratchet"
       },
       {
         type: 'improvement',
-        "description": "The CRT, lens and wobble settings go, and take their storage with them"
-      },
-      {
-        type: 'fix',
-        "description": "The settings dialog stops advertising a mode that was deleted"
-      },
-      {
-        type: 'improvement',
-        "description": "The drum pad's colour recipe becomes the design system's"
-      },
-      {
-        type: 'feature',
-        "description": "Two blocks, declared row heights, and Layer B as the channel bank"
-      },
-      {
-        type: 'feature',
-        "description": "Nine columns — a channel strip sits in its own fader column"
-      },
-      {
-        type: 'fix',
-        "description": "The controller panel uses the design system the way the editors do"
-      },
-      {
-        type: 'feature',
-        "description": "The fader touch aims the deck, and the strip fits the hardware"
-      },
-      {
-        type: 'feature',
-        "description": "The channel section is strips around one op panel"
-      },
-      {
-        type: 'improvement',
-        "description": "The send fader is the routing, so there is no channel select"
-      },
-      {
-        type: 'improvement',
-        "description": "Design the channel section as strips around one op panel"
-      },
-      {
-        type: 'feature',
-        "description": "The deck can wear the shape of the controller in front of you"
-      },
-      {
-        type: 'fix',
-        "description": "The colour moves land as gestures, and the bus says which stages are in circuit"
-      },
-      {
-        type: 'feature',
-        "description": "The X-Touch Compact drives the dub deck out of the box"
-      },
-      {
-        type: 'fix',
-        "description": "Stop the controller panel collapsing into a thumbnail"
-      },
-      {
-        type: 'fix',
-        "description": "The controller diagram fits its dialog instead of hiding behind scrollbars"
-      },
-      {
-        type: 'fix',
-        "description": "Controller diagram labels stop overlapping, and every control says its address"
-      },
-      {
-        type: 'feature',
-        "description": "The X-Touch Compact's Layer B is mappable"
-      },
-      {
-        type: 'feature',
-        "description": "Every response names the dialog that is blocking the UI"
-      },
-      {
-        type: 'fix',
-        "description": "The per-channel sends open themselves from the store, so the bus is not fed silence"
-      },
-      {
-        type: 'fix',
-        "description": "Remove the return governor — a dub return is meant to run louder than the dry"
-      },
-      {
-        type: 'fix',
-        "description": "A hold fired from MIDI, AutoDub or a lane stays lit until it releases"
-      },
-      {
-        type: 'fix',
-        "description": "Every move colour has an active state — Riddim, Float, Build, Emph, Liquid lit nothing"
-      },
-      {
-        type: 'fix',
-        "description": "The vinyl surface noise stops when the record stops"
-      },
-      {
-        type: 'fix',
-        "description": "Instrument players get their own output, so a live note survives a stop"
-      },
-      {
-        type: 'fix',
-        "description": "Loading a tune no longer destroys the instrument players"
-      },
-      {
-        type: 'fix',
-        "description": "Drop the worklet's once-a-second render heartbeat"
-      },
-      {
-        type: 'fix',
-        "description": "A hand on FX WET or FEEDBACK wins over the move driving it"
-      },
-      {
-        type: 'fix',
-        "description": "BUS tab is one row of faders in two groups"
-      },
-      {
-        type: 'fix',
-        "description": "A full send no longer squeezes the channel card"
-      },
-      {
-        type: 'fix',
-        "description": "Taller deck, full-size card buttons, master card shaped like a channel card"
-      },
-      {
-        type: 'fix',
-        "description": "Channel cards fit the deck — ops as a 3x3 grid beside the fader"
-      },
-      {
-        type: 'fix',
-        "description": "The external feedback loop closes at the echo, not after the compressor"
+        "description": "The replayer's song is liveTrackerSong"
       }
     ]
   }
