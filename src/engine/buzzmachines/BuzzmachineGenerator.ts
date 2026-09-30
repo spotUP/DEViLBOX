@@ -32,6 +32,14 @@ export class BuzzmachineGenerator implements DevilboxSynth {
   private workletNode: AudioWorkletNode | null = null;
   private initInProgress = false;
   private useWasmEngine = false;
+  /**
+   * Note messages sent before the worklet was ready. The first key press
+   * starts the WASM init and used to be dropped: "the jeskola buss synths dont
+   * fire on the first key press" (2026-09-30). Replayed in order on ready,
+   * releases included, so a quick tap still sounds and still stops (V2Synth
+   * queues attacks the same way).
+   */
+  private pendingNoteMessages: Array<Record<string, unknown>> = [];
 
   // Error tracking - no fallback synths, report errors instead
   private initError: Error | null = null;
@@ -189,6 +197,8 @@ export class BuzzmachineGenerator implements DevilboxSynth {
 
       this.useWasmEngine = true;
       console.log(`[BuzzmachineGenerator] ${this.machineType} WASM engine active`);
+      for (const msg of this.pendingNoteMessages) this.workletNode.port.postMessage({ ...msg, time: undefined });
+      this.pendingNoteMessages = [];
     } catch (err) {
       this.initError = err instanceof Error ? err : new Error(String(err));
       this.useWasmEngine = false;
@@ -230,16 +240,19 @@ export class BuzzmachineGenerator implements DevilboxSynth {
     accent?: boolean,
     slide?: boolean
   ): void {
-    // If WASM not available, error was already reported at init
-    if (!this.useWasmEngine || !this.workletNode) {
-      return;
-    }
-
     const freq = noteToFrequency(note);
 
     // Apply filter tracking for 303-style synths
     if (this.is303Style() && this.filterTrackingAmount > 0) {
       this.applyFilterTracking(freq);
+    }
+
+    if (!this.useWasmEngine || !this.workletNode) {
+      // Still loading: play it when ready. Failed: the error was reported at init.
+      if (this.initInProgress) {
+        this.pendingNoteMessages.push({ type: 'noteOn', frequency: freq, velocity: Math.round(velocity * 127), time, accent, slide });
+      }
+      return;
     }
 
     // Send note-on message to WASM
@@ -257,8 +270,8 @@ export class BuzzmachineGenerator implements DevilboxSynth {
    * Release a note
    */
   public triggerRelease(time?: number): void {
-    // If WASM not available, error was already reported at init
     if (!this.useWasmEngine || !this.workletNode) {
+      if (this.initInProgress && this.pendingNoteMessages.length > 0) this.pendingNoteMessages.push({ type: 'noteOff', time });
       return;
     }
 
