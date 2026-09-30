@@ -704,6 +704,9 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     label: 'Scientist',
     description: 'Bright, dry, precise. Plate not spring. ZERO bus compression. Extreme mid-scoop on drops.',
     overrides: {
+      chainOrder:    'echoSpring',  // echo first: distinct repeats. Unset, a preset
+                                    // inherited the bus's order - Perry's spring-first
+                                    // wash once he had been loaded (2026-09-30).
       returnGain:     0.65,
       hpfCutoff:       50,   // was 80 — more sub-bass room
       glueBypass:      true,   // research: "try mastering a song with compression" — he rejected ALL bus comp
@@ -823,6 +826,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     label: 'Prince Jammy',
     description: 'Lloyd "Prince Jammy" James — digital dancehall pioneer (Sleng Teng era). Crisp gated drums, bright Lexicon reverb tails, BBD echo, heavy sidechain. The bridge from analog dub into 80s/90s digital. Cleaner and more groove-locked than Sherwood, less echoey than Tubby.',
     overrides: {
+      chainOrder:    'echoSpring',  // echo first: distinct repeats (see scientist).
       returnGain:     0.80,
       hpfCutoff:      60,
       hpfStepped:     false,
@@ -868,6 +872,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     label: 'Mad Professor',
     description: 'Hi-fi clarity. Low shelf + high shelf air. Wide ping-pong stereo. Lush long springs.',
     overrides: {
+      chainOrder:    'echoSpring',  // echo first: distinct repeats (see scientist).
+      re201DelayMode: 1,            // head 1: clean repeats; the bus has its own spring and plate.
       returnGain:     0.70,
       hpfCutoff:       35,
       hpfStepped:      false,
