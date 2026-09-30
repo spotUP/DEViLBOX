@@ -118,6 +118,7 @@ import { AuditionHold } from '@/lib/dub/auditionHold';
 import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
 import { compressorMakeupTrim } from '@/lib/dub/compressorMakeup';
 import { makeTapeSatCurve } from '@/lib/dub/tapeSatCurve';
+import { sweepBranchNorm, sweepMix } from '@/lib/dub/sweepLevel';
 import { generatedPeak, getProgrammeLevel } from './programmeReference';
 import {
   SILENT_PROGRAMME_PEAK,
@@ -550,7 +551,11 @@ export class DubBus {
   private sweepLfoGain: GainNode;
   private sweepFeedback: GainNode;
   private sweepFeedbackHpf: BiquadFilterNode;
-  private sweepOutput: GainNode;      // wet amount (0..1)
+  private sweepOutput: GainNode;      // wet share of the sweep mix (sweepMix(amount).wet)
+  /** The main path's share of the sweep mix (sweepMix(amount).dry) - see sweepLevel.ts. */
+  private sweepDry!: GainNode;
+  /** The sweep amount now playing (settings, a sweep move, ...). */
+  private _sweepAmountNow = 0;
   // ─── True phaser (CalfPhaser WASM) — alternative to comb sweep ────────
   // Both comb and phaser are permanently wired from sweepInput; their
   // output gains crossfade based on sweepMode. No disconnect/reconnect.
@@ -1389,8 +1394,7 @@ export class DubBus {
     const now = this.context.currentTime;
     const tc = rampSec / 3;
 
-    this.sweepOutput.gain.cancelScheduledValues(now);
-    this.sweepOutput.gain.setTargetAtTime(Math.min(1, Math.max(0, targetAmount)), now, tc);
+    this._setSweepAmount(targetAmount, tc);
     this.sweepLink.set(targetAmount > 0);
 
     this.sweepLfo.frequency.cancelScheduledValues(now);
@@ -1424,8 +1428,7 @@ export class DubBus {
 
     return () => {
       const t = this.context.currentTime;
-      this.sweepOutput.gain.cancelScheduledValues(t);
-      this.sweepOutput.gain.setTargetAtTime(priorAmt, t, 0.05);
+      this._setSweepAmount(priorAmt, 0.05);
       this.sweepLink.set(priorAmt > 0);
       this.sweepLfo.frequency.cancelScheduledValues(t);
       this.sweepLfo.frequency.setTargetAtTime(priorRate, t, 0.08);
@@ -2148,14 +2151,17 @@ export class DubBus {
     this.sweepFeedbackHpf.Q.value = 0.707;
     // Wet send level — 0 disables the branch entirely.
     this.sweepOutput = this.context.createGain();
-    this.sweepOutput.gain.value = this.settings.sweepAmount;
+    this._sweepAmountNow = Math.max(0, Math.min(1, this.settings.sweepAmount));
+    this.sweepOutput.gain.value = sweepMix(this._sweepAmountNow).wet;
+    this.sweepDry = this.context.createGain();
+    this.sweepDry.gain.value = sweepMix(this._sweepAmountNow).dry;
     // Comb and phaser branch gains — crossfade based on sweepMode.
     // Both wired permanently; only one has gain > 0 at a time.
     const isComb = this.settings.sweepMode !== 'phaser';
     this.combOutput = this.context.createGain();
-    this.combOutput.gain.value = isComb ? 1 : 0;
+    this.combOutput.gain.value = isComb ? sweepBranchNorm('comb', this.settings.sweepFeedback ?? 0) : 0;
     this.phaserOutput = this.context.createGain();
-    this.phaserOutput.gain.value = isComb ? 0 : 1;
+    this.phaserOutput.gain.value = isComb ? 0 : sweepBranchNorm('phaser', this.settings.phaserFeedback ?? 0);
     // Phaser — CalfPhaser WASM. Constructed with mix=1 so it outputs
     // effect-only (no dry pass-through; we don't want to double-feed dry).
     this.phaser = new CalfPhaserEffect({
@@ -2579,10 +2585,12 @@ export class DubBus {
     // bassShelf output feeds BOTH the single-path saturator AND the 3-path
     // stack in parallel. The two paths crossfade via tapeSatBypass/tapeStackMix
     // gains on their output side; echo input receives their sum.
-    this.bassShelf.connect(this.tapeSat);
+    // The main path's share of the sweep mix (sweepLevel.ts), then the tape stage.
+    this.bassShelf.connect(this.sweepDry);
+    this.sweepDry.connect(this.tapeSat);
     this.tapeSat.connect(this.tapeSatBypass);
     for (const path of this.tapeStackPaths) {
-      this.bassShelf.connect(path.inGain);
+      this.sweepDry.connect(path.inGain);
     }
     // Parallel liquid-sweep branch — taps after the resonance node so the
     // flanger picks up the post-Altec signal (resonance colors the sweep too).
@@ -3745,6 +3753,9 @@ export class DubBus {
       this.extFeedbackGain.gain,   // external feedback loop
     ], this.context.currentTime, DubBus.AUDITION_RAMP_SEC);
 
+    // The sweep is ducked for the audition, so the main path plays whole.
+    if (started) this._rampSweepDry(1);
+
     // Already auditioning — hand back a releaser for THAT one rather than
     // snapshotting the ducked values as if they were the user's.
     if (!started) return () => { this.endAudition(); };
@@ -3781,6 +3792,8 @@ export class DubBus {
   endAudition(): void {
     if (!this._audition.active) return;
     this._audition.end(this.context.currentTime, DubBus.AUDITION_RAMP_SEC);
+    // The main path takes its share of the sweep mix back.
+    this._rampSweepDry(sweepMix(this._sweepAmountNow).dry);
     this._rampLofiBypassForAudition(false);
     console.log('[DubBus] audition OFF — colour restored');
   }
@@ -3795,9 +3808,42 @@ export class DubBus {
    * what the user asked for. Same intent-versus-reality separation the dub
    * sends use.
    */
+  /**
+   * Set the liquid sweep's amount: the branch's and the main path's shares of
+   * an equal-power mix (sweepLevel.ts), so the sweep colours without adding
+   * level. Every writer (settings, the sweep move and its release) goes
+   * through here. While auditioning, the branch stays ducked (its new share
+   * is noted for the restore) and the main path stays whole.
+   */
+  private _setSweepAmount(amount: number, timeConstant: number): void {
+    this._sweepAmountNow = Math.max(0, Math.min(1, amount));
+    const mix = sweepMix(this._sweepAmountNow);
+    this._setColourStageGain(this.sweepOutput.gain, mix.wet, timeConstant);
+    if (this._audition.active) return;
+    const now = this.context.currentTime;
+    this.sweepDry.gain.cancelScheduledValues(now);
+    this.sweepDry.gain.setTargetAtTime(mix.dry, now, timeConstant);
+  }
+
+  /** The active sweep engine at its unity gain for its feedback; the other off. */
+  private _applySweepBranchGains(m: DubBusSettings, now: number): void {
+    const isPhaser = m.sweepMode === 'phaser';
+    this._settle(this.combOutput.gain, isPhaser ? 0 : sweepBranchNorm('comb', Math.min(0.85, m.sweepFeedback ?? 0)), now, 0.01);
+    this._settle(this.phaserOutput.gain, isPhaser ? sweepBranchNorm('phaser', m.phaserFeedback ?? 0) : 0, now, 0.01);
+  }
+
   private _setColourStageGain(param: AudioParam, value: number, timeConstant: number): void {
     if (this._audition.noteChange(param, value)) return;
     param.setTargetAtTime(value, this.context.currentTime, timeConstant);
+  }
+
+  private _rampSweepDry(target: number): void {
+    const now = this.context.currentTime;
+    try {
+      this.sweepDry.gain.cancelScheduledValues(now);
+      this.sweepDry.gain.setValueAtTime(this.sweepDry.gain.value, now);
+      this.sweepDry.gain.linearRampToValueAtTime(target, now + DubBus.AUDITION_RAMP_SEC);
+    } catch { /* ok */ }
   }
 
   private _rampLofiBypassForAudition(auditioning: boolean): void {
@@ -4353,7 +4399,7 @@ export class DubBus {
     // Liquid sweep params — clamp + smooth. sweepAmount=0 fully silences
     // the branch, and unlinks its LFO from the delay so neither is computed.
     const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
-    this._setColourStageGain(this.sweepOutput.gain, sweepAmt, 0.02);
+    this._setSweepAmount(sweepAmt, 0.02);
     this.sweepLink.set(sweepAmt > 0);
     const sweepRate = Math.max(0.05, Math.min(5, merged.sweepRateHz));
     this._settle(this.sweepLfo.frequency, sweepRate, now, 0.02);
@@ -4361,6 +4407,7 @@ export class DubBus {
     this._settle(this.sweepLfoGain.gain, sweepDepthSec, now, 0.02);
     const sweepFb = Math.max(0, Math.min(0.85, merged.sweepFeedback));
     this._settle(this.sweepFeedback.gain, sweepFb, now, 0.02);
+    this._applySweepBranchGains(merged, now);
     // Tape sat mode crossfade — both gates ramp over 60ms so switching
     // mid-gig doesn't click. Same time constant intentional: gains sum
     // near 1 during the overlap which is fine (quiet crossfade dip is
@@ -4474,19 +4521,20 @@ export class DubBus {
 
     // ─── Sweep mode (comb vs phaser) ───────────────────────────────────────
     if (settings.sweepMode !== undefined || settings.sweepAmount !== undefined) {
-      const isPhaser = merged.sweepMode === 'phaser';
       const amt = Math.max(0, Math.min(1, merged.sweepAmount));
-      // Crossfade: one branch at full gain, other at 0
-      this._settle(this.combOutput.gain, isPhaser ? 0 : 1, now, 0.01);
-      this._settle(this.phaserOutput.gain, isPhaser ? 1 : 0, now, 0.01);
-      this._setColourStageGain(this.sweepOutput.gain, amt, 0.02);
+      // Crossfade: one branch at its unity gain (sweepLevel.ts), other at 0
+      this._applySweepBranchGains(merged, now);
+      this._setSweepAmount(amt, 0.02);
       this.sweepLink.set(amt > 0);
     }
     // Phaser params — update even when mode is 'comb' (no harm, WASM just idles)
     if (settings.phaserRate !== undefined) this.phaser.setRate(merged.phaserRate);
     if (settings.phaserDepth !== undefined) this.phaser.setDepth(merged.phaserDepth);
     if (settings.phaserStages !== undefined) this.phaser.setStages(merged.phaserStages);
-    if (settings.phaserFeedback !== undefined) this.phaser.setFeedback(merged.phaserFeedback);
+    if (settings.phaserFeedback !== undefined) {
+      this.phaser.setFeedback(merged.phaserFeedback);
+      this._applySweepBranchGains(merged, now);
+    }
 
     // ─── Post-echo tape saturation ────────────────────────────────────────
     if (settings.postEchoSatEnabled !== undefined || settings.postEchoSatDrive !== undefined) {
@@ -8076,6 +8124,7 @@ export class DubBus {
     try { this.feedback.disconnect(); } catch { /* ok */ }
     try { this.sidechain.disconnect(); } catch { /* ok */ }
     try { this.glue.disconnect(); } catch { /* ok */ }
+    try { this.sweepDry.disconnect(); } catch { /* ok */ }
     try { this.sidechainTrim.disconnect(); } catch { /* ok */ }
     try { this.glueTrim.disconnect(); } catch { /* ok */ }
     try { this.lpf.disconnect(); } catch { /* ok */ }

@@ -751,6 +751,18 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'measure_dub_bus_stages',
+    'Measure the dub bus stage by stage: pink noise into the bus input, level at each named stage in dB relative to the input (energy of both channels), with optional temporary `settings` (any DubBusSettings fields) restored afterwards. Refuses while playing. Default stages: inputClip, tapeSat, tapeSatBypass, postEchoSatBypass (echo out), _forwardScrubber (spring out), sidechainTrim, glueTrim, lpf, stereoMerge, plateSend, return_.',
+    {
+      settings: z.record(z.unknown()).optional().describe('Temporary dub bus settings, e.g. { echoEngine: "re201", echoWet: 1, echoIntensity: 0.62 }'),
+      stages: z.array(z.string()).optional().describe('DubBus node field names to read'),
+      seconds: z.number().optional().describe('Noise run before reading (1-10, default 3)'),
+      settleMs: z.number().optional().describe('Wait after applying settings (default 2500)'),
+    },
+    (p) => call('measure_dub_bus_stages', p),
+  );
+
+  server.tool(
     'set_dub_bus_audition',
     "Hold the dub bus's PARALLEL colour stages down so you can hear the send itself - plate, ring modulator, lo-fi, the phaser/comb sweep and the external feedback loop all duck, leaving the core wet chain (echo, spring, sidechain, glue, EQ) audible. { on: true } starts it, { on: false } hands the colour back at whatever values it had, including any changed while held. Never writes characterPreset, so a voicing survives being auditioned. Use it to check what a gesture is actually doing without dismantling the user's sound.",
     { on: z.boolean().optional() },

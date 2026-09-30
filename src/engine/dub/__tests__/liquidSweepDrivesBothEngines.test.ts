@@ -50,7 +50,8 @@ describe('the Liquid sweep drives whichever engine is in the path', () => {
 
   it('the two engines are still mutually exclusive — this did not merge them', () => {
     // combOutput/phaserOutput are gated by mode; the fix must not touch that.
-    expect(SRC).toContain('this._settle(this.combOutput.gain, isPhaser ? 0 : 1, now, 0.01);');
-    expect(SRC).toContain('this._settle(this.phaserOutput.gain, isPhaser ? 1 : 0, now, 0.01);');
+    // (Each gate's open value is the engine's unity gain - sweepLevel.ts.)
+    expect(SRC).toContain("this._settle(this.combOutput.gain, isPhaser ? 0 : sweepBranchNorm('comb'");
+    expect(SRC).toContain("this._settle(this.phaserOutput.gain, isPhaser ? sweepBranchNorm('phaser', m.phaserFeedback ?? 0) : 0, now, 0.01);");
   });
 });

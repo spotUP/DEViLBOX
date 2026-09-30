@@ -430,6 +430,85 @@ export async function setDubBusEnabled(params: Record<string, unknown>): Promise
 }
 
 /**
+ * Measure the dub bus stage by stage: pink noise into the bus input, the
+ * level at each named stage relative to the input (both channels' energy - a
+ * mono analyser reads a decorrelated stereo reverb up to 3 dB low), with
+ * optional temporary settings that are restored afterwards.
+ *
+ * Built for the 2026-09-30 calibration ("the echo/reverb is still on
+ * overdrive drowning everything"): probing from evaluate_script imported
+ * stale module copies once the page's resource list filled, so settings went
+ * to a store the live bus no longer read and every row measured the same
+ * thing. This handler lives in the app's own module graph.
+ *
+ * Refuses while the transport plays (the song would be in the measurement).
+ */
+export async function measureDubBusStages(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (useTransportStore.getState().isPlaying) return { error: 'Transport is playing - stop playback first (the song would be in the measurement).' };
+  const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
+  const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
+  const bus = getDrumPadEngine()?.getDubBus() as unknown as Record<string, unknown> | undefined;
+  if (!bus) return { error: 'No dub bus (open the tracker, drum pad or DJ view once).' };
+  const store = useDrumPadStore.getState();
+  const saved = JSON.parse(JSON.stringify(store.dubBus));
+  const override = (params.settings ?? {}) as Record<string, unknown>;
+  const seconds = Math.min(10, Math.max(1, Number(params.seconds ?? 3)));
+  const settleMs = Math.min(15000, Math.max(0, Number(params.settleMs ?? 2500)));
+  const names = (Array.isArray(params.stages) && params.stages.length
+    ? params.stages
+    : ['inputClip', 'tapeSat', 'tapeSatBypass', 'postEchoSatBypass', '_forwardScrubber', 'sidechainTrim', 'glueTrim', 'lpf', 'stereoMerge', 'plateSend', 'return_']) as string[];
+  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  const input = bus.input as GainNode;
+  const ctx = input.context as AudioContext;
+  const taps: Array<{ name: string; node: AudioNode; split: ChannelSplitterNode; a: AnalyserNode[] }> = [];
+  let src: AudioBufferSourceNode | null = null;
+  try {
+    store.setDubBus({ ...override, enabled: true });
+    await wait(settleMs);
+    // An echo-engine swap holds the bus muted and replays settings after it.
+    for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, seed = 12345;
+    for (let i = 0; i < len; i++) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      const w = (seed / 2 ** 32) * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.011; b6 = w * 0.115926;
+    }
+    src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    for (const name of ['input', ...names]) {
+      const node = bus[name] as AudioNode | undefined;
+      if (!node || typeof (node as AudioNode).connect !== 'function') continue;
+      const split = ctx.createChannelSplitter(2);
+      node.connect(split);
+      const a = [0, 1].map((ch) => { const an = ctx.createAnalyser(); an.fftSize = 4096; split.connect(an, ch); return an; });
+      taps.push({ name, node, split, a });
+    }
+    src.connect(input);
+    src.start();
+    await wait(seconds * 1000);
+    const f = new Float32Array(4096);
+    const energy: Record<string, number> = {};
+    for (let i = 0; i < 20; i++) {
+      await wait(80);
+      for (const t of taps) for (const an of t.a) { an.getFloatTimeDomainData(f); let e = 0; for (const x of f) e += x * x; energy[t.name] = (energy[t.name] ?? 0) + e; }
+    }
+    const ref = energy.input || 1e-12;
+    const db: Record<string, number> = {};
+    for (const t of taps) db[t.name] = Math.round(10 * Math.log10((energy[t.name] || 1e-12) / ref) * 10) / 10;
+    const live = bus.settings as Record<string, unknown> | undefined;
+    return { ok: true, relativeToInputDb: db, applied: override, liveEchoEngine: bus._currentEchoEngine ?? live?.echoEngine, liveEchoIntensity: live?.echoIntensity };
+  } finally {
+    try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
+    for (const t of taps) { try { t.node.disconnect(t.split); } catch { /* ok */ } }
+    useDrumPadStore.getState().setDubBus(saved);
+  }
+}
+
+/**
  * Bus audition (X6) — hold the colour stages down to hear the send itself.
  *
  * `{ on: true }` ducks plate, ring modulator, lo-fi, the sweep and the
