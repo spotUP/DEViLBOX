@@ -1136,6 +1136,19 @@ export class DubBus {
           try { this.spring.unmuteInput(); } catch { /* ok */ }
           try { this.spring.unmuteOutput(); } catch { /* ok */ }
           this._muteHoldActive = false;
+          // The return's restore ramp was scheduled when the swap began, with
+          // the bus state of THAT moment: a swap at boot (bus still off) ramped
+          // it to 0, the enable came during the hold, and the replayed settings
+          // did not touch an unchanged returnGain - the bus was on, fed, and
+          // silent (returnGainNode 0, store 0.9; 2026-09-30, "i still hear
+          // almost none of the dub moves"). Land it where the bus is now,
+          // unless a move owns it.
+          if (!this._ownedSettingKeys.has('returnGain')) {
+            const t = this.context.currentTime;
+            this.return_.gain.cancelScheduledValues(t);
+            this.return_.gain.setValueAtTime(this.return_.gain.value, t);
+            this.return_.gain.linearRampToValueAtTime(this._returnGainTarget(), t + RAMP_SEC);
+          }
           // Replay any settings that were suppressed during the hold
           if (this._pendingPostHoldSettings) {
             const pending = this._pendingPostHoldSettings;
@@ -6011,6 +6024,11 @@ export class DubBus {
   /** The input gate's gain for the bus as it is now: open when enabled, shut while disabled or draining. */
   private _inputGainTarget(): number {
     return this.enabled && !this._draining ? 1 : 0;
+  }
+
+  /** The return's gain for the bus as it is now: its setting when enabled, shut while disabled or draining. */
+  private _returnGainTarget(): number {
+    return this.enabled && !this._draining ? this.settings.returnGain : 0;
   }
 
   /** The gain that cancels the sidechain compressor's make-up at these settings. */
