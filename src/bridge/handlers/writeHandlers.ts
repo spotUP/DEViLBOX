@@ -676,6 +676,87 @@ export async function getChannelEffectSlots(params: Record<string, unknown>): Pr
 }
 
 /**
+ * The dub echo's impulse response: a 5 ms noise burst into the bus input,
+ * each named stage recorded for `seconds`, and its envelope (10 ms frames)
+ * read for repeats - the peaks, their times and levels - and `clarity`, the
+ * share of the energy within 20 ms of a peak: near 1 is distinct echoes
+ * ("SKANK skank skank"), low is a wash. Uses the bus as it is set now,
+ * unless `settings` overrides (restored afterwards). Refuses while playing.
+ */
+export async function measureDubEchoResponse(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (useTransportStore.getState().isPlaying) return { error: 'Transport is playing - stop playback first.' };
+  const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
+  const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
+  const { captureLiveAudio } = await import('../../lib/audio/LiveCapture');
+  const bus = getDrumPadEngine()?.getDubBus() as unknown as Record<string, unknown> | undefined;
+  if (!bus) return { error: 'No dub bus (open the tracker, drum pad or DJ view once).' };
+  const store = useDrumPadStore.getState();
+  const saved = JSON.parse(JSON.stringify(store.dubBus));
+  const override = params.settings as Record<string, unknown> | undefined;
+  const seconds = Math.min(8, Math.max(1, Number(params.seconds ?? 4)));
+  const names = (Array.isArray(params.stages) && params.stages.length ? params.stages : ['postEchoSatBypass', 'return_']) as string[];
+  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  const input = bus.input as GainNode;
+  const ctx = input.context as AudioContext;
+  const out: Record<string, unknown> = {};
+  try {
+    if (override) {
+      store.setDubBus({ ...override, enabled: true });
+      await wait(2500);
+      for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
+    } else if (!saved.enabled) {
+      store.setDubBus({ enabled: true });
+      await wait(1500);
+    }
+    for (const name of names) {
+      const node = bus[name] as AudioNode | undefined;
+      if (!node || typeof node.connect !== 'function') { out[name] = { error: 'no such stage' }; continue; }
+      await wait(Number(params.gapMs ?? 3000)); // let the previous tail die
+      const burst = ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.005), ctx.sampleRate);
+      const d = burst.getChannelData(0);
+      let seed = 1; for (let i = 0; i < d.length; i++) { seed = (seed * 1103515245 + 12345) >>> 0; d[i] = ((seed / 2 ** 32) * 2 - 1) * 0.5; }
+      const recorded = await captureLiveAudio(node, () => {
+        const src = ctx.createBufferSource(); src.buffer = burst; src.connect(input); src.start();
+      }, () => { /* nothing held */ }, seconds);
+      const x = recorded.getChannelData(0);
+      const frame = Math.round(ctx.sampleRate * 0.01);
+      const env: number[] = [];
+      for (let i = 0; i + frame <= x.length; i += frame) { let e = 0; for (let k = i; k < i + frame; k++) e += x[k] * x[k]; env.push(e); }
+      const max = Math.max(...env, 1e-20);
+      const peaks: { ms: number; db: number }[] = [];
+      for (let i = 1; i < env.length - 1; i++) {
+        if (env[i] > env[i - 1] && env[i] >= env[i + 1] && env[i] > max * 1e-4 && !peaks.some((p) => Math.abs(p.ms - i * 10) < 40)) {
+          peaks.push({ ms: i * 10, db: Math.round(10 * Math.log10(env[i] / max) * 10) / 10 });
+        }
+      }
+      const total = env.reduce((a, v) => a + v, 0) || 1e-20;
+      let near = 0;
+      env.forEach((v, i) => { if (peaks.some((p) => Math.abs(p.ms - i * 10) <= 20)) near += v; });
+      // onRepeats: of the energy after the burst, the share that lands within
+      // 25 ms of a multiple of the echo time - the repeats themselves - rather
+      // than smeared between them by reverbs. Near 1 = SKANK skank skank.
+      const echoMs = Number(params.echoMs ?? (bus.settings as Record<string, unknown> | undefined)?.echoRateMs ?? 300);
+      let after = 0, onRep = 0;
+      env.forEach((v, i) => {
+        const ms = i * 10;
+        if (ms < 30) return;
+        after += v;
+        const k = Math.round(ms / echoMs);
+        if (k >= 1 && Math.abs(ms - k * echoMs) <= 25) onRep += v;
+      });
+      out[name] = {
+        recordedMs: Math.round((x.length / ctx.sampleRate) * 1000), echoMs,
+        onRepeats: Math.round((onRep / (after || 1e-20)) * 100) / 100,
+        clarity: Math.round((near / total) * 100) / 100, peaks: peaks.filter((p) => p.db > -40).slice(0, 16),
+      };
+    }
+    return { ok: true, echoEngine: (bus.settings as Record<string, unknown> | undefined)?.echoEngine, stages: out };
+  } finally {
+    useDrumPadStore.getState().setDubBus(saved);
+  }
+}
+
+/**
  * Bus audition (X6) — hold the colour stages down to hear the send itself.
  *
  * `{ on: true }` ducks plate, ring modulator, lo-fi, the sweep and the
