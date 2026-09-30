@@ -919,10 +919,10 @@
       "EQ3",
       "Reverb"
     ],
-    "chainDb": 0.2,
-    "makeUpDb": 0,
-    "oldMakeUpDb": -3.4,
-    "at": "2026-09-30T08:19:52.389Z"
+    "chainDb": -0.9,
+    "makeUpDb": 0.9,
+    "oldMakeUpDb": 0,
+    "at": "2026-09-30T12:41:46.834Z"
   },
   "RAT + Delay": {
     "name": "RAT + Delay",
