@@ -41,6 +41,7 @@ export class MultibandEnhancerEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -100,6 +101,7 @@ export class MultibandEnhancerEffect extends Tone.ToneAudioNode {
       });
 
       this.workletNode.port.onmessage = (e) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (e.data.type === 'ready') {
           this.isWasmReady = true;
           for (const p of this.pendingParams) {
@@ -184,10 +186,16 @@ export class MultibandEnhancerEffect extends Tone.ToneAudioNode {
   setHarmonics(v: number): void { this._harmonics = clamp(v, 0, 1); this.sendParam('harmonics', this._harmonics); }
   setMix(v: number): void { this._mix = clamp(v, 0, 1); this.sendParam('mix', this._mix); }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp(value, 0, 1);
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._wet;
   }
 

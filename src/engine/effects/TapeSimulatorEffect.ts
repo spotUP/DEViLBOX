@@ -44,6 +44,7 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -98,6 +99,10 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
       });
 
       this.workletNode.port.onmessage = (event) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
+        // 'ready' can arrive after dispose() nulled the node: a preset switch
+        // mid-load threw "Cannot read properties of null (reading 'port')".
+        if (this._disposed || !this.workletNode) return;
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
           for (const p of this.pendingParams) {
@@ -202,11 +207,17 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
     this.sendParam('speed', this._options.speed);
   }
 
+  /** Level calibration of the wet signal, set by the master chain (EFFECT_GAIN_COMPENSATION_DB). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     this._options.wet = clamp01(value);
     this.dryGain.gain.value = 1 - this._options.wet;
-    this.wetGain.gain.value = this._options.wet;
+    this.wetGain.gain.value = this._options.wet * this._wetPathGain;
   }
 
   setParam(param: string, value: number): void {

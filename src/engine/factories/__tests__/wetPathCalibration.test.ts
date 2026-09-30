@@ -54,3 +54,37 @@ describe('wet-path calibration', () => {
     expect(factory).toContain('cal.connect(crossfadeB);');
   });
 });
+
+/**
+ * The drive / amp / dynamics corrections (EFFECT_GAIN_COMPENSATION_DB) go on
+ * the wet signal too, in the master chain. A gain after the effect cut the dry
+ * signal of a preset running the effect below 100 % wet: Vox Amp Crunch
+ * (WAMVoxAmp -13.9 dB at wet 40) came out "low volume and very thin all bass
+ * gone" (owner, 2026-09-30); measured after, it reads -2.1 dB at wet 40.
+ */
+describe('master chain level corrections', () => {
+  it('try the wet path first, and scale the whole output only when there is none', () => {
+    const chain = src('engine/tone/MasterEffectsChain.ts');
+    expect(chain).toMatch(/compLinear !== 1 && applyWetGain\(node, compLinear\) === 'none'/);
+  });
+
+  // Wrappers whose mix happens inside the worklet keep the gain after them.
+  const MIX_INSIDE = new Set(['ToneArm']);
+  it('every corrected wrapper with a wet gain takes it on its wet path', () => {
+    const table = src('engine/factories/effectGainCompensation.ts');
+    const body = table.slice(table.indexOf('const EFFECT_GAIN_COMPENSATION_DB'), table.indexOf('};', table.indexOf('const EFFECT_GAIN_COMPENSATION_DB')));
+    const types = [...body.matchAll(/^\s+(\w+):\s+([-+]?[0-9.]+),/gm)].filter((m) => Number(m[2]) !== 0).map((m) => m[1]);
+    let checked = 0;
+    for (const t of types) {
+      if (MIX_INSIDE.has(t)) continue;
+      for (const f of [`engine/effects/${t}Effect.ts`, `engine/effects/${t}.ts`]) {
+        if (!existsSync(join(process.cwd(), 'src', f))) continue;
+        const code = src(f);
+        if (!/wetGain/.test(code)) continue;
+        expect(code, t).toMatch(/setWetPathGain\(gain: number\): void/);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
+  });
+});

@@ -129,6 +129,7 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
       this.workletNode = new AudioWorkletNode(rawContext, 'shimmer-reverb-processor');
 
       this.workletNode.port.onmessage = (event) => {
+        if (!this.workletNode) return; // a message after dispose() (a preset switched mid-load)
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
           // Send all params

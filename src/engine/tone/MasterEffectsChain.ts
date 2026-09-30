@@ -4,6 +4,7 @@ import type { EffectConfig } from '@typedefs/instrument';
 import { InstrumentFactory } from '../InstrumentFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { getEffectGainCompensation } from '../factories/effectGainCompensation';
+import { applyWetGain } from '../factories/EffectFactory';
 import { useFormatStore } from '../../stores/useFormatStore';
 import { supportsChannelIsolation } from './ChannelRoutedEffects';
 import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel, channelRoleTargets } from './sidechainKey';
@@ -379,8 +380,14 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
       void wireMasterSidechain(node, scSource);
     }
 
+    // The level correction goes on the effect's WET signal when it has one: a
+    // gain after the effect scaled the dry signal as well, so a preset running
+    // an effect below 100 % wet had its dry cut too - Vox Amp Crunch (WAMVoxAmp,
+    // -13.9 dB, wet 40) played its 60 % dry 13.9 dB down: "low volume and very
+    // thin all bass gone" (2026-09-30). After the effect only when it has no
+    // separate wet path (Buzz machines; mixes done inside the worklet).
     const compLinear = getEffectGainCompensation(config.type);
-    if (compLinear !== 1) {
+    if (compLinear !== 1 && applyWetGain(node, compLinear) === 'none') {
       const compGain = new Tone.Gain(compLinear);
       ctx.masterEffectsNodes.push(compGain); // tracked for disposal
       chainNodes.push(compGain);
