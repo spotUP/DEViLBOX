@@ -510,6 +510,7 @@ export class ToneEngine {
   public static getInstance(): ToneEngine {
     if (!ToneEngine.instance) {
       ToneEngine.instance = new ToneEngine();
+      ToneEngine.instance._followTransport();
       // Expose for console diagnostics (scripts/db303-knob-diag.js)
       (window as unknown as Record<string, unknown>)._toneEngine = ToneEngine.instance;
     }
@@ -1583,6 +1584,31 @@ export class ToneEngine {
   }
 
   /** Notify noise-generating master effects (VinylNoise, Tumult) of playback state. */
+  /**
+   * Follow the song transport's playing state.
+   *
+   * The vinyl / Tumult noise layers run only while `_isPlaying`, and only
+   * ToneEngine.start()/stop() set it - which the song transport never calls.
+   * Every song played with the flag false, so the crackle, hiss and pops were
+   * gated off: "the vinyl crackles etc are not audible" (2026-09-30). One
+   * subscription covers every place the transport starts or stops.
+   */
+  private _followTransport(): void {
+    void import('../stores/useTransportStore').then(({ useTransportStore }) => {
+      let last = useTransportStore.getState().isPlaying;
+      const apply = (playing: boolean) => {
+        this._isPlaying = playing;
+        this._notifyNoiseEffectsPlaying(playing);
+      };
+      if (last) apply(true);
+      useTransportStore.subscribe((state) => {
+        if (state.isPlaying === last) return;
+        last = state.isPlaying;
+        apply(last);
+      });
+    }).catch(() => { /* no transport store (tests) */ });
+  }
+
   private _notifyNoiseEffectsPlaying(playing: boolean): void {
     this.masterEffectConfigs.forEach(({ node }) => {
       if (node instanceof VinylNoiseEffect) {
