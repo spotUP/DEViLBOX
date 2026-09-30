@@ -202,10 +202,8 @@ export interface DubBusSettings {
   pingPongSyncToBpm: boolean;
 
   // ─── RE-201 delay mode ────────────────────────────────────────────────────
-  // Selects the tape-head combination on the RE-201 engine (0-10):
-  //   0=reverb only  1=H1  2=H2  3=H3  4=H1+H2  5=H1+H3  6=H2+H3
-  //   7=H1+reverb   8=H1+H2+reverb  9=H2+H3+reverb (Tubby!)  10=all
-  // Ignored when echoEngine is not 're201'. Default 7 (H1+reverb).
+  // The tape-head combination on the RE-201 engine, 0-10: RE201_DELAY_MODES.
+  // Ignored when echoEngine is not 're201'. Default 1, head 1 only.
   re201DelayMode: number;
 
   // ─── Dub siren preset ────────────────────────────────────────────────────
@@ -352,6 +350,26 @@ export interface DubBusSettings {
   autoEqLastGenre: string;
 }
 
+/**
+ * The RE-201 engine's delay modes, as re201-wasm/RE201WASM.cpp (delayMode
+ * switch) implements them. The one list the type, the panel and the presets
+ * read - the old copies called 9 "H2 + H3 + Reverb", but 9 is all three heads
+ * with no reverb.
+ */
+export const RE201_DELAY_MODES: readonly { value: number; label: string }[] = [
+  { value: 0, label: 'Reverb only' },
+  { value: 1, label: 'Head 1' },
+  { value: 2, label: 'Head 2' },
+  { value: 3, label: 'Head 3' },
+  { value: 4, label: 'Heads 1 + 2' },
+  { value: 5, label: 'Heads 1 + 3' },
+  { value: 6, label: 'Heads 2 + 3' },
+  { value: 7, label: 'Head 1 + Reverb' },
+  { value: 8, label: 'Heads 1 + 2 + Reverb' },
+  { value: 9, label: 'Heads 1 + 2 + 3' },
+  { value: 10, label: 'Heads 1 + 2 + 3 + Reverb' },
+];
+
 export const DEFAULT_DUB_BUS: DubBusSettings = {
   enabled: false,
   // Defaults tuned so dub moves are CLEARLY audible alongside the dry mix.
@@ -422,7 +440,11 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   characterPreset:  'custom',
 
   glueBypass:       false,
-  re201DelayMode:   7,     // H1+reverb — stock RE-201 default
+  // Head 1 only: distinct repeats. The stock RE-201 default (7, head 1 +
+  // its own spring) put a second spring in front of the bus's spring and
+  // plate, and the owner heard the dub echo as reverb: "SKANK skank ..."
+  // is nothing i have heard yet" (2026-09-30). The bus has its own reverbs.
+  re201DelayMode:   1,
   sirenPreset:      'rasta' as const,
   hpfStepped:       false,
   hpfResonanceDb:   0,
@@ -635,9 +657,10 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       tapeSatMode:   'tape15ips',
       echoFeedbackHpfHz: 180,  // was 250 — let more low-end survive echo repeats
       echoFeedbackLpfHz: 5500, // was 3000 — brighter echo tails, less "in a jar"
-      re201DelayMode: 7,       // H1+H2+H3 (three-tap) — was mode 9 (H2+H3+reverb) which caused
-                               // an init beep from the RE-201's internal spring settling.
-                               // Aelapse provides the spring separately; no need for double spring.
+      re201DelayMode: 9,       // H1+H2+H3, no reverb (three-tap). This said 7 with the same
+                               // intent, but 7 is head 1 + the RE-201's own spring - the
+                               // double spring this comment meant to avoid. Aelapse provides
+                               // the spring separately.
       echoEngine:    're201',     // Tubby's MCI → RE-201 signal chain
       chainOrder:    'echoSpring', // echo FIRST (historically correct for Tubby's RE-201):
                                     // dry → RE-201 tape echo → spring. springEcho was borrowed
