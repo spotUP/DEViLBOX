@@ -244,6 +244,9 @@ static void REGPARAM2 chipmem_lput (uaecptr addr, uae_u32 l)
     addr -= chipmem_start & chipmem_mask;
     addr &= chipmem_mask;
     m = (uae_u32 *)(chipmemory + addr);
+#ifdef UADE_WASM
+    uade_wasm_capture_write(addr);
+#endif
     do_put_mem_long (m, l);
 }
 
@@ -253,6 +256,9 @@ static void REGPARAM2 chipmem_wput (uaecptr addr, uae_u32 w)
     addr -= chipmem_start & chipmem_mask;
     addr &= chipmem_mask;
     m = (uae_u16 *)(chipmemory + addr);
+#ifdef UADE_WASM
+    uade_wasm_capture_write(addr);
+#endif
     do_put_mem_word (m, w);
 }
 
