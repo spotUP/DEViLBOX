@@ -464,9 +464,6 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
     return this.workletNode;
   }
 
-  getAudioContext(): AudioContext | null {
-    return this.audioContext;
-  }
 
   /** Isolation slots only (5 outputs): no per-channel dub sends. */
   supportsDubSends(): boolean { return false; }
