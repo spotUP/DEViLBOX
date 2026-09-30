@@ -894,7 +894,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 10, parameters: { drive: 30, tone: 10000 } },
     ] },
-  { name: "Paula's Revenge", description: 'Maximum energy — exciter, bass boost, hard limiting, tape grit', tags: ['Amiga', 'Loud', 'Grit'], gainCompensationDb: -1.4,
+  { name: "Paula's Revenge", description: 'Maximum energy — exciter, bass boost, hard limiting, tape grit', tags: ['Amiga', 'Loud', 'Grit'], gainCompensationDb: 2.1,
     effects: [
       { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 90, amount: 0.5, drive: 0.3, mix: 0.4 } },
       { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 7000, amount: 0.3, blend: 0.3, ceil: 13000 } },
