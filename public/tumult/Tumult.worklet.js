@@ -1333,6 +1333,7 @@ class TumultProcessor extends AudioWorkletProcessor {
     this._editorOpen = false;
 
     this.port.onmessage = (e) => {
+      if (e.data && e.data.type === 'dispose') { this._disposed = true; return; } // removed: stop (process returns false)
       const { type, param, value, bufferL, bufferR, sampleRate: bufferSampleRate } = e.data;
       if (type === 'sample') {
         this.samplePlayer.setBuffer(
@@ -1383,6 +1384,7 @@ class TumultProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
+    if (this._disposed) return false;
     const out0   = outputs[0];
     const outL   = out0[0];
     const outR   = out0[1] ?? out0[0];

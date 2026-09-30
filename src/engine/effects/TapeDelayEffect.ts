@@ -173,6 +173,7 @@ export class TapeDelayEffect extends Tone.ToneAudioNode {
   }
 
   dispose(): this {
+    try { this.workletNode?.port.postMessage({ type: 'dispose' }); } catch { /* */ }
     try { this.workletNode?.disconnect(); } catch { /* */ }
     try { this.dryGain.dispose(); } catch { /* */ }
     try { this.wetGain.dispose(); } catch { /* */ }
