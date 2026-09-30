@@ -184,6 +184,11 @@ static inline int valid_address(uaecptr addr, uae_u32 size)
 extern uint32_t g_uade_last_chip_read_addr;
 extern void uade_wasm_check_wp_read(uint32_t addr, uint32_t value);
 extern void uade_wasm_check_wp_write(uint32_t addr, uint32_t value);
+/* Register-capture match on a write of any width. `addr` is the chip-relative
+ * start address of the access. Byte writes reach this via uade_wasm_check_wp_write;
+ * word/long writes (chipmem_wput/lput) call it directly so a capture armed on a
+ * word field (e.g. Paula period $20) actually fires — chipmem_bput is byte-only. */
+extern void uade_wasm_capture_write(uint32_t addr);
 /* Module-read trace: record chip-RAM reads that fall inside the loaded module
  * region so the frontend can discover which file bytes the player consumes as
  * note/sequence data. `chipAddr` is chip-relative (post chipmem_start subtract);
