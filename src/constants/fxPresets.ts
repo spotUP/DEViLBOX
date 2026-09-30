@@ -847,9 +847,13 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'neural', type: 'Neural', enabled: true, wet: 70, neuralModelIndex: 0, parameters: { drive: 50, tone: 55, level: 85 } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.5, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.6 } },
     ] },
-  { name: 'Big Muff Doom', description: 'Big Muff V6 + massive reverb — fuzzy doom', tags: ['Guitar', 'Loud'],
+  { name: 'Big Muff Doom', description: 'Big Muff V6 + massive reverb — fuzzy doom', tags: ['Guitar', 'Loud'], gainCompensationDb: 0.9,
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 36, parameters: { drive: 70, tone: 40, level: 80 } },
+      // The Big Muff V6 capture is the pedal at Tone 3 (dark): measured 2026-09-30,
+      // 2-8 kHz 9-17 dB down, lows +6 dB - "sounds like it's stuck in a jar".
+      // Tone 90 / treble 70 / bass 40 gives the Muff's scooped shape back: lows
+      // +3, 2 kHz scoop, 4-8 kHz within 3 dB.
+      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 36, parameters: { drive: 70, tone: 90, treble: 70, bass: 40, level: 80 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 0.5, high: -0.5 } },
       { category: 'tonejs', type: 'Reverb', enabled: true, wet: 35, parameters: { decay: 5, preDelay: 0.04 } },
     ] },

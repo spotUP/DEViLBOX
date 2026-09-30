@@ -609,6 +609,18 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
       await wait(seconds * 1000);
     }
     const f = new Float32Array(4096);
+    // Octave-band power (left channel), input vs effect: a level can be right
+    // while the tone is wrong ("sounds like it's stuck in a jar").
+    const BANDS = [63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+    const specIn = new Float32Array(2048), specFx = new Float32Array(2048);
+    const bandIn = new Array(BANDS.length).fill(0), bandFx = new Array(BANDS.length).fill(0);
+    const addBands = (spec: Float32Array, acc: number[]) => {
+      const binHz = ctx.sampleRate / 4096;
+      BANDS.forEach((c, b) => {
+        const lo = Math.floor(c / Math.SQRT2 / binHz), hi = Math.min(spec.length - 1, Math.ceil(c * Math.SQRT2 / binHz));
+        for (let k = lo; k <= hi; k++) acc[b] += 10 ** (spec[k] / 10);
+      });
+    };
     const fIn = new Float32Array(4096), fFx = new Float32Array(4096);
     let xy = 0, xx = 0, yy = 0;
     const energy: Record<string, number> = {};
@@ -623,6 +635,8 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
       // it with the dry signal cancels.
       const inTap = taps.find((t) => t.name === 'input'), fxTap = taps.find((t) => t.name === 'effect');
       if (inTap && fxTap) {
+        inTap.a[0].getFloatFrequencyData(specIn); fxTap.a[0].getFloatFrequencyData(specFx);
+        addBands(specIn, bandIn); addBands(specFx, bandFx);
         inTap.a[0].getFloatTimeDomainData(fIn); fxTap.a[0].getFloatTimeDomainData(fFx);
         for (let k = 0; k < fIn.length; k++) { xy += fIn[k] * fFx[k]; xx += fIn[k] * fIn[k]; yy += fFx[k] * fFx[k]; }
       }
@@ -631,7 +645,9 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
     const ref = energy.input || 1e-12;
     const db = (k: string) => Math.round(10 * Math.log10((energy[k] || 1e-12) / ref) * 10) / 10;
     if (ctx.currentTime === startTime) return { error: 'The audio clock is not running - click the DEViLBOX tab once to start audio.' };
-    return { ok: true, type, wet: Number(params.wet ?? 100), correlation, effectDb: db('effect'), chainDb: db('chain'), compensationDb: Math.round((db('chain') - db('effect')) * 10) / 10 };
+    return { ok: true, type, wet: Number(params.wet ?? 100), correlation,
+      bandsDb: Object.fromEntries(BANDS.map((c, b) => [c, Math.round(10 * Math.log10((bandFx[b] || 1e-20) / (bandIn[b] || 1e-20)) * 10) / 10])),
+      effectDb: db('effect'), chainDb: db('chain'), compensationDb: Math.round((db('chain') - db('effect')) * 10) / 10 };
   } finally {
     try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
     for (const t of taps) { try { t.node.disconnect(t.split); } catch { /* ok */ } }
