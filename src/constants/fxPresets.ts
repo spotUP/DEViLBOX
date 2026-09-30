@@ -498,9 +498,9 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 60, parameters: { decay: 0.65, damping: 0.45, tension: 0.5, mix: 1.0, drip: 0.5, diffusion: 0.65 } },
       { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 2, rate: 300, intensity: 0.5, echoVolume: 0.7, reverbVolume: 0.2, bass: 0.6, treble: 0.4 } },
     ] },
-  { name: 'Aelapse Dub', description: 'Tape delay + spring reverb combo — the Aelapse dub machine', tags: ['Dub', 'Dub Echo', 'Dub Reverb', 'Delay', 'Creative'], gainCompensationDb: -1.2,
+  { name: 'Aelapse Dub', description: 'Tape delay + spring reverb combo — the Aelapse dub machine', tags: ['Dub', 'Dub Echo', 'Dub Reverb', 'Delay', 'Creative'], gainCompensationDb: 1.5,
     effects: [
-      { category: 'wasm', type: 'Aelapse', enabled: true, wet: 60, parameters: { delayActive: 1, delayDryWet: 0.5, delaySeconds: 0.375, delayFeedback: 0.55, delayCutLow: 200, delayCutHi: 4000, delaySaturation: 0.3, delayDrift: 0.2, delayMode: 0, springsActive: 1, springsDryWet: 0.4, springsWidth: 0.7, springsLength: 0.6, springsDecay: 0.5, springsDamp: 0.4, springsShape: 0.5, springsTone: 0.5, springsScatter: 0.3, springsChaos: 0.2 } },
+      { category: 'wasm', type: 'Aelapse', enabled: true, wet: 60, parameters: { delayActive: 100, delayDryWet: 50, delayTime: 27.0, delayFeedback: 45.8, delayCutLow: 44.3, delayCutHi: 24.6, delaySaturation: 30, delayDrift: 20, delayMode: 0, springsActive: 100, springsDryWet: 40, springsWidth: 70, springsLength: 60, springsDecay: 50, springsDamp: 40, springsShape: 50, springsTone: 50, springsScatter: 30, springsChaos: 20 } },
     ] },
 
   // ═══ DUB — MAD PROFESSOR (MVerb-tuned PCM-70 voicing) ═══

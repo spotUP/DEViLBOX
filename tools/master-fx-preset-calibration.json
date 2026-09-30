@@ -445,11 +445,10 @@
     "types": [
       "Aelapse"
     ],
-    "chainDb": 1.2,
-    "makeUpDb": -1.2,
-    "oldMakeUpDb": 1.2,
-    "at": "2026-09-30T05:36:35.944Z",
-    "songDb": 0.2
+    "chainDb": -1.5,
+    "makeUpDb": 1.5,
+    "oldMakeUpDb": -1.2,
+    "at": "2026-09-30T12:08:33.192Z"
   },
   "Mad Professor Studio": {
     "name": "Mad Professor Studio",
