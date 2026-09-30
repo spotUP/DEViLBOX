@@ -1977,6 +1977,9 @@ function tickImpl(): void {
 
 export function startAutoDub(): void {
   if (_timer !== null) return;
+  // Give the performer material on every start - panel, reload, MCP - not only
+  // when the panel's toggle was clicked (it held the seeding until 2026-09-30).
+  void import('@/lib/dub/seedAutoDubSends').then(({ seedAutoDubSends }) => seedAutoDubSends()).catch(() => { /* stores not ready */ });
   _enableTimeMs = performance.now();
   _lastBar = -1;
   _lastGlobalFireBar = -99;

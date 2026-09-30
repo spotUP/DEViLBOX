@@ -184,5 +184,14 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   if (song.preload !== false && song.instruments.some((i) => i.synthType && i.synthType !== 'Synth')) {
     await engine.preloadInstruments(song.instruments);
   }
+  // Auto Dub running across a song load (a reload restores the song after Auto
+  // Dub has started): the song's mixer just replaced the channel sends, so give
+  // the performer its starting sends for this song. A send the song itself set
+  // is kept.
+  try {
+    const { isAutoDubRunning } = await import('@/engine/dub/AutoDub');
+    if (isAutoDubRunning()) (await import('@/lib/dub/seedAutoDubSends')).seedAutoDubSends();
+  } catch { /* Auto Dub not loaded */ }
+
   console.log(`[applySong] ${source}: "${song.metadata.name}" - ${song.patterns.length} patterns, ${song.instruments.length} instruments, editor ${useFormatStore.getState().editorMode}`);
 }

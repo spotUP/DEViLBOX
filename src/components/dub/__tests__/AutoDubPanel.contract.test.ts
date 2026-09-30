@@ -77,13 +77,23 @@ describe('AutoDubPanel — channel seeding regression', () => {
     expect(getAutoDubSeedChannelCount(undefined, 16)).toBe(16);
   });
 
-  it('caps hot preset sends so AutoDub startup does not flood the wet return', () => {
-    expect(getAutoDubSeedSendLevel(1.0)).toBe(0.45);
-    expect(getAutoDubSeedSendLevel(0.85)).toBe(0.425);
+  // 2026-09-30: the bus input measured 14-36 dB under the mix with the old
+  // halved-and-capped-at-0.45 sends; the owner heard "almost none" of the dub.
+  it('seeds 80 % of the role level, capped at 0.8 so startup does not flood the return', () => {
+    expect(getAutoDubSeedSendLevel(1.0)).toBe(0.8);
+    expect(getAutoDubSeedSendLevel(0.85)).toBeCloseTo(0.68, 6);
   });
 
-  it('keeps low preset sends audible instead of collapsing to near-zero', () => {
-    expect(getAutoDubSeedSendLevel(0.2)).toBe(0.15);
+  it('keeps low preset sends audible, never under 0.3', () => {
+    expect(getAutoDubSeedSendLevel(0.2)).toBe(0.3);
+  });
+
+  it('seeds on every Auto Dub start, not only from the panel toggle', () => {
+    expect(read('engine/dub/AutoDub.ts')).toMatch(/export function startAutoDub\(\): void \{[\s\S]{0,400}seedAutoDubSends\(\)/);
+  });
+
+  it("uses the Auto Dub persona's role sends when the bus preset is 'custom'", () => {
+    expect(read('lib/dub/seedAutoDubSends.ts')).toContain("busPreset !== 'custom' ? busPreset : useDubStore.getState().autoDubPersona");
   });
 });
 

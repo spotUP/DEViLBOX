@@ -388,6 +388,8 @@ export function getMixerState(): Record<string, unknown> {
       muted: ch.muted,
       soloed: ch.soloed,
       effects: ch.effects,
+      /** Send into the dub bus, 0-1. */
+      dubSend: ch.dubSend,
     })),
   };
 }
