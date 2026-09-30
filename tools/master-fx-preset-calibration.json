@@ -726,10 +726,11 @@
       "Tremolo"
     ],
     "chainDb": -8.1,
-    "makeUpDb": 8.1,
+    "makeUpDb": 2.1,
     "oldMakeUpDb": 20.2,
     "at": "2026-09-30T05:40:21.006Z",
-    "songDb": 6
+    "songDb": 6,
+    "songCorrected": true
   },
   "Haunted": {
     "name": "Haunted",
@@ -818,10 +819,11 @@
       "RE201"
     ],
     "chainDb": -2.7,
-    "makeUpDb": 2.7,
+    "makeUpDb": 0.1,
     "oldMakeUpDb": -2,
     "at": "2026-09-30T05:41:39.346Z",
-    "songDb": 2.6
+    "songDb": 2.6,
+    "songCorrected": true
   },
   "RE-201 Spring Only": {
     "name": "RE-201 Spring Only",
@@ -874,10 +876,11 @@
       "DattorroPlate"
     ],
     "chainDb": -7,
-    "makeUpDb": 7,
+    "makeUpDb": 4.9,
     "oldMakeUpDb": -4,
     "at": "2026-09-30T05:42:28.372Z",
-    "songDb": 2.1
+    "songDb": 2.1,
+    "songCorrected": true
   },
   "Clean Fender": {
     "name": "Clean Fender",
