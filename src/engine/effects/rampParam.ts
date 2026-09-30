@@ -58,7 +58,9 @@ export function rampDryWet(
   wet: number,
   now: number,
   rampSec: number = PARAM_RAMP_SEC,
+  /** The effect's wet-path level calibration (effectGainCompensation WET_PATH_GAIN_DB). */
+  wetScale = 1,
 ): void {
   rampParam(dryGain, 1 - wet, now, rampSec);
-  rampParam(wetGain, wet, now, rampSec);
+  rampParam(wetGain, wet * wetScale, now, rampSec);
 }

@@ -28,6 +28,7 @@ export class TapeDelayEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private workletNode: AudioWorkletNode | null = null;
   private _pendingParams = new Map<string, number>();
 
@@ -144,10 +145,16 @@ export class TapeDelayEffect extends Tone.ToneAudioNode {
   setFlutterRate(v: number)  { this._flutterRate  = Math.max(1, Math.min(20, v));    this._send('flutterRate',  this._flutterRate);  }
   setFlutterDepth(v: number) { this._flutterDepth = Math.max(0, Math.min(1, v));     this._send('flutterDepth', this._flutterDepth); }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = Math.max(0, Math.min(1, value));
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._wetPathGain;
   }
 
   setParam(param: string, value: number): void {

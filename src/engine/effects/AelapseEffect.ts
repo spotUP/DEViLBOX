@@ -137,6 +137,7 @@ export class AelapseEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
@@ -220,11 +221,17 @@ export class AelapseEffect extends Tone.ToneAudioNode {
     this.setParamById(dspId, value);
   }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     this._options.wet = Math.max(0, Math.min(1, value));
     this.dryGain.gain.value = 1 - this._options.wet;
-    this.wetGain.gain.value = this._outputMuted ? 0 : this._options.wet;
+    this.wetGain.gain.value = this._outputMuted ? 0 : this._options.wet * this._wetPathGain;
   }
 
   /* JS-graph-level output mute. Zeros wetGain so WASM output is silenced
@@ -239,7 +246,7 @@ export class AelapseEffect extends Tone.ToneAudioNode {
   }
   unmuteOutput(): void {
     this._outputMuted = false;
-    this.wetGain.gain.value = this._options.wet;
+    this.wetGain.gain.value = this._options.wet * this._wetPathGain;
   }
 
   /* JS-graph-level input mute. Zeros the input gain so the WASM worklet

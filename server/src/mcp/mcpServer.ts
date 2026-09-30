@@ -763,6 +763,21 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'measure_master_effect',
+    "Measure one master effect's level: stereo pink noise into the master effects input with the chain set to just this effect, level in dB relative to the input (energy of both channels). effectDb = the effect's own output, chainDb = after its compensation gain, compensationDb = the difference. Refuses while playing; the user's master chain is restored afterwards.",
+    {
+      type: z.string().describe('Effect type, e.g. "SpaceEcho"'),
+      category: z.string().optional().describe('tonejs | wasm | buzzmachine | neural | wam (default tonejs)'),
+      parameters: z.record(z.unknown()).optional().describe('Effect parameters (default: the effect\'s defaults)'),
+      wet: z.number().optional().describe('Wet percent (default 100)'),
+      neuralModelIndex: z.number().optional(),
+      seconds: z.number().optional().describe('Noise run before reading (1-10, default 3)'),
+      settleMs: z.number().optional().describe('Wait after building the effect (default 3000)'),
+    },
+    (p) => call('measure_master_effect', p),
+  );
+
+  server.tool(
     'set_dub_bus_audition',
     "Hold the dub bus's PARALLEL colour stages down so you can hear the send itself - plate, ring modulator, lo-fi, the phaser/comb sweep and the external feedback loop all duck, leaving the core wet chain (echo, spring, sidechain, glue, EQ) audible. { on: true } starts it, { on: false } hands the colour back at whatever values it had, including any changed while held. Never writes characterPreset, so a voicing survives being auditioned. Use it to check what a gesture is actually doing without dismantling the user's sound.",
     { on: z.boolean().optional() },

@@ -39,6 +39,7 @@ export class MVerbEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
   private passthroughGain: Tone.Gain;
 
   private workletNode: AudioWorkletNode | null = null;
@@ -95,10 +96,16 @@ export class MVerbEffect extends Tone.ToneAudioNode {
   setMix(v: number) { this._options.mix = clamp01(v); this.sendParam(PARAM_MIX, v); }
   setEarlyMix(v: number) { this._options.earlyMix = clamp01(v); this.sendParam(PARAM_EARLYMIX, v); }
 
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
+  }
+
   get wet(): number { return this._options.wet; }
   set wet(value: number) {
     this._options.wet = clamp01(value);
-    this.wetGain.gain.value = this._options.wet;
+    this.wetGain.gain.value = this._options.wet * this._wetPathGain;
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 

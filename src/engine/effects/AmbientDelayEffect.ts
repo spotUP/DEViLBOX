@@ -64,6 +64,7 @@ export class AmbientDelayEffect extends Tone.ToneAudioNode {
   // Dry/Wet
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private _wetPathGain = 1;
 
   private _options: Required<AmbientDelayOptions>;
 
@@ -291,8 +292,14 @@ export class AmbientDelayEffect extends Tone.ToneAudioNode {
 
   set wet(value: number) {
     this._options.wet = clamp01(value);
-    this.wetGain.gain.rampTo(this._options.wet, 0.05);
+    this.wetGain.gain.rampTo(this._options.wet * this._wetPathGain, 0.05);
     this.dryGain.gain.rampTo(1 - this._options.wet, 0.05);
+  }
+
+  /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
+  setWetPathGain(gain: number): void {
+    this._wetPathGain = gain;
+    this.wet = this.wet;
   }
 
   get wet(): number {

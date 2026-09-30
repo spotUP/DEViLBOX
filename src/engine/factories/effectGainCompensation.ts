@@ -10,6 +10,15 @@
  */
 
 const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
+  // ── Delays, reverbs, modulation: NO post gain (2026-09-30) ──
+  // Their level is in the wet path now (WET_PATH_GAIN_DB below). The post
+  // gains they had (+6 on RE-Tape Echo, +4.5 on Chorus, -3 on Phaser ...) moved
+  // the dry signal with the wet and several pointed the wrong way: Chorus is at
+  // unity and came out +4.2 dB.
+  // Buzz machines ignore the app's wet %, so their output IS their wet path:
+  FSMChorus:        -3.5,
+  FSMChorus2:       +4.1,
+  FSMPanzerDelay:   -2.6,
   // ── Recalibrated 2026-09-29: drive, saturation, EQ, amps, Buzz distortions ──
   // In-app, pink noise at -18 dBFS RMS (a mix's level), 20 Hz high-passed,
   // centre, wet 100 % (tools/master-fx-response-audit.ts --broadband). These
@@ -43,45 +52,24 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   // ceiling, and a boost after them defeats it - Maximizer at -1 dBFS came out
   // at +2.7 dBFS (2026-09-29). Same class as SidechainLimiter below.
   Maximizer:        0,
-  MultiChorus:      +3.1,   // was quiet, boost
   AutoSat:          -4.1,
   AutoWah:          -3.0,
   // FrequencyShifter: 0 - measured at unity (2026-09-29).
   // PitchShift: 0 - measured at unity (2026-09-29).
   // StereoWidener: 0 - measured at unity (2026-09-29).
-  Phaser:           -3.0,
   Compressor:       -2.5,
-  Vibrato:          -2.5,
-  Reverb:           -2.6,
   X42Comp:          +2.4,   // was quiet, boost
   // Exciter: 0 - rebuilt 2026-09-29 to add only harmonics above its band (the
   // old one boosted the band itself); a static cut here took 2.2 dB off the
   // whole signal, lows included.
   Exciter:          0,
-  Flanger:          +2.2,   // was quiet, boost
-  RingMod:          +2.1,   // was quiet, boost
   AGC:              -2.1,
-  Delay:            -2.0,
-  FeedbackDelay:    -2.0,
-  PingPongDelay:    -2.0,
-  Tremolo:          -2.0,
   ToneArm:          -2.0,
-  ReverseDelay:     +1.9,   // was quiet, boost
   Limiter:          0,      // ceiling device - see Maximizer
-  JunoChorus:       +1.6,   // was quiet, boost
   GOTTComp:         -1.6,
-  VintageDelay:     -1.5,
-  ArtisticDelay:    -1.4,
   DubFilter:        -1.5,
   // EQ3: 0 - measured at unity (2026-09-29).
-  Roomy:            +1.4,   // was quiet, boost
-  CalfPhaser:       -1.4,
-  ZamDelay:         -1.3,
   MultibandGate:    +1.1,   // was quiet, boost
-  AutoPanner:       -1.0,
-  BiPhase:          -1.0,
-  Pulsator:         +1.0,   // was quiet, boost
-  Della:            -0.9,
   Panda:            +0.8,   // was quiet, boost
   PhonoFilter:      +1.2,   // was quiet, boost
   MultibandEnhancer: +1.2,  // was quiet, boost
@@ -89,30 +77,17 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   // ── Measured very quiet — boost output ──
   MultibandLimiter:    0,  // ceiling device - see Maximizer
   SidechainLimiter:    0, // Dynamics processor — no static compensation
-  SlapbackDelay:       +4.7,
   HaasEnhancer:        +4.8,
   MultiSpread:         +2.3,
-  EarlyReflections:    +0.5,
 
   // ── Legacy calibrated (prior session) ──
-  SpaceyDelayer:       +6.0,
-  RETapeEcho:          +6.0,
   SidechainCompressor: 0, // Dynamics processor — no static compensation (output varies by design)
-  AmbientDelay:        +5.0,
-  Chorus:              +4.5,
-  JCReverb:            +3.0,
   Chebyshev:        +8.0,
 
   // ── Migrated from old per-node wrapper table (EffectFactory) ──
-  MVerb:               -1.0,
-  SpringReverb:        -1.5,
   // ShimmerReverb: 0 - its output gain is set at source since 2026-09-29.
   Freeverb:            -1.5,
-  SpaceEcho:           -2.0,
-  Aelapse:             -1.5,
   SwedishChainsaw:  +4.3,   // 2026-09-29, headless pink -18 dBFS centre, defaults (source trim is set for a guitar DI)
-  Leslie:              -1.0,
-  WAMStonePhaser:      -0.5,
   VinylNoise:          -1.0,
   Filter:              +1.5,
   AutoFilter:          +1.5,
@@ -124,6 +99,48 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   WAMQuadraFuzz:    -11.5,
   WAMVoxAmp:        -13.9,
 };
+
+/**
+ * Wet-path level calibration (dB) for delays, reverbs and modulation.
+ *
+ * The negative of each effect's own level at its defaults, wet 100 %, measured
+ * 2026-09-30 in the app (MCP measure_master_effect: stereo centre pink noise
+ * into the master effects input, energy of both channels;
+ * tools/master-fx-wet-calibration.ts). Applied by the effect factory to the
+ * WET signal only - Tone.js effects through `effectReturn`, the wrappers
+ * through `setWetPathGain` - so the dry signal stays at unity at any wet %.
+ * Within 1 dB: no entry. Tremolo, AutoPanner and Pulsator are exempt: their
+ * peaks already equal the input and the lower average is the effect.
+ * The dub bus builds its echo, spring and plate itself and keeps its own
+ * calibration (its parameters are not these defaults).
+ */
+const WET_PATH_GAIN_DB: Record<string, number> = {
+  // Tone.js (effectReturn)
+  Reverb: +2.0, JCReverb: +3.8, Delay: -3.9, FeedbackDelay: -3.9, PingPongDelay: -2.5,
+  // Delays
+  SpaceyDelayer: +3.9, RETapeEcho: +2.2, RE201: -3.6, AnotherDelay: -6.7, AmbientDelay: -1.2,
+  ArtisticDelay: +2.7, Della: +4.1, ReverseDelay: +2.1, SlapbackDelay: +2.8, VintageDelay: +3.2,
+  ZamDelay: +2.4, TapeDelay: -1.6, WAMPingPongDelay: -1.8, WAMFaustDelay: -5.4,
+  // Reverbs
+  MVerb: +1.2, MadProfessorPlate: +2.6, DattorroPlate: -1.2, SpringReverb: +4.5, Aelapse: +1.9,
+  DragonflyHall: -2.7, DragonflyPlate: -3.3, DragonflyRoom: -4.9, EarlyReflections: +2.6, Roomy: +3.1,
+  // Modulation
+  BiPhase: -5.3, Leslie: +7.1, CalfPhaser: -1.3, Flanger: +2.3, JunoChorus: +3.1, MultiChorus: +4.5,
+  RingMod: +4.3,
+};
+// TapeDelay keeps its dry signal at 1 at every wet (additive); it read +3.9 dB
+// with the dry in, so its wet alone is +1.6 dB.
+
+/** Linear wet-path gain for the effect type (1 when it has no entry). */
+export function getWetPathGain(type: string): number {
+  const db = WET_PATH_GAIN_DB[type] ?? 0;
+  return db === 0 ? 1 : Math.pow(10, db / 20);
+}
+
+/** The types with a wet-path calibration. */
+export function wetPathCalibratedTypes(): string[] {
+  return Object.keys(WET_PATH_GAIN_DB);
+}
 
 /**
  * Return the gain compensation in dB for the given effect type.
