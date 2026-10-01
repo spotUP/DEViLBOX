@@ -43,6 +43,16 @@ returnGainNode  0.85      return level no longer collapsed
 ```
 Non-return fields survived the repair as saved (`springWet: 1`, `hpfCutoff: 20`, `stereoWidth: 0`, `masterBassDb: -12`, `midScoopGainDb: -12`).
 
+The measurement probe itself was verified live on the same machine, since it is the code path that used to persist:
+
+| | before probe | probe | after probe |
+| --- | --- | --- | --- |
+| store `echoEngine` | `re201` | `spaceEcho` | `re201` |
+| store `echoRateMs` | `300` | `777` | `300` |
+| `localStorage` size | 167155 B | — | 167155 B, byte-identical |
+
+The probe's own sentinel (`liveEchoEngine: spaceEcho`) confirms it drove the real bus rather than being short-circuited. The `return_` stage tap — the same tap that read **-137 dB** on the dead bus — now reads **0 dB relative to input**.
+
 ## Not included
 
 - **Attribution of the writer.** The saved CC minima identify a plausible source (a CC sweep/virtual-MIDI pass), but that cannot be proven after the fact. This PR makes the state recoverable; it does not add a write audit.
