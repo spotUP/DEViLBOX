@@ -521,6 +521,64 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   autoEqLastGenre:  '',
 };
 
+/**
+ * The tail fields a dead return takes with it. Restored from factory when the
+ * return is found closed — see `repairDeadDubBusVoicing`.
+ */
+const DUB_TAIL_FIELDS = [
+  'returnGain',
+  'echoWet',
+  'echoIntensity',
+  'echoRateMs',
+] as const satisfies readonly (keyof DubBusSettings)[];
+
+/**
+ * Is this bus able to make a sound at all?
+ *
+ * `DubBus.return_` is the last node before the master and the ONLY route to
+ * the speakers for the whole wet bus: the echo, the spring, and every
+ * generated move layer (siren, stab, crack, sub, reverse) connect to it. A
+ * return at zero is not a quiet mix, it is a mute with extra steps — measured
+ * live at -137 dB on the return while every stage upstream of it carried
+ * signal normally.
+ */
+export function isDubBusAudible(settings: Partial<DubBusSettings>): boolean {
+  // Not `=== 0`: a stored value can also be missing or corrupt, and both kill
+  // the bus just as thoroughly.
+  return settings.returnGain !== undefined && settings.returnGain > 0;
+}
+
+/**
+ * A dub bus saved with its return closed is wreckage, not a voicing.
+ *
+ * `setDubBus` persists the whole voicing on every write, from every source —
+ * the panel knobs, a controller CC (`parameterRouter.ts` maps the wet bank to
+ * CC47-53 and writes straight through), an MCP `set_dub_bus_settings`, a
+ * measurement probe. Boot rehydrates it verbatim, so one machine write of a
+ * control bank used to end every later session with a bus that lit its buttons
+ * and moved no air: "moves light up but there is no siren sound".
+ *
+ * The repair is deliberately narrow. A closed return is the one state with no
+ * reading — there is no mix you can want from a bus that cannot be heard, and
+ * it is the exact shape a bank dumped to its minimums leaves behind. So the
+ * TAIL fields (the ones that decide whether a dub tail exists at all) go back
+ * to factory. Everything else is the performer's: an open return is honoured
+ * however quiet, a dry echo is a real decision, and spring mix, HPF, stereo
+ * width, colouring and EQ are all left exactly as saved.
+ *
+ * Deliberately NOT a schema-version bump. The store's version gate discards
+ * the entire key on a bump — every program, pad and MIDI mapping with it —
+ * and none of that is broken.
+ */
+export function repairDeadDubBusVoicing(merged: DubBusSettings): DubBusSettings {
+  if (isDubBusAudible(merged)) return merged;
+  const repaired: DubBusSettings = { ...merged };
+  for (const field of DUB_TAIL_FIELDS) {
+    repaired[field] = DEFAULT_DUB_BUS[field];
+  }
+  return repaired;
+}
+
 /** The 11 stepped positions of the Altec 9069B filter, per audiothing.net/
  *  pasttofuturereverbs.gumroad.com. Discrete positions the original unit
  *  clicked through — reproducing this is what gives the "Big Knob" sweep

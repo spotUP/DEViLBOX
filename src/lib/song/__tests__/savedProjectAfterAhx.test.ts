@@ -1,5 +1,6 @@
 /**
- * A saved project loads as a whole song: its own editor mode, its mixer.
+ * A saved project loads as a whole song: its own editor mode, its mixer, its
+ * dub bus.
  *
  * The three project restores (boot / recovery, file, revision) and the
  * loader's .dbx branch each applied a project by hand (2026-09-29 audit).
@@ -7,6 +8,10 @@
  * restoreNativeEngineData returned early - so a project saved from a MOD,
  * opened after an AHX, came up in the AHX editor. The .dbx branch also
  * dropped the mixer. All four now go savedSongToApply -> applySong.
+ *
+ * The dub bus is here for a different reason: a project saved while the bus's
+ * return was closed used to restore a bus that could not be heard, and it
+ * overwrote the repair the localStorage boot path had just made (2026-10-01).
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -47,5 +52,29 @@ describe('a saved project after an AHX', () => {
     expect(s.editorMode).toBe('classic');
     expect(s.hivelyNative).toBeNull();
     expect(useMixerStore.getState().channels[0]?.volume).toBeCloseTo(0.37);
+  }, 30000);
+});
+
+describe('a project saved with the dub bus return closed', () => {
+  it('opens with a tail it can be heard through', async () => {
+    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+    const { DEFAULT_DUB_BUS } = await import('@/types/dub');
+    const { makeEmptyTestSnapshot, loadProjectFromObject } = await import('@/hooks/useProjectPersistence');
+
+    // The CC47-53 wet bank dumped to its minimums, as it was on disk on
+    // 2026-10-01. springWet at maximum proves the file's own values loaded
+    // rather than the store falling back to factory wholesale.
+    const project = makeEmptyTestSnapshot() as unknown as Record<string, unknown>;
+    project.patterns = [{ id: 'p0', name: 'P0', length: 64, channels: [] }];
+    project.dubBus = { ...DEFAULT_DUB_BUS, returnGain: 0, echoWet: 0, echoIntensity: 0, springWet: 1 };
+    delete project.nativeEngineData;
+    delete project.nativeEngineMeta;
+
+    expect(await loadProjectFromObject(project)).toBe(true);
+
+    const dubBus = useDrumPadStore.getState().dubBus;
+    expect(dubBus.returnGain).toBe(DEFAULT_DUB_BUS.returnGain);
+    expect(dubBus.echoWet).toBe(DEFAULT_DUB_BUS.echoWet);
+    expect(dubBus.springWet).toBe(1);
   }, 30000);
 });
