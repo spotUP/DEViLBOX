@@ -31,6 +31,7 @@ import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { MixerSnapshot } from '@stores/useMixerStore';
 import type { DubBusSettings } from '@/types/dub';
+import { repairDeadDubBusVoicing } from '@/types/dub';
 import { migrateDubLaneEvents } from './migrateDubLaneEvents';
 
 type FormatState = ReturnType<typeof useFormatStore.getState>;
@@ -88,7 +89,17 @@ async function applyProjectExtras(x: ProjectExtras): Promise<void> {
   useTransportStore.getState().setGrooveTemplate(x.grooveTemplateId || 'straight');
   if (x.mixer) useMixerStore.getState().loadMixerState(x.mixer);
   // setDubBus merges over defaults, so an older file missing newer fields loads.
-  if (x.dubBus) useDrumPadStore.getState().setDubBus(x.dubBus as never);
+  //
+  // A project saved while the bus's return was closed comes back as a bus that
+  // cannot be heard — the same wreckage the localStorage boot path sees, and it
+  // would overwrite the repair made there. The return is the wet bus's only
+  // route to the speakers, so a closed one in a file is damage, not a mix:
+  // repair the tail on the way in. Judged on the state the file WOULD produce,
+  // not on the fields the file happens to carry.
+  if (x.dubBus) {
+    const incoming = { ...useDrumPadStore.getState().dubBus, ...(x.dubBus as Partial<DubBusSettings>) };
+    useDrumPadStore.getState().setDubBus(repairDeadDubBusVoicing(incoming) as never);
+  }
   if (x.autoDub) {
     const dub = useDubStore.getState();
     dub.setAutoDubPersona(x.autoDub.persona as never);

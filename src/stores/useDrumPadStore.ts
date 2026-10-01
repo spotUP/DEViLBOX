@@ -15,7 +15,7 @@ import type {
 } from '../types/drumpad';
 import { createEmptyProgram, createEmptyPad, getBankPads, MPK_SLOT_COUNT, mpkSlotId, mpkSlotName } from '../types/drumpad';
 import type { DubBusSettings } from '../types/dub';
-import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS } from '../types/dub';
+import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS, repairDeadDubBusVoicing } from '../types/dub';
 
 /** Build the 8 default MPK-linked program slots. */
 function buildMpkSlots(): Map<string, ReturnType<typeof createEmptyProgram>> {
@@ -775,12 +775,18 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           // characterPreset rename 'gatedFlanger' → 'jammy': map any saved
           // 'gatedFlanger' value forward so older sessions keep their voicing
           // instead of falling back to default on the now-invalid string.
+          //
+          // A saved return gain of zero is not a voicing but wreckage — the
+          // return is the wet bus's only route to the speakers, so a session
+          // that reloads one is a bus that lights its buttons and moves no air
+          // ("moves light up but there is no siren sound", 2026-10-01). The
+          // tail goes back to factory; the rest of the saved voicing stands.
           dubBus: ((): typeof DEFAULT_DUB_BUS => {
             const merged = { ...DEFAULT_DUB_BUS, ...(state.dubBus || {}), enabled: false };
             if ((merged as { characterPreset?: string }).characterPreset === 'gatedFlanger') {
               merged.characterPreset = 'jammy';
             }
-            return merged;
+            return repairDeadDubBusVoicing(merged);
           })(),
         });
 

@@ -27,6 +27,8 @@ import { suppressFormatChecks, restoreFormatChecks } from '../../lib/formatCompa
 import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 import { getDevilboxAudioContext } from '../../utils/audio-context';
+import { applyEphemeralDubSettings } from '../../lib/dub/measurementSettings';
+import type { EphemeralDubSettingsTarget } from '../../lib/dub/measurementSettings';
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
 import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths, testMAMESynths } from '../../utils/synthTester';
 
@@ -462,8 +464,17 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
   const ctx = input.context as AudioContext;
   const taps: Array<{ name: string; node: AudioNode; split: ChannelSplitterNode; a: AnalyserNode[] }> = [];
   let src: AudioBufferSourceNode | null = null;
+  let restoreSettings: (() => void) | null = null;
   try {
-    store.setDubBus({ ...override, enabled: true });
+    // Engine-only, behind a claim: a probe is not a setting the performer
+    // chose and must not reach localStorage. See measurementSettings.ts — the
+    // store used to be written here, so a reload mid-probe stranded the
+    // probe as the user's own voicing.
+    restoreSettings = applyEphemeralDubSettings(
+      bus as unknown as EphemeralDubSettingsTarget,
+      saved,
+      override,
+    );
     await wait(settleMs);
     // An echo-engine swap holds the bus muted and replays settings after it.
     for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
@@ -508,7 +519,7 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
   } finally {
     try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
     for (const t of taps) { try { t.node.disconnect(t.split); } catch { /* ok */ } }
-    useDrumPadStore.getState().setDubBus(saved);
+    restoreSettings?.();
     // Let a restoring echo-engine swap finish before the next call can start
     // another: two swaps overlapping read the input gain mid-mute.
     await wait(50);
