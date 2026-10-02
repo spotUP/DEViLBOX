@@ -842,9 +842,37 @@ int uade_wasm_full_reset(void) {
     s_paused  = 0;
     s_looping = 0;
 
-    /* Destroy old UADE state (frees all resources, resets shim IPC) */
+    /* Destroy old UADE state (frees all resources, resets shim IPC).
+     *
+     * Not straight into uade_cleanup_state(): it calls uade_stop(), which
+     * runs libuade's teardown over IPC (drain events, REBOOT, token) unless
+     * song.state is UADE_STATE_INVALID. After a rendered song it is not, and
+     * in the synchronous shim that exchange lands while the IPC is in
+     * UADE_S_STATE: "protocol error: receiving in S state is forbidden", the
+     * core reads garbage ("Invalid input. Expected score name.") and calls
+     * exit(1) with no guard up - an unreachable trap on every load after a
+     * render, which the worklet covered with a full WASM reinit each time
+     * (measured 2026-10-03, tools/uade-audit/resetTrapRepro.ts; the same on
+     * the 2026-09-24 build). uade_wasm_stop() documents and avoids the same
+     * class. So do what uade_wasm_load() does before it touches the core:
+     * zero the song and put both IPC ends in their load-time state, which
+     * makes uade_stop() a no-op, and keep the exit guard up for the rest. */
     if (s_state) {
-        uade_cleanup_state(s_state);
+        uade_shim_reset_for_load();
+        memset(&s_state->song, 0, sizeof(s_state->song));
+        s_state->song.state = 0;
+        s_state->ipc.state = 2;
+        s_state->ipc.inputbytes = 0;
+        uadecore_ipc.state = 0;
+        uadecore_ipc.inputbytes = 0;
+
+        uade_exit_guard = 1;
+        if (setjmp(uade_exit_jmpbuf) == 0) {
+            uade_cleanup_state(s_state);
+        } else {
+            fprintf(stderr, "[uade-wasm] exit(%d) during uade_cleanup_state\n", uade_exit_status);
+        }
+        uade_exit_guard = 0;
         s_state = NULL;
     }
 

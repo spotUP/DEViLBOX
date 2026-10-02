@@ -127,6 +127,13 @@ int uadecore_wasm_init(int argc, char **argv)
 
     /* Initialize default preferences */
     default_prefs(&currprefs);
+    /* A fresh core: uade_wasm_full_reset() re-spawns it through
+     * uade_arch_spawn(), and default_prefs() has just switched stereo off
+     * again. Left at 1, the next load skipped phase 1, never re-sent the
+     * CONFIG (uaerc) that turns stereo on, and init_sound() exited with
+     * "Only stereo supported." (2026-10-03). */
+    s_hw_initialized = 0;
+    s_core_phase = 1;
 
     s_core_phase = 1;  /* Waiting for config message */
     return 0;
