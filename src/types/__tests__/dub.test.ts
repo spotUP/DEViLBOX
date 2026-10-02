@@ -96,3 +96,38 @@ describe('DEFAULT_DUB_BUS', () => {
     expect(DEFAULT_DUB_BUS.characterPreset).toBe('custom');
   });
 });
+
+describe('dub return gain calibration', () => {
+  // The bus is fed by partial channel taps, not the whole mix: on an
+  // isolation-capable engine the whole-mix fallback is deliberately silenced,
+  // so the return level is far below master. Measured 2026-10-01, four sends
+  // at 0.2123, master insertOut -12.2 dB: the old 0.75 put the return 24.8 dB
+  // under the master and every wet move was inaudible ("completely dead with
+  // the faders at max"). 3.0 measures ~-8.5 dB and was confirmed audible.
+  const SILENT_RETURN_GAIN = 0.9;
+  const AUDIBLE_RETURN_GAIN = 1.5;
+
+  it('ships a default returnGain that leaves the tail audible', () => {
+    expect(DEFAULT_DUB_BUS.returnGain).toBeGreaterThan(AUDIBLE_RETURN_GAIN);
+  });
+
+  it('keeps every character preset audible — no preset may re-hide the bus', () => {
+    for (const [key, preset] of Object.entries(DUB_CHARACTER_PRESETS)) {
+      const gain = preset.overrides.returnGain ?? DEFAULT_DUB_BUS.returnGain;
+      expect(
+        gain,
+        `preset "${key}" (${preset.label}) returnGain ${gain} is at or below the old silent value ${SILENT_RETURN_GAIN}`,
+      ).toBeGreaterThan(AUDIBLE_RETURN_GAIN);
+    }
+  });
+
+  it('preserves the relative loudness order between character presets', () => {
+    // The presets are L3 artist characters; scaling returnGain for calibration
+    // must not reorder them. Relative to the old values this is the same order.
+    const order = Object.entries(DUB_CHARACTER_PRESETS)
+      .map(([key, p]) => [key, p.overrides.returnGain ?? DEFAULT_DUB_BUS.returnGain] as const)
+      .sort((a, b) => b[1] - a[1])
+      .map(([key]) => key);
+    expect(order).toEqual(['perry', 'jammy', 'tubby', 'madProfessor', 'scientist']);
+  });
+});
