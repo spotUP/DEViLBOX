@@ -1049,10 +1049,14 @@ export async function setDubBusAudition(params: Record<string, unknown>): Promis
 
 export async function setDubBusSettings(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
-  // Strip unknown keys so the store doesn't receive garbage if the caller guesses
-  const settings = params.settings as Record<string, unknown>;
-  useDrumPadStore.getState().setDubBus(settings);
-  return { ok: true };
+  const { checkDubBusPatch } = await import('../../types/dub');
+  // Checked before the store sees it: the store persists every write, and a
+  // missing or misnamed `settings` used to crash here ("Cannot read
+  // properties of undefined") while a misspelt key was saved as-is.
+  const checked = checkDubBusPatch(params.settings);
+  if (!checked.ok) return { error: checked.errors.join('; ') };
+  useDrumPadStore.getState().setDubBus(checked.patch);
+  return { ok: true, applied: Object.keys(checked.patch) };
 }
 
 /**

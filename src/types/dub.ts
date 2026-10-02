@@ -628,6 +628,33 @@ export function repairStoredDubBusVoicing(merged: DubBusSettings): DubBusSetting
   return merged;
 }
 
+/**
+ * Check an outside write (MCP, a controller script) against the settings
+ * shape before it reaches the store, which persists whatever it is given.
+ *
+ * Every key must be a real DubBusSettings field, and every value must have the
+ * type the default has (a finite number where the default is a number). A bad
+ * write is refused whole, with every problem named, rather than half-applied.
+ */
+export function checkDubBusPatch(
+  raw: unknown,
+): { ok: true; patch: Partial<DubBusSettings> } | { ok: false; errors: string[] } {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, errors: ['settings must be an object of DubBusSettings fields, e.g. { "returnGain": 0.8 }'] };
+  }
+  const errors: string[] = [];
+  const defaults = DEFAULT_DUB_BUS as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(raw)) {
+    if (!(key in defaults)) { errors.push(`unknown field "${key}"`); continue; }
+    const want = typeof defaults[key];
+    if (typeof value !== want || (want === 'number' && !Number.isFinite(value as number))) {
+      errors.push(`"${key}" must be a ${want === 'number' ? 'finite number' : want}, got ${JSON.stringify(value)}`);
+    }
+  }
+  if (Object.keys(raw).length === 0) errors.push('settings is empty');
+  return errors.length ? { ok: false, errors } : { ok: true, patch: raw as Partial<DubBusSettings> };
+}
+
 /** The 11 stepped positions of the Altec 9069B filter, per audiothing.net/
  *  pasttofuturereverbs.gumroad.com. Discrete positions the original unit
  *  clicked through — reproducing this is what gives the "Big Knob" sweep
