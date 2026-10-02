@@ -129,7 +129,7 @@ import {
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
 import { lowMidDipDbFor } from '@/lib/dub/lowMidDip';
-import { WET_CHAIN_MAKEUP, WET_GESTURE_LIFT } from '@/lib/dub/wetChainMakeup';
+import { WET_GESTURE_LIFT } from '@/lib/dub/wetGestureLift';
 import { detectLowFundamental, SubPitchTracker } from '@/lib/dub/lowFundamental';
 import { lowBandGainsFor, LOW_SAT_KNEE } from '@/lib/dub/lowBandCrossover';
 import { rideTrim, spendRide, bufferPeak } from '@/lib/dub/trimRide';
@@ -1578,8 +1578,8 @@ export class DubBus {
   private glueTrim!: GainNode;
   private lpf: BiquadFilterNode;      // sweep-able LPF on return
   private return_: GainNode;
-  /** Make-up for the send-fed wet chain on its way into `return_` — see WET_CHAIN_MAKEUP. */
-  private wetMakeup!: GainNode;
+  /** The wet chain on its way into `return_`: unity, lifted while a return processor is held (WET_GESTURE_LIFT). */
+  private wetLift!: GainNode;
   private feedback: GainNode;         // echo → feedback → input (siren)
   private noise: AudioBufferSourceNode;  // pink noise loop
   private noiseGain: GainNode;           // -55 dBFS level
@@ -2594,9 +2594,9 @@ export class DubBus {
 
     this.return_ = this.context.createGain();
     this.return_.gain.value = this.enabled ? this.settings.returnGain : 0;
-    this.wetMakeup = this.context.createGain();
-    this.wetMakeup.gain.value = this._wetMakeupTarget();
-    this.wetMakeup.connect(this.return_);
+    this.wetLift = this.context.createGain();
+    this.wetLift.gain.value = this._wetLiftTarget();
+    this.wetLift.connect(this.return_);
 
     // Feedback loop for siren self-oscillation. At rest gain=0 → no loop.
     // When raised toward 0.9+, the echo's output recirculates into the input
@@ -2776,14 +2776,14 @@ export class DubBus {
     this.stereoMerge.connect(this.lofiBypass);
     Tone.connect(this.stereoMerge as unknown as Tone.OutputNode, this.lofi.input);
     Tone.connect(this.lofi.output, this.lofiSend as unknown as Tone.InputNode);
-    this.lofiBypass.connect(this.wetMakeup);
-    this.lofiSend.connect(this.wetMakeup);
+    this.lofiBypass.connect(this.wetLift);
+    this.lofiSend.connect(this.wetLift);
 
     // Ring modulator: additive parallel send from stereoMerge.
     // Adds metallic texture on top of the main signal.
     Tone.connect(this.stereoMerge as unknown as Tone.OutputNode, this.ringMod.input);
     Tone.connect(this.ringMod.output, this.ringModSend as unknown as Tone.InputNode);
-    this.ringModSend.connect(this.wetMakeup);
+    this.ringModSend.connect(this.wetLift);
 
     // Club simulation: return → dry/wet split → master.
     // When off (default): only the dry path is wired (return_ → clubDry → master).
@@ -6373,7 +6373,7 @@ export class DubBus {
 
   /**
    * How many WET gestures are running right now. While any is, the wet
-   * make-up is lifted by WET_GESTURE_LIFT (see `holdWetGesture`).
+   * chain is lifted by WET_GESTURE_LIFT (see `holdWetGesture`).
    *
    * The return governor holds the wet return at programme level. That is right
    * while the bus is idling — it is what stopped the echo returning +19 dB
@@ -6431,14 +6431,14 @@ export class DubBus {
     };
   }
 
-  /** The wet make-up's gain: the calibration, lifted while a return processor is held. */
-  private _wetMakeupTarget(): number {
-    return WET_CHAIN_MAKEUP * (this._wetGestures > 0 ? WET_GESTURE_LIFT : 1);
+  /** The wet chain's gain: unity, lifted while a return processor is held. */
+  private _wetLiftTarget(): number {
+    return this._wetGestures > 0 ? WET_GESTURE_LIFT : 1;
   }
 
-  /** Ramp the make-up to its target; 80 ms so a toggle swells in rather than clicks. */
+  /** Ramp the lift to its target; 80 ms so a toggle swells in rather than clicks. */
   private _applyWetGestureLift(): void {
-    this._settle(this.wetMakeup.gain, this._wetMakeupTarget(), this.context.currentTime, 0.08);
+    this._settle(this.wetLift.gain, this._wetLiftTarget(), this.context.currentTime, 0.08);
   }
 
   claimSettingKeys(keys: readonly string[]): () => void {
@@ -7980,7 +7980,7 @@ export class DubBus {
     delayL.connect(fbL); fbL.connect(delayR);
     delayR.connect(fbR); fbR.connect(delayL);
     merger.connect(wetGain);
-    wetGain.connect(this.wetMakeup); // a copy of the send-fed input: same make-up as the chain
+    wetGain.connect(this.wetLift); // a copy of the send-fed input: lifted with the chain
     wetGain.gain.setValueAtTime(0, now);
     wetGain.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, wet)), now + 0.1);
     return () => {

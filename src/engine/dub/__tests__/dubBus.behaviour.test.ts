@@ -45,22 +45,6 @@ describe('DubBus, rendered', () => {
     expect(after, 'the bus stayed dead after the drain').toBeGreaterThan(before - 6);
   }, 60_000);
 
-  it('carries the wet make-up on the send-fed chain', async () => {
-    const levels: number[] = [];
-    for (const makeup of [null, 1]) {
-      const rig = await makeDubBusRig(1.5);
-      feedTone(rig);
-      const out = await rig.render([{ at: 0, run: () => {
-        rig.bus.setSettings({ enabled: true });
-        if (makeup !== null) rig.node<GainNode>('wetMakeup').gain.value = makeup;
-      } }]);
-      levels.push(toDb(rmsBetween(out, 0.5)));
-    }
-    // WET_CHAIN_MAKEUP = 3.0/0.85 = +10.95 dB.
-    expect(levels[0] - levels[1]).toBeGreaterThan(9.5);
-    expect(levels[0] - levels[1]).toBeLessThan(12.5);
-  }, 60_000);
-
   it('reports desired against actual, including through a panic', async () => {
     const rig = await makeDubBusRig(1.5);
     feedTone(rig);
@@ -141,21 +125,35 @@ describe('DubBus, rendered', () => {
   it('a held return processor lifts the wet so the toggle can be heard', async () => {
     // At Auto Dub's resting sends the return sat 30-40 dB under the music, so
     // Wide/Wobble/Liquid/Sweep/Ring/Starve/Ping-Pong changed a signal nobody
-    // could hear: "no change at all when pressed" (2026-10-02).
+    // could hear: "no change at all when pressed" (2026-10-02). +12 dB was then
+    // "way too strong"; the lift is +6 dB. Same Wobble twice — once as the
+    // move (with its wet gesture), once straight on the bus without one — so
+    // the difference is the lift alone.
     const { tapeWobble } = await import('../moves/tapeWobble');
-    const rig = await makeDubBusRig(3);
-    feedTone(rig);
-    let handle: { dispose(): void } | null = null;
-    const out = await rig.render([
-      { at: 0, run: () => rig.bus.setSettings({ enabled: true }) },
-      { at: 1.0, run: () => { handle = tapeWobble.execute({ bus: rig.bus, params: { ...tapeWobble.defaults }, bpm: 120, source: 'live' }); } },
-      { at: 2.0, run: () => handle!.dispose() },
-    ]);
-    const before = toDb(rmsBetween(out, 0.6, 1.0));
-    const held = toDb(rmsBetween(out, 1.4, 2.0));
-    const after = toDb(rmsBetween(out, 2.6, 3.0));
-    expect(held - before, 'the toggle left the wet where it was').toBeGreaterThan(4);
-    expect(held - before, 'the lift is heavier than +6 dB').toBeLessThan(8);
-    expect(Math.abs(after - before), 'the lift outlived the release').toBeLessThan(3);
+    const levels: number[] = [];
+    const afters: number[] = [];
+    for (const asMove of [false, true]) {
+      const rig = await makeDubBusRig(3);
+      feedTone(rig);
+      let release: (() => void) | null = null;
+      const out = await rig.render([
+        { at: 0, run: () => rig.bus.setSettings({ enabled: true }) },
+        { at: 1.0, run: () => {
+          if (asMove) {
+            const h = tapeWobble.execute({ bus: rig.bus, params: { ...tapeWobble.defaults }, bpm: 120, source: 'live' });
+            release = () => h?.dispose();
+          } else {
+            release = rig.bus.startTapeWobble(tapeWobble.defaults.depthMs, tapeWobble.defaults.rateHz);
+          }
+        } },
+        { at: 2.0, run: () => release!() },
+      ]);
+      levels.push(toDb(rmsBetween(out, 1.4, 2.0)));
+      afters.push(toDb(rmsBetween(out, 2.6, 3.0)));
+    }
+    const lift = levels[1] - levels[0];
+    expect(lift, 'the held toggle got no lift').toBeGreaterThan(4);
+    expect(lift, 'the lift is heavier than +6 dB').toBeLessThan(8);
+    expect(Math.abs(afters[1] - afters[0]), 'the lift outlived the release').toBeLessThan(1.5);
   }, 60_000);
 });
