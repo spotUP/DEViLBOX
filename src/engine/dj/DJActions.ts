@@ -19,9 +19,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { useVocoderStore } from '@/stores/useVocoderStore';
 import { getDrumPadEngine, getNoteRepeatEngine } from '@/hooks/drumpad/useMIDIPadRouting';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import type { DubBusSettings } from '@/types/dub';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
-import { DubBus } from '../dub/DubBus';
 import type { DJSet } from './recording/DJSetFormat';
 import { quantizedEQKill, getQuantizeMode, quantizeAction, cancelAllAutomation } from './DJQuantizedFX';
 import { syncBPMToOther, phaseAlign, snapPositionToBeat } from './DJAutoSync';
@@ -764,68 +762,13 @@ export function djKillAll(): void {
   //    reset, LFOs stopped, channel mutes cleared, mic off, etc.).
   djPanic();
 
-  // 3. Explicitly flush the dub bus store — the engine's dubPanic clears
-  //    internal state, but the mirror store value may be restored by a
-  //    React render cycle during the drain window. Force-writing enabled
-  //    = false AND echoWet/springWet = 0 lets the mirror push zeros to
-  //    the engine even after the 2 s _draining window ends.
-  //
-  //    The zeros are a TACTICAL measure for the drain window, not a new
-  //    resting state, so the pre-panic values are snapshotted and put back
-  //    once the window closes. They used to be written and never undone,
-  //    which meant one accidental hit of this — it is `dj.killAll` on Pad 5
-  //    and several grid buttons, and `window.__djKillAll()` — permanently
-  //    flattened the user's echo and spring. Measured 2026-10-02: the store
-  //    held `echoIntensity: 0` in localStorage against a default of 0.62, so
-  //    Echo wet was inoperable and Echo appeared broken on every reload.
-  try {
-    const before = useDrumPadStore.getState().dubBus;
-    dubPanicRestorePending = {
-      echoWet: before.echoWet,
-      springWet: before.springWet,
-      echoIntensity: before.echoIntensity,
-      returnGain: before.returnGain,
-    };
-    useDrumPadStore.getState().setDubBus({
-      enabled: false,
-      echoWet: 0,
-      springWet: 0,
-      echoIntensity: 0,
-      returnGain: 0,
-    });
-  } catch (err) {
-    console.warn('[DJKillAll] dub bus store flush failed:', err);
-  }
-
-  // 4. Put the user's levels back once the drain window has closed. Only if
-  //    they are still the zeros we wrote — a knob moved during the drain is the
-  //    user's decision and wins, which is the same courtesy `dubPanic`'s own
-  //    restore extends by re-reading current settings.
-  if (dubPanicRestorePending) {
-    const snapshot = dubPanicRestorePending;
-    setTimeout(() => {
-      dubPanicRestorePending = null;
-      try {
-        const now = useDrumPadStore.getState().dubBus;
-        if (now.echoWet !== 0 || now.springWet !== 0 || now.echoIntensity !== 0 || now.returnGain !== 0) {
-          console.log('[DJKillAll] dub levels changed during the drain — leaving them alone');
-          return;
-        }
-        useDrumPadStore.getState().setDubBus({ ...snapshot });
-        console.log(
-          `[DJKillAll] dub levels restored after drain: echoIntensity=${snapshot.echoIntensity.toFixed(2)}`
-          + ` springWet=${snapshot.springWet.toFixed(2)} echoWet=${snapshot.echoWet.toFixed(2)}`
-          + ` returnGain=${snapshot.returnGain.toFixed(2)}`,
-        );
-      } catch (err) {
-        console.warn('[DJKillAll] dub level restore failed:', err);
-      }
-    }, DubBus.DRAIN_MS + 200);
-  }
+  //    djPanic() has already drained the engine (`dubPanic`, which ignores
+  //    echo and spring writes for the whole drain window) and written
+  //    `enabled: false` to the store. Nothing else is written here: the
+  //    levels are the performer's voicing and the store persists them, so a
+  //    flush to zero survived any reload inside the drain window and left the
+  //    echo flattened for good (`echoIntensity: 0` in localStorage, 2026-10-02).
 }
-
-/** Pre-panic dub levels, held only for the length of one drain window. */
-let dubPanicRestorePending: Pick<DubBusSettings, 'echoWet' | 'springWet' | 'echoIntensity' | 'returnGain'> | null = null;
 
 /**
  * Dump a full snapshot of dub-bus + drumpad state to the console. Used

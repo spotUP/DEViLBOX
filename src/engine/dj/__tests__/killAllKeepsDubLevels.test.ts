@@ -1,21 +1,14 @@
 /**
- * DJ Kill All used to destroy the user's dub levels permanently.
+ * DJ Kill All must not touch the performer's dub levels.
  *
- * `djKillAll` is a panic: it force-writes `echoWet/springWet/echoIntensity/
- * returnGain = 0` into the drum-pad store so the settings mirror cannot revive
- * the echo during the 2 s drain. Those zeros were never undone. Because the
- * store persists to localStorage, one accidental hit flattened the dub bus for
- * good — and `djKillAll` is `dj.killAll` on Pad 5 and several grid buttons
- * across the controller profiles, as well as `window.__djKillAll()`.
- *
- * Found 2026-10-02 while auditing dead knobs: the user reported Echo wet and
- * Spring wet as inoperable. The store held `echoIntensity: 0` against a default
- * of 0.62. Echo wet was fine; nothing was being fed INTO the echo. Turning the
- * knob moved nothing because its input was zero, which is why it read as a dead
- * knob rather than a panic that had eaten the settings.
- *
- * The fix snapshots the four levels and restores them after the drain window,
- * skipping the restore if the user moved one of them in the meantime.
+ * It used to force-write `echoWet/springWet/echoIntensity/returnGain = 0` into
+ * the drum-pad store, which persists to localStorage, so one accidental hit
+ * (`dj.killAll` on Pad 5, several grid buttons, `window.__djKillAll()`)
+ * flattened the dub bus for good: the store held `echoIntensity: 0` against a
+ * default of 0.62 and Echo wet read as a dead knob (2026-10-02). A later
+ * snapshot-and-restore timer still lost the levels to any reload inside the
+ * window. The engine's own drain already ignores echo and spring writes, so
+ * the flush was never needed: KILL writes `enabled: false` and nothing else.
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
@@ -71,17 +64,16 @@ vi.mock('../DJBeatSync', () => ({ DJBeatSync: class { constructor() { /* no tran
 vi.mock('../DJAutoDJ', () => ({ getAutoDJ: () => null }));
 
 const { djKillAll } = await import('../DJActions');
-const { DubBus } = await import('../../dub/DubBus');
 
 /** A realistic pre-panic mix, so a restore is distinguishable from a flush. */
 const PRE_PANIC = {
   echoWet: 0.88,
   springWet: 0.4,
   echoIntensity: 0.62,
-  returnGain: 3.0,
+  returnGain: 0.85,
 };
 
-describe('DJ Kill All leaves the dub levels recoverable', () => {
+describe('DJ Kill All leaves the dub levels alone', () => {
   let store: Record<string, unknown>;
 
   beforeEach(() => {
@@ -89,54 +81,29 @@ describe('DJ Kill All leaves the dub levels recoverable', () => {
     setDubBus.mockReset();
     getDubBus.mockReset();
     store = { ...PRE_PANIC, enabled: true };
-    // The store is the source of truth for the reads inside djKillAll, so make
-    // every getState() reflect whatever was last written.
     getDubBus.mockImplementation(() => store);
     setDubBus.mockImplementation((patch: Record<string, unknown>) => { store = { ...store, ...patch }; });
   });
 
   afterEach(() => { vi.useRealTimers(); });
 
-  it('restores the dub levels after the drain window', () => {
+  it('never writes a level, so a reload at any moment keeps the voicing', () => {
     djKillAll();
-
-    // During the drain the levels are zero — that is the whole point of the
-    // flush, so the mirror cannot revive the echo while the bus tears down.
-    expect(store.echoIntensity).toBe(0);
-    expect(store.echoWet).toBe(0);
-    expect(store.springWet).toBe(0);
-    expect(store.returnGain).toBe(0);
-    expect(store.enabled).toBe(false);
-
-    vi.advanceTimersByTime(DubBus.DRAIN_MS + 200);
-
+    // Checked before any timer runs: this is what localStorage holds if the
+    // page reloads straight after the hit.
     expect(store.echoIntensity, 'echo intensity was destroyed by a panic').toBe(PRE_PANIC.echoIntensity);
     expect(store.echoWet).toBe(PRE_PANIC.echoWet);
     expect(store.springWet).toBe(PRE_PANIC.springWet);
     expect(store.returnGain).toBe(PRE_PANIC.returnGain);
+    for (const [patch] of setDubBus.mock.calls) {
+      expect(Object.keys(patch as object)).toEqual(['enabled']);
+    }
   });
 
-  it('leaves the bus disabled, because that is what a panic means', () => {
+  it('switches the bus off, because that is what a panic means', () => {
     djKillAll();
-    vi.advanceTimersByTime(DubBus.DRAIN_MS + 200);
     expect(store.enabled).toBe(false);
-  });
-
-  it('does not clobber a level the user moved during the drain', () => {
-    djKillAll();
-    // The user grabs Echo intensity while the drain is still running.
-    setDubBus({ echoIntensity: 0.3 });
-    vi.advanceTimersByTime(DubBus.DRAIN_MS + 200);
-    expect(store.echoIntensity, 'a deliberate tweak was overwritten by the restore').toBe(0.3);
-  });
-
-  it('snapshots the pre-panic values, not the zeros from a previous panic', () => {
-    djKillAll();
-    vi.advanceTimersByTime(DubBus.DRAIN_MS + 200);
-    // Second panic must restore the same real values, not zero.
-    djKillAll();
-    expect(store.echoIntensity).toBe(0);
-    vi.advanceTimersByTime(DubBus.DRAIN_MS + 200);
-    expect(store.echoIntensity).toBe(PRE_PANIC.echoIntensity);
+    vi.advanceTimersByTime(5000);
+    expect(store.enabled).toBe(false);
   });
 });
