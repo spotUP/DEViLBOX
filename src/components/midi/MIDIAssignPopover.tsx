@@ -121,7 +121,7 @@ const DUB_TARGETS: AssignableTarget[] = [
   { kind: 'dub', target: 'dub.ghostReverb', label: 'Ghost Reverb', category: 'Reverb' },
 
   // Drops/stops
-  { kind: 'dub', target: 'dub.tapeStop', label: 'Tape Stop', category: 'Performance' },
+  { kind: 'dub', target: 'dub.tapeStop', label: 'Dub Mute', category: 'Performance' },
   { kind: 'dub', target: 'dub.transportTapeStop', label: 'Transport Tape Stop', category: 'Performance' },
   { kind: 'dub', target: 'dub.masterDrop', label: 'Master Drop', category: 'Performance' },
   { kind: 'dub', target: 'dub.versionDrop', label: 'Version Drop', category: 'Performance' },
