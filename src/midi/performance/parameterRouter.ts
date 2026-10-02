@@ -18,6 +18,7 @@ import { useDJStore } from '../../stores/useDJStore';
 import * as DJActions from '../../engine/dj/DJActions';
 import type { MappableParameter } from '../types';
 import { LATCHING_MOVES } from '../../engine/dub/latchingMoves';
+import { DUB_RETURN_GAIN_MAX } from '../../types/dub';
 
 // ============================================================================
 // Route Table Types
@@ -151,7 +152,7 @@ export const DUB_BUS_PARAMS: Record<string, DubBusParamDef> = {
   'dub.echoWet':         { field: 'echoWet',         min: 0,   max: 1,    label: 'Echo Wet' },
   'dub.echoRateMs':      { field: 'echoRateMs',      min: 40,  max: 1000, label: 'Echo Rate', unit: 'ms' },
   'dub.springWet':       { field: 'springWet',       min: 0,   max: 1,    label: 'Spring Wet' },
-  'dub.returnGain':      { field: 'returnGain',      min: 0,   max: 1,    label: 'Return Gain' },
+  'dub.returnGain':      { field: 'returnGain',      min: 0,   max: DUB_RETURN_GAIN_MAX, label: 'Return Gain' },
   'dub.hpfCutoff':       { field: 'hpfCutoff',       min: 20,  max: 1000, label: 'High Pass', unit: 'Hz' },
   'dub.sidechainAmount': { field: 'sidechainAmount', min: 0,   max: 1,    label: 'Sidechain' },
   // The BUS tab's own controls. They were not routable at all, so a

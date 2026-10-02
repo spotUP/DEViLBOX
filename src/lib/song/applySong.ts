@@ -32,7 +32,7 @@ import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { MixerSnapshot } from '@stores/useMixerStore';
 import type { DubBusSettings } from '@/types/dub';
-import { repairDeadDubBusVoicing } from '@/types/dub';
+import { repairStoredDubBusVoicing } from '@/types/dub';
 import { migrateDubLaneEvents } from './migrateDubLaneEvents';
 
 type FormatState = ReturnType<typeof useFormatStore.getState>;
@@ -99,7 +99,7 @@ async function applyProjectExtras(x: ProjectExtras): Promise<void> {
   // not on the fields the file happens to carry.
   if (x.dubBus) {
     const incoming = { ...useDrumPadStore.getState().dubBus, ...(x.dubBus as Partial<DubBusSettings>) };
-    useDrumPadStore.getState().setDubBus(repairDeadDubBusVoicing(incoming) as never);
+    useDrumPadStore.getState().setDubBus(repairStoredDubBusVoicing(incoming) as never);
   }
   if (x.autoDub) {
     const dub = useDubStore.getState();
@@ -153,11 +153,6 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   // back from the audio graph - a new song inherited the last one's moves
   // (2026-09-22, jennipha.ahx opening the Dub Deck at 45 / 25 / 43 / 25 %).
   useMixerStore.getState().resetDubSends();
-  // ...but closing every send starves a bus that is still switched on, and
-  // the deck gates every `needsSend` move on an audible send, so the reset
-  // left Tape Stop, Sub Harmonic, Filter Drop and the rest firing nothing
-  // but a "Raise a CH send first" toast. Re-feed what this just starved.
-  ensureBusIsFed(useDrumPadStore.getState().dubBus.enabled);
   useAutomationStore.getState().reset();
   useTransportStore.getState().reset();
   useInstrumentStore.getState().reset();
@@ -201,14 +196,18 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   if (song.preload !== false && song.instruments.some((i) => i.synthType && i.synthType !== 'Synth')) {
     await engine.preloadInstruments(song.instruments);
   }
-  // Auto Dub running across a song load (a reload restores the song after Auto
-  // Dub has started): the song's mixer just replaced the channel sends, so give
-  // the performer its starting sends for this song. A send the song itself set
-  // is kept.
+  // The song's starting sends, decided once, after the song's own mixer has
+  // loaded (a send the file set is kept). Closing every send above starves a
+  // bus that is still on, and the deck gates every `needsSend` move on an
+  // audible send, so: Auto Dub running across the load (a reload restores the
+  // song after it started) gets its role levels on every closed channel;
+  // otherwise an enabled bus gets one channel so its moves are not dead.
+  let autoDubRunning = false;
   try {
-    const { isAutoDubRunning } = await import('@/engine/dub/AutoDub');
-    if (isAutoDubRunning()) (await import('@/lib/dub/seedAutoDubSends')).seedAutoDubSends();
+    autoDubRunning = (await import('@/engine/dub/AutoDub')).isAutoDubRunning();
   } catch { /* Auto Dub not loaded */ }
+  if (autoDubRunning) (await import('@/lib/dub/seedAutoDubSends')).seedAutoDubSends();
+  else ensureBusIsFed(useDrumPadStore.getState().dubBus.enabled);
 
   console.log(`[applySong] ${source}: "${song.metadata.name}" - ${song.patterns.length} patterns, ${song.instruments.length} instruments, editor ${useFormatStore.getState().editorMode}`);
 }

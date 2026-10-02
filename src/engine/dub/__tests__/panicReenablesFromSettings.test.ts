@@ -52,7 +52,7 @@ function drainTimerBody(): string {
 
 describe('panic re-converges the engine with the performer\'s desired state', () => {
   it('restores enabled from settings when the drain window closes', () => {
-    expect(drainTimerBody()).toContain('setSettings({ enabled: this.settings.enabled }, { force: true })');
+    expect(drainTimerBody()).toContain('setSettings({ enabled: this.settings.enabled })');
   });
 
   it('restores it through setSettings, not a bare flag poke', () => {
@@ -82,22 +82,17 @@ describe('panic re-converges the engine with the performer\'s desired state', ()
   it('un-mutes after exactly the drain window, not before', () => {
     // The re-converge has to sit inside the timer, or the bus comes back
     // while its buffers are still draining.
-    expect(dubPanicBody().indexOf('setSettings({ enabled: this.settings.enabled }, { force: true })'))
+    expect(dubPanicBody().indexOf('setSettings({ enabled: this.settings.enabled })'))
       .toBeGreaterThan(dubPanicBody().indexOf('const drainTimer = setTimeout('));
   });
 
-  it('forces the write past the no-op guard', () => {
+  it('judges the no-op guard against the engine, not the mirror alone', () => {
     // `_applySettings` drops a write whose values already match. Panic
     // diverged the ENGINE from `settings` without changing either, so the
-    // only write that can repair it looks identical to the ones the guard
-    // exists to drop — without `force` the restore returns before the enable
-    // sequence ever runs and the bus stays muted. That is what the first
-    // attempt at this fix did: it read correctly and measured `enabled:
-    // false` after the drain window closed.
-    expect(DUB_BUS_SRC).toContain('if (!changed && !opts?.force) return;');
-    expect(DUB_BUS_SRC).toMatch(
-      /private _applySettings\(settings: Partial<DubBusSettings>, opts\?: \{ force\?: boolean \}\)/,
-    );
+    // repairing write only gets through if `enabled` is compared with what the
+    // engine is doing (settingsWrite.test.ts covers the rule itself).
+    expect(DUB_BUS_SRC).toContain('const engineEnabled = this._draining ? this.settings.enabled : this.enabled;');
+    expect(DUB_BUS_SRC).toContain('if (!settingsWriteChangesBus(this.settings, settings, engineEnabled)) return;');
   });
 
   it('reuses the real enable sequence rather than poking the flag', () => {

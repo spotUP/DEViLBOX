@@ -18,12 +18,13 @@ import { useMixerStore } from '@/stores/useMixerStore';
 import { anySendAudible } from '@/lib/dub/sendAudibility';
 
 /**
- * A quiet starting send, not a performer's. 0.15 is Auto Dub's measured
- * flat seed: sends at ~0.43 left 15 of 39 moves reading SILENT, while 0.15
- * raised channel throws +8 to +18 dB, and it matches the four-send-at-
- * 0.2123 feed `returnGain` is calibrated against.
+ * The flat starting send, for the switch-on seed and for Auto Dub without a
+ * persona to take role levels from. A quiet send, not a performer's: sends at
+ * ~0.43 left 15 of 39 moves reading SILENT against the wash, while 0.15
+ * raised channel throws +8 to +18 dB (tools/dub-move-audit.ts, 2026-09-30).
+ * Auto Dub's role levels live in seedAutoDubSends.ts.
  */
-export const BUS_ENABLE_SEED_SEND = 0.15;
+export const FLAT_SEED_SEND = 0.15;
 
 /**
  * Which channel the switch-on seed opens, or `null` to seed nothing.
@@ -53,7 +54,7 @@ export function seedSendOnBusEnable(): number | null {
     channels.map(c => c?.muted),
   );
   if (channel === null) return null;
-  setChannelDubSend(channel, BUS_ENABLE_SEED_SEND);
+  setChannelDubSend(channel, FLAT_SEED_SEND);
   return channel;
 }
 

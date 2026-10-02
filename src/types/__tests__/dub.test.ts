@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { snapToAltecStep, ALTEC_HPF_STEPS, DUB_CHARACTER_PRESETS, DEFAULT_DUB_BUS } from '../dub';
+import { snapToAltecStep, ALTEC_HPF_STEPS, DUB_CHARACTER_PRESETS, DEFAULT_DUB_BUS, DUB_RETURN_GAIN_MAX } from '../dub';
+import { WET_CHAIN_MAKEUP } from '@/lib/dub/wetChainMakeup';
 
 describe('snapToAltecStep', () => {
   it('snaps to the exact step when input matches one', () => {
@@ -98,32 +99,35 @@ describe('DEFAULT_DUB_BUS', () => {
 });
 
 describe('dub return gain calibration', () => {
-  // The bus is fed by partial channel taps, not the whole mix: on an
-  // isolation-capable engine the whole-mix fallback is deliberately silenced,
-  // so the return level is far below master. Measured 2026-10-01, four sends
-  // at 0.2123, master insertOut -12.2 dB: the old 0.75 put the return 24.8 dB
-  // under the master and every wet move was inaudible ("completely dead with
-  // the faders at max"). 3.0 measures ~-8.5 dB and was confirmed audible.
-  const SILENT_RETURN_GAIN = 0.9;
-  const AUDIBLE_RETURN_GAIN = 1.5;
+  // The bus is fed by partial channel taps, not the whole mix, so its wet
+  // chain needs make-up to be heard. Measured 2026-10-01, four sends at
+  // 0.2123: an effective return of 0.75 sat 24.8 dB under the master and every
+  // wet move was inaudible; an effective 3.0 was confirmed audible. The level
+  // is carried by WET_CHAIN_MAKEUP, NOT by returnGain: the knob, its MIDI CC
+  // and the NKS map span 0..1, and generated layers join the return after the
+  // make-up at their own calibrated level.
+  const AUDIBLE_EFFECTIVE_RETURN = 1.5;
+  const knobMax = DUB_RETURN_GAIN_MAX;
 
-  it('ships a default returnGain that leaves the tail audible', () => {
-    expect(DEFAULT_DUB_BUS.returnGain).toBeGreaterThan(AUDIBLE_RETURN_GAIN);
+  const gains = (): Array<[string, number]> => [
+    ['default', DEFAULT_DUB_BUS.returnGain],
+    ...Object.entries(DUB_CHARACTER_PRESETS).map(([key, p]) => [key, p.overrides.returnGain ?? DEFAULT_DUB_BUS.returnGain] as [string, number]),
+  ];
+
+  it('keeps the default and every preset return inside the knob range', () => {
+    for (const [key, gain] of gains()) {
+      expect(gain, `${key} returnGain ${gain} is outside the 0..${knobMax} knob`).toBeLessThanOrEqual(knobMax);
+      expect(gain).toBeGreaterThan(0);
+    }
   });
 
-  it('keeps every character preset audible — no preset may re-hide the bus', () => {
-    for (const [key, preset] of Object.entries(DUB_CHARACTER_PRESETS)) {
-      const gain = preset.overrides.returnGain ?? DEFAULT_DUB_BUS.returnGain;
-      expect(
-        gain,
-        `preset "${key}" (${preset.label}) returnGain ${gain} is at or below the old silent value ${SILENT_RETURN_GAIN}`,
-      ).toBeGreaterThan(AUDIBLE_RETURN_GAIN);
+  it('leaves the wet tail audible at the default and every preset', () => {
+    for (const [key, gain] of gains()) {
+      expect(gain * WET_CHAIN_MAKEUP, `${key} effective return`).toBeGreaterThan(AUDIBLE_EFFECTIVE_RETURN);
     }
   });
 
   it('preserves the relative loudness order between character presets', () => {
-    // The presets are L3 artist characters; scaling returnGain for calibration
-    // must not reorder them. Relative to the old values this is the same order.
     const order = Object.entries(DUB_CHARACTER_PRESETS)
       .map(([key, p]) => [key, p.overrides.returnGain ?? DEFAULT_DUB_BUS.returnGain] as const)
       .sort((a, b) => b[1] - a[1])

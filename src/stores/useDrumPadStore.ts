@@ -17,7 +17,7 @@ import type {
 } from '../types/drumpad';
 import { createEmptyProgram, createEmptyPad, getBankPads, MPK_SLOT_COUNT, mpkSlotId, mpkSlotName } from '../types/drumpad';
 import type { DubBusSettings } from '../types/dub';
-import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS, repairDeadDubBusVoicing } from '../types/dub';
+import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS, repairStoredDubBusVoicing } from '../types/dub';
 
 /** Build the 8 default MPK-linked program slots. */
 function buildMpkSlots(): Map<string, ReturnType<typeof createEmptyProgram>> {
@@ -799,7 +799,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
             if ((merged as { characterPreset?: string }).characterPreset === 'gatedFlanger') {
               merged.characterPreset = 'jammy';
             }
-            return repairDeadDubBusVoicing(merged);
+            return repairStoredDubBusVoicing(merged);
           })(),
         });
 

@@ -20,6 +20,8 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useDubStore } from '@/stores/useDubStore';
 import { DUB_CHARACTER_PRESETS } from '@/types/dub';
 import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
+import { sendIsAudible } from '@/lib/dub/sendAudibility';
+import { FLAT_SEED_SEND } from '@/lib/dub/seedSendOnEnable';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 
 /** Only the loaded pattern's channels: a 4-channel MOD has 16 mixer slots, and seeding the empty 12 is noise. */
@@ -42,8 +44,6 @@ export function autoDubSeedSendLevel(level: number): number {
   return Math.max(0.1, Math.min(clamped * 0.2, 0.2));
 }
 
-/** Flat starting send when there is no persona preset to take roles from. */
-export const AUTO_DUB_FLAT_SEND = 0.15;
 
 /** Seed the closed channel sends of the loaded song for Auto Dub. */
 export function seedAutoDubSends(): void {
@@ -67,14 +67,16 @@ export function seedAutoDubSends(): void {
   }
 
   for (let i = 0; i < count; i++) {
-    if ((channels[i]?.dubSend ?? 0) > 0) continue; // the user's own send
+    // The user's own send. The BLEED floor is not one: counting it left a
+    // bleeding channel at -36 dB instead of its starting send.
+    if (sendIsAudible(channels[i]?.dubSend)) continue;
     if (preset?.defaultSendsByRole && roles.length > 0) {
       const sends = preset.defaultSendsByRole;
       const role = roles[i];
-      const level = role && role in sends ? (sends[role as keyof typeof sends] as number) : (sends.default ?? AUTO_DUB_FLAT_SEND);
+      const level = role && role in sends ? (sends[role as keyof typeof sends] as number) : (sends.default ?? FLAT_SEED_SEND);
       setChannelDubSend(i, autoDubSeedSendLevel(level));
     } else {
-      setChannelDubSend(i, AUTO_DUB_FLAT_SEND);
+      setChannelDubSend(i, FLAT_SEED_SEND);
     }
   }
 }
