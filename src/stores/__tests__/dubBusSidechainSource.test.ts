@@ -119,7 +119,25 @@ describe('useDrumPadStore — sidechain source fields (G13)', () => {
     const strip = readFileSync(
       resolve(import.meta.dirname, '..', '..', 'components', 'dub', 'DubDeckStrip.tsx'), 'utf8');
     expect(strip).toMatch(/resolveDrumKeyChannel/);
-    expect(strip).toMatch(/drumKeySongId/);
-    expect(strip).toMatch(/drumKeySongId\]/);
+    expect(strip).toMatch(/onSongChange\(\(\) => setDrumKeySong\(/);
+    expect(strip).toMatch(/drumKeySong\]\);/);
+  });
+
+  it('sees a new song even when it has as many patterns as the last one', async () => {
+    // The key used to re-resolve on `patterns.length`: two songs with the same
+    // pattern count kept the first song's drum channel.
+    const { onSongChange } = await import('@/engine/tone/sidechainKey');
+    const { useTrackerStore } = await import('@/stores/useTrackerStore');
+    const calls: number[] = [];
+    const stop = onSongChange(() => calls.push(1), 0);
+    await new Promise((r) => setTimeout(r, 20)); // the store import resolves
+    const before = useTrackerStore.getState().patterns;
+    useTrackerStore.setState({ patterns: [...before] });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls).toHaveLength(1);
+    stop();
+    useTrackerStore.setState({ patterns: [...before] });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls, 'an unsubscribed listener still fired').toHaveLength(1);
   });
 });

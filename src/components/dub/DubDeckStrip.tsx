@@ -250,6 +250,9 @@ const DECK_SHAPE_OPTIONS = listDeckShapeOptions(CONTROLLER_LAYOUTS)
  * precedent: a control the hardware does not have belongs in the header, and
  * the header is shared by both deck shapes.
  */
+/** Latched moves that re-fire when their mode select changes (see the effect below). */
+const MODE_LATCHED_MOVES = ['subHarmonic'] as const;
+
 const SUB_HARMONIC_MODE_OPTIONS = [
   { value: 'pulse', label: 'Pulse' },
   { value: 'continuous', label: 'Bed' },
@@ -808,14 +811,23 @@ export const DubDeckStrip: React.FC = () => {
   // option: resolveDrumKeyChannel() asks the channel classifier which channel
   // is the kick (else a whole-kit channel, else any percussion channel). It is
   // a promise about a song, not a channel number, so it has to be asked again
-  // whenever a different song is loaded — hence the pattern-count dependency.
+  // whenever the song changes — the same `onSongChange` the Master FX key uses.
   //
   // When it resolves to -1 (no song loaded, or a song with no percussion) the
   // key is left SILENT on purpose. Self-keying there is the failure mode
   // Master FX already learned: a kick ducker with a 150 Hz key filter becomes a
   // permanent bass compressor instead, measured at -11.4 dB at 100 Hz on
   // 2026-09-29. An inaudible duck is recoverable; bass that vanishes is not.
-  const drumKeySongId = useTrackerStore(s => s.patterns.length);
+  const [drumKeySong, setDrumKeySong] = useState(0);
+  useEffect(() => {
+    if (dubBusSettings.sidechainSource !== 'drums') return;
+    let unsubscribe: (() => void) | null = null;
+    let stopped = false;
+    void import('@/engine/tone/sidechainKey').then(({ onSongChange }) => {
+      if (!stopped) unsubscribe = onSongChange(() => setDrumKeySong(n => n + 1));
+    });
+    return () => { stopped = true; unsubscribe?.(); };
+  }, [dubBusSettings.sidechainSource]);
   useEffect(() => {
     const source = dubBusSettings.sidechainSource;
     const channelIndex = dubBusSettings.sidechainChannelIndex;
@@ -840,7 +852,10 @@ export const DubDeckStrip: React.FC = () => {
           }
         }
         const ok = await mgr.addSidechainTap(tapChannel, scInputNode);
-        if (ok && !cancelled) activeChannel = tapChannel;
+        // Torn down while the tap was being added: take it straight back out,
+        // or it stays keyed on the old song's channel with nothing to remove it.
+        if (ok && cancelled) mgr.removeSidechainTap(tapChannel, scInputNode);
+        else if (ok) activeChannel = tapChannel;
       } catch (e) {
         console.warn('[DubDeckStrip] sidechain tap failed:', e);
       }
@@ -853,7 +868,7 @@ export const DubDeckStrip: React.FC = () => {
         } catch { /* ok */ }
       }
     };
-  }, [dubBusSettings.sidechainSource, dubBusSettings.sidechainChannelIndex, drumKeySongId]);
+  }, [dubBusSettings.sidechainSource, dubBusSettings.sidechainChannelIndex, drumKeySong]);
 
   useEffect(() => {
     return startDubRecorder();
@@ -1189,7 +1204,6 @@ export const DubDeckStrip: React.FC = () => {
    * only move with a re-fire path. If a second mode-selectable move appears it
    * belongs here too, and belongs here as a list rather than a special case.
    */
-  const MODE_LATCHED_MOVES = ['subHarmonic'] as const;
   const subHarmonicModeRef = useRef(dubBusSettings.subHarmonicMode);
   useEffect(() => {
     const previous = subHarmonicModeRef.current;
