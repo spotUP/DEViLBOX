@@ -21,9 +21,12 @@ export const eqSweep: DubMove = {
     const q = params.q ?? this.defaults.q;
 
     const stop = bus.startEQSweep(startHz, endHz, gain, q, sweepSec);
+    // A return processor like the other toggles: lift the wet while held.
+    const releaseGesture = bus.holdWetGesture();
 
     return {
       dispose() {
+        releaseGesture();
         stop();
       },
     };

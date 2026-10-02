@@ -137,4 +137,24 @@ describe('DubBus, rendered', () => {
     expect(rig.bus.getSubBedLevel(), 'the re-fired bed lost its tap to the old release').toBeGreaterThan(0);
     stopSecond!();
   }, 60_000);
+
+  it('a held return processor lifts the wet so the toggle can be heard', async () => {
+    // At Auto Dub's resting sends the return sat 30-40 dB under the music, so
+    // Wide/Wobble/Liquid/Sweep/Ring/Starve/Ping-Pong changed a signal nobody
+    // could hear: "no change at all when pressed" (2026-10-02).
+    const { tapeWobble } = await import('../moves/tapeWobble');
+    const rig = await makeDubBusRig(3);
+    feedTone(rig);
+    let handle: { dispose(): void } | null = null;
+    const out = await rig.render([
+      { at: 0, run: () => rig.bus.setSettings({ enabled: true }) },
+      { at: 1.0, run: () => { handle = tapeWobble.execute({ bus: rig.bus, params: { ...tapeWobble.defaults }, bpm: 120, source: 'live' }); } },
+      { at: 2.0, run: () => handle!.dispose() },
+    ]);
+    const before = toDb(rmsBetween(out, 0.6, 1.0));
+    const held = toDb(rmsBetween(out, 1.4, 2.0));
+    const after = toDb(rmsBetween(out, 2.6, 3.0));
+    expect(held - before, 'the toggle left the wet where it was').toBeGreaterThan(8);
+    expect(Math.abs(after - before), 'the lift outlived the release').toBeLessThan(3);
+  }, 60_000);
 });
