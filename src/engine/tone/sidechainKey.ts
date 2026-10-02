@@ -49,6 +49,33 @@ async function classifyLoadedSong(): Promise<ReadonlyArray<{ role: ChannelRole; 
   return classifySongChannels(patterns, lookup, useTrackerStore.getState().patternOrder);
 }
 
+/**
+ * Call `cb` when the loaded song changes, once per load: the patterns are
+ * replaced in a burst, so calls are debounced. Pattern edits count too — a
+ * re-classification is cheap, and an edit can move the drums. Returns the
+ * unsubscribe.
+ */
+export function onSongChange(cb: () => void, debounceMs = 500): () => void {
+  let stopped = false;
+  let unsubscribe: (() => void) | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  void import('@stores/useTrackerStore').then(({ useTrackerStore }) => {
+    if (stopped) return;
+    let lastPatterns = useTrackerStore.getState().patterns;
+    unsubscribe = useTrackerStore.subscribe((state) => {
+      if (state.patterns === lastPatterns) return;
+      lastPatterns = state.patterns;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; cb(); }, debounceMs);
+    });
+  });
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+    unsubscribe?.();
+  };
+}
+
 /** The loaded song's drum channel for SIDECHAIN_KEY_DRUMS, or -1. */
 export async function resolveDrumKeyChannel(): Promise<number> {
   const analyses = await classifyLoadedSong();

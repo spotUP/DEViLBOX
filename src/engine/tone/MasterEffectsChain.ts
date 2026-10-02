@@ -7,7 +7,7 @@ import { getEffectGainCompensation } from '../factories/effectGainCompensation';
 import { applyWetGain } from '../factories/EffectFactory';
 import { useFormatStore } from '../../stores/useFormatStore';
 import { supportsChannelIsolation } from './ChannelRoutedEffects';
-import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel, channelRoleTargets } from './sidechainKey';
+import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel, channelRoleTargets, onSongChange } from './sidechainKey';
 
 export interface MasterEffectsContext {
   masterEffectsInput: Tone.Gain;
@@ -81,29 +81,18 @@ let songWatchInstalled = false;
 function watchSongForAutoRouting(): void {
   if (songWatchInstalled) return;
   songWatchInstalled = true;
-  void import('../../stores/useTrackerStore').then(({ useTrackerStore }) => {
-    let lastPatterns = useTrackerStore.getState().patterns;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    useTrackerStore.subscribe((state) => {
-      if (state.patterns === lastPatterns) return;
-      lastPatterns = state.patterns;
-      // One re-key per load, after the load's burst of pattern writes.
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        for (const node of [...autoKeyedNodes]) {
-          if ((node as { disposed?: boolean }).disposed) { autoKeyedNodes.delete(node); continue; }
-          void wireMasterSidechain(node, SIDECHAIN_KEY_DRUMS);
-        }
-        // A channel role resolves differently per song, and may move its
-        // effect between the whole mix and the channel-routed set.
-        void Promise.all([import('../../stores/useAudioStore'), import('../ToneEngine')])
-          .then(([{ useAudioStore }, { getToneEngine }]) => {
-            const effects = useAudioStore.getState().masterEffects;
-            if (effects.some((fx) => fx.enabled && fx.channelRole !== undefined)) void getToneEngine().rebuildMasterEffects(effects);
-          });
-      }, 500);
-    });
+  onSongChange(() => {
+    for (const node of [...autoKeyedNodes]) {
+      if ((node as { disposed?: boolean }).disposed) { autoKeyedNodes.delete(node); continue; }
+      void wireMasterSidechain(node, SIDECHAIN_KEY_DRUMS);
+    }
+    // A channel role resolves differently per song, and may move its
+    // effect between the whole mix and the channel-routed set.
+    void Promise.all([import('../../stores/useAudioStore'), import('../ToneEngine')])
+      .then(([{ useAudioStore }, { getToneEngine }]) => {
+        const effects = useAudioStore.getState().masterEffects;
+        if (effects.some((fx) => fx.enabled && fx.channelRole !== undefined)) void getToneEngine().rebuildMasterEffects(effects);
+      });
   });
 }
 
