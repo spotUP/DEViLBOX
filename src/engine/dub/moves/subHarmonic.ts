@@ -47,15 +47,15 @@ export const subHarmonic: DubMove = {
       // this function never fires, which is how the bed shipped running at
       // full unity and read as a heavy bass boost.
       console.log(`[subHarmonic] continuous sub bed, level=${level}`);
+      // No wet gesture: the bed is its own layer after the return, and a
+      // gesture would lift the echo wash under it (WET_GESTURE_LIFT).
       const stopBed = bus.startSubBassBed(level);
-      const releaseGesture = bus.holdWetGesture();
-      return { dispose() { releaseGesture(); stopBed(); } };
+      return { dispose() { stopBed(); } };
     }
     const freq = params.freq ?? this.defaults.freq;
     const threshold = params.threshold ?? this.defaults.threshold;
     console.log(`[subHarmonic] fired freq=${freq} threshold=${threshold} level=${level}`);
     const release = bus.startSubHarmonic(freq, threshold, level);
-    const releaseGesture = bus.holdWetGesture();
-    return { dispose() { releaseGesture(); release(); } };
+    return { dispose() { release(); } };
   },
 };

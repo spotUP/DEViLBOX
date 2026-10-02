@@ -129,7 +129,7 @@ import {
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
 import { lowMidDipDbFor } from '@/lib/dub/lowMidDip';
-import { WET_CHAIN_MAKEUP } from '@/lib/dub/wetChainMakeup';
+import { WET_CHAIN_MAKEUP, WET_GESTURE_LIFT } from '@/lib/dub/wetChainMakeup';
 import { detectLowFundamental, SubPitchTracker } from '@/lib/dub/lowFundamental';
 import { lowBandGainsFor, LOW_SAT_KNEE } from '@/lib/dub/lowBandCrossover';
 import { rideTrim, spendRide, bufferPeak } from '@/lib/dub/trimRide';
@@ -2595,7 +2595,7 @@ export class DubBus {
     this.return_ = this.context.createGain();
     this.return_.gain.value = this.enabled ? this.settings.returnGain : 0;
     this.wetMakeup = this.context.createGain();
-    this.wetMakeup.gain.value = WET_CHAIN_MAKEUP;
+    this.wetMakeup.gain.value = this._wetMakeupTarget();
     this.wetMakeup.connect(this.return_);
 
     // Feedback loop for siren self-oscillation. At rest gain=0 → no loop.
@@ -6372,7 +6372,8 @@ export class DubBus {
   private _ownedSettingKeys = new Map<string, number>();
 
   /**
-   * How many WET gestures are running right now.
+   * How many WET gestures are running right now. While any is, the wet
+   * make-up is lifted by WET_GESTURE_LIFT (see `holdWetGesture`).
    *
    * The return governor holds the wet return at programme level. That is right
    * while the bus is idling — it is what stopped the echo returning +19 dB
@@ -6420,12 +6421,24 @@ export class DubBus {
   /** Ref-counted, like `claimSettingKeys`, so overlapping moves nest safely. */
   holdWetGesture(): () => void {
     this._wetGestures++;
+    this._applyWetGestureLift();
     let released = false;
     return () => {
       if (released) return;
       released = true;
       this._wetGestures = Math.max(0, this._wetGestures - 1);
+      this._applyWetGestureLift();
     };
+  }
+
+  /** The wet make-up's gain: the calibration, lifted while a return processor is held. */
+  private _wetMakeupTarget(): number {
+    return WET_CHAIN_MAKEUP * (this._wetGestures > 0 ? WET_GESTURE_LIFT : 1);
+  }
+
+  /** Ramp the make-up to its target; 80 ms so a toggle swells in rather than clicks. */
+  private _applyWetGestureLift(): void {
+    this._settle(this.wetMakeup.gain, this._wetMakeupTarget(), this.context.currentTime, 0.08);
   }
 
   claimSettingKeys(keys: readonly string[]): () => void {
