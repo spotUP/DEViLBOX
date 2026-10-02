@@ -46,6 +46,21 @@ describe('consoleCapture', () => {
     expect(entry!.message).toContain('wet=0.90');
   });
 
+  it('keeps the song load path: parser, engine, chip-RAM reader, loader, applySong', () => {
+    // "Almost all formats are broken" (2026-10-02) was triaged for a day
+    // without these lines, because none reached the relay.
+    console.log('[UADEParser] enhanced scan recovered no usable samples for x.gray; forcing classic UADESynth streaming');
+    console.log('[ChipRAMReader] Discarded the read: 79% of 246 populated cells name an instrument outside 1..5');
+    console.log('[UADEEngine] Deferred capture: 3 patterns loaded into store');
+    console.log('[UnifiedFileLoader] loading x.gray');
+    console.log('[applySong] file: "x" - 1 patterns, 2 instruments, editor classic');
+
+    const m = getConsoleEntries().map(e => e.message);
+    for (const p of ['[UADEParser]', '[ChipRAMReader]', '[UADEEngine]', '[UnifiedFileLoader]', '[applySong]']) {
+      expect(m.some(x => x.startsWith(p)), p).toBe(true);
+    }
+  });
+
   it('still keeps errors and warnings', () => {
     console.warn('[DubBus] backwardReverb abort — captured SILENCE (peak=7.51e-6)');
     console.error('boom');

@@ -52,7 +52,15 @@ function argsToString(args: unknown[]): string {
  * holds 500 entries and a general log capture would evict the errors it exists
  * to hold.
  */
-const CAPTURED_LOG_PREFIXES = /^\[(DubRouter|DubBus|DubBusCtrl|DubPanic|DubLane|DubRecorder|FurnaceDispatch|FurnaceDispatchSynth|NativeEngineRouting|ChannelRoutedEffects|MixerStore|DubBusSnap|DubMoveAudit)\]/;
+/**
+ * The song LOAD path joined the allowlist on 2026-10-03. "Almost all formats
+ * are broken" was triaged for a day with no view of what the parser, the UADE
+ * engine or the chip-RAM reader decided for a file, because none of their
+ * lines ([UADEParser] "forcing classic", [ChipRAMReader] "Discarded the
+ * read", [applySong] "N patterns") reached the relay. The worklet's own
+ * [UADE.worklet] lines never can: they are printed in the AudioWorklet scope.
+ */
+const CAPTURED_LOG_PREFIXES = /^\[(DubRouter|DubBus|DubBusCtrl|DubPanic|DubLane|DubRecorder|FurnaceDispatch|FurnaceDispatchSynth|NativeEngineRouting|ChannelRoutedEffects|MixerStore|DubBusSnap|DubMoveAudit|UADEParser|UADEEngine|ChipRAMReader|UnifiedFileLoader|applySong)\]/;
 
 /** Start capturing console errors/warnings and unhandled rejections */
 export function startConsoleCapture(): void {
