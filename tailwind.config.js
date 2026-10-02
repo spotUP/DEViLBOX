@@ -3,6 +3,11 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    // Tests hold no UI classes. Scanning them only costs time, and a test
+    // deleted while the dev server runs left a stale path that failed the
+    // whole CSS build with ENOENT.
+    "!./src/**/__tests__/**",
+    "!./src/test/**",
   ],
   theme: {
     // Breakpoint scale — MUST stay identical to BREAKPOINTS in
