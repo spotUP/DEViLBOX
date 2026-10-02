@@ -154,7 +154,8 @@ describe('DubBus, rendered', () => {
     const before = toDb(rmsBetween(out, 0.6, 1.0));
     const held = toDb(rmsBetween(out, 1.4, 2.0));
     const after = toDb(rmsBetween(out, 2.6, 3.0));
-    expect(held - before, 'the toggle left the wet where it was').toBeGreaterThan(8);
+    expect(held - before, 'the toggle left the wet where it was').toBeGreaterThan(4);
+    expect(held - before, 'the lift is heavier than +6 dB').toBeLessThan(8);
     expect(Math.abs(after - before), 'the lift outlived the release').toBeLessThan(3);
   }, 60_000);
 });
