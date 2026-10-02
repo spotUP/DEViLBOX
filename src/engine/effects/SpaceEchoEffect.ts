@@ -282,6 +282,27 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.head3.delayTime.rampTo((this._options.rate * 3) / 1000, 0.1);
   }
 
+  /**
+   * What the engine is actually running with. RE-201 has had this seam for a
+   * while and SpaceEcho did not, so `DubBus.getLiveState()` read `null` for
+   * the live delay time on the engine that ships by default — the one
+   * parameter every throw, wobble and tape move actually moves. `rateMs` is
+   * the real value off the delay node, not the stored option, because a
+   * `rampTo` in flight is precisely what these diagnostics exist to show.
+   */
+  describe(): Record<string, unknown> {
+    let liveRateMs: number | null = null;
+    try {
+      const seconds = this.head1.delayTime.getValueAtTime(this.context.currentTime);
+      liveRateMs = typeof seconds === 'number' && Number.isFinite(seconds) ? seconds * 1000 : null;
+    } catch { /* node not ready */ }
+    return {
+      ...this._options,
+      rateMs: liveRateMs,
+      delayTime: this._options.rate,
+    };
+  }
+
   setIntensity(amount: number) {
     const clamped = Math.max(0, Math.min(0.95, amount));
     this._options.intensity = clamped;

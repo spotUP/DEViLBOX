@@ -55,3 +55,41 @@ describe('the Liquid sweep drives whichever engine is in the path', () => {
     expect(SRC).toContain("this._settle(this.phaserOutput.gain, isPhaser ? sweepBranchNorm('phaser', m.phaserFeedback ?? 0) : 0, now, 0.01);");
   });
 });
+
+/**
+ * Liquid was STILL dead after the rate fix above, and this is why.
+ *
+ * Measured 2026-10-01 with analyser taps either side of the phaser:
+ * `sweepPhaserInRms` 0.00091 against `sweepPhaserOutRms` exactly 0 — signal
+ * arriving at the branch, nothing leaving it. That was at depth 1.0, 12 stages,
+ * feedback 0.9 and 2 Hz, with `sweepPhaserWasmReady` true and the WASM itself
+ * verified healthy offline (residual 0.278 against the input at the shipped
+ * settings, so the DSP changes the signal substantially).
+ *
+ * So the break was the connection, not the engine and not the settings.
+ * `Tone.connect` was handed a raw `GainNode` cast into a Tone type, so the
+ * worklet's real input node received no audio, the worklet filled its output
+ * with zeros, and the effect was silent at every setting. Every other
+ * Tone↔native connection in DubBus.ts goes through `getNativeAudioNode`
+ * (lines 686, 724, 756, 836) — this one did not. The startup passthrough that
+ * would have hidden the fault is explicitly disconnected when the WASM takes
+ * over, so there was no fallback left to hear.
+ */
+describe('the phaser branch is connected to the bus at all', () => {
+  it('hands the phaser native nodes on both sides rather than a Tone cast', () => {
+    expect(SRC, 'a Tone cast leaves the worklet input silent at every setting')
+      .not.toContain('Tone.connect(this.sweepInput');
+    expect(SRC).toContain('getNativeAudioNode(this.sweepInput as unknown)');
+    expect(SRC).toContain('getNativeAudioNode(this.phaser.input as unknown)');
+    expect(SRC).toContain('getNativeAudioNode(this.phaser.output as unknown)');
+  });
+
+  it('keeps the branch measurable, so this can never be undiagnosable again', () => {
+    // The reason this took a full investigation: a severed branch and a
+    // working one both read as "SILENT", because a phaser barely moves level
+    // and every other probe (gate, branch gain, wasmReady) read healthy.
+    expect(SRC).toContain('sweepPhaserInRms');
+    expect(SRC).toContain('sweepPhaserOutRms');
+    expect(SRC).toContain('sweepPhaserWasmReady');
+  });
+});

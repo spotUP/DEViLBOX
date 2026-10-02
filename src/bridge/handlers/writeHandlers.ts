@@ -528,6 +528,143 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
 }
 
 /**
+ * A/B one dub bus parameter against FIXED pink noise, with the song stopped.
+ *
+ * Every "this knob is dead" call on 2026-10-02 was really an instrument
+ * problem. Return-RMS was sampled from a playing song whose level drifts, and
+ * the two values were read seconds apart, so the drift landed entirely on the
+ * difference — every parameter tested read LOWER when raised, which is what
+ * made springWet look dead (1.1% "no change") and then nearly got "fixed"
+ * when it was not broken. Two knobs were measured that way and both were fine.
+ *
+ * A fixed signal removes the drift: the same seeded pink noise feeds the bus
+ * for both readings, so the only thing that differs is the parameter. Sampling
+ * is interleaved ABAB rather than all-A-then-all-B, so any residual drift
+ * (LFO rate, ramp settling) is shared by both arms instead of loading onto
+ * one.
+ *
+ * Reports the return energy in dB at each value plus the delta, and the live
+ * value the graph actually reached for that parameter — so a knob that moves
+ * the store but not the node is distinguishable from one that does nothing at
+ * all. Both channels are summed: a mono analyser reads a decorrelated stereo
+ * reverb up to 3 dB low.
+ *
+ * Refuses while the transport plays, exactly like `measure_dub_bus_stages` —
+ * a song in the measurement is the bug this exists to remove.
+ */
+export async function measureDubKnob(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (useTransportStore.getState().isPlaying) return { error: 'Transport is playing - stop playback first (the song would be in the measurement).' };
+  const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
+  const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
+  const bus = getDrumPadEngine()?.getDubBus() as unknown as Record<string, unknown> | undefined;
+  if (!bus) return { error: 'No dub bus (open the tracker, drum pad or DJ view once).' };
+
+  const knob = params.knob as string | undefined;
+  if (!knob) return { error: 'knob required (the DubBusSettings key to A/B, e.g. echoWet)' };
+  const valueA = Number(params.a);
+  const valueB = Number(params.b);
+  if (!Number.isFinite(valueA) || !Number.isFinite(valueB)) return { error: 'a and b required (finite numbers)' };
+  if (valueA === valueB) return { error: 'a and b are the same - nothing to compare' };
+
+  const store = useDrumPadStore.getState();
+  const saved = JSON.parse(JSON.stringify(store.dubBus)) as Record<string, unknown>;
+  const settleMs = 600;
+  const sampleMs = 900;
+  const rounds = Math.min(8, Math.max(2, Number(params.rounds ?? 3)));
+  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  const input = bus.input as GainNode;
+  const ctx = input.context as AudioContext;
+  const ret = bus.return_ as GainNode;
+  const probeNode = (params.probe as string | undefined) === 'input' ? input : ret;
+  let src: AudioBufferSourceNode | null = null;
+  let split: ChannelSplitterNode | null = null;
+  try {
+    store.setDubBus({ enabled: true });
+    await wait(settleMs);
+    for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
+
+    // Same deterministic pink noise as measure_dub_bus_stages — identical
+    // seed, identical filter, so a reading here is comparable with one from
+    // there.
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, seed = 12345;
+    for (let i = 0; i < len; i++) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      const w = (seed / 2 ** 32) * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.011; b6 = w * 0.115926;
+    }
+    src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+
+    split = ctx.createChannelSplitter(2);
+    probeNode.connect(split);
+    const analysers = [0, 1].map((ch) => {
+      const an = ctx.createAnalyser(); an.fftSize = 4096; split!.connect(an, ch); return an;
+    });
+    src.connect(input);
+    src.start();
+    await wait(sampleMs);
+
+    const energy = async (): Promise<number> => {
+      const f = new Float32Array(4096);
+      let e = 0;
+      for (const an of analysers) { an.getFloatTimeDomainData(f); for (const x of f) e += x * x; }
+      return e;
+    };
+    // One interleaved round: a, b, b, a. The doubled arms cancel any ramp
+    // still settling from the previous setting and share drift between both.
+    const arm = async (value: number): Promise<number> => {
+      store.setDubBus({ [knob]: value } as never);
+      await wait(settleMs);
+      let e = 0;
+      for (let i = 0; i < 12; i++) { e += await energy(); await wait(40); }
+      return e;
+    };
+    const aSamples: number[] = [];
+    const bSamples: number[] = [];
+    for (let r = 0; r < rounds; r++) {
+      aSamples.push(await arm(valueA));
+      bSamples.push(await arm(valueB));
+      bSamples.push(await arm(valueB));
+      aSamples.push(await arm(valueA));
+    }
+    const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / Math.max(1, xs.length);
+    const meanA = mean(aSamples);
+    const meanB = mean(bSamples);
+    const db = (e: number) => (e > 0 ? 10 * Math.log10(e) : -Infinity);
+    const deltaDb = Math.round((db(meanB) - db(meanA)) * 10) / 10;
+
+    // What the graph actually reached, paired against what was asked for —
+    // this is the line that separates "moves the store only" from "dead".
+    const live = (bus as unknown as { getLiveState?: () => Record<string, { desired: number | null; actual: number | null; delta: number | null }> }).getLiveState?.() ?? null;
+
+    return {
+      ok: true,
+      knob, a: valueA, b: valueB,
+      probe: params.probe === 'input' ? 'input' : 'return',
+      energyA: +meanA.toFixed(3), energyB: +meanB.toFixed(3),
+      dbA: Math.round(db(meanA) * 10) / 10, dbB: Math.round(db(meanB) * 10) / 10,
+      deltaDb,
+      // Under ~0.5 dB is inside the noise floor of the rig itself; treat it as
+      // "no measurable effect", NOT as proof the control is dead.
+      measurable: Math.abs(deltaDb) >= 0.5,
+      liveState: live,
+      note: 'A fixed pink-noise signal, song stopped. |deltaDb| < 0.5 means the rig cannot see a difference; raise rounds or probe before concluding the control is dead.',
+    };
+  } finally {
+    try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
+    try { if (split) probeNode.disconnect(split); } catch { /* ok */ }
+    useDrumPadStore.getState().setDubBus(saved as never);
+    await wait(50);
+    for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
+  }
+}
+
+/**
  * Measure one master effect's level: stereo pink noise (the same on both
  * channels, as a mix's centre) straight into the master effects input, with
  * the chain temporarily set to just this effect. Reports the effect's own

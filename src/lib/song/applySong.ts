@@ -26,6 +26,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useDubStore } from '@/stores/useDubStore';
+import { ensureBusIsFed } from '@/lib/dub/seedSendOnEnable';
 import { getToneEngine } from '@/engine/ToneEngine';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
@@ -152,6 +153,11 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   // back from the audio graph - a new song inherited the last one's moves
   // (2026-09-22, jennipha.ahx opening the Dub Deck at 45 / 25 / 43 / 25 %).
   useMixerStore.getState().resetDubSends();
+  // ...but closing every send starves a bus that is still switched on, and
+  // the deck gates every `needsSend` move on an audible send, so the reset
+  // left Tape Stop, Sub Harmonic, Filter Drop and the rest firing nothing
+  // but a "Raise a CH send first" toast. Re-feed what this just starved.
+  ensureBusIsFed(useDrumPadStore.getState().dubBus.enabled);
   useAutomationStore.getState().reset();
   useTransportStore.getState().reset();
   useInstrumentStore.getState().reset();

@@ -12,6 +12,8 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { useMixerStore } from '@/stores/useMixerStore';
+import { anySendAudible } from '@/lib/dub/sendAudibility';
 import type { DubBusSettings } from '@/types/dub';
 import { DEFAULT_DUB_BUS, RE201_DELAY_MODES } from '@/types/dub';
 import { Speaker } from 'lucide-react';
@@ -95,6 +97,11 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
   const dubBus = useDrumPadStore((s) => s.dubBus);
   const setDubBus = useDrumPadStore((s) => s.setDubBus);
   const applySoundSystemToBank = useDrumPadStore((s) => s.applySoundSystemToBank);
+  // Stable array reference — a selector returning a fresh map() would
+  // re-render on every store tick.
+  const mixerChannels = useMixerStore((s) => s.channels);
+  const anyAudibleSend = anySendAudible(mixerChannels.map(c => c?.dubSend));
+  const returnIsSilent = dubBus.enabled && !anyAudibleSend;
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -155,7 +162,17 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
     return (
       <div className="flex flex-col gap-2 p-3 overflow-y-auto">
           <div className="flex items-center justify-between pb-1 border-b border-dark-borderLight">
-            <span className="text-xs font-bold text-text-primary">Dub Bus</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-text-primary">Dub Bus</span>
+              {returnIsSilent && (
+                <span
+                  title="The bus is fed only by channels whose send is open, and every send is closed — so the whole return chain below is silent until you open one."
+                  className="px-1.5 py-0.5 text-[9px] font-mono bg-accent-warning/10 border border-accent-warning/50 text-accent-warning rounded"
+                >
+                  No channel send — bus silent
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {/* KILL — hard-flush the bus. Fires the `dub-panic` event which
                   the engines' mount-useEffects listen to; they run
@@ -192,6 +209,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
             </div>
           </div>
 
+          <div className={returnIsSilent ? 'opacity-50' : undefined}>
           <Slider
             label="Return gain"
             value={liveReturnGain}
@@ -308,9 +326,13 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
             min={0}
             max={1}
             step={0.01}
+            // Never disabled. It used to be `disabled` whenever the stage was
+            // Off, which made it a grey knob that did nothing — reported
+            // 2026-10-02. Moving the mix now fits the default stage for you
+            // (reconcilePlateStage in the store), so the gesture you made is
+            // the gesture that lands.
             onChange={(v) => patch({ plateStageMix: v })}
             format={(v) => `${Math.round(v * 100)}%`}
-            disabled={dubBus.plateStage === 'off'}
           />
           <div className="h-px bg-dark-borderLight my-1" />
           <Choice
@@ -391,6 +413,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
             options={[
               { value: 'bus', label: 'Bus (self)' },
               { value: 'channel', label: 'Channel…' },
+              { value: 'drums', label: 'Drums (auto)' },
             ] as const}
             onChange={(v) => patch({ sidechainSource: v })}
           />
@@ -992,6 +1015,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
             format={(v) => `${Math.round(v)} Hz`}
           />
           </Section>
+          </div>
       </div>
     );
   }
