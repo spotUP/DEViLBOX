@@ -28,7 +28,7 @@ import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 import { getDevilboxAudioContext } from '../../utils/audio-context';
 import { applyEphemeralDubSettings } from '../../lib/dub/measurementSettings';
-import type { EphemeralDubSettingsTarget } from '../../lib/dub/measurementSettings';
+import type { EphemeralDubSettings, EphemeralDubSettingsTarget } from '../../lib/dub/measurementSettings';
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
 import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths, testMAMESynths } from '../../utils/synthTester';
 
@@ -432,6 +432,26 @@ export async function setDubBusEnabled(params: Record<string, unknown>): Promise
 }
 
 /**
+ * Two seconds of seeded pink noise (Paul Kellet's filter, ~-35 dBFS) in
+ * channel 0. The same seed every call, so readings from every measuring tool
+ * are comparable with each other and across runs.
+ */
+function seededPinkNoise(ctx: BaseAudioContext, channels: number): AudioBuffer {
+  const len = ctx.sampleRate * 2;
+  const buf = ctx.createBuffer(channels, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, seed = 12345;
+  for (let i = 0; i < len; i++) {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    const w = (seed / 2 ** 32) * 2 - 1;
+    b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+    b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+    d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.011; b6 = w * 0.115926;
+  }
+  return buf;
+}
+
+/**
  * Measure the dub bus stage by stage: pink noise into the bus input, the
  * level at each named stage relative to the input (both channels' energy - a
  * mono analyser reads a decorrelated stereo reverb up to 3 dB low), with
@@ -464,13 +484,13 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
   const ctx = input.context as AudioContext;
   const taps: Array<{ name: string; node: AudioNode; split: ChannelSplitterNode; a: AnalyserNode[] }> = [];
   let src: AudioBufferSourceNode | null = null;
-  let restoreSettings: (() => void) | null = null;
+  let probe: EphemeralDubSettings | null = null;
   try {
     // Engine-only, behind a claim: a probe is not a setting the performer
     // chose and must not reach localStorage. See measurementSettings.ts — the
     // store used to be written here, so a reload mid-probe stranded the
     // probe as the user's own voicing.
-    restoreSettings = applyEphemeralDubSettings(
+    probe = applyEphemeralDubSettings(
       bus as unknown as EphemeralDubSettingsTarget,
       saved,
       override,
@@ -478,17 +498,7 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
     await wait(settleMs);
     // An echo-engine swap holds the bus muted and replays settings after it.
     for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
-    const len = ctx.sampleRate * 2;
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, seed = 12345;
-    for (let i = 0; i < len; i++) {
-      seed = (seed * 1103515245 + 12345) >>> 0;
-      const w = (seed / 2 ** 32) * 2 - 1;
-      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
-      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
-      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.011; b6 = w * 0.115926;
-    }
+    const buf = seededPinkNoise(ctx, 1);
     src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
     for (const name of ['input', ...names]) {
       const node = bus[name] as AudioNode | undefined;
@@ -519,7 +529,7 @@ export async function measureDubBusStages(params: Record<string, unknown>): Prom
   } finally {
     try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
     for (const t of taps) { try { t.node.disconnect(t.split); } catch { /* ok */ } }
-    restoreSettings?.();
+    probe?.restore();
     // Let a restoring echo-engine swap finish before the next call can start
     // another: two swaps overlapping read the input gain mid-mute.
     await wait(50);
@@ -565,65 +575,85 @@ export async function measureDubKnob(params: Record<string, unknown>): Promise<R
   const valueB = Number(params.b);
   if (!Number.isFinite(valueA) || !Number.isFinite(valueB)) return { error: 'a and b required (finite numbers)' };
   if (valueA === valueB) return { error: 'a and b are the same - nothing to compare' };
+  const probeKind = params.probe === 'input' || params.probe === 'tail' ? params.probe : 'return';
 
-  const store = useDrumPadStore.getState();
-  const saved = JSON.parse(JSON.stringify(store.dubBus)) as Record<string, unknown>;
+  const saved = JSON.parse(JSON.stringify(useDrumPadStore.getState().dubBus)) as Record<string, unknown>;
   const settleMs = 600;
-  const sampleMs = 900;
   const rounds = Math.min(8, Math.max(2, Number(params.rounds ?? 3)));
+  // Tail mode: how long the noise excites the bus, and how long the decay is
+  // read for once it stops. Long enough for a spring or a few echo repeats.
+  const exciteMs = 400;
+  const tailMs = Math.min(4000, Math.max(300, Number(params.tailMs ?? 1500)));
   const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
   const input = bus.input as GainNode;
   const ctx = input.context as AudioContext;
-  const ret = bus.return_ as GainNode;
-  const probeNode = (params.probe as string | undefined) === 'input' ? input : ret;
+  const probeNode = probeKind === 'input' ? input : bus.return_ as GainNode;
   let src: AudioBufferSourceNode | null = null;
+  let gate: GainNode | null = null;
   let split: ChannelSplitterNode | null = null;
+  let probe: EphemeralDubSettings | null = null;
   try {
-    store.setDubBus({ enabled: true });
+    // Engine-only, behind a claim, exactly like measure_dub_bus_stages: the
+    // probe's values never reach the store, so a reload mid-run cannot strand
+    // them as the performer's voicing, and enabling the bus for the probe
+    // seeds no channel send.
+    probe = applyEphemeralDubSettings(bus as unknown as EphemeralDubSettingsTarget, saved, { [knob]: valueA });
     await wait(settleMs);
     for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
 
-    // Same deterministic pink noise as measure_dub_bus_stages — identical
-    // seed, identical filter, so a reading here is comparable with one from
-    // there.
-    const len = ctx.sampleRate * 2;
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, seed = 12345;
-    for (let i = 0; i < len; i++) {
-      seed = (seed * 1103515245 + 12345) >>> 0;
-      const w = (seed / 2 ** 32) * 2 - 1;
-      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
-      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
-      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.011; b6 = w * 0.115926;
-    }
-    src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    // The same seeded pink noise as measure_dub_bus_stages, so a reading here
+    // is comparable with one from there. The gate lets tail mode stop the
+    // excitation sample-accurately.
+    src = ctx.createBufferSource(); src.buffer = seededPinkNoise(ctx, 1); src.loop = true;
+    gate = ctx.createGain();
+    gate.gain.value = probeKind === 'tail' ? 0 : 1;
+    src.connect(gate);
+    gate.connect(input);
+    src.start();
 
     split = ctx.createChannelSplitter(2);
     probeNode.connect(split);
     const analysers = [0, 1].map((ch) => {
       const an = ctx.createAnalyser(); an.fftSize = 4096; split!.connect(an, ch); return an;
     });
-    src.connect(input);
-    src.start();
-    await wait(sampleMs);
-
-    const energy = async (): Promise<number> => {
+    const energy = (): number => {
       const f = new Float32Array(4096);
       let e = 0;
       for (const an of analysers) { an.getFloatTimeDomainData(f); for (const x of f) e += x * x; }
       return e;
     };
-    // One interleaved round: a, b, b, a. The doubled arms cancel any ramp
-    // still settling from the previous setting and share drift between both.
-    const arm = async (value: number): Promise<number> => {
-      store.setDubBus({ [knob]: value } as never);
-      await wait(settleMs);
+
+    // Steady state: the return's energy while the noise runs.
+    const steadyArm = async (): Promise<number> => {
       let e = 0;
-      for (let i = 0; i < 12; i++) { e += await energy(); await wait(40); }
+      for (let i = 0; i < 12; i++) { e += energy(); await wait(40); }
       return e;
     };
+    // Tail: excite, gate the input off at a known instant, then read only
+    // what the bus keeps sounding afterwards. Return-RMS under steady noise
+    // is dominated by the direct path and cannot see a reverb or delay tail
+    // (springWet/echoWet read +0.3/+0.1 dB while audibly working, 2026-10-02).
+    const tailArm = async (): Promise<number> => {
+      const g = gate!.gain;
+      const t0 = ctx.currentTime;
+      g.cancelScheduledValues(t0);
+      g.setValueAtTime(1, t0);
+      g.setValueAtTime(0, t0 + exciteMs / 1000);
+      await wait(exciteMs + 100);
+      let e = 0;
+      const reads = Math.floor(tailMs / 40);
+      for (let i = 0; i < reads; i++) { e += energy(); await wait(40); }
+      return e;
+    };
+
+    const arm = async (value: number): Promise<number> => {
+      probe!.write({ [knob]: value });
+      await wait(settleMs);
+      return probeKind === 'tail' ? tailArm() : steadyArm();
+    };
+    // Interleaved a, b, b, a: the doubled arms cancel any ramp still settling
+    // from the previous setting and share drift between both.
     const aSamples: number[] = [];
     const bSamples: number[] = [];
     for (let r = 0; r < rounds; r++) {
@@ -632,20 +662,21 @@ export async function measureDubKnob(params: Record<string, unknown>): Promise<R
       bSamples.push(await arm(valueB));
       aSamples.push(await arm(valueA));
     }
-    const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / Math.max(1, xs.length);
+    const mean = (xs: number[]) => xs.reduce((sum, x) => sum + x, 0) / Math.max(1, xs.length);
     const meanA = mean(aSamples);
     const meanB = mean(bSamples);
     const db = (e: number) => (e > 0 ? 10 * Math.log10(e) : -Infinity);
     const deltaDb = Math.round((db(meanB) - db(meanA)) * 10) / 10;
 
-    // What the graph actually reached, paired against what was asked for —
+    // What the graph actually reached, paired against what was asked for -
     // this is the line that separates "moves the store only" from "dead".
-    const live = (bus as unknown as { getLiveState?: () => Record<string, { desired: number | null; actual: number | null; delta: number | null }> }).getLiveState?.() ?? null;
+    const live = (bus as unknown as { getLiveState?: () => Record<string, unknown> }).getLiveState?.() ?? null;
 
     return {
       ok: true,
       knob, a: valueA, b: valueB,
-      probe: params.probe === 'input' ? 'input' : 'return',
+      probe: probeKind,
+      ...(probeKind === 'tail' ? { exciteMs, tailMs } : {}),
       energyA: +meanA.toFixed(3), energyB: +meanB.toFixed(3),
       dbA: Math.round(db(meanA) * 10) / 10, dbB: Math.round(db(meanB) * 10) / 10,
       deltaDb,
@@ -653,12 +684,14 @@ export async function measureDubKnob(params: Record<string, unknown>): Promise<R
       // "no measurable effect", NOT as proof the control is dead.
       measurable: Math.abs(deltaDb) >= 0.5,
       liveState: live,
-      note: 'A fixed pink-noise signal, song stopped. |deltaDb| < 0.5 means the rig cannot see a difference; raise rounds or probe before concluding the control is dead.',
+      note: probeKind === 'tail'
+        ? 'Return energy AFTER the noise stops: the tail a reverb or delay leaves. Use this for springWet, echoWet and other tail controls.'
+        : 'A fixed pink-noise signal, song stopped. |deltaDb| < 0.5 means the rig cannot see a difference; for reverb and delay controls use probe: tail before concluding the control is dead.',
     };
   } finally {
-    try { src?.stop(); src?.disconnect(); } catch { /* ok */ }
+    try { src?.stop(); src?.disconnect(); gate?.disconnect(); } catch { /* ok */ }
     try { if (split) probeNode.disconnect(split); } catch { /* ok */ }
-    useDrumPadStore.getState().setDubBus(saved as never);
+    probe?.restore();
     await wait(50);
     for (let i = 0; i < 50 && (bus._muteHoldActive || bus._pendingPostHoldSettings); i++) await wait(100);
   }
@@ -718,17 +751,9 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
     const missing = configs.filter((c) => !built.get(c.id)).map((c) => c.type);
     if (missing.length) return { error: `not built: ${missing.join(', ')} (unknown type, or it failed to load)` };
     const entry = built.get(configs[configs.length - 1].id)!;
-    const len = ctx.sampleRate * 2;
-    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    const buf = seededPinkNoise(ctx, 2);
     const d = buf.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, seed = 12345;
-    for (let i = 0; i < len; i++) {
-      seed = (seed * 1103515245 + 12345) >>> 0;
-      const w = (seed / 2 ** 32) * 2 - 1;
-      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
-      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
-      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.011; b6 = w * 0.115926;
-    }
+    const len = d.length;
     // At a mix's level (default -18 dBFS RMS): drive, saturation and feedback
     // limiting are level-dependent, and at the -35 dBFS this noise came out at
     // the Neural amps read 10-18 dB quiet and a runaway delay +32 dB.

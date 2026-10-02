@@ -44,16 +44,24 @@ export interface EphemeralDubSettingsTarget {
  * @param saved   the settings to put back when the returned function is called
  * @param override the probe's settings; `enabled` is forced on, because a
  *                 silent bus has nothing to measure
- * @returns a restore function, safe to call more than once
+ * @returns `write` for further probe values under the same claim (an A/B
+ *          probe steps its knob), and `restore`, safe to call more than once
  */
+export interface EphemeralDubSettings {
+  write(patch: Record<string, unknown>): void;
+  restore(): void;
+}
+
 export function applyEphemeralDubSettings(
   bus: EphemeralDubSettingsTarget,
   saved: Record<string, unknown>,
   override: Record<string, unknown>,
-): () => void {
+): EphemeralDubSettings {
   const keys = [...Object.keys(override), 'enabled'];
   let unclaim = bus.claimSettingKeys(keys);
+  let restored = false;
   const write = (patch: Record<string, unknown>): void => {
+    if (restored) return;
     unclaim();
     bus.setSettings(patch);
     unclaim = bus.claimSettingKeys(keys);
@@ -61,11 +69,13 @@ export function applyEphemeralDubSettings(
 
   write({ ...saved, ...override, enabled: true });
 
-  let restored = false;
-  return () => {
-    if (restored) return;
-    restored = true;
-    unclaim();
-    bus.setSettings(saved);
+  return {
+    write,
+    restore: () => {
+      if (restored) return;
+      restored = true;
+      unclaim();
+      bus.setSettings(saved);
+    },
   };
 }

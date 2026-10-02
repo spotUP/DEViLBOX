@@ -53,10 +53,10 @@ describe('measure_dub_knob measures the parameter, not the song', () => {
 
   it('drives fixed seeded pink noise into the bus input', () => {
     const body = knobBody();
-    expect(body).toContain('src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;');
-    expect(body).toContain('src.connect(input);');
-    // Deterministic seed — the reading must be repeatable run to run.
-    expect(body).toContain('seed = 12345');
+    // The shared seeded generator — the reading must be repeatable run to run.
+    expect(body).toContain('src.buffer = seededPinkNoise(ctx, 1)');
+    expect(body).toContain('src.connect(gate);');
+    expect(body).toContain('gate.connect(input);');
   });
 
   it('interleaves A and B so drift cannot load onto either arm', () => {
@@ -83,8 +83,20 @@ describe('measure_dub_knob measures the parameter, not the song', () => {
     expect(body).toMatch(/noise floor of the rig/);
   });
 
-  it('restores the settings it changed', () => {
-    expect(knobBody()).toContain('setDubBus(saved as never)');
+  it('never writes the probe values to the persisted store', () => {
+    // Every arm used to go through setDubBus, which saves to localStorage: a
+    // reload mid-run kept the probe value, and `enabled: true` seeded a send.
+    const body = knobBody();
+    expect(body).not.toContain('setDubBus(');
+    expect(body).toContain('probe = applyEphemeralDubSettings(');
+    expect(body).toContain('probe!.write({ [knob]: value });');
+    expect(body).toContain('probe?.restore();');
+  });
+
+  it('reads the decay after the noise stops in tail mode', () => {
+    const body = knobBody();
+    expect(body).toContain("return probeKind === 'tail' ? tailArm() : steadyArm();");
+    expect(body).toMatch(/g\.setValueAtTime\(0, t0 \+ exciteMs \/ 1000\);[\s\S]*await wait\(exciteMs \+ 100\);[\s\S]*e \+= energy\(\)/);
   });
 
   it('is registered on the bridge', () => {

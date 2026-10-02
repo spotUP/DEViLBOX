@@ -85,7 +85,7 @@ describe('applyEphemeralDubSettings', () => {
 
   it('releases the claim BEFORE restoring, or the restore is a silent no-op', () => {
     const { bus, calls, ops } = fakeBus();
-    const restore = applyEphemeralDubSettings(bus, SAVED, { returnGain: 0.85 });
+    const { restore } = applyEphemeralDubSettings(bus, SAVED, { returnGain: 0.85 });
     calls.length = 0;
     restore();
     expect(ops()).toEqual(['release', 'set']);
@@ -93,7 +93,7 @@ describe('applyEphemeralDubSettings', () => {
 
   it('puts the saved settings back, not the probe', () => {
     const { bus, calls } = fakeBus();
-    const restore = applyEphemeralDubSettings(bus, SAVED, { returnGain: 0.85, echoWet: 1 });
+    const { restore } = applyEphemeralDubSettings(bus, SAVED, { returnGain: 0.85, echoWet: 1 });
     restore();
     const last = calls[calls.length - 1];
     expect(last.op).toBe('set');
@@ -102,7 +102,7 @@ describe('applyEphemeralDubSettings', () => {
 
   it('leaves the keys alone after restoring — the probe is over', () => {
     const { bus, ops } = fakeBus();
-    const restore = applyEphemeralDubSettings(bus, SAVED, { returnGain: 0.85 });
+    const { restore } = applyEphemeralDubSettings(bus, SAVED, { returnGain: 0.85 });
     restore();
     expect(ops().filter(op => op === 'claim')).toHaveLength(2);
     expect(ops().at(-1)).toBe('set');
@@ -110,7 +110,7 @@ describe('applyEphemeralDubSettings', () => {
 
   it('restores once, however often it is called', () => {
     const { bus, calls } = fakeBus();
-    const restore = applyEphemeralDubSettings(bus, SAVED, { returnGain: 0.85 });
+    const { restore } = applyEphemeralDubSettings(bus, SAVED, { returnGain: 0.85 });
     restore();
     calls.length = 0;
     restore();
