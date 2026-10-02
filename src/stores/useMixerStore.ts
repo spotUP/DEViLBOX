@@ -222,6 +222,14 @@ function _regBitmask(name: string, Engine: any, chLimit?: number): void {
   }
 }
 
+let _resolveMuteRegistryReady: () => void = () => {};
+/** Resolves once every engine the mute mask can reach is registered (tests). */
+export const muteRegistryReady: Promise<void> = new Promise((resolve) => { _resolveMuteRegistryReady = resolve; });
+/** Registry names the mute mask reaches, bitmask engines first (tests). */
+export function muteMaskEngineNames(): string[] {
+  return [..._muteMaskEngineCache.keys()];
+}
+
 // Eagerly warm up all engine imports so mute is synchronous.
 // Each import uses a STATIC string path so Vite can properly resolve them.
 void (async () => {
@@ -304,8 +312,37 @@ void (async () => {
   ];
 
   await Promise.allSettled(promises);
+  // One source: the engine registry. Every descriptor whose class can mute
+  // joins the caches. The hand list above predates FredReplayer2, Oktalyzer,
+  // Dss, Synthesis, SoundFactory2 and Asap - all with setMuteMask, none ever
+  // handed a mask, so solo and mute did nothing on a Fred Editor song
+  // (2026-10-03). Deduplicated by class: the list names classes, the registry
+  // names descriptors, and one engine must not take the mask twice.
+  try {
+    const routing = await import('../engine/replayer/NativeEngineRouting');
+    // The routing module and this store sit on an import cycle; when this
+    // warm-up runs while that module is still evaluating, its namespace
+    // resolves with WASM_ENGINES not yet initialised. Wait for it rather than
+    // register nothing: a silent miss here is exactly the bug this replaces.
+    for (let tries = 0; !Array.isArray(routing.WASM_ENGINES) && tries < 100; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const { WASM_ENGINES } = routing;
+    if (!Array.isArray(WASM_ENGINES)) throw new Error('WASM_ENGINES never initialised');
+    const { collectMuteRegistrations } = await import('../lib/mixer/engineMuteRegistry');
+    const known = new Set<unknown>([..._muteMaskEngineCache.values()].map(v => v.Engine));
+    const knownGain = new Set<unknown>([..._gainEngineCache.values()].map(v => v.Engine));
+    for (const r of await collectMuteRegistrations(WASM_ENGINES)) {
+      if (r.bitmask && !known.has(r.Engine)) { _muteMaskEngineCache.set(r.key, { Engine: r.Engine as unknown as MuteMaskEngine }); known.add(r.Engine); }
+      if (r.gain && !knownGain.has(r.Engine)) { _gainEngineCache.set(r.key, { Engine: r.Engine as unknown as GainEngine, maxCh: 32 }); knownGain.add(r.Engine); }
+    }
+  } catch (e) {
+    console.warn('[Mixer] engine registry mute registration failed:', e);
+  }
   _engineCacheWarmedUp = true;
+  _resolveMuteRegistryReady();
 })();
+
 
 function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boolean): void {
   let mask = 0;
