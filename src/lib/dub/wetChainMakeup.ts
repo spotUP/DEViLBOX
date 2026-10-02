@@ -19,7 +19,7 @@
 export const WET_CHAIN_MAKEUP = 3.0 / 0.85;
 
 /**
- * Extra wet-chain gain while a return processor is held (+12 dB).
+ * Extra wet-chain gain while a return processor is held (+6 dB).
  *
  * Wide, Wobble, Liquid, Sweep, Ring, Starve and Ping-Pong reshape the wet
  * return; they open no send. At Auto Dub's resting sends (0.1-0.2, kept low so
@@ -29,6 +29,9 @@ export const WET_CHAIN_MAKEUP = 3.0 / 0.85;
  *
  * Applied after the chain, on the make-up, not at the bus input: the siren
  * feedback loop re-enters at the input, and lifting there would multiply its
- * loop gain by four.
+ * loop gain.
+ *
+ * +12 dB (4) made the toggles fire but "way too strong" (owner, 2026-10-02);
+ * halved to +6 dB.
  */
-export const WET_GESTURE_LIFT = 4;
+export const WET_GESTURE_LIFT = 2;
