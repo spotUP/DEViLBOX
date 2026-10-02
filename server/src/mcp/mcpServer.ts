@@ -764,13 +764,14 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'measure_dub_knob',
-    'A/B one dub bus knob against FIXED seeded pink noise with the song stopped: measures the return energy at value `a` and `b`, interleaved ABAB so drift is shared, and reports the delta in dB. Separates "moves the store only" from "does nothing" via the live node value. Refuses while playing. |deltaDb| < 0.5 is the rig noise floor, not proof the control is dead.',
+    'A/B one dub bus knob against FIXED seeded pink noise with the song stopped: measures the return energy at value `a` and `b`, interleaved ABAB so drift is shared, and reports the delta in dB. Separates "moves the store only" from "does nothing" via the live node value. Refuses while playing. Probe values go to the engine only, never the store. |deltaDb| < 0.5 is the rig noise floor, not proof the control is dead; steady-noise return energy cannot see reverb/delay tails, so use probe: tail for those.',
     {
       knob: z.string().describe('DubBusSettings key to A/B, e.g. echoWet, springWet, plateStageMix'),
       a: z.number().describe('First value to test'),
       b: z.number().describe('Second value to test (must differ from a)'),
       rounds: z.number().optional().describe('Interleaved ABAB rounds (2-8, default 3)'),
-      probe: z.enum(['return', 'input']).optional().describe('Measure the return (default) or the bus input'),
+      probe: z.enum(['return', 'input', 'tail']).optional().describe('return (default): return energy under steady noise; input: the bus input; tail: return energy after the noise stops - use for reverb and delay controls (springWet, echoWet)'),
+      tailMs: z.number().optional().describe('tail mode: how long the decay is read after the noise stops (300-4000 ms, default 1500)'),
     },
     (p) => call('measure_dub_knob', p),
   );
