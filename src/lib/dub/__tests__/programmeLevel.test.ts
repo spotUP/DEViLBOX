@@ -9,6 +9,7 @@ import {
   type ProgrammeAnalyser,
   smoothProgrammeLevel,
   GENERATED_PRESENCE,
+  SUSTAINED_SOURCES,
   SILENT_PROGRAMME_PEAK,
   type ProgrammeLevel,
 } from '../programmeLevel';
@@ -52,6 +53,21 @@ describe('generatedPeakFor — referenced to the music, not to full scale', () =
   it('keeps a transient referenced to peak', () => {
     expect(generatedPeakFor('sonarPing', LOUD)).toBeGreaterThan(LOUD.rms);
     expect(generatedPeakFor('sonarPing', LOUD)).toBeCloseTo(LOUD.peak * 0.45, 6);
+  });
+
+  it('references the sub pulse to the peak, not the average', () => {
+    // Reported 2026-10-01 as "sub harmonic does nothing". It was in
+    // SUSTAINED_SOURCES by its toggle KIND rather than by the shape test that
+    // set membership is judged by, so it referenced the programme's RMS and
+    // lost a whole crest factor — 11 dB on the fixture below. The app's own
+    // move audit then measured +3.3 dB on the return: a sub thump that swells
+    // and decays like a hit, arriving as a nudge. It is the twin of `subSwell`,
+    // which has always been peak-referenced.
+    expect(SUSTAINED_SOURCES.has('subHarmonic')).toBe(false);
+    const sub = generatedPeakFor('subHarmonic', LOUD);
+    expect(sub).toBeCloseTo(LOUD.peak * 0.8, 6);
+    expect(sub).toBeGreaterThan(LOUD.rms * 2);       // clear of the mix average
+    expect(sub).toBeLessThan(LOUD.peak);            // still inside its headroom
   });
 
   it('puts the siren well below where the peak reference put it', () => {

@@ -13,6 +13,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { useDrumPadStore } from '../useDrumPadStore';
 import { DEFAULT_DUB_BUS } from '../../types/dub';
 
@@ -75,5 +77,49 @@ describe('useDrumPadStore — sidechain source fields (G13)', () => {
     useDrumPadStore.getState().setDubBus({ sidechainSource: 'bus' });
     expect(useDrumPadStore.getState().dubBus.sidechainSource).toBe('bus');
     expect(useDrumPadStore.getState().dubBus.sidechainChannelIndex).toBe(3);
+  });
+
+  // ─── 'drums' — the classifier key ────────────────────────────────────────
+  // Added 2026-10-02. The user reported the sidechain as inaudible, and the
+  // depth knob was measured healthy (threshold -33.3 dB at depth 0.91, no
+  // stuck latch). The cause was that both reachable sources made the duck
+  // useless in practice: 'bus' keys the dub return off itself, and ducking an
+  // already-quiet filtered return by 27 dB cannot be heard; 'channel' requires
+  // the performer to already know which channel holds the kick. 'drums' asks
+  // the channel classifier instead — the same source of truth the Master FX
+  // "Drums (auto)" key uses, so the two cannot drift apart.
+
+  it('accepts and persists the classifier key', () => {
+    useDrumPadStore.getState().setDubBus({ sidechainSource: 'drums' });
+    expect(useDrumPadStore.getState().dubBus.sidechainSource).toBe('drums');
+  });
+
+  it('leaves the default alone — bus self-compression is still the default', () => {
+    expect(DEFAULT_DUB_BUS.sidechainSource).toBe('bus');
+  });
+
+  it('the classifier key does not overwrite the performer\'s manual channel pick', () => {
+    useDrumPadStore.getState().setDubBus({ sidechainSource: 'channel', sidechainChannelIndex: 7 });
+    useDrumPadStore.getState().setDubBus({ sidechainSource: 'drums' });
+    const s = useDrumPadStore.getState().dubBus;
+    expect(s.sidechainChannelIndex, 'switching to the auto key threw away the manual pick').toBe(7);
+  });
+
+  it('offers the classifier key in the panel', () => {
+    // Guards the UI: a setting the engine honours but the panel never exposes
+    // is exactly the dead-knob shape this audit keeps finding.
+    const panel = readFileSync(
+      resolve(import.meta.dirname, '..', '..', 'components', 'dub', 'DubBusPanel.tsx'), 'utf8');
+    expect(panel).toMatch(/value: 'drums', label: 'Drums \(auto\)'/);
+  });
+
+  it('re-resolves the drum key when the song changes', () => {
+    // A drum key is a promise about one song. Without re-resolving on a new
+    // song the duck keys on whichever channel held the kick in the last one.
+    const strip = readFileSync(
+      resolve(import.meta.dirname, '..', '..', 'components', 'dub', 'DubDeckStrip.tsx'), 'utf8');
+    expect(strip).toMatch(/resolveDrumKeyChannel/);
+    expect(strip).toMatch(/drumKeySongId/);
+    expect(strip).toMatch(/drumKeySongId\]/);
   });
 });

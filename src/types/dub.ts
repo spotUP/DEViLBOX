@@ -69,7 +69,15 @@ export interface DubBusSettings {
   // channel worklet output is summed into the bus compressor alongside
   // the normal bus signal, so loud channel transients pull the threshold
   // down harder than the bus alone would.
-  sidechainSource: 'bus' | 'channel';
+  // 'bus'    = self-compression, the bus detects its own return.
+  // 'channel' = one named tracker channel keys the duck.
+  // 'drums'  = key on whatever channel the classifier calls the drums, found
+  //            again when the song changes. The kick sits on a different
+  //            channel in every song, so this is the only setting that can say
+  //            "key on the kick" without the performer counting channels.
+  //            Resolved by resolveDrumKeyChannel() — the same classifier the
+  //            Master FX "Drums (auto)" key uses.
+  sidechainSource: 'bus' | 'channel' | 'drums';
   // When sidechainSource = 'channel', which tracker channel index (0-based)
   // drives the ducking. Ignored for 'bus' mode. Defaults to 0 (first ch).
   sidechainChannelIndex: number;
@@ -289,6 +297,20 @@ export interface DubBusSettings {
   // 'comb' = current liquid-sweep short-delay flanger (default)
   // 'phaser' = CalfPhaser WASM all-pass cascade (authentic Mutron Bi-Phase)
   sweepMode: 'comb' | 'phaser';
+  /**
+   * What Sub Harmonic does while it is held.
+   *
+   * 'pulse' — a short sine fired by an envelope follower on the low band, at
+   * the pitch the bass is playing. Discrete, beat-synced weight on each kick.
+   * 'continuous' — the lowpassed bass itself, added back as a bed. No
+   * triggering, no pitch detection; it cannot go out of key because it IS the
+   * bassline. Thicker and more "dub", but it adds weight rather than
+   * brightness, since it reinforces content that is already there.
+   *
+   * Two different characters, not two settings of one: the pulse is a gesture,
+   * the bed is a layer. Both are wanted, so both ship.
+   */
+  subHarmonicMode: 'pulse' | 'continuous';
   phaserRate: number;      // LFO rate Hz (0.01-10)
   phaserDepth: number;     // LFO depth (0-1)
   phaserStages: number;    // all-pass stages (2-12)
@@ -376,13 +398,27 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // Subtle settings produced "I hear mostly the music" — the dub tail was
   // ~8 dB below the dry. These values put the tail within 3 dB of dry,
   // which is where King Tubby / Scientist records actually sit.
-  // Gig-fix (2026-04-18): dropped returnGain 1.0 → 0.55. At 1.0 the dub
-  // tail hit the master bus at parity with deck output — sirens + echo
-  // throws were ~+6 dB hotter than the music. 0.55 sits it ~-5 dB under
-  // the dry mix, which is where real dub records actually mix (the tail
-  // supports, never dominates). User can push it back up via the Dub
+  //
+  // returnGain is calibrated against a bus fed by FOUR partial channel taps,
+  // not the whole mix. On an isolation-capable engine the whole-mix fallback
+  // is deliberately silenced (`wholeMixTapGainMax` reads 0), so the bus only
+  // ever sees the channels whose sends are open, each capped at 0.7 by
+  // `dubSendToGain`. That feed is far below master level, so a return gain
+  // calibrated for a full-mix feed arrives ~20 dB under the music.
+  //
+  // Measured 2026-10-01 on the dub bus, four sends at 0.2123, master
+  // insertOut -12.2 dB: at 0.75 the return sat -24.8 dB under the master and
+  // EVERY wet move — Liquid, Echo, Starve, Comb — was inaudible, which is the
+  // "completely dead with the faders at max" report in the DubBus header.
+  // Sweeping it: 0.75 → -24.8 dB, 1.5 → -17.2, 3.0 → -8.5, 6.0 → -0.2 (hot).
+  // 3.0 is the value that puts the return ~-8 dB under the dry, the tail
+  // supporting the music without competing with it, and the user confirmed
+  // Liquid audible at it. The 2026-04-18 note that dropped this to 0.55 was
+  // measured against a different feed topology and no longer holds; the L3
+  // character presets below are scaled with it so they keep their relative
+  // balance. User can still push it back up via the Dub
   // Bus panel return knob if they want.
-  returnGain: 0.85,
+  returnGain: 3.0,
   // HPF default is 40 Hz — effectively off. Dub Bus is used across drumpad,
   // tracker, and DJ views, but only the DJ view benefits from rolling bass
   // off the send (deck kick + echo = mud). Drumpad + tracker mix per
@@ -461,7 +497,14 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   echoMode:         4,        // H2+H3 — classic dub two-tap timing
   echoFeedbackHpfHz: 350,   // was 250 — more low-end cleanup each repeat pass
   echoFeedbackLpfHz: 4000,
-  plateStage:       'off',
+  // Default stage is 'madprofessor', NOT 'off'.
+  //
+  // The plate WASM is only built when plateStage !== 'off', and the mix write
+  // is discarded outright when there is no plateSend node. With 'off' as the
+  // default that made the Plate mix knob a no-op out of the box — the exact
+  // opposite of its own documented 0.35 "audible colored tail" default. The
+  // knob was not dead code, it was a control with nothing behind it.
+  plateStage:       'madprofessor',
   plateStageMix:    0.35,
 
   // Return EQ — active with air shelf by default. Tape sat + dark feedback LPF
@@ -489,6 +532,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
 
   // Sweep mode — comb by default (backwards compat).
   sweepMode:        'comb',
+  subHarmonicMode:  'pulse',
   phaserRate:       0.3,
   phaserDepth:      0.7,
   phaserStages:     6,
@@ -634,7 +678,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     label: 'King Tubby',
     description: 'Dark, noisy, loose-spring. Stepped filter + tape-echo feedback. Narrow stereo. Light bus compression.',
     overrides: {
-      returnGain:     0.75,  // heavy bus presence — Tubby is LOUD
+      returnGain:     2.65,  // heavy bus presence — Tubby is LOUD
       hpfCutoff:      65,   // was 100 — lower to let sub-bass breathe
       hpfStepped:     true,   // L1: the Altec's stepped "Big Knob" is documented equipment.
       hpfResonanceDb: 2.5,    // L2 that it should resonate (the 9069B T-network does); L3 for 2.5 dB.
@@ -707,7 +751,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       chainOrder:    'echoSpring',  // echo first: distinct repeats. Unset, a preset
                                     // inherited the bus's order - Perry's spring-first
                                     // wash once he had been loaded (2026-09-30).
-      returnGain:     0.65,
+      returnGain:     2.29,
       hpfCutoff:       50,   // was 80 — more sub-bass room
       glueBypass:      true,   // research: "try mastering a song with compression" — he rejected ALL bus comp
       hpfStepped:      false,
@@ -752,7 +796,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     label: 'Lee "Scratch" Perry',
     description: 'Stacked tape saturation. Near-mono. Kickable spring with high chaos. Dark shelf, subtractive air. Phaser-like comb sweep on parallel send.',
     overrides: {
-      returnGain:     0.90,  // crushed, dominant bus
+      returnGain:     3.18,  // crushed, dominant bus
       hpfCutoff:       40,
       hpfStepped:      false,
       bassShelfGainDb: 2, bassShelfFreqHz: 80, bassShelfQ: 0.5,
@@ -827,7 +871,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     description: 'Lloyd "Prince Jammy" James — digital dancehall pioneer (Sleng Teng era). Crisp gated drums, bright Lexicon reverb tails, BBD echo, heavy sidechain. The bridge from analog dub into 80s/90s digital. Cleaner and more groove-locked than Sherwood, less echoey than Tubby.',
     overrides: {
       chainOrder:    'echoSpring',  // echo first: distinct repeats (see scientist).
-      returnGain:     0.80,
+      returnGain:     2.82,
       hpfCutoff:      60,
       hpfStepped:     false,
       bassShelfGainDb: 2, bassShelfFreqHz: 90,
@@ -874,7 +918,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     overrides: {
       chainOrder:    'echoSpring',  // echo first: distinct repeats (see scientist).
       re201DelayMode: 1,            // head 1: clean repeats; the bus has its own spring and plate.
-      returnGain:     0.70,
+      returnGain:     2.47,
       hpfCutoff:       35,
       hpfStepped:      false,
       bassShelfGainDb: 5, bassShelfFreqHz: 70, bassShelfQ: 0.7,  // deeper rumble lift
