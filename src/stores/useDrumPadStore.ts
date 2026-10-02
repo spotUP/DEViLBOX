@@ -3,6 +3,8 @@
  */
 
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
+import { reconcilePlateStage } from '@/lib/dub/plateStage';
+import { ensureBusIsFed } from '@/lib/dub/seedSendOnEnable';
 import { create } from 'zustand';
 import type {
   DrumPadState,
@@ -583,10 +585,21 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       }
     }
     set((state) => ({
-      dubBus: { ...state.dubBus, ...effective },
+      dubBus: { ...state.dubBus, ...reconcilePlateStage(state.dubBus, effective) },
       ...(isLoadingPreset ? { dubBusStash: { ...prevSettings } } : {}),
     }));
     get().saveToStorage();
+    // The bus is fed only by open channel sends, so a song that reaches
+    // the bus with them all closed — which is what every `applySong`
+    // leaves behind — makes the whole wet section inaudible and gates
+    // every `needsSend` move behind the deck's "Raise a CH send first"
+    // toast. Open one channel so switching the bus on is audible.
+    //
+    // Any explicit enable, not only the off->on edge: with the store
+    // already at `true` an edge-gated seed never ran, which is also the
+    // state a song load leaves behind. Never touches a send the performer
+    // already opened.
+    if (patch.enabled === true) ensureBusIsFed(true);
     // Auto-apply sound system when bus flips OFF → ON and the current bank
     // has no pad-level dubSend configured yet. Skips if any pad already has
     // a dubSend — we never clobber a user's custom send config. This turns
