@@ -18,6 +18,7 @@ import {
   DEFAULT_DUB_BUS,
   DUB_RETURN_GAIN_MAX,
   isDubBusAudible,
+  checkDubBusPatch,
   repairStoredDubBusVoicing,
   type DubBusSettings,
 } from '../dub';
@@ -113,5 +114,31 @@ describe('repairStoredDubBusVoicing', () => {
   it('keeps a return at the top of the knob exactly as stored', () => {
     const full = { ...DEFAULT_DUB_BUS, returnGain: DUB_RETURN_GAIN_MAX };
     expect(repairStoredDubBusVoicing(full)).toBe(full);
+  });
+});
+
+describe('checkDubBusPatch', () => {
+  it('refuses a missing settings object instead of crashing the write', () => {
+    // set_dub_bus_settings({ returnGain: 0 }) — the field at the top level —
+    // reached the store as undefined: "Cannot read properties of undefined".
+    const r = checkDubBusPatch(undefined);
+    expect(r.ok).toBe(false);
+  });
+
+  it('refuses an unknown field rather than persisting it', () => {
+    const r = checkDubBusPatch({ retrunGain: 0.5 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join()).toContain('retrunGain');
+  });
+
+  it('refuses a value of the wrong type', () => {
+    expect(checkDubBusPatch({ returnGain: '0.5' }).ok).toBe(false);
+    expect(checkDubBusPatch({ returnGain: Number.NaN }).ok).toBe(false);
+    expect(checkDubBusPatch({ enabled: 1 }).ok).toBe(false);
+  });
+
+  it('accepts a real partial write', () => {
+    const r = checkDubBusPatch({ returnGain: 0.5, enabled: true, echoEngine: 're201' });
+    expect(r.ok).toBe(true);
   });
 });
