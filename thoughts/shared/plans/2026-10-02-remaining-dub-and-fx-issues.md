@@ -2,7 +2,7 @@
 date: 2026-10-02
 topic: Remaining dub bus and master FX issues after the branch review
 tags: [dub, master-fx, ledger]
-status: draft  # 1 of 9 done, L2 in progress
+status: draft  # 19 items: 5 done, 2 measured, 1 in progress, 11 open
 ---
 
 # Remaining issues — ledger
@@ -24,11 +24,13 @@ code, type-check clean, committed. Live-only checks are listed under
 | L14 | Dub deck PERFORM / EQ / BUS tabs have different heights; switching tabs jumps the layout | open | owner todo |
 | L10 | Wet too loud, little bass with bus on: WET_CHAIN_MAKEUP +11 dB on top of the owner's stored return | done | make-up removed; toggle lift only |
 | L11 | Faders jump to the click point; knobs start a drag from the stored value, not the shown one | done | relative fader drag; knob drags from shown value |
-| L12 (done) | Version Drop says "every channel reads as riddim" while fader labels say lead/chords/skank | open | Two sources: fader labels = getAutoDubCurrentRoles (audio+offline+overrides); planDrop = getChannelProfiles from the CURRENT pattern's notes, which on the owner's Hively song carried no evidence (every axis unknown@0, audibility 0). Fix = one channel-identity source (previous handoff step 2), not a patch |
+| L12 | Version Drop says "every channel reads as riddim" while fader labels say lead/chords/skank | done | 2103bd355 — readSongChannelIdentity is the one source (deck labels, Version Drop, targeting, Riddim, seeding); profile cache keyed on evidence; songChannelIdentity.test.ts. Not heard live |
 | L13 | Echo button constantly lit as held | done | DubRouter isHold from move.kind; DubRouter.test.ts |
 | L15 | "High pass seems dead" | measured | bus HPF works (60 Hz -65 dB at 1 kHz, rendered); it filters only the wet bus, now well under the dry. Need which control the owner means |
 | L17 | testToneStops.test.ts fails: server schema has mode 'pink', test expects ['sine','rich']; predates a0a83f0ad, not in test:ci | open | |
 | L16 | Master Bass "no difference" | measured | live: 63 Hz moves ~10 dB across -12..+12 after the make-up removal; the trim ride spends boost that does not fit under the clipper. Owner to re-listen |
+| L18 | DEViLBOX tab froze while the owner tested formats; tab unrecoverable, relay got no answer | open | which file unknown — ask the owner |
+| L19 | singleLoadPath.contract.test.ts flakes in the full pre-push run (passes alone) | open | failed once 2026-10-02 |
 | L9 | `src/engine/hively/__tests__/instrumentPlayersHaveTheirOwnOutput.test.ts` failing since eced26399, outside CI | open | |
 
 ## Owner checks (live, by ear)
