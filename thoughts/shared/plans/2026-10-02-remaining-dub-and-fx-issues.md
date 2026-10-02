@@ -21,6 +21,13 @@ code, type-check clean, committed. Live-only checks are listed under
 | L6 | O15 Chip Metal preset level | open | |
 | L7 | O3 Wave Landscape sounds metallic | open | |
 | L8 | O4 BadCat silent (never reproduced) | open | |
+| L14 | Dub deck PERFORM / EQ / BUS tabs have different heights; switching tabs jumps the layout | open | owner todo |
+| L10 | Wet too loud, little bass with bus on: WET_CHAIN_MAKEUP +11 dB on top of the owner's stored return | done | make-up removed; toggle lift only |
+| L11 | Faders jump to the click point; knobs start a drag from the stored value, not the shown one | done | relative fader drag; knob drags from shown value |
+| L12 | Version Drop says "every channel reads as riddim" while fader labels say lead/chords/skank | open | Two sources: fader labels = getAutoDubCurrentRoles (audio+offline+overrides); planDrop = getChannelProfiles from the CURRENT pattern's notes, which on the owner's Hively song carried no evidence (every axis unknown@0, audibility 0). Fix = one channel-identity source (previous handoff step 2), not a patch |
+| L13 | Echo button constantly lit as held | done | DubRouter isHold from move.kind; DubRouter.test.ts |
+| L15 | "High pass seems dead" | measured | bus HPF works (60 Hz -65 dB at 1 kHz, rendered); it filters only the wet bus, now well under the dry. Need which control the owner means |
+| L16 | Master Bass "no difference" | measured | live: 63 Hz moves ~10 dB across -12..+12 after the make-up removal; the trim ride spends boost that does not fit under the clipper. Owner to re-listen |
 | L9 | `src/engine/hively/__tests__/instrumentPlayersHaveTheirOwnOutput.test.ts` failing since eced26399, outside CI | open | |
 
 ## Owner checks (live, by ear)

@@ -291,3 +291,22 @@ describe('DubRouter + moves', () => {
     });
   });
 });
+
+describe('a trigger move is reported as a one-shot', () => {
+  it('Echo Throw does not stay lit: isHold follows the move kind, not its disposer', () => {
+    // echoThrow is a trigger that returns a disposer (to close its tap early).
+    // The router reported isHold from `!!disposer`, so the deck kept the Echo
+    // button lit until a release nobody sends: "the echo button is constantly
+    // held down" (owner, 2026-10-02).
+    setDubBusForRouter(null);
+    const { bus } = makeMockBus();
+    setDubBusForRouter(bus);
+    const events: Array<{ moveId: string; isHold?: boolean }> = [];
+    const unsub = subscribeDubRouter((ev) => events.push(ev));
+    fire('echoThrow', 0);
+    fire('filterDrop', undefined);
+    unsub();
+    expect(events.find(e => e.moveId === 'echoThrow')?.isHold).toBe(false);
+    expect(events.find(e => e.moveId === 'filterDrop')?.isHold).toBe(true);
+  });
+});

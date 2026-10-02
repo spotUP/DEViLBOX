@@ -363,7 +363,10 @@ function executeNow(
   // the AI is the one that must declare itself, because mislabelling ITS moves
   // as the player's makes it answer itself.
   const origin: DubFireOrigin = originForLog;
-  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, timeSec: getSongTimeSec(), source, origin, isHold: !!disposer };
+  // A hold by the move's KIND: a trigger may return a disposer to cut itself
+  // short (echoThrow closes its tap early), and reporting that as a hold kept
+  // the Echo button lit forever — nothing releases a trigger.
+  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, timeSec: getSongTimeSec(), source, origin, isHold: move.kind === 'hold' && !!disposer };
   for (const fn of subscribers) {
     try {
       fn(event);
