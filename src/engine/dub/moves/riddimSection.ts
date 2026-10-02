@@ -6,7 +6,7 @@
  * "drop everything — let the riddim breathe — skank creeps back in" arc).
  * On dispose, releases all remaining mutes.
  *
- * Uses the same classifySongRoles() call AutoDub uses (cached on the pattern
+ * Uses the same channel identity AutoDub uses (readSongChannelIdentity) (cached on the pattern
  * set, O(1) on repeated calls). User dubRole overrides in the mixer are
  * respected. If no role data is available (no patterns loaded), fires as a
  * graceful no-op — no channels muted.
@@ -23,10 +23,8 @@ import {
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { msUntilMusicalReturn } from '@/lib/dub/musicalReturn';
-import { useInstrumentStore } from '@/stores/useInstrumentStore';
-import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
+import { readSongChannelIdentity } from '../songChannelIdentity';
 import { fire } from '../DubRouter';
-import type { InstrumentConfig } from '@/types/instrument';
 import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
 import { riddimChannelToKeep, medianNoteOf, type RiddimChannelPitch } from '@/lib/dub/riddimKeep';
 
@@ -43,16 +41,9 @@ export const riddimSection: DubMove = {
     const tracker = useTrackerStore.getState();
     const patterns = tracker.patterns;
 
-    // Resolve roles — fall back to empty if no song is loaded
-    let roles: ChannelRole[] = [];
-    if (Array.isArray(patterns) && patterns.length > 0) {
-      const insts = useInstrumentStore.getState().instruments;
-      const lookup = new Map<number, InstrumentConfig>();
-      for (const inst of insts) {
-        if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
-      }
-      roles = classifySongRoles(patterns, lookup, useTrackerStore.getState().patternOrder);
-    }
+    // The one channel identity the deck labels its strips from (the user's own
+    // role already applied); empty when no song is loaded.
+    const roles: ChannelRole[] = readSongChannelIdentity().roles;
 
     // Mute every melodic channel; respect user dubRole overrides
     const channels = mixer.channels;
@@ -67,7 +58,7 @@ export const riddimSection: DubMove = {
     for (let i = 0; i < channels.length; i++) {
       const ch = channels[i];
       if (!ch) { candidateRoles[i] = 'empty'; continue; }
-      const role: ChannelRole = (ch.dubRole as ChannelRole | null) ?? roles[i] ?? 'empty';
+      const role: ChannelRole = roles[i] ?? 'empty';
       candidateRoles[i] = role;
       if (role === 'bass') { bassSurvives = true; continue; }
       if (!MELODIC_ROLES.has(role)) continue;

@@ -84,7 +84,8 @@ describe('the transport row has one reader', () => {
     const users = [
       'src/engine/dub/AutoDub.ts',
       'src/engine/dub/moves/riddimSection.ts',
-      'src/engine/dub/moves/versionDrop.ts',
+      // versionDrop's grid comes from here since it reads the song identity.
+      'src/engine/dub/channelProfiles.ts',
     ];
     for (const rel of users) {
       const src = readFileSync(resolve(ROOT, rel), 'utf8');

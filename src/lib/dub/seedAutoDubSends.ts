@@ -15,14 +15,12 @@
  */
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useDubStore } from '@/stores/useDubStore';
 import { DUB_CHARACTER_PRESETS } from '@/types/dub';
-import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
+import { readSongChannelIdentity } from '@/engine/dub/songChannelIdentity';
 import { sendIsAudible } from '@/lib/dub/sendAudibility';
 import { FLAT_SEED_SEND } from '@/lib/dub/seedSendOnEnable';
-import type { InstrumentConfig } from '@/types/instrument/defaults';
 
 /** Only the loaded pattern's channels: a 4-channel MOD has 16 mixer slots, and seeding the empty 12 is noise. */
 export function autoDubSeedChannelCount(patternChannelCount: number | undefined, mixerChannelCount: number): number {
@@ -59,11 +57,8 @@ export function seedAutoDubSends(): void {
 
   let roles: string[] = [];
   if (preset?.defaultSendsByRole) {
-    try {
-      const lookup = new Map<number, InstrumentConfig>();
-      for (const inst of useInstrumentStore.getState().instruments) if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
-      if (tracker.patterns.length > 0) roles = classifySongRoles(tracker.patterns, lookup, tracker.patternOrder);
-    } catch { /* flat sends */ }
+    // The one channel identity the deck labels its strips from.
+    try { roles = readSongChannelIdentity().roles; } catch { /* flat sends */ }
   }
 
   for (let i = 0; i < count; i++) {

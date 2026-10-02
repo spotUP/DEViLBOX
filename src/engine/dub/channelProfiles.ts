@@ -20,12 +20,12 @@ import {
   getChannelInstruments,
 } from '@/bridge/analysis/ChannelNaming';
 import { getAllRuntimeChannelRoles } from '@/bridge/analysis/ChannelAudioClassifier';
+import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
+import { readSongChannelIdentity } from './songChannelIdentity';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useMixerStore } from '@/stores/useMixerStore';
-import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { resolveTransportRow } from '@/lib/dub/transportRow';
-import { resolveChannelNames } from '@/lib/tracker/channelNames';
 import { computeMusicalPosition } from '@/lib/dub/musicalClock';
 import { buildDubTargetProfile, type DubTargetProfile } from '@/lib/dub/dubTargetProfile';
 
@@ -71,10 +71,10 @@ export function getChannelProfiles(
   rowsPerBeat: number,
   rowsPerBar: number,
   instruments?: Map<number, InstrumentConfig>,
+  /** The song-wide role per channel (`readSongChannelIdentity().roles`). */
+  songRoles?: readonly (ChannelRole | null | undefined)[],
 ): ReadonlyMap<number, MusicalChannelProfile> {
   if (!pattern?.channels?.length) return new Map();
-  const key = `${pattern.id ?? 'p'}:${pattern.channels.length}:${rowsPerBeat}:${rowsPerBar}:${names.join(',')}:${instruments?.size ?? 0}`;
-  if (_profileCache?.key === key) return _profileCache.profiles;
 
   // Live audio evidence for every channel at once. Read here rather than per
   // channel because the accessor walks its own ring buffer each call.
@@ -87,6 +87,15 @@ export function getChannelProfiles(
   // evidence that describes the SOUND, and it was not reaching this function
   // at all.
   const runtimeHints = getAllRuntimeChannelRoles(pattern.channels.length);
+
+  // Keyed on the evidence as well as the song. Live audio and the song roles
+  // arrive after the first call: a key without them froze the first, empty
+  // answer for as long as the pattern stayed loaded — every axis unknown at
+  // confidence 0 while the deck had long since named the channels.
+  const evidenceKey = runtimeHints.map(h => (h ? `${h.role}${h.confidence.toFixed(1)}` : '-')).join(',')
+    + '|' + (songRoles ?? []).map(r => r ?? '-').join(',');
+  const key = `${pattern.id ?? 'p'}:${pattern.channels.length}:${rowsPerBeat}:${rowsPerBar}:${names.join(',')}:${instruments?.size ?? 0}:${evidenceKey}`;
+  if (_profileCache?.key === key) return _profileCache.profiles;
 
   const profiles = new Map<number, MusicalChannelProfile>();
   for (let ch = 0; ch < pattern.channels.length; ch++) {
@@ -130,6 +139,7 @@ export function getChannelProfiles(
       analysis: enhanced,
       instrument: instrumentClass,
       runtime: runtimeHints[ch] ?? null,
+      songRole: songRoles?.[ch] ?? null,
       instrumentName: names[ch] ?? null,
       onsetRows,
       rowsPerBeat,
@@ -154,31 +164,35 @@ export function getChannelProfiles(
  * Returns an empty array when no pattern is loaded. A caller that cannot tell
  * what a channel IS must do nothing, not guess.
  */
+/**
+ * Profiles for the song as it stands, from the one channel identity
+ * (`readSongChannelIdentity`): the same pattern, names and roles the deck
+ * labels its channels with. Empty when no song is loaded.
+ */
+export function getSongChannelProfiles(): ReadonlyMap<number, MusicalChannelProfile> {
+  const identity = readSongChannelIdentity();
+  if (!identity.pattern?.channels?.length) return new Map();
+  const transport = useTransportStore.getState();
+  // The coarse/fine join, not the raw field: `currentGlobalRow` only moves on
+  // a pattern change, so on its own it is stale by up to a whole pattern.
+  const grid = computeMusicalPosition(
+    resolveTransportRow(transport.currentGlobalRow, transport.currentRow) ?? 0,
+    transport.speed || 6,
+  );
+  return getChannelProfiles(
+    identity.pattern,
+    identity.names,
+    grid.rowsPerBeat,
+    grid.rowsPerBar,
+    buildInstrumentLookup(),
+    identity.roles,
+  );
+}
+
 export function getDubTargetProfiles(): DubTargetProfile[] {
   let profiles: ReadonlyMap<number, MusicalChannelProfile>;
   try {
-    const tracker = useTrackerStore.getState();
-    const pattern = tracker.patterns?.[tracker.currentPatternIndex ?? 0] ?? null;
-    if (!pattern?.channels?.length) return [];
-
-    const mixer = useMixerStore.getState();
-    const transport = useTransportStore.getState();
-    // The coarse/fine join, not the raw field: `currentGlobalRow` only moves on
-    // a pattern change, so on its own it is stale by up to a whole pattern.
-    const grid = computeMusicalPosition(
-      resolveTransportRow(transport.currentGlobalRow, transport.currentRow) ?? 0,
-      transport.speed || 6,
-    );
-    profiles = getChannelProfiles(
-      pattern,
-      resolveChannelNames(
-        mixer.channels.map(c => c?.name ?? null),
-        pattern.channels.map(c => c?.name ?? null),
-      ),
-      grid.rowsPerBeat,
-      grid.rowsPerBar,
-      buildInstrumentLookup(),
-    );
+    profiles = getSongChannelProfiles();
   } catch {
     // A store that is not ready is not an error here: it means there is no
     // song to profile, and the answer to every question is "do nothing".

@@ -50,7 +50,7 @@ export type Register = 'sub' | 'low' | 'lowMid' | 'mid' | 'highMid' | 'high';
 
 /** Where an axis value came from. `user` always wins; `default` means no
  *  evidence supported a choice and the caller should treat it as unknown. */
-export type EvidenceSource = 'user' | 'instrument' | 'audio' | 'notes' | 'rhythm' | 'default';
+export type EvidenceSource = 'user' | 'instrument' | 'audio' | 'notes' | 'rhythm' | 'song' | 'default';
 
 export interface AxisEstimate<T> {
   value: T;
@@ -91,6 +91,13 @@ export interface ChannelEvidence {
   instrument?: InstrumentClassification | null;
   /** Live audio evidence, from `getRuntimeChannelRole`. */
   runtime?: RuntimeRoleHint | null;
+  /**
+   * The song-wide role verdict from `readSongChannelIdentity` — offline note
+   * analysis over the whole song, live audio, the CED classifiers. The same
+   * value the deck labels the channel with, so a move cannot judge a channel
+   * the deck calls `lead` to be an unknown.
+   */
+  songRole?: ChannelRole | null;
   /** Instrument name, the only signal that separates piano from organ etc. */
   instrumentName?: string | null;
   /** Rows carrying a note onset, song- or pattern-relative. */
@@ -220,7 +227,10 @@ function estimateFamily(ev: ChannelEvidence): AxisEstimate<InstrumentFamily> {
 
 // ─── Function ───────────────────────────────────────────────────────────────
 
-const ROLE_TO_FUNCTION: Record<ChannelRole, MusicalFunction> = {
+/** Confidence of the merged song-wide role: above `planDrop`'s 0.5 bar, under confident live audio. */
+const SONG_ROLE_CONFIDENCE = 0.7;
+
+export const ROLE_TO_FUNCTION: Record<ChannelRole, MusicalFunction> = {
   bass: 'foundation',
   percussion: 'groove',
   chord: 'harmony',
@@ -249,6 +259,12 @@ function estimateFunction(
       confidence: runtime.confidence * (runtime.support || 1),
       source: 'audio',
     };
+  }
+
+  // The song-wide verdict: several classifiers already merged, over the whole
+  // song rather than one pattern.
+  if (ev.songRole && ev.songRole !== 'empty') {
+    return { value: ROLE_TO_FUNCTION[ev.songRole], confidence: SONG_ROLE_CONFIDENCE, source: 'song' };
   }
 
   const inst = ev.instrument;
