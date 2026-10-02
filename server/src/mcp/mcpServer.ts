@@ -763,6 +763,19 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'measure_dub_knob',
+    'A/B one dub bus knob against FIXED seeded pink noise with the song stopped: measures the return energy at value `a` and `b`, interleaved ABAB so drift is shared, and reports the delta in dB. Separates "moves the store only" from "does nothing" via the live node value. Refuses while playing. |deltaDb| < 0.5 is the rig noise floor, not proof the control is dead.',
+    {
+      knob: z.string().describe('DubBusSettings key to A/B, e.g. echoWet, springWet, plateStageMix'),
+      a: z.number().describe('First value to test'),
+      b: z.number().describe('Second value to test (must differ from a)'),
+      rounds: z.number().optional().describe('Interleaved ABAB rounds (2-8, default 3)'),
+      probe: z.enum(['return', 'input']).optional().describe('Measure the return (default) or the bus input'),
+    },
+    (p) => call('measure_dub_knob', p),
+  );
+
+  server.tool(
     'measure_master_effect',
     "Measure one master effect's level: stereo pink noise into the master effects input with the chain set to just this effect, level in dB relative to the input (energy of both channels). effectDb = the effect's own output, chainDb = after its compensation gain, compensationDb = the difference. With effects, measures a whole chain (a preset) instead: effectDb is its last effect's output. Refuses while playing or while the audio clock is stopped; the user's master chain is restored afterwards.",
     {
