@@ -15,7 +15,7 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { anySendAudible } from '@/lib/dub/sendAudibility';
 import type { DubBusSettings } from '@/types/dub';
-import { DEFAULT_DUB_BUS, RE201_DELAY_MODES } from '@/types/dub';
+import { DEFAULT_DUB_BUS, DUB_RETURN_GAIN_MAX, RE201_DELAY_MODES } from '@/types/dub';
 import { Speaker } from 'lucide-react';
 import { useLiveDubParam } from '@/hooks/useLiveDubParam';
 
@@ -214,7 +214,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
             label="Return gain"
             value={liveReturnGain}
             min={0}
-            max={1}
+            max={DUB_RETURN_GAIN_MAX}
             step={0.01}
             onChange={(v) => patch({ returnGain: v })}
             format={(v) => `${Math.round(v * 100)}%`}

@@ -16,8 +16,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_DUB_BUS,
+  DUB_RETURN_GAIN_MAX,
   isDubBusAudible,
-  repairDeadDubBusVoicing,
+  repairStoredDubBusVoicing,
   type DubBusSettings,
 } from '../dub';
 
@@ -52,9 +53,9 @@ describe('isDubBusAudible', () => {
   });
 });
 
-describe('repairDeadDubBusVoicing', () => {
+describe('repairStoredDubBusVoicing', () => {
   it('rebuilds the tail of a bus saved with its return closed', () => {
-    const repaired = repairDeadDubBusVoicing(DEAD_ON_DISK);
+    const repaired = repairStoredDubBusVoicing(DEAD_ON_DISK);
     expect(repaired.returnGain).toBe(DEFAULT_DUB_BUS.returnGain);
     expect(repaired.echoWet).toBe(DEFAULT_DUB_BUS.echoWet);
     expect(repaired.echoIntensity).toBe(DEFAULT_DUB_BUS.echoIntensity);
@@ -62,7 +63,7 @@ describe('repairDeadDubBusVoicing', () => {
   });
 
   it('leaves everything that was not part of the dead tail alone', () => {
-    const repaired = repairDeadDubBusVoicing(DEAD_ON_DISK);
+    const repaired = repairStoredDubBusVoicing(DEAD_ON_DISK);
     // A dry echo at a 40 ms rate is only wreckage BECAUSE the return was shut.
     // Once the return is open again these are the performer's own settings.
     expect(repaired.springWet).toBe(1);
@@ -81,22 +82,36 @@ describe('repairDeadDubBusVoicing', () => {
       echoIntensity: 0,
       echoRateMs: 40,
     };
-    expect(repairDeadDubBusVoicing(quiet)).toEqual(quiet);
+    expect(repairStoredDubBusVoicing(quiet)).toEqual(quiet);
   });
 
   it('does not touch a bus saved with a dry echo and an open return', () => {
     const dryEcho: DubBusSettings = { ...DEFAULT_DUB_BUS, echoWet: 0, echoIntensity: 0 };
-    expect(repairDeadDubBusVoicing(dryEcho)).toEqual(dryEcho);
+    expect(repairStoredDubBusVoicing(dryEcho)).toEqual(dryEcho);
   });
 
   it('is idempotent — repairing a repair changes nothing', () => {
-    const once = repairDeadDubBusVoicing(DEAD_ON_DISK);
-    expect(repairDeadDubBusVoicing(once)).toEqual(once);
+    const once = repairStoredDubBusVoicing(DEAD_ON_DISK);
+    expect(repairStoredDubBusVoicing(once)).toEqual(once);
   });
 
   it('does not mutate its argument', () => {
     const input = { ...DEAD_ON_DISK };
-    repairDeadDubBusVoicing(input);
+    repairStoredDubBusVoicing(input);
     expect(input).toEqual(DEAD_ON_DISK);
+  });
+
+  it('pulls a return stored above the knob range back to the top of the knob', () => {
+    // The 2026-10-02 branch stored returnGain 3.0 to carry the wet make-up;
+    // on top of WET_CHAIN_MAKEUP that would sit +11 dB hot until touched.
+    const hot = { ...DEFAULT_DUB_BUS, returnGain: 3.0, echoWet: 0.4 };
+    const out = repairStoredDubBusVoicing(hot);
+    expect(out.returnGain).toBe(DUB_RETURN_GAIN_MAX);
+    expect(out.echoWet).toBe(0.4);
+  });
+
+  it('keeps a return at the top of the knob exactly as stored', () => {
+    const full = { ...DEFAULT_DUB_BUS, returnGain: DUB_RETURN_GAIN_MAX };
+    expect(repairStoredDubBusVoicing(full)).toBe(full);
   });
 });

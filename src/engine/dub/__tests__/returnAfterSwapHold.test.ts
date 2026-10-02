@@ -26,7 +26,7 @@ describe('dub bus after a swap hold', () => {
   });
 
   it('a song loaded while Auto Dub runs gets its starting sends', () => {
-    expect(src('lib/song/applySong.ts')).toMatch(/if \(isAutoDubRunning\(\)\) \(await import\('@\/lib\/dub\/seedAutoDubSends'\)\)\.seedAutoDubSends\(\);/);
+    expect(src('lib/song/applySong.ts')).toMatch(/if \(autoDubRunning\) \(await import\('@\/lib\/dub\/seedAutoDubSends'\)\)\.seedAutoDubSends\(\);\s*else ensureBusIsFed\(/);
   });
 
   it('setSettings writes the return with _settle, clearing ramps scheduled earlier for later', () => {

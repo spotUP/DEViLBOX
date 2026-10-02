@@ -87,7 +87,7 @@ describe('setSettings respects ownership', () => {
     // Order matters: filtering AFTER the change check would let an owned-key
     // write mark the settings dirty and run the whole body for nothing.
     const filterAt = BUS.indexOf('if (this._ownedSettingKeys.size > 0) {');
-    const changeAt = BUS.indexOf('let changed = false;');
+    const changeAt = BUS.indexOf('if (!settingsWriteChangesBus(');
     expect(filterAt, 'ownership filter missing from setSettings').toBeGreaterThan(-1);
     expect(filterAt).toBeLessThan(changeAt);
   });

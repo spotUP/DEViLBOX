@@ -119,7 +119,7 @@ import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
 import { compressorMakeupTrim } from '@/lib/dub/compressorMakeup';
 import { makeTapeSatCurve } from '@/lib/dub/tapeSatCurve';
 import { sweepBranchNorm, sweepMix } from '@/lib/dub/sweepLevel';
-import { heldMoveBlocksSettingsDrive } from '@/lib/dub/settingOwnership';
+import { settingsWriteChangesBus } from '@/lib/dub/settingsWrite';
 import { generatedPeak, getProgrammeLevel } from './programmeReference';
 import {
   SILENT_PROGRAMME_PEAK,
@@ -129,6 +129,7 @@ import {
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
 import { lowMidDipDbFor } from '@/lib/dub/lowMidDip';
+import { WET_CHAIN_MAKEUP } from '@/lib/dub/wetChainMakeup';
 import { detectLowFundamental, SubPitchTracker } from '@/lib/dub/lowFundamental';
 import { lowBandGainsFor, LOW_SAT_KNEE } from '@/lib/dub/lowBandCrossover';
 import { rideTrim, spendRide, bufferPeak } from '@/lib/dub/trimRide';
@@ -388,15 +389,11 @@ if (typeof window !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }
 const SIREN_SYNTH_PEAK = 0.41;
 
 /**
- * How far the Sub Bass Bed mix may be pushed past the dry bass.
- *
- * Above 1 on purpose: a sub layer is summed into the safety clipper, and the
- * only way to learn whether it is producing anything on a given pair of
- * speakers is to overdrive it until it is unmistakable. Below ~1 it sits under
- * small speakers' reproduction floor, where "too quiet" and "disconnected" are
- * indistinguishable by ear.
+ * Ceiling of the Sub Bass Bed's mix ratio: at most the dry low band again
+ * (+6 dB in the band). The bed sums into the safety clipper, so there is no
+ * reason for a performance control to go further.
  */
-const SUB_BED_MAX_MIX = 8;
+const SUB_BED_MAX_MIX = 1;
 
 /**
  * Where the Sub Bass Bed stops passing audio.
@@ -1569,6 +1566,8 @@ export class DubBus {
   private glueTrim!: GainNode;
   private lpf: BiquadFilterNode;      // sweep-able LPF on return
   private return_: GainNode;
+  /** Make-up for the send-fed wet chain on its way into `return_` — see WET_CHAIN_MAKEUP. */
+  private wetMakeup!: GainNode;
   private feedback: GainNode;         // echo → feedback → input (siren)
   private noise: AudioBufferSourceNode;  // pink noise loop
   private noiseGain: GainNode;           // -55 dBFS level
@@ -1893,17 +1892,7 @@ export class DubBus {
   // panic's `setIntensity(0)` and leave a loud echo ghost when the user
   // re-enables the bus (audible at high intensity settings — ~-13 dB of
   // the pre-panic tail at default intensity=0.62 after 1 s).
-  /**
-   * How long `dubPanic` holds the bus muted before restoring the echo/spring
-   * levels from settings.
-   *
-   * Public because `djKillAll` has to know when the window closes: it force-
-   * writes zeros into the settings store to beat the mirror during the drain,
-   * and that flush has to be undone afterwards or the bus comes back up
-   * permanently silent. Hard-coding 2000 in both places is how the two drifted
-   * apart in the first place — the bus restored from settings, the store had
-   * been zeroed, and both agreed on silence forever.
-   */
+  /** How long `dubPanic` holds the bus muted before restoring the echo/spring levels from settings. */
   static readonly DRAIN_MS = 2000;
 
   private _draining = false;
@@ -2593,6 +2582,9 @@ export class DubBus {
 
     this.return_ = this.context.createGain();
     this.return_.gain.value = this.enabled ? this.settings.returnGain : 0;
+    this.wetMakeup = this.context.createGain();
+    this.wetMakeup.gain.value = WET_CHAIN_MAKEUP;
+    this.wetMakeup.connect(this.return_);
 
     // Feedback loop for siren self-oscillation. At rest gain=0 → no loop.
     // When raised toward 0.9+, the echo's output recirculates into the input
@@ -2769,14 +2761,14 @@ export class DubBus {
     this.stereoMerge.connect(this.lofiBypass);
     Tone.connect(this.stereoMerge as unknown as Tone.OutputNode, this.lofi.input);
     Tone.connect(this.lofi.output, this.lofiSend as unknown as Tone.InputNode);
-    this.lofiBypass.connect(this.return_);
-    this.lofiSend.connect(this.return_);
+    this.lofiBypass.connect(this.wetMakeup);
+    this.lofiSend.connect(this.wetMakeup);
 
     // Ring modulator: additive parallel send from stereoMerge.
     // Adds metallic texture on top of the main signal.
     Tone.connect(this.stereoMerge as unknown as Tone.OutputNode, this.ringMod.input);
     Tone.connect(this.ringMod.output, this.ringModSend as unknown as Tone.InputNode);
-    this.ringModSend.connect(this.return_);
+    this.ringModSend.connect(this.wetMakeup);
 
     // Club simulation: return → dry/wet split → master.
     // When off (default): only the dry path is wired (return_ → clubDry → master).
@@ -3822,7 +3814,7 @@ export class DubBus {
       // gain ramp, generated-synth un-silencing, the disabled warning reset —
       // rather than poking `enabled` and leaving the bus half-open.
       try {
-        this.setSettings({ enabled: this.settings.enabled }, { force: true });
+        this.setSettings({ enabled: this.settings.enabled });
       } catch { /* ok */ }
     }, DubBus.DRAIN_MS);
     this.throwTimers.add(drainTimer);
@@ -4319,10 +4311,10 @@ export class DubBus {
     return out;
   }
 
-  setSettings(settings: Partial<DubBusSettings>, opts?: { force?: boolean }): void {
+  setSettings(settings: Partial<DubBusSettings>): void {
     const _t0 = performance.now();
     try {
-      this._applySettings(settings, opts);
+      this._applySettings(settings);
     } finally {
       const dt = performance.now() - _t0;
       const m = this._settingsMeter;
@@ -4334,7 +4326,7 @@ export class DubBus {
     }
   }
 
-  private _applySettings(settings: Partial<DubBusSettings>, opts?: { force?: boolean }): void {
+  private _applySettings(settings: Partial<DubBusSettings>): void {
     // Short-circuit no-op writes. PadGrid + DJSamplerPanel mirror this state
     // every time the store's `dubBus` OR the active deck's BPM changes —
     // during a crossfader sweep that's ~60 Hz of identical settings being
@@ -4356,18 +4348,10 @@ export class DubBus {
       if (dropped) settings = filtered;
     }
 
-    let changed = false;
-    for (const key of Object.keys(settings) as (keyof DubBusSettings)[]) {
-      if (this.settings[key] !== settings[key]) { changed = true; break; }
-    }
-    // `force` re-runs the sequence for a value that ALREADY matches. The panic
-    // drain needs exactly that: `dubPanic` mutes the engine without touching
-    // `settings`, so re-converging the engine with the desired state is by
-    // definition a no-op write — and dropping no-op writes is what this guard
-    // is for. Without the escape hatch the bus stayed muted forever behind a
-    // panel that read ON (measured 2026-10-02: engine enabled=false,
-    // inputGain 0, store enabled=true after a tracker-view KILL).
-    if (!changed && !opts?.force) return;
+    // Judged against the engine's actual enabled state, so the write that
+    // re-converges it after a panic is not mistaken for a mirror re-push.
+    const engineEnabled = this._draining ? this.settings.enabled : this.enabled;
+    if (!settingsWriteChangesBus(this.settings, settings, engineEnabled)) return;
 
     const merged: DubBusSettings = { ...this.settings, ...settings };
 
@@ -4628,7 +4612,7 @@ export class DubBus {
     // resting value there — so every settings write recomputed the gain from
     // 0 and muted a sweep that was holding perfectly well. That is the Liquid
     // bug of 2026-10-01: branch passing 0.126 RMS, `sweepOutput.gain` 0.
-    if (!heldMoveBlocksSettingsDrive(this._ownedSettingKeys.keys(), 'sweepAmount')) {
+    if (!this.isSettingOwned('sweepAmount')) {
       const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
       this._setSweepAmount(sweepAmt, 0.02);
       this.sweepLink.set(sweepAmt > 0);
@@ -5833,8 +5817,10 @@ export class DubBus {
       enabled: read(this.settings.enabled ? 1 : 0, () => (this.enabled ? 1 : 0)),
       lpfCutoffHz: read(20000, () => this.lpf.frequency.value),
       hpfCutoffHz: read(this.settings.hpfCutoff, () => this.hpf.frequency.value),
-      returnGain: read(this.settings.returnGain, () => this.return_.gain.value),
-      inputGain: read(this.enabled ? 1 : 0, () => this.input.gain.value),
+      // The targets the bus itself ramps to, so a drain or a disabled bus is
+      // not reported as a delta.
+      returnGain: read(this._returnGainTarget(), () => this.return_.gain.value),
+      inputGain: read(this._inputGainTarget(), () => this.input.gain.value),
       feedbackGain: read(this.settings.sweepFeedback, () => this.feedback.gain.value),
       plateSend: read(this.settings.plateStageMix, () => (this.plateSend ? this.plateSend.gain.value : null)),
       sweepOutput: read(this.settings.sweepAmount, () => this.sweepOutput.gain.value),
@@ -7653,6 +7639,9 @@ export class DubBus {
     return () => {
       running = false;
       cancelAnimationFrame(rafHandle);
+      // The input's edge too: disconnecting the lowpass only drops its
+      // outputs, and the input would keep every released detector alive.
+      try { this.input.disconnect(lowpass); } catch { /* ok */ }
       try { lowpass.disconnect(); } catch { /* ok */ }
       try { analyser.disconnect(); } catch { /* ok */ }
     };
@@ -7702,6 +7691,8 @@ export class DubBus {
     lp2.Q.value = 0.7;
     const bed = ctx.createGain();
     bed.gain.value = 0;
+    let bedSource: AudioNode | null = null;
+    let bedTap: AnalyserNode | null = null;
 
     try {
       // The PROGRAMME, not the bus input.
@@ -7715,6 +7706,7 @@ export class DubBus {
       // also safe to feed back into, because returnTrim joins DOWNSTREAM of it,
       // so no cycle is formed.
       const source: AudioNode = this.masterInsertSource ?? this.input;
+      bedSource = source;
       // Native connect, NOT Tone.connect. `Tone.connect` only recognises real
       // Tone nodes; handing it a plain BiquadFilterNode cast into a Tone type
       // connects NOTHING and says so with no error. That is not theoretical —
@@ -7732,6 +7724,7 @@ export class DubBus {
       const tap = this.context.createAnalyser();
       tap.fftSize = 2048;
       bed.connect(tap);
+      bedTap = tap;
       this._subBedTap = tap;
       this._wireProbeTaps();
     } catch (err) {
@@ -7751,19 +7744,11 @@ export class DubBus {
     // read as identical to Pulse (reported 2026-10-01). A signal path needs
     // unity-ish to be heard at all; the ratio is what sets how much.
     //
-    // The ceiling is above 1 deliberately. A sub layer is a sum into a
-    // limiter, and pushing it past the dry bass is the only way to find out
-    // whether it is producing anything at all on a given pair of speakers —
-    // at unity on small speakers it is genuinely below the noise floor, which
-    // is indistinguishable from a dead wire. Diagnostic overdrive is the only
-    // way to separate "too quiet" from "not connected".
-    //
     // `level` is the move's SHARED intent parameter (default 1), so it maps
     // into the bed's own range here rather than being read as a mix directly.
     // Passing it straight through is what made the bed run at full unity and
     // sound like a bass boost: the band is wide now, so unity is a heavy low
-    // boost, not a full-scale sine. Overdrive above intent still scales, so
-    // `level: 8` still means "far too much" when diagnosing.
+    // boost, not a full-scale sine.
     const intent = Number.isFinite(level) ? level : 1;
     const mix = Math.max(0, Math.min(SUB_BED_MAX_MIX, intent * SUB_BED_MIX_AT_FULL_INTENT));
     bed.gain.setValueAtTime(0, now);
@@ -7786,9 +7771,14 @@ export class DubBus {
         try { lp1.disconnect(); } catch { /* ok */ }
         try { lp2.disconnect(); } catch { /* ok */ }
         try { bed.disconnect(); } catch { /* ok */ }
-        try { this._subBedTap?.disconnect(); } catch { /* ok */ }
-        this._subBedTap = null;
-        this._wireProbeTaps();
+        try { bedSource?.disconnect(hp); } catch { /* ok */ }
+        try { bedTap?.disconnect(); } catch { /* ok */ }
+        // Only this bed's tap: a re-fire inside the release window has
+        // already registered its own, which must keep reporting.
+        if (this._subBedTap === bedTap) {
+          this._subBedTap = null;
+          this._wireProbeTaps();
+        }
       }, 600);
     };
   }
@@ -7962,7 +7952,7 @@ export class DubBus {
     delayL.connect(fbL); fbL.connect(delayR);
     delayR.connect(fbR); fbR.connect(delayL);
     merger.connect(wetGain);
-    wetGain.connect(this.return_);
+    wetGain.connect(this.wetMakeup); // a copy of the send-fed input: same make-up as the chain
     wetGain.gain.setValueAtTime(0, now);
     wetGain.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, wet)), now + 0.1);
     return () => {
