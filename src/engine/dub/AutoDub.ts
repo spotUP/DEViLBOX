@@ -664,6 +664,16 @@ const RULES: Rule[] = [
   { moveId: 'masterDrop',
     condition: (c) => c.isNewBar && c.bar % 8 === 0 && c.intensity > 0.5,
     baseWeight: 0.10, holdBars: 1 },
+  // Transport Tape Stop — the REAL tape stop: slows tempo and pitch to a floor
+  // and releases on let-go, rather than the bus-return mute that `tapeStop`
+  // does. It carried a 12-bar cooldown here from the start but had no
+  // candidate entry, so no persona could ever fire it: dead config that read
+  // as an intention. Rare and loud, so it rides the same phrase slots as
+  // Master Drop, and only above mid intensity — a tape stop over a quiet
+  // passage just stalls the song.
+  { moveId: 'transportTapeStop',
+    condition: (c) => c.isNewBar && c.bar % 12 === 0 && c.intensity > 0.55,
+    baseWeight: 0.09, holdBars: 1 },
   // Tape Wobble — LFO on echo rate, 2-bar hands-free texture.
   { moveId: 'tapeWobble',
     condition: (c) => c.isNewBar && c.bar % 4 === 1 && c.intensity > 0.35,
