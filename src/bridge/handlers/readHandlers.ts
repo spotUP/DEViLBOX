@@ -839,6 +839,12 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
     // is actually running with - a knob that moves the store but not the
     // engine is only visible here.
     diagnostic: bus?.getDiagnosticSnapshot?.() ?? null,
+    // Desired-vs-actual per parameter. `diagnostic` is a flat bag that mixes
+    // the two without saying which is which (its `echoRateMs` is the setting,
+    // not the running delay time); this pairs them so a knob that fails to
+    // reach the graph shows a non-zero delta instead of reading as "nothing
+    // happened".
+    liveState: bus?.getLiveState?.() ?? null,
     echoEngineState: bus?.describeEcho?.() ?? null,
     storeSettings,
     // The bus's OWN settings, beside the store's. Moves write the bus directly

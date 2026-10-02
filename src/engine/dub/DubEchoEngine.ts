@@ -83,6 +83,7 @@ export class SpaceEchoAdapter implements DubEchoEngine {
   }
 
   setRate(ms: number): void { this.fx.setRate(ms); }
+  describe(): Record<string, unknown> { return { engine: 'spaceEcho', ...this.fx.describe() }; }
   setIntensity(amount: number): void { this.fx.setIntensity(amount); }
   setIntensityInstant(amount: number): void { this.fx.setIntensityInstant(amount); }
   setFeedbackHpf(hz: number): void { this.fx.setFeedbackHpf(hz); }

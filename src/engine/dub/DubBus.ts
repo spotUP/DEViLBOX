@@ -119,6 +119,7 @@ import { clampExtFeedback } from '@/lib/dub/extFeedbackCeiling';
 import { compressorMakeupTrim } from '@/lib/dub/compressorMakeup';
 import { makeTapeSatCurve } from '@/lib/dub/tapeSatCurve';
 import { sweepBranchNorm, sweepMix } from '@/lib/dub/sweepLevel';
+import { heldMoveBlocksSettingsDrive } from '@/lib/dub/settingOwnership';
 import { generatedPeak, getProgrammeLevel } from './programmeReference';
 import {
   SILENT_PROGRAMME_PEAK,
@@ -128,6 +129,7 @@ import {
   type ProgrammeLevel,
 } from '@/lib/dub/programmeLevel';
 import { lowMidDipDbFor } from '@/lib/dub/lowMidDip';
+import { detectLowFundamental, SubPitchTracker } from '@/lib/dub/lowFundamental';
 import { lowBandGainsFor, LOW_SAT_KNEE } from '@/lib/dub/lowBandCrossover';
 import { rideTrim, spendRide, bufferPeak } from '@/lib/dub/trimRide';
 import { RIDER_REST, type RiderState } from '@/lib/dub/gainRider';
@@ -385,6 +387,45 @@ if (typeof window !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }
  */
 const SIREN_SYNTH_PEAK = 0.41;
 
+/**
+ * How far the Sub Bass Bed mix may be pushed past the dry bass.
+ *
+ * Above 1 on purpose: a sub layer is summed into the safety clipper, and the
+ * only way to learn whether it is producing anything on a given pair of
+ * speakers is to overdrive it until it is unmistakable. Below ~1 it sits under
+ * small speakers' reproduction floor, where "too quiet" and "disconnected" are
+ * indistinguishable by ear.
+ */
+const SUB_BED_MAX_MIX = 8;
+
+/**
+ * Where the Sub Bass Bed stops passing audio.
+ *
+ * 110 Hz was the first value and it was wrong: it discarded everything a small
+ * speaker actually reproduces, so Bed was provably running, provably adding
+ * signal, and still inaudible at 8x overdrive (reported 2026-10-01). A layer
+ * that only carries 60-90 Hz cannot be heard without a woofer.
+ *
+ * 250 Hz keeps the bass's harmonics instead of just its fundamental, so the
+ * layer lands in the range every speaker reproduces and reads as audible
+ * thickness. The trade is explicit: this is bass PRESENCE, not true sub. A
+ * control named Sub Harm cannot be pure sub and audible on small speakers at
+ * the same time, and audibility on the performer's own speakers is the one
+ * that matters — a monitor-only sub layer is a feature nobody hears.
+ */
+const SUB_BED_CEILING_HZ = 250;
+
+/**
+ * What the bed's mix ratio is when the move is asked for full intent (`level`
+ * 1, its default).
+ *
+ * 0.35 rather than 1.0 because the band's ceiling is 250 Hz, not 110: a wide
+ * low layer at unity is a large addition to the mix's mid-bass, which reads as
+ * a boost rather than as depth. The pulse can afford full scale because it is
+ * a single enveloped sine; this is a whole band of the programme.
+ */
+const SUB_BED_MIX_AT_FULL_INTENT = 0.35;
+
 export class DubBus {
   // ─── Shared Dub Bus — Vintage King Tubby / Scientist chain ─────────────────
   // Sources fanning into `input`:
@@ -571,6 +612,20 @@ export class DubBus {
   private phaser: CalfPhaserEffect;
   private phaserOutput: GainNode;     // 0 when sweepMode='comb', sweepAmount when 'phaser'
   private combOutput: GainNode;       // sweepAmount when sweepMode='comb', 0 when 'phaser'
+  // Diagnostic analyser taps either side of the phaser — see the wiring in
+  // the constructor for why the branch needed to become measurable.
+  private phaserInProbe!: AnalyserNode;
+  private phaserOutProbe!: AnalyserNode;
+  /**
+   * Post-branch tap: what the Liquid sweep actually contributes to the mix.
+   *
+   * The phaser probes above answer "is the branch alive"; they cannot answer
+   * "is the sweep audible", because between the branch output and the master
+   * sit the wet-mix gain and the tape stage. `phaserOutRms` non-zero while the
+   * move is inaudible is exactly the state Liquid spent this session in, and
+   * without a tap here nothing in the system could tell those apart.
+   */
+  private sweepOutProbe!: AnalyserNode;
   // ─── Return EQ — WASM parametric inserted between midScoop and LPF ────
   // Always 100% wet (series insert). Bypass via flat gain (0 dB).
   private returnEQ: Fil4EqEffect;
@@ -1452,8 +1507,25 @@ export class DubBus {
     this.announceHeld('dub.sweepAmount', Math.min(1, Math.max(0, targetAmount)));
     this.announceHeld('dub.sweepRateHz', normalizeSweepRate(Math.max(0.05, rateHz)));
 
+    // Own `sweepAmount` for as long as this holds.
+    //
+    // `announceHeld` only mirrors the value to the BUS tab's controls; it does
+    // not stop anything writing it. `_applySettings` drops keys listed in
+    // `_ownedSettingKeys` and applies everything else, and the store→bus mirror
+    // pushes `dubBus` continuously — so with the store's `sweepAmount` at 0,
+    // ANY settings write while the sweep was held reset `sweepOutput.gain` to
+    // zero and muted the effect mid-gesture. Measured 2026-10-01: gain 0.7071
+    // with the move held and the sweep carrying 0.096 RMS, then 0 the instant a
+    // settings write landed, with the phaser branch still passing 0.126. That
+    // is the "Liquid is dead" report: the branch works and the output is muted.
+    //
+    // `phaserRate` is claimed too — `setRate` writes the same way, for the same
+    // reason, in phaser mode.
+    const releaseClaim = this.claimSettingKeys(wasPhaser ? ['sweepAmount', 'phaserRate'] : ['sweepAmount']);
+
     return () => {
       const t = this.context.currentTime;
+      releaseClaim();
       this._setSweepAmount(priorAmt, 0.05);
       this.sweepLink.set(priorAmt > 0);
       this.sweepLfo.frequency.cancelScheduledValues(t);
@@ -1619,6 +1691,8 @@ export class DubBus {
   private masterSafetyClip!: WaveShaperNode;
   /** Passive level taps along the master insert — see where they are wired. */
   private _probeTaps: Array<{ name: string; analyser: AnalyserNode }> = [];
+  /** Sub Bass Bed's output tap — see `_wireProbeTaps`. */
+  private _subBedTap: AnalyserNode | null = null;
   // Chorus-on-master (dub finisher) — crossfaded in via masterChorusWet.
   private masterChorusDelayL!: DelayNode;
   private masterChorusDelayR!: DelayNode;
@@ -1819,6 +1893,19 @@ export class DubBus {
   // panic's `setIntensity(0)` and leave a loud echo ghost when the user
   // re-enables the bus (audible at high intensity settings — ~-13 dB of
   // the pre-panic tail at default intensity=0.62 after 1 s).
+  /**
+   * How long `dubPanic` holds the bus muted before restoring the echo/spring
+   * levels from settings.
+   *
+   * Public because `djKillAll` has to know when the window closes: it force-
+   * writes zeros into the settings store to beat the mirror during the drain,
+   * and that flush has to be undone afterwards or the bus comes back up
+   * permanently silent. Hard-coding 2000 in both places is how the two drifted
+   * apart in the first place — the bus restored from settings, the store had
+   * been zeroed, and both agreed on silence forever.
+   */
+  static readonly DRAIN_MS = 2000;
+
   private _draining = false;
   private _miniDrainPending = false;
   // Last character preset whose DSP-side bits (spring params + tape-sat
@@ -2210,9 +2297,47 @@ export class DubBus {
     this.sweepDelay.connect(this.combOutput);
     this.combOutput.connect(this.sweepOutput);
     // Phaser branch: sweepInput → phaser → phaserOutput → sweepOutput
-    Tone.connect(this.sweepInput as unknown as Tone.OutputNode, this.phaser.input);
-    Tone.connect(this.phaser.output, this.phaserOutput as unknown as Tone.InputNode);
+    //
+    // Connected through `getNativeAudioNode` on BOTH ends rather than
+    // `Tone.connect`. Measured 2026-10-01 with the analyser taps above:
+    // `sweepPhaserInRms` 0.00091 with `sweepPhaserOutRms` exactly 0 — signal
+    // arriving at the branch and nothing leaving it, at depth 1.0, 12 stages,
+    // feedback 0.9 and 2 Hz, with `sweepPhaserWasmReady` true and the WASM
+    // itself verified healthy offline. So the break was never the DSP or the
+    // settings; it was this connection. `Tone.connect` was reached with a raw
+    // `GainNode` cast into a Tone type, which is how every OTHER Tone↔native
+    // connection in this file is made — except this one, which used
+    // `getNativeAudioNode` at 686, 724, 756 and 836. The mismatch landed on the
+    // Tone wrapper rather than the node the WASM worklet actually reads, so
+    // the worklet was handed an input with no audio in it, filled its output
+    // with zeros, and the effect was silent at every setting. The startup
+    // passthrough that would have masked this is explicitly disconnected on
+    // swap, so there was no fallback path left.
+    getNativeAudioNode(this.sweepInput as unknown)
+      ?.connect(getNativeAudioNode(this.phaser.input as unknown)!);
+    getNativeAudioNode(this.phaser.output as unknown)!
+      .connect(this.phaserOutput);
     this.phaserOutput.connect(this.sweepOutput);
+
+    // Diagnostic taps on BOTH sides of the phaser.
+    //
+    // The phaser branch was the one part of the sweep that could not be
+    // checked from outside: every level probe read healthy (unity branch gain,
+    // open gate, `wasmReady`) whether or not any signal was reaching the
+    // engine, and a phaser barely moves level anyway, so "SILENT" was
+    // indistinguishable from "working". These two analysers make the branch
+    // measurable — `sweepPhaserInRms` near zero while the comb branch carries
+    // signal means the branch is severed upstream of the DSP, which is a
+    // completely different fault from the WASM being unhealthy.
+    this.phaserInProbe = this.context.createAnalyser();
+    this.phaserOutProbe = this.context.createAnalyser();
+    this.phaserInProbe.fftSize = 2048;
+    this.phaserOutProbe.fftSize = 2048;
+    this.sweepInput.connect(this.phaserInProbe);
+    this.phaserOutput.connect(this.phaserOutProbe);
+    this.sweepOutProbe = this.context.createAnalyser();
+    this.sweepOutProbe.fftSize = 2048;
+    this.sweepOutput.connect(this.sweepOutProbe);
 
     // Return EQ — 4-band WASM parametric inserted between midScoop and LPF.
     // Always 100% wet (series insert). Bands start flat unless a character
@@ -2896,6 +3021,11 @@ export class DubBus {
 
   /** Whether the bus is currently enabled (return gain > 0). */
   get isEnabled(): boolean { return this.enabled; }
+
+  /** Which character Sub Harmonic plays while held. Read by the move. */
+  get subHarmonicMode(): 'pulse' | 'continuous' {
+    return this.settings.subHarmonicMode === 'continuous' ? 'continuous' : 'pulse';
+  }
 
   /** Whether SID dub synths are active (real SID chip emulation). */
   get isSIDMode(): boolean { return this._sidMode; }
@@ -3674,17 +3804,38 @@ export class DubBus {
         this.echo.setIntensity(this.settings.echoIntensity);
         this._setSpringWet(this.settings.springWet);
       } catch { /* ok */ }
-    }, 2000);
+      // ...and re-converge `enabled` with the desired state, which is the
+      // one thing panic above left behind. `settings` mirrors the store, so
+      // this reads the performer's actual intent rather than a guess.
+      //
+      // The old comment here said to let the caller's `setDubBus({enabled:
+      // false})` flow through instead. That only holds for the KILL button,
+      // which writes the store: an emergency panic for runaway feedback has
+      // no such caller, so it muted the engine while the store still said
+      // enabled, and nothing ever pushed the store's value back — the bus
+      // stayed dead with the panel reading ON, and no knob did anything.
+      // Measured 2026-10-02: engine enabled=false, inputGain 0, returnRms 0
+      // while the master chain carried signal. Enabling again was a no-op
+      // because the store's value never changed, so the mirror never pushed.
+      //
+      // Running it through setSettings takes the full enable path — input
+      // gain ramp, generated-synth un-silencing, the disabled warning reset —
+      // rather than poking `enabled` and leaving the bus half-open.
+      try {
+        this.setSettings({ enabled: this.settings.enabled }, { force: true });
+      } catch { /* ok */ }
+    }, DubBus.DRAIN_MS);
     this.throwTimers.add(drainTimer);
 
     // 6. Flip the engine's enabled flag. Intentionally do NOT write to
     //    `this.settings.enabled` — that's the "desired state" mirror
     //    of the store, and pre-writing it would make the store's mirror
     //    effect short-circuit via the equality check in setSettings
-    //    when it later pushes the same value. Instead let the caller's
-    //    `store.setDubBus({enabled:false})` flow through normally; its
-    //    engine-side write will find `settings.enabled=true` !== false
-    //    and run the full disable path (noise gate, sync the flag, etc.).
+    //    when it later pushes the same value. The KILL button's
+    //    `store.setDubBus({enabled:false})` does flow through normally and
+    //    lands in settings.enabled; a panic with no store write (runaway
+    //    feedback) leaves it true, and the drain timer re-converges the
+    //    engine with it when the window closes.
     // Generated synths keep sounding on their own. Panic cancelled every
     // timer, tap and feedback path but never told the siren to stop, so a
     // siren left holding kept going and disabling the bus only HID it by
@@ -4094,6 +4245,33 @@ export class DubBus {
         this._probeTaps.push({ name, analyser });
       } catch { /* a tap must never break the chain it measures */ }
     }
+    // The Sub Bass Bed's own output, registered for as long as it runs.
+    //
+    // Bed was declared inaudible three times over while running correctly and
+    // adding measurable signal, and every level probe in the system called it
+    // dead because none of them touched it. "Is this thing producing anything"
+    // is the whole question a generated layer raises, so the layer gets a tap
+    // of its own rather than being inferred from a stage downstream.
+    // The analyser is already connected to the bed in `startSubBassBed`; this
+    // only registers it so `getMasterInsertLevels` reports it alongside the
+    // master stages.
+    if (this._subBedTap) {
+      this._probeTaps.push({ name: 'subBedOut', analyser: this._subBedTap });
+    }
+  }
+
+  /** Read the Sub Bass Bed's own output, or 0 when it is not running. */
+  getSubBedLevel(): number {
+    if (!this._subBedTap) return 0;
+    try {
+      const buf = new Float32Array(this._subBedTap.fftSize);
+      this._subBedTap.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      return Math.round(Math.sqrt(sum / buf.length) * 1e6) / 1e6;
+    } catch {
+      return -1;
+    }
   }
 
   getMasterInsertLevels(): Record<string, number> {
@@ -4141,10 +4319,10 @@ export class DubBus {
     return out;
   }
 
-  setSettings(settings: Partial<DubBusSettings>): void {
+  setSettings(settings: Partial<DubBusSettings>, opts?: { force?: boolean }): void {
     const _t0 = performance.now();
     try {
-      this._applySettings(settings);
+      this._applySettings(settings, opts);
     } finally {
       const dt = performance.now() - _t0;
       const m = this._settingsMeter;
@@ -4156,7 +4334,7 @@ export class DubBus {
     }
   }
 
-  private _applySettings(settings: Partial<DubBusSettings>): void {
+  private _applySettings(settings: Partial<DubBusSettings>, opts?: { force?: boolean }): void {
     // Short-circuit no-op writes. PadGrid + DJSamplerPanel mirror this state
     // every time the store's `dubBus` OR the active deck's BPM changes —
     // during a crossfader sweep that's ~60 Hz of identical settings being
@@ -4182,7 +4360,14 @@ export class DubBus {
     for (const key of Object.keys(settings) as (keyof DubBusSettings)[]) {
       if (this.settings[key] !== settings[key]) { changed = true; break; }
     }
-    if (!changed) return;
+    // `force` re-runs the sequence for a value that ALREADY matches. The panic
+    // drain needs exactly that: `dubPanic` mutes the engine without touching
+    // `settings`, so re-converging the engine with the desired state is by
+    // definition a no-op write — and dropping no-op writes is what this guard
+    // is for. Without the escape hatch the bus stayed muted forever behind a
+    // panel that read ON (measured 2026-10-02: engine enabled=false,
+    // inputGain 0, store enabled=true after a tracker-view KILL).
+    if (!changed && !opts?.force) return;
 
     const merged: DubBusSettings = { ...this.settings, ...settings };
 
@@ -4436,9 +4621,18 @@ export class DubBus {
     this._applyMasterInsertTone(merged);
     // Liquid sweep params — clamp + smooth. sweepAmount=0 fully silences
     // the branch, and unlinks its LFO from the delay so neither is computed.
-    const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
-    this._setSweepAmount(sweepAmt, 0.02);
-    this.sweepLink.set(sweepAmt > 0);
+    //
+    // Gated on ownership. Dropping the key from `settings` above is NOT enough:
+    // `merged` falls back to `this.settings`, and a move that writes the
+    // AudioParam without also updating the settings mirror leaves the stale
+    // resting value there — so every settings write recomputed the gain from
+    // 0 and muted a sweep that was holding perfectly well. That is the Liquid
+    // bug of 2026-10-01: branch passing 0.126 RMS, `sweepOutput.gain` 0.
+    if (!heldMoveBlocksSettingsDrive(this._ownedSettingKeys.keys(), 'sweepAmount')) {
+      const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
+      this._setSweepAmount(sweepAmt, 0.02);
+      this.sweepLink.set(sweepAmt > 0);
+    }
     const sweepRate = Math.max(0.05, Math.min(5, merged.sweepRateHz));
     this._settle(this.sweepLfo.frequency, sweepRate, now, 0.02);
     const sweepDepthSec = Math.max(0, Math.min(9, merged.sweepDepthMs)) / 1000;
@@ -4562,8 +4756,13 @@ export class DubBus {
       const amt = Math.max(0, Math.min(1, merged.sweepAmount));
       // Crossfade: one branch at its unity gain (sweepLevel.ts), other at 0
       this._applySweepBranchGains(merged, now);
-      this._setSweepAmount(amt, 0.02);
-      this.sweepLink.set(amt > 0);
+      // Same ownership gate as above — while a move holds sweepAmount it is the
+      // authority on the wet mix, and re-deriving it from the store's resting
+      // value is what muted Liquid mid-gesture.
+      if (!this.isSettingOwned('sweepAmount')) {
+        this._setSweepAmount(amt, 0.02);
+        this.sweepLink.set(amt > 0);
+      }
     }
     // Phaser params — update even when mode is 'comb' (no harm, WASM just idles)
     if (settings.phaserRate !== undefined) this.phaser.setRate(merged.phaserRate);
@@ -5534,6 +5733,25 @@ export class DubBus {
       draining: this._draining,
       miniDrainPending: this._miniDrainPending,
       masterInsertActive: this.masterInsertActive,
+      // false = the phaser is a passthrough cable, so the liquid sweep does
+      // nothing in phaser mode no matter what the gate and branch gain say.
+      sweepPhaserWasmReady: this.phaser.wasmReady,
+      // Sub Bass Bed's own output. Non-zero while the bed runs means it is
+      // generating; zero means the layer is not wired, which is a different bug
+      // from "too quiet to hear" and must not be diagnosed as one.
+      subBedRms: this.getSubBedLevel(),
+      // Signal actually arriving at / leaving the phaser. Both near zero while
+      // the bus is hot means the branch is severed, NOT that the effect is
+      // subtle — which is the fault these exist to distinguish.
+      sweepPhaserInRms: +DubBus._probeRms(this.phaserInProbe).toFixed(5),
+      sweepPhaserOutRms: +DubBus._probeRms(this.phaserOutProbe).toFixed(5),
+      // Post-branch, so this is the sweep's actual contribution to the mix.
+      sweepOutRms: +DubBus._probeRms(this.sweepOutProbe).toFixed(5),
+      // What the branch output reaches after the wet-mix gain. `sweepMix(1)`
+      // is 0.707, so a value far below it means the move is not at full wet.
+      sweepOutputGain: round(this.sweepOutput.gain.value),
+      // Whether the sweep is spliced into the master path at all.
+      sweepConnected: this.sweepOutput.numberOfOutputs > 0,
       echoEngine: this.settings.echoEngine,
       characterPreset: this.settings.characterPreset,
       inputGain: round(this.input.gain.value),
@@ -5584,6 +5802,52 @@ export class DubBus {
       ringModAmount: round(this.settings.ringModAmount),
       plateStage: this.settings.plateStage,
     };
+  }
+
+  /**
+   * Desired vs actual, paired per parameter.
+   *
+   * `getDiagnosticSnapshot()` is a flat field bag that mixes the store's
+   * DESIRED values with the graph's ACTUAL ones and does not say which is
+   * which — `echoRateMs` there is the setting, not the delay time the node is
+   * running, which is how a working Tape Stop hold reads as "nothing
+   * happened". Two knobs with the same name in different halves of the bag is
+   * exactly the ambiguity this method removes.
+   *
+   * Every entry is `{ desired, actual, delta }` read at one instant, so a
+   * parameter that is not reaching the graph shows a non-zero delta instead of
+   * having to be inferred. `delta` is `actual - desired`; `null` when the live
+   * value cannot be read (an engine that does not expose it), which is honest
+   * rather than a silent zero that looks like a working-but-silent control.
+   */
+  getLiveState(): Record<string, { desired: number | null; actual: number | null; delta: number | null }> {
+    const round = (value: number): number => +value.toFixed(4);
+    const read = (desired: number | undefined, readActual: () => number | null | undefined) => {
+      const actual = readActual();
+      const d = typeof desired === 'number' ? round(desired) : null;
+      const a = typeof actual === 'number' && Number.isFinite(actual) ? round(actual) : null;
+      return { desired: d, actual: a, delta: d !== null && a !== null ? round(a - d) : null };
+    };
+
+    const out: Record<string, { desired: number | null; actual: number | null; delta: number | null }> = {
+      enabled: read(this.settings.enabled ? 1 : 0, () => (this.enabled ? 1 : 0)),
+      lpfCutoffHz: read(20000, () => this.lpf.frequency.value),
+      hpfCutoffHz: read(this.settings.hpfCutoff, () => this.hpf.frequency.value),
+      returnGain: read(this.settings.returnGain, () => this.return_.gain.value),
+      inputGain: read(this.enabled ? 1 : 0, () => this.input.gain.value),
+      feedbackGain: read(this.settings.sweepFeedback, () => this.feedback.gain.value),
+      plateSend: read(this.settings.plateStageMix, () => (this.plateSend ? this.plateSend.gain.value : null)),
+      sweepOutput: read(this.settings.sweepAmount, () => this.sweepOutput.gain.value),
+      echoWet: read(this.settings.echoWet, () => this.echo.wet),
+      springWet: read(this.settings.springWet, () => this._springWetCache),
+    };
+    // Echo delay time is the parameter moves actually move (tapeStop's sibling
+    // `tapeStop()` one-shot, throw, tapeStop). The adapter's describe() is the
+    // existing seam for what the engine is really running with.
+    const echoDesc = (this.echo as unknown as { describe?: () => Record<string, unknown> }).describe?.();
+    const liveRate = echoDesc?.delayTimeMs ?? echoDesc?.rateMs ?? echoDesc?.delayTime;
+    out.echoRateMs = read(this.settings.echoRateMs, () => (typeof liveRate === 'number' ? liveRate : null));
+    return out;
   }
 
   // ─── Tracker Channel Tap API ───────────────────────────────────────────────
@@ -7247,11 +7511,33 @@ export class DubBus {
   }
 
   /**
-   * Sub Harmonic — envelope-follower that triggers a short sub-sine pulse
-   * whenever the bus input crosses `threshold`. The sub rides every
-   * transient in the music, thickening kicks/snares without a continuous
-   * drone. Implemented via an AnalyserNode polling on rAF — not sample-
-   * accurate but punchy enough for a dub move.
+   * Sub Harmonic — a triggered sub layer that follows the bass.
+   *
+   * The pulse is fired by an envelope follower on a LOWPASSED copy of the bus
+   * input, and its pitch is read out of that same low band, so the sub lands
+   * on the note the song is actually playing.
+   *
+   * Three faults this replaced, all of which made the move sound wrong rather
+   * than merely quiet (audible at last on 2026-10-01, then judged bad):
+   *
+   *  1. The follower read the FULL-BAND input, so it had no idea what was
+   *     triggering it. Snares, hats and vocals crossed the threshold and each
+   *     got a sine bolted underneath them — a snare has no sub energy, and the
+   *     result is the "doo" that made the move sound cheap. Band-limiting the
+   *     detector to the bass means only kick and bass can fire it.
+   *  2. It fired a FIXED 55 Hz. A bassline on F1 had A1 punched under it and
+   *     the two beat against each other instead of reinforcing. The pitch now
+   *     comes from `detectLowFundamental`, with `freq` only as a fallback for
+   *     when the band is too quiet to read.
+   *  3. It injected into `return_`, which is the node carrying `returnGain`.
+   *     Raising the return to make wet moves audible therefore multiplied
+   *     THIS move by 4x as well — the one generator whose level was not
+   *     calibrated against the return trim. It now lands on `returnTrim`,
+   *     after the trim and before the safety clipper, so the return knob
+   *     cannot push it into the clipper.
+   *
+   * Implemented via an AnalyserNode polling on rAF — not sample-accurate, but
+   * punchy enough for a dub move.
    */
   startSubHarmonic(freq = 55, threshold = 0.06, level = 0.5): () => void {
     // Bare `return () => {}` said nothing. A move that silently declines is
@@ -7262,15 +7548,36 @@ export class DubBus {
       console.warn('[DubBus] startSubHarmonic ignored — bus disabled');
       return () => {};
     }
-    console.log(`[DubBus] subHarmonic ▶ freq=${freq}Hz threshold=${threshold} level=${level}`);
+    console.log(`[DubBus] subHarmonic ▶ fallbackFreq=${freq}Hz threshold=${threshold} level=${level}`);
     const ctx = this.context;
+    // Band-limit BEFORE the detector. This is the fix for the move firing on
+    // snares and hats: only energy that survives a 120 Hz lowpass counts as a
+    // reason to put a sine underneath, which is what kick and bass energy is
+    // and what a snare hit is not.
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 120;
+    lowpass.Q.value = 0.7;
+    // 8192 bins at 48 kHz is 5.9 Hz resolution, which `detectLowFundamental`
+    // refines to well under a semitone. 512 (the old size) could not tell F1
+    // from A1 at all.
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.1;
+    analyser.fftSize = 8192;
+    analyser.smoothingTimeConstant = 0.5;
     try {
-      Tone.connect(this.input, analyser as unknown as Tone.InputNode);
+      // Native connect, not Tone.connect: `Tone.connect` only recognises real
+      // Tone nodes, and a plain BiquadFilterNode cast into a Tone type connects
+      // nothing without erroring. That severed the phaser branch (the Liquid
+      // bug), and it also meant Sub Harmonic's 120 Hz band-limit was never
+      // applied at all — the "detector" was reading the full-band input, so the
+      // move was still firing on snares and hats, which is one of the three
+      // faults the rewrite claimed to fix.
+      this.input.connect(lowpass);
+      lowpass.connect(analyser);
     } catch { /* ok */ }
     const data = new Float32Array(analyser.fftSize);
+    const spectrum = new Float32Array(analyser.frequencyBinCount);
+    const pitch = new SubPitchTracker(0.6);
     let rafHandle = 0;
     let lastFireAt = 0;
     let running = true;
@@ -7280,13 +7587,13 @@ export class DubBus {
     // if the SID synths aren't ready yet.
     const useSid = this._sidMode && this._sidSynths?.isReady;
     const sidSynths = this._sidSynths;
-    const fireSub = () => {
+    const fireSub = (atHz: number) => {
       if (useSid && sidSynths) {
         try {
-          // Low SID note roughly matching `freq`. 0x48 ≈ C-1, 0x50 ≈ G-1,
-          // 0x60 ≈ C-2. Clamp `freq` into the expected 30–120 Hz range
+          // Low SID note roughly matching `atHz`. 0x48 ≈ C-1, 0x50 ≈ G-1,
+          // 0x60 ≈ C-2. Clamp into the expected 30–120 Hz range
           // and map linearly to the 0x48–0x60 SID note band.
-          const clamped = Math.max(30, Math.min(120, freq));
+          const clamped = Math.max(30, Math.min(120, atHz));
           const noteByte = Math.round(0x48 + ((clamped - 30) / 90) * 0x18);
           sidSynths.fireSubBooster(noteByte, 120);
         } catch { /* ok */ }
@@ -7295,26 +7602,38 @@ export class DubBus {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       osc.type = 'sine';
-      osc.frequency.value = Math.max(30, Math.min(200, freq));
+      // Land slightly sharp and fall to the note. A sine that appears at
+      // pitch reads as a beep; one that drops into it reads as weight, which
+      // is the difference between this sounding like a test tone and like a
+      // bass drum with sub under it.
+      osc.frequency.setValueAtTime(Math.max(30, Math.min(200, atHz * 1.5)), now);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(30, Math.min(200, atHz)), now + 0.045);
       const env = ctx.createGain();
       env.gain.value = 0;
       osc.connect(env);
-      env.connect(this.return_);
+      // returnTrim, not return_: this is AFTER the return gain, so turning the
+      // return knob does not also slam the sub into the clipper.
+      env.connect(this.returnTrim);
       // Sine sums in phase with the song at low frequencies — level 0.85 over
       // a song at baseline 0.86 pushed peak to 1.066 in the 2026-04-20 sweep.
       // Clamp at 0.55 leaves enough headroom that even in-phase summation
       // with a loud song stays below full scale.
       const peak = generatedPeak('subHarmonic', level);
       env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(peak, now + 0.01);
-      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+      env.gain.linearRampToValueAtTime(peak, now + 0.008);
+      // 0.2s was too short to read as weight under a kick; 0.28s still lands
+      // inside the gap before the next note at dub tempos.
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
       osc.start(now);
-      osc.stop(now + 0.22);
+      osc.stop(now + 0.3);
       osc.onended = () => { try { env.disconnect(); } catch { /* ok */ } };
     };
     const poll = () => {
       if (!running) return;
       analyser.getFloatTimeDomainData(data);
+      analyser.getFloatFrequencyData(spectrum);
+      const nowSec = ctx.currentTime;
+      pitch.offer(detectLowFundamental(spectrum, ctx.sampleRate, analyser.fftSize));
       let peak = 0;
       for (let i = 0; i < data.length; i++) {
         const a = Math.abs(data[i]);
@@ -7324,7 +7643,9 @@ export class DubBus {
       // Fire if above threshold AND we haven't fired in 100 ms (debounce)
       if (peak > threshold && nowMs - lastFireAt > 100) {
         lastFireAt = nowMs;
-        fireSub();
+        // The note the bass is playing, or the caller's fallback when the low
+        // band is too quiet to read a pitch from.
+        fireSub(pitch.read(nowSec) ?? freq);
       }
       rafHandle = requestAnimationFrame(poll);
     };
@@ -7332,7 +7653,143 @@ export class DubBus {
     return () => {
       running = false;
       cancelAnimationFrame(rafHandle);
+      try { lowpass.disconnect(); } catch { /* ok */ }
       try { analyser.disconnect(); } catch { /* ok */ }
+    };
+  }
+
+    /**
+   * Sub Bass Bed — the continuous half of Sub Harmonic.
+   *
+   * A lowpassed copy of the dry programme, added back under the mix while held.
+   * No envelope follower, no pitch detection, no transient: because the
+   * source is the bassline itself, it cannot drift out of key the way a fixed
+   * sine does, and it needs no trigger to stay under the music.
+   *
+   * What it is for: the dry mix's own low end is often thin on small systems
+   * and gets lost against everything sitting above it. This is the standard
+   * dub answer — reinforce the fundamental that is already there so the bass
+   * has weight underneath it.
+   *
+   * What it is NOT: it adds no harmonics, because there are none to add. This
+   * is weight, not brightness. For a bassline to gain audible DEPTH on small
+   * speakers it has to carry content they reproduce, so this keeps the upper
+   * part of the low band rather than only the fundamental.
+   *
+   * 4-pole (two cascaded biquads) rather than one, because a single 2-pole
+   * lowpass leaves audible upper-harmonic residue that reads as a smeared
+   * copy of the bass rather than as weight beneath it. The highpass takes DC
+   * and infrasonic rumble out so a sub-bass bed cannot pump the master.
+   */
+  startSubBassBed(level = 0.35): () => void {
+    if (!this.enabled) {
+      console.warn('[DubBus] startSubBassBed ignored — bus disabled');
+      return () => {};
+    }
+    console.log(`[DubBus] subBassBed ▶ level=${level}`);
+    const ctx = this.context;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 28;
+    hp.Q.value = 0.7;
+    const lp1 = ctx.createBiquadFilter();
+    lp1.type = 'lowpass';
+    lp1.frequency.value = SUB_BED_CEILING_HZ;
+    lp1.Q.value = 0.7;
+    const lp2 = ctx.createBiquadFilter();
+    lp2.type = 'lowpass';
+    lp2.frequency.value = SUB_BED_CEILING_HZ;
+    lp2.Q.value = 0.7;
+    const bed = ctx.createGain();
+    bed.gain.value = 0;
+
+    try {
+      // The PROGRAMME, not the bus input.
+      //
+      // `this.input` is the dub send bus: four channel taps, each capped at
+      // 0.7 and currently sitting near 0.21, so it arrives around -25 dB. A
+      // sub layer built on that reinforces four channels' worth of partial bass
+      // rather than the bassline, which is the thing the move claims to sit
+      // under. `masterInsertSource` is `masterEffectsInput` — the full dry
+      // programme, upstream of the insert — so it holds the real low end. It is
+      // also safe to feed back into, because returnTrim joins DOWNSTREAM of it,
+      // so no cycle is formed.
+      const source: AudioNode = this.masterInsertSource ?? this.input;
+      // Native connect, NOT Tone.connect. `Tone.connect` only recognises real
+      // Tone nodes; handing it a plain BiquadFilterNode cast into a Tone type
+      // connects NOTHING and says so with no error. That is not theoretical —
+      // it severed the phaser branch (the subject of the whole Liquid bug) and
+      // then silently zeroed the Sub Bass Bed twice more, each time reading as
+      // "too quiet to hear" because every probe downstream of the break still
+      // saw plausible levels. A cast is not a connection.
+      source.connect(hp);
+      hp.connect(lp1);
+      lp1.connect(lp2);
+      lp2.connect(bed);
+      // returnTrim, not return_: same reason as the pulse — the return knob
+      // is a trim on the wet chain and must not double-apply to a sub layer.
+      bed.connect(this.returnTrim);
+      const tap = this.context.createAnalyser();
+      tap.fftSize = 2048;
+      bed.connect(tap);
+      this._subBedTap = tap;
+      this._wireProbeTaps();
+    } catch (err) {
+      console.warn('[DubBus] startSubBassBed failed to wire:', err);
+      return () => {};
+    }
+    console.log(`[DubBus] subBassBed source=${this.masterInsertSource ? 'programme' : 'busInput (no insert point)'} ceiling=${SUB_BED_CEILING_HZ}Hz`);
+
+    const now = ctx.currentTime;
+    // A MIX RATIO, not an oscillator peak.
+    //
+    // This was `generatedPeak('subHarmonic', level)`, which is the amplitude a
+    // sine's envelope ramps to. The bed is not a sine — it is a continuous
+    // signal already carrying the programme's own level, roughly -25 dB on a
+    // four-tap bus feed. Multiplying that by an envelope peak of ~0.2 put the
+    // contribution at -36 dB against a -14 dB master, so Bed was inaudible and
+    // read as identical to Pulse (reported 2026-10-01). A signal path needs
+    // unity-ish to be heard at all; the ratio is what sets how much.
+    //
+    // The ceiling is above 1 deliberately. A sub layer is a sum into a
+    // limiter, and pushing it past the dry bass is the only way to find out
+    // whether it is producing anything at all on a given pair of speakers —
+    // at unity on small speakers it is genuinely below the noise floor, which
+    // is indistinguishable from a dead wire. Diagnostic overdrive is the only
+    // way to separate "too quiet" from "not connected".
+    //
+    // `level` is the move's SHARED intent parameter (default 1), so it maps
+    // into the bed's own range here rather than being read as a mix directly.
+    // Passing it straight through is what made the bed run at full unity and
+    // sound like a bass boost: the band is wide now, so unity is a heavy low
+    // boost, not a full-scale sine. Overdrive above intent still scales, so
+    // `level: 8` still means "far too much" when diagnosing.
+    const intent = Number.isFinite(level) ? level : 1;
+    const mix = Math.max(0, Math.min(SUB_BED_MAX_MIX, intent * SUB_BED_MIX_AT_FULL_INTENT));
+    bed.gain.setValueAtTime(0, now);
+    bed.gain.linearRampToValueAtTime(mix, now + 0.12);
+    // NO `setTargetAtTime(0, …)` here. That line belongs to the release, and
+    // having it at setup decayed the bed back to silence 0.12 s after it fired:
+    // the bed was silent for every measurement taken after the first moment,
+    // which read as "inaudible" three times over. The release ramp lives in the
+    // disposer below.
+
+    return () => {
+      const t = ctx.currentTime;
+      try {
+        bed.gain.cancelScheduledValues(t);
+        bed.gain.setValueAtTime(bed.gain.value, t);
+        bed.gain.linearRampToValueAtTime(0, t + 0.25);
+      } catch { /* ok */ }
+      window.setTimeout(() => {
+        try { hp.disconnect(); } catch { /* ok */ }
+        try { lp1.disconnect(); } catch { /* ok */ }
+        try { lp2.disconnect(); } catch { /* ok */ }
+        try { bed.disconnect(); } catch { /* ok */ }
+        try { this._subBedTap?.disconnect(); } catch { /* ok */ }
+        this._subBedTap = null;
+        this._wireProbeTaps();
+      }, 600);
     };
   }
 

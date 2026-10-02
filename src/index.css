@@ -693,6 +693,22 @@
      changed background to something unrelated: "only some have an outline when
      i hover them and some have crazy weird bg colors when hovered"
      (2026-09-23). */
+  /* Press-and-hold move buttons must not let the browser take the pointer.
+     A drag across a button starts a text selection, and a touch drag starts a
+     scroll; either one makes the browser fire `pointercancel`, which the hold
+     wiring treats as a release. The button therefore lit on pointerdown and
+     went out again under the performer's finger — "can't hold it down, it
+     lights up briefly". Reported 2026-10-02, after the release path had
+     already been hardened for a different stuck-on fault (2026-09-21).
+     `touch-action: none` stops the scroll/pan gesture, `user-select: none`
+     stops the selection. Neither changes what a click does. */
+  .dub-move-button {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
   .dub-move-button:hover:not(:disabled) {
     background-color: var(--dub-move-hover-bg);
     border-color: var(--dub-move-hover-border);

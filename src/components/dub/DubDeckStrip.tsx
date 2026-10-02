@@ -180,7 +180,7 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   // ── HOLD — press and hold for precise duration, release to stop ──
   { label: 'Rise',       title: 'HPF Rise — Altec Big Knob: steps HPF up through positions, sweeps back on release', moveId: 'hpfRise',    color: MOVE_COLOR.primary,     kind: 'hold', group: 'hold', needsSend: true },
   { label: 'Filter',    title: 'Filter Drop — LPF sweeps down while held, opens on release',  moveId: 'filterDrop',  color: MOVE_COLOR.secondary,   kind: 'hold', group: 'hold', needsSend: true },
-  { label: 'Tape Stop', title: 'Tape Stop — bus LPF + echo-rate collapses while held, restores on release', moveId: 'tapeStop', color: MOVE_COLOR.secondary, kind: 'hold', group: 'hold', needsSend: true },
+  { label: 'Dub Mute',   title: 'Dub Mute — silences the whole dub return while held (echo and reverb alike), then restores it on release. The dry mix and the transport keep running. For a tempo+pitch collapse use STOP! instead.', moveId: 'tapeStop', color: MOVE_COLOR.secondary, kind: 'hold', group: 'hold', needsSend: true },
   { label: 'Drop',         title: 'Master Drop — mutes dry signal while held; echo+spring tail survives', moveId: 'masterDrop',  color: MOVE_COLOR.error, kind: 'hold', group: 'hold', needsSend: true },
   { label: 'Version Drop', title: 'Version Drop — mute all melodic channels (lead/chord/pad); leave bass + drums. Classic dub breakdown.', moveId: 'versionDrop', color: MOVE_COLOR.error,    kind: 'hold', group: 'hold' },
   { label: 'Riddim',       title: 'Riddim Section — drop to drums and bass, then the skank creeps back in soaked in echo on the next bar line. Keeps the lowest-register part even when role detection finds no bass.', moveId: 'riddimSection', color: MOVE_COLOR.error, kind: 'hold', group: 'hold' },
@@ -197,7 +197,7 @@ const GLOBAL_MOVES: Array<GlobalMove> = [
   // ── TOGGLE — click once to activate, click again to deactivate (hands-free) ──
   { label: 'Wide',       title: 'Stereo Doubler — 20ms cross-fed widening (toggle)',               moveId: 'stereoDoubler', color: MOVE_COLOR.highlight,   kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Wobble',     title: 'Tape Wobble — LFO on echo rate (toggle)',                         moveId: 'tapeWobble',   color: MOVE_COLOR.warning,  kind: 'hold', group: 'toggle', needsSend: true },
-  { label: 'Sub Harm',   title: 'Sub Harmonic — env-follower sub pulse on every transient (toggle)', moveId: 'subHarmonic', color: MOVE_COLOR.primary, kind: 'hold', group: 'toggle', needsSend: true },
+  { label: 'Sub Harm',   title: 'Sub Harmonic — sub under the bass, as a pitched pulse or a continuous bed (toggle; pick the mode under the button)', moveId: 'subHarmonic', color: MOVE_COLOR.primary, kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Liquid',     title: 'Liquid Sweep — comb filter / phaser swirl on the bus return (toggle)', moveId: 'combSweep', color: MOVE_COLOR.secondary, kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Sweep',      title: 'EQ Sweep — resonant filter sweep (toggle)',                       moveId: 'eqSweep',      color: MOVE_COLOR.highlight, kind: 'hold', group: 'toggle', needsSend: true },
   { label: 'Ring',       title: 'Ring Mod — metallic ring modulation (toggle)',                    moveId: 'ringMod',      color: MOVE_COLOR.warning,     kind: 'hold', group: 'toggle', needsSend: true },
@@ -236,6 +236,24 @@ const DECK_MOVE_INDEX = buildDeckMoveIndex(GLOBAL_MOVES, CHANNEL_OPS);
 /** The shapes on offer: automatic, the generic deck, then every descriptor. */
 const DECK_SHAPE_OPTIONS = listDeckShapeOptions(CONTROLLER_LAYOUTS)
   .map(({ id, label }) => ({ value: id, label }));
+
+/**
+ * Sub Harmonic plays two genuinely different things, not two settings of one:
+ * a beat-synced pulse at the pitch the bass is playing, or the lowpassed bass
+ * itself as a continuous bed. The deck cannot know which the performer wants
+ * before they press, so it asks.
+ *
+ * This lives in the HEADER beside SHAPE, not on the Sub Harm pad. It was
+ * stacked under the button first, which is dead code on a controller-shaped
+ * deck — those pads are a hardware mimic and no such control exists on the
+ * device, so a dropdown on one is a fabrication. SHAPE already sets the
+ * precedent: a control the hardware does not have belongs in the header, and
+ * the header is shared by both deck shapes.
+ */
+const SUB_HARMONIC_MODE_OPTIONS = [
+  { value: 'pulse', label: 'Pulse' },
+  { value: 'continuous', label: 'Bed' },
+];
 
 export const DubDeckStrip: React.FC = () => {
   const armed = useDubStore(s => s.armed);
@@ -785,31 +803,57 @@ export const DubDeckStrip: React.FC = () => {
   // 'bus' and 'channel' (or the channel index changes), re-wire the
   // isolation tap from ChannelRoutedEffects into the dub bus's sidechain
   // detector. 'bus' mode removes any active tap (bus self-detects).
+  //
+  // 'drums' is the classifier key, matching the Master FX "Drums (auto)"
+  // option: resolveDrumKeyChannel() asks the channel classifier which channel
+  // is the kick (else a whole-kit channel, else any percussion channel). It is
+  // a promise about a song, not a channel number, so it has to be asked again
+  // whenever a different song is loaded — hence the pattern-count dependency.
+  //
+  // When it resolves to -1 (no song loaded, or a song with no percussion) the
+  // key is left SILENT on purpose. Self-keying there is the failure mode
+  // Master FX already learned: a kick ducker with a 150 Hz key filter becomes a
+  // permanent bass compressor instead, measured at -11.4 dB at 100 Hz on
+  // 2026-09-29. An inaudible duck is recoverable; bass that vanishes is not.
+  const drumKeySongId = useTrackerStore(s => s.patterns.length);
   useEffect(() => {
     const source = dubBusSettings.sidechainSource;
     const channelIndex = dubBusSettings.sidechainChannelIndex;
-    if (source !== 'channel') return;
+    if (source === 'bus') return;
     let scInputNode: AudioNode | null = null;
     let activeChannel: number | null = null;
+    let cancelled = false;
     (async () => {
       try {
         const bus = ensureDrumPadEngine().getDubBus();
         scInputNode = bus.getSidechainInput();
         const mgr = getChannelRoutedEffectsManager();
-        const ok = await mgr.addSidechainTap(channelIndex, scInputNode);
-        if (ok) activeChannel = channelIndex;
+        let tapChannel = channelIndex;
+        if (source === 'drums') {
+          const { resolveDrumKeyChannel } = await import('@/engine/tone/sidechainKey');
+          tapChannel = await resolveDrumKeyChannel();
+          if (cancelled) return;
+          if (tapChannel < 0) {
+            console.info('[DubDeckStrip] no drum channel classified — sidechain key left silent');
+            scInputNode = null;
+            return;
+          }
+        }
+        const ok = await mgr.addSidechainTap(tapChannel, scInputNode);
+        if (ok && !cancelled) activeChannel = tapChannel;
       } catch (e) {
         console.warn('[DubDeckStrip] sidechain tap failed:', e);
       }
     })();
     return () => {
+      cancelled = true;
       if (activeChannel !== null && scInputNode) {
         try {
           getChannelRoutedEffectsManager().removeSidechainTap(activeChannel, scInputNode);
         } catch { /* ok */ }
       }
     };
-  }, [dubBusSettings.sidechainSource, dubBusSettings.sidechainChannelIndex]);
+  }, [dubBusSettings.sidechainSource, dubBusSettings.sidechainChannelIndex, drumKeySongId]);
 
   useEffect(() => {
     return startDubRecorder();
@@ -1124,6 +1168,45 @@ export const DubDeckStrip: React.FC = () => {
       });
     }
   }, [runWithBus]);
+
+  /**
+   * A latched move only hears the mode it was fired with.
+   *
+   * Sub Harmonic runs one of two engines — the triggered pulse or the
+   * continuous bed — and the router picks that at fire time from the bus
+   * setting. Nothing re-read it afterwards, so changing the SUB select while
+   * the button was already on left the OLD generator running: switching to Bed
+   * mid-Pulse gave you both, or Bed silently doing nothing, depending on which
+   * way round you went (reported 2026-10-01).
+   *
+   * Re-firing on change makes the select mean what it looks like it means. The
+   * alternative — leaving it to the performer to toggle off and on again — puts
+   * a hidden double-tap between the control and its effect, which is the same
+   * class of "the control says one thing and does another" that has cost this
+   * deck most of its debugging.
+   *
+   * Every other move reads one set of parameters, so this is deliberately the
+   * only move with a re-fire path. If a second mode-selectable move appears it
+   * belongs here too, and belongs here as a list rather than a special case.
+   */
+  const MODE_LATCHED_MOVES = ['subHarmonic'] as const;
+  const subHarmonicModeRef = useRef(dubBusSettings.subHarmonicMode);
+  useEffect(() => {
+    const previous = subHarmonicModeRef.current;
+    if (previous === dubBusSettings.subHarmonicMode) return;
+    subHarmonicModeRef.current = dubBusSettings.subHarmonicMode;
+    for (const moveId of MODE_LATCHED_MOVES) {
+      const release = toggleDisposers.current.get(moveId);
+      if (!release) continue; // not latched on — nothing running to replace
+      toggleDisposers.current.delete(moveId);
+      try { release(); } catch { /* ok */ }
+      const disp = fireDub(moveId, undefined);
+      if (disp) toggleDisposers.current.set(moveId, () => disp.dispose());
+    }
+    // `toggledMoves` is deliberately not a dependency: this must fire on the
+    // MODE changing only. Reading it here would re-fire whenever the set object
+    // is replaced, including by this very effect's own bookkeeping.
+  }, [dubBusSettings.subHarmonicMode]);
 
   // Persistent mic toggle — connects mic into the dub bus input until toggled off.
   const toggleMic = useCallback(async () => {
@@ -2102,6 +2185,21 @@ export const DubDeckStrip: React.FC = () => {
             deckShape.kind === 'controller'
               ? `Dub Deck shape: the ${deckShape.layout.manufacturer} ${deckShape.layout.name} panel — every control plays the dub function assigned to it`
               : 'Dub Deck shape: the generic deck — move rows and channel cards'
+          }
+        />
+        <span className="text-text-muted ml-2">SUB</span>
+        <CustomSelect
+          value={dubBusSettings.subHarmonicMode}
+          onChange={(v) => setDubBus({
+            subHarmonicMode: v === 'continuous' ? 'continuous' : 'pulse',
+            characterPreset: 'custom',
+          })}
+          options={SUB_HARMONIC_MODE_OPTIONS}
+          className="text-[10px] font-mono"
+          title={
+            dubBusSettings.subHarmonicMode === 'continuous'
+              ? 'Sub Harmonic is a continuous lowpassed sub under the bassline — weight, follows the bass, no trigger'
+              : 'Sub Harmonic is a sub sine fired by the bass, pitched to the note it is playing — discrete weight on each kick'
           }
         />
         <button

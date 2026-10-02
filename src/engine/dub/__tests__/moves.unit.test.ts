@@ -94,6 +94,7 @@ function buildFakeBus() {
     oscBass: vi.fn(),
     crushBass: vi.fn(),
     subHarmonic: vi.fn(),
+    subBassBed: vi.fn(),
     tubbyScream: vi.fn(),
     stereoDoubler: vi.fn(),
     tapeWobble: vi.fn(),
@@ -108,6 +109,8 @@ function buildFakeBus() {
     startOscBass: vi.fn().mockReturnValue(release.oscBass),
     startCrushBass: vi.fn().mockReturnValue(release.crushBass),
     startSubHarmonic: vi.fn().mockReturnValue(release.subHarmonic),
+    startSubBassBed: vi.fn().mockReturnValue(release.subBassBed),
+    subHarmonicMode: 'pulse',
     startTubbyScream: vi.fn().mockReturnValue(release.tubbyScream),
     startStereoDoubler: vi.fn().mockReturnValue(release.stereoDoubler),
     startTapeWobble: vi.fn().mockReturnValue(release.tapeWobble),
@@ -360,7 +363,7 @@ describe('delayTimeThrow', () => {
 describe.each([
   ['oscBass',       oscBass,       'startOscBass',       'oscBass',       { freq: 55, level: 0.9 }],
   ['crushBass',     crushBass,     'startCrushBass',     'crushBass',     { freq: 55, bits: 3, level: 0.55 }],
-  ['subHarmonic',   subHarmonic,   'startSubHarmonic',   'subHarmonic',   { freq: 55, threshold: 0.035, level: 1.4 }],
+  ['subHarmonic',   subHarmonic,   'startSubHarmonic',   'subHarmonic',   { freq: 55, threshold: 0.035, level: 1 }],
   ['tubbyScream',   tubbyScream,   'startTubbyScream',   'tubbyScream',   { centerHz: 500, sweepHz: 900, sweepSec: 3.5, feedbackAmount: 1.3 }],
   ['stereoDoubler', stereoDoubler, 'startStereoDoubler', 'stereoDoubler', { delayMs: 25, feedback: 0.55, wet: 0.9 }],
   ['tapeWobble',    tapeWobble,    'startTapeWobble',    'tapeWobble',    { depthMs: 70, rateHz: 2.5 }],
@@ -380,6 +383,19 @@ describe.each([
     disp!.dispose();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((release as any)[releaseKey]).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── intent that the clamp would silently eat ────────────────────────────────
+describe('generated-source level defaults', () => {
+  it('gives the sub pulse a level that survives the intent clamp', () => {
+    // Reported 2026-10-01 as "sub harmonic does nothing". `level` is INTENT for
+    // `generatedPeakFor`, which clamps to 0..1 — so the default read 1.4 for a
+    // long time and was exactly 1.0. Raising it could never have made the move
+    // louder, which is what sent the diagnosis after the number twice instead
+    // of after the RMS reference it actually needed. A default above 1 is a
+    // silent no-op wearing a comment that claims otherwise.
+    expect(subHarmonic.defaults.level).toBeLessThanOrEqual(1);
   });
 });
 
@@ -757,5 +773,42 @@ describe('skankEchoThrow', () => {
     vi.runAllTimers();
     expect(release.channelTap).toHaveBeenCalledTimes(1);
     expect(bus.setEchoRate).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── Sub Harmonic: two characters behind one button ──────────────────────────
+describe('subHarmonic mode routing', () => {
+  it('fires the pitched pulse by default', () => {
+    const { bus } = buildFakeBus();
+    subHarmonic.execute(ctx(bus));
+    expect(bus.startSubHarmonic).toHaveBeenCalled();
+    expect(bus.startSubBassBed).not.toHaveBeenCalled();
+  });
+
+  it('fires the continuous bed when the mode says so', () => {
+    const { bus } = buildFakeBus();
+    bus.subHarmonicMode = 'continuous';
+    subHarmonic.execute(ctx(bus));
+    expect(bus.startSubBassBed).toHaveBeenCalled();
+    // The pulse must NOT also run: two subs at once is neither character.
+    expect(bus.startSubHarmonic).not.toHaveBeenCalled();
+  });
+
+  it('releases the bed on dispose', () => {
+    const { bus, release } = buildFakeBus();
+    bus.subHarmonicMode = 'continuous';
+    const handle = subHarmonic.execute(ctx(bus));
+    handle!.dispose();
+    expect(release.subBassBed).toHaveBeenCalled();
+  });
+
+  it('reads the mode from the bus, not from numeric params', () => {
+    // `DubMoveContext.params` is Record<string, number>. A mode smuggled in
+    // there would be a string where a number is declared, and the bus setting
+    // is the authoritative copy — two sources would drift.
+    const { bus } = buildFakeBus();
+    bus.subHarmonicMode = 'continuous';
+    subHarmonic.execute(ctx(bus, { params: { level: 0.5 } }));
+    expect(bus.startSubBassBed).toHaveBeenCalledWith(0.5);
   });
 });

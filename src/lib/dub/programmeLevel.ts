@@ -72,11 +72,23 @@ export interface ProgrammeLevel {
  * to a programme level that its own ducking is pushing down would be a
  * feedback loop, with the mic fading as the duck deepened. Mic gain stays the
  * user's to set.
+ *
+ * NOT here either, reported 2026-10-01 as "sub harmonic does nothing":
+ * `subHarmonic`. It sits in this set by the `hold` KIND rather than by the
+ * shape test stated above — it is a toggle, not a one-shot — and that put it on
+ * the programme's RMS. It is not a drone: each trigger is a 10 ms attack /
+ * 200 ms decay sine, gone before the second second the test asks about, the
+ * exact twin of `subSwell`, which this file already references to the PEAK for
+ * exactly that reason. The cost was a whole crest factor — with the test
+ * fixture's peak/rms of 3.6 that is 11 dB — and the app's own move audit
+ * measured the result at +3.3 dB on the return: a sub thump that swells and
+ * decays like a hit, arriving as a nudge. A moving sub does not need the mix's
+ * AVERAGE as its floor; it needs its PEAK, because that is the only headroom a
+ * transient has.
  */
 export const SUSTAINED_SOURCES: ReadonlySet<string> = new Set([
   'siren',
   'oscBass',
-  'subHarmonic',
   'crushBass',
 ]);
 
@@ -112,9 +124,14 @@ export const GENERATED_PRESENCE: Readonly<Record<string, number>> = {
    *  under the mix's own peak, which is the headroom the original note is
    *  about. */
   subSwell: 0.75,
+  /**
+   * The sub pulse — peak-referenced from 2026-10-01, alongside its removal from
+   * SUSTAINED_SOURCES. 0.8 keeps it a shade above `subSwell`'s 0.75, which is
+   * the right way round: a decaying hit under a held swell.
+   */
+  subHarmonic: 0.8,
   /** Sustained low end — referenced to RMS, and kept under it: the low end
    *  has the least headroom and is felt as much as heard. */
-  subHarmonic: 0.8,
   oscBass: 0.8,
   crushBass: 0.8,
   /**

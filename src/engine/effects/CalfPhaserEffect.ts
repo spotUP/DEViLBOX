@@ -161,6 +161,19 @@ export class CalfPhaserEffect extends Tone.ToneAudioNode {
   get stereoPhase(): number { return this._stereoPhase; }
   get mix(): number { return this._mix; }
 
+  /**
+   * Whether the WASM engine has taken over from the passthrough.
+   *
+   * Until the worklet posts `ready`, `_input` is wired straight to `wetGain` —
+   * the effect is a CABLE. Nothing about that state is audible as a fault: no
+   * error, no warning, the branch gain is still unity, so every level probe
+   * reads normal and the move reports SILENT while looking healthy. That made
+   * "Liquid does nothing" undiagnosable from the outside, so the flag is public
+   * and reaches the bus diagnostic snapshot. `false` means the phaser is
+   * bypassing, whatever its settings say.
+   */
+  get wasmReady(): boolean { return this.isWasmReady; }
+
   /** Level calibration of the wet signal, set by the effect factory (WET_PATH_GAIN_DB in effectGainCompensation.ts). */
   setWetPathGain(gain: number): void {
     this._wetPathGain = gain;

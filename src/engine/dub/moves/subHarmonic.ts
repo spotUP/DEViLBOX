@@ -21,15 +21,38 @@ export const subHarmonic: DubMove = {
   // and the sub pulse is loud enough to read clearly against the mix.
   /**
    * The sub is an ADD into the return, so its level competes with the whole
-   * core wet chain rather than replacing any of it. At 0.85 it sat under the
-   * wash; 1.4 puts the octave-down where a listener feels it.
+   * core wet chain rather than replacing any of it.
+   *
+   * `level` is INTENT for `generatedPeakFor`, which clamps it to 0..1 — so
+   * this read 1.4 for a long while and 1.4 is exactly 1.0. The comment beside
+   * it claimed 1.4 "puts the octave-down where a listener feels it", and
+   * nothing did. That false belief is why the move was mis-diagnosed twice
+   * (2026-09-21, 2026-10-01): the number being pushed up could not have done
+   * anything, so the level had to be raised somewhere that could — which was
+   * the RMS reference in programmeLevel.ts, now corrected. Real full intent
+   * is 1; the level itself is set by the presence factor.
    */
-  defaults: { freq: 55, threshold: 0.035, level: 1.4 },
+  defaults: { freq: 55, threshold: 0.035, level: 1 },
 
   execute({ bus, params }) {
+    const level = params.level ?? this.defaults.level;
+    // The mode is read from the bus rather than passed in: `DubMoveContext.params`
+    // is numeric, and the deck's select already writes the authoritative value
+    // into the bus settings. One source of truth, no second copy to drift.
+    if (bus.subHarmonicMode === 'continuous') {
+      // `level` is passed straight through, and the BED maps it to its own
+      // range inside `startSubBassBed`. It cannot be defaulted here: the router
+      // merges `move.defaults` into `params` before execute runs
+      // (DubRouter.ts:250), so `params.level` is ALWAYS set — a `?? 0.35` in
+      // this function never fires, which is how the bed shipped running at
+      // full unity and read as a heavy bass boost.
+      console.log(`[subHarmonic] continuous sub bed, level=${level}`);
+      const stopBed = bus.startSubBassBed(level);
+      const releaseGesture = bus.holdWetGesture();
+      return { dispose() { releaseGesture(); stopBed(); } };
+    }
     const freq = params.freq ?? this.defaults.freq;
     const threshold = params.threshold ?? this.defaults.threshold;
-    const level = params.level ?? this.defaults.level;
     console.log(`[subHarmonic] fired freq=${freq} threshold=${threshold} level=${level}`);
     const release = bus.startSubHarmonic(freq, threshold, level);
     const releaseGesture = bus.holdWetGesture();

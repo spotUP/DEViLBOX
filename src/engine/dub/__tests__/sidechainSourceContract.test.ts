@@ -35,12 +35,25 @@ describe('G13 sidechain source wiring — static contract', () => {
     expect(DUB_BUS_SRC).toMatch(/getSidechainInput\s*\(\s*\)\s*:\s*AudioNode/);
   });
 
-  it('DubDeckStrip calls addSidechainTap when sidechainSource is "channel"', () => {
-    // The effect must check the source value and call addSidechainTap.
-    // Accept either `sidechainSource !== 'channel'` (early-return guard)
-    // or `=== 'channel'` (positive branch) — both signal the check.
-    expect(DECK_STRIP_SRC).toMatch(/(sidechainSource\s*(!==|===)\s*['"]channel['"])|(source\s*(!==|===)\s*['"]channel['"])/);
+  it('DubDeckStrip routes by sidechainSource and taps the detector', () => {
+    // The effect must branch on the source value and call addSidechainTap.
+    // The guard is now inverted — 'bus' returns early instead of 'channel'
+    // branching positively — because 'drums' (the classifier key, added
+    // 2026-10-02) resolves to a channel first and then taps the same node.
+    // Assert on the behaviour, not on which side of the comparison it sits.
+    expect(DECK_STRIP_SRC).toMatch(/source\s*(!==|===)\s*['"](bus|channel|drums)['"]/);
     expect(DECK_STRIP_SRC).toMatch(/addSidechainTap\(/);
+  });
+
+  it('DubDeckStrip resolves the drum key through the classifier', () => {
+    expect(DECK_STRIP_SRC).toMatch(/resolveDrumKeyChannel/);
+  });
+
+  it('leaves the drum key silent rather than self-keying when none is found', () => {
+    // Self-keying an unresolved drum key turns a kick ducker into a permanent
+    // bass compressor (measured -11.4 dB at 100 Hz, 2026-09-29).
+    expect(DECK_STRIP_SRC).toMatch(/tapChannel\s*<\s*0/);
+    expect(DECK_STRIP_SRC).toMatch(/sidechain key left silent/);
   });
 
   it('DubDeckStrip cleans up with removeSidechainTap on effect teardown', () => {
