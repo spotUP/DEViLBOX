@@ -896,15 +896,16 @@ describe('role-targeted rules — sparse vs rich look-ahead pattern', () => {
     expect(countChannelMute(sparsePat)).toBe(0);
   });
 
-  it('getCurrentPatternBundle uses richest pattern — regression guard', () => {
+  it('the song channel identity uses the richest pattern — regression guard', () => {
     // The fix ensures that when multiple patterns exist, the richest one
     // is used for look-ahead, not pattern 0 (which libopenmpt leaves stale).
     // This is a source-level contract check: the implementation must select
     // the pattern with the max note count.
     const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../AutoDub.ts'),
+      require('path').join(__dirname, '../songChannelIdentity.ts'),
       'utf8',
     ) as string;
+    // Moved out of AutoDub so the moves read the same identity (2026-10-02).
     expect(src).toContain('richestTotal');
     expect(src).toContain('richestPattern');
     expect(src).not.toContain('patterns[transport.currentPatternIndex');

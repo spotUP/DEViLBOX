@@ -20,7 +20,6 @@
  * throw considers worth aiming at cannot disagree.
  */
 
-import { resolveTransportRow } from '@/lib/dub/transportRow';
 import type { DubMove } from './_types';
 import { useMixerStore } from '@/stores/useMixerStore';
 import {
@@ -28,17 +27,13 @@ import {
   setDubTransient,
   endDubTransient,
 } from '@/lib/dub/dubChannelTransient';
-import { useTrackerStore } from '@/stores/useTrackerStore';
-import { useTransportStore } from '@/stores/useTransportStore';
-import { buildInstrumentLookup, getChannelProfiles } from '../channelProfiles';
-import { resolveChannelNames } from '@/lib/tracker/channelNames';
+import { getSongChannelProfiles } from '../channelProfiles';
 import {
   planDrop,
   droppedChannels,
   restoreDelayMs,
   type ChannelDropPlan,
 } from '@/lib/dub/arrangementIntelligence';
-import { computeMusicalPosition } from '@/lib/dub/musicalClock';
 
 /** How long the echo gets the channel before the mute lands, in ms. */
 const THROW_LEAD_MS = 90;
@@ -53,32 +48,13 @@ export const versionDrop: DubMove = {
 
   execute({ bus }) {
     const mixer = useMixerStore.getState();
-    const tracker = useTrackerStore.getState();
-    const transport = useTransportStore.getState();
 
-    const pattern = tracker.patterns?.[tracker.currentPatternIndex ?? 0] ?? null;
-    if (!pattern?.channels?.length) return { dispose() {} };
-
-    // The coarse/fine join, not the raw field: `currentGlobalRow` only moves on
-    // a pattern change, and this grid is what the drop plans its return
-    // against.
-    const grid = computeMusicalPosition(
-      resolveTransportRow(transport.currentGlobalRow, transport.currentRow) ?? 0,
-      transport.speed || 6,
-    );
-    const profiles = getChannelProfiles(
-      pattern,
-      // Resolved, not raw: the mixer's names stay at `CH 1` unless a user
-      // renames them by hand, and these are the instrument-name evidence the
-      // profile reads.
-      resolveChannelNames(
-        mixer.channels.map(c => c?.name ?? null),
-        pattern?.channels?.map(c => c?.name ?? null) ?? [],
-      ),
-      grid.rowsPerBeat,
-      grid.rowsPerBar,
-      buildInstrumentLookup(),
-    );
+    // The one channel identity the deck labels its strips from: the song's
+    // richest pattern and its merged roles, not the current pattern's notes
+    // alone (which on a Hively song said "every channel reads as riddim"
+    // under strips labelled lead / chords / skank).
+    const profiles = getSongChannelProfiles();
+    if (profiles.size === 0) return { dispose() {} };
 
     // A channel the user has already muted is theirs, not ours: it must not
     // come back just because the drop released.

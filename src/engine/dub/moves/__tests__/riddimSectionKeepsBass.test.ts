@@ -50,9 +50,9 @@ vi.mock('@/stores/useInstrumentStore', () => ({
   useInstrumentStore: { getState: () => ({ instruments: [] }) },
 }));
 
-vi.mock('@/bridge/analysis/ChannelNaming', () => ({
-  // What the real classifier returns for this song.
-  classifySongRoles: () => ['pad', 'percussion', 'pad', 'percussion'],
+vi.mock('../../songChannelIdentity', () => ({
+  // What the song identity resolves for this song.
+  readSongChannelIdentity: () => ({ roles: ['pad', 'percussion', 'pad', 'percussion'], pattern: null, names: [], currentRow: 0 }),
 }));
 
 vi.mock('@/lib/dub/dubChannelTransient', () => ({
