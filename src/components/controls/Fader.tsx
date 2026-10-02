@@ -12,6 +12,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ControlTone } from '@components/ui/controlColor';
 import { subscribeToParamLiveValue } from '@/midi/performance/parameterRouter';
+import { faderDragValue } from './faderDrag';
 
 interface FaderProps {
   value: number;
@@ -187,14 +188,12 @@ export const Fader: React.FC<FaderProps> = React.memo(({
   const dragStartYRef = useRef(0);
   const dragStartValueRef = useRef(0);
 
-  const valueFromPointer = useCallback((clientY: number): number => {
+  /** The value after dragging from `startY` to `clientY`: a full track's travel is the full range. */
+  const valueFromDrag = useCallback((startValue: number, startY: number, clientY: number): number => {
     const track = trackRef.current;
-    if (!track) return internalRef.current;
-    const rect = track.getBoundingClientRect();
-    const localY = clientY - rect.top - thumbH / 2;
-    const availPx = Math.max(1, rect.height - thumbH);
-    const norm = Math.max(0, Math.min(1, 1 - localY / availPx));
-    return min + norm * (max - min);
+    if (!track) return startValue;
+    const availPx = Math.max(1, track.getBoundingClientRect().height - thumbH);
+    return faderDragValue(startValue, startY - clientY, availPx, min, max);
   }, [thumbH, min, max]);
 
   const commit = useCallback((v: number) => {
@@ -213,15 +212,17 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     draggingRef.current = true;
     dragStartYRef.current = e.clientY;
     dragStartValueRef.current = internalRef.current;
-    // Jump-to-cursor on click.
-    commit(valueFromPointer(e.clientY));
-  }, [disabled, commit, valueFromPointer]);
+    // No jump-to-cursor: the value moves from where it IS by how far the hand
+    // moves. Jumping to the click point made every grab start from wherever
+    // the pointer landed - "always starts from zero when i pull it up"
+    // (owner, 2026-10-02).
+  }, [disabled]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return;
     e.preventDefault();
-    commit(valueFromPointer(e.clientY));
-  }, [commit, valueFromPointer]);
+    commit(valueFromDrag(dragStartValueRef.current, dragStartYRef.current, e.clientY));
+  }, [commit, valueFromDrag]);
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return;

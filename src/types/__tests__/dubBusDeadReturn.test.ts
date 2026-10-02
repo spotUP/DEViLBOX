@@ -104,7 +104,7 @@ describe('repairStoredDubBusVoicing', () => {
 
   it('pulls a return stored above the knob range back to the top of the knob', () => {
     // The 2026-10-02 branch stored returnGain 3.0 to carry the wet make-up;
-    // on top of WET_CHAIN_MAKEUP that would sit +11 dB hot until touched.
+    // that would sit +11 dB hot until the knob was touched.
     const hot = { ...DEFAULT_DUB_BUS, returnGain: 3.0, echoWet: 0.4 };
     const out = repairStoredDubBusVoicing(hot);
     expect(out.returnGain).toBe(DUB_RETURN_GAIN_MAX);

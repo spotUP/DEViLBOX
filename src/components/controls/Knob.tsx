@@ -155,14 +155,6 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   };
   const { knob: knobSize, fontSize, stroke } = sizes[size];
 
-  // Calculate normalized value (0-1) for control purposes
-  const getNormalized = useCallback(() => {
-    if (logarithmic) {
-      return logToLinear(Math.max(min, Math.min(max, value)), min, max);
-    }
-    return (value - min) / (max - min);
-  }, [value, min, max, logarithmic]);
-
   // Calculate normalized display value (0-1) - uses displayValue if provided
   const getDisplayNormalized = useCallback(() => {
     const displayVal = displayValue !== undefined ? displayValue : value;
@@ -172,6 +164,18 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     }
     return (clampedVal - min) / (max - min);
   }, [displayValue, value, min, max, logarithmic]);
+
+  /** The position the knob is drawn at right now: the render value, or the
+   *  last live/imperative update since. A drag starts from here. */
+  const shownNormRef = useRef(0);
+  // Only a NEW render value moves it, so a re-render with the same props
+  // cannot pull it back from a live value a move is holding.
+  const renderedNormRef = useRef<number | null>(null);
+  const renderNorm = getDisplayNormalized();
+  if (renderNorm !== renderedNormRef.current) {
+    renderedNormRef.current = renderNorm;
+    shownNormRef.current = renderNorm;
+  }
 
   // Calculate rotation angle (-135 to +135 degrees) - uses display value for visual
   // Guard against NaN to prevent SVG rendering errors
@@ -335,11 +339,16 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     setIsDragging(true);
     dragStartY.current = e.clientY;
     dragStartX.current = e.clientX;
-    dragStartValue.current = getNormalized();
+    // From where the knob is DRAWN, not from the `value` prop: a move holding
+    // the parameter (Liquid holds Sweep Amount while the store keeps 0)
+    // shows its live value, and starting from the prop jumped the knob to the
+    // stored value under the hand - "always starts from zero when i pull it
+    // up" (owner, 2026-10-02).
+    dragStartValue.current = shownNormRef.current;
     dragDirection.current = null; // Reset - will be determined on first move
     const ownerDoc = knobRef.current?.ownerDocument ?? document;
     ownerDoc.body.style.cursor = 'ns-resize';
-  }, [disabled, getNormalized, handleTap, handleLongPressStart]);
+  }, [disabled, handleTap, handleLongPressStart]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (activePointerRef.current !== e.pointerId) return;
@@ -523,6 +532,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   useEffect(() => {
     const update = (norm01: number) => {
       const safe = Math.max(0, Math.min(1, isNaN(norm01) ? 0 : norm01));
+      shownNormRef.current = safe;
       const rot = safe * 270 - 135;
       const rad = ((rot - 90) * Math.PI) / 180;
       const cos = Math.cos(rad);

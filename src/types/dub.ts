@@ -405,9 +405,10 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // supports, never dominates). User can push it back up via the Dub
   // Bus panel return knob if they want.
   //
-  // The knob spans 0..1 (panel, MIDI CC, NKS map), so the extra level a
-  // send-fed bus needs to be heard is not carried here: it is
-  // WET_CHAIN_MAKEUP in DubBus.ts, on the wet chain only.
+  // The knob spans 0..1 (panel, MIDI CC, NKS map). A 3.0 default plus a fixed
+  // +11 dB wet make-up were both tried on 2026-10-02 and both put the wash
+  // over the dry mix ("almost no bass at all with dub bus on"); held toggles
+  // get their own lift instead (WET_GESTURE_LIFT).
   returnGain: 0.85,
   // HPF default is 40 Hz — effectively off. Dub Bus is used across drumpad,
   // tracker, and DJ views, but only the DJ view benefits from rolling bass
@@ -561,8 +562,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
  */
 /**
  * Top of the Return knob. The panel slider, the MIDI CC route and the NKS map
- * all span 0..this; the level a send-fed bus needs on top is WET_CHAIN_MAKEUP
- * (src/lib/dub/wetChainMakeup.ts), not a larger return.
+ * all span 0..this.
  */
 export const DUB_RETURN_GAIN_MAX = 1;
 
@@ -621,9 +621,9 @@ export function repairStoredDubBusVoicing(merged: DubBusSettings): DubBusSetting
     return repaired;
   }
   // A return above the knob's range cannot be set from the panel or a
-  // controller, only stored by a build that carried the wet make-up in
-  // returnGain (3.0, 2026-10-02). Left alone it would sit +11 dB hot on top
-  // of WET_CHAIN_MAKEUP until the knob was first touched.
+  // controller, only stored by a build that defaulted it to 3.0
+  // (2026-10-02). Left alone it would sit +11 dB hot until the knob was
+  // first touched.
   if (merged.returnGain > DUB_RETURN_GAIN_MAX) return { ...merged, returnGain: DUB_RETURN_GAIN_MAX };
   return merged;
 }

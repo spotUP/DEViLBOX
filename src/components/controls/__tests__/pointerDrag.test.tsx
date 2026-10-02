@@ -171,6 +171,44 @@ describe('Fader keeps the shape Knob was brought onto', () => {
     const surface = dragSurface(container);
     fireEvent.pointerDown(surface, pointer({ clientX: 0, clientY: 10 }));
     expect(captured).toEqual([1]);
+    // The value moves with the hand, not on the press (see below).
+    fireEvent.pointerMove(surface, pointer({ clientX: 0, clientY: 5 }));
     expect(onChange).toHaveBeenCalled();
+  });
+});
+
+describe('a grab starts from where the control is', () => {
+  it('a fader does not jump to the click point when grabbed', () => {
+    // Jump-to-cursor made every grab start wherever the pointer landed:
+    // "always starts from zero when i pull it up" (owner, 2026-10-02).
+    const onChange = vi.fn();
+    const { container } = render(
+      <Fader label="Sweep" value={0.4} min={0} max={1} onChange={onChange} />
+    );
+    fireEvent.pointerDown(dragSurface(container), pointer({ clientX: 0, clientY: 500 }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('a knob showing a live value drags from that value, not the stored one', () => {
+    // Liquid holds Sweep Amount at 0.7 while the store keeps 0; the knob
+    // draws 0.7 and used to start the drag from 0.
+    const onChange = vi.fn();
+    const { container } = render(
+      <Knob label="Sweep" value={0} displayValue={0.7} min={0} max={1} onChange={onChange} />
+    );
+    const surface = dragSurface(container);
+    fireEvent.pointerDown(surface, pointer({ clientX: 0, clientY: 200 }));
+    fireEvent.pointerMove(surface, pointer({ clientX: 0, clientY: 185 })); // 15px of 150 = +0.1
+    fireEvent.pointerUp(surface, pointer({ clientX: 0, clientY: 185 }));
+    expect(onChange.mock.calls.at(-1)?.[0]).toBeCloseTo(0.8, 2);
+  });
+});
+
+describe('faderDragValue', () => {
+  it('moves from the start value by the share of the track travelled, clamped', async () => {
+    const { faderDragValue } = await import('../faderDrag');
+    expect(faderDragValue(0.4, 50, 100, 0, 1)).toBeCloseTo(0.9);
+    expect(faderDragValue(0.4, -50, 100, 0, 1)).toBeCloseTo(0);
+    expect(faderDragValue(3, 0, 100, -12, 12)).toBe(3);
   });
 });
