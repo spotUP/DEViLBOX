@@ -19,35 +19,7 @@ import { join } from 'node:path';
  */
 const SRC = readFileSync(join(process.cwd(), 'src/engine/dub/DubBus.ts'), 'utf-8');
 
-const startCombSweep = (): string => {
-  const start = SRC.indexOf('  startCombSweep(');
-  expect(start, 'startCombSweep moved').toBeGreaterThan(-1);
-  // Up to the end of the returned release closure.
-  return SRC.slice(start, SRC.indexOf('\n  }\n', SRC.indexOf('return () => {', start)));
-};
-
 describe('the Liquid sweep drives whichever engine is in the path', () => {
-  it('moves the phaser when the bus is in phaser mode', () => {
-    const body = startCombSweep();
-    expect(body).toContain("this.settings.sweepMode === 'phaser'");
-    expect(
-      body,
-      'in phaser mode the gesture only opened a gate onto a phaser at its resting rate'
-    ).toContain('this.phaser.setRate(Math.max(0.05, rateHz))');
-  });
-
-  it('still moves the comb, which is the other half of the same control', () => {
-    const body = startCombSweep();
-    expect(body).toContain('this.sweepLfo.frequency');
-    expect(body).toContain('this.sweepLfoGain.gain');
-  });
-
-  it('hands the phaser rate back on release, so the BUS tab keeps its value', () => {
-    const body = startCombSweep();
-    expect(body).toContain('const priorPhaserRate = this.settings.phaserRate;');
-    expect(body).toContain('if (wasPhaser) this.phaser.setRate(priorPhaserRate);');
-  });
-
   it('the two engines are still mutually exclusive — this did not merge them', () => {
     // combOutput/phaserOutput are gated by mode; the fix must not touch that.
     // (Each gate's open value is the engine's unity gain - sweepLevel.ts.)

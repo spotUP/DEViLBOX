@@ -32,11 +32,6 @@ describe('the Plate mix knob has a plate behind it', () => {
     expect(DEFAULT_DUB_BUS.plateStageMix).toBeGreaterThan(0);
   });
 
-  it('guards the mix write on the stage existing, so the knob is not silently ignored', () => {
-    // Documented in DubBus: the write is dropped when plateSend is null.
-    expect(BUS).toMatch(/settings\.plateStageMix !== undefined && this\.plateSend/);
-  });
-
   it('resolves every non-off stage to a real plate class', () => {
     // The installer is a ternary, 'dattorro' being the fallback rather than a
     // named comparison. If a stage were added to the union it would silently

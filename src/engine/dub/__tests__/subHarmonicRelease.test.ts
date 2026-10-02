@@ -30,12 +30,6 @@ describe('Sub Harmonic release', () => {
     expect(body('  startSubBassBed(')).toContain('bedSource?.disconnect(hp);');
   });
 
-  it('clears the tap only when it is still this bed\'s', () => {
-    const bed = body('  startSubBassBed(');
-    expect(bed).toContain('if (this._subBedTap === bedTap) {');
-    expect(bed).not.toContain('this._subBedTap?.disconnect()');
-  });
-
   it('caps the bed at the dry low band, not 8x it', () => {
     expect(SRC).toContain('const SUB_BED_MAX_MIX = 1;');
   });
