@@ -98,15 +98,23 @@ export async function makeDubBusRig(seconds: number): Promise<DubBusRig> {
     const settleMessages = (ran: boolean) => realDelay(ran ? MESSAGE_SETTLE_MS : 1);
     await settleMessages(runDue(0));
     const steps = Math.floor(seconds / stepSec) - 1;
+    let suspendFailure: unknown = null;
     for (let k = 1; k <= steps; k++) {
       const t = +(k * stepSec).toFixed(6);
-      void ctx.suspend(t).then(async () => {
+      ctx.suspend(t).then(async () => {
         vi.advanceTimersByTime(stepSec * 1000);
         await settleMessages(runDue(t));
-        void ctx.resume();
-      });
+        await ctx.resume();
+      }, (err: unknown) => { suspendFailure = err; });
     }
-    return ctx.startRendering();
+    // node-web-audio-api registers a suspend asynchronously: one started in
+    // the same tick as startRendering() is sometimes rejected (4 in 1480
+    // under load; none after a real tick). A suspend must never be skipped
+    // silently, so a rejection fails the render.
+    await realDelay(10);
+    const rendered = await ctx.startRendering();
+    if (suspendFailure) throw new Error(`audio-locked clock broke: ${String(suspendFailure)}`);
+    return rendered;
   };
 
   return {
