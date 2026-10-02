@@ -28,6 +28,20 @@ export interface HippelCellSpan {
    * `file` is the module being patched, for bits the grid does not carry.
    */
   encode(cell: TrackerCell, file: Uint8Array): Uint8Array | null;
+  /**
+   * Bytes outside the cell's span that the cell's volume column shows: in 7V
+   * the step's voice-volume command in the track table, drawn on row 0.
+   * Absent when the cell shows no volume; a volume edit on such a cell is
+   * refused.
+   */
+  aux?: HippelAuxSpan;
+}
+
+/** A byte run elsewhere in the file that one cell's volume column edits. */
+export interface HippelAuxSpan {
+  offset: number;
+  length: number;
+  encode(cell: TrackerCell, file: Uint8Array): Uint8Array | null;
 }
 
 /** Spans by [pattern][channel][row]; null where a row has no bytes behind it. */
@@ -43,9 +57,14 @@ export interface HippelPatchResult {
 
 interface GridPattern { channels: Array<{ rows: TrackerCell[] }> }
 
-/** The fields a Hippel grid cell decodes; anything else is not in the file. */
+/** The fields the cell's own bytes carry; anything else is not in the file. */
 function differs(a: TrackerCell, b: TrackerCell): boolean {
   return (a.note ?? 0) !== (b.note ?? 0) || (a.instrument ?? 0) !== (b.instrument ?? 0);
+}
+
+/** The volume column, which lives in other bytes (see `HippelCellSpan.aux`). */
+function volumeDiffers(a: TrackerCell, b: TrackerCell): boolean {
+  return (a.volume ?? 0) !== (b.volume ?? 0);
 }
 
 function isEmpty(c: TrackerCell): boolean {
@@ -70,14 +89,22 @@ export function patchEditedCells(
         if (!cell) continue;
         const span = spans[p]?.[ch]?.[r] ?? null;
         if (!span) {
-          if (!isEmpty(cell)) refused.push(`${p}:${ch}:${r}`);
+          if (!isEmpty(cell) || (cell.volume ?? 0) !== 0) refused.push(`${p}:${ch}:${r}`);
           continue;
         }
-        if (!differs(cell, span.baseline)) continue;
-        const enc = span.encode(cell, bytes);
-        if (!enc || enc.length !== span.length) { refused.push(`${p}:${ch}:${r}`); continue; }
-        bytes.set(enc, span.offset);
-        written++;
+        if (differs(cell, span.baseline)) {
+          const enc = span.encode(cell, bytes);
+          if (!enc || enc.length !== span.length) { refused.push(`${p}:${ch}:${r}`); continue; }
+          bytes.set(enc, span.offset);
+          written++;
+        }
+        if (volumeDiffers(cell, span.baseline)) {
+          const aux = span.aux;
+          const enc = aux ? aux.encode(cell, bytes) : null;
+          if (!aux || !enc || enc.length !== aux.length) { refused.push(`${p}:${ch}:${r}`); continue; }
+          bytes.set(enc, aux.offset);
+          written++;
+        }
       }
     }
   }

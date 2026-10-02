@@ -39,7 +39,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, TFMXConfig, UADEChipRamInfo, Pattern, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeTFMX7VCell } from '@/engine/uade/encoders/TFMX7VEncoder';
-import type { HippelCellSpan, HippelCellSpans } from '@/engine/hippel/hippelCellSpans';
+import type { HippelAuxSpan, HippelCellSpan, HippelCellSpans } from '@/engine/hippel/hippelCellSpans';
 
 const MIN_FILE_SIZE = 32;
 
@@ -353,6 +353,8 @@ function decodeTFMX7VPattern(
   trackStepBuf: Uint8Array,
   trackColumnSize: number,
   numChannels: number,
+  stepOff: number,
+  instrumentCount: number,
 ): { rows: TrackerCell[][]; spans: (HippelCellSpan | null)[][] } {
   const rows: TrackerCell[][] = Array.from({ length: numChannels }, () => {
     const arr: TrackerCell[] = [];
@@ -382,14 +384,69 @@ function decodeTFMX7VPattern(
 
       // High bit set = portamento / modifier — no new instrument trigger.
       if ((noteByte & 0x80) === 0) {
-        const instr = ((infoByte & 0x1f) + st) & 0xff;
-        // TrackerCell instrument is 1-based for display; clamp into byte range.
-        cell.instrument = instr > 0 ? instr : 0;
+        // Volume sequence `(info & 0x1f) + ST`, shown 1-based like CoSo's
+        // (`HippelDecoder::setInstrument` indexes sequences from 0).
+        const instrNum = (((infoByte & 0x1f) + st) & 0xff) + 1;
+        cell.instrument = instrNum <= instrumentCount ? instrNum : 0;
       }
+    }
+
+    // The step's fourth byte per voice is a track-table command. `0xFx` sets
+    // the voice's volume for the step (TFMX_7V_trackTabCmd); the grid shows
+    // it in row 0's volume column, where a listener can see why a voice
+    // with notes is barely heard (lethalxcess-intro: 245 of 1449 voice-steps
+    // at 36 % or less, 2026-10-03).
+    if (trackColumnSize === 4) {
+      const cmdOff = stepOff + colOff + 3;
+      const cmd = trackStepBuf[colOff + 3] | 0;
+      rows[voice][0].volume = tfmx7VVoiceVolumeColumn(cmd);
+      spans[voice][0]!.aux = tfmx7VVoiceVolumeSpan(cmdOff);
     }
   }
 
   return { rows, spans };
+}
+
+/** The decoder's voice volume (percent) for a `0xFx` track-table command. */
+function tfmx7VVoiceVolumePercent(cmd: number): number {
+  const v2 = cmd & 0x0f;
+  return v2 === 0 ? 100 : ((15 - v2) + 1) * 6;
+}
+
+/**
+ * Volume column for a track-table command byte: `0x10 + 0..64` for a `0xFx`
+ * voice-volume command, 0 (nothing shown) for any other byte.
+ */
+export function tfmx7VVoiceVolumeColumn(cmd: number): number {
+  if ((cmd >> 4) !== 0x0f) return 0;
+  return 0x10 + Math.round(tfmx7VVoiceVolumePercent(cmd) * 64 / 100);
+}
+
+/**
+ * Track-table command byte for a volume column value, or null when it cannot
+ * be written: a byte holding another command (`0xDx` sets the rate) stays.
+ * No volume (`< 0x10`) clears a voice-volume command; a volume picks the
+ * `0xFx` step whose decoder percent is nearest.
+ */
+export function tfmx7VVoiceVolumeCommand(volume: number, oldCmd: number): number | null {
+  const hi = oldCmd >> 4;
+  if (hi !== 0x0f && oldCmd !== 0) return null;
+  if (volume < 0x10) return 0;
+  const pct = Math.min(64, volume - 0x10) * 100 / 64;
+  if (pct >= 95) return 0xf0;
+  const v2 = Math.min(15, Math.max(1, 16 - Math.round(pct / 6)));
+  return 0xf0 | v2;
+}
+
+/** Row 0's volume column edits the step's voice-volume command byte. */
+function tfmx7VVoiceVolumeSpan(cmdOff: number): HippelAuxSpan {
+  return {
+    offset: cmdOff, length: 1,
+    encode(cell, file) {
+      const cmd = tfmx7VVoiceVolumeCommand(cell.volume ?? 0, file[cmdOff]);
+      return cmd === null ? null : new Uint8Array([cmd]);
+    },
+  };
 }
 
 /**
@@ -410,7 +467,8 @@ function tfmx7VSpan(offset: number, baseline: TrackerCell, tr: number, st: numbe
       const porta = (oldNote & 0x7F) !== 0 ? oldNote & 0x80 : 0;
       let info = oldInfo;
       if (!porta) {
-        const low = ((cell.instrument ?? 0) - st) & 0xFF;
+        const inst = cell.instrument ?? 0;
+        const low = inst > 0 ? ((inst - 1) - st) & 0xFF : oldInfo & 0x1F;
         if (low > 31) return null;
         info = (oldInfo & 0xE0) | low;
       }
@@ -448,7 +506,7 @@ function decodeTFMX7VGrid(
     const stepOff = layout.trackTableOff + step * layout.trackStepLen;
     if (stepOff + layout.trackStepLen > buf.length) break;
     const trackStepBuf = buf.slice(stepOff, stepOff + layout.trackStepLen);
-    const decoded = decodeTFMX7VPattern(buf, layout.patternsOff, trackStepBuf, trackColumnSize, layout.voices);
+    const decoded = decodeTFMX7VPattern(buf, layout.patternsOff, trackStepBuf, trackColumnSize, layout.voices, stepOff, layout.numVolSeqs);
     rows.push(decoded.rows);
     spans.push(decoded.spans);
   }
@@ -649,7 +707,7 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
       const tfmxNote = noteByte & 0x7F;
       // tfmxNoteToXM(note, 0): note > 1 ? note + 1 : 0
       const note = (tfmxNote > 1) ? Math.min(96, tfmxNote + 1) : 0;
-      const instrument = (infoByte & 0x1F) > 0 ? (infoByte & 0x1F) : 0;
+      const instrument = (infoByte & 0x1F) + 1; // 1-based, as the grid shows it
       // Byte-exact carriers: the note/instrument view above discards the portamento
       // bit (noteByte bit7), the 0/1 note sentinels, and the info byte's high 3 bits;
       // note-0 rows still carry an info byte the encoder would otherwise zero. Stash

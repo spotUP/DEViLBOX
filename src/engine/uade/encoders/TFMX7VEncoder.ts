@@ -38,12 +38,13 @@ export function encodeTFMX7VCell(cell: TrackerCell): Uint8Array {
   const tfmxNote = Math.max(0, Math.min(63, (cell.note - 1) | 0));
   buf[0] = tfmxNote & 0x7f;
 
-  // Instrument 1..N stored as (n & 0x1f) in the info byte. The high
-  // 3 bits remain zero — the parser only reads the low 5 bits when
-  // computing the replayer's instrument index, so this is safe even
-  // when the original byte had non-zero high bits.
+  // Instrument 1..N is volume sequence n-1, stored in the info byte's low
+  // five bits (the decoder indexes sequences from 0; the grid shows them
+  // 1-based like CoSo's). The high 3 bits remain zero — the parser only
+  // reads the low 5 bits when computing the replayer's instrument index, so
+  // this is safe even when the original byte had non-zero high bits.
   if (cell.instrument && cell.instrument > 0) {
-    buf[1] = cell.instrument & 0x1f;
+    buf[1] = (cell.instrument - 1) & 0x1f;
   }
 
   return applyByteExactCarriers(buf, cell);
