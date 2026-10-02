@@ -1121,13 +1121,16 @@ void uade_wasm_check_wp_read(uint32_t addr, uint32_t value) {
  * Called from memory.c chipmem_bput (inside #ifdef UADE_WASM).
  * Checks whether the write address falls within any active write watchpoint.
  */
-void uade_wasm_check_wp_write(uint32_t addr, uint32_t value) {
-    if (g_acctrace_enabled) {
-        uint32_t idx = g_acctrace_write++ & ACCTRACE_MASK;
-        g_acctrace_addr[idx] = addr;
-        g_acctrace_val[idx]  = (uint8_t)(value & 0xff);
-        g_acctrace_wr[idx]   = 1;
-    }
+/*
+ * Register-capture match for a chip write of any width. `addr` is the
+ * chip-relative start of the access. Byte writes reach it through
+ * uade_wasm_check_wp_write below; chipmem_wput/lput in memory.c call it
+ * directly, because a capture armed on a word field (Paula period, $20)
+ * never saw the write while only chipmem_bput was hooked (c153c59f1 added
+ * the calls and left this definition pending - the tree did not link from
+ * 2026-09-30 until 2026-10-03).
+ */
+void uade_wasm_capture_write(uint32_t addr) {
     if (g_capture_addr && !g_capture_hit &&
         addr >= g_capture_addr && addr < g_capture_addr + g_capture_size &&
         (g_capture_pc_hi == 0 ||
@@ -1137,6 +1140,16 @@ void uade_wasm_check_wp_write(uint32_t addr, uint32_t value) {
         g_capture_addr = addr;   /* report the exact hit address */
         g_capture_hit  = 1;
     }
+}
+
+void uade_wasm_check_wp_write(uint32_t addr, uint32_t value) {
+    if (g_acctrace_enabled) {
+        uint32_t idx = g_acctrace_write++ & ACCTRACE_MASK;
+        g_acctrace_addr[idx] = addr;
+        g_acctrace_val[idx]  = (uint8_t)(value & 0xff);
+        g_acctrace_wr[idx]   = 1;
+    }
+    uade_wasm_capture_write(addr);
     for (int i = 0; i < WATCHPOINT_MAX; i++) {
         if (!g_watchpoints[i].enabled) continue;
         if (!(g_watchpoints[i].mode & WP_MODE_WRITE)) continue;
