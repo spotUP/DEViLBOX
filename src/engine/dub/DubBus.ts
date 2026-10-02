@@ -483,6 +483,18 @@ export class DubBus {
    *  low, that frequency is in the bass — the "slow bass crawl" report of
    *  2026-09-17. Tracks hpfResonance's frequency/Q with negated gain. */
   private feedbackResonanceComp: BiquadFilterNode;
+  /**
+   * One render quantum of delay closing the siren feedback loop into `input`.
+   *
+   * The loop runs echo output -> feedback -> input, and the echo's output
+   * carries its dry path, so without this the cycle holds no DelayNode. The
+   * Web Audio spec mutes such a cycle, and spec-following engines do:
+   * Firefox and node-web-audio-api rendered the bus input — and so the whole
+   * bus — as silence. Chrome processes the cycle with an implicit one-quantum
+   * delay instead, which is exactly what this makes explicit, so Chrome
+   * sounds the same.
+   */
+  private feedbackLoopDelay!: DelayNode;
   /** Ext-feedback variant of feedbackShelfComp. The external return loop
    *  recirculates post-return audio back into the bus input, so it needs the
    *  same bass compensation as the internal feedback path. */
@@ -867,7 +879,7 @@ export class DubBus {
     try { this.feedback.disconnect(this._feedbackScrubber); } catch { /* ok */ }
     try { this._feedbackScrubber.disconnect(this.feedbackShelfComp); } catch { /* ok */ }
     try { this.feedbackShelfComp.disconnect(this.feedbackResonanceComp); } catch { /* ok */ }
-    try { this.feedbackResonanceComp.disconnect(this.input); } catch { /* ok */ }
+    try { this.feedbackResonanceComp.disconnect(this.feedbackLoopDelay); } catch { /* ok */ }
   }
 
   /**
@@ -968,7 +980,7 @@ export class DubBus {
     this.feedback.connect(this._feedbackScrubber);
     this._feedbackScrubber.connect(this.feedbackShelfComp);
     this.feedbackShelfComp.connect(this.feedbackResonanceComp);
-    this.feedbackResonanceComp.connect(this.input);
+    this.feedbackResonanceComp.connect(this.feedbackLoopDelay);
   }
 
   /** Async splice path for the ECHO→SPRING scrubber. Mirror of
@@ -2631,6 +2643,9 @@ export class DubBus {
     this.feedbackResonanceComp.frequency.value = this.hpfResonance.frequency.value;
     this.feedbackResonanceComp.Q.value = 2.0;
     this.feedbackResonanceComp.gain.value = -(this.settings.hpfResonanceDb ?? 0);
+    this.feedbackLoopDelay = this.context.createDelay(0.01);
+    this.feedbackLoopDelay.delayTime.value = 128 / this.context.sampleRate;
+    this.feedbackLoopDelay.connect(this.input);
     this.extFeedbackShelfComp = this.context.createBiquadFilter();
     this.extFeedbackShelfComp.type = 'lowshelf';
     this.extFeedbackShelfComp.frequency.value = this.settings.bassShelfFreqHz;
