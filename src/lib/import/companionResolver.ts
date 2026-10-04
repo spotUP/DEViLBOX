@@ -70,6 +70,19 @@ export const EXPECTED_PARTNER: Readonly<Record<string, string[]>> = {
   adsc: ['.as'], kh: ['songplay'], sci: ['patch.003'],
 };
 
+/**
+ * Directory names that hold instruments or samples, never songs (shape 4).
+ * A song index skips what sits in them even when no module beside them
+ * claims it - orphaned `instr/` and `instruments/` copies in the corpus.
+ */
+export const SAMPLE_DIR_NAMES: ReadonlySet<string> = new Set(['instr', 'instruments', 'samples']);
+
+/** Whether `relPath` (any depth, `/`-separated) passes through a sample directory. */
+export function isInSampleDirectory(relPath: string): boolean {
+  const parts = relPath.split('/');
+  return parts.slice(0, -1).some((d) => SAMPLE_DIR_NAMES.has(d.toLowerCase()));
+}
+
 /** The shared sample bank SynthDream and SynthPack keep per directory. */
 export const SHARED_BANK = 'smp.set';
 
@@ -222,7 +235,10 @@ function subdirectories(moduleName: string, listing: CompanionListing, sources: 
     if (instruments) {
       for (const f of instruments[1]) {
         if (f.startsWith('.')) continue;
-        if (!/\.(instr|ss)$/i.test(f)) continue;
+        // Sonix names instruments freely: `.instr`, `.ss`, or no extension at
+        // all (CREATION/Instruments/LEDchord). Anything else in there is
+        // Workbench litter (`.info`).
+        if (f.includes('.') && !/\.(instr|ss)$/i.test(f)) continue;
         out.push(`${instruments[0]}/${f}`);
       }
     }
@@ -331,3 +347,33 @@ export function expectedCompanionNames(moduleName: string): string[] {
     return roleFirst ? `${p}.${tune}` : `${tune}.${p}`;
   });
 }
+
+/**
+ * The files in a listing that are COMPANIONS of another listed module, as
+ * paths relative to the directory (`smpl.jaguar`, `instruments/Saxophone.ss`).
+ *
+ * A song index must not offer these as songs: the jukebox listed SMUS
+ * instrument files and the `.ins` half of an Infogrames pair, and each one
+ * "failed to load" (ledger F11, F12). A file is a companion when some other
+ * module in the listing resolves it - unless the two claim each other (the
+ * `.dum`/`.ins` pair does) and `keepAsModule(file)` says this one is a song
+ * in its own right; the caller answers that from the format registry.
+ */
+export function companionFilesIn(listing: CompanionListing, keepAsModule: (name: string) => boolean = () => false): Set<string> {
+  const claimedBy = new Map<string, Set<string>>();
+  for (const module of listing.siblings) {
+    for (const c of resolveCompanions(module, listing).companions) {
+      if (lower(c) === lower(module)) continue;
+      (claimedBy.get(c) ?? claimedBy.set(c, new Set()).get(c)!).add(module);
+    }
+  }
+  const out = new Set<string>();
+  for (const [file, claimants] of claimedBy) {
+    const mutual = listing.siblings.includes(file)
+      && [...claimants].every((m) => resolveCompanions(file, listing).companions.includes(m));
+    if (mutual && keepAsModule(file)) continue;
+    out.add(file);
+  }
+  return out;
+}
+
