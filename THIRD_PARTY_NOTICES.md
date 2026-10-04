@@ -294,6 +294,12 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 
 ## Additional Format Engines
 
+### Musicline Playback (C++ port)
+- **Source:** `third-party/musicline_playback-main` (port of the Musicline Editor 1.16 Amiga replayer, with UADE as the reference backend)
+- **License:** GPL-2.0-or-later by inheritance from UADE, which it embeds; the port carries no licence statement of its own
+- **Used for:** Musicline (.ml) playback engine
+- **Note:** the original `Mline116.asm` is not in the repository (see `third-party/PRIVATE_SOURCES.md`)
+
 ### SC68
 - **Author:** Benjamin Gerard (wothke port)
 - **Source:** https://github.com/wothke/sc68-2.2.1
@@ -361,6 +367,32 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 
 ## DSP & Audio Libraries
 
+### demucs.cpp
+- **Source:** https://github.com/sevagh/demucs.cpp (vendored as `third-party/demucs.cpp-main`)
+- **License:** MIT
+- **Used for:** stem separation
+
+### FFTW
+- **Source:** https://www.fftw.org/ (vendored as `third-party/fftw-3.3.10`)
+- **License:** GPL-2.0-or-later
+- **Used for:** FFTs in the analysis and separation paths
+
+### Shrinkler (size probe)
+- **Source:** `third-party/shrinkler-wasm/shrinkler_size.cpp` - DEViLBOX's own glue around Shrinkler (https://github.com/askeksa/Shrinkler)
+- **License:** GPL-3.0-or-later (DEViLBOX); Shrinkler itself under its own permissive licence
+- **Used for:** Amiga executable size estimates
+
+### rtosc
+- **Source:** https://github.com/fundamental/rtosc
+- **License:** MIT
+- **Used for:** OSC plumbing for the ZynAddSubFX port; only build output lived in the tree and it is no longer tracked
+
+### SunVox / SunDog engine (2002-2009 sources)
+- **Source:** `third-party/sunvox_sources-master` (`sunvox_engine`, `sundog_engine`)
+- **Author:** Alex Zolotov
+- **License:** BSD (`sunvox_engine/docs/license.txt`, `sundog_engine/docs/license.txt`)
+- **Used for:** the SunVox modular engine port
+
 ### Tone.js
 - **Author:** Yotam Mann
 - **Source:** https://github.com/Tonejs/Tone.js
@@ -411,6 +443,11 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 ---
 
 ## Audio Effects (WASM)
+
+### Buzz machines
+- **Source:** https://github.com/Buzztrax/buzzmachines (vendored as `third-party/buzzmachines-master`)
+- **License:** per machine - "There is no single license that applies to all machines. Please check individual author directories or machine sources." Each machine DEViLBOX ships is credited in its own directory's README.
+- **Used for:** Buzz effect and generator machines compiled to WASM
 
 ### Calf Studio Gear
 - **Source:** https://github.com/calf-studio-gear/calf
@@ -661,4 +698,10 @@ of work make a project like DEViLBOX possible. In particular:
 
 ---
 
-*This file was last updated on 2026-04-13.*
+## Sources not in the repository
+
+Two original player sources we study but may not redistribute, and one
+set of build objects, are kept on the maintainer's machine and ignored by
+git. `third-party/PRIVATE_SOURCES.md` lists them.
+
+*This file was last updated on 2026-10-04.*

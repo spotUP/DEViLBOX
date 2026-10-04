@@ -320,3 +320,10 @@ maxtrax-wasm/src/generated/
 # Build artifacts / scratch
 tools/kontakt-bridge/build/
 scratch-calc3.bin
+
+# Kept on disk, never published (see third-party/PRIVATE_SOURCES.md):
+# original copyrighted player sources we study but may not redistribute,
+# and build artefacts.
+third-party/sonix-music-driver/
+third-party/musicline_playback-main/musicline/asm-version/
+third-party/rtosc-build-wasm/
