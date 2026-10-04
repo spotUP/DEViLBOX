@@ -219,6 +219,16 @@ export class MusicLineEngine extends WASMSingletonBase {
     this.workletNode?.port.postMessage({ type: 'set-subsong', subsong });
   }
 
+  /**
+   * Bit N set = channel N audible. The worklet has answered `setMuteMask`
+   * since the engine was written, but no method here sent it, so the mixer's
+   * registry (which looks for `setMuteMask` on the class) never registered
+   * MusicLine and solo/mute did nothing on it (ledger F25).
+   */
+  setMuteMask(mask: number): void {
+    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   previewNoteOn(instIdx: number, midiNote: number, velocity: number): void {
     this.workletNode?.port.postMessage({
       type: 'preview-note-on',
