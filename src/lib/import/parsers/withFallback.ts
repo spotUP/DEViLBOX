@@ -34,6 +34,13 @@ export interface FallbackContext {
 const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth']);
 
 type NativeParser = (buffer: ArrayBuffer, filename: string) => Promise<TrackerSong> | TrackerSong;
+
+/** Note cells across the whole grid. Zero means a stub parser's placeholder. */
+export function countNotes(song: Pick<TrackerSong, 'patterns'>): number {
+  return song.patterns.reduce((sum, p) =>
+    sum + p.channels.reduce((cSum, ch) =>
+      cSum + ch.rows.filter((r) => r.note > 0).length, 0), 0);
+}
 type NativeParserWithBytes = (bytes: Uint8Array, filename: string) => Promise<TrackerSong | null> | TrackerSong | null;
 
 /** Call UADE as fallback */
@@ -105,6 +112,16 @@ export async function withNativeThenUADE(
       if (!opts?.isFormat || !bytes || opts.isFormat(bytes)) {
         const input = (opts?.usesBytes || opts?.isFormat) ? bytes! : ctx.buffer;
         const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
+        // A placeholder grid (stub parser: one empty 64-row pattern) must not
+        // pre-empt the UADE scan. Formats with NO parser got the heuristic
+        // scan grid; formats with a stub got an empty one - worse than having
+        // no parser at all (eco.gray, spacestation.jmf, count duckula.scr,
+        // ..., ledger F6). The `native` branch below already falls through on
+        // zero notes; this branch did not.
+        if (result && countNotes(result) === 0) {
+          console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}; UADE builds the grid`);
+          return callUADE(ctx);
+        }
         if (result) {
           // Skip UADE injection if a dedicated WASM engine handles audio
           const r = result as any;
@@ -175,10 +192,7 @@ export async function withNativeThenUADE(
         // Defense-in-depth: if native parser returned 0 notes across all patterns,
         // it's likely a stub parser that couldn't actually parse the file.
         // Fall through to UADE instead of returning empty data.
-        const totalNotes = result.patterns.reduce((sum, p) =>
-          sum + p.channels.reduce((cSum, ch) =>
-            cSum + ch.rows.filter(r => r.note > 0).length, 0), 0);
-        if (totalNotes === 0) {
+        if (countNotes(result) === 0) {
           console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}, falling back to UADE`);
           return callUADE(ctx);
         }
