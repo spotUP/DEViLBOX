@@ -8,7 +8,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useFormatStore } from '@stores';
 import { MusicLineEngine } from '@/engine/musicline/MusicLineEngine';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Info } from 'lucide-react';
+import { Modal } from '@components/ui/Modal';
+import { ModalHeader } from '@components/ui/ModalHeader';
 
 // ── Channel Mute Toggles ──────────────────────────────────────────────────
 
@@ -99,38 +101,47 @@ const KeyboardModeToggle: React.FC = () => {
 
 // ── Song Metadata Panel ───────────────────────────────────────────────────
 
+/**
+ * One summary line in the toolbar; the fields themselves in a dialog.
+ *
+ * Expanded inline, the section shared its height with the pattern grid and
+ * showed one clipped line of Info 1 ("A conversion of a Drax tune (didn't
+ * have the strengt to") with the rest never visible (owner, 2026-10-04:
+ * "show in dialog instead?", ledger F34). A MusicLine module carries five
+ * 64-character info lines besides title, author, date and duration; a
+ * dialog has room for all of them.
+ */
 const MetadataPanel: React.FC = () => {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const metadata = useFormatStore((s) => s.musiclineMetadata);
   const setField = useFormatStore((s) => s.setMusicLineMetadataField);
 
-  // Show nothing if no metadata was parsed and panel is collapsed
-  const hasAnyData = metadata && (
-    metadata.title || metadata.author || metadata.date || metadata.duration ||
-    metadata.infoText.some((t) => t)
-  );
+  const summary = metadata
+    ? [metadata.title, metadata.author, metadata.date].filter(Boolean).join(' · ')
+      || metadata.infoText.find((t) => t)
+      || ''
+    : '';
 
   return (
-    <div className="border-t border-dark-border">
+    <div className="border-t border-dark-border flex items-center gap-2 px-3 py-1 text-xs">
       <button
-        className="flex items-center gap-1 px-3 py-1 w-full text-left text-xs text-text-muted hover:text-text-primary transition-colors"
-        onClick={() => setExpanded((prev) => !prev)}
+        type="button"
+        className="flex items-center gap-1 text-text-muted hover:text-text-primary transition-colors shrink-0"
+        onClick={() => setOpen(true)}
+        title="Open the song's title, author, date, duration and info lines"
       >
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <Info size={12} />
         <span>Song Info</span>
-        {hasAnyData && !expanded && (
-          <span className="ml-2 text-text-secondary truncate">
-            {metadata!.title || metadata!.author || '(has metadata)'}
-          </span>
-        )}
       </button>
-      {expanded && (
-        <div className="px-3 pb-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
+      {summary && <span className="text-text-secondary truncate">{summary}</span>}
+      <Modal isOpen={open} onClose={() => setOpen(false)} size="md">
+        <ModalHeader title="Song Info" subtitle="MusicLine module metadata" onClose={() => setOpen(false)} />
+        <div className="px-4 pb-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
           <MetadataField label="Title" value={metadata?.title ?? ''} field="title" onChange={setField} />
           <MetadataField label="Author" value={metadata?.author ?? ''} field="author" onChange={setField} />
           <MetadataField label="Date" value={metadata?.date ?? ''} field="date" onChange={setField} />
           <MetadataField label="Duration" value={metadata?.duration ?? ''} field="duration" onChange={setField} />
-          {Array.from({ length: 5 }, (_, i) => (
+          {Array.from({ length: Math.max(5, metadata?.infoText.length ?? 0) }, (_, i) => (
             <MetadataField
               key={i}
               label={`Info ${i + 1}`}
@@ -140,7 +151,7 @@ const MetadataPanel: React.FC = () => {
             />
           ))}
         </div>
-      )}
+      </Modal>
     </div>
   );
 };
