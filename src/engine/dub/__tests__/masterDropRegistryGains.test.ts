@@ -43,15 +43,20 @@ describe('registry engine resolution', () => {
 });
 
 describe('masterDrop', () => {
-  it("takes every registry engine's output down, not four", async () => {
+  it("takes every live engine's DRY gain down and leaves its output - the dub tap - alone", async () => {
     const fred = fakeEngine(true, 0.9);
-    vi.doMock('@/engine/replayer/NativeEngineRouting', () => ({ WASM_ENGINES: [{ key: 'FredReplayer2', staticRef: fred.Engine }] }));
+    const dry = { gain: { value: 0.9 } } as unknown as GainNode;
+    vi.doMock('@/engine/replayer/NativeEngineRouting', () => ({
+      WASM_ENGINES: [{ key: 'FredReplayer2', staticRef: fred.Engine }],
+      liveNativeDryGains: () => [dry],
+    }));
     vi.doMock('@/engine/ToneEngine', () => ({ getToneEngine: () => { throw new Error('no tone engine in this test'); } }));
     vi.doMock('@/engine/libopenmpt/LibopenmptEngine', () => ({ LibopenmptEngine: { hasInstance: () => false } }));
     vi.doMock('@/engine/furnace-dispatch/FurnaceDispatchEngine', () => ({ FurnaceDispatchEngine: { hasInstance: () => false } }));
     const { collectDryGains } = await import('@/engine/dub/moves/masterDrop');
     const gains = await collectDryGains();
-    expect(gains.map((g) => g.param)).toContain(fred.output.gain);
-    expect(gains.find((g) => g.param === fred.output.gain)?.prev).toBe(0.9);
+    expect(gains.map((g) => g.param)).toContain(dry.gain);
+    expect(gains.map((g) => g.param)).not.toContain(fred.output.gain);
+    expect(gains.find((g) => g.param === dry.gain)?.prev).toBe(0.9);
   });
 });

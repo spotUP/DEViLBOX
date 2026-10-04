@@ -7,7 +7,7 @@
  * directly to `ctx.destination`:
  *   - Tone.js instruments → masterInput → masterEffectsInput → destination
  *   - Synths (DevilboxSynth) → synthBus → masterEffectsInput → destination
- *   - WASM replayers (every WASM_ENGINES entry, plus LibOpenMPT / Furnace) →
+ *   - WASM replayers (every direct-routed engine's dry gain, plus LibOpenMPT / Furnace) →
  *     engine.output (a GainNode) → destination
  *   - DubBus return → drumpad.masterGain → destination  ← untouched by drop
  *
@@ -21,7 +21,6 @@
 import type { DubMove } from './_types';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { beginDrySilence } from '@/lib/dub/drySilence';
-import { liveRegistryEngineOutputs } from '@/lib/engines/registryEngines';
 
 /**
  * Every active audio-source root gain, so masterDrop can ramp them together:
@@ -46,10 +45,14 @@ export async function collectDryGains(): Promise<Array<{ param: AudioParam; prev
     push(tone.synthBus.gain as unknown as AudioParam);
   } catch { /* tone engine not initialized */ }
 
-  // Every native engine the registry knows and has alive right now.
+  // Every direct-routed native engine alive right now: its DRY gain, not its
+  // output. The dub bus's whole-mix tap hangs off `instance.output`, so
+  // ramping that took the wet feed down with the dry and the desk went
+  // completely silent (owner, 2026-10-04). The router inserts the dry gain
+  // and keeps the tap upstream of it.
   try {
-    const { WASM_ENGINES } = await import('@/engine/replayer/NativeEngineRouting');
-    for (const live of await liveRegistryEngineOutputs(WASM_ENGINES)) push(live.output.gain);
+    const { liveNativeDryGains } = await import('@/engine/replayer/NativeEngineRouting');
+    for (const dry of liveNativeDryGains()) push(dry.gain);
   } catch { /* routing module not loadable in this build */ }
 
   // Not in WASM_ENGINES: libopenmpt plays the tracker formats through its own
