@@ -2185,6 +2185,93 @@ export const DubDeckStrip: React.FC = () => {
         >
           Audition
         </button>
+        {/* The live sliders - FX WET, INTENSITY, VINYL, ECHO - sit in the
+            header row with the switches, not on a row of their own. Two rows
+            made the header twice as tall and the sliders ran the full width
+            (owner, 2026-10-04: "the sliders are very wide, these two rows can
+            be compacted to one row"). Each slider keeps a minimum width and a
+            CAP, so a wide deck shows one row and a narrow one wraps. */}
+        {busEnabled && (
+        <>
+          {showLiveRowSlider('dub.returnGain') && (
+          <div className="flex items-center gap-2 grow basis-[11rem] min-w-[9rem] max-w-[16rem]">
+            <span className="text-text-muted text-[9px] font-mono shrink-0 uppercase">{DUB_BUS_PARAMS['dub.returnGain'].label}</span>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={liveReturnGain}
+              onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
+              {...holdLiveParam('returnGain')}
+              className="flex-1 min-w-0 accent-accent-highlight cursor-pointer"
+              title={`${DUB_BUS_PARAMS['dub.returnGain'].label}: ${(liveReturnGain * 100).toFixed(0)}% — the echo and reverb return's level in the mix`}
+            />
+            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+              {(liveReturnGain * 100).toFixed(0)}%
+            </span>
+          </div>
+          )}
+
+          {/* How busy the performer is: the one control that decides whether a
+              section breathes or drives. */}
+          <div className="flex items-center gap-2 grow basis-[11rem] min-w-[9rem] max-w-[16rem]">
+            <span className="text-text-muted text-[9px] font-mono shrink-0">INTENSITY</span>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={autoDubIntensity}
+              onChange={(e) => setAutoDubIntensity(Number(e.target.value))}
+              className="flex-1 min-w-0 accent-accent-primary cursor-pointer disabled:opacity-40"
+              disabled={!autoDubEnabled}
+              title={autoDubEnabled
+                ? `Auto Dub intensity: ${(autoDubIntensity * 100).toFixed(0)}% — how often the performer fires`
+                : 'Auto Dub intensity — switch AUTO DUB on to use'}
+            />
+            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+              {(autoDubIntensity * 100).toFixed(0)}%
+            </span>
+          </div>
+
+          {/* Vinyl wear. Moved down here from the toolbar row and renamed from
+              "JA" — asked for 2026-09-22. It belongs with the other three
+              because it is the same KIND of control: a continuous amount that
+              colours the whole bus.
+
+              Note the scale differs. vinylLevel is 0-10 with a 0.5 step, not
+              the 0-1 the others use, so the readout stays one decimal out of
+              ten rather than a percentage. Showing "450%" here would be worse
+              than the inconsistency. */}
+          <div className="flex items-center gap-2 grow basis-[11rem] min-w-[9rem] max-w-[16rem]">
+            <span className="text-text-muted text-[9px] font-mono shrink-0">VINYL</span>
+            <input
+              type="range" min={0} max={10} step={0.5}
+              value={vinylLevel}
+              onChange={(e) => setVinylLevel(Number(e.target.value))}
+              className="flex-1 min-w-0 accent-accent-warning cursor-pointer"
+              title={`Vinyl wear: ${vinylLevel.toFixed(1)} / 10 — surface noise, clicks, wow and flutter, high-frequency roll-off, rumble, left/right drift. 0 = factory new, 10 = gutter-scraped Jamaican 7-inch.`}
+            />
+            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+              {vinylLevel.toFixed(1)}
+            </span>
+          </div>
+
+          {/* Echo feedback: how long the repeats hang on. The other hand on a
+              dub desk, and it was behind a tab. */}
+          {showLiveRowSlider('dub.echoIntensity') && (
+          <div className="flex items-center gap-2 grow basis-[11rem] min-w-[9rem] max-w-[16rem]">
+            <span className="text-text-muted text-[9px] font-mono shrink-0 uppercase">{DUB_BUS_PARAMS['dub.echoIntensity'].label}</span>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={liveEchoIntensity}
+              onChange={(e) => setDubBus({ echoIntensity: Number(e.target.value) })}
+              {...holdLiveParam('echoIntensity')}
+              className="flex-1 min-w-0 accent-accent-secondary cursor-pointer"
+              title={`${DUB_BUS_PARAMS['dub.echoIntensity'].label}: ${(liveEchoIntensity * 100).toFixed(0)}% — the echo's feedback: how long the repeats last`}
+            />
+            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
+              {(liveEchoIntensity * 100).toFixed(0)}%
+            </span>
+          </div>
+          )}
+        </>
+        )}
         {/* Which shape the PERFORM tab draws in. Late in the header on
             purpose: the row wraps, and what wraps should be what is reached
             for least — this is set once when the controller arrives, not
@@ -2225,94 +2312,6 @@ export const DubDeckStrip: React.FC = () => {
         </button>
       </div>
 
-      {/* The always-visible live row.
-          FX WET used to sit here alone across the full width, while the
-          controls a performer reaches for most often were behind a small
-          settings cog. The row had the space; the cog is for what you set
-          once and leave. Each control keeps its own minimum width and the
-          row wraps, so a narrow deck stacks them instead of squashing all
-          three into unusable stubs. */}
-      {busEnabled && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 py-1 border-b border-dark-border">
-          {showLiveRowSlider('dub.returnGain') && (
-          <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
-            <span className="text-text-muted text-[9px] font-mono shrink-0 uppercase">{DUB_BUS_PARAMS['dub.returnGain'].label}</span>
-            <input
-              type="range" min={0} max={1} step={0.01}
-              value={liveReturnGain}
-              onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
-              {...holdLiveParam('returnGain')}
-              className="flex-1 min-w-0 accent-accent-highlight cursor-pointer"
-              title={`${DUB_BUS_PARAMS['dub.returnGain'].label}: ${(liveReturnGain * 100).toFixed(0)}% — the echo and reverb return's level in the mix`}
-            />
-            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
-              {(liveReturnGain * 100).toFixed(0)}%
-            </span>
-          </div>
-          )}
-
-          {/* How busy the performer is: the one control that decides whether a
-              section breathes or drives. */}
-          <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
-            <span className="text-text-muted text-[9px] font-mono shrink-0">INTENSITY</span>
-            <input
-              type="range" min={0} max={1} step={0.01}
-              value={autoDubIntensity}
-              onChange={(e) => setAutoDubIntensity(Number(e.target.value))}
-              className="flex-1 min-w-0 accent-accent-primary cursor-pointer disabled:opacity-40"
-              disabled={!autoDubEnabled}
-              title={autoDubEnabled
-                ? `Auto Dub intensity: ${(autoDubIntensity * 100).toFixed(0)}% — how often the performer fires`
-                : 'Auto Dub intensity — switch AUTO DUB on to use'}
-            />
-            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
-              {(autoDubIntensity * 100).toFixed(0)}%
-            </span>
-          </div>
-
-          {/* Vinyl wear. Moved down here from the toolbar row and renamed from
-              "JA" — asked for 2026-09-22. It belongs with the other three
-              because it is the same KIND of control: a continuous amount that
-              colours the whole bus.
-
-              Note the scale differs. vinylLevel is 0-10 with a 0.5 step, not
-              the 0-1 the others use, so the readout stays one decimal out of
-              ten rather than a percentage. Showing "450%" here would be worse
-              than the inconsistency. */}
-          <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
-            <span className="text-text-muted text-[9px] font-mono shrink-0">VINYL</span>
-            <input
-              type="range" min={0} max={10} step={0.5}
-              value={vinylLevel}
-              onChange={(e) => setVinylLevel(Number(e.target.value))}
-              className="flex-1 min-w-0 accent-accent-warning cursor-pointer"
-              title={`Vinyl wear: ${vinylLevel.toFixed(1)} / 10 — surface noise, clicks, wow and flutter, high-frequency roll-off, rumble, left/right drift. 0 = factory new, 10 = gutter-scraped Jamaican 7-inch.`}
-            />
-            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
-              {vinylLevel.toFixed(1)}
-            </span>
-          </div>
-
-          {/* Echo feedback: how long the repeats hang on. The other hand on a
-              dub desk, and it was behind a tab. */}
-          {showLiveRowSlider('dub.echoIntensity') && (
-          <div className="flex items-center gap-2 flex-1 min-w-[11rem]">
-            <span className="text-text-muted text-[9px] font-mono shrink-0 uppercase">{DUB_BUS_PARAMS['dub.echoIntensity'].label}</span>
-            <input
-              type="range" min={0} max={1} step={0.01}
-              value={liveEchoIntensity}
-              onChange={(e) => setDubBus({ echoIntensity: Number(e.target.value) })}
-              {...holdLiveParam('echoIntensity')}
-              className="flex-1 min-w-0 accent-accent-secondary cursor-pointer"
-              title={`${DUB_BUS_PARAMS['dub.echoIntensity'].label}: ${(liveEchoIntensity * 100).toFixed(0)}% — the echo's feedback: how long the repeats last`}
-            />
-            <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
-              {(liveEchoIntensity * 100).toFixed(0)}%
-            </span>
-          </div>
-          )}
-        </div>
-      )}
 
       {/* Tab bar — only when strip is expanded */}
       {!stripCollapsed && (

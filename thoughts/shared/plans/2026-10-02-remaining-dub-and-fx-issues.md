@@ -35,7 +35,7 @@ code, type-check clean, committed. Live-only checks are listed under
 | L22 | "Almost all formats broken" (owner, 2026-10-02): the marked formats gray/jb/jmf/glue/scr/sog/hip are OPAQUE stubs per thoughts/shared/research/2026-07-12_uade-stub-format-triage.md (placeholder grid, UADE audio); headless sweep at HEAD == baseline for all of them; no record of their grids ever having data. Not a regression. | triaged | |
 | L19 | singleLoadPath.contract.test.ts flakes in the full pre-push run (passes alone) | open | failed once 2026-10-02 |
 | L9 | `src/engine/hively/__tests__/instrumentPlayersHaveTheirOwnOutput.test.ts` failing since eced26399, outside CI | open | |
-| L23 | DubDeckStrip (`src/components/dub/DubDeckStrip.tsx`): the SHAPE / SUB / KILL row and the INTENSITY / VINYL slider row take two rows; the sliders are very wide (screenshot 2026-10-04). Compact both into ONE row - shorter sliders with the value beside them, the two selects and KILL on the same line. | open | owner, 2026-10-04 |
+| L23 | DubDeckStrip (`src/components/dub/DubDeckStrip.tsx`): the SHAPE / SUB / KILL row and the INTENSITY / VINYL slider row take two rows; the sliders are very wide (screenshot 2026-10-04). Compact both into ONE row - shorter sliders with the value beside them, the two selects and KILL on the same line. | done 2026-10-04 - sliders moved into the header row before SHAPE, each `grow basis-[11rem] min-w-[9rem] max-w-[16rem]`; owner to eyeball at :5174 | owner, 2026-10-04 |
 
 ## Owner checks (live, by ear)
 - Toggle lift: hold each toggle at :5174, wash swells while held.

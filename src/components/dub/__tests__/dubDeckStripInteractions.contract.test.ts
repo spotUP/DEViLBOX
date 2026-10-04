@@ -150,13 +150,23 @@ describe('DubDeckStrip — channel/master button semantics contract (G15)', () =
  * the strip itself, it follows the value while a move drives it, and the row
  * survives a narrow deck.
  */
-describe('DubDeckStrip — the live row', () => {
+describe('DubDeckStrip — the live sliders', () => {
+  // Since 2026-10-04 the sliders sit IN the header row (a fragment under
+  // `busEnabled`), not on a row of their own: "the sliders are very wide,
+  // these two rows can be compacted to one row".
   const LIVE_ROW = SOURCE.match(
-    /\{busEnabled && \(\s*<div className="flex flex-wrap[\s\S]*?\n      \)\}/,
+    /\{busEnabled && \(\s*<>[\s\S]*?\n        <\/>\s*\)\}/,
   );
+  const HEADER = SOURCE.match(/\{\/\* Header row \*\/\}[\s\S]*?<div className="([^"]*)">/);
 
-  it('renders the row at all', () => {
-    expect(LIVE_ROW, 'live row block not found').not.toBeNull();
+  it('renders the sliders at all, inside the header row', () => {
+    expect(LIVE_ROW, 'live slider block not found').not.toBeNull();
+    expect(HEADER, 'header row not found').not.toBeNull();
+    const headerStart = SOURCE.indexOf('{/* Header row */}');
+    const sliderStart = SOURCE.indexOf(LIVE_ROW![0]);
+    const shapeStart = SOURCE.indexOf("<span className=\"text-text-muted ml-2\">SHAPE</span>");
+    expect(sliderStart).toBeGreaterThan(headerStart);
+    expect(sliderStart).toBeLessThan(shapeStart);
   });
 
   it('carries the controls a performer rides, not just the wet level', () => {
@@ -187,17 +197,19 @@ describe('DubDeckStrip — the live row', () => {
     expect(LIVE_ROW![0]).toMatch(/disabled=\{!autoDubEnabled\}/);
   });
 
-  it('wraps rather than squashing its sliders into stubs on a narrow deck', () => {
+  it('wraps rather than squashing its sliders into stubs on a narrow deck, and caps them on a wide one', () => {
+    // The header row wraps; the sliders inherit that.
+    expect(HEADER![1]).toContain('flex-wrap');
     const row = LIVE_ROW![0];
-    expect(row).toContain('flex-wrap');
-    // EVERY control in the row keeps a floor wide enough to still be
-    // draggable. Counted against the sliders actually present rather than a
-    // fixed number — this said "three" and broke when VINYL joined the row on
-    // 2026-09-22, which is the test noticing a change it should not have
-    // cared about. What matters is that no slider is left without a floor.
+    // EVERY control keeps a floor wide enough to still be draggable, and a
+    // cap so two sliders do not run the full width of a wide deck (the
+    // 2026-10-04 complaint). Counted against the sliders actually present
+    // rather than a fixed number - this said "three" and broke when VINYL
+    // joined on 2026-09-22.
     const sliders = row.match(/type="range"/g) ?? [];
     expect(sliders.length).toBeGreaterThanOrEqual(3);
-    expect(row.match(/min-w-\[11rem\]/g) ?? []).toHaveLength(sliders.length);
+    expect(row.match(/min-w-\[9rem\]/g) ?? []).toHaveLength(sliders.length);
+    expect(row.match(/max-w-\[16rem\]/g) ?? []).toHaveLength(sliders.length);
   });
 });
 
