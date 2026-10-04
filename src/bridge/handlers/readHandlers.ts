@@ -31,6 +31,7 @@ import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
 import { getTrackerReplayer } from '../../engine/TrackerReplayer';
+import { playingEngineFor } from '../../engine/replayer/NativeEngineRouting';
 import { getToneEngine } from '../../engine/ToneEngine';
 import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
@@ -1510,8 +1511,11 @@ export function getSynthErrors(): Record<string, unknown> {
 
 export function getFormatState(): Record<string, unknown> {
   const format = useFormatStore.getState();
+  const loadedSong = getTrackerReplayer()?.getSong();
   return {
     editorMode: format.editorMode,
+    // What plays the loaded song, by the router's rule (see playingEngineFor).
+    playingEngine: loadedSong ? playingEngineFor(loadedSong) : null,
     hasFurnaceNative: !!format.furnaceNative,
     hasHivelyNative: !!format.hivelyNative,
     hivelyMeta: format.hivelyMeta,
