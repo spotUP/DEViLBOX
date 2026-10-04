@@ -926,6 +926,22 @@ export function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong):
   return desc.formats.includes(song.format);
 }
 
+/**
+ * What will make the sound for `song`, by the same rule `startNativeEngines`
+ * applies: the first registry descriptor whose file data the song carries
+ * (its `key`, e.g. `Hippel`, `UADEEditable`); `UADE classic` when the song's
+ * instruments stream through UADESynth with no editable file data; else
+ * `tracker` (the TypeScript scheduler voices the grid). The bridge reports
+ * this next to the registry label, which names the format's registry entry
+ * and misled two triages into blaming the wrong engine (ledger F22).
+ */
+export function playingEngineFor(song: Pick<TrackerSong, 'format' | 'instruments'> & Partial<TrackerSong>): string {
+  const desc = WASM_ENGINES.find((d) => shouldActivate(d, song as TrackerSong));
+  if (desc) return desc.key;
+  if (song.instruments?.some((inst) => inst.synthType === 'UADESynth')) return 'UADE classic';
+  return 'tracker';
+}
+
 function registerWholeMixDubSend(key: string, source: AudioNode | null | undefined): void {
   if (!source) return;
   try {
