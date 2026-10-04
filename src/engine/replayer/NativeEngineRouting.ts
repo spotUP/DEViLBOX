@@ -10,7 +10,7 @@
  */
 
 import { FILE_DATA_FIELDS } from '@/engine/formatFileDataFields';
-import { drySilencedByDub } from '@/lib/dub/drySilence';
+import { silenceIsNotTheSongs } from './performerSilence';
 import * as Tone from 'tone';
 import type { TrackerSong, TrackerFormat } from '../TrackerReplayer';
 import { getToneEngine } from '../ToneEngine';
@@ -921,28 +921,8 @@ function tryResolveSync(desc: NativeEngineDescriptor): WASMSingletonStatic | nul
   return desc.staticRef ?? null;
 }
 
-/**
- * Is the mixer muting or soloing anything right now? Silence under a mute
- * or a solo is the mixer's doing, not the song's end; the silence detector
- * asks before it stops an engine. Resolved lazily: the mixer store imports
- * this module.
- */
-let _mixerStore: { getState(): { channels: Array<{ muted: boolean; soloed: boolean }>; isSoloing: boolean } } | null = null;
-void import('@/stores/useMixerStore').then((m) => { _mixerStore = m.useMixerStore; }).catch(() => {});
-export function mixerSilencesAChannel(): boolean {
-  const st = _mixerStore?.getState();
-  if (!st) return false;
-  return st.channels.some((c) => (st.isSoloing ? !c.soloed : c.muted));
-}
+export { silenceIsNotTheSongs, mixerSilencesAChannel } from './performerSilence';
 
-/**
- * Silence the performer made, not the song's end: a mixer mute or solo, or a
- * dub move holding the dry signal down (`masterDrop`, ledger F28). The
- * silence detector asks this before it stops an engine.
- */
-export function silenceIsNotTheSongs(): boolean {
-  return mixerSilencesAChannel() || drySilencedByDub();
-}
 
 export function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolean {
   const fileData = song[desc.fileDataKey];
@@ -1020,6 +1000,32 @@ function unregisterWholeMixDubSend(key: string): void {
   try {
     getActiveDubBus()?.unregisterWholeMixTap(key);
   } catch { /* ok */ }
+  const dry = _nativeDryGains.get(key);
+  if (dry) {
+    try { dry.disconnect(); } catch { /* already gone */ }
+    _nativeDryGains.delete(key);
+  }
+}
+
+/**
+ * The DRY gain of each direct-routed native engine, between the engine's
+ * output and the master path. `masterDrop` ramps these. It used to ramp
+ * `instance.output.gain` - but the dub bus's whole-mix tap and the silence
+ * detector hang off `instance.output`, so a Drop killed the wet feed with
+ * the dry and the desk went completely silent (owner, 2026-10-04). The tap
+ * stays on the engine output; only what goes to the master is dropped.
+ */
+const _nativeDryGains = new Map<string, GainNode>();
+function attachDryGain(key: string, source: GainNode): GainNode {
+  const existing = _nativeDryGains.get(key);
+  if (existing) { try { existing.disconnect(); } catch { /* ok */ } }
+  const dry = source.context.createGain();
+  source.connect(dry);
+  _nativeDryGains.set(key, dry);
+  return dry;
+}
+export function liveNativeDryGains(): GainNode[] {
+  return [..._nativeDryGains.values()];
 }
 
 // ---------------------------------------------------------------------------
@@ -1257,19 +1263,22 @@ export async function startNativeEngines(
         // Direct routing for engines without a synth in song.instruments
         if (desc.needsDirectRouting && !isDJDeck && !routedNativeEngines.has(desc.synthType)) {
           const nativeInput = getNativeAudioNode(separationInputTone as any);
+          // Everything bound for the master goes through `dry`; the dub tap
+          // and the silence detector stay on `instance.output` (see attachDryGain).
+          const dry = attachDryGain(`native:${desc.synthType}`, instance.output);
           if (nativeInput) {
             // Handle cross-context routing (stale AudioContext from HMR)
             if (instance.output.context !== nativeInput.context) {
               try {
                 const msDest = (instance.output.context as AudioContext).createMediaStreamDestination();
-                instance.output.connect(msDest);
+                dry.connect(msDest);
                 const msSource = (nativeInput.context as AudioContext).createMediaStreamSource(msDest.stream);
                 msSource.connect(nativeInput);
                 console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation (cross-context bridge)`);
               } catch (bridgeErr) {
                 console.error(`[NativeEngineRouting] ${desc.key} cross-context bridge failed:`, bridgeErr);
                 // Fallback: connect to engine's own context destination
-                instance.output.connect(instance.output.context.destination);
+                dry.connect(instance.output.context.destination);
               }
             } else {
               // An engine that emulates Paula hands over its DAC output raw —
@@ -1278,8 +1287,8 @@ export async function startNativeEngines(
               // downstream are untouched. `engine/paulaOutput.ts` holds the
               // survey that decides membership.
               const viaPaula = needsPaulaOutputStage(desc.synthType)
-                && toneEngine.routeThroughPaulaStage(instance.output, nativeInput);
-              if (!viaPaula) instance.output.connect(nativeInput);
+                && toneEngine.routeThroughPaulaStage(dry, nativeInput);
+              if (!viaPaula) dry.connect(nativeInput);
               console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation${viaPaula ? ' (via Amiga output stage)' : ''}`);
             }
             routedNativeEngines.add(desc.synthType);
@@ -1289,7 +1298,7 @@ export async function startNativeEngines(
           } else {
             // Fallback: connect directly to audio context destination
             const ctx = instance.output.context;
-            instance.output.connect(ctx.destination);
+            dry.connect(ctx.destination);
             routedNativeEngines.add(desc.synthType);
             registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
             registerPlayingEngine(instance);

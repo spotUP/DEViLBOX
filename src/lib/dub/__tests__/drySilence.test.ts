@@ -44,8 +44,8 @@ describe('drySilence', () => {
     expect(drySilencedByDub()).toBe(false);
   });
 
-  it('the detector predicate includes it', { timeout: 30000 }, async () => {
-    const { silenceIsNotTheSongs } = await import('@/engine/replayer/NativeEngineRouting');
+  it('the detector predicate includes it', async () => {
+    const { silenceIsNotTheSongs } = await import('@/engine/replayer/performerSilence');
     expect(silenceIsNotTheSongs()).toBe(false);
     const end = beginDrySilence();
     expect(silenceIsNotTheSongs()).toBe(true);
