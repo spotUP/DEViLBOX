@@ -126,7 +126,17 @@ export async function prepareModuleImport(file: File, companions: File[] = [], h
     const buf = await file.arrayBuffer();
     const sidInfo = parseSIDHeader(new Uint8Array(buf));
     const canUseLibopenmpt = nativeFmt?.nativeParser && (nativeFmt.libopenmptFallback || nativeFmt.libopenmptPlayable);
-    if (canUseLibopenmpt) return { info: await loadModuleFile(file), sidInfo };
+    if (canUseLibopenmpt) {
+      try {
+        return { info: await loadModuleFile(file), sidInfo };
+      } catch (err) {
+        // libopenmpt could not read it. The format still has its native
+        // parser and, for `.mus`, UADE behind it; parseModuleToSong decides
+        // at import. Rejecting here showed "Failed to load module: ptr" for
+        // boogie.mus and loaded nothing (ledger F14).
+        console.warn(`[prepareModuleImport] libopenmpt could not read ${file.name}; importing through the native route:`, err);
+      }
+    }
 
     const meta = nativeFmt
       ? getNativeFormatMetadata(nativeFmt.key, buf)
