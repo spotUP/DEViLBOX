@@ -2,7 +2,7 @@
  * Fil4EqPanel — Master FX panel for Fil4EqEffect.
  * Curve display + 8 band columns: HP | LoShelf | P1–P4 | HiShelf | LP
  */
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Fil4EqCurve, type BandId } from './Fil4EqCurve';
 import { Button } from '@components/ui/Button';
 import type { Fil4EqEffect } from '@/engine/effects/Fil4EqEffect';
@@ -10,6 +10,8 @@ import { Fader } from '@components/controls/Fader';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { computeGenreBaseline } from '@engine/dub/AutoEQ';
 import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
+import { CustomSelect } from '@components/common/CustomSelect';
+import { GENRE_PRESET_NAMES, GENRE_PRESET_ENERGY, GENRE_PRESET_DANCEABILITY, genreOfParams } from '@/lib/dub/genrePresetMatch';
 
 interface BandState {
   enabled: boolean;
@@ -262,7 +264,7 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
 
   const applyGenrePreset = useCallback((genre: string) => {
     if (genre === '') return;
-    const curve = computeGenreBaseline(genre, 0.7, 0.6);
+    const curve = computeGenreBaseline(genre, GENRE_PRESET_ENERGY, GENRE_PRESET_DANCEABILITY);
     effect.setHP(curve.hp.enabled, curve.hp.freq, curve.hp.q);
     effect.setLowShelf(curve.ls.enabled, curve.ls.freq, curve.ls.gain ?? 0, curve.ls.q ?? 0.8);
     effect.setHighShelf(curve.hs.enabled, curve.hs.freq, curve.hs.gain ?? 0, curve.hs.q ?? 0.8);
@@ -271,6 +273,9 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
     });
     effect.setMasterGain(1.0);
   }, [effect]);
+
+  /** The genre curve the bands sit on right now, or '' (see genrePresetMatch.ts). */
+  const activeGenre = useMemo(() => genreOfParams(effect.getParams()) ?? '', [effect, state]);
 
   const resetFlat = useCallback(() => {
     effect.setHP(false, 25, 0.7);
@@ -287,16 +292,18 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
       {/* Preset row */}
       <div className="flex items-center gap-2">
         <span className="text-[9px] font-mono text-text-muted shrink-0">Preset</span>
-        <select
-          className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-0.5 text-[10px] font-mono text-text-primary focus:ring-1 focus:ring-accent-primary flex-1"
-          defaultValue=""
-          onChange={e => { applyGenrePreset(e.target.value); e.target.value = ''; }}
-        >
-          <option value="" disabled>Select genre curve…</option>
-          {['Reggae','Electronic','Hip-Hop','Rock','Jazz','Classical','Blues','Folk','Unknown'].map(g => (
-            <option key={g} value={g}>{g}</option>
-          ))}
-        </select>
+        {/* Shows the genre whose curve the bands still equal - derived from
+            the parameters, so a dragged band or Flat deselects by itself. It
+            was a one-shot picker that reset to its placeholder and never
+            showed the active curve, and it ran full width (owner, 2026-10-04). */}
+        <CustomSelect
+          value={activeGenre}
+          onChange={applyGenrePreset}
+          options={GENRE_PRESET_NAMES.map(g => ({ value: g, label: g }))}
+          placeholder="Select genre curve…"
+          className="text-[10px] font-mono"
+          title="Apply a genre EQ curve; the active one is shown while the bands still match it"
+        />
         <button
           type="button"
           onClick={resetFlat}
