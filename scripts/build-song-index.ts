@@ -18,8 +18,9 @@
  *     npx tsx scripts/build-song-index.ts
  */
 import { readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative, basename } from 'node:path';
+import { join, relative, basename, dirname } from 'node:path';
 import { FORMAT_REGISTRY, detectFormat } from '../src/lib/import/FormatRegistry';
+import { companionFilesIn, isInSampleDirectory } from '../src/lib/import/companionResolver';
 
 const ROOT = process.cwd();
 const SONGS_ROOT = join(ROOT, 'public/data/songs');
@@ -29,7 +30,8 @@ const OUT = join(SONGS_ROOT, 'index.json');
  *  which happened twice in one night — without shipping 15k names. */
 const PER_ENTRY = 6;
 
-const SKIP_EXT = new Set(['.json', '.md', '.txt', '.png', '.jpg', '.jpeg', '.webp', '.html']);
+// `.instr` is a Sonix instrument; no registry entry plays one as a song.
+const SKIP_EXT = new Set(['.json', '.md', '.txt', '.png', '.jpg', '.jpeg', '.webp', '.html', '.instr', '.bak', '.info']);
 const SKIP_DIR = new Set(['.git', 'node_modules']);
 
 /**
@@ -146,7 +148,42 @@ function listingFor(dir: string): string {
   return key;
 }
 
-function addRows(dirLabel: string, dir: string, files: string[], subformat?: string): void {
+/** A file the registry names as a song in its own right (not the catch-all). */
+function isSongByName(name: string): boolean {
+  const det = detectFormat(name.toLowerCase());
+  return !!det && det.key !== 'amiga_formats_catchall';
+}
+
+/**
+ * Drop the files that belong WITH a song in `dir`: the `instruments/*.ss` a
+ * SMUS owns, the `.ins` of an Infogrames `.dum`. Listed as songs they each
+ * "failed to load" and were judged broken formats (ledger F11, F12). The
+ * rule is the resolver's own, run backwards (`companionFilesIn`).
+ */
+const companionsByDir = new Map<string, Set<string>>();
+function companionsIn(dir: string): Set<string> {
+  let set = companionsByDir.get(dir);
+  if (!set) {
+    set = new Set([...companionFilesIn(dirs[listingFor(dir)], isSongByName)].map((c) => c.toLowerCase()));
+    companionsByDir.set(dir, set);
+  }
+  return set;
+}
+/** A module claims companions beside it (`smpl.x`) or one directory down
+ *  (`instruments/Saxophone.ss`), so a file is checked against the listing of
+ *  its own directory and of its parent. */
+function isCompanionFile(f: string): boolean {
+  const own = dirname(f);
+  if (companionsIn(own).has(basename(f).toLowerCase())) return true;
+  const up = dirname(own);
+  return up !== own && companionsIn(up).has(relative(up, f).toLowerCase());
+}
+function withoutCompanions(_dir: string, files: string[]): string[] {
+  return files.filter((f) => !isInSampleDirectory(relative(SONGS_ROOT, f)) && !isCompanionFile(f));
+}
+
+function addRows(dirLabel: string, dir: string, allFiles: string[], subformat?: string): void {
+  const files = withoutCompanions(dir, allFiles);
   if (files.length === 0) return;
   const byFormat = new Map<string | null, string[]>();
   for (const f of files) {
