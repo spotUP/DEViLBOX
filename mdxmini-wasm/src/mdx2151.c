@@ -362,6 +362,27 @@ ym2151_note_on( int track, int n, songdata *data )
   return;
 }
 
+/* DEViLBOX: bit N set = FM track N audible. Masking a track keys it off at
+ * once and makes its later key-ons write key-off; unmasking lets the next
+ * key-on through (the held note stays silent until the MML re-keys). */
+static unsigned int s_track_mask = 0xffu;
+
+void
+mdx2151_set_track_mask(unsigned int mask, songdata *data)
+{
+  __GETSELF(data);
+  unsigned int newly_off = s_track_mask & ~mask & 0xffu;
+  int t;
+
+  s_track_mask = mask & 0xffu;
+  for ( t = 0; t < MDX_MAX_FM_TRACKS; t++ ) {
+    if ( newly_off & (1u << t) ) {
+      self->opm[t].freq_reg[2] = t;       /* key-off state: the next key-on differs and is written */
+      reg_write( 0x08, t, data );
+    }
+  }
+}
+
 void
 ym2151_note_off(int track, songdata *data)
 {
@@ -747,7 +768,8 @@ void freq_write( int track, songdata *data )
 
   if ( o->freq_reg[2] != key+track ) {
     o->freq_reg[2] = key+track;
-    reg_write( 0x08, o->freq_reg[2], data );          /* KEY ON */
+    /* A muted track writes key-off instead (DEViLBOX mixer solo/mute). */
+    reg_write( 0x08, (s_track_mask & (1u << track)) ? o->freq_reg[2] : track, data );  /* KEY ON */
   }
 
   return;

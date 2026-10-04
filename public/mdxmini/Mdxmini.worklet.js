@@ -112,6 +112,13 @@ class MdxminiProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask':
+        // Bit N set = track N audible (0-7 FM, 8-15 PCM); DEViLBOX solo/mute.
+        if (this.module && typeof this.module._mdxmini_wasm_set_mute_mask === 'function') {
+          this.module._mdxmini_wasm_set_mute_mask(data.mask >>> 0);
+        }
+        break;
+
       case 'stop':
         if (this.module && typeof this.module._mdxmini_wasm_stop === 'function') {
           this.module._mdxmini_wasm_stop();

@@ -59,6 +59,7 @@ extern int  pcm8_get_output_channels( songdata * );
 
 extern int  pcm8_set_pcm_freq( int, int, songdata* );
 extern int  pcm8_set_volume( int, int, songdata * );
+extern void pcm8_set_track_mask( unsigned int, songdata * );
 extern int  pcm8_set_pan( int, songdata * );
 
 extern int  pcm8_note_on( int, int *, int, int *, int, songdata * );

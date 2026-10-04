@@ -366,6 +366,14 @@ int pcm8_note_off( int ch, songdata *data ) {
   return 0;
 }
 
+/* DEViLBOX: bit N set = PCM track N (MDX track 8+N) audible. */
+static unsigned int s_pcm_mask = 0xffu;
+
+void pcm8_set_track_mask( unsigned int mask, songdata *data ) {
+  (void)data;
+  s_pcm_mask = mask & 0xffu;
+}
+
 int pcm8_set_volume( int ch, int val, songdata *data ) {
 
   __GETSELF(data);
@@ -487,6 +495,7 @@ static inline void pcm8( short *buffer , int buffer_size, songdata *data )
       while(is_dst_ran_out==0) {
 	while( f>=0 ) {
 	  s = *(src++) * self->work[ch].volume / PCM8_MAX_VOLUME;
+	  if ( !(s_pcm_mask & (1u << ch)) ) { s = 0; }   /* muted PCM track keeps time, makes no sound */
 	  if ( src >= self->work[ch].end_ptr ) {
 	    src--;
 	    is_note_end=1;

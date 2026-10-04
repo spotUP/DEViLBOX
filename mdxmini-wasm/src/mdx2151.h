@@ -21,6 +21,7 @@ extern void ym2151_set_logging( int flag, songdata * );
 extern void ym2151_all_note_off( songdata * );
 extern void ym2151_note_on( int, int, songdata * );
 extern void ym2151_note_off( int, songdata * );
+extern void mdx2151_set_track_mask( unsigned int, songdata * );
 extern void ym2151_set_pan( int, int, songdata * );
 extern void ym2151_set_volume( int, int, songdata * );
 extern void ym2151_set_detune( int, int, songdata * );
