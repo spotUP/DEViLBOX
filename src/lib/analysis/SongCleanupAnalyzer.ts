@@ -64,7 +64,7 @@ function hashSampleData(buffer: ArrayBuffer): string {
  * Scan all patterns → channels → rows and collect every instrument index > 0.
  * Checks all four note columns (instrument, instrument2, instrument3, instrument4).
  */
-function findUsedInstruments(patterns: Pattern[]): Set<number> {
+export function findUsedInstruments(patterns: Pattern[]): Set<number> {
   const used = new Set<number>();
   for (const pattern of patterns) {
     for (const channel of pattern.channels) {

@@ -134,6 +134,13 @@ interface InstrumentStore {
   createInstrument: (config?: DeepPartial<InstrumentConfig>) => number;
   addInstrument: (config: InstrumentConfig) => void;
   deleteInstrument: (id: number) => void;
+  /**
+   * Remove instruments and renumber the rest 1..N in list order. The MusicLine
+   * exporter numbers cells by the instrument's position, so a removed
+   * wavesample must close its gap (ledger F35). Keeps at least one instrument;
+   * the caller remaps the pattern cells first.
+   */
+  removeInstrumentsRenumbered: (ids: number[]) => void;
   cloneInstrument: (id: number) => number;
     resetInstrument: (id: number) => void;
     bakeInstrument: (id: number, bakeType?: 'lite' | 'pro') => Promise<void>;
@@ -1258,6 +1265,27 @@ export const useInstrumentStore = create<InstrumentStore>()(
             state.currentInstrumentId = state.instruments[0].id;
           }
         }
+      });
+      triggerWasmReexport();
+    },
+
+    removeInstrumentsRenumbered: (ids) => {
+      const drop = new Set(ids);
+      set((state) => {
+        if (drop.size === 0 || drop.size >= state.instruments.length) return;
+        for (const inst of state.instruments) if (drop.has(inst.id)) revokeInstrumentSampleUrls(inst.sample);
+        const kept = state.instruments.filter((inst) => !drop.has(inst.id));
+        const oldCurrent = state.currentInstrumentId;
+        let current: number | null = null;
+        kept.forEach((inst, i) => {
+          if (inst.id === oldCurrent) current = i + 1;
+          inst.id = i + 1;
+          // The live MusicLine module is rebuilt from this list on re-export,
+          // so the chip-RAM instrument slot follows the new position.
+          if (inst.metadata?.mlInstIdx !== undefined) inst.metadata.mlInstIdx = i;
+        });
+        state.instruments = kept;
+        state.currentInstrumentId = current ?? kept[0].id;
       });
       triggerWasmReexport();
     },

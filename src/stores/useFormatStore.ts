@@ -30,6 +30,11 @@ import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
 import { applySunNoteEdit, reprojectSunGrid } from '../lib/import/formats/sunReproject';
 import { getTrackerStoreRef } from './storeAccess';
+import { useInstrumentStore } from './useInstrumentStore';
+import type { Pattern } from '@/types/tracker';
+import type { InstrumentConfig } from '@/types/instrument';
+import { applyWavesampleIdMap, planUnusedWavesampleRemoval, planEqualWavesampleMerge, type WavesampleCleanupPlan } from '@/engine/musicline/wavesampleCleanup';
+import { musicLineInstrumentBytes } from '@/lib/export/MusicLineExporter';
 // Type-only — erased at build time, no runtime cycle. Mirrors useCursorStore.ts
 // pattern so getState() can be cast without `any`.
 import type { useTrackerStore as _TrackerStoreType } from './useTrackerStore';
@@ -109,6 +114,7 @@ interface FormatStore {
   dssFileData: ArrayBuffer | null;
   soundFactoryFileData: ArrayBuffer | null;
   faceTheMusicFileData: ArrayBuffer | null;  sd2FileData: ArrayBuffer | null;
+  ayFileData: ArrayBuffer | null;
   symphonieFileData: ArrayBuffer | null;
   sawteethFileData: ArrayBuffer | null;
   v2mFileData: ArrayBuffer | null;
@@ -233,6 +239,10 @@ interface FormatStore {
   deleteMusicLineTrackEntryAllChannels: (position: number) => void;
   /** Remove patterns not referenced by any channel track table. Returns count of removed patterns. */
   removeUnusedMusicLineParts: () => number;
+  /** Remove instruments no cell references and renumber the rest; returns how many went (F35). */
+  removeUnusedMusicLineWavesamples: () => number;
+  /** Merge instruments whose exported INST and PCM bytes are equal; returns how many went (F35). */
+  mergeEqualMusicLineWavesamples: () => number;
   /** Toggle MusicLine keyboard mode between mono and poly */
   toggleMusicLineKeyboardMode: () => void;
   /** Update MusicLine metadata field */
@@ -403,6 +413,23 @@ export type MaxTraxSampleMutation =
   | { kind: 'addEnvPoint'; side: 'attack' | 'release'; duration: number; volume: number }
   | { kind: 'removeEnvPoint'; side: 'attack' | 'release'; pointIndex: number };
 
+/**
+ * MusicLine wavesample cleanup ("Remove Unused Wavesamples", "Merge Equal
+ * Wavesamples"): remap the cells to the plan's new numbers, then remove the
+ * instruments and renumber the rest. The debounced re-export rebuilds the
+ * live module from the stores, as the other MusicLine edits do.
+ * Returns how many wavesamples went.
+ */
+function applyWavesamplePlan(plan: (patterns: Pattern[], instruments: InstrumentConfig[]) => WavesampleCleanupPlan): number {
+  const trackerStore = getTrackerStoreRef();
+  const trackerState = trackerStore.getState() as ReturnType<typeof _TrackerStoreType.getState>;
+  const { removeIds, idMap } = plan(trackerState.patterns, useInstrumentStore.getState().instruments);
+  if (removeIds.length === 0) return 0;
+  trackerStore.setState((draft: { patterns: Pattern[] }) => { applyWavesampleIdMap(draft.patterns, idMap); });
+  useInstrumentStore.getState().removeInstrumentsRenumbered(removeIds);
+  return removeIds.length;
+}
+
 export const useFormatStore = create<FormatStore>()(
   immer((set, get) => ({
     editorMode: 'classic' as EditorMode,
@@ -460,6 +487,7 @@ export const useFormatStore = create<FormatStore>()(
     futureComposerFileData: null,
     inStereo2FileData: null,
     quadraComposerFileData: null,    sd2FileData: null,
+    ayFileData: null,
     ronKlarenFileData: null,
     actionamicsFileData: null,
     activisionProFileData: null,
@@ -939,6 +967,8 @@ export const useFormatStore = create<FormatStore>()(
 
       return unused.length;
     },
+    removeUnusedMusicLineWavesamples: () => applyWavesamplePlan(planUnusedWavesampleRemoval),
+    mergeEqualMusicLineWavesamples: () => applyWavesamplePlan((_patterns, instruments) => planEqualWavesampleMerge(instruments, musicLineInstrumentBytes)),
     toggleMusicLineKeyboardMode: () => set((state) => {
       state.musiclineKeyboardMode = state.musiclineKeyboardMode === 'mono' ? 'poly' : 'mono';
     }),
@@ -1012,6 +1042,7 @@ export const useFormatStore = create<FormatStore>()(
         state.futureComposerFileData = (song as any).futureComposerFileData ?? null;
         state.inStereo2FileData = (song as any).inStereo2FileData ?? null;
         state.quadraComposerFileData = (song as any).quadraComposerFileData ?? null;        state.sd2FileData = (song as any).sd2FileData ?? null;
+        state.ayFileData = (song as any).ayFileData ?? null;
         state.ronKlarenFileData = (song as any).ronKlarenFileData ?? null;
         state.actionamicsFileData = (song as any).actionamicsFileData ?? null;
         state.activisionProFileData = (song as any).activisionProFileData ?? null;
@@ -1322,6 +1353,7 @@ export const useFormatStore = create<FormatStore>()(
       state.futureComposerFileData = null;
       state.inStereo2FileData = null;
       state.quadraComposerFileData = null;      state.sd2FileData = null;
+      state.ayFileData = null;
       state.ronKlarenFileData = null;
       state.actionamicsFileData = null;
       state.activisionProFileData = null;
