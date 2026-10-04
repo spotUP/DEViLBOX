@@ -15,6 +15,8 @@
  * testable without instantiating an engine.
  */
 
+import { resolveRegistryEngineClasses, type RegistryDescriptorLike } from '@/lib/engines/registryEngines';
+
 export interface MuteCapableClass {
   hasInstance?: () => boolean;
   getInstance?: () => unknown;
@@ -41,11 +43,7 @@ export function muteRegistrationFor(key: string, Engine: MuteCapableClass | null
 }
 
 /** Descriptor shape this module reads - the registry's, narrowed. */
-export interface MuteDescriptorLike {
-  key: string;
-  staticRef?: unknown;
-  dynamicResolver?: () => Promise<unknown>;
-}
+export type MuteDescriptorLike = RegistryDescriptorLike;
 
 /**
  * Resolve every descriptor's class and keep the ones that can mute. A
@@ -54,12 +52,8 @@ export interface MuteDescriptorLike {
  */
 export async function collectMuteRegistrations(descriptors: readonly MuteDescriptorLike[]): Promise<MuteRegistration[]> {
   const out: MuteRegistration[] = [];
-  for (const d of descriptors) {
-    let Engine: unknown = d.staticRef ?? null;
-    if (!Engine && d.dynamicResolver) {
-      try { Engine = await d.dynamicResolver(); } catch { continue; }
-    }
-    const reg = muteRegistrationFor(d.key, Engine as MuteCapableClass | null);
+  for (const { key, Engine } of await resolveRegistryEngineClasses(descriptors)) {
+    const reg = muteRegistrationFor(key, Engine as MuteCapableClass);
     if (reg) out.push(reg);
   }
   return out;
