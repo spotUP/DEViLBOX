@@ -56,6 +56,7 @@ import type {
 } from '@engine/renderer/worker-types';
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
+import { formatChannelLayout } from './formatChannelLayout';
 import { toColumnSpec, formatChannelsToSnapshot } from '@/components/shared/format-editor-types';
 import { transposeFormatNote } from './formatTranspose';
 import { TrackerCanvas2DRenderer } from '@engine/renderer/TrackerCanvas2DRenderer';
@@ -374,27 +375,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const globalLaneOffset = globalLaneVisible ? GLOBAL_LANE_W : 0;
     // FORMAT MODE: compute widths from column definitions (per-channel columns supported)
     if (isFormatMode && formatColumns && formatChannels) {
-      const FORMAT_COL_GAP  = mobileCanvas ? Math.round(4 * MOBILE_SCALE) : 4;
-      const FORMAT_CHAN_PAD = mobileCanvas ? Math.round(40 * MOBILE_SCALE) : 40;
-      const widths: number[] = [];
-      const offsets: number[] = [];
-      let currentX = LNW + globalLaneOffset;
-      for (let i = 0; i < formatChannels.length; i++) {
-        const cols = formatChannels[i].columns ?? formatColumns;
-        const contentWidth = cols.reduce(
-          (sum, col) => sum + col.charWidth * CW + FORMAT_COL_GAP, 0
-        ) - FORMAT_COL_GAP;
-        const chanW = contentWidth + FORMAT_CHAN_PAD;
-        offsets.push(currentX);
-        widths.push(chanW);
-        currentX += chanW;
-      }
-      return {
-        numChannels: formatChannels.length,
-        channelOffsets: offsets,
-        channelWidths: widths,
-        totalChannelsWidth: currentX,
-      };
+      return formatChannelLayout({
+        formatChannels,
+        formatColumns,
+        charWidth: CW,
+        leftEdge: LNW + globalLaneOffset,
+        columnGap: mobileCanvas ? Math.round(4 * MOBILE_SCALE) : 4,
+        channelPad: mobileCanvas ? Math.round(40 * MOBILE_SCALE) : 40,
+        availableWidth: dimensions.width,
+      });
     }
 
     if (!pattern) return {
@@ -454,7 +443,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelWidths: widths,
       totalChannelsWidth: currentX - LNW
     };
-  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible]);
+  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width]);
 
   // Center channels horizontally when in fullscreen and channels don't fill the viewport
   const editorFullscreen = useUIStore(s => s.editorFullscreen);
