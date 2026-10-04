@@ -1097,6 +1097,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         maxSubsong,
         subsongCount,
         scanData,
+        scanStats: this._lastScanStats ?? null,
       };
 
       // Include enhanced scan extras if available
@@ -1163,7 +1164,9 @@ class UADEProcessor extends AudioWorkletProcessor {
     // WASM speed is minutes of a stalled load and dead audio — reported as
     // "7V does not work" (2026-09-22). Rendered seconds budget the editor
     // grid; wall-clock budgets what the listener feels.
-    const deadline = performance.now() + SCAN_WALL_MS;
+    const scanStartedAt = performance.now();
+    const deadline = scanStartedAt + SCAN_WALL_MS;
+    let stoppedBy = 'end';
 
     // Ensure channel snapshot buffer exists
     if (this._channelBuf === undefined) {
@@ -1184,7 +1187,7 @@ class UADEProcessor extends AudioWorkletProcessor {
 
     while (rows.length < MAX_ROWS && totalFrames < maxFrames && performance.now() < deadline) {
       const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
-      if (ret <= 0) break;
+      if (ret <= 0) { stoppedBy = 'end'; break; }
       totalFrames += ret;
       frameSinceRow += ret;
 
@@ -1220,7 +1223,25 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._wasm._free(tmpL);
     this._wasm._free(tmpR);
 
+    // Why the scan stopped - the grid's size depends on it (ledger F7).
+    if (stoppedBy !== 'end') {
+      stoppedBy = rows.length >= MAX_ROWS ? 'rows' : totalFrames >= maxFrames ? 'seconds' : 'deadline';
+    }
+    this._lastScanStats = this._scanStats('basic', rows.length, totalFrames, scanStartedAt, stoppedBy);
     return rows;
+  }
+
+  /** Scan statistics for the main thread: how much was scanned and what ended it. */
+  _scanStats(mode, rowCount, totalFrames, startedAt, stoppedBy) {
+    const sr = sampleRate || 44100;
+    return {
+      mode,
+      rows: rowCount,
+      renderedSec: Math.round(totalFrames / sr * 10) / 10,
+      wallMs: Math.round(performance.now() - startedAt),
+      wallLimitMs: SCAN_WALL_MS,
+      stoppedBy, // 'end' | 'rows' | 'seconds' | 'deadline' | 'loop'
+    };
   }
 
   /**
@@ -1250,7 +1271,9 @@ class UADEProcessor extends AudioWorkletProcessor {
     // WASM speed is minutes of a stalled load and dead audio — reported as
     // "7V does not work" (2026-09-22). Rendered seconds budget the editor
     // grid; wall-clock budgets what the listener feels.
-    const deadline = performance.now() + SCAN_WALL_MS;
+    const scanStartedAt = performance.now();
+    const deadline = scanStartedAt + SCAN_WALL_MS;
+    let stoppedBy = 'budget';
     const MAX_ROWS = 64 * 256;
 
     // Allocate WASM buffers
@@ -1282,7 +1305,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     // Phase 1: Capture per-tick snapshots at high resolution
     while (tickSnapshots.length < MAX_ROWS * 20 && totalFrames < maxFrames && performance.now() < deadline) {
       const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
-      if (ret <= 0) break;
+      if (ret <= 0) { stoppedBy = 'end'; break; }
       totalFrames += CHUNK;
 
       // Read extended channel state
@@ -1617,6 +1640,7 @@ class UADEProcessor extends AudioWorkletProcessor {
           const _windowKey = _fpHistory.slice(-LOOP_WINDOW).join('\n');
           if (_fpHistory.length > LOOP_MIN_ROWS && _seenWindows.has(_windowKey)) {
             // Detected a loop: this exact sequence of rows was seen before — stop scanning
+            stoppedBy = 'loop';
             break;
           }
           // Register the window ending one row earlier to avoid same-position false positives
@@ -1644,6 +1668,10 @@ class UADEProcessor extends AudioWorkletProcessor {
       };
     }
 
+    if (stoppedBy === 'budget') {
+      stoppedBy = tickSnapshots.length >= MAX_ROWS * 20 ? 'rows' : totalFrames >= maxFrames ? 'seconds' : 'deadline';
+    }
+    this._lastScanStats = this._scanStats('enhanced', rows.length, totalFrames, scanStartedAt, stoppedBy);
     return {
       rows, // Enhanced rows compatible with basic scan format
       samples,

@@ -107,6 +107,17 @@ export interface UADEMetadata {
   scanData?: UADEScanRow[][];            // Pre-scanned pattern data: rows of 4 channels
   enhancedScan?: UADEEnhancedScanData;   // Enhanced scan data with samples + effects
   shortScanTicks?: UADETickSnapshot[];   // Tick snapshots from short scan (compiled replayers)
+  scanStats?: UADEScanStats;             // How much the scan rendered and what ended it
+}
+
+/** What the grid scan did, reported by the worklet (ledger F7). */
+export interface UADEScanStats {
+  mode: 'basic' | 'enhanced';
+  rows: number;
+  renderedSec: number;
+  wallMs: number;
+  wallLimitMs: number;
+  stoppedBy: 'end' | 'rows' | 'seconds' | 'deadline' | 'loop';
 }
 
 export interface UADEPositionUpdate {
@@ -129,6 +140,8 @@ type PositionCallback = (update: UADEPositionUpdate) => void;
 type ChannelCallback = (channels: UADEChannelData[], totalFrames: number) => void;
 
 export class UADEEngine extends WASMSingletonBase implements IsolationCapableEngine {
+  /** The last scan's statistics, for get_format_state (ledger F7). */
+  lastScanStats: UADEScanStats | null = null;
   private static readonly MAX_ISOLATION_SLOTS = 4;
   /** Per-channel dub-send outputs. UADE has 4 Paula channels — the worklet
    * exposes 32 dub slots for consistency with the other isolation engines
@@ -290,6 +303,10 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
             // Include tick snapshots from short scan (captured before WASM reinit)
             if (data.shortScanTicks) {
               meta.shortScanTicks = data.shortScanTicks;
+            }
+            if (data.scanStats) {
+              meta.scanStats = data.scanStats;
+              this.lastScanStats = data.scanStats;
             }
             this._resolveLoad(meta);
             this._resolveLoad = null;

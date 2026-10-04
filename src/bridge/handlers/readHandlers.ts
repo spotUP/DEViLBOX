@@ -31,6 +31,7 @@ import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
 import { getTrackerReplayer } from '../../engine/TrackerReplayer';
+import { UADEEngine } from '../../engine/uade/UADEEngine';
 import { playingEngineFromStores } from '../../engine/replayer/NativeEngineRouting';
 import { getToneEngine } from '../../engine/ToneEngine';
 import * as Tone from 'tone';
@@ -1529,6 +1530,9 @@ export function getFormatState(): Record<string, unknown> {
     // What the resolver found is otherwise invisible from outside; a two-file
     // format that fails needs this to say whether the samples arrived.
     uadeCompanionNames: format.uadeCompanionFiles ? Array.from(format.uadeCompanionFiles.keys()) : [],
+    // What the UADE grid scan did for the loaded song: rows, rendered
+    // seconds, wall time and what stopped it (ledger F7).
+    uadeScanStats: UADEEngine.hasInstance() ? UADEEngine.getInstance().lastScanStats : null,
     // Which WASM engine file data is loaded
     loadedWasmEngines: [
       format.hivelyFileData && 'hively',
