@@ -31,7 +31,7 @@ target_compile_options(Mdxmini PRIVATE
     -DUSE_MAME_TIMER=0
 )
 
-set(EXPORTED_FUNCS "_malloc,_free,_mdxmini_wasm_init,_mdxmini_wasm_load,_mdxmini_wasm_load_pdx,_mdxmini_wasm_render,_mdxmini_wasm_get_length,_mdxmini_wasm_get_tracks,_mdxmini_wasm_get_title,_mdxmini_wasm_stop,_mdxmini_wasm_set_max_loop")
+set(EXPORTED_FUNCS "_malloc,_free,_mdxmini_wasm_init,_mdxmini_wasm_load,_mdxmini_wasm_load_pdx,_mdxmini_wasm_render,_mdxmini_wasm_get_length,_mdxmini_wasm_get_tracks,_mdxmini_wasm_get_title,_mdxmini_wasm_stop,_mdxmini_wasm_set_max_loop,_mdxmini_wasm_set_mute_mask")
 
 target_link_options(Mdxmini PRIVATE
     "SHELL:-s MODULARIZE=1"

@@ -12,10 +12,13 @@
 #include "mdxmini.h"
 #include "mdx.h"
 #include "class.h"
+#include "mdx2151.h"
+#include "pcm8.h"
 
 static t_mdxmini g_mdx;
 static int g_initialized = 0;
 static int g_loaded = 0;
+static unsigned int g_mute_mask = 0xffffu; /* bit = track audible */
 static int g_sample_rate = 44100;
 
 /* Temporary buffer for S16 rendering */
@@ -73,7 +76,10 @@ int mdxmini_wasm_load(unsigned char *data, int len) {
     mdx->is_use_fm        = FLAG_TRUE;
     mdx->is_use_opl3      = FLAG_TRUE;
     mdx->is_use_ym2151    = FLAG_TRUE;
-    mdx->is_use_fm_voice  = FLAG_FALSE;
+    /* pcm8() runs the YM2151 emulator only while is_use_fm_voice is set;
+     * FLAG_FALSE here rendered every MDX silent since the port (2026-04-13):
+     * the sequencer ran, no FM voice was ever mixed (ledger F32). */
+    mdx->is_use_fm_voice  = FLAG_TRUE;
     mdx->fm_wave_form     = 0;
     mdx->master_volume    = 127;
     mdx->fm_volume        = 127;
@@ -112,7 +118,21 @@ int mdxmini_wasm_load(unsigned char *data, int len) {
     g_mdx.nlg_tempo = -1;
 
     g_loaded = 1;
+    /* The mixer's mask outlives a load: a channel muted before the song
+     * changed stays muted (DEViLBOX solo/mute, ledger F25). */
+    mdx2151_set_track_mask(g_mute_mask & 0xffu, g_mdx.songdata);
+    pcm8_set_track_mask((g_mute_mask >> 8) & 0xffu, g_mdx.songdata);
     return 0;
+}
+
+/* Bit N set = MDX track N audible: tracks 0-7 are the YM2151 FM tracks,
+ * 8-15 the PCM8 tracks, in the order the grid shows them. */
+EMSCRIPTEN_KEEPALIVE
+void mdxmini_wasm_set_mute_mask(unsigned int mask) {
+    g_mute_mask = mask;
+    if (!g_loaded || !g_mdx.self) return;
+    mdx2151_set_track_mask(mask & 0xffu, g_mdx.songdata);
+    pcm8_set_track_mask((mask >> 8) & 0xffu, g_mdx.songdata);
 }
 
 EMSCRIPTEN_KEEPALIVE

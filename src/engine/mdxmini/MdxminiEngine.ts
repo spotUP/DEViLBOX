@@ -98,6 +98,11 @@ export class MdxminiEngine extends WASMSingletonBase {
   }
 
   play(): void { /* MDX starts playing immediately on load */ }
+
+  /** Bit N set = track N audible (0-7 FM, 8-15 PCM) - the mixer's solo/mute (ledger F25). */
+  setMuteMask(mask: number): void {
+    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+  }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
 
