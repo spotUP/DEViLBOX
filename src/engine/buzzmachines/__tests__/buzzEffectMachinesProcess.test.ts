@@ -30,14 +30,17 @@ const EFFECTS: [string, string][] = [
 describe('Buzz effect machines', () => {
   for (const [type, file] of EFFECTS) {
     it(`${type} initialises, finishes 400 blocks, and passes audio`, () => {
-      const r = spawnSync(process.execPath, [RUNNER, type, file, 'both'], { timeout: 8000, encoding: 'utf8' });
-      expect(r.signal, `${type} hung (killed after 8 s)`).toBeNull();
+      // A hang is infinite; 30 s tells it apart as well as 8 s did, and the
+      // full pre-push gate on a loaded machine stretched a 0.6 s init past
+      // 8 s twice (GeonikCompressor, DedaCodeStereoGain, 2026-10-04).
+      const r = spawnSync(process.execPath, [RUNNER, type, file, 'both'], { timeout: 30000, encoding: 'utf8' });
+      expect(r.signal, `${type} hung (killed after 30 s)`).toBeNull();
       const line = r.stdout.split('\n').reverse().find((l) => l.startsWith('{'));
       expect(line, r.stderr.slice(-400)).toBeTruthy();
       const res = JSON.parse(line!);
       expect(res.msgs).toEqual(['initialized']);
       expect(res.outRms).toBeGreaterThan(0.005);
-    }, 15000);
+    }, 40000);
   }
 
   it('Jeskola Freeverb at its defaults stays within 3 dB of the input (its LowCut 0 integrated sub-bass)', () => {
