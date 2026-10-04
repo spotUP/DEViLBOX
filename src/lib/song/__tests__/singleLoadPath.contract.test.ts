@@ -56,6 +56,11 @@ const ALLOWED: Record<string, string> = {
   'lib/file/UnifiedFileLoader.ts': 'partial: TD-3 pattern import (replace/append), DB303 pattern append, GoatTracker editor mode (its engine holds the song)',
 };
 
+// Each case walks every source file with synchronous reads: 1-2 s alone on a
+// quiet machine, 20 s with the dev stack and a vitest gate competing for the
+// disk (2026-10-04, three pushes blocked). Time is not what the contract tests.
+const SCAN_TIMEOUT = 60_000;
+
 describe('single load path (contract)', () => {
   it('only applySong and the named partial updates call the song-replacing setters', () => {
     const offenders: string[] = [];
@@ -66,7 +71,7 @@ describe('single load path (contract)', () => {
       if (n > 0) offenders.push(`${rel} (${n}) - route the song through applySong, or name the partial update in ALLOWED`);
     }
     expect(offenders).toEqual([]);
-  });
+  }, SCAN_TIMEOUT);
 
   it('the loader keeps its partial updates to the three it names', () => {
     // Guards the loader itself, which hosts most song loads.
@@ -88,5 +93,5 @@ describe('single save path (contract)', () => {
       if (calls(file, SERIALIZE) > 0) offenders.push(rel);
     }
     expect(offenders).toEqual([]);
-  });
+  }, SCAN_TIMEOUT);
 });
