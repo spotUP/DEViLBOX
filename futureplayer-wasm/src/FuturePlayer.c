@@ -1194,7 +1194,10 @@ tick:
         update_audio(voice_data[i]);
     }
 
-    /* Per-tick debug: print period + volume for all channels */
+    /* Per-tick trace: period + volume for all channels. Compile with
+     * -DFP_TRACE; unconditional, it wrote 200 lines to the browser console
+     * on every load (ledger F18). */
+#ifdef FP_TRACE
     if (play_tick < 200) {
         fprintf(stderr, "T%03d", play_tick);
         for (int i = 0; i < 4; i++) {
@@ -1205,6 +1208,7 @@ tick:
         }
         fprintf(stderr, "\n");
     }
+#endif
     play_tick++;
 }
 
@@ -1346,8 +1350,10 @@ void fp_set_subsong(int subsong) {
     uint32_t song_data = RD32(entry);
     uint16_t speed_val = RD16(entry + 4);
 
+#ifdef FP_TRACE
     fprintf(stderr, "[FP] set_subsong(%d): entry=0x%X, song_data=0x%X, speed_val=0x%04X, mod_size=%u\n",
             subsong, entry, song_data, speed_val, mod_size);
+#endif
 
     /* Speed comes from song_data+0x18, NOT from the subsong entry.
      * The ASM (lbC0032F0) reads: MOVE.B $18(A2),D0; ANDI.B #7,D0
@@ -1357,15 +1363,21 @@ void fp_set_subsong(int subsong) {
     tick_speed = spd;
     tick_counter = 1;
 
+#ifdef FP_TRACE
     fprintf(stderr, "[FP] tick_speed=%d\n", tick_speed);
+#endif
 
     /* Set up each voice's sequence pointer from the song data */
     for (int i = 0; i < 4; i++) {
         uint32_t voice_seq_ptr = RD32(song_data + 8 + i * 4);
-        fprintf(stderr, "[FP] voice %d: seq_block_ptr=0x%X", i, voice_seq_ptr);
+#ifdef FP_TRACE
+        fprintf(stderr, "[FP] voice %d: seq_block_ptr=0x%X\n", i, voice_seq_ptr);
+#endif
         if (voice_seq_ptr != 0) {
             uint32_t seq_data = RD32(voice_seq_ptr + 8);
-            fprintf(stderr, " -> seq_data=0x%X", seq_data);
+#ifdef FP_TRACE
+            fprintf(stderr, "[FP]   voice %d seq_data=0x%X\n", i, seq_data);
+#endif
             SET_L(voice_data[i], VS_SEQ_POS, seq_data);
             SET_L(voice_data[i], VS_STACK_BASE, seq_data);
             SET_W(voice_data[i], VS_STACK_DEPTH, 0);
