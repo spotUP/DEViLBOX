@@ -9,6 +9,7 @@
  * C64 SID is instance-based (not singleton) and handled separately.
  */
 
+import { FILE_DATA_FIELDS } from '@/engine/formatFileDataFields';
 import * as Tone from 'tone';
 import type { TrackerSong, TrackerFormat } from '../TrackerReplayer';
 import { getToneEngine } from '../ToneEngine';
@@ -919,6 +920,20 @@ function tryResolveSync(desc: NativeEngineDescriptor): WASMSingletonStatic | nul
   return desc.staticRef ?? null;
 }
 
+/**
+ * Is the mixer muting or soloing anything right now? Silence under a mute
+ * or a solo is the mixer's doing, not the song's end; the silence detector
+ * asks before it stops an engine. Resolved lazily: the mixer store imports
+ * this module.
+ */
+let _mixerStore: { getState(): { channels: Array<{ muted: boolean; soloed: boolean }>; isSoloing: boolean } } | null = null;
+void import('@/stores/useMixerStore').then((m) => { _mixerStore = m.useMixerStore; }).catch(() => {});
+export function mixerSilencesAChannel(): boolean {
+  const st = _mixerStore?.getState();
+  if (!st) return false;
+  return st.channels.some((c) => (st.isSoloing ? !c.soloed : c.muted));
+}
+
 export function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolean {
   const fileData = song[desc.fileDataKey];
   if (!fileData) return false;
@@ -940,6 +955,22 @@ export function playingEngineFor(song: Pick<TrackerSong, 'format' | 'instruments
   if (desc) return desc.key;
   if (song.instruments?.some((inst) => inst.synthType === 'UADESynth')) return 'UADE classic';
   return 'tracker';
+}
+
+/**
+ * `playingEngineFor` over what the stores hold for the LOADED song. The
+ * replayer's `getSong()` lags a load: read right after `load_file` it still
+ * held the previous song, and the bridge named the previous song's engine
+ * (`Hippel` for a UADE-played .gray, `UADEEditable` for a Fred song,
+ * 2026-10-04). The format store takes the file data at apply time.
+ */
+export function playingEngineFromStores(
+  format: Record<string, unknown> & { originalModuleData?: { format?: string } | null },
+  instruments: ReadonlyArray<{ synthType?: string }>,
+): string {
+  const songLike: Record<string, unknown> = { format: format.originalModuleData?.format ?? 'MOD', instruments };
+  for (const field of FILE_DATA_FIELDS) if (format[field]) songLike[field] = format[field];
+  return playingEngineFor(songLike as unknown as TrackerSong);
 }
 
 function registerWholeMixDubSend(key: string, source: AudioNode | null | undefined): void {
@@ -1262,7 +1293,7 @@ export async function startNativeEngines(
           detector.start(instance.output, instance.output, () => {
             console.log(`[NativeEngineRouting] ${desc.key} silence detected — stopping`);
             void endNativeSong(instance);
-          });
+          }, mixerSilencesAChannel);
           activeSilenceDetectors.set(desc.synthType, detector);
         }
       } else {

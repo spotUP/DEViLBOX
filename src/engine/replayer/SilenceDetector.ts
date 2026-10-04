@@ -22,6 +22,7 @@ export class SilenceDetector {
   private triggered = false;
   private hasSeenAudio = false;
   private onSilence: (() => void) | null = null;
+  private isSilencedUpstream: (() => boolean) | null = null;
   private gainNode: GainNode | null = null;
   private sampleRate: number;
 
@@ -36,10 +37,17 @@ export class SilenceDetector {
    * Start monitoring. Connect source → analyser (tapped, not interrupting).
    * When silence detected, fade out gainNode and call onSilence.
    */
-  start(source: AudioNode, gainNode: GainNode, onSilence: () => void): void {
+  /**
+   * `isSilencedUpstream`: true while something before this tap makes the
+   * silence - the mixer muting every channel, a solo on a resting voice.
+   * That is not the song ending: a mute-all stopped `fireworks ii.fred`
+   * (`silence detected - stopping`, unmute stayed at 0; 2026-10-04).
+   */
+  start(source: AudioNode, gainNode: GainNode, onSilence: () => void, isSilencedUpstream?: () => boolean): void {
     this.stop();
     this.gainNode = gainNode;
     this.onSilence = onSilence;
+    this.isSilencedUpstream = isSilencedUpstream ?? null;
     this.silentSamples = 0;
     this.triggered = false;
     this.hasSeenAudio = false;
@@ -87,6 +95,7 @@ export class SilenceDetector {
       // state can be 'running' yet output muted until a user gesture) — stopping there
       // would kill the engine before it's audible, and it never recovers.
       if (!this.hasSeenAudio) return;
+      if (this.isSilencedUpstream?.()) { this.silentSamples = 0; return; }
       this.silentSamples += (POLL_INTERVAL_MS / 1000) * this.sampleRate;
       const silentSeconds = this.silentSamples / this.sampleRate;
 

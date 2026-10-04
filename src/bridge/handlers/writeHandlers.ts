@@ -1704,13 +1704,11 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     // `format` is the registry entry's label; `engine` is what plays the
     // song, by the router's own rule. The two differ for every format whose
     // native parser hands playback to a WASM decoder or to UADE.
-    const { playingEngineFor } = await import('../../engine/replayer/NativeEngineRouting');
-    const { getTrackerReplayer } = await import('../../engine/TrackerReplayer');
-    const loadedSong = getTrackerReplayer().getSong();
+    const { playingEngineFromStores } = await import('../../engine/replayer/NativeEngineRouting');
     return {
       ok: true,
       format: format?.label || 'Unknown',
-      engine: loadedSong ? playingEngineFor(loadedSong) : null,
+      engine: playingEngineFromStores(formatState as unknown as Record<string, unknown>, instrumentState.instruments),
       editorMode: formatState.editorMode,
       channels: trackerState.patterns[0]?.channels?.length || 0,
       patterns: trackerState.patterns.length,
