@@ -11,6 +11,7 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { computeGenreBaseline } from '@engine/dub/AutoEQ';
 import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { autoEqStatus as computeAutoEqStatus } from '@/lib/dub/autoEqStatus';
 import { GENRE_PRESET_NAMES, GENRE_PRESET_ENERGY, GENRE_PRESET_DANCEABILITY, genreOfParams } from '@/lib/dub/genrePresetMatch';
 
 interface BandState {
@@ -160,25 +161,13 @@ export const Fil4EqPanel: React.FC<Props> = ({ effect }) => {
    */
   const analysisState = useTrackerAnalysisStore((s) => s.analysisState);
   const analysisError = useTrackerAnalysisStore((s) => s.error);
-  const autoEqStatus = (() => {
-    const genre = dubBus?.autoEqLastGenre;
-    const pct = Math.round((dubBus?.autoEqStrength ?? 0.85) * 100);
-    if (genre) return { text: `${genre} · ${pct}%`, title: `Genre baseline from the last analysis, at ${pct}% strength` };
-    switch (analysisState) {
-      case 'capturing':
-        return { text: 'capturing…', title: 'Recording audio to analyse' };
-      case 'analyzing':
-        return { text: 'analyzing…', title: 'Classifying the captured audio' };
-      case 'error':
-        return { text: 'analysis failed', title: analysisError ?? 'The analysis did not complete' };
-      default:
-        return {
-          text: 'no analysis',
-          title: 'No genre baseline yet — run the song analysis to get one. '
-            + 'The live improv EQ works without it.',
-        };
-    }
-  })();
+  const autoEqStatus = computeAutoEqStatus({
+    genre: dubBus?.autoEqLastGenre ?? '',
+    strength: dubBus?.autoEqStrength ?? 0.85,
+    analysisState,
+    error: analysisError,
+    busEnabled: !!dubBus?.enabled,
+  });
 
   // Auto-enable a band when any value (freq/gain/q/bw) is changed while it
   // is disabled, UNLESS the patch is itself toggling the enabled flag.

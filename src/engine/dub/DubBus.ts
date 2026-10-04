@@ -2933,12 +2933,12 @@ export class DubBus {
     this._autoEQUnsub = useTrackerAnalysisStore.subscribe(
       (s) => s.analysisState,
       (analysisState) => {
-        if (analysisState === 'ready' && !this._disposed) {
-          const state = useTrackerAnalysisStore.getState();
-          if (state.currentAnalysis && this.settings.enabled) {
-            void this._applyAutoEQ(state.currentAnalysis);
-          }
+        if (this._disposed) return;
+        // A new song's capture starts: the genre shown belongs to the old one.
+        if (analysisState === 'capturing' && this.settings.autoEqLastGenre) {
+          this.settings = { ...this.settings, autoEqLastGenre: '' };
         }
+        if (analysisState === 'ready') this._applyReadyAnalysis();
       }
     );
   }
@@ -4406,6 +4406,8 @@ export class DubBus {
       // how a siren survived the bus being switched off.
       if (!settings.enabled) this.silenceGeneratedSynths();
       this.enabled = settings.enabled;
+      // A song analysed while the bus was off gets its auto EQ now.
+      if (settings.enabled) this._applyReadyAnalysis();
       // The master insert follows the bus, and only the bus. Re-derived here
       // rather than by whichever view happens to be mounted — see
       // `registerMasterInsertPoint` for why that ownership moved.
@@ -8536,6 +8538,25 @@ export class DubBus {
       this.wobbleHandles.delete(handle);
       try { this.echo.setRate(baseline); } catch { /* ok */ }
     };
+  }
+
+  /** The analysis store's file hash the auto EQ was last applied for. */
+  private _autoEqAppliedFor: string | null = null;
+
+  /**
+   * Apply the finished analysis, if it is one this bus has not applied yet.
+   * Called on the store's transition to `ready` AND when the bus is enabled:
+   * the subscription alone fired only on the transition, so an analysis that
+   * finished while the bus was off was never applied, and the EQ tab kept
+   * saying "no analysis" for a song whose analysis was ready (ledger L25).
+   */
+  private _applyReadyAnalysis(): void {
+    if (!this.settings.enabled) return;
+    const st = useTrackerAnalysisStore.getState();
+    if (st.analysisState !== 'ready' || !st.currentAnalysis) return;
+    if (st.currentFileHash && st.currentFileHash === this._autoEqAppliedFor) return;
+    this._autoEqAppliedFor = st.currentFileHash;
+    void this._applyAutoEQ(st.currentAnalysis);
   }
 
   private async _applyAutoEQ(
