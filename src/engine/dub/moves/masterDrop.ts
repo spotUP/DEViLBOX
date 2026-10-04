@@ -7,7 +7,7 @@
  * directly to `ctx.destination`:
  *   - Tone.js instruments → masterInput → masterEffectsInput → destination
  *   - Synths (DevilboxSynth) → synthBus → masterEffectsInput → destination
- *   - WASM replayers (LibOpenMPT / Hively / UADE / Furnace / …) →
+ *   - WASM replayers (every WASM_ENGINES entry, plus LibOpenMPT / Furnace) →
  *     engine.output (a GainNode) → destination
  *   - DubBus return → drumpad.masterGain → destination  ← untouched by drop
  *
@@ -21,40 +21,48 @@
 import type { DubMove } from './_types';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { beginDrySilence } from '@/lib/dub/drySilence';
+import { liveRegistryEngineOutputs } from '@/lib/engines/registryEngines';
 
-// Collect every active audio-source root gain so masterDrop can ramp them
-// together. Returns an array of { gain, prev } pairs; caller restores on
-// release. Any engine without a live instance is silently skipped.
-async function collectDryGains(): Promise<Array<{ param: AudioParam; prev: number }>> {
+/**
+ * Every active audio-source root gain, so masterDrop can ramp them together:
+ * the Tone buses, every live engine the registry knows, and the two engines
+ * that live outside the registry. Returns { param, prev } pairs; the caller
+ * restores on release. An engine without a live instance has no audio path
+ * and is skipped.
+ *
+ * This was a hand list of four engines (Libopenmpt, Hively, UADE, Furnace),
+ * so Fred, TFMX/Hippel, Sonix, SunTronic and every other native engine kept
+ * playing dry through a Drop (ledger F30, 2026-10-04). The registry is the
+ * list now, the same way the mixer's mute registrations are (F25).
+ */
+export async function collectDryGains(): Promise<Array<{ param: AudioParam; prev: number }>> {
   const out: Array<{ param: AudioParam; prev: number }> = [];
+  const push = (gain: AudioParam | undefined) => { if (gain) out.push({ param: gain, prev: gain.value }); };
 
   // Tone.js sample + synth buses — always present.
   try {
     const tone = getToneEngine();
-    const sample = tone.masterInput.gain as unknown as AudioParam;
-    const synth = tone.synthBus.gain as unknown as AudioParam;
-    out.push({ param: sample, prev: sample.value });
-    out.push({ param: synth, prev: synth.value });
+    push(tone.masterInput.gain as unknown as AudioParam);
+    push(tone.synthBus.gain as unknown as AudioParam);
   } catch { /* tone engine not initialized */ }
 
-  // WASM replayers that expose `.output: GainNode`. Each is a singleton
-  // gated by `hasInstance()` so ramping only touches live audio paths.
-  const engineLoaders = [
+  // Every native engine the registry knows and has alive right now.
+  try {
+    const { WASM_ENGINES } = await import('@/engine/replayer/NativeEngineRouting');
+    for (const live of await liveRegistryEngineOutputs(WASM_ENGINES)) push(live.output.gain);
+  } catch { /* routing module not loadable in this build */ }
+
+  // Not in WASM_ENGINES: libopenmpt plays the tracker formats through its own
+  // route, and the Furnace dispatch engine is driven by the Furnace editor.
+  // Both expose the same singleton shape, so they are named here.
+  const outsideRegistry = [
     () => import('@/engine/libopenmpt/LibopenmptEngine').then(m => m.LibopenmptEngine),
-    () => import('@/engine/hively/HivelyEngine').then(m => m.HivelyEngine),
-    () => import('@/engine/uade/UADEEngine').then(m => m.UADEEngine),
     () => import('@/engine/furnace-dispatch/FurnaceDispatchEngine').then(m => m.FurnaceDispatchEngine),
   ];
-  for (const load of engineLoaders) {
+  for (const load of outsideRegistry) {
     try {
-      const E = await load();
-      if (E && (E as any).hasInstance && (E as any).hasInstance()) {
-        const inst = (E as any).getInstance();
-        const outputNode = inst.output as GainNode | undefined;
-        if (outputNode?.gain) {
-          out.push({ param: outputNode.gain, prev: outputNode.gain.value });
-        }
-      }
+      const E = await load() as unknown as { hasInstance?: () => boolean; getInstance?: () => { output?: GainNode } };
+      if (E?.hasInstance?.()) push(E.getInstance?.()?.output?.gain);
     } catch { /* engine module not loaded */ }
   }
   return out;
