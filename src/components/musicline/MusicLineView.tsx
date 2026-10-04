@@ -8,7 +8,7 @@
  * every format (2026-09-28: ~40 commits/s, dialogs and menus included).
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useTrackerStore, useUIStore, useFormatStore } from '@stores';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { PatternEditorCanvas } from '@components/tracker/PatternEditorCanvas';
@@ -23,14 +23,14 @@ export const MusicLineView: React.FC = () => {
   const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patternCount = useTrackerStore((s) => s.patterns.length);
 
-  const handleRemoveUnusedParts = useCallback(() => {
-    const count = useFormatStore.getState().removeUnusedMusicLineParts();
-    if (count > 0) {
-      useUIStore.getState().setStatusMessage(`Removed ${count} unused part${count > 1 ? 's' : ''}`);
-    } else {
-      useUIStore.getState().setStatusMessage('No unused parts found');
-    }
+  /** Run a cleanup, report the count in the status bar. */
+  const cleanup = useCallback((run: () => number, noun: string, nothing: string) => () => {
+    const count = run();
+    useUIStore.getState().setStatusMessage(count > 0 ? `${count} ${noun}${count > 1 ? 's' : ''} removed` : nothing);
   }, []);
+  const handleRemoveUnusedParts = useMemo(() => cleanup(() => useFormatStore.getState().removeUnusedMusicLineParts(), 'unused part', 'No unused parts found'), [cleanup]);
+  const handleRemoveUnusedWavesamples = useMemo(() => cleanup(() => useFormatStore.getState().removeUnusedMusicLineWavesamples(), 'unused wavesample', 'No unused wavesamples found'), [cleanup]);
+  const handleMergeEqualWavesamples = useMemo(() => cleanup(() => useFormatStore.getState().mergeEqualMusicLineWavesamples(), 'equal wavesample', 'No equal wavesamples found'), [cleanup]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-dark-bg">
@@ -55,21 +55,18 @@ export const MusicLineView: React.FC = () => {
           >
             Follow: {mlFormatData.followMode === 0 ? 'Off' : mlFormatData.followMode === 1 ? 'Pattern' : 'Tune'}
           </button>
-          <button
-            className="px-2 py-0.5 text-xs bg-dark-bgSecondary hover:bg-dark-bgTertiary text-text-muted rounded border border-dark-border"
-            onClick={handleRemoveUnusedParts}
-            title="Remove patterns not referenced by any channel track table"
-          >Rm Unused Parts</button>
-          <button
-            className="px-2 py-0.5 text-xs bg-dark-bgSecondary text-text-muted/40 rounded border border-dark-border cursor-not-allowed"
-            disabled
-            title="Remove unused wavesamples (not yet implemented)"
-          >Rm Unused WS</button>
-          <button
-            className="px-2 py-0.5 text-xs bg-dark-bgSecondary text-text-muted/40 rounded border border-dark-border cursor-not-allowed"
-            disabled
-            title="Merge duplicate wavesamples by byte comparison (not yet implemented)"
-          >Rm Equal WS</button>
+          {([
+            [handleRemoveUnusedParts, 'Remove Unused Parts', 'Remove patterns no channel track table references'],
+            [handleRemoveUnusedWavesamples, 'Remove Unused Wavesamples', 'Remove instruments no pattern cell references, and renumber the rest'],
+            [handleMergeEqualWavesamples, 'Merge Equal Wavesamples', 'Merge instruments whose parameters and sample data are byte-equal, and renumber the rest'],
+          ] as const).map(([onClick, label, title]) => (
+            <button
+              key={label}
+              className="px-2 py-0.5 text-xs bg-dark-bgSecondary hover:bg-dark-bgTertiary text-text-muted rounded border border-dark-border"
+              onClick={onClick}
+              title={title}
+            >{label}</button>
+          ))}
         </div>
         <MusicLineToolbar numChannels={channelTrackTables?.length ?? 0} />
         <MusicLineChannelStatus />

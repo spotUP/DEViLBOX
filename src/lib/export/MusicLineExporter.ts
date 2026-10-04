@@ -474,6 +474,22 @@ export function exportMusicLineFile(song: TrackerSong): Uint8Array {
 }
 
 /**
+ * The bytes the .ml exporter writes for one instrument, without the SMPL
+ * number: the INST parameters followed by the PCM. Two instruments with equal
+ * bytes are one wavesample written twice; MusicLine's "Rm Equal WS" compares
+ * wavesample data the same way (ledger F35).
+ */
+export function musicLineInstrumentBytes(inst: InstrumentConfig): Uint8Array {
+  const pcm = extractPcm(inst);
+  const evenPcm = pcm.length % 2 === 0 ? pcm : pcm.subarray(0, pcm.length - 1);
+  const instData = buildInstData(inst, 0, evenPcm.length);
+  const out = new Uint8Array(instData.length + evenPcm.length);
+  out.set(instData, 0);
+  out.set(evenPcm, instData.length);
+  return out;
+}
+
+/**
  * Export a single InstrumentConfig as a standalone MusicLine instrument file (.mli).
  *
  * Instrument file layout (from SaveExternInst @ Mline116.asm):
