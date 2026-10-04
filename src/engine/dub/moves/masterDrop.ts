@@ -20,6 +20,7 @@
 
 import type { DubMove } from './_types';
 import { getToneEngine } from '@/engine/ToneEngine';
+import { beginDrySilence } from '@/lib/dub/drySilence';
 
 // Collect every active audio-source root gain so masterDrop can ramp them
 // together. Returns an array of { gain, prev } pairs; caller restores on
@@ -95,6 +96,8 @@ export const masterDrop: DubMove = {
     // callback avoids scheduling ramps at stale timestamps.
     const pairs: Array<{ param: AudioParam; prev: number }> = [];
     let disposed = false;
+    // Tell the silence detectors the dry is down on purpose (ledger F28).
+    const endDrySilence = beginDrySilence();
 
     void (async () => {
       const collected = await collectDryGains();
@@ -130,6 +133,7 @@ export const masterDrop: DubMove = {
     const restore = () => {
       if (restored) return;
       restored = true;
+      endDrySilence();
       const now = ctx.currentTime;
       for (const { param, prev } of pairs) {
         try {

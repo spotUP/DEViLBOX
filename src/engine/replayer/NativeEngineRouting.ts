@@ -10,6 +10,7 @@
  */
 
 import { FILE_DATA_FIELDS } from '@/engine/formatFileDataFields';
+import { drySilencedByDub } from '@/lib/dub/drySilence';
 import * as Tone from 'tone';
 import type { TrackerSong, TrackerFormat } from '../TrackerReplayer';
 import { getToneEngine } from '../ToneEngine';
@@ -934,6 +935,15 @@ export function mixerSilencesAChannel(): boolean {
   return st.channels.some((c) => (st.isSoloing ? !c.soloed : c.muted));
 }
 
+/**
+ * Silence the performer made, not the song's end: a mixer mute or solo, or a
+ * dub move holding the dry signal down (`masterDrop`, ledger F28). The
+ * silence detector asks this before it stops an engine.
+ */
+export function silenceIsNotTheSongs(): boolean {
+  return mixerSilencesAChannel() || drySilencedByDub();
+}
+
 export function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolean {
   const fileData = song[desc.fileDataKey];
   if (!fileData) return false;
@@ -1293,7 +1303,7 @@ export async function startNativeEngines(
           detector.start(instance.output, instance.output, () => {
             console.log(`[NativeEngineRouting] ${desc.key} silence detected — stopping`);
             void endNativeSong(instance);
-          }, mixerSilencesAChannel);
+          }, silenceIsNotTheSongs);
           activeSilenceDetectors.set(desc.synthType, detector);
         }
       } else {
