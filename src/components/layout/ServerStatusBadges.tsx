@@ -12,6 +12,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useAudioStore } from '@stores/useAudioStore';
+import { RELAY_PROBE_URL } from '@/bridge/relayEndpoint';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -26,7 +27,6 @@ interface ServiceState {
 // ── Health check helpers ──────────────────────────────────────────────
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const WS_PORT = 4003;
 
 async function checkExpressHealth(): Promise<ServiceState> {
   try {
@@ -44,11 +44,12 @@ async function checkExpressHealth(): Promise<ServiceState> {
 function checkWebSocket(): Promise<ServiceState> {
   return new Promise((resolve) => {
     try {
-      const host = window.location.hostname || 'localhost';
-      // /probe path: the relay answers without claiming the single browser
-      // slot. A bare-path probe used to kick the real MCPBridge connection on
-      // every health poll (perpetual connect/kick/reconnect flap).
-      const ws = new WebSocket(`ws://${host}:${WS_PORT}/probe`);
+      // The address the bridge itself connects to (relayEndpoint.ts). Probing
+      // `ws://${location.hostname}` instead was a Mixed Content error on the
+      // HTTPS live page, every poll. The /probe path answers without claiming
+      // the single browser slot; a bare-path probe used to kick the real
+      // MCPBridge connection on every health poll.
+      const ws = new WebSocket(RELAY_PROBE_URL);
       const timeout = setTimeout(() => {
         ws.close();
         resolve({ label: 'WS', status: 'error', detail: 'WebSocket relay timeout' });

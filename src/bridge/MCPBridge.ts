@@ -207,7 +207,9 @@ import {
   djDuck, djUnduck,
 } from './handlers/djHandlers';
 
-const WS_URL = 'ws://localhost:4003';
+import { RELAY_WS_URL } from './relayEndpoint';
+
+const WS_URL = RELAY_WS_URL;
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 10000;
 // Give up after this many consecutive failed reconnects with no messages ever
