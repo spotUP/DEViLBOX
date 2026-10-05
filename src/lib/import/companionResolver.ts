@@ -320,6 +320,17 @@ export function resolveCompanions(moduleName: string, listing: CompanionListing)
       if (n.toLowerCase().startsWith(`${stem}.ip.`) && !companions.includes(n)) companions.push(n);
     }
   }
+  // Paul Robotham: the player opens `<song>.SSD`; collections ship one shared
+  // bank per game (`mdtest.ssd` beside every Dawn Patrol `.dat`). With exactly
+  // one `.ssd` in the folder and no per-song one, register it under the name
+  // the player asks for (2026-10-05).
+  const pr = /^(.*)\.dat$/i.exec(moduleName);
+  if (pr) {
+    const asked = `${pr[1]}.SSD`;
+    const own = listing.siblings.find((n) => n.toLowerCase() === asked.toLowerCase());
+    const banks = listing.siblings.filter((n) => /\.ssd$/i.test(n));
+    if (!own && banks.length === 1 && !companions.includes(asked)) { companions.push(asked); sources[asked] = banks[0]; }
+  }
   const kept = new Set(companions);
   for (const key of Object.keys(sources)) if (!kept.has(key)) delete sources[key];
   return { companions, sources, usedSharedBank: bank !== null };

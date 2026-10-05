@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T09:05:05.426Z",
+  "generated": "2026-10-05T10:22:42.579Z",
   "perEntry": 6,
   "registryTotal": 277,
   "covered": 158,
@@ -80,8 +80,18 @@
       "dir": "/data/songs/ashley-hogg"
     },
     {
-      "id": "audio-sculpture",
-      "label": "audio-sculpture",
+      "id": "audio-sculpture-amiga_formats_catchall",
+      "label": "audio-sculpture / Amiga Format",
+      "formatKey": "amiga_formats_catchall",
+      "files": [
+        "/data/songs/audio-sculpture/turtle-ready.adsc"
+      ],
+      "total": 1,
+      "dir": "/data/songs/audio-sculpture"
+    },
+    {
+      "id": "audio-sculpture-mod",
+      "label": "audio-sculpture / ProTracker MOD",
       "formatKey": "mod",
       "files": [
         "/data/songs/audio-sculpture/m.mod"
@@ -5924,9 +5934,10 @@
       "label": "jesper-olsen",
       "formatKey": "jesperOlsen",
       "files": [
+        "/data/songs/jesper-olsen/guldkornsexpressen ingame.jo",
         "/data/songs/jesper-olsen/lollypop-subgame 01.jo"
       ],
-      "total": 1,
+      "total": 2,
       "dir": "/data/songs/jesper-olsen"
     },
     {
@@ -5938,6 +5949,16 @@
       ],
       "total": 1,
       "dir": "/data/songs/klystrack"
+    },
+    {
+      "id": "kris-hatlelid",
+      "label": "kris-hatlelid",
+      "formatKey": "krisHatlelid",
+      "files": [
+        "/data/songs/kris-hatlelid/fiendish freddys - songs.kh"
+      ],
+      "total": 1,
+      "dir": "/data/songs/kris-hatlelid"
     },
     {
       "id": "leggless-music-editor",
@@ -6197,6 +6218,16 @@
       ],
       "total": 1,
       "dir": "/data/songs/packed_etc"
+    },
+    {
+      "id": "paul-robotham",
+      "label": "paul-robotham",
+      "formatKey": "paulRobotham",
+      "files": [
+        "/data/songs/paul-robotham/dawnpatrol-sad.dat"
+      ],
+      "total": 1,
+      "dir": "/data/songs/paul-robotham"
     },
     {
       "id": "paul-shields",
@@ -6781,11 +6812,21 @@
       "dir": "/data/songs/speedy-system"
     },
     {
-      "id": "startrekker-am",
-      "label": "startrekker-am",
+      "id": "startrekker-am-uade_nt",
+      "label": "startrekker-am / NoiseTracker",
       "formatKey": "uade_nt",
       "files": [
         "/data/songs/startrekker-am/silent sleep.mod.nt"
+      ],
+      "total": 1,
+      "dir": "/data/songs/startrekker-am"
+    },
+    {
+      "id": "startrekker-am-mod",
+      "label": "startrekker-am / ProTracker MOD",
+      "formatKey": "mod",
+      "files": [
+        "/data/songs/startrekker-am/amsyntdemo.mod"
       ],
       "total": 1,
       "dir": "/data/songs/startrekker-am"
@@ -6891,7 +6932,7 @@
       "dir": "/data/songs/symphonie"
     },
     {
-      "id": "synth-dream",
+      "id": "synth-dream-unknown",
       "label": "synth-dream",
       "formatKey": null,
       "files": [
@@ -6899,6 +6940,26 @@
       ],
       "total": 1,
       "dir": "/data/songs/synth-dream"
+    },
+    {
+      "id": "synth-dream-uade_sdr",
+      "label": "synth-dream / SynthDream",
+      "formatKey": "uade_sdr",
+      "files": [
+        "/data/songs/synth-dream/sdr.nobuddiesland jigsaw"
+      ],
+      "total": 1,
+      "dir": "/data/songs/synth-dream"
+    },
+    {
+      "id": "synth-pack",
+      "label": "synth-pack",
+      "formatKey": "synthPack",
+      "files": [
+        "/data/songs/synth-pack/centerbase soft.osp"
+      ],
+      "total": 1,
+      "dir": "/data/songs/synth-pack"
     },
     {
       "id": "synthesis",
@@ -7818,7 +7879,9 @@
           "ash.nobby the aardvark"
         ],
         "audio-sculpture": [
-          "m.mod"
+          "m.mod",
+          "turtle-ready.adsc",
+          "turtle-ready.adsc.as"
         ],
         "ay-amadeus": [
           "aztec theme.amad"
@@ -8541,10 +8604,15 @@
           "stormlord title.jt"
         ],
         "jesper-olsen": [
+          "guldkornsexpressen ingame.jo",
           "lollypop-subgame 01.jo"
         ],
         "klystrack": [
           "Ocean Loader III.kt"
+        ],
+        "kris-hatlelid": [
+          "fiendish freddys - songs.kh",
+          "songplay"
         ],
         "leggless-music-editor": [
           "the punisher gameover.lme"
@@ -8670,6 +8738,10 @@
         ],
         "packed_etc": [
           "gift of gods.p40a"
+        ],
+        "paul-robotham": [
+          "dawnpatrol-sad.dat",
+          "mdtest.ssd"
         ],
         "paul-shields": [
           "jug-hiscore.ps"
@@ -8808,6 +8880,8 @@
           "pauker rap 2.ss"
         ],
         "startrekker-am": [
+          "amsyntdemo.mod",
+          "amsyntdemo.mod.nt",
           "silent sleep.mod.nt"
         ],
         "startrekker-flt8": [
@@ -8833,7 +8907,13 @@
           "pas 2 jade.symmod"
         ],
         "synth-dream": [
-          "smp.nobuddiesland end 2"
+          "sdr.nobuddiesland jigsaw",
+          "smp.nobuddiesland end 2",
+          "smp.nobuddiesland jigsaw"
+        ],
+        "synth-pack": [
+          "centerbase soft.osp",
+          "smp.set"
         ],
         "synthesis": [
           "space sound.syn"
@@ -9063,7 +9143,9 @@
     },
     "/data/songs/audio-sculpture": {
       "siblings": [
-        "m.mod"
+        "m.mod",
+        "turtle-ready.adsc",
+        "turtle-ready.adsc.as"
       ]
     },
     "/data/songs/ay-amadeus": {
@@ -32662,12 +32744,19 @@
     },
     "/data/songs/jesper-olsen": {
       "siblings": [
+        "guldkornsexpressen ingame.jo",
         "lollypop-subgame 01.jo"
       ]
     },
     "/data/songs/klystrack": {
       "siblings": [
         "Ocean Loader III.kt"
+      ]
+    },
+    "/data/songs/kris-hatlelid": {
+      "siblings": [
+        "fiendish freddys - songs.kh",
+        "songplay"
       ]
     },
     "/data/songs/leggless-music-editor": {
@@ -32840,6 +32929,12 @@
     "/data/songs/packed_etc": {
       "siblings": [
         "gift of gods.p40a"
+      ]
+    },
+    "/data/songs/paul-robotham": {
+      "siblings": [
+        "dawnpatrol-sad.dat",
+        "mdtest.ssd"
       ]
     },
     "/data/songs/paul-shields": {
@@ -34522,6 +34617,8 @@
     },
     "/data/songs/startrekker-am": {
       "siblings": [
+        "amsyntdemo.mod",
+        "amsyntdemo.mod.nt",
         "silent sleep.mod.nt"
       ]
     },
@@ -34563,7 +34660,15 @@
     },
     "/data/songs/synth-dream": {
       "siblings": [
-        "smp.nobuddiesland end 2"
+        "sdr.nobuddiesland jigsaw",
+        "smp.nobuddiesland end 2",
+        "smp.nobuddiesland jigsaw"
+      ]
+    },
+    "/data/songs/synth-pack": {
+      "siblings": [
+        "centerbase soft.osp",
+        "smp.set"
       ]
     },
     "/data/songs/synthesis": {
