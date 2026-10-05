@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T00:24:59.641Z",
+  "generated": "2026-10-05T00:41:12.552Z",
   "perEntry": 6,
   "registryTotal": 277,
   "covered": 158,
@@ -8841,7 +8841,8 @@
           "street fighter.sb"
         ],
         "stonetracker": [
-          "hypnosphere.spm"
+          "hypnosphere.spm",
+          "hypnosphere.sps"
         ],
         "studio-pixel---piyopiyo": [
           "obj0176-1.pmd"
@@ -34567,7 +34568,8 @@
     },
     "/data/songs/stonetracker": {
       "siblings": [
-        "hypnosphere.spm"
+        "hypnosphere.spm",
+        "hypnosphere.sps"
       ]
     },
     "/data/songs/studio-pixel---piyopiyo": {
