@@ -28,6 +28,7 @@ import { basename, resolve } from 'node:path';
 import { ROOT, loadSharedWorkletScripts, startWorklet, songBuffer, stereoOutputs } from './workletHarness';
 import { EAGLE_PLAYER_FORMATS, eaglePlayerModuleName, type EaglePlayerFormat } from '../eagleplayer/eaglePlayerFormats';
 import { renderFileToSamples } from '../../../tools/uade-audit/uadeRenderCore';
+import { monoEnvelope, correlation, comparedWindows } from '../../../tools/eagleplayer/eagleCompare';
 
 const WORKER = resolve(ROOT, 'src/engine/__tests__/eaglePlayerRender.worker.ts');
 const SECONDS = 30;
@@ -54,27 +55,6 @@ function renderInWorker(fmt: EaglePlayerFormat): Promise<Result> {
   });
 }
 
-/** 100 ms loudness envelope of the mono sum (L + R) of interleaved stereo. */
-function monoEnvelope(stereo: Float32Array, sampleRate: number): number[] {
-  const w = sampleRate / 10, out: number[] = [];
-  for (let k = 0; (k + 1) * w * 2 <= stereo.length; k++) {
-    let s = 0;
-    for (let i = k * w; i < (k + 1) * w; i++) { const m = stereo[2 * i] + stereo[2 * i + 1]; s += m * m; }
-    out.push(Math.sqrt(s / w));
-  }
-  return out;
-}
-
-function correlation(a: number[], b: number[]): number {
-  const n = Math.min(a.length, b.length);
-  let ma = 0, mb = 0;
-  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
-  ma /= n; mb /= n;
-  let ab = 0, aa = 0, bb = 0;
-  for (let i = 0; i < n; i++) { ab += (a[i] - ma) * (b[i] - mb); aa += (a[i] - ma) ** 2; bb += (b[i] - mb) ** 2; }
-  return ab / Math.sqrt(aa * bb);
-}
-
 const FORMATS = Object.values(EAGLE_PLAYER_FORMATS);
 
 describe.each(FORMATS)('$label on the Musashi host', (fmt) => {
@@ -98,7 +78,7 @@ describe.each(FORMATS)('$label on the Musashi host', (fmt) => {
     const ref = monoEnvelope(uade.samples, 48000);
     // After the player's song end UADE's frontend moves on to another
     // subsong (its policy, not the player's); compare the song itself.
-    const windows = Math.floor((r.songEndAt > 0 ? r.songEndAt - 0.5 : SECONDS) * 10);
+    const windows = comparedWindows(SECONDS, r.songEndAt);
     const c = correlation(r.envelope.slice(0, windows), ref.slice(0, windows));
     expect(c, `${fmt.label}: envelope correlation ${c.toFixed(4)} over ${windows / 10} s`).toBeGreaterThan(0.95);
   }, 60_000);

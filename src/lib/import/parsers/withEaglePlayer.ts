@@ -36,6 +36,7 @@ export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: A
 }
 
 /**
+ * `nativeParse` null: no native parser, the grid is UADE's scan.
  * `uadeFileName`: the name UADE's scan needs to pick the player (the Amiga
  * `<prefix>.<tune>` form, toUADEPrefixName); the native parser gets the file's
  * own name.
@@ -43,12 +44,12 @@ export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: A
 export async function withEaglePlayer(
   formatId: string,
   ctx: FallbackContext,
-  nativeParse: NativeParse,
+  nativeParse: NativeParse | null,
   uadeFileName: string = ctx.originalFileName,
 ): Promise<TrackerSong> {
   let song: TrackerSong | null = null;
   try {
-    song = await nativeParse(ctx.buffer, ctx.originalFileName);
+    song = nativeParse ? await nativeParse(ctx.buffer, ctx.originalFileName) : null;
   } catch (e) {
     console.warn(`[withEaglePlayer] ${formatId} parser refused ${ctx.originalFileName}: ${(e as Error).message}`);
   }
