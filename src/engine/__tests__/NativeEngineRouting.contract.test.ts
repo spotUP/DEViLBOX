@@ -28,7 +28,6 @@ interface ParsedDescriptor {
   key: string;
   synthType: string;
   fileDataKey: string;
-  formats: string | null;
   loadMethod: string;
   hasStaticRef: boolean;
   hasDynamicResolver: boolean;
@@ -95,7 +94,6 @@ function parseDescriptors(src: string): ParsedDescriptor[] {
     const synthType = getStr('synthType');
     const fileDataKey = getStr('fileDataKey');
     const loadMethod = getStr('loadMethod');
-    const formatsMatch = block.match(/\bformats:\s*(null|\[[^\]]*\])/);
 
     if (!key || !synthType || !fileDataKey || !loadMethod) continue;
 
@@ -104,7 +102,6 @@ function parseDescriptors(src: string): ParsedDescriptor[] {
       key,
       synthType,
       fileDataKey,
-      formats: formatsMatch?.[1] ?? null,
       loadMethod,
       hasStaticRef: /\bstaticRef:\s*(?!null)(?!undefined)\b/.test(block),
       hasDynamicResolver: /\bdynamicResolver\s*:/.test(block),
@@ -179,25 +176,22 @@ describe('NativeEngineRouting.WASM_ENGINES — structural contract', () => {
     expect(missing, `engines missing loader: ${JSON.stringify(missing)}`).toEqual([]);
   });
 
-  it('SunTronicSong wildcard precedes UADEEditable — native pref wins over UADE fallback', () => {
-    // Regression: a SunTronic V1.3 song parsed with the 'native' engine pref
-    // carries BOTH sunTronicSongFileData AND uadeEditableFileData (the editable
-    // grid always attaches the latter). Both descriptors are formats:null
-    // wildcards, and the dispatch loop keeps only the FIRST wildcard that
-    // activates (later wildcards are skipped once one engine started). So
-    // SunTronicSong MUST come before UADEEditable — otherwise UADE-editable
-    // claims the song, the native engine never runs, and playback goes silent
-    // ~3s in (the UADE audio.device drain-out) with no native audio at all.
-    const sunIdx = descriptors.findIndex(d => d.key === 'SunTronicSong');
+  it('UADEEditable comes after every engine whose data a hybrid song can carry', () => {
+    // One engine per song: the first descriptor whose file data the song
+    // carries plays it (28d1af1a8 dropped the song.format gate). Hybrid
+    // parses carry their native engine's data AND uadeEditableFileData (the
+    // editable grid always attaches the latter): a SunTronic V1.3 song with
+    // the 'native' pref, the eagleplayer formats, PumaTracker... If
+    // UADEEditable came first it would claim the song and the native engine
+    // would never run (SunTronic: silent ~3 s in, the audio.device drain-out).
     const uadeIdx = descriptors.findIndex(d => d.key === 'UADEEditable');
-    expect(sunIdx, 'SunTronicSong descriptor present').toBeGreaterThanOrEqual(0);
     expect(uadeIdx, 'UADEEditable descriptor present').toBeGreaterThanOrEqual(0);
-    expect(descriptors[sunIdx].formats, 'SunTronicSong is a wildcard').toBe('null');
-    expect(descriptors[uadeIdx].formats, 'UADEEditable is a wildcard').toBe('null');
-    expect(
-      sunIdx,
-      'SunTronicSong must be ordered before UADEEditable in WASM_ENGINES',
-    ).toBeLessThan(uadeIdx);
+    const after = descriptors.slice(uadeIdx + 1).map(d => d.key);
+    // V2M songs never carry uadeEditableFileData.
+    expect(after, 'only V2M may follow UADEEditable').toEqual(after.filter(k => k === 'V2M'));
+    for (const key of ['SunTronicSong', 'EaglePlayer', 'PumaTracker']) {
+      expect(descriptors.findIndex(d => d.key === key), `${key} precedes UADEEditable`).toBeLessThan(uadeIdx);
+    }
   });
 
   it('every fileDataKey appears as a property on TrackerSong', () => {
