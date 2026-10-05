@@ -102,6 +102,14 @@ class AsapProcessor extends AudioWorkletProcessor {
               if (typeof this.module._asap_wasm_get_songs === 'function') {
                 meta.songs = this.module._asap_wasm_get_songs();
               }
+              // The song to start (0-based, -1 = the file's default), then the one playing.
+              const want = typeof data.song === 'number' ? data.song : -1;
+              if (want >= 0 && want < (meta.songs || 1) && typeof this.module._asap_wasm_play_song === 'function') {
+                this.module._asap_wasm_play_song(want);
+              }
+              if (typeof this.module._asap_wasm_current_song === 'function') {
+                meta.song = this.module._asap_wasm_current_song();
+              }
               this.port.postMessage({ type: 'moduleLoaded', meta });
             } else {
               this.port.postMessage({ type: 'error', message: 'asap_wasm_load failed' });
@@ -135,15 +143,21 @@ class AsapProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'stopped' });
         break;
 
-      case 'playSong':
-        if (this.module && typeof this.module._asap_wasm_play_song === 'function') {
-          const ok = this.module._asap_wasm_play_song(data.song);
-          if (ok) {
-            this.playing = true;
-            this.port.postMessage({ type: 'songChanged', song: data.song });
-          }
+      case 'playSong': {
+        // Answers every request: the song started, or -1.
+        let song = -1;
+        if (this.module && typeof this.module._asap_wasm_play_song === 'function'
+            && typeof this.module._asap_wasm_current_song === 'function'
+            && this.module._asap_wasm_current_song() >= 0
+            && this.module._asap_wasm_play_song(data.song)) {
+          this.playing = true;
+          this.rewindOnPlay = false;
+          song = data.song;
         }
+        const songs = this.module && typeof this.module._asap_wasm_get_songs === 'function' ? this.module._asap_wasm_get_songs() : 0;
+        this.port.postMessage({ type: 'songChanged', song, songs });
         break;
+      }
 
       case 'setMuteMask':
         if (this.module && typeof this.module._asap_wasm_mute_channels === 'function') {

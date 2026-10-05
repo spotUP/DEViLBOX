@@ -4,42 +4,19 @@
  * subsong dropdown only when there are multiple subsongs.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { useFormatStore } from '@stores';
-import { useShallow } from 'zustand/react/shallow';
 import { Cpu, Info } from 'lucide-react';
-import { notify } from '@stores/useNotificationStore';
+import { switchSubsong } from '@/lib/tracker/subsongSwitch';
 import { SIDInfoModal } from '@components/dialogs/SIDInfoModal';
 import { CustomSelect } from '@components/common/CustomSelect';
 
 export const SIDSubsongSelector: React.FC = React.memo(() => {
-  const { sidMetadata, setSidMetadata } = useFormatStore(
-    useShallow((state) => ({
-      sidMetadata: state.sidMetadata,
-      setSidMetadata: state.setSidMetadata,
-    }))
-  );
+  const sidMetadata = useFormatStore((state) => state.sidMetadata);
   const [showInfo, setShowInfo] = useState(false);
 
-  const handleSubsongChange = useCallback(
-    async (newIdx: number) => {
-      if (!sidMetadata || newIdx === sidMetadata.currentSubsong) return;
-
-      // Access the C64SIDEngine via TrackerReplayer
-      try {
-        const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
-        const engine = getTrackerReplayer().getC64SIDEngine();
-        if (engine) {
-          engine.setSubsong(newIdx);
-          setSidMetadata({ ...sidMetadata, currentSubsong: newIdx });
-          notify.success(`SID Subsong ${newIdx + 1}/${sidMetadata.subsongs}`);
-        }
-      } catch {
-        notify.error('Failed to switch SID subsong');
-      }
-    },
-    [sidMetadata, setSidMetadata]
-  );
+  // The one subsong switch (lib/tracker/subsongSwitch), shared with the FT2 toolbar.
+  const handleSubsongChange = (newIdx: number) => { void switchSubsong(newIdx); };
 
   if (!sidMetadata) return null;
 

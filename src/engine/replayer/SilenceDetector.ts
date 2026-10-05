@@ -24,6 +24,9 @@ export class SilenceDetector {
   private onSilence: (() => void) | null = null;
   private isSilencedUpstream: (() => boolean) | null = null;
   private gainNode: GainNode | null = null;
+  private source: AudioNode | null = null;
+  /** The output's gain before the fade, for resume(). */
+  private gainBeforeFade = 1;
   private sampleRate: number;
 
   constructor(context: AudioContext | BaseAudioContext) {
@@ -45,6 +48,7 @@ export class SilenceDetector {
    */
   start(source: AudioNode, gainNode: GainNode, onSilence: () => void, isSilencedUpstream?: () => boolean): void {
     this.stop();
+    this.source = source;
     this.gainNode = gainNode;
     this.onSilence = onSilence;
     this.isSilencedUpstream = isSilencedUpstream ?? null;
@@ -112,20 +116,38 @@ export class SilenceDetector {
   private fadeOutAndStop(): void {
     if (this.gainNode) {
       const now = this.gainNode.context.currentTime;
+      this.gainBeforeFade = this.gainNode.gain.value;
       this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
       this.gainNode.gain.linearRampToValueAtTime(0, now + FADE_DURATION_S);
     }
 
-    // Call onSilence after fade completes
+    // Call onSilence after fade completes. Stop first: onSilence may resume().
     setTimeout(() => {
-      this.onSilence?.();
+      const onSilence = this.onSilence;
       this.stop();
+      onSilence?.();
     }, FADE_DURATION_S * 1000);
+  }
+
+  /**
+   * The engine plays on after a silence (the next subsong of the file):
+   * undo the fade and watch again. The song has been heard, so a next
+   * subsong that never sounds ends too. No-op once disposed.
+   */
+  resume(): void {
+    const { source, gainNode, onSilence } = this;
+    if (!source || !gainNode || !onSilence) return;
+    const now = gainNode.context.currentTime;
+    gainNode.gain.cancelScheduledValues(now);
+    gainNode.gain.setValueAtTime(this.gainBeforeFade, now);
+    this.start(source, gainNode, onSilence, this.isSilencedUpstream ?? undefined);
+    this.hasSeenAudio = true;
   }
 
   dispose(): void {
     this.stop();
     this.onSilence = null;  // Prevent pending setTimeout callbacks from firing
     this.gainNode = null;
+    this.source = null;
   }
 }

@@ -4,56 +4,23 @@
  * Reads pre-converted subsong data from useTrackerStore.furnaceSubsongs.
  */
 
-import React, { useCallback } from 'react';
-import { useTrackerStore, useTransportStore , useFormatStore } from '@stores';
+import React from 'react';
+import { useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { Music2 } from 'lucide-react';
-import { notify } from '@stores/useNotificationStore';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { switchSubsong } from '@/lib/tracker/subsongSwitch';
 import { CustomSelect } from '@components/common/CustomSelect';
 
 export const SubsongSelector: React.FC = React.memo(() => {
-  const { loadPatterns, setPatternOrder, } = useTrackerStore(
-    useShallow((state) => ({
-      loadPatterns: state.loadPatterns,
-      setPatternOrder: state.setPatternOrder,
-      }))
-  );
-
-  const { furnaceSubsongs, furnaceActiveSubsong, setFurnaceActiveSubsong } = useFormatStore(
+  const { furnaceSubsongs, furnaceActiveSubsong } = useFormatStore(
     useShallow((state) => ({
       furnaceSubsongs: state.furnaceSubsongs,
       furnaceActiveSubsong: state.furnaceActiveSubsong,
-      setFurnaceActiveSubsong: state.setFurnaceActiveSubsong,
     }))
   );
 
-  const { setBPM, setSpeed } = useTransportStore(
-    useShallow((state) => ({
-      setBPM: state.setBPM,
-      setSpeed: state.setSpeed,
-    }))
-  );
-
-  const handleSubsongChange = useCallback(
-    (newIdx: number) => {
-      if (!furnaceSubsongs || newIdx === furnaceActiveSubsong) return;
-      const sub = furnaceSubsongs[newIdx];
-      if (!sub) return;
-
-      loadPatterns(sub.patterns);
-      setPatternOrder(sub.songPositions);
-      setBPM(sub.initialBPM);
-      setSpeed(sub.initialSpeed);
-      // Apply Furnace speed alternation — speed2 is subsong-specific
-      getTrackerReplayer().setSpeed2(
-        sub.speed2 !== undefined && sub.speed2 !== sub.initialSpeed ? sub.speed2 : null
-      );
-      setFurnaceActiveSubsong(newIdx);
-      notify.success(`Switched to: ${sub.name || `Subsong ${newIdx + 1}`}`);
-    },
-    [furnaceSubsongs, furnaceActiveSubsong, loadPatterns, setPatternOrder, setBPM, setSpeed, setFurnaceActiveSubsong]
-  );
+  // The one subsong switch (lib/tracker/subsongSwitch), shared with the FT2 toolbar.
+  const handleSubsongChange = (newIdx: number) => { void switchSubsong(newIdx); };
 
   if (!furnaceSubsongs || furnaceSubsongs.length <= 1) return null;
 

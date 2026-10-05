@@ -65,41 +65,46 @@ static void apply_mute(void)
 
 static int load(const unsigned char *data, int len, int track, int sample_rate);
 
-/* The track load() started, for gme_wasm_loaded_track(). */
+/* The track load() or gme_wasm_start_track() started, for gme_wasm_loaded_track(). */
 static int loaded_track = 0;
+/* The loaded song's sample rate, for the probe in gme_wasm_start_track(). */
+static int loaded_rate = 44100;
 
 /*
- * The first track from `from` that is music, trying at most PROBE_TRACKS;
- * `from` itself when none is (the track the import asked for). Music = still
- * sounding in the last second of the first PROBE_SECONDS and not ended: a
- * sound effect (KSS gradius 2, tracks before 40) is a short burst that dies,
- * and the first version, taking any sound at all, opened on an effect that
- * the engine's silence detector then stopped. Probes with every voice audible.
+ * The first track from `from` that sounds, trying at most PROBE_TRACKS; -1
+ * when none does. With `music_only`, a track counts only when it is still
+ * sounding in the last second of the first PROBE_SECONDS and has not ended:
+ * a sound effect (KSS gradius 2, tracks before 40) is a short burst that
+ * dies, and the first version, taking any sound at all, opened on an effect
+ * that the engine's silence detector then stopped. Without it, any sound in
+ * the first PROBE_SECONDS counts: auto-advance to the next subsong plays a
+ * short jingle and skips only the empty slots. Probes with every voice audible.
  */
-static int first_audible_track(int from, int count, int sample_rate)
+static int first_audible_track(int from, int count, int sample_rate, int music_only)
 {
 	enum { PROBE_SECONDS = 3, PROBE_TRACKS = 64, PROBE_CHUNK = 1024 };
 	const int threshold = 164; /* 0.005 of full scale, as UADE's probe */
 	const int pairs = multi ? kPairs : 1;
 	const long total = (long) PROBE_SECONDS * sample_rate;
-	const long tail = total - sample_rate; /* the last second */
+	const long tail = music_only ? total - sample_rate : 0; /* where sound starts to count */
 	gme_mute_voices(emu, 0);
 	const int last = count < from + PROBE_TRACKS ? count : from + PROBE_TRACKS;
 	for (int t = from; t < last; t++) {
 		if (gme_start_track(emu, t)) continue;
-		int sounding_late = 0;
+		int sounding = 0;
 		long done = 0;
 		for (; done < total; done += PROBE_CHUNK) {
 			if (gme_play(emu, PROBE_CHUNK * 2 * pairs, pcm)) break;
-			if (done >= tail && !sounding_late) {
+			if (done >= tail && !sounding) {
 				for (int i = 0; i < PROBE_CHUNK * 2 * pairs; i++) {
-					if (pcm[i] > threshold || pcm[i] < -threshold) { sounding_late = 1; break; }
+					if (pcm[i] > threshold || pcm[i] < -threshold) { sounding = 1; break; }
 				}
+				if (sounding && !music_only) return t;
 			}
 		}
-		if (done >= total && sounding_late && !gme_track_ended(emu)) return t;
+		if (done >= total && sounding && !gme_track_ended(emu)) return t;
 	}
-	return from;
+	return -1;
 }
 
 /* The track playing after a load (the first audible from the one asked for). */
@@ -147,13 +152,38 @@ static int load(const unsigned char *data, int len, int track, int sample_rate)
 	// and often hold sound effects or nothing in their first tracks (KSS
 	// gradius 2: tracks 0-39), so the song opened silent. The owner's rule for
 	// UADE subsongs, 2026-10-05.
-	track = first_audible_track(track, count, sample_rate);
+	const int audible = first_audible_track(track, count, sample_rate, 1);
+	if (audible >= 0) track = audible;
 	// Mute before the start: gme_start_track already renders ahead (it skips
 	// the track's leading silence), and that audio must honour the mask.
 	apply_mute();
 	if (gme_start_track(emu, track)) { release(); return -4; }
 	loaded_track = track;
+	loaded_rate = sample_rate;
 	return count > 0 ? count : 1;
+}
+
+/*
+ * Start `track` (0-based) of the song loaded: the subsong control and the
+ * auto-advance when a track ends. With `skip_silent`, the first track from
+ * `track` up that makes any sound (a KSS or HES file holds empty slots).
+ * Returns the track started, or -1: nothing loaded, `track` out of range,
+ * no sound from it on, or libgme would not start it.
+ */
+extern "C" EMSCRIPTEN_KEEPALIVE
+int gme_wasm_start_track(int track, int skip_silent)
+{
+	if (!emu) return -1;
+	const int count = gme_track_count(emu);
+	if (track < 0 || track >= count) return -1;
+	if (skip_silent) {
+		track = first_audible_track(track, count, loaded_rate, 0);
+		if (track < 0) return -1;
+	}
+	apply_mute();
+	if (gme_start_track(emu, track)) return -1;
+	loaded_track = track;
+	return track;
 }
 
 /*

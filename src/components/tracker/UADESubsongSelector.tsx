@@ -8,11 +8,11 @@
  *  3. Tells UADEEngine to jump to the new subsong
  */
 
-import React, { useCallback } from 'react';
-import { useFormatStore, useTransportStore, useTrackerStore } from '@stores';
+import React from 'react';
+import { useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { Music2 } from 'lucide-react';
-import { notify } from '@stores/useNotificationStore';
+import { switchSubsong } from '@/lib/tracker/subsongSwitch';
 import { CustomSelect } from '@components/common/CustomSelect';
 
 export const UADESubsongSelector: React.FC = React.memo(() => {
@@ -23,36 +23,8 @@ export const UADESubsongSelector: React.FC = React.memo(() => {
     }))
   );
 
-  const setPatternOrder = useTrackerStore((state) => state.setPatternOrder);
-  const setCurrentPattern = useTrackerStore((state) => state.setCurrentPattern);
-  const setSpeed = useTransportStore((state) => state.setSpeed);
-
-  const handleSubsongChange = useCallback(
-    async (newIdx: number) => {
-      if (!uadeEditableSubsongs || newIdx === uadeEditableCurrentSubsong) return;
-
-      // Update store, pattern view, and transport
-      useFormatStore.setState({ uadeEditableCurrentSubsong: newIdx });
-      setPatternOrder([newIdx]);
-      setCurrentPattern(newIdx);
-      setSpeed(uadeEditableSubsongs.speeds[newIdx] ?? 6);
-
-      // Switch UADE subsong in-place (no full reload — avoids double-init)
-      try {
-        const { UADEEngine } = await import('@engine/uade/UADEEngine');
-        if (UADEEngine.hasInstance()) {
-          const engine = UADEEngine.getInstance();
-          engine.setSubsong(newIdx);
-          engine.play();
-        }
-      } catch {
-        // UADEEngine not loaded yet — will pick up on next play
-      }
-
-      notify.success(`Subsong ${newIdx + 1}/${uadeEditableSubsongs.count}`);
-    },
-    [uadeEditableSubsongs, uadeEditableCurrentSubsong, setPatternOrder, setCurrentPattern, setSpeed]
-  );
+  // The one subsong switch (lib/tracker/subsongSwitch), shared with the FT2 toolbar.
+  const handleSubsongChange = (newIdx: number) => { void switchSubsong(newIdx); };
 
   if (!uadeEditableSubsongs || uadeEditableSubsongs.count <= 1) return null;
 

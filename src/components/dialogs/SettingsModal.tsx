@@ -276,6 +276,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                     <Toggle label="" value={s.welcomeJingleEnabled} onChange={s.setWelcomeJingleEnabled} size="sm" />
                   </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Next Subsong at End:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Off: the song stops when its subsong ends</span>
+                    </div>
+                    <Toggle label="" value={s.autoAdvanceSubsongs} onChange={s.setAutoAdvanceSubsongs} size="sm" />
+                  </div>
                 </div>
               </section>
 

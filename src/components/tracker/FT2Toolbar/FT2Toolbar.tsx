@@ -14,6 +14,7 @@ import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
+import { SubsongStepButtons } from '../SubsongStepButtons';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
@@ -629,6 +630,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               <FT2NumericInput label="BPM" value={bpm} onChange={setBPM} min={32} max={255} throttleMs={50} />
             </div>
           </div>
+          <SubsongStepButtons />
           <div className="w-px h-5 bg-dark-border shrink-0" />
           <InstrumentSelector />
           {/* In dub-deck-expanded state the strip sets editorFullscreen=true and
@@ -683,6 +685,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 <div className="ft2-section ft2-col-3">
                   <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
                 </div>
+                <SubsongStepButtons className="ft2-section" />
                     <div className="ft2-section">
                   <InstrumentSelector />
                 </div>

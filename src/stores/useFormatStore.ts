@@ -25,6 +25,7 @@ import type { SF2LoadPayload } from './useSF2Store';
 import type { MaxTraxData, MaxTraxScore } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { locateMaxTraxSampleInTailRaw } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { useSF2Store } from './useSF2Store';
+import { subsongStartField, type NativeSubsongs } from '@/lib/tracker/nativeSubsongs';
 import { useCheeseCutterStore } from './useCheeseCutterStore';
 import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
@@ -49,7 +50,7 @@ export interface HivelyTrackStepUndoEntry {
   timestamp: number;
 }
 
-interface FormatStore {
+export interface FormatStore {
   editorMode: EditorMode;
   furnaceNative: FurnaceNativeData | null;
   hivelyNative: HivelyNativeData | null;
@@ -124,6 +125,14 @@ interface FormatStore {
   gmeFileData: ArrayBuffer | null;
   /** Track GmeEngine starts (0-based), with gmeFileData */
   gmeTrack: number | null;
+  /** Song AsapEngine starts (0-based), with asapFileData; null = the file's default */
+  asapSong: number | null;
+  /**
+   * Subsongs of the whole-song engine playing (game-music-emu, ASAP, PSG
+   * play), from the engine's own load report: the scope view's subsong
+   * control and the auto-advance at a subsong's end read it.
+   */
+  nativeSubsongs: NativeSubsongs | null;
   /** S98 register log for S98Engine (ymfm) */
   s98FileData: ArrayBuffer | null;
   stoneTrackerFileData: ArrayBuffer | null;
@@ -283,6 +292,8 @@ interface FormatStore {
   applyEditorMode: (song: { format?: string; linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; sndhFileData?: ArrayBuffer; gmeFileData?: ArrayBuffer; s98FileData?: ArrayBuffer; asapFileData?: ArrayBuffer; ayFileData?: ArrayBuffer; qsfFileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; sunTronicNative?: SunTronicNativeData; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   setActivisionProSubsongs: (count: number) => void;
+  /** The engine reports the subsong it plays; the start field follows, so play after stop resumes it. */
+  reportNativeSubsongs: (subsongs: NativeSubsongs) => void;
   setActivisionProCurrentSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -521,6 +532,8 @@ export const useFormatStore = create<FormatStore>()(
     sndhSubtune: null,
     gmeFileData: null,
     gmeTrack: null,
+    asapSong: null,
+    nativeSubsongs: null,
     s98FileData: null,
     stoneTrackerFileData: null,
     musicMakerFileData: null,
@@ -1091,6 +1104,9 @@ export const useFormatStore = create<FormatStore>()(
         state.sndhSubtune = (song as any).sndhSubtune ?? null;
         state.gmeFileData = (song as any).gmeFileData ?? null;
         state.gmeTrack = (song as any).gmeTrack ?? null;
+        state.asapSong = (song as any).asapSong ?? null;
+        // The new song's engine reports its subsongs once it has loaded.
+        state.nativeSubsongs = null;
         state.s98FileData = (song as any).s98FileData ?? null;
         state.stoneTrackerFileData = (song as any).stoneTrackerFileData ?? null;
         state.musicMakerFileData = (song as any).musicMakerFileData ?? null;
@@ -1230,6 +1246,10 @@ export const useFormatStore = create<FormatStore>()(
     setFurnaceActiveSubsong: (index) => set((state) => { state.furnaceActiveSubsong = index; }),
 
     setActivisionProSubsongs: (count) => set((state) => { state.activisionProSubsongCount = count; }),
+    reportNativeSubsongs: (subsongs) => set((state) => {
+      state.nativeSubsongs = subsongs;
+      Object.assign(state, subsongStartField(subsongs));
+    }),
     setActivisionProCurrentSubsong: (index) => set((state) => { state.activisionProCurrentSubsong = index; }),
 
     // TFMX mutations
@@ -1418,6 +1438,8 @@ export const useFormatStore = create<FormatStore>()(
       state.sndhSubtune = null;
       state.gmeFileData = null;
       state.gmeTrack = null;
+      state.asapSong = null;
+      state.nativeSubsongs = null;
       state.s98FileData = null;
       state.stoneTrackerFileData = null;
       state.musicMakerFileData = null;

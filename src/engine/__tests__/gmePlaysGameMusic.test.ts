@@ -29,6 +29,7 @@ interface GmeModule {
   _gme_wasm_free(): void;
   _gme_wasm_track_count(): number;
   _gme_wasm_loaded_track(): number;
+  _gme_wasm_start_track(track: number, skipSilent: number): number;
   _gme_wasm_voice_count(): number;
   _gme_wasm_scope_count(): number;
 }
@@ -151,5 +152,33 @@ describe('the game-music-emu wasm plays game music', () => {
     // A track that is already audible stays the track that plays.
     load('nsf/dr mario.nsf', 0);
     expect(b.module._gme_wasm_loaded_track()).toBe(0);
+  }, 60_000);
+
+  it('the subsong control starts the track it asks for, and auto-advance skips empty slots', () => {
+    // The scope view's subsong control and the auto-advance at a track's end
+    // start a track of the song already loaded (gme_wasm_start_track).
+    const tracks = load('nsf/dr mario.nsf', 0);
+    const m = b.module;
+    expect(m._gme_wasm_start_track(2, 0)).toBe(2);
+    expect(m._gme_wasm_loaded_track()).toBe(2);
+    expect(measure(2).peak).toBeGreaterThan(0.02);
+    expect(m._gme_wasm_start_track(tracks, 0)).toBe(-1); // out of range
+    // gradius 2: slots before 40 are effects or empty. Skipping silence
+    // starts the first track from the one asked for that makes any sound.
+    load('kss/gradius 2.kss', 40);
+    const sounds: number[] = [];
+    for (let t = 0; t < 8; t++) {
+      if (m._gme_wasm_start_track(t, 0) !== t) continue;
+      if (measure(3).peak > 0.02) sounds.push(t);
+    }
+    console.log(`[gme] gradius 2 tracks 0-7 sounding: ${sounds.join(',')}`);
+    const empty = [0, 1, 2, 3, 4, 5, 6].find((t) => !sounds.includes(t) && sounds.some((s) => s > t));
+    expect(empty).toBeDefined();
+    const next = m._gme_wasm_start_track(empty!, 1);
+    expect(next).toBe(sounds.find((s) => s > empty!));
+    expect(m._gme_wasm_loaded_track()).toBe(next);
+    expect(measure(3).peak).toBeGreaterThan(0.02);
+    m._gme_wasm_free();
+    expect(m._gme_wasm_start_track(0, 0)).toBe(-1); // nothing loaded
   }, 60_000);
 });

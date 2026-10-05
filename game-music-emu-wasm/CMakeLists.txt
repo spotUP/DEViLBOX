@@ -52,7 +52,7 @@ set_target_properties(Gme PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/gme"
 )
 
-set(EXPORTED_FUNCS "_malloc,_free,_gme_wasm_load,_gme_wasm_render,_gme_wasm_render_channels,_gme_wasm_set_mute_mask,_gme_wasm_free,_gme_wasm_track_count,_gme_wasm_voice_count,_gme_wasm_voice_name,_gme_wasm_scope_count,_gme_wasm_info,_gme_wasm_loaded_track")
+set(EXPORTED_FUNCS "_malloc,_free,_gme_wasm_load,_gme_wasm_render,_gme_wasm_render_channels,_gme_wasm_set_mute_mask,_gme_wasm_free,_gme_wasm_track_count,_gme_wasm_voice_count,_gme_wasm_voice_name,_gme_wasm_scope_count,_gme_wasm_info,_gme_wasm_loaded_track,_gme_wasm_start_track")
 
 target_link_options(Gme PRIVATE
     "SHELL:-s MODULARIZE=1"

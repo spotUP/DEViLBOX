@@ -16,10 +16,15 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import { SubsongRequests, reportSubsongs } from '@engine/wasm/subsongRequests';
+import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
 
-export class PsgplayEngine extends WASMSingletonBase {
+export class PsgplayEngine extends WASMSingletonBase implements SubsongPlayer {
   private static instance: PsgplayEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+  private readonly subsongRequests = new SubsongRequests();
+  /** The file loaded: PSG play starts another subtune by loading it again. */
+  private tune: ArrayBuffer | null = null;
 
   private constructor() {
     super();
@@ -71,12 +76,16 @@ export class PsgplayEngine extends WASMSingletonBase {
         case 'moduleLoaded':
           useOscilloscopeStore.getState().setChipInfo(3, 0, ['YM2149 A', 'YM2149 B', 'YM2149 C']);
           console.log(`[PsgplayEngine] SNDH loaded, subtune ${data.track} of ${data.subtunes}`);
+          // PSG play counts subtunes from 1; the model from 0.
+          reportSubsongs('Psgplay', data.subtunes as number, (data.track as number) - 1);
+          this.subsongRequests.settle((data.track as number) - 1);
           break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'error':
           console.error('[PsgplayEngine]', data.message);
+          this.subsongRequests.settle(-1);
           break;
       }
     };
@@ -92,7 +101,16 @@ export class PsgplayEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer, track = 0): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PsgplayEngine not initialized');
+    this.tune = buffer;
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, track });
+  }
+
+  /** Start subtune `index` (0-based) of the file loaded: PSG play reloads it on that subtune. */
+  playSubsong(index: number): Promise<number> {
+    const node = this.workletNode;
+    const tune = this.tune;
+    if (!node || !tune) return Promise.resolve(-1);
+    return this.subsongRequests.request(() => node.port.postMessage({ type: 'loadModule', moduleData: tune, track: index + 1 }));
   }
 
   play(): void { /* the tune starts on load */ }

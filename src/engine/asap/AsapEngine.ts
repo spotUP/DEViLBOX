@@ -13,10 +13,13 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import { SubsongRequests, reportSubsongs } from '@engine/wasm/subsongRequests';
+import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
 
-export class AsapEngine extends WASMSingletonBase {
+export class AsapEngine extends WASMSingletonBase implements SubsongPlayer {
   private static instance: AsapEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+  private readonly subsongRequests = new SubsongRequests();
 
   private constructor() {
     super();
@@ -69,6 +72,14 @@ export class AsapEngine extends WASMSingletonBase {
 
         case 'moduleLoaded':
           console.log('[AsapEngine] Module loaded', data.meta);
+          if (typeof data.meta?.songs === 'number' && typeof data.meta?.song === 'number' && data.meta.song >= 0) {
+            reportSubsongs('Asap', data.meta.songs, data.meta.song);
+          }
+          break;
+
+        case 'songChanged':
+          if ((data.song as number) >= 0) reportSubsongs('Asap', data.songs as number, data.song as number);
+          this.subsongRequests.settle(data.song as number);
           break;
 
         case 'error':
@@ -87,12 +98,13 @@ export class AsapEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
-  async loadTune(buffer: ArrayBuffer, filename?: string): Promise<void> {
+  /** Load a tune and start `song` (0-based; -1 = the file's default song). */
+  async loadTune(buffer: ArrayBuffer, filename?: string, song = -1): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('AsapEngine not initialized');
 
     this.workletNode.port.postMessage(
-      { type: 'loadModule', moduleData: buffer, filename: filename || 'tune.sap' },
+      { type: 'loadModule', moduleData: buffer, filename: filename || 'tune.sap', song },
     );
   }
 
@@ -108,8 +120,11 @@ export class AsapEngine extends WASMSingletonBase {
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 
-  playSong(song: number): void {
-    this.workletNode?.port.postMessage({ type: 'playSong', song });
+  /** Start song `index` (0-based) of the tune loaded. ASAP has no empty songs to skip. */
+  playSubsong(index: number): Promise<number> {
+    const node = this.workletNode;
+    if (!node) return Promise.resolve(-1);
+    return this.subsongRequests.request(() => node.port.postMessage({ type: 'playSong', song: index }));
   }
 
   setMuteMask(mask: number): void {

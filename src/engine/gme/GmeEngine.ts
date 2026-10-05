@@ -10,6 +10,7 @@
  */
 
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { useFormatStore } from '@stores/useFormatStore';
 import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
@@ -17,10 +18,13 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import { SubsongRequests, reportSubsongs } from '@engine/wasm/subsongRequests';
+import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
 
-export class GmeEngine extends WASMSingletonBase {
+export class GmeEngine extends WASMSingletonBase implements SubsongPlayer {
   private static instance: GmeEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+  private readonly subsongRequests = new SubsongRequests();
 
   private constructor() {
     super();
@@ -73,9 +77,18 @@ export class GmeEngine extends WASMSingletonBase {
           // The voices the oscilloscopes get, named by game-music-emu.
           const names = (data.voices as string[]).slice(0, data.scopes as number);
           useOscilloscopeStore.getState().setChipInfo(names.length, 0, names);
+          // The track playing is the one game-music-emu chose (first audible), not the one asked for.
+          reportSubsongs('Gme', data.tracks as number, data.track as number, data.names as string[] | undefined);
           console.log(`[GmeEngine] loaded, track ${data.track + 1} of ${data.tracks}, voices ${(data.voices as string[]).join(', ')}`);
           break;
         }
+        case 'trackStarted':
+          if ((data.track as number) >= 0) {
+            const prev = useFormatStore.getState().nativeSubsongs;
+            reportSubsongs('Gme', data.tracks as number, data.track as number, prev?.engine === 'Gme' ? prev.names : undefined);
+          }
+          this.subsongRequests.settle(data.track as number);
+          break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
@@ -100,6 +113,13 @@ export class GmeEngine extends WASMSingletonBase {
   }
 
   play(): void { /* the track starts on load */ }
+
+  /** Start track `index` (0-based) of the file loaded; `skipSilent` passes over empty slots. */
+  playSubsong(index: number, opts?: { skipSilent?: boolean }): Promise<number> {
+    const node = this.workletNode;
+    if (!node) return Promise.resolve(-1);
+    return this.subsongRequests.request(() => node.port.postMessage({ type: 'startTrack', track: index, skipSilent: !!opts?.skipSilent }));
+  }
 
   /** Bit N set = voice N audible - the mixer's solo/mute. */
   setMuteMask(mask: number): void {
