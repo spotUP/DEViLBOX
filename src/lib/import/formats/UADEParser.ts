@@ -15,7 +15,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, UADEConfig } from '@/types/instrument';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { UADEEnhancedScanRow, UADEMetadata } from '@/engine/uade/UADEEngine';
-import { enhancedSamplesAreUnusable } from '@lib/import/uadeScanQuality';
+import { enhancedSamplesAreUnusable, nativeGridHasNotes } from '@lib/import/uadeScanQuality';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // Amiga C-3 reference sample rate (PAL: 3546895 / 428 ≈ 8287 Hz; industry standard 8363 Hz)
@@ -1065,7 +1065,7 @@ export async function parseUADEFile(
     if (route) {
       try {
         const nativeSong = await route();
-        if (nativeSong) {
+        if (nativeSong && (!(nativeSong as { uadeDeferredCapture?: boolean }).uadeDeferredCapture || nativeGridHasNotes(nativeSong))) {
           console.log(`[UADEParser] '${fmt}' → native parser`);
           nativeSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
           nativeSong.uadeEditableFileName ??= filename;

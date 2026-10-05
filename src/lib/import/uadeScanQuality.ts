@@ -64,3 +64,14 @@ export function enhancedSamplesAreUnusable(
   }
   return true;
 }
+
+/**
+ * A hybrid native route (native samples + deferred tick capture) may only keep
+ * its grid when that grid carries notes. A stub parser returns one empty
+ * 64-row pattern; keeping it freezes the editor on a blank pattern until the
+ * 15 s deferred capture lands (kh.* "fiendish freddys - songs.kh": grid did not
+ * scroll). With no notes the UADE scan builds the grid, as for parser-less formats.
+ */
+export function nativeGridHasNotes(song: { patterns: ReadonlyArray<{ channels: ReadonlyArray<{ rows: ReadonlyArray<{ note: number }> }> }> }): boolean {
+  return song.patterns.some((p) => p.channels.some((ch) => ch.rows.some((r) => r.note > 0)));
+}
