@@ -445,6 +445,24 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/tfm/TFMEngine')).TFMEngine as unknown as WASMSingletonStatic,
   },
   {
+    // Atari ST SNDH (.snd/.sndh, raw or ICE!-packed): PSG play runs the
+    // file's own 68000 code with YM2149, MFP timers and STE DMA sound in
+    // psgplay-wasm; the grid is a view (SNDHParser). SC68 containers stay
+    // on Sc68. The subtune rides as a load arg (0 = the file's default).
+    key: 'Psgplay',
+    synthType: 'PsgplaySynth',
+    suppressNotes: true,
+    fileDataKey: 'sndhFileData',
+    formats: ['SNDH'],
+    loadMethod: 'loadTune',
+    getLoadArgs: (song: TrackerSong) => [song.sndhSubtune ?? 0],
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/psgplay/PsgplayEngine')).PsgplayEngine as unknown as WASMSingletonStatic,
+  },
+  {
     // StoneTracker (.spm + .sps, Amiga): the authors' StonePlayer_Hard.bin
     // runs on Musashi's 68020 with a Paula + CIA-B in stonetracker-wasm; the
     // grid is a view (StoneTrackerParser). The SPS bank rides as a load arg.

@@ -73,6 +73,7 @@ export const FILE_DATA_FIELDS = [
   'ayFileData',
   'piyoPiyoFileData',
   'tfmFileData',
+  'sndhFileData',             // Atari ST SNDH for PsgplayEngine
   'stoneTrackerFileData',
   'stoneTrackerSampleData',   // companion SPS sample bank for StoneTracker
   'musicMakerFileData',       // MusicMaker V8 song + instruments (FORM/MMV8)

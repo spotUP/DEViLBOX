@@ -4,7 +4,7 @@
  * These are native-only formats with no UADE fallback — they each have
  * dedicated parsers that handle the chip register dump playback.
  *
- * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, MDX, PiyoPiyo, TFM, PMD, S98, SNDH, QSF
+ * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, MDX, PiyoPiyo, TFM, PMD, S98, QSF
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -129,12 +129,6 @@ export async function tryChipDumpParse(
   if (/\.s98$/.test(filename)) {
     const { parseS98File } = await import('@lib/import/formats/S98Parser');
     return parseS98File(buffer);
-  }
-
-  // ── SNDH — Atari ST (routed here as fallback; SC68 container handled in AmigaFormatParsers)
-  if (/\.sndh$/.test(filename)) {
-    const { parseSNDHFile } = await import('@lib/import/formats/SNDHParser');
-    return parseSNDHFile(buffer);
   }
 
   // ── QSF — Capcom QSound (CPS1/CPS2 arcade) ───────────────────────────────

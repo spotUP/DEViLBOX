@@ -1840,7 +1840,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'sndh',
     label: 'SNDH/SC68',
-    description: 'Atari ST music (YM2149)',
+    description: 'Atari ST music (YM2149; SNDH on PSG play, SC68 containers on sc68)',
     family: 'chip-dump',
     matchMode: 'extension',
     extRegex: /\.(sndh|sc68)$/i,

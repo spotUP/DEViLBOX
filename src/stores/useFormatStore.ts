@@ -117,6 +117,9 @@ interface FormatStore {
   ayFileData: ArrayBuffer | null;
   piyoPiyoFileData: ArrayBuffer | null;
   tfmFileData: ArrayBuffer | null;
+  sndhFileData: ArrayBuffer | null;
+  /** SNDH subtune PsgplayEngine starts (1-based), with sndhFileData */
+  sndhSubtune: number | null;
   stoneTrackerFileData: ArrayBuffer | null;
   musicMakerFileData: ArrayBuffer | null;
   stoneTrackerSampleData: ArrayBuffer | null;
@@ -508,6 +511,8 @@ export const useFormatStore = create<FormatStore>()(
     ayFileData: null,
     piyoPiyoFileData: null,
     tfmFileData: null,
+    sndhFileData: null,
+    sndhSubtune: null,
     stoneTrackerFileData: null,
     musicMakerFileData: null,
     stoneTrackerSampleData: null,
@@ -1073,6 +1078,8 @@ export const useFormatStore = create<FormatStore>()(
         state.ayFileData = (song as any).ayFileData ?? null;
         state.piyoPiyoFileData = (song as any).piyoPiyoFileData ?? null;
         state.tfmFileData = (song as any).tfmFileData ?? null;
+        state.sndhFileData = (song as any).sndhFileData ?? null;
+        state.sndhSubtune = (song as any).sndhSubtune ?? null;
         state.stoneTrackerFileData = (song as any).stoneTrackerFileData ?? null;
         state.musicMakerFileData = (song as any).musicMakerFileData ?? null;
         state.stoneTrackerSampleData = (song as any).stoneTrackerSampleData ?? null;
@@ -1392,6 +1399,8 @@ export const useFormatStore = create<FormatStore>()(
       state.ayFileData = null;
       state.piyoPiyoFileData = null;
       state.tfmFileData = null;
+      state.sndhFileData = null;
+      state.sndhSubtune = null;
       state.stoneTrackerFileData = null;
       state.musicMakerFileData = null;
       state.stoneTrackerSampleData = null;

@@ -46,6 +46,15 @@ describe('live song format', () => {
     expect(playingEngineFromStores(useFormatStore.getState() as unknown as Record<string, unknown>, [])).toBe('TFM');
   });
 
+  it('an Atari ST SNDH song activates the Psgplay engine on its subtune', () => {
+    useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
+    useFormatStore.getState().applyEditorMode({ format: 'SNDH', sndhFileData: new ArrayBuffer(16), sndhSubtune: 3 } as never);
+    const live = liveTrackerSong();
+    expect(playingEngineFor(live)).toBe('Psgplay');
+    expect(live.sndhSubtune).toBe(3);
+    expect(playingEngineFromStores(useFormatStore.getState() as unknown as Record<string, unknown>, [])).toBe('Psgplay');
+  });
+
   it('a StoneTracker song activates the StoneTracker engine with its sample bank', () => {
     useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
     const bank = new ArrayBuffer(8);
