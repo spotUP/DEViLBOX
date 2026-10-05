@@ -20,6 +20,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { DeltaMusic1Config } from '@/types';
+import { noteToDM1Index } from '@/lib/import/formats/DeltaMusic1Notes';
 
 // -- Constants ---------------------------------------------------------------
 
@@ -40,23 +41,6 @@ export interface DeltaMusic1ExportResult {
 
 // -- Utility -----------------------------------------------------------------
 
-/**
- * Convert XM note (1-96) to DM1 note index (1-83).
- * Parser does: DM1 note -> DM1_PERIODS[note] -> periodToNoteIndex -> amigaNoteToXM (adds 36)
- * Reverse: xmNote - 36 = amiga note index, which maps directly to DM1 period table index + 1
- * because DM1_PERIODS[1..72] matches AMIGA_PERIODS[0..71].
- */
-function xmNoteToDM1(xmNote: number): number {
-  if (xmNote <= 0 || xmNote === 97) return 0;
-  // Parser: dm1NoteToXM does note -> DM1_PERIODS[note] -> periodToNoteIndex -> +36
-  // periodToNoteIndex finds closest match in AMIGA_PERIODS (0-based index)
-  // amigaNoteToXM adds 36 to that index
-  // Reverse: xmNote - 36 = amigaIdx (0-based), DM1 note = amigaIdx + 1
-  const amigaIdx = xmNote - 36;
-  if (amigaIdx < 0) return 0;
-  const dm1Note = amigaIdx + 1;
-  return Math.min(83, Math.max(1, dm1Note));
-}
 
 /**
  * Reverse-map XM effect type to DM1 effect type.
@@ -300,7 +284,7 @@ export async function exportDeltaMusic1(
           if (!cell) return { instrument: 0, note: 0, effect: 0, effectArg: 0 };
 
           const xmNote = cell.note ?? 0;
-          const dm1Note = xmNoteToDM1(xmNote);
+          const dm1Note = xmNote === 97 ? 0 : noteToDM1Index(xmNote);
 
           // Instrument: DEViLBOX 1-based -> DM1 0-based
           const instrId = cell.instrument ?? 0;

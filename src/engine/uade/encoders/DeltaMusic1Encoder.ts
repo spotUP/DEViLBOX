@@ -9,15 +9,16 @@
  *
  * DeltaMusic uses 16-row blocks (not 64), assembled from 4 track sequences.
  *
- * Note mapping:
- *   Parser: DM1 note → period → periodToNoteIndex → amigaNoteToXM (adds 36)
- *   Reverse: xmNote → amigaIdx = xmNote - 36 (period table index)
- *   The DM1 format stores a raw note index (1-83) which maps to its own period table.
- *   Since the parser maps through the standard Amiga period table, we reverse through that.
+ * Note mapping: DeltaMusic1Notes.noteToDM1Index, the inverse of the name the
+ * parser gives a note byte (the period it plays, periodNotes naming). An
+ * unedited cell carries its exact source note byte in `period` (set by the
+ * parser's decodeCell) and gets it back verbatim, since several bytes share
+ * a name.
  */
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { noteToDM1Index } from '@/lib/import/formats/DeltaMusic1Notes';
 
 function encodeDeltaMusic1Cell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
@@ -27,16 +28,9 @@ function encodeDeltaMusic1Cell(cell: TrackerCell): Uint8Array {
   const instr = cell.instrument ?? 0;
   out[0] = instr > 0 ? (instr - 1) & 0xFF : 0;
 
-  // Byte 1: note index
-  // Parser does: DM1 noteVal → DM1_PERIODS[noteVal-1] → periodToNoteIndex → +36 = xmNote
-  // Reverse: xmNote - 36 = amiga index (1-based) → we need to find the DM1 note that
-  // maps to this period. Since DM1 periods are a superset, we approximate:
-  // For standard range, amiga note index ≈ DM1 note value
-  if (note > 0 && note > 36) {
-    out[1] = Math.min(83, note - 36);
-  } else {
-    out[1] = 0;
-  }
+  // Byte 1: note index - the exact source byte when decodeCell left it in the
+  // carrier, else the index that plays the grid note.
+  out[1] = cell.period !== undefined ? cell.period & 0xFF : noteToDM1Index(note);
 
   // Byte 2-3: effect type + param
   out[2] = (cell.effTyp ?? 0) & 0xFF;
