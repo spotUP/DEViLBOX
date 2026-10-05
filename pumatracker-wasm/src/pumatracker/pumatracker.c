@@ -125,6 +125,52 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
   WRITE32(addr, val);
 }
 
+/* -- Hardware Read Interception ---------------------------------------
+ * Symmetric to hw_write*: a MOVE.B $BFE001,D0 (read CIA-A control, e.g.
+ * GetAudioFilter probing the LED/audio-filter bit) must NOT dereference
+ * linear memory at 0xBFE001 — that address is a hardware register, not
+ * RAM, and reading it raw is a ~12.5 MB out-of-bounds access. Reads in
+ * the CIA ($BF0000-$BFFFFF) and custom-chip ($DFF000-$DFFFFF) ranges
+ * return a benign default (0), except the video beam below; everything
+ * else falls through to real memory so genuine absolute RAM reads still
+ * work.
+ * -------------------------------------------------------------------- */
+/* -- Video beam: VPOSR $DFF004 / VHPOSR $DFF006 ------------------------
+ * Replayers busy-wait on the beam, e.g. the DMA settle after stopping a
+ * voice:  MOVE.B $DFF006,D0 / ADDQ.B #1,D0 / .w CMP.B $DFF006,D0 / BNE .w
+ * A constant here (0, or raw linear memory) never changes, so such a wait
+ * spins forever on the audio thread. There is no real beam, so every read
+ * advances it one scanline and one horizontal step: a wait for the next
+ * line ends on the next read, a wait for line N within one frame (313 PAL
+ * lines). Returned as the longword at $DFF004: VPOSR (V8 in bit 16) then
+ * VHPOSR (V7-V0 in bits 15-8, H8-H1 in bits 7-0); every access width at
+ * $DFF004-$DFF007 reads its slice of one advance.
+ * -------------------------------------------------------------------- */
+static uint32_t hw_beam_v = 0, hw_beam_h = 0;
+static inline uint32_t hw_beam_read(void) {
+  hw_beam_v = (hw_beam_v + 1) % 313;  /* PAL lines per frame */
+  hw_beam_h = (hw_beam_h + 1) % 227;  /* PAL colour clocks per line */
+  return ((hw_beam_v >> 8) << 16) | ((hw_beam_v & 0xFF) << 8) | hw_beam_h;
+}
+static inline uint8_t hw_read8(uint32_t addr) {
+  if (addr >= 0xDFF004 && addr <= 0xDFF007) return (uint8_t)(hw_beam_read() >> (8 * (0xDFF007 - addr)));
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read (e.g. $BFE001 filter bit) */
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read */
+  return READ8(addr);
+}
+static inline uint16_t hw_read16(uint32_t addr) {
+  if (addr == 0xDFF004 || addr == 0xDFF006) return (uint16_t)(hw_beam_read() >> (8 * (0xDFF006 - addr)));
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read */
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read (DMACONR, INTREQR, ...) */
+  return READ16(addr);
+}
+static inline uint32_t hw_read32(uint32_t addr) {
+  if (addr == 0xDFF004) return hw_beam_read();
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read */
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read */
+  return READ32(addr);
+}
+
 /* -- EQU Constants ------------------------------------------------- */
 /* Mt_Data is set dynamically by player_load() to point to the module buffer */
 uint32_t g_Mt_Data = 0;
@@ -499,7 +545,7 @@ static void Begin(void) {
       flag_v = 0; flag_c = 0;
     }
 WaitMouse:
-  flag_z = ((READ32(0xbfe001) & (1u << (6 & 31))) == 0);  /* BTST	#6,$BFE001 */
+  flag_z = ((hw_read8(0xbfe001) & (1u << ((6) & 7))) == 0);  /* BTST	#6,$BFE001 */
   if (!flag_z) goto WaitMouse;  /* not equal / nonzero */  /* BNE.B	WaitMouse */
   Restore_All();  /* BSR.B	Restore_All */
   Mt_end();  /* BSR.W	Mt_end */
@@ -567,13 +613,7 @@ static void Save_All(void) {
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	#4,A6 */
-      uint32_t _mv = (uint32_t)(4);
-      a6 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a6 = 4;  /* MOVE.L	#4,A6 */
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + -132)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	-132(A6) */
   a0 = (uint32_t)(uintptr_t)Save_Irq;  /* LEA	Save_Irq(PC),A0 */
   {  /* MOVE.L	#$6c,(A0)+ */
@@ -584,21 +624,29 @@ static void Save_All(void) {
       flag_v = 0; flag_c = 0;
     }
   {  /* MOVE.W	$DFF01C,(A0) */
-      uint16_t _mv = (uint16_t)(READ16(0xdff01c));
+      uint16_t _mv = (uint16_t)(hw_read16(0xdff01c));
       hw_write16(a0, _mv);
       flag_z = ((int16_t)(_mv) == 0);
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  WRITE16_POST(a0, READ16_POST(a0) | 0xc000);  /* OR.W	#$c000,(A0)+ */
+  {  /* OR.W	#$c000,(A0)+ */
+      uint16_t _lr = (uint16_t)(READ16_POST(a0) | 0xc000);
+      WRITE16_POST(a0, _lr);
+      flag_z = (_lr == 0); flag_n = ((int16_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   {  /* MOVE.W	$DFF002,(A0) */
-      uint16_t _mv = (uint16_t)(READ16(0xdff002));
+      uint16_t _mv = (uint16_t)(hw_read16(0xdff002));
       hw_write16(a0, _mv);
       flag_z = ((int16_t)(_mv) == 0);
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  hw_write16(a0, READ16(a0) | 0x8100);  /* OR.W	#$8100,(A0) */
+  {  /* OR.W	#$8100,(A0) */
+      uint16_t _lr = (uint16_t)(READ16(a0) | 0x8100);
+      hw_write16(a0, _lr);
+      flag_z = (_lr == 0); flag_n = ((int16_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   return;  /* RTS */
 }
 
@@ -640,13 +688,7 @@ static void Restore_All(void) {
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	#$4,A6 */
-      uint32_t _mv = (uint32_t)(0x4);
-      a6 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a6 = 0x4;  /* MOVE.L	#$4,A6 */
   a1 = (uint32_t)(uintptr_t)Name_GLib;  /* LEA	Name_GLib(PC),A1 */
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + -552)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	-552(A6) */
@@ -665,13 +707,7 @@ static void Restore_All(void) {
       flag_v = 0; flag_c = 0;
     }
   /* hw $dff088 */ (void)(0);  /* CLR.W	$DFF088 */
-  {  /* MOVE.L	D0,A1 */
-      uint32_t _mv = (uint32_t)(d0);
-      a1 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a1 = d0;  /* MOVE.L	D0,A1 */
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + -414)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	-414(A6) */
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + -138)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	-138(A6) */
   return;  /* RTS */
@@ -684,7 +720,11 @@ void Mt_init(void) {
   a4 = (uint32_t)(uintptr_t)Mt_Data;  /* LEA	Mt_Data,A4 */
   a2 = (uint32_t)(uintptr_t)MusicData;  /* LEA	MusicData(PC),A2 */
   a0 = (uint32_t)(uintptr_t)Mt_Voice1;  /* LEA	Mt_Voice1(PC),A0 */
-  hw_write32(a0 + 34, READ32(a0 + 34) & ~(1u << (2 & 31)));  /* BCLR	#2,34(A0) */
+  {  /* BCLR	#2,34(A0) */
+      uint32_t _bv = (uint32_t)(READ8(a0 + 34));
+      flag_z = ((_bv & (1u << ((2) & 7))) == 0);
+      hw_write8(a0 + 34, (uint8_t)(_bv & ~(1u << ((2) & 7))));
+    }
   {  /* MOVE.B	#1,18(A0) */
       uint8_t _mv = (uint8_t)(1);
       hw_write8(a0 + 18, _mv);
@@ -693,7 +733,11 @@ void Mt_init(void) {
       flag_v = 0; flag_c = 0;
     }
   a0 = (uint32_t)(uintptr_t)Mt_Voice2;  /* LEA	Mt_Voice2(PC),A0 */
-  hw_write32(a0 + 34, READ32(a0 + 34) & ~(1u << (2 & 31)));  /* BCLR	#2,34(A0) */
+  {  /* BCLR	#2,34(A0) */
+      uint32_t _bv = (uint32_t)(READ8(a0 + 34));
+      flag_z = ((_bv & (1u << ((2) & 7))) == 0);
+      hw_write8(a0 + 34, (uint8_t)(_bv & ~(1u << ((2) & 7))));
+    }
   {  /* MOVE.B	#1,18(A0) */
       uint8_t _mv = (uint8_t)(1);
       hw_write8(a0 + 18, _mv);
@@ -702,7 +746,11 @@ void Mt_init(void) {
       flag_v = 0; flag_c = 0;
     }
   a0 = (uint32_t)(uintptr_t)Mt_Voice3;  /* LEA	Mt_Voice3(PC),A0 */
-  hw_write32(a0 + 34, READ32(a0 + 34) & ~(1u << (2 & 31)));  /* BCLR	#2,34(A0) */
+  {  /* BCLR	#2,34(A0) */
+      uint32_t _bv = (uint32_t)(READ8(a0 + 34));
+      flag_z = ((_bv & (1u << ((2) & 7))) == 0);
+      hw_write8(a0 + 34, (uint8_t)(_bv & ~(1u << ((2) & 7))));
+    }
   {  /* MOVE.B	#1,18(A0) */
       uint8_t _mv = (uint8_t)(1);
       hw_write8(a0 + 18, _mv);
@@ -711,7 +759,11 @@ void Mt_init(void) {
       flag_v = 0; flag_c = 0;
     }
   a0 = (uint32_t)(uintptr_t)Mt_Voice4;  /* LEA	Mt_Voice4(PC),A0 */
-  hw_write32(a0 + 34, READ32(a0 + 34) & ~(1u << (2 & 31)));  /* BCLR	#2,34(A0) */
+  {  /* BCLR	#2,34(A0) */
+      uint32_t _bv = (uint32_t)(READ8(a0 + 34));
+      flag_z = ((_bv & (1u << ((2) & 7))) == 0);
+      hw_write8(a0 + 34, (uint8_t)(_bv & ~(1u << ((2) & 7))));
+    }
   {  /* MOVE.B	#1,18(A0) */
       uint8_t _mv = (uint8_t)(1);
       hw_write8(a0 + 18, _mv);
@@ -735,6 +787,7 @@ void Mt_init(void) {
     }
   {  /* ADDQ.W	#1,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + 1);
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d0)));
       W(d0) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -774,14 +827,8 @@ lbC005F20:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  {  /* MOVE.L	(A6)+,A5 */
-      uint32_t _mv = (uint32_t)(READ32_POST(a6));
-      a5 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
-  a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(READ32((uintptr_t)MusicData)));  /* ADD.L	MusicData(PC),A5 */
+  a5 = READ32_POST(a6);  /* MOVE.L	(A6)+,A5 */
+  a5 = (uint32_t)((int32_t)a5 + (int32_t)(READ32((uintptr_t)MusicData)));  /* ADD.L	MusicData(PC),A5 */
   {  /* MOVE.L	A5,(A3)+ */
       uint32_t _mv = (uint32_t)(a5);
       WRITE32_POST(a3, _mv);
@@ -819,6 +866,7 @@ lbC005F38:
     }
   {  /* ADDQ.W	#1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + 1);
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -826,6 +874,7 @@ lbC005F38:
   d1 = (uint32_t)((uint16_t)14 * (uint16_t)W(d1));  /* MULU	#14,D1 */
   {  /* SUBQ.W	#4,D1 */
       uint16_t _sr = (uint16_t)(W(d1) - (uint16_t)(4));
+      flag_c = flag_x = (int)((uint16_t)_sr > (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_sr);
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
@@ -882,6 +931,7 @@ lbC005F66:
     }
   {  /* SUBQ.W	#1,D0 */
       uint16_t _sr = (uint16_t)(W(d0) - (uint16_t)(1));
+      flag_c = flag_x = (int)((uint16_t)_sr > (uint16_t)(W(d0)));
       W(d0) = (uint16_t)((uint16_t)_sr);
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
@@ -1004,6 +1054,7 @@ lbC005FE4:
     }
   {  /* ADD.W	D0,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d0));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d0)));
       W(d0) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -1018,22 +1069,21 @@ lbC005FE4:
   W(d0) = (uint16_t)(W(d0) << 3);  /* LSL.W	#3,D0 */
   {  /* SUB.W	D1,D0 */
       uint16_t _sr = (uint16_t)(W(d0) - W(d1));
+      flag_c = flag_x = (int)((uint16_t)_sr > (uint16_t)(W(d0)));
       W(d0) = (uint16_t)((uint16_t)_sr);
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  {  /* MOVE.L	MusicData(PC),A5 */
-      uint32_t _mv = (uint32_t)(READ32((uintptr_t)MusicData));
-      a5 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a5 = READ32((uintptr_t)MusicData);  /* MOVE.L	MusicData(PC),A5 */
   a5 = (uint32_t)(a5 + 80);  /* LEA	80(A5),A5 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(W(d0)));  /* ADD.W	D0,A5 */
   a4 = (uint32_t)(uintptr_t)MusicData7;  /* LEA	MusicData7(PC),A4 */
   a6 = (uint32_t)(uintptr_t)Mt_Voice1;  /* LEA	Mt_Voice1(PC),A6 */
-  hw_write8(a6 + 20, READ8(a6 + 20) | 1);  /* OR.B	#1,20(A6) */
+  {  /* OR.B	#1,20(A6) */
+      uint8_t _lr = (uint8_t)(READ8(a6 + 20) | 1);
+      hw_write8(a6 + 20, _lr);
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   d1 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D1 */
   {  /* MOVE.B	(A5)+,D1 */
       uint8_t _mv = (uint8_t)(READ8_POST(a5));
@@ -1044,12 +1094,14 @@ lbC005FE4:
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -1089,7 +1141,11 @@ lbC005FE4:
       flag_v = 0; flag_c = 0;
     }
   a6 = (uint32_t)(uintptr_t)Mt_Voice2;  /* LEA	Mt_Voice2(PC),A6 */
-  hw_write8(a6 + 20, READ8(a6 + 20) | 1);  /* OR.B	#1,20(A6) */
+  {  /* OR.B	#1,20(A6) */
+      uint8_t _lr = (uint8_t)(READ8(a6 + 20) | 1);
+      hw_write8(a6 + 20, _lr);
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   d1 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D1 */
   {  /* MOVE.B	(A5)+,D1 */
       uint8_t _mv = (uint8_t)(READ8_POST(a5));
@@ -1100,12 +1156,14 @@ lbC005FE4:
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -1145,7 +1203,11 @@ lbC005FE4:
       flag_v = 0; flag_c = 0;
     }
   a6 = (uint32_t)(uintptr_t)Mt_Voice3;  /* LEA	Mt_Voice3(PC),A6 */
-  hw_write8(a6 + 20, READ8(a6 + 20) | 1);  /* OR.B	#1,20(A6) */
+  {  /* OR.B	#1,20(A6) */
+      uint8_t _lr = (uint8_t)(READ8(a6 + 20) | 1);
+      hw_write8(a6 + 20, _lr);
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   d1 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D1 */
   {  /* MOVE.B	(A5)+,D1 */
       uint8_t _mv = (uint8_t)(READ8_POST(a5));
@@ -1156,12 +1218,14 @@ lbC005FE4:
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -1201,7 +1265,11 @@ lbC005FE4:
       flag_v = 0; flag_c = 0;
     }
   a6 = (uint32_t)(uintptr_t)Mt_Voice4;  /* LEA	Mt_Voice4(PC),A6 */
-  hw_write8(a6 + 20, READ8(a6 + 20) | 1);  /* OR.B	#1,20(A6) */
+  {  /* OR.B	#1,20(A6) */
+      uint8_t _lr = (uint8_t)(READ8(a6 + 20) | 1);
+      hw_write8(a6 + 20, _lr);
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   d1 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D1 */
   {  /* MOVE.B	(A5)+,D1 */
       uint8_t _mv = (uint8_t)(READ8_POST(a5));
@@ -1212,12 +1280,14 @@ lbC005FE4:
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -1307,7 +1377,11 @@ lbC0060C2:
       flag_z = ((int32_t)(_ar) == 0);
       flag_n = ((int32_t)(_ar) < 0);
     }
-  hw_write8(a6 + 20, READ8(a6 + 20) & 0xDF);  /* AND.B	#$DF,20(A6) */
+  {  /* AND.B	#$DF,20(A6) */
+      uint8_t _lr = (uint8_t)(READ8(a6 + 20) & 0xDF);
+      hw_write8(a6 + 20, _lr);
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   d1 = (uint32_t)(int32_t)(int8_t)(1);  /* MOVEQ	#1,D1 */
   Mt_read_sample();  /* BSR.W	Mt_read_sample */
 lbC0060F2:
@@ -1325,7 +1399,11 @@ lbC0060F2:
       flag_z = ((int32_t)(_ar) == 0);
       flag_n = ((int32_t)(_ar) < 0);
     }
-  hw_write8(a6 + 20, READ8(a6 + 20) & 0xDF);  /* AND.B	#$DF,20(A6) */
+  {  /* AND.B	#$DF,20(A6) */
+      uint8_t _lr = (uint8_t)(READ8(a6 + 20) & 0xDF);
+      hw_write8(a6 + 20, _lr);
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   d1 = (uint32_t)(int32_t)(int8_t)(2);  /* MOVEQ	#2,D1 */
   Mt_read_sample();  /* BSR.W	Mt_read_sample */
 lbC00610C:
@@ -1343,7 +1421,11 @@ lbC00610C:
       flag_z = ((int32_t)(_ar) == 0);
       flag_n = ((int32_t)(_ar) < 0);
     }
-  hw_write8(a6 + 20, READ8(a6 + 20) & 0xDF);  /* AND.B	#$DF,20(A6) */
+  {  /* AND.B	#$DF,20(A6) */
+      uint8_t _lr = (uint8_t)(READ8(a6 + 20) & 0xDF);
+      hw_write8(a6 + 20, _lr);
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   d1 = (uint32_t)(int32_t)(int8_t)(4);  /* MOVEQ	#4,D1 */
   Mt_read_sample();  /* BSR.W	Mt_read_sample */
 lbC006126:
@@ -1361,7 +1443,11 @@ lbC006126:
       flag_z = ((int32_t)(_ar) == 0);
       flag_n = ((int32_t)(_ar) < 0);
     }
-  hw_write8(a6 + 20, READ8(a6 + 20) & 0xDF);  /* AND.B	#$DF,20(A6) */
+  {  /* AND.B	#$DF,20(A6) */
+      uint8_t _lr = (uint8_t)(READ8(a6 + 20) & 0xDF);
+      hw_write8(a6 + 20, _lr);
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   d1 = (uint32_t)(int32_t)(int8_t)(8);  /* MOVEQ	#8,D1 */
   Mt_read_sample();  /* BSR.W	Mt_read_sample */
 lbC006140:
@@ -1380,10 +1466,11 @@ lbC006140:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  flag_z = ((d7 & (1u << (2 & 31))) == 0);  /* BTST	#2,D7 */
+  flag_z = ((d7 & (1u << ((2) & 31))) == 0);  /* BTST	#2,D7 */
   if (flag_z) goto lbC00615E;  /* equal / zero */  /* BEQ.S	lbC00615E */
   {  /* ADDQ.B	#1,D5 */
       uint8_t _ar = (uint8_t)(B(d5) + 1);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d5)));
       B(d5) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -1405,10 +1492,11 @@ lbC00615E:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  flag_z = ((d7 & (1u << (2 & 31))) == 0);  /* BTST	#2,D7 */
+  flag_z = ((d7 & (1u << ((2) & 31))) == 0);  /* BTST	#2,D7 */
   if (flag_z) goto lbC006178;  /* equal / zero */  /* BEQ.S	lbC006178 */
   {  /* ADDQ.B	#2,D5 */
       uint8_t _ar = (uint8_t)(B(d5) + 2);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d5)));
       B(d5) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -1430,10 +1518,11 @@ lbC006178:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  flag_z = ((d7 & (1u << (2 & 31))) == 0);  /* BTST	#2,D7 */
+  flag_z = ((d7 & (1u << ((2) & 31))) == 0);  /* BTST	#2,D7 */
   if (flag_z) goto lbC006192;  /* equal / zero */  /* BEQ.S	lbC006192 */
   {  /* ADDQ.B	#4,D5 */
       uint8_t _ar = (uint8_t)(B(d5) + 4);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d5)));
       B(d5) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -1463,10 +1552,11 @@ lbC006192:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  flag_z = ((d7 & (1u << (2 & 31))) == 0);  /* BTST	#2,D7 */
+  flag_z = ((d7 & (1u << ((2) & 31))) == 0);  /* BTST	#2,D7 */
   if (flag_z) goto lbC0061B2;  /* equal / zero */  /* BEQ.S	lbC0061B2 */
   {  /* ADDQ.B	#8,D5 */
       uint8_t _ar = (uint8_t)(B(d5) + 8);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d5)));
       B(d5) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -1508,6 +1598,7 @@ lbC0061B2:
   hw_write16(a2 + 312, 0);  /* CLR.W	312(A2) */
   {  /* ADD.W	D0,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d0));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d0)));
       W(d0) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -1521,25 +1612,28 @@ lbC0061B2:
     }
   {  /* ADD.W	D0,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d0));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d0)));
       W(d0) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
   {  /* ADD.W	D0,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d0));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d0)));
       W(d0) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
   {  /* ADD.W	D1,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d0)));
       W(d0) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
   d0 = (uint32_t)(int32_t)(int16_t)d0;  /* EXT.L	D0 */
   a0 = (uint32_t)(uintptr_t)MusicData11;  /* LEA	MusicData11(PC),A0 */
-  a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(d0));  /* ADD.L	D0,A0 */
+  a0 = (uint32_t)((int32_t)a0 + (int32_t)(d0));  /* ADD.L	D0,A0 */
   {  /* MOVE.W	(A0)+,D0 */
       uint16_t _mv = (uint16_t)(READ16_POST(a0));
       W(d0) = (uint16_t)_mv;
@@ -1590,7 +1684,7 @@ lbC006200:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  flag_z = ((d7 & (1u << (2 & 31))) == 0);  /* BTST	#2,D7 */
+  flag_z = ((d7 & (1u << ((2) & 31))) == 0);  /* BTST	#2,D7 */
   if (!flag_z) goto lbC006210;  /* not equal / nonzero */  /* BNE.S	lbC006210 */
 lbC00620A:
   hw_write16(a2 + 310, 0);  /* CLR.W	310(A2) */
@@ -1605,7 +1699,11 @@ lbC006210:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  W(d5) |= (uint16_t)(8);  /* OR.W	#8,D5 */
+  {  /* OR.W	#8,D5 */
+      uint16_t _lr = (uint16_t)(W(d5) | (uint16_t)(8));
+      W(d5) = (uint16_t)_lr;
+      flag_z = (_lr == 0); flag_n = ((int16_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
 lbC006222:
   a6 = (uint32_t)(a2 + 1378);  /* LEA	1378(A2),A6 */
   goto lbC00623E;  /* BRA.S	lbC00623E */
@@ -1616,13 +1714,7 @@ lbC006222:
       flag_z = ((int32_t)(_sr) == 0);
       flag_n = ((int32_t)(_sr) < 0);
     }
-  {  /* MOVE.L	(A6),A1 */
-      uint32_t _mv = (uint32_t)(READ32(a6));
-      a1 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a1 = READ32(a6);  /* MOVE.L	(A6),A1 */
   {  /* MOVE.L	(A1)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(a1));
       d0 = _mv;
@@ -1660,7 +1752,7 @@ lbC006236:
     }
 lbC00623E:
   {  /* MOVE.B	$DFF006,D0 */
-      uint8_t _mv = (uint8_t)(READ8(0xDFF006));
+      uint8_t _mv = (uint8_t)(hw_read8(0xDFF006));
       B(d0) = (uint8_t)_mv;
       flag_z = ((int8_t)(_mv) == 0);
       flag_n = ((int8_t)(_mv) < 0);
@@ -1668,6 +1760,7 @@ lbC00623E:
     }
   {  /* ADDQ.B	#1,D0 */
       uint8_t _ar = (uint8_t)(B(d0) + 1);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d0)));
       B(d0) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -1675,7 +1768,7 @@ lbC00623E:
 lbC006246:
   {  /* CMP.B	$DFF006,D0 */
       int32_t _lhs = (int32_t)(B(d0));
-      int32_t _rhs = (int32_t)(READ8(0xDFF006));
+      int32_t _rhs = (int32_t)(hw_read8(0xDFF006));
       int32_t _cmp = _lhs - _rhs;
       flag_z = (_cmp == 0);
       flag_n = (_cmp < 0);
@@ -1683,9 +1776,17 @@ lbC006246:
     }
   if (!flag_z) goto lbC006246;  /* not equal / nonzero */  /* BNE.S	lbC006246 */
   d0 = (uint32_t)(int32_t)(int8_t)(15);  /* MOVEQ	#15,D0 */
-  B(d0) &= B(d5);  /* AND.B	D5,D0 */
+  {  /* AND.B	D5,D0 */
+      uint8_t _lr = (uint8_t)(B(d0) & B(d5));
+      B(d0) = (uint8_t)_lr;
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   W(d0) = (uint16_t)(~W(d0));  /* NOT.W	D0 */
-  W(d0) &= (uint16_t)(15);  /* AND.W	#15,D0 */
+  {  /* AND.W	#15,D0 */
+      uint16_t _lr = (uint16_t)(W(d0) & (uint16_t)(15));
+      W(d0) = (uint16_t)_lr;
+      flag_z = (_lr == 0); flag_n = ((int16_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   {  /* TST.W	MusicData3 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)MusicData3));
       flag_z = (_tst == 0);
@@ -1734,8 +1835,16 @@ lbC006274:
     }
   return;  /* RTS */
 lbC006290:
-  W(d0) &= (uint16_t)(8);  /* AND.W	#8,D0 */
-  W(d5) &= (uint16_t)(0x8008);  /* AND.W	#$8008,D5 */
+  {  /* AND.W	#8,D0 */
+      uint16_t _lr = (uint16_t)(W(d0) & (uint16_t)(8));
+      W(d0) = (uint16_t)_lr;
+      flag_z = (_lr == 0); flag_n = ((int16_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
+  {  /* AND.W	#$8008,D5 */
+      uint16_t _lr = (uint16_t)(W(d5) & (uint16_t)(0x8008));
+      W(d5) = (uint16_t)_lr;
+      flag_z = (_lr == 0); flag_n = ((int16_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   {  /* MOVE.W	D0,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d0));
       paula_dma_write((uint16_t)(_mv));
@@ -1757,13 +1866,7 @@ lbC006290:
 /* --- Mt_read_sample --- */
 static void Mt_read_sample(void) {
   W(d0) = (uint16_t)(0);  /* CLR.W	D0 */
-  {  /* MOVE.L	14(A6),A0 */
-      uint32_t _mv = (uint32_t)(READ32(a6 + 14));
-      a0 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a0 = READ32(a6 + 14);  /* MOVE.L	14(A6),A0 */
   {  /* MOVE.B	(A0)+,D0 */
       uint8_t _mv = (uint8_t)(READ8_POST(a0));
       B(d0) = (uint8_t)_mv;
@@ -1781,6 +1884,7 @@ static void Mt_read_sample(void) {
     }
   {  /* ADD.B	25(A6),D0 */
       uint8_t _ar = (uint8_t)(B(d0) + READ8(a6 + 25));
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d0)));
       B(d0) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -1801,6 +1905,7 @@ static void Mt_read_sample(void) {
     }
   {  /* ADD.B	24(A6),D0 */
       uint8_t _ar = (uint8_t)(B(d0) + READ8(a6 + 24));
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d0)));
       B(d0) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -1838,7 +1943,11 @@ lbC0062DE:
       flag_v = 0; flag_c = 0;
     }
   d0 = (uint32_t)(int32_t)(int8_t)(-0x20);  /* MOVEQ	#-$20,D0 */
-  B(d0) &= READ8_POST(a0);  /* AND.B	(A0)+,D0 */
+  {  /* AND.B	(A0)+,D0 */
+      uint8_t _lr = (uint8_t)(B(d0) & READ8_POST(a0));
+      B(d0) = (uint8_t)_lr;
+      flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   if (!flag_z) goto lbC0062F6;  /* not equal / nonzero */  /* BNE.S	lbC0062F6 */
   {  /* MOVE.B	#$40,21(A6) */
       uint8_t _mv = (uint8_t)(0x40);
@@ -1900,7 +2009,11 @@ lbC00630E:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  W(d0) &= (uint16_t)(0xFF);  /* AND.W	#$FF,D0 */
+  {  /* AND.W	#$FF,D0 */
+      uint16_t _lr = (uint16_t)(W(d0) & (uint16_t)(0xFF));
+      W(d0) = (uint16_t)_lr;
+      flag_z = (_lr == 0); flag_n = ((int16_t)_lr < 0); flag_v = 0; flag_c = 0;
+    }
   {  /* MOVE.W	D0,56(A6) */
       uint16_t _mv = (uint16_t)(W(d0));
       hw_write16(a6 + 56, _mv);
@@ -1940,13 +2053,7 @@ static void lbC006330(void) {
       flag_v = 0; flag_c = 0;
     }
 lbC006336:
-  {  /* MOVE.L	26(A6),A0 */
-      uint32_t _mv = (uint32_t)(READ32(a6 + 26));
-      a0 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a0 = READ32(a6 + 26);  /* MOVE.L	26(A6),A0 */
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d6)));  /* ADD.W	D6,A0 */
   {  /* MOVE.B	(A0)+,D1 */
       uint8_t _mv = (uint8_t)(READ8_POST(a0));
@@ -1983,7 +2090,11 @@ lbC006336:
     }
   if (flag_z) goto lbC00635C;  /* equal / zero */  /* BEQ.S	lbC00635C */
   hw_write16(a6 + 12, 0);  /* CLR.W	12(A6) */
-  d7 = d7 & ~(1u << (2 & 31));  /* BCLR	#2,D7 */
+  {  /* BCLR	#2,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((2) & 31))) == 0);
+      d7 = (_bv & ~(1u << ((2) & 31)));
+    }
   goto lbC006404;  /* BRA.W	lbC006404 */
 lbC00635C:
   {  /* MOVE.B	(A0),D6 */
@@ -2027,6 +2138,7 @@ lbC006360:
     }
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -2055,10 +2167,15 @@ lbC006360:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_n) goto lbC006388;  /* minus / negative */  /* BMI.S	lbC006388 */
-  d7 = d7 | (1u << (3 & 31));  /* BSET	#3,D7 */
+  {  /* BSET	#3,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((3) & 31))) == 0);
+      d7 = (_bv | (1u << ((3) & 31)));
+    }
 lbC006388:
   {  /* ADD.W	D1,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d1));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -2073,14 +2190,23 @@ lbC006388:
     }
   {  /* ADDQ.B	#4,D6 */
       uint8_t _ar = (uint8_t)(B(d6) + 4);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d6)));
       B(d6) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
     }
-  d7 = d7 | (1u << (0 & 31));  /* BSET	#0,D7 */
+  {  /* BSET	#0,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((0) & 31))) == 0);
+      d7 = (_bv | (1u << ((0) & 31)));
+    }
   goto lbC006336;  /* BRA.S	lbC006336 */
 lbC00639E:
-  d7 = d7 & ~(1u << (0 & 31));  /* BCLR	#0,D7 */
+  {  /* BCLR	#0,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((0) & 31))) == 0);
+      d7 = (_bv & ~(1u << ((0) & 31)));
+    }
   if (flag_z) goto lbC0063D8;  /* equal / zero */  /* BEQ.S	lbC0063D8 */
   {  /* MOVE.B	(A0)+,D1 */
       uint8_t _mv = (uint8_t)(READ8_POST(a0));
@@ -2126,6 +2252,7 @@ lbC00639E:
     }
   {  /* SUB.B	D1,D2 */
       uint8_t _sr = (uint8_t)(B(d2) - B(d1));
+      flag_c = flag_x = (int)((uint8_t)_sr > (uint8_t)(B(d2)));
       B(d2) = (uint8_t)((uint8_t)_sr);
       flag_z = ((int8_t)(_sr) == 0);
       flag_n = ((int8_t)(_sr) < 0);
@@ -2145,11 +2272,16 @@ lbC0063C8:
 lbC0063CE:
   {  /* ADDQ.B	#4,D6 */
       uint8_t _ar = (uint8_t)(B(d6) + 4);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d6)));
       B(d6) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
     }
-  d7 = d7 | (1u << (0 & 31));  /* BSET	#0,D7 */
+  {  /* BSET	#0,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((0) & 31))) == 0);
+      d7 = (_bv | (1u << ((0) & 31)));
+    }
   goto lbC006336;  /* BRA.W	lbC006336 */
 lbC0063D8:
   {  /* SUBQ.B	#1,38(A6) */
@@ -2175,12 +2307,14 @@ lbC0063D8:
     }
   {  /* ADD.B	40(A6),D1 */
       uint8_t _ar = (uint8_t)(B(d1) + READ8(a6 + 40));
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d1)));
       B(d1) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
     }
   {  /* SUB.B	D4,D1 */
       uint8_t _sr = (uint8_t)(B(d1) - B(d4));
+      flag_c = flag_x = (int)((uint8_t)_sr > (uint8_t)(B(d1)));
       B(d1) = (uint8_t)((uint8_t)_sr);
       flag_z = ((int8_t)(_sr) == 0);
       flag_n = ((int8_t)(_sr) < 0);
@@ -2197,12 +2331,14 @@ lbC0063D8:
 lbC0063F4:
   {  /* ADD.B	D3,D2 */
       uint8_t _ar = (uint8_t)(B(d2) + B(d3));
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d2)));
       B(d2) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
     }
   {  /* SUB.B	D4,D1 */
       uint8_t _sr = (uint8_t)(B(d1) - B(d4));
+      flag_c = flag_x = (int)((uint8_t)_sr > (uint8_t)(B(d1)));
       B(d1) = (uint8_t)((uint8_t)_sr);
       flag_z = ((int8_t)(_sr) == 0);
       flag_n = ((int8_t)(_sr) < 0);
@@ -2217,6 +2353,7 @@ lbC0063F4:
 lbC0063FE:
   {  /* ADD.B	D4,D1 */
       uint8_t _ar = (uint8_t)(B(d1) + B(d4));
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d1)));
       B(d1) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -2244,13 +2381,7 @@ lbC006404:
       flag_v = 0; flag_c = 0;
     }
 lbC00640C:
-  {  /* MOVE.L	30(A6),A0 */
-      uint32_t _mv = (uint32_t)(READ32(a6 + 30));
-      a0 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a0 = READ32(a6 + 30);  /* MOVE.L	30(A6),A0 */
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d6)));  /* ADD.W	D6,A0 */
   {  /* MOVE.B	(A0)+,D1 */
       uint8_t _mv = (uint8_t)(READ8_POST(a0));
@@ -2295,7 +2426,11 @@ lbC00640C:
     }
   goto lbC00640C;  /* BRA.S	lbC00640C */
 lbC00642C:
-  d7 = d7 & ~(1u << (1 & 31));  /* BCLR	#1,D7 */
+  {  /* BCLR	#1,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((1) & 31))) == 0);
+      d7 = (_bv & ~(1u << ((1) & 31)));
+    }
   if (!flag_z) goto lbC006442;  /* not equal / nonzero */  /* BNE.S	lbC006442 */
   {  /* SUBQ.B	#1,41(A6) */
       uint8_t _sr = (uint8_t)(READ8(a6 + 41) - 1);
@@ -2304,9 +2439,14 @@ lbC00642C:
       flag_n = ((int8_t)(_sr) < 0);
     }
   if (!flag_z) goto lbC0064CA;  /* not equal / nonzero */  /* BNE.W	lbC0064CA */
-  d7 = d7 | (1u << (1 & 31));  /* BSET	#1,D7 */
+  {  /* BSET	#1,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((1) & 31))) == 0);
+      d7 = (_bv | (1u << ((1) & 31)));
+    }
   {  /* ADDQ.B	#4,D6 */
       uint8_t _ar = (uint8_t)(B(d6) + 4);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d6)));
       B(d6) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -2330,6 +2470,7 @@ lbC006442:
     }
   {  /* ADD.B	58(A6),D1 */
       uint8_t _ar = (uint8_t)(B(d1) + READ8(a6 + 58));
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d1)));
       B(d1) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -2343,7 +2484,11 @@ lbC006442:
     }
   goto lbC0064CA;  /* BRA.S	lbC0064CA */
 lbC006458:
-  d7 = d7 & ~(1u << (1 & 31));  /* BCLR	#1,D7 */
+  {  /* BCLR	#1,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((1) & 31))) == 0);
+      d7 = (_bv & ~(1u << ((1) & 31)));
+    }
   if (flag_z) goto lbC0064B6;  /* equal / zero */  /* BEQ.S	lbC0064B6 */
   W(d0) = (uint16_t)(0);  /* CLR.W	D0 */
   {  /* MOVE.B	(A0)+,D1 */
@@ -2385,12 +2530,14 @@ lbC006458:
   W(d2) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d2);  /* EXT.W	D2 */
   {  /* ADD.W	D0,D1 */
       uint16_t _ar = (uint16_t)(W(d1) + W(d0));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d1)));
       W(d1) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
   {  /* ADD.W	D0,D2 */
       uint16_t _ar = (uint16_t)(W(d2) + W(d0));
+      flag_c = flag_x = (int)((uint16_t)_ar < (uint16_t)(W(d2)));
       W(d2) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
@@ -2412,6 +2559,7 @@ lbC006458:
   hw_write16(a6 + 46, 0);  /* CLR.W	46(A6) */
   {  /* SUB.W	D1,D2 */
       uint16_t _sr = (uint16_t)(W(d2) - W(d1));
+      flag_c = flag_x = (int)((uint16_t)_sr > (uint16_t)(W(d2)));
       W(d2) = (uint16_t)((uint16_t)_sr);
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
@@ -2427,9 +2575,15 @@ lbC006458:
   d2 = (uint32_t)(int32_t)(int16_t)d2;  /* EXT.L	D2 */
   d2 = d2 << 8;  /* ASL.L	#8,D2 */
   {  /* DIVS	D1,D2 */
-      int16_t q = (int16_t)((int32_t)d2 / (int16_t)d1);
-      int16_t r = (int16_t)((int32_t)d2 % (int16_t)d1);
-      d2 = ((uint32_t)(uint16_t)r << 16) | (uint16_t)q;
+      int64_t _dd = (int32_t)d2, _ds_ = (int16_t)(d1);
+      flag_c = 0; flag_v = 1;
+      if (_ds_ != 0) {
+        int64_t _q = _dd / _ds_, _r = _dd % _ds_;
+        if (_q >= -32768 && _q <= 32767) {
+          d2 = ((uint32_t)(uint16_t)_r << 16) | (uint16_t)_q;
+          flag_v = 0; flag_z = ((uint16_t)_q == 0); flag_n = ((int16_t)_q < 0);
+        }
+      }
     }
   if (flag_v) goto lbC00649E;  /* overflow set */  /* BVS.S	lbC00649E */
   d2 = (uint32_t)(int32_t)(int16_t)d2;  /* EXT.L	D2 */
@@ -2445,9 +2599,15 @@ lbC006458:
 lbC00649E:
   d2 = (uint32_t)((int32_t)d2 >> 8);  /* ASR.L	#8,D2 */
   {  /* DIVS	D1,D2 */
-      int16_t q = (int16_t)((int32_t)d2 / (int16_t)d1);
-      int16_t r = (int16_t)((int32_t)d2 % (int16_t)d1);
-      d2 = ((uint32_t)(uint16_t)r << 16) | (uint16_t)q;
+      int64_t _dd = (int32_t)d2, _ds_ = (int16_t)(d1);
+      flag_c = 0; flag_v = 1;
+      if (_ds_ != 0) {
+        int64_t _q = _dd / _ds_, _r = _dd % _ds_;
+        if (_q >= -32768 && _q <= 32767) {
+          d2 = ((uint32_t)(uint16_t)_r << 16) | (uint16_t)_q;
+          flag_v = 0; flag_z = ((uint16_t)_q == 0); flag_n = ((int16_t)_q < 0);
+        }
+      }
     }
   d2 = (d2 >> 16) | (d2 << 16);  /* SWAP	D2 */
   W(d2) = (uint16_t)(0);  /* CLR.W	D2 */
@@ -2460,9 +2620,14 @@ lbC00649E:
     }
   goto lbC0064CA;  /* BRA.S	lbC0064CA */
 lbC0064AC:
-  d7 = d7 | (1u << (1 & 31));  /* BSET	#1,D7 */
+  {  /* BSET	#1,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((1) & 31))) == 0);
+      d7 = (_bv | (1u << ((1) & 31)));
+    }
   {  /* ADDQ.B	#4,D6 */
       uint8_t _ar = (uint8_t)(B(d6) + 4);
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d6)));
       B(d6) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -2518,20 +2683,8 @@ lbC0064CA:
       flag_n = ((int16_t)(_ar) < 0);
     }
   a0 = a6;  /* LEA	(A6),A0 */
-  {  /* MOVE.L	(A0)+,A5 */
-      uint32_t _mv = (uint32_t)(READ32_POST(a0));
-      a5 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
-  {  /* MOVE.L	(A0)+,A3 */
-      uint32_t _mv = (uint32_t)(READ32_POST(a0));
-      a3 = _mv;
-      flag_z = ((int32_t)(_mv) == 0);
-      flag_n = ((int32_t)(_mv) < 0);
-      flag_v = 0; flag_c = 0;
-    }
+  a5 = READ32_POST(a0);  /* MOVE.L	(A0)+,A5 */
+  a3 = READ32_POST(a0);  /* MOVE.L	(A0)+,A3 */
   {  /* MOVE.B	52(A6),D0 */
       uint8_t _mv = (uint8_t)(READ8(a6 + 52));
       B(d0) = (uint8_t)_mv;
@@ -2569,6 +2722,7 @@ lbC0064F0:
 lbC0064F6:
   {  /* ADD.B	D0,D1 */
       uint8_t _ar = (uint8_t)(B(d1) + B(d0));
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d1)));
       B(d1) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
@@ -2598,7 +2752,11 @@ lbC006502:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  d7 = d7 & ~(1u << (3 & 31));  /* BCLR	#3,D7 */
+  {  /* BCLR	#3,D7 */
+      uint32_t _bv = (uint32_t)(d7);
+      flag_z = ((_bv & (1u << ((3) & 31))) == 0);
+      d7 = (_bv & ~(1u << ((3) & 31)));
+    }
   if (flag_z) goto lbC006510;  /* equal / zero */  /* BEQ.S	lbC006510 */
   {  /* MOVE.W	#1,(A0) */
       uint16_t _mv = (uint16_t)(1);
@@ -2608,7 +2766,7 @@ lbC006502:
       flag_v = 0; flag_c = 0;
     }
 lbC006510:
-  a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A0 */
+  a0 = (uint32_t)((int32_t)a0 + (int32_t)(4));  /* ADDQ.L	#4,A0 */
   {  /* MOVE.W	(A0),D6 */
       uint16_t _mv = (uint16_t)(READ16(a0));
       W(d6) = (uint16_t)_mv;
@@ -2618,12 +2776,14 @@ lbC006510:
     }
   {  /* ADD.B	21(A6),D6 */
       uint8_t _ar = (uint8_t)(B(d6) + READ8(a6 + 21));
+      flag_c = flag_x = (int)((uint8_t)_ar < (uint8_t)(B(d6)));
       B(d6) = (uint8_t)((uint8_t)_ar);
       flag_z = ((int8_t)(_ar) == 0);
       flag_n = ((int8_t)(_ar) < 0);
     }
   {  /* SUB.B	#$40,D6 */
       uint8_t _sr = (uint8_t)(B(d6) - (uint8_t)(0x40));
+      flag_c = flag_x = (int)((uint8_t)_sr > (uint8_t)(B(d6)));
       B(d6) = (uint8_t)((uint8_t)_sr);
       flag_z = ((int8_t)(_sr) == 0);
       flag_n = ((int8_t)(_sr) < 0);

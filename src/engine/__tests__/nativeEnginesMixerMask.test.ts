@@ -9,9 +9,8 @@
  * their C channel mask) and re-applies it after every module load, because a
  * fresh module starts with every channel on.
  *
- * Real worklet + real WASM + a corpus song wherever the repo has one; the two
- * engines with no renderable song (SteveTurner, PumaTracker) get a recording
- * stand-in core.
+ * Real worklet + real WASM + a corpus song wherever the repo has one;
+ * SteveTurner, with no song in the repo, gets a recording stand-in core.
  * One wiring test per engine, driven through the worklet's own messages and
  * process(): a mask set BEFORE the load must survive it, all-audible must
  * play, and mask 0 must be silent.
@@ -33,6 +32,8 @@ interface Corpus {
   load(buf: ArrayBuffer, companion: ArrayBuffer): object[];
   /** A companion file the format needs besides the main song. */
   companion?: string;
+  /** Stem of the .js/.wasm pair when it differs from the worklet's. */
+  wasmStem?: string;
   start?: object[];
 }
 
@@ -42,6 +43,8 @@ const corpus: Corpus[] = [
   { name: 'ArtOfNoise', dir: 'artofnoise', stem: 'ArtOfNoise', song: 'art-of-noise/inside.blipp.aon', load: moduleData('loadModule') },
   { name: 'Bd', dir: 'bd', stem: 'Bd', song: 'ben-daglish/motorhead-titleandingame.bd', load: moduleData('loadModule') },
   { name: 'Ma', dir: 'ma', stem: 'Ma', song: 'music-assembler/thanatos.ma', load: moduleData('loadModule') },
+  { name: 'PumaTracker', dir: 'pumatracker', stem: 'PumaTracker', wasmStem: 'Pumatracker',
+    song: 'pumatracker/liquid kids - lv1a.puma', load: moduleData('loadModule') },
   { name: 'Sd2', dir: 'sidmon2', stem: 'Sd2', song: 'sidmon-2/ice7-intro.sid2', load: moduleData('loadModule') },
   { name: 'SidMon1Replayer', dir: 'sidmon1', stem: 'SidMon1Replayer', song: 'sidmon-1/myfunnymazea.sid', load: moduleData('loadModule') },
   { name: 'JamCracker', dir: 'jamcracker', stem: 'JamCracker', song: 'jamcracker/freehand-spreadtro.jam',
@@ -74,7 +77,7 @@ function energy(proc: WorkletProc): number {
 describe('mixer mask reaches the native engines (bit set = audible)', () => {
   for (const c of corpus) {
     it(`${c.name}: mask set before the load survives it; all-audible plays; 0 is silent`, async () => {
-      const { proc, send } = await startWorklet(c.dir, c.stem);
+      const { proc, send } = await startWorklet(c.dir, c.stem, undefined, c.wasmStem);
       await send({ type: 'setMuteMask', mask: 0 });                 // before any module exists
       const companion = c.companion ? songBuffer(`public/data/songs/${c.companion}`) : new ArrayBuffer(0);
       for (const m of c.load(songBuffer(`public/data/songs/${c.song}`), companion)) await send(m);
@@ -89,11 +92,9 @@ describe('mixer mask reaches the native engines (bit set = audible)', () => {
     }, 60_000);
   }
 
-  // No corpus song renders for these two: SteveTurner has none in the repo,
-  // and PumaTracker's only song (liquid kids - lv1a.puma) hangs the WASM in
-  // its first music tick, with or without this change. A recording stand-in
-  // core proves the worklet drives the gain export, including after a load.
-  for (const [name, dir] of [['PumaTracker', 'pumatracker'], ['SteveTurner', 'steveturner']]) {
+  // SteveTurner has no song in the repo: a recording stand-in core proves the
+  // worklet drives the gain export, including after a load.
+  for (const [name, dir] of [['SteveTurner', 'steveturner']]) {
     it(`${name}: gain export follows the mask, and again after a load`, async () => {
       let Processor!: new () => WorkletProc;
       const scope: Record<string, unknown> = {

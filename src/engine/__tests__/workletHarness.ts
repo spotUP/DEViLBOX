@@ -4,9 +4,12 @@
  * process() calls and read what the worklet posts and writes.
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export const ROOT = resolve(__dirname, '../../..');
+// import.meta.url, not __dirname: a worker thread (the hang watchdogs) loads
+// this file as native ESM, where __dirname does not exist.
+export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 export type JsTransform = (code: string) => string | Promise<string>;
 export type WorkletMsg = { type?: string; channels?: Int16Array[]; frame?: number; sampleRate?: number; message?: string };
@@ -24,8 +27,12 @@ export function loadSharedWorkletScripts(): void {
   }
 }
 
-/** Instantiate `public/<dir>/<stem>.worklet.js` and initialise its WASM. */
-export async function startWorklet(dir: string, stem: string, transform?: JsTransform): Promise<{
+/**
+ * Instantiate `public/<dir>/<stem>.worklet.js` and initialise its WASM from
+ * `<wasmStem>.js/.wasm` (PumaTracker's differ in case: PumaTracker.worklet.js
+ * beside Pumatracker.wasm, which only a case-insensitive disk forgives).
+ */
+export async function startWorklet(dir: string, stem: string, transform?: JsTransform, wasmStem = stem): Promise<{
   proc: WorkletProc;
   send: (m: unknown) => Promise<void>;
   posted: WorkletMsg[];
@@ -45,8 +52,8 @@ export async function startWorklet(dir: string, stem: string, transform?: JsTran
   try {
     await send({
       type: 'init', sampleRate: 48000,
-      wasmBinary: readFileSync(resolve(ROOT, `public/${dir}/${stem}.wasm`)),
-      jsCode: await (transform ?? ((c: string) => c))(readFileSync(resolve(ROOT, `public/${dir}/${stem}.js`), 'utf8')),
+      wasmBinary: readFileSync(resolve(ROOT, `public/${dir}/${wasmStem}.wasm`)),
+      jsCode: await (transform ?? ((c: string) => c))(readFileSync(resolve(ROOT, `public/${dir}/${wasmStem}.js`), 'utf8')),
     });
   } finally { Object.defineProperty(process, 'versions', versions); }
   return { proc, send, posted };
