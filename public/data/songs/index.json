@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T10:29:07.789Z",
+  "generated": "2026-10-05T12:43:12.011Z",
   "perEntry": 6,
   "registryTotal": 277,
   "covered": 158,
@@ -2698,9 +2698,12 @@
       "label": "delitracker-custom",
       "formatKey": "uade_cus",
       "files": [
-        "/data/songs/delitracker-custom/Skyfox.cus"
+        "/data/songs/delitracker-custom/Skyfox.cus",
+        "/data/songs/delitracker-custom/bards tale.cus",
+        "/data/songs/delitracker-custom/neuromancer.cus",
+        "/data/songs/delitracker-custom/skyfox2.cus"
       ],
-      "total": 1,
+      "total": 4,
       "dir": "/data/songs/delitracker-custom"
     },
     {
@@ -2924,9 +2927,11 @@
       "label": "forgotten-worlds",
       "formatKey": "amiga_formats_catchall",
       "files": [
-        "/data/songs/forgotten-worlds/forgotten worlds intro.fw"
+        "/data/songs/forgotten-worlds/forgotten worlds intro.fw",
+        "/data/songs/forgotten-worlds/forgotten worlds level1&3.fw",
+        "/data/songs/forgotten-worlds/forgotten worlds theend.fw"
       ],
-      "total": 1,
+      "total": 3,
       "dir": "/data/songs/forgotten-worlds"
     },
     {
@@ -8187,7 +8192,10 @@
           "zaxxein"
         ],
         "delitracker-custom": [
-          "Skyfox.cus"
+          "Skyfox.cus",
+          "bards tale.cus",
+          "neuromancer.cus",
+          "skyfox2.cus"
         ],
         "delta-music": [
           "triplex1.dm"
@@ -8252,7 +8260,9 @@
           "sly spy title.tf"
         ],
         "forgotten-worlds": [
-          "forgotten worlds intro.fw"
+          "forgotten worlds intro.fw",
+          "forgotten worlds level1&3.fw",
+          "forgotten worlds theend.fw"
         ],
         "formats": [
           "45.okta",
@@ -14003,7 +14013,10 @@
     },
     "/data/songs/delitracker-custom": {
       "siblings": [
-        "Skyfox.cus"
+        "Skyfox.cus",
+        "bards tale.cus",
+        "neuromancer.cus",
+        "skyfox2.cus"
       ]
     },
     "/data/songs/delta-music": {
@@ -14140,7 +14153,9 @@
     },
     "/data/songs/forgotten-worlds": {
       "siblings": [
-        "forgotten worlds intro.fw"
+        "forgotten worlds intro.fw",
+        "forgotten worlds level1&3.fw",
+        "forgotten worlds theend.fw"
       ]
     },
     "/data/songs/formats/Michel Winogradoff": {
