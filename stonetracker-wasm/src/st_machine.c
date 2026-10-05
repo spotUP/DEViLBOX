@@ -108,6 +108,23 @@ static double g_cpuPerSample, g_ciaPerSample, g_paulaPerSample;
 static double g_cpuAcc = 0.0;
 static uint32_t g_muteMask = 0xFF;
 
+/* ---- per-track taps (scopes / VU / channel classifiers) ------------------
+ * Tracks the player sends straight to a Paula channel are tapped from that
+ * channel's output - exact. Tracks it mixes in software (5-8 tracks: 3 with
+ * 6 and 7 into Paula 2, 4 with 5 and 8 into Paula 3) have no separate audio
+ * anywhere, so each gets a shadow voice: restarted from the track structure
+ * the moment the player triggers its note (it sets byte 72), then stepped at
+ * the track's live period (+22) through the same sample bytes and loop
+ * (+32 start, +36 length, +40/+44 loop) at its live volume (+26 x +28 x song
+ * volume). Taps only read: the main mix is unchanged. */
+typedef struct {
+  int active;
+  double pos;          /* byte address in chip RAM */
+  double remaining;    /* bytes left before the loop / end */
+} ShadowVoice;
+static ShadowVoice g_shadow[8];
+static float g_paulaOut[4];
+
 /* ======================================================================= */
 static inline uint16_t rd16(uint32_t a) { return (uint16_t)((ram[a] << 8) | ram[a + 1]); }
 static inline void wr16(uint32_t a, uint16_t v) { ram[a] = (uint8_t)(v >> 8); ram[a + 1] = (uint8_t)v; }
@@ -354,9 +371,26 @@ unsigned int m68k_read_memory_32(unsigned int a) {
   return (m68k_read_memory_16(a) << 16) | m68k_read_memory_16(a + 2);
 }
 
+static uint32_t rd32(uint32_t a) { return ((uint32_t)rd16(a) << 16) | rd16(a + 2); }
+
+/* The player set byte 72 of a track structure: a note (re)starts from +32. */
+static void shadow_restart(int t) {
+  const uint32_t v = PLAYER_VARS + VAR_VOICES + (uint32_t)t * VOICE_SIZE;
+  ShadowVoice *sv = &g_shadow[t];
+  sv->pos = rd32(v + 32) & 0x1FFFFFu;
+  sv->remaining = rd32(v + 36);
+  sv->active = sv->remaining > 0;
+}
+
 void m68k_write_memory_8(unsigned int a, unsigned int v) {
   a &= 0xFFFFFFu;
-  if (a < RAM_SIZE) { ram[a] = (uint8_t)v; return; }
+  if (a < RAM_SIZE) {
+    ram[a] = (uint8_t)v;
+    const uint32_t base = PLAYER_VARS + VAR_VOICES;
+    if (v && a >= base && a < base + 8 * VOICE_SIZE && (a - base) % VOICE_SIZE == 72)
+      shadow_restart((int)((a - base) / VOICE_SIZE));
+    return;
+  }
   io_write8(a, (uint8_t)v);
 }
 
@@ -391,6 +425,7 @@ static void step_sample(float *l, float *r) {
 
   const float c0 = paula_render_channel(0), c1 = paula_render_channel(1);
   const float c2 = paula_render_channel(2), c3 = paula_render_channel(3);
+  g_paulaOut[0] = c0; g_paulaOut[1] = c1; g_paulaOut[2] = c2; g_paulaOut[3] = c3;
   update_ipl();
   /* Amiga hard panning: 0 and 3 left, 1 and 2 right (paula_soft.c scale). */
   *l = (c0 + c3) * 0.5f;
@@ -454,6 +489,7 @@ static void patch_soft_interrupt_race(void) {
 static void reset_machine(void) {
   memset(ram, 0, sizeof ram);
   memset(ch, 0, sizeof ch);
+  memset(g_shadow, 0, sizeof g_shadow);
   memset(&ciaA, 0, sizeof ciaA);
   memset(&ciaB, 0, sizeof ciaB);
   ciaA.taLatch = ciaA.tbLatch = ciaB.taLatch = ciaB.tbLatch = 0xFFFF;
@@ -533,9 +569,69 @@ int st_machine_load(const uint8_t *spm, size_t spmLen, const uint8_t *sps, size_
   return 0;
 }
 
-int st_machine_render(float *out, int frames) {
-  if (!g_loaded) { memset(out, 0, (size_t)frames * 2 * sizeof(float)); return frames; }
-  for (int i = 0; i < frames; i++) step_sample(&out[2 * i], &out[2 * i + 1]);
+/* One output sample of a mixed track's shadow voice. */
+static float shadow_sample(int t) {
+  ShadowVoice *sv = &g_shadow[t];
+  const uint32_t v = PLAYER_VARS + VAR_VOICES + (uint32_t)t * VOICE_SIZE;
+  if (!sv->active || rd32(v + 36) == 0) return 0.0f;   /* cut / one-shot over */
+  const uint16_t period = rd16(v + 22);
+  if (!period) return 0.0f;
+  const uint32_t at = (uint32_t)sv->pos;
+  const int8_t s = at < RAM_SIZE ? (int8_t)ram[at] : 0;
+  double vol = (double)rd16(v + VOICE_VOLUME) * (double)rd16(v + 28) / 4096.0
+             * (double)rd16(PLAYER_VARS + 148) / 64.0;
+  if (vol > 1.0) vol = 1.0;
+  const double step = PAULA_HZ / (double)period / (double)g_sampleRate;
+  sv->pos += step;
+  sv->remaining -= step;
+  if (sv->remaining <= 0.0) {
+    const uint32_t loopLen = rd32(v + 44);
+    if (!loopLen) { sv->active = 0; }
+    else {
+      const double over = -sv->remaining;
+      const double into = over - loopLen * (double)(uint32_t)(over / loopLen);
+      sv->pos = (rd32(v + 40) & 0x1FFFFFu) + into;
+      sv->remaining = loopLen - into;
+    }
+  }
+  return (float)(s / 128.0 * vol);
+}
+
+/* Paula channel a track plays on directly, or -1 if the player mixes it. */
+static int direct_channel(int t, int voices) {
+  if (t == 0 || t == 1) return t;
+  if (t == 2) return voices < 6 ? 2 : -1;
+  if (t == 3) return voices < 5 ? 3 : -1;
+  return -1;
+}
+
+static void render(float *out, float *tracks, int frames, int stride) {
+  if (!g_loaded) {
+    memset(out, 0, (size_t)frames * 2 * sizeof(float));
+    if (tracks) memset(tracks, 0, (size_t)stride * 8 * sizeof(float));
+    return;
+  }
+  for (int i = 0; i < frames; i++) {
+    step_sample(&out[2 * i], &out[2 * i + 1]);
+    if (!tracks) continue;
+    const int voices = rd16(PLAYER_VARS + 202);
+    for (int t = 0; t < 8; t++) {
+      float v = 0.0f;
+      if (t < voices) {
+        const int c = direct_channel(t, voices);
+        v = c >= 0 ? g_paulaOut[c] : shadow_sample(t);
+        if (!(g_muteMask & (1u << t))) v = 0.0f;
+      }
+      tracks[t * stride + i] = v;
+    }
+  }
+}
+
+int st_machine_render(float *out, int frames) { render(out, NULL, frames, 0); return frames; }
+
+int st_machine_render_channels(float *out, float *tracks, int frames, int stride) {
+  if (stride < frames) stride = frames;
+  render(out, tracks, frames, stride);
   return frames;
 }
 

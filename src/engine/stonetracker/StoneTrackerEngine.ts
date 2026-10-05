@@ -8,6 +8,7 @@
  * Decision record: thoughts/shared/research/2026-10-05_stonetracker-replayer.md
  */
 
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
@@ -68,7 +69,11 @@ export class StoneTrackerEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          useOscilloscopeStore.getState().setChipInfo(8, 0, Array.from({ length: 8 }, (_, i) => `Track ${i + 1}`));
           console.log('[StoneTrackerEngine] StoneTracker song loaded');
+          break;
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'error':
           console.error('[StoneTrackerEngine]', data.message);
