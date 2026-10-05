@@ -20,7 +20,9 @@ const MICRO15 = resolve(__dirname, '../../../__tests__/fixtures/micro15-goto80.m
 const bytesOf = (path: string) => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 const u8 = async (blob: Blob) => new Uint8Array(await blob.arrayBuffer());
 
-describe('MOD export periods', () => {
+// The first case loads the parser and exporter modules; under a busy
+// machine that alone outlasts vitest's 5 s default (pre-push, 2026-10-05).
+describe('MOD export periods', { timeout: 30_000 }, () => {
   it('every cell exports at its source period, and samples keep their slots', async () => {
     const src = bytesOf(MICRO15);
     const song = await parseMODFile(src, 'micro15.mod');

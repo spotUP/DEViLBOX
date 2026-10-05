@@ -5,8 +5,6 @@
  * Returns plain JSON-serializable objects.
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
-import { sharedTapContext } from '@/engine/vj/AudioDataBus';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { getConsoleEntries } from '../consoleCapture';
 import { useTransportStore } from '../../stores/useTransportStore';
@@ -1558,7 +1556,6 @@ export function getFormatState(): Record<string, unknown> {
       format.qsfFileData && 'qsf',
       format.bdFileData && 'bendaglish',
       format.sd2FileData && 'sidmon2',
-      format.ayFileData && 'aylet',
       format.v2mFileData && 'v2m',
       format.uadeEditableFileData && 'uade-editable',
       format.libopenmptFileData && 'libopenmpt',
@@ -1961,18 +1958,6 @@ function readPlaybackStats(ctx: AudioContext): Record<string, number> | null {
   };
 }
 
-function contextReport(toneCtx: BaseAudioContext): Record<string, unknown> {
-  let live: BaseAudioContext | null = null;
-  try { live = getDevilboxAudioContext(); } catch { /* not created yet */ }
-  const tap = sharedTapContext();
-  return {
-    toneIsLive: live ? toneCtx === live : null,
-    toneIsOffline: typeof OfflineAudioContext !== 'undefined' && toneCtx instanceof OfflineAudioContext,
-    levelTapIsLive: tap && live ? tap === live : null,
-    levelTapIsOffline: tap ? (typeof OfflineAudioContext !== 'undefined' && tap instanceof OfflineAudioContext) : null,
-  };
-}
-
 export function getAudioContextInfo(): Record<string, unknown> {
   try {
     // Try Tone.js context (available after user gesture)
@@ -1991,9 +1976,6 @@ export function getAudioContextInfo(): Record<string, unknown> {
       // Output underruns since the context started — the audible dropouts.
       // Chrome's AudioContext.playbackStats; null where unsupported.
       playback: readPlaybackStats(ctx),
-      // Which context things live on. A level tap or a Tone context on a
-      // non-live (offline) context reads 0 while the music plays (2026-10-05).
-      contexts: contextReport(ctx),
     };
   } catch (e) {
     return { error: `AudioContext not available: ${(e as Error).message}` };
