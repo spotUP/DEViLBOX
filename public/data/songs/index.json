@@ -1,8 +1,8 @@
 {
-  "generated": "2026-10-05T13:32:58.832Z",
+  "generated": "2026-10-05T17:14:28.449Z",
   "perEntry": 6,
-  "registryTotal": 278,
-  "covered": 159,
+  "registryTotal": 279,
+  "covered": 167,
   "entries": [
     {
       "id": "actionamics",
@@ -4809,6 +4809,16 @@
       "dir": "/data/songs/game-music-creator"
     },
     {
+      "id": "gbs",
+      "label": "gbs",
+      "formatKey": "gbs",
+      "files": [
+        "/data/songs/gbs/airforce delta.gbs"
+      ],
+      "total": 1,
+      "dir": "/data/songs/gbs"
+    },
+    {
       "id": "general-digimusic",
       "label": "general-digimusic",
       "formatKey": "gdm",
@@ -4931,6 +4941,26 @@
       ],
       "total": 1,
       "dir": "/data/songs/graoumf-tracker-2"
+    },
+    {
+      "id": "gym",
+      "label": "gym",
+      "formatKey": "gym",
+      "files": [
+        "/data/songs/gym/level1.gym"
+      ],
+      "total": 1,
+      "dir": "/data/songs/gym"
+    },
+    {
+      "id": "hes",
+      "label": "hes",
+      "formatKey": "hes",
+      "files": [
+        "/data/songs/hes/impossamole.hes"
+      ],
+      "total": 1,
+      "dir": "/data/songs/hes"
     },
     {
       "id": "hippel",
@@ -5977,6 +6007,16 @@
       "dir": "/data/songs/kris-hatlelid"
     },
     {
+      "id": "kss",
+      "label": "kss",
+      "formatKey": "kss",
+      "files": [
+        "/data/songs/kss/gradius 2.kss"
+      ],
+      "total": 1,
+      "dir": "/data/songs/kss"
+    },
+    {
       "id": "leggless-music-editor",
       "label": "leggless-music-editor",
       "formatKey": "lme",
@@ -6154,6 +6194,16 @@
       ],
       "total": 1,
       "dir": "/data/songs/musicmaker-v8"
+    },
+    {
+      "id": "nsf",
+      "label": "nsf",
+      "formatKey": "nsf",
+      "files": [
+        "/data/songs/nsf/dr mario.nsf"
+      ],
+      "total": 1,
+      "dir": "/data/songs/nsf"
     },
     {
       "id": "octalyser",
@@ -6434,6 +6484,16 @@
       ],
       "total": 1,
       "dir": "/data/songs/s3m"
+    },
+    {
+      "id": "s98",
+      "label": "s98",
+      "formatKey": "s98",
+      "files": [
+        "/data/songs/s98/carat-01.s98"
+      ],
+      "total": 1,
+      "dir": "/data/songs/s98"
     },
     {
       "id": "sap",
@@ -7780,6 +7840,16 @@
       "dir": "/data/songs/soundfx"
     },
     {
+      "id": "spc",
+      "label": "spc",
+      "formatKey": "spc",
+      "files": [
+        "/data/songs/spc/01 - main theme.spc"
+      ],
+      "total": 1,
+      "dir": "/data/songs/spc"
+    },
+    {
       "id": "special-fx",
       "label": "special-fx",
       "formatKey": "specialFX",
@@ -8081,9 +8151,11 @@
       "label": "vgm",
       "formatKey": "vgm",
       "files": [
-        "/data/songs/vgm/BeyondSN.vgm"
+        "/data/songs/vgm/03 title screen.vgz",
+        "/data/songs/vgm/BeyondSN.vgm",
+        "/data/songs/vgm/sparkster - continue.vgz"
       ],
-      "total": 1,
+      "total": 3,
       "dir": "/data/songs/vgm"
     },
     {
@@ -8136,6 +8208,17 @@
       ],
       "total": 1,
       "dir": "/data/songs/xm"
+    },
+    {
+      "id": "ym",
+      "label": "ym",
+      "formatKey": "ym",
+      "files": [
+        "/data/songs/ym/17th.ym",
+        "/data/songs/ym/drooling.ym"
+      ],
+      "total": 2,
+      "dir": "/data/songs/ym"
     },
     {
       "id": "zoundmonitor",
@@ -9460,6 +9543,9 @@
         "game-music-creator": [
           "barbarian 2 title.gmc"
         ],
+        "gbs": [
+          "airforce delta.gbs"
+        ],
         "general-digimusic": [
           "tilbury fair (remix).gdm"
         ],
@@ -9471,6 +9557,12 @@
         ],
         "graoumf-tracker-2": [
           "living-on-video.gt2"
+        ],
+        "gym": [
+          "level1.gym"
+        ],
+        "hes": [
+          "impossamole.hes"
         ],
         "hippel": [
           "warp (ingame 2).hip"
@@ -9612,6 +9704,9 @@
           "fiendish freddys - songs.kh",
           "songplay"
         ],
+        "kss": [
+          "gradius 2.kss"
+        ],
         "leggless-music-editor": [
           "the punisher gameover.lme"
         ],
@@ -9713,6 +9808,9 @@
         "musicmaker-v8": [
           "roetzmegoem.mm8"
         ],
+        "nsf": [
+          "dr mario.nsf"
+        ],
         "octalyser": [
           "follow me to hell.mod"
         ],
@@ -9798,6 +9896,9 @@
         ],
         "s3m": [
           "andante.s3m"
+        ],
+        "s98": [
+          "carat-01.s98"
         ],
         "sap": [
           "chop suey.sap"
@@ -9951,6 +10052,9 @@
           "batdance.sfx",
           "distancia al ano.sfx"
         ],
+        "spc": [
+          "01 - main theme.spc"
+        ],
         "special-fx": [
           "striker ingame.jd"
         ],
@@ -10052,7 +10156,9 @@
           "kernel.ams"
         ],
         "vgm": [
-          "BeyondSN.vgm"
+          "03 title screen.vgz",
+          "BeyondSN.vgm",
+          "sparkster - continue.vgz"
         ],
         "voodoo": [
           "voo8.vss"
@@ -10069,6 +10175,10 @@
         ],
         "xm": [
           "flo boarding - level 1.xm"
+        ],
+        "ym": [
+          "17th.ym",
+          "drooling.ym"
         ],
         "zoundmonitor": [
           "sonjavanveen.sng"
@@ -17345,6 +17455,11 @@
         "barbarian 2 title.gmc"
       ]
     },
+    "/data/songs/gbs": {
+      "siblings": [
+        "airforce delta.gbs"
+      ]
+    },
     "/data/songs/general-digimusic": {
       "siblings": [
         "tilbury fair (remix).gdm"
@@ -17363,6 +17478,16 @@
     "/data/songs/graoumf-tracker-2": {
       "siblings": [
         "living-on-video.gt2"
+      ]
+    },
+    "/data/songs/gym": {
+      "siblings": [
+        "level1.gym"
+      ]
+    },
+    "/data/songs/hes": {
+      "siblings": [
+        "impossamole.hes"
       ]
     },
     "/data/songs/hippel": {
@@ -33862,6 +33987,11 @@
         "songplay"
       ]
     },
+    "/data/songs/kss": {
+      "siblings": [
+        "gradius 2.kss"
+      ]
+    },
     "/data/songs/leggless-music-editor": {
       "siblings": [
         "the punisher gameover.lme"
@@ -33992,6 +34122,11 @@
     "/data/songs/musicmaker-v8": {
       "siblings": [
         "roetzmegoem.mm8"
+      ]
+    },
+    "/data/songs/nsf": {
+      "siblings": [
+        "dr mario.nsf"
       ]
     },
     "/data/songs/octalyser": {
@@ -34134,6 +34269,11 @@
     "/data/songs/s3m": {
       "siblings": [
         "andante.s3m"
+      ]
+    },
+    "/data/songs/s98": {
+      "siblings": [
+        "carat-01.s98"
       ]
     },
     "/data/songs/sap": {
@@ -36724,6 +36864,11 @@
         "distancia al ano.sfx"
       ]
     },
+    "/data/songs/spc": {
+      "siblings": [
+        "01 - main theme.spc"
+      ]
+    },
     "/data/songs/special-fx": {
       "siblings": [
         "striker ingame.jd"
@@ -36876,7 +37021,9 @@
     },
     "/data/songs/vgm": {
       "siblings": [
-        "BeyondSN.vgm"
+        "03 title screen.vgz",
+        "BeyondSN.vgm",
+        "sparkster - continue.vgz"
       ]
     },
     "/data/songs/voodoo": {
@@ -36903,6 +37050,12 @@
     "/data/songs/xm": {
       "siblings": [
         "flo boarding - level 1.xm"
+      ]
+    },
+    "/data/songs/ym": {
+      "siblings": [
+        "17th.ym",
+        "drooling.ym"
       ]
     },
     "/data/songs/zoundmonitor": {
@@ -37065,14 +37218,6 @@
       "label": "Galaxy Sound System"
     },
     {
-      "formatKey": "gbs",
-      "label": "GBS"
-    },
-    {
-      "formatKey": "hes",
-      "label": "HES"
-    },
-    {
       "formatKey": "uade_hn",
       "label": "HN"
     },
@@ -37115,10 +37260,6 @@
     {
       "formatKey": "kris",
       "label": "KRIS / ChipTracker"
-    },
-    {
-      "formatKey": "kss",
-      "label": "KSS"
     },
     {
       "formatKey": "laxity",
@@ -37201,10 +37342,6 @@
       "label": "NovoTrade Packer"
     },
     {
-      "formatKey": "nsf",
-      "label": "NSF"
-    },
-    {
       "formatKey": "ntsp",
       "label": "NTSP"
     },
@@ -37265,10 +37402,6 @@
       "label": "Ron Klaren"
     },
     {
-      "formatKey": "s98",
-      "label": "S98"
-    },
-    {
       "formatKey": "uade_sc2",
       "label": "Sean Connolly 2"
     },
@@ -37303,10 +37436,6 @@
     {
       "formatKey": "uade_st",
       "label": "SoundTracker prefix"
-    },
-    {
-      "formatKey": "spc",
-      "label": "SPC"
     },
     {
       "formatKey": "uade_sun",
@@ -37379,10 +37508,6 @@
     {
       "formatKey": "xmf",
       "label": "XMF"
-    },
-    {
-      "formatKey": "ym",
-      "label": "YM"
     },
     {
       "formatKey": "zxtune",

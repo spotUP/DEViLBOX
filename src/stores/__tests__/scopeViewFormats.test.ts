@@ -23,6 +23,39 @@ describe('player-program formats open in the scope view', () => {
     });
   }
 
+  // game-music-emu songs share one field; the label is read from the file's header.
+  const header = (magic: string, size = 0x100): ArrayBuffer => {
+    const b = new Uint8Array(size);
+    for (let i = 0; i < magic.length; i++) b[i] = magic.charCodeAt(i);
+    return b.buffer;
+  };
+  const vgm = (clocks: Record<number, number>): ArrayBuffer => {
+    const buf = header('Vgm ');
+    const dv = new DataView(buf);
+    dv.setUint32(0x08, 0x150, true);
+    dv.setUint32(0x34, 0x100 - 0x34, true);
+    for (const [off, hz] of Object.entries(clocks)) dv.setUint32(Number(off), hz, true);
+    return buf;
+  };
+  for (const [name, data, format, chip] of [
+    ['NSF', header('NESM\x1a'), 'NSF', '2A03'],
+    ['NSFE', header('NSFE'), 'NSFE', '2A03'],
+    ['GBS', header('GBS\x01'), 'GBS', 'DMG APU'],
+    ['HES', header('HESM'), 'HES', 'HuC6280'],
+    ['KSS', header('KSCC'), 'KSS', 'AY-3-8910 + SCC'],
+    ['SPC', header('SNES-SPC700 Sound File Data v0.30'), 'SPC', 'S-DSP'],
+    ['VGM (Master System)', vgm({ 0x0C: 3579545 }), 'VGM', 'SN76489'],
+    ['VGM (Mega Drive)', vgm({ 0x0C: 3579545, 0x2C: 7670453 }), 'VGM', 'YM2612 + SN76489'],
+    ['GYM', header('GYMX'), 'GYM', 'YM2612 + SN76489'],
+  ] as const) {
+    it(`${name} on game-music-emu: scope view, labelled ${format} on ${chip}`, () => {
+      useFormatStore.getState().applyEditorMode({ gmeFileData: data });
+      const st = useFormatStore.getState();
+      expect(st.editorMode).toBe('sc68');
+      expect(scopeFormatLabel(st)).toMatchObject({ format, chip });
+    });
+  }
+
   it('a plain module stays in the classic grid', () => {
     useFormatStore.getState().applyEditorMode({});
     expect(useFormatStore.getState().editorMode).toBe('classic');

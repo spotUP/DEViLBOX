@@ -112,6 +112,7 @@ export type TrackerFormat =
   | 'SNDH' // Atari ST SNDH/SC68 (YM2149 68000 code)
   | 'HES'  // PC Engine / TurboGrafx-16 HuC6280
   | 'SPC'  // Super Nintendo SPC700 sound format
+  | 'GYM'  // Sega Mega Drive GYM register log (YM2612 + SN76489)
   | 'ZXTune' // ZX Spectrum / Atari ST formats played by the ZXTune engine (PT3, STC, VTX, PSG, YM, ...)
   | 'MDX'  // Sharp X68000 MDX (YM2151 OPM + ADPCM, native note data)
   | 'JamCracker'       // JamCracker Pro (.jam, .jc)
@@ -361,6 +362,10 @@ export interface TrackerSong {
   sndhFileData?: ArrayBuffer;
   /** SNDH subtune PsgplayEngine starts (1-based; absent = the file's default) */
   sndhSubtune?: number;
+  /** NSF/NSFE, GBS, HES, KSS, SPC, VGM/VGZ or GYM file for GmeEngine (game-music-emu) */
+  gmeFileData?: ArrayBuffer;
+  /** Track GmeEngine starts (0-based) */
+  gmeTrack?: number;
   /** Whole StoneTracker SPM song for StoneTrackerEngine WASM playback (the authors' player on a 68020 core) */
   stoneTrackerFileData?: ArrayBuffer;
   /** The SPS sample bank beside it (DeltaHuffman packed or not) */

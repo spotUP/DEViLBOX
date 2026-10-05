@@ -40,6 +40,11 @@ const FORMAT_INFO: Record<string, { name: string; description: string; color: st
     description: 'Atari ST SNDH replayer (PSG play by Fredrik Noring). Runs the tune\'s own 68000 code with YM2149 PSG, MFP 68901 timers and STE DMA sound.',
     color: '#ffaa44',
   },
+  GmeSynth: {
+    name: 'Game Music (game-music-emu)',
+    description: 'Console game music replayer (game-music-emu). Runs the game\'s own sound program on the emulated CPU and sound chips: NES (NSF), Game Boy (GBS), PC Engine (HES), MSX (KSS), Super Nintendo (SPC), Master System / Mega Drive (VGM, GYM).',
+    color: '#ff6688',
+  },
   ZxtuneSynth: {
     name: 'ZXTune',
     description: 'ZX Spectrum music replayer. AY-3-8910/YM2149 PSG emulation for PT3, STC, VTX, PSG, and 30+ formats.',

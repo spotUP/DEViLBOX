@@ -463,11 +463,11 @@ export function isVGMFormat(buffer: ArrayBuffer): boolean {
 }
 
 export async function parseVGMFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
-  // Decompress if .vgz or gzip-magic
-  const lowerName = filename.toLowerCase();
+  // Decompress gzip (VGZ) by its magic: parseModuleToSong hands over a
+  // .vgz already inflated.
   let raw = buffer;
   const firstBytes = new Uint8Array(buffer);
-  if (lowerName.endsWith('.vgz') || (firstBytes[0] === 0x1F && firstBytes[1] === 0x8B)) {
+  if (firstBytes[0] === 0x1F && firstBytes[1] === 0x8B) {
     raw = await decompressGzip(buffer);
   }
   if (!isVGMFormat(raw)) throw new Error('Not a valid VGM file');

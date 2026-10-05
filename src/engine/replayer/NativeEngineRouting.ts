@@ -463,6 +463,25 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/psgplay/PsgplayEngine')).PsgplayEngine as unknown as WASMSingletonStatic,
   },
   {
+    // Console game music (NSF/NSFE, GBS, HES, KSS, SPC, VGM/VGZ, GYM):
+    // game-music-emu runs the game's own sound program, or replays the
+    // register log, on the emulated CPU and sound chips (game-music-emu-wasm).
+    // Nothing to edit: GameMusicParser reads the header, the song opens in
+    // the scope view. The track rides as a load arg (0-based).
+    key: 'Gme',
+    synthType: 'GmeSynth',
+    suppressNotes: true,
+    fileDataKey: 'gmeFileData',
+    formats: ['NSF', 'GBS', 'HES', 'KSS', 'SPC', 'VGM', 'GYM'],
+    loadMethod: 'loadTune',
+    getLoadArgs: (song: TrackerSong) => [song.gmeTrack ?? 0],
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/gme/GmeEngine')).GmeEngine as unknown as WASMSingletonStatic,
+  },
+  {
     // StoneTracker (.spm + .sps, Amiga): the authors' StonePlayer_Hard.bin
     // runs on Musashi's 68020 with a Paula + CIA-B in stonetracker-wasm; the
     // grid is a view (StoneTrackerParser). The SPS bank rides as a load arg.

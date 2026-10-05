@@ -4,7 +4,11 @@
  * These are native-only formats with no UADE fallback — they each have
  * dedicated parsers that handle the chip register dump playback.
  *
- * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, MDX, PiyoPiyo, TFM, PMD, S98, QSF
+ * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, GYM, MDX, PiyoPiyo, TFM, PMD, S98, QSF
+ *
+ * Console game music (NSF/NSFE, GBS, HES, KSS, SPC, GYM, and VGM for the
+ * chips game-music-emu emulates) plays on GmeEngine: GameMusicParser reads
+ * the header and the song opens in the scope view.
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -16,24 +20,31 @@ export async function tryChipDumpParse(
   buffer: ArrayBuffer,
   filename: string,
   originalFileName: string,
+  subsong = 0,
 ): Promise<TrackerSong | null> {
 
-  // ── VGM/VGZ — Video Game Music chip-dump ─────────────────────────────────
+  // ── VGM/VGZ — Video Game Music register logs ─────────────────────────────
+  // parseModuleToSong has already inflated a VGZ. SN76489 / YM2413 / YM2612
+  // logs (Master System, Game Gear, Mega Drive) play on game-music-emu; logs
+  // for other chips (YM2151, OPL, ...) keep VGMParser's Furnace rebuild.
   if (/\.(vgm|vgz)$/.test(filename)) {
+    const { isGmeVgm, parseGameMusicFile } = await import('@lib/import/formats/GameMusicParser');
+    if (isGmeVgm(buffer)) return parseGameMusicFile(buffer, originalFileName, subsong);
     const { parseVGMFile } = await import('@lib/import/formats/VGMParser');
     return parseVGMFile(buffer, originalFileName);
   }
 
-  // ── YM — Atari ST AY/YM2149 register dumps ────────────────────────────────
-  if (/\.ym$/.test(filename)) {
-    const { parseYMFile } = await import('@lib/import/formats/YMParser');
-    return parseYMFile(buffer, originalFileName);
+  // ── Console game music on game-music-emu: NSF/NSFE, GBS, HES, KSS, SPC, GYM ──
+  if (/\.(nsfe?|gbs|hes|kss|spc|gym)$/.test(filename)) {
+    const { gameMusicType, parseGameMusicFile } = await import('@lib/import/formats/GameMusicParser');
+    if (gameMusicType(buffer, filename)) return parseGameMusicFile(buffer, originalFileName, subsong);
   }
 
-  // ── NSF/NSFE — NES Sound Format ───────────────────────────────────────────
-  if (/\.nsfe?$/.test(filename)) {
-    const { parseNSFFile } = await import('@lib/import/formats/NSFParser');
-    return parseNSFFile(buffer, originalFileName);
+  // ── YM — Atari ST AY/YM2149 register dumps (YM2-YM6, LHA-packed or raw) ──
+  // Played by the ZXTune engine's YM player (zxtune-wasm, ayumi YM2149).
+  if (/\.ym$/.test(filename)) {
+    const { parseZxtuneFile } = await import('@lib/import/formats/ZxtuneParser');
+    return parseZxtuneFile(originalFileName, buffer);
   }
 
   // ── SAP — Atari 8-bit POKEY (via ASAP WASM engine) ────────────────────────
@@ -69,30 +80,6 @@ export async function tryChipDumpParse(
   if (/\.(strc|amad)$/.test(filename)) {
     const { parseAYStructuredFile } = await import('@lib/import/formats/AYParser');
     return parseAYStructuredFile(buffer, originalFileName);
-  }
-
-  // ── KSS — MSX music (AY/SCC/FM) ──────────────────────────────────────────
-  if (/\.kss$/.test(filename)) {
-    const { parseKSSFile } = await import('@lib/import/formats/KSSParser');
-    return parseKSSFile(buffer, originalFileName);
-  }
-
-  // ── HES — PC Engine / TurboGrafx-16 ──────────────────────────────────────
-  if (/\.hes$/.test(filename)) {
-    const { parseHESFile } = await import('@lib/import/formats/HESParser');
-    return parseHESFile(buffer, originalFileName);
-  }
-
-  // ── GBS — Game Boy Sound System ──────────────────────────────────────────
-  if (/\.gbs$/.test(filename)) {
-    const { parseGBSFile } = await import('@lib/import/formats/GBSParser');
-    return parseGBSFile(buffer);
-  }
-
-  // ── SPC — Super Nintendo SPC700 ──────────────────────────────────────────
-  if (/\.spc$/.test(filename)) {
-    const { parseSPCFile } = await import('@lib/import/formats/SPCParser');
-    return parseSPCFile(buffer);
   }
 
   // ── MDX — Sharp X68000 (YM2151 + ADPCM) ─────────────────────────────────

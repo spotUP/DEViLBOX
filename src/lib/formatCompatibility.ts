@@ -264,7 +264,7 @@ export function getActiveFormatLimits(): FormatConstraints | null {
       fmt.organyaFileData || fmt.sawteethFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData ||
       fmt.pumaTrackerFileData || fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData ||
       fmt.sd2FileData || fmt.symphonieFileData || fmt.v2mFileData || fmt.ayFileData || fmt.piyoPiyoFileData ||
-      fmt.tfmFileData || fmt.sndhFileData || fmt.stoneTrackerFileData || fmt.musicMakerFileData
+      fmt.tfmFileData || fmt.sndhFileData || fmt.gmeFileData || fmt.stoneTrackerFileData || fmt.musicMakerFileData
     );
     if (!hasNative) return null;
 
