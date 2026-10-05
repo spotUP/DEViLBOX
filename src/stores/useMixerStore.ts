@@ -266,7 +266,6 @@ void (async () => {
     import('../engine/pxtone/PxtoneEngine').then(m => _regBitmask('PxtoneEngine', m.PxtoneEngine)).catch(() => {}),
     import('../engine/symphonie/SymphonieEngine').then(m => _regBitmask('SymphonieEngine', m.SymphonieEngine)).catch(() => {}),
     import('../engine/zxtune/ZxtuneEngine').then(m => _regBitmask('ZxtuneEngine', m.ZxtuneEngine)).catch(() => {}),
-    import('../engine/coredesign/CoreDesignEngine').then(m => _regBitmask('CoreDesignEngine', m.CoreDesignEngine)).catch(() => {}),
     import('../engine/sonic-arranger/SonicArrangerEngine').then(m => _regBitmask('SonicArrangerEngine', m.SonicArrangerEngine)).catch(() => {}),
     import('../engine/digmug/DigMugEngine').then(m => _regBitmask('DigMugEngine', m.DigMugEngine)).catch(() => {}),
     import('../engine/deltamusic1/DeltaMusic1Engine').then(m => _regBitmask('DeltaMusic1Engine', m.DeltaMusic1Engine)).catch(() => {}),

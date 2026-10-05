@@ -60,7 +60,6 @@ export const FILE_DATA_FIELDS = [
   'sonicArrangerFileData',
   'robHubbardFileData',
   'digMugFileData',
-  'coreDesignFileData',
   'davidWhittakerFileData',
   'soundControlFileData',
   'deltaMusic1FileData',

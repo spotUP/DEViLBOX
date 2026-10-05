@@ -5,7 +5,7 @@
 #
 # Adds Musashi's 68020 core (third-party/musashi, MIT; opcode tables generated
 # by its m68kmake for the host), the minimal Amiga (src/amiga_host.c), the
-# shared software Paula (tools/asm68k-to-c/runtime/paula_soft.c - the only
+# shared software Paula (tools/asm68k-to-c/runtime, the only
 # copy) and, with EAGLE, UADE's sound core runner (src/eagle_runner.c).
 # Ledger: thoughts/shared/plans/2026-10-05-musashi-replayer-host.md
 
