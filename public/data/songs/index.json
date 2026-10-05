@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T12:43:12.011Z",
+  "generated": "2026-10-05T13:06:38.091Z",
   "perEntry": 6,
   "registryTotal": 277,
   "covered": 158,
@@ -6948,23 +6948,15 @@
       "dir": "/data/songs/symphonie"
     },
     {
-      "id": "synth-dream-unknown",
+      "id": "synth-dream",
       "label": "synth-dream",
-      "formatKey": null,
-      "files": [
-        "/data/songs/synth-dream/smp.nobuddiesland end 2"
-      ],
-      "total": 1,
-      "dir": "/data/songs/synth-dream"
-    },
-    {
-      "id": "synth-dream-uade_sdr",
-      "label": "synth-dream / SynthDream",
       "formatKey": "uade_sdr",
       "files": [
+        "/data/songs/synth-dream/sdr.monsterbusiness 1",
+        "/data/songs/synth-dream/sdr.nobuddiesland end 2",
         "/data/songs/synth-dream/sdr.nobuddiesland jigsaw"
       ],
-      "total": 1,
+      "total": 3,
       "dir": "/data/songs/synth-dream"
     },
     {
@@ -8931,9 +8923,12 @@
           "pas 2 jade.symmod"
         ],
         "synth-dream": [
+          "sdr.monsterbusiness 1",
+          "sdr.nobuddiesland end 2",
           "sdr.nobuddiesland jigsaw",
           "smp.nobuddiesland end 2",
-          "smp.nobuddiesland jigsaw"
+          "smp.nobuddiesland jigsaw",
+          "smp.set"
         ],
         "synth-pack": [
           "centerbase soft.osp",
@@ -34703,9 +34698,12 @@
     },
     "/data/songs/synth-dream": {
       "siblings": [
+        "sdr.monsterbusiness 1",
+        "sdr.nobuddiesland end 2",
         "sdr.nobuddiesland jigsaw",
         "smp.nobuddiesland end 2",
-        "smp.nobuddiesland jigsaw"
+        "smp.nobuddiesland jigsaw",
+        "smp.set"
       ]
     },
     "/data/songs/synth-pack": {
