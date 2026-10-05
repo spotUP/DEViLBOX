@@ -329,6 +329,12 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 - **License:** GPL-2.0 (SPDX `GPL-2.0`, i.e. version 2 only, `third-party/psgplay/licence/GPL-2.0`) for PSG play, cf2149, cf68901 and cf300588; MIT for the Musashi 68000 core (`lib/m68k`); LGPL-2.1 for toslibc (only its headers and `unicode-*.c` are compiled)
 - **Used for:** Atari ST SNDH (.snd / .sndh, raw or ICE!-packed) playback - the tune's own 68000 code on an emulated Atari ST/STE with YM2149, MFP 68901 timers and STE DMA sound, through PSG play's library API (compiled to WASM, `public/psgplay/`). `psgplay-wasm/generated/` holds the Musashi opcode tables and TOS image header PSG play's Makefile generates (`psgplay-wasm/regen-generated.sh`).
 
+### game-music-emu (libgme)
+- **Authors:** Shay Green (blargg), with Michael Pyne and the libgme contributors; Nuked OPN2 by Alexey Khokholov (Nuke.YKT); emu2413 by Mitsutaka Okazaki
+- **Source:** https://github.com/libgme/game-music-emu (f68963b1de06, 2026-09-08); `gme/` vendored in `third-party/game-music-emu` (see its `VENDORED.txt`), wasm bridge in `game-music-emu-wasm/`
+- **License:** LGPL-2.1-or-later (`third-party/game-music-emu/license.txt`); the YM2612 core is Nuked OPN2 (LGPL-2.1-or-later); `ext/emu2413.c` is MIT. The MAME YM2612 core (GPL-2.0-or-later) and the GENS core are not vendored. zlib (zlib licence) comes from Emscripten's port for VGZ and packed GYM.
+- **Used for:** console game music playback - NSF/NSFE (NES), GBS (Game Boy), HES (PC Engine), KSS (MSX), SPC (Super Nintendo), VGM/VGZ (SN76489, YM2413, YM2612) and GYM (Mega Drive) on the emulated CPU and sound chips (compiled to WASM, `public/gme/`).
+
 ### StonePlayer (StoneTracker player)
 - **Authors:** Michael Lavaire and Emmanuel Marty (StonePlayer V1.98, 1995)
 - **Source:** Aminet `mus/edit/stonefree2.lha` (`Players.LHS`, unpacked with the archive's own `StoneEx`): `third-party/stonetracker/StonePlayer_Hard.bin`, the no-OS player binary; DeltaHuffman bank depacker ported from `Libs/StonePacker.library` (Aminet `mus/edit/stonefree1.lha`) into `stonetracker-wasm/src/st_dhuf.c`
