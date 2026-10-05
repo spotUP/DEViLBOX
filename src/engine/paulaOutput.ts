@@ -66,6 +66,10 @@ export const PAULA_SYNTH_TYPES: ReadonlySet<string> = new Set([
   'MaxTraxSynth',
   'MusicAssemblerSynth',
   'MusicLineSynth',
+  // MusicMaker.worklet.js: nearest-sample Paula playback, no output stage.
+  // Against UADE's MusicMaker players it measured +8 dB above 10 kHz and
+  // within 1-2 dB below 6 kHz (2026-10-05).
+  'MusicMakerSynth',
   'OktalyzerWasmSynth',
   'PreTrackerSynth',
   'PumaTrackerSynth',

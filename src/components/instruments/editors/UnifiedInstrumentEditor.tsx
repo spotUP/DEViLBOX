@@ -196,6 +196,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'PiyoPiyoSynth') return 'wasm-info';
   if (synthType === 'TFMSynth') return 'wasm-info';
   if (synthType === 'StoneTrackerSynth') return 'wasm-info';
+  if (synthType === 'MusicMakerSynth') return 'wasm-info';
   if (synthType === 'IxalanceSynth') return 'wasm-info';
   if (synthType === 'CpsycleSynth') return 'wasm-info';
   if (synthType === 'PumaTrackerSynth') return 'wasm-info';

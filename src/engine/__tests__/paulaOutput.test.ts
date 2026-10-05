@@ -21,6 +21,8 @@ describe('the Amiga output stage goes only where Paula went unfiltered', () => {
     expect(needsPaulaOutputStage('DeltaMusic1WasmSynth')).toBe(true);
     expect(needsPaulaOutputStage('SoundMonWasmSynth')).toBe(true);
     expect(needsPaulaOutputStage('SonicArrangerWasmSynth')).toBe(true);
+    // MusicMaker.worklet.js measured +8 dB above 10 kHz against UADE's players (2026-10-05).
+    expect(needsPaulaOutputStage('MusicMakerSynth')).toBe(true);
   });
 
   /**

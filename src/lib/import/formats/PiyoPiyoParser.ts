@@ -11,6 +11,7 @@
  */
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
+import { tempoForRowMs } from '../rowTempo';
 
 const ROWS_PER_PATTERN = 64;
 const TRACK_NAMES = ['Track 1', 'Track 2', 'Track 3', 'Drums'];
@@ -39,10 +40,7 @@ export function readPiyoPiyoHeader(bytes: Uint8Array): PiyoPiyoHeader {
 
 /** Tracker tempo for `waitMs` per row: the smallest speed that keeps the BPM in range. */
 export function piyoPiyoTempo(waitMs: number): { speed: number; bpm: number } {
-  const wait = Math.max(1, waitMs);
-  const speed = Math.max(1, Math.ceil(32 * wait / 2500));
-  const bpm = Math.max(32, Math.min(255, Math.round(2500 * speed / wait)));
-  return { speed, bpm };
+  return tempoForRowMs(waitMs);
 }
 
 export async function parsePiyoPiyoFile(buffer: ArrayBuffer | Uint8Array, filename = 'song.pmd'): Promise<TrackerSong> {

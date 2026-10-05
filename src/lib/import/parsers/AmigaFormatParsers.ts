@@ -2541,6 +2541,15 @@ export async function tryRouteFormat(
       'EarAcheParser', { injectUADE: true });
   }
 
+  // ── MusicMaker V8 split song (<tune>.sdata / sdata.<tune> + <tune>.ip) ───
+  // MusicMakerEngine plays STD (4-voice) and EXT (8-voice) songs from the
+  // author's player source; the parser draws the grid. Song data that does
+  // not parse falls through to the UADE route below.
+  if (matchesExt(filename, ['sdata'])) {
+    const { isMusicMakerSongData, parseMusicMakerSongFile } = await import('@lib/import/formats/MusicMakerParser');
+    if (isMusicMakerSongData(buffer)) return parseMusicMakerSongFile(buffer, originalFileName, companionFiles);
+  }
+
   // ── Music Maker 4V (mm4.* / sdata.* prefix) ──────────────────────────────
   // eagleplayer.conf: MusicMaker_4V  prefixes=mm4,sdata
   if (matchesExt(filename, ['mm4', 'sdata'])) {

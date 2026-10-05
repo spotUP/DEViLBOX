@@ -107,6 +107,7 @@ export type TrackerFormat =
   | 'PiyoPiyo' // Studio Pixel PiyoPiyo (.pmd)
   | 'TFM'  // TFM Music Maker (.tfe, ZX Spectrum TurboFM, 2x YM2203)
   | 'StoneTracker' // StoneTracker (.spm song + .sps sample bank, Amiga, 8 tracks)
+  | 'MusicMaker' // MusicMaker V8 (.sdata + .ip, Amiga, 4 or 8 voices)
   | 'KSS'  // MSX KSS (AY/SCC/OPLL/Y8950)
   | 'SNDH' // Atari ST SNDH/SC68 (YM2149 68000 code)
   | 'HES'  // PC Engine / TurboGrafx-16 HuC6280
@@ -351,6 +352,8 @@ export interface TrackerSong {
   ayFileData?: ArrayBuffer;
   /** Whole Studio Pixel PiyoPiyo .pmd for PiyoPiyoEngine worklet playback */
   piyoPiyoFileData?: ArrayBuffer;
+  /** MusicMaker V8 song + instruments as one FORM/MMV8 IFF for MusicMakerEngine worklet playback */
+  musicMakerFileData?: ArrayBuffer;
   /** Whole TFM Music Maker .tfe for TFMEngine WASM playback (ZXTune player + 2x ymfm YM2203) */
   tfmFileData?: ArrayBuffer;
   /** Whole StoneTracker SPM song for StoneTrackerEngine WASM playback (the authors' player on a 68020 core) */
