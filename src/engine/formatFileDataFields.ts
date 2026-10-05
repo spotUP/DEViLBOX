@@ -70,6 +70,8 @@ export const FILE_DATA_FIELDS = [
   'voodooFileData',
   'bdFileData',
   'sd2FileData',
+  'ayFileData',
+  'piyoPiyoFileData',
   'fredReplayerFileData',
   'oktalyzerFileData',
   'inStereo1FileData',

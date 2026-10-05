@@ -271,6 +271,8 @@ export type SynthType =
   | 'Sc68Synth'         // SC68/SNDH (Atari ST YM2149 + 68000 replayer)
   // ZXTune ZX Spectrum replayer
   | 'ZxtuneSynth'       // ZXTune (AY-3-8910 / YM2149 ZX Spectrum formats)
+  | 'AyletSynth'        // aylet (ZX Spectrum .ay - ZXAY EMUL, Z80 + AY)
+  | 'PiyoPiyoSynth'     // Studio Pixel PiyoPiyo (.pmd), worklet port of piyopiyo-rs
   // QSF Capcom QSound replayer
   | 'QsfSynth'          // QSF (Capcom CPS1/CPS2 Z80 + QSound DSP)
   | 'MAMEFZPCM'         // Casio FZ-1 8-Voice 16-bit PCM Sampler

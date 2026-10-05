@@ -104,6 +104,7 @@ export type TrackerFormat =
   | 'SAP'  // Atari 8-bit POKEY
   | 'GBS'  // Game Boy Sound System
   | 'AY'   // ZX Spectrum AY (ZXAYEMUL)
+  | 'PiyoPiyo' // Studio Pixel PiyoPiyo (.pmd)
   | 'KSS'  // MSX KSS (AY/SCC/OPLL/Y8950)
   | 'SNDH' // Atari ST SNDH/SC68 (YM2149 68000 code)
   | 'HES'  // PC Engine / TurboGrafx-16 HuC6280
@@ -344,6 +345,10 @@ export interface TrackerSong {
   bdFileData?: ArrayBuffer;
   /** Raw SidMon 2.0 (.sid2) binary for Sd2Engine WASM playback */
   sd2FileData?: ArrayBuffer;
+  /** Whole ZX Spectrum .ay file (ZXAY EMUL) for AyletEngine WASM playback */
+  ayFileData?: ArrayBuffer;
+  /** Whole Studio Pixel PiyoPiyo .pmd for PiyoPiyoEngine worklet playback */
+  piyoPiyoFileData?: ArrayBuffer;
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */
   startrekkerAMFileData?: ArrayBuffer;
   /** Raw Startrekker AM .nt synth data for StartrekkerAMEngine WASM playback */

@@ -12,12 +12,6 @@ const ascii = (bytes: Uint8Array, at: number, text: string): boolean => {
   return true;
 };
 
-/** Studio Pixel PiyoPiyo: 'PMD' magic (Cave Story's organya sibling). */
-export function isPiyoPiyoFormat(bytes: Uint8Array): boolean { return ascii(bytes, 0, 'PMD'); }
-export function parsePiyoPiyoFile(_bytes: Uint8Array, filename = ''): TrackerSong {
-  throw new Error(`${filename}: PiyoPiyo (Studio Pixel .pmd) has no replayer in DEViLBOX yet`);
-}
-
 /** StoneTracker (Amiga): 'SPM' magic. */
 export function isStoneTrackerFormat(bytes: Uint8Array): boolean { return ascii(bytes, 0, 'SPM'); }
 export function parseStoneTrackerFile(_bytes: Uint8Array, filename = ''): TrackerSong {

@@ -187,6 +187,8 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'KlysSynth': 0,       // Klystrack — volume managed internally
   'Sc68Synth': 0,       // SC68/SNDH — volume managed internally
   'ZxtuneSynth': 0,     // ZXTune — volume managed internally
+  'AyletSynth': 0,      // aylet — volume managed internally
+  'PiyoPiyoSynth': 0,   // PiyoPiyo — volume managed internally
   'WaveSabreSynth': 0,  // WaveSabre (XRNS) — volume managed internally
   'OidosSynth': 0,      // Oidos (XRNS) — volume managed internally
   'TunefishSynth': 0,   // Tunefish (XRNS) — volume managed internally

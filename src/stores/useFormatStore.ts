@@ -115,6 +115,7 @@ interface FormatStore {
   soundFactoryFileData: ArrayBuffer | null;
   faceTheMusicFileData: ArrayBuffer | null;  sd2FileData: ArrayBuffer | null;
   ayFileData: ArrayBuffer | null;
+  piyoPiyoFileData: ArrayBuffer | null;
   symphonieFileData: ArrayBuffer | null;
   sawteethFileData: ArrayBuffer | null;
   v2mFileData: ArrayBuffer | null;
@@ -488,6 +489,7 @@ export const useFormatStore = create<FormatStore>()(
     inStereo2FileData: null,
     quadraComposerFileData: null,    sd2FileData: null,
     ayFileData: null,
+    piyoPiyoFileData: null,
     ronKlarenFileData: null,
     actionamicsFileData: null,
     activisionProFileData: null,
@@ -1043,6 +1045,7 @@ export const useFormatStore = create<FormatStore>()(
         state.inStereo2FileData = (song as any).inStereo2FileData ?? null;
         state.quadraComposerFileData = (song as any).quadraComposerFileData ?? null;        state.sd2FileData = (song as any).sd2FileData ?? null;
         state.ayFileData = (song as any).ayFileData ?? null;
+        state.piyoPiyoFileData = (song as any).piyoPiyoFileData ?? null;
         state.ronKlarenFileData = (song as any).ronKlarenFileData ?? null;
         state.actionamicsFileData = (song as any).actionamicsFileData ?? null;
         state.activisionProFileData = (song as any).activisionProFileData ?? null;
@@ -1354,6 +1357,7 @@ export const useFormatStore = create<FormatStore>()(
       state.inStereo2FileData = null;
       state.quadraComposerFileData = null;      state.sd2FileData = null;
       state.ayFileData = null;
+      state.piyoPiyoFileData = null;
       state.ronKlarenFileData = null;
       state.actionamicsFileData = null;
       state.activisionProFileData = null;

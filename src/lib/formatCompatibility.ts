@@ -263,7 +263,7 @@ export function getActiveFormatLimits(): FormatConstraints | null {
       fmt.maFileData || fmt.hippelFileData || fmt.sonixFileData || fmt.pxtoneFileData ||
       fmt.organyaFileData || fmt.sawteethFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData ||
       fmt.pumaTrackerFileData || fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData ||
-      fmt.sd2FileData || fmt.symphonieFileData || fmt.v2mFileData
+      fmt.sd2FileData || fmt.symphonieFileData || fmt.v2mFileData || fmt.ayFileData || fmt.piyoPiyoFileData
     );
     if (!hasNative) return null;
 

@@ -399,6 +399,37 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/zxtune/ZxtuneEngine')).ZxtuneEngine as unknown as WASMSingletonStatic,
   },
   {
+    // ZX Spectrum .ay (ZXAY EMUL): aylet 0.5 compiled to wasm runs the tune's
+    // own Z80 code with a real AY. The grid is a view (AYParser); the engine
+    // plays the whole file (ledger F15).
+    key: 'Aylet',
+    synthType: 'AyletSynth',
+    suppressNotes: true,
+    fileDataKey: 'ayFileData',
+    formats: ['AY'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/aylet/AyletEngine')).AyletEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    // Studio Pixel PiyoPiyo (.pmd): a worklet port of piyopiyo-rs plays the
+    // whole file; the grid is a view (PiyoPiyoParser). Sweep 2026-10-05, B5.
+    key: 'PiyoPiyo',
+    synthType: 'PiyoPiyoSynth',
+    suppressNotes: true,
+    fileDataKey: 'piyoPiyoFileData',
+    formats: ['PiyoPiyo'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/piyopiyo/PiyoPiyoEngine')).PiyoPiyoEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'PumaTracker',
     synthType: 'PumaTrackerSynth',
     suppressNotes: true,
