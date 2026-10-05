@@ -3,11 +3,11 @@
  * that contain multiple subsongs.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { Music2 } from 'lucide-react';
-import { notify } from '@stores/useNotificationStore';
+import { switchSubsong } from '@/lib/tracker/subsongSwitch';
 import { CustomSelect } from '@components/common/CustomSelect';
 
 export const AVPSubsongSelector: React.FC = React.memo(() => {
@@ -18,27 +18,8 @@ export const AVPSubsongSelector: React.FC = React.memo(() => {
     }))
   );
 
-  const handleSubsongChange = useCallback(
-    async (newIdx: number) => {
-      if (newIdx === currentSubsong) return;
-
-      useFormatStore.getState().setActivisionProCurrentSubsong(newIdx);
-
-      try {
-        const { ActivisionProEngine } = await import('@engine/activisionpro/ActivisionProEngine');
-        if (ActivisionProEngine.hasInstance()) {
-          const engine = ActivisionProEngine.getInstance();
-          engine.setSubsong(newIdx);
-          engine.play();
-        }
-      } catch {
-        // Engine not loaded yet
-      }
-
-      notify.success(`Subsong ${newIdx + 1}/${subsongCount}`);
-    },
-    [currentSubsong, subsongCount]
-  );
+  // The one subsong switch (lib/tracker/subsongSwitch), shared with the FT2 toolbar.
+  const handleSubsongChange = (newIdx: number) => { void switchSubsong(newIdx); };
 
   if (subsongCount <= 1) return null;
 

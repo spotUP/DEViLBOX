@@ -12,6 +12,7 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { NativeSubsongControl } from './NativeSubsongControl';
 
 type VizMode = 'waveform' | 'spectrum' | 'vectorscope' | 'bars';
 const VIZ_MODES: VizMode[] = ['waveform', 'spectrum', 'vectorscope', 'bars'];
@@ -225,6 +226,7 @@ export const Sc68Visualizer: React.FC = () => {
         <span className="text-xs text-text-secondary truncate">{title}</span>
         {composer && <span className="text-xs truncate" style={{ color: YM_AMBER }}>{composer}</span>}
         <div className="flex-1" />
+        <NativeSubsongControl />
         <span className="text-xs" style={{ color: YM_CYAN }}>{formatInfo.format}</span>
         <button
           onClick={cycleMode}

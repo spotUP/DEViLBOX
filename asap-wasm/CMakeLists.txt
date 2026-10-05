@@ -19,7 +19,7 @@ set_target_properties(Asap PROPERTIES
 target_link_options(Asap PRIVATE
   "SHELL:-s MODULARIZE=1"
   "SHELL:-s EXPORT_NAME=createAsap"
-  "SHELL:-s EXPORTED_FUNCTIONS=[_malloc,_free,_asap_wasm_init,_asap_wasm_load,_asap_wasm_render,_asap_wasm_get_channels,_asap_wasm_get_songs,_asap_wasm_get_duration,_asap_wasm_get_position,_asap_wasm_seek,_asap_wasm_play_song,_asap_wasm_restart,_asap_wasm_stop,_asap_wasm_get_pokey_volume,_asap_wasm_mute_channels]"
+  "SHELL:-s EXPORTED_FUNCTIONS=[_malloc,_free,_asap_wasm_init,_asap_wasm_load,_asap_wasm_render,_asap_wasm_get_channels,_asap_wasm_get_songs,_asap_wasm_get_duration,_asap_wasm_get_position,_asap_wasm_seek,_asap_wasm_play_song,_asap_wasm_current_song,_asap_wasm_restart,_asap_wasm_stop,_asap_wasm_get_pokey_volume,_asap_wasm_mute_channels]"
   "SHELL:-s EXPORTED_RUNTIME_METHODS=[wasmMemory]"
   "SHELL:-s INITIAL_MEMORY=4194304"
   "SHELL:-s MAXIMUM_MEMORY=16777216"

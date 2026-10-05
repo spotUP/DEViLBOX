@@ -444,6 +444,8 @@ export interface TrackerSong {
   asapFileData?: ArrayBuffer;
   /** Original filename for ASAP format detection (extension determines format) */
   asapFilename?: string;
+  /** Song AsapEngine starts (0-based); absent = the file's default song */
+  asapSong?: number;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;

@@ -76,7 +76,10 @@ class GmeProcessor extends AudioWorkletProcessor {
               }
               // The track playing: the first audible one from the track asked for.
               const track = typeof this.module._gme_wasm_loaded_track === 'function' ? this.module._gme_wasm_loaded_track() : (data.track | 0);
-              this.port.postMessage({ type: 'moduleLoaded', track, tracks: result, voices, scopes: this.scopes });
+              // Each track's name, where the file has one (NSFE, m3u-tagged files): the subsong control.
+              const names = [];
+              for (let i = 0; i < result; i++) names.push(this.module.UTF8ToString(this.module._gme_wasm_info(i, 2)));
+              this.port.postMessage({ type: 'moduleLoaded', track, tracks: result, voices, scopes: this.scopes, names });
             } else {
               const why = { '-1': 'not a game-music-emu file', '-2': 'out of memory', '-3': 'game-music-emu refused the file', '-4': 'the track would not start' }[String(result)] || '';
               this.port.postMessage({ type: 'error', message: 'gme_wasm_load failed with code ' + result + (why ? ' (' + why + ')' : '') });
@@ -86,6 +89,18 @@ class GmeProcessor extends AudioWorkletProcessor {
           }
         }
         break;
+
+      case 'startTrack': {
+        // Start another track of the song loaded (subsong control, auto-advance).
+        // Answers every request, -1 when no track started.
+        let started = -1;
+        if (this.module && typeof this.module._gme_wasm_start_track === 'function') {
+          started = this.module._gme_wasm_start_track(data.track | 0, data.skipSilent ? 1 : 0);
+        }
+        const tracks = this.module && typeof this.module._gme_wasm_track_count === 'function' ? this.module._gme_wasm_track_count() : 0;
+        this.port.postMessage({ type: 'trackStarted', track: started, tracks });
+        break;
+      }
 
       case 'setMuteMask':
         // Bit N set = voice N audible; DEViLBOX solo/mute.

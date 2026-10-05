@@ -21,6 +21,7 @@ import { MusicLineEngine } from '../musicline/MusicLineEngine';
 import { C64SIDEngine } from '../C64SIDEngine';
 import { SF2Engine } from '../sf2/SF2Engine';
 import { SilenceDetector } from './SilenceDetector';
+import { advanceNativeSubsong } from './nativeSubsongPlayback';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 import { getActiveDubBus } from '../dub/DubBus';
@@ -44,6 +45,22 @@ export async function endNativeSong(instance: { stop(): void }): Promise<void> {
   const { useTransportStore } = await import('@stores/useTransportStore');
   const transport = useTransportStore.getState();
   if (transport.isPlaying) transport.stop();
+}
+
+/**
+ * A native engine's output stayed silent. A file with more subsongs plays
+ * the next one (owner, 2026-10-05: "just skip to next subsong when it
+ * ends") and the detector watches again; on the last subsong, or an engine
+ * without subsongs, the song ends.
+ */
+export async function onNativeSongSilence(key: string, instance: { stop(): void }, detector: { resume(): void }): Promise<void> {
+  if (await advanceNativeSubsong(key, instance)) {
+    console.log(`[NativeEngineRouting] ${key} silence detected — next subsong`);
+    detector.resume();
+    return;
+  }
+  console.log(`[NativeEngineRouting] ${key} silence detected — stopping`);
+  await endNativeSong(instance);
 }
 
 // ---------------------------------------------------------------------------
@@ -703,7 +720,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/asap/AsapEngine')).AsapEngine as unknown as WASMSingletonStatic,
-    getLoadArgs: (song: TrackerSong) => [song.asapFilename || 'tune.sap'],
+    getLoadArgs: (song: TrackerSong) => [song.asapFilename || 'tune.sap', song.asapSong ?? -1],
   },
   {
     key: 'SoundControlReplayer',
@@ -1181,6 +1198,15 @@ export interface NativeEngineStartResult {
 /** Track which engine keys are currently running to prevent duplicate starts */
 const _runningEngineKeys = new Set<string>();
 
+/** The registry engine `key` while it plays the current song, else null. */
+export async function runningEngineInstance(key: string): Promise<unknown> {
+  if (!_runningEngineKeys.has(key)) return null;
+  const desc = WASM_ENGINES.find((d) => d.key === key);
+  if (!desc) return null;
+  const engine = await resolveEngine(desc);
+  return engine.hasInstance() ? engine.getInstance() : null;
+}
+
 /** Clear running engine tracking (call on stop/dispose) */
 export function clearRunningEngineKeys(): void {
   _runningEngineKeys.clear();
@@ -1442,8 +1468,7 @@ export async function startNativeEngines(
         if (desc.needsDirectRouting) {
           const detector = new SilenceDetector(instance.output.context);
           detector.start(instance.output, instance.output, () => {
-            console.log(`[NativeEngineRouting] ${desc.key} silence detected — stopping`);
-            void endNativeSong(instance);
+            void onNativeSongSilence(desc.key, instance, detector);
           }, silenceIsNotTheSongs);
           activeSilenceDetectors.set(desc.synthType, detector);
         }

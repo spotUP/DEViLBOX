@@ -84,6 +84,12 @@ EMSCRIPTEN_KEEPALIVE int asap_wasm_play_song(int song) {
     return 1;
 }
 
+/* The song playing (0-based): the file's default after a load, or the one
+   asap_wasm_play_song started. -1 when no tune is loaded. */
+EMSCRIPTEN_KEEPALIVE int asap_wasm_current_song(void) {
+    return asap && loaded ? current_song : -1;
+}
+
 /* Rewind the loaded tune to the start of its current song (transport stop
    then play). Returns 0 when no tune is loaded. */
 EMSCRIPTEN_KEEPALIVE int asap_wasm_restart(void) {

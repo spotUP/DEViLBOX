@@ -231,6 +231,8 @@ interface SettingsStore {
 
   // Startup jingle
   welcomeJingleEnabled: boolean;
+  /** A subsong that ends (silence) starts the next one of the file; off = the song stops, as before. */
+  autoAdvanceSubsongs: boolean;
 
   // Actions
   setAmigaLimits: (enabled: boolean) => void;
@@ -261,6 +263,7 @@ interface SettingsStore {
   setVuMeterMirror: (enabled: boolean) => void;
   setMaxHeadroomMode: (enabled: boolean) => void;
   setWelcomeJingleEnabled: (v: boolean) => void;
+  setAutoAdvanceSubsongs: (v: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -442,6 +445,7 @@ export const useSettingsStore = create<SettingsStore>()(
       vuMeterMirror: false,  // Default: VU meters extend upward
       maxHeadroomMode: false,
       welcomeJingleEnabled: true,  // Play startup jingle on first interaction
+      autoAdvanceSubsongs: true,   // Owner, 2026-10-05: "just skip to next subsong when it ends"
 
       // SID Hardware defaults
       sidHardwareMode: 'off' as const,
@@ -607,6 +611,8 @@ export const useSettingsStore = create<SettingsStore>()(
 
     setWelcomeJingleEnabled: (v) =>
       set((state) => { state.welcomeJingleEnabled = v; }),
+    setAutoAdvanceSubsongs: (v) =>
+      set((state) => { state.autoAdvanceSubsongs = v; }),
     })),
     {
       name: 'devilbox-settings',
@@ -722,6 +728,8 @@ export const useSettingsStore = create<SettingsStore>()(
         sidHardwareMode: state.sidHardwareMode,
         sidEngine: state.sidEngine,
         welcomeJingleEnabled: state.welcomeJingleEnabled,
+        // Additive: a save without it merges in the default (on), no version bump.
+        autoAdvanceSubsongs: state.autoAdvanceSubsongs,
       }),
     }
   )

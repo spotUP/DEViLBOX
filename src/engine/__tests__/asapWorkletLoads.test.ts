@@ -108,4 +108,22 @@ describe('ASAP worklet in a worklet-like scope', () => {
     peakOver(p, 0.1);
     expect(peakOver(p, 0.5)).toBe(0);
   }, 60_000);
+
+  it('starts the subsong asked for, at load and later, and reports the one playing', async () => {
+    // The scope view's subsong control and the auto-advance at a song's end.
+    const b = readFileSync(resolve(ROOT, 'public/data/songs/sap/amaurote.sap')); // SONGS 8
+    const bytes = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+    const p = new Cls();
+    await startInit(p);
+    const sent = (p as unknown as { sent: Array<Msg & { meta?: { songs: number; song: number }; song?: number; songs?: number }> }).sent;
+    await p.handleMessage({ type: 'loadModule', moduleData: bytes, filename: 'amaurote.sap', song: 2 });
+    expect(sent.find((m) => m.type === 'moduleLoaded')?.meta).toMatchObject({ songs: 8, song: 2 });
+    await p.handleMessage({ type: 'playSong', song: 5 });
+    expect(sent.at(-1)).toMatchObject({ type: 'songChanged', song: 5, songs: 8 });
+    expect(peakOver(p, 2)).toBeGreaterThan(0.05);
+    await p.handleMessage({ type: 'playSong', song: 8 }); // out of range: answered, not dropped
+    expect(sent.at(-1)).toMatchObject({ type: 'songChanged', song: -1 });
+    await p.handleMessage({ type: 'loadModule', moduleData: bytes, filename: 'amaurote.sap' });
+    expect(sent.filter((m) => m.type === 'moduleLoaded').at(-1)?.meta?.song).toBeGreaterThanOrEqual(0); // the file's default
+  }, 60_000);
 });
