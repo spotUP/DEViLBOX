@@ -148,6 +148,7 @@ function companionMap(root: string, files: string[]): {
     (byDir.get(dir) ?? byDir.set(dir, []).get(dir)!).push(rel);
   }
   const wants = new Map<string, string[]>();
+  const sourcesOf = new Map<string, Record<string, string>>();
   const claimedBy = new Map<string, string[]>();
   for (const [dir, inDir] of byDir) {
     // The listing a module in `dir` sees: its siblings, plus one level of
@@ -162,13 +163,15 @@ function companionMap(root: string, files: string[]): {
       const resolved = resolveCompanions(basename(rel), listing);
       if (resolved.companions.length === 0) continue;
       wants.set(rel, resolved.companions);
+      sourcesOf.set(rel, resolved.sources);
       for (const c of resolved.companions) {
-        const target = dir === '.' ? c : join(dir, c);
+        const from = resolved.sources[c] ?? c;
+        const target = dir === '.' ? from : join(dir, from);
         (claimedBy.get(target) ?? claimedBy.set(target, []).get(target)!).push(rel);
       }
     }
   }
-  return { wants, claimedBy };
+  return { wants, claimedBy, sourcesOf };
 }
 
 /**
@@ -410,7 +413,7 @@ async function runParent(argv: string[]): Promise<void> {
   mkdirSync(dirname(out), { recursive: true });
 
   const files = walk(root);
-  const { wants, claimedBy } = companionMap(root, files);
+  const { wants, claimedBy, sourcesOf } = companionMap(root, files);
   const rows: Rows = fresh || !existsSync(out) ? {} : JSON.parse(readFileSync(out, 'utf8')) as Rows;
 
   // Everything that can be settled without touching the WASM is settled here,
@@ -434,10 +437,11 @@ async function runParent(argv: string[]): Promise<void> {
     todo.push({
       rel,
       abs: join(root, rel),
-      companions: (wants.get(rel) ?? []).map((name) => ({
-        name,
-        path: join(root, dirname(rel) === '.' ? name : join(dirname(rel), name)),
-      })).filter((c) => existsSync(c.path)),
+      companions: (wants.get(rel) ?? []).map((name) => {
+        // Registered under `name`, read from the resolver's source when it differs.
+        const from = sourcesOf.get(rel)?.[name] ?? name;
+        return { name, path: join(root, dirname(rel) === '.' ? from : join(dirname(rel), from)) };
+      }).filter((c) => existsSync(c.path)),
       secs,
     });
     if (limit && todo.length >= limit) break;
