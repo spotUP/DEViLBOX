@@ -45,6 +45,22 @@ export function periodToNote(period: number): number {
 }
 
 /**
+ * The pitch a period plays, in the same naming as periodToNote (856 = 13 =
+ * C-1) but not bounded by the table: a period beyond C-0..B-5 is read an
+ * octave at a time, so it can return 0 or less (Digital Mugician's lowest
+ * period, 3220, is note -10) or more than 72. For measuring pitch and
+ * intervals; a grid cell still needs periodToNote's 1..72. 0 for no period
+ * is not distinguishable here - callers test `period > 0` first.
+ */
+export function periodToPitch(period: number): number {
+  let p = period, octaves = 0;
+  const lowest = AMIGA_PERIODS[0], highest = AMIGA_PERIODS[AMIGA_PERIODS.length - 1];
+  while (p > lowest * 1.03) { p /= 2; octaves--; }
+  while (p < highest * 0.97) { p *= 2; octaves++; }
+  return periodToNote(p) + 12 * octaves;
+}
+
+/**
  * The note a period plays, read within ProTracker's own three octaves
  * (C-1..B-3, notes 13-48): the nearest of those, however far outside the
  * period lies. The classic ProTracker-family reading; 0 for no period.
