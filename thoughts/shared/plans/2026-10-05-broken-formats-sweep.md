@@ -213,5 +213,7 @@ PASS = audible (rmsAvg above the smoke test's silence threshold) with no critica
 
 ## Work ledger (sweep 2: pattern data)
 
+Instrument: `tools/uade-audit/gridVsPaula.ts` (2026-10-05). It renders the file through UADE with the Paula write log on, turns AUDxPER writes into a note sequence per voice, takes the grid's note sequence per channel from the registry's own parser, and scores the longest common subsequence of the two INTERVAL sequences (semitone steps), so an octave or base offset does not matter but carrier bytes shown as notes score near zero. 1.00 = the grid is the tune the player plays; a low score names the parser. Companions resolve as in the app. Crusaders1.dm (DeltaMusic 1, "Wrong Sound"): 0.96 / 0.92 / 1.00 / 0.99 - the grid is right.
+
 | ID | Keys | Cause | Fix | Status |
 |----|------|-------|-----|--------|
