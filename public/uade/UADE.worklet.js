@@ -976,6 +976,7 @@ class UADEProcessor extends AudioWorkletProcessor {
           subsongIndex = audible;
         }
         // The probe consumed the song state: load it afresh for the scan.
+        this._wasm._uade_wasm_stop();
         this._loadIntoWasm(data, filenameHint);
       }
 
@@ -1171,18 +1172,23 @@ class UADEProcessor extends AudioWorkletProcessor {
     try {
       const last = Math.min(maxSubsong, minSubsong + 15);
       for (let s = minSubsong; s <= last; s++) {
+        // A playing song must be stopped before UADE accepts a new load
+        // (same as the 'play' reload path).
+        this._wasm._uade_wasm_stop();
         if (this._loadIntoWasm(data, filenameHint) !== 0) return null;
         this._wasm._uade_wasm_set_looping(0);
         if (s > 0) this._wasm._uade_wasm_set_subsong(s);
         const maxFrames = (sampleRate || 44100) * PROBE_SECONDS;
         for (let done = 0; done < maxFrames;) {
+          // The return value says whether the song is still playing (1), not
+          // how many frames were written: a full CHUNK was rendered.
           const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
           if (ret <= 0) break;
-          const heap = new Float32Array(this._wasm.HEAPU8.buffer, tmpL, ret);
-          for (let i = 0; i < ret; i++) {
+          const heap = new Float32Array(this._wasm.HEAPU8.buffer, tmpL, CHUNK);
+          for (let i = 0; i < CHUNK; i++) {
             if (heap[i] > THRESHOLD || heap[i] < -THRESHOLD) return s;
           }
-          done += ret;
+          done += CHUNK;
         }
       }
       return null;
