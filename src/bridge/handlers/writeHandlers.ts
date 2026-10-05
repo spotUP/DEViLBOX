@@ -1667,7 +1667,7 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     // Streaming WASM players (AdPlug, V2M) bypass the tracker store entirely —
     // return metadata from the player instance, not stale tracker state.
     // But if extraction succeeded (editable mode), return tracker store data instead.
-    const { isAdPlugWasmFormat } = await import('../../lib/file/UnifiedFileLoader');
+    const { isAdPlugWasmFormat } = await import('../../lib/import/adplugFormats');
     if (isAdPlugWasmFormat(filename)) {
       const instrumentState = useInstrumentStore.getState();
       const hasExtractedInstruments = instrumentState.instruments.some(i => i.synthType === 'OPL3');

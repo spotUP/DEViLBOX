@@ -7,6 +7,7 @@
  * Eliminates code duplication and ensures consistent behavior across load methods.
  */
 
+import { isAdPlugWasmFormat } from '@lib/import/adplugFormats';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -1198,13 +1199,7 @@ async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<
  * (RAD, HSC, DRO, IMF, CMF) with pattern editing — the WASM engine plays the rest
  * as streaming audio via OPL emulation.
  */
-// All AdPlug WASM-supported extensions (from adplug.cpp player registry)
-// REMOVED: m (too broad), mus/ims/ksm/raw/sng (conflict with UADE/GoatTracker)
-const ADPLUG_WASM_EXTS = /\.(adl|agd|a2m|a2t|amd|bam|bmf|cff|cmf|d00|dfm|dmo|dro|dtm|got|ha2|hsc|hsp|hsq|imf|jbm|laa|lds|mad|mdi|mkf|mkj|msc|mtk|mtr|mdy|pis|plx|rac|rad|rix|rol|sa2|sat|sci|sdb|sop|sqx|xad|xms|xsm|edl|dtl|as3m|adlib|wlf)$/i;
 
-export function isAdPlugWasmFormat(filename: string): boolean {
-  return ADPLUG_WASM_EXTS.test(filename);
-}
 
 /**
  * Prompt the user to select a companion file via a file input dialog.
