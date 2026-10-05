@@ -12,23 +12,17 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
 
 function encodeSoundMonCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(3);
   const note = cell.note ?? 0;
 
-  // Byte 0: note value. The parser maps the raw SoundMon note index through two tables
-  // (bpNoteToXM: index→PERIODS→nearest ProTracker period→XM note), which is not a simple
-  // additive offset — so it cannot be inverted from the XM note alone. Prefer the exact
-  // source note byte stashed by decodeCell in the `period` carrier; edited grid cells carry
-  // none and fall back to the (approximate) additive derivation.
-  if (cell.period !== undefined) {
-    out[0] = cell.period & 0xFF;
-  } else if (note > 36) {
-    out[0] = (note - 36) & 0xFF;
-  } else {
-    out[0] = 0;
-  }
+  // Byte 0: note value. Several note bytes share a name (SoundMonNotes: all
+  // below C-0 read as C-0), so an unedited cell gets the exact source byte
+  // decodeCell stashed in the `period` carrier; an edited cell carries none
+  // and takes the value that plays its note.
+  out[0] = cell.period !== undefined ? cell.period & 0xFF : noteToBpNote(note) & 0xFF;
 
   // Byte 1: (sample << 4) | effect — both nibbles round-trip exactly
   const instr = cell.instrument ?? 0;

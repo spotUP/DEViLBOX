@@ -28,6 +28,7 @@ import type { SoundMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSoundMonCell } from '@/engine/uade/encoders/SoundMonEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { bpNoteToNote, bpPlayedNote } from './SoundMonNotes';
 
 // ── Utility functions ─────────────────────────────────────────────────────
 
@@ -54,58 +55,6 @@ function u16BE(buf: Uint8Array, off: number): number {
   return (buf[off] << 8) | buf[off + 1];
 }
 
-// ── SoundMon period table (from FlodJS BPPlayer PERIODS) ─────────────────
-// 84 entries covering 7 octaves. The player indexes with note+35.
-
-const PERIODS = [
-  6848, 6464, 6080, 5760, 5440, 5120, 4832, 4576, 4320, 4064, 3840, 3616,
-  3424, 3232, 3040, 2880, 2720, 2560, 2416, 2288, 2160, 2032, 1920, 1808,
-  1712, 1616, 1520, 1440, 1360, 1280, 1208, 1144, 1080, 1016,  960,  904,
-   856,  808,  760,  720,  680,  640,  604,  572,  540,  508,  480,  452,
-   428,  404,  380,  360,  340,  320,  302,  286,  270,  254,  240,  226,
-   214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120,  113,
-   107,  101,   95,   90,   85,   80,   76,   72,   68,   64,   60,   57,
-];
-
-// Standard ProTracker periods for note mapping
-const PT_PERIODS = [
-  // Octave 1 (C-1 to B-1)
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  // Octave 2 (C-2 to B-2)
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  // Octave 3 (C-3 to B-3)
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-  // Octave 4 (C-4 to B-4)
-  107, 101,  95,  90,  85,  80,  76,  72,  68,  64,  60,  57,
-];
-
-/**
- * Map a SoundMon note value + transpose to an XM note number.
- * The BPPlayer uses PERIODS[note + 35] for period lookup.
- * SoundMon note 1 with transpose 0 → PERIODS[36] = 856 = C-1 in ProTracker.
- * XM note 13 = C-1, 25 = C-2, etc.
- */
-function bpNoteToXM(note: number, transpose: number): number {
-  if (note === 0) return 0;
-  const periodsIdx = note + transpose + 35;
-  if (periodsIdx < 0 || periodsIdx >= PERIODS.length) return 0;
-  const period = PERIODS[periodsIdx];
-  if (period <= 0) return 0;
-
-  // Find closest match in ProTracker period table
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < PT_PERIODS.length; i++) {
-    const d = Math.abs(PT_PERIODS[i] - period);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
-  }
-  // PT_PERIODS[0] = C-1 = XM note 13 (displays "C-1")
-  const xmNote = bestIdx + 13;
-  return Math.max(1, Math.min(96, xmNote));
-}
 
 // ── SoundMon version constants ─────────────────────────────────────────────
 
@@ -557,13 +506,17 @@ export async function parseSoundMonFile(
         let xmInstrument = 0;
 
         if (note !== 0) {
-          // Apply transpose from step
-          xmNote = bpNoteToXM(note, step.transpose);
+          // Option 10 with a non-zero high nibble turns the step's transpose
+          // off for this row, a non-zero low nibble its sound transpose
+          // (Soundmon2.2.s bpnext).
+          const transposeOff = option === 10 && (data & 0xf0) !== 0;
+          const soundTransposeOff = option === 10 && (data & 0x0f) !== 0;
+          xmNote = bpNoteToNote(bpPlayedNote(note, transposeOff ? 0 : step.transpose));
 
           // Instrument: apply sound transpose
           let instr = bpRow.sample;
           if (instr > 0) {
-            instr += step.soundTranspose;
+            if (!soundTransposeOff) instr += step.soundTranspose;
             if (instr >= 1 && instr <= 15) {
               xmInstrument = instr;
             }
@@ -738,10 +691,10 @@ export async function parseSoundMonFile(
       const effect = sampleByte & 0x0F;
       const param = raw[2];
 
-      const note = bpNoteToXM(noteRaw, 0);
+      const note = bpNoteToNote(noteRaw);
       // Byte-exact carrier (a field the SoundMon grid loop never sets, so it stays private
-      // to the round-trip/chip-RAM path): the raw note byte, which bpNoteToXM's two-table
-      // mapping cannot reconstruct from the XM note. The sample|effect byte and param byte
+      // to the round-trip/chip-RAM path): the raw note byte, which several bytes share a name
+      // for (SoundMonNotes: everything below C-0 reads as C-0). The sample|effect byte and param byte
       // already round-trip exactly.
       return {
         note, instrument: sample, volume: 0, effTyp: effect, eff: param, effTyp2: 0, eff2: 0,
