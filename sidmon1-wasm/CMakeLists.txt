@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(SidMon1 C)
+# One software Paula for every replayer (never a local copy).
+set(PAULA_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tools/asm68k-to-c/runtime")
 
 set(CMAKE_C_STANDARD 99)
 
@@ -51,9 +53,9 @@ file(MAKE_DIRECTORY ${REPLAYER_OUTPUT_DIR})
 add_executable(${REPLAYER_NAME}
     src/sidmon1/sidmon1.c
     src/sidmon1/sidmon1_wrapper.c
-    src/sidmon1/paula_soft.c
+    ${PAULA_RUNTIME_DIR}/paula_soft.c
 )
-target_include_directories(${REPLAYER_NAME} PRIVATE src/sidmon1)
+target_include_directories(${REPLAYER_NAME} PRIVATE src/sidmon1 ${PAULA_RUNTIME_DIR})
 target_link_libraries(${REPLAYER_NAME} m)
 
 if(EMSCRIPTEN)

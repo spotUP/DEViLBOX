@@ -2,6 +2,8 @@
 # Build: emcmake cmake .. && emmake make
 cmake_minimum_required(VERSION 3.13)
 project(DaveLoweNew C)
+# One software Paula for every replayer (never a local copy).
+set(PAULA_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../tools/asm68k-to-c/runtime")
 
 set(OUTPUT_NAME "DaveLoweNew")
 set(OUTPUT_DIR  "${CMAKE_SOURCE_DIR}/../../public/davelowenew")
@@ -10,10 +12,10 @@ file(MAKE_DIRECTORY ${OUTPUT_DIR})
 add_executable(${OUTPUT_NAME}
     DaveLoweNew.c
     DaveLoweNew_wrapper.c
-    paula_soft.c
+    ${PAULA_RUNTIME_DIR}/paula_soft.c
 )
 
-target_include_directories(${OUTPUT_NAME} PRIVATE .)
+target_include_directories(${OUTPUT_NAME} PRIVATE . ${PAULA_RUNTIME_DIR})
 
 if(EMSCRIPTEN)
     set(EXPORTED_FUNCTIONS

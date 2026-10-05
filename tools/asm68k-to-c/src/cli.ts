@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join, basename, extname } from 'path';
+import { join, basename, extname, relative, resolve as resolvePath, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { Command } from 'commander';
 import { tokenize } from './lexer.js';
@@ -77,14 +77,15 @@ program
       if (opts.wrapper !== false) {
         const timing = opts.timing === 'ntsc' ? 'ntsc' : 'pal';
         const wrapper = genWrapper({ playerName: name, exports: resolved.exports, timing });
-        const cmake   = genCMake({ playerName: name, playerFile: `${name}.c` });
+        // The build compiles the runtime's paula_soft.c in place: copies per
+        // engine drifted apart (fourteen of them, five behaviours).
+        const runtimeDir = resolvePath(fileURLToPath(new URL('.', import.meta.url)), '../runtime');
+        const cmake   = genCMake({
+          playerName: name, playerFile: `${name}.c`,
+          runtimeDir: relative(resolvePath(outDir), runtimeDir).split(sep).join('/'),
+        });
         writeFileSync(join(outDir, `${name}_wrapper.c`), wrapper);
         writeFileSync(join(outDir, 'CMakeLists.txt'), cmake);
-
-        // Copy paula runtime files
-        const runtimeDir = join(fileURLToPath(new URL('.', import.meta.url)), '../runtime');
-        writeFileSync(join(outDir, 'paula_soft.h'), readFileSync(join(runtimeDir, 'paula_soft.h')));
-        writeFileSync(join(outDir, 'paula_soft.c'), readFileSync(join(runtimeDir, 'paula_soft.c')));
       }
 
       console.log(`[${name}] Written to ${outDir}/`);
