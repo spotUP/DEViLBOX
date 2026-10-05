@@ -57,9 +57,20 @@ class EupminiProcessor extends AudioWorkletProcessor {
             }
 
             heapU8.set(uint8Data, wasmPtr);
-            const result = this.module._eupmini_init(wasmPtr, uint8Data.length);
+            // The FMB / PMB banks the header names; the player copies them.
+            const put = (bank) => {
+              if (!bank || !bank.byteLength) return [0, 0];
+              const bytes = new Uint8Array(bank);
+              const ptr = malloc(bytes.length);
+              if (!ptr) return [0, 0];
+              (this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer)).set(bytes, ptr);
+              return [ptr, bytes.length];
+            };
+            const [fmbPtr, fmbLen] = put(data.fmBank);
+            const [pmbPtr, pmbLen] = put(data.pcmBank);
+            const result = this.module._eupmini_init(wasmPtr, uint8Data.length, fmbPtr, fmbLen, pmbPtr, pmbLen);
             const free = this.module._free || this.module.free;
-            if (free) free(wasmPtr);
+            if (free) { free(wasmPtr); if (fmbPtr) free(fmbPtr); if (pmbPtr) free(pmbPtr); }
 
             if (result !== 0) {
               this.port.postMessage({ type: 'error', message: 'eupmini_init failed: ' + result });

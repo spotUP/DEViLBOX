@@ -41,7 +41,17 @@ static int g_max_frames = 0;
 
 /* ---- Public API ---- */
 
-EXPORT int eupmini_init(const uint8_t *data, uint32_t size) {
+/*
+ * Load a song with its instrument banks, as eupplay does: every FM slot gets
+ * eupplay's default voice, then the FMB (header 0x6E2 names it) overwrites
+ * slots from offset 8 in 48-byte voices and the PMB (named at 0x6EA) is the
+ * PCM instrument set. A bank of length 0 is absent: FM keeps the default
+ * voice, PCM stays empty, the song still plays (eupplay does the same when it
+ * cannot open the file).
+ */
+EXPORT int eupmini_init(const uint8_t *data, uint32_t size,
+                        const uint8_t *fmb, uint32_t fmb_size,
+                        const uint8_t *pmb, uint32_t pmb_size) {
     /* Clean up previous */
     if (g_player) { g_player->stopPlaying(); delete g_player; g_player = nullptr; }
     if (g_device) { delete g_device; g_device = nullptr; }
@@ -92,6 +102,30 @@ EXPORT int eupmini_init(const uint8_t *data, uint32_t size) {
     /* Set initial tempo */
     int tempo = buf[0x805] + 30;
     g_player->tempo(tempo);
+
+    /* Instrument banks (eupplay.cpp, after the header) */
+    {
+        static const uint8_t default_fm[] = {
+            ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // name
+            17, 33, 10, 17,                         // detune / multiple
+            25, 10, 57, 0,                          // output level
+            154, 152, 218, 216,                     // key scale / attack rate
+            15, 12, 7, 12,                          // amon / decay rate
+            0, 5, 3, 5,                             // sustain rate
+            38, 40, 70, 40,                         // sustain level / release rate
+            20,                                     // feedback / algorithm
+            0xc0,                                   // pan, LFO
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        };
+        for (int n = 0; n < 128; n++)
+            g_device->setFmInstrumentParameter(n, default_fm);
+        if (fmb && fmb_size > 8) {
+            for (uint32_t n = 0; n < (fmb_size - 8) / 48; n++)
+                g_device->setFmInstrumentParameter((int)n, fmb + 8 + 48 * n);
+        }
+        if (pmb && pmb_size > 0)
+            g_device->setPcmInstrumentParameters(pmb, pmb_size);
+    }
 
     /* Init pcm struct */
     memset(&pcm, 0, sizeof(pcm));

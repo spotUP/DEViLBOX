@@ -303,6 +303,10 @@ export interface TrackerSong {
   sawteethFileData?: ArrayBuffer;
   /** Raw FM Towns EUP binary for loading into the EupminiEngine WASM */
   eupFileData?: ArrayBuffer;
+  /** The FMB FM voice bank the EUP header names (0x6E2), beside the song */
+  eupFmBankData?: ArrayBuffer;
+  /** The PMB PCM instrument bank the EUP header names (0x6EA), beside the song */
+  eupPcmBankData?: ArrayBuffer;
   /** Raw IXS binary for loading into the IxalanceEngine WASM */
   ixsFileData?: ArrayBuffer;
   /** Raw Psycle (.psy) binary for loading into the CpsycleEngine WASM */

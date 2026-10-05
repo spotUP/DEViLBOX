@@ -15,23 +15,54 @@ import type { InstrumentConfig } from '@/types';
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
+/** EUP header (eupplay.cpp EUPHEAD): 2048 bytes, then 6 bytes before the events. */
+const EUP_HEADER_SIZE = 2048;
+const TRK_MIDI_CH = 0x394;   // 32 tracks -> MIDI channel (0xFF: unused)
+const FM_MIDI_CH = 0x6D4;    // 6 FM devices -> MIDI channel
+const PCM_MIDI_CH = 0x6DA;   // 8 PCM devices -> MIDI channel
+const FM_BANK_NAME = 0x6E2;  // 8 chars, file <name>.fmb beside the song
+const PCM_BANK_NAME = 0x6EA; // 8 chars, file <name>.pmb beside the song
+
+/** A channel byte the player accepts: one of 32 MIDI channels, or 0xFF for none. */
+const isChannel = (b: number) => b < 32 || b === 0xFF;
+
 /**
- * Check if a buffer looks like an EUP file.
- * EUP files have a 32-byte title followed by track-to-channel mapping.
- * Validates header structure: bytes 32-47 should contain plausible
- * channel mapping values (0-15 for FM/SSG/PCM channels).
+ * Check if a buffer looks like an EUP file: long enough for the 2048-byte
+ * header and the event start the player reads, and every channel assignment
+ * the player maps (eupmini_harness.cpp) is a channel number, at least one
+ * track mapped. Bytes 32-47 are the artist field (Traumerei.eup: "SCHUMAN"),
+ * not a channel map; checking them refused real files.
  */
 export function isEupFormat(data: ArrayBuffer): boolean {
-  if (data.byteLength < 100) return false;
+  if (data.byteLength < EUP_HEADER_SIZE + 6 + 6) return false;
   const view = new Uint8Array(data);
-  // After the 32-byte title, bytes 32-47 contain track-to-channel mapping.
-  // Valid channel numbers are 0-15 (FM=0-5, SSG=6-8, ADPCM=9-10, rhythm=11-15).
-  // If most mapping bytes are in range, it's likely a valid EUP file.
-  let validMappings = 0;
-  for (let i = 32; i < 48 && i < view.length; i++) {
-    if (view[i] <= 15) validMappings++;
+  let mapped = 0;
+  for (let i = 0; i < 32; i++) {
+    const ch = view[TRK_MIDI_CH + i];
+    if (!isChannel(ch)) return false;
+    if (ch !== 0xFF) mapped++;
   }
-  return validMappings >= 12; // At least 12 of 16 mapping bytes are valid channels
+  for (let i = 0; i < 6; i++) if (!isChannel(view[FM_MIDI_CH + i])) return false;
+  for (let i = 0; i < 8; i++) if (!isChannel(view[PCM_MIDI_CH + i])) return false;
+  return mapped > 0;
+}
+
+/** The bank name the header gives at `offset` (8 chars, NUL-padded), or ''. */
+export function eupBankName(data: ArrayBuffer, offset: number): string {
+  const view = new Uint8Array(data, offset, 8);
+  let name = '';
+  for (const b of view) { if (b === 0) break; name += String.fromCharCode(b); }
+  return name.trim();
+}
+
+/** The companion whose file name is `<name>.<ext>` (any case, any directory), as the player opens it. */
+function bankFile(companions: Map<string, ArrayBuffer> | undefined, name: string, ext: string): ArrayBuffer | undefined {
+  if (!name || !companions) return undefined;
+  const want = `${name}.${ext}`.toLowerCase();
+  for (const [path, data] of companions) {
+    if ((path.split('/').pop() ?? path).toLowerCase() === want) return data;
+  }
+  return undefined;
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -46,10 +77,11 @@ export function isEupFormat(data: ArrayBuffer): boolean {
 export async function parseEupFile(
   fileName: string,
   data: ArrayBuffer,
+  companions?: Map<string, ArrayBuffer>,
 ): Promise<TrackerSong> {
-  if (data.byteLength < 100) {
+  if (data.byteLength < EUP_HEADER_SIZE + 6 + 6) {
     throw new Error(
-      `Invalid EUP file: too small (${data.byteLength} bytes, minimum 100)`
+      `Invalid EUP file: too small (${data.byteLength} bytes, minimum ${EUP_HEADER_SIZE + 12})`
     );
   }
 
@@ -105,5 +137,8 @@ export async function parseEupFile(
     initialBPM: 125,
     linearPeriods: false,
     eupFileData: data.slice(0),
+    // The banks the header names, beside the song (modland: in the song's own folder).
+    eupFmBankData: bankFile(companions, eupBankName(data, FM_BANK_NAME), 'fmb')?.slice(0),
+    eupPcmBankData: bankFile(companions, eupBankName(data, PCM_BANK_NAME), 'pmb')?.slice(0),
   };
 }

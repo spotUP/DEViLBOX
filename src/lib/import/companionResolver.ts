@@ -331,6 +331,16 @@ export function resolveCompanions(moduleName: string, listing: CompanionListing)
     const banks = listing.siblings.filter((n) => /\.ssd$/i.test(n));
     if (!own && banks.length === 1 && !companions.includes(asked)) { companions.push(asked); sources[asked] = banks[0]; }
   }
+  // Euphony (FM Towns): the song's header names an FM voice bank (`<name>.fmb`)
+  // and a PCM bank (`<name>.pmb`) the player opens beside it (eupplay.cpp).
+  // The name lives in the file, not its name, so every bank in the folder
+  // goes along and the player picks by the header (modland keeps one song
+  // per folder with its banks: Euphony/Aya/Mondschein/ fmtone2.fmb piano.pmb).
+  if (/\.eup$/i.test(moduleName)) {
+    for (const n of listing.siblings) {
+      if (/\.(fmb|pmb)$/i.test(n) && !companions.includes(n)) companions.push(n);
+    }
+  }
   const kept = new Set(companions);
   for (const key of Object.keys(sources)) if (!kept.has(key)) delete sources[key];
   return { companions, sources, usedSharedBank: bank !== null };
