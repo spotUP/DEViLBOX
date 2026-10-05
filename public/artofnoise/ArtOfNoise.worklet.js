@@ -63,6 +63,7 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
             if (free) free(wasmPtr);
 
             if (ok) {
+              this.applyMuteMask();
               this.port.postMessage({ type: 'moduleLoaded' });
             } else {
               this.port.postMessage({ type: 'error', message: 'player_load returned 0' });
@@ -94,6 +95,7 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
 
       case 'setMuteMask':
         this.muteMask = data.mask;
+        this.applyMuteMask();
         break;
 
       case 'getInstrumentParam': {
@@ -247,6 +249,18 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
     this.initialized = false;
     this.lastHeapBuffer = null;
   }
+  /**
+   * The mixer's mask is bit N SET = channel N AUDIBLE. The core's gain export
+   * takes 1 = audible, 0 = silent, so the bit becomes the gain here, once.
+   * Re-applied after every load: a fresh module starts with all channels on.
+   */
+  applyMuteMask() {
+    if (!this.module || typeof this.module._player_set_channel_gain !== 'function') return;
+    for (let ch = 0; ch < 8; ch++) {
+      this.module._player_set_channel_gain(ch, (this.muteMask >>> ch) & 1 ? 1 : 0);
+    }
+  }
+
 
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.module) return true;

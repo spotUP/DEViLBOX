@@ -21,6 +21,8 @@
 static AonSong* g_song = NULL;
 static uint32_t g_sample_rate = 48000;
 static char g_title[512] = {0};
+// Audible channels, bit N set = channel N audible. Survives player_load.
+static uint32_t g_audible_mask = 0xFFFFFFFFu;
 
 // Channel level tracking (peak per channel per render call)
 static float g_channel_levels[AON_MAX_CHANNELS * 2]; // L+R per channel
@@ -39,6 +41,7 @@ int player_load(const uint8_t* data, uint32_t size) {
     if (!g_song) return 0;
 
     aon_song_set_sample_rate(g_song, g_sample_rate);
+    aon_song_set_channel_mask(g_song, g_audible_mask);
     aon_song_start(g_song);
 
     // Build title from metadata
@@ -127,9 +130,12 @@ float* player_get_channel_levels(void) {
 }
 
 void player_set_channel_gain(int channel, float gain) {
-    // AoN player doesn't have per-channel gain; solo is the closest
-    (void)channel;
-    (void)gain;
+    // Binary per channel: gain > 0 = audible, 0 = muted (same contract as the
+    // other engines' gain export, which the worklet drives from the mixer mask).
+    if (channel < 0 || channel >= AON_MAX_CHANNELS) return;
+    if (gain > 0.0f) g_audible_mask |= (1u << channel);
+    else g_audible_mask &= ~(1u << channel);
+    if (g_song) aon_song_set_channel_mask(g_song, g_audible_mask);
 }
 
 int player_get_instrument_count(void) {
