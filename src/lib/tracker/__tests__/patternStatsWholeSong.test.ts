@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { parseDigitalSymphonyFile } from '@/lib/import/formats/DigitalSymphonyParser';
-import { noteCellsPerPattern } from '../handlers/readHandlers';
+import { noteCellsPerPattern } from '@/lib/tracker/patternNoteCells';
 
 describe('get_pattern_stats wholeSong', () => {
   it('finds the notes of a song that opens with an empty pattern', () => {
