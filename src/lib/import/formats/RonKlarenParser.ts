@@ -983,5 +983,9 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     linearPeriods: false,
     uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadePatternLayout,
+    // Native playback: the Ron Klaren WASM replayer (RonKlarenReplayer, ahead
+    // of UADEEditable in WASM_ENGINES). Grid edits reach it through
+    // writeCellToChipRam -> RonKlarenEngine.setCell (rk_set_cell).
+    ronKlarenFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   };
 }

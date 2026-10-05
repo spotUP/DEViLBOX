@@ -16,7 +16,10 @@
  *   1. Fixed-length chip-RAM layout (`song.uadePatternLayout`): the 68k replayer
  *      runs inside UADE and reads pattern data from emulated chip RAM, so the
  *      edit is poked straight into chip RAM via `UADEChipEditor.patchPatternCell`.
- *   2. TFMX direct-write (`song.tfmxFileData` + `song.uadePatternLayout`): the
+ *   2. Ron Klaren (`song.ronKlarenFileData` + `song.uadePatternLayout`): the
+ *      Ron Klaren WASM replayer gets the note through rk_set_cell, addressed by
+ *      the same file offset the chip-RAM write uses.
+ *   3. TFMX direct-write (`song.tfmxFileData` + `song.uadePatternLayout`): the
  *      TFMX WASM engine reads its module bytes from `tfmxFileData`, so the
  *      re-encoded cell is written into that buffer in place.
  *
@@ -33,6 +36,7 @@ import type { TrackerCell } from '@/types';
 import { UADEChipEditor } from './UADEChipEditor';
 import { UADEEngine } from './UADEEngine';
 import { getCellFileOffset } from './UADEPatternEncoder';
+import { ronKlarenNoteIndex } from './encoders/RonKlarenEncoder';
 
 export async function writeCellToChipRam(
   song: TrackerSong | null | undefined,
@@ -54,7 +58,21 @@ export async function writeCellToChipRam(
     } catch { /* UADE not active */ }
   }
 
-  // 2. TFMX direct-write into the tfmxFileData buffer (WASM playback path).
+  // 2. Ron Klaren WASM replayer: the note of the track command the cell maps
+  //    to. The replayer keeps the command's wait byte (the row's duration the
+  //    grid derives its rows from) and removes the position's transpose.
+  if (song.ronKlarenFileData && layout) {
+    const offset = getCellFileOffset(layout, patternIdx, row, channel);
+    const note = ronKlarenNoteIndex(cell.note ?? 0);
+    if (offset >= 0 && note >= 0) {
+      try {
+        const { RonKlarenEngine } = await import('../ronklaren/RonKlarenEngine');
+        if (RonKlarenEngine.hasInstance()) RonKlarenEngine.getInstance().setCell(patternIdx, channel, offset, note);
+      } catch { /* Ron Klaren not active */ }
+    }
+  }
+
+  // 3. TFMX direct-write into the tfmxFileData buffer (WASM playback path).
   if (song.tfmxFileData && layout) {
     try {
       const offset = getCellFileOffset(layout, patternIdx, row, channel);

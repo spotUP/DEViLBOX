@@ -31,6 +31,8 @@ const CASES: Array<[string, () => Promise<TrackerSong | null>, string]> = [
 const IMPORTED: Array<[string, string]> = [
   ['public/data/songs/digital-sound-studio/zrimay.dss', 'DssReplayer'],
   ['public/data/songs/formats/doxtro3.dss', 'DssReplayer'],
+  // Ron Klaren: the replayer had no rk_set_cell, so the parser left it unfed.
+  ['public/data/songs/ron-klaren/astra 2.rk', 'RonKlarenReplayer'],
 ];
 
 describe('imported songs play on their own engine', { timeout: 60000 }, () => {

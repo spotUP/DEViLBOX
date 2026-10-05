@@ -24,7 +24,6 @@ const IMPORT_DIRS = [join(ROOT, 'src/lib/import'), join(ROOT, 'src/lib/file')];
 /** Engines that import cannot reach today, each with the reason. */
 const KNOWN_UNREACHED: Record<string, string> = {
   // No feeder.
-  RonKlarenReplayer: 'ronklaren.c has no rk_set_cell: switching off UADE would make grid edits inaudible (UADE gets them via chip RAM)',
   FaceTheMusicReplayer: '.ftm imports through libopenmpt; the FTM worklet passes setCell args in the wrong order for ftm_set_cell',
   FredEditorReplayer: 'superseded for songs by FredReplayer2 (fredReplayerFileData); nothing creates FredEditorReplayerSynth either',
 };

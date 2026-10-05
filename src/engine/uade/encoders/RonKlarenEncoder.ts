@@ -32,15 +32,21 @@ const XM_REFERENCE_NOTE = 13;
 const RK_REFERENCE_IDX = 36;
 const RK_PERIODS_LEN = 70;
 
+/**
+ * Grid note → Ron Klaren period-table index (reverse of the parser's rkNoteToXM:
+ * xmNote = XM_REFERENCE_NOTE + (noteIdx - RK_REFERENCE_IDX)). The one mapping
+ * for file bytes and live edits of the WASM replayer. -1 for an empty cell.
+ */
+export function ronKlarenNoteIndex(xmNote: number): number {
+  if (!(xmNote > 0 && xmNote <= 96)) return -1;
+  return Math.max(0, Math.min(RK_PERIODS_LEN - 1, xmNote - XM_REFERENCE_NOTE + RK_REFERENCE_IDX));
+}
+
 export function encodeRonKlarenCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(2);
-  const xmNote = cell.note ?? 0;
+  const noteIdx = ronKlarenNoteIndex(cell.note ?? 0);
 
-  if (xmNote > 0 && xmNote <= 96) {
-    // Reverse rkNoteToXM: xmNote = XM_REFERENCE_NOTE + (noteIdx - RK_REFERENCE_IDX)
-    // → noteIdx = xmNote - XM_REFERENCE_NOTE + RK_REFERENCE_IDX
-    let noteIdx = xmNote - XM_REFERENCE_NOTE + RK_REFERENCE_IDX;
-    noteIdx = Math.max(0, Math.min(RK_PERIODS_LEN - 1, noteIdx));
+  if (noteIdx >= 0) {
     out[0] = noteIdx;
     // Default waitCount = 1 (triggers note and waits 1*4-1=3 ticks)
     out[1] = 1;

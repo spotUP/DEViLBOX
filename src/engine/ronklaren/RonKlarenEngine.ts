@@ -120,9 +120,14 @@ export class RonKlarenEngine extends WASMChannelOutputsEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  /** Edit a pattern cell in the WASM replayer */
-  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+  /**
+   * Set the note of the track command at `offset` in the module file (the
+   * grid cell's offset from the importer's layout). `note` is the period-table
+   * index heard at `position` on `channel`; the replayer removes that
+   * position's transpose and keeps the command's wait byte.
+   */
+  setCell(position: number, channel: number, offset: number, note: number): void {
+    this.workletNode?.port.postMessage({ type: 'setCell', position, channel, offset, note });
   }
 
   /** Set an instrument parameter by name */
