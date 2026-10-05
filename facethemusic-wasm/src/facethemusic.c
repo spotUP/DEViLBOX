@@ -156,6 +156,7 @@ typedef struct FtmVoiceInfo {
 
 typedef struct FtmPatternLoopInfo {
     uint32_t track_position;
+    int channel;               // whose track track_position indexes (edits renumber lines)
     uint16_t loop_start_pos;
     int16_t loop_count;
     int16_t orig_loop_count;
@@ -389,7 +390,9 @@ static void ftm_mark_visited(FtmModule* m, uint16_t p) {
 
 static uint32_t ftm_period_to_freq(uint16_t period) {
     if (period == 0) return 0;
-    return (uint32_t)(3546895.0 / (double)(period * 2));
+    // Paula: one sample per `period` ticks of the 3546895 Hz PAL clock (428 =
+    // 8287 Hz, PlayFTM's lead voice plays straight from its period table).
+    return (uint32_t)(3546895.0 / (double)period);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -802,8 +805,12 @@ static void ftm_parse_track_effect(FtmModule* m, FtmVoiceInfo* v, uint32_t tp) {
                     if (pi->pat_loop_top < FTM_MAX_PAT_LOOPS) {
                         FtmPatternLoopInfo* pli = &pi->pat_loop_stack[pi->pat_loop_top++];
                         pli->track_position = tp;
+                        pli->channel = v->channel_number;
                         pli->loop_start_pos = (uint16_t)((pi->current_row / m->rows_per_measure) * m->rows_per_measure);
-                        pli->loop_count = (int16_t)tl->effect_arg;
+                        // PlayFTM stores the count minus one ($f7a: lsr #6, subq #1)
+                        // and stops when the decrement goes negative, so a loop
+                        // of N plays N times in all, not N + 1.
+                        pli->loop_count = (int16_t)(tl->effect_arg - 1);
                         pli->orig_loop_count = (int16_t)tl->effect_arg;
                     }
                 } else {
@@ -1331,32 +1338,146 @@ int ftm_get_rows_per_measure(const FtmModule* module) {
     return module ? (int)module->rows_per_measure : 0;
 }
 
-void ftm_get_cell(const FtmModule* module, int channel, int row,
-                   uint8_t* note, uint8_t* effect, uint16_t* effect_arg) {
-    if (!module || channel < 0 || channel >= module->active_channel_count) {
-        if (note) *note = 0; if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
-        return;
+// Rows of a track's event lines, walked as PlayFTM walks them (track seek at
+// $bee, row step at $ed0): spacing lines add up to the gap before the next
+// event; with none since the previous event the gap is the track's default
+// spacing, and the first event sits at row 0 unless spacing lines precede it.
+typedef struct FtmEventRow { int row; int line; } FtmEventRow;
+
+static int ftm_track_event_rows(const FtmTrack* t, FtmEventRow* out) {
+    int n = 0, prev = -1, gap = 0;
+    bool spaced = false;
+    for (int i = 0; i < t->num_lines; i++) {
+        const FtmTrackLine* l = &t->lines[i];
+        if (l->effect == FTM_TE_SKIP_EMPTY) { gap += l->effect_arg; spaced = true; continue; }
+        int row = (prev < 0 ? 0 : prev + 1) + (spaced ? gap : (prev < 0 ? 0 : t->default_spacing));
+        out[n].row = row; out[n].line = i; n++;
+        prev = row; gap = 0; spaced = false;
     }
-    const FtmTrack* track = &module->tracks[channel];
-    if (row < 0 || row >= track->num_lines) {
-        if (note) *note = 0; if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
-        return;
-    }
-    const FtmTrackLine* tl = &track->lines[row];
-    if (note) *note = tl->note;
-    if (effect) *effect = (uint8_t)tl->effect;
-    if (effect_arg) *effect_arg = tl->effect_arg;
+    return n;
 }
 
-void ftm_set_cell(FtmModule* module, int channel, int row,
-                   uint8_t note, uint8_t effect, uint16_t effect_arg) {
-    if (!module || channel < 0 || channel >= module->active_channel_count) return;
+static bool ftm_line_is_empty(const FtmTrackLine* l) {
+    return l->effect == FTM_TE_NONE && l->effect_arg == 0 && l->note == 0;
+}
+
+void ftm_get_cell(const FtmModule* module, int channel, int row,
+                   uint8_t* note, uint8_t* effect, uint16_t* effect_arg) {
+    if (note) *note = 0;
+    if (effect) *effect = 0;
+    if (effect_arg) *effect_arg = 0;
+    if (!module || channel < 0 || channel >= FTM_MAX_CHANNELS) return;
+
+    const FtmTrack* track = &module->tracks[channel];
+    FtmEventRow* rows = (FtmEventRow*)malloc(sizeof(FtmEventRow) * (size_t)(track->num_lines + 1));
+    if (!rows) return;
+    int n = ftm_track_event_rows(track, rows);
+    for (int i = 0; i < n; i++) {
+        if (rows[i].row != row) continue;
+        const FtmTrackLine* tl = &track->lines[rows[i].line];
+        if (note) *note = tl->note;
+        if (effect) *effect = (uint8_t)tl->effect;
+        if (effect_arg) *effect_arg = tl->effect_arg;
+        break;
+    }
+    free(rows);
+}
+
+int ftm_set_cell(FtmModule* module, int channel, int row,
+                  uint8_t note, uint8_t effect, uint16_t effect_arg) {
+    if (!module || channel < 0 || channel >= FTM_MAX_CHANNELS || row < 0) return 0;
+    if (effect >= FTM_TE_SKIP_EMPTY || note > 35 || effect_arg > 63) return 0;
+
     FtmTrack* track = &module->tracks[channel];
-    if (row < 0 || row >= track->num_lines) return;
-    FtmTrackLine* tl = &track->lines[row];
-    tl->note = note;
-    tl->effect = (FtmTrackEffect)effect;
-    tl->effect_arg = effect_arg;
+    int old_count = track->num_lines;
+    FtmEventRow* rows = (FtmEventRow*)malloc(sizeof(FtmEventRow) * (size_t)(old_count + 1));
+    if (!rows) return 0;
+    int n = ftm_track_event_rows(track, rows);
+
+    FtmTrackLine cell = { (FtmTrackEffect)effect, effect_arg, note };
+    bool clear = ftm_line_is_empty(&cell);
+
+    int at = -1, insert_before = n;
+    for (int i = 0; i < n; i++) {
+        if (rows[i].row == row) { at = i; break; }
+        if (rows[i].row > row) { insert_before = i; break; }
+    }
+    // A pattern loop point is not a grid cell; overwriting it would drop the loop.
+    if (at >= 0 && track->lines[rows[at].line].effect == FTM_TE_PATTERN_LOOP) { free(rows); return 0; }
+
+    // Same number of events: rewrite the line in place.
+    if (at >= 0 && !clear) {
+        track->lines[rows[at].line] = cell;
+        free(rows);
+        return 1;
+    }
+    if (at < 0 && clear) { free(rows); return 1; }
+
+    // Otherwise the event list changes: rebuild the track with the spacing
+    // lines that put every event back on its row.
+    int count = n + (clear ? -1 : 1);
+    FtmEventRow* events = (FtmEventRow*)malloc(sizeof(FtmEventRow) * (size_t)(count + 1));
+    FtmTrackLine* ev_lines = (FtmTrackLine*)malloc(sizeof(FtmTrackLine) * (size_t)(count + 1));
+    int* new_index_of_old = (int*)malloc(sizeof(int) * (size_t)(old_count + 1));
+    if (!events || !ev_lines || !new_index_of_old) {
+        free(rows); free(events); free(ev_lines); free(new_index_of_old);
+        return 0;
+    }
+
+    int k = 0;
+    for (int i = 0; i < n; i++) {
+        if (i == at) continue;                 // cleared
+        if (at < 0 && i == insert_before) { events[k].row = row; events[k].line = -1; ev_lines[k] = cell; k++; }
+        events[k] = rows[i]; ev_lines[k] = track->lines[rows[i].line]; k++;
+    }
+    if (at < 0 && insert_before == n) { events[k].row = row; events[k].line = -1; ev_lines[k] = cell; k++; }
+
+    // One line per event plus the spacing lines (12-bit gaps each) it needs.
+    int cap = 0;
+    for (int i = 0, prev = -1; i < k; i++) {
+        int gap = events[i].row - (prev < 0 ? 0 : prev + 1);
+        cap += 1 + (gap + 0x0ffe) / 0x0fff + 1;
+        prev = events[i].row;
+    }
+    FtmTrackLine* lines = (FtmTrackLine*)malloc(sizeof(FtmTrackLine) * (size_t)(cap + 1));
+    if (!lines) {
+        free(rows); free(events); free(ev_lines); free(new_index_of_old);
+        return 0;
+    }
+
+    for (int i = 0; i < old_count; i++) new_index_of_old[i] = -1;
+    int m = 0, prev = -1;
+    for (int i = 0; i < k; i++) {
+        int gap = events[i].row - (prev < 0 ? 0 : prev + 1);
+        int implied = prev < 0 ? 0 : track->default_spacing;
+        if (gap != implied) {
+            while (gap > 0x0fff) {
+                lines[m].effect = FTM_TE_SKIP_EMPTY; lines[m].effect_arg = 0x0fff; lines[m].note = 0; m++;
+                gap -= 0x0fff;
+            }
+            lines[m].effect = FTM_TE_SKIP_EMPTY; lines[m].effect_arg = (uint16_t)gap; lines[m].note = 0; m++;
+        }
+        if (events[i].line >= 0) new_index_of_old[events[i].line] = m;
+        lines[m++] = ev_lines[i];
+        prev = events[i].row;
+    }
+
+    free(track->lines);
+    track->lines = lines;
+    track->num_lines = m;
+
+    // Pattern loops remember the line of their loop point; follow it.
+    FtmGlobalInfo* pi = &module->playing_info;
+    for (int i = 0; i < pi->pat_loop_top; i++) {
+        FtmPatternLoopInfo* pli = &pi->pat_loop_stack[i];
+        if (pli->channel == channel && pli->track_position < (uint32_t)old_count && new_index_of_old[pli->track_position] >= 0)
+            pli->track_position = (uint32_t)new_index_of_old[pli->track_position];
+    }
+    // The voice resumes at the row it was about to play.
+    ftm_adjust_track_indexes(module, &module->voices[channel]);
+
+    free(rows); free(events); free(ev_lines); free(new_index_of_old);
+    return 1;
 }
 
 float ftm_get_instrument_param(const FtmModule* module, int inst, const char* param) {

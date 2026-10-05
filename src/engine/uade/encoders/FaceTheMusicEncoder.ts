@@ -31,6 +31,37 @@ import type { TrackerCell } from '@/types';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
 
+/** A Face The Music track event in the replayer's own terms (what ftm_set_cell takes). */
+export interface FtmCellFields {
+  /** 0 none, 1-34 note, 35 release. */
+  note: number;
+  /** 0 instrument only, 1-10 volume step + instrument, 11 SEL, 12 pitch bend, 13 volume down. */
+  effect: number;
+  /** 6-bit argument: the instrument, or the SEL / bend / volume-down parameter. */
+  arg: number;
+}
+
+/**
+ * TrackerCell → FTM event fields, the reverse of FaceTheMusicParser's grid
+ * mapping: the one mapping for file bytes and live edits of the WASM replayer.
+ */
+export function ftmCellFields(cell: Pick<TrackerCell, 'note' | 'instrument' | 'volume' | 'effTyp' | 'eff'>): FtmCellFields {
+  const xm = cell.note ?? 0;
+  const note = xm === 97 ? 35 : xm > 0 ? Math.max(1, Math.min(34, xm - 48)) : 0;
+  const instrument = (cell.instrument ?? 0) & 0x3F;
+  switch (cell.effTyp ?? 0) {
+    case 0x1C: return { note, effect: 11, arg: (cell.eff ?? 0) & 0x3F };
+    case 0x03: return { note, effect: 12, arg: (cell.eff ?? 0) & 0x3F };
+    case 0x0A: return { note, effect: 13, arg: (cell.eff ?? 0) & 0x3F };
+    case 0x41: {
+      // Volume steps 0-9 are (step * 64 / 9); effect nibble = step + 1.
+      const step = Math.max(0, Math.min(9, Math.round(((cell.volume ?? 0) * 9) / 64)));
+      return { note, effect: step + 1, arg: instrument };
+    }
+    default: return { note, effect: 0, arg: instrument };
+  }
+}
+
 export const faceTheMusicEncoder: VariableLengthEncoder = {
   formatId: 'faceTheMusic',
 
@@ -67,7 +98,6 @@ export const faceTheMusicEncoder: VariableLengthEncoder = {
       const instr = cell.instrument ?? 0;
       const volume = cell.volume ?? 0;
       const effTyp = cell.effTyp ?? 0;
-      const eff = cell.eff ?? 0;
 
       const hasContent = note !== 0 || instr !== 0 || volume !== 0 || (effTyp !== 0 && effTyp !== 0x41);
 
@@ -91,55 +121,9 @@ export const faceTheMusicEncoder: VariableLengthEncoder = {
 
       emptyRows = 0;
 
-      // Encode note bits
-      let noteBits = 0;
-      if (note === 97) {
-        noteBits = 35; // key-off
-      } else if (note > 0) {
-        noteBits = note - 48;
-        if (noteBits < 1) noteBits = 1;
-        if (noteBits > 34) noteBits = 34;
-      }
-
-      // Determine event type and encode
-      let data0 = 0;
-      let data1 = 0;
-
-      // param encoding: param = ((data0 & 0x0F) << 2) | (data1 >> 6)
-      // So: data0 low nibble = (param >> 2) & 0x0F, data1 bits 7-6 = param & 0x03
-      const param = instr & 0x3F; // instrument/param value (0-63)
-      const paramHi = (param >> 2) & 0x0F;
-      const paramLo = param & 0x03;
-
-      if (effTyp === 0x41) {
-        // Volume set: high nibble = ((volRaw * 9 / 64) + 1)
-        // Reverse of: volRaw = ((data0 >> 4) - 1) * 64 / 9
-        // volNibble = round(volume * 9 / 64) + 1, clamped to 1-9
-        let volNibble = Math.round(volume * 9 / 64) + 1;
-        if (volNibble < 1) volNibble = 1;
-        if (volNibble > 9) volNibble = 9;
-        data0 = (volNibble << 4) | paramHi;
-        data1 = (paramLo << 6) | (noteBits & 0x3F);
-      } else if (effTyp === 0x1C) {
-        // SEL effect
-        const selParam = eff & 0x3F;
-        data0 = 0xB0 | ((selParam >> 2) & 0x0F);
-        data1 = ((selParam & 0x03) << 6) | (noteBits & 0x3F);
-      } else if (effTyp === 0x03) {
-        // Pitch bend
-        const pbParam = eff & 0x3F;
-        data0 = 0xC0 | ((pbParam >> 2) & 0x0F);
-        data1 = ((pbParam & 0x03) << 6) | (noteBits & 0x3F);
-      } else if (effTyp === 0x0A) {
-        // Volume down
-        const vdParam = eff & 0x3F;
-        data0 = 0xD0 | ((vdParam >> 2) & 0x0F);
-        data1 = ((vdParam & 0x03) << 6) | (noteBits & 0x3F);
-      } else {
-        // Default: set instrument with no effect (0x00 high nibble)
-        data0 = 0x00 | paramHi;
-        data1 = (paramLo << 6) | (noteBits & 0x3F);
-      }
+      const { note: noteBits, effect, arg } = ftmCellFields(cell);
+      const data0 = (effect << 4) | ((arg >> 2) & 0x0F);
+      const data1 = ((arg & 0x03) << 6) | (noteBits & 0x3F);
 
       buf.push(data0);
       buf.push(data1);
