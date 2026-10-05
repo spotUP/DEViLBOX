@@ -14,7 +14,7 @@
 import { loadModuleFile, type ModuleInfo } from './ModuleLoader';
 import { isUADEFormat } from './formats/UADEParser';
 import { getNativeFormatMetadata, getNativeFormatExtendedMetadata } from './NativeFormatMetadata';
-import { detectFormat, type FormatDefinition } from './FormatRegistry';
+import { detectFormat, detectFormatFromContent, type FormatDefinition } from './FormatRegistry';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 import { companionRelativeName } from './companionRelativeName';
@@ -37,8 +37,14 @@ export const isChipDumpFormat = (filename: string): boolean => {
 };
 
 /** Whether only the UADE engine can read this file. */
-export function isUADEExclusiveFile(filename: string): boolean {
+export function isUADEExclusiveFile(filename: string, head?: Uint8Array): boolean {
   const fname = filename.toLowerCase();
+  // The bytes outrank the name: a `.snd` that is Atari SNDH is not the Amiga
+  // format of the same extension.
+  if (head) {
+    const byContent = detectFormatFromContent(fname, head);
+    if (byContent && byContent !== detectFormat(fname)) return byContent.family === 'uade-only';
+  }
   // isUADEFormat only checks extensions - prefix-named formats like
   // cust.songname are missed; the FormatRegistry understands prefixes
   // (family 'uade-only', or uadeFallback without a native parser).
@@ -68,7 +74,8 @@ export async function prepareModuleImport(file: File, companions: File[] = [], h
   const nativeFmt = detectNativeFormat(fname);
   const isFurnace = isFurnaceFormat(fname);
 
-  if (isUADEExclusiveFile(fname)) {
+  const head = new Uint8Array(await file.slice(0, 64).arrayBuffer());
+  if (isUADEExclusiveFile(fname, head)) {
     const buf = await file.arrayBuffer();
     // Skip the pre-scan for synthetic/compiled 68k formats - the enhanced
     // scan corrupts UADE engine state, and later loads fail.

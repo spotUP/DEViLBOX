@@ -42,6 +42,13 @@ describe('detectFormatFromContent', () => {
     expect(fmt?.nativeParser).toBeUndefined();
     expect(fmt?.libopenmptFallback).toBe(true);
   });
+  it('Atari SNDH named .snd is SNDH, and the import does not hand it to UADE', { timeout: 60_000 }, async () => {
+    expect(keyOf('sndh/mad_max/jochen.snd')).toBe('sndh');
+    const { isUADEExclusiveFile } = await import('../prepareModuleImport');
+    expect(isUADEExclusiveFile('jochen.snd', head('sndh/mad_max/jochen.snd'))).toBe(false);
+    // An Amiga .snd without the SNDH header still goes to UADE.
+    expect(isUADEExclusiveFile('tune.snd', new Uint8Array(64))).toBe(true);
+  });
   it('a name with no collision keeps its name-only answer', () => {
     expect(keyOf('formats/mdat.turrican_bonus')).toBe(detectFormat('mdat.turrican_bonus')?.key);
   });

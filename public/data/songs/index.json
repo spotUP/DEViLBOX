@@ -1,8 +1,8 @@
 {
-  "generated": "2026-10-05T13:06:38.091Z",
+  "generated": "2026-10-05T13:32:58.832Z",
   "perEntry": 6,
-  "registryTotal": 277,
-  "covered": 158,
+  "registryTotal": 278,
+  "covered": 159,
   "entries": [
     {
       "id": "actionamics",
@@ -3682,7 +3682,7 @@
     {
       "id": "formats-MusicMaker V8 Old",
       "label": "formats / MusicMaker V8 Old",
-      "formatKey": "musicMaker4V",
+      "formatKey": "musicMaker",
       "subformat": "MusicMaker V8 Old",
       "files": [
         "/data/songs/formats/MusicMaker V8 Old/- unknown/best of guitars.sdata",
@@ -6546,6 +6546,988 @@
       "dir": "/data/songs/silmarils"
     },
     {
+      "id": "sndh-2spaces",
+      "label": "sndh / 2spaces",
+      "formatKey": "sndh",
+      "subformat": "2spaces",
+      "files": [
+        "/data/songs/sndh/2spaces/1flight.snd",
+        "/data/songs/sndh/2spaces/awaynorm.snd",
+        "/data/songs/sndh/2spaces/dinoride.snd",
+        "/data/songs/sndh/2spaces/wizards.snd"
+      ],
+      "total": 4,
+      "dir": "/data/songs/sndh/2spaces"
+    },
+    {
+      "id": "sndh-40e0d0",
+      "label": "sndh / 40e0d0",
+      "formatKey": "sndh",
+      "subformat": "40e0d0",
+      "files": [
+        "/data/songs/sndh/40e0d0/a-lagolf.snd",
+        "/data/songs/sndh/40e0d0/cp_2077.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/40e0d0"
+    },
+    {
+      "id": "sndh-505",
+      "label": "sndh / 505",
+      "formatKey": "sndh",
+      "subformat": "505",
+      "files": [
+        "/data/songs/sndh/505/baloon.snd",
+        "/data/songs/sndh/505/broarps.snd",
+        "/data/songs/sndh/505/cosytime.snd",
+        "/data/songs/sndh/505/dma/lastrans.snd",
+        "/data/songs/sndh/505/lastwish.snd",
+        "/data/songs/sndh/505/lively.snd"
+      ],
+      "total": 8,
+      "dir": "/data/songs/sndh/505"
+    },
+    {
+      "id": "sndh-607",
+      "label": "sndh / 607",
+      "formatKey": "sndh",
+      "subformat": "607",
+      "files": [
+        "/data/songs/sndh/607/humid.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/607"
+    },
+    {
+      "id": "sndh-9sphere",
+      "label": "sndh / 9sphere",
+      "formatKey": "sndh",
+      "subformat": "9sphere",
+      "files": [
+        "/data/songs/sndh/9sphere/kabocha.snd",
+        "/data/songs/sndh/9sphere/ruines.snd",
+        "/data/songs/sndh/9sphere/volcavis.snd"
+      ],
+      "total": 3,
+      "dir": "/data/songs/sndh/9sphere"
+    },
+    {
+      "id": "sndh-ad",
+      "label": "sndh / ad",
+      "formatKey": "sndh",
+      "subformat": "ad",
+      "files": [
+        "/data/songs/sndh/ad/adn_end.snd",
+        "/data/songs/sndh/ad/adn_loop.snd",
+        "/data/songs/sndh/ad/adn_quiz.snd",
+        "/data/songs/sndh/ad/cracouca.snd",
+        "/data/songs/sndh/ad/dma/adn_quiz.snd",
+        "/data/songs/sndh/ad/dma/trademrk.snd"
+      ],
+      "total": 8,
+      "dir": "/data/songs/sndh/ad"
+    },
+    {
+      "id": "sndh-aki",
+      "label": "sndh / aki",
+      "formatKey": "sndh",
+      "subformat": "aki",
+      "files": [
+        "/data/songs/sndh/aki/notdone.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/aki"
+    },
+    {
+      "id": "sndh-an_owl",
+      "label": "sndh / an_owl",
+      "formatKey": "sndh",
+      "subformat": "an_owl",
+      "files": [
+        "/data/songs/sndh/an_owl/gpanic.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/an_owl"
+    },
+    {
+      "id": "sndh-archmage",
+      "label": "sndh / archmage",
+      "formatKey": "sndh",
+      "subformat": "archmage",
+      "files": [
+        "/data/songs/sndh/archmage/plastrof.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/archmage"
+    },
+    {
+      "id": "sndh-cabbage",
+      "label": "sndh / cabbage",
+      "formatKey": "sndh",
+      "subformat": "cabbage",
+      "files": [
+        "/data/songs/sndh/cabbage/bull.snd",
+        "/data/songs/sndh/cabbage/cheese.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/cabbage"
+    },
+    {
+      "id": "sndh-cerror",
+      "label": "sndh / cerror",
+      "formatKey": "sndh",
+      "subformat": "cerror",
+      "files": [
+        "/data/songs/sndh/cerror/donut.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/cerror"
+    },
+    {
+      "id": "sndh-count_0",
+      "label": "sndh / count_0",
+      "formatKey": "sndh",
+      "subformat": "count_0",
+      "files": [
+        "/data/songs/sndh/count_0/awesome.snd",
+        "/data/songs/sndh/count_0/replay.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/count_0"
+    },
+    {
+      "id": "sndh-crazy_g",
+      "label": "sndh / crazy_g",
+      "formatKey": "sndh",
+      "subformat": "crazy_g",
+      "files": [
+        "/data/songs/sndh/crazy_g/adamisq.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/crazy_g"
+    },
+    {
+      "id": "sndh-crazy_q",
+      "label": "sndh / crazy_q",
+      "formatKey": "sndh",
+      "subformat": "crazy_q",
+      "files": [
+        "/data/songs/sndh/crazy_q/cracktro.snd",
+        "/data/songs/sndh/crazy_q/dma/knobhead.snd",
+        "/data/songs/sndh/crazy_q/minifunk.snd",
+        "/data/songs/sndh/crazy_q/sodacrk.snd"
+      ],
+      "total": 4,
+      "dir": "/data/songs/sndh/crazy_q"
+    },
+    {
+      "id": "sndh-ctrix",
+      "label": "sndh / ctrix",
+      "formatKey": "sndh",
+      "subformat": "ctrix",
+      "files": [
+        "/data/songs/sndh/ctrix/slammer.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/ctrix"
+    },
+    {
+      "id": "sndh-cube",
+      "label": "sndh / cube",
+      "formatKey": "sndh",
+      "subformat": "cube",
+      "files": [
+        "/data/songs/sndh/cube/dma/hypocerd.snd",
+        "/data/songs/sndh/cube/pulserep.snd",
+        "/data/songs/sndh/cube/pulsetx.snd",
+        "/data/songs/sndh/cube/rndacces.snd",
+        "/data/songs/sndh/cube/supturrd.snd"
+      ],
+      "total": 5,
+      "dir": "/data/songs/sndh/cube"
+    },
+    {
+      "id": "sndh-damifort",
+      "label": "sndh / damifort",
+      "formatKey": "sndh",
+      "subformat": "damifort",
+      "files": [
+        "/data/songs/sndh/damifort/broken.snd",
+        "/data/songs/sndh/damifort/fondue.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/damifort"
+    },
+    {
+      "id": "sndh-damo",
+      "label": "sndh / damo",
+      "formatKey": "sndh",
+      "subformat": "damo",
+      "files": [
+        "/data/songs/sndh/damo/dma/curly.snd",
+        "/data/songs/sndh/damo/moreish.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/damo"
+    },
+    {
+      "id": "sndh-dippy",
+      "label": "sndh / dippy",
+      "formatKey": "sndh",
+      "subformat": "dippy",
+      "files": [
+        "/data/songs/sndh/dippy/coldweat.snd",
+        "/data/songs/sndh/dippy/froztech.snd",
+        "/data/songs/sndh/dippy/heartbea.snd",
+        "/data/songs/sndh/dippy/stillalv.snd"
+      ],
+      "total": 4,
+      "dir": "/data/songs/sndh/dippy"
+    },
+    {
+      "id": "sndh-dma-sc",
+      "label": "sndh / dma-sc",
+      "formatKey": "sndh",
+      "subformat": "dma-sc",
+      "files": [
+        "/data/songs/sndh/dma-sc/adn_quiz.snd",
+        "/data/songs/sndh/dma-sc/dragdnce.snd",
+        "/data/songs/sndh/dma-sc/kingswrd.snd",
+        "/data/songs/sndh/dma-sc/purple_t.snd"
+      ],
+      "total": 4,
+      "dir": "/data/songs/sndh/dma-sc"
+    },
+    {
+      "id": "sndh-doclands",
+      "label": "sndh / doclands",
+      "formatKey": "sndh",
+      "subformat": "doclands",
+      "files": [
+        "/data/songs/sndh/doclands/buzzomet.snd",
+        "/data/songs/sndh/doclands/gin_fizz.snd",
+        "/data/songs/sndh/doclands/missionc.snd",
+        "/data/songs/sndh/doclands/myclassi.snd",
+        "/data/songs/sndh/doclands/noworrie.snd",
+        "/data/songs/sndh/doclands/pong.snd"
+      ],
+      "total": 7,
+      "dir": "/data/songs/sndh/doclands"
+    },
+    {
+      "id": "sndh-dr_eams",
+      "label": "sndh / dr_eams",
+      "formatKey": "sndh",
+      "subformat": "dr_eams",
+      "files": [
+        "/data/songs/sndh/dr_eams/replay.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/dr_eams"
+    },
+    {
+      "id": "sndh-dubmood",
+      "label": "sndh / dubmood",
+      "formatKey": "sndh",
+      "subformat": "dubmood",
+      "files": [
+        "/data/songs/sndh/dubmood/copulate.snd",
+        "/data/songs/sndh/dubmood/dma/had_to.snd",
+        "/data/songs/sndh/dubmood/dma/notimers.snd",
+        "/data/songs/sndh/dubmood/dma/toodrunk.snd",
+        "/data/songs/sndh/dubmood/hibern1.snd",
+        "/data/songs/sndh/dubmood/killpill.snd"
+      ],
+      "total": 8,
+      "dir": "/data/songs/sndh/dubmood"
+    },
+    {
+      "id": "sndh-dunkteam",
+      "label": "sndh / dunkteam",
+      "formatKey": "sndh",
+      "subformat": "dunkteam",
+      "files": [
+        "/data/songs/sndh/dunkteam/dma/fruktsal.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/dunkteam"
+    },
+    {
+      "id": "sndh-eldr0010",
+      "label": "sndh / eldr0010",
+      "formatKey": "sndh",
+      "subformat": "eldr0010",
+      "files": [
+        "/data/songs/sndh/eldr0010/1_by_1.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/eldr0010"
+    },
+    {
+      "id": "sndh-filippp",
+      "label": "sndh / filippp",
+      "formatKey": "sndh",
+      "subformat": "filippp",
+      "files": [
+        "/data/songs/sndh/filippp/why_em.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/filippp"
+    },
+    {
+      "id": "sndh-frequent",
+      "label": "sndh / frequent",
+      "formatKey": "sndh",
+      "subformat": "frequent",
+      "files": [
+        "/data/songs/sndh/frequent/dma/Hardkant.snd",
+        "/data/songs/sndh/frequent/dma/Hazmat.snd",
+        "/data/songs/sndh/frequent/dma/Lydfelle.snd",
+        "/data/songs/sndh/frequent/dma/Problem.snd",
+        "/data/songs/sndh/frequent/dma/Sharhell.snd",
+        "/data/songs/sndh/frequent/dma/Vexation.snd"
+      ],
+      "total": 8,
+      "dir": "/data/songs/sndh/frequent"
+    },
+    {
+      "id": "sndh-garvalf",
+      "label": "sndh / garvalf",
+      "formatKey": "sndh",
+      "subformat": "garvalf",
+      "files": [
+        "/data/songs/sndh/garvalf/jesienna.snd",
+        "/data/songs/sndh/garvalf/peak.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/garvalf"
+    },
+    {
+      "id": "sndh-gilmore.adm",
+      "label": "sndh / gilmore.adm",
+      "formatKey": "sndh",
+      "subformat": "gilmore.adm",
+      "files": [
+        "/data/songs/sndh/gilmore.adm/buxton.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/gilmore.adm"
+    },
+    {
+      "id": "sndh-gotoplay",
+      "label": "sndh / gotoplay",
+      "formatKey": "sndh",
+      "subformat": "gotoplay",
+      "files": [
+        "/data/songs/sndh/gotoplay/coursouv.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/gotoplay"
+    },
+    {
+      "id": "sndh-gwem",
+      "label": "sndh / gwem",
+      "formatKey": "sndh",
+      "subformat": "gwem",
+      "files": [
+        "/data/songs/sndh/gwem/bridal.snd",
+        "/data/songs/sndh/gwem/fuckings.snd",
+        "/data/songs/sndh/gwem/warpintr.snd"
+      ],
+      "total": 3,
+      "dir": "/data/songs/sndh/gwem"
+    },
+    {
+      "id": "sndh-herceg.dor",
+      "label": "sndh / herceg.dor",
+      "formatKey": "sndh",
+      "subformat": "herceg.dor",
+      "files": [
+        "/data/songs/sndh/herceg.dor/crock.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/herceg.dor"
+    },
+    {
+      "id": "sndh-husak.jak",
+      "label": "sndh / husak.jak",
+      "formatKey": "sndh",
+      "subformat": "husak.jak",
+      "files": [
+        "/data/songs/sndh/husak.jak/fractal.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/husak.jak"
+    },
+    {
+      "id": "sndh-hylst",
+      "label": "sndh / hylst",
+      "formatKey": "sndh",
+      "subformat": "hylst",
+      "files": [
+        "/data/songs/sndh/hylst/overwrit.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/hylst"
+    },
+    {
+      "id": "sndh-iami",
+      "label": "sndh / iami",
+      "formatKey": "sndh",
+      "subformat": "iami",
+      "files": [
+        "/data/songs/sndh/iami/gpanic.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/iami"
+    },
+    {
+      "id": "sndh-jakerson",
+      "label": "sndh / jakerson",
+      "formatKey": "sndh",
+      "subformat": "jakerson",
+      "files": [
+        "/data/songs/sndh/jakerson/asd.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/jakerson"
+    },
+    {
+      "id": "sndh-jarre.jea",
+      "label": "sndh / jarre.jea",
+      "formatKey": "sndh",
+      "subformat": "jarre.jea",
+      "files": [
+        "/data/songs/sndh/jarre.jea/cblood.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/jarre.jea"
+    },
+    {
+      "id": "sndh-jess",
+      "label": "sndh / jess",
+      "formatKey": "sndh",
+      "subformat": "jess",
+      "files": [
+        "/data/songs/sndh/jess/buzzmosp.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/jess"
+    },
+    {
+      "id": "sndh-jorgense.pet",
+      "label": "sndh / jorgense.pet",
+      "formatKey": "sndh",
+      "subformat": "jorgense.pet",
+      "files": [
+        "/data/songs/sndh/jorgense.pet/boesseti.snd",
+        "/data/songs/sndh/jorgense.pet/klatmix.snd",
+        "/data/songs/sndh/jorgense.pet/out4you.snd",
+        "/data/songs/sndh/jorgense.pet/russer.snd"
+      ],
+      "total": 4,
+      "dir": "/data/songs/sndh/jorgense.pet"
+    },
+    {
+      "id": "sndh-kleeder",
+      "label": "sndh / kleeder",
+      "formatKey": "sndh",
+      "subformat": "kleeder",
+      "files": [
+        "/data/songs/sndh/kleeder/crispy.snd",
+        "/data/songs/sndh/kleeder/it_melts.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/kleeder"
+    },
+    {
+      "id": "sndh-loteksty",
+      "label": "sndh / loteksty",
+      "formatKey": "sndh",
+      "subformat": "loteksty",
+      "files": [
+        "/data/songs/sndh/loteksty/italo.snd",
+        "/data/songs/sndh/loteksty/zatacka.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/loteksty"
+    },
+    {
+      "id": "sndh-mad_max",
+      "label": "sndh / mad_max",
+      "formatKey": "sndh",
+      "subformat": "mad_max",
+      "files": [
+        "/data/songs/sndh/mad_max/jochen.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/mad_max"
+    },
+    {
+      "id": "sndh-maze",
+      "label": "sndh / maze",
+      "formatKey": "sndh",
+      "subformat": "maze",
+      "files": [
+        "/data/songs/sndh/maze/chipblip.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/maze"
+    },
+    {
+      "id": "sndh-melon",
+      "label": "sndh / melon",
+      "formatKey": "sndh",
+      "subformat": "melon",
+      "files": [
+        "/data/songs/sndh/melon/trapped.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/melon"
+    },
+    {
+      "id": "sndh-mercury.sta",
+      "label": "sndh / mercury.sta",
+      "formatKey": "sndh",
+      "subformat": "mercury.sta",
+      "files": [
+        "/data/songs/sndh/mercury.sta/deli2res.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/mercury.sta"
+    },
+    {
+      "id": "sndh-miker",
+      "label": "sndh / miker",
+      "formatKey": "sndh",
+      "subformat": "miker",
+      "files": [
+        "/data/songs/sndh/miker/second.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/miker"
+    },
+    {
+      "id": "sndh-modmate",
+      "label": "sndh / modmate",
+      "formatKey": "sndh",
+      "subformat": "modmate",
+      "files": [
+        "/data/songs/sndh/modmate/alibi.snd",
+        "/data/songs/sndh/modmate/blendrac.snd",
+        "/data/songs/sndh/modmate/broarps.snd",
+        "/data/songs/sndh/modmate/calling.snd",
+        "/data/songs/sndh/modmate/chopper.snd",
+        "/data/songs/sndh/modmate/cutest_1.snd"
+      ],
+      "total": 34,
+      "dir": "/data/songs/sndh/modmate"
+    },
+    {
+      "id": "sndh-motionri.de",
+      "label": "sndh / motionri.de",
+      "formatKey": "sndh",
+      "subformat": "motionri.de",
+      "files": [
+        "/data/songs/sndh/motionri.de/dma/atarodis.snd",
+        "/data/songs/sndh/motionri.de/dma/roguemo.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/motionri.de"
+    },
+    {
+      "id": "sndh-napo",
+      "label": "sndh / napo",
+      "formatKey": "sndh",
+      "subformat": "napo",
+      "files": [
+        "/data/songs/sndh/napo/AF_Demo.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/napo"
+    },
+    {
+      "id": "sndh-nicole",
+      "label": "sndh / nicole",
+      "formatKey": "sndh",
+      "subformat": "nicole",
+      "files": [
+        "/data/songs/sndh/nicole/cutest.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/nicole"
+    },
+    {
+      "id": "sndh-nitrofur",
+      "label": "sndh / nitrofur",
+      "formatKey": "sndh",
+      "subformat": "nitrofur",
+      "files": [
+        "/data/songs/sndh/nitrofur/icdaa1.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/nitrofur"
+    },
+    {
+      "id": "sndh-no_more",
+      "label": "sndh / no_more",
+      "formatKey": "sndh",
+      "subformat": "no_more",
+      "files": [
+        "/data/songs/sndh/no_more/dnsmus9.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/no_more"
+    },
+    {
+      "id": "sndh-nrth",
+      "label": "sndh / nrth",
+      "formatKey": "sndh",
+      "subformat": "nrth",
+      "files": [
+        "/data/songs/sndh/nrth/admstran.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/nrth"
+    },
+    {
+      "id": "sndh-ominpig",
+      "label": "sndh / ominpig",
+      "formatKey": "sndh",
+      "subformat": "ominpig",
+      "files": [
+        "/data/songs/sndh/ominpig/alien.snd",
+        "/data/songs/sndh/ominpig/castle.snd",
+        "/data/songs/sndh/ominpig/dancing.snd",
+        "/data/songs/sndh/ominpig/glacial.snd",
+        "/data/songs/sndh/ominpig/gridlock.snd",
+        "/data/songs/sndh/ominpig/kelpie.snd"
+      ],
+      "total": 10,
+      "dir": "/data/songs/sndh/ominpig"
+    },
+    {
+      "id": "sndh-ordinate",
+      "label": "sndh / ordinate",
+      "formatKey": "sndh",
+      "subformat": "ordinate",
+      "files": [
+        "/data/songs/sndh/ordinate/eternal.snd",
+        "/data/songs/sndh/ordinate/gubegube.snd",
+        "/data/songs/sndh/ordinate/virtuali.snd"
+      ],
+      "total": 3,
+      "dir": "/data/songs/sndh/ordinate"
+    },
+    {
+      "id": "sndh-pator",
+      "label": "sndh / pator",
+      "formatKey": "sndh",
+      "subformat": "pator",
+      "files": [
+        "/data/songs/sndh/pator/aeration.snd",
+        "/data/songs/sndh/pator/stolecat.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/pator"
+    },
+    {
+      "id": "sndh-peirano.fra",
+      "label": "sndh / peirano.fra",
+      "formatKey": "sndh",
+      "subformat": "peirano.fra",
+      "files": [
+        "/data/songs/sndh/peirano.fra/emmanuel.snd",
+        "/data/songs/sndh/peirano.fra/freedom.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/peirano.fra"
+    },
+    {
+      "id": "sndh-pritchett",
+      "label": "sndh / pritchett",
+      "formatKey": "sndh",
+      "subformat": "pritchett",
+      "files": [
+        "/data/songs/sndh/pritchett/grandad2.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/pritchett"
+    },
+    {
+      "id": "sndh-rickymar",
+      "label": "sndh / rickymar",
+      "formatKey": "sndh",
+      "subformat": "rickymar",
+      "files": [
+        "/data/songs/sndh/rickymar/aulanko.snd",
+        "/data/songs/sndh/rickymar/yoomp.snd"
+      ],
+      "total": 2,
+      "dir": "/data/songs/sndh/rickymar"
+    },
+    {
+      "id": "sndh-russell.llo",
+      "label": "sndh / russell.llo",
+      "formatKey": "sndh",
+      "subformat": "russell.llo",
+      "files": [
+        "/data/songs/sndh/russell.llo/axel_f.snd",
+        "/data/songs/sndh/russell.llo/deepblue.snd",
+        "/data/songs/sndh/russell.llo/faj.snd",
+        "/data/songs/sndh/russell.llo/gambler.snd",
+        "/data/songs/sndh/russell.llo/take_on.snd",
+        "/data/songs/sndh/russell.llo/ungo.snd"
+      ],
+      "total": 6,
+      "dir": "/data/songs/sndh/russell.llo"
+    },
+    {
+      "id": "sndh-sean",
+      "label": "sndh / sean",
+      "formatKey": "sndh",
+      "subformat": "sean",
+      "files": [
+        "/data/songs/sndh/sean/crunches.snd",
+        "/data/songs/sndh/sean/dinos.snd",
+        "/data/songs/sndh/sean/fightsno.snd",
+        "/data/songs/sndh/sean/snowfair.snd"
+      ],
+      "total": 4,
+      "dir": "/data/songs/sndh/sean"
+    },
+    {
+      "id": "sndh-sgtslayr",
+      "label": "sndh / sgtslayr",
+      "formatKey": "sndh",
+      "subformat": "sgtslayr",
+      "files": [
+        "/data/songs/sndh/sgtslayr/somewher.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/sgtslayr"
+    },
+    {
+      "id": "sndh-stupe",
+      "label": "sndh / stupe",
+      "formatKey": "sndh",
+      "subformat": "stupe",
+      "files": [
+        "/data/songs/sndh/stupe/crime_mo.snd",
+        "/data/songs/sndh/stupe/dinoland.snd",
+        "/data/songs/sndh/stupe/jackshac.snd"
+      ],
+      "total": 3,
+      "dir": "/data/songs/sndh/stupe"
+    },
+    {
+      "id": "sndh-synthgod",
+      "label": "sndh / synthgod",
+      "formatKey": "sndh",
+      "subformat": "synthgod",
+      "files": [
+        "/data/songs/sndh/synthgod/flurry.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/synthgod"
+    },
+    {
+      "id": "sndh-tao",
+      "label": "sndh / tao",
+      "formatKey": "sndh",
+      "subformat": "tao",
+      "files": [
+        "/data/songs/sndh/tao/modulato.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/tao"
+    },
+    {
+      "id": "sndh-tecer",
+      "label": "sndh / tecer",
+      "formatKey": "sndh",
+      "subformat": "tecer",
+      "files": [
+        "/data/songs/sndh/tecer/gol_3d.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/tecer"
+    },
+    {
+      "id": "sndh-tenniser",
+      "label": "sndh / tenniser",
+      "formatKey": "sndh",
+      "subformat": "tenniser",
+      "files": [
+        "/data/songs/sndh/tenniser/complete.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/tenniser"
+    },
+    {
+      "id": "sndh-tfx",
+      "label": "sndh / tfx",
+      "formatKey": "sndh",
+      "subformat": "tfx",
+      "files": [
+        "/data/songs/sndh/tfx/caliburn.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/tfx"
+    },
+    {
+      "id": "sndh-th3_d34d",
+      "label": "sndh / th3_d34d",
+      "formatKey": "sndh",
+      "subformat": "th3_d34d",
+      "files": [
+        "/data/songs/sndh/th3_d34d/manosnow.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/th3_d34d"
+    },
+    {
+      "id": "sndh-tinker",
+      "label": "sndh / tinker",
+      "formatKey": "sndh",
+      "subformat": "tinker",
+      "files": [
+        "/data/songs/sndh/tinker/maybee.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/tinker"
+    },
+    {
+      "id": "sndh-tomchi",
+      "label": "sndh / tomchi",
+      "formatKey": "sndh",
+      "subformat": "tomchi",
+      "files": [
+        "/data/songs/sndh/tomchi/dma/retrole.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/tomchi"
+    },
+    {
+      "id": "sndh-tristend",
+      "label": "sndh / tristend",
+      "formatKey": "sndh",
+      "subformat": "tristend",
+      "files": [
+        "/data/songs/sndh/tristend/breakrom.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/tristend"
+    },
+    {
+      "id": "sndh-unconvet.ion",
+      "label": "sndh / unconvet.ion",
+      "formatKey": "sndh",
+      "subformat": "unconvet.ion",
+      "files": [
+        "/data/songs/sndh/unconvet.ion/sumdream.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/unconvet.ion"
+    },
+    {
+      "id": "sndh-unknown",
+      "label": "sndh / unknown",
+      "formatKey": "sndh",
+      "subformat": "unknown",
+      "files": [
+        "/data/songs/sndh/unknown/axel_f.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/unknown"
+    },
+    {
+      "id": "sndh-webripro",
+      "label": "sndh / webripro",
+      "formatKey": "sndh",
+      "subformat": "webripro",
+      "files": [
+        "/data/songs/sndh/webripro/jackfrst.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/webripro"
+    },
+    {
+      "id": "sndh-whittake.dav",
+      "label": "sndh / whittake.dav",
+      "formatKey": "sndh",
+      "subformat": "whittake.dav",
+      "files": [
+        "/data/songs/sndh/whittake.dav/dandare3.snd",
+        "/data/songs/sndh/whittake.dav/elektra.snd",
+        "/data/songs/sndh/whittake.dav/glider.snd"
+      ],
+      "total": 3,
+      "dir": "/data/songs/sndh/whittake.dav"
+    },
+    {
+      "id": "sndh-winston.ale",
+      "label": "sndh / winston.ale",
+      "formatKey": "sndh",
+      "subformat": "winston.ale",
+      "files": [
+        "/data/songs/sndh/winston.ale/aeration.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/winston.ale"
+    },
+    {
+      "id": "sndh-wonder.ste",
+      "label": "sndh / wonder.ste",
+      "formatKey": "sndh",
+      "subformat": "wonder.ste",
+      "files": [
+        "/data/songs/sndh/wonder.ste/dnsmus8.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/wonder.ste"
+    },
+    {
+      "id": "sndh-xrwwr",
+      "label": "sndh / xrwwr",
+      "formatKey": "sndh",
+      "subformat": "xrwwr",
+      "files": [
+        "/data/songs/sndh/xrwwr/gaveitat.snd",
+        "/data/songs/sndh/xrwwr/letter.snd",
+        "/data/songs/sndh/xrwwr/outl2017.snd"
+      ],
+      "total": 3,
+      "dir": "/data/songs/sndh/xrwwr"
+    },
+    {
+      "id": "sndh-yqn",
+      "label": "sndh / yqn",
+      "formatKey": "sndh",
+      "subformat": "yqn",
+      "files": [
+        "/data/songs/sndh/yqn/aliens.snd",
+        "/data/songs/sndh/yqn/apoloche.snd",
+        "/data/songs/sndh/yqn/bilbo.snd",
+        "/data/songs/sndh/yqn/dsccscsd.snd",
+        "/data/songs/sndh/yqn/erh.snd",
+        "/data/songs/sndh/yqn/fitta.snd"
+      ],
+      "total": 15,
+      "dir": "/data/songs/sndh/yqn"
+    },
+    {
+      "id": "sndh-zoltarx",
+      "label": "sndh / zoltarx",
+      "formatKey": "sndh",
+      "subformat": "zoltarx",
+      "files": [
+        "/data/songs/sndh/zoltarx/aurora.snd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sndh/zoltarx"
+    },
+    {
       "id": "sonic-arranger",
       "label": "sonic-arranger",
       "formatKey": "sonicArranger",
@@ -8849,6 +9831,89 @@
         ],
         "silmarils": [
           "bostonbombclub.mok"
+        ],
+        "sndh": [
+          "2spaces",
+          "40e0d0",
+          "505",
+          "607",
+          "9sphere",
+          "ad",
+          "aki",
+          "an_owl",
+          "archmage",
+          "cabbage",
+          "cerror",
+          "count_0",
+          "crazy_g",
+          "crazy_q",
+          "ctrix",
+          "cube",
+          "damifort",
+          "damo",
+          "dippy",
+          "dma-sc",
+          "doclands",
+          "dr_eams",
+          "dubmood",
+          "dunkteam",
+          "eldr0010",
+          "filippp",
+          "frequent",
+          "garvalf",
+          "gilmore.adm",
+          "gotoplay",
+          "gwem",
+          "herceg.dor",
+          "husak.jak",
+          "hylst",
+          "iami",
+          "jakerson",
+          "jarre.jea",
+          "jess",
+          "jorgense.pet",
+          "kleeder",
+          "loteksty",
+          "mad_max",
+          "maze",
+          "melon",
+          "mercury.sta",
+          "miker",
+          "modmate",
+          "motionri.de",
+          "napo",
+          "nicole",
+          "nitrofur",
+          "no_more",
+          "nrth",
+          "ominpig",
+          "ordinate",
+          "pator",
+          "peirano.fra",
+          "pritchett",
+          "rickymar",
+          "russell.llo",
+          "sean",
+          "sgtslayr",
+          "stupe",
+          "synthgod",
+          "tao",
+          "tecer",
+          "tenniser",
+          "tfx",
+          "th3_d34d",
+          "tinker",
+          "tomchi",
+          "tristend",
+          "unconvet.ion",
+          "unknown",
+          "webripro",
+          "whittake.dav",
+          "winston.ale",
+          "wonder.ste",
+          "xrwwr",
+          "yqn",
+          "zoltarx"
         ],
         "sonic-arranger": [
           "mega end.sa"
@@ -33124,6 +34189,1027 @@
     "/data/songs/silmarils": {
       "siblings": [
         "bostonbombclub.mok"
+      ]
+    },
+    "/data/songs/sndh/2spaces": {
+      "siblings": [
+        "1flight.snd",
+        "awaynorm.snd",
+        "dinoride.snd",
+        "wizards.snd"
+      ]
+    },
+    "/data/songs/sndh": {
+      "siblings": [],
+      "subdirs": {
+        "505": [
+          "baloon.snd",
+          "broarps.snd",
+          "cosytime.snd",
+          "dma",
+          "lastwish.snd",
+          "lively.snd",
+          "maybee.snd",
+          "were_not.snd"
+        ],
+        "607": [
+          "humid.snd"
+        ],
+        "2spaces": [
+          "1flight.snd",
+          "awaynorm.snd",
+          "dinoride.snd",
+          "wizards.snd"
+        ],
+        "40e0d0": [
+          "a-lagolf.snd",
+          "cp_2077.snd"
+        ],
+        "9sphere": [
+          "kabocha.snd",
+          "ruines.snd",
+          "volcavis.snd"
+        ],
+        "ad": [
+          "adn_end.snd",
+          "adn_loop.snd",
+          "adn_quiz.snd",
+          "cracouca.snd",
+          "dma",
+          "eposotro.snd",
+          "hsv.snd"
+        ],
+        "aki": [
+          "notdone.snd"
+        ],
+        "an_owl": [
+          "gpanic.snd"
+        ],
+        "archmage": [
+          "plastrof.snd"
+        ],
+        "cabbage": [
+          "bull.snd",
+          "cheese.snd"
+        ],
+        "cerror": [
+          "donut.snd"
+        ],
+        "count_0": [
+          "awesome.snd",
+          "replay.snd"
+        ],
+        "crazy_g": [
+          "adamisq.snd"
+        ],
+        "crazy_q": [
+          "cracktro.snd",
+          "dma",
+          "minifunk.snd",
+          "sodacrk.snd"
+        ],
+        "ctrix": [
+          "slammer.snd"
+        ],
+        "cube": [
+          "dma",
+          "pulserep.snd",
+          "pulsetx.snd",
+          "rndacces.snd",
+          "supturrd.snd"
+        ],
+        "damifort": [
+          "broken.snd",
+          "fondue.snd"
+        ],
+        "damo": [
+          "dma",
+          "moreish.snd"
+        ],
+        "dippy": [
+          "coldweat.snd",
+          "froztech.snd",
+          "heartbea.snd",
+          "stillalv.snd"
+        ],
+        "dma-sc": [
+          "adn_quiz.snd",
+          "dragdnce.snd",
+          "kingswrd.snd",
+          "purple_t.snd"
+        ],
+        "doclands": [
+          "buzzomet.snd",
+          "gin_fizz.snd",
+          "missionc.snd",
+          "myclassi.snd",
+          "noworrie.snd",
+          "pong.snd",
+          "private.snd"
+        ],
+        "dr_eams": [
+          "replay.snd"
+        ],
+        "dubmood": [
+          "copulate.snd",
+          "dma",
+          "hibern1.snd",
+          "killpill.snd",
+          "radix.snd",
+          "vuela.snd"
+        ],
+        "dunkteam": [
+          "dma"
+        ],
+        "eldr0010": [
+          "1_by_1.snd"
+        ],
+        "filippp": [
+          "why_em.snd"
+        ],
+        "frequent": [
+          "dma"
+        ],
+        "garvalf": [
+          "jesienna.snd",
+          "peak.snd"
+        ],
+        "gilmore.adm": [
+          "buxton.snd"
+        ],
+        "gotoplay": [
+          "coursouv.snd"
+        ],
+        "gwem": [
+          "bridal.snd",
+          "fuckings.snd",
+          "warpintr.snd"
+        ],
+        "herceg.dor": [
+          "crock.snd"
+        ],
+        "husak.jak": [
+          "fractal.snd"
+        ],
+        "hylst": [
+          "overwrit.snd"
+        ],
+        "iami": [
+          "gpanic.snd"
+        ],
+        "jakerson": [
+          "asd.snd"
+        ],
+        "jarre.jea": [
+          "cblood.snd"
+        ],
+        "jess": [
+          "buzzmosp.snd"
+        ],
+        "jorgense.pet": [
+          "boesseti.snd",
+          "klatmix.snd",
+          "out4you.snd",
+          "russer.snd"
+        ],
+        "kleeder": [
+          "crispy.snd",
+          "it_melts.snd"
+        ],
+        "loteksty": [
+          "italo.snd",
+          "zatacka.snd"
+        ],
+        "mad_max": [
+          "jochen.snd"
+        ],
+        "maze": [
+          "chipblip.snd"
+        ],
+        "melon": [
+          "trapped.snd"
+        ],
+        "mercury.sta": [
+          "deli2res.snd"
+        ],
+        "miker": [
+          "second.snd"
+        ],
+        "modmate": [
+          "alibi.snd",
+          "blendrac.snd",
+          "broarps.snd",
+          "calling.snd",
+          "chopper.snd",
+          "cutest_1.snd",
+          "da_funk.snd",
+          "donkey.snd",
+          "drunkche.snd",
+          "gloria.snd",
+          "goodenou.snd",
+          "heimdall.snd",
+          "ik.snd",
+          "kamamama.snd",
+          "kootie.snd",
+          "lastwish.snd",
+          "liptonmn.snd",
+          "love.snd",
+          "martin.snd",
+          "midearth.snd",
+          "molecule.snd",
+          "newfront.snd",
+          "ninjacom.snd",
+          "odetoym.snd",
+          "plast_nt.snd",
+          "plastic.snd",
+          "record.snd",
+          "red_max.snd",
+          "remembra.snd",
+          "robocop3.snd",
+          "sitkoyin.snd",
+          "supremac.snd",
+          "thinking.snd",
+          "ucm4intr.snd"
+        ],
+        "motionri.de": [
+          "dma"
+        ],
+        "napo": [
+          "AF_Demo.snd"
+        ],
+        "nicole": [
+          "cutest.snd"
+        ],
+        "nitrofur": [
+          "icdaa1.snd"
+        ],
+        "no_more": [
+          "dnsmus9.snd"
+        ],
+        "nrth": [
+          "admstran.snd"
+        ],
+        "ominpig": [
+          "alien.snd",
+          "castle.snd",
+          "dancing.snd",
+          "glacial.snd",
+          "gridlock.snd",
+          "kelpie.snd",
+          "oldfrien.snd",
+          "sailing.snd",
+          "spring.snd",
+          "volcanic.snd"
+        ],
+        "ordinate": [
+          "eternal.snd",
+          "gubegube.snd",
+          "virtuali.snd"
+        ],
+        "pator": [
+          "aeration.snd",
+          "stolecat.snd"
+        ],
+        "peirano.fra": [
+          "emmanuel.snd",
+          "freedom.snd"
+        ],
+        "pritchett": [
+          "grandad2.snd"
+        ],
+        "rickymar": [
+          "aulanko.snd",
+          "yoomp.snd"
+        ],
+        "russell.llo": [
+          "axel_f.snd",
+          "deepblue.snd",
+          "faj.snd",
+          "gambler.snd",
+          "take_on.snd",
+          "ungo.snd"
+        ],
+        "sean": [
+          "crunches.snd",
+          "dinos.snd",
+          "fightsno.snd",
+          "snowfair.snd"
+        ],
+        "sgtslayr": [
+          "somewher.snd"
+        ],
+        "stupe": [
+          "crime_mo.snd",
+          "dinoland.snd",
+          "jackshac.snd"
+        ],
+        "synthgod": [
+          "flurry.snd"
+        ],
+        "tao": [
+          "modulato.snd"
+        ],
+        "tecer": [
+          "gol_3d.snd"
+        ],
+        "tenniser": [
+          "complete.snd"
+        ],
+        "tfx": [
+          "caliburn.snd"
+        ],
+        "th3_d34d": [
+          "manosnow.snd"
+        ],
+        "tinker": [
+          "maybee.snd"
+        ],
+        "tomchi": [
+          "dma"
+        ],
+        "tristend": [
+          "breakrom.snd"
+        ],
+        "unconvet.ion": [
+          "sumdream.snd"
+        ],
+        "unknown": [
+          "axel_f.snd"
+        ],
+        "webripro": [
+          "jackfrst.snd"
+        ],
+        "whittake.dav": [
+          "dandare3.snd",
+          "elektra.snd",
+          "glider.snd"
+        ],
+        "winston.ale": [
+          "aeration.snd"
+        ],
+        "wonder.ste": [
+          "dnsmus8.snd"
+        ],
+        "xrwwr": [
+          "gaveitat.snd",
+          "letter.snd",
+          "outl2017.snd"
+        ],
+        "yqn": [
+          "aliens.snd",
+          "apoloche.snd",
+          "bilbo.snd",
+          "dsccscsd.snd",
+          "erh.snd",
+          "fitta.snd",
+          "half-ass.snd",
+          "home.snd",
+          "hope_se.snd",
+          "lively.snd",
+          "ohbbaby.snd",
+          "shoeshin.snd",
+          "snobol.snd",
+          "tcp_50.snd",
+          "themood.snd"
+        ],
+        "zoltarx": [
+          "aurora.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/40e0d0": {
+      "siblings": [
+        "a-lagolf.snd",
+        "cp_2077.snd"
+      ]
+    },
+    "/data/songs/sndh/505": {
+      "siblings": [
+        "baloon.snd",
+        "broarps.snd",
+        "cosytime.snd",
+        "lastwish.snd",
+        "lively.snd",
+        "maybee.snd",
+        "were_not.snd"
+      ],
+      "subdirs": {
+        "dma": [
+          "lastrans.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/505/dma": {
+      "siblings": [
+        "lastrans.snd"
+      ]
+    },
+    "/data/songs/sndh/607": {
+      "siblings": [
+        "humid.snd"
+      ]
+    },
+    "/data/songs/sndh/9sphere": {
+      "siblings": [
+        "kabocha.snd",
+        "ruines.snd",
+        "volcavis.snd"
+      ]
+    },
+    "/data/songs/sndh/ad": {
+      "siblings": [
+        "adn_end.snd",
+        "adn_loop.snd",
+        "adn_quiz.snd",
+        "cracouca.snd",
+        "eposotro.snd",
+        "hsv.snd"
+      ],
+      "subdirs": {
+        "dma": [
+          "adn_quiz.snd",
+          "trademrk.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/ad/dma": {
+      "siblings": [
+        "adn_quiz.snd",
+        "trademrk.snd"
+      ]
+    },
+    "/data/songs/sndh/aki": {
+      "siblings": [
+        "notdone.snd"
+      ]
+    },
+    "/data/songs/sndh/an_owl": {
+      "siblings": [
+        "gpanic.snd"
+      ]
+    },
+    "/data/songs/sndh/archmage": {
+      "siblings": [
+        "plastrof.snd"
+      ]
+    },
+    "/data/songs/sndh/cabbage": {
+      "siblings": [
+        "bull.snd",
+        "cheese.snd"
+      ]
+    },
+    "/data/songs/sndh/cerror": {
+      "siblings": [
+        "donut.snd"
+      ]
+    },
+    "/data/songs/sndh/count_0": {
+      "siblings": [
+        "awesome.snd",
+        "replay.snd"
+      ]
+    },
+    "/data/songs/sndh/crazy_g": {
+      "siblings": [
+        "adamisq.snd"
+      ]
+    },
+    "/data/songs/sndh/crazy_q": {
+      "siblings": [
+        "cracktro.snd",
+        "minifunk.snd",
+        "sodacrk.snd"
+      ],
+      "subdirs": {
+        "dma": [
+          "knobhead.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/crazy_q/dma": {
+      "siblings": [
+        "knobhead.snd"
+      ]
+    },
+    "/data/songs/sndh/ctrix": {
+      "siblings": [
+        "slammer.snd"
+      ]
+    },
+    "/data/songs/sndh/cube/dma": {
+      "siblings": [
+        "hypocerd.snd"
+      ]
+    },
+    "/data/songs/sndh/cube": {
+      "siblings": [
+        "pulserep.snd",
+        "pulsetx.snd",
+        "rndacces.snd",
+        "supturrd.snd"
+      ],
+      "subdirs": {
+        "dma": [
+          "hypocerd.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/damifort": {
+      "siblings": [
+        "broken.snd",
+        "fondue.snd"
+      ]
+    },
+    "/data/songs/sndh/damo/dma": {
+      "siblings": [
+        "curly.snd"
+      ]
+    },
+    "/data/songs/sndh/damo": {
+      "siblings": [
+        "moreish.snd"
+      ],
+      "subdirs": {
+        "dma": [
+          "curly.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/dippy": {
+      "siblings": [
+        "coldweat.snd",
+        "froztech.snd",
+        "heartbea.snd",
+        "stillalv.snd"
+      ]
+    },
+    "/data/songs/sndh/dma-sc": {
+      "siblings": [
+        "adn_quiz.snd",
+        "dragdnce.snd",
+        "kingswrd.snd",
+        "purple_t.snd"
+      ]
+    },
+    "/data/songs/sndh/doclands": {
+      "siblings": [
+        "buzzomet.snd",
+        "gin_fizz.snd",
+        "missionc.snd",
+        "myclassi.snd",
+        "noworrie.snd",
+        "pong.snd",
+        "private.snd"
+      ]
+    },
+    "/data/songs/sndh/dr_eams": {
+      "siblings": [
+        "replay.snd"
+      ]
+    },
+    "/data/songs/sndh/dubmood": {
+      "siblings": [
+        "copulate.snd",
+        "hibern1.snd",
+        "killpill.snd",
+        "radix.snd",
+        "vuela.snd"
+      ],
+      "subdirs": {
+        "dma": [
+          "had_to.snd",
+          "notimers.snd",
+          "toodrunk.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/dubmood/dma": {
+      "siblings": [
+        "had_to.snd",
+        "notimers.snd",
+        "toodrunk.snd"
+      ]
+    },
+    "/data/songs/sndh/dunkteam/dma": {
+      "siblings": [
+        "fruktsal.snd"
+      ]
+    },
+    "/data/songs/sndh/dunkteam": {
+      "siblings": [],
+      "subdirs": {
+        "dma": [
+          "fruktsal.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/eldr0010": {
+      "siblings": [
+        "1_by_1.snd"
+      ]
+    },
+    "/data/songs/sndh/filippp": {
+      "siblings": [
+        "why_em.snd"
+      ]
+    },
+    "/data/songs/sndh/frequent/dma": {
+      "siblings": [
+        "Hardkant.snd",
+        "Hazmat.snd",
+        "Lydfelle.snd",
+        "Problem.snd",
+        "Sharhell.snd",
+        "Vexation.snd",
+        "Ymse.snd",
+        "zeropers.snd"
+      ]
+    },
+    "/data/songs/sndh/frequent": {
+      "siblings": [],
+      "subdirs": {
+        "dma": [
+          "Hardkant.snd",
+          "Hazmat.snd",
+          "Lydfelle.snd",
+          "Problem.snd",
+          "Sharhell.snd",
+          "Vexation.snd",
+          "Ymse.snd",
+          "zeropers.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/garvalf": {
+      "siblings": [
+        "jesienna.snd",
+        "peak.snd"
+      ]
+    },
+    "/data/songs/sndh/gilmore.adm": {
+      "siblings": [
+        "buxton.snd"
+      ]
+    },
+    "/data/songs/sndh/gotoplay": {
+      "siblings": [
+        "coursouv.snd"
+      ]
+    },
+    "/data/songs/sndh/gwem": {
+      "siblings": [
+        "bridal.snd",
+        "fuckings.snd",
+        "warpintr.snd"
+      ]
+    },
+    "/data/songs/sndh/herceg.dor": {
+      "siblings": [
+        "crock.snd"
+      ]
+    },
+    "/data/songs/sndh/husak.jak": {
+      "siblings": [
+        "fractal.snd"
+      ]
+    },
+    "/data/songs/sndh/hylst": {
+      "siblings": [
+        "overwrit.snd"
+      ]
+    },
+    "/data/songs/sndh/iami": {
+      "siblings": [
+        "gpanic.snd"
+      ]
+    },
+    "/data/songs/sndh/jakerson": {
+      "siblings": [
+        "asd.snd"
+      ]
+    },
+    "/data/songs/sndh/jarre.jea": {
+      "siblings": [
+        "cblood.snd"
+      ]
+    },
+    "/data/songs/sndh/jess": {
+      "siblings": [
+        "buzzmosp.snd"
+      ]
+    },
+    "/data/songs/sndh/jorgense.pet": {
+      "siblings": [
+        "boesseti.snd",
+        "klatmix.snd",
+        "out4you.snd",
+        "russer.snd"
+      ]
+    },
+    "/data/songs/sndh/kleeder": {
+      "siblings": [
+        "crispy.snd",
+        "it_melts.snd"
+      ]
+    },
+    "/data/songs/sndh/loteksty": {
+      "siblings": [
+        "italo.snd",
+        "zatacka.snd"
+      ]
+    },
+    "/data/songs/sndh/mad_max": {
+      "siblings": [
+        "jochen.snd"
+      ]
+    },
+    "/data/songs/sndh/maze": {
+      "siblings": [
+        "chipblip.snd"
+      ]
+    },
+    "/data/songs/sndh/melon": {
+      "siblings": [
+        "trapped.snd"
+      ]
+    },
+    "/data/songs/sndh/mercury.sta": {
+      "siblings": [
+        "deli2res.snd"
+      ]
+    },
+    "/data/songs/sndh/miker": {
+      "siblings": [
+        "second.snd"
+      ]
+    },
+    "/data/songs/sndh/modmate": {
+      "siblings": [
+        "alibi.snd",
+        "blendrac.snd",
+        "broarps.snd",
+        "calling.snd",
+        "chopper.snd",
+        "cutest_1.snd",
+        "da_funk.snd",
+        "donkey.snd",
+        "drunkche.snd",
+        "gloria.snd",
+        "goodenou.snd",
+        "heimdall.snd",
+        "ik.snd",
+        "kamamama.snd",
+        "kootie.snd",
+        "lastwish.snd",
+        "liptonmn.snd",
+        "love.snd",
+        "martin.snd",
+        "midearth.snd",
+        "molecule.snd",
+        "newfront.snd",
+        "ninjacom.snd",
+        "odetoym.snd",
+        "plast_nt.snd",
+        "plastic.snd",
+        "record.snd",
+        "red_max.snd",
+        "remembra.snd",
+        "robocop3.snd",
+        "sitkoyin.snd",
+        "supremac.snd",
+        "thinking.snd",
+        "ucm4intr.snd"
+      ]
+    },
+    "/data/songs/sndh/motionri.de/dma": {
+      "siblings": [
+        "atarodis.snd",
+        "roguemo.snd"
+      ]
+    },
+    "/data/songs/sndh/motionri.de": {
+      "siblings": [],
+      "subdirs": {
+        "dma": [
+          "atarodis.snd",
+          "roguemo.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/napo": {
+      "siblings": [
+        "AF_Demo.snd"
+      ]
+    },
+    "/data/songs/sndh/nicole": {
+      "siblings": [
+        "cutest.snd"
+      ]
+    },
+    "/data/songs/sndh/nitrofur": {
+      "siblings": [
+        "icdaa1.snd"
+      ]
+    },
+    "/data/songs/sndh/no_more": {
+      "siblings": [
+        "dnsmus9.snd"
+      ]
+    },
+    "/data/songs/sndh/nrth": {
+      "siblings": [
+        "admstran.snd"
+      ]
+    },
+    "/data/songs/sndh/ominpig": {
+      "siblings": [
+        "alien.snd",
+        "castle.snd",
+        "dancing.snd",
+        "glacial.snd",
+        "gridlock.snd",
+        "kelpie.snd",
+        "oldfrien.snd",
+        "sailing.snd",
+        "spring.snd",
+        "volcanic.snd"
+      ]
+    },
+    "/data/songs/sndh/ordinate": {
+      "siblings": [
+        "eternal.snd",
+        "gubegube.snd",
+        "virtuali.snd"
+      ]
+    },
+    "/data/songs/sndh/pator": {
+      "siblings": [
+        "aeration.snd",
+        "stolecat.snd"
+      ]
+    },
+    "/data/songs/sndh/peirano.fra": {
+      "siblings": [
+        "emmanuel.snd",
+        "freedom.snd"
+      ]
+    },
+    "/data/songs/sndh/pritchett": {
+      "siblings": [
+        "grandad2.snd"
+      ]
+    },
+    "/data/songs/sndh/rickymar": {
+      "siblings": [
+        "aulanko.snd",
+        "yoomp.snd"
+      ]
+    },
+    "/data/songs/sndh/russell.llo": {
+      "siblings": [
+        "axel_f.snd",
+        "deepblue.snd",
+        "faj.snd",
+        "gambler.snd",
+        "take_on.snd",
+        "ungo.snd"
+      ]
+    },
+    "/data/songs/sndh/sean": {
+      "siblings": [
+        "crunches.snd",
+        "dinos.snd",
+        "fightsno.snd",
+        "snowfair.snd"
+      ]
+    },
+    "/data/songs/sndh/sgtslayr": {
+      "siblings": [
+        "somewher.snd"
+      ]
+    },
+    "/data/songs/sndh/stupe": {
+      "siblings": [
+        "crime_mo.snd",
+        "dinoland.snd",
+        "jackshac.snd"
+      ]
+    },
+    "/data/songs/sndh/synthgod": {
+      "siblings": [
+        "flurry.snd"
+      ]
+    },
+    "/data/songs/sndh/tao": {
+      "siblings": [
+        "modulato.snd"
+      ]
+    },
+    "/data/songs/sndh/tecer": {
+      "siblings": [
+        "gol_3d.snd"
+      ]
+    },
+    "/data/songs/sndh/tenniser": {
+      "siblings": [
+        "complete.snd"
+      ]
+    },
+    "/data/songs/sndh/tfx": {
+      "siblings": [
+        "caliburn.snd"
+      ]
+    },
+    "/data/songs/sndh/th3_d34d": {
+      "siblings": [
+        "manosnow.snd"
+      ]
+    },
+    "/data/songs/sndh/tinker": {
+      "siblings": [
+        "maybee.snd"
+      ]
+    },
+    "/data/songs/sndh/tomchi/dma": {
+      "siblings": [
+        "retrole.snd"
+      ]
+    },
+    "/data/songs/sndh/tomchi": {
+      "siblings": [],
+      "subdirs": {
+        "dma": [
+          "retrole.snd"
+        ]
+      }
+    },
+    "/data/songs/sndh/tristend": {
+      "siblings": [
+        "breakrom.snd"
+      ]
+    },
+    "/data/songs/sndh/unconvet.ion": {
+      "siblings": [
+        "sumdream.snd"
+      ]
+    },
+    "/data/songs/sndh/unknown": {
+      "siblings": [
+        "axel_f.snd"
+      ]
+    },
+    "/data/songs/sndh/webripro": {
+      "siblings": [
+        "jackfrst.snd"
+      ]
+    },
+    "/data/songs/sndh/whittake.dav": {
+      "siblings": [
+        "dandare3.snd",
+        "elektra.snd",
+        "glider.snd"
+      ]
+    },
+    "/data/songs/sndh/winston.ale": {
+      "siblings": [
+        "aeration.snd"
+      ]
+    },
+    "/data/songs/sndh/wonder.ste": {
+      "siblings": [
+        "dnsmus8.snd"
+      ]
+    },
+    "/data/songs/sndh/xrwwr": {
+      "siblings": [
+        "gaveitat.snd",
+        "letter.snd",
+        "outl2017.snd"
+      ]
+    },
+    "/data/songs/sndh/yqn": {
+      "siblings": [
+        "aliens.snd",
+        "apoloche.snd",
+        "bilbo.snd",
+        "dsccscsd.snd",
+        "erh.snd",
+        "fitta.snd",
+        "half-ass.snd",
+        "home.snd",
+        "hope_se.snd",
+        "lively.snd",
+        "ohbbaby.snd",
+        "shoeshin.snd",
+        "snobol.snd",
+        "tcp_50.snd",
+        "themood.snd"
+      ]
+    },
+    "/data/songs/sndh/zoltarx": {
+      "siblings": [
+        "aurora.snd"
       ]
     },
     "/data/songs/sonic-arranger": {
