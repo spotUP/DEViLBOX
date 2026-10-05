@@ -1,7 +1,7 @@
 /**
  * What the scope view says it is playing: the chip and the format of the song
  * whose engine runs a player program (editor mode 'sc68'). The mode is shared
- * by SC68, SNDH, game music (game-music-emu), S98, ASAP, AY and QSF, so the label
+ * by SC68, SNDH, game music (game-music-emu), S98, ASAP, AY, QSF and ZXTune, so the label
  * comes from the song's data, not the mode.
  */
 import { gameMusicType, vgmChips, type GameMusicType } from '@lib/import/formats/GameMusicParser';
@@ -10,7 +10,7 @@ export interface ScopeFormatLabel { chip: string; format: string; platform: stri
 
 export interface ScopeFormatSource {
   sndhFileData?: unknown; sc68FileData?: unknown; gmeFileData?: unknown; s98FileData?: unknown; asapFileData?: unknown;
-  ayFileData?: unknown; qsfFileData?: unknown;
+  ayFileData?: unknown; qsfFileData?: unknown; zxtuneFileData?: unknown;
 }
 
 const GAME_MUSIC: Record<GameMusicType, ScopeFormatLabel> = {
@@ -40,5 +40,12 @@ export function scopeFormatLabel(f: ScopeFormatSource): ScopeFormatLabel | null 
   if (f.asapFileData) return { chip: 'POKEY', format: 'SAP', platform: 'Atari 8-bit' };
   if (f.ayFileData) return { chip: 'AY-3-8912', format: 'AY', platform: 'ZX Spectrum' };
   if (f.qsfFileData) return { chip: 'QSound', format: 'QSF', platform: 'Capcom arcade' };
+  if (f.zxtuneFileData instanceof ArrayBuffer) {
+    // Atari YM register dumps (raw 'YMn!' or LH5-packed) also play on ZXTune.
+    const b = new Uint8Array(f.zxtuneFileData, 0, Math.min(8, f.zxtuneFileData.byteLength));
+    const ascii = (o: number, t: string) => [...t].every((c, i) => b[o + i] === c.charCodeAt(0));
+    if (ascii(0, 'YM') || ascii(2, '-lh5-')) return { chip: 'YM2149', format: 'YM', platform: 'Atari ST' };
+    return { chip: 'AY-3-8910', format: 'ZXTune', platform: 'ZX Spectrum' };
+  }
   return null;
 }
