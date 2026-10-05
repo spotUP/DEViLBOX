@@ -5,6 +5,7 @@
  * Also provides chord baking — rendering multiple notes into a single mixed sample.
  */
 
+import { isWholeSongSynth } from '@engine/wholeSongSynths';
 import * as Tone from 'tone';
 import { InstrumentFactory } from '@engine/InstrumentFactory';
 import { SynthRegistry } from '@engine/registry/SynthRegistry';
@@ -33,6 +34,11 @@ export class SynthBaker {
    * song's, on every Furnace song, a few seconds after it started.
    */
   public static async canRenderOffline(config: InstrumentConfig): Promise<boolean> {
+    // A whole-song engine's instruments (PSG play, TFM, ASAP, UADE...) are
+    // mixer labels with no voice: the engine plays the file. Unregistered,
+    // they read as "tone" below and fell through to a plain Tone.js Synth
+    // ("Unknown synth type: PsgplaySynth", 2026-10-05).
+    if (isWholeSongSynth(config.synthType)) return false;
     const desc = await SynthRegistry.ensure(config.synthType);
     return !desc || desc.category === 'tone';
   }
