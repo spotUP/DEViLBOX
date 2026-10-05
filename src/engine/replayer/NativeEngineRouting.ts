@@ -430,6 +430,21 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/piyopiyo/PiyoPiyoEngine')).PiyoPiyoEngine as unknown as WASMSingletonStatic,
   },
   {
+    // TFM Music Maker (.tfe, ZX Spectrum TurboFM): ZXTune's player drives two
+    // ymfm YM2203 in tfm-wasm; the grid is a view (TFMMusicMakerParser).
+    key: 'TFM',
+    synthType: 'TFMSynth',
+    suppressNotes: true,
+    fileDataKey: 'tfmFileData',
+    formats: ['TFM'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/tfm/TFMEngine')).TFMEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'PumaTracker',
     synthType: 'PumaTrackerSynth',
     suppressNotes: true,

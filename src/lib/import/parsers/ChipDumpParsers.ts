@@ -4,7 +4,7 @@
  * These are native-only formats with no UADE fallback — they each have
  * dedicated parsers that handle the chip register dump playback.
  *
- * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, MDX, PMD, S98, SNDH, QSF
+ * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, MDX, PiyoPiyo, TFM, PMD, S98, SNDH, QSF
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -105,6 +105,12 @@ export async function tryChipDumpParse(
   if (/\.pmd$/.test(filename)) {
     const { isPiyoPiyoFormat, parsePiyoPiyoFile } = await import('@lib/import/formats/PiyoPiyoParser');
     if (isPiyoPiyoFormat(new Uint8Array(buffer))) return parsePiyoPiyoFile(buffer, originalFileName);
+  }
+
+  // ── TFM Music Maker — ZX Spectrum TurboFM .tfe (2x YM2203), TFMEngine plays the file ──
+  if (/\.tfe$/.test(filename)) {
+    const { parseTfmMusicMakerFile } = await import('@lib/import/formats/TFMMusicMakerParser');
+    return parseTfmMusicMakerFile(buffer, originalFileName);
   }
 
   // ── PMD — PC-98 Professional Music Driver (YM2608) ───────────────────────
