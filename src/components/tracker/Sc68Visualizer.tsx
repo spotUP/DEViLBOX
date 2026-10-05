@@ -5,6 +5,8 @@
  * raw audio without structured tracker pattern data.
  */
 
+import { useShallow } from 'zustand/react/shallow';
+import { scopeFormatLabel } from '@/lib/tracker/scopeFormatLabel';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -28,7 +30,6 @@ const YM_GRID = '#1a2030';
 
 /** Labels shown in the header chip/format badge per editorMode. */
 const FORMAT_LABELS: Record<string, { chip: string; format: string }> = {
-  sc68:        { chip: 'YM2149',  format: 'SC68'    },
   c64sid:      { chip: 'SID',     format: 'C64'     },
   pxtone:      { chip: 'PxTone',  format: 'PXTCOP'  },
   organya:     { chip: 'OrgAnya', format: 'ORG'     },
@@ -46,6 +47,7 @@ export const Sc68Visualizer: React.FC = () => {
   const isPlaying = useTransportStore(s => s.isPlaying);
   const songName = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.name ?? '');
   const editorMode = useFormatStore(s => s.editorMode);
+  const scopeLabel = useFormatStore(useShallow(s => scopeFormatLabel(s)));
 
   const cycleMode = useCallback(() => {
     setMode(m => VIZ_MODES[(VIZ_MODES.indexOf(m) + 1) % VIZ_MODES.length]);
@@ -209,7 +211,7 @@ export const Sc68Visualizer: React.FC = () => {
   }, []);
 
   // Parse title/composer from song name (format: "Title — Composer [FORMAT]")
-  const formatInfo = FORMAT_LABELS[editorMode ?? ''] ?? { chip: 'AUDIO', format: 'PLAYER' };
+  const formatInfo = (editorMode === 'sc68' ? scopeLabel : null) ?? FORMAT_LABELS[editorMode ?? ''] ?? { chip: 'AUDIO', format: 'PLAYER' };
   const parts = songName.split(' \u2014 ');
   const title = parts[0] || songName || 'Loading...';
   const composerAndFormat = parts[1] || '';

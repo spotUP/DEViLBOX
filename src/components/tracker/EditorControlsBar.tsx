@@ -8,6 +8,8 @@
  * Extracted from TrackerView.tsx to be reusable in both DOM and GL modes.
  */
 
+import { useShallow } from 'zustand/react/shallow';
+import { scopeFormatLabel } from '@/lib/tracker/scopeFormatLabel';
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
@@ -99,6 +101,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // ── Current format detection for dropdown display ────────────────────────
   const editorMode = useFormatStore((s) => s.editorMode);
+  const scopeLabel = useFormatStore(useShallow((s) => scopeFormatLabel(s)));
   const activeSystemPreset = useUIStore((s) => s.activeSystemPreset);
   const sourceFormat = useTrackerStore((s) => s.patterns[0]?.importMetadata?.sourceFormat);
 
@@ -188,10 +191,10 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     if (editorMode === 'musicline') return 'MusicLine · PC';
     if (editorMode === 'goattracker') return 'GoatTracker · C64';
     if (editorMode === 'jamcracker') return 'JamCracker · Amiga';
-    if (editorMode === 'sc68') return 'SC68 · Atari ST';
+    if (editorMode === 'sc68') return scopeLabel ? `${scopeLabel.format} · ${scopeLabel.platform}` : null;
     if (editorMode === 'tfmx') return 'TFMX · Amiga';
     return null;
-  }, [sourceFormat, editorMode, FORMAT_LABELS]);
+  }, [sourceFormat, editorMode, scopeLabel, FORMAT_LABELS]);
 
   // Compute the display label for the hardware button
   const hwButtonLabel = useMemo(() => {
