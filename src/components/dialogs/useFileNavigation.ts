@@ -42,8 +42,7 @@ import {
 } from '@/lib/serverFilesApi';
 import { getSupportedExtensions } from '@/lib/import/ModuleLoader';
 import { getSupportedMIDIExtensions } from '@/lib/import/MIDIImporter';
-import { resolveCompanions } from '@lib/import/companionResolver';
-import { sunTronicCompanionPaths } from '@/lib/import/formats/SunTronicV13';
+import { gatherCompanions } from '@lib/import/companionFetch';
 
 // Build comprehensive accept string for file inputs (400+ supported formats)
 export const ACCEPTED_FILE_FORMATS = [
@@ -132,74 +131,6 @@ function isBinaryFile(filename: string): boolean {
   return !TEXT_EXTENSIONS.includes(ext);
 }
 
-
-/**
- * Auto-fetch companion files from the same server/static directory.
- * Returns a Map of filename → ArrayBuffer for any companions found.
- */
-async function fetchCompanionFiles(
-  filename: string,
-  filePath: string | undefined,
-  buffer?: ArrayBuffer,
-): Promise<Map<string, ArrayBuffer>> {
-  const companions = new Map<string, ArrayBuffer>();
-  if (!filePath) return companions;
-
-  const dir = filePath.slice(0, filePath.lastIndexOf('/') + 1);
-
-  // Read a sibling file from the static bundle first, then the server API.
-  const readSibling = async (path: string): Promise<ArrayBuffer | null> => {
-    let buf: ArrayBuffer | null = null;
-    if (isManifestAvailable()) {
-      try { buf = await readStaticFile(path); } catch { /* not in bundle */ }
-    }
-    if (!buf) {
-      try { buf = await readServerFile(path); } catch { /* not on server */ }
-    }
-    return buf;
-  };
-
-  // Format-aware: SunTronic V1.3 loads external samples from an `instr/`
-  // subdir via dos.library. The prefix scheme below cannot express a subdir of
-  // module-named files, so parse the module for its exact sidecar paths and
-  // register them keyed by their relative path (UADE writes them at
-  // /uade/<relpath>, matching the replayer's dos.library open).
-  if (buffer) {
-    const sunPaths = sunTronicCompanionPaths(buffer);
-    for (const rel of sunPaths) {
-      const buf = await readSibling(dir + rel);
-      if (buf) companions.set(rel, buf);
-    }
-    if (companions.size > 0) return companions;
-  }
-
-  // One resolver for every load path — the same rules the MCP server and a
-  // folder drop use. List the directory (static manifest, then the server
-  // API), hand the names over, fetch what comes back.
-  const listDir = async (path: string): Promise<ServerFileEntry[]> => {
-    if (isManifestAvailable()) {
-      const entries = listManifestDirectory(path);
-      if (entries.length > 0) return entries;
-    }
-    try { return await listServerDirectory(path); } catch { return []; }
-  };
-  const entries = await listDir(dir);
-  const siblings = entries.filter(e => !e.isDirectory).map(e => e.name);
-  const subdirs: Record<string, string[]> = {};
-  for (const e of entries) {
-    if (!e.isDirectory) continue;
-    if (!['instr', 'instruments', 'samples'].includes(e.name.toLowerCase())) continue;
-    const files = await listDir(dir + e.name + '/');
-    subdirs[e.name] = files.filter(f => !f.isDirectory).map(f => f.name);
-  }
-  const resolved = resolveCompanions(filename, { siblings, subdirs });
-  for (const key of resolved.companions) {
-    const source = resolved.sources[key] ?? key;
-    const buf = await readSibling(dir + source);
-    if (buf) companions.set(key, buf);
-  }
-  return companions;
-}
 
 interface UseFileNavigationOptions {
   isOpen: boolean;
@@ -704,7 +635,9 @@ export function useFileNavigation({
 
         // Auto-discover companion files (e.g. mdat.* → smpl.*, mfp.* → smp.*,
         // or a SunTronic module's external instr/ samples).
-        const companions = await fetchCompanionFiles(selectedFile.name, selectedFile.path, buffer);
+        const companions = selectedFile.path
+          ? await gatherCompanions(selectedFile.name, selectedFile.path.slice(0, selectedFile.path.lastIndexOf('/') + 1), buffer)
+          : new Map<string, ArrayBuffer>();
         await onLoadTrackerModule(buffer, selectedFile.name, companions.size > 0 ? companions : undefined);
         onClose();
         return;

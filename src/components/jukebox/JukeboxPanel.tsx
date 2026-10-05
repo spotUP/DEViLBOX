@@ -32,7 +32,7 @@ import { loadFile as loadFileHeadless } from '@/bridge/handlers/writeHandlers';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { dismissErrors, dismissModal, play as playHeadless } from '@/bridge/handlers/writeHandlers';
-import { resolveCompanions } from '@/lib/import/companionResolver';
+import { gatherCompanions } from '@/lib/import/companionFetch';
 import {
   JUKEBOX_FAULTS, JUKEBOX_OK, LOAD_FAILED, reportFault, loadVerdicts, verdictOf,
   verdictLabels, isGoodVerdict, type JukeboxVerdict,
@@ -53,19 +53,11 @@ interface IndexEntry {
   fromModland?: boolean;
 }
 
-interface DirListing {
-  siblings: string[];
-  subdirs?: Record<string, string[]>;
-  parentSamples?: string[];
-}
-
 interface SongIndex {
   generated: string;
   registryTotal: number;
   covered: number;
   entries: IndexEntry[];
-  /** Directory listings, so companions resolve exactly as they do elsewhere. */
-  dirs: Record<string, DirListing>;
   gaps: Array<{ formatKey: string; label: string }>;
 }
 
@@ -290,35 +282,22 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       const blob = cache.current.get(file) ?? await (await fetch(file)).blob();
       cache.current.set(file, blob);
 
-      // Companions, resolved by the app's OWN logic rather than a guess.
-      // A TFMX tune without its `smpl.` partner or a Sonix song without its
-      // `.ss`/`.instr` is not a test of anything, so the index ships a
-      // directory listing and `resolveCompanions` decides from it exactly as
-      // the normal load path does.
-      const listing = index?.dirs[row.dir];
+      // Companions through the file browser's own function, so a song loads
+      // here exactly as it loads from the app: same listing, same resolver,
+      // same reads.
+      const bytes = await blob.arrayBuffer();
+      const found = await gatherCompanions(name, row.dir, bytes);
       const companions: Record<string, string> = {};
-      if (listing) {
-        const dirUrl = row.dir;
-        const res = resolveCompanions(name, listing);
-        for (const registerAs of res.companions) {
-          const readFrom = res.sources[registerAs] ?? registerAs;
-          try {
-            const cRes = await fetch(`${dirUrl}/${readFrom}`);
-            if (!cRes.ok) continue;
-            const cBuf = new Uint8Array(await cRes.arrayBuffer());
-            let cBin = '';
-            for (let i = 0; i < cBuf.length; i += 0x8000) {
-              cBin += String.fromCharCode(...cBuf.subarray(i, i + 0x8000));
-            }
-            companions[registerAs] = btoa(cBin);
-          } catch { /* a companion that will not fetch is itself a finding */ }
+      for (const [registerAs, cBytes] of found) {
+        const cBuf = new Uint8Array(cBytes);
+        let cBin = '';
+        for (let i = 0; i < cBuf.length; i += 0x8000) {
+          cBin += String.fromCharCode(...cBuf.subarray(i, i + 0x8000));
         }
-        if (res.companions.length > 0) {
-          setStatus(`${name} + ${Object.keys(companions).length}/${res.companions.length} companions`);
-        }
+        companions[registerAs] = btoa(cBin);
       }
 
-      if (await loadAndPlay(await blob.arrayBuffer(), name, companions)) {
+      if (await loadAndPlay(bytes, name, companions)) {
         setStatus(Object.keys(companions).length ? `${name} (+${Object.keys(companions).length})` : name);
       }
       // The editor took the keyboard during the load; take it back.

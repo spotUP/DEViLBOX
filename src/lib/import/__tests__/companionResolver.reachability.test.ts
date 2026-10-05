@@ -22,11 +22,16 @@ describe('companion discovery reaches the resolver', () => {
     expect(server).not.toContain("const suffixCompanions = ['.nt', '.as', '.l', '.n'];");
   });
 
-  it('file browser: lists the directory and asks the resolver; the four-pair table is gone', () => {
+  it('file browser and jukebox: one shared fetch that asks the resolver; the four-pair table is gone', () => {
     const nav = read('src/components/dialogs/useFileNavigation.ts');
-    expect(nav).toContain("import { resolveCompanions } from '@lib/import/companionResolver';");
-    expect(nav).toContain('const resolved = resolveCompanions(filename, { siblings, subdirs });');
+    expect(nav).toContain("import { gatherCompanions } from '@lib/import/companionFetch';");
     expect(nav).not.toContain('COMPANION_PREFIXES');
+    expect(nav).not.toContain('resolveCompanions(');
+    const jukebox = read('src/components/jukebox/JukeboxPanel.tsx');
+    expect(jukebox).toContain('await gatherCompanions(name, row.dir, bytes)');
+    expect(jukebox).not.toContain('resolveCompanions(');
+    const fetcher = read('src/lib/import/companionFetch.ts');
+    expect(fetcher).toContain('const resolved = resolveCompanions(filename, listing);');
   });
 
   it('folder drop: asks the resolver over the dropped names, keeping everything only when it names nothing', () => {
