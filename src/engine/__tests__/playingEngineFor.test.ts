@@ -26,7 +26,7 @@ describe('playingEngineFor', () => {
 
   it('agrees with the router for every registry descriptor', () => {
     for (const desc of WASM_ENGINES) {
-      const song = base({ [desc.fileDataKey]: new ArrayBuffer(8), format: desc.formats?.[0] ?? 'MOD' } as Partial<TrackerSong>);
+      const song = base({ [desc.fileDataKey]: new ArrayBuffer(8) } as Partial<TrackerSong>);
       const first = WASM_ENGINES.find((d) => shouldActivate(d, song))!;
       expect(playingEngineFor(song), desc.key).toBe(first.key);
     }

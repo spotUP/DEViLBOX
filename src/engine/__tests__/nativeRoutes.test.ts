@@ -15,6 +15,9 @@ const ROOT = resolve(__dirname, '../../..');
 const bytes = (rel: string) => { const b = readFileSync(resolve(ROOT, rel)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
 
 const CASES: Array<[string, () => Promise<TrackerSong | null>, string]> = [
+  // PumaTracker labels its songs 'MOD' (Amiga grid); the old format gate kept
+  // its own WASM engine off (2026-10-05). The file data decides now.
+  ['pumatracker/liquid kids - lv1a.puma', async () => (await import('@lib/import/formats/PumaTrackerParser')).parsePumaTrackerFile(bytes('public/data/songs/pumatracker/liquid kids - lv1a.puma'), 'liquid kids - lv1a.puma'), 'PumaTracker'],
   ['actionamics/dynablaster.ast', async () => (await import('@lib/import/formats/ActionamicsParser')).parseActionamicsFile(new Uint8Array(bytes('public/data/songs/actionamics/dynablaster.ast')), 'dynablaster.ast'), 'ActionamicsReplayer'],
   ['formats/prehistoric_tale.hipc', async () => (await import('@lib/import/formats/HippelCoSoParser')).parseHippelCoSoFile(bytes('public/data/songs/formats/prehistoric_tale.hipc'), 'prehistoric_tale.hipc'), 'Hippel'],
   ['formats/ghostbattle_gameover.hip7', async () => (await import('@lib/import/formats/JochenHippel7VParser')).parseJochenHippel7VFile(bytes('public/data/songs/formats/ghostbattle_gameover.hip7'), 'ghostbattle_gameover.hip7'), 'Hippel'],

@@ -12,7 +12,7 @@
 import { FILE_DATA_FIELDS } from '@/engine/formatFileDataFields';
 import { silenceIsNotTheSongs } from './performerSilence';
 import * as Tone from 'tone';
-import type { TrackerSong, TrackerFormat } from '../TrackerReplayer';
+import type { TrackerSong } from '../TrackerReplayer';
 import { getToneEngine } from '../ToneEngine';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { HivelyEngine } from '../hively/HivelyEngine';
@@ -93,8 +93,6 @@ interface NativeEngineDescriptor {
   suppressNotes: boolean;
   /** Which song field holds the raw file data */
   fileDataKey: keyof TrackerSong;
-  /** Format(s) this engine handles (null = activate whenever fileData exists) */
-  formats: string[] | null;
   /** Load method name on the engine instance */
   loadMethod: 'loadTune' | 'loadSong';
   /** Extra args to pass after file data (e.g., stereoMode for Hively) */
@@ -127,7 +125,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'HivelySynth',
     suppressNotes: true,
     fileDataKey: 'hivelyFileData',
-    formats: ['HVL', 'AHX'],
     loadMethod: 'loadTune',
     getLoadArgs: (song) => [song.hivelyMeta?.stereoMode ?? 2],
     supportsPause: true,
@@ -140,7 +137,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'KlysSynth',
     suppressNotes: true,
     fileDataKey: 'klysFileData',
-    formats: ['KT'],
     loadMethod: 'loadSong',
     supportsPause: true,
     supportsResume: true,
@@ -178,7 +174,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'JamCrackerSynth',
     suppressNotes: true,
     fileDataKey: 'jamCrackerFileData',
-    formats: ['JamCracker'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -190,7 +185,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FuturePlayerSynth',
     suppressNotes: true,
     fileDataKey: 'futurePlayerFileData',
-    formats: ['FuturePlayer'],
     loadMethod: 'loadTune',
     supportsPause: true,
     supportsResume: true,
@@ -203,7 +197,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'PreTrackerSynth',
     suppressNotes: true,
     fileDataKey: 'preTrackerFileData',
-    formats: ['PreTracker'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -216,7 +209,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'MusicAssemblerSynth',
     suppressNotes: true,
     fileDataKey: 'maFileData',
-    formats: null,  // activate whenever maFileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -229,7 +221,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'BenDaglishSynth',
     suppressNotes: true,
     fileDataKey: 'bdFileData',
-    formats: null,  // activate whenever bdFileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -242,7 +233,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'HippelSynth',
     suppressNotes: true,
     fileDataKey: 'hippelFileData',
-    formats: null, // activate whenever hippelFileData exists (CoSo, ST, MCMD)
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -265,10 +255,8 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     // Activate whenever sonixFileData exists. It is attached only by
     // SonixMusicDriverParser.parseSonixFile for genuine Sonix modules (SNX, and
     // FORM/SMUS carrying an SNX1 synth chunk). The SMUS path keeps song.format
-    // = 'IFF SMUS' for the editable view, so a formats:['Sonix'] gate would
-    // wrongly route those to UADE (which can't synth the external instruments)
-    // and play silence. The WASM C port synthesizes from the SNX1 chunk directly.
-    formats: null,
+    // = 'IFF SMUS' for the editable view; the WASM C port synthesizes from the
+    // SNX1 chunk directly (UADE can't synth the external instruments).
     loadMethod: 'loadTune',
     // Pass external instrument files + the memfs song path to loadTune so the WASM
     // engine can load sample-based instruments (.instr/.ss) via memfs. 'sonix/song'
@@ -289,7 +277,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     // Activate whenever maxTraxFileData exists (set by MaxTraxParser).
     // The WASM replayer drives all audio; the tracker scheduler must not
     // also trigger the Sampler instruments that the parser decoded for display.
-    formats: null,
     loadMethod: 'loadTune',
     getLoadArgs: () => [0], // score 0 = first sub-song
     supportsPause: false,
@@ -303,7 +290,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'PxtoneSynth',
     suppressNotes: true,
     fileDataKey: 'pxtoneFileData',
-    formats: ['PxTone'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -316,7 +302,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'OrganyaSynth',
     suppressNotes: true,
     fileDataKey: 'organyaFileData',
-    formats: ['Organya'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -329,7 +314,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SawteethSynth',
     suppressNotes: true,
     fileDataKey: 'sawteethFileData',
-    formats: ['SAW'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -342,7 +326,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'EupminiSynth',
     suppressNotes: true,
     fileDataKey: 'eupFileData',
-    formats: ['EUP'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -355,7 +338,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'IxalanceSynth',
     suppressNotes: true,
     fileDataKey: 'ixsFileData',
-    formats: ['IXS'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -368,7 +350,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'CpsycleSynth',
     suppressNotes: true,
     fileDataKey: 'psycleFileData',
-    formats: ['Psycle'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -381,7 +362,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'Sc68Synth',
     suppressNotes: true,
     fileDataKey: 'sc68FileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -394,7 +374,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'QsfSynth',
     suppressNotes: true,
     fileDataKey: 'qsfFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -407,7 +386,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'ZxtuneSynth',
     suppressNotes: true,
     fileDataKey: 'zxtuneFileData',
-    formats: ['ZXTune'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -423,7 +401,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'AyletSynth',
     suppressNotes: true,
     fileDataKey: 'ayFileData',
-    formats: ['AY'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -438,7 +415,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'PiyoPiyoSynth',
     suppressNotes: true,
     fileDataKey: 'piyoPiyoFileData',
-    formats: ['PiyoPiyo'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -453,7 +429,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'TFMSynth',
     suppressNotes: true,
     fileDataKey: 'tfmFileData',
-    formats: ['TFM'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -470,7 +445,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'PsgplaySynth',
     suppressNotes: true,
     fileDataKey: 'sndhFileData',
-    formats: ['SNDH'],
     loadMethod: 'loadTune',
     getLoadArgs: (song: TrackerSong) => [song.sndhSubtune ?? 0],
     supportsPause: false,
@@ -489,7 +463,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'GmeSynth',
     suppressNotes: true,
     fileDataKey: 'gmeFileData',
-    formats: ['NSF', 'GBS', 'HES', 'KSS', 'SPC', 'VGM', 'GYM'],
     loadMethod: 'loadTune',
     getLoadArgs: (song: TrackerSong) => [song.gmeTrack ?? 0],
     supportsPause: false,
@@ -506,7 +479,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'S98Synth',
     suppressNotes: true,
     fileDataKey: 's98FileData',
-    formats: ['S98'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -522,7 +494,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'StoneTrackerSynth',
     suppressNotes: true,
     fileDataKey: 'stoneTrackerFileData',
-    formats: ['StoneTracker'],
     loadMethod: 'loadTune',
     getLoadArgs: (song: TrackerSong) => [song.stoneTrackerSampleData],
     supportsPause: false,
@@ -539,7 +510,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'MusicMakerSynth',
     suppressNotes: true,
     fileDataKey: 'musicMakerFileData',
-    formats: ['MusicMaker'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -552,7 +522,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'PumaTrackerSynth',
     suppressNotes: true,
     fileDataKey: 'pumaTrackerFileData',
-    formats: ['PumaTracker'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -565,7 +534,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FredEditorReplayerSynth',
     suppressNotes: true,
     fileDataKey: 'fredEditorWasmFileData',
-    formats: null,  // activate whenever fredEditorWasmFileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -578,7 +546,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SteveTurnerSynth',
     suppressNotes: true,
     fileDataKey: 'steveTurnerFileData',
-    formats: null, // activate whenever steveTurnerFileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -591,7 +558,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SidMon1Synth',
     suppressNotes: true,
     fileDataKey: 'sidmon1WasmFileData',
-    formats: null, // activate whenever sidmon1WasmFileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -604,7 +570,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'ArtOfNoiseSynth',
     suppressNotes: true,
     fileDataKey: 'artOfNoiseFileData',
-    formats: ['AON'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -617,7 +582,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'Cinter4Synth',
     suppressNotes: true,
     fileDataKey: 'cinter4FileData',
-    formats: ['Cinter4'],
     loadMethod: 'loadTune',
     getLoadArgs: (song) => [song.cinter4RawData, {
       spd: song.initialSpeed || 6,
@@ -635,7 +599,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'PmdminiSynth',
     suppressNotes: true,
     fileDataKey: 'pmdFileData',
-    formats: ['PMD'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -648,7 +611,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FmplayerSynth',
     suppressNotes: true,
     fileDataKey: 'fmplayerFileData',
-    formats: ['FMP'],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -661,7 +623,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SidMon2Synth',
     suppressNotes: true,
     fileDataKey: 'sd2FileData',
-    formats: null,  // activate whenever sd2FileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -674,7 +635,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'MdxminiSynth',
     suppressNotes: true,
     fileDataKey: 'mdxminiFileData',
-    formats: ['MDX' as TrackerFormat],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -687,7 +647,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'MusicLineSynth',
     suppressNotes: true,
     fileDataKey: 'musiclineFileData',
-    formats: null, // activate whenever musiclineFileData exists
     loadMethod: 'loadSong',
     supportsPause: false,
     supportsResume: false,
@@ -699,7 +658,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'TFMXModuleSynth',
     suppressNotes: true,
     fileDataKey: 'tfmxFileData',
-    formats: ['TFMX' as TrackerFormat],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -713,7 +671,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'AsapSynth',
     suppressNotes: true,
     fileDataKey: 'asapFileData',
-    formats: ['ASAP' as TrackerFormat],
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -727,7 +684,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SoundControlWasmSynth',
     suppressNotes: true,
     fileDataKey: 'soundControlFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -740,7 +696,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DeltaMusic1WasmSynth',
     suppressNotes: true,
     fileDataKey: 'deltaMusic1FileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -753,7 +708,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DeltaMusic2WasmSynth',
     suppressNotes: true,
     fileDataKey: 'deltaMusic2FileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -767,7 +721,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'RonKlarenWasmSynth',
     suppressNotes: true,
     fileDataKey: 'ronKlarenFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -780,7 +733,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'ActionamicsWasmSynth',
     suppressNotes: true,
     fileDataKey: 'actionamicsFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -793,7 +745,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'ActivisionProWasmSynth',
     suppressNotes: true,
     fileDataKey: 'activisionProFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -806,7 +757,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SynthesisWasmSynth',
     suppressNotes: true,
     fileDataKey: 'synthesisFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -819,7 +769,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DssWasmSynth',
     suppressNotes: true,
     fileDataKey: 'dssFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -832,7 +781,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SoundFactory2WasmSynth',
     suppressNotes: true,
     fileDataKey: 'soundFactoryFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -845,7 +793,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FaceTheMusicWasmSynth',
     suppressNotes: true,
     fileDataKey: 'faceTheMusicFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -858,7 +805,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FredReplayerWasmSynth2',
     suppressNotes: true,
     fileDataKey: 'fredReplayerFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -871,7 +817,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'OktalyzerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'oktalyzerFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -884,7 +829,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'InStereo1WasmSynth',
     suppressNotes: true,
     fileDataKey: 'inStereo1FileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -897,7 +841,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FutureComposerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'futureComposerFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -910,7 +853,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'InStereo2WasmSynth',
     suppressNotes: true,
     fileDataKey: 'inStereo2FileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -923,7 +865,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'QuadraComposerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'quadraComposerFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -937,7 +878,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SoundMonWasmSynth',
     suppressNotes: true,
     fileDataKey: 'soundMonFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -950,7 +890,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DigMugWasmSynth',
     suppressNotes: true,
     fileDataKey: 'digMugFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -963,7 +902,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DavidWhittakerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'davidWhittakerFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -976,7 +914,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SonicArrangerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'sonicArrangerFileData',
-    formats: null,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -986,16 +923,15 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
   },
   {
     key: 'SunTronicSong',
-    // MUST precede UADEEditable: both are formats:null wildcards and the dispatch
-    // loop keeps only the FIRST wildcard that activates (skips later ones once one
-    // engine started). sunTronicSongFileData is attached ONLY when the user picks
+    // MUST precede UADEEditable: the dispatch loop keeps only the FIRST
+    // descriptor that activates (skips later ones once one engine started).
+    // sunTronicSongFileData is attached ONLY when the user picks
     // the 'native' engine pref, so ordering it first makes native win over the
     // generic UADE-editable fallback for exactly those songs. Default pref leaves
     // the key unset → this descriptor is inert → UADEEditable still handles the song.
     synthType: 'SunTronicSongSynth',
     suppressNotes: true,
     fileDataKey: 'sunTronicSongFileData',
-    formats: null,
     loadMethod: 'loadTune',
     getLoadArgs: (song) => [song.sunTronicCompanionPcm ?? []],
     supportsPause: false,
@@ -1009,7 +945,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'UADEEditableSynth',
     suppressNotes: true,
     fileDataKey: 'uadeEditableFileData',
-    formats: null, // activate whenever uadeEditableFileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -1040,7 +975,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'V2MSynth',
     suppressNotes: true,
     fileDataKey: 'v2mFileData',
-    formats: null, // activate whenever v2mFileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -1074,10 +1008,12 @@ export { silenceIsNotTheSongs, mixerSilencesAChannel } from './performerSilence'
 
 
 export function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolean {
-  const fileData = song[desc.fileDataKey];
-  if (!fileData) return false;
-  if (desc.formats === null) return true;
-  return desc.formats.includes(song.format);
+  // The data decides: an engine plays the song that carries its file data.
+  // A song.format gate used to sit here; parsers label their songs for the
+  // grid (PumaTracker says 'MOD' for Amiga separation and editing), so the
+  // PumaTracker and Psycle engines never started (owner, 2026-10-05: our own
+  // WASM engines play whenever they can).
+  return !!song[desc.fileDataKey];
 }
 
 /**
@@ -1261,9 +1197,9 @@ export async function startNativeEngines(
       continue;
     }
 
-    // Skip wildcard engines (formats: null) when a format-specific engine
-    // already handles this song — prevents dual audio (e.g. Hively + UADE).
-    if (desc.formats === null && startedEngineKeys.size > 0) continue;
+    // One engine per song: the first descriptor (table order) whose data the
+    // song carries plays it - prevents dual audio (e.g. Hively + UADE).
+    if (startedEngineKeys.size > 0) continue;
 
     if (desc.suppressNotes) suppressNotes = true;
 

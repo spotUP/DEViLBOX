@@ -1,15 +1,13 @@
 /**
  * RATCHET — every dedicated engine in WASM_ENGINES is reachable from import.
  *
- * A descriptor starts its engine only when the song carries the descriptor's
- * fileDataKey (and, for a descriptor with a `formats` gate, when song.format
- * is one of the gate's values). Several engines were built, registered and
- * never heard: Actionamics, Digital Sound Studio, Ron Klaren, Face The Music
- * — no parser ever set their file data — and PumaTracker, Eupmini and
- * Cpsycle, whose parsers carry the data but set format 'MOD', which their
- * gate refuses. This test reads the import sources and fails when a
- * descriptor has no file that sets its fileDataKey, or when a gated
- * descriptor's feeders never set one of its gate formats.
+ * A descriptor starts its engine when the song carries the descriptor's
+ * fileDataKey (the data decides; the old song.format gate kept PumaTracker,
+ * Eupmini and Cpsycle off their engines because their parsers label songs
+ * 'MOD'). Several engines were built, registered and never heard: Actionamics,
+ * Digital Sound Studio, Ron Klaren, Face The Music - no parser ever set their
+ * file data. This test reads the import sources and fails when a descriptor
+ * has no file that sets its fileDataKey.
  *
  * KNOWN_UNREACHED is the documented debt. It may only shrink: an entry that
  * becomes reachable fails the second test until it is removed.
@@ -25,11 +23,6 @@ const IMPORT_DIRS = [join(ROOT, 'src/lib/import'), join(ROOT, 'src/lib/file')];
 
 /** Engines that import cannot reach today, each with the reason. */
 const KNOWN_UNREACHED: Record<string, string> = {
-  // Gate/format mismatch: the parser carries the file data but sets format
-  // 'MOD'; the gate wants its own name. Fix level is an open routing decision.
-  PumaTracker: "PumaTrackerParser sets format 'MOD', gate is ['PumaTracker']",
-  Eupmini: "EupminiParser sets format 'MOD', gate is ['EUP'] (isEupFormat also rejects real .eup files)",
-  Cpsycle: "CpsycleParser sets format 'MOD', gate is ['Psycle']",
   // No feeder.
   RonKlarenReplayer: 'ronklaren.c has no rk_set_cell: switching off UADE would make grid edits inaudible (UADE gets them via chip RAM)',
   FaceTheMusicReplayer: '.ftm imports through libopenmpt; the FTM worklet passes setCell args in the wrong order for ftm_set_cell',
@@ -52,13 +45,7 @@ function unreached(): Map<string, string> {
   for (const d of WASM_ENGINES) {
     const sets = new RegExp(`\\b${String(d.fileDataKey)}\\s*(:|=[^=])`);
     const feeders = files.filter((f) => sets.test(f.s));
-    if (feeders.length === 0) { result.set(d.key, 'no import source sets ' + String(d.fileDataKey)); continue; }
-    if (d.formats) {
-      const gate = d.formats.map((f) => new RegExp(`\\bformat\\b[^\\n]*['"]${f}['"]`));
-      if (!feeders.some((f) => gate.some((g) => g.test(f.s)))) {
-        result.set(d.key, `feeders (${feeders.map((f) => f.p).join(', ')}) never set format ${JSON.stringify(d.formats)}`);
-      }
-    }
+    if (feeders.length === 0) result.set(d.key, 'no import source sets ' + String(d.fileDataKey));
   }
   return result;
 }
