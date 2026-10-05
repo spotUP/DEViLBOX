@@ -25,3 +25,19 @@ export function adscRouteFor(companionKeys: Iterable<string>): AdscRoute {
   if (hasAs && !hasNt) return 'uade';
   return 'startrekker';
 }
+
+/**
+ * A plain `.mod` that arrived WITH its `<name>.mod.nt` is a StarTrekker AM
+ * module: the AM synth instruments live in the .nt, and the TS tracker engine
+ * (which sees only the sample table) plays it silent. UADE's StarTrekker AM
+ * player plays the pair (amsyntdemo.mod + .nt: rms 0.156, 2026-10-05). The
+ * companion the module came with decides, as for `.adsc`.
+ */
+export function modHasStarTrekkerNt(filename: string, companionKeys: Iterable<string>): boolean {
+  if (!/\.mod$/i.test(filename)) return false;
+  const want = `${(filename.split('/').pop() ?? filename).toLowerCase()}.nt`;
+  for (const key of companionKeys) {
+    if ((key.split('/').pop() ?? key).toLowerCase() === want) return true;
+  }
+  return false;
+}
