@@ -13,6 +13,7 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import { ftmCellFields } from '@engine/uade/encoders/FaceTheMusicEncoder';
 
 function faceTheMusicTransform(code: string): string {
   return code
@@ -120,9 +121,15 @@ export class FaceTheMusicEngine extends WASMChannelOutputsEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  /** Edit a pattern cell in the WASM replayer */
-  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+  /**
+   * Edit a grid cell in the WASM replayer. Takes the grid's terms and hands
+   * ftm_set_cell the track event (note, effect, argument) through
+   * ftmCellFields, the mapping the file encoder uses. `pattern` is the
+   * measure; the worklet turns measure + row into the song row.
+   */
+  setCell(pattern: number, row: number, channel: number, note: number, instrument: number, effTyp: number, eff: number, volume = 0): void {
+    const fields = ftmCellFields({ note, instrument, effTyp, eff, volume });
+    this.workletNode?.port.postMessage({ type: 'setCell', pattern, row, channel, ...fields });
   }
 
   /** Set an instrument parameter by name */

@@ -709,7 +709,8 @@ export const useTrackerStore = create<TrackerStore>()(
                   Engine.getInstance().setCell(
                     patternIndex, rowIndex, channelIndex,
                     fullCell.note ?? 0, fullCell.instrument ?? 0,
-                    fullCell.effTyp ?? 0, fullCell.eff ?? 0
+                    fullCell.effTyp ?? 0, fullCell.eff ?? 0,
+                    fullCell.volume ?? 0,
                   );
                 }
               });

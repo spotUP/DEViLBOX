@@ -221,8 +221,10 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     if (pos + chunkSize > bytes.byteLength) return null;
     const chunkEnd = pos + chunkSize;
 
+    // PlayFTM's track walk ($bee/$ed0): the first event sits on row 0 unless a
+    // spacing line precedes it; the default spacing applies after an event.
     let globalRow = 0;
-    let spacing   = defaultSpacing;
+    let spacing   = 0;
     let lastInstr = 0;  // Track last instrument set per channel
 
     while (pos + 2 <= chunkEnd) {
