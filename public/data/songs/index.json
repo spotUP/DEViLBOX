@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T10:22:42.579Z",
+  "generated": "2026-10-05T10:29:07.789Z",
   "perEntry": 6,
   "registryTotal": 277,
   "covered": 158,
@@ -5941,6 +5941,17 @@
       "dir": "/data/songs/jesper-olsen"
     },
     {
+      "id": "jesper-olsen-georg glaxo",
+      "label": "jesper-olsen / georg glaxo",
+      "formatKey": "jesperOlsen",
+      "subformat": "georg glaxo",
+      "files": [
+        "/data/songs/jesper-olsen/georg glaxo/JO.GeorgGlaxo title"
+      ],
+      "total": 1,
+      "dir": "/data/songs/jesper-olsen/georg glaxo"
+    },
+    {
       "id": "klystrack",
       "label": "klystrack",
       "formatKey": "kt",
@@ -8252,6 +8263,7 @@
           "SUNTronicTunes",
           "Scott Johnston",
           "SnareDrum.ss",
+          "WantedTeam.bin",
           "a sleep so deep.mod",
           "absm chain mod.it",
           "aces_high.ahx",
@@ -8604,6 +8616,8 @@
           "stormlord title.jt"
         ],
         "jesper-olsen": [
+          "WantedTeam.bin",
+          "georg glaxo",
           "guldkornsexpressen ingame.jo",
           "lollypop-subgame 01.jo"
         ],
@@ -14159,6 +14173,7 @@
         "64_conversion.tme",
         "Epic Pinball - Song 0 - Title.psm",
         "SnareDrum.ss",
+        "WantedTeam.bin",
         "a sleep so deep.mod",
         "absm chain mod.it",
         "aces_high.ahx",
@@ -32742,11 +32757,24 @@
         "stormlord title.jt"
       ]
     },
+    "/data/songs/jesper-olsen/georg glaxo": {
+      "siblings": [
+        "JO.GeorgGlaxo title",
+        "WantedTeam.bin"
+      ]
+    },
     "/data/songs/jesper-olsen": {
       "siblings": [
+        "WantedTeam.bin",
         "guldkornsexpressen ingame.jo",
         "lollypop-subgame 01.jo"
-      ]
+      ],
+      "subdirs": {
+        "georg glaxo": [
+          "JO.GeorgGlaxo title",
+          "WantedTeam.bin"
+        ]
+      }
     },
     "/data/songs/klystrack": {
       "siblings": [
