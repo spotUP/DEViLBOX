@@ -12,6 +12,8 @@ class TFMProcessor extends AudioWorkletProcessor {
     this.module = null;
     this.interleavedPtr = 0;
     this.interleavedBuf = null;
+    this.chPtr = 0;          // 6 planar channel buffers of bufferSize floats
+    this.chBufs = [];
     this.initialized = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
@@ -178,6 +180,7 @@ class TFMProcessor extends AudioWorkletProcessor {
           this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' });
           return;
         }
+        this.chPtr = malloc(this.bufferSize * 6 * 4);
       }
 
       this.updateBufferViews();
@@ -197,6 +200,9 @@ class TFMProcessor extends AudioWorkletProcessor {
     if (this.lastHeapBuffer !== heapF32.buffer) {
       this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
       this.lastHeapBuffer = heapF32.buffer;
+      this.chBufs = this.chPtr
+        ? Array.from({ length: 6 }, (_, c) => new Float32Array(heapF32.buffer, this.chPtr + c * this.bufferSize * 4, this.bufferSize))
+        : [];
     }
   }
 
@@ -206,6 +212,8 @@ class TFMProcessor extends AudioWorkletProcessor {
     }
     const free = this.module?._free || this.module?.free;
     if (free && this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
+    if (free && this.chPtr) { free(this.chPtr); this.chPtr = 0; }
+    this.chBufs = [];
     this.interleavedBuf = null;
     this.module = null;
     this.initialized = false;
@@ -225,8 +233,17 @@ class TFMProcessor extends AudioWorkletProcessor {
     if (typeof this.module._tfm_wasm_render === 'function') {
       this.updateBufferViews();
       if (this.interleavedBuf) {
-        const rendered = this.module._tfm_wasm_render(this.interleavedPtr, numSamples);
+        const withChannels = this.chBufs.length === 6 && typeof this.module._tfm_wasm_render_channels === 'function';
+        const rendered = withChannels
+          ? this.module._tfm_wasm_render_channels(this.interleavedPtr, this.chPtr, numSamples, this.bufferSize)
+          : this.module._tfm_wasm_render(this.interleavedPtr, numSamples);
         if (rendered > 0) {
+          // Every sample of each of the six FM channels, for the oscilloscopes
+          // and the per-channel role classifiers (worklets/channel-stream.js).
+          if (withChannels && globalThis.DevilboxChannelStream) {
+            this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+            this._stream.writeFloat32(this.chBufs.map((b) => b.subarray(0, rendered)), rendered);
+          }
           // Deinterleave LRLRLR... into separate L and R channels
           for (let i = 0; i < rendered; i++) {
             outputL[i] = this.interleavedBuf[i * 2];

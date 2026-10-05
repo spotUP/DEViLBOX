@@ -23,6 +23,7 @@ interface Mod {
   _tfm_wasm_init(sr: number): void;
   _tfm_wasm_load(p: number, n: number): number;
   _tfm_wasm_render(out: number, frames: number): number;
+  _tfm_wasm_render_channels(out: number, ch: number, frames: number, stride: number): number;
   _tfm_wasm_set_mute_mask(mask: number): void;
   _tfm_wasm_stop(): void;
   _tfm_wasm_get_position(): number;
@@ -113,6 +114,74 @@ describe('the TFM wasm plays a TFM Music Maker song', { timeout: 120000 }, () =>
     const chip0Only = windowsWith(0x07, 10).slice(16);
     console.log('[tfm] 8-10 s all / chip 0 only:', rms(all).toFixed(4), rms(chip0Only).toFixed(4));
     expect(rms(chip0Only)).toBeLessThan(rms(all) * 0.95);
+  });
+
+  it('the render with per-channel taps leaves the main mix bit-identical', () => {
+    const frames = 1200, total = Math.ceil(SR * 3 / frames);
+    const mix = (taps: boolean): Float32Array => {
+      expect(load(readFileSync(TFE))).toBe(0);
+      const out = mod._malloc(frames * 8), ch = mod._malloc(frames * 24);
+      const all = new Float32Array(total * frames * 2);
+      for (let b = 0; b < total; b++) {
+        if (taps) mod._tfm_wasm_render_channels(out, ch, frames, frames); else mod._tfm_wasm_render(out, frames);
+        all.set(f32().subarray(out >> 2, (out >> 2) + frames * 2), b * frames * 2);
+      }
+      mod._free(out); mod._free(ch);
+      return all;
+    };
+    const plain = mix(false), tapped = mix(true);
+    expect(tapped).toEqual(plain);
+    expect(plain.some((v) => v !== 0)).toBe(true);
+  });
+
+  it('the worklet posts oscData with six channels that sum to the mix and sound where the song plays', async () => {
+    const g = globalThis as Record<string, unknown>;
+    const posted: Array<{ type: string; channels?: Int16Array[]; frame?: number; sampleRate?: number }> = [];
+    g.sampleRate = SR;
+    g.AudioWorkletProcessor = class { port = { onmessage: null as unknown, postMessage: (m: never) => { posted.push(m); } }; };
+    type Proc = { initModule(sr: number, w: Buffer, js: string): Promise<void>; handleMessage(d: object): Promise<void>; process(i: unknown[], o: Float32Array[][]): boolean };
+    let Ctor: (new () => Proc) | null = null;
+    g.registerProcessor = (_n: string, c: new () => Proc) => { Ctor = c; };
+    runInThisContext(readFileSync(resolve(ROOT, 'public/worklets/channel-stream.js'), 'utf8'));
+    runInThisContext(readFileSync(resolve(ROOT, 'public/tfm/TFM.worklet.js'), 'utf8'));
+    const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
+    Object.defineProperty(process, 'versions', { value: {}, configurable: true });
+    const p = new Ctor!();
+    try {
+      await p.initModule(SR, readFileSync(resolve(ROOT, 'public/tfm/TFM.wasm')), readFileSync(resolve(ROOT, 'public/tfm/TFM.js'), 'utf8'));
+    } finally { Object.defineProperty(process, 'versions', versions); }
+    await p.handleMessage({ type: 'loadModule', moduleData: new Uint8Array(readFileSync(TFE)).buffer });
+    expect(posted.some((m) => m.type === 'moduleLoaded')).toBe(true);
+    let mixE = 0, mixN = 0;
+    const L = new Float32Array(128), R = new Float32Array(128);
+    for (let b = 0; b < Math.ceil(SR * 3 / 128); b++) {
+      p.process([], [[L, R]]);
+      for (const v of L) { mixE += v * v; mixN++; }
+    }
+    const osc = posted.filter((m) => m.type === 'oscData');
+    expect(osc.length).toBeGreaterThan(10);
+    expect(osc[0].channels).toHaveLength(6);
+    expect(osc[0].sampleRate).toBe(SR);
+    const rmsOf = (c: number): number => {
+      let e = 0, n = 0;
+      for (const m of osc) for (const v of m.channels![c]) { e += (v / 32767) ** 2; n++; }
+      return Math.sqrt(e / n);
+    };
+    const per = [0, 1, 2, 3, 4, 5].map(rmsOf);
+    const mixRms = Math.sqrt(mixE / mixN);
+    // The six taps summed, per sample, against the mix's own RMS.
+    let sumE = 0, sumN = 0;
+    for (const m of osc) for (let i = 0; i < m.channels![0].length; i++) {
+      let s = 0; for (let c = 0; c < 6; c++) s += m.channels![c][i] / 32767;
+      sumE += s * s; sumN++;
+    }
+    const sumRms = Math.sqrt(sumE / sumN);
+    console.log('[tfm] oscData chunks', osc.length, 'per-channel RMS', per.map((v) => v.toFixed(4)).join(' '), 'mix RMS', mixRms.toFixed(4), 'taps summed RMS', sumRms.toFixed(4));
+    expect(per[0]).toBeGreaterThan(0.005);                                  // channel 1 plays from row 0
+    expect(per.filter((v) => v > 0.005).length).toBeGreaterThanOrEqual(2);
+    expect(per[3] + per[4] + per[5]).toBeLessThan(0.001);                   // chip 1 enters at 7.7 s
+    expect(mixRms).toBeGreaterThan(0.03);
+    expect(Math.abs(sumRms - mixRms) / mixRms).toBeLessThan(0.05);
   });
 
   it('refuses a file that is not TFM Music Maker', () => {

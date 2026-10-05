@@ -40,6 +40,14 @@ class Chip : public ymfm::ym2203 {
     out.roundtrip_fp();
     return out.data[0];
   }
+  // The same FM sample, one channel (0..2) alone. output() only reads the
+  // state clock() just advanced, so this adds a tap, never a step.
+  int32_t Tap(uint32_t channel) const {
+    ymfm::ymfm_output<1> out;
+    m_fm.output(out.clear(), 0, 32767, 1u << channel);
+    out.roundtrip_fp();
+    return out.data[0];
+  }
   uint32_t FmRate(uint32_t clock) const { return m_fm.sample_rate(clock); }
 };
 
@@ -55,6 +63,8 @@ struct State {
   double fmStep = 1.0;    // FM samples per output sample
   double fmPhase = 1.0;   // position between prev and cur FM sample
   double prev = 0.0, cur = 0.0;
+  double chPrev[6] = {}, chCur[6] = {};  // per-channel taps of the same FM samples
+  bool tap = false;                      // fill chCur this render
   double frameSamples = 960.0;
   double untilFrame = 0.0;
   uint32_t muteMask = 0x3f;  // bit N set = channel N audible
@@ -72,6 +82,7 @@ void ResetChips() {
   g->fmStep = g->fmRate / g->outRate;
   g->fmPhase = 1.0;
   g->prev = g->cur = 0.0;
+  for (int i = 0; i < 6; ++i) g->chPrev[i] = g->chCur[i] = 0.0;
   g->untilFrame = 0.0;
   g->regs.clear();
   g->regsNext = 0;
@@ -87,6 +98,14 @@ double NextFmSample() {
   if (g->regsNext < g->regs.size()) ApplyWrite(g->regs[g->regsNext++]);
   const int32_t a = g->chips[0]->Clock(g->muteMask & 7);
   const int32_t b = g->chips[1]->Clock((g->muteMask >> 3) & 7);
+  if (g->tap) {
+    // Same scale as the mix (sum of both chips halved), one channel each,
+    // honouring the mixer mask so a muted channel's scope goes quiet too.
+    for (int c = 0; c < 6; ++c) {
+      const bool on = (g->muteMask >> c) & 1;
+      g->chCur[c] = on ? g->chips[c / 3]->Tap(c % 3) / 2 / 32768.0 : 0.0;
+    }
+  }
   return (a + b) / 2 / 32768.0;
 }
 
@@ -99,6 +118,41 @@ void RunFrame() {
   g->player->Frame(g->regs);
 }
 
+}  // namespace
+
+namespace {
+// `ch`, when non-null, receives 6 planar channel buffers `stride` floats apart.
+int Render(float* out, float* ch, int frames, int stride) {
+  if (!g || !g->playing) {
+    std::memset(out, 0, sizeof(float) * 2 * frames);
+    if (ch) std::memset(ch, 0, sizeof(float) * 6 * stride);
+    return frames;
+  }
+  g->tap = ch != nullptr;
+  for (int i = 0; i < frames; ++i) {
+    if (g->untilFrame <= 0.0) {
+      RunFrame();
+      g->untilFrame += g->frameSamples;
+    }
+    g->untilFrame -= 1.0;
+    while (g->fmPhase >= 1.0) {
+      g->prev = g->cur;
+      for (int c = 0; c < 6; ++c) g->chPrev[c] = g->chCur[c];
+      g->cur = NextFmSample();
+      g->fmPhase -= 1.0;
+    }
+    const double ph = g->fmPhase;
+    const float v = static_cast<float>(g->prev + (g->cur - g->prev) * ph);
+    g->fmPhase += g->fmStep;
+    out[i * 2] = v;
+    out[i * 2 + 1] = v;
+    if (ch) {
+      for (int c = 0; c < 6; ++c)
+        ch[c * stride + i] = static_cast<float>(g->chPrev[c] + (g->chCur[c] - g->chPrev[c]) * ph);
+    }
+  }
+  return frames;
+}
 }  // namespace
 
 extern "C" {
@@ -122,29 +176,13 @@ EMSCRIPTEN_KEEPALIVE int tfm_wasm_load(const uint8_t* data, int size) {
   return 0;
 }
 
+
 /** Interleaved stereo float into `out`; returns frames written. */
-EMSCRIPTEN_KEEPALIVE int tfm_wasm_render(float* out, int frames) {
-  if (!g || !g->playing) {
-    std::memset(out, 0, sizeof(float) * 2 * frames);
-    return frames;
-  }
-  for (int i = 0; i < frames; ++i) {
-    if (g->untilFrame <= 0.0) {
-      RunFrame();
-      g->untilFrame += g->frameSamples;
-    }
-    g->untilFrame -= 1.0;
-    while (g->fmPhase >= 1.0) {
-      g->prev = g->cur;
-      g->cur = NextFmSample();
-      g->fmPhase -= 1.0;
-    }
-    const float v = static_cast<float>(g->prev + (g->cur - g->prev) * g->fmPhase);
-    g->fmPhase += g->fmStep;
-    out[i * 2] = v;
-    out[i * 2 + 1] = v;
-  }
-  return frames;
+EMSCRIPTEN_KEEPALIVE int tfm_wasm_render(float* out, int frames) { return Render(out, nullptr, frames, 0); }
+
+/** As tfm_wasm_render, plus 6 planar per-channel float buffers in `ch`, `stride` floats apart (>= frames). */
+EMSCRIPTEN_KEEPALIVE int tfm_wasm_render_channels(float* out, float* ch, int frames, int stride) {
+  return Render(out, ch, frames, stride);
 }
 
 /** Bit N set = TFM channel N (0-5) audible - the mixer's solo/mute. */
