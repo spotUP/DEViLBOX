@@ -1190,7 +1190,7 @@ export const useFormatStore = create<FormatStore>()(
           newEditorMode = 'cheesecutter';
           state.editorMode = 'cheesecutter';
           clearNative(state);
-        } else if (song.sc68FileData || song.sndhFileData || song.gmeFileData || song.s98FileData || song.asapFileData || song.ayFileData || song.qsfFileData) {
+        } else if (song.sc68FileData || song.sndhFileData || song.gmeFileData || song.s98FileData || song.asapFileData || song.ayFileData || song.qsfFileData || song.zxtuneFileData) {
           // The engine runs the tune's own player program (SC68, SNDH, game music, S98, ASAP,
           // AY, QSF): nothing to edit, so the scope view - the view every
           // uneditable format uses (owner, 2026-10-05).

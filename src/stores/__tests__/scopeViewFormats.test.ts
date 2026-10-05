@@ -13,7 +13,7 @@ const bytes = () => new ArrayBuffer(16);
 describe('player-program formats open in the scope view', () => {
   for (const [field, format] of [
     ['sndhFileData', 'SNDH'], ['sc68FileData', 'SC68'], ['asapFileData', 'SAP'],
-    ['ayFileData', 'AY'], ['qsfFileData', 'QSF'],
+    ['ayFileData', 'AY'], ['qsfFileData', 'QSF'], ['zxtuneFileData', 'ZXTune'],
   ] as const) {
     it(`${format}: scope view, labelled ${format}`, () => {
       useFormatStore.getState().applyEditorMode({ [field]: bytes() });
@@ -75,5 +75,10 @@ describe('player-program formats open in the scope view', () => {
     useFormatStore.getState().applyEditorMode({});
     expect(useFormatStore.getState().editorMode).toBe('classic');
     expect(scopeFormatLabel(useFormatStore.getState())).toBeNull();
+  });
+
+  it('an Atari YM dump on the ZXTune engine is labelled YM, not ZXTune', () => {
+    const ym = new TextEncoder().encode('YM5!LeOnArD!').buffer;
+    expect(scopeFormatLabel({ zxtuneFileData: ym })?.format).toBe('YM');
   });
 });
