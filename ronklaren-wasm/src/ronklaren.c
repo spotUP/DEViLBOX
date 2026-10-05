@@ -268,6 +268,11 @@ typedef struct RkModule {
 
     uint8_t** tracks;
     int num_tracks;
+    // File offset and byte length of each loaded track, so an edit addressed
+    // by file offset (the grid's cell -> stream map lives in the importer)
+    // lands in the track the replayer reads.
+    int* track_offsets;
+    int* track_lengths;
 
     int8_t** arpeggios;
     int num_arpeggios;
@@ -743,8 +748,8 @@ static bool load_tracks(RkModule* m, RkReader* r) {
         }
     }
 
-    free(unique_offsets);
-    free(track_lengths);
+    m->track_offsets = unique_offsets;
+    m->track_lengths = track_lengths;
     return true;
 }
 
@@ -1796,6 +1801,8 @@ void rk_destroy(RkModule* module) {
             free(module->tracks[i]);
         free(module->tracks);
     }
+    free(module->track_offsets);
+    free(module->track_lengths);
 
     if (module->arpeggios) {
         for (int i = 0; i < module->num_arpeggios; i++)
@@ -1923,4 +1930,66 @@ size_t rk_export(const RkModule* module, uint8_t* out, size_t max_size) {
     if (max_size < total) return 0;
     memcpy(out, module->original_data, total);
     return total;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Cell edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Locate the loaded track byte at a file offset; -1 when no track holds it.
+static int find_track_byte(const RkModule* module, uint32_t file_offset, int* out_index) {
+    for (int t = 0; t < module->num_tracks; t++) {
+        int start = module->track_offsets[t];
+        if ((int)file_offset >= start && (int)file_offset < start + module->track_lengths[t]) {
+            *out_index = (int)file_offset - start;
+            return t;
+        }
+    }
+    return -1;
+}
+
+int rk_set_cell(RkModule* module, int position, int channel, uint32_t file_offset, uint8_t note) {
+    if (!module || !module->tracks || !module->track_offsets || module->num_sub_songs < 1)
+        return 0;
+    if (channel < 0 || channel > 3)
+        return 0;
+
+    // The grid shows sub-song 1, one pattern per position-list entry; the
+    // note it shows is the one heard, i.e. with that entry's transpose added.
+    RkPositionList* pl = &module->sub_songs[0].positions[channel];
+    if (position < 0 || position >= pl->track_count)
+        return 0;
+
+    int index = 0;
+    int t = find_track_byte(module, file_offset, &index);
+    if (t < 0 || t != pl->tracks[position].track_number || index + 1 >= module->track_lengths[t])
+        return 0;
+
+    // Only the note byte of a note command changes. The wait byte stays: it
+    // is the row's duration, which the grid derives its rows from, and a
+    // different byte here would change the command's length and
+    // desynchronise the rest of the track.
+    uint8_t* data = module->tracks[t];
+    int raw = (int)note - pl->tracks[position].transpose;
+    if (data[index] >= 0x80 || raw < 0 || raw >= 0x80)
+        return 0;
+
+    data[index] = (uint8_t)raw;
+
+    // Keep the file image in step so rk_export carries the edit.
+    if (module->original_data && file_offset < module->original_size)
+        module->original_data[file_offset] = (uint8_t)raw;
+    return 1;
+}
+
+int rk_get_cell(const RkModule* module, uint32_t file_offset) {
+    if (!module || !module->tracks || !module->track_offsets)
+        return -1;
+
+    int index = 0;
+    int t = find_track_byte(module, file_offset, &index);
+    if (t < 0 || index + 1 >= module->track_lengths[t])
+        return -1;
+
+    return (module->tracks[t][index] << 8) | module->tracks[t][index + 1];
 }

@@ -35,6 +35,17 @@ void rk_set_instrument_param(RkModule* module, int inst, const char* param, floa
 
 size_t rk_export(const RkModule* module, uint8_t* out, size_t max_size);
 
+// Set the note of the note command at file_offset, as the grid shows it:
+// `note` is the period-table index heard at sub-song 1's position-list entry
+// `position` on `channel` (that entry's transpose included). The command's
+// wait byte (the row's duration) is kept. Returns 1 when written, 0 when no
+// note command of that entry's track starts there. The importer maps a grid
+// cell to the offset.
+int rk_set_cell(RkModule* module, int position, int channel, uint32_t file_offset, uint8_t note);
+
+// The note command at file_offset as (note << 8) | wait, or -1.
+int rk_get_cell(const RkModule* module, uint32_t file_offset);
+
 
 #ifdef __cplusplus
 }
