@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T00:41:12.552Z",
+  "generated": "2026-10-05T08:31:23.499Z",
   "perEntry": 6,
   "registryTotal": 277,
   "covered": 158,
@@ -4965,7 +4965,7 @@
     {
       "id": "hippel-st-coso",
       "label": "hippel-st-coso",
-      "formatKey": "hippelCoso",
+      "formatKey": "jochenHippelST",
       "files": [
         "/data/songs/hippel-st-coso/ghostbattle titletune.soc"
       ],

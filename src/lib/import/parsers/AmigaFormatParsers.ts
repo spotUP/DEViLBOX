@@ -465,7 +465,7 @@ export async function tryRouteFormat(
   }
 
   // ── Jochen Hippel CoSo ────────────────────────────────────────────────────
-  if (matchesExt(filename, ['hipc', 'soc', 'coso'])) {
+  if (matchesExt(filename, ['hipc', 'coso'])) {
         if (prefs.hippelCoso !== 'uade') {
       try {
         const { isHippelCoSoFormat, parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
@@ -2106,7 +2106,7 @@ export async function tryRouteFormat(
 
   // ── Jochen Hippel ST (.sog / .hst / .hip / .mcmd extension or HST.* / MCMD.* prefix) ──
   // Audio routed to Hippel WASM engine (libtfmxaudiodecoder auto-detects ST/MCMD sub-format).
-  if (matchesExt(filename, ['sog', 'hst', 'hip', 'mcmd'])) {
+  if (matchesExt(filename, ['sog', 'soc', 'hst', 'hip', 'mcmd'])) {
     if (prefs.jochenHippelST !== 'uade') {
       try {
         const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');

@@ -385,7 +385,8 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'Jochen Hippel CoSo — native parser or UADE',
     family: 'amiga-native',
     matchMode: 'both',
-    extRegex: /\.(hipc|soc|coso)$/i,
+    // `.soc` is the Atari ST COSO: jochenHippelST (UADE's ST player) owns it.
+    extRegex: /\.(hipc|coso)$/i,
     prefixes: ['hipc.', 'coso.'],
     prefKey: 'hippelCoso',
     nativeParser: { module: '@lib/import/formats/HippelCoSoParser', parseFn: 'parseHippelCoSoFile', detectFn: 'isHippelCoSoFormat' },
@@ -1104,7 +1105,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'Jochen Hippel ST (.sog, hst.*, mdst.*)',
     family: 'amiga-native',
     matchMode: 'both',
-    extRegex: /\.sog$/i,
+    extRegex: /\.(sog|soc)$/i,
     prefixes: ['mdst.', 'hst.'],
     prefKey: 'jochenHippelST',
     nativeParser: { module: '@lib/import/formats/JochenHippelSTParser', parseFn: 'parseJochenHippelSTFile', detectFn: 'isJochenHippelSTFormat' },
@@ -1861,7 +1862,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/PMDParser', parseFn: 'parsePMDFile', detectFn: 'isPMDFormat' },
   },
-  // ── PiyoPiyo plays; StoneTracker and TFM Music Maker refuse with their own
+  // ── PiyoPiyo and TFM Music Maker play; StoneTracker refuses with its own
   // name and the missing replayer instead of "Unsupported file format"
   // (ledger 2026-10-05 broken-formats sweep, B5/B7/B8).
   {
@@ -1890,12 +1891,12 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'tfmMusicMaker',
     label: 'TFM Music Maker',
-    description: 'TFM Music Maker (.tfe, ZX Spectrum TurboFM) — no replayer yet',
+    description: 'TFM Music Maker (.tfe, ZX Spectrum TurboFM) — ZXTune player + 2x ymfm YM2203 in wasm',
     family: 'chip-dump',
     matchMode: 'extension',
     extRegex: /\.tfe$/i,
     nativeOnly: true,
-    nativeParser: { module: '@lib/import/formats/NoReplayerParsers', parseFn: 'parseTfmMusicMakerFile', detectFn: 'isTfmMusicMakerFormat' },
+    nativeParser: { module: '@lib/import/formats/TFMMusicMakerParser', parseFn: 'parseTfmMusicMakerFile', detectFn: 'isTfmMusicMakerFormat' },
   },
   {
     key: 'fmp',
