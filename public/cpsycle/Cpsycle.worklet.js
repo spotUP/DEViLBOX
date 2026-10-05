@@ -84,7 +84,7 @@ class CpsycleProcessor extends AudioWorkletProcessor {
           const mask = data.mask || 0;
           const numCh = data.numChannels || 32;
           for (let ch = 0; ch < numCh; ch++) {
-            const muted = (mask & (1 << ch)) !== 0;
+            const muted = (mask & (1 << ch)) === 0;
             this.module._cpsycle_set_channel_gain(ch, muted ? 0.0 : 1.0);
           }
         }

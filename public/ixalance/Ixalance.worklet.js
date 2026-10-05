@@ -90,7 +90,7 @@ class IxalanceProcessor extends AudioWorkletProcessor {
         if (this.module && typeof this.module._ixalance_set_channel_gain === 'function') {
           const mask = data.mask || 0;
           for (let ch = 0; ch < 64; ch++) {
-            const muted = (mask & (1 << ch)) !== 0;
+            const muted = (mask & (1 << ch)) === 0;
             this.module._ixalance_set_channel_gain(ch, muted ? 0.0 : 1.0);
           }
         }

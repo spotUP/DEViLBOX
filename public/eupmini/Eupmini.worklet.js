@@ -91,7 +91,7 @@ class EupminiProcessor extends AudioWorkletProcessor {
         if (this.module && typeof this.module._eupmini_set_channel_mute === 'function') {
           const mask = data.mask || 0;
           for (let ch = 0; ch < 32; ch++) {
-            const muted = (mask & (1 << ch)) !== 0;
+            const muted = (mask & (1 << ch)) === 0;
             this.module._eupmini_set_channel_mute(ch, muted ? 1 : 0);
           }
         }
