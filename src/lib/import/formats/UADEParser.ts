@@ -349,6 +349,27 @@ const UADE_EXTENSIONS: Set<string> = new Set([
 ]);
 
 /**
+ * The song's name from a UADE filename, without the format token. Amiga
+ * modules are named either way round - `fw.theend` or `theend.fw` - and the
+ * router hands UADE the prefix form (deepspace.mk2 -> mk2.deepspace) so the
+ * right replayer is picked. Cutting the last extension off a prefix-form name
+ * left only the token: the song tab read "fw", "cus", "mod_comp"
+ * (2026-10-05).
+ */
+export function uadeSongName(filename: string): string {
+  const base = filename.includes('/') ? filename.split('/').pop()! : filename;
+  const dot = base.indexOf('.');
+  const ext = base.slice(base.lastIndexOf('.') + 1).toLowerCase();
+  // Prefix form only when the tail is not itself a format token: `fred.mod`
+  // is a song called fred, `fw.theend` a song called theend.
+  if (dot > 0 && dot < base.length - 1 && UADE_EXTENSIONS.has(base.slice(0, dot).toLowerCase())
+      && !UADE_EXTENSIONS.has(ext) && ext !== 'mod') {
+    return base.slice(dot + 1);
+  }
+  return base.replace(/\.[^/.]+$/, '');
+}
+
+/**
  * Detect whether a filename likely belongs to a UADE-handled format.
  * Returns true if the extension matches a known UADE format.
  */
@@ -444,7 +465,7 @@ export async function parseUADEFile(
   // break ext/prefix extraction if the slash isn't removed.
   const basename = filename.includes('/') ? filename.split('/').pop()! : filename;
 
-  const name = basename.replace(/\.[^/.]+$/, '');
+  const name = uadeSongName(basename);
   const ext = basename.split('.').pop()?.toLowerCase() ?? '';
 
   // Initialize UADE engine; reuse pre-scanned metadata from the dialog when available
