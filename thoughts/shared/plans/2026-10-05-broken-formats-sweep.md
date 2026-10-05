@@ -270,3 +270,20 @@ Open from this pass: StarTrekker AM routing (.mod + .mod.nt opens as plain MOD, 
 ## Next phase, owner 2026-10-05: "most of the uade formats display made up incorrect pattern data, but that is something to dig into later when we have them all playing and scrolling some data"
 
 Order: (1) every UADE format plays and its grid scrolls with some data; (2) then replace scan/approximate grids with real pattern data per format (the gridVsPaula yardstick, corrected in a24938ebc, is the measure).
+
+## Owner decisions, 2026-10-05 (late)
+
+- MusicMaker V8 Old (8-voice) and 6-channel `best of guitars`: build a native MusicMaker replayer. TODO.
+- `astaroth.sog`: owner sources the SNDH archive version. Blocked on owner.
+- Skyfox.cus and Forgotten Worlds intro: find replacement songs in the same formats on modland; the two files are noted as bad (UADE player bugs). TODO.
+- ASAP silent in browser: after phase 1.
+
+Phase 1 queue (in order): P1 Digital Symphony `drwho_final4.dsym` parser returns null; P2 smoke test pattern-0 check (hipc pattern 0 is empty by design); P3 Skyfox / Forgotten Worlds replacements; P4 Synth Dream clicks; P5 native MusicMaker replayer.
+
+### P3 result (2026-10-05): Skyfox / Forgotten Worlds replacements
+
+Headless UADE sweep (corpus-sweep, 10 s, only the new files). Added from modland:
+- `delitracker-custom/skyfox2.cus` PLAYS rms 0.106; `bards tale.cus` PLAYS rms 0.087; `neuromancer.cus` PLAYS rms 0.114 (all CustomPlay).
+- `forgotten-worlds/forgotten worlds level1&3.fw` PLAYS rms 0.125; `forgotten worlds theend.fw` PLAYS rms 0.151 (FWMP, 4 voices).
+- Rejected: `forgotten worlds intro2.fw` SILENT (same player bug as intro.fw); `level2&4.fw` plays but redundant; fa-18 interceptor (rms 0.039), vindicators (1 voice), indianajones3 not kept.
+- Originals left in place. No companion files needed. index.json rebuilt.
