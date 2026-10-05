@@ -123,6 +123,32 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
   WRITE32(addr, val);
 }
 
+/* -- Hardware Read Interception (asm68k-to-c's hw_read*) ---------------
+ * Absolute reads of custom-chip registers must not hit linear memory:
+ * DMAWait spins on VHPOSR ($DFF006) until it changes, and a plain load
+ * never changes, so the wait would hang the audio thread. Every beam read
+ * advances a modelled beam one scanline and one horizontal step (313 PAL
+ * lines); other custom-chip reads (DMACONR) return 0.
+ * -------------------------------------------------------------------- */
+static uint32_t hw_beam_v = 0, hw_beam_h = 0;
+static inline uint32_t hw_beam_read(void) {
+  hw_beam_v = (hw_beam_v + 1) % 313;  /* PAL lines per frame */
+  hw_beam_h = (hw_beam_h + 1) % 227;  /* PAL colour clocks per line */
+  return ((hw_beam_v >> 8) << 16) | ((hw_beam_v & 0xFF) << 8) | hw_beam_h;
+}
+static inline uint8_t hw_read8(uint32_t addr) {
+  if (addr >= 0xDFF004 && addr <= 0xDFF007) return (uint8_t)(hw_beam_read() >> (8 * (0xDFF007 - addr)));
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0;
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0;
+  return READ8(addr);
+}
+static inline uint16_t hw_read16(uint32_t addr) {
+  if (addr == 0xDFF004 || addr == 0xDFF006) return (uint16_t)(hw_beam_read() >> (8 * (0xDFF006 - addr)));
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0;
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0;
+  return READ16(addr);
+}
+
 /* -- EQU Constants ------------------------------------------------- */
 #define SubSongs 4
 #define LoadSize 12
@@ -1521,7 +1547,7 @@ _top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(8);  /* MOVEQ	#8,D0 */
 _dma1:
   {  /* MOVE.B	$DFF006,D1 */
-      uint8_t _mv = (uint8_t)(READ8(0xDFF006));
+      uint8_t _mv = (uint8_t)(hw_read8(0xDFF006));
       B(d1) = (uint8_t)_mv;
       flag_z = ((int8_t)(_mv) == 0);
       flag_n = ((int8_t)(_mv) < 0);
@@ -1530,7 +1556,7 @@ _dma1:
 _dma2:
   {  /* CMP.B	$DFF006,D1 */
       int32_t _lhs = (int32_t)(B(d1));
-      int32_t _rhs = (int32_t)(READ8(0xDFF006));
+      int32_t _rhs = (int32_t)(hw_read8(0xDFF006));
       int32_t _cmp = _lhs - _rhs;
       flag_z = (_cmp == 0);
       flag_n = (_cmp < 0);
@@ -3183,7 +3209,7 @@ static void Code0(void) {
 _top: ;
   d1 |= 0x8200;  /* ORI.L	#$8200,D1 */
   {  /* MOVE.W	$DFF002,D0 */
-      uint16_t _mv = (uint16_t)(READ16(0xDFF002));
+      uint16_t _mv = (uint16_t)(hw_read16(0xDFF002));
       W(d0) = (uint16_t)_mv;
       flag_z = ((int16_t)(_mv) == 0);
       flag_n = ((int16_t)(_mv) < 0);
