@@ -2,9 +2,16 @@
 #include "paula_soft.h"
 #include <string.h>
 
+// Paula latches AUDxLC/AUDxLEN when a channel's DMA starts and reloads them
+// every time the buffer runs out, so a replayer's writes while a channel plays
+// set what plays NEXT: PumaTracker starts a sample, then writes LEN=1 (the
+// one-shot's silent repeat) and steps its 32-byte synth waveforms through LC
+// every tick. Applying those writes at once cut every sample to 2 bytes.
 typedef struct {
-    const int8_t* sample;
+    const int8_t* sample;       // buffer playing now (latched from repeat_*)
     uint32_t      sample_len;   // bytes
+    const int8_t* repeat_ptr;   // AUDxLC: reloaded when the buffer ends
+    uint32_t      repeat_len;   // AUDxLEN in bytes: reloaded with it
     float         pos;          // fractional position within sample
     float         step;         // samples-per-output-frame = freq / PAULA_RATE
     float         volume;       // 0.0 - 1.0
@@ -38,13 +45,12 @@ void paula_set_output_rate(float rate) {
 
 void paula_set_sample_ptr(int ch, const int8_t* data) {
     if (ch < 0 || ch >= PAULA_CHANNELS) return;
-    s_ch[ch].sample = data;
-    s_ch[ch].pos    = 0.0f;
+    s_ch[ch].repeat_ptr = data;
 }
 
 void paula_set_length(int ch, uint16_t len_words) {
     if (ch < 0 || ch >= PAULA_CHANNELS) return;
-    s_ch[ch].sample_len = (uint32_t)len_words * 2; // words -> bytes
+    s_ch[ch].repeat_len = (uint32_t)len_words * 2; // words -> bytes
 }
 
 void paula_set_period(int ch, uint16_t period) {
@@ -64,10 +70,15 @@ void paula_dma_write(uint16_t dmacon) {
     int enable = (dmacon & 0x8000) != 0;
     int i;
     for (i = 0; i < PAULA_CHANNELS; i++) {
-        if (dmacon & (1 << i)) {
-            s_ch[i].dma_on = enable;
-            if (enable) s_ch[i].pos = 0.0f;
+        if (!(dmacon & (1 << i))) continue;
+        if (enable && !s_ch[i].dma_on) {
+            // off -> on: latch LC/LEN and start from the top. Setting a
+            // channel that already runs changes nothing, as on the chip.
+            s_ch[i].sample     = s_ch[i].repeat_ptr;
+            s_ch[i].sample_len = s_ch[i].repeat_len;
+            s_ch[i].pos        = 0.0f;
         }
+        s_ch[i].dma_on = enable;
     }
 }
 
@@ -75,8 +86,13 @@ static float sample_channel(PaulaChannel* ch) {
     if (!ch->dma_on || ch->step <= 0.0f || !ch->sample || ch->sample_len == 0) return 0.0f;
     uint32_t idx = (uint32_t)ch->pos;
     if (idx >= ch->sample_len) {
-        ch->dma_on = 0;
-        return 0.0f;
+        // buffer done: reload the latched LC/LEN and keep playing
+        ch->pos -= (float)ch->sample_len;
+        ch->sample     = ch->repeat_ptr;
+        ch->sample_len = ch->repeat_len;
+        if (!ch->sample || ch->sample_len == 0) return 0.0f;
+        idx = (uint32_t)ch->pos;
+        if (idx >= ch->sample_len) { ch->pos = 0.0f; idx = 0; }
     }
     float s = (float)ch->sample[idx] / 128.0f;
     ch->pos += ch->step;
