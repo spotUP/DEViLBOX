@@ -41,6 +41,8 @@ export const FILE_DATA_FIELDS = [
   'organyaFileData',
   'sawteethFileData',
   'eupFileData',
+  'eupFmBankData',            // companion FMB voice bank for Eupmini
+  'eupPcmBankData',           // companion PMB PCM bank for Eupmini
   'ixsFileData',
   'psycleFileData',
   'sc68FileData',

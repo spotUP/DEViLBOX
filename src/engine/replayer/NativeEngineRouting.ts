@@ -327,6 +327,8 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'eupFileData',
     loadMethod: 'loadTune',
+    // The FMB / PMB banks the song's header names ride as load args.
+    getLoadArgs: (song: TrackerSong) => [song.eupFmBankData, song.eupPcmBankData],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,

@@ -1,8 +1,8 @@
 {
-  "generated": "2026-10-05T19:33:30.375Z",
+  "generated": "2026-10-05T21:26:52.117Z",
   "perEntry": 6,
   "registryTotal": 279,
-  "covered": 167,
+  "covered": 168,
   "entries": [
     {
       "id": "actionamics",
@@ -2871,6 +2871,39 @@
       ],
       "total": 1,
       "dir": "/data/songs/earache"
+    },
+    {
+      "id": "euphony-Mondschein",
+      "label": "euphony / Mondschein",
+      "formatKey": "eupmini",
+      "subformat": "Mondschein",
+      "files": [
+        "/data/songs/euphony/Mondschein/Mondschein.eup"
+      ],
+      "total": 1,
+      "dir": "/data/songs/euphony/Mondschein"
+    },
+    {
+      "id": "euphony-Requiem",
+      "label": "euphony / Requiem",
+      "formatKey": "eupmini",
+      "subformat": "Requiem",
+      "files": [
+        "/data/songs/euphony/Requiem/REQUIEM.eup"
+      ],
+      "total": 1,
+      "dir": "/data/songs/euphony/Requiem"
+    },
+    {
+      "id": "euphony-Schumann - Traumerei",
+      "label": "euphony / Schumann - Traumerei",
+      "formatKey": "eupmini",
+      "subformat": "Schumann - Traumerei",
+      "files": [
+        "/data/songs/euphony/Schumann - Traumerei/Traumerei.eup"
+      ],
+      "total": 1,
+      "dir": "/data/songs/euphony/Schumann - Traumerei"
     },
     {
       "id": "face-the-music",
@@ -9317,6 +9350,11 @@
         "earache": [
           "bladerunner.ea"
         ],
+        "euphony": [
+          "Mondschein",
+          "Requiem",
+          "Schumann - Traumerei"
+        ],
         "face-the-music": [
           "rock.ftm"
         ],
@@ -15319,6 +15357,47 @@
     "/data/songs/earache": {
       "siblings": [
         "bladerunner.ea"
+      ]
+    },
+    "/data/songs/euphony/Mondschein": {
+      "siblings": [
+        "Mondschein.eup",
+        "fmtone2.fmb",
+        "piano.pmb"
+      ]
+    },
+    "/data/songs/euphony": {
+      "siblings": [],
+      "subdirs": {
+        "Mondschein": [
+          "Mondschein.eup",
+          "fmtone2.fmb",
+          "piano.pmb"
+        ],
+        "Requiem": [
+          "REQUIEM.eup",
+          "aochan.pmb",
+          "fmp.fmb"
+        ],
+        "Schumann - Traumerei": [
+          "Traumerei.eup",
+          "fmtone2.fmb",
+          "piano.pmb"
+        ]
+      }
+    },
+    "/data/songs/euphony/Requiem": {
+      "siblings": [
+        "REQUIEM.eup",
+        "aochan.pmb",
+        "fmp.fmb"
+      ]
+    },
+    "/data/songs/euphony/Schumann - Traumerei": {
+      "siblings": [
+        "Traumerei.eup",
+        "fmtone2.fmb",
+        "piano.pmb"
       ]
     },
     "/data/songs/face-the-music": {
@@ -37220,10 +37299,6 @@
     {
       "formatKey": "uade_emsv6",
       "label": "EMS v6"
-    },
-    {
-      "formatKey": "eupmini",
-      "label": "EUP"
     },
     {
       "formatKey": "uade_fc_bsi",

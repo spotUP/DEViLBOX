@@ -2627,7 +2627,7 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['eup'])) {
     const { isEupFormat, parseEupFile } = await import('@lib/import/formats/EupminiParser');
     if (isEupFormat(buffer)) {
-      return parseEupFile(originalFileName, buffer);
+      return parseEupFile(originalFileName, buffer, companionFiles);
     }
   }
 

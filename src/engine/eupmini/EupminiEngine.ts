@@ -113,12 +113,13 @@ export class EupminiEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
-  async loadTune(buffer: ArrayBuffer): Promise<void> {
+  /** Load a song with the FMB voice bank and PMB PCM bank its header names (either may be absent). */
+  async loadTune(buffer: ArrayBuffer, fmBank?: ArrayBuffer, pcmBank?: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('EupminiEngine not initialized');
 
     this.workletNode.port.postMessage(
-      { type: 'loadModule', moduleData: buffer },
+      { type: 'loadModule', moduleData: buffer, fmBank, pcmBank },
     );
   }
 
