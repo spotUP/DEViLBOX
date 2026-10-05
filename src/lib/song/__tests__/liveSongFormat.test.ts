@@ -91,4 +91,12 @@ describe('live song format', () => {
     useFormatStore.getState().applyEditorMode(engine as never);
     expect(playingEngineFor(liveTrackerSong())).toBe('Mdxmini');
   });
+
+  it('an ASAP song keeps its file name, so RMT/CMC/TMC are not replayed as tune.sap', () => {
+    // ASAP picks its player from the extension; the replayed song lost the
+    // name and every non-SAP ASAP file loaded as 'tune.sap' (2026-10-05).
+    useFormatStore.getState().applyEditorMode({ format: 'ASAP', asapFileData: new ArrayBuffer(16), asapFilename: 'jimmy.rmt' } as never);
+    expect(liveTrackerSong().asapFilename).toBe('jimmy.rmt');
+    expect(getNativeEngineMetaForExport()?.asapFilename).toBe('jimmy.rmt');
+  });
 });
