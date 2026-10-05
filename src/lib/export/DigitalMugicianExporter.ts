@@ -23,24 +23,9 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { noteToDMIndex } from '@/lib/import/formats/DigitalMugicianNotes';
 
 const MAGIC_V1 = ' MUGICIAN/SOFTEYES 1990 ';
-
-// First 57 entries of DM_PERIODS (finetune 0 group) for reverse lookup
-const DM_PERIODS_FT0: readonly number[] = [
-  3220,3040,2869,2708,2556,2412,2277,2149,2029,1915,1807,1706,
-  1610,1520,1434,1354,1278,1206,1139,1075,1014, 957, 904, 853,
-   805, 760, 717, 677, 639, 603, 569, 537, 507, 479, 452, 426,
-   403, 380, 359, 338, 319, 302, 285, 269, 254, 239, 226, 213,
-   201, 190, 179, 169, 160, 151, 142, 134, 127,
-];
-
-/** XM note (1-96) to DM period table index (0-56). Parser uses xmNote = bestIdx + 1. */
-function xmNoteToDMIndex(xmNote: number): number {
-  if (xmNote <= 0 || xmNote > 96) return 0;
-  const idx = xmNote - 1;
-  return Math.max(0, Math.min(DM_PERIODS_FT0.length - 1, idx));
-}
 
 /** Encode a single pattern cell to 4 DM bytes (matches DigitalMugicianEncoder logic). */
 function encodeDMCell(
@@ -53,7 +38,7 @@ function encodeDMCell(
 
   // Byte 0: DM note index
   if (note > 0 && note <= 96) {
-    out[0] = xmNoteToDMIndex(note);
+    out[0] = noteToDMIndex(note);
   }
 
   // Byte 1: sample (6-bit, 0=none)

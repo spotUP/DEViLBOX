@@ -13,15 +13,20 @@
  *   - patterns always ran 64 rows, ignoring the Pattern Length effect.
  *
  * The expected sequences below were read from UADE's Paula write log while
- * the real replayer played the file (note-on = sample start + period, the
- * loop-pointer reload one tick later not counted), as semitone steps, so they
- * do not depend on the grid's note naming.
+ * the real replayer played the file (tools/uade-audit/gridVsPaula.ts note-on
+ * rules) and named by the period each note plays, through the one Amiga
+ * naming (src/lib/amiga/periodNotes.ts, 428 = C-2). The grid must show the
+ * same note numbers: the same tune AND the same names. (Before, the grid
+ * named a DM table index i as note i + 1, eleven semitones above the
+ * period's name.)
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseDigitalMugicianFile } from '../formats/DigitalMugicianParser';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { dmIndexToNote, noteToDMIndex } from '../formats/DigitalMugicianNotes';
+import { noteToPeriod } from '@/lib/amiga/periodNotes';
 
 async function load(rel: string): Promise<TrackerSong> {
   const raw = readFileSync(join(process.cwd(), rel));
@@ -41,9 +46,17 @@ function channelNotes(song: TrackerSong, ch: number, count: number): number[] {
   return out;
 }
 
-const steps = (notes: number[]): number[] => notes.slice(1).map((n, i) => n - notes[i]);
-
 describe('Digital Mugician grid plays what the replayer plays', () => {
+  it('names DM pitches by the period they play (periodNotes: 856 = C-1 = 13, 428 = C-2 = 25)', () => {
+    expect(dmIndexToNote(23)).toBe(13);  // period 853
+    expect(dmIndexToNote(35)).toBe(25);  // period 426
+    expect(dmIndexToNote(11)).toBe(1);   // period 1706 = C-0
+    expect(noteToPeriod(25)).toBe(428);
+    // Writing a grid note back gives the cell byte it came from, over the whole nameable range.
+    for (let i = 11; i < 57; i++) expect(noteToDMIndex(dmIndexToNote(i))).toBe(i);
+  });
+
+
   it('Mugician II (cockwise.mug): seven voices; the hardware voices open with the notes Paula plays', async () => {
     const song = await load('public/data/songs/formats/cockwise.mug');
     expect(song.numChannels).toBe(7);
@@ -51,14 +64,14 @@ describe('Digital Mugician grid plays what the replayer plays', () => {
 
     // Grid channel -> Paula voice: 0 -> AUD3, 1 -> AUD1, 2 -> AUD2.
     // AUD3 (first note precedes the log, so its sequence starts at note 2).
-    expect(steps(channelNotes(song, 0, 16).slice(1))).toEqual(
-      steps([47, 52, 55, 59, 64, 62, 57, 43, 47, 52, 55, 57, 53, 51, 63]));
+    expect(channelNotes(song, 0, 16).slice(1)).toEqual(
+      [20, 25, 28, 32, 37, 35, 30, 16, 20, 25, 28, 30, 26, 24, 36]);
     // AUD1
-    expect(steps(channelNotes(song, 1, 16))).toEqual(
-      steps([50, 55, 60, 57, 55, 57, 54, 50, 50, 55, 60, 57, 60, 57, 63, 63]));
+    expect(channelNotes(song, 1, 16)).toEqual(
+      [23, 28, 33, 30, 28, 30, 27, 23, 23, 28, 33, 30, 33, 30, 36, 36]);
     // AUD2
-    expect(steps(channelNotes(song, 2, 14))).toEqual(
-      steps([68, 50, 55, 52, 55, 57, 57, 60, 59, 57, 55, 54, 52, 64]));
+    expect(channelNotes(song, 2, 14)).toEqual(
+      [41, 23, 28, 25, 28, 30, 30, 33, 32, 30, 28, 27, 25, 37]);
 
     // The mixed voices carry song 1's tracks, so they are not empty.
     for (let ch = 3; ch < 7; ch++) expect(channelNotes(song, ch, 4)).toHaveLength(4);
@@ -68,10 +81,10 @@ describe('Digital Mugician grid plays what the replayer plays', () => {
     const song = await load('public/data/songs/formats/flight.dmu');
     expect(song.numChannels).toBe(4);
     const paula = [
-      [66, 56, 56, 66, 66, 56, 66, 56, 66, 66, 56, 66, 56, 66, 56, 56],
-      [49, 47, 49, 47, 49, 52, 54, 49, 49, 47, 49, 47, 49, 52, 54, 49],
-      [49, 51, 52, 51, 52, 56, 49, 52, 54, 52, 49, 47, 49, 52, 49, 49],
-      [61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 59, 59, 59, 59, 59, 61],
+      [39, 29, 29, 39, 39, 29, 39, 29, 39, 39, 29, 39, 29, 39, 29, 29],
+      [22, 20, 22, 20, 22, 25, 27, 22, 22, 20, 22, 20, 22, 25, 27, 22],
+      [22, 24, 25, 24, 25, 29, 22, 25, 27, 25, 22, 20, 22, 25, 22, 22],
+      [34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 32, 32, 32, 32, 32, 34],
     ];
     // flight's voice 1 opens with one note before the log starts.
     const grid = [
@@ -80,6 +93,6 @@ describe('Digital Mugician grid plays what the replayer plays', () => {
       channelNotes(song, 2, 16),
       channelNotes(song, 3, 16),
     ];
-    for (let ch = 0; ch < 4; ch++) expect(steps(grid[ch]), `channel ${ch}`).toEqual(steps(paula[ch]));
+    for (let ch = 0; ch < 4; ch++) expect(grid[ch], `channel ${ch}`).toEqual(paula[ch]);
   });
 });
