@@ -305,3 +305,6 @@ Phase 2 candidate (2026-10-05): tick-rebuilt grids on the generic UADE route bea
 - Owner: "skip to next subsong when it ends" + subsong nav for whole-song engines - agent running.
 - Open: shared worklet TextEncoder/TextDecoder prelude froze play when loaded for every engine (reverted); 20 worklets still rely on whichever engine installs the polyfill first. Needs per-worklet hand encoding or a safe prelude - TODO.
 - Open: ZXTune formats (PT3 etc.) still open as an empty grid, not the scope view.
+
+- Mute/solo confirmed by ear (owner, 2026-10-05) on Art Of Noise, Ben Daglish, Music Assembler, JamCracker, Future Player, SidMon 1, SidMon 2, StarTrekker AM (UADE). Not heard: SteveTurner (no corpus song), PumaTracker (render hang - agent on it).
+- Scope view survives the dub bus (analyser holds, d5d74601b). Per-channel dub for gme/aylet/psgplay/TFM/S98 via WASMChannelOutputsEngine: proposed, awaiting owner go.
