@@ -562,8 +562,24 @@ export function searchPattern(params: Record<string, unknown>): Record<string, u
 }
 
 /** Get pattern statistics — note density, instrument usage, effect usage */
+/** Note cells per pattern (notes 1-96; note-offs and empties do not count). */
+export function noteCellsPerPattern(patterns: ReadonlyArray<{ channels: ReadonlyArray<{ rows: ReadonlyArray<{ note: number } | undefined> }> }>): number[] {
+  return patterns.map((p) => p.channels.reduce(
+    (n, ch) => n + ch.rows.reduce((m, cell) => m + (cell && cell.note > 0 && cell.note < 97 ? 1 : 0), 0), 0));
+}
+
 export function getPatternStats(params: Record<string, unknown>): Record<string, unknown> {
   const tracker = useTrackerStore.getState();
+  // Whole song: a song whose first pattern is a silent intro (Digital
+  // Symphony drwho_final4, Hippel-COSO prehistoric_tale) is not empty.
+  if (params.wholeSong) {
+    const perPattern = noteCellsPerPattern(tracker.patterns);
+    return {
+      patternCount: perPattern.length,
+      noteCells: perPattern.reduce((a, b) => a + b, 0),
+      firstPatternWithNotes: perPattern.findIndex((n) => n > 0),
+    };
+  }
   const patternIndex = (params.patternIndex as number | undefined) ?? tracker.currentPatternIndex;
   const pattern = tracker.patterns[patternIndex];
   if (!pattern) return { error: `Pattern ${patternIndex} not found` };
