@@ -20,8 +20,21 @@ import { useEditorStore } from '@/stores/useEditorStore';
 import { resolveMaxTraxLoadBytes } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 
 /** The format a song plays as: its import tag, else what its editor mode implies. */
+/**
+ * The loaded song's format, the one rule: the pattern's sourceFormat, else
+ * the parser's format recorded at apply time, else the editor mode's. The
+ * playback hook used to derive its own (sourceFormat or MOD/XM) and passed it
+ * over this one, so every engine gated on a format list (ASAP, AY, PiyoPiyo,
+ * PMD, MDX...) stayed off (2026-10-05 broken-formats sweep).
+ */
+export function liveSongFormat(sourceFormat?: string): TrackerFormat {
+  const tracker = useTrackerStore.getState();
+  return formatOf(useFormatStore.getState(), sourceFormat ?? (tracker.patterns[0]?.importMetadata?.sourceFormat as string | undefined));
+}
+
 function formatOf(fmt: ReturnType<typeof useFormatStore.getState>, sourceFormat: string | undefined): TrackerFormat {
   if (sourceFormat) return sourceFormat as TrackerFormat;
+  if (fmt.songFormat) return fmt.songFormat as TrackerFormat;
   switch (fmt.editorMode) {
     case 'hively': return (fmt.hivelyMeta?.version === 0 ? 'AHX' : 'HVL') as TrackerFormat;
     case 'klystrack': return 'KT' as TrackerFormat;

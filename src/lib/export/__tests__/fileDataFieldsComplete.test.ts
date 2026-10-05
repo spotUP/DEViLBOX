@@ -33,9 +33,9 @@ const TRACKER_REPLAYER = join(process.cwd(), 'src/engine/TrackerReplayer.ts');
  * plan). Listing them here documents the gap and keeps the ratchet honest.
  */
 const EXCLUDED_FIELDS = new Set<string>([
-  'pmdFileData',     // PMD (PC-98 YM2608) — not carried in useFormatStore
-  'mdxminiFileData', // MDX (X68000 YM2151) — not carried in useFormatStore
-  'asapFileData',    // ASAP (Atari POKEY) — not carried in useFormatStore
+  // asapFileData, pmdFileData, mdxminiFileData were excluded until
+  // 2026-10-05: not carried in useFormatStore, so the live song never
+  // carried them and their engines never started. They are carried now.
   // NOTE: sunTronicSongFileData WAS excluded here (Gate B.2, before it was wired
   // into useFormatStore). Gate E mirrors it through applyEditorMode so it now
   // round-trips like the other native-engine buffers — it belongs in

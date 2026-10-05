@@ -1,0 +1,40 @@
+/**
+ * The live song carries the parser's format, so engines gated on a format
+ * list activate for chip-dump songs.
+ *
+ * The live song is rebuilt from the stores and read its format from the
+ * first pattern's importMetadata.sourceFormat; SAP, ASAP, AY, PMD and
+ * PiyoPiyo parsers never set it, so `formats: ['ASAP']` and friends never
+ * matched and the TS scheduler voiced an empty grid in silence ("POKEY WASM
+ * emulation known silent", four Silent verdicts; 2026-10-05 broken-formats
+ * sweep). applyEditorMode now records song.format once.
+ */
+import { describe, it, expect } from 'vitest';
+import { useFormatStore } from '@/stores/useFormatStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
+import { liveTrackerSong } from '../liveSong';
+import { playingEngineFor, playingEngineFromStores } from '@/engine/replayer/NativeEngineRouting';
+import type { Pattern } from '@/types';
+
+const emptyCell = () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+const pattern = (): Pattern => ({
+  id: 'p0', name: 'Pattern 1', length: 4,
+  channels: [{ id: 'ch0', name: 'A', muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: null, color: null, rows: Array.from({ length: 4 }, emptyCell) }],
+});
+
+describe('live song format', () => {
+  it('an ASAP song without pattern importMetadata still activates the Asap engine', () => {
+    useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
+    useFormatStore.getState().applyEditorMode({ format: 'ASAP', asapFileData: new ArrayBuffer(16) } as never);
+    const live = liveTrackerSong();
+    expect(live.format).toBe('ASAP');
+    expect(playingEngineFor(live)).toBe('Asap');
+    expect(playingEngineFromStores(useFormatStore.getState() as unknown as Record<string, unknown>, [])).toBe('Asap');
+  });
+
+  it('a PiyoPiyo song activates the PiyoPiyo engine', () => {
+    useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
+    useFormatStore.getState().applyEditorMode({ format: 'PiyoPiyo', piyoPiyoFileData: new ArrayBuffer(16) } as never);
+    expect(playingEngineFor(liveTrackerSong())).toBe('PiyoPiyo');
+  });
+});

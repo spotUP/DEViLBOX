@@ -3,6 +3,7 @@
  * Manages Tone.js lifecycle, instruments, master effects, and audio context
  */
 
+import { isWholeSongSynth } from './wholeSongSynths';
 import { installWorkletProfiler } from './audio/workletProfiler';
 import { installIdleGate } from './audio/idleGate';
 import { EngineGainDuck } from './engineGainDuck';
@@ -166,6 +167,29 @@ interface VoiceState {
     filter: Tone.Filter | AudioWorkletNode;
     panner: Tone.Panner;
   };
+}
+
+/**
+ * Tone's PolySynth defers far-ahead attacks and releases through
+ * context.setTimeout and does not cancel them on dispose. The deferred
+ * callback then asserts "Synth was already disposed" inside Tone's
+ * _timeoutLoop, which runs a callback BEFORE shifting it off the queue: the
+ * same throwing event re-runs every tick (the console filled with 500 a
+ * second on every song load) and every later timeout in the context starves.
+ * Many PolySynths live inside wrappers (factories, community synths), so the
+ * guard sits on the class: a disposed PolySynth schedules nothing
+ * (2026-10-05 broken-formats sweep).
+ */
+{
+  const proto = Tone.PolySynth.prototype as unknown as { _scheduleEvent: (...a: unknown[]) => void; disposed: boolean; __devilboxDisposeGuard?: boolean };
+  if (!proto.__devilboxDisposeGuard) {
+    const original = proto._scheduleEvent;
+    proto._scheduleEvent = function (this: { disposed: boolean }, ...args: unknown[]) {
+      if (this.disposed) return;
+      original.apply(this, args);
+    };
+    proto.__devilboxDisposeGuard = true;
+  }
 }
 
 export class ToneEngine {
@@ -2659,6 +2683,15 @@ export class ToneEngine {
             console.log('[SC:ToneEngine] creating SuperColliderSynth via InstrumentFactory...');
           }
           instrument = InstrumentFactory.createInstrument(config);
+          break;
+        }
+        // A whole-song engine's instruments are labels for the mixer, not
+        // voices: the engine plays the file. The hand-kept case list above
+        // missed AsapSynth, AyletSynth and PiyoPiyoSynth, and each raised the
+        // blocking "Unsupported synth type" dialog that silenced the tab
+        // (2026-10-05 broken-formats sweep). wholeSongSynths.ts is the list.
+        if (isWholeSongSynth(config.synthType)) {
+          instrument = null;
           break;
         }
         reportSynthError(
