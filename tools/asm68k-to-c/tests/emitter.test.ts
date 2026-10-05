@@ -52,3 +52,22 @@ test('emitter output has required preamble', () => {
   expect(output).toMatch(/#define W\(r\)/m);
   expect(output).toMatch(/#define B\(r\)/m);
 });
+
+// Regression: replayers busy-wait on the video beam (PumaTracker's DMA settle:
+// `MOVE.B $DFF006,D0 / ADDQ.B #1,D0 / .w CMP.B $DFF006,D0 / BNE .w`). A
+// constant VHPOSR (0, or raw linear memory) never changes and the wait spins
+// forever on the audio thread, freezing the page. Every width at
+// $DFF004-$DFF007 must read a beam that advances per read.
+test('VPOSR/VHPOSR reads advance the beam at every access width', () => {
+  const src = readFileSync('tests/fixtures/simple.asm', 'utf8');
+  const ast = parse(tokenize(src));
+  const output = emit(ast, resolve(ast));
+  expect(output).toContain('hw_beam_v = (hw_beam_v + 1) % 313;');
+  expect(output).toContain('hw_beam_h = (hw_beam_h + 1) % 227;');
+  expect(output).toContain('if (addr >= 0xDFF004 && addr <= 0xDFF007) return (uint8_t)(hw_beam_read() >> (8 * (0xDFF007 - addr)));');
+  expect(output).toContain('if (addr == 0xDFF004 || addr == 0xDFF006) return (uint16_t)(hw_beam_read() >> (8 * (0xDFF006 - addr)));');
+  expect(output).toContain('if (addr == 0xDFF004) return hw_beam_read();');
+  // the beam check comes before the generic custom-chip "return 0"
+  const r8 = output.slice(output.indexOf('static inline uint8_t hw_read8'));
+  expect(r8.indexOf('hw_beam_read')).toBeLessThan(r8.indexOf('/* custom chip read */'));
+});

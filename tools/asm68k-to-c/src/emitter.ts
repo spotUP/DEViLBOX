@@ -140,20 +140,41 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
  * linear memory at 0xBFE001 — that address is a hardware register, not
  * RAM, and reading it raw is a ~12.5 MB out-of-bounds access. Reads in
  * the CIA ($BF0000-$BFFFFF) and custom-chip ($DFF000-$DFFFFF) ranges
- * return a benign default (0); everything else falls through to real
- * memory so genuine absolute RAM reads still work.
+ * return a benign default (0), except the video beam below; everything
+ * else falls through to real memory so genuine absolute RAM reads still
+ * work.
  * -------------------------------------------------------------------- */
+/* -- Video beam: VPOSR $DFF004 / VHPOSR $DFF006 ------------------------
+ * Replayers busy-wait on the beam, e.g. the DMA settle after stopping a
+ * voice:  MOVE.B $DFF006,D0 / ADDQ.B #1,D0 / .w CMP.B $DFF006,D0 / BNE .w
+ * A constant here (0, or raw linear memory) never changes, so such a wait
+ * spins forever on the audio thread. There is no real beam, so every read
+ * advances it one scanline and one horizontal step: a wait for the next
+ * line ends on the next read, a wait for line N within one frame (313 PAL
+ * lines). Returned as the longword at $DFF004: VPOSR (V8 in bit 16) then
+ * VHPOSR (V7-V0 in bits 15-8, H8-H1 in bits 7-0); every access width at
+ * $DFF004-$DFF007 reads its slice of one advance.
+ * -------------------------------------------------------------------- */
+static uint32_t hw_beam_v = 0, hw_beam_h = 0;
+static inline uint32_t hw_beam_read(void) {
+  hw_beam_v = (hw_beam_v + 1) % 313;  /* PAL lines per frame */
+  hw_beam_h = (hw_beam_h + 1) % 227;  /* PAL colour clocks per line */
+  return ((hw_beam_v >> 8) << 16) | ((hw_beam_v & 0xFF) << 8) | hw_beam_h;
+}
 static inline uint8_t hw_read8(uint32_t addr) {
+  if (addr >= 0xDFF004 && addr <= 0xDFF007) return (uint8_t)(hw_beam_read() >> (8 * (0xDFF007 - addr)));
   if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read (e.g. $BFE001 filter bit) */
   if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read */
   return READ8(addr);
 }
 static inline uint16_t hw_read16(uint32_t addr) {
+  if (addr == 0xDFF004 || addr == 0xDFF006) return (uint16_t)(hw_beam_read() >> (8 * (0xDFF006 - addr)));
   if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read */
   if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read (DMACONR, INTREQR, ...) */
   return READ16(addr);
 }
 static inline uint32_t hw_read32(uint32_t addr) {
+  if (addr == 0xDFF004) return hw_beam_read();
   if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read */
   if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read */
   return READ32(addr);

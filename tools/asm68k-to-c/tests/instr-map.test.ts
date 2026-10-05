@@ -36,9 +36,64 @@ test('ASR.B #2,d0 sign-extends', () => { expect(emit('ASR.B #2,d0')).toContain('
 // bit (the Cinter period-table off-by-one).
 test('ADD.W d2,d2 sets flag_x', () => { expect(emit('ADD.W d2,d2')).toContain('flag_x ='); });
 test('SUB.W d3,d1 sets flag_x', () => { expect(emit('SUB.W d3,d1')).toContain('flag_x ='); });
-test('AND.W d1,d0',  () => { expect(emit('AND.W d1,d0')).toContain('&='); });
-test('OR.L d1,d0',   () => { expect(emit('OR.L d1,d0')).toContain('|='); });
-test('EOR.L d1,d0',  () => { expect(emit('EOR.L d1,d0')).toContain('^='); });
+test('AND.W d1,d0',  () => { expect(emit('AND.W d1,d0')).toContain('(uint16_t)(W(d0) & W(d1))'); });
+test('OR.L d1,d0',   () => { expect(emit('OR.L d1,d0')).toContain('(uint32_t)(d0 | d1)'); });
+test('EOR.L d1,d0',  () => { expect(emit('EOR.L d1,d0')).toContain('(uint32_t)(d0 ^ d1)'); });
+
+// PumaTracker: `Moveq #-$20,D0 / And.B (A0)+,D0 / Bne` — the branch reads Z
+// from the AND. Without it every note took the wrong path and the channel
+// volume stayed 0 (silent song).
+test('AND.B (a0)+,d0 sets Z and N from the byte result, clears V and C', () => {
+  const c = emit('AND.B (a0)+,d0');
+  expect(c).toContain('uint8_t _lr = (uint8_t)(B(d0) & READ8_POST(a0));');
+  expect(c).toContain('B(d0) = (uint8_t)_lr;');
+  expect(c).toContain('flag_z = (_lr == 0); flag_n = ((int8_t)_lr < 0); flag_v = 0; flag_c = 0;');
+});
+
+// ADDA.L adds all 32 bits; only ADDA.W sign-extends a word. PumaTracker's
+// `ADD.L MusicData(PC),A5` builds sample pointers from the module base; the
+// word truncation kept only its low 16 bits.
+test('ADD.L to an address register adds the full long', () => {
+  expect(emit('ADD.L d0,a5')).toBe('a5 = (uint32_t)((int32_t)a5 + (int32_t)(d0));');
+  expect(emit('SUBA.L d0,a5')).toBe('a5 = (uint32_t)((int32_t)a5 - (int32_t)(d0));');
+});
+test('ADDA.W (and unsized ADDA) still sign-extend the word', () => {
+  expect(emit('ADDA.W d0,a5')).toBe('a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(W(d0)));');
+  expect(emit('\tADDA d0,a5')).toContain('(int32_t)(int16_t)(');
+});
+
+// BSET/BCLR/BCHG set Z to the OLD bit inverted (`Bclr #0,D7 / Beq` picks
+// PumaTracker's slide init vs step); on memory they act on the BYTE, bit mod 8.
+test('BCLR #0,d7 tests the old bit into Z before clearing it', () => {
+  const c = emit('\tBCLR #0,d7');
+  expect(c).toContain('uint32_t _bv = (uint32_t)(d7);');
+  expect(c).toContain('flag_z = ((_bv & (1u << ((0) & 31))) == 0);');
+  expect(c).toContain('d7 = (_bv & ~(1u << ((0) & 31)));');
+});
+test('BSET #2,34(a0) is a byte operation on the addressed byte', () => {
+  const c = emit('\tBSET #2,34(a0)');
+  expect(c).toContain('READ8(a0 + 34)');
+  expect(c).toContain('hw_write8(a0 + 34,');
+  expect(c).toContain('(1u << ((2) & 7))');
+  expect(c).not.toContain('32(');
+});
+test('BTST #6,$BFE001 reads a byte, bit mod 8', () => {
+  expect(emit('\tBTST #6,$BFE001')).toBe('flag_z = ((hw_read8(0xBFE001) & (1u << ((6) & 7))) == 0);');
+});
+
+// DIVS overflow sets V and leaves the destination alone (PumaTracker's
+// `Divs D1,D2 / Bvs`); a zero divisor must not reach a C division, which
+// traps the WASM instance.
+test('DIVS sets V on overflow, guards a zero divisor, sets N/Z from the quotient', () => {
+  const c = emit('\tDIVS d1,d2');
+  expect(c).toContain('int64_t _dd = (int32_t)d2, _ds_ = (int16_t)(d1);');
+  expect(c).toContain('if (_ds_ != 0) {');
+  expect(c).toContain('if (_q >= -32768 && _q <= 32767) {');
+  expect(c).toContain('flag_v = 0; flag_z = ((uint16_t)_q == 0); flag_n = ((int16_t)_q < 0);');
+});
+test('DIVU overflows above 0xFFFF', () => {
+  expect(emit('\tDIVU d1,d2')).toContain('if (_q <= 0xFFFF) {');
+});
 test('NOT.L d0',     () => { expect(emit('NOT.L d0')).toBe('d0 = ~d0;'); });
 test('NEG.L d0',     () => { expect(emit('NEG.L d0')).toBe('d0 = (uint32_t)(-(int32_t)d0);'); });
 test('CLR.L d0',     () => { expect(emit('CLR.L d0')).toBe('d0 = 0;'); });

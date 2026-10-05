@@ -308,6 +308,17 @@ function block(stmts: string[]): string {
   return '{\n' + stmts.map(s => `    ${s}`).join('\n') + '\n  }';
 }
 
+/**
+ * Source operand of ADDA/SUBA (or ADD/SUB to an address register). ADDA.W
+ * sign-extends the word to 32 bits; ADDA.L adds all 32 (an unsized ADDA
+ * assembles as .W). Truncating a .L source to a word dropped the high half
+ * of a base pointer: PumaTracker's `ADD.L MusicData(PC),A5` built every
+ * sample pointer from the low 16 bits of the module's address.
+ */
+function addrSrc(size: Size | undefined, srcRead: string): string {
+  return size === 'L' ? `(int32_t)(${srcRead})` : `(int32_t)(int16_t)(${srcRead})`;
+}
+
 export function emitInstruction(node: InstructionNode): string {
   const { mnemonic, size, operands: ops } = node;
   const s = size ?? 'L';
@@ -451,7 +462,7 @@ export function emitInstruction(node: InstructionNode): string {
       // Always writes full 32-bit address register.
       const isAddrDst = dst?.kind === 'register' && (dst.name.startsWith('a') || dst.name === 'sp');
       if (mnemonic === 'ADDA' || isAddrDst) {
-        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} + (int32_t)(int16_t)(${srcRead}));`;
+        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} + ${addrSrc(size, srcRead)});`;
         return regWrite(dst, `${emitOperand(dst, 'L')} + ${srcRead}`, 'L');
       }
       // ADD/ADDI/ADDQ set N, Z (and X, V, C which we approximate).
@@ -486,7 +497,7 @@ export function emitInstruction(node: InstructionNode): string {
       // SUBA (or SUB/SUBQ to address register) does NOT affect condition codes.
       const isSubAddrDst = dst?.kind === 'register' && (dst.name.startsWith('a') || dst.name === 'sp');
       if (mnemonic === 'SUBA' || isSubAddrDst) {
-        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} - (int32_t)(int16_t)(${srcRead}));`;
+        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} - ${addrSrc(size, srcRead)});`;
         return regWrite(dst, `${emitOperand(dst, 'L')} - ${srcRead}`, 'L');
       }
       // SUB/SUBI/SUBQ set N, Z (and X, V, C which we approximate).
@@ -518,40 +529,53 @@ export function emitInstruction(node: InstructionNode): string {
 
     case 'MULS': return dst ? `${emitOperand(dst, 'L')} = (uint32_t)((int32_t)(int16_t)${emitOperand(ops[0], 'W')} * (int32_t)(int16_t)${emitOperand(dst, 'W')});` : '';
     case 'MULU': return dst ? `${emitOperand(dst, 'L')} = (uint32_t)((uint16_t)(${srcRead}) * (uint16_t)${emitOperand(dst, 'W')});` : '';
-    case 'DIVS': {
+    case 'DIVS': case 'DIVU': {
+      // 32/16 -> 16r:16q. A quotient that does not fit 16 bits sets V and
+      // leaves the destination unchanged (PumaTracker's pitch slide branches
+      // on it: `Divs D1,D2 / Bvs`); otherwise N/Z follow the quotient, V=C=0.
+      // A zero divisor is a 68k trap; here it is a no-op with V set, because
+      // a C division by zero (or INT_MIN / -1) traps the whole WASM instance.
       if (!dst) return '';
-      const dv = emitOperand(dst, 'L'), sv = src;
+      const dv = emitOperand(dst, 'L');
+      const signed = mnemonic === 'DIVS';
+      const fits = signed ? '_q >= -32768 && _q <= 32767' : '_q <= 0xFFFF';
       return block([
-        `int16_t q = (int16_t)((int32_t)${dv} / (int16_t)${sv});`,
-        `int16_t r = (int16_t)((int32_t)${dv} % (int16_t)${sv});`,
-        `${dv} = ((uint32_t)(uint16_t)r << 16) | (uint16_t)q;`,
-      ]);
-    }
-    case 'DIVU': {
-      if (!dst) return '';
-      const dv = emitOperand(dst, 'L'), sv = src;
-      return block([
-        `uint16_t q = (uint16_t)((uint32_t)${dv} / (uint16_t)${sv});`,
-        `uint16_t r = (uint16_t)((uint32_t)${dv} % (uint16_t)${sv});`,
-        `${dv} = ((uint32_t)r << 16) | q;`,
+        signed
+          ? `int64_t _dd = (int32_t)${dv}, _ds_ = (int16_t)(${srcRead});`
+          : `uint64_t _dd = (uint32_t)${dv}, _ds_ = (uint16_t)(${srcRead});`,
+        `flag_c = 0; flag_v = 1;`,
+        `if (_ds_ != 0) {`,
+        `  ${signed ? 'int64_t' : 'uint64_t'} _q = _dd / _ds_, _r = _dd % _ds_;`,
+        `  if (${fits}) {`,
+        `    ${dv} = ((uint32_t)(uint16_t)_r << 16) | (uint16_t)_q;`,
+        `    flag_v = 0; flag_z = ((uint16_t)_q == 0); flag_n = ((int16_t)_q < 0);`,
+        `  }`,
+        `}`,
       ]);
     }
 
     case 'AND':  case 'ANDI':
-      if (!dst) return '';
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} &= ${srcRead};`;
-      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} &= ${sizedSrc(ops[0], s)};`;
-      return regWrite(dst, `${emitOperandRead(dst, s)} & ${srcRead}`, s);
     case 'OR':   case 'ORI':
+    case 'EOR':  case 'EORI': {
+      // Logical ops set N/Z from the result and clear V/C. PumaTracker's
+      // `Moveq #-$20,D0 / And.B (A0)+,D0 / Bne` reads the command nibble
+      // through Z; without it the branch read a stale Z and never set the
+      // channel volume. (To CCR/SR they only touch the status bits.)
       if (!dst) return '';
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} |= ${srcRead};`;
-      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} |= ${sizedSrc(ops[0], s)};`;
-      return regWrite(dst, `${emitOperandRead(dst, s)} | ${srcRead}`, s);
-    case 'EOR':  case 'EORI':
-      if (!dst) return '';
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} ^= ${srcRead};`;
-      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} ^= ${sizedSrc(ops[0], s)};`;
-      return regWrite(dst, `${emitOperandRead(dst, s)} ^ ${srcRead}`, s);
+      const cop = mnemonic.startsWith('AND') ? '&' : mnemonic.startsWith('OR') ? '|' : '^';
+      if (dst.kind === 'register' && (dst.name === 'ccr' || dst.name === 'sr')) {
+        return `${dst.name} ${cop}= ${srcRead};`;
+      }
+      const lt = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
+      const ls = s === 'B' ? 'int8_t' : s === 'W' ? 'int16_t' : 'int32_t';
+      const lhs = dst.kind === 'register' ? (s === 'L' ? dst.name : emitRegSized(dst.name, s)) : emitOperandRead(dst, s);
+      const rhs = dst.kind === 'register' && s !== 'L' ? sizedSrc(ops[0], s) : srcRead;
+      return block([
+        `${lt} _lr = (${lt})(${lhs} ${cop} ${rhs});`,
+        regWrite(dst, `_lr`, s),
+        `flag_z = (_lr == 0); flag_n = ((${ls})_lr < 0); flag_v = 0; flag_c = 0;`,
+      ]);
+    }
     case 'NOT': {
       const op0 = ops[0];
       if (op0.kind === 'register') {
@@ -635,13 +659,27 @@ export function emitInstruction(node: InstructionNode): string {
     case 'ROL': return dst ? regWrite(dst, `ROL32(${emitOperandRead(dst, s)}, ${src})`, s) : ``;
     case 'ROR': return dst ? regWrite(dst, `ROR32(${emitOperandRead(dst, s)}, ${src})`, s) : ``;
 
-    case 'BSET': return dst ? regWrite(dst, `${emitOperandRead(dst, s)} | (1u << (${src} & 31))`, s) : '';
-    case 'BCLR': return dst ? regWrite(dst, `${emitOperandRead(dst, s)} & ~(1u << (${src} & 31))`, s) : '';
-    case 'BTST': {
-      const testOp = dst ?? ops[0];
-      return `flag_z = ((${emitOperandRead(testOp, s)} & (1u << (${src} & 31))) == 0);`;
+    case 'BTST': case 'BSET': case 'BCLR': case 'BCHG': {
+      // 68k bit ops: on a data register the bit number is mod 32 and the
+      // operand is the long; on memory it is mod 8 and the operand is the
+      // BYTE at the address. All four set Z to the bit's OLD value inverted
+      // (BSET/BCLR/BCHG test, then change) — replayers branch on it
+      // (PumaTracker: `Bclr #0,D7 / Beq` picks slide-init vs slide-step;
+      // without Z every slide stepped from zero and volume/period stayed 0).
+      const target = dst ?? ops[0];
+      if (!dst && mnemonic !== 'BTST') return '';
+      const onReg = target.kind === 'register';
+      const bs: Size = onReg ? 'L' : 'B';
+      const bit = `(1u << ((${src}) & ${onReg ? 31 : 7}))`;
+      const old = emitOperandRead(target, bs);
+      if (mnemonic === 'BTST') return `flag_z = ((${old} & ${bit}) == 0);`;
+      const op = mnemonic === 'BSET' ? `_bv | ${bit}` : mnemonic === 'BCLR' ? `_bv & ~${bit}` : `_bv ^ ${bit}`;
+      return block([
+        `uint32_t _bv = (uint32_t)(${old});`,
+        `flag_z = ((_bv & ${bit}) == 0);`,
+        regWrite(target, onReg ? `(${op})` : `(uint8_t)(${op})`, bs),
+      ]);
     }
-    case 'BCHG': return dst ? regWrite(dst, `${emitOperandRead(dst, s)} ^ (1u << (${src} & 31))`, s) : '';
 
     case 'CMP':  case 'CMPA': case 'CMPI': case 'CMPM': {
       const cmpOp = dst ?? ops[0];
