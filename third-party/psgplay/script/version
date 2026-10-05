@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+if [ -f version ]
+then
+	ver="$(cat version)"
+elif [ -e .git ]
+then
+	mod=$([ -z "$(git status -suno)" ] || echo "+")
+	tag="$(git describe --always --tags)"
+	ver="$(echo "$tag" | sed 's/^v//')$mod"
+else
+	ver=""
+fi
+
+major=${ver%%.*}
+label=${ver#*[.]}
+minor=${label%%[-.]*}
+label=${label#*[-.]}
+patch=${label%%[-.]*}
+label=${label#*[-.]}
+
+if [ $# = 0 ]
+then
+	echo "$ver"
+	exit
+fi
+
+if [ x"$1" = x--check ]
+then
+	check=1
+	shift
+fi
+
+for f in "$@"
+do
+	case "$f" in
+		*.h) src="// SPDX-License-Identifier: GPL-2.0
+
+#ifndef PSGPLAY_VERSION_H
+#define PSGPLAY_VERSION_H
+
+#define PSGPLAY_VERSION_MAJOR $major
+#define PSGPLAY_VERSION_MINOR $minor
+#define PSGPLAY_VERSION_PATCH $patch
+
+#define PSGPLAY_VERSION_FORMAT(major, minor, patch) \\
+	(((major)<<16) | ((minor)<<8) | (patch))
+
+#define PSGPLAY_VERSION_NUMBER	\\
+	PSGPLAY_VERSION_FORMAT(	\\
+	PSGPLAY_VERSION_MAJOR,	\\
+	PSGPLAY_VERSION_MINOR,	\\
+	PSGPLAY_VERSION_PATCH)
+
+#define PSGPLAY_VERSION "'"'"$ver"'"'"
+
+/**
+ * The PSGPLAY_VERSION_NUMBER and PSGPLAY_VERSION_FORMAT() macros can be used
+ * for conditional C preprocessor directives. Example:
+ *
+ * #if PSGPLAY_VERSION_NUMBER >= PSGPLAY_VERSION_FORMAT(1,2,3)
+ *    ... version is at least 1.2.3 ...
+ * #endf
+ */
+
+/**
+ * psgplay_version - return PSG play version
+ *
+ * Return: version string of the PSG play library
+ */
+static inline const char *psgplay_version(void) { return PSGPLAY_VERSION; }
+
+#endif /* PSGPLAY_VERSION_H */"
+			;;
+		*) echo "version: error: Unknown file: $f" >&2
+		   exit 1
+			;;
+	esac
+
+	if [ ! -f "$f" ] || ! echo "$src" | cmp --quiet - "$f"
+	then
+		if [ x"$check" = x1 ]
+		then
+			echo "$f"
+		else
+			echo "$src" >"$f".tmp
+			mv "$f".tmp "$f"
+		fi
+	else
+		:
+	fi
+done

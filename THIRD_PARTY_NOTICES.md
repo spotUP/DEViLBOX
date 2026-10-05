@@ -323,6 +323,12 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 - **License:** GPL-3.0
 - **Used for:** TFM Music Maker (.tfe, ZX Spectrum TurboFM) playback. The parser, frame player and YM2203 register builder are extracted from ZXTune's framework into `tfm-wasm/src/tfm_player.cpp` (logic kept line for line) and drive two ymfm YM2203 (compiled to WASM, `public/tfm/`).
 
+### PSG play
+- **Author:** Fredrik Noring (with Musashi by Karl Stenerud)
+- **Source:** https://github.com/frno7/psgplay (main 6f1c39ffdacd, 2026-09-08) with submodules cf2149 5a801f4f9f08, cf68901 9dc1319e549e, cf300588 c1dc39861735, toslibc 162a2fb42987; vendored in `third-party/psgplay`, wasm bridge in `psgplay-wasm/`
+- **License:** GPL-2.0 (SPDX `GPL-2.0`, i.e. version 2 only, `third-party/psgplay/licence/GPL-2.0`) for PSG play, cf2149, cf68901 and cf300588; MIT for the Musashi 68000 core (`lib/m68k`); LGPL-2.1 for toslibc (only its headers and `unicode-*.c` are compiled)
+- **Used for:** Atari ST SNDH (.snd / .sndh, raw or ICE!-packed) playback - the tune's own 68000 code on an emulated Atari ST/STE with YM2149, MFP 68901 timers and STE DMA sound, through PSG play's library API (compiled to WASM, `public/psgplay/`). `psgplay-wasm/generated/` holds the Musashi opcode tables and TOS image header PSG play's Makefile generates (`psgplay-wasm/regen-generated.sh`).
+
 ### StonePlayer (StoneTracker player)
 - **Authors:** Michael Lavaire and Emmanuel Marty (StonePlayer V1.98, 1995)
 - **Source:** Aminet `mus/edit/stonefree2.lha` (`Players.LHS`, unpacked with the archive's own `StoneEx`): `third-party/stonetracker/StonePlayer_Hard.bin`, the no-OS player binary; DeltaHuffman bank depacker ported from `Libs/StonePacker.library` (Aminet `mus/edit/stonefree1.lha`) into `stonetracker-wasm/src/st_dhuf.c`

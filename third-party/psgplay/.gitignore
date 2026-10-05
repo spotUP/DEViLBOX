@@ -1,0 +1,12 @@
+/version
+/psgplay
+/PSGPLAY.*
+*.sndh
+*.wave
+*.o
+*.o.d
+*.elf
+*.dylib
+/GPATH
+/GRTAGS
+/GTAGS

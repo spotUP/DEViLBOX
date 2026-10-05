@@ -1,0 +1,13 @@
+/version
+*.o
+*.o.d
+*.elf
+*.tmp
+*.ACC
+*.PRG
+*.TOS
+*.TTP
+*.SNDH
+/GPATH
+/GRTAGS
+/GTAGS
