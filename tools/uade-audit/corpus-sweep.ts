@@ -66,7 +66,7 @@ import {
   existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync,
 } from 'fs';
 import { basename, dirname, join, relative } from 'path';
-import { detectFormat } from '../../src/lib/import/FormatRegistry';
+import { detectFormat, detectFormatFromContent } from '../../src/lib/import/FormatRegistry';
 import {
   listingFromRelativePaths, resolveCompanions,
 } from '../../src/lib/import/companionResolver';
@@ -426,7 +426,7 @@ async function runParent(argv: string[]): Promise<void> {
       continue;
     }
     if (rows[rel] && !fresh) continue;
-    const fmt = detectFormat(basename(rel));
+    const fmt = detectFormatFromContent(basename(rel), readFileSync(join(root, rel)).subarray(0, 128));
     if (!routesToUADE(fmt)) {
       rows[rel] = { verdict: 'NOT-UADE', format: fmt!.key, engine: engineOf(fmt!) };
       continue;
@@ -455,7 +455,7 @@ async function runParent(argv: string[]): Promise<void> {
 
   let n = 0;
   const onRow = (rel: string, row: Row): void => {
-    const fmt = detectFormat(basename(rel));
+    const fmt = detectFormatFromContent(basename(rel), readFileSync(join(root, rel)).subarray(0, 128));
     row.format = fmt?.key ?? null;
     rows[rel] = row;
     writeRows(out, rows);   // every row, immediately: an interrupt costs one song

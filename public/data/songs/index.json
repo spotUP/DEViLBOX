@@ -1,8 +1,8 @@
 {
-  "generated": "2026-10-04T16:04:01.771Z",
+  "generated": "2026-10-05T00:04:26.088Z",
   "perEntry": 6,
-  "registryTotal": 273,
-  "covered": 151,
+  "registryTotal": 277,
+  "covered": 157,
   "entries": [
     {
       "id": "actionamics",
@@ -92,7 +92,7 @@
     {
       "id": "ay-amadeus",
       "label": "ay-amadeus",
-      "formatKey": null,
+      "formatKey": "ayStructured",
       "files": [
         "/data/songs/ay-amadeus/aztec theme.amad"
       ],
@@ -112,7 +112,7 @@
     {
       "id": "ay-strc",
       "label": "ay-strc",
-      "formatKey": null,
+      "formatKey": "ayStructured",
       "files": [
         "/data/songs/ay-strc/mega mix 1.strc"
       ],
@@ -227,7 +227,7 @@
     {
       "id": "composer-670-cdfm",
       "label": "composer-670-cdfm",
-      "formatKey": null,
+      "formatKey": "cdfm67",
       "files": [
         "/data/songs/composer-670-cdfm/black glass ][ - muzik0.670"
       ],
@@ -2822,7 +2822,7 @@
     {
       "id": "digital-tracker-dtm",
       "label": "digital-tracker-dtm",
-      "formatKey": "adplug",
+      "formatKey": "dtm",
       "files": [
         "/data/songs/digital-tracker-dtm/sonic subspace.dtm"
       ],
@@ -2935,16 +2935,6 @@
       "formatKey": "activisionPro",
       "files": [
         "/data/songs/formats/gettysburg.avp"
-      ],
-      "total": 1,
-      "dir": "/data/songs/formats"
-    },
-    {
-      "id": "formats-adplug",
-      "label": "formats / AdPlug",
-      "formatKey": "adplug",
-      "files": [
-        "/data/songs/formats/astaris.imf"
       ],
       "total": 1,
       "dir": "/data/songs/formats"
@@ -3412,6 +3402,16 @@
       "formatKey": "imagesMusicSystem",
       "files": [
         "/data/songs/formats/redoctober-sub-docking.ims"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-imagoOrpheus",
+      "label": "formats / Imago Orpheus",
+      "formatKey": "imagoOrpheus",
+      "files": [
+        "/data/songs/formats/astaris.imf"
       ],
       "total": 1,
       "dir": "/data/songs/formats"
@@ -4816,7 +4816,7 @@
     {
       "id": "Goat Tracker Ultra-Jammer",
       "label": "Goat Tracker Ultra / Jammer",
-      "formatKey": "zoundMonitor",
+      "formatKey": "goatTracker",
       "subformat": "Jammer",
       "files": [
         "/data/songs/Goat Tracker Ultra/Jammer/$3GarysGlitteringSaliva_4x.sng",
@@ -4831,7 +4831,7 @@
     {
       "id": "Goat Tracker Ultra-JasonPage",
       "label": "Goat Tracker Ultra / JasonPage",
-      "formatKey": "zoundMonitor",
+      "formatKey": "goatTracker",
       "subformat": "JasonPage",
       "files": [
         "/data/songs/Goat Tracker Ultra/JasonPage/RType_Amiga2SID.sng"
@@ -4842,7 +4842,7 @@
     {
       "id": "Goat Tracker Ultra-Linus",
       "label": "Goat Tracker Ultra / Linus",
-      "formatKey": "zoundMonitor",
+      "formatKey": "goatTracker",
       "subformat": "Linus",
       "files": [
         "/data/songs/Goat Tracker Ultra/Linus/$3Cold-War-Generation.sng",
@@ -4858,7 +4858,7 @@
     {
       "id": "Goat Tracker Ultra-LMan",
       "label": "Goat Tracker Ultra / LMan",
-      "formatKey": "zoundMonitor",
+      "formatKey": "goatTracker",
       "subformat": "LMan",
       "files": [
         "/data/songs/Goat Tracker Ultra/LMan/$3LMan-Rivalry-Dubs.sng",
@@ -4870,7 +4870,7 @@
     {
       "id": "Goat Tracker Ultra-Mibri",
       "label": "Goat Tracker Ultra / Mibri",
-      "formatKey": "zoundMonitor",
+      "formatKey": "goatTracker",
       "subformat": "Mibri",
       "files": [
         "/data/songs/Goat Tracker Ultra/Mibri/$3Mibri - A Tune for Unity [8580].sng",
@@ -4886,7 +4886,7 @@
     {
       "id": "Goat Tracker Ultra-Shogoon",
       "label": "Goat Tracker Ultra / Shogoon",
-      "formatKey": "zoundMonitor",
+      "formatKey": "goatTracker",
       "subformat": "Shogoon",
       "files": [
         "/data/songs/Goat Tracker Ultra/Shogoon/$3In-clouds.sng",
@@ -4900,7 +4900,7 @@
     {
       "id": "goat-tracker-ultra",
       "label": "goat-tracker-ultra",
-      "formatKey": "zoundMonitor",
+      "formatKey": "goatTracker",
       "files": [
         "/data/songs/goat-tracker-ultra/$3jammar-akhbar.sng"
       ],
@@ -4952,9 +4952,14 @@
       "label": "hippel-st",
       "formatKey": "jochenHippelST",
       "files": [
+        "/data/songs/hippel-st/crown arabia.hst",
+        "/data/songs/hippel-st/crown england.hst",
+        "/data/songs/hippel-st/crown japan.hst",
+        "/data/songs/hippel-st/crown russia.hst",
+        "/data/songs/hippel-st/crown viking.hst",
         "/data/songs/hippel-st/demo music10.sog"
       ],
-      "total": 1,
+      "total": 6,
       "dir": "/data/songs/hippel-st"
     },
     {
@@ -6018,6 +6023,16 @@
       "dir": "/data/songs/maxtrax"
     },
     {
+      "id": "mdx",
+      "label": "mdx",
+      "formatKey": "mdx",
+      "files": [
+        "/data/songs/mdx/1943kaia.mdx"
+      ],
+      "total": 1,
+      "dir": "/data/songs/mdx"
+    },
+    {
       "id": "medley",
       "label": "medley",
       "formatKey": "uade_mso",
@@ -6246,7 +6261,7 @@
     {
       "id": "pmd",
       "label": "pmd",
-      "formatKey": "pmd",
+      "formatKey": "piyoPiyo",
       "files": [
         "/data/songs/pmd/obj0176-1.pmd"
       ],
@@ -6808,7 +6823,7 @@
     {
       "id": "stonetracker",
       "label": "stonetracker",
-      "formatKey": null,
+      "formatKey": "stoneTracker",
       "files": [
         "/data/songs/stonetracker/hypnosphere.spm"
       ],
@@ -6818,7 +6833,7 @@
     {
       "id": "studio-pixel---piyopiyo",
       "label": "studio-pixel---piyopiyo",
-      "formatKey": "pmd",
+      "formatKey": "piyoPiyo",
       "files": [
         "/data/songs/studio-pixel---piyopiyo/obj0176-1.pmd"
       ],
@@ -6933,7 +6948,7 @@
     {
       "id": "tfm-music-maker",
       "label": "tfm-music-maker",
-      "formatKey": null,
+      "formatKey": "tfmMusicMaker",
       "files": [
         "/data/songs/tfm-music-maker/rainstorm.tfe"
       ],
@@ -8418,6 +8433,11 @@
           "wings of death (level 3).hipc"
         ],
         "hippel-st": [
+          "crown arabia.hst",
+          "crown england.hst",
+          "crown japan.hst",
+          "crown russia.hst",
+          "crown viking.hst",
           "demo music10.sog"
         ],
         "hippel-st-coso": [
@@ -8560,6 +8580,9 @@
           "contraptionzack-funkfest.mxtx",
           "contraptionzack-march.mxtx",
           "darkseed (00).mxtx"
+        ],
+        "mdx": [
+          "1943kaia.mdx"
         ],
         "medley": [
           "combat.mso"
@@ -16197,6 +16220,11 @@
     },
     "/data/songs/hippel-st": {
       "siblings": [
+        "crown arabia.hst",
+        "crown england.hst",
+        "crown japan.hst",
+        "crown russia.hst",
+        "crown viking.hst",
         "demo music10.sog"
       ]
     },
@@ -32692,6 +32720,11 @@
         "darkseed (00).mxtx"
       ]
     },
+    "/data/songs/mdx": {
+      "siblings": [
+        "1943kaia.mdx"
+      ]
+    },
     "/data/songs/medley": {
       "siblings": [
         "combat.mso"
@@ -34671,6 +34704,10 @@
       "label": "ADPCM Mono"
     },
     {
+      "formatKey": "adplug",
+      "label": "AdPlug"
+    },
+    {
       "formatKey": "uade_thx",
       "label": "AHX/THX prefix"
     },
@@ -34755,10 +34792,6 @@
       "label": "Dave Lowe WTD"
     },
     {
-      "formatKey": "dtm",
-      "label": "Digital Tracker"
-    },
-    {
       "formatKey": "dsm",
       "label": "DSIK Sound Module"
     },
@@ -34815,10 +34848,6 @@
       "label": "GBS"
     },
     {
-      "formatKey": "goatTracker",
-      "label": "GoatTracker"
-    },
-    {
       "formatKey": "hes",
       "label": "HES"
     },
@@ -34833,10 +34862,6 @@
     {
       "formatKey": "iceTracker",
       "label": "IceTracker"
-    },
-    {
-      "formatKey": "imagoOrpheus",
-      "label": "Imago Orpheus"
     },
     {
       "formatKey": "uade_ins",
@@ -34915,10 +34940,6 @@
       "label": "MCMD"
     },
     {
-      "formatKey": "mdx",
-      "label": "MDX"
-    },
-    {
       "formatKey": "medley",
       "label": "Medley"
     },
@@ -34989,6 +35010,10 @@
     {
       "formatKey": "pierreAdane",
       "label": "Pierre Adane"
+    },
+    {
+      "formatKey": "pmd",
+      "label": "PMD"
     },
     {
       "formatKey": "uade_pn",

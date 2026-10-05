@@ -18,7 +18,7 @@ import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
-import { isSupportedFormat, detectFormat } from '@/lib/import/FormatRegistry';
+import { isSupportedFormat, detectFormat, detectFormatFromContent } from '@/lib/import/FormatRegistry';
 import { isSupportedModule, type ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
@@ -240,19 +240,19 @@ export async function loadFile(
       return await loadV2MFile(file);
     }
 
-    // === GoatTracker .sng — detect by magic bytes BEFORE AdPlug claims it ===
-    // Both GoatTracker and AdPlug use .sng extension. Check magic bytes first.
-    if (filename.endsWith('.sng')) {
-      const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
-      const buf = await file.arrayBuffer();
-      if (isGoatTrackerSong(buf)) {
-        return await loadSongFile(file, options, buf);
-      }
-      // Not GoatTracker — fall through to AdPlug below
+    // === Extension collisions are settled by content, once, here ===
+    // .sng is GoatTracker (GTS magic) or AdPlug; .dtm Digital Tracker or AdPlug
+    // DTM; .imf Imago Orpheus or id Software; .pmd PiyoPiyo or PMD98. The same
+    // resolver names the format for the song index and the headless sweep.
+    const byContent = (filename.endsWith('.sng') || isAdPlugWasmFormat(filename) || filename.endsWith('.pmd'))
+      ? detectFormatFromContent(filename, new Uint8Array(await file.arrayBuffer()))
+      : null;
+    if (byContent?.key === 'goatTracker') {
+      return await loadSongFile(file, options, await file.arrayBuffer());
     }
 
     // === ADPLUG WASM STREAMING — OPL/AdLib formats not handled by TS parser ===
-    if (isAdPlugWasmFormat(filename)) {
+    if (isAdPlugWasmFormat(filename) && (byContent?.key ?? 'adplug') === 'adplug') {
       return await loadAdPlugFile(file, options.companionFiles);
     }
 
