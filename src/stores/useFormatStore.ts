@@ -82,7 +82,6 @@ export interface FormatStore {
   pumaTrackerFileData: ArrayBuffer | null;
   steveTurnerFileData: ArrayBuffer | null;
   sidmon1WasmFileData: ArrayBuffer | null;
-  fredEditorWasmFileData: ArrayBuffer | null;
   artOfNoiseFileData: ArrayBuffer | null;
   cinter4FileData: ArrayBuffer | null;
   cinter4RawData: ArrayBuffer | null;
@@ -507,7 +506,6 @@ export const useFormatStore = create<FormatStore>()(
     pumaTrackerFileData: null,
     steveTurnerFileData: null,
     sidmon1WasmFileData: null,
-    fredEditorWasmFileData: null,
     artOfNoiseFileData: null,
     cinter4FileData: null,
     cinter4RawData: null,
@@ -1083,7 +1081,6 @@ export const useFormatStore = create<FormatStore>()(
         state.pumaTrackerFileData = (song as any).pumaTrackerFileData ?? null;
         state.steveTurnerFileData = (song as any).steveTurnerFileData ?? null;
         state.sidmon1WasmFileData = (song as any).sidmon1WasmFileData ?? null;
-        state.fredEditorWasmFileData = (song as any).fredEditorWasmFileData ?? null;
         state.artOfNoiseFileData = (song as any).artOfNoiseFileData ?? null;
         state.cinter4FileData = (song as any).cinter4FileData ?? null;
         state.cinter4RawData = (song as any).cinter4RawData ?? null;
@@ -1421,7 +1418,6 @@ export const useFormatStore = create<FormatStore>()(
       state.pumaTrackerFileData = null;
       state.steveTurnerFileData = null;
       state.sidmon1WasmFileData = null;
-      state.fredEditorWasmFileData = null;
       state.artOfNoiseFileData = null;
       state.cinter4FileData = null;
       state.cinter4RawData = null;

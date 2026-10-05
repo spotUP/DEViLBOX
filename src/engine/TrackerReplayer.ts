@@ -321,8 +321,6 @@ export interface TrackerSong {
   steveTurnerFileData?: ArrayBuffer;
   /** Raw SidMon 1.0 (.sid1/.smn) binary for SidMon1ReplayerEngine WASM playback */
   sidmon1WasmFileData?: ArrayBuffer;
-  /** Raw Fred Editor binary for loading into the FredEditorReplayerEngine WASM */
-  fredEditorWasmFileData?: ArrayBuffer;
   /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
   artOfNoiseFileData?: ArrayBuffer;
   /**

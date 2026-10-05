@@ -50,7 +50,6 @@ export const FILE_DATA_FIELDS = [
   'pumaTrackerFileData',
   'steveTurnerFileData',
   'sidmon1WasmFileData',
-  'fredEditorWasmFileData',
   'artOfNoiseFileData',
   'cinter4FileData',
   'cinter4RawData',           // companion raw-sample PCM buffer for Cinter4

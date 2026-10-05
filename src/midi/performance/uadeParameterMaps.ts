@@ -108,7 +108,7 @@ export const FC_NKS_PARAMETERS: NKSParameter[] = [
 ];
 
 // ============================================================================
-// 6. FredSynth + FredEditorReplayerSynth — FredConfig
+// 6. FredSynth — FredConfig
 // ============================================================================
 export const FRED_NKS_PARAMETERS: NKSParameter[] = [
   // Page 0: Envelope
@@ -401,7 +401,6 @@ export const UADE_PARAMETER_MAP: Record<string, NKSParameter[]> = {
   'DigMugSynth': DIGMUG_NKS_PARAMETERS,
   'FCSynth': FC_NKS_PARAMETERS,
   'FredSynth': FRED_NKS_PARAMETERS,
-  'FredEditorReplayerSynth': FRED_NKS_PARAMETERS,
   'TFMXSynth': TFMX_NKS_PARAMETERS,
   'HippelCoSoSynth': HIPPELCOSO_NKS_PARAMETERS,
   'RobHubbardSynth': ROBHUBBARD_NKS_PARAMETERS,

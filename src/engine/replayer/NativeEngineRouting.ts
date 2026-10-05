@@ -549,18 +549,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/pumatracker/PumaTrackerEngine')).PumaTrackerEngine as unknown as WASMSingletonStatic,
   },
   {
-    key: 'FredEditorReplayer',
-    synthType: 'FredEditorReplayerSynth',
-    suppressNotes: true,
-    fileDataKey: 'fredEditorWasmFileData',
-    loadMethod: 'loadTune',
-    supportsPause: false,
-    supportsResume: false,
-    needsDirectRouting: true,
-    staticRef: null,
-    dynamicResolver: async () => (await import('@/engine/fred/FredEditorReplayerEngine')).FredEditorReplayerEngine as unknown as WASMSingletonStatic,
-  },
-  {
     key: 'SteveTurner',
     synthType: 'SteveTurnerSynth',
     suppressNotes: true,

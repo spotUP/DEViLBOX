@@ -246,7 +246,6 @@ void (async () => {
     import('../engine/pretracker/PreTrackerEngine').then(m => _regBitmask('PreTrackerEngine', m.PreTrackerEngine)).catch(() => {}),
     import('../engine/pumatracker/PumaTrackerEngine').then(m => _regBitmask('PumaTrackerEngine', m.PumaTrackerEngine)).catch(() => {}),
     import('../engine/artofnoise/ArtOfNoiseEngine').then(m => _regBitmask('ArtOfNoiseEngine', m.ArtOfNoiseEngine)).catch(() => {}),
-    import('../engine/fred/FredEditorReplayerEngine').then(m => _regBitmask('FredEditorReplayerEngine', m.FredEditorReplayerEngine)).catch(() => {}),
     import('../engine/steveturner/SteveTurnerEngine').then(m => _regBitmask('SteveTurnerEngine', m.SteveTurnerEngine)).catch(() => {}),
     import('../engine/sidmon1/SidMon1ReplayerEngine').then(m => _regBitmask('SidMon1ReplayerEngine', m.SidMon1ReplayerEngine)).catch(() => {}),
     import('../engine/sidmon1/SidMon1Engine').then(m => _regBitmask('SidMon1Engine', m.SidMon1Engine)).catch(() => {}),
