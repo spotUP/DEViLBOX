@@ -27,7 +27,7 @@ set_target_properties(TFM PROPERTIES
 
 target_compile_options(TFM PRIVATE -O2 -fexceptions -Wall -Wno-unused-variable -Wno-sign-compare)
 
-set(EXPORTED_FUNCS "_malloc,_free,_tfm_wasm_init,_tfm_wasm_load,_tfm_wasm_render,_tfm_wasm_stop,_tfm_wasm_set_mute_mask,_tfm_wasm_get_position,_tfm_wasm_get_line")
+set(EXPORTED_FUNCS "_malloc,_free,_tfm_wasm_init,_tfm_wasm_load,_tfm_wasm_render,_tfm_wasm_render_channels,_tfm_wasm_stop,_tfm_wasm_set_mute_mask,_tfm_wasm_get_position,_tfm_wasm_get_line")
 
 target_link_options(TFM PRIVATE
     "SHELL:-s MODULARIZE=1"

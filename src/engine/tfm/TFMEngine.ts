@@ -7,6 +7,7 @@
  * TFMEngine singleton pattern.
  */
 
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
@@ -67,7 +68,11 @@ export class TFMEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          useOscilloscopeStore.getState().setChipInfo(6, 0, ['YM2203 A FM 1', 'YM2203 A FM 2', 'YM2203 A FM 3', 'YM2203 B FM 1', 'YM2203 B FM 2', 'YM2203 B FM 3']);
           console.log('[TFMEngine] TFM Music Maker file loaded');
+          break;
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'error':
           console.error('[TFMEngine]', data.message);
