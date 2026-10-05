@@ -74,7 +74,9 @@ class GmeProcessor extends AudioWorkletProcessor {
               for (let i = 0; i < this.module._gme_wasm_voice_count(); i++) {
                 voices.push(this.module.UTF8ToString(this.module._gme_wasm_voice_name(i)));
               }
-              this.port.postMessage({ type: 'moduleLoaded', track: data.track | 0, tracks: result, voices, scopes: this.scopes });
+              // The track playing: the first audible one from the track asked for.
+              const track = typeof this.module._gme_wasm_loaded_track === 'function' ? this.module._gme_wasm_loaded_track() : (data.track | 0);
+              this.port.postMessage({ type: 'moduleLoaded', track, tracks: result, voices, scopes: this.scopes });
             } else {
               const why = { '-1': 'not a game-music-emu file', '-2': 'out of memory', '-3': 'game-music-emu refused the file', '-4': 'the track would not start' }[String(result)] || '';
               this.port.postMessage({ type: 'error', message: 'gme_wasm_load failed with code ' + result + (why ? ' (' + why + ')' : '') });

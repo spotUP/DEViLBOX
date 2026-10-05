@@ -28,6 +28,7 @@ interface GmeModule {
   _gme_wasm_set_mute_mask(mask: number): void;
   _gme_wasm_free(): void;
   _gme_wasm_track_count(): number;
+  _gme_wasm_loaded_track(): number;
   _gme_wasm_voice_count(): number;
   _gme_wasm_scope_count(): number;
 }
@@ -136,5 +137,16 @@ describe('the game-music-emu wasm plays game music', () => {
     b.heap().set(junk, p);
     expect(m._gme_wasm_load(p, junk.length, 0, SR)).toBe(-1);
     m._free(p);
+  }, 60_000);
+
+  it('a file whose first tracks are silent starts on its first audible track', () => {
+    // KSS has no track list; gradius 2's tracks 0-39 are effects or empty and
+    // the song opened silent on track 0 (owner rule: first audible subsong).
+    load('kss/gradius 2.kss', 0);
+    expect(b.module._gme_wasm_loaded_track()).toBeGreaterThan(0);
+    expect(measure(2).peak).toBeGreaterThan(0.02);
+    // A track that is already audible stays the track that plays.
+    load('nsf/dr mario.nsf', 0);
+    expect(b.module._gme_wasm_loaded_track()).toBe(0);
   }, 60_000);
 });

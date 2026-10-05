@@ -65,6 +65,38 @@ static void apply_mute(void)
 
 static int load(const unsigned char *data, int len, int track, int sample_rate);
 
+/* The track load() started, for gme_wasm_loaded_track(). */
+static int loaded_track = 0;
+
+/*
+ * The first track from `from` whose first PROBE_SECONDS are audible, trying
+ * at most PROBE_TRACKS; `from` itself when none is (the track the import
+ * asked for, silent or not). Probes with every voice audible.
+ */
+static int first_audible_track(int from, int count, int sample_rate)
+{
+	enum { PROBE_SECONDS = 3, PROBE_TRACKS = 64, PROBE_CHUNK = 1024 };
+	const int threshold = 164; /* 0.005 of full scale, as UADE's probe */
+	const int pairs = multi ? kPairs : 1;
+	gme_mute_voices(emu, 0);
+	const int last = count < from + PROBE_TRACKS ? count : from + PROBE_TRACKS;
+	for (int t = from; t < last; t++) {
+		if (gme_start_track(emu, t)) continue;
+		for (long done = 0; done < (long) PROBE_SECONDS * sample_rate; done += PROBE_CHUNK) {
+			if (gme_play(emu, PROBE_CHUNK * 2 * pairs, pcm)) break;
+			for (int i = 0; i < PROBE_CHUNK * 2 * pairs; i++) {
+				if (pcm[i] > threshold || pcm[i] < -threshold) return t;
+			}
+			if (gme_track_ended(emu)) break;
+		}
+	}
+	return from;
+}
+
+/* The track playing after a load (the first audible from the one asked for). */
+extern "C" EMSCRIPTEN_KEEPALIVE
+int gme_wasm_loaded_track(void) { return loaded_track; }
+
 /*
  * Load `data` and start `track` (0-based). Returns the number of tracks
  * (> 0), or -1 unknown file type, -2 out of memory, -3 libgme refused the
@@ -102,10 +134,16 @@ static int load(const unsigned char *data, int len, int track, int sample_rate)
 	gme_set_autoload_playback_limit(emu, 0);
 	const int count = gme_track_count(emu);
 	if (track < 0 || track >= count) track = 0;
+	// First audible track, from `track` up: KSS and HES have no track list
+	// and often hold sound effects or nothing in their first tracks (KSS
+	// gradius 2: tracks 0-39), so the song opened silent. The owner's rule for
+	// UADE subsongs, 2026-10-05.
+	track = first_audible_track(track, count, sample_rate);
 	// Mute before the start: gme_start_track already renders ahead (it skips
 	// the track's leading silence), and that audio must honour the mask.
 	apply_mute();
 	if (gme_start_track(emu, track)) { release(); return -4; }
+	loaded_track = track;
 	return count > 0 ? count : 1;
 }
 
