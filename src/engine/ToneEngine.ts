@@ -3,6 +3,7 @@
  * Manages Tone.js lifecycle, instruments, master effects, and audio context
  */
 
+import { AnalyserHolds } from '@/lib/audio/analyserHolds';
 import { isWholeSongSynth } from './wholeSongSynths';
 import { installWorkletProfiler } from './audio/workletProfiler';
 import { installIdleGate } from './audio/idleGate';
@@ -219,6 +220,8 @@ export class ToneEngine {
   // FFT for frequency visualization
   public fft: Tone.FFT;
   private analysersConnected: boolean = false;
+  /** Visualizers holding the master analysers (enableAnalysers / disableAnalysers). */
+  private analyserHolds = new AnalyserHolds();
 
   // Auto-gain: proportional controller that balances sample bus vs synth bus levels
   private autoGainSampleCorr: number = 0; // dB correction applied on top of manual gain
@@ -5536,7 +5539,8 @@ export class ToneEngine {
   /**
    * Enable analysers for visualization (connects them to the audio graph)
    */
-  public enableAnalysers(): void {
+  public enableAnalysers(owner: object | string = 'default'): void {
+    this.analyserHolds.acquire(owner);
     if (!this.analysersConnected) {
       this.masterChannel.connect(this.analyser);
       this.masterChannel.connect(this.fft);
@@ -5545,10 +5549,14 @@ export class ToneEngine {
   }
 
   /**
-   * Disable analysers to save CPU when visualizations are hidden
+   * Release `owner`'s hold on the analysers; they disconnect (saving CPU)
+   * only when no visualizer holds them. One visualizer's unmount used to
+   * disconnect them for every other one: opening the dub bus mounts and
+   * unmounts strip visualizers and the scope view went flat (2026-10-05).
    */
-  public disableAnalysers(): void {
-    if (this.analysersConnected) {
+  public disableAnalysers(owner: object | string = 'default'): void {
+    this.analyserHolds.release(owner);
+    if (this.analysersConnected && !this.analyserHolds.held) {
       this.masterChannel.disconnect(this.analyser);
       this.masterChannel.disconnect(this.fft);
       this.analysersConnected = false;

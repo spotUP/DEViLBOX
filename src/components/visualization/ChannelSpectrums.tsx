@@ -55,11 +55,11 @@ export const ChannelSpectrums: React.FC<ChannelSpectrumsProps> = ({ height = 100
     ctx.scale(dpr, dpr);
 
     const engine = getToneEngine();
-    engine.enableAnalysers();
+    engine.enableAnalysers(canvasRef);
 
     return () => {
       // Disable analysers to save CPU when visualization unmounts
-      engine.disableAnalysers();
+      engine.disableAnalysers(canvasRef);
     };
   }, [width, height, channelCount, pattern]);
 

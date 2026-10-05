@@ -71,7 +71,7 @@ export const Sc68Visualizer: React.FC = () => {
       return;
     }
 
-    try { getToneEngine().enableAnalysers(); } catch { /* not ready */ }
+    try { getToneEngine().enableAnalysers(canvasRef); } catch { /* not ready */ }
 
     const peaks = peaksRef.current;
 
@@ -192,7 +192,10 @@ export const Sc68Visualizer: React.FC = () => {
     };
 
     rafRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(rafRef.current);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      try { getToneEngine().disableAnalysers(canvasRef); } catch { /* engine gone */ }
+    };
   }, [isPlaying, mode]);
 
   // Resize canvas to fill container

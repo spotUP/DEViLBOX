@@ -56,7 +56,7 @@ export const ParticleField: React.FC<ParticleFieldProps> = ({ height = 100 }) =>
 
     // Enable analysers when visualization is active
     const engine = getToneEngine();
-    engine.enableAnalysers();
+    engine.enableAnalysers(canvasRef);
 
     const createParticle = (x: number, y: number, intensity: number): Particle => ({
       x,
@@ -155,7 +155,7 @@ export const ParticleField: React.FC<ParticleFieldProps> = ({ height = 100 }) =>
       }
       particlesRef.current = [];
       // Disable analysers to save CPU when visualization unmounts
-      engine.disableAnalysers();
+      engine.disableAnalysers(canvasRef);
     };
   }, [width, height]);
 

@@ -70,13 +70,15 @@ const EMPTY_AUDIO: AudioData = {
   rms: 0, peak: 0, bassEnergy: 0, midEnergy: 0, highEnergy: 0,
 };
 
+/** This visualizer's hold on the master analysers (ToneEngine counts holders). */
+const ANALYSER_OWNER = 'TrackerVisualBackground';
+
 function getTrackerAudioData(): AudioData {
   try {
     const engine = getToneEngine();
-    // Ensure analysers stay connected every frame — other viz components
-    // can call disableAnalysers() on unmount, killing our connection.
-    // The engine's method no-ops if already connected.
-    engine.enableAnalysers();
+    // Held under this module's owner token, released on unmount; other
+    // visualizers hold their own (ToneEngine counts holders).
+    engine.enableAnalysers(ANALYSER_OWNER);
     const waveform = engine.getWaveform();
     const fft = engine.getFFT();
 
@@ -172,7 +174,7 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
 
     return () => {
       // Disconnect analysers when size effect re-runs / unmounts
-      try { getToneEngine().disableAnalysers(); } catch { /* ignore */ }
+      try { getToneEngine().disableAnalysers(ANALYSER_OWNER); } catch { /* ignore */ }
     };
   }, [width, height]);
 
