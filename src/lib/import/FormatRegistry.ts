@@ -1738,22 +1738,31 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'ay',
     label: 'AY',
-    description: 'ZX Spectrum AY (ZXAYEMUL)',
+    description: 'ZX Spectrum AY (ZXAY EMUL) — aylet WASM replayer with native pattern display',
     family: 'chip-dump',
     matchMode: 'extension',
     // `.emul` because the corpus stores these files named after the ZXAY
     // SUBTYPE rather than the container: `ay-emul/spring.emul` begins with
-    // the bytes `ZXAYEMUL`, which is exactly what this parser reads. It was
-    // being refused with "Unsupported file format" for its name alone
-    // (2026-09-24).
-    //
-    // Deliberately NOT `.strc` or `.amad`. Those files are the same ZXAY
-    // container with a different payload (`ZXAYSTRC`, `ZXAYAMAD`), and
-    // `parseAYFile` only knows the EMUL layout — accepting them would trade
-    // an honest refusal for a parse failure further in.
+    // the bytes `ZXAYEMUL`. Playback is aylet (third-party/aylet-0.5) in
+    // wasm, fed the whole file; AYParser draws the grid (ledger F15).
     extRegex: /\.(ay|emul)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/AYParser', parseFn: 'parseAYFile', detectFn: 'isAYFormat' },
+  },
+  {
+    key: 'ayStructured',
+    label: 'AY (STRC / AMAD)',
+    description: 'ZX Spectrum AY — ZXAY STRC / AMAD payloads (no replayer available; refused with the reason)',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    // Same ZXAY container as `ay`, different payload: `ZXAYSTRC` and
+    // `ZXAYAMAD` are data for a replayer that lived in the host (DeliAY /
+    // AY_Emul), not Z80 code, and no player in reach implements it. The
+    // parser throws the reason so the user reads that instead of
+    // "Unsupported file format". thoughts/shared/research/2026-10-04_ay-strc-amad.md
+    extRegex: /\.(strc|amad)$/i,
+    nativeOnly: true,
+    nativeParser: { module: '@lib/import/formats/AYParser', parseFn: 'parseAYStructuredFile', detectFn: 'isAYStructuredFormat' },
   },
   {
     key: 's98',
@@ -1851,6 +1860,42 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(m|m2|mz|pmd)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/PMDParser', parseFn: 'parsePMDFile', detectFn: 'isPMDFormat' },
+  },
+  // ── Formats DEViLBOX recognises but cannot play yet ──────────────────────
+  // Each refuses with its own name and the missing replayer instead of
+  // "Unsupported file format" (ledger 2026-10-05 broken-formats sweep, B18).
+  {
+    key: 'piyoPiyo',
+    label: 'PiyoPiyo',
+    description: "Studio Pixel PiyoPiyo (.pmd, 'PMD' magic) — no replayer yet",
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.pmd$/i,
+    nativeOnly: true,
+    // `.pmd` is also PC-98 PMD; detectFormatFromContent tells them apart by the
+    // 'PMD' magic, which PMD98 files do not carry.
+    customDispatch: true,
+    nativeParser: { module: '@lib/import/formats/NoReplayerParsers', parseFn: 'parsePiyoPiyoFile', detectFn: 'isPiyoPiyoFormat' },
+  },
+  {
+    key: 'stoneTracker',
+    label: 'StoneTracker',
+    description: "StoneTracker (.spm, 'SPM' magic) — no replayer yet",
+    family: 'amiga-native',
+    matchMode: 'extension',
+    extRegex: /\.spm$/i,
+    nativeOnly: true,
+    nativeParser: { module: '@lib/import/formats/NoReplayerParsers', parseFn: 'parseStoneTrackerFile', detectFn: 'isStoneTrackerFormat' },
+  },
+  {
+    key: 'tfmMusicMaker',
+    label: 'TFM Music Maker',
+    description: 'TFM Music Maker (.tfe, ZX Spectrum TurboFM) — no replayer yet',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.tfe$/i,
+    nativeOnly: true,
+    nativeParser: { module: '@lib/import/formats/NoReplayerParsers', parseFn: 'parseTfmMusicMakerFile', detectFn: 'isTfmMusicMakerFormat' },
   },
   {
     key: 'fmp',
@@ -1963,7 +2008,9 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     matchMode: 'extension',
     extRegex: /\.fmt$/i,
     prefKey: 'fmTracker',
-    nativeParser: { module: '@lib/import/formats/FMTrackerParser', parseFn: 'parseFMTrackerFile', detectFn: 'isFMTrackerFormat' },
+    // No native parser: the one that was here was a copy of the Tim Follin
+    // stub (BRA-opcode magic) that never matched an FM Tracker file, so every
+    // .fmt went to libopenmpt anyway (ledger B6, 2026-10-05).
     libopenmptFallback: true,
   },
   {
@@ -1984,7 +2031,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'CDFM Composer 670 — native parser or libopenmpt',
     family: 'pc-tracker',
     matchMode: 'extension',
-    extRegex: /\.c67$/i,
+    extRegex: /\.(c67|670)$/i,
     prefKey: 'cdfm67',
     nativeParser: { module: '@lib/import/formats/CDFM67Parser', parseFn: 'parseCDFM67File', detectFn: 'isCDFM67Format' },
     libopenmptFallback: true,
@@ -2501,6 +2548,53 @@ export function detectFormat(filename: string): FormatDefinition | null {
     }
   }
   return null;
+}
+
+/**
+ * Detection by name, corrected by content where one extension names two
+ * formats. `detectFormat` answers from the name alone and is what the
+ * registry declares; this is what the loader, the song index and the headless
+ * sweep use when they hold the bytes, so all three agree (2026-10-05
+ * broken-formats sweep: 16 GoatTracker songs were indexed as Zound Monitor
+ * and rendered through UADE, Digital Tracker and Imago Orpheus modules went
+ * to AdPlug, PiyoPiyo to PMD98).
+ *
+ * The rules are the collisions themselves, nothing else: a file whose name
+ * resolves to a format that is not in this table keeps that answer.
+ */
+export function detectFormatFromContent(filename: string, bytes: Uint8Array): FormatDefinition | null {
+  const byName = detectFormat(filename);
+  const lower = filename.toLowerCase();
+  const ext = lower.slice(lower.lastIndexOf('.') + 1);
+  const ascii = (at: number, text: string): boolean => {
+    if (bytes.length < at + text.length) return false;
+    for (let i = 0; i < text.length; i++) if (bytes[at + i] !== text.charCodeAt(i)) return false;
+    return true;
+  };
+  const byKey = (key: string): FormatDefinition | null => FORMAT_REGISTRY.find((f) => f.key === key) ?? null;
+
+  switch (ext) {
+    case 'sng':
+      // GoatTracker: GTS2..GTS5 magic. Zound Monitor is `sng.<name>`, never this.
+      if (ascii(0, 'GTS')) return byKey('goatTracker');
+      break;
+    case 'dtm':
+      // Digital Tracker (Atari Falcon, libopenmpt) starts 'D.T.'; AdPlug's DTM
+      // (DeFy Adlib Tracker) starts 'DeFy DTM '.
+      if (ascii(0, 'D.T.')) return byKey('dtm');
+      break;
+    case 'imf':
+      // Imago Orpheus carries 'IM10' at offset 60; id Software IMF has no magic.
+      if (ascii(60, 'IM10')) return byKey('imagoOrpheus');
+      break;
+    case 'pmd':
+      // Studio Pixel PiyoPiyo starts 'PMD'; PC-98 PMD98 files start with a version byte.
+      if (ascii(0, 'PMD')) return byKey('piyoPiyo');
+      break;
+    default:
+      break;
+  }
+  return byName;
 }
 
 /** The first dot-segment of a basename — `mdat` in `mdat.rocknroll`. */

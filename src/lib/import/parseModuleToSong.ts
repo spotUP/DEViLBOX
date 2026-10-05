@@ -80,8 +80,8 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   // S3M, IT, XM, MOD native parsers, and UADE catch-all.
 
   // AdPlug OPL formats — try TS parser for editable pattern import
-  const { detectFormat } = await import('./FormatRegistry');
-  const fmt = detectFormat(filename);
+  const { detectFormatFromContent } = await import('./FormatRegistry');
+  const fmt = detectFormatFromContent(filename, new Uint8Array(buffer));
   if (fmt?.nativeParser?.parseFn === 'parseAdPlugFile') {
     try {
       const { parseAdPlugFile } = await import('./formats/AdPlugParser');
@@ -93,7 +93,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   // AdPlug WASM extraction — for CmodPlayer-based formats (A2M, AMD, CFF, etc.)
   // Try extracting editable patterns from the WASM module before falling back to streaming
   const { isAdPlugWasmFormat } = await import('@lib/file/UnifiedFileLoader');
-  if (isAdPlugWasmFormat(filename)) {
+  if (isAdPlugWasmFormat(filename) && (fmt?.key ?? 'adplug') === 'adplug') {
     try {
       const { extractAdPlugPatterns } = await import('./formats/AdPlugWasmExtractor');
       const extracted = await extractAdPlugPatterns(buffer, file.name);

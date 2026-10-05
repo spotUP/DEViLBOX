@@ -90,6 +90,8 @@ export function routesToUADE(
   fmt: { family: string; uadeFallback?: boolean; nativeOnly?: boolean } | null,
 ): boolean {
   if (!fmt) return true;
+  // nativeOnly is the registry's own word for "never UADE" (MusicLine, StoneTracker).
+  if (fmt.nativeOnly) return false;
   if (fmt.family === 'uade-only' || fmt.family === 'amiga-native') return true;
   return fmt.uadeFallback === true;
 }

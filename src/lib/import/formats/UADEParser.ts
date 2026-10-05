@@ -327,7 +327,7 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   'dsym',    // Digital Symphony (DigitalSymphonyParser)
   'cba',     // Chuck Biscuits Atari ST (ChuckBiscuitsParser)
   'act',     // Actionamics (ActionamicsParser)
-  'fmt',     // FM Tracker (FMTrackerParser)
+  'fmt',     // FM Tracker (libopenmpt; a PC OPL format UADE cannot play)
   'c67',     // CDFM Composer 670 (CDFM67Parser)
   '667',     // Composer 667 (Composer667Parser)
   // PTK-Prowiz packed formats

@@ -17,9 +17,9 @@
  * Regenerate after adding songs:
  *     npx tsx scripts/build-song-index.ts
  */
-import { readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, statSync, writeFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { join, relative, basename, dirname } from 'node:path';
-import { FORMAT_REGISTRY, detectFormat } from '../src/lib/import/FormatRegistry';
+import { FORMAT_REGISTRY, detectFormat, detectFormatFromContent } from '../src/lib/import/FormatRegistry';
 import { companionFilesIn, isInSampleDirectory } from '../src/lib/import/companionResolver';
 
 const ROOT = process.cwd();
@@ -148,6 +148,16 @@ function listingFor(dir: string): string {
   return key;
 }
 
+/** The first bytes of a file, for the content-aware detection (never the whole corpus in memory). */
+function headOf(path: string, n = 128): Uint8Array {
+  const fd = openSync(path, 'r');
+  try {
+    const buf = Buffer.alloc(n);
+    const got = readSync(fd, buf, 0, n, 0);
+    return new Uint8Array(buf.buffer, buf.byteOffset, got);
+  } finally { closeSync(fd); }
+}
+
 /** A file the registry names as a song in its own right (not the catch-all). */
 function isSongByName(name: string): boolean {
   const det = detectFormat(name.toLowerCase());
@@ -187,7 +197,7 @@ function addRows(dirLabel: string, dir: string, allFiles: string[], subformat?: 
   if (files.length === 0) return;
   const byFormat = new Map<string | null, string[]>();
   for (const f of files) {
-    const det = detectFormat(basename(f).toLowerCase());
+    const det = detectFormatFromContent(basename(f).toLowerCase(), headOf(f));
     const key = det?.key ?? null;
     const list = byFormat.get(key);
     if (list) list.push(f); else byFormat.set(key, [f]);
