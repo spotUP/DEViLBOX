@@ -40,8 +40,21 @@ const secsIdx = args.indexOf('--secs');
 const SECS = secsIdx >= 0 ? Number(args[secsIdx + 1]) : 20;
 const files = args.filter((a, i) => !a.startsWith('--') && (secsIdx < 0 || i !== secsIdx + 1));
 
-/** Note-on events per Paula voice: a period write that changes the voice's note. */
-async function paulaNotes(mod: LogModule, data: Uint8Array, name: string, dir: string): Promise<number[][]> {
+/**
+ * Note-on events per Paula voice, in two readings:
+ *   loose  - a period write after a sample start (AUDxLC) on that voice;
+ *   strict - a period write that directly follows that voice's own
+ *            LCH, LCL, LEN writes, with no write to any other register or
+ *            voice in between (the note-trigger burst of one voice).
+ * The loose reading over-counts on players that rewrite the loop pointer
+ * into AUDxLC after every row's DMA restart AND the period on every row
+ * (Tomy Tracker: every row then reads as a note-on); the strict reading
+ * misses players that write LC for all voices before any period. Each
+ * channel is scored against both and keeps the better one (the strict one
+ * only when it is not a handful of stray bursts - see the scoring loop).
+ */
+interface PaulaNotes { loose: number[][]; strict: number[][] }
+async function paulaNotes(mod: LogModule, data: Uint8Array, name: string, dir: string): Promise<PaulaNotes> {
   // The sidecars the app itself would load (smpl.<tune>, instruments/, ...).
   const listing = listingFromRelativePaths(readdirSync(dir));
   const resolved = resolveCompanions(name, listing);
@@ -63,7 +76,10 @@ async function paulaNotes(mod: LogModule, data: Uint8Array, name: string, dir: s
   const pL = mod._malloc(chunk * 4), pR = mod._malloc(chunk * 4);
   const logPtr = mod._malloc(512 * 3 * 4);
   const notes: number[][] = [[], [], [], []];
+  const strict: number[][] = [[], [], [], []];
   const last = [0, 0, 0, 0];
+  /** The last three writes, globally, as (channel << 8 | reg); -1 = none. */
+  const recent = [-1, -1, -1];
   // A note-on on the Amiga is a new sample start (AUDxLCH/LCL) followed by
   // the period; a period write alone is an effect (arpeggio, vibrato,
   // portamento) and is not a grid note. `armed` remembers the LC write.
@@ -75,7 +91,13 @@ async function paulaNotes(mod: LogModule, data: Uint8Array, name: string, dir: s
     for (let i = 0; i < n; i++) {
       const w = u32[i * 3];
       const ch = w >>> 24, reg = (w >>> 16) & 0xff, value = w & 0xffff;
+      const burst = recent[0] === (ch << 8 | 0) && recent[1] === (ch << 8 | 1) && recent[2] === (ch << 8 | 2);
+      recent.shift(); recent.push(ch << 8 | reg);
       if (ch > 3) continue;
+      if (burst && reg === 3 && value >= 108 && value <= 907) {
+        const note = periodToPtNote(value);
+        if (note > 0) strict[ch].push(note);
+      }
       if (reg === 0 || reg === 1) { armed[ch] = true; continue; }
       if (reg !== 3 || value < 108 || value > 907) continue; // AUDxPER in the 3-octave ProTracker range
       if (!armed[ch]) continue;
@@ -94,7 +116,7 @@ async function paulaNotes(mod: LogModule, data: Uint8Array, name: string, dir: s
   mod._uade_wasm_enable_paula_log(0);
   mod._free(pL); mod._free(pR); mod._free(logPtr);
   mod._uade_wasm_stop();
-  return notes;
+  return { loose: notes, strict };
 }
 
 /** The grid's note sequence per channel, in song order. */
@@ -149,16 +171,25 @@ function score(a: number[], b: number[]): number {
     let grid: Awaited<ReturnType<typeof gridNotes>> = null;
     try { grid = await gridNotes(data, name); } catch (e) { console.log(`${name}: parser threw: ${String((e as Error).message).slice(0, 100)}`); continue; }
     if (!grid) { console.log(`${name}: no native parser / no grid`); continue; }
-    let paula: number[][];
+    let paula: PaulaNotes;
     try { paula = await paulaNotes(mod, data, name, dirname(f)); } catch (e) { console.log(`${name}: ${(e as Error).message}`); continue; }
-    const voices = paula.map((v) => v.length);
-    console.log(`${name} [${grid.format}]: grid channels=${grid.notes.length} events=${grid.notes.map((c) => c.length).join('/')}; paula voices events=${voices.join('/')}`);
+    const voices = paula.loose.map((v, i) => `${v.length}(${paula.strict[i].length})`);
+    console.log(`${name} [${grid.format}]: grid channels=${grid.notes.length} events=${grid.notes.map((c) => c.length).join('/')}; paula voices events=${voices.join('/')} (strict in brackets)`);
     for (let ch = 0; ch < grid.notes.length; ch++) {
       const g = grid.notes[ch];
-      let best = 0, bestV = -1;
-      for (let v = 0; v < 4; v++) { const s = score(g, paula[v]); if (s > best) { best = s; bestV = v; } }
+      let best = 0, bestV = -1, bestSeq: number[] = [], bestRead = '';
+      for (let v = 0; v < 4; v++) {
+        for (const [read, seq] of [['loose', paula.loose[v]], ['strict', paula.strict[v]]] as const) {
+          // The score normalises by the shorter sequence, so a strict reading
+          // that caught only a handful of bursts would fit any grid; it only
+          // counts when it holds at least half as many notes as the grid.
+          if (read === 'strict' && seq.length * 2 < g.length) continue;
+          const s = score(g, seq);
+          if (s > best) { best = s; bestV = v; bestSeq = seq; bestRead = read; }
+        }
+      }
       const show = (s: number[]) => intervals(s).slice(0, 16).join(',');
-      console.log(`  ch${ch}: best voice ${bestV} score ${best.toFixed(2)}  grid[${show(g)}]  paula[${bestV >= 0 ? show(paula[bestV]) : ''}]`);
+      console.log(`  ch${ch}: best voice ${bestV} score ${best.toFixed(2)}${bestRead ? ` (${bestRead})` : ''}  grid[${show(g)}]  paula[${show(bestSeq)}]`);
     }
   }
   try { mod._uade_wasm_cleanup(); } catch { /* a refused load leaves the core in a state cleanup traps on */ }
