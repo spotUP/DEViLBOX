@@ -429,6 +429,7 @@ struct AonSong {
     // Configuration
     u32 sample_rate;
     i32 solo_channel; // -1 = all
+    u32 channel_mask; // bit N set = channel N audible (the mixer's convention)
     f32 stereo_mix;   // 0.0 = full stereo, 1.0 = mono
 
     // Decode state
@@ -2010,6 +2011,12 @@ static void mix_one_frame(AonSong* song, f32* left, f32* right) {
 
         sample *= mix->volume;
 
+        // Muted channels keep running (phase advances below) so they come
+        // back in step; only their contribution to the mix is dropped.
+        if (!((song->channel_mask >> ch) & 1u)) {
+            sample = 0.0f;
+        }
+
         if (song->scope_enabled) {
             song->scope_buffer[ch][song->scope_write_pos[ch]] = sample;
             song->scope_write_pos[ch] = (song->scope_write_pos[ch] + 1) & AON_SCOPE_BUFFER_MASK;
@@ -2051,6 +2058,7 @@ AonSong* aon_song_create(const uint8_t* data, uint32_t size) {
 
     song->sample_rate = 48000;
     song->solo_channel = -1;
+    song->channel_mask = 0xFFFFFFFFu;
     song->stereo_mix = 0.0f;
 
     if (!aon_load(song, data, size)) {
@@ -2100,6 +2108,12 @@ void aon_song_set_sample_rate(AonSong* song, uint32_t rate) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void aon_song_set_channel_mask(AonSong* song, uint32_t mask) {
+    if (song) {
+        song->channel_mask = mask;
+    }
+}
 
 void aon_song_set_solo_channel(AonSong* song, int32_t channel) {
     if (song) {

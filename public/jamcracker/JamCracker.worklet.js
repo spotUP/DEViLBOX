@@ -63,6 +63,7 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
         break;
       case 'setMuteMask':
         this.muteMask = data.mask;
+        this.applyMuteMask();
         break;
       case 'dispose':
         if (this.tuneLoaded && this.wasm) {
@@ -189,6 +190,7 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
       this.tuneLoaded = true;
       this.resetRingBuffer();
       this.resamplePos = 0.0;
+      this.applyMuteMask();
       this.port.postMessage({
         type: 'loaded',
         songLength: this.wasm._jc_get_song_length(),
@@ -268,6 +270,18 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
     this.ringWritePos = (this.ringWritePos + frames) & (this.ringSize - 1);
     this.ringAvailable += frames;
   }
+  /**
+   * The mixer's mask is bit N SET = channel N AUDIBLE. The core's gain export
+   * takes 1 = audible, 0 = silent, so the bit becomes the gain here, once.
+   * Re-applied after every load: a fresh module starts with all channels on.
+   */
+  applyMuteMask() {
+    if (!this.wasm || typeof this.wasm._jc_set_channel_gain !== 'function') return;
+    for (let ch = 0; ch < 4; ch++) {
+      this.wasm._jc_set_channel_gain(ch, (this.muteMask >>> ch) & 1 ? 1 : 0);
+    }
+  }
+
 
   process(inputs, outputs, parameters) {
     const output = outputs[0];

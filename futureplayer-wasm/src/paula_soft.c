@@ -17,6 +17,13 @@ typedef struct {
 static PaulaChannel s_ch[PAULA_CHANNELS];
 static float        s_paula_clock = PAULA_CLOCK_PAL;
 static float        s_channel_peaks[PAULA_CHANNELS] = {0};
+// Per-channel output gain (mute/solo); deliberately not cleared by paula_reset.
+static float        s_channel_gain[PAULA_CHANNELS] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+void paula_set_channel_gain(int ch, float gain) {
+    if (ch < 0 || ch >= PAULA_CHANNELS) return;
+    s_channel_gain[ch] = gain < 0.0f ? 0.0f : (gain > 1.0f ? 1.0f : gain);
+}
 
 void paula_reset(void) {
     memset(s_ch, 0, sizeof(s_ch));
@@ -107,7 +114,7 @@ int paula_render(float* buffer, int frames) {
     for (i = 0; i < frames; i++) {
         float ch_out[PAULA_CHANNELS];
         for (c = 0; c < PAULA_CHANNELS; c++) {
-            ch_out[c] = sample_channel(&s_ch[c]);
+            ch_out[c] = sample_channel(&s_ch[c]) * s_channel_gain[c];
             float absv = ch_out[c] < 0 ? -ch_out[c] : ch_out[c];
             if (absv > s_channel_peaks[c]) s_channel_peaks[c] = absv;
         }

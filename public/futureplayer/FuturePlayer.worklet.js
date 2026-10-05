@@ -65,6 +65,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
         break;
       case 'setMuteMask':
         this.muteMask = data.mask;
+        this.applyMuteMask();
         break;
       case 'dispose':
         if (this.tuneLoaded && this.wasm) {
@@ -231,6 +232,8 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
       const sampleRate = this.wasm._fp_wasm_get_sample_rate();
       if (sampleRate > 0) this.srcRate = sampleRate;
 
+      this.applyMuteMask();
+
       this.port.postMessage({
         type: 'loaded',
         numSubsongs: this.wasm._fp_wasm_get_num_subsongs(),
@@ -319,6 +322,18 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
     this.ringWritePos = (this.ringWritePos + frames) & (this.ringSize - 1);
     this.ringAvailable += frames;
   }
+  /**
+   * The mixer's mask is bit N SET = channel N AUDIBLE. The core's gain export
+   * takes 1 = audible, 0 = silent, so the bit becomes the gain here, once.
+   * Re-applied after every load: a fresh module starts with all channels on.
+   */
+  applyMuteMask() {
+    if (!this.wasm || typeof this.wasm._fp_wasm_set_channel_gain !== 'function') return;
+    for (let ch = 0; ch < 4; ch++) {
+      this.wasm._fp_wasm_set_channel_gain(ch, (this.muteMask >>> ch) & 1 ? 1 : 0);
+    }
+  }
+
 
   process(inputs, outputs, parameters) {
     const output = outputs[0];

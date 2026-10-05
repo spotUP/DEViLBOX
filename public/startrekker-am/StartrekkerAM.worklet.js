@@ -29,6 +29,7 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             this._wasm.HEAPU8.set(data, ptr);
             this._wasm._player_load_mod(ptr, data.length);
             this._wasm._free(ptr);
+            this.applyMuteMask();
             this.port.postMessage({ type: 'modLoaded' });
             break;
         }
@@ -42,6 +43,7 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             this._wasm._free(ptr);
             if (ok) {
                 const title = this._wasm.ccall('player_get_title', 'string', [], []);
+                this.applyMuteMask();
                 this.port.postMessage({ type: 'loaded', title });
             } else {
                 this.port.postMessage({ type: 'error', msg: 'player_load_nt failed' });
@@ -58,6 +60,7 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             this._wasm._free(ptr);
             if (ok) {
                 const title = this._wasm.ccall('player_get_title', 'string', [], []);
+                this.applyMuteMask();
                 this.port.postMessage({ type: 'loaded', title });
             } else {
                 this.port.postMessage({ type: 'error', msg: 'player_load failed' });
@@ -84,6 +87,7 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             break;
         case 'setMuteMask':
             this.muteMask = msg.mask;
+            this.applyMuteMask();
             break;
         default:
             break;
@@ -128,6 +132,18 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             this.port.postMessage({ type: 'error', msg: String(err) });
         }
     }
+    /**
+     * The mixer's mask is bit N SET = channel N AUDIBLE. The core's gain export
+     * takes 1 = audible, 0 = silent, so the bit becomes the gain here, once.
+     * Re-applied after every load: a fresh module starts with all channels on.
+     */
+    applyMuteMask() {
+      if (!this._wasm || typeof this._wasm._paula_set_channel_gain !== 'function') return;
+      for (let ch = 0; ch < 4; ch++) {
+        this._wasm._paula_set_channel_gain(ch, (this.muteMask >>> ch) & 1 ? 1 : 0);
+      }
+    }
+
 
     process(_inputs, outputs) {
         if (!this._ready || !this._wasm || !this._outPtr) {

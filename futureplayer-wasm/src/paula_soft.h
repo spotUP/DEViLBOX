@@ -19,6 +19,7 @@ void paula_dma_write(uint16_t dmacon);            // $8xxx=enable, $0xxx=disable
 
 // Reset all channels
 void paula_reset(void);
+void paula_set_channel_gain(int ch, float gain);  // 0.0 mutes, 1.0 full
 
 // Configure clock (call before render; default: PAL)
 void paula_set_clock(float paula_clock);

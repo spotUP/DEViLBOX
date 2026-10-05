@@ -53,6 +53,8 @@ void aon_song_destroy(AonSong* song);
 void aon_song_set_subsong(AonSong* song, int subsong);
 void aon_song_set_sample_rate(AonSong* song, uint32_t rate);
 void aon_song_set_solo_channel(AonSong* song, int32_t channel);
+// bit N set = channel N audible; muted channels keep running silently
+void aon_song_set_channel_mask(AonSong* song, uint32_t mask);
 void aon_song_set_stereo_mix(AonSong* song, float mix);
 
 // Playback

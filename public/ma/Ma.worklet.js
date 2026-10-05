@@ -64,6 +64,8 @@ class MaProcessor extends AudioWorkletProcessor {
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
 
+            this.applyMuteMask();
+
             this.port.postMessage({ type: 'moduleLoaded' });
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
@@ -177,6 +179,7 @@ class MaProcessor extends AudioWorkletProcessor {
 
       case 'setMuteMask':
         this.muteMask = data.mask;
+        this.applyMuteMask();
         break;
 
       case 'getInstrumentParam': {
@@ -332,6 +335,18 @@ class MaProcessor extends AudioWorkletProcessor {
     this.initialized = false;
     this.lastHeapBuffer = null;
   }
+  /**
+   * The mixer's mask is bit N SET = channel N AUDIBLE. The core's gain export
+   * takes 1 = audible, 0 = silent, so the bit becomes the gain here, once.
+   * Re-applied after every load: a fresh module starts with all channels on.
+   */
+  applyMuteMask() {
+    if (!this.module || typeof this.module._player_set_channel_gain !== 'function') return;
+    for (let ch = 0; ch < 4; ch++) {
+      this.module._player_set_channel_gain(ch, (this.muteMask >>> ch) & 1 ? 1 : 0);
+    }
+  }
+
 
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.module) return true;
