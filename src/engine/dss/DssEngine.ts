@@ -13,6 +13,7 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import { dssCellFields } from '@engine/uade/encoders/DSSEncoder';
 
 function dssTransform(code: string): string {
   return code
@@ -139,9 +140,14 @@ export class DssEngine extends WASMChannelOutputsEngine {
     this._positionCallback = callback;
   }
 
-  /** Edit a pattern cell in the WASM replayer */
-  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+  /**
+   * Edit a pattern cell in the WASM replayer. Takes the grid's terms (note,
+   * instrument, XM effect) and hands dss_set_cell the replayer's own (sample,
+   * period, DSS effect) through the same reverse mapping the file encoder uses.
+   */
+  setCell(index: number, row: number, channel: number, note: number, instrument: number, effTyp: number, eff: number): void {
+    const fields = dssCellFields({ note, instrument, effTyp, eff });
+    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, ...fields });
   }
 
   /** Set an instrument parameter by name */

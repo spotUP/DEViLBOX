@@ -568,6 +568,11 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
     uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
       // uadePatternLayout omitted: native Sampler instruments handle audio directly.
       // UADE audio is silent for DSS — samples are extracted as PCM Samplers.
+      // Native playback: the DSS WASM replayer (DssReplayer, ahead of
+      // UADEEditable in WASM_ENGINES). Grid edits reach it through
+      // DssEngine.setCell (dss_set_cell). Nothing attached this before, so
+      // every .dss played on UADE, where edits were not heard at all.
+      dssFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     };
   } catch {
     return null;
