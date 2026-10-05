@@ -36,6 +36,7 @@
  *   npx tsx tools/playback-smoke-test.ts --skip-furnace    # all EXCEPT furnace demos
  *   npx tsx tools/playback-smoke-test.ts --push-results    # push pass/fail to localhost:4444 tracker
  *   npx tsx tools/playback-smoke-test.ts --only AHX,MOD    # test specific families only (substring match)
+ *   npx tsx tools/playback-smoke-test.ts --files=desire/batmanreturns.dsr,sc68/aprentice%20title.sc68  # explicit corpus files, nothing else
  *   npx tsx tools/playback-smoke-test.ts --resume          # skip tests that passed in the last run (reads /tmp/final-audit.txt)
  *   npx tsx tools/playback-smoke-test.ts --lockstep        # enable Furnace lock-step command comparison (slow)
  *   npx tsx tools/playback-smoke-test.ts --write-baseline  # snapshot current results to tools/baselines/playback-smoke.json
@@ -1074,6 +1075,18 @@ async function main(): Promise<void> {
   const skipFurnace = args.includes('--skip-furnace');
   const lockstep = args.includes('--lockstep');
   const resume = args.includes('--resume');  // skip tests that passed in the last run
+  // --files=<a,b,...>: explicit corpus files (relative to public/data/songs),
+  // one test each, nothing else. The broken-formats sweep re-checks the
+  // owner's jukebox verdicts this way once a tab is attached (2026-10-05).
+  const filesArg = args.find(a => a.startsWith('--files='));
+  const fileTests: TestCase[] = filesArg
+    ? filesArg.slice('--files='.length).split(',').map(s => s.trim()).filter(Boolean).map(rel => ({
+        name: rel,
+        family: rel.split('/')[0].substring(0, 12).toUpperCase(),
+        loader: 'local' as const,
+        path: `${process.cwd()}/public/data/songs/${rel}`,
+      }))
+    : [];
   const onlyArg = args.find(a => a.startsWith('--only=') || a.startsWith('--only '));
   const onlyFamilies = onlyArg
     ? (onlyArg.includes('=') ? onlyArg.split('=')[1] : args[args.indexOf('--only') + 1])
@@ -1082,7 +1095,8 @@ async function main(): Promise<void> {
 
   // Build the test set based on flags
   let allTests: TestCase[];
-  if (hardcodedOnly) allTests = TESTS;
+  if (fileTests.length) allTests = fileTests;
+  else if (hardcodedOnly) allTests = TESTS;
   else if (localOnly) allTests = localTests;
   else if (furnaceOnly) allTests = furnaceTests;
   else if (fxOnly) allTests = effectTests;
@@ -1098,7 +1112,7 @@ async function main(): Promise<void> {
   }
 
   // Always include regression tests (tier 6) unless a specific --*-only flag was used
-  if (!hardcodedOnly && !localOnly && !furnaceOnly && !fxOnly) {
+  if (!hardcodedOnly && !localOnly && !furnaceOnly && !fxOnly && !fileTests.length) {
     allTests.push(...REGRESSIONS);
   }
 
