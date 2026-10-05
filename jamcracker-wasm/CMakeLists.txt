@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
 project(JamCracker C)
+# One software Paula for every replayer (never a local copy).
+set(PAULA_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tools/asm68k-to-c/runtime")
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(JamCracker src/jc_harness.c src/paula_soft.c)
-target_include_directories(JamCracker PRIVATE src)
+add_executable(JamCracker src/jc_harness.c ${PAULA_RUNTIME_DIR}/paula_soft.c)
+target_include_directories(JamCracker PRIVATE src ${PAULA_RUNTIME_DIR})
 
 # Emscripten settings
 if(EMSCRIPTEN)

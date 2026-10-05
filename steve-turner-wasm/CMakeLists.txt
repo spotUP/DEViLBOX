@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(SteveTurner C)
+# One software Paula for every replayer (never a local copy).
+set(PAULA_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tools/asm68k-to-c/runtime")
 
 set(CMAKE_C_STANDARD 99)
 set(OUTPUT_NAME "SteveTurner")
@@ -9,10 +11,10 @@ file(MAKE_DIRECTORY ${OUTPUT_DIR})
 add_executable(${OUTPUT_NAME}
     src/steveturner/steveturner.c
     src/steveturner/steveturner_wrapper.c
-    src/steveturner/paula_soft.c
+    ${PAULA_RUNTIME_DIR}/paula_soft.c
 )
 
-target_include_directories(${OUTPUT_NAME} PRIVATE src/steveturner)
+target_include_directories(${OUTPUT_NAME} PRIVATE src/steveturner ${PAULA_RUNTIME_DIR})
 target_link_libraries(${OUTPUT_NAME} m)
 
 if(EMSCRIPTEN)

@@ -12,8 +12,15 @@ test('wrapper contains all required exported symbols', () => {
 });
 
 test('cmake contains emscripten exported functions', () => {
-  const cmake = genCMake({ playerName: 'sonix', playerFile: 'sonix.c' });
+  const cmake = genCMake({ playerName: 'sonix', playerFile: 'sonix.c', runtimeDir: '../../runtime' });
   expect(cmake).toContain('_player_init');
   expect(cmake).toContain('_player_render');
   expect(cmake).toContain('emcmake');
+});
+
+test('cmake builds the shared runtime Paula, not a local copy', () => {
+  const cmake = genCMake({ playerName: 'sonix', playerFile: 'sonix.c', runtimeDir: '../../runtime' });
+  expect(cmake).toContain('set(PAULA_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../runtime")');
+  expect(cmake).toContain('${PAULA_RUNTIME_DIR}/paula_soft.c');
+  expect(cmake).not.toMatch(/^\s+paula_soft\.c$/m);
 });
