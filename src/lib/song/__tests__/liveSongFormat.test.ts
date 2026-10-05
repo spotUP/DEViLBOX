@@ -46,6 +46,16 @@ describe('live song format', () => {
     expect(playingEngineFromStores(useFormatStore.getState() as unknown as Record<string, unknown>, [])).toBe('TFM');
   });
 
+  it('a StoneTracker song activates the StoneTracker engine with its sample bank', () => {
+    useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
+    const bank = new ArrayBuffer(8);
+    useFormatStore.getState().applyEditorMode({ format: 'StoneTracker', stoneTrackerFileData: new ArrayBuffer(16), stoneTrackerSampleData: bank } as never);
+    const live = liveTrackerSong();
+    expect(playingEngineFor(live)).toBe('StoneTracker');
+    expect(live.stoneTrackerSampleData).toBe(bank);
+    expect(playingEngineFromStores(useFormatStore.getState() as unknown as Record<string, unknown>, [])).toBe('StoneTracker');
+  });
+
   it('a saved / crash-recovered MDX comes back on the Mdxmini engine', () => {
     useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
     useFormatStore.getState().applyEditorMode({ format: 'MDX', mdxminiFileData: new ArrayBuffer(16) } as never);

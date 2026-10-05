@@ -1,0 +1,7 @@
+Musashi v4.60 (m68kmake banner; readme.txt still says 4.10)
+https://github.com/kstenerud/Musashi commit 313ebf1bd9f4d0d93341eb5ce21fd8a119e9dbdd (2026-03-08)
+Licence: MIT (readme.txt). softfloat/: John R. Hauser's SoftFloat release 2 (softfloat/README.txt terms).
+Vendored unmodified, minus m68kdasm.c (the disassembler, unused) and the test/
+and example/ trees. m68kops.c/.h are generated at build time by m68kmake
+(stonetracker-wasm/CMakeLists.txt).
+Used by: stonetracker-wasm (StoneTracker player on a 68020 core).
