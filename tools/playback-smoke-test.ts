@@ -638,27 +638,18 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       const base64 = fileData.toString('base64');
       const filename = bn(test.path);
 
-      // Auto-discover companion files (same logic as mcpServer.ts load_file)
+      // Companions: the app's own resolver (src/lib/import/companionResolver.ts),
+      // registered under the name the player opens and read from the file on
+      // disk (`sources`). This had its own three-prefix copy and so sent no
+      // .adsc.as, WantedTeam.bin, smp.set, songplay, .mod.nt ... (2026-10-05).
       const companionFiles: Record<string, string> = {};
       const dir = dn(test.path);
-      const lowerFilename = filename.toLowerCase();
       try {
         const { readdirSync } = await import('fs');
-        const dirFiles = readdirSync(dir);
-        const prefixPairs: [string, string][] = [
-          ['mdat.', 'smpl.'], ['smpl.', 'mdat.'],
-          ['midi.', 'smpl.'], ['smpl.', 'midi.'],
-          ['jpn.', 'smp.'], ['smp.', 'jpn.'],
-        ];
-        for (const [myPrefix, pairPrefix] of prefixPairs) {
-          if (lowerFilename.startsWith(myPrefix)) {
-            const suffix = filename.slice(myPrefix.length);
-            const pairName = dirFiles.find(f => f.toLowerCase() === `${pairPrefix}${suffix.toLowerCase()}`);
-            if (pairName) {
-              const pairData = readFileSync(`${dir}/${pairName}`);
-              companionFiles[pairName] = pairData.toString('base64');
-            }
-          }
+        const { listingFromRelativePaths, resolveCompanions } = await import('../src/lib/import/companionResolver');
+        const res = resolveCompanions(filename, listingFromRelativePaths(readdirSync(dir)));
+        for (const name of res.companions) {
+          companionFiles[name] = readFileSync(`${dir}/${res.sources[name] ?? name}`).toString('base64');
         }
       } catch { /* companion discovery failed — OK for most formats */ }
 
