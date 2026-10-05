@@ -223,3 +223,11 @@ Instrument: `tools/uade-audit/gridVsPaula.ts` (2026-10-05). It renders the file 
 | S4 | EMPTY STUB: digitalSonixChrome `dragon'sbreath*.dsc` (3 files), imagesMusicSystem `chip5.ims` | The parser returns one empty 64-row placeholder with the file as `uadeEditableFileData`; F6 (7060474cf) now falls through to the UADE scan grid when the stub has no notes. The owner's "Incorrect Pattern Data" predates F6. | F6 | BROWSER (scan grid) |
 | S5 | NO NATIVE PARSER: uade_tf `sly spy title.tf`, soundControl, activisionPro `gettysburg.avp`, ronKlaren, inStereo2 | UADE-only formats; the grid is the scan grid (F6). "Incorrect" = the heuristic scan, by design | none | OWNER (accept scan grid, or a parser per format) |
 | S6 | forgotten-worlds `.fw` | UADE renders silence (B11, UADE's own bug) so no grid can be checked | none | OWNER |
+
+## Owner answers 2026-10-05 (morning)
+
+- MDX hang after e665a0ab3: owner tests at :5174 (load mdx/1943kaia.mdx, Play); push held until then.
+- UADE starting subsong: FIRST AUDIBLE - start on the first subsong that renders sound within a few seconds (Desire batmanreturns.dsr: subsong 1 silent 20 s).
+- Ports approved: TFM Music Maker (ZXTune .tfe player + YM2203), StoneTracker (68k StonePlayer.Library via asm68k), Hippel ST .sog/.soc (Atari ST YM).
+- Missing sidecars: owner finds them and drops them in; then wire + re-sweep those rows.
+- Subagent rule (global): smallest model that can do the job; haiku for running tests/sweeps.
