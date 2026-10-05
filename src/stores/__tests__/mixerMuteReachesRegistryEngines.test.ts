@@ -33,7 +33,7 @@ describe('the engine registry is the one source', () => {
     const { WASM_ENGINES } = await import('@/engine/replayer/NativeEngineRouting');
     const regs = await collectMuteRegistrations(WASM_ENGINES);
     const bitmask = new Set(regs.filter(r => r.bitmask).map(r => r.key));
-    for (const key of ['FredReplayer2', 'OktalyzerReplayer', 'DssReplayer', 'SynthesisReplayer', 'SoundFactory2Replayer', 'Asap', 'MusicLine']) {
+    for (const key of ['FredReplayer2', 'OktalyzerReplayer', 'DssReplayer', 'SynthesisReplayer', 'SoundFactory2Replayer', 'Asap', 'MusicLine', 'TFM']) {
       expect(bitmask.has(key), key).toBe(true);
     }
   }, 60_000);

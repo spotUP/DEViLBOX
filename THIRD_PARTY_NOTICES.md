@@ -317,6 +317,12 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 - **License:** GPL-2.0-or-later (`third-party/aylet-0.5/COPYING`)
 - **Used for:** ZX Spectrum .ay / .emul (ZXAY EMUL) playback — the tune's own Z80 code with AY and beeper emulation (compiled to WASM). `aylet-wasm/src/z80_frame.c` is aylet's `z80.c` made re-entrant one frame at a time; `sound.c` and the opcode tables are used unchanged.
 
+### ZXTune TFM Music Maker player
+- **Author:** Vitamin (vitamin.caig@gmail.com)
+- **Source:** https://github.com/vitamin-caig/zxtune (master, 2026-10-05): `src/formats/chiptune/fm/tfmmusicmaker.cpp`, `src/module/players/tfm/tfmmusicmaker.cpp`, `src/module/players/tfm/tfm_base_track.cpp`
+- **License:** GPL-3.0
+- **Used for:** TFM Music Maker (.tfe, ZX Spectrum TurboFM) playback. The parser, frame player and YM2203 register builder are extracted from ZXTune's framework into `tfm-wasm/src/tfm_player.cpp` (logic kept line for line) and drive two ymfm YM2203 (compiled to WASM, `public/tfm/`).
+
 ### piyopiyo-rs
 - **Author:** crumblingstatue
 - **Source:** https://github.com/crumblingstatue/piyopiyo-rs (player algorithm ported to `public/piyopiyo/PiyoPiyo.worklet.js`; drum samples copied to `public/piyopiyo/drums/`)

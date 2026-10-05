@@ -72,6 +72,7 @@ export const FILE_DATA_FIELDS = [
   'sd2FileData',
   'ayFileData',
   'piyoPiyoFileData',
+  'tfmFileData',
   'asapFileData',
   'mdxminiFileData',
   'pmdFileData',

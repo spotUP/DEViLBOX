@@ -39,6 +39,13 @@ describe('live song format', () => {
     expect(playingEngineFor(liveTrackerSong())).toBe('PiyoPiyo');
   });
 
+  it('a TFM Music Maker song activates the TFM engine', () => {
+    useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
+    useFormatStore.getState().applyEditorMode({ format: 'TFM', tfmFileData: new ArrayBuffer(16) } as never);
+    expect(playingEngineFor(liveTrackerSong())).toBe('TFM');
+    expect(playingEngineFromStores(useFormatStore.getState() as unknown as Record<string, unknown>, [])).toBe('TFM');
+  });
+
   it('a saved / crash-recovered MDX comes back on the Mdxmini engine', () => {
     useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
     useFormatStore.getState().applyEditorMode({ format: 'MDX', mdxminiFileData: new ArrayBuffer(16) } as never);

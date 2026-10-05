@@ -17,12 +17,3 @@ export function isStoneTrackerFormat(bytes: Uint8Array): boolean { return ascii(
 export function parseStoneTrackerFile(_bytes: Uint8Array, filename = ''): TrackerSong {
   throw new Error(`${filename}: StoneTracker (.spm) has no replayer in DEViLBOX yet`);
 }
-
-/** TFM Music Maker (ZX Spectrum TurboFM, .tfe): no magic, the extension names it. */
-export function isTfmMusicMakerFormat(bytes: Uint8Array): boolean {
-  // No magic; a real file has a non-zero header (rainstorm.tfe: 33 01 29 00 ...).
-  return bytes.length > 16 && bytes.subarray(0, 16).some((b) => b !== 0);
-}
-export function parseTfmMusicMakerFile(_bytes: Uint8Array, filename = ''): TrackerSong {
-  throw new Error(`${filename}: TFM Music Maker (.tfe) has no replayer in DEViLBOX yet`);
-}

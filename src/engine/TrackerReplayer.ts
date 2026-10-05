@@ -105,6 +105,7 @@ export type TrackerFormat =
   | 'GBS'  // Game Boy Sound System
   | 'AY'   // ZX Spectrum AY (ZXAYEMUL)
   | 'PiyoPiyo' // Studio Pixel PiyoPiyo (.pmd)
+  | 'TFM'  // TFM Music Maker (.tfe, ZX Spectrum TurboFM, 2x YM2203)
   | 'KSS'  // MSX KSS (AY/SCC/OPLL/Y8950)
   | 'SNDH' // Atari ST SNDH/SC68 (YM2149 68000 code)
   | 'HES'  // PC Engine / TurboGrafx-16 HuC6280
@@ -349,6 +350,8 @@ export interface TrackerSong {
   ayFileData?: ArrayBuffer;
   /** Whole Studio Pixel PiyoPiyo .pmd for PiyoPiyoEngine worklet playback */
   piyoPiyoFileData?: ArrayBuffer;
+  /** Whole TFM Music Maker .tfe for TFMEngine WASM playback (ZXTune player + 2x ymfm YM2203) */
+  tfmFileData?: ArrayBuffer;
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */
   startrekkerAMFileData?: ArrayBuffer;
   /** Raw Startrekker AM .nt synth data for StartrekkerAMEngine WASM playback */
