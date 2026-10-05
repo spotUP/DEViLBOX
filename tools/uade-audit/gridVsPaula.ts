@@ -17,6 +17,12 @@
  *
  * Paula is read to the song's end (UADE, looping off); --secs N caps it.
  *
+ * The UADE import's scan grid (a UADE-only format, or a native parser that
+ * falls back to it) needs the worklet. Dump that grid's note sequence per
+ * channel to JSON ({ "<basename>": number[][] }) and pass it with
+ * --grid-json FILE; a file named there is scored against that grid instead
+ * of its native parser's.
+ *
  * Output per file: channels, grid events, Paula events, score 0..1 per
  * channel pairing (best assignment of grid channels to voices), and the first
  * 16 intervals of each so a mismatch can be read. The 2026-10-05
@@ -44,7 +50,10 @@ const secsIdx = args.indexOf('--secs');
 // uade_wasm_render's return value - 1, not a frame count - to its clock, so
 // every run read the whole song whatever --secs said.)
 const SECS = secsIdx >= 0 ? Number(args[secsIdx + 1]) : 900;
-const files = args.filter((a, i) => !a.startsWith('--') && (secsIdx < 0 || i !== secsIdx + 1));
+const gridJsonIdx = args.indexOf('--grid-json');
+const GRID_JSON: Record<string, number[][]> = gridJsonIdx >= 0 ? JSON.parse(readFileSync(args[gridJsonIdx + 1], 'utf8')) : {};
+const optionValues = new Set([secsIdx, gridJsonIdx].filter((i) => i >= 0).map((i) => i + 1));
+const files = args.filter((a, i) => !a.startsWith('--') && !optionValues.has(i));
 
 /**
  * Paula note-on rules - one function each, applied per voice in log order.
@@ -211,6 +220,7 @@ async function paulaNotes(mod: LogModule, data: Uint8Array, name: string, dir: s
 
 /** The grid's note sequence per channel, in song order. */
 async function gridNotes(data: Uint8Array, name: string): Promise<{ format: string; notes: number[][] } | null> {
+  if (GRID_JSON[name]) return { format: 'grid-json', notes: GRID_JSON[name] };
   const fmt = detectFormatFromContent(name, data.subarray(0, 128));
   if (!fmt?.nativeParser) return null;
   const modPath = fmt.nativeParser.module.replace('@lib/', `${process.cwd()}/src/lib/`);

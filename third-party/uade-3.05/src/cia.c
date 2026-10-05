@@ -24,6 +24,11 @@
  * Defined in uade-wasm/src/entry.c; used to count cumulative ticks for
  * row-boundary detection in the enhanced scan. */
 extern void uade_wasm_on_cia_a_tick(void);
+/* Hook called once per CIA-A Timer B overflow with its interrupt enabled:
+ * the timer the score runs a player's DTP_Interrupt from (score.s
+ * cia_chip_sel = 0, cia_timer_sel = 1), i.e. the player's real tick. Feeds
+ * the tick snapshot ring, which Timer A never filled for any format. */
+extern void uade_wasm_on_player_tick(void);
 #endif
 
 #define DIV10 5 /* Yes, a bad identifier. */
@@ -160,6 +165,10 @@ static void CIA_update(void)
 	ciaaicr |= 2; RethinkICRA();
 	ciaatb = ciaalb;
 	if (ciaacrb & 0x8) ciaacrb &= ~1;
+#ifdef UADE_WASM
+	if (ciaaimask & 2)
+	    uade_wasm_on_player_tick();
+#endif
     }
     if (bovfla) {
 	ciabicr |= 1; RethinkICRB();
