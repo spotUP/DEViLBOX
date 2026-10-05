@@ -27,8 +27,9 @@
  *
  * Note mapping:
  *   DM1 note byte 0 = no note. Non-zero: note + channel.Transpose -> index into DM1 Periods.
- *   DM1 period table: index 0 = 0 (silent), 1-72 = valid Amiga periods, 73-83 = clamped at 113.
- *   Index 37 = 856 = ProTracker C-1 = XM note 13.
+ *   A cell is named by the period it plays (DeltaMusic1Notes.ts, periodNotes naming):
+ *   index 36 = 856 = C-1 = note 13. The table skips 1016, so indices below 34 sit a
+ *   semitone lower than a straight offset would name them.
  *
  * Instrument header sizes:
  *   isSample=true:  30 bytes (no 48-byte synth table)
@@ -42,27 +43,14 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig, UADEChipRamInfo, DeltaMusic1Config } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeDeltaMusic1Cell } from '@/engine/uade/encoders/DeltaMusic1Encoder';
-import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
+import { createSamplerInstrument } from './AmigaUtils';
+import { dm1IndexToNote } from './DeltaMusic1Notes';
 
 // -- Constants ---------------------------------------------------------------
 
 /** PAL Amiga clock frequency (Hz) */
 const PAL_CLOCK = 3546895;
 
-/**
- * DM1 period table (84 entries). Index 0 = silent, 1-72 = valid Amiga periods,
- * 73-83 = clamped at 113 (highest note limit).
- * Source: NostalgicPlayer DeltaMusic10/Tables.cs
- */
-const DM1_PERIODS: number[] = [
-     0, 6848, 6464, 6096, 5760, 5424, 5120, 4832, 4560, 4304, 4064, 3840,
-  3616, 3424, 3232, 3048, 2880, 2712, 2560, 2416, 2280, 2152, 2032, 1920,
-  1808, 1712, 1616, 1524, 1440, 1356, 1280, 1208, 1140, 1076,  960,  904,
-   856,  808,  762,  720,  678,  640,  604,  570,  538,  508,  480,  452,
-   428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240,  226,
-   214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120,  113,
-   113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,
-];
 
 /**
  * PAL sample rate at ProTracker C-3 (period 214) -- standard Amiga PCM rate.
@@ -185,24 +173,6 @@ function buildDM1Config(inst: DM1Instrument): DeltaMusic1Config {
   };
 }
 
-// -- Note conversion ---------------------------------------------------------
-
-/**
- * Convert a DM1 note index (after applying channel transpose) to an XM note number.
- *
- * DM1 index 0 = no note (returns 0).
- * DM1 index 1-83 -> DM1_PERIODS lookup -> Amiga period -> XM note via AmigaUtils.
- *
- * Example: DM1 note 37 -> period 856 -> periodToNoteIndex(856)=1 -> amigaNoteToXM(1)=13 (XM C-1)
- */
-function dm1NoteToXM(noteIndex: number): number {
-  if (noteIndex <= 0) return 0;
-  const idx = Math.max(0, Math.min(83, noteIndex));
-  const period = DM1_PERIODS[idx];
-  if (period === 0) return 0;
-  const amigaIdx = periodToNoteIndex(period);
-  return amigaNoteToXM(amigaIdx);
-}
 
 // -- Main Parser -------------------------------------------------------------
 
@@ -576,8 +546,8 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
         // Convert DM1 note index (with channel transpose) to XM note number
         let xmNote = 0;
         if (line.note !== 0) {
-          xmNote = dm1NoteToXM(line.note + chTranspose);
-          xmNote = Math.max(0, Math.min(96, xmNote));
+          // The player adds note and transpose as bytes (frequency_data is a byte).
+          xmNote = dm1IndexToNote(line.note + chTranspose);
         }
 
         // Instrument is 0-based in DM1, 1-based in DEViLBOX; only set on a note trigger
@@ -720,9 +690,11 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       const dm1Arg   = raw[3];
 
       const instrument = instrRaw > 0 ? instrRaw + 1 : 0; // 0-based → 1-based
-      // dm1NoteToXM: note index → DM1_PERIODS → periodToNoteIndex → amigaNoteToXM
-      // Simplified inverse of encoder: xmNote = noteRaw + 36
-      const note = noteRaw > 0 ? noteRaw + 36 : 0;
+      // Named like the grid (DeltaMusic1Notes, without the track transpose,
+      // which lives in the track, not the cell). Several bytes share a name
+      // (1..25 read as C-0, 71..83 as B-3), so the exact byte rides in the
+      // `period` carrier, which encodeDeltaMusic1Cell writes back verbatim.
+      const note = dm1IndexToNote(noteRaw);
 
       // Store the DM1 effect command + argument VERBATIM (native raw codes), exactly as
       // encodeDeltaMusic1Cell writes them back (out[2]=effTyp, out[3]=eff). DM1's effect set
@@ -731,7 +703,7 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // on write-back. This codec is played by the dedicated DeltaMusic1Engine (raw file
       // bytes), not DEViLBOX's XM effect engine, so raw native codes are the correct
       // representation — this makes decode↔encode a byte-exact inverse (Tomy Tracker model).
-      return { note, instrument, volume: 0, effTyp: dm1Eff, eff: dm1Arg, effTyp2: 0, eff2: 0 };
+      return { note, instrument, volume: 0, effTyp: dm1Eff, eff: dm1Arg, effTyp2: 0, eff2: 0, period: noteRaw };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // pattern = TrackerSong pattern index (= song position)
