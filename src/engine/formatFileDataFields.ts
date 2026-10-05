@@ -75,6 +75,7 @@ export const FILE_DATA_FIELDS = [
   'tfmFileData',
   'stoneTrackerFileData',
   'stoneTrackerSampleData',   // companion SPS sample bank for StoneTracker
+  'musicMakerFileData',       // MusicMaker V8 song + instruments (FORM/MMV8)
   'asapFileData',
   'mdxminiFileData',
   'pmdFileData',

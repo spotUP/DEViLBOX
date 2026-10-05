@@ -3,6 +3,9 @@
  * played the same files (2026-10-05):
  *  1. StarTrekker AM `.mod` + `.mod.nt` opened as a plain TS-engine MOD: silent.
  *  2. MusicMaker `moveback.sdata` reached UADE as `sdata.moveback`: refused.
+ *     (MusicMaker songs now play on MusicMakerEngine; the native route is
+ *     tested in src/engine/__tests__/musicMakerPlays.test.ts. The name
+ *     mapping stays for any `sdata.<tune>` that still falls to UADE.)
  * Both are decided by the name/companions the app hands over; the render half
  * uses the exact name the app's route gives UADE plus the resolver's companions.
  */
@@ -20,14 +23,9 @@ vi.mock('@lib/import/formats/UADEParser', () => ({
     return { __uade: true };
   }),
 }));
-vi.mock('@lib/import/formats/MusicMakerParser', async () => ({
-  isMusicMaker4VFormat: () => false,
-  parseMusicMaker4VFile: () => { throw new Error('native refused'); },
-}));
 
 const ROOT = process.cwd();
 const AM_DIR = join(ROOT, 'public/data/songs/startrekker-am');
-const MM_DIR = join(ROOT, 'public/data/songs/formats/MusicMaker V8 Old/- unknown');
 
 function companionMap(dir: string, module: string): Map<string, ArrayBuffer> {
   const r = resolveCompanions(module, { siblings: readdirSync(dir) });
@@ -85,26 +83,10 @@ describe('StarTrekker AM .mod + .mod.nt', () => {
   }, 60_000);
 });
 
-describe('MusicMaker moveback.sdata', () => {
-  it('the app route offers prefix form and uadePlayerHint maps it to the name UADE plays', async () => {
-    const comps = companionMap(MM_DIR, 'moveback.sdata');
-    expect([...comps.keys()]).toContain('moveback.i');
-    const { parseModuleToSong } = await import('../parseModuleToSong');
-    await parseModuleToSong(fileOf(MM_DIR, 'moveback.sdata'), 0, undefined, undefined, comps);
-    expect(calls.length).toBe(1);
-    expect(uadePlayerHint(calls[0].name)).toBe('moveback.sdata');
-    expect(calls[0].companions).toContain('moveback.i');
-  }, 60_000);
-
-  it('other names are untouched', () => {
+describe('MusicMaker sdata prefix name', () => {
+  it('uadePlayerHint maps the prefix form to the name UADE plays; other names are untouched', () => {
     expect(uadePlayerHint('moveback.sdata')).toBe('moveback.sdata');
     expect(uadePlayerHint('dir/sdata.tune')).toBe('dir/tune.sdata');
     expect(uadePlayerHint('mm4.tune')).toBe('mm4.tune');
   });
-
-  it('UADE plays the prefix-form name the app hands over, once mapped', async () => {
-    const comps = companionMap(MM_DIR, 'moveback.sdata');
-    const r = await render(MM_DIR, 'moveback.sdata', comps, 'sdata.moveback');
-    expect(r.rms).toBeGreaterThan(0.05);
-  }, 60_000);
 });
