@@ -33,6 +33,9 @@ beforeAll(async () => {
 /** Peak of the first `seconds` of song 0; ASAP renders interleaved S16. */
 function peakOf(data: Uint8Array, name: string, seconds: number): number {
   const m = b.module;
+  // _asap_wasm_stop (below) deletes the ASAP object: every song starts from
+  // a fresh init, as the worklet does on load.
+  m._asap_wasm_init(44100);
   const ptr = m._malloc(data.length);
   b.heap().set(data, ptr);
   const nameBytes = new TextEncoder().encode(`${name}\0`);
