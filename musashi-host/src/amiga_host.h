@@ -40,6 +40,9 @@ typedef struct {
   void (*ram_write8)(uint32_t addr, uint8_t v);
   /* TRAP #n is about to be taken. Return 1 to skip the exception. */
   int (*trap)(int n);
+  /* After a write to a custom-chip register ($DFF000 + reg), with the PC of
+   * the writing instruction (register taps, traces). */
+  void (*custom_write)(uint32_t reg, uint16_t v, uint32_t ppc);
 } AhHooks;
 
 /* Clear RAM and every chip, reset the CPU (68020, supervisor, IPL 0) and set
