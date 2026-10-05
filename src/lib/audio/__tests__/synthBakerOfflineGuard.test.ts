@@ -34,4 +34,12 @@ describe('baking a synth to a sample', () => {
     expect(await SynthBaker.canRenderOffline(config('TestLiveEngineSynth'))).toBe(false);
     expect(await SynthBaker.canRenderOffline(config('TestToneSynth'))).toBe(true);
   });
+
+  it('refuses a whole-song engine label (PSG play, TFM) instead of building a stand-in Tone.js synth', async () => {
+    for (const t of ['PsgplaySynth', 'TFMSynth', 'MusicMakerSynth']) {
+      expect(await SynthBaker.canRenderOffline(config(t))).toBe(false);
+      await expect(SynthBaker.bakeToSample(config(t), 0.1)).rejects.toThrow();
+    }
+    expect(createInstrument).not.toHaveBeenCalled();
+  });
 });
