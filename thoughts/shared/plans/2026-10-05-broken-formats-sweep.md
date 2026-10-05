@@ -297,3 +297,11 @@ Phase 2 candidate (2026-10-05): tick-rebuilt grids on the generic UADE route bea
 - Done: SNDH (psgplay), SC68, ASAP/SAP, AY (aylet), QSF open in the scope view ('sc68' editor mode), label from scopeFormatLabel (6a68b027c, 1ec993bbf).
 - Owner decision: add game-music-emu as the engine for NSF/NSFE, GBS, HES, KSS, SPC, VGM/VGZ (and GYM); YM to the existing ZXTune engine; S98 to a ymfm player. All in the scope view. Today VGM/YM/NSF/S98 rebuild notes onto Furnace instruments (approximate) and GBS/HES/KSS/SPC are stubs. TODO.
 - Open: ASAP plays near-silent in the browser (chop suey.sap rms 0.0003) - owner deferred until after phase 1; now next.
+
+## Late 2026-10-05
+
+- ASAP plays in the browser (owner): TextEncoder in worklet, dropped load during init, render spin with no tune (page freeze), stop deleting the tune, and the mixer mask polarity (a88916f17, aeba7a72f). Mixer mask polarity audit: 11 engines inverted and fixed (85decab29, cc4f918a3); 10 engines store the mask and never use it (ArtOfNoise, Bd, Ma, JamCracker, FuturePlayer, PumaTracker, Sd2, SteveTurner, SidMon1Replayer, StartrekkerAM) - TODO.
+- game-music-emu formats confirmed by ear: NSF, GBS, HES, SPC, VGM (Mega Drive), GYM, YM (ZXTune), S98. KSS opens on its first sustained track (5c6438c71).
+- Owner: "skip to next subsong when it ends" + subsong nav for whole-song engines - agent running.
+- Open: shared worklet TextEncoder/TextDecoder prelude froze play when loaded for every engine (reverted); 20 worklets still rely on whichever engine installs the polyfill first. Needs per-worklet hand encoding or a safe prelude - TODO.
+- Open: ZXTune formats (PT3 etc.) still open as an empty grid, not the scope view.
