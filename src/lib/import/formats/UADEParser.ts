@@ -1359,75 +1359,18 @@ export async function parseUADEFile(
       console.warn('[UADEParser] UADEFormatAnalyzer failed:', e);
     }
 
-    // CIA tick snapshot reconstruction: replace display-only patterns with
-    // editable patterns derived from real Paula DMA trigger events.
-    // Conservative: only replaces when reconstruction yields ≥ 1 pattern.
-    try {
-      const tickSnapshots = await engine.getTickSnapshots();
-      engine.enableTickSnapshots(false);
-
-      if (tickSnapshots.length >= 2) {
-        const { reconstructPatterns } = await import('@engine/uade/UADEPatternReconstructor');
-
-        // Build samplePtr → instrument index map from song.instruments so the
-        // index matches the actual 1-based position in the instruments array.
-        // Using song.instruments (not Object.keys(activeEnhancedScan.samples))
-        // avoids order mismatches when buildEnhancedSong skips zero-length or
-        // PCM-less samples that are still present as keys in the scan table.
-        const samplePtrToInstrIndex = new Map<number, number>();
-        song.instruments.forEach((inst, idx) => {
-          const ptr = inst.sample?.uadeSamplePtr;
-          if (ptr != null) {
-            const instrIdx = idx + 1; // 1-based instrument index
-            samplePtrToInstrIndex.set(ptr, instrIdx);
-            // Also map the loop-start chip RAM address.
-            // After the first sample pass, Paula reloads lc to (ptr + loopStart).
-            // Without this alias, tick snapshots during looped playback would fail
-            // the instrument lookup and produce instrument = 0 in pattern rows.
-            // Use the raw enhanced scan loopStart (unscaled byte offset from chip
-            // RAM base) rather than inst.sample.loopStart which is a scaled PCM
-            // frame count after upsampling.
-            const rawLoopStart = activeEnhancedScan.samples[ptr]?.loopStart;
-            if (rawLoopStart != null && rawLoopStart > 0) {
-              samplePtrToInstrIndex.set(ptr + rawLoopStart, instrIdx);
-            }
-          }
-        });
-
-        // VBlank-timed compiled 68k formats (Dave Lowe etc.) don't use CIA timers,
-        // so the auto-detected speed is unreliable.  Force speed 6 for these.
-        const vblankPrefix = basename.split('.')[0]?.toLowerCase() ?? '';
-        const VBLANK_PREFIXES = new Set(['dl', 'bd', 'fg', 'jb', 'jp', 'mc', 'dh', 'ps', 'sb', 'th', 'wb', 'kc', 'jt']);
-        const speedHint = VBLANK_PREFIXES.has(vblankPrefix) ? 6 : undefined;
-
-        const reconstructed = reconstructPatterns(
-          tickSnapshots,
-          samplePtrToInstrIndex,
-          song.numChannels,
-          speedHint,
-        );
-
-        if (reconstructed.warnings.length > 0) {
-          console.warn('[UADEParser] Reconstructor warnings:', reconstructed.warnings);
-        }
-
-        if (reconstructed.patterns.length > 0) {
-          // Replace the scan-row display patterns with tick-reconstructed editable patterns.
-          // The instruments (from enhanced scan PCM extraction) are kept unchanged.
-          song.patterns = reconstructed.patterns;
-          song.songPositions = reconstructed.patterns.map((_, i) => i);
-          song.songLength = reconstructed.patterns.length;
-          song.initialSpeed = reconstructed.speed;
-          song.uadeFirstTick = reconstructed.firstTick;
-          console.log(
-            `[UADEParser] CIA tick reconstructor: ${reconstructed.patterns.length} patterns, speed=${reconstructed.speed}, firstTick=${reconstructed.firstTick}`,
-          );
-        }
-      }
-    } catch (e) {
-      console.warn('[UADEParser] CIA tick pattern reconstruction failed (non-critical):', e);
-      engine.enableTickSnapshots(false);
-    }
+    // The scan rows ARE this grid. Rebuilding it from the tick snapshots
+    // (the compiled-replayer route, reconstructClassicPatterns) was wired here
+    // too but never ran: the snapshot ring stayed empty until 2026-10-05,
+    // when it started filling from the player's real tick. Measured then on
+    // 50 corpus songs through this path, the rebuild emptied 13 grids
+    // (anthrox.fc, synth_corn.emod, space_sound.syn ... -> 0 notes) and
+    // lowered gridVsPaula on others (antmusic.mxtx 0.93 -> 0.77,
+    // crusaders1.dm 0.95 -> 0.84), while raising some compiled players
+    // (apb.dw, rebels.fred, ikari_warriors.jb). No import-time signal picks
+    // the better grid, so the scan grid stays. Capture stops here (which
+    // also clears the ring).
+    engine.enableTickSnapshots(false);
 
     // Fall back to classic if enhanced scan yielded no playable instruments.
     // This happens for synthesis-only formats, all-zero PCM, or pure VBlank formats
