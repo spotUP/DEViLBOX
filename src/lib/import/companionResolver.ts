@@ -304,6 +304,22 @@ export function resolveCompanions(moduleName: string, listing: CompanionListing)
   const own = dedupe([...ownSiblings, ...ownSubdirs]);
   const bank = sharedBank(module, moduleName, listing.siblings, own.length > 0);
   const companions = bank ? [...own, bank] : own;
+  // MusicMaker: the song `<tune>.sdata` keeps its instruments in
+  // `<tune>.ip`, and UADE's MusicMaker player opens them as `<tune>.i`
+  // ("file not found '/uade/moveback.i'"; with the alias the 4V player plays
+  // the V8 Old pairs, rms 0.07). Register under the name the player asks
+  // for, read from the file that exists (2026-10-05).
+  const mm = /^(.*)\.sdata$/i.exec(moduleName);
+  if (mm) {
+    const stem = mm[1].toLowerCase();
+    const ip = listing.siblings.find((n) => n.toLowerCase() === `${stem}.ip`);
+    const asked = `${mm[1]}.i`;
+    if (ip && !companions.includes(asked)) { companions.push(asked); sources[asked] = ip; }
+    // The editor's side files (`.ip.n` names, `.ip.l` list) belong to the song too.
+    for (const n of listing.siblings) {
+      if (n.toLowerCase().startsWith(`${stem}.ip.`) && !companions.includes(n)) companions.push(n);
+    }
+  }
   const kept = new Set(companions);
   for (const key of Object.keys(sources)) if (!kept.has(key)) delete sources[key];
   return { companions, sources, usedSharedBank: bank !== null };
@@ -365,15 +381,20 @@ export function expectedCompanionNames(moduleName: string): string[] {
 export function companionFilesIn(listing: CompanionListing, keepAsModule: (name: string) => boolean = () => false): Set<string> {
   const claimedBy = new Map<string, Set<string>>();
   for (const module of listing.siblings) {
-    for (const c of resolveCompanions(module, listing).companions) {
+    const res = resolveCompanions(module, listing);
+    for (const registered of res.companions) {
+      // The file on disk is the read-from source when it differs (MusicMaker `.ip` as `.i`).
+      const c = res.sources[registered] ?? registered;
       if (lower(c) === lower(module)) continue;
       (claimedBy.get(c) ?? claimedBy.set(c, new Set()).get(c)!).add(module);
     }
   }
   const out = new Set<string>();
   for (const [file, claimants] of claimedBy) {
+    const own = resolveCompanions(file, listing);
+    const ownFiles = own.companions.map((c) => own.sources[c] ?? c);
     const mutual = listing.siblings.includes(file)
-      && [...claimants].every((m) => resolveCompanions(file, listing).companions.includes(m));
+      && [...claimants].every((m) => ownFiles.includes(m));
     if (mutual && keepAsModule(file)) continue;
     out.add(file);
   }

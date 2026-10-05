@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   resolveCompanions,
+  companionFilesIn,
   expectedCompanionNames,
   listingFromRelativePaths,
   splitName,
@@ -232,5 +233,19 @@ describe('expectedCompanionNames — the lone-file prompt', () => {
   it('says nothing for a format that needs nothing', () => {
     expect(expectedCompanionNames('ghostbattle gameover.hip7')).toEqual([]);
     expect(expectedCompanionNames('break the box.mod')).toEqual([]);
+  });
+});
+
+describe('MusicMaker instrument file', () => {
+  it('registers <tune>.ip as the <tune>.i the player opens', () => {
+    const res = resolveCompanions('moveback.sdata', { siblings: ['moveback.sdata', 'moveback.ip', 'moveback.ip.n'] });
+    expect(res.companions).toContain('moveback.i');
+    expect(res.sources['moveback.i']).toBe('moveback.ip');
+    expect(res.companions).toContain('moveback.ip.n');
+  });
+
+  it('the .ip and its side files are companions, not songs', () => {
+    const files = companionFilesIn({ siblings: ['moveback.sdata', 'moveback.ip', 'moveback.ip.n'] }, (n) => n.endsWith('.sdata'));
+    expect([...files].sort()).toEqual(['moveback.ip', 'moveback.ip.n']);
   });
 });

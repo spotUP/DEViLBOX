@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T08:55:46.009Z",
+  "generated": "2026-10-05T09:05:05.426Z",
   "perEntry": 6,
   "registryTotal": 277,
   "covered": 158,
@@ -3667,11 +3667,11 @@
     {
       "id": "formats-MusicMaker V8 Old",
       "label": "formats / MusicMaker V8 Old",
-      "formatKey": null,
+      "formatKey": "musicMaker4V",
       "subformat": "MusicMaker V8 Old",
       "files": [
-        "/data/songs/formats/MusicMaker V8 Old/- unknown/best of guitars.ip",
-        "/data/songs/formats/MusicMaker V8 Old/- unknown/moveback.ip"
+        "/data/songs/formats/MusicMaker V8 Old/- unknown/best of guitars.sdata",
+        "/data/songs/formats/MusicMaker V8 Old/- unknown/moveback.sdata"
       ],
       "total": 2,
       "dir": "/data/songs/formats/MusicMaker V8 Old"
@@ -6117,16 +6117,6 @@
       ],
       "total": 1,
       "dir": "/data/songs/musicmaker-v8"
-    },
-    {
-      "id": "musicmaker-v8-old",
-      "label": "musicmaker-v8-old",
-      "formatKey": null,
-      "files": [
-        "/data/songs/musicmaker-v8-old/moveback.ip.n"
-      ],
-      "total": 1,
-      "dir": "/data/songs/musicmaker-v8-old"
     },
     {
       "id": "octalyser",
@@ -8656,9 +8646,6 @@
         ],
         "musicmaker-v8": [
           "roetzmegoem.mm8"
-        ],
-        "musicmaker-v8-old": [
-          "moveback.ip.n"
         ],
         "octalyser": [
           "follow me to hell.mod"
@@ -32813,11 +32800,6 @@
     "/data/songs/musicmaker-v8": {
       "siblings": [
         "roetzmegoem.mm8"
-      ]
-    },
-    "/data/songs/musicmaker-v8-old": {
-      "siblings": [
-        "moveback.ip.n"
       ]
     },
     "/data/songs/octalyser": {
