@@ -191,6 +191,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'PiyoPiyoSynth': 0,   // PiyoPiyo — volume managed internally
   'PsgplaySynth': 0,    // Atari ST SNDH — volume managed internally
   'GmeSynth': 0,        // game-music-emu — volume managed internally
+  'S98Synth': 0,        // S98 on ymfm — volume managed internally
   'TFMSynth': 0,        // TFM Music Maker — volume managed internally
   'StoneTrackerSynth': 0, // StoneTracker — volume managed internally
   'MusicMakerSynth': 0,  // MusicMaker V8 — volume managed internally

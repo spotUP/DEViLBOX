@@ -56,6 +56,21 @@ describe('player-program formats open in the scope view', () => {
     });
   }
 
+  it('S98 on ymfm: scope view, labelled S98 with its logged chips', () => {
+    const buf = header('S983', 0x40);
+    const dv = new DataView(buf);
+    dv.setUint32(0x1C, 2, true);
+    dv.setUint32(0x20, 1, true); dv.setUint32(0x24, 4_000_000, true);
+    dv.setUint32(0x30, 5, true); dv.setUint32(0x34, 4_000_000, true);
+    useFormatStore.getState().applyEditorMode({ s98FileData: buf });
+    const st = useFormatStore.getState();
+    expect(st.editorMode).toBe('sc68');
+    expect(scopeFormatLabel(st)).toMatchObject({ format: 'S98', chip: 'YM2149 + YM2151' });
+    // v1 has no device table: the format's default YM2608.
+    useFormatStore.getState().applyEditorMode({ s98FileData: header('S981', 0x40) });
+    expect(scopeFormatLabel(useFormatStore.getState())).toMatchObject({ format: 'S98', chip: 'YM2608' });
+  });
+
   it('a plain module stays in the classic grid', () => {
     useFormatStore.getState().applyEditorMode({});
     expect(useFormatStore.getState().editorMode).toBe('classic');

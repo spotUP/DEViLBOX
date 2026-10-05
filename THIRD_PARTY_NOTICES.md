@@ -248,7 +248,7 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 - **Author:** Aaron Giles
 - **Source:** https://github.com/aarongiles/ymfm
 - **License:** BSD-3-Clause
-- **Used for:** Yamaha FM synthesis cores (OPN, OPM, OPL, OPQ, OPLL, etc.)
+- **Used for:** Yamaha FM synthesis cores (OPN, OPM, OPL, OPQ, OPLL, etc.); also the S98 register-log player (`s98-wasm/`, `public/s98/`): one ymfm chip per logged device, with the YM2608 rhythm ROM image from Furnace's `sound/rss.h` (GPL-2.0-or-later). The S98 header and command rules follow libvgm's `player/s98player.cpp` (Valley Bell, https://github.com/ValleyBell/libvgm); no libvgm code is compiled in.
 
 ### ReSID / ReSID-fp
 - **Author:** Dag Lem

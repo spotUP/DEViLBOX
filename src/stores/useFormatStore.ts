@@ -124,6 +124,8 @@ interface FormatStore {
   gmeFileData: ArrayBuffer | null;
   /** Track GmeEngine starts (0-based), with gmeFileData */
   gmeTrack: number | null;
+  /** S98 register log for S98Engine (ymfm) */
+  s98FileData: ArrayBuffer | null;
   stoneTrackerFileData: ArrayBuffer | null;
   musicMakerFileData: ArrayBuffer | null;
   stoneTrackerSampleData: ArrayBuffer | null;
@@ -278,7 +280,7 @@ interface FormatStore {
   setMaxTraxData: (data: MaxTraxData | null) => void;
   mutateMaxTraxScore: (scoreIndex: number, fn: (score: MaxTraxScore) => void) => void;
   mutateMaxTraxSample: (sampleIndex: number, mutation: MaxTraxSampleMutation) => void;
-  applyEditorMode: (song: { format?: string; linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; sndhFileData?: ArrayBuffer; gmeFileData?: ArrayBuffer; asapFileData?: ArrayBuffer; ayFileData?: ArrayBuffer; qsfFileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; sunTronicNative?: SunTronicNativeData; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
+  applyEditorMode: (song: { format?: string; linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; sndhFileData?: ArrayBuffer; gmeFileData?: ArrayBuffer; s98FileData?: ArrayBuffer; asapFileData?: ArrayBuffer; ayFileData?: ArrayBuffer; qsfFileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; sunTronicNative?: SunTronicNativeData; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   setActivisionProSubsongs: (count: number) => void;
   setActivisionProCurrentSubsong: (index: number) => void;
@@ -519,6 +521,7 @@ export const useFormatStore = create<FormatStore>()(
     sndhSubtune: null,
     gmeFileData: null,
     gmeTrack: null,
+    s98FileData: null,
     stoneTrackerFileData: null,
     musicMakerFileData: null,
     stoneTrackerSampleData: null,
@@ -1088,6 +1091,7 @@ export const useFormatStore = create<FormatStore>()(
         state.sndhSubtune = (song as any).sndhSubtune ?? null;
         state.gmeFileData = (song as any).gmeFileData ?? null;
         state.gmeTrack = (song as any).gmeTrack ?? null;
+        state.s98FileData = (song as any).s98FileData ?? null;
         state.stoneTrackerFileData = (song as any).stoneTrackerFileData ?? null;
         state.musicMakerFileData = (song as any).musicMakerFileData ?? null;
         state.stoneTrackerSampleData = (song as any).stoneTrackerSampleData ?? null;
@@ -1186,8 +1190,8 @@ export const useFormatStore = create<FormatStore>()(
           newEditorMode = 'cheesecutter';
           state.editorMode = 'cheesecutter';
           clearNative(state);
-        } else if (song.sc68FileData || song.sndhFileData || song.gmeFileData || song.asapFileData || song.ayFileData || song.qsfFileData) {
-          // The engine runs the tune's own player program (SC68, SNDH, game music, ASAP,
+        } else if (song.sc68FileData || song.sndhFileData || song.gmeFileData || song.s98FileData || song.asapFileData || song.ayFileData || song.qsfFileData) {
+          // The engine runs the tune's own player program (SC68, SNDH, game music, S98, ASAP,
           // AY, QSF): nothing to edit, so the scope view - the view every
           // uneditable format uses (owner, 2026-10-05).
           newEditorMode = 'sc68';
@@ -1414,6 +1418,7 @@ export const useFormatStore = create<FormatStore>()(
       state.sndhSubtune = null;
       state.gmeFileData = null;
       state.gmeTrack = null;
+      state.s98FileData = null;
       state.stoneTrackerFileData = null;
       state.musicMakerFileData = null;
       state.stoneTrackerSampleData = null;

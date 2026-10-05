@@ -55,6 +55,13 @@ describe('live song format', () => {
     expect(playingEngineFromStores(useFormatStore.getState() as unknown as Record<string, unknown>, [])).toBe('Gme');
   });
 
+  it('an S98 song activates the S98 engine', () => {
+    useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
+    useFormatStore.getState().applyEditorMode({ format: 'S98', s98FileData: new ArrayBuffer(16) } as never);
+    expect(playingEngineFor(liveTrackerSong())).toBe('S98');
+    expect(playingEngineFromStores(useFormatStore.getState() as unknown as Record<string, unknown>, [])).toBe('S98');
+  });
+
   it('an Atari ST SNDH song activates the Psgplay engine on its subtune', () => {
     useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
     useFormatStore.getState().applyEditorMode({ format: 'SNDH', sndhFileData: new ArrayBuffer(16), sndhSubtune: 3 } as never);

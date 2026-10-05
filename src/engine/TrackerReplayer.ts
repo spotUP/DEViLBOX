@@ -366,6 +366,8 @@ export interface TrackerSong {
   gmeFileData?: ArrayBuffer;
   /** Track GmeEngine starts (0-based) */
   gmeTrack?: number;
+  /** S98 register log for S98Engine (one ymfm chip per logged device) */
+  s98FileData?: ArrayBuffer;
   /** Whole StoneTracker SPM song for StoneTrackerEngine WASM playback (the authors' player on a 68020 core) */
   stoneTrackerFileData?: ArrayBuffer;
   /** The SPS sample bank beside it (DeltaHuffman packed or not) */

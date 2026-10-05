@@ -1780,7 +1780,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 's98',
     label: 'S98',
-    description: 'Japanese computer FM register dumps (PC-88/PC-98/MSX)',
+    description: 'Japanese computer FM register logs (PC-88/PC-98/X1/MSX), replayed on ymfm',
     family: 'chip-dump',
     matchMode: 'extension',
     extRegex: /\.s98$/i,

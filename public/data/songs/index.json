@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T17:14:28.449Z",
+  "generated": "2026-10-05T17:26:24.901Z",
   "perEntry": 6,
   "registryTotal": 279,
   "covered": 167,
@@ -6490,9 +6490,11 @@
       "label": "s98",
       "formatKey": "s98",
       "files": [
-        "/data/songs/s98/carat-01.s98"
+        "/data/songs/s98/carat-01.s98",
+        "/data/songs/s98/hiouden 10.s98",
+        "/data/songs/s98/ys2x105.s98"
       ],
-      "total": 1,
+      "total": 3,
       "dir": "/data/songs/s98"
     },
     {
@@ -9898,7 +9900,9 @@
           "andante.s3m"
         ],
         "s98": [
-          "carat-01.s98"
+          "carat-01.s98",
+          "hiouden 10.s98",
+          "ys2x105.s98"
         ],
         "sap": [
           "chop suey.sap"
@@ -34273,7 +34277,9 @@
     },
     "/data/songs/s98": {
       "siblings": [
-        "carat-01.s98"
+        "carat-01.s98",
+        "hiouden 10.s98",
+        "ys2x105.s98"
       ]
     },
     "/data/songs/sap": {

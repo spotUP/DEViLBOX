@@ -45,6 +45,11 @@ const FORMAT_INFO: Record<string, { name: string; description: string; color: st
     description: 'Console game music replayer (game-music-emu). Runs the game\'s own sound program on the emulated CPU and sound chips: NES (NSF), Game Boy (GBS), PC Engine (HES), MSX (KSS), Super Nintendo (SPC), Master System / Mega Drive (VGM, GYM).',
     color: '#ff6688',
   },
+  S98Synth: {
+    name: 'S98 (ymfm)',
+    description: 'S98 register log replayer for Japanese computer FM music (PC-88, PC-98, X1, FM Towns, MSX). Each logged chip is a ymfm core: YM2149, YM2203, YM2608, YM2612, YM2151, YM2413, YM3526, YM3812, YMF262.',
+    color: '#66ccff',
+  },
   ZxtuneSynth: {
     name: 'ZXTune',
     description: 'ZX Spectrum music replayer. AY-3-8910/YM2149 PSG emulation for PT3, STC, VTX, PSG, and 30+ formats.',

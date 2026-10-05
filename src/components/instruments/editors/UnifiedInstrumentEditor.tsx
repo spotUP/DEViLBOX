@@ -197,6 +197,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'TFMSynth') return 'wasm-info';
   if (synthType === 'PsgplaySynth') return 'wasm-info';
   if (synthType === 'GmeSynth') return 'wasm-info';
+  if (synthType === 'S98Synth') return 'wasm-info';
   if (synthType === 'StoneTrackerSynth') return 'wasm-info';
   if (synthType === 'MusicMakerSynth') return 'wasm-info';
   if (synthType === 'IxalanceSynth') return 'wasm-info';
