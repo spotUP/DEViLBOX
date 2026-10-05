@@ -652,6 +652,23 @@ export async function tryRouteFormat(
     return parseCinter4File(bytes, filename);
   }
 
+  // ── StoneTracker (SPM.<tune> / <tune>.spm + the SPS sample bank) ─────────
+  // StoneTrackerEngine plays the authors' player on a 68020 core; the parser
+  // draws the grid. The bank arrives as a companion (companionResolver pairs
+  // spm/sps) and rides to the engine as stoneTrackerSampleData.
+  if (matchesExt(filename, ['spm'])) {
+    const { isStoneTrackerFormat, parseStoneTrackerFile } = await import('@lib/import/formats/StoneTrackerParser');
+    const bytes = new Uint8Array(buffer);
+    if (isStoneTrackerFormat(bytes)) {
+      let bank: ArrayBuffer | undefined;
+      for (const [key, val] of companionFiles ?? []) {
+        const base = key.split('/').pop()?.toLowerCase() ?? '';
+        if (base.startsWith('sps.') || base.endsWith('.sps')) { bank = val; break; }
+      }
+      return parseStoneTrackerFile(bytes, originalFileName, bank);
+    }
+  }
+
   // ── Digital Symphony ──────────────────────────────────────────────────────
   // .dsym files — OpenMPT
   if (matchesExt(filename, ['dsym'])) {

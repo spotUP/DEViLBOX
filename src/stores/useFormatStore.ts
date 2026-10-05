@@ -117,6 +117,8 @@ interface FormatStore {
   ayFileData: ArrayBuffer | null;
   piyoPiyoFileData: ArrayBuffer | null;
   tfmFileData: ArrayBuffer | null;
+  stoneTrackerFileData: ArrayBuffer | null;
+  stoneTrackerSampleData: ArrayBuffer | null;
   /** Whole-file data for the ASAP, mdxmini and pmdmini engines: absent from the store until 2026-10-05, so the live song never carried them and their engines never started from a store rebuild. */
   asapFileData: ArrayBuffer | null;
   mdxminiFileData: ArrayBuffer | null;
@@ -505,6 +507,8 @@ export const useFormatStore = create<FormatStore>()(
     ayFileData: null,
     piyoPiyoFileData: null,
     tfmFileData: null,
+    stoneTrackerFileData: null,
+    stoneTrackerSampleData: null,
     asapFileData: null,
     mdxminiFileData: null,
     pmdFileData: null,
@@ -1067,6 +1071,8 @@ export const useFormatStore = create<FormatStore>()(
         state.ayFileData = (song as any).ayFileData ?? null;
         state.piyoPiyoFileData = (song as any).piyoPiyoFileData ?? null;
         state.tfmFileData = (song as any).tfmFileData ?? null;
+        state.stoneTrackerFileData = (song as any).stoneTrackerFileData ?? null;
+        state.stoneTrackerSampleData = (song as any).stoneTrackerSampleData ?? null;
         state.asapFileData = (song as any).asapFileData ?? null;
         state.mdxminiFileData = (song as any).mdxminiFileData ?? null;
         state.pmdFileData = (song as any).pmdFileData ?? null;
@@ -1383,6 +1389,8 @@ export const useFormatStore = create<FormatStore>()(
       state.ayFileData = null;
       state.piyoPiyoFileData = null;
       state.tfmFileData = null;
+      state.stoneTrackerFileData = null;
+      state.stoneTrackerSampleData = null;
       state.asapFileData = null;
       state.mdxminiFileData = null;
       state.pmdFileData = null;

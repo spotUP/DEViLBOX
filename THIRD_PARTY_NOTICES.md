@@ -323,6 +323,18 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 - **License:** GPL-3.0
 - **Used for:** TFM Music Maker (.tfe, ZX Spectrum TurboFM) playback. The parser, frame player and YM2203 register builder are extracted from ZXTune's framework into `tfm-wasm/src/tfm_player.cpp` (logic kept line for line) and drive two ymfm YM2203 (compiled to WASM, `public/tfm/`).
 
+### StonePlayer (StoneTracker player)
+- **Authors:** Michael Lavaire and Emmanuel Marty (StonePlayer V1.98, 1995)
+- **Source:** Aminet `mus/edit/stonefree2.lha` (`Players.LHS`, unpacked with the archive's own `StoneEx`): `third-party/stonetracker/StonePlayer_Hard.bin`, the no-OS player binary; DeltaHuffman bank depacker ported from `Libs/StonePacker.library` (Aminet `mus/edit/stonefree1.lha`) into `stonetracker-wasm/src/st_dhuf.c`
+- **License:** freeware - re-released free in 2001 by Emmanuel Marty with Michael Lavaire's agreement: "Feel free to provide these archives for download on your own site, as long as you retain this document." The readme is kept as `third-party/stonetracker/stonefree.readme`.
+- **Used for:** StoneTracker (.spm + .sps) playback - the player binary runs unmodified except for a reordered three-instruction tail of its SOFT-interrupt handler (a lost-request race, see `stonetracker-wasm/src/st_machine.c`), compiled to WASM (`public/stonetracker/`).
+
+### Musashi
+- **Author:** Karl Stenerud
+- **Source:** https://github.com/kstenerud/Musashi (commit 313ebf1, v4.60), vendored in `third-party/musashi/` with John R. Hauser's SoftFloat 2b (`third-party/musashi/softfloat/`)
+- **License:** MIT (Musashi); SoftFloat's own permissive terms (`softfloat/README.txt`)
+- **Used for:** the 68020 core that runs StonePlayer in `stonetracker-wasm`.
+
 ### piyopiyo-rs
 - **Author:** crumblingstatue
 - **Source:** https://github.com/crumblingstatue/piyopiyo-rs (player algorithm ported to `public/piyopiyo/PiyoPiyo.worklet.js`; drum samples copied to `public/piyopiyo/drums/`)

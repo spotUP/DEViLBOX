@@ -445,6 +445,23 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/tfm/TFMEngine')).TFMEngine as unknown as WASMSingletonStatic,
   },
   {
+    // StoneTracker (.spm + .sps, Amiga): the authors' StonePlayer_Hard.bin
+    // runs on Musashi's 68020 with a Paula + CIA-B in stonetracker-wasm; the
+    // grid is a view (StoneTrackerParser). The SPS bank rides as a load arg.
+    key: 'StoneTracker',
+    synthType: 'StoneTrackerSynth',
+    suppressNotes: true,
+    fileDataKey: 'stoneTrackerFileData',
+    formats: ['StoneTracker'],
+    loadMethod: 'loadTune',
+    getLoadArgs: (song: TrackerSong) => [song.stoneTrackerSampleData],
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/stonetracker/StoneTrackerEngine')).StoneTrackerEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'PumaTracker',
     synthType: 'PumaTrackerSynth',
     suppressNotes: true,

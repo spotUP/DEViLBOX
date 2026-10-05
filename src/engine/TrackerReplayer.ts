@@ -106,6 +106,7 @@ export type TrackerFormat =
   | 'AY'   // ZX Spectrum AY (ZXAYEMUL)
   | 'PiyoPiyo' // Studio Pixel PiyoPiyo (.pmd)
   | 'TFM'  // TFM Music Maker (.tfe, ZX Spectrum TurboFM, 2x YM2203)
+  | 'StoneTracker' // StoneTracker (.spm song + .sps sample bank, Amiga, 8 tracks)
   | 'KSS'  // MSX KSS (AY/SCC/OPLL/Y8950)
   | 'SNDH' // Atari ST SNDH/SC68 (YM2149 68000 code)
   | 'HES'  // PC Engine / TurboGrafx-16 HuC6280
@@ -352,6 +353,10 @@ export interface TrackerSong {
   piyoPiyoFileData?: ArrayBuffer;
   /** Whole TFM Music Maker .tfe for TFMEngine WASM playback (ZXTune player + 2x ymfm YM2203) */
   tfmFileData?: ArrayBuffer;
+  /** Whole StoneTracker SPM song for StoneTrackerEngine WASM playback (the authors' player on a 68020 core) */
+  stoneTrackerFileData?: ArrayBuffer;
+  /** The SPS sample bank beside it (DeltaHuffman packed or not) */
+  stoneTrackerSampleData?: ArrayBuffer;
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */
   startrekkerAMFileData?: ArrayBuffer;
   /** Raw Startrekker AM .nt synth data for StartrekkerAMEngine WASM playback */

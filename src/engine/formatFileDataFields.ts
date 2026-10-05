@@ -73,6 +73,8 @@ export const FILE_DATA_FIELDS = [
   'ayFileData',
   'piyoPiyoFileData',
   'tfmFileData',
+  'stoneTrackerFileData',
+  'stoneTrackerSampleData',   // companion SPS sample bank for StoneTracker
   'asapFileData',
   'mdxminiFileData',
   'pmdFileData',

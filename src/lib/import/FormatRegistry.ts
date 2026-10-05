@@ -1862,8 +1862,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/PMDParser', parseFn: 'parsePMDFile', detectFn: 'isPMDFormat' },
   },
-  // ── PiyoPiyo and TFM Music Maker play; StoneTracker refuses with its own
-  // name and the missing replayer instead of "Unsupported file format"
+  // ── PiyoPiyo, StoneTracker and TFM Music Maker play
   // (ledger 2026-10-05 broken-formats sweep, B5/B7/B8).
   {
     key: 'piyoPiyo',
@@ -1881,12 +1880,12 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'stoneTracker',
     label: 'StoneTracker',
-    description: "StoneTracker (.spm, 'SPM' magic) — no replayer yet",
+    description: "StoneTracker (.spm + .sps sample bank, 'SPM' magic) — the authors' player on a 68020 core in wasm",
     family: 'amiga-native',
     matchMode: 'extension',
     extRegex: /\.spm$/i,
     nativeOnly: true,
-    nativeParser: { module: '@lib/import/formats/NoReplayerParsers', parseFn: 'parseStoneTrackerFile', detectFn: 'isStoneTrackerFormat' },
+    nativeParser: { module: '@lib/import/formats/StoneTrackerParser', parseFn: 'parseStoneTrackerFile', detectFn: 'isStoneTrackerFormat' },
   },
   {
     key: 'tfmMusicMaker',

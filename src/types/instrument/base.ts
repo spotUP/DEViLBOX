@@ -274,6 +274,7 @@ export type SynthType =
   | 'AyletSynth'        // aylet (ZX Spectrum .ay - ZXAY EMUL, Z80 + AY)
   | 'PiyoPiyoSynth'     // Studio Pixel PiyoPiyo (.pmd), worklet port of piyopiyo-rs
   | 'TFMSynth'          // TFM Music Maker (.tfe), ZXTune player + 2x ymfm YM2203
+  | 'StoneTrackerSynth' // StoneTracker (.spm + .sps), StonePlayer on a 68020 core
   // QSF Capcom QSound replayer
   | 'QsfSynth'          // QSF (Capcom CPS1/CPS2 Z80 + QSound DSP)
   | 'MAMEFZPCM'         // Casio FZ-1 8-Voice 16-bit PCM Sampler
