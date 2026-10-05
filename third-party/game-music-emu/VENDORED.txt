@@ -1,0 +1,1 @@
+upstream https://github.com/libgme/game-music-emu at f68963b1de0633149b05732113d3c3113c6f63a1 (2026-09-08); gme/ only; Ym2612_MAME (GPL-2.0+) and Ym2612_GENS dropped - the build uses Nuked OPN2 (LGPL-2.1+); gme/CMakeLists.txt and libgme.pc.in dropped (game-music-emu-wasm/CMakeLists.txt builds it).
