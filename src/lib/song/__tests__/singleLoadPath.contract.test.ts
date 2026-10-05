@@ -48,7 +48,7 @@ const ALLOWED: Record<string, string> = {
   'stores/useInstrumentStore.ts': 'defines loadInstruments',
   'stores/useFormatStore.ts': 'defines applyEditorMode / setOriginalModuleData',
   'engine/SequencerEngine.ts': 'its own loadPatterns method (acid sequencer JSON), not the tracker store',
-  'components/tracker/SubsongSelector.tsx': 'partial: switches subsong within the loaded song',
+  'lib/tracker/subsongSwitch.ts': 'partial: the one subsong switch (Furnace, UADE, SID, game music...) within the loaded song',
   'components/tfmx/TFMXView.tsx': 'partial: re-reads the loaded TFMX module\'s patterns after an edit',
   'engine/uade/UADEChipRAMPatternReader.ts': 'partial: live pattern read-back from the playing UADE engine',
   'engine/uade/UADEEngine.ts': 'partial: patterns reconstructed from the loaded UADE song',
