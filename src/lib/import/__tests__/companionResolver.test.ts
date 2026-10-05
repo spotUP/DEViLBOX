@@ -217,6 +217,7 @@ describe('expectedCompanionNames — the lone-file prompt', () => {
     expect(expectedCompanionNames('mdat.fatalheritage ship')).toEqual(['smpl.fatalheritage ship']);
     expect(expectedCompanionNames('dns.starball title')).toEqual(['smp.starball title']);
     expect(expectedCompanionNames('sdr.monsterbusiness 5')).toEqual(['smp.monsterbusiness 5', SHARED_BANK]);
+    expect(expectedCompanionNames('SPM.Hypnosphere')).toEqual(['sps.Hypnosphere']);
   });
 
   it('names the partner for a role-last module', () => {
@@ -225,6 +226,7 @@ describe('expectedCompanionNames — the lone-file prompt', () => {
     expect(expectedCompanionNames('tune.sng')).toEqual(['tune.ins']);
     expect(expectedCompanionNames('intro.kh')).toEqual(['songplay']);
     expect(expectedCompanionNames('abcsong.sci')).toEqual(['abcpatch.003']);
+    expect(expectedCompanionNames('hypnosphere.spm')).toEqual(['hypnosphere.sps']);
   });
 
   it('says nothing for a format that needs nothing', () => {

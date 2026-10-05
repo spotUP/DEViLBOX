@@ -45,6 +45,8 @@
 export const ROLE_WORDS: ReadonlySet<string> = new Set([
   // TFMX
   'mdat', 'smpl', 'tfmx', 'tfx',
+  // StoneTracker: SPM.<tune> song + SPS.<tune> samples (Aminet stonefree2 ships both halves)
+  'spm', 'sps',
   // assorted trackers
   'sng', 'ins', 'instr', 'smp', 'samples', 'sdata', 'song', 'snd',
   // DynamicSynthesizer, SynthDream, SynthPack, AudioSculpture
@@ -63,6 +65,7 @@ export const ROLE_WORDS: ReadonlySet<string> = new Set([
  */
 export const EXPECTED_PARTNER: Readonly<Record<string, string[]>> = {
   mdat: ['smpl'], smpl: ['mdat'], tfmx: ['smpl'], tfx: ['smpl'],
+  spm: ['sps'], sps: ['spm'],
   dns: ['smp'], sdr: ['smp', 'smp.set'], osp: ['smp.set'],
   jpn: ['smp'], jpnd: ['smp'], thm: ['smp'], mfp: ['smp'], sjs: ['smp'], max: ['smp'],
   mcr: ['mcs'], mcs: ['mcr'], midi: ['smpl'],
