@@ -995,8 +995,14 @@ export async function parseSonicArrangerFile(
     initialSpeed:    Math.max(1, song.startSpeed),
     initialBPM,
     linearPeriods:   false,
-    // Only use dedicated WASM replayer for SOARV1.0 chunk format;
-    // 4EFA player binaries need UADE's 68k emulation
+    // Only the SOARV1.0 chunk format goes to the dedicated WASM replayer: its
+    // loader (sonic-arranger-wasm/src/sonic_arranger.c sa_create) accepts the
+    // "SOARV1.0" mark only and reads STBL/OVTB/NTBL/INST/SD8B/SYWT/SYAR/SYAF by
+    // chunk mark (load_normal_module). A 4EFA player binary carries the same
+    // tables behind an 8-longword offset table, and its SD8B has no 38-byte
+    // sample headers; sa_create returns null for it, so handing it the bytes
+    // would play silence. 4EFA stays on UADE until the C loader reads the
+    // offset table (the layout this parser decodes above).
     ...(useOffsetTable ? {} : { sonicArrangerFileData: buffer.slice(0) as ArrayBuffer }),
     uadePatternLayout,
   };
