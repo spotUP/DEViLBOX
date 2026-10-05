@@ -249,3 +249,15 @@ describe('MusicMaker instrument file', () => {
     expect([...files].sort()).toEqual(['moveback.ip', 'moveback.ip.n']);
   });
 });
+
+describe('Paul Robotham sample bank', () => {
+  it('registers the folder\'s one .ssd bank as the <song>.SSD the player opens', () => {
+    const res = resolveCompanions('dawnpatrol-sad.dat', { siblings: ['dawnpatrol-sad.dat', 'mdtest.ssd'] });
+    expect(res.companions).toContain('dawnpatrol-sad.SSD');
+    expect(res.sources['dawnpatrol-sad.SSD']).toBe('mdtest.ssd');
+  });
+  it('prefers a per-song bank when one exists', () => {
+    const res = resolveCompanions('a.dat', { siblings: ['a.dat', 'a.ssd', 'mdtest.ssd'] });
+    expect(res.sources['a.SSD']).toBeUndefined();
+  });
+});
