@@ -244,3 +244,19 @@ Instrument: `tools/uade-audit/gridVsPaula.ts` (2026-10-05). It renders the file 
 ## Level readings after a reload (WITHDRAWN, 2026-10-05)
 
 An earlier note here claimed the meters read 0 after a tab reload while audio played. Owner, 2026-10-05: the songs were not playing from my side when I measured ("you are not playing the song so anything you measure will be wrong"); the owner heard them because they played them. The readings say nothing about the meters. A tracker-voiced MOD measured rms 0.158 after the same reload. Open question instead: why the bridge's `play` left native-engine songs silent in that tab while the owner's own play worked - to measure properly, with the song confirmed playing.
+
+## Owner listening pass (2026-10-05 afternoon, in the tab)
+
+- Kris Hatlelid fiendish freddys - songs.kh: sound GOOD (owner), patterns FROZEN (owner, 2026-10-05)
+- StarTrekker AM amsyntdemo.mod (+ .mod.nt): SILENT in the app (owner) - opened as plain ProTracker MOD on the tracker engine; should route to UADE StarTrekker AM when <name>.mod.nt is beside it
+- Synth Dream sdr.nobuddiesland jigsaw: only bassy clicks in the app (owner); headless with smp. companion rms 0.44 -> suspect the playback load (UADEEditable loadTune / uadeCompanionFiles) does not register the smp. file
+- Synth Pack centerbase soft.osp: GOOD, patterns move (owner)
+- Paul Robotham dawnpatrol-sad.dat: GOOD, patterns move (owner)
+- MusicMaker moveback.sdata: LOAD FAILED in the app - app renames the hint to 'sdata.moveback' (prefix form) and UADE's module check fails; headless with 'moveback.sdata' it plays (rms 0.070)
+- Tomy Tracker inconvenient intro.sg: sound + grid RIGHT (owner)
+- Mugician II cockwise.mug: sound + grid RIGHT (owner)
+- Fashion Tracker ivory tover ii.ex: sound + grid RIGHT (owner)
+- David Whittaker garfield2+.dw: sound + grid RIGHT (owner)
+- Jesper Olsen lollypop-subgame 01: GOOD (owner); AudioSculpture turtle-ready: GOOD (owner)
+
+Open from this pass: StarTrekker AM routing (.mod + .mod.nt opens as plain MOD, silent), Synth Dream companion missing on the app's playback load (bassy clicks), MusicMaker hint renamed to prefix form in the app (module check fails), Kris Hatlelid patterns frozen. Yardstick corrections (a24938ebc) re-scored DeltaMusic1 crusaders1.dm 0.28/0.74/0.30/0.29 and SoundMon nicktune1.bp 0.21/0.41/0.33/0.41 - earlier 'grid right' verdicts for those two were from the broken render loop; both parsers need the Tomy/Mugician treatment.
