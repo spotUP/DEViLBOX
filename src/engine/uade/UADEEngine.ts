@@ -11,6 +11,7 @@
  * Follows the HivelyEngine pattern: static WASM/JS caching, per-context worklet loading.
  */
 
+import { uadePlayerHint } from '@/lib/import/uadePlayerHint';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
@@ -613,7 +614,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     const raw = data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer;
     const transferBuf = raw.slice(0);
     this.workletNode.port.postMessage(
-      { type: 'load', buffer: transferBuf, filenameHint, skipScan, subsong, scanTimeoutSec },
+      { type: 'load', buffer: transferBuf, filenameHint: uadePlayerHint(filenameHint), skipScan, subsong, scanTimeoutSec },
       [transferBuf]
     );
 

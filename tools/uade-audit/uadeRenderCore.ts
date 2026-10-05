@@ -12,6 +12,7 @@
  * probes before executing it via vm.runInThisContext (avoids esbuild template mangling).
  */
 
+import { uadePlayerHint } from '../../src/lib/import/uadePlayerHint';
 import { readFileSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
@@ -265,6 +266,7 @@ export async function renderToSamples(
   refreshHeap(mod);
   mod.HEAPU8.set(data, ptr);
 
+  filename = uadePlayerHint(filename);
   const hintLen = filename.length * 4 + 1;
   const hintPtr = mod._malloc(hintLen);
   if (!hintPtr) { mod._free(ptr); throw new Error('malloc failed for filename hint'); }
