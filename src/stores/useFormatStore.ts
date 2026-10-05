@@ -164,6 +164,8 @@ export interface FormatStore {
   maxTraxRev: number;
   adplugFileData: ArrayBuffer | null;
   adplugFileName: string | null;
+  /** ASAP picks its player from the file's extension (SAP, RMT, CMC, TMC...), so the name travels with asapFileData. */
+  asapFilename: string | null;
   adplugTicksPerRow: number | null;
   uadeCompanionFiles: Map<string, ArrayBuffer> | null;
   uadePatternLayout: import('@/engine/uade/UADEPatternEncoder').UADEPatternLayout | null;
@@ -562,6 +564,7 @@ export const useFormatStore = create<FormatStore>()(
     maxTraxRev: 0,
     adplugFileData: null,
     adplugFileName: null,
+    asapFilename: null,
     adplugTicksPerRow: null,
     uadeCompanionFiles: null,
     uadePatternLayout: null,
@@ -1135,6 +1138,7 @@ export const useFormatStore = create<FormatStore>()(
         if ((song as any).maxTraxData) state.maxTraxRev = 0;
         state.adplugFileData = (song as any).adplugFileData ?? null;
         state.adplugFileName = (song as any).adplugFileName ?? null;
+        state.asapFilename = (song as any).asapFilename ?? null;
         state.adplugTicksPerRow = (song as any).adplugTicksPerRow ?? null;
         state.uadeCompanionFiles = (song as any).uadeCompanionFiles ?? null;
         state.uadePatternLayout = (song as any).uadePatternLayout ?? null;
@@ -1471,6 +1475,7 @@ export const useFormatStore = create<FormatStore>()(
       state.maxTraxRev = 0;
       state.adplugFileData = null;
       state.adplugFileName = null;
+      state.asapFilename = null;
       state.adplugTicksPerRow = null;
       state.uadeCompanionFiles = null;
       state.uadePatternLayout = null;

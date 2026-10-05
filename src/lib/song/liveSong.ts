@@ -79,6 +79,7 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     uadeEditableFileName: fmt.uadeEditableFileName ?? undefined,
     maxTraxFileName: fmt.maxTraxFileName ?? undefined,
     adplugFileName: fmt.adplugFileName ?? undefined,
+    asapFilename: fmt.asapFilename ?? undefined,
     adplugTicksPerRow: fmt.adplugTicksPerRow ?? undefined,
     c64MemPatches: fmt.c64MemPatches ?? undefined,
     sunTronicCompanionPcm: fmt.sunTronicCompanionPcm ?? undefined,
