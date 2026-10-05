@@ -44,8 +44,11 @@ describe('detectFormatFromContent', () => {
   });
   it('Atari SNDH named .snd is SNDH, and the import does not hand it to UADE', { timeout: 60_000 }, async () => {
     expect(keyOf('sndh/mad_max/jochen.snd')).toBe('sndh');
-    const { isUADEExclusiveFile } = await import('../prepareModuleImport');
+    const { isUADEExclusiveFile, detectNativeFormat } = await import('../prepareModuleImport');
     expect(isUADEExclusiveFile('jochen.snd', head('sndh/mad_max/jochen.snd'))).toBe(false);
+    // ...and it has a native route, so the import does not fall to libopenmpt
+    // ("Failed to load module: ptr").
+    expect(detectNativeFormat('jochen.snd', head('sndh/mad_max/jochen.snd'))?.key).toBe('sndh');
     // An Amiga .snd without the SNDH header still goes to UADE.
     expect(isUADEExclusiveFile('tune.snd', new Uint8Array(64))).toBe(true);
   });
