@@ -176,7 +176,7 @@ Measured 2026-10-05 01:50-02:10 with `corpus-sweep.ts --dir public/data/songs --
 
 | ID | Keys / files | Cause (measured) | Fix | Status |
 |----|--------------|------------------|-----|--------|
-| B1 | Goat Tracker Ultra-* (6 keys, 26 .sng) | Index formatKey zoundMonitor: `detectFormat` matched the prefix format's extension form before GoatTracker's `.sng` entry; the sweep rendered them through UADE (REFUSED). In the browser the loader already checked the GTS magic, so the owner's "Silent" is the GTUltra engine, not detection. | `detectFormatFromContent` (de67adeec); index rebuilt | DONE (detect); BROWSER (GTUltra silent) |
+| B1 | Goat Tracker Ultra-* (6 keys, 26 .sng) | Index formatKey zoundMonitor: `detectFormat` matched the prefix format's extension form before GoatTracker's `.sng` entry; the sweep rendered them through UADE (REFUSED). In the browser the loader already checked the GTS magic, so the owner's "Silent" is the GTUltra engine, not detection. | `detectFormatFromContent` (de67adeec); index rebuilt. Headless the GTUltra core loads all 26 corpus .sng, plays song 0 and renders from 0.00-0.04 s (peaks 0.56-1.01; `gtultraRendersCorpus.test.ts`, test:ci), so a silent browser is the routing around the engine. | DONE (detect, core proven); BROWSER (routing) |
 | B2 | digital-tracker-dtm (`sonic subspace.dtm`) | 'D.T.' Digital Tracker went to the AdPlug streamer (`.dtm` in ADPLUG_WASM_EXTS) | content rule -> dtm (libopenmpt) | DONE; BROWSER |
 | B3 | formats-adplug (`astaris.imf`) | Imago Orpheus ('IM10' at 60) went to AdPlug | content rule -> imagoOrpheus | DONE; BROWSER |
 | B4 | composer-670-cdfm (`.670`) | no registry entry | cdfm67 answers to .670 | DONE; BROWSER |
