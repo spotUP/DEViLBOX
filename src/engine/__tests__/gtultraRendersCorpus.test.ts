@@ -4,13 +4,12 @@
  * The jukebox marked four Goat Tracker Ultra keys "Silent" (2026-10-02).
  * Headless, the core loads each .sng, starts song 0 and renders audio from
  * the first frames, so a silent browser is the routing around the engine,
- * not the engine (2026-10-05 broken-formats sweep, B1). The bundle is
- * web-built; it is evaluated here with a CommonJS require in scope.
+ * not the engine (2026-10-05 broken-formats sweep, B1).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { createRequire } from 'node:module';
+import { loadWebBundle, type WebBundle } from '@/test/wasm/webBundle';
 
 const ROOT = process.cwd();
 const GT_DIR = join(ROOT, 'public/gtultra');
@@ -20,18 +19,14 @@ interface GTModule {
   cwrap: (name: string, ret: string | null, args: string[]) => (...a: number[]) => number;
   _malloc: (n: number) => number;
   _free: (p: number) => void;
-  HEAPU8: Uint8Array;
 }
 
-let gt: GTModule;
+let b: WebBundle<GTModule>;
 let api: Record<string, (...a: number[]) => number>;
 
 beforeAll(async () => {
-  const js = readFileSync(join(GT_DIR, 'GTUltra.js'), 'utf8');
-  const wasmBinary = readFileSync(join(GT_DIR, 'GTUltra.wasm'));
-  const require = createRequire(import.meta.url);
-  const factory = new Function('require', '__dirname', '__filename', `${js}\nreturn createGTUltra;`)(require, GT_DIR, join(GT_DIR, 'GTUltra.js'));
-  gt = await factory({ wasmBinary, print: () => {}, printErr: () => {} });
+  b = await loadWebBundle<GTModule>(join(GT_DIR, 'GTUltra.js'), join(GT_DIR, 'GTUltra.wasm'), 'createGTUltra');
+  const gt = b.module;
   api = {
     init: gt.cwrap('gt_init', null, ['number', 'number']),
     load: gt.cwrap('gt_load_sng', 'number', ['number', 'number']),
@@ -44,8 +39,9 @@ beforeAll(async () => {
 
 /** Peak of the first `seconds` of song 0. */
 function peakOf(data: Uint8Array, seconds: number): number {
+  const gt = b.module;
   const ptr = gt._malloc(data.length);
-  gt.HEAPU8.set(data, ptr);
+  b.heap().set(data, ptr);
   const ok = api.load(ptr, data.length);
   gt._free(ptr);
   if (!ok) throw new Error('gt_load_sng refused the file');
@@ -57,7 +53,7 @@ function peakOf(data: Uint8Array, seconds: number): number {
   let peak = 0;
   for (let done = 0; done < 44100 * seconds; done += frames) {
     api.render(pL, pR, frames);
-    const h = new Float32Array(gt.HEAPU8.buffer, pL, frames);
+    const h = new Float32Array(b.heap().buffer, pL, frames);
     for (let i = 0; i < frames; i++) { const a = Math.abs(h[i]); if (a > peak) peak = a; }
   }
   gt._free(pL);
