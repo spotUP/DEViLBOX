@@ -2599,6 +2599,12 @@ export function detectFormatFromContent(filename: string, bytes: Uint8Array): Fo
       // Imago Orpheus carries 'IM10' at offset 60; id Software IMF has no magic.
       if (ascii(60, 'IM10')) return byKey('imagoOrpheus');
       break;
+    case 'snd':
+      // Atari ST SNDH carries 'SNDH' at offset 12 (or is ICE!-packed); the
+      // Amiga formats that share `.snd` have neither. Every SNDH collection
+      // names its files `.snd`, and all of them went to UADE (2026-10-05).
+      if (ascii(12, 'SNDH') || ascii(0, 'ICE!')) return byKey('sndh');
+      break;
     case 'pmd':
       // Studio Pixel PiyoPiyo starts 'PMD'; PC-98 PMD98 files start with a version byte.
       if (ascii(0, 'PMD')) return byKey('piyoPiyo');
