@@ -1,0 +1,256 @@
+/**
+ * Psgplay.worklet.js - AudioWorklet processor for Atari ST SNDH (.snd/.sndh)
+ *
+ * psgplay-wasm/: PSG play (Fredrik Noring) runs the SNDH's own 68000 code on
+ * an emulated Atari ST/STE (YM2149, MFP timers, STE DMA sound).
+ * psgplay_wasm_render_channels() writes interleaved stereo float (LRLRLR...)
+ * plus the three YM channels planar; the worklet deinterleaves the mix into
+ * the WebAudio output and streams the channels to the oscilloscopes.
+ */
+
+class PsgplayProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.module = null;
+    this.interleavedPtr = 0;
+    this.interleavedBuf = null;
+    this.chPtr = 0;          // 3 planar YM channel buffers of bufferSize floats
+    this.chBufs = [];
+    this.initialized = false;
+    this.bufferSize = 128;
+    this.lastHeapBuffer = null;
+    this.initializing = false;
+
+    this.port.onmessage = (event) => {
+      this.handleMessage(event.data);
+    };
+  }
+
+  async handleMessage(data) {
+    if (data.type !== 'init' && !this.module && this.initializing) {
+      return;
+    }
+
+    switch (data.type) {
+      case 'init':
+        await this.initModule(data.sampleRate, data.wasmBinary, data.jsCode);
+        break;
+
+      case 'loadModule':
+        if (this.module && typeof this.module._psgplay_wasm_load === 'function') {
+          try {
+            const uint8Data = new Uint8Array(data.moduleData);
+            const malloc = this.module._malloc || this.module.malloc;
+            if (!malloc) {
+              this.port.postMessage({ type: 'error', message: 'malloc not available' });
+              return;
+            }
+
+            const wasmPtr = malloc(uint8Data.length);
+            if (!wasmPtr) {
+              this.port.postMessage({ type: 'error', message: 'malloc failed for module data' });
+              return;
+            }
+
+            const heapU8 = this.module.HEAPU8 || (this.module.wasmMemory && new Uint8Array(this.module.wasmMemory.buffer));
+            if (!heapU8) {
+              const free = this.module._free || this.module.free;
+              if (free) free(wasmPtr);
+              this.port.postMessage({ type: 'error', message: 'HEAPU8 not available' });
+              return;
+            }
+
+            heapU8.set(uint8Data, wasmPtr);
+            // track 1-based; 0 = the file's default subtune. Loading replaces any song playing.
+            const result = this.module._psgplay_wasm_load(wasmPtr, uint8Data.length, data.track | 0, Math.round(sampleRate));
+            const free = this.module._free || this.module.free;
+            if (free) free(wasmPtr);
+
+            if (result > 0) {
+              this.port.postMessage({ type: 'moduleLoaded', track: result, subtunes: this.module._psgplay_wasm_subtune_count() });
+            } else {
+              const why = { '-1': 'not an SNDH file', '-2': 'ICE! decrunch failed', '-3': 'PSG play refused the file', '-4': 'out of memory' }[String(result)] || '';
+              this.port.postMessage({ type: 'error', message: 'psgplay_wasm_load failed with code ' + result + (why ? ' (' + why + ')' : '') });
+            }
+          } catch (error) {
+            this.port.postMessage({ type: 'error', message: error.message });
+          }
+        }
+        break;
+
+      case 'setMuteMask':
+        // Bit N set = YM channel N (A, B, C) audible; DEViLBOX solo/mute.
+        if (this.module && typeof this.module._psgplay_wasm_set_mute_mask === 'function') {
+          this.module._psgplay_wasm_set_mute_mask(data.mask >>> 0);
+        }
+        break;
+
+      case 'stop':
+        if (this.module && typeof this.module._psgplay_wasm_free === 'function') {
+          // Stop means silence now: the song is released, render returns 0.
+          this.module._psgplay_wasm_free();
+          this.port.postMessage({ type: 'stopped' });
+        }
+        break;
+
+      case 'dispose':
+        this.cleanup();
+        break;
+    }
+  }
+
+  async initModule(sr, wasmBinary, jsCode) {
+    this.initializing = true;
+    try {
+      this.cleanup();
+
+      if (jsCode && !globalThis.PsgplayFactory) {
+        if (typeof globalThis.document === 'undefined') {
+          globalThis.document = {
+            createElement: () => ({ relList: { supports: () => false }, tagName: 'DIV', rel: '', addEventListener: () => {}, removeEventListener: () => {} }),
+            getElementById: () => null, querySelector: () => null, querySelectorAll: () => [],
+            getElementsByTagName: () => [], head: { appendChild: () => {} },
+            addEventListener: () => {}, removeEventListener: () => {}
+          };
+        }
+        if (typeof globalThis.window === 'undefined') {
+          globalThis.window = { addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => {}, customElements: { whenDefined: () => Promise.resolve() }, location: { href: '', pathname: '' } };
+        }
+        if (typeof globalThis.MutationObserver === 'undefined') {
+          globalThis.MutationObserver = class { constructor() {} observe() {} disconnect() {} };
+        }
+        if (typeof globalThis.DOMParser === 'undefined') {
+          globalThis.DOMParser = class { parseFromString() { return { querySelector: () => null, querySelectorAll: () => [] }; } };
+        }
+        if (typeof globalThis.URL === 'undefined') {
+          globalThis.URL = class { constructor(path) { this.href = path; } };
+        }
+
+        const wrappedCode = jsCode + '\nreturn createPsgplay;';
+        const factory = new Function(wrappedCode);
+        const result = factory();
+
+        if (typeof result === 'function') {
+          globalThis.PsgplayFactory = result;
+        } else {
+          this.port.postMessage({ type: 'error', message: 'Failed to load JS module' });
+          return;
+        }
+      }
+
+      if (typeof globalThis.PsgplayFactory !== 'function') {
+        this.port.postMessage({ type: 'error', message: 'Psgplay factory not available' });
+        return;
+      }
+
+      let capturedMemory = null;
+      const origInstantiate = WebAssembly.instantiate;
+      WebAssembly.instantiate = async function(...args) {
+        const result = await origInstantiate.apply(this, args);
+        const instance = result.instance || result;
+        if (instance.exports) {
+          for (const value of Object.values(instance.exports)) {
+            if (value instanceof WebAssembly.Memory) { capturedMemory = value; break; }
+          }
+        }
+        return result;
+      };
+
+      const config = {};
+      if (wasmBinary) config.wasmBinary = wasmBinary;
+
+      try {
+        this.module = await globalThis.PsgplayFactory(config);
+      } finally {
+        WebAssembly.instantiate = origInstantiate;
+      }
+
+      if (!this.module.wasmMemory && capturedMemory) {
+        this.module.wasmMemory = capturedMemory;
+      }
+
+      // Allocate interleaved stereo buffer: frames * 2 channels * 4 bytes per float
+      const malloc = this.module._malloc || this.module.malloc;
+      if (malloc) {
+        this.interleavedPtr = malloc(this.bufferSize * 2 * 4);
+        if (!this.interleavedPtr) {
+          this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' });
+          return;
+        }
+        this.chPtr = malloc(this.bufferSize * 3 * 4);
+      }
+
+      this.updateBufferViews();
+      this.initialized = true;
+      this.initializing = false;
+      this.port.postMessage({ type: 'ready' });
+    } catch (error) {
+      this.initializing = false;
+      this.port.postMessage({ type: 'error', message: error.message });
+    }
+  }
+
+  updateBufferViews() {
+    if (!this.module || !this.interleavedPtr) return;
+    const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
+    if (!heapF32) return;
+    if (this.lastHeapBuffer !== heapF32.buffer) {
+      this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
+      this.lastHeapBuffer = heapF32.buffer;
+      this.chBufs = this.chPtr
+        ? Array.from({ length: 3 }, (_, c) => new Float32Array(heapF32.buffer, this.chPtr + c * this.bufferSize * 4, this.bufferSize))
+        : [];
+    }
+  }
+
+  cleanup() {
+    if (this.module && typeof this.module._psgplay_wasm_free === 'function') {
+      try { this.module._psgplay_wasm_free(); } catch(e) { /* ignore */ }
+    }
+    const free = this.module?._free || this.module?.free;
+    if (free && this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
+    if (free && this.chPtr) { free(this.chPtr); this.chPtr = 0; }
+    this.chBufs = [];
+    this.interleavedBuf = null;
+    this.module = null;
+    this.initialized = false;
+    this.lastHeapBuffer = null;
+  }
+
+  process(inputs, outputs, parameters) {
+    if (!this.initialized || !this.module) return true;
+    const output = outputs[0];
+    if (!output || output.length < 2) return true;
+    const outputL = output[0];
+    const outputR = output[1];
+    if (!outputL || !outputR) return true;
+
+    const numSamples = Math.min(outputL.length, this.bufferSize);
+
+    if (typeof this.module._psgplay_wasm_render === 'function') {
+      this.updateBufferViews();
+      if (this.interleavedBuf) {
+        const withChannels = this.chBufs.length === 3 && typeof this.module._psgplay_wasm_render_channels === 'function';
+        const rendered = withChannels
+          ? this.module._psgplay_wasm_render_channels(this.interleavedPtr, this.chPtr, numSamples, this.bufferSize)
+          : this.module._psgplay_wasm_render(this.interleavedPtr, numSamples);
+        if (rendered > 0) {
+          // Every sample of each of the three YM channels, for the oscilloscopes
+          // and the per-channel role classifiers (worklets/channel-stream.js).
+          if (withChannels && globalThis.DevilboxChannelStream) {
+            this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+            this._stream.writeFloat32(this.chBufs.map((b) => b.subarray(0, rendered)), rendered);
+          }
+          // Deinterleave LRLRLR... into separate L and R channels
+          for (let i = 0; i < rendered; i++) {
+            outputL[i] = this.interleavedBuf[i * 2];
+            outputR[i] = this.interleavedBuf[i * 2 + 1];
+          }
+        }
+      }
+    }
+    return true;
+  }
+}
+
+registerProcessor('psgplay-processor', PsgplayProcessor);

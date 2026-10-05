@@ -1,0 +1,31 @@
+CFLAGS = -O2 -Wall
+
+TARGET_CC = m68k-atari-tos-gnu-gcc
+
+EXAMPLES =								\
+	ALERT.PRG							\
+	COOKIE.TOS							\
+	DESK.ACC							\
+	HELLO.TOS							\
+	MUSIC.SNDH							\
+	WINDOW.PRG							\
+	XBRA.PRG
+
+# Set V=1 for verbosity
+export V
+
+.PHONY: all
+all: $(EXAMPLES)
+
+lowercase ?= $(shell echo "$(1)" | tr '[:upper:]' '[:lower:]')
+
+define EXAMPLE_target
+$(1): $(call lowercase,$(basename $(1))).c
+	$$(TARGET_CC) $$(CFLAGS) -o $$@ $$^
+endef
+
+$(foreach e,$(EXAMPLES), $(eval $(call EXAMPLE_target,$(e))))
+
+.PHONY: clean
+clean:
+	$(RM) $(EXAMPLES)

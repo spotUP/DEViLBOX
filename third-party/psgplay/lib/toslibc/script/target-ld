@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+gen_ld()
+{
+	echo '#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+shopt -s nocasematch
+
+file_type()
+{
+	case "$(echo "$1" | tr '[:lower:]' '[:upper:]')" in
+		*.ACC | *.APP | *.GEM | *.GTP | *.PRG | *.TOS | *.TTP)
+			echo "PRG"
+			;;
+		*.SNDH)
+			echo "SNDH"
+			;;
+		*)
+			echo "default"
+	esac
+}
+
+args_PRG()
+{
+	out=${args[$i]}
+	elf="$out".elf
+	args[$i]="$elf"
+	args+=('"$TOSLIBC_PROGRAM_BASIC_LDFLAGS"')
+	args+=(--script="'"$ldscriptdir"'"/prg.ld)
+}
+
+args_SNDH()
+{
+	out=${args[$i]}
+	elf="$out".elf
+	args[$i]="$elf"
+	args+=('"$TOSLIBC_SNDH_BASIC_LDFLAGS"')
+	args+=(--script="'"$ldscriptdir"'"/sndh.ld)
+}
+
+args_default()
+{
+	:
+}
+
+args=("$@")
+for (( i=1; i<$#; i++ ))
+do
+	# Match -o FILE.APP, -o FILE.PRG, etc.
+	if [[ ${args[(( i-1 ))]} = -o ]]
+	then
+		args_$(file_type "${args[i]}")
+	fi
+done
+
+cmd()
+{
+	[ "x$V" != x1 ] || echo "$@"
+	"$@"
+}
+
+if [[ x"$elf" != x ]]
+then
+	cmd "'"$TARGET_LD"'" "${args[@]}"
+	cmd "'"$binutilsbindir/${target_prefix}toslink"'" -o "$out" "$elf"
+	rm "$elf"
+else
+	cmd "'"$TARGET_LD"'" "$@"
+fi'
+}
+
+if [ $# = 1 ]
+then
+	gen_ld >"$1".tmp
+	chmod a+x "$1".tmp
+	mv "$1".tmp "$1"
+else
+	gen_ld
+fi

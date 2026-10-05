@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+if [ "x$1" = x-v ]
+then
+	shift
+	verbose=1
+else
+	verbose=0
+fi
+
+install_alias_symlink()
+{
+	local ca
+	for ca in "$@"
+	do
+		local c="${ca%%:*}"
+		local a="${ca##*:}"
+		local s="${DESTDIR}${bindir}/${target_prefix}${c}"
+		local d="${DESTDIR}${bindir}/${target_prefix}${a}"
+
+		# Don't install symlink if command doesn't exist.
+		[   -e "$s" ] || continue
+		# Don't install symlink if it’s already in place.
+		# [ ! -e "$d" ] || continue
+
+		if [ $verbose = 1 ]
+		then
+			echo "${DESTDIR}${bindir}: ln -sf ${target_prefix}${c} ${target_prefix}${a}"
+		fi
+
+		(cd "${DESTDIR}${bindir}" && ln -sf "${target_prefix}${c}" "${target_prefix}${a}")
+	done
+}
+
+install_target_symlink()
+{
+	local c
+	for c in "$@"
+	do
+		local s="$(command -v ${TARGET_COMPILE}${c} || :)"
+		local d="${DESTDIR}${bindir}/${target_prefix}${c}"
+
+		# Don't install symlink if command doesn't exist.
+		[   -e "$s" ] || continue
+		# Don't install symlink if it’s already in place.
+		# [ ! -e "$d" ] || continue
+
+		if [ $verbose = 1 ]
+		then
+			echo ln -sf "$s" "$d"
+		fi
+
+		ln -sf "$s" "$d"
+	done
+}
+
+if [ "x$1" = x-a ]
+then
+	shift
+	bindir="$1"
+	shift
+	install_alias_symlink "$@"
+else
+	bindir="$1"
+	shift
+	install_target_symlink "$@"
+fi

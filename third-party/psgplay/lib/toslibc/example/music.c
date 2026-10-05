@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: GPL-2.0
+
+#include <asm/snd/psg.h>
+#include <asm/snd/sndh.h>
+
+#define tune_value_names(t)						\
+	t(440, "A4 pitch standard A440 440 Hz")				\
+	t(262, "C4 middle C 262 Hz")
+
+sndh_title("Music");
+sndh_composer("Pitch Tone");
+sndh_year(2025);
+sndh_tune_value_names(int, tune_value_names);
+sndh_timer(SNDH_TIMER_C, 200);
+
+void sndh_init(int32_t tune)
+{
+	const int pitch = sndh_tune_select_value(tune);
+
+	snd_psg_wr_iomix(SND_PSG_IOMIX_OFF);
+	snd_psg_wr_freq_a(pitch);
+	snd_psg_wr_level_a(SND_PSG_LEVEL_MAX);
+}
+
+void sndh_play(void)
+{
+	snd_psg_wr_iomix(SND_PSG_IOMIX_TONE_A);
+}
+
+void sndh_exit(void)
+{
+	snd_psg_wr_iomix(SND_PSG_IOMIX_OFF);
+}

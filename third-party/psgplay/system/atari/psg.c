@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2019 Fredrik Noring
+ */
+
+#include <stdbool.h>
+#include <stdlib.h>
+
+#include <tos/system-variable.h>
+#include <tos/xbios.h>
+
+#include "system/atari/psg.h"
+
+#include "cf2149/module/cf2149.h"
+
+static bool key_click;
+
+static void save_disable_key_click(void)
+{
+	key_click = __system_variables->conterm.key_click;
+
+	__system_variables->conterm.key_click = false;
+}
+
+static void restore_key_click(void)
+{
+	__system_variables->conterm.key_click = key_click;
+}
+
+static void psg_exit(void)
+{
+	psg_mute();
+
+	xbios_supexec(restore_key_click);
+}
+
+void psg_init(void)
+{
+	xbios_supexec(save_disable_key_click);
+
+	atexit(psg_exit);
+}
+
+uint8_t psg_mute(void)
+{
+	const uint8_t iomix = xbios_giaccess(0, CF2149_REG_IOMIX);
+
+	xbios_giaccess(0x3f | iomix, XBIOS_GIACCESS_SET | CF2149_REG_IOMIX);
+
+	return iomix;
+}
+
+void psg_unmute(uint8_t iomix)
+{
+	xbios_giaccess(iomix, XBIOS_GIACCESS_SET | CF2149_REG_IOMIX);
+}
