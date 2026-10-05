@@ -18,9 +18,8 @@
 
 import type { EditorMode } from '@/types/tracker';
 import { useFormatStore } from '@/stores/useFormatStore';
+import { NON_EDITABLE_MODES } from '@/lib/tracker/nonEditableModes';
 
-/** Editor modes whose "pattern" is a synthetic stub (no rows to target). */
-const NON_EDITABLE_MODES: readonly EditorMode[] = ['sc68'];
 
 /**
  * Does this song render its dub lane as time-indexed events?

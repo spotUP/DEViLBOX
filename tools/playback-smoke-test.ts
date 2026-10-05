@@ -85,6 +85,7 @@
  *   DO NOT duplicate their functionality here — this script is for BROAD coverage.
  */
 
+import { isNonEditableMode } from '../src/lib/tracker/nonEditableModes';
 import { WebSocket } from 'ws';
 import { randomUUID } from 'crypto';
 
@@ -707,7 +708,14 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     // Poll with retries: load_file returns from the bridge before the async
     // parser finishes populating the TrackerStore, so pattern data may not
     // be ready immediately. Wait up to 3s for notes to appear.
-    if (!test.engineDriven) {
+    // A song the app opens in a scope view (SC68, SNDH: the engine plays a
+    // program, there are no rows) has no notes to check.
+    let scopeView = false;
+    try {
+      const fmt = await client.call<{ editorMode?: string }>('get_format_state', {});
+      scopeView = isNonEditableMode(fmt.editorMode);
+    } catch { /* format state unavailable: check notes */ }
+    if (!test.engineDriven && !scopeView) {
       let noteCells = 0;
       const patternPollDeadline = Date.now() + 3000;
       while (Date.now() < patternPollDeadline) {
