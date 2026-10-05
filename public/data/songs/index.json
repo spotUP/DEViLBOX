@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T17:56:09.015Z",
+  "generated": "2026-10-05T19:33:30.375Z",
   "perEntry": 6,
   "registryTotal": 279,
   "covered": 167,
@@ -7925,6 +7925,17 @@
       "dir": "/data/songs/steve-barrett"
     },
     {
+      "id": "steve-turner",
+      "label": "steve-turner",
+      "formatKey": "steveTurner",
+      "files": [
+        "/data/songs/steve-turner/paradroid90.jpo",
+        "/data/songs/steve-turner/rainbow islands.jpo"
+      ],
+      "total": 2,
+      "dir": "/data/songs/steve-turner"
+    },
+    {
       "id": "stonetracker",
       "label": "stonetracker",
       "formatKey": "stoneTracker",
@@ -10084,6 +10095,10 @@
         ],
         "steve-barrett": [
           "street fighter.sb"
+        ],
+        "steve-turner": [
+          "paradroid90.jpo",
+          "rainbow islands.jpo"
         ],
         "stonetracker": [
           "hypnosphere.spm",
@@ -36914,6 +36929,12 @@
     "/data/songs/steve-barrett": {
       "siblings": [
         "street fighter.sb"
+      ]
+    },
+    "/data/songs/steve-turner": {
+      "siblings": [
+        "paradroid90.jpo",
+        "rainbow islands.jpo"
       ]
     },
     "/data/songs/stonetracker": {
