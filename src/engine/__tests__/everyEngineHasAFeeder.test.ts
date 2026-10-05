@@ -24,7 +24,6 @@ const IMPORT_DIRS = [join(ROOT, 'src/lib/import'), join(ROOT, 'src/lib/file')];
 /** Engines that import cannot reach today, each with the reason. */
 const KNOWN_UNREACHED: Record<string, string> = {
   // No feeder.
-  FaceTheMusicReplayer: '.ftm imports through libopenmpt: the replayer runs PlayFTM\'s CIA tempo (709379 / tempo), 0.23 % slower than libopenmpt\'s 1777517.482 / tempo BPM, so the two drift apart (owner decides which is reference)',
 };
 
 function sources(dir: string): string[] {
