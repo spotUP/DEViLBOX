@@ -80,6 +80,17 @@ export async function tryRouteFormat(
 ): Promise<TrackerSong | null> {
   const ctx: FallbackContext = { buffer, originalFileName, prefs, subsong, preScannedMeta, companionFiles };
 
+  // ── StarTrekker AM on a plain .mod (companion <name>.mod.nt) ─────────────
+  // The AM instruments live in the .nt; the TS MOD engine plays it silent.
+  // UADE's StarTrekker AM player plays the pair. See adscRoute.modHasStarTrekkerNt.
+  {
+    const { modHasStarTrekkerNt } = await import('@lib/import/adscRoute');
+    if (modHasStarTrekkerNt(originalFileName, companionFiles?.keys() ?? [])) {
+      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+      return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    }
+  }
+
   // ── HivelyTracker / AHX ─────────────────────────────────────────────────
   if (filename.endsWith('.hvl') || filename.endsWith('.ahx')) {
     const { parseHivelyFile } = await import('@lib/import/formats/HivelyParser');
