@@ -79,4 +79,29 @@ describe('David Whittaker pattern codec', () => {
     expect(checked, 'at least one block round-tripped').toBeGreaterThan(0);
     expect(sawCommands, 'fixture exercises multi-command blocks').toBe(true);
   });
+
+  // Regression: the structure scan stepped back onto its own `move.w x(a5),d1`
+  // after reading the period table and spun there until its iteration limit, so
+  // it never reached the `subi.b #$c0/#$b0/#$a0,d0` instructions that give each
+  // player's command ranges. Every module fell back to 0xb0 sample / 0xa0 volume
+  // sequence / 0x90 frequency sequence. garfield2+'s player uses 0xc0 / 0xb0 /
+  // 0xa0 (its command dispatch compares d0 against #$e0, #$c0, #$b0, #$a0), so
+  // its first block `c2 b6 ff 82 ...` showed sample 19 then a bogus switch to
+  // sample 7, where the player selects sample 3 and volume sequence 6.
+  // apb.dw's player really does use 0xb0 / 0xa0 / 0x90 and must stay as it was.
+  it('reads sample-change commands with the command ranges of the module\'s own player', () => {
+    const firstRows = (path: string, name: string) => {
+      const raw = new Uint8Array(readFileSync(join(process.cwd(), path)));
+      const song = parseDavidWhittakerFile(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength), name);
+      return song.patterns[0].channels[0].rows.slice(0, 2).map((c) => ({ byte: c.period, instrument: c.instrument }));
+    };
+    expect(firstRows('public/data/songs/david-whittaker/garfield2+.dw', 'garfield2+.dw')).toEqual([
+      { byte: 0xc2, instrument: 3 },  // 0xc0 range: sample 3
+      { byte: 0xb6, instrument: 0 },  // 0xb0 range: volume sequence, no sample change
+    ]);
+    expect(firstRows('public/data/songs/formats/apb.dw', 'apb.dw')).toEqual([
+      { byte: 0xae, instrument: 0 },  // 0xa0 range: volume sequence
+      { byte: 0xb1, instrument: 2 },  // 0xb0 range: sample 2
+    ]);
+  });
 });
