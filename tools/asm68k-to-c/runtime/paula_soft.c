@@ -28,6 +28,7 @@ typedef struct {
     uint8_t       next_vol;
     int           next_valid;
     int           completed;    // a one-shot ended since the last poll
+    int           latched;      // LC/LEN latched since the last poll (AUDx interrupt)
 } PaulaChannel;
 
 static PaulaChannel s_ch[PAULA_CHANNELS];
@@ -113,6 +114,7 @@ void paula_dma_write(uint16_t dmacon) {
             c->pos        = 0.0f;
             c->completed  = 0;
             c->dma_on     = 1;
+            c->latched    = 1;
         } else {
             c->dma_on = 0;
         }
@@ -160,6 +162,7 @@ static int buffer_end(PaulaChannel* c) {
         // one-shot has pointed them at a silent word (or LEN 0) by now.
         c->sample     = c->reg_sample;
         c->sample_len = c->reg_len;
+        c->latched    = 1;
     } else {
         c->completed = 1;
         if (!c->next_valid) { c->dma_on = 0; return 0; }
@@ -171,6 +174,7 @@ static int buffer_end(PaulaChannel* c) {
         c->volume     = (float)c->next_vol / 64.0f;
         c->next_valid = 0;
         c->pos        = 0.0f;
+        c->latched    = 1;
     }
     if (!c->sample || c->sample_len == 0) { c->dma_on = 0; return 0; }
     if ((uint32_t)c->pos >= c->sample_len) c->pos = 0.0f;
@@ -195,7 +199,18 @@ static float sample_channel(PaulaChannel* c) {
     return s * c->volume;
 }
 
+int paula_poll_block_start(int ch) {
+    if (!valid_ch(ch)) return 0;
+    int l = s_ch[ch].latched;
+    s_ch[ch].latched = 0;
+    return l;
+}
+
 int paula_render(float* buffer, int frames) {
+    return paula_render_voices(buffer, 0, 0, frames);
+}
+
+int paula_render_voices(float* buffer, float* voices, int stride, int frames) {
     int i, ch;
     for (i = 0; i < frames; i++) {
         float out[PAULA_CHANNELS];
@@ -204,6 +219,7 @@ int paula_render(float* buffer, int frames) {
             float a = out[ch] < 0.0f ? -out[ch] : out[ch];
             if (a > s_channel_peaks[ch]) s_channel_peaks[ch] = a;
             s_scope[ch][s_scope_pos] = (int16_t)(out[ch] * 32767.0f);
+            if (voices) voices[ch * stride + i] = out[ch];
         }
         s_scope_pos = (s_scope_pos + 1) & (SCOPE_LEN - 1);
         // Amiga hard panning: ch0,3 -> left; ch1,2 -> right; halved to not clip

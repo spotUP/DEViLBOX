@@ -53,6 +53,16 @@ void paula_set_channel_gain(int ch, float gain);  // 0 = mute, 1 = unity
 // each side halved). Returns frames written.
 int paula_render(float* buffer, int frames);
 
+// As paula_render, plus each voice's post-gain output: voices[ch * stride + i]
+// (voices may be NULL). For per-voice outputs (scopes, dub sends, isolation).
+int paula_render_voices(float* buffer, float* voices, int stride, int frames);
+
+// AUDx interrupt source: 1 (and cleared) if the channel latched AUDxLC/AUDxLEN
+// since the last poll - when its DMA started and at every repeat. The chip
+// raises the channel's audio interrupt there; a host with a CPU (musashi-host)
+// turns this into INTREQ AUDx.
+int paula_poll_block_start(int ch);
+
 // Per-channel peak levels (0-1) since the last call; reading resets them.
 void paula_get_channel_levels(float* out4);
 
