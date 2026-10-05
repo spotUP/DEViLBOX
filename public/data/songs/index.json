@@ -1,8 +1,8 @@
 {
-  "generated": "2026-10-05T00:04:26.088Z",
+  "generated": "2026-10-05T00:24:59.641Z",
   "perEntry": 6,
   "registryTotal": 277,
-  "covered": 157,
+  "covered": 158,
   "entries": [
     {
       "id": "actionamics",
@@ -6409,6 +6409,16 @@
       "dir": "/data/songs/s3m"
     },
     {
+      "id": "sap",
+      "label": "sap",
+      "formatKey": "sap",
+      "files": [
+        "/data/songs/sap/chop suey.sap"
+      ],
+      "total": 1,
+      "dir": "/data/songs/sap"
+    },
+    {
       "id": "sawteeth",
       "label": "sawteeth",
       "formatKey": "sawteeth",
@@ -8742,6 +8752,9 @@
         ],
         "s3m": [
           "andante.s3m"
+        ],
+        "sap": [
+          "chop suey.sap"
         ],
         "sawteeth": [
           "okolaNUKE.st"
@@ -32955,6 +32968,11 @@
         "andante.s3m"
       ]
     },
+    "/data/songs/sap": {
+      "siblings": [
+        "chop suey.sap"
+      ]
+    },
     "/data/songs/sawteeth": {
       "siblings": [
         "okolaNUKE.st"
@@ -35046,10 +35064,6 @@
     {
       "formatKey": "s98",
       "label": "S98"
-    },
-    {
-      "formatKey": "sap",
-      "label": "SAP"
     },
     {
       "formatKey": "uade_sc2",

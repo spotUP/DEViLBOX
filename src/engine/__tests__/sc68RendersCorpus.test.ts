@@ -4,13 +4,12 @@
  * The jukebox marked sc68 "Silent" (`aprentice title.sc68`). Headless, the
  * core takes the file, renders audio from the first frame (peak 0.34), so a
  * silent browser is the routing around the engine, not the engine
- * (2026-10-05 broken-formats sweep, B16). The bundle exports no heap view;
- * the wasm memory is captured at instantiation.
+ * (2026-10-05 broken-formats sweep, B16).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { createRequire } from 'node:module';
+import { loadWebBundle, type WebBundle } from '@/test/wasm/webBundle';
 
 const ROOT = process.cwd();
 const DIR = join(ROOT, 'public/sc68');
@@ -24,32 +23,14 @@ interface Sc68Module {
   _sc68_wasm_stop: () => void;
 }
 
-let m: Sc68Module;
-let memory: WebAssembly.Memory | null = null;
-
+let b: WebBundle<Sc68Module>;
 beforeAll(async () => {
-  const js = readFileSync(join(DIR, 'Sc68.js'), 'utf8');
-  const wasmBinary = readFileSync(join(DIR, 'Sc68.wasm'));
-  const original = WebAssembly.instantiate;
-  (WebAssembly as unknown as { instantiate: unknown }).instantiate = async (...args: unknown[]) => {
-    const result = await (original as (...a: unknown[]) => Promise<unknown>)(...args);
-    const inst = (result as { instance?: WebAssembly.Instance }).instance ?? (result as WebAssembly.Instance);
-    const exported = (inst as WebAssembly.Instance).exports?.memory;
-    if (exported instanceof WebAssembly.Memory) memory = exported;
-    return result;
-  };
-  try {
-    const require = createRequire(import.meta.url);
-    const factory = new Function('require', '__dirname', '__filename', `${js}\nreturn createSc68;`)(require, DIR, join(DIR, 'Sc68.js'));
-    m = await factory({ wasmBinary, print: () => {}, printErr: () => {} });
-  } finally {
-    (WebAssembly as unknown as { instantiate: unknown }).instantiate = original;
-  }
-  if (!memory) throw new Error('wasm memory not captured');
+  b = await loadWebBundle<Sc68Module>(join(DIR, 'Sc68.js'), join(DIR, 'Sc68.wasm'), 'createSc68');
 }, 60_000);
 
 function peakOf(data: Uint8Array, seconds: number): number {
-  const heap = () => new Uint8Array(memory!.buffer);
+  const m = b.module;
+  const heap = b.heap;
   const ptr = m._malloc(data.length);
   heap().set(data, ptr);
   const ret = m._sc68_wasm_init(ptr, data.length);
