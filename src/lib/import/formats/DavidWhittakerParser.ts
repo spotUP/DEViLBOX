@@ -402,13 +402,15 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
         const wval = u16BE(buf, pos);
         pos += 2;
         if (wval === 0x000a || wval === 0x000c) {
-          pos -= 8;
-          if (u16BE(buf, pos) === 0x45fa) {  // lea x,a2
-            pos += 2;
-            periodTableOffset = pos + s16BE(buf, pos);
-            pos += 2;
-          } else {
-            pos += 6;
+          // The period table is the `lea x,a2` two words before this instruction.
+          // Read it in place and resume AFTER the move: stepping back to it left
+          // `pos` on this same 0x322d, so the scan spun here until safeLimit ran
+          // out and never reached the command-range `subi.b` checks below — every
+          // module then used the 0xb0/0xa0/0x90 defaults, which mis-split the
+          // command bytes of players using 0xc0/0xb0/0xa0 (garfield2+.dw).
+          const lea = pos - 8;
+          if (u16BE(buf, lea) === 0x45fa) {  // lea x,a2
+            periodTableOffset = lea + 2 + s16BE(buf, lea + 2);
           }
         }
         break;
