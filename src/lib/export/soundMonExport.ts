@@ -23,6 +23,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
 import type { SoundMonConfig } from '@/types/instrument/exotic';
+import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
 
 export interface SoundMonExportResult {
   data: Blob;
@@ -51,17 +52,6 @@ function writeString(buf: Uint8Array, off: number, str: string, len: number): vo
   }
 }
 
-// ── Note conversion ─────────────────────────────────────────────────────
-
-/** XM note → SoundMon note index.
- *  Parser bpNoteToXM: SM note 1 → PERIODS[36]=856 → C-1 → XM 13.
- *  So reverse: SM note = XM note - 12. Range: 1-48 (4 octaves). */
-function xmNoteToSM(xmNote: number): number {
-  if (xmNote === 0 || xmNote === 97) return 0;
-  const smNote = xmNote - 12;
-  if (smNote < 1 || smNote > 48) return 0;
-  return smNote;
-}
 
 // ── Effect reverse-mapping (XM → SoundMon) ─────────────────────────────
 
@@ -94,7 +84,7 @@ function xmEffectToSM(xmEffTyp: number, xmEff: number): { smOpt: number; smParam
 
 /** Encode TrackerCell → 3 bytes at offset in buf. */
 function encodeCell(cell: TrackerCell, buf: Uint8Array, off: number): void {
-  const note = xmNoteToSM(cell.note ?? 0);
+  const note = (cell.note ?? 0) === 97 ? 0 : noteToBpNote(cell.note ?? 0);
   writeS8(buf, off, note);
 
   const instr = (cell.instrument ?? 0) & 0x0F;
