@@ -101,6 +101,10 @@ EMSCRIPTEN_KEEPALIVE int asap_wasm_get_pokey_volume(int channel) {
     return ASAP_GetPokeyChannelVolume(asap, channel);
 }
 
+/* `mask` follows the app's mixer: bit N set = channel N AUDIBLE. ASAP's
+   MutePokeyChannels takes bit N set = channel N MUTED, so the mixer's
+   all-on mask muted every POKEY channel: bleeps, then silence (2026-10-05).
+   Eight bits: two POKEYs in stereo tunes. */
 EMSCRIPTEN_KEEPALIVE void asap_wasm_mute_channels(int mask) {
-    if (asap) ASAP_MutePokeyChannels(asap, mask);
+    if (asap) ASAP_MutePokeyChannels(asap, ~mask & 0xff);
 }
