@@ -24,14 +24,22 @@ class AsapProcessor extends AudioWorkletProcessor {
   }
 
   async handleMessage(data) {
+    // A message that arrives while the WASM module is still initialising is
+    // queued, not dropped: a dropped loadModule left the engine "playing"
+    // with no tune (silence, and before the wrapper's guard, a hung render).
     if (data.type !== 'init' && !this.module && this.initializing) {
+      (this.pending ||= []).push(data);
       return;
     }
 
     switch (data.type) {
-      case 'init':
+      case 'init': {
         await this.initModule(data.sampleRate, data.wasmBinary, data.jsCode);
+        const queued = this.pending || [];
+        this.pending = [];
+        for (const m of queued) await this.handleMessage(m);
         break;
+      }
 
       case 'loadModule':
         if (this.module && typeof this.module._asap_wasm_load === 'function') {
@@ -60,7 +68,18 @@ class AsapProcessor extends AudioWorkletProcessor {
 
             // Allocate and copy filename
             const filename = data.filename || 'tune.sap';
-            const fnBytes = new TextEncoder().encode(filename + '\0');
+            // AudioWorkletGlobalScope has no TextEncoder: "TextEncoder is not
+            // defined" threw here, the tune never loaded and ASAP played
+            // silence (2026-10-05). Encode UTF-8 by hand, NUL-terminated.
+            const fnList = [];
+            for (let i = 0; i < filename.length; i++) {
+              const c = filename.charCodeAt(i);
+              if (c < 0x80) fnList.push(c);
+              else if (c < 0x800) fnList.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+              else fnList.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+            }
+            fnList.push(0);
+            const fnBytes = new Uint8Array(fnList);
             if (this.filenamePtr) { if (free) free(this.filenamePtr); }
             this.filenamePtr = malloc(fnBytes.length);
             if (!this.filenamePtr) {
@@ -74,6 +93,7 @@ class AsapProcessor extends AudioWorkletProcessor {
             if (free) free(dataPtr);
 
             if (result) {
+              this.rewindOnPlay = false;
               this.playing = true;
               const meta = {};
               if (typeof this.module._asap_wasm_get_channels === 'function') {
@@ -89,22 +109,29 @@ class AsapProcessor extends AudioWorkletProcessor {
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
           }
+        } else {
+          // Never drop a tune silently: with no module (disposed, or init
+          // failed) the engine reported "playing" and rendered nothing.
+          this.port.postMessage({ type: 'error', message: 'loadModule ignored: the ASAP module is not initialised (disposed or init failed)' });
         }
         break;
 
       case 'play':
+        // After a stop, start the tune again from the top.
+        if (this.rewindOnPlay && this.module && typeof this.module._asap_wasm_restart === 'function') {
+          this.module._asap_wasm_restart();
+        }
+        this.rewindOnPlay = false;
         this.playing = true;
         break;
 
       case 'stop':
+        // Stop keeps the tune. It used to delete it and re-initialise ASAP,
+        // so any stop (or pause, which sends 'stop') followed by play without
+        // a fresh load rendered silence: a few bleeps, then nothing
+        // (2026-10-05). The next 'play' rewinds; a new load replaces it.
         this.playing = false;
-        if (this.module && typeof this.module._asap_wasm_stop === 'function') {
-          this.module._asap_wasm_stop();
-        }
-        // Re-init ASAP so it's ready for next load
-        if (this.module && typeof this.module._asap_wasm_init === 'function') {
-          this.module._asap_wasm_init(sampleRate);
-        }
+        this.rewindOnPlay = true;
         this.port.postMessage({ type: 'stopped' });
         break;
 

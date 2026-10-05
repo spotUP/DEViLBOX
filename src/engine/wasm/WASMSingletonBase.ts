@@ -204,6 +204,15 @@ export abstract class WASMSingletonBase {
     try {
       await loadWASMAssets(this.audioContext, cache, this.getLoaderConfig());
       this.createNode();
+      // A processor that throws inside process() stops for good, and the
+      // exception never reaches the page console: the engine just goes
+      // silent (ASAP, 2026-10-05). Report it.
+      const node = this.workletNode;
+      if (node && !node.onprocessorerror) {
+        node.onprocessorerror = (event) => {
+          console.error(`[${this.constructor.name}] worklet processor error - the engine stopped:`, event);
+        };
+      }
     } catch (err) {
       console.error(`[${this.constructor.name}] Initialization failed:`, err);
     }
