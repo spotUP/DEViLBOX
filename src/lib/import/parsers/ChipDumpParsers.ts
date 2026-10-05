@@ -48,11 +48,11 @@ export async function tryChipDumpParse(
     return parseAsapFile(buffer, originalFileName);
   }
 
-  // ── AY — ZX Spectrum AY (ZXAYEMUL) ───────────────────────────────────────
+  // ── AY — ZX Spectrum AY (ZXAY EMUL) ───────────────────────────────────────
   // `.emul` too: the corpus names these files after the ZXAY SUBTYPE instead
   // of the container, and `ay-emul/spring.emul` begins with the bytes
-  // `ZXAYEMUL` that `parseAYFile` reads. NOT `.strc`/`.amad` — same container,
-  // different payload, and this parser only knows the EMUL layout.
+  // `ZXAYEMUL`. Playback is aylet in wasm (AyletEngine); the parser draws the
+  // grid and carries the file as `ayFileData`.
   //
   // NOTE: this extension test duplicates the one in FORMAT_REGISTRY, which is
   // why registering `.emul` there was not enough on its own. Every branch in
@@ -61,6 +61,14 @@ export async function tryChipDumpParse(
   if (/\.(ay|emul)$/.test(filename)) {
     const { parseAYFile } = await import('@lib/import/formats/AYParser');
     return parseAYFile(buffer, originalFileName);
+  }
+
+  // ── AY STRC / AMAD — same container, host-side replayer payload ─────────
+  // No available player implements these replayers; the parser throws the
+  // reason (thoughts/shared/research/2026-10-04_ay-strc-amad.md).
+  if (/\.(strc|amad)$/.test(filename)) {
+    const { parseAYStructuredFile } = await import('@lib/import/formats/AYParser');
+    return parseAYStructuredFile(buffer, originalFileName);
   }
 
   // ── KSS — MSX music (AY/SCC/FM) ──────────────────────────────────────────
@@ -91,6 +99,12 @@ export async function tryChipDumpParse(
   if (/\.mdx$/.test(filename)) {
     const { parseMDXFile } = await import('@lib/import/formats/MDXParser');
     return parseMDXFile(buffer);
+  }
+
+  // ── PiyoPiyo — Studio Pixel .pmd ('PMD' magic), before PC-98 PMD claims the extension ──
+  if (/\.pmd$/.test(filename)) {
+    const { isPiyoPiyoFormat, parsePiyoPiyoFile } = await import('@lib/import/formats/PiyoPiyoParser');
+    if (isPiyoPiyoFormat(new Uint8Array(buffer))) return parsePiyoPiyoFile(buffer, originalFileName);
   }
 
   // ── PMD — PC-98 Professional Music Driver (YM2608) ───────────────────────

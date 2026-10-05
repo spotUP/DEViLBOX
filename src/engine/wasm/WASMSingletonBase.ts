@@ -46,8 +46,8 @@ export interface WASMLoaderConfig {
   dir: string;
   /** Filename of the AudioWorklet file, e.g. "JamCracker.worklet.js". */
   workletFile: string;
-  /** Filename of the WASM binary, e.g. "JamCracker.wasm". */
-  wasmFile: string;
+  /** Filename of the WASM binary, e.g. "JamCracker.wasm". Omit for a worklet without WASM (PiyoPiyo). */
+  wasmFile?: string;
   /**
    * Filename of the Emscripten JS glue, e.g. "JamCracker.js". Omit for engines
    * whose worklet instantiates the WASM binary directly (e.g. VocoderCore) —
@@ -127,7 +127,7 @@ export async function loadWASMAssets(
       /* Module might already be registered — not fatal. */
     }
 
-    const needsWasm = !cache.wasmBinary;
+    const needsWasm = !!config.wasmFile && !cache.wasmBinary;
     const needsJs = !!config.jsFile && !cache.jsCode;
 
     if (needsWasm || needsJs) {

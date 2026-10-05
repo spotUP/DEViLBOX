@@ -311,6 +311,18 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 - **License:** MIT (ayumi AY-3-8910 core)
 - **Used for:** ZX Spectrum formats (.pt3, .pt2, .stc, .vtx, .psg, and 30+ more)
 
+### aylet
+- **Authors:** Russell Marks, Ian Collier (Z80 core from xz80)
+- **Source:** `third-party/aylet-0.5` (aylet 0.5, from the Debian `aylet_0.5.orig.tar.gz`); wasm bridge in `aylet-wasm/`
+- **License:** GPL-2.0-or-later (`third-party/aylet-0.5/COPYING`)
+- **Used for:** ZX Spectrum .ay / .emul (ZXAY EMUL) playback — the tune's own Z80 code with AY and beeper emulation (compiled to WASM). `aylet-wasm/src/z80_frame.c` is aylet's `z80.c` made re-entrant one frame at a time; `sound.c` and the opcode tables are used unchanged.
+
+### piyopiyo-rs
+- **Author:** crumblingstatue
+- **Source:** https://github.com/crumblingstatue/piyopiyo-rs (player algorithm ported to `public/piyopiyo/PiyoPiyo.worklet.js`; drum samples copied to `public/piyopiyo/drums/`)
+- **License:** 0BSD (`public/piyopiyo/drums/LICENSE-0BSD.txt`)
+- **Used for:** Studio Pixel PiyoPiyo .pmd playback
+
 ### PxTone
 - **Author:** Studio Pixel (Daisuke "Pixel" Amaya)
 - **Source:** https://studiopixel.sakura.ne.jp/pxtone/

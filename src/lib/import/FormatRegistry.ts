@@ -1861,13 +1861,13 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/PMDParser', parseFn: 'parsePMDFile', detectFn: 'isPMDFormat' },
   },
-  // ── Formats DEViLBOX recognises but cannot play yet ──────────────────────
-  // Each refuses with its own name and the missing replayer instead of
-  // "Unsupported file format" (ledger 2026-10-05 broken-formats sweep, B18).
+  // ── PiyoPiyo plays; StoneTracker and TFM Music Maker refuse with their own
+  // name and the missing replayer instead of "Unsupported file format"
+  // (ledger 2026-10-05 broken-formats sweep, B5/B7/B8).
   {
     key: 'piyoPiyo',
     label: 'PiyoPiyo',
-    description: "Studio Pixel PiyoPiyo (.pmd, 'PMD' magic) — no replayer yet",
+    description: "Studio Pixel PiyoPiyo (.pmd, 'PMD' magic) — worklet port of piyopiyo-rs",
     family: 'chip-dump',
     matchMode: 'extension',
     extRegex: /\.pmd$/i,
@@ -1875,7 +1875,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     // `.pmd` is also PC-98 PMD; detectFormatFromContent tells them apart by the
     // 'PMD' magic, which PMD98 files do not carry.
     customDispatch: true,
-    nativeParser: { module: '@lib/import/formats/NoReplayerParsers', parseFn: 'parsePiyoPiyoFile', detectFn: 'isPiyoPiyoFormat' },
+    nativeParser: { module: '@lib/import/formats/PiyoPiyoParser', parseFn: 'parsePiyoPiyoFile', detectFn: 'isPiyoPiyoFormat' },
   },
   {
     key: 'stoneTracker',
