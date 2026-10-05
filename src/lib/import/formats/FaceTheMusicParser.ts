@@ -539,5 +539,7 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     initialBPM,
     linearPeriods:   true,  // SONG_LINEARSLIDES per Load_ftm.cpp
     uadeVariableLayout,
+    // Plays on our FaceTheMusicReplayer (PlayFTM timing, live edits).
+    faceTheMusicFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   };
 }

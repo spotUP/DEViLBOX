@@ -15,6 +15,8 @@ const ROOT = resolve(__dirname, '../../..');
 const bytes = (rel: string) => { const b = readFileSync(resolve(ROOT, rel)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
 
 const CASES: Array<[string, () => Promise<TrackerSong | null>, string]> = [
+  // .ftm went to libopenmpt; our replayer (PlayFTM timing, editable) plays it now (2026-10-06).
+  ['face-the-music/rock.ftm', async () => (await import('@lib/import/parsers/AmigaFormatParsers')).tryRouteFormat(bytes('public/data/songs/face-the-music/rock.ftm'), 'rock.ftm', 'rock.ftm', {} as never, 0), 'FaceTheMusicReplayer'],
   // PumaTracker labels its songs 'MOD' (Amiga grid); the old format gate kept
   // its own WASM engine off (2026-10-05). The file data decides now.
   ['pumatracker/liquid kids - lv1a.puma', async () => (await import('@lib/import/formats/PumaTrackerParser')).parsePumaTrackerFile(bytes('public/data/songs/pumatracker/liquid kids - lv1a.puma'), 'liquid kids - lv1a.puma'), 'PumaTracker'],

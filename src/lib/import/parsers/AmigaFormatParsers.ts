@@ -876,8 +876,13 @@ export async function tryRouteFormat(
   }
 
   // ── Face The Music (.ftm) ─────────────────────────────────────────────────
-  // .ftm files — OpenMPT
+  // Our replayer (PlayFTM's own CIA timing, editable) - owner, 2026-10-06:
+  // libopenmpt runs 0.23 % fast and 2.4 dB quiet against PlayFTM. libopenmpt
+  // only takes what the native parser refuses.
   if (matchesExt(filename, ['ftm'])) {
+    const { parseFaceTheMusicFile } = await import('@lib/import/formats/FaceTheMusicParser');
+    const native = parseFaceTheMusicFile(new Uint8Array(buffer), originalFileName);
+    if (native) return native;
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
     const song = await parseWithOpenMPT(buffer, originalFileName);
     song.libopenmptFileData = buffer.slice(0);
