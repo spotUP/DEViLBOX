@@ -62,7 +62,7 @@ export const AudioMotionVisualizer: React.FC<AudioMotionVisualizerProps> = ({
     try {
       if (audioSource === 'master') {
         const engine = getToneEngine();
-        engine.enableAnalysers(); // ensure analyser tap is alive
+        engine.enableAnalysers(containerRef); // ensure analyser tap is alive
         const nativeNode = getNativeAudioNode(engine.masterChannel);
         if (nativeNode) {
           analyzer.connectInput(nativeNode);
@@ -90,7 +90,7 @@ export const AudioMotionVisualizer: React.FC<AudioMotionVisualizerProps> = ({
       // Disconnect master analysers if we enabled them
       if (connectedMaster) {
         try {
-          getToneEngine().disableAnalysers();
+          getToneEngine().disableAnalysers(containerRef);
         } catch { /* ignore */ }
       }
     };

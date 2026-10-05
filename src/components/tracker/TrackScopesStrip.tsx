@@ -40,12 +40,12 @@ export const TrackScopesStrip: React.FC = memo(() => {
   // Enable master analyser for waveform fallback
   useEffect(() => {
     try {
-      getToneEngine().enableAnalysers();
+      getToneEngine().enableAnalysers(canvasRef);
       analysersEnabledRef.current = true;
     } catch { /* engine not ready yet */ }
     return () => {
       if (analysersEnabledRef.current) {
-        try { getToneEngine().disableAnalysers(); } catch { /* ok */ }
+        try { getToneEngine().disableAnalysers(canvasRef); } catch { /* ok */ }
       }
     };
   }, []);
@@ -140,7 +140,7 @@ export const TrackScopesStrip: React.FC = memo(() => {
       if (!useOsc && playing) {
         try {
           if (!analysersEnabledRef.current) {
-            getToneEngine().enableAnalysers();
+            getToneEngine().enableAnalysers(canvasRef);
             analysersEnabledRef.current = true;
           }
           const raw = getToneEngine().analyser.getValue();

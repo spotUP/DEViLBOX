@@ -59,7 +59,7 @@ export const FrequencyBars: React.FC<FrequencyBarsProps> = ({ height = 100 }) =>
 
     // Enable analysers when visualization is active
     const engine = getToneEngine();
-    engine.enableAnalysers();
+    engine.enableAnalysers(canvasRef);
 
     const animate = () => {
       if (document.hidden) {
@@ -112,7 +112,7 @@ export const FrequencyBars: React.FC<FrequencyBarsProps> = ({ height = 100 }) =>
         cancelAnimationFrame(animationRef.current);
       }
       // Disable analysers to save CPU when visualization unmounts
-      engine.disableAnalysers();
+      engine.disableAnalysers(canvasRef);
     };
   }, [width, height]);
 
