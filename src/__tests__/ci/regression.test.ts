@@ -177,9 +177,9 @@ describe('NativeEngineRouting integrity', () => {
     const fs = await import('fs');
     const path = await import('path');
 
-    // Read NativeEngineRouting to extract fileDataKey values
+    // Read the engine registry to extract fileDataKey values
     const routingTs = fs.readFileSync(
-      path.resolve(__dirname, '../../engine/replayer/NativeEngineRouting.ts'),
+      path.resolve(__dirname, '../../engine/replayer/wasmEngineRegistry.ts'),
       'utf-8',
     );
 
