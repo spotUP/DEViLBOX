@@ -14,12 +14,17 @@
  * These are specific 68k instruction sequences at fixed byte offsets in the
  * compiled executable, unique to this format.
  *
- * Binary layout:
- *   0x0000-0x0293: Player code (68k executable)
- *   0x0294-0x02D3: Song order table (128 bytes, one byte per position = pattern index)
- *   0x02D4+:       Pattern data (1024 bytes per pattern, standard MOD cell encoding:
- *                   4 bytes/cell × 4 channels × 64 rows)
- *   After patterns: Sample PCM data
+ * Binary layout (located the way the module's own player and the EaglePlayer's
+ * InitPlayer find it — by scanning the embedded player code, never fixed offsets):
+ *   Origin:   the absolute load address the executable was assembled at — the
+ *             longword before the first `MOVE.L abs,d16(An)` (0x2379) opcode.
+ *   Patterns: `MOVE.L #base,ptr` right after `MULU #$400,D0` (0xC0FC0400, +6).
+ *             The player advances the row pointer by 16 BEFORE reading a row, so
+ *             row r of pattern p lives at base + 16 + p*1024 + r*16.
+ *   Orders:   `MOVEA.L #orders,A1` after `CMP.W #$400,rowpos` (0x0C790400, +12);
+ *             the song length is the `CMPI.L #len,songpos` operand at +34.
+ *   Cell:     word0 = Amiga period (0 = empty), byte2 = sample<<4 | effect,
+ *             byte3 = effect parameter — 4 bytes x 4 channels x 64 rows.
  *
  * File prefix: "EX."  (e.g. "EX.songname")
  *
@@ -41,14 +46,8 @@ import { periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 /** Minimum file size: needs bytes through offset 25 (22 + 4 bytes = 26). */
 const MIN_FILE_SIZE = 26;
 
-/** Offset of the 128-byte song order table */
-const SONG_ORDER_OFF = 0x0294;
-
-/** Length of the song order table in bytes */
-const SONG_ORDER_LEN = 128;
-
-/** Offset where pattern data begins (immediately after order table) */
-const PATTERN_DATA_OFF = SONG_ORDER_OFF + SONG_ORDER_LEN; // 0x0314
+/** The embedded player code the layout scan walks (InitPlayer scans 1000 bytes). */
+const CODE_SCAN_LEN = 1000;
 
 /** Rows per pattern */
 const ROWS_PER_PATTERN = 64;
@@ -72,6 +71,49 @@ function u32BE(buf: Uint8Array, off: number): number {
   return (
     ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0
   );
+}
+
+// ── Layout scan (mirrors FashionTracker.asm InitPlayer + the module's player) ──
+
+interface FTLayout {
+  /** File offset of pattern 0, row 0, channel 0. */
+  patternDataOff: number;
+  /** File offset of the order table. */
+  orderOff: number;
+  /** Number of order positions the player walks before wrapping. */
+  songLength: number;
+}
+
+/**
+ * Locate pattern data, order table and song length from the embedded player code.
+ * Returns null when the code does not carry the expected opcodes (corrupt module).
+ */
+export function locateFashionTrackerLayout(buf: Uint8Array): FTLayout | null {
+  const end = Math.min(CODE_SCAN_LEN, buf.length - 4);
+  let origin = -1;
+  for (let o = 4; o < end; o += 2) {
+    if (u16BE(buf, o) === 0x2379) { origin = u32BE(buf, o - 4); break; }
+  }
+  if (origin < 0) return null;
+
+  let patternBase = -1;
+  let orderOff = -1;
+  let songLength = 0;
+  for (let o = 0; o < end; o += 2) {
+    const w = u32BE(buf, o);
+    if (w === 0xc0fc0400 && o + 10 <= buf.length) {
+      patternBase = u32BE(buf, o + 6) - origin;
+    } else if (w === 0x0c790400 && o + 38 <= buf.length) {
+      orderOff = u32BE(buf, o + 12) - origin;
+      songLength = u32BE(buf, o + 34);
+    }
+  }
+  if (patternBase < 0 || orderOff < 0 || songLength <= 0) return null;
+  if (orderOff + songLength > buf.length) return null;
+  // The player pre-increments the row pointer by one row before reading.
+  const patternDataOff = patternBase + BYTES_PER_ROW;
+  if (patternDataOff <= 0 || patternDataOff >= buf.length) return null;
+  return { patternDataOff, orderOff, songLength };
 }
 
 // ── MOD cell decoder ───────────────────────────────────────────────────────
@@ -198,24 +240,21 @@ export function parseFashionTrackerFile(buffer: ArrayBuffer, filename: string): 
   // Strip "EX." prefix (case-insensitive) or .ex extension
   const moduleName = baseName.replace(/^ex\./i, '').replace(/\.ex$/i, '') || baseName;
 
+  const ftLayout = locateFashionTrackerLayout(buf);
+  if (!ftLayout) {
+    throw new Error('Fashion Tracker: player code does not locate pattern/order data');
+  }
+  const PATTERN_DATA_OFF = ftLayout.patternDataOff;
+
   // ── Song order table ──────────────────────────────────────────────────────
 
-  const songOrders: number[] = [];
+  const usedOrders: number[] = [];
   let maxPatIdx = 0;
-
-  for (let i = 0; i < SONG_ORDER_LEN; i++) {
-    const patIdx = buf[SONG_ORDER_OFF + i];
-    songOrders.push(patIdx);
+  for (let i = 0; i < ftLayout.songLength; i++) {
+    const patIdx = buf[ftLayout.orderOff + i];
+    usedOrders.push(patIdx);
     if (patIdx > maxPatIdx) maxPatIdx = patIdx;
   }
-
-  // Trim trailing zero entries to find actual song length.
-  // Find the last non-zero entry (or keep at least 1 position).
-  let songLength = SONG_ORDER_LEN;
-  while (songLength > 1 && songOrders[songLength - 1] === 0) {
-    songLength--;
-  }
-  const usedOrders = songOrders.slice(0, songLength);
 
   const numPatterns = maxPatIdx + 1;
 
