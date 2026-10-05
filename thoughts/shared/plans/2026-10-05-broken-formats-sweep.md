@@ -266,3 +266,7 @@ Open from this pass: StarTrekker AM routing (.mod + .mod.nt opens as plain MOD, 
 - Retest after 4fdfa299f (owner): StarTrekker AM amsyntdemo.mod GOOD (was silent). MusicMaker moveback.sdata now LOADS but sounds WRONG: the files are 'MusicMaker V8 Old' (8-voice) and only UADE's 4V player accepts them; the 8V player fails its module check. OPEN: needs the 8V-old player variant or a native MusicMaker replayer (same decision as the 6-channel 'best of guitars').
 - DeltaMusic 1 crusaders1.dm and SoundMon nicktune1.bp after 29fa4b92e / 21f833ada (notes below C-1 were clamped to C-1): sound + grid RIGHT (owner).
 - Kris Hatlelid after e42633cfc (hybrid stub routes with an empty grid fall through to the UADE scan grid): grid scrolls and looks right (owner); first pattern 120 notes, was empty.
+
+## Next phase, owner 2026-10-05: "most of the uade formats display made up incorrect pattern data, but that is something to dig into later when we have them all playing and scrolling some data"
+
+Order: (1) every UADE format plays and its grid scrolls with some data; (2) then replace scan/approximate grids with real pattern data per format (the gridVsPaula yardstick, corrected in a24938ebc, is the measure).
