@@ -92,9 +92,9 @@
       "exporter": "DigitalMugicianExporter.exportDigitalMugician",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.7791,
+      "matchPct": 0.9954,
       "cells": 2816,
-      "bytes": 17286
+      "bytes": 18054
     },
     "digitalSymphony": {
       "exporter": "DigitalSymphonyExporter.exportDigitalSymphony",

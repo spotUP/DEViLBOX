@@ -259,6 +259,66 @@ function dmPeriodToXMNote(period: number): number {
   return Math.max(1, Math.min(96, xmNote));
 }
 
+/** One replayer voice: the song header and sequence column that drive it. */
+interface DMVoice {
+  song: number;
+  column: number;
+  name: string;
+  pan: number;
+}
+
+/**
+ * One pool cell as the replayer plays it. The note that sounds is always the
+ * row's note byte (+ transpose + finetune): the effect byte only ADDS a
+ * behaviour. Effect bytes 0..63 are Pitch Bend (val1 1) whose target note is
+ * the effect byte and whose speed is the parameter - a plain note carries
+ * effect 0 / param 0, a bend that never moves. 0x4A (val1 12) is Note Wander:
+ * no retrigger, the voice slides to the row's note.
+ */
+function dmCellToTracker(row: DMPatternRow, transpose: number, finetune: number, instrument: number): TrackerCell {
+  const noteAt = (n: number): number => {
+    const idx = n + transpose + finetune;
+    return idx >= 0 && idx < DM_PERIODS.length ? dmPeriodToXMNote(DM_PERIODS[idx]) : 0;
+  };
+  const xmNote = noteAt(row.note);
+  const val1 = row.effect < 64 ? 1 : row.effect - 62;
+  const val2 = row.param;
+  let effTyp = 0;
+  let eff = 0;
+  switch (val1) {
+    case 1: { // Pitch bend from the note towards the effect byte's note
+      if (val2 !== 0 && row.effect !== row.note) {
+        effTyp = row.effect > row.note ? 0x01 : 0x02; // higher index = higher pitch
+        eff = Math.min(Math.abs(val2), 0xFF);
+      }
+      break;
+    }
+    case 6: // Song speed
+      if (val2 > 0 && val2 <= 15) { effTyp = 0x0F; eff = val2 & 0xFF; }
+      break;
+    case 7: // LED filter on
+      effTyp = 0x0E; eff = 0x01;
+      break;
+    case 8: // LED filter off
+      effTyp = 0x0E; eff = 0x00;
+      break;
+    case 12: // Note wander: slide to the row's note, no retrigger
+      if (val2 !== 0) { effTyp = 0x03; eff = Math.min(Math.abs(val2), 0xFF); }
+      break;
+    case 13: { // Shuffle: different speeds on even/odd rows
+      const lo = val2 & 0x0F;
+      const hi = (val2 >> 4) & 0x0F;
+      if (lo > 0 && hi > 0) { effTyp = 0x0F; eff = lo; }
+      break;
+    }
+    default: // 2-4 no envelope restart, 5 pattern length (the grid cuts the pattern),
+      // 9 switch filter, 10 no DMA, 11 arpeggio select
+      break;
+  }
+  // DM volume comes from the instrument's envelope; no per-row volume.
+  return { note: xmNote, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+}
+
 // -- Format detection -------------------------------------------------------
 
 const MAGIC_V1 = ' MUGICIAN/SOFTEYES 1990 ';
@@ -616,7 +676,29 @@ export async function parseDigitalMugicianFile(
     return id;
   }
 
-  // -- Use the first (or paired first two for V2) song ----------------------
+  // -- Voices: which sequence column drives which grid channel ---------------
+  // Mugician I: four voices, sub-song 0's sequence columns 0..3 (Paula 0..3).
+  // Mugician II: seven voices from a PAIR of song headers (sub-song N = songs
+  // 2N and 2N+1). The replayer (Mugician II_v8.asm, Init + Play) runs song 0's
+  // columns 0..2 on the hardware voices AUD3, AUD1, AUD2 and song 1's columns
+  // 0..3 as four software voices mixed into AUD0; song 0's column 3 is never
+  // read. Position count, speed and loop come from song 0's header.
+  const isV2 = id === MAGIC_V2;
+  const voices: DMVoice[] = isV2
+    ? [
+      { song: 0, column: 0, name: 'Voice 1 (Paula 4)', pan: -50 },
+      { song: 0, column: 1, name: 'Voice 2 (Paula 2)', pan: 50 },
+      { song: 0, column: 2, name: 'Voice 3 (Paula 3)', pan: 50 },
+      { song: 1, column: 0, name: 'Voice 4 (mixed)', pan: -50 },
+      { song: 1, column: 1, name: 'Voice 5 (mixed)', pan: -50 },
+      { song: 1, column: 2, name: 'Voice 6 (mixed)', pan: -50 },
+      { song: 1, column: 3, name: 'Voice 7 (mixed)', pan: -50 },
+    ]
+    : [0, 1, 2, 3].map((c) => ({
+      song: 0, column: c, name: `Channel ${c + 1}`, pan: (c === 0 || c === 3) ? -50 : 50,
+    }));
+  const numChannels = voices.length;
+
   const song = songs[0];
   if (!song || song.length === 0) {
     throw new Error('Digital Mugician file contains no song data');
@@ -631,210 +713,106 @@ export async function parseDigitalMugicianFile(
   }
 
   // -- Convert to TrackerSong patterns --------------------------------------
-  // Each "step" in the song references a pattern for each of the 4 channels.
-  // Steps are grouped in sets of 4 (one per channel).
-  // Each pattern has 64 rows. We create one TrackerSong pattern per step position.
+  // One TrackerSong pattern per distinct song position. A position plays its
+  // tracks until the row counter reaches 64 or the current pattern length -
+  // a global the Pattern Length effect (val1 5, param 1..64) sets and that
+  // persists across positions. Every voice re-applies its last effect on
+  // every tick, so after a row the length is the param of the LAST voice (in
+  // replayer order) whose current effect is Pattern Length.
 
-  const numSteps = Math.floor(song.length / 4); // number of positions
+  const numPositions = Math.floor(song.length / 4);
   const trackerPatterns: Pattern[] = [];
   const songPositions: number[] = [];
-
-  // Track which pattern combinations we've already generated to deduplicate
   const patternCache = new Map<string, number>();
 
-  // Track the DM base row offset per channel for each TrackerSong pattern
-  // Used by getCellFileOffset to map (pattern, row, channel) → file offset
+  // DM base row (pool offset) per channel for each TrackerSong pattern, for
+  // getCellFileOffset: (pattern, row, channel) -> file offset.
   const patternChannelBaseRows: number[][] = [];
 
-  for (let stepIdx = 0; stepIdx < numSteps; stepIdx++) {
-    const trackBase = stepIdx * 4;
-    if (trackBase + 3 >= song.tracks.length) break;
+  const poolRow = (rowOffset: number): DMPatternRow | null =>
+    rowOffset >= 0 && rowOffset < patternRows.length ? patternRows[rowOffset] : null;
 
-    // Build a cache key from the 4 channel pattern/transpose values
-    const ch0 = song.tracks[trackBase];
-    const ch1 = song.tracks[trackBase + 1];
-    const ch2 = song.tracks[trackBase + 2];
-    const ch3 = song.tracks[trackBase + 3];
+  // Replayer state carried across rows and positions.
+  let patLength = 64;
+  const voiceEffect = voices.map(() => 0);  // 15(a5): val1 of the voice's last note row
+  const voiceParam = voices.map(() => 0);   // 13(a5): its parameter byte
+  const voiceSample = voices.map(() => 1);  // 5(a5)+1: last instrument (finetune source)
 
-    const cacheKey = `${ch0.pattern}:${ch0.transpose}:${ch1.pattern}:${ch1.transpose}:${ch2.pattern}:${ch2.transpose}:${ch3.pattern}:${ch3.transpose}`;
+  for (let posIdx = 0; posIdx < numPositions; posIdx++) {
+    const steps: DMStep[] = [];
+    for (const v of voices) {
+      const step = songs[v.song]?.tracks[posIdx * 4 + v.column];
+      if (!step) break;
+      steps.push(step);
+    }
+    if (steps.length < numChannels) break;
 
-    if (patternCache.has(cacheKey)) {
-      songPositions.push(patternCache.get(cacheKey)!);
+    // Rows this position plays.
+    let rowCount = 64;
+    for (let row = 0; row < 64; row++) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        const cell = poolRow(steps[ch].pattern + row);
+        if (!cell || cell.note === 0) continue;
+        voiceEffect[ch] = cell.effect < 64 ? 1 : cell.effect - 62;
+        voiceParam[ch] = cell.param & 0xFF;
+        if (voiceEffect[ch] === 13) voiceEffect[ch] = 0; // shuffle clears 15(a5)
+      }
+      for (let ch = 0; ch < numChannels; ch++) {
+        if (voiceEffect[ch] === 5 && voiceParam[ch] >= 1 && voiceParam[ch] <= 64) patLength = voiceParam[ch];
+      }
+      if (row + 1 === 64 || row + 1 === patLength) { rowCount = row + 1; break; }
+    }
+
+    const startSamples = voiceSample.slice();
+    const cacheKey = `${rowCount}|${steps.map((s, ch) => `${s.pattern}:${s.transpose}:${startSamples[ch]}`).join('|')}`;
+    const cached = patternCache.get(cacheKey);
+    // Advance each voice's last-instrument state over the rows that play.
+    for (let ch = 0; ch < numChannels; ch++) {
+      for (let row = 0; row < rowCount; row++) {
+        const cell = poolRow(steps[ch].pattern + row);
+        if (cell && cell.note > 0 && cell.effect !== 0x4A && cell.sample > 0) voiceSample[ch] = cell.sample;
+      }
+    }
+    if (cached !== undefined) {
+      songPositions.push(cached);
       continue;
     }
 
     const patIdx = trackerPatterns.length;
     patternCache.set(cacheKey, patIdx);
     songPositions.push(patIdx);
+    patternChannelBaseRows.push(steps.map((s) => s.pattern));
 
-    // Record base row offsets for each channel (step.pattern is already <<6 = row offset)
-    patternChannelBaseRows.push([ch0.pattern, ch1.pattern, ch2.pattern, ch3.pattern]);
-
-    // Build 4 channels x 64 rows
-    const channelRows: TrackerCell[][] = [[], [], [], []];
-
-    for (let row = 0; row < 64; row++) {
-      for (let ch = 0; ch < 4; ch++) {
-        const step = song.tracks[trackBase + ch];
-        const rowOffset = step.pattern + row; // step.pattern is already <<6 = base offset in rows
-
-        let note = 0;
-        let sampleNum = 0;
-        let effect = 0;
-        let param = 0;
-
-        if (rowOffset >= 0 && rowOffset < patternRows.length) {
-          const pRow = patternRows[rowOffset];
-          note = pRow.note;
-          sampleNum = pRow.sample;
-          effect = pRow.effect;
-          param = pRow.param;
+    const channelRows: TrackerCell[][] = steps.map((step, ch) => {
+      const rows: TrackerCell[] = [];
+      let lastSample = startSamples[ch];
+      for (let row = 0; row < rowCount; row++) {
+        const cell = poolRow(step.pattern + row);
+        if (!cell || cell.note === 0) {
+          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+          continue;
         }
-
-        // -- Convert note to XM note ---
-        let xmNote = 0;
-        if (note > 0) {
-          // Look up the sample's finetune for period calculation
-          let finetune = 0;
-          let transposeVal = step.transpose;
-          if (sampleNum > 0 && sampleNum < samples.length) {
-            finetune = samples[sampleNum].finetune;
-          }
-
-          // For portamento effect (val1 == 1), the effect byte is the pitch target
-          // For normal notes, we use note + transpose + finetune
-          const noteIdx = note + transposeVal + finetune;
-          if (noteIdx >= 0 && noteIdx < DM_PERIODS.length) {
-            const period = DM_PERIODS[noteIdx];
-            xmNote = dmPeriodToXMNote(period);
-          }
-        }
-
-        // -- Convert sample to instrument ---
-        let instrument = 0;
-        if (sampleNum > 0) {
-          instrument = getOrCreateInstrument(sampleNum);
-        }
-
-        // -- Convert DM effects to XM effects ---
-        // DM effects are stored differently: the effect byte is context-dependent
-        // val1 (derived from effect): effect < 64 ? 1 : effect - 62
-        // So: effect 0-63 = portamento (val1=1), 64 = no effect (val1=2),
-        //     65=vol (3), 66=vol(4), etc.
-        const val1 = note > 0 ? (effect < 64 ? 1 : effect - 62) : 0;
-        // val2 = param (signed byte)
-        const val2 = param;
-
-        let effTyp = 0;
-        let eff = 0;
-
-        if (note > 0) {
-          switch (val1) {
-            case 1: { // Portamento to note
-              // effect byte (0-63) is the target pitch index into DM_PERIODS.
-              // val2 is the portamento speed. Use XM effect 0x03 (Tone Portamento)
-              // which slides from the current note to the target note.
-              const targetPitch = effect; // 0-63, the raw effect byte
-              if (targetPitch >= 0 && targetPitch < DM_PERIODS.length) {
-                const targetNote = dmPeriodToXMNote(DM_PERIODS[targetPitch]);
-                if (targetNote > 0) {
-                  // Set the target note as the row's note (XM 0x03 slides TO this note)
-                  xmNote = targetNote;
-                  effTyp = 0x03; // Tone Portamento
-                  eff = Math.min(Math.abs(val2), 0xFF);
-                }
-              } else if (val2 !== 0) {
-                // Fallback: no valid target, use portamento up/down
-                effTyp = val2 > 0 ? 0x01 : 0x02;
-                eff = Math.min(Math.abs(val2), 0xFF);
-              }
-              break;
-            }
-            case 5: // Pattern length
-              // No direct XM equivalent; could use pattern break
-              break;
-            case 6: // Song speed
-              if (val2 > 0 && val2 <= 15) {
-                effTyp = 0x0F; // Set speed
-                eff = val2 & 0xFF;
-              }
-              break;
-            case 7: // LED filter on
-              effTyp = 0x0E; // Exx
-              eff = 0x01; // E01 = set filter on
-              break;
-            case 8: // LED filter off
-              effTyp = 0x0E; // Exx
-              eff = 0x00; // E00 = set filter off
-              break;
-            case 9: // Pitch bend (speed adjustment)
-              // Approximate as portamento
-              if (val2 !== 0) {
-                if (val2 > 0) {
-                  effTyp = 0x01;
-                  eff = Math.min(val2, 0xFF);
-                } else {
-                  effTyp = 0x02;
-                  eff = Math.min(-val2, 0xFF);
-                }
-              }
-              break;
-            case 10: // Replay from wave position (no vol reset)
-              break;
-            case 11: // Arpeggio select
-              // val2 & 7 selects arpeggio table -- no direct XM mapping
-              break;
-            case 12: { // Portamento to note
-              // voice.pitch = row.note, portamento speed = val2
-              if (val2 !== 0) {
-                effTyp = 0x03; // Tone portamento
-                eff = Math.min(Math.abs(val2), 0xFF);
-              }
-              break;
-            }
-            case 13: { // Shuffle
-              // Sets different speeds for even/odd ticks
-              const lo = val2 & 0x0F;
-              const hi = (val2 >> 4) & 0x0F;
-              if (lo > 0 && hi > 0) {
-                effTyp = 0x0F;
-                eff = lo; // Use the lower nibble as speed (approximation)
-              }
-              break;
-            }
-            default:
-              break;
-          }
-        }
-
-        // -- Volume: DM uses wavetable-based volume envelopes, no direct per-row volume.
-        // We leave volume at 0 (unset) to let the instrument envelope handle it.
-        const xmVolume = 0;
-
-        channelRows[ch].push({
-          note: xmNote,
-          instrument,
-          volume: xmVolume,
-          effTyp,
-          eff,
-          effTyp2: 0,
-          eff2: 0,
-        });
+        // Note wander (0x4A) keeps the voice's instrument; otherwise a
+        // non-zero sample byte selects a new one.
+        if (cell.effect !== 0x4A && cell.sample > 0) lastSample = cell.sample;
+        const finetune = lastSample > 0 && lastSample < samples.length ? samples[lastSample].finetune : 0;
+        rows.push(dmCellToTracker(cell, step.transpose, finetune, cell.sample > 0 ? getOrCreateInstrument(cell.sample) : 0));
       }
-    }
+      return rows;
+    });
 
     trackerPatterns.push({
       id: `pattern-${patIdx}`,
       name: `Pattern ${patIdx}`,
-      length: 64,
+      length: rowCount,
       channels: channelRows.map((rows, ch) => ({
         id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
+        name: voices[ch].name,
         muted: false,
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50, // LRRL Amiga panning
+        pan: voices[ch].pan,
         instrumentId: null,
         color: null,
         rows,
@@ -843,7 +821,7 @@ export async function parseDigitalMugicianFile(
         sourceFormat: 'MOD' as const,
         sourceFile: filename,
         importedAt: new Date().toISOString(),
-        originalChannelCount: 4,
+        originalChannelCount: numChannels,
         originalPatternCount: Math.floor(totalPatternRows / 64),
         originalInstrumentCount: sampleCount,
       },
@@ -852,7 +830,7 @@ export async function parseDigitalMugicianFile(
 
   // Fallback: at least one empty pattern
   if (trackerPatterns.length === 0) {
-    trackerPatterns.push(makeEmptyPattern(filename));
+    trackerPatterns.push(makeEmptyPattern(filename, numChannels));
     songPositions.push(0);
   }
 
@@ -866,15 +844,15 @@ export async function parseDigitalMugicianFile(
 
   // Build uadePatternLayout with custom getCellFileOffset for DM's track indirection.
   // DM pattern data is a flat pool of single-channel 4-byte cells at patternDataStart.
-  // Each TrackerSong pattern combines 4 channels, each referencing a different
-  // sub-pattern (base row offset) in the pool via the song's track sequence.
+  // Each TrackerSong pattern combines one channel per voice, each referencing a
+  // different sub-pattern (base row offset) in the pool via the song's track sequence.
   const numDMPatterns = Math.floor(totalPatternRows / 64);
   const uadePatternLayout: UADEPatternLayout = {
     formatId: 'digitalMugician',
     patternDataFileOffset: patternDataStart,
     bytesPerCell: 4,
     rowsPerPattern: 64,
-    numChannels: 4,
+    numChannels,
     numPatterns: numDMPatterns,
     moduleSize: buf.byteLength,
     encodeCell: encodeDigitalMugicianCell,
@@ -916,7 +894,7 @@ export async function parseDigitalMugicianFile(
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= patternChannelBaseRows.length) return patternDataStart;
-      if (channel < 0 || channel >= 4) return patternDataStart;
+      if (channel < 0 || channel >= numChannels) return patternDataStart;
       // patternChannelBaseRows[pattern][channel] = base row index in the flat pool
       const baseRow = patternChannelBaseRows[pattern][channel];
       return patternDataStart + (baseRow + row) * 4;
@@ -931,7 +909,7 @@ export async function parseDigitalMugicianFile(
     songPositions,
     songLength: songPositions.length,
     restartPosition: restartPos,
-    numChannels: 4,
+    numChannels,
     initialSpeed: songSpeed > 0 ? songSpeed : 6,
     initialBPM: 125,
     linearPeriods: false,
@@ -942,12 +920,12 @@ export async function parseDigitalMugicianFile(
 
 // -- Helper: empty pattern --------------------------------------------------
 
-function makeEmptyPattern(filename: string): Pattern {
+function makeEmptyPattern(filename: string, numChannels: number): Pattern {
   return {
     id: 'pattern-0',
     name: 'Pattern 0',
     length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
+    channels: Array.from({ length: numChannels }, (_, ch) => ({
       id: `channel-${ch}`,
       name: `Channel ${ch + 1}`,
       muted: false,
@@ -965,7 +943,7 @@ function makeEmptyPattern(filename: string): Pattern {
       sourceFormat: 'MOD' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
+      originalChannelCount: numChannels,
       originalPatternCount: 0,
       originalInstrumentCount: 0,
     },
