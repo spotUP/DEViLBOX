@@ -31,6 +31,30 @@ static AhHooks g_hooks;
 static uint16_t intena, intreq, dmacon;
 static uint32_t audLc[4];
 
+/* Paula's audio state machine, as far as the CPU can see it (interrupts and
+ * when a channel really stops). The samples come from the shared software
+ * Paula; this decides when it starts and stops and when AUDx is requested,
+ * following the chip (HRM audio state diagram; UAE audio.c audio_handler):
+ *  - DMA on from idle latches LC/LEN and starts output; the interrupt comes
+ *    at the next line (state 1 -> 5 in UAE), not at the write.
+ *  - Every block repeat requests AUDx (the software Paula's wrap latch).
+ *  - DMA off does NOT stop a playing channel: at each word boundary it
+ *    requests AUDx if it is not pending, and goes idle once it is. A DMA on
+ *    before it went idle continues the channel (no restart, no interrupt).
+ * Players depend on this: Ben Daglish's audio handler stops a voice on
+ * AUDx and only re-enables its interrupt while the voice is off - an
+ * interrupt at the DMA-on write killed every note it started. */
+enum { AUD_IDLE, AUD_STARTING, AUD_PLAYING };
+typedef struct {
+  int state;
+  int dmaen;
+  uint16_t per;        /* AUDxPER as written (0 = 65536 colour clocks) */
+  double wordCc;       /* non-DMA mode: colour clocks to the next word boundary */
+} AudState;
+static AudState aud[4];
+
+static double word_cc(int ch) { return 2.0 * (aud[ch].per ? aud[ch].per : 65536); }
+
 /* ---- CIA --------------------------------------------------------------- */
 typedef struct {
   uint8_t regs[16];
@@ -90,21 +114,56 @@ static void aud_set_lc(int ch) {
 }
 
 static void dmacon_write(uint16_t v) {
-  const uint16_t before = dmacon;
   if (v & 0x8000) dmacon |= (v & 0x7FFF); else dmacon &= (uint16_t)~v;
-  /* Paula sees a channel's DMA as its enable bit AND the master DMAEN. */
-  uint16_t on = 0, off = 0;
+  /* A channel's DMA is its enable bit AND the master DMAEN. */
   for (int i = 0; i < 4; i++) {
-    const int was = (before & 0x200) && (before & (1 << i));
+    AudState *a = &aud[i];
     const int now = (dmacon & 0x200) && (dmacon & (1 << i));
-    if (!was && now) on |= (uint16_t)(1 << i);
-    else if (was && !now) off |= (uint16_t)(1 << i);
+    if (now == a->dmaen) continue;
+    a->dmaen = now;
+    const uint16_t bit = (uint16_t)(1 << i);
+    if (now) {
+      if (a->state == AUD_IDLE) {
+        a->state = AUD_STARTING;
+        paula_dma_write((uint16_t)(0x8000 | bit));   /* latch LC/LEN, start output */
+        (void)paula_poll_block_start(i);              /* AUDx comes at the next line */
+      }
+      /* still playing in non-DMA mode: it simply continues */
+    } else if (a->state == AUD_STARTING) {
+      a->state = AUD_IDLE;
+      paula_dma_write(bit);
+    } else if (a->state == AUD_PLAYING) {
+      a->wordCc = word_cc(i);
+    }
   }
-  if (off) paula_dma_write(off);
-  if (on) paula_dma_write((uint16_t)(0x8000 | on));
+}
+
+/* Per output sample, after Paula rendered it. */
+static void aud_advance(void) {
+  for (int i = 0; i < 4; i++) {
+    AudState *a = &aud[i];
+    const uint16_t ip = (uint16_t)(0x0080u << i);
+    if (a->state != AUD_PLAYING) continue;
+    if (a->dmaen) {
+      if (paula_poll_block_start(i)) intreq |= ip;   /* block repeat */
+      if (!paula_is_active(i)) a->state = AUD_IDLE;   /* empty latch */
+      continue;
+    }
+    a->wordCc -= g_ccPerSample;
+    while (a->wordCc <= 0.0) {
+      if (intreq & ip) {
+        a->state = AUD_IDLE;
+        paula_dma_write((uint16_t)(1 << i));
+        break;
+      }
+      intreq |= ip;
+      a->wordCc += word_cc(i);
+    }
+  }
 }
 
 static void custom_write16(uint32_t reg, uint16_t v) {
+  if (g_hooks.custom_write) g_hooks.custom_write(reg, v, m68ki_cpu.ppc);
   switch (reg) {
     case 0x096: dmacon_write(v); break;
     case 0x09A: if (v & 0x8000) intena |= (v & 0x7FFF); else intena &= (uint16_t)~v; update_ipl(); break;
@@ -116,7 +175,7 @@ static void custom_write16(uint32_t reg, uint16_t v) {
           case 0x0: audLc[ch] = (audLc[ch] & 0x0000FFFFu) | ((uint32_t)v << 16); aud_set_lc(ch); break;
           case 0x2: audLc[ch] = (audLc[ch] & 0xFFFF0000u) | (v & 0xFFFEu); aud_set_lc(ch); break;
           case 0x4: paula_set_length(ch, v); break;
-          case 0x6: paula_set_period(ch, v); break;
+          case 0x6: aud[ch].per = v; paula_set_period(ch, v); break;
           case 0x8: paula_set_volume(ch, (uint8_t)((v & 0x7F) > 64 ? 64 : (v & 0x7F))); break;
           default: break;  /* AUDxDAT: DMA mode only */
         }
@@ -307,6 +366,8 @@ static void advance_beam(double ccStart, double ccEnd) {
   while ((uint64_t)g_line < lineEnd) {
     g_line++;
     cia_tod_pulse(&ciaB);
+    for (int i = 0; i < 4; i++)
+      if (aud[i].state == AUD_STARTING) { aud[i].state = AUD_PLAYING; intreq |= (uint16_t)(0x0080u << i); }
     if (g_line % AH_FRAME_LINES == 0) {
       g_frame++;
       cia_tod_pulse(&ciaA);
@@ -336,8 +397,7 @@ void ah_step(float *l, float *r, float *voices) {
 
   float st[2];
   paula_render_voices(st, voices, 1, 1);
-  for (int i = 0; i < 4; i++)
-    if (paula_poll_block_start(i)) intreq |= (uint16_t)(0x0080u << i);   /* AUDx */
+  aud_advance();
   update_ipl();
   *l = st[0];
   *r = st[1];
@@ -373,6 +433,7 @@ void ah_reset(int sampleRate) {
   g_ccPerSample = AH_PAULA_HZ / g_sampleRate;
   memset(ah_ram, 0, sizeof ah_ram);
   memset(audLc, 0, sizeof audLc);
+  memset(aud, 0, sizeof aud);
   memset(&ciaA, 0, sizeof ciaA);
   memset(&ciaB, 0, sizeof ciaB);
   ciaA.taLatch = ciaA.tbLatch = ciaB.taLatch = ciaB.tbLatch = 0xFFFF;
