@@ -205,7 +205,6 @@ export function synthTypeToInstrumentType(synthType: string): InstrumentType | n
     case 'SidMon1Synth':
     case 'FCSynth':
     case 'FredSynth':
-    case 'FredEditorReplayerSynth':
     case 'TFMXSynth':
     case 'HippelCoSoSynth':
     case 'SoundMonSynth':

@@ -26,7 +26,7 @@ export const WHOLE_SONG_SYNTH_TYPES: ReadonlySet<string> = new Set([
   'ActionamicsWasmSynth', 'ActivisionProWasmSynth', 'ArtOfNoiseSynth', 'AsapSynth',
   'BenDaglishSynth', 'Cinter4Synth', 'CpsycleSynth', 'DavidWhittakerWasmSynth',
   'DeltaMusic1WasmSynth', 'DeltaMusic2WasmSynth', 'DigMugWasmSynth', 'DssWasmSynth',
-  'EupminiSynth', 'FaceTheMusicWasmSynth', 'FmplayerSynth', 'FredEditorReplayerSynth',
+  'EupminiSynth', 'FaceTheMusicWasmSynth', 'FmplayerSynth',
   'FredReplayerWasmSynth2', 'FutureComposerWasmSynth', 'FuturePlayerSynth',
   'HippelSynth', 'HivelySynth', 'InStereo1WasmSynth', 'InStereo2WasmSynth',
   'IxalanceSynth', 'JamCrackerSynth', 'KlysSynth', 'MaxTraxSynth', 'MdxminiSynth',

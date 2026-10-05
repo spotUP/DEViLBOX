@@ -20,7 +20,6 @@ import { MaxTraxSynth } from './maxtrax/MaxTraxSynth';
 import { PreTrackerSynth } from './pretracker/PreTrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SunTronicSynth } from './suntronic/SunTronicSynth';
-import { FredEditorReplayerSynth } from './fred/FredEditorReplayerSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
 import { FCSynth } from './fc/FCSynth';
@@ -814,13 +813,6 @@ export class InstrumentFactory {
         // Set 0-based instrument index for note preview
         stSynth.setInstrumentIndex((config.id ?? 1) - 1);
         instrument = stSynth;
-        break;
-      }
-
-      case 'FredEditorReplayerSynth': {
-        const ferSynth = new FredEditorReplayerSynth();
-        ferSynth.setInstrumentIndex((config.id ?? 1) - 1);
-        instrument = ferSynth;
         break;
       }
 

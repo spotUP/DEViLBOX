@@ -31,7 +31,8 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
 
   private constructor() {
     super();
-    // Connect to destination for note preview (same reasoning as FredEditorReplayerEngine).
+    // Connect to destination for note preview: unlike most whole-song replayers,
+    // this engine also previews instruments from the editor panel.
     this.output.connect(this.audioContext.destination);
     this.initialize(SidMon1ReplayerEngine.cache);
   }

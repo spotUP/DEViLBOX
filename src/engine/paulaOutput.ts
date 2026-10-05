@@ -55,7 +55,6 @@ export const PAULA_SYNTH_TYPES: ReadonlySet<string> = new Set([
   'DigMugWasmSynth',
   'DssWasmSynth',
   'FaceTheMusicWasmSynth',
-  'FredEditorReplayerSynth',
   'FredReplayerWasmSynth2',
   'FutureComposerWasmSynth',
   'FuturePlayerSynth',
