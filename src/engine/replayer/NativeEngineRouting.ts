@@ -482,6 +482,22 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/gme/GmeEngine')).GmeEngine as unknown as WASMSingletonStatic,
   },
   {
+    // S98 register logs (PC-88 / PC-98 / X1 / FM Towns / MSX): s98-wasm
+    // replays the log on one ymfm chip per device. Nothing to edit:
+    // S98Parser reads the header, the song opens in the scope view.
+    key: 'S98',
+    synthType: 'S98Synth',
+    suppressNotes: true,
+    fileDataKey: 's98FileData',
+    formats: ['S98'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/s98/S98Engine')).S98Engine as unknown as WASMSingletonStatic,
+  },
+  {
     // StoneTracker (.spm + .sps, Amiga): the authors' StonePlayer_Hard.bin
     // runs on Musashi's 68020 with a Paula + CIA-B in stonetracker-wasm; the
     // grid is a view (StoneTrackerParser). The SPS bank rides as a load arg.

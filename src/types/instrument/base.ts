@@ -275,6 +275,7 @@ export type SynthType =
   | 'PiyoPiyoSynth'     // Studio Pixel PiyoPiyo (.pmd), worklet port of piyopiyo-rs
   | 'PsgplaySynth'       // Atari ST SNDH (PSG play: 68000 + YM2149 + MFP + STE DMA)
   | 'GmeSynth'           // game-music-emu: NSF, GBS, HES, KSS, SPC, VGM, GYM
+  | 'S98Synth'           // S98 register logs on ymfm (PC-88 / PC-98 / X1 FM)
   | 'TFMSynth'          // TFM Music Maker (.tfe), ZXTune player + 2x ymfm YM2203
   | 'StoneTrackerSynth' // StoneTracker (.spm + .sps), StonePlayer on a 68020 core
   | 'MusicMakerSynth'   // MusicMaker V8 (.sdata + .ip), worklet replayer from the author's player source

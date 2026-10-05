@@ -1,14 +1,15 @@
 /**
  * What the scope view says it is playing: the chip and the format of the song
  * whose engine runs a player program (editor mode 'sc68'). The mode is shared
- * by SC68, SNDH, game music (game-music-emu), ASAP, AY and QSF, so the label
+ * by SC68, SNDH, game music (game-music-emu), S98, ASAP, AY and QSF, so the label
  * comes from the song's data, not the mode.
  */
 import { gameMusicType, vgmChips, type GameMusicType } from '@lib/import/formats/GameMusicParser';
+import { readS98Header, s98DeviceName } from '@lib/import/formats/S98Parser';
 export interface ScopeFormatLabel { chip: string; format: string; platform: string }
 
 export interface ScopeFormatSource {
-  sndhFileData?: unknown; sc68FileData?: unknown; gmeFileData?: unknown; asapFileData?: unknown;
+  sndhFileData?: unknown; sc68FileData?: unknown; gmeFileData?: unknown; s98FileData?: unknown; asapFileData?: unknown;
   ayFileData?: unknown; qsfFileData?: unknown;
 }
 
@@ -30,6 +31,10 @@ export function scopeFormatLabel(f: ScopeFormatSource): ScopeFormatLabel | null 
     // A GYM without its GYMX header has no magic; it is the only one that can.
     const label = GAME_MUSIC[type ?? 'GYM'];
     return type === 'VGM' ? { ...label, chip: vgmChips(f.gmeFileData) || label.chip } : label;
+  }
+  if (f.s98FileData instanceof ArrayBuffer) {
+    const chips = readS98Header(f.s98FileData).devices.map((d) => s98DeviceName(d.type).split(' ')[0]);
+    return { chip: chips.join(' + '), format: 'S98', platform: 'Japanese computers' };
   }
   if (f.sc68FileData) return { chip: 'YM2149', format: 'SC68', platform: 'Atari ST' };
   if (f.asapFileData) return { chip: 'POKEY', format: 'SAP', platform: 'Atari 8-bit' };

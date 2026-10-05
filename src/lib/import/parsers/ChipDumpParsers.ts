@@ -112,10 +112,10 @@ export async function tryChipDumpParse(
     return parseFmplayerFile(buffer, filename);
   }
 
-  // ── S98 — Japanese computer FM register dumps ────────────────────────────
+  // ── S98 — Japanese computer FM register logs, replayed on ymfm (S98Engine) ──
   if (/\.s98$/.test(filename)) {
     const { parseS98File } = await import('@lib/import/formats/S98Parser');
-    return parseS98File(buffer);
+    return parseS98File(buffer, originalFileName);
   }
 
   // ── QSF — Capcom QSound (CPS1/CPS2 arcade) ───────────────────────────────
