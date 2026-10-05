@@ -191,6 +191,7 @@ All third-party components are compatible with GPL-3.0-or-later.
 - **Source:** https://gitlab.com/uade-music-player/uade
 - **License:** GPL-2.0+
 - **Used for:** Universal Amiga Delitracker Emulator — plays 200+ Amiga music formats (compiled to WASM)
+- **Also used by** `eagleplayer-wasm` (`public/eagleplayer/`): UADE's sound core `score` (`amigasrc/score/score`, LGPL) runs on the Musashi host and drives eagleplayers copied from `players/` (`public/eagleplayer/players/`: Anders_0land, BenDaglish, CoreDesign, DaveLowe, DaveLoweNew, WallyBeben - Wanted Team / UADE eagleplayers, distributed with UADE)
 
 ### Hively Tracker
 - **Author:** Pete Gordon (Dexter / Abyss)

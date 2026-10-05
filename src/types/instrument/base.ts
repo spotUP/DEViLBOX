@@ -278,6 +278,7 @@ export type SynthType =
   | 'S98Synth'           // S98 register logs on ymfm (PC-88 / PC-98 / X1 FM)
   | 'TFMSynth'          // TFM Music Maker (.tfe), ZXTune player + 2x ymfm YM2203
   | 'StoneTrackerSynth' // StoneTracker (.spm + .sps), StonePlayer on a 68020 core
+  | 'EaglePlayerSynth' // any UADE eagleplayer on the Musashi host (eaglePlayerFormats.ts)
   | 'MusicMakerSynth'   // MusicMaker V8 (.sdata + .ip), worklet replayer from the author's player source
   // QSF Capcom QSound replayer
   | 'QsfSynth'          // QSF (Capcom CPS1/CPS2 Z80 + QSound DSP)

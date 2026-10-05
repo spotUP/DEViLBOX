@@ -503,6 +503,23 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/stonetracker/StoneTrackerEngine')).StoneTrackerEngine as unknown as WASMSingletonStatic,
   },
   {
+    // Any UADE eagleplayer on the shared Musashi host (eagleplayer-wasm:
+    // UADE's own sound core `score` drives the format's player). Which
+    // player comes from the song's eaglePlayerId (eaglePlayerFormats.ts).
+    // Ahead of UADEEditable: a song carrying both plays here.
+    key: 'EaglePlayer',
+    synthType: 'EaglePlayerSynth',
+    suppressNotes: true,
+    fileDataKey: 'eaglePlayerFileData',
+    loadMethod: 'loadTune',
+    getLoadArgs: (song: TrackerSong) => [song.eaglePlayerId, song.name],
+    supportsPause: true,
+    supportsResume: true,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/eagleplayer/EaglePlayerEngine')).EaglePlayerEngine as unknown as WASMSingletonStatic,
+  },
+  {
     // MusicMaker V8 (.sdata + .ip, Amiga): a worklet replayer built from the
     // author's player source (MusicMaker4/8.asm) plays the song; the grid is a
     // view (MusicMakerParser). The song travels as one FORM/MMV8 IFF.

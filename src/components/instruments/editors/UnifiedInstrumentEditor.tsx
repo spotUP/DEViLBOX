@@ -199,6 +199,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'GmeSynth') return 'wasm-info';
   if (synthType === 'S98Synth') return 'wasm-info';
   if (synthType === 'StoneTrackerSynth') return 'wasm-info';
+  if (synthType === 'EaglePlayerSynth') return 'wasm-info';
   if (synthType === 'MusicMakerSynth') return 'wasm-info';
   if (synthType === 'IxalanceSynth') return 'wasm-info';
   if (synthType === 'CpsycleSynth') return 'wasm-info';

@@ -372,6 +372,10 @@ export interface TrackerSong {
   stoneTrackerFileData?: ArrayBuffer;
   /** The SPS sample bank beside it (DeltaHuffman packed or not) */
   stoneTrackerSampleData?: ArrayBuffer;
+  /** Module for EaglePlayerEngine: its eagleplayer runs on the Musashi host (eagleplayer-wasm) */
+  eaglePlayerFileData?: ArrayBuffer;
+  /** Which eagleplayer (EAGLE_PLAYER_FORMATS key, src/engine/eagleplayer/eaglePlayerFormats.ts) */
+  eaglePlayerId?: string;
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */
   startrekkerAMFileData?: ArrayBuffer;
   /** Raw Startrekker AM .nt synth data for StartrekkerAMEngine WASM playback */
