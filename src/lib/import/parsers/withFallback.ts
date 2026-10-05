@@ -13,6 +13,11 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
+// "Has a dedicated engine" is asked of the engine registry itself. Two
+// hand-written lists stood here, copied from it and disagreeing (11 and 24 of
+// 60-odd engines), so songs with an engine of their own were handed to UADE
+// too. The registry module is data only; importing it loads no engine.
+import { playsOnDedicatedEngine } from '@/engine/replayer/wasmEngineRegistry';
 
 /** Common context passed through all fallback helpers */
 export interface FallbackContext {
@@ -59,8 +64,7 @@ export async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
  */
 export function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): TrackerSong {
   const ra = result as any;
-  const hasDedicatedWasm = ra.sonicArrangerFileData || ra.soundMonFileData || ra.digMugFileData || ra.davidWhittakerFileData || ra.soundControlFileData || ra.deltaMusic1FileData || ra.deltaMusic2FileData || ra.soundFxFileData || ra.gmcFileData || ra.voodooFileData || ra.sunTronicSongFileData;
-  if (ra.uadePatternLayout && !ra.uadeEditableFileData && !hasDedicatedWasm) {
+  if (ra.uadePatternLayout && !ra.uadeEditableFileData && !playsOnDedicatedEngine(result)) {
     (result as any).uadeEditableFileData = ctx.buffer.slice(0);
     (result as any).uadeEditableFileName = ctx.originalFileName;
   }
@@ -125,12 +129,12 @@ export async function withNativeThenUADE(
         if (result) {
           // Skip UADE injection if a dedicated WASM engine handles audio
           const r = result as any;
-          const hasDedicatedEngine = r.sonicArrangerFileData || r.soundMonFileData || r.digMugFileData || r.davidWhittakerFileData || r.soundControlFileData || r.deltaMusic1FileData || r.deltaMusic2FileData || r.soundFxFileData || r.gmcFileData || r.voodooFileData || r.fredReplayerFileData || r.oktalyzerFileData || r.inStereo1FileData || r.futureComposerFileData || r.inStereo2FileData || r.quadraComposerFileData || r.ronKlarenFileData || r.actionamicsFileData || r.activisionProFileData || r.synthesisFileData || r.dssFileData || r.soundFactoryFileData || r.faceTheMusicFileData || r.sunTronicSongFileData;
-          if (!r.uadeEditableFileData && !hasDedicatedEngine) {
+          const dedicated = playsOnDedicatedEngine(result);
+          if (!r.uadeEditableFileData && !dedicated) {
             (result as any).uadeEditableFileData = ctx.buffer.slice(0);
             (result as any).uadeEditableFileName = ctx.originalFileName;
           }
-          if (hasDedicatedEngine) {
+          if (dedicated) {
             // Dedicated WASM engine handles all audio — set instruments to
             // 'Sampler' so ToneEngine doesn't try to instantiate unknown
             // synth types (e.g. 'SynthesisWasmSynth') and show error dialogs.

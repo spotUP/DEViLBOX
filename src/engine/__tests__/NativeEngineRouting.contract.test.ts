@@ -20,7 +20,8 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const ENGINE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const ROUTING_FILE = resolve(ENGINE_DIR, 'replayer/NativeEngineRouting.ts');
+// WASM_ENGINES lives in the registry module NativeEngineRouting re-exports.
+const ROUTING_FILE = resolve(ENGINE_DIR, 'replayer/wasmEngineRegistry.ts');
 const TRACKER_REPLAYER = resolve(ENGINE_DIR, 'TrackerReplayer.ts');
 
 interface ParsedDescriptor {

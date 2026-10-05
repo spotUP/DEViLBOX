@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { WASM_ENGINES } from '../replayer/NativeEngineRouting';
+import { WASM_ENGINES } from '../replayer/wasmEngineRegistry';
 
 const ROOT = join(__dirname, '../../..');
 /** Where songs are built: the parsers and the file loader that hands songs to the store. */

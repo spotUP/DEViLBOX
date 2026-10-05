@@ -34,10 +34,10 @@ describe('recognising a whole-song replayer', () => {
 
 describe('the list cannot drift from the engine registry', () => {
   it('covers every synthType NativeEngineRouting registers', () => {
-    // Read as text rather than importing: NativeEngineRouting pulls the whole
-    // engine graph behind it, and this assertion only needs the declarations.
+    // Read as text: this assertion only needs the declarations, which live in
+    // the registry module (NativeEngineRouting re-exports WASM_ENGINES).
     const source = readFileSync(
-      resolve(__dirname, '../replayer/NativeEngineRouting.ts'),
+      resolve(__dirname, '../replayer/wasmEngineRegistry.ts'),
       'utf-8',
     );
     const declared = [...source.matchAll(/synthType: '([A-Za-z0-9]+)'/g)].map(m => m[1]);

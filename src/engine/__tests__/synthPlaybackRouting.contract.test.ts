@@ -30,6 +30,8 @@ function read(rel: string): string {
 describe('Synth playback routing — libopenmpt creation contract', () => {
   const src = read('engine/TrackerReplayer.ts');
   const nativeRouting = read('engine/replayer/NativeEngineRouting.ts');
+  // The WASM_ENGINES descriptors live in the registry module.
+  const engineRegistry = read('engine/replayer/wasmEngineRegistry.ts');
   const instrumentFactory = read('engine/InstrumentFactory.ts');
 
   it('Phase 5.4 does not gate on synthType or hasOnlyNativePlayerSynths', () => {
@@ -68,7 +70,7 @@ describe('Synth playback routing — libopenmpt creation contract', () => {
   });
 
   it('Hively whole-song playback suppresses tracker note synthesis', () => {
-    expect(nativeRouting).toMatch(/key:\s*'Hively'[\s\S]*?suppressNotes:\s*true/);
+    expect(engineRegistry).toMatch(/key:\s*'Hively'[\s\S]*?suppressNotes:\s*true/);
   });
 
   it('Hively instrument wrapper skips standalone player setup when a tune is already loaded', () => {
