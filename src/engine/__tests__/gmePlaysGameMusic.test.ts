@@ -142,9 +142,12 @@ describe('the game-music-emu wasm plays game music', () => {
   it('a file whose first tracks are silent starts on its first audible track', () => {
     // KSS has no track list; gradius 2's tracks 0-39 are effects or empty and
     // the song opened silent on track 0 (owner rule: first audible subsong).
+    // A short sound effect is not music: the first version opened on one,
+    // and the silence detector then stopped the song.
     load('kss/gradius 2.kss', 0);
-    expect(b.module._gme_wasm_loaded_track()).toBeGreaterThan(0);
-    expect(measure(2).peak).toBeGreaterThan(0.02);
+    expect(b.module._gme_wasm_loaded_track()).toBeGreaterThanOrEqual(40);
+    measure(4);
+    expect(measure(2).peak).toBeGreaterThan(0.02); // still playing at 4-6 s
     // A track that is already audible stays the track that plays.
     load('nsf/dr mario.nsf', 0);
     expect(b.module._gme_wasm_loaded_track()).toBe(0);
