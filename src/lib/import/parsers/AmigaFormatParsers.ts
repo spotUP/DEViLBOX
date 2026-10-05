@@ -546,7 +546,7 @@ export async function tryRouteFormat(
   }
 
   // ── Chip-dump formats (VGM, YM, NSF, SAP, AY) ───────────────────────────
-  { const chipResult = await tryChipDumpParse(buffer, filename, originalFileName);
+  { const chipResult = await tryChipDumpParse(buffer, filename, originalFileName, subsong);
     if (chipResult) return chipResult; }
 
   // ── SID Factory II (.sf2) ─────────────────────────────────────────────────

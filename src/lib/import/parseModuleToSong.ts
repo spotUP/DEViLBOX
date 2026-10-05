@@ -52,10 +52,10 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // ── Gzip auto-detection ────────────────────────────────────────────────────
   // Many Amiga archives are gzip-compressed (magic bytes 0x1f 0x8b).
-  // Transparently inflate before format routing.
-  // Skip VGZ files — VGMParser handles its own gzip decompression via DecompressionStream.
+  // Transparently inflate before format routing (VGZ too: the router reads
+  // the VGM header to choose game-music-emu or VGMParser).
   const header = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
-  if (header[0] === 0x1f && header[1] === 0x8b && !/\.vgz$/i.test(filename)) {
+  if (header[0] === 0x1f && header[1] === 0x8b) {
     const pako = await import('pako');
     const inflated = pako.ungzip(new Uint8Array(buffer));
     buffer = inflated.buffer as ArrayBuffer;

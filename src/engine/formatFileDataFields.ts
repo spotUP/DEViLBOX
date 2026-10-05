@@ -74,6 +74,7 @@ export const FILE_DATA_FIELDS = [
   'piyoPiyoFileData',
   'tfmFileData',
   'sndhFileData',             // Atari ST SNDH for PsgplayEngine
+  'gmeFileData',              // NSF/GBS/HES/KSS/SPC/VGM/GYM for GmeEngine (game-music-emu)
   'stoneTrackerFileData',
   'stoneTrackerSampleData',   // companion SPS sample bank for StoneTracker
   'musicMakerFileData',       // MusicMaker V8 song + instruments (FORM/MMV8)
