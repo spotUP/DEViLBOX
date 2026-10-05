@@ -1499,8 +1499,17 @@ export async function tryRouteFormat(
   }
 
   // ── Dave Lowe (.dl / DL.* prefix) ─────────────────────────────────────────
-  // Native parser extracts real PCM samples; UADE handles audio.
-  if (matchesExt(filename, ['dl', 'dl_deli'])) {
+  // Native parser draws the grid; the Dave Lowe eagleplayer plays it on the
+  // Musashi host (EaglePlayerEngine, eaglePlayerFormats.ts).
+  if (matchesExt(filename, ['dl'])) {
+    const { isDaveLoweFormat, parseDaveLoweFile } = await import('@lib/import/formats/DaveLoweParser');
+    const { withEaglePlayer } = await import('./withEaglePlayer');
+    return withEaglePlayer('DaveLowe', ctx,
+      (buf, name) => (isDaveLoweFormat(new Uint8Array(buf)) ? parseDaveLoweFile(buf, name) : null),
+      toUADEPrefixName(originalFileName, ['dl']));
+  }
+  // dl_deli is DaveLowe_Deli, another eagleplayer: native grid, UADE audio.
+  if (matchesExt(filename, ['dl_deli'])) {
     const { isDaveLoweFormat, parseDaveLoweFile } = await import('@lib/import/formats/DaveLoweParser');
     return withNativeThenUADE('daveLowe', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
@@ -1890,16 +1899,15 @@ export async function tryRouteFormat(
   }
 
   // ── Core Design (CORE.* prefix) ───────────────────────────────────────────
+  // The Core Design eagleplayer plays it on the Musashi host
+  // (EaglePlayerEngine); the native parser finds no notes, so UADE's scan
+  // draws the grid.
   if (matchesExt(filename, ['core'])) {
-    const coreCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['core']) };
     const { isCoreDesignFormat, parseCoreDesignFile } = await import('@lib/import/formats/CoreDesignParser');
-    return withNativeThenUADE('coreDesign', coreCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => {
-        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
-        if (isCoreDesignFormat(ab)) return parseCoreDesignFile(ab, name);
-        return null;
-      },
-      'CoreDesignParser', { injectUADE: true });
+    const { withEaglePlayer } = await import('./withEaglePlayer');
+    return withEaglePlayer('CoreDesign', ctx,
+      (buf, name) => (isCoreDesignFormat(buf) ? parseCoreDesignFile(buf, name) : null),
+      toUADEPrefixName(originalFileName, ['core']));
   }
 
   // ── Janko Mrsic-Flogel (JMF.* prefix) ────────────────────────────────────
@@ -1940,15 +1948,14 @@ export async function tryRouteFormat(
   }
 
   // ── Wally Beben (WB.* prefix) ─────────────────────────────────────────────
-  // Native parser decodes phrase/pattern data + samples; UADE handles audio.
+  // Native parser decodes phrase/pattern data + samples for the grid; the
+  // Wally Beben eagleplayer plays it on the Musashi host (EaglePlayerEngine).
   if (matchesExt(filename, ['wb'])) {
     const { isWallyBebenFormat, parseWallyBebenFile } = await import('@lib/import/formats/WallyBebenParser');
-    return withNativeThenUADE('wallyBeben', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => {
-        if (isWallyBebenFormat(buf)) return parseWallyBebenFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
-        return null;
-      },
-      'WallyBebenParser', { injectUADE: true });
+    const { withEaglePlayer } = await import('./withEaglePlayer');
+    return withEaglePlayer('WallyBeben', ctx,
+      (buf, name) => (isWallyBebenFormat(buf) ? parseWallyBebenFile(buf, name) : null),
+      toUADEPrefixName(originalFileName, ['wb']));
   }
 
   // ── Steve Barrett — native parser provides detection; UADE handles audio.
@@ -1985,10 +1992,14 @@ export async function tryRouteFormat(
   }
 
   // ── Dave Lowe New (DLN.* prefix) ──────────────────────────────────────────
-  // New-style Dave Lowe Amiga format with table-based detection. UADE prefix: DLN.
+  // New-style Dave Lowe Amiga format with table-based detection. Native grid;
+  // the Dave Lowe New eagleplayer plays it on the Musashi host.
   if (matchesExt(filename, ['dln'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dln']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
+    const { withEaglePlayer } = await import('./withEaglePlayer');
+    return withEaglePlayer('DaveLoweNew', ctx,
+      (buf, name) => (isDaveLoweNewFormat(buf) ? parseDaveLoweNewFile(buf, name) : null),
+      toUADEPrefixName(originalFileName, ['dln']));
   }
 
   // ── Martin Walker (AVP.* / MW.* prefix) ──────────────────────────────────
@@ -2035,10 +2046,14 @@ export async function tryRouteFormat(
   }
 
   // ── Anders 0land (HOT.* prefix) ───────────────────────────────────────────
-  // Amiga 3-chunk format (mpl/mdt/msm). UADE prefix: hot.
+  // Amiga 3-chunk format (mpl/mdt/msm). Native grid when the parser reads it,
+  // else UADE's scan; the Anders 0land eagleplayer plays it on the Musashi host.
   if (matchesExt(filename, ['hot'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['hot']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    const { isAnders0landFormat, parseAnders0landFile } = await import('@lib/import/formats/Anders0landParser');
+    const { withEaglePlayer } = await import('./withEaglePlayer');
+    return withEaglePlayer('Anders0land', ctx,
+      (buf, name) => (isAnders0landFormat(buf, name) ? parseAnders0landFile(buf, name) : null),
+      toUADEPrefixName(originalFileName, ['hot']));
   }
 
   // ── Andrew Parton (BYE.* prefix) ──────────────────────────────────────────

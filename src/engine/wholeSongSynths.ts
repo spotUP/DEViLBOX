@@ -37,7 +37,7 @@ export const WHOLE_SONG_SYNTH_TYPES: ReadonlySet<string> = new Set([
   'SoundControlWasmSynth', 'SoundFactory2WasmSynth', 'SoundMonWasmSynth',
   'SteveTurnerSynth', 'SunTronicSongSynth', 'SynthesisWasmSynth', 'TFMXModuleSynth',
   'UADEEditableSynth', 'V2MSynth', 'ZxtuneSynth', 'AyletSynth', 'PiyoPiyoSynth',
-  'TFMSynth', 'PsgplaySynth', 'GmeSynth', 'S98Synth', 'StoneTrackerSynth', 'MusicMakerSynth',
+  'TFMSynth', 'PsgplaySynth', 'GmeSynth', 'S98Synth', 'StoneTrackerSynth', 'MusicMakerSynth', 'EaglePlayerSynth',
   // Routed alongside the WASM engine registry but defined elsewhere.
   'UADESynth', 'SunVoxSynth', 'SunVoxModular',
   // Symphonie and the C64 engines are whole-song replayers too; they reach the
