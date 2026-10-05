@@ -153,5 +153,35 @@ notes, sample, first effect) from the same rules the player uses.
 Open after this: an own C replayer + SPM export for editing (route 1, with
 this wasm as its lock-step oracle); song 2..n selection (the engine plays
 song 1, the subsong the C examples default to); CrunchMania (method 2) and
-StoneCruncher (method 3) banks are refused - none in the corpus; per-channel
-oscilloscope stream (the worklet sends none yet).
+StoneCruncher (method 3) banks are refused - none in the corpus.
+
+## Per-track feed for scopes / VU (added 2026-10-05)
+
+Owner report: VU meters and oscilloscopes flat. The player mixes tracks
+3/6/7 and 4/5/8 into Paula 2/3 in software, so per-track audio is not a
+free tap. Options weighed:
+
+1. **Re-render per track with the mute mask** - eight more machines. The
+   CPU core is one global Musashi context (context swap per slice), 9x the
+   cost, and a masked track takes the mixer's silent path, so interrupt
+   timing - and the solo render - drifts from the real mix. Rejected.
+2. **Tap inside the mixing loop** - the mixer sums voices through volume
+   tables into one byte per output sample in unrolled loops; no point holds
+   one voice's contribution alone. Rejected.
+3. **Per-track level from voice state** - a level, not audio; the channel
+   classifiers need audio. Last resort, not needed.
+4. **Chosen:** tracks on a Paula channel (1 and 2 always; 3 below six tracks;
+   4 below five) are that channel's output - exact. Software-mixed tracks get
+   a shadow voice: restarted from the track structure at the instant the
+   player triggers the note (its write of byte 72; +32 start, +36 length),
+   stepped at the live period (+22) through the same sample bytes and loop
+   (+40/+44) at the live volume (+26 x +28 x song volume +148). It is the
+   track's own audio as the mixer would compute it, minus the mixer's 8-bit
+   table rounding and its block-ahead timing. Taps only read memory.
+
+Measured (hypnosphere, 48 kHz): main mix bit-identical with and without
+taps (3 s compared sample for sample); track 4's shadow RMS 0.1333 against
+Paula 3 (which carries track 4 alone in the first 1.4 s) 0.1445 - within 8 %;
+per-track RMS over 4 s 0 / 0.135 / 0.042 / 0.245 / 0 / 0 / 0 / 0, matching
+which tracks hold notes at position 0. Cost: 60 s of audio renders in about
+1.4 s with or without taps (2.4 % of real time) - no underrun risk.

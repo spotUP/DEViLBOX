@@ -26,6 +26,7 @@ interface Mod {
   _st_wasm_init(sr: number): void;
   _st_wasm_load(spm: number, spmLen: number, sps: number, spsLen: number): number;
   _st_wasm_render(out: number, frames: number): number;
+  _st_wasm_render_channels(out: number, ch: number, frames: number, stride: number): number;
   _st_wasm_set_mute_mask(mask: number): void;
   _st_wasm_stop(): void;
   _st_wasm_get_position(): number;
@@ -132,6 +133,82 @@ describe('the StoneTracker wasm plays a StoneTracker song', { timeout: 180000 },
     console.log('[stonetracker] at 112 s: position', pos, 'line', line);
     expect(pos * 64 + line).toBeGreaterThan(13 * 64 + 53);
     expect(mod._st_wasm_crashed()).toBe(0);
+  });
+
+  it('the render with per-track taps leaves the main mix bit-identical', () => {
+    const frames = 1200, total = Math.ceil(SR * 3 / frames);
+    const mix = (taps: boolean): Float32Array => {
+      expect(load(readFileSync(SPM), readFileSync(SPS))).toBe(0);
+      const out = mod._malloc(frames * 8), ch = mod._malloc(frames * 32);
+      const all = new Float32Array(total * frames * 2);
+      for (let b = 0; b < total; b++) {
+        if (taps) mod._st_wasm_render_channels(out, ch, frames, frames); else mod._st_wasm_render(out, frames);
+        all.set(f32().subarray(out >> 2, (out >> 2) + frames * 2), b * frames * 2);
+      }
+      mod._free(out); mod._free(ch);
+      return all;
+    };
+    const plain = mix(false), tapped = mix(true);
+    expect(tapped).toEqual(plain);
+    expect(plain.some((v) => v !== 0)).toBe(true);
+  });
+
+  it('the worklet posts oscData with eight tracks, sounding where the song plays', async () => {
+    const g = globalThis as Record<string, unknown>;
+    const posted: Array<{ type: string; channels?: Int16Array[]; frame?: number; sampleRate?: number; message?: string }> = [];
+    g.sampleRate = SR;
+    g.AudioWorkletProcessor = class { port = { onmessage: null as unknown, postMessage: (m: never) => { posted.push(m); } }; };
+    type Proc = { initModule(w: Buffer, js: string): Promise<void>; handleMessage(d: object): Promise<void>; process(i: unknown[], o: Float32Array[][]): boolean };
+    let Ctor: (new () => Proc) | null = null;
+    g.registerProcessor = (_n: string, c: new () => Proc) => { Ctor = c; };
+    runInThisContext(readFileSync(resolve(ROOT, 'public/worklets/channel-stream.js'), 'utf8'));
+    runInThisContext(readFileSync(resolve(ROOT, 'public/stonetracker/StoneTracker.worklet.js'), 'utf8'));
+    const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
+    Object.defineProperty(process, 'versions', { value: {}, configurable: true });
+    const p = new Ctor!();
+    try {
+      await p.initModule(readFileSync(resolve(ROOT, 'public/stonetracker/StoneTracker.wasm')), readFileSync(resolve(ROOT, 'public/stonetracker/StoneTracker.js'), 'utf8'));
+    } finally { Object.defineProperty(process, 'versions', versions); }
+    await p.handleMessage({
+      type: 'loadModule',
+      moduleData: new Uint8Array(readFileSync(SPM)).buffer,
+      sampleData: new Uint8Array(readFileSync(SPS)).buffer,
+    });
+    expect(posted.some((m) => m.type === 'moduleLoaded'), JSON.stringify(posted.filter((m) => m.type === 'error'))).toBe(true);
+    const L = new Float32Array(128), R = new Float32Array(128);
+    let leftE = 0, leftN = 0;
+    const firstBlocks = Math.floor(SR * 1.4 / 128);   // before track 2 enters (line 12, 1.46 s)
+    for (let b = 0; b < Math.ceil(SR * 4 / 128); b++) {
+      p.process([], [[L, R]]);
+      if (b < firstBlocks) for (const v of L) { leftE += v * v; leftN++; }
+    }
+    const osc = posted.filter((m) => m.type === 'oscData');
+    expect(osc.length).toBeGreaterThan(10);
+    expect(osc[0].channels).toHaveLength(8);
+    expect(osc[0].sampleRate).toBe(SR);
+    const rmsOf = (c: number, upToSample = Infinity): number => {
+      let e = 0, n = 0;
+      for (const m of osc) {
+        const base = m.frame ?? 0;
+        m.channels![c].forEach((v, i) => { if (base + i < upToSample) { e += (v / 32767) ** 2; n++; } });
+      }
+      return n ? Math.sqrt(e / n) : 0;
+    };
+    const per = [0, 1, 2, 3, 4, 5, 6, 7].map((c) => rmsOf(c));
+    // Track 4 alone feeds Paula 3 (left) for the first 1.4 s: L = Paula 3 / 2.
+    const track4Early = rmsOf(3, firstBlocks * 128);
+    const paula3Early = 2 * Math.sqrt(leftE / leftN);
+    console.log('[stonetracker] oscData chunks', osc.length, 'per-track RMS', per.map((v) => v.toFixed(4)).join(' '),
+      '| track 4 shadow vs Paula 3, first 1.4 s:', track4Early.toFixed(4), paula3Early.toFixed(4));
+    // Position 0: track 2 (direct) from line 12, track 3 (mixed) from line 16,
+    // track 4 (mixed) from line 0; tracks 1, 6, 7, 8 hold no notes yet.
+    expect(per[1]).toBeGreaterThan(0.005);
+    expect(per[2]).toBeGreaterThan(0.005);
+    expect(per[3]).toBeGreaterThan(0.005);
+    expect(per[0] + per[5] + per[6] + per[7]).toBeLessThan(0.001);
+    // The shadow voice is the track's own audio: within 25 % of the Paula
+    // channel it is mixed into while it plays there alone.
+    expect(Math.abs(track4Early - paula3Early) / paula3Early).toBeLessThan(0.25);
   });
 
   it('refuses a file that is not an SPM song, and a bank that is not SPS', () => {

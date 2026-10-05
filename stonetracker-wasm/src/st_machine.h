@@ -23,6 +23,11 @@ int st_machine_load(const uint8_t *spm, size_t spmLen, const uint8_t *sps, size_
 /* Render interleaved stereo float frames. Returns frames written. */
 int st_machine_render(float *out, int frames);
 
+/* As st_machine_render, plus 8 planar per-track float buffers in `ch`,
+ * `stride` floats apart (>= frames). Tracks on a Paula channel are that
+ * channel's output; software-mixed tracks are shadow voices (st_machine.c). */
+int st_machine_render_channels(float *out, float *ch, int frames, int stride);
+
 /* Bit N set = track N+1 (0-7) audible. */
 void st_machine_set_mute_mask(uint32_t mask);
 

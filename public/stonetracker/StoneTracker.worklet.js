@@ -12,6 +12,8 @@ class StoneTrackerProcessor extends AudioWorkletProcessor {
     this.module = null;
     this.interleavedPtr = 0;
     this.interleavedBuf = null;
+    this.chPtr = 0;          // 8 planar per-track buffers of bufferSize floats
+    this.chBufs = [];
     this.initialized = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
@@ -137,6 +139,7 @@ class StoneTrackerProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' });
         return;
       }
+      this.chPtr = this.module._malloc(this.bufferSize * 8 * 4);
 
       this.updateBufferViews();
       this.initialized = true;
@@ -155,6 +158,9 @@ class StoneTrackerProcessor extends AudioWorkletProcessor {
     if (this.lastHeapBuffer !== heapF32.buffer) {
       this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
       this.lastHeapBuffer = heapF32.buffer;
+      this.chBufs = this.chPtr
+        ? Array.from({ length: 8 }, (_, c) => new Float32Array(heapF32.buffer, this.chPtr + c * this.bufferSize * 4, this.bufferSize))
+        : [];
     }
   }
 
@@ -163,6 +169,8 @@ class StoneTrackerProcessor extends AudioWorkletProcessor {
       try { this.module._st_wasm_stop(); } catch (e) { /* ignore */ }
     }
     if (this.module && this.interleavedPtr) { this.module._free(this.interleavedPtr); this.interleavedPtr = 0; }
+    if (this.module && this.chPtr) { this.module._free(this.chPtr); this.chPtr = 0; }
+    this.chBufs = [];
     this.interleavedBuf = null;
     this.module = null;
     this.initialized = false;
@@ -180,7 +188,16 @@ class StoneTrackerProcessor extends AudioWorkletProcessor {
     const numSamples = Math.min(outputL.length, this.bufferSize);
     this.updateBufferViews();
     if (this.interleavedBuf) {
-      const rendered = this.module._st_wasm_render(this.interleavedPtr, numSamples);
+      const withChannels = this.chBufs.length === 8;
+      const rendered = withChannels
+        ? this.module._st_wasm_render_channels(this.interleavedPtr, this.chPtr, numSamples, this.bufferSize)
+        : this.module._st_wasm_render(this.interleavedPtr, numSamples);
+      // Every sample of each of the eight tracks, for the oscilloscopes, VU
+      // meters and per-channel role classifiers (worklets/channel-stream.js).
+      if (withChannels && rendered > 0 && globalThis.DevilboxChannelStream) {
+        this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+        this._stream.writeFloat32(this.chBufs.map((b) => b.subarray(0, rendered)), rendered);
+      }
       for (let i = 0; i < rendered; i++) {
         outputL[i] = this.interleavedBuf[i * 2];
         outputR[i] = this.interleavedBuf[i * 2 + 1];

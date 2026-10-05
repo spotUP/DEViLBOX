@@ -57,7 +57,7 @@ set_target_properties(StoneTracker PROPERTIES
 
 target_compile_options(StoneTracker PRIVATE -O2 -Wall -Wno-unused-variable -Wno-unused-function -Wno-sign-compare)
 
-set(EXPORTED_FUNCS "_malloc,_free,_st_wasm_init,_st_wasm_load,_st_wasm_render,_st_wasm_stop,_st_wasm_set_mute_mask,_st_wasm_get_position,_st_wasm_get_line,_st_wasm_crashed")
+set(EXPORTED_FUNCS "_malloc,_free,_st_wasm_init,_st_wasm_load,_st_wasm_render,_st_wasm_render_channels,_st_wasm_stop,_st_wasm_set_mute_mask,_st_wasm_get_position,_st_wasm_get_line,_st_wasm_crashed")
 
 target_link_options(StoneTracker PRIVATE
     "SHELL:-s MODULARIZE=1"

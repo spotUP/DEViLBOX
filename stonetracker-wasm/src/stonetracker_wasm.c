@@ -21,6 +21,10 @@ EMSCRIPTEN_KEEPALIVE int st_wasm_load(const uint8_t *spm, int spmLen, const uint
 }
 
 EMSCRIPTEN_KEEPALIVE int st_wasm_render(float *out, int frames) { return st_machine_render(out, frames); }
+/* As st_wasm_render, plus 8 planar per-track buffers `stride` floats apart. */
+EMSCRIPTEN_KEEPALIVE int st_wasm_render_channels(float *out, float *ch, int frames, int stride) {
+  return st_machine_render_channels(out, ch, frames, stride);
+}
 EMSCRIPTEN_KEEPALIVE void st_wasm_set_mute_mask(int mask) { st_machine_set_mute_mask((uint32_t)mask); }
 EMSCRIPTEN_KEEPALIVE void st_wasm_stop(void) { st_machine_stop(); }
 EMSCRIPTEN_KEEPALIVE int st_wasm_get_position(void) { return st_machine_get_position(); }
