@@ -765,6 +765,11 @@ static void lh5_fill(LH5* s, int n) {
     }
     s->bitcount -= n;
     s->bitbuf = (s->bitbuf << n) | ((uint32_t)s->subbitbuf >> (8 - n));
+    /* The decoder reads bitbuf as LHA's 16-bit bit buffer (bitbuf >> 8,
+     * >> 4, >> (16 - n)): bits shifted past 16 must fall off, as they do
+     * in the reference's unsigned short. Kept, they corrupted every table
+     * lookup and every LH5-packed YM decoded to garbage (-4 at load). */
+    s->bitbuf &= 0xFFFF;
     s->subbitbuf <<= n;
     s->subbitbuf &= 0xFF;
 }

@@ -112,6 +112,7 @@ export type TrackerFormat =
   | 'SNDH' // Atari ST SNDH/SC68 (YM2149 68000 code)
   | 'HES'  // PC Engine / TurboGrafx-16 HuC6280
   | 'SPC'  // Super Nintendo SPC700 sound format
+  | 'ZXTune' // ZX Spectrum / Atari ST formats played by the ZXTune engine (PT3, STC, VTX, PSG, YM, ...)
   | 'MDX'  // Sharp X68000 MDX (YM2151 OPM + ADPCM, native note data)
   | 'JamCracker'       // JamCracker Pro (.jam, .jc)
   | 'FuturePlayer'     // Future Player (Wanted Team, .fp)
