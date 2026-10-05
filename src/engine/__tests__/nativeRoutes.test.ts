@@ -20,6 +20,25 @@ const CASES: Array<[string, () => Promise<TrackerSong | null>, string]> = [
   ['formats/ghostbattle_gameover.hip7', async () => (await import('@lib/import/formats/JochenHippel7VParser')).parseJochenHippel7VFile(bytes('public/data/songs/formats/ghostbattle_gameover.hip7'), 'ghostbattle_gameover.hip7'), 'Hippel'],
 ];
 
+/**
+ * The same question through the importer's own entry point: the file goes in
+ * through parseModuleToSong, and playingEngineFor (the router's rule) names
+ * the engine. Digital Sound Studio had a working replayer that no parser fed.
+ */
+const IMPORTED: Array<[string, string]> = [
+  ['public/data/songs/digital-sound-studio/zrimay.dss', 'DssReplayer'],
+  ['public/data/songs/formats/doxtro3.dss', 'DssReplayer'],
+];
+
+describe('imported songs play on their own engine', { timeout: 60000 }, () => {
+  it.each(IMPORTED)('%s plays on %s', async (rel, key) => {
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const { playingEngineFor } = await import('../replayer/NativeEngineRouting');
+    const song = await parseModuleToSong(new File([bytes(rel)], rel.split('/').pop()!));
+    expect(playingEngineFor(song)).toBe(key);
+  });
+});
+
 describe('native replayer routing', { timeout: 60000 }, () => {
   it.each(CASES)('%s starts its native replayer', async (_file, parse, key) => {
     const song = (await parse())!;

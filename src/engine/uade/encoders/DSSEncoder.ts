@@ -61,15 +61,22 @@ function reverseEffect(effTyp: number, eff: number): { effect: number; effectArg
   }
 }
 
+/** A DSS track line in the replayer's own terms (what dss_set_cell takes). */
+export interface DSSCellFields { sample: number; period: number; effect: number; effectArg: number }
+
+/** TrackerCell → DSS track line fields: the one reverse mapping for file bytes and live edits. */
+export function dssCellFields(cell: Pick<TrackerCell, 'note' | 'instrument' | 'effTyp' | 'eff'>): DSSCellFields {
+  const { effect, effectArg } = reverseEffect(cell.effTyp ?? 0, cell.eff ?? 0);
+  return { sample: cell.instrument ?? 0, period: xmNoteToPeriod(cell.note ?? 0), effect, effectArg };
+}
+
 /**
  * Encode a TrackerCell to DSS binary format (4 bytes).
  */
 function encodeDSSCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
 
-  const sample = cell.instrument ?? 0;
-  const period = xmNoteToPeriod(cell.note ?? 0);
-  const { effect, effectArg } = reverseEffect(cell.effTyp ?? 0, cell.eff ?? 0);
+  const { sample, period, effect, effectArg } = dssCellFields(cell);
 
   // Byte 0: sample[4:0] << 3 | period[10:8]
   out[0] = ((sample & 0x1F) << 3) | ((period >> 8) & 0x07);
