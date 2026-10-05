@@ -69,26 +69,35 @@ static int load(const unsigned char *data, int len, int track, int sample_rate);
 static int loaded_track = 0;
 
 /*
- * The first track from `from` whose first PROBE_SECONDS are audible, trying
- * at most PROBE_TRACKS; `from` itself when none is (the track the import
- * asked for, silent or not). Probes with every voice audible.
+ * The first track from `from` that is music, trying at most PROBE_TRACKS;
+ * `from` itself when none is (the track the import asked for). Music = still
+ * sounding in the last second of the first PROBE_SECONDS and not ended: a
+ * sound effect (KSS gradius 2, tracks before 40) is a short burst that dies,
+ * and the first version, taking any sound at all, opened on an effect that
+ * the engine's silence detector then stopped. Probes with every voice audible.
  */
 static int first_audible_track(int from, int count, int sample_rate)
 {
 	enum { PROBE_SECONDS = 3, PROBE_TRACKS = 64, PROBE_CHUNK = 1024 };
 	const int threshold = 164; /* 0.005 of full scale, as UADE's probe */
 	const int pairs = multi ? kPairs : 1;
+	const long total = (long) PROBE_SECONDS * sample_rate;
+	const long tail = total - sample_rate; /* the last second */
 	gme_mute_voices(emu, 0);
 	const int last = count < from + PROBE_TRACKS ? count : from + PROBE_TRACKS;
 	for (int t = from; t < last; t++) {
 		if (gme_start_track(emu, t)) continue;
-		for (long done = 0; done < (long) PROBE_SECONDS * sample_rate; done += PROBE_CHUNK) {
+		int sounding_late = 0;
+		long done = 0;
+		for (; done < total; done += PROBE_CHUNK) {
 			if (gme_play(emu, PROBE_CHUNK * 2 * pairs, pcm)) break;
-			for (int i = 0; i < PROBE_CHUNK * 2 * pairs; i++) {
-				if (pcm[i] > threshold || pcm[i] < -threshold) return t;
+			if (done >= tail && !sounding_late) {
+				for (int i = 0; i < PROBE_CHUNK * 2 * pairs; i++) {
+					if (pcm[i] > threshold || pcm[i] < -threshold) { sounding_late = 1; break; }
+				}
 			}
-			if (gme_track_ended(emu)) break;
 		}
+		if (done >= total && sounding_late && !gme_track_ended(emu)) return t;
 	}
 	return from;
 }
