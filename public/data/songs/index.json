@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T17:26:24.901Z",
+  "generated": "2026-10-05T17:56:09.015Z",
   "perEntry": 6,
   "registryTotal": 279,
   "covered": 167,
@@ -6502,9 +6502,12 @@
       "label": "sap",
       "formatKey": "sap",
       "files": [
-        "/data/songs/sap/chop suey.sap"
+        "/data/songs/sap/amaurote.sap",
+        "/data/songs/sap/chop suey.sap",
+        "/data/songs/sap/international karate.sap",
+        "/data/songs/sap/warhawk.sap"
       ],
-      "total": 1,
+      "total": 4,
       "dir": "/data/songs/sap"
     },
     {
@@ -9905,7 +9908,10 @@
           "ys2x105.s98"
         ],
         "sap": [
-          "chop suey.sap"
+          "amaurote.sap",
+          "chop suey.sap",
+          "international karate.sap",
+          "warhawk.sap"
         ],
         "sawteeth": [
           "okolaNUKE.st"
@@ -34284,7 +34290,10 @@
     },
     "/data/songs/sap": {
       "siblings": [
-        "chop suey.sap"
+        "amaurote.sap",
+        "chop suey.sap",
+        "international karate.sap",
+        "warhawk.sap"
       ]
     },
     "/data/songs/sawteeth": {

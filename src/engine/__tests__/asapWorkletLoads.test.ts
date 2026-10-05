@@ -95,4 +95,17 @@ describe('ASAP worklet in a worklet-like scope', () => {
     await p.handleMessage({ type: 'play' });
     expect(peakOver(p, 2)).toBeGreaterThan(0.05);
   }, 60_000);
+
+  it("follows the mixer's mask: bit set = channel audible", async () => {
+    const p = new Cls();
+    await startInit(p);
+    await p.handleMessage({ type: 'loadModule', moduleData: sapBytes(), filename: 'chop suey.sap' });
+    await p.handleMessage({ type: 'play' });
+    // The mixer's all-channels-on mask muted every POKEY channel: bleeps, then silence.
+    await p.handleMessage({ type: 'setMuteMask', mask: 0xffffffff });
+    expect(peakOver(p, 1)).toBeGreaterThan(0.05);
+    await p.handleMessage({ type: 'setMuteMask', mask: 0 });
+    peakOver(p, 0.1);
+    expect(peakOver(p, 0.5)).toBe(0);
+  }, 60_000);
 });
