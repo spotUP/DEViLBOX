@@ -119,7 +119,9 @@ export async function parseZxtuneFile(
 
   return {
     name: `${baseName} [ZXTune]`,
-    format: 'MOD' as TrackerFormat,
+    // The Zxtune engine descriptor activates on format 'ZXTune'; as 'MOD'
+    // every ZXTune song fell to the tracker scheduler and played nothing.
+    format: 'ZXTune' as TrackerFormat,
     patterns: [pattern],
     instruments,
     songPositions: [0],
