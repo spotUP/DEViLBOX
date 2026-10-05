@@ -240,3 +240,7 @@ Instrument: `tools/uade-audit/gridVsPaula.ts` (2026-10-05). It renders the file 
 - MusicMaker V8 Old: UADE's player opens `<tune>.i`; the resolver now registers `<tune>.ip` under that name (e3f20427d). moveback.sdata PLAYS (rms 0.070); best of guitars.sdata is a 6-channel MusicMaker song (header 'Best of guitars/6chl'); UADE ships only the MusicMaker-4V and -8V players and both reject it at the module check, with and without its `.ip.l` list file under every candidate name. UADE gap; needs a MusicMaker replayer of our own (OWNER decision).
 - Fred `fuzzball-title.fred`: UADE refuses it, but the app plays .fred through FredReplayer2 natively - measured in the tab rms 0.089. Not a defect.
 - TFM Music Maker: plays in the tab (owner by ear: "plays correct"); channel VU meters missing -> per-channel taps being added (subagent).
+
+## Measuring-tool bug (open, 2026-10-05)
+
+After a `hard_reload` of the tab, `get_audio_level`, the silence detector's node levels and every master meter read 0 while the owner hears the song (confirmed twice by ear: rainstorm.tfe). Before reloads the same tool measured fine (TFM 0.051, MDX 0.6). AudioDataBus taps `Tone.getDestination()`'s input once; guarding it to the live context (SynthBaker/preview switch Tone to an OfflineAudioContext) did NOT change the reading, so that is not the cause - reverted. Until fixed, browser verdicts after a reload come from the owner's ear; headless tests stay the numeric proof.
