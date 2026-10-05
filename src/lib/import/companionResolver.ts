@@ -304,20 +304,20 @@ export function resolveCompanions(moduleName: string, listing: CompanionListing)
   const own = dedupe([...ownSiblings, ...ownSubdirs]);
   const bank = sharedBank(module, moduleName, listing.siblings, own.length > 0);
   const companions = bank ? [...own, bank] : own;
-  // MusicMaker: the song `<tune>.sdata` keeps its instruments in
-  // `<tune>.ip`, and UADE's MusicMaker player opens them as `<tune>.i`
-  // ("file not found '/uade/moveback.i'"; with the alias the 4V player plays
-  // the V8 Old pairs, rms 0.07). Register under the name the player asks
-  // for, read from the file that exists (2026-10-05).
+  // MusicMaker: the song `<tune>.sdata` keeps its instruments in `<tune>.i`
+  // (unpacked) or `<tune>.ip` (packed). The player picks the codec by the
+  // name it finds (MusicMaker4/8.asm Loadexternal: `.i` first, then `.ip`),
+  // so the file keeps its own name: handing `.ip` bytes over as `.i` made the
+  // player read packed codes as raw samples (moveback sounded wrong,
+  // 2026-10-05). The editor's side files (`.ip.n` names, `.ip.l` list) belong
+  // to the song too.
   const mm = /^(.*)\.sdata$/i.exec(moduleName);
   if (mm) {
     const stem = mm[1].toLowerCase();
-    const ip = listing.siblings.find((n) => n.toLowerCase() === `${stem}.ip`);
-    const asked = `${mm[1]}.i`;
-    if (ip && !companions.includes(asked)) { companions.push(asked); sources[asked] = ip; }
-    // The editor's side files (`.ip.n` names, `.ip.l` list) belong to the song too.
     for (const n of listing.siblings) {
-      if (n.toLowerCase().startsWith(`${stem}.ip.`) && !companions.includes(n)) companions.push(n);
+      const lower = n.toLowerCase();
+      const own = lower === `${stem}.i` || lower === `${stem}.ip` || lower.startsWith(`${stem}.i.`) || lower.startsWith(`${stem}.ip.`);
+      if (own && !companions.includes(n)) companions.push(n);
     }
   }
   // Paul Robotham: the player opens `<song>.SSD`; collections ship one shared
@@ -394,7 +394,7 @@ export function companionFilesIn(listing: CompanionListing, keepAsModule: (name:
   for (const module of listing.siblings) {
     const res = resolveCompanions(module, listing);
     for (const registered of res.companions) {
-      // The file on disk is the read-from source when it differs (MusicMaker `.ip` as `.i`).
+      // The file on disk is the read-from source when it differs (a shared `.ssd` as `<song>.SSD`).
       const c = res.sources[registered] ?? registered;
       if (lower(c) === lower(module)) continue;
       (claimedBy.get(c) ?? claimedBy.set(c, new Set()).get(c)!).add(module);

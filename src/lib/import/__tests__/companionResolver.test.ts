@@ -237,11 +237,10 @@ describe('expectedCompanionNames — the lone-file prompt', () => {
 });
 
 describe('MusicMaker instrument file', () => {
-  it('registers <tune>.ip as the <tune>.i the player opens', () => {
+  it('hands <tune>.ip over under its own name: the player picks the codec by the name', () => {
     const res = resolveCompanions('moveback.sdata', { siblings: ['moveback.sdata', 'moveback.ip', 'moveback.ip.n'] });
-    expect(res.companions).toContain('moveback.i');
-    expect(res.sources['moveback.i']).toBe('moveback.ip');
-    expect(res.companions).toContain('moveback.ip.n');
+    expect(res.companions).toEqual(['moveback.ip', 'moveback.ip.n']);
+    expect(res.sources).toEqual({});
   });
 
   it('the .ip and its side files are companions, not songs', () => {
