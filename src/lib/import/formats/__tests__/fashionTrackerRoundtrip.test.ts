@@ -36,7 +36,6 @@ describe('Fashion Tracker pattern codec', () => {
 
     let checked = 0;
     let sawNote = false;         // note-bearing cell
-    let sawOffTablePeriod = false; // cell whose raw period the shared table would have rewritten
     for (let p = 0; p < layout.numPatterns; p++) {
       for (let r = 0; r < layout.rowsPerPattern; r++) {
         for (let c = 0; c < layout.numChannels; c++) {
@@ -47,14 +46,6 @@ describe('Fashion Tracker pattern codec', () => {
           if (period > 0) sawNote = true;
           const decoded = layout.decodeCell(orig);
           const re = layout.encodeCell(decoded);
-          // Canonical (carrier-less) encode of the same decoded cell — what the old shared codec
-          // produced. When it differs on the period bytes, this fixture has an off-table period
-          // the fix rescued.
-          // (period stripped: the shared codec now keeps a cell's own period too)
-          const canonical = encodeMODCell({ ...decoded, period: undefined });
-          if (period > 0 && (canonical[0] !== orig[0] || canonical[1] !== orig[1])) {
-            sawOffTablePeriod = true;
-          }
           expect([...re], `cell p${p} r${r} c${c} @${off}`).toEqual([...orig]);
           checked++;
         }
@@ -62,6 +53,18 @@ describe('Fashion Tracker pattern codec', () => {
     }
     expect(checked).toBeGreaterThan(0);
     expect(sawNote, 'fixture exercises a note-bearing cell').toBe(true);
-    expect(sawOffTablePeriod, 'fixture exercises an off-table period the canonical codec rewrote').toBe(true);
+  });
+
+  it('writes an off-table raw period back verbatim (the fixture holds only on-table periods)', () => {
+    const raw = new Uint8Array(readFileSync(FIXTURE));
+    const layout = parseFashionTrackerFile(
+      raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer,
+      'ivory tover ii.ex',
+    ).uadePatternLayout!;
+    // Period 0x0171 is not a ProTracker table value; the shared codec would snap it.
+    const orig = Uint8Array.of(0x01, 0x71, 0x12, 0x34);
+    const decoded = layout.decodeCell!(orig);
+    expect([...layout.encodeCell!(decoded)]).toEqual([...orig]);
+    expect([...encodeMODCell({ ...decoded, period: undefined })]).not.toEqual([...orig]);
   });
 });
