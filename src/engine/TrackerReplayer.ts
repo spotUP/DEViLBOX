@@ -356,6 +356,10 @@ export interface TrackerSong {
   musicMakerFileData?: ArrayBuffer;
   /** Whole TFM Music Maker .tfe for TFMEngine WASM playback (ZXTune player + 2x ymfm YM2203) */
   tfmFileData?: ArrayBuffer;
+  /** Atari ST SNDH file (raw or ICE!-packed) for PsgplayEngine (PSG play: 68000 + YM2149 + MFP + STE DMA) */
+  sndhFileData?: ArrayBuffer;
+  /** SNDH subtune PsgplayEngine starts (1-based; absent = the file's default) */
+  sndhSubtune?: number;
   /** Whole StoneTracker SPM song for StoneTrackerEngine WASM playback (the authors' player on a 68020 core) */
   stoneTrackerFileData?: ArrayBuffer;
   /** The SPS sample bank beside it (DeltaHuffman packed or not) */

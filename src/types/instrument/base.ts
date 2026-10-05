@@ -273,6 +273,7 @@ export type SynthType =
   | 'ZxtuneSynth'       // ZXTune (AY-3-8910 / YM2149 ZX Spectrum formats)
   | 'AyletSynth'        // aylet (ZX Spectrum .ay - ZXAY EMUL, Z80 + AY)
   | 'PiyoPiyoSynth'     // Studio Pixel PiyoPiyo (.pmd), worklet port of piyopiyo-rs
+  | 'PsgplaySynth'       // Atari ST SNDH (PSG play: 68000 + YM2149 + MFP + STE DMA)
   | 'TFMSynth'          // TFM Music Maker (.tfe), ZXTune player + 2x ymfm YM2203
   | 'StoneTrackerSynth' // StoneTracker (.spm + .sps), StonePlayer on a 68020 core
   | 'MusicMakerSynth'   // MusicMaker V8 (.sdata + .ip), worklet replayer from the author's player source

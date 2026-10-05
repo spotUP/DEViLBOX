@@ -85,6 +85,7 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     uadePatternLayout: fmt.uadePatternLayout ?? undefined,
     nativeSamplePlayback: fmt.nativeSamplePlayback || undefined,
     tfmxTimingTable: fmt.tfmxTimingTable ?? undefined,
+    sndhSubtune: fmt.sndhSubtune ?? undefined,
   };
   // Every native engine binary, from the one list that names them.
   const store = fmt as unknown as Record<string, unknown>;

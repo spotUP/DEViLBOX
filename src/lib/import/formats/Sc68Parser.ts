@@ -1,10 +1,10 @@
 /**
- * Sc68Parser.ts — SC68 / SNDH (Atari ST) format detection and parser
+ * Sc68Parser.ts — SC68 container ('SC68 Music-file', Atari ST) detection and parser
  *
- * Detects SC68 container files, raw SNDH files, and ICE-packed SNDH files.
- * Extracts metadata (title, composer, year, subsong count) from SNDH tags
- * and SC68 container chunks. Returns a TrackerSong with the raw binary stored
- * in sc68FileData for the Sc68Engine WASM player.
+ * Extracts metadata (title, composer, replay rate) from the SC68 container
+ * chunks. Returns a TrackerSong with the raw binary stored in sc68FileData for
+ * the Sc68Engine WASM player. Raw and ICE!-packed SNDH files are not SC68
+ * containers: SNDHParser takes them and PsgplayEngine plays them.
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -38,17 +38,6 @@ function readNullTerminated(buf: Uint8Array, off: number, maxLen: number = 256):
   return text;
 }
 
-/** Read ASCII string at offset, returning text and offset past the null terminator. */
-function readStringAdvance(buf: Uint8Array, off: number, maxLen: number = 256): { text: string; nextOff: number } {
-  let text = '';
-  let i = off;
-  const end = Math.min(off + maxLen, buf.length);
-  while (i < end && buf[i] !== 0) {
-    text += String.fromCharCode(buf[i++]);
-  }
-  return { text, nextOff: i + 1 };
-}
-
 /** Check if bytes at offset match a given ASCII tag. */
 function matchTag(buf: Uint8Array, off: number, tag: string): boolean {
   if (off + tag.length > buf.length) return false;
@@ -74,60 +63,7 @@ interface Sc68Metadata {
   year: string;
   numSubsongs: number;
   replayFreq: number;
-  subFormat: string;   // 'SC68' | 'SNDH' | 'ICE'
-}
-
-// ── SNDH Tag Parser ──────────────────────────────────────────────────────────
-
-function parseSNDHTags(buf: Uint8Array, startOff: number): Sc68Metadata {
-  const meta: Sc68Metadata = {
-    title: '', composer: '', year: '',
-    numSubsongs: 1, replayFreq: 50, subFormat: 'SNDH',
-  };
-
-  const scanLimit = Math.min(buf.length, startOff + 2048);
-  let off = startOff + 4; // skip "SNDH" magic
-
-  while (off < scanLimit - 3) {
-    if (matchTag(buf, off, 'HDNS')) break;
-
-    if (matchTag(buf, off, 'TITL')) {
-      const r = readStringAdvance(buf, off + 4);
-      meta.title = r.text;
-      off = r.nextOff;
-      continue;
-    }
-    if (matchTag(buf, off, 'COMM')) {
-      const r = readStringAdvance(buf, off + 4);
-      meta.composer = r.text;
-      off = r.nextOff;
-      continue;
-    }
-    if (matchTag(buf, off, 'YEAR')) {
-      const r = readStringAdvance(buf, off + 4);
-      meta.year = r.text;
-      off = r.nextOff;
-      continue;
-    }
-    // ## — subsong count
-    if (buf[off] === 0x23 && buf[off + 1] === 0x23) {
-      const tens = buf[off + 2] - 0x30;
-      const ones = buf[off + 3] - 0x30;
-      if (tens >= 0 && tens <= 9 && ones >= 0 && ones <= 9) {
-        meta.numSubsongs = tens * 10 + ones;
-      }
-      off += 4;
-      continue;
-    }
-    // TC/TA — timer frequency
-    if ((buf[off] === 0x54 && (buf[off + 1] === 0x43 || buf[off + 1] === 0x41)) && off + 3 < scanLimit) {
-      meta.replayFreq = readU16BE(buf, off + 2);
-      off += 4;
-      continue;
-    }
-    off++;
-  }
-  return meta;
+  subFormat: string;   // 'SC68'
 }
 
 // ── SC68 Container Parser ────────────────────────────────────────────────────
@@ -166,49 +102,14 @@ export function isSc68Format(data: ArrayBuffer): boolean {
   if (bytes.length < 4) return false;
 
   // SC68 container: "SC68 Music-file" at offset 0
-  if (bytes.length >= 15) {
-    let match = true;
-    const expected = 'SC68 Music-file';
-    for (let i = 0; i < 15 && match; i++) {
-      if (bytes[i] !== expected.charCodeAt(i)) match = false;
-    }
-    if (match) return true;
-  }
-
-  // SNDH: "SNDH" at offset 12
-  if (bytes.length >= 16 && matchTag(bytes, 12, 'SNDH')) return true;
-
-  // ICE packed: "ICE!" at offset 0
-  if (matchTag(bytes, 0, 'ICE!')) return true;
-
-  return false;
+  return matchTag(bytes, 0, 'SC68 Music-file');
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
 
-function extractMetadata(data: ArrayBuffer): Sc68Metadata {
-  const buf = new Uint8Array(data);
-
-  // SC68 container
-  if (buf.length >= 4 && matchTag(buf, 0, 'SC68')) {
-    return parseSC68Container(buf);
-  }
-
-  // Standard SNDH (magic at offset 12)
-  if (buf.length >= 16 && matchTag(buf, 12, 'SNDH')) {
-    return parseSNDHTags(buf, 12);
-  }
-
-  // ICE packed — can't extract tags without 68k CPU decompression
-  return {
-    title: '', composer: '', year: '',
-    numSubsongs: 1, replayFreq: 50, subFormat: 'ICE',
-  };
-}
-
 export async function parseSc68File(fileName: string, data: ArrayBuffer): Promise<TrackerSong> {
-  const meta = extractMetadata(data);
-  const baseName = fileName.replace(/\.(sc68|sndh|snd)$/i, '');
+  const meta = parseSC68Container(new Uint8Array(data));
+  const baseName = fileName.replace(/\.sc68$/i, '');
 
   // Build display title
   let title = meta.title || baseName;

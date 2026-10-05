@@ -31,8 +31,13 @@ const FORMAT_INFO: Record<string, { name: string; description: string; color: st
     color: '#66aaff',
   },
   Sc68Synth: {
-    name: 'SC68 / SNDH',
-    description: 'Atari ST music replayer. YM2149 PSG + 68000 CPU emulation for SNDH and SC68 formats.',
+    name: 'SC68',
+    description: 'Atari ST music replayer for SC68 containers. YM2149 PSG + 68000 CPU emulation.',
+    color: '#ffaa44',
+  },
+  PsgplaySynth: {
+    name: 'SNDH (PSG play)',
+    description: 'Atari ST SNDH replayer (PSG play by Fredrik Noring). Runs the tune\'s own 68000 code with YM2149 PSG, MFP 68901 timers and STE DMA sound.',
     color: '#ffaa44',
   },
   ZxtuneSynth: {

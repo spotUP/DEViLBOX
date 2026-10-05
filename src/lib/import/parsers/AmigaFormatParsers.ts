@@ -2640,12 +2640,15 @@ export async function tryRouteFormat(
     }
   }
 
-  // ── SC68 / SNDH (.sc68, .sndh, .snd) ──────────────────────────────────────
+  // ── Atari ST (.snd, .sndh, .sc68) ─────────────────────────────────────────
+  // The one routing decision, by content: SNDH (raw or ICE!-packed) plays on
+  // PSG play (PsgplayEngine); an SC68 container ('SC68 Music-file') on sc68.
+  // A .snd that is neither falls through to UADE's Amiga formats.
   if (matchesExt(filename, ['sc68', 'sndh', 'snd'])) {
+    const { isSNDHFormat, parseSNDHFile } = await import('@lib/import/formats/SNDHParser');
+    if (isSNDHFormat(buffer)) return parseSNDHFile(buffer, originalFileName, subsong);
     const { isSc68Format, parseSc68File } = await import('@lib/import/formats/Sc68Parser');
-    if (isSc68Format(buffer)) {
-      return parseSc68File(originalFileName, buffer);
-    }
+    if (isSc68Format(buffer)) return parseSc68File(originalFileName, buffer);
   }
 
   // ── ZXTune formats (.pt3, .pt2, .stc, .stp, .vtx, .psg, .sqt, .psc, .asc, .psm, .gtr, .ftc, .ayc, .ts) ──
