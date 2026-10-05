@@ -699,7 +699,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       };
     }
 
-    // Verify pattern 0 has actual notes — not just empty rows. The
+    // Verify the song has actual notes — not just empty rows. The
     // bartmanintro symptom: song loads with patterns and channels declared,
     // but every cell is empty so playback is silent. Fail-fast on this.
     // Skipped for engine-driven formats (SID, etc.) that have no pattern data.
@@ -712,7 +712,8 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       const patternPollDeadline = Date.now() + 3000;
       while (Date.now() < patternPollDeadline) {
         try {
-          const stats = await client.call<PatternStatsResp>('get_pattern_stats', { patternIndex: 0 });
+          // Across the whole song: a first pattern can be a silent intro.
+          const stats = await client.call<PatternStatsResp>('get_pattern_stats', { wholeSong: true });
           noteCells = stats.noteCells ?? 0;
           if (noteCells > 0) break;
         } catch {
@@ -724,7 +725,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
         await client.call('stop').catch(() => {});
         return {
           name: test.name, family: test.family, status: 'fail',
-          reason: 'pattern 0 has no note cells after 3s (load decoded but pattern data is empty)',
+          reason: 'no pattern has note cells after 3s (load decoded but pattern data is empty)',
           durationMs: Date.now() - start,
         };
       }

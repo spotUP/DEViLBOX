@@ -217,6 +217,7 @@ export function createMcpServer(): McpServer {
     'Get pattern statistics: note density, instrument usage, effect usage, note distribution',
     {
       patternIndex: z.number().int().min(0).optional().describe('Pattern index (default: current)'),
+      wholeSong: z.boolean().optional().describe('Count note cells across every pattern instead (returns patternCount, noteCells, firstPatternWithNotes)'),
     },
     (p) => call('get_pattern_stats', p),
   );
