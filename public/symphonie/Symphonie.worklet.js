@@ -1268,7 +1268,7 @@ class SymphonieProcessor extends AudioWorkletProcessor {
           const mask = msg.mask || 0;
           const numCh = this._expander.channelGains.length;
           for (let ch = 0; ch < numCh; ch++) {
-            const muted = (mask & (1 << ch)) !== 0;
+            const muted = (mask & (1 << ch)) === 0;
             this._expander.channelGains[ch] = muted ? 0.0 : 1.0;
           }
           break;

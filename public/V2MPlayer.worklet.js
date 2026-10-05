@@ -128,7 +128,7 @@ class V2MPlayerProcessor extends AudioWorkletProcessor {
   setMuteMask(mask) {
     if (!this.initialized) return;
     for (let ch = 0; ch < 16; ch++) {
-      const gain = (mask & (1 << ch)) ? 0.0 : 1.0;
+      const gain = (mask & (1 << ch)) ? 1.0 : 0.0;  // bit N set = channel N audible
       this.module._v2m_set_channel_gain(ch, gain);
     }
   }

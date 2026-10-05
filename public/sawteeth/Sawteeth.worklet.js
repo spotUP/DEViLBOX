@@ -89,7 +89,7 @@ class SawteethProcessor extends AudioWorkletProcessor {
           const numCh = typeof this.module._sawteeth_get_num_channels === 'function'
             ? this.module._sawteeth_get_num_channels() : 12;
           for (let ch = 0; ch < numCh; ch++) {
-            const muted = (mask & (1 << ch)) !== 0;
+            const muted = (mask & (1 << ch)) === 0;
             this.module._sawteeth_set_channel_gain(ch, muted ? 0.0 : 1.0);
           }
         }
