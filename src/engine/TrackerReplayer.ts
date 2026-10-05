@@ -388,8 +388,6 @@ export interface TrackerSong {
   robHubbardFileData?: ArrayBuffer;
   /** Raw Digital Mugician binary for DigMugEngine WASM playback */
   digMugFileData?: ArrayBuffer;
-  /** Raw Core Design binary for CoreDesignEngine WASM playback */
-  coreDesignFileData?: ArrayBuffer;
   /** Raw David Whittaker binary for DavidWhittakerEngine WASM playback */
   davidWhittakerFileData?: ArrayBuffer;
   /** Raw Sound Control binary for SoundControlEngine WASM playback */
