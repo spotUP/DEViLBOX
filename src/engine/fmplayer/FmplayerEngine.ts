@@ -51,24 +51,14 @@ export interface SsgChannelData {
   noise: number; toneEn: number; noiseEn: number;
 }
 
-/**
- * Maps a logical channel index (0-9) to the corresponding LIBOPNA_CHAN_* bitmask.
- * Returns 0 for unknown indices (no-op).
- */
-function channelIndexToMask(ch: number): number {
-  if (ch >= 0 && ch <= 5) return 1 << ch;          // FM 1-6: bits 0-5
-  if (ch >= 6 && ch <= 8) return 1 << ch;          // SSG 1-3: bits 6-8
-  if (ch === 9) return 0x8000;                      // ADPCM: bit 15
-  return 0;
-}
-
 export class FmplayerEngine extends WASMSingletonBase {
   private static instance: FmplayerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _pendingFmRequests = new Map<number, (data: FmChannelData) => void>();
   private _pendingSsgRequests = new Map<number, (data: SsgChannelData) => void>();
-  private _muteMask = 0;
+  /** Bit N set = channel N audible (the mixer's convention). */
+  private _audibleMask = 0xffffffff;
 
   private constructor() {
     super();
@@ -158,16 +148,13 @@ export class FmplayerEngine extends WASMSingletonBase {
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
 
   /**
-   * Set the channel mute mask directly using LIBOPNA_CHAN_* bitmask values.
-   * A set bit mutes the corresponding channel.  Pass 0 to un-mute all channels.
-   *
-   * Bitmask constants (mirrors LIBOPNA_CHAN_* in opna.h):
-   *   FM 1-6   : 0x0001-0x0020
-   *   SSG 1-3  : 0x0040-0x0100
-   *   ADPCM    : 0x8000
+   * Set the channel mask the mixer's way: bit N set = channel N AUDIBLE
+   * (channel indices: 0-5 FM 1-6, 6-8 SSG 1-3, 9 ADPCM). The WASM converts to
+   * libopna's LIBOPNA_CHAN_* bits.
    */
   setMuteMask(mask: number): void {
-    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+    this._audibleMask = mask >>> 0;
+    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask: this._audibleMask });
   }
 
   /**
@@ -179,14 +166,9 @@ export class FmplayerEngine extends WASMSingletonBase {
    * To apply actual volume scaling use the master GainNode on this.output.
    */
   setChannelGain(ch: number, gain: number): void {
-    const bit = channelIndexToMask(ch);
-    if (!bit) return;
-    if (gain === 0) {
-      this._muteMask |= bit;
-    } else {
-      this._muteMask &= ~bit;
-    }
-    this.setMuteMask(this._muteMask);
+    if (ch < 0 || ch > 9) return;
+    const bit = (1 << ch) >>> 0;
+    this.setMuteMask(gain === 0 ? this._audibleMask & ~bit : this._audibleMask | bit);
   }
 
   /** Request full FM channel data (alg, fb, pan + 4 operator params) */

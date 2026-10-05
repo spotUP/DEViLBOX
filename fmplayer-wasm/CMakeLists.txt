@@ -57,6 +57,7 @@ set(EXPORTED_FUNCTIONS
   "_fmplayer_wasm_get_loop_count"
   "_fmplayer_wasm_stop"
   "_fmplayer_wasm_set_mute_mask"
+  "_fmplayer_wasm_get_chip_mute_mask"
   "_fmplayer_wasm_get_fm_slot_param"
   "_fmplayer_wasm_set_fm_slot_param"
   "_fmplayer_wasm_get_fm_ch_param"

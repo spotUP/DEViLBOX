@@ -57,7 +57,10 @@ static int g_loaded = 0;
  *   0-5  : FM 1-6   (bits 0-5)
  *   6-8  : SSG 1-3  (bits 6-8)
  *   9    : ADPCM    (bit 15)
- * A set bit means the channel is MUTED (passed directly to opna_set_mask).
+ * g_mute_mask holds the libopna mask itself: a set bit means MUTED. The
+ * export fmplayer_wasm_set_mute_mask takes the mixer's convention (bit N =
+ * channel index N AUDIBLE) and converts; it used to hand the mixer's mask
+ * straight to opna_set_mask, so the all-on mask muted every channel.
  */
 static unsigned g_mute_mask = 0;
 
@@ -267,20 +270,30 @@ void fmplayer_wasm_stop(void) {
 /* ── Per-channel mute control ────────────────────────────────────────── */
 
 /**
- * fmplayer_wasm_set_mute_mask - set the libopna channel mute bitmask.
+ * fmplayer_wasm_set_mute_mask - the mixer's solo/mute.
  *
- * The mask uses the LIBOPNA_CHAN_* constants directly:
- *   ch 0-5  = LIBOPNA_CHAN_FM_1..FM_6  (bits 0-5)
- *   ch 6-8  = LIBOPNA_CHAN_SSG_1..SSG_3 (bits 6-8)
- *   ch 9    = LIBOPNA_CHAN_ADPCM        (bit 15)
- * A set bit means the channel is muted.  Pass 0 to un-mute all channels.
+ * Bit N set = channel index N AUDIBLE (the mixer's convention; 0xffffffff
+ * is everything on). Channel index -> LIBOPNA_CHAN_* bit:
+ *   ch 0-5  = FM 1-6   (bits 0-5)
+ *   ch 6-8  = SSG 1-3  (bits 6-8)
+ *   ch 9    = ADPCM    (bit 15)
+ * libopna wants the opposite sense (set = muted), so the mask is inverted here.
  */
 EMSCRIPTEN_KEEPALIVE
 void fmplayer_wasm_set_mute_mask(unsigned mask) {
-  g_mute_mask = mask;
+  unsigned muted = ~mask & 0x1ffu;          /* ch 0-8 map to bits 0-8 */
+  if (!(mask & (1u << 9))) muted |= 0x8000u; /* ch 9 -> ADPCM bit */
+  g_mute_mask = muted;
   if (g_initialized) {
-    opna_set_mask(&g_opna, mask);
+    opna_set_mask(&g_opna, muted);
   }
+}
+
+/* The chip's own mask (libopna LIBOPNA_CHAN_* bits, set = muted): what the
+ * mixer's mask actually did to the OPNA, for tests to read back. */
+EMSCRIPTEN_KEEPALIVE
+unsigned fmplayer_wasm_get_chip_mute_mask(void) {
+  return g_opna.mask;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
