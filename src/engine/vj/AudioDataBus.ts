@@ -99,6 +99,11 @@ function acquireAnalysers(): { waveform: AnalyserNode; fft: AnalyserNode } {
   return { waveform: sharedWaveformAnalyser, fft: sharedFFTAnalyser };
 }
 
+/** Which context the shared level tap sits on, for the bridge's context report (diagnostic). */
+export function sharedTapContext(): BaseAudioContext | null {
+  return sharedWaveformAnalyser?.context ?? null;
+}
+
 function releaseAnalysers(): void {
   sharedRefCount--;
   if (sharedRefCount <= 0) {
