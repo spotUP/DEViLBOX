@@ -20,38 +20,40 @@ import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 import { companionRelativeName } from './companionRelativeName';
 
 /** A format with a native parser (non-libopenmpt, non-UADE-only), or Furnace / chip-dump. */
-export function detectNativeFormat(filename: string): FormatDefinition | null {
-  const fmt = detectFormat(filename);
+/**
+ * The file's format: by content when the first bytes are given (a `.snd`
+ * holding Atari SNDH is not the Amiga format of that extension), else by name.
+ */
+function formatOf(filename: string, head?: Uint8Array): FormatDefinition | null {
+  return head ? detectFormatFromContent(filename, head) : detectFormat(filename);
+}
+
+export function detectNativeFormat(filename: string, head?: Uint8Array): FormatDefinition | null {
+  const fmt = formatOf(filename, head);
   if (!fmt) return null;
   if (fmt.nativeParser || fmt.family === 'furnace' || fmt.family === 'chip-dump' || fmt.family === 'c64-chip') return fmt;
   return null;
 }
 
 /** Furnace / DefleMask — always the native parser, no libopenmpt or UADE option. */
-export const isFurnaceFormat = (filename: string): boolean => detectFormat(filename)?.family === 'furnace';
+export const isFurnaceFormat = (filename: string, head?: Uint8Array): boolean => formatOf(filename, head)?.family === 'furnace';
 
 /** Chip-dump formats with dedicated native parsers — no UADE mode selector needed. */
-export const isChipDumpFormat = (filename: string): boolean => {
-  const fmt = detectFormat(filename);
+export const isChipDumpFormat = (filename: string, head?: Uint8Array): boolean => {
+  const fmt = formatOf(filename, head);
   return fmt?.family === 'chip-dump' || fmt?.family === 'c64-chip';
 };
 
 /** Whether only the UADE engine can read this file. */
 export function isUADEExclusiveFile(filename: string, head?: Uint8Array): boolean {
   const fname = filename.toLowerCase();
-  // The bytes outrank the name: a `.snd` that is Atari SNDH is not the Amiga
-  // format of the same extension.
-  if (head) {
-    const byContent = detectFormatFromContent(fname, head);
-    if (byContent && byContent !== detectFormat(fname)) return byContent.family === 'uade-only';
-  }
   // isUADEFormat only checks extensions - prefix-named formats like
   // cust.songname are missed; the FormatRegistry understands prefixes
   // (family 'uade-only', or uadeFallback without a native parser).
-  const fmt = detectFormat(fname);
+  const fmt = formatOf(fname, head);
   const byRegistry = !!fmt && !fmt.nativeParser &&
     (fmt.family === 'uade-only' || (fmt.uadeFallback && !fmt.nativeOnly));
-  return !detectNativeFormat(fname) && !isFurnaceFormat(fname) && !isChipDumpFormat(fname) && (isUADEFormat(fname) || !!byRegistry);
+  return !detectNativeFormat(fname, head) && !isFurnaceFormat(fname, head) && !isChipDumpFormat(fname, head) && (isUADEFormat(fname) || !!byRegistry);
 }
 
 export interface PreparedModule {
@@ -71,10 +73,10 @@ export interface PrepareHooks {
 
 export async function prepareModuleImport(file: File, companions: File[] = [], hooks: PrepareHooks = {}): Promise<PreparedModule> {
   const fname = file.name.toLowerCase();
-  const nativeFmt = detectNativeFormat(fname);
-  const isFurnace = isFurnaceFormat(fname);
+  const head = new Uint8Array(await file.slice(0, 128).arrayBuffer());
+  const nativeFmt = detectNativeFormat(fname, head);
+  const isFurnace = isFurnaceFormat(fname, head);
 
-  const head = new Uint8Array(await file.slice(0, 64).arrayBuffer());
   if (isUADEExclusiveFile(fname, head)) {
     const buf = await file.arrayBuffer();
     // Skip the pre-scan for synthetic/compiled 68k formats - the enhanced
