@@ -298,14 +298,14 @@ export const useSettingsStore = create<SettingsStore>()(
         musicAssembler: 'native',   // MusicAssemblerParser — dedicated Music Assembler support
         digitalSoundStudio: 'native', // DigitalSoundStudioParser — dedicated Digital Sound Studio support
         digitalSymphony: 'native',    // DigitalSymphonyParser — dedicated Digital Symphony support
-        imagoOrpheus: 'uade',     // ImagoOrpheusParser — dedicated Imago Orpheus support
-        cdfm67: 'uade',           // CDFM67Parser — dedicated CDFM Composer 670 support
-        easyTrax: 'uade',         // EasyTraxParser — dedicated EasyTrax support
-        karlMorton: 'uade',       // KarlMortonParser — dedicated Karl Morton Music Format support
+        imagoOrpheus: 'native',     // ImagoOrpheusParser — dedicated Imago Orpheus support  // PC format: UADE cannot play it (2026-10-05)
+        cdfm67: 'native',           // CDFM67Parser — dedicated CDFM Composer 670 support  // PC format: UADE cannot play it (2026-10-05)
+        easyTrax: 'native',         // EasyTraxParser — dedicated EasyTrax support  // PC format: UADE cannot play it (2026-10-05)
+        karlMorton: 'native',       // KarlMortonParser — dedicated Karl Morton Music Format support  // PC format: UADE cannot play it (2026-10-05)
         ams: 'native',              // AMSParser — Extreme's Tracker / Velvet Studio support
         xTracker: 'uade',         // XTrackerParser — dedicated X-Tracker DMF support
-        xmf: 'uade',              // XMFParser — dedicated Astroidea XMF support
-        uax: 'uade',              // UAXParser — Unreal Audio Package sound ripper
+        xmf: 'native',              // XMFParser — dedicated Astroidea XMF support  // PC format: UADE cannot play it (2026-10-05)
+        uax: 'native',              // UAXParser — Unreal Audio Package sound ripper  // PC format: UADE cannot play it (2026-10-05)
         graoumfTracker2: 'uade',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
         symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
         chuckBiscuits: 'uade',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
@@ -406,7 +406,7 @@ export const useSettingsStore = create<SettingsStore>()(
         fmTracker: 'native',        // FMTrackerParser — dedicated FM Tracker support (UADE can't play PC OPL formats)
         madTracker2: 'native',        // MadTracker2Parser — dedicated MadTracker 2 support
         psm: 'native',              // PSMParser — dedicated PSM/PSM16 support
-        composer667: 'uade',        // Composer667Parser — dedicated Composer 667 support
+        composer667: 'native',        // Composer667Parser — dedicated Composer 667 support  // PC format: UADE cannot play it (2026-10-05)
         kt: 'native',                // KlysParser — native klystrack engine
         earAche: 'native',           // EarAcheParser — native pattern display + UADE classic audio
         scumm: 'native',             // SCUMMParser — native pattern display + UADE classic audio
@@ -610,7 +610,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 11,
+      version: 12,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -633,6 +633,19 @@ export const useSettingsStore = create<SettingsStore>()(
           // Migrate users still at old v5 default (50/100).
           if (s.stereoSeparation === 50) s.stereoSeparation = 25;
           if (s.modplugSeparation === 100) s.modplugSeparation = 50;
+        }
+        if (version < 12) {
+          // v12: seven PC tracker formats (Imago Orpheus, CDFM 670, EasyTrax,
+          // Karl Morton, XMF, UAX, Composer 667) defaulted to 'uade', an
+          // Amiga player that cannot read them: every load went to UADE and
+          // failed ("UADE could not play"). Flip a stored 'uade' to 'native'
+          // (2026-10-05 broken-formats sweep).
+          const fe = s.formatEngine as Record<string, unknown> | undefined;
+          if (fe) {
+            for (const key of ['imagoOrpheus', 'cdfm67', 'easyTrax', 'karlMorton', 'xmf', 'uax', 'composer667']) {
+              if (fe[key] === 'uade') fe[key] = 'native';
+            }
+          }
         }
         if (version < 8) {
           // v8: SunTronic default changed from 'uade' to 'native' (native

@@ -24,6 +24,7 @@ import { computePlayButtonAction } from '@/lib/tracker/playbackButtonAction';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
+import { gtUltraTogglePlay } from '@engine/gtultra/gtUltraTransport';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
 import { X, Menu, FileUp, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2 } from 'lucide-react';
@@ -381,21 +382,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // GT Ultra: delegate to its own engine
     const editorMode = useFormatStore.getState().editorMode;
     if (editorMode === 'goattracker') {
-      const gtStore = useGTUltraStore.getState();
-      const gtEngine = gtStore.engine;
-      if (!gtEngine) return;
-      const ctx = Tone.getContext().rawContext as AudioContext;
-      if (ctx.state !== 'running') await ctx.resume();
-      if (gtStore.playing) {
-        gtEngine.stop();
-        gtStore.setPlaying(false);
-        setFormatPlaybackPlaying(false);
-      } else {
-        resetFormatPlaybackState();
-        gtEngine.play();
-        gtStore.setPlaying(true);
-        setFormatPlaybackPlaying(true);
-      }
+      await gtUltraTogglePlay();
       return;
     }
 

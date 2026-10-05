@@ -15,6 +15,13 @@ import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } fro
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { useUIStore } from './useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { gtUltraOwnsTransport, gtUltraPlay, gtUltraStop, gtUltraTogglePlay } from '@engine/gtultra/gtUltraTransport';
+import { getFormatStoreRefOrNull } from './storeAccess';
+
+/** The format store's editor mode, late-bound (the format store imports this store). */
+function editorModeNow(): string | undefined {
+  return (getFormatStoreRefOrNull()?.getState() as { editorMode?: string } | undefined)?.editorMode;
+}
 
 interface TransportStore extends TransportState {
   // State
@@ -249,6 +256,10 @@ export const useTransportStore = create<TransportStore>()(
 
     play: async () => {
       const gen = ++_playGeneration;
+      // GoatTracker: its own engine plays; the TS scheduler has nothing to voice.
+      if (gtUltraOwnsTransport(editorModeNow())) {
+        if (await gtUltraPlay()) { set((state) => { state.isPlaying = true; state.isPaused = false; }); return; }
+      }
 
       // Auto-bake any instruments that need it before starting playback
       useInstrumentStore.getState().autoBakeInstruments();
@@ -287,6 +298,7 @@ export const useTransportStore = create<TransportStore>()(
       // Invalidate any in-flight async play() — it must not set isPlaying=true
       // after stop. play() checks _playGeneration before setting isPlaying.
       ++_playGeneration;
+      if (gtUltraOwnsTransport(editorModeNow())) gtUltraStop();
       // Cancel any pending throttled row update — without this, a queued
       // setCurrentRowThrottled timer (up to 250ms) can fire after stop and
       // overwrite the stop-position that TrackerReplayer.stop() just saved.
@@ -302,6 +314,11 @@ export const useTransportStore = create<TransportStore>()(
 
     togglePlayPause: async () => {
       const isPlaying = _get().isPlaying;
+      if (gtUltraOwnsTransport(editorModeNow())) {
+        await gtUltraTogglePlay();
+        set((state) => { state.isPlaying = !isPlaying; state.isPaused = false; });
+        return;
+      }
       if (!isPlaying) {
         // Auto-bake before starting
         useInstrumentStore.getState().autoBakeInstruments();

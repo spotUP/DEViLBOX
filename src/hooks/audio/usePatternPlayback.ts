@@ -14,10 +14,10 @@ import { useEditorStore } from '@stores/useEditorStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@engine/FormatPlaybackState';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
-import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
-import { liveTrackerSong } from '@/lib/song/liveSong';
+import { liveTrackerSong, liveSongFormat } from '@/lib/song/liveSong';
 import { computePlaybackFollow } from '@/lib/tracker/playbackFollow';
 import { computeEffectiveSongOrder } from '@/lib/tracker/playbackOrder';
 
@@ -218,8 +218,7 @@ export const usePatternPlayback = () => {
 
       // Per-channel formats (MusicLine etc.) have no importMetadata.sourceFormat on their
       // single-voice PART patterns. Fall back to 'MOD' (Amiga period math) not 'XM'.
-      const format = (pattern.importMetadata?.sourceFormat as TrackerFormat)
-        || (channelTrackTables && channelTrackTables.length > 0 ? 'MOD' : 'XM');
+      const format = liveSongFormat(pattern.importMetadata?.sourceFormat as string | undefined);
 
       // ── UADE: opaque song player — bypass TrackerReplayer entirely ──────
       if (format === 'UADE') {

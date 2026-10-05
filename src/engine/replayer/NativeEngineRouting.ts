@@ -986,10 +986,10 @@ export function playingEngineFor(song: Pick<TrackerSong, 'format' | 'instruments
  * 2026-10-04). The format store takes the file data at apply time.
  */
 export function playingEngineFromStores(
-  format: Record<string, unknown> & { originalModuleData?: { format?: string } | null },
+  format: Record<string, unknown> & { songFormat?: string | null; originalModuleData?: { format?: string } | null },
   instruments: ReadonlyArray<{ synthType?: string }>,
 ): string {
-  const songLike: Record<string, unknown> = { format: format.originalModuleData?.format ?? 'MOD', instruments };
+  const songLike: Record<string, unknown> = { format: format.songFormat ?? format.originalModuleData?.format ?? 'MOD', instruments };
   for (const field of FILE_DATA_FIELDS) if (format[field]) songLike[field] = format[field];
   return playingEngineFor(songLike as unknown as TrackerSong);
 }
