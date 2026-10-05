@@ -59,6 +59,14 @@ static int s_sample_rate = 44100;
  * Used by the JS enhanced scan to derive row boundaries precisely. */
 static uint32_t g_uade_tick_count = 0;
 
+/* Player ticks since last load: CIA-A Timer B overflows with the interrupt
+ * enabled - the timer the score drives a player's DTP_Interrupt from. Numbers
+ * the tick snapshots and the real-time channel log. Kept apart from
+ * g_uade_tick_count, which the enhanced scan reads for row boundaries and
+ * which stays on Timer A: switching the scan's rows to the real tick is a
+ * separate change (measured 2026-10-05 it thins MaxTrax / Fred scan rows). */
+static uint32_t g_player_tick_count = 0;
+
 /* ── Paula write log ────────────────────────────────────────────────────── */
 #include "paula_log.h"
 
@@ -335,6 +343,7 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     s_pcm_write = 0;
     s_total_frames = 0;
     g_uade_tick_count = 0;
+    g_player_tick_count = 0;
 
     /* Reset DMA restart detection state */
     for (int i = 0; i < 4; i++) { g_prev_lc[i] = 0; g_prev_dma[i] = 0; }
@@ -617,6 +626,14 @@ static void rt_channel_log_tick(void);  /* forward declaration */
 
 void uade_wasm_on_cia_a_tick(void) {
     g_uade_tick_count++;
+}
+
+/* Called from cia.c once per player tick (CIA-A Timer B, interrupt enabled).
+ * Until 2026-10-05 this ran on Timer A, which no player runs: the snapshot
+ * ring stayed empty and compiled-replayer grids were a handful of notes
+ * (skyfox2.cus: 1). */
+void uade_wasm_on_player_tick(void) {
+    g_player_tick_count++;
 
     /* Real-time channel state logging (always runs when enabled) */
     rt_channel_log_tick();
@@ -625,7 +642,7 @@ void uade_wasm_on_cia_a_tick(void) {
 
     uint32_t idx = g_tick_snap_write & TICK_SNAP_MASK;
     UadeTickSnapshot *snap = &g_tick_snaps[idx];
-    snap->tick = g_uade_tick_count;
+    snap->tick = g_player_tick_count;
 
     for (int ch = 0; ch < 4; ch++) {
         snap->channels[ch].period    = (uint16_t)(audio_channel[ch].per & 0xFFFF);
@@ -881,6 +898,7 @@ int uade_wasm_full_reset(void) {
     s_pcm_read  = 0;
     s_pcm_write = 0;
     g_uade_tick_count   = 0;
+    g_player_tick_count = 0;
     g_paula_log_read    = 0;
     g_paula_log_write   = 0;
     g_paula_log_enabled = 0;
@@ -1439,12 +1457,12 @@ void uade_wasm_enable_rt_channel_log(int enable) {
     if (enable) { g_rt_chan_read = 0; g_rt_chan_write = 0; }
 }
 
-/* Called from uade_wasm_on_cia_a_tick() — captures channel state every tick */
+/* Called from uade_wasm_on_player_tick() — captures channel state every tick */
 static void rt_channel_log_tick(void) {
     if (!g_rt_chan_enabled) return;
     uint32_t idx = g_rt_chan_write & RT_CHAN_LOG_MASK;
     RtChannelState *s = &g_rt_chan_log[idx];
-    s->tick = g_uade_tick_count;
+    s->tick = g_player_tick_count;
     for (int i = 0; i < 4; i++) {
         s->period[i]     = (uint16_t)audio_channel[i].per;
         s->volume[i]     = (uint8_t)audio_channel[i].vol;

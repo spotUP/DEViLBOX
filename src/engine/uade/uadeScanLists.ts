@@ -29,7 +29,6 @@ export const SCAN_CRASH_EXTS = new Set([
   'thm',   // ThomasHermann — scan crashes browser
   'sb',    // SteveBarrett — scan crashes browser
   'ps',    // PaulShields — scan crashes browser
-  'cus', 'cust', 'custom',  // DelitrackerCustom — soft reset fails after scan → stutter
   'hip7',  // JochenHippel-7V — game music that never ends: the scan runs its whole budget, and the reload after a cut scan renders silence (2026-09-22)
 ]);
 
@@ -40,7 +39,6 @@ export const SCAN_CRASH_PREFIXES = new Set([
   'thm',   // ThomasHermann — scan crashes browser
   'sb',    // SteveBarrett — scan crashes browser
   'ps',    // PaulShields — scan crashes browser
-  'cus', 'cust', 'custom',  // DelitrackerCustom — soft reset fails after scan → stutter
 ]);
 
 // ── Formats that loop indefinitely but don't crash — safe for short 30s scan ─
@@ -57,6 +55,11 @@ export const SHORT_SCAN_EXTS = new Set([
   'sng',    // RichardJoseph (two-file .sng/.ins)
   'sjs',    // SoundPlayer (two-file sjs.*+smp.*)
   'jpn', 'jpnd', 'jp',  // JasonPage (two-file jpn.*+smp.*)
+  // DelitrackerCustom: a compiled player that never signals an end. Was on the
+  // CRASH list for "soft reset fails after scan -> stutter"; measured
+  // 2026-10-05 the scan + full reset + reload plays sample-identical to a
+  // clean load, and the skip left the grid with one note.
+  'cus', 'cust', 'custom',
 ]);
 
 export const SHORT_SCAN_PREFIXES = new Set([
@@ -73,6 +76,7 @@ export const SHORT_SCAN_PREFIXES = new Set([
   'sjs',    // SoundPlayer
   'jpn', 'jpnd', 'jp',  // JasonPage
   'sng',    // RichardJoseph
+  'cus', 'cust', 'custom',  // DelitrackerCustom (see SHORT_SCAN_EXTS)
 ]);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
