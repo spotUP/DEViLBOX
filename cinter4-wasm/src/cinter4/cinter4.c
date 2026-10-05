@@ -125,6 +125,26 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
   WRITE32(addr, val);
 }
 
+/* -- Video beam: VHPOSR $DFF006 (asm68k-to-c's hw_read16) -------------
+ * Cinter saves the beam line after stopping DMA and, next tick, waits for
+ * the beam to pass that line + 7.5 before starting DMA again. There is no
+ * real beam, so every read advances a modelled one a scanline and a
+ * horizontal step (313 PAL lines); a raw linear-memory read never changes
+ * and would spin forever.
+ * -------------------------------------------------------------------- */
+static uint32_t hw_beam_v = 0, hw_beam_h = 0;
+static inline uint32_t hw_beam_read(void) {
+  hw_beam_v = (hw_beam_v + 1) % 313;  /* PAL lines per frame */
+  hw_beam_h = (hw_beam_h + 1) % 227;  /* PAL colour clocks per line */
+  return ((hw_beam_v >> 8) << 16) | ((hw_beam_v & 0xFF) << 8) | hw_beam_h;
+}
+static inline uint16_t hw_read16(uint32_t addr) {
+  if (addr == 0xDFF004 || addr == 0xDFF006) return (uint16_t)(hw_beam_read() >> (8 * (0xDFF006 - addr)));
+  if (addr >= 0xBF0000 && addr < 0xC00000) return 0; /* CIA read */
+  if (addr >= 0xDFF000 && addr < 0xE00000) return 0; /* custom chip read */
+  return READ16(addr);
+}
+
 /* -- EQU Constants ------------------------------------------------- */
 #define CINTER_DEGREES 16384
 /* c_* */
@@ -1161,7 +1181,7 @@ _top: ;
     }
   /* Save line and dma */
   {  /* MOVE.W	6(A3),D1 */
-      uint16_t _mv = (uint16_t)(READ16(a3 + 6));
+      uint16_t _mv = (uint16_t)(hw_read16(a3 + 6));
       W(d1) = (uint16_t)_mv;
       flag_z = ((int16_t)(_mv) == 0);
       flag_n = ((int16_t)(_mv) < 0);
@@ -1478,9 +1498,11 @@ _noteloop:
       flag_n = ((int16_t)(_ar) < 0);
     }
   a3 = (uint32_t)0xdff000;  /* LEA.L	$DFF000,A3 */
-  /* Amiga scanline wait: VHPOSR at 0xDFF006 is uninitialized WASM memory and
-   * never updates, so the original do-while would spin forever. Skip it. */
-  flag_z = 1;
+CinterPlay2_L_dmawait:
+  {  /* .dmawait: CMP.W	$006(A3),D1 / BGT.B .dmawait */
+      int16_t _rhs = (int16_t)hw_read16(a3 + 6);
+      if ((int16_t)W(d1) > _rhs) goto CinterPlay2_L_dmawait;
+    }
   {  /* MOVE.W	D0,150(A3) */
       uint16_t _mv = (uint16_t)(W(d0));
       hw_write16(a3 + 150, _mv);
