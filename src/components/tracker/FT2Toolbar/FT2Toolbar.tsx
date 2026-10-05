@@ -611,7 +611,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     <div className="ft2-toolbar">
       {editorFullscreen ? (
         /* Fullscreen compact mode: single row with numerics + action buttons side by side */
-        <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar py-[3px] px-[3px]">
           <div className="ft2-toolbar-row shrink-0">
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Pos" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
@@ -691,7 +691,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           </div>
           {/* Hide action row when dub deck is expanded — NavBar shows them there */}
           {stripCollapsed && (
-            <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar py-[3px] px-[3px]">
               {actionButtons}
             </div>
           )}

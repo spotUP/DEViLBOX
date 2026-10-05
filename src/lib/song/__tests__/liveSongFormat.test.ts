@@ -15,6 +15,7 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { liveTrackerSong } from '../liveSong';
 import { playingEngineFor, playingEngineFromStores } from '@/engine/replayer/NativeEngineRouting';
 import type { Pattern } from '@/types';
+import { getNativeEngineMetaForExport, decodeNativeEngineFields } from '@/lib/export/exporters';
 
 const emptyCell = () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 const pattern = (): Pattern => ({
@@ -36,5 +37,16 @@ describe('live song format', () => {
     useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
     useFormatStore.getState().applyEditorMode({ format: 'PiyoPiyo', piyoPiyoFileData: new ArrayBuffer(16) } as never);
     expect(playingEngineFor(liveTrackerSong())).toBe('PiyoPiyo');
+  });
+
+  it('a saved / crash-recovered MDX comes back on the Mdxmini engine', () => {
+    useTrackerStore.setState({ patterns: [pattern()], patternOrder: [0] } as never);
+    useFormatStore.getState().applyEditorMode({ format: 'MDX', mdxminiFileData: new ArrayBuffer(16) } as never);
+    const meta = getNativeEngineMetaForExport();
+    useFormatStore.getState().applyEditorMode({} as never);
+    expect(playingEngineFor(liveTrackerSong())).toBe('tracker');
+    const engine = decodeNativeEngineFields({ mdxminiFileData: btoa('x'.repeat(16)) }, meta ?? undefined, false, undefined);
+    useFormatStore.getState().applyEditorMode(engine as never);
+    expect(playingEngineFor(liveTrackerSong())).toBe('Mdxmini');
   });
 });

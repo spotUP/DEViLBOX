@@ -104,6 +104,8 @@ export interface UADEMetadata {
   minSubsong: number;
   maxSubsong: number;
   subsongCount: number;
+  /** The subsong playback starts on: the requested one, or the first audible one when none was requested (0 = the module's default). */
+  startSubsong?: number;
   scanData?: UADEScanRow[][];            // Pre-scanned pattern data: rows of 4 channels
   enhancedScan?: UADEEnhancedScanData;   // Enhanced scan data with samples + effects
   shortScanTicks?: UADETickSnapshot[];   // Tick snapshots from short scan (compiled replayers)
@@ -291,6 +293,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
               minSubsong: data.minSubsong ?? 1,
               maxSubsong: data.maxSubsong ?? 1,
               subsongCount: data.subsongCount ?? 1,
+              startSubsong: data.startSubsong ?? 0,
               scanData: data.scanData,
             };
             // Include enhanced scan data if available

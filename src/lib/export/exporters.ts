@@ -124,6 +124,10 @@ export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
   if (state.uadeEditableFileName) result.uadeEditableFileName = state.uadeEditableFileName;
   if (state.uadeEditableSubsongs) result.uadeEditableSubsongs = state.uadeEditableSubsongs;
   if (state.editorMode !== 'classic') result.editorMode = state.editorMode;
+  // The parser's song format (ASAP, MDX, PiyoPiyo...): engines gated on a
+  // format list start from it. Without it a saved or crash-recovered MDX
+  // came back voiced by Furnace synths through the TS tracker (2026-10-05).
+  if (state.songFormat) result.format = state.songFormat;
   return Object.keys(result).length > 0 ? result : null;
 }
 

@@ -965,6 +965,20 @@ class UADEProcessor extends AudioWorkletProcessor {
       const maxSubsong = this._wasm._uade_wasm_get_subsong_max();
       const subsongCount = this._wasm._uade_wasm_get_subsong_count();
 
+      // No subsong asked for and several on offer: start on the first one
+      // that is audible within a few seconds. Desire's batmanreturns.dsr
+      // opens on a subsong that is silent for 20 s while subsongs 2-10 sound
+      // at once, and was judged "Silent" (owner decision 2026-10-05).
+      if (subsongIndex === 0 && subsongCount > 1) {
+        const audible = this._firstAudibleSubsong(data, filenameHint, minSubsong, maxSubsong);
+        if (audible !== null && audible !== minSubsong) {
+          console.log('[UADE.worklet] Subsong ' + minSubsong + ' is silent at the start; starting on ' + audible);
+          subsongIndex = audible;
+        }
+        // The probe consumed the song state: load it afresh for the scan.
+        this._loadIntoWasm(data, filenameHint);
+      }
+
       // Fast-scan the entire song to extract pattern data before playback.
       // skipScan=true is used for formats (e.g. compiled 68k replayers) where the
       // scan crashes or corrupts engine state. scanTimeoutSec overrides the default
@@ -1096,6 +1110,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         minSubsong,
         maxSubsong,
         subsongCount,
+        startSubsong: subsongIndex,
         scanData,
         scanStats: this._lastScanStats ?? null,
       };
@@ -1142,6 +1157,41 @@ class UADEProcessor extends AudioWorkletProcessor {
    * Captures Paula channel state at regular row intervals (~5292 frames at 125BPM/speed 6).
    * Returns array of rows, each containing 4 channels of {period, volume, samplePtr}.
    */
+  /**
+   * The first subsong in [min, max] (at most 16 tried) whose first
+   * PROBE_SECONDS render audio, or null when none does. Reloads the module
+   * per subsong; the caller reloads once more afterwards.
+   */
+  _firstAudibleSubsong(data, filenameHint, minSubsong, maxSubsong) {
+    const PROBE_SECONDS = 3;
+    const THRESHOLD = 0.005;
+    const CHUNK = 1024;
+    const tmpL = this._wasm._malloc(CHUNK * 4);
+    const tmpR = this._wasm._malloc(CHUNK * 4);
+    try {
+      const last = Math.min(maxSubsong, minSubsong + 15);
+      for (let s = minSubsong; s <= last; s++) {
+        if (this._loadIntoWasm(data, filenameHint) !== 0) return null;
+        this._wasm._uade_wasm_set_looping(0);
+        if (s > 0) this._wasm._uade_wasm_set_subsong(s);
+        const maxFrames = (sampleRate || 44100) * PROBE_SECONDS;
+        for (let done = 0; done < maxFrames;) {
+          const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
+          if (ret <= 0) break;
+          const heap = new Float32Array(this._wasm.HEAPU8.buffer, tmpL, ret);
+          for (let i = 0; i < ret; i++) {
+            if (heap[i] > THRESHOLD || heap[i] < -THRESHOLD) return s;
+          }
+          done += ret;
+        }
+      }
+      return null;
+    } finally {
+      this._wasm._free(tmpL);
+      this._wasm._free(tmpR);
+    }
+  }
+
   _scanSong(subsongIndex = 0, maxSeconds = 600) {
     // Try enhanced scan first; fall back to basic scan if new WASM exports aren't available
     if (typeof this._wasm._uade_wasm_get_channel_extended === 'function') {
