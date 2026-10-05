@@ -92,7 +92,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // AdPlug WASM extraction — for CmodPlayer-based formats (A2M, AMD, CFF, etc.)
   // Try extracting editable patterns from the WASM module before falling back to streaming
-  const { isAdPlugWasmFormat } = await import('@lib/file/UnifiedFileLoader');
+  const { isAdPlugWasmFormat } = await import('./adplugFormats');
   if (isAdPlugWasmFormat(filename) && (fmt?.key ?? 'adplug') === 'adplug') {
     try {
       const { extractAdPlugPatterns } = await import('./formats/AdPlugWasmExtractor');
