@@ -16,7 +16,7 @@ function emptyCell() {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
 }
 
-function emptyPattern(numCh: number, rows: number): Pattern {
+export function emptyPattern(numCh: number, rows: number): Pattern {
   return {
     id: 'p0', name: 'Pattern 1', length: rows,
     channels: Array.from({ length: numCh }, (_, i): ChannelData => ({
