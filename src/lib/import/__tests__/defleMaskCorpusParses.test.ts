@@ -17,7 +17,11 @@ import { installFurnaceFileOpsWasm, readSong, repoRoot } from './furnaceFileOpsW
 
 const SONGS = join(repoRoot, 'public/data/songs');
 const ROOT = join(SONGS, 'deflemask');
-const VERDICT_DIRS = ['', '0xfroman', '220hertz', '85NESplayer'];
+const VERDICT_DIRS = ['', '0xfroman', '220hertz', '85NESplayer', 'CrazySoundEnginer', 'DevEd', 'MegaSphere'];
+/** Genuinely broken files: the zlib adler32 is wrong AND the header's custom-Hz
+ *  field is short, so the pattern-row count reads 0x08000000 and Furnace
+ *  refuses it ("pattern length is too large"). Not a DEViLBOX defect. */
+const KNOWN_BROKEN = new Set(['deflemask/CrazySoundEnginer/Sonic The Hedgehog - Bridge Zone.dmf']);
 const ALL = process.env.DMF_ALL === '1';
 
 function dmfFiles(dir: string, recurse: boolean): string[] {
@@ -30,13 +34,19 @@ function dmfFiles(dir: string, recurse: boolean): string[] {
   return out.sort();
 }
 const files = (ALL ? dmfFiles(ROOT, true) : VERDICT_DIRS.flatMap((d) => dmfFiles(join(ROOT, d), false)))
-  .map((p) => relative(SONGS, p));
+  .map((p) => relative(SONGS, p))
+  .filter((rel) => !KNOWN_BROKEN.has(rel));
 const failures: Record<string, string> = {};
 
 beforeAll(() => { installFurnaceFileOpsWasm(); });
 afterAll(() => { if (ALL && process.env.DMF_OUT) writeFileSync(process.env.DMF_OUT, JSON.stringify({ total: files.length, failures }, null, 2)); });
 
 describe('DefleMask corpus imports', () => {
+  it('every CrazySoundEnginer, DevEd and MegaSphere DefleMask song is in the run', () => {
+    for (const d of ['CrazySoundEnginer', 'DevEd', 'MegaSphere']) {
+      expect(files.some((f) => f.startsWith(`deflemask/${d}/`)), d).toBe(true);
+    }
+  });
   it('finds the verdict files', () => { expect(files.length).toBeGreaterThanOrEqual(12); });
   for (const rel of files) {
     it(`${rel} imports with patterns and instruments`, async () => {

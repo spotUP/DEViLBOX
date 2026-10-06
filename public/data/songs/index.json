@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-06T17:24:27.041Z",
+  "generated": "2026-10-06T19:10:15.091Z",
   "perEntry": 6,
   "registryTotal": 279,
   "covered": 167,
@@ -195,33 +195,8 @@
       "dir": "/data/songs/david-whittaker"
     },
     {
-      "id": "deflemask-CrazySoundEnginer-unknown",
-      "label": "deflemask / CrazySoundEnginer",
-      "formatKey": null,
-      "subformat": "CrazySoundEnginer",
-      "files": [
-        "/data/songs/deflemask/CrazySoundEnginer/Midway YM2151 VOPM Collection.zip",
-        "/data/songs/deflemask/CrazySoundEnginer/NARC Full Soundtrack.zip",
-        "/data/songs/deflemask/CrazySoundEnginer/NARC VGMS.zip",
-        "/data/songs/deflemask/CrazySoundEnginer/Sonic 1 Dreamcast Edition.zip"
-      ],
-      "total": 4,
-      "dir": "/data/songs/deflemask/CrazySoundEnginer"
-    },
-    {
-      "id": "deflemask-DevEd-unknown",
+      "id": "deflemask-DevEd",
       "label": "deflemask / DevEd",
-      "formatKey": null,
-      "subformat": "DevEd",
-      "files": [
-        "/data/songs/deflemask/DevEd/perfume.dmw"
-      ],
-      "total": 1,
-      "dir": "/data/songs/deflemask/DevEd"
-    },
-    {
-      "id": "deflemask-DevEd-dmf",
-      "label": "deflemask / DevEd / DefleMask / X-Tracker",
       "formatKey": "dmf",
       "subformat": "DevEd",
       "files": [
@@ -234,17 +209,6 @@
       ],
       "total": 227,
       "dir": "/data/songs/deflemask/DevEd"
-    },
-    {
-      "id": "deflemask-MegaSphere-unknown",
-      "label": "deflemask / MegaSphere",
-      "formatKey": null,
-      "subformat": "MegaSphere",
-      "files": [
-        "/data/songs/deflemask/MegaSphere/font.fdm"
-      ],
-      "total": 1,
-      "dir": "/data/songs/deflemask/MegaSphere"
     },
     {
       "id": "delitracker-custom",
