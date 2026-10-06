@@ -147,6 +147,8 @@ export interface FormatStore {
   eaglePlayerSubsong: number | null;
   /** Runner tick of row 0 and ticks per pass, when the parser measured them (TrackerSong.eaglePlayerTickGrid) */
   eaglePlayerTickGrid: { firstTick: number; passTicks: number } | null;
+  /** The grid's rows are UADE player ticks, proved by the parser (TrackerSong.uadePlayerTickGrid) */
+  uadePlayerTickGrid: boolean;
   /** Whole-file data for the ASAP, mdxmini and pmdmini engines: absent from the store until 2026-10-05, so the live song never carried them and their engines never started from a store rebuild. */
   asapFileData: ArrayBuffer | null;
   mdxminiFileData: ArrayBuffer | null;
@@ -555,6 +557,7 @@ export const useFormatStore = create<FormatStore>()(
     eaglePlayerFileName: null,
     eaglePlayerSubsong: null,
     eaglePlayerTickGrid: null,
+    uadePlayerTickGrid: false,
     asapFileData: null,
     mdxminiFileData: null,
     pmdFileData: null,
@@ -1134,6 +1137,7 @@ export const useFormatStore = create<FormatStore>()(
         state.eaglePlayerFileName = (song as any).eaglePlayerFileName ?? null;
         state.eaglePlayerSubsong = (song as any).eaglePlayerSubsong ?? null;
         state.eaglePlayerTickGrid = (song as any).eaglePlayerTickGrid ?? null;
+        state.uadePlayerTickGrid = (song as any).uadePlayerTickGrid === true;
         state.asapFileData = (song as any).asapFileData ?? null;
         state.mdxminiFileData = (song as any).mdxminiFileData ?? null;
         state.pmdFileData = (song as any).pmdFileData ?? null;
@@ -1473,6 +1477,7 @@ export const useFormatStore = create<FormatStore>()(
       state.eaglePlayerFileName = null;
       state.eaglePlayerSubsong = null;
       state.eaglePlayerTickGrid = null;
+      state.uadePlayerTickGrid = false;
       state.asapFileData = null;
       state.mdxminiFileData = null;
       state.pmdFileData = null;

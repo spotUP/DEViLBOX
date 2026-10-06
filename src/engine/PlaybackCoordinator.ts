@@ -264,6 +264,18 @@ export class PlaybackCoordinator {
   onSongEnd: SongEndCallback | null = null;
   onTickProcess: TickProcessCallback | null = null;
 
+  /**
+   * Observers of every row an engine reports, with the audio-context time it
+   * sounds at. Unlike onRowChange (one owner, the playback hook) any number
+   * may listen; row preview uses it to end playback at the row's end.
+   */
+  private readonly rowObservers = new Set<(row: number, position: number, time: number) => void>();
+
+  addRowObserver(cb: (row: number, position: number, time: number) => void): () => void {
+    this.rowObservers.add(cb);
+    return () => { this.rowObservers.delete(cb); };
+  }
+
   /** Drop all callbacks (called on dispose). */
   clearCallbacks(): void {
     this.onRowChange = null;
@@ -361,6 +373,7 @@ export class PlaybackCoordinator {
     if (this.onRowChange) {
       this.onRowChange(row, patternNum, position);
     }
+    for (const observe of this.rowObservers) observe(row, position, time);
     if (fireHybrid && ctx.fireHybridNotes) {
       ctx.fireHybridNotes(time);
     }

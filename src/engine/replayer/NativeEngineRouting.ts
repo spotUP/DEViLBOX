@@ -26,6 +26,7 @@ import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 import { getActiveDubBus } from '../dub/DubBus';
 import { asIsolationCapable, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
 import { needsPaulaOutputStage } from '@engine/paulaOutput';
+import { isTickSeekable, rowSeekTarget } from './rowSeek';
 import { WASM_ENGINES, shouldActivate, songFromStores, type NativeEngineDescriptor, type WASMSingletonStatic } from './wasmEngineRegistry';
 
 export { WASM_ENGINES, shouldActivate, playsOnDedicatedEngine } from './wasmEngineRegistry';
@@ -102,35 +103,8 @@ export { silenceIsNotTheSongs, mixerSilencesAChannel } from './performerSilence'
 
 
 
-/**
- * What will make the sound for `song`, by the same rule `startNativeEngines`
- * applies: the first registry descriptor whose file data the song carries
- * (its `key`, e.g. `Hippel`, `UADEEditable`); `UADE classic` when the song's
- * instruments stream through UADESynth with no editable file data; else
- * `tracker` (the TypeScript scheduler voices the grid). The bridge reports
- * this next to the registry label, which names the format's registry entry
- * and misled two triages into blaming the wrong engine (ledger F22).
- */
-export function playingEngineFor(song: Pick<TrackerSong, 'format' | 'instruments'> & Partial<TrackerSong>): string {
-  const desc = WASM_ENGINES.find((d) => shouldActivate(d, song as TrackerSong));
-  if (desc) return desc.key;
-  if (song.instruments?.some((inst) => inst.synthType === 'UADESynth')) return 'UADE classic';
-  return 'tracker';
-}
-
-/**
- * `playingEngineFor` over what the stores hold for the LOADED song. The
- * replayer's `getSong()` lags a load: read right after `load_file` it still
- * held the previous song, and the bridge named the previous song's engine
- * (`Hippel` for a UADE-played .gray, `UADEEditable` for a Fred song,
- * 2026-10-04). The format store takes the file data at apply time.
- */
-export function playingEngineFromStores(
-  format: Record<string, unknown> & { songFormat?: string | null; originalModuleData?: { format?: string } | null },
-  instruments: ReadonlyArray<{ synthType?: string }>,
-): string {
-  return playingEngineFor(songFromStores(format, instruments));
-}
+// playingEngineFor / playingEngineFromStores live in the registry (no engine import).
+export { playingEngineFor, playingEngineFromStores } from './wasmEngineRegistry';
 
 function registerWholeMixDubSend(key: string, source: AudioNode | null | undefined): void {
   if (!source) return;
@@ -242,6 +216,8 @@ export async function startNativeEngines(
   isDJDeck: boolean,
   muted: boolean,
   routedNativeEngines: Set<string>,
+  /** The grid row playback starts at (TrackerReplayer's songPos / pattPos). */
+  startAt?: { songPos: number; row: number },
 ): Promise<NativeEngineStartResult> {
   // Wait for any pending async engine stops from the previous song to complete.
   // Prevents race conditions during rapid song switching where the old engine's
@@ -322,6 +298,13 @@ export async function startNativeEngines(
         const output = (instance as unknown as { output?: { gain?: AudioParam } }).output;
         if (output?.gain) {
           try { output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
+        }
+        // Playback that starts past row 0 starts there in the engine too:
+        // an engine that runs its format's real player runs silently up to
+        // the row (rowSeek.ts). Engines that cannot seek play from the top.
+        if (startAt && (startAt.songPos > 0 || startAt.row > 0)) {
+          const target = rowSeekTarget(desc.key, song, startAt.songPos, startAt.row);
+          if (target && isTickSeekable(instance)) instance.seekToTick(target.tick, target.clock);
         }
         instance.play();
         console.log(`[NativeEngineRouting] ${desc.key} loaded & playing`);

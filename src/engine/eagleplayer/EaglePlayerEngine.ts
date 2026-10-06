@@ -26,23 +26,14 @@ import { SubsongRequests, reportSubsongs } from '@engine/wasm/subsongRequests';
 import { advanceNativeSubsong } from '@engine/replayer/nativeSubsongPlayback';
 import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
 import { tickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
+import { eaglePlayerGrid } from '@engine/replayer/rowSeek';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 
 /** What the grid follow gets: the order position and row the player is at. */
 export interface EaglePlayerPosition { songPos: number; row: number; ticks: number }
 
-/** The grid geometry the player's tick count maps onto (tickGridPosition). */
-export function eaglePlayerGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition' | 'eaglePlayerTickGrid'>): TickGrid {
-  return {
-    // Where the parser measured it: the tick of row 0 and the pass length.
-    ...song.eaglePlayerTickGrid,
-    speed: song.initialSpeed || 6,
-    songPositions: song.songPositions,
-    patternLengths: song.patterns.map((p) => p.length),
-    // The player loops its song; the grid goes round with it.
-    loopFrom: song.restartPosition ?? 0,
-  };
-}
+// The grid geometry lives with the seek that inverts it (pure module).
+export { eaglePlayerGrid } from '@engine/replayer/rowSeek';
 
 export class EaglePlayerEngine extends WASMChannelOutputsEngine implements SubsongPlayer {
   private static instance: EaglePlayerEngine | null = null;
@@ -177,6 +168,8 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
   }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
+  /** Start the next play() where the player's tick count reaches `tick` (EaglePlayer.worklet.js 'seekToTick'). */
+  seekToTick(tick: number, _clock: 'player' | 'cia' = 'player'): void { this.workletNode?.port.postMessage({ type: 'seekToTick', tick }); }
 
   /**
    * Write `bytes` at `offset` into the module the player is playing (a grid

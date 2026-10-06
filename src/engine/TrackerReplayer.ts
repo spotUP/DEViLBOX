@@ -942,6 +942,11 @@ export class TrackerReplayer {
     }
   }
 
+  /** Observe every row an engine reports, with the audio time it sounds at (PlaybackCoordinator.addRowObserver). */
+  addRowObserver(cb: (row: number, position: number, time: number) => void): () => void {
+    return this.coordinator.addRowObserver(cb);
+  }
+
   /** Whether a WASM engine handles playback (forcePosition is meaningless) */
   get isSuppressNotes(): boolean { return this._suppressNotes; }
 
@@ -2229,6 +2234,7 @@ export class TrackerReplayer {
         this.isDJDeck,
         this._muted,
         this.routedNativeEngines,
+        { songPos: this.songPos, row: this.pattPos },
       );
       _playLog('startNativeEngines');
       if (gen !== this._playGeneration) return;

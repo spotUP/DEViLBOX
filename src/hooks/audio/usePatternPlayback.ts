@@ -7,6 +7,7 @@
  * - Ticks 1+: process continuous effects
  */
 
+import { takePlaybackStartRow } from '@engine/playbackStartRow';
 import { useEffect, useMemo, useRef, startTransition } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, useSettingsStore , useFormatStore } from '@stores';
@@ -532,14 +533,16 @@ export const usePatternPlayback = () => {
           }
         } else if (isLooping) {
           // Pattern-loop initial start: begin at the top of the looped song
-          // position rather than at the cursor row.
-          replayer.seekTo(effectiveOrder.loopRange?.start ?? 0, 0);
-          seekCinter4(actualPatternIndex, 0);
+          // position rather than at the cursor row - unless a command asked
+          // for a row (row preview, playbackStartRow.ts).
+          const startRow = takePlaybackStartRow() ?? 0;
+          replayer.seekTo(effectiveOrder.loopRange?.start ?? 0, startRow);
+          seekCinter4(actualPatternIndex, startRow);
         } else {
           // Initial start (song mode): seek to the current cursor position so playback
           // begins where the user is looking, not from the top of the song.
           const startPos = currentPositionIndexRef.current;
-          const startRow = useTransportStore.getState().currentRow;
+          const startRow = takePlaybackStartRow() ?? useTransportStore.getState().currentRow;
           if (startPos > 0 || startRow > 0) {
             replayer.seekTo(startPos, startRow);
             seekCinter4(effectiveSongPositions[startPos] ?? startPos, startRow);

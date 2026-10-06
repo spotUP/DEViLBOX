@@ -25,6 +25,7 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.songEndSent = false;
     this.lastTicks = -1;
+    this.seekTick = -1; // >= 0 while running silently up to a start row
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
@@ -46,7 +47,14 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
       case 'pause':
         this.playing = false;
         break;
+      case 'seekToTick':
+        // Start playback at a grid row: the player runs silently from where
+        // it is (a fresh load) until its tick count reaches data.tick, so
+        // every voice holds the state the real playback has there.
+        this.seekTick = data.tick >>> 0;
+        break;
       case 'stop':
+        this.seekTick = -1;
         this.playing = false;
         this.loaded = false;
         if (this.module) this.module._ep_wasm_stop();
@@ -114,6 +122,7 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
       this.loaded = false;
       this.playing = false;
       this.songEndSent = false;
+      this.seekTick = -1;
       m._ep_wasm_stop();
       m._ep_wasm_init(Math.round(sampleRate));
       m._ep_wasm_clear_files();
@@ -240,12 +249,32 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
   }
 
+  /**
+   * One audio quantum of a seek: render and discard until the player's tick
+   * count reaches seekTick, for at most a few milliseconds so the audio
+   * thread keeps its deadline. Returns true while the seek is still running.
+   */
+  seekStep(n) {
+    const m = this.module;
+    const deadline = Date.now() + 6;
+    let chunks = 0;
+    while ((m._ep_wasm_player_ticks() >>> 0) < this.seekTick) {
+      if (m._ep_wasm_song_ended()) break;
+      m._ep_wasm_render_voices(this.outPtr, this.voicePtr, n, this.bufferSize);
+      if ((++chunks & 15) === 0 && Date.now() >= deadline) return true;
+    }
+    this.seekTick = -1;
+    this.port.postMessage({ type: 'seekDone', ticks: m._ep_wasm_player_ticks() >>> 0 });
+    return false;
+  }
+
   process(inputs, outputs) {
     if (!this.initialized || !this.module || !this.loaded || !this.playing) return true;
     const output = outputs[0];
     if (!output || output.length < 2) return true;
     const outL = output[0], outR = output[1];
     const n = Math.min(outL.length, this.bufferSize);
+    if (this.seekTick >= 0 && this.seekStep(n)) return true; // outputs stay silent
     this.updateBufferViews();
     if (!this.outBuf) return true;
     const rendered = this.module._ep_wasm_render_voices(this.outPtr, this.voicePtr, n, this.bufferSize);

@@ -1022,3 +1022,33 @@ export function playsAsOpaqueUADE(
 ): boolean {
   return sourceFormat === 'UADE' && !playsOnDedicatedEngine(songFromStores(format, instruments));
 }
+
+/**
+ * What will make the sound for `song`, by the same rule `startNativeEngines`
+ * applies: the first registry descriptor whose file data the song carries
+ * (its `key`, e.g. `Hippel`, `UADEEditable`); `UADE classic` when the song's
+ * instruments stream through UADESynth with no editable file data; else
+ * `tracker` (the TypeScript scheduler voices the grid). The bridge reports
+ * this next to the registry label, which names the format's registry entry
+ * and misled two triages into blaming the wrong engine (ledger F22).
+ */
+export function playingEngineFor(song: Pick<TrackerSong, 'format' | 'instruments'> & Partial<TrackerSong>): string {
+  const desc = WASM_ENGINES.find((d) => shouldActivate(d, song as TrackerSong));
+  if (desc) return desc.key;
+  if (song.instruments?.some((inst) => inst.synthType === 'UADESynth')) return 'UADE classic';
+  return 'tracker';
+}
+
+/**
+ * `playingEngineFor` over what the stores hold for the LOADED song. The
+ * replayer's `getSong()` lags a load: read right after `load_file` it still
+ * held the previous song, and the bridge named the previous song's engine
+ * (`Hippel` for a UADE-played .gray, `UADEEditable` for a Fred song,
+ * 2026-10-04). The format store takes the file data at apply time.
+ */
+export function playingEngineFromStores(
+  format: Record<string, unknown> & { songFormat?: string | null; originalModuleData?: { format?: string } | null },
+  instruments: ReadonlyArray<{ synthType?: string }>,
+): string {
+  return playingEngineFor(songFromStores(format, instruments));
+}

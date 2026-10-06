@@ -743,6 +743,15 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     this.workletNode?.port.postMessage({ type: 'pause' });
   }
 
+  /**
+   * Start the next play() at a tick of `clock`: the song runs silently until
+   * that clock reaches `tick` (UADE.worklet.js 'seekToTick'). 'player' is the
+   * player-interrupt count, 'cia' the CIA-A Timer A count (see 'position').
+   */
+  seekToTick(tick: number, clock: 'player' | 'cia'): void {
+    this.workletNode?.port.postMessage({ type: 'seekToTick', clock, tick });
+  }
+
   setSubsong(index: number): void {
     this.workletNode?.port.postMessage({ type: 'setSubsong', index });
   }

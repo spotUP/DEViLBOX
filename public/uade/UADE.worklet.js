@@ -44,6 +44,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._outR = null;
     this._outFrames = 256;    // Larger than 128 to handle render calls > quantum size
     this._needsReload = false; // Set after stop so next play() reloads from _lastData
+    this._seek = null;         // { clock, tick } while running silently up to a start row
     this._lastLoadFailed = false; // Set when _uade_wasm_load returns non-zero (unsupported file)
     this._wasmCorrupted = false;  // Set when WASM abort/malloc failure — forces full reinit
 
@@ -138,6 +139,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'stop':
+        this._seek = null;
         if (this._wasm && this._ready) {
           this._wasm._uade_wasm_stop();
         }
@@ -148,6 +150,15 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'pause':
         this._paused = !this._paused;
+        break;
+
+      case 'seekToTick':
+        // Start playback at a grid row: the song runs silently from where it
+        // is (a fresh load) until the clock the grid follows reaches `tick`,
+        // so every voice holds the state the real playback has there.
+        // clock 'player' = uade_wasm_get_player_tick_count, 'cia' =
+        // uade_wasm_get_tick_count (see the 'position' message).
+        this._seek = { clock: data.clock === 'player' ? 'player' : 'cia', tick: data.tick >>> 0 };
         break;
 
       case 'setSubsong':
@@ -826,6 +837,7 @@ class UADEProcessor extends AudioWorkletProcessor {
   }
 
   async _load(buffer, filenameHint, subsongIndex = 0, skipScan = false, scanTimeoutSec = undefined, pinSubsong = false) {
+    this._seek = null;
     if (!this._wasm || !this._ready) {
       this.port.postMessage({ type: 'error', message: 'WASM not ready' });
       return;
@@ -2264,6 +2276,28 @@ class UADEProcessor extends AudioWorkletProcessor {
     if (this._wasm && this._wasm._uade_wasm_isolate_channels) this._wasm._uade_wasm_isolate_channels(mask & 0x0F);
   }
 
+  /**
+   * One audio quantum of a seek: render and discard until the seek clock
+   * reaches its tick, for at most a few milliseconds so the audio thread
+   * keeps its deadline. Returns true while the seek is still running.
+   */
+  _seekStep(frames) {
+    const seek = this._seek;
+    const w = this._wasm;
+    const now = () => (seek.clock === 'player'
+      ? (w._uade_wasm_get_player_tick_count ? w._uade_wasm_get_player_tick_count() : 0)
+      : w._uade_wasm_get_tick_count()) >>> 0;
+    const deadline = Date.now() + 6;
+    let chunks = 0;
+    while (now() < seek.tick) {
+      if (w._uade_wasm_render(this._ptrL, this._ptrR, frames) <= 0) { this._seek = null; return false; }
+      if ((++chunks & 15) === 0 && Date.now() >= deadline) return true;
+    }
+    this._seek = null;
+    this.port.postMessage({ type: 'seekDone', tick: now() });
+    return false;
+  }
+
   process(_inputs, outputs) {
     const outL = outputs[0][0];
     const outR = outputs[0][1] || outputs[0][0];  // Mono fallback
@@ -2271,6 +2305,13 @@ class UADEProcessor extends AudioWorkletProcessor {
 
     if (!this._ready || !this._playing || this._paused || !this._wasm) {
       // Silence
+      outL.fill(0);
+      if (outR !== outL) outR.fill(0);
+      return true;
+    }
+
+    if (this._seek && this._seekStep(frames)) {
+      // Still running up to the start row: nothing to hear yet.
       outL.fill(0);
       if (outR !== outL) outR.fill(0);
       return true;
