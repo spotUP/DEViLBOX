@@ -28,7 +28,7 @@ tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
 export GIT_INDEX_FILE="$tmp_dir/index"
 
-for attempt in 1 2 3 4 5 6 7 8 9 10; do
+for attempt in $(seq 1 30); do
   base=$(git rev-parse HEAD)
   git read-tree "$base"
   git add -- "${files[@]}"
@@ -59,7 +59,7 @@ for attempt in 1 2 3 4 5 6 7 8 9 10; do
     exit 1
   fi
   echo "commit-files: HEAD moved, rebuilding the index (attempt $attempt)" >&2
-  sleep 2
+  sleep $((2 + RANDOM % 9))
 done
-echo "commit-files: gave up after 10 attempts" >&2
+echo "commit-files: gave up after 30 attempts" >&2
 exit 1
