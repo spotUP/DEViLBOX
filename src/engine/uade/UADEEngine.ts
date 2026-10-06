@@ -20,12 +20,15 @@ import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { tickGridPosition, playerTickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+
+const meterFeed = new ChannelMeterFeed();
 
 /** UADE only strips ESM markers — no HEAP rewrites (the worklet handles memory views itself). */
 export function uadeTransform(code: string): string {
@@ -367,9 +370,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
           try {
             const engine = getToneEngine();
             const levels: number[] = data.levels;
-            for (let i = 0; i < levels.length; i++) {
-              engine.triggerChannelMeter(i, levels[i]);
-            }
+            meterFeed.feed(engine, levels);
           } catch { /* ToneEngine not ready */ }
           break;
 
