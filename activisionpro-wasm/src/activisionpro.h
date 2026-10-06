@@ -27,6 +27,11 @@ size_t avp_render_multi(AvpModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool avp_has_ended(const AvpModule* module);
 
+// The replayer's own step counter (0-based) and the live track swap for edits.
+uint32_t avp_get_step(const AvpModule* module);
+uint16_t avp_get_voice_period(const AvpModule* module, int voice);
+bool avp_replace_tracks(AvpModule* module, const uint8_t* data, size_t size);
+
 // Edit API
 int avp_get_instrument_count(const AvpModule* module);
 
