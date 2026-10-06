@@ -11,6 +11,7 @@
  * Follows the HivelyEngine pattern: static WASM/JS caching, per-context worklet loading.
  */
 
+import { uadeFormatLabel } from './uadeFormatLabel';
 import { uadePlayerHint } from '@/lib/import/uadePlayerHint';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -296,7 +297,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
           if (this._resolveLoad) {
             const meta: UADEMetadata = {
               player: data.player ?? 'Unknown',
-              formatName: data.formatName ?? 'Unknown',
+              formatName: uadeFormatLabel(data.formatName, data.player),
               minSubsong: data.minSubsong ?? 1,
               maxSubsong: data.maxSubsong ?? 1,
               subsongCount: data.subsongCount ?? 1,
