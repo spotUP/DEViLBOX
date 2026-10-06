@@ -7,6 +7,8 @@ import React, { useEffect, useRef } from 'react';
 import { useTrackerStore, useTransportStore, useThemeStore, useSettingsStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useShallow } from 'zustand/react/shallow';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { waveformVuLevel, engineFedMeterTarget } from '@components/tracker/waveformVuLevel';
 
 interface ChannelLevelsCompactProps {
   height?: number;
@@ -27,6 +29,7 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
   const levelStatesRef = useRef<number[]>([]);
   const peakHoldsRef = useRef<{ level: number; frames: number }[]>([]);
   const lastGensRef = useRef<number[]>([]);
+  const prevSourceRef = useRef<number[]>([]);
   // PERF: Cache gradient to avoid createLinearGradient every frame
   const gradientCacheRef = useRef<{ gradient: CanvasGradient; width: number; cyan: boolean } | null>(null);
   // PERF: Cache container width — reading clientWidth forces layout reflow (~0.5-2ms)
@@ -156,6 +159,9 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       const triggerLevels = engine.getChannelTriggerLevels(nc);
       const triggerGens = engine.getChannelTriggerGenerations(nc);
       const realtimeLevels = isRealtime ? engine.getChannelLevels(nc) : null;
+      const engineLevels = engine.getEngineChannelLevels(nc);
+      const oscChannelData = useOscilloscopeStore.getState().isActive
+        ? useOscilloscopeStore.getState().channelData : null;
 
       // Grow lastGens if needed
       if (lastGensRef.current.length < nc) {
@@ -175,6 +181,15 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
         if (isRealtime && realtimeLevels) {
           const rt = realtimeLevels[i] || 0;
           if (rt > trigger) trigger = rt;
+        }
+        // Direct-routed WASM engines (Fred, Activision Pro, ...) send no note triggers:
+        // meter them from their channel waveform, on note starts only in trigger mode.
+        const oscD = oscChannelData ? oscChannelData[i] : null;
+        if (oscD && oscD.length > 0) {
+          const level = waveformVuLevel(engineLevels ? (engineLevels[i] || 0) : null, oscD);
+          const target = engineFedMeterTarget(isRealtime ? 'realtime' : 'trigger', level, prevSourceRef.current[i] || 0);
+          prevSourceRef.current[i] = level;
+          if (target > trigger) trigger = target;
         }
         const current = levelStatesRef.current[i] || 0;
 
