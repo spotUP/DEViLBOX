@@ -65,6 +65,8 @@ int paula_poll_block_start(int ch);
 
 // Per-channel peak levels (0-1) since the last call; reading resets them.
 void paula_get_channel_levels(float* out4);
+// Cumulative note starts per channel (DMA off->on edges); zeroed by paula_reset.
+void paula_get_note_start_counts(uint32_t* out, int n);
 
 // ── Scope / trace / debug ──────────────────────────────────────────────────
 // Per-channel oscilloscope rings (int16, post-gain), written by paula_render.
