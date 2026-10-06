@@ -15,6 +15,8 @@ class InStereo2Processor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    this.lastPosPattern = -1;
+    this.lastPosRow = -1;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
@@ -45,7 +47,7 @@ class InStereo2Processor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; break;
+      case 'play': this.playing = true; this.lastPosPattern = -1; this.lastPosRow = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._is2_select_subsong(this.handle, 0);
@@ -168,6 +170,18 @@ class InStereo2Processor extends AudioWorkletProcessor {
       if (globalThis.DevilboxChannelStream) {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
+      }
+    }
+
+    // The replayer's own song position (the grid's pattern index) and row,
+    // posted when either moves; the engine hands them to the pattern editor.
+    if (this.module._is2_get_play_pattern) {
+      const songPos = this.module._is2_get_play_pattern(this.handle);
+      const row = this.module._is2_get_play_row(this.handle);
+      if (songPos !== this.lastPosPattern || row !== this.lastPosRow) {
+        this.lastPosPattern = songPos;
+        this.lastPosRow = row;
+        this.port.postMessage({ type: 'position', songPos, row });
       }
     }
 

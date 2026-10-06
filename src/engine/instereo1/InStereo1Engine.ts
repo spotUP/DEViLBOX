@@ -14,7 +14,7 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
-function instereo1Transform(code: string): string {
+export function instereo1Transform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -25,11 +25,17 @@ function instereo1Transform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
+export interface InStereo1PositionUpdate {
+  songPos: number;
+  row: number;
+}
+
 export class InStereo1Engine extends WASMChannelOutputsEngine {
   private static instance: InStereo1Engine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _songEndCallback: (() => void) | null = null;
+  private _positionCallbacks: Set<(update: InStereo1PositionUpdate) => void> = new Set();
 
   private constructor() {
     super();
@@ -85,6 +91,9 @@ export class InStereo1Engine extends WASMChannelOutputsEngine {
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
+        case 'position':
+          for (const cb of this._positionCallbacks) cb({ songPos: data.songPos, row: data.row });
+          break;
         case 'songEnd':
           this._songEndCallback?.();
           break;
@@ -120,6 +129,12 @@ export class InStereo1Engine extends WASMChannelOutputsEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
+  /** The replayer's song position (the grid's pattern index) and row, as it moves. */
+  onPositionUpdate(cb: (update: InStereo1PositionUpdate) => void): () => void {
+    this._positionCallbacks.add(cb);
+    return () => { this._positionCallbacks.delete(cb); };
+  }
+
   /** Edit a pattern cell in the WASM replayer */
   setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
     this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
@@ -132,6 +147,7 @@ export class InStereo1Engine extends WASMChannelOutputsEngine {
 
   override dispose(): void {
     super.dispose();
+    this._positionCallbacks.clear();
     if (InStereo1Engine.instance === this) InStereo1Engine.instance = null;
   }
 }
