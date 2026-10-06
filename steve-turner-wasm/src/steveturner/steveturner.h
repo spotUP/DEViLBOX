@@ -37,6 +37,8 @@ void st_set_instrument_param(int inst, int param_id, int value);
 #define ST_PARAM_CHAIN       16  // instrument chain (byte at $2F)
 #define ST_PARAM_COUNT       17
 
-// Note preview (triggers instrument sample on Paula channel 0)
+// Note preview (the replayer's own voice, Paula channel 0)
 void st_note_on(int instrument, int note, int velocity);
 void st_note_off(void);
+void st_preview_tick(void);   // call at the player's tick rate while a preview note sounds
+int  st_preview_active(void);
