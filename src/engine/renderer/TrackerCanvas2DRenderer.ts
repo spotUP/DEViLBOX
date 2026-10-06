@@ -369,7 +369,7 @@ export class TrackerCanvas2DRenderer {
           ctx.fillStyle = isPlayRow ? '#ffffff' : eff === 0 && effp === 0 ? theme.textMuted : theme.textEffect;
           const effStr = eff === 0 && effp === 0
             ? '···'
-            // SunTronic (0x40..0x4F) / SNX (0x60..0x62) / Sound Player (0x63..0x69) / Fred Editor (0x70..0x73) / Sound Master (0x74..0x78) private control effects
+            // SunTronic (0x40..0x4F) / SNX (0x60..0x62) / Sound Player (0x63..0x69) / Fred Editor (0x70..0x73) / Sound Master (0x74..0x76) private control effects
             : `${SUN_EFFECT_GLYPH[eff] ?? SNX_EFFECT_GLYPH[eff] ?? SPL_EFFECT_GLYPH[eff] ?? FRED_EFFECT_GLYPH[eff] ?? SM_EFFECT_GLYPH[eff] ?? EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
           ctx.fillText(effStr, effBaseX, y);
         }

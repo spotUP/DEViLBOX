@@ -216,7 +216,7 @@ describe('Sound Master module codec', () => {
       song.steps.forEach((s, i) => s.voices.forEach((v, ch) => {
         for (let r = 0; r < s.rows; r++) {
           cells++;
-          expect(song.encodeRow(grid[i][ch][r], v.ctx[r]), `${c.path} step ${i} row ${r} voice ${ch}`).toEqual(song.rowBytes(v.pattern, r));
+          expect(song.encodeRow(grid[i][ch][r], v.ctx[r], song.rowBytes(v.pattern, r)), `${c.path} step ${i} row ${r} voice ${ch}`).toEqual(song.rowBytes(v.pattern, r));
         }
       }));
       expect(cells).toBeGreaterThan(9000);
