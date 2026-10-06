@@ -84,3 +84,5 @@ bool pre_song_get_track_cell(const struct PreSong* song, uint8_t track, uint8_t 
 
 // Live playback state (updated each tick during decode)
 const PrePlaybackState* pre_song_get_playback_state(const struct PreSong* song);
+// Cumulative note starts (the replayer's channel triggers) of channel ch; restart at 0 with each pre_song_start.
+uint32_t pre_song_get_note_starts(const struct PreSong* song, int ch);

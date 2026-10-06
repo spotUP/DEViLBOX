@@ -567,6 +567,7 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
     if (free) {
       if (this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
       if (this.levelsPtr) { free(this.levelsPtr); this.levelsPtr = 0; }
+      if (this._noteStartsPtr) { free(this._noteStartsPtr); this._noteStartsPtr = 0; }
       if (this.waveInfoPtr) { free(this.waveInfoPtr); this.waveInfoPtr = 0; }
       if (this.instInfoPtr) { free(this.instInfoPtr); this.instInfoPtr = 0; }
     }
@@ -686,7 +687,15 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
         const levels = [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]];
         const pos = typeof this.module._player_get_position === 'function' ? this.module._player_get_position() : 0;
         const row = typeof this.module._player_get_row === 'function' ? this.module._player_get_row() : 0;
-        this.port.postMessage({ type: 'chLevels', levels, position: pos, row });
+        // Cumulative note starts per channel (the replayer's own channel triggers)
+        let noteStarts = null;
+        if (typeof this.module._player_get_note_start_counts === 'function') {
+          if (!this._noteStartsPtr) this._noteStartsPtr = this.module._malloc(4 * 4);
+          this.module._player_get_note_start_counts(this._noteStartsPtr, 4);
+          const heapU8 = this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer);
+          noteStarts = Array.from(new Uint32Array(heapU8.buffer, this._noteStartsPtr, 4));
+        }
+        this.port.postMessage({ type: 'chLevels', levels, noteStarts, position: pos, row });
       }
     }
 

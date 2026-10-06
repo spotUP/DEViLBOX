@@ -19,7 +19,7 @@ if(EMSCRIPTEN)
         "_player_init" "_player_render" "_player_stop" "_player_set_sample_rate"
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration" "_player_set_channel_gain"
-        "_player_get_channel_levels"
+        "_player_get_channel_levels" "_player_get_note_start_counts"
         "_player_get_author" "_player_get_num_waves" "_player_get_num_instruments"
         "_player_get_num_positions" "_player_get_num_steps"
         "_player_get_wave_name" "_player_get_instrument_name"

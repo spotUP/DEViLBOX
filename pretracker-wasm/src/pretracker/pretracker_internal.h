@@ -299,6 +299,7 @@ typedef struct {
     u32 sample_length;  // playback length in bytes
     u32 loop_offset;    // loop start offset (0xFFFF = no loop)
     bool active;        // channel producing sound
+    u32 note_starts;    // cumulative sample (DMA) starts, counted where the replayer triggers a channel
     f32 volume;         // final volume as float 0..1
     f32 pan_left;       // stereo pan gain
     f32 pan_right;      // stereo pan gain
