@@ -1236,7 +1236,7 @@ int furnace_dispatch_get_num_channels(int handle) {
 EMSCRIPTEN_KEEPALIVE
 int furnace_dispatch_get_osc_needle(int handle, int chan) {
   auto it = g_instances.find(handle);
-  if (it != g_instances.end()) {
+  if (it != g_instances.end() && chan >= 0 && chan < it->second->numChannels) {
     DivDispatchOscBuffer* buf = it->second->dispatch->getOscBuffer(chan);
     return buf != nullptr ? (int)((buf->needle >> OSCBUF_PREC) & 0xffff) : 0;
   }
@@ -1253,6 +1253,7 @@ EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_read_osc(int handle, int chan, int end, short* outBuf, int count) {
   auto it = g_instances.find(handle);
   if (it == g_instances.end()) return;
+  if (chan < 0 || chan >= it->second->numChannels) return;
   DivDispatchOscBuffer* buf = it->second->dispatch->getOscBuffer(chan);
   if (!buf || count <= 0) return;
   if (count > 65536) count = 65536;
@@ -1286,7 +1287,10 @@ void furnace_dispatch_get_osc_data(int handle, int chan, short* outBuf, int maxS
 EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_mute(int handle, int chan, int mute) {
   auto it = g_instances.find(handle);
-  if (it != g_instances.end()) {
+  // A channel outside this chip's range (multi-chip song falling back to the
+  // wrong chip, mute-all looping the song's channel count) would index past
+  // the platform's per-channel arrays.
+  if (it != g_instances.end() && chan >= 0 && chan < it->second->numChannels) {
     it->second->dispatch->muteChannel(chan, mute != 0);
   }
 }
