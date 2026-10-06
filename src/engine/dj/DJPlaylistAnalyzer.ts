@@ -478,16 +478,6 @@ export async function analyzePlaylist(
         // any render call — the render worker needs them in virtual FS.
         let companions: Array<{ filename: string; buffer: ArrayBuffer }> | undefined;
         if (!isHVSC) {
-          if (lcFilename.startsWith('mdat.')) {
-            try {
-              const { downloadTFMXCompanion } = await import('@/lib/modlandApi');
-              const companion = await downloadTFMXCompanion(remotePath);
-              if (companion) {
-                companions = [{ filename: companion.filename, buffer: companion.buffer }];
-                await cacheSourceFile(companion.buffer, companion.filename);
-              }
-            } catch { /* non-fatal — render will fail with score-died if smpl is required */ }
-          }
           try {
             const { downloadUADECompanions } = await import('@/lib/modlandApi');
             const uadeCompanions = await downloadUADECompanions(remotePath, buffer);

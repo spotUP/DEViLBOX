@@ -150,20 +150,6 @@ export async function precachePlaylist(
 
       // Modland-specific companion files
       if (!isHVSC) {
-        // Check for TFMX companion file (mdat.* needs smpl.*)
-        if (filename.toLowerCase().startsWith('mdat.')) {
-          try {
-            const { downloadTFMXCompanion } = await import('@/lib/modlandApi');
-            const companion = await downloadTFMXCompanion(remotePath);
-            if (companion) {
-              await cacheSourceFile(companion.buffer, companion.filename);
-              console.log(`[Precache] Cached TFMX companion: ${companion.filename}`);
-            }
-          } catch (companionErr) {
-            console.warn(`[Precache] TFMX companion download failed (non-fatal):`, companionErr);
-          }
-        }
-
         // Check for UADE companion files (Sonix, Jason Page, MFP, etc.)
         try {
           const { downloadUADECompanions } = await import('@/lib/modlandApi');

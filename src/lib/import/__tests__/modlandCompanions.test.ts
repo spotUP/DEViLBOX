@@ -6,7 +6,7 @@
  * Only the network (listing + download) is mocked.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { downloadUADECompanions, downloadTFMXCompanion } from '../../modlandApi';
+import { downloadUADECompanions } from '../../modlandApi';
 
 const DIR = 'pub/modules/Infogrames/Bob Morane';
 
@@ -59,12 +59,44 @@ describe('Modland companions go through the resolver', () => {
 
   it('a Modland mdat.x download fetches smpl.x through the same resolver', async () => {
     serveModland([`${DIR}/mdat.tune`, `${DIR}/smpl.tune`]);
-    expect((await downloadTFMXCompanion(`${DIR}/mdat.tune`))?.filename).toBe('smpl.tune');
+    expect((await downloadUADECompanions(`${DIR}/mdat.tune`)).map((c) => c.filename)).toEqual(['smpl.tune']);
   });
 
   it('a plain module with no partners fetches nothing', async () => {
     const got = serveModland([`${DIR}/a.mod`, `${DIR}/b.mod`]);
     expect(await downloadUADECompanions(`${DIR}/a.mod`)).toEqual([]);
     expect(got).toEqual([]);
+  });
+});
+
+describe('a DJ load downloads a TFMX partner once', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('an mdat.x download fetches smpl.x exactly once, and no DJ loader keeps a second TFMX fetch', async () => {
+    const got = serveModland([`${DIR}/mdat.tune`, `${DIR}/smpl.tune`]);
+    await downloadUADECompanions(`${DIR}/mdat.tune`);
+    expect(got.filter((n) => n === 'smpl.tune')).toHaveLength(1);
+    const { readFileSync } = await import('fs');
+    for (const f of ['DJTrackLoader', 'DJPlaylistPrecache', 'DJPlaylistAnalyzer']) {
+      expect(readFileSync(`src/engine/dj/${f}.ts`, 'utf8')).not.toContain('downloadTFMXCompanion');
+    }
+  });
+});
+
+describe('the app and the MCP server read a Modland directory through one builder', () => {
+  it('the MCP server keeps no listing builder of its own', async () => {
+    const { readFileSync } = await import('fs');
+    const src = readFileSync('server/src/mcp/mcpServer.ts', 'utf8');
+    expect(src).toContain('modlandListing(');
+    expect(src).not.toContain("wanted.push('Instruments')");
+  });
+
+  it('modlandListing lists instr/, and Instruments/ only on request', async () => {
+    const { modlandListing } = await import('../companionResolver');
+    const tree: Record<string, string[]> = { d: ['a.smus', 'b.sng'], 'd/instr': ['x.x'], 'd/Instruments': ['i.instr'], 'd/Samples': ['s'] };
+    const list = async (d: string) => tree[d] ?? [];
+    expect((await modlandListing('d/', list))?.subdirs).toEqual({ instr: ['x.x'], Samples: ['s'] });
+    expect((await modlandListing('d', list, { withInstruments: true }))?.subdirs).toHaveProperty('Instruments');
+    expect(await modlandListing('empty', list)).toBeNull();
   });
 });

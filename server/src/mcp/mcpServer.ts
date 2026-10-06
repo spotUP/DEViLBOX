@@ -11,32 +11,20 @@ import { config as loadEnv } from 'dotenv';
 import { readFile, readdir, stat as fsStat } from 'fs/promises';
 import { basename, dirname, join, resolve } from 'path';
 import { callBrowser } from './wsRelay';
-import { resolveCompanions, type CompanionListing } from '../../../src/lib/import/companionResolver.ts';
+import { resolveCompanions, modlandListing, type CompanionListing } from '../../../src/lib/import/companionResolver.ts';
 
 /** Sample subdirectories a module may own. Listed when present, by their name as on disk. */
 const COMPANION_SUBDIRS = ['instr', 'instruments', 'samples'];
 
-/** A modland directory as the companion resolver reads it. Subdirectories are listed only when a shape can live there. */
-async function listModlandForCompanions(dirPath: string, filename: string): Promise<CompanionListing> {
+/** A modland directory as the companion resolver reads it (one builder, shared with the app's modlandApi). */
+async function listModlandForCompanions(dirPath: string): Promise<CompanionListing> {
   const list = async (dir: string): Promise<string[]> => {
     const resp = await fetch(`${API_BASE}/api/modland/list?dir=${encodeURIComponent(dir)}`);
     if (!resp.ok) return [];
     const listed = await resp.json() as { files?: Array<{ full_path: string }> };
     return (listed.files ?? []).map(f => f.full_path.split('/').pop() ?? '').filter(Boolean);
   };
-  const siblings = await list(dirPath);
-  const subdirs: Record<string, string[]> = {};
-  const lower = filename.toLowerCase();
-  const wanted: string[] = ['instr'];
-  if (/\.(smus|snx|tiny)$|^(smus|snx|tiny)\./.test(lower)) wanted.push('Instruments');
-  if (lower.endsWith('.sng')) wanted.push('Samples');
-  for (const sub of wanted) {
-    try {
-      const files = await list(`${dirPath}/${sub}`);
-      if (files.length > 0) subdirs[sub] = files;
-    } catch { /* not there */ }
-  }
-  return { siblings, subdirs };
+  return (await modlandListing(dirPath, list, { withInstruments: true })) ?? { siblings: [] };
 }
 
 /** The module's directory as the companion resolver reads it. */
@@ -1855,7 +1843,7 @@ export function createMcpServer(): McpServer {
         const companionFiles: Record<string, string> = {};
         const dirPath = remotePath.slice(0, remotePath.lastIndexOf('/'));
         try {
-          const listing = await listModlandForCompanions(dirPath, filename);
+          const listing = await listModlandForCompanions(dirPath);
           const resolved = resolveCompanions(filename, listing);
           for (const key of resolved.companions) {
             const source = resolved.sources[key] ?? key;

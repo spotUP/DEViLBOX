@@ -399,6 +399,34 @@ export function listingFromRelativePaths(relativePaths: string[]): CompanionList
 }
 
 /**
+ * A Modland directory as the resolver reads it: the siblings, plus the sample
+ * subdirectories a shape can live in (`instr/`, and `Samples/` when a `.sng`
+ * is listed). `list(dir)` returns basenames and is the only IO. Sonix's
+ * `Instruments/` is listed only when `withInstruments` is set: the app fetches
+ * it selectively (a shared author folder holds 100+ files and trips the
+ * proxy's rate limit), the MCP server takes it whole.
+ * The app (modlandApi) and the MCP server both build their listing here.
+ */
+export async function modlandListing(
+  dir: string,
+  list: (dir: string) => Promise<string[]>,
+  opts: { withInstruments?: boolean } = {},
+): Promise<CompanionListing | null> {
+  const base = dir.replace(/\/+$/, '');
+  const siblings = await list(base);
+  if (siblings.length === 0) return null;
+  const subdirs: Record<string, string[]> = {};
+  const wanted = ['instr'];
+  if (opts.withInstruments) wanted.push('Instruments');
+  if (siblings.some((n) => /\.sng$/i.test(n))) wanted.push('Samples');
+  for (const sub of wanted) {
+    const files = await list(`${base}/${sub}`);
+    if (files.length > 0) subdirs[sub] = files;
+  }
+  return Object.keys(subdirs).length > 0 ? { siblings, subdirs } : { siblings };
+}
+
+/**
  * What a lone module's format is expected to want beside it — for the
  * prompt when a single file is dropped and nothing can be looked for.
  * Empty when the name carries no known role.

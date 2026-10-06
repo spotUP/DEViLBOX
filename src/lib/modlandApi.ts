@@ -26,7 +26,7 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 
 import { gatherCompanions, type CompanionIO } from './import/companionFetch';
-import type { CompanionListing } from './import/companionResolver';
+import { modlandListing } from './import/companionResolver';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -145,23 +145,9 @@ export async function downloadModlandFile(fullPath: string): Promise<ArrayBuffer
  * `bob4.ins` Modland ships for the set (2026-10-06).
  */
 const modlandCompanionIO: CompanionIO = {
-  async listing(dir) {
-    const base = dir.replace(/\/+$/, '');
-    const names = async (d: string): Promise<string[]> =>
-      (await listModlandDir(d)).map((f) => f.full_path.split('/').pop() ?? '').filter(Boolean);
-    const siblings = await names(base);
-    if (siblings.length === 0) return null;
-    const listing: CompanionListing = { siblings };
-    // Sample subdirectories a shape can live in; Sonix's Instruments/ is fetched selectively below.
-    const subdirs: Record<string, string[]> = {};
-    const instr = await names(`${base}/instr`);
-    if (instr.length > 0) subdirs.instr = instr;
-    if (siblings.some((n) => /\.sng$/i.test(n))) {
-      const samples = await names(`${base}/Samples`);
-      if (samples.length > 0) subdirs.Samples = samples;
-    }
-    if (Object.keys(subdirs).length > 0) listing.subdirs = subdirs;
-    return listing;
+  listing(dir) {
+    return modlandListing(dir, async (d) =>
+      (await listModlandDir(d)).map((f) => f.full_path.split('/').pop() ?? '').filter(Boolean));
   },
   async read(path) {
     try { return await downloadModlandFile(path); } catch { return null; }
@@ -178,19 +164,6 @@ async function modlandCompanions(
   const basename = lastSlash >= 0 ? mainPath.slice(lastSlash + 1) : mainPath;
   const found = await gatherCompanions(basename, dir, mainBuffer, modlandCompanionIO);
   return [...found].map(([filename, buffer]) => ({ filename, buffer }));
-}
-
-/**
- * TFMX companion: `smpl.<tune>` beside `mdat.<tune>`. Now the resolver's answer
- * for an mdat module, not a hard-coded name. Null for anything else.
- */
-export async function downloadTFMXCompanion(
-  mdatPath: string,
-): Promise<{ filename: string; buffer: ArrayBuffer } | null> {
-  const basename = mdatPath.slice(mdatPath.lastIndexOf('/') + 1);
-  if (!basename.toLowerCase().startsWith('mdat.')) return null;
-  const found = await modlandCompanions(mdatPath);
-  return found.find((c) => /^smpl\./i.test(c.filename)) ?? null;
 }
 
 /**

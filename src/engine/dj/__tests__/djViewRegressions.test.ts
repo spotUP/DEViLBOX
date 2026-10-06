@@ -283,8 +283,8 @@ describe('DJTrackLoader live load path handles companions', () => {
   // The loadPlaylistTrackToDeckInternal function (live load path)
   const liveLoadSection = src.slice(src.indexOf('loadPlaylistTrackToDeckInternal'));
 
-  it('downloads TFMX companions in the live load modland path', () => {
-    expect(liveLoadSection).toContain('downloadTFMXCompanion');
+  it('fetches companions once: no separate TFMX download beside downloadUADECompanions', () => {
+    expect(liveLoadSection).not.toContain('downloadTFMXCompanion');
   });
 
   it('downloads UADE companions in the live load modland path', () => {
