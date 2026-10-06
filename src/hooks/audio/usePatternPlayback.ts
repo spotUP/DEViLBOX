@@ -465,32 +465,7 @@ export const usePatternPlayback = () => {
           import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
             const engine = FurnaceDispatchEngine.getInstance();
 
-            if (hasCompatFlags) {
-              const cf = furnaceData!.compatFlags as Record<string, unknown>;
-              if (cf._packed && cf._dispatchFlags) {
-                // WASM-parsed: send raw dispatch compat flag bytes to ALL chips
-                engine.setCompatFlagsRaw(cf._dispatchFlags as Uint8Array);
-              } else {
-                // TS-parsed: send named flags (legacy path)
-                engine.setCompatFlags(furnaceData!.compatFlags as any);
-              }
-            }
-
-            // Apply per-chip flags (clock selection, chip model, etc.)
-            if (hasChipFlags) {
-              for (let i = 0; i < furnaceData!.chipFlags!.length; i++) {
-                const flagStr = furnaceData!.chipFlags![i];
-                if (flagStr && flagStr.length > 0) {
-                  const chipId = furnaceNative?.chipIds?.[i];
-                  engine.setChipFlags(flagStr, chipId);
-                }
-              }
-            }
-
-            // Apply tuning (A-4 frequency)
-            if (hasTuning) {
-              engine.setTuning(furnaceData!.tuning!);
-            }
+            engine.applySongDispatchSettings(furnaceData!, furnaceNative?.chipIds);
           });
         }
 

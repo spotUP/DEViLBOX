@@ -1686,6 +1686,32 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   }
 
   /**
+   * Give every chip the song's own dispatch settings: the compat flags (pitch
+   * model, slide behaviour), the per-chip flag strings (clock, model) and the
+   * tuning. One place, called by startWithCoordinator once the chips exist.
+   *
+   * Applied from usePatternPlayback's `.then` alone, they raced the chip
+   * creation: a chip created afterwards kept the defaults (linearPitch 0)
+   * while the sequencer computed pitch in the song's units (linear), so a
+   * DefleMask vibrato of +-47 became +-5 semitones: "off key and wobbly"
+   * (7_grand_cop.dmf, 2026-10-06).
+   */
+  applySongDispatchSettings(
+    data: { compatFlags?: object; chipFlags?: string[]; tuning?: number },
+    chipIds: readonly number[] | undefined,
+  ): void {
+    const cf = data.compatFlags as Record<string, unknown> | undefined;
+    if (cf && Object.keys(cf).length > 0) {
+      if (cf._packed && cf._dispatchFlags) this.setCompatFlagsRaw(cf._dispatchFlags as Uint8Array);
+      else this.setCompatFlags(cf as unknown as CompatFlags);
+    }
+    (data.chipFlags ?? []).forEach((flagStr, i) => {
+      if (flagStr && flagStr.length > 0) this.setChipFlags(flagStr, chipIds?.[i]);
+    });
+    if (data.tuning !== undefined) this.setTuning(data.tuning);
+  }
+
+  /**
    * Send per-song mix volumes to the worklet (masterVol, systemVol, systemPan).
    * Matches upstream Furnace: vol = systemVol[chip] * postAmp * masterVol.
    */
@@ -2043,6 +2069,9 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
           _log(`[FurnaceDispatchEngine] reusing existing chip ${chipId}`);
         }
       }
+
+      // The song's own pitch model / clock / tuning, before anything plays or resets.
+      this.applySongDispatchSettings(opts.song.furnaceNative, chipIds);
 
       // ── 3. Module samples + chip reset ─────────────────────────────────
       // Must happen every play — switching songs leaves stale register state
