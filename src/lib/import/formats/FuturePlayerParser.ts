@@ -544,8 +544,13 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     if (sampInfoPtr === 0 || sampInfoPtr + 14 > code.length) return null;
     const wtFlag = rd8(code, sampInfoPtr + 8);
     const isWavetable = wtFlag !== 0;
-    const lenWords = isWavetable ? 0 : rd16(code, sampInfoPtr + 4);
-    const sampleSize = lenWords * 2;
+    // The sample struct sits behind the sample info (replayer: sample_ptr =
+    // RD32(samp_info + 10); length in bytes at sample_ptr + 12, data at + 8).
+    // Reading the length from the sample info itself gave 0 for every
+    // instrument, so every one was skipped and the song showed a single
+    // whole-song placeholder.
+    const sampleStructPtr = isWavetable ? 0 : rd32(code, sampInfoPtr + 10);
+    const sampleSize = sampleStructPtr !== 0 && sampleStructPtr + 14 <= code.length ? rd16(code, sampleStructPtr + 12) : 0;
 
     // Read detail pointer (instrPtr + 12)
     const detailPtr = rd32(code, instrPtr + 12);

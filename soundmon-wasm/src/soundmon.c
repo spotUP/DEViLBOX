@@ -155,6 +155,9 @@ typedef struct SmBpCurrent {
     int8_t   vibrato;
 } SmBpCurrent;
 
+#define SM_VOICES 4
+#define SM_PREVIEW_VOICE 4
+
 typedef struct SmGlobalPlayingInfo {
     uint16_t bp_step;
     uint8_t  vib_index;
@@ -170,7 +173,7 @@ typedef struct SmGlobalPlayingInfo {
     bool     first_repeat;
     int8_t*  wave_tables;
     int      wave_tables_size;
-    int8_t   synth_buffer[4][32];
+    int8_t   synth_buffer[SM_VOICES + 1][32];  // + the keyboard preview voice
 } SmGlobalPlayingInfo;
 
 // Mixer channel state (maps IChannel calls)
@@ -207,12 +210,16 @@ struct SmModule {
 
     // Playing state
     SmGlobalPlayingInfo playing_info;
-    SmBpCurrent bp_current[4];
+    SmBpCurrent bp_current[SM_VOICES + 1];   // [SM_PREVIEW_VOICE] = keyboard preview
     bool end_reached;
     bool amiga_filter;
 
     // Mixer
-    SmChannel channels[4];
+    SmChannel channels[SM_VOICES + 1];
+    // Keyboard preview: its own counters, same 50 Hz clock as the song
+    float preview_tick_accumulator;
+    uint8_t preview_arp_count;
+    uint8_t preview_vib_index;
     float sample_rate;
 
     // Original file data for export
@@ -560,13 +567,16 @@ static void initialize_sound(SmModule* m, int start_position) {
     m->has_ended = false;
 
     // Initialize BpCurrent for each channel
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < SM_VOICES + 1; i++) {
         memset(&m->bp_current[i], 0, sizeof(SmBpCurrent));
         m->bp_current[i].synth_offset = -1;
     }
+    m->preview_arp_count = 1;
+    m->preview_vib_index = 0;
+    m->preview_tick_accumulator = 0.0f;
 
     // Initialize synth buffers
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < SM_VOICES + 1; i++)
         memset(pi->synth_buffer[i], 0, 32);
 
     // Make a copy of wave tables
@@ -578,7 +588,7 @@ static void initialize_sound(SmModule* m, int start_position) {
         memcpy(pi->wave_tables, m->wave_tables, wave_table_size);
 
     // Reset mixer channels
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < SM_VOICES + 1; i++) {
         memset(&m->channels[i], 0, sizeof(SmChannel));
         m->channels[i].sample_number = -1;
     }
@@ -606,6 +616,8 @@ static void play_it(SmModule* m, int voice);
 static void do_optionals(SmModule* m, int voice, uint8_t optional, uint8_t optional_data);
 static void do_effects(SmModule* m);
 static void do_synths(SmModule* m);
+static void do_effects_voice(SmModule* m, int voice, uint8_t arp_count, uint8_t vib_index);
+static void do_synth_voice(SmModule* m, int voice);
 static void do_adsr(SmModule* m, int voice, SmBpCurrent* cur, SmSynthInstrument* si);
 static void do_lfo(SmModule* m, int voice, SmBpCurrent* cur, SmSynthInstrument* si);
 static void do_eg(SmModule* m, int voice, SmBpCurrent* cur, SmSynthInstrument* si);
@@ -1001,6 +1013,40 @@ static void do_optionals(SmModule* m, int voice, uint8_t optional, uint8_t optio
 // DoEffects — real-time effects
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// One voice's real-time effects for this tick (auto slide, vibrato, arpeggio),
+// given the global arpeggio counter and vibrato table index. The song steps
+// every voice with its counters; the keyboard preview voice with its own.
+static void do_effects_voice(SmModule* m, int i, uint8_t arp_count, uint8_t vib_index) {
+    SmBpCurrent* cur = &m->bp_current[i];
+    SmChannel* ch = &m->channels[i];
+
+    // Auto slide
+    cur->period = (uint16_t)(cur->period + cur->auto_slide);
+
+    // Vibrato
+    if (cur->vibrato != 0)
+        channel_set_amiga_period(ch, (uint16_t)(cur->period + sm_vibrato_table[vib_index] / cur->vibrato));
+    else
+        channel_set_amiga_period(ch, cur->period);
+
+    // Arpeggio
+    if ((cur->arp_value != 0) || (cur->auto_arp != 0)) {
+        int note = (int8_t)cur->note;
+
+        if (arp_count == 0)
+            note += ((cur->arp_value & 0xf0) >> 4) + ((cur->auto_arp & 0xf0) >> 4);
+        else {
+            if (arp_count == 1)
+                note += (cur->arp_value & 0x0f) + (cur->auto_arp & 0x0f);
+        }
+
+        // Find the period
+        cur->restart = false;
+        cur->period = sm_lookup_period(note);
+        channel_set_amiga_period(ch, cur->period);
+    }
+}
+
 static void do_effects(SmModule* m) {
     SmGlobalPlayingInfo* pi = &m->playing_info;
 
@@ -1010,64 +1056,39 @@ static void do_effects(SmModule* m) {
     // Adjust the vibrato table index
     pi->vib_index = (uint8_t)((pi->vib_index + 1) & 7);
 
-    for (int i = 0; i < 4; i++) {
-        SmBpCurrent* cur = &m->bp_current[i];
-        SmChannel* ch = &m->channels[i];
-
-        // Auto slide
-        cur->period = (uint16_t)(cur->period + cur->auto_slide);
-
-        // Vibrato
-        if (cur->vibrato != 0)
-            channel_set_amiga_period(ch, (uint16_t)(cur->period + sm_vibrato_table[pi->vib_index] / cur->vibrato));
-        else
-            channel_set_amiga_period(ch, cur->period);
-
-        // Arpeggio
-        if ((cur->arp_value != 0) || (cur->auto_arp != 0)) {
-            int note = (int8_t)cur->note;
-
-            if (pi->arp_count == 0)
-                note += ((cur->arp_value & 0xf0) >> 4) + ((cur->auto_arp & 0xf0) >> 4);
-            else {
-                if (pi->arp_count == 1)
-                    note += (cur->arp_value & 0x0f) + (cur->auto_arp & 0x0f);
-            }
-
-            // Find the period
-            cur->restart = false;
-            cur->period = sm_lookup_period(note);
-            channel_set_amiga_period(ch, cur->period);
-        }
-    }
+    for (int i = 0; i < SM_VOICES; i++)
+        do_effects_voice(m, i, pi->arp_count, pi->vib_index);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DoSynths — synth effect processing
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void do_synths(SmModule* m) {
-    for (int i = 0; i < 4; i++) {
-        SmBpCurrent* cur = &m->bp_current[i];
+static void do_synth_voice(SmModule* m, int i) {
+    SmBpCurrent* cur = &m->bp_current[i];
 
-        // Does the current voice play a synth sample?
-        if (cur->synth_mode) {
-            // Get the instrument
-            if (cur->instrument != 0 && m->instruments[cur->instrument - 1].is_synth) {
-                SmSynthInstrument* si = &m->instruments[cur->instrument - 1].synth;
+    // Does the current voice play a synth sample?
+    if (cur->synth_mode) {
+        // Get the instrument
+        if (cur->instrument != 0 && m->instruments[cur->instrument - 1].is_synth) {
+            SmSynthInstrument* si = &m->instruments[cur->instrument - 1].synth;
 
-                do_adsr(m, i, cur, si);
-                do_lfo(m, i, cur, si);
+            do_adsr(m, i, cur, si);
+            do_lfo(m, i, cur, si);
 
-                // Do we have a synth buffer?
-                if (cur->synth_offset >= 0) {
-                    do_eg(m, i, cur, si);
-                    do_fx(m, i, cur, si);
-                    do_mod(m, cur, si);
-                }
+            // Do we have a synth buffer?
+            if (cur->synth_offset >= 0) {
+                do_eg(m, i, cur, si);
+                do_fx(m, i, cur, si);
+                do_mod(m, cur, si);
             }
         }
     }
+}
+
+static void do_synths(SmModule* m) {
+    for (int i = 0; i < SM_VOICES; i++)
+        do_synth_voice(m, i);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1566,6 +1587,113 @@ SmModule* sm_create(const uint8_t* data, size_t size, float sample_rate) {
     mark_position_visited(0);
 
     return m;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Keyboard preview: the replayer's own voice
+//
+// A typed key starts a note on a fifth voice of the loaded module the way
+// bp_next + bp_play start one on a song voice: note -> period through
+// sm_lookup_period, the instrument through play_it (envelope, LFO, EG, FX
+// tables), then each 50 Hz tick runs the same do_effects_voice and
+// do_synth_voice and the channel is mixed with the song's own scale. Nothing
+// here models the instrument: the preview is the replayer.
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void preview_restore_wave(SmModule* m) {
+    SmBpCurrent* cur = &m->bp_current[SM_PREVIEW_VOICE];
+    // Effects rewrite the voice's wave in place; the player copies it back on
+    // the voice's next restart. The preview does it when it ends.
+    if (cur->synth_offset >= 0 && m->playing_info.wave_tables) {
+        memcpy(m->playing_info.wave_tables + cur->synth_offset,
+               m->playing_info.synth_buffer[SM_PREVIEW_VOICE], 32);
+        cur->synth_offset = -1;
+    }
+}
+
+// `inst` is the 1-based instrument number, `note` the note value a pattern
+// row holds (period index note + 35, see sm_lookup_period). volume < 0 keeps
+// the instrument's own volume as a row without a set-volume does.
+void sm_preview_note_on(SmModule* m, int inst, int note, int volume) {
+    if (!m || inst < 1 || inst > 15) return;
+    preview_restore_wave(m);
+    SmBpCurrent* cur = &m->bp_current[SM_PREVIEW_VOICE];
+    memset(cur, 0, sizeof(*cur));
+    cur->synth_offset = -1;
+    cur->note = (uint8_t)note;
+    cur->period = sm_lookup_period(note);
+    cur->instrument = (uint8_t)inst;
+    cur->use_default_volume = (volume < 0);
+    if (volume >= 0) cur->volume = (uint8_t)(volume > 64 ? 64 : volume);
+    m->preview_arp_count = 1;
+    m->preview_vib_index = 0;
+    m->preview_tick_accumulator = 0.0f;
+    memset(&m->channels[SM_PREVIEW_VOICE], 0, sizeof(SmChannel));
+    m->channels[SM_PREVIEW_VOICE].sample_number = -1;
+    play_it(m, SM_PREVIEW_VOICE);
+}
+
+// The player has no note-off: a voice sounds until the next note replaces it.
+// A released key ends the voice, as a row that mutes the channel would.
+void sm_preview_note_off(SmModule* m) {
+    if (!m) return;
+    channel_mute(&m->channels[SM_PREVIEW_VOICE]);
+    preview_restore_wave(m);
+}
+
+int sm_preview_active(const SmModule* m) {
+    return m && m->channels[SM_PREVIEW_VOICE].active;
+}
+
+size_t sm_render_preview(SmModule* m, float* out_l, float* out_r, size_t frames) {
+    if (!m || !out_l || !out_r) return 0;
+    SmChannel* c = &m->channels[SM_PREVIEW_VOICE];
+    for (size_t f = 0; f < frames; f++) {
+        if (c->active) {
+            m->preview_tick_accumulator += 1.0f;
+            if (m->preview_tick_accumulator >= m->ticks_per_frame) {
+                m->preview_tick_accumulator -= m->ticks_per_frame;
+                m->preview_arp_count = (uint8_t)((m->preview_arp_count - 1) & 3);
+                m->preview_vib_index = (uint8_t)((m->preview_vib_index + 1) & 7);
+                do_effects_voice(m, SM_PREVIEW_VOICE, m->preview_arp_count, m->preview_vib_index);
+                do_synth_voice(m, SM_PREVIEW_VOICE);
+            }
+        }
+        float sample = 0.0f;
+        if (c->active && !c->muted && c->period != 0 && c->sample_data != nullptr) {
+            double step = AMIGA_CLOCK / ((double)c->period * (double)m->sample_rate);
+            uint32_t pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+            if (pos < c->sample_length)
+                sample = (float)c->sample_data[pos] / 128.0f;
+            sample *= (float)c->volume / 256.0f;
+            sample *= 0.5f;  // the song's per-voice scale (sm_render, sm_render_multi)
+
+            c->position_fp += (uint64_t)(step * (double)(1 << SAMPLE_FRAC_BITS));
+            uint32_t new_pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+            if (new_pos >= c->sample_length) {
+                if (c->loop_length > 0) {
+                    while (new_pos >= c->sample_length) {
+                        uint32_t overshoot = new_pos - c->sample_length;
+                        new_pos = c->loop_start + overshoot;
+                        c->sample_offset = c->loop_start;
+                        c->sample_length = c->loop_start + c->loop_length;
+                        if (new_pos >= c->sample_length && c->loop_length > 0) {
+                            uint32_t loop_offset = (new_pos - c->loop_start) % c->loop_length;
+                            new_pos = c->loop_start + loop_offset;
+                            break;
+                        }
+                    }
+                    c->position_fp = (uint64_t)new_pos << SAMPLE_FRAC_BITS;
+                } else {
+                    c->active = false;
+                }
+            }
+        }
+        out_l[f] = sample;
+        out_r[f] = sample;
+    }
+    return frames;
 }
 
 void sm_destroy(SmModule* module) {

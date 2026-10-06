@@ -1430,6 +1430,9 @@ int fp_get_sample_rate(void) {
 
 static int preview_active = 0;
 
+/* Full volume of the fade level (lbC0034E8 level 0xFF), as the song runs. */
+static uint8_t fade_full_level(void) { return 0xFF; }
+
 void fp_note_on(uint32_t instr_ptr, int note, int velocity) {
     if (!mod_base || mod_size == 0) return;
     if (instr_ptr == 0 || instr_ptr >= mod_size) return;
@@ -1458,10 +1461,12 @@ void fp_note_on(uint32_t instr_ptr, int note, int velocity) {
     SET_B(v, VS_END_FLAG, 0);
     SET_B(v, VS_ROW_TIMER, 0xFF);  /* long duration */
 
-    /* Set volume (velocity 0-127 → master vol 0-255) */
-    int vol = velocity * 2;
-    if (vol > 255) vol = 255;
-    SET_W(v, VS_MASTER_VOL, (uint16_t)vol);
+    /* The player has no velocity: a voice's master volume word is the fade
+     * level (set_fade_level writes it to byte 0x81 of every voice), 0xFF at
+     * full volume. Scaling it by key velocity made the preview quieter than the
+     * same instrument in the song. */
+    (void)velocity;
+    SET_W(v, VS_MASTER_VOL, (uint16_t)fade_full_level());
 
     /* Init envelope */
     SET_B(v, VS_ENV_PHASE, 0);
@@ -1489,18 +1494,22 @@ void fp_note_on(uint32_t instr_ptr, int note, int velocity) {
 void fp_note_off(void) {
     if (!preview_active) return;
     uint8_t* v = voice_data[0];
-    /* Clear note trigger → envelope enters release phase */
+    /* As the player does when a row's time is up: clear the note trigger and
+     * the envelope runs its release rate (update_audio) until it reaches zero;
+     * fp_preview_tick then ends the preview. */
     SET_B(v, VS_NOTE_TRIG, 0);
-    /* Disable DMA */
-    hw_write_dmacon(V_W(v, VS_DMA_OFF));
-    paula_set_volume(0, 0);
-    SET_B(v, VS_STATE, 0x80);
-    preview_active = 0;
 }
 
 void fp_preview_tick(void) {
     if (!preview_active) return;
-    update_audio(voice_data[0]);
+    uint8_t* v = voice_data[0];
+    update_audio(v);
+    if (V_B(v, VS_NOTE_TRIG) == 0 && V_B(v, VS_ENV_LEVEL) == 0) {
+        hw_write_dmacon(V_W(v, VS_DMA_OFF));
+        paula_set_volume(0, 0);
+        SET_B(v, VS_STATE, 0x80);
+        preview_active = 0;
+    }
 }
 
 int fp_is_preview_active(void) {
@@ -1523,9 +1532,11 @@ int fp_get_instrument_info(uint32_t instr_ptr, int* is_wavetable) {
     int wt = (RD8(samp_info + 8) != 0) ? 1 : 0;
     if (is_wavetable) *is_wavetable = wt;
     if (wt) return 0;
-    /* PCM: sample data ptr at +10, length at +4 (words) */
-    uint16_t len_words = RD16(samp_info + 4);
-    return (int)len_words * 2;
+    /* Sample: struct at samp_info + 10, data pointer at +8, length in bytes at
+     * +12 (the voice update reads sample_ptr + 12 the same way). */
+    uint32_t sample_ptr = RD32(samp_info + 10);
+    if (sample_ptr == 0 || sample_ptr + 14 > mod_size) return 0;
+    return (int)RD16(sample_ptr + 12);
 }
 
 /* ======================================================================

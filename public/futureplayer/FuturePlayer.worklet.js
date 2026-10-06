@@ -287,8 +287,9 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
 
   handleNoteOff() {
     if (!this.wasm || !this.initialized) return;
+    // The voice runs its release envelope (as the player does at a note's
+    // end); previewActive stays set until the core reports it has finished.
     this.wasm._fp_wasm_note_off();
-    this.previewActive = false;
   }
 
   handleGetInstrumentInfo(instrPtr, requestId) {
@@ -310,6 +311,9 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
 
     const frames = Math.min(this.decodeBufSize, space);
     this.wasm._fp_wasm_render_preview(this.decodeBufPtr, frames);
+    if (typeof this.wasm._fp_wasm_preview_active === 'function' && !this.wasm._fp_wasm_preview_active()) {
+      this.previewActive = false;
+    }
 
     const floatOffset = this.decodeBufPtr >> 2;
     const heap = this.wasm.HEAPF32;

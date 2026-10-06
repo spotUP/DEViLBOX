@@ -703,6 +703,7 @@ export class InstrumentFactory {
 
       case 'SoundMonSynth': {
         const smSynth = new SoundMonSynth();
+        smSynth.setSlot(config.id);
         if (config.soundMon) {
           smSynth.setInstrument(config.soundMon).catch(err =>
             console.error('[InstrumentFactory] SoundMon load failed:', err)
