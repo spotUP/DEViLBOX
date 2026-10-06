@@ -16,10 +16,16 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ROOT, stereoOutputs } from './workletHarness';
 import { uadeVoice } from './uadeVoice';
-import { chainedHeapTransform, db, fromOnset, previewRender, previewVoice, renderTicks, risingEdges, rmsPerTick, totalRms, FPT, SR } from './keyboardPreviewHarness';
+import { chainedHeapTransform, db, fromOnset, previewRender, previewVoice, renderTicks, risingEdges, rmsPerTick, totalRms, FPT } from './keyboardPreviewHarness';
 import { parseRobHubbardFile } from '@/lib/import/formats/RobHubbardParser';
 import { serializeRobHubbardConfig } from '@/engine/robhubbard/RobHubbardSynth';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { parseMEDFile } from '@/lib/import/formats/MEDParser';
+import { OctaMEDSynth } from '@/engine/octamed/OctaMEDSynth';
+import { startWorklet } from './workletHarness';
+import { noteToMidi } from '@/utils/audio-context';
+import { buildMedSynthModule, type MedSynthFixture } from './medSynthFixture';
+import type { OctaMEDConfig } from '@/types/instrument';
 
 const PAULA_CLOCK = 3546895;
 const cents = (a: number, b: number) => 1200 * Math.log2(a / b);
@@ -83,4 +89,109 @@ describe('Rob Hubbard keyboard preview is the instrument as UADE plays it (skate
     expect(Math.max(...after[0][0].map(Math.abs))).toBe(0);
   });
 });
-void SR;
+
+describe('OctaMED synth keyboard preview is the instrument as UADE\'s OctaMED player plays it', () => {
+  // The corpus (public/data/songs, 8 MED files) holds no synth or hybrid instrument,
+  // so the oracle module is built around one (medSynthFixture.ts); the preview is
+  // fed what MEDParser makes of that same file.
+  const saw = (n: number) => Int8Array.from({ length: n }, (_, i) => -120 + Math.round((240 * i) / (n - 1)));
+  const flat = (n: number, a: number) => Int8Array.from({ length: n }, (_, i) => (i < n / 2 ? a : -a));
+
+  const config = (fx: MedSynthFixture) => {
+    const song = parseMEDFile(buf(buildMedSynthModule(fx)), 'x.mmd0') as unknown as TrackerSong;
+    return { cfg: (song.instruments[0] as unknown as { octamed: OctaMEDConfig }).octamed, cell: song.patterns[0].channels[0].rows[0] };
+  };
+  const octaPreview = async (cfg: OctaMEDConfig, key: number, ticks: number) => {
+    const { proc, send, posted } = await startWorklet('octamed', 'OctaMED', chainedHeapTransform);
+    await send({ type: 'createPlayer' });
+    const handle = (posted.find((p) => (p as { type?: string }).type === 'playerCreated') as unknown as { handle: number }).handle;
+    await send({ type: 'setInstrument', handle, buffer: OctaMEDSynth.serializeInstrument(cfg) });
+    await send({ type: 'noteOn', handle, note: key, velocity: 100 });
+    return { out: renderTicks(proc, ticks, 0), proc, send, handle };
+  };
+
+  const pitchCases: { wave: number; rawNote: number }[] = [
+    { wave: 64, rawNote: 25 }, { wave: 64, rawNote: 37 }, { wave: 32, rawNote: 26 }, { wave: 128, rawNote: 13 }, { wave: 64, rawNote: 49 },
+  ];
+  for (const c of pitchCases) {
+    it(`pitch: raw note ${c.rawNote} on a ${c.wave}-byte wave plays UADE's Paula period`, { timeout: 60000 }, async () => {
+      const fx: MedSynthFixture = { waveforms: [saw(c.wave)], voltbl: [64, 0xff], wftbl: [0, 0xff], volSpeed: 1, wfSpeed: 1, note: c.rawNote };
+      const uv = await uadeVoice(buildMedSynthModule(fx), 'x.mmd0', 0, 0.3);
+      const { cfg, cell } = config(fx);
+      expect(cell.note, 'grid note of the raw note').toBe(c.rawNote + 24);
+      const { out } = await octaPreview(cfg, cell.note + 11, 50);
+      const previewPeriod = PAULA_CLOCK / (hzOf(out.subarray(FPT), 49) * c.wave);
+      expect(Math.abs(cents(previewPeriod, uv.period[4])), `preview period ${previewPeriod.toFixed(1)} UADE ${uv.period[4]}`).toBeLessThan(30);
+    });
+  }
+
+  type Run = { name: string; fx: Partial<MedSynthFixture> & Pick<MedSynthFixture, 'voltbl' | 'wftbl'>; ticks: number; tol?: number };
+  const runs: Run[] = [
+    { name: 'volume table values at speed 3', ticks: 20, fx: { voltbl: [64, 48, 32, 16, 8, 0, 0xff], wftbl: [0, 0xff], volSpeed: 3 } },
+    { name: 'volume F2 slide down / F3 slide up', ticks: 12, fx: { voltbl: [64, 0xf2, 8, 0xff], wftbl: [0, 0xff], volSpeed: 1 } },
+    { name: 'volume F3 slide up', ticks: 10, fx: { voltbl: [10, 0xf3, 8, 0xff], wftbl: [0, 0xff], volSpeed: 1 } },
+    { name: 'volume FE jump', ticks: 10, fx: { voltbl: [64, 32, 0xfe, 0], wftbl: [0, 0xff], volSpeed: 1 } },
+    { name: 'volume F1 wait', ticks: 8, fx: { voltbl: [64, 0xf1, 3, 32, 0xff], wftbl: [0, 0xff], volSpeed: 1 } },
+    { name: 'volume F0 speed applies one step late', ticks: 10, fx: { voltbl: [64, 0xf0, 3, 32, 16, 8, 0xff], wftbl: [0, 0xff], volSpeed: 1 } },
+    { name: 'instrument volume scales the table (32)', ticks: 6, fx: { voltbl: [64, 48, 32, 0xff], wftbl: [0, 0xff], volSpeed: 2, volume: 32 } },
+    { name: 'waveform table steps at speed 2', ticks: 12, fx: { voltbl: [64, 0xff], wftbl: [0, 1, 2, 0, 0xff], volSpeed: 1, wfSpeed: 2 } },
+    { name: 'waveform FE jump (a new wave every tick: the song switches mid-tick at loop ends)', ticks: 10, tol: 4, fx: { voltbl: [64, 0xff], wftbl: [0, 1, 0xfe, 0], volSpeed: 1, wfSpeed: 1 } },
+    { name: 'waveform F1 wait', ticks: 8, fx: { voltbl: [64, 0xff], wftbl: [0, 0xf1, 3, 1, 0xff], volSpeed: 1, wfSpeed: 1 } },
+  ];
+  for (const r of runs) {
+    it(`level and envelope: ${r.name}`, { timeout: 60000 }, async () => {
+      // Three waveforms of different loudness, so the RMS tells which one plays.
+      const fx: MedSynthFixture = { waveforms: [flat(64, 30), flat(64, 100), flat(64, 60)], volSpeed: 1, wfSpeed: 1, note: 25, ...r.fx };
+      const uv = await uadeVoice(buildMedSynthModule(fx), 'x.mmd0', 0, (r.ticks + 3) / 50);
+      const { cfg, cell } = config(fx);
+      const { out } = await octaPreview(cfg, cell.note + 11, r.ticks + 2);
+      const s = rmsPerTick(uv.pcm, r.ticks + 2), p = rmsPerTick(out, r.ticks + 2);
+      for (let t = 2; t <= r.ticks; t++) {
+        if (s[t] < 0.004) { expect(p[t], `tick ${t} silent in the song`).toBeLessThan(0.006); continue; }
+        // The step a tick early or late is the player's own jitter (UADE's tick drifts by one around tick 15).
+        const best = Math.min(...[t - 1, t, t + 1].map((k) => Math.abs(db(p[k] || 1e-6, s[t]))));
+        expect(best, `tick ${t}: song ${s[t].toFixed(3)} preview ${p[t].toFixed(3)} (song ${Array.from(s).map((x) => x.toFixed(2)).join(' ')} | preview ${Array.from(p).map((x) => x.toFixed(2)).join(' ')})`).toBeLessThan(r.tol ?? 3);
+      }
+    });
+  }
+
+  it('wave table F2 slides the period up by n per tick and FC..FD arpeggio steps one semitone entry per tick', { timeout: 60000 }, async () => {
+    const fx: MedSynthFixture = { waveforms: [saw(64)], voltbl: [64, 0xff], wftbl: [0, 0xfc, 0, 12, 7, 0xfd, 0xff], volSpeed: 1, wfSpeed: 1, note: 25 };
+    const uv = await uadeVoice(buildMedSynthModule(fx), 'x.mmd0', 0, 0.2);
+    const { cfg, cell } = config(fx);
+    const { out } = await octaPreview(cfg, cell.note + 11, 8);
+    // Rising edges per tick of a 64-byte saw: 3546895 / (period * 64) / 50 per tick.
+    for (let t = 2; t < 8; t++) {
+      const edges = risingEdges(out.subarray(t * FPT, (t + 1) * FPT));
+      const expected = PAULA_CLOCK / (uv.period[t] * 64) / 50;
+      expect(Math.abs(edges - expected), `tick ${t}: ${edges} edges, UADE period ${uv.period[t]} wants ${expected.toFixed(1)}`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('key release cuts the voice (MED has no release phase: the next note or stop does it)', { timeout: 60000 }, async () => {
+    const { cfg, cell } = config({ waveforms: [flat(64, 100)], voltbl: [64, 0xff], wftbl: [0, 0xff], volSpeed: 1, wfSpeed: 1, note: 25 });
+    const { proc, send, handle } = await octaPreview(cfg, cell.note + 11, 5);
+    await send({ type: 'noteOff', handle });
+    const after = stereoOutputs(1, 128);
+    proc.process([], after);
+    expect(Math.max(...after[0][0].map(Math.abs))).toBe(0);
+  });
+});
+
+describe('OctaMED sampler instruments: a typed key plays the Paula period UADE plays for that grid note', () => {
+  for (const [name, ch] of [['formats/funky nightmare.mmd1', 1], ['formats/universal monsters - dracula.mmd0', 1]] as const) {
+    it(`${name}: voice ${ch}, first note`, { timeout: 60000 }, async () => {
+      const file = songFile(name);
+      const song = parseMEDFile(buf(file), name) as unknown as TrackerSong;
+      const cell = song.patterns[song.songPositions[0]].channels[ch].rows.find((r) => r.note > 0 && r.note < 97)!;
+      const inst = song.instruments[cell.instrument - 1];
+      expect(inst.synthType).toBe('Sampler');
+      const uv = await uadeVoice(file, name.split('/').pop()!, ch, 0.2);
+      const songRate = PAULA_CLOCK / uv.period[3];
+      // ToneEngine's keyboard path: playbackRate = f(key) / f(baseNote), on a buffer of the sample's own rate.
+      const key = cell.note + 11;
+      const previewRate = inst.sample!.sampleRate! * 2 ** ((key - noteToMidi(inst.sample!.baseNote)) / 12);
+      expect(Math.abs(cents(previewRate, songRate)), `preview ${previewRate.toFixed(0)} Hz, UADE ${songRate.toFixed(0)} Hz`).toBeLessThan(30);
+    });
+  }
+});
