@@ -205,6 +205,38 @@ const FC13_WAVES = [
   -128, -96, -80, -64, -48, -32, -16,   0,  16,  32,  48,  64,  80,  96, 112, 127,
 ];
 
+
+/**
+ * The frequency macros and wave slots a volume macro's voice can reach: the
+ * macro it names, every macro an 0xE7 jump leads to, and every wave an
+ * 0xE2/0xE4 command selects (slots 0-9 samples, 10-89 wave tables). Opcode
+ * lengths are the replayer's (futurecomposer.c fc_effect).
+ */
+export function fcMacroReach(entry: number, macroAt: (index: number) => Uint8Array | null): { macros: Map<number, Uint8Array>; waves: Set<number> } {
+  const macros = new Map<number, Uint8Array>();
+  const waves = new Set<number>();
+  const todo = [entry];
+  while (todo.length) {
+    const idx = todo.pop()!;
+    if (macros.has(idx)) continue;
+    const m = macroAt(idx);
+    if (!m) continue;
+    macros.set(idx, m);
+    for (let i = 0; i < 64;) {
+      const b = m[i];
+      if (b === 0xe1) break;
+      if (b === 0xe0) break;
+      if (b === 0xe2 || b === 0xe4) { waves.add(m[i + 1]); i += 2; continue; }
+      if (b === 0xe7) { todo.push(m[i + 1]); i += 2; continue; }
+      if (b === 0xe9) { i += 3; continue; }
+      if (b === 0xe3 || b === 0xea) { i += 3; continue; }
+      if (b === 0xe8) { i += 2; continue; }
+      i++;
+    }
+  }
+  return { macros, waves };
+}
+
 /**
  * Extract a single FC13 built-in waveform as an unsigned Uint8Array.
  * @param waveIndex 0-46 — index into FC13_WAVES length table
@@ -880,8 +912,32 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
       volMacroData.push(vm[i]);
     }
 
+    // The macros and waves the replayer's voice reads, so the keyboard preview runs the same bytes.
+    const reach = fcMacroReach(freqMacroIdx, (i) => (i < freqMacros.length ? freqMacros[i] : null));
+    const freqMacroBank: Record<number, number[]> = {};
+    reach.macros.forEach((m, i) => { freqMacroBank[i] = Array.from(m); });
+    const waveBank: NonNullable<FCConfig['waveBank']> = {};
+    reach.waves.forEach((w) => {
+      if (w < 10) {
+        const def = sampleDefs[w];
+        const pcm = samplePCMs[w];
+        if (!pcm || pcm.length === 0) return;
+        let loopStart = def.loopStart, loopLength = def.loopLen * 2;
+        if (loopStart >= pcm.length) { loopStart = 0; loopLength = 2; }
+        waveBank[w] = { data: Array.from(pcm, (v) => (v < 128 ? v : v - 256)), loopStart, loopLength };
+      } else if (w < 90) {
+        let raw: Uint8Array | undefined = isFC14 ? waveTablePCMs[w - 10] : undefined;
+        if (!raw || raw.length === 0) raw = extractFC13Wave(w - 10);
+        if (raw.length === 0) return;
+        waveBank[w] = { data: Array.from(raw, (v) => (v < 128 ? v : v - 256)), loopStart: 0, loopLength: raw.length };
+      }
+    });
+
     return {
       waveNumber: initialWaveNum,
+      freqMacroIndex: freqMacroIdx,
+      freqMacros: freqMacroBank,
+      waveBank,
       wavePCM: wavePCM.length > 0 ? wavePCM : undefined,
       volMacroData,
       volMacroSpeed: volSpeed,

@@ -254,7 +254,8 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
   const synthMacroCellChange = useMemo(
     () => {
       const baseCellChange = makeSynthMacroCellChange(config, (updates) => {
-        onChange(updates);
+        // An edited synth table is encoded afresh; the imported frequency macros no longer describe it.
+        onChange(updates.synthTable ? { ...updates, freqMacros: undefined } : updates);
         if (updates.synthTable) {
           writeFreqMacroToChipRam({ ...configRef.current, ...updates });
         }
@@ -299,7 +300,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
   const arpeggioCellChange = useMemo(
     () => {
       const baseCellChange = makeArpeggioCellChange(config, (updates) => {
-        onChange(updates);
+        onChange(updates.arpTable ? { ...updates, freqMacros: undefined } : updates);
         if (updates.arpTable) {
           writeFreqMacroToChipRam({ ...configRef.current, ...updates });
         }
