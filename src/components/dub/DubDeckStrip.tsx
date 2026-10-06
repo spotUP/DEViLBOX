@@ -1458,11 +1458,20 @@ export const DubDeckStrip: React.FC = () => {
                 const userRole = ch?.dubRole ?? null;
                 const autoRole = autoRoles[i] ?? null;
                 return (
-                  <select
+                  <CustomSelect
                     value={userRole ?? ''}
-                    onChange={(e) => setChannelDubRole(i, e.target.value || null)}
+                    onChange={(v) => setChannelDubRole(i, v || null)}
+                    options={[
+                      { value: '', label: autoRole ?? '—' },
+                      { value: 'percussion', label: 'Drums' },
+                      { value: 'bass', label: 'Bass' },
+                      { value: 'lead', label: 'Lead' },
+                      { value: 'skank', label: 'Skank' },
+                      { value: 'pad', label: 'Pad' },
+                      { value: 'empty', label: 'Exclude' },
+                    ]}
                     className={
-                      'flex-1 min-w-0 text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
+                      'flex-1 min-w-0 text-[8px] font-mono rounded border ' +
                       (userRole === 'empty'
                         ? 'bg-accent-error/20 border-accent-error text-accent-error'
                         : userRole
@@ -1475,15 +1484,7 @@ export const DubDeckStrip: React.FC = () => {
                         : `Ch ${i + 1} role — classifier says "${autoRole ?? '?'}". Override locks AutoDub targeting.`
                     }
                     disabled={!busEnabled}
-                  >
-                    <option value="">{autoRole ?? '—'}</option>
-                    <option value="percussion">Drums</option>
-                    <option value="bass">Bass</option>
-                    <option value="lead">Lead</option>
-                    <option value="skank">Skank</option>
-                    <option value="pad">Pad</option>
-                    <option value="empty">Exclude</option>
-                  </select>
+                  />
                 );
               })()}
               {/* Per-channel sound-shaping slot on the send */}
