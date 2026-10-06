@@ -240,3 +240,36 @@ describe('SidMon 2 sampler instruments play a typed key at the replayer rate of 
     });
   });
 });
+
+describe('SidMon 2 replayer preview voice (sd2_note_on) is the song voice', () => {
+  const buf = songBuffer('public/data/songs/formats/bruno_time.sid2');
+  async function previewWorklet() {
+    const w = await startWorklet('sidmon2', 'Sd2', exposeHeapTransform);
+    await w.send({ type: 'loadModule', moduleData: buf.slice(0) });
+    return w;
+  }
+
+  it('bruno_time.sid2: the first note of voice 0 typed as its grid note has the song pitch, level and envelope', async () => {
+    const song = await parseSidMon2File(buf.slice(0), 'bruno_time.sid2');
+    const cell = song.patterns[song.songPositions[0]].channels[0].rows[0];
+    expect(cell.note).toBeGreaterThan(0);
+    const speed = song.initialSpeed;
+    const ticks = 4 * speed - 1; // the voice's next note is 4 rows on
+    const sw = await previewWorklet();
+    for (let c = 1; c < 4; c++) await sw.send({ type: 'setChannelGain', channel: c, gain: 0 });
+    const s = fromOnset(renderTicks(sw.proc, ticks + 20, 0), 0, ticks);
+    const pw = await previewWorklet();
+    await pw.send({ type: 'noteOn', instrument: cell.instrument - 1, note: cell.note - 12, velocity: 100 });
+    compare('SM2 voice 0', s, renderTicks(pw.proc, ticks, 0), ticks, { pitchCents: 40, level: 0.8, tick: 1 });
+  });
+
+  it('bruno_time.sid2: the keyboard note is cut on key release and the song voice is not retriggered meanwhile', async () => {
+    const pw = await previewWorklet();
+    await pw.send({ type: 'noteOn', instrument: 0, note: 38, velocity: 100 });
+    // The sequencer stands still while a key is held: the first tick's envelope is not repeated at the next row.
+    const held = rmsPerTick(renderTicks(pw.proc, 14, 0), 14);
+    expect(Math.abs(db(held[5], held[0])), 'the note is not restarted at the next row').toBeGreaterThan(0.5);
+    await pw.send({ type: 'noteOff' });
+    expect(Math.max(...renderTicks(pw.proc, 1, 0).map(Math.abs))).toBe(0);
+  });
+});
