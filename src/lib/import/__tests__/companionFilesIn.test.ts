@@ -51,30 +51,39 @@ describe('isInSampleDirectory', () => {
 });
 
 
-describe('partnerlessFilesIn (real corpus listing of songs/formats)', () => {
-  const dir = join(process.cwd(), 'public/data/songs/formats');
-  const listing = { siblings: readdirSync(dir) };
-
-  it('does not offer bob4e.dum: its .ins is not in the corpus, UADE cannot open /uade/bob4e.ins', () => {
-    expect(listing.siblings).not.toContain('bob4e.ins');
-    expect(partnerlessFilesIn(listing).has('bob4e.dum')).toBe(true);
+describe('partnerlessFilesIn', () => {
+  it('does not offer an Infogrames .dum with no .ins (UADE cannot open /uade/<tune>.ins)', () => {
+    expect(partnerlessFilesIn({ siblings: ['bob4e.dum'] }).has('bob4e.dum')).toBe(true);
   });
 
-  it('does not offer jpn.virocop-14: its smp.virocop-14 is not in the corpus', () => {
-    expect(partnerlessFilesIn(listing).has('jpn.virocop-14')).toBe(true);
+  it('does not offer a Jason Page jpn.* without its smp.*', () => {
+    expect(partnerlessFilesIn({ siblings: ['jpn.virocop-14', 'smp.virocop-13'] }).has('jpn.virocop-14')).toBe(true);
   });
 
-  it('does not offer shortsong1.mod.nt as a song: it is StarTrekker synth data, its .mod is absent', () => {
-    expect(partnerlessFilesIn(listing).has('shortsong1.mod.nt')).toBe(true);
+  it('does not offer a StarTrekker .nt as a song when its .mod is absent', () => {
+    expect(partnerlessFilesIn({ siblings: ['shortsong1.mod.nt'] }).has('shortsong1.mod.nt')).toBe(true);
   });
 
-  it('keeps complete pairs and the song index agrees', () => {
-    expect(partnerlessFilesIn({ siblings: ['jpn.a', 'smp.a', 'x.dum', 'x.ins', 'amsyntdemo.mod', 'amsyntdemo.mod.nt'] }).size).toBe(0);
+  it('keeps complete pairs, including a .dum on its shared bank', () => {
+    expect(partnerlessFilesIn({ siblings: ['jpn.a', 'smp.a', 'x.dum', 'x.ins', 'amsyntdemo.mod', 'amsyntdemo.mod.nt', 'bob4e.dum', 'bob4.ins'] }).size).toBe(0);
+  });
+
+  it('the song index offers every corpus song whose partner is present', () => {
     const index = JSON.parse(readFileSync(join(process.cwd(), 'public/data/songs/index.json'), 'utf8')) as { entries: { files: string[] }[] };
     const offered = index.entries.flatMap((e) => e.files);
-    for (const f of ['bob4e.dum', 'jpn.virocop-14', 'shortsong1.mod.nt']) {
+    const formats = new Set(readdirSync(join(process.cwd(), 'public/data/songs/formats')));
+    for (const f of partnerlessFilesIn({ siblings: [...formats] })) {
       expect(offered).not.toContain(`/data/songs/formats/${f}`);
     }
     expect(offered).toContain('/data/songs/infogrames/advantage tennis-intro.dum');
+  });
+});
+
+describe('Infogrames shared instrument bank', () => {
+  it('bob4e.dum takes the shared bob4.ins when bob4e.ins does not exist (UADE asks for both)', async () => {
+    const { resolveCompanions, listingFromRelativePaths } = await import('../companionResolver');
+    const res = resolveCompanions('bob4e.dum', listingFromRelativePaths(['bob4e.dum', 'bob4.ins', 'bob4d.ins']));
+    expect(res.companions).toContain('bob4.ins');
+    expect(res.companions).not.toContain('bob4d.ins');
   });
 });
