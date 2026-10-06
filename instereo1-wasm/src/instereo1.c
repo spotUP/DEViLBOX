@@ -1339,6 +1339,26 @@ int is1_get_instrument_count(const Is1Module* module) {
     return module ? (int)module->num_instruments : 0;
 }
 
+/* Live play position, as the pattern grid sees it: the grid has one pattern
+ * per song position of the sub-song (first_position..last_position) and
+ * rows_per_track rows in each. Before the first row has been taken the
+ * player sits on 0 / 0. */
+static int is1_started(const Is1Module* module) {
+    return module->current_song_info &&
+           !(module->song_position == module->current_song_info->first_position &&
+             module->row_position >= module->rows_per_track);
+}
+
+int is1_get_play_pattern(const Is1Module* module) {
+    if (!module || !is1_started(module)) return 0;
+    return (int)module->song_position - 1 - (int)module->current_song_info->first_position;
+}
+
+int is1_get_play_row(const Is1Module* module) {
+    if (!module || !is1_started(module) || module->row_position == 0) return 0;
+    return (int)module->row_position - 1;
+}
+
 int is1_get_num_track_lines(const Is1Module* module) {
     return module ? (int)module->total_track_rows : 0;
 }

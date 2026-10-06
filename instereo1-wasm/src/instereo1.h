@@ -23,6 +23,8 @@ size_t is1_render(Is1Module* module, float* interleaved_stereo, size_t frames);
 size_t is1_render_multi(Is1Module* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames);
 
 bool is1_has_ended(const Is1Module* module);
+int is1_get_play_pattern(const Is1Module* module);
+int is1_get_play_row(const Is1Module* module);
 
 // Edit API
 int is1_get_instrument_count(const Is1Module* module);
