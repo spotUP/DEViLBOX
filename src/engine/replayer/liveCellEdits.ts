@@ -7,6 +7,9 @@
  * for the song (`WASM_ENGINES`, first descriptor whose file data the song
  * carries), so the edit goes where the sound comes from:
  *
+ *   - a track-index engine (SoundMon, Digital Mugician, Sonic Arranger, Delta
+ *     Music, InStereo, Synthesis) takes the replayer's own track index and
+ *     row (trackIndexCellEdits), never the grid's pattern number;
  *   - a registry engine with `gridCellEdits` takes each cell through its
  *     setCell(pattern, row, channel, note, instrument, effTyp, eff, volume);
  *   - an eagleplayer song whose format re-encodes its whole module from
@@ -25,6 +28,7 @@
 import type { TrackerSong } from '../TrackerReplayer';
 import type { TrackerCell, Pattern } from '@/types/tracker';
 import { takeRestoredEdits } from '@/lib/song/gridBaseline';
+import { isTrackIndexEngine, applyTrackIndexEdits } from './trackIndexCellEdits';
 import { WASM_ENGINES, shouldActivate, type NativeEngineDescriptor } from './wasmEngineRegistry';
 
 export interface LiveCellEdit {
@@ -70,6 +74,14 @@ export async function sendCellEditsToEngine(
   if (desc?.key === 'ActivisionProReplayer') {
     const { applyActivisionProModuleEdits } = await import('../activisionpro/activisionProModuleEdits');
     await applyActivisionProModuleEdits(song, edits);
+    return;
+  }
+
+  // Engines with their own track pool: the replayer's index, not the grid's pattern.
+  if (desc && isTrackIndexEngine(desc.key)) {
+    const Engine = desc.staticRef ?? (desc.dynamicResolver ? await desc.dynamicResolver() : null);
+    if (!Engine?.hasInstance()) return;
+    applyTrackIndexEdits(song, desc.key, Engine.getInstance() as never, edits);
     return;
   }
 
