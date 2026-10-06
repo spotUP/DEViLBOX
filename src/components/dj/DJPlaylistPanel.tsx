@@ -853,8 +853,10 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       if (track.fileName.startsWith('modland:')) {
         const modlandPath = track.fileName.slice('modland:'.length);
         try {
-          const { downloadModlandFile } = await import('@/lib/modlandApi');
+          const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
           const buffer = await downloadModlandFile(modlandPath);
+          const found = await downloadUADECompanions(modlandPath, buffer);
+          const companions = found.length > 0 ? found : undefined;
           const filename = modlandPath.split('/').pop() || 'download.mod';
 
           if (isAudioFile(filename)) {
@@ -863,7 +865,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           } else if (isUADEFormat(filename)) {
             // Pass track.fileName as identity so deck store / playlist row
             // match for scrubber + isPlaying badge (see DJUADEPrerender).
-            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName);
+            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName, companions);
             useDJStore.getState().setDeckViewMode('visualizer');
           } else {
             const blob = new File([buffer], filename, { type: 'application/octet-stream' });

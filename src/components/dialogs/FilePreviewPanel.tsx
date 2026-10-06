@@ -11,7 +11,6 @@ import {
   searchModland,
   getModlandFormats,
   downloadModlandFile,
-  downloadTFMXCompanion,
   downloadUADECompanions,
   getModlandStatus,
   type ModlandFile,
@@ -130,16 +129,16 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
       setModlandDownloading((prev) => new Set(prev).add(file.full_path));
       setModlandError(null);
       try {
-        // Download primary file and optional TFMX companion in parallel
-        const [buffer, companion] = await Promise.all([
+        // Download primary file and its resolver-named companions in parallel
+        const [buffer, companions] = await Promise.all([
           downloadModlandFile(file.full_path),
-          downloadTFMXCompanion(file.full_path),
+          downloadUADECompanions(file.full_path),
         ]);
 
-        // Pre-write companion to UADE WASM filesystem before loading
-        if (companion) {
+        // Pre-write companions to UADE WASM filesystem before loading
+        if (companions.length > 0) {
           const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+          for (const c of companions) await UADEEngine.getInstance().addCompanionFile(c.filename, c.buffer);
         }
 
         await onLoadTrackerModule(buffer, file.filename);
@@ -834,12 +833,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
         throw new Error(`Modland download failed: ${(fetchErr as Error).message}`);
       }
 
-      const [uadeCompanions, tfmx] = await Promise.all([
-        downloadUADECompanions(item.key, buffer).catch(() => []),
-        downloadTFMXCompanion(item.key).catch(() => null),
-      ]);
-      const all = [...uadeCompanions];
-      if (tfmx) all.push(tfmx);
+      const all = await downloadUADECompanions(item.key, buffer).catch(() => []);
       if (all.length > 0) {
         companions = new Map(all.map((c) => [c.filename, c.buffer]));
       }

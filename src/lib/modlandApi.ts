@@ -25,6 +25,9 @@
  */
 const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 
+import { gatherCompanions, type CompanionIO } from './import/companionFetch';
+import type { CompanionListing } from './import/companionResolver';
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 export interface ModlandFile {
@@ -132,68 +135,70 @@ export async function downloadModlandFile(fullPath: string): Promise<ArrayBuffer
 }
 
 /**
- * TFMX companion file support.
- *
- * TFMX-Pro songs use two files in the same directory:
- *   mdat.<name>  – module/pattern data (the primary file)
- *   smpl.<name>  – sample data (required companion)
- *
- * Returns null if the file is not a TFMX mdat, or if the companion download fails.
+ * Modland as a companion source: the directory listing is the server's file
+ * index (`/modland/list`), the read is the proxy download. The resolver
+ * (companionResolver.ts) decides which listed files belong with the module, in
+ * both naming forms (`ins.x` and `x.ins`) with the shared-bank fallback, the
+ * same as a local pick, a drop and the jukebox. This module used to carry its
+ * own rule list (TFMX smpl, jpn, mfp, .dum/.sng + `.ins`, `.nt`) that asked
+ * Modland for blind names: bob4e.dum fetched `bob4e.ins` only, never the
+ * `bob4.ins` Modland ships for the set (2026-10-06).
+ */
+const modlandCompanionIO: CompanionIO = {
+  async listing(dir) {
+    const base = dir.replace(/\/+$/, '');
+    const names = async (d: string): Promise<string[]> =>
+      (await listModlandDir(d)).map((f) => f.full_path.split('/').pop() ?? '').filter(Boolean);
+    const siblings = await names(base);
+    if (siblings.length === 0) return null;
+    const listing: CompanionListing = { siblings };
+    // Sample subdirectories a shape can live in; Sonix's Instruments/ is fetched selectively below.
+    const subdirs: Record<string, string[]> = {};
+    const instr = await names(`${base}/instr`);
+    if (instr.length > 0) subdirs.instr = instr;
+    if (siblings.some((n) => /\.sng$/i.test(n))) {
+      const samples = await names(`${base}/Samples`);
+      if (samples.length > 0) subdirs.Samples = samples;
+    }
+    if (Object.keys(subdirs).length > 0) listing.subdirs = subdirs;
+    return listing;
+  },
+  async read(path) {
+    try { return await downloadModlandFile(path); } catch { return null; }
+  },
+};
+
+/** The companions Modland holds beside `mainPath`, keyed by the name the replayer opens. */
+async function modlandCompanions(
+  mainPath: string,
+  mainBuffer?: ArrayBuffer,
+): Promise<Array<{ filename: string; buffer: ArrayBuffer }>> {
+  const lastSlash = mainPath.lastIndexOf('/');
+  const dir = lastSlash >= 0 ? mainPath.slice(0, lastSlash + 1) : '';
+  const basename = lastSlash >= 0 ? mainPath.slice(lastSlash + 1) : mainPath;
+  const found = await gatherCompanions(basename, dir, mainBuffer, modlandCompanionIO);
+  return [...found].map(([filename, buffer]) => ({ filename, buffer }));
+}
+
+/**
+ * TFMX companion: `smpl.<tune>` beside `mdat.<tune>`. Now the resolver's answer
+ * for an mdat module, not a hard-coded name. Null for anything else.
  */
 export async function downloadTFMXCompanion(
   mdatPath: string,
 ): Promise<{ filename: string; buffer: ArrayBuffer } | null> {
-  const lastSlash = mdatPath.lastIndexOf('/');
-  const dir = lastSlash >= 0 ? mdatPath.slice(0, lastSlash + 1) : '';
-  const basename = lastSlash >= 0 ? mdatPath.slice(lastSlash + 1) : mdatPath;
-
+  const basename = mdatPath.slice(mdatPath.lastIndexOf('/') + 1);
   if (!basename.toLowerCase().startsWith('mdat.')) return null;
-
-  const smplBasename = 'smpl.' + basename.slice(5);
-  const smplPath = dir + smplBasename;
-
-  try {
-    const buffer = await downloadModlandFile(smplPath);
-    return { filename: smplBasename, buffer };
-  } catch {
-    // Companion not found or download error — proceed without it
-    return null;
-  }
+  const found = await modlandCompanions(mdatPath);
+  return found.find((c) => /^smpl\./i.test(c.filename)) ?? null;
 }
 
 /**
- * UADE/Amiga companion file support.
- *
- * Many UADE formats use two-file pairs:
- *   - Sonix: .instr/.ss companions for instruments
- *   - Jason Page: jpn.* song + smp.* samples
- *   - MFP: .mfp song + smp.* samples  
- *   - Richard Joseph: .dum/.sng song + .ins samples
- *   - AdLib Tracker: .sng song + .ins instruments
- *   - Startrekker AM: .mod song + .nt synthesis definitions
- *
+ * UADE/Amiga companion files for any multi-file format (jpn/smp, mfp/smp,
+ * dum/ins with its shared bank, sng/ins, StarTrekker .nt, adsc .as, kh songplay,
+ * sci patch.003, smp.set banks, TFMX smpl) - everything the resolver names.
  * Returns array of all found companions (some formats have multiple).
  */
-/**
- * Inspect a MOD buffer's 4-char signature at offset 1080 (0x438) to decide
- * whether this is a Startrekker AM variant that might ship a .nt companion.
- *
- * Every ProTracker-family MOD has a magic here ('M.K.', '4CHN', 'FLT4',
- * 'FLT8', etc.). Only the Startrekker flavours ('FLT4' / 'FLT8' / 'EX04' /
- * 'EX08') are known to carry AM-synthesis data in a side-car .nt file — and
- * even among those, most don't. For everything else, probing `.nt` burns a
- * Modland request per track and paints a red 404 in the browser console
- * (which looks like a real failure to the user). Gate the probe on magic
- * so we only ask when it's plausible.
- */
-function isLikelyStartrekkerAM(buffer: ArrayBuffer): boolean {
-  if (buffer.byteLength < 1084) return false;
-  const bytes = new Uint8Array(buffer, 1080, 4);
-  let magic = '';
-  for (const b of bytes) magic += String.fromCharCode(b);
-  return magic === 'FLT4' || magic === 'FLT8' || magic === 'EX04' || magic === 'EX08';
-}
-
 export async function downloadUADECompanions(
   mainPath: string,
   mainBuffer?: ArrayBuffer,
@@ -202,52 +207,7 @@ export async function downloadUADECompanions(
   const dir = lastSlash >= 0 ? mainPath.slice(0, lastSlash + 1) : '';
   const basename = lastSlash >= 0 ? mainPath.slice(lastSlash + 1) : mainPath;
   const basenameLower = basename.toLowerCase();
-  const companions: Array<{ filename: string; buffer: ArrayBuffer }> = [];
-
-  const tryDownload = async (companionName: string) => {
-    try {
-      const buffer = await downloadModlandFile(dir + companionName);
-      companions.push({ filename: companionName, buffer });
-    } catch {
-      // Companion not found - non-fatal
-    }
-  };
-
-  // Jason Page: jpn.* → smp.*
-  if (basenameLower.startsWith('jpn.') || basenameLower.startsWith('jpnd.') ||
-      basenameLower.startsWith('jp.') || basenameLower.startsWith('jpo.') ||
-      basenameLower.startsWith('jpold.')) {
-    const suffix = basename.slice(basename.indexOf('.') + 1);
-    await tryDownload('smp.' + suffix);
-  }
-
-  // MFP: mfp.* → smp.*
-  if (basenameLower.startsWith('mfp.')) {
-    const suffix = basename.slice(4);
-    await tryDownload('smp.' + suffix);
-  }
-
-  // Richard Joseph / AdLib Tracker: check for .ins companion
-  if (basenameLower.endsWith('.dum') || basenameLower.endsWith('.sng')) {
-    const nameNoExt = basename.slice(0, basename.lastIndexOf('.'));
-    await tryDownload(nameNoExt + '.ins');
-    // Also try .INS (uppercase)
-    await tryDownload(nameNoExt + '.INS');
-  }
-
-  // Startrekker AM: .mod → .nt
-  //
-  // Only probe when the buffer's magic byte actually looks Startrekker-ish.
-  // Without this gate, every ProTracker MOD in a playlist generates a red
-  // 404 in the console as we blind-fetch a .nt that doesn't exist. If no
-  // buffer was handed in (legacy caller), fall back to the old blind probe
-  // so we don't regress Startrekker support for those paths.
-  if (basenameLower.endsWith('.mod')) {
-    if (!mainBuffer || isLikelyStartrekkerAM(mainBuffer)) {
-      const nameNoExt = basename.slice(0, -4);
-      await tryDownload(nameNoExt + '.nt');
-    }
-  }
+  const companions = await modlandCompanions(mainPath, mainBuffer);
 
   // Sonix (IFF SMUS / SNX / TINY): external instruments live in a sibling Instruments/
   // folder (Modland layout: <song>.smus + Instruments/<instrName>.instr + <name>.ss PCM) —

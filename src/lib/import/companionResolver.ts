@@ -52,7 +52,7 @@ export const ROLE_WORDS: ReadonlySet<string> = new Set([
   // DynamicSynthesizer, SynthDream, SynthPack, AudioSculpture
   'dns', 'sdr', 'osp', 'adsc',
   // the server's prefix pairs
-  'jpn', 'jpnd', 'thm', 'mfp', 'sjs', 'max', 'mcr', 'mcs', 'midi',
+  'jpn', 'jpnd', 'jp', 'jpo', 'jpold', 'thm', 'mfp', 'sjs', 'max', 'mcr', 'mcs', 'midi',
   // the server's extension pairs and suffixes
   'dum', '4v', 'set', 'kh', 'nt', 'l', 'n', 'sci',
 ]);
@@ -67,7 +67,7 @@ export const EXPECTED_PARTNER: Readonly<Record<string, string[]>> = {
   mdat: ['smpl'], smpl: ['mdat'], tfmx: ['smpl'], tfx: ['smpl'],
   spm: ['sps'], sps: ['spm'],
   dns: ['smp'], sdr: ['smp', 'smp.set'], osp: ['smp.set'],
-  jpn: ['smp'], jpnd: ['smp'], thm: ['smp'], mfp: ['smp'], sjs: ['smp'], max: ['smp'],
+  jpn: ['smp'], jpnd: ['smp'], jp: ['smp'], jpo: ['smp'], jpold: ['smp'], thm: ['smp'], mfp: ['smp'], sjs: ['smp'], max: ['smp'],
   mcr: ['mcs'], mcs: ['mcr'], midi: ['smpl'],
   sng: ['ins'], dum: ['ins'], '4v': ['set'],
   adsc: ['.as'], kh: ['songplay'], sci: ['patch.003'],
@@ -102,6 +102,12 @@ export function isNonSongAsset(relPath: string): boolean {
 
 /** The shared sample bank SynthDream and SynthPack keep per directory. */
 export const SHARED_BANK = 'smp.set';
+
+/** The shared bank in either naming form: `smp.set` (prefix) or `set.smp` (extension). */
+export function isSharedBank(name: string): boolean {
+  const n = lower(name.split('/').pop() ?? name);
+  return n === SHARED_BANK || n === 'set.smp';
+}
 
 /**
  * Cap on SIBLING matches — a wrong stem can sweep a whole directory of other
@@ -182,7 +188,7 @@ function sharedStem(module: NameParts, moduleName: string, siblings: string[]): 
   const out: string[] = [];
   for (const s of siblings) {
     if (lower(s) === lower(moduleName)) continue;
-    if (lower(s) === SHARED_BANK) continue;   // shape 5, decided last
+    if (isSharedBank(s)) continue;   // shape 5, decided last
     const parts = splitName(s);
     if (parts.role === null) continue;
     if (parts.stem !== module.stem) continue;
@@ -215,10 +221,13 @@ function specialCases(moduleName: string, siblings: string[]): string[] {
   // Infogrames: the player asks for '<tune>.ins' and, missing it, for the
   // shared bank named without the tune's last letter - bob4e.dum loads
   // '/uade/bob4e.ins' then '/uade/bob4.ins' (Modland ships bob4.ins for the set).
+  // Both naming forms (`bob4.ins`, `ins.bob4`) are taken, like every other role.
   if (name.endsWith('.dum')) {
     const stem = name.slice(0, -4);
-    if (!find(stem + '.ins') && stem.length > 1) {
-      const shared = find(stem.slice(0, -1) + '.ins');
+    const ownIns = find(stem + '.ins') ?? find('ins.' + stem);
+    if (!ownIns && stem.length > 1) {
+      const bank = stem.slice(0, -1);
+      const shared = find(bank + '.ins') ?? find('ins.' + bank);
       if (shared) out.push(shared);
     }
   }
@@ -293,11 +302,11 @@ function subdirectories(moduleName: string, listing: CompanionListing, sources: 
  */
 function sharedBank(module: NameParts, moduleName: string, siblings: string[], ownFound: boolean): string | null {
   if (ownFound) return null;
-  if (lower(moduleName) === SHARED_BANK) return null;
-  const bank = siblings.find(s => lower(s) === SHARED_BANK);
+  if (isSharedBank(moduleName)) return null;
+  const bank = siblings.find(s => isSharedBank(s));
   if (!bank) return null;
   for (const s of siblings) {
-    if (lower(s) === lower(moduleName) || lower(s) === SHARED_BANK) continue;
+    if (lower(s) === lower(moduleName) || isSharedBank(s)) continue;
     if (splitName(s).stem === module.stem) return null;
   }
   return bank;
