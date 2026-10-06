@@ -129,6 +129,10 @@ EXPORT void player_get_channel_levels(float* out) {
     memcpy(out, g_channel_levels, 4 * sizeof(float));
 }
 
+EXPORT void player_get_note_start_counts(uint32_t* out, int n) {
+    for (int i = 0; i < n; i++) out[i] = (g_song && i < 4) ? pre_song_get_note_starts(g_song, i) : 0;
+}
+
 EXPORT float* player_get_scope_buffer(int ch) {
     if (ch < 0 || ch >= 4) return NULL;
     return g_scope_bufs[ch];
