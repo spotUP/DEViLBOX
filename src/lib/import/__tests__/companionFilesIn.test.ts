@@ -68,14 +68,15 @@ describe('partnerlessFilesIn', () => {
     expect(partnerlessFilesIn({ siblings: ['jpn.a', 'smp.a', 'x.dum', 'x.ins', 'amsyntdemo.mod', 'amsyntdemo.mod.nt', 'bob4e.dum', 'bob4.ins'] }).size).toBe(0);
   });
 
-  it('the song index offers every corpus song whose partner is present', () => {
-    const index = JSON.parse(readFileSync(join(process.cwd(), 'public/data/songs/index.json'), 'utf8')) as { entries: { files: string[] }[] };
+  it('the song index offers no song whose partner is missing, and still has an Infogrames row', () => {
+    const index = JSON.parse(readFileSync(join(process.cwd(), 'public/data/songs/index.json'), 'utf8')) as { entries: { files: string[]; formatKey: string | null }[] };
     const offered = index.entries.flatMap((e) => e.files);
     const formats = new Set(readdirSync(join(process.cwd(), 'public/data/songs/formats')));
     for (const f of partnerlessFilesIn({ siblings: [...formats] })) {
       expect(offered).not.toContain(`/data/songs/formats/${f}`);
     }
-    expect(offered).toContain('/data/songs/infogrames/advantage tennis-intro.dum');
+    // One row per format: which Infogrames song carries the row may change; that one exists does not.
+    expect(index.entries.some((e) => e.files.some((f) => f.endsWith('.dum')))).toBe(true);
   });
 });
 
@@ -85,5 +86,13 @@ describe('Infogrames shared instrument bank', () => {
     const res = resolveCompanions('bob4e.dum', listingFromRelativePaths(['bob4e.dum', 'bob4.ins', 'bob4d.ins']));
     expect(res.companions).toContain('bob4.ins');
     expect(res.companions).not.toContain('bob4d.ins');
+  });
+});
+
+describe('jukebox song index', () => {
+  it('offers one song per format (one per chip for Furnace), not one per artist folder', () => {
+    const index = JSON.parse(readFileSync(join(process.cwd(), 'public/data/songs/index.json'), 'utf8')) as { entries: { formatKey: string | null; subformat?: string; dir: string }[] };
+    const keys = index.entries.filter((e) => e.formatKey).map((e) => e.dir.startsWith('/data/songs/furnace/') && e.subformat ? `${e.formatKey}/${e.subformat}` : e.formatKey);
+    expect(keys.length).toBe(new Set(keys).size);
   });
 });

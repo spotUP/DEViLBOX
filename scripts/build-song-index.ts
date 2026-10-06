@@ -254,6 +254,30 @@ const gaps = FORMAT_REGISTRY
   .map((f) => ({ formatKey: f.key, label: f.label }))
   .sort((a, b) => a.label.localeCompare(b.label));
 
+/**
+ * One row per format (owner, 2026-10-06: "we only need one song per format").
+ * Directories of directories made a row per artist folder - DefleMask had 176
+ * rows, SNDH 82. Rows of one format collapse to the one with the most takes;
+ * its takes stay in its own directory so companions still resolve. Furnace
+ * keeps a row per chip: each chip is a different sound engine. Rows whose
+ * format was not detected are kept as they are.
+ */
+function onePerFormat(rows: Entry[]): Entry[] {
+  const best = new Map<string, Entry>();
+  const kept: Entry[] = [];
+  for (const row of rows) {
+    if (!row.formatKey) { kept.push(row); continue; }
+    const perChip = row.dir.startsWith('/data/songs/furnace/') && row.subformat;
+    const key = perChip ? `${row.formatKey}/${row.subformat}` : row.formatKey;
+    const prev = best.get(key);
+    if (!prev || row.total > prev.total) best.set(key, row);
+  }
+  return [...kept, ...best.values()];
+}
+
+const deduped = onePerFormat(entries);
+entries.length = 0;
+entries.push(...deduped);
 entries.sort((a, b) => a.label.localeCompare(b.label));
 
 writeFileSync(OUT, `${JSON.stringify({
