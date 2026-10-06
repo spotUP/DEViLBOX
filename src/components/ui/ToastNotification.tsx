@@ -2,8 +2,8 @@
  * ToastNotification - Display toast notifications
  */
 
-import React from 'react';
-import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Copy, Check } from 'lucide-react';
 import { useNotificationStore, type NotificationType } from '@stores/useNotificationStore';
 import { Button } from './Button';
 
@@ -55,6 +55,7 @@ export const ToastNotification: React.FC = () => {
               </Button>
             )}
           </div>
+          <CopyMessageButton text={notification.message} />
           <button
             onClick={() => removeNotification(notification.id)}
             className="flex-shrink-0 p-0.5 rounded hover:bg-dark-bgHover transition-colors"
@@ -65,5 +66,25 @@ export const ToastNotification: React.FC = () => {
         </div>
       ))}
     </div>
+  );
+};
+
+/** Copies a toast's text, so an error can be pasted into a report. */
+const CopyMessageButton: React.FC<{ text: string }> = ({ text }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        void navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      className="flex-shrink-0 p-0.5 rounded hover:bg-dark-bgHover transition-colors"
+      aria-label="Copy message"
+      title="Copy message"
+    >
+      {copied ? <Check size={14} className="text-accent-success" /> : <Copy size={14} className="text-text-muted" />}
+    </button>
   );
 };
