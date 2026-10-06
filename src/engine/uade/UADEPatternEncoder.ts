@@ -44,8 +44,17 @@ export interface UADEPatternLayout {
   /**
    * Encode a TrackerCell back to native binary bytes.
    * Returns a Uint8Array of exactly `bytesPerCell` length.
+   * `stored` is the cell's current bytes, passed when `encodeOverStored` is
+   * set, so bytes the grid has no field for are kept rather than invented.
    */
-  encodeCell: (cell: TrackerCell) => Uint8Array;
+  encodeCell: (cell: TrackerCell, stored?: Uint8Array) => Uint8Array;
+
+  /**
+   * The cell holds bytes the grid does not show (Ron Klaren's wait byte, the
+   * row's duration): writers read the stored bytes and hand them to
+   * encodeCell, which keeps them.
+   */
+  encodeOverStored?: true;
 
   /**
    * Decode native binary bytes back to a TrackerCell.

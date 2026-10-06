@@ -120,7 +120,8 @@ export class UADEChipEditor {
     const fileOffset = getCellFileOffset(layout, pattern, row, channel);
     if (fileOffset < 0) return; // non-editable cell (e.g., wait row in variable-length format)
     const addr = moduleBase + fileOffset;
-    const bytes = layout.encodeCell(cell);
+    const stored = layout.encodeOverStored ? await this.readBytes(addr, layout.bytesPerCell) : undefined;
+    const bytes = layout.encodeCell(cell, stored);
     await this.writeBytes(addr, bytes);
   }
 

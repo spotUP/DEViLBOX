@@ -42,18 +42,22 @@ export function ronKlarenNoteIndex(xmNote: number): number {
   return Math.max(0, Math.min(RK_PERIODS_LEN - 1, xmNote - XM_REFERENCE_NOTE + RK_REFERENCE_IDX));
 }
 
-export function encodeRonKlarenCell(cell: TrackerCell): Uint8Array {
+export function encodeRonKlarenCell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
   const out = new Uint8Array(2);
   const noteIdx = ronKlarenNoteIndex(cell.note ?? 0);
+  // The wait byte is the row's duration: the grid derives its rows from it and
+  // has no field for it, so an edit keeps the stored one (as rk_set_cell does
+  // on the native replayer). A different byte would shift every later row.
+  const storedWait = stored && stored.length >= 2 && stored[0] < 0x80 ? stored[1] : undefined;
 
   if (noteIdx >= 0) {
     out[0] = noteIdx;
-    // Default waitCount = 1 (triggers note and waits 1*4-1=3 ticks)
-    out[1] = 1;
+    // No stored command to keep (a new file): wait 1 (triggers note and waits 1*4-1=3 ticks)
+    out[1] = storedWait ?? 1;
   } else {
-    // Empty cell: note 0 + waitCount 0 (no wait, no note trigger)
+    // Empty cell: note 0, the command's duration kept
     out[0] = 0;
-    out[1] = 0;
+    out[1] = storedWait ?? 0;
   }
 
   // Byte-exact carrier restore. RonKlarenParser.decodeCell stashes both source bytes in the
