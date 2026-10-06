@@ -41,7 +41,7 @@ export interface FallbackContext {
 // synth keeps that voice whether or not the parser also rendered PCM for it.
 // Choosing Sampler by has-PCM played the rendered waveform instead of the synth
 // (owner, 2026-10-06, SoundMon antidust.bp3).
-const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth', 'FredSynth', 'SoundMonSynth', 'FuturePlayerSynth']);
+const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth', 'FredSynth', 'SoundMonSynth', 'FuturePlayerSynth', 'SidMonSynth']);
 
 /**
  * Per-note WASM voices that play ONE instrument of a song on the keyboard

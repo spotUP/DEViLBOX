@@ -36,6 +36,10 @@ import type { DevilboxSynth } from '@/types/synth';
 import type { SidMonConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { SidMonEngine } from './SidMonEngine';
+import { Sd2Engine } from '../sidmon2/Sd2Engine';
+
+/** A keyboard key (MIDI) to the replayer's note index: grid note = key - 11 (xmConversions), index = grid note - 12. */
+export const sd2NoteForKey = (key: number): number => key - 11 - 12;
 
 export class SidMonSynth implements DevilboxSynth {
   readonly name = 'SidMonSynth';
@@ -48,6 +52,8 @@ export class SidMonSynth implements DevilboxSynth {
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
+  /** 1-based instrument of the loaded SidMon II module, 0 for a free-standing SidMon instrument. */
+  private _songSlot = 0;
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -61,6 +67,9 @@ export class SidMonSynth implements DevilboxSynth {
       this._ownsEngineConnection = true;
     }
   }
+
+  /** Instrument of the loaded module this voice plays: keys then run the replayer's own voice. */
+  setSongSlot(slot: number): void { this._songSlot = slot; }
 
   async ensureInitialized(): Promise<void> {
     await this.engine.ready();
@@ -97,7 +106,15 @@ export class SidMonSynth implements DevilboxSynth {
   }
 
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
-    if (this._disposed || this._playerHandle < 0) return;
+    if (this._disposed) return;
+    if (this._songSlot > 0) {
+      // The module's replayer (sd2_note_on) plays the instrument exactly as the song does.
+      const key = typeof note === 'string' ? noteToMidi(note) : (note ?? 48);
+      const sd2 = Sd2Engine.getInstance();
+      void sd2.ready().then(() => sd2.noteOn(this._songSlot - 1, sd2NoteForKey(key), Math.round((velocity ?? 0.8) * 127)));
+      return;
+    }
+    if (this._playerHandle < 0) return;
 
     let midiNote: number;
     if (typeof note === 'string') {
@@ -119,7 +136,9 @@ export class SidMonSynth implements DevilboxSynth {
   }
 
   triggerRelease(_note?: string | number, _time?: number): void {
-    if (this._disposed || this._playerHandle < 0) return;
+    if (this._disposed) return;
+    if (this._songSlot > 0) { Sd2Engine.getInstance().noteOff(); return; }
+    if (this._playerHandle < 0) return;
     this.engine.sendMessage({ type: 'noteOff', handle: this._playerHandle });
   }
 
