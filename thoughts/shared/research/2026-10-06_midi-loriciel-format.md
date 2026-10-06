@@ -129,28 +129,53 @@ where they would differ (the grid then falls back to UADE's scan).
 
 ## Collisions (two events on one voice in one interrupt)
 
-- note-off then note-on (a retrigger): Bumpy's 744 cells, Cartoons 4-7: 1-16.
-  The cell shows the note; the off is implied.
+- note-off then note-on (a retrigger): the cell shows the note; the off is implied.
 - two or more note-ons (a MIDI chord squeezed onto one voice): Bumpy's 24,
   Cartoons 1: 84. The first note-on's sample is the one DMA latches, the last
-  one's period and volume stay. The grid shows each as a note column of the
-  cell, in player order (TrackerCell note, note2..note4; channelMeta.noteCols).
-- note-on then note-off: none in the corpus (would show the note column(s)
-  then a 97 column).
+  one's period and volume stay.
+
+## Timing facts that decide the layout (measured on the corpus)
+
+- Note-ons sit on 16ths (Cartoons 5/9 and a few in Bumpy's: 16th triplets,
+  16 ticks); a handful are off-grid (Cartoons 3: 1, 5: 1, 6: 8, 4: 2).
+- Note-offs sit one tick before the next 16th (gate = length - 1 tick).
+- So the player fires most note-ons ONE interrupt after their tick: the
+  gate-off at tick 47 fires at interrupt 12, the note-on at tick 48 (delta 1)
+  cannot fire in the same interrupt and plays at 13 (Cartoons 1: 1597 of 1608
+  note-ons). Note-ons with no gate-off just before them play on their tick.
+- The runner plays at the CIA rate (measured: 118 interrupts/s for Cartoons 1,
+  129 for Cartoons 2) - the 2.5 x rate BPM is the true rate.
 
 ## The decoded grid (src/lib/import/formats/MIDILoricielParser.ts)
 
-- `scheduleMIDILoriciel` runs Init + Play over one pass; `loricielGridRows`
-  turns it into rows[voice][interrupt]: note-on = note (index + 27), instrument
-  = bank sample + 1 (Sampler instruments from the bank PCM), volume = 0x10 +
-  Paula volume; a voice-freeing note-off = 97; the restart interrupt cuts
-  voices still allocated (97). Tempo at interrupt 0 -> initialBPM (2.5 x
-  interrupt rate, speed 1); a later tempo -> effect F (none in the corpus).
-- Patterns are one bar at the file's time signature (192 rows at 192 ticks/4/4),
-  songPositions in order, restartPosition 0. Speed 1: the runner's tick count
-  (EaglePlayerEngine position) is the row.
-- Rows per pass: Bumpy's 27194, Cartoons 1: 15362, 2: 3266, 3: 5378, 4: 4610,
-  5: 5906, 6: 9218, 7: 9218, 8: 10754, 9: 6914.
+Layout rule (loricielLayout), owner 2026-10-06 ("the pattern speed/length/note
+distribution is wrong" on the first, one-row-per-interrupt decode):
+
+- Row = G MIDI ticks, G = the largest divisor of a 16th (ppq/4) that is a
+  whole number of interrupts (multiple of 4 ticks) and on which >= 98% of the
+  song's note-ons start. Corpus: a 16th (48 ticks) everywhere except Cartoons 5
+  and 9 (16 ticks, triplet 16ths).
+- Speed = G / 4 = player interrupts per row (12 or 4); BPM = 2.5 x the
+  interrupt rate (Cartoons 1: speed 12, BPM 297 = 118.9 interrupts/s). One
+  tracker tick = one player interrupt.
+- Every event sits at row = interrupt / speed with a note delay EDx =
+  interrupt % speed: zero rounding. The player's one-interrupt lag shows as
+  ED1; a note-on on the row grid is on the row of its MIDI tick.
+- Patterns: whole bars, up to 64 rows (4 bars of 16ths; 1 bar of triplets).
+- Channel n = Paula voice n (the allocator decides; MIDI channels spread over
+  voices). A voice that takes a second event inside one row (a chord stacked
+  in one interrupt, or a note one interrupt after another) puts it on that
+  voice's chord channel, after the four (Bumpy's: 3, Cartoons 1/4/6: 1).
+- Note-on = note (index + 27), instrument = bank sample + 1, volume = 0x10 +
+  Paula volume; voice-freeing note-off = 97; the restart interrupt cuts voices
+  still allocated (97). Tempo at interrupt 0 -> initialBPM; later tempos ->
+  effect F in the second effect column of channel 0 (none in the corpus).
+- Playhead: the runner counts an interrupt as it starts it, so runner tick 1
+  = interrupt 0; one pass = schedule rows interrupts. The song carries
+  eaglePlayerTickGrid {firstTick: 1, passTicks} (format store + live song);
+  eaglePlayerGrid / tickGridPosition use it, so the playhead row is the row
+  Paula is playing and does not drift over loops when a pass is not a whole
+  number of rows.
 
 ## Verification
 
@@ -158,27 +183,30 @@ where they would differ (the grid then falls back to UADE's scan).
   voice's period, volume and DMA on the runner equal the schedule's
   (0 mismatching interrupts; runner tick 1 = row 0). In test:ci for Cartoons 2:
   `src/engine/__tests__/midiLoricielRunner.test.ts`.
-- gridVsPaula (UADE's Paula log, no --secs), score per channel 0..1:
+- Playhead: at every Paula note-on in 30 s of Cartoons 2 on the runner, the
+  row the posted tick count maps to holds that note on that voice's channel
+  (`src/engine/__tests__/midiLoricielPlayhead.test.ts`).
+- gridVsPaula (UADE's Paula log, no --secs), voice channels 1-4:
 
-| Song | before (carrier stub, 0 notes) | after ch0/ch1/ch2/ch3 |
-|---|---|---|
-| Bumpy'sArcadeFantasy | 0 | 1.00 / 1.00 / 1.00 / 1.00 |
-| Cartoons 1 | 0 | 1.00 / 1.00 / 1.00 / 1.00 |
-| Cartoons 2 | 0 | 0.98 / 0.98 / 1.00 / 1.00 |
-| Cartoons 3 | 0 | 1.00 / 1.00 / 1.00 / - |
-| Cartoons 4 | 0 | 0.99 / 1.00 / 1.00 / - |
-| Cartoons 5 | 0 | 1.00 / 1.00 / 1.00 / 1.00 |
-| Cartoons 6 | 0 | 1.00 / 0.99 / 1.00 / 1.00 |
-| Cartoons 7 | 0 | 0.99 / 1.00 / 1.00 / 1.00 |
-| Cartoons 8 | 0 | 1.00 / 1.00 / 1.00 / - |
-| Cartoons 9 | 0 | 1.00 / 1.00 / 1.00 / - |
+| Song | before (carrier stub) | first decode | now | now, voice + its chord channels merged |
+|---|---|---|---|---|
+| Bumpy'sArcadeFantasy | 0 notes | 1.00/1.00/1.00/1.00 | 0.98/1.00/1.00/1.00 | 1.00/1.00/1.00/1.00 |
+| Cartoons 1 | 0 notes | 1.00/1.00/1.00/1.00 | 1.00/1.00/1.00/1.00 | 1.00/1.00/1.00/1.00 |
+| Cartoons 2 | 0 notes | 0.98/0.98/1.00/1.00 | same | same |
+| Cartoons 3 | 0 notes | 1.00/1.00/1.00/- | same | same |
+| Cartoons 4 | 0 notes | 0.99/1.00/1.00/- | 0.98/1.00/1.00/- | 0.99/1.00/1.00/- |
+| Cartoons 5 | 0 notes | 1.00/1.00/1.00/1.00 | same | same |
+| Cartoons 6 | 0 notes | 1.00/0.99/1.00/1.00 | 0.95/0.99/1.00/1.00 | 1.00/0.99/1.00/1.00 |
+| Cartoons 7 | 0 notes | 0.99/1.00/1.00/1.00 | same | same |
+| Cartoons 8 | 0 notes | 1.00/1.00/1.00/- | same | same |
+| Cartoons 9 | 0 notes | 1.00/1.00/1.00/- | same | same |
 
-  "-": voice 3 is never used (0 notes on both sides; the tool scores that 0).
-  The sub-1.0 entries are one interval at the start: UADE's log begins after
-  the first interrupt's writes (the grid has one more leading note), not a
-  grid difference - the runner trace has none. "Before" = the old parser's grid
-  (one channel of MTrk bytes, 0 notes; the app then showed UADE's scan, not
-  measured here).
+  "-": voice 3 unused (0 notes on both sides). Below 1.0 per voice channel in
+  the new layout: the notes a voice plays in the same row as another (moved
+  to the chord channel) are missing from the voice channel's sequence; merged
+  back by time (--grid-json) the sequences are what they were. Sub-1.0
+  entries that stay: one leading interval (UADE's log starts after the first
+  interrupt) - the runner register trace has no difference.
 
 ## Editing (src/lib/import/formats/MIDILoricielEncoder.ts)
 

@@ -7,7 +7,9 @@
  *    Cartoons 2 the runner's Paula registers (period, volume, DMA per voice)
  *    are the ones the schedule says. Runner tick 1 is row 0.
  *  - The app's import (parseModuleToSong with the SMPL companion) gives that
- *    grid and routes the song to EaglePlayerEngine.
+ *    grid, keeps its tick grid through the store rebuild (the playhead's
+ *    side: midiLoricielPlayhead.test.ts), and routes the song to
+ *    EaglePlayerEngine.
  *  - A grid edit through the store's edit path (sendCellEditsToEngine)
  *    re-encodes the MIDI file, makes it the song's module and reloads the
  *    runner with it; the runner then plays the edited pitch on that row.
@@ -80,16 +82,23 @@ describe('MIDI Loriciel on the eagleplayer runner', () => {
 
   it('an edit through the store path reloads the runner with a module that plays it', async () => {
     const module = songBuffer(`${DIR}/MIDI.${TUNE}`), bank = songBuffer(`${DIR}/SMPL.${TUNE}`);
+    const dec0Speed = decodeMIDILoriciel(new Uint8Array(module), new Uint8Array(bank)).layout.speed;
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
     const song = await parseModuleToSong(new File([module], `MIDI.${TUNE}`), 0, undefined, undefined, new Map([[`SMPL.${TUNE}`, bank]]));
     expect(song.eaglePlayerId).toBe('MIDILoriciel');
     expect(song.numChannels).toBe(4);
-    expect(song.initialSpeed).toBe(1);
+    expect(song.initialSpeed).toBe(dec0Speed);
+    // The playback song is rebuilt from the stores: the tick grid rides along.
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    useFormatStore.getState().applyEditorMode(song);
+    const { liveTrackerSong } = await import('@/lib/song/liveSong');
+    expect(liveTrackerSong().eaglePlayerTickGrid).toEqual(song.eaglePlayerTickGrid);
 
     // The first note of the song, a tone up.
     const dec = decodeMIDILoriciel(new Uint8Array(module), new Uint8Array(bank));
     const first = dec.schedule.noteOns[0];
-    const p = Math.floor(first.row / dec.rowsPerPattern), r = first.row % dec.rowsPerPattern;
+    const row = Math.floor(first.row / dec.layout.speed);
+    const p = Math.floor(row / dec.layout.rowsPerPattern), r = row % dec.layout.rowsPerPattern;
     const cell = { ...song.patterns[p].channels[first.voice].rows[r] };
     expect(cell.note).toBeGreaterThan(0);
     cell.note += 2;
@@ -103,7 +112,7 @@ describe('MIDI Loriciel on the eagleplayer runner', () => {
     expect(new Uint8Array(song.eaglePlayerFileData!)).toEqual(new Uint8Array(sent));
 
     const after = decodeMIDILoriciel(new Uint8Array(sent), new Uint8Array(bank), true);
-    expect(after.grid[first.voice][first.row].note).toBe(cell.note);
+    expect(after.grid[first.voice][row].note).toBe(cell.note);
     const runner = await runnerStates(sent, bank, first.row + 2);
     const v = runner[first.row + 1][first.voice];
     expect(v.dma).toBe(true);

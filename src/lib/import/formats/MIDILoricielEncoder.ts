@@ -29,14 +29,14 @@
 import { writeMidi, type MidiData, type MidiEvent } from 'midi-file';
 import type { TrackerCell } from '@/types';
 import {
-  decodeMIDILoriciel, getNoteColumn, loricielCellEvents, loricielGridNote, loricielRange, loricielVolume,
-  LORICIEL_MAX_COLUMNS, LORICIEL_NOTE_OFF, LORICIEL_TICKS_PER_INTERRUPT,
+  decodeMIDILoriciel, loricielGridNote, loricielRange, loricielVolume,
+  LORICIEL_NOTE_OFF, LORICIEL_TICKS_PER_INTERRUPT,
   LORICIEL_PERIOD_MIN_INDEX, LORICIEL_PERIOD_MAX_INDEX, LORICIEL_TABLE_MIN_INDEX, LORICIEL_TABLE_MAX_INDEX,
   type DecodedMIDILoriciel, type LoricielBank, type LoricielNoteOn,
 } from './MIDILoricielParser';
 
-/** One edited grid cell, at an absolute row (interrupt) of the pass. */
-export interface LoricielCellEdit { row: number; voice: number; cell: TrackerCell }
+/** One edited grid cell: a row of the pass (all patterns in order) and a grid channel. */
+export interface LoricielCellEdit { row: number; channel: number; cell: TrackerCell }
 
 interface Item { tick: number; ev: MidiEvent }
 
@@ -248,8 +248,10 @@ function nextEventRow(dec: DecodedMIDILoriciel, voice: number, row: number): num
   return next;
 }
 
-const sameColumn = (a: ReturnType<typeof getNoteColumn>, b: ReturnType<typeof getNoteColumn>) =>
-  a.note === b.note && a.instrument === b.instrument && a.volume === b.volume;
+/** The note delay (EDx) of a cell, in interrupts; 0 without one. */
+function noteDelay(cell: TrackerCell): number {
+  return cell.effTyp === 0x0E && (cell.eff & 0xF0) === 0xD0 ? cell.eff & 0x0F : 0;
+}
 
 /**
  * Apply grid cell edits to a MIDI Loriciel module. `module` is the file the
@@ -263,111 +265,106 @@ export function encodeMIDILoricielEdits(module: Uint8Array, bank: Uint8Array, ed
 /** A grid edit as the tracker store sends it (pattern index, row in it, channel). */
 export interface LoricielGridEdit { pattern: number; row: number; channel: number; cell: TrackerCell }
 
-/**
- * Grid edits from the tracker (patterns of the parsed song, in order) into
- * the module. The patterns are one bar each (MIDILoricielParser), so a
- * pattern row is pattern * rowsPerPattern + row of the pass.
- */
+/** Grid edits from the tracker (the parsed song's patterns, in order) into the module. */
 export function encodeMIDILoricielGridEdits(module: Uint8Array, bank: Uint8Array, edits: readonly LoricielGridEdit[]): Uint8Array {
   const dec = decodeMIDILoriciel(module, bank);
-  return applyEdits(module, dec, edits.map((e) => ({ row: e.pattern * dec.rowsPerPattern + e.row, voice: e.channel, cell: e.cell })));
+  const per = dec.layout.rowsPerPattern;
+  return applyEdits(module, dec, edits.map((e) => ({ row: e.pattern * per + e.row, channel: e.channel, cell: e.cell })));
 }
 
 function applyEdits(module: Uint8Array, dec: DecodedMIDILoriciel, edits: readonly LoricielCellEdit[]): Uint8Array {
-  const cells = loricielCellEvents(dec.schedule);
   const edit = new TrackEdit(dec.midi, dec.schedule.ticks);
-  const { rows } = dec.schedule;
+  const { layout } = dec;
 
-  for (const { row, voice, cell } of edits) {
-    if (row < 0 || row >= rows || voice < 0 || voice > 3) continue;
-    const old = dec.grid[voice][row];
-    const events = cells.get(voice * rows + row) ?? [];
+  for (const { row, channel, cell } of edits) {
+    if (row < 0 || row >= layout.rows || channel < 0 || channel >= layout.channels.length) continue;
+    const { voice } = layout.channels[channel];
+    const old = dec.grid[channel][row];
+    const ev = layout.cells[channel][row];
+    // The interrupt the edited cell plays at: its row, plus its note delay.
+    const at = Math.min(dec.schedule.restartRow, row * layout.speed + noteDelay(cell));
 
-    // Effect F on voice 0: the tempo events after row 0.
-    if (voice === 0 && (old.effTyp !== cell.effTyp || old.eff !== cell.eff)) {
-      const tempo = dec.schedule.tempos.filter((t) => t.row === row && row > 0).pop();
-      if (tempo) edit.remove(tempo.track, edit.item(tempo.track, tempo.event));
-      if (cell.effTyp === 0x0F && cell.eff >= 0x20) {
-        const { tick, late } = tickForRow(dec, 0, row);
-        edit.insert(0, tick, { deltaTime: 0, type: 'setTempo', microsecondsPerBeat: tempoForBpm(cell.eff, dec.schedule.division) }, late);
+    // Effect F (second effect column, channel 0): the tempo events after the start.
+    if (channel === 0 && (old.effTyp2 !== cell.effTyp2 || old.eff2 !== cell.eff2)) {
+      for (const tempo of dec.schedule.tempos.filter((t) => t.row > 0 && Math.floor(t.row / layout.speed) === row)) {
+        edit.remove(tempo.track, edit.item(tempo.track, tempo.event));
+      }
+      if (cell.effTyp2 === 0x0F && cell.eff2 >= 0x20) {
+        const { tick, late } = tickForRow(dec, 0, at);
+        edit.insert(0, tick, { deltaTime: 0, type: 'setTempo', microsecondsPerBeat: tempoForBpm(cell.eff2, dec.schedule.division) }, late);
       }
     }
 
-    for (let col = 0; col < LORICIEL_MAX_COLUMNS; col++) {
-      const before = getNoteColumn(old, col), after = getNoteColumn(cell, col);
-      if (sameColumn(before, after)) continue;
-      const ev = events[col];
+    if (old.note === cell.note && old.instrument === cell.instrument && old.volume === cell.volume) continue;
 
-      if (ev?.kind === 'on') {
-        const on = ev.on;
-        const onItem = edit.item(on.track, on.event);
-        const offItem = pairedOff(edit, on.track, onItem);
-        if (after.note === 0 && after.instrument === 0) {
-          edit.remove(on.track, onItem);
-          if (offItem) edit.remove(on.track, offItem);
-          continue;
-        }
-        if (after.note === LORICIEL_NOTE_OFF) {
-          // The note-on becomes the sounding note's note-off.
-          edit.remove(on.track, onItem);
-          if (offItem) edit.remove(on.track, offItem);
-          const sounding = soundingNote(dec, voice, row);
-          if (sounding) {
-            const sItem = edit.item(sounding.track, sounding.event);
-            const sOff = pairedOff(edit, sounding.track, sItem);
-            if (sOff) edit.remove(sounding.track, sOff);
-            const { tick, late } = tickForRow(dec, sounding.track, row);
-            edit.insert(sounding.track, tick, offEvent(edit, sounding.track, sounding.channel, sounding.key), late);
-          }
-          continue;
-        }
-        const sample = after.instrument > 0 ? after.instrument - 1 : on.sample;
-        const note = after.note > 0 ? after.note : loricielGridNote(on.periodIndex);
-        const vol = after.volume >= 0x10 && after.volume <= 0x50 ? after.volume - 0x10 : -1;
-        const velocity = vol < 0 || loricielVolume(on.velocity) === vol ? on.velocity : loricielVelocityFor(vol);
-        const { key, program } = resolveKey(dec, on.channel, row, sample, note);
-        edit.update(on.track, onItem, { noteNumber: key, velocity });
-        if (offItem) edit.update(on.track, offItem, { noteNumber: key });
-        if (program !== null) switchProgram(edit, on.track, onItem, on.channel, program, on.program);
+    if (ev?.kind === 'on') {
+      const on = ev.on;
+      const onItem = edit.item(on.track, on.event);
+      const offItem = pairedOff(edit, on.track, onItem);
+      if (cell.note === 0 && cell.instrument === 0) {
+        edit.remove(on.track, onItem);
+        if (offItem) edit.remove(on.track, offItem);
         continue;
       }
-
-      if (ev?.kind === 'off') {
-        const offIt = edit.item(ev.off.track, ev.off.event);
-        if (after.note === 0) { edit.remove(ev.off.track, offIt); continue; }
-        if (after.note >= 1 && after.note <= 96) {
-          // The voice stops and a new note starts on it in the same interrupt.
-          const sample = after.instrument > 0 ? after.instrument - 1 : -1;
-          const velocity = after.volume >= 0x10 ? loricielVelocityFor(after.volume - 0x10) : 127;
-          const on = placeNoteOn(edit, dec, ev.off.track, ev.off.channel, row, sample, after.note, velocity, offIt);
-          const end = nextEventRow(dec, voice, row);
-          const { tick, late } = tickForRow(dec, ev.off.track, end);
-          edit.insert(ev.off.track, Math.max(tick, on.tick + 1), offEvent(edit, ev.off.track, ev.off.channel, (on.ev as { noteNumber: number }).noteNumber), late);
-        }
+      if (cell.note === LORICIEL_NOTE_OFF) {
+        // The note-on goes; the note sounding before it stops here.
+        edit.remove(on.track, onItem);
+        if (offItem) edit.remove(on.track, offItem);
+        stopSounding(edit, dec, voice, ev.interrupt);
         continue;
       }
+      const sample = cell.instrument > 0 ? cell.instrument - 1 : on.sample;
+      const note = cell.note > 0 ? cell.note : loricielGridNote(on.periodIndex);
+      const vol = cell.volume >= 0x10 && cell.volume <= 0x50 ? cell.volume - 0x10 : -1;
+      const velocity = vol < 0 || loricielVolume(on.velocity) === vol ? on.velocity : loricielVelocityFor(vol);
+      const { key, program } = resolveKey(dec, on.channel, on.row, sample, note);
+      edit.update(on.track, onItem, { noteNumber: key, velocity });
+      if (offItem) edit.update(on.track, offItem, { noteNumber: key });
+      if (program !== null) switchProgram(edit, on.track, onItem, on.channel, program, on.program);
+      continue;
+    }
 
-      // No event behind this column: a typed note or note-off.
-      if (after.note === LORICIEL_NOTE_OFF) {
-        const sounding = soundingNote(dec, voice, row);
-        if (!sounding) continue;
-        const sItem = edit.item(sounding.track, sounding.event);
-        const sOff = pairedOff(edit, sounding.track, sItem);
-        if (sOff) edit.remove(sounding.track, sOff);
-        const { tick, late } = tickForRow(dec, sounding.track, row);
-        edit.insert(sounding.track, tick, offEvent(edit, sounding.track, sounding.channel, sounding.key), late);
-      } else if (after.note >= 1 && after.note <= 96) {
-        const host = hostFor(dec, voice, row);
-        const sample = after.instrument > 0 ? after.instrument - 1 : -1;
-        const velocity = after.volume >= 0x10 ? loricielVelocityFor(after.volume - 0x10) : 127;
-        const on = placeNoteOn(edit, dec, host.track, host.channel, row, sample, after.note, velocity, null);
-        const end = nextEventRow(dec, voice, row);
-        const { tick, late } = tickForRow(dec, host.track, end);
-        edit.insert(host.track, Math.max(tick, on.tick + 1), offEvent(edit, host.track, host.channel, (on.ev as { noteNumber: number }).noteNumber), late);
+    if (ev?.kind === 'off') {
+      const offIt = edit.item(ev.off.track, ev.off.event);
+      if (cell.note === 0) { edit.remove(ev.off.track, offIt); continue; }
+      if (cell.note >= 1 && cell.note <= 96) {
+        // The voice stops and a new note starts on it in the same interrupt.
+        addNote(edit, dec, voice, ev.off.row, ev.off.track, ev.off.channel, cell, offIt);
       }
+      continue;
+    }
+
+    // Nothing behind the cell (or the restart's cut): a typed note or note-off.
+    if (cell.note === LORICIEL_NOTE_OFF) {
+      stopSounding(edit, dec, voice, at);
+    } else if (cell.note >= 1 && cell.note <= 96) {
+      const host = hostFor(dec, voice, at);
+      addNote(edit, dec, voice, at, host.track, host.channel, cell, null);
     }
   }
 
   if (edit.touched.size === 0) return module;
   return new Uint8Array(writeMidi(edit.toMidi()));
+}
+
+/** Move the note-off of the note sounding on `voice` to interrupt `at` (or add one). */
+function stopSounding(edit: TrackEdit, dec: DecodedMIDILoriciel, voice: number, at: number): void {
+  const sounding = soundingNote(dec, voice, at);
+  if (!sounding) return;
+  const sItem = edit.item(sounding.track, sounding.event);
+  const sOff = pairedOff(edit, sounding.track, sItem);
+  if (sOff) edit.remove(sounding.track, sOff);
+  const { tick, late } = tickForRow(dec, sounding.track, at);
+  edit.insert(sounding.track, tick, offEvent(edit, sounding.track, sounding.channel, sounding.key), late);
+}
+
+/** A typed note at interrupt `at` on (track, MIDI channel), ending at the voice's next event. */
+function addNote(edit: TrackEdit, dec: DecodedMIDILoriciel, voice: number, at: number, track: number, channel: number,
+  cell: TrackerCell, anchor: Item | null): void {
+  const sample = cell.instrument > 0 ? cell.instrument - 1 : -1;
+  const velocity = cell.volume >= 0x10 ? loricielVelocityFor(cell.volume - 0x10) : 127;
+  const on = placeNoteOn(edit, dec, track, channel, at, sample, cell.note, velocity, anchor);
+  const end = nextEventRow(dec, voice, at);
+  const { tick, late } = tickForRow(dec, track, end);
+  edit.insert(track, Math.max(tick, on.tick + 1), offEvent(edit, track, channel, (on.ev as { noteNumber: number }).noteNumber), late);
 }

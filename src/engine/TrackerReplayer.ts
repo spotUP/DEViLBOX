@@ -381,6 +381,13 @@ export interface TrackerSong {
   /** The module's own file name, which the eagleplayer opens it by. */
   eaglePlayerFileName?: string;
   /**
+   * How the runner's tick count meets the grid, when the parser measured it:
+   * the tick at which row 0 plays and the ticks of one pass of the song (the
+   * player restarts after it). Absent: tick 0 is row 0 and the grid loops
+   * from restartPosition (tickGridPosition).
+   */
+  eaglePlayerTickGrid?: { firstTick: number; passTicks: number };
+  /**
    * The grid was rebuilt from the player's Paula output (UADE scan), not
    * decoded from the file. Owner, 2026-10-06: "guessing is pointless" - such a
    * song shows the scope view until its format is reverse-engineered.
