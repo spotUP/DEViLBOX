@@ -15,6 +15,7 @@
  * The UADE "basedir" is set to a virtual filesystem populated at init.
  */
 
+#include <malloc.h>
 #include <uade/uade.h>
 #include <uade/uadestate.h>
 
@@ -831,6 +832,17 @@ extern int uade_audio_read_channel_samples(float *ch0, float *ch1, float *ch2, f
 EMSCRIPTEN_KEEPALIVE
 int uade_wasm_read_channel_samples(float *ch0, float *ch1, float *ch2, float *ch3, int max_frames) {
     return uade_audio_read_channel_samples(ch0, ch1, ch2, ch3, max_frames);
+}
+
+/*
+ * Bytes currently held by malloc (live allocations), for the per-load growth
+ * regression test: the wasm heap only grows when this keeps climbing, and the
+ * heap size alone hides a leak until the 128 MB limit aborts a load.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t uade_wasm_heap_used(void) {
+    struct mallinfo mi = mallinfo();
+    return (uint32_t)mi.uordblks;
 }
 
 EMSCRIPTEN_KEEPALIVE

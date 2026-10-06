@@ -579,6 +579,18 @@ void memory_init (void)
     int i, fd;
     int custom_start;
 
+#ifndef USE_MAPPED_MEMORY
+    /* DEViLBOX: the wasm build re-runs memory_init() for every fresh core
+     * (uade_wasm_full_reset after each rendered song). Without releasing the
+     * previous allocation each reset leaked the whole Amiga address space
+     * (~10 MB per load), and a jukebox hit the 128 MB wasm limit. */
+    free (chipmemory);
+    free (kickmemory);
+    free (bogomemory);
+    free (a3000memory);
+    chipmemory = kickmemory = bogomemory = a3000memory = NULL;
+#endif
+
     allocated_chipmem = currprefs.chipmem_size;
     allocated_bogomem = currprefs.bogomem_size;
     allocated_a3000mem = currprefs.a3000mem_size;
