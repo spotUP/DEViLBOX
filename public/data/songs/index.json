@@ -1,8 +1,8 @@
 {
-  "generated": "2026-10-05T21:26:52.117Z",
+  "generated": "2026-10-06T15:52:06.161Z",
   "perEntry": 6,
   "registryTotal": 279,
-  "covered": 168,
+  "covered": 167,
   "entries": [
     {
       "id": "actionamics",
@@ -3475,16 +3475,6 @@
       "dir": "/data/songs/formats"
     },
     {
-      "id": "formats-infogrames",
-      "label": "formats / Infogrames",
-      "formatKey": "infogrames",
-      "files": [
-        "/data/songs/formats/bob4e.dum"
-      ],
-      "total": 1,
-      "dir": "/data/songs/formats"
-    },
-    {
       "id": "formats-inStereoAmbiguous",
       "label": "formats / InStereo!",
       "formatKey": "inStereoAmbiguous",
@@ -3530,16 +3520,6 @@
       "formatKey": "jasonBrooke",
       "files": [
         "/data/songs/formats/ikari_warriors.jb"
-      ],
-      "total": 1,
-      "dir": "/data/songs/formats"
-    },
-    {
-      "id": "formats-jasonPage",
-      "label": "formats / Jason Page",
-      "formatKey": "jasonPage",
-      "files": [
-        "/data/songs/formats/jpn.virocop-14"
       ],
       "total": 1,
       "dir": "/data/songs/formats"
@@ -3730,16 +3710,6 @@
       "formatKey": "nru",
       "files": [
         "/data/songs/formats/howiedavies.nru"
-      ],
-      "total": 1,
-      "dir": "/data/songs/formats"
-    },
-    {
-      "id": "formats-uade_nt",
-      "label": "formats / NoiseTracker",
-      "formatKey": "uade_nt",
-      "files": [
-        "/data/songs/formats/shortsong1.mod.nt"
       ],
       "total": 1,
       "dir": "/data/songs/formats"
@@ -7918,18 +7888,8 @@
       "dir": "/data/songs/speedy-system"
     },
     {
-      "id": "startrekker-am-uade_nt",
-      "label": "startrekker-am / NoiseTracker",
-      "formatKey": "uade_nt",
-      "files": [
-        "/data/songs/startrekker-am/silent sleep.mod.nt"
-      ],
-      "total": 1,
-      "dir": "/data/songs/startrekker-am"
-    },
-    {
-      "id": "startrekker-am-mod",
-      "label": "startrekker-am / ProTracker MOD",
+      "id": "startrekker-am",
+      "label": "startrekker-am",
       "formatKey": "mod",
       "files": [
         "/data/songs/startrekker-am/amsyntdemo.mod"
@@ -37446,6 +37406,10 @@
     },
     {
       "formatKey": "nst",
+      "label": "NoiseTracker"
+    },
+    {
+      "formatKey": "uade_nt",
       "label": "NoiseTracker"
     },
     {

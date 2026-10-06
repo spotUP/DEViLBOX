@@ -20,7 +20,7 @@
 import { readdirSync, statSync, writeFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { join, relative, basename, dirname } from 'node:path';
 import { FORMAT_REGISTRY, detectFormat, detectFormatFromContent } from '../src/lib/import/FormatRegistry';
-import { companionFilesIn, isInSampleDirectory } from '../src/lib/import/companionResolver';
+import { companionFilesIn, isInSampleDirectory, partnerlessFilesIn } from '../src/lib/import/companionResolver';
 
 const ROOT = process.cwd();
 const SONGS_ROOT = join(ROOT, 'public/data/songs');
@@ -174,7 +174,8 @@ const companionsByDir = new Map<string, Set<string>>();
 function companionsIn(dir: string): Set<string> {
   let set = companionsByDir.get(dir);
   if (!set) {
-    set = new Set([...companionFilesIn(dirs[listingFor(dir)], isSongByName)].map((c) => c.toLowerCase()));
+    const listing = dirs[listingFor(dir)];
+    set = new Set([...companionFilesIn(listing, isSongByName), ...partnerlessFilesIn(listing)].map((c) => c.toLowerCase()));
     companionsByDir.set(dir, set);
   }
   return set;
