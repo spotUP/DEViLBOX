@@ -181,7 +181,8 @@ export interface FormatStore {
   tfmxTimingTable: { patternIndex: number; row: number; cumulativeJiffies: number }[] | null;
   tfmxNative: TFMXNativeData | null;
   tfmxSelectedPattern: number;
-  uadeEditableSubsongs: { count: number; speeds: number[] } | null;
+  /** `orders`: a parser decoded each subsong's song order (the grid switches with it, UADE is pinned to it); `start`: the subsong loaded. */
+  uadeEditableSubsongs: { count: number; speeds: number[]; orders?: number[][]; start?: number } | null;
   uadeEditableCurrentSubsong: number;
   libopenmptFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
@@ -1161,7 +1162,7 @@ export const useFormatStore = create<FormatStore>()(
         state.tfmxSmplData = (song as any).tfmxSmplData ?? null;
         state.tfmxTimingTable = (song as any).tfmxTimingTable ?? null;
         state.uadeEditableSubsongs = (song as any).uadeEditableSubsongs ?? null;
-        state.uadeEditableCurrentSubsong = 0;
+        state.uadeEditableCurrentSubsong = (song as any).uadeEditableSubsongs?.start ?? 0;
         state.libopenmptFileData = (song as any).libopenmptFileData ?? null;
         if (song.furnaceNative) {
           newEditorMode = 'furnace';

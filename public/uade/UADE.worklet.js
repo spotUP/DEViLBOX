@@ -63,7 +63,7 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'load':
         this._stream?.discontinue(); // a new song is a new stream
-        await this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false, data.scanTimeoutSec);
+        await this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false, data.scanTimeoutSec, data.pinSubsong === true);
         break;
 
       case 'reinit':
@@ -825,7 +825,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     }
   }
 
-  async _load(buffer, filenameHint, subsongIndex = 0, skipScan = false, scanTimeoutSec = undefined) {
+  async _load(buffer, filenameHint, subsongIndex = 0, skipScan = false, scanTimeoutSec = undefined, pinSubsong = false) {
     if (!this._wasm || !this._ready) {
       this.port.postMessage({ type: 'error', message: 'WASM not ready' });
       return;
@@ -969,7 +969,9 @@ class UADEProcessor extends AudioWorkletProcessor {
       // that is audible within a few seconds. Desire's batmanreturns.dsr
       // opens on a subsong that is silent for 20 s while subsongs 2-10 sound
       // at once, and was judged "Silent" (owner decision 2026-10-05).
-      if (subsongIndex === 0 && subsongCount > 1) {
+      // A pinned subsong is the one the grid shows (a parser decoded it):
+      // play exactly that one.
+      if (subsongIndex === 0 && subsongCount > 1 && !pinSubsong) {
         const audible = this._firstAudibleSubsong(data, filenameHint, minSubsong, maxSubsong);
         if (audible !== null && audible !== minSubsong) {
           console.log('[UADE.worklet] Subsong ' + minSubsong + ' is silent at the start; starting on ' + audible);
@@ -2406,10 +2408,15 @@ class UADEProcessor extends AudioWorkletProcessor {
           totalFrames
         });
 
-        // Post position update with CIA tick count for audio/visual sync
+        // Post position update with CIA tick count for audio/visual sync.
+        // tickCount is CIA-A Timer A (the enhanced scan's row clock);
+        // playerTickCount is CIA-A Timer B with its interrupt enabled, the
+        // timer the score runs every DTP_Interrupt player on - Timer A stays
+        // 0 for those, so a grid of player ticks follows playerTickCount.
         this.port.postMessage({
           type: 'position',
           tickCount: this._wasm._uade_wasm_get_tick_count(),
+          playerTickCount: this._wasm._uade_wasm_get_player_tick_count ? this._wasm._uade_wasm_get_player_tick_count() : 0,
           totalFrames,
           audioTime: currentTime
         });

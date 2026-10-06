@@ -18,7 +18,7 @@ import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
 import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
-import { tickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
+import { tickGridPosition, playerTickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import {
   WASMSingletonBase,
@@ -128,6 +128,8 @@ export interface UADEPositionUpdate {
   subsong: number;
   position: number;
   tickCount?: number;
+  /** Player interrupts run (CIA-A Timer B), the clock of a parser-decoded grid; see TrackerSong.uadePlayerTickGrid. */
+  playerTickCount?: number;
   totalFrames?: number;
   audioTime?: number;
 }
@@ -348,6 +350,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
               subsong: data.subsong ?? 0,
               position: data.position ?? 0,
               tickCount: data.tickCount,
+              playerTickCount: data.playerTickCount,
               totalFrames: data.totalFrames,
               audioTime: data.audioTime,
             });
@@ -600,7 +603,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * @param data - Raw file bytes
    * @param filenameHint - Original filename (used by UADE for format detection)
    */
-  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number, looping?: boolean): Promise<UADEMetadata> {
+  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number, looping?: boolean, pinSubsong = false): Promise<UADEMetadata> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
 
@@ -615,7 +618,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     const raw = data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer;
     const transferBuf = raw.slice(0);
     this.workletNode.port.postMessage(
-      { type: 'load', buffer: transferBuf, filenameHint: uadePlayerHint(filenameHint), skipScan, subsong, scanTimeoutSec },
+      { type: 'load', buffer: transferBuf, filenameHint: uadePlayerHint(filenameHint), skipScan, subsong, scanTimeoutSec, pinSubsong },
       [transferBuf]
     );
 
@@ -651,9 +654,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * had grown their own copy of this incantation and two of them still ran the
    * scan (2026-09-24).
    */
-  async loadForPlayback(data: ArrayBuffer, filenameHint: string, subsong = 0): Promise<void> {
+  async loadForPlayback(data: ArrayBuffer, filenameHint: string, subsong = 0, pinSubsong = false): Promise<void> {
     const { getScanParams } = await import('./uadeScanLists');
-    await this.load(data, filenameHint, true, subsong, undefined, getScanParams(filenameHint).loops);
+    await this.load(data, filenameHint, true, subsong, undefined, getScanParams(filenameHint).loops, pinSubsong);
   }
 
   /**
@@ -673,7 +676,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       }
     }
 
-    await this.loadForPlayback(buffer, fileName, state.uadeEditableCurrentSubsong);
+    // A grid decoded per subsong (uadeEditableSubsongs.orders) shows one
+    // subsong: UADE plays exactly that one, never the first-audible probe's pick.
+    await this.loadForPlayback(buffer, fileName, state.uadeEditableCurrentSubsong, !!state.uadeEditableSubsongs?.orders);
   }
 
   /**
@@ -815,14 +820,28 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       const grid: TickGrid = { speed, songPositions: song.songPositions, patternLengths: song.patterns.map(p => p.length) };
       let lastRow = -1;
       let lastPosition = -1;
+      // A grid the parser decoded from the module counts the player's own
+      // interrupts (CIA-A Timer B). The Timer A count above stays 0 for every
+      // DTP_Interrupt player, so without this the subscription never anchored
+      // and the grid ran on the TS scheduler's clock instead of UADE's.
+      const playerClock = song.uadePlayerTickGrid === true;
+      const playerGrid: TickGrid = { ...grid, loopFrom: song.restartPosition ?? 0 };
       const unsub = this.onPositionUpdate((update) => {
         if (!isPlaying()) return;
-        const tickCount = update.tickCount ?? 0;
-        if (firstTick === null) {
-          if (tickCount <= 0) return;   // engine has not started yet
-          firstTick = tickCount;
+        let at: { songPos: number; row: number };
+        if (playerClock) {
+          const ticks = update.playerTickCount ?? 0;
+          if (ticks <= 0) return;       // the player has not run yet
+          at = playerTickGridPosition(ticks, playerGrid);
+        } else {
+          const tickCount = update.tickCount ?? 0;
+          if (firstTick === null) {
+            if (tickCount <= 0) return;   // engine has not started yet
+            firstTick = tickCount;
+          }
+          at = tickGridPosition(tickCount - firstTick, grid);
         }
-        const { songPos: position, row } = tickGridPosition(tickCount - firstTick, grid);
+        const { songPos: position, row } = at;
         if (row === lastRow && position === lastPosition) return;
         lastRow = row;
         lastPosition = position;
