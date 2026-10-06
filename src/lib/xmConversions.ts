@@ -269,7 +269,7 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   const fred = fredEffectToString(effTyp, eff);
   if (fred !== null) return fred;
 
-  // Sound Master private control effects (reserved block 0x74..0x78).
+  // Sound Master private control effects (reserved block 0x74..0x76).
   const sm = soundMasterEffectToString(effTyp, eff);
   if (sm !== null) return sm;
 

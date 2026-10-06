@@ -155,11 +155,9 @@ export class SmSong {
   decodeRow(n: number, info: number, ctx: SmVoiceCtx): TrackerCell {
     const cell = emptyCell();
     const noteless = (): void => {
-      if (info & 0x40) {
-        cell.volume = 0x10 + (info & 0x3f);
-        if (info & 0x80) addEffect(cell, SM_FX.fixed, 0);
-      } else if (info === 0x80) addEffect(cell, SM_FX.fixed, 0);
-      else if (info !== 0) addEffect(cell, SM_FX.inert, info);
+      // Only bit 6 means anything without a note (the player's no-note path
+      // tests nothing else); the rest of the byte stays in the module.
+      if (info & 0x40) cell.volume = 0x10 + (info & 0x3f);
     };
     if (this.fixed && n === 0xfd) { addEffect(cell, FX_SPEED, info); return cell; }
     if (this.fixed && n === 0xfe) { addEffect(cell, FX_BREAK, 0); noteless(); return cell; }
@@ -180,18 +178,28 @@ export class SmSong {
     else if (info & 0x40) cell.volume = 0x10 + (info & 0x3f);
     else cell.instrument = ((info + ctx.offset) & 63) + 1;
     if (legato && cell.note) addEffect(cell, SM_FX.legato, 0);
-    if (info & 0x80) addEffect(cell, SM_FX.fixed, 0);
+    // Info bit 7 (no transposes) is already in the note shown: the note is the one played.
     return cell;
   }
 
-  /** The row bytes a grid cell is, at `ctx`; null when the cell cannot be written there. */
-  encodeRow(cell: TrackerCell, ctx: SmVoiceCtx): [number, number] | null {
+  /**
+   * The row bytes a grid cell is, at `ctx`, over the row's `stored` bytes;
+   * null when the cell cannot be written there. Info bits the grid does not
+   * show are kept from the stored row: bit 7 of a note row (the note shown is
+   * already the untransposed one played), and the bits the player ignores on
+   * a row without a note.
+   */
+  encodeRow(cell: TrackerCell, ctx: SmVoiceCtx, stored: [number, number]): [number, number] | null {
     const fx = effects(cell);
-    const fixedPitch = fx.has(SM_FX.fixed) ? 0x80 : 0;
+    const [sn, si] = stored;
+    const storedNoteless = sn === 0 || (this.fixed && sn === 0xfe);
+    const storedNote = !storedNoteless && sn !== 0xff && !(this.fixed && sn === 0xfd);
+    const fixedPitch = storedNote ? si & 0x80 : 0;
     const vol = cell.volume >= 0x10 && cell.volume <= 0x4f ? cell.volume - 0x10 : -1;
     const notelessInfo = (): number => {
-      if (fx.has(SM_FX.inert)) return fx.get(SM_FX.inert)!;
-      return (vol >= 0 ? 0x40 | vol : 0) | fixedPitch;
+      const meaning = vol >= 0 ? 0x40 | vol : 0;
+      if (storedNoteless && (si & 0x40 ? 0x40 | (si & 0x3f) : 0) === meaning) return si;
+      return meaning;
     };
     if (this.fixed && fx.has(FX_SPEED)) return [0xfd, fx.get(FX_SPEED)!];
     if (fx.has(SM_FX.hold)) return [0xff, fx.get(SM_FX.hold)!];
@@ -244,7 +252,7 @@ export class SmSong {
     const s = this.steps[step];
     if (!s || row < 0 || row >= s.rows || ch < 0 || ch > 3) return null;
     const v = s.voices[ch];
-    const bytes = this.encodeRow(cell, v.ctx[row]);
+    const bytes = this.encodeRow(cell, v.ctx[row], this.rowBytes(v.pattern, row));
     if (!bytes) return null;
     const o = this.rowOffset(v.pattern, row);
     if (this.image[o] === bytes[0] && this.image[o + 1] === bytes[1]) return [];
