@@ -69,6 +69,9 @@ import {
   strandedDubMutes,
 } from '@/lib/dub/dubChannelTransient';
 import { automationFor } from '@/lib/dub/moveAutomation';
+import type { AutomatedShape, ShapeCurve } from '@/lib/dub/gestureShape';
+import { channelShapeEffectIndex, channelShapeNormFromValue, type ChannelShapeKind } from '@/lib/dub/channelShape';
+import type { AutoDubPersonaId } from '@/stores/useDubStore';
 import {
   beginGesture,
   cancelAllGestures,
@@ -233,6 +236,9 @@ const MOVE_COOLDOWNS: Record<string, number> = {
   channelThrow:        2,
   skankEchoThrow:      2,
   skankFloatThrow:     4,
+  // Shaping is a colour on one channel, several rules share the id: two bars
+  // keeps one persona from re-shaping every bar without starving the others.
+  channelShape:        2,
 };
 const DEFAULT_COOLDOWN_BARS = 6;
 /** Cap on wet moves (echo/reverb-contributing) per bar, regardless of total
@@ -479,7 +485,84 @@ interface Rule {
    *  stack into a reverb mush. Dry moves (mute, tapeStop, filter)
    *  keep firing normally. */
   wet?: boolean;
+  /** Only these personas consider the rule. Undefined = every persona. */
+  personas?: readonly AutoDubPersonaId[];
+  /** Params the rule fires with, under the persona's paramOverrides. */
+  params?: Record<string, number>;
+  /** Trace one param across the hold (overrides moveAutomation's default). */
+  automate?: { param: string; shape: AutomatedShape; from: number; to: number; curve: ShapeCurve };
 }
+
+/**
+ * A persona reaching for a channel's sound-shaping slot (F2, 2026-10-06).
+ * The table these rows come from — which persona, which effect, which role,
+ * when, how long, how it releases — and its sources are in
+ * thoughts/shared/plans/2026-10-06-fix-all-open.md ("F2 persona shaping
+ * table"). Values are in the effect's own unit (Hz, bits, ms, drive) and
+ * become the move's 0..1 `amount` here. A `sweep` traces the amount there and
+ * back across the hold, so the slot hands back where the gesture began; a
+ * flat value snaps back through the stage's 6 ms duck. Dry: the slot colours
+ * what the channel already sends and adds no tail.
+ */
+function shapeRule(o: {
+  personas: readonly AutoDubPersonaId[];
+  effect: Exclude<ChannelShapeKind, 'off'>;
+  role: NonNullable<Rule['channelRole']>;
+  condition: Rule['condition'];
+  baseWeight: number;
+  holdBars: number;
+  value?: number;
+  sweep?: readonly [number, number];
+}): Rule {
+  const norm = (v: number) => channelShapeNormFromValue(o.effect, v);
+  const from = o.sweep ? norm(o.sweep[0]) : norm(o.value ?? 0);
+  return {
+    moveId: 'channelShape',
+    channelRole: o.role,
+    personas: o.personas,
+    condition: o.condition,
+    baseWeight: o.baseWeight,
+    holdBars: o.holdBars,
+    params: { effect: channelShapeEffectIndex(o.effect), amount: from },
+    ...(o.sweep ? { automate: { param: 'amount', shape: 'sweep' as const, from, to: norm(o.sweep[1]), curve: 'linear' as const } } : {}),
+  };
+}
+
+const SHAPE_RULES: Rule[] = [
+  // Tubby — the Altec filter moved across a part, on the source.
+  shapeRule({ personas: ['tubby', 'custom'], effect: 'hpf', role: 'skank',
+    condition: (c) => c.isNewBar && c.bar % 4 === 1, baseWeight: 0.20, holdBars: 1, sweep: [255, 2100] }),
+  shapeRule({ personas: ['tubby', 'custom'], effect: 'lpf', role: 'bass',
+    condition: (c) => c.isNewBar && c.bar % 8 === 7, baseWeight: 0.18, holdBars: 1, sweep: [1000, 300] }),
+  shapeRule({ personas: ['tubby', 'custom'], effect: 'saturation', role: 'bass',
+    condition: (c) => c.isNewBar && c.bar % 8 === 0, baseWeight: 0.12, holdBars: 2, value: 0.5 }),
+  // Scientist — HPF sweeps on the drum stem, resonant LPF at the seams, rare ring.
+  shapeRule({ personas: ['scientist'], effect: 'hpf', role: 'percussion',
+    condition: (c) => c.barPos > 0.5 && c.bar % 4 === 2, baseWeight: 0.20, holdBars: 1, sweep: [300, 5000] }),
+  shapeRule({ personas: ['scientist'], effect: 'lpf', role: 'bass',
+    condition: (c) => c.isNewBar && c.bar % 8 === 7, baseWeight: 0.16, holdBars: 1, sweep: [1000, 300] }),
+  shapeRule({ personas: ['scientist'], effect: 'ringMod', role: 'percussion',
+    condition: (c) => c.intensity > 0.5 && c.barPos > 0.6 && c.bar % 4 === 3, baseWeight: 0.05, holdBars: 1, value: 80 }),
+  // Perry — ring on the drums, a starved skank, a wobbling lead.
+  shapeRule({ personas: ['perry'], effect: 'ringMod', role: 'percussion',
+    condition: (c) => c.intensity > 0.5 && c.barPos > 0.6 && c.bar % 4 === 3, baseWeight: 0.14, holdBars: 1, value: 120 }),
+  shapeRule({ personas: ['perry'], effect: 'lofi', role: 'skank',
+    condition: (c) => c.intensity > 0.6 && c.isNewBar && c.bar % 8 === 5, baseWeight: 0.12, holdBars: 1, value: 4 }),
+  shapeRule({ personas: ['perry'], effect: 'wobble', role: 'lead',
+    condition: (c) => c.intensity > 0.35 && c.isNewBar && c.bar % 4 === 1, baseWeight: 0.12, holdBars: 2, value: 3.7 }),
+  // Mad Professor — slow HPF into the reverb, gentle wow, warm bass.
+  shapeRule({ personas: ['madProfessor'], effect: 'hpf', role: 'lead',
+    condition: (c) => c.barPos > 0.5 && c.bar % 4 === 2, baseWeight: 0.16, holdBars: 2, sweep: [500, 4000] }),
+  shapeRule({ personas: ['madProfessor'], effect: 'wobble', role: 'pad',
+    condition: (c) => c.isNewBar && c.bar % 8 === 0, baseWeight: 0.10, holdBars: 2, value: 1.8 }),
+  shapeRule({ personas: ['madProfessor'], effect: 'saturation', role: 'bass',
+    condition: (c) => c.isNewBar && c.bar % 8 === 4, baseWeight: 0.10, holdBars: 2, value: 0.3 }),
+  // Jammy — minimal and digital: a hard bass cut, a rare crushed drum bar.
+  shapeRule({ personas: ['jammy'], effect: 'lpf', role: 'bass',
+    condition: (c) => c.isNewBar && c.bar % 8 === 0, baseWeight: 0.14, holdBars: 1, value: 200 }),
+  shapeRule({ personas: ['jammy'], effect: 'lofi', role: 'percussion',
+    condition: (c) => c.isNewBar && c.bar % 16 === 8, baseWeight: 0.06, holdBars: 1, value: 8 }),
+];
 
 const RULES: Rule[] = [
   // Bar 1 of 4 — Tubby's Altec Big Knob HPF rise. Research: Tubby swept the
@@ -766,6 +849,8 @@ const RULES: Rule[] = [
       && c.intensity > 0.35
       && !c.inRiddimSection,
     baseWeight: 0.60, holdBars: 4 },
+
+  ...SHAPE_RULES,
 ];
 
 /** Unique move IDs Auto Dub can fire. Deduplicated from RULES — several
@@ -853,6 +938,8 @@ export interface AutoDubChoice {
   /** True when the chosen rule was wet-tagged. Caller uses this to
    *  increment its per-bar wet-fires counter. */
   wet: boolean;
+  /** The rule's own gesture automation, when it has one. */
+  automate?: Rule['automate'];
 }
 
 /**
@@ -907,6 +994,7 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
 
   for (const rule of RULES) {
     if (ctx.blacklist.has(rule.moveId)) continue;
+    if (rule.personas && !rule.personas.includes(ctx.persona.id)) continue;
     // Gate E: the intention was chosen before the move, so only moves that can
     // express it are eligible. Without an intention (older callers, tests that
     // drive the rule engine directly) every move stays eligible and the
@@ -1097,7 +1185,7 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
   }
 
   const paramOverrides = ctx.persona.paramOverrides?.[picked.rule.moveId] ?? {};
-  const params: Record<string, number> = { ...paramOverrides };
+  const params: Record<string, number> = { ...(picked.rule.params ?? {}), ...paramOverrides };
 
   return {
     moveId: picked.rule.moveId,
@@ -1105,7 +1193,22 @@ export function chooseMove(ctx: AutoDubTickCtx, rng: () => number): AutoDubChoic
     params,
     holdBars: picked.rule.holdBars ?? 1,
     wet: picked.rule.wet === true,
+    ...(picked.rule.automate ? { automate: picked.rule.automate } : {}),
   };
+}
+
+/**
+ * The gesture a choice is performed as: how long it holds, and the parameter
+ * it traces while held — the rule's own sweep when it has one (a persona's
+ * shaping sweep), else the move's default (`moveAutomation.ts`). Only a hold
+ * with a length has anything to travel over.
+ */
+export function autoDubGesture(choice: AutoDubChoice, bpm: number): {
+  holdMs: number;
+  automation: { shape: AutomatedShape; param: string; from: number; to: number; curve: ShapeCurve } | null;
+} {
+  const holdMs = choice.holdBars > 0 ? (60000 / bpm) * 4 * choice.holdBars : 0;
+  return { holdMs, automation: holdMs > 0 ? (choice.automate ?? automationFor(choice.moveId)) : null };
 }
 
 const EMPTY_CHANNELS: readonly number[] = Object.freeze([]);
@@ -1731,7 +1834,7 @@ function tickImpl(): void {
   }
   // Gate F4: the gesture engine owns the shape — fire, hold, release — and
   // still executes through DubRouter, so nothing bypasses the single path.
-  const holdMsForGesture = choice.holdBars > 0 ? (60000 / bpm) * 4 * choice.holdBars : 0;
+  const { holdMs: holdMsForGesture, automation } = autoDubGesture(choice, bpm);
   const chStrForLog = choice.channelId !== undefined ? ` ch${choice.channelId}` : '';
   // Moves whose parameter is worth MOVING under the hand get the gesture
   // traced across the hold instead of a single position held flat. Only where
@@ -1741,7 +1844,6 @@ function tickImpl(): void {
   // The move's own internal ramp is harmless here: the first automated value
   // is pushed synchronously, in the same block as the fire, and cancels the
   // schedule before a frame of it is rendered.
-  const automation = holdMsForGesture > 0 ? automationFor(choice.moveId) : null;
   const gestureId = beginGesture({
     moveId: choice.moveId,
     channelId: choice.channelId,
