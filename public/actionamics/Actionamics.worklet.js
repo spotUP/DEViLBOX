@@ -15,6 +15,7 @@ class ActionamicsProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    this.lastReport = -1;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
@@ -45,7 +46,18 @@ class ActionamicsProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; break;
+      case 'replaceModule': {
+        // An edited module's tracks swapped in while it plays; every voice keeps its row.
+        if (!this.module || !this.handle) break;
+        const bytes = new Uint8Array(data.moduleData);
+        const ptr = this.module._malloc(bytes.length);
+        if (!ptr) break;
+        this.module.HEAPU8.set(bytes, ptr);
+        this.module._act_replace_tracks(this.handle, ptr, bytes.length);
+        this.module._free(ptr);
+        break;
+      }
+      case 'play': this.playing = true; this.lastReport = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._act_select_subsong(this.handle, 0);
@@ -182,6 +194,17 @@ class ActionamicsProcessor extends AudioWorkletProcessor {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
       }
+    }
+
+    // The row the voices last read: song position and the row within it, the
+    // replayer's own counters (act_get_position / act_get_row), reported when
+    // they change.
+    const position = this.module._act_get_position(this.handle);
+    const row = this.module._act_get_row(this.handle);
+    const key = position * 65536 + row;
+    if (key !== this.lastReport) {
+      this.lastReport = key;
+      this.port.postMessage({ type: 'position', position, row });
     }
 
     if (this.module._act_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });

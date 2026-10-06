@@ -314,6 +314,19 @@ static void act_reader_read_string(ActReader* r, char* buf, int max_len) {
 // Module struct
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#define ACT_EVENT_RING 4096
+
+typedef struct ActNoteEvent {
+    uint8_t position;
+    uint16_t row;
+    uint8_t voice;
+    int16_t note;           // the row's note plus the position's note transpose (0 = restart)
+    uint8_t instrument;     // the row's instrument byte
+    int16_t final_note;     // plus the instrument's own transpose
+    int16_t sample;
+    uint16_t period;        // the table period the note names (before any slide or frequency list)
+} ActNoteEvent;
+
 typedef struct ActModule {
     float sample_rate;
 
@@ -347,6 +360,7 @@ typedef struct ActModule {
     int num_frequency_lists;
 
     uint8_t** tracks;
+    int* track_sizes;
     int num_tracks;
 
     ActSongInfo* current_song_info;
@@ -360,6 +374,19 @@ typedef struct ActModule {
     uint8_t end_position;
     uint8_t current_row_position;
     uint8_t number_of_rows;
+
+    // Where the player is, as the editor shows it: the position and the row
+    // (rows read since the position began - a Break row leaves the pattern
+    // after the next row, so this is not current_row_position) of the row the
+    // voices read on the last row tick.
+    uint8_t shown_position;
+    uint16_t shown_row;
+    uint16_t row_counter;
+
+    // Every sample start the voices make (note rows and sample restarts), for
+    // tests that compare the notes the player plays with the notes shown.
+    ActNoteEvent events[ACT_EVENT_RING];
+    uint32_t event_count;
 
     ActVoiceInfo voices[4];
 
@@ -664,7 +691,8 @@ static bool act_load_tracks(ActModule* m, ActReader* r, long start_offset, uint3
     int count = (int)(track_offset_length / 2);
     m->num_tracks = count - 1;
     m->tracks = (uint8_t**)calloc(m->num_tracks, sizeof(uint8_t*));
-    if (!m->tracks) return false;
+    m->track_sizes = (int*)calloc(m->num_tracks, sizeof(int));
+    if (!m->tracks || !m->track_sizes) return false;
 
     uint16_t* offsets = (uint16_t*)calloc(count, sizeof(uint16_t));
     if (!offsets) return false;
@@ -680,6 +708,7 @@ static bool act_load_tracks(ActModule* m, ActReader* r, long start_offset, uint3
         act_reader_seek(r, track_start_offset + offsets[i]);
 
         int track_length = offsets[i + 1] - offsets[i];
+        m->track_sizes[i] = track_length;
         m->tracks[i] = (uint8_t*)malloc(track_length);
         if (!m->tracks[i]) { free(offsets); return false; }
 
@@ -1384,6 +1413,10 @@ static void act_initialize_sound(ActModule* m, int sub_song) {
     m->end_position = m->current_song_info->end_position;
     m->current_row_position = 0;
     m->number_of_rows = 64;
+    m->shown_position = m->current_song_info->start_position;
+    m->shown_row = 0;
+    m->row_counter = 0;
+    m->event_count = 0;
 
     m->has_ended = false;
 
@@ -1488,6 +1521,9 @@ static void act_play_tick(ActModule* m) {
         m->speed_counter = 0;
         m->measure_counter = 0;
 
+        m->shown_position = m->current_position;
+        m->shown_row = m->row_counter++;
+
         for (int i = 0; i < 4; i++) {
             ActVoiceInfo* vi = &m->voices[i];
             act_read_next_row(vi);
@@ -1500,6 +1536,7 @@ static void act_play_tick(ActModule* m) {
 
         if (m->current_row_position == m->number_of_rows) {
             m->current_row_position = 0;
+            m->row_counter = 0;
 
             uint8_t position = m->current_position;
             m->current_position++;
@@ -1535,6 +1572,18 @@ static void act_play_tick(ActModule* m) {
             if (vi->trig_sample) {
                 vi->trig_sample = false;
 
+                {
+                    ActNoteEvent* ev = &m->events[m->event_count % ACT_EVENT_RING];
+                    ev->position = m->shown_position;
+                    ev->row = m->shown_row;
+                    ev->voice = (uint8_t)i;
+                    ev->note = (int16_t)vi->note;
+                    ev->instrument = (uint8_t)vi->instrument_number;
+                    ev->final_note = (int16_t)vi->final_note;
+                    ev->sample = (int16_t)vi->sample_number;
+                    ev->period = vi->note_period;
+                    m->event_count++;
+                }
                 act_ch_play_sample(ch, (int16_t)vi->sample_number, vi->sample_data, vi->sample_offset, vi->sample_length * 2U);
 
                 if (vi->sample_loop_length > 1)
@@ -1836,6 +1885,7 @@ void act_destroy(ActModule* module) {
             free(module->tracks[i]);
         free(module->tracks);
     }
+    free(module->track_sizes);
 
     free(module->song_info_list);
     if (module->original_data) free(module->original_data);
@@ -1864,6 +1914,101 @@ void act_set_channel_mask(ActModule* module, uint32_t mask) {
     if (!module) return;
     for (int i = 0; i < 4; i++)
         module->channels[i].muted = ((mask >> i) & 1) == 0;
+}
+
+// The position and row the voices last read, in the editor's terms: the
+// position counted from the sub-song's start (the grid's pattern index; the
+// positions between start and end are the grid's patterns in order), the row
+// counting rows since the position began.
+int act_get_position(const ActModule* module) {
+    if (!module || !module->current_song_info) return 0;
+    return (int)module->shown_position - (int)module->current_song_info->start_position;
+}
+int act_get_row(const ActModule* module) { return module ? module->shown_row : 0; }
+int act_get_rows(const ActModule* module) { return module ? (module->number_of_rows ? module->number_of_rows : 256) : 0; }
+
+// Sample starts so far; event fields by absolute index (only the last
+// ACT_EVENT_RING are kept). field: 0 position, 1 row, 2 voice, 3 note,
+// 4 instrument, 5 final note, 6 sample, 7 period.
+uint32_t act_event_count(const ActModule* module) { return module ? module->event_count : 0; }
+int act_event_field(const ActModule* module, uint32_t index, int field) {
+    if (!module || index >= module->event_count || module->event_count - index > ACT_EVENT_RING) return -1;
+    const ActNoteEvent* e = &module->events[index % ACT_EVENT_RING];
+    switch (field) {
+        case 0: return e->position;
+        case 1: return e->row;
+        case 2: return e->voice;
+        case 3: return e->note;
+        case 4: return e->instrument;
+        case 5: return e->final_note;
+        case 6: return e->sample;
+        case 7: return e->period;
+        default: return -1;
+    }
+}
+
+// Where a voice stands in a track after reading row `row` (-1: none yet): the
+// byte offset after the event that covers the row, and the delay rows that
+// event still has to play. Mirrors act_read_track_data.
+static void act_track_seek(const uint8_t* t, int size, int row, int* pos_out, int* delay_out) {
+    int pos = 0, delay = 0, r = -1;
+    while (r < row && pos < size) {
+        uint8_t data = t[pos++];
+        delay = 0;
+        if (!(data & 0x80)) {
+            if (data >= 0x70) { pos++; }
+            else {
+                if (pos >= size) break;
+                data = t[pos++];
+                if (data & 0x80) delay = (uint8_t)~data;
+                else if (data >= 0x70) { pos++; }
+                else {
+                    if (pos >= size) break;
+                    data = t[pos++];
+                    if (data & 0x80) delay = (uint8_t)~data;
+                    else pos++;
+                }
+            }
+        } else delay = (uint8_t)~data;
+        r++;
+        // This event covers rows r .. r + delay.
+        if (row <= r + delay) { delay = r + delay - row; r = row; break; }
+        r += delay;
+        delay = 0;
+    }
+    *pos_out = pos > size ? size : pos;
+    *delay_out = delay;
+}
+
+// Swap in the tracks of an edited module (same structure: the number of
+// tracks and positions) while it plays: every voice keeps its row.
+int act_replace_tracks(ActModule* m, const uint8_t* data, size_t size) {
+    if (!m) return 0;
+    ActModule* next = act_create(data, size, m->sample_rate);
+    if (!next) return 0;
+    if (next->num_tracks != m->num_tracks || next->position_count != m->position_count) { act_destroy(next); return 0; }
+
+    int row = (int)m->row_counter - 1;   // the row the voices last read (-1: a position just began)
+    for (int i = 0; i < 4; i++) {
+        ActVoiceInfo* vi = &m->voices[i];
+        for (int k = 0; k < m->num_tracks; k++) {
+            if (vi->track_data != m->tracks[k]) continue;
+            int pos = 0, delay = 0;
+            act_track_seek(next->tracks[k], next->track_sizes[k], row, &pos, &delay);
+            vi->track_data = next->tracks[k];
+            vi->track_position = pos;
+            vi->delay_counter = (uint8_t)delay;
+            break;
+        }
+    }
+
+    // The module's tracks (and its original bytes, for export) become the new ones; `next` takes the old with it.
+    uint8_t** tracks = m->tracks; m->tracks = next->tracks; next->tracks = tracks;
+    int* sizes = m->track_sizes; m->track_sizes = next->track_sizes; next->track_sizes = sizes;
+    uint8_t* orig = m->original_data; m->original_data = next->original_data; next->original_data = orig;
+    size_t osz = m->original_size; m->original_size = next->original_size; next->original_size = osz;
+    act_destroy(next);
+    return 1;
 }
 
 bool act_has_ended(const ActModule* module) {

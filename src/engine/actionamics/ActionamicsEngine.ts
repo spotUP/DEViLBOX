@@ -14,7 +14,7 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
-function actionamicsTransform(code: string): string {
+export function actionamicsTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -25,11 +25,21 @@ function actionamicsTransform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
+/**
+ * Where the replayer is: the grid pattern (song position counted from the
+ * sub-song's start) and the row within it, both the replayer's own counters.
+ */
+export interface ActionamicsPositionUpdate {
+  songPos: number;
+  row: number;
+}
+
 export class ActionamicsEngine extends WASMChannelOutputsEngine {
   private static instance: ActionamicsEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _songEndCallback: (() => void) | null = null;
+  private _positionCallbacks = new Set<(update: ActionamicsPositionUpdate) => void>();
 
   private constructor() {
     super();
@@ -85,6 +95,9 @@ export class ActionamicsEngine extends WASMChannelOutputsEngine {
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
+        case 'position':
+          for (const cb of this._positionCallbacks) cb({ songPos: data.position, row: data.row });
+          break;
         case 'songEnd':
           this._songEndCallback?.();
           break;
@@ -107,6 +120,11 @@ export class ActionamicsEngine extends WASMChannelOutputsEngine {
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
+  /** Swap in an edited module's tracks while it plays (every voice keeps its row). */
+  replaceModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'replaceModule', moduleData: buffer });
+  }
+
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
     this.afterPlay();
@@ -116,6 +134,11 @@ export class ActionamicsEngine extends WASMChannelOutputsEngine {
 
   setMuteMask(mask: number): void {
     this.workletNode?.port.postMessage({ type: 'setChannelMask', mask });
+  }
+
+  onPositionUpdate(cb: (update: ActionamicsPositionUpdate) => void): () => void {
+    this._positionCallbacks.add(cb);
+    return () => this._positionCallbacks.delete(cb);
   }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
@@ -131,6 +154,7 @@ export class ActionamicsEngine extends WASMChannelOutputsEngine {
   }
 
   override dispose(): void {
+    this._positionCallbacks.clear();
     super.dispose();
     if (ActionamicsEngine.instance === this) ActionamicsEngine.instance = null;
   }

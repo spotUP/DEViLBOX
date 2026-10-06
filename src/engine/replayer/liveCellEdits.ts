@@ -59,6 +59,13 @@ export async function sendCellEditsToEngine(
     return;
   }
 
+  // Actionamics: a grid cell is a row of a voice's track; the edit re-encodes the module.
+  if (desc?.key === 'ActionamicsReplayer') {
+    const { applyActionamicsModuleEdits } = await import('../actionamics/actionamicsModuleEdits');
+    await applyActionamicsModuleEdits(song, edits);
+    return;
+  }
+
   if (desc?.gridCellEdits) {
     const Engine = desc.staticRef ?? (desc.dynamicResolver ? await desc.dynamicResolver() : null);
     if (!Engine) return;
