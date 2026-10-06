@@ -14,6 +14,7 @@
  * Usage:
  *   npx tsx tools/format-server.ts
  *   npx tsx tools/format-server.ts --port 4444
+ *   npx tsx tools/format-server.ts --port=4555 --state=/tmp/scratch.json
  */
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
@@ -22,7 +23,10 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const STATE_FILE = join(__dirname, 'format-state.json');
+// --state=<file> lets a test run the real handlers against a scratch file
+// instead of the live tools/format-state.json.
+const STATE_FILE = process.argv.find(a => a.startsWith('--state='))?.split('=')[1] ??
+                   join(__dirname, 'format-state.json');
 const HTML_FILE  = join(__dirname, 'format-status.html');
 const PORT = parseInt(process.argv.find(a => a.startsWith('--port='))?.split('=')[1] ?? '') ||
              (process.argv.includes('--port') ? parseInt(process.argv[process.argv.indexOf('--port') + 1]) : 0) ||

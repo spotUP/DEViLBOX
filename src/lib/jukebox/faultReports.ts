@@ -62,40 +62,56 @@ export interface ReportContext {
   note?: string;
 }
 
+/** Fault ids in canonical (keyboard, worst first) order, unknown ids dropped. */
+function canonical(ids: readonly string[]): string[] {
+  return JUKEBOX_FAULTS.filter((f) => ids.includes(f.id)).map((f) => f.id);
+}
+
 /**
- * Send one verdict.
- *
- * Fire-and-forget by design: a listener sweeping 186 formats must never wait
- * on a dev server, and the tracker being down is not a reason to lose the
- * rest of the sweep. Returns whether it landed, for the UI to show quietly.
+ * The set after one fault is switched on or off. Pure, and independent per
+ * fault: switching one never touches another.
  */
-export async function reportFault(
-  fault: JukeboxFault | typeof JUKEBOX_OK,
-  ctx: ReportContext,
-  /**
-   * Take the fault BACK off the row.
-   *
-   * A verdict is a state, not an event: a mis-keyed fault used to stick until
-   * a reload. The server merges shallowly, so writing the fault's own fields
-   * as empty strings removes exactly this fault and leaves any other verdict
-   * on the row alone.
-   */
-  clear = false,
-): Promise<boolean> {
-  const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  const parts = [`${fault.label} — ${ctx.file}`];
-  if (ctx.engine) parts.push(`engine=${ctx.engine}`);
-  if (ctx.note) parts.push(ctx.note);
-  parts.push(`(jukebox ${stamp})`);
+export function setFault(current: readonly string[], id: string, on: boolean): string[] {
+  const without = current.filter((x) => x !== id);
+  return canonical(on ? [...without, id] : without);
+}
 
-  const body: Record<string, unknown> = {
-    notes: clear ? `cleared ${fault.label} — ${ctx.file} (jukebox ${stamp})` : parts.join(' · '),
+/**
+ * The tracker's two shared fields, derived from a fault set. First match in
+ * JUKEBOX_FAULTS order wins, which is worst first.
+ */
+export function deriveFields(ids: readonly string[]): { status: string; patternQuality: string } {
+  const held = JUKEBOX_FAULTS.filter((f) => ids.includes(f.id));
+  return {
+    status: held.find((f) => f.status)?.status ?? '',
+    patternQuality: held.find((f) => f.patternQuality)?.patternQuality ?? '',
   };
-  if ('status' in fault && fault.status) body.status = clear ? '' : fault.status;
-  if ('patternQuality' in fault && fault.patternQuality) {
-    body.patternQuality = clear ? '' : fault.patternQuality;
-  }
+}
 
+/** The faults a stored verdict carries, whichever shape wrote it. */
+export function faultsOf(v: JukeboxVerdict | undefined): string[] {
+  if (!v) return [];
+  if (Array.isArray(v.faults)) {
+    const d = deriveFields(v.faults);
+    // Consistent with the shared fields -> the set is the truth. Otherwise the
+    // dashboard changed the fields after the set was written.
+    if (d.status === (v.status ?? '') && d.patternQuality === (v.patternQuality ?? '')) {
+      return canonical(v.faults);
+    }
+  }
+  return JUKEBOX_FAULTS
+    .filter((f) => (f.status && f.status === v.status) || (f.patternQuality && f.patternQuality === v.patternQuality))
+    .map((f) => f.id);
+}
+
+/** The verdict a fault set writes, so the UI shows it without a round trip. */
+export function verdictFromFaults(ids: readonly string[], notes?: string): JukeboxVerdict {
+  const faults = canonical(ids);
+  const d = deriveFields(faults);
+  return { faults, status: d.status || undefined, patternQuality: d.patternQuality || undefined, notes };
+}
+
+async function push(ctx: ReportContext, body: Record<string, unknown>): Promise<boolean> {
   try {
     const res = await fetch(`${TRACKER}/push-updates`, {
       method: 'POST',
@@ -110,6 +126,48 @@ export async function reportFault(
   }
 }
 
+function stampOf(): string {
+  return new Date().toISOString().slice(0, 16).replace('T', ' ');
+}
+
+/**
+ * Send a row's whole fault set.
+ *
+ * The full set goes every time (not a delta), so the server never has to merge
+ * two faults and a reload shows exactly what was set.
+ *
+ * Fire-and-forget by design: a listener sweeping 186 formats must never wait
+ * on a dev server, and the tracker being down is not a reason to lose the
+ * rest of the sweep. Returns whether it landed, for the UI to show quietly.
+ *
+ * @param changed the fault just switched, for the note
+ */
+export async function reportFaults(
+  faults: readonly string[],
+  changed: JukeboxFault,
+  on: boolean,
+  ctx: ReportContext,
+): Promise<boolean> {
+  const stamp = stampOf();
+  const parts = [`${on ? '' : 'cleared '}${changed.label} — ${ctx.file}`];
+  if (on && ctx.engine) parts.push(`engine=${ctx.engine}`);
+  if (on && ctx.note) parts.push(ctx.note);
+  parts.push(`(jukebox ${stamp})`);
+  const set = canonical(faults);
+  const d = deriveFields(set);
+  return push(ctx, { faults: set, status: d.status, patternQuality: d.patternQuality, notes: parts.join(' · ') });
+}
+
+/** Mark a row good. Exclusive: the fault set is emptied. */
+export async function reportGood(ctx: ReportContext): Promise<boolean> {
+  return push(ctx, {
+    faults: [],
+    status: JUKEBOX_OK.status,
+    patternQuality: '',
+    notes: `${JUKEBOX_OK.label} — ${ctx.file} (jukebox ${stampOf()})`,
+  });
+}
+
 /**
  * A row's recorded verdict, in the tracker's own vocabulary.
  *
@@ -118,6 +176,8 @@ export async function reportFault(
  * when it comes back.
  */
 export interface JukeboxVerdict {
+  /** Fault ids; see the header for how it relates to the two fields below. */
+  faults?: string[];
   status?: string;
   patternQuality?: string;
   notes?: string;
@@ -136,20 +196,20 @@ export interface JukeboxVerdict {
  */
 export function verdictLabels(v: JukeboxVerdict | undefined): string[] {
   if (!v) return [];
-  if (v.status === JUKEBOX_OK.status) return [JUKEBOX_OK.label];
-  const out: string[] = [];
+  if (isGoodVerdict(v)) return [JUKEBOX_OK.label];
+  const ids = faultsOf(v);
+  const out = ids.map((id) => JUKEBOX_FAULTS.find((f) => f.id === id)!.label);
   for (const field of ['status', 'patternQuality'] as const) {
     const value = v[field];
-    if (!value) continue;
-    const known = JUKEBOX_FAULTS.find((f) => f[field] === value);
-    out.push(known?.label ?? value);
+    if (!value || value === 'untested') continue;
+    if (!JUKEBOX_FAULTS.some((f) => f[field] === value)) out.push(value);
   }
   return out;
 }
 
 /** True when this verdict means there is nothing to come back to. */
 export function isGoodVerdict(v: JukeboxVerdict | undefined): boolean {
-  return v?.status === JUKEBOX_OK.status;
+  return v?.status === JUKEBOX_OK.status && faultsOf(v).length === 0;
 }
 
 /**
@@ -169,8 +229,11 @@ export async function loadVerdicts(): Promise<Record<string, JukeboxVerdict>> {
     const data = await res.json() as Record<string, JukeboxVerdict>;
     const out: Record<string, JukeboxVerdict> = {};
     for (const [key, entry] of Object.entries(data)) {
-      if (!entry?.status && !entry?.patternQuality) continue;
-      out[key] = { status: entry.status, patternQuality: entry.patternQuality, notes: entry.notes };
+      if ((!entry?.status || entry.status === 'untested') && !entry?.patternQuality && !entry?.faults?.length) continue;
+      out[key] = {
+        faults: Array.isArray(entry.faults) ? entry.faults : undefined,
+        status: entry.status, patternQuality: entry.patternQuality, notes: entry.notes,
+      };
     }
     return out;
   } catch {
@@ -178,12 +241,10 @@ export async function loadVerdicts(): Promise<Record<string, JukeboxVerdict>> {
   }
 }
 
-/** The verdict a fault writes, so the UI can show it without a round trip. */
+/** The verdict one fault alone writes (or Good). */
 export function verdictOf(fault: JukeboxFault | typeof JUKEBOX_OK): JukeboxVerdict {
-  return {
-    status: 'status' in fault ? fault.status : undefined,
-    patternQuality: 'patternQuality' in fault ? fault.patternQuality : undefined,
-  };
+  if (fault.id === JUKEBOX_OK.id) return { faults: [], status: JUKEBOX_OK.status };
+  return verdictFromFaults([fault.id]);
 }
 
 /** The fault a failed load reports — looked up, never duplicated. */
