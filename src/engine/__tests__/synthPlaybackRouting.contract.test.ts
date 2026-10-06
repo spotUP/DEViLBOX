@@ -81,7 +81,8 @@ describe('Synth playback routing — libopenmpt creation contract', () => {
     const tfmxBlockMatch = nativeRouting.match(/if\s*\(desc\.key === 'TFMXModule'[\s\S]*?console\.log\(`\[NativeEngineRouting\] TFMXModule position sync wired[\s\S]*?\n\s*\}/);
     expect(tfmxBlockMatch, 'TFMXModule position sync block should exist').not.toBeNull();
     const tfmxBlock = tfmxBlockMatch![0];
-    expect(tfmxBlock).toContain('useWasmPositionStore.getState().setPosition(row, position);');
+    // Through reportEnginePosition, which writes useWasmPositionStore while TFMX is the running engine.
+    expect(tfmxBlock).toContain('reportEnginePosition(desc.key, row, position);');
     expect(tfmxBlock).not.toContain('setFormatPlaybackPlaying(true)');
     expect(tfmxBlock).not.toContain('setFormatPlaybackRow(row)');
   });

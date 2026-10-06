@@ -257,9 +257,6 @@ export function useTrackerAnalysis(): void {
               }
             }
           } catch { /* non-fatal — proceed from current position */ }
-          // The seek wait above is async: the song may have changed (its capture
-          // was stopped for the old one) or another run already started.
-          if (lastFileHash.current !== fileHash || isCurrentlyCapturing()) return;
           startCapture(fileHash, handleCaptureComplete);
         })();
       }
