@@ -582,19 +582,25 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     if (!this.workletNode) return;
     // Create a new init promise that resolves when the worklet sends 'ready'
     return new Promise<void>((resolve) => {
+      const port = this.workletNode!.port;
+      // Settled exactly once, and the listener goes with it: when no reinit was
+      // needed the worklet never sends 'ready', and the listener used to stay on
+      // the port for the life of the page, one per song prepared.
+      const settle = () => {
+        port.removeEventListener('message', handler);
+        clearTimeout(timer);
+        resolve();
+      };
       const handler = (event: MessageEvent) => {
-        if (event.data.type === 'ready') {
-          this.workletNode!.port.removeEventListener('message', handler);
-          resolve();
-        }
+        if (event.data.type === 'ready') settle();
         if (event.data.type === 'initProgress' && this._onInitProgress) {
           this._onInitProgress(event.data.progress, event.data.phase);
         }
       };
-      this.workletNode!.port.addEventListener('message', handler);
-      this.workletNode!.port.postMessage({ type: 'reinit' });
-      // If no reinit needed, worklet won't send 'ready' — resolve after short timeout
-      setTimeout(() => resolve(), 100);
+      // If no reinit needed, worklet won't send 'ready' - resolve after short timeout
+      const timer = setTimeout(settle, 100);
+      port.addEventListener('message', handler);
+      port.postMessage({ type: 'reinit' });
     });
   }
 
