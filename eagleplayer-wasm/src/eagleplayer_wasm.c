@@ -43,6 +43,10 @@ EMSCRIPTEN_KEEPALIVE void ep_wasm_set_subsong(int subsong) { eagle_set_subsong(s
 EMSCRIPTEN_KEEPALIVE int ep_wasm_subsong_min(void) { return eagle_subsong_min(); }
 EMSCRIPTEN_KEEPALIVE int ep_wasm_subsong_max(void) { return eagle_subsong_max(); }
 EMSCRIPTEN_KEEPALIVE int ep_wasm_subsong_current(void) { return eagle_subsong_current(); }
+/* A grid edit's bytes into the playing module (eagle_write_module). */
+EMSCRIPTEN_KEEPALIVE int ep_wasm_write_module(int offset, const uint8_t *data, int len) {
+  return offset < 0 || len < 0 ? -1 : eagle_write_module((uint32_t)offset, data, (size_t)len);
+}
 EMSCRIPTEN_KEEPALIVE uint32_t ep_wasm_player_ticks(void) { return eagle_player_ticks(); }
 EMSCRIPTEN_KEEPALIVE int ep_wasm_song_ended(void) { return eagle_song_ended(); }
 EMSCRIPTEN_KEEPALIVE void ep_wasm_set_song_end_detection(int on) { eagle_set_song_end_detection(on); }

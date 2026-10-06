@@ -225,7 +225,7 @@ Corpus songs sum to less than the 4480 in index.json: entries with `formatKey` n
 | Sean Connolly | seanConnolly | C/N0 | SeanConnollyParser.ts ; AmigaFormatParsers.ts:2352 - stub [h: 1p/256r/0n] | 2 | UADE | binary only: uade players/SeanConnolly; amigasrc/ems (EMS player source, same player ASSUMED) |
 | Sean Conran | seanConran | C/N0 | SeanConranParser.ts ; AmigaFormatParsers.ts:1824 - stub [h: 1p/256r/0n] | 2 | UADE | asm/src: amigasrc/wanted_team/SeanConran |
 | Sonic Arranger SAS | sonicArrangerSas | C/N0 | SimpleAmigaStubParser.ts - SimpleAmigaStubParser [h: 1p/256r/0n] | 1 | UADE | binary only: uade players/SonicArranger |
-| Sound Player | soundPlayer | C/N0 | SoundPlayerParser.ts ; AmigaFormatParsers.ts:1940 - stub; 15-byte header + 8SVX only; EaglePlayer plays [h: 1p/256r/0n] | 30 | EaglePlayer | asm/src: amigasrc/wanted_team/SoundPlayer |
+| Sound Player | soundPlayer | A/L (2026-10-06, was C/N0) | SoundPlayerParser.ts + soundPlayerCodec.ts - 3-byte header + 12-byte rows walked per voice as the player does; byte-exact 31/31; gridVsPaula 1.00 on every channel of all 31 (2026-10-06_soundplayer-format.md) | 30 | EaglePlayer | asm/src: amigasrc/wanted_team/SoundPlayer |
 | Special FX | specialFX | C/N0 | SpecialFXParser.ts ; AmigaFormatParsers.ts:2518 - stub [h: 1p/256r/0n] | 2 | UADE | asm/src: amigasrc/wanted_team/SpecialFX |
 | Speedy System | speedySystem | C/N0 | SpeedySystemParser.ts ; AmigaFormatParsers.ts:1492 - SpeedySystemParser: detector/stub, 1 empty pattern -> UADE scan [h: 1p/256r/0n] | 3 | UADE | binary only: uade players/SpeedySystem |
 | Steve Barrett | steveBarrett | C/N0 | SteveBarrettParser.ts ; AmigaFormatParsers.ts:1977 - stub [h: 1p/256r/0n] | 2 | UADE | asm/src: amigasrc/wanted_team/SteveBarrett |

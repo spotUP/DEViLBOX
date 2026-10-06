@@ -363,6 +363,16 @@ void eagle_set_subsong(int subsong) {
   g_tickBase = ah_cia_timer_irqs(0, 1);
 }
 
+int eagle_write_module(uint32_t offset, const uint8_t *data, size_t len) {
+  const uint32_t modAddr = ah_rd32(SCORE_MODULE_ADDR);
+  const uint32_t modLen = ah_rd32(SCORE_MODULE_LEN);
+  if (!data || !modLen || offset > modLen || len > modLen - offset) return -1;
+  memcpy(ah_ram + modAddr + offset, data, len);
+  /* The file copy too: a player that reopens its module reads the edit. */
+  if (g_moduleFile.data && offset + len <= g_moduleFile.len) memcpy(g_moduleFile.data + offset, data, len);
+  return 0;
+}
+
 uint32_t eagle_player_ticks(void) { return g_loaded ? ah_cia_timer_irqs(0, 1) - g_tickBase : 0; }
 
 void eagle_set_song_end_detection(int on) {

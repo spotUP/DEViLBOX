@@ -1,34 +1,43 @@
 /**
- * SoundPlayerParser.ts — Sound Player Amiga music format native parser
+ * SoundPlayerParser.ts - Sound Player (Scott Johnston, SJS.* + SMP.*): the
+ * grid is the player's own walk of the song data.
  *
- * Sound Player is a Wanted Team Amiga 4-channel music player. Files use
- * a structured header encoding voice counts and pattern repetition values
- * that enable detection without a magic string.
+ * The module is a 3-byte header (CIA timer, voice mask) and an array of
+ * 12-byte rows, 3 bytes [note, instrument, command] per voice; each voice
+ * walks the rows on its own (waits, loops, song end), so the grid is a
+ * row-tick timeline (one grid row = one player row tick = 6 player ticks)
+ * with every row a voice reads on the tick it reads it. Codec, command set
+ * and walk: soundPlayerCodec.ts; format write-up:
+ * thoughts/shared/research/2026-10-06_soundplayer-format.md.
  *
- * Detection (from UADE SoundPlayer_v1.asm Check2 routine):
- *   byte[1] in range 0x0B–0xA0 (number of something, 11–160)
- *   byte[2] is 7 or 15 (voice count)
- *   byte[3] and byte[4] are 0
- *   byte[5] is non-zero (call it b5)
- *   word at offset 6 is 0
- *   byte[8] == b5, byte[9] == 0, byte[10] == 0
- *   byte[11] == b5
- *   word at offset 12 is 0
- *   when byte[2] == 15: byte[14] == b5
+ * Grid cells map back to the module bytes they came from
+ * (uadePatternLayout.getCellFileOffset; -1 on the rows a voice spends
+ * waiting), so an edit re-encodes its 3 bytes into the module the
+ * eagleplayer runner plays (writeCellToChipRam).
  *
- * File prefix: "SJS."
- * Actual audio playback is delegated to UADE.
+ * Samples are the IFF 8SVX FORMs of the SMP.<tune> companion, numbered as
+ * InstallSamples numbers them (one slot per 4-byte step, a FORM skipping its
+ * length): the cell's instrument byte is that slot.
  *
- * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/SoundPlayer/SoundPlayer_v1.asm
+ * Detection (SoundPlayer_v1.asm Check2): byte1 in $0B..$A0, byte2 7 or 15,
+ * the first row a command-only row (the same command for every voice).
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import {
+  SP_CIA_CLOCK, SP_TICKS_PER_ROW, decodeSoundPlayerModule, walkSoundPlayerVoice, spActiveVoices,
+  spCellOffset, decodeSPCell, encodeSPCell, type SoundPlayerModule,
+} from './soundPlayerCodec';
 
 const MIN_FILE_SIZE = 15;
+const ROWS_PER_PATTERN = 64;
+/** Ceiling on the timeline when no voice reaches its song end (a parked voice). */
+const MAX_ROW_TICKS = ROWS_PER_PATTERN * 512;
+/** MI_MaxSamples: InstallSamples stops at slot 38. */
+const MAX_SAMPLE_SLOTS = 38;
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
@@ -41,33 +50,6 @@ function u32BE(buf: Uint8Array, off: number): number {
 /** Read a 4-character ASCII tag at offset. */
 function tag4(buf: Uint8Array, off: number): string {
   return String.fromCharCode(buf[off], buf[off + 1], buf[off + 2], buf[off + 3]);
-}
-
-/**
- * Scan for IFF FORM chunks in buf starting at `start`, walking every 2 bytes.
- * Mirrors the InstallSamples routine from SoundPlayer_v1.asm.
- */
-function scanIffForms(buf: Uint8Array, start: number): Array<{ formOff: number; formSize: number }> {
-  const len = buf.length;
-  const forms: Array<{ formOff: number; formSize: number }> = [];
-
-  let off = start;
-  while (off + 8 <= len) {
-    if (off + 4 <= len && tag4(buf, off) === 'FORM') break;
-    off += 2;
-  }
-
-  while (off + 8 <= len && tag4(buf, off) === 'FORM') {
-    const formSize = u32BE(buf, off + 4);
-    if (formSize === 0 || formSize > 0x1000000 || off + 8 + formSize > len + 4) break;
-    forms.push({ formOff: off, formSize });
-    off += 8 + formSize;
-    if (off & 1) off++;
-    // Cap at 38 samples (MI_MaxSamples in ASM)
-    if (forms.length >= 38) break;
-  }
-
-  return forms;
 }
 
 /**
@@ -165,7 +147,66 @@ export function isSoundPlayerFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   return true;
 }
 
-export function parseSoundPlayerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+/**
+ * The samples of an SMP.<tune> file, walked as InstallSamples walks them:
+ * slot 1 at offset 0; a FORM fills its slot and the walk jumps past it
+ * (FORM + 8 + length); anything else is an empty slot of 4 bytes.
+ */
+export function soundPlayerSampleSlots(smp: Uint8Array): Array<{ slot: number; formOff: number; formSize: number }> {
+  const out: Array<{ slot: number; formOff: number; formSize: number }> = [];
+  let a = 0;
+  for (let slot = 1; slot <= MAX_SAMPLE_SLOTS && a + 4 <= smp.length; slot++) {
+    if (tag4(smp, a) === 'FORM' && a + 8 <= smp.length) {
+      const formSize = u32BE(smp, a + 4);
+      out.push({ slot, formOff: a, formSize });
+      a += 4 + formSize;
+    }
+    a += 4;
+  }
+  return out;
+}
+
+/** The SMP.<tune> companion the player's ExtLoad opens ("SJS." -> "SMP."). */
+function findSampleFile(filename: string, companions?: Map<string, ArrayBuffer>): Uint8Array | null {
+  if (!companions) return null;
+  const base = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
+  const want = `smp${base.slice(3)}`.toLowerCase();
+  for (const [name, data] of companions) {
+    const b = (name.split('/').pop() ?? name).toLowerCase();
+    if (b === want) return new Uint8Array(data);
+  }
+  return null;
+}
+
+function soundPlayerInstruments(smp: Uint8Array | null): InstrumentConfig[] {
+  const instruments: InstrumentConfig[] = [];
+  if (!smp) return instruments;
+  for (const { slot, formOff, formSize } of soundPlayerSampleSlots(smp)) {
+    const sample = extractIffSample(smp, formOff, formSize);
+    if (!sample) continue;
+    instruments.push(createSamplerInstrument(
+      slot, sample.name || `Sample ${slot}`, sample.pcm, 64, 8287, sample.loopStart, sample.loopEnd,
+    ));
+  }
+  return instruments;
+}
+
+const EMPTY_CELL: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+
+/** The grid: each played voice's walk on one row-tick timeline. */
+export function buildSoundPlayerGrid(m: SoundPlayerModule): {
+  rowTicks: number; voices: number[]; rowAt: Int32Array[];
+} {
+  const voices = spActiveVoices(m);
+  const probe = voices.map((v) => walkSoundPlayerVoice(m, v, MAX_ROW_TICKS));
+  const passes = probe.map((w) => w.passTicks).filter((t) => t > 0);
+  // The song is as long as its longest voice's pass; a shorter voice goes
+  // round again inside it, as it does in the player.
+  const rowTicks = passes.length > 0 ? Math.max(...passes) : MAX_ROW_TICKS;
+  return { rowTicks, voices, rowAt: probe.map((w) => w.rowAt.subarray(0, rowTicks)) };
+}
+
+export function parseSoundPlayerFile(buffer: ArrayBuffer, filename: string, companions?: Map<string, ArrayBuffer>): TrackerSong {
   const buf = new Uint8Array(buffer);
   const _base = filename.split('/').pop()?.toLowerCase() ?? '';
   if (!_base.startsWith('sjs.') && !_base.endsWith('.spl') && !isSoundPlayerFormat(buf)) throw new Error('Not a Sound Player module');
@@ -173,93 +214,89 @@ export function parseSoundPlayerFile(buffer: ArrayBuffer, filename: string): Tra
   const baseName = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
   const moduleName = baseName.replace(/^sjs\./i, '') || baseName;
 
-  // ── Extract IFF FORM samples ─────────────────────────────────────────────
-  // SoundPlayer stores IFF 8SVX FORM chunks within the file (after the pattern
-  // data header). The ASM InstallSamples routine scans for 'FORM' on 2-byte
-  // boundaries. We scan from offset 0; the FORM magic won't appear in the
-  // short pattern header by coincidence.
-  const instruments: InstrumentConfig[] = [];
-  const forms = scanIffForms(buf, 0);
+  const m = decodeSoundPlayerModule(buf);
+  const { rowTicks, voices, rowAt } = buildSoundPlayerGrid(m);
+  const numChannels = voices.length;
+  const numPatterns = Math.max(1, Math.ceil(rowTicks / ROWS_PER_PATTERN));
 
-  for (let i = 0; i < forms.length; i++) {
-    const { formOff, formSize } = forms[i];
-    const sample = extractIffSample(buf, formOff, formSize);
-    if (sample) {
-      const sampleName = sample.name || `SJS Sample ${i + 1}`;
-      instruments.push(createSamplerInstrument(
-        i + 1, sampleName, sample.pcm, 64, 8287,
-        sample.loopStart, sample.loopEnd,
-      ));
-    } else {
-      instruments.push({
-        id: i + 1, name: `SJS Sample ${i + 1}`, type: 'synth' as const,
-        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-      } as InstrumentConfig);
-    }
+  const patterns: Pattern[] = [];
+  for (let p = 0; p < numPatterns; p++) {
+    const length = Math.max(1, Math.min(ROWS_PER_PATTERN, rowTicks - p * ROWS_PER_PATTERN));
+    patterns.push({
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length,
+      channels: voices.map((voice, ch) => ({
+        id: `channel-${ch}`,
+        name: `Voice ${voice + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        // Amiga panning: voices 0 and 3 left, 1 and 2 right.
+        pan: voice === 0 || voice === 3 ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows: Array.from({ length }, (_, r) => {
+          const row = rowAt[ch][p * ROWS_PER_PATTERN + r] ?? -1;
+          if (row < 0) return { ...EMPTY_CELL };
+          const off = spCellOffset(row, voice);
+          return decodeSPCell(buf.subarray(off, off + 3)) as TrackerCell;
+        }),
+      })),
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: numChannels,
+        originalPatternCount: numPatterns,
+        originalInstrumentCount: 0,
+      },
+    });
   }
 
-  // Fallback placeholder if no samples found
+  let instruments = soundPlayerInstruments(findSampleFile(filename, companions));
   if (instruments.length === 0) {
-    instruments.push({
+    instruments = [{
       id: 1, name: 'Sample 1', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-    } as InstrumentConfig);
+    } as InstrumentConfig];
   }
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: forms.length,
-    },
-  };
+  // One player tick = timer / CIA clock seconds; tracker BPM = 2.5 x ticks per second.
+  const initialBPM = m.timer > 0 ? Math.round((2.5 * SP_CIA_CLOCK) / m.timer) : 125;
 
   return {
     name: `${moduleName} [Sound Player]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: patterns.map((_, i) => i),
+    songLength: numPatterns,
     restartPosition: 0,
-    numChannels: 4,
-    initialSpeed: 6,
-    initialBPM: 125,
+    numChannels,
+    initialSpeed: SP_TICKS_PER_ROW,
+    initialBPM,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'soundPlayer',
-      patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
+      patternDataFileOffset: 3,
+      bytesPerCell: 3,
+      rowsPerPattern: ROWS_PER_PATTERN,
+      numChannels,
+      numPatterns,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
+      encodeCell: encodeSPCell,
+      decodeCell: decodeSPCell,
+      // The module bytes the cell came from: the row its voice reads on that
+      // row tick; -1 while the voice waits (no bytes behind the cell).
+      getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+        const tick = pattern * ROWS_PER_PATTERN + row;
+        const r = rowAt[channel]?.[tick] ?? -1;
+        return r < 0 || row >= ROWS_PER_PATTERN ? -1 : spCellOffset(r, voices[channel]);
+      },
     } as UADEPatternLayout,
   };
 }

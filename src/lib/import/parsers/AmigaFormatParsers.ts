@@ -1936,12 +1936,14 @@ export async function tryRouteFormat(
 
   // ── Sound Player / Steve Barrett (SJS.* prefix) ───────────────────────────
   // The SoundPlayer eagleplayer plays it on the Musashi host
-  // (EaglePlayerEngine) with its smp.<tune> companion; the grid as before.
+  // (EaglePlayerEngine) with its smp.<tune> companion; the grid is the
+  // player's own walk of the song rows (SoundPlayerParser), its samples the
+  // smp.<tune> FORMs, and grid edits go into the module the player plays.
   if (matchesExt(filename, ['sjs'])) {
     const { isSoundPlayerFormat, parseSoundPlayerFile } = await import('@lib/import/formats/SoundPlayerParser');
     if (isSoundPlayerFormat(buffer)) {
       const { withEaglePlayer } = await import('./withEaglePlayer');
-      return withEaglePlayer('SoundPlayer', ctx, (buf, name) => parseSoundPlayerFile(buf, name), toUADEPrefixName(originalFileName, ['sjs']));
+      return withEaglePlayer('SoundPlayer', ctx, (buf, name) => parseSoundPlayerFile(buf, name, companionFiles), toUADEPrefixName(originalFileName, ['sjs']));
     }
     return withNativeThenUADE('soundPlayer', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSoundPlayerFormat(buf as ArrayBuffer)) return parseSoundPlayerFile(buf as ArrayBuffer, name); return null; },
