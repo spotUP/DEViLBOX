@@ -34,6 +34,29 @@ Measured 2026-10-06 (grep of call sites, src/ excluding tests):
 - [ ] F1 Per-channel pre-send effect slot replacing the filter dropdown (DubDeckStrip.tsx:1494): Off, High Pass, Low Pass, Ring Mod, Lo-fi, Wobble, Saturation; one effect per channel; reuse the bus's existing effect code; CustomSelect not <select>; space effects (echo, spring, plate, sweep, width) stay on the bus. Starts after D1 lands (same files).
 - [ ] F2 Dub personas (AutoDub) use the per-channel shaping effects properly: read every relevant dub plan/research in thoughts/shared/ (persona, AutoDub, intention, channel roles, moves) to derive which persona reaches for which effect on which channel role and when; moves must target the channel slot, be recorded/replayed in the performance journal and dub lanes, and release cleanly. Owner 2026-10-06. Sources: plans/2026-09-22-dub-personas-completeness.md, 2026-09-17-dub-studio-revised-ai-performer-plan.md, 2026-09-17-dub-studio-master-implementation-plan.md, 2026-09-17-dub-studio-gap-reconciliation.md, 2026-09-23-autodub-rides-the-faders.md, 2026-09-23-dub-deck-channel-section.md, 2026-09-29-per-channel-dub-outputs.md, 2026-04-20-tracker-dub-bus-world-class.md, 2026-10-02-remaining-dub-and-fx-issues.md; research/2026-04-20_dub-sound-coloring.md. Same agent as F1, after F1.
 
+### F2 persona shaping table (derived 2026-10-06, before coding)
+Sources: research/2026-04-20_dub-sound-coloring.md (:37 Tubby swept filters, :40 Scientist HPF sweeps on drum stems, :47/:150 Perry lo-fi/tape, :57 Mad Professor sub weight, :63-86 per-source EQ hygiene, :74 LPF 1000->300 Hz "treble all the way down"); plans 2026-09-22-dub-personas-completeness.md, 2026-09-17-dub-studio-revised-ai-performer-plan.md (:778, :1510-1522), 2026-09-17-dub-studio-master-implementation-plan.md (:1029), 2026-09-23-autodub-rides-the-faders.md (:84-107 cadence via variance / minBarsBetweenFires / densityBias). The docs name the GESTURE per persona; which channel role carries it is mostly inferred (marked *). Slot timings reuse the existing bus-move rule slots in AutoDub.ts RULES (hpfRise bar%4==1, filterDrop bar%8==7, eqSweep bar%4==2 barPos>.5, ringMod bar%4==3 barPos>.6, voltageStarve bar%8==5, tapeWobble bar%4==1).
+
+Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount 0-1}, registered like every move (router, kinds, colours, table slot 45, intentions TEXTURE, energy, MCP, keyboard, CC 86). Persona use = AutoDub RULES rows with `channelRole`, a `personas` filter, rule-level `params` and an optional rule-level `automate` (gesture sweep of `amount`), picked through intention/cooldown/weights like any rule; journaled through the router; the move borrows the slot (override stack in ChannelRoutedEffects) and hands the user's own slot back on release. Dry move (wet: false): it colours what a channel already sends.
+
+| Persona | Effect | Role | When | Hold | Amount | Release |
+|---|---|---|---|---|---|---|
+| tubby (+custom) | High Pass | skank* | new bar, bar%4==1 | 1 bar | sweep 255 Hz -> 2.1 kHz -> back | swept back, slot returns (6 ms duck) |
+| tubby (+custom) | Low Pass | bass* | new bar, bar%8==7 (phrase end) | 1 bar | sweep 1 kHz -> 300 Hz -> back | swept back, slot returns |
+| tubby (+custom) | Saturation | bass* | new bar, bar%8==0 | 2 bars | drive 50% flat | slot returns |
+| scientist | High Pass | percussion | barPos>.5, bar%4==2 | 1 bar | sweep 300 Hz -> 5 kHz -> back | swept back, slot returns |
+| scientist | Low Pass | bass* | new bar, bar%8==7 | 1 bar | sweep 1 kHz -> 300 Hz -> back | swept back, slot returns |
+| scientist | Ring Mod | percussion* | barPos>.6, bar%4==3, intensity>.5 | 1 bar | 80 Hz flat | snap (slot returns) |
+| perry | Ring Mod | percussion | barPos>.6, bar%4==3, intensity>.5 | 1 bar | 120 Hz flat | snap |
+| perry | Lo-fi | skank* | new bar, bar%8==5, intensity>.6 | 1 bar | 4 bits flat | snap to clean |
+| perry | Wobble | lead* | new bar, bar%4==1, intensity>.35 | 2 bars | 3.7 ms depth flat | slot returns |
+| madProfessor | High Pass | lead* | barPos>.5, bar%4==2 | 2 bars | slow sweep 500 Hz -> 4 kHz -> back | swept back, slot returns |
+| madProfessor | Wobble | pad* | new bar, bar%8==0 | 2 bars | gentle 1.8 ms flat | slot returns |
+| madProfessor | Saturation | bass* | new bar, bar%8==4 | 2 bars | drive 30% flat | slot returns |
+| jammy | Low Pass | bass* | new bar, bar%8==0 | 1 bar | hard cut ~200 Hz flat | snap |
+| jammy | Lo-fi | percussion* | new bar, bar%16==8 | 1 bar | 8 bits flat | snap |
+
+
 ## Batch L - load / route / companions
 - [!] L1 `black glass ][ - muzik0.670`: not CDFM 670; format research, route. -- BLOCKED: header 06 0b 09 09 09 00 e9 28 ... is no known tracker signature (not CDFM 670, not libopenmpt); needs format RE or an owner pointer to the player
 - [x] L2 `shortsong1.mod.nt`: StarTrekker companion loaded as the song. -- (index already excludes .nt; guard jukeboxIndexOffersNoCompanions a56417abc)

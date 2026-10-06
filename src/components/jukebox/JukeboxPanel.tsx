@@ -129,7 +129,13 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   }, [index, allEntries, filter]);
 
   const row = rows[Math.min(selected, rows.length - 1)];
-  const file = row?.files[take % Math.max(1, row.files.length)];
+  /** The Modland song a gap row last fetched, by row id - what its report names. */
+  const [modlandFiles, setModlandFiles] = useState<Record<string, string>>({});
+  // A Modland row has no local file; its report names the song it fetched,
+  // or the row itself before anything was fetched (e.g. Modland had nothing).
+  const file = row?.fromModland
+    ? (modlandFiles[row.id] ?? row.label.trim())
+    : row?.files[take % Math.max(1, row.files.length)];
 
   /** Warm the next few rows so Enter is instant. */
   useEffect(() => {
@@ -279,6 +285,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         const res = await searchModland({ q: term, limit: 1 });
         const hit = res.results?.[0];
         if (!hit) { setStatus(`Modland has nothing for "${term}"`); return; }
+        setModlandFiles((m) => ({ ...m, [row.id]: hit.full_path }));
         const buf = await downloadModlandFile(hit.full_path);
         const name = hit.filename ?? 'song';
         // The partner files Modland lists beside the hit, through the resolver.
