@@ -88,7 +88,6 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "markCooksey", fixture: "public/data/songs/formats/grand_national-title.mc", kind: "fixed" },
   { formatId: "markII", fixture: "public/data/songs/mark-ii/astarrsonix.mk2", kind: "fixed" },
   { formatId: "mdl", fixture: "public/data/songs/digi-trakker/rohadtjo.mdl", kind: "variable" },
-  { formatId: "midiLoriciel", fixture: "public/data/songs/formats/Michel Winogradoff/MIDI.Bumpy'sArcadeFantasy", kind: "fixed" },
   { formatId: "mod", fixture: "public/data/songs/audio-sculpture/m.mod", kind: "fixed" },
   { formatId: "mtm", fixture: "public/data/songs/formats/anonymous in 4ce.mtm", kind: "fixed" },
   { formatId: "musicLine", fixture: "public/data/songs/formats/harmonic disorder.ml", kind: "variable" },

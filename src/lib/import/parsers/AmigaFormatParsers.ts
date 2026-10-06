@@ -2253,12 +2253,15 @@ export async function tryRouteFormat(
 
   // ── MIDI Loriciel (MIDI.* prefix) ─────────────────────────────────────────
   // The MIDI-Loriciel eagleplayer plays it on the Musashi host
-  // (EaglePlayerEngine) with its SMPL.<tune> companion; the grid as before.
+  // (EaglePlayerEngine) with its SMPL.<tune> companion. The grid is the
+  // player's schedule of the MIDI file (one row per interrupt, one channel
+  // per Paula voice), read with the bank's key ranges; edits re-encode the
+  // MIDI file the runner plays (eaglePlayerModuleEdits).
   if (matchesExt(filename, ['midi'])) {
     const { isMIDILoricielFormat, parseMIDILoricielFile } = await import('@lib/import/formats/MIDILoricielParser');
     if (isMIDILoricielFormat(buffer)) {
       const { withEaglePlayer } = await import('./withEaglePlayer');
-      return withEaglePlayer('MIDILoriciel', ctx, (buf, name) => parseMIDILoricielFile(buf, name), toUADEPrefixName(originalFileName, ['midi']));
+      return withEaglePlayer('MIDILoriciel', ctx, (buf, name) => parseMIDILoricielFile(buf, name, companionFiles), toUADEPrefixName(originalFileName, ['midi']));
     }
     return withNativeThenUADE('midiLoriciel', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMIDILoricielFormat(buf as ArrayBuffer)) return parseMIDILoricielFile(buf as ArrayBuffer, name); return null; },

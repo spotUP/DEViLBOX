@@ -9,8 +9,9 @@ import { resolve } from 'path';
 import { isMIDILoricielFormat, parseMIDILoricielFile } from '../formats/MIDILoricielParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC  = resolve(import.meta.dirname, '../../../../Reference Music');
-const MIDI_FILE  = resolve(REF_MUSIC, 'MIDI-Loriciel/Christophe Zurfluh/MIDI.Entity high');
+const DIR       = resolve(import.meta.dirname, '../../../../public/data/songs/formats/Michel Winogradoff');
+const MIDI_FILE = resolve(DIR, 'MIDI.Cartoons 2');
+const BANK      = new Map([['SMPL.Cartoons 2', loadAB(resolve(DIR, 'SMPL.Cartoons 2'))]]);
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);
@@ -47,49 +48,49 @@ describe('isMIDILoricielFormat', () => {
 
 describe('parseMIDILoricielFile', () => {
   it('parses without throwing', () => {
-    expect(() => parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high')).not.toThrow();
+    expect(() => parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK)).not.toThrow();
   });
 
   it('returns a defined TrackerSong', () => {
-    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high');
+    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK);
     expect(song).toBeDefined();
   });
 
   it('returns format MOD', () => {
-    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high');
+    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK);
     expect(song.format).toBe('MOD');
   });
 
   it('has 4 channels', () => {
-    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high');
+    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK);
     expect(song.numChannels).toBe(4);
   });
 
   it('has at least one pattern', () => {
-    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high');
+    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK);
     expect(song.patterns.length).toBeGreaterThanOrEqual(1);
   });
 
   it('has a valid song order', () => {
-    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high');
+    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK);
     expect(song.songPositions.length).toBeGreaterThan(0);
     expect(song.songLength).toBe(song.songPositions.length);
   });
 
   it('has valid BPM and speed', () => {
-    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high');
+    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK);
     expect(song.initialBPM).toBeGreaterThan(0);
     expect(song.initialSpeed).toBeGreaterThan(0);
   });
 
   it('includes MIDI Loriciel in the name', () => {
-    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high');
+    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK);
     expect(song.name).toContain('MIDI Loriciel');
   });
 
   it('logs format report', () => {
-    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Entity high');
-    const report = analyzeFormat(song, 'MIDI.Entity high');
+    const song = parseMIDILoricielFile(loadAB(MIDI_FILE), 'MIDI.Cartoons 2', BANK);
+    const report = analyzeFormat(song, 'MIDI.Cartoons 2');
     console.log(formatReportToString(report));
     expect(report.numChannels).toBeGreaterThan(0);
   });

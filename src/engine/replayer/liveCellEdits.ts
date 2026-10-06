@@ -9,6 +9,8 @@
  *
  *   - a registry engine with `gridCellEdits` takes each cell through its
  *     setCell(pattern, row, channel, note, instrument, effTyp, eff, volume);
+ *   - an eagleplayer song whose format re-encodes its whole module from
+ *     grid edits (eaglePlayerModuleEdits: MIDI Loriciel) gets a new module;
  *   - otherwise a song with a fixed chip-RAM layout takes it through
  *     writeCellToChipRam (UADE chip RAM, the Ron Klaren replayer, TFMX bytes).
  *
@@ -60,6 +62,16 @@ export async function sendCellEditsToEngine(
       );
     }
     return;
+  }
+
+  // An eagleplayer format whose grid is a reading of the module (MIDI
+  // Loriciel: the player's schedule of a MIDI file) re-encodes the module.
+  if (desc?.key === 'EaglePlayer' && song.eaglePlayerId) {
+    const { hasModuleEncoder, applyEaglePlayerModuleEdits } = await import('../eagleplayer/eaglePlayerModuleEdits');
+    if (hasModuleEncoder(song)) {
+      await applyEaglePlayerModuleEdits(song, edits);
+      return;
+    }
   }
 
   if (song.uadePatternLayout) {
