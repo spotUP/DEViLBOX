@@ -1,3 +1,7 @@
+import { VU_ONSET_RISE } from '@/engine/tone/channelMeterFeed';
+
+export { VU_ONSET_RISE };
+
 /**
  * Meter level for a channel of a direct-routed WASM engine.
  *
@@ -26,8 +30,6 @@ export function waveformVuLevel(
   return peak / 32768;
 }
 
-/** Per-frame rise in the source level that counts as a note starting. */
-export const VU_ONSET_RISE = 0.1;
 
 /**
  * Meter target for an engine-fed channel (one with no note-trigger events of

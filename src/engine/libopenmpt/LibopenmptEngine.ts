@@ -15,6 +15,9 @@ import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { ChannelMeterFeed } from '../tone/channelMeterFeed';
+
+const meterFeed = new ChannelMeterFeed();
 
 // ---------------------------------------------------------------------------
 // Position callback type
@@ -170,16 +173,8 @@ export class LibopenmptEngine {
         if (chLevels) {
           try {
             const engine = getToneEngine();
-            // Update trigger meters only for significant level increases (note-on events)
-            // This prevents constant small values from resetting the decay
-            for (let i = 0; i < chLevels.length; i++) {
-              // Only trigger if level is above noise floor threshold
-              if (chLevels[i] > 0.05) {
-                engine.triggerChannelMeter(i, chLevels[i]);
-              }
-            }
-            // Always update realtime levels for realtime VU mode
-            engine.updateRealtimeChannelLevels(chLevels);
+            // Levels go to the level feed; note starts to the note feed (on a level jump)
+            meterFeed.feed(engine, chLevels);
           } catch { /* ToneEngine not ready */ }
         }
         if (chState && this._onChannelState) {

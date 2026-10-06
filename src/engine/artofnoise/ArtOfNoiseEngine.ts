@@ -8,12 +8,15 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+
+const meterFeed = new ChannelMeterFeed();
 
 export class ArtOfNoiseEngine extends WASMSingletonBase {
   private static instance: ArtOfNoiseEngine | null = null;
@@ -77,10 +80,11 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
             const engine = getToneEngine();
             const levels: number[] = data.levels;
             // levels is [ch0_L, ch0_R, ch1_L, ch1_R, ...] up to 8 channels
+            const peaks: number[] = [];
             for (let ch = 0; ch < levels.length / 2; ch++) {
-              const peak = Math.max(levels[ch * 2], levels[ch * 2 + 1]);
-              engine.triggerChannelMeter(ch, peak);
+              peaks.push(Math.max(levels[ch * 2], levels[ch * 2 + 1]));
             }
+            meterFeed.feed(engine, peaks);
           } catch { /* ToneEngine not ready */ }
           break;
 
