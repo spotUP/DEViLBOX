@@ -2813,6 +2813,7 @@ static void mixer_sync_channels(MyPlayer* player, MixerState* mixer) {
             mc->loop_offset = pcd->out.loop_offset;
             mc->frac_pos = 0.0;
             mc->active = true;
+            mc->note_starts++;
             pcd->out.trigger = 0;
 
             // Post-trigger loop setup (asm:4136-4156): after the one-shot buffer
@@ -3343,6 +3344,10 @@ bool pre_song_get_track_cell(const PreSong* ps, u8 track, u8 row, PreTrackCell* 
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+uint32_t pre_song_get_note_starts(const PreSong* ps, int ch) {
+    return (ch >= 0 && ch < NUM_CHANNELS) ? ps->mixer.channels[ch].note_starts : 0;
+}
 
 const PrePlaybackState* pre_song_get_playback_state(const PreSong* ps) {
     return &ps->playback_state;
