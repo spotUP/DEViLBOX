@@ -67,6 +67,10 @@ export class SilenceDetector {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    // analyser.disconnect() only cuts its outputs. The tap's INPUT edge
+    // (source -> analyser) is held by the source, which keeps every
+    // detector's analyser alive for as long as the engine output lives.
+    try { this.source?.disconnect(this.analyser); } catch { /* not connected */ }
     try { this.analyser.disconnect(); } catch { /* already disconnected */ }
     this.silentSamples = 0;
     this.triggered = false;

@@ -75,30 +75,7 @@ export async function buildInstrumentEffectChain(
   const existing = ctx.instrumentEffectChains.get(key);
   if (existing) {
     console.log('[ToneEngine] buildInstrumentEffectChain: disposing existing chain with', existing.effects.length, 'effects');
-    // Clean up per-node registry entries
-    for (const [effectId, entry] of ctx.instrumentEffectNodes) {
-      if (existing.effects.includes(entry.node)) {
-        ctx.instrumentEffectNodes.delete(effectId);
-      }
-    }
-    existing.effects.forEach((fx) => {
-      try {
-        fx.disconnect();
-        fx.dispose();
-      } catch {
-        // Node may already be disposed
-      }
-    });
-    if (existing.bridge) {
-      try {
-        existing.bridge.disconnect();
-        existing.bridge.dispose();
-      } catch {
-        // Bridge may already be disposed
-      }
-    }
-    existing.output.disconnect();
-    existing.output.dispose();
+    releaseEffectChain(ctx, existing);
   }
 
   // Create output gain node
@@ -304,6 +281,44 @@ export function throwInstrumentToEffect(
 }
 
 /**
+ * Dispose one chain's nodes (effects, bridge, output) and drop its effects
+ * from the per-effect registry. The registry holds each node strongly, so a
+ * chain disposed without it stays reachable with all its Tone.js Gains.
+ */
+function releaseEffectChain(
+  ctx: InstrumentEffectsContext,
+  chain: { effects: Tone.ToneAudioNode[]; output: Tone.Gain; bridge?: Tone.Gain }
+): void {
+  for (const [effectId, entry] of ctx.instrumentEffectNodes) {
+    if (chain.effects.includes(entry.node)) {
+      ctx.instrumentEffectNodes.delete(effectId);
+    }
+  }
+  chain.effects.forEach((fx) => {
+    try {
+      fx.disconnect();
+      fx.dispose();
+    } catch {
+      // Node may already be disposed
+    }
+  });
+  if (chain.bridge) {
+    try {
+      chain.bridge.disconnect();
+      chain.bridge.dispose();
+    } catch {
+      // Bridge may already be disposed
+    }
+  }
+  try {
+    chain.output.disconnect();
+    chain.output.dispose();
+  } catch {
+    // Node may already be disposed
+  }
+}
+
+/**
  * Dispose instrument effect chain
  */
 export function disposeInstrumentEffectChain(
@@ -312,18 +327,7 @@ export function disposeInstrumentEffectChain(
 ): void {
   const chain = ctx.instrumentEffectChains.get(key);
   if (chain) {
-    chain.effects.forEach((fx) => {
-      try {
-        fx.dispose();
-      } catch {
-        // Node may already be disposed
-      }
-    });
-    try {
-      chain.output.dispose();
-    } catch {
-      // Node may already be disposed
-    }
+    releaseEffectChain(ctx, chain);
     ctx.instrumentEffectChains.delete(key);
   }
 }
