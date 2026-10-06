@@ -21,6 +21,8 @@ import { parseFuturePlayerFile } from '@/lib/import/formats/FuturePlayerParser';
 import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
 import { parseSteveTurnerFile } from '@/lib/import/formats/SteveTurnerParser';
 import { parseHivelyFile } from '@/lib/import/formats/HivelyParser';
+import { parseJochenHippel7VFile } from '@/lib/import/formats/JochenHippel7VParser';
+import { serializeTFMXConfig } from '@/engine/tfmx/TFMXSynth';
 import { HivelySynth, hvlNoteForKey } from '@/engine/hively/HivelySynth';
 import { hivelyTransform } from '@/engine/hively/HivelyEngine';
 
@@ -275,4 +277,46 @@ describe('Hively / AHX: a typed note is the replayer voice the song plays, at th
       expect(per[per.length - 1], 'the voice has released').toBeLessThan(0.002);
     });
   }
+});
+
+describe('TFMX voice (Hippel TFMX / 7V instruments): the keyboard plays the decoder, not silence', () => {
+  /** Total power per tick over both sides of a TFMX worklet's main output, and the mono sum. */
+  function capture(proc: { process(i: Float32Array[][], o: Float32Array[][]): boolean }, ticks: number) {
+    const l = new Float32Array(ticks * FPT), r = new Float32Array(ticks * FPT);
+    for (let f = 0; f < l.length; f += 128) { const o = stereoOutputs(1); proc.process([], o); l.set(o[0][0], f); r.set(o[0][1], f); }
+    const pl = rmsPerTick(l, ticks), pr = rmsPerTick(r, ticks);
+    return { power: pl.map((v, t) => Math.hypot(v, pr[t])), mix: l.map((v, i) => v + r[i]) };
+  }
+  it('ghostbattle_gameover.hip7: a typed note sounds with the pitch and level of the same note in the song', async () => {
+    const name = 'ghostbattle_gameover.hip7';
+    const ab = corpus(name);
+    const song = parseJochenHippel7VFile(ab, name) as unknown as GridSong & { instruments: Array<{ id: number; tfmx: Parameters<typeof serializeTFMXConfig>[0] }> };
+    const n = firstNote(song, song.instruments.map((i) => i.id));
+    expect(n.row).toBe(0);
+    const ticks = 5;
+    const a = await startWorklet('tfmx', 'TFMX');
+    await a.send({ type: 'loadModule', mdatBuffer: ab, subsong: 0 });
+    const voices = (a.posted.find((p) => (p as { type?: string }).type === 'moduleLoaded') as unknown as { voices: number }).voices;
+    for (let v = 0; v < voices; v++) await a.send({ type: 'moduleMuteVoice', voice: v, mute: v !== n.ch });
+    await a.send({ type: 'modulePlay' });
+    const sc = capture(a.proc, ticks + 1);
+    const sPow = sc.power.slice(1), sMix = sc.mix.subarray(FPT);
+    // The same voice, left or right of the mix, as an edge count of the first output
+    const key = n.note + 11;
+    const b = await startWorklet('tfmx', 'TFMX');
+    await b.send({ type: 'createPlayer' });
+    const handle = (b.posted.find((p) => (p as { type?: string }).type === 'playerCreated') as unknown as { handle: number }).handle;
+    await b.send({ type: 'loadInstrument', handle, buffer: serializeTFMXConfig(song.instruments.find((i) => i.id === n.ins)!.tfmx) });
+    await b.send({ type: 'noteOn', handle, note: key, velocity: 100 });
+    const pc = capture(b.proc, ticks + 1);
+    const pPow = pc.power.slice(1), pMix = pc.mix.subarray(FPT);
+    expect(totalRms(sPow), 'the song voice sounds').toBeGreaterThan(0.01);
+    expect(totalRms(pPow), 'the preview sounds').toBeGreaterThan(0.01);
+    if (process.env.PV_DEBUG) console.log('TF', sPow.map((v) => v.toFixed(3)).join(','), '|', pPow.map((v) => v.toFixed(3)).join(','));
+    expect(Math.abs(db(totalRms(pPow), totalRms(sPow))), 'overall level, dB').toBeLessThan(1);
+    sPow.forEach((v, t) => expect(Math.abs(db(pPow[t] || 1e-6, v)), `tick ${t}`).toBeLessThan(1.5));
+    const se = risingEdges(sMix), pe = risingEdges(pMix);
+    expect(se, 'the song voice has pitch').toBeGreaterThan(3);
+    expect(Math.abs(pe / se - 1), `rising edges preview ${pe} song ${se}`).toBeLessThan(0.06);
+  });
 });
