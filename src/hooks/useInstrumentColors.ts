@@ -52,8 +52,12 @@ export function useInstrumentColors(
   const panelBg = isCyan
     ? 'bg-[#041510]'
     : '';
+  // A translucent wash of the accent, not the opaque `dim`: the editor's own
+  // background shows through the module panels. Before April the panel class
+  // was built at runtime (`bg-[${dim}]`), which Tailwind never generates, so the
+  // panels were see-through; making the colour real made them solid.
   const panelStyle: React.CSSProperties = {
-    backgroundColor: dim,
+    backgroundColor: accent + '14', // ~8% opacity hex suffix
     borderColor: accent + '33', // 20% opacity hex suffix
   };
 
