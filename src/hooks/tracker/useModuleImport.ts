@@ -41,11 +41,13 @@ export function useModuleImport() {
     try {
       await importTrackerModule(info, options);
     } catch (err) {
-      const { showAlert } = await import('@stores/useConfirmStore');
+      const { notify } = await import('@stores/useNotificationStore');
       const msg = err instanceof Error ? err.message : String(err);
       const name = info.file?.name ?? info.metadata?.title ?? 'module';
       console.error('[useModuleImport] import failed:', err);
-      void showAlert({ title: 'Load Failed', message: `${name}: ${msg}` });
+      // A toast the user can select and copy from, kept until closed (duration 0):
+      // a modal alert blocked the app and its text could not be copied.
+      notify.error(`Load failed - ${name}: ${msg}`, 0);
     }
   }, []);
 

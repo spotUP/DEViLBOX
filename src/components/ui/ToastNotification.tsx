@@ -42,7 +42,7 @@ export const ToastNotification: React.FC = () => {
             {iconMap[notification.type]}
           </span>
           <div className="flex-1 flex flex-col items-start gap-2">
-            <p className="text-sm font-medium text-text-primary">
+            <p className="text-sm font-medium text-text-primary select-text cursor-text break-words">
               {notification.message}
             </p>
             {notification.action && (
