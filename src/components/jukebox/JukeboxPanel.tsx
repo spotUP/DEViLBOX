@@ -13,7 +13,7 @@
  *   up / down   move
  *   left/right  page
  *   Enter       play the selected row
- *   R           another take from the same format
+ *   Alt+N       play the next song of the same format
  *   Alt+0       mark good        Alt+1..7  switch a fault on/off (several can be on)
  *   Alt+8       Visualizer mark (song shows the scope view, not the pattern editor)
  *   Escape      clear the filter
@@ -72,8 +72,10 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const [index, setIndex] = useState<SongIndex | null>(null);
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState(0);
-  /** Which take of the selected format, so R can move through them. */
+  /** Which song of the selected format, so Next Song can move through them. */
   const [take, setTake] = useState(0);
+  /** Bumped by Next Song: plays the take once the new take's file is selected. */
+  const [playRequest, setPlayRequest] = useState(0);
   const [status, setStatus] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [judged, setJudged] = useState<Record<string, JukeboxVerdict>>({});
@@ -390,6 +392,14 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
 
 
 
+  /** The next song of the selected format, played straight away. */
+  const nextSong = () => { setTake((t) => t + 1); setPlayRequest((n) => n + 1); };
+  useEffect(() => {
+    if (playRequest > 0) void play();
+    // play() reads the take the request selected; it must not re-run on its own.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playRequest]);
+
   /**
    * Alt+digit reports. Handled on the window (below), not only on the list:
    * the list loses focus as soon as a switch, the pattern editor or a button
@@ -399,6 +409,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
    */
   const handleReportKey = (e: { altKey: boolean; code: string; key: string; preventDefault(): void; stopPropagation(): void }): boolean => {
     if (!e.altKey) return false;
+    if (e.code === 'KeyN') { e.preventDefault(); e.stopPropagation(); nextSong(); return true; }
     const digit = /^(?:Digit|Numpad)(\d)$/.exec(e.code)?.[1] ?? e.key;
     if (digit === '0') { e.preventDefault(); e.stopPropagation(); void markGood(); return true; }
     if (digit === JUKEBOX_VISUALIZER.key) {
@@ -521,12 +532,12 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         <div className="text-[9px] font-mono text-text-muted truncate" title={status}>
           {!row ? '' : row.fromModland
             ? `${row.label} · no local song`
-            : `${row.label} · take ${(take % Math.max(1, row.files.length)) + 1}/${row.files.length} of ${row.total}`}
+            : `${row.label} · song ${(take % Math.max(1, row.files.length)) + 1}/${row.files.length} of ${row.total}`}
         </div>
         <div className="text-[9px] font-mono text-text-secondary truncate">{status}</div>
         <div className="flex gap-1">
           <Button variant="primary" size="sm" onClick={() => void play()} title="Play (Enter)">Play</Button>
-          <Button variant="default" size="sm" onClick={() => setTake((t) => t + 1)} title="Another take (R)">Take</Button>
+          <Button variant="default" size="sm" onClick={nextSong} title="Play the next song of this format (Alt+N)">Next Song</Button>
           <Button variant="primary" size="sm" onClick={() => void markGood()} title="Good (Alt+0) — clears every fault">Good</Button>
         </div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-x-4 gap-y-1">
