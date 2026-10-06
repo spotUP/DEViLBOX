@@ -96,6 +96,14 @@
       "cells": 2816,
       "bytes": 18054
     },
+    "digitalSonixChrome": {
+      "exporter": "DigitalSonixChromeExporter.exportDigitalSonixChrome",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 36164,
+      "bytes": 36164
+    },
     "digitalSymphony": {
       "exporter": "DigitalSymphonyExporter.exportDigitalSymphony",
       "tier": "pattern-data",

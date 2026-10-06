@@ -12,10 +12,10 @@ import { resolve } from 'path';
 import { isDscFormat, parseDscFile } from '../formats/DigitalSonixChromeParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
-const FILE1 = resolve(REF, "Digital Sonix And Chrome/David Hanlon/dragon'sbreath dbfx.dsc");
-const FILE2 = resolve(REF, "Digital Sonix And Chrome/David Hanlon/dragon'sbreath demo 1.dsc");
+const FILE1 = resolve(REF, "digital-sonix-and-chrome/David Hanlon/dragon'sbreath dbfx.dsc");
+const FILE2 = resolve(REF, "digital-sonix-and-chrome/David Hanlon/dragon'sbreath demo 1.dsc");
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

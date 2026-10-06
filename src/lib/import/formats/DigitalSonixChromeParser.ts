@@ -10,25 +10,28 @@
  * Detection is ported 1:1 from the DTP_Check2 routine in
  * DigitalSonixChrome_v1.asm (Wanted Team eagleplayer).
  *
- * File layout (big-endian):
- *   +0x00  word   — non-zero header word
- *   +0x02  byte   — D0: "length" count (number of sequence length entries, must be > 0)
- *   +0x03  byte   — D1: sample count (must be >= 2)
- *   +0x04  long   — D2: song data size (even, non-zero, <= 0x80000, < fileSize)
- *   +0x08  long   — D3: sequence count (non-zero, <= 0x20000)
- *   +0x0C  (D1-1) * 6 bytes: instrument entries (long length + word extra)
- *   After entries:
- *     long   — must be zero
- *     word   — must be zero
- *     D3*4 bytes — sequence table
- *     D0*18 bytes — sample info records
+ * The song structures (reversed from the replayer, every byte) live in
+ * DigitalSonixChromeModule.ts; the grid is built from them here:
+ *   - a pattern per distinct (firstRow, rows) block the song entries name;
+ *     row r of channel v is track byte v*trackLen + firstRow + r
+ *   - the order list is the chosen subsong's entries, each `repeats` times
+ *   - a cell is a record trigger: note = the record's period, instrument =
+ *     record index + 1 (codec: engine/uade/encoders/DigitalSonixChromeEncoder.ts)
+ *   - speed from the tempo word, one tick per 50 Hz frame
+ * Research: thoughts/shared/research/2026-10-06_digitalsonixchrome-format.md
+ *
+ * Check2 below names the header bytes D0..D3 after the registers the asm
+ * uses: D0 = record count, D1 = entry count, D2 = PCM size, D3 = track length.
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig, TrackerCell } from '@/types';
+import type { InstrumentConfig, Pattern } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeDscCell } from '@/engine/uade/encoders/DigitalSonixChromeEncoder';
+import { makeDscCellCodec } from '@/engine/uade/encoders/DigitalSonixChromeEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import {
+  decodeDscModule, dscSections, dscSpeed, dscSubsongEntries, type DscModule,
+} from './DigitalSonixChromeModule';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -205,110 +208,102 @@ export function isDscFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 
 // ── Main parser ─────────────────────────────────────────────────────────────
 
-export function parseDscFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+const NUM_CHANNELS = 4;
+/** Paula's C-2 rate (period 428); the grid note carries the record's own pitch. */
+const SAMPLE_RATE = 8287;
+
+/** A distinct block of rows the song entries name. */
+interface DscBlock { firstRow: number; rows: number }
+
+/** Every block any subsong plays, in file order, de-duplicated. */
+function dscBlocks(m: DscModule): DscBlock[] {
+  const blocks: DscBlock[] = [];
+  for (const e of m.entries) {
+    if (e.repeats === 0 || e.rows === 0) continue;
+    if (!blocks.some((b) => b.firstRow === e.firstRow && b.rows === e.rows)) blocks.push({ firstRow: e.firstRow, rows: e.rows });
+  }
+  return blocks;
+}
+
+function recordInstrument(m: DscModule, i: number): InstrumentConfig {
+  const r = m.records[i];
+  const name = `Sample ${i + 1} (period ${r.period})`;
+  const end = Math.min(r.pcmOffset + r.length, m.pcm.length);
+  const pcm = m.pcm.slice(Math.min(r.pcmOffset, end), end);
+  if (pcm.length === 0) {
+    return { id: i + 1, name, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig;
+  }
+  const loopEnd = r.repeats > 0 && r.loopStart < pcm.length ? pcm.length : 0;
+  return createSamplerInstrument(i + 1, name, pcm, Math.min(r.volume & 0x7f, 64), SAMPLE_RATE, loopEnd ? r.loopStart : 0, loopEnd);
+}
+
+/**
+ * Parse a DSC module into the grid the player plays. `subsong` is numbered
+ * as UADE numbers it (dtg_SndNum). Throws for a subsong that plays nothing.
+ */
+export function parseDscFile(buffer: ArrayBuffer, filename: string, subsong = 0): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isDscFormat(buf)) throw new Error('Not a Digital Sonix & Chrome module');
+  const m = decodeDscModule(buf);
+  const { tracksOff, trackLen } = dscSections(buf);
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^dsc\./i, '').replace(/\.dsc$/i, '') || baseName;
 
-  // ── Parse binary header ─────────────────────────────────────────────────
-  const nLengths = buf[2];
-  const nSamples = buf[3];
-  const seqCount = u32BE(buf, 8);
+  const blocks = dscBlocks(m);
+  const played = dscSubsongEntries(m, subsong).filter((e) => e.rows > 0);
+  if (played.length === 0) throw new Error(`DSC: subsong ${subsong} plays nothing`);
+  const blockIndex = (firstRow: number, rows: number): number => blocks.findIndex((b) => b.firstRow === firstRow && b.rows === rows);
+  const songPositions = played.flatMap((e) => Array<number>(e.repeats).fill(blockIndex(e.firstRow, e.rows)));
 
-  // Section offsets
-  const instrEntriesOff = 12;
-  const seqTableOff = instrEntriesOff + (nSamples - 1) * 6 + 6; // (nSamples-1) entries + 6 zero bytes
-  const sampleInfoOff = seqTableOff + seqCount * 4;
-  const pcmDataOff = sampleInfoOff + nLengths * 18;
-
-  // ── Extract samples ─────────────────────────────────────────────────────
-  const instruments: InstrumentConfig[] = [];
-
-  for (let i = 0; i < nLengths; i++) {
-    const recOff = sampleInfoOff + i * 18;
-    const sampleLen = u32BE(buf, recOff + 2);
-    const sampleOffset = u32BE(buf, recOff + 12);
-    const pcmFileOff = pcmDataOff + sampleOffset;
-
-    if (pcmFileOff + sampleLen <= buf.length && sampleLen > 0) {
-      const pcm = buf.slice(pcmFileOff, pcmFileOff + sampleLen);
-      instruments.push(createSamplerInstrument(
-        i + 1, `DSC Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
-      ));
-    } else {
-      instruments.push({
-        id: i + 1, name: `DSC Sample ${i + 1}`, type: 'synth' as const,
-        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-      } as InstrumentConfig);
-    }
-  }
-
-  // ── Sequence table → editable grid ──────────────────────────────────────
-  // The 4-byte-per-entry sequence table at seqTableOff is the module's only
-  // on-disk song data (nothing sits between it and the sample info: seqTableOff
-  // + seqCount*4 === sampleInfoOff). The player walks it reading per-voice
-  // position bytes; the packed bytes are not a clean note/effect cell, so each
-  // grid cell carries its four source bytes verbatim (period/pan/cutoff carriers)
-  // and the encoder reproduces them byte-for-byte. Lay the linear entry stream
-  // out as 4-voice rows so the harness's linear getCellFileOffset covers exactly
-  // [seqTableOff, sampleInfoOff).
-  const NUM_CHANNELS = 4;
-  const ROWS_PER_PATTERN = 64;
-  const cellsPerPattern = ROWS_PER_PATTERN * NUM_CHANNELS;
-  const numPatterns = Math.max(1, Math.floor(seqCount / cellsPerPattern));
-
-  const decodeDscCell = (raw: Uint8Array): TrackerCell => {
-    const b0 = raw[0], b1 = raw[1], b2 = raw[2], b3 = raw[3];
-    // No documented note/effect packing (position/trigger stream); expose an
-    // empty editable cell and carry the exact source bytes for byte-exact export.
-    return {
-      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-      period: (b0 << 8) | b1, pan: b2, cutoff: b3,
-    };
+  const codec = makeDscCellCodec(m.records);
+  const cellOffset = (p: number, row: number, ch: number): number => {
+    const b = blocks[p];
+    if (!b || row < 0 || row >= b.rows || ch < 0 || ch >= NUM_CHANNELS || b.firstRow + row >= trackLen) return -1;
+    return tracksOff + ch * trackLen + b.firstRow + row;
   };
 
-  const patterns = Array.from({ length: numPatterns }, (_, p) => ({
-    id: `pattern-${p}`, name: `Pattern ${p}`, length: ROWS_PER_PATTERN,
+  const patterns: Pattern[] = blocks.map((b, p) => ({
+    id: `pattern-${p}`,
+    name: `Rows ${b.firstRow}-${b.firstRow + b.rows - 1}`,
+    length: b.rows,
     channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
       id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
       solo: false, collapsed: false, volume: 100,
       pan: ch === 0 || ch === 3 ? -50 : 50,
       instrumentId: null, color: null,
-      rows: Array.from({ length: ROWS_PER_PATTERN }, (_, r) => {
-        const off = seqTableOff + (p * cellsPerPattern + r * NUM_CHANNELS + ch) * 4;
-        return off + 4 <= buf.length
-          ? decodeDscCell(buf.subarray(off, off + 4))
-          : { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      rows: Array.from({ length: b.rows }, (_, r) => {
+        const off = cellOffset(p, r, ch);
+        return codec.decodeCell(off >= 0 ? buf.subarray(off, off + 1) : Uint8Array.of(0xff));
       }),
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: NUM_CHANNELS, originalPatternCount: numPatterns,
-      originalInstrumentCount: nLengths,
+      originalChannelCount: NUM_CHANNELS, originalPatternCount: blocks.length,
+      originalInstrumentCount: m.records.length,
     },
   }));
 
   return {
     name: `${moduleName} [Digital Sonix & Chrome]`, format: 'MOD' as TrackerFormat,
-    patterns, instruments,
-    songPositions: patterns.map((_, i) => i),
-    songLength: numPatterns, restartPosition: 0, numChannels: NUM_CHANNELS,
-    initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    patterns,
+    instruments: m.records.map((_, i) => recordInstrument(m, i)),
+    songPositions, songLength: songPositions.length, restartPosition: 0, numChannels: NUM_CHANNELS,
+    initialSpeed: dscSpeed(m.tempo), initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'digitalSonixChrome',
-      patternDataFileOffset: seqTableOff,
-      bytesPerCell: 4,
-      rowsPerPattern: ROWS_PER_PATTERN,
+      patternDataFileOffset: tracksOff,
+      bytesPerCell: 1,
+      rowsPerPattern: Math.max(...blocks.map((b) => b.rows)),
       numChannels: NUM_CHANNELS,
-      numPatterns,
+      numPatterns: blocks.length,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeDscCell,
-      decodeCell: decodeDscCell,
-    } as UADEPatternLayout,
+      encodeCell: codec.encodeCell,
+      decodeCell: codec.decodeCell,
+      getCellFileOffset: cellOffset,
+    } satisfies UADEPatternLayout,
   };
 }

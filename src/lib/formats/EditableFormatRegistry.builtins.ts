@@ -33,6 +33,7 @@ registerEditableFormat({ formatId: "digiBooster", label: "DigiBooster", patternC
 registerEditableFormat({ formatId: "digiBoosterPro", label: "DigiBooster Pro", patternCodec: { kind: "variable" }, exporter: { module: "DigiBoosterProExporter", fn: "exportDigiBoosterPro", byLayout: true } });
 registerEditableFormat({ formatId: "digitalMugician", label: "Digital Mugician", patternCodec: { kind: "fixed" }, exporter: { module: "DigitalMugicianExporter", fn: "exportDigitalMugician", byLayout: true } });
 registerEditableFormat({ formatId: "digitalSymphony", label: "Digital Symphony", patternCodec: { kind: "variable" }, exporter: { module: "DigitalSymphonyExporter", fn: "exportDigitalSymphony", ext: "dsym", byLayout: true } });
+registerEditableFormat({ formatId: "digitalSonixChrome", label: "", patternCodec: { kind: "fixed" }, exporter: { module: "DigitalSonixChromeExporter", fn: "exportDigitalSonixChrome", ext: "dsc", byLayout: true } });
 registerEditableFormat({ formatId: "dmf", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "dsm_dyn", label: "", patternCodec: { kind: "fixed" }, exporter: { module: "DSMDynExporter", fn: "exportDSMDyn", byLayout: true } });
 registerEditableFormat({ formatId: "dss", label: "Digital Sound Studio", patternCodec: { kind: "fixed" } });
