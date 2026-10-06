@@ -51,8 +51,10 @@ export class FuturePlayerSynth implements DevilboxSynth {
       const fpNote = Math.max(1, Math.min(96, midiNote - 11));
       const vol = Math.round((velocity ?? 0.8) * 127);
       this.engine.noteOn(this._instrumentPtr, fpNote, vol);
-    } else {
-      // Whole-song playback
+    } else if (note === undefined) {
+      // Whole-song playback: only an explicit play with no note. A typed key
+      // on an instrument without a pointer must stay silent, never start the
+      // song (owner: "when I play it it plays the song").
       this.engine.play();
     }
   }

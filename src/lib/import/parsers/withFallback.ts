@@ -36,7 +36,12 @@ export interface FallbackContext {
  * auditioning one of these instruments plays that native voice instead of
  * restarting the module. Kept out of the UADEEditableSynth clobber below.
  */
-const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth', 'FredSynth']);
+// SoundMonSynth and FuturePlayerSynth run the replayer's own note start (the
+// preview voice of the loaded module): an instrument the format defines as a
+// synth keeps that voice whether or not the parser also rendered PCM for it.
+// Choosing Sampler by has-PCM played the rendered waveform instead of the synth
+// (owner, 2026-10-06, SoundMon antidust.bp3).
+const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth', 'FredSynth', 'SoundMonSynth', 'FuturePlayerSynth']);
 
 /**
  * Per-note WASM voices that play ONE instrument of a song on the keyboard

@@ -131,6 +131,20 @@ export class SoundMonEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
   }
 
+  /**
+   * Keyboard preview on the replayer's own fifth voice. `instrument` is the
+   * 1-based instrument of the loaded module, `note` the value a pattern row
+   * holds (see SoundMonNotes noteToBpNote); `volume` 0-64 or omitted for the
+   * instrument's own.
+   */
+  previewNoteOn(instrument: number, note: number, volume?: number): void {
+    this.workletNode?.port.postMessage({ type: 'previewNoteOn', instrument, note, volume });
+  }
+
+  previewNoteOff(): void {
+    this.workletNode?.port.postMessage({ type: 'previewNoteOff' });
+  }
+
   override dispose(): void {
     super.dispose();
     if (SoundMonEngine.instance === this) SoundMonEngine.instance = null;

@@ -27,8 +27,8 @@ const CORPUS: Array<[string, string, number, number]> = [
   ['rebels.fred', 'Fred Editor', 9, 0],
   ['antidust.bp3', 'SoundMon 3', 2, 10],
   ['flight.dmu', 'Digital Mugician', 3, 0],
-  ['hybris.fp', 'Future Player', 1, 0],
-  ['imploder_drums.fp', 'Future Player', 1, 0],
+  ['hybris.fp', 'Future Player', 9, 0],
+  ['imploder_drums.fp', 'Future Player', 8, 0],
   ['baseheads.ma', 'Music Assembler (no voice)', 0, 5],
   ['doxtro3.dss', 'Digital Sound Studio (no voice)', 0, 13],
   ['dynablaster.ast', 'Actionamics (no voice)', 0, 4],
@@ -49,7 +49,9 @@ describe('dedicated-engine synth instruments keep a keyboard voice', () => {
 
   it('flattening rule: PCM -> Sampler, no PCM + voice -> keeps voice, no PCM + no voice -> Sampler', () => {
     const pcm = { audioBuffer: new ArrayBuffer(8) };
-    expect(dedicatedEngineSynthType({ synthType: 'SoundMonSynth', sample: pcm })).toBe('Sampler');
+    // A synth the replayer has a preview voice for keeps it even when the parser rendered PCM for it.
+    expect(dedicatedEngineSynthType({ synthType: 'SoundMonSynth', sample: pcm })).toBe('SoundMonSynth');
+    expect(dedicatedEngineSynthType({ synthType: 'DigMugSynth', sample: pcm })).toBe('Sampler');
     expect(dedicatedEngineSynthType({ synthType: 'SoundMonSynth' })).toBe('SoundMonSynth');
     expect(dedicatedEngineSynthType({ synthType: 'DigMugSynth', sample: { audioBuffer: new ArrayBuffer(0) } })).toBe('DigMugSynth');
     expect(dedicatedEngineSynthType({ synthType: 'DssWasmSynth' })).toBe('Sampler');
