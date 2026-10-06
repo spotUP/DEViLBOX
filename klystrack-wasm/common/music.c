@@ -1124,6 +1124,11 @@ static void do_pwm(MusEngine* mus, int chan)
 #endif
 
 
+/* Cumulative note starts per channel, read by the channel meters. A synth
+ * voice with a slow attack barely moves its level between reports, so the
+ * meters cannot find note starts from levels. */
+Uint32 g_mus_note_starts[MUS_MAX_CHANNELS];
+
 //***** USE THIS INSIDE MUS_ADVANCE_TICK TO AVOID MUTEX DEADLOCK
 int mus_trigger_instrument_internal(MusEngine* mus, int chan, MusInstrument *ins, Uint16 note, int panning)
 {
@@ -1280,6 +1285,7 @@ int mus_trigger_instrument_internal(MusEngine* mus, int chan, MusInstrument *ins
 
 	//cyd_set_frequency(mus->cyd, cydchn, chn->frequency);
 	cyd_enable_gate(mus->cyd, cydchn, 1);
+	if (chan >= 0 && chan < MUS_MAX_CHANNELS) g_mus_note_starts[chan]++;
 
 	return chan;
 }

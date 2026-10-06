@@ -87,6 +87,8 @@ static void ensure_mix_buffer(Uint32 samples)
 
 /* ---- Playback API ---- */
 
+extern Uint32 g_mus_note_starts[];
+
 EMSCRIPTEN_KEEPALIVE
 void klys_init(Uint32 sampleRate)
 {
@@ -97,6 +99,7 @@ void klys_init(Uint32 sampleRate)
     memset(&g_cyd, 0, sizeof(g_cyd));
     memset(&g_mus, 0, sizeof(g_mus));
     memset(&g_song, 0, sizeof(g_song));
+    memset(g_mus_note_starts, 0, sizeof(Uint32) * MUS_MAX_CHANNELS);
 
     cyd_init(&g_cyd, sampleRate, CYD_MAX_CHANNELS);
     g_cyd.flags |= CYD_SINGLE_THREAD;
@@ -234,6 +237,13 @@ int klys_get_num_channels(void)
 {
     if (!g_song_loaded) return 0;
     return g_song.num_channels;
+}
+
+/* out[i] = cumulative note starts of channel i since the song loaded. */
+EMSCRIPTEN_KEEPALIVE
+void klys_get_note_start_counts(Uint32 *out, int maxCh)
+{
+    for (int i = 0; i < maxCh; i++) out[i] = (i < MUS_MAX_CHANNELS) ? g_mus_note_starts[i] : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE

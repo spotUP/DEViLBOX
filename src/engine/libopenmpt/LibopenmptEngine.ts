@@ -19,6 +19,22 @@ import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 
 const meterFeed = new ChannelMeterFeed();
 
+/** Highest pattern note number libopenmpt reports for a played note (254 and 255 are cut and off). */
+const MAX_PLAYED_NOTE = 120;
+
+/**
+ * Add one note start to `counts[ch]` for every channel whose pattern row holds a
+ * note. `state` is the worklet's per-row dump, six numbers per channel with the
+ * note first.
+ */
+export function countRowNoteStarts(counts: number[], state: ArrayLike<number>): void {
+  const channels = Math.floor(state.length / 6);
+  for (let ch = 0; ch < channels; ch++) {
+    const note = state[ch * 6];
+    if (note >= 1 && note <= MAX_PLAYED_NOTE) counts[ch] = (counts[ch] ?? 0) + 1;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Position callback type
 // ---------------------------------------------------------------------------
@@ -159,6 +175,9 @@ export class LibopenmptEngine {
     console.log('[LibopenmptEngine] Ready');
   }
 
+  /** Cumulative note starts per channel, from the pattern rows the worklet reports. */
+  private _noteStarts: number[] = [];
+
   private handleMessage(msg: MessageEvent): void {
     const { cmd, order, pattern, row, chLevels, chState, audioTime, speed, tempo } = msg.data;
     switch (cmd) {
@@ -170,11 +189,15 @@ export class LibopenmptEngine {
         if (this._playing) this._onPosition?.(order, pattern, row, audioTime);
         // Unthrottled tick callback for SynthEffectProcessor (fires every ~2.9ms)
         if (this._playing) this._onPositionTick?.(audioTime, row, order, this._lastSpeed, this._lastTempo);
+        // The module's own pattern rows say when a note starts (sent once per row
+        // change). libopenmpt's channel VU is smoothed, so a note retriggered on a
+        // channel that is still sounding moves it by less than any jump threshold.
+        if (chState) countRowNoteStarts(this._noteStarts, chState as ArrayLike<number>);
         if (chLevels) {
           try {
             const engine = getToneEngine();
-            // Levels go to the level feed; note starts to the note feed (on a level jump)
-            meterFeed.feed(engine, chLevels);
+            // Levels go to the level feed; note starts to the note feed
+            meterFeed.feedCounted(engine, chLevels, this._noteStarts);
           } catch { /* ToneEngine not ready */ }
         }
         if (chState && this._onChannelState) {
@@ -304,6 +327,7 @@ export class LibopenmptEngine {
 
   /** Load a module file (raw binary) into the worklet. */
   async loadTune(data: ArrayBuffer): Promise<void> {
+    this._noteStarts = [];
     if (!this._available || !this.workletNode) {
       throw new Error('LibopenmptEngine not available');
     }

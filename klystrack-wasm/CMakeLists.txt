@@ -69,6 +69,7 @@ if(EMSCRIPTEN)
         "_klys_get_num_instruments"
         "_klys_get_num_patterns"
         "_klys_get_pattern_length"
+        "_klys_get_note_start_counts"
         "_klys_get_title"
         "_klys_get_instrument_name"
         "_klys_get_loop_point"
