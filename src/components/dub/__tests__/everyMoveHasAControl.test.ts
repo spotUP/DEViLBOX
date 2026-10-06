@@ -24,7 +24,11 @@ const DECK = readFileSync(join(process.cwd(), 'src/components/dub/DubDeckStrip.t
 
 /** Moves deliberately left without a control, each with its reason. */
 const NO_CONTROL_BY_DESIGN: Readonly<Record<string, string>> = {
-  // (empty — every move in the table is reachable by hand)
+  // The hand control IS the channel card's shaping slot (ChannelShapeSlot):
+  // it sets the very slot this move only borrows for a hold. A second button
+  // for the same thing would be view duplication; the move exists so AutoDub's
+  // personas (and MCP, keys, CC 86) can perform the slot as a gesture.
+  channelShape: 'performed by hand through the channel card\'s sound-shaping slot',
 };
 
 const wiredMoveIds = (): Set<string> =>

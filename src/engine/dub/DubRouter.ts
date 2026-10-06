@@ -51,7 +51,8 @@ import { skankEchoThrow } from './moves/skankEchoThrow';
 import { skankFloatThrow } from './moves/skankFloatThrow';
 import { riddimSection } from './moves/riddimSection';
 import { bassEmphasis } from './moves/bassEmphasis';
-import type { DubMove, DubMoveContext } from './moves/_types';
+import { channelShape } from './moves/channelShape';
+import type { DubMove, DubMoveContext, DubMoveHandle } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useDubStore } from '@/stores/useDubStore';
@@ -107,6 +108,7 @@ const MOVES: Record<string, DubMove> = {
   skankFloatThrow,
   riddimSection,
   bassEmphasis,
+  channelShape,
 };
 
 /**
@@ -236,7 +238,7 @@ export function fire(
     /** Who is firing. Defaults to 'lane' for lane playback, else 'user'. */
     origin?: DubFireOrigin;
   },
-): { dispose(): void } | null {
+): DubMoveHandle | null {
   const move = MOVES[moveId];
   if (!move) {
     console.warn(`[DubRouter] unknown moveId "${moveId}" — ignoring`);
@@ -285,14 +287,15 @@ function deferFire(
   source: 'live' | 'lane',
   opts: { deckId?: import('../dj/DeckEngine').DeckId } | undefined,
   waitMs: number,
-): { dispose(): void } {
-  let landed: { dispose(): void } | null = null;
+): DubMoveHandle {
+  let landed: DubMoveHandle | null = null;
   let cancelled = false;
   const timer = setTimeout(() => {
     if (cancelled) return;
     landed = executeNow(moveId, move, channelId, merged, bpm, source, opts);
   }, waitMs);
   return {
+    update(p: Record<string, number>) { landed?.update?.(p); },
     dispose() {
       cancelled = true;
       clearTimeout(timer);
@@ -315,7 +318,7 @@ function executeNow(
     preQuantized?: boolean;
     origin?: DubFireOrigin;
   } | undefined,
-): { dispose(): void } | null {
+): DubMoveHandle | null {
   if (!_bus) return null;
   const rawRow = currentRow();
   const quantize = useDubStore.getState().quantize;
@@ -382,7 +385,12 @@ function executeNow(
   // id to fill in durationRows on held-move events. Idempotent — wrapping
   // only fires the release once even if dispose() is called multiple times.
   let released = false;
-  const wrapped = {
+  const wrapped: DubMoveHandle = {
+    // Passed through: GestureEngine traces a ramp / sweep by calling the
+    // handle's update. Dropped here, every automated gesture through the
+    // router — filterDrop's sweep, the persona shape sweeps — degraded to a
+    // flat hold, because the engine found no update on the wrapper.
+    ...(disposer.update ? { update: (p: Record<string, number>) => { if (!released) disposer.update!(p); } } : {}),
     dispose() {
       if (released) return;
       released = true;

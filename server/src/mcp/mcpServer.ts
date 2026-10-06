@@ -717,10 +717,12 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'set_channel_dub_send',
-    'Set dub-send level for a tracker channel (0-1). First non-zero value lazily activates the WASM worklet dub output for that channel.',
+    'Set a tracker channel\'s dub send (0-1) and/or its sound-shaping slot - the one effect on the channel\'s send before it joins the bus. First non-zero send lazily activates the WASM worklet dub output for that channel. Shape kinds and their main parameter (shapeValue): off; hpf / lpf = cutoff Hz 40-8000; ringMod = carrier Hz 20-2000; lofi = bits 1-16; wobble = depth ms 0.2-8; saturation = drive 0-1. shapeValue omitted = keep the value if the kind is unchanged, else the kind\'s default. get_dub_bus_state reports each channel\'s slot as channelDubSends[i].shape / shapeValue (plus heldByMove when a channelShape move is holding it).',
     {
       channel: z.number().int().min(0).describe('Channel index'),
-      amount: z.number().min(0).max(1).describe('Dub send level (0=off, 1=full)'),
+      amount: z.number().min(0).max(1).optional().describe('Dub send level (0=off, 1=full)'),
+      shape: z.enum(['off', 'hpf', 'lpf', 'ringMod', 'lofi', 'wobble', 'saturation']).optional().describe('Sound-shaping slot kind'),
+      shapeValue: z.number().optional().describe('The slot kind\'s main parameter (see description for units and ranges)'),
     },
     (p) => call('set_channel_dub_send', p),
   );
@@ -823,7 +825,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'fire_dub_move',
-    'Fire a dub move by id through DubRouter. Returns heldHandle for hold-kind moves (pass to release_dub_move to stop). Trigger-kind moves return heldHandle:null. Requires bus enabled (see set_dub_bus_enabled). Processors need channel sends > 0 to be audible. Channel-scoped moves do nothing without channelId. Valid moveIds (all 45, kept in step with DubRouter.MOVES by moveRegistryContract.test.ts): backwardReverb, bassEmphasis, channelMute, channelThrow, combSweep, crushBass, delayPreset16th, delayPreset380, delayPreset8th, delayPresetDotted, delayPresetDoubler, delayPresetQuarter, delayPresetTriplet, delayTimeThrow, dubSiren, dubStab, echoBuildUp, echoThrow, eqSweep, filterDrop, ghostReverb, hpfRise, madProfPingPong, masterDrop, oscBass, radioRiser, reverseEcho, riddimSection, ringMod, skankEchoThrow, skankFloatThrow, snareCrack, sonarPing, springKick, springSlam, stereoDoubler, subHarmonic, subSwell, tapeStop, tapeWobble, toast, transportTapeStop, tubbyScream, versionDrop, voltageStarve.',
+    'Fire a dub move by id through DubRouter. Returns heldHandle for hold-kind moves (pass to release_dub_move to stop). Trigger-kind moves return heldHandle:null. Requires bus enabled (see set_dub_bus_enabled). Processors need channel sends > 0 to be audible. Channel-scoped moves do nothing without channelId. channelShape holds the sound-shaping slot of a channel: params effect 1 High Pass, 2 Low Pass, 3 Ring Mod, 4 Lo-fi, 5 Wobble, 6 Saturation; amount 0-1 across the range of that effect; needs channelId; release hands back the slot the user chose. Valid moveIds (all 46, kept in step with DubRouter.MOVES by moveRegistryContract.test.ts): backwardReverb, bassEmphasis, channelMute, channelShape, channelThrow, combSweep, crushBass, delayPreset16th, delayPreset380, delayPreset8th, delayPresetDotted, delayPresetDoubler, delayPresetQuarter, delayPresetTriplet, delayTimeThrow, dubSiren, dubStab, echoBuildUp, echoThrow, eqSweep, filterDrop, ghostReverb, hpfRise, madProfPingPong, masterDrop, oscBass, radioRiser, reverseEcho, riddimSection, ringMod, skankEchoThrow, skankFloatThrow, snareCrack, sonarPing, springKick, springSlam, stereoDoubler, subHarmonic, subSwell, tapeStop, tapeWobble, toast, transportTapeStop, tubbyScream, versionDrop, voltageStarve.',
     {
       moveId: z.string().describe('Move id (e.g. "echoThrow", "tubbyScream")'),
       channelId: z.number().int().optional().describe('Tracker channel index when the move is channel-scoped'),

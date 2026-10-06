@@ -404,6 +404,7 @@ export type DubMoveParameter =
   | 'dub.skankFloatThrow'
   | 'dub.riddimSection'
   | 'dub.bassEmphasis'
+  | 'dub.channelShape'
   // Continuous bus settings
   | 'dub.echoIntensity'
   | 'dub.echoWet'

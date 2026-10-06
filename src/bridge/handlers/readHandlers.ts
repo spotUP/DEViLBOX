@@ -735,7 +735,24 @@ export async function getDubBusState(): Promise<Record<string, unknown>> {
 
   // Dub-send values from the mixer store (what the user has dialed).
   const mixer = useMixerStore.getState();
-  const channelDubSends = mixer.channels.map((c, i) => ({ index: i, dubSend: c.dubSend }));
+  // Each channel's sound-shaping slot: what the user chose, and what the
+  // engine is running now (a channelShape move may be holding it).
+  let shapeOf: ((ch: number) => { kind: string; value: number; heldByMove: boolean } | null) = () => null;
+  try {
+    const { getChannelRoutedEffectsManager } = await import('../../engine/tone/ChannelRoutedEffects');
+    const mgr = getChannelRoutedEffectsManager();
+    if (mgr) shapeOf = (ch) => mgr.getEffectiveChannelShape(ch);
+  } catch { /* engine not loaded */ }
+  const channelDubSends = mixer.channels.map((c, i) => {
+    const live = shapeOf(i);
+    return {
+      index: i,
+      dubSend: c.dubSend,
+      shape: c.dubShape,
+      shapeValue: c.dubShapeValue,
+      ...(live?.heldByMove ? { heldByMove: true, liveShape: live.kind, liveShapeValue: live.value } : {}),
+    };
+  });
 
   // Private field access via cast — MCP diagnostic only. Production code
   // never reads these directly; they're here so the gig-sim can confirm the
