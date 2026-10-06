@@ -75,6 +75,11 @@ interface DJModlandBrowserProps {
   variant?: 'popover' | 'fullHeight';
 }
 
+/** The companion list as the Map the loaders take; undefined when there are none. */
+function companionMap(companions: Array<{ filename: string; buffer: ArrayBuffer }>): Map<string, ArrayBuffer> | undefined {
+  return companions.length > 0 ? new Map(companions.map((c) => [c.filename, c.buffer])) : undefined;
+}
+
 export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, variant = 'popover' }) => {
   const online = useOnlineStatus();
   const [query, setQuery] = useState('');
@@ -349,18 +354,15 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
 
       try {
         let buffer: ArrayBuffer;
+        // Companions travel WITH the load (loadUADEToDeck / parseModuleToSong),
+        // never pre-written into the UADE filesystem: a later load, a purge or
+        // an engine recreation drops what was written ahead of it.
+        let companions: Array<{ filename: string; buffer: ArrayBuffer }> = [];
         if (file.source === 'hvsc') {
           buffer = await downloadHVSCFile(file.key);
         } else {
-          const [modBuffer, companions] = await Promise.all([
-            downloadModlandFile(file.key),
-            downloadUADECompanions(file.key),
-          ]);
-          buffer = modBuffer;
-          if (companions.length > 0) {
-            const { UADEEngine } = await import('@engine/uade/UADEEngine');
-            for (const c of companions) await UADEEngine.getInstance().addCompanionFile(c.filename, c.buffer);
-          }
+          buffer = await downloadModlandFile(file.key);
+          companions = await downloadUADECompanions(file.key, buffer);
         }
 
         const cacheKey = `${file.source}:${file.key}`;
@@ -384,7 +386,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         } else if (isUADEFormat(file.filename)) {
           // Amiga formats: use UADE pre-render path
           await loadUADEToDeck(
-            engine, deckId, buffer, file.filename, true, undefined, file.filename
+            engine, deckId, buffer, file.filename, true, undefined, file.filename, undefined,
+            companions.length > 0 ? companions : undefined,
           );
           if (useDJStore.getState().deckViewMode !== '3d') {
             useDJStore.getState().setDeckViewMode('visualizer');
@@ -392,7 +395,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         } else {
           // Non-UADE tracker (XM/IT/S3M/etc.) — parse + pipeline render
           const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
-          const song = await parseModuleToSong(blob);
+          const song = await parseModuleToSong(blob, 0, undefined, undefined, companionMap(companions));
           const bpmResult = detectBPM(song);
 
           cacheSong(cacheKey, song);
@@ -406,7 +409,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
             isPlaying: false,
           });
 
-          const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
+          const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high', companions.length > 0 ? companions : undefined);
           await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
 
           if (useDJStore.getState().deckViewMode !== '3d') {
@@ -552,18 +555,11 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         }
 
         let buffer: ArrayBuffer;
-        const [modBuffer, companions] = await Promise.all([
-          downloadModlandFile(file.key),
-          downloadUADECompanions(file.key),
-        ]);
-        buffer = modBuffer;
-        if (companions.length > 0) {
-          const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          for (const c of companions) await UADEEngine.getInstance().addCompanionFile(c.filename, c.buffer);
-        }
+        buffer = await downloadModlandFile(file.key);
+        const companions = await downloadUADECompanions(file.key, buffer);
 
         const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
-        const song = await parseModuleToSong(blob);
+        const song = await parseModuleToSong(blob, 0, undefined, undefined, companionMap(companions));
         const bpmResult = detectBPM(song);
         const duration = estimateSongDuration(song);
 

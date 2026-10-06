@@ -38,7 +38,7 @@ import { AuthModal } from '@/components/dialogs/AuthModal';
 
 interface ModlandPanelProps {
   isOpen: boolean;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string) => Promise<void>;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
   onClose: () => void;
 }
 
@@ -129,19 +129,15 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
       setModlandDownloading((prev) => new Set(prev).add(file.full_path));
       setModlandError(null);
       try {
-        // Download primary file and its resolver-named companions in parallel
-        const [buffer, companions] = await Promise.all([
-          downloadModlandFile(file.full_path),
-          downloadUADECompanions(file.full_path),
-        ]);
+        // The primary file, then its resolver-named companions. They travel
+        // WITH the load (onLoadTrackerModule -> loadFile -> prepareModuleImport),
+        // never pre-written into the UADE filesystem: a bob4e.dum loaded that
+        // way reached UADE without bob4.ins (2026-10-06).
+        const buffer = await downloadModlandFile(file.full_path);
+        const found = await downloadUADECompanions(file.full_path, buffer);
+        const companions = found.length > 0 ? new Map(found.map((c) => [c.filename, c.buffer])) : undefined;
 
-        // Pre-write companions to UADE WASM filesystem before loading
-        if (companions.length > 0) {
-          const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          for (const c of companions) await UADEEngine.getInstance().addCompanionFile(c.filename, c.buffer);
-        }
-
-        await onLoadTrackerModule(buffer, file.filename);
+        await onLoadTrackerModule(buffer, file.filename, companions);
         onClose();
       } catch (err) {
         setModlandError(err instanceof Error ? err.message : 'Failed to download');
