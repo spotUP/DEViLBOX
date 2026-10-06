@@ -33,8 +33,6 @@ export interface CapturedAudio {
 // ── Singleton State ──────────────────────────────────────────────────────────
 
 let scriptProcessor: ScriptProcessorNode | null = null;
-let tappedNode: AudioNode | null = null;        // the master node the processor listens to
-let silentSink: GainNode | null = null;         // terminates the processor's output
 let captureBufferL: Float32Array | null = null;
 let captureBufferR: Float32Array | null = null;
 let capturedSamples = 0;
@@ -139,8 +137,6 @@ export function startCapture(
       silentGain.connect(ctx.destination);
       
       masterNode.connect(scriptProcessor);
-      tappedNode = masterNode;
-      silentSink = silentGain;
       scriptProcessor.connect(silentGain); // Connect to silent node, not destination
       console.log(`[TrackerAudioCapture] Started capturing (target: ${TARGET_SECONDS}s)`);
     } else {
@@ -157,21 +153,14 @@ export function startCapture(
  * Stop capturing audio and discard buffers.
  */
 export function stopCapture(): void {
-  // disconnect() on the processor only cuts its OUTPUT. The master keeps
-  // feeding it (and running its callback) until the master's connection to it
-  // is cut too, and the silent sink stays attached to the destination: one
-  // leaked pair per analysed song.
   if (scriptProcessor) {
-    scriptProcessor.onaudioprocess = null;
-    try { tappedNode?.disconnect(scriptProcessor); } catch { /* not connected */ }
-    try { scriptProcessor.disconnect(); } catch { /* not connected */ }
+    try {
+      scriptProcessor.disconnect();
+    } catch {
+      // Ignore disconnect errors
+    }
     scriptProcessor = null;
   }
-  if (silentSink) {
-    try { silentSink.disconnect(); } catch { /* not connected */ }
-    silentSink = null;
-  }
-  tappedNode = null;
   
   captureBufferL = null;
   captureBufferR = null;
