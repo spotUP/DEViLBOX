@@ -30,35 +30,29 @@ const SM1_PERIODS: number[] = [
    180, 170, 160, 151, 143, 135, 127,
 ];
 
-// Standard ProTracker periods for reverse mapping
-const PT_PERIODS: number[] = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-];
+/** Semitones from ProTracker C-1 (period 856, XM note 13) of period index `k`, unrounded to the XM range. */
+function xmOfIndex(k: number): number {
+  return 13 + Math.round(12 * Math.log2(856 / SM1_PERIODS[k]));
+}
 
 /**
- * Convert XM note to SM1 note index (1-66).
- * XM note 37 = C-3 → PT period 856 → closest SM1 index.
+ * XM note of SM1 period index `k` (1-66): the pitch the player sounds for a
+ * note byte n plus its track's transpose is period index n + 1. Indices below
+ * XM note 1 (periods past C-0) all show as note 1.
  */
-function xmNoteToSM1(xmNote: number): number {
-  if (xmNote <= 0 || xmNote > 96) return 0;
-  // XM note → PT period
-  const ptIdx = xmNote - 37;
-  if (ptIdx < 0 || ptIdx >= PT_PERIODS.length) return 0;
-  const period = PT_PERIODS[ptIdx];
+export function sm1IndexToXM(k: number): number {
+  if (k < 1 || k >= SM1_PERIODS.length) return 0;
+  return Math.max(1, Math.min(96, xmOfIndex(k)));
+}
 
-  // Find closest SM1 period (indices 1-66)
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 1; i < SM1_PERIODS.length; i++) {
-    const d = Math.abs(SM1_PERIODS[i] - period);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
+/** SM1 period index (1-66) nearest to an XM note; 0 for no note. */
+export function xmToSm1Index(xmNote: number): number {
+  if (xmNote <= 0 || xmNote > 96) return 0;
+  let best = 1;
+  for (let k = 2; k < SM1_PERIODS.length; k++) {
+    if (Math.abs(xmOfIndex(k) - xmNote) < Math.abs(xmOfIndex(best) - xmNote)) best = k;
   }
-  return bestIdx;
+  return best;
 }
 
 export function encodeSidMon1Cell(cell: TrackerCell): Uint8Array {
@@ -67,7 +61,7 @@ export function encodeSidMon1Cell(cell: TrackerCell): Uint8Array {
 
   // Byte 0: SM1 note index
   if (xmNote > 0 && xmNote <= 96) {
-    out[0] = xmNoteToSM1(xmNote);
+    out[0] = Math.max(0, xmToSm1Index(xmNote) - 1);
   } else {
     out[0] = 0;
   }

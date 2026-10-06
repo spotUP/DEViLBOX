@@ -61,7 +61,11 @@ export async function sendCellEditsToEngine(
 
   if (desc?.gridCellEdits) {
     const Engine = desc.staticRef ?? (desc.dynamicResolver ? await desc.dynamicResolver() : null);
-    if (!Engine?.hasInstance()) return;
+    if (!Engine) return;
+    if (!Engine.hasInstance()) {
+      for (const { pattern, row, channel, cell } of edits) Engine.patchModuleCell?.(pattern, row, channel, cell.note ?? 0, cell.instrument ?? 0);
+      return;
+    }
     const engine = Engine.getInstance() as unknown as GridCellEngine;
     for (const { pattern, row, channel, cell } of edits) {
       engine.setCell(

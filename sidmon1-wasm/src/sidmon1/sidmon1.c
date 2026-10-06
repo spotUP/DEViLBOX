@@ -179,6 +179,9 @@ typedef struct {
     int waveList;               // current waveList index (= sample.waveform for wavetable)
     int waveTimer;              // ticks remaining on current waveform
     int waitCtr;                // DMA retrigger state machine (0..3)
+    int lastRow;                // pattern row index the voice consumed last (-1 = none yet)
+    int rowsConsumed;           // how many pattern rows the voice has consumed
+    int lastNote;               // note + track transpose of the last note-on
 } SM1Voice;
 
 typedef struct {
@@ -323,6 +326,9 @@ static void memZero(int offset, int len) {
 
 static void voice_initialize(SM1Voice *v) {
     v->step         =  0;
+    v->lastRow      = -1;
+    v->rowsConsumed =  0;
+    v->lastNote     =  0;
     v->row          =  0;
     v->sample       =  0;
     v->samplePtr    = -1;
@@ -395,6 +401,34 @@ int sm1r_get_num_instruments(void) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Load (= S1Player.loader)
 // ══════════════════════════════════════════════════════════════════════════════
+
+// One 5-byte pattern row as the player sees it: the version-dependent
+// remaps the loader applies, shared by the load and by live cell edits.
+static void set_row_raw(int i, const uint8_t *raw, int totInstruments) {
+    uint8_t note = raw[0], sample = raw[1], effect = raw[2];
+    if (ps.versionTag == SIDMON_1444) {
+        if (note > 0 && note < 255) note = (uint8_t)((note + 469) & 0xff);
+        if (effect > 0 && effect < 255) effect = (uint8_t)((effect + 469) & 0xff);
+        if (sample > 59) sample = (uint8_t)(totInstruments + (sample - 60));
+    } else if ((int)sample > totInstruments) {
+        sample = 0;
+    }
+    ps.patterns[i].note   = note;
+    ps.patterns[i].sample = sample;
+    ps.patterns[i].effect = effect;
+    ps.patterns[i].param  = raw[3];
+    ps.patterns[i].speed  = raw[4];
+}
+
+int sm1r_set_row(int index, const uint8_t *raw5) {
+    if (!ps.loaded || !ps.patterns || index < 0 || index >= ps.numPatternRows) return 0;
+    set_row_raw(index, raw5, ps.totInstruments);
+    return 1;
+}
+
+int sm1r_get_voice_consumed(int v)       { return (v >= 0 && v < NUM_VOICES) ? ps.voices[v].lastRow : -1; }
+int sm1r_get_voice_rows_consumed(int v)  { return (v >= 0 && v < NUM_VOICES) ? ps.voices[v].rowsConsumed : 0; }
+int sm1r_get_voice_note(int v)           { return (v >= 0 && v < NUM_VOICES) ? ps.voices[v].lastNote : 0; }
 
 int sm1r_load(const uint8_t *data, int len) {
     if (!data || len < 64) return 0;
@@ -753,25 +787,10 @@ int sm1r_load(const uint8_t *data, int len) {
     int rowReadPos = position + (int)patternDataStart;
     for (int i = 0; i < numRows; i++) {
         if (rowReadPos + 5 > len) { ps.numPatternRows = i; break; }
-        uint8_t note   = buf[rowReadPos + 0];
-        uint8_t sample = buf[rowReadPos + 1];
-        uint8_t effect = buf[rowReadPos + 2];
-        uint8_t param  = buf[rowReadPos + 3];
-        uint8_t speed  = buf[rowReadPos + 4];
+        uint8_t raw[5];
+        memcpy(raw, buf + rowReadPos, 5);
         rowReadPos += 5;
-
-        if (ps.versionTag == SIDMON_1444) {
-            if (note > 0 && note < 255) note = (uint8_t)((note + 469) & 0xff);
-            if (effect > 0 && effect < 255) effect = (uint8_t)((effect + 469) & 0xff);
-            if (sample > 59) sample = (uint8_t)(totInstruments + (sample - 60));
-        } else if ((int)sample > totInstruments) {
-            sample = 0;
-        }
-        ps.patterns[i].note   = note;
-        ps.patterns[i].sample = sample;
-        ps.patterns[i].effect = effect;
-        ps.patterns[i].param  = param;
-        ps.patterns[i].speed  = speed;
+        set_row_raw(i, raw, totInstruments);
     }
 
     // ── Step 10: version-dependent flags ──
@@ -870,6 +889,8 @@ static void voice_process(SM1Voice *voice) {
         if (voice->noteTimer == 0) {
             if (voice->row < 0 || voice->row >= ps.numPatternRows) voice->row = 0;
             SM1Row *row = &ps.patterns[voice->row];
+            voice->lastRow = voice->row;
+            voice->rowsConsumed++;
 
             if (row->sample == 0) {
                 if (row->note) {
@@ -926,6 +947,7 @@ static void voice_process(SM1Voice *voice) {
                     SM1Track  *step   = &ps.tracks[voice->step];
 
                     voice->note = (int)row->note + step->transpose;
+                    voice->lastNote = voice->note;
 
                     int pidx = 1 + (int)sample->finetune + voice->note;
                     if (pidx < 0) pidx = 0;

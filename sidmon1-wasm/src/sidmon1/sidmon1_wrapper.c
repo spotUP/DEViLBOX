@@ -142,3 +142,8 @@ void player_note_on(int instrument, int note, int velocity) {
 void player_note_off(void) {
     sm1r_note_off();
 }
+
+int player_set_row(int index, const uint8_t *raw5) { return sm1r_set_row(index, raw5); }
+int player_get_voice_consumed(int v) { return sm1r_get_voice_consumed(v); }
+int player_get_voice_rows_consumed(int v) { return sm1r_get_voice_rows_consumed(v); }
+int player_get_voice_note(int v) { return sm1r_get_voice_note(v); }

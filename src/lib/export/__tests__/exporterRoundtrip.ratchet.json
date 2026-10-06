@@ -346,11 +346,11 @@
     },
     "sidmon1": {
       "exporter": "SidMon1Exporter.exportSidMon1",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 1536,
-      "bytes": 4324
+      "cells": 30586,
+      "bytes": 30586
     },
     "sidMon2": {
       "exporter": "SidMon2 (SidMon2Exporter)",
