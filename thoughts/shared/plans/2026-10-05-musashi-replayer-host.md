@@ -82,6 +82,11 @@ host core.
 - [x] W3 git rm scaffolds (anders0land-wasm benndaglish-wasm coredesign-wasm davelowe-wasm davelowenew-wasm wallybeben-wasm davelonenew-wasm)
 - [x] G1 tools/ generator
 - [x] G2 ranked list of next UADE formats
+- [x] P1 grid follows the player (player ticks -> tickGridPosition) - ca77ef3d2
+- [x] P2 subsongs: native subsong model, one switch, auto-advance at the player's song end - ca77ef3d2
+- [x] P3 silent suffix-named songs (UADE-tagged scan grid took the opaque-UADE playback branch) - 8687b8932, ad6f044ba
+- [x] F7 Ben Daglish SID, F8 Beathoven Synthesizer, F9 Sound Player (+smp.), F10 MIDI Loriciel (+SMPL.) - 1463d1603
+- [~] F11 Digital Sonix & Chrome - plays (was silent: AUDxDAT), 0.889 vs UADE, stays on UADE
 
 ## Evidence
 - E1 StoneTracker hypnosphere 60 s @ 48 kHz, private Paula (before) vs host +
@@ -140,13 +145,45 @@ the runner (eagle_unsupported_messages() counts them).
 How to add one: `npx tsx tools/eagleplayer/scaffold-format.ts --player <P>
 --corpus <song> [--write]`, add the printed route, set isDefault: true.
 
+## 2026-10-06 session
+- D10 Silence of primemover 07.hot / dynamite dux.core in the app: their
+  grid comes from UADE's scan (buildClassicSong tags format + patterns
+  'UADE'); usePatternPlayback's opaque-UADE branch took them and never
+  started EaglePlayer. Fix at both levels: the import retags (8687b8932),
+  and the branch asks the registry (playsAsOpaqueUADE, ad6f044ba) so a
+  project saved before still plays.
+- D11 Position: player tick = CIA-A timer B interrupt (score's
+  DTP_Interrupt clock, UADE counts the same timer). row = ticks / speed
+  over the grid order, looping from restartPosition
+  (src/lib/tracker/tickGridPosition.ts, shared with UADEEngine). Measured
+  50 Hz on all six corpus songs.
+- D12 Subsongs: engine 'EaglePlayer' in nativeSubsongs; 0-based index into
+  the player's DTP_SubSongRange; start field eaglePlayerSubsong rides as a
+  load arg; the player's own song end advances (advanceNativeSubsong).
+  withEaglePlayer drops uadeEditableSubsongs so the switch is not UADE's.
+- D13 Companions: song.uadeCompanionFiles (the existing persisted field)
+  -> getLoadArgs -> loadTune files -> eagle_add_file. Table field
+  `companions` for the corpus song.
+- D14 Host timing for the eagle runner = UADE's: 4 colour clocks per
+  instruction (ah_set_uade_timing; uademain.c m68k_speed = 4). AUDxDAT
+  start, byte clock in DMA mode, start interrupt at the first line after
+  DMA on (amiga_host.c). StoneTracker keeps 68020 timing; rebuilt, passes.
+- E5 (all 30 s, mono envelope): Anders 0land 0.9916 / hot.primemover_01
+  0.9953, Ben Daglish 0.9977, Core Design 0.9996 (end 23.1 s), Dave Lowe
+  0.9951, Dave Lowe New 0.9946, Wally Beben 0.9958, Ben Daglish SID
+  0.965, Beathoven 0.9836 / 0.9872, Sound Player 0.9986 / 0.9934 / 0.976,
+  MIDI Loriciel 0.9836 / 0.994, Digital Sonix & Chrome 0.889 (held).
+- DSC remaining gap: the player restarts or continues each note by a
+  colour-clock race (busy-wait poll vs Paula byte boundary, 4 cc either
+  way); about one note in ten lands on the other side from UADE. Closing it
+  needs UAE's exact CIA/hsync/CPU phase, not a parameter.
+
 ## Open
 - BD default (D6) - owner.
-- Grid follow: the runner reports no song position; the grid does not follow
-  playback on these formats (UADEEditable did for some). Needs per-player
-  position reads (module RAM) - not done.
-- Subsongs: engine.setSubsong exists; not wired into nativeSubsongs (scope
-  view control / auto-advance) - the silence detector ends the song.
+- Grid follow is tick-timed against the grid's speed: exact for the
+  speed-1 tick grids (Dave Lowe, DLN, Wally Beben), as good as the scan's
+  speed for UADE-scanned grids. Not verified in the browser yet.
+- Digital Sonix & Chrome: 0.889, held (see 2026-10-06).
 - Instrument editing on these formats: none (the player is the module's own
   68k code); edits would be RAM pokes into the module.
 - Untracked build dirs left on disk by earlier sessions: davelowe-wasm/,
