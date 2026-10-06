@@ -16,6 +16,7 @@ export type WorkletMsg = { type?: string; channels?: Int16Array[]; frame?: numbe
 export type WorkletProc = {
   handleMessage?(d: unknown): Promise<void>;
   _handleMessage?(d: unknown): Promise<void>;   // UADE's name for it
+  _onMessage?(d: unknown): void;                // the per-note synth worklets' (Fred)
   process(i: Float32Array[][], o: Float32Array[][]): boolean;
   [k: string]: unknown;
 };
@@ -46,7 +47,7 @@ export async function startWorklet(dir: string, stem: string, transform?: JsTran
   };
   new Function(...Object.keys(scope), readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8'))(...Object.values(scope));
   const proc = new Processor();
-  const send = (m: unknown) => (proc.handleMessage ?? proc._handleMessage)!.call(proc, m);
+  const send = async (m: unknown) => { await (proc.handleMessage ?? proc._handleMessage ?? proc._onMessage)!.call(proc, m); };
   const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
   Object.defineProperty(process, 'versions', { value: {}, configurable: true });
   try {
@@ -55,6 +56,8 @@ export async function startWorklet(dir: string, stem: string, transform?: JsTran
       wasmBinary: readFileSync(resolve(ROOT, `public/${dir}/${wasmStem}.wasm`)),
       jsCode: await (transform ?? ((c: string) => c))(readFileSync(resolve(ROOT, `public/${dir}/${wasmStem}.js`), 'utf8')),
     });
+    // The synth worklets start their WASM without returning the promise: wait for their ready post.
+    for (let i = 0; i < 200 && proc._onMessage && !proc.handleMessage && !posted.some((p) => p.type === 'ready'); i++) await new Promise((r) => setTimeout(r, 10));
   } finally { Object.defineProperty(process, 'versions', versions); }
   return { proc, send, posted };
 }

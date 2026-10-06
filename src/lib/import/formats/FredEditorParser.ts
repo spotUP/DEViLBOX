@@ -188,6 +188,17 @@ function readSample(rec: Uint8Array): FESample {
   };
 }
 
+/**
+ * A note byte n plays PeriodTable[n] * InsPer >> 10 and PeriodTable[36] = 1024,
+ * so byte 36 (grid C-2, keyboard 'C-2' = MIDI 36) plays the sample at period
+ * InsPer: 3546895 / InsPer Hz. The Sampler plays its buffer at the buffer's own
+ * rate on its base note, so the buffer carries that rate and the base note is C-2.
+ */
+export const FRED_PCM_BASE_NOTE = 'C2';
+export function fredPcmRate(insPer: number): number {
+  return insPer > 0 ? Math.round(3546895 / insPer) : 8287;
+}
+
 function fredConfigOf(sample: FESample): FredConfig {
   return {
     envelopeVol:   sample.envelopeVol,
@@ -211,6 +222,7 @@ function fredConfigOf(sample: FESample): FredConfig {
     pulsePosH:     sample.pulsePosH,
     pulseDelay:    sample.pulseDelay,
     relative:      sample.relative,
+    length:        sample.length,
   };
 }
 
@@ -255,26 +267,30 @@ export async function parseFredEditorFile(
       ? bytes.slice(start, start + sample.length) : null;
 
     let instr: InstrumentConfig;
+    const pcmRate = fredPcmRate(sample.relative);
     if (sample.type === 1) {
       // PWM synth instrument — FredSynth
       instr = {
         id: instId, name: `${name} (PWM)`, type: 'synth' as const, synthType: 'FredSynth' as const,
-        fred: fredConfigOf(sample), effects: [], volume: -6, pan: 0,
+        fred: fredConfigOf(sample), effects: [],
+        // 0 dB: fred_synth.c already renders at the replayer's per-voice level.
+        volume: 0, pan: 0,
       } as unknown as InstrumentConfig;
     } else if (sample.type === 2) {
       // Wavetable blend — Sampler approximation with the PCM data if available
       instr = pcm
-        ? createSamplerInstrument(instId, `${name} (Blend)`, pcm, Math.min(64, sample.envelopeVol || 64), 8287, 0, 0)
+        ? createSamplerInstrument(instId, `${name} (Blend)`, pcm, Math.min(64, sample.envelopeVol || 64), pcmRate, 0, 0)
         : makePlaceholderInstrument(instId, `${name} (Blend)`);
     } else if (sample.type === 0 && pcm) {
       const loop = sample.loopPtr > 0;
-      instr = createSamplerInstrument(instId, name, pcm, Math.min(64, sample.envelopeVol || 64), 8287,
+      instr = createSamplerInstrument(instId, name, pcm, Math.min(64, sample.envelopeVol || 64), pcmRate,
         loop ? sample.loopPtr : 0, loop ? sample.length : 0);
       // Instrument-level vibrato / arpeggio / envelope live on the record; keep them on the config.
       instr.fred = fredConfigOf(sample);
     } else {
       instr = makePlaceholderInstrument(instId, name);
     }
+    if (instr.sample && sample.type !== 1) instr.sample.baseNote = FRED_PCM_BASE_NOTE;
     instr.uadeChipRam = chipRam;
     instruments.push(instr);
   });
