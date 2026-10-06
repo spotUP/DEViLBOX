@@ -337,3 +337,17 @@ Owner: estimated grids are useless; reverse each format to its real data. Work l
 - Sound Master (c2cc825a8): owner - sounds good, grid "almost correct but not correct" (missing notes, extra/wrong notes, effects/volume). Data matched note-ons; display diverges -> agent fixing.
 - ACCEPTANCE ADDED (all reversed formats): a test walks every cell - the shown note equals the played note (transposes applied, names match periods), every played note-on has a shown cell, effects/volumes shown decoded. Re-check Fred Editor and Hippel ST against it.
 - Wally Beben - agent running. Jesper Olsen - agent running.
+
+## Open from owner jukebox run, 2026-10-06 afternoon
+- [ ] `composer-670-cdfm/black glass ][ - muzik0.670`: not CDFM 670 as CDFM67Parser/libopenmpt know it (sample-name bytes are binary); needs format research. Falls to UADE, which cannot play it.
+- [ ] `bob4e.dum` (Infogrames): companion `bob4e.ins` not fetched.
+- [ ] `shortsong1.mod.nt`: StarTrekker companion loaded as the song.
+- [ ] `the punisher - title.psa`: UADE formatName Unknown, no route.
+- [ ] `fm dance.fmt`: UADE probe in prepareModuleImport fails first (log noise at least; playback not checked).
+- [ ] Autosave restore keeps stale song data (engine fileData, grid cells) - decision pending with owner (re-decode on restore recommended).
+- [x] MMD3 to libopenmpt (520bd9934), stale engine position (b0c754959), Eupmini mute range (28e92ca07).
+- [ ] `jpn.virocop-14`: companion `SMP.virocop-14` not fetched (UADE "file not found").
+- [ ] `boogie.mus`: UADE "module check failed"; WantedTeam.bin companion was written, so it may be misrouted to the Jesper Olsen / Wanted Team player.
+- [ ] A format asks UADE for `/uade/songplay` repeatedly (maxsubsong = -1); song name not in the log.
+- [x] Lag under rapid jukebox loading: engine position callbacks piled up per song start (894685de1). Not yet measured in the tab after the fix.
+- [ ] Other growth candidates, unmeasured: UADE's /uade directory keeps every loaded file; TrackerAudioCapture creates a ScriptProcessorNode per song.

@@ -37,6 +37,9 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._lastHint = '';
     this._currentSubsong = 0;    // Last requested subsong index (preserved across reloads)
     this._companionFiles = new Map();  // filename → Uint8Array, survives WASM reinit
+    this._pendingCompanions = new Set(); // companions sent since the last load: they belong to the NEXT song
+    this._songFiles = new Set();         // /uade-relative paths written for the loaded song (module + companions)
+    this._songBasename = null;           // module file name of the loaded song
     this._stderrTail = [];             // last UADE stderr lines, reported with a refused load
 
     // Float32 output buffers allocated in WASM heap
@@ -741,6 +744,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     // Always cache companion files so they survive WASM reinit
     const data = new Uint8Array(buffer);
     this._companionFiles.set(filename, data.slice(0));
+    this._pendingCompanions.add(filename);
 
     if (!this._wasm || !this._ready) {
       console.log('[UADE.worklet] addCompanionFile cached (WASM not ready yet): ' + filename);
@@ -791,6 +795,36 @@ class UADEProcessor extends AudioWorkletProcessor {
         console.log('[UADE.worklet] Restored companion: ' + filename + ' (' + data.byteLength + ' bytes)');
       }
     }
+  }
+
+  /**
+   * MEMFS keeps every file written to /uade until something unlinks it, so a
+   * jukebox session accumulated every module and companion ever loaded (and the
+   * companions were replayed into each fresh WASM instance). A load of a
+   * DIFFERENT song removes the previous song's module and companions; config
+   * files (ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, players)
+   * are never tracked here, so they stay. Companions sent for the incoming
+   * song (before this load) are kept.
+   */
+  _purgePreviousSong(newBasename) {
+    const keep = new Set(this._pendingCompanions);
+    keep.add(newBasename);
+    const fs = this._wasm && this._wasm.FS;
+    for (const path of this._songFiles) {
+      if (keep.has(path)) continue;
+      try { if (fs) fs.unlink('/uade/' + path); } catch { /* already gone */ }
+      const dirs = path.split('/').slice(0, -1);
+      while (dirs.length && fs) {
+        try { fs.rmdir('/uade/' + dirs.join('/')); } catch { break; } // non-empty or gone
+        dirs.pop();
+      }
+    }
+    for (const name of [...this._companionFiles.keys()]) {
+      if (!this._pendingCompanions.has(name)) this._companionFiles.delete(name);
+    }
+    this._songFiles = new Set(keep);
+    this._songBasename = newBasename;
+    this._pendingCompanions = new Set();
   }
 
   _loadIntoWasm(data, filenameHint) {
@@ -924,6 +958,9 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       // Rolling, not reset per load: the "Companion file written" lines from
       // the moments before the load are part of the story.
+      const newBasename = filenameHint.includes('/') ? filenameHint.split('/').pop() : filenameHint;
+      if (newBasename !== this._songBasename) this._purgePreviousSong(newBasename);
+      else this._pendingCompanions.clear(); // same song reloaded: its companions stay
       let ret = this._loadIntoWasm(data, filenameHint);
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
 
