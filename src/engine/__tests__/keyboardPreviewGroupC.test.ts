@@ -14,12 +14,15 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { startWorklet, ROOT } from './workletHarness';
+import { startWorklet, stereoOutputs, ROOT } from './workletHarness';
 import { renderTicks, rmsPerTick, risingEdges, totalRms, db, FPT } from './keyboardPreviewHarness';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { parseFuturePlayerFile } from '@/lib/import/formats/FuturePlayerParser';
 import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
 import { parseSteveTurnerFile } from '@/lib/import/formats/SteveTurnerParser';
+import { parseHivelyFile } from '@/lib/import/formats/HivelyParser';
+import { HivelySynth, hvlNoteForKey } from '@/engine/hively/HivelySynth';
+import { hivelyTransform } from '@/engine/hively/HivelyEngine';
 
 const corpus = (n: string, dir = 'formats') => {
   const f = readFileSync(resolve(ROOT, 'public/data/songs', dir === 'formats' ? 'formats' : dir, n));
@@ -34,7 +37,7 @@ const emscriptenTransform = (c: string) => c
   .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
   .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 
-interface Cell { note: number; instrument: number; effTyp?: number; eff?: number }
+interface Cell { note: number; instrument: number; volume?: number; effTyp?: number; eff?: number }
 interface GridSong {
   songPositions: number[];
   initialSpeed: number;
@@ -197,4 +200,79 @@ describe('Steve Turner: a typed note runs the replayer voice (envelope, vibrato,
     expect(after[0], 'no hard cut at key-up').toBeGreaterThan(0.1);
     expect(after[after.length - 1], 'level falls through the decay').toBeLessThan(after[0] * 0.85);
   });
+});
+
+describe('Hively / AHX: a typed note is the replayer voice the song plays, at the song pitch and level', () => {
+  /** The keyboard players of the Hively worklet render into output 37, apart from the tune. */
+  async function previewOf(ab: ArrayBuffer, cfg: unknown, hvlNote: number, ticks: number, withTune: boolean) {
+    const c = await startWorklet('hively', 'Hively', hivelyTransform);
+    if (withTune) await c.send({ type: 'loadTune', buffer: ab, defStereo: 0 });
+    await c.send({ type: 'createPlayer' });
+    const handle = (c.posted.find((p) => (p as { type?: string }).type === 'playerCreated') as unknown as { handle: number }).handle;
+    const blob = (HivelySynth.prototype as unknown as { serializeInstrument(cfg: unknown): ArrayBuffer }).serializeInstrument.call({}, cfg);
+    await c.send({ type: 'setInstrument', handle, buffer: blob });
+    await c.send({ type: 'noteOn', handle, note: hvlNote, velocity: 127 });
+    const l = new Float32Array(ticks * FPT), r = new Float32Array(ticks * FPT);
+    for (let f = 0; f < l.length; f += 128) { const o = stereoOutputs(38); c.proc.process([], o); l.set(o[37][0], f); r.set(o[37][1], f); }
+    return { l, r, c, handle };
+  }
+  const NOTES = 3;
+  for (const name of ['aces_high.ahx', 'hexplosion.hvl']) {
+    it(`${name}: the plain notes on the first row have the song's pitch, level and envelope`, async () => {
+      const ab = corpus(name);
+      const song = parseHivelyFile(ab, name) as unknown as GridSong & { instruments: Array<{ id: number; hively: unknown }> };
+      const seen = new Set<string>();
+      let checked = 0;
+      // First position only: the song's tempo is still the header's there, so row times are exact.
+      for (const pi of song.songPositions.slice(0, 1)) {
+        const pat = song.patterns[pi];
+        for (let r = 0; r < pat.length && checked < NOTES; r++) for (let c = 0; c < pat.channels.length && checked < NOTES; c++) {
+          const cell = pat.channels[c].rows[r];
+          // A volume or effect cell plays more than the instrument (track volume, slides).
+          if (!(cell.note > 0 && cell.note < 97 && cell.instrument > 0 && !cell.effTyp && !cell.eff && !cell.volume)) continue;
+          const seenKey = `${cell.instrument}/${cell.note}`;
+          if (seen.has(seenKey) || r > 0) continue;   // a note on the first row, once per instrument and note
+          seen.add(seenKey);
+          const n = { posIdx: song.songPositions.indexOf(pi), row: r, ch: c, patLen: pat.length };
+          const ticks = holdTicks(song, n, 8);
+          const a = await startWorklet('hively', 'Hively', hivelyTransform);
+          await a.send({ type: 'loadTune', buffer: ab, defStereo: 0 });
+          await a.send({ type: 'setMuteMask', mask: 1 << c });
+          await a.send({ type: 'play' });
+          const startTick = Math.round(n.posIdx * n.patLen * song.initialSpeed + r * song.initialSpeed);
+          // The song voice sits where the song's stereo mode pans it; the preview is centred. Level is
+          // compared as total power over both sides, pitch on the sum.
+          const total = (startTick + ticks + 4) * FPT;
+          const sl = new Float32Array(total), sR = new Float32Array(total);
+          for (let f = 0; f < total; f += 128) { const o = stereoOutputs(1); a.proc.process([], o); sl.set(o[0][0], f); sR.set(o[0][1], f); }
+          const inst = song.instruments.find((i) => i.id === cell.instrument)!;
+          // key = grid note + 11 (xmConversions); HivelySynth maps the key back to the replayer's note
+          const key = cell.note + 11;
+          const hvlNote = hvlNoteForKey(key);
+          const p = await previewOf(ab, inst.hively, hvlNote, ticks + 4, true);
+          const mixS = sl.map((v, i) => v + sR[i]).subarray(startTick * FPT);
+          const mixP = p.l.map((v, i) => v + p.r[i]);
+          const powS = (x: Float32Array, y: Float32Array) => rmsPerTick(x, ticks).map((v, t) => Math.hypot(v, rmsPerTick(y, ticks)[t]));
+          const sr = powS(sl.subarray(startTick * FPT), sR.subarray(startTick * FPT)), pr = powS(p.l, p.r);
+          if (process.env.PV_DEBUG) console.log('HV', name, key, JSON.stringify(n), ticks, startTick, sr.map((v) => v.toFixed(3)).join(','), '|', pr.map((v) => v.toFixed(3)).join(','));
+          const sPitch = risingEdges(mixS.subarray(0, ticks * FPT)), pPitch = risingEdges(mixP.subarray(0, ticks * FPT));
+          if (sPitch > 8) expect(Math.abs(pPitch / sPitch - 1), `${name} note ${key}: rising edges preview ${pPitch} song ${sPitch}`).toBeLessThan(0.08);
+          expect(Math.abs(db(totalRms(pr), totalRms(sr))), `${name} note ${key}: overall level, dB`).toBeLessThan(1.5);
+          checked++;
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
+    });
+
+    it(`${name}: key release runs the instrument's release`, async () => {
+      const ab = corpus(name);
+      const song = parseHivelyFile(ab, name) as unknown as { instruments: Array<{ id: number; hively: unknown }> };
+      const p = await previewOf(ab, song.instruments[0].hively, 40, 10, false);
+      await p.c.send({ type: 'noteOff', handle: p.handle });
+      const r = new Float32Array(120 * FPT);
+      for (let f = 0; f < r.length; f += 128) { const o = stereoOutputs(38); p.c.proc.process([], o); r.set(o[37][0], f); }
+      const per = rmsPerTick(r, 120);
+      expect(per[per.length - 1], 'the voice has released').toBeLessThan(0.002);
+    });
+  }
 });
