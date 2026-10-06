@@ -31,7 +31,7 @@ import { useInstrumentStore } from '../../stores/useInstrumentStore';
 
 const STEP = 5538, STEPS = 16;
 const NOTES = [36, 36, 48, 36, 39, 36, 51, 36, 36, 48, 36, 43, 36, 39, 46, 36];
-type Knob = 'none' | 'cutoff' | 'resonance' | 'envMod' | 'decay' | 'accent';
+type Knob = 'none' | 'cutoff' | 'resonance' | 'envMod' | 'decay' | 'decayMidi' | 'accent';
 
 async function render(knob: Knob) {
   const { proc, send } = await startWorklet('db303', 'DB303', (DB303Synth as unknown as { transformDB303Glue(c: string): string }).transformDB303Glue);
@@ -54,6 +54,8 @@ async function render(knob: Knob) {
         : knob === 'resonance' ? { filter: { ...tb.filter, resonance: v } }
         : knob === 'envMod' ? { filterEnvelope: { ...tb.filterEnvelope, envMod: v } }
         : knob === 'decay' ? { filterEnvelope: { ...tb.filterEnvelope, decay: v }, devilFish: { ...tb.devilFish, normalDecay: v } }
+        // MIDI / automation (parameterRouter 'decay' route): only filterEnvelope.decay is written.
+        : knob === 'decayMidi' ? { filterEnvelope: { ...tb.filterEnvelope, decay: v } }
         : { accent: { ...tb.accent, amount: v } };
       useInstrumentStore.getState().updateInstrumentRealtime(id, { tb303: { ...tb, ...u } } as never);
     }
@@ -69,7 +71,7 @@ describe('a 303 knob sweep does not flatten the audio', () => {
     const base = await render('none');
     const baseRms = stepRms(base);
     expect(Math.min(...baseRms)).toBeGreaterThan(0.05);
-    for (const k of ['cutoff', 'resonance', 'envMod', 'decay', 'accent'] as Knob[]) {
+    for (const k of ['cutoff', 'resonance', 'envMod', 'decay', 'decayMidi', 'accent'] as Knob[]) {
       const before = sentinel.engineCalls;
       const L = await render(k);
       expect(sentinel.engineCalls - before, `${k}: knob path reached the synth`).toBeGreaterThan(50);
