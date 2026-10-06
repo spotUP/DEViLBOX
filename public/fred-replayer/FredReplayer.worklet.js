@@ -14,6 +14,7 @@ class FredReplayerProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
+    this.lastReport = -1;
     this.initializing = false;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
@@ -45,7 +46,7 @@ class FredReplayerProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; break;
+      case 'play': this.playing = true; this.lastReport = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._fred_select_subsong(this.handle, 0);
@@ -181,6 +182,13 @@ class FredReplayerProcessor extends AudioWorkletProcessor {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
       }
+    }
+
+    // The line the replayer is on (fred_get_line), its own counter, reported when it changes.
+    const line = this.module._fred_get_line(this.handle);
+    if (line !== this.lastReport) {
+      this.lastReport = line;
+      this.port.postMessage({ type: 'position', line });
     }
 
     if (this.module._fred_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });
