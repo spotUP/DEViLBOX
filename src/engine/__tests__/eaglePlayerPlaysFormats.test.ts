@@ -155,6 +155,49 @@ describe('the default load plays on EaglePlayer', () => {
     expect(song.instruments.some((i) => i.uade), 'no instrument carries a UADE player config').toBe(false);
   }, 60_000);
 
+  // The app's path after the import: the format store takes the song, the
+  // replayer plays liveTrackerSong(), playback picks its branch from the
+  // stores, startNativeEngines loads the engine with the descriptor's args.
+  // primemover 07.hot and dynamite dux.core (grid from UADE's scan) were
+  // silent in the app while the engine tests passed.
+  it.each(['Anders0land', 'CoreDesign'])('%s: a UADE-scanned song reaches the engine through the stores and plays', async (id) => {
+    const fmt = EAGLE_PLAYER_FORMATS[id];
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+    const { liveTrackerSong } = await import('@/lib/song/liveSong');
+    const { WASM_ENGINES, playsAsOpaqueUADE } = await import('../replayer/wasmEngineRegistry');
+    const { playingEngineFor } = await import('../replayer/NativeEngineRouting');
+    const bytes = readFileSync(resolve(ROOT, fmt.corpus));
+    const song = await parseModuleToSong(new File([new Uint8Array(bytes)], basename(fmt.corpus)));
+    useFormatStore.getState().applyEditorMode(song);
+    useInstrumentStore.setState({ instruments: song.instruments });
+    // A grid still tagged 'UADE' (a project saved before the import retagged
+    // it) must not send playback down the opaque-UADE branch either.
+    expect(playsAsOpaqueUADE('UADE', useFormatStore.getState() as unknown as Record<string, unknown>, song.instruments), 'playback starts the song engine').toBe(false);
+    const live = liveTrackerSong();
+    expect(playingEngineFor(live)).toBe('EaglePlayer');
+    const desc = WASM_ENGINES.find((d) => d.key === 'EaglePlayer')!;
+    const data = live[desc.fileDataKey] as ArrayBuffer;
+    expect(data.byteLength, 'the module bytes the engine gets').toBe(bytes.length);
+    const [formatId, fileName] = desc.getLoadArgs!(live) as [string, string];
+    expect(formatId).toBe(id);
+    loadSharedWorkletScripts();
+    const { proc, send, posted } = await startWorklet('eagleplayer', 'EaglePlayer');
+    // EaglePlayerEngine.loadTune's message, from the same helpers.
+    await send({ type: 'loadModule', moduleData: data.slice(0), playerData: songBuffer(`public/eagleplayer/players/${fmt.player}`), moduleName: eaglePlayerModuleName(fmt, fileName), options: fmt.options });
+    await send({ type: 'play' });
+    expect(posted.filter((m) => m.type === 'error').map((m) => m.message)).toEqual([]);
+    expect(posted.some((m) => m.type === 'moduleLoaded')).toBe(true);
+    let sum = 0, n = 0;
+    for (let b = 0; b < Math.ceil((48000 * 3) / 128); b++) {
+      const out = stereoOutputs(5);
+      proc.process([], out);
+      for (const ch of out[0]) for (const v of ch) { sum += v * v; n++; }
+    }
+    expect(Math.sqrt(sum / n), `${fmt.label} plays (rms of 3 s)`).toBeGreaterThan(0.02);
+  }, 120_000);
+
   it('Ben Daglish stays on BdEngine until the owner moves it (heldBecause)', async () => {
     expect(EAGLE_PLAYER_FORMATS.BenDaglish.isDefault).toBe(false);
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');

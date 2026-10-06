@@ -18,6 +18,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 import { liveTrackerSong, liveSongFormat } from '@/lib/song/liveSong';
+import { playsAsOpaqueUADE } from '@engine/replayer/wasmEngineRegistry';
 import { computePlaybackFollow } from '@/lib/tracker/playbackFollow';
 import { computeEffectiveSongOrder } from '@/lib/tracker/playbackOrder';
 
@@ -221,7 +222,10 @@ export const usePatternPlayback = () => {
       const format = liveSongFormat(pattern.importMetadata?.sourceFormat as string | undefined);
 
       // ── UADE: opaque song player — bypass TrackerReplayer entirely ──────
-      if (format === 'UADE') {
+      // Only when UADE plays it: a 'UADE' grid on a song with an engine of
+      // its own (UADE's scan drew the grid) goes through the replayer, which
+      // starts that engine.
+      if (format === 'UADE' && playsAsOpaqueUADE(format, useFormatStore.getState() as unknown as Record<string, unknown>, instrumentsRef.current)) {
         if (!hasStartedRef.current) {
           hasStartedRef.current = true;
           uadeLiveRowRef.current = 0;
