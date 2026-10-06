@@ -59,6 +59,26 @@ function s16(buf: Uint8Array, off: number): number {
 }
 
 
+/**
+ * The MED versions UADE's OctaMED player accepts (its eagleplayer.conf entry:
+ * prefixes=med,mmd0,mmd1,mmd2). MMD3 is not among them: handing an MMD3 song to
+ * UADE fails to load ("MMD3 not in eagleplayer.conf") and the song plays silence.
+ */
+export const UADE_MED_MAGICS: readonly string[] = ['MMD0', 'MMD1', 'MMD2'];
+
+/** Which engine gets the module: UADE for the versions it plays, libopenmpt for MMD3. */
+function playbackData(
+  magic: string,
+  buffer: ArrayBuffer,
+  filename: string,
+  uadePatternLayout: UADEPatternLayout,
+): Partial<TrackerSong> {
+  if (UADE_MED_MAGICS.includes(magic)) {
+    return { uadeEditableFileData: buffer.slice(0), uadeEditableFileName: filename, uadePatternLayout };
+  }
+  return { libopenmptFileData: buffer.slice(0) };
+}
+
 export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   const magic = str4(buf, 0);
@@ -659,9 +679,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     initialSpeed: tempo2 || 6,
     initialBPM: initialBPM,
     linearPeriods: false,
-    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
-    uadeEditableFileName: filename,
-    uadePatternLayout,
+    ...playbackData(magic, buffer, filename, uadePatternLayout),
   };
 }
 
