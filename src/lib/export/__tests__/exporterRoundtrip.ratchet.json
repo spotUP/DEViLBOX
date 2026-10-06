@@ -232,6 +232,14 @@
       "cells": 1280,
       "bytes": 48558
     },
+    "jochenHippelST": {
+      "exporter": "JochenHippelSTExporter.exportJochenHippelST",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 6058,
+      "bytes": 6058
+    },
     "klystrack": {
       "exporter": "KT (KlysExporter)",
       "tier": "byte-exact",

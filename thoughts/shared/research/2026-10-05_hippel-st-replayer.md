@@ -1,8 +1,8 @@
 ---
 date: 2026-10-05
 topic: How DEViLBOX can play Jochen Hippel's Atari ST formats (.sog TFMX-ST/MMME, .soc COSO-ST)
-tags: [hippel, atari-st, ym2149, uade, sc68, sndh, tfmx, coso, F4, B12]
-status: final
+tags: [hippel, atari-st, ym2149, uade, sc68, sndh, tfmx, coso, F4, B12, grid, reverse-engineering]
+status: implemented
 ---
 
 # Hippel ST replayer: routes (2026-10-05)
@@ -144,3 +144,129 @@ carrying only the right `FA23`-style timer byte and the period-table marker.
   `/Users/spot/Code/Reference Docs/Replayers/DeliPlayers/Delirium/Hippel.s`: Amiga Hippel replayers, not ST.
 - Consequence: R4 (debug the raw-`.sog` path) and R5 (spec for a native port) need no download; use v4 from gitlab for the
   current behaviour. Not read in full here.
+
+
+## 2026-10-06: the song reversed, the grid decoded (provenance row `jochenHippelST`, C -> A)
+
+Source read: `Jochen Hippel ST_v4.asm` (uade gitlab master, `$VER ... V1.3 (13 Dec 2008)`; UADE ships the V1.2
+binary `players/Jochen_Hippel_ST`). Routines: `Check` (lbC0001C0), `InitPlayer`, `Compress` (TFMX -> COSO),
+`Init` (lbC0008FE), `Play` (lbC0006D6 / lbC000784 row step / lbC000854 note), `Play_Emu` (YM on Paula).
+Code: `src/lib/import/formats/JochenHippelSTModule.ts` (model, codec, Compress port, sequencer),
+`JochenHippelSTSong.ts` (grid cells, playback image, edits, export), `JochenHippelSTParser.ts` (grid, route),
+`src/lib/export/JochenHippelSTExporter.ts`.
+
+### Corpus (8 songs) - what they really are
+
+| file | song | prefix | note |
+|---|---|---|---|
+| `hippel-st/crown {arabia,england,japan,russia,viking}.hst` | **COSO** at 2600 (word pointers), TFMX header at 2632 | 2600 bytes replay code (lea at 54 and 104 -> 2600) | the old doc said "TFMX header at 2632": that is the header INSIDE the COSO |
+| `hippel-st/demo music10.sog` | raw TFMX at 0 | - | table cut 4 bytes short |
+| `formats/astaroth.sog` | raw TFMX at 0 | - | table cut 2 bytes short, 7 subsongs (4-7 = step 208, no notes) |
+| `hippel-st-coso/ghostbattle titletune.soc` | COSO at 0 | - | 1151 bytes after the table (digi or text, kept verbatim) |
+
+**R4 root cause found (the `.sog` "buzz"):** both raw rips are a few bytes shorter than InitPlayer's size sum
+(`(2+snd+vol)*64 + (1+pat)*patSize + (1+steps)*12 + (2+subsongs+table)*6 + 32`): `sub.l D1,D0; bmi Short` ->
+`EPR_ModuleTooShort`, so UADE never played them (the 0.004-0.007 flat output is "nothing"). With the table's zero
+bytes put back, demo music10 plays (peak 0.34) and astaroth (0.17); the timer/period-default hypothesis was wrong.
+The playback image (below) carries the full table, so both now play in the app.
+
+### Song structures (all big-endian; counts are n - 1 words)
+
+TFMX header (32 bytes): `+0` magic TFMX/MMME, `+4` sound sequences, `+6` volume sequences (= instruments), `+8`
+patterns, `+10` steps, `+12` pattern size (bytes; 64 or 128), `+14` unused, `+16` subsongs (n; the table holds
+n + 1 entries), `+18` 6-byte table entries - 1, `+20..31` copied verbatim.
+
+Raw TFMX: header, sound sequences x 64, volume sequences x 64, patterns x patternSize (rows of note, info; note 0 =
+empty, 1 = pattern end), steps x 12, subsongs x 6 (first step, last step, speed), table x 6, then digital drums
+(a table of 8-byte entries whose first word is $80/$100) or a text or nothing.
+
+COSO: `+0` 'COSO', `+4` sound pointer table, `+8` volume pointer table, `+12` pattern pointer table, `+16` steps,
+`+20` subsongs, `+24` table, `+28` digi (the player writes it), `+32` the TFMX header. Pointers are word offsets
+from the song start, or longs when the first sound pointer word is 0 (`TypeAdr`; also drives `TypePlay`).
+Pattern = byte stream: `FF` end; `FE w` set the voice's wait; `FD w` set it and rest this row; else note, info,
+and one more byte when info & $E0. Compress (ported, `compressHstSong`) packs a raw pattern: leading empty rows ->
+one FD, a note's trailing empty rows -> its wait (FE only when the wait changes), the extra byte = the byte before
+the note in the raw pattern (previous row's info; row 0 takes the pattern's last byte). Sequences are cut after
+the last $E1 (or $E0 + offset).
+
+Step (12 bytes): three voices x (pattern, transpose s8, sound transpose s8, command). Command `$Fx`: the voice is
+attenuated by x for the step (volume = macro - $30); `$Ex`: speed = x from the next row on (the counter was
+reloaded before the voices ran; Init reads only $Fx of the first step). **Three voices** (YM A, B, C); the YM
+emulation writes A -> Paula 0, B -> Paula 3, C -> Paula 2; Paula 1 is the digi voice.
+
+Sequencer (per player tick, 50 Hz): the global counter (init 1) reloads from the speed (subsong word +4; 0 -> 4);
+on reload each voice counts down its wait and, when negative, reads: FF -> next step (voice 0 counts steps; after
+`last` it ends the pass: SongEnd, all voices back to `first`), FE -> wait, FD -> wait + rest, note -> trigger.
+Note trigger (lbC000854): $1E = note byte, $1F = info, $2C = extra; note < $80 sets the instrument: volume sequence
+`((info & $1F) + sound transpose) & $FF`, 0 when past the last; its sound sequence, or `extra` when info & $40.
+info & $20 = portamento by `extra` per tick. Pitch = YM table[(macro + $1E + transpose) & $7F]; table index 0 =
+$EEE = 32.7 Hz = C-1.
+
+### Grid (what the parser builds)
+
+One pattern per step (rows = the rows the step lasts: 64 for the crowns, 32 for the others; all three voices end
+every step together in the whole corpus - checked, the parser throws otherwise), three channels, order = the
+subsong's steps. Cell = the note event the voice reads on that row: note = (note & $7F) + transpose + 13 (XM; C-1),
+instrument = volume sequence + 1 (none for a note >= $80, which triggers no instrument). Row 0 volume shows `$Fx`;
+`$Ex` is the speed effect on the step's second row. Hidden bits (note bit 7, info top bits, extra byte, raw
+empty-row info bytes) stay in the model and survive edits. Subsongs: UADE numbers them from 1
+(`uadeEditableSubsongs.first = 1`, UADEEngine.loadTune adds it).
+
+### Playback image and edits
+
+A packed stream moves every later row when a note is added, so UADE is handed a playback image of the same song
+(`HstSongEdit.image`): the COSO song (a raw song first packed by the Compress port) whose patterns are stored
+one event per row (empty row = `FD 00`, wait always 0) in slots with room for three bytes per row; the source file
+sits in the pattern region (unreferenced, tag `DVBXHSTS`) so the exporter can write the edits into the file's own
+encoding. A grid edit = `UADEPatternLayout.writeCell` (new, for layouts whose cell bytes depend on their step):
+the changed byte run of that pattern's slot, written by `UADEChipEditor.patchPatternCell`; there is no chip-RAM
+read-back for such a layout. The export decodes the source, writes edited cells only (raw rows in place, COSO
+patterns packed again with the Compress strategy and the pattern region re-laid), byte-exact when unedited.
+Limit: an edit that changes a row's length (empty <-> note, or a 3-byte note) moves the rows after it in that slot;
+a voice inside that pattern at that moment may misread the rest of the pattern (until its FF). Not measured.
+
+### Proof (2026-10-06)
+
+- Byte-exact: decode/encode on all 8 files; the image gives back its source; unedited export == file
+  (`jochenHippelSTSong.test.ts`; exporter harness: `jochenHippelST byte-exact 6058/6058`).
+- Packing the decoded rows again reproduces every pattern stream the player reads (all used patterns, 8 files);
+  the Compress port's output equals the player's own packed copy in UADE memory byte for byte (2524 and 6222 bytes).
+- Player oracle: the V1.2 binary's voice records (3 x $34 bytes ending $FE before the period table) read every
+  half tick. Over one full pass of every subsong of every file (probe, 2026-10-06), every voice's reads equal the
+  decoded events exactly, in order (e.g. crown arabia 705 / 903 / 775 reads, ghostbattle 705 / 1198 / 1604,
+  astaroth subsong 3 1952 / 1556 / 928), on the grid's rows (offset within the half-tick sampling jitter; UADE's
+  clock runs 1.0001x). CI checks 20 s of every file plus astaroth subsong 2 (`jochenHippelSTGridMatchesPlayer.test.ts`).
+- The image plays the song: the same voice reads row for row, and the same Paula register writes (values, order)
+  as the original for 20 s (crown arabia, demo music10, ghostbattle). Sample output differs slightly: the writes
+  land at other cycle positions (the player's DMA wait loops), not other values.
+- Edits: two edits (a note on an empty row, a note moved a tone) through `UADEChipEditor.patchPatternCell` at 1 s
+  are read by the player when their rows come (crown arabia COSO, demo music10 raw).
+- gridVsPaula is blind to this player: it writes AUDxLC only when a YM voice switches tone/noise, so its note-on
+  rule finds 0 events on the three YM voices (crown arabia: Paula 0/2/3 = 0 events; ghostbattle: 0 on all). The
+  UADE scan grid the app showed for .hst/.soc uses the same rule (inference: not run, needs the worklet). Heard
+  pitch instead (probe): at each grid note-on tick, the YM period Paula is given ((P - 1) / 7), per instrument's
+  commonest offset (its sound sequence's first note offset), per channel:
+
+  | song | ch A | ch B | ch C |
+  |---|---|---|---|
+  | crown arabia | 0.96 | 0.96 | 0.92 |
+  | crown england | 1.00 | 0.97 | 1.00 |
+  | crown japan | 0.99 | 0.96 | 0.79 |
+  | crown russia | 0.92 | 0.94 | 0.84 |
+  | crown viking | 0.95 | 0.97 | 0.99 |
+  | demo music10 (sub 1 / 2) | 0.90 / 1.00 | 0.90 / 1.00 | 0.83 / 1.00 |
+  | astaroth (sub 1 / 2 / 3) | 0.92 / 0.95 / 0.89 | 0.94 / 0.90 / 0.88 | 1.00 / 0.81 / 0.88 |
+  | ghostbattle | 1.00 | 1.00 | 0.95 |
+
+  The misses are the player's own pitch moves on the first tick (arpeggio and vibrato sequences, portamento
+  notes, noise-mode drums): the note read is proven exact by the voice records above.
+- Before: `.sog` stub grid, 0 notes, and no sound (module too short); `.hst` / `.soc` the UADE scan grid.
+
+### Open
+
+- The live-edit misread window above (length-changing edit inside the pattern a voice is playing).
+- Volume (`$Fx`) and speed (`$Ex`) step commands are shown, not editable; instruments (sound/volume sequences)
+  are not decoded into an editor; the YM sound itself is UADE's ST emulation on Paula.
+- `.hip` / `.mcmd` (the Amiga "Jochen Hippel" SOG./MCMD. player) keep the old detection and empty grid
+  (provenance row `hip`), untouched here.
+- MMME songs and long-pointer COSO are handled by the code paths but have no corpus file (not measured).

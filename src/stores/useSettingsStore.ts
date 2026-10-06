@@ -352,7 +352,7 @@ export const useSettingsStore = create<SettingsStore>()(
         richardJoseph: 'native',  // RichardJosephParser — dedicated Richard Joseph support
         daveLowe: 'uade',       // DaveLoweParser — dedicated Dave Lowe support
         lme: 'uade',            // LMEParser — dedicated Leggless Music Editor support
-        jochenHippelST: 'native', // JochenHippelSTParser — Hippel WASM engine (libtfmxaudiodecoder)
+        jochenHippelST: 'native', // .hip/.mcmd: Amiga SOG/MCMD stub (libtfmxaudiodecoder) vs UADE; ST songs always decode
         specialFX: 'uade',      // SpecialFXParser — dedicated Special FX ST support
         timeTracker: 'uade',          // TimeTrackerParser — dedicated TimeTracker support
         kris: 'native',                 // KRISParser — dedicated ChipTracker/KRIS support
