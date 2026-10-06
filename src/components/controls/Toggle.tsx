@@ -20,6 +20,12 @@ interface ToggleProps {
    */
   tone?: ControlTone;
   size?: 'sm' | 'md';
+  /**
+   * Draw only the switch; the caller lays the label out itself (a form row
+   * with the label beside the switch). `label` still names the button for
+   * assistive tech.
+   */
+  hideLabel?: boolean;
   disabled?: boolean;
   title?: string;
 }
@@ -32,6 +38,7 @@ export const Toggle: React.FC<ToggleProps> = React.memo(({
   color: colorProp,
   tone,
   size = 'md',
+  hideLabel = false,
   disabled = false,
   title,
 }) => {
@@ -51,15 +58,19 @@ export const Toggle: React.FC<ToggleProps> = React.memo(({
   const { width, height, fontSize } = sizes[size];
 
   return (
-    <div className="toggle-container" style={{ width: width + 10, opacity: disabled ? 0.4 : 1 }}>
-      <div className="toggle-label" style={{ fontSize: fontSize - 1 }}>
-        {label}
-      </div>
+    <div className="toggle-container" style={{ width: hideLabel ? width + 4 : width + 10, opacity: disabled ? 0.4 : 1 }}>
+      {!hideLabel && (
+        <div className="toggle-label" style={{ fontSize: fontSize - 1 }}>
+          {label}
+        </div>
+      )}
       <button
         className={`toggle-switch ${value ? 'toggle-on' : 'toggle-off'}`}
         onClick={() => !disabled && onChange(!value)}
         disabled={disabled}
         title={title}
+        aria-label={label}
+        aria-pressed={value}
         style={{
           width,
           height,
@@ -90,7 +101,8 @@ export const Toggle: React.FC<ToggleProps> = React.memo(({
     prevProps.label === nextProps.label &&
     prevProps.disabled === nextProps.disabled &&
     prevProps.color === nextProps.color &&
-    prevProps.size === nextProps.size
+    prevProps.size === nextProps.size &&
+    prevProps.hideLabel === nextProps.hideLabel
   );
 });
 

@@ -14,7 +14,7 @@
  *   left/right  page
  *   Enter       play the selected row
  *   R           another take from the same format
- *   Alt+0       mark good        Alt+1..6  name a fault
+ *   Alt+0       mark good        Alt+1..7  switch a fault on/off (several can be on)
  *   Escape      clear the filter
  *
  * Reports are digits with ALT held on purpose: plain digits belong to the
@@ -34,8 +34,9 @@ import { useModlandContributionModal } from '@stores/useModlandContributionModal
 import { dismissErrors, dismissModal, play as playHeadless } from '@/bridge/handlers/writeHandlers';
 import { gatherCompanions } from '@/lib/import/companionFetch';
 import {
-  JUKEBOX_FAULTS, JUKEBOX_OK, LOAD_FAILED, reportFault, loadVerdicts, verdictOf,
-  verdictLabels, isGoodVerdict, type JukeboxVerdict,
+  JUKEBOX_FAULTS, LOAD_FAILED, reportFaults, reportGood, loadVerdicts,
+  verdictLabels, isGoodVerdict, faultsOf, setFault, verdictFromFaults, verdictOf, JUKEBOX_OK,
+  type JukeboxVerdict, type JukeboxFault,
 } from '@/lib/jukebox/faultReports';
 import { searchModland, downloadModlandFile } from '@/lib/modlandApi';
 
@@ -73,6 +74,9 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const [status, setStatus] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [judged, setJudged] = useState<Record<string, JukeboxVerdict>>({});
+  /** The same map, current at once — two quick clicks must both see the first. */
+  const judgedRef = useRef<Record<string, JukeboxVerdict>>({});
+  judgedRef.current = judged;
   const listRef = useRef<HTMLDivElement>(null);
   /** Bytes already fetched, so Enter does not wait on the network. */
   const cache = useRef<Map<string, Blob>>(new Map());
@@ -188,8 +192,11 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     setStatus(`LOAD FAILED — ${short}: ${message}`);
     const { id } = reportCtx.current;
     if (!id) return;
-    const ok = await reportFault(LOAD_FAILED, { format: id, file: short, note: message });
-    setJudged((j) => ({ ...j, [id]: { ...verdictOf(LOAD_FAILED), notes: message } }));
+    const faults = setFault(faultsOf(judgedRef.current[id]), LOAD_FAILED.id, true);
+    const next = verdictFromFaults(faults, message);
+    judgedRef.current = { ...judgedRef.current, [id]: next };
+    setJudged(judgedRef.current);
+    const ok = await reportFaults(faults, LOAD_FAILED, true, { format: id, file: short, note: message });
     if (!ok) setStatus(`LOAD FAILED — ${short}: ${message} · tracker offline (:4444)`);
   }, []);
 
@@ -311,64 +318,45 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   }, [row, file, loadAndPlay, grabFocus, index, failLoad]);
 
   /** Whether the selected row currently carries this fault. */
-  const carries = useCallback((fault: (typeof JUKEBOX_FAULTS)[number]): boolean => {
-    const v = row ? judged[row.id] : undefined;
-    if (!v) return false;
-    if (fault.status && v.status === fault.status) return true;
-    if (fault.patternQuality && v.patternQuality === fault.patternQuality) return true;
-    return false;
+  const carries = useCallback((fault: JukeboxFault): boolean => {
+    return !!row && faultsOf(judged[row.id]).includes(fault.id);
   }, [row, judged]);
 
   /**
-   * A fault is a STATE of the row, not a fire-and-forget action.
+   * A fault is a STATE of the row, not a fire-and-forget action, and faults
+   * are independent: any combination can be on.
    *
-   * "can you change the toggle buttons to switches?" — a mis-keyed fault used
-   * to stick until a reload, and a row already marked gave no sign of it on
-   * the buttons. The switch shows what the row carries and takes it back off.
+   * The row does NOT advance. It used to move to the next song on every
+   * switch-on, so the second click of a two-fault report landed on a
+   * different song — the owner's "i am not sure i can set more than one
+   * switch active". Moving on is Good, or the arrow keys.
    */
-  const toggleFault = useCallback(async (
-    fault: (typeof JUKEBOX_FAULTS)[number],
-    on: boolean,
-  ) => {
-    // Everything read through the ref, and the deps left EMPTY on purpose.
+  const toggleFault = useCallback(async (fault: JukeboxFault, on: boolean) => {
+    // Everything read through refs, and the deps left EMPTY on purpose.
     // `Toggle` is memoized and its comparator does not look at `onChange`
     // (`controls/Toggle.tsx`), so a switch keeps the very first handler it was
-    // given. A handler that closed over `row` therefore stayed bound to
-    // whatever was selected when the panel mounted — nothing, so every click
-    // returned at the first line and the switches looked dead. This is the
-    // ref pattern docs/CONTROL_PATTERNS.md prescribes for exactly this.
-    const { id, label, file: current, rowCount } = reportCtx.current;
+    // given. See docs/CONTROL_PATTERNS.md.
+    const { id, label, file: current } = reportCtx.current;
     if (!id || !current) return;
-    const ok = await reportFault(fault, {
+    const faults = setFault(faultsOf(judgedRef.current[id]), fault.id, on);
+    judgedRef.current = { ...judgedRef.current, [id]: verdictFromFaults(faults, judgedRef.current[id]?.notes) };
+    setJudged(judgedRef.current);
+    const ok = await reportFaults(faults, fault, on, {
       format: id,
       file: current.split('/').pop() ?? current,
-    }, !on);
-    setJudged((j) => {
-      const prev = j[id] ?? {};
-      const next: JukeboxVerdict = { ...prev };
-      if (fault.status) next.status = on ? fault.status : undefined;
-      if (fault.patternQuality) next.patternQuality = on ? fault.patternQuality : undefined;
-      return { ...j, [id]: next };
     });
     setStatus(ok
       ? `${label ?? id}: ${fault.label} ${on ? 'on' : 'off'}`
       : `${fault.label} — tracker offline (:4444)`);
-    // Only a NEW fault moves the sweep on. Clearing one means staying put.
-    if (on) {
-      setSelected((i) => Math.min(i + 1, rowCount - 1));
-      setTake(0);
-    }
   }, []);
 
-  const send = useCallback(async (fault: typeof JUKEBOX_OK | (typeof JUKEBOX_FAULTS)[number], note?: string) => {
+  /** Good is exclusive: it empties the fault set. Then on to the next row. */
+  const markGood = useCallback(async () => {
     if (!row || !file) return;
-    const ok = await reportFault(fault, {
-      format: row.id,
-      file: file.split('/').pop() ?? file,
-      note,
-    });
-    setJudged((j) => ({ ...j, [row.id]: verdictOf(fault) }));
-    setStatus(ok ? `${row.label}: ${fault.label}` : `${fault.label} — tracker offline (:4444)`);
+    judgedRef.current = { ...judgedRef.current, [row.id]: verdictOf(JUKEBOX_OK) };
+    setJudged(judgedRef.current);
+    const ok = await reportGood({ format: row.id, file: file.split('/').pop() ?? file });
+    setStatus(ok ? `${row.label}: ${JUKEBOX_OK.label}` : `${JUKEBOX_OK.label} — tracker offline (:4444)`);
     setSelected((i) => Math.min(i + 1, rows.length - 1));
     setTake(0);
   }, [row, file, rows.length]);
@@ -387,8 +375,12 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.altKey) {
-      if (e.key === '0') { e.preventDefault(); void send(JUKEBOX_OK); return; }
-      const fault = JUKEBOX_FAULTS.find((f) => f.key === e.key);
+      // e.code, not e.key: with Alt held macOS turns the digit into a symbol
+      // (Alt+1 is "¡"), so matching e.key made every Alt+digit report dead on
+      // a Mac.
+      const digit = /^(?:Digit|Numpad)(\d)$/.exec(e.code)?.[1] ?? e.key;
+      if (digit === '0') { e.preventDefault(); void markGood(); return; }
+      const fault = JUKEBOX_FAULTS.find((f) => f.key === digit);
       // The key TOGGLES now, same as the switch it drives — press it twice to
       // take back a mis-keyed fault instead of reloading to clear it.
       if (fault) { e.preventDefault(); void toggleFault(fault, !carries(fault)); return; }
@@ -485,21 +477,26 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
             : `${row.label} · take ${(take % Math.max(1, row.files.length)) + 1}/${row.files.length} of ${row.total}`}
         </div>
         <div className="text-[9px] font-mono text-text-secondary truncate">{status}</div>
-        <div className="flex flex-wrap gap-1">
-          <Button variant="primary" onClick={() => void play()} title="Play (Enter)">Play</Button>
-          <Button variant="default" onClick={() => setTake((t) => t + 1)} title="Another take (R)">Take</Button>
-          <Button variant="primary" onClick={() => void send(JUKEBOX_OK)} title="Good (Alt+0)">Good</Button>
+        <div className="flex gap-1">
+          <Button variant="primary" size="sm" onClick={() => void play()} title="Play (Enter)">Play</Button>
+          <Button variant="default" size="sm" onClick={() => setTake((t) => t + 1)} title="Another take (R)">Take</Button>
+          <Button variant="primary" size="sm" onClick={() => void markGood()} title="Good (Alt+0) — clears every fault">Good</Button>
+        </div>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-x-4 gap-y-1">
           {JUKEBOX_FAULTS.map((f) => (
-            <Toggle
-              key={f.id}
-              label={f.label}
-              value={carries(f)}
-              onChange={(v) => void toggleFault(f, v)}
-              tone="error"
-              size="sm"
-              disabled={!row || !file}
-              title={`${f.title} (Alt+${f.key})`}
-            />
+            <div key={f.id} className="flex items-center justify-between gap-2" title={`${f.title} (Alt+${f.key})`}>
+              <span className="text-[10px] font-mono text-text-secondary whitespace-nowrap">{f.label}</span>
+              <Toggle
+                label={f.label}
+                hideLabel
+                value={carries(f)}
+                onChange={(v) => void toggleFault(f, v)}
+                tone="error"
+                size="sm"
+                disabled={!row || !file}
+                title={`${f.title} (Alt+${f.key})`}
+              />
+            </div>
           ))}
         </div>
       </div>
