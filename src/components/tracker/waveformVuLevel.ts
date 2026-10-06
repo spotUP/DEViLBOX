@@ -25,3 +25,23 @@ export function waveformVuLevel(
   }
   return peak / 32768;
 }
+
+/** Per-frame rise in the source level that counts as a note starting. */
+export const VU_ONSET_RISE = 0.1;
+
+/**
+ * Meter target for an engine-fed channel (one with no note-trigger events of
+ * its own, metered from its level or waveform peak).
+ *
+ * Live mode follows the level. Trigger mode follows note triggers: the meter
+ * flashes only on the frame the source level jumps (a note starting) and then
+ * decays on its own, so a held or slowly moving level gives 0 here.
+ */
+export function engineFedMeterTarget(
+  mode: 'trigger' | 'realtime',
+  level: number,
+  prevLevel: number,
+): number {
+  if (mode === 'realtime') return level;
+  return level - prevLevel > VU_ONSET_RISE ? level : 0;
+}
