@@ -117,6 +117,10 @@ export class UADEChipEditor {
     cell: TrackerCell,
   ): Promise<void> {
     const moduleBase = await this.getModuleBase();
+    if (layout.writeCell) {
+      for (const run of layout.writeCell(pattern, row, channel, cell)) await this.writeBytes(moduleBase + run.offset, run.bytes);
+      return;
+    }
     const fileOffset = getCellFileOffset(layout, pattern, row, channel);
     if (fileOffset < 0) return; // non-editable cell (e.g., wait row in variable-length format)
     const addr = moduleBase + fileOffset;

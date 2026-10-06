@@ -1120,7 +1120,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'jochenHippelST',
     label: 'Jochen Hippel ST',
-    description: 'Jochen Hippel ST (.sog, hst.*, mdst.*)',
+    description: 'Jochen Hippel Atari ST (.hst, .sog, .soc, hst.*, mdst.*) — decoded grid, UADE plays',
     family: 'amiga-native',
     matchMode: 'both',
     extRegex: /\.(sog|soc)$/i,

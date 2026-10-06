@@ -71,6 +71,16 @@ export interface UADEPatternLayout {
    * Returns the file byte offset for the given cell.
    */
   getCellFileOffset?: (pattern: number, row: number, channel: number) => number;
+
+  /**
+   * A cell whose bytes depend on where it sits - a step's transposes, a row
+   * of a packed stream whose later rows move when its length changes - is
+   * written by the layout itself: the byte runs to write, at offsets from the
+   * module start ([] when nothing changes or the cell cannot be written).
+   * When set it replaces encodeCell for live writes, and the grid is not a
+   * per-cell byte view of chip RAM, so there is no chip-RAM read-back.
+   */
+  writeCell?: (pattern: number, row: number, channel: number, cell: TrackerCell) => Array<{ offset: number; bytes: Uint8Array }>;
 }
 
 // ─── Cell Offset Calculation ──────────────────────────────────────────────────

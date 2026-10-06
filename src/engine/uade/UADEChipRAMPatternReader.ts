@@ -30,6 +30,10 @@ export async function populatePatternsFromChipRAM(
    */
   instrumentCount = 0,
 ): Promise<{ patternsRead: number; cellsDecoded: number; nonEmptyCells: number }> {
+  // A layout that writes its own cells (writeCell) has no per-cell byte view
+  // to decode: its parser's grid is the song.
+  if (layout.writeCell) return { patternsRead: 0, cellsDecoded: 0, nonEmptyCells: 0 };
+
   const moduleBase = await chipEditor.getModuleBase();
   if (!moduleBase || moduleBase === 0) {
     console.warn('[ChipRAMReader] No module base address — cannot read patterns');

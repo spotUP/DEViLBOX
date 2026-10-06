@@ -678,7 +678,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
 
     // A grid decoded per subsong (uadeEditableSubsongs.orders) shows one
     // subsong: UADE plays exactly that one, never the first-audible probe's pick.
-    await this.loadForPlayback(buffer, fileName, state.uadeEditableCurrentSubsong, !!state.uadeEditableSubsongs?.orders);
+    // Its UADE number counts from the player's lowest (`first`; Hippel ST's is 1).
+    const first = state.uadeEditableSubsongs?.first ?? 0;
+    await this.loadForPlayback(buffer, fileName, first + state.uadeEditableCurrentSubsong, !!state.uadeEditableSubsongs?.orders);
   }
 
   /**

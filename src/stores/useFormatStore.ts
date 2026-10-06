@@ -182,7 +182,7 @@ export interface FormatStore {
   tfmxNative: TFMXNativeData | null;
   tfmxSelectedPattern: number;
   /** `orders`: a parser decoded each subsong's song order (the grid switches with it, UADE is pinned to it); `start`: the subsong loaded. */
-  uadeEditableSubsongs: { count: number; speeds: number[]; orders?: number[][]; start?: number } | null;
+  uadeEditableSubsongs: { count: number; speeds: number[]; orders?: number[][]; start?: number; first?: number } | null;
   uadeEditableCurrentSubsong: number;
   libopenmptFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;

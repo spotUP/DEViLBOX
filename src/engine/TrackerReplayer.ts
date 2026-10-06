@@ -498,8 +498,9 @@ export interface TrackerSong {
 
   /** Subsongs of a UADE-played song whose parser decoded every subsong's order:
    *  `orders[n]` is subsong n's song order over the shared patterns, `start` the
-   *  subsong this grid shows. UADE is told to play exactly that subsong. */
-  uadeEditableSubsongs?: { count: number; speeds: number[]; orders?: number[][]; start?: number };
+   *  subsong this grid shows. UADE is told to play exactly that subsong: UADE's
+   *  number `first + n` (`first`: the player's lowest subsong, default 0). */
+  uadeEditableSubsongs?: { count: number; speeds: number[]; orders?: number[][]; start?: number; first?: number };
 
   /** When true, the UADE playback engine should capture tick snapshots + Paula log
    *  during normal-speed playback and reconstruct patterns after one song loop.
