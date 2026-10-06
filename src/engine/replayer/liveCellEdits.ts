@@ -66,6 +66,13 @@ export async function sendCellEditsToEngine(
     return;
   }
 
+  // Activision Pro: a grid cell is a row of a voice's event stream; the edit re-encodes the module.
+  if (desc?.key === 'ActivisionProReplayer') {
+    const { applyActivisionProModuleEdits } = await import('../activisionpro/activisionProModuleEdits');
+    await applyActivisionProModuleEdits(song, edits);
+    return;
+  }
+
   if (desc?.gridCellEdits) {
     const Engine = desc.staticRef ?? (desc.dynamicResolver ? await desc.dynamicResolver() : null);
     if (!Engine) return;

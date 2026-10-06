@@ -11,6 +11,7 @@ import { soundPlayerEffectToString } from './import/formats/soundPlayerEffectGly
 import { fredEffectToString } from './import/formats/fredEffectGlyphs';
 import { soundMasterEffectToString } from './import/formats/soundMasterEffectGlyphs';
 import { actionamicsEffectToString } from './import/formats/actionamicsEffectGlyphs';
+import { activisionProEffectToString } from './import/formats/activisionProEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
@@ -277,6 +278,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Actionamics private control effects (reserved block 0xA0..0xAF).
   const ast = actionamicsEffectToString(effTyp, eff);
   if (ast !== null) return ast;
+
+  // Activision Pro private operations (reserved block 0xB0..0xB9).
+  const avp = activisionProEffectToString(effTyp, eff);
+  if (avp !== null) return avp;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;

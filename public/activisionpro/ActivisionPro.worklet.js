@@ -14,6 +14,7 @@ class ActivisionProProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
+    this.lastReport = -1;
     this.initializing = false;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
@@ -45,7 +46,18 @@ class ActivisionProProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; break;
+      case 'replaceModule': {
+        // An edited module's tracks swapped in while it plays; every voice keeps its place.
+        if (!this.module || !this.handle) break;
+        const bytes = new Uint8Array(data.moduleData);
+        const ptr = this.module._malloc(bytes.length);
+        if (!ptr) break;
+        this.module.HEAPU8.set(bytes, ptr);
+        this.module._avp_replace_tracks(this.handle, ptr, bytes.length);
+        this.module._free(ptr);
+        break;
+      }
+      case 'play': this.playing = true; this.lastReport = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._avp_select_subsong(this.handle, 0);
@@ -182,6 +194,14 @@ class ActivisionProProcessor extends AudioWorkletProcessor {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
       }
+    }
+
+    // The step the voices last read events on (avp_get_step), the replayer's own
+    // counter, reported when it changes.
+    const step = this.module._avp_get_step(this.handle);
+    if (step !== this.lastReport) {
+      this.lastReport = step;
+      this.port.postMessage({ type: 'position', step });
     }
 
     if (this.module._avp_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });

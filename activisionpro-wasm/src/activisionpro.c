@@ -244,6 +244,10 @@ typedef struct AvpModule {
     float tick_accumulator;
     float ticks_per_frame;
 
+    // Steps played: ticks on which the voices counted their events down
+    // (speed variation lets some ticks wait). The grid row of the playhead.
+    uint32_t step_count;
+
     // The raw file data for re-reading during identification
     const uint8_t* file_data;
     size_t file_size;
@@ -979,6 +983,7 @@ static void avp_initialize_sound(AvpModule* m, int sub_song) {
 
     m->has_ended = false;
     m->ended_channels = 0;
+    m->step_count = 0;
 
     avp_initialize_voice_info(m);
 
@@ -1524,6 +1529,8 @@ static void avp_play_tick(AvpModule* m) {
     avp_do_master_volume_fade(m);
     avp_do_speed_variation2(m);
 
+    if (m->speed_variation_counter == 0) m->step_count++;
+
     for (int i = 0; i < 4; i++) {
         AvpVoiceInfo* vi = &m->voices[i];
         AvpChannel* ch = &m->channels[i];
@@ -1781,6 +1788,33 @@ void avp_set_channel_mask(AvpModule* module, uint32_t mask) {
     if (!module) return;
     for (int i = 0; i < 4; i++)
         module->channels[i].muted = ((mask >> i) & 1) == 0;
+}
+
+// The step the voices last read events on (0-based), the replayer's own counter.
+uint32_t avp_get_step(const AvpModule* module) {
+    if (!module || module->step_count == 0) return 0;
+    return module->step_count - 1;
+}
+
+// The period a voice last set for its note (before fine tune), for tests.
+uint16_t avp_get_voice_period(const AvpModule* module, int voice) {
+    if (!module || voice < 0 || voice > 3) return 0;
+    return module->voices[voice].period;
+}
+
+// Swap in the tracks of an edited module while it plays. The edit may not
+// change a track's length (the grid writes tracks in place), so every voice's
+// byte position stays valid and each keeps its place.
+bool avp_replace_tracks(AvpModule* module, const uint8_t* data, size_t size) {
+    if (!module || !data) return false;
+    AvpModule* fresh = avp_create(data, size, module->sample_rate);
+    if (!fresh) return false;
+    if (fresh->num_tracks != module->num_tracks) { avp_destroy(fresh); return false; }
+    uint8_t** tracks = module->tracks;
+    module->tracks = fresh->tracks;
+    fresh->tracks = tracks;
+    avp_destroy(fresh);
+    return true;
 }
 
 bool avp_has_ended(const AvpModule* module) {

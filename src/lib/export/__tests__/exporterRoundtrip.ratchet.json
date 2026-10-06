@@ -10,11 +10,11 @@
     },
     "activisionPro": {
       "exporter": "ActivisionProExporter.exportActivisionPro",
-      "tier": "pattern-data",
-      "status": "pattern-match",
-      "matchPct": 0.9204,
-      "cells": 17152,
-      "bytes": 106856
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 50942,
+      "bytes": 50942
     },
     "adPlug": {
       "exporter": "AdPlug (AdPlugExporter)",

@@ -6,6 +6,8 @@
 
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { useFormatStore } from '@stores/useFormatStore';
+import { decodeActivisionProModule } from '@/lib/import/formats/ActivisionProModule';
+import { AVP_ROWS_PER_PATTERN, walkActivisionPro } from '@/lib/import/formats/activisionProGrid';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMChannelOutputsEngine,
@@ -15,7 +17,13 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
-function activisionProTransform(code: string): string {
+/** The grid's length in steps for a module, 0 when it cannot be walked. */
+function gridRowsOf(buffer: ArrayBuffer): number {
+  const m = decodeActivisionProModule(new Uint8Array(buffer));
+  return m ? walkActivisionPro(m, 0).rows : 0;
+}
+
+export function activisionProTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -26,11 +34,21 @@ function activisionProTransform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
+export interface ActivisionProPositionUpdate {
+  /** The grid pattern the replayer is in (64 steps each). */
+  songPos: number;
+  /** The row within it. */
+  row: number;
+}
+
 export class ActivisionProEngine extends WASMChannelOutputsEngine {
   private static instance: ActivisionProEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _songEndCallback: (() => void) | null = null;
+  private _positionCallbacks = new Set<(update: ActivisionProPositionUpdate) => void>();
+  /** Steps in the grid (the walk's length): the replayer keeps looping past it. */
+  private _gridRows = 0;
 
   private constructor() {
     super();
@@ -87,6 +105,13 @@ export class ActivisionProEngine extends WASMChannelOutputsEngine {
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
+        case 'position': {
+          // The replayer's step counter as the grid's pattern and row (activisionProGrid.ts).
+          const step = this._gridRows > 0 ? data.step % this._gridRows : data.step;
+          const songPos = Math.floor(step / AVP_ROWS_PER_PATTERN);
+          for (const cb of this._positionCallbacks) cb({ songPos, row: step - songPos * AVP_ROWS_PER_PATTERN });
+          break;
+        }
         case 'songEnd':
           this._songEndCallback?.();
           break;
@@ -107,6 +132,18 @@ export class ActivisionProEngine extends WASMChannelOutputsEngine {
     await this._initPromise;
     if (!this.workletNode) throw new Error('ActivisionProEngine not initialized');
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    this._gridRows = gridRowsOf(buffer);
+  }
+
+  /** Swap in an edited module's tracks while it plays (every voice keeps its place). */
+  replaceModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'replaceModule', moduleData: buffer });
+    this._gridRows = gridRowsOf(buffer);
+  }
+
+  onPositionUpdate(cb: (update: ActivisionProPositionUpdate) => void): () => void {
+    this._positionCallbacks.add(cb);
+    return () => this._positionCallbacks.delete(cb);
   }
 
   play(): void {
@@ -137,6 +174,7 @@ export class ActivisionProEngine extends WASMChannelOutputsEngine {
   }
 
   override dispose(): void {
+    this._positionCallbacks.clear();
     super.dispose();
     if (ActivisionProEngine.instance === this) ActivisionProEngine.instance = null;
   }

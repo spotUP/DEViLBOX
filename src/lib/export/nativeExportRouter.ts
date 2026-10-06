@@ -260,6 +260,10 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // Actionamics: its module (with the grid's edits) is the export.
     const { exportActionamics } = await import('./ActionamicsExporter');
     result = await exportActionamics(song);
+  } else if (format === 'AVP' && song.activisionProFileData) {
+    // Activision Pro: its module (with the grid's edits) is the export.
+    const { exportActivisionPro } = await import('./ActivisionProExporter');
+    result = await exportActivisionPro(song);
   } else if (format === 'MOD' && !layoutFormatId) {
     const { exportSongToMOD } = await import('./modExport');
     const modResult = await exportSongToMOD(song, { bakeSynths: true });

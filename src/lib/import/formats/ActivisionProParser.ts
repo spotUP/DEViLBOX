@@ -27,35 +27,18 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeActivisionProCell } from '@/engine/uade/encoders/ActivisionProEncoder';
+import type { Pattern, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import { decodeActivisionProModule } from './ActivisionProModule';
+import { walkActivisionPro, avpPatternCells, AVP_ROWS_PER_PATTERN } from './activisionProGrid';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const PAL_CLOCK = 3546895;
 const MAX_SAMPLES = 27;
 
-/**
- * Activision Pro period table (verbatim from NostalgicPlayer Tables.cs).
- * 85 entries (some duplicated / quirky values in the original, preserved faithfully).
- */
-const AVP_PERIODS: number[] = [
-  1695, 1600, 1505, 1426, 1347, 1268, 1189, 1125, 1062, 1006,  951,  895,
-  1695, 1600, 1505, 1426, 1347, 1268, 1189, 1125, 1062, 1006,  951,  895,
-  1695, 1600, 1505, 1426, 1347, 1268, 1189, 1125, 1062, 1006,  951, 1790,
-  1695, 1600, 1505, 1426, 1347, 1268, 1189, 1125, 1062, 1006,  951,  895,
-   848,  800,  753,  713,  674,  634,  595,  563,  531,  503,  476,  448,
-   424,  400,  377,  357,  337,  317,  298,  282,  266,  252,  238,  224,
-   212,  200,  189,  179,  169,  159,  149,  141,  133,  126,  119,  112,
-   106,
-];
-
 // Reference: period 424 = ProTracker C-2 ≈ XM note 37 (C-3). Index of 424 in table = 60.
 const AVP_REF_PERIOD = 424;
-const AVP_REF_IDX    = 60;  // 0-based index in AVP_PERIODS for period 424
-const AVP_REF_XM     = 37;  // XM note C-3
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
@@ -78,13 +61,6 @@ function periodToRate(period: number): number {
   return Math.round(PAL_CLOCK / (2 * period));
 }
 
-/** Convert AVP period index (0-based) to XM note */
-function avpNoteToXM(idx: number): number {
-  if (idx < 0 || idx >= AVP_PERIODS.length) return 0;
-  const xm = AVP_REF_XM + (idx - AVP_REF_IDX);
-  return Math.max(1, Math.min(96, xm));
-}
-
 // ── Format Identification ──────────────────────────────────────────────────
 
 /**
@@ -101,7 +77,7 @@ export function isActivisionProFormat(bytes: Uint8Array): boolean {
 
 // ── Internal types ─────────────────────────────────────────────────────────
 
-interface AvpPlayerInfo {
+export interface AvpPlayerInfo {
   subSongListOffset: number;
   positionListsOffset: number;
   trackOffsetsOffset: number;
@@ -144,11 +120,6 @@ interface AvpInstrument {
   vibratoDelay: number;
 }
 
-interface AvpSongInfo {
-  positionLists: Uint8Array[];  // 4 channels, each a raw position list
-  speedVariation: Int8Array;    // 8 bytes
-}
-
 // ── Heuristic player info extraction ──────────────────────────────────────
 
 /**
@@ -157,7 +128,7 @@ interface AvpSongInfo {
  * Faithfully mirrors NostalgicPlayer's TestModule → FindStartOffset →
  * ExtractInfoFromInitFunction → ExtractInfoFromPlayFunction chain.
  */
-function extractPlayerInfo(bytes: Uint8Array): AvpPlayerInfo | null {
+export function extractPlayerInfo(bytes: Uint8Array): AvpPlayerInfo | null {
   const searchLength = Math.min(bytes.length, 4096);
 
   // Find start offset: look for 0x48 0xe7 0xfc 0xfe
@@ -469,85 +440,10 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   const len = bytes.length;
 
-  // ── Sub-song list and position lists ──────────────────────────────────
-  const subSongListOffset = info.subSongListOffset;
-  const positionListsOffset = info.positionListsOffset;
-
-  if (subSongListOffset < 0 || positionListsOffset <= subSongListOffset) return null;
-
-  const numberOfSubSongs = Math.floor((positionListsOffset - subSongListOffset) / 16);
-  if (numberOfSubSongs <= 0) return null;
-
-  const songInfoList: AvpSongInfo[] = [];
-
-  for (let i = 0; i < numberOfSubSongs; i++) {
-    const base = subSongListOffset + i * 16;
-    if (base + 16 > len) break;
-
-    const posListOffsets: number[] = [
-      u16BE(bytes, base),
-      u16BE(bytes, base + 2),
-      u16BE(bytes, base + 4),
-      u16BE(bytes, base + 6),
-    ];
-
-    const speedVariation = new Int8Array(8);
-    for (let j = 0; j < 8; j++) {
-      speedVariation[j] = s8(bytes[base + 8 + j]);
-    }
-
-    const positionLists: Uint8Array[] = [];
-    for (let ch = 0; ch < 4; ch++) {
-      const listOff = positionListsOffset + posListOffsets[ch];
-      if (listOff >= len) {
-        positionLists.push(new Uint8Array([0xff]));
-        continue;
-      }
-      const list = loadPositionList(bytes, listOff);
-      positionLists.push(list);
-    }
-
-    songInfoList.push({ positionLists, speedVariation });
-  }
-
-  if (songInfoList.length === 0) return null;
-
-  // ── Tracks ─────────────────────────────────────────────────────────────
-  const trackOffsetsOffset = info.trackOffsetsOffset;
-  const tracksOffset = info.tracksOffset;
-
-  if (trackOffsetsOffset < 0 || tracksOffset < 0) return null;
-
-  // Track offset table size: use distance to next section (envelopes or instruments).
-  // The track data may come before OR after the offset table depending on the variant.
-  const nextSectionAfterOffsets = info.envelopesOffset > trackOffsetsOffset
-    ? info.envelopesOffset
-    : info.instrumentsOffset > trackOffsetsOffset
-      ? info.instrumentsOffset
-      : tracksOffset > trackOffsetsOffset
-        ? tracksOffset
-        : len;
-  const numberOfTracks = Math.floor((nextSectionAfterOffsets - trackOffsetsOffset) / 2);
-  const trackOffsets: number[] = [];
-  for (let i = 0; i < numberOfTracks; i++) {
-    const off = trackOffsetsOffset + i * 2;
-    if (off + 2 > len) break;
-    trackOffsets.push(s16BE(bytes, off));
-  }
-
-  const tracks: (Uint8Array | null)[] = new Array(numberOfTracks).fill(null);
-  const trackFileStarts: number[] = new Array(numberOfTracks).fill(-1);
-  for (let i = 0; i < trackOffsets.length; i++) {
-    if (trackOffsets[i] < 0) continue;
-    const trackOff = tracksOffset + trackOffsets[i];
-    if (trackOff >= len) continue;
-    tracks[i] = loadSingleTrack(bytes, trackOff, info.parseTrackVersion);
-    trackFileStarts[i] = trackOff;
-  }
-
-  // ── Envelopes ──────────────────────────────────────────────────────────
-  // (loaded but not used for static pattern extraction)
-  // envelopesOffset → instrumentsOffset; each 16 bytes (5×3 + 1 extra = 16)
+  // The song as the replayer walks it (activisionProGrid.ts), from the module model.
+  const module = decodeActivisionProModule(bytes);
+  if (!module) return null;
+  const walk = walkActivisionPro(module, 0);
 
   // ── Instruments ────────────────────────────────────────────────────────
   const instrumentsOffset = info.instrumentsOffset;
@@ -673,109 +569,36 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   }
 
   // ── Build TrackerSong patterns ─────────────────────────────────────────
-  // Use subsong 0 by default. User can switch subsongs via the UI.
-  const primarySong = songInfoList[0];
-  const trackerPatterns: Pattern[] = [];
-
-  // Build cell offset map: cellOffsetMap[patIdx][ch][row] = file offset
-  const cellOffsetMap: number[][][] = [];
-
-  // Extract flat track sequences per channel (unrolling position-list loops)
-  const channelTrackSeqs: number[][] = primarySong.positionLists.map(pl => extractTrackSequence(pl));
-  const maxPositions = Math.max(...channelTrackSeqs.map(seq => seq.length));
-
-  for (let posIdx = 0; posIdx < maxPositions; posIdx++) {
-    const channelRows: TrackerCell[][] = [[], [], [], []];
-    const patOffsets: number[][] = [[], [], [], []];
-
-    for (let ch = 0; ch < 4; ch++) {
-      const trackNum = posIdx < channelTrackSeqs[ch].length ? channelTrackSeqs[ch][posIdx] : -1;
-
-      const trackData = (trackNum >= 0 && trackNum < tracks.length) ? tracks[trackNum] : null;
-      const trackFileStart = (trackNum >= 0 && trackNum < trackFileStarts.length) ? trackFileStarts[trackNum] : -1;
-      const { rows, noteBytePositions } = decodeAvpTrack(trackData, instruments, info.parseTrackVersion);
-
-      // Compute file offsets from track-relative positions
-      for (const relPos of noteBytePositions) {
-        patOffsets[ch].push(relPos >= 0 && trackFileStart >= 0 ? trackFileStart + relPos : -1);
-      }
-
-      // Pad to 64 rows
-      while (rows.length < 64) {
-        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-        patOffsets[ch].push(-1);
-      }
-      channelRows[ch] = rows.slice(0, 64);
-      patOffsets[ch] = patOffsets[ch].slice(0, 64);
-    }
-
-    cellOffsetMap.push(patOffsets);
-
-    trackerPatterns.push({
-      id:     `pattern-${posIdx}`,
-      name:   `Position ${posIdx}`,
-      length: 64,
-      channels: channelRows.map((rows, ch) => ({
-        id:          `channel-${ch}`,
-        name:        `Channel ${ch + 1}`,
-        muted:       false,
-        solo:        false,
-        collapsed:   false,
-        volume:      100,
-        pan:         ([-50, 50, 50, -50] as const)[ch] ?? 0,
-        instrumentId: null,
-        color:       null,
-        rows,
-      })),
-      importMetadata: {
-        sourceFormat: 'AVP',
-        sourceFile:   filename,
-        importedAt:   new Date().toISOString(),
-        originalChannelCount:    4,
-        originalPatternCount:    tracks.length,
-        originalInstrumentCount: instruments.length,
-      },
-    });
-  }
-
-  if (trackerPatterns.length === 0) {
-    trackerPatterns.push(makeEmptyPattern(filename, instruments.length));
-  }
+  // Sub-song 0; one grid row per replayer step, 64-row patterns.
+  const cells = avpPatternCells(walk);
+  const trackerPatterns: Pattern[] = cells.map((voices, posIdx) => ({
+    id:     `pattern-${posIdx}`,
+    name:   `Steps ${posIdx * AVP_ROWS_PER_PATTERN}`,
+    length: voices[0].length,
+    channels: voices.map((rows, ch) => ({
+      id:          `channel-${ch}`,
+      name:        `Channel ${ch + 1}`,
+      muted:       false,
+      solo:        false,
+      collapsed:   false,
+      volume:      100,
+      pan:         ([-50, 50, 50, -50] as const)[ch] ?? 0,
+      instrumentId: null,
+      color:       null,
+      rows,
+    })),
+    importMetadata: {
+      sourceFormat: 'AVP',
+      sourceFile:   filename,
+      importedAt:   new Date().toISOString(),
+      originalChannelCount:    4,
+      originalPatternCount:    module.tracks.length,
+      originalInstrumentCount: instruments.length,
+    },
+  }));
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
-
-  // Build uadePatternLayout with getCellFileOffset for track indirection
-  const uadePatternLayout: UADEPatternLayout = {
-    formatId: 'activisionPro',
-    patternDataFileOffset: tracksOffset,
-    bytesPerCell: 1, // just the note+instrument byte
-    rowsPerPattern: 64,
-    numChannels: 4,
-    numPatterns: trackerPatterns.length,
-    moduleSize: bytes.byteLength,
-    encodeCell: encodeActivisionProCell,
-    decodeCell: (raw: Uint8Array): TrackerCell => {
-      const b = raw[0];
-      const noteIdx = b & 0x3F;
-      const instrField = (b >> 6) & 0x03;
-      // avpNoteToXM: xm = 37 + (noteIdx - 60) = noteIdx - 23
-      const note = noteIdx > 0 ? avpNoteToXM(noteIdx) : 0;
-      // Byte-exact carrier: avpNoteToXM clamps xm to [1,96], so note indices below 24
-      // all collapse to xm 1 and encode reverses them all to idx 24 (lossy lower-clamp).
-      // Stash the exact source note+instrument byte in the invisible `period` carrier so
-      // encodeActivisionProCell reproduces it verbatim on round-trip. Grid cells (built by
-      // decodeAvpTrack) carry no period, so an edited cell falls back to the derivation.
-      return { note, instrument: instrField, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, period: b };
-    },
-    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      if (pattern < 0 || pattern >= cellOffsetMap.length) return -1;
-      const patOffsets = cellOffsetMap[pattern];
-      if (channel < 0 || channel >= patOffsets.length) return -1;
-      const chOffsets = patOffsets[channel];
-      if (row < 0 || row >= chOffsets.length) return -1;
-      return chOffsets[row];
-    },
-  };
+  const copy = (): ArrayBuffer => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
   return {
     name:            moduleName,
@@ -789,159 +612,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
-    activisionProFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    uadePatternLayout,
+    activisionProFileData: copy(),
   };
-}
-
-// ── Position list helpers ──────────────────────────────────────────────────
-
-/**
- * Load a position list from the buffer. Format:
- *   Each entry: if byte >= 0xfd or (byte & 0x40) == 0: byte + extra_byte
- *               if byte == 0xfe or 0xff: end
- */
-function loadPositionList(bytes: Uint8Array, off: number): Uint8Array {
-  const result: number[] = [];
-  const len = bytes.length;
-  let pos = off;
-
-  while (pos < len) {
-    const dat = bytes[pos++];
-    result.push(dat);
-
-    if (dat >= 0xfd || (dat & 0x40) === 0) {
-      if (pos < len) result.push(bytes[pos++]);
-    }
-
-    if (dat === 0xfe || dat === 0xff) break;
-  }
-
-  return new Uint8Array(result);
-}
-
-/**
- * Extract a flat sequence of track numbers from a raw position list,
- * fully unrolling position-list loops.
- *
- * Position list entry types (matches NostalgicPlayer ParseNextPosition):
- *   0xFE/0xFF + byte: end markers (stop / song loop)
- *   0xFD + byte:      master volume fade command (skip)
- *   bit 6 SET:        loop marker — lower 6 bits = loop count
- *   bit 6 CLEAR:      normal entry — 2 bytes: loopTrackCounter + trackNumber
- *
- * Each normal entry emits trackNumber × loopTrackCounter positions.
- * Loop markers cause a block of entries to repeat.
- */
-function extractTrackSequence(list: Uint8Array): number[] {
-  const result: number[] = [];
-  // Simulate NostalgicPlayer's ParseNextPosition calls
-  let position = -1;
-  let loopEnabled = false;
-  let loopCount = 0;
-  let loopStart = 0;
-  const maxPositions = 256; // safety limit
-
-  while (result.length < maxPositions) {
-    let oneMore: boolean;
-    do {
-      oneMore = false;
-      position++;
-
-      if (position >= list.length) return result;
-
-      if (list[position] >= 0xfe) {
-        // Song end (0xFE = stop, 0xFF = loop)
-        return result;
-      }
-
-      if (list[position] === 0xfd) {
-        // Volume fade command — skip arg byte
-        position++;
-        oneMore = true;
-      } else {
-        if ((list[position] & 0x40) !== 0) {
-          // Loop marker
-          if (loopEnabled) {
-            loopCount--;
-            if (loopCount <= 0) {
-              loopEnabled = false;
-              oneMore = true;
-              continue;
-            }
-            position = loopStart;
-          } else {
-            loopEnabled = true;
-            loopCount = list[position] & 0x3f;
-            loopStart = ++position;
-          }
-        }
-
-        // Normal entry: loopTrackCounter + trackNumber
-        if (position >= list.length) return result;
-        const repeatCount = list[position++];
-        if (position >= list.length) return result;
-        const trackNumber = list[position];
-
-        for (let r = 0; r < repeatCount; r++) {
-          result.push(trackNumber);
-        }
-      }
-    } while (oneMore);
-  }
-
-  return result;
-}
-
-// ── Track loading ─────────────────────────────────────────────────────────
-
-/**
- * Load a single track from the buffer, terminated by 0xff.
- * Track encoding varies by parseTrackVersion (1-5):
- *   v1/2: byte; if 0x80 set → extra byte (v2: extra extra byte); then row byte
- *   v3:   byte; while 0x80 set → extra byte, byte; then row byte
- *   v4/5: byte; if not 0x81 and 0x80 set → same multi-byte loop; then row byte
- */
-function loadSingleTrack(bytes: Uint8Array, off: number, parseTrackVersion: number): Uint8Array {
-  const result: number[] = [];
-  const len = bytes.length;
-  let pos = off;
-
-  while (pos < len) {
-    let dat = bytes[pos++];
-    result.push(dat);
-
-    if (dat === 0xff) break;
-
-    if (parseTrackVersion === 3) {
-      while ((dat & 0x80) !== 0 && pos < len) {
-        result.push(bytes[pos++]);
-        if (pos >= len) break;
-        dat = bytes[pos++];
-        result.push(dat);
-      }
-    } else if (parseTrackVersion === 4 || parseTrackVersion === 5) {
-      if (dat !== 0x81) {
-        while ((dat & 0x80) !== 0 && pos < len) {
-          result.push(bytes[pos++]);
-          if (pos >= len) break;
-          dat = bytes[pos++];
-          result.push(dat);
-        }
-      }
-    } else {
-      if ((dat & 0x80) !== 0 && pos < len) {
-        result.push(bytes[pos++]);
-        if (parseTrackVersion === 2 && pos < len) {
-          result.push(bytes[pos++]);
-        }
-      }
-    }
-
-    if (pos < len) result.push(bytes[pos++]);
-  }
-
-  return new Uint8Array(result);
 }
 
 // ── Instrument loading ────────────────────────────────────────────────────
@@ -999,126 +671,3 @@ function loadInstrument(bytes: Uint8Array, base: number, version: number): AvpIn
   return instr;
 }
 
-// ── Track decoding ────────────────────────────────────────────────────────
-
-/**
- * Decode a raw AVP track byte stream into TrackerCell rows.
- *
- * Track format varies by parseTrackVersion. The key point is that each
- * "event" in the track consists of: an encoded byte (note/flags) followed
- * by a row-data byte. We extract note index and instrument number.
- *
- * Due to the highly version-specific encoding we perform a simple extraction:
- * collect all row-data bytes (the second byte of each event pair) and map them.
- */
-function decodeAvpTrack(
-  data: Uint8Array | null,
-  instruments: AvpInstrument[],
-  parseTrackVersion: number,
-): { rows: TrackerCell[]; noteBytePositions: number[] } {
-  const rows: TrackerCell[] = [];
-  const noteBytePositions: number[] = [];
-  if (!data) return { rows, noteBytePositions };
-
-  const len = data.length;
-  let pos = 0;
-
-  while (pos < len && rows.length < 64) {
-    if (pos >= len) break;
-    let dat = data[pos++];
-
-    if (dat === 0xff) break;
-
-    let noteByte = 0;
-    let noteBytePos = -1; // position of the note byte within data[]
-
-    if (parseTrackVersion === 3) {
-      // Multi-byte note encoding: while high bit set, it's extended data
-      // The last byte with high bit clear is the row note byte
-      while ((dat & 0x80) !== 0 && pos < len) {
-        // extended byte — skip
-        pos++; // skip paired byte
-        if (pos >= len) break;
-        dat = data[pos++];
-      }
-      noteByte = dat;
-      noteBytePos = pos - 1;
-    } else if (parseTrackVersion === 4 || parseTrackVersion === 5) {
-      if (dat === 0x81) {
-        // Special: rest / no note
-        noteByte = 0;
-        noteBytePos = pos - 1; // the 0x81 byte itself
-      } else {
-        while ((dat & 0x80) !== 0 && pos < len) {
-          pos++;
-          if (pos >= len) break;
-          dat = data[pos++];
-        }
-        noteByte = dat;
-        noteBytePos = pos - 1;
-      }
-    } else {
-      // v1/v2: if high bit → skip 1 (v2: skip 2) extra bytes
-      if ((dat & 0x80) !== 0) {
-        pos++; // skip extra byte
-        if (parseTrackVersion === 2 && pos < len) pos++;
-      }
-      // Next byte is the row note byte
-      noteBytePos = pos;
-      noteByte = pos < len ? data[pos++] : 0;
-    }
-
-    // noteByte encoding: bits 5..0 = note index, bits 7..6 = instrument
-    const noteIdx = noteByte & 0x3f;
-    const instrField = (noteByte >> 6) & 0x03;
-
-    let xmNote = 0;
-    let instrId = 0;
-
-    if (noteIdx > 0 && noteIdx < AVP_PERIODS.length) {
-      xmNote = avpNoteToXM(noteIdx);
-    }
-
-    // Instrument index from upper 2 bits (0-3); clamp to available instruments
-    if (instrField > 0 && instruments.length > 0) {
-      instrId = Math.min(instrField, instruments.length);
-    }
-
-    rows.push({ note: xmNote, instrument: instrId, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-    noteBytePositions.push(noteBytePos);
-  }
-
-  return { rows, noteBytePositions };
-}
-
-// ── Helper ─────────────────────────────────────────────────────────────────
-
-function makeEmptyPattern(filename: string, numInstr: number): Pattern {
-  return {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id:          `channel-${ch}`,
-      name:        `Channel ${ch + 1}`,
-      muted:       false,
-      solo:        false,
-      collapsed:   false,
-      volume:      100,
-      pan:         ([-50, 50, 50, -50] as const)[ch] ?? 0,
-      instrumentId: null,
-      color:       null,
-      rows: Array.from({ length: 64 }, () => ({
-        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-      })),
-    })),
-    importMetadata: {
-      sourceFormat: 'AVP',
-      sourceFile:   filename,
-      importedAt:   new Date().toISOString(),
-      originalChannelCount:    4,
-      originalPatternCount:    0,
-      originalInstrumentCount: numInstr,
-    },
-  };
-}
