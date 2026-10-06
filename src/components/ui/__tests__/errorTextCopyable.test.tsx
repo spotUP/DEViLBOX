@@ -32,3 +32,16 @@ describe('error text can be copied', () => {
     expect(readFileSync(join(root, 'src/components/common/ConfirmDialog.tsx'), 'utf8')).toContain('select-text cursor-text">{message}');
   });
 });
+
+describe('toast copy button', () => {
+  afterEach(() => { cleanup(); useNotificationStore.setState({ notifications: [] } as never); });
+
+  it('every toast has a Copy button that puts its message on the clipboard', async () => {
+    const written: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => { written.push(t); } }, configurable: true });
+    const { getByLabelText } = render(<ToastNotification />);
+    act(() => { notify.info('hello copy'); });
+    await act(async () => { getByLabelText('Copy message').click(); });
+    expect(written).toEqual(['hello copy']);
+  });
+});
