@@ -35,9 +35,10 @@ type Knob = 'none' | 'cutoff' | 'resonance' | 'envMod' | 'decay' | 'accent';
 
 async function render(knob: Knob) {
   const { proc, send } = await startWorklet('db303', 'DB303', (DB303Synth as unknown as { transformDB303Glue(c: string): string }).transformDB303Glue);
-  const synth = Object.create(DB303Synth.prototype) as DB303Synth & Record<string, unknown>;
-  synth.workletNode = { port: { postMessage: (m: unknown) => { void send(m); } } };
-  synth._disposed = false; synth._pendingParams = [];
+  const synth = Object.create(DB303Synth.prototype) as DB303Synth;
+  const priv = synth as unknown as Record<string, unknown>;
+  priv.workletNode = { port: { postMessage: (m: unknown) => { void send(m); } } };
+  priv._disposed = false; priv._pendingParams = [];
   sentinel.target = { synth };
   const id = useInstrumentStore.getState().createInstrument({ name: 'k', type: 'synth', synthType: 'TB303', tb303: structuredClone(DEFAULT_TB303) } as never);
   synth.applyConfig(structuredClone(DEFAULT_TB303));
