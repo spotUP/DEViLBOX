@@ -267,6 +267,10 @@ int eagle_load(const uint8_t *score, size_t scoreLen,
   }
 
   const AhHooks hooks = { NULL, NULL, trap_hook, g_customTap };
+  /* UADE is the reference for every player run here: its CPU timing too
+   * (Digital Sonix & Chrome races Paula's word timing between a DMA-off
+   * and the next DMA-on). */
+  ah_set_uade_timing(1);
   ah_reset(sampleRate);
   ah_set_hooks(&hooks);
   ah_set_voice_mask(0xF);

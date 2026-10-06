@@ -41,7 +41,7 @@ type Result = Done | { type: 'hung'; lastBlock: number };
 
 function renderInWorker(fmt: EaglePlayerFormat): Promise<Result> {
   const worker = new Worker(WORKER, {
-    workerData: { song: fmt.corpus, player: fmt.player, moduleName: eaglePlayerModuleName(fmt, basename(fmt.corpus)), seconds: SECONDS },
+    workerData: { song: fmt.corpus, player: fmt.player, moduleName: eaglePlayerModuleName(fmt, basename(fmt.corpus)), seconds: SECONDS, companions: fmt.companions ?? [] },
   });
   let lastBlock = -1;
   return new Promise((done, fail) => {
@@ -57,6 +57,12 @@ function renderInWorker(fmt: EaglePlayerFormat): Promise<Result> {
 }
 
 const FORMATS = Object.values(EAGLE_PLAYER_FORMATS);
+
+/** The corpus song's companion files, as the companion resolver hands them over. */
+function companionsOf(fmt: EaglePlayerFormat): Map<string, ArrayBuffer> | undefined {
+  if (!fmt.companions?.length) return undefined;
+  return new Map(fmt.companions.map((c) => [basename(c), songBuffer(c)]));
+}
 
 describe.each(FORMATS)('$label on the Musashi host', (fmt) => {
   let r: Result;
@@ -75,7 +81,9 @@ describe.each(FORMATS)('$label on the Musashi host', (fmt) => {
   it('sounds like UADE: loudness envelope correlation > 0.95 up to the song end', async () => {
     if (r.type !== 'done') throw new Error('render did not finish');
     const name = eaglePlayerModuleName(fmt, basename(fmt.corpus));
-    const uade = await renderFileToSamples(new Uint8Array(readFileSync(resolve(ROOT, fmt.corpus))), name, { sampleRate: 48000, seconds: SECONDS });
+    // UADE gets the same companion files (the app's companion resolver passes them to both).
+    const companions = (fmt.companions ?? []).map((c) => ({ name: basename(c), data: new Uint8Array(readFileSync(resolve(ROOT, c))) }));
+    const uade = await renderFileToSamples(new Uint8Array(readFileSync(resolve(ROOT, fmt.corpus))), name, { sampleRate: 48000, seconds: SECONDS, companions });
     const ref = monoEnvelope(uade.samples, 48000);
     // After the player's song end UADE's frontend moves on to another
     // subsong (its policy, not the player's); compare the song itself.
@@ -142,7 +150,7 @@ describe('the default load plays on EaglePlayer', () => {
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
     const { playingEngineFor } = await import('../replayer/NativeEngineRouting');
     const bytes = readFileSync(resolve(ROOT, fmt.corpus));
-    const song = await parseModuleToSong(new File([new Uint8Array(bytes)], basename(fmt.corpus)));
+    const song = await parseModuleToSong(new File([new Uint8Array(bytes)], basename(fmt.corpus)), 0, undefined, undefined, companionsOf(fmt));
     expect(song.eaglePlayerId).toBe(fmt.id);
     expect(song.eaglePlayerFileData?.byteLength).toBe(bytes.length);
     expect(song.uadeEditableFileData, 'UADE does not play it').toBeUndefined();
@@ -161,7 +169,7 @@ describe('the default load plays on EaglePlayer', () => {
   // stores, startNativeEngines loads the engine with the descriptor's args.
   // primemover 07.hot and dynamite dux.core (grid from UADE's scan) were
   // silent in the app while the engine tests passed.
-  it.each(['Anders0land', 'CoreDesign'])('%s: a UADE-scanned song reaches the engine through the stores and plays', async (id) => {
+  it.each(['Anders0land', 'CoreDesign', 'SoundPlayer', 'MIDILoriciel'])('%s: the song reaches the engine through the stores (module, name, companions) and plays', async (id) => {
     const fmt = EAGLE_PLAYER_FORMATS[id];
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
     const { useFormatStore } = await import('@/stores/useFormatStore');
@@ -170,7 +178,7 @@ describe('the default load plays on EaglePlayer', () => {
     const { WASM_ENGINES, playsAsOpaqueUADE } = await import('../replayer/wasmEngineRegistry');
     const { playingEngineFor } = await import('../replayer/NativeEngineRouting');
     const bytes = readFileSync(resolve(ROOT, fmt.corpus));
-    const song = await parseModuleToSong(new File([new Uint8Array(bytes)], basename(fmt.corpus)));
+    const song = await parseModuleToSong(new File([new Uint8Array(bytes)], basename(fmt.corpus)), 0, undefined, undefined, companionsOf(fmt));
     useFormatStore.getState().applyEditorMode(song);
     useInstrumentStore.setState({ instruments: song.instruments });
     // A grid still tagged 'UADE' (a project saved before the import retagged
@@ -181,22 +189,18 @@ describe('the default load plays on EaglePlayer', () => {
     const desc = WASM_ENGINES.find((d) => d.key === 'EaglePlayer')!;
     const data = live[desc.fileDataKey] as ArrayBuffer;
     expect(data.byteLength, 'the module bytes the engine gets').toBe(bytes.length);
-    const [formatId, fileName] = desc.getLoadArgs!(live) as [string, string];
-    expect(formatId).toBe(id);
-    loadSharedWorkletScripts();
-    const { proc, send, posted } = await startWorklet('eagleplayer', 'EaglePlayer');
-    // EaglePlayerEngine.loadTune's message, from the same helpers.
-    await send({ type: 'loadModule', moduleData: data.slice(0), playerData: songBuffer(`public/eagleplayer/players/${fmt.player}`), moduleName: eaglePlayerModuleName(fmt, fileName), options: fmt.options });
+    const args = desc.getLoadArgs!(live);
+    expect(args[0]).toBe(id);
+    expect(args[3] instanceof Map ? [...(args[3] as Map<string, ArrayBuffer>).keys()] : [], 'the companion files ride to the engine')
+      .toEqual((fmt.companions ?? []).map((c) => basename(c)));
+    // EaglePlayerEngine.loadTune over the real worklet, with the route's args.
+    const { engine, send, run, posted, level } = await engineOnWorklet(fmt);
+    await engine.loadTune(data.slice(0), ...(args as [string, string, number | undefined, Map<string, ArrayBuffer> | undefined]));
     await send({ type: 'play' });
     expect(posted.filter((m) => m.type === 'error').map((m) => m.message)).toEqual([]);
     expect(posted.some((m) => m.type === 'moduleLoaded')).toBe(true);
-    let sum = 0, n = 0;
-    for (let b = 0; b < Math.ceil((48000 * 3) / 128); b++) {
-      const out = stereoOutputs(5);
-      proc.process([], out);
-      for (const ch of out[0]) for (const v of ch) { sum += v * v; n++; }
-    }
-    expect(Math.sqrt(sum / n), `${fmt.label} plays (rms of 3 s)`).toBeGreaterThan(0.02);
+    run(3);
+    expect(level(), `${fmt.label} plays (rms of 3 s)`).toBeGreaterThan(0.02);
   }, 120_000);
 
   it('Ben Daglish stays on BdEngine until the owner moves it (heldBecause)', async () => {
@@ -216,13 +220,13 @@ describe('the default load plays on EaglePlayer', () => {
  */
 async function engineOnWorklet(fmt: EaglePlayerFormat) {
   loadSharedWorkletScripts();
-  const { proc, send } = await startWorklet('eagleplayer', 'EaglePlayer');
+  const { proc, send, posted } = await startWorklet('eagleplayer', 'EaglePlayer');
   const { EaglePlayerEngine } = await import('../eagleplayer/EaglePlayerEngine');
   const port: { onmessage: ((e: { data: unknown }) => void) | null; postMessage(m: { type?: string }): void } = {
     onmessage: null,
     postMessage(m) { if (m.type !== 'init') void send(m); },
   };
-  (proc as unknown as { port: { postMessage(m: unknown): void } }).port.postMessage = (m) => port.onmessage?.({ data: m });
+  (proc as unknown as { port: { postMessage(m: unknown): void } }).port.postMessage = (m) => { posted.push(m as never); port.onmessage?.({ data: m }); };
   (globalThis as Record<string, unknown>).AudioWorkletNode = class { port = port; connect() {} };
   const engine = Object.create(EaglePlayerEngine.prototype) as import('../eagleplayer/EaglePlayerEngine').EaglePlayerEngine;
   Object.assign(engine, {
@@ -231,17 +235,27 @@ async function engineOnWorklet(fmt: EaglePlayerFormat) {
     audioContext: {}, output: {}, _initPromise: Promise.resolve(),
   });
   (engine as unknown as { createNode(): void }).createNode();
-  // EaglePlayerEngine.fetchPlayer reads public/ through fetch.
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async () => new Response(songBuffer(`public/eagleplayer/players/${fmt.player}`))) as typeof fetch;
+  // EaglePlayerEngine.fetchPlayer reads public/ through fetch: served from disk while it loads.
+  const loadTune = engine.loadTune.bind(engine);
+  engine.loadTune = async (...a: Parameters<typeof loadTune>) => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => new Response(songBuffer(`public/eagleplayer/players/${decodeURIComponent(String(url).split('/').pop()!)}`))) as unknown as typeof fetch;
+    try { return await loadTune(...a); } finally { globalThis.fetch = realFetch; }
+  };
   const load = async (subsong?: number) => {
-    try { await engine.loadTune(songBuffer(fmt.corpus), fmt.id, basename(fmt.corpus), subsong); } finally { globalThis.fetch = realFetch; }
+    await engine.loadTune(songBuffer(fmt.corpus), fmt.id, basename(fmt.corpus), subsong, companionsOf(fmt));
     await send({ type: 'play' });
   };
+  let sum = 0, n = 0;
   const run = (seconds: number) => {
-    for (let b = 0; b < Math.ceil((48000 * seconds) / 128); b++) proc.process([], stereoOutputs(5));
+    for (let b = 0; b < Math.ceil((48000 * seconds) / 128); b++) {
+      const out = stereoOutputs(5);
+      proc.process([], out);
+      for (const ch of out[0]) for (const v of ch) { sum += v * v; n++; }
+    }
   };
-  return { engine, load, run, send };
+  const level = () => Math.sqrt(sum / Math.max(1, n));
+  return { engine, load, run, send, posted, level };
 }
 
 describe('the grid follows the player', () => {
@@ -333,11 +347,37 @@ describe('subsongs on the runner', () => {
   it('the start field reaches the runner: the route loads the store\'s subsong', async () => {
     const { WASM_ENGINES } = await import('../replayer/wasmEngineRegistry');
     const desc = WASM_ENGINES.find((d) => d.key === 'EaglePlayer')!;
-    expect(desc.getLoadArgs!({ eaglePlayerId: 'CoreDesign', eaglePlayerFileName: 'dynamite dux.core', eaglePlayerSubsong: 5 } as never)).toEqual(['CoreDesign', 'dynamite dux.core', 5]);
+    expect(desc.getLoadArgs!({ eaglePlayerId: 'CoreDesign', eaglePlayerFileName: 'dynamite dux.core', eaglePlayerSubsong: 5 } as never).slice(0, 3)).toEqual(['CoreDesign', 'dynamite dux.core', 5]);
     const fmt = EAGLE_PLAYER_FORMATS.CoreDesign;
     const { useFormatStore } = await import('@/stores/useFormatStore');
     const { load } = await engineOnWorklet(fmt);
     await load(5);
     expect(useFormatStore.getState().nativeSubsongs).toMatchObject({ engine: 'EaglePlayer', current: 5 });
+  }, 60_000);
+});
+
+describe('Paula as the players see it', () => {
+  // Digital Sonix & Chrome (not routed: 0.89 against UADE, see the ledger)
+  // starts each note with DMA off, period 1 and a write to AUDxDAT, then
+  // busy-waits for the AUDx request that write raises (UAE AUDxDAT, state
+  // 0 -> 2). The host ignored AUDxDAT: the player hung in its first note.
+  it('AUDxDAT on an idle channel raises AUDx: Digital Sonix & Chrome gets past its first note', async () => {
+    loadSharedWorkletScripts();
+    const { proc, send, posted } = await startWorklet('eagleplayer', 'EaglePlayer');
+    await send({
+      type: 'loadModule',
+      moduleData: songBuffer("public/data/songs/digital-sonix-and-chrome/dragon'sbreath ingame 1.dsc"),
+      playerData: songBuffer('third-party/uade-3.05/players/DigitalSonixChrome'),
+      moduleName: "dsc.dragon'sbreath ingame 1",
+    });
+    await send({ type: 'play' });
+    expect(posted.filter((m) => m.type === 'error').map((m) => m.message)).toEqual([]);
+    let sum = 0, n = 0;
+    for (let b = 0; b < Math.ceil((48000 * 3) / 128); b++) {
+      const out = stereoOutputs(5);
+      proc.process([], out);
+      for (const ch of out[0]) for (const v of ch) { sum += v * v; n++; }
+    }
+    expect(Math.sqrt(sum / n), 'rms of 3 s').toBeGreaterThan(0.02);
   }, 60_000);
 });

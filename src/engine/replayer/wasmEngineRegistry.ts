@@ -477,8 +477,9 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'eaglePlayerFileData',
     loadMethod: 'loadTune',
-    // The subsong rides as a load arg (0-based, the native subsong model's start field).
-    getLoadArgs: (song: TrackerSong) => [song.eaglePlayerId, song.eaglePlayerFileName ?? song.name, song.eaglePlayerSubsong],
+    // The subsong rides as a load arg (0-based, the native subsong model's
+    // start field), then the files the player opens beside the module.
+    getLoadArgs: (song: TrackerSong) => [song.eaglePlayerId, song.eaglePlayerFileName ?? song.name, song.eaglePlayerSubsong, song.uadeCompanionFiles],
     supportsPause: true,
     supportsResume: true,
     needsDirectRouting: true,

@@ -13,7 +13,9 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInThisContext } from 'node:vm';
-import { renderFileToSamples } from '../uade-audit/uadeRenderCore';
+import { renderFileToSamples, type Companion } from '../uade-audit/uadeRenderCore';
+
+export type { Companion };
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -47,6 +49,8 @@ export function comparedWindows(seconds: number, songEndAt: number): number {
 interface EpModule {
   _malloc(n: number): number; _free(p: number): void;
   _ep_wasm_init(sr: number): void;
+  _ep_wasm_add_file(name: number, data: number, len: number): number;
+  _ep_wasm_clear_files(): void;
   _ep_wasm_load(pl: number, plLen: number, mod: number, modLen: number, name: number, sub: number, opt: number): number;
   _ep_wasm_render(out: number, frames: number): number;
   _ep_wasm_song_ended(): number;
@@ -88,13 +92,23 @@ async function loadEaglePlayer(): Promise<{ mod: EpModule; mem: () => WebAssembl
 
 export interface EagleRender { samples: Float32Array; songEndAt: number; loadResult: number; player: string; log: string }
 
-/** Render `module` with the eagleplayer binary `player` for `seconds` at 48 kHz. */
-export async function renderEaglePlayer(player: Uint8Array, module: Uint8Array, moduleName: string, seconds: number): Promise<EagleRender> {
+/**
+ * Render `module` with the eagleplayer binary `player` for `seconds` at 48 kHz.
+ * `companions`: the files the player opens beside the module (smp.<tune>,
+ * SMPL.<tune>, ...), as the app passes them (companionResolver).
+ */
+export async function renderEaglePlayer(player: Uint8Array, module: Uint8Array, moduleName: string, seconds: number, companions: Companion[] = []): Promise<EagleRender> {
   const { mod, mem } = await loadEaglePlayer();
   const SR = 48000, CHUNK = 4800;
   const put = (b: Uint8Array) => { const p = mod._malloc(b.length + 1); const u = new Uint8Array(mem().buffer); u.set(b, p); u[p + b.length] = 0; return p; };
   const str = (p: number) => { const u = new Uint8Array(mem().buffer); let s = ''; while (u[p]) s += String.fromCharCode(u[p++]); return s; };
   mod._ep_wasm_init(SR);
+  mod._ep_wasm_clear_files();
+  for (const c of companions) {
+    const np = put(new TextEncoder().encode(c.name)), dp = put(c.data);
+    mod._ep_wasm_add_file(np, dp, c.data.length);
+    mod._free(np); mod._free(dp);
+  }
   const pp = put(player), mp = put(module), np = put(new TextEncoder().encode(moduleName));
   const loadResult = mod._ep_wasm_load(pp, player.length, mp, module.length, np, -1, 0);
   mod._free(pp); mod._free(mp); mod._free(np);
@@ -113,9 +127,9 @@ export async function renderEaglePlayer(player: Uint8Array, module: Uint8Array, 
 export interface UadeComparison { correlation: number; seconds: number; songEndAt: number; oursRms: number; uadeRms: number; loadResult: number; player: string; log: string }
 
 /** Ours vs UADE for one module (the module name is what both players see). */
-export async function compareWithUade(player: Uint8Array, module: Uint8Array, moduleName: string, seconds = 30): Promise<UadeComparison> {
-  const ours = await renderEaglePlayer(player, module, moduleName, seconds);
-  const uade = await renderFileToSamples(module, moduleName, { sampleRate: 48000, seconds });
+export async function compareWithUade(player: Uint8Array, module: Uint8Array, moduleName: string, seconds = 30, companions: Companion[] = []): Promise<UadeComparison> {
+  const ours = await renderEaglePlayer(player, module, moduleName, seconds, companions);
+  const uade = await renderFileToSamples(module, moduleName, { sampleRate: 48000, seconds, companions });
   const rms = (x: Float32Array) => Math.sqrt(x.reduce((s, v) => s + v * v, 0) / Math.max(1, x.length));
   const w = comparedWindows(seconds, ours.songEndAt);
   return {

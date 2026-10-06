@@ -1935,8 +1935,14 @@ export async function tryRouteFormat(
   }
 
   // ── Sound Player / Steve Barrett (SJS.* prefix) ───────────────────────────
+  // The SoundPlayer eagleplayer plays it on the Musashi host
+  // (EaglePlayerEngine) with its smp.<tune> companion; the grid as before.
   if (matchesExt(filename, ['sjs'])) {
     const { isSoundPlayerFormat, parseSoundPlayerFile } = await import('@lib/import/formats/SoundPlayerParser');
+    if (isSoundPlayerFormat(buffer)) {
+      const { withEaglePlayer } = await import('./withEaglePlayer');
+      return withEaglePlayer('SoundPlayer', ctx, (buf, name) => parseSoundPlayerFile(buf, name), toUADEPrefixName(originalFileName, ['sjs']));
+    }
     return withNativeThenUADE('soundPlayer', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSoundPlayerFormat(buf as ArrayBuffer)) return parseSoundPlayerFile(buf as ArrayBuffer, name); return null; },
       'SoundPlayerParser', { injectUADE: true });
@@ -2084,12 +2090,15 @@ export async function tryRouteFormat(
   }
 
   // ── Ben Daglish SID (BDS.* prefix) ────────────────────────────────────────
-  // Amiga HUNK-based SID-style 3-voice format. UADE prefix: BDS.
+  // Amiga HUNK-based SID-style 3-voice format. Native grid when the parser
+  // reads it, else UADE's scan; the BenDaglish-SID eagleplayer plays it on
+  // the Musashi host (EaglePlayerEngine, eaglePlayerFormats.ts).
   if (matchesExt(filename, ['bds'])) {
     const { isBenDaglishSIDFormat, parseBenDaglishSIDFile } = await import('@lib/import/formats/BenDaglishSIDParser');
-    return withNativeThenUADE('benDaglishSID', ctx,
-      async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isBenDaglishSIDFormat(buf as ArrayBuffer, name)) return parseBenDaglishSIDFile(buf as ArrayBuffer, name); return null; },
-      'BenDaglishSIDParser', { injectUADE: true });
+    const { withEaglePlayer } = await import('./withEaglePlayer');
+    return withEaglePlayer('BenDaglishSID', ctx,
+      (buf, name) => (isBenDaglishSIDFormat(buf, name) ? parseBenDaglishSIDFile(buf, name) : null),
+      toUADEPrefixName(originalFileName, ['bds']));
   }
 
   // ── Digital Sonix & Chrome (DSC.* prefix) ────────────────────────────────
@@ -2240,8 +2249,14 @@ export async function tryRouteFormat(
   }
 
   // ── MIDI Loriciel (MIDI.* prefix) ─────────────────────────────────────────
+  // The MIDI-Loriciel eagleplayer plays it on the Musashi host
+  // (EaglePlayerEngine) with its SMPL.<tune> companion; the grid as before.
   if (matchesExt(filename, ['midi'])) {
     const { isMIDILoricielFormat, parseMIDILoricielFile } = await import('@lib/import/formats/MIDILoricielParser');
+    if (isMIDILoricielFormat(buffer)) {
+      const { withEaglePlayer } = await import('./withEaglePlayer');
+      return withEaglePlayer('MIDILoriciel', ctx, (buf, name) => parseMIDILoricielFile(buf, name), toUADEPrefixName(originalFileName, ['midi']));
+    }
     return withNativeThenUADE('midiLoriciel', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMIDILoricielFormat(buf as ArrayBuffer)) return parseMIDILoricielFile(buf as ArrayBuffer, name); return null; },
       'MIDILoricielParser', { injectUADE: true });
@@ -2323,16 +2338,15 @@ export async function tryRouteFormat(
       },
       'WantedTeamDaveLoweParser', { injectUADE: true });
   }
+  // Beathoven Synthesizer: the BeathovenSynthesizer eagleplayer plays it on
+  // the Musashi host (EaglePlayerEngine); the grid as before.
   if (matchesExt(filename, ['bss'])) {
-    const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['bss']) };
     const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
       await import('@lib/import/formats/WantedTeamDaveLoweParser');
-    return withNativeThenUADE('beathovenSynthesizer', wtCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => {
-        if (isWantedTeamDaveLoweFormat(buf)) return parseWantedTeamDaveLoweFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
-        return null;
-      },
-      'WantedTeamDaveLoweParser', { injectUADE: true });
+    const { withEaglePlayer } = await import('./withEaglePlayer');
+    return withEaglePlayer('BeathovenSynthesizer', ctx,
+      (buf, name) => (isWantedTeamDaveLoweFormat(buf) ? parseWantedTeamDaveLoweFile(buf, name) : null),
+      toUADEPrefixName(originalFileName, ['bss']));
   }
   // ── Sean Connolly — native parser provides detection; UADE handles audio.
   if (matchesExt(filename, ['scn'])) {

@@ -12,6 +12,8 @@
  *   --prefixes comma list (default: eagleplayer.conf `prefixes=` of the player)
  *   --options  eagleplayer options (eagleoptions), rare
  *   --seconds  comparison length (default 30)
+ *   --companions comma list of files beside the corpus song the player opens
+ *              (e.g. smp.<tune>), passed by name as the app passes them
  *   --write    copy the player to public/eagleplayer/players/ and add the
  *              table entry to src/engine/eagleplayer/eaglePlayerFormats.ts
  *
@@ -82,7 +84,10 @@ async function main(): Promise<void> {
   };
 
   const moduleName = eaglePlayerModuleName(fmt, basename(corpus));
-  const r = await compareWithUade(new Uint8Array(readFileSync(playerPath)), new Uint8Array(readFileSync(join(ROOT, corpus))), moduleName, seconds);
+  const companions = typeof a.companions === 'string'
+    ? a.companions.split(',').map((f) => ({ name: basename(f.trim()), data: new Uint8Array(readFileSync(join(ROOT, f.trim()))) }))
+    : [];
+  const r = await compareWithUade(new Uint8Array(readFileSync(playerPath)), new Uint8Array(readFileSync(join(ROOT, corpus))), moduleName, seconds, companions);
   const corr = Math.round(r.correlation * 10000) / 10000;
   console.log(`${player} on ${corpus} as "${moduleName}"`);
   console.log(`  load ${r.loadResult} (${r.player || 'no player name'})${r.log ? `\n  score said:\n    ${r.log.trim().split('\n').join('\n    ')}` : ''}`);
@@ -100,6 +105,7 @@ async function main(): Promise<void> {
     `    id: ${quote(id)}, label: ${quote(fmt.label)}, player: ${quote(player)}, prefixes: [${prefixes.map(quote).join(', ')}], voices: 4,`,
     ...(fmt.options ? [`    options: ${quote(fmt.options)},`] : []),
     `    corpus: ${quote(corpus)}, uadeEnvelopeCorrelation: ${Number.isFinite(corr) ? corr : 0},`,
+    ...(typeof a.companions === 'string' ? [`    companions: [${a.companions.split(',').map((f) => quote(f.trim())).join(', ')}],`] : []),
     `    isDefault: false,`,
     `    heldBecause: ${quote(held)},`,
     `  },`,

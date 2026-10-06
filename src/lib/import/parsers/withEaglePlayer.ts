@@ -23,7 +23,7 @@ const UADE_SYNTHS = new Set(['UADESynth', 'UADEEditableSynth']);
  * on it, UADE's playback fields come off, and instruments that would start
  * UADE (classic UADESynth / UADEEditableSynth) become plain samplers.
  */
-export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: ArrayBuffer, fileName: string): TrackerSong {
+export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: ArrayBuffer, fileName: string, companions?: Map<string, ArrayBuffer>): TrackerSong {
   if (!EAGLE_PLAYER_FORMATS[formatId]) throw new Error(`withEaglePlayer: unknown format ${formatId}`);
   song.eaglePlayerFileData = module.slice(0);
   song.eaglePlayerId = formatId;
@@ -31,6 +31,10 @@ export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: A
   // one, not the song's display name ('primemover 07 [Anders 0land]' left
   // suffix-named songs silent in the app, 2026-10-06).
   song.eaglePlayerFileName = fileName;
+  // Files the player opens beside the module (smp.<tune>, SMPL.<tune>): the
+  // song's companion files, one field for every engine that loads them
+  // (saved with the project, exporters.ts).
+  if (companions && companions.size > 0) song.uadeCompanionFiles = companions;
   delete song.uadeEditableFileData;
   delete song.uadeEditableFileName;
   // Subsongs are the engine's (it reports them on load, nativeSubsongs); the
@@ -81,5 +85,5 @@ export async function withEaglePlayer(
       console.warn(`[withEaglePlayer] ${formatId}: no UADE grid for ${ctx.originalFileName}: ${(e as Error).message}`);
     }
   }
-  return playOnEaglePlayer(song, formatId, ctx.buffer, ctx.originalFileName);
+  return playOnEaglePlayer(song, formatId, ctx.buffer, ctx.originalFileName, ctx.companionFiles);
 }

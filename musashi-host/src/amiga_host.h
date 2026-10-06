@@ -69,6 +69,12 @@ int ah_crashed(void);
 /* Mixer mute/solo: bit N set = Paula voice N audible. */
 void ah_set_voice_mask(uint32_t mask);
 
+/* CPU timing as UADE's: every instruction 4 colour clocks (uademain.c
+ * m68k_speed = 4), instead of the 68020's own cycle counts. For players
+ * whose timing races the chips the way UADE runs them (the eagleplayer
+ * runner: UADE is its reference). Takes effect at the next ah_reset(). */
+void ah_set_uade_timing(int on);
+
 /* Machine time in colour clocks since reset (diagnostics, beam). */
 double ah_colour_clocks(void);
 
