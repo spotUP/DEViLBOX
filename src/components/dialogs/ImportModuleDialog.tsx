@@ -23,6 +23,7 @@ import { getFormatCapabilities, type FormatCapabilityInfo } from '@lib/import/Fo
 import { Info } from 'lucide-react';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
+import { expectedCompanionNames } from '@lib/import/companionResolver';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
@@ -45,19 +46,14 @@ interface ImportModuleDialogProps {
 }
 
 /**
- * For two-file Amiga formats, derive the expected companion filename from the main file.
- * TFMX: mdat.songname → smpl.songname, MFP: mfp.songname → smp.songname
+ * For multi-file formats, the companion names the module expects beside it,
+ * from the one companion resolver (bob4e.dum -> bob4e.ins, mdat.x -> smpl.x).
  */
-function getExpectedCompanion(filename: string): { expectedPrefix: string; description: string } | null {
+function getExpectedCompanion(filename: string): { names: string[]; description: string } | null {
   const basename = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
-  const lower = basename.toLowerCase();
-  if (lower.startsWith('mdat.')) {
-    return { expectedPrefix: 'smpl.', description: 'TFMX sample data (smpl.*)' };
-  }
-  if (lower.startsWith('mfp.')) {
-    return { expectedPrefix: 'smp.', description: 'MFP sample data (smp.*)' };
-  }
-  return null;
+  const names = expectedCompanionNames(basename);
+  if (names.length === 0) return null;
+  return { names, description: names.join(' or ') };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -653,8 +649,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                       if (comp) return (
                         <>
                           <span>
-                            <span className="font-semibold">Missing {comp.description}</span>
-                            {' '}({comp.expectedPrefix})
+                            <span className="font-semibold">Missing companion file</span>
+                            {' '}({comp.description})
                           </span>
                           <button
                             type="button"
@@ -666,7 +662,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                               }
                             }}
                           >
-                            Select {comp.expectedPrefix.split('.')[0]}.* file
+                            Select companion file
                           </button>
                         </>
                       );
