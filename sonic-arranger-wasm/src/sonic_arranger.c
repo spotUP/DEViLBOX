@@ -241,6 +241,12 @@ struct SaModule {
 
     // Playing state
     SaGlobalPlayingInfo playing_info;
+    // The song-order index (position - first_position) and row whose notes were
+    // read last: what the music is on, for the playhead. A Position Jump or
+    // Track Break moves playing_info before the next row plays, so the playhead
+    // is recorded where the notes are read, not derived from it. -1 until a row has played.
+    int play_order_index;
+    int play_row;
     SaVoiceInfo voices[4];
     SaChannel channels[4];
 
@@ -770,6 +776,8 @@ static void initialize_sound(SaModule* m, int sub_song) {
     m->playing_info.song_position = (int16_t)(m->current_song_info->first_position - 1);
     m->playing_info.row_position = m->current_song_info->rows_per_track;
     m->playing_info.rows_per_track = m->current_song_info->rows_per_track;
+    m->play_order_index = -1;
+    m->play_row = -1;
 
     for (int i = 0; i < 4; i++) {
         SaVoiceInfo* v = &m->voices[i];
@@ -938,6 +946,8 @@ static void get_next_row(SaModule* m) {
         get_next_position(m);
     }
 
+    m->play_order_index = (int)m->playing_info.song_position - (int)m->current_song_info->first_position;
+    m->play_row = (int)m->playing_info.row_position;
     get_new_notes(m);
 }
 
@@ -2371,6 +2381,16 @@ bool sa_has_ended(const SaModule* module) {
 
 int sa_get_num_positions(const SaModule* module) {
     return module ? module->num_positions : 0;
+}
+
+// Playhead: the index into the song order (first_position..last_position, the
+// grid's songPositions) and the row of it that is sounding. -1 before the first row.
+int sa_get_play_order_index(const SaModule* module) {
+    return module ? module->play_order_index : -1;
+}
+
+int sa_get_play_row(const SaModule* module) {
+    return module ? module->play_row : -1;
 }
 
 int sa_get_num_track_lines(const SaModule* module) {

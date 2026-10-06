@@ -5,6 +5,7 @@
  * Follows the BdEngine singleton pattern.
  */
 
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
@@ -16,7 +17,7 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 
 /** SonicArranger Emscripten output needs extended script-replaces + chained-HEAP. */
-function sonicArrangerTransform(code: string): string {
+export function sonicArrangerTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -30,6 +31,8 @@ function sonicArrangerTransform(code: string): string {
 export class SonicArrangerEngine extends WASMChannelOutputsEngine {
   private static instance: SonicArrangerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private readonly _positions = new PositionCallbacks();
 
   private _songEndCallback: (() => void) | null = null;
 
@@ -84,6 +87,9 @@ export class SonicArrangerEngine extends WASMChannelOutputsEngine {
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[SonicArrangerEngine] Module loaded, subsongs:', data.subsongCount);
           break;
+        case 'position':
+          this._positions.emit(data);
+          break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
@@ -134,7 +140,13 @@ export class SonicArrangerEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
   }
 
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
+  }
+
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     if (SonicArrangerEngine.instance === this) SonicArrangerEngine.instance = null;
   }

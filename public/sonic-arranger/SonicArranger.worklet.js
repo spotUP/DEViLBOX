@@ -42,7 +42,7 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; break;
+      case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop': this.playing = false; if (this.handle) this.module._sa_select_subsong(this.handle, 0); this.port.postMessage({ type: 'stopped' }); break;
       case 'pause': this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._sa_select_subsong(this.handle, data.subsong); break;
@@ -141,6 +141,16 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
       if (globalThis.DevilboxChannelStream) {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
+      }
+    }
+    // Playhead: the song-order index and row the music is on, posted when they
+    // change (the engine's onPositionUpdate; the grid is songPositions x rows).
+    const playRow = this.module._sa_get_play_row(this.handle);
+    if (playRow >= 0) {
+      const songPos = this.module._sa_get_play_order_index(this.handle);
+      if (songPos !== this._lastSongPos || playRow !== this._lastRow) {
+        this._lastSongPos = songPos; this._lastRow = playRow;
+        this.port.postMessage({ type: 'position', songPos, row: playRow });
       }
     }
     if (this.module._sa_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });

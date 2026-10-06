@@ -4,6 +4,7 @@
  * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
@@ -14,7 +15,7 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
-function synthesisTransform(code: string): string {
+export function synthesisTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -28,6 +29,8 @@ function synthesisTransform(code: string): string {
 export class SynthesisEngine extends WASMChannelOutputsEngine {
   private static instance: SynthesisEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private readonly _positions = new PositionCallbacks();
 
   private _songEndCallback: (() => void) | null = null;
 
@@ -82,6 +85,9 @@ export class SynthesisEngine extends WASMChannelOutputsEngine {
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[SynthesisEngine] Module loaded, subsongs:', data.subsongCount);
           break;
+        case 'position':
+          this._positions.emit(data);
+          break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
@@ -130,7 +136,13 @@ export class SynthesisEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
   }
 
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
+  }
+
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     if (SynthesisEngine.instance === this) SynthesisEngine.instance = null;
   }
