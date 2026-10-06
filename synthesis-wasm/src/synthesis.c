@@ -257,6 +257,11 @@ struct SynModule {
     SynSongInfo* current_song_info;
 
     SynGlobalPlayingInfo playing_info;
+    // The song-order index (position - first_position) and row whose notes
+    // were read last: what the music is on, for the playhead. -1 until a row
+    // has played. Written by get_next_row, so a mid-tick read is never torn.
+    int play_order_index;
+    int play_row;
     SynVoiceInfo voices[4];
 
     SynChannel channels[4];
@@ -639,6 +644,8 @@ static void initialize_sound(SynModule* m, int sub_song) {
     pi->row_position = song->rows_per_track;
     pi->rows_per_track = song->rows_per_track;
     pi->transpose_enable_status = SYN_TRANSPOSE_ENABLED;
+    m->play_order_index = -1;
+    m->play_row = -1;
 
     for (int i = 0; i < 4; i++) {
         SynVoiceInfo* v = &m->voices[i];
@@ -924,6 +931,9 @@ static void get_next_row(SynModule* m) {
         v->effect = tl->effect;
         v->effect_arg = tl->effect_arg;
     }
+
+    m->play_order_index = (int)pi->song_position - 1 - (int)m->current_song_info->first_position;
+    m->play_row = pi->row_position;
 
     for (int i = 0; i < 4; i++)
         play_row(m, &m->voices[i], &m->channels[i]);
@@ -1767,6 +1777,16 @@ int syn_get_num_track_lines(const SynModule* module) {
 
 int syn_get_num_positions(const SynModule* module) {
     return module ? module->num_positions : 0;
+}
+
+// Playhead: the index into the song order (first_position..last_position, the
+// grid's songPositions) and the row of it that is sounding. -1 before the first row.
+int syn_get_play_order_index(const SynModule* module) {
+    return module ? module->play_order_index : -1;
+}
+
+int syn_get_play_row(const SynModule* module) {
+    return module ? module->play_row : -1;
 }
 
 void syn_get_cell(const SynModule* module, int idx,
