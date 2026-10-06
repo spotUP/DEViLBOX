@@ -56,9 +56,17 @@ class MusicLineProcessor extends AudioWorkletProcessor {
       case 'play':
         this.playing = true;
         this._resampPos = 0.0;
+        // InitTune resets every channel to on; keep the mixer's mask across it.
+        if (this.muteMask !== undefined) this._applyMuteMask(this.muteMask);
         // Reset per-channel tracking
         if (this._prevChRows) this._prevChRows.fill(-1);
         if (this._prevChPos) this._prevChPos.fill(-1);
+        break;
+
+      case 'pause':
+        // Keeps the song loaded: 'stop' unloads it, so a pause that sent
+        // 'stop' left the following resume playing nothing.
+        this.playing = false;
         break;
 
       case 'stop':
@@ -272,12 +280,7 @@ class MusicLineProcessor extends AudioWorkletProcessor {
 
       case 'setMuteMask':
         this.muteMask = data.mask;
-        if (this.wasm && typeof this.wasm._ml_set_channel_on === 'function') {
-          for (let ch = 0; ch < 8; ch++) {
-            const active = (data.mask & (1 << ch)) !== 0;
-            this.wasm._ml_set_channel_on(ch, active ? 1 : 0);
-          }
-        }
+        this._applyMuteMask(data.mask);
         break;
 
       case 'get-channels-on': {
@@ -372,6 +375,13 @@ class MusicLineProcessor extends AudioWorkletProcessor {
   // Song loading
   // --------------------------------------------------------------------------
 
+  _applyMuteMask(mask) {
+    if (!this.wasm || !this.songLoaded || typeof this.wasm._ml_set_channel_on !== 'function') return;
+    for (let ch = 0; ch < 8; ch++) {
+      this.wasm._ml_set_channel_on(ch, (mask & (1 << ch)) !== 0 ? 1 : 0);
+    }
+  }
+
   loadSong(buffer) {
     if (!this.wasm || !this.initialized) return;
 
@@ -388,6 +398,8 @@ class MusicLineProcessor extends AudioWorkletProcessor {
 
     if (ok) {
       this.songLoaded = true;
+      // A fresh module starts with every channel on: re-apply the mixer's mask.
+      if (this.muteMask !== undefined) this._applyMuteMask(this.muteMask);
       this.numChannels = this.wasm._ml_get_num_channels ? this.wasm._ml_get_num_channels() : 0;
       this.playing = false;
       this._resampPos = 0.0;
