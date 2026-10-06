@@ -334,3 +334,6 @@ Owner: estimated grids are useless; reverse each format to its real data. Work l
 - [ ] Sound Master - agent running. Jochen Hippel ST - agent running.
 - Yardstick: gridVsPaula misreads players that write the period twice in a note's tick (Fred); fix against real note-on traces (runner) before relying on its scores for such formats.
 - No-guess rule live (047ca8685): UADE-scan grids open in the scope view.
+- Sound Master (c2cc825a8): owner - sounds good, grid "almost correct but not correct" (missing notes, extra/wrong notes, effects/volume). Data matched note-ons; display diverges -> agent fixing.
+- ACCEPTANCE ADDED (all reversed formats): a test walks every cell - the shown note equals the played note (transposes applied, names match periods), every played note-on has a shown cell, effects/volumes shown decoded. Re-check Fred Editor and Hippel ST against it.
+- Wally Beben - agent running. Jesper Olsen - agent running.
