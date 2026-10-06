@@ -1539,6 +1539,21 @@ void is2_set_channel_mask(Is2Module* module, uint32_t mask) {
         module->channels[i].muted = ((mask >> i) & 1) == 0;
 }
 
+/* Live play position, as the pattern grid sees it: one pattern per song
+ * position of the sub-song (first_position..), rows_per_track rows each.
+ * Before the first row has been taken the player sits on 0 / 0. */
+int is2_get_play_pattern(const Is2Module* module) {
+    if (!module || !module->current_song_info) return 0;
+    int p = (int)module->playing_info.song_position - (int)module->current_song_info->first_position;
+    return p < 0 ? 0 : p;
+}
+
+int is2_get_play_row(const Is2Module* module) {
+    if (!module || !module->current_song_info) return 0;
+    if (module->playing_info.song_position < (int16_t)module->current_song_info->first_position) return 0;
+    return module->playing_info.row_position < module->playing_info.rows_per_track ? module->playing_info.row_position : 0;
+}
+
 bool is2_has_ended(const Is2Module* module) {
     if (!module) return true;
     return module->has_ended;
