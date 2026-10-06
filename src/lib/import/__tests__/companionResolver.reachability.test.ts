@@ -28,7 +28,7 @@ describe('companion discovery reaches the resolver', () => {
     expect(nav).not.toContain('COMPANION_PREFIXES');
     expect(nav).not.toContain('resolveCompanions(');
     const jukebox = read('src/components/jukebox/JukeboxPanel.tsx');
-    expect(jukebox).toContain('await gatherCompanions(name, row.dir, bytes)');
+    expect(jukebox).toContain('await gatherCompanions(name, directoryOfFile(file), bytes)');
     expect(jukebox).not.toContain('resolveCompanions(');
     const fetcher = read('src/lib/import/companionFetch.ts');
     expect(fetcher).toContain('const resolved = resolveCompanions(filename, listing);');
