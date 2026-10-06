@@ -62,80 +62,68 @@ export function ftmCellFields(cell: Pick<TrackerCell, 'note' | 'instrument' | 'v
   }
 }
 
-export const faceTheMusicEncoder: VariableLengthEncoder = {
-  formatId: 'faceTheMusic',
+/** The FTM grid effects that are events of their own (volume, SEL, pitch bend, volume down). */
+const FTM_EVENT_EFFECTS = new Set([0x41, 0x1C, 0x03, 0x0A]);
 
-  encodePattern(rows: TrackerCell[], _channel: number): Uint8Array {
-    // Carrier path (byte-exact): rows produced by FaceTheMusicParser's blockRows
-    // are per-byte carriers of the real per-channel event stream (cutoff=1,
-    // period=byte). FTM events are variable-length with spacing updates, so
-    // per-byte carriers cover the whole stream; concatenating them reproduces the
-    // channel chunk verbatim. The editable display grid stays carrier-less and
-    // re-derives the event stream below.
-    if (rows.some(c => c.cutoff !== undefined)) {
-      const carried: number[] = [];
-      for (const cell of rows) {
-        if (cell.cutoff === undefined) continue; // padding — emits nothing
-        carried.push((cell.period ?? 0) & 0xFF);
-      }
-      return new Uint8Array(carried);
+function isFtmEvent(cell: TrackerCell): boolean {
+  return (cell.note ?? 0) !== 0 || (cell.instrument ?? 0) !== 0 || FTM_EVENT_EFFECTS.has(cell.effTyp ?? 0);
+}
+
+/**
+ * One channel's grid rows (all measures, in order) -> its FTM event stream.
+ *
+ * PlayFTM's track walk (and FaceTheMusicParser): an event sits `spacing` rows
+ * after the row following the previous event. `spacing` is 0 before the first
+ * event and the channel's `defaultSpacing` after every event; a spacing line
+ * (0xFx xx) sets it for the NEXT event only. So a spacing line is due before
+ * every event whose gap differs from that value, not only when the gap
+ * changes. A gap is at most 0xFFF rows (12 bits).
+ */
+export function encodeFtmEventStream(rows: readonly TrackerCell[], defaultSpacing: number): Uint8Array {
+  const buf: number[] = [];
+  let nextRow = 0;   // the row after the previous event
+  let spacing = 0;   // what the replayer adds without a spacing line
+  for (let row = 0; row < rows.length; row++) {
+    const cell = rows[row];
+    if (!cell || !isFtmEvent(cell)) continue;
+    const gap = Math.min(0xFFF, row - nextRow);
+    if (gap !== spacing) {
+      buf.push(0xF0 | ((gap >> 8) & 0x0F), gap & 0xFF);
     }
+    const { note, effect, arg } = ftmCellFields(cell);
+    buf.push((effect << 4) | ((arg >> 2) & 0x0F), ((arg & 0x03) << 6) | (note & 0x3F));
+    nextRow = row + 1;
+    spacing = defaultSpacing;
+  }
+  return new Uint8Array(buf);
+}
 
-    const buf: number[] = [];
-
-    // FTM stores events as a stream with spacing between them.
-    // We need to track the globalRow and emit spacing updates + events.
-    // Since we encode per-channel, each event advances globalRow by (1 + spacing).
-    // For simplicity we emit each non-empty row as an event with spacing=0,
-    // preceded by spacing updates to skip empty rows.
-
-    let currentSpacing = 0; // Will be set by first spacing update
-    let emptyRows = 0;
-
-    for (let row = 0; row < rows.length; row++) {
-      const cell = rows[row];
-      const note = cell.note ?? 0;
-      const instr = cell.instrument ?? 0;
-      const volume = cell.volume ?? 0;
-      const effTyp = cell.effTyp ?? 0;
-
-      const hasContent = note !== 0 || instr !== 0 || volume !== 0 || (effTyp !== 0 && effTyp !== 0x41);
-
-      if (!hasContent && effTyp !== 0x41) {
-        emptyRows++;
-        continue;
+/**
+ * The variable-length encoder for a song whose channels carry these default
+ * spacings (the u16 before each channel chunk, which the chip-RAM rewrite
+ * keeps). Carrier rows reproduce the stream verbatim.
+ */
+export function faceTheMusicEncoderFor(defaultSpacings: readonly number[]): VariableLengthEncoder {
+  return {
+    formatId: 'faceTheMusic',
+    encodePattern(rows: TrackerCell[], channel: number): Uint8Array {
+      // Carrier path (byte-exact): rows produced by FaceTheMusicParser's
+      // blockRows are per-byte carriers of the channel's event stream
+      // (cutoff=1, period=byte); concatenating them reproduces the chunk.
+      if (rows.some(c => c.cutoff !== undefined)) {
+        const carried: number[] = [];
+        for (const cell of rows) {
+          if (cell.cutoff === undefined) continue; // padding — emits nothing
+          carried.push((cell.period ?? 0) & 0xFF);
+        }
+        return new Uint8Array(carried);
       }
+      return encodeFtmEventStream(rows, defaultSpacings[channel] ?? 0);
+    },
+  };
+}
 
-      // Emit spacing update if needed to skip empty rows
-      // Each event advances globalRow by (1 + spacing).
-      // To place an event after N empty rows, we need spacing = N.
-      const neededSpacing = emptyRows;
-
-      if (neededSpacing !== currentSpacing) {
-        // Emit spacing update: 0xF0 | (spacing >> 8), spacing & 0xFF
-        const sp = neededSpacing & 0xFFF;
-        buf.push(0xF0 | ((sp >> 8) & 0x0F));
-        buf.push(sp & 0xFF);
-        currentSpacing = neededSpacing;
-      }
-
-      emptyRows = 0;
-
-      const { note: noteBits, effect, arg } = ftmCellFields(cell);
-      const data0 = (effect << 4) | ((arg >> 2) & 0x0F);
-      const data1 = ((arg & 0x03) << 6) | (noteBits & 0x3F);
-
-      buf.push(data0);
-      buf.push(data1);
-
-      // After emitting an event, reset spacing tracking
-      // Next event will need spacing = 0 by default (adjacent row)
-      currentSpacing = neededSpacing;
-      emptyRows = 0;
-    }
-
-    return new Uint8Array(buf);
-  },
-};
+/** Registry entry: channels with default spacing 0 (what FaceTheMusicExporter writes for a new file). */
+export const faceTheMusicEncoder: VariableLengthEncoder = faceTheMusicEncoderFor([]);
 
 registerVariableEncoder(faceTheMusicEncoder);

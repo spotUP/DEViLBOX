@@ -27,10 +27,18 @@
  *   Sample data: per sample (loopStart(u16BE words) + loopLength(u16BE words) + PCM)
  *
  * Reference: FaceTheMusicParser.ts (authoritative parser)
- * Reference: FaceTheMusicEncoder.ts (cell encoding)
+ * Reference: FaceTheMusicEncoder.ts (event stream encoding, shared with the chip-RAM path)
+ *
+ * A loaded .ftm exports as its own bytes with edited channel streams spliced
+ * in (rebuildFaceTheMusicModule); the from-scratch writer is for songs with
+ * no FTM file behind them.
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { EMPTY_CELL, type TrackerCell } from '@/types';
+import { encodeFtmEventStream } from '@/engine/uade/encoders/FaceTheMusicEncoder';
+import { cellFieldsEqual } from '@/engine/uade/UADEPatternEncoder';
+import { parseFaceTheMusicFile } from '@/lib/import/formats/FaceTheMusicParser';
 
 // -- Constants ---------------------------------------------------------------
 
@@ -67,126 +75,61 @@ function writeString(view: DataView, off: number, str: string, maxLen: number): 
   }
 }
 
-// -- Channel event stream encoder --------------------------------------------
+// -- Channel event streams ---------------------------------------------------
+
+/** One channel's grid rows across all measures, each measure padded to its row count. */
+function channelRows(patterns: TrackerSong['patterns'], numMeasures: number, channelIdx: number, rowsPerMeasure: number): TrackerCell[] {
+  const rows: TrackerCell[] = [];
+  for (let m = 0; m < numMeasures; m++) {
+    const src = patterns[m]?.channels[channelIdx]?.rows ?? [];
+    for (let r = 0; r < rowsPerMeasure; r++) rows.push(src[r] ?? EMPTY_CELL);
+  }
+  return rows;
+}
 
 /**
- * Encode one channel's pattern data across all measures into an FTM event stream.
- *
- * The event stream uses 2-byte event pairs with spacing updates to skip empty rows.
- * See FaceTheMusicEncoder.ts for the encoding reference.
+ * The loaded module with the grid's edits written in: every channel whose
+ * rows differ from the file's own (re-parsed) grid gets a re-encoded event
+ * stream under the file's default spacing; every other byte (header, effect
+ * scripts, untouched channels, samples) is the original's. Null when the
+ * original does not parse.
  */
-function encodeChannelStream(
-  song: TrackerSong,
-  channelIdx: number,
-  rowsPerMeasure: number,
-): Uint8Array {
-  const buf: number[] = [];
-  let currentSpacing = 0;
-  let emptyRows = 0;
-
-  const numMeasures = song.songPositions.length;
-
-  for (let m = 0; m < numMeasures; m++) {
-    const patIdx = song.songPositions[m];
-    const pat = song.patterns[patIdx];
-    if (!pat) continue;
-
-    const channel = pat.channels[channelIdx];
-    if (!channel) continue;
-
-    for (let row = 0; row < rowsPerMeasure; row++) {
-      const cell = channel.rows[row];
-      if (!cell) {
-        emptyRows++;
-        continue;
-      }
-
-      const note = cell.note ?? 0;
-      const instr = cell.instrument ?? 0;
-      const volume = cell.volume ?? 0;
-      const effTyp = cell.effTyp ?? 0;
-      const eff = cell.eff ?? 0;
-
-      // Check if cell has any content worth encoding
-      const hasContent =
-        note !== 0 ||
-        instr !== 0 ||
-        (effTyp === 0x41 && volume !== 0) ||
-        effTyp === 0x1C ||
-        effTyp === 0x03 ||
-        effTyp === 0x0A;
-
-      if (!hasContent) {
-        emptyRows++;
-        continue;
-      }
-
-      // Emit spacing update if needed
-      const neededSpacing = emptyRows;
-      if (neededSpacing !== currentSpacing) {
-        const sp = neededSpacing & 0xFFF;
-        buf.push(0xF0 | ((sp >> 8) & 0x0F));
-        buf.push(sp & 0xFF);
-        currentSpacing = neededSpacing;
-      }
-
-      emptyRows = 0;
-
-      // Encode note bits
-      let noteBits = 0;
-      if (note === 97) {
-        noteBits = 35; // key-off
-      } else if (note > 0) {
-        noteBits = note - 48;
-        if (noteBits < 1) noteBits = 1;
-        if (noteBits > 34) noteBits = 34;
-      }
-
-      // Determine event type and encode
-      let data0 = 0;
-      let data1 = 0;
-
-      const param = instr & 0x3F;
-      const paramHi = (param >> 2) & 0x0F;
-      const paramLo = param & 0x03;
-
-      if (effTyp === 0x41) {
-        // Volume set: volNibble = round(volume * 9 / 64) + 1, clamped 1-9
-        let volNibble = Math.round(volume * 9 / 64) + 1;
-        if (volNibble < 1) volNibble = 1;
-        if (volNibble > 9) volNibble = 9;
-        data0 = (volNibble << 4) | paramHi;
-        data1 = (paramLo << 6) | (noteBits & 0x3F);
-      } else if (effTyp === 0x1C) {
-        // SEL effect
-        const selParam = eff & 0x3F;
-        data0 = 0xB0 | ((selParam >> 2) & 0x0F);
-        data1 = ((selParam & 0x03) << 6) | (noteBits & 0x3F);
-      } else if (effTyp === 0x03) {
-        // Pitch bend
-        const pbParam = eff & 0x3F;
-        data0 = 0xC0 | ((pbParam >> 2) & 0x0F);
-        data1 = ((pbParam & 0x03) << 6) | (noteBits & 0x3F);
-      } else if (effTyp === 0x0A) {
-        // Volume down
-        const vdParam = eff & 0x3F;
-        data0 = 0xD0 | ((vdParam >> 2) & 0x0F);
-        data1 = ((vdParam & 0x03) << 6) | (noteBits & 0x3F);
-      } else {
-        // Default: set instrument (0x00 high nibble)
-        data0 = 0x00 | paramHi;
-        data1 = (paramLo << 6) | (noteBits & 0x3F);
-      }
-
-      buf.push(data0);
-      buf.push(data1);
-
-      currentSpacing = neededSpacing;
-      emptyRows = 0;
-    }
+function rebuildFaceTheMusicModule(
+  original: Uint8Array,
+  patterns: TrackerSong['patterns'],
+  warnings: string[],
+): Uint8Array | null {
+  const base = parseFaceTheMusicFile(original, 'original.ftm');
+  const layout = base?.uadeVariableLayout;
+  if (!base || !layout || layout.filePatternAddrs.length === 0) return null;
+  const rowsPerMeasure = layout.rowsPerPattern as number;
+  const numMeasures = base.patterns.length;
+  if (patterns.length !== numMeasures) {
+    warnings.push(`FTM keeps its ${numMeasures} measures; ${patterns.length} grid patterns were given.`);
   }
 
-  return new Uint8Array(buf);
+  const view = new DataView(original.buffer, original.byteOffset, original.byteLength);
+  const parts: Uint8Array[] = [original.subarray(0, layout.filePatternAddrs[0] - 6)];
+  let end = 0;
+  layout.filePatternAddrs.forEach((addr, ch) => {
+    const size = layout.filePatternSizes[ch];
+    const defaultSpacing = view.getUint16(addr - 6, false);
+    const edited = channelRows(patterns, numMeasures, ch, rowsPerMeasure);
+    const loaded = channelRows(base.patterns, numMeasures, ch, rowsPerMeasure);
+    const unchanged = edited.every((c, i) => cellFieldsEqual(c, loaded[i]));
+    const stream = unchanged ? original.subarray(addr, addr + size) : encodeFtmEventStream(edited, defaultSpacing);
+    const head = new Uint8Array(6);
+    new DataView(head.buffer).setUint16(0, defaultSpacing, false);
+    new DataView(head.buffer).setUint32(2, stream.length, false);
+    parts.push(head, stream);
+    end = addr + size;
+  });
+  parts.push(original.subarray(end));
+
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
 }
 
 // -- Sample extraction -------------------------------------------------------
@@ -277,6 +220,17 @@ export async function exportFaceTheMusic(
   song: TrackerSong,
 ): Promise<FaceTheMusicExportResult> {
   const warnings: string[] = [];
+  const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'untitled';
+  const filename = `${baseName}.ftm`;
+
+  // A loaded FTM: its own bytes with the edits written in (keeps the effect
+  // scripts, artist, tempo and samples a from-scratch file cannot rebuild).
+  if (song.faceTheMusicFileData) {
+    const rebuilt = rebuildFaceTheMusicModule(new Uint8Array(song.faceTheMusicFileData), song.patterns, warnings);
+    if (rebuilt) {
+      return { data: new Blob([rebuilt as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }), filename, warnings };
+    }
+  }
 
   // -- Determine format parameters ------------------------------------------
 
@@ -330,7 +284,8 @@ export async function exportFaceTheMusic(
   const channelStreams: Uint8Array[] = [];
   for (let ch = 0; ch < NUM_CHANNELS; ch++) {
     if (ch < numChannels) {
-      channelStreams.push(encodeChannelStream(song, ch, rowsPerMeasure));
+      const measures = song.songPositions.map((p) => song.patterns[p]);
+      channelStreams.push(encodeFtmEventStream(channelRows(measures, measures.length, ch, rowsPerMeasure), 0));
     } else {
       channelStreams.push(new Uint8Array(0));
     }
@@ -426,9 +381,6 @@ export async function exportFaceTheMusic(
   }
 
   // -- Build result -----------------------------------------------------------
-
-  const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'untitled';
-  const filename = `${baseName}.ftm`;
 
   return {
     data: new Blob([output], { type: 'application/octet-stream' }),

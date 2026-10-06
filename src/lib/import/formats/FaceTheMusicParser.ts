@@ -61,7 +61,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEChipRamInfo } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { faceTheMusicEncoder } from '@/engine/uade/encoders/FaceTheMusicEncoder';
+import { faceTheMusicEncoderFor } from '@/engine/uade/encoders/FaceTheMusicEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
@@ -204,12 +204,14 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
   // Track per-channel event stream file offsets and sizes
   const channelStreamAddrs: number[] = [];
   const channelStreamSizes: number[] = [];
+  const channelDefaultSpacings: number[] = [];
 
   // Read each channel's event stream and place events into the grid.
   for (let chn = 0; chn < NUM_CHANNELS; chn++) {
     if (pos + 6 > bytes.byteLength) break;  // Need at least defaultSpacing + chunkSize
 
     const defaultSpacing = u16be(view, pos);
+    channelDefaultSpacings.push(defaultSpacing);
     pos += 2;
     const chunkSize = u32be(view, pos);
     pos += 4;
@@ -519,7 +521,7 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     numFilePatterns: channelStreamAddrs.length,
     rowsPerPattern: rowsPerMeasure,
     moduleSize: bytes.byteLength,
-    encoder: faceTheMusicEncoder,
+    encoder: faceTheMusicEncoderFor(channelDefaultSpacings),
     filePatternAddrs: channelStreamAddrs,
     filePatternSizes: channelStreamSizes,
     trackMap,
