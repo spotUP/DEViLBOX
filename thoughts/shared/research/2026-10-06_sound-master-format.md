@@ -116,7 +116,7 @@ finetune is that of the instrument started by the note (legato keeps the previou
 - One pattern per block played, in song order from the start position until the song is back at it; order
   = 0..n-1, restart 0. Rows = patLen / 2 (a $FE row ends the pattern), speed = header speed, 125 BPM.
 - Cell: note + period from the player's table; instrument column = instrument + 1; info bit 6 = volume
-  column $10 + v; portamento = XM 3xx; $FD = Fxx, $FE = D00 (II v1). Private block 0x74..0x76
+  column $10 + v; portamento = XM 3xx; $FD = Fxx, $FE = D00 (II v1). Private block 0x74..0x78
   (`soundMasterEffectGlyphs.ts`): H hold (info kept), L legato, N a note byte whose pitch is outside the
   table. Info bit 7 (no transposes) is not shown - the note shown is already the played one - and the
   info bits the player ignores on a row without a note are not shown; both stay in the module and are

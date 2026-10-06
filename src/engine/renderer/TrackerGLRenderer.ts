@@ -871,7 +871,7 @@ export class TrackerGLRenderer {
                 // Fred Editor private control effects (block 0x70..0x73)
                 effStr = FRED_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else if (SM_EFFECT_GLYPH[colEffTyp] !== undefined) {
-                // Sound Master private control effects (block 0x74..0x76)
+                // Sound Master private control effects (block 0x74..0x78)
                 effStr = SM_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
