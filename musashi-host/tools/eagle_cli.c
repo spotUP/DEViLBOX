@@ -15,6 +15,7 @@
 #include <string.h>
 #include "eagle_runner.h"
 #include "amiga_host.h"
+#include "m68k.h"
 
 static uint32_t g_trace[32];
 static int g_ntrace;
@@ -85,6 +86,7 @@ int main(int argc, char **argv) {
   }
   double s = 0; for (int i = 0; i < frames * 2; i++) s += buf[i] * buf[i];
   fprintf(stderr, "cia irqs A.ta %u A.tb %u B.ta %u B.tb %u\n", ah_cia_timer_irqs(0, 0), ah_cia_timer_irqs(0, 1), ah_cia_timer_irqs(1, 0), ah_cia_timer_irqs(1, 1));
+  fprintf(stderr, "pc %06X sr %04X intena %04X intreq %04X dmacon %04X\n", m68k_get_reg(NULL, M68K_REG_PC), m68k_get_reg(NULL, M68K_REG_SR), ah_intena(), ah_intreq(), ah_dmacon());
   fprintf(stderr, "rms %.4f ended %d\n", frames ? __builtin_sqrt(s / (frames * 2)) : 0.0, eagle_song_ended());
   if (out) { FILE *f = fopen(out, "wb"); fwrite(buf, sizeof(float), (size_t)frames * 2, f); fclose(f); }
   return 0;

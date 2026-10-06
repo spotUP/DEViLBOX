@@ -14,12 +14,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ROOT, startWorklet, stereoOutputs } from './workletHarness.ts';
 
-const { song, player, moduleName, seconds } = workerData as { song: string; player: string; moduleName: string; seconds: number };
+const { song, player, moduleName, seconds, companions = [] } = workerData as { song: string; player: string; moduleName: string; seconds: number; companions?: string[] };
 const port = parentPort!;
 const bytes = (p: string) => { const b = readFileSync(resolve(ROOT, p)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
 
 const { proc, send, posted } = await startWorklet('eagleplayer', 'EaglePlayer');
-await send({ type: 'loadModule', moduleData: bytes(song), playerData: bytes(`public/eagleplayer/players/${player}`), moduleName });
+await send({
+  type: 'loadModule', moduleData: bytes(song), playerData: bytes(`public/eagleplayer/players/${player}`), moduleName,
+  files: companions.map((c) => ({ name: c.split('/').pop(), data: bytes(c) })),
+});
 await send({ type: 'play' });
 
 const SR = 48000, BLOCK = 128, WINDOW = SR / 10;

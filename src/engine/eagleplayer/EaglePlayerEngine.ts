@@ -150,7 +150,7 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
   }
 
   /** Load a module for the format `formatId` (EAGLE_PLAYER_FORMATS key). */
-  async loadTune(moduleData: ArrayBuffer, formatId?: string, fileName?: string, subsong?: number): Promise<void> {
+  async loadTune(moduleData: ArrayBuffer, formatId?: string, fileName?: string, subsong?: number, companions?: Map<string, ArrayBuffer>): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('EaglePlayerEngine not initialized');
     const fmt = eaglePlayerFormat(formatId);
@@ -163,6 +163,9 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
       options: fmt.options,
       // 0-based into the player's subsong range; undefined = its default.
       subsongIndex: typeof subsong === 'number' && subsong >= 0 ? subsong : undefined,
+      // The files the player opens beside the module, by name (the runner
+      // matches the base name, case-insensitively).
+      files: Array.from(companions ?? [], ([name, data]) => ({ name, data: data.slice(0) })),
     }, [moduleData, playerData]);
   }
 

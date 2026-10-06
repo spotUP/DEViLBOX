@@ -41,19 +41,40 @@ static uint32_t audLc[4];
  *  - DMA off does NOT stop a playing channel: at each word boundary it
  *    requests AUDx if it is not pending, and goes idle once it is. A DMA on
  *    before it went idle continues the channel (no restart, no interrupt).
+ *  - AUDxDAT written to an idle channel with AUDx not pending starts it in
+ *    non-DMA mode and requests AUDx at once (UAE AUDxDAT, state 0 -> 2);
+ *    it then runs word by word as above and goes idle once AUDx is pending.
  * Players depend on this: Ben Daglish's audio handler stops a voice on
  * AUDx and only re-enables its interrupt while the voice is off - an
- * interrupt at the DMA-on write killed every note it started. */
+ * interrupt at the DMA-on write killed every note it started. Digital
+ * Sonix & Chrome starts every note with DMA off, period 1 and a write to
+ * AUDxDAT, and busy-waits for the AUDx request it raises before turning
+ * DMA on (without it the player hung on its first note, silent).
+ * The byte clock runs like UAE's states 2 and 3, in DMA mode too: the first
+ * byte starts the line after the start interrupt (state 5), each byte lasts
+ * the period AUDxPER holds when it starts, and DMA off finishes the byte
+ * playing (the player above writes period 1, then its note's period, around
+ * the request, and restarts the note or not by a few colour clocks). The boundaries are caught
+ * up to the CPU's time at every register access that depends on them, as
+ * UAE's update_audio() does. */
 enum { AUD_IDLE, AUD_STARTING, AUD_PLAYING };
 typedef struct {
   int state;
   int dmaen;
   uint16_t per;        /* AUDxPER as written (0 = 65536 colour clocks) */
-  double wordCc;       /* non-DMA mode: colour clocks to the next word boundary */
+  double startCc;      /* when DMA went on from idle (UAE state 1 until the next line) */
+  int prelude;         /* DMA started: the line before its first byte (UAE state 5) */
+  int lowByte;         /* in the word's second byte (UAE state 3) */
+  double byteEnd;      /* colour-clock time the current byte (or the prelude) ends */
 } AudState;
 static AudState aud[4];
 
-static double word_cc(int ch) { return 2.0 * (aud[ch].per ? aud[ch].per : 65536); }
+/* One byte at the channel's period; UAE (audio.c AUDxPER) runs periods
+ * under 16 as 16. */
+static double byte_cc(int ch) {
+  const uint16_t p = aud[ch].per;
+  return p == 0 ? 65536.0 : p < 16 ? 16.0 : (double)p;
+}
 
 /* ---- CIA --------------------------------------------------------------- */
 typedef struct {
@@ -77,6 +98,7 @@ static int g_sliceCycles;      /* cycles granted to the slice running now (0 = n
 static uint32_t g_frame, g_line;
 static uint32_t g_crashAddr, g_crashLen;
 static int g_crashed;
+static int g_uadeTiming;
 
 /* ======================================================================== */
 static void update_ipl(void) {
@@ -114,7 +136,51 @@ static void aud_set_lc(int ch) {
   paula_set_sample_ptr(ch, (const int8_t *)(ah_ram + (audLc[ch] & (AH_RAM_SIZE - 2))));
 }
 
+
+/* Non-DMA mode up to colour-clock time `now`: at the end of each word AUDx
+ * is requested, or, already pending, the channel goes idle (UAE
+ * audio_handler case 3). */
+static void aud_words_until(int ch, double now) {
+  AudState *a = &aud[ch];
+  const uint16_t ip = (uint16_t)(0x0080u << ch);
+  if (a->state == AUD_STARTING) {
+    /* The first line start after DMA went on: AUDx, and the line before
+     * the first byte (UAE state 1 -> 5 at hsync). */
+    const double line = ((double)(uint64_t)(a->startCc / AH_LINE_CC) + 1.0) * AH_LINE_CC;
+    if (line > now) return;
+    a->state = AUD_PLAYING;
+    a->prelude = 1;
+    a->byteEnd = line + AH_LINE_CC;
+    intreq |= ip;
+  }
+  while (a->state == AUD_PLAYING && a->byteEnd <= now) {
+    if (a->prelude) {
+      a->prelude = 0;
+      a->lowByte = 0;
+    } else if (a->dmaen) {
+      a->lowByte ^= 1;   /* DMA mode: the byte clock only (requests come from block starts) */
+    } else if (!a->lowByte) {
+      a->lowByte = 1;
+    } else {
+      if (intreq & ip) {
+        a->state = AUD_IDLE;
+        paula_dma_write((uint16_t)(1 << ch));
+        break;
+      }
+      intreq |= ip;
+      a->lowByte = 0;
+    }
+    a->byteEnd += byte_cc(ch);
+  }
+}
+
+static void aud_catch_up(void) {
+  const double now = now_cc();
+  for (int i = 0; i < 4; i++) aud_words_until(i, now);
+}
+
 static void dmacon_write(uint16_t v) {
+  aud_catch_up();
   if (v & 0x8000) dmacon |= (v & 0x7FFF); else dmacon &= (uint16_t)~v;
   /* A channel's DMA is its enable bit AND the master DMAEN. */
   for (int i = 0; i < 4; i++) {
@@ -126,16 +192,16 @@ static void dmacon_write(uint16_t v) {
     if (now) {
       if (a->state == AUD_IDLE) {
         a->state = AUD_STARTING;
+        a->startCc = now_cc();
         paula_dma_write((uint16_t)(0x8000 | bit));   /* latch LC/LEN, start output */
         (void)paula_poll_block_start(i);              /* AUDx comes at the next line */
       }
       /* still playing in non-DMA mode: it simply continues */
-    } else if (a->state == AUD_STARTING) {
-      a->state = AUD_IDLE;
+    } else if (a->state == AUD_STARTING || (a->state == AUD_PLAYING && a->prelude)) {
+      a->state = AUD_IDLE;   /* UAE: DMA off in state 1 or 5 stops the channel */
       paula_dma_write(bit);
-    } else if (a->state == AUD_PLAYING) {
-      a->wordCc = word_cc(i);
     }
+    /* AUD_PLAYING otherwise finishes the byte it is playing (byteEnd). */
   }
 }
 
@@ -144,22 +210,12 @@ static void aud_advance(void) {
   for (int i = 0; i < 4; i++) {
     AudState *a = &aud[i];
     const uint16_t ip = (uint16_t)(0x0080u << i);
-    if (a->state != AUD_PLAYING) continue;
-    if (a->dmaen) {
+    if (a->state == AUD_IDLE) continue;
+    if (a->state == AUD_PLAYING && a->dmaen) {
       if (paula_poll_block_start(i)) intreq |= ip;   /* block repeat */
-      if (!paula_is_active(i)) a->state = AUD_IDLE;   /* empty latch */
-      continue;
+      if (!paula_is_active(i)) { a->state = AUD_IDLE; continue; }   /* empty latch */
     }
-    a->wordCc -= g_ccPerSample;
-    while (a->wordCc <= 0.0) {
-      if (intreq & ip) {
-        a->state = AUD_IDLE;
-        paula_dma_write((uint16_t)(1 << i));
-        break;
-      }
-      intreq |= ip;
-      a->wordCc += word_cc(i);
-    }
+    aud_words_until(i, g_cc);
   }
 }
 
@@ -168,7 +224,7 @@ static void custom_write16(uint32_t reg, uint16_t v) {
   switch (reg) {
     case 0x096: dmacon_write(v); break;
     case 0x09A: if (v & 0x8000) intena |= (v & 0x7FFF); else intena &= (uint16_t)~v; update_ipl(); break;
-    case 0x09C: if (v & 0x8000) intreq |= (v & 0x7FFF); else intreq &= (uint16_t)~v; update_ipl(); break;
+    case 0x09C: aud_catch_up(); if (v & 0x8000) intreq |= (v & 0x7FFF); else intreq &= (uint16_t)~v; update_ipl(); break;
     default:
       if (reg >= 0x0A0 && reg < 0x0E0) {
         const int ch = (int)((reg - 0x0A0) >> 4);
@@ -178,7 +234,21 @@ static void custom_write16(uint32_t reg, uint16_t v) {
           case 0x4: paula_set_length(ch, v); break;
           case 0x6: aud[ch].per = v; paula_set_period(ch, v); break;
           case 0x8: paula_set_volume(ch, (uint8_t)((v & 0x7F) > 64 ? 64 : (v & 0x7F))); break;
-          default: break;  /* AUDxDAT: DMA mode only */
+          case 0xA: {   /* AUDxDAT */
+            aud_catch_up();
+            AudState *a = &aud[ch];
+            const uint16_t ip = (uint16_t)(0x0080u << ch);
+            if (a->state == AUD_IDLE && !a->dmaen && !(intreq & ip)) {
+              a->state = AUD_PLAYING;
+              a->prelude = 0;
+              a->lowByte = 0;
+              a->byteEnd = now_cc() + byte_cc(ch);
+              intreq |= ip;
+              update_ipl();
+            }
+            break;
+          }
+          default: break;
         }
       }
       break;  /* ADKCON, copper, blitter, display: not sound */
@@ -192,7 +262,7 @@ static uint16_t custom_read16(uint32_t reg) {
     case 0x004: beam(&v, &h); return (uint16_t)(0x2000 | ((v >> 8) & 1));  /* ECS Agnus id $20, PAL */
     case 0x006: beam(&v, &h); return (uint16_t)(((v & 0xFF) << 8) | (h & 0xFF));
     case 0x01C: return intena;
-    case 0x01E: return intreq;
+    case 0x01E: aud_catch_up(); return intreq;
     default: return 0;
   }
 }
@@ -368,8 +438,6 @@ static void advance_beam(double ccStart, double ccEnd) {
   while ((uint64_t)g_line < lineEnd) {
     g_line++;
     cia_tod_pulse(&ciaB);
-    for (int i = 0; i < 4; i++)
-      if (aud[i].state == AUD_STARTING) { aud[i].state = AUD_PLAYING; intreq |= (uint16_t)(0x0080u << i); }
     if (g_line % AH_FRAME_LINES == 0) {
       g_frame++;
       cia_tod_pulse(&ciaA);
@@ -454,6 +522,29 @@ void ah_reset(int sampleRate) {
 
   m68k_init();
   m68k_set_cpu_type(M68K_CPU_TYPE_68020);
+  if (g_uadeTiming) {
+    /* Every instruction costs 4 colour clocks, as in UADE (uademain.c
+     * m68k_speed = 4: newcpu.c replaces each instruction's cycle count by
+     * 4, in colour clocks). */
+    static uint8_t uadeCycles[0x10000], uadeExceptions[256];
+    const uint8_t four = (uint8_t)(4.0 * AH_CPU_HZ / AH_PAULA_HZ + 0.5);
+    if (!uadeCycles[0]) {
+      memset(uadeCycles, four, sizeof uadeCycles);
+      /* An exception instruction (TRAP, CHK, ...) is one instruction; an
+       * interrupt costs nothing (UAE Interrupt() takes no cycles). */
+      memset(uadeExceptions, four, sizeof uadeExceptions);
+      memset(uadeExceptions + 24, 0, 8);   /* spurious + autovectors 1-7 */
+      memset(uadeExceptions + 64, 0, 192); /* user interrupt vectors */
+    }
+    m68ki_cpu.cyc_instruction = uadeCycles;
+    m68ki_cpu.cyc_exception = uadeExceptions;
+    /* No per-operand extras (shift count, MOVEM registers, branch taken). */
+    m68ki_cpu.cyc_bcc_notake_b = m68ki_cpu.cyc_bcc_notake_w = 0;
+    m68ki_cpu.cyc_dbcc_f_noexp = m68ki_cpu.cyc_dbcc_f_exp = 0;
+    m68ki_cpu.cyc_scc_r_true = 0;
+    m68ki_cpu.cyc_movem_w = m68ki_cpu.cyc_movem_l = 0;
+    m68ki_cpu.cyc_shift = 0;
+  }
   m68k_pulse_reset();
   m68k_set_reg(M68K_REG_SR, 0x2000);   /* supervisor, all levels open */
   m68k_set_irq(0);
@@ -471,6 +562,7 @@ void ah_set_voice_mask(uint32_t mask) {
 }
 
 double ah_colour_clocks(void) { return now_cc(); }
+void ah_set_uade_timing(int on) { g_uadeTiming = on ? 1 : 0; }
 uint16_t ah_intena(void) { return intena; }
 uint32_t ah_cia_timer_irqs(int cia, int timer) {
   const Cia *c = cia ? &ciaB : &ciaA;

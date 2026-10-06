@@ -323,12 +323,13 @@ export async function renderToSamples(
 export async function renderFileToSamples(
   data: Uint8Array,
   filename: string,
-  opts: { sampleRate: number; seconds: number; verbose?: boolean },
+  opts: { sampleRate: number; seconds: number; verbose?: boolean; companions?: Companion[] },
 ): Promise<RenderResult> {
   const mod = await loadUADEModule(opts.verbose);
   const initRet = mod._uade_wasm_init(opts.sampleRate);
   if (initRet !== 0) throw new Error(`_uade_wasm_init failed (ret=${initRet})`);
   try {
+    if (opts.companions?.length) addCompanions(mod, opts.companions);
     return await renderToSamples(mod, data, filename, opts);
   } finally {
     try { mod._uade_wasm_cleanup(); } catch { /* ignore */ }

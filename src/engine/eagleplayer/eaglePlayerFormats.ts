@@ -28,6 +28,8 @@ export interface EaglePlayerFormat {
   options?: string;
   /** A corpus song: the render test and the UADE comparison play it. */
   corpus: string;
+  /** Files beside the corpus song the player opens (smp.<tune>, SMPL.<tune>); the app passes them from the companion resolver. */
+  companions?: string[];
   /**
    * 100 ms loudness-envelope correlation with UADE (mono sum - UADE renders
    * with panning 1.0), 30 s or to the player's song end, when it was switched.
@@ -45,29 +47,51 @@ export interface EaglePlayerFormat {
 export const EAGLE_PLAYER_FORMATS: Readonly<Record<string, EaglePlayerFormat>> = {
   Anders0land: {
     id: 'Anders0land', label: 'Anders 0land', player: 'Anders_0land', prefixes: ['hot'], voices: 4,
-    corpus: 'public/data/songs/anders-oland/primemover 07.hot', uadeEnvelopeCorrelation: 0.9956, isDefault: true,
+    corpus: 'public/data/songs/anders-oland/primemover 07.hot', uadeEnvelopeCorrelation: 0.9916, isDefault: true,
   },
   BenDaglish: {
     id: 'BenDaglish', label: 'Ben Daglish', player: 'BenDaglish', prefixes: ['bd'], voices: 4,
-    corpus: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd', uadeEnvelopeCorrelation: 0.9982,
+    corpus: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd', uadeEnvelopeCorrelation: 0.9977,
     isDefault: false,
     heldBecause: 'BdEngine (bd-wasm, a C port) plays Ben Daglish today with live instrument editing; it measures 0.948 / 0.984 against UADE, this runner 0.999 / 0.998. Moving trades the editing for fidelity - the owner decides.',
   },
   CoreDesign: {
     id: 'CoreDesign', label: 'Core Design', player: 'CoreDesign', prefixes: ['core'], voices: 4,
-    corpus: 'public/data/songs/core-design/dynamite dux.core', uadeEnvelopeCorrelation: 0.9969, isDefault: true,
+    corpus: 'public/data/songs/core-design/dynamite dux.core', uadeEnvelopeCorrelation: 0.9996, isDefault: true,
   },
   DaveLowe: {
     id: 'DaveLowe', label: 'Dave Lowe', player: 'DaveLowe', prefixes: ['dl'], voices: 4,
-    corpus: 'public/data/songs/dave-lowe/incredibleshrinkingsphere.dl', uadeEnvelopeCorrelation: 0.9948, isDefault: true,
+    corpus: 'public/data/songs/dave-lowe/incredibleshrinkingsphere.dl', uadeEnvelopeCorrelation: 0.9951, isDefault: true,
   },
   DaveLoweNew: {
     id: 'DaveLoweNew', label: 'Dave Lowe New', player: 'DaveLoweNew', prefixes: ['dln'], voices: 4,
-    corpus: 'public/data/songs/dave-lowe-new/m-bison.dln', uadeEnvelopeCorrelation: 0.9909, isDefault: true,
+    corpus: 'public/data/songs/dave-lowe-new/m-bison.dln', uadeEnvelopeCorrelation: 0.9946, isDefault: true,
   },
   WallyBeben: {
     id: 'WallyBeben', label: 'Wally Beben', player: 'WallyBeben', prefixes: ['wb'], voices: 4,
-    corpus: 'public/data/songs/wally-beben/wicked.wb', uadeEnvelopeCorrelation: 0.9845, isDefault: true,
+    corpus: 'public/data/songs/wally-beben/wicked.wb', uadeEnvelopeCorrelation: 0.9958, isDefault: true,
+  },
+  BenDaglishSID: {
+    id: 'BenDaglishSID', label: 'Ben Daglish SID', player: 'BenDaglish-SID', prefixes: ['bds'], voices: 4,
+    corpus: 'public/data/songs/ben-daglish-sid/terramex.bds', uadeEnvelopeCorrelation: 0.965,
+    isDefault: true,
+  },
+  BeathovenSynthesizer: {
+    id: 'BeathovenSynthesizer', label: 'Beathoven Synthesizer', player: 'BeathovenSynthesizer', prefixes: ['bss'], voices: 4,
+    corpus: 'public/data/songs/beathoven-synthesizer/tristar cracktro.bss', uadeEnvelopeCorrelation: 0.9836,
+    isDefault: true,
+  },
+  SoundPlayer: {
+    id: 'SoundPlayer', label: 'Sound Player', player: 'SoundPlayer', prefixes: ['sjs'], voices: 4,
+    corpus: 'public/data/songs/formats/Scott Johnston/sjs.tune1', uadeEnvelopeCorrelation: 0.9986,
+    companions: ['public/data/songs/formats/Scott Johnston/smp.tune1'],
+    isDefault: true,
+  },
+  MIDILoriciel: {
+    id: 'MIDILoriciel', label: 'MIDI Loriciel', player: 'MIDI-Loriciel', prefixes: ['midi'], voices: 4,
+    corpus: 'public/data/songs/formats/Michel Winogradoff/MIDI.Cartoons 1', uadeEnvelopeCorrelation: 0.9836,
+    companions: ['public/data/songs/formats/Michel Winogradoff/SMPL.Cartoons 1'],
+    isDefault: true,
   },
 };
 
