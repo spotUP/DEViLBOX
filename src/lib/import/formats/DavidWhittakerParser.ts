@@ -175,7 +175,7 @@ interface DWParseResult {
  * This implements a simplified version of DWPlayer.js loader() using the
  * same opcode scan approach.
  */
-function scanDWStructures(buf: Uint8Array): DWParseResult | null {
+export function scanDWStructures(buf: Uint8Array): DWParseResult | null {
   let base = 0;
   let variant = 0;
   let songsHeaders = 0;  // offset to songs table (speed + track pointers)
@@ -186,6 +186,7 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
   let readLen = 2;   // bytes per track pointer (2 = u16, 4 = u32)
   let flag = false;  // determines song header format (speed as u8+delay vs u16)
   let channels = 4;
+  let initRoutine = 0;
 
   // ── First pass: scan for base, song headers (before first rts) ──────────
   let pos = 0;
@@ -215,6 +216,11 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
       }
       case 0x6100: {  // bsr.w
         pos += 2;
+        // FlodJS: `info` = the init routine the bsr.w reaches (a following
+        // bsr.w wins). The sample-table scan runs inside THAT routine, not
+        // after the first rts.
+        initRoutine = pos;
+        if (u16BE(buf, pos) === 0x6100) initRoutine = pos + 2 + u16BE(buf, pos + 2);
         if (u16BE(buf, pos - 4) === 0x6100) pos += 2;
         break;
       }
@@ -304,7 +310,8 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
     let sampleHeaders = 0;
     let sampleTotal = 0;
     let sampleSize = 0;
-    let spos = pos;
+    // FlodJS starts in the init routine (tst.b x(a3) first), not after the first rts.
+    let spos = (initRoutine > 0 && initRoutine + 2 < buf.length && u16BE(buf, initRoutine) === 0x4a2b) ? initRoutine + 2 : pos;
     let limit2 = 0;
     while (spos < buf.length - 20 && limit2++ < 4096) {
       const val2 = u16BE(buf, spos);

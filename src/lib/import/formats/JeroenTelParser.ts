@@ -41,7 +41,7 @@ import { amigaNoteToXM } from './AmigaUtils';
 const MIN_FILE_SIZE = 1701;
 
 /** Maximum number of instruments to create as placeholders. */
-const MAX_INSTRUMENTS = 36;
+const MAX_INSTRUMENTS = 128;
 
 // ── Format detection ───────────────────────────────────────────────────────
 
@@ -195,13 +195,32 @@ function scanJTDataPointers(buf: Uint8Array): JTDataPointers | null {
   return { origin, trackTableOff, subsongTableOff, sampleTableOff };
 }
 
+/**
+ * Number of instruments = highest non-null slot of the sample pointer table + 1.
+ * The table's slots run up to the first record it points at (the records follow it
+ * directly; the player's own count `Infos` is (firstRecord - (table + 4)) / 4).
+ */
+function countSampleTableEntries(buf: Uint8Array, ptrs: JTDataPointers): number {
+  const t = ptrs.sampleTableOff;
+  if (t + 4 > buf.length) return 0;
+  const firstAbs = readLong(buf, t);
+  const firstOff = (firstAbs - ptrs.origin) >>> 0;
+  if (firstOff <= t || firstOff > buf.length) return 0;
+  const slots = (firstOff - t - 4) >> 2; // the player's own `Infos`
+  let last = 0;
+  for (let i = 0; i < slots; i++) {
+    if (readLong(buf, t + i * 4) !== 0) last = i + 1;
+  }
+  return last;
+}
+
 // ── Track data parsing ────────────────────────────────────────────────────
 
 /** A single entry decoded from a JT track byte stream. */
 interface JTTrackEntry {
   duration: number;   // bits 0-4 of the command byte (0-31 ticks)
   note: number;       // raw note value (0 = none)
-  instrument: number; // instrument index (0 = no change)
+  instrument: number; // sample table index (-1 = no change)
   volume: number;     // volume override (0 = no change, 1-127 = value)
   slide: number;      // portamento speed (0 = none)
 }
@@ -249,12 +268,12 @@ function parseJTTrack(buf: Uint8Array, trackOff: number): JTTrackEntry[] {
       pos++;
       if (pos >= len || buf[pos] === 0xFF) break;
       // Otherwise this is just a rest/spacer row with the given duration
-      entries.push({ duration, note: 0, instrument: 0, volume, slide: 0 });
+      entries.push({ duration, note: 0, instrument: -1, volume, slide: 0 });
       continue;
     }
 
     let note = 0;
-    let instrument = 0;
+    let instrument = -1;
     let slide = 0;
 
     if (typeBits === 0x40) {
@@ -421,10 +440,12 @@ export async function parseJeroenTelFile(
 
   // ── Instrument count from scan ─────────────────────────────────────────────
 
-  const scanPos = findJeroenTelScanPos(buf);
-  // scanPos is guaranteed valid because isJeroenTelFormat passed
-  const rawInstrumentCount = buf[scanPos + 9]; // D1 in the assembly (1..127)
-  const numInstruments = Math.min(rawInstrumentCount, MAX_INSTRUMENTS);
+  // The byte at scanPos+9 is the BNE displacement of the detection check, NOT an
+  // instrument count. The replayer picks table[byte] for an instrument change
+  // (lbC000162: ASL.W #2,D1 / move.l 0(A4,D1.W),A4), so the instruments are the
+  // pointer slots of the sample table the player loads with `lea x,a4` (0x49F9).
+  const ptrs = scanJTDataPointers(buf);
+  const numInstruments = Math.min(ptrs ? countSampleTableEntries(buf, ptrs) : 0, MAX_INSTRUMENTS);
 
   // ── Instrument placeholders ──────────────────────────────────────────────
 
@@ -455,8 +476,6 @@ export async function parseJeroenTelFile(
   }
 
   // ── Scan for data pointers ──────────────────────────────────────────────
-
-  const ptrs = scanJTDataPointers(buf);
 
   // ── Build patterns ──────────────────────────────────────────────────────
 
@@ -554,7 +573,7 @@ export async function parseJeroenTelFile(
 
           rows.push({
             note: clampedNote,
-            instrument: entry.instrument > 0 ? entry.instrument + 1 : 0,
+            instrument: entry.instrument >= 0 ? entry.instrument + 1 : 0,
             volume: entry.volume > 0 ? (0x10 + Math.min(entry.volume, 64)) : 0,
             effTyp: entry.slide > 0 ? 0x03 : 0,
             eff: entry.slide > 0 ? Math.min(entry.slide, 0xFF) : 0,
