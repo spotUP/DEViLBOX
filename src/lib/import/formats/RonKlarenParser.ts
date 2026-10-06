@@ -943,6 +943,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     numPatterns: trackerPatterns.length,
     moduleSize: bytes.byteLength,
     encodeCell: encodeRonKlarenCell,
+    encodeOverStored: true,
     decodeCell: (raw: Uint8Array): TrackerCell => {
       // 2 bytes: noteIdx, waitCount
       const noteIdx = raw[0];
