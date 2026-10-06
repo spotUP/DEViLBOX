@@ -308,3 +308,10 @@ Phase 2 candidate (2026-10-05): tick-rebuilt grids on the generic UADE route bea
 
 - Mute/solo confirmed by ear (owner, 2026-10-05) on Art Of Noise, Ben Daglish, Music Assembler, JamCracker, Future Player, SidMon 1, SidMon 2, StarTrekker AM (UADE). Not heard: SteveTurner (no corpus song), PumaTracker (render hang - agent on it).
 - Scope view survives the dub bus (analyser holds, d5d74601b). Per-channel dub for gme/aylet/psgplay/TFM/S98 via WASMChannelOutputsEngine: proposed, awaiting owner go.
+
+## 2026-10-06
+
+- Commit 8687b8932 (message: eagleplayer UADE-scanned grids) ALSO contains the PumaTracker route fix (.puma -> our parser + PumaTracker WASM first, libopenmpt only on refusal; src/lib/import/__tests__/pumaRoutesToOwnEngine.test.ts): a concurrent `git commit` took the shared index. Rule for all sessions: commit with explicit paths (`git commit -- <paths>`).
+- Heard (owner): Wally Beben, Dave Lowe, Dave Lowe New, Anders 0land (hot.primemover_01), DSS zrimay - right. Wally Beben grid bogus (phase 2). SAP warhawk plays at double speed (open). Core Design / primemover 07.hot silent in app -> fixed in 8687b8932 (to re-listen).
+- Face The Music routed to our replayer (3c36dfb48, owner). Ben Daglish stays on BdEngine, to be brought to the runner's fidelity (owner) - agent running.
+- TextEncoder worklet prelude restored (9b3f7b78b); no freeze on play (owner).
