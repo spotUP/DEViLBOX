@@ -811,8 +811,21 @@ export async function tryRouteFormat(
   }
 
   // ── Chuck Biscuits / Black Artist ────────────────────────────────────────
-  // .cba files — OpenMPT
+  // .cba files — Atari ST format; UADE (Amiga) cannot play it. Honours the
+  // 'native' setting (own parser, libopenmpt plays it), else libopenmpt parses.
   if (matchesExt(filename, ['cba'])) {
+    if (prefs.chuckBiscuits === 'native') {
+      try {
+        const { isChuckBiscuitsFormat, parseChuckBiscuitsFile } = await import('@lib/import/formats/ChuckBiscuitsParser');
+        const bytes = new Uint8Array(buffer);
+        if (isChuckBiscuitsFormat(bytes)) {
+          const result = parseChuckBiscuitsFile(bytes, originalFileName);
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
+        }
+      } catch (err) {
+        console.warn(`[ChuckBiscuitsParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+      }
+    }
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
     const song = await parseWithOpenMPT(buffer, originalFileName);
     song.libopenmptFileData = buffer.slice(0);

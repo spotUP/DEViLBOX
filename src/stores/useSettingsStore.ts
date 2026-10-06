@@ -63,7 +63,7 @@ export interface FormatEnginePreferences {
   // Additional Amiga formats with native parsers
   graoumfTracker2: FormatEngineChoice;    // .gt2/.gtk → GraoumfTracker2Parser vs UADE
   symphoniePro: FormatEngineChoice;       // .symmod → SymphonieProParser vs UADE
-  chuckBiscuits: FormatEngineChoice;      // .cba → ChuckBiscuitsParser vs UADE
+  chuckBiscuits: FormatEngineChoice;      // .cba → ChuckBiscuitsParser vs libopenmpt (UADE cannot play it)
   speedySystem: FormatEngineChoice;       // .ss → SpeedySystemParser vs UADE
   tronic: FormatEngineChoice;             // .trc/.dp/.tro → TronicParser vs UADE
   suntronic: FormatEngineChoice;          // .sun/.tsm → SunTronic/TSM via UADE
@@ -311,7 +311,7 @@ export const useSettingsStore = create<SettingsStore>()(
         uax: 'native',              // UAXParser — Unreal Audio Package sound ripper  // PC format: UADE cannot play it (2026-10-05)
         graoumfTracker2: 'uade',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
         symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
-        chuckBiscuits: 'uade',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
+        chuckBiscuits: 'native',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support  // Atari ST format: UADE (Amiga) cannot play it
         speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
         tronic: 'uade',             // TronicParser — no native parser; always UADE
         suntronic: 'native',        // SunTronicV13Parser — native editable engine (V1.3); UADE = offline oracle only
@@ -616,7 +616,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 12,
+      version: 13,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -652,6 +652,14 @@ export const useSettingsStore = create<SettingsStore>()(
               if (fe[key] === 'uade') fe[key] = 'native';
             }
           }
+        }
+        if (version < 13) {
+          // v13: Chuck Biscuits (.cba, Atari ST) defaulted to 'uade' while the
+          // import route ignored the setting and always used libopenmpt; UADE
+          // is an Amiga player and cannot play it. The route now honours the
+          // setting, so a stored 'uade' becomes 'native'.
+          const fe = s.formatEngine as Record<string, unknown> | undefined;
+          if (fe && fe.chuckBiscuits === 'uade') fe.chuckBiscuits = 'native';
         }
         if (version < 8) {
           // v8: SunTronic default changed from 'uade' to 'native' (native
