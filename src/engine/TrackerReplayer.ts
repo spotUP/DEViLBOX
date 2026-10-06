@@ -378,6 +378,8 @@ export interface TrackerSong {
   eaglePlayerFileData?: ArrayBuffer;
   /** Which eagleplayer (EAGLE_PLAYER_FORMATS key, src/engine/eagleplayer/eaglePlayerFormats.ts) */
   eaglePlayerId?: string;
+  /** The module's own file name, which the eagleplayer opens it by. */
+  eaglePlayerFileName?: string;
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */
   startrekkerAMFileData?: ArrayBuffer;
   /** Raw Startrekker AM .nt synth data for StartrekkerAMEngine WASM playback */
