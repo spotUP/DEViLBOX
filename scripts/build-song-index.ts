@@ -18,9 +18,9 @@
  *     npx tsx scripts/build-song-index.ts
  */
 import { readdirSync, statSync, writeFileSync, openSync, readSync, closeSync } from 'node:fs';
-import { join, relative, basename, dirname } from 'node:path';
+import { join, relative, basename, dirname, sep } from 'node:path';
 import { FORMAT_REGISTRY, detectFormat, detectFormatFromContent } from '../src/lib/import/FormatRegistry';
-import { companionFilesIn, isInSampleDirectory, partnerlessFilesIn } from '../src/lib/import/companionResolver';
+import { companionFilesIn, isInSampleDirectory, isNonSongAsset, partnerlessFilesIn } from '../src/lib/import/companionResolver';
 
 const ROOT = process.cwd();
 const SONGS_ROOT = join(ROOT, 'public/data/songs');
@@ -190,7 +190,7 @@ function isCompanionFile(f: string): boolean {
   return up !== own && companionsIn(up).has(relative(up, f).toLowerCase());
 }
 function withoutCompanions(_dir: string, files: string[]): string[] {
-  return files.filter((f) => !isInSampleDirectory(relative(SONGS_ROOT, f)) && !isCompanionFile(f));
+  return files.filter((f) => !isInSampleDirectory(relative(SONGS_ROOT, f)) && !isNonSongAsset(relative(SONGS_ROOT, f).split(sep).join('/')) && !isCompanionFile(f));
 }
 
 function addRows(dirLabel: string, dir: string, allFiles: string[], subformat?: string): void {

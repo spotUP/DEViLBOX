@@ -86,6 +86,20 @@ export function isInSampleDirectory(relPath: string): boolean {
   return parts.slice(0, -1).some((d) => SAMPLE_DIR_NAMES.has(d.toLowerCase()));
 }
 
+/**
+ * Files that sit in a song directory but are not songs. The DefleMask corpus
+ * holds only `.dmf` modules; its folders also carry wavetable (`.dmw`), FM
+ * patch (`.fdm`) and archive (`.zip`) assets that no format claims. The song
+ * index offered them as an undetected row ("deflemask / CrazySoundEnginer" =
+ * four zips) and the jukebox could not load it (2026-10-06).
+ * `relPath` is `/`-separated, relative to public/data/songs.
+ */
+export function isNonSongAsset(relPath: string): boolean {
+  const lower = relPath.toLowerCase();
+  if (/\.(dmw|dmp)$/.test(lower)) return true;
+  return lower.startsWith('deflemask/') && !lower.endsWith('.dmf');
+}
+
 /** The shared sample bank SynthDream and SynthPack keep per directory. */
 export const SHARED_BANK = 'smp.set';
 
