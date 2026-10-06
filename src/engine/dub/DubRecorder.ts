@@ -16,7 +16,9 @@
  */
 
 import { subscribeDubRouter, subscribeDubRelease } from './DubRouter';
-import { subscribeChannelSend } from '@/lib/dub/channelSendStream';
+import { subscribeChannelSend, subscribeChannelShape } from '@/lib/dub/channelSendStream';
+import { encodeChannelShapeLane, channelShapeMoveTarget } from '@/lib/dub/channelShape';
+import { useMixerStore } from '@/stores/useMixerStore';
 import { scheduleDubStoreSync, useDubStore } from '@/stores/useDubStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
@@ -82,6 +84,47 @@ const TRIGGER_SPIKE_WIDTH_ROWS = 0.05;
 
 /** Last point written per channel, so a ride is thinned rather than transcribed. */
 const lastSendPoint = new Map<number, { row: number; value: number }>();
+
+/**
+ * The parameter a channel's sound-shaping slot is recorded as
+ * (`dub.shapeSlot`, channel in the curve's `channelIndex`, a STEP curve whose
+ * value is `encodeChannelShapeLane`). It carries both the user choosing the
+ * slot and a live `channelShape` move: a move curve stores only on/off, which
+ * would replay the move at its default effect, so a shape move is recorded as
+ * the slot it held and the slot it handed back.
+ */
+export const SHAPE_SLOT_PARAM = 'shapeSlot';
+/** Lane-value change below which a knob turn writes no new point (a 1/700 of the lane). */
+const SHAPE_POINT_EPSILON = 0.0015;
+const lastShapePoint = new Map<number, number>();
+/** Live channelShape holds waiting for their release row. */
+const pendingShapeHolds = new Map<string, number>();
+
+function writeShapePoint(channelId: number, row: number, laneValue: number): void {
+  scheduleDubStoreSync(() => {
+    const tracker = useTrackerStore.getState();
+    const pattern = tracker.patterns[tracker.currentPatternIndex];
+    if (!pattern) return;
+    const store = useAutomationStore.getState();
+    const param = `dub.${SHAPE_SLOT_PARAM}` as AutomationParameter;
+    let curveId = store.getCurvesForPattern(pattern.id, channelId).find(c => c.parameter === param)?.id ?? null;
+    if (!curveId) {
+      curveId = store.addCurve(pattern.id, channelId, param);
+      // Steps: a slot is a choice, and interpolating between two kinds'
+      // bands would pass through every kind in between.
+      if (curveId) store.updateCurve(curveId, { mode: 'steps' });
+    }
+    if (!curveId) return;
+    store.addPoint(curveId, row, laneValue);
+    if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
+  });
+}
+
+/** The user's own slot on a channel, as a lane value. */
+function storedShapeLane(channelId: number): number {
+  const ch = useMixerStore.getState().channels[channelId];
+  return encodeChannelShapeLane(ch?.dubShape ?? 'off', ch?.dubShapeValue ?? 0);
+}
 
 /** Find or create an automation curve for (patternId, channelIndex, 'dub.moveId').
  *  Returns '' if addCurve triggers a format-violation dialog (deferred). */
@@ -165,6 +208,18 @@ export function startDubRecorder(): () => void {
 
     const isTimeMode = currentSongIsTimeBasedLane();
     if (isTimeMode) return; // time-mode songs have no automation rows
+
+    // A live shape move: record the slot it holds, and (on release) the slot
+    // it hands back — see SHAPE_SLOT_PARAM.
+    if (fireEvent.moveId === 'channelShape') {
+      const ch = fireEvent.channelId;
+      if (ch === undefined || ch < 0) return;
+      const target = channelShapeMoveTarget(fireEvent.params ?? {});
+      if (!target) return;
+      writeShapePoint(ch, fireEvent.row, encodeChannelShapeLane(target.kind, target.value));
+      pendingShapeHolds.set(fireEvent.invocationId, ch);
+      return;
+    }
 
     scheduleDubStoreSync(() => {
       const tracker = useTrackerStore.getState();
@@ -254,6 +309,12 @@ export function startDubRecorder(): () => void {
 
   const unsubRelease = subscribeDubRelease((releaseEvent) => {
     if (releaseEvent.source !== 'live') return;
+    const shapeCh = pendingShapeHolds.get(releaseEvent.invocationId);
+    if (shapeCh !== undefined) {
+      pendingShapeHolds.delete(releaseEvent.invocationId);
+      writeShapePoint(shapeCh, releaseEvent.row, storedShapeLane(shapeCh));
+      return;
+    }
     const pending = pendingHolds.get(releaseEvent.invocationId);
     if (!pending) return;
     pendingHolds.delete(releaseEvent.invocationId);
@@ -319,12 +380,28 @@ export function startDubRecorder(): () => void {
     });
   });
 
+  /** The slot, chosen by hand: same permission and thinning as the send ride. */
+  const unsubShape = subscribeChannelShape((write) => {
+    if (write.source !== 'live') return;
+    if (!useDubStore.getState().armed) return;
+    if (currentSongIsTimeBasedLane()) return;
+    if (write.channelId < 0) return;
+    const lane = encodeChannelShapeLane(write.kind, write.value);
+    const previous = lastShapePoint.get(write.channelId);
+    if (previous !== undefined && Math.abs(previous - lane) < SHAPE_POINT_EPSILON) return;
+    lastShapePoint.set(write.channelId, lane);
+    writeShapePoint(write.channelId, write.row, lane);
+  });
+
   return () => {
     unsubFire();
     unsubRelease();
     unsubSend();
+    unsubShape();
     pendingHolds.clear();
+    pendingShapeHolds.clear();
     lastSendPoint.clear();
+    lastShapePoint.clear();
   };
 }
 

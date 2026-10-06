@@ -30,6 +30,7 @@ import { getDevilboxAudioContext } from '../../utils/audio-context';
 import { applyEphemeralDubSettings } from '../../lib/dub/measurementSettings';
 import type { EphemeralDubSettings, EphemeralDubSettingsTarget } from '../../lib/dub/measurementSettings';
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
+import { isChannelShapeKind } from '../../lib/dub/channelShape';
 import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths, testMAMESynths } from '../../utils/synthTester';
 
 // ─── Note Parsing ──────────────────────────────────────────────────────────────
@@ -410,8 +411,18 @@ export function setChannelSolo(params: Record<string, unknown>): Record<string, 
 // between drumpad pads, DJ decks, and tracker channels.
 
 export function setChannelDubSend(params: Record<string, unknown>): Record<string, unknown> {
-  useMixerStore.getState().setChannelDubSend(params.channel as number, params.amount as number);
-  return { ok: true };
+  const ch = params.channel as number;
+  const store = useMixerStore.getState();
+  if (typeof params.amount === 'number') store.setChannelDubSend(ch, params.amount);
+  if (params.shape !== undefined) {
+    if (!isChannelShapeKind(params.shape)) return { ok: false, error: `unknown shape '${String(params.shape)}'` };
+    store.setChannelDubShape(ch, params.shape, typeof params.shapeValue === 'number' ? params.shapeValue : undefined);
+  } else if (typeof params.shapeValue === 'number') {
+    const cur = store.channels[ch];
+    if (cur) store.setChannelDubShape(ch, cur.dubShape, params.shapeValue);
+  }
+  const after = useMixerStore.getState().channels[ch];
+  return { ok: true, dubSend: after?.dubSend, shape: after?.dubShape, shapeValue: after?.dubShapeValue };
 }
 
 /**
