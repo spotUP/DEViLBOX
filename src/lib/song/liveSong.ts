@@ -83,6 +83,7 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     eaglePlayerId: fmt.eaglePlayerId ?? undefined,
     eaglePlayerFileName: fmt.eaglePlayerFileName ?? undefined,
     eaglePlayerSubsong: fmt.eaglePlayerSubsong ?? undefined,
+    eaglePlayerTickGrid: fmt.eaglePlayerTickGrid ?? undefined,
     uadeCompanionFiles: fmt.uadeCompanionFiles ?? undefined,
     adplugTicksPerRow: fmt.adplugTicksPerRow ?? undefined,
     c64MemPatches: fmt.c64MemPatches ?? undefined,

@@ -3,9 +3,11 @@
  * by Loriciel's own player (Entity, 1993), with a BNKS sample bank beside it
  * (SMPL.<tune> / <tune>.BSP).
  *
- * The grid is the player's schedule, not a quantised MIDI import: one row per
- * player interrupt, one channel per Paula voice, and every cell is what the
- * player writes to that voice on that interrupt. Reverse-engineered from
+ * The grid is the player's schedule, not a quantised MIDI import: rows of
+ * MIDI time (a 16th, or the finer division the song's note-ons need), one
+ * tracker tick per player interrupt (speed = interrupts per row), one channel
+ * per Paula voice, and every event at its row with its note delay (EDx) -
+ * when the player plays it, to the interrupt (loricielLayout). Reverse-engineered from
  * third-party/uade-3.05/amigasrc/players/wanted_team/MIDI-Loriciel/
  * "MIDI - Loriciel_v1.asm" and checked against the runner and UADE's Paula log;
  * the full map is thoughts/shared/research/2026-10-06_midi-loriciel-format.md.
@@ -459,25 +461,14 @@ export function findLoricielBank(filename: string, companions?: Map<string, Arra
   return pick ? new Uint8Array(pick) : null;
 }
 
-/** Rows per grid pattern: one bar at the file's first time signature (4/4 by default). */
-function rowsPerBar(midi: MidiData, division: number): number {
-  const ppq = division & 0x8000 ? 0xC0 : division;
-  let num = 4, den = 4;
-  for (const e of midi.tracks[0] ?? []) {
-    if (e.type === 'timeSignature') { num = e.numerator; den = e.denominator; break; }
-    if (e.deltaTime > 0) break;
-  }
-  const rows = Math.round((ppq * num * 4) / den / LORICIEL_TICKS_PER_INTERRUPT);
-  if (rows >= 16 && rows <= 256) return rows;
-  const beat = Math.round(ppq / LORICIEL_TICKS_PER_INTERRUPT);
-  return beat >= 16 && beat <= 256 ? beat : 64;
-}
-
 export const LORICIEL_NOTE_OFF = 97;
-/** Effect F: the BPM a tempo event sets (2.5 x the interrupt rate at speed 1). */
+/** Effect F: set BPM (a tempo event after the start). */
 const EFFECT_SET_SPEED = 0x0F;
+/** Effect E, sub-command D: note delay, in ticks (here: player interrupts). */
+const EFFECT_EXTENDED = 0x0E;
+const EXT_NOTE_DELAY = 0xD0;
 
-/** The song's BPM at speed 1 (one row per interrupt): 2.5 x the interrupt rate. */
+/** The song's BPM: one tracker tick per player interrupt, 2.5 x the interrupt rate. */
 export function loricielBpm(timer: number): number {
   return Math.max(32, Math.min(999, Math.round(loricielInterruptHz(timer) * 2.5)));
 }
@@ -498,132 +489,169 @@ export function loricielGridNote(periodIndex: number): number {
   return pitch >= 1 && pitch <= 96 ? pitch : 0;
 }
 
-/**
- * A grid cell for a note-on. A period with no grid note (Cartoons 1: one
- * key read 6682 from the velocity table, two octaves below C-0) keeps its
- * instrument and volume with an empty note.
- */
-export function loricielNoteCell(n: Pick<LoricielNoteOn, 'periodIndex' | 'sample' | 'volume'>): TrackerCell {
-  return {
-    note: loricielGridNote(n.periodIndex), instrument: n.sample + 1, volume: 0x10 + n.volume,
-    effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  };
-}
-
 const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 
-/** A grid column's event: a note-on, or the note-off that stopped the voice. */
-export type LoricielCellEvent =
-  | { kind: 'on'; on: LoricielNoteOn }
-  | { kind: 'off'; off: LoricielNoteOff };
-
-/** Note columns per cell (TrackerCell note, note2, note3, note4). */
-export const LORICIEL_MAX_COLUMNS = 4;
+// ── Layout: rows of MIDI time, channels of Paula voices ──────────────────────
 
 /**
- * What each (voice, row) cell shows, in the player's order (interrupt, then
- * track, then event): every note-on the voice took in that interrupt, one
- * note column each, and the note-off that stopped it when nothing started
- * after it. A note-off followed by a note-on in the same interrupt is the
- * retrigger the note column already says. Two note-ons in one interrupt are
- * a MIDI chord the allocator put on one voice: the first one's sample is the
- * one DMA latches, the last one's period is the one that stays (the
- * research doc, "Collisions").
+ * What one grid cell holds: a note-on, the note-off that stopped the voice,
+ * or the restart's cut. `interrupt` is when the player plays it; the cell's
+ * row is interrupt / speed and its note delay (EDx) interrupt % speed.
+ * `retrigger` is a note-off of the same voice that the note-on follows in
+ * the same row (the cell's note says it).
  */
-export function loricielCellEvents(s: LoricielSchedule): Map<number, LoricielCellEvent[]> {
-  type Ev = { row: number; track: number; event: number; voice: number; ev: LoricielCellEvent };
+export type LoricielCellEvent =
+  | { kind: 'on'; interrupt: number; on: LoricielNoteOn; retrigger?: LoricielNoteOff }
+  | { kind: 'off'; interrupt: number; off: LoricielNoteOff }
+  | { kind: 'cut'; interrupt: number };
+
+export interface LoricielLayout {
+  /** MIDI ticks per row (G) and player interrupts per row (G / 4 = the song's speed). */
+  ticksPerRow: number;
+  speed: number;
+  rowsPerPattern: number;
+  /** Rows of one pass (the last row holds the restart interrupt). */
+  rows: number;
+  /** Grid channel -> Paula voice, and its slot (0 = the voice's own channel, 1.. = notes the voice took in a row it already has one). */
+  channels: { voice: number; slot: number }[];
+  /** [channel][row] -> the event the cell shows. */
+  cells: (LoricielCellEvent | undefined)[][];
+}
+
+/** Share of note-ons a row size must hold exactly; the rest carry a note delay. */
+const ROW_COVERAGE = 0.98;
+
+/**
+ * The row: the largest whole-interrupt division of a 16th (ppq / 4 ticks,
+ * a multiple of 4 ticks) on which at least 98% of the song's note-ons start
+ * (Cartoons 1/2/3/6/7/8: a 16th; Cartoons 4: a 16th; Bumpy's, Cartoons 5/9:
+ * a 16th triplet, 16 ticks). Whatever does not start on a row, or starts
+ * late because of the player's counter (a note after a gate-off fires one
+ * interrupt after its tick), is on its row with a note delay: no event is
+ * moved.
+ */
+function ticksPerRow(s: LoricielSchedule): number {
+  const ppq = s.division & 0x8000 ? 0xC0 : s.division;
+  const sixteenth = Math.floor(ppq / 4);
+  const starts = s.noteOns.map((n) => s.ticks[n.track][n.event]);
+  for (let g = sixteenth; g >= LORICIEL_TICKS_PER_INTERRUPT; g--) {
+    if (sixteenth % g || g % LORICIEL_TICKS_PER_INTERRUPT) continue;
+    if (starts.length === 0 || starts.filter((t) => t % g === 0).length >= starts.length * ROW_COVERAGE) return g;
+  }
+  return LORICIEL_TICKS_PER_INTERRUPT;
+}
+
+/** Bars per pattern: whole bars, up to 64 rows (one bar when a bar is longer). */
+function rowsPerPattern(midi: MidiData, s: LoricielSchedule, g: number): number {
+  const ppq = s.division & 0x8000 ? 0xC0 : s.division;
+  let num = 4, den = 4;
+  for (const e of midi.tracks[0] ?? []) {
+    if (e.type === 'timeSignature') { num = e.numerator; den = e.denominator; break; }
+    if (e.deltaTime > 0) break;
+  }
+  const bar = Math.round((ppq * num * 4) / den / g);
+  if (bar < 1 || bar > 256) return 64;
+  return bar * Math.max(1, Math.floor(64 / bar));
+}
+
+/**
+ * Lay the schedule out: one row per `speed` interrupts, channel n = Paula
+ * voice n; a second note-on a voice takes inside a row it already has a
+ * note in (a MIDI chord the allocator put on one voice) goes to that voice's
+ * next slot channel, after the four.
+ */
+export function loricielLayout(midi: MidiData, s: LoricielSchedule): LoricielLayout {
+  const g = ticksPerRow(s);
+  const speed = g / LORICIEL_TICKS_PER_INTERRUPT;
+  const rows = Math.ceil(s.rows / speed);
+  type Ev = { order: [number, number, number]; voice: number; ev: LoricielCellEvent };
   const evs: Ev[] = [
-    ...s.noteOns.map((on) => ({ row: on.row, track: on.track, event: on.event, voice: on.voice, ev: { kind: 'on', on } as LoricielCellEvent })),
-    ...s.noteOffs.map((off) => ({ row: off.row, track: off.track, event: off.event, voice: off.voice, ev: { kind: 'off', off } as LoricielCellEvent })),
+    ...s.noteOns.map((on) => ({ order: [on.row, on.track, on.event] as [number, number, number], voice: on.voice, ev: { kind: 'on', interrupt: on.row, on } as LoricielCellEvent })),
+    ...s.noteOffs.map((off) => ({ order: [off.row, off.track, off.event] as [number, number, number], voice: off.voice, ev: { kind: 'off', interrupt: off.row, off } as LoricielCellEvent })),
+    ...s.restartCuts.map((voice) => ({ order: [s.restartRow, 1 << 30, 0] as [number, number, number], voice, ev: { kind: 'cut', interrupt: s.restartRow } as LoricielCellEvent })),
   ];
-  evs.sort((a, b) => a.row - b.row || a.track - b.track || a.event - b.event);
-  const cells = new Map<number, LoricielCellEvent[]>();
+  evs.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1] || a.order[2] - b.order[2]);
+  // Per voice and row, the events the row shows, in player order.
+  const perCell = new Map<number, LoricielCellEvent[]>();
   for (const e of evs) {
-    const key = e.voice * s.rows + e.row;
-    let list = cells.get(key);
-    if (!list) cells.set(key, list = []);
-    // A note-on after a note-off in the same cell: the off is the retrigger.
-    if (e.ev.kind === 'on' && list.length > 0 && list[list.length - 1].kind === 'off') list.pop();
-    list.push(e.ev);
+    const key = e.voice * rows + Math.floor(e.ev.interrupt / speed);
+    let list = perCell.get(key);
+    if (!list) perCell.set(key, list = []);
+    const prev = list[list.length - 1];
+    if (e.ev.kind === 'on' && prev?.kind === 'off') {
+      list[list.length - 1] = { ...e.ev, retrigger: prev.off };
+    } else {
+      list.push(e.ev);
+    }
   }
-  for (const list of cells.values()) {
-    if (list.length > LORICIEL_MAX_COLUMNS) throw new Error(`MIDI Loriciel: ${list.length} events on one voice in one interrupt (the grid has ${LORICIEL_MAX_COLUMNS} note columns)`);
-  }
-  return cells;
-}
-
-const NOTE_KEYS = [['note', 'instrument', 'volume'], ['note2', 'instrument2', 'volume2'], ['note3', 'instrument3', 'volume3'], ['note4', 'instrument4', 'volume4']] as const;
-
-/** Write note column `col` (0-based) of a cell. */
-export function setNoteColumn(cell: TrackerCell, col: number, note: number, instrument: number, volume: number): void {
-  const [n, i, v] = NOTE_KEYS[col];
-  (cell as unknown as Record<string, number>)[n] = note;
-  (cell as unknown as Record<string, number>)[i] = instrument;
-  (cell as unknown as Record<string, number>)[v] = volume;
-}
-
-/** Read note column `col` (0-based) of a cell; absent columns read empty. */
-export function getNoteColumn(cell: TrackerCell, col: number): { note: number; instrument: number; volume: number } {
-  const [n, i, v] = NOTE_KEYS[col];
-  const r = cell as unknown as Record<string, number | undefined>;
-  return { note: r[n] ?? 0, instrument: r[i] ?? 0, volume: r[v] ?? 0 };
-}
-
-/** The grid of one pass: rows[voice][row]. */
-export function loricielGridRows(s: LoricielSchedule): TrackerCell[][] {
-  const grid = [0, 1, 2, 3].map(() => Array.from({ length: s.rows }, emptyCell));
-  for (const [key, list] of loricielCellEvents(s)) {
-    const cell = grid[Math.floor(key / s.rows)][key % s.rows];
-    list.forEach((e, col) => {
-      if (e.kind === 'on') {
-        const c = loricielNoteCell(e.on);
-        setNoteColumn(cell, col, c.note, c.instrument, c.volume);
-      } else {
-        setNoteColumn(cell, col, LORICIEL_NOTE_OFF, 0, 0);
-      }
+  const slots = [1, 1, 1, 1];
+  for (const [key, list] of perCell) slots[Math.floor(key / rows)] = Math.max(slots[Math.floor(key / rows)], list.length);
+  const channels: { voice: number; slot: number }[] = [0, 1, 2, 3].map((voice) => ({ voice, slot: 0 }));
+  for (let v = 0; v < 4; v++) for (let k = 1; k < slots[v]; k++) channels.push({ voice: v, slot: k });
+  const cells = channels.map(() => new Array<LoricielCellEvent | undefined>(rows));
+  for (const [key, list] of perCell) {
+    const voice = Math.floor(key / rows), row = key % rows;
+    list.forEach((ev, k) => {
+      const ch = channels.findIndex((c) => c.voice === voice && c.slot === k);
+      cells[ch][row] = ev;
     });
   }
+  return { ticksPerRow: g, speed, rowsPerPattern: rowsPerPattern(midi, s, g), rows, channels, cells };
+}
+
+/** A grid cell for a note-on (note, sample, Paula volume). */
+export function loricielNoteCell(n: Pick<LoricielNoteOn, 'periodIndex' | 'sample' | 'volume'>): TrackerCell {
+  return { ...emptyCell(), note: loricielGridNote(n.periodIndex), instrument: n.sample + 1, volume: 0x10 + n.volume };
+}
+
+/**
+ * The cell an event shows. A period with no grid note (Cartoons 1: one key
+ * read 6682 from the velocity table, two octaves below C-0) keeps its
+ * instrument and volume with an empty note.
+ */
+export function loricielEventCell(ev: LoricielCellEvent | undefined, speed: number): TrackerCell {
+  const cell = emptyCell();
+  if (!ev) return cell;
+  if (ev.kind === 'on') Object.assign(cell, loricielNoteCell(ev.on));
+  else cell.note = LORICIEL_NOTE_OFF;
+  const delay = ev.interrupt % speed;
+  if (delay) { cell.effTyp = EFFECT_EXTENDED; cell.eff = EXT_NOTE_DELAY | delay; }
+  return cell;
+}
+
+/** The grid [channel][row] of a layout, with tempo changes after the start as effect F on channel 0. */
+export function loricielGrid(s: LoricielSchedule, layout: LoricielLayout): TrackerCell[][] {
+  const grid = layout.cells.map((col) => Array.from({ length: layout.rows }, (_, r) => loricielEventCell(col[r], layout.speed)));
   for (const t of s.tempos) {
     if (t.row === 0) continue;                 // the song's initial BPM
     const bpm = Math.round(loricielInterruptHz(t.timer) * 2.5);
-    if (bpm < 0x20 || bpm > 0xFF) throw new Error(`MIDI Loriciel: tempo ${t.tempo} at row ${t.row} is ${bpm} BPM (effect F holds 32..255)`);
-    const c = grid[0][t.row];
-    c.effTyp = EFFECT_SET_SPEED; c.eff = bpm;
-  }
-  for (const v of s.restartCuts) {
-    const c = grid[v][s.restartRow];
-    c.note = LORICIEL_NOTE_OFF;
+    if (bpm < 0x20 || bpm > 0xFF) throw new Error(`MIDI Loriciel: tempo ${t.tempo} at interrupt ${t.row} is ${bpm} BPM (effect F holds 32..255)`);
+    const c = grid[0][Math.floor(t.row / layout.speed)];
+    c.effTyp2 = EFFECT_SET_SPEED; c.eff2 = bpm;
   }
   return grid;
 }
 
-/** Note columns each voice uses (1..4), for channelMeta.noteCols. */
-function noteColumnsUsed(grid: TrackerCell[][]): number[] {
-  return grid.map((rows) => {
-    let cols = 1;
-    for (const c of rows) for (let k = cols; k < LORICIEL_MAX_COLUMNS; k++) if (getNoteColumn(c, k).note) cols = k + 1;
-    return cols;
-  });
-}
-
-/** Cut a [voice][row] grid into patterns of `rowsPer` rows, in order. */
-function toPatterns(grid: TrackerCell[][], rowsPer: number, filename: string): Pattern[] {
-  const total = grid[0].length;
-  const cols = noteColumnsUsed(grid);
+/** Cut a [channel][row] grid into patterns of `rowsPer` rows, in order. */
+function toPatterns(grid: TrackerCell[][], layout: LoricielLayout, filename: string): Pattern[] {
+  const total = layout.rows, rowsPer = layout.rowsPerPattern;
   const patterns: Pattern[] = [];
   for (let start = 0, p = 0; start < total; start += rowsPer, p++) {
     const len = Math.min(rowsPer, total - start);
     patterns.push({
       id: `pattern-${p}`, name: `Pattern ${p}`, length: len,
-      channels: grid.map((rows, v) => ({
-        id: `channel-${v}`, name: `Paula ${v + 1}`, muted: false, solo: false, collapsed: false,
-        volume: 100, pan: v === 0 || v === 3 ? -50 : 50, instrumentId: null, color: null,
-        rows: rows.slice(start, start + len),
-        ...(cols[v] > 1 ? { channelMeta: { importedFromMOD: false, noteCols: cols[v] } } : {}),
-      })),
+      channels: grid.map((rows, c) => {
+        const { voice, slot } = layout.channels[c];
+        return {
+          id: `channel-${c}`, name: slot ? `Paula ${voice + 1} chord ${slot + 1}` : `Paula ${voice + 1}`,
+          muted: false, solo: false, collapsed: false,
+          volume: 100, pan: voice === 0 || voice === 3 ? -50 : 50, instrumentId: null, color: null,
+          rows: rows.slice(start, start + len),
+        };
+      }),
       importMetadata: {
         sourceFormat: 'MOD' as const, sourceFile: filename, importedAt: new Date().toISOString(),
-        originalChannelCount: 4, originalPatternCount: 0, originalInstrumentCount: 0,
+        originalChannelCount: grid.length, originalPatternCount: 0, originalInstrumentCount: 0,
       },
     });
   }
@@ -634,19 +662,28 @@ export interface DecodedMIDILoriciel {
   midi: MidiData;
   bank: LoricielBank;
   schedule: LoricielSchedule;
-  /** [voice][row] for one pass. */
+  layout: LoricielLayout;
+  /** [channel][row] for one pass. */
   grid: TrackerCell[][];
-  rowsPerPattern: number;
 }
 
-/** Module + bank -> the player's schedule and its grid. */
+/** Module + bank -> the player's schedule, its layout and grid. */
 export function decodeMIDILoriciel(module: Uint8Array, bankBytes: Uint8Array, withStates = false): DecodedMIDILoriciel {
   if (!isMIDILoricielFormat(module)) throw new Error('Not a MIDI Loriciel module');
   const midi = parseMidi(module);
   const bank = parseLoricielBank(bankBytes);
   const schedule = scheduleMIDILoriciel(midi, module, bank, withStates);
-  const grid = loricielGridRows(schedule);
-  return { midi, bank, schedule, grid, rowsPerPattern: rowsPerBar(midi, schedule.division) };
+  const layout = loricielLayout(midi, schedule);
+  return { midi, bank, schedule, layout, grid: loricielGrid(schedule, layout) };
+}
+
+/**
+ * Runner ticks -> pass interrupts: the eagleplayer runner counts an
+ * interrupt as it starts it (tick 1 = interrupt 0, measured against the
+ * player's Paula writes), and the song restarts every pass.
+ */
+export function loricielTickGrid(schedule: LoricielSchedule): { firstTick: number; passTicks: number } {
+  return { firstTick: 1, passTicks: schedule.rows };
 }
 
 /**
@@ -665,16 +702,17 @@ export function parseMIDILoricielFile(buffer: ArrayBuffer, filename: string, com
   const moduleName = baseName.replace(/^midi\./i, '').replace(/\.mid$/i, '') || baseName;
   const instruments: InstrumentConfig[] = dec.bank.samples.map((s, i) =>
     createSamplerInstrument(i + 1, `Sample ${i + 1}`, bankBytes.subarray(s.data, s.data + s.length), 64, 8287, 0, 0));
-  const patterns = toPatterns(dec.grid, dec.rowsPerPattern, filename);
+  const patterns = toPatterns(dec.grid, dec.layout, filename);
   const firstTimer = dec.schedule.tempos.filter((t) => t.row === 0).pop()?.timer ?? loricielTimer(LORICIEL_DEFAULT_TEMPO, dec.schedule.division);
 
   return {
     name: `${moduleName} [MIDI Loriciel]`, format: 'MOD' as TrackerFormat,
     patterns, instruments,
     songPositions: patterns.map((_, i) => i),
-    songLength: patterns.length, restartPosition: 0, numChannels: 4,
-    // One row per player interrupt: speed 1, the grid follow maps the
-    // runner's interrupt count straight onto rows.
-    initialSpeed: 1, initialBPM: loricielBpm(firstTimer), linearPeriods: false,
+    songLength: patterns.length, restartPosition: 0, numChannels: dec.grid.length,
+    // One tracker tick per player interrupt: speed = interrupts per row,
+    // BPM = 2.5 x the interrupt rate - the rate the runner plays at.
+    initialSpeed: dec.layout.speed, initialBPM: loricielBpm(firstTimer), linearPeriods: false,
+    eaglePlayerTickGrid: loricielTickGrid(dec.schedule),
   };
 }

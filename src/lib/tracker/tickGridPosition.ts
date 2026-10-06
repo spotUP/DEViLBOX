@@ -21,6 +21,14 @@ export interface TickGrid {
    * there, as the player loops its song (song.restartPosition).
    */
   loopFrom?: number;
+  /** The tick count at which row 0 plays (default 0). */
+  firstTick?: number;
+  /**
+   * Ticks of one pass, when the player restarts its song after exactly that
+   * many: the count wraps on it (and rows past the pass hold its last row),
+   * so a pass that is not a whole number of rows does not drift.
+   */
+  passTicks?: number;
 }
 
 export interface GridPosition { songPos: number; row: number }
@@ -29,7 +37,9 @@ export function tickGridPosition(ticks: number, grid: TickGrid): GridPosition {
   const order = grid.songPositions;
   if (order.length === 0 || !Number.isFinite(ticks)) return { songPos: 0, row: 0 };
   const lenAt = (pos: number) => Math.max(1, grid.patternLengths[order[pos]] ?? 64);
-  let remaining = Math.max(0, Math.floor(ticks / Math.max(1, grid.speed || 1)));
+  let t = Math.max(0, ticks - (grid.firstTick ?? 0));
+  if (grid.passTicks && grid.passTicks > 0) t %= grid.passTicks;
+  let remaining = Math.floor(t / Math.max(1, grid.speed || 1));
   for (let pos = 0; pos < order.length; pos++) {
     const len = lenAt(pos);
     if (remaining < len) return { songPos: pos, row: remaining };

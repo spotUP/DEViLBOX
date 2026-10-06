@@ -32,8 +32,10 @@ import type { TrackerSong } from '@engine/TrackerReplayer';
 export interface EaglePlayerPosition { songPos: number; row: number; ticks: number }
 
 /** The grid geometry the player's tick count maps onto (tickGridPosition). */
-export function eaglePlayerGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition'>): TickGrid {
+export function eaglePlayerGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition' | 'eaglePlayerTickGrid'>): TickGrid {
   return {
+    // Where the parser measured it: the tick of row 0 and the pass length.
+    ...song.eaglePlayerTickGrid,
     speed: song.initialSpeed || 6,
     songPositions: song.songPositions,
     patternLengths: song.patterns.map((p) => p.length),
@@ -205,7 +207,7 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
    * The grid the player's position maps onto - the song as loaded
    * (speed ticks per row, patterns in order). Set by the route on start.
    */
-  setGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition'>): void {
+  setGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition' | 'eaglePlayerTickGrid'>): void {
     this._grid = eaglePlayerGrid(song);
   }
 
