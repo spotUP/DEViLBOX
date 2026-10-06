@@ -11,7 +11,12 @@
  *
  * Measured per toggle: RMS of (on - off) over the held window, against the
  * rig's own render-to-render noise (off vs off). The toggle must clear that
- * noise floor by a clear margin.
+ * noise floor by a clear margin, and an absolute audibility floor.
+ *
+ * D2 (2026-10-06): this failed on Starve, once on Liquid, with their effect
+ * steady. The noise floor was the thing moving, -50 to -41 dBFS, because the
+ * rig left the main thread's Math.random unseeded and SpaceEchoEffect draws
+ * its wow rate from it. Fixed in the rig (dubBusRig.ts).
  *
  * Sub Harm was the dead one: its pulse detector listened to the send bus, where
  * a kick arrives at a third of the detection threshold, so no sub fired.
@@ -49,6 +54,14 @@ const TOGGLES: ReadonlyArray<{ label: string; move: DubMove; settings?: Record<s
 const SECONDS = 2.5;
 const SEND = 0.15; // FLAT_SEED_SEND: what a freshly enabled bus is fed with
 const FIRE_AT = 0.4;
+/**
+ * The least a toggle must change the output by, absolute. The rig renders
+ * bit-identically now (dubBusRigIsDeterministic.test.ts), so the render-noise
+ * floor is -Infinity and "12 dB over it" alone would pass a toggle that moved
+ * the output by a rounding error. Measured 2026-10-06: every toggle lands
+ * between -30.1 dBFS (Starve) and -18.7 dBFS (Sub Harm bed) here.
+ */
+const AUDIBLE_CHANGE_DBFS = -45;
 
 /** A song-like programme: kick, bass, hats, a stereo lead. Seeded, so both arms hear the same. */
 function programme(rig: DubBusRig): GainNode {
@@ -126,6 +139,7 @@ describe('every dub toggle changes an engine-played song\'s output', () => {
   it.each(TOGGLES.map((t) => [t.label, t] as const))('%s', async (_label, toggle) => {
     const on = await renderEngineSong(toggle);
     const effect = diffDb(off, on);
-    expect(effect, `${toggle.label}: ${effect.toFixed(1)} dBFS against a ${noiseFloorDb.toFixed(1)} dBFS render noise floor`).toBeGreaterThan(noiseFloorDb + 12);
+    console.log(`[toggle] ${toggle.label}: ${effect.toFixed(1)} dBFS (render noise ${noiseFloorDb.toFixed(1)} dBFS)`);
+    expect(effect, `${toggle.label}: ${effect.toFixed(1)} dBFS against a ${noiseFloorDb.toFixed(1)} dBFS render noise floor`).toBeGreaterThan(Math.max(noiseFloorDb + 12, AUDIBLE_CHANGE_DBFS));
   }, 60_000);
 });
