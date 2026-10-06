@@ -89,4 +89,14 @@ describe('player-program formats open in the scope view', () => {
     useFormatStore.getState().applyEditorMode({ uadeEditableFileData: bytes(), uadeEditableFileName: 'x.mod' });
     expect(useFormatStore.getState().editorMode).toBe('classic');
   });
+
+  it.each(['a.pt3', 'a.pt2', 'a.stc', 'a.vtx', 'a.psg', 'a.asc'])('%s imported through parseModuleToSong opens in the scope view, labelled ZXTune', async (name) => {
+    // The ZX Spectrum formats reached the importer's own entry but opened as an empty grid (sweep, 2026-10-05).
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const song = await parseModuleToSong(new File([new Uint8Array(512)], name));
+    useFormatStore.getState().applyEditorMode(song);
+    const st = useFormatStore.getState();
+    expect(st.editorMode).toBe('sc68');
+    expect(scopeFormatLabel(st)?.format).toBe('ZXTune');
+  });
 });
