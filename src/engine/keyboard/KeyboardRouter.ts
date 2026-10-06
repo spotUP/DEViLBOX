@@ -1,3 +1,4 @@
+import { isTextEntryTarget } from '@/lib/keyboard/isTextEntryTarget';
 /**
  * KeyboardRouter - Centralized keyboard event routing by active view.
  *
@@ -35,31 +36,12 @@ const state: RouterState = {
  * Check if event target is an input field where we shouldn't intercept keys.
  */
 function isInputElement(e: KeyboardEvent): boolean {
-  const target = e.target as HTMLElement;
-  if (!target) return false;
-
-  const tagName = target.tagName;
-  if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
-    // Allow Escape to still work in inputs
-    if (e.key === 'Escape') return false;
-    // Allow Tab to still work for navigation
-    if (e.key === 'Tab') return false;
-    return true;
-  }
-
-  // Check for CodeMirror editors (use div.cm-content, not native textarea)
-  if (target.closest?.('.cm-editor')) {
-    if (e.key === 'Escape') return false;
-    return true;
-  }
-
-  // Check for contenteditable
-  if (target.isContentEditable) {
-    if (e.key === 'Escape') return false;
-    return true;
-  }
-
-  return false;
+  if (!isTextEntryTarget(e.target)) return false;
+  // Escape still closes things from a field, and Tab still moves focus out
+  // (except in CodeMirror, which keeps Tab for indenting).
+  if (e.key === 'Escape') return false;
+  if (e.key === 'Tab' && !(e.target as HTMLElement).closest?.('.cm-editor')) return false;
+  return true;
 }
 
 /**
