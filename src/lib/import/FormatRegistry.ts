@@ -575,14 +575,14 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'chuckBiscuits',
     label: 'Chuck Biscuits',
-    description: 'Chuck Biscuits Atari ST — native parser or UADE',
+    description: 'Chuck Biscuits Atari ST — native parser or libopenmpt (UADE cannot play it)',
     family: 'amiga-native',
-    matchMode: 'both',
+    matchMode: 'extension',
     extRegex: /\.cba$/i,
-    prefixes: ['cba.'],
     prefKey: 'chuckBiscuits',
     nativeParser: { module: '@lib/import/formats/ChuckBiscuitsParser', parseFn: 'parseChuckBiscuitsFile', detectFn: 'isChuckBiscuitsFormat' },
-    uadeFallback: true,
+    libopenmptFallback: true,
+    libopenmptPlayable: true,
   },
   {
     key: 'imagesMusicSystem',

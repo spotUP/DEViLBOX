@@ -126,4 +126,11 @@ describe('useSettingsStore — persist migration', () => {
     }
     expect(threw, `malformed-data crash: ${threw?.message}`).toBeNull();
   });
+
+  it('v13: a stored uade for Chuck Biscuits (Atari ST, UADE cannot play it) becomes native', async () => {
+    seed(12, { formatEngine: { chuckBiscuits: 'uade', synthesis: 'uade' } });
+    const s = await freshLoad();
+    expect(s.formatEngine.chuckBiscuits).toBe('native');
+    expect(s.formatEngine.synthesis, 'unrelated engine choices survive').toBe('uade');
+  });
 });
