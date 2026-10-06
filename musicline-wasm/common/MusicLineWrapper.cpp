@@ -736,6 +736,11 @@ void ml_set_channel_on(int ch, int on) {
     } else {
         mod->m_ChannelsOn &= ~(1 << ch);
     }
+    // m_ChannelsOn is only copied into the channel's m_ChannelOff when a tune
+    // is initialised, so a live mute must set the channel flag itself.
+    if (ch < mod->m_ChanNum && mod->m_ChannelBuf[ch]) {
+        mod->m_ChannelBuf[ch]->m_ChannelOff = on ? 0 : 1;
+    }
 }
 
 /**

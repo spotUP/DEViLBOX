@@ -629,8 +629,8 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'musiclineFileData',
     loadMethod: 'loadSong',
-    supportsPause: false,
-    supportsResume: false,
+    supportsPause: true,
+    supportsResume: true,
     needsDirectRouting: true,
     // Linked statically by NativeEngineRouting (STATIC_ENGINES) for its sync stop/pause/resume.
     staticRef: null,

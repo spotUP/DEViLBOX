@@ -1131,8 +1131,8 @@ void MLModule::EndTune(void) {
 // set by jump-count expiry which doesn't mean the channel is done.
 bool MLModule::isSongEnd() const {
     for (int i = 0; i < m_ChanNum; i++) {
-        if ((m_ChannelsOn & (1 << i)) == 0)
-            continue; // channel not active in this song
+        // A muted channel (m_ChannelsOn bit clear) still plays its END: skipping it
+        // made muting every channel read as "song ended" and stopped playback.
         if (m_ChannelBuf[i]->m_VoiceOff == 0)
             return false; // this channel hasn't ended yet
     }
