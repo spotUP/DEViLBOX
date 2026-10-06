@@ -50,6 +50,21 @@ function isWASMSynthList(): string[] {
   return [...m![1].matchAll(/['"]([^'"]+)['"]/g)].map((x) => x[1]);
 }
 
+/** Entries of the `KEYBOARD_VOICE_SYNTHS` Set literal (dedicated-engine keyboard voices). */
+function keyboardVoiceSynths(): string[] {
+  const src = read('lib/import/parsers/withFallback.ts');
+  const m = src.match(/KEYBOARD_VOICE_SYNTHS[^=]*=\s*new Set\(\[([\s\S]*?)\]\)/);
+  expect(m, 'KEYBOARD_VOICE_SYNTHS Set literal not found in withFallback.ts').toBeTruthy();
+  return [...m![1].matchAll(/['"]([^'"]+)['"]/g)].map((x) => x[1]);
+}
+
+describe('keyboard-voice synths are shared singletons in ToneEngine', () => {
+  const shared = new Set(isWASMSynthList());
+  it.each(keyboardVoiceSynths())('%s is in the isWASMSynth shared-instance list', (synthType) => {
+    expect(shared.has(synthType)).toBe(true);
+  });
+});
+
 describe('native-audition synths are shared singletons in ToneEngine', () => {
   const audition = nativeAuditionSynths();
   const shared = new Set(isWASMSynthList());
