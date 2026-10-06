@@ -48,11 +48,12 @@ describe('jukebox list and switches', { timeout: 60000 }, () => {
     await waitFor(() => expect(container.querySelector('[title="This song shows the visualizer instead of the pattern editor"]')?.textContent).toBe('Visualizer'));
   });
 
-  it('offers Missing Notes and Keyboard Silent as their own faults', async () => {
+  it('offers Missing Notes, Keyboard Silent and Wrong Channel Meters as their own faults', async () => {
     const { JUKEBOX_FAULTS } = await import('@/lib/jukebox/faultReports');
     const ids = JUKEBOX_FAULTS.map((f) => f.id);
     expect(ids).toContain('missing-notes');
     expect(ids).toContain('keyboard-silent');
+    expect(ids).toContain('wrong-meters');
     const keys = JUKEBOX_FAULTS.map((f) => f.key).filter(Boolean);
     expect(new Set(keys).size).toBe(keys.length);
   });
