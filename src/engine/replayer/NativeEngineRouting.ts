@@ -227,6 +227,25 @@ export async function runningEngineInstance(key: string): Promise<unknown> {
   return engine.hasInstance() ? engine.getInstance() : null;
 }
 
+/**
+ * Record a position an engine reported, if that engine is playing the current
+ * song. Engines are singletons whose position callbacks outlive a song: after
+ * stopNativeEngines() cleared the store, a stopped engine's late report marked
+ * the store active again and the pattern editor followed that frozen position
+ * through every later song (an AmigaKlang .mod showed empty pattern 0 while it
+ * played). Only the running engine owns the position.
+ */
+export function reportEnginePosition(
+  key: string,
+  row: number,
+  songPos?: number,
+  channelRows?: number[],
+  channelPositions?: number[],
+): void {
+  if (!_runningEngineKeys.has(key)) return;
+  useWasmPositionStore.getState().setPosition(row, songPos, channelRows, channelPositions);
+}
+
 /** Clear running engine tracking (call on stop/dispose) */
 export function clearRunningEngineKeys(): void {
   _runningEngineKeys.clear();
@@ -336,7 +355,7 @@ export async function startNativeEngines(
           // on row 0 (the transport-store fallback) and overwrote the
           // previous one — Zxx cells appeared to "never get written".
           hivelyEngine.onPositionUpdate((update) => {
-            useWasmPositionStore.getState().setPosition(update.row, update.position);
+            reportEnginePosition(desc.key, update.row, update.position);
           });
         }
 
@@ -392,7 +411,7 @@ export async function startNativeEngines(
             }
 
             if (Number.isFinite(row) && Number.isFinite(position)) {
-              useWasmPositionStore.getState().setPosition(row, position);
+              reportEnginePosition(desc.key, row, position);
             }
           });
           console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} entries, msPerJiffy=${msPerJiffy})`);
@@ -408,7 +427,7 @@ export async function startNativeEngines(
           if (spans) {
             (instance as unknown as import('@/engine/tfmx/TFMXEngine').TFMXEngine).onPositionUpdate((u) => {
               if (u.step === undefined || u.step < 0 || u.patternOffset === undefined || u.patternOffset < 0) return;
-              useWasmPositionStore.getState().setPosition(hippelRowAt(spans, u.step, u.patternOffset), u.step);
+              reportEnginePosition(desc.key, hippelRowAt(spans, u.step, u.patternOffset), u.step);
             });
             console.log(`[NativeEngineRouting] Hippel position sync wired (${spans.length} steps)`);
           }
@@ -426,11 +445,11 @@ export async function startNativeEngines(
           // MusicLine: use onPosition for per-channel row/position data
           if (desc.key === 'MusicLine' && 'onPosition' in instance) {
             (instance as any).onPosition((update: { position: number; row: number; channelRows?: number[]; channelPositions?: number[] }) => {
-              useWasmPositionStore.getState().setPosition(update.row, update.position, update.channelRows, update.channelPositions);
+              reportEnginePosition(desc.key, update.row, update.position, update.channelRows, update.channelPositions);
             });
           } else {
             (instance as any).onPositionUpdate((update: { songPos?: number; row: number }) => {
-              useWasmPositionStore.getState().setPosition(update.row, update.songPos);
+              reportEnginePosition(desc.key, update.row, update.songPos);
             });
           }
           // Also connect meters on first play
