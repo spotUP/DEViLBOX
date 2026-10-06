@@ -14,6 +14,17 @@ import type { HivelyConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { HivelyEngine } from './HivelyEngine';
 
+/**
+ * The replayer note a typed key plays. The key's grid note is MIDI - 11
+ * (xmConversions.noteToMidi: C-0 = 12). The replayer plays a step note n at
+ * period index n - 1 and the grid shows the note a step plays, so the preview
+ * takes that grid note + 1. Measured against the song voice
+ * (keyboardPreviewGroupC.test.ts) the old MIDI + 1 was 11 semitones sharp.
+ */
+export function hvlNoteForKey(midiNote: number): number {
+  return Math.max(1, Math.min(60, midiNote - 10));
+}
+
 export class HivelySynth implements DevilboxSynth {
   readonly name = 'HivelySynth';
   readonly output: GainNode;
@@ -207,9 +218,7 @@ export class HivelySynth implements DevilboxSynth {
         midiNote = 36; // default to C-2
       }
 
-      // Convert MIDI note to HVL note (HVL note 1 = C-0 = MIDI 0)
-      // MIDI 0 = C-0 = HVL 1, MIDI 12 = C-1 = HVL 13, etc.
-      const hvlNote = Math.max(1, Math.min(60, midiNote + 1));
+      const hvlNote = hvlNoteForKey(midiNote);
       const vel = Math.max(64, Math.round((velocity ?? 1) * 127));
 
       this.engine.sendMessage({
@@ -231,8 +240,9 @@ export class HivelySynth implements DevilboxSynth {
           this.triggerAttack(queued.note, undefined, queued.velocity);
         }
       });
-    } else {
-      // Song playback mode
+    } else if (note === undefined) {
+      // Song playback mode: only an explicit play with no note. A typed key on
+      // an instrument that has no config must stay silent, never start the song.
       this.engine.play();
     }
   }

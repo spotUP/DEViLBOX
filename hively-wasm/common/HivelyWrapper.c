@@ -642,10 +642,17 @@ void hively_player_note_on(int32 handle, int32 note, int32 velocity) {
     voice->vc_ADSR.rVolume = voice->vc_ADSR.rFrames ? (Ins->ins_Envelope.rVolume - Ins->ins_Envelope.dVolume) * 256 / voice->vc_ADSR.rFrames : Ins->ins_Envelope.rVolume * 256;
 
     voice->vc_WaveLength = Ins->ins_WaveLength;
-    /* Scale volume by velocity — ensure minimum 1 to avoid integer truncation silence */
-    int32 scaledVol = (Ins->ins_Volume * velocity) / 127;
-    if (scaledVol < 1 && velocity > 0) scaledVol = 1;
-    voice->vc_NoteMaxVolume = scaledVol;
+    /* The replayer has no velocity: a note plays at the instrument's volume
+     * (hvl_process_step: vc_NoteMaxVolume = ins_Volume). Scaling it by key
+     * velocity put the preview under the same instrument in the song. */
+    (void)velocity;
+    voice->vc_NoteMaxVolume = Ins->ins_Volume;
+
+    /* The tune's own mix gain, when one is loaded (hvl_reset: AHX derives it
+     * from the stereo mode, HVL stores it in the header). The standalone
+     * player was built with a fixed 71 percent, so an instrument previewed
+     * beside a loaded tune was off the tune's level by the gain difference. */
+    if (g_tune) ht->ht_mixgain = g_tune->ht_mixgain;
 
     voice->vc_VibratoCurrent = 0;
     voice->vc_VibratoDelay = Ins->ins_VibratoDelay;
