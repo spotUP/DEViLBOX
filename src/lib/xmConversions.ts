@@ -10,6 +10,7 @@ import { sonixEffectToString } from './import/formats/sonixEffectGlyphs';
 import { soundPlayerEffectToString } from './import/formats/soundPlayerEffectGlyphs';
 import { fredEffectToString } from './import/formats/fredEffectGlyphs';
 import { soundMasterEffectToString } from './import/formats/soundMasterEffectGlyphs';
+import { actionamicsEffectToString } from './import/formats/actionamicsEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
@@ -272,6 +273,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Sound Master private control effects (reserved block 0x74..0x78).
   const sm = soundMasterEffectToString(effTyp, eff);
   if (sm !== null) return sm;
+
+  // Actionamics private control effects (reserved block 0xA0..0xAF).
+  const ast = actionamicsEffectToString(effTyp, eff);
+  if (ast !== null) return ast;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;

@@ -27,6 +27,13 @@ size_t act_render_multi(ActModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool act_has_ended(const ActModule* module);
 
+int act_replace_tracks(ActModule* module, const uint8_t* data, size_t size);
+int act_get_position(const ActModule* module);
+int act_get_row(const ActModule* module);
+int act_get_rows(const ActModule* module);
+uint32_t act_event_count(const ActModule* module);
+int act_event_field(const ActModule* module, uint32_t index, int field);
+
 // Edit API
 int act_get_instrument_count(const ActModule* module);
 int act_get_sample_count(const ActModule* module);

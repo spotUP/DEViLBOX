@@ -16,6 +16,7 @@ import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
 import { SPL_EFFECT_GLYPH } from '@/lib/import/formats/soundPlayerEffectGlyphs';
 import { FRED_EFFECT_GLYPH } from '@/lib/import/formats/fredEffectGlyphs';
 import { SM_EFFECT_GLYPH } from '@/lib/import/formats/soundMasterEffectGlyphs';
+import { AST_EFFECT_GLYPH } from '@/lib/import/formats/actionamicsEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import type {
@@ -873,6 +874,9 @@ export class TrackerGLRenderer {
               } else if (SM_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Sound Master private control effects (block 0x74..0x78)
                 effStr = SM_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (AST_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // Actionamics private control effects (block 0xA0..0xAF)
+                effStr = AST_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }
