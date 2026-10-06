@@ -34,6 +34,7 @@ import type { MixerSnapshot } from '@stores/useMixerStore';
 import type { DubBusSettings } from '@/types/dub';
 import { repairStoredDubBusVoicing } from '@/types/dub';
 import { migrateDubLaneEvents } from './migrateDubLaneEvents';
+import { baselineOf, setGridBaseline, type GridBaseline } from './gridBaseline';
 
 type FormatState = ReturnType<typeof useFormatStore.getState>;
 
@@ -66,6 +67,12 @@ export interface SongToApply {
    * drop makes an audible transient.
    */
   preload?: boolean;
+  /**
+   * The grid as the decoder produced it (gridBaseline.ts), when it differs from
+   * `patterns` (a saved song carries edits). Omitted: `patterns` is the decoder's
+   * grid. null: unknown (saved before baselines existed).
+   */
+  gridBaseline?: GridBaseline | null;
 }
 
 /** A saved project's state beyond the song (see savedSong.ts). */
@@ -172,6 +179,7 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   // sees the previous song's - or no - instruments.
   await new Promise<void>((resolve) => queueMicrotask(resolve));
   tracker.loadPatterns(song.patterns);
+  setGridBaseline(song.gridBaseline === undefined ? baselineOf(song.patterns) : song.gridBaseline);
   tracker.setCurrentPattern(0);
   if (song.order.length > 0) tracker.setPatternOrder(song.order);
 

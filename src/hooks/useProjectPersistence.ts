@@ -17,6 +17,7 @@ import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/
 import type { SerializedCompanionFiles } from '@/lib/export/exporters';
 import { applySong } from '@/lib/song/applySong';
 import { savedSongToApply } from '@/lib/song/savedSong';
+import { restoreFromStoredBytes } from '@/lib/song/restoreFromStoredBytes';
 import { snapshotSong } from '@/lib/song/snapshotSong';
 import { compressProject } from '@/lib/projectCompression';
 
@@ -178,6 +179,8 @@ interface SavedProject {
    * loads in a build that has never heard of the field.
    */
   performanceJournal?: import('@/lib/dub/performanceJournal').PerformanceJournal;
+  /** The grid as loaded, hashed per cell (restore tells edits from decoder output). Additive: older saves lack it. */
+  gridBaseline?: import('@/lib/song/gridBaseline').GridBaseline;
 }
 
 // ============================================================================
@@ -434,7 +437,13 @@ export { migrateDubLaneEvents } from '@/lib/song/migrateDubLaneEvents';
  */
 export async function applySavedProject(project: SavedProject, opts?: { fromRecovery?: boolean }): Promise<boolean> {
   if (!prepareSavedProject(project, 'discard')) return false;
-  await applySong(savedSongToApply(project), opts?.fromRecovery ? 'recovery' : 'project');
+  // The stored module bytes are decoded again by today's decoder; the user's
+  // edited cells, instruments, mixer and the rest of the project come from the
+  // save (restoreFromStoredBytes.ts says when it keeps the saved song instead).
+  const stored = savedSongToApply(project);
+  const restored = await restoreFromStoredBytes(stored, project.gridBaseline);
+  console.log(`[restore] ${restored.redecoded ? 're-decoded from the stored module bytes' : `kept as saved (${restored.reason})`}`);
+  await applySong({ ...restored.song, gridBaseline: restored.baseline }, opts?.fromRecovery ? 'recovery' : 'project');
 
   // Recovery restore must stay never-saved + dirty so the scheduler re-arms;
   // the default (explicit-slot) load marks saved. Decision is the pure
