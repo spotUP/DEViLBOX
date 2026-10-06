@@ -101,6 +101,10 @@ EXPORT void fp_wasm_get_channel_levels(float *out4) {
     paula_get_channel_levels(out4);
 }
 
+EXPORT void fp_wasm_get_note_start_counts(uint32_t *out, int n) {
+    paula_get_note_start_counts(out, n);
+}
+
 EXPORT void fp_wasm_set_channel_gain(int ch, float gain) {
     paula_set_channel_gain(ch, gain);
 }
