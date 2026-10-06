@@ -179,6 +179,31 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     return null;
   }
 
+  /**
+   * The chip and its own channel index for a mute message, or null when the
+   * channel does not exist. `seqChan` is the song-wide channel the sequencer
+   * counts (chips in creation order, as the isolation offsets do).
+   */
+  resolveMuteTarget(platformType, chan) {
+    if (!Number.isInteger(chan) || chan < 0) return null;
+    if (platformType === undefined || platformType === null) {
+      let offset = 0;
+      for (const chip of this.chips.values()) {
+        if (chan < offset + chip.numChannels) return { chip, local: chan - offset, seqChan: chan };
+        offset += chip.numChannels;
+      }
+      return null;
+    }
+    const chip = this.getChip(platformType);
+    if (!chip || chan >= chip.numChannels) return null;
+    let offset = 0;
+    for (const c of this.chips.values()) {
+      if (c === chip) break;
+      offset += c.numChannels;
+    }
+    return { chip, local: chan, seqChan: offset + chan };
+  }
+
   async handleMessage(data) {
     switch (data.type) {
       case 'init':
@@ -477,12 +502,18 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       }
 
       case 'mute': {
-        const chip = this.getChip(data.platformType);
-        if (chip && this.wasm) {
-          this.wasm.mute(chip.handle, data.chan, data.mute ? 1 : 0);
+        // A message with a platform names a channel of that chip; one without
+        // (the mixer's) names a channel of the song, counted across its chips.
+        // The chip's mute flags are sized to its own channel count (GB: bool
+        // isMuted[4]), so a channel the chip does not have must never reach it:
+        // the mixer sends all 16 of its channels, and the writes past the end
+        // of a 4-channel chip's array silenced or garbled the song.
+        const target = this.resolveMuteTarget(data.platformType, data.chan);
+        if (target && this.wasm) {
+          this.wasm.mute(target.chip.handle, target.local, data.mute ? 1 : 0);
           // Also mute in sequencer to block NOTE_ON retriggering
           if (this.wasm.seqSetMute) {
-            this.wasm.seqSetMute(data.chan, data.mute ? 1 : 0);
+            this.wasm.seqSetMute(target.seqChan, data.mute ? 1 : 0);
           }
         }
         break;
