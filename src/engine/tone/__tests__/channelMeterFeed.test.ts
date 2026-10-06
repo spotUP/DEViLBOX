@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ChannelMeterFeed } from '../channelMeterFeed';
+import { countRowNoteStarts } from '../../libopenmpt/LibopenmptEngine';
 import { engineFedMeterTarget } from '@/components/tracker/waveformVuLevel';
 
 function sink() {
@@ -13,6 +14,25 @@ function sink() {
     updateRealtimeChannelLevels: (l: number[]) => { levels.push([...l]); },
   };
 }
+
+describe('engine channel level feed with counted note starts', () => {
+  it('a rise in the count flashes even when the level never moved', () => {
+    const s = sink(); const f = new ChannelMeterFeed();
+    f.feedCounted(s, [0.5], [1]); f.feedCounted(s, [0.5], [1]); f.feedCounted(s, [0.5], [2]);
+    expect(s.triggers).toEqual([[0, 0.5], [0, 0.5]]);
+  });
+  it('a new song counting from zero again still flashes on its first note', () => {
+    const s = sink(); const f = new ChannelMeterFeed();
+    f.feedCounted(s, [0.5], [7]); f.feedCounted(s, [0.5], [1]);
+    expect(s.triggers).toEqual([[0, 0.5], [0, 0.5]]);
+  });
+  it('a silent channel stays dark even if its count rises', () => {
+    const s = sink(); const f = new ChannelMeterFeed();
+    f.feedCounted(s, [0], [3]);
+    expect(s.triggers).toEqual([]);
+    expect(s.levels).toEqual([[0]]);
+  });
+});
 
 describe('engine channel level feed', () => {
   it('a steady level gives no new note flashes in trigger mode', () => {
@@ -46,8 +66,23 @@ const ENGINES = [
   'jamcracker/JamCrackerEngine', 'uade/UADEEngine', 'ma/MaEngine', 'sidmon1/SidMon1ReplayerEngine',
   'pumatracker/PumaTrackerEngine', 'futureplayer/FuturePlayerEngine', 'klystrack/KlysEngine',
   'pretracker/PreTrackerEngine', 'steveturner/SteveTurnerEngine', 'artofnoise/ArtOfNoiseEngine',
-  'libopenmpt/LibopenmptEngine',
 ];
+
+describe('libopenmpt flashes on the pattern rows, not on VU jumps', () => {
+  it('counts a note per channel row, ignoring empty cells, note cut and note off', () => {
+    const counts: number[] = [];
+    // two channels, six numbers each, note first: C-5 (61) | note cut (254)
+    countRowNoteStarts(counts, [61, 1, 0, 0, 0, 0, 254, 0, 0, 0, 0, 0]);
+    countRowNoteStarts(counts, [0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0]);
+    countRowNoteStarts(counts, [48, 1, 0, 0, 0, 0, 60, 2, 0, 0, 0, 0]);
+    expect(counts).toEqual([2, 1]);
+  });
+  it('the engine feeds the counts through feedCounted', () => {
+    const src = readFileSync(resolve(__dirname, '../../libopenmpt/LibopenmptEngine.ts'), 'utf8');
+    expect(src).toContain('meterFeed.feedCounted(');
+    expect(src).not.toContain('meterFeed.feed(');
+  });
+});
 
 describe('engines feed per-frame levels through the split feed, never as note triggers', () => {
   it.each(ENGINES)('%s', (name) => {

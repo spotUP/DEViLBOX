@@ -30,10 +30,11 @@ export function loadSharedWorkletScripts(): void {
 
 /**
  * Instantiate `public/<dir>/<stem>.worklet.js` and initialise its WASM from
- * `<wasmStem>.js/.wasm` (PumaTracker's differ in case: PumaTracker.worklet.js
+ * `<wasmStem>.js/.wasm`. `clocked` makes the worklet's `currentTime` read `globalThis.__workletClock`,
+ * which the test advances, for worklets that post on a timer (UADE's levels). (PumaTracker's differ in case: PumaTracker.worklet.js
  * beside Pumatracker.wasm, which only a case-insensitive disk forgives).
  */
-export async function startWorklet(dir: string, stem: string, transform?: JsTransform, wasmStem = stem): Promise<{
+export async function startWorklet(dir: string, stem: string, transform?: JsTransform, wasmStem = stem, clocked = false): Promise<{
   proc: WorkletProc;
   send: (m: unknown) => Promise<void>;
   posted: WorkletMsg[];
@@ -45,7 +46,7 @@ export async function startWorklet(dir: string, stem: string, transform?: JsTran
     registerProcessor: (_n: string, cls: new () => WorkletProc) => { Processor = cls; },
     sampleRate: 48000, currentTime: 0,
   };
-  new Function(...Object.keys(scope), readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8'))(...Object.values(scope));
+  new Function(...Object.keys(scope), (clocked ? readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8').replace(/\bcurrentTime\b/g, 'globalThis.__workletClock') : readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8')))(...Object.values(scope));
   const proc = new Processor();
   const send = async (m: unknown) => { await (proc.handleMessage ?? proc._handleMessage ?? proc._onMessage)!.call(proc, m); };
   const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
