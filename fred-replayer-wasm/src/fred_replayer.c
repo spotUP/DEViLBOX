@@ -195,6 +195,11 @@ struct FredModule {
     float tick_accumulator;
     float ticks_per_frame;       // sample_rate / 50.0 (PAL)
 
+    // The line clock: a line is current_tempo ticks (a note or pause lasts one
+    // line), the grid's row. line_count is the line being played.
+    uint32_t line_count;
+    uint32_t line_phase;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -778,6 +783,13 @@ static void play_tick(FredModule* m) {
         modify_sound(chanInfo, mc);
     }
 
+    // The line clock: the next line starts after current_tempo ticks.
+    m->line_phase++;
+    if (m->line_phase >= (uint32_t)(m->current_tempo > 0 ? m->current_tempo : 1)) {
+        m->line_phase = 0;
+        m->line_count++;
+    }
+
     // Check if any channel wrapped (end detection)
     for (int i = 0; i < 4; i++) {
         if (m->end_reached[i]) {
@@ -795,6 +807,8 @@ static void initialize_sound(FredModule* m, int song_number) {
     m->current_song = song_number;
     m->current_tempo = m->start_tempos[song_number];
     m->has_ended = false;
+    m->line_count = 0;
+    m->line_phase = 0;
 
     for (int i = 0; i < 4; i++) {
         m->end_reached[i] = false;
@@ -1900,6 +1914,11 @@ int fred_replace_module(FredModule* module, const uint8_t* data, size_t size) {
 #undef FRED_SWAP
     fred_destroy(next);
     return 1;
+}
+
+/** The line the replayer is on (0-based): the grid row. */
+uint32_t fred_get_line(const FredModule* module) {
+    return module ? module->line_count : 0;
 }
 
 /** The period voice `ch` plays now (0 when silent) - for tests and meters. */

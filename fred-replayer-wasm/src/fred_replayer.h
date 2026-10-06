@@ -36,6 +36,9 @@ int fred_replace_module(FredModule* module, const uint8_t* data, size_t size);
 // The period voice `ch` plays now (0 when silent).
 int fred_get_channel_period(const FredModule* module, int ch);
 
+/* The line (grid row, 0-based) the replayer is playing. */
+uint32_t fred_get_line(const FredModule* module);
+
 
 #ifdef __cplusplus
 }
