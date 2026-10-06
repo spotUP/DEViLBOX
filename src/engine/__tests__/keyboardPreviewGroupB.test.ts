@@ -171,6 +171,43 @@ describe('OctaMED synth keyboard preview is the instrument as UADE\'s OctaMED pl
     }
   });
 
+  // Volume table F4 (envelope from a waveform) and FA (jump the wave table), wave table F7
+  // (vibrato shape from a waveform), against UADE's own OctaMED player.
+  const levelRuns: Run[] = [
+    { name: 'volume F4 envelope: waveform 3 (a 128-byte ramp) drives the volume', ticks: 24, fx: { waveforms: [flat(64, 100), flat(64, 100), flat(64, 100), saw(128)], voltbl: [0xf4, 3, 0xff], wftbl: [0, 0xff] } },
+    { name: 'volume FA jumps the wave table and cancels its wait', ticks: 12, fx: { voltbl: [64, 0xf1, 3, 0xfa, 3, 0xff], wftbl: [0, 0xf1, 20, 1, 2, 0xff] } },
+  ];
+  for (const r of levelRuns) {
+    it(`level and envelope: ${r.name}`, { timeout: 60000 }, async () => {
+      const fx: MedSynthFixture = { waveforms: [flat(64, 30), flat(64, 100), flat(64, 60)], volSpeed: 1, wfSpeed: 1, note: 25, ...r.fx };
+      const uv = await uadeVoice(buildMedSynthModule(fx), 'x.mmd0', 0, (r.ticks + 3) / 50);
+      const { cfg, cell } = config(fx);
+      const { out } = await octaPreview(cfg, cell.note + 11, r.ticks + 2);
+      const s = rmsPerTick(uv.pcm, r.ticks + 2), p = rmsPerTick(out, r.ticks + 2);
+      for (let t = 2; t <= r.ticks; t++) {
+        if (s[t] < 0.004) { expect(p[t], `tick ${t} silent in the song`).toBeLessThan(0.006); continue; }
+        const best = Math.min(...[t - 1, t, t + 1].map((k) => Math.abs(db(p[k] || 1e-6, s[t]))));
+        expect(best, `tick ${t}: song ${Array.from(s).map((x) => x.toFixed(2)).join(' ')} | preview ${Array.from(p).map((x) => x.toFixed(2)).join(' ')}`).toBeLessThan(3);
+      }
+    });
+  }
+
+  it('wave table F7 takes the vibrato shape from a waveform, not the sine', { timeout: 60000 }, async () => {
+    // An 8-byte wave makes ten cycles a tick, so the pitch over twenty ticks is read to a cycle or two.
+    const fx: MedSynthFixture = { waveforms: [saw(8), Int8Array.from({ length: 64 }, () => 120)], voltbl: [64, 0xff], wftbl: [0, 0xf4, 0xff, 0xf5, 8, 0xf7, 1, 0xff], volSpeed: 1, wfSpeed: 1, note: 25 };
+    const uv = await uadeVoice(buildMedSynthModule(fx), 'x.mmd0', 0, 0.5);
+    const { cfg, cell } = config(fx);
+    const { out } = await octaPreview(cfg, cell.note + 11, 22);
+    // A constant vibrato wave is a constant period shift, which a sine could not give.
+    expect(uv.period[10], 'UADE shifts the period by the wave').toBeGreaterThan(856 + 60);
+    let edges = 0, expected = 0;
+    for (let t = 2; t < 22; t++) {
+      edges += risingEdges(out.subarray(t * FPT, (t + 1) * FPT));
+      expected += PAULA_CLOCK / (uv.period[t] * 8) / 50;
+    }
+    expect(Math.abs(edges - expected), `${edges} edges over 20 ticks, UADE periods want ${expected.toFixed(1)}`).toBeLessThanOrEqual(4);
+  });
+
   it('key release cuts the voice (MED has no release phase: the next note or stop does it)', { timeout: 60000 }, async () => {
     const { cfg, cell } = config({ waveforms: [flat(64, 100)], voltbl: [64, 0xff], wftbl: [0, 0xff], volSpeed: 1, wfSpeed: 1, note: 25 });
     const { proc, send, handle } = await octaPreview(cfg, cell.note + 11, 5);
