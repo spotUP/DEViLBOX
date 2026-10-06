@@ -107,7 +107,14 @@ export async function loadWASMAssets(
     const workletUrl = `${baseUrl}${config.dir}/${config.workletFile}`
       + (config.workletCacheBust ? `?v=${Date.now()}` : '');
 
-    // The shared per-voice audio stream (DevilboxChannelStream) comes first:
+    // TextEncoder/TextDecoder first: the worklet scope has neither, and engine
+    // worklets call them while loading (worklets/text-codec.js).
+    try {
+      await context.audioWorklet.addModule(`${baseUrl}worklets/text-codec.js`);
+    } catch {
+      /* Already in this scope - not fatal. */
+    }
+    // The shared per-voice audio stream (DevilboxChannelStream) comes next:
     // the engine worklet's constructor looks it up on the global scope.
     try {
       await context.audioWorklet.addModule(`${baseUrl}worklets/channel-stream.js`);
