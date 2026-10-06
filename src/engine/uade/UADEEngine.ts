@@ -371,7 +371,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
           try {
             const engine = getToneEngine();
             const levels: number[] = data.levels;
-            meterFeed.feed(engine, levels);
+            const noteStarts: number[] | null = data.noteStarts;
+            if (noteStarts) meterFeed.feedCounted(engine, levels, noteStarts);
+            else meterFeed.feed(engine, levels);
           } catch { /* ToneEngine not ready */ }
           break;
 

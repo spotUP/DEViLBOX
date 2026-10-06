@@ -2463,7 +2463,14 @@ class UADEProcessor extends AudioWorkletProcessor {
         for (let i = 0; i < 4; i++) {
           levels[i] = channels[i].dma ? channels[i].volume / 64.0 : 0;
         }
-        this.port.postMessage({ type: 'chLevels', levels });
+        // Cumulative note starts per channel, counted by the core on every player
+        // tick with the same detector the pattern grid uses.
+        let noteStarts = null;
+        if (this._wasm._uade_wasm_get_note_start_counts) {
+          this._wasm._uade_wasm_get_note_start_counts(this._channelBuf);
+          noteStarts = Array.from(new Uint32Array(this._wasm.HEAPU8.buffer, this._channelBuf, 4));
+        }
+        this.port.postMessage({ type: 'chLevels', levels, noteStarts });
 
         this._lastChannelPost = currentTime;
       }

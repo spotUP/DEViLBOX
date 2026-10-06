@@ -123,6 +123,15 @@ static uint32_t g_prev_lc[4]     = {0, 0, 0, 0};
 static uint8_t  g_prev_dma[4]    = {0, 0, 0, 0};
 static uint16_t g_prev_period[4] = {0, 0, 0, 0};
 static uint16_t g_prev_volume[4] = {0, 0, 0, 0};
+/* Cumulative note starts per channel, counted on every player tick whether or
+ * not tick snapshots are enabled: the live channel meters read it. Separate
+ * previous-state from the snapshot detector, which resets when scans start. */
+static uint32_t g_meter_notes[4]   = {0, 0, 0, 0};
+static uint32_t g_meter_prev_lc[4] = {0, 0, 0, 0};
+static uint8_t  g_meter_prev_dma[4]= {0, 0, 0, 0};
+static uint16_t g_meter_prev_per[4]= {0, 0, 0, 0};
+static uint16_t g_meter_prev_vol[4]= {0, 0, 0, 0};
+
 /* ------------------------------------------------------------------------- */
 
 /* Called from audio.c AUDx handlers (inside #ifdef UADE_WASM guards). */
@@ -348,6 +357,7 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
 
     /* Reset DMA restart detection state */
     for (int i = 0; i < 4; i++) { g_prev_lc[i] = 0; g_prev_dma[i] = 0; }
+    memset(g_meter_notes, 0, sizeof(g_meter_notes)); memset(g_meter_prev_lc, 0, sizeof(g_meter_prev_lc)); memset(g_meter_prev_dma, 0, sizeof(g_meter_prev_dma)); memset(g_meter_prev_per, 0, sizeof(g_meter_prev_per)); memset(g_meter_prev_vol, 0, sizeof(g_meter_prev_vol));
 
     /* Write the file to MEMFS */
     char vpath[512];
@@ -630,12 +640,52 @@ void uade_wasm_on_cia_a_tick(void) {
     g_uade_tick_count++;
 }
 
+/* One Paula channel's note-start test, shared by the tick snapshots and the
+ * channel meters so both agree with the pattern grid on what a note is.
+ *   1. LC changed while DMA on (new sample pointer = new note)
+ *   2. DMA just enabled
+ *   3. Period moved more than ~1 semitone on the same sample (compiled
+ *      replayers reuse one sample for different pitches; vibrato stays under)
+ *   4. Volume went from 0 to >0 while DMA was already on */
+static int paula_note_start(uint32_t lc, uint8_t dma, uint16_t per, uint16_t vol,
+                            uint32_t plc, uint8_t pdma, uint16_t pper, uint16_t pvol) {
+    if (!dma) return 0;
+    if (lc != plc || !pdma) return 1;
+    if (per > 0 && pper > 0) {
+        uint16_t hi = per > pper ? per : pper;
+        uint16_t lo = per > pper ? pper : per;
+        if ((uint32_t)hi * 100 > (uint32_t)lo * 106) return 1;
+    }
+    return vol > 0 && pvol == 0 && pdma;
+}
+
+static void meter_count_note_starts(void) {
+    for (int ch = 0; ch < 4; ch++) {
+        uint32_t lc = (uint32_t)audio_channel[ch].lc;
+        uint8_t dma = dmaen(1 << ch) ? 1 : 0;
+        uint16_t per = (uint16_t)(audio_channel[ch].per & 0xFFFF);
+        uint16_t vol = (uint16_t)(audio_channel[ch].vol & 0xFFFF);
+        if (paula_note_start(lc, dma, per, vol, g_meter_prev_lc[ch], g_meter_prev_dma[ch],
+                             g_meter_prev_per[ch], g_meter_prev_vol[ch]))
+            g_meter_notes[ch]++;
+        g_meter_prev_lc[ch] = lc; g_meter_prev_dma[ch] = dma;
+        g_meter_prev_per[ch] = per; g_meter_prev_vol[ch] = vol;
+    }
+}
+
+/* out[ch] = cumulative note starts of Paula channel ch since the song loaded. */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_get_note_start_counts(uint32_t *out) {
+    for (int ch = 0; ch < 4; ch++) out[ch] = g_meter_notes[ch];
+}
+
 /* Called from cia.c once per player tick (CIA-A Timer B, interrupt enabled).
  * Until 2026-10-05 this ran on Timer A, which no player runs: the snapshot
  * ring stayed empty and compiled-replayer grids were a handful of notes
  * (skyfox2.cus: 1). */
 void uade_wasm_on_player_tick(void) {
     g_player_tick_count++;
+    meter_count_note_starts();
 
     /* Real-time channel state logging (always runs when enabled) */
     rt_channel_log_tick();
@@ -653,39 +703,12 @@ void uade_wasm_on_player_tick(void) {
         snap->channels[ch].len       = (uint16_t)(audio_channel[ch].len & 0xFFFF);
         snap->channels[ch].dma_en    = dmaen(1 << ch) ? 1 : 0;
 
-        /* Enhanced trigger detection:
-         * 1. LC changed while DMA on (original: sample pointer change = new note)
-         * 2. DMA just enabled (original: channel was off, now on)
-         * 3. Period changed significantly while DMA on and LC unchanged
-         *    (compiled replayers reuse same sample for different pitched notes)
-         *    Threshold: period ratio > 1.06 (~1 semitone) to avoid vibrato false positives
-         * 4. Volume went from 0 to >0 while DMA on (note-on after silence)
-         */
         uint32_t curr_lc     = snap->channels[ch].lc;
         uint8_t  curr_dma    = snap->channels[ch].dma_en;
         uint16_t curr_period = snap->channels[ch].period;
         uint16_t curr_volume = snap->channels[ch].volume;
-        uint8_t  triggered   = 0;
-
-        if (curr_dma) {
-            if (curr_lc != g_prev_lc[ch] || !g_prev_dma[ch]) {
-                /* Case 1 & 2: LC changed or DMA just enabled */
-                triggered = 1;
-            } else if (curr_period > 0 && g_prev_period[ch] > 0) {
-                /* Case 3: significant period change (>1 semitone) on same sample */
-                uint16_t hi = curr_period > g_prev_period[ch] ? curr_period : g_prev_period[ch];
-                uint16_t lo = curr_period > g_prev_period[ch] ? g_prev_period[ch] : curr_period;
-                /* ratio > 1.06 ≈ 1 semitone (2^(1/12) ≈ 1.0595) */
-                /* Use integer: hi * 100 > lo * 106 to avoid float */
-                if ((uint32_t)hi * 100 > (uint32_t)lo * 106) {
-                    triggered = 1;
-                }
-            }
-            if (!triggered && curr_volume > 0 && g_prev_volume[ch] == 0 && g_prev_dma[ch]) {
-                /* Case 4: volume from zero while DMA was already on */
-                triggered = 1;
-            }
-        }
+        uint8_t  triggered   = (uint8_t)paula_note_start(curr_lc, curr_dma, curr_period, curr_volume,
+                                    g_prev_lc[ch], g_prev_dma[ch], g_prev_period[ch], g_prev_volume[ch]);
         snap->channels[ch].triggered = triggered;
         g_prev_lc[ch]     = curr_lc;
         g_prev_dma[ch]    = curr_dma;
@@ -922,6 +945,7 @@ int uade_wasm_full_reset(void) {
     memset(g_prev_dma,    0, sizeof(g_prev_dma));
     memset(g_prev_period, 0, sizeof(g_prev_period));
     memset(g_prev_volume, 0, sizeof(g_prev_volume));
+    memset(g_meter_notes, 0, sizeof(g_meter_notes)); memset(g_meter_prev_lc, 0, sizeof(g_meter_prev_lc)); memset(g_meter_prev_dma, 0, sizeof(g_meter_prev_dma)); memset(g_meter_prev_per, 0, sizeof(g_meter_prev_per)); memset(g_meter_prev_vol, 0, sizeof(g_meter_prev_vol));
 
     /* Create fresh UADE state — virtual FS is already populated from
      * the initial uade_wasm_init() call, no need to redo it. */

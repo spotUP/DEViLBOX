@@ -18,7 +18,7 @@ import {
 const meterFeed = new ChannelMeterFeed();
 
 /** Klys adds a defensive comment footer referencing the EXPORT_NAME factory. */
-function klysTransform(code: string): string {
+export function klysTransform(code: string): string {
   let out = code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -220,7 +220,9 @@ export class KlysEngine extends WASMSingletonBase {
           try {
             const engine = getToneEngine();
             const levels: number[] = data.levels;
-            meterFeed.feed(engine, levels);
+            const noteStarts: number[] | null = data.noteStarts;
+            if (noteStarts) meterFeed.feedCounted(engine, levels, noteStarts);
+            else meterFeed.feed(engine, levels);
           } catch { /* ToneEngine not ready */ }
           break;
       }
