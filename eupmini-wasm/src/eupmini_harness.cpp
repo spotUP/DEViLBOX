@@ -205,7 +205,8 @@ EXPORT int eupmini_get_sample_rate(void) {
 }
 
 EXPORT void eupmini_set_channel_mute(int channel, int muted) {
-    if (!g_device || channel < 0 || channel >= 32) return;
+    /* The device has 16 channels; the mixer's mask carries 32 bits. */
+    if (!g_device || channel < 0 || channel >= EUP_TownsEmulator::channelCount()) return;
     /* enable(ch, true) = unmuted, enable(ch, false) = muted */
     g_device->enable(channel, muted ? false : true);
 }
