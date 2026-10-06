@@ -25,6 +25,18 @@ export interface CompanionIO {
   read(path: string): Promise<ArrayBuffer | null>;
 }
 
+/**
+ * The directory a song file sits in: its OWN directory, not the directory its
+ * index row is named for. A row such as `iff-smus/- unknown` holds songs in
+ * subfolders (`42/42.smus` beside `42/instruments/`); resolving companions
+ * against the row's directory found no Instruments and every Sonix row failed
+ * silent in the jukebox (2026-10-06).
+ */
+export function directoryOfFile(path: string): string {
+  const slash = path.lastIndexOf('/');
+  return slash >= 0 ? path.slice(0, slash + 1) : '';
+}
+
 /** Ensure a directory path is relative to public/data and ends with `/`. */
 function normaliseDir(dir: string): string {
   const d = dir.replace(/^\/+/, '').replace(/^data\//, '');
