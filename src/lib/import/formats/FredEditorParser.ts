@@ -8,18 +8,21 @@
  *   - 0x4efa (jmp) at 16-byte intervals in the first 16 bytes
  *   - 0x123a/0xb001 and 0x214a/0x47fa sequences in the first 1024 bytes
  *
- * Reference: FlodJS FEPlayer.js by Christian Corti (Neoart)
+ * The song is decoded from the module's own structures (FredEditorModule.ts:
+ * track lists, pattern command streams, instrument records - reversed from
+ * the replayer every .fred file carries) and the grid is each voice's walk
+ * through its track list on one line timeline (fredEditorGrid.ts). Audio:
+ * FredReplayer2 (fredReplayerFileData). Grid edits re-encode the module
+ * (applyFredGridEdits) and the engine swaps it in (fredModuleEdits.ts).
+ * Research: thoughts/shared/research/2026-10-06_fred-editor-format.md
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell } from '@/types';
+import type { Pattern, ChannelData } from '@/types';
 import type { InstrumentConfig, FredConfig, UADEChipRamInfo } from '@/types/instrument';
-import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
-import { fredEditorEncoder } from '@/engine/uade/encoders/FredEditorEncoder';
-
-// ── Fred Editor period table (from FEPlayer.js) ─────────────────────────────
-// 6 octaves of 12 semitones = 72 entries. Used with relative tuning per sample.
+import { decodeFredModule, fredSections, FRED_INSTRUMENT_SIZE } from './FredEditorModule';
+import { FRED_ROWS_PER_PATTERN, fredCellEffectColumns, fredLineToCell, walkFredSong } from './fredEditorGrid';
 
 // ── Utility: read big-endian values from a DataView ─────────────────────────
 
@@ -85,25 +88,6 @@ interface FESample {
   blendCounter: number;
 }
 
-// ── FE song definition ──────────────────────────────────────────────────────
-
-interface FESong {
-  speed: number;
-  length: number;     // max track length
-  tracks: Uint32Array[];  // 4 tracks, each with pattern offsets
-}
-
-// ── Map a Fred Editor note to XM note ───────────────────────────────────────
-// FE notes are stored as 1-based values in the file (1-72, 6 octaves).
-// FE note 1 = C-1 (period 856) = XM note 13
-// FE note 13 = C-2 (period 428) = XM note 25
-// FE note 25 = C-3 = XM note 37
-
-function feNoteToXM(feNote: number): number {
-  if (feNote < 1 || feNote > 72) return 0;
-  return feNote + 12; // 1-based: FE note 1 (C-1) → XM note 13 (displays "C-1")
-}
-
 // ── Format detection ────────────────────────────────────────────────────────
 
 /**
@@ -165,556 +149,151 @@ export function isFredEditorFormat(buffer: ArrayBuffer): boolean {
 
 // ── Main parser ─────────────────────────────────────────────────────────────
 
+/** One 64-byte instrument record (Lab2_InsStr) as the replayer reads it. */
+function readSample(rec: Uint8Array): FESample {
+  const view = new DataView(rec.buffer, rec.byteOffset, rec.byteLength);
+  const arpeggio = new Int8Array(16);
+  for (let i = 0; i < 16; i++) arpeggio[i] = readInt8(view, 22 + i);
+  return {
+    pointer: readUint32(view, 0),
+    loopPtr: readInt16(view, 4),
+    length: readUint16(view, 6) << 1,
+    relative: readUint16(view, 8),
+    vibratoDelay: readUint8(view, 10),
+    vibratoSpeed: readUint8(view, 12),
+    vibratoDepth: readUint8(view, 13),
+    envelopeVol: readUint8(view, 14),
+    attackSpeed: readUint8(view, 15),
+    attackVol: readUint8(view, 16),
+    decaySpeed: readUint8(view, 17),
+    decayVol: readUint8(view, 18),
+    sustainTime: readUint8(view, 19),
+    releaseSpeed: readUint8(view, 20),
+    releaseVol: readUint8(view, 21),
+    arpeggio,
+    arpeggioSpeed: readUint8(view, 38),
+    type: readInt8(view, 39),
+    pulseRateNeg: readInt8(view, 40),
+    pulseRatePos: readUint8(view, 41),
+    pulseSpeed: readUint8(view, 42),
+    pulsePosL: readUint8(view, 43),
+    pulsePosH: readUint8(view, 44),
+    pulseDelay: readUint8(view, 45),
+    synchro: readUint8(view, 46),
+    blendRate: readUint8(view, 47),
+    blendDelay: readUint8(view, 48),
+    pulseCounter: readUint8(view, 49),
+    blendCounter: readUint8(view, 50),
+    arpeggioLimit: readUint8(view, 51),
+  };
+}
+
+function fredConfigOf(sample: FESample): FredConfig {
+  return {
+    envelopeVol:   sample.envelopeVol,
+    attackSpeed:   sample.attackSpeed,
+    attackVol:     sample.attackVol,
+    decaySpeed:    sample.decaySpeed,
+    decayVol:      sample.decayVol,
+    sustainTime:   sample.sustainTime,
+    releaseSpeed:  sample.releaseSpeed,
+    releaseVol:    sample.releaseVol,
+    vibratoDelay:  sample.vibratoDelay,
+    vibratoSpeed:  sample.vibratoSpeed,
+    vibratoDepth:  sample.vibratoDepth,
+    arpeggio:      Array.from(sample.arpeggio),
+    arpeggioLimit: sample.arpeggioLimit,
+    arpeggioSpeed: sample.arpeggioSpeed,
+    pulseRateNeg:  sample.pulseRateNeg,
+    pulseRatePos:  sample.pulseRatePos,
+    pulseSpeed:    sample.pulseSpeed,
+    pulsePosL:     sample.pulsePosL,
+    pulsePosH:     sample.pulsePosH,
+    pulseDelay:    sample.pulseDelay,
+    relative:      sample.relative,
+  };
+}
+
 /**
- * Parse a Fred Editor (.fred) file into a TrackerSong.
- *
- * Extracts samples, songs, and pattern data. Each subsong is flattened into
- * sequential patterns. Sample instruments are created with proper loop points.
- * Arpeggio tables and portamento are mapped to XM effects.
+ * Parse a Fred Editor (.fred) file into a TrackerSong: the grid of subsong
+ * `subsong` decoded from the module (see the file header), the instrument
+ * records as instruments.
  */
 export async function parseFredEditorFile(
   buffer: ArrayBuffer,
   filename: string,
-  moduleBase = 0
+  moduleBase = 0,
+  subsong = 0,
 ): Promise<TrackerSong> {
-  const view = new DataView(buffer);
-  const byteLength = buffer.byteLength;
+  const bytes = new Uint8Array(buffer);
+  const module = decodeFredModule(bytes);
+  const { dataPtr, base, blockTrk, patStart, structStart } = fredSections(bytes);
+  const song = Math.min(Math.max(0, subsong), module.songs - 1);
 
-  // ── Step 1: Locate dataPtr and basePtr using 68k assembly patterns ────────
-
-  // Verify jmp instructions
-  for (let pos = 0; pos < 16; pos += 4) {
-    const value = view.getUint16(pos, false);
-    if (value !== 0x4efa) {
-      throw new Error('Not a Fred Editor file: missing jmp instructions');
-    }
-  }
-
-  let dataPtr = 0;
-  let basePtr = -1;
-  let pos = 16;
-
-  while (pos < 1024 && pos + 6 <= byteLength) {
-    const value = view.getUint16(pos, false);
-
-    if (value === 0x123a) {
-      // move.b $x,d1
-      const offset = view.getUint16(pos + 2, false); // displacement
-      const nextInstr = view.getUint16(pos + 4, false);
-
-      if (nextInstr === 0xb001) {
-        // cmp.b d1,d0 -- calculate dataPtr
-        // FEPlayer: dataPtr = (stream.position + stream.readUshort()) - 0x895
-        // stream.position was at pos (before reading 0x123a), then +2 for the
-        // first readUshort, so displacement is relative to pos.
-        // Actually: the FlodJS code reads at stream.position (gets 0x123a),
-        // advances position by 2 (the readUshort), then skips 2 (position += 2),
-        // then reads the next ushort and checks for 0xb001.
-        // When it found 0x123a: position was at `pos`, readUshort advances to pos+2,
-        // position += 2 makes it pos+4, then it backs up 4 (position -= 4) to get
-        // the displacement calculation: dataPtr = (position + readUshort()) - 0x895
-        // position at that point = pos+4-4 = pos
-        // readUshort reads the displacement at pos which is the 0x123a value itself...
-        // Let me re-read the FlodJS more carefully.
-        //
-        // FlodJS loader:
-        //   value = stream.readUshort();             // reads at position, advances +2
-        //   if (value == 0x123a) {
-        //     stream.position += 2;                   // skip 2 bytes (the displacement)
-        //     value = stream.readUshort();             // reads next instruction
-        //     if (value == 0xb001) {
-        //       stream.position -= 4;                  // back to the displacement
-        //       dataPtr = (stream.position + stream.readUshort()) - 0x895;
-        //     }
-        //   }
-        //
-        // So: after reading 0x123a at pos, position = pos+2
-        // skip 2: position = pos+4
-        // read 0xb001 at pos+4, position = pos+6
-        // back 4: position = pos+2
-        // read displacement at pos+2, position = pos+4
-        // dataPtr = (pos+2 + displacement) - 0x895
-        dataPtr = (pos + 2 + offset) - 0x895;
-      }
-    } else if (value === 0x214a) {
-      // move.l a2,(a0)
-      const nextPos = pos + 2;
-      if (nextPos + 2 <= byteLength) {
-        // Skip 2 bytes (position += 2 in FlodJS after reading 0x214a)
-        const nextInstr = view.getUint16(nextPos + 2, false);
-        if (nextInstr === 0x47fa) {
-          // lea $x,a3 -- basePtr = position + displacement (signed short)
-          // FlodJS: stream.position += 2; value = stream.readUshort();
-          // if (value == 0x47fa) basePtr = stream.position + stream.readShort();
-          //
-          // After reading 0x214a at pos, position = pos+2
-          // position += 2: position = pos+4
-          // read 0x47fa at pos+4, position = pos+6
-          // read signed short displacement at pos+6, position = pos+8
-          // basePtr = pos+6 + displacement
-          if (pos + 8 <= byteLength) {
-            const displacement = view.getInt16(pos + 6, false);
-            basePtr = pos + 6 + displacement;
-          }
-          break;
-        }
-      }
-    }
-
-    pos += 2;
-  }
-
-  if (basePtr === -1) {
-    throw new Error('Not a Fred Editor file: could not locate basePtr');
-  }
-
-  // ── Step 2: Read sample definitions ───────────────────────────────────────
-  // FlodJS: stream.position = dataPtr + 0x8a2; pos = stream.readUint();
-  //         stream.position = basePtr + pos;
-  // Then reads samples until sentinel.
-
-  const sampleTableOffset = dataPtr + 0x8a2;
-  if (sampleTableOffset + 8 > byteLength) {
-    throw new Error('Fred Editor: sample table offset out of bounds');
-  }
-
-  const sampleDataOffset = readUint32(view, sampleTableOffset);
-  const sampleDefsStart = basePtr + sampleDataOffset; // file offset of first sample def
-  let readPos = sampleDefsStart;
-
-  if (readPos >= byteLength) {
-    throw new Error('Fred Editor: sample data position out of bounds');
-  }
-
-  const samples: FESample[] = [];
-  let minSamplePointer = 0x7fffffff; // tracks earliest sample PCM data
-
-  while (readPos + 64 <= byteLength) {
-    const samplePointer = readUint32(view, readPos);
-
-    if (samplePointer !== 0) {
-      // Validate: pointer should be forward of current position or within file
-      if ((samplePointer < readPos && samplePointer !== 0) || samplePointer >= byteLength) {
-        break;
-      }
-      // Track minimum raw pointer (NOT basePtr-adjusted) so comparisons stay in consistent units
-      if (samplePointer < minSamplePointer) {
-        minSamplePointer = samplePointer;
-      }
-    }
-
-    const sample: FESample = {
-      pointer: samplePointer,
-      loopPtr: readInt16(view, readPos + 4),
-      length: readUint16(view, readPos + 6) << 1,
-      relative: readUint16(view, readPos + 8),
-
-      vibratoDelay: readUint8(view, readPos + 10),
-      // skip 1 byte (readPos + 11)
-      vibratoSpeed: readUint8(view, readPos + 12),
-      vibratoDepth: readUint8(view, readPos + 13),
-
-      envelopeVol: readUint8(view, readPos + 14),
-      attackSpeed: readUint8(view, readPos + 15),
-      attackVol: readUint8(view, readPos + 16),
-      decaySpeed: readUint8(view, readPos + 17),
-      decayVol: readUint8(view, readPos + 18),
-      sustainTime: readUint8(view, readPos + 19),
-      releaseSpeed: readUint8(view, readPos + 20),
-      releaseVol: readUint8(view, readPos + 21),
-
-      arpeggio: new Int8Array(16),
-      arpeggioSpeed: 0,
-      arpeggioLimit: 0,
-      type: 0,
-      synchro: 0,
-      pulseRateNeg: 0,
-      pulseRatePos: 0,
-      pulseSpeed: 0,
-      pulsePosL: 0,
-      pulsePosH: 0,
-      pulseDelay: 0,
-      pulseCounter: 0,
-      blendRate: 0,
-      blendDelay: 0,
-      blendCounter: 0,
-    };
-
-    // 16 signed bytes of arpeggio data
-    for (let i = 0; i < 16; i++) {
-      sample.arpeggio[i] = readInt8(view, readPos + 22 + i);
-    }
-
-    sample.arpeggioSpeed = readUint8(view, readPos + 38);
-    sample.type = readInt8(view, readPos + 39);
-    sample.pulseRateNeg = readInt8(view, readPos + 40);
-    sample.pulseRatePos = readUint8(view, readPos + 41);
-    sample.pulseSpeed = readUint8(view, readPos + 42);
-    sample.pulsePosL = readUint8(view, readPos + 43);
-    sample.pulsePosH = readUint8(view, readPos + 44);
-    sample.pulseDelay = readUint8(view, readPos + 45);
-    sample.synchro = readUint8(view, readPos + 46);
-    sample.blendRate = readUint8(view, readPos + 47);
-    sample.blendDelay = readUint8(view, readPos + 48);
-    sample.pulseCounter = readUint8(view, readPos + 49);
-    sample.blendCounter = readUint8(view, readPos + 50);
-    sample.arpeggioLimit = readUint8(view, readPos + 51);
-
-    // Skip 12 padding bytes
-    readPos += 64; // 52 data bytes + 12 padding = 64 total per sample entry
-
-    samples.push(sample);
-  }
-
-  // ── Step 3: Extract PCM sample data ───────────────────────────────────────
-  // FlodJS: mixer.store(stream, stream.length - pos) where pos = basePtr + minSamplePointer
-  // Then adjusts sample pointers relative to the stored memory base.
-
-  // minSamplePointer is raw (relative to basePtr); convert to absolute file offset
-  const pcmBase = minSamplePointer < 0x7fffffff ? (basePtr + minSamplePointer) : 0;
-  const pcmData = pcmBase > 0 && pcmBase < byteLength
-    ? new Uint8Array(buffer, pcmBase, byteLength - pcmBase)
-    : new Uint8Array(0);
-
-  // Adjust sample pointers to be relative to pcmBase
-  // sample.pointer is raw (relative to basePtr); absolute = basePtr + sample.pointer
-  if (pcmBase > 0) {
-    for (const sample of samples) {
-      if (sample.pointer > 0) {
-        sample.pointer = (basePtr + sample.pointer) - pcmBase;
-      }
-    }
-  }
-
-  // ── Step 4: Read pattern byte stream ──────────────────────────────────────
-  // FlodJS:
-  //   stream.position = dataPtr + 0x8a2;
-  //   len = stream.readUint();     // sampleDataOffset (already read above)
-  //   pos = stream.readUint();     // patternDataOffset
-  //   stream.position = basePtr + pos;
-  //   patterns = ByteArray(new ArrayBuffer((len - pos)));
-  //   stream.readBytes(patterns, 0, (len - pos));
-
-  const patternDataOffset = readUint32(view, sampleTableOffset + 4);
-  const patternStart = basePtr + patternDataOffset;
-  const patternLen = sampleDataOffset - patternDataOffset;
-
-  let patternBytes: Uint8Array;
-  if (patternLen > 0 && patternStart + patternLen <= byteLength) {
-    patternBytes = new Uint8Array(buffer, patternStart, patternLen);
-  } else {
-    patternBytes = new Uint8Array(0);
-  }
-
-  // ── Step 5: Read songs ────────────────────────────────────────────────────
-  // FlodJS:
-  //   stream.position = dataPtr + 0x895;
-  //   lastSong = len = stream.readUbyte();
-  //   songs.length = ++len;
-  //   basePtr2 = dataPtr + 0xb0e;      // track data starts here
-  //   tracksLen = patternStart - basePtr2;
-  //
-  // Each song has 4 tracks. Track table: sequential uint16 entries.
-  // For each song, 4 x uint16 start offsets, track lengths derived from
-  // adjacent offsets. Track data is uint16 arrays of pattern offsets.
-
-  const songCountOffset = dataPtr + 0x895;
-  if (songCountOffset >= byteLength) {
-    throw new Error('Fred Editor: song count offset out of bounds');
-  }
-
-  const numSongs = readUint8(view, songCountOffset) + 1;
-  const tracksBase = dataPtr + 0xb0e;
-  const tracksLen = patternStart - tracksBase;
-
-  const songs: FESong[] = [];
-  let trackTablePos = 0;
-
-  for (let i = 0; i < numSongs; i++) {
-    const song: FESong = {
-      speed: 0,
-      length: 0,
-      tracks: [],
-    };
-
-    for (let j = 0; j < 4; j++) {
-      const trackOffset = tracksBase + trackTablePos;
-      if (trackOffset + 2 > byteLength) break;
-
-      const startOff = readUint16(view, trackOffset);
-
-      // Determine end offset
-      let endOff: number;
-      if (j === 3 && i === numSongs - 1) {
-        endOff = tracksLen;
-      } else {
-        const nextOffset = tracksBase + trackTablePos + 2;
-        if (nextOffset + 2 <= byteLength) {
-          endOff = readUint16(view, nextOffset);
-        } else {
-          endOff = tracksLen;
-        }
-      }
-
-      const trackEntries = (endOff - startOff) >> 1;
-      if (trackEntries > song.length) song.length = trackEntries;
-
-      const track = new Uint32Array(Math.max(0, trackEntries));
-      for (let ptr = 0; ptr < trackEntries; ptr++) {
-        const entryOff = tracksBase + startOff + ptr * 2;
-        if (entryOff + 2 <= byteLength) {
-          track[ptr] = readUint16(view, entryOff);
-        }
-      }
-      song.tracks[j] = track;
-
-      trackTablePos += 2;
-    }
-
-    // Read speed for this song
-    const speedOffset = dataPtr + 0x897 + i;
-    if (speedOffset < byteLength) {
-      song.speed = readUint8(view, speedOffset);
-    }
-    if (song.speed === 0) song.speed = 6;
-
-    songs.push(song);
-  }
-
-  // ── Step 6: Build instruments from samples ────────────────────────────────
-
+  // ── Instruments: the 64-byte records; sample data at Base + InsAdr ──────
   const instruments: InstrumentConfig[] = [];
-
-  for (let i = 0; i < samples.length; i++) {
-    const sample = samples[i];
+  module.instruments.forEach((rec, i) => {
+    const sample = readSample(rec);
     const instId = i + 1;
-    const name = `Sample ${i + 1}`;
-
-    // Chip RAM location for this instrument's 64-byte sample definition entry
-    const instrFileOffset = sampleDefsStart + i * 64;
+    const name = `Sample ${instId}`;
+    const instrFileOffset = structStart + i * FRED_INSTRUMENT_SIZE;
     const chipRam: UADEChipRamInfo = {
       moduleBase,
       moduleSize: buffer.byteLength,
       instrBase: moduleBase + instrFileOffset,
-      instrSize: 64,
+      instrSize: FRED_INSTRUMENT_SIZE,
       sections: {
         dataBase:    moduleBase + dataPtr,
-        fileBase:    moduleBase + basePtr,
-        sampleDefs:  moduleBase + sampleDefsStart,
-        patternData: moduleBase + patternStart,
-        trackData:   moduleBase + tracksBase,
+        fileBase:    moduleBase + base,
+        sampleDefs:  moduleBase + structStart,
+        patternData: moduleBase + patStart,
+        trackData:   moduleBase + blockTrk,
       },
     };
+    const start = sample.pointer ? base + sample.pointer : -1;
+    const pcm = start >= 0 && sample.length > 0 && start + sample.length <= bytes.length
+      ? bytes.slice(start, start + sample.length) : null;
 
-    if (sample.length > 0 && sample.pointer >= 0 && sample.type === 0) {
-      // Regular PCM sample
-      const start = sample.pointer;
-      const end = start + sample.length;
-
-      if (end <= pcmData.length) {
-        const pcm = pcmData.slice(start, end);
-
-        // Calculate loop points
-        let loopStart = 0;
-        let loopEnd = 0;
-        if (sample.loopPtr > 0) {
-          loopStart = sample.loopPtr;
-          loopEnd = sample.length;
-        }
-
-        const instr = createSamplerInstrument(
-          instId,
-          name,
-          pcm,
-          Math.min(64, sample.envelopeVol || 64),
-          8287,
-          loopStart,
-          loopEnd
-        );
-        instr.uadeChipRam = chipRam;
-        // PCM sample notes still carry instrument-level vibrato / arpeggio / envelope,
-        // which the pattern decoder synthesises into each note cell (effTyp 0x04 vibrato,
-        // effTyp 0x00 arpeggio; see the note-trigger block below). Preserve those raw
-        // sample-descriptor fields on the config so the exporter can write them back —
-        // otherwise the round-trip drops every vibrato/arpeggio effect on sample notes.
-        instr.fred = {
-          envelopeVol:   sample.envelopeVol,
-          attackSpeed:   sample.attackSpeed,
-          attackVol:     sample.attackVol,
-          decaySpeed:    sample.decaySpeed,
-          decayVol:      sample.decayVol,
-          sustainTime:   sample.sustainTime,
-          releaseSpeed:  sample.releaseSpeed,
-          releaseVol:    sample.releaseVol,
-          vibratoDelay:  sample.vibratoDelay,
-          vibratoSpeed:  sample.vibratoSpeed,
-          vibratoDepth:  sample.vibratoDepth,
-          arpeggio:      Array.from(sample.arpeggio),
-          arpeggioLimit: sample.arpeggioLimit,
-          arpeggioSpeed: sample.arpeggioSpeed,
-          pulseRateNeg:  sample.pulseRateNeg,
-          pulseRatePos:  sample.pulseRatePos,
-          pulseSpeed:    sample.pulseSpeed,
-          pulsePosL:     sample.pulsePosL,
-          pulsePosH:     sample.pulsePosH,
-          pulseDelay:    sample.pulseDelay,
-          relative:      sample.relative,
-        };
-        instruments.push(instr);
-      } else {
-        const instr = makePlaceholderInstrument(instId, name);
-        instr.uadeChipRam = chipRam;
-        instruments.push(instr);
-      }
-    } else if (sample.type === 1) {
-      // PWM synth instrument — use FredSynth
-      const fredCfg: FredConfig = {
-        envelopeVol:   sample.envelopeVol,
-        attackSpeed:   sample.attackSpeed,
-        attackVol:     sample.attackVol,
-        decaySpeed:    sample.decaySpeed,
-        decayVol:      sample.decayVol,
-        sustainTime:   sample.sustainTime,
-        releaseSpeed:  sample.releaseSpeed,
-        releaseVol:    sample.releaseVol,
-        vibratoDelay:  sample.vibratoDelay,
-        vibratoSpeed:  sample.vibratoSpeed,
-        vibratoDepth:  sample.vibratoDepth,
-        arpeggio:      Array.from(sample.arpeggio),
-        arpeggioLimit: sample.arpeggioLimit,
-        arpeggioSpeed: sample.arpeggioSpeed,
-        pulseRateNeg:  sample.pulseRateNeg,
-        pulseRatePos:  sample.pulseRatePos,
-        pulseSpeed:    sample.pulseSpeed,
-        pulsePosL:     sample.pulsePosL,
-        pulsePosH:     sample.pulsePosH,
-        pulseDelay:    sample.pulseDelay,
-        relative:      sample.relative,
-      };
-      instruments.push({
-        id:           instId,
-        name:         `${name} (PWM)`,
-        type:         'synth' as const,
-        synthType:    'FredSynth' as const,
-        fred:         fredCfg,
-        effects:      [],
-        volume:       -6,
-        pan:          0,
-        uadeChipRam:  chipRam,
-      } as unknown as InstrumentConfig);
+    let instr: InstrumentConfig;
+    if (sample.type === 1) {
+      // PWM synth instrument — FredSynth
+      instr = {
+        id: instId, name: `${name} (PWM)`, type: 'synth' as const, synthType: 'FredSynth' as const,
+        fred: fredConfigOf(sample), effects: [], volume: -6, pan: 0,
+      } as unknown as InstrumentConfig;
     } else if (sample.type === 2) {
-      // Wavetable blend — use Sampler approximation with the PCM data if available
-      const start = sample.pointer;
-      const end   = start + sample.length;
-      if (sample.length > 0 && start >= 0 && end <= pcmData.length) {
-        const pcm = pcmData.slice(start, end);
-        const instr = createSamplerInstrument(
-          instId,
-          `${name} (Blend)`,
-          pcm,
-          Math.min(64, sample.envelopeVol || 64),
-          8287,
-          0,
-          0
-        );
-        instr.uadeChipRam = chipRam;
-        instruments.push(instr);
-      } else {
-        const instr = makePlaceholderInstrument(instId, `${name} (Blend)`);
-        instr.uadeChipRam = chipRam;
-        instruments.push(instr);
-      }
+      // Wavetable blend — Sampler approximation with the PCM data if available
+      instr = pcm
+        ? createSamplerInstrument(instId, `${name} (Blend)`, pcm, Math.min(64, sample.envelopeVol || 64), 8287, 0, 0)
+        : makePlaceholderInstrument(instId, `${name} (Blend)`);
+    } else if (sample.type === 0 && pcm) {
+      const loop = sample.loopPtr > 0;
+      instr = createSamplerInstrument(instId, name, pcm, Math.min(64, sample.envelopeVol || 64), 8287,
+        loop ? sample.loopPtr : 0, loop ? sample.length : 0);
+      // Instrument-level vibrato / arpeggio / envelope live on the record; keep them on the config.
+      instr.fred = fredConfigOf(sample);
     } else {
-      const instr = makePlaceholderInstrument(instId, name);
-      instr.uadeChipRam = chipRam;
-      instruments.push(instr);
+      instr = makePlaceholderInstrument(instId, name);
     }
-  }
+    instr.uadeChipRam = chipRam;
+    instruments.push(instr);
+  });
+  if (instruments.length === 0) instruments.push(makePlaceholderInstrument(1, 'Default'));
 
-  // Ensure at least one instrument
-  if (instruments.length === 0) {
-    instruments.push(makePlaceholderInstrument(1, 'Default'));
-  }
-
-  // ── Step 7: Convert songs to TrackerSong patterns ─────────────────────────
-  // We flatten the first song (subsong 0) into sequential patterns.
-  // Each track position yields one pattern of rows.
-
-  const trackerPatterns: Pattern[] = [];
-  const songPositions: number[] = [];
-  const activeSong = songs.length > 0 ? songs[0] : null;
-
-  if (activeSong && patternBytes.length > 0) {
-    const speed = activeSong.speed || 6;
-
-    // We need to simulate the playback to extract patterns.
-    // Each voice has a track position that advances through track entries.
-    // A track entry is an offset into the pattern byte stream.
-    // We step through the byte stream until we hit -128 (pattern end).
-
-    // First, determine the song length by finding the max track length
-    const maxTrackLen = activeSong.length;
-
-    for (let trackPos = 0; trackPos < maxTrackLen; trackPos++) {
-      const channelRows: TrackerCell[][] = [[], [], [], []];
-
-      // For each channel, decode the pattern data starting at the
-      // offset given by the track entry.
-      for (let ch = 0; ch < 4; ch++) {
-        const track = activeSong.tracks[ch];
-        if (!track || trackPos >= track.length) {
-          // Fill with empty rows
-          for (let row = 0; row < 64; row++) {
-            channelRows[ch].push(emptyCell());
-          }
-          continue;
-        }
-
-        const patOffset = track[trackPos];
-
-        // Check for end/loop markers in track entries
-        if (patOffset === 65535) {
-          // End of song marker
-          for (let row = 0; row < 64; row++) {
-            channelRows[ch].push(emptyCell());
-          }
-          continue;
-        }
-        if (patOffset > 32767) {
-          // Loop marker: (value ^ 32768) >> 1 = target track position
-          // We don't loop, just fill empty
-          for (let row = 0; row < 64; row++) {
-            channelRows[ch].push(emptyCell());
-          }
-          continue;
-        }
-
-        // Decode the pattern byte stream
-        const rows = decodePatternStream(patternBytes, patOffset, speed, samples);
-        for (const row of rows) {
-          channelRows[ch].push(row);
-        }
-      }
-
-      // Normalize all channels to the same row count
-      const maxRows = Math.max(
-        ...channelRows.map(r => r.length),
-        1
-      );
-      // Cap at 64 rows per pattern
-      const patternLength = Math.min(maxRows, 64);
-
-      for (let ch = 0; ch < 4; ch++) {
-        while (channelRows[ch].length < patternLength) {
-          channelRows[ch].push(emptyCell());
-        }
-        // Truncate if over 64
-        if (channelRows[ch].length > patternLength) {
-          channelRows[ch].length = patternLength;
-        }
-      }
-
-      const channels: ChannelData[] = channelRows.map((rows, ch) => ({
+  // ── Grid: every voice's line on one timeline, cut into 64-row patterns ──
+  const walk = walkFredSong(module, song);
+  const numPatterns = Math.max(1, Math.ceil(walk.lines / FRED_ROWS_PER_PATTERN));
+  const patterns: Pattern[] = [];
+  for (let p = 0; p < numPatterns; p++) {
+    const first = p * FRED_ROWS_PER_PATTERN;
+    const length = Math.max(1, Math.min(FRED_ROWS_PER_PATTERN, walk.lines - first));
+    const channels: ChannelData[] = walk.voices.map((refs, ch) => {
+      const rows = Array.from({ length }, (_, r) => {
+        const ref = refs[first + r];
+        return fredLineToCell(ref ? module.patterns[ref.pattern].lines[ref.line] : undefined);
+      });
+      const effectCols = Math.max(...rows.map(fredCellEffectColumns));
+      return {
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
         muted: false,
@@ -725,313 +304,44 @@ export async function parseFredEditorFile(
         instrumentId: null,
         color: null,
         rows,
-      }));
-
-      const patIdx = trackerPatterns.length;
-      trackerPatterns.push({
-        id: `pattern-${patIdx}`,
-        name: `Pattern ${patIdx}`,
-        length: patternLength,
-        channels,
-        importMetadata: {
-          sourceFormat: 'MOD' as const,
-          sourceFile: filename,
-          importedAt: new Date().toISOString(),
-          originalChannelCount: 4,
-          originalPatternCount: maxTrackLen,
-          originalInstrumentCount: samples.length,
-        },
-      });
-      songPositions.push(patIdx);
-    }
+        ...(effectCols > 2 ? { channelMeta: { importedFromMOD: false, effectCols } } : {}),
+      };
+    });
+    patterns.push({
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length,
+      channels,
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 4,
+        originalPatternCount: module.patterns.length,
+        originalInstrumentCount: module.instruments.length,
+      },
+    });
   }
-
-  // Fallback: at least one empty pattern
-  if (trackerPatterns.length === 0) {
-    trackerPatterns.push(makeEmptyPattern(filename));
-    songPositions.push(0);
-  }
-
-  const moduleName = filename.replace(/\.[^/.]+$/, '');
-  const initialSpeed = activeSong?.speed || 6;
-
-  // ── Build UADEVariablePatternLayout for chip RAM editing ────────────────
-  // Collect all unique pattern byte stream offsets, measure their sizes,
-  // and build the (trackerPatIdx, channelIdx) → filePatIdx mapping.
-
-  const uniqueOffsets: number[] = [];  // de-duped list of pattern stream offsets
-  const offsetToIdx = new Map<number, number>(); // patOffset → index in uniqueOffsets
-
-  if (activeSong && patternBytes.length > 0) {
-    const maxTrackLen = activeSong.length;
-    for (let trackPos = 0; trackPos < maxTrackLen; trackPos++) {
-      for (let ch = 0; ch < 4; ch++) {
-        const track = activeSong.tracks[ch];
-        if (!track || trackPos >= track.length) continue;
-        const patOffset = track[trackPos];
-        if (patOffset >= 32768) continue; // end/loop markers
-        if (!offsetToIdx.has(patOffset)) {
-          offsetToIdx.set(patOffset, uniqueOffsets.length);
-          uniqueOffsets.push(patOffset);
-        }
-      }
-    }
-  }
-
-  // Measure byte size of each pattern stream (scan to -128 end marker)
-  const filePatternAddrs: number[] = [];
-  const filePatternSizes: number[] = [];
-  // Per-byte carrier rows: a Fred Editor pattern is a variable-length command
-  // stream (note / duration / set-sample / set-speed / portamento / end), not a
-  // fixed grid. Per-byte carriers (cutoff=1, period=byte) let the encoder
-  // reproduce each stream verbatim; the editable display grid stays carrier-less.
-  const blockRows: TrackerCell[][] = [];
-  for (const off of uniqueOffsets) {
-    filePatternAddrs.push(patternStart + off); // absolute file offset
-    let pos = off;
-    while (pos < patternBytes.length) {
-      const val = patternBytes[pos];
-      pos++;
-      if (val === 0x80) break; // -128 as unsigned = 0x80
-      // Commands that consume extra bytes:
-      if (val === 0x83) pos++;        // set sample: +1
-      else if (val === 0x82) pos++;   // set speed: +1
-      else if (val === 0x81) pos += 3; // portamento: +3
-      // Note values (1-127) and note off (0x84), duration (other negative): no extra bytes
-    }
-    filePatternSizes.push(pos - off);
-    const cells: TrackerCell[] = [];
-    for (let b = off; b < pos; b++) {
-      cells.push({
-        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-        cutoff: 1, period: patternBytes[b] & 0xFF,
-      });
-    }
-    blockRows.push(cells);
-  }
-
-  // Build trackMap: trackerPatternIdx → [ch0 filePatIdx, ch1 filePatIdx, ...]
-  const trackMap: number[][] = [];
-  if (activeSong) {
-    const maxTrackLen = activeSong.length;
-    for (let trackPos = 0; trackPos < maxTrackLen; trackPos++) {
-      const chPats: number[] = [];
-      for (let ch = 0; ch < 4; ch++) {
-        const track = activeSong.tracks[ch];
-        if (!track || trackPos >= track.length) {
-          chPats.push(-1);
-          continue;
-        }
-        const patOffset = track[trackPos];
-        if (patOffset >= 32768) {
-          chPats.push(-1);
-          continue;
-        }
-        chPats.push(offsetToIdx.get(patOffset) ?? -1);
-      }
-      trackMap.push(chPats);
-    }
-  }
-
-  const variableLayout: UADEVariablePatternLayout = {
-    formatId: 'fredEditor',
-    numChannels: 4,
-    numFilePatterns: uniqueOffsets.length,
-    rowsPerPattern: 64,
-    moduleSize: buffer.byteLength,
-    encoder: fredEditorEncoder,
-    filePatternAddrs,
-    filePatternSizes,
-    trackMap,
-    blockRows,
-  };
 
   return {
-    name: moduleName,
+    name: filename.replace(/\.[^/.]+$/, ''),
     format: 'MOD' as TrackerFormat,
-    patterns: trackerPatterns,
+    patterns,
     instruments,
-    songPositions,
-    songLength: songPositions.length,
+    songPositions: patterns.map((_, i) => i),
+    songLength: patterns.length,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed,
+    // One line = TempoCur ticks of the 50 Hz play call (125 BPM = 50 ticks/s).
+    initialSpeed: module.tempos[song] || 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadeVariableLayout: variableLayout,
     // WASM engine playback (replaces UADE)
     fredReplayerFileData: buffer.slice(0) as ArrayBuffer,
   };
 }
 
-// ── Pattern byte stream decoder ─────────────────────────────────────────────
-
-/**
- * Decode a Fred Editor pattern byte stream starting at the given offset.
- * Returns an array of TrackerCells representing the rows.
- *
- * Byte stream encoding:
- *   Positive (1-127): note value, consume 1 tick worth of rows
- *   Negative values are commands:
- *     -125 (0x83): set sample, followed by 1 byte sample index
- *     -126 (0x82): set speed, followed by 1 byte speed value
- *     -127 (0x81): portamento, followed by speed (1), note (1), delay (1)
- *     -124 (0x84): note off
- *     -128 (0x80): pattern end
- *     Other negative: duration = speed * abs(value)
- */
-function decodePatternStream(
-  patternBytes: Uint8Array,
-  startOffset: number,
-  initialSpeed: number,
-  samples: FESample[]
-): TrackerCell[] {
-  const rows: TrackerCell[] = [];
-  let pos = startOffset;
-  let currentSample = 0;
-  let speed = initialSpeed;
-  let portaSpeed = 0;
-  let portaNote = 0;
-  let portaDelay = 0;
-  const maxRows = 64;
-
-  while (pos < patternBytes.length && rows.length < maxRows) {
-    const value = patternBytes[pos] < 128 ? patternBytes[pos] : patternBytes[pos] - 256;
-    pos++;
-
-    if (value > 0 && value <= 127) {
-      // Note trigger
-      const xmNote = feNoteToXM(value);
-      const instrument = currentSample + 1; // 1-based
-
-      // Volume from sample envelope (use attackVol as initial volume)
-      const smp = currentSample < samples.length ? samples[currentSample] : null;
-      let vol = 0;
-      if (smp) {
-        vol = Math.min(64, smp.attackVol || smp.envelopeVol || 64);
-      }
-      const xmVolume = 0x10 + vol;
-
-      // Build effects
-      let effTyp = 0;
-      let eff = 0;
-      let effTyp2 = 0;
-      let eff2 = 0;
-
-      // Arpeggio from sample definition
-      if (smp && smp.arpeggioLimit > 0 && smp.arpeggio[0] !== 0) {
-        // Map first two arpeggio offsets to XM arpeggio effect 0xy
-        const arp1 = Math.abs(smp.arpeggio[0]) & 0xF;
-        const arp2 = smp.arpeggioLimit > 1
-          ? Math.abs(smp.arpeggio[1]) & 0xF
-          : 0;
-        if (arp1 > 0 || arp2 > 0) {
-          effTyp = 0x00; // Arpeggio
-          eff = (arp1 << 4) | arp2;
-        }
-      }
-
-      // Portamento effect if active.
-      // In MOD mode, TrackerReplayer sets ch.portaTarget from row.note when effTyp === 0x03.
-      // So we must: (a) put the TARGET in the note field, and (b) use the primary effect slot.
-      let noteToUse = xmNote;
-      if (portaDelay === 0 && portaSpeed > 0) {
-        const pNote = feNoteToXM(portaNote);
-        if (pNote > 0 && pNote !== xmNote) {
-          effTyp = 0x03; // Tone portamento (primary slot — TrackerReplayer checks effTyp only)
-          eff = Math.min(portaSpeed, 0xFF);
-          effTyp2 = 0;
-          eff2 = 0;
-          noteToUse = pNote; // portamento TARGET so ch.portaTarget = period(pNote)
-        }
-      }
-
-      // Vibrato from sample definition (only if portamento not already using primary slot)
-      if (smp && smp.vibratoSpeed > 0 && smp.vibratoDepth > 0 && effTyp === 0) {
-        effTyp = 0x04; // Vibrato
-        const vSpeed = Math.min(smp.vibratoSpeed, 15);
-        const vDepth = Math.min(smp.vibratoDepth, 15);
-        eff = (vSpeed << 4) | vDepth;
-      }
-
-      rows.push({
-        note: noteToUse, instrument, volume: xmVolume,
-        effTyp, eff, effTyp2, eff2,
-      });
-    } else if (value < 0) {
-      switch (value) {
-        case -125: {
-          // Set sample: next byte is sample index
-          if (pos < patternBytes.length) {
-            currentSample = patternBytes[pos];
-            pos++;
-          }
-          break;
-        }
-        case -126: {
-          // Set speed: next byte is speed value
-          if (pos < patternBytes.length) {
-            speed = patternBytes[pos];
-            pos++;
-
-            // Emit speed change effect on the current row or a new empty row
-            const cell = emptyCell();
-            cell.effTyp = 0x0F; // Fxx speed
-            cell.eff = speed;
-            rows.push(cell);
-          }
-          break;
-        }
-        case -127: {
-          // Portamento: speed(1), note(1), delay(1)
-          if (pos + 2 < patternBytes.length) {
-            portaSpeed = patternBytes[pos] * speed;
-            portaNote = patternBytes[pos + 1];
-            portaDelay = patternBytes[pos + 2] * speed;
-            pos += 3;
-          }
-          break;
-        }
-        case -124: {
-          // Note off
-          rows.push({
-            note: 97, instrument: 0, volume: 0,
-            effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-          });
-          break;
-        }
-        case -128: {
-          // Pattern end
-          return rows;
-        }
-        default: {
-          // Duration: adds speed * abs(value) empty ticks
-          // In the tracker world, this translates to empty rows
-          const duration = Math.abs(value);
-          const emptyRows = Math.min(duration - 1, maxRows - rows.length);
-          for (let d = 0; d < emptyRows; d++) {
-            rows.push(emptyCell());
-          }
-          break;
-        }
-      }
-    } else {
-      // value === 0: should not normally occur, treat as empty row
-      rows.push(emptyCell());
-    }
-  }
-
-  return rows;
-}
-
 // ── Helper functions ────────────────────────────────────────────────────────
-
-function emptyCell(): TrackerCell {
-  return {
-    note: 0, instrument: 0, volume: 0,
-    effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  };
-}
 
 function makePlaceholderInstrument(id: number, name: string): InstrumentConfig {
   return {
@@ -1043,32 +353,4 @@ function makePlaceholderInstrument(id: number, name: string): InstrumentConfig {
     volume: -6,
     pan: 0,
   } as InstrumentConfig;
-}
-
-function makeEmptyPattern(filename: string): Pattern {
-  return {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: (ch === 0 || ch === 3) ? -50 : 50, // Amiga LRRL hard stereo
-      instrumentId: null,
-      color: null,
-      rows: Array.from({ length: 64 }, () => emptyCell()),
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 0,
-      originalInstrumentCount: 0,
-    },
-  };
 }

@@ -1730,7 +1730,7 @@ static uint8_t* convert_fred_final(const uint8_t* mod, size_t mod_len, size_t* o
 // Public API
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-FredModule* fred_create(const uint8_t* data, size_t size, float sample_rate) {
+static FredModule* fred_build(const uint8_t* data, size_t size, float sample_rate) {
     if (!data || size < 20)
         return nullptr;
 
@@ -1792,11 +1792,121 @@ do_load:
     }
 
     free(converted);
-
-    if (m->sub_song_num > 0)
-        initialize_sound(m, 0);
-
     return m;
+}
+
+FredModule* fred_create(const uint8_t* data, size_t size, float sample_rate) {
+    FredModule* m = fred_build(data, size, sample_rate);
+    if (m && m->sub_song_num > 0)
+        initialize_sound(m, 0);
+    return m;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module swap - grid edits
+//
+// A grid edit re-encodes the module (src/lib/import/formats/fredEditorGrid.ts
+// applyFredGridEdits) and the new module replaces the playing one's song data
+// here, without restarting: every voice keeps its place in its track list and,
+// within its current track, its place in time (lines, then ticks), so a note
+// edited ahead of the playhead sounds when the playhead reaches it.
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** Lines the events in track bytes [0, pos) last (a note or pause 1, a hold 256 - byte). */
+static int track_lines_before(const uint8_t* t, int size, int pos) {
+    int p = 0, lines = 0;
+    while (p < pos && p < size) {
+        uint8_t c = t[p];
+        if (c == TRACK_END_CODE) break;
+        if (c == TRACK_PORT_CODE) { p += 4; continue; }
+        if (c == TRACK_TEMPO_CODE || c == TRACK_INST_CODE) { p += 2; continue; }
+        lines += (c < 0x80 || c == TRACK_PAUSE_CODE) ? 1 : 256 - c;
+        p++;
+    }
+    return lines;
+}
+
+/**
+ * Where a voice continues in `t` when `cur_tick` ticks of the track have
+ * passed: the first event boundary after it (position, and ticks left until
+ * that boundary is read).
+ */
+static void track_seek(const uint8_t* t, int size, int tempo, int cur_tick, uint16_t* pos_out, uint16_t* dur_out) {
+    int p = 0, lines = 0;
+    int last_p = 0, last_lines = 0;
+    for (;;) {
+        if (lines * tempo > cur_tick) {
+            *pos_out = (uint16_t)p;
+            *dur_out = (uint16_t)(lines * tempo - cur_tick);
+            return;
+        }
+        last_p = p; last_lines = lines;
+        // Skip zero-time commands to the next event.
+        while (p < size && (t[p] == TRACK_PORT_CODE || t[p] == TRACK_TEMPO_CODE || t[p] == TRACK_INST_CODE))
+            p += (t[p] == TRACK_PORT_CODE) ? 4 : 2;
+        if (p >= size || t[p] == TRACK_END_CODE) break;
+        uint8_t c = t[p++];
+        lines += (c < 0x80 || c == TRACK_PAUSE_CODE) ? 1 : 256 - c;
+    }
+    (void)last_lines;
+    *pos_out = (uint16_t)last_p;
+    *dur_out = 1;
+}
+
+static int8_t* remap_sample_ptr(int8_t* ptr, const FredModule* from, const FredModule* to) {
+    if (!ptr) return ptr;
+    for (int i = 0; i < from->inst_num && i < to->inst_num; i++) {
+        const FredInstrument* a = &from->instruments[i];
+        if (a->sample_addr && ptr >= a->sample_addr && ptr <= a->sample_addr + a->sample_size)
+            return to->instruments[i].sample_addr ? to->instruments[i].sample_addr + (ptr - a->sample_addr) : nullptr;
+    }
+    return ptr;
+}
+
+int fred_replace_module(FredModule* module, const uint8_t* data, size_t size) {
+    if (!module) return 0;
+    FredModule* next = fred_build(data, size, module->sample_rate);
+    if (!next) return 0;
+    if (next->sub_song_num != module->sub_song_num) { fred_destroy(next); return 0; }
+
+    int tempo = module->current_tempo ? module->current_tempo : 1;
+    for (int ch = 0; ch < 4; ch++) {
+        FredChannelInfo* c = &module->channels[ch];
+        FredMixChannel* mc = &module->mix_channels[ch];
+        int8_t idx = c->position_table ? c->position_table[c->position] : 0;
+        int track = idx < 0 ? 0 : idx;
+        const uint8_t* old_t = module->tracks[track];
+        int cur_tick = track_lines_before(old_t, module->track_sizes[track], c->track_position) * tempo - c->track_duration;
+
+        c->position_table = next->positions[module->current_song][ch];
+        int8_t nidx = c->position_table[c->position];
+        int ntrack = nidx < 0 ? 0 : nidx;
+        c->track_table = next->tracks[ntrack];
+        track_seek(c->track_table, next->track_sizes[ntrack], tempo, cur_tick, &c->track_position, &c->track_duration);
+
+        if (c->instrument) {
+            int i = (int)(c->instrument - module->instruments);
+            c->instrument = (i >= 0 && i < next->inst_num) ? &next->instruments[i] : nullptr;
+        }
+        if (mc->sample_data != c->synth_sample)
+            mc->sample_data = remap_sample_ptr(mc->sample_data, module, next);
+    }
+
+    // Swap the song data; `next` takes the old data with it.
+#define FRED_SWAP(field) do { __typeof__(module->field) t_ = module->field; module->field = next->field; next->field = t_; } while (0)
+    FRED_SWAP(original_data); FRED_SWAP(original_size);
+    FRED_SWAP(start_tempos); FRED_SWAP(positions); FRED_SWAP(tracks); FRED_SWAP(track_sizes);
+    FRED_SWAP(instruments); FRED_SWAP(has_notes); FRED_SWAP(inst_num);
+#undef FRED_SWAP
+    fred_destroy(next);
+    return 1;
+}
+
+/** The period voice `ch` plays now (0 when silent) - for tests and meters. */
+int fred_get_channel_period(const FredModule* module, int ch) {
+    if (!module || ch < 0 || ch > 3) return 0;
+    const FredMixChannel* mc = &module->mix_channels[ch];
+    return mc->active ? (int)mc->period : 0;
 }
 
 void fred_destroy(FredModule* module) {

@@ -15,7 +15,7 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 
 /** FredReplayer Emscripten output needs extended script-replaces + chained-HEAP. */
-function fredReplayerTransform(code: string): string {
+export function fredReplayerTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -121,9 +121,12 @@ export class FredReplayerEngine extends WASMChannelOutputsEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  /** Edit a pattern cell in the WASM replayer */
-  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+  /**
+   * Play an edited module (grid edits re-encoded by applyFredGridEdits) without
+   * restarting: the replayer swaps the song data and every voice keeps its place.
+   */
+  replaceModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'replaceModule', moduleData: buffer });
   }
 
   /** Set an instrument parameter by name */

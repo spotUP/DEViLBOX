@@ -14,6 +14,7 @@ import { buildGlyphAtlas, parseColor, parseRgba, type GlyphAtlas, type GlyphInfo
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
 import { SPL_EFFECT_GLYPH } from '@/lib/import/formats/soundPlayerEffectGlyphs';
+import { FRED_EFFECT_GLYPH } from '@/lib/import/formats/fredEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import type {
@@ -865,6 +866,9 @@ export class TrackerGLRenderer {
               } else if (SPL_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Sound Player private control effects (block 0x63..0x69)
                 effStr = SPL_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (FRED_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // Fred Editor private control effects (block 0x70..0x73)
+                effStr = FRED_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }

@@ -11,6 +11,8 @@
  *     setCell(pattern, row, channel, note, instrument, effTyp, eff, volume);
  *   - an eagleplayer song whose format re-encodes its whole module from
  *     grid edits (eaglePlayerModuleEdits: MIDI Loriciel) gets a new module;
+ *   - a Fred Editor song (FredReplayer2) re-encodes its module and the
+ *     replayer swaps it in where it plays (fredModuleEdits);
  *   - otherwise a song with a fixed chip-RAM layout takes it through
  *     writeCellToChipRam (UADE chip RAM, the Ron Klaren replayer, TFMX bytes).
  *
@@ -48,6 +50,13 @@ export async function sendCellEditsToEngine(
 ): Promise<void> {
   if (!song || edits.length === 0) return;
   const desc = playingDescriptor(song);
+
+  // Fred Editor: a grid cell is a line of a pattern; the edit re-encodes the module.
+  if (desc?.key === 'FredReplayer2') {
+    const { applyFredModuleEdits } = await import('../fred-replayer/fredModuleEdits');
+    await applyFredModuleEdits(song, edits);
+    return;
+  }
 
   if (desc?.gridCellEdits) {
     const Engine = desc.staticRef ?? (desc.dynamicResolver ? await desc.dynamicResolver() : null);

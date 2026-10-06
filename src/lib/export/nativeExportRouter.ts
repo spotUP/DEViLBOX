@@ -252,6 +252,10 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     const live = useFormatStore.getState().maxTraxData;
     const data = live ?? parseMaxTrax(new Uint8Array(song.maxTraxFileData!));
     result = { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings: [] };
+  } else if (song.fredReplayerFileData) {
+    // Fred Editor keeps format 'MOD'; its module (with the grid's edits) is the export.
+    const { exportFredEditor } = await import('./FredEditorExporter');
+    result = await exportFredEditor(song);
   } else if (format === 'MOD' && !layoutFormatId) {
     const { exportSongToMOD } = await import('./modExport');
     const modResult = await exportSongToMOD(song, { bakeSynths: true });
