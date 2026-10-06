@@ -17,7 +17,7 @@ import {
   decodeFredModule, encodeFredModule, encodeFredPattern, fredSections, FRED_END, type FredLine,
 } from '../FredEditorModule';
 import {
-  FRED_ROWS_PER_PATTERN, applyFredGridEdits, cellToFredLine, fredLineToCell, fredLinesEqual, walkFredSong,
+  FRED_ROWS_PER_PATTERN, applyFredGridEdits, cellToFredLine, fredLineToCell, fredLinesEqual, fredVoiceStates, walkFredSong,
 } from '../fredEditorGrid';
 import { parseFredEditorFile } from '../FredEditorParser';
 import { exportFredEditor } from '@/lib/export/FredEditorExporter';
@@ -52,11 +52,12 @@ describe('Fred Editor module codec', () => {
       const m = decodeFredModule(bytes);
       const song = await parseFredEditorFile(ab(bytes), name);
       const walk = walkFredSong(m);
+      const states = fredVoiceStates(m, walk);
       expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(walk.lines);
       song.patterns.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
         const ref = walk.voices[c][p * FRED_ROWS_PER_PATTERN + r];
         const line: FredLine = ref ? m.patterns[ref.pattern].lines[ref.line] : {};
-        expect(fredLinesEqual(cellToFredLine(cell), line)).toBe(true);
+        expect(fredLinesEqual(cellToFredLine(cell, { line, state: states[c][p * FRED_ROWS_PER_PATTERN + r] }), line)).toBe(true);
       })));
       for (const p of m.patterns) for (const l of p.lines) expect(fredLinesEqual(cellToFredLine(fredLineToCell(l)), l)).toBe(true);
     });
@@ -85,10 +86,13 @@ describe('Fred Editor module codec', () => {
     // A held line of voice 1: a new note splits the hold.
     const r = walk.voices[1].findIndex((ref, i) => i > 0 && !!ref && Object.keys(m.patterns[ref.pattern].lines[ref.line]).length === 0);
     const ref = walk.voices[1][r]!;
-    const cell = { note: 25, instrument: 3, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    // An instrument other than the one the voice has selected, so the edit must write a $83.
+    const carried = fredVoiceStates(m, walk)[1][r].instrument ?? 0;
+    const newIns = (carried + 1) % m.instruments.length;
+    const cell = { note: 25, instrument: newIns + 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
     const out = applyFredGridEdits(bytes, [{ pattern: Math.floor(r / 64), row: r % 64, channel: 1, cell }]);
     const m2 = decodeFredModule(out);
-    expect(m2.patterns[ref.pattern].lines[ref.line]).toEqual({ note: 36, instrument: 2 });
+    expect(m2.patterns[ref.pattern].lines[ref.line]).toEqual({ note: 36, instrument: newIns });
     m2.patterns.forEach((p, i) => { if (i !== ref.pattern) expect(p.lines).toEqual(m.patterns[i].lines); });
     expect(m2.instruments.length).toBe(m.instruments.length);
     expect([...m2.pcm]).toEqual([...m.pcm]);

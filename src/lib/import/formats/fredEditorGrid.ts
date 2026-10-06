@@ -108,8 +108,47 @@ export function walkFredSong(m: FredModule, song = 0): FredSongWalk {
   return { lines, voices };
 }
 
-/** A line as a grid cell. Every byte the line stands for is in the cell (cellToFredLine inverts it). */
-export function fredLineToCell(line: FredLine | undefined): TrackerCell {
+/**
+ * What the voice holds when a line starts: the instrument the player has
+ * selected (the last $83 it read; undefined before the first) and whether a
+ * note is sounding (set by a note, cleared by $84).
+ */
+export interface FredVoiceState {
+  instrument: number | undefined;
+  sounding: boolean;
+}
+
+/**
+ * The voice state before every row of every voice. The player keeps one
+ * current instrument per voice that persists across lines, patterns and
+ * track-list entries (FREDPLA0.2ED ChangeIns), so a note without a $83 plays
+ * the instrument an earlier line selected.
+ */
+export function fredVoiceStates(m: FredModule, walk: FredSongWalk): FredVoiceState[][] {
+  return walk.voices.map((refs) => {
+    let instrument: number | undefined;
+    let sounding = false;
+    return refs.map((ref) => {
+      const before: FredVoiceState = { instrument, sounding };
+      const line = ref ? m.patterns[ref.pattern].lines[ref.line] : undefined;
+      if (line) {
+        if (line.instrument !== undefined) instrument = line.instrument;
+        if (line.note !== undefined) sounding = true;
+        else if (line.pause) sounding = false;
+      }
+      return before;
+    });
+  });
+}
+
+/**
+ * A line as a grid cell. Every byte the line stands for is in the cell, plus
+ * (with `state`) what the player does with it: a note shows the instrument the
+ * player plays it with even when no $83 precedes it on that line, and an $84
+ * on a voice that sounds nothing is no event, so the cell shows it empty.
+ * cellToFredLine inverts it given the same state and line.
+ */
+export function fredLineToCell(line: FredLine | undefined, state?: FredVoiceState): TrackerCell {
   const cell: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
   if (!line) return cell;
   const fx: [number, number][] = [];
@@ -117,10 +156,16 @@ export function fredLineToCell(line: FredLine | undefined): TrackerCell {
     const n = line.note - NOTE_OFFSET;
     if (n >= 1 && n <= 96) cell.note = n;
     else fx.push([FRED_FX.rawNote, line.note]);
-  } else if (line.pause) {
+  } else if (line.pause && (!state || state.sounding)) {
     cell.note = NOTE_OFF;
   }
-  if (line.instrument !== undefined) cell.instrument = line.instrument + 1;
+  if (line.instrument !== undefined) {
+    // A $83 that only repeats the voice's instrument on a line with no event is no change.
+    const idle = state && line.note === undefined && line.instrument === state.instrument;
+    if (!idle) cell.instrument = line.instrument + 1;
+  } else if (state && line.note !== undefined && state.instrument !== undefined) {
+    cell.instrument = state.instrument + 1;
+  }
   if (line.tempo !== undefined) fx.push([FX_SPEED, line.tempo]);
   if (line.porta) {
     fx.push([FRED_FX.portaLines, line.porta.lines], [FRED_FX.portaTarget, line.porta.note]);
@@ -140,8 +185,20 @@ export function fredCellEffectColumns(cell: TrackerCell): number {
   return cell.effTyp4 ? 4 : cell.effTyp3 ? 3 : 2;
 }
 
-/** A grid cell as a line (the inverse of fredLineToCell; effects Fred has no command for are dropped). */
-export function cellToFredLine(cell: TrackerCell): FredLine {
+function cellsEqual(a: TrackerCell, b: TrackerCell): boolean {
+  const k = Object.keys({ ...a, ...b }) as (keyof TrackerCell)[];
+  return k.every((key) => (a[key] ?? 0) === (b[key] ?? 0));
+}
+
+/**
+ * A grid cell as a line (the inverse of fredLineToCell; effects Fred has no
+ * command for are dropped). With `ctx` (the line the cell stands on and the
+ * voice state before it): a cell that is what fredLineToCell shows for that
+ * line is that line, byte for byte; an instrument the player already has
+ * selected is not written as a $83 unless the line already carries one.
+ */
+export function cellToFredLine(cell: TrackerCell, ctx?: { line: FredLine; state: FredVoiceState }): FredLine {
+  if (ctx && cellsEqual(cell, fredLineToCell(ctx.line, ctx.state))) return ctx.line;
   const line: FredLine = {};
   const c = cell as unknown as Record<string, number | undefined>;
   let portaLines: number | undefined, portaTarget: number | undefined, portaDelay = 0;
@@ -155,7 +212,10 @@ export function cellToFredLine(cell: TrackerCell): FredLine {
   }
   if (cell.note >= 1 && cell.note <= 96) line.note = cell.note + NOTE_OFFSET;
   else if (cell.note === NOTE_OFF) line.pause = true;
-  if (cell.instrument > 0) line.instrument = cell.instrument - 1;
+  if (cell.instrument > 0) {
+    const ins = cell.instrument - 1;
+    if (!ctx || ins !== ctx.state.instrument || ctx.line.instrument !== undefined || line.note === undefined) line.instrument = ins;
+  }
   if (portaLines !== undefined || portaTarget !== undefined) {
     line.porta = { lines: portaLines ?? 0, note: portaTarget ?? 0, delay: portaDelay };
   }
@@ -184,11 +244,14 @@ export interface FredGridEdit {
 export function applyFredGridEdits(bytes: Uint8Array, edits: readonly FredGridEdit[], song = 0): Uint8Array {
   const m = decodeFredModule(bytes);
   const walk = walkFredSong(m, song);
+  const states = fredVoiceStates(m, walk);
   let changed = false;
   for (const { pattern, row, channel, cell } of edits) {
-    const ref = walk.voices[channel]?.[pattern * FRED_ROWS_PER_PATTERN + row];
+    const r = pattern * FRED_ROWS_PER_PATTERN + row;
+    const ref = walk.voices[channel]?.[r];
     if (!ref) continue;
-    m.patterns[ref.pattern].lines[ref.line] = cellToFredLine(cell);
+    const line = m.patterns[ref.pattern].lines[ref.line];
+    m.patterns[ref.pattern].lines[ref.line] = cellToFredLine(cell, { line, state: states[channel][r] });
     changed = true;
   }
   return changed ? encodeFredModule(m) : bytes;

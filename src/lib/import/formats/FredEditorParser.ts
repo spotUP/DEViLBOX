@@ -22,7 +22,7 @@ import type { Pattern, ChannelData } from '@/types';
 import type { InstrumentConfig, FredConfig, UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 import { decodeFredModule, fredSections, FRED_INSTRUMENT_SIZE } from './FredEditorModule';
-import { FRED_ROWS_PER_PATTERN, fredCellEffectColumns, fredLineToCell, walkFredSong } from './fredEditorGrid';
+import { FRED_ROWS_PER_PATTERN, fredCellEffectColumns, fredLineToCell, fredVoiceStates, walkFredSong } from './fredEditorGrid';
 
 // ── Utility: read big-endian values from a DataView ─────────────────────────
 
@@ -282,6 +282,7 @@ export async function parseFredEditorFile(
 
   // ── Grid: every voice's line on one timeline, cut into 64-row patterns ──
   const walk = walkFredSong(module, song);
+  const states = fredVoiceStates(module, walk);
   const numPatterns = Math.max(1, Math.ceil(walk.lines / FRED_ROWS_PER_PATTERN));
   const patterns: Pattern[] = [];
   for (let p = 0; p < numPatterns; p++) {
@@ -290,7 +291,7 @@ export async function parseFredEditorFile(
     const channels: ChannelData[] = walk.voices.map((refs, ch) => {
       const rows = Array.from({ length }, (_, r) => {
         const ref = refs[first + r];
-        return fredLineToCell(ref ? module.patterns[ref.pattern].lines[ref.line] : undefined);
+        return fredLineToCell(ref ? module.patterns[ref.pattern].lines[ref.line] : undefined, states[ch][first + r]);
       });
       const effectCols = Math.max(...rows.map(fredCellEffectColumns));
       return {

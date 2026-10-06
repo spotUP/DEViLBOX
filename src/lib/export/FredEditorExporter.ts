@@ -18,7 +18,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { decodeFredModule } from '@lib/import/formats/FredEditorModule';
 import {
-  FRED_ROWS_PER_PATTERN, applyFredGridEdits, cellToFredLine, fredLinesEqual, walkFredSong, type FredGridEdit,
+  FRED_ROWS_PER_PATTERN, applyFredGridEdits, cellToFredLine, fredLinesEqual, fredVoiceStates, walkFredSong, type FredGridEdit,
 } from '@lib/import/formats/fredEditorGrid';
 
 export interface FredEditorExportResult {
@@ -33,13 +33,16 @@ export async function exportFredEditor(song: TrackerSong): Promise<FredEditorExp
   const bytes = new Uint8Array(src);
   const module = decodeFredModule(bytes);
   const walk = walkFredSong(module);
+  const states = fredVoiceStates(module, walk);
   const edits: FredGridEdit[] = [];
   song.patterns.forEach((pattern, p) => {
     pattern.channels.forEach((channel, ch) => {
       channel.rows.forEach((cell, row) => {
         const ref = walk.voices[ch]?.[p * FRED_ROWS_PER_PATTERN + row];
         if (!ref) return;
-        if (!fredLinesEqual(cellToFredLine(cell), module.patterns[ref.pattern].lines[ref.line])) {
+        const r = p * FRED_ROWS_PER_PATTERN + row;
+        const line = module.patterns[ref.pattern].lines[ref.line];
+        if (!fredLinesEqual(cellToFredLine(cell, { line, state: states[ch][r] }), line)) {
           edits.push({ pattern: p, row, channel: ch, cell });
         }
       });

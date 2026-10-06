@@ -17,7 +17,7 @@ import type { LiveCellEdit } from '../replayer/liveCellEdits';
 /** Re-encode `edits` into the song's module and hand it to the replayer. Returns the new module, or null when nothing changed. */
 export async function applyFredModuleEdits(song: TrackerSong, edits: readonly LiveCellEdit[]): Promise<ArrayBuffer | null> {
   if (!song.fredReplayerFileData) return null;
-  const { applyFredGridEdits, walkFredSong, fredLineToCell, FRED_ROWS_PER_PATTERN } = await import('@/lib/import/formats/fredEditorGrid');
+  const { applyFredGridEdits, walkFredSong, fredLineToCell, fredVoiceStates, FRED_ROWS_PER_PATTERN } = await import('@/lib/import/formats/fredEditorGrid');
   const { decodeFredModule } = await import('@/lib/import/formats/FredEditorModule');
   const current = new Uint8Array(song.fredReplayerFileData);
   const next = applyFredGridEdits(current, edits);
@@ -30,27 +30,33 @@ export async function applyFredModuleEdits(song: TrackerSong, edits: readonly Li
   const { FredReplayerEngine } = await import('./FredReplayerEngine');
   if (FredReplayerEngine.hasInstance()) FredReplayerEngine.getInstance().replaceModule(module.slice(0));
 
-  // Every other cell showing an edited line.
+  // Every other cell whose line changed - or whose carried instrument changed with an edited $83.
+  const before = decodeFredModule(current);
   const m = decodeFredModule(next);
+  const walkBefore = walkFredSong(before);
   const walk = walkFredSong(m);
-  const key = (pattern: number, line: number): string => `${pattern}:${line}`;
-  const edited = new Set<string>();
-  const at = new Set<string>();
-  for (const e of edits) {
-    const ref = walk.voices[e.channel]?.[e.pattern * FRED_ROWS_PER_PATTERN + e.row];
-    if (ref) { edited.add(key(ref.pattern, ref.line)); at.add(`${e.channel}:${e.pattern * FRED_ROWS_PER_PATTERN + e.row}`); }
-  }
-  const mirrors: { pattern: number; row: number; channel: number; line: (typeof m.patterns)[number]['lines'][number] }[] = [];
-  walk.voices.forEach((refs, channel) => refs.forEach((ref, r) => {
-    if (!ref || !edited.has(key(ref.pattern, ref.line)) || at.has(`${channel}:${r}`)) return;
-    mirrors.push({ pattern: Math.floor(r / FRED_ROWS_PER_PATTERN), row: r % FRED_ROWS_PER_PATTERN, channel, line: m.patterns[ref.pattern].lines[ref.line] });
-  }));
+  const statesBefore = fredVoiceStates(before, walkBefore);
+  const states = fredVoiceStates(m, walk);
+  const at = new Set(edits.map((e) => `${e.channel}:${e.pattern * FRED_ROWS_PER_PATTERN + e.row}`));
+  const cellAt = (mod: typeof m, w: typeof walk, st: typeof states, channel: number, r: number) => {
+    const ref = w.voices[channel][r];
+    return fredLineToCell(ref ? mod.patterns[ref.pattern].lines[ref.line] : undefined, st[channel][r]);
+  };
+  const mirrors: { pattern: number; row: number; channel: number; cell: ReturnType<typeof fredLineToCell> }[] = [];
+  walk.voices.forEach((_, channel) => {
+    for (let r = 0; r < walk.lines; r++) {
+      if (at.has(`${channel}:${r}`)) continue;
+      const cell = cellAt(m, walk, states, channel, r);
+      if (JSON.stringify(cell) === JSON.stringify(cellAt(before, walkBefore, statesBefore, channel, r))) continue;
+      mirrors.push({ pattern: Math.floor(r / FRED_ROWS_PER_PATTERN), row: r % FRED_ROWS_PER_PATTERN, channel, cell });
+    }
+  });
   if (mirrors.length) {
     const { useTrackerStore } = await import('@stores/useTrackerStore');
     useTrackerStore.setState((state) => {
-      for (const { pattern, row, channel, line } of mirrors) {
+      for (const { pattern, row, channel, cell } of mirrors) {
         const rows = state.patterns[pattern]?.channels[channel]?.rows;
-        if (rows && row < rows.length) rows[row] = fredLineToCell(line);
+        if (rows && row < rows.length) rows[row] = cell;
       }
     });
   }
