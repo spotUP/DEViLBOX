@@ -33,6 +33,12 @@ export interface WASMSingletonEngine {
 export interface WASMSingletonStatic {
   getInstance(): WASMSingletonEngine;
   hasInstance(): boolean;
+  /**
+   * A grid edit made while the engine is not running: written into the module
+   * the song carries, so the next load plays it (engines with `gridCellEdits`
+   * whose module the grid is a reading of).
+   */
+  patchModuleCell?(pattern: number, row: number, channel: number, note: number, instrument: number): void;
 }
 
 /** Descriptor for a singleton WASM engine in the registry */
@@ -532,6 +538,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SidMon1Synth',
     suppressNotes: true,
     fileDataKey: 'sidmon1WasmFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,

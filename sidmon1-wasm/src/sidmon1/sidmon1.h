@@ -33,3 +33,11 @@ void sm1r_set_instrument_param(int inst, int param_id, int value);
 // Note preview (triggers instrument on Paula channel 0)
 void sm1r_note_on(int instrument, int note, int velocity);
 void sm1r_note_off(void);
+
+// Live grid edit: overwrite pattern row `index` (absolute row of the module's
+// pattern data) with the 5 raw module bytes [note, sample, effect, param, speed].
+int  sm1r_set_row(int index, const uint8_t *raw5);
+// What a voice consumed last: pattern row index, count of rows consumed, note+transpose of its last note-on.
+int  sm1r_get_voice_consumed(int v);
+int  sm1r_get_voice_rows_consumed(int v);
+int  sm1r_get_voice_note(int v);

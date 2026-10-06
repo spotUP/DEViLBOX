@@ -20,7 +20,8 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { SidMon1Config, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeSidMon1Cell } from '@/engine/uade/encoders/SidMon1Encoder';
+import { encodeSidMon1Cell, sm1IndexToXM, xmToSm1Index } from '@/engine/uade/encoders/SidMon1Encoder';
+import { walkSidMon1, type Sm1Cell, type Sm1RawRow, type Sm1Track } from './sidmon1Grid';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -57,47 +58,6 @@ function readString(buf: Uint8Array, off: number, len: number): string {
 }
 
 // ── SidMon 1.0 period table (for note mapping, verbatim from S1Player.js) ────
-// Used for creating test patterns only.
-
-const SM1_PERIODS: number[] = [
-  0,
-  5760,5424,5120,4832,4560,4304,4064,3840,3616,3424,3232,3048,
-  2880,2712,2560,2416,2280,2152,2032,1920,1808,1712,1616,1524,
-  1440,1356,1280,1208,1140,1076,1016, 960, 904, 856, 808, 762,
-   720, 678, 640, 604, 570, 538, 508, 480, 452, 428, 404, 381,
-   360, 339, 320, 302, 285, 269, 254, 240, 226, 214, 202, 190,
-   180, 170, 160, 151, 143, 135, 127,
-];
-
-// Standard ProTracker periods for note mapping
-const PT_PERIODS: number[] = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-];
-
-/**
- * Map a SidMon 1 note index (0-66) to an XM note number (1-96).
- */
-function sm1NoteToXM(sm1Note: number): number {
-  if (sm1Note <= 0 || sm1Note >= SM1_PERIODS.length) return 0;
-  const period = SM1_PERIODS[sm1Note];
-  if (!period || period <= 0) return 0;
-
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < PT_PERIODS.length; i++) {
-    const d = Math.abs(PT_PERIODS[i] - period);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
-  }
-  // PT_PERIODS[0] = 856 = C-1 = XM note 13 (displays "C-1")
-  const xmNote = bestIdx + 13;
-  return Math.max(1, Math.min(96, xmNote));
-}
-
 // ── Format detection ──────────────────────────────────────────────────────────
 
 /**
@@ -345,147 +305,84 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
   // Each pattern row is 5 bytes: note, sample, effect, param, speed
   const patStart  = position - 12 >= 0 ? u32BE(buf, position - 12) : 0;
   const patEnd    = position - 8  >= 0 ? u32BE(buf, position - 8)  : patStart;
-  const numPatRows = Math.max(0, Math.floor((patEnd - patStart) / 5));
-
-  interface SM1Row {
-    note:   number;
-    sample: number;
-    effect: number;
-    param:  number;
-    speed:  number;
-  }
-
-  const patRows: SM1Row[] = [];
+  const numPatRows = Math.min(65536, Math.max(0, Math.floor((patEnd - patStart) / 5)));
   const patDataOffset = position + patStart;
 
-  for (let i = 0; i < numPatRows && i < 2048; i++) {
+  // The versions whose note/effect/sample bytes the player remaps on load.
+  const versionTag = j === 0x0FEC ? 0x0FFA : j === 0x1466 ? 0x1444 : j;
+  const doReset = !(versionTag === 0x1170 || versionTag === 0x11C6 || versionTag === 0x1444);
+
+  const rawRows: Uint8Array[] = [];
+  const patRows: Sm1RawRow[] = [];
+  for (let i = 0; i < numPatRows; i++) {
     const base = patDataOffset + i * 5;
     if (base + 5 > buf.length) break;
-    patRows.push({
-      note:   u8(buf, base),
-      sample: u8(buf, base + 1),
-      effect: u8(buf, base + 2),
-      param:  u8(buf, base + 3),
-      speed:  u8(buf, base + 4),
-    });
+    const raw = buf.slice(base, base + 5);
+    rawRows.push(raw);
+    patRows.push(playerRow(raw, versionTag, totInstruments));
   }
 
   // ── Read tracks ───────────────────────────────────────────────────────────
-  // S1Player: stream.position = position - 44; start = stream.readUint()
-  //   stream.position = position - 28; len = ((stream.readUint() - start) / 6) >> 0
   const trackBase = position - 44 >= 0 ? u32BE(buf, position - 44) : 0;
   const trackEnd2 = position - 28 >= 0 ? u32BE(buf, position - 28) : trackBase;
-  const numTracks = Math.floor((trackEnd2 - trackBase) / 6);
+  const numTracks = Math.min(16384, Math.max(0, Math.floor((trackEnd2 - trackBase) / 6)));
 
-  interface SM1Track {
-    pattern:   number;
-    transpose: number;
-  }
-  const tracks: SM1Track[] = [];
+  const tracks: Sm1Track[] = [];
   const trackDataOffset = position + trackBase;
-
-  for (let i = 0; i < numTracks && i < 512; i++) {
+  for (let i = 0; i < numTracks; i++) {
     const base = trackDataOffset + i * 6;
     if (base + 6 > buf.length) break;
-    const pattern   = u32BE(buf, base);
-    // skip 1 byte at base+4
     const transpose = s8(buf, base + 5);
-    tracks.push({ pattern, transpose: (transpose >= -99 && transpose <= 99) ? transpose : 0 });
+    tracks.push({ pattern: u32BE(buf, base), transpose: (transpose >= -99 && transpose <= 99) ? transpose : 0 });
   }
 
-  // ── Read pattern pointers ─────────────────────────────────────────────────
-  // S1Player reads patternsPtr[i] = (stream.readUint() / 5) >> 0
-  const ppBase = position - 8  >= 0 ? u32BE(buf, position - 8)  : 0;
-  const ppEnd  = position - 4  >= 0 ? u32BE(buf, position - 4)  : ppBase;
-  // totPatterns = (ppEnd - ppBase) >> 2 (each entry is uint32 = 4 bytes)
-  // But ppEnd is the difference from some other point, let's just use patStart area.
-  // Actually in S1Player: stream.position = position + start + 4
-  // totPatterns = (len - start) >> 2  where start/len are from position - 8/position - 4
-  const patternsBase = position + (ppBase > 0 ? ppBase : 0);
-  const patternsCount = Math.max(1, Math.min(256, (ppEnd > ppBase ? (ppEnd - ppBase) >> 2 : 1)));
-
-  const patternPtrs: number[] = [];
-  for (let i = 0; i < patternsCount; i++) {
-    const poff = patternsBase + 4 + i * 4; // +4 for first entry skip
-    if (poff + 4 > buf.length) break;
-    const ptr = Math.floor(u32BE(buf, poff) / 5);
-    if (ptr === 0 && i > 0) break;
-    patternPtrs.push(ptr);
+  // ── Pattern start rows, as the player reads them ──────────────────────────
+  // Entry 0 is the empty first entry (the player skips the file's first
+  // pointer); the list ends at the first zero start.
+  const ppBase = position - 8 >= 0 ? u32BE(buf, position - 8) : 0;
+  const ppEnd  = position - 4 >= 0 ? u32BE(buf, position - 4) : ppBase;
+  const ppLen  = ppEnd < ppBase ? buf.length - position : ppEnd;
+  let totPatterns = Math.min(4096, Math.max(1, (ppLen - ppBase) >> 2));
+  const patternPtrs: number[] = new Array(totPatterns).fill(0);
+  for (let i = 1; i < totPatterns; i++) {
+    const poff = position + ppBase + 4 + (i - 1) * 4;
+    const start = poff + 4 <= buf.length ? Math.floor(u32BE(buf, poff) / 5) : 0;
+    if (start === 0) { totPatterns = i; patternPtrs.length = i; break; }
+    patternPtrs[i] = start;
   }
 
-  // ── Build TrackerSong patterns ─────────────────────────────────────────────
-  const ROWS_PER_PATTERN = 16;
-  const trackerPatterns: Pattern[] = [];
-  const CHANNELS = 4;
-
-  // Read tracksPtr (starting positions per voice) from position - 44
+  // Each voice's first track (the player's tracksPtr).
   const tracksPtr: number[] = [0, 0, 0, 0];
-  for (let v = 1; v < 4 && position - 44 + 4 + v * 4 < buf.length; v++) {
+  for (let v = 1; v < 4; v++) {
     const tpOff = position - 44 + v * 4;
-    if (tpOff + 4 <= buf.length) {
-      const raw = u32BE(buf, tpOff);
-      // S1Player: ((stream.readUint() - start) / 6) >> 0
-      tracksPtr[v] = Math.floor((raw - trackBase) / 6);
+    if (tpOff >= 0 && tpOff + 4 <= buf.length) {
+      tracksPtr[v] = Math.floor((u32BE(buf, tpOff) - trackBase) / 6);
     }
   }
 
-  // Compute song length from trackLen
-  // S1Player: stream.position = position - 20; stream reads mix/pattern/track data
-  // trackLen is at position - 20 + 7*4 = position + 8
-  // Let's skip complex parsing and build a simple song using the track data directly
+  // ── The grid is the rows the player walks ─────────────────────────────────
+  const hdrOff = position + waveEnd;
+  const steps = walkSidMon1({
+    rows: patRows, tracks, tracksPtr, patternPtrs,
+    patternDef: u32BE(buf, hdrOff + 24),
+    trackLen: u32BE(buf, hdrOff + 28),
+    doReset,
+  });
+  const CHANNELS = 4;
+  const trackerPatterns: Pattern[] = [];
 
-  // Determine number of song steps from tracks array
-  const songSteps = Math.min(32, Math.max(1, Math.floor(numTracks / CHANNELS)));
-
-  for (let stepIdx = 0; stepIdx < songSteps; stepIdx++) {
+  steps.forEach((step, stepIdx) => {
     const channelRows: TrackerCell[][] = [[], [], [], []];
-
     for (let ch = 0; ch < CHANNELS; ch++) {
-      const trackIdx = stepIdx * CHANNELS + ch;
-      const track = tracks[trackIdx] ?? { pattern: 0, transpose: 0 };
-      const patPtr = patternPtrs[track.pattern] ?? 0;
-
-      const rows: TrackerCell[] = [];
-      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
-        const row = patRows[patPtr + r];
-        if (!row) {
-          rows.push(emptyCell());
-          continue;
-        }
-
-        // note 0 = no note, 255 = no note
-        if (row.note === 0 || row.note === 255 || row.sample === 0) {
-          rows.push(emptyCell());
-          continue;
-        }
-
-        const sm1Note = row.note + track.transpose;
-        const xmNote = sm1NoteToXM(Math.max(0, sm1Note - 1)); // S1Player uses 1-based notes
-
-        const instrNum = Math.min(row.sample, instruments.length);
-
-        rows.push({
-          note: xmNote,
-          instrument: instrNum,
-          volume: 0,
-          effTyp: 0,
-          eff: 0,
-          effTyp2: 0,
-          eff2: 0,
-        });
+      for (let g = 0; g < step.length; g++) {
+        const c = step.cells[ch][g];
+        channelRows[ch].push(c.row < 0 ? emptyCell() : gridCell(rawRows[c.row], patRows[c.row], tracks[c.track].transpose));
       }
-
-      while (rows.length < ROWS_PER_PATTERN) {
-        rows.push(emptyCell());
-      }
-
-      channelRows[ch] = rows;
     }
-
     trackerPatterns.push({
       id: `pattern-${stepIdx}`,
       name: `Pattern ${stepIdx}`,
-      length: ROWS_PER_PATTERN,
+      length: step.length,
       channels: channelRows.map((rows, ch) => ({
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
@@ -503,62 +400,63 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: CHANNELS,
-        originalPatternCount: songSteps,
+        originalPatternCount: steps.length,
         originalInstrumentCount: instruments.length,
       },
     });
-  }
+  });
 
   // Ensure at least one pattern
   if (trackerPatterns.length === 0) {
     trackerPatterns.push(createEmptyPattern(filename, instruments.length));
   }
+  const songSteps = trackerPatterns.length;
+  const maxRows = Math.max(1, ...steps.map((s) => s.length));
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
-  // Build uadePatternLayout with getCellFileOffset for track/pattern indirection
+  // The file offset of the module row a grid cell shows, or -1 for a cell
+  // inside a long row (the player consumes no row there).
+  const cellRow = (pattern: number, row: number, channel: number): Sm1Cell | undefined =>
+    steps[pattern]?.cells[channel]?.[row];
+  const rowOffset = (c: Sm1Cell | undefined): number =>
+    !c || c.row < 0 ? -1 : patDataOffset + c.row * 5;
+
+  // Edits land in this working copy of the module: a cell write keeps the
+  // effect and speed bytes the grid has no field for.
+  const working = new Uint8Array(buffer.slice(0));
+
   const uadePatternLayout: UADEPatternLayout = {
     formatId: 'sidmon1',
     patternDataFileOffset: patDataOffset,
     bytesPerCell: 5,
-    rowsPerPattern: ROWS_PER_PATTERN,
+    rowsPerPattern: maxRows,
     numChannels: CHANNELS,
     numPatterns: songSteps,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSidMon1Cell,
-    decodeCell: (raw: Uint8Array): TrackerCell => {
-      // 5 bytes: note, sample, effect, effectParam, speed
-      const sm1Note = raw[0];
-      const sample  = raw[1];
-      // raw[2] = effect, raw[3] = effectParam — SM1 effects have no XM mapping
-      const speed   = raw[4];
-
-      const note = sm1NoteToXM(sm1Note);
-      let effTyp = 0, eff = 0;
-      if (speed > 0) { effTyp = 0x0F; eff = speed; }
-      // Byte-exact carrier. The 5-byte SM1 cell is heavily lossy in the XM view: the
-      // note round-trips through a period-table nearest-match, and the effect/effectParam
-      // bytes have no XM mapping at all (decode drops them). Stash the raw 5 source bytes
-      // in the invisible period/pan/cutoff/resonance carriers (fields the grid loop never
-      // sets, so edited cells fall back to the canonical derivation).
-      return {
-        note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
-        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3], resonance: raw[4],
-      };
-    },
-    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      // pattern = TrackerSong pattern index (= song step index)
-      // Resolve through track table: each step has CHANNELS tracks
-      const trackIdx = pattern * CHANNELS + channel;
-      const track = tracks[trackIdx];
-      if (!track) return 0;
-
-      // Track.pattern indexes into patternPtrs to get the row offset
-      const patPtr = patternPtrs[track.pattern];
-      if (patPtr === undefined) return 0;
-
-      // Each row is 5 bytes in the pattern data section
-      return patDataOffset + (patPtr + row) * 5;
+    decodeCell: (raw: Uint8Array): TrackerCell => gridCell(raw, playerRow(raw, versionTag, totInstruments), 0),
+    getCellFileOffset: (pattern: number, row: number, channel: number): number =>
+      rowOffset(cellRow(pattern, row, channel)),
+    // A note edit is the track's transpose away from the byte the row holds.
+    writeCell: (pattern, row, channel, cell) => {
+      const c = cellRow(pattern, row, channel);
+      const off = rowOffset(c);
+      if (!c || off < 0) return [];
+      const bytes = working.slice(off, off + 5);
+      const shown = gridCell(bytes, playerRow(bytes, versionTag, totInstruments), tracks[c.track].transpose);
+      if ((cell.note ?? 0) !== shown.note) {
+        const note = cell.note ?? 0;
+        if (note === 0) bytes[0] = 0;
+        else {
+          const raw = xmToSm1Index(note) - 1 - tracks[c.track].transpose;
+          if (raw < 1 || raw > 254) return [];
+          bytes[0] = raw;
+        }
+      }
+      if ((cell.instrument ?? 0) !== shown.instrument) bytes[1] = (cell.instrument ?? 0) & 0xFF;
+      working.set(bytes, off);
+      return [{ offset: off, bytes }];
     },
   };
 
@@ -581,11 +479,43 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
   };
 }
 
-// ── Helper functions ──────────────────────────────────────────────────────────
+// ── Cells ─────────────────────────────────────────────────────────────────────
+
+/** A pattern row as the player holds it: the loader's version remaps applied. */
+function playerRow(raw: Uint8Array, versionTag: number, totInstruments: number): Sm1RawRow {
+  let note = raw[0], sample = raw[1], effect = raw[2];
+  if (versionTag === 0x1444) {
+    if (note > 0 && note < 255) note = (note + 469) & 0xff;
+    if (effect > 0 && effect < 255) effect = (effect + 469) & 0xff;
+    if (sample > 59) sample = (totInstruments + (sample - 60)) & 0xff;
+  } else if (sample > totInstruments) {
+    sample = 0;
+  }
+  return { note, sample, effect, param: raw[3], speed: raw[4] };
+}
+
+/**
+ * The grid cell of a module row. The note is the one the player plays: the
+ * row's note plus the track's transpose, period index note + 1. The five raw
+ * bytes ride in the period/pan/cutoff/resonance carriers (fields the grid
+ * never sets), so an unedited cell encodes back byte-exact.
+ */
+function gridCell(raw: Uint8Array, row: Sm1RawRow, transpose: number): TrackerCell {
+  const playsNote = row.note > 0 && row.note < 255;
+  const effTyp = playsNote && row.effect === 2 ? 0x0F : 0;
+  return {
+    note: playsNote ? sm1IndexToXM(row.note + transpose + 1) : 0,
+    instrument: row.sample, volume: 0,
+    effTyp, eff: effTyp ? row.param : 0, effTyp2: 0, eff2: 0,
+    period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3], resonance: raw[4],
+  };
+}
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
 }
+
+// ── Helper functions ──────────────────────────────────────────────────────────
 
 function makeDefaultInstrument(id: number): InstrumentConfig {
   return {

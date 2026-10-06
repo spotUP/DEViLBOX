@@ -70,6 +70,21 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setRow':
+        // Live grid edit: one pattern row, five raw module bytes.
+        if (this.module && typeof this.module._player_set_row === 'function') {
+          const malloc = this.module._malloc || this.module.malloc;
+          const free = this.module._free || this.module.free;
+          const ptr = malloc(5);
+          if (ptr) {
+            const heap = this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer);
+            heap.set(new Uint8Array(data.bytes), ptr);
+            this.module._player_set_row(data.index, ptr);
+            free(ptr);
+          }
+        }
+        break;
+
       case 'stop':
         if (this.module && typeof this.module._player_stop === 'function') {
           this.module._player_stop();

@@ -173,20 +173,32 @@ describe('exporter round-trip regressions', () => {
     expect(matched / cells).toBeGreaterThan(0.99);
   }, 30000); // HippelCoSo parser attempts a (failing) network fetch that is slow to reject
 
-  it('SidMon1 export writes 1-based note bytes so notes do not decode a semitone low', async () => {
+  it('SidMon1 export is the loaded module with the grid edits written in, notes at the period the player sounds', async () => {
     const { parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
     const { exportSidMon1 } = await import('../SidMon1Exporter');
     const raw = fixture('public/data/songs/formats/anarchy.sid1');
     const song = parseSidMon1File(raw, 'anarchy.sid1');
-    expect(song).not.toBeNull();
-    const out = await toU8(await exportSidMon1(song as TrackerSong));
+    // Unedited: byte-identical to the file that was loaded.
+    const same = await toU8(await exportSidMon1(song as TrackerSong));
+    expect([...same]).toEqual([...new Uint8Array(raw)]);
+    // One edited note comes back on the same step / row / voice, the rest untouched.
+    const edited = { ...song, patterns: structuredClone(song.patterns) } as TrackerSong;
+    const layout = song.uadePatternLayout!;
+    let step = -1, cell = -1;
+    song.patterns.some((pat, p) => pat.channels[0].rows.some((c, r) => {
+      if (c.note > 0 && layout.getCellFileOffset!(p, r, 0) > 0) { step = p; cell = r; return true; }
+      return false;
+    }));
+    expect(step).toBeGreaterThanOrEqual(0);
+    const target = edited.patterns[step].channels[0].rows[cell];
+    const newNote = target.note + 5;
+    target.note = newNote;
+    const out = await toU8(await exportSidMon1(edited));
     const re = parseSidMon1File(out.buffer.slice(0) as ArrayBuffer, 'anarchy.sid1');
-    expect(re).not.toBeNull();
-    // The parser reads the stored note byte as 1-based (storedNote - 1); without the
-    // exporter's compensating +1, mid-range notes decoded a semitone low.
+    expect(re.patterns[step].channels[0].rows[cell].note).toBe(newNote);
     const { cells, matched } = cellMatch(song as TrackerSong, re as TrackerSong);
-    expect(cells).toBeGreaterThan(1000);
-    expect(matched).toBe(cells);
+    expect(cells).toBeGreaterThan(200);
+    expect(cells - matched).toBeLessThan(40); // the edit shows on every step that shares its pattern row
   });
 
   it('FC export encodes note as period index xmNote-13 (was -12, shifting every note up a semitone)', async () => {
