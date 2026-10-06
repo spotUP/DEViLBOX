@@ -393,7 +393,14 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
       this.levelsCounter = 0;
       this.wasm._fp_wasm_get_channel_levels(this.levelsPtr);
       const off = this.levelsPtr >> 2;
-      this.port.postMessage({ type: 'chLevels', levels: [this.wasm.HEAPF32[off], this.wasm.HEAPF32[off+1], this.wasm.HEAPF32[off+2], this.wasm.HEAPF32[off+3]] });
+      // Cumulative note starts per channel (Paula's DMA off->on edges)
+      let noteStarts = null;
+      if (typeof this.wasm._fp_wasm_get_note_start_counts === 'function') {
+        if (!this._noteStartsPtr) this._noteStartsPtr = this.wasm._malloc(4 * 4);
+        this.wasm._fp_wasm_get_note_start_counts(this._noteStartsPtr, 4);
+        noteStarts = Array.from(new Uint32Array(this.wasm.HEAPU8.buffer, this._noteStartsPtr, 4));
+      }
+      this.port.postMessage({ type: 'chLevels', levels: [this.wasm.HEAPF32[off], this.wasm.HEAPF32[off+1], this.wasm.HEAPF32[off+2], this.wasm.HEAPF32[off+3]], noteStarts });
     }
 
     return true;
