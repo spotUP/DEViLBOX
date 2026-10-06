@@ -38,6 +38,7 @@ int player_load(const uint8_t *data, int len) {
 
     // Start first subsong
     st_set_subsong(1);
+    st_reset_note_starts();
 
     s_loaded = 1;
     s_finished = 0;
@@ -117,6 +118,7 @@ void player_set_subsong(int n) {
     if (!s_loaded) return;
     paula_reset();
     st_set_subsong(n);
+    st_reset_note_starts();
     s_finished = 0;
     s_paused = 0;
     s_tick_accum = 0.0f;
@@ -128,6 +130,11 @@ double player_detect_duration(void) { return 0.0; }
 
 void player_get_channel_levels(float *out4) {
     paula_get_channel_levels(out4);
+}
+
+/** out[i] = cumulative note starts of voice i (restarts at 0 on load / subsong change). */
+void player_get_note_start_counts(uint32_t *out, int maxCh) {
+    for (int i = 0; i < maxCh; i++) out[i] = st_get_note_starts(i);
 }
 
 void player_set_channel_gain(int ch, float gain) {

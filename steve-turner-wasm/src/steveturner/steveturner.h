@@ -42,3 +42,6 @@ void st_note_on(int instrument, int note, int velocity);
 void st_note_off(void);
 void st_preview_tick(void);   // call at the player's tick rate while a preview note sounds
 int  st_preview_active(void);
+/* Cumulative note starts of a song voice (trigger_note), restarting at 0 on load / subsong change. */
+uint32_t st_get_note_starts(int voice);
+void st_reset_note_starts(void);

@@ -29,6 +29,8 @@ export function isLevelOnset(level: number, prevLevel: number): boolean {
 export class ChannelMeterFeed {
   private prev: number[] = [];
   private prevStarts: number[] = [];
+  /** Channels whose counted note has not sounded yet (envelope delay / attack from silence). */
+  private pending: boolean[] = [];
 
   /** Split one frame of per-channel levels into the level feed and the note feed. */
   feed(sink: ChannelMeterSink, levels: ArrayLike<number>): void {
@@ -47,7 +49,7 @@ export class ChannelMeterFeed {
    * them off Paula): `noteStarts[i]` is channel i's cumulative note-start
    * count. A rise in it is a note, whatever the level did - a note retriggered
    * at the same volume, or one shorter than the report interval, moves no
-   * level. A channel at level 0 stays dark. Counts restart at 0 on a song load.
+   * level. A channel at level 0 stays dark until it sounds. Counts restart at 0 on a song load.
    */
   feedCounted(sink: ChannelMeterSink, levels: ArrayLike<number>, noteStarts: ArrayLike<number>): void {
     const arr: number[] = [];
@@ -57,7 +59,10 @@ export class ChannelMeterFeed {
       const count = noteStarts[i] || 0;
       // A count below the last one is a new song: its starts count from zero again.
       const before = count < (this.prevStarts[i] || 0) ? 0 : (this.prevStarts[i] || 0);
-      if (count > before && level > 0) sink.triggerChannelMeter(i, level);
+      if (count > before) this.pending[i] = true;
+      // A note whose level is still 0 (an init delay, an attack from silence)
+      // flashes at the first report where it sounds, not never.
+      if (this.pending[i] && level > 0) { sink.triggerChannelMeter(i, level); this.pending[i] = false; }
       this.prevStarts[i] = count;
     }
     sink.updateRealtimeChannelLevels(arr);

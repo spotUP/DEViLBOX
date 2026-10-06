@@ -228,6 +228,7 @@ static inline uint8_t ivib_byte(const uint8_t *inst, int entry, int off) {
 
 static void reset_voice(Voice *v);
 static void trigger_note(Voice *v, uint16_t inst_offset, uint8_t prio);
+static uint32_t note_starts[NUM_VOICES];  // cumulative note starts per song voice
 static void init_vibrato(Voice *v);
 static void parse_data_stream(Voice *v, uint8_t *ptr);
 
@@ -644,6 +645,8 @@ static void slide_tick(Voice *v) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 static void trigger_note(Voice *v, uint16_t inst_offset, uint8_t prio) {
+    // The replayer's note start (lbC0008D6). The keyboard preview voice is not a song channel.
+    if (v >= ps.voices && v < ps.voices + NUM_VOICES) note_starts[v - ps.voices]++;
     v->inst_offset = inst_offset;
     v->inst_prio = prio;
     v->inst_num = (uint8_t)(inst_offset / INST_SIZE + 1);
@@ -1008,8 +1011,15 @@ static void update_tempo(void) {
 // Public API
 // ═══════════════════════════════════════════════════════════════════════════
 
+void st_reset_note_starts(void) { memset(note_starts, 0, sizeof(note_starts)); }
+
+uint32_t st_get_note_starts(int voice) {
+    return (voice >= 0 && voice < NUM_VOICES) ? note_starts[voice] : 0;
+}
+
 void st_init(void) {
     memset(&ps, 0, sizeof(ps));
+    st_reset_note_starts();
     paula_reset();
 
     // Initialize voice channel indices
