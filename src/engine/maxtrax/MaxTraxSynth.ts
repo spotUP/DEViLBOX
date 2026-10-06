@@ -7,6 +7,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { keyOnWholeSongPlayer } from '../wholeSongKeyboard';
 import { MaxTraxEngine } from './MaxTraxEngine';
 
 export class MaxTraxSynth implements DevilboxSynth {
@@ -33,18 +34,20 @@ export class MaxTraxSynth implements DevilboxSynth {
     }
   }
 
+  /** A key plays nothing: the whole-song player has no single-instrument voice, and must not start the song. */
   triggerAttack(_note?: string | number, _time?: number, _velocity?: number): void {
     if (this._disposed) return;
-    this.engine.play();
+    keyOnWholeSongPlayer('MaxTrax');
   }
 
   triggerRelease(_note?: string | number, _time?: number): void {
-    if (this._disposed) return;
-    this.engine.stop();
+    // A key-up never stops the song.
   }
 
+  /** Panic / song stop: this one does stop the player. */
   releaseAll(): void {
-    this.triggerRelease();
+    if (this._disposed) return;
+    this.engine.stop();
   }
 
   set(param: string, value: number): void {

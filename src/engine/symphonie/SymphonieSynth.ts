@@ -11,6 +11,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { SymphoniePlaybackData } from './SymphoniePlaybackData';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { keyOnWholeSongPlayer } from '../wholeSongKeyboard';
 import { SymphonieEngine } from './SymphonieEngine';
 
 export interface SymphonieLoadConfig {
@@ -59,15 +60,14 @@ export class SymphonieSynth implements DevilboxSynth {
     this.engine.stop();
   }
 
-  /** triggerAttack — starts playback (maps note-on to play for song engines) */
+  /** A key plays nothing: the whole-song player has no single-instrument voice, and must not start the song. */
   triggerAttack(_note?: string | number, _time?: number, _velocity?: number): void {
-    this.play();
+    if (this._disposed) return;
+    keyOnWholeSongPlayer('Symphonie');
   }
 
-  /** triggerRelease — stops playback (maps note-off to stop for song engines) */
-  triggerRelease(_note?: string | number, _time?: number): void {
-    this.stop();
-  }
+  /** A key-up never stops the song. */
+  triggerRelease(_note?: string | number, _time?: number): void {}
 
   set(param: string, value: number): void {
     switch (param) {

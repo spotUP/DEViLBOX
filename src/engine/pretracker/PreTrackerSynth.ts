@@ -7,6 +7,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { keyOnWholeSongPlayer } from '../wholeSongKeyboard';
 import { PreTrackerEngine } from './PreTrackerEngine';
 
 export class PreTrackerSynth implements DevilboxSynth {
@@ -33,13 +34,14 @@ export class PreTrackerSynth implements DevilboxSynth {
     }
   }
 
+  /** A key plays nothing: the whole-song player has no single-instrument voice, and must not start the song. */
   triggerAttack(_note?: string | number, _time?: number, _velocity?: number): void {
     if (this._disposed) return;
-    this.engine.play();
+    keyOnWholeSongPlayer('PreTracker');
   }
 
   triggerRelease(_note?: string | number, _time?: number): void {
-    // no-op — whole-song player
+    // A key-up never stops the song.
   }
 
   releaseAll(): void {
