@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import {
   JUKEBOX_FAULTS, reportFaults, reportGood, loadVerdicts, setFault, faultsOf,
   verdictLabels, isGoodVerdict, verdictFromFaults, deriveFields,
+  reportVisualizer, isVisualizer,
 } from '../faultReports';
 
 const fault = (id: string) => JUKEBOX_FAULTS.find((f) => f.id === id)!;
@@ -131,5 +132,30 @@ describe('reporting round trip', () => {
   it('switching the last fault off leaves a row with no verdict', async () => {
     await reportFaults([], fault('wrong-sound'), false, ctx);
     expect((await loadVerdicts()).sonix).toBeUndefined();
+  });
+
+  it('the visualizer mark round-trips through the server', async () => {
+    expect(await reportVisualizer(true, ctx)).toBe(true);
+    const on = (await loadVerdicts()).sonix;
+    expect(isVisualizer(on)).toBe(true);
+    expect(await reportVisualizer(false, ctx)).toBe(true);
+    // No verdict and no mark left: the row reads as untouched again.
+    expect((await loadVerdicts()).sonix).toBeUndefined();
+  });
+
+  it('the visualizer mark survives Good and does not change status', async () => {
+    await reportVisualizer(true, ctx);
+    const marked = (await loadVerdicts()).sonix;
+    expect(marked.status ?? "").toBe("");
+    expect(marked.patternQuality ?? "").toBe("");
+    await reportFaults(['silent'], fault('silent'), true, ctx);
+    await reportGood(ctx);
+    const good = (await loadVerdicts()).sonix;
+    expect(isGoodVerdict(good)).toBe(true);
+    expect(isVisualizer(good)).toBe(true);
+    await reportVisualizer(false, ctx);
+    const after = (await loadVerdicts()).sonix;
+    expect(isGoodVerdict(after)).toBe(true);
+    expect(isVisualizer(after)).toBe(false);
   });
 });

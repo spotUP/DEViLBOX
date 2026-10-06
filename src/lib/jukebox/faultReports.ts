@@ -48,6 +48,18 @@ export const JUKEBOX_FAULTS: readonly JukeboxFault[] = [
   { id: 'wrong-patterns', key: '7', label: 'Incorrect Pattern Data', title: 'Pattern data is present and moving, but wrong', patternQuality: 'incorrect' },
 ] as const;
 
+/**
+ * The Visualizer mark: this song shows the scope view instead of the pattern
+ * editor. An observation, not a fault — it never touches `status` or
+ * `patternQuality`, is never cleared by Good, and has its own switch and key.
+ */
+export const JUKEBOX_VISUALIZER = {
+  id: 'visualizer', key: '8', label: 'Visualizer',
+  title: 'This song shows the visualizer instead of the pattern editor',
+  /** The value stored in the row's `view` field. */
+  value: 'visualizer',
+} as const;
+
 /** Nothing wrong — worth recording, so a swept format is not re-swept. */
 export const JUKEBOX_OK = { id: 'ok', key: '0', label: 'Good', title: 'Plays and displays correctly', status: 'works' } as const;
 
@@ -109,6 +121,21 @@ export function verdictFromFaults(ids: readonly string[], notes?: string): Jukeb
   const faults = canonical(ids);
   const d = deriveFields(faults);
   return { faults, status: d.status || undefined, patternQuality: d.patternQuality || undefined, notes };
+}
+
+/** Whether a verdict carries the Visualizer mark. */
+export function isVisualizer(v: JukeboxVerdict | undefined): boolean {
+  return v?.view === JUKEBOX_VISUALIZER.value;
+}
+
+/** A verdict rewritten by a fault or Good keeps the row's Visualizer mark. */
+export function keepView(next: JukeboxVerdict, prev: JukeboxVerdict | undefined): JukeboxVerdict {
+  return prev?.view ? { ...next, view: prev.view } : next;
+}
+
+/** Switch the Visualizer mark on or off. Writes only `view`; the rest is merged by the server. */
+export async function reportVisualizer(on: boolean, ctx: ReportContext): Promise<boolean> {
+  return push(ctx, { view: on ? JUKEBOX_VISUALIZER.value : '' });
 }
 
 async function push(ctx: ReportContext, body: Record<string, unknown>): Promise<boolean> {
@@ -176,6 +203,8 @@ export async function reportGood(ctx: ReportContext): Promise<boolean> {
  * when it comes back.
  */
 export interface JukeboxVerdict {
+  /** 'visualizer' when the song shows the scope view; see JUKEBOX_VISUALIZER. */
+  view?: string;
   /** Fault ids; see the header for how it relates to the two fields below. */
   faults?: string[];
   status?: string;
@@ -229,9 +258,10 @@ export async function loadVerdicts(): Promise<Record<string, JukeboxVerdict>> {
     const data = await res.json() as Record<string, JukeboxVerdict>;
     const out: Record<string, JukeboxVerdict> = {};
     for (const [key, entry] of Object.entries(data)) {
-      if ((!entry?.status || entry.status === 'untested') && !entry?.patternQuality && !entry?.faults?.length) continue;
+      if ((!entry?.status || entry.status === 'untested') && !entry?.patternQuality && !entry?.faults?.length && !entry?.view) continue;
       out[key] = {
         faults: Array.isArray(entry.faults) ? entry.faults : undefined,
+        view: entry.view || undefined,
         status: entry.status, patternQuality: entry.patternQuality, notes: entry.notes,
       };
     }
