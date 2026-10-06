@@ -246,6 +246,31 @@ export function reportEnginePosition(
   useWasmPositionStore.getState().setPosition(row, songPos, channelRows, channelPositions);
 }
 
+/**
+ * Unsubscribers for the position callbacks registered on engine start. The
+ * engines are singletons: a callback left registered stays for the life of the
+ * page, so without this every song start added one more (and every report ran
+ * all of them), and loading songs made playback slower and slower.
+ */
+const _positionUnsubscribers: Array<() => void> = [];
+
+/** Keep an engine subscription's unsubscriber so stopNativeEngines() can remove it. */
+export function trackSubscription(unsubscribe: unknown): void {
+  if (typeof unsubscribe === 'function') _positionUnsubscribers.push(unsubscribe as () => void);
+}
+
+/** Remove every position callback the router registered. */
+export function releaseEngineSubscriptions(): void {
+  for (const unsubscribe of _positionUnsubscribers.splice(0)) {
+    try { unsubscribe(); } catch { /* engine already disposed */ }
+  }
+}
+
+/** Callbacks the router holds on engines right now (for tests). */
+export function engineSubscriptionCount(): number {
+  return _positionUnsubscribers.length;
+}
+
 /** Clear running engine tracking (call on stop/dispose) */
 export function clearRunningEngineKeys(): void {
   _runningEngineKeys.clear();
@@ -354,9 +379,9 @@ export async function startNativeEngines(
           // the live row for AutoDub fires. Without this every fire stamped
           // on row 0 (the transport-store fallback) and overwrote the
           // previous one — Zxx cells appeared to "never get written".
-          hivelyEngine.onPositionUpdate((update) => {
+          trackSubscription(hivelyEngine.onPositionUpdate((update) => {
             reportEnginePosition(desc.key, update.row, update.position);
-          });
+          }));
         }
 
         // Capture UADEEngine for position sync in TrackerReplayer
@@ -383,7 +408,7 @@ export async function startNativeEngines(
           const sr = Tone.context.sampleRate || 44100;
 
           let _posLogCount = 0;
-          (instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => {
+          trackSubscription((instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => {
             if (!timingTable || timingTable.length === 0) return;
 
             // Compute elapsed ms from samplesRendered (more reliable than worklet's elapsedMs)
@@ -413,7 +438,7 @@ export async function startNativeEngines(
             if (Number.isFinite(row) && Number.isFinite(position)) {
               reportEnginePosition(desc.key, row, position);
             }
-          });
+          }));
           console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} entries, msPerJiffy=${msPerJiffy})`);
         }
 
@@ -425,10 +450,10 @@ export async function startNativeEngines(
           const { hippelRowAt } = await import('@/engine/hippel/hippelCellSpans');
           const spans = mapHippelCells(song.hippelFileData, song.instruments.length);
           if (spans) {
-            (instance as unknown as import('@/engine/tfmx/TFMXEngine').TFMXEngine).onPositionUpdate((u) => {
+            trackSubscription((instance as unknown as import('@/engine/tfmx/TFMXEngine').TFMXEngine).onPositionUpdate((u) => {
               if (u.step === undefined || u.step < 0 || u.patternOffset === undefined || u.patternOffset < 0) return;
               reportEnginePosition(desc.key, hippelRowAt(spans, u.step, u.patternOffset), u.step);
-            });
+            }));
             console.log(`[NativeEngineRouting] Hippel position sync wired (${spans.length} steps)`);
           }
         }
@@ -444,13 +469,13 @@ export async function startNativeEngines(
           // the usePatternPlayback effect chain (which causes recursive engine spawns).
           // MusicLine: use onPosition for per-channel row/position data
           if (desc.key === 'MusicLine' && 'onPosition' in instance) {
-            (instance as any).onPosition((update: { position: number; row: number; channelRows?: number[]; channelPositions?: number[] }) => {
+            trackSubscription((instance as any).onPosition((update: { position: number; row: number; channelRows?: number[]; channelPositions?: number[] }) => {
               reportEnginePosition(desc.key, update.row, update.position, update.channelRows, update.channelPositions);
-            });
+            }));
           } else {
-            (instance as any).onPositionUpdate((update: { songPos?: number; row: number }) => {
+            trackSubscription((instance as any).onPositionUpdate((update: { songPos?: number; row: number }) => {
               reportEnginePosition(desc.key, update.row, update.songPos);
-            });
+            }));
           }
           // Also connect meters on first play
           try { getToneEngine().connectMeters(); } catch { /* ok */ }
@@ -826,6 +851,8 @@ export function stopNativeEngines(
   _runningEngineKeys.clear();
 
 
+  // The stopped engines' position callbacks go with them.
+  releaseEngineSubscriptions();
   // Clear WASM position tracking (synchronous — async import caused race with startNativeEngines)
   useWasmPositionStore.getState().clear();
 
