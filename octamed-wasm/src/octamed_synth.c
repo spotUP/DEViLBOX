@@ -32,9 +32,13 @@
  *     Paula reloads its pointer then.
  *   - Vibrato: period + (sine * depth >> 8), the sine advancing `speed` of 256
  *     per tick (the measured excursion of depth 8 / speed 4 is +3 at tick 16).
- *   - F4/FA of the volume table (envelope, wave-synchronised jump) and F7 of
- *     the waveform table are not modelled: their effect on the real player
- *     was not decoded.
+ *   - Volume table F4 n / F5 n: waveform n becomes the volume envelope, one
+ *     byte ((b + 128) >> 2) per step, 128 steps, once (F4) or looped (F5); F6
+ *     stops it. FA n jumps the waveform table to n and cancels its wait.
+ *     Waveform table F7 n: waveform n shapes the vibrato (its first 32 bytes,
+ *     in place of the sine). Per the OctaMED player (NostalgicPlayer OctaMed
+ *     Player.cs); F4 and FA and F7 are checked against UADE in
+ *     keyboardPreviewGroupB.test.ts.
  *
  * Binary blob for octamed_player_set_instrument (little-endian), version 2:
  *   [0]     u8  version = 2
@@ -118,6 +122,9 @@ typedef struct {
   int      periodOff;    /* F2/F3 accumulated period offset */
   int      pitchSlide;   /* per tick, signed (+ = period grows = pitch falls) */
   int      vibDepth, vibSpeed, vibPhase;
+  int      vibWf;        /* F7: waveform n+1 shapes the vibrato; 0 = sine */
+  int      envWf;        /* F4/F5: waveform n+1 drives the volume; 0 = none */
+  int      envLoop, envCount;
   int      arp[32], arpLen, arpIdx;
   float    phase;        /* position in the current waveform, bytes */
   int      active, allocated;
@@ -131,6 +138,13 @@ static int cmd_arg(const uint8_t *tbl, int pos) { return pos + 1 < 128 ? tbl[pos
 /* One volume-table step: run entries until a value (or END). */
 static void vol_step(Player *p) {
   Seq *s = &p->vol;
+  /* An envelope waveform sets the volume from one byte per step, before the
+   * table's entries, whether or not the table is waiting. */
+  if (p->envWf > 0 && p->envWf <= p->numWaves) {
+    int w = p->envWf - 1, wl = p->waveLen[w];
+    p->volume = ((int)p->waves[w][p->envCount % wl] + 128) >> 2;
+    if (++p->envCount >= 128) { p->envCount = 0; if (!p->envLoop) p->envWf = 0; }
+  }
   if (s->wait > 0) { s->wait--; return; }
   for (int guard = 0; guard < 64; guard++) {
     if (s->pos < 0 || s->pos >= 128) { s->pos = 127; return; }
@@ -143,8 +157,13 @@ static void vol_step(Player *p) {
       case 0xF2: p->volSlide = -a; s->pos += 2; break;
       case 0xF3: p->volSlide = a; s->pos += 2; break;
       case 0xFE: s->pos = a; break;
+      case 0xF4: case 0xF5: /* envelope from waveform n, once / looped */
+        p->envWf = a + 1; p->envLoop = (c == 0xF5); p->envCount = 0; s->pos += 2; break;
+      case 0xF6: p->envWf = 0; s->pos += 1; break;
+      case 0xFA: /* jump the waveform table to n, cancelling its wait */
+        p->wf.wait = 0; p->wf.pos = a; s->pos += 2; break;
       case 0xFF: return; /* END: hold */
-      default: s->pos += 2; break; /* F4, FA, ...: not modelled */
+      default: s->pos += 2; break;
     }
   }
 }
@@ -169,6 +188,7 @@ static void wf_step(Player *p) {
       case 0xF3: p->pitchSlide = -a; s->pos += 2; break;
       case 0xF4: p->vibDepth = a; s->pos += 2; break;
       case 0xF5: p->vibSpeed = a; s->pos += 2; break;
+      case 0xF7: p->vibWf = a + 1; s->pos += 2; break;
       case 0xFC: { /* arpeggio list up to FD */
         int n = 0, q = s->pos + 1;
         while (q < 128 && p->wftbl[q] != 0xFD && n < 32) p->arp[n++] = (int8_t)p->wftbl[q++];
@@ -178,7 +198,7 @@ static void wf_step(Player *p) {
       }
       case 0xFE: s->pos = a; break;
       case 0xFF: return; /* END: hold */
-      default: s->pos += 2; break; /* F7, FA, ...: not modelled */
+      default: s->pos += 2; break; 
     }
   }
 }
@@ -203,7 +223,11 @@ static void player_tick(Player *p) {
 
 static float current_period(const Player *p) {
   float period = (float)(p->period + p->periodOff);
-  if (p->vibDepth > 0) period += (float)((SINE_TABLE[p->vibPhase & 0xFF] * p->vibDepth) >> 8);
+  if (p->vibDepth > 0) {
+    int shape = SINE_TABLE[p->vibPhase & 0xFF];
+    if (p->vibWf > 0 && p->vibWf <= p->numWaves) shape = p->waves[p->vibWf - 1][(p->vibPhase >> 3) & 0x1F];
+    period += (float)((shape * p->vibDepth) >> 8);
+  }
   if (p->arpLen > 0) period *= powf(2.0f, -(float)p->arp[p->arpIdx] / 12.0f);
   if (period < 113.0f) period = 113.0f;
   return period;
@@ -302,6 +326,7 @@ KEEPALIVE void octamed_player_note_on(int handle, int midi_note, int velocity) {
   p->volume = 0;
   p->wave = p->waveNext = 0;
   p->vibDepth = 0; p->vibSpeed = p->vibSpeed0; p->vibPhase = 0;
+  p->vibWf = 0; p->envWf = 0; p->envLoop = 0; p->envCount = 0;
   p->arpLen = 0; p->arpIdx = 0;
   p->vol.pos = 0; p->vol.wait = 0; p->vol.speed = p->volSpeed0 < 1 ? 1 : p->volSpeed0;
   p->wf.pos = 0; p->wf.wait = 0; p->wf.speed = p->wfSpeed0 < 1 ? 1 : p->wfSpeed0;
