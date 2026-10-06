@@ -2972,7 +2972,7 @@ export class DubBus {
   /**
    * Keep `_preferChannelIsolation` in sync with the active editor mode.
    *
-   * `modeImpliesChannelIsolation()` owns the list of modes whose engines expose
+   * `supportsChannelIsolation()` owns the list of modes whose engines expose
    * real per-channel outputs. Lazily imported and subscribed (rather than a
    * static import) so DubBus keeps no load-time dependency on the format
    * store — the same pattern `setEchoRate` uses for useDrumPadStore.
@@ -2981,10 +2981,10 @@ export class DubBus {
     void Promise.all([
       import('@stores/useFormatStore'),
       import('@engine/tone/ChannelRoutedEffects'),
-    ]).then(([{ useFormatStore }, { modeImpliesChannelIsolation }]) => {
+    ]).then(([{ useFormatStore }, { supportsChannelIsolation }]) => {
       if (this._disposed) return;
       const apply = (mode: string): void => {
-        this._modeIsolation = modeImpliesChannelIsolation(mode);
+        this._modeIsolation = supportsChannelIsolation(mode);
         this._applyIsolationPreference(`editorMode="${mode}"`);
       };
       apply(useFormatStore.getState().editorMode);
@@ -5863,10 +5863,6 @@ export class DubBus {
   registerChannelTap(channelId: number, tap: GainNode, baseline?: number): void {
     this.channelTaps.set(channelId, tap);
     this.channelTapBaselines.set(channelId, baseline ?? tap.gain.value);
-    // A channel output now feeds this tap: the engine isolates, whatever the
-    // mode presumed. Only when nothing reported yet - an engine that started
-    // and said it cannot isolate (Fred) keeps its word.
-    if (this._engineIsolation === null) this.setEngineIsolation(true);
   }
 
   /** Called by ChannelRoutedEffects on every fader write, so a move that
