@@ -1252,7 +1252,11 @@ export const useFormatStore = create<FormatStore>()(
       // modes — they render inside viewMode === 'tracker'. Without this, loading
       // a GoatTracker file while on 'grid' would leave the custom
       // editor invisible until the user manually switched views.
-      if (newEditorMode !== 'classic') {
+      // 'sunvox' is a view the SunVox loader switches ON and nothing switched
+      // off: loading a MOD after a SunVox song kept trackerViewMode 'sunvox',
+      // so the pattern display stayed dead for every later load (owner,
+      // 2026-10-07). Every song that is not a SunVox project leaves it.
+      if (newEditorMode !== 'classic' || useUIStore.getState().trackerViewMode === 'sunvox') {
         const ui = useUIStore.getState();
         ui.setActiveView('tracker');
         ui.setTrackerViewMode('tracker');
