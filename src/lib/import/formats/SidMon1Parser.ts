@@ -449,7 +449,7 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
         const note = cell.note ?? 0;
         if (note === 0) bytes[0] = 0;
         else {
-          const raw = xmToSm1Index(note) - 1 - tracks[c.track].transpose;
+          const raw = xmToSm1Index(note) - tracks[c.track].transpose;
           if (raw < 1 || raw > 254) return [];
           bytes[0] = raw;
         }
@@ -496,15 +496,21 @@ function playerRow(raw: Uint8Array, versionTag: number, totInstruments: number):
 
 /**
  * The grid cell of a module row. The note is the one the player plays: the
- * row's note plus the track's transpose, period index note + 1. The five raw
+ * row's note plus the track's transpose, which is the period index (the
+ * replayer writes PERIODS[finetune + arpeggio + note] on every tick). The five raw
  * bytes ride in the period/pan/cutoff/resonance carriers (fields the grid
  * never sets), so an unedited cell encodes back byte-exact.
  */
 function gridCell(raw: Uint8Array, row: Sm1RawRow, transpose: number): TrackerCell {
   const playsNote = row.note > 0 && row.note < 255;
-  const effTyp = playsNote && row.effect === 2 ? 0x0F : 0;
+  // Effects only act on a note row. 2 sets the speed; any other non-zero
+  // effect other than 3 (pattern length) is a bend: the pitch slides from the
+  // row's note to note `effect + transpose` at `param` (portamento).
+  let effTyp = 0;
+  if (playsNote && row.effect === 2) effTyp = 0x0F;
+  else if (playsNote && row.effect !== 0 && row.effect !== 3) effTyp = 0x03;
   return {
-    note: playsNote ? sm1IndexToXM(row.note + transpose + 1) : 0,
+    note: playsNote ? sm1IndexToXM(row.note + transpose) : 0,
     instrument: row.sample, volume: 0,
     effTyp, eff: effTyp ? row.param : 0, effTyp2: 0, eff2: 0,
     period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3], resonance: raw[4],

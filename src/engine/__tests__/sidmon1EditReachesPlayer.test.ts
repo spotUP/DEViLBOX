@@ -49,7 +49,7 @@ async function play(bytes: ArrayBuffer, posted: { type: string; index: number; b
     const n = m._player_get_voice_rows_consumed(0);
     if (n !== seen) {
       seen = n;
-      if (soundedNote < 0 && m._player_get_voice_consumed(0) === row) soundedNote = sm1IndexToXM(m._player_get_voice_note(0) + 1);
+      if (soundedNote < 0 && m._player_get_voice_consumed(0) === row) soundedNote = sm1IndexToXM(m._player_get_voice_note(0));
     }
   }
   return { soundedNote, audio };

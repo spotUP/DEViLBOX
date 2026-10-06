@@ -147,3 +147,4 @@ int player_set_row(int index, const uint8_t *raw5) { return sm1r_set_row(index, 
 int player_get_voice_consumed(int v) { return sm1r_get_voice_consumed(v); }
 int player_get_voice_rows_consumed(int v) { return sm1r_get_voice_rows_consumed(v); }
 int player_get_voice_note(int v) { return sm1r_get_voice_note(v); }
+int player_get_paula_period(int ch) { return paula_reg_period(ch); }
