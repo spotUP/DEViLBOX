@@ -17,6 +17,7 @@ import type { DubBusSettings } from '@/types/dub';
 import { needsMigration, migrateProject } from '@/lib/migration';
 import { decodeNativeEngineFields, type SerializedCompanionFiles } from '@/lib/export/exporters';
 import type { SongToApply, ProjectExtras } from './applySong';
+import type { GridBaseline } from './gridBaseline';
 
 /** The fields both saved shapes (SavedProject and SongExport) carry. */
 export interface SavedSongFields {
@@ -46,6 +47,8 @@ export interface SavedSongFields {
   dubBus?: Partial<DubBusSettings>;
   autoDub?: { enabled: boolean; persona: string; intensity: number; moveBlacklist?: string[] };
   performanceJournal?: unknown;
+  /** Per-cell hashes of the grid as loaded (gridBaseline.ts); absent in older saves. */
+  gridBaseline?: GridBaseline;
 }
 
 /** Legacy .dbx automation: { [patternId]: { [channel]: { [param]: curve } } }. */
@@ -109,5 +112,6 @@ export function savedSongToApply(data: SavedSongFields): SongToApply {
     originalModuleData: data.originalModuleData?.base64 ? (data.originalModuleData as SongToApply['originalModuleData']) : null,
     engine: decodeNativeEngineFields(data.nativeEngineData, data.nativeEngineMeta, data.linearPeriods, data.nativeCompanionFiles) as SongToApply['engine'],
     extras,
+    gridBaseline: data.gridBaseline ?? null,
   };
 }
