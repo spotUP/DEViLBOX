@@ -245,6 +245,7 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
           return;
         }
         this.levelsPtr = malloc(4 * 4);
+        this.noteStartsPtr = malloc(4 * 4);
       }
 
       if (typeof this.module._player_set_sample_rate === 'function') {
@@ -275,6 +276,7 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
     const free = this.module?._free || this.module?.free;
     if (free && this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
     if (free && this.levelsPtr) { free(this.levelsPtr); this.levelsPtr = 0; }
+    if (free && this.noteStartsPtr) { free(this.noteStartsPtr); this.noteStartsPtr = 0; }
     this.interleavedBuf = null;
     this.module = null;
     this.initialized = false;
@@ -331,7 +333,13 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
       const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
       if (heapF32) {
         const off = this.levelsPtr >> 2;
-        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]] });
+        // Cumulative note starts per channel (Paula DMA off->on edges)
+        let noteStarts = null;
+        if (this.noteStartsPtr && typeof this.module._player_get_note_start_counts === 'function') {
+          this.module._player_get_note_start_counts(this.noteStartsPtr, 4);
+          noteStarts = Array.from(new Uint32Array((this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer)).buffer, this.noteStartsPtr, 4));
+        }
+        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts });
       }
     }
 
