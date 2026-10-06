@@ -26,6 +26,7 @@
  *   [18]      pulseDelay    (uint8)
  *   [19..34]  arpeggio[16]  (int8 array)
  *   [35..36]  relative      (uint16 LE)
+ *   [37..38]  length        (uint16 LE, wave bytes)
  */
 
 import type { DevilboxSynth } from '@/types/synth';
@@ -163,7 +164,7 @@ export class FredSynth implements DevilboxSynth {
  * Returns an ArrayBuffer that can be transferred to the AudioWorklet.
  */
 export function serializeFredConfig(cfg: FredConfig): ArrayBuffer {
-  const BLOB_SIZE = 37;
+  const BLOB_SIZE = 39;
   const buf = new Uint8Array(BLOB_SIZE);
 
   buf[0]  = cfg.envelopeVol  & 0xFF;
@@ -196,6 +197,9 @@ export function serializeFredConfig(cfg: FredConfig): ArrayBuffer {
   const rel = cfg.relative & 0xFFFF;
   buf[35] = rel & 0xFF;
   buf[36] = (rel >> 8) & 0xFF;
+  const len = (cfg.length ?? 0) & 0xFFFF;
+  buf[37] = len & 0xFF;
+  buf[38] = (len >> 8) & 0xFF;
 
   return buf.buffer;
 }
