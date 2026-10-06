@@ -25,7 +25,7 @@ if(EMSCRIPTEN)
     string(JOIN "," EXPORT_STR ${EXPORTED_FUNCTIONS})
     target_link_options(${OUTPUT_NAME} PRIVATE
         -sEXPORTED_FUNCTIONS=[${EXPORT_STR}]
-        -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue']
+        -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','lengthBytesUTF8','stringToUTF8']
         -sALLOW_MEMORY_GROWTH=1
         -sINITIAL_MEMORY=33554432
         -sMODULARIZE=1

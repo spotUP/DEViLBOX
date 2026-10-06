@@ -13,7 +13,7 @@
 #endif
 #endif
 
-#define SAMPLE_FRAC_BITS 11
+#define SAMPLE_FRAC_BITS 32  // Paula's period clock is exact; 11 bits detuned voices by up to 0.2 %
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tables
@@ -302,8 +302,10 @@ static void bd_set_period(BdVoicePlaybackInfo* pb, uint16_t period, uint32_t sam
         return;
     }
 
-    uint32_t frequency = 3546895u / (uint32_t)period;
-    pb->sample_step_fp = ((uint64_t)frequency << SAMPLE_FRAC_BITS) / (uint64_t)sample_rate;
+    // Paula fetches a byte every `period` ticks of the 3546895 Hz PAL clock:
+    // step = clock / (period * rate), rounded once (no truncated Hz first).
+    const uint64_t den = (uint64_t)period * sample_rate;
+    pb->sample_step_fp = (((uint64_t)3546895u << SAMPLE_FRAC_BITS) + den / 2) / den;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2418,7 +2420,11 @@ BdModule* bd_create(const uint8_t* data, size_t size, float sample_rate) {
     mod->player->sample_rate = (uint32_t)sample_rate;
     mod->player->channel_mask = 0x0f;
     mod->player->frames_per_tick = sample_rate / 50.0f;  // 50 Hz PAL VBlank
-    mod->player->frames_until_tick = 0.0f;
+    // The Amiga runs the module's init, then calls its play routine from the
+    // NEXT VBlank: the first tick comes one frame after the start, never at
+    // sample 0 (UADE and the 68k runner both show it; starting at 0 put every
+    // note one tick early against them).
+    mod->player->frames_until_tick = mod->player->frames_per_tick;
     mod->player->current_subsong = 0;
 
     bd_init_sound(mod, 0);
@@ -2459,7 +2465,7 @@ bool bd_select_subsong(BdModule* module, int subsong) {
     }
 
     module->player->current_subsong = subsong;
-    module->player->frames_until_tick = 0.0f;
+    module->player->frames_until_tick = module->player->frames_per_tick;  // init, then the next VBlank plays
     bd_init_sound(module, subsong);
     return true;
 }

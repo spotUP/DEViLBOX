@@ -112,7 +112,7 @@ class BdProcessor extends AudioWorkletProcessor {
         var pLen = m.lengthBytesUTF8(data.param) + 1;
         var pPtr = m._malloc(pLen);
         m.stringToUTF8(data.param, pPtr, pLen);
-        m._bd_set_instrument_param(data.inst, pPtr, data.value);
+        m._bd_set_instrument_param(data.instrument, pPtr, data.value);  // WasmParamEditorWrapper sends { instrument }
         m._free(pPtr);
         break;
       }
