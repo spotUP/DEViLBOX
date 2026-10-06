@@ -297,7 +297,15 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
           // Send up to 8 channels × 2 (L+R) = 16 floats
           const levels = [];
           for (let i = 0; i < 16; i++) levels.push(heapF32[off + i]);
-          this.port.postMessage({ type: 'chLevels', levels });
+          // Cumulative note starts per channel (the replayer's own trigger point)
+          let noteStarts = null;
+          if (typeof this.module._player_get_note_start_counts === 'function') {
+            if (!this._noteStartsPtr) this._noteStartsPtr = this.module._malloc(8 * 4);
+            this.module._player_get_note_start_counts(this._noteStartsPtr, 8);
+            noteStarts = [];
+            for (let i = 0; i < 8; i++) noteStarts.push(this.module.getValue(this._noteStartsPtr + i * 4, 'i32') >>> 0);
+          }
+          this.port.postMessage({ type: 'chLevels', levels, noteStarts });
         }
       }
     }

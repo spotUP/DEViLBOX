@@ -424,6 +424,7 @@ struct AonSong {
     // Playback state
     AonGlobalState global;
     AonVoice voices[AON_MAX_CHANNELS];
+    uint32_t note_starts[AON_MAX_CHANNELS]; // cumulative note starts per channel since aon_song_start
     AonMixerChannel mixer[AON_MAX_CHANNELS];
 
     // Configuration
@@ -765,6 +766,7 @@ static bool aon_load(AonSong* song, const u8* data, u32 size) {
 
 static void aon_init_playback(AonSong* song, u8 start_position) {
     memset(&song->global, 0, sizeof(song->global));
+    memset(song->note_starts, 0, sizeof(song->note_starts));
     song->global.tempo = 125;
     song->global.speed = 6;
     song->global.position = start_position;
@@ -1144,6 +1146,8 @@ static void init_synth(AonSong* song, const AonTrackCell* cell, AonVoice* v, Aon
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void use_old_instrument(AonSong* song, const AonTrackCell* cell, AonVoice* v, AonInstrument* instr) {
+    // The replayer's note start: every sample/synth voice (re)start passes here.
+    song->note_starts[v - song->voices]++;
     v->vib_cont = 0;
     init_adsr(v, instr);
 
@@ -2333,8 +2337,12 @@ void aon_song_enable_scope_capture(AonSong* song, int enable) {
     if (!song) {
         return;
     }
+    // Clear only on the off-to-on edge: player_get_channel_levels re-enables on
+    // every report, and clearing each time wiped the scope before it was read
+    // (every channel level read 0).
+    int was_enabled = song->scope_enabled;
     song->scope_enabled = enable;
-    if (enable) {
+    if (enable && !was_enabled) {
         memset(song->scope_buffer, 0, sizeof(song->scope_buffer));
         memset(song->scope_write_pos, 0, sizeof(song->scope_write_pos));
     }
@@ -2360,4 +2368,9 @@ uint32_t aon_song_get_scope_data(AonSong* song, int channel, float* buffer, uint
     }
 
     return num_samples;
+}
+
+uint32_t aon_song_get_note_starts(const AonSong* song, int channel) {
+    if (!song || channel < 0 || channel >= AON_MAX_CHANNELS) return 0;
+    return song->note_starts[channel];
 }
