@@ -315,3 +315,15 @@ Phase 2 candidate (2026-10-05): tick-rebuilt grids on the generic UADE route bea
 - Heard (owner): Wally Beben, Dave Lowe, Dave Lowe New, Anders 0land (hot.primemover_01), DSS zrimay - right. Wally Beben grid bogus (phase 2). SAP warhawk plays at double speed (open). Core Design / primemover 07.hot silent in app -> fixed in 8687b8932 (to re-listen).
 - Face The Music routed to our replayer (3c36dfb48, owner). Ben Daglish stays on BdEngine, to be brought to the runner's fidelity (owner) - agent running.
 - TextEncoder worklet prelude restored (9b3f7b78b); no freeze on play (owner).
+
+## Grid reverse-engineering program (owner, 2026-10-06)
+
+Owner: estimated grids are useless; reverse each format to its real data. Work list: thoughts/shared/research/2026-10-06_grid-provenance-per-format.md (A decoded 110 fmts/3772 songs, B partial 14/67, C estimated 82/168, D no grid 26/254). Acceptance per format: byte-exact decode->encode round trip on every corpus file, gridVsPaula near 1.0 and better than the current grid, edits reach the playing engine.
+- [ ] Sound Player (30) - agent running
+- [ ] Digital Sonix & Chrome (14) - agent running
+- [ ] MIDI Loriciel (13) - agent running
+- [ ] Jochen Hippel ST (8), DeliTracker customs .cus (5), Synth Dream (5, binary only), Custom Made (4), Fred Editor (B, 4), Jesper Olsen (4), Sound Master (B, 4), then Jason Brooke, Mark Cooksey, Speedy System, Beathoven, Forgotten Worlds, Riff Raff; B: Wally Beben, David Whittaker, Ben Daglish, SidMon 1, GlueMon, Tomy Tracker, Paul Robotham.
+- [ ] Re-score the A rows with gridVsPaula one by one (only 19 have a Paula score) to find hidden B's.
+- [ ] Check NATIVE_ROUTES (UADEParser.ts:527-1040, return :1089): stub grid returned without a note-count check.
+- Cheap extra: Pxtone, Organya, Eupmini, Ixalance, Psycle, ZXTune have documented event data but show an empty shell (scope view).
+- Open bugs: SAP warhawk double speed; eight track-index engines may get the grid's pattern index for edits (SoundMon, DigMug, SonicArranger, DM1/2, InStereo1/2, Synthesis); undo/redo and macro paste reach no engine.
