@@ -41,7 +41,7 @@ import {
   JUKEBOX_VISUALIZER, isVisualizer, keepView, reportVisualizer,
   type JukeboxVerdict, type JukeboxFault,
 } from '@/lib/jukebox/faultReports';
-import { searchModland, downloadModlandFile } from '@/lib/modlandApi';
+import { searchModland, downloadModlandFile, downloadUADECompanions } from '@/lib/modlandApi';
 
 interface IndexEntry {
   id: string;
@@ -277,7 +277,15 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         if (!hit) { setStatus(`Modland has nothing for "${term}"`); return; }
         const buf = await downloadModlandFile(hit.full_path);
         const name = hit.filename ?? 'song';
-        if (await loadAndPlay(buf, name)) setStatus(`${name} (Modland)`);
+        // The partner files Modland lists beside the hit, through the resolver.
+        const companions: Record<string, string> = {};
+        for (const c of await downloadUADECompanions(hit.full_path, buf)) {
+          const cBuf = new Uint8Array(c.buffer);
+          let cBin = '';
+          for (let i = 0; i < cBuf.length; i += 0x8000) cBin += String.fromCharCode(...cBuf.subarray(i, i + 0x8000));
+          companions[c.filename] = btoa(cBin);
+        }
+        if (await loadAndPlay(buf, name, companions)) setStatus(`${name} (Modland)`);
         window.setTimeout(grabFocus, 0);
         window.setTimeout(grabFocus, 500);
       } catch (err) {
