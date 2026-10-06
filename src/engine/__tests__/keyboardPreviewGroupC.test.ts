@@ -19,9 +19,10 @@ import { renderTicks, rmsPerTick, risingEdges, totalRms, db, FPT } from './keybo
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { parseFuturePlayerFile } from '@/lib/import/formats/FuturePlayerParser';
 import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
+import { parseSteveTurnerFile } from '@/lib/import/formats/SteveTurnerParser';
 
-const corpus = (n: string) => {
-  const f = readFileSync(resolve(ROOT, 'public/data/songs/formats', n));
+const corpus = (n: string, dir = 'formats') => {
+  const f = readFileSync(resolve(ROOT, 'public/data/songs', dir === 'formats' ? 'formats' : dir, n));
   return f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
 };
 /** The Emscripten glue of the replayer wasm, made loadable in a worklet scope. */
@@ -53,11 +54,11 @@ function firstNote(song: GridSong, ids: number[]) {
 }
 
 /** Ticks the note sounds before its channel's next note or instrument cell (within the pattern), capped. */
-function holdTicks(song: GridSong, n: { posIdx: number; row: number; ch: number; patLen: number }, cap: number): number {
+function holdTicks(song: GridSong, n: { posIdx: number; row: number; ch: number; patLen: number }, cap: number, ticksPerRow = song.initialSpeed): number {
   const rows = song.patterns[song.songPositions[n.posIdx]].channels[n.ch].rows;
   let r = n.row + 1;
   while (r < n.patLen && !(rows[r].note > 0 || rows[r].instrument > 0)) r++;
-  return Math.max(3, Math.min(cap, (r - n.row) * song.initialSpeed - 1));
+  return Math.max(3, Math.min(cap, (r - n.row) * ticksPerRow - 1));
 }
 
 /** Pitch, overall level and per-tick envelope of `prev` against `song` (both from their first sound). */
@@ -156,5 +157,44 @@ describe('SoundMon: a synth instrument typed on the keyboard is the replayer voi
     renderTicks(b.proc, 5, 0);
     await b.send({ type: 'previewNoteOff' });
     expect(Math.max(...renderTicks(b.proc, 5, 0).map(Math.abs))).toBe(0);
+  });
+});
+
+describe('Steve Turner: a typed note runs the replayer voice (envelope, vibrato, slide), not a flat sample', () => {
+  for (const name of ['paradroid90.jpo', 'rainbow islands.jpo']) {
+    it(`${name}: the first sampled note has the song's pitch, level and envelope`, async () => {
+      const ab = corpus(name, 'steve-turner');
+      const song = parseSteveTurnerFile(ab, name) as unknown as GridSong;
+      const n = firstNote(song, Array.from({ length: 32 }, (_, i) => i + 1));
+      // The player ticks at 99.86 Hz, two ticks to a 50 Hz tick of the harness.
+      const ticks = holdTicks(song, n, 12, song.initialSpeed / 2);
+      const a = await startWorklet('steveturner', 'SteveTurner', emscriptenTransform);
+      await a.send({ type: 'loadModule', moduleData: ab });
+      await a.send({ type: 'setMuteMask', mask: 1 << n.ch });
+      const startTick = Math.round((n.posIdx * n.patLen + n.row) * song.initialSpeed / 2);
+      const side = n.ch === 0 || n.ch === 3 ? 0 : 1;
+      const s = fromFirstSound(renderTicks(a.proc, startTick + ticks + 40, side).subarray(startTick * FPT), 0.02);
+      const b = await startWorklet('steveturner', 'SteveTurner', emscriptenTransform);
+      await b.send({ type: 'loadModule', moduleData: ab });
+      await b.send({ type: 'pause' });
+      // grid note = replayer note index + 13; the key is the grid note + 11; the synth maps the key back
+      await b.send({ type: 'noteOn', instrument: n.ins - 1, note: n.note - 13, velocity: 100 });
+      const p = fromFirstSound(renderTicks(b.proc, ticks + 40, 0), 0.02);
+      expectSameVoice(name, s, p, ticks);
+    });
+  }
+
+  it('key release enters the instrument decay segment (no hard cut)', async () => {
+    const ab = corpus('paradroid90.jpo', 'steve-turner');
+    const b = await startWorklet('steveturner', 'SteveTurner', emscriptenTransform);
+    await b.send({ type: 'loadModule', moduleData: ab });
+    await b.send({ type: 'pause' });
+    await b.send({ type: 'noteOn', instrument: 3, note: 12, velocity: 100 });
+    renderTicks(b.proc, 4, 0);
+    await b.send({ type: 'noteOff' });
+    const after = rmsPerTick(renderTicks(b.proc, 40, 0), 40);
+    // The instrument's own decay segment: no hard cut at key-up, and the level falls steadily.
+    expect(after[0], 'no hard cut at key-up').toBeGreaterThan(0.1);
+    expect(after[after.length - 1], 'level falls through the decay').toBeLessThan(after[0] * 0.85);
   });
 });
