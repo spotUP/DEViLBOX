@@ -9,7 +9,8 @@
  * soundMasterGrid.ts). `effTyp`
  * is a GLOBAL id space shared by every format's display path
  * (xmEffectToString + TrackerGLRenderer + TrackerCanvas2DRenderer); this
- * block is 0x74..0x76, after Fred Editor's 0x70..0x73.
+ * block is 0x74..0x78 (0x76/0x77, once K and I, are retired: a grid saved
+ * with them must not read them as N), after Fred Editor's 0x70..0x73.
  *
  * ZERO imports on purpose - imported by the renderer workers.
  *
@@ -17,14 +18,14 @@
  * period routines), thoughts/shared/research/2026-10-06_sound-master-format.md.
  */
 
-/** Sound Master private effect ids (reserved block 0x74..0x76). */
+/** Sound Master private effect ids (reserved block 0x74..0x78). */
 export const SM_FX = {
   /** H: note byte $FF - the voice holds (its envelope keeps attacking), no new note; eff = the info byte, which the player ignores. */
   hold: 0x74,
   /** L: note byte bit 7 - the pitch changes, the sample is not restarted. */
   legato: 0x75,
   /** N: a note byte whose pitch the grid cannot name, kept verbatim (eff = the byte). */
-  rawNote: 0x76,
+  rawNote: 0x78,
 } as const;
 
 export const SM_FX_MIN = SM_FX.hold;

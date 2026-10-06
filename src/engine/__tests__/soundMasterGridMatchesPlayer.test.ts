@@ -26,6 +26,8 @@ import { exportSoundMaster } from '@/lib/export/SoundMasterExporter';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { SM_FX } from '@/lib/import/formats/soundMasterEffectGlyphs';
+import { periodToNote } from '@/lib/amiga/periodNotes';
 
 // The edit test drives the real UADEChipEditor; only the engine singleton is
 // replaced by the UADE module this test renders with.
@@ -64,20 +66,24 @@ function baseName(path: string): string {
 interface NoteOn { t: number; period: number | null }
 
 /**
- * The note-ons the grid says the player makes, per voice, in song order: a
- * row whose note byte starts a sample (not empty, not $FF hold, not legato,
- * not a II v1 speed/break row), at its row's tick. A portamento note starts
- * its sample at the period it glides from, so its period is not compared.
+ * The note-ons the DISPLAYED grid says the player makes, per voice, in song
+ * order: every cell that shows a note and is not legato (L: pitch only, no
+ * sample start), at its row's tick, with the note it shows. A portamento
+ * note (3xx) starts its sample at the period it glides from, so only its
+ * time is compared.
  */
-function gridNoteOns(song: SmSong): NoteOn[][] {
-  const out: NoteOn[][] = [[], [], [], []];
+interface ShownNote extends NoteOn { note: number; step: number; row: number }
+function gridNoteOns(song: SmSong): ShownNote[][] {
+  const grid = soundMasterGrid(song);
+  const out: ShownNote[][] = [[], [], [], []];
   let tick = 0;
   song.steps.forEach((s, si) => {
     for (let r = 0; r < s.rows; r++) {
       for (let v = 0; v < 4; v++) {
-        const [n] = song.rowBytes(s.voices[v].pattern, r);
-        if (n === 0 || n === 0xff || (n & 0x80) || (song.fixed && (n === 0xfd || n === 0xfe))) continue;
-        out[v].push({ t: tick * 20, period: n & 0x40 ? null : song.cell(si, r, v)!.period! });
+        const c = grid[si][v][r];
+        const fx = [c.effTyp, c.effTyp2, c.effTyp3 ?? 0];
+        if (c.note === 0 || fx.includes(SM_FX.legato)) continue;
+        out[v].push({ t: tick * 20, period: fx.includes(0x03) ? null : c.period!, note: c.note, step: si, row: r });
       }
       tick += song.module.speed;
     }
@@ -240,6 +246,22 @@ describe('Sound Master module codec', () => {
 });
 
 describe('Sound Master grid matches the player', () => {
+  it("no cell shows a bookkeeping effect: rackney's notes carry no effect, the volume column only the info byte's volume", async () => {
+    const song = await parse(load(CORPUS[0].path), baseName(CORPUS[0].path));
+    const effects = new Map<number, number>();
+    let volumes = 0;
+    for (const p of song.patterns) for (const ch of p.channels) for (const c of ch.rows) {
+      for (const t of [c.effTyp, c.effTyp2, c.effTyp3 ?? 0]) if (t) effects.set(t, (effects.get(t) ?? 0) + 1);
+      if (c.volume) volumes++;
+    }
+    // rackney has no hold, legato, portamento or out-of-table note rows.
+    expect([...effects]).toEqual([]);
+    // Info bit 6 volumes only (on note-less rows here); a note's level is its instrument's envelope.
+    expect(volumes).toBeGreaterThan(0);
+    // Voice 0 plays every other row in block 1 (D#3/G-3 drums), voices 1 and 3 start at 6.96 s / 7.68 s.
+    expect(song.patterns[0].channels[0].rows.map((c) => c.note)).toEqual([40, 0, 44, 0, 44, 0, 44, 0, 40, 0, 44, 0, 44, 0, 44, 0]);
+  });
+
   it('the grid is the song walk: one pattern per block played, notes per voice', async () => {
     for (const c of CORPUS) {
       const song = await parse(load(c.path), baseName(c.path));
@@ -267,6 +289,8 @@ describe('Sound Master grid matches the player', () => {
       const got = notes[v];
       expect(got.length, `${path} voice ${v}`).toBe(exp.length);
       for (let i = 0; i < exp.length; i++) {
+        // The note the cell shows is the note Paula plays.
+        if (exp[i].period !== null) expect(periodToNote(got[i].period), `${path} voice ${v} step ${exp[i].step} row ${exp[i].row}`).toBe(exp[i].note);
         if (exp[i].period !== null) expect(got[i].period, `${path} voice ${v} note ${i}`).toBe(exp[i].period);
         // One play call (20 ms) plus the 10 ms render grain.
         expect(Math.abs(got[i].t - exp[i].t), `${path} voice ${v} note ${i} time`).toBeLessThanOrEqual(30);
