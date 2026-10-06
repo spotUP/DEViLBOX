@@ -554,6 +554,15 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
         effTyp2: 0, eff2: 0,
       };
     },
+    // The grid's pattern is a position; each voice reads its track lines from
+    // that position's start row (the loop that builds `patterns` above).
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const pos = positions[pattern]?.[channel];
+      if (!pos) return 0;
+      const lineIdx = pos.startTrackRow + row;
+      if (lineIdx < 0 || lineIdx >= trackLines.length) return 0;
+      return trackRowDataOffset + lineIdx * 4;
+    },
   };
 
   return {
