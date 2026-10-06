@@ -296,7 +296,15 @@ class SteveTurnerProcessor extends AudioWorkletProcessor {
       const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
       if (heapF32) {
         const off = this.levelsPtr >> 2;
-        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]] });
+        // Cumulative note starts per voice (the replayer's own trigger_note)
+        let noteStarts = null;
+        if (typeof this.module._player_get_note_start_counts === 'function') {
+          if (!this._noteStartsPtr) this._noteStartsPtr = (this.module._malloc || this.module.malloc)(4 * 4);
+          this.module._player_get_note_start_counts(this._noteStartsPtr, 4);
+          noteStarts = [];
+          for (let i = 0; i < 4; i++) noteStarts.push(this.module.getValue(this._noteStartsPtr + i * 4, 'i32') >>> 0);
+        }
+        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts });
       }
     }
 

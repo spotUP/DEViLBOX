@@ -26,6 +26,11 @@ describe('engine channel level feed with counted note starts', () => {
     f.feedCounted(s, [0.5], [7]); f.feedCounted(s, [0.5], [1]);
     expect(s.triggers).toEqual([[0, 0.5], [0, 0.5]]);
   });
+  it('a counted note still silent at its report flashes when it first sounds', () => {
+    const s = sink(); const f = new ChannelMeterFeed();
+    f.feedCounted(s, [0], [1]); f.feedCounted(s, [0], [1]); f.feedCounted(s, [0.4], [1]); f.feedCounted(s, [0.4], [1]);
+    expect(s.triggers).toEqual([[0, 0.4]]);
+  });
   it('a silent channel stays dark even if its count rises', () => {
     const s = sink(); const f = new ChannelMeterFeed();
     f.feedCounted(s, [0], [3]);
