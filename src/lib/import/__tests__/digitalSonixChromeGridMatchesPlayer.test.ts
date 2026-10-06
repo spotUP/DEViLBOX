@@ -201,12 +201,18 @@ describe('Digital Sonix & Chrome grid matches the player', () => {
 
   it('importing a .dsc file (the app entry point) gives the decoded grid of the chosen subsong, UADE attached for audio', async () => {
     const fanfares = new Uint8Array(readFileSync(join(process.cwd(), "public/data/songs/formats/dragon'sbreath_fanfares.dsc")));
-    const viaApp = await parseModuleToSong(new File([load()], NAME));
+    const viaApp = await parseModuleToSong(new File([load().slice().buffer as ArrayBuffer], NAME));
     expect(viaApp.name).toContain('[Digital Sonix & Chrome]');
     expect(gridPitches(viaApp).map((c) => c.length)).toEqual([98, 130, 141, 200]);
     expect(viaApp.uadeEditableFileData?.byteLength).toBe(bytes.length);
     expect(viaApp.uadePatternLayout?.formatId).toBe('digitalSonixChrome');
-    const sub1 = await parseModuleToSong(new File([fanfares], "dragon'sbreath_fanfares.dsc"), 1);
+    expect(viaApp.uadePlayerTickGrid).toBe(true);
+    const sub1 = await parseModuleToSong(new File([fanfares.slice().buffer as ArrayBuffer], "dragon'sbreath_fanfares.dsc"), 1);
     expect(sub1.songPositions.length).toBe(42); // entries (64,2,64) + (192,40,64)
+    // The subsong switch and UADE's pinned load read the same subsongs.
+    expect(sub1.uadeEditableSubsongs?.start).toBe(1);
+    expect(sub1.uadeEditableSubsongs?.count).toBe(4);
+    expect(sub1.uadeEditableSubsongs?.orders?.[1]).toEqual(sub1.songPositions);
+    expect(sub1.uadeEditableSubsongs?.orders?.[3]).toEqual([]);
   });
 });

@@ -490,6 +490,17 @@ export interface TrackerSong {
    *  During playback, row = floor((tickCount - uadeFirstTick) / initialSpeed). */
   uadeFirstTick?: number;
 
+  /** The grid was decoded from the module by its parser: each row is `initialSpeed`
+   *  player interrupts and row 0 plays on the first one. UADE's player-tick count
+   *  (CIA-A Timer B) then drives the playhead (playerTickGridPosition). Set only by
+   *  a parser whose grid is proven tick-exact against UADE's Paula output. */
+  uadePlayerTickGrid?: boolean;
+
+  /** Subsongs of a UADE-played song whose parser decoded every subsong's order:
+   *  `orders[n]` is subsong n's song order over the shared patterns, `start` the
+   *  subsong this grid shows. UADE is told to play exactly that subsong. */
+  uadeEditableSubsongs?: { count: number; speeds: number[]; orders?: number[][]; start?: number };
+
   /** When true, the UADE playback engine should capture tick snapshots + Paula log
    *  during normal-speed playback and reconstruct patterns after one song loop.
    *  Used for SKIP_SCAN formats where enhanced scan crashes but playback works. */
@@ -2265,6 +2276,7 @@ export class TrackerReplayer {
           () => this.playing && this.song != null,
         );
         const uadeHasPositionDispatch = this.song.uadeFirstTick != null
+          || this.song.uadePlayerTickGrid === true
           || (this.song.tfmxTimingTable != null && this.song.tfmxTimingTable.length > 0);
         if (uadeHasPositionDispatch) {
           this.coordinator.markDispatchActive();

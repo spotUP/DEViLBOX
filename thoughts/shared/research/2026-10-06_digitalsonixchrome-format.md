@@ -166,6 +166,50 @@ occur in the corpus; they would decode as empty.
   place). `exportDigitalSonixChrome` decodes the original file, writes only
   changed cells into the tracks and re-encodes.
 
+## Playback sync in the app (owner check, 2026-10-06)
+
+Owner, live app: decoded grid shown, UADE plays, but "missing notes, not
+synced". Measured causes, fixed at the root:
+
+1. **The playhead never followed UADE.** The worklet's `position` message
+   carried only `uade_wasm_get_tick_count`, CIA-A **Timer A**; the score runs
+   every DTP_Interrupt player on CIA-A **Timer B** (score.s cia_chip_sel 0,
+   cia_timer_sel 1; known since 2315f03b1 for the snapshot ring). Measured:
+   tick_count stays 0 for 10 s of DSC playback. UADEEngine.subscribeToCoordinator
+   ignores tick 0, so it never anchored, and TrackerReplayer only hands the
+   playhead to UADE when a scan anchor exists - the DSC grid scrolled on the TS
+   scheduler, counted from the Play press, not from UADE's first interrupt.
+   Fix: `uade_wasm_get_player_tick_count` (Timer B with the interrupt enabled,
+   reset on load and set_subsong; tick 1 = the first interrupt, inside the
+   load, = row 0) exported and posted as `playerTickCount`; a song whose parser
+   proved its grid is player ticks sets `uadePlayerTickGrid`, and the playhead is
+   `playerTickGridPosition(playerTicks)` (row = (ticks-1)/speed, looping from
+   restartPosition), with TrackerReplayer marking the engine dispatch active.
+   UADE.wasm rebuilt with uade-wasm/build.sh (57 bytes differ: the export).
+2. **Subsong: one source.** UADE's worklet starts a multi-subsong file on the
+   first subsong audible within 3 s when asked for subsong 0; a DSC grid shows
+   one subsong. The parser now sets `uadeEditableSubsongs` {count, speeds,
+   orders, start}; the format store starts on `start`; loadTune pins the
+   subsong (`pinSubsong`, the worklet skips the probe); the one subsong switch
+   (subsongSwitch.ts) takes `orders[n]` and restarts playback through the
+   transport so the order, the playhead clock and UADE's subsong change
+   together. ingame 1 has one subsong, so this was not the owner's symptom.
+
+Proof (`src/engine/__tests__/dscPlayheadFollowsUade.test.ts`, real worklet +
+WASM): every Paula note-on in the first 30 s of ingame 1 (and 12 s of
+fanfares subsong 2) is on the row the posted position maps to; a pinned
+subsong 0 that is silent at the start stays subsong 0 (unpinned, the probe
+moves to 1). All three fail on the old worklet.
+
+3. **Likely remaining "missing notes": the records' sustain (measured, not
+   changed).** ingame 1's records have loopStart 0 and repeats 5: the Audio IRQ
+   replays the WHOLE sample up to 5 more times (no period write, so no Paula
+   note-on and no grid note). Counted from the model: 284 such re-attacks in
+   170 of the 569 notes, i.e. the ear hears a re-struck note every ~1.1 s on
+   held voices where the grid shows one note. That is the record's behaviour
+   (like a looped sample in a tracker), not a decode loss. Showing it would
+   need a display convention (e.g. continuation marks); not done, owner call.
+
 ## The Musashi runner's 0.889 (inference, not measured)
 
 The trigger routine (lbC005970-lbC005A14) is a hardware handshake, not a plain

@@ -457,6 +457,7 @@ void uade_wasm_set_subsong(int subsong) {
      * Do NOT use uade_stop() — use our clean reset path instead. */
     s_playing = 0;
     g_uade_tick_count = 0;
+    g_player_tick_count = 0;
     uade_shim_reset_for_load();
     memset(&s_state->song, 0, sizeof(s_state->song));
     s_state->song.state = 0;
@@ -1042,6 +1043,19 @@ int uade_wasm_get_module_ranges(uint32_t *out, int maxPairs) {
 EMSCRIPTEN_KEEPALIVE
 uint32_t uade_wasm_get_tick_count(void) {
     return g_uade_tick_count;
+}
+
+/*
+ * Player ticks run so far: CIA-A Timer B overflows with the interrupt
+ * enabled, the timer the score runs every DTP_Interrupt player on
+ * (score.s cia_chip_sel = 0, cia_timer_sel = 1). For those players the
+ * Timer A count above stays 0, so this is the clock a grid of player ticks
+ * (speed ticks per row) follows. Tick 1 is the player's first interrupt,
+ * which runs inside uade_wasm_load / uade_wasm_set_subsong. Reset by both.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t uade_wasm_get_player_tick_count(void) {
+    return g_player_tick_count;
 }
 
 /* ── CIA Tick Snapshot exports ──────────────────────────────────────────── */

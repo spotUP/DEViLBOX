@@ -30,7 +30,7 @@ import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { makeDscCellCodec } from '@/engine/uade/encoders/DigitalSonixChromeEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import {
-  decodeDscModule, dscSections, dscSpeed, dscSubsongEntries, type DscModule,
+  decodeDscModule, dscSections, dscSpeed, dscSubsongCount, dscSubsongEntries, type DscModule,
 } from './DigitalSonixChromeModule';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -254,7 +254,10 @@ export function parseDscFile(buffer: ArrayBuffer, filename: string, subsong = 0)
   const played = dscSubsongEntries(m, subsong).filter((e) => e.rows > 0);
   if (played.length === 0) throw new Error(`DSC: subsong ${subsong} plays nothing`);
   const blockIndex = (firstRow: number, rows: number): number => blocks.findIndex((b) => b.firstRow === firstRow && b.rows === rows);
-  const songPositions = played.flatMap((e) => Array<number>(e.repeats).fill(blockIndex(e.firstRow, e.rows)));
+  const orderOf = (n: number): number[] => dscSubsongEntries(m, n).filter((e) => e.rows > 0)
+    .flatMap((e) => Array<number>(e.repeats).fill(blockIndex(e.firstRow, e.rows)));
+  const songPositions = orderOf(subsong);
+  const subsongCount = dscSubsongCount(m);
 
   const codec = makeDscCellCodec(m.records);
   const cellOffset = (p: number, row: number, ch: number): number => {
@@ -293,6 +296,16 @@ export function parseDscFile(buffer: ArrayBuffer, filename: string, subsong = 0)
     initialSpeed: dscSpeed(m.tempo), initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    // Rows are `speed` player interrupts from the first one (proven against
+    // UADE's Paula log, digitalSonixChromeGridMatchesPlayer.test.ts).
+    uadePlayerTickGrid: true,
+    // UADE numbering; the subsong switch takes the order, UADE is pinned to it.
+    uadeEditableSubsongs: subsongCount > 1 ? {
+      count: subsongCount,
+      speeds: Array<number>(subsongCount).fill(dscSpeed(m.tempo)),
+      orders: Array.from({ length: subsongCount }, (_, n) => orderOf(n)),
+      start: subsong,
+    } : undefined,
     uadePatternLayout: {
       formatId: 'digitalSonixChrome',
       patternDataFileOffset: tracksOff,

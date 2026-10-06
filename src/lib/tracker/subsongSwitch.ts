@@ -79,6 +79,23 @@ export async function switchSubsong(index: number): Promise<void> {
       ]);
       useFormatStore.setState({ uadeEditableCurrentSubsong: index });
       const tracker = useTrackerStore.getState();
+      // A parser decoded each subsong's order over shared patterns (DSC):
+      // the grid takes that order, and the song restarts through the one
+      // play path so the replayer's order, the playhead clock and UADE's
+      // pinned subsong (loadTune) all change together.
+      if (subs.orders) {
+        const order = subs.orders[index] ?? [];
+        if (order.length === 0) { notify.warning(`Subsong ${index + 1} plays nothing`); return; }
+        const transport = useTransportStore.getState();
+        const wasPlaying = transport.isPlaying;
+        if (wasPlaying) transport.stop();
+        tracker.setPatternOrder(order);
+        tracker.setCurrentPattern(order[0]);
+        transport.setSpeed(subs.speeds[index] ?? 6);
+        if (wasPlaying) await transport.play();
+        notify.success(`Subsong ${index + 1}/${subs.count}`);
+        return;
+      }
       tracker.setPatternOrder([index]);
       tracker.setCurrentPattern(index);
       useTransportStore.getState().setSpeed(subs.speeds[index] ?? 6);

@@ -50,3 +50,14 @@ export function tickGridPosition(ticks: number, grid: TickGrid): GridPosition {
   }
   return { songPos: last, row: lenAt(last) - 1 };
 }
+
+/**
+ * Where in the grid a song is, from the count of player interrupts UADE has
+ * run (uade_wasm_get_player_tick_count): tick 1 is the player's first
+ * interrupt, which plays row 0, so row r of the song sounds on tick
+ * 1 + r * speed. For grids a parser decoded from the module (rows of `speed`
+ * player ticks from the first interrupt); 0 ticks = nothing has run yet.
+ */
+export function playerTickGridPosition(playerTicks: number, grid: TickGrid): GridPosition {
+  return tickGridPosition(Math.max(0, playerTicks - 1), grid);
+}
