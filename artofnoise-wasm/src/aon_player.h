@@ -111,6 +111,9 @@ const AonPlaybackState* aon_song_get_playback_state(const AonSong* song);
 void aon_song_enable_scope_capture(AonSong* song, int enable);
 uint32_t aon_song_get_scope_data(AonSong* song, int channel, float* buffer, uint32_t num_samples);
 
+/** Cumulative note starts of a channel since aon_song_start (the replayer's own trigger count). */
+uint32_t aon_song_get_note_starts(const AonSong* song, int channel);
+
 #ifdef __cplusplus
 }
 #endif

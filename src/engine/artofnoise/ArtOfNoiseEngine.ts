@@ -84,7 +84,9 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
             for (let ch = 0; ch < levels.length / 2; ch++) {
               peaks.push(Math.max(levels[ch * 2], levels[ch * 2 + 1]));
             }
-            meterFeed.feed(engine, peaks);
+            const noteStarts: number[] | null = data.noteStarts;
+            if (noteStarts) meterFeed.feedCounted(engine, peaks, noteStarts);
+            else meterFeed.feed(engine, peaks);
           } catch { /* ToneEngine not ready */ }
           break;
 

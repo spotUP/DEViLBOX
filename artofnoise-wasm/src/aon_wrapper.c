@@ -129,6 +129,11 @@ float* player_get_channel_levels(void) {
     return g_channel_levels;
 }
 
+/** out[i] = cumulative note starts of channel i (restarts at 0 on load). */
+void player_get_note_start_counts(uint32_t* out, int maxCh) {
+    for (int i = 0; i < maxCh; i++) out[i] = g_song ? aon_song_get_note_starts(g_song, i) : 0;
+}
+
 void player_set_channel_gain(int channel, float gain) {
     // Binary per channel: gain > 0 = audible, 0 = muted (same contract as the
     // other engines' gain export, which the worklet drives from the mixer mask).
