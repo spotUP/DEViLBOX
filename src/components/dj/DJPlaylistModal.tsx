@@ -1863,18 +1863,15 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       if (track.fileName.startsWith('modland:')) {
         const modlandPath = track.fileName.slice('modland:'.length);
         try {
-          const { downloadModlandFile, downloadTFMXCompanion } = await import('@/lib/modlandApi');
-          // TFMX mdat.<song> needs its smpl.<song> companion in UADE's virtual
-          // FS — download both in parallel. downloadTFMXCompanion returns null
-          // for non-TFMX files, so this is a no-op for everything else.
-          const [buffer, tfmxCompanion] = await Promise.all([
+          const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
+          // Every partner file Modland lists beside the module (TFMX smpl, dum/ins
+          // and its shared bank, jpn/smp, ...) goes into UADE's virtual FS.
+          const [buffer, found] = await Promise.all([
             downloadModlandFile(modlandPath),
-            downloadTFMXCompanion(modlandPath),
+            downloadUADECompanions(modlandPath),
           ]);
           const filename = modlandPath.split('/').pop() || 'download.mod';
-          const companions = tfmxCompanion
-            ? [{ filename: tfmxCompanion.filename, buffer: tfmxCompanion.buffer }]
-            : undefined;
+          const companions = found.length > 0 ? found : undefined;
 
           if (isAudioFile(filename)) {
             await engine.loadAudioToDeck(deckId, buffer, track.fileName);

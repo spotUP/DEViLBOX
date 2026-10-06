@@ -12,7 +12,7 @@ import {
   searchModland,
   getModlandFormats,
   downloadModlandFile,
-  downloadTFMXCompanion,
+  downloadUADECompanions,
   getModlandStatus,
   type ModlandFile,
   type ModlandFormat,
@@ -352,14 +352,14 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         if (file.source === 'hvsc') {
           buffer = await downloadHVSCFile(file.key);
         } else {
-          const [modBuffer, companion] = await Promise.all([
+          const [modBuffer, companions] = await Promise.all([
             downloadModlandFile(file.key),
-            downloadTFMXCompanion(file.key),
+            downloadUADECompanions(file.key),
           ]);
           buffer = modBuffer;
-          if (companion) {
+          if (companions.length > 0) {
             const { UADEEngine } = await import('@engine/uade/UADEEngine');
-            await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+            for (const c of companions) await UADEEngine.getInstance().addCompanionFile(c.filename, c.buffer);
           }
         }
 
@@ -453,9 +453,9 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     if (file.source === 'modland' && isUADEFormat(file.filename)) {
       previewModeRef.current = 'uade';
       try {
-        const [buffer, companion] = await Promise.all([
+        const [buffer, companions] = await Promise.all([
           downloadModlandFile(file.key),
-          downloadTFMXCompanion(file.key),
+          downloadUADECompanions(file.key),
         ]);
         // User may have hit Stop (or previewed something else) while we
         // were downloading — bail out cleanly in that case.
@@ -467,9 +467,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         const uade = UADEEngine.getInstance();
         await uade.ready();
 
-        if (companion) {
-          await uade.addCompanionFile(companion.filename, companion.buffer);
-        }
+        for (const c of companions) await uade.addCompanionFile(c.filename, c.buffer);
 
         // Stop any prior UADE playback before loading a new module —
         // leaving it playing leaks audio during the ~100 ms load window.
@@ -554,14 +552,14 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         }
 
         let buffer: ArrayBuffer;
-        const [modBuffer, companion] = await Promise.all([
+        const [modBuffer, companions] = await Promise.all([
           downloadModlandFile(file.key),
-          downloadTFMXCompanion(file.key),
+          downloadUADECompanions(file.key),
         ]);
         buffer = modBuffer;
-        if (companion) {
+        if (companions.length > 0) {
           const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+          for (const c of companions) await UADEEngine.getInstance().addCompanionFile(c.filename, c.buffer);
         }
 
         const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
