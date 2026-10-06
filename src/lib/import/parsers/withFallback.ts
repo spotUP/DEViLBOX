@@ -38,6 +38,42 @@ export interface FallbackContext {
  */
 const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth', 'FredSynth']);
 
+/**
+ * Per-note WASM voices that play ONE instrument of a song on the keyboard
+ * (ToneEngine "UADE format-specific synths (per-note WASM synthesis)" block,
+ * built by InstrumentFactory from the instrument's own config). A dedicated
+ * engine plays the song itself; these voices exist only so an instrument with
+ * no PCM can still be auditioned. Whole-song replayer types (SoundMonWasmSynth,
+ * DssWasmSynth, ActionamicsWasmSynth, MusicAssemblerSynth, SynthesisWasmSynth,
+ * ...) are NOT here: they have no note-on voice, so such instruments stay
+ * silent on the keyboard (nothing to play, and nothing is faked).
+ */
+export const KEYBOARD_VOICE_SYNTHS: ReadonlySet<string> = new Set([
+  'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth', 'FCSynth', 'FredSynth',
+  'TFMXSynth', 'OctaMEDSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth',
+  'DavidWhittakerSynth', 'SonicArrangerSynth', 'InStereo1Synth', 'InStereo2Synth',
+  'StartrekkerAMSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'FuturePlayerSynth',
+  'SunTronicSynth',
+]);
+
+/**
+ * Synth type a dedicated-engine song's instrument gets. The engine plays the
+ * song, so unknown synth types are flattened to 'Sampler' (no error dialogs) -
+ * but only when the instrument has sample data. A synth instrument without PCM
+ * would become an EmptySampler (silent keyboard), so it keeps its voice when
+ * one exists.
+ */
+export function dedicatedEngineSynthType(inst: {
+  synthType?: string;
+  sample?: { audioBuffer?: ArrayBuffer | null; url?: string } | null;
+}): string {
+  const t = inst.synthType ?? 'Sampler';
+  if (NATIVE_AUDITION_SYNTHS.has(t)) return t;
+  const hasPcm = (inst.sample?.audioBuffer?.byteLength ?? 0) > 0 || !!inst.sample?.url;
+  if (hasPcm) return 'Sampler';
+  return KEYBOARD_VOICE_SYNTHS.has(t) ? t : 'Sampler';
+}
+
 type NativeParser = (buffer: ArrayBuffer, filename: string) => Promise<TrackerSong> | TrackerSong;
 
 /** Note cells across the whole grid. Zero means a stub parser's placeholder. */
@@ -138,12 +174,11 @@ export async function withNativeThenUADE(
             // Dedicated WASM engine handles all audio — set instruments to
             // 'Sampler' so ToneEngine doesn't try to instantiate unknown
             // synth types (e.g. 'SynthesisWasmSynth') and show error dialogs.
-            // Native audition voices (FredSynth) stay: the keyboard plays the
-            // instrument through its own engine voice; flattening them left an
-            // empty Sampler and silence.
+            // An instrument with no PCM keeps its native keyboard voice
+            // (dedicatedEngineSynthType); flattening it left an empty Sampler
+            // and a silent keyboard.
             for (const inst of result.instruments) {
-              if (NATIVE_AUDITION_SYNTHS.has(inst.synthType)) continue;
-              inst.synthType = 'Sampler';
+              inst.synthType = dedicatedEngineSynthType(inst) as typeof inst.synthType;
             }
             return result;
           }
