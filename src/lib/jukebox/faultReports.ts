@@ -46,6 +46,13 @@ export const JUKEBOX_FAULTS: readonly JukeboxFault[] = [
   // cells. A parser that half-works looks like this, and calling it "empty"
   // would send the next reader to the wrong half of the code.
   { id: 'wrong-patterns', key: '7', label: 'Incorrect Pattern Data', title: 'Pattern data is present and moving, but wrong', patternQuality: 'incorrect' },
+  // Narrower than incorrect data: what the grid shows is right, but some notes
+  // the song plays have no cell (an arpeggio table, a skipped row, a voice the
+  // decoder misses). The fix lives in a different place from wrong cells.
+  { id: 'missing-notes',  key: '9', label: 'Missing Notes',   title: 'The grid is right but some played notes have no cell', patternQuality: 'missing-notes' },
+  // The song plays, but its instruments make no sound when played from the
+  // computer or MIDI keyboard - an instrument-preview fault, not a playback one.
+  { id: 'keyboard-silent', key: '', label: 'Keyboard Silent', title: 'The instruments make no sound when played on the keyboard', status: 'partial' },
 ] as const;
 
 /**

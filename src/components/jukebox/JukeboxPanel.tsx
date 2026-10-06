@@ -27,6 +27,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Play } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { Toggle } from '@components/controls/Toggle';
 import { loadFile as loadFileHeadless } from '@/bridge/handlers/writeHandlers';
@@ -389,23 +390,38 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
 
 
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.altKey) {
-      // e.code, not e.key: with Alt held macOS turns the digit into a symbol
-      // (Alt+1 is "¡"), so matching e.key made every Alt+digit report dead on
-      // a Mac.
-      const digit = /^(?:Digit|Numpad)(\d)$/.exec(e.code)?.[1] ?? e.key;
-      if (digit === '0') { e.preventDefault(); void markGood(); return; }
-      if (digit === JUKEBOX_VISUALIZER.key) {
-        e.preventDefault();
-        void toggleVisualizer(!(row && isVisualizer(judged[row.id])));
-        return;
-      }
-      const fault = JUKEBOX_FAULTS.find((f) => f.key === digit);
-      // The key TOGGLES now, same as the switch it drives — press it twice to
-      // take back a mis-keyed fault instead of reloading to clear it.
-      if (fault) { e.preventDefault(); void toggleFault(fault, !carries(fault)); return; }
+  /**
+   * Alt+digit reports. Handled on the window (below), not only on the list:
+   * the list loses focus as soon as a switch, the pattern editor or a button
+   * is clicked, and then every report key went nowhere.
+   * e.code, not e.key: with Alt held macOS turns the digit into a symbol
+   * (Alt+1 is "¡"), so matching e.key made every Alt+digit report dead on a Mac.
+   */
+  const handleReportKey = (e: { altKey: boolean; code: string; key: string; preventDefault(): void; stopPropagation(): void }): boolean => {
+    if (!e.altKey) return false;
+    const digit = /^(?:Digit|Numpad)(\d)$/.exec(e.code)?.[1] ?? e.key;
+    if (digit === '0') { e.preventDefault(); e.stopPropagation(); void markGood(); return true; }
+    if (digit === JUKEBOX_VISUALIZER.key) {
+      e.preventDefault(); e.stopPropagation();
+      void toggleVisualizer(!(row && isVisualizer(judged[row.id])));
+      return true;
     }
+    const fault = JUKEBOX_FAULTS.find((f) => f.key === digit);
+    // The key TOGGLES, same as the switch it drives — press it twice to take
+    // back a mis-keyed fault instead of reloading to clear it.
+    if (fault) { e.preventDefault(); e.stopPropagation(); void toggleFault(fault, !carries(fault)); return true; }
+    return false;
+  };
+  const reportKeyRef = useRef(handleReportKey);
+  reportKeyRef.current = handleReportKey;
+  useEffect(() => {
+    const onWindowKey = (e: KeyboardEvent) => { reportKeyRef.current(e); };
+    window.addEventListener('keydown', onWindowKey, true);
+    return () => window.removeEventListener('keydown', onWindowKey, true);
+  }, []);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.altKey && /^(?:Digit|Numpad)\d$/.test(e.code)) return; // the window listener owns these
     switch (e.key) {
       case 'Backspace':  e.preventDefault(); setFilter((f) => f.slice(0, -1)); setSelected(0); return;
       case 'ArrowDown':  e.preventDefault(); move(1); return;
@@ -470,13 +486,23 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
               onClick={() => { setSelected(i); setTake(0); }}
               onDoubleClick={() => void play()}
               style={{ height: ROW_HEIGHT }}
-              className={`px-2 flex items-center gap-2 cursor-pointer ${
-                isSel ? 'bg-dark-bgActive text-text-primary' : 'text-text-secondary hover:bg-dark-bgHover'
+              className={`px-2 flex items-center gap-2 cursor-pointer border-l-2 ${
+                playingId === e.id
+                  ? 'border-accent-primary bg-accent-primary/15 text-accent-primary'
+                  : isSel ? 'border-transparent bg-dark-bgActive text-text-primary' : 'border-transparent text-text-secondary hover:bg-dark-bgHover'
               }`}
               title={`${e.label} — ${e.total} song${e.total === 1 ? '' : 's'}`}
             >
               <span className="truncate flex-1">{e.label}</span>
-              {playingId === e.id && <span className="text-accent-primary">▶</span>}
+              {isVisualizer(verdict) && (
+                <span
+                  className="shrink-0 rounded px-1 text-[9px] font-mono bg-accent-secondary/15 text-accent-secondary"
+                  title={JUKEBOX_VISUALIZER.title}
+                >
+                  Visualizer
+                </span>
+              )}
+              {playingId === e.id && <Play size={10} className="shrink-0 text-accent-primary" aria-label="Playing" />}
               {verdict && (
                 <span
                   className={`shrink-0 ${isGoodVerdict(verdict) ? 'text-accent-success' : 'text-accent-error'}`}
@@ -505,7 +531,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         </div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-x-4 gap-y-1">
           {JUKEBOX_FAULTS.map((f) => (
-            <div key={f.id} className="flex items-center justify-between gap-2" title={`${f.title} (Alt+${f.key})`}>
+            <div key={f.id} className="flex items-center justify-between gap-2" title={f.key ? `${f.title} (Alt+${f.key})` : f.title}>
               <span className="text-[10px] font-mono text-text-secondary whitespace-nowrap">{f.label}</span>
               <Toggle
                 label={f.label}
@@ -515,7 +541,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                 tone="error"
                 size="sm"
                 disabled={!row || !file}
-                title={`${f.title} (Alt+${f.key})`}
+                title={f.key ? `${f.title} (Alt+${f.key})` : f.title}
               />
             </div>
           ))}
