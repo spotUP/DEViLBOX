@@ -469,7 +469,8 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
     songLength: trackerPatterns.length,
     restartPosition: 0,
     numChannels: CHANNELS,
-    initialSpeed: 6,
+    // A global row lasts speed + 1 of the player's 50 Hz ticks (effect 2 changes it mid-song).
+    initialSpeed: (u32BE(buf, hdrOff + 32) || 4) + 1,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,

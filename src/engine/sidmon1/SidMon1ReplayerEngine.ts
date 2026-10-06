@@ -30,6 +30,7 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
   private static instance: SidMon1ReplayerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
+  private _positionCallback: ((u: { row: number; songPos: number }) => void) | null = null;
   private _pendingRequests: Map<number, { resolve: (data: unknown) => void }> = new Map();
   private _nextRequestId = 1;
 
@@ -93,6 +94,12 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
 
         case 'moduleLoaded':
           console.log('[SidMon1ReplayerEngine] Module loaded');
+          break;
+
+        case 'position':
+          // The playhead follows the replayer's own step and row (its speed
+          // and pattern length change inside the song), not the TS scheduler.
+          this._positionCallback?.({ row: data.row as number, songPos: data.position as number });
           break;
 
         case 'chLevels':
@@ -161,6 +168,10 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
     for (const { index, bytes } of SidMon1ReplayerEngine.patchModuleCell(pattern, row, channel, note, instrument)) {
       this.workletNode?.port.postMessage({ type: 'setRow', index, bytes });
     }
+  }
+
+  onPositionUpdate(callback: (update: { row: number; songPos: number }) => void): void {
+    this._positionCallback = callback;
   }
 
   play(): void {

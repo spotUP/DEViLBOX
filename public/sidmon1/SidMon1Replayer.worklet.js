@@ -16,6 +16,7 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
     this.levelsPtr = 0;
     this.processCount = 0;
     this.muteMask = 0xFFFFFFFF;
+    this.lastPosition = -1;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -63,6 +64,7 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
               return;
             }
             this.applyMuteMask();
+            this.lastPosition = -1;
             this.port.postMessage({ type: 'moduleLoaded' });
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
@@ -311,6 +313,15 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
             outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
         }
+      }
+    }
+
+    // The playhead: the replayer's own step and row, posted when it moves.
+    if (typeof this.module._player_get_position === 'function') {
+      const packed = this.module._player_get_position();
+      if (packed !== this.lastPosition) {
+        this.lastPosition = packed;
+        this.port.postMessage({ type: 'position', position: packed >> 16, row: packed & 0xffff });
       }
     }
 

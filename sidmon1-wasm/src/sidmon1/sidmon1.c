@@ -426,6 +426,14 @@ int sm1r_set_row(int index, const uint8_t *raw5) {
     return 1;
 }
 
+// Where the song is: step (0-based, into the track lists) << 16 | global row in the step.
+// The row being sounded is patternPos (the rows' notes are taken at its tick 0).
+int sm1r_get_position(void) {
+    int step = ps.trackPos - 1;
+    int row  = ps.patternPos < 0 ? 0 : ps.patternPos;
+    return (step << 16) | (row & 0xffff);
+}
+
 int sm1r_get_voice_consumed(int v)       { return (v >= 0 && v < NUM_VOICES) ? ps.voices[v].lastRow : -1; }
 int sm1r_get_voice_rows_consumed(int v)  { return (v >= 0 && v < NUM_VOICES) ? ps.voices[v].rowsConsumed : 0; }
 int sm1r_get_voice_note(int v)           { return (v >= 0 && v < NUM_VOICES) ? ps.voices[v].lastNote : 0; }
