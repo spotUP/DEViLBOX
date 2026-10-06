@@ -951,6 +951,9 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
           if (!UADEEngine.hasInstance()) return;
           const { UADEChipEditor } = await import('@/engine/uade/UADEChipEditor');
           const editor = new UADEChipEditor(UADEEngine.getInstance());
+          // A restored song's edits go into chip RAM first, so the read-back below keeps them.
+          const { replayRestoredEdits } = await import('./liveCellEdits');
+          await replayRestoredEdits(song);
           const { populatePatternsFromChipRAM } = await import('@/engine/uade/UADEChipRAMPatternReader');
           await populatePatternsFromChipRAM(editor, layout, song.instruments?.length ?? 0);
         } catch (err) {

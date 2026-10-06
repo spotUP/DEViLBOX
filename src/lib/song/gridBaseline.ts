@@ -38,5 +38,30 @@ export function baselineOf(patterns: readonly Pattern[]): GridBaseline {
 let current: GridBaseline | null = null;
 
 /** null = unknown (a project saved before baselines existed): it is never re-decoded. */
-export function setGridBaseline(b: GridBaseline | null): void { current = b; }
+export function setGridBaseline(b: GridBaseline | null): void { current = b; restoredEditsPending = false; }
 export function getGridBaseline(): GridBaseline | null { return current; }
+
+/**
+ * A restore that decoded the stored module again brought back the original
+ * bytes, so an engine that plays them (UADE chip RAM, eagleplayer runner ...)
+ * plays the song without the user's edits until they are sent again. Set by
+ * the restore, cleared by the next song entering through applySong and taken
+ * by the first engine start (restoredEdits.ts).
+ */
+let restoredEditsPending = false;
+export function setRestoredEditsPending(v: boolean): void { restoredEditsPending = v; }
+
+/** The cells of `patterns` that differ from the baseline, once per restore; [] when nothing is pending. */
+export function takeRestoredEdits(patterns: readonly Pattern[]): { pattern: number; row: number; channel: number; cell: TrackerCell }[] {
+  const baseline = current;
+  if (!restoredEditsPending || !baseline) return [];
+  restoredEditsPending = false;
+  const edits: { pattern: number; row: number; channel: number; cell: TrackerCell }[] = [];
+  patterns.forEach((p, pi) => {
+    let flat = 0;
+    p.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
+      if (hashCell(cell) !== baseline[pi]?.[flat++]) edits.push({ pattern: pi, row: r, channel: c, cell });
+    }));
+  });
+  return edits;
+}

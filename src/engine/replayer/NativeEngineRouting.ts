@@ -351,6 +351,11 @@ export async function startNativeEngines(
 
       // Run engine-specific post-load setup
       desc.onStarted?.(instance, song);
+      // UADE replays inside its own onStarted, before the chip RAM is read back into the grid.
+      if (desc.key !== 'UADEEditable') {
+        const { replayRestoredEdits } = await import('./liveCellEdits');
+        await replayRestoredEdits(song);
+      }
 
       // Pre-create synth instrument so audio graph is connected before play()
       const firstInst = song.instruments.find(i => i.synthType === desc.synthType);
