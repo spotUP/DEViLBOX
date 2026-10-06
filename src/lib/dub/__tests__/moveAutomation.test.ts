@@ -87,6 +87,6 @@ describe('wiring contract — the performer traces the shape', () => {
   });
 
   it('does not try to sweep a one-shot, which has no hold to travel over', () => {
-    expect(autoDub).toContain('holdMsForGesture > 0 ? automationFor(choice.moveId) : null');
+    expect(autoDub).toContain('holdMs > 0 ? (choice.automate ?? automationFor(choice.moveId)) : null');
   });
 });
