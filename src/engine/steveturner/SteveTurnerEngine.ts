@@ -7,12 +7,15 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+
+const meterFeed = new ChannelMeterFeed();
 
 export class SteveTurnerEngine extends WASMSingletonBase {
   private static instance: SteveTurnerEngine | null = null;
@@ -87,9 +90,7 @@ export class SteveTurnerEngine extends WASMSingletonBase {
           try {
             const engine = getToneEngine();
             const levels: number[] = data.levels;
-            for (let i = 0; i < levels.length; i++) {
-              engine.triggerChannelMeter(i, levels[i]);
-            }
+            meterFeed.feed(engine, levels);
           } catch { /* ToneEngine not ready */ }
           break;
 
