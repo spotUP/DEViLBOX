@@ -213,7 +213,7 @@ export class MusicLineEngine extends WASMSingletonBase {
   /** Halts output but keeps the song loaded, so resume() (play) continues from here. */
   pause(): void {
     this._playing = false;
-    this.workletNode?.postMessage({ type: 'pause' });
+    this.workletNode?.port.postMessage({ type: 'pause' });
   }
 
   stop(): void {
