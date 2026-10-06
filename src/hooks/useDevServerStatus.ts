@@ -19,8 +19,13 @@ export function useDevServerStatus(intervalMs = 5000): boolean {
         await fetch('/', { cache: 'no-cache', signal: controller.signal });
         clearTimeout(timer);
         if (!cancelled) setIsDown(false);
-      } catch {
+      } catch (err) {
         clearTimeout(timer);
+        // A slow answer is not an outage: under heavy machine load (a test run,
+        // a build) Vite can take longer than the timeout, and the banner then
+        // claimed the server was down while it was serving. Only a failed
+        // connection says so; a timed-out check leaves the state as it was.
+        if ((err as { name?: string })?.name === 'AbortError') return;
         if (!cancelled) setIsDown(true);
       }
     };
