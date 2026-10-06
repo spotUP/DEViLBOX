@@ -33,9 +33,20 @@ describe('the dedicated-engine question is the registry', { timeout: 60000 }, ()
   });
 
   it('the registry module loads no engine (the importer asks it while parsing)', () => {
-    const src = readFileSync(join(ROOT, 'src/engine/replayer/wasmEngineRegistry.ts'), 'utf8');
-    const imports = src.split('\n').filter((l) => /^import\s/.test(l));
-    expect(imports.filter((l) => !/^import type\s/.test(l))).toEqual([]);
+    // Runtime imports are allowed only from leaf data modules: files that
+    // themselves import nothing at runtime (formatFileDataFields' constant
+    // list), so asking the registry can never pull an engine in.
+    const runtimeImports = (file: string) => readFileSync(file, 'utf8').split('\n')
+      .filter((l) => /^import\s/.test(l) && !/^import type\s/.test(l));
+    const registry = join(ROOT, 'src/engine/replayer/wasmEngineRegistry.ts');
+    const offenders: string[] = [];
+    for (const line of runtimeImports(registry)) {
+      const rel = line.match(/from '(\.\.?\/[^']+)'/)?.[1];
+      if (!rel) { offenders.push(line); continue; }
+      const dep = join(registry, '..', `${rel}.ts`);
+      if (runtimeImports(dep).length > 0) offenders.push(line);
+    }
+    expect(offenders).toEqual([]);
   });
 
   it('withFallback keeps no copy of the engine list', () => {
