@@ -97,6 +97,8 @@ if(EMSCRIPTEN)
         "_ml_set_arp_entry"
         "_ml_get_channel_row"
         "_ml_get_channel_position"
+        "_ml_set_channel_on"
+        "_ml_get_channels_on"
     )
 
     string(JOIN "," EXPORTED_FUNCTIONS_STR ${EXPORTED_FUNCTIONS})

@@ -18,6 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { defaultWASMTransform } from '../wasm/WASMSingletonBase';
 import { ROOT, startWorklet, songBuffer, stereoOutputs, type WorkletProc } from './workletHarness';
 
 const ALL_AUDIBLE = 0xffffffff;
@@ -35,6 +36,8 @@ interface Corpus {
   /** Stem of the .js/.wasm pair when it differs from the worklet's. */
   wasmStem?: string;
   start?: object[];
+  /** The JS transform the engine's loader applies (MusicLine needs the heap views exposed). */
+  transform?: (code: string) => string;
 }
 
 const moduleData = (type: string) => (b: ArrayBuffer) => [{ type, moduleData: b }];
@@ -47,6 +50,8 @@ const corpus: Corpus[] = [
     song: 'pumatracker/liquid kids - lv1a.puma', load: moduleData('loadModule') },
   { name: 'Sd2', dir: 'sidmon2', stem: 'Sd2', song: 'sidmon-2/ice7-intro.sid2', load: moduleData('loadModule') },
   { name: 'SidMon1Replayer', dir: 'sidmon1', stem: 'SidMon1Replayer', song: 'sidmon-1/myfunnymazea.sid', load: moduleData('loadModule') },
+  { name: 'MusicLine', dir: 'musicline', stem: 'MusicLine', song: 'musicline-editor/drax.ml',
+    load: (b) => [{ type: 'load', buffer: b }], start: [{ type: 'play' }], transform: defaultWASMTransform },
   { name: 'JamCracker', dir: 'jamcracker', stem: 'JamCracker', song: 'jamcracker/freehand-spreadtro.jam',
     load: (b) => [{ type: 'loadTune', buffer: b }], start: [{ type: 'play' }] },
   { name: 'FuturePlayer', dir: 'futureplayer', stem: 'FuturePlayer', song: 'future-player/imploder drums.fp',
@@ -77,7 +82,7 @@ function energy(proc: WorkletProc): number {
 describe('mixer mask reaches the native engines (bit set = audible)', () => {
   for (const c of corpus) {
     it(`${c.name}: mask set before the load survives it; all-audible plays; 0 is silent`, async () => {
-      const { proc, send } = await startWorklet(c.dir, c.stem, undefined, c.wasmStem);
+      const { proc, send } = await startWorklet(c.dir, c.stem, c.transform, c.wasmStem);
       await send({ type: 'setMuteMask', mask: 0 });                 // before any module exists
       const companion = c.companion ? songBuffer(`public/data/songs/${c.companion}`) : new ArrayBuffer(0);
       for (const m of c.load(songBuffer(`public/data/songs/${c.song}`), companion)) await send(m);
