@@ -2195,6 +2195,8 @@ function buildEnhancedSong(
   return {
     name,
     format: 'MOD' as TrackerFormat, // Editable! TrackerReplayer handles playback
+    // Rebuilt from UADE's Paula scan, not decoded from the file: a guess.
+    gridEstimated: true,
     patterns,
     instruments,
     songPositions,
@@ -2477,6 +2479,8 @@ function buildClassicSong(
   return {
     name,
     format: 'UADE' as TrackerFormat,
+    // Rebuilt from UADE's Paula scan, not decoded from the file: a guess.
+    gridEstimated: true,
     patterns,
     instruments,
     songPositions,
