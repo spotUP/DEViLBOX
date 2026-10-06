@@ -149,6 +149,7 @@ typedef struct VoiceInfo {
     uint16_t current_volume;
     uint16_t previous_volume;
     uint8_t ramp_counter;
+    uint32_t note_starts; /* cumulative ma_force_retrigger calls: the player's own note starts */
 } VoiceInfo;
 
 typedef struct GlobalPlayingInfo {
@@ -1063,6 +1064,7 @@ static void ma_initialize_voice(VoiceInfo* voice) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void ma_force_retrigger(VoiceInfo* voice) {
+    voice->note_starts++;
     voice->flag &= VoiceFlag_Release;
     voice->flag |= VoiceFlag_Retrig;
     voice->muted = true;
@@ -1906,6 +1908,18 @@ bool ma_has_ended(const MaModule* module) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+uint32_t ma_note_start_count(const MaModule* module, int ch) {
+    if (module == nullptr || module->player == nullptr || ch < 0 || ch >= 4) return 0;
+    return module->player->voices[ch].note_starts;
+}
+
+float ma_channel_level(const MaModule* module, int ch) {
+    if (module == nullptr || module->player == nullptr || ch < 0 || ch >= 4) return 0.0f;
+    const VoiceInfo* v = &module->player->voices[ch];
+    if ((module->player->config.channel_enable_mask & (1U << ch)) == 0) return 0.0f;
+    return (float)v->current_volume / 64.0f;
+}
 
 void ma_set_channel_mask(MaModule* module, uint32_t mask) {
     if (module == nullptr || module->player == nullptr) {

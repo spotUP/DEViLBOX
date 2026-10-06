@@ -18,6 +18,7 @@ if(EMSCRIPTEN)
     set(EXPORTED_FUNCTIONS
         "_malloc" "_free"
         "_player_init" "_player_render" "_player_stop" "_player_set_sample_rate"
+        "_player_get_channel_levels" "_player_get_note_start_counts"
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration" "_player_set_channel_gain"
         "_ma_get_num_tracks" "_ma_get_track_length" "_ma_get_cell" "_ma_set_cell"
