@@ -190,6 +190,7 @@ typedef struct Sd2Module {
     float frames_per_tick;
     float frames_until_tick;
     uint32_t channel_mask;
+    bool preview;                // keyboard note on voice 0: the sequencer stands still
     bool ended;
 } Sd2Module;
 
@@ -1487,8 +1488,41 @@ static void mix_voices(Sd2Module* mod, float* stereo, size_t frames) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// A keyboard note: voice 0 alone, through the replayer's own per-tick Effect and mixer.
+static size_t sd2_render_preview_internal(Sd2Module* mod, float* stereo, size_t frames) {
+    uint32_t saved_mask = mod->channel_mask;
+    mod->channel_mask = 1;
+
+    size_t pos = 0;
+    while (pos < frames) {
+        if (mod->frames_until_tick <= 0.0f) {
+            do_effect(mod, &mod->voices[0], &mod->voice_render[0]);
+            mod->frames_until_tick += mod->frames_per_tick;
+        }
+
+        size_t chunk = frames - pos;
+        if ((float)chunk > mod->frames_until_tick) {
+            chunk = (size_t)mod->frames_until_tick;
+        }
+        if (chunk == 0) {
+            chunk = 1;
+        }
+
+        mix_voices(mod, stereo + pos * 2, chunk);
+        mod->frames_until_tick -= (float)chunk;
+        pos += chunk;
+    }
+
+    mod->channel_mask = saved_mask;
+    return frames;
+}
+
 static size_t sd2_render_internal(Sd2Module* mod, float* stereo, size_t frames) {
     memset(stereo, 0, frames * 2 * sizeof(float));
+
+    if (mod->preview) {
+        return sd2_render_preview_internal(mod, stereo, frames);
+    }
 
     size_t pos = 0;
     while (pos < frames) {
@@ -1920,72 +1954,23 @@ void sd2_preview_note_on(Sd2Module* mod, int instrument, int note, int velocity)
     if (mod == nullptr) return;
     if (instrument < 0 || instrument >= mod->instrument_count) return;
     if (note < 1 || note >= (int)PERIODS_COUNT) return;
+    (void)velocity; // volume is the instrument's envelope, as in the song
 
     VoiceInfo* vi = &mod->voices[0];
     VoiceRender* vr = &mod->voice_render[0];
 
-    // Reset voice state for preview
-    vi->sample_volume = 0;
-    vi->wave_list_delay = 0;
-    vi->wave_list_offset = 0;
-    vi->arpeggio_delay = 0;
-    vi->arpeggio_offset = 0;
-    vi->vibrato_delay = 0;
-    vi->vibrato_offset = 0;
-    vi->pitch_bend_counter = 0;
-    vi->pitch_bend_value = 0;
-    vi->note_slide_speed = 0;
-    vi->envelope_state = EnvelopeState_Attack;
-    vi->sustain_counter = 0;
+    // The row start of a pattern cell "note, instrument" (get_note2 + play_voice), no transposes.
     vi->current_note = (uint16_t)note;
-    vi->current_instrument = (uint16_t)(instrument + 1); // 1-based for play_voice
+    vi->current_instrument = (uint16_t)(instrument + 1);
     vi->current_effect = 0;
     vi->current_effect_arg = 0;
+    vi->note_transpose = 0;
+    vi->instrument_transpose = 0;
+    play_voice(mod, vi, vr);
 
-    // Set instrument
-    vi->instrument = &mod->instruments[instrument];
-    Instrument* inst = vi->instrument;
-
-    // Look up sample from waveform list
-    if (inst->waveform_list_number < mod->waveform_count) {
-        uint8_t* waveform_list = mod->waveform_info[inst->waveform_list_number];
-        vi->current_sample = waveform_list[0];
-
-        if (vi->current_sample < (uint16_t)mod->sample_count) {
-            Sample* smp = &mod->samples[vi->current_sample];
-            vi->sample_data = smp->sample_data;
-            vi->sample_length = smp->length;
-            vi->loop_sample = smp->sample_data;
-            vi->loop_offset = smp->loop_start;
-            vi->loop_length = smp->loop_length;
-        }
-    }
-
-    // Set period from note + arpeggio offset
-    if (inst->arpeggio_number < mod->arpeggio_count) {
-        int8_t* arpeggio = mod->arpeggios[inst->arpeggio_number];
-        int final_note = note + arpeggio[0];
-        if (final_note >= 0 && final_note < (int)PERIODS_COUNT) {
-            vi->original_note = (uint16_t)final_note;
-            vi->sample_period = s_periods[final_note];
-        }
-    } else {
-        vi->original_note = (uint16_t)note;
-        vi->sample_period = s_periods[note];
-    }
-
-    // Scale volume by velocity (0-127 mapped to multiplier)
-    (void)velocity; // Volume is handled by ADSR envelope, velocity unused in SidMon II
-
-    // Start sample playback on voice render
-    if (vi->sample_length != 0) {
-        voice_render_play_sample(vr, vi->sample_data, 0, vi->sample_length);
-        if (vi->loop_length > 2) {
-            voice_render_set_loop(vr, vi->loop_sample, vi->loop_offset, vi->loop_length);
-        }
-    }
-
-    update_period(vr, vi->sample_period, mod->sample_rate);
+    // The replayer runs Effect in the tick that starts the note.
+    mod->preview = true;
+    mod->frames_until_tick = 0.0f;
 }
 
 void sd2_preview_note_off(Sd2Module* mod) {
@@ -1993,10 +1978,9 @@ void sd2_preview_note_off(Sd2Module* mod) {
     VoiceInfo* vi = &mod->voices[0];
     VoiceRender* vr = &mod->voice_render[0];
 
-    // Force release state
+    // Cut the voice, as the next note does; the song resumes.
+    mod->preview = false;
     vi->envelope_state = EnvelopeState_Release;
-
-    // Mute immediately
     vr->volume = 0;
     vi->sample_volume = 0;
     voice_render_mute(vr);
