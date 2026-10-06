@@ -1,16 +1,32 @@
-import { describe, it, expect } from 'vitest';
+/**
+ * AYParser: the ZXAY EMUL layout, on a synthetic file and on the corpus.
+ *
+ * Until 2026-10-04 the parser read the song data at the wrong offsets, so
+ * the Z80 never ran and `spring.emul` showed an empty grid (ledger F15).
+ */
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { isAYFormat, parseAYFile } from '../formats/AYParser';
+import { installAyletNodeFetch } from './helpers/ayletNodeFetch';
+
+const SPRING = resolve(__dirname, '../../../../public/data/songs/ay-emul/spring.emul');
+const toArrayBuffer = (b: Buffer): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 
 function makeAYHeader(): ArrayBuffer {
   const buf = new Uint8Array(64);
   const magic = new TextEncoder().encode('ZXAYEMUL');
   buf.set(magic, 0);
-  buf[8]  = 0; // AY type
-  buf[18] = 0; // 1 song (N-1)
+  buf[8]  = 0; // FileVersion
+  buf[16] = 0; // 1 song (N-1)
   return buf.buffer;
 }
 
 describe('AYParser', () => {
+  let restore: () => void;
+  beforeAll(() => { restore = installAyletNodeFetch(); });
+  afterAll(() => restore());
+
   it('detects AY by magic', () => {
     expect(isAYFormat(makeAYHeader())).toBe(true);
   });
@@ -20,11 +36,21 @@ describe('AYParser', () => {
     expect(isAYFormat(buf.buffer)).toBe(false);
   });
 
-  it('parses and returns AY instruments', async () => {
+  it('parses and returns aylet instruments', async () => {
     const song = await parseAYFile(makeAYHeader(), 'test.ay');
     expect(song.instruments.length).toBeGreaterThan(0);
-    expect(song.instruments[0].synthType).toBe('FurnaceAY');
+    expect(song.instruments[0].synthType).toBe('AyletSynth');
     expect(song.numChannels).toBe(3);
+  });
+
+  it('spring.emul: the grid carries notes and the song carries the file for aylet', async () => {
+    const bytes = readFileSync(SPRING);
+    const song = await parseAYFile(toArrayBuffer(bytes), 'spring.emul');
+    expect(song.name).toContain('Spring');
+    expect(song.ayFileData?.byteLength).toBe(bytes.length);
+    const noteCells = song.patterns[0].channels.reduce(
+      (n, ch) => n + ch.rows.filter((c) => c.note > 0 && c.note < 97).length, 0);
+    expect(noteCells).toBeGreaterThan(0);
   });
 
   /**
@@ -145,45 +171,38 @@ describe('AYParser', () => {
     //             [0-1] u16 BE = 0x0000  terminator addr
     //             [2-3] u16 BE = 0x0000  terminator len
 
-    const codeBlockLen = 1 + playCode.length; // 1 byte init RET + play bytes
-    const totalSize = 38 + codeBlockLen + 4;  // +4 for terminator
-
+    // Project AY layout (see AYParser.ts). Pointers are relative to their own
+    // position. Offsets:
+    //   20 SongStructure[0]: PSongName=0, PSongData -> 24
+    //   24 SongData: chans, SongLength, FadeLength, HiReg, LoReg, PPoints -> 38, PAddresses -> 44
+    //   38 Points: Stack F000, Init 8000, Interrupt 8001
+    //   44 Addresses: { 8000, len, POffset -> 56 }, terminator 0000
+    //   56 code: init RET at $8000, play routine at $8001
+    const codeBlockLen = 1 + playCode.length;
+    const totalSize = 56 + codeBlockLen;
     const ayBuf = new Uint8Array(totalSize);
     const dv    = new DataView(ayBuf.buffer);
-
-    // Magic
-    const magic = new TextEncoder().encode('ZXAYEMUL');
-    ayBuf.set(magic, 0);
-
-    // File header fields
-    ayBuf[8]  = 0; // AY type
-    ayBuf[9]  = 1; // version
-    ayBuf[18] = 0; // 1 song
-    ayBuf[19] = 0; // first song
-
-    // Song descriptor at offset 20
-    dv.setInt16(20, 0, false);    // name ptr = 0
-    dv.setInt16(22, 2, false);    // data ptr: relative to offset 22, so 22+2=24
-
-    // Song data block at offset 24
-    dv.setUint16(24, 0x0000, false); // unused
-    dv.setUint16(26, 0x8000, false); // init addr
-    dv.setUint16(28, 0x8001, false); // intr addr
-    dv.setUint16(30, 0xF000, false); // stack
-    dv.setUint16(32, 0x0000, false); // extra reg
-
-    // Memory block descriptor at offset 34
-    dv.setUint16(34, 0x8000, false);          // target Z80 addr
-    dv.setUint16(36, codeBlockLen, false);    // length
-
-    // Code: init RET at offset 38 ($8000), play routine at offset 39 ($8001)
-    ayBuf[38] = 0xC9; // RET — init routine
-    ayBuf.set(playCode, 39);
-
-    // Terminator at offset 38 + codeBlockLen
-    const termOff = 38 + codeBlockLen;
-    dv.setUint16(termOff,     0x0000, false);
-    dv.setUint16(termOff + 2, 0x0000, false);
+    ayBuf.set(new TextEncoder().encode('ZXAYEMUL'), 0);
+    ayBuf[8]  = 0; ayBuf[9] = 1;          // FileVersion, PlayerVersion
+    ayBuf[16] = 0; ayBuf[17] = 0;         // 1 song, first song 0
+    dv.setInt16(18, 2, false);            // PSongsStructure -> 20
+    dv.setInt16(20, 0, false);            // PSongName: none
+    dv.setInt16(22, 2, false);            // PSongData -> 24
+    ayBuf[24] = 0; ayBuf[25] = 1; ayBuf[26] = 2; ayBuf[27] = 3;
+    dv.setUint16(28, 0, false);           // SongLength
+    dv.setUint16(30, 0, false);           // FadeLength
+    ayBuf[32] = 0; ayBuf[33] = 0;         // HiReg, LoReg
+    dv.setInt16(34, 38 - 34, false);      // PPoints -> 38
+    dv.setInt16(36, 44 - 36, false);      // PAddresses -> 44
+    dv.setUint16(38, 0xF000, false);      // Stack
+    dv.setUint16(40, 0x8000, false);      // Init
+    dv.setUint16(42, 0x8001, false);      // Interrupt
+    dv.setUint16(44, 0x8000, false);      // Address
+    dv.setUint16(46, codeBlockLen, false);// Length
+    dv.setInt16(48, 56 - 48, false);      // POffset -> 56
+    dv.setUint16(50, 0x0000, false);      // terminator
+    ayBuf[56] = 0xC9;                     // RET - init routine at $8000
+    ayBuf.set(playCode, 57);              // play routine at $8001
 
     // ── Run the parser ─────────────────────────────────────────────────────
     const song = await parseAYFile(ayBuf.buffer, 'test.ay');

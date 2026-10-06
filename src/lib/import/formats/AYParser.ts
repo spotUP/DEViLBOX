@@ -1,16 +1,34 @@
 /**
- * AYParser.ts — ZX Spectrum AY/YM format parser (ZXAYEMUL / AY-emul)
+ * AYParser.ts — ZX Spectrum .ay (Project AY "ZXAY" container, EMUL payload)
  *
- * Parses the ZXAYEMUL header for song metadata, loads Z80 memory blocks,
- * runs the init and interrupt routines via Z80 CPU emulation, intercepts
- * AY chip register writes via OUT port hooks, and reconstructs 3-channel
- * patterns from the resulting register frame snapshots.
+ * Playback is aylet (third-party/aylet-0.5, GPL-2) compiled to wasm: the song
+ * carries the whole file as `ayFileData` and `AyletEngine` runs the tune's
+ * own Z80 code with a real AY. The grid is a VIEW of that: the same wasm
+ * runs the tune for 300 frames (AyletWasmExtractor), the AY registers after
+ * each frame become one 3-channel pattern. One Z80, so the grid shows what
+ * plays.
+ *
+ * Layout (Project AY / DeliAY, Patrik Rak; Amiga origin, so every word is
+ * big-endian and every pointer a signed 16-bit offset RELATIVE TO ITS OWN
+ * POSITION) - verified against the corpus in
+ * thoughts/shared/research/2026-10-04_ay-strc-amad.md:
+ *
+ *   Header        +0 'ZXAY'  +4 TypeID 'EMUL'|'STRC'|'AMAD'  +8 FileVersion
+ *                 +9 PlayerVersion  +10 PSpecialPlayer  +12 PAuthor  +14 PMisc
+ *                 +16 NumOfSongs-1  +17 FirstSong  +18 PSongsStructure
+ *   SongStructure +0 PSongName  +2 PSongData                 (4 bytes a song)
+ *   SongData      +0..3 ChanA ChanB ChanC Noise  +4 SongLength  +6 FadeLength
+ *                 +8 HiReg  +9 LoReg  +10 PPoints  +12 PAddresses
+ *   Points        Stack, Init, Interrupt (u16 each)
+ *   Addresses     { Address u16, Length u16, POffset } ... until Address == 0
+ *
+ * Until 2026-10-04 this file read the song data at the wrong offsets, so the
+ * Z80 never ran and every .ay / .emul showed an empty stub grid (ledger F15).
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
-import { DEFAULT_FURNACE } from '@/types/instrument';
-import { CpuZ80, type Z80MemoryMap } from '@/lib/import/cpu/CpuZ80';
+import { extractAYRegisterFrames } from './AyletWasmExtractor';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,17 +47,20 @@ function emptyPattern(numCh: number): Pattern {
   };
 }
 
-/**
- * Read a null-terminated string via a signed big-endian offset pointer at `ptrOff`.
- * The pointer is relative to its own position in the file.
- */
-function readRelStr(buf: Uint8Array, ptrOff: number): string {
-  if (ptrOff + 2 > buf.length) return '';
+/** Resolve a signed big-endian pointer at `ptrOff`, relative to its own position; -1 when it points outside the file or is 0. */
+function relPtr(buf: Uint8Array, ptrOff: number): number {
+  if (ptrOff < 0 || ptrOff + 2 > buf.length) return -1;
   const dv  = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-  const rel = dv.getInt16(ptrOff, false); // big-endian signed
-  if (rel === 0) return '';
+  const rel = dv.getInt16(ptrOff, false);
+  if (rel === 0) return -1;
   const abs = ptrOff + rel;
-  if (abs < 0 || abs >= buf.length) return '';
+  return abs < 0 || abs >= buf.length ? -1 : abs;
+}
+
+/** Read a null-terminated string through a relative pointer at `ptrOff`. */
+function readRelStr(buf: Uint8Array, ptrOff: number): string {
+  const abs = relPtr(buf, ptrOff);
+  if (abs < 0) return '';
   let s = '', i = abs;
   while (i < buf.length && buf[i] !== 0) s += String.fromCharCode(buf[i++]);
   return s.trim();
@@ -59,135 +80,16 @@ function ayPeriodToNote(period: number): number {
   return note >= 1 && note <= 96 ? note : 0;
 }
 
-interface MemBlock {
-  addr: number;
-  data: Uint8Array;
-}
+const OFF_NUM_SONGS = 16;
+const OFF_FIRST_SONG = 17;
+const OFF_SONGS = 18;
 
-interface SongDescriptor {
-  initAddr: number;
-  intrAddr: number;
-  stackAddr: number;
-  memBlocks: MemBlock[];
-}
-
-/**
- * Parse AY format song descriptor starting at offset `songDescOff` in `buf`.
- *
- * The per-song entry layout (each 4 bytes at songDescOff):
- *   [0-1]  i16 BE: relative offset to song name string (relative to this field)
- *   [2-3]  i16 BE: relative offset to song data block  (relative to this field)
- *
- * The song data block:
- *   [0-1]  u16 BE: unused (channel count or flags)
- *   [2-3]  u16 BE: init address
- *   [4-5]  u16 BE: interrupt (play) address
- *   [6-7]  u16 BE: stack pointer initial value
- *   [8-9]  u16 BE: additional register (usually 0)
- *   [10+]  memory block descriptors, each:
- *            [0-1]  u16 BE: Z80 target address
- *            [2-3]  u16 BE: data length (0 means 65536 bytes)
- *            [4+]   raw data bytes
- *          terminated by two consecutive 0x0000 words
- */
-function parseSongDescriptor(buf: Uint8Array, songDescOff: number): SongDescriptor {
-  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-
-  // Read the data-block relative pointer at songDescOff+2
-  const dataRel = dv.getInt16(songDescOff + 2, false);
-  const dataOff = songDescOff + 2 + dataRel;
-
-  if (dataOff < 0 || dataOff + 10 > buf.length) {
-    throw new Error(`AY song data block out of range: dataOff=${dataOff}`);
-  }
-
-  // Song data block fields
-  const initAddr  = dv.getUint16(dataOff + 2, false);
-  const intrAddr  = dv.getUint16(dataOff + 4, false);
-  const stackAddr = dv.getUint16(dataOff + 6, false);
-
-  // Parse memory block descriptors starting at dataOff + 10
-  let blockOff = dataOff + 10;
-  const memBlocks: MemBlock[] = [];
-
-  while (blockOff + 4 <= buf.length) {
-    const targetAddr = dv.getUint16(blockOff, false);
-    const rawLen     = dv.getUint16(blockOff + 2, false);
-
-    // Terminator: both words are 0
-    if (targetAddr === 0 && rawLen === 0) break;
-
-    const dataLen = rawLen === 0 ? 65536 : rawLen;
-    blockOff += 4;
-
-    const end = Math.min(blockOff + dataLen, buf.length);
-    const data = buf.slice(blockOff, end);
-    memBlocks.push({ addr: targetAddr, data });
-    blockOff += dataLen;
-  }
-
-  return { initAddr, intrAddr, stackAddr, memBlocks };
-}
-
-/**
- * Run Z80 emulation to extract AY register frames.
- * Runs init once then calls the interrupt routine FRAMES times, capturing
- * a 16-byte AY register snapshot after each interrupt call.
- */
-function runAYEmulation(desc: SongDescriptor): Uint8Array[] {
-  const FRAMES = 300;
-  const STACK  = (desc.stackAddr > 0 && desc.stackAddr <= 0xFFFF) ? desc.stackAddr : 0xF000;
-
-  const ram = new Uint8Array(0x10000);
-
-  // Load all memory blocks into Z80 RAM
-  for (const block of desc.memBlocks) {
-    const len = Math.min(block.data.length, 0x10000 - block.addr);
-    ram.set(block.data.subarray(0, len), block.addr);
-  }
-
-  // Guard: verify that initAddr and intrAddr are covered by at least one
-  // loaded memory block so we don't silently burn cycles on uncovered addresses.
-  function isCovered(addr: number): boolean {
-    return desc.memBlocks.some(b => addr >= b.addr && addr < b.addr + b.data.length);
-  }
-  if (!isCovered(desc.initAddr) || !isCovered(desc.intrAddr)) {
-    return [];
-  }
-
-  const ayRegs = new Uint8Array(16);
-  let selectedReg = 0;
-
-  const mem: Z80MemoryMap = {
-    read:  (addr)       => ram[addr & 0xFFFF],
-    write: (addr, val)  => { ram[addr & 0xFFFF] = val & 0xFF; },
-    outPort: (port, val) => {
-      const p16 = port & 0xFFFF;
-      // AY register select:  OUT ($FFFD), A  or  OUT (C),A with BC=$FFFD
-      if (p16 === 0xFFFD) {
-        selectedReg = val & 0x0F;
-      }
-      // AY register write:   OUT ($BFFD), A  or  OUT (C),A with BC=$BFFD
-      else if (p16 === 0xBFFD) {
-        ayRegs[selectedReg] = val & 0xFF;
-      }
-    },
-  };
-
-  const cpu = new CpuZ80(mem);
-  cpu.reset(desc.initAddr, STACK);
-
-  // Run init routine once
-  cpu.callSubroutine(desc.initAddr);
-
-  // Run interrupt routine FRAMES times, snapshotting registers each frame
-  const frames: Uint8Array[] = [];
-  for (let f = 0; f < FRAMES; f++) {
-    cpu.callSubroutine(desc.intrAddr);
-    frames.push(new Uint8Array(ayRegs)); // snapshot (copy current state)
-  }
-
-  return frames;
+/** The name of song `songIndex` (SongStructure.PSongName), '' when absent. */
+function songName(buf: Uint8Array, songIndex: number): string {
+  const songs = relPtr(buf, OFF_SONGS);
+  if (songs < 0) return '';
+  const off = songs + songIndex * 4;
+  return off + 4 <= buf.length ? readRelStr(buf, off) : '';
 }
 
 // ── Frames → Pattern ─────────────────────────────────────────────────────────
@@ -245,67 +147,74 @@ function framesToPattern(frames: Uint8Array[]): Pattern {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function isAYFormat(buffer: ArrayBuffer): boolean {
+/** The ZXAY container's TypeID ('EMUL', 'STRC', 'AMAD', ...), or null when the file is not a ZXAY container. */
+export function ayContainerType(buffer: ArrayBuffer): string | null {
   const b = new Uint8Array(buffer);
-  if (b.length < 8) return false;
-  return String.fromCharCode(b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]) === 'ZXAYEMUL';
+  if (b.length < 8) return null;
+  if (String.fromCharCode(b[0], b[1], b[2], b[3]) !== 'ZXAY') return null;
+  return String.fromCharCode(b[4], b[5], b[6], b[7]);
+}
+
+export function isAYFormat(buffer: ArrayBuffer): boolean {
+  return ayContainerType(buffer) === 'EMUL';
+}
+
+/** True for the ZXAY payloads that need a host-side replayer (STRC, AMAD). */
+export function isAYStructuredFormat(buffer: ArrayBuffer): boolean {
+  const t = ayContainerType(buffer);
+  return t === 'STRC' || t === 'AMAD';
+}
+
+/**
+ * STRC and AMAD are ZXAY files whose song data is NOT a Z80 program: it is
+ * a structure for a replayer that lived in the host (DeliAY on the Amiga,
+ * AY_Emul on Windows). No player in reach implements those replayers -
+ * aylet, ayfly, libayemu, ZXTune and deadbeef all play EMUL only - so the
+ * refusal says exactly that instead of "Unsupported file format".
+ * See thoughts/shared/research/2026-10-04_ay-strc-amad.md.
+ */
+export async function parseAYStructuredFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
+  const type = ayContainerType(buffer);
+  const kind = type === 'AMAD' ? 'AMAD (Amadeus)' : type === 'STRC' ? 'STRC (structure)' : type ?? 'unknown';
+  throw new Error(
+    `${filename}: ZXAY ${kind} payload. The song is data for a replayer that lived in DeliAY / AY_Emul, ` +
+    `not Z80 code, and no available player implements it; only ZXAY EMUL files play (via aylet).`,
+  );
 }
 
 export async function parseAYFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
   if (!isAYFormat(buffer)) throw new Error('Not a valid AY file');
   const buf = new Uint8Array(buffer);
 
-  // buf[8]: type (0=AY, 1=YM)
-  const isYM    = buf[8] === 1;
-  // buf[18]: number of songs minus 1
-  const numSongs = (buf[18] ?? 0) + 1;
+  const numSongs  = (buf[OFF_NUM_SONGS] ?? 0) + 1;
+  const firstSong = Math.min(buf[OFF_FIRST_SONG] ?? 0, numSongs - 1);
 
-  // Offset 14: signed BE pointer to author string (relative to offset 14)
-  // Offset 16: signed BE pointer to misc string   (relative to offset 16)
-  const author = readRelStr(buf, 14);
-  const misc   = readRelStr(buf, 16);
+  const author = readRelStr(buf, 12);
+  const misc   = readRelStr(buf, 14);
 
-  const chipLabel = isYM ? 'YM' : 'AY';
   const instruments: InstrumentConfig[] = Array.from({ length: 3 }, (_, i) => ({
     id: i + 1,
-    name: `${chipLabel} ${String.fromCharCode(65 + i)}`,
+    name: `AY ${String.fromCharCode(65 + i)}`,
     type: 'synth' as const,
-    synthType: 'FurnaceAY' as const,
-    furnace: { ...DEFAULT_FURNACE, chipType: 6, ops: 2 },
+    synthType: 'AyletSynth' as const,
     effects: [] as [],
     volume: 0,
     pan: 0,
   }));
 
-  const name = misc || filename.replace(/\.ay$/i, '');
-
-  // ── Z80 emulation: attempt to extract real pattern data ──────────────────
-  //
-  // Song descriptor array starts at offset 20.
-  // Each entry is 4 bytes: [nameRel i16 BE] [dataRel i16 BE]
-  // We use the first song (index 0) at offset 20.
-  //
-  // Wrap in try/catch and fall back to stub pattern on any parse failure.
-
+  // The grid: aylet runs the tune for 300 frames and the registers after
+  // each frame become the pattern. A file aylet cannot run still loads with
+  // an empty grid, and the console says why.
   let pattern: Pattern;
-
   try {
-    const songDescOff = 20; // first song descriptor in the array
-    const desc = parseSongDescriptor(buf, songDescOff);
-
-    if (desc.initAddr === 0 || desc.intrAddr === 0) {
-      throw new Error('AY init/interrupt address is zero — cannot emulate');
-    }
-    if (desc.memBlocks.length === 0) {
-      throw new Error('AY file has no memory blocks');
-    }
-
-    const frames = runAYEmulation(desc);
+    const { frames } = await extractAYRegisterFrames(buffer, firstSong, 300);
     pattern = framesToPattern(frames);
-  } catch {
-    // Emulation not possible for this file — produce a stub pattern
+  } catch (err) {
+    console.warn(`[AYParser] ${filename}: aylet could not run the tune for the grid, showing an empty grid:`, err);
     pattern = emptyPattern(3);
   }
+
+  const name = songName(buf, firstSong) || misc || filename.replace(/\.(ay|emul)$/i, '');
 
   return {
     name: name + (author ? ` — ${author}` : ''),
@@ -313,10 +222,11 @@ export async function parseAYFile(buffer: ArrayBuffer, filename: string): Promis
     patterns: [pattern],
     instruments,
     songPositions: [0],
-    songLength: numSongs > 1 ? numSongs : 1,
+    songLength: 1,
     restartPosition: 0,
     numChannels: 3,
     initialSpeed: 6,
     initialBPM: 125,
+    ayFileData: buffer.slice(0),
   };
 }
