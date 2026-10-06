@@ -57,3 +57,23 @@ describe('jukebox list and switches', { timeout: 60000 }, () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
+
+describe('jukebox next song', { timeout: 60000 }, () => {
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  it('Next Song plays the next song of the selected format (it used to only move a counter)', async () => {
+    const two = { gaps: [], dirs: [], entries: [{ id: 'fred', label: 'fred', formatKey: 'fred', files: ['/data/songs/formats/a.fred', '/data/songs/formats/b.fred'], total: 2, dir: '/data/songs/formats' }] };
+    const fetched: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      fetched.push(String(url));
+      if (String(url).endsWith('/data/songs/index.json')) return new Response(JSON.stringify(two));
+      if (String(url).endsWith('.fred')) return new Response(new Uint8Array([1, 2, 3]));
+      return new Response('{}');
+    }));
+    const { JukeboxPanel } = await import('../JukeboxPanel');
+    const { findAllByText, getByText } = render(<JukeboxPanel onClose={() => {}} />);
+    await findAllByText(/fred/i);
+    fireEvent.click(getByText('Next Song'));
+    await waitFor(() => expect(fetched.some((u) => u.endsWith('/b.fred'))).toBe(true));
+  });
+});
