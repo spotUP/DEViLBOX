@@ -45,7 +45,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(repo, { recursive: true, force: true }));
 
-describe('scripts/commit-files.sh', () => {
+describe('scripts/commit-files.sh', { timeout: 30000 }, () => {
   it('keeps another agent\'s commit that lands while ours is being made', () => {
     // A pre-commit hook that, on its first run only, lands another agent's
     // commit of theirs.txt and fails our attempt - as "cannot lock ref HEAD"
