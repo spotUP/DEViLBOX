@@ -40,6 +40,7 @@ import { moveButtonStyle, MOVE_COLOR, type MoveColor } from './moveButtonStyle';
 import { resolveDubTarget, isDubTargetChannel, describeDubTarget } from './dubTarget';
 import { useControllerLamps } from '@/hooks/useControllerLamps';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { ChannelShapeSelect, ChannelShapeKnob } from './ChannelShapeSlot';
 import { CONTROLLER_LAYOUTS } from '@/midi/controllerLayouts';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
 import { AutoDubPanel } from './AutoDubPanel';
@@ -381,7 +382,6 @@ export const DubDeckStrip: React.FC = () => {
   const channels = useMixerStore(s => s.channels);
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
   const setChannelDubRole = useMixerStore(s => s.setChannelDubRole);
-  const setChannelDubFilter = useMixerStore(s => s.setChannelDubFilter);
   const setChannelDubReverbSend = useMixerStore(s => s.setChannelDubReverbSend);
   const setChannelDubSweepAmount = useMixerStore(s => s.setChannelDubSweepAmount);
   const patternIdx = useTrackerStore(s => s.currentPatternIndex);
@@ -1486,49 +1486,16 @@ export const DubDeckStrip: React.FC = () => {
                   </select>
                 );
               })()}
-              {/* Per-channel mini-bus: filter mode */}
-              {(() => {
-                const filterMode = ch?.dubFilterMode ?? 'off';
-                return (
-                  <>
-                    <select
-                      value={filterMode}
-                      onChange={(e) => setChannelDubFilter(i, e.target.value as 'off' | 'hpf' | 'lpf')}
-                      className={
-                        'flex-1 min-w-0 text-[8px] font-mono rounded border px-0.5 py-0.5 transition-colors ' +
-                        (filterMode !== 'off'
-                          ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
-                          : 'bg-dark-bgTertiary border-dark-border text-text-muted')
-                      }
-                      title={`Ch ${i + 1} filter — Off / High Pass / Low Pass. Shapes the audio before it enters the dub bus mix.`}
-                      disabled={!busEnabled}
-                    >
-                      <option value="off">Filter off</option>
-                      <option value="hpf">High Pass</option>
-                      <option value="lpf">Low Pass</option>
-                    </select>
-                  </>
-                );
-              })()}
+              {/* Per-channel sound-shaping slot on the send */}
+              <ChannelShapeSelect channel={i} disabled={!busEnabled} />
               </div>
-              {/* Filter cutoff (when a filter is on) + reverb send + sweep */}
+              {/* Shaping parameter (when the slot is on) + reverb send + sweep */}
               {(() => {
-                const filterMode = ch?.dubFilterMode ?? 'off';
-                const filterHz = ch?.dubFilterHz ?? 200;
                 const reverbSend = ch?.dubReverbSend ?? 0;
                 const sweepAmt = ch?.dubSweepAmount ?? 0;
                 return (
                   <>
-                    {filterMode !== 'off' && (
-                      <input
-                        type="range" min={40} max={8000} step={10}
-                        value={filterHz}
-                        onChange={(e) => setChannelDubFilter(i, filterMode, Number(e.target.value))}
-                        className="w-full accent-accent-warning"
-                        disabled={!busEnabled}
-                        title={`Filter cutoff ${filterHz} Hz`}
-                      />
-                    )}
+                    <ChannelShapeKnob channel={i} disabled={!busEnabled} />
                     {/* min-w-0 on both columns: a flex child defaults to
                         min-width:auto, so the range inputs' intrinsic ~129px
                         each became the floor for this row and set the whole

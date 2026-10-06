@@ -29,7 +29,7 @@ export const MIN_LOADABLE_SCHEMA = 21;
  * every save and gates loads against it. Kept here so the migration chain and
  * the writer share one source of truth.
  */
-export const CURRENT_SCHEMA = 23;
+export const CURRENT_SCHEMA = 24;
 
 /**
  * Forward-migrate a saved project in place from `fromVersion` up to the current
@@ -52,9 +52,37 @@ export function migrateSavedProject(
   //          simply has no journal, and a v23 project loads in a build that
   //          has never heard of the field, because it is commentary rather
   //          than anything replay depends on.
-  void fromVersion;
+  // 23 → 24: the mixer channel's dub filter (`dubFilterMode`/`dubFilterHz`)
+  //          became the sound-shaping slot (`dubShape`/`dubShapeValue`), which
+  //          holds the filter as two of its seven kinds. Transformed, not
+  //          dropped: a v23 project's filter carries over as the same filter.
+  if (fromVersion < 24) {
+    const mixer = (project as { mixer?: { channels?: Array<Record<string, unknown>> } }).mixer;
+    if (Array.isArray(mixer?.channels)) mixer.channels = mixer.channels.map((c) => migrateMixerChannelShape(c));
+  }
 
   // Stamp the project at the current schema so a subsequent save is not
   // re-migrated.
   project.schemaVersion = CURRENT_SCHEMA;
+}
+
+/**
+ * A saved mixer channel's legacy dub filter as the shaping slot (schema 24).
+ *
+ * `dubFilterMode: 'hpf' | 'lpf'` becomes `dubShape` of the same kind with the
+ * cutoff carried as `dubShapeValue`; `'off'` becomes Off. Idempotent: a
+ * channel that already has `dubShape` is returned with the legacy keys
+ * stripped. Also applied by `loadMixerState` itself, because song files and
+ * exports carry a mixer snapshot without passing through the project chain.
+ */
+export function migrateMixerChannelShape<T extends object>(channel: T): T {
+  const c = channel as Record<string, unknown>;
+  if (c.dubFilterMode === undefined && c.dubFilterHz === undefined) return channel;
+  const { dubFilterMode, dubFilterHz, ...rest } = c;
+  if (rest.dubShape === undefined) {
+    const mode = dubFilterMode === 'hpf' || dubFilterMode === 'lpf' ? dubFilterMode : 'off';
+    rest.dubShape = mode;
+    rest.dubShapeValue = mode === 'off' ? 0 : (typeof dubFilterHz === 'number' && Number.isFinite(dubFilterHz) ? dubFilterHz : 200);
+  }
+  return rest as T;
 }
