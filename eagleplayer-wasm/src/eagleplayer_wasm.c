@@ -43,6 +43,7 @@ EMSCRIPTEN_KEEPALIVE void ep_wasm_set_subsong(int subsong) { eagle_set_subsong(s
 EMSCRIPTEN_KEEPALIVE int ep_wasm_subsong_min(void) { return eagle_subsong_min(); }
 EMSCRIPTEN_KEEPALIVE int ep_wasm_subsong_max(void) { return eagle_subsong_max(); }
 EMSCRIPTEN_KEEPALIVE int ep_wasm_subsong_current(void) { return eagle_subsong_current(); }
+EMSCRIPTEN_KEEPALIVE uint32_t ep_wasm_player_ticks(void) { return eagle_player_ticks(); }
 EMSCRIPTEN_KEEPALIVE int ep_wasm_song_ended(void) { return eagle_song_ended(); }
 EMSCRIPTEN_KEEPALIVE void ep_wasm_set_song_end_detection(int on) { eagle_set_song_end_detection(on); }
 EMSCRIPTEN_KEEPALIVE void ep_wasm_stop(void) { eagle_stop(); }

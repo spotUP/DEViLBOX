@@ -477,12 +477,15 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'eaglePlayerFileData',
     loadMethod: 'loadTune',
-    getLoadArgs: (song: TrackerSong) => [song.eaglePlayerId, song.eaglePlayerFileName ?? song.name],
+    // The subsong rides as a load arg (0-based, the native subsong model's start field).
+    getLoadArgs: (song: TrackerSong) => [song.eaglePlayerId, song.eaglePlayerFileName ?? song.name, song.eaglePlayerSubsong],
     supportsPause: true,
     supportsResume: true,
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/eagleplayer/EaglePlayerEngine')).EaglePlayerEngine as unknown as WASMSingletonStatic,
+    // The player reports its tick count; the grid it maps onto is this song's.
+    onStarted: (instance, song) => (instance as unknown as import('@/engine/eagleplayer/EaglePlayerEngine').EaglePlayerEngine).setGrid(song),
   },
   {
     // MusicMaker V8 (.sdata + .ip, Amiga): a worklet replayer built from the

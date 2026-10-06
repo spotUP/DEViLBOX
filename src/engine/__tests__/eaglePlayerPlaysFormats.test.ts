@@ -27,6 +27,7 @@ import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { ROOT, loadSharedWorkletScripts, startWorklet, songBuffer, stereoOutputs } from './workletHarness';
 import { EAGLE_PLAYER_FORMATS, eaglePlayerModuleName, type EaglePlayerFormat } from '../eagleplayer/eaglePlayerFormats';
+import type { EaglePlayerPosition } from '../eagleplayer/EaglePlayerEngine';
 import { renderFileToSamples } from '../../../tools/uade-audit/uadeRenderCore';
 import { monoEnvelope, correlation, comparedWindows } from '../../../tools/eagleplayer/eagleCompare';
 
@@ -204,5 +205,139 @@ describe('the default load plays on EaglePlayer', () => {
     const { playingEngineFor } = await import('../replayer/NativeEngineRouting');
     const song = await parseModuleToSong(new File([new Uint8Array(readFileSync(resolve(ROOT, EAGLE_PLAYER_FORMATS.BenDaglish.corpus)))], 'mickey_mouse.bd'));
     expect(playingEngineFor(song)).toBe('BenDaglish');
+  }, 60_000);
+});
+
+/**
+ * EaglePlayerEngine over the real worklet: the engine's message handling
+ * runs (createNode with a stand-in AudioWorkletNode whose port is the
+ * worklet's), so what the grid and the subsong model get is what the engine
+ * makes of the player's own reports.
+ */
+async function engineOnWorklet(fmt: EaglePlayerFormat) {
+  loadSharedWorkletScripts();
+  const { proc, send } = await startWorklet('eagleplayer', 'EaglePlayer');
+  const { EaglePlayerEngine } = await import('../eagleplayer/EaglePlayerEngine');
+  const port: { onmessage: ((e: { data: unknown }) => void) | null; postMessage(m: { type?: string }): void } = {
+    onmessage: null,
+    postMessage(m) { if (m.type !== 'init') void send(m); },
+  };
+  (proc as unknown as { port: { postMessage(m: unknown): void } }).port.postMessage = (m) => port.onmessage?.({ data: m });
+  (globalThis as Record<string, unknown>).AudioWorkletNode = class { port = port; connect() {} };
+  const engine = Object.create(EaglePlayerEngine.prototype) as import('../eagleplayer/EaglePlayerEngine').EaglePlayerEngine;
+  Object.assign(engine, {
+    _songEndCallback: null, _positionCallbacks: new Set(), _grid: null,
+    subsongRequests: new (await import('@engine/wasm/subsongRequests')).SubsongRequests(),
+    audioContext: {}, output: {}, _initPromise: Promise.resolve(),
+  });
+  (engine as unknown as { createNode(): void }).createNode();
+  // EaglePlayerEngine.fetchPlayer reads public/ through fetch.
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(songBuffer(`public/eagleplayer/players/${fmt.player}`))) as typeof fetch;
+  const load = async (subsong?: number) => {
+    try { await engine.loadTune(songBuffer(fmt.corpus), fmt.id, basename(fmt.corpus), subsong); } finally { globalThis.fetch = realFetch; }
+    await send({ type: 'play' });
+  };
+  const run = (seconds: number) => {
+    for (let b = 0; b < Math.ceil((48000 * seconds) / 128); b++) proc.process([], stereoOutputs(5));
+  };
+  return { engine, load, run, send };
+}
+
+describe('the grid follows the player', () => {
+  it('maps player ticks onto the grid: speed ticks per row, patterns in order, looping from the restart', async () => {
+    const { tickGridPosition } = await import('@/lib/tracker/tickGridPosition');
+    const grid = { speed: 6, songPositions: [0, 1, 0], patternLengths: [4, 2], loopFrom: 1 };
+    expect(tickGridPosition(0, grid)).toEqual({ songPos: 0, row: 0 });
+    expect(tickGridPosition(5, grid)).toEqual({ songPos: 0, row: 0 });
+    expect(tickGridPosition(6 * 3, grid)).toEqual({ songPos: 0, row: 3 });
+    expect(tickGridPosition(6 * 4, grid)).toEqual({ songPos: 1, row: 0 });
+    expect(tickGridPosition(6 * 9, grid)).toEqual({ songPos: 2, row: 3 });
+    // 10 rows played: the loop (positions 1..2, 6 rows) starts again.
+    expect(tickGridPosition(6 * 10, grid)).toEqual({ songPos: 1, row: 0 });
+    expect(tickGridPosition(6 * 14, grid)).toEqual({ songPos: 2, row: 2 });
+    // UADE's scan grid (no loop) holds its last row.
+    expect(tickGridPosition(6 * 99, { ...grid, loopFrom: undefined })).toEqual({ songPos: 2, row: 3 });
+  });
+
+  it('Wally Beben: the engine reports the player position each tick, at the player rate, and the grid moves with it', async () => {
+    const fmt = EAGLE_PLAYER_FORMATS.WallyBeben;
+    const { engine, load, run } = await engineOnWorklet(fmt);
+    // wicked.wb's grid: speed 1 (a row per player tick), patterns of 8 rows.
+    engine.setGrid({ initialSpeed: 1, restartPosition: 0, songPositions: [0, 1, 2], patterns: [{ length: 8 }, { length: 8 }, { length: 8 }] as never });
+    const seen: Array<{ songPos: number; row: number; ticks: number }> = [];
+    engine.onPositionUpdate((p: EaglePlayerPosition) => seen.push(p));
+    await load();
+    run(2);
+    const last = seen[seen.length - 1];
+    // score runs the player at 50 Hz (CIA-A timer B): 2 s = 100 ticks.
+    expect(last.ticks).toBeGreaterThanOrEqual(98);
+    expect(last.ticks).toBeLessThanOrEqual(101);
+    expect(new Set(seen.map((p) => p.songPos)), 'the grid moves through the order').toEqual(new Set([0, 1, 2]));
+    expect(last).toMatchObject({ songPos: (Math.floor(last.ticks / 8)) % 3, row: last.ticks % 8 });
+  }, 60_000);
+
+  it('the route hands the playing song\'s grid to the engine (onStarted)', async () => {
+    const { WASM_ENGINES } = await import('../replayer/wasmEngineRegistry');
+    const desc = WASM_ENGINES.find((d) => d.key === 'EaglePlayer')!;
+    let grid: unknown = null;
+    desc.onStarted!({ setGrid: (s: unknown) => { grid = s; } } as never, { initialSpeed: 3, songPositions: [0], patterns: [{ length: 64 }], restartPosition: 0 } as never);
+    expect(grid).toMatchObject({ initialSpeed: 3 });
+  });
+});
+
+describe('subsongs on the runner', () => {
+  it('Core Design: the engine reports the player\'s 34 subsongs; the one subsong switch starts another on the runner', async () => {
+    const fmt = EAGLE_PLAYER_FORMATS.CoreDesign;
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    const { subsongStatus, switchSubsong } = await import('@/lib/tracker/subsongSwitch');
+    const { engine, load, run } = await engineOnWorklet(fmt);
+    await load();
+    expect(useFormatStore.getState().nativeSubsongs).toMatchObject({ engine: 'EaglePlayer', count: 34, current: 0 });
+    expect(subsongStatus(useFormatStore.getState())).toMatchObject({ source: 'native', count: 34, current: 0 });
+    run(1);
+    // The switch (FT2 toolbar 'Subsong', scope control) while playing goes
+    // to the running engine; stand in for the route's running set.
+    const routing = await import('../replayer/NativeEngineRouting');
+    const running = vi.spyOn(routing, 'runningEngineInstance').mockResolvedValue(engine);
+    const { useTransportStore } = await import('@/stores/useTransportStore');
+    useTransportStore.setState({ isPlaying: true });
+    const positions: number[] = [];
+    engine.onPositionUpdate((p: EaglePlayerPosition) => positions.push(p.ticks));
+    engine.setGrid({ initialSpeed: 6, restartPosition: 0, songPositions: [0], patterns: [{ length: 64 }] as never });
+    await switchSubsong(3);
+    running.mockRestore();
+    useTransportStore.setState({ isPlaying: false });
+    expect(useFormatStore.getState().nativeSubsongs).toMatchObject({ engine: 'EaglePlayer', current: 3 });
+    // The start field follows: a reload (stop, play) starts subsong 3.
+    expect(useFormatStore.getState().eaglePlayerSubsong).toBe(3);
+    run(1);
+    expect(positions[0], 'the position restarts with the subsong').toBeLessThan(5);
+  }, 60_000);
+
+  it('Core Design: at the player\'s song end (dynamite dux, 22.6 s) the next subsong starts, as UADE does', async () => {
+    const fmt = EAGLE_PLAYER_FORMATS.CoreDesign;
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    const { useSettingsStore } = await import('@/stores/useSettingsStore');
+    useSettingsStore.setState({ autoAdvanceSubsongs: true });
+    const { load, run } = await engineOnWorklet(fmt);
+    await load();
+    expect(useFormatStore.getState().nativeSubsongs?.current).toBe(0);
+    run(22);
+    expect(useFormatStore.getState().nativeSubsongs?.current, 'still the first subsong before its end').toBe(0);
+    run(2);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useFormatStore.getState().nativeSubsongs?.current, 'the next subsong after the song end').toBe(1);
+  }, 60_000);
+
+  it('the start field reaches the runner: the route loads the store\'s subsong', async () => {
+    const { WASM_ENGINES } = await import('../replayer/wasmEngineRegistry');
+    const desc = WASM_ENGINES.find((d) => d.key === 'EaglePlayer')!;
+    expect(desc.getLoadArgs!({ eaglePlayerId: 'CoreDesign', eaglePlayerFileName: 'dynamite dux.core', eaglePlayerSubsong: 5 } as never)).toEqual(['CoreDesign', 'dynamite dux.core', 5]);
+    const fmt = EAGLE_PLAYER_FORMATS.CoreDesign;
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    const { load } = await engineOnWorklet(fmt);
+    await load(5);
+    expect(useFormatStore.getState().nativeSubsongs).toMatchObject({ engine: 'EaglePlayer', current: 5 });
   }, 60_000);
 });

@@ -33,6 +33,9 @@ export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: A
   song.eaglePlayerFileName = fileName;
   delete song.uadeEditableFileData;
   delete song.uadeEditableFileName;
+  // Subsongs are the engine's (it reports them on load, nativeSubsongs); the
+  // UADE list would send the subsong switch to UADE's engine.
+  delete (song as { uadeEditableSubsongs?: unknown }).uadeEditableSubsongs;
   for (const inst of song.instruments) {
     if (UADE_SYNTHS.has(inst.synthType)) {
       inst.synthType = 'Sampler';

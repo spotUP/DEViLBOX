@@ -76,6 +76,9 @@ static void log_line(const char *t) {
 }
 static int g_sampleRate = 48000;
 static int g_songEndDetect = 1;
+/* CIA-A timer B interrupts (score's DTP_Interrupt clock) when the current
+ * (sub)song started: eagle_player_ticks() counts from here. */
+static uint32_t g_tickBase;
 
 /* ---- files -------------------------------------------------------------- */
 int eagle_add_file(const char *name, const uint8_t *data, size_t len) {
@@ -326,6 +329,7 @@ int eagle_load(const uint8_t *score, size_t scoreLen,
     if (g_dead) return -4;
   }
   if (!g_startOutput) return -5;
+  g_tickBase = ah_cia_timer_irqs(0, 1);
   g_loaded = 1;
   return 0;
 }
@@ -352,7 +356,10 @@ void eagle_set_subsong(int subsong) {
   ah_wr32(SCORE_INPUT_MSG, MSG_SETSUBSONG);
   g_songEnd = 0;
   g_subCur = subsong;
+  g_tickBase = ah_cia_timer_irqs(0, 1);
 }
+
+uint32_t eagle_player_ticks(void) { return g_loaded ? ah_cia_timer_irqs(0, 1) - g_tickBase : 0; }
 
 void eagle_set_song_end_detection(int on) {
   g_songEndDetect = on ? 1 : 0;

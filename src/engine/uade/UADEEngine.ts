@@ -18,6 +18,7 @@ import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
 import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
+import { tickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import {
   WASMSingletonBase,
@@ -811,7 +812,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       const scannedFirstTick = song.uadeFirstTick;
       /** Anchor: the scan's, or the first real tick this playback reports. */
       let firstTick = scannedFirstTick ?? null;
-      const patternLengths = song.patterns.map(p => p.length);
+      const grid: TickGrid = { speed, songPositions: song.songPositions, patternLengths: song.patterns.map(p => p.length) };
       let lastRow = -1;
       let lastPosition = -1;
       const unsub = this.onPositionUpdate((update) => {
@@ -821,26 +822,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
           if (tickCount <= 0) return;   // engine has not started yet
           firstTick = tickCount;
         }
-        // Convert CIA tick count to absolute row index
-        const absoluteRow = Math.max(0, Math.floor((tickCount - firstTick) / speed));
-        // Map absolute row to pattern position + row within pattern
-        let remaining = absoluteRow;
-        let position = 0;
-        for (let i = 0; i < song.songPositions.length; i++) {
-          const patIdx = song.songPositions[i];
-          const patLen = patternLengths[patIdx] ?? 64;
-          if (remaining < patLen) {
-            position = i;
-            break;
-          }
-          remaining -= patLen;
-          position = i;
-          // If we've exhausted all patterns, clamp to last position
-          if (i === song.songPositions.length - 1) {
-            remaining = Math.min(remaining, patLen - 1);
-          }
-        }
-        const row = remaining;
+        const { songPos: position, row } = tickGridPosition(tickCount - firstTick, grid);
         if (row === lastRow && position === lastPosition) return;
         lastRow = row;
         lastPosition = position;

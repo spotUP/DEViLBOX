@@ -380,6 +380,8 @@ export interface TrackerSong {
   eaglePlayerId?: string;
   /** The module's own file name, which the eagleplayer opens it by. */
   eaglePlayerFileName?: string;
+  /** Subsong to start (0-based index into the player's min..max), the native subsong model's start field */
+  eaglePlayerSubsong?: number;
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */
   startrekkerAMFileData?: ArrayBuffer;
   /** Raw Startrekker AM .nt synth data for StartrekkerAMEngine WASM playback */

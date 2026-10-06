@@ -72,6 +72,12 @@ void ah_set_voice_mask(uint32_t mask);
 /* Machine time in colour clocks since reset (diagnostics, beam). */
 double ah_colour_clocks(void);
 
+/* Timer underflows that raised a CIA interrupt (ICR mask bit set) since
+ * reset: cia 0 = CIA-A, 1 = CIA-B; timer 0 = A, 1 = B. CIA-A timer B is
+ * the clock score calls a player's DTP_Interrupt from (UADE counts the same
+ * timer as its player tick, cia.c uade_wasm_on_player_tick). */
+uint32_t ah_cia_timer_irqs(int cia, int timer);
+
 /* Custom-chip register state for tests. */
 uint16_t ah_intena(void);
 uint16_t ah_intreq(void);

@@ -18,6 +18,6 @@ describe('eagleplayer module file name', () => {
     useFormatStore.getState().applyEditorMode(song);
     const live = liveTrackerSong();
     const desc = WASM_ENGINES.find((d) => d.key === 'EaglePlayer')!;
-    expect(desc.getLoadArgs!(live)).toEqual(['Anders0land', 'primemover 07.hot']);
+    expect(desc.getLoadArgs!(live).slice(0, 2)).toEqual(['Anders0land', 'primemover 07.hot']);
   });
 });
