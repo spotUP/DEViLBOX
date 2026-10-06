@@ -733,6 +733,10 @@ export function decodeCoSoGrid(
 ): { rows: TrackerCell[][][]; spans: HippelCellSpans } {
   const rows: TrackerCell[][][] = [];
   const spans: HippelCellSpans = [];
+  // Each voice's sound transpose: the step's third byte, kept until a step sets
+  // a new one. The replayer treats a byte above 127 as a position command
+  // (volume fade, speed, stop) that leaves the transpose as it was.
+  const soundTransp = [0, 0, 0, 0];
   for (let stepIdx = 0; stepIdx < stepCount; stepIdx++) {
     const stepBase = songPointer + stepIdx * 12;
     const stepRows: TrackerCell[][] = [];
@@ -744,6 +748,8 @@ export function decodeCoSoGrid(
       if (chBase + 3 <= buf.length) {
         const patIdx = u8(buf, chBase);
         const trackTransp = s8(buf, chBase + 1);
+        if (buf[chBase + 2] <= 127) soundTransp[ch] = buf[chBase + 2];
+        const sndT = soundTransp[ch];
         const patPtrOff = patternsOff + patIdx * 2;
         let pos = patPtrOff + 2 <= buf.length ? u16BE(buf, patPtrOff) : 0;
         while (chRows.length < COSO_ROWS_PER_STEP && pos < buf.length) {
@@ -754,20 +760,23 @@ export function decodeCoSoGrid(
             pos += 2;
             const baseline = emptyCell();
             chRows.push(baseline);
-            chSpans.push(cosoSpan(at, 2, baseline, trackTransp, false));
+            chSpans.push(cosoSpan(at, 2, baseline, trackTransp, false, sndT));
           } else if (v >= 0) {
             pos++;
             let infoVal = 0;
             if (pos < buf.length) { infoVal = s8(buf, pos); pos++; }
             if ((infoVal & 0xE0) !== 0 && pos < buf.length) pos++; // infoPrev
-            const instrNum = (infoVal & 31) + 1;
+            // The replayer plays envelope (info & 31) + sound transpose, byte
+            // wrapped, and falls back to envelope 0 when that is past the table.
+            const envIdx = ((infoVal & 31) + sndT) & 0xFF;
+            const instrNum = envIdx < instrumentCount ? envIdx + 1 : 1;
             const baseline: TrackerCell = {
               note: cosoNoteToXM(v, trackTransp),
-              instrument: instrNum <= instrumentCount ? instrNum : 0,
+              instrument: instrNum,
               volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
             };
             chRows.push(baseline);
-            chSpans.push(cosoSpan(at, pos - at, baseline, trackTransp, true));
+            chSpans.push(cosoSpan(at, pos - at, baseline, trackTransp, true, sndT));
           } else {
             pos++; // unknown command: one byte, shown as an empty row
             const baseline = emptyCell();
@@ -794,7 +803,7 @@ export function decodeCoSoGrid(
  * note, and a note keeps the info byte's top bits (and so its length).
  */
 function cosoSpan(
-  offset: number, length: number, baseline: TrackerCell, trackTransp: number, isNote: boolean,
+  offset: number, length: number, baseline: TrackerCell, trackTransp: number, isNote: boolean, soundTransp: number,
 ): HippelCellSpan {
   return {
     offset, length, baseline,
@@ -806,7 +815,8 @@ function cosoSpan(
       if (noteByte < 0 || noteByte > 0x7F) return null;
       const oldInfo = file[offset + 1];
       const inst = cell.instrument ?? 0;
-      const low = inst > 0 ? inst - 1 : oldInfo & 31;
+      // The cell shows envelope + sound transpose, so write it back less it.
+      const low = inst > 0 ? (inst - 1 - soundTransp) & 0xFF : oldInfo & 31;
       if (low > 31) return null;
       const info = (oldInfo & 0xE0) | low;
       const out = [noteByte, info];
