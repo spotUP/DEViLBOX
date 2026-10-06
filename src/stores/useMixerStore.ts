@@ -20,6 +20,8 @@ import { getSendBusManager } from '../engine/SendBusManager';
 import { getChannelRoutedEffectsManager } from '../engine/tone/ChannelRoutedEffects';
 import { getActiveDubBus } from '../engine/dub/DubBus';
 import { dubSendBaselines } from '@/lib/dub/channelSendBaseline';
+import { clampChannelShapeValue, isChannelShapeKind, type ChannelShapeKind } from '@/lib/dub/channelShape';
+import { migrateMixerChannelShape } from '@/lib/persistence/migrations';
 
 /**
  * Who is writing a channel's dub send / mute.
@@ -767,8 +769,10 @@ export interface MixerChannelState {
   sendLevels: number[]; // Send levels per return bus (0-1), indexed by bus number
   dubSend: number;  // 0–1 send into shared DubBus (0 = no send, 1 = full send)
   dubRole: string | null; // User-set channel role override for AutoDub targeting. null = use classifier.
-  dubFilterMode: 'off' | 'hpf' | 'lpf'; // Per-channel filter before the dub bus mix point
-  dubFilterHz: number;      // Filter cutoff frequency (Hz)
+  /** Per-channel sound-shaping slot on the dub send (lib/dub/channelShape.ts). Replaced dubFilterMode. */
+  dubShape: ChannelShapeKind;
+  /** The slot's main parameter, in the kind's own unit (Hz, bits, ms, drive). Replaced dubFilterHz. */
+  dubShapeValue: number;
   dubReverbSend: number;    // 0–1 dry spring send (bypasses echo, feeds spring directly)
   dubSweepAmount: number;   // 0–1 per-channel comb sweep wet level
   dubSweepRateHz: number;   // Comb sweep LFO rate (Hz)
@@ -788,8 +792,8 @@ function defaultChannels(): MixerChannelState[] {
     sendLevels: [0, 0, 0, 0], // 4 send buses
     dubSend: 0,               // dub bus send (0 = off)
     dubRole: null,            // auto — use classifier
-    dubFilterMode: 'off',
-    dubFilterHz: 200,
+    dubShape: 'off',
+    dubShapeValue: 0,
     dubReverbSend: 0,
     dubSweepAmount: 0,
     dubSweepRateHz: 0.8,
@@ -870,7 +874,11 @@ interface MixerStoreActions {
   setChannelDubRole: (ch: number, role: string | null) => void;
 
   // Per-channel dub mini-chain controls
-  setChannelDubFilter: (ch: number, mode: 'off' | 'hpf' | 'lpf', hz?: number) => void;
+  /**
+   * Choose a channel's sound-shaping slot. `value` omitted = keep the current
+   * value when the kind is unchanged, else the new kind's default.
+   */
+  setChannelDubShape: (ch: number, kind: ChannelShapeKind, value?: number, opts?: DubWriteOrigin) => void;
   setChannelDubReverbSend: (ch: number, amount: number) => void;
   setChannelDubSweepAmount: (ch: number, amount: number) => void;
   setChannelDubSweepParams: (ch: number, rateHz: number, depthMs: number, feedback: number) => void;
@@ -1258,17 +1266,26 @@ export const useMixerStore = create<MixerStore>()(
       });
     },
 
-    setChannelDubFilter(ch: number, mode: 'off' | 'hpf' | 'lpf', hz?: number): void {
+    setChannelDubShape(ch: number, kind: ChannelShapeKind, value?: number, opts?: DubWriteOrigin): void {
+      const cur = get().channels[ch];
+      if (!cur || !isChannelShapeKind(kind)) return;
+      const next = clampChannelShapeValue(kind, value ?? (kind === cur.dubShape ? cur.dubShapeValue : undefined));
+      // A lane replays its step every tick; an unchanged slot is not a write.
+      if (kind === cur.dubShape && next === cur.dubShapeValue) return;
       set((state) => {
-        if (ch < 0 || ch >= state.channels.length) return;
-        state.channels[ch].dubFilterMode = mode;
-        if (hz !== undefined) state.channels[ch].dubFilterHz = hz;
+        state.channels[ch].dubShape = kind;
+        state.channels[ch].dubShapeValue = next;
       });
-      try {
-        const fx = getChannelRoutedEffectsManager()?.getPerChannelFx(ch);
-        fx?.setFilterMode(mode);
-        if (hz !== undefined) fx?.setFilterHz(hz);
-      } catch { /* ok */ }
+      // The manager applies it — or a shape move holding the channel, which
+      // hands back to this value when it releases.
+      try { getChannelRoutedEffectsManager()?.applyChannelShape(ch); } catch { /* engine not ready */ }
+      if (!opts?.transient) {
+        void (async () => {
+          const { publishChannelShape } = await import('@/lib/dub/channelSendStream');
+          const { getCurrentRow } = await import('@/engine/dub/dubGrid');
+          publishChannelShape({ channelId: ch, kind, value: next, row: getCurrentRow(), source: opts?.source ?? 'live' });
+        })().catch(() => { /* dub subsystem not loaded — nothing is listening */ });
+      }
     },
 
     setChannelDubReverbSend(ch: number, amount: number): void {
@@ -1309,7 +1326,7 @@ export const useMixerStore = create<MixerStore>()(
     },
 
     applyChannelFxConfig(ch: number, cfg: import('@/types/dub').ChannelFxConfig): void {
-      get().setChannelDubFilter(ch, cfg.filterMode, cfg.filterHz);
+      get().setChannelDubShape(ch, cfg.shape, cfg.shapeValue);
       get().setChannelDubReverbSend(ch, cfg.reverbSend);
       get().setChannelDubSweepAmount(ch, cfg.sweepAmount);
       if (cfg.sweepRateHz !== undefined || cfg.sweepDepthMs !== undefined || cfg.sweepFeedback !== undefined) {
@@ -1477,7 +1494,7 @@ export const useMixerStore = create<MixerStore>()(
         // Merge saved channels over defaults (partial — older saves may lack newer fields)
         const defaults = defaultChannels();
         for (let i = 0; i < Math.min(snapshot.channels.length, state.channels.length); i++) {
-          state.channels[i] = { ...defaults[i < defaults.length ? i : 0], ...snapshot.channels[i] };
+          state.channels[i] = { ...defaults[i < defaults.length ? i : 0], ...migrateMixerChannelShape(snapshot.channels[i]) };
         }
         if (snapshot.master?.volume != null) {
           state.master.volume = snapshot.master.volume;

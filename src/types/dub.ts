@@ -723,8 +723,10 @@ export interface DubCharacterPreset {
 }
 
 export interface ChannelFxConfig {
-  filterMode: 'off' | 'hpf' | 'lpf';
-  filterHz?: number;
+  /** The channel's sound-shaping slot (lib/dub/channelShape.ts). */
+  shape: import('@/lib/dub/channelShape').ChannelShapeKind;
+  /** The slot's main parameter; omitted = the kind's default. */
+  shapeValue?: number;
   reverbSend: number;
   sweepAmount: number;
   sweepRateHz?: number;
@@ -824,14 +826,14 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // dry (no filter, no reverb — it competes with the bass shelf). Leads get
     // a gentle HPF to prevent mud buildup during echo throws.
     perChannelFxByRole: {
-      percussion: { filterMode: 'hpf', filterHz: 150, reverbSend: 0.0, sweepAmount: 0.75, sweepRateHz: 0.08, sweepDepthMs: 4.0, sweepFeedback: 0.70 },
-      bass:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.0 },
-      lead:       { filterMode: 'hpf', filterHz: 200, reverbSend: 0.0, sweepAmount: 0.50, sweepRateHz: 0.15, sweepDepthMs: 5.0, sweepFeedback: 0.65 },
-      chord:      { filterMode: 'hpf', filterHz: 120, reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.10, sweepDepthMs: 3.0, sweepFeedback: 0.60 },
-      skank:      { filterMode: 'hpf', filterHz: 120, reverbSend: 0.0, sweepAmount: 0.55, sweepRateHz: 0.12, sweepDepthMs: 4.0, sweepFeedback: 0.65 },
-      arpeggio:   { filterMode: 'hpf', filterHz: 180, reverbSend: 0.0, sweepAmount: 0.35, sweepRateHz: 0.15, sweepDepthMs: 4.5, sweepFeedback: 0.62 },
-      pad:        { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.0 },
-      default:    { filterMode: 'hpf', filterHz: 150, reverbSend: 0.0, sweepAmount: 0.45, sweepRateHz: 0.12, sweepDepthMs: 3.5, sweepFeedback: 0.65 },
+      percussion: { shape: 'hpf', shapeValue: 150, reverbSend: 0.0, sweepAmount: 0.75, sweepRateHz: 0.08, sweepDepthMs: 4.0, sweepFeedback: 0.70 },
+      bass:       { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.0 },
+      lead:       { shape: 'hpf', shapeValue: 200, reverbSend: 0.0, sweepAmount: 0.50, sweepRateHz: 0.15, sweepDepthMs: 5.0, sweepFeedback: 0.65 },
+      chord:      { shape: 'hpf', shapeValue: 120, reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.10, sweepDepthMs: 3.0, sweepFeedback: 0.60 },
+      skank:      { shape: 'hpf', shapeValue: 120, reverbSend: 0.0, sweepAmount: 0.55, sweepRateHz: 0.12, sweepDepthMs: 4.0, sweepFeedback: 0.65 },
+      arpeggio:   { shape: 'hpf', shapeValue: 180, reverbSend: 0.0, sweepAmount: 0.35, sweepRateHz: 0.15, sweepDepthMs: 4.5, sweepFeedback: 0.62 },
+      pad:        { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.0 },
+      default:    { shape: 'hpf', shapeValue: 150, reverbSend: 0.0, sweepAmount: 0.45, sweepRateHz: 0.12, sweepDepthMs: 3.5, sweepFeedback: 0.65 },
     },
   },
   scientist: {
@@ -872,14 +874,14 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // constant spring saturation. Leads get a touch of plate air; everything
     // else stays analytical and clean.
     perChannelFxByRole: {
-      percussion: { filterMode: 'hpf', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
-      bass:       { filterMode: 'lpf', filterHz: 800, reverbSend: 0.0,  sweepAmount: 0.0 },
-      lead:       { filterMode: 'hpf', filterHz: 250, reverbSend: 0.25, sweepAmount: 0.0 },
-      chord:      { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
-      skank:      { filterMode: 'hpf', filterHz: 250, reverbSend: 0.10, sweepAmount: 0.0 },
-      arpeggio:   { filterMode: 'hpf', filterHz: 220, reverbSend: 0.20, sweepAmount: 0.0 },
-      pad:        { filterMode: 'off', filterHz: 200, reverbSend: 0.15, sweepAmount: 0.0 },
-      default:    { filterMode: 'hpf', filterHz: 180, reverbSend: 0.0,  sweepAmount: 0.0 },
+      percussion: { shape: 'hpf', shapeValue: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      bass:       { shape: 'lpf', shapeValue: 800, reverbSend: 0.0,  sweepAmount: 0.0 },
+      lead:       { shape: 'hpf', shapeValue: 250, reverbSend: 0.25, sweepAmount: 0.0 },
+      chord:      { shape: 'off', shapeValue: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      skank:      { shape: 'hpf', shapeValue: 250, reverbSend: 0.10, sweepAmount: 0.0 },
+      arpeggio:   { shape: 'hpf', shapeValue: 220, reverbSend: 0.20, sweepAmount: 0.0 },
+      pad:        { shape: 'off', shapeValue: 200, reverbSend: 0.15, sweepAmount: 0.0 },
+      default:    { shape: 'hpf', shapeValue: 180, reverbSend: 0.0,  sweepAmount: 0.0 },
     },
   },
   perry: {
@@ -946,14 +948,14 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // not from direct per-channel spring taps. Constant direct sends created a rolling reverb bed.
     // Phaser sweep is present but moderate — too high across all channels stacks into a wash.
     perChannelFxByRole: {
-      percussion: { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.65 },
-      bass:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.35, sweepRateHz: 0.10, sweepDepthMs: 5.5, sweepFeedback: 0.62 },
-      lead:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.45, sweepRateHz: 0.15, sweepDepthMs: 6.0, sweepFeedback: 0.68 },
-      chord:      { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.65 },
-      skank:      { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.42, sweepRateHz: 0.13, sweepDepthMs: 6.0, sweepFeedback: 0.66 },
-      arpeggio:   { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.14, sweepDepthMs: 5.5, sweepFeedback: 0.65 },
-      pad:        { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.30, sweepRateHz: 0.08, sweepDepthMs: 5.0, sweepFeedback: 0.60 },
-      default:    { filterMode: 'off', filterHz: 80,  reverbSend: 0.0, sweepAmount: 0.38, sweepRateHz: 0.12, sweepDepthMs: 5.5, sweepFeedback: 0.64 },
+      percussion: { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.65 },
+      bass:       { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.35, sweepRateHz: 0.10, sweepDepthMs: 5.5, sweepFeedback: 0.62 },
+      lead:       { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.45, sweepRateHz: 0.15, sweepDepthMs: 6.0, sweepFeedback: 0.68 },
+      chord:      { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.12, sweepDepthMs: 6.0, sweepFeedback: 0.65 },
+      skank:      { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.42, sweepRateHz: 0.13, sweepDepthMs: 6.0, sweepFeedback: 0.66 },
+      arpeggio:   { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.40, sweepRateHz: 0.14, sweepDepthMs: 5.5, sweepFeedback: 0.65 },
+      pad:        { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.30, sweepRateHz: 0.08, sweepDepthMs: 5.0, sweepFeedback: 0.60 },
+      default:    { shape: 'off', shapeValue: 80,  reverbSend: 0.0, sweepAmount: 0.38, sweepRateHz: 0.12, sweepDepthMs: 5.5, sweepFeedback: 0.64 },
     },
   },
   jammy: {
@@ -992,14 +994,14 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // Jammy-style minimalism: extremely selective routing, tight HPFs.
     // Only lead and pad get any reverb. Bass gets LPF to stay clean.
     perChannelFxByRole: {
-      percussion: { filterMode: 'hpf', filterHz: 80,  reverbSend: 0.0,  sweepAmount: 0.0 },
-      bass:       { filterMode: 'lpf', filterHz: 600, reverbSend: 0.15, sweepAmount: 0.0 },
-      lead:       { filterMode: 'hpf', filterHz: 120, reverbSend: 0.40, sweepAmount: 0.0 },
-      chord:      { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
-      skank:      { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
-      arpeggio:   { filterMode: 'off', filterHz: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
-      pad:        { filterMode: 'off', filterHz: 200, reverbSend: 0.30, sweepAmount: 0.0 },
-      default:    { filterMode: 'hpf', filterHz: 100, reverbSend: 0.0,  sweepAmount: 0.0 },
+      percussion: { shape: 'hpf', shapeValue: 80,  reverbSend: 0.0,  sweepAmount: 0.0 },
+      bass:       { shape: 'lpf', shapeValue: 600, reverbSend: 0.15, sweepAmount: 0.0 },
+      lead:       { shape: 'hpf', shapeValue: 120, reverbSend: 0.40, sweepAmount: 0.0 },
+      chord:      { shape: 'off', shapeValue: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      skank:      { shape: 'off', shapeValue: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      arpeggio:   { shape: 'off', shapeValue: 200, reverbSend: 0.0,  sweepAmount: 0.0 },
+      pad:        { shape: 'off', shapeValue: 200, reverbSend: 0.30, sweepAmount: 0.0 },
+      default:    { shape: 'hpf', shapeValue: 100, reverbSend: 0.0,  sweepAmount: 0.0 },
     },
   },
   madProfessor: {
@@ -1044,14 +1046,14 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     // the highest direct spring reverb send — "sub bass in reverb" is the
     // definitive Mad Prof texture. Leads swim in lush plate decay.
     perChannelFxByRole: {
-      percussion: { filterMode: 'hpf', filterHz: 80,  reverbSend: 0.0,  sweepAmount: 0.0 },
-      bass:       { filterMode: 'off', filterHz: 80,  reverbSend: 0.80, sweepAmount: 0.0 },
-      lead:       { filterMode: 'hpf', filterHz: 150, reverbSend: 0.75, sweepAmount: 0.0 },
-      chord:      { filterMode: 'hpf', filterHz: 120, reverbSend: 0.65, sweepAmount: 0.0 },
-      skank:      { filterMode: 'hpf', filterHz: 130, reverbSend: 0.55, sweepAmount: 0.0 },
-      arpeggio:   { filterMode: 'hpf', filterHz: 140, reverbSend: 0.60, sweepAmount: 0.0 },
-      pad:        { filterMode: 'off', filterHz: 80,  reverbSend: 0.90, sweepAmount: 0.0 },
-      default:    { filterMode: 'hpf', filterHz: 100, reverbSend: 0.50, sweepAmount: 0.0 },
+      percussion: { shape: 'hpf', shapeValue: 80,  reverbSend: 0.0,  sweepAmount: 0.0 },
+      bass:       { shape: 'off', shapeValue: 80,  reverbSend: 0.80, sweepAmount: 0.0 },
+      lead:       { shape: 'hpf', shapeValue: 150, reverbSend: 0.75, sweepAmount: 0.0 },
+      chord:      { shape: 'hpf', shapeValue: 120, reverbSend: 0.65, sweepAmount: 0.0 },
+      skank:      { shape: 'hpf', shapeValue: 130, reverbSend: 0.55, sweepAmount: 0.0 },
+      arpeggio:   { shape: 'hpf', shapeValue: 140, reverbSend: 0.60, sweepAmount: 0.0 },
+      pad:        { shape: 'off', shapeValue: 80,  reverbSend: 0.90, sweepAmount: 0.0 },
+      default:    { shape: 'hpf', shapeValue: 100, reverbSend: 0.50, sweepAmount: 0.0 },
     },
   },
 };

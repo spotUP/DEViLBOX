@@ -32,6 +32,7 @@ import { effectiveDubSend } from '@/lib/dub/sendAudibility';
 import { connectAudio } from './connectAudio';
 // Type-only: erased at build time, so it adds no edge to the module graph.
 import type { MixerChannelState } from '@stores/useMixerStore';
+import type { ChannelShapeKind } from '@/lib/dub/channelShape';
 
 /**
  * How long a channel's dub-send gain takes to reach its new value.
@@ -462,8 +463,6 @@ export class ChannelRoutedEffectsManager {
         const mixer = getMixerStoreRefOrNull();
         const chState = (mixer?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels?.[ch];
         if (chState) {
-          fx.setFilterMode(chState.dubFilterMode ?? 'off');
-          fx.setFilterHz(chState.dubFilterHz ?? 200);
           fx.setReverbSend(chState.dubReverbSend ?? 0);
           fx.setSweepAmount(chState.dubSweepAmount ?? 0);
           fx.setSweepRate(chState.dubSweepRateHz ?? 0.8);
@@ -471,11 +470,78 @@ export class ChannelRoutedEffectsManager {
           fx.setSweepFeedback(chState.dubSweepFeedback ?? 0.5);
         }
       } catch { /* ok — store may not be ready on first init */ }
+      this._applyShapeTo(ch, fx);
     } else {
       g.connect(busInput);
     }
     this.channelDubGains[ch] = g;
     return g;
+  }
+
+  // ── Sound-shaping slot ────────────────────────────────────────────
+  //
+  // The slot the user chose lives in the mixer store. A shape MOVE borrows
+  // the slot for its hold without writing the store (the user's choice is
+  // never clobbered): it pushes an override here, and releasing pops it, so
+  // the channel falls back to the next override or to the store. Nested moves
+  // on one channel release in any order.
+
+  private shapeOverrides = new Map<number, Array<{ token: number; kind: ChannelShapeKind; value: number }>>();
+  private shapeOverrideSeq = 0;
+
+  /** What the channel's slot should be now: the newest override, else the store. */
+  getEffectiveChannelShape(ch: number): { kind: ChannelShapeKind; value: number; heldByMove: boolean } {
+    const stack = this.shapeOverrides.get(ch);
+    const top = stack?.[stack.length - 1];
+    if (top) return { kind: top.kind, value: top.value, heldByMove: true };
+    const chState = (getMixerStoreRefOrNull()?.getState() as { channels?: MixerChannelState[] } | undefined)?.channels?.[ch];
+    return { kind: chState?.dubShape ?? 'off', value: chState?.dubShapeValue ?? 0, heldByMove: false };
+  }
+
+  /** Re-apply the effective slot to the channel's chain, if it has one yet. */
+  applyChannelShape(ch: number): void {
+    const fx = this.perChannelFx.get(ch);
+    if (fx) this._applyShapeTo(ch, fx);
+  }
+
+  private _applyShapeTo(ch: number, fx: import('../dub/PerChannelDubFx').PerChannelDubFx): void {
+    const { kind, value } = this.getEffectiveChannelShape(ch);
+    fx.setShape(kind, value);
+  }
+
+  /**
+   * Hold a channel's slot at `kind` for a move. Builds the channel's chain if
+   * the dub wiring exists, so a shape lands even on a channel whose send has
+   * not opened yet. Returns `update` (move the parameter mid-hold) and
+   * `release` (idempotent).
+   */
+  holdChannelShape(ch: number, kind: ChannelShapeKind, value: number): { update: (value: number) => void; release: () => void } {
+    const token = ++this.shapeOverrideSeq;
+    const entry = { token, kind, value };
+    const stack = this.shapeOverrides.get(ch) ?? [];
+    stack.push(entry);
+    this.shapeOverrides.set(ch, stack);
+    this._ensureDubChannel(ch);
+    this.applyChannelShape(ch);
+    let released = false;
+    return {
+      update: (v: number) => {
+        if (released) return;
+        entry.value = v;
+        this.applyChannelShape(ch);
+      },
+      release: () => {
+        if (released) return;
+        released = true;
+        const s = this.shapeOverrides.get(ch);
+        if (s) {
+          const i = s.findIndex((e) => e.token === token);
+          if (i >= 0) s.splice(i, 1);
+          if (s.length === 0) this.shapeOverrides.delete(ch);
+        }
+        this.applyChannelShape(ch);
+      },
+    };
   }
 
   /** Get the per-channel effect chain for a tracker channel. */
