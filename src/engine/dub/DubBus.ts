@@ -2972,7 +2972,7 @@ export class DubBus {
   /**
    * Keep `_preferChannelIsolation` in sync with the active editor mode.
    *
-   * `supportsChannelIsolation()` owns the list of modes whose engines expose
+   * `modeImpliesChannelIsolation()` owns the list of modes whose engines expose
    * real per-channel outputs. Lazily imported and subscribed (rather than a
    * static import) so DubBus keeps no load-time dependency on the format
    * store — the same pattern `setEchoRate` uses for useDrumPadStore.
@@ -2981,10 +2981,10 @@ export class DubBus {
     void Promise.all([
       import('@stores/useFormatStore'),
       import('@engine/tone/ChannelRoutedEffects'),
-    ]).then(([{ useFormatStore }, { supportsChannelIsolation }]) => {
+    ]).then(([{ useFormatStore }, { modeImpliesChannelIsolation }]) => {
       if (this._disposed) return;
       const apply = (mode: string): void => {
-        this._modeIsolation = supportsChannelIsolation(mode);
+        this._modeIsolation = modeImpliesChannelIsolation(mode);
         this._applyIsolationPreference(`editorMode="${mode}"`);
       };
       apply(useFormatStore.getState().editorMode);
@@ -5838,7 +5838,10 @@ export class DubBus {
       // not reported as a delta.
       returnGain: read(this._returnGainTarget(), () => this.return_.gain.value),
       inputGain: read(this._inputGainTarget(), () => this.input.gain.value),
-      feedbackGain: read(this.settings.sweepFeedback, () => this.feedback.gain.value),
+      // The setting drives the comb sweep's own loop. `this.feedback` is the
+      // siren loop, closed only while a siren is held, so pairing the two read
+      // a permanent -0.72 "fault" on a healthy bus (2026-10-06).
+      sweepFeedbackGain: read(Math.max(0, Math.min(0.85, this.settings.sweepFeedback)), () => this.sweepFeedback.gain.value),
       plateSend: read(this.settings.plateStageMix, () => (this.plateSend ? this.plateSend.gain.value : null)),
       sweepOutput: read(this.settings.sweepAmount, () => this.sweepOutput.gain.value),
       echoWet: read(this.settings.echoWet, () => this.echo.wet),
@@ -5863,6 +5866,10 @@ export class DubBus {
   registerChannelTap(channelId: number, tap: GainNode, baseline?: number): void {
     this.channelTaps.set(channelId, tap);
     this.channelTapBaselines.set(channelId, baseline ?? tap.gain.value);
+    // A channel output now feeds this tap: the engine isolates, whatever the
+    // mode presumed. Only when nothing reported yet - an engine that started
+    // and said it cannot isolate (Fred) keeps its word.
+    if (this._engineIsolation === null) this.setEngineIsolation(true);
   }
 
   /** Called by ChannelRoutedEffects on every fader write, so a move that

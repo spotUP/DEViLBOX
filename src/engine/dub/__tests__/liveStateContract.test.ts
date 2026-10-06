@@ -47,3 +47,11 @@ describe('getLiveState pairs desired with actual', () => {
     expect(READ_HANDLERS_SRC).toContain('liveState: bus?.getLiveState?.() ?? null');
   });
 });
+describe('getLiveState pairs a setting with the node that carries it', () => {
+  it('reports the sweep feedback setting against the sweep loop, not the siren loop', () => {
+    const body = DUB_BUS_SRC.slice(DUB_BUS_SRC.indexOf('getLiveState()'));
+    expect(body).toMatch(/sweepFeedbackGain: read\([^\n]*settings\.sweepFeedback[^\n]*this\.sweepFeedback\.gain\.value/);
+    // `this.feedback` is closed only while a siren is held; it rests at 0.
+    expect(body).not.toMatch(/read\([^\n]*sweepFeedback[^\n]*this\.feedback\.gain/);
+  });
+});
