@@ -1,3 +1,4 @@
+import { isTextEntryTarget } from '@/lib/keyboard/isTextEntryTarget';
 /**
  * useTrackerInput - FastTracker II Keyboard Input System
  * Composition hook that combines navigation, note input, and effect input sub-hooks.
@@ -233,11 +234,7 @@ export const useTrackerInput = () => {
       if (isKeyHandled(e)) return;
 
       // Ignore if typing in input field or operating a dropdown
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement
-      ) {
+      if (isTextEntryTarget(e.target)) {
         return;
       }
 

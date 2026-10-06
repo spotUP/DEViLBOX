@@ -1,3 +1,4 @@
+import { isTextEntryTarget } from '@/lib/keyboard/isTextEntryTarget';
 /**
  * useGlobalKeyboardHandler - Handles global keyboard shortcuts using configurable schemes
  * 
@@ -1927,13 +1928,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       // CodeMirror 6 uses a root div (.cm-editor) with tabindex but the contenteditable
       // is on the inner .cm-content child — so isContentEditable alone misses the case
       // where e.target is the root div itself (e.g. after Tab-key focus).
-      const target = e.target as HTMLElement;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target?.isContentEditable ||
-        !!target?.closest?.('.cm-editor')
-      ) {
+      if (isTextEntryTarget(e.target)) {
         return;
       }
 
@@ -2049,11 +2044,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
 
     // Handle keyup for hold-to-release commands (fader cut, crab, transformer, flare)
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target as HTMLElement)?.isContentEditable
-      ) {
+      if (isTextEntryTarget(e.target)) {
         return;
       }
 

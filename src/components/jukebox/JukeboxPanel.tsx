@@ -484,6 +484,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       <div
         ref={listRef}
         tabIndex={0}
+        data-captures-typing
         onKeyDown={onKeyDown}
         className="flex-1 min-h-0 overflow-y-auto font-mono text-[11px] outline-none"
       >
