@@ -15,6 +15,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { waveformVuLevel } from './waveformVuLevel';
 
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;       // per-frame decay at 60fps reference rate
@@ -147,11 +148,13 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
       let triggerLevels: number[];
       let triggerGens: number[];
       let realtimeLevels: number[] | null = null;
+      let engineLevels: number[] | null = null;
       try {
         const engine = getToneEngine();
         if (isRealtime) {
           realtimeLevels = engine.getChannelLevels(nc);
         }
+        engineLevels = engine.getEngineChannelLevels(nc);
         triggerLevels = engine.getChannelTriggerLevels(nc);
         triggerGens = engine.getChannelTriggerGenerations(nc);
       } catch {
@@ -220,11 +223,11 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
           // WASM per-channel oscilloscope (Cinter, Furnace, Hively, …): those play
           // via a direct-routed WASM engine so the ToneEngine channel meters above
           // stay silent. Derive the level from the channel waveform peak instead.
+          // An engine that reports its own levels (libopenmpt) is metered from
+          // those: its waveform capture bleeds the neighbouring channels.
           const oscD = oscChannelData ? oscChannelData[i] : null;
           if (oscD && oscD.length > 0) {
-            let peak = 0;
-            for (let k = 0; k < oscD.length; k++) { const a = Math.abs(oscD[k]); if (a > peak) peak = a; }
-            const target = peak / 32768;
+            const target = waveformVuLevel(engineLevels ? (engineLevels[i] || 0) : null, oscD);
             if (target > meter.level) meter.level = target;
           }
         }
