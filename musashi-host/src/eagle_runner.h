@@ -55,6 +55,13 @@ int eagle_subsong_current(void);
  * UADE_COMMAND_SONG_END_NOT_POSSIBLE. */
 void eagle_set_song_end_detection(int on);
 
+/* Write `len` bytes at `offset` into the module the player plays (the copy
+ * score hands the player at SCORE_MODULE_ADDR, and the file copy a player
+ * reopens): a grid edit re-encoded into the module. Players that read their
+ * song data from the module as they play hear it on their next read.
+ * Returns 0, or -1 when the range is outside the module. */
+int eagle_write_module(uint32_t offset, const uint8_t *data, size_t len);
+
 /* Player ticks since the (sub)song started: score calls the player's
  * DTP_Interrupt from CIA-A timer B (UADE counts the same timer,
  * cia.c uade_wasm_on_player_tick). A grid drawn `speed` ticks per row

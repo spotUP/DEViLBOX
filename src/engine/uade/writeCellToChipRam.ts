@@ -22,6 +22,13 @@
  *   3. TFMX direct-write (`song.tfmxFileData` + `song.uadePatternLayout`): the
  *      TFMX WASM engine reads its module bytes from `tfmxFileData`, so the
  *      re-encoded cell is written into that buffer in place.
+ *   4. Eagleplayer runner (`song.eaglePlayerFileData` + `song.uadePatternLayout`):
+ *      the format's own player runs on EaglePlayerEngine and reads its song
+ *      data from the module in its chip RAM, so the re-encoded cell goes
+ *      into that module (EaglePlayerEngine.writeModule) and into the song's
+ *      copy of it (the next load and the export play the edit). Such a song
+ *      is not in UADE, so the UADE chip-RAM write (1) is skipped for it - it
+ *      would land in whatever song UADE last held.
  *
  * Variable-length layouts (`song.uadeVariableLayout`) are re-encoded per channel
  * via `UADEChipEditor.rewriteVariablePattern`, not per cell, so they are not a
@@ -49,7 +56,7 @@ export async function writeCellToChipRam(
   const layout = song.uadePatternLayout;
 
   // 1. Fixed-length chip-RAM layout → patch chip RAM via the live UADE engine.
-  if (layout) {
+  if (layout && !song.eaglePlayerFileData) {
     try {
       if (UADEEngine.hasInstance()) {
         const editor = new UADEChipEditor(UADEEngine.getInstance());
@@ -85,5 +92,20 @@ export async function writeCellToChipRam(
         }
       }
     } catch { /* TFMX not active */ }
+  }
+
+  // 4. Eagleplayer runner: the module the player is playing, and the song's copy.
+  if (song.eaglePlayerFileData && layout) {
+    const offset = getCellFileOffset(layout, patternIdx, row, channel);
+    const buf = new Uint8Array(song.eaglePlayerFileData);
+    if (offset >= 0 && offset + layout.bytesPerCell <= buf.length) {
+      const stored = layout.encodeOverStored ? buf.slice(offset, offset + layout.bytesPerCell) : undefined;
+      const encoded = layout.encodeCell(cell, stored);
+      buf.set(encoded, offset);
+      try {
+        const { EaglePlayerEngine } = await import('../eagleplayer/EaglePlayerEngine');
+        if (EaglePlayerEngine.hasInstance()) EaglePlayerEngine.getInstance().writeModule(offset, encoded);
+      } catch { /* EaglePlayer not active */ }
+    }
   }
 }

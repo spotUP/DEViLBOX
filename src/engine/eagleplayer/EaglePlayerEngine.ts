@@ -176,6 +176,16 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
 
+  /**
+   * Write `bytes` at `offset` into the module the player is playing (a grid
+   * edit re-encoded by the song's layout, writeCellToChipRam): the player
+   * reads it the next time it reads that part of its song data.
+   */
+  writeModule(offset: number, bytes: Uint8Array): void {
+    const copy = bytes.slice();
+    this.workletNode?.port.postMessage({ type: 'writeModule', offset, bytes: copy.buffer }, [copy.buffer]);
+  }
+
   /** Bit N set = Paula voice N audible - the mixer's solo/mute. */
   setMuteMask(mask: number): void {
     this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });

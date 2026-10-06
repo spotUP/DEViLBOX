@@ -319,7 +319,7 @@ Phase 2 candidate (2026-10-05): tick-rebuilt grids on the generic UADE route bea
 ## Grid reverse-engineering program (owner, 2026-10-06)
 
 Owner: estimated grids are useless; reverse each format to its real data. Work list: thoughts/shared/research/2026-10-06_grid-provenance-per-format.md (A decoded 110 fmts/3772 songs, B partial 14/67, C estimated 82/168, D no grid 26/254). Acceptance per format: byte-exact decode->encode round trip on every corpus file, gridVsPaula near 1.0 and better than the current grid, edits reach the playing engine.
-- [ ] Sound Player (30) - agent running
+- [x] Sound Player (31) - decoded: rows walked per voice as the player does, byte-exact 31/31, gridVsPaula 1.00 every channel of all 31, edits write into the runner's module (thoughts/shared/research/2026-10-06_soundplayer-format.md)
 - [ ] Digital Sonix & Chrome (14) - agent running
 - [ ] MIDI Loriciel (13) - agent running
 - [ ] Jochen Hippel ST (8), DeliTracker customs .cus (5), Synth Dream (5, binary only), Custom Made (4), Fred Editor (B, 4), Jesper Olsen (4), Sound Master (B, 4), then Jason Brooke, Mark Cooksey, Speedy System, Beathoven, Forgotten Worlds, Riff Raff; B: Wally Beben, David Whittaker, Ben Daglish, SidMon 1, GlueMon, Tomy Tracker, Paul Robotham.

@@ -60,6 +60,11 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
         // data.index: 0-based into the player's subsong range.
         this.port.postMessage({ type: 'subsongStarted', index: this.startSubsong(data.index | 0), count: this.subsongCount() });
         break;
+      case 'writeModule':
+        // A grid edit re-encoded into the module: data.bytes at data.offset
+        // of the module the player is playing (ep_wasm_write_module).
+        this.writeModule(data.offset | 0, data.bytes);
+        break;
       case 'dispose':
         this.cleanup();
         break;
@@ -79,6 +84,18 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
     this.songEndSent = false;
     this.lastTicks = -1;
     return index;
+  }
+
+  writeModule(offset, bytes) {
+    const m = this.module;
+    if (!m || !this.loaded || !bytes) return;
+    const data = new Uint8Array(bytes);
+    const ptr = this.writeBytes(data, false);
+    if (!ptr) return;
+    if (m._ep_wasm_write_module(offset, ptr, data.length) !== 0) {
+      this.port.postMessage({ type: 'error', message: 'writeModule: ' + data.length + ' bytes at ' + offset + ' are outside the module' });
+    }
+    m._free(ptr);
   }
 
   writeBytes(bytes, zeroTerminate) {
