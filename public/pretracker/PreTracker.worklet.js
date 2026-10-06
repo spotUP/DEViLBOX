@@ -19,6 +19,8 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
     this.waveInfoPtr = 0;
     this.instInfoPtr = 0;
     this.processCount = 0;
+    this.lastReportedPos = -1;
+    this.lastReportedRow = -1;
 
     // Per-channel isolation (4 slots, matching Hively/Furnace pattern)
     this.isolationSlots = [null, null, null, null]; // { channelMask }
@@ -39,6 +41,8 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
         break;
 
       case 'loadModule':
+        this.lastReportedPos = -1;
+        this.lastReportedRow = -1;
         this.loadModuleData(data.moduleData);
         break;
 
@@ -658,6 +662,18 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
             }
           }
         }
+      }
+    }
+
+    // The replayer's own order position and row, posted when either moves
+    // (the engine hands them to the pattern editor as onPositionUpdate).
+    if (this.module && typeof this.module._player_get_position === 'function' && typeof this.module._player_get_row === 'function') {
+      const songPos = this.module._player_get_position();
+      const row = this.module._player_get_row();
+      if (songPos !== this.lastReportedPos || row !== this.lastReportedRow) {
+        this.lastReportedPos = songPos;
+        this.lastReportedRow = row;
+        this.port.postMessage({ type: 'position', songPos, row });
       }
     }
 

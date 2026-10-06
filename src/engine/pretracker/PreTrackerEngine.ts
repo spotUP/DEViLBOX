@@ -20,7 +20,7 @@ import {
 const meterFeed = new ChannelMeterFeed();
 
 /** PreTracker adds HEAP32 rewrite. */
-function preTrackerTransform(code: string): string {
+export function preTrackerTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -28,6 +28,11 @@ function preTrackerTransform(code: string): string {
     .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
     .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;')
     .replace(/HEAP32=new Int32Array\(b\);/, 'HEAP32=new Int32Array(b);Module["HEAP32"]=HEAP32;');
+}
+
+export interface PreTrackerPositionUpdate {
+  songPos: number;
+  row: number;
 }
 
 export interface PreTrackerMetadata {
@@ -139,6 +144,7 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
   private _rawInstInfoCallbacks: RawInstInfoCallback[] = [];
 
   private _position = 0;
+  private _positionCallbacks: Set<(update: PreTrackerPositionUpdate) => void> = new Set();
   private _row = 0;
 
   private constructor() {
@@ -170,6 +176,12 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
 
   get metadata(): PreTrackerMetadata | null { return this._metadata; }
   get position(): number { return this._position; }
+
+  /** The replayer's order position (the grid's pattern index) and row, as it moves. */
+  onPositionUpdate(cb: (update: PreTrackerPositionUpdate) => void): () => void {
+    this._positionCallbacks.add(cb);
+    return () => { this._positionCallbacks.delete(cb); };
+  }
   get row(): number { return this._row; }
 
   protected getLoaderConfig(): WASMLoaderConfig {
@@ -276,9 +288,13 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
           this._rawFileCallbacks = [];
           break;
 
-        case 'chLevels':
-          this._position = data.position ?? 0;
+        case 'position':
+          this._position = data.songPos ?? 0;
           this._row = data.row ?? 0;
+          for (const cb of this._positionCallbacks) cb({ songPos: this._position, row: this._row });
+          break;
+
+        case 'chLevels':
           try {
             const engine = getToneEngine();
             const levels: number[] = data.levels;
@@ -484,6 +500,7 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
 
   override dispose(): void {
     super.dispose();
+    this._positionCallbacks.clear();
     if (PreTrackerEngine.instance === this) {
       PreTrackerEngine.instance = null;
     }
