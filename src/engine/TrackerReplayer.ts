@@ -380,6 +380,12 @@ export interface TrackerSong {
   eaglePlayerId?: string;
   /** The module's own file name, which the eagleplayer opens it by. */
   eaglePlayerFileName?: string;
+  /**
+   * The grid was rebuilt from the player's Paula output (UADE scan), not
+   * decoded from the file. Owner, 2026-10-06: "guessing is pointless" - such a
+   * song shows the scope view until its format is reverse-engineered.
+   */
+  gridEstimated?: boolean;
   /** Subsong to start (0-based index into the player's min..max), the native subsong model's start field */
   eaglePlayerSubsong?: number;
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */

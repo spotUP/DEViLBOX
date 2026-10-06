@@ -81,4 +81,12 @@ describe('player-program formats open in the scope view', () => {
     const ym = new TextEncoder().encode('YM5!LeOnArD!').buffer;
     expect(scopeFormatLabel({ zxtuneFileData: ym })?.format).toBe('YM');
   });
+
+  it('a grid rebuilt from the Paula scan (a guess) opens in the scope view, not as editable patterns', () => {
+    // Owner, 2026-10-06: "guessing is pointless" - no estimated grids.
+    useFormatStore.getState().applyEditorMode({ gridEstimated: true, uadeEditableFileData: bytes(), uadeEditableFileName: 'x.cus' });
+    expect(useFormatStore.getState().editorMode).toBe('sc68');
+    useFormatStore.getState().applyEditorMode({ uadeEditableFileData: bytes(), uadeEditableFileName: 'x.mod' });
+    expect(useFormatStore.getState().editorMode).toBe('classic');
+  });
 });
