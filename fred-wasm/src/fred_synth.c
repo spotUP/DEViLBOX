@@ -53,6 +53,9 @@
 #define WAVE_SIZE       64        /* samples per oscillator period */
 #define ARP_SIZE        16        /* max arpeggio table entries */
 #define MAX_PLAYERS      8
+/* fred_render_multi (fred-replayer-wasm) writes every voice as sample * volume / 256 * 0.5. */
+#define VOICE_SCALE     0.5f
+#define PAL_CLOCK       3546895.0 /* Paula clock / 2 */
 #define TICKS_PER_SEC   50        /* Amiga ~50 Hz tick rate */
 
 /* Amiga period table for one octave (C-1 period = 856). We use full range. */
@@ -94,6 +97,7 @@ typedef struct {
   uint8_t  pulseDelay;
   int8_t   arpTable[ARP_SIZE];
   uint16_t relative;            /* period multiplier / 1024 */
+  uint16_t length;              /* synth wave length in bytes (instrument record word 3, <<1) */
 
   /* --- playback state --- */
   int      loaded;
@@ -101,22 +105,22 @@ typedef struct {
 
   /* Oscillator */
   double   phase;               /* fractional position in [0, WAVE_SIZE) */
-  double   phaseInc;            /* samples per WAVE_SIZE step */
+  double   phaseInc;            /* WAVE_SIZE steps per output sample */
 
-  /* ADSR */
+  /* Replayer channel state (FredChannelInfo): everything below is what the
+     song replayer keeps per voice, stepped once per 50 Hz tick. */
   EnvStage envStage;
-  float    envVol;              /* current volume 0.0 .. 64.0 */
-  int      envTick;             /* ticks remaining in current step */
-  int      sustainTick;         /* ticks remaining in sustain */
-
-  /* Vibrato */
-  int      vibTick;             /* ticks elapsed since note_on */
-  float    vibPhase;            /* LFO phase [0, 2π) */
-
-  /* Arpeggio */
-  int      arpStep;             /* current table index */
-  int      arpTick;             /* ticks remaining for current step */
-  int      arpSemitoneOffset;   /* semitone offset currently applied */
+  int16_t  trackVolume;         /* 0..255, attack/decay/release steps are volume units per tick */
+  int      sustainDelay;        /* ticks left in sustain */
+  int      trackNote;           /* note byte (PeriodTable index) */
+  uint8_t  arpPosition;
+  uint8_t  arpCountdown;
+  uint8_t  vibDelay;
+  int8_t   vibValue;
+  uint8_t  vibFlags;            /* 1 = rising, 2 = period direction */
+  int      period;              /* Amiga period after arpeggio and vibrato */
+  float    volume;              /* 0..1 amplitude the envelope gives */
+  float    gain;                /* set_param 0 */
 
   /* PWM */
   float    pulsePos;            /* current pulse width [0, 64] */
@@ -134,21 +138,6 @@ typedef struct {
 
 static FredPlayer g_players[MAX_PLAYERS];
 static float      g_sampleRate = 44100.0f;
-
-/* ── Frequency helpers ──────────────────────────────────────────────────────── */
-
-/* Convert MIDI note to frequency in Hz (A4 = 69 = 440 Hz) */
-static double midiToFreq(int midi) {
-  return 440.0 * pow(2.0, (midi - 69) / 12.0);
-}
-
-/* Apply Fred's relative tuning (period multiplier / 1024). */
-/* Fred uses Amiga-style periods: lower period = higher pitch.              */
-/* relative = 1024 means no change. relative > 1024 lowers pitch.          */
-static double applyRelative(double freq, uint16_t relative) {
-  if (relative == 0 || relative == 1024) return freq;
-  return freq * 1024.0 / (double)relative;
-}
 
 /* ── PWM waveform sample ────────────────────────────────────────────────────── */
 
@@ -172,74 +161,52 @@ static float pwmSample(double phase, float pulsePos) {
 static void fredTick(FredPlayer* p) {
   if (!p->active) return;
 
-  /* --- ADSR --- */
+  /* Arpeggio (Lab2 ModifySound): the note byte plus the table entry, wrapping as a byte. */
+  uint8_t newNote = (uint8_t)(p->trackNote + p->arpTable[p->arpPosition % ARP_SIZE]);
+  if (--p->arpCountdown == 0) {
+    p->arpCountdown = p->arpeggioSpeed;
+    if (++p->arpPosition >= p->arpeggioLimit) p->arpPosition = 0;
+  }
+  int period = (int)floor(1024.0 * pow(2.0, -((double)newNote - 36.0) / 12.0) * (double)p->relative / 1024.0);
+
+  /* Vibrato: a triangle in period units, delayed. */
+  if (p->vibDelay != 0) {
+    p->vibDelay--;
+  } else if (p->vibFlags != 0) {
+    if (p->vibFlags & 1) {
+      p->vibValue = (int8_t)(p->vibValue + (int8_t)p->vibratoSpeed);
+      if (p->vibValue == (int8_t)p->vibratoDepth) p->vibFlags &= ~1;
+    } else {
+      p->vibValue = (int8_t)(p->vibValue - (int8_t)p->vibratoSpeed);
+      if (p->vibValue == 0) p->vibFlags |= 1;
+    }
+    if (p->vibValue == 0) p->vibFlags ^= 2;
+    period += (p->vibFlags & 2) ? p->vibValue : -p->vibValue;
+  }
+  p->period = period < 1 ? 1 : period;
+
+  /* Envelope: speeds are volume units per tick, volumes 0..255 (modify_sound). */
   switch (p->envStage) {
     case ENV_ATTACK:
-      p->envTick--;
-      if (p->envTick <= 0) {
-        p->envVol += 1.0f;
-        if (p->envVol >= (float)p->attackVol) {
-          p->envVol = (float)p->attackVol;
-          p->envStage = ENV_DECAY;
-        }
-        p->envTick = (p->attackSpeed > 0) ? p->attackSpeed : 1;
-      }
+      p->trackVolume += p->attackSpeed;
+      if (p->trackVolume >= p->attackVol) { p->trackVolume = p->attackVol; p->envStage = ENV_DECAY; }
       break;
     case ENV_DECAY:
-      p->envTick--;
-      if (p->envTick <= 0) {
-        p->envVol -= 1.0f;
-        if (p->envVol <= (float)p->decayVol) {
-          p->envVol = (float)p->decayVol;
-          p->envStage = ENV_SUSTAIN;
-          p->sustainTick = p->sustainTime;
-        }
-        p->envTick = (p->decaySpeed > 0) ? p->decaySpeed : 1;
-      }
+      p->trackVolume -= p->decaySpeed;
+      if (p->trackVolume <= p->decayVol) { p->trackVolume = p->decayVol; p->envStage = ENV_SUSTAIN; }
       break;
     case ENV_SUSTAIN:
-      if (p->sustainTime > 0) {
-        p->sustainTick--;
-        if (p->sustainTick <= 0) {
-          p->envStage = ENV_RELEASE;
-          p->envTick = (p->releaseSpeed > 0) ? p->releaseSpeed : 1;
-        }
-      }
-      /* else: sustain until note_off */
+      if (p->sustainDelay == 0) p->envStage = ENV_RELEASE; else p->sustainDelay--;
       break;
     case ENV_RELEASE:
-      p->envTick--;
-      if (p->envTick <= 0) {
-        p->envVol -= 1.0f;
-        if (p->envVol <= (float)p->releaseVol) {
-          p->envVol = (float)p->releaseVol;
-          p->envStage = ENV_OFF;
-          p->active = 0;
-        }
-        p->envTick = (p->releaseSpeed > 0) ? p->releaseSpeed : 1;
-      }
+      p->trackVolume -= p->releaseSpeed;
+      if (p->trackVolume <= p->releaseVol) { p->trackVolume = p->releaseVol; p->envStage = ENV_OFF; }
       break;
     case ENV_OFF:
-      p->active = 0;
-      return;
+      break;
   }
-
-  /* --- Arpeggio --- */
-  if (p->arpeggioLimit > 0) {
-    p->arpTick--;
-    if (p->arpTick <= 0) {
-      p->arpStep = (p->arpStep + 1) % p->arpeggioLimit;
-      p->arpSemitoneOffset = (int)p->arpTable[p->arpStep];
-      p->arpTick = (p->arpeggioSpeed > 0) ? p->arpeggioSpeed : 1;
-    }
-  }
-
-  /* --- Vibrato --- */
-  p->vibTick++;
-  if (p->vibTick > p->vibratoDelay && p->vibratoDepth > 0 && p->vibratoSpeed > 0) {
-    p->vibPhase += (float)(2.0 * M_PI / (p->vibratoSpeed * (double)p->samplesPerTick / WAVE_SIZE + 1.0));
-    if (p->vibPhase >= (float)(2.0 * M_PI)) p->vibPhase -= (float)(2.0 * M_PI);
-  }
+  /* The replayer's mixer: channel volume = EnvVol * TrackVolume / 256, applied as volume / 256. */
+  p->volume = ((float)((int)p->envelopeVol * (int)p->trackVolume / 256)) / 256.0f;
 
   /* --- PWM modulation --- */
   if (p->pulseDelayTick > 0) {
@@ -285,6 +252,7 @@ int fred_create_player(void) {
       memset(&g_players[i], 0, sizeof(FredPlayer));
       g_players[i].sampleRate = g_sampleRate;
       g_players[i].samplesPerTick = g_sampleRate / (double)TICKS_PER_SEC;
+      g_players[i].gain = 1.0f;
       g_players[i].loaded = 1;
       return i;
     }
@@ -327,6 +295,7 @@ void fred_load_instrument(int handle, const uint8_t* blob, int blobLen) {
     p->arpTable[i] = (int8_t)blob[19 + i];
   }
   p->relative = (uint16_t)(blob[35] | ((uint16_t)blob[36] << 8));
+  p->length   = blobLen >= 39 ? (uint16_t)(blob[37] | ((uint16_t)blob[38] << 8)) : 0;
   p->active   = 0;
   p->loaded   = 1;
 }
@@ -337,33 +306,18 @@ void fred_note_on(int handle, int midiNote, int velocity) {
   FredPlayer* p = &g_players[handle];
   if (!p->loaded) return;
 
-  /* Apply arpeggio offset to base note */
-  int note = midiNote;
-  if (note < 0) note = 0;
-  if (note > 127) note = 127;
-
-  double freq = midiToFreq(note);
-  freq = applyRelative(freq, p->relative);
-
-  /* Phase increment: how much phase advances per audio sample */
-  /* One full wave period = WAVE_SIZE samples at the nominal 50 Hz tick rate */
-  p->phaseInc = freq * WAVE_SIZE / g_sampleRate;
-  p->phase    = 0.0;
-
-  /* Reset ADSR */
-  p->envVol     = (float)p->envelopeVol;
-  p->envStage   = ENV_ATTACK;
-  p->envTick    = (p->attackSpeed > 0) ? p->attackSpeed : 1;
-  p->sustainTick = p->sustainTime;
-
-  /* Reset vibrato */
-  p->vibTick  = 0;
-  p->vibPhase = 0.0f;
-
-  /* Reset arpeggio */
-  p->arpStep           = 0;
-  p->arpTick           = (p->arpeggioSpeed > 0) ? p->arpeggioSpeed : 1;
-  p->arpSemitoneOffset = 0;
+  /* The note byte is the PeriodTable index: PeriodTable[n] * InsPer >> 10 (grid note n - 11). */
+  p->trackNote = midiNote < 0 ? 0 : midiNote > 127 ? 127 : midiNote;
+  p->phase = 0.0;
+  p->arpPosition = 0;
+  p->arpCountdown = p->arpeggioSpeed;
+  p->vibDelay = p->vibratoDelay;
+  p->vibValue = 0;
+  p->vibFlags = 3;
+  p->envStage = ENV_ATTACK;
+  p->trackVolume = 0;
+  p->sustainDelay = p->sustainTime;
+  p->tickAccum = 0.0;
 
   /* Reset PWM */
   p->pulsePos       = (float)((p->pulsePosL + p->pulsePosH) / 2);
@@ -372,18 +326,16 @@ void fred_note_on(int handle, int midiNote, int velocity) {
   p->pulseDelayTick = p->pulseDelay;
 
   p->active = 1;
+  fredTick(p); /* the note's own line runs ModifySound too */
   (void)velocity;
 }
 
 EMSCRIPTEN_KEEPALIVE
 void fred_note_off(int handle) {
   if (handle < 0 || handle >= MAX_PLAYERS) return;
-  FredPlayer* p = &g_players[handle];
-  if (!p->active) return;
-  if (p->envStage == ENV_SUSTAIN || p->envStage == ENV_ATTACK || p->envStage == ENV_DECAY) {
-    p->envStage = ENV_RELEASE;
-    p->envTick  = (p->releaseSpeed > 0) ? p->releaseSpeed : 1;
-  }
+  /* A pause ($84) and the tick before the next note mute the voice (mix_mute); the
+     envelope's release stage only runs when the sustain time ends. */
+  g_players[handle].active = 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -412,24 +364,14 @@ void fred_render(int handle, float* outL, float* outR, int numSamples) {
       }
     }
 
-    /* Compute arpeggio-adjusted phase increment */
-    double freq = midiToFreq(60 + p->arpSemitoneOffset) / midiToFreq(60);
-    double inc  = p->phaseInc * freq;
+    /* Pitch: Paula plays a wave of `length` bytes at one byte per period * 0.2819 us. */
+    double len = p->length ? (double)p->length : (double)WAVE_SIZE;
+    double inc = (PAL_CLOCK / ((double)p->period * len)) * WAVE_SIZE / (double)g_sampleRate;
+    p->phaseInc = inc;
 
-    /* Vibrato — modulate frequency with delayed sine LFO */
-    if (p->vibTick > (int)p->vibratoDelay && p->vibratoDepth > 0) {
-      float vibSemitones = sinf(p->vibPhase) * (float)p->vibratoDepth / 64.0f;
-      float vibFactor    = powf(2.0f, vibSemitones / 12.0f);
-      inc *= (double)vibFactor;
-    }
-
-    /* Generate PWM sample */
+    /* Generate PWM sample at the replayer's channel level */
     float sample = pwmSample(p->phase, p->pulsePos);
-
-    /* Scale by envelope volume (0-64) and normalize to [-1, +1] */
-    /* Max amplitude: 127 * 64 / (127 * 64) = 1.0 */
-    float vol = p->envVol / 64.0f;
-    float out = sample * vol / 128.0f;
+    float out = sample / 128.0f * p->volume * VOICE_SCALE * p->gain;
 
     outL[i] = out;
     outR[i] = out;
@@ -446,7 +388,7 @@ void fred_set_param(int handle, int paramId, float value) {
   if (handle < 0 || handle >= MAX_PLAYERS) return;
   FredPlayer* p = &g_players[handle];
   switch (paramId) {
-    case 0: p->envVol = value * 64.0f; break;  /* volume 0-1 → 0-64 */
+    case 0: p->gain = value; break;  /* output gain, 1 = the replayer's level */
     default: break;
   }
 }
@@ -456,7 +398,7 @@ float fred_get_param(int handle, int paramId) {
   if (handle < 0 || handle >= MAX_PLAYERS) return 0.0f;
   FredPlayer* p = &g_players[handle];
   switch (paramId) {
-    case 0: return p->envVol / 64.0f;
+    case 0: return p->gain;
     default: return 0.0f;
   }
 }

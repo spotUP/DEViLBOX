@@ -361,6 +361,8 @@ export interface FredConfig {
   pulsePosH:     number;
   pulseDelay:    number;
   relative:      number;
+  /** Synth wave length in bytes (record word 3 << 1); the preview's pitch is clock / (period * length). */
+  length?:       number;
 }
 
 /**
