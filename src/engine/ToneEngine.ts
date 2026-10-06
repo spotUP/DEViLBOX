@@ -5503,6 +5503,8 @@ export class ToneEngine {
     }
     return result;
   }
+  /** Per-channel levels an engine reported itself in the last 100 ms (libopenmpt, AdPlug), else null. */
+  public getEngineChannelLevels(numChannels: number): number[] | null { return _getRealtimeChannelLevels(this.channelMeter, numChannels); }
   /** Update realtime per-channel levels from WASM engines */
   public updateRealtimeChannelLevels(levels: number[]): void { _updateRealtimeChannelLevels(this.channelMeter, levels); }
   /** Get the master level (0-1) from masterEffectsInput where all audio converges */
