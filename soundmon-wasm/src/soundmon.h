@@ -39,6 +39,13 @@ float sm_get_instrument_param(const SmModule* module, int inst, const char* para
 void sm_set_instrument_param(SmModule* module, int inst, const char* param, float value);
 size_t sm_export(const SmModule* module, uint8_t* out, size_t max_size);
 
+// Keyboard preview: a fifth voice of the loaded module driven by the replayer's
+// own note start, effect and synth code (see soundmon.c).
+void sm_preview_note_on(SmModule* module, int inst, int note, int volume);
+void sm_preview_note_off(SmModule* module);
+int sm_preview_active(const SmModule* module);
+size_t sm_render_preview(SmModule* module, float* out_l, float* out_r, size_t frames);
+
 
 #ifdef __cplusplus
 }

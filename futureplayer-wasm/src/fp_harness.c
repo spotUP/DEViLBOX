@@ -136,6 +136,10 @@ EXPORT void fp_wasm_note_off(void) {
     fp_note_off();
 }
 
+EXPORT int fp_wasm_preview_active(void) {
+    return initialized && fp_is_preview_active();
+}
+
 EXPORT int fp_wasm_render_preview(float* buffer, int frames) {
     if (!initialized || !fp_is_preview_active()) {
         memset(buffer, 0, frames * 2 * sizeof(float));
