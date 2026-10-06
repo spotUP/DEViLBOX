@@ -469,7 +469,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'eaglePlayerFileData',
     loadMethod: 'loadTune',
-    getLoadArgs: (song: TrackerSong) => [song.eaglePlayerId, song.name],
+    getLoadArgs: (song: TrackerSong) => [song.eaglePlayerId, song.eaglePlayerFileName ?? song.name],
     supportsPause: true,
     supportsResume: true,
     needsDirectRouting: true,

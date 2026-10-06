@@ -126,6 +126,7 @@ export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
   if (state.asapFilename) result.asapFilename = state.asapFilename;
   // The eagleplayer is chosen by id: the module bytes alone do not name it.
   if (state.eaglePlayerId) result.eaglePlayerId = state.eaglePlayerId;
+  if (state.eaglePlayerFileName) result.eaglePlayerFileName = state.eaglePlayerFileName;
   if (state.uadeEditableSubsongs) result.uadeEditableSubsongs = state.uadeEditableSubsongs;
   if (state.editorMode !== 'classic') result.editorMode = state.editorMode;
   // The parser's song format (ASAP, MDX, PiyoPiyo...): engines gated on a

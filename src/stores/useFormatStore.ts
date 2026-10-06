@@ -141,6 +141,8 @@ export interface FormatStore {
   /** Module + eagleplayer for EaglePlayerEngine (eaglePlayerFormats.ts) */
   eaglePlayerFileData: ArrayBuffer | null;
   eaglePlayerId: string | null;
+  /** The module's file name, which the eagleplayer opens it by. */
+  eaglePlayerFileName: string | null;
   /** Whole-file data for the ASAP, mdxmini and pmdmini engines: absent from the store until 2026-10-05, so the live song never carried them and their engines never started from a store rebuild. */
   asapFileData: ArrayBuffer | null;
   mdxminiFileData: ArrayBuffer | null;
@@ -545,6 +547,7 @@ export const useFormatStore = create<FormatStore>()(
     stoneTrackerSampleData: null,
     eaglePlayerFileData: null,
     eaglePlayerId: null,
+    eaglePlayerFileName: null,
     asapFileData: null,
     mdxminiFileData: null,
     pmdFileData: null,
@@ -1121,6 +1124,7 @@ export const useFormatStore = create<FormatStore>()(
         state.stoneTrackerSampleData = (song as any).stoneTrackerSampleData ?? null;
         state.eaglePlayerFileData = (song as any).eaglePlayerFileData ?? null;
         state.eaglePlayerId = (song as any).eaglePlayerId ?? null;
+        state.eaglePlayerFileName = (song as any).eaglePlayerFileName ?? null;
         state.asapFileData = (song as any).asapFileData ?? null;
         state.mdxminiFileData = (song as any).mdxminiFileData ?? null;
         state.pmdFileData = (song as any).pmdFileData ?? null;
@@ -1457,6 +1461,7 @@ export const useFormatStore = create<FormatStore>()(
       state.stoneTrackerSampleData = null;
       state.eaglePlayerFileData = null;
       state.eaglePlayerId = null;
+      state.eaglePlayerFileName = null;
       state.asapFileData = null;
       state.mdxminiFileData = null;
       state.pmdFileData = null;

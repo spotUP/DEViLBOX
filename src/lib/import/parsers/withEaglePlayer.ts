@@ -23,10 +23,14 @@ const UADE_SYNTHS = new Set(['UADESynth', 'UADEEditableSynth']);
  * on it, UADE's playback fields come off, and instruments that would start
  * UADE (classic UADESynth / UADEEditableSynth) become plain samplers.
  */
-export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: ArrayBuffer): TrackerSong {
+export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: ArrayBuffer, fileName: string): TrackerSong {
   if (!EAGLE_PLAYER_FORMATS[formatId]) throw new Error(`withEaglePlayer: unknown format ${formatId}`);
   song.eaglePlayerFileData = module.slice(0);
   song.eaglePlayerId = formatId;
+  // The player opens the module (and its companions) by file name: the real
+  // one, not the song's display name ('primemover 07 [Anders 0land]' left
+  // suffix-named songs silent in the app, 2026-10-06).
+  song.eaglePlayerFileName = fileName;
   delete song.uadeEditableFileData;
   delete song.uadeEditableFileName;
   for (const inst of song.instruments) {
@@ -62,5 +66,5 @@ export async function withEaglePlayer(
       console.warn(`[withEaglePlayer] ${formatId}: no UADE grid for ${ctx.originalFileName}: ${(e as Error).message}`);
     }
   }
-  return playOnEaglePlayer(song, formatId, ctx.buffer);
+  return playOnEaglePlayer(song, formatId, ctx.buffer, ctx.originalFileName);
 }
