@@ -551,6 +551,7 @@ export async function parseSidMon2File(
       pcmData: pcm,
       loopStart,
       loopLength,
+      songSlot: i,
     };
 
     const uadeChipRam: UADEChipRamInfo = {

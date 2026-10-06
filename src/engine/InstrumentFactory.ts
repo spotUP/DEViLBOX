@@ -723,7 +723,8 @@ export class InstrumentFactory {
 
       case 'SidMonSynth': {
         const sidSynth = new SidMonSynth();
-        if (config.sidMon) {
+        sidSynth.setSongSlot(config.sidMon?.songSlot ?? 0);
+        if (config.sidMon && !config.sidMon.songSlot) {
           sidSynth.setInstrument(config.sidMon).catch(err =>
             console.error('[InstrumentFactory] SidMon load failed:', err)
           );

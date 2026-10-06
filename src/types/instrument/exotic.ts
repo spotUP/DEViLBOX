@@ -165,6 +165,12 @@ export interface SidMonConfig {
   loopStart?: number;
   loopLength?: number;
   finetune?: number;          // -8..+7
+  /**
+   * 1-based instrument of the loaded SidMon II module (the parser's id). When set,
+   * a typed key plays that instrument on the replayer's own preview voice
+   * (Sd2Engine / sd2_note_on) instead of the generic per-note voice.
+   */
+  songSlot?: number;
 }
 
 /**
