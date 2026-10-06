@@ -18,7 +18,9 @@ import { exposeHeapTransform, previewVoice as previewVoiceNote, previewRender, r
 import { parseFCFile } from '@/lib/import/formats/FCParser';
 import { serializeFCConfig } from '@/engine/fc/FCSynth';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { noteToMidi } from '@/lib/xmConversions';
 import { parseSidMon1File } from '@/lib/import/formats/SidMon1Parser';
+import { parseSidMon2File } from '@/lib/import/formats/SidMon2Parser';
 import { serializeSidMon1Config } from '@/engine/sidmon1/SidMon1Synth';
 import { sm1IndexToXM } from '@/engine/uade/encoders/SidMon1Encoder';
 
@@ -200,5 +202,41 @@ describe('SidMon 1 keyboard preview is the instrument as the song plays it', () 
     renderTicks(proc, 2);
     await send({ type: 'noteOff', handle });
     expect(Math.max(...renderTicks(proc, 1).map(Math.abs))).toBe(0);
+  });
+});
+
+// ── Instrument gain ────────────────────────────────────────────────────────────
+
+describe('synth voices that already render at the replayer level carry no extra gain', () => {
+  it('FC and SidMon 1 synth instruments sit at 0 dB (the voices are the replayer voice, level for level)', async () => {
+    const fc = await parseFCFile(ab(bytes('anthrox.fc')), 'anthrox.fc');
+    const sm1 = parseSidMon1File(songBuffer('public/data/songs/formats/anarchy.sid1').slice(0), 'anarchy.sid1');
+    for (const [song, type] of [[fc, 'FCSynth'], [sm1, 'SidMon1Synth']] as const) {
+      const synths = song.instruments.filter((i) => i.synthType === type);
+      expect(synths.length, type).toBeGreaterThan(0);
+      synths.forEach((i) => expect(i.volume, `${type} ${i.id}`).toBe(0));
+    }
+  });
+});
+
+// ── SidMon 2 ───────────────────────────────────────────────────────────────────
+
+describe('SidMon 2 sampler instruments play a typed key at the replayer rate of that grid note', () => {
+  it('bruno_time.sid2: grid note x (XM) is period index x - 12 and plays the sample at 3546895 / period Hz', async () => {
+    // The replayer's own table (sidmon2.c s_periods), read from its source.
+    const src = readFileSync(resolve(ROOT, 'sidmon2-wasm/src/sd2/sidmon2.c'), 'utf8');
+    const table = src.match(/s_periods\[\] = \{([\s\S]*?)\};/)![1].split(',').map((v) => parseInt(v.trim(), 10));
+    expect(table.length).toBe(73);
+    const song = await parseSidMon2File(songBuffer('public/data/songs/formats/bruno_time.sid2'), 'bruno_time.sid2');
+    const withSample = song.instruments.filter((i) => i.sample);
+    expect(withSample.length).toBeGreaterThan(0);
+    withSample.forEach((inst) => {
+      const base = noteToMidi(inst.sample!.baseNote ?? 'C4');
+      for (let idx = 1; idx <= 72; idx++) {
+        const key = idx + 12 + 11; // grid note idx + 12, key = grid note + 11
+        const rate = inst.sample!.sampleRate! * Math.pow(2, (key - base) / 12);
+        expect(Math.abs(rate / (3546895 / table[idx]) - 1), `note index ${idx}`).toBeLessThan(0.012);
+      }
+    });
   });
 });

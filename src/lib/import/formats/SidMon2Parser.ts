@@ -53,6 +53,14 @@ const PERIODS = [
    180,  170,  160,  151,  143,  135,  127,  120,  113,  107,  101,   95,
 ];
 
+/**
+ * A SidMon II sample plays at 3546895 / period Hz (sidmon2.c: s_periods[note]), and the grid
+ * names note index n (1-72) XM note n + 12, so keyboard C-4 (XM 49, MIDI 60) is index 37. The
+ * sampler's buffer carries the rate that note plays it at, on base note C-4.
+ */
+export const SIDMON2_PCM_BASE_NOTE = 'C4';
+export const SIDMON2_PCM_RATE = Math.round(3546895 / PERIODS[37]);
+
 // -- Internal data structures -------------------------------------------------
 
 interface S2Step {
@@ -560,7 +568,7 @@ export async function parseSidMon2File(
     };
 
     // Attach sample data for the sample editor when PCM is available
-    const sampleUrl = pcm && pcm.length > 0 ? pcm8ToWavDataUrl(pcm) : undefined;
+    const sampleUrl = pcm && pcm.length > 0 ? pcm8ToWavDataUrl(pcm, SIDMON2_PCM_RATE) : undefined;
     const loopEnabled = loopLength > 2 && loopStart >= 0;
 
     trackerInstruments.push({
@@ -576,8 +584,8 @@ export async function parseSidMon2File(
       ...(sampleUrl ? {
         sample: {
           url: sampleUrl,
-          sampleRate: 8363,
-          baseNote: 'C4',
+          sampleRate: SIDMON2_PCM_RATE,
+          baseNote: SIDMON2_PCM_BASE_NOTE,
           detune: 0,
           loop: loopEnabled,
           loopType: loopEnabled ? 'forward' as const : 'off' as const,
