@@ -17,7 +17,8 @@ describe('libopenmpt-processor', () => {
     let Ctor!: new (o: unknown) => Proc;
     (globalThis as Record<string, unknown>).AudioWorkletProcessor = class { port = { postMessage() {}, onmessage: null }; };
     (globalThis as Record<string, unknown>).registerProcessor = (_n: string, c: unknown) => { Ctor = c as typeof Ctor; };
-    await import('../../../../public/chiptune3/chiptune3.worklet.js');
+    const workletPath: string = '../../../../public/chiptune3/chiptune3.worklet.js';
+    await import(/* @vite-ignore */ workletPath);
 
     const procs = Array.from({ length: 10 }, () => new Ctor({}));
     procs.forEach((p) => p.handleMessage_({ data: { cmd: 'dispose' } }));
