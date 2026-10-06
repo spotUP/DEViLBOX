@@ -406,7 +406,23 @@ export interface HippelCoSoSampleEntry {
 /**
  * Jochen Hippel CoSo instrument configuration.
  */
+/**
+ * One sample of the CoSo bank with its bytes, for the samples a sound sequence
+ * switches to. Header fields are the file's own (length and repeatLength in
+ * bytes, loopStart the raw header word the player adds to the sample start).
+ */
+export interface HippelCoSoSampleData {
+  index: number;
+  length: number;
+  loopStart: number;
+  repeatLength: number;
+  /** Signed-byte PCM as stored, as unsigned 0-255, from the sample start. */
+  pcm: number[];
+}
+
 export interface HippelCoSoConfig {
+  /** Sound-sample data the sequence references, so the voice can play it. */
+  samples?: HippelCoSoSampleData[];
   fseq:     number[];
   vseq:     number[];
   volSpeed: number;

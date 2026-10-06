@@ -25,6 +25,9 @@ import { OctaMEDSynth } from '@/engine/octamed/OctaMEDSynth';
 import { startWorklet } from './workletHarness';
 import { noteToMidi } from '@/utils/audio-context';
 import { buildMedSynthModule, type MedSynthFixture } from './medSynthFixture';
+import { parseHippelCoSoFile } from '@/lib/import/formats/HippelCoSoParser';
+import { serializeHippelCoSoConfig } from '@/engine/hippelcoso/HippelCoSoSynth';
+import type { HippelCoSoConfig } from '@/types/instrument';
 import type { OctaMEDConfig } from '@/types/instrument';
 
 const PAULA_CLOCK = 3546895;
@@ -194,4 +197,56 @@ describe('OctaMED sampler instruments: a typed key plays the Paula period UADE p
       expect(Math.abs(cents(previewRate, songRate)), `preview ${previewRate.toFixed(0)} Hz, UADE ${songRate.toFixed(0)} Hz`).toBeLessThan(30);
     });
   }
+});
+
+describe('Hippel CoSo keyboard preview is the instrument as the player plays it (prehistoric_tale.hipc)', () => {
+  const file = songFile('formats/prehistoric_tale.hipc');
+  // (voice, instrument as the player numbers it, grid note, UADE onset tick of that note, UADE period)
+  const cases = [
+    { ch: 0, ins: 2, grid: 32, onset: 8, period: 285 },
+    { ch: 1, ins: 2, grid: 35, onset: 22, period: 240 },
+    // The grid shows instrument 1 here: its number leaves out the track table's
+    // sound transpose (+5), and the player plays volume sequence 5 = instrument 6.
+    { ch: 3, ins: 6, grid: 32, onset: 344, period: 285 },
+  ];
+  for (const c of cases) {
+    it(`voice ${c.ch} instrument ${c.ins}, grid ${c.grid}: the preview has the song's pitch and envelope shape`, { timeout: 120000 }, async () => {
+      const song = await parseHippelCoSoFile(buf(file), 'prehistoric_tale.hipc');
+      const cfg = (song.instruments[c.ins - 1] as unknown as { hippelCoso: HippelCoSoConfig }).hippelCoso;
+      const uv = await uadeVoice(file, 'prehistoric_tale.hipc', c.ch, (c.onset + 40) / 50);
+      expect(uv.period[c.onset + 1], 'UADE period of the grid note').toBe(c.period);
+      const v = await previewVoice('hippel-coso', 'HippelCoSo', serializeHippelCoSoConfig(cfg), c.grid + 11, 100, chainedHeapTransform);
+      const N = 26; // the song retriggers the note 28 ticks after the onset
+      const p = renderTicks(v.proc, N + 2, 0);
+      const s = uv.pcm.subarray(c.onset * FPT, (c.onset + N + 2) * FPT);
+      // Pitch: rising edges of the same sample played at the same period.
+      const edges = (x: Float32Array, t: number) => risingEdges(x.subarray(t * FPT, (t + 1) * FPT));
+      let se = 0, pe = 0;
+      for (let t = 2; t < N; t++) { se += edges(s, t); pe += edges(p, t - 1); }
+      expect(Math.abs(pe / se - 1), `rising edges: preview ${pe}, song ${se}`).toBeLessThan(0.04);
+      // Envelope: the song mixes the voice at its own track volume, so preview / song
+      // is one constant (the volume quotient) on every tick the song's volume register
+      // is high enough not to be rounding noise; the spread around it is the shape.
+      const sr = rmsPerTick(s, N + 2), pr = rmsPerTick(p, N + 2);
+      const dbs: number[] = [];
+      for (let t = 2; t < N; t++) if (uv.volume[c.onset + t] >= 4) dbs.push(20 * Math.log10(pr[t - 1] / sr[t]));
+      expect(dbs.length).toBeGreaterThan(5);
+      const mean = dbs.reduce((a, b) => a + b, 0) / dbs.length;
+      dbs.forEach((d, i) => expect(Math.abs(d - mean), `tick ${i + 2}: ${d.toFixed(1)} dB around ${mean.toFixed(1)} dB`).toBeLessThan(2));
+      // Level: the constant is 100 / the voice's volume percentage in the song, which
+      // is the instrument's own level at 100 (the preview) over the song's mix.
+      expect(mean, 'preview is never quieter than the song voice').toBeGreaterThan(-1.5);
+    });
+  }
+
+  it('key release cuts the voice', { timeout: 60000 }, async () => {
+    const song = await parseHippelCoSoFile(buf(file), 'prehistoric_tale.hipc');
+    const cfg = (song.instruments[1] as unknown as { hippelCoso: HippelCoSoConfig }).hippelCoso;
+    const v = await previewVoice('hippel-coso', 'HippelCoSo', serializeHippelCoSoConfig(cfg), 43, 100, chainedHeapTransform);
+    renderTicks(v.proc, 4);
+    await v.send({ type: 'noteOff', handle: v.handle });
+    const after = stereoOutputs(1, 128);
+    v.proc.process([], after);
+    expect(Math.max(...after[0][0].map(Math.abs))).toBe(0);
+  });
 });
