@@ -24,6 +24,7 @@
 
 import type { TrackerSong } from '../TrackerReplayer';
 import type { TrackerCell, Pattern } from '@/types/tracker';
+import { takeRestoredEdits } from '@/lib/song/gridBaseline';
 import { WASM_ENGINES, shouldActivate, type NativeEngineDescriptor } from './wasmEngineRegistry';
 
 export interface LiveCellEdit {
@@ -88,6 +89,18 @@ export async function sendCellEditsToEngine(
     await Promise.all(edits.map(({ pattern, row, channel, cell }) =>
       writeCellToChipRam(song, pattern, row, channel, cell)));
   }
+}
+
+/**
+ * After a restore: send the user's edited cells (those that differ from the
+ * decoded baseline) through the same path an interactive edit takes. Called
+ * once the engine has loaded the module; a no-op unless a restore is pending.
+ */
+export async function replayRestoredEdits(song: TrackerSong): Promise<void> {
+  const edits = takeRestoredEdits(song.patterns);
+  if (edits.length === 0) return;
+  console.log(`[restore] sending ${edits.length} edited cell(s) to the engine`);
+  await sendCellEditsToEngine(song, edits);
 }
 
 function sameCell(a: TrackerCell, b: TrackerCell): boolean {

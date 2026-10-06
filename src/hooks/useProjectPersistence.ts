@@ -17,6 +17,7 @@ import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/
 import type { SerializedCompanionFiles } from '@/lib/export/exporters';
 import { applySong } from '@/lib/song/applySong';
 import { savedSongToApply } from '@/lib/song/savedSong';
+import { setRestoredEditsPending } from '@/lib/song/gridBaseline';
 import { restoreFromStoredBytes } from '@/lib/song/restoreFromStoredBytes';
 import { snapshotSong } from '@/lib/song/snapshotSong';
 import { compressProject } from '@/lib/projectCompression';
@@ -444,6 +445,8 @@ export async function applySavedProject(project: SavedProject, opts?: { fromReco
   const restored = await restoreFromStoredBytes(stored, project.gridBaseline);
   console.log(`[restore] ${restored.redecoded ? 're-decoded from the stored module bytes' : `kept as saved (${restored.reason})`}`);
   await applySong({ ...restored.song, gridBaseline: restored.baseline }, opts?.fromRecovery ? 'recovery' : 'project');
+  // The engine plays the stored (original) bytes: its first start sends the edited cells again.
+  if (restored.redecoded) setRestoredEditsPending(true);
 
   // Recovery restore must stay never-saved + dirty so the scheduler re-arms;
   // the default (explicit-slot) load marks saved. Decision is the pure
