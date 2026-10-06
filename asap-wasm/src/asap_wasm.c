@@ -45,9 +45,25 @@ EMSCRIPTEN_KEEPALIVE int asap_wasm_load(const uint8_t *data, int len, const char
 
 EMSCRIPTEN_KEEPALIVE int asap_wasm_render(int16_t *buf, int frames) {
     if (!asap || !loaded) return 0;
-    int bytes = frames * 2 * (int)sizeof(int16_t); /* stereo S16 */
+    /* ASAP writes one sample per POKEY output channel per block: a mono tune
+       (one POKEY) yields 2-byte blocks, not 4. Asking for frames*4 bytes of a
+       mono tune rendered 2*frames blocks, which the caller read as stereo
+       frames: every mono SAP played at double speed and an octave up
+       (2026-10-06, Warhawk). Render the tune's own block count, then spread a
+       mono signal over both output channels, in place from the end. */
+    int channels = ASAPInfo_GetChannels(ASAP_GetInfo(asap));
+    if (channels < 1) channels = 1;
+    int bytes = frames * channels * (int)sizeof(int16_t);
     int generated = ASAP_Generate(asap, (uint8_t*)buf, bytes, ASAPSampleFormat_S16_L_E);
-    return generated / (2 * (int)sizeof(int16_t));
+    int blocks = generated / (channels * (int)sizeof(int16_t));
+    if (channels == 1) {
+        for (int i = blocks - 1; i >= 0; i--) {
+            int16_t v = buf[i];
+            buf[i * 2] = v;
+            buf[i * 2 + 1] = v;
+        }
+    }
+    return blocks;
 }
 
 EMSCRIPTEN_KEEPALIVE int asap_wasm_get_channels(void) {
