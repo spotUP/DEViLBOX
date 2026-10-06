@@ -268,6 +268,12 @@ export function getActiveFormatLimits(): FormatConstraints | null {
     );
     if (!hasNative) return null;
 
+    // Eagleplayer formats (MIDI Loriciel, Sound Player, ...) carry their own
+    // data model - 192-row MIDI bars, 3-voice row walks - and their own
+    // encoders. The MOD 'safe default' below warned 'Format Compatibility' on
+    // merely loading MIDI.Cartoons 1 (2026-10-06): no MOD limits for them.
+    if (fmt.eaglePlayerFileData) return null;
+
     // Detect format from editorMode or fileData
     if (fmt.hivelyFileData) return FORMAT_LIMITS.HVL ?? null;
     if (fmt.editorMode === 'furnace') return null; // Furnace has its own limits
