@@ -41,3 +41,4 @@ int  sm1r_set_row(int index, const uint8_t *raw5);
 int  sm1r_get_voice_consumed(int v);
 int  sm1r_get_voice_rows_consumed(int v);
 int  sm1r_get_voice_note(int v);
+int  sm1r_get_position(void);

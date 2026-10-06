@@ -148,3 +148,4 @@ int player_get_voice_consumed(int v) { return sm1r_get_voice_consumed(v); }
 int player_get_voice_rows_consumed(int v) { return sm1r_get_voice_rows_consumed(v); }
 int player_get_voice_note(int v) { return sm1r_get_voice_note(v); }
 int player_get_paula_period(int ch) { return paula_reg_period(ch); }
+int player_get_position(void) { return sm1r_get_position(); }
