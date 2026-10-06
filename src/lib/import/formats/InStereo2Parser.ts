@@ -555,13 +555,27 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   const lastPos  = song.lastPosition;
 
   const trackerPatterns: Pattern[] = [];
+  // SetTrackLen (effect 9) changes the replayer's rows per track from that row
+  // on and the change carries into the following positions, so a pattern's
+  // length is what the replayer plays, not the sub-song's header value.
+  let playedRows = rowsPerTrack;
 
   for (let posIdx = firstPos; posIdx <= lastPos; posIdx++) {
     if (posIdx >= positions.length) break;
     const posRow = positions[posIdx];
     const channelRows: TrackerCell[][] = [[], [], [], []];
 
-    for (let row = 0; row < rowsPerTrack; row++) {
+    let patternRows = 0;
+    for (let row = 0; row < playedRows; row++) {
+      patternRows = row + 1;
+      for (let ch = 0; ch < 4; ch++) {
+        const tl = trackLines[posRow[ch].startTrackRow + row];
+        if (tl && tl.effect === 0x9 && tl.effectArg <= 64) playedRows = tl.effectArg;
+      }
+    }
+    patternRows = Math.max(1, patternRows);
+
+    for (let row = 0; row < patternRows; row++) {
       for (let ch = 0; ch < 4; ch++) {
         const pos = posRow[ch];
         const lineIdx = pos.startTrackRow + row;
@@ -616,7 +630,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     trackerPatterns.push({
       id: `pattern-${patIdx}`,
       name: `Position ${patIdx}`,
-      length: rowsPerTrack,
+      length: patternRows,
       channels: channelRows.map((rows, ch) => ({
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
