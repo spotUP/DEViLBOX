@@ -9,12 +9,12 @@ import { startWorklet, songBuffer } from './workletHarness';
 import { meterFlashCounts } from './meterCountHarness';
 
 describe('Music Assembler channel meters', { timeout: 60_000 }, () => {
-  it('flash on more notes than the level-jump rule saw', async () => {
+  it('flash on notes the level-jump rule missed', async () => {
     const { proc, send, posted } = await startWorklet('ma', 'Ma');
     await send({ type: 'loadModule', moduleData: songBuffer('public/data/songs/music-assembler/thanatos.ma') });
-    const { counted, byLevel, reports } = meterFlashCounts(proc, posted, 15);
+    const { counted, onlyCounted, reports } = meterFlashCounts(proc, posted, 15);
     expect(reports).toBeGreaterThan(100);
     expect(counted).toBeGreaterThan(0);
-    expect(counted).toBeGreaterThan(byLevel);
+    expect(onlyCounted, 'notes the level-jump rule missed').toBeGreaterThan(0);
   });
 });

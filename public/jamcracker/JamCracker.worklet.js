@@ -161,6 +161,7 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
 
       // Allocate 4-float buffer for channel levels
       this.levelsPtr = this.wasm._malloc(4 * 4);
+      this.noteStartsPtr = this.wasm._malloc(4 * 4);
 
       this.initialized = true;
       this.port.postMessage({ type: 'ready' });
@@ -351,7 +352,13 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
       this.levelsCounter = 0;
       this.wasm._jc_get_channel_levels(this.levelsPtr);
       const off = this.levelsPtr >> 2;
-      this.port.postMessage({ type: 'chLevels', levels: [this.wasm.HEAPF32[off], this.wasm.HEAPF32[off+1], this.wasm.HEAPF32[off+2], this.wasm.HEAPF32[off+3]] });
+      // Cumulative note starts per channel (Paula DMA off->on edges)
+      let noteStarts = null;
+      if (this.noteStartsPtr && typeof this.wasm._jc_get_note_start_counts === 'function') {
+        this.wasm._jc_get_note_start_counts(this.noteStartsPtr, 4);
+        noteStarts = Array.from(new Uint32Array(this.wasm.HEAPU8.buffer, this.noteStartsPtr, 4));
+      }
+      this.port.postMessage({ type: 'chLevels', levels: [this.wasm.HEAPF32[off], this.wasm.HEAPF32[off+1], this.wasm.HEAPF32[off+2], this.wasm.HEAPF32[off+3]], noteStarts });
     }
 
     return true;
