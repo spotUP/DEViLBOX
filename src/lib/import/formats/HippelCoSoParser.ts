@@ -52,7 +52,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { HippelCoSoConfig, HippelCoSoSampleEntry, UADEChipRamInfo } from '@/types/instrument';
+import type { HippelCoSoConfig, HippelCoSoSampleData, HippelCoSoSampleEntry, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { hippelCoSoEncoder } from '@/engine/uade/encoders/HippelCoSoEncoder';
 import type { HippelCellSpan, HippelCellSpans } from '@/engine/hippel/hippelCellSpans';
@@ -151,22 +151,54 @@ export function isHippelCoSoFormat(buffer: ArrayBuffer): boolean {
 
 /**
  * Extract a frequency sequence starting at `offset` in the buffer.
- * Reads until end of buffer or encounters a terminating -31 (FSEQ_END).
+ * Reads whole commands until the end (E1) or loop (E0) command, or end of buffer.
  * Returns at most `maxLen` bytes.
  */
 function extractFseq(buf: Uint8Array, offset: number, maxLen = 256): number[] {
   const result: number[] = [];
-  for (let i = 0; i < maxLen; i++) {
-    const pos = offset + i;
-    if (pos >= buf.length) break;
-    const v = s8(buf, pos);
-    result.push(v);
-    /* Stop collecting after end marker (-31) so we don't include garbage */
-    if (v === -31) break;
+  let pos = offset;
+  while (result.length < maxLen && pos < buf.length) {
+    const b = buf[pos];
+    // A command is its byte plus arguments; reading it whole keeps an argument
+    // that happens to be 0xE1 from ending the sequence early. E1 (end) and E0
+    // (loop back) are the last thing the player reads.
+    const n = cosoSndSeqCommandLen(b);
+    for (let k = 0; k < n && pos + k < buf.length && result.length < maxLen; k++) result.push(s8(buf, pos + k));
+    pos += n;
+    if (b === 0xE1 || b === 0xE0) break;
   }
   /* If empty or only an end marker, provide a default single-note fseq */
   if (result.length === 0) result.push(0, -31);
   return result;
+}
+
+/**
+ * Bytes one sound-modulation (fseq) entry takes in the player (libtfmxaudiodecoder
+ * TFMX_sndSeq_E0..EA, COSO variant): a transpose/pitch byte is one; E0 loop,
+ * E2 set wave, E4 new wave, E7 set wave if different, E8 sustain and EA take one
+ * argument, E3 two, E9 two, E6 five, E5 eight, E1 none.
+ */
+export function cosoSndSeqCommandLen(b: number): number {
+  if (b < 0xE0) return 1;
+  switch (b) {
+    case 0xE0: case 0xE2: case 0xE4: case 0xE7: case 0xE8: case 0xEA: return 2;
+    case 0xE3: case 0xE9: return 3;
+    case 0xE5: return 9;
+    case 0xE6: return 6;
+    default: return 1;
+  }
+}
+
+/** The sample numbers a sound-modulation sequence switches to (E2, E4, E5, E7 argument 0). */
+export function cosoSndSeqSampleRefs(fseq: readonly number[]): number[] {
+  const refs = new Set<number>();
+  for (let pos = 0; pos < fseq.length;) {
+    const b = fseq[pos] & 0xFF;
+    if ((b === 0xE2 || b === 0xE4 || b === 0xE5 || b === 0xE7) && pos + 1 < fseq.length) refs.add(fseq[pos + 1] & 0xFF);
+    if (b === 0xE1) break;
+    pos += cosoSndSeqCommandLen(b);
+  }
+  return [...refs].sort((a, b) => a - b);
 }
 
 /**
@@ -372,7 +404,7 @@ export async function parseHippelCoSoFile(
     const volSpeed = u8(buf, vsqOff);
     const fseqIdx  = s8(buf, vsqOff + 1);
     const vibSpeed = s8(buf, vsqOff + 2);
-    const vibDepth = Math.abs(s8(buf, vsqOff + 3)); // depth is magnitude
+    const vibDepth = u8(buf, vsqOff + 3); // the player reads it unsigned (vibAmpl is a ubyte)
     const vibDelay = u8(buf, vsqOff + 4);
 
     // Extract vseq starting at vsqOff + 5
@@ -392,7 +424,25 @@ export async function parseHippelCoSoFile(
       }
     }
 
+    // The PCM of the samples this instrument's sound sequence switches to: a
+    // keyboard note is played by the player itself, which needs the sample bytes.
+    const samples: HippelCoSoSampleData[] = cosoSndSeqSampleRefs(fseq)
+      .filter((n) => n < sampleBank.length)
+      .map((n) => {
+        const e = sampleBank[n];
+        const start = samplesDataOff + e.pointer;
+        const need = Math.max(e.length, e.loopStart + e.repeatLength) + 2;
+        return {
+          index: n,
+          length: e.length,
+          loopStart: e.loopStart,
+          repeatLength: e.repeatLength,
+          pcm: Array.from(buf.subarray(Math.min(start, buf.length), Math.min(start + need, buf.length))),
+        };
+      });
+
     const hcConfig: HippelCoSoConfig = {
+      samples,
       fseq,
       vseq,
       volSpeed: Math.max(1, volSpeed),

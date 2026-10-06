@@ -173,54 +173,41 @@ export class HippelCoSoSynth implements DevilboxSynth {
 }
 
 /**
- * Serialise a HippelCoSoConfig into the binary format expected by hc_load_instrument().
+ * Serialise a HippelCoSoConfig into the binary format expected by hc_load_instrument()
+ * (hippel_coso_synth.cpp, version 2): the volume sequence header bytes, the sound
+ * (fseq) and volume (vseq) sequences, and the samples the sound sequence switches
+ * to with their PCM, from which the voice assembles a COSO module the decoder plays.
  * Returns an ArrayBuffer that can be transferred to the AudioWorklet.
  */
 export function serializeHippelCoSoConfig(cfg: HippelCoSoConfig): ArrayBuffer {
   const fseq = cfg.fseq ?? [];
   const vseq = cfg.vseq ?? [];
+  const samples = cfg.samples ?? [];
 
-  /* Layout:
-   * [0]       version = 0
-   * [1]       volSpeed
-   * [2]       vibSpeed (signed byte)
-   * [3]       vibDepth
-   * [4]       vibDelay
-   * [5..6]    fseqLen (LE uint16)
-   * [7..7+fseqLen-1]   fseq bytes
-   * [7+fseqLen..8+fseqLen]  vseqLen (LE uint16)
-   * [9+fseqLen..]  vseq bytes
-   */
-  const totalLen = 7 + fseq.length + 2 + vseq.length;
-  const buf = new Uint8Array(totalLen);
+  const total = 11 + fseq.length + vseq.length + samples.reduce((n, smp) => n + 12 + smp.pcm.length, 0);
+  const buf = new Uint8Array(total);
+  const dv = new DataView(buf.buffer);
 
-  buf[0] = 0; // version
-  buf[1] = Math.max(1, (cfg.volSpeed ?? 1)) & 0xFF;
-  buf[2] = ((cfg.vibSpeed ?? 0) + 256) & 0xFF; // signed → unsigned
+  buf[0] = 2; // version
+  buf[1] = Math.max(1, cfg.volSpeed ?? 1) & 0xFF;
+  buf[2] = (cfg.vibSpeed ?? 0) & 0xFF;   // signed -> the byte the player reads
   buf[3] = (cfg.vibDepth ?? 0) & 0xFF;
   buf[4] = (cfg.vibDelay ?? 0) & 0xFF;
+  dv.setUint16(5, fseq.length, true);
+  dv.setUint16(7, vseq.length, true);
+  dv.setUint16(9, samples.length, true);
 
-  // fseqLen LE uint16
-  const fl = fseq.length;
-  buf[5] = fl & 0xFF;
-  buf[6] = (fl >> 8) & 0xFF;
-
-  // fseq data
-  for (let i = 0; i < fl; i++) {
-    buf[7 + i] = (fseq[i] + 256) & 0xFF; // signed → unsigned byte
+  let pos = 11;
+  for (const b of fseq) buf[pos++] = b & 0xFF;
+  for (const b of vseq) buf[pos++] = b & 0xFF;
+  for (const smp of samples) {
+    dv.setUint16(pos, smp.index, true);
+    dv.setUint16(pos + 2, smp.length >> 1, true);        // header words are in words
+    dv.setUint16(pos + 4, smp.loopStart, true);
+    dv.setUint16(pos + 6, smp.repeatLength >> 1, true);
+    dv.setUint32(pos + 8, smp.pcm.length, true);
+    pos += 12;
+    for (const b of smp.pcm) buf[pos++] = b & 0xFF;
   }
-
-  // vseqLen LE uint16
-  const vl = vseq.length;
-  const vseqLenOff = 7 + fl;
-  buf[vseqLenOff] = vl & 0xFF;
-  buf[vseqLenOff + 1] = (vl >> 8) & 0xFF;
-
-  // vseq data
-  const vseqOff = vseqLenOff + 2;
-  for (let i = 0; i < vl; i++) {
-    buf[vseqOff + i] = (vseq[i] + 256) & 0xFF;
-  }
-
   return buf.buffer;
 }
