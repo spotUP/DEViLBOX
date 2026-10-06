@@ -109,6 +109,11 @@ export class DB303Synth implements DevilboxSynth {
   private _resolveInit: (() => void) | null = null;
   // Queue parameter messages that arrive before worklet node is ready
   private _pendingParams: Array<{ paramId: string; value: number }> = [];
+  // Decay bookkeeping for applyConfig: what the WASM was last given, and the
+  // normalDecay value the last config carried (to tell which knob moved).
+  private _appliedDecay: number | undefined;
+  private _appliedNormalDecay: number | undefined;
+  private _configNormalDecay: number | undefined;
   // Track pending release timeout so slides can cancel it
   private _releaseTimeout: ReturnType<typeof setTimeout> | null = null;
   // Cache last-sent values for DSP-reinitializing parameters to avoid redundant sends
@@ -1008,7 +1013,15 @@ export class DB303Synth implements DevilboxSynth {
       } else {
         this.setEnvMod(tb.filterEnvelope.envMod);
       }
-      this.setDecay(tb.filterEnvelope.decay);
+      // Decay and Devil Fish normalDecay are ONE WASM parameter. Whichever the
+      // config changed since the last apply wins; re-sending the unchanged one
+      // would overwrite the knob that just moved (MIDI/automation write only
+      // filterEnvelope.decay, the panel's N.Dec writes only normalDecay).
+      if (this._appliedDecay !== tb.filterEnvelope.decay || this._appliedNormalDecay === undefined) {
+        this.setDecay(tb.filterEnvelope.decay);
+        this._appliedDecay = tb.filterEnvelope.decay;
+        this._appliedNormalDecay = tb.filterEnvelope.decay;
+      }
     }
 
     // Accent (0-1)
@@ -1085,7 +1098,11 @@ export class DB303Synth implements DevilboxSynth {
     if (df) {
       // normalDecay: setDecay() above syncs normalDecay to match the core decay.
       // If the user has set a different normalDecay via the DEVILFISH tab, override here.
-      if (df.normalDecay !== undefined) this.setNormalDecay(df.normalDecay);
+      if (df.normalDecay !== undefined && df.normalDecay !== this._configNormalDecay) {
+        this.setNormalDecay(df.normalDecay);
+        this._appliedNormalDecay = df.normalDecay;
+      }
+      this._configNormalDecay = df.normalDecay;
       if (df.accentDecay !== undefined) this.setAccentDecay(df.accentDecay);
       if (df.softAttack !== undefined) this.setSoftAttack(df.softAttack);
       if (df.accentSoftAttack !== undefined) this.setAccentSoftAttack(df.accentSoftAttack);
