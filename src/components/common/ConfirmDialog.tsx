@@ -78,7 +78,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <X size={14} />
           </button>
         </div>
-        <p className="text-sm text-text-secondary mb-4 whitespace-pre-line">{message}</p>
+        <p className="text-sm text-text-secondary mb-4 whitespace-pre-line select-text cursor-text">{message}</p>
         <div className="flex justify-end gap-2">
           {!alertOnly && (
             <button
