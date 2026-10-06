@@ -261,14 +261,14 @@ int tfmx_load_instrument(void* /*ctx*/, int handle, const uint8_t* blob, uint32_
 }
 
 /**
- * Convert MIDI note to TFMX period-table index.
- * TFMX note index 0 = Amiga period 856 = B-1 (lowest note).
- * MIDI 36 (C2) ≈ Amiga B-1 → TFMX index 0.
- * MIDI note = TFMX index + 36.
+ * Convert a typed key (MIDI) to the note value of a pattern row. The key's
+ * grid note is MIDI - 11 (xmConversions.noteToMidi) and the Hippel TFMX grid
+ * shows a row's note as note + 1 (period table index 0 = 1712 = C-0 = grid
+ * note 1; JochenHippel7VParser tfmxNoteToXM), so the row note is MIDI - 12.
  */
 static int midiToTfmxNote(int midi) {
-  int note = midi - 36;
-  if (note < 0)  note = 0;
+  int note = midi - 12;
+  if (note < 1)  note = 1;
   if (note > 95) note = 95;
   return note;
 }
@@ -282,9 +282,11 @@ void tfmx_note_on(void* /*ctx*/, int handle, int midiNote, int /*velocity*/) {
   const int tfmxNote = midiToTfmxNote(midiNote);
 
   // Update pattern row 0: trigger note using VolModSeq index 0
-  // byte0: bit7=hasNote, bits6-0=noteIdx
+  // byte0: bits6-0 = note; bit7 set means "pitch only, keep the instrument"
+  //        (HippelDecoder::TFMX_processPattern starts the instrument only
+  //        when bit7 is clear), so it must be clear for the note to sound.
   // byte1: bits4-0=volSeqIdx (always 0 — our single remapped VolModSeq)
-  p.miniMod[p.patternOff + 0] = (uint8_t)(0x80 | (tfmxNote & 0x7F));
+  p.miniMod[p.patternOff + 0] = (uint8_t)(tfmxNote & 0x7F);
   p.miniMod[p.patternOff + 1] = 0x00; // volSeqIdx = 0
   // Rows 1-31 remain zero (no note, decoder advances and loops via loop_mode)
 
