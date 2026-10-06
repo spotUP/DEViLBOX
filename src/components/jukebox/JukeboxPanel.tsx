@@ -15,6 +15,7 @@
  *   Enter       play the selected row
  *   R           another take from the same format
  *   Alt+0       mark good        Alt+1..7  switch a fault on/off (several can be on)
+ *   Alt+8       Visualizer mark (song shows the scope view, not the pattern editor)
  *   Escape      clear the filter
  *
  * Reports are digits with ALT held on purpose: plain digits belong to the
@@ -36,6 +37,7 @@ import { gatherCompanions } from '@/lib/import/companionFetch';
 import {
   JUKEBOX_FAULTS, LOAD_FAILED, reportFaults, reportGood, loadVerdicts,
   verdictLabels, isGoodVerdict, faultsOf, setFault, verdictFromFaults, verdictOf, JUKEBOX_OK,
+  JUKEBOX_VISUALIZER, isVisualizer, keepView, reportVisualizer,
   type JukeboxVerdict, type JukeboxFault,
 } from '@/lib/jukebox/faultReports';
 import { searchModland, downloadModlandFile } from '@/lib/modlandApi';
@@ -193,7 +195,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     const { id } = reportCtx.current;
     if (!id) return;
     const faults = setFault(faultsOf(judgedRef.current[id]), LOAD_FAILED.id, true);
-    const next = verdictFromFaults(faults, message);
+    const next = keepView(verdictFromFaults(faults, message), judgedRef.current[id]);
     judgedRef.current = { ...judgedRef.current, [id]: next };
     setJudged(judgedRef.current);
     const ok = await reportFaults(faults, LOAD_FAILED, true, { format: id, file: short, note: message });
@@ -339,7 +341,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     const { id, label, file: current } = reportCtx.current;
     if (!id || !current) return;
     const faults = setFault(faultsOf(judgedRef.current[id]), fault.id, on);
-    judgedRef.current = { ...judgedRef.current, [id]: verdictFromFaults(faults, judgedRef.current[id]?.notes) };
+    judgedRef.current = { ...judgedRef.current, [id]: keepView(verdictFromFaults(faults, judgedRef.current[id]?.notes), judgedRef.current[id]) };
     setJudged(judgedRef.current);
     const ok = await reportFaults(faults, fault, on, {
       format: id,
@@ -350,10 +352,24 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       : `${fault.label} — tracker offline (:4444)`);
   }, []);
 
+  /** The Visualizer mark: an observation about the row, independent of every fault and of Good. */
+  const toggleVisualizer = useCallback(async (on: boolean) => {
+    // Refs only, empty deps: see toggleFault.
+    const { id, label, file: current } = reportCtx.current;
+    if (!id || !current) return;
+    const prev = judgedRef.current[id] ?? {};
+    judgedRef.current = { ...judgedRef.current, [id]: { ...prev, view: on ? JUKEBOX_VISUALIZER.value : undefined } };
+    setJudged(judgedRef.current);
+    const ok = await reportVisualizer(on, { format: id, file: current.split('/').pop() ?? current });
+    setStatus(ok
+      ? `${label ?? id}: ${JUKEBOX_VISUALIZER.label} ${on ? 'on' : 'off'}`
+      : `${JUKEBOX_VISUALIZER.label} — tracker offline (:4444)`);
+  }, []);
+
   /** Good is exclusive: it empties the fault set. Then on to the next row. */
   const markGood = useCallback(async () => {
     if (!row || !file) return;
-    judgedRef.current = { ...judgedRef.current, [row.id]: verdictOf(JUKEBOX_OK) };
+    judgedRef.current = { ...judgedRef.current, [row.id]: keepView(verdictOf(JUKEBOX_OK), judgedRef.current[row.id]) };
     setJudged(judgedRef.current);
     const ok = await reportGood({ format: row.id, file: file.split('/').pop() ?? file });
     setStatus(ok ? `${row.label}: ${JUKEBOX_OK.label}` : `${JUKEBOX_OK.label} — tracker offline (:4444)`);
@@ -380,6 +396,11 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       // a Mac.
       const digit = /^(?:Digit|Numpad)(\d)$/.exec(e.code)?.[1] ?? e.key;
       if (digit === '0') { e.preventDefault(); void markGood(); return; }
+      if (digit === JUKEBOX_VISUALIZER.key) {
+        e.preventDefault();
+        void toggleVisualizer(!(row && isVisualizer(judged[row.id])));
+        return;
+      }
       const fault = JUKEBOX_FAULTS.find((f) => f.key === digit);
       // The key TOGGLES now, same as the switch it drives — press it twice to
       // take back a mis-keyed fault instead of reloading to clear it.
@@ -498,6 +519,18 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
               />
             </div>
           ))}
+          <div className="flex items-center justify-between gap-2" title={`${JUKEBOX_VISUALIZER.title} (Alt+${JUKEBOX_VISUALIZER.key})`}>
+            <span className="text-[10px] font-mono text-text-secondary whitespace-nowrap">{JUKEBOX_VISUALIZER.label}</span>
+            <Toggle
+              label={JUKEBOX_VISUALIZER.label}
+              hideLabel
+              value={!!row && isVisualizer(judged[row.id])}
+              onChange={(v) => void toggleVisualizer(v)}
+              size="sm"
+              disabled={!row || !file}
+              title={`${JUKEBOX_VISUALIZER.title} (Alt+${JUKEBOX_VISUALIZER.key})`}
+            />
+          </div>
         </div>
       </div>
     </div>
