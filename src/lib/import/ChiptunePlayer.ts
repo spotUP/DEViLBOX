@@ -42,6 +42,7 @@ export class ChiptunePlayer {
   private initialized = false;
   private initError: string | null = null;
   private initPromise: Promise<void> | null = null;
+  private disposed = false;
 
   public meta: ChiptuneMetadata | null = null;
   public duration = 0;
@@ -108,6 +109,10 @@ export class ChiptunePlayer {
       // Load worklet from public folder (use BASE_URL for proper path in dev/prod)
       const baseUrl = import.meta.env.BASE_URL || '/';
       await this.context.audioWorklet.addModule(`${baseUrl}chiptune3/chiptune3.worklet.js`);
+
+      if (this.disposed) {
+        return;
+      }
 
       this.processNode = new AudioWorkletNode(this.context, 'libopenmpt-processor', {
         numberOfInputs: 0,
@@ -229,6 +234,26 @@ export class ChiptunePlayer {
 
   stop(): void {
     this.processNode?.port.postMessage({ cmd: 'stop' });
+  }
+
+  /**
+   * Release the worklet node and gain. Without this every player leaves a
+   * libopenmpt-processor running on the audio thread for the page's life.
+   */
+  dispose(): void {
+    this.disposed = true;
+    const node = this.processNode;
+    if (node) {
+      try { node.port.postMessage({ cmd: 'stop' }); } catch { /* port closed */ }
+      node.port.onmessage = null;
+      try { node.port.close(); } catch { /* already closed */ }
+      try { node.disconnect(); } catch { /* not connected */ }
+    }
+    try { this.gain?.disconnect(); } catch { /* not connected */ }
+    this.processNode = null;
+    this.gain = null;
+    this.handlers.clear();
+    this.initialized = false;
   }
 
   pause(): void {

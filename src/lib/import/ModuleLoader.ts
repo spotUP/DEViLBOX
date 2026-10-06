@@ -54,7 +54,6 @@ export interface ModuleMetadata {
 export interface ModuleInfo {
   metadata: ModuleMetadata;
   arrayBuffer: ArrayBuffer;
-  player?: ChiptunePlayer;  // Optional for formats not supported by libopenmpt (e.g., .fur)
   file: File;  // Original file for sample extraction
   // Native parser data (if available)
   nativeData?: {
@@ -117,7 +116,6 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           resolve({
             metadata,
             arrayBuffer,
-            player: undefined,
             file,
             nativeData: undefined,
             goatTrackerData: new Uint8Array(arrayBuffer),
@@ -147,7 +145,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
               samples: 0,
               duration: 0,
             };
-            resolve({ metadata, arrayBuffer, player: undefined, file, nativeData: undefined, dmfSong: song });
+            resolve({ metadata, arrayBuffer, file, nativeData: undefined, dmfSong: song });
           } catch (err) {
             console.error('[ModuleLoader] DefleMask/Furnace WASM parse failed:', err);
             reject(new Error('Failed to parse DefleMask file: ' + (err as Error).message));
@@ -180,15 +178,16 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
               };
 
               // Load with libopenmpt for playback (skip for formats not supported by libopenmpt)
-              let player: ChiptunePlayer | undefined;
               if (ext !== '.fur' && !isDefleMask && ext !== '.xrns') {
-                player = await loadWithLibopenmpt(arrayBuffer);
+                // Probe only: libopenmpt must be able to open it. The probe
+                // player is released at once, it is never played from here.
+                const probe = await loadWithLibopenmpt(arrayBuffer);
+                probe.dispose();
               }
 
               resolve({
                 metadata,
                 arrayBuffer,
-                player,
                 file,
                 nativeData,
               });
@@ -249,12 +248,11 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
             clearTimeout(timeout);
             metaReject(new Error(`Failed to load module: ${err.type || err.message || 'unknown error'}`));
           });
-        });
+        }).finally(() => player.dispose()); // metadata probe only; never left running
 
         resolve({
           metadata,
           arrayBuffer,
-          player,
           file,
         });
       } catch (error) {
@@ -265,24 +263,6 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsArrayBuffer(file);
   });
-}
-
-/**
- * Preview a loaded module (play audio)
- */
-export async function previewModule(info: ModuleInfo): Promise<void> {
-  if (info.player) {
-    await info.player.play(info.arrayBuffer);
-  }
-}
-
-/**
- * Stop module preview
- */
-export function stopPreview(info: ModuleInfo): void {
-  if (info.player) {
-    info.player.stop();
-  }
 }
 
 /**
@@ -509,6 +489,7 @@ async function loadWithLibopenmpt(
   });
 
   if (!initSuccess) {
+    player.dispose();
     throw new Error('Module player not available. The audio worklet failed to load.');
   }
 
