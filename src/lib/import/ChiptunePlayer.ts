@@ -244,9 +244,8 @@ export class ChiptunePlayer {
     this.disposed = true;
     const node = this.processNode;
     if (node) {
-      try { node.port.postMessage({ cmd: 'stop' }); } catch { /* port closed */ }
+      try { node.port.postMessage({ cmd: 'dispose' }); } catch { /* port closed */ }
       node.port.onmessage = null;
-      try { node.port.close(); } catch { /* already closed */ }
       try { node.disconnect(); } catch { /* not connected */ }
     }
     try { this.gain?.disconnect(); } catch { /* not connected */ }
