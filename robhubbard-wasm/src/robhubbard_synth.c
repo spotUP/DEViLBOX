@@ -410,7 +410,13 @@ void rh_note_on(void *ctxPtr, int handle, int note, int velocity) {
   RHPlayer *p = &ctx->players[handle];
   (void)velocity; /* Rob Hubbard uses per-instrument volume, not velocity */
 
-  int noteIdx = rh_clampNote(note - 24); /* MIDI 48 = Amiga C-2 = index 12 */
+  /* The keyboard key for a grid cell is MIDI = grid note + 11 (xmConversions
+   * noteToMidi), and the grid shows RH note byte b as b + 25 - but UADE's own
+   * Rob Hubbard player plays grid note N at PERIODS[N - 22] (skateordie.rh: grid
+   * 41 -> period 566 = PERIODS[19] x 0.993; grid 56 -> 238 = PERIODS[34] x 0.992),
+   * so the table index of a key is key - 11 - 22. The old key - 24 sounded
+   * 9 semitones above the song's note. */
+  int noteIdx = rh_clampNote(note - 33);
   if (noteIdx < 0)  noteIdx = 0;
   if (noteIdx > 83) noteIdx = 83;
 
@@ -462,8 +468,10 @@ int rh_render(void *ctxPtr, int handle, float *outL, float *outR, int numSamples
 
   if (!p->playing || !p->ins.sampleData || p->ins.sampleLen == 0) return numSamples;
 
-  /* Volume normalisation: max Amiga vol=64, max sample amplitude=127 */
-  const float volNorm = 1.0f / (64.0f * 127.0f);
+  /* Paula voice scale as the song is heard: UADE's audio.c hands the mixer
+   * sample * vol (int8 x 0..64, max 8128 of 32768), i.e. a full-scale voice is
+   * 0.25 of full scale. The preview was full scale: +12 dB over the song. */
+  const float volNorm = 0.25f / (64.0f * 128.0f);
   const int spTick = p->samplesPerTick > 0 ? p->samplesPerTick : (p->sampleRate / TICKS_PER_SEC);
 
   for (int i = 0; i < numSamples; i++) {

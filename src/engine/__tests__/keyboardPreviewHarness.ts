@@ -56,3 +56,13 @@ export function fromOnset(out: Float32Array, fromTick: number, ticks: number, th
   while (on < out.length && Math.abs(out[on]) < thr) on++;
   return out.subarray(on, on + ticks * FPT);
 }
+
+/** The engines' shared "chained HEAP" JS transform (WASMLoaderConfig.transformJS) for node. */
+export function chainedHeapTransform(code: string): string {
+  return code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+    .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
+    .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
+}
