@@ -190,6 +190,62 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
   const _trackBase      = position - 44 >= 0 ? u32BE(buf, position - 44) : 0;
   const _trackDataOffset = position + _trackBase;
 
+  // ── Wave lists and PCM samples (what the replayer's voice code reads) ──────
+  // sidmon1.c sm1r_load steps 6 and 8: list L is 16 bytes of (wave, ticks) pairs, the default
+  // [L, 0xff, 0xff, 0x10] (play wave L, then stop) with the file's lists laid over bytes 16 on.
+  const waveListsStart = u32BE(buf, position - 16);
+  const waveListsBytes = Math.max(0, u32BE(buf, position - 12) - waveListsStart);
+  const prefillBytes = (totWaveforms + 2) << 4;
+  const waveListByte = (b: number): number => {
+    if (b >= 16 && b - 16 < waveListsBytes) return u8(buf, position + waveListsStart + (b - 16));
+    if (b >= prefillBytes) return 0;
+    const k = b & 15;
+    return k === 0 ? b >> 4 : k === 1 || k === 2 ? 0xff : k === 3 ? 0x10 : 0;
+  };
+  const waveListAndWaves = (waveform: number, phaseShift: number) => {
+    const waveList = Array.from({ length: 16 }, (_, k) => waveListByte(waveform * 16 + k));
+    const waves: Record<number, number[]> = {};
+    const want = new Set<number>();
+    for (let k = 0; k < 16; k += 2) if (waveList[k] !== 0xff) want.add(waveList[k]);
+    if (phaseShift > 0) want.add(phaseShift);
+    want.forEach((w) => { if (w < waveformData.length) waves[w] = Array.from(waveformData[w]); });
+    // The song's wave blends (sm1r_load step 7, then applied every song tick) whose destination this voice plays.
+    const mix: NonNullable<SidMon1Config['mix']> = [];
+    for (let m = 0; m < 2; m++) {
+      const speed = u32BE(buf, mixHeader + 36 + m * 4);
+      const dest = u32BE(buf, mixHeader + 16 + m * 4);
+      let src1 = u32BE(buf, mixHeader + m * 4), src2 = u32BE(buf, mixHeader + 8 + m * 4);
+      if (src1 > totWaveforms) src1 = 0;
+      if (src2 > totWaveforms) src2 = 0;
+      if (speed && dest <= totWaveforms && want.has(dest)) {
+        mix.push({ speed, dest, src1, src2 });
+        [src1, src2].forEach((w) => { if (w < waveformData.length) waves[w] = Array.from(waveformData[w]); });
+      }
+    }
+    return { waveList, waves, mix };
+  };
+  // sm1r_load step 8: the sample header (pointer, loop, length) of PCM sample `waveform`.
+  const mixHeader = position + waveEnd;
+  const sampleStart = u32BE(buf, position - 4);
+  const readPcm = (waveform: number): NonNullable<SidMon1Config['pcm']> | undefined => {
+    if (sampleStart === 1) return undefined; // the three drum samples built into the player binary
+    const tableBase = position + sampleStart;
+    const data0 = u32BE(buf, tableBase);
+    const totSamples = (data0 >> 5) + 15;
+    if (totSamples > 15 && waveform > totSamples) return undefined;
+    const hdr = tableBase + 4 + ((waveform - 16) << 5);
+    if (hdr + 32 > buf.length) return undefined;
+    const sPointer = u32BE(buf, hdr), sLoop = u32BE(buf, hdr + 4), sLength = u32BE(buf, hdr + 8);
+    let repeat: number, loop: number;
+    if (sLoop === 0 || sLoop === 99999 || sLoop === 199999 || sLoop >= sLength) { loop = 0; repeat = 4; }
+    else { repeat = sLength - sLoop; loop = sLoop - sPointer; }
+    const finalLen = Math.max(0, sLength - sPointer, loop + repeat);
+    const src = tableBase + 4 + data0 + sPointer;
+    if (src < 0 || src >= buf.length) return undefined;
+    const bytes = buf.slice(src, Math.min(buf.length, src + finalLen));
+    return { data: Array.from(bytes, (v) => (v < 128 ? v : v - 256)), loop, repeat };
+  };
+
   // ── Parse instruments ─────────────────────────────────────────────────────
   // stream.position = position + instrBase (= position + j)
   const instruments: InstrumentConfig[] = [];
@@ -251,7 +307,19 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
       phaseWave = Array.from(waveformData[actualPhaseShift]);
     }
 
+    // What the replayer's voice reads for this instrument: its wave list and the waves the
+    // list and the phase LFO name (keyboard preview), or its PCM sample (waveform > 15).
+    const voiceData: { waveList?: number[]; waves?: Record<number, number[]>; mix?: SidMon1Config['mix'] } = waveform <= 15 ? waveListAndWaves(waveform, actualPhaseShift) : {};
+    const pcm = waveform > 15 ? readPcm(waveform) : undefined;
+    // A PCM sample without a loop falls back to the first bytes of wave memory (loop pointer 0, repeat 4).
+    if (pcm && waveformData.length > 0) voiceData.waves = { 0: Array.from(waveformData[0]) };
+
     const sm1Config: SidMon1Config = {
+      waveform,
+      waveList: voiceData.waveList,
+      waves: voiceData.waves,
+      mix: voiceData.mix,
+      pcm,
       arpeggio,
       attackSpeed,
       attackMax,

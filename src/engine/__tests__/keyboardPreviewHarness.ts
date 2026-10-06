@@ -66,3 +66,40 @@ export function chainedHeapTransform(code: string): string {
     .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
+
+/** What a song replayer says one of its voices plays: the audio of the voice from each new pattern row to the next. */
+export interface VoiceEvent { startFrame: number; endFrame: number; row: number; note: number }
+
+/** The JS transform the per-note synth engines apply (SidMon, SidMon 1, ...): module-scope WASM and heap views exposed on Module. */
+export function exposeHeapTransform(code: string): string {
+  return code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+    .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
+    .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
+}
+
+/**
+ * Fundamental frequency (Hz) by normalised autocorrelation: the first lag whose
+ * correlation is within 90 % of the best, so a wave with many zero crossings
+ * (which rising edges over-count) still reads as its pitch.
+ */
+export function fundamentalHz(x: Float32Array, minHz = 30, maxHz = 4000): number {
+  const lo = Math.floor(SR / maxHz), hi = Math.min(Math.floor(SR / minHz), Math.floor(x.length / 2));
+  const n = x.length - hi;
+  if (n < 64) return 0;
+  const r = new Float64Array(hi + 1);
+  let e0 = 0;
+  for (let i = 0; i < n; i++) e0 += x[i] * x[i];
+  if (e0 < 1e-9) return 0;
+  let best = -1;
+  for (let l = lo; l <= hi; l++) {
+    let s = 0;
+    for (let i = 0; i < n; i++) s += x[i] * x[i + l];
+    r[l] = s / e0;
+    if (r[l] > best) best = r[l];
+  }
+  for (let l = lo + 1; l < hi; l++) if (r[l] >= 0.9 * best && r[l] >= r[l - 1] && r[l] >= r[l + 1]) return SR / l;
+  return 0;
+}

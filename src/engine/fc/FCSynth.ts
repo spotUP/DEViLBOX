@@ -1,38 +1,15 @@
 /**
- * FCSynth.ts — DevilboxSynth wrapper for Future Composer WASM engine
- *
- * Implements per-note triggering for Future Composer instruments.
- * Each FCSynth instance owns one fc_create_player() handle.
- *
- * Binary serialisation format for fc_load_instrument() matches fc_synth.c:
- *   [0]          type: 0=FC synth, 1=PCM sample
- *   --- FC SYNTH (type=0) ---
- *   [1]          initialWaveNum (0-46)
- *   [2]          synthSpeed (1-15)
- *   [3..50]      synthTable[16][3]: waveNum(1), transpositionSigned(1), effect(1)
- *   [51]         atkLength (0-255)
- *   [52]         atkVolume (0-64)
- *   [53]         decLength (0-255)
- *   [54]         decVolume (0-64)
- *   [55]         sustVolume (0-64)
- *   [56]         relLength (0-255)
- *   [57]         vibDelay (0-255)
- *   [58]         vibSpeed (0-63)
- *   [59]         vibDepth (0-63)
- *   [60..75]     arpTable[16] (signed bytes)
- *   --- PCM (type=1) ---
- *   [1]          volume (0-64)
- *   [2]          finetune (signed int8 as uint8: finetune+128)
- *   [3..6]       pcmLen uint32 LE
- *   [7..10]      loopStart uint32 LE
- *   [11..14]     loopLen uint32 LE
- *   [15..]       pcmData
+ * FCSynth.ts - DevilboxSynth wrapper for the Future Composer keyboard preview voice.
+ * Each FCSynth instance owns one fc_create_player() handle; the blob layout is
+ * documented at serializeFCConfig and in fc-wasm/src/fc_synth.c.
  */
 
 import type { DevilboxSynth } from '@/types/synth';
 import type { FCConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { FCEngine } from './FCEngine';
+import { encodeFCFreqMacro, encodeFCVolEnvelope } from '@/engine/uade/chipRamEncoders';
+import { extractFC13Wave, fcMacroReach } from '@/lib/import/formats/FCParser';
 
 export class FCSynth implements DevilboxSynth {
   readonly name = 'FCSynth';
@@ -203,85 +180,68 @@ export class FCSynth implements DevilboxSynth {
 }
 
 /**
- * Serialise an FCConfig into the binary format expected by fc_load_instrument().
- * Returns an ArrayBuffer that can be transferred to the AudioWorklet.
+ * Serialise an FCConfig into the blob fc_load_instrument() reads: the
+ * replayer's own instrument, i.e. the 64-byte volume macro, the frequency
+ * macros it reaches and the waves those select (layout in fc_synth.c).
  *
- * FC Synth blob layout (76 bytes total):
- *   [0]        type=0
- *   [1]        initialWaveNum (0-46)
- *   [2]        synthSpeed (1-15)
- *   [3..50]    synthTable[16][3]: waveNum, transpositionSigned, effect
- *   [51..56]   ADSR lengths/volumes: atkLength, atkVolume, decLength, decVolume, sustVolume, relLength
- *   [57..59]   vibDelay, vibSpeed, vibDepth
- *   [60..75]   arpTable[16] signed bytes
+ * Volume macro: header from the config (speed, vibrato), values from the
+ * imported macro bytes, or the editor's ADSR encoded the way it is written to
+ * chip RAM. Frequency macro: the imported bytes, or the editor's synth table
+ * and arpeggio encoded the way it is written to chip RAM.
  */
 export function serializeFCConfig(cfg: FCConfig): ArrayBuffer {
-  const buf = new Uint8Array(76);
+  const vol = new Uint8Array(64).fill(0xE1);
+  vol[0] = cfg.volMacroSpeed ?? Math.max(1, cfg.synthSpeed ?? 1);
+  vol[1] = cfg.freqMacroIndex ?? 0;
+  vol[2] = cfg.vibSpeed ?? 0;
+  vol[3] = cfg.vibDepth ?? 0;
+  vol[4] = cfg.vibDelay ?? 0;
+  const values = cfg.volMacroData && cfg.volMacroData.length > 0
+    ? cfg.volMacroData.slice(0, 59)
+    : Array.from(encodeFCVolEnvelope(cfg));
+  for (let i = 0; i < values.length; i++) vol[5 + i] = values[i] & 0xFF;
 
-  buf[0] = 0; // type=FC synth
-  buf[1] = Math.max(0, Math.min(46, cfg.waveNumber ?? 0));
-  buf[2] = Math.max(1, Math.min(15, cfg.synthSpeed ?? 1));
+  const entry = cfg.freqMacroIndex ?? 0;
+  const macros = new Map<number, Uint8Array>();
+  if (cfg.freqMacros && cfg.freqMacros[entry]) {
+    for (const [k, v] of Object.entries(cfg.freqMacros)) macros.set(Number(k), Uint8Array.from(v));
+  } else {
+    const table = cfg.synthTable && cfg.synthTable.length > 0
+      ? cfg.synthTable
+      : [{ waveNum: cfg.waveNumber ?? 0, transposition: 0, effect: 1 }];
+    macros.set(entry, encodeFCFreqMacro(table, cfg.arpTable ?? []));
+  }
 
-  // synthTable: 16 entries × 3 bytes
-  const table = cfg.synthTable ?? [];
-  for (let i = 0; i < 16; i++) {
-    const step = table[i];
-    const base = 3 + i * 3;
-    if (step) {
-      buf[base]     = Math.max(0, Math.min(46, step.waveNum ?? 0)) & 0xFF;
-      buf[base + 1] = ((step.transposition ?? 0) & 0xFF); // signed → unsigned
-      buf[base + 2] = (step.effect ?? 0) & 0xFF;
+  const reach = fcMacroReach(entry, (i) => macros.get(i) ?? null);
+  const waves: Array<{ idx: number; data: Int8Array; ls: number; ll: number }> = [];
+  reach.waves.forEach((w) => {
+    const banked = cfg.waveBank?.[w];
+    if (banked) {
+      waves.push({ idx: w, data: Int8Array.from(banked.data), ls: banked.loopStart, ll: banked.loopLength });
+    } else if (w >= 10 && w < 57) {
+      const raw = extractFC13Wave(w - 10);
+      waves.push({ idx: w, data: Int8Array.from(raw, (v) => (v < 128 ? v : v - 256)), ls: 0, ll: raw.length });
     }
-    // else zero-filled by default
+  });
+
+  let size = 67 + macros.size * 65 + 1;
+  for (const w of waves) size += 7 + w.data.length;
+  const buf = new Uint8Array(size);
+  buf[0] = 2;
+  buf.set(vol, 1);
+  buf[65] = entry;
+  buf[66] = macros.size;
+  let at = 67;
+  macros.forEach((m, idx) => { buf[at] = idx; buf.set(m.subarray(0, 64), at + 1); at += 65; });
+  buf[at++] = waves.length;
+  for (const w of waves) {
+    buf[at] = w.idx;
+    buf[at + 1] = w.data.length & 0xFF; buf[at + 2] = (w.data.length >> 8) & 0xFF;
+    buf[at + 3] = w.ls & 0xFF; buf[at + 4] = (w.ls >> 8) & 0xFF;
+    buf[at + 5] = w.ll & 0xFF; buf[at + 6] = (w.ll >> 8) & 0xFF;
+    at += 7;
+    buf.set(new Uint8Array(w.data.buffer), at);
+    at += w.data.length;
   }
-
-  buf[51] = Math.max(0, Math.min(255, cfg.atkLength ?? 4));
-  buf[52] = Math.max(0, Math.min(64, cfg.atkVolume ?? 64));
-  buf[53] = Math.max(0, Math.min(255, cfg.decLength ?? 8));
-  buf[54] = Math.max(0, Math.min(64, cfg.decVolume ?? 32));
-  buf[55] = Math.max(0, Math.min(64, cfg.sustVolume ?? 32));
-  buf[56] = Math.max(0, Math.min(255, cfg.relLength ?? 8));
-  buf[57] = Math.max(0, Math.min(255, cfg.vibDelay ?? 0));
-  buf[58] = Math.max(0, Math.min(63, cfg.vibSpeed ?? 0));
-  buf[59] = Math.max(0, Math.min(63, cfg.vibDepth ?? 0));
-
-  const arpTable = cfg.arpTable ?? new Array(16).fill(0);
-  for (let i = 0; i < 16; i++) {
-    buf[60 + i] = (arpTable[i] ?? 0) & 0xFF; // signed → unsigned byte
-  }
-
-  return buf.buffer;
-}
-
-/**
- * Serialise a PCM instrument (FC PCM sample slot) for fc_load_instrument().
- */
-export function serializeFCPcm(
-  pcmData: Uint8Array,
-  volume: number,
-  loopStart: number,
-  loopLen: number,
-  finetune = 0,
-): ArrayBuffer {
-  const totalLen = 15 + pcmData.length;
-  const buf = new Uint8Array(totalLen);
-
-  buf[0] = 1; // type=PCM
-  buf[1] = Math.max(0, Math.min(64, volume)) & 0xFF;
-  buf[2] = ((finetune + 128) & 0xFF); // signed → unsigned
-
-  const len = pcmData.length;
-  buf[3] = len & 0xFF; buf[4] = (len >> 8) & 0xFF;
-  buf[5] = (len >> 16) & 0xFF; buf[6] = (len >> 24) & 0xFF;
-
-  const ls = loopStart;
-  buf[7] = ls & 0xFF; buf[8] = (ls >> 8) & 0xFF;
-  buf[9] = (ls >> 16) & 0xFF; buf[10] = (ls >> 24) & 0xFF;
-
-  const ll = loopLen;
-  buf[11] = ll & 0xFF; buf[12] = (ll >> 8) & 0xFF;
-  buf[13] = (ll >> 16) & 0xFF; buf[14] = (ll >> 24) & 0xFF;
-
-  buf.set(pcmData, 15);
   return buf.buffer;
 }
