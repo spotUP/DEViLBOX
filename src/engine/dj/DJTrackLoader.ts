@@ -180,18 +180,13 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
   if (track.fileName.startsWith('modland:')) {
     const modlandPath = track.fileName.slice('modland:'.length);
     try {
-      const { downloadModlandFile, downloadTFMXCompanion } = await import('@/lib/modlandApi');
-      // Grab the TFMX companion in parallel (no-op for non-TFMX formats).
-      // Auto DJ pre-render without this silently fails with UADE -1 on every
-      // mdat.* track in the playlist.
-      const [buffer, tfmxCompanion] = await Promise.all([
-        downloadModlandFile(modlandPath),
-        downloadTFMXCompanion(modlandPath),
-      ]);
+      const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
+      // One companion fetch: the resolver names every partner, TFMX smpl.*
+      // included. Auto DJ pre-render without them silently fails with UADE -1.
+      const buffer = await downloadModlandFile(modlandPath);
       const filename = modlandPath.split('/').pop() || 'download.mod';
-      const companions = tfmxCompanion
-        ? [{ filename: tfmxCompanion.filename, buffer: tfmxCompanion.buffer }]
-        : undefined;
+      const found = await downloadUADECompanions(modlandPath, buffer);
+      const companions = found.length > 0 ? found : undefined;
 
       if (isAudioFile(filename)) {
         // Audio file - no rendering needed
@@ -441,21 +436,11 @@ async function loadPlaylistTrackToDeckInternal(
   if (track.fileName.startsWith('modland:')) {
     const modlandPath = track.fileName.slice('modland:'.length);
     try {
-      const { downloadModlandFile, downloadTFMXCompanion, downloadUADECompanions } = await import('@/lib/modlandApi');
-      // Download main file + TFMX companion in parallel
-      const [buffer, tfmxCompanion] = await Promise.all([
-        downloadModlandFile(modlandPath),
-        downloadTFMXCompanion(modlandPath),
-      ]);
+      const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
+      const buffer = await downloadModlandFile(modlandPath);
       const filename = modlandPath.split('/').pop() || 'download.mod';
-
-      // Build companion list (TFMX smpl + UADE companions like .nt files)
-      const companions: Array<{ filename: string; buffer: ArrayBuffer }> = [];
-      if (tfmxCompanion) {
-        companions.push({ filename: tfmxCompanion.filename, buffer: tfmxCompanion.buffer });
-      }
-      const uadeCompanions = await downloadUADECompanions(modlandPath, buffer);
-      companions.push(...uadeCompanions);
+      // One companion fetch: the resolver names every partner (TFMX smpl.*, .nt, banks).
+      const companions = await downloadUADECompanions(modlandPath, buffer);
 
       if (isAudioFile(filename)) {
         await getDJEngine().loadAudioToDeck(deckId, buffer, track.fileName);

@@ -19,10 +19,10 @@ const SRC = fs.readFileSync(
 const remoteSection = SRC.slice(SRC.indexOf('── Remote track'));
 
 describe('DJPlaylistAnalyzer companion handling', () => {
-  it('downloads TFMX companions BEFORE the render in the remote section', () => {
-    // The companion download ("downloadTFMXCompanion") must appear before
+  it('downloads companions (TFMX smpl included) BEFORE the render in the remote section', () => {
+    // The companion download ("downloadUADECompanions") must appear before
     // any "loadOrEnqueue" call in the remote-track analysis section.
-    const companionIdx = remoteSection.indexOf('downloadTFMXCompanion');
+    const companionIdx = remoteSection.indexOf('downloadUADECompanions');
     const firstEnqueue = remoteSection.indexOf('loadOrEnqueue');
     expect(companionIdx).toBeGreaterThan(0);
     expect(firstEnqueue).toBeGreaterThan(0);
