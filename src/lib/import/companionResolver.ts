@@ -204,6 +204,15 @@ function suffixed(moduleName: string, siblings: string[]): string[] {
   return siblings.filter(s => lower(s) !== lower(moduleName) && lower(s).startsWith(prefix));
 }
 
+/**
+ * The shared bank an Infogrames tune falls back to: its own name without the
+ * last letter (`bob4e` -> `bob4`). Null for a one-letter name. One rule for the
+ * resolver and for the lone-file prompt.
+ */
+function infogramesBankStem(stem: string): string | null {
+  return stem.length > 1 ? stem.slice(0, -1) : null;
+}
+
 /** Shape 3: the named special cases the server carried. */
 function specialCases(moduleName: string, siblings: string[]): string[] {
   const out: string[] = [];
@@ -225,8 +234,8 @@ function specialCases(moduleName: string, siblings: string[]): string[] {
   if (name.endsWith('.dum')) {
     const stem = name.slice(0, -4);
     const ownIns = find(stem + '.ins') ?? find('ins.' + stem);
-    if (!ownIns && stem.length > 1) {
-      const bank = stem.slice(0, -1);
+    const bank = infogramesBankStem(stem);
+    if (!ownIns && bank) {
       const shared = find(bank + '.ins') ?? find('ins.' + bank);
       if (shared) out.push(shared);
     }
@@ -440,13 +449,19 @@ export function expectedCompanionNames(moduleName: string): string[] {
   const roleFirst = lower(base).startsWith(role + '.');
   // Keep the tune's original casing for the prompt.
   const tune = roleFirst ? base.slice(role.length + 1) : base.slice(0, base.length - role.length - 1);
-  return partners.map(p => {
+  const names = partners.map(p => {
     if (p === SHARED_BANK) return SHARED_BANK;
     if (p.startsWith('.')) return base + p;
     if (p === 'songplay') return 'songplay';
     if (p === 'patch.003') return base.slice(0, 3) + 'patch.003';
     return roleFirst ? `${p}.${tune}` : `${tune}.${p}`;
   });
+  // Infogrames: the bank may be the set's shared one (bob4e.dum takes bob4.ins).
+  if (role === 'dum' && !roleFirst) {
+    const bank = infogramesBankStem(tune);
+    if (bank) names.push(`${bank}.ins`);
+  }
+  return names;
 }
 
 /**

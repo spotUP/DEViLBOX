@@ -72,8 +72,8 @@ describe('companionResolver: shared banks and special cases', () => {
       expect(existsSync(join(dir, f)), f).toBe(true);
     }
   });
-  it('the lone-file prompt names the partner in the module own form', () => {
-    expect(expectedCompanionNames('bob4e.dum')).toEqual(['bob4e.ins']);
+  it('the lone-file prompt names the partner in the module own form, and the shared bank a .dum falls back to', () => {
+    expect(expectedCompanionNames('bob4e.dum')).toEqual(['bob4e.ins', 'bob4.ins']);
     expect(expectedCompanionNames('dns.tune')).toEqual(['smp.tune']);
   });
 });
