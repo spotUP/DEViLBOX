@@ -282,6 +282,7 @@ class PumaTrackerProcessor extends AudioWorkletProcessor {
     const free = this.module?._free || this.module?.free;
     if (free && this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
     if (free && this.levelsPtr) { free(this.levelsPtr); this.levelsPtr = 0; }
+    if (free && this._noteStartsPtr) { free(this._noteStartsPtr); this._noteStartsPtr = 0; }
     this.interleavedBuf = null;
     this.levelsBuf = null;
     this.module = null;
@@ -330,7 +331,15 @@ class PumaTrackerProcessor extends AudioWorkletProcessor {
       const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
       if (heapF32) {
         const off = this.levelsPtr >> 2;
-        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]] });
+        // Cumulative note starts per channel (Paula's DMA off->on edges)
+        let noteStarts = null;
+        if (typeof this.module._player_get_note_start_counts === 'function') {
+          if (!this._noteStartsPtr) this._noteStartsPtr = this.module._malloc(4 * 4);
+          this.module._player_get_note_start_counts(this._noteStartsPtr, 4);
+          const heapU8 = this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer);
+          noteStarts = Array.from(new Uint32Array(heapU8.buffer, this._noteStartsPtr, 4));
+        }
+        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts });
       }
     }
 

@@ -38,6 +38,8 @@ static uint16_t     s_last_dmacon = 0;
 // Mixer state: outside s_ch so paula_reset (every song load) keeps mute/solo.
 static float        s_channel_gain[PAULA_CHANNELS] = { 1.0f, 1.0f, 1.0f, 1.0f };
 static float        s_channel_peaks[PAULA_CHANNELS];
+// Cumulative note starts per channel: DMA off->on edges, the chip's own note trigger.
+static uint32_t     s_note_starts[PAULA_CHANNELS];
 
 #define SCOPE_LEN 256
 static int16_t s_scope[PAULA_CHANNELS][SCOPE_LEN];
@@ -62,6 +64,7 @@ void paula_reset(void) {
     memset(s_ch, 0, sizeof(s_ch));
     for (i = 0; i < PAULA_CHANNELS; i++) { s_ch[i].loop = 1; s_channel_peaks[i] = 0.0f; }
     s_last_dmacon = 0;
+    memset(s_note_starts, 0, sizeof(s_note_starts));
 }
 
 void paula_set_clock(float clock) { s_paula_clock = clock; }
@@ -115,6 +118,7 @@ void paula_dma_write(uint16_t dmacon) {
             c->completed  = 0;
             c->dma_on     = 1;
             c->latched    = 1;
+            s_note_starts[i]++;
         } else {
             c->dma_on = 0;
         }
@@ -227,6 +231,11 @@ int paula_render_voices(float* buffer, float* voices, int stride, int frames) {
         buffer[i * 2 + 1] = (out[1] + out[2]) * 0.5f;
     }
     return frames;
+}
+
+void paula_get_note_start_counts(uint32_t* out, int n) {
+    int i;
+    for (i = 0; i < n; i++) out[i] = i < PAULA_CHANNELS ? s_note_starts[i] : 0;
 }
 
 void paula_get_channel_levels(float* out4) {
