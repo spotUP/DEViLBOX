@@ -11,6 +11,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { UADEConfig } from '@/types/instrument';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { keyOnWholeSongPlayer } from '../wholeSongKeyboard';
 import { UADEEngine } from './UADEEngine';
 
 export class UADESynth implements DevilboxSynth {
@@ -72,21 +73,23 @@ export class UADESynth implements DevilboxSynth {
     if (this._initPromise) await this._initPromise;
   }
 
+  /** A key plays nothing: the whole-song player has no single-instrument voice, and must not start the song. */
   triggerAttack(_note?: string | number, _time?: number, _velocity?: number): void {
     if (this._disposed) return;
-    this.engine.play();
+    keyOnWholeSongPlayer('UADE');
   }
 
   triggerRelease(_note?: string | number, _time?: number): void {
-    if (this._disposed) return;
-    this.engine.stop();
+    // A key-up never stops the song.
   }
 
   /**
    * Release all / stop playback (panic button, song stop, etc.)
    */
+  /** Panic / song stop: this one does stop the player. */
   releaseAll(): void {
-    this.triggerRelease();
+    if (this._disposed) return;
+    this.engine.stop();
   }
 
   set(param: string, value: number): void {
