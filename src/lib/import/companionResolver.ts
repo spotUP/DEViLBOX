@@ -422,3 +422,36 @@ export function companionFilesIn(listing: CompanionListing, keepAsModule: (name:
   return out;
 }
 
+
+/**
+ * Roles whose player cannot start without the partner file: UADE answers a
+ * lone one with "file not found '/uade/SMP.<tune>'" / "'/uade/<tune>.ins'".
+ * Only formats confirmed that way belong here; roles with a shared-bank
+ * fallback or a single-file variant (TFMX `mdat`) stay out.
+ */
+export const PARTNER_REQUIRED_ROLES: ReadonlySet<string> = new Set(['jpn', 'jpnd', 'dum']);
+
+/**
+ * Files in a listing that cannot play because the other half is not there:
+ *
+ *   * a module of a PARTNER_REQUIRED_ROLES role with nothing resolved beside
+ *     it (`jpn.virocop-14` with no `smp.virocop-14`, `bob4e.dum` with no
+ *     `bob4e.ins`);
+ *   * a StarTrekker `<module>.nt` whose `<module>` is not listed. The `.nt`
+ *     holds synth data only; offered alone UADE says "Cannot play file".
+ *
+ * A song index must not offer these as songs (jukebox, 2026-10-06). The
+ * partner is absent from the corpus, so no loader can supply it.
+ */
+export function partnerlessFilesIn(listing: CompanionListing): Set<string> {
+  const out = new Set<string>();
+  const names = new Set(listing.siblings.map(lower));
+  for (const file of listing.siblings) {
+    const { role } = splitName(file);
+    if (role !== null && PARTNER_REQUIRED_ROLES.has(role)
+      && resolveCompanions(file, listing).companions.length === 0) out.add(file);
+    const owner = /^(.+)\.nt$/i.exec(file);
+    if (owner && !names.has(lower(owner[1]))) out.add(file);
+  }
+  return out;
+}
