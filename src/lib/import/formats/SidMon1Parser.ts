@@ -357,7 +357,8 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
       sidmon1: sm1Config,
       uadeChipRam: chipRam,
       effects: [],
-      volume: -6,
+      // 0 dB: sidmon1_synth.c already renders at the replayer's per-voice level.
+      volume: 0,
       pan: 0,
     } as InstrumentConfig);
   }

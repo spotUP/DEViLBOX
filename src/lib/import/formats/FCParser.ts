@@ -978,7 +978,8 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
       synthType: 'FCSynth' as const,
       fc: config,
       effects: [],
-      volume: -6,
+      // 0 dB: fc_synth.c already renders at the replayer's per-voice level.
+      volume: 0,
       pan: 0,
       uadeChipRam: chipRam,
     } as unknown as InstrumentConfig);
