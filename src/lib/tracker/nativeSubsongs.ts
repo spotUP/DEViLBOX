@@ -1,7 +1,8 @@
 /**
  * Subsongs of a whole-song engine: game-music-emu (NSF, GBS, HES, KSS, SPC,
- * VGM, GYM), ASAP (SAP and the other Atari 8-bit formats) and PSG play
- * (SNDH). One file holds several tunes; the engine plays one at a time and
+ * VGM, GYM), ASAP (SAP and the other Atari 8-bit formats), PSG play
+ * (SNDH) and the eagleplayer runner (EaglePlayerEngine: Amiga players with
+ * DTP_SubSongRange, e.g. Core Design, Wally Beben). One file holds several tunes; the engine plays one at a time and
  * says which (its load report). The format store keeps that report
  * (`nativeSubsongs`), the scope view's subsong control shows it, and the
  * silence detector's song-end advances through it instead of stopping the
@@ -11,7 +12,7 @@
  */
 
 /** The engines that play one subsong of a file - their `NativeEngineRouting` keys. */
-export type NativeSubsongEngine = 'Gme' | 'Asap' | 'Psgplay';
+export type NativeSubsongEngine = 'Gme' | 'Asap' | 'Psgplay' | 'EaglePlayer';
 
 export interface NativeSubsongs {
   engine: NativeSubsongEngine;
@@ -59,11 +60,12 @@ export function subsongLabel(s: NativeSubsongs, index: number): string {
  * The format-store field that tells the engine which subsong to start when
  * the song is (re)loaded - play after a stop starts the subsong last heard.
  */
-export function subsongStartField(s: NativeSubsongs): { gmeTrack: number } | { sndhSubtune: number } | { asapSong: number } {
+export function subsongStartField(s: NativeSubsongs): { gmeTrack: number } | { sndhSubtune: number } | { asapSong: number } | { eaglePlayerSubsong: number } {
   switch (s.engine) {
     case 'Gme': return { gmeTrack: s.current };
     case 'Psgplay': return { sndhSubtune: s.current + 1 };
     case 'Asap': return { asapSong: s.current };
+    case 'EaglePlayer': return { eaglePlayerSubsong: s.current };
   }
 }
 

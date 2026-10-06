@@ -84,6 +84,7 @@ int main(int argc, char **argv) {
     eagle_render(buf, NULL, frames, 0);
   }
   double s = 0; for (int i = 0; i < frames * 2; i++) s += buf[i] * buf[i];
+  fprintf(stderr, "cia irqs A.ta %u A.tb %u B.ta %u B.tb %u\n", ah_cia_timer_irqs(0, 0), ah_cia_timer_irqs(0, 1), ah_cia_timer_irqs(1, 0), ah_cia_timer_irqs(1, 1));
   fprintf(stderr, "rms %.4f ended %d\n", frames ? __builtin_sqrt(s / (frames * 2)) : 0.0, eagle_song_ended());
   if (out) { FILE *f = fopen(out, "wb"); fwrite(buf, sizeof(float), (size_t)frames * 2, f); fclose(f); }
   return 0;

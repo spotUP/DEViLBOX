@@ -24,6 +24,7 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
     this.loaded = false;
     this.playing = false;
     this.songEndSent = false;
+    this.lastTicks = -1;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
@@ -56,15 +57,28 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
         if (this.module) this.module._ep_wasm_set_voice_mask(data.mask >>> 0);
         break;
       case 'setSubsong':
-        if (this.module && this.loaded) {
-          this.module._ep_wasm_set_subsong(data.subsong | 0);
-          this.songEndSent = false;
-        }
+        // data.index: 0-based into the player's subsong range.
+        this.port.postMessage({ type: 'subsongStarted', index: this.startSubsong(data.index | 0), count: this.subsongCount() });
         break;
       case 'dispose':
         this.cleanup();
         break;
     }
+  }
+
+  subsongCount() {
+    const m = this.module;
+    return m && this.loaded ? m._ep_wasm_subsong_max() - m._ep_wasm_subsong_min() + 1 : 0;
+  }
+
+  /** Start subsong `index` (0-based); returns it, or -1 outside the range. */
+  startSubsong(index) {
+    const m = this.module;
+    if (!m || !this.loaded || index < 0 || index >= this.subsongCount()) return -1;
+    m._ep_wasm_set_subsong(m._ep_wasm_subsong_min() + index);
+    this.songEndSent = false;
+    this.lastTicks = -1;
+    return index;
   }
 
   writeBytes(bytes, zeroTerminate) {
@@ -115,8 +129,14 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
         return;
       }
       this.loaded = true;
+      // A subsong other than the player's default (the store's start field).
+      if (typeof data.subsongIndex === 'number' && data.subsongIndex !== m._ep_wasm_subsong_current() - m._ep_wasm_subsong_min()) {
+        this.startSubsong(data.subsongIndex);
+      }
       this.port.postMessage({
         type: 'moduleLoaded',
+        moduleName: data.moduleName,
+        moduleBytes: mod.length,
         player: m.UTF8ToString(m._ep_wasm_player_name()),
         subsongMin: m._ep_wasm_subsong_min(),
         subsongMax: m._ep_wasm_subsong_max(),
@@ -236,6 +256,13 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
     if (globalThis.DevilboxChannelStream) {
       this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
       this._stream.writeFloat32(voices, rendered);
+    }
+    // The player's tick count (score's DTP_Interrupt clock) for the grid
+    // follow: the engine maps it to a grid row (src/lib/tracker/tickGridPosition.ts).
+    const ticks = this.module._ep_wasm_player_ticks() >>> 0;
+    if (ticks !== this.lastTicks) {
+      this.lastTicks = ticks;
+      this.port.postMessage({ type: 'position', ticks, subsong: this.module._ep_wasm_subsong_current() });
     }
     if (!this.songEndSent && this.module._ep_wasm_song_ended()) {
       this.songEndSent = true;

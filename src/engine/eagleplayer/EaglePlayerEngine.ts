@@ -22,14 +22,36 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 import { eaglePlayerFormat, eaglePlayerModuleName, eaglePlayerUrl } from './eaglePlayerFormats';
+import { SubsongRequests, reportSubsongs } from '@engine/wasm/subsongRequests';
+import { advanceNativeSubsong } from '@engine/replayer/nativeSubsongPlayback';
+import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
+import { tickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
+import type { TrackerSong } from '@engine/TrackerReplayer';
 
-export class EaglePlayerEngine extends WASMChannelOutputsEngine {
+/** What the grid follow gets: the order position and row the player is at. */
+export interface EaglePlayerPosition { songPos: number; row: number; ticks: number }
+
+/** The grid geometry the player's tick count maps onto (tickGridPosition). */
+export function eaglePlayerGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition'>): TickGrid {
+  return {
+    speed: song.initialSpeed || 6,
+    songPositions: song.songPositions,
+    patternLengths: song.patterns.map((p) => p.length),
+    // The player loops its song; the grid goes round with it.
+    loopFrom: song.restartPosition ?? 0,
+  };
+}
+
+export class EaglePlayerEngine extends WASMChannelOutputsEngine implements SubsongPlayer {
   private static instance: EaglePlayerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
   /** Player binaries by file name, fetched once per page. */
   private static players = new Map<string, Promise<ArrayBuffer>>();
 
   private _songEndCallback: (() => void) | null = null;
+  private _positionCallbacks = new Set<(p: EaglePlayerPosition) => void>();
+  private _grid: TickGrid | null = null;
+  private readonly subsongRequests = new SubsongRequests();
 
   private constructor() {
     super();
@@ -78,13 +100,28 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine {
           break;
         case 'moduleLoaded':
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 1', 'Paula 2', 'Paula 3', 'Paula 4']);
-          console.log(`[EaglePlayerEngine] ${data.player} loaded, subsongs ${data.subsongMin}-${data.subsongMax}`);
+          // The player's DTP_SubSongRange, 0-based for the subsong model.
+          reportSubsongs('EaglePlayer', data.subsongMax - data.subsongMin + 1, data.subsongCurrent - data.subsongMin);
+          console.log(`[EaglePlayerEngine] ${data.player} loaded (${data.moduleName}, ${data.moduleBytes} bytes), subsongs ${data.subsongMin}-${data.subsongMax}, playing ${data.subsongCurrent}`);
+          break;
+        case 'subsongStarted':
+          if ((data.index as number) >= 0) reportSubsongs('EaglePlayer', data.count as number, data.index as number);
+          this.subsongRequests.settle(data.index as number);
+          break;
+        case 'position':
+          if (this._grid && this._positionCallbacks.size > 0) {
+            const at = { ...tickGridPosition(data.ticks as number, this._grid), ticks: data.ticks as number };
+            for (const cb of this._positionCallbacks) cb(at);
+          }
           break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'songEnd':
+          // The player said its song is over: the next subsong, when the
+          // setting asks for it (the same step the silence detector takes).
           this._songEndCallback?.();
+          void advanceNativeSubsong('EaglePlayer', this);
           break;
         case 'error':
           console.error('[EaglePlayerEngine]', data.message);
@@ -113,7 +150,7 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine {
   }
 
   /** Load a module for the format `formatId` (EAGLE_PLAYER_FORMATS key). */
-  async loadTune(moduleData: ArrayBuffer, formatId?: string, fileName?: string): Promise<void> {
+  async loadTune(moduleData: ArrayBuffer, formatId?: string, fileName?: string, subsong?: number): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('EaglePlayerEngine not initialized');
     const fmt = eaglePlayerFormat(formatId);
@@ -124,6 +161,8 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine {
       moduleData, playerData,
       moduleName: eaglePlayerModuleName(fmt, fileName || fmt.id),
       options: fmt.options,
+      // 0-based into the player's subsong range; undefined = its default.
+      subsongIndex: typeof subsong === 'number' && subsong >= 0 ? subsong : undefined,
     }, [moduleData, playerData]);
   }
 
@@ -139,9 +178,28 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
   }
 
-  /** Ask the player for another subsong (score's AMIGAMSG_SETSUBSONG). */
-  setSubsong(subsong: number): void {
-    this.workletNode?.port.postMessage({ type: 'setSubsong', subsong });
+  /**
+   * Start subsong `index` (0-based into the player's range) - score's
+   * AMIGAMSG_SETSUBSONG. Resolves to the subsong started, or -1.
+   */
+  playSubsong(index: number): Promise<number> {
+    const node = this.workletNode;
+    if (!node) return Promise.resolve(-1);
+    return this.subsongRequests.request(() => node.port.postMessage({ type: 'setSubsong', index }));
+  }
+
+  /**
+   * The grid the player's position maps onto - the song as loaded
+   * (speed ticks per row, patterns in order). Set by the route on start.
+   */
+  setGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition'>): void {
+    this._grid = eaglePlayerGrid(song);
+  }
+
+  /** The player's grid position as it plays (each player tick). */
+  onPositionUpdate(cb: (p: EaglePlayerPosition) => void): () => void {
+    this._positionCallbacks.add(cb);
+    return () => this._positionCallbacks.delete(cb);
   }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }

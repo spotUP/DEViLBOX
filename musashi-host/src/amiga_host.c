@@ -64,6 +64,7 @@ typedef struct {
   uint32_t tod, todLatch;   /* 24-bit event counter, latched on a high-byte read */
   int todLatched, todStopped;
   double eAcc;
+  uint32_t irqs[2];         /* timer A / B underflows that raised the interrupt (ICR mask set) */
 } Cia;
 static Cia ciaA, ciaB;
 
@@ -200,6 +201,7 @@ static uint16_t custom_read16(uint32_t reg) {
 static void cia_raise(Cia *c, uint8_t bit, int isB) {
   c->icrData |= bit;
   if (c->icrMask & bit) {
+    if (bit & 0x03) c->irqs[bit >> 1]++;
     intreq |= isB ? 0x2000 : 0x0008;   /* EXTER (level 6) / PORTS (level 2) */
     update_ipl();
   }
@@ -470,5 +472,9 @@ void ah_set_voice_mask(uint32_t mask) {
 
 double ah_colour_clocks(void) { return now_cc(); }
 uint16_t ah_intena(void) { return intena; }
+uint32_t ah_cia_timer_irqs(int cia, int timer) {
+  const Cia *c = cia ? &ciaB : &ciaA;
+  return c->irqs[timer ? 1 : 0];
+}
 uint16_t ah_intreq(void) { return intreq; }
 uint16_t ah_dmacon(void) { return dmacon; }

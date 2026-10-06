@@ -55,6 +55,12 @@ int eagle_subsong_current(void);
  * UADE_COMMAND_SONG_END_NOT_POSSIBLE. */
 void eagle_set_song_end_detection(int on);
 
+/* Player ticks since the (sub)song started: score calls the player's
+ * DTP_Interrupt from CIA-A timer B (UADE counts the same timer,
+ * cia.c uade_wasm_on_player_tick). A grid drawn `speed` ticks per row
+ * follows playback with row = ticks / speed. */
+uint32_t eagle_player_ticks(void);
+
 /* 1 once the player reported its song end. */
 int eagle_song_ended(void);
 void eagle_stop(void);
