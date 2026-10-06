@@ -327,3 +327,10 @@ Owner: estimated grids are useless; reverse each format to its real data. Work l
 - [ ] Check NATIVE_ROUTES (UADEParser.ts:527-1040, return :1089): stub grid returned without a note-count check.
 - Cheap extra: Pxtone, Organya, Eupmini, Ixalance, Psycle, ZXTune have documented event data but show an empty shell (scope view).
 - Open bugs: SAP warhawk double speed; eight track-index engines may get the grid's pattern index for edits (SoundMon, DigMug, SonicArranger, DM1/2, InStereo1/2, Synthesis); undo/redo and macro paste reach no engine.
+- [x] Digital Sonix & Chrome (5ada02984, playhead dc3ff4d13) - owner: in sync, real.
+- [x] Sound Player (d7895285b) - owner: in sync, real.
+- [ ] MIDI Loriciel (01589f808) - owner: plays correct, but grid speed/length/note distribution wrong -> agent reworking layout + playhead.
+- [x] Fred Editor (e4d9eb725) - decoded from real structures; to be heard.
+- [ ] Sound Master - agent running. Jochen Hippel ST - agent running.
+- Yardstick: gridVsPaula misreads players that write the period twice in a note's tick (Fred); fix against real note-on traces (runner) before relying on its scores for such formats.
+- No-guess rule live (047ca8685): UADE-scan grids open in the scope view.

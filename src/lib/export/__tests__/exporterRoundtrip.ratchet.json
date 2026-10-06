@@ -146,11 +146,11 @@
     },
     "fredEditor": {
       "exporter": "FredEditorExporter.exportFredEditor",
-      "tier": "byte-exact",
-      "status": "byte-exact",
+      "tier": "pattern-data",
+      "status": "pattern-match",
       "matchPct": 1,
-      "cells": 9704,
-      "bytes": 9704
+      "cells": 65312,
+      "bytes": 11080
     },
     "futurePlayer": {
       "exporter": "FuturePlayerExporter.exportAsFuturePlayer",
