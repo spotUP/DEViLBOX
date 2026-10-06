@@ -7,6 +7,7 @@
  * TFMEngine singleton pattern.
  */
 
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
@@ -19,6 +20,8 @@ import {
 export class TFMEngine extends WASMSingletonBase {
   private static instance: TFMEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private readonly _positions = new PositionCallbacks();
 
   private constructor() {
     super();
@@ -71,6 +74,9 @@ export class TFMEngine extends WASMSingletonBase {
           useOscilloscopeStore.getState().setChipInfo(6, 0, ['YM2203 A FM 1', 'YM2203 A FM 2', 'YM2203 A FM 3', 'YM2203 B FM 1', 'YM2203 B FM 2', 'YM2203 B FM 3']);
           console.log('[TFMEngine] TFM Music Maker file loaded');
           break;
+        case 'position':
+          this._positions.emit(data);
+          break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
@@ -103,7 +109,13 @@ export class TFMEngine extends WASMSingletonBase {
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
 
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
+  }
+
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     if (TFMEngine.instance === this) TFMEngine.instance = null;
   }

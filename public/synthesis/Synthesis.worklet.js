@@ -45,7 +45,7 @@ class SynthesisProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; break;
+      case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._syn_select_subsong(this.handle, 0);
@@ -171,6 +171,16 @@ class SynthesisProcessor extends AudioWorkletProcessor {
       }
     }
 
+    // Playhead: the song-order index and row the music is on, posted when they
+    // change (the engine's onPositionUpdate; the grid is songPositions x rows).
+    const playRow = this.module._syn_get_play_row(this.handle);
+    if (playRow >= 0) {
+      const songPos = this.module._syn_get_play_order_index(this.handle);
+      if (songPos !== this._lastSongPos || playRow !== this._lastRow) {
+        this._lastSongPos = songPos; this._lastRow = playRow;
+        this.port.postMessage({ type: 'position', songPos, row: playRow });
+      }
+    }
     if (this.module._syn_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });
     return true;
   }

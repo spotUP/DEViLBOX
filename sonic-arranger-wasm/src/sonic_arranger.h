@@ -34,6 +34,8 @@ bool sa_has_ended(const SaModule* module);
 
 // Pattern info
 int sa_get_num_positions(const SaModule* module);
+int sa_get_play_order_index(const SaModule* module);
+int sa_get_play_row(const SaModule* module);
 int sa_get_num_track_lines(const SaModule* module);
 int sa_get_rows_per_track(const SaModule* module, int subsong);
 

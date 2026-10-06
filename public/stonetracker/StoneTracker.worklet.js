@@ -63,6 +63,7 @@ class StoneTrackerProcessor extends AudioWorkletProcessor {
             free(bankPtr);
 
             if (result === 0) {
+              this._lastSongPos = -1; this._lastRow = -1;
               this.port.postMessage({ type: 'moduleLoaded' });
             } else {
               const why = { '-2': 'not a StoneTracker SPM song', '-3': 'not a StoneTracker SPS bank (or an unsupported packing)', '-4': 'the player refused the module', '-5': 'the 68k player crashed' }[String(result)] || '';
@@ -177,6 +178,17 @@ class StoneTrackerProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
   }
 
+  postPlayhead() {
+    const m = this.module;
+    if (typeof m._st_wasm_get_position !== 'function') return;
+    const songPos = m._st_wasm_get_position();
+    const row = m._st_wasm_get_line();
+    if (songPos < 0 || row < 0) return;
+    if (songPos === this._lastSongPos && row === this._lastRow) return;
+    this._lastSongPos = songPos; this._lastRow = row;
+    this.port.postMessage({ type: 'position', songPos, row });
+  }
+
   process(inputs, outputs) {
     if (!this.initialized || !this.module) return true;
     const output = outputs[0];
@@ -203,6 +215,10 @@ class StoneTrackerProcessor extends AudioWorkletProcessor {
         outputR[i] = this.interleavedBuf[i * 2 + 1];
       }
     }
+
+    // Playhead: the order position and line the player is on, posted when they
+    // change (the engine's onPositionUpdate; the grid is songPositions x rows).
+    this.postPlayhead();
     return true;
   }
 }

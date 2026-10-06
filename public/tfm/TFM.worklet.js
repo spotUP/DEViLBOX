@@ -72,6 +72,7 @@ class TFMProcessor extends AudioWorkletProcessor {
             if (free) free(wasmPtr);
 
             if (result === 0) {
+              this._lastSongPos = -1; this._lastRow = -1;
               this.port.postMessage({ type: 'moduleLoaded' });
             } else {
               this.port.postMessage({ type: 'error', message: 'tfm_wasm_load failed with code ' + result + (result === -2 ? ' (not a TFM Music Maker file)' : '') });
@@ -220,6 +221,17 @@ class TFMProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
   }
 
+  postPlayhead() {
+    const m = this.module;
+    if (typeof m._tfm_wasm_get_position !== 'function') return;
+    const songPos = m._tfm_wasm_get_position();
+    const row = m._tfm_wasm_get_line();
+    if (songPos < 0 || row < 0) return;
+    if (songPos === this._lastSongPos && row === this._lastRow) return;
+    this._lastSongPos = songPos; this._lastRow = row;
+    this.port.postMessage({ type: 'position', songPos, row });
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.module) return true;
     const output = outputs[0];
@@ -252,6 +264,10 @@ class TFMProcessor extends AudioWorkletProcessor {
         }
       }
     }
+
+    // Playhead: the order position and line the player is on, posted when they
+    // change (the engine's onPositionUpdate; the grid is songPositions x rows).
+    this.postPlayhead();
     return true;
   }
 }

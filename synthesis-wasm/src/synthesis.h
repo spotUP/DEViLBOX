@@ -31,6 +31,8 @@ bool syn_has_ended(const SynModule* module);
 int syn_get_instrument_count(const SynModule* module);
 int syn_get_num_track_lines(const SynModule* module);
 int syn_get_num_positions(const SynModule* module);
+int syn_get_play_order_index(const SynModule* module);
+int syn_get_play_row(const SynModule* module);
 
 void syn_get_cell(const SynModule* module, int idx,
                    uint8_t* note, uint8_t* instrument, uint8_t* arpeggio,
