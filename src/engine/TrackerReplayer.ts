@@ -1980,6 +1980,7 @@ export class TrackerReplayer {
     // XM, IT, S3M and AdPlug all use note numbers (1-96/120) instead of Amiga periods
     this.useXMPeriods = song.format === 'XM' || song.format === 'IT' || song.format === 'S3M' || song.format === 'AdPlug';
     this.linearPeriods = song.linearPeriods ?? (song.format === 'XM' || song.format === 'AdPlug');
+    getToneEngine().amigaPeriodSong = !this.useXMPeriods;
 
     // Set initial playback state
     this.songPos = 0;
