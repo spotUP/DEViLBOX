@@ -24,6 +24,9 @@ size_t ma_render(MaModule* module, float* interleaved_stereo, size_t frames);
 bool ma_has_ended(const MaModule* module);
 
 void ma_set_channel_mask(MaModule* module, uint32_t mask);
+/* Cumulative note starts of voice ch (reset with the song) and its current volume 0..1. */
+uint32_t ma_note_start_count(const MaModule* module, int ch);
+float ma_channel_level(const MaModule* module, int ch);
 
 /* Track data access for pattern editing */
 size_t ma_track_count(const MaModule* module);
