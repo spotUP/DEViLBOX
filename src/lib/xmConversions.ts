@@ -9,6 +9,7 @@ import { sunEffectToString } from './import/formats/sunEffectGlyphs';
 import { sonixEffectToString } from './import/formats/sonixEffectGlyphs';
 import { soundPlayerEffectToString } from './import/formats/soundPlayerEffectGlyphs';
 import { fredEffectToString } from './import/formats/fredEffectGlyphs';
+import { soundMasterEffectToString } from './import/formats/soundMasterEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
@@ -267,6 +268,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Fred Editor private control effects (reserved block 0x70..0x73).
   const fred = fredEffectToString(effTyp, eff);
   if (fred !== null) return fred;
+
+  // Sound Master private control effects (reserved block 0x74..0x78).
+  const sm = soundMasterEffectToString(effTyp, eff);
+  if (sm !== null) return sm;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;

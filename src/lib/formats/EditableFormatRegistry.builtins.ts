@@ -106,6 +106,7 @@ registerEditableFormat({ formatId: "soundControl", label: "Sound Control", patte
 registerEditableFormat({ formatId: "soundFactory", label: "Sound Factory", patternCodec: { kind: "fixed" }, exporter: { module: "SoundFactoryExporter", fn: "exportSoundFactory", byLayout: true } });
 registerEditableFormat({ formatId: "soundFactoryStub", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "soundfx", label: "Sound-FX", patternCodec: { kind: "fixed" }, exporter: { module: "SoundFXExporter", fn: "exportSoundFX", byLayout: true } });
+registerEditableFormat({ formatId: "soundMaster", label: "Sound Master", patternCodec: { kind: "fixed" }, exporter: { module: "SoundMasterExporter", fn: "exportSoundMaster", byLayout: true } });
 registerEditableFormat({ formatId: "soundMon", label: "SoundMon", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "startrekkerAM", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "steveTurner", label: "", patternCodec: { kind: "variable" } });

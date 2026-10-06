@@ -1,9 +1,13 @@
 /**
- * SoundMasterParser.ts — Sound Master Amiga music format native parser
+ * SoundMasterParser.ts - Sound Master (Michiel J. Soede, 1991-94) native parser
  *
- * Sound Master (versions 1.0–3.0) was written by Michiel J. Soede. The module
- * file is a compiled 68k Amiga executable combining player code and music data
- * in a single binary. MI_MaxSamples = 32 (from InfoBuffer in the player asm).
+ * A Sound Master module is its own replayer plus the song (sm., sm1.-sm3.,
+ * smpro.; .sm/.sm3/.smpro). The grid is the song the replayer walks, decoded
+ * from the module's positions, blocks and patterns where the player's own
+ * code addresses them (SoundMasterModule.ts, soundMasterGrid.ts): one grid
+ * pattern per block the song plays, the four voices in step, a row = `speed`
+ * play calls. UADE plays the module; grid edits are written into its chip RAM
+ * through the layout's writeCell.
  *
  * Detection (from UADE "Sound Master_v1.asm", DTP_Check2 routine):
  *   1. word[0] must be 0x6000 (BRA.W opcode).
@@ -20,42 +24,25 @@
  *
  * UADE eagleplayer.conf: SoundMaster  prefixes=sm,sm1,sm2,sm3,smpro
  *
- * Single-file format: player code + music data + samples all in one binary
- * blob. This parser extracts metadata only; UADE handles actual audio playback.
- *
- * Reference:
- *   third-party/uade-3.05/amigasrc/players/wanted_team/SoundMaster/Sound Master_v1.asm
- * Reference parsers: JeroenTelParser.ts, JasonPageParser.ts
+ * Research: thoughts/shared/research/2026-10-06_sound-master-format.md
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
-
-// NOTE: uadePatternLayout not added — Sound Master uses compiled 68k executable
-// layout with variable-length note data discovered by opcode scanning. No fixed-size
-// cell format exists. Requires UADEVariablePatternLayout with per-track tracking.
-
-// ── Constants ───────────────────────────────────────────────────────────────
-
-/**
- * Maximum number of samples as declared in InfoBuffer:
- *   MI_MaxSamples = 32
- */
-const MAX_SAMPLES = 32;
+import type { InstrumentConfig, Pattern } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { createSamplerInstrument } from './AmigaUtils';
+import { SmSong, soundMasterGrid, smCellEffectColumns } from './soundMasterGrid';
 
 const NUM_CHANNELS = 4;
-const ROWS_PER_PATTERN = 64;
+/** Paula's C-2 rate (period 428): a sample played at grid note C-2 sounds at its recorded pitch. */
+const SAMPLE_RATE = 8287;
+const CHANNEL_PAN = [-50, 50, 50, -50];
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
 function u16BE(buf: Uint8Array, off: number): number {
   if (off + 1 >= buf.length) return 0;
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
-}
-
-function i16BE(buf: Uint8Array, off: number): number {
-  const v = u16BE(buf, off);
-  return v < 0x8000 ? v : v - 0x10000;
 }
 
 function u32BE(buf: Uint8Array, off: number): number {
@@ -150,367 +137,6 @@ export function isSoundMasterFormat(buffer: ArrayBuffer, filename?: string): boo
   return u32BE(buf, checkOff - 6) === 0x00bfe001;
 }
 
-// ── Data extraction helpers ─────────────────────────────────────────────────
-
-/**
- * Sample info entry extracted from the module binary.
- * New format: 6 bytes per entry (u32 offset, u16 word-length).
- * Old format: 4 bytes offset + 2 bytes length in a different layout.
- */
-interface SMSampleInfo {
-  offset: number;   // byte offset to PCM data (relative to sample base)
-  length: number;   // sample length in words (multiply by 2 for bytes)
-}
-
-/**
- * Song entry from the position list.
- * 3 bytes per entry: (byte0, byte1, byte2).
- * A null entry (0, 0, 1) marks the end.
- */
-interface SMSongEntry {
-  byte0: number;   // position / pattern index
-  byte1: number;   // speed or second index
-  byte2: number;   // end mark or flag
-}
-
-/**
- * Results of scanning the module binary for data structures.
- */
-interface SMScanResult {
-  isNewFormat: boolean;
-  samples: SMSampleInfo[];
-  songEntries: SMSongEntry[];
-  numSubSongs: number;
-  songLength: number;
-}
-
-/**
- * Scan the Sound Master module binary to extract sample info and song entries.
- *
- * Detection algorithm (from Sound Master_v1.asm InitPlayer):
- *
- * 1. Find the code entry: A1 = module + 2 + word@(module+2)
- * 2. Determine format variant (new vs old) by scanning for specific opcodes
- * 3. Scan for $1743 (MOVE.B (D7,A3),D3) to find the position/song data
- * 4. Scan for $41EB (LEA d16(A3),A0) to find the sample info table (new format)
- *    or $3D70 / $D5F0 for old format
- *
- * Returns null if the scan fails.
- */
-function scanSMStructures(buf: Uint8Array): SMScanResult | null {
-  try {
-    if (buf.length < 14) return null;
-
-    const d2 = u16BE(buf, 2);  // first BRA displacement
-    const moduleBase = 0;
-
-    // A1 = module + 2 + d2 (second init entry point)
-    const a1Init = 2 + d2;
-    if (a1Init >= buf.length) return null;
-
-    // Determine format: check for $1740 at specific offsets
-    let isNewFormat = false;
-    if (a1Init + 8 < buf.length) {
-      if (u16BE(buf, a1Init + 6) === 0x1740 || u16BE(buf, a1Init + 4) === 0x1740) {
-        isNewFormat = true;
-      }
-    }
-
-    // ── Find position/song data via $1743 scan ─────────────────────────────
-
-    let positionOff = -1;
-    let songAnchorOff = -1;
-
-    // The $1743 scan in InitPlayer starts from module base (A0)
-    for (let i = moduleBase; i + 1 < buf.length && i < buf.length - 2; i += 2) {
-      if (u16BE(buf, i) === 0x1743) {
-        songAnchorOff = i + 2;  // displacement word follows the opcode
-        break;
-      }
-    }
-
-    // After finding $1743, locate the $47FA (LEA pc-relative) scan
-    // which gives us the song data base pointer (A6/A3)
-    let songBase = -1;
-    if (a1Init + 40 < buf.length) {
-      // Find $47FA or $3C00 near A1 to locate the data base
-      for (let i = a1Init; i + 3 < buf.length && i < a1Init + 200; i += 2) {
-        if (u16BE(buf, i) === 0x47fa) {
-          const disp = i16BE(buf, i + 2);
-          songBase = i + 2 + disp;
-          break;
-        }
-      }
-    }
-
-    // Read position data: the $1743 displacement gives offset to song entries
-    const songEntries: SMSongEntry[] = [];
-    if (songAnchorOff >= 0 && songBase >= 0) {
-      const songDisp = i16BE(buf, songAnchorOff);
-      positionOff = songBase + songDisp;
-
-      // Song entries start at positionOff + 3 (per InitPlayer: ADDQ #3,A3)
-      let entryOff = positionOff + 3;
-      if (entryOff < 0) entryOff = positionOff;
-
-      for (let i = 0; i < 8 && entryOff + 2 < buf.length; i++) {
-        const b0 = buf[entryOff];
-        const b1 = buf[entryOff + 1];
-        const b2 = buf[entryOff + 2];
-
-        // Null entry (0, 0, 1) marks end
-        if (b0 === 0 && b1 === 0 && b2 === 1) break;
-
-        songEntries.push({ byte0: b0, byte1: b1, byte2: b2 });
-        entryOff += 3;
-      }
-    }
-
-    // ── Find sample info via $41EB scan (new format) ────────────────────────
-
-    const samples: SMSampleInfo[] = [];
-
-    if (isNewFormat || songEntries.length === 0) {
-      // Scan for $41EB (LEA d16(A3),A0) starting from init code area
-      let sampleInfoOff = -1;
-      const scanStart = a1Init;
-
-      for (let i = scanStart; i + 5 < buf.length && i < scanStart + 2000; i += 2) {
-        if (u16BE(buf, i) === 0x41eb) {
-          // Found LEA d16(A3),A0 — displacement gives sample info offset
-          if (songBase >= 0) {
-            const disp = i16BE(buf, i + 2);
-            sampleInfoOff = songBase + disp;
-
-            // Read additional displacement to get actual sample info address
-            const disp2Off = i + 4;
-            if (disp2Off + 1 < buf.length) {
-              const disp2 = i16BE(buf, disp2Off);
-              const sampleTableBase = songBase + disp2;
-              if (sampleTableBase >= 0 && sampleTableBase + 4 < buf.length) {
-                const sampleDataOff = u32BE(buf, sampleTableBase);
-                sampleInfoOff = sampleInfoOff + sampleDataOff;
-              }
-            }
-          }
-          break;
-        }
-      }
-
-      // Parse sample info table: each entry is 6 bytes (u32 offset, u16 word-length)
-      if (sampleInfoOff > 0 && sampleInfoOff < buf.length) {
-        for (let i = 0; i < MAX_SAMPLES; i++) {
-          const entryOff = sampleInfoOff + i * 6;
-          if (entryOff + 5 >= buf.length) break;
-
-          const sampleOff = u32BE(buf, entryOff);
-          const wordLen = u16BE(buf, entryOff + 4);
-
-          // Negative offset means unused (per InitPlayer: bmi.b NoUsed)
-          if (sampleOff >= 0x80000000) continue;
-          if (wordLen === 0) continue;
-
-          samples.push({ offset: sampleOff, length: wordLen });
-        }
-      }
-    }
-
-    // If no samples found via scan, try reading from known offsets
-    if (samples.length === 0) {
-      // Old format scan: look for $D5F0 or $3D70
-      for (let i = a1Init; i + 3 < buf.length && i < a1Init + 2000; i += 2) {
-        if (u16BE(buf, i) === 0xd5f0 || u16BE(buf, i) === 0x3d70) {
-          // Try to extract sample info from old format layout
-          // Old format has 128-byte offset to sample lengths (32 × u16 word pairs)
-          if (songBase >= 0) {
-            const baseOff = songBase;
-            for (let s = 0; s < MAX_SAMPLES && baseOff + s * 4 + 3 < buf.length; s++) {
-              const off = u32BE(buf, baseOff + s * 4);
-              if (off >= 0x80000000 || off === 0) continue;
-              samples.push({ offset: off, length: 0 });
-            }
-          }
-          break;
-        }
-      }
-    }
-
-    // Determine song length from position data
-    let songLength = 0;
-    if (positionOff >= 0 && positionOff < buf.length) {
-      songLength = buf[positionOff] || 1;
-    }
-
-    return {
-      isNewFormat,
-      samples,
-      songEntries,
-      numSubSongs: Math.max(1, songEntries.length),
-      songLength: Math.max(1, songLength),
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Standard Amiga period table for Amiga note detection.
- * Maps period values to note indices (C-1 = 0 through B-5 = 59).
- */
-const AMIGA_PERIODS = [
-  856,808,762,720,678,640,604,570,538,508,480,453,  // Octave 1
-  428,404,381,360,339,320,302,285,269,254,240,226,  // Octave 2
-  214,202,190,180,170,160,151,143,135,127,120,113,  // Octave 3
-  107,101, 95, 90, 85, 80, 76, 71, 67, 64, 60, 57, // Octave 4
-];
-
-/**
- * Find the closest Amiga note index for a given period value.
- * Returns -1 if no reasonable match found.
- */
-function periodToNoteIndex(period: number): number {
-  if (period < 50 || period > 1000) return -1;
-  let bestIdx = -1;
-  let bestDist = Infinity;
-  for (let i = 0; i < AMIGA_PERIODS.length; i++) {
-    const dist = Math.abs(period - AMIGA_PERIODS[i]);
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestIdx = i;
-    }
-  }
-  // Allow +/- 5 tolerance for finetune variations
-  return bestDist <= 5 ? bestIdx : -1;
-}
-
-/**
- * Scan the data area of the module for Amiga period values to reconstruct
- * basic pattern data. This is a heuristic approach since the exact pattern
- * cell encoding varies between Sound Master versions.
- *
- * We scan for consecutive u16BE values that match known Amiga periods,
- * which indicates likely note data.
- */
-function extractSMNoteData(
-  buf: Uint8Array,
-  startOff: number,
-  endOff: number,
-): { notes: number[]; positions: number[] } {
-  const notes: number[] = [];
-  const positions: number[] = [];
-
-  const scanEnd = Math.min(endOff, buf.length - 2);
-  for (let i = startOff; i < scanEnd; i += 2) {
-    const word = u16BE(buf, i);
-    const noteIdx = periodToNoteIndex(word);
-    if (noteIdx >= 0) {
-      // Convert to tracker note: noteIndex + 25 (Amiga convention)
-      const trackerNote = noteIdx + 25;
-      if (trackerNote >= 1 && trackerNote <= 96) {
-        notes.push(trackerNote);
-        positions.push(i);
-      }
-    }
-  }
-
-  return { notes, positions };
-}
-
-/**
- * Build tracker patterns from extracted note data and song structure.
- */
-function buildSMPatterns(
-  scanResult: SMScanResult,
-  buf: Uint8Array,
-  filename: string,
-): { patterns: Pattern[]; songPositions: number[] } {
-  const numInstr = Math.max(1, scanResult.samples.length);
-
-  // Determine data area to scan for periods
-  // The data area is typically after the code section. Use the second BRA
-  // displacement as a rough estimate of where data might start.
-  const d2 = u16BE(buf, 2);
-  const d3 = u16BE(buf, 6);
-  const codeEnd = Math.max(2 + d2, 6 + d3);
-  const dataStart = Math.min(codeEnd + 100, buf.length);
-  const dataEnd = buf.length;
-
-  const { notes } = extractSMNoteData(buf, dataStart, dataEnd);
-
-  if (notes.length === 0) {
-    return { patterns: [], songPositions: [0] };
-  }
-
-  // Distribute notes across 4 channels into 64-row patterns
-  const numPat = Math.max(1, Math.ceil(notes.length / (ROWS_PER_PATTERN * NUM_CHANNELS)));
-  const patternLimit = Math.min(numPat, 128);
-  const patterns: Pattern[] = [];
-  let noteIdx = 0;
-
-  for (let p = 0; p < patternLimit; p++) {
-    const channels: ChannelData[] = [];
-
-    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
-      const rows: TrackerCell[] = [];
-
-      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
-        if (noteIdx < notes.length && (r % 2 === 0 || noteIdx < notes.length * 0.8)) {
-          // Place notes with some spacing for readability
-          const instrNum = Math.min(numInstr, (noteIdx % numInstr) + 1);
-          rows.push({
-            note: notes[noteIdx],
-            instrument: instrNum,
-            volume: 0,
-            effTyp: 0,
-            eff: 0,
-            effTyp2: 0,
-            eff2: 0,
-          });
-          noteIdx++;
-        } else {
-          rows.push({
-            note: 0, instrument: 0, volume: 0,
-            effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-          });
-        }
-      }
-
-      channels.push({
-        id: `p${p}-ch${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows,
-      });
-    }
-
-    patterns.push({
-      id: `pattern-${p}`,
-      name: `Pattern ${p}`,
-      length: ROWS_PER_PATTERN,
-      channels,
-      importMetadata: {
-        sourceFormat: 'MOD' as const,
-        sourceFile: filename,
-        importedAt: new Date().toISOString(),
-        originalChannelCount: NUM_CHANNELS,
-        originalPatternCount: patternLimit,
-        originalInstrumentCount: numInstr,
-      },
-    });
-  }
-
-  return {
-    patterns,
-    songPositions: patterns.map((_, i) => i),
-  };
-}
-
 // ── Prefix helpers ──────────────────────────────────────────────────────────
 
 /**
@@ -529,19 +155,37 @@ function stripSoundMasterPrefix(name: string): string {
   );
 }
 
+// ── Instruments ─────────────────────────────────────────────────────────────
+
+/**
+ * Instrument record `i` as a sampler of the sample it starts with: record
+ * byte 0 names the sample slot, or, when byte 10 (the wave sequence length)
+ * is set, the wave table entry byte 9 points at does.
+ */
+function recordInstrument(song: SmSong, i: number): InstrumentConfig {
+  const m = song.module;
+  const rec = m.instruments[i];
+  const name = `Instrument ${i + 1}`;
+  const placeholder = { id: i + 1, name, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig;
+  const sample = (rec[10] ? m.wave[rec[9]] ?? 0 : rec[0]) & 31;
+  const slot = m.samples[sample];
+  if (!slot || slot.offset < 0 || slot.length === 0) return placeholder;
+  const startAt = slot.offset;
+  const end = Math.min(startAt + slot.length * 2, m.sampleData.length);
+  if (startAt >= end) return placeholder;
+  const pcm = m.sampleData.slice(startAt, end);
+  const loops = slot.repeatLength > 1 && slot.repeatOffset < pcm.length;
+  const loopStart = loops ? slot.repeatOffset : 0;
+  const loopEnd = loops ? Math.min(pcm.length, slot.repeatOffset + slot.repeatLength * 2) : 0;
+  return createSamplerInstrument(i + 1, `${name} (sample ${sample})`, pcm, 64, SAMPLE_RATE, loopStart, loopEnd);
+}
+
 // ── Main parser ─────────────────────────────────────────────────────────────
 
 /**
- * Parse a Sound Master module file into a TrackerSong.
- *
- * Sound Master modules are compiled 68k Amiga executables. This parser
- * scans the binary for sample info tables (via $41EB opcode scan), song
- * entries (via $1743 opcode scan), and reconstructs pattern data by
- * scanning for Amiga period values in the data area. Actual audio
- * playback is always delegated to UADE.
- *
- * @param buffer   Raw file bytes (ArrayBuffer)
- * @param filename Original filename (used to derive module name)
+ * Parse a Sound Master module into the grid its replayer plays. Throws for a
+ * module whose player is not a Sound Master player this decoder knows (the
+ * import then refuses rather than show a grid that is not the file's).
  */
 export async function parseSoundMasterFile(
   buffer: ArrayBuffer,
@@ -550,107 +194,64 @@ export async function parseSoundMasterFile(
   if (!isSoundMasterFormat(buffer, filename)) {
     throw new Error('Not a Sound Master module');
   }
-
-  const buf = new Uint8Array(buffer);
-
-  // ── Module name from filename ─────────────────────────────────────────────
-
+  const song = new SmSong(new Uint8Array(buffer));
+  const m = song.module;
   const base = filename.split('/').pop() ?? filename;
   const moduleName = stripSoundMasterPrefix(base) || base;
 
-  // ── Scan binary for data structures ───────────────────────────────────────
+  const grid = soundMasterGrid(song);
+  const patterns: Pattern[] = song.steps.map((s, p) => ({
+    id: `pattern-${p}`,
+    name: `Position ${s.position} block ${s.block}`,
+    length: s.rows,
+    channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => {
+      const rows = grid[p][ch];
+      const effectCols = Math.max(2, ...rows.map(smCellEffectColumns));
+      return {
+        id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
+        solo: false, collapsed: false, volume: 100, pan: CHANNEL_PAN[ch],
+        instrumentId: null, color: null, rows,
+        ...(effectCols > 2 ? { channelMeta: { importedFromMOD: false, effectCols } } : {}),
+      };
+    }),
+    importMetadata: {
+      sourceFormat: 'MOD' as const, sourceFile: filename,
+      importedAt: new Date().toISOString(),
+      originalChannelCount: NUM_CHANNELS, originalPatternCount: m.patterns.length,
+      originalInstrumentCount: m.instruments.length,
+    },
+  }));
 
-  let scanResult: SMScanResult | null = null;
-  try {
-    scanResult = scanSMStructures(buf);
-  } catch {
-    // Fall through to defaults
-  }
-
-  // ── Build instruments from sample info or use placeholders ────────────────
-
-  const instruments: InstrumentConfig[] = [];
-  const numInstruments = (scanResult && scanResult.samples.length > 0)
-    ? scanResult.samples.length
-    : MAX_SAMPLES;
-
-  for (let i = 0; i < numInstruments; i++) {
-    const sampleInfo = scanResult?.samples[i];
-    const sampleLen = sampleInfo ? sampleInfo.length * 2 : 0;
-    instruments.push({
-      id: i + 1,
-      name: sampleLen > 0 ? `Sample ${i + 1} (${sampleLen}b)` : `Sample ${i + 1}`,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
-  }
-
-  // ── Extract patterns or fall back to placeholder ──────────────────────────
-
-  let patterns: Pattern[];
-  let songPositions: number[];
-  let songLength: number;
-
-  const extracted = scanResult
-    ? buildSMPatterns(scanResult, buf, filename)
-    : null;
-
-  if (extracted && extracted.patterns.length > 0) {
-    patterns = extracted.patterns;
-    songPositions = extracted.songPositions;
-    songLength = songPositions.length;
-  } else {
-    // Fallback: single empty pattern
-    const emptyRows = Array.from({ length: ROWS_PER_PATTERN }, () => ({
-      note: 0, instrument: 0, volume: 0,
-      effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-    }));
-
-    patterns = [{
-      id: 'pattern-0',
-      name: 'Pattern 0',
-      length: ROWS_PER_PATTERN,
-      channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
-        id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows: emptyRows,
-      })),
-      importMetadata: {
-        sourceFormat: 'MOD' as const,
-        sourceFile: filename,
-        importedAt: new Date().toISOString(),
-        originalChannelCount: NUM_CHANNELS,
-        originalPatternCount: 1,
-        originalInstrumentCount: numInstruments,
-      },
-    }];
-    songPositions = [0];
-    songLength = 1;
-  }
+  const layout: UADEPatternLayout = {
+    formatId: 'soundMaster',
+    patternDataFileOffset: song.addrs.patterns,
+    bytesPerCell: 2,
+    rowsPerPattern: m.patternLength >> 1,
+    numChannels: NUM_CHANNELS,
+    numPatterns: patterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: () => { throw new Error('Sound Master cells are written through writeCell (their bytes depend on the block and position)'); },
+    getCellFileOffset: (p, row, ch) => song.cellOffset(p, row, ch),
+    writeCell: (p, row, ch, cell) => song.edit(p, row, ch, cell) ?? [],
+  };
 
   return {
     name: `${moduleName} [Sound Master]`,
     format: 'MOD' as TrackerFormat,
     patterns,
-    instruments,
-    songPositions,
-    songLength,
+    instruments: m.instruments.map((_, i) => recordInstrument(song, i)),
+    songPositions: patterns.map((_, i) => i),
+    songLength: patterns.length,
     restartPosition: 0,
     numChannels: NUM_CHANNELS,
-    initialSpeed: 6,
+    initialSpeed: m.speed,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    // Rows are `speed` player interrupts from the first one (proven against
+    // UADE's Paula log, soundMasterGridMatchesPlayer.test.ts).
+    uadePlayerTickGrid: true,
+    uadePatternLayout: layout,
   };
 }
