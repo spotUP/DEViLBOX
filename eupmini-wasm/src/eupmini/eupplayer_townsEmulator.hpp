@@ -250,6 +250,10 @@ class EUP_TownsEmulator : public TownsAudioDevice {
            _maxPcmSoundNum = 128,
          };
     EUP_TownsEmulator_Channel *_channel[_maxChannelNum];
+public:
+    /** Channels the device has; enable()/mute indices outside 0..channelCount()-1 are invalid. */
+    static constexpr int channelCount() { return _maxChannelNum; }
+private:
     bool _enabled[_maxChannelNum];
     uint8_t _fmInstrumentData[8 + 48*_maxFmInstrumentNum];
     uint8_t *_fmInstrument[_maxFmInstrumentNum]; // pointers into above _fmInstrumentData buffer
