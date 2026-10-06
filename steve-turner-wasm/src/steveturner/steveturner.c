@@ -1189,48 +1189,58 @@ void st_set_instrument_param(int inst, int param_id, int value) {
 // Note preview
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Keyboard preview: the replayer's own voice. A typed key starts a note the way
+// the pattern stream does (parse_data_stream, note byte < 0x80): trigger_note
+// for the instrument, then start_slide to the note's period with no slide
+// rate. Every tick the envelope, vibrato and slide state machines run exactly
+// as process_voices runs them (dispatch_env/vib/slide), on a voice of its own
+// that writes Paula channel 0. Nothing here models the instrument.
+static Voice pv;
+static int   pv_active = 0;
+
 void st_note_on(int instrument, int note, int velocity) {
+    (void)velocity;  // the player has no velocity; the master volume is the level
     if (!ps.loaded || instrument < 0 || instrument >= ps.num_instruments) return;
     if (note < 0 || note >= FREQ_TABLE_SIZE) return;
 
-    uint8_t *inst = ps.inst_base + instrument * INST_SIZE;
+    uint16_t inst_ofs = (uint16_t)(instrument * INST_SIZE);
+    // A synth-waveform instrument (negative sample) plays nothing in the
+    // player either: lbC000C5E is a bare RTS.
+    if ((int8_t)ps.inst_base[inst_ofs + I_SAMPLE] < 0) return;
 
-    // Get sample from instrument
-    int8_t sample_idx = (int8_t)inst[I_SAMPLE];
-    if (sample_idx < 0) return; // no sample (synth waveform — not supported for preview)
+    // The song fades master volume up from 0 to full when it starts; a module
+    // that was never started (or has been stopped) has no level to borrow.
+    if (ps.master_vol == 0) ps.master_vol = 255;
 
-    uint32_t samp_off = rd32(ps.samp_base + sample_idx * 4);
-    uint8_t *samp = ps.samp_base + samp_off;
-    uint16_t len_bytes = rd16(samp);
-    uint16_t len_words = len_bytes >> 1;
-    if (len_words == 0) return;
-    samp += 2; // skip length word
-
-    // Get period from frequency table, apply instrument pitch shift
-    uint16_t period = freq_table[note];
-    uint8_t shift = inst[I_SHIFT];
-    // The instrument stores periods pre-shifted in vibrato table.
-    // For preview, use the raw freq_table period (no shift needed —
-    // the shift is for the vibrato system's internal representation).
-
-    // Map velocity (0-127) to Paula volume (0-64)
-    int vol = (velocity * 64) / 127;
-    if (vol > 64) vol = 64;
-    if (vol < 1) vol = 1;
-
-    // Use Paula channel 0 for preview
-    paula_dma_write(0x0001);  // disable ch0
-    paula_set_sample_ptr(0, (const int8_t *)samp);
-    paula_set_length(0, len_words);
-    paula_set_period(0, period);
-    paula_set_volume(0, (uint8_t)vol);
-    paula_dma_write(0x8001);  // enable ch0
+    memset(&pv, 0, sizeof(pv));
+    pv.ch = 0;
+    reset_voice(&pv);
+    trigger_note(&pv, inst_ofs, ps.inst_base[inst_ofs + I_PRIO]);
+    pv.slide_shift = 0;
+    start_slide(&pv, freq_table[note]);
+    pv_active = 1;
 }
 
+// A held key is a note the song would let run; releasing it enters the
+// instrument's own decay segment (env_phase7) with a single pass, the stage the
+// player reaches at the end of the oscillation segment.
 void st_note_off(void) {
-    paula_dma_write(0x0001);  // disable ch0
-    paula_set_volume(0, 0);
+    if (!pv_active || !pv.inst_ptr) return;
+    pv.env_delta = (int8_t)pv.inst_ptr[I_DECAY];
+    pv.env_func = FN_ENV7;
+    pv.loop_count = 1;
 }
+
+// One player tick of the preview voice (call at the player's tick rate).
+void st_preview_tick(void) {
+    if (!pv_active) return;
+    dispatch_env(&pv);
+    dispatch_vib(&pv);
+    dispatch_slide(&pv);
+    if (pv.env_func == FN_NOP) pv_active = 0;
+}
+
+int st_preview_active(void) { return pv_active; }
 
 // Debug dump for native testing
 #ifndef __EMSCRIPTEN__

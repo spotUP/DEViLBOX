@@ -14,6 +14,7 @@ static float s_tick_accum     = 0.0f;
 // Tick rate = 709379 / 7104 ≈ 99.86 Hz (2× standard VBlank)
 static float s_ticks_per_sec  = 99.86f;
 static float s_samples_per_tick = 0.0f;
+static float s_pv_accum       = 0.0f;  // preview voice tick clock (runs while the song is paused)
 
 void player_init(int sample_rate) {
     s_ticks_per_sec = 99.86f;
@@ -54,6 +55,17 @@ int player_render(float *buffer, int frames) {
         // Always render Paula audio (needed for note preview even when paused/finished)
         paula_render(buffer + written * 2, chunk);
         written += chunk;
+
+        // The preview voice ticks at the player's rate whatever the song does
+        if (st_preview_active()) {
+            s_pv_accum += (float)chunk;
+            while (s_pv_accum >= s_samples_per_tick) {
+                s_pv_accum -= s_samples_per_tick;
+                st_preview_tick();
+            }
+        } else {
+            s_pv_accum = 0.0f;
+        }
 
         // Only advance song ticks if not paused and not finished
         if (!s_paused && !s_finished) {
