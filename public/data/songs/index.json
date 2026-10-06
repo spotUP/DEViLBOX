@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-06T15:52:06.161Z",
+  "generated": "2026-10-06T16:22:45.354Z",
   "perEntry": 6,
   "registryTotal": 279,
   "covered": 167,
@@ -2698,12 +2698,11 @@
       "label": "delitracker-custom",
       "formatKey": "uade_cus",
       "files": [
-        "/data/songs/delitracker-custom/Skyfox.cus",
         "/data/songs/delitracker-custom/bards tale.cus",
         "/data/songs/delitracker-custom/neuromancer.cus",
         "/data/songs/delitracker-custom/skyfox2.cus"
       ],
-      "total": 4,
+      "total": 3,
       "dir": "/data/songs/delitracker-custom"
     },
     {
@@ -3130,7 +3129,7 @@
       "label": "formats / Custom",
       "formatKey": "uade_cus",
       "files": [
-        "/data/songs/formats/skyfox.cus"
+        "/data/songs/formats/skyfox2.cus"
       ],
       "total": 1,
       "dir": "/data/songs/formats"
@@ -3475,6 +3474,16 @@
       "dir": "/data/songs/formats"
     },
     {
+      "id": "formats-infogrames",
+      "label": "formats / Infogrames",
+      "formatKey": "infogrames",
+      "files": [
+        "/data/songs/formats/bob4e.dum"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
       "id": "formats-inStereoAmbiguous",
       "label": "formats / InStereo!",
       "formatKey": "inStereoAmbiguous",
@@ -3520,6 +3529,16 @@
       "formatKey": "jasonBrooke",
       "files": [
         "/data/songs/formats/ikari_warriors.jb"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-jasonPage",
+      "label": "formats / Jason Page",
+      "formatKey": "jasonPage",
+      "files": [
+        "/data/songs/formats/jpn.virocop-14"
       ],
       "total": 1,
       "dir": "/data/songs/formats"
@@ -3803,9 +3822,10 @@
       "label": "formats / ProTracker MOD",
       "formatKey": "mod",
       "files": [
-        "/data/songs/formats/a sleep so deep.mod"
+        "/data/songs/formats/a sleep so deep.mod",
+        "/data/songs/formats/shortsong1.mod"
       ],
-      "total": 1,
+      "total": 2,
       "dir": "/data/songs/formats"
     },
     {
@@ -7892,9 +7912,10 @@
       "label": "startrekker-am",
       "formatKey": "mod",
       "files": [
-        "/data/songs/startrekker-am/amsyntdemo.mod"
+        "/data/songs/startrekker-am/amsyntdemo.mod",
+        "/data/songs/startrekker-am/silent sleep.mod"
       ],
-      "total": 1,
+      "total": 2,
       "dir": "/data/songs/startrekker-am"
     },
     {
@@ -9258,7 +9279,6 @@
           "zaxxein"
         ],
         "delitracker-custom": [
-          "Skyfox.cus",
           "bards tale.cus",
           "neuromancer.cus",
           "skyfox2.cus"
@@ -9374,6 +9394,7 @@
           "battleships.rho",
           "beathoven_smallest.bss",
           "blazing_thunder.hd",
+          "bob4.ins",
           "bob4e.dum",
           "bomb jack.fred",
           "boogie.mus",
@@ -9473,12 +9494,14 @@
           "seasons.ult",
           "shades.sun",
           "shades2.sun",
+          "shortsong1.mod",
           "shortsong1.mod.nt",
           "sidewinder2.riff",
           "silmarils_smallest.mok",
-          "skyfox.cus",
+          "skyfox2.cus",
           "skythebest.ea",
           "slideshow i.stm",
+          "smp.virocop-14",
           "smpl.turrican_bonus",
           "snickle.mug2",
           "space_sound.syn",
@@ -10086,6 +10109,7 @@
         "startrekker-am": [
           "amsyntdemo.mod",
           "amsyntdemo.mod.nt",
+          "silent sleep.mod",
           "silent sleep.mod.nt"
         ],
         "startrekker-flt8": [
@@ -15206,7 +15230,6 @@
     },
     "/data/songs/delitracker-custom": {
       "siblings": [
-        "Skyfox.cus",
         "bards tale.cus",
         "neuromancer.cus",
         "skyfox2.cus"
@@ -15452,6 +15475,7 @@
         "battleships.rho",
         "beathoven_smallest.bss",
         "blazing_thunder.hd",
+        "bob4.ins",
         "bob4e.dum",
         "bomb jack.fred",
         "boogie.mus",
@@ -15551,12 +15575,14 @@
         "seasons.ult",
         "shades.sun",
         "shades2.sun",
+        "shortsong1.mod",
         "shortsong1.mod.nt",
         "sidewinder2.riff",
         "silmarils_smallest.mok",
-        "skyfox.cus",
+        "skyfox2.cus",
         "skythebest.ea",
         "slideshow i.stm",
+        "smp.virocop-14",
         "smpl.turrican_bonus",
         "snickle.mug2",
         "space_sound.syn",
@@ -36957,6 +36983,7 @@
       "siblings": [
         "amsyntdemo.mod",
         "amsyntdemo.mod.nt",
+        "silent sleep.mod",
         "silent sleep.mod.nt"
       ]
     },

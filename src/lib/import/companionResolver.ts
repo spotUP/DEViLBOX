@@ -198,6 +198,16 @@ function specialCases(moduleName: string, siblings: string[]): string[] {
     const songplay = find('songplay');
     if (songplay) out.push(songplay);
   }
+  // Infogrames: the player asks for '<tune>.ins' and, missing it, for the
+  // shared bank named without the tune's last letter - bob4e.dum loads
+  // '/uade/bob4e.ins' then '/uade/bob4.ins' (Modland ships bob4.ins for the set).
+  if (name.endsWith('.dum')) {
+    const stem = name.slice(0, -4);
+    if (!find(stem + '.ins') && stem.length > 1) {
+      const shared = find(stem.slice(0, -1) + '.ins');
+      if (shared) out.push(shared);
+    }
+  }
   if (name.endsWith('.sci')) {
     const patch = find(name.slice(0, 3) + 'patch.003');
     if (patch) out.push(patch);
