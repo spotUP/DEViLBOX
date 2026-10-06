@@ -2114,13 +2114,16 @@ export async function tryRouteFormat(
       'DigitalSonixChromeParser', { injectUADE: true });
   }
 
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
+  // ── Jesper Olsen (JO.* / *.jo) ────────────────────────────────────────────
+  // LollyPop / Georg Glaxo songs: the grid is the driver's own row reads,
+  // decoded from the song (JesperOlsenModule.ts); UADE plays with the
+  // WantedTeam.bin companion. Songs carrying their own routine (Format 0/1)
+  // have no decoded grid: the parser throws and UADE's scan grid is used.
   if (matchesExt(filename, ['jo'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = originalFileName;
-    return song;
+    const { isJesperOlsenFormat, parseJesperOlsenFile } = await import('@lib/import/formats/JesperOlsenParser');
+    return withNativeThenUADE('jesperOlsen', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJesperOlsenFormat(buf as ArrayBuffer)) return parseJesperOlsenFile(buf as ArrayBuffer, name, ctx.subsong); return null; },
+      'JesperOlsenParser', { injectUADE: true });
   }
 
   // ── Kim Christensen (KIM.* prefix) ────────────────────────────────────────

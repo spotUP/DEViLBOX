@@ -1,41 +1,37 @@
 /**
- * JesperOlsenParser.ts — Jesper Olsen music format parser
+ * JesperOlsenParser.ts - Jesper Olsen game music (.jo / JO.*)
  *
- * Jesper Olsen is an Amiga music format used in games from the early 1990s.
- * The format has three variants (Format 0, 1, and -1/latest) detected by
- * the Wanted Team EaglePlayer DTP_Check2 routine.
+ * Detection is the Wanted Team EaglePlayer's DTP_Check2 (Jesper Olsen_v1.asm),
+ * which knows three kinds of file:
  *
- * Detection (from Jesper Olsen_v1.asm, DTP_Check2):
+ * - offset-table songs (Format -1, `st`): the LollyPop (L) and Georg Glaxo (G)
+ *   songs; the replay routine is the companion WantedTeam.bin. Word 0 in
+ *   4..$200, even; every list offset > 0, even, with $7FFF just before it.
+ *   The grid is DECODED: JesperOlsenModule.ts (structures, codec, the driver),
+ *   jesperOlsenGrid.ts (row reads on the driver's row clock, cell codec).
+ * - Format 1: a $6000 BRA chain and the H routine (Harald Hardtand) in the
+ *   file, then `4A40 6B00 / 0006 41FA` and a song whose word 4 is `0001 7FFF`.
+ * - Format 0 (`clr.b`): a $6000 BRA chain and an older routine in the file
+ *   (guldkornsexpressen); `C0FC`, or `0280 0000` then `00FF C0FC`, then the
+ *   table `6AE0 64E0` 800..1700 bytes on.
  *
- * Format -1 (new/latest, Format byte = 0xFF set via `st`):
- *   Word at offset 0 is NOT 0x6000, so falls to the new-format branch:
- *   - word[0] (D1) must be in range [4, 0x200] (inclusive), even
- *   - word[0] / 2 - 1 iterations of: read word[2+i*2], must be > 0, even,
- *     and data[word[2+i*2] - 2] == 0x7FFF
- *
- * Format 1 (old/second):
- *   Word at offset 0 IS 0x6000 (BRA instruction):
- *   - Three consecutive pairs at A0+0, A0+2, A0+4 must be 0x6000 + positive-even offset
- *   Then navigate to song body via: A0+6, add word, check sequence:
- *   0x4A406B00 / 0x000641FA → navigate → check word[4] == 0x017FFF
- *
- * Format 0 (oldest/third, Format byte = 0 = cleared via `clr.b`):
- *   After the BRA chain fails the 0x4A40... test, checks two sub-variants:
- *   a) word at A0 is 0xC0FC → look forward for the sync marker 0x6AE064E0
- *   b) scan up to 16 words for 0x02800000 → then check 0x00FFC0FC, then scan
- *      for 0x6AE064E0 within 800..900 bytes
- *
- * This parser returns a stub TrackerSong for use with the UADE replayer.
- * Real playback is handled by UADE/EaglePlayer with the WantedTeam.bin external player.
+ * Formats 0 and 1 have no decoded grid here; the parser throws and the route
+ * takes UADE's.
+ * Research: thoughts/shared/research/2026-10-06_jesper-olsen-format.md
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { decodeJoModule, isJoOffsetTableSong, joSubsongCount, type JoInstrument, type JoModule } from './JesperOlsenModule';
+import { buildJoGrid, joCell, joCellEffectColumns, joWriteCell } from './jesperOlsenGrid';
 
 const MIN_FILE_SIZE = 20;
+const ROWS_PER_PATTERN = 64;
+const NUM_CHANNELS = 4;
+/** Paula's C-2 rate (period 428); a cell's note is the driver's own period index. */
+const SAMPLE_RATE = 8287;
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
@@ -43,101 +39,6 @@ function u16BE(buf: Uint8Array, off: number): number {
 
 function u32BE(buf: Uint8Array, off: number): number {
   return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
-}
-
-/** Read a 4-character ASCII tag at offset. */
-function tag4(buf: Uint8Array, off: number): string {
-  return String.fromCharCode(buf[off], buf[off + 1], buf[off + 2], buf[off + 3]);
-}
-
-/**
- * Scan for IFF FORM chunks starting at `start` on 2-byte boundaries.
- * Mirrors the NextIFF / NextIFFO scanning in Jesper Olsen_v1.asm.
- */
-function scanIffForms(buf: Uint8Array, start: number): Array<{ formOff: number; formSize: number }> {
-  const len = buf.length;
-  const forms: Array<{ formOff: number; formSize: number }> = [];
-
-  let off = start;
-  // Scan for first FORM
-  while (off + 8 <= len) {
-    if (tag4(buf, off) === 'FORM') break;
-    off += 2;
-  }
-
-  // Walk consecutive FORM chunks
-  while (off + 8 <= len && tag4(buf, off) === 'FORM') {
-    const formSize = u32BE(buf, off + 4);
-    if (formSize === 0 || formSize > 0x1000000 || off + 8 + formSize > len + 4) break;
-    forms.push({ formOff: off, formSize });
-    // ASM: addq.l #4,A2; add.l (A2),A2; addq.l #2,A2
-    // = skip FORM(4) + read size at +4, add it, then +2 for alignment padding
-    off += 8 + formSize;
-    if (off & 1) off++;
-    // Then checks addq.l #2,A2 (another 2-byte skip) before comparing again
-    // But the next FORM check is at the new offset — the ASM also does addq.l #2
-    // for the non-FORM case. Let's check if FORM is at this offset, if not, step 2
-    if (off + 4 <= len && tag4(buf, off) !== 'FORM') {
-      off += 2;
-    }
-  }
-
-  return forms;
-}
-
-/**
- * Extract PCM from an IFF FORM chunk by finding the BODY sub-chunk.
- * Also extracts name (NAME) and loop info (VHDR).
- */
-function extractIffSample(buf: Uint8Array, formOff: number, formSize: number): {
-  pcm: Uint8Array; name: string; loopStart: number; loopEnd: number;
-} | null {
-  const dataStart = formOff + 12;
-  const dataEnd = formOff + 8 + formSize;
-
-  let pcm: Uint8Array | null = null;
-  let name = '';
-  let oneShotHiSamples = 0;
-  let repeatHiSamples = 0;
-
-  let pos = dataStart;
-  while (pos + 8 <= dataEnd) {
-    const chunkTag = tag4(buf, pos);
-    const chunkSize = u32BE(buf, pos + 4);
-    const chunkData = pos + 8;
-
-    if (chunkTag === 'BODY') {
-      const bodyLen = Math.min(chunkSize, dataEnd - chunkData);
-      if (bodyLen > 0) pcm = buf.slice(chunkData, chunkData + bodyLen);
-    } else if (chunkTag === 'NAME') {
-      const nameLen = Math.min(chunkSize, 64, dataEnd - chunkData);
-      if (nameLen > 0) {
-        name = String.fromCharCode(...Array.from(buf.slice(chunkData, chunkData + nameLen)))
-          .replace(/\0/g, '').trim();
-      }
-    } else if (chunkTag === 'VHDR') {
-      if (chunkSize >= 8 && chunkData + 8 <= dataEnd) {
-        oneShotHiSamples = u32BE(buf, chunkData);
-        repeatHiSamples = u32BE(buf, chunkData + 4);
-      }
-    }
-
-    let nextPos = chunkData + chunkSize;
-    if (nextPos & 1) nextPos++;
-    if (nextPos <= pos) break;
-    pos = nextPos;
-  }
-
-  if (!pcm || pcm.length === 0) return null;
-
-  let loopStart = 0;
-  let loopEnd = 0;
-  if (repeatHiSamples > 2) {
-    loopStart = oneShotHiSamples;
-    loopEnd = oneShotHiSamples + repeatHiSamples;
-  }
-
-  return { pcm, name, loopStart, loopEnd };
 }
 
 /**
@@ -225,9 +126,9 @@ export function isJesperOlsenFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   // Check for 0xC0FC at pos
   if (pos + 2 <= buf.length && u16BE(buf, pos) === 0xC0FC) {
     pos += 2;
-    // scan for 0x6AE064E0 within buf[pos+800..pos+900]
+    // lea 800(A0),A0; lea 900(A0),A1: scan [pos+800, pos+1700) for 0x6AE064E0
     const scanStart = pos + 800;
-    const scanEnd = pos + 900;
+    const scanEnd = pos + 1700;
     for (let s = scanStart; s < scanEnd && s + 4 <= buf.length; s += 2) {
       if (u32BE(buf, s) === 0x6AE064E0) return true;
     }
@@ -250,91 +151,157 @@ export function isJesperOlsenFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   if (u32BE(buf, pos) !== 0x00FFC0FC) return false;
   pos += 4;
 
-  // Older path: scan buf[pos+800..pos+900] for 0x6AE064E0
+  // Older path: lea 800(A0),A0; lea 900(A0),A1 - scan [pos+800, pos+1700)
   const scanStart = pos + 800;
-  const scanEnd = pos + 900;
+  const scanEnd = pos + 1700;
   for (let s = scanStart; s < scanEnd && s + 4 <= buf.length; s += 2) {
     if (u32BE(buf, s) === 0x6AE064E0) return true;
   }
   return false;
 }
 
-export function parseJesperOlsenFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  const buf = new Uint8Array(buffer);
-  if (!isJesperOlsenFormat(buf)) throw new Error('Not a Jesper Olsen module');
+/** The PCM an instrument starts with, and its repeat part as the loop (description §6.9). */
+function instrumentSample(m: JoModule, buf: Uint8Array, ins: JoInstrument): { pcm: Uint8Array; loopStart: number; loopEnd: number } {
+  const clip = (o: number, len: number) => buf.slice(Math.max(0, Math.min(o, buf.length)), Math.max(0, Math.min(o + len, buf.length)));
+  if (m.driver === 'L' && (ins.sample & 0x80000000)) {
+    // IFF 8SVX: one-shot and repeat lengths (low words) 82 and 78 bytes before the BODY data.
+    const o = ins.sample & 0x7fffffff;
+    const oneShot = u16BE(buf, o - 82), repeat = u16BE(buf, o - 78);
+    const pcm = clip(o, oneShot + repeat);
+    return { pcm, loopStart: repeat > 2 ? oneShot : 0, loopEnd: repeat > 2 ? Math.min(pcm.length, oneShot + repeat) : 0 };
+  }
+  const start = clip(ins.sample, 2 * ins.length);
+  if (ins.repeatLength <= 1) return { pcm: start, loopStart: 0, loopEnd: 0 };
+  const rel = ins.repeat - ins.sample;
+  if (rel >= 0 && rel + 2 * ins.repeatLength <= start.length) {
+    return { pcm: start, loopStart: rel, loopEnd: rel + 2 * ins.repeatLength };
+  }
+  const rep = clip(ins.repeat, 2 * ins.repeatLength);
+  const pcm = new Uint8Array(start.length + rep.length);
+  pcm.set(start); pcm.set(rep, start.length);
+  return { pcm, loopStart: start.length, loopEnd: pcm.length };
+}
 
-  const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^jo\./i, '') || baseName;
-
-  // ── Extract IFF FORM samples ─────────────────────────────────────────────
-  // All three Jesper Olsen format variants (0, 1, -1) store IFF 8SVX FORM
-  // chunks within the file. The ASM InitPlayer scans for 'FORM' on 2-byte
-  // boundaries in the latter portion of the file data.
-  const instruments: InstrumentConfig[] = [];
-  const forms = scanIffForms(buf, 0);
-
-  for (let i = 0; i < forms.length; i++) {
-    const { formOff, formSize } = forms[i];
-    const sample = extractIffSample(buf, formOff, formSize);
-    if (sample) {
-      const sampleName = sample.name || `JO Sample ${i + 1}`;
-      instruments.push(createSamplerInstrument(
-        i + 1, sampleName, sample.pcm, 64, 8287,
-        sample.loopStart, sample.loopEnd,
-      ));
-    } else {
-      instruments.push({
-        id: i + 1, name: `JO Sample ${i + 1}`, type: 'synth' as const,
-        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-      } as InstrumentConfig);
+/** The name an IFF sample carries (NAME chunk), if any. */
+function iffName(buf: Uint8Array, ins: JoInstrument): string {
+  if (!(ins.sample & 0x80000000)) return '';
+  const o = ins.sample & 0x7fffffff;
+  for (let p = Math.max(0, o - 104); p + 8 <= o; p += 2) {
+    if (u32BE(buf, p) === 0x4e414d45) { // 'NAME'
+      const len = Math.min(u32BE(buf, p + 4), 32, o - p - 8);
+      return String.fromCharCode(...Array.from(buf.subarray(p + 8, p + 8 + Math.max(0, len)))).replace(/\0/g, '').trim();
     }
   }
+  return '';
+}
 
-  // Fallback placeholder if no samples found
-  if (instruments.length === 0) {
-    instruments.push({
-      id: 1, name: 'Sample 1', type: 'synth' as const,
-      synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-    } as InstrumentConfig);
-  }
+/**
+ * Parse a Jesper Olsen song into the grid its driver plays. `subsong` is
+ * 0-based (UADE's subsong `subsong + 1`, start list `subsong + 1`). Throws for
+ * a file with no decoded grid (Formats 0 and 1) and for a subsong out of range.
+ */
+export function parseJesperOlsenFile(buffer: ArrayBuffer, filename: string, subsong = 0): TrackerSong {
+  const buf = new Uint8Array(buffer);
+  if (!isJesperOlsenFormat(buf)) throw new Error('Not a Jesper Olsen module');
+  if (!isJoOffsetTableSong(buf)) throw new Error('Jesper Olsen: the song carries its own replay routine (Format 0/1); no decoded grid');
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  const baseName = filename.split('/').pop() ?? filename;
+  const moduleName = baseName.replace(/^jo\./i, '').replace(/\.jo$/i, '') || baseName;
+  const m = decodeJoModule(buf);
+  const count = joSubsongCount(buf);
+  if (subsong < 0 || subsong >= count) throw new Error(`Jesper Olsen: subsong ${subsong} of ${count}`);
 
-  const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
-      solo: false, collapsed: false, volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null, color: null, rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const, sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1,
-      originalInstrumentCount: forms.length,
+  const grid = buildJoGrid(buf, subsong);
+  const nRows = grid.rowTicks.length;
+  if (nRows === 0) throw new Error(`Jesper Olsen: subsong ${subsong} plays nothing`);
+  const nPatterns = Math.ceil(nRows / ROWS_PER_PATTERN);
+  const readAt = (p: number, row: number, ch: number) => (ch >= 0 && ch < NUM_CHANNELS ? grid.reads[p * ROWS_PER_PATTERN + row]?.[ch] : undefined);
+
+  const columns = Array.from({ length: NUM_CHANNELS }, (_, ch) => grid.reads.map((r) => joCell(r[ch])));
+  const patterns: Pattern[] = Array.from({ length: nPatterns }, (_, p) => {
+    const first = p * ROWS_PER_PATTERN;
+    const length = Math.min(ROWS_PER_PATTERN, nRows - first);
+    return {
+      id: `pattern-${p}`,
+      name: `Rows ${first}-${first + length - 1}`,
+      length,
+      channels: columns.map((cells, ch) => {
+        const rows = cells.slice(first, first + length);
+        const effectCols = Math.max(2, ...rows.map(joCellEffectColumns));
+        return {
+          id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
+          solo: false, collapsed: false, volume: 100,
+          pan: ch === 0 || ch === 3 ? -50 : 50,
+          instrumentId: null, color: null, rows,
+          ...(effectCols > 2 ? { channelMeta: { importedFromMOD: false, effectCols } } : {}),
+        };
+      }),
+      importMetadata: {
+        sourceFormat: 'MOD' as const, sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: NUM_CHANNELS, originalPatternCount: m.patterns.length,
+        originalInstrumentCount: m.instruments.length,
+      },
+    };
+  });
+
+  // The instrument column is an index into the voice's instrument table (one
+  // table per start entry; every corpus song has one): table 0's order.
+  const table = m.instrumentTables[0]?.entries ?? [];
+  const instruments: InstrumentConfig[] = table.map((at, i) => {
+    const ins = m.instruments.find((x) => x.at === at)!;
+    const { pcm, loopStart, loopEnd } = instrumentSample(m, buf, ins);
+    const name = iffName(buf, ins) || `Instrument ${i + 1}`;
+    if (pcm.length === 0) {
+      return { id: i + 1, name, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig;
+    }
+    return createSamplerInstrument(i + 1, name, pcm, Math.round((Math.min(ins.volume, 63) * 64) / 63), SAMPLE_RATE, loopStart, loopEnd);
+  });
+
+  // Row clock: G rows are evenly spaced (tempo $22: 3 ticks); L rows are not
+  // ($5A: 3,3,3,2,...), so the playhead takes the row ticks themselves.
+  const gaps = grid.rowTicks.slice(1).map((t, i) => t - grid.rowTicks[i]);
+  const even = gaps.length > 0 && gaps.every((g) => g === gaps[0]);
+  const ticksPerRow = gaps.length ? (grid.rowTicks[nRows - 1] - grid.rowTicks[0]) / gaps.length : 3;
+  const speed = even ? gaps[0] : Math.max(1, Math.round(ticksPerRow));
+  // 125 BPM = 50 ticks/s; the TS clock's rows run at the driver's mean row rate.
+  const bpm = even ? 125 : Math.round((125 * speed) / ticksPerRow);
+
+  const layout: UADEPatternLayout = {
+    formatId: 'jesperOlsen',
+    patternDataFileOffset: 0,
+    bytesPerCell: 2,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: NUM_CHANNELS,
+    numPatterns: nPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: () => { throw new Error('Jesper Olsen cells are written through writeCell (their bytes depend on the voice\'s transpose)'); },
+    getCellFileOffset: (p, row, ch) => readAt(p, row, ch)?.noteAt ?? -1,
+    writeCell: (p, row, ch, cell) => {
+      const read = readAt(p, row, ch);
+      return read ? joWriteCell(read, cell) : [];
     },
   };
 
   return {
     name: `${moduleName} [Jesper Olsen]`, format: 'MOD' as TrackerFormat,
-    patterns: [pattern], instruments, songPositions: [0],
-    songLength: 1, restartPosition: 0, numChannels: 4,
-    initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    patterns, instruments,
+    songPositions: patterns.map((_, i) => i), songLength: nPatterns, restartPosition: 0,
+    numChannels: NUM_CHANNELS,
+    initialSpeed: speed, initialBPM: bpm, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout: {
-      formatId: 'jesperOlsen',
-      patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
-      moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
-    } as UADEPatternLayout,
+    // G rows are `speed` player interrupts apart from the first one (the voice
+    // records in UADE's chip RAM follow the driver model tick for tick); L rows
+    // are not evenly spaced, so its playhead needs the row ticks themselves
+    // (open: TickGrid row-tick table) and stays on the TS clock meanwhile.
+    ...(even ? { uadePlayerTickGrid: true } : {}),
+    uadeEditableSubsongs: count > 1 ? {
+      count,
+      speeds: Array<number>(count).fill(speed),
+      start: subsong,
+      first: 1,
+    } : undefined,
+    uadePatternLayout: layout,
   };
 }
