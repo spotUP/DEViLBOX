@@ -119,12 +119,16 @@ describe('mixer mask and per-voice outputs', () => {
 });
 
 // UADE's scan needs a browser (an AudioContext); a format whose native parser
-// draws no grid hands the grid to it. Stand in for it with a classic-UADE
-// shaped song so the route's retargeting is what is tested.
+// draws no grid hands the grid to it. Stand in for it with a song shaped as
+// UADEParser's classic path builds it (buildClassicSong: format 'UADE',
+// patterns tagged sourceFormat 'UADE', a UADESynth carrying the file) so the
+// route's retargeting is what is tested.
 vi.mock('@lib/import/formats/UADEParser', () => ({
   parseUADEFile: vi.fn(async (buf: ArrayBuffer, name: string) => ({
-    name, format: 'MOD', patterns: [{ id: 'p0', name: 'p0', length: 1, channels: [{ id: 'c0', name: 'c0', rows: [{ note: 49, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }] }] }],
-    instruments: [{ id: 1, name: 'UADE', type: 'synth', synthType: 'UADESynth', effects: [], volume: 0, pan: 0 }],
+    name, format: 'UADE',
+    patterns: [{ id: 'p0', name: 'p0', length: 1, importMetadata: { sourceFormat: 'UADE', sourceFile: name, importedAt: '', originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 1 },
+      channels: [{ id: 'c0', name: 'c0', rows: [{ note: 49, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }] }] }],
+    instruments: [{ id: 1, name: 'UADE', type: 'synth', synthType: 'UADESynth', effects: [], volume: 0, pan: 0, uade: { type: 'uade', filename: name, fileData: buf, subsongCount: 1, currentSubsong: 0 } }],
     songPositions: [0], songLength: 1, restartPosition: 0, numChannels: 4, initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buf.slice(0), uadeEditableFileName: name,
   })),
@@ -143,6 +147,12 @@ describe('the default load plays on EaglePlayer', () => {
     expect(song.uadeEditableFileData, 'UADE does not play it').toBeUndefined();
     expect(song.instruments.some((i) => i.synthType === 'UADESynth' || i.synthType === 'UADEEditableSynth')).toBe(false);
     expect(playingEngineFor(song)).toBe('EaglePlayer');
+    // Playback hands a song tagged 'UADE' to UADE's opaque player and never
+    // starts its engine (usePatternPlayback): primemover 07.hot and dynamite
+    // dux.core, whose grid UADE's scan draws, were silent in the app.
+    expect(song.format, 'not tagged as a UADE song').not.toBe('UADE');
+    expect(song.patterns.filter((p) => p.importMetadata?.sourceFormat === 'UADE').map((p) => p.id), 'no pattern tagged UADE').toEqual([]);
+    expect(song.instruments.some((i) => i.uade), 'no instrument carries a UADE player config').toBe(false);
   }, 60_000);
 
   it('Ben Daglish stays on BdEngine until the owner moves it (heldBecause)', async () => {

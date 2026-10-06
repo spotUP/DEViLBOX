@@ -738,17 +738,21 @@ export async function tryRouteFormat(
   }
 
   // ── PumaTracker ───────────────────────────────────────────────────────────
-  // .puma files — OpenMPT WASM handles playback (UADE can't play Pumatracker)
+  // Our parser + PumaTracker WASM (editable; 0.999 vs UADE, 0.994 vs
+  // libopenmpt). libopenmpt was tried first and never failed in the browser,
+  // so the WASM never played there (owner rule, 2026-10-06: our own engine
+  // when we have one). libopenmpt keeps what the native parser refuses.
   if (matchesExt(filename, ['puma'])) {
-    try {
-      const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
-      return await parseWithOpenMPT(buffer, originalFileName);
-    } catch {
-      const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
-      return withNativeThenUADE('pumaTracker', ctx,
-        (bytes: Uint8Array | ArrayBuffer, name: string) => parsePumaTrackerFile(bytes instanceof Uint8Array ? bytes.buffer as ArrayBuffer : bytes, name),
-        'PumaTrackerParser', { isFormat: (b: Uint8Array) => isPumaTrackerFormat(b.buffer as ArrayBuffer), injectUADE: true });
+    const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
+    if (isPumaTrackerFormat(buffer)) {
+      try {
+        return await parsePumaTrackerFile(buffer, originalFileName);
+      } catch (e) {
+        console.warn(`[PumaTracker] native parse refused ${originalFileName}:`, e);
+      }
     }
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    return await parseWithOpenMPT(buffer, originalFileName);
   }
 
   // ── Synthesis ─────────────────────────────────────────────────────────────
