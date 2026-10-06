@@ -36,7 +36,7 @@ export interface FallbackContext {
  * auditioning one of these instruments plays that native voice instead of
  * restarting the module. Kept out of the UADEEditableSynth clobber below.
  */
-const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth']);
+const NATIVE_AUDITION_SYNTHS = new Set(['SunTronicSynth', 'FredSynth']);
 
 type NativeParser = (buffer: ArrayBuffer, filename: string) => Promise<TrackerSong> | TrackerSong;
 
@@ -138,7 +138,11 @@ export async function withNativeThenUADE(
             // Dedicated WASM engine handles all audio — set instruments to
             // 'Sampler' so ToneEngine doesn't try to instantiate unknown
             // synth types (e.g. 'SynthesisWasmSynth') and show error dialogs.
+            // Native audition voices (FredSynth) stay: the keyboard plays the
+            // instrument through its own engine voice; flattening them left an
+            // empty Sampler and silence.
             for (const inst of result.instruments) {
+              if (NATIVE_AUDITION_SYNTHS.has(inst.synthType)) continue;
               inst.synthType = 'Sampler';
             }
             return result;
