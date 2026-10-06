@@ -702,6 +702,9 @@ void read_table68k (void)
 {
     int i;
 
+    /* DEViLBOX: the wasm build re-runs this for every fresh core (each load
+     * after a rendered song); the 1 MB table of the previous run leaked. */
+    free (table68k);
     table68k = (struct instr *)xmalloc (65536 * sizeof (struct instr));
     for (i = 0; i < 65536; i++) {
 	table68k[i].mnemo = i_ILLG;
