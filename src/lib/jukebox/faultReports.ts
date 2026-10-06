@@ -53,6 +53,10 @@ export const JUKEBOX_FAULTS: readonly JukeboxFault[] = [
   // The song plays, but its instruments make no sound when played from the
   // computer or MIDI keyboard - an instrument-preview fault, not a playback one.
   { id: 'keyboard-silent', key: '', label: 'Keyboard Silent', title: 'The instruments make no sound when played on the keyboard', status: 'partial' },
+  // The song plays and looks right, but the channel meters do not follow the
+  // audio - dark while a channel sounds, or moving while it is silent. A
+  // display fault: it leaves both `status` and `patternQuality` alone.
+  { id: 'wrong-meters', key: '', label: 'Wrong Channel Meters', title: 'The channel meters do not follow what the channels play' },
 ] as const;
 
 /**
