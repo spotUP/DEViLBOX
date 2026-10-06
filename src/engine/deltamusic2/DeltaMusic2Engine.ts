@@ -120,9 +120,9 @@ export class DeltaMusic2Engine extends WASMChannelOutputsEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  /** Edit a pattern cell in the WASM replayer */
-  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+  /** Edit a cell of the replayer's own track pool (its index and row, not the grid's pattern). */
+  setTrackCell(index: number, row: number, note: number, instrument: number, arpeggio: number, effect: number, effectArg: number): void {
+    this.workletNode?.port.postMessage({ type: 'setTrackCell', index, row, note, instrument, arpeggio, effect, effectArg });
   }
 
   /** Set an instrument parameter by name */
