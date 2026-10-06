@@ -5,6 +5,8 @@
  */
 
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { decodeFredModule } from '@/lib/import/formats/FredEditorModule';
+import { FRED_ROWS_PER_PATTERN, walkFredSong } from '@/lib/import/formats/fredEditorGrid';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMChannelOutputsEngine,
@@ -26,11 +28,29 @@ export function fredReplayerTransform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
+export interface FredPositionUpdate {
+  /** The grid pattern the replayer is in (64 lines each). */
+  songPos: number;
+  /** The row within it. */
+  row: number;
+}
+
+/** The grid's length in lines for a module, 0 when it cannot be walked. */
+function gridLinesOf(buffer: ArrayBuffer): number {
+  try {
+    const m = decodeFredModule(new Uint8Array(buffer));
+    return m ? walkFredSong(m, 0).lines : 0;
+  } catch { return 0; }
+}
+
 export class FredReplayerEngine extends WASMChannelOutputsEngine {
   private static instance: FredReplayerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _songEndCallback: (() => void) | null = null;
+  private _positionCallbacks = new Set<(update: FredPositionUpdate) => void>();
+  /** Lines in the grid (the walk's length): the replayer keeps looping past it. */
+  private _gridLines = 0;
 
   private constructor() {
     super();
@@ -86,6 +106,13 @@ export class FredReplayerEngine extends WASMChannelOutputsEngine {
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
+        case 'position': {
+          // The replayer's own line counter as the grid's pattern and row (fredEditorGrid.ts).
+          const line = this._gridLines > 0 ? data.line % this._gridLines : data.line;
+          const songPos = Math.floor(line / FRED_ROWS_PER_PATTERN);
+          for (const cb of this._positionCallbacks) cb({ songPos, row: line - songPos * FRED_ROWS_PER_PATTERN });
+          break;
+        }
         case 'songEnd':
           this._songEndCallback?.();
           break;
@@ -106,6 +133,12 @@ export class FredReplayerEngine extends WASMChannelOutputsEngine {
     await this._initPromise;
     if (!this.workletNode) throw new Error('FredReplayerEngine not initialized');
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    this._gridLines = gridLinesOf(buffer);
+  }
+
+  onPositionUpdate(cb: (update: FredPositionUpdate) => void): () => void {
+    this._positionCallbacks.add(cb);
+    return () => this._positionCallbacks.delete(cb);
   }
 
   play(): void {
@@ -127,6 +160,7 @@ export class FredReplayerEngine extends WASMChannelOutputsEngine {
    */
   replaceModule(buffer: ArrayBuffer): void {
     this.workletNode?.port.postMessage({ type: 'replaceModule', moduleData: buffer });
+    this._gridLines = gridLinesOf(buffer);
   }
 
   /** Set an instrument parameter by name */
@@ -135,6 +169,7 @@ export class FredReplayerEngine extends WASMChannelOutputsEngine {
   }
 
   override dispose(): void {
+    this._positionCallbacks.clear();
     super.dispose();
     if (FredReplayerEngine.instance === this) FredReplayerEngine.instance = null;
   }
