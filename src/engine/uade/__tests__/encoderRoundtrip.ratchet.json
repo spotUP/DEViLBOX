@@ -304,14 +304,6 @@
       "matchPct": 0.1602,
       "cells": 256
     },
-    "jesperOlsen": {
-      "kind": "fixed",
-      "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.2578,
-      "cells": 256
-    },
     "klystrack": {
       "kind": "variable",
       "method": "encode-pattern",
