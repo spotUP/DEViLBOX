@@ -1,37 +1,78 @@
 /**
- * DigitalSonixChromeEncoder — Encodes TrackerCell back to Digital Sonix & Chrome
- * (.dsc) sequence-table bytes.
+ * DigitalSonixChromeEncoder - the Digital Sonix & Chrome (DSC.*) grid cell codec.
  *
- * A DSC module is fully linear: header, instrument entries, a 4-byte-per-entry
- * sequence table (the only on-disk song data), sample info, then PCM. The player
- * (DigitalSonixChrome_v1.asm, Play routine) walks the sequence table reading
- * per-voice position bytes — there is no separate note grid, so the sequence
- * table IS the song. Its 4-byte entries are a packed position/trigger stream
- * (mostly 0xFF rests with occasional low position bytes), not a clean note/effect
- * cell, so the only faithful byte-exact inverse is a whole-entry carrier.
+ * A DSC row is one byte per voice (DigitalSonixChrome_v1.asm lbC005400): a
+ * record index 0..nRecords-1 triggers that 18-byte record (a sample at a fixed
+ * period, volume and repeat count, lbC005936), 0xFF triggers nothing. So the
+ * grid cell is: note = the record's period read as a note, instrument = record
+ * index + 1. The record IS the note: pitch is not a separate field on disk.
  *
- * decodeCell (in DigitalSonixChromeParser) stashes the four source bytes in the
- * invisible period/pan/cutoff carriers; this encoder reproduces them verbatim.
- * Edited grid cells lack the carriers and fall back to zero bytes.
+ * Encoding a cell:
+ *   - no note (or note-off, or no instrument)          -> 0xFF
+ *   - the instrument's own record plays the cell's note -> that record
+ *   - the note was changed: a record of the SAME sample (pcmOffset + length)
+ *     whose period plays that note                       -> that record
+ *   - otherwise                                          -> the instrument's record
+ *     (the format cannot play that sample at another pitch)
+ *
+ * Bytes past the record table other than 0xFF never occur in the corpus (14
+ * files); they decode as an empty cell.
+ *
+ * Module layout and the whole-file codec: src/lib/import/formats/DigitalSonixChromeModule.ts.
  */
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { periodToNote } from '@/lib/amiga/periodNotes';
+import { DSC_EMPTY, type DscRecord } from '@/lib/import/formats/DigitalSonixChromeModule';
 
-function encodeDscCell(cell: TrackerCell): Uint8Array {
-  const out = new Uint8Array(4);
+const NOTE_OFF = 97;
 
-  // Byte-exact carrier restore: reproduce the four source bytes when present.
-  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
-    out[0] = (cell.period >> 8) & 0xFF;
-    out[1] = cell.period & 0xFF;
-    out[2] = cell.pan & 0xFF;
-    out[3] = cell.cutoff & 0xFF;
-  }
-
-  return out;
+export interface DscCellCodec {
+  decodeCell(bytes: Uint8Array): TrackerCell;
+  encodeCell(cell: TrackerCell): Uint8Array;
+  /** The track byte for a cell (encodeCell's single byte). */
+  cellByte(cell: TrackerCell): number;
 }
 
-registerPatternEncoder('digitalSonixChrome', () => encodeDscCell);
+function emptyCell(): TrackerCell {
+  return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+}
 
-export { encodeDscCell };
+/**
+ * The codec for one module's records. Without records (the registry's
+ * context-free entry) the instrument number is written as is.
+ */
+export function makeDscCellCodec(records?: readonly DscRecord[]): DscCellCodec {
+  const noteOf = (r: DscRecord): number => periodToNote(r.period);
+
+  const cellByte = (cell: TrackerCell): number => {
+    const note = cell.note ?? 0;
+    const inst = cell.instrument ?? 0;
+    if (note <= 0 || note >= NOTE_OFF || inst < 1) return DSC_EMPTY;
+    if (!records) return inst - 1 < DSC_EMPTY ? inst - 1 : DSC_EMPTY;
+    if (inst > records.length) return DSC_EMPTY;
+    const idx = inst - 1;
+    const own = records[idx];
+    if (noteOf(own) === note) return idx;
+    const sibling = records.findIndex((r) => r.pcmOffset === own.pcmOffset && r.length === own.length && noteOf(r) === note);
+    return sibling >= 0 ? sibling : idx;
+  };
+
+  return {
+    cellByte,
+    encodeCell: (cell) => Uint8Array.of(cellByte(cell)),
+    decodeCell: (bytes) => {
+      const b = bytes[0];
+      const rec = records?.[b];
+      if (b === DSC_EMPTY || !rec) return emptyCell();
+      return { ...emptyCell(), note: noteOf(rec), instrument: b + 1, period: rec.period };
+    },
+  };
+}
+
+const contextFree = makeDscCellCodec();
+registerPatternEncoder('digitalSonixChrome', () => contextFree.encodeCell);
+
+/** Context-free cell encoder (instrument number as the record index). */
+export const encodeDscCell = contextFree.encodeCell;

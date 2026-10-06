@@ -118,7 +118,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 1024
+      "cells": 4096
     },
     "earAche": {
       "kind": "fixed",

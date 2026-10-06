@@ -2102,11 +2102,12 @@ export async function tryRouteFormat(
   }
 
   // ── Digital Sonix & Chrome (DSC.* prefix) ────────────────────────────────
-  // Amiga format with sample-table structural detection. UADE prefix: DSC.
+  // The grid is decoded from the module's own entries/tracks/records (reversed
+  // from the replayer); UADE plays. The subsong is numbered as UADE numbers it.
   if (matchesExt(filename, ['dsc'])) {
     const { isDscFormat, parseDscFile } = await import('@lib/import/formats/DigitalSonixChromeParser');
     return withNativeThenUADE('digitalSonixChrome', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDscFormat(buf as ArrayBuffer)) return parseDscFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDscFormat(buf as ArrayBuffer)) return parseDscFile(buf as ArrayBuffer, name, ctx.subsong); return null; },
       'DigitalSonixChromeParser', { injectUADE: true });
   }
 
