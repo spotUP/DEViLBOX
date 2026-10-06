@@ -88,6 +88,10 @@ export const MOVE_ENERGY: Readonly<Record<string, MoveEnergyCost>> = {
   // shelf actually spends: the headroom under 120 Hz. That is also the axis
   // `bassEmphasisShape` reads back to decide HOW MANY dB to ask for.
   bassEmphasis:     { wet: 0.05, feedback: 0.00, spectralDensity: 0.10, lowFrequencyRisk: 0.45, decaySec: 2 },
+  // Colours what a channel already sends — adds no signal and no feedback.
+  // Ring Mod and Lo-fi add harmonics (density); Saturation on a bass is the
+  // only low-end cost, and it holds level by construction.
+  channelShape:     { wet: 0.05, feedback: 0.00, spectralDensity: 0.20, lowFrequencyRisk: 0.10, decaySec: 0.5 },
 
   // Filters and EQ: they take away more than they add.
   filterDrop:       { wet: 0.05, feedback: 0.00, spectralDensity: 0.00, lowFrequencyRisk: 0.00, decaySec: 1 },

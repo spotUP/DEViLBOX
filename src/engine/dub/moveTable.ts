@@ -67,11 +67,14 @@ export const DUB_MOVE_TABLE: readonly string[] = [
   // Appended 2026-09-22 (bass-as-musical-target, Phase 2). The dry low-shelf
   // gesture: the bass line that is already playing becomes dominant.
   'bassEmphasis',        // 44
+  // Appended 2026-10-06 (per-channel sound shaping, F1/F2). A hold, so it is
+  // recorded as a lane, never as a cell; the slot keeps the table complete.
+  'channelShape',        // 45
 ];
 
 /** Ratchet: tests assert `DUB_MOVE_TABLE.length === DUB_MOVE_TABLE_VERSION`
  *  so any append forces a one-line bump here — a cheap review signal. */
-export const DUB_MOVE_TABLE_VERSION = 45;
+export const DUB_MOVE_TABLE_VERSION = 46;
 
 /**
  * Dub effect-command slots. Picked at 36-38 to sit BEYOND the existing

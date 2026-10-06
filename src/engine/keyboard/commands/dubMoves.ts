@@ -131,6 +131,8 @@ export const dubRiddimSection:     MoveHandler = holdCommand('riddimSection',   
 // keyboard layer and the move refuses it. Reachable today through the router,
 // MIDI and the lane; a key binding needs a channel picker first.
 export const dubBassEmphasis:      MoveHandler = holdCommand('bassEmphasis',    'Bass Emphasis');
+// Channel-scoped for the same reason; holds the slot at its defaults (High Pass).
+export const dubChannelShape:      MoveHandler = holdCommand('channelShape',    'Channel Shape');
 
 // ── Panic — release everything ────────────────────────────────────────────
 export function dubPanicReleaseAll(): boolean {

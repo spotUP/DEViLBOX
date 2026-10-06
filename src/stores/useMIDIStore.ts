@@ -295,6 +295,9 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 83, parameter: 'dub.sweepRateHz',       min: 0, max: 1, curve: 'linear' },
   { ccNumber: 84, parameter: 'dub.plateStageMix',     min: 0, max: 1, curve: 'linear' },
   { ccNumber: 85, parameter: 'dub.bassShelfGainDb',   min: 0, max: 1, curve: 'linear' },
+  // 86 is undefined in the MIDI spec, like 78. A held channel shape at its
+  // defaults (High Pass, half way) on the addressed channel.
+  { ccNumber: 86, parameter: 'dub.channelShape',      min: 0, max: 1, curve: 'linear' },
 
   // Dub bus continuous params — min/max are documentary; the actual
   // normalisation is handled by DUB_BUS_PARAMS transforms in

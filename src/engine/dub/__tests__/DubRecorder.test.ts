@@ -21,7 +21,10 @@ import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { isDubMoveEffectSlot, decodeDubEffect } from '../moveTable';
-import { publishChannelSend } from '@/lib/dub/channelSendStream';
+import { publishChannelSend, publishChannelShape } from '@/lib/dub/channelSendStream';
+import { encodeChannelShapeLane } from '@/lib/dub/channelShape';
+import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
+import { useMixerStore } from '@/stores/useMixerStore';
 import { useUIStore } from '@/stores/useUIStore';
 import type { DubBus } from '../DubBus';
 
@@ -265,5 +268,31 @@ describe('DubRecorder — automation store write path', () => {
       getCurves('p0', 0).some(c => c.parameter === 'dub.channelSend'),
       'replaying a ride re-recorded it — one take becomes an endless accumulation of itself'
     ).toBe(false);
+  });
+
+  // The channel sound-shaping slot (F1): chosen by hand, it is part of how the
+  // channel was performed, so it records like the send ride — and replays.
+  it('a shaping slot chosen by hand is recorded on its channel as a step lane', () => {
+    useDubStore.setState({ armed: true });
+    publishChannelShape({ channelId: 2, kind: 'lofi', value: 6, row: 16, source: 'live' });
+    const curve = getCurves('p0', 2).find(c => c.parameter === 'dub.shapeSlot');
+    expect(curve, 'an armed deck dropped the slot change').toBeDefined();
+    expect(curve!.mode, 'a slot interpolated between kinds would pass through every kind between').toBe('steps');
+    expect(curve!.points).toEqual([expect.objectContaining({ row: 16, value: encodeChannelShapeLane('lofi', 6) })]);
+  });
+
+  it('a lane replaying the slot is not recorded again, and an unarmed deck records nothing', () => {
+    useDubStore.setState({ armed: true });
+    publishChannelShape({ channelId: 1, kind: 'hpf', value: 400, row: 8, source: 'lane' });
+    useDubStore.setState({ armed: false });
+    publishChannelShape({ channelId: 1, kind: 'hpf', value: 400, row: 9, source: 'live' });
+    expect(getCurves('p0', 1).some(c => c.parameter === 'dub.shapeSlot')).toBe(false);
+  });
+
+  it('a recorded slot point replays as the same slot on its channel', async () => {
+    useMixerStore.getState().setChannelDubShape(3, 'off');
+    routeParameterToEngine('dub.shapeSlot.ch3', encodeChannelShapeLane('ringMod', 250), undefined, 'lane');
+    await vi.waitFor(() => expect(useMixerStore.getState().channels[3].dubShape).toBe('ringMod'));
+    expect(useMixerStore.getState().channels[3].dubShapeValue).toBeCloseTo(250, 6);
   });
 });

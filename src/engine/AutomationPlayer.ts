@@ -234,7 +234,7 @@ export class AutomationPlayer {
         // whichever channel the router guessed (X5).
         const shortDubName = parameter.slice('dub.'.length);
         const perChannel =
-          DUB_MOVE_KINDS?.[shortDubName] !== undefined || shortDubName === 'channelSend';
+          DUB_MOVE_KINDS?.[shortDubName] !== undefined || shortDubName === 'channelSend' || shortDubName === 'shapeSlot';
         const addressed =
           channelIndex !== undefined
           && channelIndex >= 0

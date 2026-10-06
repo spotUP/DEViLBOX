@@ -56,6 +56,7 @@ export const MOVE_COLOR: Record<string, string> = {
   skankFloatThrow:     'bg-accent-highlight/40',  // 3:2 floating variant — same family, lighter
   riddimSection:       'bg-accent-error/70',      // bass+drums breakdown — dramatic drop, lighter than full versionDrop
   bassEmphasis:        'bg-accent-secondary/60',  // sub / bass family — dry low-shelf lift
+  channelShape:        'bg-accent-warning/40',    // the channel card's shaping slot is warning-coloured when on
 };
 
 // Hold-kind moves have a meaningful durationRows. Keep in sync with the
@@ -71,4 +72,5 @@ export const HOLD_KINDS = new Set([
   'versionDrop',
   'riddimSection',
   'bassEmphasis',
+  'channelShape',
 ]);

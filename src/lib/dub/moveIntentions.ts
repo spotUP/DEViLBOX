@@ -79,6 +79,10 @@ export const MOVE_INTENTIONS: Readonly<Record<string, readonly Intention[]>> = {
   // no persona can choose it. Registered but not selectable is exactly the
   // state Phase 2 was asked to leave it in.
   bassEmphasis:       [],
+  // A colour on one channel's send, like the bus Ring / Starve / Wobble it
+  // shares DSP with — and tagged like them. Which persona shapes which role
+  // comes from AutoDub's RULES (channelRole + params), not from here.
+  channelShape:       ['TEXTURE'],
 
   // Drops and seams — taking the mix away.
   filterDrop:         ['DROP', 'TRANSITION'],

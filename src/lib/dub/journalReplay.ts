@@ -171,6 +171,8 @@ export function firesFromCurves(curves: readonly AutomationCurve[]): ReplayFire[
     // The send is a continuous ride, not a fire — it has no on-edge to count,
     // and counting its points would invent a move per curve point.
     if (curve.parameter.startsWith('dub.channelSend')) continue;
+    // The shaping slot is a state lane (a step per choice), not a fire either.
+    if (curve.parameter.startsWith('dub.shapeSlot')) continue;
 
     const moveId = curve.parameter.slice('dub.'.length);
     const channelId = curve.channelIndex >= 0 ? curve.channelIndex : undefined;

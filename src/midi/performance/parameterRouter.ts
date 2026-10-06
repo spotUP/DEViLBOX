@@ -19,6 +19,7 @@ import * as DJActions from '../../engine/dj/DJActions';
 import type { MappableParameter } from '../types';
 import { LATCHING_MOVES } from '../../engine/dub/latchingMoves';
 import { DUB_RETURN_GAIN_MAX } from '../../types/dub';
+import { encodeChannelShapeLane, type ChannelShapeKind } from '../../lib/dub/channelShape';
 
 // ============================================================================
 // Route Table Types
@@ -122,6 +123,7 @@ export const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   skankFloatThrow:     'trigger', // dotted-quarter 3:2 floating variant
   riddimSection:       'hold',   // bass+drums breakdown with skank echo return
   bassEmphasis:        'hold',   // dry low-shelf lift on the bass, eased in and out
+  channelShape:        'hold',   // borrow a channel's sound-shaping slot (High Pass … Saturation)
 };
 
 /**
@@ -223,6 +225,13 @@ function parseDubMoveParam(param: string): { moveId: string; channelId?: number 
 const CHANNEL_SEND_PREFIX = 'dub.channelSend.ch';
 
 /**
+ * `dub.shapeSlot.ch<N>` — a channel's sound-shaping slot as one lane value
+ * (`encodeChannelShapeLane`): what DubRecorder writes when the slot is chosen
+ * by hand or a live channelShape move holds it, and what a lane replays.
+ */
+const SHAPE_SLOT_PREFIX = 'dub.shapeSlot.ch';
+
+/**
  * `dub.channelTouch.ch<N>` — a hand landing on a channel's fader.
  *
  * Touch-sensitive faders send this the instant you make contact, before the
@@ -300,6 +309,17 @@ function routeTransportParameter(param: string, value: number): void {
 }
 
 function routeDubParameter(param: string, value: number, source: 'live' | 'lane' = 'live'): void {
+  // Per-channel shaping slot, before the move parser for the same reason as the send.
+  if (param.startsWith(SHAPE_SLOT_PREFIX)) {
+    const ch = parseInt(param.slice(SHAPE_SLOT_PREFIX.length), 10);
+    if (!Number.isFinite(ch) || ch < 0) return;
+    void Promise.all([import('../../stores/useMixerStore'), import('../../lib/dub/channelShape')]).then(([{ useMixerStore }, { decodeChannelShapeLane }]) => {
+      const { kind, value: v } = decodeChannelShapeLane(value);
+      useMixerStore.getState().setChannelDubShape(ch, kind, v, { source });
+    });
+    return;
+  }
+
   // 0. Per-channel dub send — handled before the move parser, which does not
   //    know 'channelSend' and would reject it.
   if (param.startsWith(CHANNEL_SEND_PREFIX)) {
@@ -1773,6 +1793,13 @@ export function readDubParameter(param: string): number | null {
     if (typeof raw !== 'number') return null;
     const span = busDef.max - busDef.min;
     return span === 0 ? 0 : Math.max(0, Math.min(1, (raw - busDef.min) / span));
+  }
+
+  if (param.startsWith(SHAPE_SLOT_PREFIX)) {
+    const ch = parseInt(param.slice(SHAPE_SLOT_PREFIX.length), 10);
+    if (!Number.isFinite(ch) || ch < 0) return null;
+    const c = (getMixerStoreRef()?.getState?.()?.channels as Array<{ dubShape?: ChannelShapeKind; dubShapeValue?: number }> | undefined)?.[ch];
+    return c?.dubShape ? encodeChannelShapeLane(c.dubShape, c.dubShapeValue ?? 0) : null;
   }
 
   if (param.startsWith(CHANNEL_SEND_PREFIX)) {
