@@ -64,6 +64,11 @@ describe('partnerlessFilesIn', () => {
     expect(partnerlessFilesIn({ siblings: ['shortsong1.mod.nt'] }).has('shortsong1.mod.nt')).toBe(true);
   });
 
+  it('does not offer a Kris Hatlelid .kh without songplay (UADE asks /uade/songplay repeatedly)', () => {
+    expect(partnerlessFilesIn({ siblings: ['hatlelid_smallest.kh'] }).has('hatlelid_smallest.kh')).toBe(true);
+    expect(partnerlessFilesIn({ siblings: ['hatlelid_smallest.kh', 'songplay'] }).size).toBe(0);
+  });
+
   it('keeps complete pairs, including a .dum on its shared bank', () => {
     expect(partnerlessFilesIn({ siblings: ['jpn.a', 'smp.a', 'x.dum', 'x.ins', 'amsyntdemo.mod', 'amsyntdemo.mod.nt', 'bob4e.dum', 'bob4.ins'] }).size).toBe(0);
   });

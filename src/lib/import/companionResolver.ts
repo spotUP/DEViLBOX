@@ -505,14 +505,15 @@ export function companionFilesIn(listing: CompanionListing, keepAsModule: (name:
  * Only formats confirmed that way belong here; roles with a shared-bank
  * fallback or a single-file variant (TFMX `mdat`) stay out.
  */
-export const PARTNER_REQUIRED_ROLES: ReadonlySet<string> = new Set(['jpn', 'jpnd', 'dum']);
+export const PARTNER_REQUIRED_ROLES: ReadonlySet<string> = new Set(['jpn', 'jpnd', 'dum', 'kh']);
 
 /**
  * Files in a listing that cannot play because the other half is not there:
  *
  *   * a module of a PARTNER_REQUIRED_ROLES role with nothing resolved beside
  *     it (`jpn.virocop-14` with no `smp.virocop-14`, `bob4e.dum` with no
- *     `bob4e.ins`);
+ *     `bob4e.ins`, a Kris Hatlelid `.kh` with no `songplay` - UADE asks
+ *     `/uade/songplay` again and again);
  *   * a StarTrekker `<module>.nt` whose `<module>` is not listed. The `.nt`
  *     holds synth data only; offered alone UADE says "Cannot play file".
  *
