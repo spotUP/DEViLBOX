@@ -28,9 +28,46 @@ const MESSAGE_SETTLE_MS = 40;
 /** Every clock the bus reads. setImmediate/nextTick stay real so I/O resolves. */
 const FAKED: NonNullable<Parameters<typeof vi.useFakeTimers>[0]>['toFake'] = ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'Date'];
 
-/** Call from afterAll: the rig leaves fake timers installed between renders. */
+/** The main thread's own Math.random, put back by releaseDubBusRigClock. */
+const realRandom = Math.random;
+
+/**
+ * Seed the MAIN thread's Math.random, from the same start for every rig.
+ *
+ * The worklet scopes were already seeded (realWebAudio.ts), but the bus also
+ * draws on the main thread while it builds: SpaceEchoEffect picks its wow LFO
+ * rate as `0.5 + Math.random() * 0.2`. Unseeded, two identical renders ran
+ * their echo heads at different wow rates and differed by -41 to -50 dBFS
+ * from render to render, and that drift was the "noise floor" the toggle test
+ * measured Starve against — it failed whenever the draw was unlucky
+ * (D2, 2026-10-06). Analogue scatter is right for the instrument; a
+ * measurement rig must render the same graph the same way every time.
+ */
+function seedMainThreadRandom(): void {
+  let s = 0x2545f491;
+  Math.random = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
+}
+
+/**
+ * Tone fills its white/pink/brown noise buffers with Math.random the first
+ * time any Noise starts (Tone.Reverb's impulse response does, inside
+ * SpaceEchoEffect) and caches them for the process. Left to the first rig,
+ * that rig makes ~half a million more draws than every later one, so the same
+ * seed hands its echo a different wow rate. Fill the caches before any rig.
+ */
+function warmToneNoiseCaches(Tone: typeof import('tone')): void {
+  const ctx = new Tone.OfflineContext(1, 0.01, RIG_SAMPLE_RATE);
+  for (const type of ['white', 'pink', 'brown'] as const) {
+    const noise = new Tone.Noise({ context: ctx, type });
+    noise.start(0);
+    noise.dispose();
+  }
+}
+
+/** Call from afterAll: the rig leaves fake timers and a seeded Math.random installed between renders. */
 export function releaseDubBusRigClock(): void {
   vi.useRealTimers();
+  Math.random = realRandom;
 }
 
 /** An action at a point on the audio timeline. */
@@ -58,6 +95,7 @@ export function loadDubBus(): Promise<{ Tone: typeof import('tone'); DubBus: typ
     servePublicToFetch();
     loaded = (async () => {
       const Tone = await import('tone');
+      warmToneNoiseCaches(Tone);
       const { DubBus } = await import('@/engine/dub/DubBus');
       return { Tone, DubBus };
     })();
@@ -75,6 +113,7 @@ export async function makeDubBusRig(seconds: number): Promise<DubBusRig> {
   // built must run on the audio-locked clock too, or it fires in real time in
   // the middle of a render. Re-installing also drops the previous rig's timers.
   vi.useFakeTimers({ toFake: FAKED });
+  seedMainThreadRandom();
   const ctx = new OfflineAudioContext(2, Math.round(seconds * RIG_SAMPLE_RATE), RIG_SAMPLE_RATE);
   Tone.setContext(ctx);
   const master = ctx.createGain();
