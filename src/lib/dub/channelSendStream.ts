@@ -33,29 +33,54 @@ export interface ChannelSendWrite {
   source: 'live' | 'lane';
 }
 
-type Listener = (write: ChannelSendWrite) => void;
-
-const listeners = new Set<Listener>();
-
-export function subscribeChannelSend(fn: Listener): () => void {
-  listeners.add(fn);
-  return () => { listeners.delete(fn); };
+/**
+ * The per-channel shaping slot (lib/dub/channelShape.ts) chosen by hand or
+ * replayed by a lane. Recorded the same way as a send ride: a channel's slot
+ * is part of how it was performed, and a take that dropped it would replay
+ * the dry channel.
+ */
+export interface ChannelShapeWrite {
+  channelId: number;
+  kind: import('./channelShape').ChannelShapeKind;
+  value: number;
+  row: number;
+  source: 'live' | 'lane';
 }
 
-export function publishChannelSend(write: ChannelSendWrite): void {
-  if (listeners.size === 0) return;
-  for (const fn of listeners) {
-    try {
-      fn(write);
-    } catch (err) {
-      // One bad listener must not stop the others, and must never break a
-      // fader move — the audio already happened by the time this runs.
-      console.error('[channelSendStream] listener threw:', err);
-    }
-  }
+/** A tiny listener set; one bad listener never stops the others. */
+function createWriteStream<T>(name: string) {
+  const listeners = new Set<(write: T) => void>();
+  return {
+    subscribe(fn: (write: T) => void): () => void {
+      listeners.add(fn);
+      return () => { listeners.delete(fn); };
+    },
+    publish(write: T): void {
+      if (listeners.size === 0) return;
+      for (const fn of listeners) {
+        try {
+          fn(write);
+        } catch (err) {
+          // The audio already happened by the time this runs; a listener
+          // must never break the control that wrote it.
+          console.error(`[${name}] listener threw:`, err);
+        }
+      }
+    },
+    reset(): void { listeners.clear(); },
+  };
 }
+
+const sendStream = createWriteStream<ChannelSendWrite>('channelSendStream');
+const shapeStream = createWriteStream<ChannelShapeWrite>('channelShapeStream');
+
+export const subscribeChannelSend = sendStream.subscribe;
+export const publishChannelSend = sendStream.publish;
+export const subscribeChannelShape = shapeStream.subscribe;
+export const publishChannelShape = shapeStream.publish;
 
 /** Test seam. Never call from app code. */
 export function resetChannelSendListeners(): void {
-  listeners.clear();
+  sendStream.reset();
+  shapeStream.reset();
 }
