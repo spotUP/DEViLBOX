@@ -429,7 +429,7 @@ export class CpuZ80 {
       // LDIR ($B0)
       case 0xB0: {
         let cyc = 0;
-        do {
+        for (;;) {
           const hl = (this.H<<8)|this.L;
           const de = (this.D<<8)|this.E;
           const bc = (this.B<<8)|this.C;
@@ -442,14 +442,14 @@ export class CpuZ80 {
           this.B = (bc2 >> 8) & 0xFF; this.C = bc2 & 0xFF;
           cyc += 21;
           if (bc2 === 0) break;
-        } while (true);
+        }
         this.F &= ~(F_H | F_PV | F_N);
         return cyc;
       }
       // LDDR ($B8)
       case 0xB8: {
         let cyc = 0;
-        do {
+        for (;;) {
           const hl = (this.H<<8)|this.L;
           const de = (this.D<<8)|this.E;
           const bc = (this.B<<8)|this.C;
@@ -462,14 +462,14 @@ export class CpuZ80 {
           this.B = (bc2 >> 8) & 0xFF; this.C = bc2 & 0xFF;
           cyc += 21;
           if (bc2 === 0) break;
-        } while (true);
+        }
         this.F &= ~(F_H | F_PV | F_N);
         return cyc;
       }
       // CPIR ($B1)
       case 0xB1: {
         let cyc = 0;
-        do {
+        for (;;) {
           const hl = (this.H<<8)|this.L;
           const bc = (this.B<<8)|this.C;
           const v = this.rd(hl);
@@ -480,13 +480,13 @@ export class CpuZ80 {
           this.B = (bc2 >> 8) & 0xFF; this.C = bc2 & 0xFF;
           cyc += 21;
           if ((r & 0xFF) === 0 || bc2 === 0) break;
-        } while (true);
+        }
         return cyc;
       }
       // CPDR ($B9)
       case 0xB9: {
         let cyc = 0;
-        do {
+        for (;;) {
           const hl = (this.H<<8)|this.L;
           const bc = (this.B<<8)|this.C;
           const v = this.rd(hl);
@@ -497,11 +497,28 @@ export class CpuZ80 {
           this.B = (bc2 >> 8) & 0xFF; this.C = bc2 & 0xFF;
           cyc += 21;
           if ((r & 0xFF) === 0 || bc2 === 0) break;
-        } while (true);
+        }
         return cyc;
       }
-      // INIR ($B2) / INDR ($BA) / OTIR ($B3) / OTDR ($BB) — treat as NOP blocks
-      case 0xB2: case 0xBA: case 0xB3: case 0xBB: return 21;
+      // OUTI ($A3) / OUTD ($AB) / OTIR ($B3) / OTDR ($BB)
+      // B is decremented BEFORE the write, so the port is (B-1):C - the
+      // Pro Tracker 3 player dumps its registers with `LD B,$BF; OUTI`,
+      // which lands on $BEFD; AYParser decodes it by the top bits, as aylet
+      // does. Until 2026-10-04 these were NOPs and no PT3 note ever reached
+      // the grid (ledger F15).
+      case 0xA3: case 0xAB: { this.outBlock(op === 0xA3 ? 1 : -1); return 16; }
+      case 0xB3: case 0xBB: {
+        let cyc = 0;
+        do { this.outBlock(op === 0xB3 ? 1 : -1); cyc += 21; } while (this.B !== 0);
+        return cyc;
+      }
+      // INI ($A2) / IND ($AA) / INIR ($B2) / INDR ($BA)
+      case 0xA2: case 0xAA: { this.inBlock(op === 0xA2 ? 1 : -1); return 16; }
+      case 0xB2: case 0xBA: {
+        let cyc = 0;
+        do { this.inBlock(op === 0xB2 ? 1 : -1); cyc += 21; } while (this.B !== 0);
+        return cyc;
+      }
       // IM 0/1/2
       case 0x46: case 0x56: case 0x5E: case 0x4E: case 0x66: case 0x6E: case 0x76: case 0x7E: return 8;
       default: return 8; // unimplemented ED opcode → NOP
@@ -974,6 +991,28 @@ export class CpuZ80 {
       // ── Unimplemented → NOP ───────────────────────────────────────────────
       default: return 4;
     }
+  }
+
+  /** OUTI/OUTD step: B = B-1, OUT ((B<<8)|C), (HL), HL += dir; Z and N flags from B. */
+  private outBlock(dir: 1 | -1): void {
+    const hl = (this.H<<8)|this.L;
+    const v = this.rd(hl);
+    this.B = (this.B - 1) & 0xFF;
+    this.mem.outPort?.(((this.B<<8)|this.C) & 0xFFFF, v);
+    const hl2 = (hl + dir) & 0xFFFF;
+    this.H = (hl2 >> 8) & 0xFF; this.L = hl2 & 0xFF;
+    this.F = (this.F & ~(F_Z | F_N)) | (this.B === 0 ? F_Z : 0) | F_N;
+  }
+
+  /** INI/IND step: (HL) = IN ((B<<8)|C), B = B-1, HL += dir; Z and N flags from B. */
+  private inBlock(dir: 1 | -1): void {
+    const hl = (this.H<<8)|this.L;
+    const v = this.mem.inPort ? this.mem.inPort(((this.B<<8)|this.C) & 0xFFFF) & 0xFF : 0xFF;
+    this.wr(hl, v);
+    this.B = (this.B - 1) & 0xFF;
+    const hl2 = (hl + dir) & 0xFFFF;
+    this.H = (hl2 >> 8) & 0xFF; this.L = hl2 & 0xFF;
+    this.F = (this.F & ~(F_Z | F_N)) | (this.B === 0 ? F_Z : 0) | F_N;
   }
 
   /**

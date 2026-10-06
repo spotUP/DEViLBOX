@@ -345,6 +345,51 @@ describe('CpuZ80', () => {
     expect(cpu.getB()).toBe(0xFF);
   });
 
+  // ── OUTI / OTIR: B is decremented BEFORE the port is formed ─────────────
+  // The Pro Tracker 3 player dumps its AY registers with `LD B,$BF; OUTI`,
+  // so the write lands on $BEFD. These were NOPs until 2026-10-04 (ledger F15).
+  it('OUTI writes (HL) to port (B-1):C, advances HL and sets Z when B reaches 0', () => {
+    // 0x0200: 01 FD BF   LD BC,$BFFD
+    // 0x0203: 21 00 40   LD HL,$4000
+    // 0x0206: ED A3      OUTI
+    const mem = makeRAM({
+      0x0200: 0x01, 0x0201: 0xFD, 0x0202: 0xBF,
+      0x0203: 0x21, 0x0204: 0x00, 0x0205: 0x40,
+      0x0206: 0xED, 0x0207: 0xA3,
+      0x4000: 0x5A,
+    });
+    const outPort = vi.fn();
+    mem.outPort = outPort;
+    const cpu = new CpuZ80(mem);
+    cpu.reset(0x0200);
+    cpu.step(); cpu.step(); cpu.step();
+    expect(outPort).toHaveBeenCalledWith(0xBEFD, 0x5A);
+    expect(cpu.getB()).toBe(0xBE);
+    expect(cpu.getHL()).toBe(0x4001);
+    expect(cpu.getAF() & 0x40).toBe(0);
+  });
+
+  it('OTIR repeats until B is 0, one port write per byte', () => {
+    // 0x0200: 01 FD 03   LD BC,$03FD
+    // 0x0203: 21 00 40   LD HL,$4000
+    // 0x0206: ED B3      OTIR
+    const mem = makeRAM({
+      0x0200: 0x01, 0x0201: 0xFD, 0x0202: 0x03,
+      0x0203: 0x21, 0x0204: 0x00, 0x0205: 0x40,
+      0x0206: 0xED, 0x0207: 0xB3,
+      0x4000: 0x11, 0x4001: 0x22, 0x4002: 0x33,
+    });
+    const outPort = vi.fn();
+    mem.outPort = outPort;
+    const cpu = new CpuZ80(mem);
+    cpu.reset(0x0200);
+    cpu.step(); cpu.step(); cpu.step();
+    expect(outPort.mock.calls).toEqual([[0x02FD, 0x11], [0x01FD, 0x22], [0x00FD, 0x33]]);
+    expect(cpu.getB()).toBe(0);
+    expect(cpu.getHL()).toBe(0x4003);
+    expect(cpu.getAF() & 0x40).toBe(0x40);
+  });
+
   it('RST 38h pushes PC and jumps to $0038', () => {
     // 0x0200: FF   RST $38
     const mem = makeRAM({ 0x0200: 0xFF, 0x0038: 0x00 });
