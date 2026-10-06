@@ -219,7 +219,7 @@ async function paulaNotes(mod: LogModule, data: Uint8Array, name: string, dir: s
 }
 
 /** The grid's note sequence per channel, in song order. */
-async function gridNotes(data: Uint8Array, name: string): Promise<{ format: string; notes: number[][] } | null> {
+async function gridNotes(data: Uint8Array, name: string, dir: string): Promise<{ format: string; notes: number[][] } | null> {
   if (GRID_JSON[name]) return { format: 'grid-json', notes: GRID_JSON[name] };
   const fmt = detectFormatFromContent(name, data.subarray(0, 128));
   if (!fmt?.nativeParser) return null;
@@ -228,7 +228,15 @@ async function gridNotes(data: Uint8Array, name: string): Promise<{ format: stri
   const parse = m[fmt.nativeParser.parseFn];
   if (typeof parse !== 'function') return null;
   const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-  const song = await parse(buf, name);
+  // A parser whose grid needs the companion files (registry companionsArg)
+  // gets the ones the app would load beside the module.
+  const companions = fmt.nativeParser.companionsArg
+    ? new Map(resolveCompanions(name, listingFromRelativePaths(readdirSync(dir))).companions.map((c) => {
+      const b = readFileSync(join(dir, c));
+      return [c, b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)] as const;
+    }))
+    : undefined;
+  const song = await parse(buf, name, companions);
   if (!song?.patterns) return null;
   const order: number[] = song.songPositions?.length ? song.songPositions : song.patterns.map((_: unknown, i: number) => i);
   const notes: number[][] = Array.from({ length: song.numChannels ?? song.patterns[0].channels.length }, () => []);
@@ -279,7 +287,7 @@ function score(a: number[], b: number[]): number {
     const data = new Uint8Array(readFileSync(f));
     const name = basename(f);
     let grid: Awaited<ReturnType<typeof gridNotes>> = null;
-    try { grid = await gridNotes(data, name); } catch (e) { console.log(`${name}: parser threw: ${String((e as Error).message).slice(0, 100)}`); continue; }
+    try { grid = await gridNotes(data, name, dirname(f)); } catch (e) { console.log(`${name}: parser threw: ${String((e as Error).message).slice(0, 100)}`); continue; }
     if (!grid) { console.log(`${name}: no native parser / no grid`); continue; }
     let paula: PaulaNotes;
     try { paula = await paulaNotes(mod, data, name, dirname(f)); } catch (e) { console.log(`${name}: ${(e as Error).message}`); continue; }

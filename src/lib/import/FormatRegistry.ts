@@ -39,6 +39,12 @@ export interface NativeParserRef {
   parseFn: string;
   /** Name of the format-detect function export (optional), e.g., 'isHivelyFormat' */
   detectFn?: string;
+  /**
+   * parseFn takes the module's companion files as its third argument
+   * (name -> bytes, as the companion resolver hands them over): the grid
+   * needs them (MIDI Loriciel's SMPL bank holds the key ranges).
+   */
+  companionsArg?: true;
 }
 
 /** A single format definition in the registry */
@@ -1596,7 +1602,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     matchMode: 'prefix',
     prefixes: ['midi.'],
     prefKey: 'midiLoriciel',
-    nativeParser: { module: '@lib/import/formats/MIDILoricielParser', parseFn: 'parseMIDILoricielFile', detectFn: 'isMIDILoricielFormat' },
+    nativeParser: { module: '@lib/import/formats/MIDILoricielParser', parseFn: 'parseMIDILoricielFile', detectFn: 'isMIDILoricielFormat', companionsArg: true },
     uadeFallback: true,
   },
   {

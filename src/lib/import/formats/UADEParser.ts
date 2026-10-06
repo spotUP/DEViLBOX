@@ -881,7 +881,7 @@ export async function parseUADEFile(
       },
       'MIDI-Loriciel': async () => {
         const { parseMIDILoricielFile } = await import('./MIDILoricielParser');
-        return parseMIDILoricielFile(buffer, filename);
+        return parseMIDILoricielFile(buffer, filename, companionFiles);
       },
       'onEscapee': async () => {
         const { parseOnEscapeeFile } = await import('./OnEscapeeParser');

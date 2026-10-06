@@ -129,6 +129,7 @@
     "libflacjs": "^5.4.0",
     "lucide-react": "^0.562.0",
     "lzma": "^2.3.2",
+    "midi-file": "^1.2.4",
     "mpg123-decoder": "^1.0.3",
     "onnxruntime-web": "^1.23.2",
     "p5": "^2.1.2",
