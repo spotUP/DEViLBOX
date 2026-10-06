@@ -209,6 +209,12 @@ export interface FCConfig {
   wavePCM?: number[];        // Signed 8-bit PCM of the initial waveform (32-64 bytes)
   volMacroData?: number[];   // Raw vol macro bytes (5..63): volume values + control codes
   volMacroSpeed?: number;    // Vol macro speed (ticks per step)
+  /** Index of the frequency macro the volume macro names. */
+  freqMacroIndex?: number;
+  /** The 64-byte frequency macros the voice can reach (entry macro and 0xE7 jump targets), by macro index. Absent: built from synthTable and arpTable. */
+  freqMacros?: Record<number, number[]>;
+  /** Waves those macros select, by the replayer's slot number (0-9 samples, 10-89 wave tables). Absent slots 10-56 are the FC13 built-in waves. */
+  waveBank?: Record<number, { data: number[]; loopStart: number; loopLength: number }>;
 }
 
 /**
@@ -476,6 +482,16 @@ export interface SidMon1Config {
   pitchFall?: number;
   mainWave?: number[];
   phaseWave?: number[];
+  /** Wave list index (<= 15) or PCM sample number (> 15) the instrument plays. */
+  waveform?: number;
+  /** The 16 bytes of the instrument's wave list: (wave number, ticks) pairs, 0xff = jump. */
+  waveList?: number[];
+  /** The waves that list and the phase LFO name, by wave number (32 signed bytes each). */
+  waves?: Record<number, number[]>;
+  /** The PCM sample of an instrument with waveform > 15: signed bytes, loop offset and repeat length in bytes. */
+  pcm?: { data: number[]; loop: number; repeat: number };
+  /** The song's wave blends (Mix1, Mix2) whose destination is a wave this instrument plays. */
+  mix?: Array<{ speed: number; dest: number; src1: number; src2: number }>;
 }
 
 /**

@@ -4,22 +4,8 @@
  * Implements per-note triggering for SidMon 1.0 instruments.
  * Each SidMon1Synth instance owns one sm1_create_player() handle.
  *
- * Binary serialisation format for sm1_load_instrument() (93 bytes):
- *   [0]       version = 0
- *   [1]       attackSpeed (uint8)
- *   [2]       attackMax   (uint8, 0-64)
- *   [3]       decaySpeed  (uint8)
- *   [4]       decayMin    (uint8, 0-64)
- *   [5]       sustain     (uint8, countdown ticks)
- *   [6]       releaseSpeed (uint8)
- *   [7]       releaseMin  (uint8, 0-64)
- *   [8]       phaseShift  (uint8, 0 = disabled)
- *   [9]       phaseSpeed  (uint8)
- *   [10..11]  finetune    (uint16 LE, 0-1005)
- *   [12]      pitchFall   (int8 as uint8)
- *   [13..28]  arpeggio[16] (16 uint8 values)
- *   [29..60]  mainWave[32] (32 int8 as uint8)
- *   [61..92]  phaseWave[32] (32 int8 as uint8)
+ * The blob sm1_load_instrument() reads is documented at serializeSidMon1Config
+ * and in sidmon1-wasm/src/sidmon1_synth.c.
  */
 
 import type { DevilboxSynth } from '@/types/synth';
@@ -249,67 +235,53 @@ export class SidMon1Synth implements DevilboxSynth {
 }
 
 /**
- * Serialise a SidMon1Config into the binary format expected by sm1_load_instrument().
- * Returns an ArrayBuffer (93 bytes) that can be transferred to the AudioWorklet.
+ * Serialise a SidMon1Config into the blob sm1_load_instrument() reads (layout
+ * in sidmon1_synth.c): the replayer's instrument record, its wave list and the
+ * waves and PCM sample it plays. Wave edits made in the editor (mainWave at the
+ * instrument's waveform, phaseWave at its phase shift) replace the imported waves.
  */
 export function serializeSidMon1Config(cfg: SidMon1Config): ArrayBuffer {
-  const buf = new Uint8Array(93);
+  const waveform = cfg.waveform ?? 0;
+  const phaseShift = cfg.phaseShift ?? 0;
+  const waveList = cfg.waveList ?? [waveform, 0xff, 0xff, 0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const waves = new Map<number, number[]>();
+  Object.entries(cfg.waves ?? {}).forEach(([k, v]) => waves.set(Number(k), v));
+  if (waveform <= 15 && cfg.mainWave) waves.set(waveform, cfg.mainWave);
+  if (phaseShift > 0 && cfg.phaseWave) waves.set(phaseShift, cfg.phaseWave);
+  const pcm = cfg.pcm && waveform > 15 ? cfg.pcm : undefined;
+
+  const mixes = (cfg.mix ?? []).slice(0, 2);
+  mixes.forEach((m) => [m.src1, m.src2].forEach((w) => { const src = cfg.waves?.[w]; if (src && !waves.has(w)) waves.set(w, src); }));
+  const buf = new Uint8Array(50 + waves.size * 33 + 12 + (pcm ? pcm.data.length : 0) + 8);
   const view = new DataView(buf.buffer);
-
-  /* [0]  version = 0 */
-  buf[0] = 0;
-
-  /* [1]  attackSpeed */
-  buf[1] = (cfg.attackSpeed ?? 8) & 0xFF;
-
-  /* [2]  attackMax (0-64) */
-  buf[2] = Math.min(64, cfg.attackMax ?? 64) & 0xFF;
-
-  /* [3]  decaySpeed */
-  buf[3] = (cfg.decaySpeed ?? 4) & 0xFF;
-
-  /* [4]  decayMin (0-64) */
-  buf[4] = Math.min(64, cfg.decayMin ?? 32) & 0xFF;
-
-  /* [5]  sustain */
-  buf[5] = (cfg.sustain ?? 0) & 0xFF;
-
-  /* [6]  releaseSpeed */
-  buf[6] = (cfg.releaseSpeed ?? 4) & 0xFF;
-
-  /* [7]  releaseMin (0-64) */
-  buf[7] = Math.min(64, cfg.releaseMin ?? 0) & 0xFF;
-
-  /* [8]  phaseShift */
-  buf[8] = (cfg.phaseShift ?? 0) & 0xFF;
-
-  /* [9]  phaseSpeed */
-  buf[9] = (cfg.phaseSpeed ?? 0) & 0xFF;
-
-  /* [10..11]  finetune (uint16 LE, 0-1005) */
-  const ft = Math.max(0, Math.min(1005, cfg.finetune ?? 0));
-  view.setUint16(10, ft, true);
-
-  /* [12]  pitchFall (signed → unsigned byte) */
-  buf[12] = ((cfg.pitchFall ?? 0) + 256) & 0xFF;
-
-  /* [13..28]  arpeggio[16] */
-  const arp = cfg.arpeggio ?? new Array(16).fill(0);
-  for (let i = 0; i < 16; i++) {
-    buf[13 + i] = (arp[i] ?? 0) & 0xFF;
-  }
-
-  /* [29..60]  mainWave[32] (signed → unsigned) */
-  const mw = cfg.mainWave ?? new Array(32).fill(0);
-  for (let i = 0; i < 32; i++) {
-    buf[29 + i] = ((mw[i] ?? 0) + 256) & 0xFF;
-  }
-
-  /* [61..92]  phaseWave[32] (signed → unsigned) */
-  const pw = cfg.phaseWave ?? new Array(32).fill(0);
-  for (let i = 0; i < 32; i++) {
-    buf[61 + i] = ((pw[i] ?? 0) + 256) & 0xFF;
-  }
-
+  buf[0] = 2;
+  view.setUint32(1, waveform, true);
+  const arp = cfg.arpeggio ?? [];
+  for (let i = 0; i < 16; i++) buf[5 + i] = (arp[i] ?? 0) & 0xFF;
+  buf[21] = (cfg.attackSpeed ?? 8) & 0xFF;
+  buf[22] = (cfg.attackMax ?? 64) & 0xFF;
+  buf[23] = (cfg.decaySpeed ?? 4) & 0xFF;
+  buf[24] = (cfg.decayMin ?? 32) & 0xFF;
+  buf[25] = (cfg.sustain ?? 0) & 0xFF;
+  buf[26] = (cfg.releaseSpeed ?? 4) & 0xFF;
+  buf[27] = (cfg.releaseMin ?? 0) & 0xFF;
+  buf[28] = phaseShift & 0xFF;
+  buf[29] = (cfg.phaseSpeed ?? 0) & 0xFF;
+  view.setUint16(30, Math.max(0, Math.min(1005, cfg.finetune ?? 0)), true);
+  buf[32] = (cfg.pitchFall ?? 0) & 0xFF;
+  for (let i = 0; i < 16; i++) buf[33 + i] = (waveList[i] ?? 0) & 0xFF;
+  buf[49] = waves.size;
+  let at = 50;
+  waves.forEach((w, idx) => {
+    buf[at] = idx & 0xFF;
+    for (let i = 0; i < 32; i++) buf[at + 1 + i] = (w[i] ?? 0) & 0xFF;
+    at += 33;
+  });
+  view.setUint32(at, pcm ? pcm.data.length : 0, true);
+  view.setUint32(at + 4, pcm ? pcm.loop : 0, true);
+  view.setUint32(at + 8, pcm ? pcm.repeat : 0, true);
+  at += 12;
+  if (pcm) { pcm.data.forEach((v, i) => { buf[at + i] = v & 0xFF; }); at += pcm.data.length; }
+  mixes.forEach((m, k) => { buf[at + k * 4] = m.speed; buf[at + k * 4 + 1] = m.dest; buf[at + k * 4 + 2] = m.src1; buf[at + k * 4 + 3] = m.src2; });
   return buf.buffer;
 }
