@@ -39,6 +39,14 @@ function matchesExt(filename: string, exts: string[]): boolean {
   return false;
 }
 
+/** `.ufo` always; `.mus` only with the UFO bytes (see the UFO route in tryRouteFormat). */
+async function isUfoRoute(filename: string, buffer: ArrayBuffer): Promise<boolean> {
+  if (matchesExt(filename, ['ufo'])) return true;
+  if (!matchesExt(filename, ['mus'])) return false;
+  const { isUFOFormat } = await import('@lib/import/formats/UFOParser');
+  return isUFOFormat(buffer);
+}
+
 /**
  * Normalize a reversed-extension filename to UADE prefix form.
  * UADE identifies formats by filename prefix (e.g. "mc.commando"), not extension ("commando.mc").
@@ -1292,7 +1300,11 @@ export async function tryRouteFormat(
   }
 
   // ── UFO / MicroProse — native parser provides detection; UADE handles audio.
-  if (matchesExt(filename, ['ufo', 'mus'])) {
+  // `.mus` is only UFO when the bytes say so: UADE's UFO player accepts nothing
+  // but FORM/DDAT/BODY/CHAN (EP_UFO Check2), so any other `.mus` (boogie.mus,
+  // a PC MIDI-style file) was handed to UADE to fail "module check failed".
+  // It falls through to libopenmpt instead.
+  if (await isUfoRoute(filename, buffer)) {
     const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
     return withNativeThenUADE('ufo', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
@@ -1876,7 +1888,7 @@ export async function tryRouteFormat(
   }
 
   // UADE enhanced scan reconstructs patterns from Paula register captures.
-  if (matchesExt(filename, ['mus', 'ufo'])) {
+  if (await isUfoRoute(filename, buffer)) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     const musFile = toUADEPrefixName(originalFileName, ['mus', 'ufo']);
     const song = await parseUADEFile(buffer, musFile, 'enhanced', subsong, preScannedMeta, companionFiles);
