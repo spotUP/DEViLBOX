@@ -31,6 +31,11 @@ float fred_get_instrument_param(const FredModule* module, int inst, const char* 
 void fred_set_instrument_param(FredModule* module, int inst, const char* param, float value);
 size_t fred_export(const FredModule* module, uint8_t* out, size_t max_size);
 
+// Replace the song data with a re-encoded module (grid edits), keeping every voice's place. 1 on success.
+int fred_replace_module(FredModule* module, const uint8_t* data, size_t size);
+// The period voice `ch` plays now (0 when silent).
+int fred_get_channel_period(const FredModule* module, int ch);
+
 
 #ifdef __cplusplus
 }

@@ -31,7 +31,6 @@ import './EarAcheEncoder';
 import './FaceTheMusicEncoder';
 import './FAREncoder';
 import './FCEncoder';
-import './FredEditorEncoder';
 import './FuturePlayerEncoder';
 import './GameMusicCreatorEncoder';
 import './GDMEncoder';

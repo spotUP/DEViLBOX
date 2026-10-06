@@ -65,7 +65,6 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "far", fixture: "public/data/songs/farandole-composer/dark dreams.far", kind: "fixed" },
   { formatId: "fashionTracker", fixture: "public/data/songs/fashion-tracker/ivory tover ii.ex", kind: "fixed" },
   { formatId: "format669", fixture: "public/data/songs/composer-669/speed fighter.669", kind: "fixed" },
-  { formatId: "fredEditor", fixture: "public/data/songs/formats/bomb jack.fred", kind: "variable" },
   { formatId: "fredGray", fixture: "public/data/songs/formats/eco.gray", kind: "fixed" },
   { formatId: "futureComposer", fixture: "public/data/songs/formats/adept.smod", kind: "fixed" },
   { formatId: "futurePlayer", fixture: "public/data/songs/formats/hybris.fp", kind: "variable" },

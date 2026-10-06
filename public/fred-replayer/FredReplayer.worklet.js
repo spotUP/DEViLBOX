@@ -54,7 +54,19 @@ class FredReplayerProcessor extends AudioWorkletProcessor {
       case 'pause': this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._fred_select_subsong(this.handle, data.subsong); break;
       case 'setChannelMask': if (this.handle) this.module._fred_set_channel_mask(this.handle, data.mask); break;
-      case 'setCell': {        if (this.handle && this.module._fred_set_cell) {          this.module._fred_set_cell(this.handle, data.index, data.row, data.channel, data.note, data.instrument, data.effect, data.effectArg);        }        break;      }      case 'setInstrumentParam': {        if (this.handle && this.module._fred_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._fred_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'dispose': this.cleanup(); break;
+      case 'replaceModule': {
+        // A grid edit re-encoded the module: swap its song data in, every voice keeps its place.
+        if (!this.handle) break;
+        const bytes = new Uint8Array(data.moduleData);
+        const ptr = this.module._malloc(bytes.length);
+        if (!ptr) { this.port.postMessage({ type: 'error', message: 'malloc failed' }); break; }
+        this.module.HEAPU8.set(bytes, ptr);
+        const ok = this.module._fred_replace_module(this.handle, ptr, bytes.length);
+        this.module._free(ptr);
+        if (!ok) this.port.postMessage({ type: 'error', message: 'fred_replace_module refused the edited module' });
+        break;
+      }
+      case 'setInstrumentParam': {        if (this.handle && this.module._fred_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._fred_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'dispose': this.cleanup(); break;
     }
   }
 

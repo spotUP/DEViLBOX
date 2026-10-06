@@ -8,6 +8,7 @@ import { periodToNote as amigaPeriodToNote, noteToPeriod as amigaNoteToPeriod, A
 import { sunEffectToString } from './import/formats/sunEffectGlyphs';
 import { sonixEffectToString } from './import/formats/sonixEffectGlyphs';
 import { soundPlayerEffectToString } from './import/formats/soundPlayerEffectGlyphs';
+import { fredEffectToString } from './import/formats/fredEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
@@ -262,6 +263,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Sound Player private control effects (reserved block 0x63..0x69).
   const spl = soundPlayerEffectToString(effTyp, eff);
   if (spl !== null) return spl;
+
+  // Fred Editor private control effects (reserved block 0x70..0x73).
+  const fred = fredEffectToString(effTyp, eff);
+  if (fred !== null) return fred;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
