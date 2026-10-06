@@ -1236,24 +1236,6 @@ export function supportsChannelIsolation(editorMode: string): boolean {
   return ISOLATION_CAPABLE_MODES.has(editorMode);
 }
 
-/**
- * What the editor mode ALONE says about per-channel outputs, for the dub bus's
- * whole-mix fallback before any engine has reported.
- *
- * `classic` is left out on purpose. It is the mixed-bag mode: libopenmpt (which
- * isolates, and only while it plays), but also the TypeScript tracker
- * (ProTracker and the other grid formats), plain UADE songs and a dozen native
- * engines, none of which expose a channel output. Presuming isolation there
- * silenced the whole-mix tap while no channel tap could ever open, so a send on
- * those songs fed the bus nothing ("the channel sends haven't worked for any
- * format", 2026-10-06). An engine that really isolates says so when its first
- * channel tap is wired (DubBus.registerChannelTap) or when it starts
- * (NativeEngineRouting); the other modes only exist for isolating engines.
- */
-export function modeImpliesChannelIsolation(editorMode: string): boolean {
-  return editorMode !== 'classic' && ISOLATION_CAPABLE_MODES.has(editorMode);
-}
-
 // Singleton
 let routedEffectsInstance: ChannelRoutedEffectsManager | null = null;
 
