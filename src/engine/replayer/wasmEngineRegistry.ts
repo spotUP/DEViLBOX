@@ -13,6 +13,7 @@
  */
 
 import type { TrackerSong } from '../TrackerReplayer';
+import { FILE_DATA_FIELDS } from '../formatFileDataFields';
 
 // ---------------------------------------------------------------------------
 // Engine registry types
@@ -62,6 +63,13 @@ export interface NativeEngineDescriptor {
   dynamicExportName?: string;
   /** Dynamic resolver function (preferred over dynamicImport for Vite compatibility) */
   dynamicResolver?: () => Promise<WASMSingletonStatic>;
+  /**
+   * The engine applies grid cell edits live: its instance has
+   * setCell(pattern, row, channel, note, instrument, effTyp, eff, volume) and
+   * its WASM exports the cell write. sendCellEditsToEngine routes every grid
+   * edit (set, clear, bulk) of a song this engine plays there.
+   */
+  gridCellEdits?: true;
   /** Optional post-start hook for engine-specific setup (e.g., Klys onSongData) */
   onStarted?: (instance: WASMSingletonEngine, song: TrackerSong) => void;
 }
@@ -660,6 +668,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DeltaMusic1WasmSynth',
     suppressNotes: true,
     fileDataKey: 'deltaMusic1FileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -672,6 +681,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DeltaMusic2WasmSynth',
     suppressNotes: true,
     fileDataKey: 'deltaMusic2FileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -721,6 +731,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SynthesisWasmSynth',
     suppressNotes: true,
     fileDataKey: 'synthesisFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -733,6 +744,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DssWasmSynth',
     suppressNotes: true,
     fileDataKey: 'dssFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -757,6 +769,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FaceTheMusicWasmSynth',
     suppressNotes: true,
     fileDataKey: 'faceTheMusicFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -781,6 +794,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'OktalyzerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'oktalyzerFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -793,6 +807,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'InStereo1WasmSynth',
     suppressNotes: true,
     fileDataKey: 'inStereo1FileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -805,6 +820,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FutureComposerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'futureComposerFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -817,6 +833,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'InStereo2WasmSynth',
     suppressNotes: true,
     fileDataKey: 'inStereo2FileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -829,6 +846,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'QuadraComposerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'quadraComposerFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -842,6 +860,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SoundMonWasmSynth',
     suppressNotes: true,
     fileDataKey: 'soundMonFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -854,6 +873,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'DigMugWasmSynth',
     suppressNotes: true,
     fileDataKey: 'digMugFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -878,6 +898,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'SonicArrangerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'sonicArrangerFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
@@ -966,4 +987,34 @@ export function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong):
 export function playsOnDedicatedEngine(song: Partial<TrackerSong>): boolean {
   const desc = WASM_ENGINES.find((d) => shouldActivate(d, song as TrackerSong));
   return !!desc && desc.fileDataKey !== 'uadeEditableFileData';
+}
+
+/**
+ * The loaded song as the engine registry sees it, from what the stores hold:
+ * the format store takes every engine's file data at apply time (the
+ * replayer's song lags a load). For "which engine plays the loaded song".
+ */
+export function songFromStores(
+  format: Record<string, unknown> & { songFormat?: string | null; originalModuleData?: { format?: string } | null },
+  instruments: ReadonlyArray<{ synthType?: string }>,
+): TrackerSong {
+  const songLike: Record<string, unknown> = { format: format.songFormat ?? format.originalModuleData?.format ?? 'MOD', instruments };
+  for (const field of FILE_DATA_FIELDS) if (format[field]) songLike[field] = format[field];
+  return songLike as unknown as TrackerSong;
+}
+
+/**
+ * A grid tagged 'UADE' is UADE's opaque player only when no engine of the
+ * song's own plays it. A UADE-scanned grid on a song that carries its own
+ * engine's data (an eagleplayer format whose grid UADE's scan drew, or a
+ * project saved with such a grid) took the opaque-UADE branch of playback,
+ * which never starts the song's engine: dynamite dux.core and primemover
+ * 07.hot played silence, 2026-10-06.
+ */
+export function playsAsOpaqueUADE(
+  sourceFormat: string | undefined,
+  format: Parameters<typeof songFromStores>[0],
+  instruments: Parameters<typeof songFromStores>[1],
+): boolean {
+  return sourceFormat === 'UADE' && !playsOnDedicatedEngine(songFromStores(format, instruments));
 }

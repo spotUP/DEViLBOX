@@ -9,7 +9,6 @@
  * C64 SID is instance-based (not singleton) and handled separately.
  */
 
-import { FILE_DATA_FIELDS } from '@/engine/formatFileDataFields';
 import { silenceIsNotTheSongs } from './performerSilence';
 import * as Tone from 'tone';
 import type { TrackerSong } from '../TrackerReplayer';
@@ -27,7 +26,7 @@ import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 import { getActiveDubBus } from '../dub/DubBus';
 import { asIsolationCapable, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
 import { needsPaulaOutputStage } from '@engine/paulaOutput';
-import { WASM_ENGINES, shouldActivate, type NativeEngineDescriptor, type WASMSingletonStatic } from './wasmEngineRegistry';
+import { WASM_ENGINES, shouldActivate, songFromStores, type NativeEngineDescriptor, type WASMSingletonStatic } from './wasmEngineRegistry';
 
 export { WASM_ENGINES, shouldActivate, playsOnDedicatedEngine } from './wasmEngineRegistry';
 
@@ -130,9 +129,7 @@ export function playingEngineFromStores(
   format: Record<string, unknown> & { songFormat?: string | null; originalModuleData?: { format?: string } | null },
   instruments: ReadonlyArray<{ synthType?: string }>,
 ): string {
-  const songLike: Record<string, unknown> = { format: format.songFormat ?? format.originalModuleData?.format ?? 'MOD', instruments };
-  for (const field of FILE_DATA_FIELDS) if (format[field]) songLike[field] = format[field];
-  return playingEngineFor(songLike as unknown as TrackerSong);
+  return playingEngineFor(songFromStores(format, instruments));
 }
 
 function registerWholeMixDubSend(key: string, source: AudioNode | null | undefined): void {
