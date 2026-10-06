@@ -21,6 +21,8 @@ import { join } from 'path';
 import { loadUADEModule, refreshHeap, type UADEModule } from '../../../../tools/uade-audit/uadeRenderCore';
 import { parseFredEditorFile } from '../formats/FredEditorParser';
 import { decodeFredModule } from '../formats/FredEditorModule';
+import { exportFredEditor } from '@lib/export/FredEditorExporter';
+import { applyFredGridEdits, walkFredSong } from '../formats/fredEditorGrid';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 // The import route must keep the decoded grid; the UADE scan grid is a sentinel here.
@@ -152,4 +154,48 @@ describe('Fred Editor grid matches the replayer', () => {
     expect(song.fredReplayerFileData?.byteLength).toBe(bytes.length);
     expect(song.uadeEditableFileData).toBeUndefined();
   }, 60_000);
+
+  for (const file of ['bomb jack.fred', 'fuzzball-title.fred']) {
+    it(`${file}: every Fred Editor note shows the instrument the player uses, and no voice shows a command the player does not execute`, async () => {
+      const bytes = load(`public/data/songs/formats/${file}`);
+      const m = decodeFredModule(bytes);
+      const song = await parseFredEditorFile(bytes.slice().buffer as ArrayBuffer, file);
+      // Replay of the player's own state: the instrument is the last $83 any earlier line of the voice read.
+      const walk = walkFredSong(m);
+      const missing: string[] = [];
+      let notes = 0;
+      walk.voices.forEach((refs, ch) => {
+        let ins: number | undefined;
+        let sounding = false;
+        refs.forEach((ref, r) => {
+          const line = ref ? m.patterns[ref.pattern].lines[ref.line] : undefined;
+          if (line?.instrument !== undefined) ins = line.instrument;
+          const cell = song.patterns[Math.floor(r / 64)].channels[ch].rows[r % 64];
+          if (line?.note !== undefined) {
+            sounding = true; notes++;
+            if (cell.instrument !== (ins ?? -1) + 1 || cell.instrument === 0) missing.push(`v${ch} row ${r}`);
+          } else if (line?.pause) {
+            // $84 on a voice with DMA already off executes nothing audible: not shown as a note-off.
+            if (!sounding) { if (cell.note !== 0) missing.push(`v${ch} row ${r} idle pause shown`); }
+            sounding = false;
+          }
+        });
+      });
+      expect(notes).toBeGreaterThan(0);
+      expect(missing.slice(0, 5)).toEqual([]);
+      // Voice 4 of bomb jack never sounds: only the one row that selects its instrument shows anything.
+      if (file === 'bomb jack.fred') {
+        const v3 = song.patterns.flatMap((p) => p.channels[3].rows).filter((c) => c.note || c.instrument);
+        expect(v3.length).toBeLessThanOrEqual(1);
+        expect(v3.every((c) => c.note === 0)).toBe(true);
+      }
+      // The carried instrument is display only: export of the untouched grid is the file, and re-writing
+      // a carried cell as shown adds no $83 byte.
+      expect([...(await exportFredEditor(song)).data]).toEqual([...bytes]);
+      const first = song.patterns[0].channels[0].rows.findIndex((c, i) => c.note > 0 && c.instrument > 0 && m.patterns[walk.voices[0][i]!.pattern].lines[walk.voices[0][i]!.line].instrument === undefined);
+      expect(first).toBeGreaterThanOrEqual(0);
+      const edited = applyFredGridEdits(bytes, [{ pattern: 0, row: first, channel: 0, cell: { ...song.patterns[0].channels[0].rows[first], note: song.patterns[0].channels[0].rows[first].note } }]);
+      expect([...edited]).toEqual([...bytes]);
+    });
+  }
 });
