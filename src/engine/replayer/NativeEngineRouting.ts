@@ -873,6 +873,14 @@ export function stopNativeEngines(
     for (const st of routedNativeEngines) {
       try { toneEngine.stopNativeEngine(st); } catch { /* ignored */ }
       unregisterWholeMixDubSend(`native:${st}`);
+      // A direct-routed engine's dub tap and dry gain were just torn down, and
+      // only the routing block in `startNativeEngines` builds them again - but
+      // that block is skipped for a key still in the set. Play after Stop (no
+      // song reload in between: the MusicLine replay path, or any caller that
+      // only calls play()) therefore left the engine out of the dub bus for
+      // good, so every return-processor toggle (Wide, Wobble, Ring ...) had
+      // nothing to act on while the master-side knobs still worked.
+      if (WASM_ENGINES.some((d) => d.synthType === st && d.needsDirectRouting)) routedNativeEngines.delete(st);
     }
   }
 
