@@ -10758,10 +10758,10 @@
   },
   "desire": {
     "status": "silent",
-    "notes": "Silent — batmanreturns.dsr · (jukebox 2026-09-24 06:49)",
+    "notes": "smoke-test PASS -- rms=0.0001 [audio=ok, inst=4/ok, export=ok] (2026-10-05)",
     "auditStatus": "fixed",
-    "rmsAvg": 0.001048,
-    "instrumentCount": 8,
+    "rmsAvg": 0.000108,
+    "instrumentCount": 4,
     "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
@@ -11414,12 +11414,12 @@
     "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
   },
   "actionamics": {
-    "status": "silent",
-    "notes": "Silent — dynablaster.ast · (jukebox 2026-09-24 09:23)",
+    "status": "",
+    "notes": "cleared Silent — dynablaster.ast (jukebox 2026-10-04 21:08)",
     "auditStatus": "fixed",
     "rmsAvg": 0.000093,
     "instrumentCount": 39,
-    "patternQuality": "incorrect",
+    "patternQuality": "out-of-sync",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -12187,13 +12187,15 @@
   },
   "sap": {
     "status": "silent",
-    "notes": "SAP metadata loads — POKEY WASM emulation known silent, needs engine fix",
-    "auditStatus": "fixed",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=4/ok] (2026-10-05)",
+    "auditStatus": "fail",
     "patternQuality": "none",
     "synthIntegration": "chip-emulator",
     "sampleExtraction": "none",
     "editability": "none",
-    "deepNotes": "Atari SAP: chip emulation — no extractable patterns (complete)"
+    "deepNotes": "Atari SAP: chip emulation — no extractable patterns (complete)",
+    "rmsAvg": 0,
+    "instrumentCount": 4
   },
   "sndh": {
     "status": "works",
@@ -12312,10 +12314,10 @@
   },
   "sc68": {
     "status": "silent",
-    "notes": "smoke-test PASS -- rms=0.2828 [audio=ok, inst=1/ok] (2026-04-11)",
-    "auditStatus": "fixed",
-    "rmsAvg": 0.282815,
-    "instrumentCount": 1,
+    "notes": "smoke-test FAIL -- pattern 0 has no note cells after 3s (load decoded but pattern data is empty) [] (2026-10-05)",
+    "auditStatus": "fail",
+    "rmsAvg": 0,
+    "instrumentCount": 0,
     "patternQuality": "none",
     "synthIntegration": "wasm-engine",
     "sampleExtraction": "none",
@@ -12823,8 +12825,8 @@
   },
   "activision-p": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). UADE-backed, needs re-test.",
-    "rmsAvg": 0,
+    "notes": "smoke-test PASS -- rms=0.0916 [audio=ok, inst=10/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0.091562,
     "instrumentCount": 10,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
@@ -12834,9 +12836,9 @@
   },
   "anders-oland": {
     "auditStatus": "fixed",
-    "notes": "Frozen Patterns — primemover 07.hot · (jukebox 2026-09-24 05:10)",
-    "rmsAvg": 0,
-    "instrumentCount": 8,
+    "notes": "smoke-test PASS -- rms=0.2998 [audio=ok, inst=7/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0.299823,
+    "instrumentCount": 7,
     "patternQuality": "frozen",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "names-only",
@@ -12902,10 +12904,10 @@
     "status": "works"
   },
   "composer-670": {
-    "auditStatus": "fixed",
-    "notes": "UADE limitation — format not supported. No dedicated engine available.",
-    "rmsAvg": 0.000092,
-    "instrumentCount": 0,
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=50/ok] (2026-10-05)",
+    "rmsAvg": 0,
+    "instrumentCount": 50,
     "patternQuality": "none",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "none",
@@ -12979,10 +12981,10 @@
     "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
   },
   "digital-mugi": {
-    "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1007 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
-    "rmsAvg": 0.100743,
-    "instrumentCount": 6,
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- pattern 0 has no note cells after 3s (load decoded but pattern data is empty) [] (2026-10-05)",
+    "rmsAvg": 0,
+    "instrumentCount": 0,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
@@ -12991,9 +12993,9 @@
   },
   "digital-soni": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.2161 [audio=ok, inst=19/ok, export=ok] (2026-04-11)",
-    "rmsAvg": 0.216145,
-    "instrumentCount": 19,
+    "notes": "smoke-test PASS -- rms=0.0003 [audio=ok, inst=3/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0.000311,
+    "instrumentCount": 3,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
@@ -13023,10 +13025,10 @@
     "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
   },
   "digital-trac": {
-    "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0214 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
-    "rmsAvg": 0.021387,
-    "instrumentCount": 31,
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=63/ok] (2026-10-05)",
+    "rmsAvg": 0,
+    "instrumentCount": 63,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
@@ -13056,10 +13058,10 @@
     "deepNotes": "Unclassified format — defaulted to UADE stub | Chip RAM pattern reader active | Enhanced scan: runtime PCM from chip RAM"
   },
   "fm-tracker": {
-    "auditStatus": "fixed",
-    "notes": "Load Failed — fm dance.fmt · loadFile failed: UADE could not play: fm dance.fmt (ret=-1) | uade: protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Cannot play file: fm dance.fmt (ret=0) | /uade: unreadable (Aborted('FS' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the Emscripten FAQ))) · (jukebox 2026-09-24 06:51)",
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=50/ok] (2026-10-05)",
     "rmsAvg": 0,
-    "instrumentCount": 0,
+    "instrumentCount": 50,
     "patternQuality": "none",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "names-only",
@@ -13102,9 +13104,9 @@
   },
   "follin-playe": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0653 [audio=ok, inst=5/ok, export=ok] (2026-04-11)",
-    "rmsAvg": 0.065274,
-    "instrumentCount": 5,
+    "notes": "smoke-test PASS -- rms=0.1005 [audio=ok, inst=14/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0.100492,
+    "instrumentCount": 14,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
@@ -13124,10 +13126,10 @@
   },
   "fred-gray": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.3521 [audio=ok, inst=2/ok, export=ok] (2026-04-11)",
+    "notes": "Empty Patterns — eco.gray · (jukebox 2026-10-02 21:19)",
     "rmsAvg": 0.352052,
     "instrumentCount": 2,
-    "patternQuality": "full",
+    "patternQuality": "empty",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -13135,10 +13137,10 @@
   },
   "fredmon": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1904 [audio=ok, inst=20/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — fireworks ii.fred · (jukebox 2026-10-02 21:20)",
     "rmsAvg": 0.190427,
     "instrumentCount": 20,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "FredEditorReplayerSynth",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -13179,9 +13181,9 @@
   },
   "general-digi": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0388 [audio=ok, inst=27/ok, export=ok] (2026-04-11)",
-    "rmsAvg": 0.038785,
-    "instrumentCount": 27,
+    "notes": "smoke-test PASS -- rms=0.0860 [audio=ok, inst=46/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0.085971,
+    "instrumentCount": 46,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
@@ -13190,19 +13192,19 @@
   },
   "gluemon": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1587 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — gnu-song.glue · (jukebox 2026-10-02 21:23)",
     "rmsAvg": 0.158689,
     "instrumentCount": 1,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
     "deepNotes": "uadePatternLayout added — chip RAM pattern reader decodes patterns after UADE load | Enhanced scan: runtime PCM from chip RAM"
   },
   "goat-tracker": {
-    "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0006 [audio=ok, inst=63/ok] (2026-04-11)",
-    "rmsAvg": 0.000644,
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=63/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0,
     "instrumentCount": 63,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
@@ -13223,10 +13225,10 @@
   },
   "hippel": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0889 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — warp (ingame 2).hip · (jukebox 2026-10-02 21:25)",
     "rmsAvg": 0.088905,
     "instrumentCount": 1,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -13234,10 +13236,10 @@
   },
   "hippel-7v": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0006 [audio=ok, inst=20/ok, export=ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — lethalxcess-intro.hip7 · (jukebox 2026-10-02 21:25)",
     "rmsAvg": 0.000641,
     "instrumentCount": 20,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -13245,25 +13247,27 @@
   },
   "hippel-coso": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). Dedicated WASM engine, needs re-test.",
+    "notes": "Good — wings of death (level 3).hipc · (jukebox 2026-10-02 21:26)",
     "rmsAvg": 0,
     "instrumentCount": 32,
     "patternQuality": "full",
     "synthIntegration": "HippelCoSoSynth",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "WASM engine synthesizes from format data — no PCM needed"
+    "deepNotes": "WASM engine synthesizes from format data — no PCM needed",
+    "status": "works"
   },
   "hippel-st": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). Dedicated WASM engine, needs re-test.",
-    "rmsAvg": 0,
-    "instrumentCount": 1,
+    "notes": "smoke-test PASS -- rms=0.1886 [audio=ok, inst=3/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0.188619,
+    "instrumentCount": 3,
     "patternQuality": "full",
     "synthIntegration": "HippelSynth",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "WASM engine synthesizes from format data — no PCM needed"
+    "deepNotes": "WASM engine synthesizes from format data — no PCM needed",
+    "status": "silent"
   },
   "hippel-st-co": {
     "auditStatus": "fixed",
@@ -13333,8 +13337,8 @@
   },
   "images-music": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1224 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
-    "rmsAvg": 0.122367,
+    "notes": "smoke-test PASS -- rms=0.1846 [audio=ok, inst=31/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0.184646,
     "instrumentCount": 31,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
@@ -13839,10 +13843,10 @@
   },
   "sean-conran": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0349 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "notes": "Empty Patterns — count duckula.scr · (jukebox 2026-10-02 21:30)",
     "rmsAvg": 0.034931,
     "instrumentCount": 13,
-    "patternQuality": "full",
+    "patternQuality": "empty",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -14004,20 +14008,21 @@
   },
   "stonetracker": {
     "auditStatus": "fixed",
-    "notes": "AudioContext staleness fix (e2d9edf0e). UADE-backed, needs re-test.",
+    "notes": "Load Failed — hypnosphere.spm · loadFile failed: Unsupported file format: hypnosphere.spm · (jukebox 2026-10-04 21:05)",
     "rmsAvg": 0,
     "instrumentCount": 8,
     "patternQuality": "none",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "names-only",
     "editability": "none",
-    "deepNotes": "Forced classic — compiled 68k replayer"
+    "deepNotes": "Forced classic — compiled 68k replayer",
+    "status": "crashes"
   },
   "studio-pixel": {
-    "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0014 [audio=ok, inst=9/ok, export=ok] (2026-04-11)",
-    "rmsAvg": 0.001359,
-    "instrumentCount": 9,
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=4/ok] (2026-10-05)",
+    "rmsAvg": 0,
+    "instrumentCount": 4,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
@@ -14026,14 +14031,15 @@
   },
   "suntronic": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0007 [audio=ok, inst=11/ok, export=ok] (2026-04-11)",
+    "notes": "Load Failed — pseudo oops.sun · loadFile failed: UADE could not play: pseudo oops.sun (ret=-1) | uade: Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / [uade-wasm] Cannot play file: silent sleep.mod.nt (ret=0) / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / uade warning: Song ended prematurely due to error: module check failed / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] exit(1) intercepted via longjmp / [uade-wasm] exit(1) during uade_play / protocol error: sending in R state is forbidden / Can not send score name. / [uade-wasm] Cannot play file: pseudo oops.sun (ret=-1) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, jb.ikari_warriors, dynablaster.ast, hot.primemover 07, ash.nobby the aardvark, terramex.bds, pauker rap 2.ss, silent sleep.mod.nt, street fighter.sb, pseudo oops.sun · (jukebox 2026-10-04 21:05)",
     "rmsAvg": 0.000735,
     "instrumentCount": 11,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
-    "deepNotes": "uadePatternLayout added — chip RAM pattern reader decodes patterns after UADE load | Enhanced scan: runtime PCM from chip RAM"
+    "deepNotes": "uadePatternLayout added — chip RAM pattern reader decodes patterns after UADE load | Enhanced scan: runtime PCM from chip RAM",
+    "status": "crashes"
   },
   "sunvox": {
     "auditStatus": "fixed",
@@ -14070,10 +14076,10 @@
   },
   "tcb-tracker": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.2766 [audio=ok, inst=4/ok] (2026-04-11)",
+    "notes": "Incorrect Pattern Data — m-demo3 3.tcb · (jukebox 2026-10-04 21:07)",
     "rmsAvg": 0.276564,
     "instrumentCount": 4,
-    "patternQuality": "full",
+    "patternQuality": "incorrect",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
     "editability": "chip-ram",
@@ -14997,10 +15003,10 @@
   },
   "sid": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.0473 [audio=ok, inst=3/ok] (2026-04-11)",
+    "notes": "cleared Empty Patterns — abaddon-starfish-test.sid (jukebox 2026-10-02 21:38)",
     "rmsAvg": 0.047289,
     "instrumentCount": 3,
-    "patternQuality": "none",
+    "patternQuality": "",
     "synthIntegration": "chip-emulator",
     "sampleExtraction": "none",
     "editability": "none",
@@ -15031,10 +15037,10 @@
     "status": "crashes"
   },
   "ay-emul": {
-    "auditStatus": "fixed",
-    "notes": "Load Failed — spring.emul · loadFile failed: Unsupported file format: spring.emul · (jukebox 2026-09-24 06:46)",
-    "rmsAvg": 0.036786,
-    "instrumentCount": 13,
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 270 console error(s): [SynthError] AyletSynth: Unsupported synth type \"AyletSynth\". This instrument ca [audio=ok, inst=3/ok] (2026-10-05)",
+    "rmsAvg": 0.000338,
+    "instrumentCount": 3,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
     "sampleExtraction": "full",
@@ -15044,7 +15050,7 @@
   },
   "ay-strc": {
     "auditStatus": "fixed",
-    "notes": "Load Failed — mega mix 1.strc · loadFile failed: Unsupported file format: mega mix 1.strc · (jukebox 2026-09-24 06:46)",
+    "notes": "Load Failed — mega mix 1.strc · loadFile failed: Unsupported file format: mega mix 1.strc · (jukebox 2026-10-02 20:44)",
     "rmsAvg": 0.037469,
     "instrumentCount": 13,
     "patternQuality": "full",
@@ -15135,8 +15141,8 @@
   },
   "deflemask": {
     "auditStatus": "fixed",
-    "notes": "Load Failed — Darude - Sandstorm.dmf · loadFile failed: Failed to parse DefleMask file: DefleMask import requires Furnace WASM engine (WASM error: Furnace WASM load failed: load failed: incomplete file) · (jukebox 2026-09-24 06:48)",
-    "rmsAvg": 0.375014,
+    "notes": "smoke-test PASS -- rms=0.0516 [audio=ok, inst=4/ok] (2026-10-05)",
+    "rmsAvg": 0.051593,
     "instrumentCount": 4,
     "patternQuality": "full",
     "synthIntegration": "uade-generic",
@@ -16419,5 +16425,346 @@
   "formats-inStereoAmbiguous": {
     "notes": "Incorrect Pattern Data — fantasi8.is · (jukebox 2026-09-25 10:19)",
     "patternQuality": "incorrect"
+  },
+  "formats-inStereo2": {
+    "notes": "Good — stereo_feeling.is20 · (jukebox 2026-10-02 20:45)",
+    "status": "works"
+  },
+  "formats-jamcracker": {
+    "notes": "Good — analogue_vibes.jam · (jukebox 2026-10-02 20:45)",
+    "patternQuality": "incorrect",
+    "status": "works"
+  },
+  "formats-jankoMrsicFlogel": {
+    "notes": "Empty Patterns — spacestation.jmf · (jukebox 2026-10-02 20:45)",
+    "patternQuality": "empty"
+  },
+  "formats-jasonBrooke": {
+    "notes": "Incorrect Pattern Data — ikari_warriors.jb · (jukebox 2026-10-02 20:46)",
+    "patternQuality": "incorrect"
+  },
+  "formats-jasonPage": {
+    "notes": "Incorrect Pattern Data — jpn.virocop-14 · (jukebox 2026-10-02 20:46)",
+    "patternQuality": "incorrect"
+  },
+  "formats-jeroenTel": {
+    "notes": "Incorrect Pattern Data — insects_in_space.jt · (jukebox 2026-10-02 20:46)",
+    "patternQuality": "incorrect"
+  },
+  "formats-jesperOlsen": {
+    "notes": "Load Failed — lollypop-subgame_01.jo · loadFile failed: UADE could not play: lollypop-subgame_01.jo (ret=-1) | uade: [uade-wasm] uade_request_amiga_file: file not found '/uade/WantedTeam.bin' / uade warning: Song ended prematurely due to error: score died / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] exit(1) intercepted via longjmp / [uade-wasm] exit(1) during uade_play / protocol error: sending in R state is forbidden / Can not send score name. / [uade-wasm] Cannot play file: lollypop-subgame_01.jo (ret=-1) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, lollypop-subgame_01.jo · (jukebox 2026-10-02 20:46)",
+    "patternQuality": "incorrect",
+    "status": "crashes"
+  },
+  "formats-jochenHippel7V": {
+    "notes": "Good — ghostbattle_gameover.hip7 · (jukebox 2026-10-02 20:47)",
+    "status": "works"
+  },
+  "formats-jochenHippelST": {
+    "notes": "Silent — astaroth.sog · (jukebox 2026-10-02 20:47)",
+    "status": "silent"
+  },
+  "formats-karlMorton": {
+    "notes": "Load Failed — boogie.mus · loadFile failed: Failed to load module: ptr · (jukebox 2026-10-02 20:47)",
+    "status": "crashes"
+  },
+  "formats-krisHatlelid": {
+    "notes": "Silent — hatlelid_smallest.kh · (jukebox 2026-10-02 20:47)",
+    "status": "silent"
+  },
+  "formats-rtm": {
+    "notes": "Good — odyssey.rtm · (jukebox 2026-10-02 21:13)",
+    "status": "works"
+  },
+  "formats-uade_riff": {
+    "notes": "Empty Patterns — riffraff_smallest.riff · (jukebox 2026-10-02 21:13)",
+    "patternQuality": "empty"
+  },
+  "formats-robHubbard": {
+    "notes": "Incorrect Pattern Data — centurion_battle.rh · (jukebox 2026-10-02 21:13)",
+    "patternQuality": "incorrect"
+  },
+  "formats-robHubbardST": {
+    "notes": "Empty Patterns — battleships.rho · (jukebox 2026-10-02 21:13)",
+    "patternQuality": "empty"
+  },
+  "formats-ronKlaren": {
+    "notes": "Incorrect Pattern Data — astra_2.rk · (jukebox 2026-10-02 21:13)",
+    "patternQuality": "incorrect"
+  },
+  "formats-sawteeth": {
+    "notes": "Incorrect Pattern Data — okolaNUKE.st · (jukebox 2026-10-02 21:13)",
+    "patternQuality": "incorrect"
+  },
+  "formats-Scott Johnston-unknown": {
+    "notes": "Load Failed — smp.awesome · loadFile failed: UADE could not play: smp.awesome (ret=-1) | uade: protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Companion file written: /uade/sjs.awesome (5991 bytes) / [uade-wasm] Cannot play file: smp.awesome (ret=0) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, sjs.awesome, smp.awesome · (jukebox 2026-10-02 21:13)",
+    "status": "crashes"
+  },
+  "formats-Scott Johnston-jasonBrooke": {
+    "notes": "Empty Patterns — sjs.jb · (jukebox 2026-10-02 21:13)",
+    "patternQuality": "empty"
+  },
+  "formats-Scott Johnston-soundPlayer": {
+    "notes": "Empty Patterns — sjs.awesome · (jukebox 2026-10-02 21:14)",
+    "patternQuality": "empty"
+  },
+  "formats-stm": {
+    "notes": "Good — slideshow i.stm · (jukebox 2026-10-02 21:14)",
+    "status": "works"
+  },
+  "formats-s3m": {
+    "notes": "Good — andante.s3m · (jukebox 2026-10-02 21:14)",
+    "status": "works"
+  },
+  "formats-stx": {
+    "notes": "Good — futurebrain.stx · (jukebox 2026-10-02 21:14)",
+    "status": "works"
+  },
+  "formats-scumm": {
+    "notes": "Empty Patterns — zaktitle.scumm · (jukebox 2026-10-02 21:14)",
+    "patternQuality": "empty"
+  },
+  "formats-seanConnolly": {
+    "notes": "Empty Patterns — surf_ninjas.scn · (jukebox 2026-10-02 21:14)",
+    "patternQuality": "empty"
+  },
+  "formats-seanConran": {
+    "notes": "Empty Patterns — count_duckula.scr · (jukebox 2026-10-02 21:14)",
+    "patternQuality": "empty"
+  },
+  "formats-sidmon1": {
+    "notes": "Incorrect Pattern Data — anarchy.sid1 · (jukebox 2026-10-02 21:14)",
+    "patternQuality": "incorrect"
+  },
+  "formats-sidmon2": {
+    "notes": "Incorrect Pattern Data — bruno_time.sid2 · (jukebox 2026-10-02 21:15)",
+    "patternQuality": "incorrect"
+  },
+  "formats-sonicArranger": {
+    "notes": "Incorrect Pattern Data — almighty.sa · (jukebox 2026-10-02 21:15)",
+    "patternQuality": "incorrect"
+  },
+  "formats-soundControl": {
+    "notes": "Incorrect Pattern Data — north_sea_inferno.sc · (jukebox 2026-10-02 21:15)",
+    "patternQuality": "incorrect"
+  },
+  "formats-soundFactory": {
+    "notes": "Out Of Sync — goldrunner.psf · (jukebox 2026-10-02 21:15)",
+    "patternQuality": "out-of-sync"
+  },
+  "formats-soundMaster": {
+    "notes": "Incorrect Pattern Data — rackney'sisland_4.sm · (jukebox 2026-10-02 21:16)",
+    "patternQuality": "incorrect"
+  },
+  "formats-soundfx": {
+    "notes": "Incorrect Pattern Data — operation_stealth.sfx · (jukebox 2026-10-02 21:16)",
+    "patternQuality": "incorrect"
+  },
+  "formats-soundmon": {
+    "notes": "Incorrect Pattern Data — antidust.bp3 · (jukebox 2026-10-02 21:16)",
+    "patternQuality": "incorrect"
+  },
+  "formats-stp": {
+    "notes": "Good — noname.stp · (jukebox 2026-10-02 21:17)",
+    "status": "works"
+  },
+  "formats-specialFX": {
+    "notes": "Empty Patterns — wildwheels_ingame.jd · (jukebox 2026-10-02 21:17)",
+    "patternQuality": "empty"
+  },
+  "formats-speedySystem": {
+    "notes": "Load Failed — SnareDrum.ss · loadFile failed: UADE could not play: SnareDrum.ss (ret=-1) | uade: [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / [uade-wasm] Companion file written: /uade/smp.jb (27736 bytes) / [uade-wasm] Companion file written: /uade/smp.awesome (30474 bytes) / uade warning: Song ended prematurely due to error: module check failed / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] exit(1) intercepted via longjmp / [uade-wasm] exit(1) during uade_play / protocol error: sending in R state is forbidden / Can not send score name. / [uade-wasm] Cannot play file: SnareDrum.ss (ret=-1) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, smp.jb, smp.awesome, SnareDrum.ss · (jukebox 2026-10-02 21:17)",
+    "status": "crashes"
+  },
+  "formats-steveBarrett": {
+    "notes": "Empty Patterns — street_fighter.sb · (jukebox 2026-10-02 21:17)",
+    "patternQuality": "empty"
+  },
+  "formats-steveTurner": {
+    "notes": "Empty Patterns — offroad.jpo · (jukebox 2026-10-02 21:17)",
+    "patternQuality": "empty"
+  },
+  "formats-suntronic": {
+    "notes": "Empty Patterns — msx-cracktro 2.sun · (jukebox 2026-10-02 21:17)",
+    "patternQuality": "empty"
+  },
+  "formats-SUNTronicTunes-uade_ah": {
+    "notes": "Load Failed — ah · loadFile failed: Unsupported file format: ah · (jukebox 2026-10-02 21:17)",
+    "status": "crashes"
+  },
+  "formats-uade_sdr": {
+    "notes": "Load Failed — sdr.monsterbusiness_5 · loadFile failed: UADE could not play: sdr.monsterbusiness_5 (ret=-1) | uade: [uade-wasm] uade_request_amiga_file: file not found '/uade/SMP.monsterbusiness_5' / [uade-wasm] uade_request_amiga_file: file not found '/uade/SMP.set' / uade warning: Song ended prematurely due to error: score died / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] exit(1) intercepted via longjmp / [uade-wasm] exit(1) during uade_play / protocol error: sending in R state is forbidden / Can not send score name. / [uade-wasm] Cannot play file: sdr.monsterbusiness_5 (ret=-1) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, sdr.monsterbusiness_5 · (jukebox 2026-10-02 21:18)",
+    "status": "crashes"
+  },
+  "formats-tfmx": {
+    "notes": "Silent — mdat.rocknroll · (jukebox 2026-10-02 21:18)",
+    "status": "silent"
+  },
+  "formats-uade_tf": {
+    "notes": "Incorrect Pattern Data — follin_smallest.tf · (jukebox 2026-10-02 21:18)",
+    "patternQuality": "incorrect"
+  },
+  "formats-tme": {
+    "notes": "Empty Patterns — 64_conversion.tme · (jukebox 2026-10-02 21:18)",
+    "patternQuality": "empty"
+  },
+  "formats-tomyTracker": {
+    "notes": "Incorrect Pattern Data — irrepressible intro.sg · (jukebox 2026-10-02 21:19)",
+    "patternQuality": "incorrect"
+  },
+  "formats-ult": {
+    "notes": "Good — seasons.ult · (jukebox 2026-10-02 21:19)",
+    "status": "works"
+  },
+  "formats-unic": {
+    "notes": "Good — african dreams.unic · (jukebox 2026-10-02 21:19)",
+    "status": "works"
+  },
+  "formats-wallyBeben": {
+    "notes": "Incorrect Pattern Data — wicked.wb · (jukebox 2026-10-02 21:19)",
+    "patternQuality": "incorrect"
+  },
+  "future-composer-1.3": {
+    "notes": "Out Of Sync — commando.smod · (jukebox 2026-10-02 21:22)",
+    "patternQuality": "out-of-sync"
+  },
+  "future-composer-bsi": {
+    "notes": "Empty Patterns — newtek.bsi · (jukebox 2026-10-02 21:22)",
+    "patternQuality": "empty"
+  },
+  "future-player": {
+    "notes": "Incorrect Pattern Data — imploder drums.fp · (jukebox 2026-10-02 21:22)",
+    "patternQuality": "incorrect"
+  },
+  "game-music-creator": {
+    "notes": "Good — barbarian 2 title.gmc · (jukebox 2026-10-02 21:23)",
+    "status": "works"
+  },
+  "general-digimusic": {
+    "notes": "Wrong Sound — tilbury fair (remix).gdm · (jukebox 2026-10-02 21:23)",
+    "status": "partial"
+  },
+  "Goat Tracker Ultra-Jammer": {
+    "notes": "Silent — $3GarysGlitteringSaliva_4x.sng · (jukebox 2026-10-02 21:23)",
+    "status": "silent"
+  },
+  "Goat Tracker Ultra-JasonPage": {
+    "notes": "Silent — RType_Amiga2SID.sng · (jukebox 2026-10-02 21:24)",
+    "status": "silent"
+  },
+  "Goat Tracker Ultra-Linus": {
+    "notes": "Silent — $3Cold-War-Generation.sng · (jukebox 2026-10-02 21:24)",
+    "status": "silent"
+  },
+  "Goat Tracker Ultra-LMan": {
+    "notes": "Silent — $3LMan-Rivalry-Dubs.sng · (jukebox 2026-10-02 21:24)",
+    "status": "silent"
+  },
+  "graoumf-tracker-2": {
+    "notes": "Good — living-on-video.gt2 · (jukebox 2026-10-02 21:25)",
+    "status": "works"
+  },
+  "hippel-st-coso": {
+    "notes": "Silent — ghostbattle titletune.soc · (jukebox 2026-10-02 21:26)",
+    "status": "silent"
+  },
+  "his-masters-noise": {
+    "notes": "Good — the funny farm.mod · (jukebox 2026-10-02 21:26)",
+    "status": "works"
+  },
+  "hivelytracker": {
+    "notes": "Good — waiting for a message.hvl · (jukebox 2026-10-02 21:26)",
+    "status": "works"
+  },
+  "iff-smus-- unknown-unknown": {
+    "notes": "Load Failed — Sax.42.instr · loadFile failed: Unsupported file format: Sax.42.instr · (jukebox 2026-10-02 21:27)",
+    "status": "crashes"
+  },
+  "iff-smus-- unknown-speedySystem": {
+    "notes": "Load Failed — Saxophone.ss · loadFile failed: UADE could not play: Saxophone.ss (ret=-1) | uade: protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] FATAL: unguarded exit(1) / uade warning: Song ended prematurely due to error: module check failed / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] exit(1) intercepted via longjmp / [uade-wasm] exit(1) during uade_play / protocol error: sending in R state is forbidden / Can not send score name. / [uade-wasm] Cannot play file: Saxophone.ss (ret=-1) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, Saxophone.ss · (jukebox 2026-10-02 21:27)",
+    "status": "crashes"
+  },
+  "iff-smus-Allister Brimble-unknown": {
+    "notes": "Load Failed — Ace2-2.instr · loadFile failed: Unsupported file format: Ace2-2.instr · (jukebox 2026-10-02 21:27)",
+    "status": "crashes"
+  },
+  "iff-smus-Allister Brimble-speedySystem": {
+    "notes": "Load Failed — deeptrumpet1.ss · loadFile failed: UADE could not play: deeptrumpet1.ss (ret=-1) | uade: uade warning: Song ended prematurely due to error: module check failed / protocol error: receiving in S state is forbidden / uadecore: Invalid input. Expected score name. / [uade-wasm] exit(1) intercepted via longjmp / [uade-wasm] exit(1) during uade_play / protocol error: sending in R state is forbidden / Can not send score name. / [uade-wasm] Cannot play file: deeptrumpet1.ss (ret=-1) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, deeptrumpet1.ss · (jukebox 2026-10-02 21:27)",
+    "status": "crashes"
+  },
+  "iff-smus-Andreas Starr-iffSmus": {
+    "notes": "Silent — Electric Dream.smus · (jukebox 2026-10-02 21:27)",
+    "status": "silent"
+  },
+  "infogrames-amiga_formats_catchall": {
+    "notes": "Load Failed — advantage tennis-intro.ins · loadFile failed: UADE could not play: advantage tennis-intro.ins (ret=-1) | uade: [uade-wasm] Companion file written: /uade/advantage tennis-intro.dum (2627 bytes) / [uade-wasm] Cannot play file: advantage tennis-intro.ins (ret=0) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, advantage tennis-intro.dum, advantage tennis-intro.ins · (jukebox 2026-10-02 21:27)",
+    "status": "crashes"
+  },
+  "infogrames-infogrames": {
+    "notes": "Incorrect Pattern Data — advantage tennis-intro.dum · (jukebox 2026-10-02 21:27)",
+    "patternQuality": "incorrect"
+  },
+  "instereo!-2.0": {
+    "notes": "Incorrect Pattern Data — spaceflight.is20 · (jukebox 2026-10-02 21:28)",
+    "patternQuality": "incorrect"
+  },
+  "multimedia-sound": {
+    "notes": "Empty Patterns — bottle popper.mms · (jukebox 2026-10-02 21:28)",
+    "patternQuality": "empty"
+  },
+  "musicmaker-v8": {
+    "notes": "Incorrect Pattern Data — roetzmegoem.mm8 · (jukebox 2026-10-02 21:29)",
+    "patternQuality": "incorrect"
+  },
+  "musicmaker-v8-old": {
+    "notes": "Load Failed — moveback.ip.n · loadFile failed: Unsupported file format: moveback.ip.n · (jukebox 2026-10-02 21:29)",
+    "status": "crashes"
+  },
+  "sean-connolly": {
+    "notes": "Empty Patterns — surf ninjas.scn · (jukebox 2026-10-02 21:30)",
+    "patternQuality": "empty"
+  },
+  "startrekker-am": {
+    "notes": "Load Failed — silent sleep.mod.nt · loadFile failed: UADE could not play: silent sleep.mod.nt (ret=-1) | uade: Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / Warning: Supervisor stack may have been breached. / Warning: User stack may have been breached possibly by the supervisor stack. / [uade-wasm] Cannot play file: silent sleep.mod.nt (ret=0) | /uade: ENV, uaerc, uade.conf, eagleplayer.conf, score, uadecore, jb.ikari_warriors, dynablaster.ast, hot.primemover 07, ash.nobby the aardvark, terramex.bds, pauker rap 2.ss, silent sleep.mod.nt · (jukebox 2026-10-04 21:05)",
+    "status": "crashes"
+  },
+  "startrekker-flt8": {
+    "notes": "Good — gidion graveland.mod · (jukebox 2026-10-04 21:05)",
+    "status": "works"
+  },
+  "steve-barrett": {
+    "notes": "Empty Patterns — street fighter.sb · (jukebox 2026-10-04 21:05)",
+    "patternQuality": "empty"
+  },
+  "studio-pixel---piyopiyo": {
+    "notes": "Silent — obj0176-1.pmd · (jukebox 2026-10-04 21:05)",
+    "status": "silent"
+  },
+  "syntracker": {
+    "notes": "Frozen Patterns — autumn melodies.synmod · (jukebox 2026-10-04 21:06)",
+    "patternQuality": "frozen"
+  },
+  "tfm-music-maker": {
+    "notes": "Load Failed — rainstorm.tfe · loadFile failed: Unsupported file format: rainstorm.tfe · (jukebox 2026-10-04 21:07)",
+    "status": "crashes"
+  },
+  "impulse-tracker": {
+    "notes": "Good — absm chain mod.it · (jukebox 2026-10-04 21:08)",
+    "status": "works"
+  },
+  "images-music-system": {
+    "notes": "Incorrect Pattern Data — chip5.ims · (jukebox 2026-10-04 21:09)",
+    "status": "partial",
+    "patternQuality": "incorrect"
+  },
+  "instereo!": {
+    "notes": "Good — fantasi8.is · (jukebox 2026-10-04 21:09)",
+    "status": "works"
+  },
+  "formats": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0807 [audio=ok, inst=17/ok, export=ok] (2026-10-05)",
+    "rmsAvg": 0.08066,
+    "instrumentCount": 17
   }
 }
