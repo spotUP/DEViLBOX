@@ -15,7 +15,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
-import { waveformVuLevel } from './waveformVuLevel';
+import { waveformVuLevel, engineFedMeterTarget } from './waveformVuLevel';
 
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;       // per-frame decay at 60fps reference rate
@@ -66,6 +66,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   const meterStates = useRef<MeterState[]>([]);
   const animationRef = useRef<number | null>(null);
   const lastGensRef = useRef<number[]>([]);
+  const prevSourceRef = useRef<number[]>([]);
 
   // Refs for values needed inside the animation loop
   const numChannelsRef = useRef(numChannels);
@@ -227,7 +228,9 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
           // those: its waveform capture bleeds the neighbouring channels.
           const oscD = oscChannelData ? oscChannelData[i] : null;
           if (oscD && oscD.length > 0) {
-            const target = waveformVuLevel(engineLevels ? (engineLevels[i] || 0) : null, oscD);
+            const level = waveformVuLevel(engineLevels ? (engineLevels[i] || 0) : null, oscD);
+            const target = engineFedMeterTarget(isRealtime ? 'realtime' : 'trigger', level, prevSourceRef.current[i] || 0);
+            prevSourceRef.current[i] = level;
             if (target > meter.level) meter.level = target;
           }
         }
