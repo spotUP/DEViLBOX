@@ -12,7 +12,12 @@ import { readFileSync } from 'node:fs';
 import { ModlandPanel } from '../FilePreviewPanel';
 
 const DIR = 'pub/modules/Infogrames/Charles Callet';
-const FILES = ['bob4e.dum', 'bob4.ins', 'bob4d.ins', 'bob4f.dum'].map((n) => `${DIR}/${n}`);
+const SMUS_DIR = 'pub/modules/IFF-SMUS/JJ';
+const FILES = [
+  ...['bob4e.dum', 'bob4.ins', 'bob4d.ins', 'bob4f.dum'].map((n) => `${DIR}/${n}`),
+  `${SMUS_DIR}/STOP.smus`, `${SMUS_DIR}/Instruments/piano.instr`, `${SMUS_DIR}/Instruments/piano.ss`,
+];
+let searchHit = { filename: 'bob4e.dum', full_path: `${DIR}/bob4e.dum`, format: 'Infogrames', extension: 'dum' };
 
 function serveModland(): void {
   vi.stubGlobal('fetch', async (input: string | URL) => {
@@ -20,7 +25,7 @@ function serveModland(): void {
     const p = url.pathname;
     if (p.endsWith('/modland/search')) {
       return new Response(JSON.stringify({
-        results: [{ id: 1, format: 'Infogrames', author: 'Charles Callet', filename: 'bob4e.dum', full_path: `${DIR}/bob4e.dum`, extension: 'dum', avg_rating: null, vote_count: null }],
+        results: [{ id: 1, author: 'x', ...searchHit, avg_rating: null, vote_count: null }],
         limit: 50, offset: 0, query: 'bob4e',
       }), { status: 200 });
     }
@@ -58,6 +63,21 @@ describe('a Modland bob4e.dum loaded from the file browser plays with bob4.ins',
     await waitFor(() => expect(loads).toHaveLength(1), { timeout: 4000 });
     expect(loads[0].name).toBe('bob4e.dum');
     expect([...(loads[0].companions?.keys() ?? [])]).toEqual(['bob4.ins']);
+  });
+
+  it('a Modland SMUS loaded from the file browser arrives with its Instruments folder (Sonix fails silent without it)', async () => {
+    serveModland();
+    searchHit = { filename: 'STOP.smus', full_path: `${SMUS_DIR}/STOP.smus`, format: 'IFF-SMUS', extension: 'smus' };
+    const loads: Array<Map<string, ArrayBuffer> | undefined> = [];
+    const view = render(
+      <ModlandPanel isOpen onClose={() => {}} onLoadTrackerModule={async (_b, _n, companions) => { loads.push(companions); }} />,
+    );
+    fireEvent.change(view.container.querySelector('input') as HTMLInputElement, { target: { value: 'stop' } });
+    const row = await waitFor(() => view.getByText('STOP.smus').closest('div[class*="cursor-pointer"]') as HTMLElement, { timeout: 4000 });
+    fireEvent.doubleClick(row);
+    await waitFor(() => expect(loads).toHaveLength(1), { timeout: 4000 });
+    expect([...(loads[0]?.keys() ?? [])].sort()).toEqual(['Instruments/piano.instr', 'Instruments/piano.ss']);
+    searchHit = { filename: 'bob4e.dum', full_path: `${DIR}/bob4e.dum`, format: 'Infogrames', extension: 'dum' };
   });
 
   it('no browser pre-writes companions into the UADE filesystem ahead of a separate load', () => {
