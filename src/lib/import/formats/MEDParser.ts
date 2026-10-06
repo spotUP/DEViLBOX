@@ -439,7 +439,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
             type: 'synth' as const,
             synthType: 'OctaMEDSynth' as const,
             octamed: {
-              volume: instr.volume & 0x3F,
+              volume: Math.min(64, instr.volume),
               voltblSpeed: 0,
               wfSpeed: 0,
               vibratoSpeed: 0,
@@ -487,9 +487,11 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
             waveforms.push(new Int8Array(256)); // truncated/empty — silent
             continue;
           }
-          // Copy up to 256 bytes of signed PCM into a 256-byte Int8Array
-          const wf = new Int8Array(256);
+          // The waveform keeps its own length: Paula loops over exactly these
+          // bytes, so the length sets the pitch (octamed_synth.c). Padding it to
+          // 256 with silence made the preview play a different instrument.
           const copyLen = Math.min(wfBytes, 256);
+          const wf = new Int8Array(copyLen);
           for (let b = 0; b < copyLen; b++) {
             const raw = buf[dataStart + b];
             wf[b] = raw >= 128 ? raw - 256 : raw;
@@ -501,7 +503,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
         }
 
         const octamedConfig: OctaMEDConfig = {
-          volume: instr.volume & 0x3F,
+          volume: Math.min(64, instr.volume),
           voltblSpeed: volspeed,
           wfSpeed: wfspeed,
           vibratoSpeed: 0,   // vibratoSpeed is per-note in OctaMED, not per-instrument
@@ -544,7 +546,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           type: 'synth' as const,
           synthType: 'OctaMEDSynth' as const,
           octamed: {
-            volume: instr.volume & 0x3F,
+            volume: Math.min(64, instr.volume),
             voltblSpeed: 0,
             wfSpeed: 0,
             vibratoSpeed: 0,

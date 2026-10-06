@@ -14,6 +14,8 @@ export interface UadeVoice {
   /** Paula AUDxPER and AUDxVOL of the channel after each 20 ms tick. */
   period: number[];
   volume: number[];
+  /** AUDxLC (the channel's current sample pointer): changes when the player switches waveform. */
+  pointer: number[];
 }
 
 export async function uadeVoice(data: Uint8Array, hint: string, channel: number, seconds: number, rate = 48000): Promise<UadeVoice> {
@@ -31,7 +33,7 @@ export async function uadeVoice(data: Uint8Array, hint: string, channel: number,
   const CH = 960;
   const pL = mod._malloc(CH * 4), pR = mod._malloc(CH * 4), snapPtr = mod._malloc(64);
   const pcm = new Float32Array(total);
-  const period: number[] = [], volume: number[] = [];
+  const period: number[] = [], volume: number[] = [], pointer: number[] = [];
   for (let f = 0; f < total; f += CH) {
     if (mod._uade_wasm_render(pL, pR, CH) <= 0) break;
     refreshHeap(mod);
@@ -39,8 +41,8 @@ export async function uadeVoice(data: Uint8Array, hint: string, channel: number,
     mod._uade_wasm_get_channel_snapshot(snapPtr);
     refreshHeap(mod);
     const snap = new Uint32Array(mod.HEAPU8.buffer, snapPtr, 16);
-    period.push(snap[channel * 4]); volume.push(snap[channel * 4 + 1]);
+    period.push(snap[channel * 4]); volume.push(snap[channel * 4 + 1]); pointer.push(snap[channel * 4 + 3]);
   }
   try { mod._uade_wasm_cleanup(); } catch { /* ignore */ }
-  return { pcm, period, volume };
+  return { pcm, period, volume, pointer };
 }

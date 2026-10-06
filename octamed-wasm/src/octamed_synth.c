@@ -1,20 +1,53 @@
 /**
- * octamed_synth.c — OctaMED real-time synthesis engine
+ * octamed_synth.c — OctaMED synthetic-instrument voice (keyboard preview)
  *
- * Implements the vol/wf command-table oscillator for OctaMED synth instruments.
- * Parses the DEViLBOX compact binary format and renders audio per sample block.
+ * Plays one OctaMED SynthInstr the way the original player does, as measured
+ * against UADE's own OctaMED eagleplayer on hand-built modules (see
+ * src/engine/__tests__/keyboardPreviewGroupB.test.ts and medSynthFixture.ts):
  *
- * Binary format (compact, not raw SynthInstr layout):
- *   [0]     u8  version = 1
+ *   - Paula playback: the current waveform (L bytes, signed) loops at
+ *     3546895 / period samples per second, so its pitch is 3546895 / (period * L).
+ *     The old model treated the 256-byte slot as one cycle at the sample rate
+ *     (eight octaves high for a 64-byte wave padded with zeros) and used the
+ *     NTSC clock.
+ *   - Note to period: MED raw note n sounds ProTracker period
+ *     PT12[(n-1) % 12] * 4 >> ((n-1) / 12) (raw 25 = 856, raw 49 = 214); the old
+ *     table (36 entries, key - 24) clamped and sat three octaves off.
+ *   - Level: Paula volume = volume-table value * instrument volume / 64, mixed
+ *     by UADE as sample * volume / 32768, a full-scale voice being 0.25.
+ *   - Tables: one 50 Hz tick at a time. A table runs a step at note start and
+ *     then every `speed` ticks (the counter reloads from the speed in force
+ *     before the step runs, so a speed command applies one step late).
+ *     A step reads entries until it reaches a value:
+ *       volume table: 00-40 volume | F0 n speed | F1 n wait n steps |
+ *                     F2 n slide down n per tick | F3 n slide up n per tick |
+ *                     FE n jump | FF end (hold)
+ *       waveform table: 00-.. waveform | F0 n speed | F1 n wait |
+ *                     F2 n period + n per tick | F3 n period - n per tick |
+ *                     F4 n vibrato depth | F5 n vibrato speed |
+ *                     FC .. FD arpeggio (semitones, one per tick) |
+ *                     FE n jump | FF end (hold)
+ *     Slides run every tick before the step. A waveform the table selects
+ *     reaches the output at the end of the current loop of the old one, as
+ *     Paula reloads its pointer then.
+ *   - Vibrato: period + (sine * depth >> 8), the sine advancing `speed` of 256
+ *     per tick (the measured excursion of depth 8 / speed 4 is +3 at tick 16).
+ *   - F4/FA of the volume table (envelope, wave-synchronised jump) and F7 of
+ *     the waveform table are not modelled: their effect on the real player
+ *     was not decoded.
+ *
+ * Binary blob for octamed_player_set_instrument (little-endian), version 2:
+ *   [0]     u8  version = 2
  *   [1]     u8  numWaveforms (1-10)
- *   [2]     u8  defaultVolume (0-64)
- *   [3]     u8  vibratoSpeed
- *   [4]     u8  voltblSpeed (vol-table execute rate; 0=every block)
- *   [5]     u8  wfSpeed    (wf-table execute rate;  0=every block)
- *   [6-7]   u16 reserved
- *   [8]     128 bytes — vol command table (voltbl)
- *   [136]   128 bytes — wf command table (wftbl)
- *   [264]   numWaveforms × 256 bytes — signed waveforms
+ *   [2]     u8  instrument volume (0-64)
+ *   [3]     u8  vibrato speed (initial)
+ *   [4]     u8  voltbl speed
+ *   [5]     u8  wftbl speed
+ *   [6-7]   reserved
+ *   [8]     128 bytes volume table
+ *   [136]   128 bytes waveform table
+ *   [264]   numWaveforms x u16 waveform length in bytes (2..256)
+ *   [264 + 2*numWaveforms]  waveform data, signed bytes, back to back
  */
 
 #ifdef __EMSCRIPTEN__
@@ -29,250 +62,157 @@
 #include <string.h>
 #include <math.h>
 
-/* ── Period table (Amiga Paula, 3-octave standard set) ────────────────────── */
-/* Index 0 = C-1 (period 856), index 35 = B-3 (period 113)                    */
-/* MIDI note 36 = C-2 = index 12 in this table                                 */
-static const uint16_t AMIGA_PERIODS[36] = {
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,  /* oct 1 */
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,  /* oct 2 */
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,  /* oct 3 */
-};
+#define PAULA_CLOCK     3546895.0f
+#define TICKS_PER_SEC   50
+#define MAX_WAVES       10
+#define MAX_WAVE_BYTES  256
+#define MAX_PLAYERS     16
+/* UADE audio.c mixes int8 * volume (0..64) and the float output is that / 32768:
+ * normalised sample * volume gives 0.25 at full scale. */
+#define PAULA_VOICE_SCALE 0.25f
 
-/* Sine table (256 entries, amplitude ±127) for vibrato */
+static const uint16_t PT12[12] = { 856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453 };
+
+/* Sine for the vibrato, -127..127 over 256 steps. */
 static int8_t SINE_TABLE[256];
 static int    g_sine_inited = 0;
-static int    g_sample_rate = 44100;
 
 static void init_sine_table(void) {
   if (g_sine_inited) return;
-  for (int i = 0; i < 256; i++) {
-    SINE_TABLE[i] = (int8_t)(127.0 * sin(2.0 * 3.14159265358979323846 * i / 256.0));
-  }
+  for (int i = 0; i < 256; i++) SINE_TABLE[i] = (int8_t)(127.0 * sin(2.0 * 3.14159265358979323846 * i / 256.0));
   g_sine_inited = 1;
 }
 
-/* Convert MIDI note to Amiga period (clamped to table range) */
-static float note_to_period(int midi_note) {
-  /* midi 36 = C-2 = index 12 (oct 2 C) */
-  int idx = midi_note - 24; /* shift so midi 24 = C-1 = index 0 */
-  if (idx < 0) idx = 0;
-  if (idx > 35) idx = 35;
-  return (float)AMIGA_PERIODS[idx];
+/* Period of a MED raw note on a synth instrument (raw 25 = 856). */
+static int raw_note_period(int raw) {
+  if (raw < 1) raw = 1;
+  if (raw > 96) raw = 96;
+  int i = (raw - 1) % 12, oct = (raw - 1) / 12;
+  return ((int)PT12[i] << 2) >> oct;
 }
-
-/* Convert period + semitone offset to frequency */
-static float period_to_freq(float period, int semitone_offset) {
-  /* Amiga: freq = 7159090 / (2 * period) for PAL */
-  /* Apply semitone offset by multiplying period by 2^(-st/12) */
-  float p = period;
-  if (semitone_offset != 0) {
-    p = p * (float)pow(2.0, -semitone_offset / 12.0);
-  }
-  if (p < 1.0f) p = 1.0f;
-  return 7159090.0f / (2.0f * p);
-}
-
-/* ── Player state ─────────────────────────────────────────────────────────── */
-
-#define MAX_PLAYERS 16
 
 typedef struct {
-  /* Instrument data */
-  int8_t   waveforms[10][256];
+  int pos;      /* table position */
+  int cnt;      /* ticks until the next step */
+  int speed;    /* ticks per step (>= 1) */
+  int wait;     /* steps still to skip (F1) */
+} Seq;
+
+typedef struct {
+  /* Instrument */
+  int8_t   waves[MAX_WAVES][MAX_WAVE_BYTES];
+  int      waveLen[MAX_WAVES];
   uint8_t  voltbl[128];
   uint8_t  wftbl[128];
-  uint8_t  numWaveforms;
-  uint8_t  defaultVolume;
-  uint8_t  voltblSpeed;
-  uint8_t  wfSpeed;
-  uint8_t  vibratoSpeed;
+  int      numWaves;
+  int      instVolume;
+  int      volSpeed0, wfSpeed0, vibSpeed0;
 
-  /* Runtime oscillator state */
-  float    samplePos;       /* position within current 256-byte waveform (0-255) */
-  float    phaseInc;        /* waveform samples advanced per output sample */
-  int      wfIndex;         /* current waveform index (0-9) */
-  int      volume;          /* current volume (0-64) */
+  /* Voice */
+  Seq      vol, wf;
+  int      wave;         /* waveform Paula is looping */
+  int      waveNext;     /* waveform the table last selected: Paula takes it at the next loop end */
+  int      volume;       /* table volume 0..64 */
+  int      volSlide;     /* per tick, signed */
+  int      period;       /* base period of the note */
+  int      periodOff;    /* F2/F3 accumulated period offset */
+  int      pitchSlide;   /* per tick, signed (+ = period grows = pitch falls) */
+  int      vibDepth, vibSpeed, vibPhase;
+  int      arp[32], arpLen, arpIdx;
+  float    phase;        /* position in the current waveform, bytes */
+  int      active, allocated;
+  int      sampleRate, tickCtr, samplesPerTick;
+} Player;
 
-  /* Vol table sequencer */
-  int      volPos;          /* byte offset into voltbl */
-  int      volCounter;      /* samples until next vol table step */
-  int      volStepSamples;  /* samples per vol table step (from voltblSpeed) */
+static Player g_players[MAX_PLAYERS];
 
-  /* Wf table sequencer */
-  int      wfPos;           /* byte offset into wftbl */
-  int      wfCounter;       /* samples until next wf table step */
-  int      wfStepSamples;   /* samples per wf table step (from wfSpeed) */
+static int cmd_arg(const uint8_t *tbl, int pos) { return pos + 1 < 128 ? tbl[pos + 1] : 0; }
 
-  /* Arpeggio (from wf table non-command bytes) */
-  int      arpSemitone;     /* current arpeggio semitone offset */
-
-  /* Vibrato */
-  int      vibratoPhase;    /* 0-255 sawtooth phase */
-  int      vibDepth;        /* current vibrato depth (0-63) */
-  int      vibSpeed;        /* current vibrato speed (overrides vibratoSpeed) */
-
-  /* Playback state */
-  int      baseNote;        /* MIDI note of current key-on */
-  float    basePeriod;      /* Amiga period for baseNote */
-  int      active;          /* 1 = playing */
-  int      allocated;       /* 1 = slot in use */
-  int      sampleRate;
-} OctaMEDPlayer;
-
-static OctaMEDPlayer g_players[MAX_PLAYERS];
-
-/* ── Step rate calculation ────────────────────────────────────────────────── */
-/* OctaMED vol/wf table runs at ~50Hz (PAL frame rate) by default.            */
-/* Speed value 0 = execute every block (~50Hz at typical block sizes).         */
-/* Here we treat speed as: execute every (speed+1) * (sampleRate/50) samples.  */
-
-static int compute_step_samples(int speed, int sample_rate) {
-  /* minimum 1 sample */
-  int base = sample_rate / 50; /* ~882 at 44100, ~960 at 48000 */
-  if (base < 1) base = 1;
-  return base * (speed + 1);
-}
-
-/* ── Vol table execution ──────────────────────────────────────────────────── */
-
-static void execute_vol_step(OctaMEDPlayer *p) {
-  if (p->volPos < 0 || p->volPos >= 128) { p->volPos = 127; return; }
-  uint8_t cmd = p->voltbl[p->volPos];
-  int8_t  scmd = (int8_t)cmd;
-
-  if (scmd >= 0) {
-    /* Direct volume value 0-64 */
-    p->volume = (cmd > 64) ? 64 : (int)cmd;
-    p->volPos++;
-    if (p->volPos >= 128) p->volPos = 127;
-    return;
-  }
-
-  /* Command byte — need argument at volPos+1 */
-  int argPos = p->volPos + 1;
-  uint8_t arg = (argPos < 128) ? p->voltbl[argPos] : 0;
-
-  switch (cmd & 0x0F) {
-    case 0x00: /* F0: set vol-table speed */
-      p->voltblSpeed = arg;
-      p->volStepSamples = compute_step_samples(arg, p->sampleRate);
-      p->volPos += 2;
-      break;
-    case 0x01: /* F1: wait N extra steps (skip) */
-      p->volPos += 2;
-      break;
-    case 0x02: /* F2: slide volume down by arg */
-      p->volume -= (int)arg;
-      if (p->volume < 0) p->volume = 0;
-      p->volPos += 2;
-      break;
-    case 0x03: /* F3: slide volume up by arg */
-      p->volume += (int)arg;
-      if (p->volume > 64) p->volume = 64;
-      p->volPos += 2;
-      break;
-    case 0x04: /* F4: set envelope waveform (for vibrato volume shape - ignore for now) */
-      p->volPos += 2;
-      break;
-    case 0x0A: /* FA: JWS - jump if wf table position <= arg */
-      p->volPos += 2;
-      break;
-    case 0x0E: /* FE: JMP to arg */
-      p->volPos = (int)arg;
-      break;
-    case 0x0F: /* FF: END - loop back (stay at current pos - 1) */
-      /* Stay at this position to repeat */
-      if (p->volPos > 0) p->volPos--;
-      break;
-    default:
-      p->volPos += 2;
-      break;
-  }
-
-  if (p->volPos >= 128) p->volPos = 127;
-}
-
-/* ── Wf table execution ───────────────────────────────────────────────────── */
-
-static void execute_wf_step(OctaMEDPlayer *p) {
-  if (p->wfPos < 0 || p->wfPos >= 128) { p->wfPos = 127; return; }
-  uint8_t cmd = p->wftbl[p->wfPos];
-  int8_t  scmd = (int8_t)cmd;
-
-  if (scmd >= 0) {
-    /* Direct waveform index or arpeggio semitone */
-    if (cmd < 10) {
-      /* Waveform select (0-9) */
-      p->wfIndex = (int)cmd;
-      if (p->wfIndex >= p->numWaveforms) p->wfIndex = p->numWaveforms - 1;
-      p->arpSemitone = 0;
-    } else {
-      /* Arpeggio semitone offset (values 10+ are treated as semitones relative to root) */
-      p->arpSemitone = (int)cmd - 10;
+/* One volume-table step: run entries until a value (or END). */
+static void vol_step(Player *p) {
+  Seq *s = &p->vol;
+  if (s->wait > 0) { s->wait--; return; }
+  for (int guard = 0; guard < 64; guard++) {
+    if (s->pos < 0 || s->pos >= 128) { s->pos = 127; return; }
+    uint8_t c = p->voltbl[s->pos];
+    if (c <= 0x40) { p->volume = c; s->pos++; return; }
+    int a = cmd_arg(p->voltbl, s->pos);
+    switch (c) {
+      case 0xF0: s->speed = a < 1 ? 1 : a; s->pos += 2; break;
+      case 0xF1: s->wait = a > 1 ? a - 1 : 0; s->pos += 2; return;
+      case 0xF2: p->volSlide = -a; s->pos += 2; break;
+      case 0xF3: p->volSlide = a; s->pos += 2; break;
+      case 0xFE: s->pos = a; break;
+      case 0xFF: return; /* END: hold */
+      default: s->pos += 2; break; /* F4, FA, ...: not modelled */
     }
-    p->wfPos++;
-    if (p->wfPos >= 128) p->wfPos = 127;
-    return;
   }
-
-  /* Command byte */
-  int argPos = p->wfPos + 1;
-  uint8_t arg = (argPos < 128) ? p->wftbl[argPos] : 0;
-
-  switch (cmd & 0x0F) {
-    case 0x00: /* F0: set wf-table speed */
-      p->wfSpeed = arg;
-      p->wfStepSamples = compute_step_samples(arg, p->sampleRate);
-      p->wfPos += 2;
-      break;
-    case 0x01: /* F1: wait */
-      p->wfPos += 2;
-      break;
-    case 0x02: /* F2: slide wf index down */
-      p->wfIndex -= (int)arg;
-      if (p->wfIndex < 0) p->wfIndex = 0;
-      p->wfPos += 2;
-      break;
-    case 0x03: /* F3: slide wf index up */
-      p->wfIndex += (int)arg;
-      if (p->wfIndex >= p->numWaveforms) p->wfIndex = p->numWaveforms - 1;
-      p->wfPos += 2;
-      break;
-    case 0x04: /* F4: set vibrato depth */
-      p->vibDepth = (int)arg;
-      p->wfPos += 2;
-      break;
-    case 0x05: /* F5: set vibrato speed */
-      p->vibSpeed = (int)arg;
-      p->wfPos += 2;
-      break;
-    case 0x07: /* F7: set vibrato waveform (ignore - always sine) */
-      p->wfPos += 2;
-      break;
-    case 0x0A: /* FA: JVS - jump to arg (volume sync) */
-      p->wfPos += 2;
-      break;
-    case 0x0C: /* FC: set arpeggio begin */
-      p->wfPos += 2;
-      break;
-    case 0x0E: /* FE: JMP to arg */
-      p->wfPos = (int)arg;
-      break;
-    case 0x0F: /* FF: END - loop */
-      if (p->wfPos > 0) p->wfPos--;
-      break;
-    default:
-      p->wfPos += 2;
-      break;
-  }
-
-  if (p->wfPos >= 128) p->wfPos = 127;
 }
 
-/* ── Public API ───────────────────────────────────────────────────────────── */
+/* One waveform-table step. */
+static void wf_step(Player *p) {
+  Seq *s = &p->wf;
+  if (s->wait > 0) { s->wait--; return; }
+  for (int guard = 0; guard < 64; guard++) {
+    if (s->pos < 0 || s->pos >= 128) { s->pos = 127; return; }
+    uint8_t c = p->wftbl[s->pos];
+    if (c < 0x80) {
+      p->waveNext = c < p->numWaves ? c : p->numWaves - 1;
+      s->pos++;
+      return;
+    }
+    int a = cmd_arg(p->wftbl, s->pos);
+    switch (c) {
+      case 0xF0: s->speed = a < 1 ? 1 : a; s->pos += 2; break;
+      case 0xF1: s->wait = a > 1 ? a - 1 : 0; s->pos += 2; return;
+      case 0xF2: p->pitchSlide = a; s->pos += 2; break;
+      case 0xF3: p->pitchSlide = -a; s->pos += 2; break;
+      case 0xF4: p->vibDepth = a; s->pos += 2; break;
+      case 0xF5: p->vibSpeed = a; s->pos += 2; break;
+      case 0xFC: { /* arpeggio list up to FD */
+        int n = 0, q = s->pos + 1;
+        while (q < 128 && p->wftbl[q] != 0xFD && n < 32) p->arp[n++] = (int8_t)p->wftbl[q++];
+        p->arpLen = n; p->arpIdx = 0;
+        s->pos = q < 128 ? q + 1 : 127;
+        break;
+      }
+      case 0xFE: s->pos = a; break;
+      case 0xFF: return; /* END: hold */
+      default: s->pos += 2; break; /* F7, FA, ...: not modelled */
+    }
+  }
+}
+
+static void run_seq(Player *p, Seq *s, void (*step)(Player *)) {
+  if (--s->cnt > 0) return;
+  s->cnt = s->speed; /* reload from the speed in force before the step */
+  step(p);
+}
+
+/* One 50 Hz tick of the voice. */
+static void player_tick(Player *p) {
+  p->volume += p->volSlide;
+  if (p->volume < 0) p->volume = 0;
+  if (p->volume > 64) p->volume = 64;
+  p->periodOff += p->pitchSlide;
+  run_seq(p, &p->vol, vol_step);
+  run_seq(p, &p->wf, wf_step);
+  p->vibPhase = (p->vibPhase + p->vibSpeed) & 0xFF;
+  if (p->arpLen > 0) p->arpIdx = (p->arpIdx + 1) % p->arpLen;
+}
+
+static float current_period(const Player *p) {
+  float period = (float)(p->period + p->periodOff);
+  if (p->vibDepth > 0) period += (float)((SINE_TABLE[p->vibPhase & 0xFF] * p->vibDepth) >> 8);
+  if (p->arpLen > 0) period *= powf(2.0f, -(float)p->arp[p->arpIdx] / 12.0f);
+  if (period < 113.0f) period = 113.0f;
+  return period;
+}
+
+/* ── Public API ─────────────────────────────────────────────────────────── */
 
 KEEPALIVE void octamed_init(int sample_rate) {
-  g_sample_rate = sample_rate;
+  (void)sample_rate;
   init_sine_table();
   memset(g_players, 0, sizeof(g_players));
 }
@@ -281,137 +221,97 @@ KEEPALIVE int octamed_create_player(int sample_rate) {
   init_sine_table();
   for (int i = 0; i < MAX_PLAYERS; i++) {
     if (!g_players[i].allocated) {
-      memset(&g_players[i], 0, sizeof(OctaMEDPlayer));
-      g_players[i].allocated   = 1;
-      g_players[i].sampleRate  = sample_rate;
-      g_players[i].active      = 0;
-      g_players[i].volume      = 64;
-      g_players[i].wfIndex     = 0;
-      g_players[i].numWaveforms = 1;
-      g_players[i].voltblSpeed = 0;
-      g_players[i].wfSpeed     = 0;
-      g_players[i].vibratoSpeed = 0;
-      /* Default: single silent waveform, tables end immediately */
-      g_players[i].voltbl[0] = 0xFF; /* FF = END */
-      g_players[i].wftbl[0]  = 0xFF;
-      g_players[i].volStepSamples = compute_step_samples(0, sample_rate);
-      g_players[i].wfStepSamples  = compute_step_samples(0, sample_rate);
+      memset(&g_players[i], 0, sizeof(Player));
+      g_players[i].allocated = 1;
+      g_players[i].sampleRate = sample_rate;
+      g_players[i].samplesPerTick = sample_rate / TICKS_PER_SEC;
+      g_players[i].numWaves = 1;
+      g_players[i].waveLen[0] = MAX_WAVE_BYTES;
+      g_players[i].instVolume = 64;
+      memset(g_players[i].voltbl, 0xFF, 128);
+      memset(g_players[i].wftbl, 0xFF, 128);
       return i;
     }
   }
-  return -1; /* no free slot */
+  return -1;
 }
 
 KEEPALIVE void octamed_destroy_player(int handle) {
   if (handle < 0 || handle >= MAX_PLAYERS) return;
   g_players[handle].allocated = 0;
-  g_players[handle].active    = 0;
+  g_players[handle].active = 0;
 }
 
-/**
- * Parse compact binary format and load into player.
- * Returns 1 on success, 0 on error.
- */
+/* Returns 1 on success, 0 on error. */
 KEEPALIVE int octamed_player_set_instrument(int handle, const uint8_t *data, int len) {
   if (handle < 0 || handle >= MAX_PLAYERS) return 0;
-  if (!g_players[handle].allocated) return 0;
-  if (!data || len < 264) return 0; /* need at least header + both tables */
+  Player *p = &g_players[handle];
+  if (!p->allocated || !data || len < 264) return 0;
+  if (data[0] != 2) return 0;
 
-  OctaMEDPlayer *p = &g_players[handle];
-
-  /* Header */
-  /* data[0] = version (must be 1) */
-  if (data[0] != 1) return 0;
-  p->numWaveforms  = data[1];
-  if (p->numWaveforms < 1) p->numWaveforms = 1;
-  if (p->numWaveforms > 10) p->numWaveforms = 10;
-  p->defaultVolume = data[2];
-  p->vibratoSpeed  = data[3];
-  p->voltblSpeed   = data[4];
-  p->wfSpeed       = data[5];
-
-  /* Vol table: 128 bytes at offset 8 */
+  int nw = data[1];
+  if (nw < 1) nw = 1;
+  if (nw > MAX_WAVES) nw = MAX_WAVES;
+  p->numWaves = nw;
+  p->instVolume = data[2] > 64 ? 64 : data[2];
+  p->vibSpeed0 = data[3];
+  p->volSpeed0 = data[4];
+  p->wfSpeed0 = data[5];
   memcpy(p->voltbl, data + 8, 128);
-
-  /* Wf table: 128 bytes at offset 136 */
   memcpy(p->wftbl, data + 136, 128);
 
-  /* Waveforms at offset 264, each 256 signed bytes */
-  for (int w = 0; w < p->numWaveforms; w++) {
-    int off = 264 + w * 256;
-    if (off + 256 > len) {
-      /* Pad remaining waveforms with silence */
-      memset(p->waveforms[w], 0, 256);
-    } else {
-      memcpy(p->waveforms[w], (const int8_t *)(data + off), 256);
-    }
+  int lenOff = 264, dataOff = 264 + 2 * nw;
+  for (int w = 0; w < nw; w++) {
+    int wl = lenOff + 2 * w + 1 < len ? data[lenOff + 2 * w] | (data[lenOff + 2 * w + 1] << 8) : 0;
+    if (wl < 2) wl = 2;
+    if (wl > MAX_WAVE_BYTES) wl = MAX_WAVE_BYTES;
+    memset(p->waves[w], 0, MAX_WAVE_BYTES);
+    if (dataOff + wl <= len) memcpy(p->waves[w], data + dataOff, wl);
+    p->waveLen[w] = wl;
+    dataOff += wl;
   }
-
-  /* Precompute step samples */
-  p->volStepSamples = compute_step_samples(p->voltblSpeed, p->sampleRate);
-  p->wfStepSamples  = compute_step_samples(p->wfSpeed,     p->sampleRate);
-
   return 1;
 }
 
-/**
- * Live-edit a scalar instrument parameter. Matches the string-keyed
- * set_instrument_param convention used by Symphonie/SoundMon so the TS
- * engine layer can forward OctaMEDControls edits without reloading the
- * full instrument blob.
- */
 KEEPALIVE void octamed_player_set_instrument_param(int handle, const char *param, float value) {
-  if (handle < 0 || handle >= MAX_PLAYERS) return;
-  if (!g_players[handle].allocated) return;
-  if (!param) return;
-  OctaMEDPlayer *p = &g_players[handle];
-
+  if (handle < 0 || handle >= MAX_PLAYERS || !param) return;
+  Player *p = &g_players[handle];
+  if (!p->allocated) return;
   if (strcmp(param, "volume") == 0) {
-    /* Config "volume" maps to the instrument-level defaultVolume (0-64). */
     int v = (int)value;
-    if (v < 0) v = 0;
-    if (v > 64) v = 64;
-    p->defaultVolume = (uint8_t)v;
+    p->instVolume = v < 0 ? 0 : (v > 64 ? 64 : v);
   } else if (strcmp(param, "voltblSpeed") == 0) {
-    p->voltblSpeed = (uint8_t)value;
-    p->volStepSamples = compute_step_samples(p->voltblSpeed, p->sampleRate);
+    p->volSpeed0 = (int)value;
   } else if (strcmp(param, "wfSpeed") == 0) {
-    p->wfSpeed = (uint8_t)value;
-    p->wfStepSamples = compute_step_samples(p->wfSpeed, p->sampleRate);
+    p->wfSpeed0 = (int)value;
   } else if (strcmp(param, "vibratoSpeed") == 0) {
-    p->vibratoSpeed = (uint8_t)value;
+    p->vibSpeed0 = (int)value;
   }
-  /* loopStart / loopLen live in chip-RAM only; they do not affect the
-   * OctaMED synth engine's waveform oscillator and are applied by the
-   * UADE chip-RAM write-back in OctaMEDControls. */
 }
 
+/* midi_note is the keyboard key: grid note n = key - 11 (xmConversions
+ * noteToMidi), and MED raw note = grid note - 24 (MEDParser's MMD0-2 base). */
 KEEPALIVE void octamed_player_note_on(int handle, int midi_note, int velocity) {
   if (handle < 0 || handle >= MAX_PLAYERS) return;
-  if (!g_players[handle].allocated) return;
+  Player *p = &g_players[handle];
+  if (!p->allocated) return;
+  (void)velocity; /* Paula volume comes from the tables and the instrument */
 
-  OctaMEDPlayer *p = &g_players[handle];
-
-  p->baseNote    = midi_note;
-  p->basePeriod  = note_to_period(midi_note);
-  p->samplePos   = 0.0f;
-  p->wfIndex     = 0;
-  p->volPos      = 0;
-  p->wfPos       = 0;
-  p->volCounter  = p->volStepSamples;
-  p->wfCounter   = p->wfStepSamples;
-  p->volume      = (int)p->defaultVolume;
-  p->vibratoPhase = 0;
-  p->vibDepth    = 0;
-  p->vibSpeed    = (int)p->vibratoSpeed;
-  p->arpSemitone = 0;
-  p->active      = 1;
-
-  /* Compute initial phase increment */
-  float freq = period_to_freq(p->basePeriod, 0);
-  p->phaseInc = 256.0f * freq / (float)p->sampleRate;
-
-  (void)velocity;
+  p->period = raw_note_period(midi_note - 11 - 24);
+  p->periodOff = 0; p->pitchSlide = 0; p->volSlide = 0;
+  p->volume = 0;
+  p->wave = p->waveNext = 0;
+  p->vibDepth = 0; p->vibSpeed = p->vibSpeed0; p->vibPhase = 0;
+  p->arpLen = 0; p->arpIdx = 0;
+  p->vol.pos = 0; p->vol.wait = 0; p->vol.speed = p->volSpeed0 < 1 ? 1 : p->volSpeed0;
+  p->wf.pos = 0; p->wf.wait = 0; p->wf.speed = p->wfSpeed0 < 1 ? 1 : p->wfSpeed0;
+  p->phase = 0.0f;
+  p->tickCtr = 0;
+  p->active = 1;
+  /* The note-start step, then the counters as the player leaves them. */
+  vol_step(p); p->vol.cnt = p->vol.speed;
+  wf_step(p);  p->wf.cnt = p->wf.speed;
+  p->wave = p->waveNext; /* the note starts on the table's first waveform */
 }
 
 KEEPALIVE void octamed_player_note_off(int handle) {
@@ -419,75 +319,29 @@ KEEPALIVE void octamed_player_note_off(int handle) {
   g_players[handle].active = 0;
 }
 
-/**
- * Render numSamples into outL and outR (float, stereo).
- * Returns numSamples on success, 0 if player inactive.
- */
 KEEPALIVE int octamed_player_render(int handle, float *outL, float *outR, int numSamples) {
   if (handle < 0 || handle >= MAX_PLAYERS) return 0;
-  OctaMEDPlayer *p = &g_players[handle];
+  Player *p = &g_players[handle];
   if (!p->allocated || !p->active) return 0;
 
   for (int i = 0; i < numSamples; i++) {
-    /* ── Vol table step ──────────────────────────────────────────────── */
-    p->volCounter--;
-    if (p->volCounter <= 0) {
-      execute_vol_step(p);
-      p->volCounter = p->volStepSamples;
-      if (p->volCounter < 1) p->volCounter = 1;
-    }
+    if (++p->tickCtr >= p->samplesPerTick) { p->tickCtr = 0; player_tick(p); }
 
-    /* ── Wf table step ───────────────────────────────────────────────── */
-    p->wfCounter--;
-    if (p->wfCounter <= 0) {
-      execute_wf_step(p);
-      p->wfCounter = p->wfStepSamples;
-      if (p->wfCounter < 1) p->wfCounter = 1;
-    }
-
-    /* ── Vibrato ─────────────────────────────────────────────────────── */
-    p->vibratoPhase = (p->vibratoPhase + p->vibSpeed) & 0xFF;
-    float vibAdj = 0.0f;
-    if (p->vibDepth > 0) {
-      int sineVal = (int)SINE_TABLE[p->vibratoPhase]; /* -127..127 */
-      /* Vibrato modulates period slightly; depth in 1/256 semitone units */
-      float vibSemitones = (float)(sineVal * p->vibDepth) / (128.0f * 64.0f);
-      vibAdj = vibSemitones;
-    }
-
-    /* ── Compute phase increment ──────────────────────────────────────── */
-    {
-      float period = p->basePeriod;
-      if (p->arpSemitone != 0 || vibAdj != 0.0f) {
-        /* Apply arp + vibrato as combined semitone offset */
-        float totalSemitones = (float)p->arpSemitone + vibAdj;
-        period = period * (float)pow(2.0, -totalSemitones / 12.0);
-        if (period < 1.0f) period = 1.0f;
-      }
-      float freq = 7159090.0f / (2.0f * period);
-      p->phaseInc = 256.0f * freq / (float)p->sampleRate;
-    }
-
-    /* ── Sample output ───────────────────────────────────────────────── */
-    int wi = p->wfIndex;
-    if (wi < 0) wi = 0;
-    if (wi >= p->numWaveforms) wi = p->numWaveforms - 1;
-
-    int pos = (int)p->samplePos;
-    if (pos < 0) pos = 0;
-    if (pos > 255) pos = 255;
-
-    float sample = (float)p->waveforms[wi][pos] * (float)p->volume / (64.0f * 128.0f);
-
+    int wi = p->wave;
+    int wl = p->waveLen[wi];
+    int pos = (int)p->phase;
+    if (pos >= wl) pos %= wl;
+    float vol = (float)p->volume * (float)p->instVolume / 64.0f; /* Paula volume 0..64 */
+    float sample = (float)p->waves[wi][pos] * vol * PAULA_VOICE_SCALE / (128.0f * 64.0f);
     outL[i] = sample;
     outR[i] = sample;
 
-    /* ── Advance phase ───────────────────────────────────────────────── */
-    p->samplePos += p->phaseInc;
-    while (p->samplePos >= 256.0f) {
-      p->samplePos -= 256.0f;
+    p->phase += (PAULA_CLOCK / current_period(p)) / (float)p->sampleRate;
+    if (p->phase >= (float)wl) {
+      p->phase -= (float)wl;
+      p->wave = p->waveNext; /* Paula reloads AUDxLC when the loop ends */
+      if (p->phase >= (float)p->waveLen[p->wave]) p->phase = 0.0f;
     }
   }
-
   return numSamples;
 }

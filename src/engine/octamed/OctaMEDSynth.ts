@@ -64,7 +64,7 @@ export class OctaMEDSynth implements DevilboxSynth {
    * Serialize OctaMEDConfig to the compact binary format consumed by octamed_synth.c.
    *
    * Layout:
-   *   [0]     version = 1
+   *   [0]     version = 2
    *   [1]     numWaveforms
    *   [2]     defaultVolume
    *   [3]     vibratoSpeed
@@ -73,16 +73,23 @@ export class OctaMEDSynth implements DevilboxSynth {
    *   [6-7]   reserved
    *   [8]     voltbl (128 bytes)
    *   [136]   wftbl  (128 bytes)
-   *   [264]   waveforms (numWaveforms × 256 signed bytes)
+   *   [264]   numWaveforms × u16 waveform length (bytes), then the waveform bytes
    */
   static serializeInstrument(config: OctaMEDConfig): ArrayBuffer {
     const numWf = Math.max(1, Math.min(10, config.waveforms.length));
-    const total = 8 + 128 + 128 + numWf * 256;
+    // Each waveform keeps its own length: it is the number of bytes Paula loops
+    // over, so it sets the pitch of every note (octamed_synth.c).
+    const wfs = Array.from({ length: numWf }, (_, w) => {
+      const wf = config.waveforms[w];
+      const bytes = wf ? new Uint8Array(wf.buffer, wf.byteOffset, Math.min(256, wf.byteLength)) : new Uint8Array(2);
+      return bytes.byteLength >= 2 ? bytes : new Uint8Array(2);
+    });
+    const total = 8 + 128 + 128 + 2 * numWf + wfs.reduce((n, w) => n + w.byteLength, 0);
     const buf = new Uint8Array(total);
 
-    buf[0] = 1;                          // version
+    buf[0] = 2;                          // version
     buf[1] = numWf;
-    buf[2] = config.volume & 0x3F;       // 0-64
+    buf[2] = Math.max(0, Math.min(64, config.volume));  // 0-64
     buf[3] = config.vibratoSpeed & 0xFF;
     buf[4] = config.voltblSpeed & 0xFF;
     buf[5] = config.wfSpeed & 0xFF;
@@ -100,14 +107,14 @@ export class OctaMEDSynth implements DevilboxSynth {
       buf[136 + i] = wftbl[i] ?? 0xFF;
     }
 
-    // waveforms: numWf × 256 signed bytes at offset 264
-    for (let w = 0; w < numWf; w++) {
-      const wf = config.waveforms[w];
-      const dst = new Uint8Array(buf.buffer, 264 + w * 256, 256);
-      if (wf) {
-        dst.set(new Uint8Array(wf.buffer, wf.byteOffset, Math.min(256, wf.byteLength)));
-      }
-    }
+    // waveform lengths (u16 LE, bytes) at 264, then the waveform bytes
+    let off = 264 + 2 * numWf;
+    wfs.forEach((w, i) => {
+      buf[264 + 2 * i] = w.byteLength & 0xFF;
+      buf[264 + 2 * i + 1] = w.byteLength >> 8;
+      buf.set(w, off);
+      off += w.byteLength;
+    });
 
     return buf.buffer;
   }
