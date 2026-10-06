@@ -34,7 +34,19 @@ export function playOnEaglePlayer(song: TrackerSong, formatId: string, module: A
   delete song.uadeEditableFileData;
   delete song.uadeEditableFileName;
   for (const inst of song.instruments) {
-    if (UADE_SYNTHS.has(inst.synthType)) inst.synthType = 'Sampler';
+    if (UADE_SYNTHS.has(inst.synthType)) {
+      inst.synthType = 'Sampler';
+      delete inst.uade;
+    }
+  }
+  // A grid from UADE's scan is tagged 'UADE', and playback treats a 'UADE'
+  // song as UADE's opaque player: it looks for the UADESynth and never starts
+  // the song's engine - suffix-named Core Design / Anders 0land songs (the
+  // ones whose grid UADE draws) were silent in the app, 2026-10-06. The grid
+  // is an Amiga period grid like the native parsers' ('MOD').
+  if (song.format === 'UADE') song.format = 'MOD';
+  for (const p of song.patterns) {
+    if (p.importMetadata?.sourceFormat === 'UADE') p.importMetadata.sourceFormat = 'MOD';
   }
   return song;
 }
