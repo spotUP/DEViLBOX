@@ -86,6 +86,8 @@ class MPT extends AudioWorkletProcessor {
 	}
 
 	process(inputList, outputList, parameters) {
+		// A processor lives until process() returns false: 'dispose' ends it.
+		if (this.disposed) return false
 		// Why-silent bookkeeping. A hard-zero master with the transport still
 		// ticking has cost two debugging sessions: every gain downstream reads
 		// sane, so the answer is in here, and there was no way to ask. One
@@ -302,6 +304,12 @@ class MPT extends AudioWorkletProcessor {
 				this.teardownAllIsolation_()
 				this.teardownAllDubSlots_()
 				this.stop()
+				break
+			case 'dispose':
+				this.teardownAllIsolation_()
+				this.teardownAllDubSlots_()
+				this.stop()
+				this.disposed = true
 				break
 			case 'meta':
 				this.meta()
