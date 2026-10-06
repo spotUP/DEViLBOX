@@ -160,7 +160,13 @@ export async function reportPlaybackIsolation(
   }
 }
 
-/** Make a started native engine the dub/isolation engine for this song, when it can be one. */
+/**
+ * Make a started native engine the dub/isolation engine for this song, when it can be one.
+ * Its isolation report must come from this instance: the generic resolver falls back to
+ * any engine left loaded by an earlier song (libopenmpt, Furnace), which said "isolates"
+ * for Fred Editor - the dub bus then muted the whole-mix tap, the only way Fred's audio
+ * reaches it, and every dub toggle went silent.
+ */
 function registerPlayingEngine(instance: unknown): void {
   setPlayingIsolationEngine(asIsolationCapable(instance));
 }
@@ -521,7 +527,7 @@ export async function startNativeEngines(
             routedNativeEngines.add(desc.synthType);
             registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
             registerPlayingEngine(instance);
-            void reportPlaybackIsolation();
+            void reportPlaybackIsolation(undefined, async () => asIsolationCapable(instance));
           } else {
             // Fallback: connect directly to audio context destination
             const ctx = instance.output.context;
@@ -529,7 +535,7 @@ export async function startNativeEngines(
             routedNativeEngines.add(desc.synthType);
             registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
             registerPlayingEngine(instance);
-            void reportPlaybackIsolation();
+            void reportPlaybackIsolation(undefined, async () => asIsolationCapable(instance));
             console.log(`[NativeEngineRouting] ${desc.key} output → destination (fallback)`);
           }
         }
