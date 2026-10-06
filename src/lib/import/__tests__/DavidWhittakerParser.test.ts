@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isDavidWhittakerFormat, parseDavidWhittakerFile } from '../formats/DavidWhittakerParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DW_DIR = resolve(REF, 'David Whittaker/David Whittaker');
-const FILE1 = resolve(DW_DIR, 'alfred chicken.dw');
-const FILE2 = resolve(DW_DIR, 'alien syndrome.dw');
+const DIR = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(DIR, 'formats/apb.dw');
+const FILE2 = resolve(DIR, 'david-whittaker/garfield2+.dw');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);
@@ -18,10 +17,10 @@ function loadBuf(path: string): ArrayBuffer {
 }
 
 describe('isDavidWhittakerFormat', () => {
-  it('detects alfred chicken.dw', () => {
+  it('detects apb.dw', () => {
     expect(isDavidWhittakerFormat(loadBuf(FILE1))).toBe(true);
   });
-  it('detects alien syndrome.dw', () => {
+  it('detects garfield2+.dw', () => {
     expect(isDavidWhittakerFormat(loadBuf(FILE2))).toBe(true);
   });
   it('rejects zeroed buffer', () => {
@@ -29,26 +28,26 @@ describe('isDavidWhittakerFormat', () => {
   });
 });
 
-describe('parseDavidWhittakerFile — alfred chicken.dw', () => {
+describe('parseDavidWhittakerFile — apb.dw', () => {
   it('parses without throwing', () => {
-    expect(() => parseDavidWhittakerFile(loadBuf(FILE1), 'alfred chicken.dw')).not.toThrow();
+    expect(() => parseDavidWhittakerFile(loadBuf(FILE1), 'apb.dw')).not.toThrow();
   });
   it('reports format capabilities', () => {
-    const song = parseDavidWhittakerFile(loadBuf(FILE1), 'alfred chicken.dw');
-    const report = analyzeFormat(song, 'alfred chicken.dw');
+    const song = parseDavidWhittakerFile(loadBuf(FILE1), 'apb.dw');
+    const report = analyzeFormat(song, 'apb.dw');
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
 });
 
-describe('parseDavidWhittakerFile — alien syndrome.dw', () => {
+describe('parseDavidWhittakerFile — garfield2+.dw', () => {
   it('parses without throwing', () => {
-    expect(() => parseDavidWhittakerFile(loadBuf(FILE2), 'alien syndrome.dw')).not.toThrow();
+    expect(() => parseDavidWhittakerFile(loadBuf(FILE2), 'garfield2+.dw')).not.toThrow();
   });
   it('reports format capabilities', () => {
-    const song = parseDavidWhittakerFile(loadBuf(FILE2), 'alien syndrome.dw');
-    const report = analyzeFormat(song, 'alien syndrome.dw');
+    const song = parseDavidWhittakerFile(loadBuf(FILE2), 'garfield2+.dw');
+    const report = analyzeFormat(song, 'garfield2+.dw');
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
