@@ -34,7 +34,7 @@ import { loadFile as loadFileHeadless } from '@/bridge/handlers/writeHandlers';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { dismissErrors, dismissModal, play as playHeadless } from '@/bridge/handlers/writeHandlers';
-import { gatherCompanions } from '@/lib/import/companionFetch';
+import { gatherCompanions, directoryOfFile } from '@/lib/import/companionFetch';
 import {
   JUKEBOX_FAULTS, LOAD_FAILED, reportFaults, reportGood, loadVerdicts,
   verdictLabels, isGoodVerdict, faultsOf, setFault, verdictFromFaults, verdictOf, JUKEBOX_OK,
@@ -42,6 +42,7 @@ import {
   type JukeboxVerdict, type JukeboxFault,
 } from '@/lib/jukebox/faultReports';
 import { searchModland, downloadModlandFile, downloadUADECompanions } from '@/lib/modlandApi';
+import { notify } from '@stores/useNotificationStore';
 
 interface IndexEntry {
   id: string;
@@ -195,6 +196,9 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const failLoad = useCallback(async (name: string, message: string) => {
     const short = name.split('/').pop() ?? name;
     setStatus(`LOAD FAILED — ${short}: ${message}`);
+    // A toast that stays until closed and can be copied from: the status line
+    // alone let every Sonix row fail with nothing to read (2026-10-06).
+    notify.error(`Load failed - ${short}: ${message}`, 0);
     const { id } = reportCtx.current;
     if (!id) return;
     const faults = setFault(faultsOf(judgedRef.current[id]), LOAD_FAILED.id, true);
@@ -306,7 +310,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       // here exactly as it loads from the app: same listing, same resolver,
       // same reads.
       const bytes = await blob.arrayBuffer();
-      const found = await gatherCompanions(name, row.dir, bytes);
+      const found = await gatherCompanions(name, directoryOfFile(file), bytes);
       const companions: Record<string, string> = {};
       for (const [registerAs, cBytes] of found) {
         const cBuf = new Uint8Array(cBytes);
