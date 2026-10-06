@@ -392,6 +392,14 @@
       "cells": 256,
       "bytes": 4862
     },
+    "soundMaster": {
+      "exporter": "SoundMasterExporter.exportSoundMaster",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 62660,
+      "bytes": 62660
+    },
     "soundMon": {
       "exporter": "SMON (SoundMonExporter)",
       "tier": "pattern-data",

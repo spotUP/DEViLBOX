@@ -1600,8 +1600,9 @@ export async function tryRouteFormat(
   }
 
   // ── Sound Master (sm.* / sm1.* / sm2.* / sm3.* / smpro.* prefix) ───────────
-  // Compiled 68k executable with embedded replayer. Native parser provides detection;
-  // UADE enhanced scan captures patterns from Paula DMA writes.
+  // The module is its own replayer; the grid is decoded from the positions,
+  // blocks and patterns the replayer's code addresses (SoundMasterModule.ts).
+  // UADE plays.
   if (matchesExt(filename, ['sm', 'sm1', 'sm2', 'sm3', 'smpro'])) {
     const { isSoundMasterFormat, parseSoundMasterFile } = await import('@lib/import/formats/SoundMasterParser');
     return withNativeThenUADE('soundMaster', ctx,

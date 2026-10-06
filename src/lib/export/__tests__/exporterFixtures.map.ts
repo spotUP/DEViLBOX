@@ -48,6 +48,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   tcbTracker: 'public/data/songs/formats/cannonfodder.tcb',
   digitalSonixChrome: "public/data/songs/digital-sonix-and-chrome/dragon'sbreath ingame 1.dsc",
   jochenHippelST: 'public/data/songs/hippel-st/crown arabia.hst',
+  soundMaster: 'public/data/songs/sound-master-ii-v3/doofus 3.sm3',
   gameMusicCreator: 'public/data/songs/formats/knights_of_sky.gmc',
   quadraComposer: 'public/data/songs/formats/synth_corn.emod',
   activisionPro: 'public/data/songs/activision-pro/gettysburg.avp',

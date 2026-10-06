@@ -1,0 +1,48 @@
+/**
+ * soundMasterEffectGlyphs.ts - Sound Master private effect id block + glyphs.
+ *
+ * SINGLE SOURCE OF TRUTH for the effTyp integers the Sound Master row bits
+ * occupy in the tracker grid where no XM effect means the same thing (the
+ * portamento note is XM 3xx, the info byte's volume the volume column, the
+ * smpro speed and break rows XM Fxx and D00 - soundMasterGrid.ts). `effTyp`
+ * is a GLOBAL id space shared by every format's display path
+ * (xmEffectToString + TrackerGLRenderer + TrackerCanvas2DRenderer); this
+ * block is 0x74..0x78, after Fred Editor's 0x70..0x73.
+ *
+ * ZERO imports on purpose - imported by the renderer workers.
+ *
+ * Ground truth: the replayer each module carries (row read, note trigger and
+ * period routines), thoughts/shared/research/2026-10-06_sound-master-format.md.
+ */
+
+/** Sound Master private effect ids (reserved block 0x74..0x78). */
+export const SM_FX = {
+  /** H: note byte $FF - the voice holds (its envelope keeps attacking), no new note; eff = the info byte, which the player ignores. */
+  hold: 0x74,
+  /** L: note byte bit 7 - the pitch changes, the sample is not restarted. */
+  legato: 0x75,
+  /** K: info byte bit 7 - the note is played without the block and position transposes. */
+  fixed: 0x76,
+  /** I: an info byte on a row without a note that the player ignores, kept verbatim (eff = the byte). */
+  inert: 0x77,
+  /** N: a note byte whose pitch the grid cannot name, kept verbatim (eff = the byte). */
+  rawNote: 0x78,
+} as const;
+
+export const SM_FX_MIN = SM_FX.hold;
+export const SM_FX_MAX = SM_FX.rawNote;
+
+export const SM_EFFECT_GLYPH: Record<number, string> = {
+  [SM_FX.hold]: 'H',
+  [SM_FX.legato]: 'L',
+  [SM_FX.fixed]: 'K',
+  [SM_FX.inert]: 'I',
+  [SM_FX.rawNote]: 'N',
+};
+
+/** A Sound Master private effect as a 3-char grid token, or null outside the block. */
+export function soundMasterEffectToString(effTyp: number, eff: number): string | null {
+  const glyph = SM_EFFECT_GLYPH[effTyp];
+  if (glyph === undefined) return null;
+  return `${glyph}${(eff & 0xff).toString(16).toUpperCase().padStart(2, '0')}`;
+}
