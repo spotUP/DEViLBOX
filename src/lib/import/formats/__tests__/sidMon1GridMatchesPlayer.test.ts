@@ -66,7 +66,7 @@ describe('SidMon 1 grid against the replayer', () => {
         const row = m._player_get_voice_consumed(v);
         const note = m._player_get_voice_note(v);
         // a note-on moved lastNote; the displayed pitch must equal it
-        seen[v].push({ row, note: note !== lastNote[v] ? sm1IndexToXM(note + 1) : -1 });
+        seen[v].push({ row, note: note !== lastNote[v] ? sm1IndexToXM(note) : -1 });
         lastNote[v] = note;
       }
     }

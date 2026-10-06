@@ -69,7 +69,7 @@ if(EMSCRIPTEN)
         "_player_get_num_instruments"
         "_player_get_instrument_param" "_player_set_instrument_param"
         "_player_note_on" "_player_note_off"
-        "_player_set_row" "_player_get_voice_consumed" "_player_get_voice_rows_consumed" "_player_get_voice_note"
+        "_player_set_row" "_player_get_voice_consumed" "_player_get_voice_rows_consumed" "_player_get_voice_note" "_player_get_paula_period"
     )
     string(JOIN "," REPLAYER_EXPORT_STR ${REPLAYER_EXPORTED})
 

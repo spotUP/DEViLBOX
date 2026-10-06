@@ -30,19 +30,27 @@ const SM1_PERIODS: number[] = [
    180, 170, 160, 151, 143, 135, 127,
 ];
 
-/** Semitones from ProTracker C-1 (period 856, XM note 13) of period index `k`, unrounded to the XM range. */
+/**
+ * SM1 notes run from period 5760 down to 127, 66 semitones: 21 below
+ * ProTracker's C-1 (856), more than XM's range (note 1 = C-0) can hold.
+ * The grid shows every note SM1_DISPLAY_SHIFT semitones (two octaves, so the
+ * note names stay true) above its ProTracker-named pitch.
+ */
+export const SM1_DISPLAY_SHIFT = 24;
+
+/** XM note of period index `k` (1-66), shifted into the grid's range. */
 function xmOfIndex(k: number): number {
-  return 13 + Math.round(12 * Math.log2(856 / SM1_PERIODS[k]));
+  return 13 + SM1_DISPLAY_SHIFT + Math.round(12 * Math.log2(856 / SM1_PERIODS[k]));
 }
 
 /**
  * XM note of SM1 period index `k` (1-66): the pitch the player sounds for a
- * note byte n plus its track's transpose is period index n + 1. Indices below
- * XM note 1 (periods past C-0) all show as note 1.
+ * note byte n plus its track's transpose is period index n (PERIODS[finetune +
+ * arpeggio + note], sidmon1.c voice_process).
  */
 export function sm1IndexToXM(k: number): number {
   if (k < 1 || k >= SM1_PERIODS.length) return 0;
-  return Math.max(1, Math.min(96, xmOfIndex(k)));
+  return xmOfIndex(k);
 }
 
 /** SM1 period index (1-66) nearest to an XM note; 0 for no note. */
@@ -61,7 +69,7 @@ export function encodeSidMon1Cell(cell: TrackerCell): Uint8Array {
 
   // Byte 0: SM1 note index
   if (xmNote > 0 && xmNote <= 96) {
-    out[0] = Math.max(0, xmToSm1Index(xmNote) - 1);
+    out[0] = xmToSm1Index(xmNote);
   } else {
     out[0] = 0;
   }
