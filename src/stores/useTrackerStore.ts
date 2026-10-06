@@ -14,6 +14,7 @@ import type {
 } from '@typedefs';
 import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { sendCellEditsToEngine, changedCells, type LiveCellEdit } from '@engine/replayer/liveCellEdits';
 import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
@@ -176,10 +177,23 @@ export function debouncedWasmEngineReexport(): void {
   }, 300); // 300ms debounce
 }
 
+/** Grid cells to the engine playing the loaded song (see liveCellEdits). */
+function sendCellEdits(edits: LiveCellEdit[]): void {
+  let song: import('@engine/TrackerReplayer').TrackerSong | null = null;
+  try { song = getTrackerReplayer().getSong(); } catch { return; /* replayer not initialized */ }
+  void sendCellEditsToEngine(song, edits).catch((err) => {
+    console.warn('[TrackerStore] live cell edit failed:', err);
+  });
+}
+
 // ── Bulk edit sync ───────────────────────────────────────────────────────────
 // After bulk operations that modify many cells at once, sync the full pattern
 // across all active playback engines (OpenMPT, Furnace, UADE, MusicLine etc.)
-function syncBulkEdit(patternIndex: number, pattern: import('@typedefs').Pattern): void {
+function syncBulkEdit(
+  patternIndex: number,
+  pattern: import('@typedefs').Pattern,
+  before?: import('@typedefs').Pattern,
+): void {
   // OpenMPT soundlib sync
   if (OpenMPTEditBridge.isActive()) {
     OpenMPTEditBridge.syncFullPattern(patternIndex, pattern.channels);
@@ -197,21 +211,8 @@ function syncBulkEdit(patternIndex: number, pattern: import('@typedefs').Pattern
     }
   } catch { /* replayer not initialized */ }
 
-  // UADE chip RAM sync — iterate all cells
-  try {
-    const replayer = getTrackerReplayer();
-    const song = replayer.getSong();
-    if (song?.uadePatternLayout) {
-      import('@engine/uade/writeCellToChipRam').then(({ writeCellToChipRam }) => {
-        for (let ch = 0; ch < pattern.channels.length; ch++) {
-          const rows = pattern.channels[ch].rows;
-          for (let row = 0; row < rows.length; row++) {
-            void writeCellToChipRam(song, patternIndex, row, ch, rows[row]);
-          }
-        }
-      });
-    }
-  } catch { /* UADE not active */ }
+  // The changed cells to the engine playing the song (native replayer or UADE).
+  sendCellEdits(changedCells(patternIndex, pattern, before));
 
   // MusicLine / PumaTracker / Symphonie (debounced re-export)
   debouncedWasmEngineReexport();
@@ -247,7 +248,7 @@ function resizeOne(index: number, newLength: number): void {
 
   const afterPattern = useTrackerStore.getState().patterns[index];
   useHistoryStore.getState().pushAction('RESIZE_PATTERN', 'Resize pattern', index, beforePattern, afterPattern);
-  syncBulkEdit(index, afterPattern);
+  syncBulkEdit(index, afterPattern, beforePattern);
 
   // Clamp the cursor if it is editing this pattern and now sits past the end.
   if (index === useTrackerStore.getState().currentPatternIndex) {
@@ -560,21 +561,12 @@ export const useTrackerStore = create<TrackerStore>()(
           OpenMPTEditBridge.syncCellEdit(patternIndex, channelIndex, rowIndex, cellUpdate, fullCell);
         }
       }
-      // Sync edit to UADE chip RAM (fixed-length layout) and/or the TFMX
-      // mdat buffer (direct binary patch for WASM playback) via the unified
-      // single-cell chip-RAM write helper.
-      try {
-        const replayer = getTrackerReplayer();
-        const song = replayer.getSong();
-        if (song?.uadePatternLayout) {
-          const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
-          if (fullCell) {
-            import('@engine/uade/writeCellToChipRam').then(({ writeCellToChipRam }) => {
-              void writeCellToChipRam(song, patternIndex, rowIndex, channelIndex, fullCell);
-            });
-          }
-        }
-      } catch { /* UADE / TFMX not active */ }
+      // The engine playing the song: a native replayer's setCell, or UADE chip
+      // RAM / Ron Klaren / TFMX through writeCellToChipRam (liveCellEdits).
+      {
+        const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+        if (fullCell) sendCellEdits([{ pattern: patternIndex, row: rowIndex, channel: channelIndex, cell: fullCell }]);
+      }
       // Sync edit to StarTrekker AM WASM engine (direct MOD pattern cell write)
       try {
         const fmt = useFormatStore.getState();
@@ -677,48 +669,6 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* PreTracker not active */ }
-      // Sync edit to NostalgicPlayer WASM replayer engines (SA, SM, DM, etc.)
-      // These engines have setCell() that directly modifies the internal pattern data.
-      try {
-        const fmt = useFormatStore.getState();
-        const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
-        if (fullCell) {
-          const fileDataKeys: [string, string, () => Promise<{ getInstance(): { setCell: (...args: number[]) => void }, hasInstance(): boolean }>][] = [
-            ['sonicArrangerFileData', 'SonicArranger', () => import('@engine/sonic-arranger/SonicArrangerEngine').then(m => m.SonicArrangerEngine as any)],
-            ['soundMonFileData', 'SoundMon', () => import('@engine/soundmon/SoundMonEngine').then(m => m.SoundMonEngine as any)],
-            ['digMugFileData', 'DigMug', () => import('@engine/digmug/DigMugEngine').then(m => m.DigMugEngine as any)],
-            ['davidWhittakerFileData', 'DavidWhittaker', () => import('@engine/davidwhittaker/DavidWhittakerEngine').then(m => m.DavidWhittakerEngine as any)],
-            ['soundControlFileData', 'SoundControl', () => import('@engine/soundcontrol/SoundControlEngine').then(m => m.SoundControlEngine as any)],
-            ['deltaMusic1FileData', 'DeltaMusic1', () => import('@engine/deltamusic1/DeltaMusic1Engine').then(m => m.DeltaMusic1Engine as any)],
-            ['deltaMusic2FileData', 'DeltaMusic2', () => import('@engine/deltamusic2/DeltaMusic2Engine').then(m => m.DeltaMusic2Engine as any)],
-            ['gmcFileData', 'Gmc', () => import('@engine/gmc/GmcEngine').then(m => m.GmcEngine as any)],
-            ['soundFxFileData', 'SoundFx', () => import('@engine/soundfx/SoundFxEngine').then(m => m.SoundFxEngine as any)],
-            ['oktalyzerFileData', 'Oktalyzer', () => import('@engine/oktalyzer/OktalyzerEngine').then(m => m.OktalyzerEngine as any)],
-            ['inStereo1FileData', 'InStereo1', () => import('@engine/instereo1/InStereo1Engine').then(m => m.InStereo1Engine as any)],
-            ['futureComposerFileData', 'FutureComposer', () => import('@engine/futurecomposer/FutureComposerEngine').then(m => m.FutureComposerEngine as any)],
-            ['inStereo2FileData', 'InStereo2', () => import('@engine/instereo2/InStereo2Engine').then(m => m.InStereo2Engine as any)],
-            ['quadraComposerFileData', 'QuadraComposer', () => import('@engine/quadracomposer/QuadraComposerEngine').then(m => m.QuadraComposerEngine as any)],
-            ['synthesisFileData', 'Synthesis', () => import('@engine/synthesis/SynthesisEngine').then(m => m.SynthesisEngine as any)],
-            ['dssFileData', 'Dss', () => import('@engine/dss/DssEngine').then(m => m.DssEngine as any)],
-            ['faceTheMusicFileData', 'FaceTheMusic', () => import('@engine/facethemusic/FaceTheMusicEngine').then(m => m.FaceTheMusicEngine as any)],
-          ];
-          for (const [key, , loader] of fileDataKeys) {
-            if ((fmt as any)[key]) {
-              loader().then(Engine => {
-                if (Engine.hasInstance()) {
-                  Engine.getInstance().setCell(
-                    patternIndex, rowIndex, channelIndex,
-                    fullCell.note ?? 0, fullCell.instrument ?? 0,
-                    fullCell.effTyp ?? 0, fullCell.eff ?? 0,
-                    fullCell.volume ?? 0,
-                  );
-                }
-              });
-              break; // Only one NP engine active at a time
-            }
-          }
-        }
-      } catch { /* NostalgicPlayer engine not active */ }
       // Sync edit to MusicLine WASM engine (debounced re-export)
       debouncedWasmEngineReexport();
 
@@ -751,21 +701,11 @@ export const useTrackerStore = create<TrackerStore>()(
       if (OpenMPTEditBridge.isActive()) {
         OpenMPTEditBridge.syncCellClear(patternIndex, channelIndex, rowIndex);
       }
-      // Sync clear to UADE chip RAM if format has a pattern layout. The cleared
-      // cell is the now-empty cell read back from the store, so the helper
-      // encodes and writes an empty/zero cell into chip RAM.
-      try {
-        const replayer = getTrackerReplayer();
-        const song = replayer.getSong();
-        if (song?.uadePatternLayout) {
-          const clearedCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
-          if (clearedCell) {
-            import('@engine/uade/writeCellToChipRam').then(({ writeCellToChipRam }) => {
-              void writeCellToChipRam(song, patternIndex, rowIndex, channelIndex, clearedCell);
-            });
-          }
-        }
-      } catch { /* UADE not active */ }
+      // The cleared (now empty) cell to the engine playing the song.
+      {
+        const clearedCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+        if (clearedCell) sendCellEdits([{ pattern: patternIndex, row: rowIndex, channel: channelIndex, cell: clearedCell }]);
+      }
       // Sync clear to SunVox WASM sequencer if active. Dynamic import for the
       // same reason as the edit path above.
       void import('../engine/sunvox-modular/SunVoxModularSynth').then(({ getSharedSunVoxHandle }) => {
@@ -798,7 +738,7 @@ export const useTrackerStore = create<TrackerStore>()(
         clearChannelInPattern(state.patterns[state.currentPatternIndex], channelIndex);
       });
       useHistoryStore.getState().pushAction('CLEAR_CHANNEL', 'Clear channel', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     clearPattern: () => {
@@ -808,7 +748,7 @@ export const useTrackerStore = create<TrackerStore>()(
         clearPatternCells(state.patterns[state.currentPatternIndex]);
       });
       useHistoryStore.getState().pushAction('CLEAR_PATTERN', 'Clear pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     insertRow: (channelIndex, rowIndex) => {
@@ -818,7 +758,7 @@ export const useTrackerStore = create<TrackerStore>()(
         insertRowInChannel(state.patterns[state.currentPatternIndex], channelIndex, rowIndex);
       });
       useHistoryStore.getState().pushAction('INSERT_ROW', 'Insert row', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     deleteRow: (channelIndex, rowIndex) => {
@@ -828,7 +768,7 @@ export const useTrackerStore = create<TrackerStore>()(
         deleteRowInChannel(state.patterns[state.currentPatternIndex], channelIndex, rowIndex);
       });
       useHistoryStore.getState().pushAction('DELETE_ROW', 'Delete row', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     findBestChannel: () => {
@@ -857,7 +797,7 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       useCursorStore.getState().clearSelection();
       useHistoryStore.getState().pushAction('CUT_SELECTION', 'Cut', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     setClipboard: (data) =>
@@ -876,7 +816,7 @@ export const useTrackerStore = create<TrackerStore>()(
         pasteHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE', 'Paste', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     swapSelection: () => {
@@ -893,7 +833,7 @@ export const useTrackerStore = create<TrackerStore>()(
         );
       });
       useHistoryStore.getState().pushAction('SWAP_SELECTION', 'Swap selection', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // OpenMPT-style Mix Paste: Only fill empty cells
@@ -908,7 +848,7 @@ export const useTrackerStore = create<TrackerStore>()(
         pasteMixHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_MIX', 'Mix paste', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // OpenMPT-style Flood Paste: Paste repeatedly until pattern end
@@ -923,7 +863,7 @@ export const useTrackerStore = create<TrackerStore>()(
         pasteFloodHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_FLOOD', 'Flood paste', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // OpenMPT-style Push-Forward Paste: Insert clipboard data and shift existing content down
@@ -938,7 +878,7 @@ export const useTrackerStore = create<TrackerStore>()(
         pastePushForwardHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_PUSH_FORWARD', 'Push-forward paste', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // FT2: Track operations (single-channel copy/paste)
@@ -958,7 +898,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (result) state.trackClipboard = result;
       });
       useHistoryStore.getState().pushAction('CUT_TRACK', 'Cut track', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     pasteTrack: (channelIndex) => {
@@ -971,7 +911,7 @@ export const useTrackerStore = create<TrackerStore>()(
         pasteTrackHelper(p, channelIndex, state.trackClipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_TRACK', 'Paste track', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // PT: Commands-only clipboard operations
@@ -990,7 +930,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (result) state.cmdsClipboard = result;
       });
       useHistoryStore.getState().pushAction('CUT_COMMANDS', 'Cut commands', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
     pasteCommands: (channelIndex) => {
       if (!get().cmdsClipboard) return;
@@ -1002,7 +942,7 @@ export const useTrackerStore = create<TrackerStore>()(
         pasteCommandsHelper(p, channelIndex, state.cmdsClipboard);
       });
       useHistoryStore.getState().pushAction('PASTE_COMMANDS', 'Paste commands', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // PT/IT: Block operations
@@ -1013,7 +953,7 @@ export const useTrackerStore = create<TrackerStore>()(
         killToEndHelper(state.patterns[state.currentPatternIndex], channelIndex, fromRow);
       });
       useHistoryStore.getState().pushAction('KILL_TO_END', 'Kill to end', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
     killToStart: (channelIndex, toRow) => {
       const patternIndex = get().currentPatternIndex;
@@ -1022,7 +962,7 @@ export const useTrackerStore = create<TrackerStore>()(
         killToStartHelper(state.patterns[state.currentPatternIndex], channelIndex, toRow);
       });
       useHistoryStore.getState().pushAction('KILL_TO_START', 'Kill to start', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
     swapChannels: (ch1, ch2) => {
       const patternIndex = get().currentPatternIndex;
@@ -1031,7 +971,7 @@ export const useTrackerStore = create<TrackerStore>()(
         swapChannelsHelper(state.patterns[state.currentPatternIndex], ch1, ch2);
       });
       useHistoryStore.getState().pushAction('SWAP_CHANNELS', `Swap ch ${ch1+1}↔${ch2+1}`, patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
     reverseBlock: (channelIndex, startRow, endRow) => {
       const patternIndex = get().currentPatternIndex;
@@ -1040,7 +980,7 @@ export const useTrackerStore = create<TrackerStore>()(
         reverseBlockHelper(state.patterns[state.currentPatternIndex], channelIndex, startRow, endRow);
       });
       useHistoryStore.getState().pushAction('REVERSE_BLOCK', 'Reverse block', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
     doubleBlock: (channelIndex, startRow, endRow) => {
       const patternIndex = get().currentPatternIndex;
@@ -1049,7 +989,7 @@ export const useTrackerStore = create<TrackerStore>()(
         doubleBlockHelper(state.patterns[state.currentPatternIndex], channelIndex, startRow, endRow);
       });
       useHistoryStore.getState().pushAction('DOUBLE_BLOCK', 'Double block', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
     halveBlock: (channelIndex, startRow, endRow) => {
       const patternIndex = get().currentPatternIndex;
@@ -1058,7 +998,7 @@ export const useTrackerStore = create<TrackerStore>()(
         halveBlockHelper(state.patterns[state.currentPatternIndex], channelIndex, startRow, endRow);
       });
       useHistoryStore.getState().pushAction('HALVE_BLOCK', 'Halve block', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
     bulkBlockEdit: (label, mutate) => {
       const patternIndex = get().currentPatternIndex;
@@ -1067,7 +1007,7 @@ export const useTrackerStore = create<TrackerStore>()(
         mutate(state.patterns[state.currentPatternIndex]);
       });
       useHistoryStore.getState().pushAction('BULK_BLOCK_EDIT', label, patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // FT2: Pattern operations (all channels — copies each track)
@@ -1088,7 +1028,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (allTracks.length > 0) state.patternClipboard = allTracks;
       });
       useHistoryStore.getState().pushAction('CUT_PATTERN', 'Cut pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     pastePattern: () => {
@@ -1106,7 +1046,7 @@ export const useTrackerStore = create<TrackerStore>()(
         });
       });
       useHistoryStore.getState().pushAction('PASTE_PATTERN', 'Paste pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // FT2: Macro slots (quick-entry)
@@ -1142,7 +1082,7 @@ export const useTrackerStore = create<TrackerStore>()(
         applyInstrumentToSelectionHelper(pattern, selection, cursor, instrumentId);
       });
       useHistoryStore.getState().pushAction('EDIT_CELL', 'Apply instrument to selection', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Advanced editing - Transpose selection by semitones
@@ -1158,8 +1098,7 @@ export const useTrackerStore = create<TrackerStore>()(
         transposeSelectionHelper(pattern, selection, cursor, semitones, targetInstrumentId);
       });
       useHistoryStore.getState().pushAction('TRANSPOSE', 'Transpose', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Transpose entire track (single channel, all rows) by semitones
@@ -1181,7 +1120,7 @@ export const useTrackerStore = create<TrackerStore>()(
         transposeSelectionHelper(pattern, fullTrackSelection, cursor, semitones, null);
       });
       useHistoryStore.getState().pushAction('TRANSPOSE', 'Transpose Track', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Transpose entire pattern (all channels, all rows) by semitones
@@ -1203,17 +1142,18 @@ export const useTrackerStore = create<TrackerStore>()(
         transposeSelectionHelper(pattern, fullPatternSelection, cursor, semitones, null);
       });
       useHistoryStore.getState().pushAction('TRANSPOSE', 'Transpose Pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Swap all occurrences of Instrument A with Instrument B
     remapInstrument: (oldId, newId, scope) => {
       const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const { cursor, selection } = useCursorStore.getState();
         remapInstrumentHelper(state.patterns, state.currentPatternIndex, selection, cursor, oldId, newId, scope);
       });
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Advanced editing - Interpolate values in selection
@@ -1228,7 +1168,7 @@ export const useTrackerStore = create<TrackerStore>()(
         interpolateSelectionHelper(state.patterns[state.currentPatternIndex], currentSel, column, startValue, endValue, curve);
       });
       useHistoryStore.getState().pushAction('INTERPOLATE', 'Interpolate', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Advanced editing - Humanize selection (add random variation to volume)
@@ -1243,7 +1183,7 @@ export const useTrackerStore = create<TrackerStore>()(
         humanizeSelectionHelper(state.patterns[state.currentPatternIndex], currentSel, volumeVariation);
       });
       useHistoryStore.getState().pushAction('HUMANIZE', 'Humanize', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Strum: add incremental note delays across channels (EDx effect)
@@ -1258,7 +1198,7 @@ export const useTrackerStore = create<TrackerStore>()(
         strumSelectionHelper(state.patterns[state.currentPatternIndex], currentSel, tickDelay, direction);
       });
       useHistoryStore.getState().pushAction('STRUM', 'Strum', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Legato: for each channel in selection, extend each note's duration
@@ -1273,7 +1213,7 @@ export const useTrackerStore = create<TrackerStore>()(
         legatoSelectionHelper(state.patterns[state.currentPatternIndex], currentSel);
       });
       useHistoryStore.getState().pushAction('LEGATO', 'Legato', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // FT2: Scale volume (multiply by factor)
@@ -1286,7 +1226,7 @@ export const useTrackerStore = create<TrackerStore>()(
         scaleVolumeHelper(pattern, scope, factor, selection, cursor);
       });
       useHistoryStore.getState().pushAction('SCALE_VOLUME', 'Scale volume', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // FT2: Fade volume (linear interpolation)
@@ -1299,7 +1239,7 @@ export const useTrackerStore = create<TrackerStore>()(
         fadeVolumeHelper(pattern, scope, startVol, endVol, selection, cursor);
       });
       useHistoryStore.getState().pushAction('FADE_VOLUME', 'Fade volume', patternIndex, beforePattern, get().patterns[patternIndex]);
-      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Advanced editing methods
@@ -1312,7 +1252,7 @@ export const useTrackerStore = create<TrackerStore>()(
         amplifySelectionHelper(state.patterns[state.currentPatternIndex], selection, factor);
       });
       useHistoryStore.getState().pushAction('AMPLIFY', 'Amplify selection', currentPatternIndex, beforePattern, get().patterns[currentPatternIndex]);
-      syncBulkEdit(currentPatternIndex, get().patterns[currentPatternIndex]);
+      syncBulkEdit(currentPatternIndex, get().patterns[currentPatternIndex], beforePattern);
     },
 
     growSelection: () => {
