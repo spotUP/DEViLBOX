@@ -95,6 +95,15 @@ EXPORT void player_set_channel_gain(int ch, float gain) {
     ma_set_channel_mask(g_module, mask);
 }
 
+EXPORT void player_get_channel_levels(float *out) {
+    for (int i = 0; i < 4; i++) out[i] = g_module ? ma_channel_level(g_module, i) : 0.0f;
+}
+
+/* out[i] = cumulative note starts of voice i since the song loaded. */
+EXPORT void player_get_note_start_counts(uint32_t *out, int maxCh) {
+    for (int i = 0; i < maxCh; i++) out[i] = (g_module && i < 4) ? ma_note_start_count(g_module, i) : 0;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Instrument preview
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
