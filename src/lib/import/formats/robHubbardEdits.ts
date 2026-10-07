@@ -1,12 +1,13 @@
 /**
  * robHubbardEdits.ts - write the Rob Hubbard tick grid's edits back into the module's command blocks.
  *
- * The grid is carrier-less (docs/FORMAT_COMMAND_STREAM_GRID.md): each note or rest is drawn on the
- * tick its command starts, and RobHubbardParser records which block command that is
- * (cellSources). An edited cell is a byte patch of that command, never a re-pack, so the module
- * keeps its length and every other byte:
- *   - note: the command's note byte (index = tracker note - 25); a note turned into a rest (and
- *     back) swaps the two bytes of the same two-byte command: [duration, note] <-> [-126, duration];
+ * The grid is the player's walk (rhWalk.ts, docs/FORMAT_COMMAND_STREAM_GRID.md): each note or
+ * note-off is drawn on the row its command ran, and RobHubbardParser records which block command
+ * that is (cellSources). An edited cell is a byte patch of that command, never a re-pack, so the
+ * module keeps its length and every other byte:
+ *   - note: the command's note byte, the table index whose period (scaled by the sample the voice
+ *     plays it with) names the edited note; a note turned into a rest (and back) swaps the two
+ *     bytes of the same two-byte command: [duration, note] <-> [-126, duration];
  *   - instrument: the sample-change command in force in the note's block (its byte is index - 1).
  * A command is shared by every tick that replays its block, so the edit shows wherever the block
  * plays. Edits that need a longer block (a note on a blank row, a removed note) come back as
@@ -14,6 +15,7 @@
  */
 import type { Pattern } from '@/types';
 import { buildRobHubbardGrid } from './RobHubbardParser';
+import { rhNotePeriod, rhPeriodToNote, rhTableLength } from './robHubbardGrid';
 
 const SAMPLE_CHANGE = 0x80; // -128
 const REST = 0x82;          // -126
@@ -33,6 +35,14 @@ export function applyRhGridEdits(source: Uint8Array, edited: Pattern[]): RhEditR
     for (const c of rows) { offs.push(o); o += c.cutoff ?? 0; }
     return offs;
   });
+  const { periods, samples } = grid.walk.module;
+  const tableLen = rhTableLength(source, periods);
+  /** The note byte that plays tracker note `n` on sample `sample`, or -1 when no table entry names it. */
+  const noteByte = (n: number, sample: number): number => {
+    const rel = samples[sample]?.relative ?? 0;
+    for (let b = 0; b < tableLen; b++) if (rhPeriodToNote(rhNotePeriod(source, periods, b, rel)) === n) return b;
+    return -1;
+  };
   const wanted = new Map<number, { value: number; why: string }>();
   const want = (off: number, value: number, why: string): void => {
     const prev = wanted.get(off);
@@ -56,8 +66,8 @@ export function applyRhGridEdits(source: Uint8Array, edited: Pattern[]): RhEditR
         const where = `pattern ${p} voice ${ch + 1} row ${row}`;
         const src = grid.cellSources[p][ch][row];
         if (!src) {
-          // a release marker is display only; anything else needs a command the block does not have
-          if ((c.note ?? 0) !== 0 && (c.note ?? 0) !== 97) warnings.push(`${where}: a note where the module has no command needs a longer block; not written`);
+          // a cell the player ran no note or note-off command on: a note there needs a command the block does not have
+          if ((c.note ?? 0) !== 0) warnings.push(`${where}: a note where the module has no command needs a longer block; not written`);
           continue;
         }
         const carrier = grid.blockRows[src.fp][src.cmd];
@@ -68,12 +78,16 @@ export function applyRhGridEdits(source: Uint8Array, edited: Pattern[]): RhEditR
           if (n < 1 || n > 97) warnings.push(`${where}: a removed note needs a shorter block; not written`);
           else if (n === 97) {
             if (!isRest) { want(o, REST, `${where} rest`); want(o + 1, carrier.period ?? 0, `${where} rest`); }
-          } else if (n - 25 < 0 || n - 25 > 0x7f) warnings.push(`${where}: note ${n} is below the replayer's table; not written`);
-          else if (isRest) {
-            const dur = carrier.pan ?? 0;
-            if (dur >= 0x80 || dur === 0) warnings.push(`${where}: a rest of ${dur} ticks cannot become a note; not written`);
-            else { want(o, dur, `${where} note`); want(o + 1, n - 25, `${where} note`); }
-          } else want(o + 1, n - 25, `${where} note`);
+          } else {
+            const sample = dIns ? Math.max(0, (c.instrument ?? 1) - 1) : src.sample;
+            const nb = noteByte(n, sample);
+            if (nb < 0) warnings.push(`${where}: no note of the player's period table plays as note ${n} on sample ${sample + 1}; not written`);
+            else if (isRest) {
+              const dur = carrier.pan ?? 0;
+              if (dur >= 0x80 || dur === 0) warnings.push(`${where}: a rest of ${dur} ticks cannot become a note; not written`);
+              else { want(o, dur, `${where} note`); want(o + 1, nb, `${where} note`); }
+            } else want(o + 1, nb, `${where} note`);
+          }
         }
         if (dIns) {
           const ins = c.instrument ?? 0;

@@ -20,6 +20,7 @@ import { AST_EFFECT_GLYPH } from '@/lib/import/formats/actionamicsEffectGlyphs';
 import { AVP_EFFECT_GLYPH } from '@/lib/import/formats/activisionProEffectGlyphs';
 import { DW_EFFECT_GLYPH } from '@/lib/import/formats/davidWhittakerEffectGlyphs';
 import { BD_EFFECT_GLYPH } from '@/lib/import/formats/benDaglishEffectGlyphs';
+import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import type {
@@ -889,6 +890,9 @@ export class TrackerGLRenderer {
               } else if (BD_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Ben Daglish track and position-list commands (block 0xD8..0xEC)
                 effStr = BD_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (RH_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // Rob Hubbard stream commands (block 0xED..0xF2)
+                effStr = RH_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }

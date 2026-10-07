@@ -14,6 +14,7 @@ import { actionamicsEffectToString } from './import/formats/actionamicsEffectGly
 import { activisionProEffectToString } from './import/formats/activisionProEffectGlyphs';
 import { davidWhittakerEffectToString } from './import/formats/davidWhittakerEffectGlyphs';
 import { benDaglishEffectToString } from './import/formats/benDaglishEffectGlyphs';
+import { robHubbardEffectToString } from './import/formats/robHubbardEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
@@ -292,6 +293,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Ben Daglish track and position-list commands (reserved block 0xD8..0xEC).
   const bd = benDaglishEffectToString(effTyp, eff);
   if (bd !== null) return bd;
+
+  // Rob Hubbard stream commands (reserved block 0xED..0xF2).
+  const rh = robHubbardEffectToString(effTyp, eff);
+  if (rh !== null) return rh;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
