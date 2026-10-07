@@ -14,7 +14,7 @@
 import type { TrackerSong } from '../TrackerReplayer';
 import type { NativeEngineDescriptor } from './wasmEngineRegistry';
 import { getCellFileOffset, encodeVariableBlock } from '../uade/UADEPatternEncoder';
-import { gridIsEdited, editedCells } from '@/lib/song/gridBaseline';
+import { gridIsEdited, sampleIsEdited, editedCells } from '@/lib/song/gridBaseline';
 
 /** Engines whose module is not a file the exporter writes (a one-way crunch), so a reload is not the engine's data. */
 const NOT_RELOADABLE = new Set(['Cinter4']);
@@ -78,7 +78,7 @@ export async function editedModuleForPlay(
   song: TrackerSong,
   desc: NativeEngineDescriptor,
 ): Promise<ArrayBuffer | Uint8Array | null> {
-  if (NOT_RELOADABLE.has(desc.key) || !gridIsEdited(song.patterns)) return null;
+  if (NOT_RELOADABLE.has(desc.key) || !(gridIsEdited(song.patterns) || sampleIsEdited())) return null;
   const loaded = song[desc.fileDataKey] as ArrayBuffer | Uint8Array | undefined;
   const carriesEdit = (d: ArrayBuffer | Uint8Array | null | undefined): d is ArrayBuffer | Uint8Array => {
     if (!d) return false;

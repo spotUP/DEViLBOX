@@ -2,6 +2,7 @@
  * Instrument Store - Instrument Bank & Preset Management
  */
 
+import { classifySampleEdit, propagateSampleEditToSong } from '@/lib/song/sampleEdit';
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -39,7 +40,7 @@ import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { peekTrackerReplayer } from '@engine/TrackerReplayer';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
 import { cinter4ParamsToSampleName } from '@lib/import/formats/cinter4Params';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
@@ -615,6 +616,23 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       });
 
+      // A sample edit (loop moved, data replaced) is told to every song player that holds its own
+      // copy of the sample (libopenmpt's module, the native engines' bytes); sampleEdit.ts.
+      const sampleEdit = updates.sample
+        ? classifySampleEdit(currentInstrument?.sample, get().instruments.find((inst) => inst.id === id)?.sample)
+        : { loop: false, data: false };
+      propagateSampleEditToSong(id, get().instruments.find((inst) => inst.id === id)?.sample, sampleEdit);
+      // A loop-only edit reaches the keyboard voice's Players where they stand, so a held note follows
+      // it; only a Player that cannot take it (a Sampler that never looped) is rebuilt below.
+      let sampleLoopLive = false;
+      if (sampleEdit.loop && !sampleEdit.data && !synthTypeChanging && !isPresetLoad
+          && Object.keys(updates).every((k) => k === 'sample')) {
+        try {
+          const live = get().instruments.find((inst) => inst.id === id);
+          sampleLoopLive = !!live && getToneEngine().applySampleLoop(id, live);
+        } catch { /* no engine yet: nothing is sounding */ }
+      }
+
       // Handle real-time updates for specialized synths (without recreating)
       if (!synthTypeChanging && !isPresetLoad) {
         try {
@@ -967,8 +985,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
           console.warn(`[InstrumentStore] Skipping invalidation for ${updatedInst.synthType} id=${id} — applyConfig synth, config-only change`);
         } else {
           try {
-            const engine = getToneEngine();
-            engine.invalidateInstrument(id);
+            if (!sampleLoopLive) getToneEngine().invalidateInstrument(id);
           } catch (error) {
             console.warn('[InstrumentStore] Could not invalidate instrument:', error);
           }
@@ -977,7 +994,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const updatedConfig = get().instruments.find(i => i.id === id);
         if (updatedConfig) {
           try {
-            const replayer = getTrackerReplayer();
+            // An edit does not build the audio replayer (S1); with none there is no cached map to sync.
+            const replayer = peekTrackerReplayer();
+            if (!replayer) return;
             replayer.updateInstrument(updatedConfig);
 
             // Mark/unmark replaced instruments for hybrid playback

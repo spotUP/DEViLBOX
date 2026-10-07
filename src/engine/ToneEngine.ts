@@ -20,6 +20,7 @@ import { keyboardPeriod } from './keyboardPeriod';
 import { periodToNoteIndex, getPeriodExtended, _registerToneEngineRef } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { shimAudioListenerParams } from './tone/firefoxAudioListenerShim';
+import { applyLoopToPlayer, sampleLoops } from './tone/samplePlayerLoop';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
@@ -2156,8 +2157,6 @@ export class ToneEngine {
         const rawBaseNote = config.sample?.baseNote || 'C4';
         const baseNote = rawBaseNote.replace('-', '');
         const hasLoop = config.sample?.loop === true;
-        const loopStart = config.sample?.loopStart || 0;
-        const loopEnd = config.sample?.loopEnd || 0;
 
         // Check if we have an edited buffer stored (takes priority over URL)
         const storedBuffer = config.sample?.audioBuffer;
@@ -2217,17 +2216,7 @@ export class ToneEngine {
                   const audioBuffer = await this.decodeAudioData(bufferForDecode);
                   playerRef.buffer = new Tone.ToneAudioBuffer(audioBuffer);
                   
-                  if (hasLoop) {
-                    const originalSampleRate = config.sample?.sampleRate || 8363;
-                    const duration = audioBuffer.duration;
-                    // Clamp loop points to buffer duration to avoid RangeError
-                    playerRef.loopStart = Math.min(loopStart / originalSampleRate, duration - 0.0001);
-                    playerRef.loopEnd = Math.min(loopEnd / originalSampleRate, duration);
-                    
-                    if (playerRef.loopEnd <= playerRef.loopStart) {
-                      playerRef.loopEnd = duration;
-                    }
-                  }
+                  if (hasLoop) applyLoopToPlayer(playerRef, config.sample, audioBuffer.duration);
                   
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
                 } catch (err) {
@@ -2279,20 +2268,7 @@ export class ToneEngine {
               loop: hasLoop,
               volume: getNormalizedVolume('Player', config.volume),
               onload: () => {
-                if (hasLoop) {
-                  const originalSampleRate = config.sample?.sampleRate || 8363;
-                  const audioBuffer = playerRef.buffer.get();
-                  const duration = audioBuffer ? audioBuffer.duration : 0;
-                  
-                  if (duration > 0) {
-                    playerRef.loopStart = Math.min(loopStart / originalSampleRate, duration - 0.0001);
-                    playerRef.loopEnd = Math.min(loopEnd / originalSampleRate, duration);
-                    
-                    if (playerRef.loopEnd <= playerRef.loopStart) {
-                      playerRef.loopEnd = duration;
-                    }
-                  }
-                }
+                if (hasLoop) applyLoopToPlayer(playerRef, config.sample, playerRef.buffer.get()?.duration ?? 0);
                 
                 const audioBuffer = playerRef.buffer.get();
                 if (audioBuffer) {
@@ -4783,6 +4759,42 @@ export class ToneEngine {
    */
   public invalidateInstrument(instrumentId: number): void {
     this.disposeInstrument(instrumentId);
+  }
+
+  /**
+   * A sample's loop changed: put it on the sample Players that exist for this
+   * instrument and on the voices still sounding from them, so a held note loops at
+   * the new points at once (Tone forwards a Player's loop to its running sources).
+   *
+   * Returns false when the live Players cannot take it - a Tone.Sampler has no loop,
+   * so turning a loop on needs the Player the next build makes - and the caller
+   * invalidates instead. An instrument not built yet reads the config when it is.
+   */
+  public applySampleLoop(instrumentId: number, config: InstrumentConfig): boolean {
+    const sample = config.sample;
+    const loops = sampleLoops(sample);
+    const players: Tone.Player[] = [];
+    for (const [key, inst] of this.instruments) {
+      if (this.instrumentIdFromKey(key) !== instrumentId) continue;
+      const type = this.instrumentSynthTypes.get(key);
+      if (type === 'Player' && inst instanceof Tone.Player) { players.push(inst); continue; }
+      if (type === 'Sampler' && !loops) continue; // a Sampler never looped; still does not
+      return false;
+    }
+    for (const player of players) {
+      const audio = player.buffer.get();
+      if (!player.buffer.loaded || !audio) return false; // still decoding: rebuild reads the new loop
+      const decoded = audio.duration;
+      applyLoopToPlayer(player, sample, decoded);
+      // Voices copy their Player's loop when a note starts (see triggerNote); those still sounding follow too.
+      for (const voices of this.activeVoices.values()) {
+        for (const voice of voices) {
+          const v = voice.instrument;
+          if (v instanceof Tone.Player && v !== player && v.buffer.get() === audio) applyLoopToPlayer(v, sample, decoded);
+        }
+      }
+    }
+    return true;
   }
 
   /**

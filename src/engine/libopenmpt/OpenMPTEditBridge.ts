@@ -15,6 +15,8 @@
  */
 
 import type { TrackerCell } from '@/types/tracker';
+import type { SampleConfig } from '@typedefs/instrument';
+import type { SampleEdit } from '@/lib/song/sampleEdit';
 import type { SaveFormat } from '@lib/import/wasm/OpenMPTSoundlib';
 import { mapNoteToOpenMPT } from '@lib/import/wasm/OpenMPTConverter';
 
@@ -250,6 +252,30 @@ export async function syncFullPattern(
     }
   }
 
+  _dirty = true;
+  scheduleHotReload();
+}
+
+/**
+ * Forward a sample edit (loop moved, data replaced) to the OpenMPT soundlib, then hot-reload the
+ * player: it holds its own copy of the module, so the instrument store's edit reaches it only here.
+ * In a MOD / S3M the sample IS the instrument, so the sample number is the instrument id (as
+ * parseWithOpenMPT numbered them).
+ */
+export async function syncSampleEdit(instrumentId: number, sample: SampleConfig, edit: SampleEdit): Promise<void> {
+  if (!_loaded) return;
+  const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+  if (edit.data && sample.audioBuffer && sample.audioBuffer.byteLength > 0) {
+    const { decodeWavBytes } = await import('@/bridge/analysis/SampleSpectrum');
+    const wav = decodeWavBytes(new Uint8Array(sample.audioBuffer));
+    if (wav && wav.pcm.length > 0) {
+      const pcm = Int16Array.from(wav.pcm, (x) => Math.max(-32768, Math.min(32767, Math.round(x * 32767))));
+      await osl.setSampleData(instrumentId, pcm, sample.sampleRate || 8363, false);
+    }
+  }
+  // The loop is written after the data: replacing the data leaves the old loop flags on the new length.
+  const type = sample.loop ? (sample.loopType === 'pingpong' ? 'pingpong' : 'forward') : 'off';
+  await osl.setSampleLoop(instrumentId, sample.loopStart || 0, sample.loopEnd || 0, type);
   _dirty = true;
   scheduleHotReload();
 }
