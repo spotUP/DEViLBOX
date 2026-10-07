@@ -74,6 +74,8 @@ export const SF2_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     formatter: sf2NoteToString,
+    noteBase: 1,
+    noteCount: 95,
   },
 ];
 

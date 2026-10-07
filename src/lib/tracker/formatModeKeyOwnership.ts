@@ -17,6 +17,8 @@
  * and can be unit-tested without a DOM.
  */
 
+import type { EditorMode } from '@/types/tracker';
+
 /** Minimal, DOM-free view of a keydown event for the ownership decision. */
 export interface FormatKeyDescriptor {
   /** `KeyboardEvent.key` verbatim (case preserved for the F-keys / arrows). */
@@ -65,4 +67,40 @@ export function formatModeOwnsEditKey(
   if (lower === 'x' || lower === 'v' || lower === 'a') return true;
 
   return false;
+}
+
+/**
+ * Who writes a typed note / effect digit into the song, per editor mode (P14).
+ *
+ *   'window'  the view draws the tracker store, so the classic window handler (useTrackerInput) writes it
+ *   'canvas'  the view draws the format's own native data, and PatternEditorCanvas.handleFormatKeyDown
+ *             writes it through the view's onFormatCellChange; the window handler may only jam
+ *   'none'    the view has no keyboard entry (a visualiser, or a grid edited by double click); typing only jams
+ *
+ * A Record over EditorMode: adding a mode without deciding who owns its keys is a type error. Before this,
+ * the window handler wrote the tracker store in EVERY mode, so a Hively edit landed in a grid the Hively
+ * view does not draw (owner 2026-10-07, amanda.ahx).
+ */
+
+export type EntryOwner = 'window' | 'canvas' | 'none';
+
+export const ENTRY_OWNER: Record<EditorMode, EntryOwner> = {
+  classic: 'window',
+  furnace: 'window',
+  suntronic: 'window',
+  tfmx: 'window',
+  hively: 'canvas',
+  klystrack: 'canvas',
+  jamcracker: 'canvas',
+  sidfactory2: 'canvas',
+  cheesecutter: 'canvas',
+  musicline: 'canvas',
+  goattracker: 'canvas',
+  maxtrax: 'none',
+  sc68: 'none',
+};
+
+/** True when the classic window handler may write the tracker store in this mode. */
+export function windowHandlerWritesCells(editorMode: EditorMode): boolean {
+  return ENTRY_OWNER[editorMode] === 'window';
 }

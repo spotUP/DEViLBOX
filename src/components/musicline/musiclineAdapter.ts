@@ -62,6 +62,8 @@ export const MUSICLINE_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     formatter: noteToString,
+    noteBase: 1,
+    noteCount: 96,
   },
   {
     key: 'instrument',

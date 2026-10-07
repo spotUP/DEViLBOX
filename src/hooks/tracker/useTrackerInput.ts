@@ -22,7 +22,7 @@ import { useNoteInput, useEffectInput, useNavigationInput } from './input';
 import { amplifySelectionHelper } from '@stores/tracker/patternEditActions';
 import { resolveFt2BlockKey } from '@lib/tracker/blockKeymap';
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
-import { formatModeOwnsEditKey } from '@lib/tracker/formatModeKeyOwnership';
+import { formatModeOwnsEditKey, windowHandlerWritesCells } from '@lib/tracker/formatModeKeyOwnership';
 import type { EditorBehavior } from '@engine/keyboard/EditorBehavior';
 
 /** Get the cell field names for a given note column index (0-3) */
@@ -1686,6 +1686,8 @@ export const useTrackerInput = () => {
       if (noteInput.handleKeyDown(e)) return;
 
       // ── Delegate to effect input (instrument, volume, effect, flag, probability columns) ──
+      // A format editor mode writes instrument / effect digits itself (P14): the tracker store is not its grid.
+      if (!windowHandlerWritesCells(editorMode)) return;
       if (effectInput.handleKeyDown(e)) return;
     },
     [

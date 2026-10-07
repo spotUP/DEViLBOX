@@ -57,6 +57,9 @@ import type {
 } from '@engine/renderer/worker-types';
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
+import { typedNoteValue } from '@/components/shared/format-editor-types';
+import { undoHively, redoHively, insertHivelyRow, deleteHivelyRow } from '@/components/hively/hivelyEdit';
+import { planNoteEntry, planCursorEntry, typedPitch, type EntryContext } from '@/lib/tracker/formatEntryPlan';
 import { formatChannelLayout } from './formatChannelLayout';
 import { toColumnSpec, formatChannelsToSnapshot } from '@/components/shared/format-editor-types';
 import { transposeFormatNote } from './formatTranspose';
@@ -85,14 +88,6 @@ const MOBILE_SCALE = 1.6;
 const M_CHAR_WIDTH = Math.round(CHAR_WIDTH * MOBILE_SCALE);
 const M_LINE_NUMBER_WIDTH = Math.round(LINE_NUMBER_WIDTH * MOBILE_SCALE);
 // Channel width is computed dynamically in render() based on acid/prob columns
-
-const KEY_TO_SEMITONE: Record<string, number> = {
-  'z': 0, 's': 1, 'x': 2, 'd': 3, 'c': 4, 'v': 5,
-  'g': 6, 'b': 7, 'h': 8, 'n': 9, 'j': 10, 'm': 11,
-  'q': 12, '2': 13, 'w': 14, '3': 15, 'e': 16, 'r': 17,
-  '5': 18, 't': 19, '6': 20, 'y': 21, '7': 22, 'u': 23,
-  'i': 24, '9': 25, 'o': 26, '0': 27, 'p': 28,
-};
 
 // NOTE_NAMES, noteToString and hexByte moved to TrackerGLRenderer (WebGL worker)
 
@@ -259,7 +254,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   useEffect(() => {
     onFormatCursorChangeRef.current?.(formatCursor);
   }, [formatCursor]);
-  const [formatOctave, setFormatOctave] = useState(3);
+  // Hex-column typing: how many digits of the current cell are in (a two-digit column takes two keys)
+  const formatHexTypedRef = useRef<{ ch: number; row: number; col: number; digits: number } | null>(null);
 
   // Format mode selection: normalized range (startRow <= endRow, startCol <= endCol)
   const [formatSelection, setFormatSelection] = useState<{
@@ -1114,8 +1110,28 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       });
     };
 
-    if (e.key === '[' || e.key === '-') { e.preventDefault(); setFormatOctave(o => Math.max(0, o - 1)); return; }
-    if (e.key === ']' || e.key === '=') { e.preventDefault(); setFormatOctave(o => Math.min(7, o + 1)); return; }
+    // One octave for the jam (window handler) and the write: the editor store's.
+    if (e.key === '[' || e.key === '-') { e.preventDefault(); const ed = useEditorStore.getState(); ed.setCurrentOctave(ed.currentOctave - 1); return; }
+    if (e.key === ']' || e.key === '=') { e.preventDefault(); const ed = useEditorStore.getState(); ed.setCurrentOctave(ed.currentOctave + 1); return; }
+
+    // Edit / record / jam follows the reference trackers (formatEntryPlan.ts, P14): edit off = nothing written
+    // (the window handler jams), edit on + stopped = write at the cursor and step, recording = write at the playback row.
+    const entryContext = (): EntryContext => {
+      const ed = useEditorStore.getState();
+      return {
+        recordMode: ed.recordMode,
+        isPlaying: formatIsPlayingRef.current,
+        cursorRow: formatCursor.rowIndex,
+        playbackRow: formatCurrentRowRef.current ?? 0,
+        editStep: ed.editStep,
+        numRows,
+        recQuantEnabled: ed.recQuantEnabled,
+        recQuantRes: ed.recQuantRes,
+      };
+    };
+    const stepCursorTo = (row: number | null) => {
+      if (row !== null) setFormatCursor(p => ({ ...p, rowIndex: Math.max(0, Math.min(numRows - 1, row)) }));
+    };
 
     const isCtrlCmd = e.ctrlKey || e.metaKey;
 
@@ -1163,17 +1179,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Undo / Redo (Ctrl+Z / Ctrl+Shift+Z)
     if (isCtrlCmd && e.key.toLowerCase() === 'z' && !e.altKey) {
       e.preventDefault();
-      const store = useFormatStore.getState();
       if (e.shiftKey) {
-        if (store.canRedoHively()) {
-          store.redoHivelyTrackStep();
+        if (redoHively()) {
           useUIStore.getState().setStatusMessage('REDO');
         } else {
           useUIStore.getState().setStatusMessage('NOTHING TO REDO');
         }
       } else {
-        if (store.canUndoHively()) {
-          store.undoHivelyTrackStep();
+        if (undoHively()) {
           useUIStore.getState().setStatusMessage('UNDO');
         } else {
           useUIStore.getState().setStatusMessage('NOTHING TO UNDO');
@@ -1229,7 +1242,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (trackIdx != null) {
         const store = useFormatStore.getState();
         if (store.editorMode === 'hively') {
-          store.insertHivelyTrackRow(trackIdx, formatCursor.rowIndex);
+          insertHivelyRow(trackIdx, formatCursor.rowIndex);
         }
       }
       return;
@@ -1243,7 +1256,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (trackIdx != null) {
         const store = useFormatStore.getState();
         if (store.editorMode === 'hively') {
-          store.deleteHivelyTrackRow(trackIdx, formatCursor.rowIndex);
+          deleteHivelyRow(trackIdx, formatCursor.rowIndex);
         }
       }
       return;
@@ -1265,8 +1278,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           formatClearSelection();
           setFormatSelection(null);
         } else if (col) {
-          onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, col.emptyValue ?? 0);
-          moveCursor({ rowIndex: +1 });
+          const plan = planCursorEntry(entryContext());
+          if (plan.write) {
+            onFormatCellChange?.(formatCursor.channelIndex, plan.row, col.key, col.emptyValue ?? 0);
+            stepCursorTo(plan.nextCursorRow);
+          }
         }
         return;
     }
@@ -1275,31 +1291,44 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Data entry clears selection
     if (col.type === 'note') {
-      const semitone = KEY_TO_SEMITONE[e.key.toLowerCase()];
-      if (semitone !== undefined) {
+      const typed = typedPitch(e.key, useEditorStore.getState().currentOctave);
+      if (typed !== null && !e.altKey && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setFormatSelection(null);
-        const midi = semitone + formatOctave * 12;
-        if (midi >= 0 && midi <= 95) {
-          onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, midi);
-          moveCursor({ rowIndex: +1 });
+        const ctx = entryContext();
+        if (e.repeat && ctx.isPlaying) return;
+        const value = typedNoteValue(col, typed);
+        const plan = planNoteEntry(ctx);
+        if (value !== null && plan.write) {
+          onFormatCellChange?.(formatCursor.channelIndex, plan.row, col.key, value);
+          stepCursorTo(plan.nextCursorRow);
         }
       }
     } else if (col.type === 'hex' || col.type === 'ctrl') {
-      if (/^[0-9a-fA-F]$/i.test(e.key)) {
+      if (/^[0-9a-fA-F]$/i.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setFormatSelection(null);
+        const plan = planCursorEntry(entryContext());
+        if (!plan.write) return;
         const digit = parseInt(e.key, 16);
         const hexDigits = col.hexDigits ?? 2;
-        const cur = formatChannels[formatCursor.channelIndex]?.rows[formatCursor.rowIndex]?.[col.key]
-          ?? (col.emptyValue ?? 0);
+        const typedSoFar = formatHexTypedRef.current;
+        const continuing = typedSoFar !== null && typedSoFar.ch === formatCursor.channelIndex
+          && typedSoFar.row === plan.row && typedSoFar.col === formatCursor.columnIndex;
+        const digits = continuing ? typedSoFar.digits : 0;
+        const cur = digits === 0 ? 0 : (formatChannels[formatCursor.channelIndex]?.rows[plan.row]?.[col.key]
+          ?? (col.emptyValue ?? 0));
         const mask = (1 << (hexDigits * 4)) - 1;
-        onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key,
-          ((cur << 4) | digit) & mask);
-        moveCursor({ rowIndex: +1 });
+        onFormatCellChange?.(formatCursor.channelIndex, plan.row, col.key, ((cur << 4) | digit) & mask);
+        if (digits + 1 >= hexDigits) {
+          formatHexTypedRef.current = null;
+          stepCursorTo(plan.nextCursorRow);
+        } else {
+          formatHexTypedRef.current = { ch: formatCursor.channelIndex, row: plan.row, col: formatCursor.columnIndex, digits: digits + 1 };
+        }
       }
     }
-  }, [isFormatMode, formatColumns, formatChannels, formatCursor, formatOctave,
+  }, [isFormatMode, formatColumns, formatChannels, formatCursor,
       onFormatCellChange, formatSelection, formatCopySelection, formatClearSelection, formatPasteClipboard,
       formatTransposeSelection]);
 
