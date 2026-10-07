@@ -2204,8 +2204,11 @@ export async function tryRouteFormat(
   // song's hippelFileData. UADE only when the native parse fails.
   if (matchesExt(filename, ['hip7', 's7g'])) {
     const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
+    const { hippelPlayedPitch } = await import('@lib/import/formats/hippelPlayedPitch');
+    // The pitch the decoder plays per note (sound sequences shift or fix it) is what the grid shows.
+    const played = await hippelPlayedPitch(new Uint8Array(buffer));
     return withNativeThenUADE('jochenHippel7V', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name, played ?? undefined); return null; },
       'JochenHippel7VParser');
   }
 
@@ -2227,7 +2230,9 @@ export async function tryRouteFormat(
       try {
         const { isJochenHippelAmigaSogFormat, parseJochenHippelAmigaSogFile } = await import('@lib/import/formats/JochenHippelSTParser');
         if (isJochenHippelAmigaSogFormat(buffer)) {
-          return parseJochenHippelAmigaSogFile(buffer, originalFileName);
+          const { hippelPlayedPitch } = await import('@lib/import/formats/hippelPlayedPitch');
+          const played = await hippelPlayedPitch(new Uint8Array(buffer));
+          return parseJochenHippelAmigaSogFile(buffer, originalFileName, played ?? undefined);
         }
       } catch (err) {
         console.warn(`[JochenHippelSTParser] Native parse failed for ${filename}, falling back to UADE:`, err);

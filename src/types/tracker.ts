@@ -110,6 +110,11 @@ export interface TrackerCell {
   // 0 = no instrument arp (use XM 0xy if present), 1-3 = SA arp table 0-2
   saArpTable?: number;
 
+  /** Jochen Hippel TFMX only: the sound-sequence transpose the decoder applied when this note started (negative = the sequence fixes the pitch). The shown note is the pitch played; this is what turns it back into the pattern note. Absent = 0. */
+  hippelSeq?: number;
+  /** Jochen Hippel TFMX only: the octave (12) the song's notes are shifted up because the decoder plays below C-0. Absent = 0. */
+  hippelBias?: number;
+
   // Sonic Arranger: raw SA effect/arg for WASM-direct routing
   // Effects 1,2,4,7,8,A are handled by WASM synth, not XM replayer
   saEffect?: number;
