@@ -248,10 +248,16 @@ bar test first (revert check: it must fail on the old grid), then fix.
 
 ### Wave 3
 
-- **U7 Future Player (L).** FuturePlayerParser.ts:299 flattens shared subroutines (2055 grid events
+- [x] **U7 Future Player (L) - DONE 2026-10-07 (2673e7140).** FuturePlayerParser.ts:299 flattens shared subroutines (2055 grid events
   vs 440 Paula); build the grid from futureplayer-wasm walking calls/returns/loops, carrier keeps
   the byte-exact raw-block codec (futurePlayerRoundtrip.test.ts). Oracle: UADE Paula (asm
   wanted_team/FuturePlayer). Include position reporting. Test: futurePlayerGridMatchesPlayer.test.ts.
+  Result: walk = fpWalk.ts (TS port of read_sequence + the period path), held to UADE's 68k voice records
+  (futurePlayerWalkMatchesPlayer.test.ts): hybris.fp 6 subsongs and imploder_drums.fp, every voice record after every
+  read pass (stream position, note, timer, instrument, arpeggio, portamento, transposes, end flag), 270k period checks,
+  tick length = the module's CIA timer (hybris 43.98 Hz, not 50). Grid cap 32768 rows (imploder_drums never repeats
+  inside it; hybris sub 0 loops at row 26017). Found and fixed: carrier addresses (file length - code length),
+  50 Hz replayer, missing intro skip, cmd 13, 97th table entry.
 - **U8 Music Assembler (M).** MusicAssemblerParser.ts:399/767 + ma-wasm (registry :177) + position
   reporting; oracle UADE (amigasrc/ma) Paula + ma-wasm trace. Test: musicAssemblerGridMatchesPlayer.test.ts.
 - **U9 MusicLine (L).** First reproduce "empty / frozen / silent" (parser alone gives 402 notes, so the
