@@ -50,6 +50,7 @@ import { parseAhiFile } from '@lib/import/formats/HivelyParser';
 import { exportMusicLineInstrument } from '@lib/export/MusicLineExporter';
 import { parseMusicLineInstrument } from '@lib/import/formats/MusicLineParser';
 import { SYSTEM_PRESETS } from '@constants/systemPresets';
+import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 interface InstrumentListProps {
   /** Optional: Compact mode for sidebar */
@@ -683,9 +684,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       ? 'instrument-art-name whitespace-pre shrink-0'
                       : 'whitespace-nowrap flex-1 min-w-[4rem] truncate'}`}
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
-                    title={instrument.name}
+                    title={instrumentDisplayName(instrument, useHexNumbers)}
                   >
-                    {instrument.name}
+                    {instrumentDisplayName(instrument, useHexNumbers)}
                   </span>
                 )}
 
@@ -901,7 +902,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
                     title="Double-click to rename"
                   >
-                    {instrument.name}
+                    {instrumentDisplayName(instrument, useHexNumbers)}
                   </span>
                 )}
 
