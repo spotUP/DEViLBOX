@@ -95,6 +95,7 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     tfmxTimingTable: fmt.tfmxTimingTable ?? undefined,
     sndhSubtune: fmt.sndhSubtune ?? undefined,
     gmeTrack: fmt.gmeTrack ?? undefined,
+    fileSubsongs: fmt.fileSubsongs ?? undefined,
     asapSong: fmt.asapSong ?? undefined,
   };
   // Every native engine binary, from the one list that names them.

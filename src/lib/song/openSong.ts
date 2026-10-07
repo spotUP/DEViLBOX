@@ -64,6 +64,8 @@ export interface PreparedSong {
   info?: ModuleInfo;
   uadeMetadata?: UADEMetadata;
   sidInfo?: SIDHeaderInfo | null;
+  /** A command-stream file with several tunes (lib/import/fileSubsongs): how many, and the first that sounds. */
+  fileSubsongs?: { count: number; first: number };
 }
 
 /** What a source is. `file` and `bytes` are in hand; `modland` and `url` are fetched here, with their companions; `prepared` is already read. */
@@ -77,7 +79,7 @@ export type SongSourceRef =
 
 export type OpenOrigin = 'drop' | 'filebrowser' | 'dialog' | 'mcp' | 'jukebox' | 'tour'
   | 'embed' | 'hvsc' | 'modland' | 'restore' | 'tab' | 'sync' | 'dj' | 'preview'
-  | 'project' | 'revision' | 'export';
+  | 'project' | 'revision' | 'export' | 'subsong';
 
 /** A DJ deck as the target of an open. `deck` is absent for a background render that loads to no deck. */
 export interface DeckTarget { deck?: DeckId }
@@ -134,7 +136,7 @@ export type OpenResult =
 export const START_BY_ORIGIN: Record<OpenOrigin, false | 'song'> = {
   drop: false, filebrowser: false, dialog: false, mcp: false, hvsc: false, modland: false,
   restore: false, tab: false, sync: false, dj: false, preview: false,
-  project: false, revision: false, export: false,
+  project: false, revision: false, export: false, subsong: false,
   jukebox: 'song', tour: 'song', embed: 'song',
 };
 
@@ -203,7 +205,9 @@ export async function prepareSong(src: SongSourceRef, hooks: PrepareHooks = {}):
   if (songKind !== 'module') return { kind: 'prepared', file, songKind, companions };
   const companionFiles = companions ? Array.from(companions, ([name, data]) => new File([data], name)) : [];
   const { info, uadeMetadata, sidInfo } = await prepareModuleFile(file, companionFiles, hooks);
-  return { kind: 'prepared', file, songKind, companions, info, uadeMetadata, sidInfo };
+  const { scanFileSubsongs } = await import('@/lib/import/fileSubsongs');
+  const fileSubsongs = info.arrayBuffer ? await scanFileSubsongs(file.name, info.arrayBuffer).catch(() => null) : null;
+  return { kind: 'prepared', file, songKind, companions, info, uadeMetadata, sidInfo, ...(fileSubsongs ? { fileSubsongs } : {}) };
 }
 
 /** Route an acquired file to its branch. The branch bodies live in songBranches.ts. */
@@ -223,7 +227,7 @@ async function route(kind: SongKind, file: File, o: OpenOptions, companions?: Ma
   if (prepared?.info || kind === 'module') {
     await importModuleFile(file, {
       ...(o.useLibopenmpt === false ? { useLibopenmpt: false } : {}),
-      subsong: o.subsong ?? 0,
+      subsong: o.subsong,
       companionFiles: companions,
       midiOptions: o.midiOptions,
       ...(prepared?.info

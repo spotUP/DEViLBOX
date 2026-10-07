@@ -134,6 +134,8 @@ export interface FormatStore {
    * control and the auto-advance at a subsong's end read it.
    */
   nativeSubsongs: NativeSubsongs | null;
+  /** The subsongs of a command-stream file the parser built the grid from (lib/import/fileSubsongs); null for one tune. */
+  fileSubsongs: { count: number; current: number; fileName: string } | null;
   /** S98 register log for S98Engine (ymfm) */
   s98FileData: ArrayBuffer | null;
   stoneTrackerFileData: ArrayBuffer | null;
@@ -548,6 +550,7 @@ export const useFormatStore = create<FormatStore>()(
     gmeTrack: null,
     asapSong: null,
     nativeSubsongs: null,
+    fileSubsongs: null,
     s98FileData: null,
     stoneTrackerFileData: null,
     musicMakerFileData: null,
@@ -1128,6 +1131,7 @@ export const useFormatStore = create<FormatStore>()(
         state.asapSong = (song as any).asapSong ?? null;
         // The new song's engine reports its subsongs once it has loaded.
         state.nativeSubsongs = null;
+        state.fileSubsongs = (song as any).fileSubsongs ?? null;
         state.s98FileData = (song as any).s98FileData ?? null;
         state.stoneTrackerFileData = (song as any).stoneTrackerFileData ?? null;
         state.musicMakerFileData = (song as any).musicMakerFileData ?? null;
@@ -1472,6 +1476,7 @@ export const useFormatStore = create<FormatStore>()(
       state.gmeTrack = null;
       state.asapSong = null;
       state.nativeSubsongs = null;
+      state.fileSubsongs = null;
       state.s98FileData = null;
       state.stoneTrackerFileData = null;
       state.musicMakerFileData = null;

@@ -127,7 +127,7 @@ async function importTrackerModuleUnloaded(
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
   throwIfSongLoadCancelled();
   setSongLoadPhase('parse');
-  const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
+  const song = await parseModuleToSong(file, options.subsong, options.uadeMetadata, options.midiOptions, options.companionFiles);
   if (!song.patterns.length) {
     notify.error(`Module "${song.name || filename}" contains no patterns to import.`);
     return;
@@ -206,7 +206,7 @@ async function importModuleFileUnloaded(file: File, options: Partial<ImportOptio
   throwIfSongLoadCancelled();
   // The dialog imports with libopenmpt on; importTrackerModule still keeps
   // native-only formats off it.
-  await importTrackerModule(prepared.info, { useLibopenmpt: true, subsong: 0, uadeMetadata: prepared.uadeMetadata, ...importOptions });
+  await importTrackerModule(prepared.info, { useLibopenmpt: true, uadeMetadata: prepared.uadeMetadata, ...importOptions });
 }
 
 /**
@@ -817,7 +817,7 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
       };
       await importTrackerModule(info, {
         useLibopenmpt: false,
-        subsong: options.subsong ?? 0,
+        subsong: options.subsong,
         companionFiles: options.companionFiles,
       });
       return { success: true, message: `Loaded ${file.name}` };
