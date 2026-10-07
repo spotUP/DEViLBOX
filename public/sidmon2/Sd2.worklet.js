@@ -63,6 +63,7 @@ class Sd2Processor extends AudioWorkletProcessor {
             if (free) free(wasmPtr);
 
             this.applyMuteMask();
+            this._lastSongPos = -1; this._lastRow = -1;
 
             this.port.postMessage({ type: 'moduleLoaded' });
           } catch (error) {
@@ -344,6 +345,20 @@ class Sd2Processor extends AudioWorkletProcessor {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
+        }
+      }
+    }
+
+    // Playhead: the order position and row the music is on, posted when they
+    // change (the engine's onPositionUpdate; the grid is songPositions x rows).
+    // Not while the keyboard preview renders: it ticks the same player.
+    if (!this.previewActive && typeof this.module._sd2_bridge_get_play_row === 'function') {
+      const playRow = this.module._sd2_bridge_get_play_row();
+      if (playRow >= 0) {
+        const songPos = this.module._sd2_bridge_get_play_position();
+        if (songPos !== this._lastSongPos || playRow !== this._lastRow) {
+          this._lastSongPos = songPos; this._lastRow = playRow;
+          this.port.postMessage({ type: 'position', songPos, row: playRow });
         }
       }
     }

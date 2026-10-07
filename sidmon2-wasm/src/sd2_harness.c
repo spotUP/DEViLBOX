@@ -78,6 +78,16 @@ EXPORT void player_set_channel_gain(int ch, float gain) {
     sd2_set_channel_mask(g_module, mask);
 }
 
+/* ---- Playhead: order position and row of it that is sounding (-1 before the first row) ---- */
+
+EXPORT int sd2_bridge_get_play_position(void) {
+    return g_module ? sd2_get_play_position(g_module) : -1;
+}
+
+EXPORT int sd2_bridge_get_play_row(void) {
+    return g_module ? sd2_get_play_row(g_module) : -1;
+}
+
 /* ---- Track editing API ---- */
 
 EXPORT int sd2_bridge_get_num_tracks(void) {

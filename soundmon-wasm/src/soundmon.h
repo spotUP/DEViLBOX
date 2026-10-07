@@ -30,6 +30,8 @@ bool sm_has_ended(const SmModule* module);
 // Edit API
 int sm_get_instrument_count(const SmModule* module);
 int sm_get_num_tracks(const SmModule* module);
+int sm_get_play_step(const SmModule* module);
+int sm_get_play_row(const SmModule* module);
 void sm_get_cell(const SmModule* module, int track_idx, int row,
                  uint8_t* note, uint8_t* instrument, uint8_t* effect, uint8_t* effect_arg);
 void sm_set_cell(SmModule* module, int track_idx, int row,
