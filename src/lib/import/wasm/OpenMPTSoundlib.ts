@@ -369,6 +369,21 @@ export async function setSampleData(
   return result === 1;
 }
 
+/**
+ * Set a sample's loop in place; the PCM stays. Points are frames of the sample.
+ * loopType: 'off' | 'forward' | 'pingpong'.
+ */
+export async function setSampleLoop(
+  sampleIndex: number,
+  loopStart: number,
+  loopEnd: number,
+  loopType: 'off' | 'forward' | 'pingpong',
+): Promise<boolean> {
+  const m = await getModule();
+  const type = loopType === 'off' ? 0 : loopType === 'pingpong' ? 2 : 1;
+  return m._osl_set_sample_loop(sampleIndex, Math.max(0, Math.round(loopStart)), Math.max(0, Math.round(loopEnd)), type) === 1;
+}
+
 // ─── Save / Export ─────────────────────────────────────────────────────────
 
 /**

@@ -512,6 +512,29 @@ int osl_set_sample_data(int32_t sampleIdx, const void *data, int32_t numFrames,
     return 0;
 }
 
+/**
+ * Set a sample's loop in place (the sample data stays). Points are frames.
+ * loopType: 0 = none, 1 = forward, 2 = ping-pong. Returns 1 on success.
+ * The same entry a sample-editor drag reaches, so the running module and the
+ * next serialization (osl_save_*) carry the loop the editor shows.
+ */
+EMSCRIPTEN_KEEPALIVE
+int osl_set_sample_loop(int32_t sampleIdx, uint32_t loopStart, uint32_t loopEnd, int loopType) {
+    if (!g_sf || sampleIdx < 1 || sampleIdx > static_cast<int32_t>(g_sf->GetNumSamples())) return 0;
+    ModSample &smp = g_sf->GetSample(static_cast<SAMPLEINDEX>(sampleIdx));
+    if (loopEnd > smp.nLength) loopEnd = smp.nLength;
+    smp.nLoopStart = loopStart;
+    smp.nLoopEnd = loopEnd;
+    smp.uFlags.reset(CHN_LOOP);
+    smp.uFlags.reset(CHN_PINGPONGLOOP);
+    if (loopType != 0 && loopEnd > loopStart) {
+        smp.uFlags.set(CHN_LOOP);
+        if (loopType == 2) smp.uFlags.set(CHN_PINGPONGLOOP);
+    }
+    smp.PrecomputeLoops(*g_sf, false);
+    return 1;
+}
+
 // ============================================================================
 // MIDI macro config (Zxx / Symphonie DSP)
 // ============================================================================
