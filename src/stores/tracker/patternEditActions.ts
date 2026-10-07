@@ -162,7 +162,8 @@ export function transposeSelectionHelper(
       const midiNote = xmNoteToMidi(cell.note);
       if (midiNote === null) continue;
       const newMidiNote = midiNote + semitones;
-      if (newMidiNote >= 12 && newMidiNote <= 107) {
+      // MIDI 0..107: down into the octave below C-0 (c_1 = MIDI 0), up to B-7
+      if (newMidiNote >= 0 && newMidiNote <= 107) {
         cell.note = midiToXMNote(newMidiNote);
       }
     }

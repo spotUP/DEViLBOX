@@ -6,6 +6,7 @@
 import React from 'react';
 import type { NoteValue } from '@typedefs';
 import { xmNoteToString } from '@/lib/xmConversions';
+import { isPitchedNote } from '@/lib/tracker/noteValue';
 
 interface NoteCellProps {
   value: NoteValue;
@@ -24,8 +25,8 @@ export const NoteCell: React.FC<NoteCellProps> = React.memo(
       displayValue = '...'; // Empty
     } else if (value === 97) {
       displayValue = '==='; // Note off
-    } else if (value >= 1 && value <= 96) {
-      // Convert XM note to string (1 = C-0, 49 = C-4, etc.)
+    } else if (isPitchedNote(value)) {
+      // Convert XM note to string (1 = C-0, 49 = C-4, -12 = c_1 an octave below C-0)
       displayValue = xmNoteToString(value);
     }
 

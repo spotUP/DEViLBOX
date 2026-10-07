@@ -15,6 +15,7 @@
 
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { isReplacedInstrument } from './replayer/hybridInstruments';
+import { isLowOctaveNote, isPitchedNote, noteValueToPitch } from '@/lib/tracker/noteValue';
 import * as Tone from 'tone';
 import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, KlysNativeData, FurnaceSubsongPlayback } from '@/types';
 import type { TFMXNativeData } from '@/types/tfmxNative';
@@ -1194,7 +1195,7 @@ export class TrackerReplayer {
     if (!livePattern) return;
     for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
       const row = livePattern.channels[ch]?.rows[this.pattPos];
-      if (row && row.note > 0 && row.note < 97) {
+      if (row && isPitchedNote(row.note)) {
         const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
           ? row.volume / 64 : 0.7;
         this.meterStaging[ch] = vol;
@@ -1251,7 +1252,7 @@ export class TrackerReplayer {
       const wasPlayingSynth = chanInst && this._replacedInstruments.has(chanInst);
 
       // Case 1: Row triggers a NON-replaced instrument → release synth, let libopenmpt play
-      if (row.note > 0 && row.note < 97 && rowInst && !this._replacedInstruments.has(rowInst)) {
+      if (isPitchedNote(row.note) && rowInst && !this._replacedInstruments.has(rowInst)) {
         if (wasPlayingSynth) {
           try {
             const engine = getToneEngine();
@@ -1349,7 +1350,7 @@ export class TrackerReplayer {
       const engine = getToneEngine();
       const saInst = engine.getInstrument(ch.instrument.id, ch.instrument, chIndex);
       if (saInst && typeof (saInst as any).set === 'function') {
-        if (row.note > 0 && row.note < 97) {
+        if (isPitchedNote(row.note)) {
           (saInst as any).set('speedCounter', 0);
         }
         if (row.saArpTable !== undefined) {
@@ -1391,7 +1392,7 @@ export class TrackerReplayer {
 
     // FT2: when instrument+note both present, reset channel volume to instrument's default.
     // This matches FT2 behavior: instrument switch resets volume unless Cxx overrides it.
-    const hasNote = noteValue && noteValue > 0 && noteValue < 97;
+    const hasNote = isPitchedNote(noteValue);
     if (hasNote && instNum > 0 && ch.instrument) {
       const defaultVol = ch.instrument.metadata?.modPlayback?.defaultVolume ?? 64;
       ch.volume = defaultVol;
@@ -1586,7 +1587,7 @@ export class TrackerReplayer {
       // Trigger synth notes via processHybridRow. Sampler instruments are normally
       // played by a WASM replayer, but nativeSamplePlayback songs (MaxTrax) drive
       // their samplers from here too.
-      if (row.note > 0 && row.note < 97 && (isSynth || this.song?.nativeSamplePlayback)) {
+      if (isPitchedNote(row.note) && (isSynth || this.song?.nativeSamplePlayback)) {
         this.processHybridRow(ch, channel, row, time);
       }
     }
@@ -1605,7 +1606,7 @@ export class TrackerReplayer {
     }
     for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
       const row = livePattern.channels[ch]?.rows[this.pattPos];
-      if (row && row.note > 0 && row.note < 97) {
+      if (row && isPitchedNote(row.note)) {
         const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
           ? row.volume / 64 : 0.7;
         this.meterStaging[ch] = vol;
@@ -3419,6 +3420,14 @@ export class TrackerReplayer {
    * For MOD files: Uses ProTracker's 3-octave period table with rawPeriod priority.
    */
   private noteToPlaybackPeriod(noteValue: number, rawPeriod: number | undefined, ch: ChannelState): number {
+    if (this.useXMPeriods && isLowOctaveNote(noteValue)) {
+      // A note of the octave below C-0, which FT2 has no note for: the FT2 period of the note an
+      // octave up, one octave lower (linear periods: +768 = 12 x 64; Amiga periods: doubled).
+      const note = noteValueToPitch(noteValue)! + 12 + ch.relativeNote;
+      if (note < 1 || note >= 10 * 12) return 0;
+      const up = ft2NoteToPeriod(note, ch.finetune, this.linearPeriods);
+      return this.linearPeriods ? up + 768 : up * 2;
+    }
     if (this.useXMPeriods && noteValue > 0 && noteValue < 97) {
       // XM mode: Use FT2 period system
       // Add relativeNote to note BEFORE period lookup (FT2 triggerNote behavior)
@@ -3471,17 +3480,17 @@ export class TrackerReplayer {
   }
 
   private noteToPeriod(note: number | string, finetune: number): number {
-    if (typeof note === 'number' && note > 0) {
+    if (typeof note === 'number' && note !== 0) {
       // MOD files use period values directly (113-856), XM uses note numbers (1-96)
       if (note >= 113 && note <= 856) {
         // Already a period value (MOD format)
         return note;
-      } else if (note < 97) {
-        // Note number (1-96): convert to period
-        // Note 1 = C-0, Note 13 = C-1, Note 25 = C-2, etc.
+      } else if (isPitchedNote(note)) {
+        // Note number (1-96, or -12..-1 for the octave below C-0): convert its pitch to period
+        // Note 1 = C-0, Note 13 = C-1, Note 25 = C-2, etc.; the octave shift below reaches under C-0
         // Period table covers C-1 to B-3 (notes 13-48 in 1-based, or 12-47 in 0-based)
 
-        const noteIndex = note - 1; // Convert to 0-based
+        const noteIndex = noteValueToPitch(note)! - 1; // Convert to 0-based
 
         // Find which note within the period table's 3-octave range
         // Period table: 0-11 = C-1 to B-1, 12-23 = C-2 to B-2, 24-35 = C-3 to B-3
@@ -3599,7 +3608,7 @@ export class TrackerReplayer {
 
 
       // VU meters for per-channel native engines (MusicLine)
-      if (this._suppressNotes && chTick === 0 && row && row.note > 0 && row.note < 97) {
+      if (this._suppressNotes && chTick === 0 && row && isPitchedNote(row.note)) {
         const engine = getToneEngine();
         if (!this.meterCallbacks) {
           this.meterCallbacks = [];

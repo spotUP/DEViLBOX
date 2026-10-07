@@ -6,6 +6,7 @@
  */
 
 import { noteCellsPerPattern } from '@/lib/tracker/patternNoteCells';
+import { noteValueName, pitchName } from '@/lib/tracker/noteValue';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { getConsoleEntries } from '../consoleCapture';
 import { useTransportStore } from '../../stores/useTransportStore';
@@ -46,14 +47,10 @@ import {
 
 // ─── Note Helpers ──────────────────────────────────────────────────────────────
 
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-
 export function noteToString(note: number): string {
   if (note === 0) return '---';
   if (note === 97) return 'OFF';
-  const noteIndex = (note - 1) % 12;
-  const octave = Math.floor((note - 1) / 12);
-  return `${NOTE_NAMES[noteIndex]}${octave}`;
+  return noteValueName(note) ?? (note > 0 ? pitchName(note) : null) ?? String(note);
 }
 
 function formatHex(val: number, digits = 2): string {
