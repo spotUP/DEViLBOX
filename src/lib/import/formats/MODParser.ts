@@ -114,8 +114,17 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
   for (let i = 0; i < 31; i++) {
     const sampleHeader = header.samples[i];
 
-    // Skip empty samples
+    // An empty slot is still a slot: pattern cells address it by number and
+    // its name is the author's (greetings live in unused sample names).
     if (sampleHeader.length === 0) {
+      instruments.push({
+        id: i + 1,
+        name: sampleHeader.name,
+        samples: [],
+        fadeout: 0,
+        volumeType: 'none',
+        panningType: 'none',
+      });
       continue;
     }
 
