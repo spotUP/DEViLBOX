@@ -30,6 +30,8 @@ import { parseSynthesisFile } from '@/lib/import/formats/SynthesisParser';
 import { parseSonicArrangerFile } from '@/lib/import/formats/SonicArrangerParser';
 import { parseTfmMusicMakerFile } from '@/lib/import/formats/TFMMusicMakerParser';
 import { parseStoneTrackerFile } from '@/lib/import/formats/StoneTrackerParser';
+import { parseDeltaMusic1File } from '@/lib/import/formats/DeltaMusic1Parser';
+import { parseDigitalMugicianFile } from '@/lib/import/formats/DigitalMugicianParser';
 import { parseSoundMonFile } from '@/lib/import/formats/SoundMonParser';
 import { parseFCFile } from '@/lib/import/formats/FCParser';
 import { parseSidMon2File } from '@/lib/import/formats/SidMon2Parser';
@@ -101,6 +103,12 @@ const CASES: Case[] = [
   { name: 'SidMon 2 (ice7-intro.sid2)', dir: 'sidmon2', stem: 'Sd2', file: 'public/data/songs/sidmon-2/ice7-intro.sid2',
     transform: emscriptenTransform, voices: 4, gridClock: false, isolate: true, noPlay: true,
     parse: (b) => parseSidMon2File(ab(b), 'ice7-intro.sid2') },
+  { name: 'Delta Music 1 (triplex1.dm)', dir: 'deltamusic1', stem: 'DeltaMusic1', file: 'public/data/songs/delta-music/triplex1.dm',
+    transform: emscriptenTransform, voices: 4, gridClock: false,
+    parse: (b) => parseDeltaMusic1File(ab(b), 'triplex1.dm') },
+  { name: 'Digital Mugician (believe.dmu)', dir: 'digmug', stem: 'DigMug', file: 'public/data/songs/digital-mugician/believe.dmu',
+    transform: emscriptenTransform, voices: 4, gridClock: false,
+    parse: (b) => parseDigitalMugicianFile(ab(b), 'believe.dmu') },
   { name: 'Sound Factory (im maien.psf)', dir: 'soundfactory', stem: 'SoundFactory2', file: 'public/data/songs/soundfactory/im maien.psf',
     transform: emscriptenTransform, voices: 4, gridClock: false, maxOnsetLag: 1,
     parse: (b) => parseSoundFactoryFile(b, 'im maien.psf') as TrackerSong },
