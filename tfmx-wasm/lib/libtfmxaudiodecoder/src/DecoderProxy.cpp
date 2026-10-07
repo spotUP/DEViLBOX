@@ -92,6 +92,14 @@ void DecoderProxy::previewMacro(int macroIdx, int note, int volume, int channel)
     }
 }
 
+void DecoderProxy::setPreviewOnly(bool on) {
+    if (pDecoder) pDecoder->setPreviewOnly(on);
+}
+
+void DecoderProxy::previewStop() {
+    if (pDecoder) pDecoder->previewStop();
+}
+
 // --------------------------------------------------------------------------
 
 bool DecoderProxy::maybeOurs(void *data, udword length) {

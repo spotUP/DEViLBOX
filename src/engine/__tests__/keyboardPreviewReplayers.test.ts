@@ -28,6 +28,8 @@ import { parseDeltaMusic2File } from '@/lib/import/formats/DeltaMusic2Parser';
 import { dm2NoteForKey } from '@/engine/deltamusic2/dm2KeyNote';
 import { parseInStereo1File } from '@/lib/import/formats/InStereo1Parser';
 import { parseInStereo2File } from '@/lib/import/formats/InStereo2Parser';
+import { parseTFMXFile } from '@/lib/import/formats/TFMXParser';
+import { tfmxNoteForKey } from '@/engine/tfmx/tfmxKeyNote';
 import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT, fromOnset } from './keyboardPreviewHarness';
 
 const corpus = (n: string) => {
@@ -536,5 +538,54 @@ describe('InStereo! 2.0: a key never starts the song, and key release silences t
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
+  });
+});
+
+describe('TFMX Professional tfmx/mdat.hbtitle: a typed note is the module\'s own replayer voice', () => {
+  // Oracle: the module's own decoder with its sequencer running, every voice muted but one, and the
+  // macro started on that voice by the replayer's note command (tfmx_module_preview_macro, the macro
+  // editor's audition). The key plays the same note command on a second decoder whose sequencer is
+  // off. They must sound the same: the key adds nothing and drops nothing, and never starts the song.
+  // Every macro that starts a sample itself (SetBegin and DMA on). The others are modulation macros
+  // (envelope, vibrato) another macro or the voice's previous note feeds: on their own they start nothing,
+  // in the song or from a key.
+  const macroTable = (parseTFMXFile(corpus('tfmx/mdat.hbtitle'), 'mdat.hbtitle') as unknown as { tfmxNative: { macros: Array<{ index: number; commands: Array<{ opcode: number }> }> } }).tfmxNative.macros;
+  const macros = macroTable.filter((m) => m.commands.some((c) => c.opcode === 2) && m.commands.some((c) => c.opcode === 1)).map((m) => m.index);
+  it('the module has macros that start a sample', () => { expect(macros.length).toBeGreaterThan(3); });
+  it('a key stands for the grid note it is typed as: grid note = TFMX note + 13, key = grid note + 11', () => {
+    for (let note = 0; note < 64; note++) expect(tfmxNoteForKey(note + 13 + 11), `note ${note}`).toBe(note);
+  });
+  for (const macro of macros) {
+    it(`macro ${macro}: pitch, level and envelope equal the module decoder's own audition`, async () => {
+      const mdat = corpus('tfmx/mdat.hbtitle'), smpl = corpus('tfmx/smpl.hbtitle');
+      const note = tfmxNoteForKey(48 + 11);   // grid note 48 (+13 base): key 59
+      const voice = 0;   // hbtitle plays four voices; the song's own first notes on voice 0 come later than the six ticks compared
+      const a = await startWorklet('tfmx', 'TFMX', emscriptenTransform);
+      await a.send({ type: 'loadModule', mdatBuffer: mdat.slice(0), smplBuffer: smpl.slice(0), subsong: 0 });
+      for (let v = 0; v < 7; v++) if (v !== voice) await a.send({ type: 'moduleMuteVoice', voice: v, mute: true });
+      await a.send({ type: 'modulePlay' });
+      await a.send({ type: 'modulePreviewMacro', macroIdx: macro, note, volume: 15, channel: voice });
+      const out = renderTicks(a.proc, 24, voice % 4 === 1 || voice % 4 === 2 ? 1 : 0);
+      const b = await startWorklet('tfmx', 'TFMX', emscriptenTransform);
+      await b.send({ type: 'keyLoad', mdatBuffer: mdat.slice(0), smplBuffer: smpl.slice(0) });
+      await b.send({ type: 'keyNote', macroIdx: macro, note, volume: 15, channel: 0 });
+      const pr = renderTicks(b.proc, 24, 0);
+      const so = rmsPerTick(out, 24).findIndex((v) => v >= 0.001), po = rmsPerTick(pr, 24).findIndex((v) => v >= 0.001);
+      expect(so, `macro ${macro}: the module decoder sounds the macro`).toBeGreaterThanOrEqual(0);
+      expect(po, `macro ${macro}: the key sounds`).toBeGreaterThanOrEqual(0);
+      expectSameVoice(`hbtitle macro ${macro}`, fromOnset(out, so, 6, 1e-4), fromOnset(pr, po, 6, 1e-4), 6);
+    });
+  }
+
+  it('a key never starts the song, and key release silences the voice', async () => {
+    const mdat = corpus('tfmx/mdat.hbtitle'), smpl = corpus('tfmx/smpl.hbtitle');
+    const b = await startWorklet('tfmx', 'TFMX', emscriptenTransform);
+    await b.send({ type: 'keyLoad', mdatBuffer: mdat.slice(0), smplBuffer: smpl.slice(0) });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 300, 0), 300)), 'silent before a key: the song does not play').toBe(0);
+    await b.send({ type: 'keyNote', macroIdx: 0, note: 36, volume: 15, channel: 0 });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 30, 0), 30)), 'a key sounds').toBeGreaterThan(0.005);
+    await b.send({ type: 'keyOff' });
+    renderTicks(b.proc, 2, 0);
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 30, 0), 30)), 'silent after release').toBeLessThan(1e-4);
   });
 });

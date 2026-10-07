@@ -62,7 +62,12 @@ class TFMXDecoder : public Decoder {
      */
     void previewMacro(int macroIdx, int note, int volume, int channel) override;
 
+    /** DEViLBOX extension: keyboard decoder - the sequencer never steps, only previewMacro voices sound. */
+    void setPreviewOnly(bool on) override { previewOnly = on; }
+    void previewStop() override;
+
  private:
+    bool previewOnly = false;
     void reset();
     void adjustTraitsPost();
     void dumpMacros();

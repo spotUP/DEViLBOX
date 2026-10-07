@@ -17,7 +17,9 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { TFMXConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { useFormatStore } from '@/stores/useFormatStore';
 import { TFMXEngine } from './TFMXEngine';
+import { tfmxNoteForKey } from './tfmxKeyNote';
 
 export class TFMXSynth implements DevilboxSynth {
   readonly name = 'TFMXSynth';
@@ -27,6 +29,9 @@ export class TFMXSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _playerHandle = -1;
+  /** TFMX Professional: the instrument is a macro of the module; its keys go to the keyboard decoder. */
+  private _macroIndex = -1;
+  private _keyLoadedFor: ArrayBuffer | null = null;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -44,12 +49,27 @@ export class TFMXSynth implements DevilboxSynth {
     }
   }
 
+  /** Make this a TFMX Professional macro instrument (the module's macro table index). */
+  setMacroIndex(index: number): void { this._macroIndex = index; }
+
+  /** The loaded song's mdat/smpl become the engine's keyboard decoder (once per song). */
+  private loadKeyDecoder(): boolean {
+    const { tfmxFileData: mdat, tfmxSmplData: smpl } = useFormatStore.getState();
+    if (!mdat) return false;
+    if (mdat !== this._keyLoadedFor) {
+      this.engine.keyLoad(mdat, smpl);
+      this._keyLoadedFor = mdat;
+    }
+    return true;
+  }
+
   async ensureInitialized(): Promise<void> {
     await this.engine.ready();
   }
 
   async setInstrument(config: TFMXConfig): Promise<void> {
     await this.engine.ready();
+    if (this._macroIndex >= 0) { this.loadKeyDecoder(); return; }   // a macro instrument has no mini-module of its own
 
     // Destroy old player if we have one
     if (this._playerHandle >= 0) {
@@ -82,7 +102,14 @@ export class TFMXSynth implements DevilboxSynth {
   }
 
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
-    if (this._disposed || this._playerHandle < 0) return;
+    if (this._disposed) return;
+    if (this._macroIndex >= 0) {
+      // TFMX Professional: the replayer's own note command and macro interpreter, sequencer off
+      if (note === undefined || !this.loadKeyDecoder()) return;
+      this.engine.keyNote(this._macroIndex, tfmxNoteForKey(typeof note === 'string' ? noteToMidi(note) : note), 15);
+      return;
+    }
+    if (this._playerHandle < 0) return;
 
     let midiNote: number;
     if (typeof note === 'string') {
@@ -104,7 +131,9 @@ export class TFMXSynth implements DevilboxSynth {
   }
 
   triggerRelease(_note?: string | number, _time?: number): void {
-    if (this._disposed || this._playerHandle < 0) return;
+    if (this._disposed) return;
+    if (this._macroIndex >= 0) { this.engine.keyOff(); return; }
+    if (this._playerHandle < 0) return;
     this.engine.sendMessage({ type: 'noteOff', handle: this._playerHandle });
   }
 

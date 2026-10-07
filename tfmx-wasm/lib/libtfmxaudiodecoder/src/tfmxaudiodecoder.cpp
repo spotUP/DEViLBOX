@@ -174,3 +174,13 @@ void tfmxdec_preview_macro(void* decoder, int macroIdx, int note,
     TFMX_DECLARE_DECODER;
     p->dec.previewMacro(macroIdx, note, volume, channel);
 }
+
+void tfmxdec_set_preview_only(void* decoder, int on) {
+    TFMX_DECLARE_DECODER;
+    p->dec.setPreviewOnly(on != 0);
+}
+
+void tfmxdec_preview_stop(void* decoder) {
+    TFMX_DECLARE_DECODER;
+    p->dec.previewStop();
+}
