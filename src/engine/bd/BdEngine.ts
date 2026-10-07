@@ -4,6 +4,7 @@
  * Follows the MaEngine singleton pattern.
  */
 
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
@@ -15,6 +16,8 @@ import {
 export class BdEngine extends WASMSingletonBase {
   private static instance: BdEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private readonly _positions = new PositionCallbacks();
 
   private constructor() {
     super();
@@ -72,6 +75,9 @@ export class BdEngine extends WASMSingletonBase {
         case 'moduleLoaded':
           console.log('[BdEngine] Module loaded');
           break;
+        case 'position':
+          this._positions.emit(data);
+          break;
         case 'error':
           console.error('[BdEngine]', data.message);
           break;
@@ -94,6 +100,11 @@ export class BdEngine extends WASMSingletonBase {
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
+  }
 
   /** Set per-channel mute mask. Bit N=1 means channel N is active, 0=muted. */
   setMuteMask(mask: number): void {

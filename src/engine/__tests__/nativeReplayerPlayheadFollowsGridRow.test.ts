@@ -36,6 +36,8 @@ import { parseSoundMonFile } from '@/lib/import/formats/SoundMonParser';
 import { parseFCFile } from '@/lib/import/formats/FCParser';
 import { parseSidMon2File } from '@/lib/import/formats/SidMon2Parser';
 import { parseSoundFactoryFile } from '@/lib/import/formats/SoundFactoryParser';
+import { parseBenDaglishFile } from '@/lib/import/formats/BenDaglishParser';
+import { installWasmNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 
 /** The Emscripten glue of the replayer wasm, made loadable in a worklet scope (as the engines' own transforms do). */
 const emscriptenTransform = (c: string) => c
@@ -115,6 +117,11 @@ const CASES: Case[] = [
   { name: 'Sound Factory (oriental.psf)', dir: 'soundfactory', stem: 'SoundFactory2', file: 'public/data/songs/soundfactory/oriental.psf',
     transform: emscriptenTransform, voices: 4, gridClock: false, maxOnsetLag: 1,
     parse: (b) => parseSoundFactoryFile(b, 'oriental.psf') as TrackerSong },
+  // Ben Daglish: the grid is the walk (one row per 50 Hz tick); the worklet has no per-voice buffers and no play
+  // message, and the sample's DMA starts on the tick after the note is read (as on the Amiga): onset lag 1.
+  { name: 'Ben Daglish (mickey_mouse.bd)', dir: 'bd', stem: 'Bd', file: 'public/data/songs/formats/mickey_mouse.bd',
+    transform: emscriptenTransform, voices: 4, gridClock: false, isolate: true, noPlay: true, maxOnsetLag: 1,
+    parse: async (b) => { const restore = installWasmNodeFetch('bd', 'Bd'); try { return await parseBenDaglishFile(ab(b), 'mickey_mouse.bd'); } finally { restore(); } } },
 ];
 
 interface Report { frame: number; songPos: number; row: number }
@@ -245,6 +252,7 @@ describe('every position-reporting replayer engine is wirable by NativeEngineRou
     ['FutureComposerReplayer', () => import('@/engine/futurecomposer/FutureComposerEngine').then((m) => m.FutureComposerEngine)],
     ['SidMon2', () => import('@/engine/sidmon2/Sd2Engine').then((m) => m.Sd2Engine)],
     ['SoundFactory2Replayer', () => import('@/engine/soundfactory/SoundFactory2Engine').then((m) => m.SoundFactory2Engine)],
+    ['BenDaglish', () => import('@/engine/bd/BdEngine').then((m) => m.BdEngine)],
   ])('%s has onPositionUpdate', async (_key, load) => {
     const Engine = await load();
     expect(typeof Engine.prototype.onPositionUpdate).toBe('function');

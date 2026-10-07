@@ -13,6 +13,7 @@ import { soundMasterEffectToString } from './import/formats/soundMasterEffectGly
 import { actionamicsEffectToString } from './import/formats/actionamicsEffectGlyphs';
 import { activisionProEffectToString } from './import/formats/activisionProEffectGlyphs';
 import { davidWhittakerEffectToString } from './import/formats/davidWhittakerEffectGlyphs';
+import { benDaglishEffectToString } from './import/formats/benDaglishEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
@@ -287,6 +288,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // David Whittaker track commands (reserved block 0xC0..0xD4).
   const dw = davidWhittakerEffectToString(effTyp, eff);
   if (dw !== null) return dw;
+
+  // Ben Daglish track and position-list commands (reserved block 0xD8..0xEC).
+  const bd = benDaglishEffectToString(effTyp, eff);
+  if (bd !== null) return bd;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
