@@ -22,10 +22,11 @@ let loaded: TrackerSong | null = null;
 vi.mock('@/engine/tfmx/TFMXEngine', () => ({
   TFMXEngine: { hasInstance: () => true, getInstance: () => ({ reloadModule: (b: ArrayBuffer) => reloads.push(b) }) },
 }));
-vi.mock('@engine/TrackerReplayer', async (orig) => ({
-  ...(await orig<object>()),
-  getTrackerReplayer: () => ({ getSong: () => loaded, syncCellToWasmSequencer: () => {}, setChannelMuteMask: () => {}, isPlaying: () => false }),
-}));
+// Store actions peek the replayer singleton (S1) and never construct it.
+vi.mock('@engine/TrackerReplayer', async (orig) => {
+  const fake = () => ({ getSong: () => loaded, syncCellToWasmSequencer: () => {}, setChannelMuteMask: () => {}, isPlaying: () => false });
+  return { ...(await orig<object>()), getTrackerReplayer: fake, peekTrackerReplayer: fake };
+});
 
 function file(rel: string): ArrayBuffer {
   const b = readFileSync(resolve(ROOT, rel));
