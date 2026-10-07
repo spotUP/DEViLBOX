@@ -15,6 +15,7 @@
  * Status per format is recorded in src/lib/import/gridProvenance.ts (EXPORT_ROUND_TRIP).
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { noteValueToPitch } from '@/lib/tracker/noteValue';
 import { createHash } from 'node:crypto';
 import { isSunTronicV13Format } from '@/lib/import/formats/SunTronicV13';
 import { openUade, PaulaSession } from './gridOracle';
@@ -72,7 +73,7 @@ function corpus(exts: string[], inDir?: string): string[] {
 }
 
 /** The emscripten bundles the grid walks of these parsers fetch (public/<dir>/<name>.js + .wasm). */
-const WASM_BUNDLES: Array<[string, string]> = [['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd']];
+const WASM_BUNDLES: Array<[string, string]> = [['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd'], ['tfmx', 'TFMX']];
 
 beforeAll(() => {
   const g = globalThis as Record<string, unknown>;
@@ -111,7 +112,7 @@ function sunTronicCorpus(): string[] {
 
 /** gridProvenance key -> its corpus. */
 const FORMATS: FormatRow[] = [
-  { key: 'jochenHippel7V', rig: 'tfmx', held: 'U4 (thoughts/lars/u4-hippel-ledger.md): the TFMX wasm, the walk host, the 7V parser and rebuildHippelModule are being rewritten uncommitted', files: corpus(['.hip7', '.hip']) },
+  { key: 'jochenHippel7V', rig: 'tfmx', files: corpus(['.hip7', '.hip']) },
   { key: 'davidWhittaker', rig: 'paula', files: corpus(['.dw']) },
   { key: 'robHubbard', rig: 'paula', files: corpus(['.rh']) },
   { key: 'benDaglish', rig: 'paula', files: corpus(['.bd']) },
@@ -415,7 +416,8 @@ for (const fmt of FORMATS.filter((f) => !f.held)) {
         expect(at, 'the grid has a note to edit').not.toBeNull();
         const old = before.patterns[at!.p].channels[at!.ch].rows[at!.r];
         const note = at!.note;
-        const delta = note - old.note;
+        // In pitch (the octave below C-0 is stored -12..-1, so stored values skip 0)
+        const delta = noteValueToPitch(note)! - noteValueToPitch(old.note)!;
         st.setCurrentPattern(at!.p);
         st.setCell(at!.ch, at!.r, { note });
         const out = await exportThroughRouter();
@@ -428,8 +430,9 @@ for (const fmt of FORMATS.filter((f) => !f.held)) {
         // sub-pattern) shows the edit wherever it plays: one set of bytes. An echo is a cell that moved
         // by the same interval and kept every other field.
         const echo = (d: string) => {
-          const m = /^(\d+):(\d+):(\d+) (\d+)\/(.*) -> (\d+)\/(.*)$/.exec(d);
-          return !!m && m[5] === m[7] && +m[6] - +m[4] === delta;
+          const m = /^(\d+):(\d+):(\d+) (-?\d+)\/(.*) -> (-?\d+)\/(.*)$/.exec(d);
+          const from = m ? noteValueToPitch(+m[4]) : null, to = m ? noteValueToPitch(+m[6]) : null;
+          return !!m && m[5] === m[7] && from !== null && to !== null && to - from === delta;
         };
         // The edited cell itself is checked by its note below: a format whose instrument IS the note's record
         // (Digital Sonix & Chrome) answers an edited pitch with the record that plays it.
@@ -465,7 +468,7 @@ for (const fmt of FORMATS.filter((f) => !f.held)) {
 describe('native export round trip: the render stage ran', () => {
   it('names every file the replayer rig does not take (nothing is skipped quietly)', () => {
     expect(stats.renders, 'the replayers rendered (sentinel)').toBeGreaterThan(0);
-    expect(FORMATS.filter((f) => f.held).map((f) => f.key), 'formats held out of the run').toEqual(['jochenHippel7V']);
+    expect(FORMATS.filter((f) => f.held).map((f) => f.key), 'formats held out of the run').toEqual([]);
     expect([...NO_RIG].sort()).toEqual([...EXPECTED_NO_RIG].sort());
   });
 });
