@@ -23,6 +23,12 @@ bool ma_select_subsong(MaModule* module, int subsong);
 size_t ma_render(MaModule* module, float* interleaved_stereo, size_t frames);
 bool ma_has_ended(const MaModule* module);
 
+/* The playhead's clock: ticks played since the song (re)started (50 Hz), the frame offsets the last ma_render call's ticks ran at
+ * (returns how many; the last is tick ma_ticks_played, the one before it that minus one, ...), and ticks per row. */
+uint32_t ma_ticks_played(const MaModule* module);
+int ma_tick_marks(const MaModule* module, int* out, int max);
+int ma_tick_speed(const MaModule* module);
+
 void ma_set_channel_mask(MaModule* module, uint32_t mask);
 /* Cumulative note starts of voice ch (reset with the song) and its current volume 0..1. */
 uint32_t ma_note_start_count(const MaModule* module, int ch);

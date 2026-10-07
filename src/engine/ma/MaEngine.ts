@@ -7,6 +7,10 @@
 import { getDevilboxAudioContext } from "@/utils/audio-context";
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
+import { loadMaModule } from '@/lib/import/formats/maModule';
+import { walkMusicAssembler } from '@/lib/import/formats/maWalk';
+import { walkLayout, walkTickPosition, type WalkLayout } from '@/lib/import/formats/walkLayout';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -19,6 +23,11 @@ const meterFeed = new ChannelMeterFeed();
 export class MaEngine extends WASMSingletonBase {
   private static instance: MaEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private readonly _positions = new PositionCallbacks();
+  /** The grid's layout of sub-song 0 (the importer's, from the same walk); null for another sub-song (no grid to follow). */
+  private _layout: WalkLayout | null = null;
+  private _layoutOfSubsong0: WalkLayout | null = null;
 
   private _requestId = 0;
   private _pendingRequests = new Map<number, (data: any) => void>();
@@ -79,6 +88,12 @@ export class MaEngine extends WASMSingletonBase {
         case 'moduleLoaded':
           console.log('[MaEngine] Module loaded');
           break;
+        case 'position': {
+          // the worklet posts the player's tick count when it reaches a new row; the grid's (song position, row) of it is the importer's layout of the same walk
+          const pos = this._layout && typeof data.ticks === 'number' ? walkTickPosition(this._layout, data.ticks) : null;
+          if (pos) this._positions.emit(pos);
+          break;
+        }
         case 'chLevels':
           try {
             const engine = getToneEngine();
@@ -117,7 +132,17 @@ export class MaEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('MaEngine not initialized');
+    // the importer's grid layout of sub-song 0, from the same walk
+    const m = loadMaModule(new Uint8Array(buffer));
+    const walk = m ? walkMusicAssembler(m, 0) : null;
+    this._layoutOfSubsong0 = walk && walk.stop !== 'ended' ? walkLayout(walk) : null;
+    this._layout = this._layoutOfSubsong0;
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+  }
+
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
   }
 
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
@@ -192,6 +217,7 @@ export class MaEngine extends WASMSingletonBase {
   }
 
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     this._pendingRequests.clear();
     if (MaEngine.instance === this) MaEngine.instance = null;
