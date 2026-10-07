@@ -18,6 +18,7 @@ import { robHubbardEffectToString } from './import/formats/robHubbardEffectGlyph
 import { futurePlayerEffectToString } from './import/formats/fpEffectGlyphs';
 import { musicAssemblerEffectToString } from './import/formats/maEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
+import { isLowOctaveNote, midiToNoteValue, noteValueName, noteValueToMidi, parseNoteName } from '@/lib/tracker/noteValue';
 
 /**
  * Note names for XM encoding
@@ -27,11 +28,12 @@ const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 
 /**
  * Convert string note to XM note number
  *
- * @param note String note ("C-4", "D#5", "===", null)
- * @returns XM note number (0 = empty, 1-96 = notes, 97 = note off)
+ * @param note String note ("C-4", "D#5", "c_1", "===", null)
+ * @returns stored note value (0 = empty, 1-96 = notes, -12..-1 = the octave below C-0, 97 = note off)
  *
  * XM note encoding: (octave * 12) + semitone + 1
- * Example: C-4 = (4 * 12) + 0 + 1 = 49
+ * Example: C-4 = (4 * 12) + 0 + 1 = 49. The octave below C-0 (c_1..b_1) is
+ * stored below zero (src/lib/tracker/noteValue.ts).
  */
 export function stringNoteToXM(note: string | null): number {
   if (note === null || note === '' || note === '...') {
@@ -42,35 +44,12 @@ export function stringNoteToXM(note: string | null): number {
     return 97; // Note off
   }
 
-  // Parse note string like "C-4", "C#5", or "C#-4"
-  const match = note.match(/^([A-G])([#-])[-]?(\d)$/);
-  if (!match) {
-    console.warn(`Invalid note format: ${note}`);
+  const v = parseNoteName(note);
+  if (v === null) {
+    console.warn(`Invalid note or out of range: ${note}`);
     return 0;
   }
-
-  const [, noteLetter, sharp, octaveStr] = match;
-  const octave = parseInt(octaveStr, 10);
-
-  // Find semitone (0-11)
-  const noteStr = noteLetter + sharp;
-  const semitone = NOTE_NAMES.indexOf(noteStr);
-
-  if (semitone === -1) {
-    console.warn(`Invalid note name: ${noteStr}`);
-    return 0;
-  }
-
-  // XM encoding: (octave * 12) + semitone + 1
-  // Valid range: 1-96 (C-0 to B-7)
-  const xmNote = (octave * 12) + semitone + 1;
-
-  if (xmNote < 1 || xmNote > 96) {
-    console.warn(`Note out of XM range: ${note} (${xmNote})`);
-    return 0;
-  }
-
-  return xmNote;
+  return v;
 }
 
 // Pre-computed XM note → display string lookup (avoids template literal per call)
@@ -94,6 +73,7 @@ for (let i = 1; i <= 96; i++) {
  * @returns String note ("C-4", "D#5", "===", "...")
  */
 export function xmNoteToString(xmNote: number): string {
+  if (xmNote < 0) return noteValueName(xmNote) ?? '...';
   return XM_NOTE_STRING_LOOKUP[xmNote] || '...';
 }
 
@@ -107,8 +87,8 @@ export function xmNoteToString(xmNote: number): string {
  */
 export function noteToMidi(note: string | number | null | undefined): number {
   if (typeof note === 'number') {
-    // XM format: 1 = C-0, add 11 to get MIDI (C-0 = 12)
-    return note + 11;
+    // XM format: 1 = C-0, add 11 to get MIDI (C-0 = 12); the octave below C-0 is MIDI 0..11
+    return noteValueToMidi(note) ?? note + 11;
   }
 
   // Handle null, undefined, empty, or special note values
@@ -446,6 +426,7 @@ for (let i = 1; i <= 96; i++) {
  * @returns Tone.js note string ("C4", "D#5", etc.) or null
  */
 export function xmNoteToToneJS(xmNote: number): string | null {
+  if (isLowOctaveNote(xmNote)) return `${NOTE_NAMES[xmNote + 12].replace('-', '')}-1`;
   if (xmNote < 1 || xmNote > 96) return null;
   return TONE_NOTE_LOOKUP[xmNote];
 }
@@ -461,27 +442,19 @@ export function xmNoteToMidi(xmNote: number): number | null {
     return null; // Empty or note off
   }
 
-  if (xmNote < 1 || xmNote > 96) {
-    console.warn(`Invalid XM note: ${xmNote}`);
-    return null;
-  }
-
-  // XM note 1 = C-0 = MIDI note 12
-  // XM note 49 = C-4 = MIDI note 60 (middle C)
-  return xmNote + 11;
+  // XM note 1 = C-0 = MIDI note 12, XM note 49 = C-4 = MIDI 60 (middle C);
+  // the octave below C-0 (-12..-1) is MIDI 0..11.
+  const midi = noteValueToMidi(xmNote);
+  if (midi === null) console.warn(`Invalid XM note: ${xmNote}`);
+  return midi;
 }
 
 /**
  * Convert MIDI note number to XM note number
  *
  * @param midiNote MIDI note number (0-127)
- * @returns XM note number (1-96, clamped)
+ * @returns stored note value: MIDI 0..11 = the octave below C-0 (-12..-1), 12..107 = 1..96 (clamped above)
  */
 export function midiToXMNote(midiNote: number): number {
-  // MIDI note 12 = C-0 = XM note 1
-  // MIDI note 60 = C-4 = XM note 49
-  const xmNote = midiNote - 11;
-
-  // Clamp to valid XM range (1-96)
-  return Math.min(96, Math.max(1, xmNote));
+  return midiToNoteValue(Math.max(0, Math.min(107, Math.round(midiNote))));
 }

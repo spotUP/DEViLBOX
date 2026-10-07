@@ -231,7 +231,7 @@ export function createMcpServer(): McpServer {
       channel: z.number().int().min(0).describe('Channel index'),
       row: z.number().int().min(0).describe('Row index'),
       patternIndex: z.number().int().min(0).optional().describe('Pattern index (default: current)'),
-      note: z.union([z.number(), z.string()]).optional().describe('Note: 1-96, 97=off, or "C-4"/"OFF"'),
+      note: z.union([z.number(), z.string()]).optional().describe('Note: 1-96 (1 = C-0), -12..-1 = the octave below C-0 (c_1..b_1), 97=off, or "C-4"/"c_1"/"OFF"'),
       instrument: z.number().int().min(0).max(128).optional().describe('Instrument (1-128, 0=none)'),
       volume: z.number().int().min(0).max(255).optional().describe('Volume column'),
       effTyp: z.number().int().min(0).max(35).optional().describe('Effect type'),

@@ -13,6 +13,7 @@ import { AudioExportPanel } from './AudioExportPanel';
 import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
+import { notify } from '@stores/useNotificationStore';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -51,13 +52,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
     try {
       switch (ex.exportMode) {
         case 'song':
-          return ex.handleExportSong(onClose);
+          return await ex.handleExportSong(onClose);
 
         case 'sfx':
-          return ex.handleExportSFX(onClose);
+          return await ex.handleExportSFX(onClose);
 
         case 'instrument':
-          return ex.handleExportInstrument(onClose);
+          return await ex.handleExportInstrument(onClose);
 
         case 'audio': {
           if (await audioHandlerRef.current?.() === false) return;
@@ -83,13 +84,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         }
 
         case 'fur':
-          return ex.handleExportFur((b, n) => saveAs(b, n), onClose);
+          return await ex.handleExportFur((b, n) => saveAs(b, n), onClose);
 
         case 'nano':
-          return ex.handleExportNano((b, n) => saveAs(b, n), onClose);
+          return await ex.handleExportNano((b, n) => saveAs(b, n), onClose);
 
         case 'native':
-          return ex.handleExportNative((b, n) => saveAs(b, n), onClose);
+          return await ex.handleExportNative((b, n) => saveAs(b, n), onClose);
       }
 
       // Only close if no warnings (warnings will show in dialog)
@@ -97,7 +98,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         onClose();
       }
     } catch (error) {
+      // A refusal (e.g. notes a format cannot hold) is the user's to read, not the console's
       console.error('Export failed:', error);
+      notify.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 

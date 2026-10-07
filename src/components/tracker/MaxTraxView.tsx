@@ -69,7 +69,7 @@ export const MaxTraxView: React.FC = () => {
       }
     } catch (err) {
       console.error(`[MaxTraxView] ${verb} error`, err);
-      notify.error(`${capitalized} failed — see console.`, 3000);
+      notify.error(`${capitalized} failed: ${err instanceof Error ? err.message : String(err)}`, 5000);
     }
   };
 

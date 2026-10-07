@@ -12,6 +12,8 @@
  * are discarded.
  */
 
+import { pitchToNoteValue } from '@/lib/tracker/noteValue';
+
 /**
  * Lowest `schemaVersion` the current code can forward-migrate and load.
  *
@@ -85,4 +87,39 @@ export function migrateMixerChannelShape<T extends object>(channel: T): T {
     rest.dubShapeValue = mode === 'off' ? 0 : (typeof dubFilterHz === 'number' && Number.isFinite(dubFilterHz) ? dubFilterHz : 200);
   }
   return rest as T;
+}
+
+/**
+ * Songs saved while two parsers shifted a whole grid up to fit it above C-0 (Hippel TFMX, 858d8ef85: cells
+ * carry `hippelBias`; Future Player, 2673e7140: instruments carry `metadata.fpOctaveBias`) are moved back
+ * down to the pitch they play, now that the grid holds the octave below C-0 (G15, src/lib/tracker/noteValue.ts).
+ * Without this their export would write every note an octave off, because the writers no longer add a shift.
+ * Keyed on the fields themselves, which it removes, so it is idempotent and leaves every other song untouched.
+ * Mutates and returns its arguments.
+ */
+export function migrateGridOctaveBias<P extends { channels: Array<{ rows: Array<Record<string, unknown>> }> }, I extends { metadata?: Record<string, unknown> }>(
+  patterns: P[],
+  instruments: I[],
+): { patterns: P[]; instruments: I[]; shifted: number } {
+  let bias = 0;
+  for (const p of patterns) for (const ch of p.channels) for (const c of ch.rows) {
+    const b = c?.hippelBias;
+    if (typeof b === 'number' && b !== 0) bias = b;
+  }
+  for (const inst of instruments) {
+    const b = inst.metadata?.fpOctaveBias;
+    if (typeof b === 'number' && b !== 0) bias = b;
+    if (inst.metadata && 'fpOctaveBias' in inst.metadata) delete inst.metadata.fpOctaveBias;
+  }
+  let shifted = 0;
+  for (const p of patterns) for (const ch of p.channels) for (const c of ch.rows) {
+    if (!c) continue;
+    if ('hippelBias' in c) delete c.hippelBias;
+    if (bias === 0) continue;
+    for (const key of ['note', 'note2', 'note3', 'note4'] as const) {
+      const v = c[key];
+      if (typeof v === 'number' && v >= 1 && v <= 96) { c[key] = pitchToNoteValue(v - bias); shifted++; }
+    }
+  }
+  return { patterns, instruments, shifted };
 }

@@ -7,6 +7,7 @@
 
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
 import type { GrooveTemplate } from '@/types/audio';
+import { noteValueToMidi } from '@/lib/tracker/noteValue';
 
 // Re-export groove helpers used by TrackerReplayer
 export { getGrooveOffset, getGrooveVelocity };
@@ -161,6 +162,11 @@ for (let oct = 0; oct < 3; oct++) {
  * Maps to MIDI: XM + 11 = MIDI (so XM 25 = MIDI 36 = C2)
  */
 export function xmNoteToNoteName(xmNote: number): string {
+  if (xmNote < 0) {
+    // The octave below C-0 (stored -12..-1) is MIDI 0..11, octave -1
+    const midi = noteValueToMidi(xmNote);
+    if (midi !== null) return `${NOTE_NAMES_CLEAN[midi % 12]}-1`;
+  }
   return XM_NOTE_NAMES[xmNote] || 'C4';
 }
 

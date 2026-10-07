@@ -6,6 +6,7 @@
  */
 
 import type { Pattern } from '@/types/tracker';
+import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
 import type { InstrumentConfig } from '@/types/instrument';
 import * as osl from '@lib/import/wasm/OpenMPTSoundlib';
 import type { SaveFormat, PatternCell } from '@lib/import/wasm/OpenMPTSoundlib';
@@ -84,6 +85,9 @@ export async function exportWithOpenMPT(
 ): Promise<OpenMPTExportResult> {
   const warnings: string[] = [];
   const format = options.format;
+  // MOD/XM/IT/S3M have no note below C-0: a song with notes there is refused, never written an octave off or dropped.
+  const refusal = lowOctaveExportRefusal(patterns, format.toUpperCase());
+  if (refusal) throw new Error(refusal);
   const numChannels = options.channelLimit || patterns[0]?.channels.length || 4;
 
   // Bake automation curves into pattern effects before writing to OpenMPT
