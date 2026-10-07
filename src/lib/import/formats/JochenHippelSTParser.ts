@@ -23,6 +23,7 @@ import {
   hstU16, hstU32, type HstModule,
 } from './JochenHippelSTModule';
 import { HstSongEdit, hstGrid } from './JochenHippelSTSong';
+import { parseHippelTfmxAmigaFile } from './JochenHippel7VParser';
 
 const MIN_FILE_SIZE = 20;
 
@@ -309,12 +310,16 @@ export function isJochenHippelAmigaSogFormat(buffer: ArrayBuffer | Uint8Array): 
 }
 
 /**
- * The Amiga SOG./MCMD. module as one empty pattern; its audio is
- * libtfmxaudiodecoder's (hippelFileData). Not decoded: provenance row 'hip'.
+ * The Amiga SOG. module (a TFMX song behind its replay code) as the grid the
+ * decoder walks (HippelTfmxWalk, JochenHippel7VParser.buildHippelTfmxSong); its
+ * audio is libtfmxaudiodecoder's (hippelFileData). An MCMD module, whose song
+ * the decoder does not read as TFMX, is one empty pattern in the scope view.
  */
 export function parseJochenHippelAmigaSogFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isJochenHippelAmigaSogFormat(buf)) throw new Error('Not a Jochen Hippel SOG/MCMD module');
+  const walked = parseHippelTfmxAmigaFile(buffer, filename);
+  if (walked) return walked;
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^(sog|mcmd)\./i, '').replace(/\.(hip|mcmd)$/i, '') || baseName;
   const emptyRows = Array.from({ length: 64 }, emptyCell);
@@ -341,5 +346,6 @@ export function parseJochenHippelAmigaSogFile(buffer: ArrayBuffer, filename: str
     songPositions: [0], songLength: 1, restartPosition: 0, numChannels: 4,
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     hippelFileData: buffer.slice(0),
+    gridUnmatchedReason: 'an MCMD module: its song is not read as TFMX, so its pattern data is not decoded',
   };
 }
