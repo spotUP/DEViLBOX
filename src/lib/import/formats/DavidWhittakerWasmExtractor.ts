@@ -14,6 +14,8 @@ interface DwWasmModule {
   _free(p: number): void;
   _dw_create(data: number, size: number, sampleRate: number): number;
   _dw_destroy(handle: number): void;
+  _dw_subsong_count(handle: number): number;
+  _dw_select_subsong(handle: number, subsong: number): boolean;
   _dw_walk(handle: number, maxTicks: number, out: number, maxEvents: number, info: number): number;
   HEAPU8: Uint8Array;
 }
@@ -79,11 +81,11 @@ const MAX_EVENTS = 200_000;
 const EXTRACT_SAMPLE_RATE = 44100;
 
 /**
- * Run subsong 0 from its start until every voice with a track has played its list once (the longest
+ * Run subsong `subsong` from its start until every voice with a track has played its list once (the longest
  * voice's pass is the song; shorter voices loop inside it, as the replayer loops them), or `maxTicks`.
  * Throws when the replayer refuses the file.
  */
-export async function walkDavidWhittaker(buffer: ArrayBuffer, maxTicks = 60_000): Promise<DwWalk> {
+export async function walkDavidWhittaker(buffer: ArrayBuffer, maxTicks = 60_000, subsong = 0): Promise<DwWalk> {
   const M = await getModule();
   const data = new Uint8Array(buffer);
   const p = M._malloc(data.length);
@@ -91,6 +93,10 @@ export async function walkDavidWhittaker(buffer: ArrayBuffer, maxTicks = 60_000)
   const handle = M._dw_create(p, data.length, EXTRACT_SAMPLE_RATE);
   M._free(p);
   if (!handle) throw new Error('the David Whittaker replayer refused the file');
+  if (!M._dw_select_subsong(handle, subsong)) {
+    M._dw_destroy(handle);
+    throw new Error(`the David Whittaker replayer has no subsong ${subsong}`);
+  }
   const out = M._malloc(MAX_EVENTS * 7 * 4);
   const info = M._malloc(16 * 4);
   try {
@@ -110,6 +116,22 @@ export async function walkDavidWhittaker(buffer: ArrayBuffer, maxTicks = 60_000)
   } finally {
     M._free(out);
     M._free(info);
+    M._dw_destroy(handle);
+  }
+}
+
+/** Subsongs the replayer finds in the file (the count it plays from, not the module scan's). */
+export async function dwSubsongCount(buffer: ArrayBuffer): Promise<number> {
+  const M = await getModule();
+  const data = new Uint8Array(buffer);
+  const p = M._malloc(data.length);
+  M.HEAPU8.set(data, p);
+  const handle = M._dw_create(p, data.length, EXTRACT_SAMPLE_RATE);
+  M._free(p);
+  if (!handle) return 0;
+  try {
+    return M._dw_subsong_count(handle);
+  } finally {
     M._dw_destroy(handle);
   }
 }

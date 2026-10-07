@@ -14,7 +14,7 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
-function davidwhittakerTransform(code: string): string {
+export function davidwhittakerTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -101,10 +101,11 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
     this.workletNode.connect(this.output, 0);
   }
 
-  async loadTune(buffer: ArrayBuffer): Promise<void> {
+  /** Load the module and start on `subsong` (0-based) - the tune the song's grid shows. */
+  async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('DavidWhittakerEngine not initialized');
-    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
   }
 
   play(): void {

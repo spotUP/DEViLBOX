@@ -104,6 +104,8 @@ export async function tryRouteFormat(
   companionFiles?: Map<string, ArrayBuffer>,
   /** The UADE engine the scan runs on (a deck's own, or the editor's when absent). */
   uadeEngine?: UADEEngine,
+  /** The tune a person asked for in a command-stream file (David Whittaker, ...); absent: the first that sounds. */
+  requestedSubsong?: number,
 ): Promise<TrackerSong | null> {
   const ctx: FallbackContext = { buffer, originalFileName, prefs, subsong, preScannedMeta, companionFiles, uadeEngine };
 
@@ -667,7 +669,7 @@ export async function tryRouteFormat(
         if (prefs.davidWhittaker !== 'uade') {
       try {
         const { parseDavidWhittakerFile } = await import('@lib/import/formats/DavidWhittakerParser');
-        const dwResult = await parseDavidWhittakerFile(buffer, originalFileName);
+        const dwResult = await parseDavidWhittakerFile(buffer, originalFileName, 0, requestedSubsong);
         // A song the replayer's walk could not be matched to opens in the scope view (no guessed grid);
         // check if native parser produced any notes; if not, fall to UADE
         const dwNotes = dwResult.patterns.reduce((sum: number, p: any) =>
@@ -1710,7 +1712,13 @@ export async function tryRouteFormat(
   // ── Jason Page (jpn.* / jpnd.* / jp.* / jpo.* / jpold.*) ──────────────────
   // Two-file format: song data (JPN.*) + samples (SMP.*). Native parser extracts
   // real PCM samples from companion file; UADE enhanced scan captures patterns.
-  if (matchesExt(filename, ['jpn', 'jpnd', 'jp', 'jpo', 'jpold'])) {
+  // .jpo/.jpold is shared with Steve Turner (the same extension, a different player): its strict 68k
+  // signature decides, and the Steve Turner branch below takes the file. Before, this branch took every
+  // .jpo (Jason Page's detector accepts them too), the Steve Turner parser and its keyboard voice were
+  // unreachable, and the song opened as a UADE scan.
+  const steveTurnerFile = matchesExt(filename, ['jpo', 'jpold'])
+    && (await import('@lib/import/formats/SteveTurnerParser')).isSteveTurnerFormat(new Uint8Array(ctx.buffer));
+  if (!steveTurnerFile && matchesExt(filename, ['jpn', 'jpnd', 'jp', 'jpo', 'jpold'])) {
     const { isJasonPageFormat, parseJasonPageFile } = await import('@lib/import/formats/JasonPageParser');
     return withNativeThenUADE('jasonPage', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {

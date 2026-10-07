@@ -1,7 +1,8 @@
 /**
  * One subsong switch for every song that has subsongs: Furnace modules, UADE
  * editable formats, C64 SID, ActivisionPro and the whole-song engines
- * (game-music-emu, ASAP, PSG play). The FT2 toolbar's previous / next
+ * (game-music-emu, ASAP, PSG play) and the command-stream formats (David Whittaker, ...:
+ * lib/import/fileSubsongs, a switch reopens the file at the tune). The FT2 toolbar's previous / next
  * buttons, the format selectors and the scope view's control all switch
  * through `switchSubsong`, so a subsong change does the same thing wherever
  * it starts.
@@ -9,7 +10,7 @@
 import { useFormatStore, type FormatStore } from '@stores/useFormatStore';
 import { notify } from '@stores/useNotificationStore';
 
-export type SubsongSource = 'furnace' | 'uade' | 'sid' | 'activisionPro' | 'native';
+export type SubsongSource = 'furnace' | 'uade' | 'sid' | 'activisionPro' | 'native' | 'file';
 
 export interface SubsongStatus {
   source: SubsongSource;
@@ -20,7 +21,7 @@ export interface SubsongStatus {
 
 type SubsongFields = Pick<FormatStore,
   'furnaceSubsongs' | 'furnaceActiveSubsong' | 'uadeEditableSubsongs' | 'uadeEditableCurrentSubsong'
-  | 'sidMetadata' | 'activisionProSubsongCount' | 'activisionProCurrentSubsong' | 'nativeSubsongs'>;
+  | 'sidMetadata' | 'activisionProSubsongCount' | 'activisionProCurrentSubsong' | 'nativeSubsongs' | 'fileSubsongs'>;
 
 /** The subsongs of the song loaded, from whichever format holds them; null when it has none. */
 export function subsongStatus(f: SubsongFields): SubsongStatus | null {
@@ -35,6 +36,9 @@ export function subsongStatus(f: SubsongFields): SubsongStatus | null {
   }
   if (f.activisionProSubsongCount > 0) {
     return { source: 'activisionPro', count: f.activisionProSubsongCount, current: f.activisionProCurrentSubsong };
+  }
+  if (f.fileSubsongs) {
+    return { source: 'file', count: f.fileSubsongs.count, current: f.fileSubsongs.current };
   }
   if (f.nativeSubsongs) {
     return { source: 'native', count: f.nativeSubsongs.count, current: f.nativeSubsongs.current };
@@ -137,6 +141,11 @@ export async function switchSubsong(index: number): Promise<void> {
         }
       } catch { /* engine not loaded yet */ }
       notify.success(`Subsong ${index + 1}/${status.count}`);
+      return;
+    }
+    case 'file': {
+      const { reopenAtFileSubsong } = await import('@/lib/song/reopenSubsong');
+      await reopenAtFileSubsong(index);
       return;
     }
     case 'native': {

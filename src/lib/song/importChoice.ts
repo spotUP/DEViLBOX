@@ -36,10 +36,11 @@ export function needsCompanionPrompt(filename: string, companionCount: number): 
 }
 
 /** The D1 rule: does this prepared song need the import dialog? */
-export function needsImportChoice(p: Pick<PreparedSong, 'file' | 'songKind' | 'companions' | 'uadeMetadata' | 'sidInfo'>): boolean {
+export function needsImportChoice(p: Pick<PreparedSong, 'file' | 'songKind' | 'companions' | 'uadeMetadata' | 'sidInfo' | 'fileSubsongs'>): boolean {
   if (OWN_DIALOG.test(p.file.name)) return true;
   if (p.songKind !== 'module') return false;
   if ((p.uadeMetadata?.subsongCount ?? 0) > 1) return true;
   if ((p.sidInfo?.subsongs ?? 0) > 1) return true;
+  if ((p.fileSubsongs?.count ?? 0) > 1) return true;
   return needsCompanionPrompt(p.file.name, p.companions?.size ?? 0);
 }

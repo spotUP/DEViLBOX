@@ -401,6 +401,11 @@ export interface TrackerSong {
   gridUnmatchedReason?: string;
   /** Subsong to start (0-based index into the player's min..max), the native subsong model's start field */
   eaglePlayerSubsong?: number;
+  /**
+   * The subsongs of a command-stream file (lib/import/fileSubsongs): how many the file holds and
+   * which one the grid was built from and the engine plays. Absent for a format with one tune.
+   */
+  fileSubsongs?: { count: number; current: number; fileName: string };
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */
   startrekkerAMFileData?: ArrayBuffer;
   /** Raw Startrekker AM .nt synth data for StartrekkerAMEngine WASM playback */

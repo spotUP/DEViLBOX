@@ -2513,6 +2513,9 @@ bool dw_select_subsong(DwModule* module, int subsong) {
 
     initialize_sound(module, subsong);
     module->current_song = subsong;
+    // The voices of the tune left behind keep sounding their last sample otherwise (a tune with fewer
+    // voices would play the other tune's tail on the voices it does not use).
+    for (int i = 0; i < module->number_of_channels; i++) mixer_mute(&module->mixer_channels[i]);
     return true;
 }
 

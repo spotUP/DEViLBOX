@@ -29,6 +29,7 @@ import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder
 import { DEFAULT_DAVID_WHITTAKER } from '@/types/instrument';
 import { davidWhittakerEncoder } from '@/engine/uade/encoders/DavidWhittakerEncoder';
 import { walkDavidWhittaker, DW_WALK } from './DavidWhittakerWasmExtractor';
+import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField } from '../fileSubsongs';
 import { buildDWGridFromWalk } from './davidWhittakerGrid';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
@@ -602,7 +603,7 @@ function buildDWFilePatterns(buf: Uint8Array, scan: DWParseResult, song: DWSong,
  *                     DavidWhittaker is a compiled Amiga binary; use UADEEngine.scanMemoryForMagic
  *                     with the 0x47fa (lea x,a3) opcode to find the actual base address.
  */
-export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, moduleBase = 0): Promise<TrackerSong> {
+export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, moduleBase = 0, subsong?: number): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   const baseName = filename.replace(/\.[^.]+$/, '');
 
@@ -613,6 +614,11 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
   } catch {
     // Fall through to default
   }
+
+  // The tune the grid shows: the one asked for, else the first the replayer's walk makes a sound in.
+  const fallbackTunes = { count: 1, current: 0, fileName: filename };
+  const tunes = await chooseFileSubsong(fileSubsongFormatByKey('davidWhittaker')!, buffer, filename, subsong).catch(() => fallbackTunes);
+  const tune = scanResult && tunes.current < scanResult.songs.length ? tunes.current : 0;
 
   const instruments: InstrumentConfig[] = [];
 
@@ -717,11 +723,11 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
   let unmatched: string | null = null;
 
   if (scanResult && scanResult.songs.length > 0) {
-    const song = scanResult.songs[0];
+    const song = scanResult.songs[tune];
     initialSpeed = song.speed || 6;
     filePatterns = buildDWFilePatterns(buf, scanResult, song, CHANNELS);
     try {
-      const walk = await walkDavidWhittaker(buffer);
+      const walk = await walkDavidWhittaker(buffer, undefined, tune);
       const grid = buildDWGridFromWalk(walk);
       const known = new Set(filePatterns.filePatternAddrs);
       const stray = walk.events.find((e) => e.block !== 0xffffffff && !known.has(e.block));
@@ -775,6 +781,7 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
     davidWhittakerFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    ...fileSubsongsField({ ...tunes, current: tune }),
   };
 
   if (filePatterns && !unmatched) {

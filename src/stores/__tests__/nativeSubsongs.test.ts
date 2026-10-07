@@ -51,7 +51,7 @@ describe('the whole-song subsong model', () => {
 describe('the one subsong switch', () => {
   const none = {
     furnaceSubsongs: null, furnaceActiveSubsong: 0, uadeEditableSubsongs: null, uadeEditableCurrentSubsong: 0,
-    sidMetadata: null, activisionProSubsongCount: 0, activisionProCurrentSubsong: 0, nativeSubsongs: null,
+    sidMetadata: null, activisionProSubsongCount: 0, activisionProCurrentSubsong: 0, nativeSubsongs: null, fileSubsongs: null,
   };
 
   beforeEach(() => { useFormatStore.setState(none); });
@@ -64,6 +64,8 @@ describe('the one subsong switch', () => {
       .toEqual({ source: 'activisionPro', count: 3, current: 1 });
     expect(subsongStatus({ ...none, nativeSubsongs: normalizeSubsongs('Psgplay', 7, 6) }))
       .toEqual({ source: 'native', count: 7, current: 6 });
+    expect(subsongStatus({ ...none, fileSubsongs: { count: 8, current: 1, fileName: 'apb.dw' } }))
+      .toEqual({ source: 'file', count: 8, current: 1 });
   });
 
   it('previous and next stay inside the song', () => {
