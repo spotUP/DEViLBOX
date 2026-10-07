@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadUADEModule, refreshHeap, type UADEModule } from '../../../tools/uade-audit/uadeRenderCore';
+import { openUade, PaulaSession } from './gridOracle';
 import { decodeActivisionProModule } from '@/lib/import/formats/ActivisionProModule';
 import { walkActivisionPro, avpStepTicks, AVP_ROWS_PER_PATTERN, type AvpEventStart } from '@/lib/import/formats/activisionProGrid';
 import { parseActivisionProFile } from '@/lib/import/formats/ActivisionProParser';
@@ -26,35 +26,15 @@ import { parseActivisionProFile } from '@/lib/import/formats/ActivisionProParser
 const TOL = 45;
 const SONG = 'public/data/songs/activision-pro/gettysburg.avp';
 
-interface LogModule extends UADEModule {
-  _uade_wasm_enable_paula_log(on: number): void;
-  _uade_wasm_get_paula_log(outPtr: number, max: number): number;
-}
-
 /** UADE's period writes per voice: [ms, period]. */
 async function uadePeriods(bytes: Uint8Array): Promise<number[][][]> {
-  const mod = (await loadUADEModule(false)) as LogModule;
-  if (mod._uade_wasm_init(44100) !== 0) throw new Error('uade init failed');
-  const ptr = mod._malloc(bytes.byteLength);
-  refreshHeap(mod);
-  mod.HEAPU8.set(bytes, ptr);
-  const hint = mod._malloc(64);
-  mod.stringToUTF8('gettysburg.avp', hint, 64);
-  mod._uade_wasm_stop(); mod._uade_wasm_set_looping(0); mod._uade_wasm_set_one_subsong(1);
-  if (mod._uade_wasm_load(ptr, bytes.byteLength, hint) !== 0) throw new Error('UADE refused the module');
-  mod._uade_wasm_enable_paula_log(1);
-  const CH = 441;
-  const pL = mod._malloc(CH * 4), pR = mod._malloc(CH * 4), log = mod._malloc(512 * 12);
+  const mod = await openUade();
+  const session = new PaulaSession(mod, bytes, 'gettysburg.avp', { logBeforeLoad: false });
   const per: number[][][] = [[], [], [], []];
   for (let chunk = 1; chunk < 19500; chunk++) {
-    if (mod._uade_wasm_render(pL, pR, CH) <= 0) break;
-    const n = mod._uade_wasm_get_paula_log(log, 512);
-    refreshHeap(mod);
-    const u32 = new Uint32Array(mod.HEAPU8.buffer, log, n * 3);
-    for (let i = 0; i < n; i++) {
-      const w = u32[i * 3];
-      if (((w >>> 16) & 0xff) === 3 && (w >>> 24) < 4) per[w >>> 24].push([chunk * 10, w & 0xffff]);
-    }
+    const writes = session.step();
+    if (!writes) break;
+    for (const w of writes) if (w.reg === 3 && w.voice < 4) per[w.voice].push([chunk * 10, w.value]);
   }
   mod._uade_wasm_stop();
   return per;

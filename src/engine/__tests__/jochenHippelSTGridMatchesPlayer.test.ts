@@ -17,7 +17,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { loadUADEModule, refreshHeap, type UADEModule } from '../../../tools/uade-audit/uadeRenderCore';
+import { refreshHeap } from '../../../tools/uade-audit/uadeRenderCore';
+import { openUade, drainPaulaLog, readChipRam, writeChipRam, chipRamEngine, type PaulaLogModule as LogModule } from './gridOracle';
 import {
   decodeHstModule, encodeHstModule, compressHstSong, simulateHstSubsong, hstSubsongRange, hstHeader, hstU16, hstU32,
   perRowHstOffsets, type HstModule, type HstPlayback,
@@ -31,13 +32,6 @@ vi.mock('@/engine/uade/UADEEngine', () => ({ UADEEngine: { hasInstance: () => tr
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import type { UADEEngine } from '@/engine/uade/UADEEngine';
 
-interface LogModule extends UADEModule {
-  _uade_wasm_enable_paula_log(on: number): void;
-  _uade_wasm_get_paula_log(outPtr: number, max: number): number;
-  _uade_wasm_read_memory(addr: number, dst: number, len: number): number;
-  _uade_wasm_write_memory(addr: number, src: number, len: number): number;
-  _uade_wasm_set_subsong(n: number): void;
-}
 
 const ROOT = join(process.cwd(), 'public/data/songs');
 const CORPUS = [
@@ -103,33 +97,14 @@ class Uade {
     if (subsong > 1) m._uade_wasm_set_subsong(subsong);
   }
   render(): void { this.mod._uade_wasm_render(this.pL, this.pR, HALF_TICK); }
-  read(addr: number, len: number): Uint8Array {
-    const p = this.mod._malloc(len);
-    this.mod._uade_wasm_read_memory(addr, p, len);
-    refreshHeap(this.mod);
-    const out = this.mod.HEAPU8.slice(p, p + len);
-    this.mod._free(p);
-    return out;
-  }
-  write(addr: number, data: Uint8Array): void {
-    const p = this.mod._malloc(data.length);
-    refreshHeap(this.mod);
-    this.mod.HEAPU8.set(data, p);
-    this.mod._uade_wasm_write_memory(addr, p, data.length);
-    this.mod._free(p);
-  }
+  read(addr: number, len: number): Uint8Array { return readChipRam(this.mod, addr, len); }
+  write(addr: number, data: Uint8Array): void { writeChipRam(this.mod, addr, data); }
   /** The UADEEngine surface UADEChipEditor uses, on this module's chip RAM. */
-  engine(): UADEEngine {
-    return {
-      readMemory: async (addr: number, len: number) => this.read(addr, len),
-      writeMemory: async (addr: number, data: Uint8Array) => this.write(addr, data),
-    } as unknown as UADEEngine;
-  }
+  engine(): UADEEngine { return chipRamEngine(this.mod); }
 }
 
 async function uade(): Promise<Uade> {
-  const mod = (await loadUADEModule(false)) as LogModule;
-  expect(mod._uade_wasm_init(44100)).toBe(0);
+  const mod = await openUade();
   return new Uade(mod);
 }
 
@@ -302,12 +277,8 @@ describe('Jochen Hippel ST grid matches the player', () => {
         const writes: string[] = [];
         for (let h = 0; h < SECONDS * 100; h++) {
           w.render();
-          const n = w.mod._uade_wasm_get_paula_log(logPtr, 4096);
-          refreshHeap(w.mod);
-          const u32 = new Uint32Array(w.mod.HEAPU8.buffer, logPtr, n * 3);
-          for (let i = 0; i < n; i++) {
-            const reg = (u32[i * 3] >>> 16) & 0xff;
-            if (reg > 1) writes.push(`${u32[i * 3] >>> 24}:${reg}:${u32[i * 3] & 0xffff}`); // pointers differ by design
+          for (const pw of drainPaulaLog(w.mod, logPtr, 4096)) {
+            if (pw.reg > 1) writes.push(`${pw.voice}:${pw.reg}:${pw.value}`); // pointers differ by design
           }
         }
         return writes;
