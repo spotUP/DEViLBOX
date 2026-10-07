@@ -229,6 +229,10 @@ typedef struct BdPlayer {
     float frames_per_tick;
     float frames_until_tick;
     int current_subsong;
+    // Playhead: the 50 Hz tick being played, counted from the start of the song and restarted when
+    // the song starts over (-1 before the first tick). The grid is one row per tick (bd_walk).
+    int play_tick;
+    int next_tick;
 } BdPlayer;
 
 struct BdModule {
@@ -258,7 +262,49 @@ struct BdModule {
     size_t file_size;
 
     BdPlayer* player;
+
+    // Walk (bd_walk): every command the track reader executes, with the tick it ran on
+    bool walking;
+    int walk_tick;
+    int walk_count, walk_max;
+    int32_t* walk_out;             // 8 ints per event
+    int walk_end_tick[4];          // tick each voice first reached the end of its position list (-1: not yet)
 };
+
+// Event kinds of bd_walk, in the replayer's own terms. a / b / c are the command's arguments.
+// pos is the byte position inside the track (track events) or inside the position list (position events).
+enum {
+    BD_WALK_NOTE = 0,          // a: sample index (-1 none), b: transposed note, c: the period it plays
+    BD_WALK_REST = 1,          // a: ticks
+    BD_WALK_SAMPLE_MAP = 2,    // a: mapping index
+    BD_WALK_CONTROL = 3,       // a control flag the player ignores
+    BD_WALK_PORTA_ON = 4,      // a: start delay, b: duration, c: delta note (signed)
+    BD_WALK_PORTA_OFF = 5,
+    BD_WALK_FADE_ON = 6,       // a: speed, b: duration, c: add value (signed)
+    BD_WALK_FADE_OFF = 7,
+    BD_WALK_PORTA2_ON = 8,     // a: duration
+    BD_WALK_PORTA2_OFF = 9,
+    BD_WALK_CHAN_VOL = 10,     // a: volume byte, b: slide speed (-1 none), c: slide add (signed)
+    BD_WALK_VOL_SLIDE_OFF = 11,
+    BD_WALK_TRACK_END = 12,    // the track data ran out; the voice moves to the next position
+    BD_WALK_TRANSPOSE = 13,    // position list: a: semitones (signed)
+    BD_WALK_LOOP_COUNT = 14,   // position list: a: times the next track plays
+    BD_WALK_MASTER_FADE = 15,  // position list: a: speed (signed)
+    BD_WALK_MAP_SET = 16,      // position list: a: mapping index, b: sample
+    BD_WALK_END = 17,          // position list: the voice reached its end (a: 1 when it stops for good)
+    BD_WALK_NEXT_TRACK = 18    // position list: a: the track the voice starts, b: its position
+};
+
+static void bd_walk_event(BdModule* mod, const BdVoiceInfo* v, int track, int pos, int kind, int a, int b, int c) {
+    if (!mod->walking || mod->walk_count >= mod->walk_max) return;
+    int32_t* e = mod->walk_out + (size_t)mod->walk_count * 8;
+    e[0] = mod->walk_tick;
+    e[1] = (int32_t)(v - mod->player->voices);
+    e[2] = track;
+    e[3] = pos;
+    e[4] = kind; e[5] = a; e[6] = b; e[7] = c;
+    mod->walk_count++;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Byte reading helpers
@@ -1371,6 +1417,8 @@ static void bd_init_sound(BdModule* mod, int sub_song) {
     p->playing_info.master_volume_fade_speed = 0;
     p->playing_info.master_volume_fade_speed_counter = 1;
     p->playing_info.counter = 6;
+    p->play_tick = -1;
+    p->next_tick = 0;
 
     for (int i = 0; i < 4; i++) {
         BdVoiceInfo* v = &p->voices[i];
@@ -1855,6 +1903,8 @@ static void bd_handle_voice_effects(BdPlayer* p, BdVoicePlaybackInfo* pb, const 
 
 static void bd_parse_track_effect(BdModule* mod, BdVoiceInfo* v, int* position) {
     const BdFeatures* f = &mod->features;
+    int cmd_pos = *position;
+    int trk = v->playing_track;
     uint8_t cmd = v->track[(*position)++];
 
     if (cmd <= f->max_sample_mapping_value) {
@@ -1862,11 +1912,14 @@ static void bd_parse_track_effect(BdModule* mod, BdVoiceInfo* v, int* position) 
         if (index >= 0 && index < 10 && v->sample_mapping[index] < (int)mod->sample_count) {
             v->sample_info = &mod->samples[v->sample_mapping[index]];
         }
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_SAMPLE_MAP, index, 0, 0);
     } else if (cmd == 0xff) {
         v->switch_to_next_position = true;
         (*position)--;
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_TRACK_END, 1, 0, 0);
     } else if ((f->uses_cx_track_effects && cmd < 0xc0) || (f->uses_9x_track_effects && cmd < 0x9b)) {
         // Set control flag - not used
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_CONTROL, cmd, 0, 0);
     } else if ((cmd == 0xc0 && f->uses_cx_track_effects && f->enable_portamento)
                || (cmd == 0x9b && f->uses_9x_track_effects && f->enable_portamento)) {
         v->portamento1_enabled = 255;
@@ -1874,26 +1927,32 @@ static void bd_parse_track_effect(BdModule* mod, BdVoiceInfo* v, int* position) 
         v->portamento_start_delay = v->track[(*position)++];
         v->portamento_duration = v->track[(*position)++];
         v->portamento_delta_note_number = (int8_t)v->track[(*position)++];
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_PORTA_ON, v->portamento_start_delay, v->portamento_duration, v->portamento_delta_note_number);
     } else if ((cmd == 0xc1 && f->uses_cx_track_effects && f->enable_portamento)
                || (cmd == 0x9c && f->uses_9x_track_effects && f->enable_portamento)) {
         v->portamento1_enabled = 0;
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_PORTA_OFF, 0, 0, 0);
     } else if ((cmd == 0xc2 && f->uses_cx_track_effects && f->enable_volume_fade)
                || (cmd == 0x9d && f->uses_9x_track_effects && f->enable_volume_fade)) {
         v->volume_fade_enabled = true;
         v->volume_fade_init_speed = v->track[(*position)++];
         v->volume_fade_duration = v->track[(*position)++];
         v->volume_fade_init_add_value = (int8_t)v->track[(*position)++];
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_FADE_ON, v->volume_fade_init_speed, v->volume_fade_duration, v->volume_fade_init_add_value);
     } else if ((cmd == 0xc3 && f->uses_cx_track_effects && f->enable_volume_fade)
                || (cmd == 0x9e && f->uses_9x_track_effects && f->enable_volume_fade)) {
         v->volume_fade_enabled = false;
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_FADE_OFF, 0, 0, 0);
     } else if ((cmd == 0xc4 && f->uses_cx_track_effects && f->enable_portamento)
                || (cmd == 0x9f && f->uses_9x_track_effects && f->enable_portamento)) {
         v->portamento2_enabled = true;
         v->portamento1_enabled = 0;
         v->portamento_duration = v->track[(*position)++];
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_PORTA2_ON, v->portamento_duration, 0, 0);
     } else if ((cmd == 0xc5 && f->uses_cx_track_effects && f->enable_portamento)
                || (cmd == 0xa0 && f->uses_9x_track_effects && f->enable_portamento)) {
         v->portamento2_enabled = false;
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_PORTA2_OFF, 0, 0, 0);
     } else if ((cmd == 0xc6 && f->uses_cx_track_effects && f->enable_volume_fade)
                || (cmd == 0xa1 && f->uses_9x_track_effects && f->enable_volume_fade)) {
         v->channel_volume = (uint16_t)((v->track[(*position)++] << 8) | 0xff);
@@ -1901,11 +1960,15 @@ static void bd_parse_track_effect(BdModule* mod, BdVoiceInfo* v, int* position) 
         if (f->enable_final_volume_slide) {
             v->channel_volume_slide_speed = v->track[(*position)++];
             v->channel_volume_slide_add_value = (int8_t)v->track[(*position)++];
+            bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_CHAN_VOL, v->channel_volume >> 8, v->channel_volume_slide_speed, v->channel_volume_slide_add_value);
+        } else {
+            bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_CHAN_VOL, v->channel_volume >> 8, -1, 0);
         }
     } else if ((cmd == 0xc7 && f->uses_cx_track_effects && f->enable_final_volume_slide)
                || (cmd == 0xa2 && f->uses_9x_track_effects && f->enable_final_volume_slide)) {
         v->channel_volume_slide_speed = 0;
         v->channel_volume = 0xffff;
+        bd_walk_event(mod, v, trk, cmd_pos, BD_WALK_VOL_SLIDE_OFF, 0, 0, 0);
     }
 }
 
@@ -1925,6 +1988,7 @@ static bool bd_take_next_position(BdModule* mod, BdVoiceInfo* v, BdVoicePlayback
             return true;
         }
 
+        int cmd_pos = position;
         cmd = v->position_list[position++];
         if (cmd < f->max_track_value) {
             break;
@@ -1936,10 +2000,17 @@ static bool bd_take_next_position(BdModule* mod, BdVoiceInfo* v, BdVoicePlayback
                 return true;
             }
             v->transpose = (int8_t)v->position_list[position++];
+            bd_walk_event(mod, v, -1, cmd_pos, BD_WALK_TRANSPOSE, v->transpose, 0, 0);
         } else if (cmd == 0xff) {
+            bool first = !v->reached_end;
             v->reached_end = true;
             if (pb->loop_delay_counter == 0 || pb->loop_delay_counter == 0x8000) {
                 v->channel_enabled = false;
+            }
+            if (first) {
+                int vi = (int)(v - mod->player->voices);
+                if (mod->walk_end_tick[vi] < 0) mod->walk_end_tick[vi] = mod->walk_tick;
+                bd_walk_event(mod, v, -1, cmd_pos, BD_WALK_END, 1, 0, 0);
             }
             return true;
         } else if (cmd == 0xfd && f->master_volume_fade_version > 0) {
@@ -1948,10 +2019,13 @@ static bool bd_take_next_position(BdModule* mod, BdVoiceInfo* v, BdVoicePlayback
                 return true;
             }
             mod->player->playing_info.master_volume_fade_speed = (int8_t)v->position_list[position++];
+            bd_walk_event(mod, v, -1, cmd_pos, BD_WALK_MASTER_FADE, mod->player->playing_info.master_volume_fade_speed, 0, 0);
         } else if (f->enable_f0_track_loop && cmd < 0xf0) {
             v->track_loop_counter = (uint8_t)(cmd - 0xc8);
+            bd_walk_event(mod, v, -1, cmd_pos, BD_WALK_LOOP_COUNT, v->track_loop_counter, 0, 0);
         } else if (f->enable_c0_track_loop && cmd < 0xc0) {
             v->track_loop_counter = (uint8_t)(cmd & 0x1f);
+            bd_walk_event(mod, v, -1, cmd_pos, BD_WALK_LOOP_COUNT, v->track_loop_counter, 0, 0);
         } else {
             // Sample mapping
             int index;
@@ -1968,6 +2042,7 @@ static bool bd_take_next_position(BdModule* mod, BdVoiceInfo* v, BdVoicePlayback
 
             if (index >= 0 && index < 10) {
                 v->sample_mapping[index] = (uint8_t)(v->position_list[position++] / 4);
+                bd_walk_event(mod, v, -1, cmd_pos, BD_WALK_MAP_SET, index, v->sample_mapping[index], 0);
             } else {
                 position++;
             }
@@ -1988,6 +2063,7 @@ static bool bd_take_next_position(BdModule* mod, BdVoiceInfo* v, BdVoicePlayback
     }
 
     v->next_track_position = 0;
+    bd_walk_event(mod, v, -1, v->current_position, BD_WALK_NEXT_TRACK, cmd, v->current_position, 0);
 
     return false;
 }
@@ -2019,6 +2095,7 @@ static bool bd_parse_track(BdModule* mod, BdVoiceInfo* v, BdVoicePlaybackInfo* p
     for (;;) {
         if (position >= (int)v->track_length) {
             v->switch_to_next_position = true;
+            bd_walk_event(mod, v, v->playing_track, position, BD_WALK_TRACK_END, 0, 0, 0);
             break;
         }
 
@@ -2043,6 +2120,7 @@ static bool bd_parse_track(BdModule* mod, BdVoiceInfo* v, BdVoicePlaybackInfo* p
         return true;
     }
 
+    int note_pos = position;
     uint8_t note = v->track[position++];
 
     if (note == 0x7f) {
@@ -2055,6 +2133,7 @@ static bool bd_parse_track(BdModule* mod, BdVoiceInfo* v, BdVoicePlaybackInfo* p
 
         v->ticks_left_for_next_track_command = v->track[position++];
         v->next_track_position = position;
+        bd_walk_event(mod, v, v->playing_track, note_pos, BD_WALK_REST, v->ticks_left_for_next_track_command, 0, 0);
         return false;
     }
 
@@ -2132,6 +2211,7 @@ static bool bd_parse_track(BdModule* mod, BdVoiceInfo* v, BdVoicePlaybackInfo* p
     v->sample_info2 = sample;
 
     if (sample == nullptr) {
+        bd_walk_event(mod, v, v->playing_track, note_pos, BD_WALK_NOTE, -1, note, 0);
         return false;
     }
 
@@ -2140,6 +2220,7 @@ static bool bd_parse_track(BdModule* mod, BdVoiceInfo* v, BdVoicePlaybackInfo* p
 
     bd_setup_sample(p, f, pb, sample, note, ticks, volume, v->channel_volume_slide_speed,
                     v->channel_volume_slide_add_value);
+    bd_walk_event(mod, v, v->playing_track, note_pos, BD_WALK_NOTE, (int)(sample - mod->samples), note, pb->note_period);
 
     return false;
 }
@@ -2192,6 +2273,9 @@ static void bd_player_tick(BdModule* mod) {
     BdPlayer* p = mod->player;
     const BdFeatures* f = &mod->features;
 
+    p->play_tick = p->next_tick;
+    p->next_tick++;
+
     // Handle effects first
     if (f->master_volume_fade_version > 0) {
         bd_do_master_volume_fade(p, f);
@@ -2231,6 +2315,62 @@ static void bd_player_tick(BdModule* mod) {
             bd_handle_voice(mod, &p->voices[i], &p->playback[i]);
         }
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Walk
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Run the current subsong from its start and write every command the replayer executes, each as 8
+ * int32: tick, voice, track number (-1: a position-list command), byte position in the track (or
+ * the position list), kind (BD_WALK_*), a, b, c. Stops when every voice has reached the end of its
+ * position list once, or after `max_ticks`. info[0] ticks run, info[1] the tick the last voice
+ * finished, info[2..5] each voice's end tick (-1 never), info[6] voices, info[7] samples,
+ * info[8] subsongs. Returns the event count.
+ */
+int bd_get_play_tick(const BdModule* module) {
+    return (module != nullptr && module->player != nullptr) ? module->player->play_tick : -1;
+}
+
+int bd_walk(BdModule* mod, int max_ticks, int32_t* out, int max_events, int32_t* info) {
+    if (mod == nullptr || mod->player == nullptr || out == nullptr || max_events <= 0) {
+        return 0;
+    }
+    BdPlayer* p = mod->player;
+    int saved = p->current_subsong;
+    bd_init_sound(mod, saved);
+    mod->walking = true;
+    mod->walk_count = 0;
+    mod->walk_max = max_events;
+    mod->walk_out = out;
+    for (int i = 0; i < 4; i++) mod->walk_end_tick[i] = -1;
+    int ticks = 0;
+    for (; ticks < max_ticks && mod->walk_count < max_events; ticks++) {
+        mod->walk_tick = ticks;
+        bd_player_tick(mod);
+        bool all = true;
+        for (int i = 0; i < 4; i++) {
+            const BdVoiceInfo* v = &p->voices[i];
+            if (!v->channel_enabled && mod->walk_end_tick[i] < 0) mod->walk_end_tick[i] = ticks;
+            if (mod->walk_end_tick[i] < 0) all = false;
+        }
+        if (all) { ticks++; break; }
+    }
+    mod->walking = false;
+    int done = 0;
+    for (int i = 0; i < 4; i++) if (mod->walk_end_tick[i] > done) done = mod->walk_end_tick[i];
+    if (info != nullptr) {
+        info[0] = ticks;
+        info[1] = done;
+        for (int i = 0; i < 4; i++) info[2 + i] = mod->walk_end_tick[i];
+        info[6] = 4;
+        info[7] = (int)mod->sample_count;
+        info[8] = (int)mod->sub_song_count;
+    }
+    int n = mod->walk_count;
+    bd_init_sound(mod, saved);
+    return n;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

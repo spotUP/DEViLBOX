@@ -17,6 +17,8 @@ class BdProcessor extends AudioWorkletProcessor {
     this.initializing = false;
     this.processCount = 0;
     this.muteMask = 0xFFFFFFFF;
+    this._lastSongPos = -1;
+    this._lastRow = -1;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -59,6 +61,7 @@ class BdProcessor extends AudioWorkletProcessor {
 
             heapU8.set(uint8Data, wasmPtr);
             this.module._player_init(wasmPtr, uint8Data.length);
+            this._lastSongPos = -1; this._lastRow = -1;
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
 
@@ -273,6 +276,20 @@ class BdProcessor extends AudioWorkletProcessor {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
+        }
+      }
+    }
+
+    // Playhead: the importer's grid is one row per 50 Hz tick in patterns of 64 rows
+    // (benDaglishGrid.ts), so the replayer's tick is the global row; posted when it changes
+    // (the engine's onPositionUpdate).
+    if (typeof this.module._bd_play_tick === 'function') {
+      const playTick = this.module._bd_play_tick();
+      if (playTick >= 0) {
+        const songPos = Math.floor(playTick / 64), playRow = playTick % 64;
+        if (songPos !== this._lastSongPos || playRow !== this._lastRow) {
+          this._lastSongPos = songPos; this._lastRow = playRow;
+          this.port.postMessage({ type: 'position', songPos, row: playRow });
         }
       }
     }

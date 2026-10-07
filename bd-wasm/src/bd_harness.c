@@ -75,6 +75,17 @@ EXPORT void player_set_channel_gain(int ch, float gain) {
     bd_set_channel_mask(g_module, mask);
 }
 
+EXPORT int bd_play_tick(void) {
+    if (!g_module) return -1;
+    return bd_get_play_tick(g_module);
+}
+
+/* Every command the track reader executes, with its tick (see bd_walk in bd/ben_daglish.c). */
+EXPORT int bd_walk_song(int max_ticks, int32_t *out, int max_events, int32_t *info) {
+    if (!g_module) return 0;
+    return bd_walk(g_module, max_ticks, out, max_events, info);
+}
+
 /* ── Instrument parameter API ─────────────────────────────────────────── */
 
 typedef struct {

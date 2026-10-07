@@ -18,13 +18,19 @@
  *
  * Fixture: public/data/songs/ben-daglish/motorhead-titleandingame.bd (real module).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseBenDaglishFile } from '../BenDaglishParser';
+import { installWasmNodeFetch } from '../../__tests__/helpers/dwNodeFetch';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 const FIXTURE = join(process.cwd(), 'public/data/songs/ben-daglish/motorhead-titleandingame.bd');
+
+// the grid is the replayer's walk (bd-wasm), which the parser loads by fetch
+let restoreFetch = () => {};
+beforeAll(() => { restoreFetch = installWasmNodeFetch('bd', 'Bd'); });
+afterAll(() => restoreFetch());
 
 describe('Ben Daglish pattern codec', () => {
   it('the variable encoder reproduces every track block byte-for-byte', async () => {
