@@ -1276,24 +1276,24 @@ export function setProjectMetadata(params: Record<string, unknown>): Record<stri
 // ─── History ───────────────────────────────────────────────────────────────────
 
 export function undo(): Record<string, unknown> {
-  const restored = useHistoryStore.getState().undo();
+  const history = useHistoryStore.getState();
+  const restored = history.undo();
   if (restored) {
+    // Through the store action: the cells reach the playing engine like a typed edit.
     const patternIndex = useTrackerStore.getState().currentPatternIndex;
-    useTrackerStore.setState((state) => {
-      state.patterns[patternIndex] = restored;
-    });
+    useTrackerStore.getState().replacePattern(patternIndex, restored);
     return { ok: true };
   }
   return { ok: false, error: 'Nothing to undo' };
 }
 
 export function redo(): Record<string, unknown> {
-  const restored = useHistoryStore.getState().redo();
+  const history = useHistoryStore.getState();
+  const restored = history.redo();
   if (restored) {
+    // Through the store action: the cells reach the playing engine like a typed edit.
     const patternIndex = useTrackerStore.getState().currentPatternIndex;
-    useTrackerStore.setState((state) => {
-      state.patterns[patternIndex] = restored;
-    });
+    useTrackerStore.getState().replacePattern(patternIndex, restored);
     return { ok: true };
   }
   return { ok: false, error: 'Nothing to redo' };

@@ -1070,6 +1070,7 @@ export const useTrackerStore = create<TrackerStore>()(
         readMacroSlotHelper(pattern, cursor, macro, useEditorStore.getState().pasteMask, useEditorStore.getState().insertMode);
       });
       useHistoryStore.getState().pushAction('READ_MACRO', 'Apply macro', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 
     // Advanced editing - Apply instrument number to all notes in selection
@@ -1983,13 +1984,17 @@ export const useTrackerStore = create<TrackerStore>()(
     },
 
     // Undo/Redo support
-    replacePattern: (index, pattern) =>
+    // Undo, redo and collaboration all restore a pattern through here, so the
+    // cells that differ reach the playing engine the way a typed edit's do.
+    replacePattern: (index, pattern) => {
+      if (index < 0 || index >= get().patterns.length) return;
+      const beforePattern = get().patterns[index];
       set((state) => {
-        if (index >= 0 && index < state.patterns.length) {
-          // Deep clone the pattern to avoid reference issues
-          state.patterns[index] = structuredClone(pattern);
-        }
-      }),
+        // Deep clone the pattern to avoid reference issues
+        state.patterns[index] = structuredClone(pattern);
+      });
+      syncBulkEdit(index, get().patterns[index], beforePattern);
+    },
 
     // FT2: Pattern Order List management
     addToOrder: (patternIndex, position) => {
