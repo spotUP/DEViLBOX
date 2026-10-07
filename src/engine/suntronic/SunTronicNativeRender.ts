@@ -37,7 +37,7 @@ import {
   type SunSynthInstrument,
   type SunV13Score,
 } from '../../lib/import/formats/SunTronicV13';
-import { SunTronicPlayer } from './SunTronicPlayer';
+import { SunTronicPlayer, type SunWalkGroup } from './SunTronicPlayer';
 import {
   renderSynthTick,
   createVoiceState,
@@ -214,6 +214,11 @@ export class SunTronicNativeRenderer {
   private readonly vUserGain = [1, 1, 1, 1];
 
   /** Set a voice's mixer gain (0 = muted). ch out of range is ignored. */
+  /** Every row any voice decodes, with the sample it was decoded at (playhead). */
+  setRowListener(cb: ((sample: number, group: SunWalkGroup) => void) | null): void {
+    this.player.groupRecorder = cb ? (g) => cb(this.pos, g) : null;
+  }
+
   setVoiceGain(ch: number, gain: number): void {
     if (ch >= 0 && ch < 4) this.vUserGain[ch] = gain < 0 ? 0 : gain;
   }

@@ -23,6 +23,9 @@ import { channelOutputNodeOptions } from '@engine/wasm/WASMSingletonBase';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { parseSunTronicV13Score, type SunV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicNativeRenderer, NATIVE_SAMPLE_RATE, voiceScopeToInt16, type RenderChannels } from './SunTronicNativeRender';
+import { walkSunTronic } from './SunTronicWalk';
+import { SunPlayhead } from './SunTronicPlayhead';
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { pushChannelAudio } from '@/bridge/analysis/ChannelAudioTap';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
@@ -78,6 +81,12 @@ export class SunTronicSongEngine {
   private score: SunV13Score | null = null;
   private slotPcm: (Int8Array | null)[] = [];
   private renderer: SunTronicNativeRenderer | null = null;
+  // The grid row the music is on: voice 0's decoded rows with the sample each was
+  // decoded at, read at the samples the worklet has consumed (NativeEngineRouting
+  // hands onPositionUpdate to the pattern editor).
+  private playhead: SunPlayhead | null = null;
+  private readonly _positions = new PositionCallbacks();
+  private lastReported = '';
 
   // Per-voice mixer gain (mute/solo/volume from useMixerStore, forwarded via the
   // _gainEngineCache broadcast like Cinter4). Persisted here so a renderer rebuild
@@ -170,6 +179,9 @@ export class SunTronicSongEngine {
     this.stopPump();
     this.workletNode.port.postMessage({ type: 'reset' });
     this.renderer = new SunTronicNativeRenderer(this.score, this.slotPcm);
+    this.playhead = new SunPlayhead(walkSunTronic(this.score).voices[0]);
+    this.lastReported = '';
+    this.renderer.setRowListener((sample, g) => { if (g.channel === 0) this.playhead?.push(sample, g); });
     // Re-apply the user's mute/solo/volume to the fresh renderer.
     for (let ch = 0; ch < 4; ch++) this.renderer.setVoiceGain(ch, this.voiceGains[ch]);
     // Wire the per-channel oscilloscope/VU visualizer (4 Paula voices), matching
@@ -255,8 +267,22 @@ export class SunTronicSongEngine {
   private startPump(): void {
     if (this.pump) return;
     this.pump = setInterval(() => {
-      if (this.playing) this.produceUntilLookahead();
+      if (this.playing) { this.produceUntilLookahead(); this.reportPosition(); }
     }, PUMP_INTERVAL_MS);
+  }
+
+  /** The row and song-order index the music is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
+  }
+
+  private reportPosition(): void {
+    const at = this.playhead?.at(this.consumed);
+    if (!at) return;
+    const key = `${at.songPos}:${at.row}`;
+    if (key === this.lastReported) return;
+    this.lastReported = key;
+    this._positions.emit(at);
   }
 
   private stopPump(): void {
@@ -275,6 +301,7 @@ export class SunTronicSongEngine {
     this.stopPump();
     this.workletNode?.port.postMessage({ type: 'reset' });
     this.renderer = null;
+    this.playhead = null;
     this.generated = 0;
     this.consumed = 0;
     useOscilloscopeStore.getState().clear();
@@ -296,6 +323,8 @@ export class SunTronicSongEngine {
     try { this.workletNode?.disconnect(); } catch { /* already disconnected */ }
     this.workletNode = null;
     this.renderer = null;
+    this.playhead = null;
+    this._positions.clear();
     if (SunTronicSongEngine.instance === this) SunTronicSongEngine.instance = null;
   }
 }
