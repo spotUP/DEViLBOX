@@ -701,6 +701,7 @@ export class InstrumentFactory {
         const fpPtr = config.metadata?.fpInstrPtr;
         if (typeof fpPtr === 'number' && fpPtr > 0) {
           fpSynth.set('instrumentPtr', fpPtr);
+          fpSynth.set('octaveBias', config.metadata?.fpOctaveBias ?? 0);
         }
         instrument = fpSynth;
         break;

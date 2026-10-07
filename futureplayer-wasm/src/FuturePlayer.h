@@ -30,7 +30,7 @@ void fp_set_subsong(int subsong);
 /* Get sample rate for rendering */
 int fp_get_sample_rate(void);
 
-/* Per-note instrument preview */
+/* Per-note instrument preview: `note` is a period table index (0..96), see fp_note_on */
 void fp_note_on(uint32_t instr_ptr, int note, int velocity);
 void fp_note_off(void);
 void fp_preview_tick(void);  /* call at 50Hz during preview */
@@ -45,3 +45,5 @@ int fp_get_instrument_info(uint32_t instr_ptr, int* is_wavetable);
 int fp_get_module_data(const uint8_t** out_base, uint32_t* out_size);
 int fp_get_voice_seq_start(int subsong, int voice);
 int fp_get_tick_speed(int subsong);
+int fp_get_timer_byte(int subsong);
+uint32_t fp_get_ticks_played(void);

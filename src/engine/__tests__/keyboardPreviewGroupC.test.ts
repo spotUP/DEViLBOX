@@ -18,6 +18,8 @@ import { startWorklet, stereoOutputs, ROOT } from './workletHarness';
 import { renderTicks, rmsPerTick, risingEdges, totalRms, db, FPT } from './keyboardPreviewHarness';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { parseFuturePlayerFile } from '@/lib/import/formats/FuturePlayerParser';
+import { fpKeyToTableIndex } from '@/lib/import/formats/fpGrid';
+import { fpCodeSection, walkFuturePlayer } from '@/lib/import/formats/fpWalk';
 import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
 import { parseSteveTurnerFile } from '@/lib/import/formats/SteveTurnerParser';
 import { parseHivelyFile } from '@/lib/import/formats/HivelyParser';
@@ -98,17 +100,24 @@ describe('Future Player: the keyboard plays the instrument the module defines, a
       const song = parseFuturePlayerFile(ab, name) as unknown as GridSong & { instruments: Array<{ id: number; metadata: { fpInstrPtr: number } }> };
       const n = firstNote(song, song.instruments.map((i) => i.id));
       const ptr = song.instruments.find((i) => i.id === n.ins)!.metadata.fpInstrPtr;
+      // the grid shows the pitch the player plays (shifted up by the song's octave bias): the key plays that table entry
+      const bias = (song.instruments.find((i) => i.id === n.ins) as unknown as { metadata: { fpOctaveBias: number } }).metadata.fpOctaveBias;
       const ticks = holdTicks(song, n, 12);
       const a = await startWorklet('futureplayer', 'FuturePlayer');
       await a.send({ type: 'loadTune', buffer: ab });
       await a.send({ type: 'setMuteMask', mask: 1 << n.ch });
       await a.send({ type: 'play' });
       const side = n.ch === 0 || n.ch === 3 ? 0 : 1;
-      const s = fromFirstSound(renderTicks(a.proc, 40, side), 0.05);
+      // the song's note starts on its row's interrupt, at the module's own tick rate (hybris.fp ticks at 43.98 Hz, not 50):
+      // cut the song at that frame, so both renders start their note at frame 0 and the 20 ms windows line up
+      const walk = walkFuturePlayer(fpCodeSection(new Uint8Array(ab)), 0)!;
+      const flatRow = song.songPositions.slice(0, n.posIdx).reduce((sum, pi) => sum + song.patterns[pi].length, 0) + n.row;
+      const startFrame = Math.round(((flatRow * walk.speed) / walk.tickHz) * 48000);
+      const s = renderTicks(a.proc, 40 + Math.ceil(startFrame / FPT), side).subarray(startFrame);
       const b = await startWorklet('futureplayer', 'FuturePlayer');
       await b.send({ type: 'loadTune', buffer: ab });
-      await b.send({ type: 'noteOn', instrPtr: ptr, note: n.note, velocity: 100 });
-      const p = fromFirstSound(renderTicks(b.proc, 40, 0), 0.05);
+      await b.send({ type: 'noteOn', instrPtr: ptr, note: fpKeyToTableIndex(n.note, bias), velocity: 100 });
+      const p = renderTicks(b.proc, 40, 0);
       expectSameVoice(name, s, p, ticks);
     });
 
@@ -119,7 +128,7 @@ describe('Future Player: the keyboard plays the instrument the module defines, a
       const ptr = song.instruments.find((i) => i.id === n.ins)!.metadata.fpInstrPtr;
       const b = await startWorklet('futureplayer', 'FuturePlayer');
       await b.send({ type: 'loadTune', buffer: ab });
-      await b.send({ type: 'noteOn', instrPtr: ptr, note: n.note, velocity: 100 });
+      await b.send({ type: 'noteOn', instrPtr: ptr, note: fpKeyToTableIndex(n.note, 0), velocity: 100 });
       renderTicks(b.proc, 6, 0);
       await b.send({ type: 'noteOff' });
       const after = rmsPerTick(renderTicks(b.proc, 60, 0), 60);

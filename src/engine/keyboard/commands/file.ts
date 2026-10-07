@@ -106,16 +106,12 @@ export function saveModule(): boolean {
           return;
         }
 
-        // FuturePlayer (.fp) export with shadow array edits
+        // FuturePlayer (.fp) export: the module with the grid's edits patched into its commands
         if (sourceFormat === 'FuturePlayer' && song.futurePlayerFileData) {
           const { exportAsFuturePlayer } = await import('@/lib/export/FuturePlayerExporter');
           const { saveAs } = await import('file-saver');
           const result = await exportAsFuturePlayer(song);
           saveAs(result.data, result.filename);
-          // Also save sidecar if present
-          if (result.sidecar) {
-            saveAs(result.sidecar.data, result.sidecar.filename);
-          }
           const msg = result.warnings.length > 0
             ? `FuturePlayer exported — ${result.warnings[0]}`
             : 'FuturePlayer exported';

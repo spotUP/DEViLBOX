@@ -213,6 +213,8 @@ export interface SampleConfig {
   fpIsWavetable?: boolean;
   /** Future Player PCM sample size in bytes */
   fpSampleSize?: number;
+  /** Future Player: octaves (a multiple of 12) the song's grid shows its notes above the pitch they play (the keyboard preview plays the pitch the key's grid note shows) */
+  fpOctaveBias?: number;
 }
 
 // ============================================================================

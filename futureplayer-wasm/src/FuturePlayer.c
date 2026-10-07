@@ -80,10 +80,10 @@
 #include <stdio.h>
 
 /* ======================================================================
- * Period table — 96 entries (8 octaves × 12 notes)
+ * Period table — 97 entries (8 octaves × 12 notes + 1; the player's table ends at $1C)
  * From lbW0036C4 in the ASM source
  * ====================================================================== */
-static const uint16_t period_table[96] = {
+static const uint16_t period_table[97] = {
     0x1C40, 0x1AC0, 0x1940, 0x17D0, 0x1680, 0x1530, 0x1400, 0x12E0,
     0x11D0, 0x10D0, 0x0FE0, 0x0F00, 0x0E20, 0x0D60, 0x0CA0, 0x0BE8,
     0x0B40, 0x0A98, 0x0A00, 0x0970, 0x08E8, 0x0868, 0x07F0, 0x0780,
@@ -96,6 +96,7 @@ static const uint16_t period_table[96] = {
     0x0071, 0x006B, 0x0065, 0x005F, 0x005A, 0x0055, 0x0050, 0x004C,
     0x0048, 0x0044, 0x0040, 0x003C, 0x0039, 0x0035, 0x0032, 0x002F,
     0x002D, 0x002A, 0x0028, 0x0026, 0x0024, 0x0022, 0x0020, 0x001E,
+    0x001C,
 };
 
 /* ======================================================================
@@ -150,6 +151,7 @@ static uint8_t  tick_counter;   /* lbB00366E: current tick countdown */
 static uint8_t  cmd_overflow;   /* lbB00366F: command overflow flag */
 static int      seq_break;     /* Set by cmd_end_voice to break read_sequence loop (simulates TST.L (SP)+) */
 static uint32_t intro_count;    /* lbL003680: intro row count */
+static uint32_t fp_ticks_played; /* fp_play calls since the subsong started (the playhead's clock) */
 static uint32_t wait_counter;   /* lbL003698: wait counter */
 
 /* Song data pointer — points to the subsong table in the module */
@@ -440,11 +442,23 @@ read_next:
  * Command handlers — matching lbL003808 dispatch table
  * ====================================================================== */
 
-/* Cmd 0: lbC002CCC — End voice / return from subroutine */
-static void cmd_end_voice(uint8_t* v, uint32_t* seq_pos, uint8_t d0) {
-    /* TST.B lbB00366A — check skip flag */
-    if (skip_seq) return;
+/* lbC002CD4: the voice ends. TST.L (SP)+ pops read_sequence's return address, so the
+ * reader stops for this voice (seq_break). */
+static void end_voice_now(uint8_t* v) {
+    SET_B(v, VS_END_FLAG, 0x80);
 
+    if (V_B(v, VS_STATE) == 0) {
+        /* First time ending — disable DMA */
+        SET_B(v, VS_STATE, 0x80);
+        uint16_t dma_off = V_W(v, VS_DMA_OFF);
+        hw_write_dmacon(dma_off);
+    }
+
+    seq_break = 1;  /* signal read_sequence to return immediately */
+}
+
+/* Cmd 0: lbC002CCC — End voice / return from subroutine. No skip-flag check (that is cmd 13's). */
+static void cmd_end_voice(uint8_t* v, uint32_t* seq_pos, uint8_t d0) {
     /* lbC002CCC: TST.W 4(A0) — check call stack depth */
     uint16_t depth = V_W(v, VS_STACK_DEPTH);
     if (depth != 0) {
@@ -456,20 +470,7 @@ static void cmd_end_voice(uint8_t* v, uint32_t* seq_pos, uint8_t d0) {
         *seq_pos = V_L(v, VS_STACK_BASE + depth);
         return;  /* returns to dispatch loop, which continues reading */
     }
-
-    /* lbC002CD4: TST.L (SP)+ — pops read_sequence return address.
-     * This effectively exits read_sequence entirely. We simulate
-     * this by setting seq_break so the dispatch loop stops. */
-    SET_B(v, VS_END_FLAG, 0x80);
-
-    if (V_B(v, VS_STATE) == 0) {
-        /* First time ending — disable DMA */
-        SET_B(v, VS_STATE, 0x80);
-        uint16_t dma_off = V_W(v, VS_DMA_OFF);
-        hw_write_dmacon(dma_off);
-    }
-
-    seq_break = 1;  /* signal read_sequence to return immediately */
+    end_voice_now(v);
 }
 
 /* Cmd 1: lbC002CF2 — Set instrument + detune for all voices */
@@ -599,11 +600,11 @@ static void cmd_set_transpose2(uint8_t* v, uint32_t* seq_pos, uint8_t d0) {
     SET_B(v, VS_TRANSPOSE2, d0);
 }
 
-/* Cmd D: lbC002CC2 — Check skip flag */
+/* Cmd D: lbC002CC2 — Check skip flag: ignored while the intro is skipped (lbB00366A), otherwise
+ * ends the voice outright (it does not look at the call stack, unlike cmd 0). */
 static void cmd_check_flag(uint8_t* v, uint32_t* seq_pos, uint8_t d0) {
     if (skip_seq) return;
-    /* Fall through to cmd_end_voice behavior */
-    cmd_end_voice(v, seq_pos, d0);
+    end_voice_now(v);
 }
 
 /* Cmd E: lbC002DF6 — Reset position counter */
@@ -789,12 +790,12 @@ use_wave:;
         uint8_t final_note = note_sum + (uint8_t)arp_val;
         /* ASL.B #1,D0 — multiply by 2 for table index */
         uint8_t tbl_idx = (final_note << 1) & 0xFF;
-        period = period_table[tbl_idx / 2 < 96 ? tbl_idx / 2 : 95];
+        period = period_table[tbl_idx / 2 < 97 ? tbl_idx / 2 : 96];
     } else {
         /* Portamento mode */
         uint8_t final_note = note_sum;
         uint8_t tbl_idx = (final_note << 1) & 0xFF;
-        uint16_t target = period_table[tbl_idx / 2 < 96 ? tbl_idx / 2 : 95];
+        uint16_t target = period_table[tbl_idx / 2 < 97 ? tbl_idx / 2 : 96];
 
         uint16_t cur = V_W(v, VS_CUR_PERIOD);
 
@@ -1140,6 +1141,7 @@ env_done:
  * ====================================================================== */
 void fp_play(void) {
     static int play_tick = 0;
+    fp_ticks_played++;
 
     /* ===== Fade handling ===== */
     if (fade_state != 0) {
@@ -1387,8 +1389,8 @@ void fp_set_subsong(int subsong) {
         }
     }
 
-    /* Get intro count */
-    intro_count = RD32(song_data + 24);
+    /* Intro count: the low word of the subsong entry's second long (InitSound: move.w D0,lbL003680+2) */
+    intro_count = RD16(entry + 6);
 
     /* Set fade state */
     fade_state = 0;
@@ -1404,6 +1406,17 @@ void fp_set_subsong(int subsong) {
     /* Reset counters */
     skip_seq = 0;
     cmd_overflow = 0;
+
+    /* lbC003468: the intro is skipped by running the sequence reader intro_count times with the skip
+     * flag set (every voice advances that many rows, silently); the first tick then reads again. */
+    if (intro_count != 0) {
+        skip_seq = 1;
+        for (uint32_t n = 0; n < intro_count; n++) {
+            for (int i = 0; i < 4; i++) read_sequence(voice_data[i]);
+        }
+        skip_seq = 0;
+    }
+    fp_ticks_played = 0;
 }
 
 void fp_stop(void) {
@@ -1433,11 +1446,24 @@ static int preview_active = 0;
 /* Full volume of the fade level (lbC0034E8 level 0xFF), as the song runs. */
 static uint8_t fade_full_level(void) { return 0xFF; }
 
+/* The base note of an instrument's sample (the byte at +0x11 of its sample struct; a wavetable's first frame):
+ * the replayer adds it to the note byte before it indexes the period table. */
+static uint8_t instrument_base_note(uint32_t instr_ptr) {
+    uint32_t samp_info = RD32(instr_ptr + 8);
+    uint32_t sample;
+    if (RD8(samp_info + 8) != 0) sample = RD32(RD32(samp_info + 10) + 8);
+    else sample = RD32(samp_info + 10);
+    return RD8(sample + 0x11);
+}
+
+/* `note` is a PERIOD TABLE INDEX (0..96), the entry the voice plays: the note byte the player would read for it
+ * is the index minus the sample's base note, which this subtracts (the song's grid shows the pitch of the entry). */
 void fp_note_on(uint32_t instr_ptr, int note, int velocity) {
     if (!mod_base || mod_size == 0) return;
     if (instr_ptr == 0 || instr_ptr >= mod_size) return;
-    if (note < 1) note = 1;
+    if (note < 0) note = 0;
     if (note > 96) note = 96;
+    uint8_t note_byte = (uint8_t)((note - instrument_base_note(instr_ptr)) & 0x7F);
 
     /* Use voice 0 for preview */
     uint8_t* v = voice_data[0];
@@ -1454,9 +1480,9 @@ void fp_note_on(uint32_t instr_ptr, int note, int velocity) {
     SET_W(v, VS_ARP_IDX, 0);
 
     /* Set note and trigger */
-    SET_B(v, VS_CUR_NOTE, (uint8_t)note);
-    SET_B(v, VS_NOTE_TRIG, (uint8_t)note);
-    SET_B(v, VS_DMA_TRIG, (uint8_t)note);
+    SET_B(v, VS_CUR_NOTE, note_byte);
+    SET_B(v, VS_NOTE_TRIG, 1);
+    SET_B(v, VS_DMA_TRIG, 1);
     SET_B(v, VS_STATE, 0);
     SET_B(v, VS_END_FLAG, 0);
     SET_B(v, VS_ROW_TIMER, 0xFF);  /* long duration */
@@ -1558,6 +1584,19 @@ int fp_get_voice_seq_start(int subsong, int voice) {
     uint32_t block_ptr = RD32(song_data + 8 + voice * 4);
     if (block_ptr == 0 || block_ptr + 8 >= mod_size) return 0;
     return (int)RD32(block_ptr + 8);
+}
+
+/* The CIA timer byte of a subsong (song data +0x19): the player's tick lasts (byte << 8) cycles of the
+ * 709379 Hz PAL CIA clock (InitSound: move.b $19(A1),D0; lsl.w #8,D0; move.w D0,dtg_Timer). 0: 50 Hz. */
+int fp_get_timer_byte(int subsong) {
+    if (subsong < 0 || subsong >= num_subsongs) subsong = 0;
+    uint32_t song_data = RD32(song_ptr + subsong * 8);
+    return RD8(song_data + 0x19);
+}
+
+/* fp_play calls since the subsong started: the replayer's clock for the playhead. */
+uint32_t fp_get_ticks_played(void) {
+    return fp_ticks_played;
 }
 
 int fp_get_tick_speed(int subsong) {

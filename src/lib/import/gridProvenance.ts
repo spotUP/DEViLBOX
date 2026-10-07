@@ -48,6 +48,7 @@ export const WALK_GRIDS: Record<string, string> = {
   digitalSonixChrome: 'src/lib/import/__tests__/digitalSonixChromeGridMatchesPlayer.test.ts',
   jochenHippel7V: 'src/engine/__tests__/hippelTfmxGridMatchesPlayer.test.ts',
   suntronic: 'src/engine/__tests__/sunTronicGridMatchesPlayer.test.ts',
+  futurePlayer: 'src/engine/__tests__/futurePlayerWalkMatchesPlayer.test.ts',
 };
 
 /** Scope view by design: no pattern grid exists or can exist. */
@@ -106,7 +107,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   psa: 'G11-psa',
   tme: 'G11-tme',
   jasonPage: 'U26',
-  futurePlayer: 'U7',
   jasonBrooke: 'U28',
   laxity: 'G11-laxity',
   fredGray: 'U28',

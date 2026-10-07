@@ -6,10 +6,15 @@
  *
  * This parser:
  *   1. Strips the AmigaDOS hunk header to find the code section
- *   2. Parses the subsong table and voice sequence pointers
- *   3. Linearizes each voice's variable-length byte stream into fixed rows
- *   4. Maps FP commands to tracker effects (instrument, portamento, transpose, etc.)
- *   5. Stores the raw binary for WASM native playback
+ *   2. Walks subsong 0 with the replayer's own reader (fpWalk.ts, held to the original 68k player in UADE
+ *      by futurePlayerWalkMatchesPlayer.test.ts) and draws that walk as the grid (fpGrid.ts): one row per
+ *      `speed` interrupts, notes named by the period the voice plays, instruments on note starts, note-offs
+ *      only where a voice stops, commands in the effect columns (fpEffectGlyphs.ts)
+ *   3. Carries the module's blocks byte-exact (uadeVariableLayout) and records what each cell was drawn
+ *      from, so a grid edit is a byte patch of its command (fpGridEdits.ts)
+ *   4. Stores the raw binary for WASM native playback
+ *
+ * A song the walk cannot be matched to opens in the scope view (gridUnmatchedReason), never a guessed grid.
  *
  * Reference: futureplayer-wasm/src/FuturePlayer.c (transpiled from 68k ASM)
  */
@@ -19,6 +24,8 @@ import type { InstrumentConfig } from '@/types';
 import type { FuturePlayerConfig } from '@/types/instrument/exotic';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeFuturePlayerPattern } from '@/engine/uade/encoders/FuturePlayerEncoder';
+import { fpCodeSection, fpSongs, walkFuturePlayer, FP_WALK, type FpWalk } from './fpWalk';
+import { buildFpGridFromWalk, type FpGrid } from './fpGrid';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -60,20 +67,6 @@ export function isFuturePlayerFormat(buffer: ArrayBuffer | Uint8Array): boolean 
   );
 }
 
-// ── Hunk header stripping ──────────────────────────────────────────────────
-
-function stripHunkHeader(buf: Uint8Array): Uint8Array {
-  if (buf.length < 20 || u32BE(buf, 0) !== 0x000003F3) return buf;
-  const numHunks = u32BE(buf, 8);
-  let offset = 20 + numHunks * 4;
-  if (offset + 8 <= buf.length && u32BE(buf, offset) === 0x000003E9) {
-    const codeSize = u32BE(buf, offset + 4) * 4;
-    offset += 8;
-    return buf.subarray(offset, offset + codeSize);
-  }
-  return buf;
-}
-
 // ── FP note → Amiga period → XM note mapping ──────────────────────────────
 
 // The FP period table spans 8 octaves × 12 notes (indices 0-95).
@@ -94,186 +87,6 @@ interface FPRow {
   eff: number;
   effTyp2: number;
   eff2: number;
-}
-
-// ── Linearize voice sequence stream into rows ──────────────────────────────
-
-interface VoiceLinearizeState {
-  seqPos: number;
-  callStack: number[];
-  loopAddrs: number[];
-  loopCounts: number[];
-  currentInstr: number;
-  ended: boolean;
-}
-
-function linearizeVoice(
-  code: Uint8Array,
-  startPos: number,
-  maxRows: number,
-  instrumentMap: Map<number, number>,
-): FPRow[] {
-  const rows: FPRow[] = [];
-  const st: VoiceLinearizeState = {
-    seqPos: startPos,
-    callStack: [],
-    loopAddrs: [],
-    loopCounts: [],
-    currentInstr: 0,
-    ended: false,
-  };
-
-  let safetyCounter = 0;
-  const MAX_ITERATIONS = 100000;
-
-  while (rows.length < maxRows && !st.ended && safetyCounter < MAX_ITERATIONS) {
-    safetyCounter++;
-    const byte0 = rd8(code, st.seqPos);
-    st.seqPos++;
-
-    if (byte0 & 0x80) {
-      // Command byte
-      const cmdNum = ((byte0 << 2) & 0xFF) >> 2;  // == byte0 & 0x3F, i.e. byte0 - 0x80
-      const arg = rd8(code, st.seqPos);
-      st.seqPos++;
-
-      switch (cmdNum) {
-        case 0: // end voice / return from sub
-          if (st.callStack.length > 0) {
-            st.seqPos = st.callStack.pop()!;
-          } else {
-            st.ended = true;
-          }
-          break;
-
-        case 1: { // set instrument (4-byte pointer)
-          const instrPtr = rd32(code, st.seqPos);
-          st.seqPos += 4;
-          if (!instrumentMap.has(instrPtr)) {
-            instrumentMap.set(instrPtr, instrumentMap.size + 1);
-          }
-          st.currentInstr = instrumentMap.get(instrPtr)!;
-          break;
-        }
-
-        case 2: // set arpeggio table (4-byte ptr)
-          st.seqPos += 4;
-          break;
-
-        case 3: // reset arpeggio
-          break;
-
-        case 4: { // set portamento (2-byte word)
-          const rate = rd16(code, st.seqPos);
-          st.seqPos += 2;
-          // Insert a portamento effect on the next note row
-          if (rows.length > 0 && rate > 0) {
-            const last = rows[rows.length - 1];
-            if (last.effTyp === 0 && last.eff === 0) {
-              last.effTyp = 0x03;  // Tone portamento
-              last.eff = Math.min(0xFF, rate & 0xFF);
-            }
-          }
-          break;
-        }
-
-        case 5: // nop
-          break;
-
-        case 6: { // call subroutine (4-byte ptr)
-          st.callStack.push(st.seqPos + 4);
-          const targetPtr = rd32(code, st.seqPos);
-          const seqData = rd32(code, targetPtr + 8);
-          st.seqPos = seqData;
-          break;
-        }
-
-        case 7: { // jump pattern (4-byte ptr)
-          const targetPtr2 = rd32(code, st.seqPos);
-          const seqData2 = rd32(code, targetPtr2 + 8);
-          st.seqPos = seqData2;
-          break;
-        }
-
-        case 8: { // repeat start
-          st.loopAddrs.push(st.seqPos);
-          st.loopCounts.push(arg);
-          break;
-        }
-
-        case 9: { // repeat check (decrement, loop if not done)
-          if (st.loopCounts.length > 0) {
-            const idx = st.loopCounts.length - 1;
-            st.loopCounts[idx]--;
-            if (st.loopCounts[idx] > 0 && st.loopAddrs.length > idx) {
-              st.seqPos = st.loopAddrs[idx];
-            } else {
-              st.loopCounts.pop();
-              st.loopAddrs.pop();
-            }
-          }
-          break;
-        }
-
-        case 10: { // repeat jump (conditional)
-          if (st.loopAddrs.length > 0) {
-            st.seqPos = st.loopAddrs[st.loopAddrs.length - 1];
-          }
-          break;
-        }
-
-        case 11: // set transpose 1 — map to E5x (fine tune)
-          break;
-
-        case 12: // set transpose 2
-          break;
-
-        case 13: // check flag
-          st.ended = true;
-          break;
-
-        case 14: // reset counter (nop)
-          break;
-
-        default:
-          // Unknown command — safety exit
-          st.ended = true;
-          break;
-      }
-      continue;
-    }
-
-    // Note or rest + duration
-    const note = byte0;  // 0=rest, 1-96=note
-    const dur = rd8(code, st.seqPos);
-    st.seqPos++;
-
-    const duration = dur & 0x80 ? (dur & 0x7F) : dur;
-
-    // First row gets the note trigger
-    const row: FPRow = {
-      note: fpNoteToXM(note),
-      instrument: note > 0 ? st.currentInstr : 0,
-      volume: 0,
-      effTyp: 0,
-      eff: 0,
-      effTyp2: 0,
-      eff2: 0,
-    };
-    rows.push(row);
-
-    // Remaining duration rows are empty (sustain)
-    for (let d = 1; d < duration && rows.length < maxRows; d++) {
-      rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-    }
-  }
-
-  // Pad to maxRows if sequence ended early
-  while (rows.length < maxRows) {
-    rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-  }
-
-  return rows;
 }
 
 // ── Per-block decode for the structural raw-block carrier ───────────────────
@@ -323,10 +136,11 @@ function decodeBlock(
         case 1: { // set instrument (4-byte ptr)
           const instrPtr = rd32(code, p);
           p += 4;
-          if (!instrumentMap.has(instrPtr)) {
+          // a null pointer is no instrument (the player would read garbage): no slot, instrument 0
+          if (instrPtr !== 0 && !instrumentMap.has(instrPtr)) {
             instrumentMap.set(instrPtr, instrumentMap.size + 1);
           }
-          currentInstr = instrumentMap.get(instrPtr)!;
+          currentInstr = instrPtr === 0 ? 0 : instrumentMap.get(instrPtr)!;
           break;
         }
         case 2: // set arpeggio table (4-byte ptr)
@@ -389,6 +203,61 @@ function readCString(code: Uint8Array, ptr: number, maxLen = 64): string {
 
 // ── Main parser ────────────────────────────────────────────────────────────
 
+export interface FpModuleGrid {
+  /** The module's code section (every pointer in the module is an offset into it). */
+  code: Uint8Array;
+  /** The walk of subsong 0; null when the module has none. */
+  walk: FpWalk | null;
+  /** The grid drawn from the walk; null when it cannot be matched (the song opens in the scope view). */
+  grid: FpGrid | null;
+  /** Why there is no grid. */
+  unmatched?: string;
+  /** Instrument pointer -> 1-based instrument id, in the order the walk first sets them (the carrier adds the rest). */
+  instrumentMap: Map<number, number>;
+}
+
+/** Walk subsong 0 of a module with the replayer's own reader and draw it as the grid. */
+export function buildFuturePlayerGrid(rawBuf: Uint8Array): FpModuleGrid {
+  const code = fpCodeSection(rawBuf);
+  const walk = walkFuturePlayer(code, 0);
+  const instrumentMap = new Map<number, number>();
+  const arpMap = new Map<number, number>();
+  if (walk) {
+    // Instruments in the order the walk first sets them, voice by voice as they happen
+    for (const e of walk.events) {
+      if (e.kind === FP_WALK.instrument && e.a !== 0 && !instrumentMap.has(e.a)) instrumentMap.set(e.a, instrumentMap.size + 1);
+      if (e.kind === FP_WALK.arpTable && !arpMap.has(e.a)) arpMap.set(e.a, arpMap.size + 1);
+    }
+  }
+  if (!walk) return { code, walk, grid: null, unmatched: 'the module has no subsong 0 to walk', instrumentMap };
+  const grid = buildFpGridFromWalk(walk, {
+    code,
+    instrId: (ptr) => instrumentMap.get(ptr) ?? 0,
+    arpId: (ptr) => arpMap.get(ptr) ?? 0,
+  });
+  if (grid.unnamedNotes > 0) {
+    return { code, walk, grid: null, unmatched: `${grid.unnamedNotes} notes play table entries past the period table`, instrumentMap };
+  }
+  return { code, walk, grid, instrumentMap };
+}
+
+/** The config of an instrument whose data cannot be read: every slot is kept. */
+function emptyFuturePlayerConfig(): FuturePlayerConfig {
+  return {
+    isWavetable: false,
+    volume: 64,
+    attackRate: 16, attackPeak: 255,
+    decayRate: 4, sustainLevel: 128,
+    sustainRate: 0, sustainTarget: 128,
+    releaseRate: 8,
+    pitchMod1Delay: 0, pitchMod1Shift: 0, pitchMod1Mode: 0, pitchMod1Negate: false, hasPitchMod1: false,
+    pitchMod2Delay: 0, pitchMod2Shift: 0, pitchMod2Mode: 0, pitchMod2Negate: false, hasPitchMod2: false,
+    sampleMod1Delay: 0, sampleMod1Shift: 0, sampleMod1Mode: 0, hasSampleMod1: false,
+    sampleMod2Delay: 0, sampleMod2Shift: 0, sampleMod2Mode: 0, hasSampleMod2: false,
+    sampleSize: 0,
+  };
+}
+
 export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const rawBuf = new Uint8Array(buffer);
 
@@ -396,7 +265,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     throw new Error('Not a Future Player module');
   }
 
-  const code = stripHunkHeader(rawBuf);
+  const code = fpCodeSection(rawBuf);
 
   // Verify code section signature
   if (code.length < 44 || u32BE(code, 0) !== 0x70FF4E75) {
@@ -414,125 +283,62 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
   const moduleName = songName ||
     baseName.replace(/^fp\./i, '').replace(/\.fp$/i, '') || baseName;
 
-  // ── Parse subsong table (offset 32, 8 bytes per entry) ──────────────
+  // ── Subsong table (offset 32, 8 bytes per entry) ─────────────────────
 
-  interface Subsong {
-    songDataPtr: number;
-    speedVal: number;
-    voiceSeqPtrs: number[];
-    tickSpeed: number;
-  }
-
-  const subsongs: Subsong[] = [];
-  let scan = 32;
-  while (scan + 8 <= code.length) {
-    const songDataPtr = rd32(code, scan);
-    if (songDataPtr === 0) break;
-    const speedVal = rd16(code, scan + 4);
-
-    const voiceSeqPtrs: number[] = [];
-    for (let i = 0; i < 4; i++) {
-      const blockPtr = rd32(code, songDataPtr + 8 + i * 4);
-      if (blockPtr !== 0 && blockPtr + 8 < code.length) {
-        voiceSeqPtrs.push(rd32(code, blockPtr + 8));
-      } else {
-        voiceSeqPtrs.push(0);
-      }
-    }
-
-    let tickSpeed = rd8(code, songDataPtr + 0x18) & 7;
-    if (tickSpeed === 0) tickSpeed = 8;
-
-    subsongs.push({ songDataPtr, speedVal, voiceSeqPtrs, tickSpeed });
-    scan += 8;
-  }
-
+  const subsongs = fpSongs(code);
   if (subsongs.length === 0) {
     throw new Error('No subsongs found');
   }
-
-  // ── Linearize all voices for subsong 0 into rows ────────────────────
-
   const sub = subsongs[0];
-  const instrumentMap = new Map<number, number>(); // instrPtr → 1-based ID
+
+  // ── Walk subsong 0 with the replayer's own reader, draw it as the grid ─
+
+  const { walk, grid, unmatched, instrumentMap } = buildFuturePlayerGrid(rawBuf);
   const ROWS_PER_PATTERN = 64;
 
-  // First pass: linearize all 4 voices to find the total row count
-  const voiceRows: FPRow[][] = [];
-  let maxVoiceLen = 0;
-  for (let ch = 0; ch < 4; ch++) {
-    if (sub.voiceSeqPtrs[ch] !== 0) {
-      const rows = linearizeVoice(code, sub.voiceSeqPtrs[ch], 4096, instrumentMap);
-      // Trim trailing empty rows
-      let lastNonEmpty = rows.length - 1;
-      while (lastNonEmpty > 0 && rows[lastNonEmpty].note === 0 && rows[lastNonEmpty].effTyp === 0) {
-        lastNonEmpty--;
-      }
-      voiceRows.push(rows.slice(0, lastNonEmpty + 1));
-      maxVoiceLen = Math.max(maxVoiceLen, lastNonEmpty + 1);
-    } else {
-      voiceRows.push([]);
-    }
-  }
-
-  // Pad shorter voices to match longest
-  for (let ch = 0; ch < 4; ch++) {
-    while (voiceRows[ch].length < maxVoiceLen) {
-      voiceRows[ch].push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-    }
-  }
-
-  // ── Split into patterns of ROWS_PER_PATTERN rows ────────────────────
-
-  const numPatterns = Math.max(1, Math.ceil(maxVoiceLen / ROWS_PER_PATTERN));
-
-  const patterns = [];
-  const songPositions: number[] = [];
-
-  for (let pidx = 0; pidx < numPatterns; pidx++) {
-    const startRow = pidx * ROWS_PER_PATTERN;
-    const patLen = Math.min(ROWS_PER_PATTERN, maxVoiceLen - startRow);
-
-    const channels = Array.from({ length: 4 }, (_, ch) => {
-      const rows = [];
-      for (let r = 0; r < patLen; r++) {
-        const srcRow = voiceRows[ch][startRow + r];
-        rows.push(srcRow || { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-      }
-      // Pad to ROWS_PER_PATTERN
-      while (rows.length < ROWS_PER_PATTERN) {
-        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-      }
-      return {
-        id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows,
-      };
-    });
-
-    patterns.push({
-      id: `pattern-${pidx}`,
-      name: `Pattern ${pidx}`,
-      length: ROWS_PER_PATTERN,
-      channels,
+  let patterns: TrackerSong['patterns'];
+  let songPositions: number[];
+  let restartPosition = 0;
+  if (grid) {
+    patterns = grid.patterns.map((pat) => ({
+      ...pat,
       importMetadata: {
         sourceFormat: 'FuturePlayer' as const,
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: 4,
-        originalPatternCount: numPatterns,
+        originalPatternCount: grid!.patterns.length,
         originalInstrumentCount: instrumentMap.size,
       },
-    });
-
-    songPositions.push(pidx);
+    }));
+    songPositions = grid.songPositions;
+    restartPosition = grid.layout.restartPosition;
+  } else {
+    // No guessed grid: the song opens in the scope view (gridUnmatchedReason) over an empty pattern.
+    console.warn(`[FuturePlayerParser] ${filename}: no grid - ${unmatched}`);
+    patterns = [{
+      id: 'pattern-0',
+      name: 'Pattern 0',
+      length: ROWS_PER_PATTERN,
+      channels: Array.from({ length: 4 }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false, solo: false, collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null, color: null,
+        rows: Array.from({ length: ROWS_PER_PATTERN }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 })),
+      })),
+      importMetadata: {
+        sourceFormat: 'FuturePlayer' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 4,
+        originalPatternCount: 1,
+        originalInstrumentCount: instrumentMap.size,
+      },
+    }];
+    songPositions = [0];
   }
 
   // ── Build instruments list ──────────────────────────────────────────
@@ -617,72 +423,18 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     return { meta: { isWavetable, sampleSize }, config };
   }
 
-  // One FuturePlayerSynth per discovered instrument pointer
-  const instruments: InstrumentConfig[] = [];
-  instrumentMap.forEach((id, instrPtr) => {
-    // Skip null pointers — instrPtr=0 means the voice stream had a malformed set-instrument
-    // command. A FuturePlayerSynth with instrPtr=0 would call engine.play() on click instead
-    // of engine.noteOn(), causing whole-song playback (audible as a double-beep).
-    if (instrPtr === 0) return;
-
-    const extracted = extractInstrumentConfig(instrPtr);
-    if (!extracted) return;
-
-    const { meta, config: fpConfig } = extracted;
-
-    // Skip instruments with no audio data at all (no wavetable, no PCM sample).
-    // These produce silence or a WASM-default tone that causes an unexpected beep.
-    if (!meta.isWavetable && meta.sampleSize === 0) return;
-
-    const typeLabel = meta.isWavetable ? 'Synth' : 'Sample';
-    const sizeLabel = meta.sampleSize > 0 ? ` (${meta.sampleSize}B)` : '';
-    instruments.push({
-      id,
-      name: `${typeLabel} ${id}${sizeLabel}`,
-      type: 'synth' as const,
-      synthType: 'FuturePlayerSynth' as const,
-      effects: [],
-      volume: -6,
-      pan: 0,
-      futurePlayer: fpConfig,
-      metadata: { fpInstrPtr: instrPtr, fpIsWavetable: meta.isWavetable, fpSampleSize: meta.sampleSize },
-    } as unknown as InstrumentConfig);
-  });
-
-  // If no instruments found, add a default one
-  if (instruments.length === 0) {
-    instruments.push({
-      id: 1,
-      name: 'Future Player',
-      type: 'synth' as const,
-      synthType: 'FuturePlayerSynth' as const,
-      effects: [],
-      volume: -6,
-      pan: 0,
-    } as unknown as InstrumentConfig);
-  }
-
-  // ── Build BPM from tick speed ──────────────────────────────────────
-
-  // FP runs at 50Hz (PAL). BPM = 50 * 60 / (tickSpeed * rowsPerBeat)
-  // With 4 rows/beat: BPM = 50 * 60 / (tickSpeed * 4) = 750 / tickSpeed
-  const initialSpeed = sub.tickSpeed;
-  const initialBPM = 125;  // Standard Amiga BPM (50Hz CIA)
-
-  const displayName = authorName
-    ? `${moduleName} by ${authorName} [Future Player]`
-    : `${moduleName} [Future Player]`;
-
-  // ── Build uadeVariableLayout: structural raw-block carrier ────────────────
+  // ── The module's blocks: every one carried byte-exact ──────────────────────
   // FP voice data is a call-GRAPH over shared command BLOCKS, each a REAL
   // contiguous byte range (start -> cmd0/cmd7 terminator). Enumerate every
-  // reachable block (BFS from the voice sequence pointers, following cmd6/cmd7
-  // targets), dedupe by code offset, and carry each block's real bytes +
-  // decoded baseline rows. encodeVariableBlock re-emits them verbatim when
-  // unedited (byte-exact) and falls back to the packer on edit. numChannels=1
-  // because a block is not owned by one channel — the flat block list is the
-  // file-pattern dimension. Display patterns above are unchanged (carrier-only).
-  const hdrOffset = rawBuf.length - code.length; // code-relative ptr -> file offset
+  // reachable block of subsong 0 (BFS from the voice sequence pointers,
+  // following cmd6/cmd7 targets), dedupe by code offset, and carry each block's
+  // real bytes + decoded baseline rows. encodeVariableBlock re-emits them
+  // verbatim when unedited (byte-exact) and falls back to the packer on edit.
+  // numChannels=1 because a block is not owned by one channel — the flat block
+  // list is the file-pattern dimension. The blocks also name every instrument
+  // subsong 0's streams set, so each gets its slot even where the walk never plays it.
+  // code-relative ptr -> file offset: where the hunk's code starts in the file (not file length minus code length: relocations follow the code)
+  const hdrOffset = code.byteOffset - rawBuf.byteOffset;
 
   const filePatternAddrs: number[] = [];
   const filePatternSizes: number[] = [];
@@ -707,6 +459,35 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     }
   }
 
+  // One FuturePlayerSynth per instrument pointer the module sets: every slot kept, none named (the module has no names)
+  const instruments: InstrumentConfig[] = [];
+  instrumentMap.forEach((id, instrPtr) => {
+    const extracted = extractInstrumentConfig(instrPtr);
+    const config: FuturePlayerConfig = extracted?.config ?? emptyFuturePlayerConfig();
+    const meta = extracted?.meta ?? { isWavetable: false, sampleSize: 0 };
+    instruments.push({
+      id,
+      name: '',
+      type: 'synth' as const,
+      synthType: 'FuturePlayerSynth' as const,
+      effects: [],
+      volume: -6,
+      pan: 0,
+      futurePlayer: config,
+      metadata: { fpInstrPtr: instrPtr, fpIsWavetable: meta.isWavetable, fpSampleSize: meta.sampleSize, fpOctaveBias: grid?.bias ?? 0 },
+    } as unknown as InstrumentConfig);
+  });
+
+  // ── Tempo: a row is `speed` player interrupts, the interrupt is the module's own CIA timer ──
+
+  // tracker tick = 2.5 / BPM seconds, so BPM = 2.5 * interrupts per second (50 Hz -> 125)
+  const initialSpeed = walk ? walk.speed : sub.speed;
+  const initialBPM = walk ? Math.round(walk.tickHz * 2.5 * 100) / 100 : 125;
+
+  const displayName = authorName
+    ? `${moduleName} by ${authorName} [Future Player]`
+    : `${moduleName} [Future Player]`;
+
   // trackMap is unused when blockRows is present (harness reads blockRows), but
   // the type requires it. One empty entry per tracker pattern is a safe default.
   const trackMap: number[][] = patterns.map(() => []);
@@ -715,7 +496,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     formatId: 'futurePlayer',
     numChannels: 1,
     numFilePatterns: filePatternAddrs.length,
-    rowsPerPattern: ROWS_PER_PATTERN,
+    rowsPerPattern: patterns.map((pat) => pat.length),
     moduleSize: rawBuf.length,
     encoder: {
       formatId: 'futurePlayer',
@@ -735,7 +516,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     instruments,
     songPositions,
     songLength: songPositions.length,
-    restartPosition: 0,
+    restartPosition,
     numChannels: 4,
     initialSpeed,
     initialBPM,
@@ -744,5 +525,6 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     uadeEditableFileName: filename,
     futurePlayerFileData: buffer.slice(0),
     uadeVariableLayout,
+    ...(grid ? {} : { gridUnmatchedReason: unmatched ?? 'the grid was not matched to the player' }),
   };
 }

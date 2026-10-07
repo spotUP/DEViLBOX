@@ -34,8 +34,25 @@ static int current_subsong = 0;
  * Frames per tick: 28150 / 50 = 563 frames.
  * But the actual timer rate depends on the module's CIA timer value.
  * Default: ~50Hz = 563 frames per tick. */
-static int frames_per_tick = 563;
+static double frames_per_tick = 563.0;  /* Paula frames per player interrupt (the subsong's CIA timer) */
+static double frame_frac = 0.0;         /* the fraction of a frame the integer tick lengths have not yet spent */
 static int frame_counter = 0;
+
+/* Where in the last render call each player interrupt ran (frame offset), so the worklet can tell which
+ * interrupt the audio it is playing belongs to: it renders ahead into a ring buffer. */
+#define MAX_TICK_MARKS 256
+static int tick_mark_frame[MAX_TICK_MARKS];
+static int tick_mark_count = 0;
+
+/* The player's tick is the module's own CIA timer: song data +0x19, lsl 8, cycles of the 709379 Hz
+ * PAL CIA clock (Future Player_v1.asm InitSound: dtg_Timer). 50 Hz when the module sets none. */
+static void set_tick_length(int subsong) {
+    int timer = fp_get_timer_byte(subsong);
+    frames_per_tick = timer > 0 ? (double)fp_get_sample_rate() * (double)(timer << 8) / 709379.0
+                                : (double)fp_get_sample_rate() / 50.0;
+    frame_frac = 0.0;
+    frame_counter = 0;
+}
 
 EXPORT int fp_wasm_init(const uint8_t* data, uint32_t size) {
     if (module_copy) { free(module_copy); module_copy = NULL; module_size = 0; }
@@ -56,8 +73,7 @@ EXPORT int fp_wasm_init(const uint8_t* data, uint32_t size) {
     }
 
     initialized = 1;
-    frame_counter = 0;
-    frames_per_tick = 563;  /* Default 50Hz */
+    set_tick_length(0);
 
     /* Build linearized shadow array for pattern editing */
     current_subsong = 0;
@@ -68,6 +84,7 @@ EXPORT int fp_wasm_init(const uint8_t* data, uint32_t size) {
 }
 
 EXPORT int fp_wasm_render(float* buffer, int frames) {
+    tick_mark_count = 0;
     if (!initialized) {
         memset(buffer, 0, frames * 2 * sizeof(float));
         return frames;
@@ -77,7 +94,11 @@ EXPORT int fp_wasm_render(float* buffer, int frames) {
     while (written < frames) {
         if (frame_counter <= 0) {
             fp_play();
-            frame_counter = frames_per_tick;
+            if (tick_mark_count < MAX_TICK_MARKS) tick_mark_frame[tick_mark_count++] = written;
+            frame_frac += frames_per_tick;
+            frame_counter = (int)frame_frac;
+            frame_frac -= (double)frame_counter;
+            if (frame_counter < 1) frame_counter = 1;
         }
 
         int chunk = frames - written;
@@ -113,12 +134,31 @@ EXPORT int fp_wasm_get_sample_rate(void) {
     return fp_get_sample_rate();
 }
 
+/* The interrupts of the last fp_wasm_render call: their frame offsets into its buffer; returns how many.
+ * The last of them is interrupt number fp_wasm_get_ticks_played(), the one before it that minus one, ... */
+EXPORT int fp_wasm_get_tick_marks(int* out, int max) {
+    int n = tick_mark_count < max ? tick_mark_count : max;
+    for (int i = 0; i < n; i++) out[i] = tick_mark_frame[i];
+    return tick_mark_count;
+}
+
+/* Player interrupts per row of the current subsong (song data +0x18, low 3 bits, 0 = 8). */
+EXPORT int fp_wasm_get_tick_speed(void) {
+    return initialized ? fp_get_tick_speed(current_subsong) : 4;
+}
+
+/* fp_play calls since the subsong started: the playhead's clock (row = (ticks - 1) / ticks per row). */
+EXPORT uint32_t fp_wasm_get_ticks_played(void) {
+    return initialized ? fp_get_ticks_played() : 0;
+}
+
 EXPORT int fp_wasm_get_num_subsongs(void) {
     return fp_get_num_subsongs();
 }
 
 EXPORT void fp_wasm_set_subsong(int subsong) {
     fp_set_subsong(subsong);
+    set_tick_length(subsong);
     /* Rebuild shadow array for the new subsong */
     current_subsong = subsong;
     shadow_built = 0;
@@ -127,12 +167,15 @@ EXPORT void fp_wasm_set_subsong(int subsong) {
 
 /* ── Per-note instrument preview ───────────────────────────────────────── */
 
-static int preview_frames_per_tick = 563;  /* 28150/50 */
+/* A previewed note's envelope runs on the same tick as the song's: the module's own CIA timer (frames_per_tick). */
 static double preview_accum = 0.0;
 
 EXPORT void fp_wasm_note_on(uint32_t instr_ptr, int note, int velocity) {
     if (!initialized) return;
     fp_note_on(instr_ptr, note, velocity);
+    /* The song's voice is read and updated on the same interrupt, so its note sounds from the first frame of its
+     * tick; the preview's first update runs at once too instead of one tick (22 ms at 44 Hz) later. */
+    fp_preview_tick();
     preview_accum = 0.0;
 }
 
@@ -154,7 +197,7 @@ EXPORT int fp_wasm_render_preview(float* buffer, int frames) {
     int remaining = frames;
 
     while (remaining > 0) {
-        double until_tick = (double)preview_frames_per_tick - preview_accum;
+        double until_tick = frames_per_tick - preview_accum;
         int n = (int)until_tick;
         if (n < 1) n = 1;
         if (n > remaining) n = remaining;
@@ -164,8 +207,8 @@ EXPORT int fp_wasm_render_preview(float* buffer, int frames) {
         remaining -= got;
         preview_accum += (double)got;
 
-        if (preview_accum >= (double)preview_frames_per_tick) {
-            preview_accum -= (double)preview_frames_per_tick;
+        if (preview_accum >= frames_per_tick) {
+            preview_accum -= frames_per_tick;
             fp_preview_tick();
         }
     }

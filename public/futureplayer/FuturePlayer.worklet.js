@@ -37,6 +37,15 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
     this.levelsPtr = 0;
     this.levelsCounter = 0;
 
+    // Playhead: the replayer renders ahead into the ring, so the position is the interrupt the audio
+    // being PLAYED belongs to: every render call logs the frame at which each interrupt ran
+    // (fp_wasm_get_tick_marks); the frames consumed from the ring pick the interrupt.
+    this.marksPtr = 0;
+    this.tickQueue = [];        // [{ frame, tick }] in render order, frames counted from the ring's start
+    this.framesRendered = 0;
+    this.framesPlayed = 0;
+    this.lastPostedRow = -1;
+
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
 
@@ -61,6 +70,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
       case 'setSubsong':
         if (this.wasm && this.tuneLoaded) {
           this.wasm._fp_wasm_set_subsong(data.subsong);
+          this.resetRingBuffer();
         }
         break;
       case 'setMuteMask':
@@ -199,6 +209,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
 
       // Allocate 4-float buffer for channel levels
       this.levelsPtr = this.wasm._malloc(4 * 4);
+      this.marksPtr = this.wasm._malloc(256 * 4);
 
       this.initialized = true;
       this.port.postMessage({ type: 'ready' });
@@ -248,6 +259,40 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
     this.ringWritePos = 0;
     this.ringReadPos = 0;
     this.ringAvailable = 0;
+    this.tickQueue = [];
+    this.framesRendered = 0;
+    this.framesPlayed = 0;
+    this.lastPostedRow = -1;
+  }
+
+  /** Remember the interrupts the last render call ran (frame offsets into it) against the ring's frame count. */
+  logTickMarks(frames) {
+    const w = this.wasm;
+    if (typeof w._fp_wasm_get_tick_marks !== 'function') { this.framesRendered += frames; return; }
+    const count = Math.min(w._fp_wasm_get_tick_marks(this.marksPtr, 256), 256);
+    const last = w._fp_wasm_get_ticks_played();
+    const marks = new Int32Array(w.HEAPU8.buffer, this.marksPtr, count);
+    for (let i = 0; i < count; i++) {
+      this.tickQueue.push({ frame: this.framesRendered + marks[i], tick: last - count + 1 + i });
+    }
+    this.framesRendered += frames;
+  }
+
+  /** Post the player's row when the audio now playing is on another one: { type: 'position', ticks } (the engine maps it to the grid). */
+  postPlayhead() {
+    const w = this.wasm;
+    if (!this.playing || typeof w._fp_wasm_get_tick_marks !== 'function') return;
+    let tick = 0;
+    const q = this.tickQueue;
+    let n = 0;
+    while (n < q.length && q[n].frame <= this.framesPlayed) { tick = q[n].tick; n++; }
+    if (n > 1) q.splice(0, n - 1);
+    if (tick === 0) return;
+    const speed = Math.max(1, w._fp_wasm_get_tick_speed());
+    const row = Math.floor((tick - 1) / speed);
+    if (row === this.lastPostedRow) return;
+    this.lastPostedRow = row;
+    this.port.postMessage({ type: 'position', ticks: tick });
   }
 
   fillRingBuffer() {
@@ -261,6 +306,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
 
     const frames = Math.min(this.decodeBufSize, space);
     this.wasm._fp_wasm_render(this.decodeBufPtr, frames);
+    this.logTickMarks(frames);
 
     // Read stereo interleaved float32 from WASM heap
     const floatOffset = this.decodeBufPtr >> 2;
@@ -311,6 +357,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
 
     const frames = Math.min(this.decodeBufSize, space);
     this.wasm._fp_wasm_render_preview(this.decodeBufPtr, frames);
+    this.framesRendered += frames;
     if (typeof this.wasm._fp_wasm_preview_active === 'function' && !this.wasm._fp_wasm_preview_active()) {
       this.previewActive = false;
     }
@@ -387,6 +434,8 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
     this.ringAvailable -= consumed;
     if (this.ringAvailable < 0) this.ringAvailable = 0;
     this.resamplePos -= consumed;
+    this.framesPlayed += consumed;
+    this.postPlayhead();
 
     // Post per-channel levels every 8 process() calls
     if (++this.levelsCounter >= 8 && this.levelsPtr && typeof this.wasm._fp_wasm_get_channel_levels === 'function') {
