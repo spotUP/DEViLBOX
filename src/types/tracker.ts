@@ -483,6 +483,8 @@ export interface CursorPosition {
   noteColumnIndex: number; // 0-3: which note column the cursor is in (0 = primary)
   columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'flag1' | 'flag2' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability' | 'automation';
   digitIndex: number; // For hex input (0-2 depending on column)
+  /** Format editor modes: index into the format's column list (the one cursor, P14f). Classic modes leave it unset. */
+  formatColumnIndex?: number;
 }
 
 export interface BlockSelection {

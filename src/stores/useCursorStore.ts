@@ -54,6 +54,8 @@ interface CursorStore {
 
   moveCursor: (direction: 'up' | 'down' | 'left' | 'right', opts?: { preserveSelection?: boolean }) => void;
   moveCursorToRow: (row: number) => void;
+  /** The format editors' cursor: the same store, bounds clamped by the caller against the format's own channels. */
+  setFormatCursor: (pos: { channelIndex: number; rowIndex: number; columnIndex: number }) => void;
   applyEntryAdvance: (columnType: CursorPosition['columnType'], digitIndex: number) => void;
   moveCursorToChannel: (channel: number) => void;
   moveCursorToColumn: (columnType: CursorPosition['columnType']) => void;
@@ -234,6 +236,12 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     }
 
     set({ cursor: { channelIndex, rowIndex, noteColumnIndex, columnType, digitIndex } });
+  },
+
+  setFormatCursor: ({ channelIndex, rowIndex, columnIndex }) => {
+    const cur = get().cursor;
+    if (cur.channelIndex === channelIndex && cur.rowIndex === rowIndex && (cur.formatColumnIndex ?? 0) === columnIndex) return;
+    set({ cursor: { ...cur, channelIndex, rowIndex, formatColumnIndex: columnIndex, digitIndex: 0 } });
   },
 
   moveCursorToRow: (row) => {

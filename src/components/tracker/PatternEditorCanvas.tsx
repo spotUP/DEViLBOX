@@ -40,7 +40,6 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { getFormatPlaybackState, getClockPosition } from '@engine/FormatPlaybackState';
 import * as Tone from 'tone';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { useFormatStore } from '@stores/useFormatStore';
 import type { CursorPosition } from '@typedefs';
 // OffscreenCanvas + WebGL2 worker bridge
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
@@ -57,9 +56,7 @@ import type {
 } from '@engine/renderer/worker-types';
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
-import { typedNoteValue } from '@/components/shared/format-editor-types';
-import { undoHively, redoHively, insertHivelyRow, deleteHivelyRow } from '@/components/hively/hivelyEdit';
-import { planNoteEntry, planCursorEntry, typedPitch, type EntryContext } from '@/lib/tracker/formatEntryPlan';
+import { attachFormatKeyboard, type FormatKeyHost, type FormatCursor } from './formatKeyboard';
 import { formatChannelLayout } from './formatChannelLayout';
 import { toColumnSpec, formatChannelsToSnapshot } from '@/components/shared/format-editor-types';
 import { transposeFormatNote } from './formatTranspose';
@@ -242,12 +239,29 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const mainThreadRendererRef = useRef<TrackerCanvas2DRenderer | null>(null);
   const mainThreadRafRef = useRef<number>(0);
 
-  const [formatCursor, setFormatCursor] = useState({
-    channelIndex: 0, rowIndex: 0, columnIndex: 0,
-  });
-  // Mutable ref so rAF loops can read the latest cursor without re-renders
-  const formatCursorRef = useRef({ channelIndex: 0, rowIndex: 0, columnIndex: 0 });
+  const activeChannelIndex = useCursorStore((s) => s.cursor.channelIndex);
+  // The format editors share the tracker's ONE cursor (useCursorStore: row, channel, formatColumnIndex), so the
+  // window key handler, Tab, the click handler and this canvas move and draw the same position (P14f).
+  const storedCursorRow = useCursorStore((s) => (isFormatMode ? s.cursor.rowIndex : 0));
+  const storedCursorCol = useCursorStore((s) => (isFormatMode ? (s.cursor.formatColumnIndex ?? 0) : 0));
+  const formatCursor = useMemo(() => {
+    const chs = formatChannels ?? [];
+    const channelIndex = Math.max(0, Math.min(chs.length - 1, activeChannelIndex));
+    const ch = chs[channelIndex];
+    return {
+      channelIndex,
+      rowIndex: Math.max(0, Math.min((ch?.patternLength ?? 1) - 1, storedCursorRow)),
+      columnIndex: Math.max(0, Math.min((ch?.columns ?? formatColumns ?? []).length - 1, storedCursorCol)),
+    };
+  }, [formatChannels, formatColumns, activeChannelIndex, storedCursorRow, storedCursorCol]);
+  const formatCursorRef = useRef(formatCursor);
   formatCursorRef.current = formatCursor;
+  const setFormatCursor = useCallback((next: FormatCursor | ((p: FormatCursor) => FormatCursor)) => {
+    const prev = formatCursorRef.current;
+    const value = typeof next === 'function' ? next(prev) : next;
+    formatCursorRef.current = value;
+    useCursorStore.getState().setFormatCursor(value);
+  }, []);
   // Notify parent of cursor changes (so SF2/GT stores stay in sync)
   const onFormatCursorChangeRef = useRef(onFormatCursorChange);
   onFormatCursorChangeRef.current = onFormatCursorChange;
@@ -263,6 +277,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     startCol: number; endCol: number;
     anchorRow: number; anchorCol: number;  // original anchor before normalization
   } | null>(null);
+
+  const formatSelectionRef = useRef<typeof formatSelection>(null);
+  formatSelectionRef.current = formatSelection;
 
   // Format mode clipboard: array of rows, each row is column-key → value
   const formatClipboardRef = useRef<Record<string, number>[]>([]);
@@ -307,7 +324,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const moveCursorToChannelAndColumn = useCursorStore((s) => s.moveCursorToChannelAndColumn);
   // Subscribe to active channel index so headers re-render when cursor moves channels
-  const activeChannelIndex = useCursorStore((s) => s.cursor.channelIndex);
   const mobileChannelIndex = cursorRef.current.channelIndex;
 
 
@@ -1065,272 +1081,35 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     useUIStore.getState().setStatusMessage(`PASTED ${pasted} ROW${pasted > 1 ? 'S' : ''}`);
   }, [formatColumns, formatChannels, formatCursor, onFormatCellChange]);
 
-  const handleFormatKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (!isFormatMode || !formatColumns || !formatChannels) return;
-    const chCols = formatChannels[formatCursor.channelIndex]?.columns ?? formatColumns;
-    const col = chCols[formatCursor.columnIndex];
-    const numRows = formatChannels[formatCursor.channelIndex]?.patternLength ?? formatChannels[0]?.patternLength ?? 0;
-    const numCols = chCols.length;
-
-    // ── Helper: move cursor and optionally extend/clear selection ──
-    const moveCursor = (delta: { channelIndex?: number; rowIndex?: number; columnIndex?: number }, extend?: boolean) => {
-      setFormatCursor(prev => {
-        const newChIdx = Math.max(0, Math.min(formatChannels!.length - 1,
-            prev.channelIndex + (delta.channelIndex ?? 0)));
-        const newChCols = formatChannels![newChIdx]?.columns ?? formatColumns!;
-        const newNumCols = newChCols.length;
-        const newNumRows = formatChannels![newChIdx]?.patternLength ?? 0;
-        const next = {
-          channelIndex: newChIdx,
-          rowIndex: Math.max(0, Math.min(newNumRows - 1,
-            prev.rowIndex + (delta.rowIndex ?? 0))),
-          columnIndex: Math.max(0, Math.min(newNumCols - 1,
-            delta.channelIndex ? Math.min(prev.columnIndex, newNumCols - 1)
-              : prev.columnIndex + (delta.columnIndex ?? 0))),
-        };
-        if (extend) {
-          // Extend selection from anchor to new cursor position
-          setFormatSelection(prevSel => {
-            const anchorRow = prevSel ? prevSel.anchorRow : prev.rowIndex;
-            const anchorCol = prevSel ? prevSel.anchorCol : prev.columnIndex;
-            return {
-              startRow: Math.min(anchorRow, next.rowIndex),
-              endRow: Math.max(anchorRow, next.rowIndex),
-              startCol: Math.min(anchorCol, next.columnIndex),
-              endCol: Math.max(anchorCol, next.columnIndex),
-              anchorRow,
-              anchorCol,
-            };
-          });
-        } else {
-          // Clear selection on non-shift movement
-          setFormatSelection(null);
-        }
-        return next;
-      });
-    };
-
-    // One octave for the jam (window handler) and the write: the editor store's.
-    if (e.key === '[' || e.key === '-') { e.preventDefault(); const ed = useEditorStore.getState(); ed.setCurrentOctave(ed.currentOctave - 1); return; }
-    if (e.key === ']' || e.key === '=') { e.preventDefault(); const ed = useEditorStore.getState(); ed.setCurrentOctave(ed.currentOctave + 1); return; }
-
-    // Edit / record / jam follows the reference trackers (formatEntryPlan.ts, P14): edit off = nothing written
-    // (the window handler jams), edit on + stopped = write at the cursor and step, recording = write at the playback row.
-    const entryContext = (): EntryContext => {
-      const ed = useEditorStore.getState();
-      return {
-        recordMode: ed.recordMode,
-        isPlaying: formatIsPlayingRef.current,
-        cursorRow: formatCursor.rowIndex,
-        playbackRow: formatCurrentRowRef.current ?? 0,
-        editStep: ed.editStep,
-        numRows,
-        recQuantEnabled: ed.recQuantEnabled,
-        recQuantRes: ed.recQuantRes,
-      };
-    };
-    const stepCursorTo = (row: number | null) => {
-      if (row !== null) setFormatCursor(p => ({ ...p, rowIndex: Math.max(0, Math.min(numRows - 1, row)) }));
-    };
-
-    const isCtrlCmd = e.ctrlKey || e.metaKey;
-
-    // Escape: clear selection
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      setFormatSelection(null);
-      return;
-    }
-
-    // Select All (Ctrl+A): select all rows in current channel, all columns
-    if (isCtrlCmd && e.key.toLowerCase() === 'a') {
-      e.preventDefault();
-      setFormatSelection({
-        startRow: 0, endRow: Math.max(0, numRows - 1),
-        startCol: 0, endCol: Math.max(0, numCols - 1),
-        anchorRow: 0, anchorCol: 0,
-      });
-      return;
-    }
-
-    // Copy (Ctrl+C / F4)
-    if ((isCtrlCmd && e.key.toLowerCase() === 'c' && !e.shiftKey) || e.key === 'F4') {
-      e.preventDefault();
-      formatCopySelection();
-      return;
-    }
-
-    // Cut (Ctrl+X / F3)
-    if ((isCtrlCmd && e.key.toLowerCase() === 'x') || e.key === 'F3') {
-      e.preventDefault();
-      formatCopySelection();
-      formatClearSelection();
-      setFormatSelection(null);
-      return;
-    }
-
-    // Paste (Ctrl+V / F5)
-    if ((isCtrlCmd && e.key.toLowerCase() === 'v') || e.key === 'F5') {
-      e.preventDefault();
-      formatPasteClipboard();
-      return;
-    }
-
-    // Undo / Redo (Ctrl+Z / Ctrl+Shift+Z)
-    if (isCtrlCmd && e.key.toLowerCase() === 'z' && !e.altKey) {
-      e.preventDefault();
-      if (e.shiftKey) {
-        if (redoHively()) {
-          useUIStore.getState().setStatusMessage('REDO');
-        } else {
-          useUIStore.getState().setStatusMessage('NOTHING TO REDO');
-        }
-      } else {
-        if (undoHively()) {
-          useUIStore.getState().setStatusMessage('UNDO');
-        } else {
-          useUIStore.getState().setStatusMessage('NOTHING TO UNDO');
-        }
-      }
-      return;
-    }
-
-    // Transpose: Ctrl+ArrowUp/Down = +/-1 semitone, Ctrl+Shift = +/-12
-    if (isCtrlCmd && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey) {
-      e.preventDefault();
-      // Transpose the marked block if there is one, else the cell under the cursor.
-      const delta = e.key === 'ArrowUp' ? (e.shiftKey ? 12 : 1) : (e.shiftKey ? -12 : -1);
-      formatTransposeSelection(delta);
-      return;
-    }
-
-    // Arrow up/down: RAF-based hold-to-scroll (no initial delay, 50ms interval)
-    // Shift+Arrow extends selection
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (e.repeat) return; // RAF loop handles repeats
-      const dir = e.key === 'ArrowUp' ? -1 : 1;
-      moveCursor({ rowIndex: dir }, e.shiftKey);
-      if (!e.shiftKey) {
-        // Only start RAF scroll for non-shift arrows
-        formatHeldArrowRef.current = { dir };
-        if (!formatArrowRafRef.current) {
-          let lastMove = performance.now();
-          const tick = (now: number) => {
-            if (!formatHeldArrowRef.current) { formatArrowRafRef.current = 0; return; }
-            if (now - lastMove >= 50) {
-              lastMove = now;
-              setFormatCursor(prev => ({
-                ...prev,
-                rowIndex: Math.max(0, Math.min(numRows - 1,
-                  prev.rowIndex + formatHeldArrowRef.current!.dir)),
-              }));
-            }
-            formatArrowRafRef.current = requestAnimationFrame(tick);
-          };
-          formatArrowRafRef.current = requestAnimationFrame(tick);
-        }
-      }
-      return;
-    }
-
-    // ── Insert row (Insert key) ──────────────────────────────────────────────
-    if (e.key === 'Insert') {
-      e.preventDefault();
-      const ch = formatChannels[formatCursor.channelIndex];
-      const trackIdx = ch?.trackIndex;
-      if (trackIdx != null) {
-        const store = useFormatStore.getState();
-        if (store.editorMode === 'hively') {
-          insertHivelyRow(trackIdx, formatCursor.rowIndex);
-        }
-      }
-      return;
-    }
-
-    // ── Delete row (Shift+Backspace) ──────────────────────────────────────────
-    if (e.key === 'Backspace' && e.shiftKey) {
-      e.preventDefault();
-      const ch = formatChannels[formatCursor.channelIndex];
-      const trackIdx = ch?.trackIndex;
-      if (trackIdx != null) {
-        const store = useFormatStore.getState();
-        if (store.editorMode === 'hively') {
-          deleteHivelyRow(trackIdx, formatCursor.rowIndex);
-        }
-      }
-      return;
-    }
-
-    switch (e.key) {
-      case 'ArrowLeft':  e.preventDefault(); moveCursor({ columnIndex: -1 }, e.shiftKey); return;
-      case 'ArrowRight': e.preventDefault(); moveCursor({ columnIndex: +1 }, e.shiftKey); return;
-      case 'Tab':        e.preventDefault(); moveCursor({ channelIndex: e.shiftKey ? -1 : +1 }); return;
-      case 'PageUp':     e.preventDefault(); moveCursor({ rowIndex: -16 }, e.shiftKey); return;
-      case 'PageDown':   e.preventDefault(); moveCursor({ rowIndex: +16 }, e.shiftKey); return;
-      case 'Home':       e.preventDefault(); setFormatCursor(p => ({ ...p, rowIndex: 0 })); setFormatSelection(null); return;
-      case 'End':        e.preventDefault(); setFormatCursor(p => ({ ...p, rowIndex: Math.max(0, numRows - 1) })); setFormatSelection(null); return;
-      case 'Delete':
-      case 'Backspace':
-        e.preventDefault();
-        if (formatSelection) {
-          // Delete clears entire selection
-          formatClearSelection();
-          setFormatSelection(null);
-        } else if (col) {
-          const plan = planCursorEntry(entryContext());
-          if (plan.write) {
-            onFormatCellChange?.(formatCursor.channelIndex, plan.row, col.key, col.emptyValue ?? 0);
-            stepCursorTo(plan.nextCursorRow);
-          }
-        }
-        return;
-    }
-
-    if (!col) return;
-
-    // Data entry clears selection
-    if (col.type === 'note') {
-      const typed = typedPitch(e.key, useEditorStore.getState().currentOctave);
-      if (typed !== null && !e.altKey && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        setFormatSelection(null);
-        const ctx = entryContext();
-        if (e.repeat && ctx.isPlaying) return;
-        const value = typedNoteValue(col, typed);
-        const plan = planNoteEntry(ctx);
-        if (value !== null && plan.write) {
-          onFormatCellChange?.(formatCursor.channelIndex, plan.row, col.key, value);
-          stepCursorTo(plan.nextCursorRow);
-        }
-      }
-    } else if (col.type === 'hex' || col.type === 'ctrl') {
-      if (/^[0-9a-fA-F]$/i.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        setFormatSelection(null);
-        const plan = planCursorEntry(entryContext());
-        if (!plan.write) return;
-        const digit = parseInt(e.key, 16);
-        const hexDigits = col.hexDigits ?? 2;
-        const typedSoFar = formatHexTypedRef.current;
-        const continuing = typedSoFar !== null && typedSoFar.ch === formatCursor.channelIndex
-          && typedSoFar.row === plan.row && typedSoFar.col === formatCursor.columnIndex;
-        const digits = continuing ? typedSoFar.digits : 0;
-        const cur = digits === 0 ? 0 : (formatChannels[formatCursor.channelIndex]?.rows[plan.row]?.[col.key]
-          ?? (col.emptyValue ?? 0));
-        const mask = (1 << (hexDigits * 4)) - 1;
-        onFormatCellChange?.(formatCursor.channelIndex, plan.row, col.key, ((cur << 4) | digit) & mask);
-        if (digits + 1 >= hexDigits) {
-          formatHexTypedRef.current = null;
-          stepCursorTo(plan.nextCursorRow);
-        } else {
-          formatHexTypedRef.current = { ch: formatCursor.channelIndex, row: plan.row, col: formatCursor.columnIndex, digits: digits + 1 };
-        }
-      }
-    }
-  }, [isFormatMode, formatColumns, formatChannels, formatCursor,
-      onFormatCellChange, formatSelection, formatCopySelection, formatClearSelection, formatPasteClipboard,
-      formatTransposeSelection]);
+  // The key handler lives in formatKeyboard.ts and listens on the window while this canvas shows a format, so
+  // clicking REC (or any button) never strands editing.
+  const formatHostRef = useRef<FormatKeyHost | null>(null);
+  formatHostRef.current = isFormatMode && formatColumns && formatChannels ? {
+    columns: formatColumns,
+    channels: formatChannels,
+    isPlaying: () => formatIsPlayingRef.current,
+    playbackRow: () => formatCurrentRowRef.current ?? 0,
+    getCursor: () => formatCursorRef.current,
+    setCursor: setFormatCursor,
+    getSelection: () => formatSelectionRef.current,
+    setSelection: (n) => {
+      const v = typeof n === 'function' ? n(formatSelectionRef.current) : n;
+      formatSelectionRef.current = v;
+      setFormatSelection(v);
+    },
+    onCellChange: onFormatCellChange,
+    copy: formatCopySelection,
+    clearSelection: formatClearSelection,
+    paste: formatPasteClipboard,
+    transpose: formatTransposeSelection,
+    hexTyped: formatHexTypedRef,
+    heldArrow: formatHeldArrowRef,
+    arrowRaf: formatArrowRafRef,
+  } : null;
+  useEffect(() => {
+    if (!isFormatMode) return;
+    return attachFormatKeyboard(() => formatHostRef.current);
+  }, [isFormatMode]);
 
   // Handle tap on pattern canvas - move cursor to tapped cell
   const handlePatternTap = useCallback((tapX: number, tapY: number) => {
@@ -3673,12 +3452,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={handleContextMenu}
-        onKeyDown={isFormatMode ? handleFormatKeyDown : undefined}
-        onKeyUp={isFormatMode ? (e: React.KeyboardEvent) => {
-          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            formatHeldArrowRef.current = null;
-          }
-        } : undefined}
         onPointerDown={handleMouseDown as React.PointerEventHandler}
         onPointerMove={handleMouseMove as React.PointerEventHandler}
         onPointerUp={handleMouseUp as React.PointerEventHandler}
