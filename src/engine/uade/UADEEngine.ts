@@ -857,7 +857,10 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
         if (row === lastRow && position === lastPosition) return;
         lastRow = row;
         lastPosition = position;
-        coordinator.dispatchEnginePosition(row, position);
+        // audioTime: the block the count was read after; the coordinator adds the
+        // output latency so the row is shown when it is heard, not when the
+        // message happened to arrive.
+        coordinator.dispatchEnginePosition(row, position, update.audioTime);
       });
       cleanups.push(unsub);
 
