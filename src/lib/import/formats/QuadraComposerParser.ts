@@ -128,7 +128,7 @@ export async function parseQuadraComposerFile(
         p += 4;  // skip file-offset pointer
 
         instruments.push({
-          name: smpName || `Sample ${i + 1}`,
+          name: smpName || '',
           volume: vol,
           length: len,
           hasLoop: (ctrl & 1) !== 0,

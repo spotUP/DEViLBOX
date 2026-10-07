@@ -465,7 +465,7 @@ export async function parseDigitalMugicianFile(
 
       instruments.push({
         id,
-        name: sample.name || `PCM ${sampleIdx}`,
+        name: sample.name || '',
         type: 'synth' as const,
         synthType: 'DigMugSynth' as const,
         digMug: config,
@@ -515,7 +515,7 @@ export async function parseDigitalMugicianFile(
 
       instruments.push({
         id,
-        name: `Wave ${sample.wave}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'DigMugSynth' as const,
         digMug: config,
@@ -530,7 +530,7 @@ export async function parseDigitalMugicianFile(
       // Placeholder for empty/unknown instrument
       instruments.push({
         id,
-        name: `Instrument ${sampleIdx}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],

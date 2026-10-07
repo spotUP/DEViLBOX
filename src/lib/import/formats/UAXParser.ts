@@ -499,7 +499,7 @@ function createSoundInstrument(id: number, name: string, data: Uint8Array): Inst
 
   return {
     id,
-    name:      name || `Sound ${id}`,
+    name:      name || '',
     type:      'sample' as const,
     synthType: 'Sampler' as const,
     effects:   [],

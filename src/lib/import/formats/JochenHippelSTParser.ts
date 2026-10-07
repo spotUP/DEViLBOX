@@ -341,7 +341,7 @@ export function parseJochenHippelAmigaSogFile(buffer: ArrayBuffer, filename: str
       },
     }],
     instruments: [{
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig],
     songPositions: [0], songLength: 1, restartPosition: 0, numChannels: 4,

@@ -185,7 +185,7 @@ function soundPlayerInstruments(smp: Uint8Array | null): InstrumentConfig[] {
     const sample = extractIffSample(smp, formOff, formSize);
     if (!sample) continue;
     instruments.push(createSamplerInstrument(
-      slot, sample.name || `Sample ${slot}`, sample.pcm, 64, 8287, sample.loopStart, sample.loopEnd,
+      slot, sample.name || '', sample.pcm, 64, 8287, sample.loopStart, sample.loopEnd,
     ));
   }
   return instruments;
@@ -258,7 +258,7 @@ export function parseSoundPlayerFile(buffer: ArrayBuffer, filename: string, comp
   let instruments = soundPlayerInstruments(findSampleFile(filename, companions));
   if (instruments.length === 0) {
     instruments = [{
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig];
   }

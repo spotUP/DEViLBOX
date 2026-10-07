@@ -55,7 +55,7 @@ export function parseLaxityFile(buffer: ArrayBuffer, filename: string): TrackerS
   const moduleName = baseName.replace(/^(powt|pt)\./i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
+    id: 1, name: '', type: 'synth' as const,
     synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig];
 

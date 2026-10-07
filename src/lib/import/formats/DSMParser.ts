@@ -161,7 +161,7 @@ function createSamplerInstrument16(
 
   return {
     id,
-    name: name.replace(/\0/g, '').trim() || `Sample ${id}`,
+    name: name.replace(/\0/g, '').trim() || '',
     type:      'sample'  as const,
     synthType: 'Sampler' as const,
     effects: [],
@@ -196,7 +196,7 @@ function createSamplerInstrument16(
 function buildEmptyInstrument(id: number, name: string): InstrumentConfig {
   return {
     id,
-    name: name || `Sample ${id}`,
+    name: name || '',
     type:      'sample'  as const,
     synthType: 'Sampler' as const,
     effects: [],
@@ -474,7 +474,7 @@ function parseRiffDSMF(v: DataView, bytes: Uint8Array, filename: string): Tracke
       const smpIdx    = instruments.length + 1;
 
       if (dataStart + DSM_SAMPLE_HEADER_SIZE > fileLen) {
-        instruments.push(buildEmptyInstrument(smpIdx, `Sample ${smpIdx}`));
+        instruments.push(buildEmptyInstrument(smpIdx, ''));
         continue;
       }
 
@@ -482,7 +482,7 @@ function parseRiffDSMF(v: DataView, bytes: Uint8Array, filename: string): Tracke
       const pcmStart  = dataStart + DSM_SAMPLE_HEADER_SIZE;
       const pcmLen    = Math.min(hdr.length, dataStart + chunkSize - pcmStart);
       const volume    = Math.min(hdr.volume, 64);
-      const smpName   = hdr.sampleName || hdr.filename || `Sample ${smpIdx}`;
+      const smpName   = hdr.sampleName || hdr.filename || '';
 
       const loopActive = (hdr.flags & 0x01) !== 0;
       const is16Bit    = (hdr.flags & 0x04) !== 0;
@@ -550,7 +550,7 @@ function parseRiffDSMF(v: DataView, bytes: Uint8Array, filename: string): Tracke
   // Pad instruments to match declared count if needed
   while (instruments.length < songHeader.numSamples) {
     const id = instruments.length + 1;
-    instruments.push(buildEmptyInstrument(id, `Sample ${id}`));
+    instruments.push(buildEmptyInstrument(id, ''));
   }
 
   const restartPos = Math.min(songHeader.restartPos, Math.max(0, orderList.length - 1));
@@ -847,7 +847,7 @@ function parseDynamicStudioDSm(v: DataView, bytes: Uint8Array, filename: string)
   for (let i = 0; i < numSamples; i++) {
     const sh       = sampleHeaders[i]!;
     const smpIdx   = i + 1;
-    const smpName  = sh.name || `Sample ${smpIdx}`;
+    const smpName  = sh.name || '';
     const volume   = Math.min(sh.volume, 64);
     const is16Bit  = sh.type === 16;
     const byteLen  = sh.length * 2;              // length field is in words → bytes

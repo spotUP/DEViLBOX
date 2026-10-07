@@ -379,7 +379,7 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // Empty slot: produce a placeholder instrument
       trackerInstruments.push({
         id,
-        name: `Instrument ${id}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],
@@ -404,7 +404,7 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       const loopStart = hasLoop ? inst.repeatStart * 2 : 0;
       const loopEnd   = hasLoop ? (inst.repeatStart + inst.repeatLength) * 2 : 0;
 
-      const samplerInst = createSamplerInstrument(id, `Sample ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, loopStart, loopEnd);
+      const samplerInst = createSamplerInstrument(id, '', pcmUint8, inst.volume, PCM_BASE_RATE, loopStart, loopEnd);
       // PCM slots also carry uadeChipRam so the editor can export the module.
       if (chipRam) samplerInst.uadeChipRam = chipRam;
       trackerInstruments.push(samplerInst);
@@ -424,7 +424,7 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       if (waveLen <= 0) {
         trackerInstruments.push({
           id,
-          name: `Synth ${i}`,
+          name: '',
           type: 'synth' as const,
           synthType: 'DeltaMusic1Synth' as const,
           effects: [],
@@ -445,7 +445,7 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // This waveform is used only for the instrument editor display; actual audio comes
       // from UADE via uadeEditableFileData injected by the routing layer.
       const synthInst = {
-        ...createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, 0, waveLen),
+        ...createSamplerInstrument(id, '', pcmUint8, inst.volume, PCM_BASE_RATE, 0, waveLen),
         type: 'synth' as const,
         synthType: 'DeltaMusic1Synth' as const,
       } as InstrumentConfig;
@@ -456,7 +456,7 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
     } else {
       trackerInstruments.push({
         id,
-        name: `Instrument ${id}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'DeltaMusic1Synth' as const,
         effects: [],

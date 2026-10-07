@@ -392,7 +392,7 @@ function buildInstruments(count: number, buf?: Uint8Array, instrOffset?: number)
   return Array.from({ length: count }, (_, i) => {
     const inst: InstrumentConfig = {
       id: i + 1,
-      name: `Instr ${(i + 1).toString().padStart(2, '0')}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'SteveTurnerSynth' as const,
       effects: [],

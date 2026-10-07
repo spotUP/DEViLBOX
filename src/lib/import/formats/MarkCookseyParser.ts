@@ -389,12 +389,12 @@ export async function parseMarkCookseyFile(
     if (smp && smp.offset > 0 && smp.offset + smp.length <= buf.length && smp.length > 0) {
       const pcm = buf.slice(smp.offset, smp.offset + smp.length);
       instruments.push(createSamplerInstrument(
-        i + 1, `MC Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+        i + 1, '', pcm, 64, 8287, 0, 0,
       ));
     } else {
       instruments.push({
         id: i + 1,
-        name: `MC Sample ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],

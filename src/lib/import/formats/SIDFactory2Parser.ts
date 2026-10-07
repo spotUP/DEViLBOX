@@ -404,7 +404,7 @@ export async function parseSIDFactory2File(
   for (let i = 0; i < instCount; i++) {
     const instName = i < instrumentDescriptions.length && instrumentDescriptions[i]
       ? instrumentDescriptions[i]
-      : `Instrument ${i + 1}`;
+      : '';
 
     // Extract raw instrument bytes from C64 memory
     let rawBytes = new Uint8Array(0);
@@ -628,7 +628,7 @@ export async function parseSIDFactory2File(
       }
       sf2Instruments.push({
         rawBytes,
-        name: i < instrumentDescriptions.length ? instrumentDescriptions[i] : `Inst ${i + 1}`,
+        name: i < instrumentDescriptions.length ? instrumentDescriptions[i] : '',
       });
     }
   }

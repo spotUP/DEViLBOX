@@ -306,7 +306,7 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
   for (let s = 0; s < NUM_SAMPLES; s++) {
     const hdr  = sampleHeaders[s];
     const id   = s + 1;
-    const name = `Sample ${id}`;
+    const name = '';
 
     if (hdr.lengthBytes === 0 || hdr.offset === 0 || hdr.offset >= bytes.byteLength) {
       // Empty/silent placeholder — header slot still exists in chip RAM

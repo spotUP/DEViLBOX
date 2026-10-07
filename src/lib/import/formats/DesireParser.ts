@@ -234,11 +234,11 @@ export function parseDesireFile(buffer: ArrayBuffer, filename: string): TrackerS
       if (pcmOffset + pcmLength <= buf.length && pcmLength > 0) {
         const pcm = buf.slice(pcmOffset, pcmOffset + pcmLength);
         instruments.push(createSamplerInstrument(
-          i + 1, `DSR Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+          i + 1, '', pcm, 64, 8287, 0, 0,
         ));
       } else {
         instruments.push({
-          id: i + 1, name: `DSR Sample ${i + 1}`, type: 'synth' as const,
+          id: i + 1, name: '', type: 'synth' as const,
           synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
         } as InstrumentConfig);
       }
@@ -248,7 +248,7 @@ export function parseDesireFile(buffer: ArrayBuffer, filename: string): TrackerS
   if (instruments.length === 0) {
     for (let i = 0; i < NUM_PLACEHOLDER_INSTRUMENTS; i++) {
       instruments.push({
-        id: i + 1, name: `Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
     }

@@ -367,8 +367,8 @@ export async function parseZoundMonitorFile(
           .split(':').pop()!
           .split('!').pop()!
           .replace(/\.smp$/i, '')
-          .trim() || `Sample ${id}`
-      : `Sample ${id}`;
+          .trim() || ''
+      : '';
 
     const pcm = samplePCM[i];
 

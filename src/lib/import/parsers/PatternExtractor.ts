@@ -143,7 +143,7 @@ export function createFallbackInstruments(patterns: Pattern[], instrumentNames: 
   for (const instNum of Array.from(usedInstruments).sort((a, b) => a - b)) {
     instruments.push({
       id: instNum,
-      name: instrumentNames[instNum - 1] || `Instrument ${instNum}`,
+      name: instrumentNames[instNum - 1] || '',
       type: 'synth',
       synthType: 'Synth',
       effects: [],

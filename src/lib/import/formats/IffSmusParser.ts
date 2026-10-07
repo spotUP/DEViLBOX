@@ -491,7 +491,7 @@ export async function parseIffSmusFile(
     // default so the instrument is playable/editable immediately.
     if (companion?.instr && isSonixSynthInstr(companion.instr)) {
       const cfg = createSamplerInstrument(
-        id, instr.name || `Instrument ${id}`, new Uint8Array(2), 64, 8287, 0, 0,
+        id, instr.name || '', new Uint8Array(2), 64, 8287, 0, 0,
       );
       cfg.type = 'synth';
       cfg.synthType = 'SonixSynth';
@@ -510,7 +510,7 @@ export async function parseIffSmusFile(
       const parsed = parseSonixSampleFile(companion.ss);
       if (parsed && parsed.pcm.length > 2) {
         instrConfigs.push(createSamplerInstrument(
-          id, instr.name || `Instrument ${id}`,
+          id, instr.name || '',
           parsed.pcm, 64, parsed.sampleRate, parsed.loopStart, parsed.loopEnd,
         ));
         continue;
@@ -520,7 +520,7 @@ export async function parseIffSmusFile(
     // Fallback: silent placeholder
     const silentPcm = new Uint8Array(2);
     instrConfigs.push(createSamplerInstrument(
-      id, instr.name || `Instrument ${id}`,
+      id, instr.name || '',
       silentPcm, 64, 8287, 0, 0,
     ));
   }

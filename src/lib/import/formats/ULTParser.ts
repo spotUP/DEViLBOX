@@ -386,7 +386,7 @@ export async function parseULTFile(
     }
 
     sampleHeaders.push({
-      name:       name || `Sample ${s + 1}`,
+      name:       name || '',
       filename:   filename_,
       loopStart,
       loopEnd,
@@ -710,7 +710,7 @@ export async function parseULTFile(
 
       instruments.push({
         id,
-        name:      hdr.name.replace(/\0/g, '').trim() || `Sample ${id}`,
+        name:      hdr.name.replace(/\0/g, '').trim() || '',
         type:      'sample'  as const,
         synthType: 'Sampler' as const,
         effects:   [],

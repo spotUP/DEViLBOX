@@ -135,7 +135,6 @@ function extractNPPSamples(buf: Uint8Array, scanFrom: number): InstrumentConfig[
         if (ch === 0) break;
         name += String.fromCharCode(ch);
       }
-      if (!name) name = `NPP Sample ${i + 1}`;
 
       const lenWords = u16BE(buf, entryOff + 22);
       const lenBytes = lenWords * 2;

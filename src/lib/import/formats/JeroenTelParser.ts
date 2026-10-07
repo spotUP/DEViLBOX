@@ -454,7 +454,7 @@ export async function parseJeroenTelFile(
   for (let i = 0; i < numInstruments; i++) {
     instruments.push({
       id: i + 1,
-      name: `Sample ${i + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],
@@ -466,7 +466,7 @@ export async function parseJeroenTelFile(
   if (instruments.length === 0) {
     instruments.push({
       id: 1,
-      name: 'Sample 1',
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

@@ -647,7 +647,7 @@ function buildSonixInstruments(
   lut: Map<string, Uint8Array>,
 ): InstrumentConfig[] {
   return Array.from({ length: count }, (_, i) => {
-    const name = names[i]?.trim() || `Sample ${i + 1}`;
+    const name = names[i]?.trim() || '';
     const instr = lut.get(`${name.toLowerCase()}.instr`);
     if (instr && parseSonixSynthInstr(instr)) return placeholderSonixSynth(i + 1, name);
     const pcm = resolveSonixSamplePcm(name, lut);

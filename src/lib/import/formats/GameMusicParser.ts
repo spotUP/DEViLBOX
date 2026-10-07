@@ -201,8 +201,8 @@ export async function parseGameMusicFile(buffer: ArrayBuffer, filename = 'song',
   const h = readHeader(type, new Uint8Array(buffer));
   const track = subsong >= 0 && subsong < h.tracks ? subsong : 0;
 
-  const instruments: InstrumentConfig[] = h.voices.map((name, i): InstrumentConfig => ({
-    id: i + 1, name, type: 'synth', synthType: 'GmeSynth', effects: [], volume: 0, pan: 0,
+  const instruments: InstrumentConfig[] = h.voices.map((_voice, i): InstrumentConfig => ({
+    id: i + 1, name: '', type: 'synth', synthType: 'GmeSynth', effects: [], volume: 0, pan: 0,
   }));
   const pattern = emptyPattern(h.voices.length, 64);
   pattern.channels.forEach((ch, i) => { ch.name = h.voices[i]; });

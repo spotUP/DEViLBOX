@@ -137,7 +137,7 @@ export async function parseMagneticFieldsPackerFile(
   for (let i = 0; i < DEFAULT_INSTRUMENTS; i++) {
     instruments.push({
       id: i + 1,
-      name: `Sample ${i + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

@@ -161,7 +161,7 @@ export function createSamplerInstrument(
 
   return {
     id,
-    name: name.replace(/\0/g, '').trim() || `Sample ${id}`,
+    name: name.replace(/\0/g, '').trim(),
     type: 'sample' as const,
     synthType: 'Sampler' as const,
     effects: [],

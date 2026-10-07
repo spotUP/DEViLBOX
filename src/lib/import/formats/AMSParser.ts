@@ -267,7 +267,7 @@ function buildSampleInstrument(
   if (finalPcm.length === 0) {
     return {
       id,
-      name: name || `Sample ${id}`,
+      name: name || '',
       type: 'sample' as const,
       synthType: 'Sampler' as const,
       effects: [],
@@ -291,7 +291,7 @@ function buildSampleInstrument(
 
   return {
     id,
-    name: name || `Sample ${id}`,
+    name: name || '',
     type: 'sample' as const,
     synthType: 'Sampler' as const,
     effects: [],
@@ -892,7 +892,7 @@ function parseAMS1(bytes: Uint8Array, filename: string): TrackerSong | null {
 
   for (let s = 0; s < numSamps; s++) {
     const hdr  = sampleHeaders[s]!;
-    const name = sampleNames[s] || `Sample ${s + 1}`;
+    const name = sampleNames[s] || '';
     const pcm  = samplePCM[s];
     const packChar = packChars[s] ?? 0;
 
@@ -1458,7 +1458,7 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
     if (instr.numSamples === 0) {
       instrumentConfigs.push({
         id:        instId++,
-        name:      instr.name || `Instrument ${instId}`,
+        name:      instr.name || '',
         type:      'sample' as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -1471,12 +1471,12 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
     // Use first sample as the primary sample for this instrument
     const smpIdx = instr.firstSampleIdx;
     const hdr    = instr.sampleHdrs[0];
-    const smpName = (instr.sampleNames[0] || instr.name || `Sample ${smpIdx + 1}`);
+    const smpName = (instr.sampleNames[0] || instr.name || '');
 
     if (!hdr) {
       instrumentConfigs.push({
         id:        instId++,
-        name:      instr.name || `Instrument ${instId}`,
+        name:      instr.name || '',
         type:      'sample' as const,
         synthType: 'Sampler' as const,
         effects:   [],

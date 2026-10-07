@@ -433,7 +433,7 @@ export async function parseSoundMonFile(
 
       instrConfigs.push({
         id,
-        name: `Synth ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'SoundMonSynth' as const,
         soundMon: smConfig,
@@ -453,7 +453,7 @@ export async function parseSoundMonFile(
 
         const instr = createSamplerInstrument(
           id,
-          sampleInst.name || `Sample ${i + 1}`,
+          sampleInst.name || '',
           pcm,
           sampleInst.volume,
           8287,
@@ -464,7 +464,7 @@ export async function parseSoundMonFile(
         instrConfigs.push(instr);
       } else {
         // Empty sample placeholder
-        const placeholder = makePlaceholder(id, sampleInst.name || `Sample ${i + 1}`);
+        const placeholder = makePlaceholder(id, sampleInst.name || '');
         placeholder.uadeChipRam = chipRam;
         instrConfigs.push(placeholder);
       }
@@ -735,7 +735,7 @@ function emptyCell(): TrackerCell {
 function makePlaceholder(id: number, name: string): InstrumentConfig {
   return {
     id,
-    name: name.replace(/\0/g, '').trim() || `Sample ${id}`,
+    name: name.replace(/\0/g, '').trim() || '',
     type: 'synth' as const,
     synthType: 'Synth' as const,
     effects: [],

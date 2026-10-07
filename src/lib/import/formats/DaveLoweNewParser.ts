@@ -276,7 +276,7 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
 
     if (descOff + SAMPLE_DESC_SIZE > buf.length) {
       instruments.push({
-        id: i + 1, name: `Sample ${i + 1}`,
+        id: i + 1, name: '',
         type: 'synth' as const, synthType: 'Synth' as const,
         effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
@@ -293,7 +293,7 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
 
     if (sampleAddr === 0 || lenBytes === 0 || sampleAddr + lenBytes > buf.length) {
       instruments.push({
-        id: i + 1, name: `Sample ${i + 1}`,
+        id: i + 1, name: '',
         type: 'synth' as const, synthType: 'Synth' as const,
         effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
@@ -309,13 +309,13 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
     const loopEnd = loopType > 0 ? loopStartRel + loopLen * 2 : 0;
 
     instruments.push(createSamplerInstrument(
-      i + 1, `DLN Sample ${i + 1}`, pcm, 64, 8287, loopStart, loopEnd,
+      i + 1, '', pcm, 64, 8287, loopStart, loopEnd,
     ));
   }
 
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1',
+      id: 1, name: '',
       type: 'synth' as const, synthType: 'Synth' as const,
       effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);

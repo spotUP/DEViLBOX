@@ -432,7 +432,7 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
       loopStart,
       loopEnd,
       loopMode: hasLoop ? 1 : 0,
-      name: `Sample ${i}`,
+      name: '',
     });
   }
 

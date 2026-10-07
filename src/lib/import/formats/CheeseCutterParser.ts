@@ -459,7 +459,7 @@ export async function parseCheeseCutterFile(
     if (hasContent || i === 0) {
       instruments.push({
         id: i + 1, // 1-indexed
-        name: ci.name || `Inst ${i + 1}`,
+        name: ci.name || '',
         type: 'synth',
         synthType: 'C64SID',
       } as unknown as InstrumentConfig);

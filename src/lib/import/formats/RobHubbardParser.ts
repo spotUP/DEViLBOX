@@ -486,7 +486,7 @@ export async function parseRobHubbardFile(
 
       instruments.push({
         id:          i + 1,
-        name:        `Sample ${i + 1}`,
+        name:        '',
         type:        'synth' as const,
         synthType:   'RobHubbardSynth' as const,
         effects:     [],
@@ -499,7 +499,7 @@ export async function parseRobHubbardFile(
       // Placeholder for unextracted slots (silent but correctly typed)
       instruments.push({
         id:         i + 1,
-        name:       `Sample ${i + 1}`,
+        name:       '',
         type:       'synth' as const,
         synthType:  'RobHubbardSynth' as const,
         effects:    [],

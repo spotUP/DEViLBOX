@@ -460,7 +460,7 @@ export async function parseNRUFile(
       // Silent placeholder — no PCM data for this slot
       instruments.push({
         id,
-        name:      `Sample ${id}`,
+        name:      '',
         type:      'sample'  as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -489,7 +489,7 @@ export async function parseNRUFile(
 
     const instr = createSamplerInstrument(
       id,
-      `Sample ${id}`,
+      '',
       pcm,
       hdr.volume,
       SAMPLE_RATE,

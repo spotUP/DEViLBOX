@@ -94,7 +94,7 @@ export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string): 
   for (let i = 0; i < sampleCount; i++) {
     instruments.push({
       id: i + 1,
-      name: `MoN Sample ${i + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

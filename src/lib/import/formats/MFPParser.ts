@@ -306,7 +306,7 @@ export async function parseMFPFile(
     const id = i + 1;
     return {
       id,
-      name: 'Sample ' + id,
+      name: '' + id,
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

@@ -261,7 +261,7 @@ export class DefleMaskParser {
     version: number,
     system: SystemDef
   ): { name: string; config: FurnaceConfig } {
-    const name = version > 5 ? reader.readPrefixedString() : `Instrument ${reader.getOffset()}`;
+    const name = version > 5 ? reader.readPrefixedString() : '';
     // mode: 1 = FM, 0 = STD (matches Furnace: mode?DIV_INS_FM:DIV_INS_STD)
     const mode = version >= 11 ? reader.readUint8() : 1; // ancient versions = all FM
 

@@ -333,7 +333,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   for (let smp = 0; smp < NUM_PCM_INSTRS; smp++) {
     const smpNameBase = 2 + smp * 13;
     const smpHdrBase  = 418 + smp * 16;
-    const smpName     = readString(bytes, smpNameBase, 13) || `PCM ${smp + 1}`;
+    const smpName     = readString(bytes, smpNameBase, 13) || '';
     const length      = u32le(bytes, smpHdrBase + 4);
     const loopStart   = u32le(bytes, smpHdrBase + 8);
     const loopEnd     = u32le(bytes, smpHdrBase + 12);

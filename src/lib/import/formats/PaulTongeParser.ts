@@ -194,7 +194,7 @@ export function parsePaulTongeFile(buffer: ArrayBuffer, filename: string): Track
         const entry = entries[i];
         const pcm = buf.slice(entry.offset, entry.offset + entry.lengthBytes);
         instruments.push(createSamplerInstrument(
-          i + 1, `PT Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+          i + 1, '', pcm, 64, 8287, 0, 0,
         ));
       }
       samplesExtracted = true;
@@ -204,7 +204,7 @@ export function parsePaulTongeFile(buffer: ArrayBuffer, filename: string): Track
 
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1',
+      id: 1, name: '',
       type: 'synth' as const, synthType: 'Synth' as const,
       effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);

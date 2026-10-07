@@ -103,7 +103,7 @@ export function parseTimeTrackerFile(buffer: ArrayBuffer, filename: string): Tra
     (_, i) =>
       ({
         id: i + 1,
-        name: `Sample ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],

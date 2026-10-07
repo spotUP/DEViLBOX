@@ -204,7 +204,7 @@ function extractSamples(buf: Uint8Array, smpOffset: number): InstrumentConfig[] 
 
       instruments.push(createSamplerInstrument(
         i + 1,
-        `MAX Sample ${i + 1}`,
+        '',
         pcm,
         64,
         8287,
@@ -214,7 +214,7 @@ function extractSamples(buf: Uint8Array, smpOffset: number): InstrumentConfig[] 
       validSamples++;
     } else {
       instruments.push({
-        id: i + 1, name: `MAX Sample ${i + 1}`,
+        id: i + 1, name: '',
         type: 'synth' as const, synthType: 'Synth' as const,
         effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
@@ -250,7 +250,7 @@ export function parseMaximumEffectFile(buffer: ArrayBuffer, filename: string): T
 
   if (!samplesExtracted) {
     instruments = [{
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig];
   }

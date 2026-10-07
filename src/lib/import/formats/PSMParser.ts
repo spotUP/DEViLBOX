@@ -554,7 +554,7 @@ function _parseNewPSM(bytes: Uint8Array, filename: string): TrackerSong | null {
   for (let i = 1; i <= Math.max(maxSample, 1); i++) {
     instruments.push({
       id:        i,
-      name:      sampleNames.get(i) || `Sample ${i}`,
+      name:      sampleNames.get(i) || '',
       type:      'sample' as const,
       synthType: 'Sampler' as const,
       effects:   [],
@@ -699,7 +699,7 @@ function _parseNewPSM(bytes: Uint8Array, filename: string): TrackerSong | null {
   if (instruments.length === 0) {
     instruments.push({
       id:        1,
-      name:      'Sample 1',
+      name:      '',
       type:      'sample' as const,
       synthType: 'Sampler' as const,
       effects:   [],
@@ -839,7 +839,7 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
             const idx = instruments.length + 1;
             instruments.push({
               id:        idx,
-              name:      `Sample ${idx}`,
+              name:      '',
               type:      'sample' as const,
               synthType: 'Sampler' as const,
               effects:   [],
@@ -849,7 +849,7 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
           }
           instruments[smpNumber - 1] = {
             id:        smpNumber,
-            name:      sName || `Sample ${smpNumber}`,
+            name:      sName || '',
             type:      'sample' as const,
             synthType: 'Sampler' as const,
             effects:   [],
@@ -989,7 +989,7 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
   if (instruments.length === 0) {
     instruments.push({
       id:        1,
-      name:      'Sample 1',
+      name:      '',
       type:      'sample' as const,
       synthType: 'Sampler' as const,
       effects:   [],

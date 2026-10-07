@@ -362,7 +362,7 @@ export async function extractAdPlugPatterns(
 
     for (let i = 0; i < Math.max(numInst, 1); i++) {
       const instName = numInst > 0 ? M.UTF8ToString(M._adplug_get_instrument_name(i)) : '';
-      const inst = makeOPLInstrument(i + 1, instName.trim() || `Inst ${i + 1}`);
+      const inst = makeOPLInstrument(i + 1, instName.trim() || '');
 
       if (M._adplug_get_instrument_regs(i, regsPtr)) {
         const regs = new Uint8Array(11);

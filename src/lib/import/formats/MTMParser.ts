@@ -296,7 +296,7 @@ export async function parseMTMFile(
 
   const instruments: InstrumentConfig[] = sampleInfos.map((info, i) => {
     const id   = i + 1;
-    const name = info.name || `Sample ${id}`;
+    const name = info.name || '';
 
     const fileBytesForSample = info.rawLength;
     const startOff = sampleReadOffset;

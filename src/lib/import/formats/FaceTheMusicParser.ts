@@ -359,7 +359,7 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
 
   for (let s = 0; s < numSamples; s++) {
     const id   = s + 1;
-    const name = sampleNames[s] || `Sample ${id}`;
+    const name = sampleNames[s] || '';
     const pcm  = pcmData[s];
 
     if (!pcm || pcm.length === 0) {

@@ -76,7 +76,7 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
     const loopStart = smp.attackLen;
     const loopEnd = smp.sustainLen > 0 ? smp.attackLen + smp.sustainLen : 0;
     instruments.push(createSamplerInstrument(
-      id, `Sample ${smp.number}`, smp.pcm,
+      id, '', smp.pcm,
       Math.min(64, Math.max(1, smp.volume >> 2)), // MaxTrax vol 0-256ish → 0-64
       8287, // nominal Amiga C-3 rate; MaxTrax repitches per note
       loopStart, loopEnd,
@@ -84,7 +84,7 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
   }
   // Fallback so the bank is never empty.
   if (instruments.length === 0) {
-    instruments.push({ id: 1, name: 'Sample 0', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig);
+    instruments.push({ id: 1, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig);
   }
 
   // MaxTraxSynth control instrument — gives NativeEngineRouting a handle to wire
