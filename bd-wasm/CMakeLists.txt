@@ -20,12 +20,12 @@ if(EMSCRIPTEN)
         "_player_init" "_player_render" "_player_stop" "_player_set_sample_rate"
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration" "_player_set_channel_gain"
-        "_bd_get_instrument_count" "_bd_get_instrument_param" "_bd_set_instrument_param"
+        "_bd_walk_song" "_bd_play_tick" "_bd_get_instrument_count" "_bd_get_instrument_param" "_bd_set_instrument_param"
     )
     string(JOIN "," EXPORT_STR ${EXPORTED_FUNCTIONS})
     target_link_options(${OUTPUT_NAME} PRIVATE
         -sEXPORTED_FUNCTIONS=[${EXPORT_STR}]
-        -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','lengthBytesUTF8','stringToUTF8']
+        -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','lengthBytesUTF8','stringToUTF8','HEAPU8']
         -sALLOW_MEMORY_GROWTH=1
         -sINITIAL_MEMORY=33554432
         -sMODULARIZE=1

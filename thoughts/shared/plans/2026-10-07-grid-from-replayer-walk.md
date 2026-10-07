@@ -203,7 +203,7 @@ bar test first (revert check: it must fail on the old grid), then fix.
   (offsets from amigasrc/hippel and wanted_team/Jochen_Hippel_7V). Tests:
   src/engine/__tests__/hippelAmigaSogGridMatchesPlayer.test.ts, hippel7VGridMatchesPlayer.test.ts,
   extend jochenHippelSTGridMatchesPlayer.test.ts.
-- **U5 Ben Daglish (L).** BenDaglishParser.ts:804/1001 + bd-wasm + src/engine/bd; add a walk to the C
+- **U5 Ben Daglish (L) - DONE 2026-10-07 (subsong 0 only; other subsongs open).** Walk = bd_walk in ben_daglish.c (every track and position-list command with tick, voice, track, byte), BenDaglishWasmExtractor.ts, grid benDaglishGrid.ts (50 Hz tick rows, notes named by the period they play, effect block 0xD8..0xEC), carriers kept (benDaglishRoundtrip.test.ts green), position reporting (bd_play_tick -> Bd.worklet.js -> BdEngine.onPositionUpdate; case added to nativeReplayerPlayheadFollowsGridRow.test.ts). Oracle UADE Paula, mickey_mouse.bd and motorhead-titleandingame.bd: every sample start is a grid note with the same pitch and every grid note a sample start (benDaglishGridMatchesPlayer.test.ts, revert-checked); bdEngineMatchesUade green. Open: motorhead has 3 subsongs, the parser reads only the first; an unmatched song falls through withNativeThenUADE to the UADE scan grid on zero notes (not the scope view). Brief was: BenDaglishParser.ts:804/1001 + bd-wasm + src/engine/bd; add a walk to the C
   port, grid from the walk, blockRows carriers kept (benDaglishRoundtrip.test.ts). Oracle: UADE Paula
   + the runner (BenDaglish id, held) with bdEngineMatchesUade.test.ts as the engine-vs-UADE gate: if
   the port differs from UADE the grid follows UADE and the port is fixed first. Test:
