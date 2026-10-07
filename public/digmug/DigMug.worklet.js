@@ -7,6 +7,9 @@ class DigMugProcessor extends AudioWorkletProcessor {
     super();
     this.module = null;
     this.handle = 0;
+    this.previewHandle = 0;   // a second copy of the module that plays keyboard notes, whether or not the song plays
+    this.previewPtr = 0;      // mono buffer the preview renders into
+    this.previewKey = null;   // the module bytes the preview copy was made from
     this.chPtrs = [0, 0, 0, 0];
     this.interleavedPtr = 0;
     this.interleavedBuf = null;
@@ -45,6 +48,9 @@ class DigMugProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
+      case 'previewLoad': this.previewLoad(data.buffer); break;
+      case 'noteOn': if (this.previewHandle) this.module._dm_preview_note(this.previewHandle, data.instrument, data.note); break;
+      case 'noteOff': if (this.previewHandle) this.module._dm_preview_stop(this.previewHandle); break;
       case 'play': this.playing = true; break;
       case 'stop':
         this.playing = false;
@@ -103,6 +109,7 @@ class DigMugProcessor extends AudioWorkletProcessor {
       const frameBytes = this.bufferSize * 4; // float32
       this.interleavedPtr = this.module._malloc(this.bufferSize * 2 * 4);
       for (let i = 0; i < 4; i++) this.chPtrs[i] = this.module._malloc(frameBytes);
+      this.previewPtr = this.module._malloc(frameBytes);
       if (!this.interleavedPtr) { this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' }); return; }
       this.updateBufferViews();
       this.initialized = true;
@@ -125,17 +132,48 @@ class DigMugProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /** Make the preview copy of the module (the replayer plays the keys itself, apart from the song). */
+  previewLoad(buffer) {
+    if (!this.module || !buffer) return;
+    if (this.previewKey === buffer && this.previewHandle) return;
+    if (this.previewHandle) { this.module._dm_destroy(this.previewHandle); this.previewHandle = 0; }
+    const bytes = new Uint8Array(buffer);
+    const ptr = this.module._malloc(bytes.length);
+    if (!ptr) return;
+    this.module.HEAPU8.set(bytes, ptr);
+    this.previewHandle = this.module._dm_create(ptr, bytes.length, sampleRate);
+    this.module._free(ptr);
+    this.previewKey = buffer;
+    if (this.previewHandle) this.module._dm_preview_stop(this.previewHandle);
+  }
+
   cleanup() {
+    if (this.module && this.previewHandle) { this.module._dm_destroy(this.previewHandle); this.previewHandle = 0; this.previewKey = null; }
     if (this.module && this.handle) { this.module._dm_destroy(this.handle); this.handle = 0; }
     if (this.module) {
       if (this.interleavedPtr) { this.module._free(this.interleavedPtr); this.interleavedPtr = 0; }
+      if (this.previewPtr) { this.module._free(this.previewPtr); this.previewPtr = 0; }
       for (let i = 0; i < 4; i++) { if (this.chPtrs[i]) { this.module._free(this.chPtrs[i]); this.chPtrs[i] = 0; } }
     }
     this.interleavedBuf = null; this.chBufs = null; this.module = null; this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
   }
 
+  /** Keyboard voice: the preview copy's channel 0, added to both sides (the song pans its channels hard). */
+  addPreview(outputL, outputR, numSamples) {
+    if (!this.previewHandle || !this.previewPtr) return;
+    const m = this.module;
+    m._dm_render_multi(this.previewHandle, this.previewPtr, 0, 0, 0, numSamples);
+    const heap = m.HEAPF32 || new Float32Array(m.wasmMemory.buffer);
+    const base = this.previewPtr >> 2;
+    for (let i = 0; i < numSamples; i++) {
+      const v = heap[base + i];
+      outputL[i] += v;
+      outputR[i] += v;
+    }
+  }
+
   process(inputs, outputs) {
-    if (!this.initialized || !this.module || !this.handle || !this.playing) return true;
+    if (!this.initialized || !this.module) return true;
     const output = outputs[0];
     if (!output || output.length < 2) return true;
     const outputL = output[0], outputR = output[1];
@@ -143,6 +181,12 @@ class DigMugProcessor extends AudioWorkletProcessor {
     const numSamples = Math.min(outputL.length, this.bufferSize);
     this.updateBufferViews();
     if (!this.chBufs) return true;
+    const songPlays = this.handle && this.playing;
+    if (!songPlays) {
+      outputL.fill(0); outputR.fill(0);
+      this.addPreview(outputL, outputR, numSamples);
+      return true;
+    }
 
     // Render per-channel
     const rendered = this.module._dm_render_multi(
@@ -171,6 +215,7 @@ class DigMugProcessor extends AudioWorkletProcessor {
       }
     }
 
+    this.addPreview(outputL, outputR, rendered > 0 ? rendered : numSamples);
     if (this.module._dm_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });
     return true;
   }
