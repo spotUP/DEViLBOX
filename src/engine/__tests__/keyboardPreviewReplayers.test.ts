@@ -16,6 +16,8 @@ import { parseDavidWhittakerFile } from '@/lib/import/formats/DavidWhittakerPars
 import { dwNoteForKey } from '@/engine/davidwhittaker/dwKeyNote';
 import { parseStartrekkerAMFile } from '@/lib/import/formats/StartrekkerAMParser';
 import { stPeriodForKey } from '@/engine/startrekker-am/stKeyNote';
+import { parseDigitalMugicianFile } from '@/lib/import/formats/DigitalMugicianParser';
+import { dmNoteForKey } from '@/engine/digmug/dmKeyNote';
 import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT } from './keyboardPreviewHarness';
 
 const corpus = (n: string) => {
@@ -32,7 +34,7 @@ const emscriptenTransform = (c: string) => c
   .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 
 interface Cell { note: number; instrument: number; effTyp?: number; eff?: number }
-interface GridSong { instruments: Array<{ id: number; synthType?: string }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
+interface GridSong { instruments: Array<{ id: number; synthType?: string; digMug?: { sampleIndex?: number; fineTune?: number } }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
 
 /** First note of channel `ch` in song order that is a plain note (no effect), with its instrument. */
 function firstNoteOnChannel(song: GridSong, ch: number): { note: number; ins: number } | null {
@@ -171,5 +173,64 @@ describe('StarTrekker AM: a key never starts the song, and key release silences 
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 20, 0), 20)), 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 20, 0), 20)), 'silent after release').toBe(0);
+  });
+});
+
+describe.each(['digital-mugician/believe.dmu', 'formats/flight.dmu', 'formats/cockwise.mug', 'digital-mugician-2/snickle.mug'])('Digital Mugician %s: a typed note is the replayer voice, as the song plays it', (name) => {
+  it('the first note of each voice has the song\'s pitch, level and envelope', async () => {
+    const ab = corpus(name);
+    const raw = new Uint8Array(ab);
+    const song = (await parseDigitalMugicianFile(ab, name)) as unknown as GridSong & { uadePatternLayout: { getCellFileOffset(p: number, r: number, c: number): number } };
+    const sampleOf = new Map(song.instruments.map((i) => [i.id, i.digMug?.sampleIndex ?? 0]));
+    let measured = 0;
+    for (let ch = 0; ch < 4; ch++) {
+      // The voice's first note, if it is a plain one (effect byte 0, parameter 0): an effect byte
+      // can keep the volume envelope or the instrument effect from restarting, which a key cannot say.
+      let n = null as { note: number; ins: number } | null;
+      let done = false;
+      for (const pi of song.songPositions) {
+        song.patterns[pi].channels[ch].rows.forEach((c, row) => {
+          if (done || c.note <= 0) return;
+          done = true;
+          const off = song.uadePatternLayout.getCellFileOffset(pi, row, ch);
+          if (c.instrument > 0 && raw[off + 2] === 0 && raw[off + 3] === 0) n = { note: c.note, ins: c.instrument };
+        });
+        if (done) break;
+      }
+      if (!n || !sampleOf.get(n.ins)) continue;
+      const a = await startWorklet('digmug', 'DigMug', emscriptenTransform);
+      await a.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await a.send({ type: 'setChannelMask', mask: 1 << ch });
+      await a.send({ type: 'play' });
+      const out = renderTicks(a.proc, 3000, ch === 1 || ch === 2 ? 1 : 0);
+      const r = rmsPerTick(out, 3000);
+      const on = r.findIndex((v) => v >= 0.02);
+      if (on < 0) continue;
+      const ticks = Math.max(4, Math.min(8, song.initialSpeed - 1));   // before the voice's next row
+      const b = await startWorklet('digmug', 'DigMug', emscriptenTransform);
+      await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+      await b.send({ type: 'noteOn', instrument: sampleOf.get(n.ins), note: dmNoteForKey(n.note + 11, song.instruments.find((i) => i.id === n!.ins)?.digMug?.fineTune ?? 0) });
+      const pr = renderTicks(b.proc, ticks + 12, 0);
+      const pOn = rmsPerTick(pr, ticks + 12).findIndex((v) => v >= 0.02);
+      expect(pOn, `${name} voice ${ch}: the key sounds`).toBeGreaterThanOrEqual(0);
+      expectSameVoice(`${name} voice ${ch}`, out.subarray(on * FPT, (on + ticks) * FPT), pr.subarray(pOn * FPT, (pOn + ticks) * FPT), ticks);
+      measured++;
+    }
+    expect(measured, 'the song has a voice to measure').toBeGreaterThan(0);
+  });
+});
+
+describe('Digital Mugician: a key never starts the song, and key release silences the voice', () => {
+  it('believe.dmu: silent before a key, sounds on a key, silent after release', async () => {
+    const ab = corpus('digital-mugician/believe.dmu');
+    const b = await startWorklet('digmug', 'DigMug', emscriptenTransform);
+    await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+    await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
+    await b.send({ type: 'noteOn', instrument: 9, note: 30 });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
+    await b.send({ type: 'noteOff' });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
   });
 });
