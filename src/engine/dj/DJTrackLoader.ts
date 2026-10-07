@@ -10,7 +10,7 @@ import type { DeckId } from './DeckEngine';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from './DJEngine';
 import { getDJPipeline } from './DJPipeline';
-import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { openDeckTrack } from '@/lib/song/openSong';
 import { detectBPM } from './DJBeatDetector';
 import { cacheSong, getCachedSong } from './DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
@@ -180,16 +180,12 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
   if (track.fileName.startsWith('modland:')) {
     const modlandPath = track.fileName.slice('modland:'.length);
     try {
-      const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
-      // One companion fetch: the resolver names every partner, TFMX smpl.*
-      // included. Auto DJ pre-render without them silently fails with UADE -1.
-      const buffer = await downloadModlandFile(modlandPath);
+      const { downloadModlandFile } = await import('@/lib/modlandApi');
       const filename = modlandPath.split('/').pop() || 'download.mod';
-      const found = await downloadUADECompanions(modlandPath, buffer);
-      const companions = found.length > 0 ? found : undefined;
 
       if (isAudioFile(filename)) {
         // Audio file - no rendering needed
+        const buffer = await downloadModlandFile(modlandPath);
         return {
           wavData: buffer,
           filename: track.fileName,
@@ -199,9 +195,10 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         };
       }
 
-      // Tracker file - render in background (UADE crashes happen here, isolated from playback)
-      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-      const song = await parseModuleToSong(blob);
+      // Tracker file - render in background (UADE crashes happen here, isolated from playback).
+      // One open: the download, the partner files (TFMX smpl.*, .nt, banks) and the parse;
+      // Auto DJ pre-render without the partners silently fails with UADE -1.
+      const { bytes: buffer, song, companionList: companions } = await openDeckTrack({ kind: 'modland', path: modlandPath });
       cacheSong(track.fileName, song);
       const bpmResult = detectBPM(song);
 
@@ -275,8 +272,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         };
       }
 
-      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-      const song = await parseModuleToSong(blob);
+      const { song } = await openDeckTrack({ kind: 'bytes', name: filename, bytes: buffer });
       cacheSong(track.fileName, song);
       const bpmResult = detectBPM(song);
 
@@ -319,8 +315,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         };
       }
 
-      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-      const song = await parseModuleToSong(blob);
+      const { song } = await openDeckTrack({ kind: 'bytes', name: filename, bytes: buffer });
       cacheSong(filename, song);
       const bpmResult = detectBPM(song);
 
@@ -436,20 +431,16 @@ async function loadPlaylistTrackToDeckInternal(
   if (track.fileName.startsWith('modland:')) {
     const modlandPath = track.fileName.slice('modland:'.length);
     try {
-      const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
-      const buffer = await downloadModlandFile(modlandPath);
       const filename = modlandPath.split('/').pop() || 'download.mod';
-      // One companion fetch: the resolver names every partner (TFMX smpl.*, .nt, banks).
-      const companions = await downloadUADECompanions(modlandPath, buffer);
 
       if (isAudioFile(filename)) {
-        await getDJEngine().loadAudioToDeck(deckId, buffer, track.fileName);
+        const { downloadModlandFile } = await import('@/lib/modlandApi');
+        await getDJEngine().loadAudioToDeck(deckId, await downloadModlandFile(modlandPath), track.fileName);
         return true;
       }
 
-      // Tracker file — parse, render, analyze, load
-      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-      const song = await parseModuleToSong(blob);
+      // Tracker file: one open on this deck (download, partner files, parse), then render, analyze, load
+      const { bytes: buffer, song, companionList: companions } = await openDeckTrack({ kind: 'modland', path: modlandPath }, deckId);
       cacheSong(track.fileName, song);
       const bpmResult = detectBPM(song);
 
@@ -465,7 +456,7 @@ async function loadPlaylistTrackToDeckInternal(
 
       const result = await getDJPipeline().loadOrEnqueue(
         buffer, filename, deckId, 'high',
-        companions.length > 0 ? companions : undefined,
+        companions,
       );
 
       // Use .wav filename to avoid UADE re-init on decode
@@ -538,8 +529,7 @@ async function loadPlaylistTrackToDeckInternal(
       }
 
       // Tracker file — parse + render through the pipeline, same as modland.
-      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-      const song = await parseModuleToSong(blob);
+      const { song } = await openDeckTrack({ kind: 'bytes', name: filename, bytes: buffer }, deckId);
       cacheSong(track.fileName, song);
       const bpmResult = detectBPM(song);
 
@@ -587,8 +577,7 @@ async function loadPlaylistTrackToDeckInternal(
         return true;
       }
 
-      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-      const song = await parseModuleToSong(blob);
+      const { song } = await openDeckTrack({ kind: 'bytes', name: filename, bytes: buffer }, deckId);
       cacheSong(filename, song);
       const bpmResult = detectBPM(song);
 

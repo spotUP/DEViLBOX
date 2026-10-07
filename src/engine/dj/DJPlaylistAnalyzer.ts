@@ -479,10 +479,10 @@ export async function analyzePlaylist(
         let companions: Array<{ filename: string; buffer: ArrayBuffer }> | undefined;
         if (!isHVSC) {
           try {
-            const { downloadUADECompanions } = await import('@/lib/modlandApi');
-            const uadeCompanions = await downloadUADECompanions(remotePath, buffer);
-            if (uadeCompanions.length > 0) {
-              companions = [...(companions ?? []), ...uadeCompanions.map(c => ({ filename: c.filename, buffer: c.buffer }))];
+            const { acquireModlandCompanions, companionList } = await import('@/lib/song/acquireSource');
+            const uadeCompanions = companionList(await acquireModlandCompanions(remotePath, buffer));
+            if (uadeCompanions) {
+              companions = [...(companions ?? []), ...uadeCompanions];
               for (const c of uadeCompanions) {
                 await cacheSourceFile(c.buffer, c.filename);
               }

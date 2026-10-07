@@ -37,9 +37,9 @@ describe('Deck B totalPositions regression', () => {
       path.resolve(__dirname, '../DJTrackLoader.ts'),
       'utf-8',
     );
-    // All setDeckState calls that follow parseModuleToSong must include totalPositions
-    const chunks = src.split('parseModuleToSong');
-    // Skip the first chunk (before any parseModuleToSong call)
+    // All setDeckState calls that follow the deck open (openDeckTrack parses) must include totalPositions
+    const chunks = src.split('openDeckTrack(');
+    // Skip the first chunk (before any openDeckTrack call)
     const postParseChunks = chunks.slice(1);
     expect(postParseChunks.length).toBeGreaterThanOrEqual(2); // modland + local paths
     for (const chunk of postParseChunks) {
@@ -283,12 +283,14 @@ describe('DJTrackLoader live load path handles companions', () => {
   // The loadPlaylistTrackToDeckInternal function (live load path)
   const liveLoadSection = src.slice(src.indexOf('loadPlaylistTrackToDeckInternal'));
 
-  it('fetches companions once: no separate TFMX download beside downloadUADECompanions', () => {
+  it('fetches companions once: no separate TFMX download, no own companion fetch', () => {
     expect(liveLoadSection).not.toContain('downloadTFMXCompanion');
+    expect(liveLoadSection).not.toContain('downloadUADECompanions');
   });
 
-  it('downloads UADE companions in the live load modland path', () => {
-    expect(liveLoadSection).toContain('downloadUADECompanions');
+  it('gets the UADE companions from the deck open in the live load modland path', () => {
+    expect(liveLoadSection).toContain("openDeckTrack({ kind: 'modland'");
+    expect(liveLoadSection).toContain('companionList: companions');
   });
 
   it('passes companions to loadOrEnqueue in the live load path', () => {

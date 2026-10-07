@@ -9,7 +9,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { setDeckPitch, setDeckChannelMuteMask, setDeckRepitchLock } from '@/engine/dj/DJActions';
-import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { openDeckTrack } from '@/lib/song/openSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
@@ -367,10 +367,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         useDJStore.getState().setDeckViewMode('visualizer');
       } else {
         // Non-UADE tracker module (XM/IT/S3M/etc.)
-        const song = await parseModuleToSong(file);
+        const { song, bytes: moduleBuffer } = await openDeckTrack({ kind: 'file', file }, deckId);
         cacheSong(file.name, song);
         const bpmResult = detectBPM(song);
-        const moduleBuffer = await file.arrayBuffer();
 
         useDJStore.getState().setDeckState(deckId, {
           fileName: file.name,

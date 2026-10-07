@@ -438,6 +438,26 @@ async function tryReadChipRamNames(
 }
 
 /**
+ * Which engine a parse scans on. The editor's by default; a DJ deck load runs
+ * its parse inside withDeckUADEEngine so the scan lands on the deck's own
+ * engine and never replaces the editor song's module or companions (plan
+ * 2026-10-07, U2.6a). Deck parses run one at a time: the scope is a module
+ * variable, so two overlapping deck parses would restore each other's scope.
+ */
+let parseOnDeckEngine = false;
+let deckParseQueue: Promise<unknown> = Promise.resolve();
+
+export function withDeckUADEEngine<T>(fn: () => Promise<T>): Promise<T> {
+  const run = async (): Promise<T> => {
+    parseOnDeckEngine = true;
+    try { return await fn(); } finally { parseOnDeckEngine = false; }
+  };
+  const result = deckParseQueue.then(run, run);
+  deckParseQueue = result.catch(() => undefined);
+  return result;
+}
+
+/**
  * Parse an exotic Amiga music file via UADE scan.
  *
  * If the WASM has enhanced exports (read_memory, get_channel_extended, get_cia_state),
@@ -470,7 +490,7 @@ export async function parseUADEFile(
 
   // Initialize UADE engine; reuse pre-scanned metadata from the dialog when available
   // (avoids a second full scan which can take several seconds per file)
-  const engine = UADEEngine.getInstance();
+  const engine = parseOnDeckEngine ? UADEEngine.getDeckInstance() : UADEEngine.getInstance();
   await engine.ready();
 
   // Enable CIA tick snapshot capture BEFORE the scan so snapshots are accumulated

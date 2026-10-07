@@ -10,7 +10,7 @@ import { Upload, Music, X, Loader2, ListPlus } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
-import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { openDeckTrack } from '@/lib/song/openSong';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { loadUADEToDeck, isUADECached } from '@/engine/dj/DJUADEPrerender';
@@ -68,7 +68,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
         } else {
           // Tracker module
           const isUADE = isUADEFormat(file.name);
-          const song = await parseModuleToSong(file);
+          const { song } = await openDeckTrack({ kind: 'bytes', name: file.name, bytes: buffer });
           const bpmResult = detectBPM(song);
           const duration = estimateSongDuration(song);
 

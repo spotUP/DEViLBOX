@@ -356,12 +356,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           await loadUADE(engine, deckId, buffer.slice(0), filename, true, track.bpm > 0 ? track.bpm : undefined, track.title);
           useDJStore.getState().setDeckViewMode('visualizer');
         } else {
-          const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+          const { openDeckTrack } = await import('@/lib/song/openSong');
           const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
           const { cacheSong } = await import('@/engine/dj/DJSongCache');
 
-          const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-          const song = await parseModuleToSong(blob);
+          const { song } = await openDeckTrack({ kind: 'bytes', name: filename, bytes: buffer }, deckId);
           const bpmResult = detectBPM(song);
 
           cacheSong(cacheKey, song);

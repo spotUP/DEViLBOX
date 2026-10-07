@@ -152,13 +152,13 @@ export async function precachePlaylist(
       if (!isHVSC) {
         // Check for UADE companion files (Sonix, Jason Page, MFP, etc.)
         try {
-          const { downloadUADECompanions } = await import('@/lib/modlandApi');
+          const { acquireModlandCompanions } = await import('@/lib/song/acquireSource');
           // Pass the main buffer so Startrekker-AM detection can gate the
           // .nt probe; avoids a harmless 404 per plain ProTracker MOD.
-          const companions = await downloadUADECompanions(remotePath, buffer);
-          for (const companion of companions) {
-            await cacheSourceFile(companion.buffer, companion.filename);
-            console.log(`[Precache] Cached UADE companion: ${companion.filename}`);
+          const companions = await acquireModlandCompanions(remotePath, buffer);
+          for (const [companionName, companionBuffer] of companions ?? []) {
+            await cacheSourceFile(companionBuffer, companionName);
+            console.log(`[Precache] Cached UADE companion: ${companionName}`);
           }
         } catch (companionErr) {
           console.warn(`[Precache] UADE companion download failed (non-fatal):`, companionErr);

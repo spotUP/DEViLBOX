@@ -25,7 +25,9 @@ export async function acquireNeighbourCompanions(name: string, dir: string, byte
   return found.size ? found : undefined;
 }
 
-export async function acquire(src: SongSourceRef): Promise<{ file: File; companions?: Companions }> {
+/** `publishPhase` false for a deck open: it must not write into the editor's loading state. */
+export async function acquire(src: SongSourceRef, publishPhase = true): Promise<{ file: File; companions?: Companions }> {
+  const phase = (): void => { if (publishPhase) setSongLoadPhase('companions'); };
   switch (src.kind) {
     case 'prepared':
       return { file: src.file, companions: src.companions };
@@ -36,7 +38,7 @@ export async function acquire(src: SongSourceRef): Promise<{ file: File; compani
     case 'modland': {
       const { downloadModlandFile } = await import('@/lib/modlandApi');
       const bytes = await downloadModlandFile(src.path);
-      setSongLoadPhase('companions');
+      phase();
       const name = src.path.split('/').pop() ?? 'song';
       return {
         file: new File([bytes], name, { type: 'application/octet-stream' }),
@@ -51,11 +53,26 @@ export async function acquire(src: SongSourceRef): Promise<{ file: File; compani
         bytes = await res.arrayBuffer();
       }
       const name = src.name ?? src.url.split('/').pop() ?? 'song';
-      setSongLoadPhase('companions');
+      phase();
       return {
         file: new File([bytes], name, { type: 'application/octet-stream' }),
         companions: await acquireNeighbourCompanions(name, directoryOfFile(src.url), bytes),
       };
     }
   }
+}
+
+/** Partner files in the shape the DJ render pipeline takes (DJPipeline.loadOrEnqueue, loadUADEToDeck). */
+export function companionList(companions?: Companions): Array<{ filename: string; buffer: ArrayBuffer }> | undefined {
+  return companions?.size ? Array.from(companions, ([filename, buffer]) => ({ filename, buffer })) : undefined;
+}
+
+/**
+ * A deck load that renders from the bytes (the UADE pre-render path) needs the
+ * file and its partner files but no parse here: loadUADEToDeck parses on a
+ * cache miss, through the deck open. Same acquire, nothing written to the editor's load state.
+ */
+export async function acquireForDeck(src: SongSourceRef): Promise<{ name: string; bytes: ArrayBuffer; companions?: Array<{ filename: string; buffer: ArrayBuffer }> }> {
+  const { file, companions } = await acquire(src, false);
+  return { name: file.name, bytes: await file.arrayBuffer(), companions: companionList(companions) };
 }

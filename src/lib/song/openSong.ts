@@ -39,7 +39,9 @@ import { askImportDialog, type ImportAnswer } from '@/lib/song/importRequest';
 import { isAdPlugWasmFormat } from '@/lib/import/adplugFormats';
 import { detectFormatFromContent, isSupportedByHeader } from '@/lib/import/FormatRegistry';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
-import { acquire } from './acquireSource';
+import { acquire, companionList } from './acquireSource';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { DeckId } from '@/engine/dj/DeckEngine';
 import { withSongLoad } from '@/lib/song/songLifecycle';
 import { applySong, type SongToApply, type SongSource } from '@/lib/song/applySong';
 import { useSongLoadStore, setSongLoadPhase, throwIfSongLoadCancelled, type OpenPhase } from '@/stores/useSongLoadStore';
@@ -78,11 +80,32 @@ export type OpenOrigin = 'drop' | 'filebrowser' | 'dialog' | 'mcp' | 'jukebox' |
   | 'embed' | 'hvsc' | 'modland' | 'restore' | 'tab' | 'sync' | 'dj' | 'preview'
   | 'project' | 'revision' | 'export';
 
+/** A DJ deck as the target of an open. `deck` is absent for a background render that loads to no deck. */
+export interface DeckTarget { deck?: DeckId }
+
+/** What a deck open hands back: the parsed song plus the bytes and partner files the render pipeline loads with. */
+export interface DeckSong {
+  ok: true;
+  target: 'deck';
+  deck?: DeckId;
+  name: string;
+  file: File;
+  bytes: ArrayBuffer;
+  song: TrackerSong;
+  companions?: Map<string, ArrayBuffer>;
+  /** The same partner files in the shape DJPipeline.loadOrEnqueue takes. */
+  companionList?: Array<{ filename: string; buffer: ArrayBuffer }>;
+}
+
 export interface OpenOptions {
   origin: OpenOrigin;
   subsong?: number;
-  /** Only the editor exists in U2.2; decks and previews arrive with U2.5 / U2.6. */
-  target?: 'editor';
+  /**
+   * Where the song goes. The editor (default), or a DJ deck: a deck open reads
+   * the source and its partner files, parses on the deck's own UADE engine and
+   * hands back the song. It never unloads or applies to the editor.
+   */
+  target?: 'editor' | DeckTarget;
   /** Start playback after the load. Default: the origin's rule (START_BY_ORIGIN). */
   start?: false | 'song' | 'pattern';
   /** May this load raise questions (import dialog, contribution prompt)? Default: false for headless origins. */
@@ -294,8 +317,39 @@ export async function openSavedSong(src: Omit<StoredSongSource, 'kind'>): Promis
   if (!r.ok) throw new Error(r.error);
 }
 
-export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOptions): Promise<OpenResult> {
+/**
+ * A deck target: acquire (file or Modland path, with its partner files), parse
+ * on the deck's own UADE engine, return the song. One call per deck load; the
+ * editor song, its stores and its UADE engine are not touched.
+ */
+async function openDeckSong(src: SongSourceRef, o: OpenOptions & { target: DeckTarget }): Promise<DeckSong | { ok: false; error: string }> {
+  try {
+    const { file, companions } = await acquire(src, false);
+    const bytes = await file.arrayBuffer();
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const { withDeckUADEEngine } = await import('@/lib/import/formats/UADEParser');
+    const song = await withDeckUADEEngine(() => parseModuleToSong(file, o.subsong ?? 0, undefined, undefined, companions));
+    return {
+      ok: true, target: 'deck', deck: o.target.deck, name: file.name, file, bytes, song, companions,
+      companionList: companionList(companions),
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** openSong with a deck target, for callers whose contract is to throw (every DJ loader catches and reports). */
+export async function openDeckTrack(src: SongSourceRef, deck?: DeckId, o: Omit<OpenOptions, 'target' | 'origin'> = {}): Promise<DeckSong> {
+  const r = await openSong(src, { ...o, origin: 'dj', target: { deck } });
+  if (!r.ok) throw new Error(r.error);
+  return r;
+}
+
+export async function openSong(src: SongSourceRef, o: OpenOptions & { target: DeckTarget }): Promise<DeckSong | { ok: false; error: string }>;
+export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOptions): Promise<OpenResult>;
+export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOptions): Promise<OpenResult | DeckSong> {
   if (src.kind === 'song') return openStoredSong(src);
+  if (typeof o.target === 'object') return openDeckSong(src, o as OpenOptions & { target: DeckTarget });
   const interactive = o.interactive ?? INTERACTIVE_ORIGINS.has(o.origin);
   const phase = (p: OpenPhase): void => {
     setSongLoadPhase(p);
