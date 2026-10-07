@@ -316,7 +316,7 @@ services, and the parsers' internal recursion (`ChipDumpParsers`,
 
 ## Checklist
 
-- [ ] U4.0 guard, ratchet mode
+- [x] U4.0 guard, ratchet mode (src/engine/__tests__/oneOpenPath.contract.test.ts + oneOpenPathAllowlist.ts; useImportDialog.ts deleted)
 - [ ] U2.1 unload + generation fence + frame age (VU freeze, stop before parse) - needs D3
 - [ ] U2.2 openSong, headless callers, family C fixed
 - [ ] U2.3 dialog in front of openSong - needs D1, D2, D4
