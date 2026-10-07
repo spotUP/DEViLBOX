@@ -4,6 +4,7 @@
  * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
+import { qcLiveCellFields } from '@/engine/uade/encoders/QuadraComposerEncoder';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
@@ -120,9 +121,14 @@ export class QuadraComposerEngine extends WASMChannelOutputsEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  /** Edit a pattern cell in the WASM replayer */
+  /**
+   * Edit a pattern cell in the WASM replayer. The arguments are the grid cell's (XM note, instrument, effect type and
+   * parameter); the replayer takes the module's own fields (qc_set_cell: sample, note byte 0-35, effect, argument),
+   * the same bytes the encoder writes to the file.
+   */
   setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+    const f = qcLiveCellFields({ note, instrument, effTyp: effect, eff: effectArg });
+    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, sample: f.sample, note: f.note, effect: f.effect, effectArg: f.effectArg });
   }
 
   /** Set an instrument parameter by name */

@@ -266,7 +266,9 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
         if (empty && any) {
           const e = empty as { p: number; ch: number; r: number };
           s2.setCurrentPattern(e.p);
-          s2.setCell(e.ch, e.r, { note: any });
+          // A typed note takes the instrument in use: the one of the note above it.
+          const above = s2.patterns[0].channels[e.ch].rows[e.r - 1];
+          s2.setCell(e.ch, e.r, { note: any, ...(above.note > 0 && above.instrument > 0 ? { instrument: above.instrument } : {}) });
           await settle();
           const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
           const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
@@ -276,8 +278,9 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
             if (out) {
               const back = await parseModuleToSong(new File([new Uint8Array(out.data).buffer as ArrayBuffer], name)) as unknown as { patterns: Array<{ channels: Array<{ rows: Cell[] }> }> };
               ok = back.patterns[e.p]?.channels[e.ch]?.rows[e.r]?.note === any;
+              if (process.env.G24_DEBUG && !ok) console.log('[g24add]', key, 'cell', JSON.stringify(e), 'wanted', any, 'back', JSON.stringify(back.patterns[e.p]?.channels[e.ch]?.rows[e.r]), 'warnings', JSON.stringify(out.warnings), 'sizes', out.data.length);
             }
-          } catch { ok = false; }
+          } catch (err) { ok = false; if (process.env.G24_DEBUG) console.log('[g24add]', key, 'threw', String(err).slice(0, 160)); }
           add = ok ? 'yes' : 'no';
         }
       }
