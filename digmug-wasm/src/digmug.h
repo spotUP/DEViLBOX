@@ -26,6 +26,8 @@ size_t dm_render(DmModule* module, float* interleaved_stereo, size_t frames);
 size_t dm_render_multi(DmModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames);
 
 bool dm_has_ended(const DmModule* module);
+int dm_get_play_pos(const DmModule* module);
+int dm_get_play_row(const DmModule* module);
 
 // Edit API
 int dm_get_instrument_count(const DmModule* module);

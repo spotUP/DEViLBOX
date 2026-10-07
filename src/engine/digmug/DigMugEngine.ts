@@ -4,6 +4,7 @@
  * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
@@ -28,6 +29,8 @@ function digmugTransform(code: string): string {
 export class DigMugEngine extends WASMChannelOutputsEngine {
   private static instance: DigMugEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private readonly _positions = new PositionCallbacks();
 
   private _songEndCallback: (() => void) | null = null;
 
@@ -88,6 +91,9 @@ export class DigMugEngine extends WASMChannelOutputsEngine {
         case 'songEnd':
           this._songEndCallback?.();
           break;
+        case 'position':
+          this._positions.emit(data);
+          break;
         case 'error':
           console.error('[DigMugEngine]', data.message);
           break;
@@ -140,7 +146,13 @@ export class DigMugEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
   }
 
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
+  }
+
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     if (DigMugEngine.instance === this) DigMugEngine.instance = null;
   }

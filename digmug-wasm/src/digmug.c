@@ -213,6 +213,9 @@ typedef struct DmModule {
     int16_t* instrument_to_sample_info_mapping;
 
     bool end_reached;
+    // Playhead: the position and row whose notes play_it read last (-1 until a row has played).
+    int play_pos;
+    int play_row;
     bool has_ended;
 
     // Mixer
@@ -704,6 +707,8 @@ static void initialize_sound(DmModule* m, int song_number) {
     m->new_pattern = true;
     m->new_row = true;
     m->current_position = 0;
+    m->play_pos = -1;
+    m->play_row = -1;
     m->song_length = m->current_sub_song->number_of_sequences;
     m->current_row = 0;
     m->pattern_length = 64;
@@ -1047,6 +1052,11 @@ static void play_it(DmModule* m) {
     m->ch_tab[2] = 0x80;
     m->ch_tab[3] = 0x80;
     m->ch_tab_index = 0;
+
+    if (m->new_row && !m->preview) {
+        m->play_pos = (int)m->current_position;
+        m->play_row = (int)m->current_row;
+    }
 
     for (int i = 0; i < m->number_of_channels; i++)
         play_note(m, i);
@@ -1745,6 +1755,15 @@ void dm_set_channel_mask(DmModule* module, uint32_t mask) {
 
     for (int i = 0; i < module->number_of_channels; i++)
         module->channels[i].muted = ((mask >> i) & 1) == 0;
+}
+
+// Playhead: the sequence position and the row of it that is sounding; -1 before the first row.
+int dm_get_play_pos(const DmModule* module) {
+    return module ? module->play_pos : -1;
+}
+
+int dm_get_play_row(const DmModule* module) {
+    return module ? module->play_row : -1;
 }
 
 bool dm_has_ended(const DmModule* module) {
