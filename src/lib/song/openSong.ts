@@ -41,6 +41,7 @@ import { detectFormatFromContent, isSupportedByHeader } from '@/lib/import/Forma
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { directoryOfFile, gatherCompanions } from '@/lib/import/companionFetch';
 import { withSongLoad } from '@/lib/song/songLifecycle';
+import { applySong, type SongToApply, type SongSource } from '@/lib/song/applySong';
 import { useSongLoadStore, setSongLoadPhase, throwIfSongLoadCancelled, type OpenPhase } from '@/stores/useSongLoadStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useFormatStore } from '@/stores/useFormatStore';
@@ -74,7 +75,8 @@ export type SongSourceRef =
   | { kind: 'url'; url: string; name?: string; bytes?: ArrayBuffer };
 
 export type OpenOrigin = 'drop' | 'filebrowser' | 'dialog' | 'mcp' | 'jukebox' | 'tour'
-  | 'embed' | 'hvsc' | 'modland' | 'restore' | 'tab' | 'sync' | 'dj' | 'preview';
+  | 'embed' | 'hvsc' | 'modland' | 'restore' | 'tab' | 'sync' | 'dj' | 'preview'
+  | 'project' | 'revision' | 'export';
 
 export interface OpenOptions {
   origin: OpenOrigin;
@@ -100,7 +102,7 @@ export interface OpenOptions {
 }
 
 export type OpenResult =
-  | { ok: true; name: string; message: string; engine: string; editorMode: string; kind: SongKind; started: boolean; companions: number;
+  | { ok: true; name: string; message: string; engine: string; editorMode: string; kind: SongKind | 'saved'; started: boolean; companions: number;
       /** The importer already told the user (toast); callers must not announce it again. */
       notified: boolean }
   /** `cancelled`: the person cancelled (the dialog or the loading panel); no error to show. */
@@ -110,6 +112,7 @@ export type OpenResult =
 export const START_BY_ORIGIN: Record<OpenOrigin, false | 'song'> = {
   drop: false, filebrowser: false, dialog: false, mcp: false, hvsc: false, modland: false,
   restore: false, tab: false, sync: false, dj: false, preview: false,
+  project: false, revision: false, export: false,
   jukebox: 'song', tour: 'song', embed: 'song',
 };
 
@@ -290,7 +293,46 @@ async function askIfChoice(src: SongSourceRef, o: OpenOptions): Promise<{ song: 
   };
 }
 
-export async function openSong(src: SongSourceRef, o: OpenOptions): Promise<OpenResult> {
+/**
+ * A song already in hand as a SongToApply (a saved project, a restored
+ * autosave, a tab, a collaborator's full sync). `song` runs AFTER the outgoing
+ * song is unloaded, so a restore's re-decode of the stored file bytes happens
+ * in the same silence a file open parses in.
+ */
+export interface StoredSongSource {
+  kind: 'song';
+  name: string;
+  song: () => SongToApply | Promise<SongToApply>;
+  /** Which opener this is, for logs and the few source-specific choices in applySong. */
+  source: SongSource;
+}
+
+/** The lifecycle of a song that needs no parse: unload, loading state, apply once. */
+async function openStoredSong(src: StoredSongSource): Promise<OpenResult> {
+  try {
+    await withSongLoad(src.name, async () => {
+      useSongLoadStore.setState({ interactive: false });
+      setSongLoadPhase('parse');
+      const song = await src.song();
+      setSongLoadPhase('apply');
+      await applySong(song, src.source);
+    });
+    const format = useFormatStore.getState();
+    return { ok: true, name: src.name, message: `Opened ${src.name}`, engine: 'saved', editorMode: format.editorMode,
+      kind: 'saved', started: false, companions: 0, notified: false };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** openStoredSong for callers whose contract is to throw (restore, tabs, sync). */
+export async function openSavedSong(src: Omit<StoredSongSource, 'kind'>): Promise<void> {
+  const r = await openSong({ kind: 'song', ...src }, { origin: src.source === 'recovery' ? 'restore' : src.source as OpenOrigin });
+  if (!r.ok) throw new Error(r.error);
+}
+
+export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOptions): Promise<OpenResult> {
+  if (src.kind === 'song') return openStoredSong(src);
   const interactive = o.interactive ?? INTERACTIVE_ORIGINS.has(o.origin);
   const phase = (p: OpenPhase): void => {
     setSongLoadPhase(p);
