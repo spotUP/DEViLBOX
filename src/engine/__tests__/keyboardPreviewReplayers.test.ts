@@ -20,6 +20,8 @@ import { parseDigitalMugicianFile } from '@/lib/import/formats/DigitalMugicianPa
 import { dmNoteForKey } from '@/engine/digmug/dmKeyNote';
 import { parseSonicArrangerFile } from '@/lib/import/formats/SonicArrangerParser';
 import { saNoteForKey } from '@/engine/sonic-arranger/saKeyNote';
+import { parseDeltaMusic1File } from '@/lib/import/formats/DeltaMusic1Parser';
+import { dm1NoteForKey } from '@/engine/deltamusic1/dm1KeyNote';
 import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT, fromOnset } from './keyboardPreviewHarness';
 
 const corpus = (n: string) => {
@@ -287,6 +289,64 @@ describe('Sonic Arranger: a key never starts the song, and key release silences 
     await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
     await b.send({ type: 'noteOn', instrument: 4, note: 49 });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
+    await b.send({ type: 'noteOff' });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
+  });
+});
+
+// triplex1.dm is not compared: its voice 2 note plays an instrument an earlier effect row has reconfigured (the
+// replayer's effects rewrite the playing instrument), which a key, playing the instrument as stored, cannot know.
+describe.each(['formats/crusaders1.dm'])('Delta Music 1 %s: a typed note is the replayer voice, as the song plays it', (name) => {
+  it('the first note of each voice has the song\'s pitch, level and envelope', async () => {
+    const ab = corpus(name);
+    const song = (await parseDeltaMusic1File(ab, name)) as unknown as GridSong;
+    let measured = 0;
+    for (let ch = 0; ch < 4; ch++) {
+      // The voice's first note, if its row has no effect mapped to the grid: an effect (arpeggio,
+      // vibrato, ADSR settings) changes what the replayer makes of the note, which a key cannot say.
+      let n = null as { note: number; ins: number } | null;
+      let done = false;
+      for (const pi of song.songPositions) {
+        for (const c of song.patterns[pi].channels[ch].rows) {
+          if (done || c.note <= 0) continue;
+          done = true;
+          // grid note 1 is the clamp for every period index below C-0 (the byte is in a carrier), not a pitch
+          if (c.instrument > 0 && !c.effTyp && !c.eff && c.note > 1) n = { note: c.note, ins: c.instrument };
+        }
+        if (done) break;
+      }
+      if (!n) continue;
+      const a = await startWorklet('deltamusic1', 'DeltaMusic1', emscriptenTransform);
+      await a.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await a.send({ type: 'setChannelMask', mask: 1 << ch });
+      await a.send({ type: 'play' });
+      const out = renderTicks(a.proc, 3000, ch === 1 || ch === 2 ? 1 : 0);
+      const on = rmsPerTick(out, 3000).findIndex((v) => v >= 0.02);
+      if (on < 0) continue;
+      const ticks = 6;   // a row is at least the song's speed (6 ticks) long
+      const b = await startWorklet('deltamusic1', 'DeltaMusic1', emscriptenTransform);
+      await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+      await b.send({ type: 'noteOn', instrument: n.ins - 1, note: dm1NoteForKey(n.note + 11) });
+      const pr = renderTicks(b.proc, ticks + 12, 0);
+      const pOn = rmsPerTick(pr, ticks + 12).findIndex((v) => v >= 0.02);
+      expect(pOn, `${name} voice ${ch}: the key sounds`).toBeGreaterThanOrEqual(0);
+      expectSameVoice(`${name} voice ${ch}`, fromOnset(out, on, ticks, 1e-3), fromOnset(pr, pOn, ticks, 1e-3), ticks);
+      measured++;
+    }
+    expect(measured, 'the song has a voice to measure').toBeGreaterThan(0);
+  });
+});
+
+describe('Delta Music 1: a key never starts the song, and key release silences the voice', () => {
+  it('triplex1.dm: silent before a key, sounds on a key, silent after release', async () => {
+    const ab = corpus('delta-music/triplex1.dm');
+    const b = await startWorklet('deltamusic1', 'DeltaMusic1', emscriptenTransform);
+    await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+    await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
+    await b.send({ type: 'noteOn', instrument: 0, note: 40 });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);

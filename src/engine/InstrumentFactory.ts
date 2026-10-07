@@ -33,6 +33,7 @@ import { SidMon1Synth } from './sidmon1/SidMon1Synth';
 import { OctaMEDSynth } from './octamed/OctaMEDSynth';
 import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
 import { SonicArrangerSynth } from './sonic-arranger/SonicArrangerSynth';
+import { DeltaMusic1Synth } from './deltamusic1/DeltaMusic1Synth';
 import { SymphonieSynth } from './symphonie/SymphonieSynth';
 import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { FuturePlayerSynth } from './futureplayer/FuturePlayerSynth';
@@ -882,9 +883,15 @@ export class InstrumentFactory {
         break;
       }
 
+      case 'DeltaMusic1Synth': {
+        const dm1Synth = new DeltaMusic1Synth();
+        dm1Synth.setInstrumentNumber(config.id ?? 0);
+        instrument = dm1Synth;
+        break;
+      }
+
       case 'UADESynth':
       case 'UADEEditableSynth':
-      case 'DeltaMusic1Synth':
       case 'DeltaMusic2Synth': {
         const uadeSynth = new UADESynth();
         if (config.uade) {
