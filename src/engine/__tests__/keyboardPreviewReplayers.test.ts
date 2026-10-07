@@ -27,6 +27,7 @@ import { dm1NoteForKey } from '@/engine/deltamusic1/dm1KeyNote';
 import { parseDeltaMusic2File } from '@/lib/import/formats/DeltaMusic2Parser';
 import { dm2NoteForKey } from '@/engine/deltamusic2/dm2KeyNote';
 import { parseInStereo1File } from '@/lib/import/formats/InStereo1Parser';
+import { parseInStereo2File } from '@/lib/import/formats/InStereo2Parser';
 import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT, fromOnset } from './keyboardPreviewHarness';
 
 const corpus = (n: string) => {
@@ -43,7 +44,7 @@ const emscriptenTransform = (c: string) => c
   .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 
 interface Cell { note: number; instrument: number; effTyp?: number; eff?: number; effTyp2?: number; effTyp3?: number; effTyp4?: number; effTyp5?: number }
-interface GridSong { instruments: Array<{ id: number; synthType?: string; digMug?: { sampleIndex?: number; fineTune?: number } }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
+interface GridSong { instruments: Array<{ id: number; synthType?: string; digMug?: { sampleIndex?: number; fineTune?: number }; inStereo2?: { instrumentNumber?: number } }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
 
 /**
  * First note of channel `ch` in song order that carries only the commands a key plays too (the envelope,
@@ -470,6 +471,64 @@ describe('InStereo! 1.0: a key never starts the song, and key release silences t
   it('fantasi8.is: silent before a key, sounds on a key, silent after release', async () => {
     const ab = corpus('instereo!/fantasi8.is');
     const b = await startWorklet('instereo1', 'InStereo1', emscriptenTransform);
+    await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+    await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
+    await b.send({ type: 'noteOn', instrument: 1, note: 49 });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
+    await b.send({ type: 'noteOff' });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
+  });
+});
+
+describe.each(['instereo!-2.0/spaceflight.is20', 'formats/stereo_feeling.is20'])('InStereo! 2.0 %s: a typed note is the replayer voice, as the song plays it', (name) => {
+  it('the first synth note of each voice has the song\'s pitch, level and envelope', async () => {
+    const ab = corpus(name);
+    const song = parseInStereo2File(new Uint8Array(ab), name) as unknown as GridSong;
+    const numberOf = new Map(song.instruments.map((i) => [i.id, i.inStereo2?.instrumentNumber ?? 0]));
+    let measured = 0;
+    for (let ch = 0; ch < 4; ch++) {
+      // The voice's first note, if it is a synth instrument with no effect mapped to the grid: an effect
+      // changes what the replayer makes of the note, which a key cannot say.
+      let n = null as { note: number; ins: number; tick: number } | null;
+      let done = false, rowsBefore = 0;
+      for (const pi of song.songPositions) {
+        song.patterns[pi].channels[ch].rows.forEach((c, row) => {
+          if (done || c.note <= 0 || c.note >= 97) return;
+          done = true;
+          if (numberOf.get(c.instrument) && !c.effTyp && !c.eff) n = { note: c.note, ins: c.instrument, tick: (rowsBefore + row) * song.initialSpeed };
+        });
+        if (done) break;
+        rowsBefore += song.patterns[pi].length;
+      }
+      if (!n) continue;
+      const a = await startWorklet('instereo2', 'InStereo2', emscriptenTransform);
+      await a.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await a.send({ type: 'setChannelMask', mask: 1 << ch });
+      await a.send({ type: 'play' });
+      const out = renderTicks(a.proc, 3000, ch === 1 || ch === 2 ? 1 : 0);
+      const on = rmsPerTick(out, 3000).findIndex((v) => v >= 0.02);
+      // the note must sound when its row plays; if the voice is silent then, the song voice is not this note
+      if (on < 0 || Math.abs(on - n.tick) > song.initialSpeed) continue;
+      const ticks = Math.max(4, Math.min(8, song.initialSpeed - 1));
+      const b = await startWorklet('instereo2', 'InStereo2', emscriptenTransform);
+      await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+      await b.send({ type: 'noteOn', instrument: numberOf.get(n.ins), note: saNoteForKey(n.note + 11) });
+      const pr = renderTicks(b.proc, ticks + 12, 0);
+      const pOn = rmsPerTick(pr, ticks + 12).findIndex((v) => v >= 0.02);
+      expect(pOn, `${name} voice ${ch}: the key sounds`).toBeGreaterThanOrEqual(0);
+      expectSameVoice(`${name} voice ${ch}`, fromOnset(out, on, ticks, 1e-3), fromOnset(pr, pOn, ticks, 1e-3), ticks);
+      measured++;
+    }
+    expect(measured, 'the song has a voice to measure').toBeGreaterThan(0);
+  });
+});
+
+describe('InStereo! 2.0: a key never starts the song, and key release silences the voice', () => {
+  it('spaceflight.is20: silent before a key, sounds on a key, silent after release', async () => {
+    const ab = corpus('instereo!-2.0/spaceflight.is20');
+    const b = await startWorklet('instereo2', 'InStereo2', emscriptenTransform);
     await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
     await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
