@@ -29,6 +29,11 @@ export interface FormatKeyDescriptor {
   alt: boolean;
 }
 
+const FORMAT_CURSOR_KEYS: ReadonlySet<string> = new Set([
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'PageUp', 'PageDown', 'Home', 'End',
+  'Insert', 'Delete', 'Backspace',
+]);
+
 /**
  * True when, in the given editor mode, the format-specific handler owns this key
  * and `useTrackerInput` must delegate (return early) rather than run its classic
@@ -49,6 +54,10 @@ export function formatModeOwnsEditKey(
 
   // Bare F3/F4/F5 = cut/copy/paste in the format editor.
   if (key === 'F3' || key === 'F4' || key === 'F5') return true;
+
+  // A canvas-owned mode also owns the cursor keys: the format keyboard moves the ONE cursor (P14f), bounded by the
+  // format's own channels and columns. The classic handler would move it against the tracker pattern's bounds.
+  if (ENTRY_OWNER[editorMode as EditorMode] === 'canvas' && !e.ctrlOrMeta && !e.alt && FORMAT_CURSOR_KEYS.has(key)) return true;
 
   // Everything else the format handler owns is a Ctrl/Cmd chord without Alt.
   const chord = e.ctrlOrMeta && !e.alt;
