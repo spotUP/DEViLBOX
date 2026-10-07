@@ -292,7 +292,7 @@ export async function exportIffSmus(
 
   for (let i = 0; i < numInstruments; i++) {
     const inst = song.instruments[i];
-    const instName = inst.name || `Instrument ${i + 1}`;
+    const instName = inst.name || '';
     // INS1: uint8 register, uint8 type(0=sampled), uint8 data1, uint8 data2, string name
     const ins1Data = new Uint8Array(4 + instName.length);
     ins1Data[0] = i;     // register number

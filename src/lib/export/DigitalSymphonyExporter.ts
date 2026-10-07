@@ -214,7 +214,7 @@ export function exportDigitalSymphony(song: TrackerSong): ArrayBuffer {
     const instr = song.instruments[smp];
     if (!instr || !instr.sample?.audioBuffer) {
       sampleEntries.push({
-        name: instr?.name || `Sample ${smp + 1}`,
+        name: instr?.name || '',
         isVirtual: true,
         length: 0,
         loopStart: 0,
@@ -242,7 +242,7 @@ export function exportDigitalSymphony(song: TrackerSong): ArrayBuffer {
     const volume = Math.max(0, Math.min(64, volLin));
 
     sampleEntries.push({
-      name: instr.name || `Sample ${smp + 1}`,
+      name: instr.name || '',
       isVirtual: false,
       length: nLength,
       loopStart,

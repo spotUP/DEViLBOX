@@ -271,7 +271,7 @@ export async function exportInStereo2(song: TrackerSong): Promise<InStereo2Expor
       synthConfigs.push(inst.inStereo2);
     } else {
       warnings.push(`Synth instrument ${inst.id} (${inst.name}) missing InStereo2 config, using defaults`);
-      synthConfigs.push(makeDefaultSynthConfig(inst.name || `Synth ${i}`));
+      synthConfigs.push(makeDefaultSynthConfig(inst.name || ''));
     }
   }
 

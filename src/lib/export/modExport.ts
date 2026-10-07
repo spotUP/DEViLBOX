@@ -96,7 +96,8 @@ export async function exportSongToMOD(
       const pcm = new Int8Array(original.pcmData);
       const even = (pcm.length & 1) ? (() => { const p = new Int8Array(pcm.length + 1); p.set(pcm); return p; })() : pcm;
       slots.push({
-        name: (original.name || inst?.name || '').slice(0, 22),
+        // The instrument's name is the song's name: a rename (or a cleared name) is what is saved.
+        name: ((inst ? inst.name : original.name) ?? '').slice(0, 22),
         pcm: even,
         finetune: original.finetune,
         volume: original.volume,

@@ -714,7 +714,7 @@ class FurnaceExporter {
     }
   }
 
-  private writeInstrument(inst: ParsedInstrument, index: number): void {
+  private writeInstrument(inst: ParsedInstrument, _index: number): void {
     const blockStart = this.writer.getOffset();
 
     // Block magic
@@ -735,7 +735,7 @@ class FurnaceExporter {
     this.writer.writeUint8(0);
 
     // Instrument name
-    this.writer.writeNullTerminatedString(inst.name || `Instrument ${index}`);
+    this.writer.writeNullTerminatedString(inst.name || '');
 
     // Write type-specific data
     this.writeInstrumentData(inst, furType);
@@ -1116,7 +1116,7 @@ class FurnaceExporter {
     }
   }
 
-  private writeSample(sample: ParsedSample, index: number): void {
+  private writeSample(sample: ParsedSample, _index: number): void {
     const blockStart = this.writer.getOffset();
 
     // Block magic (use new SMP2 format)
@@ -1127,7 +1127,7 @@ class FurnaceExporter {
     this.writer.writeUint32(0);
 
     // Sample name
-    this.writer.writeNullTerminatedString(sample.name || `Sample ${index}`);
+    this.writer.writeNullTerminatedString(sample.name || '');
 
     // Sample length (4 bytes)
     this.writer.writeUint32(sample.length);

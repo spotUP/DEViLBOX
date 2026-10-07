@@ -140,7 +140,7 @@ export async function exportUNIC(
       const finetune = inst.metadata?.modPlayback?.finetune ?? 0;
 
       samples.push({
-        name: (inst.name ?? `Sample ${i + 1}`).slice(0, 20),
+        name: (inst.name ?? '').slice(0, 20),
         pcm,
         volume: pcm.length > 0 ? vol : 0,
         loopStart: inst.sample?.loopStart ?? 0,

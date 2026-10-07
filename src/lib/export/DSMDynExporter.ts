@@ -213,7 +213,7 @@ export async function exportDSMDyn(
     const hOff = cur;
 
     // name[22]
-    writeStringPadded(output, hOff, inst?.name ?? `Sample ${i + 1}`, 22);
+    writeStringPadded(output, hOff, inst?.name ?? '', 22);
 
     // type: always 8-bit in our export
     output[hOff + 22] = 0;

@@ -77,7 +77,7 @@ export async function exportIMS(
   for (let i = 0; i < MAX_SAMPLES; i++) {
     if (i < maxInstruments) {
       const inst = song.instruments[i];
-      const name = inst?.name ?? `Sample ${i + 1}`;
+      const name = inst?.name ?? '';
       sampleNames.push(name);
 
       if (inst?.sample?.audioBuffer) {
@@ -141,7 +141,7 @@ export async function exportIMS(
         sampleVolumes.push(0);
       }
     } else {
-      sampleNames.push(`Sample ${i + 1}`);
+      sampleNames.push('');
       samplePCMs.push(new Uint8Array(0));
       sampleLengths.push(0);
       sampleLoopStarts.push(0);

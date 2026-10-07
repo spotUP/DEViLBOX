@@ -357,7 +357,7 @@ export async function exportSTP(
     writeU8(view, cursor, 0); cursor += 1;
 
     // name[30]
-    writeStringFixed(out, cursor, sd?.name ?? `Sample ${actualSmp}`, 30); cursor += 30;
+    writeStringFixed(out, cursor, sd?.name ?? '', 30); cursor += 30;
 
     // length (u32BE)
     const sampleLen = sd?.pcm.length ?? 0;
