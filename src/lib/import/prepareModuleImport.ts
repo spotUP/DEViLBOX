@@ -100,15 +100,16 @@ export async function prepareModuleImport(file: File, companions: File[] = [], h
       };
     }
     hooks.onUadeScanStart?.();
-    // Companions go into UADE's virtual FS before the module loads.
+    // Companions travel with the load: UADE's filesystem holds exactly this set.
+    const uadeCompanions = new Map<string, ArrayBuffer>();
     for (const companion of companions) {
-      await engine.addCompanionFile(companionRelativeName(file, companion), await companion.arrayBuffer());
+      uadeCompanions.set(companionRelativeName(file, companion), await companion.arrayBuffer());
     }
     // CIA tick snapshots, so pattern reconstruction works when parseUADEFile
     // is later called with this pre-scan.
     engine.enableTickSnapshots(true);
     engine.resetTickSnapshots();
-    const uadeMetadata = await engine.load(buf, file.name);
+    const uadeMetadata = await engine.load(buf, file.name, false, 0, undefined, undefined, false, uadeCompanions);
     return {
       uadeMetadata,
       info: {

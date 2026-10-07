@@ -473,14 +473,6 @@ export async function parseUADEFile(
   const engine = UADEEngine.getInstance();
   await engine.ready();
 
-  // Register companion files (e.g. TFMX smpl.* samples) into UADE's virtual FS
-  // BEFORE loading the main module so the 68k replayer can find them.
-  if (companionFiles) {
-    for (const [cfName, cfBuf] of companionFiles) {
-      await engine.addCompanionFile(cfName, cfBuf);
-    }
-  }
-
   // Enable CIA tick snapshot capture BEFORE the scan so snapshots are accumulated
   // during UADE's internal enhanced scan playback.
   if (mode === 'enhanced' && !preScannedMeta) {
@@ -503,7 +495,7 @@ export async function parseUADEFile(
   const { getScanParams } = await import('@engine/uade/uadeScanLists');
   const { skipScan, scanTimeoutSec } = getScanParams(basename);
 
-  const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan, 0, scanTimeoutSec);
+  const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan, 0, scanTimeoutSec, undefined, false, companionFiles);
   const scanRows = metadata.scanData ?? [];
 
   // Helper: inject subsong info onto song result when format has multiple subsongs.
