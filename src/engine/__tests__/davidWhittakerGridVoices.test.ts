@@ -39,3 +39,12 @@ describe.each(['formats/apb.dw', 'david-whittaker/garfield2+.dw'])('David Whitta
     }
   });
 });
+
+describe('David Whittaker apb.dw: a voice that never sounds shows empty cells, not a note-off on every row', () => {
+  it('voices 3 and 4 (silent in subsong 0) have no note-off cells', () => {
+    const song = parseDavidWhittakerFile(corpus('formats/apb.dw'), 'apb.dw') as unknown as GridSong;
+    const offs = (ch: number) => song.songPositions.reduce((n, pi) => n + song.patterns[pi].channels[ch].rows.filter((c) => c.note === 97).length, 0);
+    expect(offs(2), 'voice 3 note-offs').toBe(0);
+    expect(offs(3), 'voice 4 note-offs').toBe(0);
+  });
+});
