@@ -16,9 +16,9 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { FORMAT_REGISTRY } from '@/lib/import/FormatRegistry';
-import { WALK_GRIDS, DIRECT_GRIDS, LIVE_EDIT, ADD_ON_EMPTY_ROW, type LiveEditStatus } from '@/lib/import/gridProvenance';
+import { WALK_GRIDS, DIRECT_GRIDS, LIVE_EDIT, LIVE_WHILE_PLAYING, LIVE_WHILE_PLAYING_WHY, ADD_ON_EMPTY_ROW, type LiveEditStatus } from '@/lib/import/gridProvenance';
 import { pickDscNote } from './helpers/pickDscNote';
-import { openUade, PaulaSession } from './gridOracle';
+import { openUade, PaulaSession, chipRamEngine } from './gridOracle';
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });
@@ -34,6 +34,13 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
   const replayer: object = new Proxy({}, { get: (_t, k) => (k === 'getSong' ? () => (globalThis as { __liveSong?: () => unknown }).__liveSong?.() ?? null : () => undefined) });
   return { ...(await orig<object>()), getTrackerReplayer: () => replayer };
 });
+// UADE's engine instance is the test's wasm module: the live-edit routes write chip RAM through it.
+vi.mock('@/engine/uade/UADEEngine', () => ({
+  UADEEngine: {
+    hasInstance: () => !!(globalThis as { __uadePort?: unknown }).__uadePort,
+    getInstance: () => (globalThis as { __uadePort?: unknown }).__uadePort,
+  },
+}));
 vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: async () => null }));
 
 const ROOT = process.cwd();
@@ -274,5 +281,140 @@ describe('the live-edit table is complete', () => {
   it('has a row for every format with a corpus song, and none for a format without one', () => {
     expect(Object.keys(LIVE_EDIT).sort()).toEqual(rows.map((r) => r.key).sort());
     expect(Object.keys(ADD_ON_EMPTY_ROW).sort()).toEqual(rows.map((r) => r.key).sort());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// G24: heard WHILE playing. UADE plays the module bytes; the edit goes into its chip RAM through the same
+// sendCellEditsToEngine a keystroke reaches, between two render chunks, and the Paula stream after it carries
+// the note the next play would (editedModuleForPlay), with the song never restarted.
+// ---------------------------------------------------------------------------
+
+/** Formats UADE plays (Paula stream = sound) and the chunk the edit is written at. */
+const LIVE_UADE = ['robHubbard', 'suntronic', 'jochenHippelST', 'soundMaster', 'digitalSonixChrome', 'tcbTracker'];
+
+interface LiveMeasured { status: LiveEditStatus; detail: string }
+export const liveMeasured: Record<string, LiveMeasured> = {};
+
+/** A plain note a few rows into the first pattern, far enough ahead that the player has not read it yet. */
+const ANY_EFFECT = true;
+async function pickAheadNote(index = 2): Promise<{ p: number; ch: number; r: number; note: number } | null> {
+  const { useTrackerStore } = await import('@/stores/useTrackerStore');
+  const found: Array<{ p: number; ch: number; r: number; note: number }> = [];
+  useTrackerStore.getState().patterns.slice(0, 3).forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
+    if (r >= 6 && cell.note > 0 && cell.note < 95 && (!cell.effTyp && !cell.eff || ANY_EFFECT)) found.push({ p, ch, r, note: cell.note + (cell.note > 48 ? -2 : 2) });
+  })));
+  found.sort((a, b) => a.p - b.p || a.r - b.r);
+  if (process.env.G24_DEBUG) console.log('[g24] candidates', found.length, found.map((f) => `${f.ch}:${f.r}`).join(' '));
+  return found[Math.min(index, found.length - 1)] ?? null;
+}
+
+async function layoutPatched(song: { uadePatternLayout?: import('@/engine/uade/UADEPatternEncoder').UADEPatternLayout }, bytes: Uint8Array, at: { p: number; ch: number; r: number }): Promise<Uint8Array> {
+  const { getCellFileOffset } = await import('@/engine/uade/UADEPatternEncoder');
+  const { useTrackerStore } = await import('@/stores/useTrackerStore');
+  const layout = song.uadePatternLayout!;
+  const cell = useTrackerStore.getState().patterns[at.p].channels[at.ch].rows[at.r];
+  const out = bytes.slice();
+  if (layout.writeCell) { for (const run of layout.writeCell(at.p, at.r, at.ch, cell)) out.set(run.bytes, run.offset); return out; }
+  const off = getCellFileOffset(layout, at.p, at.r, at.ch);
+  out.set(layout.encodeCell(cell, layout.encodeOverStored ? out.slice(off, off + layout.bytesPerCell) : undefined), off);
+  return out;
+}
+
+async function streamWithWrite(bytes: Uint8Array, name: string, writeAt: number, seconds: number, write: (mod: object) => Promise<void>): Promise<{ events: string[]; chunks: number[] }> {
+  const uade = await openUade();
+  const session = new PaulaSession(uade, bytes, name);
+  const events: string[] = [];
+  const chunks: number[] = [];
+  const add = (c: number, w: Array<{ voice: number; reg: number; value: number }>) => { for (const x of w) if (x.voice < 4) events.push(`${c}:${x.voice}:${x.reg}:${x.value}`); };
+  add(0, session.drain());
+  (globalThis as { __uadePort?: unknown }).__uadePort = chipRamEngine(uade);
+  try {
+    for (let c = 1; c <= seconds * 100; c++) {
+      if (c === writeAt) await write(uade);
+      const w = session.step();
+      if (!w) break;
+      chunks.push(session.chunks);
+      add(c, w);
+    }
+  } finally {
+    (globalThis as { __uadePort?: unknown }).__uadePort = undefined;
+    session.close();
+  }
+  return { events, chunks };
+}
+
+describe('an edit in the grid is heard while the song plays (G24)', { timeout: 300000 }, () => {
+  for (const key of LIVE_UADE) {
+    const rel = FILE[key] || registryFile(key);
+    if (!rel || !existsSync(join(SONGS, rel)) || !(key in LIVE_WHILE_PLAYING)) continue;
+    it(`${key} (${rel})`, async () => {
+      const { useTrackerStore } = await import('@/stores/useTrackerStore');
+      const { liveTrackerSong } = await import('@/lib/song/liveSong');
+      const { liveEditRoute, sendCellEditsToEngine, playingDescriptor } = await import('@/engine/replayer/liveCellEdits');
+      const { editedModuleForPlay } = await import('@/engine/replayer/editedModuleForPlay');
+      const W = 5;
+      const clock = (e: string) => Number(e.split(':')[0]);
+      let measuredRow: LiveMeasured | null = null;
+      // Candidate cells, nearest first: the first whose edit the stream shows AFTER the write chunk is the one measured
+      // (a cell that plays before the write, or that no voice reaches in eight seconds, says nothing about live).
+      for (let k = 0; k < 24 && !measuredRow; k++) {
+        const { bytes, name } = await load(rel);
+        const nm = (UADE_NAME[key] ?? ((n: string) => n))(name);
+        const at = key === 'digitalSonixChrome' ? await pickDscNote({ patterns: useTrackerStore.getState().patterns as never }, bytes) : await pickAheadNote(k);
+        expect(at, 'the song has a note to edit').not.toBeNull();
+        const was = await streamWithWrite(bytes, nm, W, 8, async () => undefined);
+        expect(was.events.length, 'the replayer ran (sentinel)').toBeGreaterThan(0);
+
+        // The edit, as a keystroke makes it: the store action.
+        const st = useTrackerStore.getState();
+        st.setCurrentPattern(at!.p);
+        st.setCell(at!.ch, at!.r, { note: at!.note });
+        await settle();
+        const song = liveTrackerSong();
+        const route = liveEditRoute(song).route;
+        const desc = playingDescriptor(song);
+        // The oracle: the edited module played from the start. A module the layout writes in place is the original with
+        // that cell's bytes written where the layout says; any other is the native export of the stores.
+        const nextPlay = route === 'chip-ram' ? await layoutPatched(song, bytes, at!) : asBytes(((desc ? await editedModuleForPlay(song, desc) : null) ?? (await (async () => {
+          const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
+          return (await exportNativeSong(null, {}))!.data;
+        })())) as Uint8Array);
+        const after = await streamWithWrite(nextPlay, nm, W, 8, async () => undefined);
+        const firstDiff = was.events.findIndex((e, i) => e !== after.events[i]);
+        if (firstDiff < 0 || clock(was.events[firstDiff]) <= W) continue;
+
+        // Live: the original module is playing; the edit arrives at chunk W through the store's own route.
+        await load(rel);
+        useTrackerStore.getState().setCurrentPattern(at!.p);
+        let written = false;
+        const live = await streamWithWrite(bytes, nm, W, 8, async () => {
+          useTrackerStore.getState().setCell(at!.ch, at!.r, { note: at!.note });
+          const cell = useTrackerStore.getState().patterns[at!.p].channels[at!.ch].rows[at!.r];
+          await sendCellEditsToEngine(liveTrackerSong(), [{ pattern: at!.p, row: at!.r, channel: at!.ch, cell }]);
+          written = true;
+        });
+        const sameUpTo = live.events.filter((e) => clock(e) <= W).join() === was.events.filter((e) => clock(e) <= W).join();
+        const heard = live.events.join() === after.events.join();
+        // No restart: the render chunks count on from 1 without a gap, and the song's init writes are not logged again.
+        const noRestart = live.chunks.every((c, i) => c === i + 1) && live.events.filter((e) => clock(e) > W).length > 0;
+        const status: LiveEditStatus = written && sameUpTo && heard && noRestart ? 'pass' : 'fail';
+        measuredRow = { status, detail: `route=${route} cell=${at!.ch}:${at!.r} firstDiffChunk=${clock(was.events[firstDiff])} sameUpTo=${sameUpTo} heard=${heard} noRestart=${noRestart}` };
+      }
+      // No candidate cell shows its edit after the write chunk: the format's edit does not reach its stream (a 'fail' row names why).
+      measuredRow ??= { status: 'fail', detail: `no candidate cell shows its edit after chunk ${W}` };
+      liveMeasured[key] = measuredRow;
+      console.log(`[liveWhilePlaying] ${key} ${JSON.stringify(measuredRow)}`);
+      expect(measuredRow!.status, `${key} edit heard while playing (gridProvenance LIVE_WHILE_PLAYING)`).toBe(LIVE_WHILE_PLAYING[key]);
+    });
+  }
+});
+
+describe('the live-while-playing table (G24)', () => {
+  it('names a reason for every fail, and only lists formats the G19 table has', () => {
+    for (const [k, v] of Object.entries(LIVE_WHILE_PLAYING)) {
+      expect(k in LIVE_EDIT, `${k} is a row of the next-play table`).toBe(true);
+      if (v === 'fail') expect(LIVE_WHILE_PLAYING_WHY[k], `${k} fail needs a reason`).toBeTruthy();
+    }
   });
 });

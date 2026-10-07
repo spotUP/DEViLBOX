@@ -52,7 +52,7 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
 /** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
 export type LiveEditRoute =
   | 'fred-module' | 'actionamics-module' | 'activisionPro-module'
-  | 'track-index' | 'grid-cell' | 'eagleplayer-module' | 'chip-ram' | 'none';
+  | 'track-index' | 'grid-cell' | 'eagleplayer-module' | 'chip-ram' | 'uade-module' | 'none';
 
 /**
  * The route `sendCellEditsToEngine` takes for `song`, decided from the song alone (no engine
@@ -70,6 +70,8 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   if (desc?.gridCellEdits) return at('grid-cell');
   if (desc?.key === 'EaglePlayer' && song.eaglePlayerId && hasModuleEncoder(song)) return at('eagleplayer-module');
   if (song.uadePatternLayout) return at('chip-ram');
+  // A module UADE plays whose edit only the exporter can place (G24): the exported bytes are diffed into chip RAM.
+  if (song.uadeEditableFileData) return at('uade-module');
   return at('none');
 }
 
@@ -137,6 +139,11 @@ export async function sendCellEditsToEngine(
       const { writeCellToChipRam } = await import('../uade/writeCellToChipRam');
       await Promise.all(edits.map(({ pattern, row, channel, cell }) =>
         writeCellToChipRam(song, pattern, row, channel, cell)));
+      return;
+    }
+    case 'uade-module': {
+      const { applyEditedModuleToChipRam } = await import('../uade/liveModuleEdits');
+      await applyEditedModuleToChipRam(song);
       return;
     }
     case 'none':
