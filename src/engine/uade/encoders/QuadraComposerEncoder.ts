@@ -7,7 +7,7 @@
  *   byte[2]: effect type (low nibble only)
  *   byte[3]: effect parameter
  *
- * Note mapping: XM note 37-72 → QC note 0-35
+ * Note mapping: XM note 13-48 → QC note 0-35 (the parser's `note + 13`)
  * Effect: mostly direct ProTracker; vibrato depth halved, sample offset halved
  */
 
@@ -21,9 +21,9 @@ function encodeQCCell(cell: TrackerCell): Uint8Array {
   // Byte 0: instrument
   out[0] = (cell.instrument ?? 0) & 0xFF;
 
-  // Byte 1: note (XM 37 = C-3 → QC 0)
-  if (note > 0 && note >= 37 && note <= 72) {
-    out[1] = note - 37;
+  // Byte 1: note (XM 13 = C-1 → QC 0, the inverse of the parser's `note + 13`)
+  if (note >= 13 && note <= 48) {
+    out[1] = note - 13;
   } else {
     out[1] = 0xFF; // no note
   }
@@ -63,5 +63,14 @@ function encodeQCCell(cell: TrackerCell): Uint8Array {
 }
 
 registerPatternEncoder('quadraComposer', () => encodeQCCell);
+
+/**
+ * The fields qc_set_cell takes (sample, note, effect, effect_arg) for a grid cell: the same four bytes the file holds,
+ * so a live edit and the saved module agree. The note is the signed byte (0-35, -1 for none).
+ */
+export function qcLiveCellFields(cell: Pick<TrackerCell, 'note' | 'instrument' | 'effTyp' | 'eff'>): { sample: number; note: number; effect: number; effectArg: number } {
+  const b = encodeQCCell({ note: cell.note, instrument: cell.instrument, volume: 0, effTyp: cell.effTyp, eff: cell.eff, effTyp2: 0, eff2: 0 });
+  return { sample: b[0], note: (b[1] << 24) >> 24, effect: b[2], effectArg: b[3] };
+}
 
 export { encodeQCCell };
