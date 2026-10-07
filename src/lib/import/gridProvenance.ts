@@ -49,6 +49,7 @@ export const WALK_GRIDS: Record<string, string> = {
   jochenHippel7V: 'src/engine/__tests__/hippelTfmxGridMatchesPlayer.test.ts',
   suntronic: 'src/engine/__tests__/sunTronicGridMatchesPlayer.test.ts',
   futurePlayer: 'src/engine/__tests__/futurePlayerWalkMatchesPlayer.test.ts',
+  musicAssembler: 'src/engine/__tests__/musicAssemblerWalkMatchesPlayer.test.ts',
 };
 
 /** Scope view by design: no pattern grid exists or can exist. */
@@ -88,7 +89,6 @@ export const SCOPE_GRIDS: Record<string, string> = {
 export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   midi: 'G11-midi',
   mugician: 'U11',
-  musicAssembler: 'U8',
   imagesMusicSystem: 'U20',
   musicLine: 'U9',
   sawteeth: 'U13',

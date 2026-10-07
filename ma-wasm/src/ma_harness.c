@@ -58,6 +58,11 @@ EXPORT void player_stop(void) {
     if (g_save_buf) { free(g_save_buf); g_save_buf = NULL; g_save_size = 0; }
 }
 
+/* The playhead's clock (see music_assembler.h). */
+EXPORT uint32_t player_get_ticks_played(void) { return g_module ? ma_ticks_played(g_module) : 0; }
+EXPORT int player_get_tick_marks(int *out, int max) { return g_module ? ma_tick_marks(g_module, out, max) : 0; }
+EXPORT int player_get_tick_speed(void) { return g_module ? ma_tick_speed(g_module) : 0; }
+
 EXPORT void player_set_sample_rate(int rate) {
     g_sample_rate = (float)rate;
 }

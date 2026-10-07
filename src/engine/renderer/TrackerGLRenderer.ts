@@ -22,6 +22,7 @@ import { DW_EFFECT_GLYPH } from '@/lib/import/formats/davidWhittakerEffectGlyphs
 import { BD_EFFECT_GLYPH } from '@/lib/import/formats/benDaglishEffectGlyphs';
 import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
+import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import type {
@@ -897,6 +898,9 @@ export class TrackerGLRenderer {
               } else if (FP_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Future Player stream commands (block 0xF3..0xFA)
                 effStr = FP_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (MA_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // Music Assembler track and position commands (block 0xFB..0xFE)
+                effStr = MA_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }

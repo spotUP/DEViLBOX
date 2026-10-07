@@ -179,6 +179,12 @@ typedef struct MaPlayer {
 
     float frames_until_tick;
     float frames_per_tick;
+
+    /* The playhead's clock: ticks played since the song (re)started, and the frame (in the last render call) each of
+     * that call's ticks ran at, so a worklet can tell which tick the audio it plays belongs to. */
+    uint32_t ticks_played;
+    int tick_mark_frame[256];
+    int tick_mark_count;
     bool filter_enabled;
     int64_t filter_a1;
     int64_t filter_a2;
@@ -1119,7 +1125,8 @@ static uint16_t ma_do_arpeggio(const Instrument* instr, VoiceInfo* voice) {
     if (instr->fx_arp_spdlp != 0) {
         voice->arpeggio_counter += 0x10;
 
-        if (voice->arpeggio_counter >= instr->fx_arp_spdlp) {
+        /* strictly greater (the 68k player's compare): fx 0x40 steps every 5 ticks, not 4 */
+        if (voice->arpeggio_counter > instr->fx_arp_spdlp) {
             voice->arpeggio_counter = 0;
 
             uint8_t spd = (uint8_t)(instr->fx_arp_spdlp & 0x03);
@@ -1191,11 +1198,14 @@ static uint16_t ma_do_vibrato(uint16_t period, const Instrument* instr, VoiceInf
                 voice->vibrato_speed_counter = 0;
                 voice->vibrato_direction++;
             }
-
-            period <<= 1;
-            period = (uint16_t)(period + voice->vibrato_add_value);
-            period >>= 1;
         }
+
+        /* The vibrato's accumulated offset is part of the period whether or not it moves this tick: the 68k player
+         * keeps it through a legato note and a portamento (measured against UADE; this port added it only while the
+         * vibrato ran, which put a portamento after a vibrato note a few periods off). */
+        period <<= 1;
+        period = (uint16_t)(period + voice->vibrato_add_value);
+        period >>= 1;
     } else {
         voice->vibrato_delay_counter--;
     }
@@ -1221,7 +1231,8 @@ static void ma_do_adsr(const Instrument* instr, VoiceInfo* voice) {
         int new_volume = voice->volume + instr->attack;
         int decay_sustain = (instr->decay_sustain & 0xf0) | 0x0f;
 
-        if (new_volume >= decay_sustain) {
+        /* strictly greater: an attack that lands exactly on the peak (attack 255 and a peak of 255) is held one more tick, as the 68k player does */
+        if (new_volume > decay_sustain) {
             voice->flag |= VoiceFlag_Release;
             new_volume = instr->decay_sustain << 4;
         }
@@ -1650,6 +1661,8 @@ static void ma_player_init_state(MaPlayer* player, int subsong) {
 
     player->frames_per_tick = (player->config.sample_rate == 0) ? 0.0f : ((float)player->config.sample_rate / 50.0f);
     player->frames_until_tick = 0.0f;
+    player->ticks_played = 0;
+    player->tick_mark_count = 0;
     memset(player->filter_x1, 0, sizeof(player->filter_x1));
     memset(player->filter_x2, 0, sizeof(player->filter_x2));
     memset(player->filter_y1, 0, sizeof(player->filter_y1));
@@ -1686,9 +1699,12 @@ static size_t ma_player_render(MaPlayer* player, float* interleaved_stereo, size
         return 0;
     }
 
+    player->tick_mark_count = 0;
     for (size_t frame = 0; frame < frames; frame++) {
         if (player->frames_until_tick <= 0.0f) {
             ma_player_tick(player);
+            player->ticks_played++;
+            if (player->tick_mark_count < 256) player->tick_mark_frame[player->tick_mark_count++] = (int)frame;
             player->frames_until_tick += player->frames_per_tick;
         }
 
@@ -1713,7 +1729,11 @@ static size_t ma_player_render(MaPlayer* player, float* interleaved_stereo, size
             float volume = ((float)voice->current_volume / 64.0f) * player->config.master_gain;
             float out = sample * volume;
 
-            int pan = (ch == 0 || ch == 3) ? 0 : 256;
+            /* Hardware stereo: voice ch plays on Paula channel s_channel_map[s_channel_map[ch]] (measured against UADE's
+             * Paula log: its position list index is s_channel_map[ch], and that list index maps through the table
+             * once more); Paula channels 0 and 3 are left, 1 and 2 right. */
+            const int hw = s_channel_map[s_channel_map[ch]];
+            int pan = (hw == 0 || hw == 3) ? 0 : 256;
             float left_gain = (float)(256 - pan) / 256.0f;
             float right_gain = (float)pan / 256.0f;
 
@@ -1898,6 +1918,24 @@ size_t ma_render(MaModule* module, float* interleaved_stereo, size_t frames) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+uint32_t ma_ticks_played(const MaModule* module) {
+    if (module == nullptr || module->player == nullptr) return 0;
+    return module->player->ticks_played;
+}
+
+int ma_tick_marks(const MaModule* module, int* out, int max) {
+    if (module == nullptr || module->player == nullptr) return 0;
+    const MaPlayer* p = module->player;
+    int n = p->tick_mark_count < max ? p->tick_mark_count : max;
+    for (int i = 0; i < n; i++) out[i] = p->tick_mark_frame[i];
+    return p->tick_mark_count;
+}
+
+int ma_tick_speed(const MaModule* module) {
+    if (module == nullptr || module->player == nullptr) return 0;
+    return module->player->playing_info.speed;
+}
 
 bool ma_has_ended(const MaModule* module) {
     if (module == nullptr || module->player == nullptr) {
