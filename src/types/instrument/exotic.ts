@@ -535,6 +535,8 @@ export interface OctaMEDConfig {
  * David Whittaker synthesizer configuration.
  */
 export interface DavidWhittakerConfig {
+  /** 0-based sample the replayer plays for this instrument (grid instrument - 1). */
+  sampleIndex?: number;
   defaultVolume?: number;
   relative?: number;
   vibratoSpeed?: number;
