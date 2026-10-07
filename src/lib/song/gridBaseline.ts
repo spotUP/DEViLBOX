@@ -51,11 +51,10 @@ export function getGridBaseline(): GridBaseline | null { return current; }
 let restoredEditsPending = false;
 export function setRestoredEditsPending(v: boolean): void { restoredEditsPending = v; }
 
-/** The cells of `patterns` that differ from the baseline, once per restore; [] when nothing is pending. */
-export function takeRestoredEdits(patterns: readonly Pattern[]): { pattern: number; row: number; channel: number; cell: TrackerCell }[] {
+/** The cells of `patterns` that differ from the baseline (every call; nothing is consumed). [] when no baseline is known. */
+export function editedCells(patterns: readonly Pattern[]): { pattern: number; row: number; channel: number; cell: TrackerCell }[] {
   const baseline = current;
-  if (!restoredEditsPending || !baseline) return [];
-  restoredEditsPending = false;
+  if (!baseline) return [];
   const edits: { pattern: number; row: number; channel: number; cell: TrackerCell }[] = [];
   patterns.forEach((p, pi) => {
     let flat = 0;
@@ -64,4 +63,25 @@ export function takeRestoredEdits(patterns: readonly Pattern[]): { pattern: numb
     }));
   });
   return edits;
+}
+
+/** The cells of `patterns` that differ from the baseline, once per restore; [] when nothing is pending. */
+export function takeRestoredEdits(patterns: readonly Pattern[]): { pattern: number; row: number; channel: number; cell: TrackerCell }[] {
+  if (!restoredEditsPending || !current) return [];
+  restoredEditsPending = false;
+  return editedCells(patterns);
+}
+
+/**
+ * Whether `patterns` differ from the baseline taken at load: any cell, or a changed pattern/channel/row
+ * count. false when no baseline is known (a project saved before baselines existed).
+ */
+export function gridIsEdited(patterns: readonly Pattern[]): boolean {
+  const baseline = current;
+  if (!baseline) return false;
+  if (patterns.length !== baseline.length) return true;
+  return patterns.some((p, pi) => {
+    const flat = p.channels.flatMap((ch) => ch.rows);
+    return flat.length !== baseline[pi].length || flat.some((cell, i) => hashCell(cell) !== baseline[pi][i]);
+  });
 }

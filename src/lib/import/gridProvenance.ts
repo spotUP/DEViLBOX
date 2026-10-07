@@ -37,6 +37,8 @@ export interface GridProvenance {
    * the round trip (every unit must bring its format under it, plan bar item 9).
    */
   exportRoundTrip?: ExportRoundTrip;
+  /** G19: a grid edit is heard on the next play (liveEditHeard.test.ts). */
+  liveEdit?: LiveEditStatus;
 }
 
 export type ExportRoundTrip = 'pass' | 'fail' | 'n/a';
@@ -58,6 +60,161 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   soundMaster: 'pass',
   digitalSonixChrome: 'pass',
   sidmon1: 'pass',
+};
+
+/**
+ * G19: is a grid edit heard on the next play? 'pass' = the module the engine is loaded with carries
+ * the edit (and, where UADE can play it, its Paula stream moves); 'fail' = it does not (the row names its
+ * plan unit in liveEditHeard.test.ts); 'n/a' = the TypeScript scheduler plays the grid itself. A key absent
+ * from this table has no corpus song in the table run. Measured by src/engine/__tests__/liveEditHeard.test.ts.
+ */
+export type LiveEditStatus = 'pass' | 'fail' | 'n/a';
+export const LIVE_EDIT: Record<string, LiveEditStatus> = {
+  '669': 'n/a',
+  actionamics: 'pass',
+  activisionPro: 'pass',
+  amf: 'n/a',
+  benDaglish: 'fail',
+  cheesecutter: 'n/a',
+  composer667: 'n/a',
+  daveLowe: 'pass',
+  davidWhittaker: 'pass',
+  deltaMusic1: 'pass',
+  deltaMusic2: 'pass',
+  digi: 'pass',
+  digitalSonixChrome: 'pass',
+  digitalSoundStudio: 'fail',
+  dtm: 'n/a',
+  faceTheMusic: 'pass',
+  far: 'n/a',
+  fc: 'pass',
+  fred: 'pass',
+  fur: 'n/a',
+  futurePlayer: 'pass',
+  gdm: 'n/a',
+  hippelCoso: 'pass',
+  hvl: 'pass',
+  inStereo2: 'pass',
+  inStereoAmbiguous: 'pass',
+  it: 'n/a',
+  jamcracker: 'pass',
+  jochenHippel7V: 'pass',
+  jochenHippelST: 'pass',
+  maxTrax: 'fail',
+  mdl: 'n/a',
+  med: 'n/a',
+  mod: 'n/a',
+  mtm: 'n/a',
+  musicAssembler: 'pass',
+  okt: 'pass',
+  plm: 'n/a',
+  psm: 'n/a',
+  ptm: 'n/a',
+  pumaTracker: 'pass',
+  quadraComposer: 'pass',
+  robHubbard: 'pass',
+  rtm: 'n/a',
+  s3m: 'n/a',
+  sidFactory2: 'n/a',
+  sidmon1: 'pass',
+  sidmon2: 'fail',
+  soundControl: 'pass',
+  soundMaster: 'pass',
+  soundPlayer: 'pass',
+  soundmon: 'pass',
+  sonicArranger: 'pass',
+  stm: 'n/a',
+  stp: 'n/a',
+  stx: 'n/a',
+  suntronic: 'pass',
+  synthesis: 'pass',
+  tcbTracker: 'pass',
+  tfmMusicMaker: 'fail',
+  tfmx: 'pass',
+  ult: 'n/a',
+  unic: 'n/a',
+  xm: 'n/a',
+};
+
+/** Why a LIVE_EDIT row is 'fail' (plan unit in thoughts/shared/plans/2026-10-06-fix-all-open.md, G19). */
+export const LIVE_EDIT_WHY: Record<string, string> = {
+  benDaglish: 'G16: grid edits have no writer (the walk grid has no cell-to-command-byte map)',
+  digitalSoundStudio: 'G19-dss: no exporter or layout writes the edit into dssFileData; the engine plays the loaded module',
+  maxTrax: 'G19-maxTrax: the export encodes the MaxTrax model, which a grid edit does not reach',
+  sidmon2: 'G19-sidmon2: the export reads the running engine (none on play) and the variable encoder returns 212 bytes for a 62-byte slot',
+  tfmMusicMaker: 'G19-tfm: no exporter and no cell layout',
+};
+
+/**
+ * G5: a note put on an EMPTY row reaches the exported module (it reloads with that note in that cell).
+ * 'no' = the block has no room and the format's writer refuses it (re-encode and shift is the open work).
+ */
+export type AddOnEmptyRow = 'pass' | 'fail' | 'n/a';
+export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
+  '669': 'n/a',
+  actionamics: 'fail',
+  activisionPro: 'fail',
+  amf: 'n/a',
+  benDaglish: 'fail',
+  cheesecutter: 'n/a',
+  composer667: 'n/a',
+  daveLowe: 'fail',
+  davidWhittaker: 'fail',
+  deltaMusic1: 'pass',
+  deltaMusic2: 'pass',
+  digi: 'pass',
+  digitalSonixChrome: 'fail',
+  digitalSoundStudio: 'fail',
+  dtm: 'n/a',
+  faceTheMusic: 'pass',
+  far: 'n/a',
+  fc: 'pass',
+  fred: 'pass',
+  fur: 'n/a',
+  futurePlayer: 'fail',
+  gdm: 'n/a',
+  hippelCoso: 'fail',
+  hvl: 'fail',
+  inStereo2: 'pass',
+  inStereoAmbiguous: 'pass',
+  it: 'n/a',
+  jamcracker: 'pass',
+  jochenHippel7V: 'fail',
+  jochenHippelST: 'pass',
+  maxTrax: 'fail',
+  mdl: 'n/a',
+  med: 'n/a',
+  mod: 'n/a',
+  mtm: 'n/a',
+  musicAssembler: 'n/a',
+  okt: 'pass',
+  plm: 'n/a',
+  psm: 'n/a',
+  ptm: 'n/a',
+  pumaTracker: 'pass',
+  quadraComposer: 'fail',
+  robHubbard: 'fail',
+  rtm: 'n/a',
+  s3m: 'n/a',
+  sidFactory2: 'n/a',
+  sidmon1: 'fail',
+  sidmon2: 'fail',
+  soundControl: 'fail',
+  soundMaster: 'pass',
+  soundPlayer: 'fail',
+  soundmon: 'fail',
+  sonicArranger: 'pass',
+  stm: 'n/a',
+  stp: 'n/a',
+  stx: 'n/a',
+  suntronic: 'pass',
+  synthesis: 'pass',
+  tcbTracker: 'pass',
+  tfmMusicMaker: 'fail',
+  tfmx: 'fail',
+  ult: 'n/a',
+  unic: 'n/a',
+  xm: 'n/a',
 };
 
 export const GRID_PLAN_FILE = 'thoughts/shared/plans/2026-10-07-grid-from-replayer-walk.md';
@@ -283,5 +440,10 @@ export function gridProvenanceOf(key: string): GridProvenance | null {
     if (DIRECT_GRIDS.includes(key)) return { source: 'DIRECT' };
     return null;
   })();
-  return base && key in EXPORT_ROUND_TRIP ? { ...base, exportRoundTrip: EXPORT_ROUND_TRIP[key] } : base;
+  if (!base) return base;
+  return {
+    ...base,
+    ...(key in EXPORT_ROUND_TRIP ? { exportRoundTrip: EXPORT_ROUND_TRIP[key] } : {}),
+    ...(key in LIVE_EDIT ? { liveEdit: LIVE_EDIT[key] } : {}),
+  };
 }
