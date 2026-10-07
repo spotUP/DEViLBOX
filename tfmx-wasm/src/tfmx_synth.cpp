@@ -40,6 +40,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 // libtfmxaudiodecoder C API
 #include "tfmxaudiodecoder.h"
@@ -650,6 +651,71 @@ int tfmx_module_preview_macro(void* /*ctx*/, int macroIdx, int note,
   if (!p.decoder || !p.active) return -1;
   tfmxdec_preview_macro(p.decoder, macroIdx, note, volume, channel);
   return 0;
+}
+
+// ── Keyboard decoder: the song's own replayer, sequencer off, voices started by previewMacro ──
+
+static void*   gKeyDecoder = nullptr;
+
+/**
+ * Load a second copy of the module for keyboard notes (mdat + smpl). The decoder never steps its
+ * sequencer, so the song does not play: only tfmx_key_note's macro sounds, through the replayer's
+ * own note command, macro interpreter and Paula mixer. Returns 0 on success.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_key_load(void* /*ctx*/, const uint8_t* mdatData, uint32_t mdatLen,
+                  const uint8_t* smplData, uint32_t smplLen) {
+  if (!gInit) return -1;
+  if (gKeyDecoder) { tfmxdec_delete(gKeyDecoder); gKeyDecoder = nullptr; }
+  void* dec = tfmxdec_new();
+  if (!dec) return -2;
+
+  // The library finds smpl.<name> beside mdat.<name>: its own directory keeps it apart from the song's files.
+  mkdir("/tmp/key", 0777);
+  FILE* fm = fopen("/tmp/key/mdat.song", "wb");
+  if (fm) { fwrite(mdatData, 1, mdatLen, fm); fclose(fm); }
+  if (smplData && smplLen > 0) {
+    FILE* fs = fopen("/tmp/key/smpl.song", "wb");
+    if (fs) { fwrite(smplData, 1, smplLen, fs); fclose(fs); }
+  }
+  if (!tfmxdec_load(dec, "/tmp/key/mdat.song", 0)) {
+    tfmxdec_set_path(dec, "/tmp/key/mdat.song");
+    if (!tfmxdec_init(dec, (void*)mdatData, mdatLen, 0)) { tfmxdec_delete(dec); return -3; }
+  }
+  tfmxdec_mixer_init(dec, gSampleRate, 16, 2, 0, 75);
+  tfmxdec_set_loop_mode(dec, 1);
+  tfmxdec_set_preview_only(dec, 1);
+  tfmxdec_preview_stop(dec);
+  gKeyDecoder = dec;
+  return 0;
+}
+
+/** One key: macro `macroIdx` (0..127) at TFMX note `note` (0..63), relative volume 0..15, on voice `channel`. */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_key_note(void* /*ctx*/, int macroIdx, int note, int volume, int channel) {
+  if (!gKeyDecoder) return -1;
+  tfmxdec_preview_macro(gKeyDecoder, macroIdx, note, volume, channel);
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void tfmx_key_stop(void* /*ctx*/) {
+  if (gKeyDecoder) tfmxdec_preview_stop(gKeyDecoder);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void tfmx_key_render(void* /*ctx*/, float* outL, float* outR, int numSamples) {
+  if (!gKeyDecoder) {
+    memset(outL, 0, (size_t)numSamples * sizeof(float));
+    memset(outR, 0, (size_t)numSamples * sizeof(float));
+    return;
+  }
+  int16_t tmp[256];
+  tfmxdec_buffer_fill(gKeyDecoder, tmp, (uint32_t)(numSamples * 2 * (int)sizeof(int16_t)));
+  for (int i = 0; i < numSamples; i++) {
+    outL[i] = tmp[i * 2 + 0] * (1.0f / 32768.0f);
+    outR[i] = tmp[i * 2 + 1] * (1.0f / 32768.0f);
+  }
 }
 
 } // extern "C"
