@@ -14,7 +14,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useThemeStore } from '@stores/useThemeStore';
-import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { liveScopeFrame } from '@stores/useOscilloscopeStore';
 import { waveformVuLevel, engineFedMeterTarget } from './waveformVuLevel';
 
 // VU meter timing constants - ProTracker style
@@ -167,8 +167,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
       const widths = channelWidthsRef.current;
       const isPlaying = useTransportStore.getState().isPlaying;
       // Per-channel waveforms from a direct-routed WASM engine (Cinter, Furnace, …).
-      const oscChannelData = useOscilloscopeStore.getState().isActive
-        ? useOscilloscopeStore.getState().channelData : null;
+      const oscChannelData = liveScopeFrame();
       const swingEnabled = useSettingsStore.getState().vuMeterSwing;
       const mirrorEnabled = useSettingsStore.getState().vuMeterMirror;
       const vuStyle = useSettingsStore.getState().vuMeterStyle;

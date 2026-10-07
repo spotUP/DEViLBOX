@@ -7,7 +7,7 @@ import React, { useEffect, useRef } from 'react';
 import { useTrackerStore, useTransportStore, useThemeStore, useSettingsStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useShallow } from 'zustand/react/shallow';
-import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { liveScopeFrame } from '@stores/useOscilloscopeStore';
 import { waveformVuLevel, engineFedMeterTarget } from '@components/tracker/waveformVuLevel';
 
 interface ChannelLevelsCompactProps {
@@ -160,8 +160,7 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       const triggerGens = engine.getChannelTriggerGenerations(nc);
       const realtimeLevels = isRealtime ? engine.getChannelLevels(nc) : null;
       const engineLevels = engine.getEngineChannelLevels(nc);
-      const oscChannelData = useOscilloscopeStore.getState().isActive
-        ? useOscilloscopeStore.getState().channelData : null;
+      const oscChannelData = liveScopeFrame();
 
       // Grow lastGens if needed
       if (lastGensRef.current.length < nc) {

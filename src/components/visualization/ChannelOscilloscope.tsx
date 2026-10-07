@@ -8,7 +8,7 @@
  */
 
 import { useRef, useCallback, useMemo } from 'react';
-import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { useOscilloscopeStore, liveScopeFrame } from '@stores/useOscilloscopeStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { useTransportStore } from '@stores';
@@ -163,7 +163,7 @@ export function ChannelOscilloscope({
 
   // Animation loop (shared hook — cancels rAF fully when playback stops)
   const onFrame = useCallback((_timestamp: number): boolean => {
-    const data = useOscilloscopeStore.getState().channelData;
+    const data = liveScopeFrame() ?? [];
 
     for (let i = 0; i < canvasRefs.current.length; i++) {
       const canvas = canvasRefs.current[i];

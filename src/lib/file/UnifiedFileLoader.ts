@@ -7,6 +7,7 @@
  * Eliminates code duplication and ensures consistent behavior across load methods.
  */
 
+import { withSongLoad } from '@/lib/song/songLifecycle';
 import { isAdPlugWasmFormat } from '@lib/import/adplugFormats';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
@@ -89,6 +90,14 @@ async function stopActivePlaybackForIncomingSong(
 // every view. All other import paths are dead — this is the one.
 
 export async function importTrackerModule(
+  info: ModuleInfo,
+  options: ImportOptions,
+): Promise<void> {
+  const name = info.file?.name || info.metadata.title || 'module';
+  return withSongLoad(name, () => importTrackerModuleUnloaded(info, options));
+}
+
+async function importTrackerModuleUnloaded(
   info: ModuleInfo,
   options: ImportOptions,
 ): Promise<void> {
@@ -183,6 +192,11 @@ export async function importTrackerModule(
  * audit), so the same file loaded differently depending on how it arrived.
  */
 export async function importModuleFile(file: File, options: Partial<ImportOptions> = {}): Promise<void> {
+  // The outgoing song leaves before the scan in prepareModuleImport, not after it.
+  return withSongLoad(file.name, () => importModuleFileUnloaded(file, options));
+}
+
+async function importModuleFileUnloaded(file: File, options: Partial<ImportOptions>): Promise<void> {
   const companions = options.companionFiles
     ? Array.from(options.companionFiles, ([name, data]) => new File([data], name))
     : [];
@@ -238,7 +252,7 @@ export async function loadFile(
     // === V2M FILES — handle before isSongFormat check ===
     // V2M has its own player and shouldn't go through the ImportModuleDialog
     if (filename.endsWith('.v2m')) {
-      return await loadV2MFile(file);
+      return await withSongLoad(file.name, () => loadV2MFile(file));
     }
 
     // === Extension collisions are settled by content, once, here ===
@@ -249,12 +263,12 @@ export async function loadFile(
       ? detectFormatFromContent(filename, new Uint8Array(await file.arrayBuffer()))
       : null;
     if (byContent?.key === 'goatTracker') {
-      return await loadSongFile(file, options, await file.arrayBuffer());
+      return await withSongLoad(file.name, async () => loadSongFile(file, options, await file.arrayBuffer()));
     }
 
     // === ADPLUG WASM STREAMING — OPL/AdLib formats not handled by TS parser ===
     if (isAdPlugWasmFormat(filename) && (byContent?.key ?? 'adplug') === 'adplug') {
-      return await loadAdPlugFile(file, options.companionFiles);
+      return await withSongLoad(file.name, () => loadAdPlugFile(file, options.companionFiles));
     }
 
     // === SONG FORMATS (replace project) ===
@@ -271,12 +285,12 @@ export async function loadFile(
       // .sunvox files bypass the confirmation dialog — they use their own
       // SunVox engine loading path in loadSongFile, not importTrackerModule.
       if (filename.endsWith('.sunvox')) {
-        return await loadSongFile(file, options);
+        return await withSongLoad(file.name, () => loadSongFile(file, options));
       }
       if (options.requireConfirmation) {
         return { success: 'pending-confirmation', file };
       }
-      return await loadSongFile(file, options);
+      return await withSongLoad(file.name, () => loadSongFile(file, options));
     }
 
     // === NON-SONG FORMATS (additive/modify) ===

@@ -11,6 +11,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { LoudnessMeterPanel } from '@/components/audio/LoudnessMeterPanel';
+import { useSongLoadStore } from '@/stores/useSongLoadStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { WifiOff } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -383,6 +384,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   const [knobPage, setKnobPage] = useReactState(0);
   const [showLoudness, setShowLoudness] = useReactState(false);
   const online = useOnlineStatus();
+  const loadingSong = useSongLoadStore((s) => (s.depth > 0 ? s.label || 'song' : null));
   const localTotalPages = Math.max(1, Math.ceil(contextKnobs.length / 8));
 
   // Effective page state — curated banks use MIDI store, others use local
@@ -522,6 +524,16 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
                 <span className="font-bold uppercase">{hasMIDIDevice ? deviceName : 'Knobs'}</span>
                 {showKnobBar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
               </button>
+              <div className="w-px h-3 bg-border opacity-50"></div>
+            </>
+          )}
+
+          {/* A song is loading: the old one is already gone */}
+          {loadingSong && (
+            <>
+              <span className="text-accent-warning text-[10px] font-bold uppercase truncate max-w-[240px]" title={`Loading ${loadingSong}`}>
+                Loading {loadingSong}
+              </span>
               <div className="w-px h-3 bg-border opacity-50"></div>
             </>
           )}

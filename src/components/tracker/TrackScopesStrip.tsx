@@ -9,7 +9,7 @@ import React, { useEffect, useRef, memo, useCallback } from 'react';
 import { useTrackerStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useTransportStore } from '@stores/useTransportStore';
-import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { useOscilloscopeStore, liveScopeFrame } from '@stores/useOscilloscopeStore';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -129,7 +129,7 @@ export const TrackScopesStrip: React.FC = memo(() => {
       const playing = isPlayingRef.current;
       const useOsc = oscActiveRef.current;
 
-      const oscSnapshot = useOsc ? useOscilloscopeStore.getState().channelData : null;
+      const oscSnapshot = useOsc ? liveScopeFrame() : null;
       const mixState = useMixerStore.getState().channels;
       const trackerState = useTrackerStore.getState();
       const patternChannels = trackerState.patterns[trackerState.currentPatternIndex]?.channels;
