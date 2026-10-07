@@ -762,6 +762,9 @@ export class InstrumentFactory {
 
       case 'TFMXSynth': {
         const tfmxSynth = new TFMXSynth();
+        // A TFMX Professional instrument is a macro of the module: its keys go to the module's own replayer
+        const macroIdx = (config.metadata as { tfmxMacroIndex?: number } | undefined)?.tfmxMacroIndex;
+        if (typeof macroIdx === 'number') tfmxSynth.setMacroIndex(macroIdx);
         if (config.tfmx) {
           tfmxSynth.setInstrument(config.tfmx).catch(err =>
             console.error('[InstrumentFactory] TFMX load failed:', err)

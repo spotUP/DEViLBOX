@@ -171,6 +171,11 @@ extern "C" {
     void tfmxdec_preview_macro(void* decoder, int macroIdx, int note,
                                int volume, int channel);
 
+    /* DEViLBOX extension: a keyboard decoder - the sequencer never steps (the song does not play), only
+     * tfmxdec_preview_macro voices sound; tfmxdec_preview_stop silences them. */
+    void tfmxdec_set_preview_only(void* decoder, int on);
+    void tfmxdec_preview_stop(void* decoder);
+
 #ifdef __cplusplus
 }
 #endif

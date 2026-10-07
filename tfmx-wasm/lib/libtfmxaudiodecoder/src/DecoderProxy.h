@@ -74,6 +74,10 @@ class DecoderProxy {
      */
     void previewMacro(int macroIdx, int note, int volume, int channel);
 
+    /** DEViLBOX extension: forward to the underlying decoder (keyboard decoder: no sequencer). */
+    void setPreviewOnly(bool on);
+    void previewStop();
+
     /** DEViLBOX extension: forward to the underlying decoder. */
     bool getPlayPosition(int& step, udword& offset);
 

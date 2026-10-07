@@ -267,6 +267,27 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
     });
   }
 
+  /**
+   * Hand the worklet the song's mdat (and smpl) for its keyboard decoder: the song's own replayer with
+   * its sequencer off, so a key plays only the macro it starts (tfmx_key_load).
+   */
+  keyLoad(mdat: ArrayBuffer, smpl: ArrayBuffer | null): void {
+    const mdatCopy = mdat.slice(0);
+    const smplCopy = smpl ? smpl.slice(0) : null;
+    const transfers: Transferable[] = [mdatCopy];
+    if (smplCopy) transfers.push(smplCopy);
+    this.sendMessage({ type: 'keyLoad', mdatBuffer: mdatCopy, smplBuffer: smplCopy }, transfers);
+  }
+
+  /** One key on the keyboard decoder: macro `macroIdx` (0..127) at TFMX note `note` (0..63), relative volume 0..15. */
+  keyNote(macroIdx: number, note: number, volume: number): void {
+    this.sendMessage({ type: 'keyNote', macroIdx, note, volume, channel: 0 });
+  }
+
+  keyOff(): void {
+    this.sendMessage({ type: 'keyOff' });
+  }
+
   setMuteMask(mask: number): void {
     // The project-wide convention (useMixerStore, TrackerReplayer): bit N = 1
     // means voice N is AUDIBLE. This engine read it inverted, which went

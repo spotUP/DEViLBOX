@@ -48,6 +48,13 @@ public:
                               int /*volume*/, int /*channel*/) { }
 
     /**
+     * DEViLBOX extension: a keyboard decoder runs only what previewMacro starts. Its sequencer is off
+     * (the song never plays) and previewStop() silences every voice. No-ops for non-TFMX decoders.
+     */
+    virtual void setPreviewOnly(bool /*on*/) { }
+    virtual void previewStop() { }
+
+    /**
      * DEViLBOX extension: where voice 0 is reading. `step` counts track
      * steps from the song's first; `offset` is the module-file offset of the
      * next pattern byte the voice reads. False when the decoder cannot say.

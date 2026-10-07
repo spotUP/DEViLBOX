@@ -114,6 +114,39 @@ class TFMXProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      // ── Keyboard decoder: the song's replayer with its sequencer off, a key starts a macro ──
+      case 'keyLoad': {
+        if (!this.wasm || !this.ctx || !this.wasm._tfmx_key_load) break;
+        const mdat = new Uint8Array(data.mdatBuffer);
+        const smpl = data.smplBuffer ? new Uint8Array(data.smplBuffer) : null;
+        const mdatPtr = this.wasm._malloc(mdat.byteLength);
+        this.wasm.HEAPU8.set(mdat, mdatPtr);
+        let smplPtr = 0, smplLen = 0;
+        if (smpl && smpl.byteLength > 0) {
+          smplLen = smpl.byteLength;
+          smplPtr = this.wasm._malloc(smplLen);
+          this.wasm.HEAPU8.set(smpl, smplPtr);
+        }
+        const ret = this.wasm._tfmx_key_load(this.ctx, mdatPtr, mdat.byteLength, smplPtr, smplLen);
+        this.wasm._free(mdatPtr);
+        if (smplPtr) this.wasm._free(smplPtr);
+        this._keyLoaded = ret === 0;
+        if (!this._keyOutL) {
+          this._keyOutL = this.wasm._malloc(256 * 4);
+          this._keyOutR = this.wasm._malloc(256 * 4);
+        }
+        if (ret !== 0) this.port.postMessage({ type: 'error', message: 'tfmx_key_load failed: ' + ret });
+        break;
+      }
+
+      case 'keyNote':
+        if (this._keyLoaded) this.wasm._tfmx_key_note(this.ctx, data.macroIdx | 0, data.note | 0, data.volume | 0, data.channel | 0);
+        break;
+
+      case 'keyOff':
+        if (this._keyLoaded) this.wasm._tfmx_key_stop(this.ctx);
+        break;
+
       // ── Full-module playback messages ────────────────────────────────────
       case 'loadModule': {
         if (!this.wasm || !this.ctx) break;
@@ -342,6 +375,17 @@ class TFMXProcessor extends AudioWorkletProcessor {
 
     outputL.fill(0);
     outputR.fill(0);
+
+    // Keyboard decoder (a key's macro, whether or not the song plays)
+    if (this._keyLoaded) {
+      this.wasm._tfmx_key_render(this.ctx, this._keyOutL, this._keyOutR, numSamples);
+      const kF32 = this.wasm.HEAPF32;
+      const kL = this._keyOutL >> 2, kR = this._keyOutR >> 2;
+      for (let i = 0; i < numSamples; i++) {
+        outputL[i] += kF32[kL + i];
+        outputR[i] += kF32[kR + i];
+      }
+    }
 
     // Full-module playback (dedicated player slot 0)
     if (this._moduleMode && this._modulePlaying) {

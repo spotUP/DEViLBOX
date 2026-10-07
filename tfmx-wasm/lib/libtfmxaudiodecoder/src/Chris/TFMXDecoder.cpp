@@ -642,7 +642,7 @@ int TFMXDecoder::run() {
         }
     }
     
-    if ( !songEnd || loopMode ) {
+    if ( !previewOnly && (!songEnd || loopMode) ) {
         if (--admin.count < 0) {
             admin.count = admin.speed;  // reload
             do {
@@ -783,6 +783,13 @@ void TFMXDecoder::previewMacro(int macroIdx, int note, int volume, int channel) 
                     | (channel & 0x07));    // low nibble: channel index
     cmd.ee = 0;                             // no detune
     noteCmd();
+}
+
+void TFMXDecoder::previewStop() {
+    for (ubyte v = 0; v < voices; v++) {
+        voiceVars[v].macro.skip = true;
+        voiceVars[v].ch->off();
+    }
 }
 
 // ----------------------------------------------------------------------
