@@ -512,7 +512,20 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
       )}
 
       {/* Main Status Bar */}
-      <div className="bg-dark-bgSecondary border-t border-dark-border flex items-center justify-between px-4 py-1.5 text-xs font-mono">
+      <div className="relative bg-dark-bgSecondary border-t border-dark-border flex items-center justify-between px-4 py-1.5 text-xs font-mono">
+        {/* A song is loading (the old one is already gone). Drawn over the bar's
+            centre, out of the layout flow, so its changing text never moves the
+            other status items (owner 2026-10-07: "the loading text push other
+            text aside"). */}
+        {loadingSong && (
+          <span
+            data-testid="status-bar-loading"
+            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 max-w-[50%] truncate rounded bg-dark-bgSecondary px-2 text-accent-warning text-[10px] font-bold uppercase"
+            title={loadingText}
+          >
+            {loadingText}
+          </span>
+        )}
         {/* Left: View-specific content */}
         {activeView === 'dj' ? <DJStatusContent />
           : activeView === 'vj' ? (
@@ -542,15 +555,6 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
             </>
           )}
 
-          {/* A song is loading: the old one is already gone */}
-          {loadingSong && (
-            <>
-              <span className="text-accent-warning text-[10px] font-bold uppercase truncate max-w-[420px]" title={loadingText}>
-                {loadingText}
-              </span>
-              <div className="w-px h-3 bg-border opacity-50"></div>
-            </>
-          )}
 
           {/* Global offline indicator — online-only features degrade */}
           {!online && (
