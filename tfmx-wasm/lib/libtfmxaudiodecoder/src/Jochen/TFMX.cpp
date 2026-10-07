@@ -194,6 +194,13 @@ void HippelDecoder::TFMX_nextNote(VoiceVars& voiceX) {
             TFMX_7V_trackTabCmd(voiceX,trackOffs);
         }
         voiceX.pattPos = 0;
+        if (walkOn) {
+            udword at = trackOffs - 3;
+            int cmd = (trackColumnSize == 4) ? (int)fcBuf[trackOffs] : 0;
+            int step = (int)((at - voiceX.voiceNum*trackColumnSize - offsets.trackTable) / trackStepLen);
+            walkPush(0, voiceX.voiceNum, step, (int)pattern, (int)voiceX.transpose,
+                     (int)voiceX.soundTranspose, cmd, (int)admin.speed, (int)stats.voices);
+        }
     }
     TFMX_processPattern(voiceX);
 }
@@ -202,6 +209,13 @@ void HippelDecoder::TFMX_processPattern(VoiceVars& voiceX) {
     udword pattOffs = getPattOffs(voiceX);
 
     ubyte note = fcBuf[pattOffs++];
+    if (walkOn) {
+        int first = (int)((voiceX.trackStart - voiceX.voiceNum*trackColumnSize - offsets.trackTable) / trackStepLen);
+        int step = first + (int)(voiceX.trackPos / trackStepLen) - 1;
+        walkPush(1, voiceX.voiceNum, step, (int)(voiceX.pattPos / 2), (int)note,
+                 (int)fcBuf[pattOffs], (int)voiceX.transpose, (int)voiceX.soundTranspose,
+                 (int)admin.speed);
+    }
 #if defined(DEBUG_RUN)
     dumpByte(note);
     dumpByte(fcBuf[pattOffs]);
@@ -209,6 +223,7 @@ void HippelDecoder::TFMX_processPattern(VoiceVars& voiceX) {
 #endif
     if ( (note & 0x7f) != 0 ) {  // 0 = nothing more to do here
         
+        voiceX.walkFresh = true;
         voiceX.pattVal1 = note&0x7f;
         voiceX.pattVal2 = fcBuf[pattOffs];
         voiceX.portaOffs = 0;   // reset portamento offset

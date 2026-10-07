@@ -623,6 +623,36 @@ int tfmx_module_position(void* /*ctx*/, int32_t* out) {
 }
 
 /**
+ * DEViLBOX extension: the module player's walk (every track-step load and
+ * pattern row read, per voice, with the tick it happened on; Hippel TFMX 4V
+ * and 7V). tfmx_module_walk_enable(1) clears the record and restarts the tick
+ * count; _count is in records of 10 int32; _data points at the first.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_walk_enable(void* /*ctx*/, int on) {
+  TFMXPlayer& p = gPlayers[0];
+  return p.decoder ? tfmxdec_walk_enable(p.decoder, on) : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void tfmx_module_walk_run(void* /*ctx*/, int ticks) {
+  TFMXPlayer& p = gPlayers[0];
+  if (p.decoder) tfmxdec_walk_run(p.decoder, ticks);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_walk_count(void* /*ctx*/) {
+  TFMXPlayer& p = gPlayers[0];
+  return p.decoder ? tfmxdec_walk_count(p.decoder) : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+const int32_t* tfmx_module_walk_data(void* /*ctx*/) {
+  TFMXPlayer& p = gPlayers[0];
+  return p.decoder ? tfmxdec_walk_data(p.decoder) : nullptr;
+}
+
+/**
  * Mute/unmute a voice.
  */
 EMSCRIPTEN_KEEPALIVE
