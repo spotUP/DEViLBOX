@@ -20,6 +20,7 @@ import { computeNibbleAdvance } from '@/lib/tracker/nibbleAdvance';
 // not create a runtime module cycle.
 import type { useTrackerStore as _TrackerStoreType } from './useTrackerStore';
 import type { useEditorStore as _EditorStoreType } from './useEditorStore';
+import { stepRow } from '@/lib/tracker/cursorNavigation';
 import {
   getTrackerStoreRef,
   getEditorStoreRef,
@@ -104,18 +105,10 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
 
     switch (direction) {
       case 'up':
-        if (rowIndex > 0) {
-          rowIndex--;
-        } else if (behavior.cursorWrapVertical) {
-          rowIndex = numRows - 1;
-        }
+        rowIndex = stepRow(rowIndex, -1, numRows, behavior.cursorWrapVertical);
         break;
       case 'down':
-        if (rowIndex < numRows - 1) {
-          rowIndex++;
-        } else if (behavior.cursorWrapVertical) {
-          rowIndex = 0;
-        }
+        rowIndex = stepRow(rowIndex, 1, numRows, behavior.cursorWrapVertical);
         break;
       case 'left': {
         if (currentDigits > 0 && digitIndex > 0) { digitIndex--; break; }
