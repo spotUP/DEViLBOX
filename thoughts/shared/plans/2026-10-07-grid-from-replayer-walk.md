@@ -258,8 +258,14 @@ bar test first (revert check: it must fail on the old grid), then fix.
   tick length = the module's CIA timer (hybris 43.98 Hz, not 50). Grid cap 32768 rows (imploder_drums never repeats
   inside it; hybris sub 0 loops at row 26017). Found and fixed: carrier addresses (file length - code length),
   50 Hz replayer, missing intro skip, cmd 13, 97th table entry.
-- **U8 Music Assembler (M).** MusicAssemblerParser.ts:399/767 + ma-wasm (registry :177) + position
+- [x] **U8 Music Assembler (M) - DONE 2026-10-07 (cb09d9c3c).** MusicAssemblerParser.ts:399/767 + ma-wasm (registry :177) + position
   reporting; oracle UADE (amigasrc/ma) Paula + ma-wasm trace. Test: musicAssemblerGridMatchesPlayer.test.ts.
+  Result: walk = maWalk.ts (the 68k player's tick, event reader and period/volume path; tables in maModule.ts), held to
+  UADE's Paula log (musicAssemblerWalkMatchesPlayer.test.ts): baseheads.ma 25789 and thanatos.ma 11571 period+volume
+  writes, the sample address and length of every note, 50 Hz tick; plus both modules with 24 note events turned into
+  release events (the corpus has none). The oracle found three ma-wasm faults (ADSR peak and arpeggio counter compares
+  `>`, vibrato offset kept through portamento) and a stereo fault (voice v plays Paula channel [0,2,3,1][v]); all fixed.
+  Grid cap 32768 rows; baseheads 21889 rows, loop at row 1.
 - **U9 MusicLine (L).** First reproduce "empty / frozen / silent" (parser alone gives 402 notes, so the
   fault is in wiring or the engine), then the PART walk (MusicLineParser.ts:477) against
   musicline-wasm (has onPosition) and amigasrc/musicline_editor. Test: musicLineGridMatchesPlayer.test.ts.
