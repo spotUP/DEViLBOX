@@ -118,6 +118,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   try {
     return await parseTrackerModule(buffer, file.name);
   } catch {
+    // `.mus` belongs to UFO (UADE, by its FORM/DDAT/BODY/CHAN bytes) and Karl Morton
+    // (SONG/SMPL chunks, libopenmpt); both were routed above. A `.mus` that is neither
+    // (boogie.mus, comic.mus, doink.mus: a 128-byte header then status/note/velocity/delta
+    // events) has no player anywhere - UADE's only `.mus` player is UFO, and it answered
+    // "module check failed" and left a stray WantedTeam.bin. Refuse it by name instead.
+    if (filename.endsWith('.mus')) {
+      throw new Error(`${file.name}: no player for this .mus - it is not a UFO (MicroProse) or Karl Morton module, and libopenmpt and UADE have no other .mus player`);
+    }
     // If libopenmpt fails, try UADE as last resort
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     // For .mod files without a standard MOD signature at offset 1080 (M.K., FLT4,
