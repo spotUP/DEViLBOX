@@ -20,12 +20,28 @@ import { withNativeDefault, withNativeThenUADE, callUADE, getBasename, injectUAD
 import { tryChipDumpParse } from './ChipDumpParsers';
 import { tryUADEPrefixParse } from './UADEPrefixParsers';
 import { tryPCTrackerParse } from './PCTrackerParsers';
+import { songWalks, WalkCancelledError, type SongWalkClient } from '@/lib/import/formats/songWalkClient';
 import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
 
 /**
  * Check if a filename matches a list of extensions, either as suffix (.ext) or prefix (ext.).
  * Handles Amiga naming convention where 'mdat.songname' and 'songname.mdat' are equivalent.
  */
+/**
+ * Run an import-time walk in the walk worker. A Cancel is rethrown (the open
+ * stops); any other failure gives undefined, and the parser then walks the
+ * song itself, as it did before the worker existed.
+ */
+async function walkOffMainThread<T>(run: (client: SongWalkClient) => Promise<T>): Promise<T | undefined> {
+  try {
+    return await run(songWalks);
+  } catch (err) {
+    if (err instanceof WalkCancelledError) throw err;
+    console.warn('[import] the walk worker failed; the parser walks the song itself:', err);
+    return undefined;
+  }
+}
+
 function matchesExt(filename: string, exts: string[]): boolean {
   const lower = filename.toLowerCase();
   const base = getBasename(lower);
@@ -797,8 +813,12 @@ export async function tryRouteFormat(
   // .ma files — identified by M68k player bytecode scanning (no magic bytes).
   if (matchesExt(filename, ['ma'])) {
     const { isMusicAssemblerFormat, parseMusicAssemblerFile } = await import('@lib/import/formats/MusicAssemblerParser');
+    // The player's walk (the grid) runs in the walk worker, not on the main thread.
+    const maWalk = isMusicAssemblerFormat(new Uint8Array(buffer))
+      ? await walkOffMainThread((c) => c.musicAssembler(new Uint8Array(buffer), 0))
+      : undefined;
     return withNativeThenUADE('musicAssembler', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseMusicAssemblerFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseMusicAssemblerFile(bytes as Uint8Array, name, maWalk),
       'MusicAssemblerParser', { isFormat: isMusicAssemblerFormat, usesBytes: true, injectUADE: true });
   }
 
@@ -1667,8 +1687,13 @@ export async function tryRouteFormat(
   // Amiga 4-channel format (Future Player). Magic: 0x000003F3 + "F.PLAYER" at offsets 32-39.
   if (matchesExt(filename, ['fp'])) {
     const { isFuturePlayerFormat, parseFuturePlayerFile } = await import('@lib/import/formats/FuturePlayerParser');
+    // The reader's walk (the grid) runs in the walk worker, not on the main thread.
+    const { fpCodeSection } = await import('@lib/import/formats/fpWalk');
+    const fpWalk = isFuturePlayerFormat(buffer)
+      ? await walkOffMainThread((c) => c.futurePlayer(fpCodeSection(new Uint8Array(buffer)), 0))
+      : undefined;
     return withNativeThenUADE('futurePlayer', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFuturePlayerFormat(buf as ArrayBuffer)) return parseFuturePlayerFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFuturePlayerFormat(buf as ArrayBuffer)) return parseFuturePlayerFile(buf as ArrayBuffer, name, fpWalk); return null; },
       'FuturePlayerParser', { injectUADE: true });
   }
 
@@ -2235,6 +2260,7 @@ export async function tryRouteFormat(
           return parseJochenHippelAmigaSogFile(buffer, originalFileName, played ?? undefined);
         }
       } catch (err) {
+        if (err instanceof WalkCancelledError) throw err;
         console.warn(`[JochenHippelSTParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
     }

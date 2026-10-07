@@ -308,6 +308,16 @@ the main-thread walk for every corpus hip7 / ma file (existing
 `*GridMatchesPlayer` tests run against the worker walker). Skip DW and Fred
 (under 2 ms warm).
 
+#### U2.8 result (2026-10-07, node, main-thread time per load; the browser numbers in the research were higher)
+Decision: `src/workers/songWalk.worker.ts` + `songWalkClient.ts` (own worker, same shape as the U2.7 scan client; Cancel ends it). The walking code is the importer's own (runHippelWalk / walkMusicAssembler / walkFuturePlayer run inside the worker via `runWalk`). A walk's reply is typed arrays (`walkPack.ts`): a structured clone of the walk objects cost as much as the walk (MA 115 ms, FP 60 ms), and Hippel's 243 thousand records are reduced to the transposes in the worker. Measured fresh (not in the research): Future Player walk 85-122 ms; BD 1-8 ms, DW 0-6 ms (left alone, as planned).
+Main thread per load, before -> after:
+- Hippel 7V lethalxcess-intro.hip7: decoder walk + records 320-430 ms in node (97-118 ms in the tab) -> 4-6 ms (receive the 16401 transposes). ghostbattle_gameover.hip7: 140 -> 0.4.
+- Future Player hybris.fp / imploder drums.fp: walk 85-122 ms -> 6-16 ms (receive 53 thousand events).
+- Music Assembler baseheads.ma: walk 33-43 ms -> 9-13 ms (receive 22 thousand events and 155 thousand writes).
+- Music Assembler loadPatterns (343 patterns) was a store cost, not a walk: immer walked and deep-froze every cell of the new patterns (25-34 ms in node, 82-101 ms in the tab). A whole-song replacement is now a plain `set`: 1-3 ms.
+Tests: src/engine/__tests__/importWalksRunInWorker.test.ts (reachability per walk through parseModuleToSong, equality over MA/FP/hip/hip7 corpus, Cancel), src/stores/__tests__/loadPatternsCost.test.ts. Revert-checked.
+Not done: no live tab measurement (MCP not connected for this run); the browser numbers above are the research's.
+
 ### U3 - One export per target (two sessions)
 - U3a audio: new `src/lib/export/audioExportService.ts` `exportAudio({format,
   scope: 'song'|'pattern'|'stems'})` - ONE render strategy (the panel's live
@@ -340,7 +350,7 @@ services, and the parsers' internal recursion (`ChipDumpParsers`,
 - [x] U2.6a DJ engine loaders. Done: openSong deck target (OpenOptions.target {deck}; openDeckTrack = the throwing wrapper): acquire (publishes no editor load phase) + parse on the deck's own UADE engine (UADEEngine.getDeckInstance, withDeckUADEEngine scope in UADEParser), returns song + bytes + companions; DJTrackLoader (6 sites), DJUADEPrerender, DJPlaylistPrecache / DJPlaylistAnalyzer (acquireModlandCompanions). Deviation: the engine hand-off (pipeline render, loadAudioToDeck) stays in each loader; the call returns the song. Test: src/engine/dj/__tests__/deckLoadOpensThroughOpenSong.contract.test.ts (revert-checked both tests)
 - [x] U2.6b DJ components. Done: DJFileBrowser, DJView, DJDeck, DJPlaylistModal (6), DJPlaylistPanel (4), DJModlandBrowser (5), tourScript on openDeckTrack / acquireForDeck; every Modland deck load carries companions (20 parsed with none before). Allowlist: 17 entries / 32 calls removed, 1 owner entry added (openDeckSong)
 - [x] U2.7 UADE scan in a worker (measured 2026-10-07; see U2.7 result)
-- [ ] U2.8 Hippel / MA walks in a worker
+- [x] U2.8 Hippel / MA / FP walks in a worker (measured 2026-10-07; see U2.8 result)
 - [ ] U3a one audio export
 - [ ] U3b one module / MIDI export input
 - [ ] U4.1 guard final state
@@ -379,3 +389,6 @@ before the switch.
 - D3: accepted - the old song stops before the parse, so a failed load leaves silence.
 - D4: the dialog's Import no longer writes formatEngine settings.
 - Live tab measurement for U2.7: APPROVED 2026-10-07 - an agent may load songs in the owner's open tab via MCP to time the UADE scan (never open a new tab; stop playback after).
+
+- U2.7 OWNER PASS 2026-10-07: bards tale.cus loads and plays fine with the scan in the worker.
+- U2.1/U2.2/U2.7 OWNER PASS 2026-10-07: fast jukebox switching through UADE songs - no long silent gaps, loading panel shows phases.

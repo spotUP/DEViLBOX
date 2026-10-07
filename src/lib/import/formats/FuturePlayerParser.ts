@@ -217,9 +217,10 @@ export interface FpModuleGrid {
 }
 
 /** Walk subsong 0 of a module with the replayer's own reader and draw it as the grid. */
-export function buildFuturePlayerGrid(rawBuf: Uint8Array): FpModuleGrid {
+export function buildFuturePlayerGrid(rawBuf: Uint8Array, precomputedWalk?: FpWalk | null): FpModuleGrid {
   const code = fpCodeSection(rawBuf);
-  const walk = walkFuturePlayer(code, 0);
+  // The import path hands in the walk the walk worker made (songWalkClient); without one the walk runs here.
+  const walk = precomputedWalk !== undefined ? precomputedWalk : walkFuturePlayer(code, 0);
   const instrumentMap = new Map<number, number>();
   const arpMap = new Map<number, number>();
   if (walk) {
@@ -258,7 +259,7 @@ function emptyFuturePlayerConfig(): FuturePlayerConfig {
   };
 }
 
-export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string, walk0?: FpWalk | null): TrackerSong {
   const rawBuf = new Uint8Array(buffer);
 
   if (!isFuturePlayerFormat(rawBuf)) {
@@ -293,7 +294,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
 
   // ── Walk subsong 0 with the replayer's own reader, draw it as the grid ─
 
-  const { walk, grid, unmatched, instrumentMap } = buildFuturePlayerGrid(rawBuf);
+  const { walk, grid, unmatched, instrumentMap } = buildFuturePlayerGrid(rawBuf, walk0);
   const ROWS_PER_PATTERN = 64;
 
   let patterns: TrackerSong['patterns'];

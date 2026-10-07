@@ -65,7 +65,7 @@ import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder
 import { musicAssemblerEncoder } from '@/engine/uade/encoders/MusicAssemblerEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import { isMusicAssemblerModule, loadMaModule, MA_PAL_CLOCK } from './maModule';
-import { walkMusicAssembler } from './maWalk';
+import { walkMusicAssembler, type MaWalk } from './maWalk';
 import { buildMaGridFromWalk } from './maGrid';
 
 /** PAL sample rate at Amiga C-3 (period 214): 3546895 / (2 × 214) ≈ 8287 Hz. */
@@ -87,15 +87,15 @@ export function isMusicAssemblerFormat(bytes: Uint8Array): boolean {
  * Parse a Music Assembler (.ma) module into a TrackerSong.
  * Returns null if the file is not valid or cannot be parsed.
  */
-export function parseMusicAssemblerFile(bytes: Uint8Array, filename: string): TrackerSong | null {
+export function parseMusicAssemblerFile(bytes: Uint8Array, filename: string, walk?: MaWalk | null): TrackerSong | null {
   try {
-    return parseMusicAssembler(bytes, filename);
+    return parseMusicAssembler(bytes, filename, walk);
   } catch {
     return null;
   }
 }
 
-function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong | null {
+function parseMusicAssembler(bytes: Uint8Array, filename: string, precomputedWalk?: MaWalk | null): TrackerSong | null {
   const m = loadMaModule(bytes);
   if (!m) return null;
 
@@ -189,7 +189,8 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
 
   // ── The grid: the player's walk of sub-song 0, or none ───────────────────
   const primarySong = subSongs[0];
-  const walk = walkMusicAssembler(m, 0);
+  // The import path hands in the walk the walk worker made (songWalkClient); without one the walk runs here.
+  const walk = precomputedWalk !== undefined ? precomputedWalk : walkMusicAssembler(m, 0);
   let grid = walk ? buildMaGridFromWalk(walk, m) : null;
   let unmatched: string | undefined;
   if (!walk) unmatched = 'the module has no sub-song to walk';
