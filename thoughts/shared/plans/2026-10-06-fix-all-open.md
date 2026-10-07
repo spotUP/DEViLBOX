@@ -57,6 +57,7 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 | jammy | Lo-fi | percussion* | new bar, bar%16==8 | 1 bar | 8 bits flat | snap |
 
 - [x] F3 FIXED d7a948e52 (CustomSelect; test channelRoleUsesCustomSelect). Dub Deck channel card: the channel role dropdown is still a native <select>; use CustomSelect (project rule).
+- [ ] F4 DubDeckStrip.tsx bus row STYLE and ECHO dropdowns are native <select>; use CustomSelect.
 
 ## Batch L - load / route / companions
 - [!] L1 `black glass ][ - muzik0.670`: not CDFM 670; format research, route. -- BLOCKED: header 06 0b 09 09 09 00 e9 28 ... is no known tracker signature (not CDFM 670, not libopenmpt); needs format RE or an owner pointer to the player
@@ -92,6 +93,7 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 - [ ] E7 7 of 8 FIXED, 1 BLOCKED: PreTracker 87217659f, InStereo1+2 4213e42ea, Synthesis/SonicArranger/TFM/StoneTracker d98a02cf1 (each verified against grid rows on a corpus song). Pmdmini blocked: repo has no real PC-98 PMD song (both .pmd are PiyoPiyo) and PMDParser grid is one MML tick per row, not the player clock. Asap (ms only) not done. PARTIAL: audit done (see report): engines reporting own position = Hively, Klystrack, JamCracker, Hippel, Sonix, EaglePlayer, SidMon1, MusicLine, TFMX, Actionamics, ActivisionPro, Dss, FredReplayer2, UADE (+ Cinter4 through its own store feed). Getter exists in WASM but nothing reports: PreTracker, InStereo1, InStereo2, Synthesis, SonicArranger, TFM, StoneTracker, Pmdmini, Asap (ms only). Not implemented: each needs the getter mapped to the grid row and verified.
 
 ## Batch K - keyboard voices
+- [ ] K1b SidMon 2 keys before the first Play may be silent: the Sd2 engine is loaded and routed only on Play (same as Steve Turner). A key must work right after load.
 - [ ] K0c DB303 N.Dec knob display lags a MIDI-driven decay (store devilFish.normalDecay not updated by parameterRouter); sound is right (f3bdd3c01). Fix in parameterRouter once its foreign WIP lands.
 - [x] K0b FIXED f3bdd3c01 (DB303Synth.applyConfig sends decay or normalDecay only when changed; decayMidi case in db303KnobSweepKeepsAudio). DB303 decay knob dead on MIDI/automation paths: applyConfig ends with normalDecay = devilFish.normalDecay, overriding the decay it just set; parameterRouter writes only filterEnvelope.decay (agent aed7ccf, 2026-10-07). K0 guard committed 9e730ec92/935a58560 but K0 itself not reproduced: suspect DB303Synth DynamicsCompressor (-3 dB, 12:1, 727149898) pulling the level down when resonance/accent raise peaks - unmeasured.
 - [ ] K0 PRIORITY, recurring: TB-303 (DB303) audio "goes flat during knob pulls" - owner: regression "for the 100th time". Fix the root cause AND add the missing permanent guard: no test drives a knob drag through the real path (Knob -> parameterRouter/fast-path -> DB303 worklet) and checks the audio. Guard = rapid knob sweep on cutoff/resonance/env mod/decay/accent while a pattern plays, assert no dropout, no level collapse, no pitch change vs the same render without the sweep; in test:ci. Bisect which commit broke it (docs/CONTROL_PATTERNS.md knob perf invariants; 7f43955f9, 7f56a56ec, recent ToneEngine/keyboard changes 7a6840350). Measure what "flat" is (pitch drop vs dull/compressed vs silence) before fixing.
@@ -106,7 +108,7 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 - [x] P3 Hippel CoSo grid instrument omits track-table sound transpose. (91f4f881a)
 - [x] P4 OctaMED synth vol-table F4/FA and wave-table F7 not modelled. (9c66ba43d, UADE-checked)
 - [x] P5 Track-index engines may get the grid's pattern index for edits (SoundMon, DigMug, SonicArranger, DM1/2, InStereo1/2, Synthesis).
-- [x] P6 Undo/redo and macro paste reach no engine.
+- [x] P6 (f1dffabb6) Undo/redo and macro paste reach no engine.
 
 ## Batch T - tests
 - [x] T1 `src/__tests__/format-parsers.test.ts`: 4 cases fail on missing `.test-formats` fixtures.
