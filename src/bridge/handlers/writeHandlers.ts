@@ -2981,8 +2981,8 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
 
     // The song from the stores (null): the replayer's copy is only rebuilt when
     // playback starts, so an edit made since the last play was missing.
-    const { exportNativeSong } = await import('../../lib/export/nativeExportRouter');
-    const result = await exportNativeSong(null, {});
+    const { exportNativeFile } = await import('../../lib/export/moduleExportService');
+    const result = await exportNativeFile();
 
     if (!result) {
       return { error: `No native exporter available. editorMode="${fmt.editorMode}" hasUadeFileData=${!!fmt.uadeEditableFileData} uadeFileName="${fmt.uadeEditableFileName || ''}"` };

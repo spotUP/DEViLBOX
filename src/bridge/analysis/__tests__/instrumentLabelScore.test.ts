@@ -59,7 +59,7 @@ describe('instrument verdicts match the owner\'s ear', () => {
   it('the same verdicts on a song loaded the way the app loads it', async () => {
     const entry = LABELS.find((e) => e.song.endsWith('micro15-goto80.mod'))!;
     const { parseMOD } = await import('@/lib/import/formats/MODParser');
-    const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+    const { importTrackerModule } = await import('@/lib/song/songBranches');
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
     const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
     const { analyzeSong } = await import('../songAnalyzer');

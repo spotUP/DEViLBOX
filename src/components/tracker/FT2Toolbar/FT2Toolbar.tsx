@@ -268,8 +268,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             // RENDERED (not stripped), so it re-imports as audible, editable
             // instruments. The tiny crunched .cinter4 is an Export, not a Save.
             // Routed through the shared native-export router (cinterMode:'save').
-            const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
-            const res = await exportNativeSong(null, { cinterMode: 'save' });
+            const { exportNativeFile } = await import('@lib/export/moduleExportService');
+            const res = await exportNativeFile({ cinterMode: 'save' });
             if (res) downloadBytes(res.data, res.filename);
           } else {
             const { exportModuleFile } = await import('@lib/export/moduleExportService');

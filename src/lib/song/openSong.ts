@@ -17,7 +17,7 @@
  *   - the result: what loaded, what engine plays it, which editor it opened in.
  *
  * The branch bodies (module import, SunVox, V2M, AdPlug, GoatTracker, MIDI,
- * .dbx) still live in UnifiedFileLoader and are called from here.
+ * .dbx) live in songBranches.ts, which only this file imports.
  *
  * The import dialog is an optional step IN FRONT of this call (U2.3): an
  * interactive open prepares the file (prepareSong: read, classify, scan), asks
@@ -27,10 +27,8 @@
  * settings (D4).
  */
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
-import {
-  isSongFormat, isAudioFile, loadSongFile, loadV2MFile, loadAdPlugFile, importModuleFile, prepareModuleFile,
-  type FileLoadOptions, type FileLoadResult,
-} from '@/lib/file/UnifiedFileLoader';
+import { isSongFormat, isAudioFile, type FileLoadOptions, type FileLoadResult } from '@/lib/file/UnifiedFileLoader';
+import { loadSongFile, loadV2MFile, loadAdPlugFile, importModuleFile, prepareModuleFile } from '@/lib/song/songBranches';
 import type { ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { PrepareHooks } from '@/lib/import/prepareModuleImport';
 import type { SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
@@ -208,7 +206,7 @@ export async function prepareSong(src: SongSourceRef, hooks: PrepareHooks = {}):
   return { kind: 'prepared', file, songKind, companions, info, uadeMetadata, sidInfo };
 }
 
-/** Route an acquired file to its branch. The branch bodies live in UnifiedFileLoader. */
+/** Route an acquired file to its branch. The branch bodies live in songBranches.ts. */
 async function route(kind: SongKind, file: File, o: OpenOptions, companions?: Map<string, ArrayBuffer>, prepared?: PreparedSong): Promise<FileLoadResult> {
   const options: FileLoadOptions = {
     subsong: o.subsong,
@@ -318,6 +316,13 @@ export async function openSavedSong(src: Omit<StoredSongSource, 'kind'>): Promis
   if (!r.ok) throw new Error(r.error);
 }
 
+let deckParseQueue: Promise<unknown> = Promise.resolve();
+function queueDeckParse<T>(run: () => Promise<T>): Promise<T> {
+  const result = deckParseQueue.then(run, run);
+  deckParseQueue = result.catch(() => undefined);
+  return result;
+}
+
 /**
  * A deck target: acquire (file or Modland path, with its partner files), parse
  * on the deck's own UADE engine, return the song. One call per deck load; the
@@ -328,8 +333,11 @@ async function openDeckSong(src: SongSourceRef, o: OpenOptions & { target: DeckT
     const { file, companions } = await acquire(src, false);
     const bytes = await file.arrayBuffer();
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-    const { withDeckUADEEngine } = await import('@/lib/import/formats/UADEParser');
-    const song = await withDeckUADEEngine(() => parseModuleToSong(file, o.subsong ?? 0, undefined, undefined, companions));
+    const { UADEEngine } = await import('@engine/uade/UADEEngine');
+    // The scan runs on the deck's own engine, passed down the parse: an editor
+    // parse in flight at the same time scans on the editor's (U2.6c). Deck
+    // parses queue, one scan at a time on that one engine.
+    const song = await queueDeckParse(() => parseModuleToSong(file, o.subsong ?? 0, undefined, undefined, companions, UADEEngine.getDeckInstance()));
     return {
       ok: true, target: 'deck', deck: o.target.deck, name: file.name, file, bytes, song, companions,
       companionList: companionList(companions),

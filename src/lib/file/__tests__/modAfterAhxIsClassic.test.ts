@@ -42,7 +42,7 @@ const fileOf = (path: string, name: string) => {
 
 describe('MOD after AHX', () => {
   it('lands in the classic editor with no AHX data left', async () => {
-    const { importTrackerModule } = await import('../UnifiedFileLoader');
+    const { importTrackerModule } = await import('@/lib/song/songBranches');
     const infoOf = async (file: File, type: string) => ({
       metadata: { title: file.name, type, channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1, duration: 0 },
       arrayBuffer: await file.arrayBuffer(),
@@ -65,7 +65,8 @@ describe('MOD after AHX', () => {
   // Reachability, not a regression: the old MIDI path's up-front tracker reset
   // already reset the format store. Proves loadFile's MIDI branch reaches applySong.
   it('a MIDI file after an AHX is classic too (loadFile -> applySong)', async () => {
-    const { importTrackerModule, loadFile } = await import('../UnifiedFileLoader');
+    const { importTrackerModule } = await import('@/lib/song/songBranches');
+    const { loadFile } = await import('../UnifiedFileLoader');
     const { useFormatStore } = await import('@/stores/useFormatStore');
     const ahx = fileOf('public/data/songs/ahx/amanda.ahx', 'amanda.ahx');
     await importTrackerModule({
@@ -84,7 +85,8 @@ describe('MOD after AHX', () => {
   it('a V2M replaces the song: its instruments only, not stacked on the previous song', async () => {
     // loadV2MFile added the V2M's instruments on top of whatever was loaded
     // and reset nothing (2026-09-29 audit); it goes through applySong now.
-    const { importTrackerModule, loadFile } = await import('../UnifiedFileLoader');
+    const { importTrackerModule } = await import('@/lib/song/songBranches');
+    const { loadFile } = await import('../UnifiedFileLoader');
     const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
     const mod = fileOf('src/__tests__/fixtures/micro15-goto80.mod', 'micro15.mod');
     await importTrackerModule({

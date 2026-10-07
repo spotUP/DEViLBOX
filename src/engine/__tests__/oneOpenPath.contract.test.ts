@@ -1,13 +1,14 @@
 /**
- * U4.0 ratchet: no NEW caller of the song-open / export entry points may
- * appear outside the allowlist, and an entry may not stay once its calls are
- * gone. Counted from the TypeScript AST of every non-test file under src/
+ * U4.1 final state: only the OWNERS in the allowlist may call the song-open /
+ * export primitives, and an owner entry may not stay once its calls are gone. Counted from the TypeScript AST of every non-test file under src/
  * (call expressions, import aliases resolved) - see oneOpenPathScan.ts.
  */
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scanTree, scanSource, RESTRICTED, type CallMap } from './oneOpenPathScan';
+import fs from 'node:fs';
+import ts from 'typescript';
+import { scanTree, scanSource, listSourceFiles, RESTRICTED, type CallMap } from './oneOpenPathScan';
 import { ALLOWED_CALLERS } from './oneOpenPathAllowlist';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -37,11 +38,12 @@ function scanOnce(): CallMap {
 const SCAN_TIMEOUT = 60_000;
 
 describe('one open path guard (ratchet)', () => {
-  it('allowlist has no duplicate keys and every entry names its removing phase', () => {
+  it('allowlist has no duplicate keys and every entry is a permanent owner with a reason', () => {
     const keys = ALLOWED_CALLERS.map((a) => `${a.file}|${a.fn}|${a.callee}`);
     expect(new Set(keys).size).toBe(keys.length);
     for (const a of ALLOWED_CALLERS) {
-      expect(a.removedBy).toMatch(/^U\d/);
+      expect(a.why.length).toBeGreaterThan(10);
+      expect(a.why).not.toMatch(/\bU\d|removedBy|until|TODO|for now/i);
       expect(RESTRICTED).toContain(a.callee);
     }
   });
@@ -69,5 +71,22 @@ describe('one open path guard (ratchet)', () => {
     const actual = { ...scanOnce() };
     actual['src/planted/Fake.ts|fake|parseModuleToSong'] = 1;
     expect(diffAgainstAllowlist(actual).added).toHaveLength(1);
+  }, SCAN_TIMEOUT);
+
+  it('every parseUADEFile call states which UADE engine it scans on (U2.6c: the engine is an argument, not a scope)', () => {
+    const missing: string[] = [];
+    for (const file of listSourceFiles(path.join(repoRoot, 'src'))) {
+      const text = fs.readFileSync(file, 'utf8');
+      if (!text.includes('parseUADEFile(')) continue;
+      const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+      const visit = (n: ts.Node): void => {
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'parseUADEFile' && n.arguments.length !== 7) {
+          missing.push(`${path.relative(repoRoot, file)}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`);
+        }
+        ts.forEachChild(n, visit);
+      };
+      visit(sf);
+    }
+    expect(missing).toEqual([]);
   }, SCAN_TIMEOUT);
 });

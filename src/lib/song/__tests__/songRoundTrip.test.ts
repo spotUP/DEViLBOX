@@ -39,7 +39,7 @@ describe('song round trip', () => {
     ['a MOD', 'src/__tests__/fixtures/micro15-goto80.mod', 'MOD'],
     ['an AHX (native engine data)', 'public/data/songs/ahx/amanda.ahx', 'AHX'],
   ])('%s: snapshot -> apply -> snapshot is unchanged', async (_label, path, type) => {
-    const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+    const { importTrackerModule } = await import('@/lib/song/songBranches');
     const { snapshotSong } = await import('../snapshotSong');
     const { savedSongToApply } = await import('../savedSong');
     const { applySong } = await import('../applySong');

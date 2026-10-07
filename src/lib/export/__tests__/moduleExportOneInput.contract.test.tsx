@@ -67,7 +67,7 @@ const songInput = (b: number[]) => {
 };
 
 async function loadMicro15() {
-  const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+  const { importTrackerModule } = await import('@/lib/song/songBranches');
   const b = readFileSync(resolve(ROOT, 'src/__tests__/fixtures/micro15-goto80.mod'));
   const file = new File([b], 'micro15.mod');
   await importTrackerModule({

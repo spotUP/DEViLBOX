@@ -58,9 +58,9 @@ export const MaxTraxView: React.FC = () => {
     const capitalized = verb === 'save' ? 'Save' : 'Export';
     const past = verb === 'save' ? 'Saved' : 'Exported';
     try {
-      const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
+      const { exportNativeFile } = await import('@lib/export/moduleExportService');
       const { downloadBytes } = await import('@lib/export/Cinter4ModSave');
-      const res = await exportNativeSong(null);
+      const res = await exportNativeFile();
       if (res) {
         downloadBytes(res.data, res.filename);
         notify.success(`${past} ${res.filename}`, 2000);
