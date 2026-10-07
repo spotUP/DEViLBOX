@@ -30,6 +30,7 @@ import { parseInStereo1File } from '@/lib/import/formats/InStereo1Parser';
 import { parseInStereo2File } from '@/lib/import/formats/InStereo2Parser';
 import { parseTFMXFile } from '@/lib/import/formats/TFMXParser';
 import { tfmxNoteForKey } from '@/engine/tfmx/tfmxKeyNote';
+import { parseSteveTurnerFile } from '@/lib/import/formats/SteveTurnerParser';
 import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT, fromOnset } from './keyboardPreviewHarness';
 
 const corpus = (n: string) => {
@@ -638,5 +639,56 @@ describe('InStereo! 1.0 fantasi8.is: every instrument slot of the file is kept, 
       await b.send({ type: 'noteOn', instrument: ins, note: 61 });
       expect(Math.max(...rmsPerTick(renderTicks(b.proc, 40, 0), 40)), `instrument ${ins} sounds`).toBeGreaterThan(0.01);
     }
+  });
+});
+
+// K8: Steve Turner. The import reaches SteveTurnerParser (the Jason Page .jpo branch used to take the file), the
+// key is the replayer's own preview voice (st_note_on / st_preview_tick) on a paused copy of the module.
+describe.each(['steve-turner/paradroid90.jpo', 'steve-turner/rainbow islands.jpo'])('Steve Turner %s: a typed note is the replayer voice, as the song plays it', (name) => {
+  const stTransform = (c: string) => c.replace(/import\.meta\.url/g, "'.'").replace(/export\s+default\s+\w+;?/g, '');
+  it('the first note of each voice that starts a sample instrument has the song\'s pitch and level; a key never starts the song; key-up releases', async () => {
+    const ab = corpus(name);
+    const g = await parseSteveTurnerFile(ab, name.split('/')[1]) as unknown as GridSong;
+    let measured = 0;
+    for (let ch = 0; ch < 4; ch++) {
+      // The voice's FIRST note event: the song sounds it first, so a later one cannot be matched to the onset.
+      // Grid note 96 is the clamp of every index above the table, not a note a key can name: that voice is not compared.
+      let n: { note: number; ins: number } | null = null, first = false;
+      for (const pi of g.songPositions) {
+        if (first) break;
+        for (const c of g.patterns[pi].channels[ch].rows) if (c.note > 0 && c.instrument > 0) { first = true; if (c.note < 96) n = { note: c.note, ins: c.instrument }; break; }
+      }
+      if (!n) continue;
+      const a = await startWorklet('steveturner', 'SteveTurner', stTransform);
+      await a.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await a.send({ type: 'setMuteMask', mask: 1 << ch });
+      const out = renderTicks(a.proc, 400, ch === 1 || ch === 2 ? 1 : 0);
+      const on = rmsPerTick(out, 400).findIndex((v) => v >= 0.03);
+      if (on < 0) continue;
+      // up to 8 ticks, ended where the song retriggers the voice (a sudden fall to under a third of the level so far)
+      const lvl = rmsPerTick(out.subarray(on * FPT), 8);
+      let ticks = 8;
+      for (let t = 4; t < 8; t++) if (lvl[t] < Math.max(...lvl.slice(0, t)) / 3) { ticks = t; break; }
+      const b = await startWorklet('steveturner', 'SteveTurner', stTransform);
+      await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await b.send({ type: 'pause' });
+      expect(totalRms(rmsPerTick(renderTicks(b.proc, 20, 0), 20)), 'a paused module is silent: a key never starts the song').toBe(0);
+      await b.send({ type: 'noteOn', instrument: n.ins - 1, note: n.note - 13, velocity: 127 });
+      const pr = renderTicks(b.proc, ticks + 12, 0);
+      const pOn = rmsPerTick(pr, ticks + 12).findIndex((v) => v >= 0.03);
+      if (pOn < 0) continue; // synth-waveform instruments play nothing in the player either (lbC000C5E is a bare RTS)
+      const sv = fromOnset(out, on, 3), pv = fromOnset(pr, pOn, 3);
+      // Same replayer code: the first three ticks are usually the very samples; otherwise pitch, level and envelope are compared.
+      let maxDiff = 0, peak = 0;
+      for (let i = 0; i < sv.length; i++) { maxDiff = Math.max(maxDiff, Math.abs(sv[i] - pv[i])); peak = Math.max(peak, Math.abs(sv[i])); }
+      const sw = out.subarray(on * FPT, (on + ticks) * FPT), pw = pr.subarray(pOn * FPT, (pOn + ticks) * FPT);
+      if (maxDiff < 0.02 * peak) { /* the very samples */ }
+      else if (!(fundamentalHz(sw, 30, 4000) > 0)) {
+        // A sample with no fundamental (noise): only the level and envelope are comparable.
+        expect(Math.abs(db(totalRms(rmsPerTick(pw, ticks)), totalRms(rmsPerTick(sw, ticks)))), `${name} voice ${ch}: overall level, dB`).toBeLessThan(2);
+      } else expectSameVoice(`${name} voice ${ch} instrument ${n.ins}`, sw, pw, ticks);
+      measured++;
+    }
+    expect(measured, 'the song has a sample voice to measure').toBeGreaterThan(0);
   });
 });
