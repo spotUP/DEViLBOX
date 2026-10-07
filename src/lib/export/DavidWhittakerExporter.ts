@@ -6,8 +6,10 @@
  * binary in `uadeEditableFileData` and creates placeholder patterns.
  *
  * Export strategy:
- *   1. If `uadeEditableFileData` exists, return it verbatim. Any live edits
- *      made via UADE chip RAM patching are already baked into this buffer.
+ *   1. If the original module is available, walk it with the replayer (the walk the grid is drawn
+ *      from), compare every grid cell with the cell that walk draws, and patch each edited cell
+ *      into the command byte it came from (davidWhittakerEdits.ts). Byte-exact where nothing
+ *      was edited; edits that need a longer block come back as warnings.
  *   2. If no original binary is available, encode pattern data using standard
  *      ProTracker MOD 4-byte cell encoding as a best-effort fallback.
  *
@@ -16,6 +18,8 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { encodeDavidWhittakerCell } from '@/engine/uade/encoders/DavidWhittakerEncoder';
+import { walkDavidWhittaker } from '@lib/import/formats/DavidWhittakerWasmExtractor';
+import { applyDwGridEdits } from '@lib/import/formats/davidWhittakerEdits';
 
 // ── Result type ─────────────────────────────────────────────────────────────
 
@@ -49,11 +53,20 @@ export async function exportDavidWhittaker(
 ): Promise<DavidWhittakerExportResult> {
   const warnings: string[] = [];
 
-  // ── Path 1: Original binary available — return verbatim ─────────────────
-  if (song.uadeEditableFileData && song.uadeEditableFileData.byteLength > 0) {
+  // ── Path 1: Original module available - its own bytes with the grid's edits patched in ──
+  const original = song.davidWhittakerFileData ?? song.uadeEditableFileData;
+  if (original && original.byteLength > 0) {
     const baseName = sanitizeName(song.name);
+    let bytes: Uint8Array = new Uint8Array(original);
+    // a song whose grid did not match the walk opened in the scope view: it has no grid to write back
+    if (song.uadeVariableLayout) {
+      const walk = await walkDavidWhittaker(original);
+      const r = applyDwGridEdits(bytes, walk, song.patterns);
+      bytes = r.data;
+      warnings.push(...r.warnings);
+    }
     return {
-      data: new Blob([song.uadeEditableFileData], { type: 'application/octet-stream' }),
+      data: new Blob([bytes as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
       filename: deriveFilename(baseName, song.uadeEditableFileName),
       warnings,
     };

@@ -481,7 +481,12 @@ interface RHVariableResult {
   trackMap: number[][];
   /** Canonical carrier rows per unique block (byte-exact source of truth). */
   blockRows: TrackerCell[][];
+  /** Per pattern, voice and row: the block command the cell shows (rhGridEdits.ts writes edits to it); null where the cell is blank or a release marker. */
+  cellSources: Array<Array<Array<RHCellSource | null>>>;
 }
+
+/** The command of a block a grid cell is drawn from. */
+export interface RHCellSource { fp: number; cmd: number }
 
 const RH_PATTERN_ROWS = 64;
 // Hard ceiling on the display timeline so a pathological loop can't allocate an
@@ -587,11 +592,13 @@ function buildRHVariablePatterns(
   // Per-channel timeline of display cells + the fp covering each tick.
   const chRows: TrackerCell[][] = [];
   const chFpByTick: Int32Array[] = [];
+  const chSrc: Array<Array<RHCellSource | null>> = [];
   for (let ch = 0; ch < numChannels; ch++) {
     const timeline: TrackerCell[] = Array.from({ length: totalRows }, () => ({
       note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
     }));
     const fpByTick = new Int32Array(totalRows).fill(-1);
+    const srcByTick: Array<RHCellSource | null> = new Array(totalRows).fill(null);
     const list = channelBlocks[ch];
     if (list.length > 0) {
       let tick = 0;
@@ -601,7 +608,7 @@ function buildRHVariablePatterns(
         const fp = fpFor(list[blockIdx % list.length]);
         blockIdx++;
         let advanced = false;
-        for (const cell of blockRows[fp]) {
+        for (const [cmd, cell] of blockRows[fp].entries()) {
           const dur = rhCellTicks(cell);
           if (dur <= 0) continue;              // control command — no display row
           if (tick >= totalRows) break;
@@ -609,6 +616,7 @@ function buildRHVariablePatterns(
             note: cell.note, instrument: cell.instrument,
             volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
           };
+          srcByTick[tick] = { fp, cmd };
           const end = Math.min(totalRows, tick + dur);
           for (let t = tick; t < end; t++) fpByTick[t] = fp;
           // Release marker: on the note's LAST held row, drop a note-off (===) so
@@ -622,6 +630,7 @@ function buildRHVariablePatterns(
               note: 97, instrument: 0,
               volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
             };
+            srcByTick[end - 1] = null;
           }
           tick = end;
           advanced = true;
@@ -634,12 +643,14 @@ function buildRHVariablePatterns(
     }
     chRows.push(timeline);
     chFpByTick.push(fpByTick);
+    chSrc.push(srcByTick);
   }
 
   // ── Pass 2: slice the timelines into fixed 64-row patterns ─────────────────
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
   const trackMap: number[][] = [];
+  const cellSources: RHVariableResult['cellSources'] = [];
   for (let p = 0; p < numPatterns; p++) {
     const base = p * RH_PATTERN_ROWS;
     const channels: ChannelData[] = [];
@@ -655,6 +666,7 @@ function buildRHVariablePatterns(
       });
       patTrack.push(channelBlocks[ch].length > 0 ? chFpByTick[ch][base] : -1);
     }
+    cellSources.push(chSrc.map((src) => src.slice(base, base + RH_PATTERN_ROWS)));
     patterns.push({
       id: `pattern-${p}`, name: `Pattern ${p}`, length: RH_PATTERN_ROWS, channels,
     });
@@ -662,7 +674,16 @@ function buildRHVariablePatterns(
     trackMap.push(patTrack);
   }
 
-  return { patterns, songPositions, filePatternAddrs, filePatternSizes, trackMap, blockRows };
+  return { patterns, songPositions, filePatternAddrs, filePatternSizes, trackMap, blockRows, cellSources };
+}
+
+/** The grid the module shows, with the block command behind every cell (what an edit is compared with and written to). */
+export function buildRobHubbardGrid(buf: Uint8Array): (RHVariableResult & { blocks: Array<{ addr: number; size: number }> }) | null {
+  const found = findRHSongs(buf);
+  if (!found || found.songs.length === 0) return null;
+  const grid = buildRHVariablePatterns(buf, found.songs[0], 4);
+  if (!grid) return null;
+  return { ...grid, blocks: grid.filePatternAddrs.map((addr, i) => ({ addr, size: grid.filePatternSizes[i] })) };
 }
 
 // ── Main parser ─────────────────────────────────────────────────────────────
