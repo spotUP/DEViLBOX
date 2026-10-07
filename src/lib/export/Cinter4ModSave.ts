@@ -18,7 +18,6 @@
  */
 
 import type { InstrumentConfig } from '@/types';
-import type { Pattern } from '@/types/tracker';
 import { cinter4ParseSampleName, cinter4ParamsToSampleName, cinter4ParamsToWords, type Cinter4Version } from '@/lib/import/formats/cinter4Params';
 import { readCinter4InstrumentParams, cinter4EffectiveWords, renderCinterVoice } from '@/engine/cinter4/cinter4Instrument';
 
@@ -255,13 +254,12 @@ export interface CinterModExportResult {
  * (MOD + Native), the format-aware Save, and anywhere else a Cinter .mod is saved.
  */
 export async function exportCinterModFile(
-  patterns: Pattern[],
-  instruments: InstrumentConfig[],
-  songPositions: number[],
   opts: CinterModExportOptions,
 ): Promise<CinterModExportResult> {
-  const { exportWithOpenMPT } = await import('./OpenMPTExporter');
-  const omptRes = await exportWithOpenMPT(patterns, instruments, songPositions, {
+  const { exportModuleFile } = await import('./moduleExportService');
+  const { liveTrackerSong } = await import('@/lib/song/liveSong');
+  const instruments = liveTrackerSong().instruments;
+  const omptRes = await exportModuleFile({
     format: 'mod',
     moduleName: opts.moduleName || 'cinter',
     channelLimit: opts.channels ?? 4,
@@ -307,16 +305,15 @@ export interface CinterCrunchedResult {
  * byte-exact.
  */
 export async function exportCinterCrunched(
-  patterns: Pattern[],
-  instruments: InstrumentConfig[],
-  songPositions: number[],
   opts: { moduleName?: string; bpm?: number; speed?: number; originalModBytes?: Uint8Array },
 ): Promise<CinterCrunchedResult> {
+  const { liveTrackerSong } = await import('@/lib/song/liveSong');
+  const instruments = liveTrackerSong().instruments;
   let modBytes: Uint8Array;
   if (opts.originalModBytes && opts.originalModBytes.length > 1084) {
     modBytes = cinterPatchMod(opts.originalModBytes, instruments, { stripCinter: false }).data;
   } else {
-    modBytes = (await exportCinterModFile(patterns, instruments, songPositions, {
+    modBytes = (await exportCinterModFile({
       stripCinter: false, moduleName: opts.moduleName, bpm: opts.bpm, speed: opts.speed,
     })).data;
   }

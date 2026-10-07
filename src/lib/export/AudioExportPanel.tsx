@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify , useFormatStore } from '@stores';
-import { exportLiveCaptureToWav, exportLiveCaptureToMp3, exportLiveCaptureToFlac, exportLiveCaptureToOgg, exportUADEAsWav, getUADEInstrument, downloadLiveCaptureStems } from './audioExport';
+import { useTrackerStore, useProjectStore, useTransportStore, notify } from '@stores';
+import { exportAudio } from './audioExportService';
 
 type AudioExportScope = 'pattern' | 'song';
 type AudioExportFormat = 'wav' | 'mp3' | 'flac' | 'ogg';
@@ -27,8 +27,6 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   initialScope,
 }) => {
   const { patterns } = useTrackerStore();
-  const { originalModuleData } = useFormatStore();
-  const { instruments } = useInstrumentStore();
   const { metadata } = useProjectStore();
   const { bpm } = useTransportStore();
   // Default to full-song export — users overwhelmingly want the whole track,
@@ -77,9 +75,11 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
     setStemProgress({ active: true, channelIndex: 0, totalChannels: numChannels, stemPercent: 0 });
     try {
       const baseName = metadata.name || 'song';
-      await downloadLiveCaptureStems(baseName, {
+      await exportAudio({
+        scope: 'stems',
         format: formatRef.current,
-        onProgress: (ch, total, percent) => {
+        filename: baseName,
+        onStemProgress: (ch, total, percent) => {
           setStemProgress({ active: true, channelIndex: ch, totalChannels: total, stemPercent: Math.round(percent) });
         },
       });
@@ -92,84 +92,42 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
     }
   };
 
-  // Register export handler (assigned during render — always has fresh closure).
-  //
-  // All paths now go through `exportLiveCaptureToWav` — a real-time capture
-  // of the engine's master output post-FX. This is the only path that
-  // includes every synth (TB303/DB303/Furnace/UADE/Hively/libopenmpt/…),
-  // every per-instrument + per-channel + master effect, the user's mute/
-  // solo state, stereo separation, and every in-song tracker effect.
-  //
-  // For a raw-module render (ignore all user processing), hold Shift at
-  // export time — we'll route UADE-backed songs through the offline UADE
-  // renderer which bypasses the live graph.
+  // Register export handler (assigned during render - always has fresh closure).
+  // The render is audioExportService.exportAudio: a live capture of the engine's
+  // export tap (see its header for why); Shift-style "raw" asks it for the
+  // offline module render instead. MCP export_wav / export_mp3 / export_stems
+  // call the same function.
   handlerRef.current = async () => {
     setIsRendering(true);
     setRenderProgress(0);
     try {
       const baseName = metadata.name || 'song';
-      const uadeInst = getUADEInstrument(instruments);
-      const rawMode = rawRenderRef.current;
       const fmt = formatRef.current;
-      const ext = fmt;
+      // Shift-export (raw) is WAV only: re-encoding the raw render would defeat "as shipped".
+      const rawMode = rawRenderRef.current;
 
-      // Shift-export → raw module render bypassing the live graph. UADE
-      // only emits WAV; MP3-re-encoding the raw render would defeat the
-      // "as shipped" promise, so raw mode forces WAV regardless of toggle.
-      if (rawMode && uadeInst?.uade?.fileData) {
-        await exportUADEAsWav(
-          uadeInst.uade.fileData,
-          uadeInst.uade.filename,
-          `${baseName}.wav`,
-          uadeInst.uade.currentSubsong ?? 0,
-          (progress) => setRenderProgress(progress),
-        );
-        return;
-      }
-      if (rawMode && originalModuleData?.base64) {
-        const binaryStr = atob(originalModuleData.base64);
-        const bytes = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-        const sourceFilename = originalModuleData.sourceFile ||
-          `module.${originalModuleData.format.toLowerCase()}`;
-        await exportUADEAsWav(
-          bytes.buffer,
-          sourceFilename,
-          `${baseName}.wav`,
-          0,
-          (progress) => setRenderProgress(progress),
-        );
-        return;
-      }
-
-      const exportFn =
-        fmt === 'mp3' ? exportLiveCaptureToMp3
-        : fmt === 'flac' ? exportLiveCaptureToFlac
-        : fmt === 'ogg' ? exportLiveCaptureToOgg
-        : exportLiveCaptureToWav;
-
-      // Default path — live capture. Handles every song type uniformly.
       if (audioExportScope === 'pattern') {
         const pattern = patterns[selectedPatternIndex];
         if (!pattern) {
           notify.warning('Please select a valid pattern');
           return false;
         }
-        // Pattern-scope duration: rows × secondsPerRow + 2 s tail.
-        const secondsPerRow = (60 / bpm) * 0.25;
-        const durationSec = pattern.length * secondsPerRow + 2;
-        await exportFn({
-          durationSec,
+        await exportAudio({
+          scope: 'pattern',
+          patternIndex: selectedPatternIndex,
+          format: fmt,
+          raw: rawMode,
           unmuteAll: unmuteAllRef.current,
-          filename: `${pattern.name || 'pattern'}.${ext}`,
+          filename: rawMode ? baseName : (pattern.name || 'pattern'),
           onProgress: (p: number) => setRenderProgress(p),
         });
       } else {
-        // Full song — let the helper estimate duration from transport +
-        // patterns.
-        await exportFn({
+        await exportAudio({
+          scope: 'song',
+          format: fmt,
+          raw: rawMode,
           unmuteAll: unmuteAllRef.current,
-          filename: `${baseName}.${ext}`,
+          filename: baseName,
           onProgress: (p: number) => setRenderProgress(p),
         });
       }

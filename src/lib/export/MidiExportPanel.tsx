@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useTrackerStore, useProjectStore, useTransportStore, useAutomationStore, notify } from '@stores';
-import { exportPatternToMIDI, exportSongToMIDI } from './midiExport';
+import { useTrackerStore, useTransportStore, notify } from '@stores';
+import { exportMidiFile } from './moduleExportService';
 
 interface MidiExportPanelProps {
   handlerRef: React.MutableRefObject<(() => Promise<false | void>) | null>;
@@ -14,9 +14,7 @@ export const MidiExportPanel: React.FC<MidiExportPanelProps> = ({
   setSelectedPatternIndex,
 }) => {
   const { patterns } = useTrackerStore();
-  const { metadata } = useProjectStore();
   const { bpm } = useTransportStore();
-  const { curves } = useAutomationStore();
 
   const [midiType, setMidiType] = useState<0 | 1>(1);
   const [midiIncludeAutomation, setMidiIncludeAutomation] = useState(true);
@@ -24,7 +22,6 @@ export const MidiExportPanel: React.FC<MidiExportPanelProps> = ({
 
   // Register export handler
   handlerRef.current = async () => {
-    const timeSignature: [number, number] = [4, 4];
     const midiOptions = {
       type: midiType,
       includeAutomation: midiIncludeAutomation,
@@ -32,22 +29,18 @@ export const MidiExportPanel: React.FC<MidiExportPanelProps> = ({
       exportMutedChannels: false,
     };
 
-    let midiData: Uint8Array;
-    let filename: string;
-
-    if (midiExportFullSong) {
-      const sequence = patterns.map((p) => p.id);
-      midiData = exportSongToMIDI(patterns, sequence, bpm, timeSignature, curves, midiOptions);
-      filename = `${metadata.name || 'song'}.mid`;
-    } else {
-      const pattern = patterns[selectedPatternIndex];
-      if (!pattern) {
-        notify.warning('Please select a valid pattern');
-        return false;
-      }
-      midiData = exportPatternToMIDI(pattern, bpm, timeSignature, midiOptions);
-      filename = `${pattern.name || 'pattern'}.mid`;
+    if (!midiExportFullSong && !patterns[selectedPatternIndex]) {
+      notify.warning('Please select a valid pattern');
+      return false;
     }
+    // The live song's order list and tempo, the same input MCP export_midi reads.
+    const exported = await exportMidiFile({
+      scope: midiExportFullSong ? 'song' : 'pattern',
+      patternIndex: selectedPatternIndex,
+      ...midiOptions,
+    });
+    const midiData = exported.data;
+    const filename = `${exported.name || 'song'}.mid`;
 
     // Download the file - create a fresh Uint8Array to ensure standard ArrayBuffer
     const blob = new Blob([new Uint8Array(midiData)], { type: 'audio/midi' });

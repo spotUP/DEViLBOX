@@ -8,7 +8,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { OctaMEDConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
+import { useTrackerStore } from '@stores';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
 import { UADEChipEditor } from '@engine/uade/UADEChipEditor';
@@ -67,27 +67,8 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   const handleExportMod = useCallback(async () => {
     setExportingMod(true);
     try {
-      const trackerState = useTrackerStore.getState();
-      const instrumentState = useInstrumentStore.getState();
-      const projectState = useProjectStore.getState();
-      const transportState = useTransportStore.getState();
-
-      const nChannels = trackerState.patterns[0]?.channels.length ?? 4;
-      const song = {
-        name: projectState.metadata?.name ?? 'Untitled',
-        format: 'MED' as const,
-        patterns: trackerState.patterns,
-        instruments: instrumentState.instruments,
-        songPositions: trackerState.patternOrder,
-        songLength: trackerState.patternOrder.length,
-        restartPosition: 0,
-        numChannels: nChannels,
-        initialSpeed: transportState.speed,
-        initialBPM: transportState.bpm,
-      };
-
-      const { exportSongToMOD } = await import('@/lib/export/modExport');
-      const result = await exportSongToMOD(song, { bakeSynths: true });
+      const { exportBakedMod } = await import('@/lib/export/moduleExportService');
+      const result = await exportBakedMod();
 
       const url = URL.createObjectURL(result.blob);
       const a = document.createElement('a');

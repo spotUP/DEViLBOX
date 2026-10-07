@@ -143,14 +143,9 @@ export function debouncedWasmEngineReexport(): void {
             // Update the store bytes so the Shrinkler-size readout recomputes, and reload the
             // WASM engine so playback reflects the edits.
             const { exportCinterModFile } = await import('@/lib/export/Cinter4ModSave');
-            // Read CURRENT patterns/instruments from the stores (not the replayer's cached
-            // song) so pattern edits AND instrument add/delete/edit all reflect in the export.
-            const tState = useTrackerStore.getState();
-            const iState = useInstrumentStore.getState();
+            // The export reads the live song (not the replayer's cached one) so pattern
+            // edits AND instrument add/delete/edit all reflect in the export.
             const modRes = await exportCinterModFile(
-              tState.patterns as unknown as import('@/types/tracker').Pattern[],
-              iState.instruments,
-              tState.patternOrder,
               { stripCinter: false, moduleName: song.name || 'cinter', bpm: song.initialBPM, speed: song.initialSpeed },
             );
             const { crunchModInWorker } = await import('@/lib/export/cinterCrunch');
