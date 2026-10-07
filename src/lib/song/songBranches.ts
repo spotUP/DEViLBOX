@@ -35,6 +35,7 @@ import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
 
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 import { applySong } from '@/lib/song/applySong';
+import { emptyPattern } from '@/lib/import/formats/Sc68Parser';
 import type { PreparedModule, PrepareHooks } from '@/lib/import/prepareModuleImport';
 import { isSongFormat, type FileLoadOptions, type FileLoadResult } from '@/lib/file/UnifiedFileLoader';
 
@@ -248,7 +249,6 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
   clearExplicitlySaved();
 
   const { loadPatterns, setPatternOrder, setCurrentPattern, reset: resetTracker } = useTrackerStore.getState();
-  const { applyEditorMode } = useFormatStore.getState();
   const { addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
   const { setBPM, reset: resetTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();
@@ -267,27 +267,20 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
     const gtBuf = preReadBuffer ?? await file.arrayBuffer();
     if (isGoatTrackerSong(gtBuf)) {
       console.log('[UnifiedFileLoader] GoatTracker .sng detected — routing to GTUltra engine');
-      // Stop playback but do NOT reset instruments/patterns — GT has its own state
-      await stopActivePlaybackForIncomingSong(engine);
-
-      const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
-      const gtStore = useGTUltraStore.getState();
-
-      if (gtStore.engine) {
-        gtStore.engine.loadSong(gtBuf);
-        gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
-        // loadSong triggers onSongLoaded → refreshSongInfo → onSongInfo
-        // which sets sidCount then refreshes orders/patterns/instruments/tables.
-      } else {
-        // Store the raw ArrayBuffer for pending load — avoids Uint8Array.buffer
-        // offset issues if the typed array wraps a pooled/shared buffer.
-        gtStore.setPendingSongData(new Uint8Array(gtBuf));
-        gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
-      }
-
-      // Switch to GoatTracker editor mode (applyEditorMode auto-switches to tracker view)
-      const songBytes = new Uint8Array(gtBuf);
-      applyEditorMode({ goatTrackerData: songBytes });
+      // The song is applied like every other: applySong resets the per-song
+      // stores and fills the GTUltra store from the applied song's
+      // goatTrackerData (U4.2). The outgoing song is already unloaded by
+      // withSongLoad.
+      // The GTUltra editor draws the song; the tracker store holds a blank
+      // pattern so nothing of the outgoing song lingers.
+      const blank = emptyPattern(3, 64);
+      const placeholderPattern = { ...blank, channels: blank.channels.map((c, i) => ({ ...c, name: `Voice ${i + 1}` })) };
+      await applySong({
+        instruments: [], patterns: [placeholderPattern], order: [0], bpm: 125, speed: 6,
+        metadata: { name: file.name.replace(/\.sng$/i, '') },
+        originalModuleData: null,
+        engine: { goatTrackerData: new Uint8Array(gtBuf) },
+      }, 'import');
 
       return {
         success: true,
