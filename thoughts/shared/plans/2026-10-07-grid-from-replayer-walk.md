@@ -43,7 +43,16 @@ and an independent trace) and src/engine/__tests__/actionamicsGridMatchesPlayer.
 6. byte-exact carrier round trip on every corpus file (the format's existing *Roundtrip test stays green);
 7. playhead: the engine reports song position + row (src/engine/wasm/PositionCallbacks.ts) and the
    reported row is the row sounding;
-8. a song that cannot be matched opens the scope view (no-guess rule, 047ca8685).
+8. a song that cannot be matched opens the scope view (no-guess rule, 047ca8685);
+9. EXPORT ROUND TRIP (G16, owner 2026-10-07: "export to native format and then load it again, does it sound
+   the same? only then its fully editable"). Through the product's own doors (importTrackerModule ->
+   useTrackerStore.setCell -> exportNativeSong(null), the Export dialog / MCP export_native router ->
+   parseModuleToSong) every corpus song of the format: unedited, the exported bytes equal the original,
+   the reloaded grid equals the loaded grid, the replayer's stream equals the original's; one edited note
+   exports, reloads as that edit, is heard, only voices whose cells changed play differently and only in
+   pitch. Add the format to FORMATS in src/engine/__tests__/nativeExportReloadSoundsTheSame.test.ts and
+   its status (pass | fail | n/a) to EXPORT_ROUND_TRIP in src/lib/import/gridProvenance.ts. A defect the
+   test shows is fixed at its root or recorded as a G16-<key> unit below and held in the test's KNOWN table.
 
 Per global rule 6a every unit runs only its own format's songs; new tests go in
 src/engine/__tests__/ (inside the test:ci glob; files in src/lib/import/__tests__ must be named
@@ -440,3 +449,37 @@ Size rule used here: asm source of the player in third-party/uade-3.05/amigasrc 
 | G11-sonicArrangerSas | sonicArrangerSas | UADE | UADE Paula + traceModuleReads (binary only) | L |
 | G11-aProSys | aProSys | UADE | UADE Paula + traceModuleReads (binary only) | L |
 | G11-amiga_formats_catchall | amiga_formats_catchall | UADE | UADE Paula (gridVsPaula) + voice records | L |
+
+## G16 export round trip (2026-10-07, src/engine/__tests__/nativeExportReloadSoundsTheSame.test.ts)
+
+One table-driven test, bar item 9, over 12 walk formats / 253 corpus songs (Hippel held, see table) (SunTronic 193 of them: default
+run takes every 8th, G16_FULL=1 takes all; every other format runs every song). Sound = the format's own
+replayer as the chip's input stream: UADE Paula register writes per voice (a fresh UADE per render), the TFMX
+decoder's note starts for Hippel .hip/.hip7. Window 12 s (G16_SECONDS=n). Roots fixed with it:
+liveTrackerSong/useFormatStore dropped `uadeVariableLayout` (every variable-layout exporter - Rob Hubbard,
+Ben Daglish, SunTronic, Face The Music - was handed a song without its layout, so the router exported a
+MOD or the original bytes and lost grid edits), the SunTronic exporter read the parse-time carriers not the
+live pool (and liveTrackerSong dropped `sunTronicNative`), Ben Daglish had no exporter at all.
+
+| Format | Status | Notes |
+|---|---|---|
+| Hippel ST, DW, Rob Hubbard, Activision Pro, Fred, Actionamics, Sound Master, Digital Sonix & Chrome, SidMon 1 | pass | Hippel ST .sog: bytes + grid only (UADE plays the .sog source as noise; sound held by jochenHippelSTGridMatchesPlayer packed form); fuzzball-title.fred: UADE refuses it, bytes + grid only; Actionamics re-packs the module on an edit (2 bytes longer, 114 KB differ, sample addresses move) |
+| Hippel .hip / 7V | held (n/a) | passed 6 of 6 (3 songs, bytes + grid + decoder note stream, edit heard on its voices) before U4's uncommitted decoder / walk host / 7V parser / rebuildHippelModule rewrite; with that tree in the working tree it fails (export zeroes bytes, 7V grid has no note). Held out by `held` in the test; U4 removes the line when its work lands and the row must pass again |
+| SunTronic | fail (1 of 193) | smooth: score without notes parses to a stub, router exports a MOD of it (G16-sunSmooth) |
+| Ben Daglish | fail (edit) | export of the unedited module passes; edits are not written (G16-benDaglish) |
+
+- [ ] G16-benDaglish (M): grid edit writer for Ben Daglish (like robHubbardEdits.ts / davidWhittakerEdits.ts).
+  The grid is the walk (benDaglishGrid.ts); a walk event carries (track, pos) = the command's byte
+  position, the note cell is the PERIOD (e.c) the note byte, the voice's transposes and the sample's
+  base note give. Needs: the player's note-byte -> period rule (third-party/uade-3.05/amigasrc/players/**
+  Benn Daglishv3.asm, ben_daglish.c) inverted per voice, a patch of that byte at trackFileOffsets[track] + pos,
+  warnings for edits that need a longer track (blank row, removed note). BenDaglishExporter.ts today returns
+  the module as loaded and names every edited cell as a warning. Done when KNOWN.benDaglish is removed from the test.
+- [ ] G16-sunSmooth (S): SunTronic `smooth` (V1.3, no instr sidecars): the parse gives one empty pattern and
+  no layout, the router's `format === 'MOD' && !layoutFormatId` branch exports a MOD of nothing. A song
+  with no grid (scope view) must export the module's own bytes; find why the score has no notes first
+  (parseSunTronicFile with and without companions). Done when 'suntronic|smooth' leaves KNOWN.
+- Found, not fixed: a track a song shares (Hippel steps and voices, SunTronic blocks, Fred sub-patterns) shows
+  the edit on every cell it plays on after the reload, but not in the editor before it (setCell changes one
+  cell); where the shared cell is at the end of the note range the grid clamps and shows no change although
+  the replayer plays it differently (warp.hip voice 1, tank1). Editor echo is a product decision.

@@ -22,7 +22,7 @@ registerEditableFormat({ formatId: "ams", label: "", patternCodec: { kind: "vari
 registerEditableFormat({ formatId: "aon", label: "Art of Noise", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "aProSys", label: "A-Pro-Sys", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "artAndMagic", label: "Art and Magic", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "benDaglish", label: "", patternCodec: { kind: "variable" } });
+registerEditableFormat({ formatId: "benDaglish", label: "", patternCodec: { kind: "variable" }, exporter: { module: "BenDaglishExporter", fn: "exportBenDaglish", ext: "bd", byLayout: true } });
 registerEditableFormat({ formatId: "c67", label: "", patternCodec: { kind: "variable" }, exporter: { module: "CDFM67Exporter", fn: "exportCDFM67", byLayout: true } });
 registerEditableFormat({ formatId: "chuckBiscuits", label: "Chuck Biscuits", patternCodec: { kind: "fixed" }, exporter: { module: "ChuckBiscuitsExporter", fn: "exportChuckBiscuits", byLayout: true } });
 registerEditableFormat({ formatId: "composer667", label: "Composer 667", patternCodec: { kind: "fixed" }, exporter: { module: "Composer667Exporter", fn: "exportComposer667", byLayout: true } });
