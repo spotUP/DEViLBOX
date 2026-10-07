@@ -56,6 +56,7 @@ export const GTU_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     formatter: gtNoteToString,
+    noteBase: 1,
   },
   {
     key: 'instrument',

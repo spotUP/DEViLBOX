@@ -554,6 +554,50 @@ function mapHvlEffect(hvlFx: number, hvlParam: number): { effTyp: number; eff: n
 }
 
 /**
+ * One Hively track step as the grid cell the replayer plays at a position whose channel carries `transpose`
+ * (HVL note 1 = C-0 = XM note 1; effects map many-to-one onto XM columns). The ONE projection of a native
+ * step into the tracker grid: the importer builds every cell with it, and an edit of a native step is
+ * projected into the grid with it (hivelyEdit.ts), so the two never disagree.
+ */
+export function hivelyStepToCell(
+  step: { note: number; instrument: number; fx: number; fxParam: number; fxb: number; fxbParam: number },
+  transpose: number,
+): TrackerCell {
+  // Apply transpose to note (skip empty notes where note=0)
+  let xmNote = 0;
+  if (step.note > 0 && step.note <= 60) {
+    // HVL note 1-60 → XM note (semitone-based)
+    // HVL note 1 = C-0, XM note 1 = C-0
+    xmNote = step.note + transpose;
+    if (xmNote < 1) xmNote = 1;
+    if (xmNote > 96) xmNote = 96;
+  }
+
+  // Map primary effect
+  const fx1 = mapHvlEffect(step.fx, step.fxParam);
+  // Map secondary effect
+  const fx2 = mapHvlEffect(step.fxb, step.fxbParam);
+
+  const cell: TrackerCell = {
+    note: xmNote,
+    instrument: step.instrument,
+    volume: fx1.volume ?? fx2.volume ?? 0,
+    effTyp: fx1.effTyp,
+    eff: fx1.eff,
+    effTyp2: fx2.effTyp,
+    eff2: fx2.eff,
+  };
+
+  // Preserve HVL-specific effects in flag columns
+  if (fx1.flag1 !== undefined) cell.flag1 = fx1.flag1;
+  if (fx1.flag2 !== undefined) cell.flag2 = fx1.flag2;
+  if (fx2.flag1 !== undefined && cell.flag1 === undefined) cell.flag1 = fx2.flag1;
+  if (fx2.flag2 !== undefined && cell.flag2 === undefined) cell.flag2 = fx2.flag2;
+
+  return cell;
+}
+
+/**
  * Convert a parsed HivelyModule to a TrackerSong for the TrackerReplayer.
  * Flattens the per-channel pattern matrix into combined patterns.
  */
@@ -579,36 +623,7 @@ export function convertHivelyToTrackerSong(mod: HivelyModule, fileName: string):
       for (let row = 0; row < trackLength; row++) {
         const step = track?.[row] ?? { note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 };
 
-        // Apply transpose to note (skip empty notes where note=0)
-        let xmNote = 0;
-        if (step.note > 0 && step.note <= 60) {
-          // HVL note 1-60 → XM note (semitone-based)
-          // HVL note 1 = C-0, XM note 1 = C-0
-          xmNote = step.note + transpose;
-          if (xmNote < 1) xmNote = 1;
-          if (xmNote > 96) xmNote = 96;
-        }
-
-        // Map primary effect
-        const fx1 = mapHvlEffect(step.fx, step.fxParam);
-        // Map secondary effect
-        const fx2 = mapHvlEffect(step.fxb, step.fxbParam);
-
-        const cell: TrackerCell = {
-          note: xmNote,
-          instrument: step.instrument,
-          volume: fx1.volume ?? fx2.volume ?? 0,
-          effTyp: fx1.effTyp,
-          eff: fx1.eff,
-          effTyp2: fx2.effTyp,
-          eff2: fx2.eff,
-        };
-
-        // Preserve HVL-specific effects in flag columns
-        if (fx1.flag1 !== undefined) cell.flag1 = fx1.flag1;
-        if (fx1.flag2 !== undefined) cell.flag2 = fx1.flag2;
-        if (fx2.flag1 !== undefined && cell.flag1 === undefined) cell.flag1 = fx2.flag1;
-        if (fx2.flag2 !== undefined && cell.flag2 === undefined) cell.flag2 = fx2.flag2;
+        const cell = hivelyStepToCell(step, transpose);
 
         rows.push(cell);
       }

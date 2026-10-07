@@ -17,6 +17,12 @@ import { validateEdit } from '@/lib/import/formatConstraints';
 import { notify } from '@/stores/useNotificationStore';
 import type { TrackerFormat } from '@/engine/TrackerReplayer';
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
+import { windowHandlerWritesCells } from '@lib/tracker/formatModeKeyOwnership';
+import { planNoteEntry } from '@lib/tracker/formatEntryPlan';
+import { useFormatStore } from '@stores/useFormatStore';
+
+/** In a format editor mode the view's own handler writes cells (P14); this handler only jams. */
+const windowMayWrite = (): boolean => windowHandlerWritesCells(useFormatStore.getState().editorMode);
 
 // XM note values for IT-style note types
 const XM_NOTE_OFF = 97;
@@ -186,19 +192,19 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
         ? targetChannelOverride
         : getTargetChannel();
 
-      let targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
-
-      // Record quantization: snap to nearest boundary when recording during playback
-      if (recordMode && isPlaying && pattern) {
-        const editor = useEditorStore.getState();
-        if (editor.recQuantEnabled && editor.recQuantRes > 0) {
-          const res = editor.recQuantRes;
-          const remainder = targetRow % res;
-          targetRow = remainder >= res / 2
-            ? Math.min(targetRow + (res - remainder), pattern.length - 1)
-            : targetRow - remainder;
-        }
-      }
+      const editor = useEditorStore.getState();
+      const plan = planNoteEntry({
+        recordMode: true, // enterNote is only called in edit/record mode
+        isPlaying,
+        cursorRow: cursorRef.current.rowIndex,
+        playbackRow,
+        editStep,
+        numRows: pattern?.length ?? 0,
+        recQuantEnabled: editor.recQuantEnabled,
+        recQuantRes: editor.recQuantRes,
+      });
+      if (!plan.write) return;
+      const targetRow = plan.row;
 
       const nci = cursorRef.current.noteColumnIndex ?? 0;
 
@@ -270,9 +276,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
         }
       }
 
-      if (editStep > 0 && !isPlaying) {
-        moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-      }
+      if (plan.nextCursorRow !== null) moveCursorToRow(plan.nextCursorRow);
     },
     [setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel, currentInstrumentId, instruments, setColumnVisibility, cursorRef]
   );
@@ -297,7 +301,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
           const nci = cursorRef.current.noteColumnIndex ?? 0;
           const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
-          if (recordMode) {
+          if (recordMode && windowMayWrite()) {
             setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_OFF });
             if (editStep > 0 && !isPlaying) {
               moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
@@ -312,7 +316,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
           const nci = cursorRef.current.noteColumnIndex ?? 0;
           const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
-          if (recordMode) {
+          if (recordMode && windowMayWrite()) {
             setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_CUT });
             if (editStep > 0 && !isPlaying) {
               moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
@@ -327,7 +331,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
           const nci = cursorRef.current.noteColumnIndex ?? 0;
           const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
-          if (recordMode) {
+          if (recordMode && windowMayWrite()) {
             setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_FADE });
             if (editStep > 0 && !isPlaying) {
               moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
@@ -442,7 +446,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
 
         previewNote(note, octave, keyLower, e.shiftKey);
 
-        if (recordMode) {
+        if (recordMode && windowMayWrite()) {
           const heldNote = heldNotesRef.current.get(keyLower);
           const targetChannel = heldNote?.channelIndex;
           enterNote(note, octave, targetChannel);
@@ -470,7 +474,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
       // FT2: Key repeat - only repeat note entry in edit mode
       if (NOTE_MAP[keyLower] && e.repeat && cursorRef.current.columnType === 'note') {
         e.preventDefault();
-        if (recordMode && !isPlaying) {
+        if (recordMode && !isPlaying && windowMayWrite()) {
           const { note, octaveOffset } = NOTE_MAP[keyLower];
           const octave = currentOctave + octaveOffset;
           const heldNote = heldNotesRef.current.get(keyLower);

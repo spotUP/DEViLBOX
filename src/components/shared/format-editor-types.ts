@@ -32,6 +32,19 @@ export interface ColumnDef {
   hexDigits?: number;
   /** Function to format a value for display */
   formatter: (value: number) => string;
+  /** For type='note': the value that means C-0 (default 0). Typing a note writes `noteBase + semitonesAboveC0`. */
+  noteBase?: number;
+  /** For type='note': the lowest note the format holds, in semitones above C-0 (default 0; JamCracker starts at C-1). */
+  noteMin?: number;
+  /** For type='note': how many notes the format holds from noteMin upward (default 96). */
+  noteCount?: number;
+}
+
+/** The cell value a typed note (semitones above C-0) becomes in a note column, or null when out of range. */
+export function typedNoteValue(col: ColumnDef, semitonesAboveC0: number): number | null {
+  const min = col.noteMin ?? 0;
+  if (semitonesAboveC0 < min || semitonesAboveC0 >= min + (col.noteCount ?? 96)) return null;
+  return (col.noteBase ?? 0) + semitonesAboveC0;
 }
 
 /**

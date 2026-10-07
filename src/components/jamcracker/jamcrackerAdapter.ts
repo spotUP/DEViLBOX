@@ -55,6 +55,9 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     formatter: noteStr,
+    noteBase: -11, // value 1 = C-1
+    noteMin: 12,
+    noteCount: 36,
   },
   {
     key: 'instrument',

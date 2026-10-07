@@ -297,7 +297,8 @@ interface TrackerStore {
 
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
-  setCell: (channelIndex: number, rowIndex: number, cell: Partial<TrackerCell>) => void;
+  /** `patternIndex` writes a pattern other than the current one (an edit that echoes into every position sharing a track). */
+  setCell: (channelIndex: number, rowIndex: number, cell: Partial<TrackerCell>, patternIndex?: number) => void;
   clearCell: (channelIndex: number, rowIndex: number) => void;
   clearChannel: (channelIndex: number) => void;
   clearPattern: () => void;
@@ -542,11 +543,11 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    setCell: (channelIndex, rowIndex, cellUpdate) => {
-      const patternIndex = get().currentPatternIndex;
+    setCell: (channelIndex, rowIndex, cellUpdate, targetPattern) => {
+      const patternIndex = targetPattern ?? get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        setCellInPattern(state.patterns[state.currentPatternIndex], channelIndex, rowIndex, cellUpdate);
+        setCellInPattern(state.patterns[patternIndex], channelIndex, rowIndex, cellUpdate);
       });
       useHistoryStore.getState().pushAction('EDIT_CELL', 'Edit cell', patternIndex, beforePattern, get().patterns[patternIndex]);
       // Apply the edit to a Furnace song: its native data, and the sequencer while it runs

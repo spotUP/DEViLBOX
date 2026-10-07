@@ -41,6 +41,7 @@ export const CC_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     formatter: ccNoteToString,
+    noteBase: 3,
   },
   {
     key: 'instrument',
