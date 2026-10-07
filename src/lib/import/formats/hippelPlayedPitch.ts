@@ -6,13 +6,14 @@
  * the decoder (libtfmxaudiodecoder in the TFMX wasm, the engine that plays
  * .hip and .hip7) runs sound sequences. Its walk export (tfmx_module_walk_*)
  * logs, per note start, the pitch index it looked up and the sequence
- * transpose behind it. This runs that on the main thread, once per import,
+ * transpose behind it. This runs that in the walk worker, once per import,
  * and hands the grid the transposes. No sequence is emulated in TypeScript.
  */
 import {
   hippelPlayedFromRecords, hippelSubsong, passTicks, readHippelTfmx,
   type HippelPlayed, type HippelWalkRecord,
 } from './HippelTfmxWalk';
+import { songWalks, WalkCancelledError } from './songWalkClient';
 
 /** Runs the decoder's walk on subsong `subsong` for `ticks` ticks and returns its records. */
 export type HippelDecoderWalker = (bytes: Uint8Array, subsong: number, ticks: number) => Promise<HippelWalkRecord[]>;
@@ -31,8 +32,8 @@ interface TfmxWasm {
 
 let wasmReady: Promise<{ w: TfmxWasm; ctx: number }> | null = null;
 
-/** The TFMX wasm on the main thread (a second instance beside the playing worklet's), loaded once. */
-function loadBrowserWasm(): Promise<{ w: TfmxWasm; ctx: number }> {
+/** The TFMX wasm (a second instance beside the playing worklet's), loaded once per thread. */
+function loadTfmxWasm(): Promise<{ w: TfmxWasm; ctx: number }> {
   wasmReady ??= (async () => {
     const base = `${import.meta.env.BASE_URL ?? '/'}tfmx/`;
     const [js, wasm] = await Promise.all([
@@ -47,9 +48,14 @@ function loadBrowserWasm(): Promise<{ w: TfmxWasm; ctx: number }> {
   return wasmReady;
 }
 
-/** The decoder's walk records, from the TFMX wasm in the browser. */
-export const browserHippelWalker: HippelDecoderWalker = async (bytes, subsong, ticks) => {
-  const { w, ctx } = await loadBrowserWasm();
+/**
+ * The decoder's walk records, run on THIS thread. The import path never calls
+ * it on the main thread (songWalks sends the walk to the walk worker,
+ * src/workers/songWalk.worker.ts, which calls this); where there is no Worker
+ * (node) the client runs it inline.
+ */
+export const runHippelWalk: HippelDecoderWalker = async (bytes, subsong, ticks) => {
+  const { w, ctx } = await loadTfmxWasm();
   const p = w._malloc(bytes.length);
   w.HEAPU8.set(bytes, p);
   const r = w._tfmx_load_module(ctx, p, bytes.length, 0, 0, subsong);
@@ -69,12 +75,17 @@ export const browserHippelWalker: HippelDecoderWalker = async (bytes, subsong, t
  * for `hippelGrid`. Null when the decoder cannot run the song (the grid then
  * shows the pattern notes, as before).
  */
-export async function hippelPlayedPitch(bytes: Uint8Array, walker: HippelDecoderWalker = browserHippelWalker): Promise<HippelPlayed | null> {
+export async function hippelPlayedPitch(bytes: Uint8Array, walker?: HippelDecoderWalker): Promise<HippelPlayed | null> {
   const m = readHippelTfmx(bytes);
   if (!m) return null;
   try {
-    return hippelPlayedFromRecords(await walker(bytes, 0, passTicks(hippelSubsong(m, 0))));
+    const ticks = passTicks(hippelSubsong(m, 0));
+    // The import path walks in the walk worker, which also reduces the records to the transposes
+    // (a Hippel 7V walk is 243 thousand records: shipping them back is as dear as the walk). A
+    // walker passed in (the tests' own decoder host) returns the records and is reduced here.
+    return walker ? hippelPlayedFromRecords(await walker(bytes, 0, ticks)) : await songWalks.hippelPlayed(bytes, 0, ticks);
   } catch (err) {
+    if (err instanceof WalkCancelledError) throw err;
     console.warn('[hippelPlayedPitch] the decoder could not walk the song; the grid shows pattern notes:', err);
     return null;
   }

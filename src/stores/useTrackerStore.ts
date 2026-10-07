@@ -1892,47 +1892,36 @@ export const useTrackerStore = create<TrackerStore>()(
 
     // Import/Export
     loadPatterns: (patterns) => {
-      set((state) => {
-        if (patterns.length > 0) {
-          // Debug logging for pattern loading
-          console.log('[TrackerStore] loadPatterns called with', patterns.length, 'patterns');
-          let totalNotes = 0;
-          patterns.forEach((p, pIdx) => {
-            p.channels.forEach((c) => {
-              c.rows.forEach((r) => {
-                if (r.note > 0) totalNotes++;
-              });
-            });
-            if (pIdx < 3) {
-              console.log(`[TrackerStore] Pattern ${pIdx}: ${p.channels.length} channels, ${p.channels[0]?.rows?.length || 0} rows`);
-            }
-          });
-          console.log('[TrackerStore] Total notes in loaded patterns:', totalNotes);
-          
-          // Ensure all channels have required properties (color) and length is valid
-          const normalizedPatterns = patterns.map((pattern) => ({
-            ...pattern,
-            length: Math.max(1, pattern.length),
-            channels: pattern.channels.map((channel) => ({
-              ...channel,
-              color: channel.color ?? null,
-            })),
-          }));
-          state.patterns = normalizedPatterns;
-          state.currentPatternIndex = 0;
-          // Loading a new song is a full replacement — playback must begin at the
-          // song's start, not the previous song's leftover cursor. Resetting only
-          // currentPatternIndex left currentPositionIndex (the song-order position)
-          // stale, so Play Song started mid-song (e.g. "song pos 8" after loading a
-          // fresh module). Reset the song-order position here too.
-          state.currentPositionIndex = 0;
-          useCursorStore.setState({
-            cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
-            selection: null,
-          });
-          state.clipboard = null;
-        }
-      });
+      if (patterns.length > 0) {
+        // Ensure all channels have required properties (color) and length is valid
+        const normalizedPatterns = patterns.map((pattern) => ({
+          ...pattern,
+          length: Math.max(1, pattern.length),
+          channels: pattern.channels.map((channel) => ({
+            ...channel,
+            color: channel.color ?? null,
+          })),
+        }));
+        // A whole-song replacement is a plain object update, not an immer
+        // recipe: a recipe makes immer walk and deep-freeze every cell of the
+        // new patterns (343 patterns of Music Assembler: 25-30 ms of the
+        // main thread per load, more in the browser) to look for drafts that
+        // cannot be there. A later edit drafts these objects like any others.
+        // Loading a new song is a full replacement - playback must begin at
+        // the song's start, so the cursor row and the song-order position
+        // reset with it (a stale currentPositionIndex made Play Song start
+        // mid-song).
+        set({
+          patterns: normalizedPatterns,
+          currentPatternIndex: 0,
+          currentPositionIndex: 0,
+          clipboard: null,
+        });
+        useCursorStore.setState({
+          cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
+          selection: null,
+        });
+      }
       // Reset mixer mute/solo AFTER set() completes to avoid nested setState
       if (patterns.length > 0) {
         // The play-start seek reads the transport row; clear it so a new song

@@ -48,6 +48,7 @@ import { useSongLoadStore, setSongLoadPhase, throwIfSongLoadCancelled, type Open
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import { songWalks } from '@/lib/import/formats/songWalkClient';
 
 export type { OpenPhase };
 
@@ -361,6 +362,8 @@ export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOpt
   const cancel = (): void => {
     controller.abort();
     useSongLoadStore.setState({ cancelled: true });
+    // The import-time walks (Hippel, Music Assembler, Future Player) run in a worker; end it.
+    songWalks.cancel();
     // A UADE scan in flight does not poll the flag; stop it where it runs.
     void import('@engine/uade/UADEEngine')
       .then(({ UADEEngine }) => { if (UADEEngine.hasInstance()) UADEEngine.getInstance().cancelLoad(); })
