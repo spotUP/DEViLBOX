@@ -26,6 +26,7 @@
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import '@lib/formats/EditableFormatRegistry.builtins';
 import { getLayoutExporters, type LayoutExporterEntry } from '@lib/formats/EditableFormatRegistry';
+import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
 
 export type { LayoutExporterEntry };
 
@@ -231,6 +232,16 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
   const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
   let result: RawExportResult | null = null;
 
+  // The octave below C-0 (noteValue.ts) is held only by the writers that name notes by the pitch their player
+  // plays: Hippel (TFMX/7V and CoSo, patched in place; an unplayable note comes back in `refused`) and Future
+  // Player. Every other native writer would drop such a note or write it an octave off: refuse the song instead.
+  const holdsLowOctave = (!!song.hippelFileData && (layoutFormatId === 'hippelCoSo' || layoutFormatId === 'tfmx7v'))
+    || layoutFormatId === 'futurePlayer';
+  if (!holdsLowOctave) {
+    const refusal = lowOctaveExportRefusal(song.patterns ?? [], layoutFormatId || format || 'This format');
+    if (refusal) throw new Error(refusal);
+  }
+
   if (format === 'JamCracker') {
     const { exportAsJamCracker } = await import('./JamCrackerExporter');
     result = await exportAsJamCracker(song);
@@ -308,7 +319,8 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // the TFMX decoder plays. Byte-exact where nothing was edited, and it keeps
     // the samples the from-scratch CoSo serializer cannot rebuild.
     const { rebuildHippelModule } = await import('@engine/hippel/rebuildHippelModule');
-    const rebuilt = rebuildHippelModule(song.hippelFileData, song.patterns, song.instruments.length);
+    // A song with no grid (the scope view, gridUnmatchedReason) has no edits: its placeholder pattern is not one.
+    const rebuilt = rebuildHippelModule(song.hippelFileData, song.gridUnmatchedReason ? [] : song.patterns, song.instruments.length);
     if (rebuilt) {
       const warnings = rebuilt.refused.length > 0
         ? [`${rebuilt.refused.length} edit(s) have no room in the module and were not saved (pattern:channel:row ${rebuilt.refused.slice(0, 8).join(', ')})`]
