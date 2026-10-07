@@ -329,7 +329,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold">Furnace</div>
                     </button>
                   )}
-                  {(ex.editorMode === 'jamcracker' || ex.editorMode === 'classic' || ex.editorMode === 'hively' || ex.editorMode === 'klystrack' || ex.editorMode === 'musicline') && (
+                  {ex.nativeAvailable && (
                     <button
                       onClick={() => ex.setExportMode('native')}
                       className={`
