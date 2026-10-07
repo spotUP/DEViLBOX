@@ -24,7 +24,7 @@ import { isSupportedModule, type ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import type { SunVoxSongMeta, SunVoxPatternData } from '@/engine/sunvox/SunVoxEngine';
-import { checkModlandFile } from '@/lib/modland/ModlandDetector';
+import { checkModlandFile, isKnownSource } from '@/lib/modland/ModlandDetector';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { useModlandContributionModal } from '@/stores/useModlandContributionModal';
 import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
@@ -202,7 +202,7 @@ async function checkModlandFileWithPatternHash(file: File, patternHash: string |
     const result = await checkModlandFile(file, null); // We don't have libopenmpt meta at this point
     
     // If not found, show contribution modal
-    if (!result.found && result.hash && isSongFormat(file.name.toLowerCase())) {
+    if (!result.found && result.hash && isSongFormat(file.name.toLowerCase()) && !isKnownSource(file.name)) {
       const { showModal } = useModlandContributionModal.getState();
       showModal(file.name, result.hash);
       console.log('🆕 Unknown module detected (hash: ' + result.hash + ', pattern hash: ' + (patternHash || 'unavailable') + ') - showing contribution modal');

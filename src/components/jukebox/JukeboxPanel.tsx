@@ -42,6 +42,7 @@ import {
   type JukeboxVerdict, type JukeboxFault,
 } from '@/lib/jukebox/faultReports';
 import { searchModland, downloadModlandFile, downloadUADECompanions } from '@/lib/modlandApi';
+import { markKnownSource } from '@/lib/modland/ModlandDetector';
 import { notify } from '@stores/useNotificationStore';
 
 interface IndexEntry {
@@ -220,6 +221,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     name: string,
     companionFiles?: Record<string, string>,
   ) => {
+    markKnownSource(name);   // the library's own songs and Modland hits are never contribution candidates
     let binary = '';
     const view = new Uint8Array(bytes);
     // Chunked: String.fromCharCode(...view) blows the argument limit on a
