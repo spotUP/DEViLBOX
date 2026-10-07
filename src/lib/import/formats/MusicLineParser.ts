@@ -1182,10 +1182,10 @@ function buildInstruments(
         wavePcm = new Uint8Array(loopLen);
       }
 
-      const displayType = ML_WAVE_DISPLAY_NAMES[inst.smplType] ?? `ML Wave ${inst.smplType}`;
+      const displayType = ML_WAVE_DISPLAY_NAMES[inst.smplType] ?? '';
       const base = createSamplerInstrument(
         i + 1,
-        inst.title || displayType,
+        inst.title,
         wavePcm,
         inst.volume > 0 ? inst.volume : 64,
         PAL_C3_RATE,
@@ -1211,7 +1211,7 @@ function buildInstruments(
     if (!smpl || smpl.pcm.length === 0) {
       // Instrument has no sample — create a silent placeholder
       const silentPcm = new Uint8Array(2);
-      const placeholder = createSamplerInstrument(i + 1, inst.title || `Instrument ${i + 1}`, silentPcm, inst.volume || 64, PAL_C3_RATE, 0, 0);
+      const placeholder = createSamplerInstrument(i + 1, inst.title || '', silentPcm, inst.volume || 64, PAL_C3_RATE, 0, 0);
       instruments.push({ ...placeholder, metadata: { ...placeholder.metadata!, isMusicLine: true, mlInstIdx: i }, uadeChipRam: { moduleBase: 0, moduleSize: moduleSize, instrBase: inst.instrBase ?? 0, instrSize: INST_SIZE } as UADEChipRamInfo });
       continue;
     }
@@ -1223,7 +1223,7 @@ function buildInstruments(
 
     const base2 = createSamplerInstrument(
       i + 1,
-      inst.title || smpl.title || `Instrument ${i + 1}`,
+      inst.title || smpl.title || '',
       smpl.pcm,
       inst.volume > 0 ? inst.volume : 64,
       PAL_C3_RATE,

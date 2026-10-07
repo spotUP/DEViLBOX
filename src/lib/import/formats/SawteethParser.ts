@@ -432,7 +432,7 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
   const sawteethNames: string[] = [];
   for (let i = 1; i < instrumentCount; i++) {
     const inst = instruments[i];
-    sawteethNames.push(inst.name || `Instrument ${i}`);
+    sawteethNames.push(inst.name || '');
     sawteethInstruments.push({
       filterMode: inst.filterMode,
       clipMode: inst.clipMode,
@@ -465,7 +465,7 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
     const inst = instruments[i];
     instrConfigs.push({
       id: i,
-      name: inst.name || `Instrument ${i}`,
+      name: inst.name || '',
       type: 'synth' as const,
       synthType: 'SawteethSynth' as const,
       sawteeth: sawteethConfig,

@@ -1085,7 +1085,7 @@ function parseXTrackerFileInternal(bytes: Uint8Array, filename: string): Tracker
       // Filler + CRC: v2+ = 6 bytes, v1 = 2 bytes
       mpos += fileVersion > 1 ? 6 : 2;
 
-      sampleInfos.push({ name: name || `Sample ${s + 1}`, length, loopStart, loopEnd, c3freq, volume, flags });
+      sampleInfos.push({ name: name || '', length, loopStart, loopEnd, c3freq, volume, flags });
     }
   }
 
@@ -1171,7 +1171,7 @@ function parseXTrackerFileInternal(bytes: Uint8Array, filename: string): Tracker
 
       instruments.push({
         id,
-        name:      info.name.replace(/\0/g, '').trim() || `Sample ${id}`,
+        name:      info.name.replace(/\0/g, '').trim() || '',
         type:      'sample'  as const,
         synthType: 'Sampler' as const,
         effects:   [],

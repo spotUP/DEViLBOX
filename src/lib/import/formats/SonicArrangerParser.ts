@@ -421,7 +421,7 @@ export async function parseSonicArrangerFile(
     }
 
     // Name at +122, 30 bytes
-    const name = readString(v, base + 122, 30) || `Instrument ${i + 1}`;
+    const name = readString(v, base + 122, 30) || '';
 
     saInstruments.push({
       isSynth,

@@ -417,7 +417,7 @@ export async function parsePumaTrackerFile(
   for (let ins = 0; ins < numInstruments; ins++) {
     const wfIdx = waveformIndices[ins];
     const id    = ins + 1;
-    const name  = `Instrument ${id}`;
+    const name  = '';
 
     // Determine PCM data and loop points from waveform index
     let pcm: Uint8Array | null = null;

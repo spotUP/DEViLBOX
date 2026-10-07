@@ -209,12 +209,12 @@ export function parsePaulRobothamFile(buffer: ArrayBuffer, filename: string): Tr
       if (lengthBytes > 0 && pcmOff >= 0 && pcmOff + lengthBytes <= buf.length) {
         const pcm = buf.slice(pcmOff, pcmOff + lengthBytes);
         instruments.push(createSamplerInstrument(
-          i + 1, `PR Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+          i + 1, '', pcm, 64, 8287, 0, 0,
         ));
         samplesExtracted = true;
       } else {
         instruments.push({
-          id: i + 1, name: `PR Sample ${i + 1}`,
+          id: i + 1, name: '',
           type: 'synth' as const, synthType: 'Synth' as const,
           effects: [], volume: 0, pan: 0,
         } as InstrumentConfig);
@@ -224,7 +224,7 @@ export function parsePaulRobothamFile(buffer: ArrayBuffer, filename: string): Tr
 
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1',
+      id: 1, name: '',
       type: 'synth' as const, synthType: 'Synth' as const,
       effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);

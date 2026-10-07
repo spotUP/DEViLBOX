@@ -299,8 +299,8 @@ export async function parseWithOpenMPT(
 
     for (let i = 0; i < count; i++) {
       const name = hasInstruments
-        ? (instrumentNames[i] || `Instrument ${i + 1}`)
-        : (sampleNames[i] || `Sample ${i + 1}`);
+        ? (instrumentNames[i] || '')
+        : (sampleNames[i] || '');
 
       // Extract sample PCM data (1-indexed in OpenMPT)
       const sampleIdx = i + 1;

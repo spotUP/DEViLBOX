@@ -522,7 +522,7 @@ function buildHippelTfmxSong(buffer: ArrayBuffer, filename: string, songOff: num
 
     instruments.push({
       id: i + 1,
-      name: `Instrument ${i + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'TFMXSynth' as const,
       tfmx: tfmxConfig,

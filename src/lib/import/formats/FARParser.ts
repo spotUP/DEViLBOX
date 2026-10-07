@@ -567,7 +567,7 @@ export async function parseFARFile(
     //   +47 loop  (uint8): bit 3 = loop active
 
     const smpOff     = cursor;
-    const smpName    = readString(v, smpOff, 32) || `Sample ${smp + 1}`;
+    const smpName    = readString(v, smpOff, 32) || '';
     const smpLength  = u32(v, smpOff + 32);
     const smpVol     = u8(v, smpOff + 37);   // 0–15
     let   loopStart  = u32(v, smpOff + 38);

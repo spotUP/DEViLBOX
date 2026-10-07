@@ -173,14 +173,14 @@ export function parseKrisHatlelidFile(buffer: ArrayBuffer, filename: string): Tr
     const { formOff, formSize } = forms[i];
     const sample = extractIffSample(buf, formOff, formSize);
     if (sample) {
-      const sampleName = sample.name || `KH Sample ${i + 1}`;
+      const sampleName = sample.name || '';
       instruments.push(createSamplerInstrument(
         i + 1, sampleName, sample.pcm, 64, 8287,
         sample.loopStart, sample.loopEnd,
       ));
     } else {
       instruments.push({
-        id: i + 1, name: `KH Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
     }
@@ -189,7 +189,7 @@ export function parseKrisHatlelidFile(buffer: ArrayBuffer, filename: string): Tr
   // Fallback placeholder if no samples found
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
   }

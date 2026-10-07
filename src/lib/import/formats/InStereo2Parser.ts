@@ -459,11 +459,11 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
         }
       }
       instrConfigs.push({
-        ...createSamplerInstrument(id, samp.name || `Sample ${i}`, rawPcm, samp.volume, PAL_C3_RATE, loopStart, loopEnd),
+        ...createSamplerInstrument(id, samp.name || '', rawPcm, samp.volume, PAL_C3_RATE, loopStart, loopEnd),
         uadeChipRam: sampChipRam,
       });
     } else {
-      instrConfigs.push({ ...makeSynthPlaceholder(id, samp.name || `Sample ${i}`), uadeChipRam: sampChipRam });
+      instrConfigs.push({ ...makeSynthPlaceholder(id, samp.name || ''), uadeChipRam: sampChipRam });
     }
   }
 
@@ -513,11 +513,11 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
       egTable: instr.egTable,
       waveform1: Array.from(instr.waveform1),
       waveform2: Array.from(instr.waveform2),
-      name: instr.name || `Synth ${i}`,
+      name: instr.name || '',
     };
 
     instrConfigs.push({
-      ...createSamplerInstrument(id, instr.name || `Synth ${i}`, pcmUint8, instr.volume, synthRate, 0, playLen),
+      ...createSamplerInstrument(id, instr.name || '', pcmUint8, instr.volume, synthRate, 0, playLen),
       type: 'synth' as const,
       synthType: 'InStereo2Synth' as const,
       inStereo2: is20Config,

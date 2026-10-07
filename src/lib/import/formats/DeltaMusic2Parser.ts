@@ -397,7 +397,7 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       const loopStart = hasLoop ? inst.repeatStart : 0;
       const loopEnd   = hasLoop ? inst.repeatStart + inst.repeatLength : 0;
 
-      builtInstrument = createSamplerInstrument(id, `Sample ${i}`, pcmUint8, 64, PCM_BASE_RATE, loopStart, loopEnd);
+      builtInstrument = createSamplerInstrument(id, '', pcmUint8, 64, PCM_BASE_RATE, loopStart, loopEnd);
     } else if (!inst.isSample && inst.sampleLength > 0 && waveforms.length > 0) {
       // ── Synth (waveform) instrument ───────────────────────────────────
       // The first entry in inst.table gives the initial waveform index.
@@ -423,7 +423,7 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       //   = (PAL_CLOCK/2/856) × 2^((N−37)/12)
       //   = PAL_CLOCK / (2 × periods[N])   [because periods[N] = 856 / 2^((N−37)/12)]
       builtInstrument = {
-        ...createSamplerInstrument(id, `Synth ${i}`, pcmUint8, 64, SYNTH_BASE_RATE, 0, playLen),
+        ...createSamplerInstrument(id, '', pcmUint8, 64, SYNTH_BASE_RATE, 0, playLen),
         type: 'synth' as const,
         synthType: 'DeltaMusic2Synth' as const,
       } as InstrumentConfig;
@@ -431,7 +431,7 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       // Placeholder (no sample data / no waveforms)
       builtInstrument = {
         id,
-        name: `Instrument ${i}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'DeltaMusic2Synth' as const,
         effects: [],

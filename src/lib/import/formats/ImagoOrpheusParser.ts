@@ -446,7 +446,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   for (let ins = 0; ins < insNum; ins++) {
     if (cursor + IMF_INSTRUMENT_SIZE > bytes.length) {
-      instruments.push(silentInstrument(ins + 1, `Instrument ${ins + 1}`));
+      instruments.push(silentInstrument(ins + 1, ''));
       continue;
     }
 
@@ -460,7 +460,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     //   +378  smpNum (uint16LE)
     //   +380  ii10[4]
     const insBase  = cursor;
-    const insName  = readString(bytes, insBase, 32) || `Instrument ${ins + 1}`;
+    const insName  = readString(bytes, insBase, 32) || '';
     const smpNum   = u16le(bytes, insBase + 378);
     cursor += IMF_INSTRUMENT_SIZE;
 

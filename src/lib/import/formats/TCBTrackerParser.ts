@@ -287,7 +287,7 @@ export async function parseTCBTrackerFile(
       loopEnd   = length;
     }
 
-    const name = instrNames[i] || `Sample ${i + 1}`;
+    const name = instrNames[i] || '';
     const instr = createSamplerInstrument(i + 1, name, pcm, volume, AMIGA_SAMPLE_RATE, loopStart, loopEnd);
     const chipRam: UADEChipRamInfo = {
       moduleBase: 0,

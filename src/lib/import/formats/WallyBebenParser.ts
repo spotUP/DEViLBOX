@@ -212,7 +212,7 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
       const pcmOff = toFileOff(origin, u32BE(buf, samplesOff + i * 4), buf.length);
       if (pcmOff < 0) {
         instruments.push({
-          id: i + 1, name: `WB Sample ${i + 1}`,
+          id: i + 1, name: '',
           type: 'synth' as const, synthType: 'Synth' as const,
           effects: [], volume: 0, pan: 0,
         } as InstrumentConfig);
@@ -229,7 +229,7 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
 
       if (lenBytes <= 0 || pcmOff + lenBytes > buf.length) {
         instruments.push({
-          id: i + 1, name: `WB Sample ${i + 1}`,
+          id: i + 1, name: '',
           type: 'synth' as const, synthType: 'Synth' as const,
           effects: [], volume: 0, pan: 0,
         } as InstrumentConfig);
@@ -240,14 +240,14 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
       for (let k = 0; k < lenBytes; k++) pcm[k] = buf[pcmOff + k];
 
       instruments.push(createSamplerInstrument(
-        i + 1, `WB Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+        i + 1, '', pcm, 64, 8287, 0, 0,
       ));
     }
   }
 
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1',
+      id: 1, name: '',
       type: 'synth' as const, synthType: 'Synth' as const,
       effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);

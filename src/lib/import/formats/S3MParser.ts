@@ -149,7 +149,7 @@ function extractPCM(
 function makeEmptyInstrumentConfig(id: number, name: string): InstrumentConfig {
   return {
     id,
-    name: name || `Sample ${id}`,
+    name: name || '',
     type:      'sample' as const,
     synthType: 'Sampler' as const,
     effects:   [],
@@ -394,14 +394,14 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
     const smpOff = sampleParapointers[si] * 16;
 
     if (smpOff === 0 || smpOff + 80 > buffer.byteLength) {
-      instruments.push(makeEmptyInstrumentConfig(id, `Sample ${id}`));
+      instruments.push(makeEmptyInstrumentConfig(id, ''));
       continue;
     }
 
     const sampleType = u8(v, smpOff);
     if (sampleType !== 1) {
       // AdLib or empty — skip
-      const name = readString(v, smpOff + 48, 28).replace(/\0/g, '').trim() || `Sample ${id}`;
+      const name = readString(v, smpOff + 48, 28).replace(/\0/g, '').trim() || '';
       instruments.push(makeEmptyInstrumentConfig(id, name));
       continue;
     }
@@ -421,7 +421,7 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
     const flags         = u8(v, smpOff + 31);
     const c5speed       = u32le(v, smpOff + 32);
     const sampleName    = readString(v, smpOff + 48, 28);
-    const name          = sampleName.replace(/\0/g, '').trim() || `Sample ${id}`;
+    const name          = sampleName.replace(/\0/g, '').trim() || '';
 
     // Skip compressed (DP30ADPCM) and empty samples
     if (pack === 1 || length === 0 || dataPointer === 0 || dataPointer >= buffer.byteLength) {

@@ -100,7 +100,7 @@ function mod2xmFineTune(nibble: number): number {
 function blankInstrument(id: number, name: string): InstrumentConfig {
   return {
     id,
-    name: name || `Sample ${id}`,
+    name: name || '',
     type:      'sample'  as const,
     synthType: 'Sampler' as const,
     effects:   [],
@@ -324,7 +324,7 @@ function parseAsylumAMF(v: DataView, raw: Uint8Array, filename: string): Tracker
   for (let s = 0; s < numSamples; s++) {
     const sh  = sampleHeaders[s];
     const id  = s + 1;
-    const name = sh?.name || `Sample ${id}`;
+    const name = sh?.name || '';
 
     if (!sh || sh.length === 0 || smpDataOff + sh.length > v.byteLength) {
       instruments.push(blankInstrument(id, name));
@@ -943,7 +943,7 @@ function parseDSMIAMF(v: DataView, raw: Uint8Array, filename: string): TrackerSo
       if (!sh) continue;
 
       const id   = target + 1;
-      const name = sh.name || `Sample ${id}`;
+      const name = sh.name || '';
 
       if (sh.length === 0) {
         instruments.push(blankInstrument(id, name));

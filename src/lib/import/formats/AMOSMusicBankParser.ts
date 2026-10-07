@@ -300,7 +300,7 @@ export async function parseAMOSMusicBankFile(
     const sampleLength = len2 > 4 ? len2 : len1;
 
     abkInstruments.push({
-      name: name || `Sample ${i + 1}`,
+      name: name || '',
       sampleOffset,
       repeatOffset,
       sampleLength,

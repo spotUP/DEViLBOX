@@ -365,7 +365,7 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
     if (!samp) {
       instrConfigs.push({
         id: instrId,
-        name: `Sample ${s}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'SoundControlWasmSynth' as const,
         effects: [],
@@ -379,12 +379,12 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
         const loopStart = hasLoop ? samp.loopStart * 2 : 0;
         const loopEnd   = hasLoop ? samp.loopEnd * 2 : 0;
         instrConfigs.push(
-          createSamplerInstrument(instrId, samp.name || `Sample ${s}`, samp.sampleData, 64, c3Rate, loopStart, loopEnd)
+          createSamplerInstrument(instrId, samp.name || '', samp.sampleData, 64, c3Rate, loopStart, loopEnd)
         );
       } else {
         instrConfigs.push({
           id: instrId,
-          name: samp.name || `Sample ${s}`,
+          name: samp.name || '',
           type: 'synth' as const,
           synthType: 'SoundControlWasmSynth' as const,
           effects: [],

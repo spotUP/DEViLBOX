@@ -232,7 +232,7 @@ export function parsePaulShieldsFile(buffer: ArrayBuffer, filename: string): Tra
     const recOff = recordStart + i * recordSize;
     if (recOff + recordSize > buf.length) {
       instruments.push({
-        id: i + 1, name: `Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
       continue;
@@ -266,7 +266,7 @@ export function parsePaulShieldsFile(buffer: ArrayBuffer, filename: string): Tra
 
     if (lenBytes === 0 || sampleDataStart === 0) {
       instruments.push({
-        id: i + 1, name: name || `Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: name || '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
       continue;
@@ -284,7 +284,7 @@ export function parsePaulShieldsFile(buffer: ArrayBuffer, filename: string): Tra
 
       instruments.push(createSamplerInstrument(
         i + 1,
-        name || `Sample ${i + 1}`,
+        name || '',
         pcm,
         64,     // EPS_Volume = 64
         8287,   // Amiga PAL base rate
@@ -293,7 +293,7 @@ export function parsePaulShieldsFile(buffer: ArrayBuffer, filename: string): Tra
       ));
     } else {
       instruments.push({
-        id: i + 1, name: name || `Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: name || '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
     }
@@ -304,7 +304,7 @@ export function parsePaulShieldsFile(buffer: ArrayBuffer, filename: string): Tra
   if (instruments.length === 0) {
     for (let i = 0; i < 8; i++) {
       instruments.push({
-        id: i + 1, name: `Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
     }

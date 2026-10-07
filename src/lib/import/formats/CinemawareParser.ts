@@ -134,7 +134,7 @@ export function parseCinemawareFile(buffer: ArrayBuffer, filename: string): Trac
   const instruments: InstrumentConfig[] = Array.from(
     { length: instrumentLength },
     (_, i) => {
-      let name = `Sample ${i + 1}`;
+      let name = '';
       const groupOff = 5 + i * 138;
       const subEntryOff = groupOff + 60;
       if (subEntryOff + 6 <= buf.length) {

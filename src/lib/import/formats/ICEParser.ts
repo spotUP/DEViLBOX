@@ -283,7 +283,7 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
       };
       instruments.push({
         id,
-        name: hdr.name || `Sample ${id}`,
+        name: hdr.name || '',
         type: 'sample' as const,
         synthType: 'Sampler' as const,
         effects: [],
@@ -317,7 +317,7 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
     };
     const iceInst = createSamplerInstrument(
       id,
-      hdr.name || `Sample ${id}`,
+      hdr.name || '',
       rawPcm,
       hdr.volume,
       8287,      // Amiga standard C-3 sample rate

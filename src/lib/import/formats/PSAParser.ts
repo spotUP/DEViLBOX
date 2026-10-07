@@ -110,7 +110,7 @@ export function parsePSAFile(buffer: ArrayBuffer, filename: string): TrackerSong
     (_, i) =>
       ({
         id: i + 1,
-        name: `Sample ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],

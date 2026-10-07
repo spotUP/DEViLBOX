@@ -448,7 +448,7 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
     if (!info || !info.hasSampleData || info.lengthBytes === 0) {
       instruments.push({
         id,
-        name:      `Sample ${id}`,
+        name:      '',
         type:      'sample' as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -463,7 +463,7 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
     if (endOff > bytes.length) {
       instruments.push({
         id,
-        name:      `Sample ${id}`,
+        name:      '',
         type:      'sample' as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -496,7 +496,7 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
       }
       instruments.push(createSamplerInstrument(
         id,
-        `Sample ${id}`,
+        '',
         pcm8,
         info.defaultVolume,
         sampleRate,
@@ -508,7 +508,7 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
       const pcm = bytes.subarray(sampleDataOffset, endOff);
       instruments.push(createSamplerInstrument(
         id,
-        `Sample ${id}`,
+        '',
         pcm,
         info.defaultVolume,
         sampleRate,

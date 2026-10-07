@@ -679,7 +679,7 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
 
       instruments.push({
         id: i + 1,
-        name: `DW Inst ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'DavidWhittakerSynth' as const,
         davidWhittaker: dwConfig,

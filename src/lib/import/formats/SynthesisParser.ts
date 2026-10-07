@@ -362,13 +362,13 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
         }
 
         instrumentConfigs.push(
-          createSamplerInstrument(instrId, sampleNames[sampleIdx] || `Sample ${sampleIdx}`, pcm, vol, sampleRate, loopStart, loopEnd)
+          createSamplerInstrument(instrId, sampleNames[sampleIdx] || '', pcm, vol, sampleRate, loopStart, loopEnd)
         );
       } else {
         // Empty / missing sample — create a placeholder synth instrument
         instrumentConfigs.push({
           id: instrId,
-          name: `Instrument ${instrId}`,
+          name: '',
           type: 'synth' as const,
           synthType: 'SynthesisWasmSynth' as const,
           effects: [],
@@ -401,12 +401,12 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
         }
 
         instrumentConfigs.push(
-          createSamplerInstrument(instrId, `Waveform ${waveIdx}`, waveBytes, vol, SYNTH_BASE_RATE, loopStart, loopEnd)
+          createSamplerInstrument(instrId, '', waveBytes, vol, SYNTH_BASE_RATE, loopStart, loopEnd)
         );
       } else {
         instrumentConfigs.push({
           id: instrId,
-          name: `Instrument ${instrId}`,
+          name: '',
           type: 'synth' as const,
           synthType: 'SynthesisWasmSynth' as const,
           effects: [],

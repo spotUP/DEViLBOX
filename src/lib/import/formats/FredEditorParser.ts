@@ -247,7 +247,7 @@ export async function parseFredEditorFile(
   module.instruments.forEach((rec, i) => {
     const sample = readSample(rec);
     const instId = i + 1;
-    const name = `Sample ${instId}`;
+    const name = '';
     const instrFileOffset = structStart + i * FRED_INSTRUMENT_SIZE;
     const chipRam: UADEChipRamInfo = {
       moduleBase,

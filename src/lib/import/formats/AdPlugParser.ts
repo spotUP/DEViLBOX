@@ -206,7 +206,7 @@ function parseRADv1(buf: Uint8Array, filename: string): TrackerSong {
     pos++;
     if (pos + 11 > buf.length) break;
 
-    const inst = makeOPLInstrument(instruments.length + 1, `Inst ${instNum}`);
+    const inst = makeOPLInstrument(instruments.length + 1, '');
     applyOPLRegisters(inst, buf, pos);
     pos += 11;
     instruments.push(inst);
@@ -342,7 +342,7 @@ function parseRADv2(buf: Uint8Array, filename: string): TrackerSong {
     pos++;
     if (pos + 11 > buf.length) break;
 
-    const inst = makeOPLInstrument(instruments.length + 1, `Inst ${instNum}`);
+    const inst = makeOPLInstrument(instruments.length + 1, '');
     applyOPLRegisters(inst, buf, pos);
     pos += 11;
     instruments.push(inst);

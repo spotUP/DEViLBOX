@@ -304,7 +304,7 @@ export async function parsePreTrackerFile(
       nameOff += name.length + 1;
       instruments.push({
         id: i + 1,
-        name: name || `Instrument ${i + 1}`,
+        name: name || '',
         type: 'synth' as const,
         synthType: 'PreTrackerSynth' as const,
         effects: [],
@@ -318,7 +318,7 @@ export async function parsePreTrackerFile(
   if (instruments.length === 0) {
     instruments.push({
       id: 1,
-      name: 'Instrument 1',
+      name: '',
       type: 'synth' as const,
       synthType: 'PreTrackerSynth' as const,
       effects: [],

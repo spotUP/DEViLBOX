@@ -483,7 +483,7 @@ export async function parsePTMFile(
       // No usable sample data — emit silent placeholder
       instruments.push({
         id,
-        name: hdr.name || hdr.filename || `Sample ${id}`,
+        name: hdr.name || hdr.filename || '',
         type:      'sample'  as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -517,7 +517,7 @@ export async function parsePTMFile(
       // Sample data extends past end of file — skip
       instruments.push({
         id,
-        name: hdr.name || hdr.filename || `Sample ${id}`,
+        name: hdr.name || hdr.filename || '',
         type:      'sample'  as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -542,7 +542,7 @@ export async function parsePTMFile(
       ? Math.round(loopEndF)
       : 0;
 
-    const name = hdr.name || hdr.filename || `Sample ${id}`;
+    const name = hdr.name || hdr.filename || '';
 
     instruments.push(
       createSamplerInstrument(id, name, pcmBytes, volume, sampleRate, loopStartBytes, loopEndBytes),

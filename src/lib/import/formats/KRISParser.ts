@@ -306,7 +306,7 @@ export async function parseKRISFile(
       // No sample data — return silent placeholder
       return {
         id,
-        name: samp.name || `Sample ${id}`,
+        name: samp.name || '',
         type: 'sample' as const,
         synthType: 'Sampler' as const,
         effects: [],
@@ -327,7 +327,7 @@ export async function parseKRISFile(
 
     return createSamplerInstrument(
       id,
-      samp.name || `Sample ${id}`,
+      samp.name || '',
       pcm,
       samp.volume,
       SAMPLE_RATE,

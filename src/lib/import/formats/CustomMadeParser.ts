@@ -288,7 +288,7 @@ export async function parseCustomMadeFile(
     for (let i = 0; i < sampleCount; i++) {
       instruments.push({
         id: i + 1,
-        name: `${variantLabel} Sample ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],
