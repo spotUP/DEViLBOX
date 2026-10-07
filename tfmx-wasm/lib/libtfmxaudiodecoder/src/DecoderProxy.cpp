@@ -86,6 +86,18 @@ bool DecoderProxy::getPlayPosition(int& step, udword& offset) {
     return pDecoder ? pDecoder->getPlayPosition(step, offset) : false;
 }
 
+bool DecoderProxy::walkEnable(bool on) {
+    return pDecoder ? pDecoder->walkEnable(on) : false;
+}
+
+int DecoderProxy::walkCount() {
+    return pDecoder ? pDecoder->walkCount() : 0;
+}
+
+const int* DecoderProxy::walkData() {
+    return pDecoder ? pDecoder->walkData() : 0;
+}
+
 void DecoderProxy::previewMacro(int macroIdx, int note, int volume, int channel) {
     if (pDecoder) {
         pDecoder->previewMacro(macroIdx, note, volume, channel);

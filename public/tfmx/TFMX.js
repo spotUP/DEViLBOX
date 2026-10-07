@@ -3768,6 +3768,10 @@ var _tfmx_init,
   _tfmx_module_seek,
   _tfmx_module_scope,
   _tfmx_module_position,
+  _tfmx_module_walk_enable,
+  _tfmx_module_walk_run,
+  _tfmx_module_walk_count,
+  _tfmx_module_walk_data,
   _tfmx_module_mute_voice,
   _tfmx_module_preview_macro,
   _tfmx_key_load,
@@ -3807,6 +3811,10 @@ function assignWasmExports(wasmExports) {
   _tfmx_module_seek = Module['_tfmx_module_seek'] = wasmExports['tfmx_module_seek'];
   _tfmx_module_scope = Module['_tfmx_module_scope'] = wasmExports['tfmx_module_scope'];
   _tfmx_module_position = Module['_tfmx_module_position'] = wasmExports['tfmx_module_position'];
+  _tfmx_module_walk_enable = Module['_tfmx_module_walk_enable'] = wasmExports['tfmx_module_walk_enable'];
+  _tfmx_module_walk_run = Module['_tfmx_module_walk_run'] = wasmExports['tfmx_module_walk_run'];
+  _tfmx_module_walk_count = Module['_tfmx_module_walk_count'] = wasmExports['tfmx_module_walk_count'];
+  _tfmx_module_walk_data = Module['_tfmx_module_walk_data'] = wasmExports['tfmx_module_walk_data'];
   _tfmx_module_mute_voice = Module['_tfmx_module_mute_voice'] = wasmExports['tfmx_module_mute_voice'];
   _tfmx_module_preview_macro = Module['_tfmx_module_preview_macro'] = wasmExports['tfmx_module_preview_macro'];
   _tfmx_key_load = Module['_tfmx_key_load'] = wasmExports['tfmx_key_load'];

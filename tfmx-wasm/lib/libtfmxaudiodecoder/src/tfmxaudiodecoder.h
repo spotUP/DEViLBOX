@@ -98,6 +98,14 @@ extern "C" {
      * decoder cannot report one. */
     int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset);
 
+    /* DEViLBOX extension: the walk (see Decoder.h). Enable clears the record;
+     * count is in records of 10 int32; data points at the first. Hippel
+     * TFMX 4V and 7V only. */
+    int tfmxdec_walk_enable(void* decoder, int on);
+    void tfmxdec_walk_run(void* decoder, int ticks);  /* run the sequencer for `ticks` ticks, no audio */
+    int tfmxdec_walk_count(void* decoder);
+    const int32_t* tfmxdec_walk_data(void* decoder);
+
     /* DEViLBOX extension: capture each voice's output into `buf` (voice v at
      * buf + v*capacity, up to `capacity` samples per buffer_fill call, 16-bit
      * stereo mixing only). NULL disables. */

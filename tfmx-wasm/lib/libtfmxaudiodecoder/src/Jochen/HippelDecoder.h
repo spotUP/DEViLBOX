@@ -38,6 +38,9 @@ class HippelDecoder : public Decoder {
 
     bool init(void *data, udword length, int songNumber) override;
     bool getPlayPosition(int& step, udword& offset) override;
+    bool walkEnable(bool on) override;
+    int walkCount() override { return (int)(walkLog.size() / WALK_INTS); }
+    const int* walkData() override { return walkLog.empty() ? 0 : walkLog.data(); }
     bool detect(void*,udword) override;
 
     ubyte getVoices() override;
@@ -210,6 +213,7 @@ class HippelDecoder : public Decoder {
         bool trigger;
         
         ubyte pattVal1, pattVal2;
+        bool walkFresh;  // DEViLBOX walk: a row was read, record its period once
 
         ubyte currentVolSeq;  // the number, not the offset
         udword volSeq;
@@ -410,6 +414,16 @@ class HippelDecoder : public Decoder {
     bool MCMD_init(int songNumber);
     void MCMD_startSong();
 
+
+    static const int WALK_INTS = 10;
+    bool walkOn = false;
+    int walkTick = 0;
+    std::vector<int> walkLog;
+    // kind 0 (step load): tick, 0, voice, step, pattern, transpose, soundTranspose, command byte, speed, voices
+    // kind 1 (row read):  tick, 1, voice, step, row, note byte, info byte, transpose, soundTranspose, speed
+    // kind 2 (note period, once per row read with a note, from the replayer's own period lookup, before vibrato and
+    //         portamento): tick, 2, voice, step, period-table index, period, pattern note, transpose, sequence transpose, volume sequence playing
+    void walkPush(int kind, int voice, int step, int a, int b, int c, int d, int e, int f);
 
     bool (HippelDecoder::*pInitFunc)(int);
     void (HippelDecoder::*pStartSongFunc)();

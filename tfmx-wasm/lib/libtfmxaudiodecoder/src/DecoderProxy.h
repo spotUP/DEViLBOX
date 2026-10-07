@@ -80,6 +80,9 @@ class DecoderProxy {
 
     /** DEViLBOX extension: forward to the underlying decoder. */
     bool getPlayPosition(int& step, udword& offset);
+    bool walkEnable(bool on);
+    int walkCount();
+    const int* walkData();
 
  private:
     bool initDecoder(void*, udword, int);

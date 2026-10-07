@@ -51,6 +51,7 @@ void HippelDecoder::reset() {
     
     for (ubyte v=0; v<stats.voices; v++) {
         voiceVars[v].voiceNum = v;
+        voiceVars[v].walkFresh = false;
         voiceVars[v].trackPos =
             voiceVars[v].pattPos = 0;
         voiceVars[v].volSlideSpeed =
@@ -416,6 +417,7 @@ int HippelDecoder::run() {
     int tick = tickFPadd>>8;
     tickFPadd &= 0xff;
     songPosCurrent += tick;
+    if (walkOn) walkTick++;
     return tick;  // in [ms]
 }
 
@@ -676,6 +678,20 @@ const uword HippelDecoder::periodsLower[0x40] = {
     0x0036, 0x0033, 0x0030, 0x002d
     // +0x40
 };
+
+// DEViLBOX extension: the walk (Decoder.h). Switching it on clears the record
+// and restarts the tick count; the first run() after it is tick 0.
+bool HippelDecoder::walkEnable(bool on) {
+    walkOn = on;
+    walkTick = 0;
+    walkLog.clear();
+    return true;
+}
+
+void HippelDecoder::walkPush(int kind, int voice, int step, int a, int b, int c, int d, int e, int f) {
+    int rec[WALK_INTS] = { walkTick, kind, voice, step, a, b, c, d, e, f };
+    walkLog.insert(walkLog.end(), rec, rec + WALK_INTS);
+}
 
 // DEViLBOX extension. trackPos already points past the step being played
 // (it is advanced when the step is read), so the current one is one back.

@@ -483,6 +483,8 @@ void HippelDecoder::TFMX_processPerVol(VoiceVars& voiceX) {
     }
     // else: lock note (i.e. transpose value from sequence is note to play)
     ubyte note = t&0x7f;
+    const bool walkNote = walkOn && voiceX.walkFresh;
+    voiceX.walkFresh = false;
     sword period;
     if (traits.lowerPeriods) {
         note = t&0x3f;
@@ -495,6 +497,12 @@ void HippelDecoder::TFMX_processPerVol(VoiceVars& voiceX) {
     // double rate period values in the same array.
     if (period < traits.periodMin) {
         period = traits.periodMin;
+    }
+    if (walkNote) {
+        int step = (int)((voiceX.trackStart - voiceX.voiceNum*trackColumnSize - offsets.trackTable) / trackStepLen)
+                   + (int)(voiceX.trackPos / trackStepLen) - 1;
+        walkPush(2, voiceX.voiceNum, step, (int)note, (int)period, (int)voiceX.pattVal1,
+                 (int)voiceX.transpose, (int)voiceX.seqTranspose, (int)voiceX.currentVolSeq);
     }
 
     period = (this->*pVibratoFunc)(voiceX,period,note);
