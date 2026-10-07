@@ -35,11 +35,11 @@ const MICRO15 = resolve(__dirname, '../../../__tests__/fixtures/micro15-goto80.m
 const parsed = (id: number): ParsedInstrument => ({ id, name: `s${id}`, samples: [], fadeout: 0, volumeType: 'none', panningType: 'none' });
 
 describe('instrument slot ids on import', () => {
-  it('MOD samples after an empty slot keep their slot number', async () => {
+  it('MOD keeps all 31 slots, empty ones included, and samples after an empty slot keep their slot number', async () => {
     const bytes = readFileSync(MICRO15);
     const { instruments } = await parseMOD(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     const converted = convertParsedInstruments(instruments, 'MOD');
-    expect(converted.map((i) => i.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 18, 19]);
+    expect(converted.map((i) => i.id)).toEqual(Array.from({ length: 31 }, (_, i) => i + 1));
     // Slot 16 is the 1960-byte hi-hat, not slot 19's 222-byte loop.
     const hat = instruments.find((i) => i.id === 16)!;
     expect(hat.samples[0].length).toBe(1960);
@@ -63,7 +63,7 @@ describe('instrument slot ids on import', () => {
     await importTrackerModule(info as never, { useLibopenmpt: false } as never);
     await new Promise<void>((r) => queueMicrotask(r));
     const ids = useInstrumentStore.getState().instruments.map((i) => i.id);
-    expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 18, 19]);
+    expect(ids).toEqual(Array.from({ length: 31 }, (_, i) => i + 1));
     expect(useInstrumentStore.getState().getInstrument(16)!.sample?.loopStart).toBe(1074);
     // Channel 2 of the first played pattern names slot 16.
     const t = useTrackerStore.getState();

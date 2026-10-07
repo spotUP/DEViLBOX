@@ -222,7 +222,7 @@ export function convertToInstrument(
     
     instruments.push({
       id: instrumentId,
-      name: parsed.name + (isXRNS && isMacro ? ' [Macro - silent]' : ' [empty]'),
+      name: parsed.name,
       synthType: 'Sampler',  // Use Sampler so empty instruments round-trip without warnings
       type: 'sample',
       effects: [],
