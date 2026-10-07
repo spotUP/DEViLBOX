@@ -42,7 +42,9 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
           this.module._free(wasmPtr);
           if (!this.handle) { this.port.postMessage({ type: 'error', message: 'dw_create failed (unsupported format)' }); return; }
           const subsongCount = this.module._dw_subsong_count(this.handle);
-          if (typeof data.subsong === 'number' && data.subsong > 0) this.module._dw_select_subsong(this.handle, data.subsong);
+          // The tune the song's grid shows; stop returns to it, never to tune 0.
+          this.subsong = typeof data.subsong === 'number' && data.subsong > 0 ? data.subsong : 0;
+          if (this.subsong > 0) this.module._dw_select_subsong(this.handle, this.subsong);
           this.playing = false;
           this.port.postMessage({ type: 'moduleLoaded', subsongCount, channels: 4 });
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
@@ -54,11 +56,11 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
       case 'play': this.playing = true; break;
       case 'stop':
         this.playing = false;
-        if (this.handle) this.module._dw_select_subsong(this.handle, 0);
+        if (this.handle) this.module._dw_select_subsong(this.handle, this.subsong || 0);
         this.port.postMessage({ type: 'stopped' });
         break;
       case 'pause': this.playing = !this.playing; break;
-      case 'setSubsong': if (this.handle) this.module._dw_select_subsong(this.handle, data.subsong); break;
+      case 'setSubsong': if (this.handle) { this.subsong = data.subsong; this.module._dw_select_subsong(this.handle, data.subsong); } break;
       case 'setChannelMask': if (this.handle) this.module._dw_set_channel_mask(this.handle, data.mask); break;
       case 'setCell': {        if (this.handle && this.module._dw_set_cell) {          this.module._dw_set_cell(this.handle, data.index, data.row, data.channel, data.note, data.instrument, data.effect, data.effectArg);        }        break;      }      case 'setInstrumentParam': {        if (this.handle && this.module._dw_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._dw_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'dispose': this.cleanup(); break;
     }

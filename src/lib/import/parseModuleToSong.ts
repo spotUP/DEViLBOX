@@ -45,8 +45,10 @@ interface ParseOptions {
  * Format engine preferences (Settings → Format Engine) control which parser
  * is used for formats supported by multiple engines (MOD, HVL, MED, FC, etc.).
  */
-export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata, midiOptions?: ParseOptions['midiOptions'], companionFiles?: Map<string, ArrayBuffer>, uadeEngine?: UADEEngine): Promise<TrackerSong> {
+export async function parseModuleToSong(file: File, requestedSubsong?: number, preScannedMeta?: UADEMetadata, midiOptions?: ParseOptions['midiOptions'], companionFiles?: Map<string, ArrayBuffer>, uadeEngine?: UADEEngine): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
+  // Absent: the format picks (a command-stream file opens on its first tune that sounds); UADE counts from 0.
+  const subsong = requestedSubsong ?? 0;
   let buffer = await file.arrayBuffer();
   const prefs = getFormatEngine();
 
@@ -104,7 +106,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   const { tryRouteFormat } = await import('./parsers/AmigaFormatParsers');
-  const routed = await tryRouteFormat(buffer, filename, file.name, prefs, subsong, preScannedMeta, companionFiles, uadeEngine);
+  const routed = await tryRouteFormat(buffer, filename, file.name, prefs, subsong, preScannedMeta, companionFiles, uadeEngine, requestedSubsong);
   if (routed) return routed;
 
   // ── Final fallback: libopenmpt + UADE ──────────────────────────────────────

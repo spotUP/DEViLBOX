@@ -59,6 +59,22 @@ function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
 }
 
+/** Commands that set a state the next command of the same kind sets again: the later one wins. */
+const STATE_SETTING: ReadonlySet<number> = new Set([DW_FX.envelope, DW_FX.arpeggio, DW_FX.vibratoSpeed, DW_FX.vibratoDepth]);
+
+/**
+ * The effect-column entries a tick of one voice can show. A voice that wraps its position list on
+ * the tick the walk ends runs the end of one pass and the start of the next in one tick (a loop,
+ * then its vibrato and envelope again): six entries for five columns. Only then are the entries a
+ * later command of the same kind sets again dropped - they were in force for no time at all - and
+ * what still does not fit is counted by the caller (the song then opens without a grid).
+ */
+export function fitEffectColumns(list: Fx[]): { shown: Fx[]; overflow: boolean } {
+  if (list.length <= EFFECT_SLOTS) return { shown: list, overflow: false };
+  const kept = list.filter(([typ], i) => !(STATE_SETTING.has(typ) && list.some(([t2], j) => j > i && t2 === typ)));
+  return { shown: kept.slice(0, EFFECT_SLOTS), overflow: kept.length > EFFECT_SLOTS };
+}
+
 export interface DwGrid {
   patterns: Pattern[];
   songPositions: number[];
@@ -75,7 +91,8 @@ export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
   const channels = Math.max(1, walk.channels);
   const rows = Math.max(1, walk.ticks);
   const grid: TrackerCell[][] = Array.from({ length: channels }, () => Array.from({ length: rows }, emptyCell));
-  const slots: number[][] = Array.from({ length: channels }, () => new Array<number>(rows).fill(0));
+  // The effects each cell shows, in the order the replayer ran them; placed into the columns once the tick is complete.
+  const pending = new Map<number, Fx[]>();
   const blockAt: number[][] = Array.from({ length: channels }, () => new Array<number>(rows).fill(-1));
   let overflowRows = 0;
 
@@ -95,17 +112,22 @@ export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
         // a mute is a note-off only where it stops a sounding voice
         if (e.a === 1 && cell.note === 0) cell.note = 97;
       } else {
-        for (const [typ, val] of dwEventEffects(e)) {
-          const s = slots[e.channel][t];
-          if (s >= EFFECT_SLOTS) { overflowRows++; break; }
-          const [kt, kv] = SLOT_KEYS[s];
-          (cell as unknown as Record<string, number>)[kt] = typ;
-          (cell as unknown as Record<string, number>)[kv] = val;
-          slots[e.channel][t] = s + 1;
+        const fx = dwEventEffects(e);
+        if (fx.length > 0) {
+          const key = e.channel * rows + t;
+          const list = pending.get(key);
+          if (list) list.push(...fx); else pending.set(key, [...fx]);
         }
       }
     }
     for (let ch = 0; ch < channels; ch++) blockAt[ch][t] = curBlock[ch];
+  }
+
+  for (const [key, list] of pending) {
+    const { shown, overflow } = fitEffectColumns(list);
+    if (overflow) overflowRows++;
+    const cell = grid[Math.floor(key / rows)][key % rows] as unknown as Record<string, number>;
+    shown.forEach(([typ, val], i) => { cell[SLOT_KEYS[i][0]] = typ; cell[SLOT_KEYS[i][1]] = val; });
   }
 
   const patterns: Pattern[] = [];
