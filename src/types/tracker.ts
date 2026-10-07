@@ -638,6 +638,8 @@ export interface HivelyNativeData {
   positions: HivelyNativePosition[];  // Song arrangement (up to 1000)
   tempo: number;
   speedMultiplier: number;
+  /** Position the song loops back to; the live song does not carry it, so the native data does. */
+  restartPosition?: number;
 }
 
 export interface HivelyNativeTrack {

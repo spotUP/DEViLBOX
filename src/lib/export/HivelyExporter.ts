@@ -28,7 +28,8 @@ export interface HivelyExportResult {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const textEncoder = new TextEncoder();
+/** The file's text is one byte per character (the parser reads it as Latin-1); UTF-8 would double every accented byte. */
+const textEncoder = { encode: (s: string): Uint8Array => Uint8Array.from(s, (c) => c.charCodeAt(0) & 0xff) };
 
 /**
  * Hash a track for deduplication. Returns a string key.
@@ -95,6 +96,7 @@ export function exportAsHively(
   const native: HivelyNativeData | undefined = options.nativeOverride ?? song.hivelyNative ?? undefined;
 
   // Determine track length
+  const restartPosition = native?.restartPosition ?? song.restartPosition;
   const trackLength = native?.trackLength ?? song.patterns[0]?.length ?? 64;
   if (trackLength > 64) {
     warnings.push(`Track length ${trackLength} exceeds HVL max of 64. Truncating.`);
@@ -277,7 +279,7 @@ export function exportAsHively(
   if (isAHX) {
     // ── AHX Header ──
     buf[0] = 0x54; buf[1] = 0x48; buf[2] = 0x58; // "THX"
-    buf[3] = 2; // Version 2
+    buf[3] = song.hivelyMeta?.version ?? 2; // the file's own revision (0 differs from 1 and 2 in the replayer)
 
     // String offset (big-endian)
     buf[4] = (stringOffset >> 8) & 0xff;
@@ -291,8 +293,8 @@ export function exportAsHively(
     buf[7] = posn & 0xff;
 
     // Restart position (big-endian)
-    buf[8] = (song.restartPosition >> 8) & 0xff;
-    buf[9] = song.restartPosition & 0xff;
+    buf[8] = (restartPosition >> 8) & 0xff;
+    buf[9] = restartPosition & 0xff;
 
     buf[10] = trkl;
     buf[11] = trkn;
@@ -361,9 +363,9 @@ export function exportAsHively(
 
     // Channel count + restart position
     const chnnBits = ((channelsToExport - 4) & 0x3f) << 2;
-    const restartHi = (song.restartPosition >> 8) & 0x3;
+    const restartHi = (restartPosition >> 8) & 0x3;
     buf[8] = chnnBits | restartHi;
-    buf[9] = song.restartPosition & 0xff;
+    buf[9] = restartPosition & 0xff;
 
     buf[10] = trkl;
     buf[11] = trkn;
