@@ -27,7 +27,7 @@ import { join } from 'node:path';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { parseJochenHippel7VFile } from '@/lib/import/formats/JochenHippel7VParser';
 import { parseJochenHippelAmigaSogFile } from '@/lib/import/formats/JochenHippelSTParser';
-import { hippelIndexToXm, hippelNoteIndex, readHippelTfmx } from '@/lib/import/formats/HippelTfmxWalk';
+import { hippelGrid, hippelIndexToXm, hippelNoteIndex, readHippelTfmx } from '@/lib/import/formats/HippelTfmxWalk';
 import { mapHippelCells, rebuildHippelModule } from '@/engine/hippel/rebuildHippelModule';
 import { hippelRowAt } from '@/engine/hippel/hippelCellSpans';
 import { loadTfmxWalkModule, HIPPEL_TFMX_CORPUS, type TfmxWalkHost } from './helpers/tfmxWalkHost';
@@ -50,6 +50,8 @@ beforeAll(async () => { host = await loadTfmxWalkModule(); });
  */
 function holdGridToDecoder(rel: string, bytes: Uint8Array, song: TrackerSong): { notes: number; rows: number; patterns: number; rowCounts: number[] } {
   const m = readHippelTfmx(bytes)!;
+  // Parsed without the decoder's sequence transposes: the pattern notes, an octave up when the song plays below C-0.
+  const bias = hippelGrid(m, 0).bias;
   const { records, voices } = host.walk(bytes, 0, TICKS);
   expect(records.length, 'the decoder walk ran (sentinel)').toBeGreaterThan(1000);
   expect(song.numChannels).toBe(voices);
@@ -93,7 +95,7 @@ function holdGridToDecoder(rel: string, bytes: Uint8Array, song: TrackerSong): {
           const s = started.get(`${r[0]}:${v}`);
           expect(s, `${where}: the decoder starts the note`).toBeDefined();
           expect(cell.note, `${where}: the note the voice reads (note ${noteByte & 0x7f}, transpose ${r[7]})`)
-            .toBe(hippelIndexToXm(hippelNoteIndex(noteByte & 0x7f, r[7])));
+            .toBe(hippelIndexToXm(hippelNoteIndex(noteByte & 0x7f, r[7]), bias));
           const sequence = s![9];
           expect(cell.instrument, `${where}: the volume sequence it starts`)
             .toBe((noteByte & 0x80) !== 0 ? 0 : sequence < m.nVolume ? sequence + 1 : 0);

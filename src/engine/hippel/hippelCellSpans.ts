@@ -24,6 +24,12 @@ export interface HippelCellSpan {
   /** The cell as the parser decoded it from these bytes. */
   baseline: TrackerCell;
   /**
+   * The cell as the file decodes it, when that depends on the cell itself: a
+   * Hippel note shows the pitch the sound sequence plays, which the cell
+   * carries (`hippelSeq`) because only the decoder knows it. Absent: `baseline`.
+   */
+  baselineFor?(cell: TrackerCell): TrackerCell;
+  /**
    * Bytes for `cell` in this span, or null when it cannot be written in place.
    * `file` is the module being patched, for bits the grid does not carry.
    */
@@ -92,7 +98,7 @@ export function patchEditedCells(
           if (!isEmpty(cell) || (cell.volume ?? 0) !== 0) refused.push(`${p}:${ch}:${r}`);
           continue;
         }
-        if (differs(cell, span.baseline)) {
+        if (differs(cell, span.baselineFor?.(cell) ?? span.baseline)) {
           const enc = span.encode(cell, bytes);
           if (!enc || enc.length !== span.length) { refused.push(`${p}:${ch}:${r}`); continue; }
           bytes.set(enc, span.offset);
