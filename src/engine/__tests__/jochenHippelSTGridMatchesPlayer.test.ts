@@ -20,10 +20,11 @@ import { join } from 'path';
 import { refreshHeap } from '../../../tools/uade-audit/uadeRenderCore';
 import { openUade, drainPaulaLog, readChipRam, writeChipRam, chipRamEngine, type PaulaLogModule as LogModule } from './gridOracle';
 import {
-  decodeHstModule, encodeHstModule, compressHstSong, simulateHstSubsong, hstSubsongRange, hstHeader, hstU16, hstU32,
+  decodeHstModule, encodeHstModule, compressHstSong, simulateHstSubsong, hstSubsongRange, hstSubsongs, hstHeader, hstU16, hstU32,
   perRowHstOffsets, type HstModule, type HstPlayback,
 } from '@/lib/import/formats/JochenHippelSTModule';
-import { HstSongEdit } from '@/lib/import/formats/JochenHippelSTSong';
+import { HstSongEdit, hstVolSeqCount } from '@/lib/import/formats/JochenHippelSTSong';
+import { playerTickGridPosition } from '@/lib/tracker/tickGridPosition';
 import { parseJochenHippelSTFile } from '@/lib/import/formats/JochenHippelSTParser';
 
 // The edit test drives the real UADEChipEditor; only the engine singleton is
@@ -122,7 +123,7 @@ function locate(u: Uade, song: Uint8Array): { base: number; voices: number } {
   throw new Error('no voice records point into the song');
 }
 
-interface Read { key: string; half: number }
+interface Read { key: string; half: number; /** The player's interrupt count when the read showed. */ tick: number }
 
 /** Each voice's record, every half tick, as `step:patternOffset:note:info:transpose:soundTranspose` changes. */
 async function watch(u: Uade, song: Uint8Array, at: { base: number; voices: number }, halves: number, onHalf?: (h: number) => Promise<void> | void): Promise<Read[][]> {
@@ -135,13 +136,14 @@ async function watch(u: Uade, song: Uint8Array, at: { base: number; voices: numb
   for (let h = 0; h < halves; h++) {
     await onHalf?.(h);
     const s = u.read(at.voices, VOICE_SIZE * 3);
+    const tick = (u.mod as unknown as { _uade_wasm_get_player_tick_count(): number })._uade_wasm_get_player_tick_count();
     for (let v = 0; v < 3; v++) {
       const o = v * VOICE_SIZE;
       const track = hstU32(s, o);
       const step = (track - tracks - v * 4) / 12 + hstU16(s, o + 0x14) / 12 - 1;
       const pt = song[hstU32(song, 16) + step * 12 + v * 4];
       const key = `${step}:${hstU32(s, o + 12) - patStart(pt)}:${s[o + 0x1e]}:${s[o + 0x1f]}:${(s[o + 0x21] << 24) >> 24}:${(s[o + 0x20] << 24) >> 24}`;
-      if (key !== last[v]) { last[v] = key; out[v].push({ key, half: h }); }
+      if (key !== last[v]) { last[v] = key; out[v].push({ key, half: h, tick }); }
     }
     u.render();
   }
@@ -172,7 +174,7 @@ function expected(p: HstPlayback, endOf: (e: HstPlayback['events'][0][0]) => num
  * late when it is off by half a row or more - a read on the wrong row is off
  * by a whole row (`speed` ticks), the half-tick sampling by at most one tick.
  */
-function matches(player: Read[], want: Array<{ key: string; tick: number }>, speed: number): { matched: number; late: number } {
+function matches(player: Read[], want: Array<{ key: string; tick: number }>, speed: number, pairs?: Array<[number, Read]>): { matched: number; late: number } {
   let i = player.findIndex((r) => r.key === want[0]?.key);
   if (i < 0) return { matched: 0, late: 0 };
   const offsets: number[] = [];
@@ -182,6 +184,7 @@ function matches(player: Read[], want: Array<{ key: string; tick: number }>, spe
     while (j < player.length && j < i + 3 && player[j].key !== want[k].key) j++;
     if (j >= player.length || player[j].key !== want[k].key) break;
     offsets.push(player[j].half / 2 - want[k].tick);
+    pairs?.push([k, player[j]]);
     i = j + 1;
     k++;
   }
@@ -200,8 +203,17 @@ function playedSong(m: HstModule): Uint8Array {
   return m.song.kind === 'raw' ? compressHstSong(m.song) : encodeHstModule({ prefix: new Uint8Array(0), song: m.song, trailing: new Uint8Array(0) });
 }
 
+/** Every (file, UADE subsong number) of the corpus: demo music10 has 2, astaroth 7. */
+const SUBSONGS: Array<readonly [string, number]> = CORPUS.flatMap((rel) =>
+  Array.from({ length: Math.max(1, hstSubsongs(decodeHstModule(load(rel))).length) }, (_, i) => [rel, i + 1] as const));
+
+/** Seconds the player needs for one pass of the subsong (the walk's last row, and a few ticks past it). */
+function passSeconds(p: HstPlayback): number {
+  return Math.min(400, Math.ceil(p.rowTicks[p.rows - 1] / 50) + 4);
+}
+
 describe('Jochen Hippel ST grid matches the player', () => {
-  it.each([...CORPUS.map((rel) => [rel, 1] as const), ['formats/astaroth.sog', 2] as const])(
+  it.each(SUBSONGS)(
     '%s subsong %i: the player\'s voices read the decoded events, in order, on the grid\'s rows',
     async (rel, subsong) => {
       const bytes = load(rel);
@@ -211,14 +223,82 @@ describe('Jochen Hippel ST grid matches the player', () => {
       const u = await uade();
       u.load(playable(bytes), subsong);
       const at = locate(u, song);
-      const player = await watch(u, song, at, SECONDS * 100);
-      const want = expected(p, streamEnd, (SECONDS - 2) * 50);
+      const seconds = passSeconds(p);
+      const player = await watch(u, song, at, seconds * 100);
+      const want = expected(p, streamEnd, (seconds - 2) * 50);
       const speed = hstSubsongRange(m, subsong - 1).speed;
       for (let v = 0; v < 3; v++) {
         expect(want[v].length).toBeGreaterThan(0);
         expect(matches(player[v], want[v], speed)).toEqual({ matched: want[v].length, late: 0 });
       }
-    }, 120_000);
+    }, 240_000);
+
+  /**
+   * The grid the app shows (parseJochenHippelSTFile) against the player's own
+   * voice records, over the whole pass of every subsong of every corpus song:
+   *  - on the row the player reads a note event, the cell is the note (pattern
+   *    note + the step's transpose) and the instrument (volume sequence + the
+   *    step's sound transpose) the PLAYER's record holds; on a rest, empty;
+   *  - the grid shows no note the player does not read (cell counts equal);
+   *  - the playhead function the UADE engine runs (playerTickGridPosition on the
+   *    player's interrupt count, grid from the parser) is that row, on that
+   *    position, at the moment the read shows.
+   * Silent subsongs (astaroth 4-7): empty grids, no note read.
+   */
+  it.each(SUBSONGS)('%s subsong %i: the cell on every row the player reads is what the player holds, and the playhead is on it', async (rel, subsong) => {
+    const bytes = load(rel);
+    const m = decodeHstModule(bytes);
+    const played = playedSong(m);
+    const p = simulateHstSubsong(m, subsong - 1);
+    const song = parseJochenHippelSTFile(bytes.slice().buffer as ArrayBuffer, rel, subsong);
+    const volSeqs = hstVolSeqCount(m);
+    const u = await uade();
+    u.load(playable(bytes), subsong);
+    const at = locate(u, played);
+    const seconds = passSeconds(p);
+    const player = await watch(u, played, at, seconds * 100);
+    const want = expected(p, streamEnd, (seconds - 2) * 50);
+    const speed = hstSubsongRange(m, subsong - 1).speed;
+    expect(song.initialSpeed).toBe(speed);
+    const tickGrid = {
+      speed: song.initialSpeed, songPositions: song.songPositions,
+      patternLengths: song.patterns.map((pat) => pat.length), loopFrom: song.restartPosition ?? 0,
+    };
+    let checked = 0;
+    let notesRead = 0;
+    for (let v = 0; v < 3; v++) {
+      const pairs: Array<[number, Read]> = [];
+      expect(matches(player[v], want[v], speed, pairs).matched).toBe(want[v].length);
+      for (const [k, read] of pairs) {
+        // The event the walk names (the k-th of this voice within the horizon) and the cell the grid shows for it.
+        const e = p.events[v][k];
+        const start = p.stepStarts.filter((st) => st.voice === v && st.step === e.step && st.row <= e.row).pop()!;
+        const rowInStep = e.row - start.row;
+        const cell = song.patterns[e.step].channels[v].rows[rowInStep];
+        const [, , note, info, tr, st] = read.key.split(':').map(Number);
+        // What the player's record holds, by the player's arithmetic (lbC000854): the table index is
+        // note + transpose & $7F (index 0 = YM period $EEE = C-1 = note 13), the volume sequence
+        // (info & $1F) + sound transpose as a byte, sequence 0 when past the last; bit 7 of the
+        // note byte keeps the sound playing (no instrument).
+        const index = ((note & 0x7f) + tr) & 0x7f;
+        const sequence = ((info & 0x1f) + st) & 0xff;
+        const held = e.kind === 'note'
+          ? [Math.min(96, index + 13), (note & 0x80) !== 0 ? 0 : (sequence > volSeqs - 1 ? 0 : sequence) + 1]
+          : [0, 0];
+        expect([cell.note, cell.instrument], `voice ${v} step ${e.step} row ${rowInStep} (${e.kind})`).toEqual(held);
+        if (e.kind === 'note') notesRead++;
+        // The playhead the engine shows when the read shows.
+        const pos = playerTickGridPosition(read.tick, tickGrid);
+        expect([song.songPositions[pos.songPos], pos.row], `voice ${v} read at player tick ${read.tick}: the playhead`).toEqual([e.step, rowInStep]);
+        checked++;
+      }
+    }
+    // The grid shows no note the player does not read: its notes over one pass are the walk's.
+    const inPass = song.songPositions.reduce((n, step) => n + song.patterns[step].channels.reduce((a, ch) => a + ch.rows.filter((c) => c.note > 0).length, 0), 0);
+    expect(inPass).toBe(p.events.reduce((n, list) => n + list.filter((e) => e.kind === 'note').length, 0));
+    expect(checked, 'reads checked (sentinel)').toBeGreaterThan(0);
+    console.log(`[hippel st grid] ${rel} subsong ${subsong}: ${checked} reads (${notesRead} notes) held to the player, ${inPass} notes in the grid`);
+  }, 240_000);
 
   it.each(['demo music10.sog', 'astaroth.sog'])('%s: Compress (ported) builds the song the player packs for itself', async (name) => {
     const rel = name.startsWith('demo') ? `hippel-st/${name}` : `formats/${name}`;
