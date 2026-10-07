@@ -142,6 +142,7 @@ typedef struct Dm1ChannelInfo {
     Dm1Effect effect_number;
     uint8_t effect_data;
     bool retrigger_sound;
+    bool hold;                 // keyboard preview: the sustain stage waits while the key is down
 
     // Mixer state
     int8_t* ch_sample_data;
@@ -255,7 +256,7 @@ struct Dm1Module {
     bool preview;
     bool preview_done;
     uint32_t preview_block;      // first of the two appended blocks: [+0] the note line, [+1] empty
-    Dm1Track preview_tracks[2][2]; // [0] voice 0's one-entry track, [1] the other voices'
+    Dm1Track preview_tracks[2][64]; // [0] voice 0's track (the note block, then empty blocks), [1] the other voices' (empty blocks)
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -586,7 +587,9 @@ static void dm1_volume_handler(int channel_number, Dm1ChannelInfo* channel, Dm1I
     }
 
     if (status == 0x06) {
-        if (channel->sustain == 0) {
+        if (channel->hold) {
+            // key down: stay in sustain
+        } else if (channel->sustain == 0) {
             status |= 0x0e;
             channel->status |= 0x0e;
         } else {
@@ -1355,8 +1358,11 @@ bool dm1_preview_note(Dm1Module* m, int instrument, int note) {
         if (!m->blocks[m->num_blocks] || !m->blocks[m->num_blocks + 1]) return false;
         m->preview_block = m->num_blocks;
         m->num_blocks += 2;
-        m->preview_tracks[0][0].block_number = (uint8_t)m->preview_block;
-        m->preview_tracks[1][0].block_number = (uint8_t)(m->preview_block + 1);
+        // 64 blocks of 16 rows: the note on the first, silence after, so a held key is not cut at one block
+        for (int k = 0; k < 64; k++) {
+            m->preview_tracks[0][k].block_number = (uint8_t)(m->preview_block + (k == 0 ? 0 : 1));
+            m->preview_tracks[1][k].block_number = (uint8_t)(m->preview_block + 1);
+        }
         m->preview = true;
     }
     if (m->preview_block + 1 > 254) return false;   // block numbers are bytes; 0xFF is the jump marker
@@ -1370,9 +1376,10 @@ bool dm1_preview_note(Dm1Module* m, int instrument, int note) {
     for (int i = 0; i < 4; i++) {
         Dm1ChannelInfo* ch = &m->channels[i];
         ch->track = m->preview_tracks[i == 0 ? 0 : 1];
-        ch->track_length = 1;
+        ch->track_length = 64;
         ch->track_counter = 0;
         ch->block = m->blocks[m->preview_block + (i == 0 ? 0 : 1)];
+        ch->hold = (i == 0);   // a key is down: the sustain stage waits for key-up
     }
     m->preview_done = false;
     return true;
@@ -1382,4 +1389,10 @@ void dm1_preview_stop(Dm1Module* m) {
     if (!m) return;
     m->preview_done = true;
     for (int i = 0; i < 4; i++) m->channels[i].active = false;
+}
+
+/** Key-up: the sustain stage ends and the instrument's own release runs (the voice ends itself). */
+void dm1_preview_release(Dm1Module* m) {
+    if (!m) return;
+    for (int i = 0; i < 4; i++) m->channels[i].hold = false;
 }

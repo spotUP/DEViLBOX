@@ -162,3 +162,9 @@ void player_get_voice_info(float* out8) {
     extern void sam_get_voice_info(float* out8);
     sam_get_voice_info(out8);
 }
+
+// ─── Keyboard preview: hold the sustain stage while a key is down ─────────────
+EMSCRIPTEN_KEEPALIVE
+void player_set_hold(int on) {
+    sam_set_hold(on);
+}

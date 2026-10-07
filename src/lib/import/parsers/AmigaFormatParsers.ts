@@ -95,8 +95,18 @@ export async function tryRouteFormat(
   {
     const { modHasStarTrekkerNt } = await import('@lib/import/adscRoute');
     if (modHasStarTrekkerNt(originalFileName, companionFiles?.keys() ?? [])) {
-      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-      return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+      // The grid, the instruments (AM synth parameters from the .nt) and the keyboard voice are the native
+      // parser's: a ProTracker-style grid the UADE route could only estimate (it opened in the scope view,
+      // with a generic bleep for a key). UADE still plays the pair, with the .nt registered as a companion.
+      const { parseStartrekkerAMFile } = await import('@lib/import/formats/StartrekkerAMParser');
+      let ntBuffer: ArrayBuffer | null = null;
+      for (const [key, val] of companionFiles ?? []) if (key.toLowerCase().endsWith('.nt')) { ntBuffer = val; break; }
+      const modAB = ArrayBuffer.isView(buffer)
+        ? (buffer as unknown as Uint8Array).buffer.slice((buffer as unknown as Uint8Array).byteOffset, (buffer as unknown as Uint8Array).byteOffset + (buffer as unknown as Uint8Array).byteLength) as ArrayBuffer
+        : buffer as ArrayBuffer;
+      const song = parseStartrekkerAMFile(modAB, originalFileName, ntBuffer);
+      if (companionFiles && companionFiles.size > 0) (song as { uadeCompanionFiles?: Map<string, ArrayBuffer> }).uadeCompanionFiles = companionFiles;
+      return song;
     }
   }
 

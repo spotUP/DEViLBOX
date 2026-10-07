@@ -19,6 +19,9 @@ void sam_music(void);
 // Stop all audio DMA.
 void sam_end(void);
 
+// Keyboard preview: hold (1) keeps the sustain stage while a key is down; 0 lets the release run.
+void sam_set_hold(int on);
+
 // Get per-channel voice info: [instr0, pos0, instr1, pos1, ...]
 // instr = instrument number (1-31, 0=none), pos = sample position fraction (0-1)
 void sam_get_voice_info(float* out8);

@@ -1522,11 +1522,40 @@ bool is1_preview_note(Is1Module* m, int instrument, int note) {
     line->note = (uint8_t)note;
     line->instrument = (uint8_t)instrument;
 
+    // The row effect and arpeggio the song first plays this instrument with (an instrument that only
+    // sounds through a Restart ADSR / EGC row effect is silent without it): found by walking the song's
+    // own positions and track lines, the instrument number after each position's sound transpose.
+    {
+        Is1SongInfo* orig = &m->sub_songs[0];
+        bool found = false;
+        for (int pos = orig->first_position; pos <= orig->last_position && pos < (int)m->preview_position && !found; pos++) {
+            for (int k = 0; k < 4 && !found; k++) {
+                Is1SinglePositionInfo* pi = &m->positions[pos][k];
+                for (int r = 0; r < 64 && !found; r++) {
+                    uint32_t at = (uint32_t)pi->start_track_row + (uint32_t)r;
+                    if (at >= m->total_track_rows) break;
+                    Is1TrackLine* tl = &m->track_lines[at];
+                    if (tl->note == 0 || tl->note == 0x7f || tl->instrument == 0) continue;
+                    int num = tl->effect == IS1_EFFECT_SKIP_ST ? tl->instrument : (uint8_t)(tl->instrument + pi->sound_transpose);
+                    if (num != instrument) continue;
+                    line->arpeggio = tl->arpeggio;
+                    line->effect = tl->effect;
+                    line->effect_arg = tl->effect_arg;
+                    found = true;
+                }
+            }
+        }
+    }
+
     Is1SongInfo* song = &m->sub_songs[0];
     song->first_position = song->last_position = song->restart_position = m->preview_position;
-    if (song->rows_per_track < 2 || song->rows_per_track > 62) song->rows_per_track = 62;
+    // rows past the padding read as empty lines: a held key is not cut at the end of a short pattern
+    song->rows_per_track = 250;
 
     initialize_sound(m, 0);
+    // An envelope-generator (EGC) instrument sets its sample on the channel without starting it: on the
+    // hardware the channel's DMA is already on, here only a played sample sets it. The key's channel is on.
+    m->mix_channels[0].active = true;
     m->preview_done = false;
     m->preview_visits = 0;
     m->tick_accumulator = m->ticks_per_frame;   // the first row plays with the first frame
