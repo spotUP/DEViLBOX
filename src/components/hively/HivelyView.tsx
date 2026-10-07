@@ -16,6 +16,7 @@ import { useTrackerStore, useFormatStore, useUIStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { HIVELY_COLUMNS, hivelyToFormatChannels } from './hivelyAdapter';
+import { hivelyCellChangeFor } from './hivelyEdit';
 import { HivelyPositionEditor, HIVELY_MATRIX_HEIGHT, HIVELY_MATRIX_COLLAPSED_HEIGHT } from './HivelyPositionEditor';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
@@ -130,6 +131,7 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
           formatChannels={channels}
           formatCurrentRow={currentRow}
           formatIsPlaying={isPlaying}
+          onFormatCellChange={hivelyCellChangeFor(activePosition)}
         />
       </div>
     </div>

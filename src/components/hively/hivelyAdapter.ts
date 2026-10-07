@@ -36,6 +36,8 @@ export const HIVELY_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     formatter: (val: number) => noteToString(val, 0), // transpose applied during rendering
+    noteBase: 1,
+    noteCount: 60,
   },
   {
     key: 'instrument',
@@ -142,6 +144,8 @@ export const HIVELY_PERFLIST_COLUMNS: ColumnDef[] = [
     emptyColor: '#334455',  // Dark blue-gray — empty
     emptyValue: 0,
     formatter: (val: number) => noteToString(val, 0),
+    noteBase: 1,
+    noteCount: 60,
   },
   {
     key: 'fixed',
