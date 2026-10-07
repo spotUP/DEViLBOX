@@ -43,7 +43,7 @@ const cellsOf = (patterns: Array<{ channels: Array<{ rows: Array<{ note: number;
 describe('one parse path', () => {
   for (const [type, path] of SONGS) {
     it(`${type}: the tracker's import and the DJ decks get the same song`, async () => {
-      const { importTrackerModule } = await import('../UnifiedFileLoader');
+      const { importTrackerModule } = await import('@/lib/song/songBranches');
       const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
       const { useTrackerStore } = await import('@/stores/useTrackerStore');
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
@@ -85,7 +85,7 @@ describe('one parse path', () => {
   }, 120000);
 
   it('importTrackerModule parses nothing itself', () => {
-    const src = readFileSync(resolve(__dirname, '../UnifiedFileLoader.ts'), 'utf8');
+    const src = readFileSync(resolve(__dirname, '../../song/songBranches.ts'), 'utf8');
     const start = src.indexOf('async function importTrackerModuleUnloaded(');
     const body = src.slice(start, src.indexOf('\n}\n', start));
     expect(body).toContain('parseModuleToSong(');

@@ -27,6 +27,8 @@ export const RESTRICTED = [
   'renderUADEToWav',
   'renderPatternToAudio',
   'captureAudioLiveToBuffer',
+  // The UADE song scan (worker client and the worklet host it drives).
+  'scan',
 ] as const;
 
 /** key = `${file}|${enclosingFunction}|${callee}` -> number of calls */

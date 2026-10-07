@@ -8,7 +8,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
-import type { UADEMetadata } from '@/engine/uade/UADEEngine';
+import type { UADEEngine, UADEMetadata } from '@/engine/uade/UADEEngine';
 import { getBasename } from './withFallback';
 
 /**
@@ -165,6 +165,7 @@ export async function tryUADEPrefixParse(
   subsong: number,
   preScannedMeta?: UADEMetadata,
   companionFiles?: Map<string, ArrayBuffer>,
+  uadeEngine?: UADEEngine,
 ): Promise<TrackerSong | null> {
   const base = getBasename(filename);
 
@@ -189,13 +190,13 @@ export async function tryUADEPrefixParse(
     // from a sibling file through AMIGAMSG_LOADFILE, and without it the
     // replayer renders silence or garbage instruments.
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   const { isUADEFormat, parseUADEFile } = await import('@lib/import/formats/UADEParser');
   if (isUADEFormat(filename)) {
-    return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   return null;

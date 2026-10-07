@@ -344,6 +344,11 @@ the UADE engine family for `addCompanionFile`, `applySong.ts`, the export
 services, and the parsers' internal recursion (`ChipDumpParsers`,
 `VGMParser`, `UADEParser` re-entry). Probe again with a planted caller.
 
+#### U4.1 result (2026-10-08)
+Branch bodies moved: `src/lib/song/songBranches.ts` (importTrackerModule, importModuleFile, prepareModuleFile, loadSongFile: SunVox / MIDI / .dbx / GoatTracker / header, loadV2MFile, loadAdPlugFile) is imported by openSong.ts only; UnifiedFileLoader keeps loadFile (the gate), isSongFormat, isAudioFile and the non-song files. Tests re-pointed to songBranches (13 files).
+Guard final state: allowlist 27 entries -> 25, every one a permanent owner with a `why` (the `removedBy` phase labels are gone, and the guard rejects a phase label in a reason). Owners: openSong.ts (route, openStoredSong, openDeckSong), songBranches.ts (8 entries), acquireSource.ts + modlandApi.ts (companion acquisition), UADEEngine.load + uade-scan.worker (the scan; `scan` is now a restricted callee), editedModuleForPlay + liveModuleEdits (play-time and live-edit module owners), moduleExportService (exportNativeFile = the one door to the native export router, now also used by the bridge, FT2 Save, MaxTrax and the Export dialog, 4 callers removed), audioExportService + audioExport (raw render, live capture), nativeExportRouter + MODExporter (MOD dispatch). Also a structural test: every parseUADEFile call passes all 7 arguments, the engine included.
+U2.6c: the scan engine is an argument (parseModuleToSong -> tryRouteFormat / tryUADEPrefixParse / FallbackContext -> parseUADEFile `uadeEngine`); withDeckUADEEngine and its module-level flag are deleted; openSong's deck target passes UADEEngine.getDeckInstance() and queues deck parses itself. Tests: deckAndEditorParseOverlap.test.ts (a deck and an editor parse in flight together scan on their own engines; revert-checked), openSongBranches.test.ts (MIDI, GoatTracker, SunVox, V2M, AdPlug, .dbx through openSong; V2M revert-checked).
+
 ## Checklist
 
 - [x] U4.0 guard, ratchet mode (src/engine/__tests__/oneOpenPath.contract.test.ts + oneOpenPathAllowlist.ts; useImportDialog.ts deleted)
@@ -358,7 +363,7 @@ services, and the parsers' internal recursion (`ChipDumpParsers`,
 - [x] U2.8 Hippel / MA / FP walks in a worker (measured 2026-10-07; see U2.8 result)
 - [x] U3a one audio export (2026-10-08; see U3 result)
 - [x] U3b one module / MIDI export input (2026-10-08; see U3 result)
-- [ ] U4.1 guard final state
+- [x] U4.1 guard final state (2026-10-08; see U4.1 result)
 
 ## Verification
 

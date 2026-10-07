@@ -27,7 +27,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 describe('the song native export and the MOD export take', () => {
   it('is the live store song: an edit shows at once, without playing', async () => {
-    const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+    const { importTrackerModule } = await import('@/lib/song/songBranches');
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
     const { liveTrackerSong } = await import('../liveSong');
     const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
@@ -49,7 +49,7 @@ describe('the song native export and the MOD export take', () => {
   }, 60000);
 
   it('carries a native-engine song\'s data (an AHX exports from the stores)', async () => {
-    const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+    const { importTrackerModule } = await import('@/lib/song/songBranches');
     const { liveTrackerSong } = await import('../liveSong');
     const b = readFileSync(resolve(ROOT, 'public/data/songs/ahx/amanda.ahx'));
     const file = new File([b], 'amanda.ahx');

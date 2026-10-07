@@ -175,8 +175,8 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   // pulls in every exporter. The song is the one the stores hold (null): the replayer's copy is only
   // rebuilt when playback starts, so an edit made since the last play was missing.
   const runNativeExport = useCallback(async () => {
-    const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
-    return exportNativeSong(null, {});
+    const { exportNativeFile } = await import('@lib/export/moduleExportService');
+    return exportNativeFile();
   }, []);
 
   const [nativeAvailable, setNativeAvailable] = useState(false);

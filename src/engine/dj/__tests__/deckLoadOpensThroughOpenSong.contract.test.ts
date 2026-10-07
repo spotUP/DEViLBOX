@@ -4,7 +4,7 @@
  * two-file Modland song opens ONCE on the deck target, the partner file
  * arrives with that call (parse AND render pipeline), and the editor song, its
  * loading state and its UADE engine are not touched. A deck's UADE scan runs on
- * the deck's own engine.
+ * the deck's own engine, passed down the parse.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
@@ -108,12 +108,13 @@ describe('a DJ deck load goes through the one open path', () => {
     expect(probe.editorEngine.load).not.toHaveBeenCalled();
   });
 
-  it('scans a deck song on the deck engine, never the editor engine', async () => {
-    const { parseUADEFile, withDeckUADEEngine } = await import('@/lib/import/formats/UADEParser');
-    await expect(withDeckUADEEngine(() => parseUADEFile(new ArrayBuffer(16), 'bob4e.dum'))).rejects.toThrow('scan stopped');
+  it('hands the parse the deck engine as an argument, so the scan runs there and nowhere else', async () => {
+    const { parseUADEFile } = await import('@/lib/import/formats/UADEParser');
+    const deck = UADEEngine.getDeckInstance();
+    await expect(parseUADEFile(new ArrayBuffer(16), 'bob4e.dum', 'enhanced', 0, undefined, undefined, deck)).rejects.toThrow('scan stopped');
     expect(probe.deckEngine.load).toHaveBeenCalledTimes(1);
     expect(UADEEngine.getInstance).not.toHaveBeenCalled();
-    // outside a deck scope the editor's engine is the one
+    // without an engine argument the editor's engine is the one
     probe.editorEngine.load.mockRejectedValueOnce(new Error('editor scan'));
     await expect(parseUADEFile(new ArrayBuffer(16), 'bob4e.dum')).rejects.toThrow();
     expect(UADEEngine.getInstance).toHaveBeenCalled();
