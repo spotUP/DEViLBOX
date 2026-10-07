@@ -5,7 +5,7 @@
  * Hybrid approach: Canvas for pattern grid + HTML overlays for UI controls
  */
 
-import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useEditorStore, useAutomationStore } from '@stores';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
@@ -44,6 +44,7 @@ import { useFormatStore } from '@stores/useFormatStore';
 import type { CursorPosition } from '@typedefs';
 // OffscreenCanvas + WebGL2 worker bridge
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
+import { feedWorkerFromTracker } from './trackerWorkerFeed';
 import { reportSynthError } from '@stores/useSynthErrorStore';
 import { watchdogStage1, watchdogStage2, MainThreadLiveness } from './trackerWatchdog';
 import type {
@@ -278,6 +279,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const bridgeRef = useRef<TrackerOffscreenBridge | null>(null);
   // Ref-tracked scroll for immediate worker updates (avoids React re-renders on scroll)
   const scrollLeftRef = useRef(0);
+  // The worker was given new patterns and is waiting for their channel layout (layoutHold.ts).
+  const layoutOwedRef = useRef(false);
+  const postedLayoutFnRef = useRef<unknown>(null);
 
   // ── Shared pattern editor logic ────────────────────────────────────────────
   const {
@@ -2198,10 +2202,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (isFormatModeRef.current) return;
       const b = bridgeRef.current;
       if (!b) return;
-      if (s.patterns !== prev.patterns || s.currentPatternIndex !== prev.currentPatternIndex) {
-        b.post({ type: 'patterns', patterns: snapshotPatterns(), currentPatternIndex: s.currentPatternIndex });
-        // Re-send uiState when song changes — noteDisplayOffset may differ per format
-        b.post({ type: 'uiState', uiState: snapshotUI() });
+      // New patterns with another layout (a song with a different channel
+      // count): the worker keeps the old picture until the layout effect below
+      // has posted the matching channel layout.
+      if (feedWorkerFromTracker(s, prev, (m) => b.post(m), snapshotPatterns, snapshotUI)) {
+        layoutOwedRef.current = true;
       }
     });
 
@@ -2553,9 +2558,34 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, []);
 
   // Forward layout changes to worker when channel widths/offsets change
-  useEffect(() => {
-    bridgeRef.current?.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
-  }, [snapshotLayout]);
+  // A layout effect, so it runs in the commit that renders the new song's
+  // headers, before the browser paints either. When the new patterns were posted
+  // with awaitLayout, the scroll is also settled here (a song narrower than the
+  // old scroll position would otherwise show blank space until a later render
+  // clamped it), and the layout is posted even if it came out identical.
+  useLayoutEffect(() => {
+    const bridge = bridgeRef.current;
+    const owed = layoutOwedRef.current;
+    layoutOwedRef.current = false;
+    if (owed) {
+      const container = containerRef.current;
+      const maxScroll = container ? Math.max(0, LNW + totalChannelsWidth - container.clientWidth) : 0;
+      const next = Math.min(scrollLeftRef.current, maxScroll);
+      if (next !== scrollLeftRef.current) {
+        scrollLeftRef.current = next;
+        channelLayout.scrollLeft = next;
+        bridge?.post({ type: 'scroll', x: next });
+        setScrollLeft(next);
+        if (headerScrollRef.current) headerScrollRef.current.scrollLeft = next;
+        if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = next;
+      }
+    }
+    if (owed || postedLayoutFnRef.current !== snapshotLayout) {
+      postedLayoutFnRef.current = snapshotLayout;
+      bridge?.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshotLayout, pattern]);
 
   // Format mode: re-sync columns/channels/layout when props change
   useEffect(() => {

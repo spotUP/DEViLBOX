@@ -14,6 +14,7 @@
 
 import { TrackerGLRenderer } from '../engine/renderer/TrackerGLRenderer';
 import { TrackerCanvas2DRenderer } from '../engine/renderer/TrackerCanvas2DRenderer';
+import { LayoutHold } from '../engine/renderer/layoutHold';
 import type {
   TrackerWorkerMsg,
   TrackerWorkerReply,
@@ -60,6 +61,7 @@ let ui: UIStateSnapshot = {
 let layout: ChannelLayoutSnapshot = { offsets: [], widths: [], totalWidth: 0 };
 let playback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
 let dragOver: { channelIndex: number; rowIndex: number } | null = null;
+const layoutHold = new LayoutHold(); // new patterns wait for their channel layout
 let dirty = true; // Dirty flag — skip GPU draws when nothing changed
 // Reusable playback object for render calls (avoids per-frame allocation)
 const workerPlayback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
@@ -121,6 +123,7 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
     case 'patterns':
       patterns = msg.patterns;
       currentPatternIndex = msg.currentPatternIndex;
+      layoutHold.patterns(msg.awaitLayout, performance.now());
       dirty = true;
       break;
 
@@ -170,6 +173,7 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
 
     case 'channelLayout':
       layout = msg.channelLayout;
+      layoutHold.layout();
       dirty = true;
       break;
 
@@ -206,7 +210,7 @@ function startRAF(): void {
     if (playback.isPlaying) dirty = true;
     
     // Only call renderFrame if dirty (skip GPU calls when nothing changed)
-    if (dirty) {
+    if (dirty && layoutHold.canDraw(performance.now())) {
       renderFrame();
     }
     requestAnimationFrame(tick);
