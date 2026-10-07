@@ -179,6 +179,7 @@ export interface FormatStore {
   adplugTicksPerRow: number | null;
   uadeCompanionFiles: Map<string, ArrayBuffer> | null;
   uadePatternLayout: import('@/engine/uade/UADEPatternEncoder').UADEPatternLayout | null;
+  uadeVariableLayout: import('@/engine/uade/UADEPatternEncoder').UADEVariablePatternLayout | null;
   tfmxFileData: ArrayBuffer | null;
   tfmxSmplData: ArrayBuffer | null;
   tfmxTimingTable: { patternIndex: number; row: number; cumulativeJiffies: number }[] | null;
@@ -584,6 +585,7 @@ export const useFormatStore = create<FormatStore>()(
     adplugTicksPerRow: null,
     uadeCompanionFiles: null,
     uadePatternLayout: null,
+    uadeVariableLayout: null,
     tfmxFileData: null,
     tfmxSmplData: null,
     uadeEditableFileName: null,
@@ -1163,6 +1165,7 @@ export const useFormatStore = create<FormatStore>()(
         state.adplugTicksPerRow = (song as any).adplugTicksPerRow ?? null;
         state.uadeCompanionFiles = (song as any).uadeCompanionFiles ?? null;
         state.uadePatternLayout = (song as any).uadePatternLayout ?? null;
+        state.uadeVariableLayout = (song as any).uadeVariableLayout ?? null;
         state.tfmxFileData = (song as any).tfmxFileData ?? null;
         state.tfmxSmplData = (song as any).tfmxSmplData ?? null;
         state.tfmxTimingTable = (song as any).tfmxTimingTable ?? null;
@@ -1509,6 +1512,7 @@ export const useFormatStore = create<FormatStore>()(
       state.adplugTicksPerRow = null;
       state.uadeCompanionFiles = null;
       state.uadePatternLayout = null;
+      state.uadeVariableLayout = null;
       state.tfmxFileData = null;
       state.tfmxSmplData = null;
       state.tfmxTimingTable = null;

@@ -359,7 +359,8 @@ export function exportAsSunTronic(song: TrackerSong): NativeExportResult {
   // is what the encoder consumes and the pool-index order matches `score.blocks`.
   const encodedBlocks: Uint8Array[] = [];
   for (let fp = 0; fp < layout.numFilePatterns; fp++) {
-    const rows = layout.blockRows[fp];
+    // The live pool the editor mutates (a grid edit lands there), else the layout's parse-time carriers.
+    const rows = song.sunTronicNative?.blocks[fp] ?? layout.blockRows[fp];
     const raw = layout.blockRawBytes[fp];
     // sunTronicV13Encoder is a pure carrier re-emitter and ignores the channel
     // argument (blocks are per-(position,voice) streams, not per-channel grids).

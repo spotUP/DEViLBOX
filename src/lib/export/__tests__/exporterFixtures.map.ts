@@ -69,6 +69,9 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   unic: 'public/data/songs/formats/african dreams.unic',
   scumm: 'public/data/songs/formats/zaktitle.scumm',
   sunTronic: 'public/data/songs/formats/SUNTronicTunes/mule.src',
+  davidWhittaker: 'public/data/songs/formats/apb.dw',
+  robHubbard: 'public/data/songs/rob-hubbard/skateordie.rh',
+  benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
   // No committed fixture found (reported missing-fixture by the harness — Task 1.3):
   //   amosMusicBank, synthesis, chuckBiscuits, kris, dsm_dyn, xmf, digitalSymphony (.dsym)
 };
