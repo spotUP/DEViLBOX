@@ -206,7 +206,18 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
       expect(at, 'the song has a note to edit').not.toBeNull();
       const st = useTrackerStore.getState();
       st.setCurrentPattern(at!.p);
-      st.setCell(at!.ch, at!.r, { note: at!.note });
+      if (key === 'maxTrax') {
+        // MaxTrax's edit authority is its own score model (maxTraxData, edited by MaxTraxView's grid ops), not the tracker
+        // grid: the edit is the editor's own op, and liveTrackerSong() hands the engine the encoding of that model.
+        const { useFormatStore } = await import('@/stores/useFormatStore');
+        const { setNoteField } = await import('@/lib/maxtrax/maxtraxGrid');
+        const fs = useFormatStore.getState();
+        const score = fs.maxTraxData!.scores.find((sc) => sc.events.some((e) => e.command >= 1 && e.command < 0x80))!;
+        const si = fs.maxTraxData!.scores.indexOf(score);
+        const ei = score.events.findIndex((e) => e.command >= 1 && e.command < 0x80);
+        const next = setNoteField(score, ei, { pitch: (score.events[ei].command + 2) & 0x7f });
+        fs.mutateMaxTraxScore(si, (sc) => { sc.events.length = 0; sc.events.push(...next.events); });
+      } else st.setCell(at!.ch, at!.r, { note: at!.note });
       // The store handed the cell to the engine without waiting; wait for the same route to finish (it is idempotent).
       await settle();
       await sendCellEditsToEngine(liveTrackerSong(), [{ pattern: at!.p, row: at!.r, channel: at!.ch, cell: useTrackerStore.getState().patterns[at!.p].channels[at!.ch].rows[at!.r] }]);
@@ -236,7 +247,8 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
 
       // G5: a note on an empty row reaches the exported module.
       let add: Measured['add'] = 'n/a';
-      if (desc) {
+      // MaxTrax: notes are made by the editor's own score ops (no tracker-grid cell to put on an empty row).
+      if (desc && key !== 'maxTrax') {
         await load(rel);
         const s2 = useTrackerStore.getState();
         let empty: { p: number; ch: number; r: number } | null = null;
