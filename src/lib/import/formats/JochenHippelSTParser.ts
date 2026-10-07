@@ -24,6 +24,7 @@ import {
 } from './JochenHippelSTModule';
 import { HstSongEdit, hstGrid } from './JochenHippelSTSong';
 import { parseHippelTfmxAmigaFile } from './JochenHippel7VParser';
+import type { HippelPlayed } from './HippelTfmxWalk';
 
 const MIN_FILE_SIZE = 20;
 
@@ -315,10 +316,10 @@ export function isJochenHippelAmigaSogFormat(buffer: ArrayBuffer | Uint8Array): 
  * audio is libtfmxaudiodecoder's (hippelFileData). An MCMD module, whose song
  * the decoder does not read as TFMX, is one empty pattern in the scope view.
  */
-export function parseJochenHippelAmigaSogFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseJochenHippelAmigaSogFile(buffer: ArrayBuffer, filename: string, played?: HippelPlayed): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isJochenHippelAmigaSogFormat(buf)) throw new Error('Not a Jochen Hippel SOG/MCMD module');
-  const walked = parseHippelTfmxAmigaFile(buffer, filename);
+  const walked = parseHippelTfmxAmigaFile(buffer, filename, played);
   if (walked) return walked;
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^(sog|mcmd)\./i, '').replace(/\.(hip|mcmd)$/i, '') || baseName;
