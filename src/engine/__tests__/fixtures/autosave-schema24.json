@@ -1,0 +1,274 @@
+{
+ "_comment": "Saved-project shapes as a schema-24 build wrote them (2026-10-07, before G15): a plain MOD song, a Hippel TFMX song whose cells carry hippelBias (858d8ef85), a Future Player song whose instruments carry fpOctaveBias (2673e7140). Loaded by gridOctaveBelowC0.test.ts.",
+ "schemaVersion": 24,
+ "plain": {
+  "patterns": [
+   {
+    "id": "pattern-0",
+    "name": "Pattern 0",
+    "length": 8,
+    "channels": [
+     {
+      "id": "channel-0",
+      "name": "Channel 1",
+      "muted": false,
+      "solo": false,
+      "collapsed": false,
+      "volume": 100,
+      "pan": 0,
+      "instrumentId": null,
+      "color": null,
+      "rows": [
+       {
+        "note": 25,
+        "instrument": 1,
+        "volume": 64,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0,
+        "period": 428
+       },
+       {
+        "note": 0,
+        "instrument": 0,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 97,
+        "instrument": 0,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 1,
+        "instrument": 2,
+        "volume": 0,
+        "effTyp": 12,
+        "eff": 32,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 96,
+        "instrument": 1,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 13,
+        "instrument": 1,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0,
+        "period": 856
+       },
+       {
+        "note": 0,
+        "instrument": 0,
+        "volume": 0,
+        "effTyp": 15,
+        "eff": 6,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 48,
+        "instrument": 3,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "instruments": [
+   {
+    "id": 1,
+    "name": "bass",
+    "type": "sample",
+    "synthType": "Sampler",
+    "effects": [],
+    "volume": 64,
+    "pan": 0
+   }
+  ]
+ },
+ "hippel": {
+  "patterns": [
+   {
+    "id": "pattern-0",
+    "name": "Pattern 1 (step 0)",
+    "length": 5,
+    "channels": [
+     {
+      "id": "channel-0",
+      "name": "Channel 1",
+      "muted": false,
+      "solo": false,
+      "collapsed": false,
+      "volume": 100,
+      "pan": 0,
+      "instrumentId": null,
+      "color": null,
+      "rows": [
+       {
+        "note": 1,
+        "instrument": 1,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0,
+        "hippelBias": 12
+       },
+       {
+        "note": 12,
+        "instrument": 0,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0,
+        "hippelBias": 12,
+        "hippelSeq": -86
+       },
+       {
+        "note": 25,
+        "instrument": 2,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0,
+        "hippelBias": 12
+       },
+       {
+        "note": 97,
+        "instrument": 0,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 0,
+        "instrument": 0,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "instruments": [
+   {
+    "id": 1,
+    "name": "",
+    "type": "synth",
+    "synthType": "TFMXSynth",
+    "effects": [],
+    "volume": 64,
+    "pan": 0
+   }
+  ]
+ },
+ "futurePlayer": {
+  "patterns": [
+   {
+    "id": "pattern-0",
+    "name": "Pattern 0",
+    "length": 4,
+    "channels": [
+     {
+      "id": "channel-0",
+      "name": "Channel 1",
+      "muted": false,
+      "solo": false,
+      "collapsed": false,
+      "volume": 100,
+      "pan": 0,
+      "instrumentId": null,
+      "color": null,
+      "rows": [
+       {
+        "note": 6,
+        "instrument": 1,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 37,
+        "instrument": 1,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 0,
+        "instrument": 0,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       },
+       {
+        "note": 97,
+        "instrument": 0,
+        "volume": 0,
+        "effTyp": 0,
+        "eff": 0,
+        "effTyp2": 0,
+        "eff2": 0
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "instruments": [
+   {
+    "id": 1,
+    "name": "",
+    "type": "synth",
+    "synthType": "FuturePlayerSynth",
+    "effects": [],
+    "volume": 64,
+    "pan": 0,
+    "metadata": {
+     "fpInstrPtr": 1234,
+     "fpIsWavetable": false,
+     "fpSampleSize": 512,
+     "fpOctaveBias": 12
+    }
+   }
+  ]
+ }
+}

@@ -29,6 +29,7 @@ import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
+import { noteValueToPitch, pitchName } from '@/lib/tracker/noteValue';
 
 const ROW_HEIGHT   = 24;
 const CHAR_WIDTH   = 10;
@@ -64,7 +65,12 @@ function buildNoteTable(displayOffset: number): string[] {
   return table;
 }
 
-function noteStr(n: number, displayOffset: number): string {
+export function noteStr(n: number, displayOffset: number): string {
+  if (n < 0) {
+    // The octave below C-0 (stored -12..-1) by its own name, c_1..b_1
+    const p = noteValueToPitch(n);
+    return (p !== null ? pitchName(p + displayOffset) : null) ?? '???';
+  }
   const table = NOTE_CACHE.get(displayOffset) ?? buildNoteTable(displayOffset);
   return n === 0 ? '···' : (table[n] ?? '???');
 }

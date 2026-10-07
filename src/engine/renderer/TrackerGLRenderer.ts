@@ -25,6 +25,7 @@ import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
+import { noteValueToPitch, pitchName } from '@/lib/tracker/noteValue';
 import type {
   PatternSnapshot,
   CursorSnapshot,
@@ -143,7 +144,7 @@ const HEX1_TABLE: string[] = Array.from({ length: 16 }, (_, i) => i.toString(16)
 
 // Pre-compute note strings — 192 entries covers GT Ultra range (1-188), standard (1-96), and OFF (97)
 const NOTE_CACHE = new Map<number, string[]>();
-function getNoteTable(displayOffset: number): string[] {
+export function getNoteTable(displayOffset: number): string[] {
   let table = NOTE_CACHE.get(displayOffset);
   if (table) return table;
   table = new Array(192);
@@ -157,6 +158,13 @@ function getNoteTable(displayOffset: number): string[] {
   table[97] = 'OFF';
   NOTE_CACHE.set(displayOffset, table);
   return table;
+}
+
+/** The glyphs of a stored note: the table for 0..191, the octave below C-0 (stored -12..-1) by its own name. */
+export function noteGlyphs(table: string[], v: number, displayOffset: number): string {
+  if (v >= 0) return table[v] ?? '---';
+  const p = noteValueToPitch(v);
+  return (p !== null ? pitchName(p + displayOffset) : null) ?? '---';
 }
 
 const COL_GAP = 4; // Gap between columns in data-driven mode
@@ -744,10 +752,10 @@ export class TrackerGLRenderer {
 
         if (isCollapsed) {
           const x = colX + Math.floor((chW - noteWidth) / 2);
-          const noteHas = (cell.note ?? 0) > 0;
+          const noteHas = (cell.note ?? 0) !== 0;
           const nc = lerpWhiteRGBA(noteHas ? colors.textNote : colors.textMuted, noteHas ? glow : 0);
           this.setTmpColor(nc, cellAlpha);
-          this.addGlyphString(noteTable[cell.note ?? 0] ?? '---', x, gy, atlas, this.tmpColor, noteHas && bold);
+          this.addGlyphString(noteGlyphs(noteTable, cell.note ?? 0, ui.noteDisplayOffset), x, gy, atlas, this.tmpColor, noteHas && bold);
           continue;
         }
 
@@ -804,13 +812,13 @@ export class TrackerGLRenderer {
               : nc === 1 ? (cell.note2 ?? 0)
               : nc === 2 ? (cell.note3 ?? 0) : (cell.note4 ?? 0);
             if (!ui.blankEmpty || cellNote !== 0) {
-              const noteHas = cellNote > 0;
+              const noteHas = cellNote !== 0;
               const noteColor = lerpWhiteRGBA(
                 cellNote === 0 ? colors.textMuted
                 : cellNote === 97 ? colors.textEffect
                 : colors.textNote, noteHas ? glow : 0);
               this.setTmpColor(noteColor, cellAlpha);
-              this.addGlyphString(noteTable[cellNote] ?? '---', ncX, gy, atlas, this.tmpColor, noteHas && bold);
+              this.addGlyphString(noteGlyphs(noteTable, cellNote, ui.noteDisplayOffset), ncX, gy, atlas, this.tmpColor, noteHas && bold);
             }
 
             let px = ncX + noteWidth + 4;

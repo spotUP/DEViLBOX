@@ -146,7 +146,7 @@ export const useBlockOperations = () => {
                 const midiNote = xmNoteToMidi(cell.note);
                 if (midiNote !== null) {
                   const newMidiNote = midiNote + semitones;
-                  if (newMidiNote >= 12 && newMidiNote <= 107) {
+                  if (newMidiNote >= 0 && newMidiNote <= 107) { // c_1 (MIDI 0) .. B-7
                     cell.note = midiToXMNote(newMidiNote);
                   }
                 }

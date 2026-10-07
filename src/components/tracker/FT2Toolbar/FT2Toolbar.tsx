@@ -290,6 +290,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           return;
         } catch (e) {
           console.warn('[Save] native .mod export failed, falling back to .dbx:', e);
+          notify.warning(`.mod not written (${e instanceof Error ? e.message : String(e)}); saving as .dbx`);
         }
       }
 

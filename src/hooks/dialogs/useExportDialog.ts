@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
 import {
   useTrackerStore,
   useInstrumentStore,
@@ -219,6 +220,8 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     downloadFn: (blob: Blob, filename: string) => void,
     onClose: () => void,
   ) => {
+    const refusal = lowOctaveExportRefusal(patterns, 'Nano');
+    if (refusal) throw new Error(refusal);
     const sequence = patterns.map((_: unknown, idx: number) => idx);
     const nanoData = NanoExporter.export(instruments, patterns, sequence, bpm, 6);
     const blob = new Blob([new Uint8Array(nanoData)], { type: 'application/octet-stream' });

@@ -32,27 +32,17 @@ import type { EphemeralDubSettings, EphemeralDubSettingsTarget } from '../../lib
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
 import { isChannelShapeKind } from '../../lib/dub/channelShape';
 import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths, testMAMESynths } from '../../utils/synthTester';
+import { parseNoteName } from '../../lib/tracker/noteValue';
 
 // ─── Note Parsing ──────────────────────────────────────────────────────────────
 
-const NOTE_MAP: Record<string, number> = {
-  'C-': 0, 'C#': 1, 'D-': 2, 'D#': 3, 'E-': 4, 'F-': 5,
-  'F#': 6, 'G-': 7, 'G#': 8, 'A-': 9, 'A#': 10, 'B-': 11,
-};
-
 function parseNoteString(noteStr: string): number | undefined {
-  const upper = noteStr.toUpperCase().trim();
+  const t = noteStr.trim();
+  const upper = t.toUpperCase();
   if (upper === 'OFF') return 97;
   if (upper === '---' || upper === '') return 0;
-  if (upper.length >= 3) {
-    const notePart = upper.substring(0, 2);
-    const octave = parseInt(upper.substring(2), 10);
-    const noteIndex = NOTE_MAP[notePart];
-    if (noteIndex !== undefined && !isNaN(octave) && octave >= 0 && octave <= 7) {
-      return noteIndex + octave * 12 + 1;
-    }
-  }
-  return undefined;
+  // One parser for every note name (C-4, C#4, and the octave below C-0, c_1 .. b_1)
+  return parseNoteName(t) ?? undefined;
 }
 
 function resolveNote(note: unknown): number | undefined {
