@@ -902,6 +902,7 @@ function buildHivelyNativeData(mod: HivelyModule): HivelyNativeData {
     positions,
     tempo: mod.defaultTempo,
     speedMultiplier: mod.speedMultiplier,
+    restartPosition: mod.restartPosition,
   };
 }
 
