@@ -167,6 +167,19 @@ const FORMATS: Format[] = [
     },
   },
   {
+    name: 'Steve Turner paradroid90.jpo', song: 'steve-turner/paradroid90.jpo', synthType: 'SteveTurnerSynth', worklet: ['steveturner', 'SteveTurner'],
+    pick: (i) => i.find((x) => x.synthType === 'SteveTurnerSynth' && x.id === 14),
+    make: async (inst, send) => {
+      const { SteveTurnerEngine } = await import('@/engine/steveturner/SteveTurnerEngine');
+      const fake = engineOver(SteveTurnerEngine as never, send) as unknown as Record<string, unknown>;
+      fake._initPromise = Promise.resolve();
+      const { SteveTurnerSynth } = await import('@/engine/steveturner/SteveTurnerSynth');
+      const s = new SteveTurnerSynth();
+      s.setInstrumentIndex(inst.id - 1);
+      return s as unknown as Keyed;
+    },
+  },
+  {
     name: 'TFMX Professional hbtitle', sustains: false, song: 'tfmx/mdat.hbtitle', companion: 'tfmx/smpl.hbtitle', synthType: 'TFMXSynth', worklet: ['tfmx', 'TFMX'],
     pick: (i) => i.find((x) => x.synthType === 'TFMXSynth' && x.id === 9),
     make: async (inst, send) => {

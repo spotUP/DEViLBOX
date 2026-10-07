@@ -60,7 +60,11 @@ export class SteveTurnerSynth implements DevilboxSynth {
     const stNote = Math.max(0, Math.min(83, midi - 24));
     const vel = Math.round(velocity * 127);
 
-    ensureEngineLoaded().then(engine => {
+    ensureEngineLoaded().then(async engine => {
+      // No song running: the replayer needs the module to play the instrument (the song stays paused).
+      const { useFormatStore } = await import('@/stores/useFormatStore');
+      const module = useFormatStore.getState().steveTurnerFileData;
+      if (module) await engine.loadPreviewModule(module as ArrayBuffer);
       engine.noteOn(this.instrumentIndex, stNote, vel);
     }).catch(() => {});
   }

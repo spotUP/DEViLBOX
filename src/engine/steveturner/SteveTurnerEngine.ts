@@ -23,6 +23,10 @@ export class SteveTurnerEngine extends WASMSingletonBase {
 
   private _pendingRequests: Map<number, { resolve: (data: unknown) => void }> = new Map();
   private _nextRequestId = 1;
+  /** True between play() and stop()/pause(): the song is running in the worklet. */
+  private _songPlaying = false;
+  /** The module bytes a key loaded (paused) when no song was running; null when the engine holds the song's own load. */
+  private _previewSource: ArrayBuffer | null = null;
 
   private constructor() {
     super();
@@ -129,19 +133,38 @@ export class SteveTurnerEngine extends WASMSingletonBase {
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    this._previewSource = null;
+  }
+
+  /**
+   * Make the replayer hold `module` for a key when no song is running (a key before the first Play, or after
+   * Stop): player_load starts the song, so the load is followed at once by a pause, which keeps the module and
+   * the preview voice (it ticks while the song is paused) without the song sounding. A running song, or the
+   * module this engine already holds for the keys, is left alone.
+   */
+  async loadPreviewModule(module: ArrayBuffer): Promise<void> {
+    if (this._songPlaying || this._previewSource === module) return;
+    await this._initPromise;
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: module.slice(0) });
+    this.workletNode.port.postMessage({ type: 'pause' });
+    this._previewSource = module;
   }
 
   play(): void {
     // Resume playback (loadTune already starts the song via player_load)
+    this._songPlaying = true;
     this.workletNode?.port.postMessage({ type: 'resume' });
   }
 
   stop(): void {
     // Pause instead of stop to keep module loaded for note preview
+    this._songPlaying = false;
     this.workletNode?.port.postMessage({ type: 'pause' });
   }
 
   pause(): void {
+    this._songPlaying = false;
     this.workletNode?.port.postMessage({ type: 'pause' });
   }
 
