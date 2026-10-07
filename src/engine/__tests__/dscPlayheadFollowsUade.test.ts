@@ -19,6 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { drainPaulaLog, PaulaNoteOns, type PaulaLogHost } from './gridOracle';
 import { startWorklet, songBuffer, stereoOutputs } from './workletHarness';
 import { parseDscFile } from '@/lib/import/formats/DigitalSonixChromeParser';
 import { decodeDscModule, encodeDscModule } from '@/lib/import/formats/DigitalSonixChromeModule';
@@ -28,12 +29,10 @@ import { uadePlayerHint } from '@/lib/import/uadePlayerHint';
 
 const DIR = 'public/data/songs/digital-sonix-and-chrome/David Hanlon';
 
-interface Wasm {
-  HEAPU8: Uint8Array;
+type Wasm = PaulaLogHost & {
   _malloc(n: number): number;
   _uade_wasm_enable_paula_log(on: number): void;
-  _uade_wasm_get_paula_log(ptr: number, max: number): number;
-}
+};
 
 async function playAndCompare(file: string, subsong: number, seconds: number): Promise<{ checked: number; wrong: string[]; lastRowShown: number }> {
   const bytes = new Uint8Array(readFileSync(join(process.cwd(), DIR, file)));
@@ -54,7 +53,7 @@ async function playAndCompare(file: string, subsong: number, seconds: number): P
   const wasm = proc._wasm as Wasm;
   wasm._uade_wasm_enable_paula_log(1);
   const logPtr = wasm._malloc(512 * 12);
-  const armed = [false, false, false, false];
+  const noteRule = new PaulaNoteOns('armed');
   const wrong: string[] = [];
   let checked = 0;
   let lastRowShown = -1;
@@ -64,15 +63,10 @@ async function playAndCompare(file: string, subsong: number, seconds: number): P
     const before = posted.length;
     proc.process([], stereoOutputs(37));
     // Note-ons Paula received while rendering this block.
-    const n = wasm._uade_wasm_get_paula_log(logPtr, 512);
-    const u32 = new Uint32Array(wasm.HEAPU8.buffer, logPtr, n * 3);
     const noteOns: Array<[number, number]> = [];
-    for (let i = 0; i < n; i++) {
-      const w = u32[i * 3];
-      const ch = w >>> 24, reg = (w >>> 16) & 0xff, value = w & 0xffff;
-      if (ch > 3) continue;
-      if (reg === 0 || reg === 1) armed[ch] = true;
-      else if (reg === 3 && armed[ch] && value >= 60 && value <= 7000) { armed[ch] = false; noteOns.push([ch, value]); }
+    for (const w of drainPaulaLog(wasm, logPtr)) {
+      const period = noteRule.push(w);
+      if (period !== null) noteOns.push([w.voice, period]);
     }
     // The position the app receives for this block, mapped as UADEEngine maps it.
     const pos = posted.slice(before).find((m) => m.type === 'position') as { playerTickCount?: number } | undefined;

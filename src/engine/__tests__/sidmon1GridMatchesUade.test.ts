@@ -22,16 +22,12 @@ import { join } from 'node:path';
 import { loadSharedWorkletScripts, startWorklet, songBuffer } from './workletHarness';
 import { parseSidMon1File } from '@/lib/import/formats/SidMon1Parser';
 import { SM1_DISPLAY_SHIFT } from '@/engine/uade/encoders/SidMon1Encoder';
-import { loadUADEModule, refreshHeap, type UADEModule } from '../../../tools/uade-audit/uadeRenderCore';
+import { openUade, PaulaSession } from './gridOracle';
 
 const SECS = 30;
 const TICKS = SECS * 50 - 50;
 const SONG = 'public/data/songs/formats/anarchy.sid1';
 
-interface LogModule extends UADEModule {
-  _uade_wasm_enable_paula_log(on: number): void;
-  _uade_wasm_get_paula_log(outPtr: number, max: number): number;
-}
 interface Mod {
   _malloc(n: number): number;
   _player_render(ptr: number, frames: number): number;
@@ -41,29 +37,15 @@ interface Mod {
 
 /** UADE's Paula writes: [ms, voice, register (0 LCH, 3 PER), value]. */
 async function uadeWrites(): Promise<number[][]> {
-  const mod = (await loadUADEModule(false)) as LogModule;
-  if (mod._uade_wasm_init(44100) !== 0) throw new Error('uade init failed');
+  const mod = await openUade();
   const data = new Uint8Array(readFileSync(join(__dirname, '../../../', SONG)));
-  const ptr = mod._malloc(data.byteLength);
-  refreshHeap(mod);
-  mod.HEAPU8.set(data, ptr);
-  const hint = mod._malloc(64);
-  mod.stringToUTF8('anarchy.sid1', hint, 64);
-  mod._uade_wasm_stop(); mod._uade_wasm_set_looping(0); mod._uade_wasm_set_one_subsong(1);
-  if (mod._uade_wasm_load(ptr, data.byteLength, hint) !== 0) throw new Error('UADE refused the module');
-  mod._uade_wasm_enable_paula_log(1);
-  const CH = 441;
-  const pL = mod._malloc(CH * 4), pR = mod._malloc(CH * 4), log = mod._malloc(512 * 12);
+  const session = new PaulaSession(mod, data, 'anarchy.sid1', { logBeforeLoad: false });
   const out: number[][] = [];
   for (let chunk = 1; chunk * 10 < SECS * 1000; chunk++) {
-    if (mod._uade_wasm_render(pL, pR, CH) <= 0) break;
-    const n = mod._uade_wasm_get_paula_log(log, 512);
-    refreshHeap(mod);
-    const u32 = new Uint32Array(mod.HEAPU8.buffer, log, n * 3);
-    for (let i = 0; i < n; i++) {
-      const w = u32[i * 3];
-      const reg = (w >>> 16) & 0xff;
-      if ((w >>> 24) < 4 && (reg === 0 || reg === 3)) out.push([chunk * 10, w >>> 24, reg, w & 0xffff]);
+    const writes = session.step();
+    if (!writes) break;
+    for (const w of writes) {
+      if (w.voice < 4 && (w.reg === 0 || w.reg === 3)) out.push([chunk * 10, w.voice, w.reg, w.value]);
     }
   }
   mod._uade_wasm_stop();

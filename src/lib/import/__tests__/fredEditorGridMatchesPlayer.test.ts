@@ -18,7 +18,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { loadUADEModule, refreshHeap, type UADEModule } from '../../../../tools/uade-audit/uadeRenderCore';
+import { openUade, PaulaSession, PaulaNoteOns, PAULA_CHUNK, type PaulaLogModule } from '@/engine/__tests__/gridOracle';
 import { parseFredEditorFile } from '../formats/FredEditorParser';
 import { decodeFredModule } from '../formats/FredEditorModule';
 import { exportFredEditor } from '@lib/export/FredEditorExporter';
@@ -30,11 +30,6 @@ const scanGrid = vi.hoisted(() => ({ name: 'uade-scan-grid', patterns: [], instr
 vi.mock('@lib/import/formats/UADEParser', () => ({ parseUADEFile: vi.fn(async () => scanGrid) }));
 import { parseModuleToSong } from '../parseModuleToSong';
 
-interface LogModule extends UADEModule {
-  _uade_wasm_enable_paula_log(on: number): void;
-  _uade_wasm_get_paula_log(outPtr: number, max: number): number;
-}
-
 /** Lab2_PeriodTable. */
 const PERIODS = [
   8192, 7728, 7296, 6888, 6504, 6136, 5792, 5464, 5160, 4872, 4600, 4336,
@@ -44,8 +39,6 @@ const PERIODS = [
   512, 483, 456, 430, 406, 383, 362, 341, 322, 304, 287, 271,
   256, 241, 228, 215, 203, 191, 181, 170, 161, 152, 143, 135,
 ];
-const CHUNK = 441; // 10 ms
-const REG_LEN = 2, REG_PER = 3, REG_VOL = 4;
 
 
 const load = (p: string) => new Uint8Array(readFileSync(join(process.cwd(), p)));
@@ -73,40 +66,19 @@ function gridNoteOns(song: TrackerSong, bytes: Uint8Array): { tick: number; peri
 }
 
 /** UADE's note-on bursts per voice over `seconds`. */
-function paulaNoteOns(mod: LogModule, bytes: Uint8Array, name: string, seconds: number): { ms: number; period: number }[][] {
-  const ptr = mod._malloc(bytes.length);
-  refreshHeap(mod);
-  mod.HEAPU8.set(bytes, ptr);
-  const hint = mod._malloc(name.length * 4 + 1);
-  mod.stringToUTF8(name, hint, name.length * 4 + 1);
-  mod._uade_wasm_stop();
-  mod._uade_wasm_set_looping(0);
-  mod._uade_wasm_set_one_subsong(1);
-  mod._uade_wasm_enable_paula_log(1);
-  const ret = mod._uade_wasm_load(ptr, bytes.length, hint);
-  mod._free(ptr); mod._free(hint);
-  if (ret !== 0) throw new Error(`UADE refused ${name} (${ret})`);
-  const pL = mod._malloc(CHUNK * 4), pR = mod._malloc(CHUNK * 4), logPtr = mod._malloc(512 * 12);
+function paulaNoteOns(mod: PaulaLogModule, bytes: Uint8Array, name: string, seconds: number): { ms: number; period: number }[][] {
+  const session = new PaulaSession(mod, bytes, name);
+  const rule = new PaulaNoteOns('volZeroAfterLen');
   const out: { ms: number; period: number }[][] = [[], [], [], []];
-  const last = [-1, -1, -1, -1];
-  const vol0AfterLen = [false, false, false, false];
-  for (let c = 0; c < (seconds * 44100) / CHUNK; c++) {
-    if (mod._uade_wasm_render(pL, pR, CHUNK) <= 0) break;
-    const n = mod._uade_wasm_get_paula_log(logPtr, 512);
-    refreshHeap(mod);
-    const u32 = new Uint32Array(mod.HEAPU8.buffer, logPtr, n * 3);
-    for (let i = 0; i < n; i++) {
-      const w = u32[i * 3];
-      const ch = w >>> 24, reg = (w >>> 16) & 0xff, value = w & 0xffff;
-      if (ch > 3) continue;
-      if (reg === REG_PER && vol0AfterLen[ch]) out[ch].push({ ms: c * 10, period: value });
-      vol0AfterLen[ch] = reg === REG_VOL && value === 0 && last[ch] === REG_LEN;
-      last[ch] = reg;
+  for (let c = 0; c < (seconds * 44100) / PAULA_CHUNK; c++) {
+    const writes = session.step();
+    if (!writes) break;
+    for (const w of writes) {
+      const period = rule.push(w);
+      if (period !== null) out[w.voice].push({ ms: c * 10, period });
     }
   }
-  mod._uade_wasm_enable_paula_log(0);
-  mod._free(pL); mod._free(pR); mod._free(logPtr);
-  mod._uade_wasm_stop();
+  session.close();
   return out;
 }
 
@@ -125,8 +97,7 @@ describe('Fred Editor grid matches the replayer', () => {
       const grid = gridNoteOns(song, bytes);
       expect(grid.map((c) => c.length)).toEqual(notes);
       const rows = song.patterns.reduce((n, p) => n + p.length, 0);
-      const mod = (await loadUADEModule(false)) as LogModule;
-      expect(mod._uade_wasm_init(44100)).toBe(0);
+      const mod = await openUade();
       try {
         // The whole grid, stopping before the second pass reaches the first notes again.
         const paula = paulaNoteOns(mod, bytes, name, (rows * song.initialSpeed) / 50);

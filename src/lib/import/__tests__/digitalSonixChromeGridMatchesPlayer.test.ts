@@ -16,7 +16,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { loadUADEModule, refreshHeap, type UADEModule } from '../../../../tools/uade-audit/uadeRenderCore';
+import { openUade, PaulaSession, PaulaNoteOns, PAULA_CHUNK, chipRamEngine, type PaulaLogModule, type PaulaWrite } from '@/engine/__tests__/gridOracle';
 import { parseDscFile } from '../formats/DigitalSonixChromeParser';
 import { decodeDscModule } from '../formats/DigitalSonixChromeModule';
 import { periodToPitch, periodToNote } from '@/lib/amiga/periodNotes';
@@ -30,18 +30,9 @@ vi.mock('@/engine/uade/UADEEngine', () => ({ UADEEngine: { hasInstance: () => tr
 const scanGrid = vi.hoisted(() => ({ name: 'uade-scan-grid', patterns: [], instruments: [] }));
 vi.mock('@lib/import/formats/UADEParser', () => ({ parseUADEFile: vi.fn(async () => scanGrid) }));
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
-import type { UADEEngine } from '@/engine/uade/UADEEngine';
-
-interface LogModule extends UADEModule {
-  _uade_wasm_enable_paula_log(on: number): void;
-  _uade_wasm_get_paula_log(outPtr: number, max: number): number;
-  _uade_wasm_read_memory(addr: number, dst: number, len: number): number;
-  _uade_wasm_write_memory(addr: number, src: number, len: number): number;
-}
 
 const NAME = "dragon'sbreath ingame 1.dsc";
 const FILE = join(process.cwd(), 'public/data/songs/digital-sonix-and-chrome/David Hanlon', NAME);
-const CHUNK = 441; // 10 ms
 const INIT_PITCH = periodToPitch(150);
 
 function load(): Uint8Array {
@@ -61,81 +52,30 @@ function gridPitches(song: TrackerSong): number[][] {
   return out;
 }
 
-/** Paula note-ons per voice: an AUDxPER write (60..7000) after an AUDxLC write on that voice. */
-class PaulaNotes {
-  readonly notes: number[][] = [[], [], [], []];
-  private readonly armed = [false, false, false, false];
-  private readonly mod: LogModule;
-  private readonly logPtr: number;
-  constructor(mod: LogModule, logPtr: number) { this.mod = mod; this.logPtr = logPtr; }
-  drain(): void {
-    const n = this.mod._uade_wasm_get_paula_log(this.logPtr, 512);
-    refreshHeap(this.mod);
-    const u32 = new Uint32Array(this.mod.HEAPU8.buffer, this.logPtr, n * 3);
-    for (let i = 0; i < n; i++) {
-      const w = u32[i * 3];
-      const ch = w >>> 24, reg = (w >>> 16) & 0xff, value = w & 0xffff;
-      if (ch > 3) continue;
-      if (reg === 0 || reg === 1) this.armed[ch] = true;
-      else if (reg === 3 && this.armed[ch] && value >= 60 && value <= 7000) {
-        this.armed[ch] = false;
-        this.notes[ch].push(periodToPitch(value));
-      }
-    }
-  }
-}
-
-/** Load into UADE (subsong 0, log on from before the load), render `seconds`, calling `at` once at `atSeconds`. */
+/** Load into UADE (subsong 0, log on from before the load), render `seconds`, calling `at` once at `atSeconds`. Paula note-ons per voice, as pitches. */
 async function renderPaula(
-  mod: LogModule, bytes: Uint8Array, seconds: number,
+  mod: PaulaLogModule, bytes: Uint8Array, seconds: number,
   at?: { seconds: number; run: () => Promise<void> },
 ): Promise<number[][]> {
-  const ptr = mod._malloc(bytes.length);
-  refreshHeap(mod);
-  mod.HEAPU8.set(bytes, ptr);
-  const hintPtr = mod._malloc(NAME.length * 4 + 1);
-  mod.stringToUTF8(NAME, hintPtr, NAME.length * 4 + 1);
-  mod._uade_wasm_stop();
-  mod._uade_wasm_set_looping(0);
-  mod._uade_wasm_set_one_subsong(1);
-  mod._uade_wasm_enable_paula_log(1);
-  const ret = mod._uade_wasm_load(ptr, bytes.length, hintPtr);
-  mod._free(ptr); mod._free(hintPtr);
-  if (ret !== 0) throw new Error(`UADE refused ${NAME} (${ret})`);
-  const pL = mod._malloc(CHUNK * 4), pR = mod._malloc(CHUNK * 4), logPtr = mod._malloc(512 * 12);
-  const paula = new PaulaNotes(mod, logPtr);
+  const session = new PaulaSession(mod, bytes, NAME);
+  const rule = new PaulaNoteOns('armed');
+  const notes: number[][] = [[], [], [], []];
+  const feed = (writes: PaulaWrite[]): void => {
+    for (const w of writes) {
+      const period = rule.push(w);
+      if (period !== null) notes[w.voice].push(periodToPitch(period));
+    }
+  };
   let ran = false;
-  for (let f = 0; f < 44100 * seconds; f += CHUNK) {
-    if (at && !ran && f >= 44100 * at.seconds) { ran = true; paula.drain(); await at.run(); }
-    if (mod._uade_wasm_render(pL, pR, CHUNK) <= 0) break;
-    paula.drain();
+  for (let f = 0; f < 44100 * seconds; f += PAULA_CHUNK) {
+    if (at && !ran && f >= 44100 * at.seconds) { ran = true; feed(session.drain()); await at.run(); }
+    const writes = session.step();
+    if (!writes) break;
+    feed(writes);
   }
-  mod._uade_wasm_enable_paula_log(0);
-  mod._free(pL); mod._free(pR); mod._free(logPtr);
-  mod._uade_wasm_stop();
+  session.close();
   // Drop the load-time init write.
-  return paula.notes.map((n) => (n[0] === INIT_PITCH ? n.slice(1) : n));
-}
-
-/** The UADEEngine surface UADEChipEditor uses, backed by the wasm module's chip RAM. */
-function chipRamEngine(mod: LogModule): UADEEngine {
-  return {
-    readMemory: async (addr: number, len: number) => {
-      const p = mod._malloc(len);
-      mod._uade_wasm_read_memory(addr, p, len);
-      refreshHeap(mod);
-      const out = mod.HEAPU8.slice(p, p + len);
-      mod._free(p);
-      return out;
-    },
-    writeMemory: async (addr: number, data: Uint8Array) => {
-      const p = mod._malloc(data.length);
-      refreshHeap(mod);
-      mod.HEAPU8.set(data, p);
-      mod._uade_wasm_write_memory(addr, p, data.length);
-      mod._free(p);
-    },
-  } as unknown as UADEEngine;
+  return notes.map((n) => (n[0] === INIT_PITCH ? n.slice(1) : n));
 }
 
 describe('Digital Sonix & Chrome grid matches the player', () => {
@@ -154,8 +94,7 @@ describe('Digital Sonix & Chrome grid matches the player', () => {
   });
 
   it("UADE's Paula note-ons over the whole song are the grid's notes, in order, on every voice", async () => {
-    const mod = (await loadUADEModule(false)) as LogModule;
-    expect(mod._uade_wasm_init(44100)).toBe(0);
+    const mod = await openUade();
     try {
       // 16 entries x 64 rows x 5 ticks / 50 Hz = 102.4 s; stop just before the loop.
       const paula = await renderPaula(mod, bytes, 102.3);
@@ -179,8 +118,7 @@ describe('Digital Sonix & Chrome grid matches the player', () => {
     const before = song.patterns[song.songPositions[0]].channels[0].rows.filter((c) => c.note > 0).length
       + rows.slice(0, row).filter((c) => c.note > 0).length;
 
-    const mod = (await loadUADEModule(false)) as LogModule;
-    expect(mod._uade_wasm_init(44100)).toBe(0);
+    const mod = await openUade();
     try {
       const seconds = ((64 + row) * 5) / 50 + 2;
       const plain = await renderPaula(mod, bytes, seconds);
