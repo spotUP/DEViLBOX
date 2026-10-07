@@ -16,6 +16,9 @@ import { useUIStore } from '@stores/useUIStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { isTextEntryTarget } from '@/lib/keyboard/isTextEntryTarget';
 import { isKeyHandled } from '@/lib/tracker/keyHandledSentinel';
+import { stepRow, jumpRow, startHeldRepeat } from '@/lib/tracker/cursorNavigation';
+import { isManualRowNavAllowed } from '@/lib/tracker/playbackNavigation';
+import { nextTabChannel } from '@/lib/tracker/tabNavigation';
 import { planNoteEntry, planCursorEntry, typedPitch, type EntryContext } from '@/lib/tracker/formatEntryPlan';
 import { undoHively, redoHively, insertHivelyRow, deleteHivelyRow } from '@/components/hively/hivelyEdit';
 import { typedNoteValue } from '@/components/shared/format-editor-types';
@@ -189,32 +192,25 @@ export function handleFormatKey(e: KeyboardEvent, host: FormatKeyHost): void {
       return;
     }
 
-    // Arrow up/down: RAF-based hold-to-scroll (no initial delay, 50ms interval)
-    // Shift+Arrow extends selection
+    // Row navigation is the classic editor's rule (cursorNavigation.ts, playbackNavigation.ts): not while the song plays and
+    // the view follows the play head; wrap at the ends when the keymap wraps; the keymap's page size; the shared held-key repeat.
+    const rowNavAllowed = () => isManualRowNavAllowed(host.isPlaying(), useEditorStore.getState().followPlayback);
+    const behavior = useEditorStore.getState().activeBehavior;
+    const stepCursorRow = (dir: -1 | 1, extend?: boolean) => {
+      const to = stepRow(host.getCursor().rowIndex, dir, numRows, behavior.cursorWrapVertical);
+      moveCursor({ rowIndex: to - host.getCursor().rowIndex }, extend);
+    };
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      if (!rowNavAllowed()) return;
       e.preventDefault();
-      if (e.repeat) return; // RAF loop handles repeats
+      if (e.repeat) return; // the shared repeat loop handles repeats
       const dir = e.key === 'ArrowUp' ? -1 : 1;
-      moveCursor({ rowIndex: dir }, e.shiftKey);
+      stepCursorRow(dir, e.shiftKey);
       if (!e.shiftKey) {
-        // Only start RAF scroll for non-shift arrows
         host.heldArrow.current = { dir };
-        if (!host.arrowRaf.current) {
-          let lastMove = performance.now();
-          const tick = (now: number) => {
-            if (!host.heldArrow.current) { host.arrowRaf.current = 0; return; }
-            if (now - lastMove >= 50) {
-              lastMove = now;
-              host.setCursor(prev => ({
-                ...prev,
-                rowIndex: Math.max(0, Math.min(numRows - 1,
-                  prev.rowIndex + host.heldArrow.current!.dir)),
-              }));
-            }
-            host.arrowRaf.current = requestAnimationFrame(tick);
-          };
-          host.arrowRaf.current = requestAnimationFrame(tick);
-        }
+        startHeldRepeat(host.arrowRaf, () => host.heldArrow.current, () => {
+          if (rowNavAllowed()) stepCursorRow(host.heldArrow.current!.dir as -1 | 1);
+        });
       }
       return;
     }
@@ -250,11 +246,27 @@ export function handleFormatKey(e: KeyboardEvent, host: FormatKeyHost): void {
     switch (e.key) {
       case 'ArrowLeft':  e.preventDefault(); moveCursor({ columnIndex: -1 }, e.shiftKey); return;
       case 'ArrowRight': e.preventDefault(); moveCursor({ columnIndex: +1 }, e.shiftKey); return;
-      case 'Tab':        e.preventDefault(); moveCursor({ channelIndex: e.shiftKey ? -1 : +1 }); return;
-      case 'PageUp':     e.preventDefault(); moveCursor({ rowIndex: -16 }, e.shiftKey); return;
-      case 'PageDown':   e.preventDefault(); moveCursor({ rowIndex: +16 }, e.shiftKey); return;
-      case 'Home':       e.preventDefault(); host.setCursor(p => ({ ...p, rowIndex: 0 })); host.setSelection(null); return;
-      case 'End':        e.preventDefault(); host.setCursor(p => ({ ...p, rowIndex: Math.max(0, numRows - 1) })); host.setSelection(null); return;
+      case 'Tab': {
+        e.preventDefault();
+        // classic: Tab / Shift+Tab land on the next / previous channel's note column, wrapping
+        const ch = nextTabChannel(pos.channelIndex, host.channels.length, e.shiftKey);
+        const cols = host.channels[ch]?.columns ?? host.columns;
+        const noteCol = Math.max(0, cols.findIndex((c) => c.type === 'note'));
+        host.setCursor((p) => ({ ...p, channelIndex: ch, columnIndex: noteCol }));
+        host.setSelection(null);
+        return;
+      }
+      case 'PageUp':
+      case 'PageDown':
+      case 'Home':
+      case 'End': {
+        if (!rowNavAllowed()) return;
+        e.preventDefault();
+        const to = jumpRow(e.key, pos.rowIndex, numRows, behavior.pageJumpSize);
+        if (e.key === 'PageUp' || e.key === 'PageDown') moveCursor({ rowIndex: to - pos.rowIndex }, e.shiftKey);
+        else { host.setCursor((p) => ({ ...p, rowIndex: to })); host.setSelection(null); }
+        return;
+      }
       case 'Delete':
       case 'Backspace':
         e.preventDefault();
