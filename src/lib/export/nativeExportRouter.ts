@@ -245,7 +245,8 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
   if (format === 'JamCracker') {
     const { exportAsJamCracker } = await import('./JamCrackerExporter');
     result = await exportAsJamCracker(song);
-  } else if (format === 'SMON') {
+  } else if (format === 'SMON' || layoutFormatId === 'soundMon') {
+    // The parser reports format 'MOD' (so UADE routes it); the layout names the format.
     const { exportAsSoundMon } = await import('./SoundMonExporter');
     result = await exportAsSoundMon(song);
   } else if (isSynTracker(song)) {
