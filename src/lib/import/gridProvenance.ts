@@ -85,7 +85,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   deltaMusic2: 'pass',
   digi: 'pass',
   digitalSonixChrome: 'pass',
-  digitalSoundStudio: 'fail',
+  digitalSoundStudio: 'pass',
   dtm: 'n/a',
   faceTheMusic: 'pass',
   far: 'n/a',
@@ -165,7 +165,6 @@ export const LIVE_WHILE_PLAYING_WHY: Record<string, string> = {
 /** Why a LIVE_EDIT row is 'fail' (plan unit in thoughts/shared/plans/2026-10-06-fix-all-open.md, G19). */
 export const LIVE_EDIT_WHY: Record<string, string> = {
   benDaglish: 'G16: grid edits have no writer (the walk grid has no cell-to-command-byte map)',
-  digitalSoundStudio: 'G19-dss: no exporter or layout writes the edit into dssFileData; the engine plays the loaded module',
   maxTrax: 'G19-maxTrax: the export encodes the MaxTrax model, which a grid edit does not reach',
   sidmon2: 'G19-sidmon2: the export reads the running engine (none on play) and the variable encoder returns 212 bytes for a 62-byte slot',
   tfmMusicMaker: 'G19-tfm: no exporter and no cell layout',
@@ -190,7 +189,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   deltaMusic2: 'pass',
   digi: 'pass',
   digitalSonixChrome: 'fail',
-  digitalSoundStudio: 'fail',
+  digitalSoundStudio: 'pass',
   dtm: 'n/a',
   faceTheMusic: 'pass',
   far: 'n/a',

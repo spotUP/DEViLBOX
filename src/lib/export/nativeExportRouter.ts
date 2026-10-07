@@ -276,6 +276,12 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // Activision Pro: its module (with the grid's edits) is the export.
     const { exportActivisionPro } = await import('./ActivisionProExporter');
     result = await exportActivisionPro(song);
+  } else if (song.dssFileData) {
+    // Digital Sound Studio keeps format 'MOD' (no chip-RAM layout: its samples are native Sampler
+    // instruments); the grid's edits are the export.
+    const { exportDssEdited } = await import('./DSSExporter');
+    const out = await exportDssEdited(song);
+    result = { data: out.data, filename: out.filename, warnings: out.warnings };
   } else if (format === 'MOD' && !layoutFormatId) {
     const { exportSongToMOD } = await import('./modExport');
     const modResult = await exportSongToMOD(song, { bakeSynths: true });
