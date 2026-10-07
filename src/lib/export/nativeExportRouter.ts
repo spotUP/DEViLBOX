@@ -282,7 +282,7 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
   } else if (format === 'FC') {
     const { exportFC } = await import('./FCExporter');
     result = { data: exportFC(song), filename: `${baseName}.fc`, warnings: [] };
-  } else if (format === 'SidMon2') {
+  } else if (format === 'SIDMON2' || format === 'SidMon2') {
     const { exportSidMon2File } = await import('./SidMon2Exporter');
     result = { data: await exportSidMon2File(song), filename: `${baseName}.sd2`, warnings: [] };
   } else if (format === 'PumaTracker') {

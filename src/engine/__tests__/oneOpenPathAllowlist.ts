@@ -48,6 +48,9 @@ export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
   { file: 'src/engine/dj/DJTrackLoader.ts', fn: 'preRenderTrackInternal', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.6a' },
   { file: 'src/engine/dj/DJTrackLoader.ts', fn: 'preRenderTrackInternal', callee: 'parseModuleToSong', count: 3, removedBy: 'U2.6a' },
   { file: 'src/engine/dj/DJUADEPrerender.ts', fn: 'loadUADEToDeck', callee: 'parseModuleToSong', count: 1, removedBy: 'U2.6a' },
+  // Play-time re-encode (G19): the module an engine is loaded with after a grid edit is the native export of the stores run through the parse a reload runs; it applies no song and fills no store.
+  { file: 'src/engine/replayer/editedModuleForPlay.ts', fn: 'editedModuleForPlay', callee: 'exportNativeSong', count: 1, removedBy: 'U4.1 (stays: play-time module owner)' },
+  { file: 'src/engine/replayer/editedModuleForPlay.ts', fn: 'editedModuleForPlay', callee: 'parseModuleToSong', count: 1, removedBy: 'U4.1 (stays: play-time module owner)' },
   { file: 'src/engine/tour/tourScript.ts', fn: 'searchAndLoadModland', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.6b' },
   { file: 'src/engine/uade/UADEEngine.ts', fn: 'loadTune', callee: 'addCompanionFile', count: 1, removedBy: 'U4.1 (stays: UADE engine family)' },
   { file: 'src/engine/uade/UADESynth.ts', fn: 'setInstrument', callee: 'addCompanionFile', count: 1, removedBy: 'U4.1 (stays: UADE engine family)' },

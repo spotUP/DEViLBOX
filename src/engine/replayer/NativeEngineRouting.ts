@@ -26,6 +26,7 @@ import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 import { getActiveDubBus } from '../dub/DubBus';
 import { asIsolationCapable, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
 import { needsPaulaOutputStage } from '@engine/paulaOutput';
+import { editedModuleForPlay } from './editedModuleForPlay';
 import { WASM_ENGINES, shouldActivate, songFromStores, type NativeEngineDescriptor, type WASMSingletonStatic } from './wasmEngineRegistry';
 
 export { WASM_ENGINES, shouldActivate, playsOnDedicatedEngine } from './wasmEngineRegistry';
@@ -344,7 +345,9 @@ export async function startNativeEngines(
       await instance.ready();
 
       // Load file data into the engine
-      const fileData = song[desc.fileDataKey] as ArrayBuffer | Uint8Array;
+      // A grid edited since the load plays as the module its native export writes (G19).
+      const fileData = (isDJDeck ? null : await editedModuleForPlay(song, desc))
+        ?? song[desc.fileDataKey] as ArrayBuffer | Uint8Array;
       const dataCopy = fileData instanceof Uint8Array
         ? fileData.slice(0) : (fileData as ArrayBuffer).slice(0);
       const extraArgs = desc.getLoadArgs?.(song) ?? [];

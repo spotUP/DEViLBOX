@@ -29,6 +29,7 @@ import type { TrackerSong } from '../TrackerReplayer';
 import type { TrackerCell, Pattern } from '@/types/tracker';
 import { takeRestoredEdits } from '@/lib/song/gridBaseline';
 import { isTrackIndexEngine, applyTrackIndexEdits } from './trackIndexCellEdits';
+import { hasModuleEncoder } from '../eagleplayer/eaglePlayerModuleEdits';
 import { WASM_ENGINES, shouldActivate, type NativeEngineDescriptor } from './wasmEngineRegistry';
 
 export interface LiveCellEdit {
@@ -48,6 +49,30 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
   return WASM_ENGINES.find((d) => shouldActivate(d, song)) ?? null;
 }
 
+/** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
+export type LiveEditRoute =
+  | 'fred-module' | 'actionamics-module' | 'activisionPro-module'
+  | 'track-index' | 'grid-cell' | 'eagleplayer-module' | 'chip-ram' | 'none';
+
+/**
+ * The route `sendCellEditsToEngine` takes for `song`, decided from the song alone (no engine
+ * running): the one rule the dispatch and the live-edit measurement
+ * (liveEditHeard.test.ts) both read.
+ */
+export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine: string | null } {
+  const desc = playingDescriptor(song);
+  const engine = desc?.key ?? null;
+  const at = (route: LiveEditRoute) => ({ route, engine });
+  if (desc?.key === 'FredReplayer2') return at('fred-module');
+  if (desc?.key === 'ActionamicsReplayer') return at('actionamics-module');
+  if (desc?.key === 'ActivisionProReplayer') return at('activisionPro-module');
+  if (desc && isTrackIndexEngine(desc.key)) return at('track-index');
+  if (desc?.gridCellEdits) return at('grid-cell');
+  if (desc?.key === 'EaglePlayer' && song.eaglePlayerId && hasModuleEncoder(song)) return at('eagleplayer-module');
+  if (song.uadePatternLayout) return at('chip-ram');
+  return at('none');
+}
+
 /** Hand edited cells to the engine playing `song`. Safe no-op when nothing editable plays. */
 export async function sendCellEditsToEngine(
   song: TrackerSong | null | undefined,
@@ -55,69 +80,67 @@ export async function sendCellEditsToEngine(
 ): Promise<void> {
   if (!song || edits.length === 0) return;
   const desc = playingDescriptor(song);
+  const { route } = liveEditRoute(song);
 
-  // Fred Editor: a grid cell is a line of a pattern; the edit re-encodes the module.
-  if (desc?.key === 'FredReplayer2') {
-    const { applyFredModuleEdits } = await import('../fred-replayer/fredModuleEdits');
-    await applyFredModuleEdits(song, edits);
-    return;
-  }
-
-  // Actionamics: a grid cell is a row of a voice's track; the edit re-encodes the module.
-  if (desc?.key === 'ActionamicsReplayer') {
-    const { applyActionamicsModuleEdits } = await import('../actionamics/actionamicsModuleEdits');
-    await applyActionamicsModuleEdits(song, edits);
-    return;
-  }
-
-  // Activision Pro: a grid cell is a row of a voice's event stream; the edit re-encodes the module.
-  if (desc?.key === 'ActivisionProReplayer') {
-    const { applyActivisionProModuleEdits } = await import('../activisionpro/activisionProModuleEdits');
-    await applyActivisionProModuleEdits(song, edits);
-    return;
-  }
-
-  // Engines with their own track pool: the replayer's index, not the grid's pattern.
-  if (desc && isTrackIndexEngine(desc.key)) {
-    const Engine = desc.staticRef ?? (desc.dynamicResolver ? await desc.dynamicResolver() : null);
-    if (!Engine?.hasInstance()) return;
-    applyTrackIndexEdits(song, desc.key, Engine.getInstance() as never, edits);
-    return;
-  }
-
-  if (desc?.gridCellEdits) {
-    const Engine = desc.staticRef ?? (desc.dynamicResolver ? await desc.dynamicResolver() : null);
-    if (!Engine) return;
-    if (!Engine.hasInstance()) {
-      for (const { pattern, row, channel, cell } of edits) Engine.patchModuleCell?.(pattern, row, channel, cell.note ?? 0, cell.instrument ?? 0);
+  switch (route) {
+    // Fred Editor: a grid cell is a line of a pattern; the edit re-encodes the module.
+    case 'fred-module': {
+      const { applyFredModuleEdits } = await import('../fred-replayer/fredModuleEdits');
+      await applyFredModuleEdits(song, edits);
       return;
     }
-    const engine = Engine.getInstance() as unknown as GridCellEngine;
-    for (const { pattern, row, channel, cell } of edits) {
-      engine.setCell(
-        pattern, row, channel,
-        cell.note ?? 0, cell.instrument ?? 0,
-        cell.effTyp ?? 0, cell.eff ?? 0,
-        cell.volume ?? 0,
-      );
+    // Actionamics: a grid cell is a row of a voice's track; the edit re-encodes the module.
+    case 'actionamics-module': {
+      const { applyActionamicsModuleEdits } = await import('../actionamics/actionamicsModuleEdits');
+      await applyActionamicsModuleEdits(song, edits);
+      return;
     }
-    return;
-  }
-
-  // An eagleplayer format whose grid is a reading of the module (MIDI
-  // Loriciel: the player's schedule of a MIDI file) re-encodes the module.
-  if (desc?.key === 'EaglePlayer' && song.eaglePlayerId) {
-    const { hasModuleEncoder, applyEaglePlayerModuleEdits } = await import('../eagleplayer/eaglePlayerModuleEdits');
-    if (hasModuleEncoder(song)) {
+    // Activision Pro: a grid cell is a row of a voice's event stream; the edit re-encodes the module.
+    case 'activisionPro-module': {
+      const { applyActivisionProModuleEdits } = await import('../activisionpro/activisionProModuleEdits');
+      await applyActivisionProModuleEdits(song, edits);
+      return;
+    }
+    // Engines with their own track pool: the replayer's index, not the grid's pattern.
+    case 'track-index': {
+      const Engine = desc!.staticRef ?? (desc!.dynamicResolver ? await desc!.dynamicResolver() : null);
+      if (!Engine?.hasInstance()) return;
+      applyTrackIndexEdits(song, desc!.key, Engine.getInstance() as never, edits);
+      return;
+    }
+    case 'grid-cell': {
+      const Engine = desc!.staticRef ?? (desc!.dynamicResolver ? await desc!.dynamicResolver() : null);
+      if (!Engine) return;
+      if (!Engine.hasInstance()) {
+        for (const { pattern, row, channel, cell } of edits) Engine.patchModuleCell?.(pattern, row, channel, cell.note ?? 0, cell.instrument ?? 0);
+        return;
+      }
+      const engine = Engine.getInstance() as unknown as GridCellEngine;
+      for (const { pattern, row, channel, cell } of edits) {
+        engine.setCell(
+          pattern, row, channel,
+          cell.note ?? 0, cell.instrument ?? 0,
+          cell.effTyp ?? 0, cell.eff ?? 0,
+          cell.volume ?? 0,
+        );
+      }
+      return;
+    }
+    // An eagleplayer format whose grid is a reading of the module (MIDI
+    // Loriciel: the player's schedule of a MIDI file) re-encodes the module.
+    case 'eagleplayer-module': {
+      const { applyEaglePlayerModuleEdits } = await import('../eagleplayer/eaglePlayerModuleEdits');
       await applyEaglePlayerModuleEdits(song, edits);
       return;
     }
-  }
-
-  if (song.uadePatternLayout) {
-    const { writeCellToChipRam } = await import('../uade/writeCellToChipRam');
-    await Promise.all(edits.map(({ pattern, row, channel, cell }) =>
-      writeCellToChipRam(song, pattern, row, channel, cell)));
+    case 'chip-ram': {
+      const { writeCellToChipRam } = await import('../uade/writeCellToChipRam');
+      await Promise.all(edits.map(({ pattern, row, channel, cell }) =>
+        writeCellToChipRam(song, pattern, row, channel, cell)));
+      return;
+    }
+    case 'none':
+      return;
   }
 }
 
