@@ -4,6 +4,7 @@
  * Legacy ModlandPanel + HVSCPanel kept for backwards compatibility.
  */
 
+import { markKnownSource } from '@/lib/modland/ModlandDetector';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, FileAudio, ArrowLeft, Globe, Search, Loader2, Download, AlertCircle, Play, Square } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
@@ -137,6 +138,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
         const found = await downloadUADECompanions(file.full_path, buffer);
         const companions = found.length > 0 ? new Map(found.map((c) => [c.filename, c.buffer])) : undefined;
 
+        markKnownSource(file.filename);   // it came from Modland: not a contribution candidate
         await onLoadTrackerModule(buffer, file.filename, companions);
         onClose();
       } catch (err) {
