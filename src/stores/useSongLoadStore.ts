@@ -5,8 +5,8 @@
  * 2026-10-07-one-load-save-export-path), and which phase of the load it is in.
  *
  * Phase and elapsed time are published by openSong and by the opener steps it
- * runs (setSongLoadPhase). The status bar shows them now; the loading panel
- * and its Cancel button (plan U6, later phase) read the same fields.
+ * runs (setSongLoadPhase). The status bar and the pattern editor's loading
+ * panel (SongLoadPanel, with its Cancel button) read the same fields.
  */
 import { create } from 'zustand';
 
@@ -47,10 +47,9 @@ interface SongLoadState {
   startedAt: number;
   /** The load was asked for by a person at a dialog (may raise questions); false for MCP, jukebox, tour, embed. */
   interactive: boolean;
-  /**
-   * Hook for the loading panel's Cancel button (plan U6, later phase): the
-   * running openSong sets it, the panel calls it. Not shown anywhere yet.
-   */
+  /** The load was cancelled (the panel's Cancel button); the opener steps stop at their next check. */
+  cancelled: boolean;
+  /** The loading panel's Cancel button: the running openSong sets it, the panel calls it. */
   cancel: (() => void) | null;
 }
 
@@ -62,6 +61,7 @@ export const useSongLoadStore = create<SongLoadState>(() => ({
   phase: 'idle',
   startedAt: 0,
   interactive: true,
+  cancelled: false,
   cancel: null,
 }));
 
@@ -69,4 +69,9 @@ export const useSongLoadStore = create<SongLoadState>(() => ({
 export function setSongLoadPhase(phase: OpenPhase): void {
   if (useSongLoadStore.getState().depth === 0) return;
   useSongLoadStore.setState({ phase });
+}
+
+/** Throw when the person pressed Cancel; the opener steps call this between phases. */
+export function throwIfSongLoadCancelled(): void {
+  if (useSongLoadStore.getState().cancelled) throw new Error('Load cancelled');
 }

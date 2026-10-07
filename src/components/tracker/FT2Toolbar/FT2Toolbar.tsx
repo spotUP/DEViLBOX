@@ -35,12 +35,11 @@ import { NibblesGame } from '@components/visualization/NibblesGame';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 
 
-import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { exportSong } from '@lib/export/exporters';
 import { hasAnyConfirmedFormatViolation } from '@/lib/formatCompatibility';
-import { type ModuleInfo } from '@lib/import/ModuleLoader';
-import { useModuleImport } from '@hooks/tracker/useModuleImport';
+import { openUserSong } from '@/lib/song/openUserSong';
+import { useSongLoadStore } from '@/stores/useSongLoadStore';
 import { clearSavedProject, saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
@@ -164,7 +163,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   })));
 
 
-  const { handleModuleImport: importModule } = useModuleImport();
 
   const editorMode = useFormatStore((s) => s.editorMode);
   const gtPlaying = useGTUltraStore((s) => s.playing);
@@ -172,8 +170,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const isGT = editorMode === 'goattracker';
 
   const engine = getToneEngine();
-  const [isLoading, setIsLoading] = useState(false);
-  const [pendingCompanions, setPendingCompanions] = useState<File[]>([]);
+  // A song is opening (openSong publishes it): the Load button waits.
+  const isLoading = useSongLoadStore((state) => state.depth > 0);
   const [showNibbles, setShowNibbles] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
 
@@ -212,8 +210,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
 
 
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const aiOpen = useAIStore((s) => s.isOpen);
@@ -301,17 +297,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     } catch (error) {
       console.error('Failed to save:', error);
       notify.error('Failed to save');
-    }
-  };
-
-  const handleModuleImport = async (moduleInfo: ModuleInfo, options: ImportOptions = { useLibopenmpt: true }) => {
-    setIsLoading(true);
-    try {
-      await importModule(moduleInfo, options);
-    } catch {
-      notify.error(`Failed to import module`);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -702,13 +687,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         </>
       )}
 
-      <ImportModuleDialog
-        isOpen={showImportDialog}
-        onClose={() => { setShowImportDialog(false); setPendingFile(null); setPendingCompanions([]); }}
-        onImport={handleModuleImport}
-        initialFile={pendingFile}
-        companionFiles={pendingCompanions}
-      />
       <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} mode="load" onLoad={async (data, filename) => {
         // The file loader handles every one of these (DB303 XML preset or
         // pattern, MIDI, JSON / .dbx project). This handler parsed and applied
@@ -718,34 +696,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             ? (data as unknown as BlobPart)
             : JSON.stringify(data);
           const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-          const result = await loadFile(new File([body], filename), { requireConfirmation: false });
+          const result = await loadFile(new File([body], filename));
           if (result.success === true) notify.success(result.message);
           else if (result.success === false) notify.error(result.error);
         } catch { notify.error('Failed to load file'); }
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
-        const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-        const file = new File([buffer], filename);
-        const result = await loadFile(file, { companionFiles, requireConfirmation: true });
-        if (result.success === 'pending-confirmation') {
-          setPendingFile(result.file);
-          // Surface companion files from the Online panel download into the
-          // import dialog — otherwise the dialog's internal File[]→Map
-          // conversion (ImportModuleDialog.tsx:387-395) produces an empty
-          // map and WASM replayers that need a companion (TFMX smpl.*,
-          // Jason Page smp.*, Startrekker .nt, …) fail with -3.
-          if (companionFiles && companionFiles.size > 0) {
-            const asFiles: File[] = [];
-            for (const [name, buf] of companionFiles) {
-              asFiles.push(new File([buf], name));
-            }
-            setPendingCompanions(asFiles);
-          }
-          setShowImportDialog(true);
-        } else if (result.success === true) {
-          notify.success(result.message);
-        } else if (result.success === false) {
-          notify.error(result.error);
-        }
+        // openSong shows the import dialog (the one in the tracker view) only when
+        // the file has a real choice, and opens it directly otherwise.
+        await openUserSong(new File([buffer], filename), 'filebrowser', companionFiles, (message) => notify.error(message));
       }} />
 
       {/* Clear Modal */}

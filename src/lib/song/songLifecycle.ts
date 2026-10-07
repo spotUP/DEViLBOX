@@ -64,7 +64,7 @@ export async function withSongLoad<T>(label: string, load: () => Promise<T>): Pr
   } finally {
     useSongLoadStore.setState((s) => {
       const depth = s.depth - 1;
-      return depth === 0 ? { depth, label: '', unloadedForLoad: false, phase: 'idle' as const, interactive: true, cancel: null } : { depth };
+      return depth === 0 ? { depth, label: '', unloadedForLoad: false, phase: 'idle' as const, interactive: true, cancelled: false, cancel: null } : { depth };
     });
   }
 }

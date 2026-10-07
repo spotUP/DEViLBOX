@@ -1,23 +1,20 @@
 /**
- * useModuleImport — React hook wrapper around the unified importTrackerModule.
+ * useModuleImport — React callbacks for the TD-3 and SunVox patch dialogs.
  *
- * Thin wrapper that provides React callbacks for ImportModuleDialog.
- * All import logic lives in UnifiedFileLoader.importTrackerModule().
+ * Module imports are not here: the import dialog is an optional step in front
+ * of openSong (src/lib/song/openSong.ts), which owns every song open.
  */
 
 import { useCallback } from 'react';
 import { useUIStore } from '@stores';
-import type { ModuleInfo } from '@lib/import/ModuleLoader';
-import type { ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import type { SunVoxConfig } from '@/types/instrument/exotic';
 import { notify } from '@stores/useNotificationStore';
-import { importTrackerModule } from '@lib/file/UnifiedFileLoader';
 
 export function useModuleImport() {
   // ── TD-3 pattern import ──────────────────────────────────────────────────
   const handleTD3Import = useCallback(async (file: File, replacePatterns: boolean) => {
     const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-    const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
+    const result = await loadFile(file, { replacePatterns });
     if (result.success === true) notify.success(result.message);
     else if (result.success === false) notify.error(result.error);
   }, []);
@@ -36,20 +33,5 @@ export function useModuleImport() {
     }
   }, []);
 
-  // ── Module import — delegates to the unified importTrackerModule ──────
-  const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
-    try {
-      await importTrackerModule(info, options);
-    } catch (err) {
-      const { notify } = await import('@stores/useNotificationStore');
-      const msg = err instanceof Error ? err.message : String(err);
-      const name = info.file?.name ?? info.metadata?.title ?? 'module';
-      console.error('[useModuleImport] import failed:', err);
-      // A toast the user can select and copy from, kept until closed (duration 0):
-      // a modal alert blocked the app and its text could not be copied.
-      notify.error(`Load failed - ${name}: ${msg}`, 0);
-    }
-  }, []);
-
-  return { handleModuleImport, handleTD3Import, handleSunVoxImport };
+  return { handleTD3Import, handleSunVoxImport };
 }

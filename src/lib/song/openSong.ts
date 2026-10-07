@@ -17,28 +17,56 @@
  *   - the result: what loaded, what engine plays it, which editor it opened in.
  *
  * The branch bodies (module import, SunVox, V2M, AdPlug, GoatTracker, MIDI,
- * .dbx) still live in UnifiedFileLoader and are called from here; the dialog
- * step in front of this call is U2.3.
+ * .dbx) still live in UnifiedFileLoader and are called from here.
+ *
+ * The import dialog is an optional step IN FRONT of this call (U2.3): an
+ * interactive open prepares the file (prepareSong: read, classify, scan), asks
+ * a person only when the file carries a real choice (importChoice, owner
+ * decision D1), and then opens the prepared song. The dialog's preview is the
+ * same prepareSong, and its Import hands the choices back; it writes no
+ * settings (D4).
  */
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import {
-  isSongFormat, isAudioFile, loadSongFile, loadV2MFile, loadAdPlugFile, importModuleFile,
+  isSongFormat, isAudioFile, loadSongFile, loadV2MFile, loadAdPlugFile, importModuleFile, prepareModuleFile,
   type FileLoadOptions, type FileLoadResult,
 } from '@/lib/file/UnifiedFileLoader';
+import type { ModuleInfo } from '@/lib/import/ModuleLoader';
+import type { PrepareHooks } from '@/lib/import/prepareModuleImport';
+import type { SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
+import { needsImportChoice } from '@/lib/song/importChoice';
+import { askImportDialog, type ImportAnswer } from '@/lib/song/importRequest';
 import { isAdPlugWasmFormat } from '@/lib/import/adplugFormats';
 import { detectFormatFromContent, isSupportedByHeader } from '@/lib/import/FormatRegistry';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { directoryOfFile, gatherCompanions } from '@/lib/import/companionFetch';
 import { withSongLoad } from '@/lib/song/songLifecycle';
-import { useSongLoadStore, setSongLoadPhase, type OpenPhase } from '@/stores/useSongLoadStore';
+import { useSongLoadStore, setSongLoadPhase, throwIfSongLoadCancelled, type OpenPhase } from '@/stores/useSongLoadStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 
 export type { OpenPhase };
 
-/** What a source is. `file` and `bytes` are in hand; `modland` and `url` are fetched here, with their companions. */
+/**
+ * A song that was read, classified and (for a module) scanned: what the import
+ * dialog previews and what an import applies. Made by prepareSong; openSong
+ * takes it instead of reading the file again.
+ */
+export interface PreparedSong {
+  kind: 'prepared';
+  file: File;
+  songKind: SongKind;
+  companions?: Map<string, ArrayBuffer>;
+  /** The module the import reads (UADE scan, header metadata or libopenmpt's); absent for formats the loader reads itself. */
+  info?: ModuleInfo;
+  uadeMetadata?: UADEMetadata;
+  sidInfo?: SIDHeaderInfo | null;
+}
+
+/** What a source is. `file` and `bytes` are in hand; `modland` and `url` are fetched here, with their companions; `prepared` is already read. */
 export type SongSourceRef =
+  | PreparedSong
   | { kind: 'file'; file: File; companions?: Map<string, ArrayBuffer> }
   | { kind: 'bytes'; name: string; bytes: ArrayBuffer; companions?: Map<string, ArrayBuffer> }
   | { kind: 'modland'; path: string }
@@ -62,8 +90,12 @@ export interface OpenOptions {
   midiOptions?: FileLoadOptions['midiOptions'];
   /** TD-3 pattern files: replace or append. */
   td3?: { replacePatterns?: boolean; preserveInstruments?: boolean };
-  /** A newer open cancels an older one; checked between phases. */
+  /** Aborting it cancels the open (the loading panel's Cancel does the same); checked between phases. */
   signal?: AbortSignal;
+  /** May the import dialog be shown for a file with a real choice (D1)? Default: `interactive`. loadFile turns it off: its callers want the song opened as is. */
+  askForChoices?: boolean;
+  /** Asks a person at an import dialog. Default: the one dialog in the tracker view (askImportDialog). */
+  ask?: (prepared: PreparedSong) => Promise<ImportAnswer | null>;
   onProgress?: (p: { phase: OpenPhase }) => void;
 }
 
@@ -71,7 +103,8 @@ export type OpenResult =
   | { ok: true; name: string; message: string; engine: string; editorMode: string; kind: SongKind; started: boolean; companions: number;
       /** The importer already told the user (toast); callers must not announce it again. */
       notified: boolean }
-  | { ok: false; error: string };
+  /** `cancelled`: the person cancelled (the dialog or the loading panel); no error to show. */
+  | { ok: false; error: string; cancelled?: true };
 
 /** Owner decision D2: drop and file browser load without playing; jukebox, tour and embed play. */
 export const START_BY_ORIGIN: Record<OpenOrigin, false | 'song'> = {
@@ -122,6 +155,8 @@ export async function classifySong(file: File): Promise<SongKind | null> {
 
 async function acquire(src: SongSourceRef): Promise<{ file: File; companions?: Map<string, ArrayBuffer> }> {
   switch (src.kind) {
+    case 'prepared':
+      return { file: src.file, companions: src.companions };
     case 'file':
       return { file: src.file, companions: src.companions };
     case 'bytes':
@@ -157,6 +192,7 @@ async function acquire(src: SongSourceRef): Promise<{ file: File; companions?: M
 
 function sourceName(src: SongSourceRef): string {
   switch (src.kind) {
+    case 'prepared': return src.file.name;
     case 'file': return src.file.name;
     case 'bytes': return src.name;
     case 'modland': return src.path.split('/').pop() ?? 'song';
@@ -164,8 +200,26 @@ function sourceName(src: SongSourceRef): string {
   }
 }
 
+/**
+ * Read a song to the point where a person could be asked about it: acquire the
+ * file and its partner files, classify it, and scan a module (UADE pre-scan,
+ * header metadata or libopenmpt's). Changes no song state: the outgoing song
+ * keeps playing until an open follows. THE preview the import dialog shows and
+ * the one scan the import that follows uses.
+ */
+export async function prepareSong(src: SongSourceRef, hooks: PrepareHooks = {}): Promise<PreparedSong> {
+  if (src.kind === 'prepared') return src;
+  const { file, companions } = await acquire(src);
+  const songKind = await classifySong(file);
+  if (!songKind) throw new Error(`Unsupported file format: ${file.name}`);
+  if (songKind !== 'module') return { kind: 'prepared', file, songKind, companions };
+  const companionFiles = companions ? Array.from(companions, ([name, data]) => new File([data], name)) : [];
+  const { info, uadeMetadata, sidInfo } = await prepareModuleFile(file, companionFiles, hooks);
+  return { kind: 'prepared', file, songKind, companions, info, uadeMetadata, sidInfo };
+}
+
 /** Route an acquired file to its branch. The branch bodies live in UnifiedFileLoader. */
-async function route(kind: SongKind, file: File, o: OpenOptions, companions?: Map<string, ArrayBuffer>): Promise<FileLoadResult> {
+async function route(kind: SongKind, file: File, o: OpenOptions, companions?: Map<string, ArrayBuffer>, prepared?: PreparedSong): Promise<FileLoadResult> {
   const options: FileLoadOptions = {
     subsong: o.subsong,
     uadeMetadata: o.uadeMetadata,
@@ -174,26 +228,66 @@ async function route(kind: SongKind, file: File, o: OpenOptions, companions?: Ma
     replacePatterns: o.td3?.replacePatterns,
     preserveInstruments: o.td3?.preserveInstruments,
   };
+  // A module is imported from the read it already has (the dialog's preview,
+  // the D1 scan, or the Furnace / MIDI dialog's own read), never read twice;
+  // without one, importModuleFile reads it. libopenmpt on unless the caller
+  // says no; native-only formats stay off it regardless.
+  if (prepared?.info || kind === 'module') {
+    await importModuleFile(file, {
+      ...(o.useLibopenmpt === false ? { useLibopenmpt: false } : {}),
+      subsong: o.subsong ?? 0,
+      companionFiles: companions,
+      midiOptions: o.midiOptions,
+      ...(prepared?.info
+        ? { prepared: { info: prepared.info, uadeMetadata: o.uadeMetadata ?? prepared.uadeMetadata, sidInfo: prepared.sidInfo } }
+        : { uadeMetadata: o.uadeMetadata }),
+    });
+    return { success: true, message: `Loaded ${file.name}` };
+  }
   switch (kind) {
     case 'v2m': return loadV2MFile(file);
     case 'adplug': return loadAdPlugFile(file, companions);
     case 'goatTracker': return loadSongFile(file, options, await file.arrayBuffer());
-    case 'module':
-      // Read and imported exactly as the import dialog does it. libopenmpt on
-      // unless the caller says no; native-only formats stay off it regardless.
-      await importModuleFile(file, {
-        ...(o.useLibopenmpt === false ? { useLibopenmpt: false } : {}),
-        subsong: o.subsong ?? 0,
-        uadeMetadata: o.uadeMetadata,
-        companionFiles: companions,
-        midiOptions: o.midiOptions,
-      });
-      return { success: true, message: `Loaded ${file.name}` };
     case 'header':
       return loadSongFile(file, options, await file.arrayBuffer());
     default:
       return loadSongFile(file, options);
   }
+}
+
+/**
+ * The interactive step in front of the open (D1): prepare the file, and ask a
+ * person only when it carries a real choice. Returns the song to open and the
+ * options they chose, or null when they cancelled.
+ */
+async function askIfChoice(src: SongSourceRef, o: OpenOptions): Promise<{ song: PreparedSong; options: OpenOptions } | null> {
+  let prepared: PreparedSong;
+  try {
+    prepared = await prepareSong(src);
+  } catch (err) {
+    // A format that needs a partner file the person has not picked yet fails
+    // its scan; the dialog is where they pick it.
+    if (src.kind !== 'file' || !needsImportChoice({ file: src.file, songKind: 'module', companions: src.companions })) throw err;
+    prepared = { kind: 'prepared', file: src.file, songKind: 'module', companions: src.companions };
+  }
+  if (!needsImportChoice(prepared)) return { song: prepared, options: o };
+  const answer = await (o.ask ?? askImportDialog)(prepared);
+  if (!answer) return null;
+  const { info, options } = answer;
+  return {
+    song: {
+      ...prepared,
+      info: info ?? prepared.info,
+      uadeMetadata: options.uadeMetadata ?? prepared.uadeMetadata,
+      companions: options.companionFiles ?? prepared.companions,
+    },
+    options: {
+      ...o,
+      subsong: options.subsong ?? o.subsong,
+      useLibopenmpt: options.useLibopenmpt,
+      midiOptions: options.midiOptions ?? o.midiOptions,
+    },
+  };
 }
 
 export async function openSong(src: SongSourceRef, o: OpenOptions): Promise<OpenResult> {
@@ -202,28 +296,59 @@ export async function openSong(src: SongSourceRef, o: OpenOptions): Promise<Open
     setSongLoadPhase(p);
     o.onProgress?.({ phase: p });
   };
-  const aborted = (): boolean => o.signal?.aborted === true;
+  // One way to cancel: the loading panel's Cancel button and OpenOptions.signal
+  // both land in cancel(), which raises the flag every opener step checks.
+  const controller = new AbortController();
+  const cancel = (): void => {
+    controller.abort();
+    useSongLoadStore.setState({ cancelled: true });
+    // A UADE scan in flight does not poll the flag; stop it where it runs.
+    void import('@engine/uade/UADEEngine')
+      .then(({ UADEEngine }) => { if (UADEEngine.hasInstance()) UADEEngine.getInstance().cancelLoad(); })
+      .catch(() => { /* engine never started: nothing to cancel */ });
+  };
+  if (o.signal) {
+    if (o.signal.aborted) controller.abort();
+    else o.signal.addEventListener('abort', cancel, { once: true });
+  }
+  const throwIfCancelled = (): void => {
+    if (controller.signal.aborted) throw new Error('Load cancelled');
+    throwIfSongLoadCancelled();
+  };
   if (!interactive) suppressFormatChecks(); // a headless open must never stop to ask
   try {
-    let kind: SongKind | null = null;
+    let source = src;
+    let options = o;
+    // The dialog step: a person at a drop or a file browser may be asked, once,
+    // and only when there is something to choose. The dialog itself and every
+    // headless origin open directly.
+    if ((o.askForChoices ?? interactive) && o.origin !== 'dialog' && src.kind !== 'prepared') {
+      const chosen = await askIfChoice(src, o);
+      if (!chosen) return { ok: false, error: 'Import cancelled', cancelled: true };
+      source = chosen.song;
+      options = chosen.options;
+    }
+    const prepared = source.kind === 'prepared' ? source : undefined;
+
+    let kind: SongKind | null = prepared?.songKind ?? null;
     let started = false;
     let companionCount = 0;
-    const start = o.start ?? START_BY_ORIGIN[o.origin];
-    let name = sourceName(src);
+    const start = options.start ?? START_BY_ORIGIN[options.origin];
+    let name = sourceName(source);
     const loaded = await withSongLoad(name, async () => {
-      // `cancel` is the hook for the loading panel's Cancel button (plan U6,
-      // later phase): it will abort a controller whose signal arrives here.
-      useSongLoadStore.setState({ interactive });
+      useSongLoadStore.setState({ interactive, cancel });
       phase('acquire');
-      const { file, companions } = await acquire(src);
+      const { file, companions } = await acquire(source);
       name = file.name;
       companionCount = companions?.size ?? 0;
       useSongLoadStore.setState({ label: name });
-      if (aborted()) throw new Error('Load cancelled');
-      kind = await classifySong(file);
+      throwIfCancelled();
+      kind ??= await classifySong(file);
       if (!kind) return { success: false, error: `Unsupported file format: ${file.name}` } as FileLoadResult;
+      throwIfCancelled();
       phase('scan');
-      const result = await route(kind, file, o, companions);
+      const result = await route(kind, file, options, companions, prepared);
+      throwIfCancelled();
       // Wait for deferred state updates (loadInstruments uses queueMicrotask)
       await new Promise<void>((resolve) => queueMicrotask(resolve));
       if (result.success === true && start) {
@@ -253,11 +378,15 @@ export async function openSong(src: SongSourceRef, o: OpenOptions): Promise<Open
       kind: kind as unknown as SongKind,
       started,
       companions: companionCount,
-      notified: kind === 'module' || kind === 'header',
+      notified: kind === 'module' || kind === 'header' || !!prepared?.info,
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    const wasCancelled = controller.signal.aborted;
+    return wasCancelled
+      ? { ok: false, error: 'Load cancelled', cancelled: true }
+      : { ok: false, error: err instanceof Error ? err.message : String(err) };
   } finally {
+    o.signal?.removeEventListener('abort', cancel);
     if (!interactive) restoreFormatChecks();
   }
 }
