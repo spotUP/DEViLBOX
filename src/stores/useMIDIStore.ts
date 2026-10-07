@@ -1319,44 +1319,6 @@ export const useMIDIStore = create<MIDIStore>()(
   )
 );
 
-// ============================================================================
-// Auto-sync MIDI knobs to current instrument on instrument selection change.
-// This ensures the MIDI controller always maps to whatever instrument the user
-// is looking at in the synth editor, not just on MIDI note-on events.
-// ============================================================================
-
-// Defer subscription to avoid circular dependency — useInstrumentStore may not
-// be initialized yet when this module first loads. A bundler evaluates the
-// whole cycle before the first microtask; a module loader that awaits between
-// modules (the test runner, entering through the UADE engine) does not, so
-// wait until the store exists instead of assuming one microtask is enough.
-function subscribeToInstrumentSelection(): void {
-  if (!useInstrumentStore) { setTimeout(subscribeToInstrumentSelection, 0); return; }
-  useInstrumentStore.subscribe((state, prevState) => {
-    if (state.currentInstrumentId !== prevState.currentInstrumentId) {
-      const instrument = state.instruments.find(i => i.id === state.currentInstrumentId);
-      if (!instrument) return;
-
-      // Defer to a microtask so the set() inside syncKnobsToSynth does not fire
-      // subscribers synchronously in the middle of bulk instrument loading
-      // (e.g. a song file import). The crash that put this here was a
-      // Pixi-renderer one and that renderer is gone, so the defer is now
-      // belt-and-braces rather than load-bearing — but it also keeps a whole
-      // song's worth of knob syncs out of the import's own render pass.
-      queueMicrotask(() => {
-        const store = useMIDIStore.getState();
-        // Auto-switch bank
-        const autoBank = getKnobBankForSynth(instrument.synthType);
-        if (autoBank && store.knobBank !== autoBank) {
-          store.setKnobBank(autoBank);
-        }
-        // Sync NKS2 knob assignments + pages
-        if (store.nksActiveSynthType !== instrument.synthType) {
-          store.syncKnobsToSynth(instrument.synthType);
-        }
-      });
-    }
-  });
-}
-queueMicrotask(subscribeToInstrumentSelection);
-
+// The knob auto-sync to the selected instrument subscribes to useInstrumentStore
+// from src/midi/instrumentSelectionWiring.ts at app init, so neither store
+// touches the other while its module loads.
