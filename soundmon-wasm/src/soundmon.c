@@ -160,6 +160,9 @@ typedef struct SmBpCurrent {
 
 typedef struct SmGlobalPlayingInfo {
     uint16_t bp_step;
+    // The step and row whose notes bp_next read last (the playhead); -1 until a row has played.
+    int      play_step;
+    int      play_row;
     uint8_t  vib_index;
     uint8_t  arp_count;
     uint8_t  bp_count;
@@ -557,6 +560,8 @@ static void initialize_sound(SmModule* m, int start_position) {
     pi->vib_index   = 0;
     pi->bp_step     = (uint16_t)start_position;
     pi->bp_pat_count = 0;
+    pi->play_step   = -1;
+    pi->play_row    = -1;
     pi->st          = 0;
     pi->tr          = 0;
     pi->new_pos     = 0;
@@ -668,6 +673,9 @@ static void bp_play(SmModule* m) {
 
 static void bp_next(SmModule* m) {
     SmGlobalPlayingInfo* pi = &m->playing_info;
+
+    pi->play_step = (int)pi->bp_step;
+    pi->play_row  = (int)pi->bp_pat_count;
 
     for (int i = 0; i < 4; i++) {
         SmBpCurrent* cur = &m->bp_current[i];
@@ -1764,6 +1772,15 @@ bool sm_has_ended(const SmModule* module) {
 
 int sm_get_instrument_count(const SmModule* module) {
     return module ? 15 : 0;
+}
+
+// Playhead: the song step (the grid's order position) and the row of it that is sounding; -1 before the first row.
+int sm_get_play_step(const SmModule* module) {
+    return module ? module->playing_info.play_step : -1;
+}
+
+int sm_get_play_row(const SmModule* module) {
+    return module ? module->playing_info.play_row : -1;
 }
 
 int sm_get_num_tracks(const SmModule* module) {

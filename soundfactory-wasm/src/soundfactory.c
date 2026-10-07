@@ -242,6 +242,11 @@ struct SfModule {
     SfSongInfo* current_song;
     bool has_ended;
     int ended_channels;
+    // Playhead: the 50 Hz tick being played, counted from the start of the song and
+    // restarted when every enabled voice has looped (-1 before the first tick). The
+    // importer's grid is one row per tick, so this is the grid's global row.
+    int play_tick;
+    int next_tick;
 
     float tick_accumulator;
     float ticks_per_frame;
@@ -1064,6 +1069,8 @@ static void sf_play_voice(SfModule* m, SfVoiceInfo* v, SfChannel* ch) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void sf_play_tick(SfModule* m) {
+    m->play_tick = m->next_tick;
+    m->next_tick++;
     sf_handle_fade(m);
 
     // Take voices backward (matching C# original)
@@ -1075,6 +1082,13 @@ static void sf_play_tick(SfModule* m) {
             sf_play_voice(m, v, ch);
         else
             m->ended_channels |= (1 << i);
+    }
+
+    // Every enabled voice has looped: the song starts over, so does the grid.
+    int enabled = m->current_song ? (int)m->current_song->enabled_channels : 0;
+    if (enabled != 0 && (m->ended_channels & enabled) == enabled) {
+        m->ended_channels = 0;
+        m->next_tick = 0;
     }
 }
 
@@ -1276,6 +1290,8 @@ static void sf_initialize_sound(SfModule* m, int sub_song) {
 
     m->has_ended = false;
     m->ended_channels = 0;
+    m->play_tick = -1;
+    m->next_tick = 0;
 
     for (int i = 0; i < 4; i++) {
         SfVoiceInfo* v = &m->voices[i];
@@ -1504,6 +1520,11 @@ void sf_set_channel_mask(SfModule* module, uint32_t mask) {
     if (!module) return;
     for (int i = 0; i < 4; i++)
         module->channels[i].muted = ((mask >> i) & 1) == 0;
+}
+
+// Playhead: the grid's global row (one row per 50 Hz tick); -1 before the first tick.
+int sf_get_play_tick(const SfModule* module) {
+    return module ? module->play_tick : -1;
 }
 
 bool sf_has_ended(const SfModule* module) {

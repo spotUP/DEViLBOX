@@ -30,6 +30,8 @@ bool fc_has_ended(const FcModule* module);
 // Edit API
 int fc_get_instrument_count(const FcModule* module);
 int fc_get_num_patterns(const FcModule* module);
+int fc_get_play_pos(const FcModule* module);
+int fc_get_play_row(const FcModule* module);
 int fc_get_num_sequences(const FcModule* module);
 
 void fc_get_cell(const FcModule* module, int pattern, int row,
