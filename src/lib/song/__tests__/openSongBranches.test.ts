@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 vi.mock('@/engine/ToneEngine', () => {
   const engine = {
     releaseAll: vi.fn(), disposeAllInstruments: vi.fn(), preloadInstruments: vi.fn(async () => {}),
-    invalidateInstrument: vi.fn(), setBPM: vi.fn(),
+    invalidateInstrument: vi.fn(), setBPM: vi.fn(), ensureInstrumentReady: vi.fn(),
   };
   return { getToneEngine: () => engine };
 });
@@ -139,5 +139,51 @@ describe('every branch behind openSong is reached through it', { timeout: 120000
     expect(vi.mocked(branches.loadSongFile)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(applySong)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(applySong).mock.calls[0][1]).toBe('project');
+  });
+
+  describe('TD-3 pattern files', () => {
+    const rel = 'public/data/songs/behringer-td-3/Acid Pattern 8.seq';
+    const openTD3 = (replacePatterns: boolean) =>
+      openSong({ kind: 'bytes', name: basename(rel), bytes: bytesOf(rel) }, { origin: 'mcp', td3: { replacePatterns } });
+
+    it('replace mode opens through the one apply step: unloaded first, the song lands, stores hold only the TD-3 song', async () => {
+      const { useSongLoadStore } = await import('@/stores/useSongLoadStore');
+      const { useProjectStore } = await import('@/stores/useProjectStore');
+      expect((await open('drum_song.mid', bytesOf('public/data/songs/midi/drum_song.mid'))).ok).toBe(true);
+      vi.mocked(applySong).mockClear();
+      const before = useSongLoadStore.getState().generation;
+      let generationAtApply = -1;
+      const real = (await vi.importActual<typeof import('@/lib/song/applySong')>('@/lib/song/applySong')).applySong;
+      vi.mocked(applySong).mockImplementationOnce(async (song, source) => {
+        generationAtApply = useSongLoadStore.getState().generation;
+        await real(song, source);
+      });
+
+      const r = await openTD3(true);
+
+      expect(r, JSON.stringify(r)).toMatchObject({ ok: true });
+      expect(vi.mocked(applySong)).toHaveBeenCalledTimes(1);
+      expect(generationAtApply).toBeGreaterThan(before);
+      const instruments = useInstrumentStore.getState().instruments;
+      expect(instruments.map((i) => i.synthType)).toEqual(['TB303']);
+      const patterns = useTrackerStore.getState().patterns;
+      expect(patterns.length).toBeGreaterThan(0);
+      expect(patterns.every((p) => p.channels[0].instrumentId === instruments[0].id)).toBe(true);
+      expect(useProjectStore.getState().metadata.author).toBe('TD-3 Import');
+    });
+
+    it('append mode stays an edit: no apply step, the loaded song keeps its instruments and gains the patterns', async () => {
+      expect((await open('drum_song.mid', bytesOf('public/data/songs/midi/drum_song.mid'))).ok).toBe(true);
+      const patternsBefore = useTrackerStore.getState().patterns.length;
+      const instrumentsBefore = useInstrumentStore.getState().instruments.length;
+      vi.mocked(applySong).mockClear();
+
+      const r = await openTD3(false);
+
+      expect(r, JSON.stringify(r)).toMatchObject({ ok: true });
+      expect(vi.mocked(applySong)).not.toHaveBeenCalled();
+      expect(useTrackerStore.getState().patterns.length).toBeGreaterThan(patternsBefore);
+      expect(useInstrumentStore.getState().instruments.length).toBe(instrumentsBefore + 1);
+    });
   });
 });
