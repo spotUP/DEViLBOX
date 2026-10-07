@@ -591,11 +591,12 @@ interface DWVariableResult {
 /**
  * Build the byte-exact variable pattern layout for one DW song.
  *
- * Each channel independently steps through an ordered list of block addresses.
+ * Each channel independently steps through an ordered list of block addresses (a
+ * shorter list wraps to its start, as the replayer restarts it).
  * Blocks are deduplicated into file-patterns (filePatternAddrs/Sizes); one
  * tracker "step" corresponds to one entry across all channels' block lists.
- * trackMap[step][ch] resolves to the file-pattern index for that block (-1 if the
- * channel's list is shorter). Each channel's rows carry the block's exact source
+ * trackMap[step][ch] resolves to the file-pattern index for that block (-1 only if the
+ * channel has no list). Each channel's rows carry the block's exact source
  * bytes so the variable encoder reproduces the file byte-for-byte.
  */
 function buildDWVariablePatterns(
@@ -643,8 +644,11 @@ function buildDWVariablePatterns(
 
     for (let ch = 0; ch < numChannels; ch++) {
       const list = channelBlocks[ch];
-      if (step < list.length) {
-        const fp = fpFor(list[step]);
+      // A channel whose position list is shorter than the longest loops it (the
+      // replayer restarts every channel's list on its own: apb.dw voice 0 is one
+      // eight-note block that repeats under voice 1's seven).
+      if (list.length > 0) {
+        const fp = fpFor(list[step % list.length]);
         stepTrackMap.push(fp);
         // Clone the decoded rows so per-step patterns don't share cell objects.
         const rows = fpRows[fp].map(c => ({ ...c }));
@@ -744,6 +748,7 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
       }
 
       const dwConfig: DavidWhittakerConfig = {
+        sampleIndex: i,
         defaultVolume: Math.min(64, sample.volume),
         relative: sample.relative > 0 ? sample.relative : 8364,
         vibratoSpeed: 0,
