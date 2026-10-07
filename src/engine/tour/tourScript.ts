@@ -474,16 +474,15 @@ async function disengageDjFx(actionId: string): Promise<void> {
 /** Search Modland and load the first result into the DJ deck */
 async function searchAndLoadModland(query: string, deckId: 'A' | 'B'): Promise<void> {
   try {
-    const { searchModland, downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
+    const { searchModland } = await import('@/lib/modlandApi');
+    const { acquireForDeck } = await import('@/lib/song/acquireSource');
     const results = await searchModland({ q: query, limit: 5 });
     if (!results.results || results.results.length === 0) {
       console.warn(`[Tour] No Modland results for "${query}"`);
       return;
     }
     const file = results.results[0];
-    const buffer = await downloadModlandFile(file.full_path);
-    const companions = await downloadUADECompanions(file.full_path, buffer);
-    const filename = file.full_path.split('/').pop() || 'download.mod';
+    const { name: filename, bytes: buffer, companions } = await acquireForDeck({ kind: 'modland', path: file.full_path });
 
     const { getDJEngine } = await import('@/engine/dj/DJEngine');
     const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');

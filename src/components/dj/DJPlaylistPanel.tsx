@@ -45,7 +45,8 @@ import {
 import { useDJStore } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { openDeckTrack } from '@/lib/song/openSong';
+import { acquireForDeck } from '@/lib/song/acquireSource';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
@@ -708,9 +709,8 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
               addedAt: Date.now(),
             });
           } else {
-            // parseModuleToSong needs a File object — create a Blob-based File
-            // from the buffer we already read so we don't re-read from disk.
-            const song = await parseModuleToSong(new File([buffer], file.name, { type: file.type }));
+            // The buffer is already read: open it as bytes so the file is not read from disk twice.
+            const { song } = await openDeckTrack({ kind: 'bytes', name: file.name, bytes: buffer });
             cacheSong(file.name, song);
             const bpmResult = detectBPM(song);
             const duration = estimateSongDuration(song);
@@ -853,23 +853,20 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       if (track.fileName.startsWith('modland:')) {
         const modlandPath = track.fileName.slice('modland:'.length);
         try {
-          const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
-          const buffer = await downloadModlandFile(modlandPath);
-          const found = await downloadUADECompanions(modlandPath, buffer);
-          const companions = found.length > 0 ? found : undefined;
           const filename = modlandPath.split('/').pop() || 'download.mod';
 
           if (isAudioFile(filename)) {
-            await engine.loadAudioToDeck(deckId, buffer, track.fileName);
+            const { downloadModlandFile } = await import('@/lib/modlandApi');
+            await engine.loadAudioToDeck(deckId, await downloadModlandFile(modlandPath), track.fileName);
             useDJStore.getState().setDeckViewMode('vinyl');
           } else if (isUADEFormat(filename)) {
+            const { bytes, companions } = await acquireForDeck({ kind: 'modland', path: modlandPath });
             // Pass track.fileName as identity so deck store / playlist row
             // match for scrubber + isPlaying badge (see DJUADEPrerender).
-            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName, companions);
+            await loadUADEToDeck(engine, deckId, bytes, filename, true, undefined, track.trackName, track.fileName, companions);
             useDJStore.getState().setDeckViewMode('visualizer');
           } else {
-            const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-            const song = await parseModuleToSong(blob);
+            const { song, bytes: buffer } = await openDeckTrack({ kind: 'modland', path: modlandPath }, deckId);
             cacheSong(track.fileName, song);
             await loadSongToDeck(song, track.fileName, deckId, buffer);
           }
@@ -894,7 +891,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             await engine.loadAudioToDeck(deckId, rawBuffer, file.name);
             useDJStore.getState().setDeckViewMode('vinyl');
           } else {
-            const song = await parseModuleToSong(file);
+            const { song } = await openDeckTrack({ kind: 'file', file }, deckId);
             cacheSong(file.name, song);
             await loadSongToDeck(song, file.name, deckId, rawBuffer);
           }
@@ -1008,7 +1005,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
               addedAt: Date.now(),
             });
           } else {
-            const song = await parseModuleToSong(file);
+            const { song } = await openDeckTrack({ kind: 'file', file });
             cacheSong(file.name, song);
             const bpmResult = detectBPM(song);
             const duration = estimateSongDuration(song);

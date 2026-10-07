@@ -11,8 +11,6 @@ import { ContextMenu, useContextMenu, type MenuItemType } from '@components/comm
 import {
   searchModland,
   getModlandFormats,
-  downloadModlandFile,
-  downloadUADECompanions,
   getModlandStatus,
   type ModlandFile,
   type ModlandFormat,
@@ -28,7 +26,8 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { OfflineNotice } from '@components/common/OfflineNotice';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
-import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { openDeckTrack } from '@/lib/song/openSong';
+import { acquireForDeck } from '@/lib/song/acquireSource';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 import { cacheSong } from '@/engine/dj/DJSongCache';
@@ -73,11 +72,6 @@ interface DJModlandBrowserProps {
   onClose?: () => void;
   /** `popover`: rounded card, capped at 400px (default). `fullHeight`: stretches to fill parent, no border. */
   variant?: 'popover' | 'fullHeight';
-}
-
-/** The companion list as the Map the loaders take; undefined when there are none. */
-function companionMap(companions: Array<{ filename: string; buffer: ArrayBuffer }>): Map<string, ArrayBuffer> | undefined {
-  return companions.length > 0 ? new Map(companions.map((c) => [c.filename, c.buffer])) : undefined;
 }
 
 export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, variant = 'popover' }) => {
@@ -353,16 +347,16 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
       setError(null);
 
       try {
-        let buffer: ArrayBuffer;
-        // Companions travel WITH the load (loadUADEToDeck / parseModuleToSong),
-        // never pre-written into the UADE filesystem: a later load, a purge or
-        // an engine recreation drops what was written ahead of it.
-        let companions: Array<{ filename: string; buffer: ArrayBuffer }> = [];
+        // Companions travel WITH the load (acquire, then loadUADEToDeck / openSong's
+        // deck target), never pre-written into the UADE filesystem: a later load,
+        // a purge or an engine recreation drops what was written ahead of it.
+        const uadeModule = file.source === 'modland' && isUADEFormat(file.filename);
+        let buffer: ArrayBuffer = new ArrayBuffer(0);
+        let companions: Array<{ filename: string; buffer: ArrayBuffer }> | undefined;
         if (file.source === 'hvsc') {
           buffer = await downloadHVSCFile(file.key);
-        } else {
-          buffer = await downloadModlandFile(file.key);
-          companions = await downloadUADECompanions(file.key, buffer);
+        } else if (uadeModule) {
+          ({ bytes: buffer, companions } = await acquireForDeck({ kind: 'modland', path: file.key }));
         }
 
         const cacheKey = `${file.source}:${file.key}`;
@@ -385,17 +379,16 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
           }
         } else if (isUADEFormat(file.filename)) {
           // Amiga formats: use UADE pre-render path
-          await loadUADEToDeck(
-            engine, deckId, buffer, file.filename, true, undefined, file.filename, undefined,
-            companions.length > 0 ? companions : undefined,
-          );
+          await loadUADEToDeck(engine, deckId, buffer, file.filename, true, undefined, file.filename, undefined, companions);
           if (useDJStore.getState().deckViewMode !== '3d') {
             useDJStore.getState().setDeckViewMode('visualizer');
           }
         } else {
           // Non-UADE tracker (XM/IT/S3M/etc.) — parse + pipeline render
-          const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
-          const song = await parseModuleToSong(blob, 0, undefined, undefined, companionMap(companions));
+          const opened = await openDeckTrack({ kind: 'modland', path: file.key }, deckId);
+          const { song } = opened;
+          buffer = opened.bytes;
+          companions = opened.companionList;
           const bpmResult = detectBPM(song);
 
           cacheSong(cacheKey, song);
@@ -409,7 +402,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
             isPlaying: false,
           });
 
-          const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high', companions.length > 0 ? companions : undefined);
+          const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high', companions);
           await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
 
           if (useDJStore.getState().deckViewMode !== '3d') {
@@ -456,10 +449,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     if (file.source === 'modland' && isUADEFormat(file.filename)) {
       previewModeRef.current = 'uade';
       try {
-        const [buffer, companions] = await Promise.all([
-          downloadModlandFile(file.key),
-          downloadUADECompanions(file.key),
-        ]);
+        const { bytes: buffer, companions = [] } = await acquireForDeck({ kind: 'modland', path: file.key });
         // User may have hit Stop (or previewed something else) while we
         // were downloading — bail out cleanly in that case.
         if (previewingKey !== file.key && previewModeRef.current !== 'uade') {
@@ -553,12 +543,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
           return;
         }
 
-        let buffer: ArrayBuffer;
-        buffer = await downloadModlandFile(file.key);
-        const companions = await downloadUADECompanions(file.key, buffer);
-
-        const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
-        const song = await parseModuleToSong(blob, 0, undefined, undefined, companionMap(companions));
+        const { song } = await openDeckTrack({ kind: 'modland', path: file.key });
         const bpmResult = detectBPM(song);
         const duration = estimateSongDuration(song);
 
