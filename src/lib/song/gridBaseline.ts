@@ -37,8 +37,16 @@ export function baselineOf(patterns: readonly Pattern[]): GridBaseline {
 
 let current: GridBaseline | null = null;
 
+/**
+ * A sample's loop or data changed since the load (sampleEdit.ts). An engine that holds its own
+ * copy of the module plays the loaded bytes until it is given the edited ones, whatever the grid says.
+ */
+let samplesEdited = false;
+export function markSampleEdited(): void { samplesEdited = true; }
+export function sampleIsEdited(): boolean { return samplesEdited; }
+
 /** null = unknown (a project saved before baselines existed): it is never re-decoded. */
-export function setGridBaseline(b: GridBaseline | null): void { current = b; restoredEditsPending = false; }
+export function setGridBaseline(b: GridBaseline | null): void { current = b; restoredEditsPending = false; samplesEdited = false; }
 export function getGridBaseline(): GridBaseline | null { return current; }
 
 /**
