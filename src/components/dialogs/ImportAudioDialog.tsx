@@ -20,6 +20,7 @@ import type { InstrumentConfig } from '@/types/instrument';
 import type { IFF8SVXResult } from '@lib/audio/IFF8SVXParser';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useStemSeparation } from '@/hooks/useStemSeparation';
+import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 const IS_IFF = /\.(iff|8svx)$/i;
 const IS_SUPPORTED = /\.(wav|mp3|ogg|flac|aiff?|m4a|iff|8svx)$/i;
@@ -74,6 +75,7 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
   onClose,
   initialFile,
 }) => {
+  const typingTrap = useDialogTypingTrap();
   useModalClose({ isOpen, onClose });
   const [preview, setPreview]         = useState<AudioPreview | null>(null);
   const [audioFile, setAudioFile]     = useState<File | null>(null);
@@ -369,7 +371,7 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990]">
+    <div {...typingTrap} className="fixed inset-0 focus:outline-none bg-black/60 flex items-center justify-center z-[99990]">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[440px] max-h-[85vh] overflow-hidden flex flex-col">
 
         {/* Header */}

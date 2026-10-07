@@ -4,6 +4,7 @@
  * Legacy ModlandPanel + HVSCPanel kept for backwards compatibility.
  */
 
+import { readFileBrowserMemory, updateFileBrowserMemory } from './fileBrowserMemory';
 import { markKnownSource } from '@/lib/modland/ModlandDetector';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, FileAudio, ArrowLeft, Globe, Search, Loader2, Download, AlertCircle, Play, Square } from 'lucide-react';
@@ -701,17 +702,20 @@ interface OnlinePanelProps {
 const ONLINE_LIMIT = 50;
 
 export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerModule, onClose }) => {
-  const [query, setQuery] = useState('');
-  const [source, setSource] = useState<SearchSource>('all');
-  const [format, setFormat] = useState('');
-  const [results, setResults] = useState<OnlineResult[]>([]);
+  // The last search and its results come back when the dialog reopens.
+  const [remembered] = useState(() => readFileBrowserMemory().online);
+  const restoredSearch = useRef(remembered);
+  const [query, setQuery] = useState(remembered?.query ?? '');
+  const [source, setSource] = useState<SearchSource>(remembered?.source ?? 'all');
+  const [format, setFormat] = useState(remembered?.format ?? '');
+  const [results, setResults] = useState<OnlineResult[]>((remembered?.results as OnlineResult[] | undefined) ?? []);
   const [previewingKey, setPreviewingKey] = useState<string | null>(null);
   const [formats, setFormats] = useState<ModlandFormat[]>([]);
   const [status, setStatus] = useState<ModlandStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(remembered?.offset ?? 0);
+  const [hasMore, setHasMore] = useState(remembered?.hasMore ?? false);
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
   const [ratings, setRatings] = useState<RatingMap>({});
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -795,6 +799,24 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
   }, []);
 
   useEffect(() => {
+    updateFileBrowserMemory({ online: { query, source, format, results, offset, hasMore } });
+  }, [query, source, format, results, offset, hasMore]);
+
+  useEffect(() => {
+    // First pass after a restore: the remembered results ARE this search.
+    const r = restoredSearch.current;
+    if (r && r.query === query && r.format === format && r.source === source) {
+      restoredSearch.current = null;
+      if (r.results.length > 0) {
+        const rows = r.results as OnlineResult[];
+        const maps = (['modland', 'hvsc'] as const)
+          .map((src) => ({ src, keys: rows.filter((x) => x.source === src).map((x) => x.key) }))
+          .filter((g) => g.keys.length > 0)
+          .map((g) => batchGetRatings(g.src, g.keys));
+        Promise.all(maps).then((m) => setRatings(Object.assign({}, ...m))).catch(() => {});
+        return;
+      }
+    }
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       doSearch(query, format, source, 0, false);
