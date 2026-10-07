@@ -8,6 +8,9 @@
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
+import { fpCodeSection, walkFuturePlayer } from '@/lib/import/formats/fpWalk';
+import { fpLayout, fpTickPosition, type FpLayout } from '@/lib/import/formats/fpGrid';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -44,6 +47,11 @@ export class FuturePlayerEngine extends WASMSingletonBase {
   private _resolveTune: ((info: FuturePlayerTuneInfo) => void) | null = null;
   private _rejectTune: ((err: Error) => void) | null = null;
   private _requestId = 0;
+
+  private readonly _positions = new PositionCallbacks();
+  /** The grid's layout (the importer's, from the same walk) while subsong 0 plays; null otherwise (no grid to follow). */
+  private _layout: FpLayout | null = null;
+  private _layoutOfSubsong0: FpLayout | null = null;
 
   private _patternResolves = new Map<number, (data: FPPatternData) => void>();
   private _voiceLengthsResolves = new Map<number, (lengths: number[]) => void>();
@@ -118,6 +126,14 @@ export class FuturePlayerEngine extends WASMSingletonBase {
           }
           break;
 
+        case 'position': {
+          // the worklet posts the player's interrupt count when the audio now playing is on a new row; the grid's
+          // (song position, row) of it is the importer's own layout of the same walk
+          const pos = this._layout && typeof data.ticks === 'number' ? fpTickPosition(this._layout, data.ticks) : null;
+          if (pos) this._positions.emit(pos);
+          break;
+        }
+
         case 'chLevels':
           try {
             const engine = getToneEngine();
@@ -175,6 +191,11 @@ export class FuturePlayerEngine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('FuturePlayerEngine not initialized');
 
+    // the importer's grid layout of subsong 0, from the same walk (the buffer is transferred below)
+    const walk = walkFuturePlayer(fpCodeSection(new Uint8Array(buffer)), 0);
+    this._layoutOfSubsong0 = walk ? fpLayout(walk) : null;
+    this._layout = this._layoutOfSubsong0;
+
     this._tunePromise = new Promise<FuturePlayerTuneInfo>((resolve, reject) => {
       this._resolveTune = resolve;
       this._rejectTune = reject;
@@ -201,7 +222,14 @@ export class FuturePlayerEngine extends WASMSingletonBase {
   }
 
   setSubsong(subsong: number): void {
+    // the grid is subsong 0's: no position to report for another
+    this._layout = subsong === 0 ? this._layoutOfSubsong0 : null;
     this.workletNode?.port.postMessage({ type: 'setSubsong', subsong });
+  }
+
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
   }
 
   /** Trigger a single instrument for preview (instrPtr = raw binary offset, note 1-96, velocity 0-127) */
@@ -296,6 +324,7 @@ export class FuturePlayerEngine extends WASMSingletonBase {
   }
 
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     this._patternResolves.clear();
     this._voiceLengthsResolves.clear();
