@@ -39,6 +39,8 @@ export interface GridProvenance {
   exportRoundTrip?: ExportRoundTrip;
   /** G19: a grid edit is heard on the next play (liveEditHeard.test.ts). */
   liveEdit?: LiveEditStatus;
+  /** G24: a grid edit is heard while the song plays (liveEditHeard.test.ts, second table). */
+  liveWhilePlaying?: LiveEditStatus;
 }
 
 export type ExportRoundTrip = 'pass' | 'fail' | 'n/a';
@@ -134,6 +136,30 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   ult: 'n/a',
   unic: 'n/a',
   xm: 'n/a',
+};
+
+/**
+ * G24: is a grid edit heard WHILE the song plays (the next time the player reaches the row, no restart)?
+ * Measured by the second table of liveEditHeard.test.ts: UADE plays the module, the edit goes through
+ * sendCellEditsToEngine into chip RAM between two render chunks, and the Paula stream after it equals the
+ * stream of the edited module played from the start. 'n/a' = the TypeScript scheduler plays the grid.
+ * A key absent here is not measurable in node (a worklet engine, or no corpus song); LIVE_WHILE_PLAYING_WHY
+ * names the reason a row is 'fail' or absent.
+ */
+export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
+  digitalSonixChrome: 'pass',
+  jochenHippelST: 'pass',
+  robHubbard: 'pass',
+  soundMaster: 'pass',
+  suntronic: 'fail',
+  tcbTracker: 'fail',
+};
+
+/** Why a LIVE_WHILE_PLAYING row is 'fail', and why the other formats are not in the table (G24). */
+export const LIVE_WHILE_PLAYING_WHY: Record<string, string> = {
+  suntronic: 'the exported bytes are found in chip RAM (image at 0x20000, 0x100 records 0x2a000) and written there, but the stream does not move: the player reads a converted copy, not the file image',
+  tcbTracker: 'the layout write changes the file bytes but no Paula event in 8 s of the first three patterns: UADE plays a converted copy of the TCB patterns',
+  digi: 'UADE refuses the file (DigiBooster plays through the native engine only)',
 };
 
 /** Why a LIVE_EDIT row is 'fail' (plan unit in thoughts/shared/plans/2026-10-06-fix-all-open.md, G19). */
@@ -445,5 +471,6 @@ export function gridProvenanceOf(key: string): GridProvenance | null {
     ...base,
     ...(key in EXPORT_ROUND_TRIP ? { exportRoundTrip: EXPORT_ROUND_TRIP[key] } : {}),
     ...(key in LIVE_EDIT ? { liveEdit: LIVE_EDIT[key] } : {}),
+    ...(key in LIVE_WHILE_PLAYING ? { liveWhilePlaying: LIVE_WHILE_PLAYING[key] } : {}),
   };
 }

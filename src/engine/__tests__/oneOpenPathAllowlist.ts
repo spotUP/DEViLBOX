@@ -47,6 +47,8 @@ export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
   { file: 'src/engine/dj/DJTrackLoader.ts', fn: 'preRenderTrackInternal', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.6a' },
   { file: 'src/engine/dj/DJTrackLoader.ts', fn: 'preRenderTrackInternal', callee: 'parseModuleToSong', count: 3, removedBy: 'U2.6a' },
   { file: 'src/engine/dj/DJUADEPrerender.ts', fn: 'loadUADEToDeck', callee: 'parseModuleToSong', count: 1, removedBy: 'U2.6a' },
+  // Live edit into chip RAM (G24): the diff of the native export of the stores is written where UADE plays the module
+  { file: 'src/engine/uade/liveModuleEdits.ts', fn: 'run', callee: 'exportNativeSong', count: 1, removedBy: 'U4.1 (stays: live-edit module owner)' },
   // Play-time re-encode (G19): the module an engine is loaded with after a grid edit is the native export of the stores run through the parse a reload runs; it applies no song and fills no store.
   { file: 'src/engine/replayer/editedModuleForPlay.ts', fn: 'editedModuleForPlay', callee: 'exportNativeSong', count: 1, removedBy: 'U4.1 (stays: play-time module owner)' },
   { file: 'src/engine/replayer/editedModuleForPlay.ts', fn: 'editedModuleForPlay', callee: 'parseModuleToSong', count: 1, removedBy: 'U4.1 (stays: play-time module owner)' },
