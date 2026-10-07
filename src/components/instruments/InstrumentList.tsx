@@ -684,9 +684,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       ? 'instrument-art-name whitespace-pre shrink-0'
                       : 'whitespace-nowrap flex-1 min-w-[4rem] truncate'}`}
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
-                    title={instrumentDisplayName(instrument, useHexNumbers)}
+                    title={instrumentDisplayName(instrument)}
                   >
-                    {instrumentDisplayName(instrument, useHexNumbers)}
+                    {instrumentDisplayName(instrument)}
                   </span>
                 )}
 
@@ -902,7 +902,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
                     title="Double-click to rename"
                   >
-                    {instrumentDisplayName(instrument, useHexNumbers)}
+                    {instrumentDisplayName(instrument)}
                   </span>
                 )}
 

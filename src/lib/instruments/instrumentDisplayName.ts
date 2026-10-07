@@ -1,10 +1,11 @@
 /**
  * What the UI calls an instrument.
  *
- * An instrument the original file does not name has the name '' (parsers never
- * invent one). The UI shows the slot number for it, so a list row, a selector
- * entry or an editor header is never blank. The number is formatted the way
- * the tracker shows instrument numbers: two digits, hex or decimal.
+ * Exactly the name the file stores, as ProTracker shows it: an unnamed slot is
+ * blank, never a made-up label or a number standing in for a name (owner,
+ * 2026-10-07: "show nothing if an empty sample are not named ... dont make
+ * things up"). Spaces are kept - authors draw text art in name slots. The slot
+ * number is its own column, formatted by formatInstrumentNumber.
  */
 export interface NamedInstrument {
   id: number;
@@ -16,8 +17,7 @@ export function formatInstrumentNumber(id: number, hex = true): string {
   return hex ? id.toString(16).toUpperCase().padStart(2, '0') : id.toString(10).padStart(2, '0');
 }
 
-/** The instrument's stored name, or its slot number when it has none. */
-export function instrumentDisplayName(inst: NamedInstrument, hex = true): string {
-  const name = (inst.name ?? '').trim();
-  return name || formatInstrumentNumber(inst.id, hex);
+/** The instrument's stored name, verbatim; '' when the file names none. */
+export function instrumentDisplayName(inst: NamedInstrument): string {
+  return inst.name ?? '';
 }
