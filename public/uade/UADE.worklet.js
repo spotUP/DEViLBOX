@@ -66,6 +66,9 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'load':
         this._stream?.discontinue(); // a new song is a new stream
+        // The call owns the companion set: what it carries replaces whatever the
+        // previous load left behind (nothing is written out of band).
+        this._replaceCompanions(data.companions || []);
         await this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false, data.scanTimeoutSec, data.pinSubsong === true);
         break;
 
@@ -105,10 +108,6 @@ class UADEProcessor extends AudioWorkletProcessor {
             }
           }
         }
-        break;
-
-      case 'addCompanionFile':
-        this._addCompanionFile(data.filename, data.buffer);
         break;
 
       case 'play':
@@ -740,6 +739,31 @@ class UADEProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /**
+   * Make the companion set exactly `list` ([{filename, buffer}]): a companion
+   * of an earlier load that is not in it is unlinked from /uade and forgotten,
+   * the others are (re)written. Runs at the start of every load, so a song
+   * never inherits a partner file from the song before it.
+   */
+  _replaceCompanions(list) {
+    const names = new Set(list.map((c) => c.filename));
+    const fs = this._wasm && this._wasm.FS;
+    for (const name of [...this._companionFiles.keys()]) {
+      if (names.has(name)) continue;
+      this._companionFiles.delete(name);
+      this._songFiles.delete(name);
+      if (!fs) continue;
+      try { fs.unlink('/uade/' + name); } catch { /* already gone */ }
+      const dirs = name.split('/').slice(0, -1);
+      while (dirs.length) {
+        try { fs.rmdir('/uade/' + dirs.join('/')); } catch { break; }
+        dirs.pop();
+      }
+    }
+    this._pendingCompanions = new Set();
+    for (const c of list) this._addCompanionFile(c.filename, c.buffer);
+  }
+
   _addCompanionFile(filename, buffer) {
     // Always cache companion files so they survive WASM reinit
     const data = new Uint8Array(buffer);
@@ -960,7 +984,11 @@ class UADEProcessor extends AudioWorkletProcessor {
       // the moments before the load are part of the story.
       const newBasename = filenameHint.includes('/') ? filenameHint.split('/').pop() : filenameHint;
       if (newBasename !== this._songBasename) this._purgePreviousSong(newBasename);
-      else this._pendingCompanions.clear(); // same song reloaded: its companions stay
+      else {
+        // same song reloaded: its companions stay, and are tracked so a later purge unlinks them
+        for (const name of this._pendingCompanions) this._songFiles.add(name);
+        this._pendingCompanions.clear();
+      }
       let ret = this._loadIntoWasm(data, filenameHint);
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
 

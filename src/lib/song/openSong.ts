@@ -39,7 +39,7 @@ import { askImportDialog, type ImportAnswer } from '@/lib/song/importRequest';
 import { isAdPlugWasmFormat } from '@/lib/import/adplugFormats';
 import { detectFormatFromContent, isSupportedByHeader } from '@/lib/import/FormatRegistry';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
-import { directoryOfFile, gatherCompanions } from '@/lib/import/companionFetch';
+import { acquire } from './acquireSource';
 import { withSongLoad } from '@/lib/song/songLifecycle';
 import { applySong, type SongToApply, type SongSource } from '@/lib/song/applySong';
 import { useSongLoadStore, setSongLoadPhase, throwIfSongLoadCancelled, type OpenPhase } from '@/stores/useSongLoadStore';
@@ -154,43 +154,6 @@ export async function classifySong(file: File): Promise<SongKind | null> {
     if (isSupportedByHeader(new Uint8Array(await file.arrayBuffer()))) return 'header';
   } catch { /* unreadable: not a song */ }
   return null;
-}
-
-async function acquire(src: SongSourceRef): Promise<{ file: File; companions?: Map<string, ArrayBuffer> }> {
-  switch (src.kind) {
-    case 'prepared':
-      return { file: src.file, companions: src.companions };
-    case 'file':
-      return { file: src.file, companions: src.companions };
-    case 'bytes':
-      return { file: new File([src.bytes], src.name, { type: 'application/octet-stream' }), companions: src.companions };
-    case 'modland': {
-      const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
-      const bytes = await downloadModlandFile(src.path);
-      setSongLoadPhase('companions');
-      const found = await downloadUADECompanions(src.path, bytes);
-      const name = src.path.split('/').pop() ?? 'song';
-      return {
-        file: new File([bytes], name, { type: 'application/octet-stream' }),
-        companions: found.length ? new Map(found.map((c) => [c.filename, c.buffer])) : undefined,
-      };
-    }
-    case 'url': {
-      let bytes = src.bytes;
-      if (!bytes) {
-        const res = await fetch(src.url);
-        if (!res.ok) throw new Error(`HTTP ${res.status} for ${src.url}`);
-        bytes = await res.arrayBuffer();
-      }
-      const name = src.name ?? src.url.split('/').pop() ?? 'song';
-      setSongLoadPhase('companions');
-      const found = await gatherCompanions(name, directoryOfFile(src.url), bytes);
-      return {
-        file: new File([bytes], name, { type: 'application/octet-stream' }),
-        companions: found.size ? found : undefined,
-      };
-    }
-  }
 }
 
 function sourceName(src: SongSourceRef): string {

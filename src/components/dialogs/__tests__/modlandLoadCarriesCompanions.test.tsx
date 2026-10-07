@@ -80,12 +80,9 @@ describe('a Modland bob4e.dum loaded from the file browser plays with bob4.ins',
     searchHit = { filename: 'bob4e.dum', full_path: `${DIR}/bob4e.dum`, format: 'Infogrames', extension: 'dum' };
   });
 
-  it('no browser pre-writes companions into the UADE filesystem ahead of a separate load', () => {
-    // Only a direct preview (write, then loadForPlayback on the same engine) may write.
+  it('no browser writes companions into the UADE filesystem: the engine has no such call', () => {
     for (const f of ['src/components/dialogs/FilePreviewPanel.tsx', 'src/components/dj/DJModlandBrowser.tsx']) {
-      const src = readFileSync(f, 'utf8');
-      const writes = src.split('\n').filter((l) => l.includes('addCompanionFile'));
-      for (const w of writes) expect(w).toMatch(/uade\.addCompanionFile/);
+      expect(readFileSync(f, 'utf8')).not.toContain('addCompanionFile');
     }
   });
 });

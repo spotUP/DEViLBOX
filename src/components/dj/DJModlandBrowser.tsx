@@ -305,7 +305,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
       void (async () => {
         try {
           const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          const uade = UADEEngine.getInstance();
+          const uade = UADEEngine.getPreviewInstance();
           uade.stop();
           try {
             // Preview routes to the cue bus (headphones) — disconnect from
@@ -467,15 +467,14 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         }
 
         const { UADEEngine } = await import('@engine/uade/UADEEngine');
-        const uade = UADEEngine.getInstance();
+        // The preview's own engine: the editor song's module and companions are not touched.
+        const uade = UADEEngine.getPreviewInstance();
         await uade.ready();
-
-        for (const c of companions) await uade.addCompanionFile(c.filename, c.buffer);
 
         // Stop any prior UADE playback before loading a new module —
         // leaving it playing leaks audio during the ~100 ms load window.
         uade.stop();
-        await uade.loadForPlayback(buffer, file.filename);
+        await uade.loadForPlayback(buffer, file.filename, 0, false, new Map(companions.map((c) => [c.filename, c.buffer])));
 
         // Route UADE.output to the CUE bus (headphones) so preview is
         // audible to the DJ but NOT to the crowd — classic sound-system

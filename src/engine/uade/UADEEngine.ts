@@ -149,6 +149,9 @@ export interface UADEChannelData {
 type PositionCallback = (update: UADEPositionUpdate) => void;
 type ChannelCallback = (channels: UADEChannelData[], totalFrames: number) => void;
 
+/** A song's partner files by the name UADE opens them under (two-file formats: smp.*, .ins, .set). */
+export type UADECompanions = ReadonlyMap<string, ArrayBuffer>;
+
 export class UADEEngine extends WASMSingletonBase implements IsolationCapableEngine {
   /** The last scan's statistics, for get_format_state (ledger F7). */
   lastScanStats: UADEScanStats | null = null;
@@ -159,6 +162,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   private static readonly MAX_DUB_CHANNELS = 32;
   private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
   private static instance: UADEEngine | null = null;
+  private static previewInstance: UADEEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _rejectInit: ((err: Error) => void) | null = null;
@@ -257,6 +261,22 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       UADEEngine.instance = new UADEEngine();
     }
     return UADEEngine.instance;
+  }
+
+  /**
+   * The engine a PREVIEW plays on (file browser, Modland, DJ browser). A second
+   * instance with its own worklet and /uade filesystem: a preview loaded into
+   * the editor's engine replaced the editor song's module and companions
+   * (the call owns the companion set), and silenced it.
+   */
+  static getPreviewInstance(): UADEEngine {
+    const currentCtx = getDevilboxAudioContext();
+    const p = UADEEngine.previewInstance;
+    if (!p || p._disposed || p._poisoned || p.audioContext !== currentCtx) {
+      if (p && !p._disposed) p.dispose();
+      UADEEngine.previewInstance = new UADEEngine();
+    }
+    return UADEEngine.previewInstance!;
   }
 
   /** Check if a live singleton instance exists (without creating one). */
@@ -612,8 +632,11 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * Load an exotic Amiga music file.
    * @param data - Raw file bytes
    * @param filenameHint - Original filename (used by UADE for format detection)
+   * @param companions - The song's partner files (smp.*, .ins, Instruments/...), keyed by the
+   *   name UADE opens them under. The call owns them: this set REPLACES the previous load's
+   *   (none given = none), so nothing is written out of band and no earlier song's file stays.
    */
-  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number, looping?: boolean, pinSubsong = false): Promise<UADEMetadata> {
+  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number, looping?: boolean, pinSubsong = false, companions?: UADECompanions): Promise<UADEMetadata> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
 
@@ -627,9 +650,13 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     // which is not transferable. ArrayBuffer.slice() returns an ArrayBuffer.
     const raw = data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer;
     const transferBuf = raw.slice(0);
+    const companionList = [...(companions ?? [])].map(([filename, buf]) => ({
+      filename,
+      buffer: (buf instanceof ArrayBuffer ? buf : (buf as Uint8Array).buffer).slice(0),
+    }));
     this.workletNode.port.postMessage(
-      { type: 'load', buffer: transferBuf, filenameHint: uadePlayerHint(filenameHint), skipScan, subsong, scanTimeoutSec, pinSubsong },
-      [transferBuf]
+      { type: 'load', buffer: transferBuf, filenameHint: uadePlayerHint(filenameHint), skipScan, subsong, scanTimeoutSec, pinSubsong, companions: companionList },
+      [transferBuf, ...companionList.map((c) => c.buffer)]
     );
 
     const meta = await this._loadPromise;
@@ -664,9 +691,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * had grown their own copy of this incantation and two of them still ran the
    * scan (2026-09-24).
    */
-  async loadForPlayback(data: ArrayBuffer, filenameHint: string, subsong = 0, pinSubsong = false): Promise<void> {
+  async loadForPlayback(data: ArrayBuffer, filenameHint: string, subsong = 0, pinSubsong = false, companions?: UADECompanions): Promise<void> {
     const { getScanParams } = await import('./uadeScanLists');
-    await this.load(data, filenameHint, true, subsong, undefined, getScanParams(filenameHint).loops, pinSubsong);
+    await this.load(data, filenameHint, true, subsong, undefined, getScanParams(filenameHint).loops, pinSubsong, companions);
   }
 
   /**
@@ -678,35 +705,11 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     const state = useFormatStore.getState();
     const fileName = state.uadeEditableFileName || 'module.mod';
 
-    // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading
-    const companions = state.uadeCompanionFiles;
-    if (companions) {
-      for (const [cfName, cfBuf] of companions) {
-        await this.addCompanionFile(cfName, cfBuf);
-      }
-    }
-
     // A grid decoded per subsong (uadeEditableSubsongs.orders) shows one
     // subsong: UADE plays exactly that one, never the first-audible probe's pick.
     // Its UADE number counts from the player's lowest (`first`; Hippel ST's is 1).
     const first = state.uadeEditableSubsongs?.first ?? 0;
-    await this.loadForPlayback(buffer, fileName, first + state.uadeEditableCurrentSubsong, !!state.uadeEditableSubsongs?.orders);
-  }
-
-  /**
-   * Write a companion file into the WASM virtual filesystem before loading.
-   * Required for multi-file formats like TFMX (mdat.* + smpl.*).
-   * Must be called BEFORE load() for the companion to be available.
-   */
-  async addCompanionFile(filename: string, data: ArrayBuffer): Promise<void> {
-    await this._initPromise;
-    if (!this.workletNode) throw new Error('UADEEngine not initialized');
-    const raw = data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer;
-    const transferBuf = raw.slice(0);
-    this.workletNode.port.postMessage(
-      { type: 'addCompanionFile', filename, buffer: transferBuf },
-      [transferBuf],
-    );
+    await this.loadForPlayback(buffer, fileName, first + state.uadeEditableCurrentSubsong, !!state.uadeEditableSubsongs?.orders, state.uadeCompanionFiles ?? undefined);
   }
 
   /**
@@ -1300,6 +1303,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     this._songEndCallbacks.clear();
     if (UADEEngine.instance === this) {
       UADEEngine.instance = null;
+    }
+    if (UADEEngine.previewInstance === this) {
+      UADEEngine.previewInstance = null;
     }
   }
 }

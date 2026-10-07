@@ -25,16 +25,15 @@ async function start() {
 }
 
 describe('UADE filesystem across song loads', { timeout: 60000 }, () => {
+  const first = { filename: 'smp.first', buffer: new ArrayBuffer(16) };
   const files = readdirSync(join(process.cwd(), DIR)).filter((f) => !f.startsWith('.')).slice(0, 2);
 
   it('keeps only the current song and its companions after loading two songs', async () => {
     const { send, fs } = await start();
     const hint = (f: string) => uadePlayerHint(f);
-    await send({ type: 'addCompanionFile', filename: 'smp.first', buffer: new ArrayBuffer(16) });
-    await send({ type: 'load', buffer: songBuffer(join(DIR, files[0])), filenameHint: hint(files[0]), skipScan: true });
+    await send({ type: 'load', buffer: songBuffer(join(DIR, files[0])), filenameHint: hint(files[0]), skipScan: true, companions: [first] });
     expect(fs()).toContain('smp.first');
-    await send({ type: 'addCompanionFile', filename: 'smp.second', buffer: new ArrayBuffer(16) });
-    await send({ type: 'load', buffer: songBuffer(join(DIR, files[1])), filenameHint: hint(files[1]), skipScan: true });
+    await send({ type: 'load', buffer: songBuffer(join(DIR, files[1])), filenameHint: hint(files[1]), skipScan: true, companions: [{ filename: 'smp.second', buffer: new ArrayBuffer(16) }] });
 
     const left = fs().filter((n) => !CONFIG.includes(n));
     expect(left.sort()).toEqual(['smp.second', hint(files[1])].sort());
@@ -42,17 +41,15 @@ describe('UADE filesystem across song loads', { timeout: 60000 }, () => {
 
   it('keeps the companions when the same song is loaded again', async () => {
     const { send, fs } = await start();
-    await send({ type: 'addCompanionFile', filename: 'smp.first', buffer: new ArrayBuffer(16) });
     const h = uadePlayerHint(files[0]);
-    await send({ type: 'load', buffer: songBuffer(join(DIR, files[0])), filenameHint: h, skipScan: true });
-    await send({ type: 'load', buffer: songBuffer(join(DIR, files[0])), filenameHint: h, skipScan: true });
+    await send({ type: 'load', buffer: songBuffer(join(DIR, files[0])), filenameHint: h, skipScan: true, companions: [first] });
+    await send({ type: 'load', buffer: songBuffer(join(DIR, files[0])), filenameHint: h, skipScan: true, companions: [first] });
     expect(fs()).toContain('smp.first');
   });
 
   it('does not replay a previous song companions into a fresh instance', async () => {
     const { send, proc } = await start();
-    await send({ type: 'addCompanionFile', filename: 'smp.first', buffer: new ArrayBuffer(16) });
-    await send({ type: 'load', buffer: songBuffer(join(DIR, files[0])), filenameHint: uadePlayerHint(files[0]), skipScan: true });
+    await send({ type: 'load', buffer: songBuffer(join(DIR, files[0])), filenameHint: uadePlayerHint(files[0]), skipScan: true, companions: [first] });
     await send({ type: 'load', buffer: songBuffer(join(DIR, files[1])), filenameHint: uadePlayerHint(files[1]), skipScan: true });
     expect([...(proc._companionFiles as Map<string, unknown>).keys()]).toEqual([]);
   });

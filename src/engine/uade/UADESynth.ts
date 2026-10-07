@@ -50,16 +50,10 @@ export class UADESynth implements DevilboxSynth {
 
     const p = (async () => {
       await this.engine.ready();
-      // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading.
-      // Mirrors the logic in UADEEngine.loadTune() for the UADEEditableSynth path.
+      // Companions (two-file formats: smp.*, .ins, .set) travel with the load.
       const { useFormatStore } = await import('@/stores/useFormatStore');
-      const companions = useFormatStore.getState().uadeCompanionFiles;
-      if (companions) {
-        for (const [cfName, cfBuf] of companions) {
-          await this.engine.addCompanionFile(cfName, cfBuf);
-        }
-      }
-      await this.engine.loadForPlayback(config.fileData, config.filename, config.currentSubsong ?? 0);
+      const companions = useFormatStore.getState().uadeCompanionFiles ?? undefined;
+      await this.engine.loadForPlayback(config.fileData, config.filename, config.currentSubsong ?? 0, false, companions);
     })();
     this._initPromise = p;
     await p;
