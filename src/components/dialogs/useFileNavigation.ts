@@ -43,7 +43,7 @@ import {
 } from '@/lib/serverFilesApi';
 import { getSupportedExtensions } from '@/lib/import/ModuleLoader';
 import { getSupportedMIDIExtensions } from '@/lib/import/MIDIImporter';
-import { gatherCompanions } from '@lib/import/companionFetch';
+import { acquireNeighbourCompanions } from '@/lib/song/acquireSource';
 
 // Build comprehensive accept string for file inputs (400+ supported formats)
 export const ACCEPTED_FILE_FORMATS = [
@@ -645,9 +645,9 @@ export function useFileNavigation({
         // Auto-discover companion files (e.g. mdat.* → smpl.*, mfp.* → smp.*,
         // or a SunTronic module's external instr/ samples).
         const companions = selectedFile.path
-          ? await gatherCompanions(selectedFile.name, selectedFile.path.slice(0, selectedFile.path.lastIndexOf('/') + 1), buffer)
-          : new Map<string, ArrayBuffer>();
-        await onLoadTrackerModule(buffer, selectedFile.name, companions.size > 0 ? companions : undefined);
+          ? await acquireNeighbourCompanions(selectedFile.name, selectedFile.path.slice(0, selectedFile.path.lastIndexOf('/') + 1), buffer)
+          : undefined;
+        await onLoadTrackerModule(buffer, selectedFile.name, companions);
         onClose();
         return;
       }

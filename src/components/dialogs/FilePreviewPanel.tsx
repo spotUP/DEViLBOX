@@ -6,6 +6,7 @@
 
 import { readFileBrowserMemory, updateFileBrowserMemory } from './fileBrowserMemory';
 import { markKnownSource } from '@/lib/modland/ModlandDetector';
+import { acquireModlandCompanions } from '@/lib/song/acquireSource';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, FileAudio, ArrowLeft, Globe, Search, Loader2, Download, AlertCircle, Play, Square } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
@@ -13,7 +14,6 @@ import {
   searchModland,
   getModlandFormats,
   downloadModlandFile,
-  downloadUADECompanions,
   getModlandStatus,
   type ModlandFile,
   type ModlandFormat,
@@ -136,8 +136,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
         // never pre-written into the UADE filesystem: a bob4e.dum loaded that
         // way reached UADE without bob4.ins (2026-10-06).
         const buffer = await downloadModlandFile(file.full_path);
-        const found = await downloadUADECompanions(file.full_path, buffer);
-        const companions = found.length > 0 ? new Map(found.map((c) => [c.filename, c.buffer])) : undefined;
+        const companions = await acquireModlandCompanions(file.full_path, buffer);
 
         markKnownSource(file.filename);   // it came from Modland: not a contribution candidate
         await onLoadTrackerModule(buffer, file.filename, companions);
@@ -853,10 +852,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
         throw new Error(`Modland download failed: ${(fetchErr as Error).message}`);
       }
 
-      const all = await downloadUADECompanions(item.key, buffer).catch(() => []);
-      if (all.length > 0) {
-        companions = new Map(all.map((c) => [c.filename, c.buffer]));
-      }
+      companions = await acquireModlandCompanions(item.key, buffer).catch(() => undefined);
     }
 
     return { buffer, filename, companions };
@@ -924,15 +920,11 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
       if (isUADEFormat(filename)) {
         const { UADEEngine } = await import('@engine/uade/UADEEngine');
         const { getDevilboxAudioContext } = await import('@/utils/audio-context');
-        const uade = UADEEngine.getInstance();
+        // The preview's own engine: the editor song's module and companions are not touched.
+        const uade = UADEEngine.getPreviewInstance();
         await uade.ready();
-        if (companions) {
-          for (const [name, buf] of companions) {
-            await uade.addCompanionFile(name, buf);
-          }
-        }
         uade.stop();
-        await uade.loadForPlayback(buffer, filename);
+        await uade.loadForPlayback(buffer, filename, 0, false, companions);
         const ctx = getDevilboxAudioContext();
         try { uade.output.connect(ctx.destination); } catch { /* already connected */ }
         uade.play();
