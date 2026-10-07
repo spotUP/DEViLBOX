@@ -10,6 +10,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { X, AlertCircle, Music2 } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 interface TD3Preview {
   name: string;
@@ -33,6 +34,7 @@ export const ImportTD3Dialog: React.FC<ImportTD3DialogProps> = ({
   initialFile,
   onImport,
 }) => {
+  const typingTrap = useDialogTypingTrap();
   useModalClose({ isOpen, onClose });
   const [preview, setPreview]         = useState<TD3Preview | null>(null);
   const [td3File, setTD3File]         = useState<File | null>(null);
@@ -86,7 +88,7 @@ export const ImportTD3Dialog: React.FC<ImportTD3DialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990]">
+    <div {...typingTrap} className="fixed inset-0 focus:outline-none bg-black/60 flex items-center justify-center z-[99990]">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[420px] max-h-[75vh] overflow-hidden flex flex-col">
 
         {/* Header */}

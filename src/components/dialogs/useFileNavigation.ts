@@ -18,6 +18,7 @@ import {
 } from '@/lib/fileSystemAccess';
 import type { FileEntry } from '@/lib/fileSystemAccess';
 import { hasElectronFS } from '@utils/electron';
+import { readFileBrowserMemory, updateFileBrowserMemory, rememberScroll, scrollKey } from './fileBrowserMemory';
 import {
   isServerFSAvailable,
   isManifestAvailable,
@@ -147,9 +148,6 @@ interface UseFileNavigationOptions {
 // searchQuery additionally persists to localStorage so it survives HMR/reload.
 const _SEARCH_KEY = 'dvbx_file_browser_search';
 const _lastState = {
-  fileSource: 'demo' as FileSource,
-  currentPath: '',
-  electronDirectory: null as string | null,
   searchQuery: (() => {
     try { return localStorage.getItem(_SEARCH_KEY) ?? ''; } catch { return ''; }
   })(),
@@ -157,12 +155,12 @@ const _lastState = {
 
 /** Read the last file source the dialog was on. */
 export function getLastFileSource(): FileSource {
-  return _lastState.fileSource;
+  return readFileBrowserMemory().fileSource;
 }
 
 /** Persist the current dialog state so next open restores it. */
 export function setLastFileSource(source: FileSource): void {
-  _lastState.fileSource = source;
+  updateFileBrowserMemory({ fileSource: source });
 }
 
 export function useFileNavigation({
@@ -197,17 +195,17 @@ export function useFileNavigation({
   const [saveFilename, setSaveFilename] = useState(suggestedFilename);
   const [hasFilesystemAccess, setHasFilesystemAccess] = useState(false);
   const [hasServerFS, setHasServerFS] = useState(false);
-  const [currentPath, _setCurrentPath] = useState<string>(_lastState.currentPath);
-  const [electronDirectory, _setElectronDirectory] = useState<string | null>(_lastState.electronDirectory);
+  const [currentPath, _setCurrentPath] = useState<string>(() => readFileBrowserMemory().currentPath);
+  const [electronDirectory, _setElectronDirectory] = useState<string | null>(() => readFileBrowserMemory().electronDirectory);
   const [cloudFiles, setCloudFiles] = useState<ServerFile[]>([]);
 
   // Wrap setters to persist to module-level cache
   const setCurrentPath = useCallback((p: string) => {
-    _lastState.currentPath = p;
+    updateFileBrowserMemory({ currentPath: p });
     _setCurrentPath(p);
   }, []);
   const setElectronDirectory = useCallback((d: string | null) => {
-    _lastState.electronDirectory = d;
+    updateFileBrowserMemory({ electronDirectory: d });
     _setElectronDirectory(d);
   }, []);
 
@@ -250,10 +248,11 @@ export function useFileNavigation({
   }, [isOpen]);
 
   // Quick-nav keyboard handler: 0-9, a-z jump to matching file
-  useEffect(() => {
+  // Called by the dialog's key trap, which keeps the key from reaching document
+  // listeners, so this is not registered on document itself.
+  const handleQuickNavKey = (e: KeyboardEvent): void => {
     if (!isOpen || fileSource === 'modland' || fileSource === 'hvsc' || fileSource === 'online') return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
+    {
       // Skip if an input/select/textarea is focused
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
@@ -303,11 +302,8 @@ export function useFileNavigation({
           row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, fileSource, files, currentPath]);
+    }
+  };
 
   // Load files based on view mode
   const loadFiles = useCallback(async () => {
@@ -441,6 +437,19 @@ export function useFileNavigation({
       loadFiles();
     }
   }, [isOpen, loadFiles, fileSource]);
+
+  // Put the list back where it was left once the folder's rows exist.
+  useEffect(() => {
+    if (!isOpen || isLoading) return;
+    const el = fileListRef.current;
+    if (!el) return;
+    el.scrollTop = readFileBrowserMemory().scroll[scrollKey(fileSource, currentPath)] ?? 0;
+  }, [isOpen, isLoading, fileSource, currentPath, rawFiles]);
+
+  const handleFileListScroll = useCallback((e: { currentTarget: { scrollTop: number } }) => {
+    if (isLoading) return;
+    rememberScroll(scrollKey(fileSource, currentPath), e.currentTarget.scrollTop);
+  }, [isLoading, fileSource, currentPath]);
 
   // Load revisions for a cloud file
   const loadRevisions = useCallback(async (fileId: string, filename: string) => {
@@ -802,6 +811,8 @@ export function useFileNavigation({
 
     // Refs
     fileListRef,
+    handleFileListScroll,
+    handleQuickNavKey,
     lastClickRef,
   };
 }
