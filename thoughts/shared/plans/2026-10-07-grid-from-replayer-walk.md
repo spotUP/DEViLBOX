@@ -177,7 +177,7 @@ bar test first (revert check: it must fail on the old grid), then fix.
   implementing the bar items 1-5); migrate sidmon1 and hippel-ST tests onto it as proof and delete the
   copies. Test: src/engine/__tests__/gridOracle.test.ts (anarchy.sid1; asserts the sentinel counter
   and that a deliberately shifted grid fails). Unblocks U6 and every later unit.
-- **U2 Position reporting for four native replayers (M).** Formats: SoundMon (frozen), Future Composer
+- **U2 Position reporting for four native replayers (M). DONE 2026-10-07 (e926bce15; verified by nativeReplayerPlayheadFollowsGridRow.test.ts).** Formats: SoundMon (frozen), Future Composer
   (out of sync), SidMon 2 (out of sync), Sound Factory (out of sync). Template: commit d98a02cf1
   (C `*_get_position` + worklet `{type:'position',songPos,row}` + Engine.onPositionUpdate through
   PositionCallbacks.ts). Files: soundmon-wasm + public/soundmon + src/engine/soundmon/SoundMonEngine.ts;
@@ -309,8 +309,20 @@ Ben Daglish SID. About 18 corpus songs, no player source, each L.
 
 - Whether the flags dated before a fix still reproduce: nothing was listened to; all state is from
   git log and tests.
-- Which of fc-wasm / futurecomposer-wasm the FutureComposerReplayer descriptor loads.
+- (RESOLVED 2026-10-07) FutureComposerReplayer loads futurecomposer-wasm (FutureComposerEngine -> public/futurecomposer/FutureComposer.*); fc-wasm / public/fc is the keyboard-voice FCEngine/FCSynth.
 - Engine of TCB Tracker and Digital Symphony (provenance doc says libopenmpt; tools/format-state.json says uade-generic for TCB).
 - MusicLine "empty/frozen/silent" cause; Hippel ST's remaining fault; Sound Master after the owner's "almost correct".
 - A libopenmpt pattern-cell oracle harness and a CheeseCutter register trace were not found; both may need to be written.
 - Corpus counts per format beyond the provenance doc were not recounted (the provenance doc itself warns counts truncate).
+
+## Position reporting progress (U2 and its extension, 2026-10-07)
+
+Done (worklet posts songPos+row, engine has onPositionUpdate, corpus-song test in
+nativeReplayerPlayheadFollowsGridRow.test.ts): SoundMon (e926bce15), Future Composer (e926bce15),
+SidMon 2 (e926bce15), Sound Factory (e926bce15; row = 50 Hz tick, patterns of 64; the sample starts on the
+tick of the note or the next, by instrument), Delta Music 1 (reference = longest track), Digital Mugician (4-voice file).
+Not done, because the grid itself is not time-aligned to one global row, so a position would point at the wrong cell:
+Music Assembler (grid = decoded track events zipped per position, voices drift), Sound Control (event rows, voices advance
+the position independently), Sawteeth (per-part speed, channels not row-aligned), Ron Klaren (sparse opcode scan),
+Future Player (flattened subroutine graph). Each is blocked on its own grid-from-walk unit (U7, U8, U12, U13, U15); position
+reporting comes with that walk.

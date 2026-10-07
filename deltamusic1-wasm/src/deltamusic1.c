@@ -239,6 +239,14 @@ struct Dm1Module {
     bool has_ended;
     bool end_reached[4]; // per-channel end detection
 
+    // Playhead: the importer zips the 4 independent track pointers into one grid pattern per
+    // track position and wraps the shorter tracks, so the grid's position is the longest
+    // track's (play_channel). play_step is that track's entry index, play_row the block line
+    // read (-1 until one has been read).
+    int play_channel;
+    int play_step;
+    int play_row;
+
     // Mixer state
     float tick_accumulator;
     float ticks_per_frame;
@@ -643,7 +651,12 @@ static void dm1_calculate_frequency(Dm1Module* m, int channel_number, Dm1Channel
             channel->transpose = new_track.transpose;
             channel->block = m->blocks[new_track.block_number];
             channel->track_counter++;
+            if (!m->preview && channel_number == m->play_channel)
+                m->play_step = (int)channel->track_counter - 1;
         }
+
+        if (!m->preview && channel_number == m->play_channel)
+            m->play_row = (int)channel->block_counter;
 
         Dm1BlockLine* block_line = &channel->block[channel->block_counter];
 
@@ -766,6 +779,19 @@ static void initialize_sound(Dm1Module* m) {
     m->has_ended = false;
     for (int i = 0; i < 4; i++)
         m->end_reached[i] = false;
+
+    // The grid has one pattern per entry of the longest track, counted up to the first jump marker.
+    m->play_channel = 0;
+    m->play_step = -1;
+    m->play_row = -1;
+    int longest = -1;
+    for (int i = 0; i < 4; i++) {
+        int len = 0;
+        while (len < (int)m->track_lengths[i] &&
+               !(m->tracks[i][len].block_number == 0xff && m->tracks[i][len].transpose == -1))
+            len++;
+        if (len > longest) { longest = len; m->play_channel = i; }
+    }
 
     for (int i = 0; i < 4; i++) {
         Dm1ChannelInfo* ch = &m->channels[i];
@@ -1197,6 +1223,16 @@ bool dm1_has_ended(const Dm1Module* module) {
 
 int dm1_get_instrument_count(const Dm1Module* module) {
     return module ? 20 : 0;
+}
+
+// Playhead: the grid's pattern (track entry of the longest track) and the row of it that is
+// sounding; -1 before the first row.
+int dm1_get_play_step(const Dm1Module* module) {
+    return module ? module->play_step : -1;
+}
+
+int dm1_get_play_row(const Dm1Module* module) {
+    return module ? module->play_row : -1;
 }
 
 int dm1_get_num_blocks(const Dm1Module* module) {
