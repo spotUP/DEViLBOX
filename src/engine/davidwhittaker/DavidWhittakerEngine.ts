@@ -118,6 +118,16 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setChannelMask', mask });
   }
 
+  /** Hand the worklet the song's bytes for its keyboard copy of the module. */
+  previewLoad(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'previewLoad', buffer });
+  }
+  /** One key: `sample` (0-based) at the replayer's note `note`, with the envelope and arpeggio the song pairs with it. */
+  noteOn(sample: number, note: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', sample, note });
+  }
+  noteOff(): void { this.workletNode?.port.postMessage({ type: 'noteOff' }); }
+
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
   /** Edit a pattern cell in the WASM replayer */

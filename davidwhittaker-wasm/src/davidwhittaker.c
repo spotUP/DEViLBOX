@@ -285,6 +285,17 @@ struct DwModule {
     uint8_t* raw_data;
     size_t raw_data_size;
 
+    // Keyboard preview: which envelope / arpeggio the song has selected when each sample
+    // first plays (-1 = none seen), recorded by the replayer's own note-on while scanning,
+    // and the one-note tracks the preview feeds the replayer's own track reader.
+    int* scan_env;
+    int* scan_arp;
+    int* scan_transpose;     // channel transpose and half-volume flag the song has on the channel at that first note
+    int* scan_half;
+    bool scanning;
+    uint8_t preview_track[8];
+    uint8_t preview_idle[2];
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1867,6 +1878,21 @@ static void read_track_commands(DwModule* m, DwChannelInfo* ch, DwMixerChannel* 
 
                 DwSample* sample = ch->current_sample_info;
 
+                if (m->scanning && m->scan_env && sample >= m->samples && sample < m->samples + m->number_of_samples) {
+                    int si = (int)(sample - m->samples);
+                    if (m->scan_env[si] == -2) {
+                        int e = -1, a = -1;
+                        for (int k = 0; k < m->envelope_count; k++)
+                            if (ch->envelope_list == m->envelopes[k]) { e = k; break; }
+                        for (int k = 0; k < m->arpeggio_count; k++)
+                            if (ch->arpeggio_list == m->arpeggios[k]) { a = k; break; }
+                        m->scan_env[si] = e;
+                        m->scan_arp[si] = a;
+                        m->scan_transpose[si] = ch->transpose;
+                        m->scan_half[si] = ch->enable_half_volume ? 1 : 0;
+                    }
+                }
+
                 mixer_play_sample(mc, sample->sample_number, sample->sample_data, 0, sample->length);
 
                 if (sample->loop_start >= 0)
@@ -2372,6 +2398,11 @@ void dw_destroy(DwModule* module) {
     free(module->channels);
     free(module->mixer_channels);
 
+    free(module->scan_env);
+    free(module->scan_arp);
+    free(module->scan_transpose);
+    free(module->scan_half);
+
     // Free raw data
     free(module->raw_data);
 
@@ -2450,4 +2481,103 @@ size_t dw_export(const DwModule* module, uint8_t* out, size_t max_size) {
     if (max_size < total) return 0;
     memcpy(out, module->original_data, total);
     return total;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Keyboard preview: one note of one sample through the replayer's own track reader and frame code
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Find, by running the song through the replayer itself, the envelope and arpeggio the song
+ * has selected when each sample first sounds. A sample is not an instrument on its own:
+ * its volume shape and arpeggio come from the track commands that precede its notes.
+ */
+void dw_preview_scan(DwModule* m) {
+    if (!m || m->song_info_count <= 0 || m->number_of_samples <= 0) return;
+    if (!m->scan_env) {
+        m->scan_env = (int*)malloc(sizeof(int) * (size_t)m->number_of_samples);
+        m->scan_arp = (int*)malloc(sizeof(int) * (size_t)m->number_of_samples);
+        m->scan_transpose = (int*)calloc((size_t)m->number_of_samples, sizeof(int));
+        m->scan_half = (int*)calloc((size_t)m->number_of_samples, sizeof(int));
+        if (!m->scan_env || !m->scan_arp || !m->scan_transpose || !m->scan_half) return;
+        for (int i = 0; i < m->number_of_samples; i++) m->scan_env[i] = m->scan_arp[i] = -2;
+    }
+    int saved = m->current_song;
+    m->scanning = true;
+    for (int song = 0; song < m->song_info_count; song++) {
+        initialize_sound(m, song);
+        for (int t = 0; t < 40000 && !m->has_ended; t++) play_tick(m);
+    }
+    m->scanning = false;
+    initialize_sound(m, saved);
+    m->current_song = saved;
+    for (int i = 0; i < m->number_of_channels; i++) mixer_mute(&m->mixer_channels[i]);
+}
+
+/** Envelope index the song pairs with `sample` (-1: none). */
+int dw_preview_envelope(const DwModule* m, int sample) {
+    if (!m || !m->scan_env || sample < 0 || sample >= m->number_of_samples) return -1;
+    return m->scan_env[sample] < 0 ? -1 : m->scan_env[sample];
+}
+int dw_preview_arpeggio(const DwModule* m, int sample) {
+    if (!m || !m->scan_arp || sample < 0 || sample >= m->number_of_samples) return -1;
+    return m->scan_arp[sample] < 0 ? -1 : m->scan_arp[sample];
+}
+
+/**
+ * Start `note` (the track byte: an index into the period table) of `sample` on channel 0,
+ * the other channels idle. The replayer reads this one-note track exactly as it reads a
+ * song track: sample, envelope and arpeggio select commands, then the note.
+ * `envelope` / `arpeggio` < 0 use the pair the song uses with this sample, and the channel
+ * transpose / half volume the song has on the voice when the sample first sounds.
+ */
+bool dw_preview_note(DwModule* m, int sample, int note, int envelope, int arpeggio) {
+    if (!m || m->number_of_channels <= 0 || sample < 0 || sample >= m->number_of_samples) return false;
+    if (!m->scan_env) dw_preview_scan(m);
+    if (envelope < 0) envelope = dw_preview_envelope(m, sample);
+    if (arpeggio < 0) arpeggio = dw_preview_arpeggio(m, sample);
+
+    initialize_sound(m, m->current_song);
+    for (int i = 0; i < m->number_of_channels; i++) mixer_mute(&m->mixer_channels[i]);
+
+    int n = 0;
+    m->preview_track[n++] = 0xFF;                                   // hold: a long wait after the note
+    if (!m->old_player) m->preview_track[n++] = (uint8_t)(m->new_sample_cmd + sample);
+    if (!m->old_player && m->enable_envelopes && envelope >= 0 && envelope < m->envelope_count)
+        m->preview_track[n++] = (uint8_t)(m->new_envelope_cmd + envelope);
+    if (!m->old_player && m->enable_arpeggio && arpeggio >= 0 && arpeggio < m->arpeggio_count)
+        m->preview_track[n++] = (uint8_t)(m->new_arpeggio_cmd + arpeggio);
+    if (note < 0) note = 0;
+    if (note > 0x7f) note = 0x7f;
+    m->preview_track[n++] = (uint8_t)note;
+
+    m->preview_idle[0] = 0xFF;
+    for (int i = 0; i < m->number_of_channels; i++) {
+        DwChannelInfo* ch = &m->channels[i];
+        ch->track_data = i == 0 ? m->preview_track : m->preview_idle;
+        ch->track_data_length = i == 0 ? n : 1;
+        ch->track_data_position = 0;
+        ch->position_list_length = 0;     // never fetch another song track
+        ch->speed_counter = 1;            // the first tick reads the track
+    }
+    // The channel transpose and half volume the song has on the voice when this sample first sounds
+    if (m->scan_transpose) {
+        m->channels[0].transpose = (int8_t)m->scan_transpose[sample];
+        m->channels[0].enable_half_volume = m->scan_half[sample] != 0;
+    }
+    m->tick_accumulator = m->ticks_per_frame;   // and that tick comes with the first frame
+    m->has_ended = false;
+    return true;
+}
+
+void dw_preview_stop(DwModule* m) {
+    if (!m) return;
+    for (int i = 0; i < m->number_of_channels; i++) mixer_mute(&m->mixer_channels[i]);
+    if (m->channels) for (int i = 0; i < m->number_of_channels; i++) {
+        m->channels[i].track_data = m->preview_idle;
+        m->channels[i].track_data_length = 1;
+        m->channels[i].track_data_position = 0;
+        m->channels[i].speed_counter = 2;
+        m->channels[i].current_sample_info = nullptr;
+    }
 }

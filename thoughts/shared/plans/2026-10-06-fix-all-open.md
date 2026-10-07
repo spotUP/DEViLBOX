@@ -100,6 +100,13 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 - [ ] K0 PRIORITY, recurring: TB-303 (DB303) audio "goes flat during knob pulls" - owner: regression "for the 100th time". Fix the root cause AND add the missing permanent guard: no test drives a knob drag through the real path (Knob -> parameterRouter/fast-path -> DB303 worklet) and checks the audio. Guard = rapid knob sweep on cutoff/resonance/env mod/decay/accent while a pattern plays, assert no dropout, no level collapse, no pitch change vs the same render without the sweep; in test:ci. Bisect which commit broke it (docs/CONTROL_PATTERNS.md knob perf invariants; 7f43955f9, 7f56a56ec, recent ToneEngine/keyboard changes 7a6840350). Measure what "flat" is (pitch drop vs dull/compressed vs silence) before fixing.
 - [x] K1 FIXED d52222288 (SidMonSynth songSlot -> Sd2Engine.noteOn; keyboardSidMon2Synth.test). SidMon 2 keys reach the generic Sampler; wire SidMonSynth (NATIVE_AUDITION_SYNTHS + isWASMSynth), keep the sample editor.
 - [ ] K2 NOT STARTED (needs owner go-ahead per format: each is a replayer preview voice in C + wasm rebuild + oracle test, Hippel CoSo took ~570 lines; InStereo1/2, DeltaMusic1/2, DigMug, SonicArranger have other agents' uncommitted wasm/worklet edits in the same files). Silent synth stubs: DigMug, DavidWhittaker, SonicArranger, InStereo1/2, DeltaMusic1/2, StartrekkerAM synth classes; TFMX Pro instruments.
+  - [x] K2-DW DavidWhittaker: key = dw_preview_note on a second copy of the module in the worklet (replayer's own track reader; envelope, arpeggio, channel transpose paired by dw_preview_scan). apb.dw voices 0/1 0.00 cents, 0.00 dB; garfield2+ voices 1/3 3.6/0.0 cents, 0.0 dB (keyboardPreviewReplayers.test.ts, revert-checked key map and transpose). Limitation: a sample shared by voices with different channel transposes plays the first voice's.
+  - [ ] K2-STAR StartrekkerAM
+  - [ ] K2-DM DigMug
+  - [ ] K2-SA SonicArranger
+  - [ ] K2-DM1 DeltaMusic1 / DeltaMusic2 (K2-DM2)
+  - [ ] K2-IS InStereo1 / InStereo2
+  - [ ] K2-TFMX TFMX Pro instruments
 - [x] K3 FIXED 23032f437 (keys play nothing, notify once per player; wholeSongSynthKeys.test). Whole-song synths start/stop the song on any key: KlysSynth, MaxTraxSynth, PreTrackerSynth, SymphonieSynth, UADESynth.
 - [x] K4 FIXED d264a01a0 (measured 0.500 kbd/song at 8287 Hz, 0.125-1.33 for other stored rates on 23 corpus songs; keyboardPeriod through ToneEngine; keyboardPeriodSamplers.test). Sampler base note may be one octave under the grid for Amiga samples (measure).
 
