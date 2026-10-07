@@ -263,6 +263,12 @@ struct SaModule {
     // Original file data for export patching
     uint8_t* original_data;
     size_t original_size;
+
+    // Keyboard preview: the module cut down to one note on voice 0 (sa_preview_note)
+    bool preview;
+    bool preview_done;
+    int preview_position;     // the one-note position's index
+    int preview_visits;       // times the song reached it: a second visit is the end of the one pattern
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -919,6 +925,8 @@ static void metamorph_and_oszilator_helper(SaModule* m, SaVoiceInfo* voice, SaIn
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void play_tick(SaModule* m) {
+    if (m->preview_done)
+        return;
     m->playing_info.speed_counter++;
 
     if (m->playing_info.speed_counter >= m->playing_info.current_speed) {
@@ -974,6 +982,12 @@ static void clear_visited(void) {
 }
 
 static void get_next_position(SaModule* m) {
+    if (m->preview && ++m->preview_visits > 1) {
+        // the one-note song ends with its pattern: it does not restart the note
+        m->preview_done = true;
+        for (int i = 0; i < 4; i++) channel_mute(&m->channels[i]);
+        return;
+    }
     m->playing_info.song_position++;
 
     if ((m->playing_info.song_position > (int16_t)m->current_song_info->last_position) ||
@@ -2550,4 +2564,58 @@ size_t sa_export(const SaModule* module, uint8_t* out, size_t max_size) {
 
     memcpy(out, module->original_data, total);
     return total;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Keyboard preview: one note of one instrument through the replayer's own play_voice and effects
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Cut the module down to one position whose voice 0 plays `note` (1-108, an index into the period
+ * table) of the 1-based `instrument` on row 0, the other voices silent. Positions and track lines are
+ * appended, the instruments, waveforms and tables are the song's, so the sound is the song's own.
+ */
+bool sa_preview_note(SaModule* m, int instrument, int note) {
+    if (!m || instrument < 1 || instrument > m->num_instruments || m->num_sub_songs < 1) return false;
+
+    if (!m->preview) {
+        SaTrackLine* t = (SaTrackLine*)realloc(m->track_lines, ((size_t)m->num_track_lines + 2) * sizeof(SaTrackLine));
+        if (!t) return false;
+        m->track_lines = t;
+        memset(&m->track_lines[m->num_track_lines], 0, 2 * sizeof(SaTrackLine));
+
+        SaSinglePositionInfo** p = (SaSinglePositionInfo**)realloc(m->positions, ((size_t)m->num_positions + 1) * sizeof(SaSinglePositionInfo*));
+        if (!p) return false;
+        m->positions = p;
+        m->positions[m->num_positions] = (SaSinglePositionInfo*)calloc(4, sizeof(SaSinglePositionInfo));
+        if (!m->positions[m->num_positions]) return false;
+
+        m->preview_position = m->num_positions;
+        m->positions[m->preview_position][0].start_track_row = (uint16_t)m->num_track_lines;
+        for (int k = 1; k < 4; k++) m->positions[m->preview_position][k].start_track_row = (uint16_t)(m->num_track_lines + 1);
+        m->num_track_lines += 2;
+        m->num_positions++;
+        m->preview = true;
+    }
+
+    SaTrackLine* line = &m->track_lines[m->positions[m->preview_position][0].start_track_row];
+    memset(line, 0, sizeof(SaTrackLine));
+    line->note = (uint8_t)note;
+    line->instrument = (uint8_t)instrument;
+
+    SaSongInfo* song = &m->sub_songs[0];
+    song->first_position = song->last_position = song->restart_position = (uint16_t)m->preview_position;
+    if (song->rows_per_track < 2) song->rows_per_track = 64;
+
+    initialize_sound(m, 0);
+    m->preview_done = false;
+    m->preview_visits = 0;
+    m->tick_accumulator = m->ticks_per_frame;   // the first row plays with the first frame
+    return true;
+}
+
+void sa_preview_stop(SaModule* m) {
+    if (!m) return;
+    m->preview_done = true;
+    for (int i = 0; i < 4; i++) channel_mute(&m->channels[i]);
 }

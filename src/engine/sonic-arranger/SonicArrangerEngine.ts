@@ -126,6 +126,16 @@ export class SonicArrangerEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setChannelMask', mask });
   }
 
+  /** Hand the worklet the song's bytes for its keyboard copy of the module. */
+  previewLoad(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'previewLoad', buffer });
+  }
+  /** One key: the 1-based instrument at the replayer's note (index into its period table). */
+  noteOn(instrument: number, note: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', instrument, note });
+  }
+  noteOff(): void { this.workletNode?.port.postMessage({ type: 'noteOff' }); }
+
   onSongEnd(callback: () => void): void {
     this._songEndCallback = callback;
   }
