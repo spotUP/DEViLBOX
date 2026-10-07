@@ -14,6 +14,7 @@ import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
 import type { MIDIImportOptions } from '@lib/import/MIDIImporter';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 interface MIDIPreview {
   bpm: number;
@@ -48,6 +49,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
   onImport,
   initialFile,
 }) => {
+  const typingTrap = useDialogTypingTrap();
   useModalClose({ isOpen, onClose });
   const [preview, setPreview]       = useState<MIDIPreview | null>(null);
   const [moduleFile, setModuleFile] = useState<File | null>(null);
@@ -162,7 +164,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
     : '0:00';
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990]">
+    <div {...typingTrap} className="fixed inset-0 focus:outline-none bg-black/60 flex items-center justify-center z-[99990]">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[480px] max-h-[85vh] overflow-hidden flex flex-col">
 
         {/* Header */}

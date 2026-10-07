@@ -10,6 +10,7 @@ import { FolderOpen, Music, Layers, Cpu, User, Clock } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { decompressProject } from '@/lib/projectCompression';
+import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 interface DBXPreview {
   name: string;
@@ -33,6 +34,7 @@ export const ImportDBXDialog: React.FC<ImportDBXDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const typingTrap = useDialogTypingTrap();
   useModalClose({ isOpen, onClose: onCancel });
   const [preview, setPreview] = useState<DBXPreview | null>(null);
   const [error, setError]     = useState<string | null>(null);
@@ -64,7 +66,7 @@ export const ImportDBXDialog: React.FC<ImportDBXDialogProps> = ({
   if (!isOpen || !file) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[99990] animate-fade-in">
+    <div {...typingTrap} className="fixed inset-0 focus:outline-none bg-black/80 flex items-center justify-center z-[99990] animate-fade-in">
       <div className="bg-dark-bg border-2 border-accent-primary rounded-xl p-6 max-w-md w-full mx-4 animate-slide-in-up shadow-2xl">
 
         {/* Header */}

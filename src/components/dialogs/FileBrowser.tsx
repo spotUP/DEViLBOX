@@ -6,13 +6,14 @@
  * - Server API (jailed to data/ directory)
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe, Search } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
 import { hasElectronFS } from '@utils/electron';
 import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource, setLastFileSource } from './useFileNavigation';
 import { OnlinePanel } from './FilePreviewPanel';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 interface FileBrowserProps {
   isOpen: boolean;
@@ -37,27 +38,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   useModalClose({ isOpen, onClose });
   const [fileSource, _setFileSource] = useState<FileSource>(getLastFileSource);
   const setFileSource = (s: FileSource) => { setLastFileSource(s); _setFileSource(s); };
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  // Protect text inputs inside the modal from being intercepted by global
-  // keyboard handlers. In WebGL mode the modal renders in a portal outside
-  // the React root, so capture-phase listeners on `window` may eat keystrokes
-  // before the browser's default input handling. Registering our own capture
-  // handler on the modal container lets us stopPropagation early.
-  useEffect(() => {
-    const el = modalRef.current;
-    if (!el || !isOpen) return;
-    const guard = (e: KeyboardEvent) => {
-      const t = e.target;
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) {
-        // Allow Escape to still close the modal
-        if (e.key === 'Escape') return;
-        e.stopPropagation();
-      }
-    };
-    el.addEventListener('keydown', guard, { capture: true });
-    return () => el.removeEventListener('keydown', guard, { capture: true });
-  }, [isOpen]);
+  const navKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  const typingTrap = useDialogTypingTrap((e) => navKeyRef.current(e));
 
   const nav = useFileNavigation({
     isOpen,
@@ -70,12 +52,13 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     suggestedFilename,
   });
 
+  navKeyRef.current = nav.handleQuickNavKey;
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99990]" onClick={onClose}>
+    <div {...typingTrap} className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99990] focus:outline-none" onClick={onClose}>
       <div
-        ref={modalRef}
         className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[800px] h-[90vh] md:h-[600px] max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -219,7 +202,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             )}
 
             {/* File List */}
-            <div ref={nav.fileListRef} className="flex-1 min-h-0 overflow-auto p-4">
+            <div ref={nav.fileListRef} onScroll={nav.handleFileListScroll} className="flex-1 min-h-0 overflow-auto p-4">
               {nav.error && (
                 <div className="bg-accent-error/10 border border-accent-error/50 text-accent-error px-4 py-2 rounded mb-4 select-text">
                   {nav.error}

@@ -24,6 +24,7 @@ import { Info } from 'lucide-react';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
 import { expectedCompanionNames } from '@lib/import/companionResolver';
+import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
@@ -65,6 +66,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   initialFile,
   companionFiles,
 }) => {
+  const typingTrap = useDialogTypingTrap();
   const [moduleInfo, setModuleInfo]     = useState<ModuleInfo | null>(null);
   const [loadedFileName, setLoadedFileName] = useState('');
   const [isLoading, setIsLoading]       = useState(false);
@@ -337,7 +339,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const displayedCompanions = activeCompanions;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990]">
+    <div {...typingTrap} className="fixed inset-0 focus:outline-none bg-black/60 flex items-center justify-center z-[99990]">
       {/* Hidden input for companion file (step 2 of two-part loader) */}
       <input
         ref={companionInputRef}

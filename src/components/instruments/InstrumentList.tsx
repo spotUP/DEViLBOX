@@ -11,6 +11,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
 import { getSynthBadge } from '@constants/channelTypeCompat';
+import { instrumentGridTemplate } from './instrumentListColumns';
 
 const isSamplePlayer = (synthType: string): boolean => synthType === 'Sampler' || synthType === 'Player';
 import { analyzeSong, type InstrumentRole, type DrumPart, type InstrumentVerdict } from '@/bridge/analysis/songAnalyzer';
@@ -551,6 +552,24 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     return Icon || LucideIcons.Music2;
   };
 
+  // One template for every row of this list: the columns line up.
+  const actionSlots = !showActions ? 0 : Math.max(
+    0,
+    ...visibleInstruments.map((ins) =>
+      2 + (isFT2 && (ins.synthType === 'HivelySynth' || ins.synthType === 'Sampler') ? 2 : 0) + (instruments.length > 1 ? 1 : 0)),
+  );
+  const hasStatus = isFT2 && visibleInstruments.some((ins) => !!ins.loadError);
+  const gridTemplate = instrumentGridTemplate({
+    artMode,
+    longestNameLength: Math.max(0, ...visibleInstruments.map((ins) => [...instrumentDisplayName(ins)].length)),
+    showBadges: isFT2 || !compact,
+    hasRole: isFT2 && !!analysis,
+    hasStatus,
+    hasLoop: !isFT2,
+    actionSlots,
+    actionSlotRem: isFT2 ? 1 : 1.75,
+  });
+
   // Show action bar if any action buttons are enabled
   const showActionBar = isFT2;
 
@@ -621,10 +640,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 onPointerCancel={handlePreviewUp}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
+                style={{ gridTemplateColumns: gridTemplate }}
                 className={`
                   instrument-list-item
-                  flex items-center gap-x-2 gap-y-1 px-2 py-1.5 cursor-pointer
-                  ${artMode ? '' : 'flex-wrap'}
+                  grid items-center gap-x-2 px-2 py-1.5 cursor-pointer
                   transition-all duration-200 ease-out group relative ${artMode ? '' : 'overflow-hidden'}
                   ${isSelected
                     ? 'bg-ft2-cursor text-ft2-bg'
@@ -644,7 +663,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 )}
 
                 {/* ID */}
-                <span className={`font-mono text-xs font-bold w-6 ${isSelected ? 'text-ft2-bg' : 'text-ft2-highlight'}`}>
+                <span className={`font-mono text-xs font-bold ${isSelected ? 'text-ft2-bg' : 'text-ft2-highlight'}`}>
                   {useHexNumbers
                     ? displayNum.toString(16).toUpperCase().padStart(2, '0')
                     : displayNum.toString(10).padStart(2, '0')
@@ -652,7 +671,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 </span>
 
                 {/* Icon */}
-                <IconComponent size={12} className={`shrink-0 ${isSelected ? 'text-ft2-bg' : (synthInfo?.color || 'text-ft2-highlight')}`} />
+                <span className="flex items-center" title={synthInfo?.name ?? instrument.synthType} data-instrument-type-icon="">
+                  <IconComponent size={12} className={`shrink-0 ${isSelected ? 'text-ft2-bg' : 'text-ft2-textDim'}`} />
+                </span>
 
                 {/* Name (double-click to edit) */}
                 {editingId === instrument.id ? (
@@ -682,7 +703,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                        the right edge with nothing to show they existed. */
                     className={`text-xs font-mono cursor-text ${artMode
                       ? 'instrument-art-name whitespace-pre shrink-0'
-                      : 'whitespace-nowrap flex-1 min-w-[4rem] truncate'}`}
+                      : 'whitespace-nowrap min-w-0 truncate'}`}
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
                     title={instrumentDisplayName(instrument)}
                   >
@@ -696,22 +717,14 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     name is `shrink-0` with no flex basis, so each row's badges
                     began at a different x and the column read as noise.
                     Asked for 2026-09-22. */}
-                <span className={`instrument-badge ml-auto text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
-                  {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
+                <span className="min-w-0">
+                  <span className={`instrument-badge block truncate text-[10px] px-1.5 py-0.5 rounded font-bold border ${isSelected ? 'bg-transparent text-ft2-bg border-ft2-bg/60' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
+                    {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
+                  </span>
                 </span>
 
-                {/* Load-failure badge — the sample/patch data could not be read,
-                    so this instrument is a silent placeholder. */}
-                {instrument.loadError && (
-                  <span
-                    className="instrument-badge text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0 bg-accent-error/15 text-accent-error border-accent-error/40"
-                    title={instrument.loadError}
-                  >
-                    Load Failed
-                  </span>
-                )}
-
                 {/* Channel Type Badge (hardware affinity) */}
+                <span className="min-w-0">
                 {(() => {
                   const badge = getSynthBadge(instrument.synthType);
                   // A sample player's channel type is PCM by definition: the
@@ -719,7 +732,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   if (isSamplePlayer(instrument.synthType)) return null;
                   return (
                     <span
-                      className="instrument-badge text-[10px] px-1.5 py-0.5 rounded font-bold border shrink-0"
+                      className="instrument-badge block truncate text-[10px] px-1.5 py-0.5 rounded font-bold border"
                       style={isSelected
                         ? { backgroundColor: 'transparent', color: 'var(--color-ft2-bg)', borderColor: 'var(--color-ft2-bg)' }
                         : { backgroundColor: `${badge.cssColor}20`, color: badge.cssColor, borderColor: `${badge.cssColor}40` }
@@ -729,9 +742,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     </span>
                   );
                 })()}
+                </span>
 
                 {/* Role chip — what the song analyzer says this instrument IS; click to hear it and label it */}
-                {(() => {
+                {analysis && <span className="min-w-0">{(() => {
                   const verdict = analysis?.instruments.get(instrument.id);
                   const label = ownerLabels?.[instrument.id];
                   // Not played anywhere in the song: nothing to judge it by
@@ -771,23 +785,37 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       )}
                     </div>
                   );
-                })()}
+                })()}</span>}
 
+                {/* Status column — the sample/patch data could not be read, so
+                    this instrument is a silent placeholder. */}
+                {hasStatus ? (
+                  <span className="min-w-0">
+                    {instrument.loadError && (
+                      <span
+                        className="instrument-badge block truncate text-[10px] px-1.5 py-0.5 rounded font-bold border bg-accent-error/15 text-accent-error border-accent-error/40"
+                        title={instrument.loadError}
+                      >
+                        Load Failed
+                      </span>
+                    )}
+                  </span>
+                ) : null}
 
-                {/* Actions (visible on hover, always visible when selected) */}
+                {/* Actions column (visible on hover, always when selected) */}
                 {showActions && (
-                  <div className={`instrument-action-buttons flex gap-0.5 absolute right-1 ${isSelected ? 'instrument-action-buttons--selected opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                  <div className={`instrument-action-buttons flex gap-0.5 justify-end ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                     <button
                       onClick={(e) => handlePopOut(e, instrument.id)}
                       className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-highlight'}`}
-                      title="Pop out editor"
+                      title="Pop out instrument editor" aria-label="Pop out instrument editor"
                     >
                       <ExternalLink size={10} />
                     </button>
                     <button
                       onClick={(e) => handleClone(e, instrument.id)}
                       className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'}`}
-                      title="Duplicate"
+                      title="Duplicate instrument" aria-label="Duplicate instrument"
                     >
                       <Copy size={10} />
                     </button>
@@ -795,15 +823,15 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       <>
                         <button
                           onClick={(e) => handleSaveAhi(e, instrument)}
-                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-yellow-400'}`}
-                          title="Save as .ahi instrument file"
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-warning'}`}
+                          title="Save instrument as .ahi file" aria-label="Save instrument as .ahi file"
                         >
                           <Download size={10} />
                         </button>
                         <button
                           onClick={(e) => handleLoadAhi(e, instrument.id)}
-                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-yellow-400'}`}
-                          title="Load .ahi instrument file"
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-warning'}`}
+                          title="Load instrument from .ahi file" aria-label="Load instrument from .ahi file"
                         >
                           <Upload size={10} />
                         </button>
@@ -813,15 +841,15 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       <>
                         <button
                           onClick={(e) => handleSaveMli(e, instrument)}
-                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-orange-400'}`}
-                          title="Save as .mli instrument file"
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-warning'}`}
+                          title="Save instrument as .mli file" aria-label="Save instrument as .mli file"
                         >
                           <Download size={10} />
                         </button>
                         <button
                           onClick={(e) => handleLoadMli(e, instrument.id)}
-                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-orange-400'}`}
-                          title="Load .mli instrument file"
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-warning'}`}
+                          title="Load instrument from .mli file" aria-label="Load instrument from .mli file"
                         >
                           <Upload size={10} />
                         </button>
@@ -830,8 +858,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     {instruments.length > 1 && (
                       <button
                         onClick={(e) => handleDelete(e, instrument.id)}
-                        className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-red-400'}`}
-                        title="Delete"
+                        className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-error'}`}
+                        title="Delete instrument" aria-label="Delete instrument"
                       >
                         <Trash2 size={10} />
                       </button>
@@ -856,8 +884,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 onPointerCancel={handlePreviewUp}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
+                style={{ gridTemplateColumns: gridTemplate }}
                 className={`
-                  group flex items-center gap-2 px-3 py-2 cursor-pointer transition-all relative
+                  group grid items-center gap-x-2 px-3 py-2 cursor-pointer transition-all relative
                   ${isSelected
                     ? 'bg-accent-primary/20 border-l-2 border-accent-primary'
                     : 'hover:bg-dark-bgHover border-l-2 border-transparent'
@@ -867,7 +896,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 {/* Instrument number */}
                 <span
                   className={`
-                    font-mono text-xs w-6 text-center
+                    font-mono text-xs text-center
                     ${isSelected ? 'text-accent-primary' : 'text-text-muted'}
                   `}
                 >
@@ -875,10 +904,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 </span>
 
                 {/* Synth type icon */}
-                <IconComponent
-                  size={compact ? 12 : 14}
-                  className={`shrink-0 ${synthInfo?.color || 'text-accent-primary'}`}
-                />
+                <span className="flex items-center" title={synthInfo?.name ?? instrument.synthType} data-instrument-type-icon="">
+                  <IconComponent
+                    size={compact ? 12 : 14}
+                    className={`shrink-0 ${isSelected ? 'text-accent-primary' : 'text-text-muted'}`}
+                  />
+                </span>
 
                 {/* Instrument name (double-click to edit) */}
                 {editingId === instrument.id ? (
@@ -896,7 +927,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 ) : (
                   <span
                     className={`
-                      text-sm whitespace-nowrap cursor-text
+                      text-sm whitespace-nowrap min-w-0 truncate cursor-text
                       ${isSelected ? 'text-text-primary' : 'text-text-secondary'}
                     `}
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
@@ -908,66 +939,69 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
                 {/* Synth type badge (non-compact only) */}
                 {!compact && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded font-bold font-mono border bg-dark-bgSecondary text-text-muted border-dark-border">
-                    {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
+                  <span className="min-w-0">
+                    <span className="block truncate text-[10px] px-1.5 py-0.5 rounded font-bold font-mono border bg-dark-bgSecondary text-text-muted border-dark-border">
+                      {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
+                    </span>
                   </span>
                 )}
 
                 {/* Channel Type Badge (non-compact only) */}
-                {!compact && (() => {
-                  const badge = getSynthBadge(instrument.synthType);
-                  // A sample player's channel type is PCM by definition: the
-                  // synth type badge already says it.
-                  if (isSamplePlayer(instrument.synthType)) return null;
-                  return (
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-bold border"
-                      style={{
-                        backgroundColor: `${badge.cssColor}20`,
-                        color: badge.cssColor,
-                        borderColor: `${badge.cssColor}40`,
-                      }}
-                    >
-                      {badge.label}
-                    </span>
-                  );
-                })()}
+                {!compact && (
+                  <span className="min-w-0">
+                    {!isSamplePlayer(instrument.synthType) && (() => {
+                      const badge = getSynthBadge(instrument.synthType);
+                      return (
+                        <span
+                          className="block truncate text-[10px] px-1.5 py-0.5 rounded font-bold border"
+                          style={{
+                            backgroundColor: `${badge.cssColor}20`,
+                            color: badge.cssColor,
+                            borderColor: `${badge.cssColor}40`,
+                          }}
+                        >
+                          {badge.label}
+                        </span>
+                      );
+                    })()}
+                  </span>
+                )}
 
 
                 {/* Sample loop indicator - enhanced visibility */}
-                {instrument.sample?.loop && (
+                <span className="min-w-0">{instrument.sample?.loop && (
                   <span
-                    className="flex items-center gap-0.5 ml-auto"
+                    className="flex items-center gap-0.5"
                     title={instrument.sample.loopType === 'pingpong' ? 'Ping-pong loop' : 'Forward loop'}
                   >
                     {instrument.sample.loopType === 'pingpong' ? (
                       <>
-                        <Repeat size={12} className="shrink-0 text-blue-400" />
-                        <span className="text-[9px] text-blue-400 font-bold leading-none">↔</span>
+                        <Repeat size={12} className="shrink-0 text-accent-secondary" />
+                        <span className="text-[9px] text-accent-secondary font-bold leading-none">↔</span>
                       </>
                     ) : (
                       <>
-                        <Repeat1 size={12} className="shrink-0 text-green-400" />
-                        <span className="text-[9px] text-green-400 font-bold leading-none">→</span>
+                        <Repeat1 size={12} className="shrink-0 text-accent-success" />
+                        <span className="text-[9px] text-accent-success font-bold leading-none">→</span>
                       </>
                     )}
                   </span>
-                )}
+                )}</span>
 
                 {/* Actions (on hover) */}
                 {showActions && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2">
+                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => handlePopOut(e, instrument.id)}
                       className="p-1 text-text-muted hover:text-accent-highlight"
-                      title="Pop out editor"
+                      title="Pop out instrument editor" aria-label="Pop out instrument editor"
                     >
                       <ExternalLink size={12} />
                     </button>
                     <button
                       onClick={(e) => handleClone(e, instrument.id)}
                       className="p-1 text-text-muted hover:text-accent-primary"
-                      title="Clone instrument"
+                      title="Clone instrument" aria-label="Clone instrument"
                     >
                       <Copy size={12} />
                     </button>
@@ -975,7 +1009,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       <button
                         onClick={(e) => handleDelete(e, instrument.id)}
                         className="p-1 text-text-muted hover:text-accent-error"
-                        title="Delete instrument"
+                        title="Delete instrument" aria-label="Delete instrument"
                       >
                         <Trash2 size={12} />
                       </button>

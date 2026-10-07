@@ -15,6 +15,7 @@ import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
 import { loadFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 interface ImportFurnaceDialogProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
   onImport,
   initialFile,
 }) => {
+  const typingTrap = useDialogTypingTrap();
   useModalClose({ isOpen, onClose });
   const [module, setModule]           = useState<FurnacePreview | null>(null);
   const [moduleBuffer, setModuleBuffer] = useState<ArrayBuffer | null>(null);
@@ -129,7 +131,7 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
     : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[99990]">
+    <div {...typingTrap} className="fixed inset-0 focus:outline-none bg-black/60 flex items-center justify-center z-[99990]">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[500px] max-h-[85vh] overflow-hidden flex flex-col">
 
         {/* Header */}

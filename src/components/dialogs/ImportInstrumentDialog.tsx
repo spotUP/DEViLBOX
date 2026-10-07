@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { Cpu } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 interface InstrumentPreview {
   name: string;
@@ -54,6 +55,7 @@ export const ImportInstrumentDialog: React.FC<ImportInstrumentDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const typingTrap = useDialogTypingTrap();
   useModalClose({ isOpen, onClose: onCancel });
   const [preview, setPreview] = useState<InstrumentPreview | null>(null);
   const [error, setError]     = useState<string | null>(null);
@@ -87,7 +89,7 @@ export const ImportInstrumentDialog: React.FC<ImportInstrumentDialogProps> = ({
   const typeLabel = preview ? (SYNTH_LABELS[preview.synthType] ?? preview.synthType) : '';
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[99990] animate-fade-in">
+    <div {...typingTrap} className="fixed inset-0 focus:outline-none bg-black/80 flex items-center justify-center z-[99990] animate-fade-in">
       <div className="bg-dark-bg border-2 border-accent-primary rounded-xl p-6 max-w-sm w-full mx-4 animate-slide-in-up shadow-2xl">
 
         {/* Header */}
