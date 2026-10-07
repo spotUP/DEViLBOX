@@ -317,7 +317,7 @@ services, and the parsers' internal recursion (`ChipDumpParsers`,
 ## Checklist
 
 - [x] U4.0 guard, ratchet mode (src/engine/__tests__/oneOpenPath.contract.test.ts + oneOpenPathAllowlist.ts; useImportDialog.ts deleted)
-- [ ] U2.1 unload + generation fence + frame age (VU freeze, stop before parse) - needs D3
+- [x] U2.1 unload + generation fence + frame age (VU freeze, stop before parse) - D3 accepted. Done: songLifecycle.ts (unloadSong, withSongLoad), useSongLoadStore, store fence + liveScopeFrame(), openers wrapped in UnifiedFileLoader, StatusBar Loading. Deviation: the 40 engine sites are NOT edited - the store fences unstamped frames for 100 ms after unload and expires frames after 100 ms; the optional `generation` argument exists for stamped sites. Test: src/stores/__tests__/songSwitchUnload.test.ts
 - [ ] U2.2 openSong, headless callers, family C fixed
 - [ ] U2.3 dialog in front of openSong - needs D1, D2, D4
 - [ ] U2.4 restore / tabs / sync / Export-dialog import
@@ -357,3 +357,10 @@ before the switch.
 - No frozen meter after a switch (frame-age + generation tests).
 - UADE switch: no audio-thread block from the scan (U2.7 sentinel + owner check).
 - Audio export: 2 render strategies -> 1.
+
+## Owner decisions (2026-10-07: "all recommended")
+- D1: the import dialog on drag-drop shows only when there is a real choice (several subsongs, or libopenmpt vs native).
+- D2: playback start stays per origin (drop does not start; jukebox, tour and embed do).
+- D3: accepted - the old song stops before the parse, so a failed load leaves silence.
+- D4: the dialog's Import no longer writes formatEngine settings.
+- Live tab measurement for U2.7: APPROVED 2026-10-07 - an agent may load songs in the owner's open tab via MCP to time the UADE scan (never open a new tab; stop playback after).

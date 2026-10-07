@@ -28,6 +28,8 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useDubStore } from '@/stores/useDubStore';
 import { ensureBusIsFed } from '@/lib/dub/seedSendOnEnable';
 import { getToneEngine } from '@/engine/ToneEngine';
+import { useSongLoadStore } from '@/stores/useSongLoadStore';
+import { unloadSong } from './songLifecycle';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { MixerSnapshot } from '@stores/useMixerStore';
@@ -137,24 +139,12 @@ async function applyProjectExtras(x: ProjectExtras): Promise<void> {
   }
 }
 
-/** Stop everything that plays the outgoing song. */
-async function stopOutgoingSong(): Promise<void> {
-  useTransportStore.getState().stop();
-  getToneEngine().releaseAll();
-  try {
-    const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-    getTrackerReplayer().stop();
-  } catch { /* replayer not initialized yet */ }
-  try {
-    const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
-    getAdPlugPlayer().stop();
-  } catch { /* player may not be initialized */ }
-}
-
 /** Replace the current song with `song`. */
 export async function applySong(song: SongToApply, source: SongSource): Promise<void> {
   const engine = getToneEngine();
-  await stopOutgoingSong();
+  // An opener inside withSongLoad has already unloaded; a direct caller
+  // (restore, tab, sync) gets the same unload here.
+  if (!useSongLoadStore.getState().unloadedForLoad) await unloadSong();
 
   // Per-song state. The dub sends are fader positions for one song, written
   // back from the audio graph - a new song inherited the last one's moves

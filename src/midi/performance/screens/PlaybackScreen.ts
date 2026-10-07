@@ -12,7 +12,7 @@ import { MK2Display } from '../MK2Display';
 import type { MK2Screen, MK2ScreenContext } from './MK2ScreenManager';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
+import { useOscilloscopeStore, liveScopeFrame } from '@/stores/useOscilloscopeStore';
 
 // XM note format: 0=empty, 1-96=notes, 97=note off
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -115,7 +115,7 @@ export class PlaybackScreen implements MK2Screen {
   private renderVUMeters(d: MK2Display): void {
     const { W, WHITE } = MK2Display;
     const oscState = useOscilloscopeStore.getState();
-    const channelData = oscState.channelData;
+    const channelData = liveScopeFrame(oscState);
     const channelNames = oscState.channelNames;
 
     if (!channelData || channelData.length === 0) {
