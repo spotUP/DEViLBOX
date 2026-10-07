@@ -30,19 +30,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Play } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { Toggle } from '@components/controls/Toggle';
-import { loadFile as loadFileHeadless } from '@/bridge/handlers/writeHandlers';
-import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
-import { useModlandContributionModal } from '@stores/useModlandContributionModal';
-import { dismissErrors, dismissModal, play as playHeadless } from '@/bridge/handlers/writeHandlers';
-import { gatherCompanions, directoryOfFile } from '@/lib/import/companionFetch';
+import { openSong, type SongSourceRef } from '@/lib/song/openSong';
 import {
   JUKEBOX_FAULTS, LOAD_FAILED, reportFaults, reportGood, loadVerdicts,
   verdictLabels, isGoodVerdict, faultsOf, setFault, verdictFromFaults, verdictOf, JUKEBOX_OK,
   JUKEBOX_VISUALIZER, isVisualizer, keepView, reportVisualizer,
   type JukeboxVerdict, type JukeboxFault,
 } from '@/lib/jukebox/faultReports';
-import { searchModland, downloadModlandFile, downloadUADECompanions } from '@/lib/modlandApi';
-import { markKnownSource } from '@/lib/modland/ModlandDetector';
+import { searchModland } from '@/lib/modlandApi';
 import { notify } from '@stores/useNotificationStore';
 
 interface IndexEntry {
@@ -170,20 +165,6 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   useEffect(() => { grabFocus(); }, [grabFocus]);
 
   /**
-   * Load bytes and START them.
-   *
-   * NOT `UnifiedFileLoader.loadFile`: for tracker modules that returns
-   * `{ success: 'pending-import' }` and waits for the import dialog, so every
-   * song loaded into a dialog that is not on screen and nothing played. The
-   * MCP handler is the headless entry — it runs the same pipeline and then
-   * bypasses the dialog, which is a hundred lines of format routing that must
-   * not be copied here.
-   *
-   * It does not start playback either; that is the transport's job, and the
-   * MCP `play` handler is the entry that sets song mode and starts it.
-   * `TrackerReplayer.play()` would no-op for native-engine songs.
-   */
-  /**
    * The row a report belongs to, mirrored so the load path can file a finding
    * without taking `row` as a dependency — `loadAndPlay` must stay stable, and
    * the docs/CONTROL_PATTERNS.md ref pattern is how this codebase does that.
@@ -216,60 +197,22 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     if (!ok) setStatus(`LOAD FAILED — ${short}: ${message} · tracker offline (:4444)`);
   }, []);
 
-  const loadAndPlay = useCallback(async (
-    bytes: ArrayBuffer,
-    name: string,
-    companionFiles?: Record<string, string>,
-  ) => {
-    markKnownSource(name);   // the library's own songs and Modland hits are never contribution candidates
-    let binary = '';
-    const view = new Uint8Array(bytes);
-    // Chunked: String.fromCharCode(...view) blows the argument limit on a
-    // module of any size.
-    for (let i = 0; i < view.length; i += 0x8000) {
-      binary += String.fromCharCode(...view.subarray(i, i + 0x8000));
+  /**
+   * Open a song and START it: openSong with the jukebox origin. The origin
+   * is headless (no dialog can be raised: format-compatibility warnings,
+   * the Modland contribution prompt) and starts playback in song mode, so
+   * nothing here stops to ask, and a refused load is a FINDING (failLoad).
+   */
+  const loadAndPlay = useCallback(async (src: SongSourceRef): Promise<number | false> => {
+    const result = await openSong(src, { origin: 'jukebox' });
+    if (!result.ok) {
+      // A refused load is a FINDING, not a dead end: file it with the reason
+      // attached, so the tracker carries the actual message rather than
+      // "Load Failed" and a shrug (2026-09-24).
+      await failLoad(src.kind === 'modland' ? src.path : src.kind === 'url' ? src.url : src.kind === 'bytes' ? src.name : src.file.name, result.error);
+      return false;
     }
-    // Nothing may stop to ask a question. Sweeping hundreds of formats means
-    // meeting every dialog the app has — the format-compatibility warning, the
-    // "rare find" Modland contribution prompt, a synth that cannot be built —
-    // and each one wedges the list until it is answered by hand.
-    suppressFormatChecks();
-    try {
-      const result = await loadFileHeadless({
-        filename: name,
-        data: btoa(binary),
-        ...(companionFiles && Object.keys(companionFiles).length ? { companionFiles } : {}),
-      });
-      if (result.error) {
-        // A refused load is a FINDING, not a dead end. It used to set a status
-        // line and nothing else — "they fail silent" (2026-09-24), which for a
-        // sweep means the row looks untested and gets swept again. File it
-        // with the reason attached, so the tracker carries the actual message
-        // rather than "Load Failed" and a shrug.
-        await failLoad(name, String(result.error));
-        return false;
-      }
-      // SONG mode. `useTransportStore.play()` alone inherits whatever the
-      // loop flag happened to be, so the browser looped one pattern instead of
-      // playing the tune — and an audit that never leaves pattern 0 cannot see
-      // a song fall apart later. This is the MCP `play` handler, which sets
-      // the flag and then plays.
-      await playHeadless({ mode: 'song' });
-      return true;
-    } finally {
-      restoreFormatChecks();
-      // The contribution prompt is raised asynchronously, after the hash
-      // lookup returns, so closing it once here is not enough — it is closed
-      // again on the next tick.
-      const close = () => {
-        try { useModlandContributionModal.getState().closeModal(); } catch { /* not open */ }
-        try { dismissErrors(); } catch { /* none */ }
-        try { dismissModal(); } catch { /* none */ }
-      };
-      close();
-      window.setTimeout(close, 400);
-      window.setTimeout(close, 1500);
-    }
+    return result.companions;
   }, [failLoad]);
 
   const play = useCallback(async () => {
@@ -288,17 +231,9 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         const hit = res.results?.[0];
         if (!hit) { setStatus(`Modland has nothing for "${term}"`); return; }
         setModlandFiles((m) => ({ ...m, [row.id]: hit.full_path }));
-        const buf = await downloadModlandFile(hit.full_path);
         const name = hit.filename ?? 'song';
-        // The partner files Modland lists beside the hit, through the resolver.
-        const companions: Record<string, string> = {};
-        for (const c of await downloadUADECompanions(hit.full_path, buf)) {
-          const cBuf = new Uint8Array(c.buffer);
-          let cBin = '';
-          for (let i = 0; i < cBuf.length; i += 0x8000) cBin += String.fromCharCode(...cBuf.subarray(i, i + 0x8000));
-          companions[c.filename] = btoa(cBin);
-        }
-        if (await loadAndPlay(buf, name, companions)) setStatus(`${name} (Modland)`);
+        // The partner files Modland lists beside the hit are fetched by openSong.
+        if (await loadAndPlay({ kind: 'modland', path: hit.full_path }) !== false) setStatus(`${name} (Modland)`);
         window.setTimeout(grabFocus, 0);
         window.setTimeout(grabFocus, 500);
       } catch (err) {
@@ -315,24 +250,10 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       const blob = cache.current.get(file) ?? await (await fetch(file)).blob();
       cache.current.set(file, blob);
 
-      // Companions through the file browser's own function, so a song loads
-      // here exactly as it loads from the app: same listing, same resolver,
-      // same reads.
-      const bytes = await blob.arrayBuffer();
-      const found = await gatherCompanions(name, directoryOfFile(file), bytes);
-      const companions: Record<string, string> = {};
-      for (const [registerAs, cBytes] of found) {
-        const cBuf = new Uint8Array(cBytes);
-        let cBin = '';
-        for (let i = 0; i < cBuf.length; i += 0x8000) {
-          cBin += String.fromCharCode(...cBuf.subarray(i, i + 0x8000));
-        }
-        companions[registerAs] = btoa(cBin);
-      }
-
-      if (await loadAndPlay(bytes, name, companions)) {
-        setStatus(Object.keys(companions).length ? `${name} (+${Object.keys(companions).length})` : name);
-      }
+      // Companions are resolved by openSong beside the song's own directory,
+      // exactly as it loads from the app: same listing, same resolver.
+      const loaded = await loadAndPlay({ kind: 'url', url: file, name, bytes: await blob.arrayBuffer() });
+      if (loaded !== false) setStatus(loaded ? `${name} (+${loaded})` : name);
       // The editor took the keyboard during the load; take it back.
       window.setTimeout(grabFocus, 0);
       window.setTimeout(grabFocus, 500);

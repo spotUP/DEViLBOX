@@ -24,7 +24,7 @@ import type {
   ComposerTune,
 } from '@/lib/sid/composerApi';
 import { downloadHVSCFile } from '@/lib/hvscApi';
-import { loadFile } from '@/lib/file/UnifiedFileLoader';
+import { openSong } from '@/lib/song/openSong';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,11 +86,11 @@ export function useSIDInfoDialog({ onClose }: UseSIDInfoDialogOptions) {
       try {
         const buffer = await downloadHVSCFile(tune.path);
         const file = new File([buffer], tune.filename || tune.path.split('/').pop() || 'tune.sid');
-        const result = await loadFile(file, { requireConfirmation: false });
-        if (result.success === true) {
-          notify.success(result.message);
+        const result = await openSong({ kind: 'file', file }, { origin: 'dialog' });
+        if (result.ok) {
+          if (!result.notified) notify.success(result.message);
           onClose();
-        } else if (result.success === false) {
+        } else {
           notify.error(result.error);
         }
       } catch (err) {

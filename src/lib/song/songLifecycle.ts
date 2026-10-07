@@ -49,17 +49,22 @@ export async function unloadSong(): Promise<void> {
  */
 export async function withSongLoad<T>(label: string, load: () => Promise<T>): Promise<T> {
   const first = useSongLoadStore.getState().depth === 0;
-  useSongLoadStore.setState((s) => ({ depth: s.depth + 1, label: first ? label : s.label }));
+  useSongLoadStore.setState((s) => ({
+    depth: s.depth + 1,
+    label: first ? label : s.label,
+    ...(first ? { phase: 'unload' as const, startedAt: performance.now() } : {}),
+  }));
   try {
     if (first) {
       await unloadSong();
+      useSongLoadStore.setState({ phase: 'acquire' });
       useSongLoadStore.setState({ unloadedForLoad: true });
     }
     return await load();
   } finally {
     useSongLoadStore.setState((s) => {
       const depth = s.depth - 1;
-      return depth === 0 ? { depth, label: '', unloadedForLoad: false } : { depth };
+      return depth === 0 ? { depth, label: '', unloadedForLoad: false, phase: 'idle' as const, interactive: true, cancel: null } : { depth };
     });
   }
 }

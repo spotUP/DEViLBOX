@@ -8,7 +8,8 @@
  */
 
 import { withSongLoad } from '@/lib/song/songLifecycle';
-import { isAdPlugWasmFormat } from '@lib/import/adplugFormats';
+import { setSongLoadPhase, useSongLoadStore } from '@/stores/useSongLoadStore';
+import type { OpenOrigin } from '@/lib/song/openSong';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -20,8 +21,8 @@ import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
-import { isSupportedFormat, detectFormat, detectFormatFromContent } from '@/lib/import/FormatRegistry';
-import { isSupportedModule, type ModuleInfo } from '@/lib/import/ModuleLoader';
+import { isSupportedFormat, detectFormat } from '@/lib/import/FormatRegistry';
+import type { ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import type { SunVoxSongMeta, SunVoxPatternData } from '@/engine/sunvox/SunVoxEngine';
@@ -53,13 +54,14 @@ export interface FileLoadOptions {
   companionFiles?: Map<string, ArrayBuffer>;
   /** TD-3: if true, clear existing patterns before importing */
   replacePatterns?: boolean;
+  /** Who asked, for songs (default 'filebrowser'); decides whether the load may raise questions and whether it starts playing. */
+  origin?: OpenOrigin;
 }
 
 export type FileLoadResult =
   | { success: true; message: string }
   | { success: false; error: string }
-  | { success: 'pending-confirmation'; file: File }
-  | { success: 'pending-import'; file: File };
+  | { success: 'pending-confirmation'; file: File };
 
 async function stopActivePlaybackForIncomingSong(
   engine: ReturnType<typeof getToneEngine>,
@@ -148,6 +150,7 @@ async function importTrackerModuleUnloaded(
     return;
   }
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+  setSongLoadPhase('parse');
   const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
   if (!song.patterns.length) {
     notify.error(`Module "${song.name || filename}" contains no patterns to import.`);
@@ -167,6 +170,7 @@ async function importTrackerModuleUnloaded(
     }
     if (rawData) (song as { cinter4RawData?: ArrayBuffer }).cinter4RawData = rawData;
   }
+  setSongLoadPhase('apply');
   const knownFormat = (['MOD', 'XM', 'IT', 'S3M'] as const).find((f) => f === song.format) ?? 'UNKNOWN';
   await applySong({
     instruments: song.instruments, patterns: song.patterns, order: song.songPositions,
@@ -178,7 +182,9 @@ async function importTrackerModuleUnloaded(
     engine: useLibopenmpt ? song : { ...song, libopenmptFileData: undefined },
   }, 'import');
   notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-  checkModlandFileWithPatternHash(file, null);
+  // The "unknown module" contribution prompt is a question; a headless load
+  // (MCP, jukebox, tour, embed) never raises one.
+  if (useSongLoadStore.getState().interactive) checkModlandFileWithPatternHash(file, null);
   } finally {
     restoreFormatChecks();
   }
@@ -201,6 +207,7 @@ async function importModuleFileUnloaded(file: File, options: Partial<ImportOptio
     ? Array.from(options.companionFiles, ([name, data]) => new File([data], name))
     : [];
   const { prepareModuleImport } = await import('@/lib/import/prepareModuleImport');
+  setSongLoadPhase('scan');
   const { info, uadeMetadata } = await prepareModuleImport(file, companions);
   // The dialog imports with libopenmpt on; importTrackerModule still keeps
   // native-only formats off it.
@@ -239,7 +246,10 @@ async function checkModlandFileWithPatternHash(file: File, patternHash: string |
 
 /**
  * Load any supported file format.
- * Handles state reset, format detection, parsing, and store updates.
+ *
+ * Songs go through openSong (the one door: classification, unload, routing,
+ * phases); this function keeps the confirmation gates the dialogs wait on and
+ * the non-song files (instruments, DB303 XML, audio samples).
  */
 export async function loadFile(
   file: File,
@@ -249,52 +259,38 @@ export async function loadFile(
   const filename = file.name.toLowerCase();
 
   try {
-    // === V2M FILES — handle before isSongFormat check ===
-    // V2M has its own player and shouldn't go through the ImportModuleDialog
-    if (filename.endsWith('.v2m')) {
-      return await withSongLoad(file.name, () => loadV2MFile(file));
-    }
-
-    // === Extension collisions are settled by content, once, here ===
-    // .sng is GoatTracker (GTS magic) or AdPlug; .dtm Digital Tracker or AdPlug
-    // DTM; .imf Imago Orpheus or id Software; .pmd PiyoPiyo or PMD98. The same
-    // resolver names the format for the song index and the headless sweep.
-    const byContent = (filename.endsWith('.sng') || isAdPlugWasmFormat(filename) || filename.endsWith('.pmd'))
-      ? detectFormatFromContent(filename, new Uint8Array(await file.arrayBuffer()))
-      : null;
-    if (byContent?.key === 'goatTracker') {
-      return await withSongLoad(file.name, async () => loadSongFile(file, options, await file.arrayBuffer()));
-    }
-
-    // === ADPLUG WASM STREAMING — OPL/AdLib formats not handled by TS parser ===
-    if (isAdPlugWasmFormat(filename) && (byContent?.key ?? 'adplug') === 'adplug') {
-      return await withSongLoad(file.name, () => loadAdPlugFile(file, options.companionFiles));
-    }
-
-    // === SONG FORMATS (replace project) ===
-    if (isSongFormat(filename)) {
+    const { classifySong, openSong } = await import('@/lib/song/openSong');
+    const kind = await classifySong(file);
+    if (kind) {
       // TD-3 pattern files need replace/append choice from user
-      if ((filename.endsWith('.sqs') || filename.endsWith('.seq')) && options.replacePatterns === undefined) {
+      if (kind === 'td3' && options.replacePatterns === undefined) {
         const { useUIStore } = await import('@stores/useUIStore');
         useUIStore.getState().setPendingTD3File(file);
         return { success: 'pending-confirmation', file };
       }
-
-      // GoatTracker .sng already handled above (before AdPlug check)
-
-      // .sunvox files bypass the confirmation dialog — they use their own
-      // SunVox engine loading path in loadSongFile, not importTrackerModule.
-      if (filename.endsWith('.sunvox')) {
-        return await withSongLoad(file.name, () => loadSongFile(file, options));
-      }
-      if (options.requireConfirmation) {
+      // Module and project songs wait for the import dialog when asked to;
+      // streaming and self-contained formats (V2M, AdPlug, GoatTracker,
+      // SunVox) and header-detected files load straight away.
+      if ((kind === 'module' || kind === 'project' || kind === 'td3') && options.requireConfirmation) {
         return { success: 'pending-confirmation', file };
       }
-      return await withSongLoad(file.name, () => loadSongFile(file, options));
+      const result = await openSong(
+        { kind: 'file', file, companions: options.companionFiles },
+        {
+          origin: options.origin ?? 'filebrowser',
+          subsong: options.subsong,
+          uadeMetadata: options.uadeMetadata,
+          midiOptions: options.midiOptions,
+          td3: { replacePatterns: options.replacePatterns, preserveInstruments: options.preserveInstruments },
+        },
+      );
+      return result.ok
+        ? { success: true, message: result.message }
+        : { success: false, error: `Failed to load ${file.name}: ${result.error}` };
     }
 
     // === NON-SONG FORMATS (additive/modify) ===
-    
+
     // .dbi - DEViLBOX instrument
     if (filename.endsWith('.dbi')) {
       return await loadInstrumentFile(file);
@@ -317,17 +313,6 @@ export async function loadFile(
       return await loadAudioSample(file);
     }
 
-    // Content fallback: extensionless Amiga song rips (SunTronic V1.3 "Delirium"
-    // songs like `newest_play`, `paradroid.final`) reveal nothing by name. Sniff
-    // the header before giving up — the DELIRIUM magic is unambiguous.
-    try {
-      const buf = await file.arrayBuffer();
-      const { isSupportedByHeader } = await import('../import/FormatRegistry');
-      if (isSupportedByHeader(new Uint8Array(buf))) {
-        return await loadSongFile(file, options, buf);
-      }
-    } catch { /* fall through to unsupported */ }
-
     return { success: false, error: `Unsupported file format: ${file.name}` };
 
   } catch (error) {
@@ -341,7 +326,7 @@ export async function loadFile(
 /**
  * Check if a file is a "song format" that replaces the entire project.
  */
-function isSongFormat(filename: string): boolean {
+export function isSongFormat(filename: string): boolean {
   return (
     filename.endsWith('.dbx') ||
     filename.endsWith('.mid') ||
@@ -356,14 +341,14 @@ function isSongFormat(filename: string): boolean {
 /**
  * Check if a file is an audio sample.
  */
-function isAudioFile(filename: string): boolean {
+export function isAudioFile(filename: string): boolean {
   return /\.(wav|mp3|ogg|flac|aiff?|m4a|iff|8svx|vag|vb|spu)$/i.test(filename);
 }
 
 /**
  * Load a song file (replaces entire project).
  */
-async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?: ArrayBuffer): Promise<FileLoadResult> {
+export async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?: ArrayBuffer): Promise<FileLoadResult> {
   // Loading an external song — prevent auto-save from overwriting user's saved project
   clearExplicitlySaved();
 
@@ -931,11 +916,6 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
   // (GoatTracker .sng is handled above, before the state reset, to avoid
   //  clearing instruments/patterns during the async gap.)
 
-  // === All other tracker/module formats → show import dialog ===
-  if (isSupportedModule(filename)) {
-    return { success: 'pending-import', file };
-  }
-
   // Content fallback: extensionless Amiga song rips (SunTronic V1.3 "Delirium"
   // songs like `newest_play`, `paradroid.final`) reveal nothing by name, so every
   // name-based gate above rejects them. Detect by header and import DIRECTLY via
@@ -1148,7 +1128,7 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
  * Load a V2M (Farbrausch V2 Synthesizer Music) file.
  * V2M can be loaded as editable patterns or played directly.
  */
-async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<FileLoadResult> {
+export async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<FileLoadResult> {
   try {
     const arrayBuffer = await file.arrayBuffer();
     
@@ -1280,7 +1260,7 @@ async function applyAdPlugSong(song: import('@/engine/TrackerReplayer').TrackerS
   }, 'import');
 }
 
-async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuffer>): Promise<FileLoadResult> {
+export async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuffer>): Promise<FileLoadResult> {
   try {
     const arrayBuffer = await file.arrayBuffer();
 

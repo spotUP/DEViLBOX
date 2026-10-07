@@ -1621,49 +1621,20 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     }
     receivedCompanions = Array.from(companionFiles.keys());
 
-    // Create a File object (browser API)
-    const file = new File([arrayBuffer], filename, { type: 'application/octet-stream' });
-
-    // Use the full UnifiedFileLoader pipeline (same as drag-and-drop in the UI).
-    // This correctly routes .sunvox, .fur, UADE formats, etc.
-    const { loadFile: unifiedLoadFile } = await import('../../lib/file/UnifiedFileLoader');
+    // One open path for every opener: classification, unload, routing, the
+    // module import and the engine/editor read-back all live in openSong.
+    const { openSong } = await import('../../lib/song/openSong');
     const { detectFormat } = await import('../../lib/import/FormatRegistry');
-
     const format = detectFormat(filename);
     const subsong = (params.subsong as number) ?? 0;
 
-    let loadResult = await unifiedLoadFile(file, { subsong, companionFiles: companionFiles.size > 0 ? companionFiles : undefined });
-    if (!loadResult.success) {
-      throw new Error(loadResult.error || `Failed to load ${filename}`);
+    const opened = await openSong(
+      { kind: 'bytes', name: filename, bytes: arrayBuffer, companions: companionFiles.size > 0 ? companionFiles : undefined },
+      { origin: 'mcp', subsong, ...(params.useLibopenmpt === false ? { useLibopenmpt: false } : {}) },
+    );
+    if (!opened.ok) {
+      throw new Error(opened.error || `Failed to load ${filename}`);
     }
-    if (loadResult.success === 'pending-confirmation') {
-      throw new Error(`${filename} requires user confirmation before loading (format dialog suppressed)`);
-    }
-    // For tracker modules that need the import dialog, bypass it and import directly.
-    if (loadResult.success === 'pending-import') {
-      suppressFormatChecks();
-      try {
-      // Default to libopenmpt for standard tracker formats (MOD/XM/IT/S3M etc.)
-      // unless explicitly disabled. The old code required useLibopenmpt=true which
-      // the MCP load_modland/load_file callers never set, causing MODs to silently
-      // fall through to parseModuleToSong which could fail.
-      // Read and imported exactly as the import dialog does it (drag and
-      // drop). This handler read files its own way and applied three kinds of
-      // song by hand; the same file loaded differently from here.
-      const { importModuleFile } = await import('../../lib/file/UnifiedFileLoader');
-      await importModuleFile(file, {
-        ...(params.useLibopenmpt === false ? { useLibopenmpt: false } : {}),
-        subsong,
-        companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
-      });
-      } finally {
-        restoreFormatChecks();
-      }
-      loadResult = { success: true, message: 'imported' };
-    }
-
-    // Wait for any deferred state updates (loadInstruments uses queueMicrotask)
-    await new Promise<void>(resolve => queueMicrotask(resolve));
 
     // Streaming WASM players (AdPlug, V2M) bypass the tracker store entirely —
     // return metadata from the player instance, not stale tracker state.
@@ -1697,23 +1668,15 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
       };
     }
 
-    // Read back the result from stores
     const trackerState = useTrackerStore.getState();
-    const instrumentState = useInstrumentStore.getState();
-    const formatState = (await import('../../stores/useFormatStore')).useFormatStore.getState();
-
-    // `format` is the registry entry's label; `engine` is what plays the
-    // song, by the router's own rule. The two differ for every format whose
-    // native parser hands playback to a WASM decoder or to UADE.
-    const { playingEngineFromStores } = await import('../../engine/replayer/NativeEngineRouting');
     return {
       ok: true,
       format: format?.label || 'Unknown',
-      engine: playingEngineFromStores(formatState as unknown as Record<string, unknown>, instrumentState.instruments),
-      editorMode: formatState.editorMode,
+      engine: opened.engine,
+      editorMode: opened.editorMode,
       channels: trackerState.patterns[0]?.channels?.length || 0,
       patterns: trackerState.patterns.length,
-      instruments: instrumentState.instruments.length,
+      instruments: useInstrumentStore.getState().instruments.length,
       filename,
     };
   } catch (e) {

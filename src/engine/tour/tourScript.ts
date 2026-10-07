@@ -38,15 +38,10 @@ async function loadTrackerSong(path: string): Promise<void> {
     const filename = path.split('/').pop() || 'song';
     const file = new File([buf], filename, { type: 'application/octet-stream' });
 
-    // The same load as drag and drop: loadFile, and for a module the import
-    // the dialog runs (this parsed and applied native formats by hand).
-    const { loadFile, importModuleFile } = await import('@/lib/file/UnifiedFileLoader');
-    const result = await loadFile(file, { requireConfirmation: false });
-    if (result.success === 'pending-import') {
-      await importModuleFile(file);
-    } else if (!result.success) {
-      console.warn('[Tour] loadFile failed:', result.error);
-    }
+    // The one open path; the tour's origin starts playback itself (D2).
+    const { openSong } = await import('@/lib/song/openSong');
+    const result = await openSong({ kind: 'file', file }, { origin: 'tour' });
+    if (!result.ok) console.warn('[Tour] openSong failed:', result.error);
 
 
     // Give the engine a moment to finish setting up channels/instruments

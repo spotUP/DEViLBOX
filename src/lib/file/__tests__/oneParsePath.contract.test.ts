@@ -86,7 +86,7 @@ describe('one parse path', () => {
 
   it('importTrackerModule parses nothing itself', () => {
     const src = readFileSync(resolve(__dirname, '../UnifiedFileLoader.ts'), 'utf8');
-    const start = src.indexOf('export async function importTrackerModule(');
+    const start = src.indexOf('async function importTrackerModuleUnloaded(');
     const body = src.slice(start, src.indexOf('\n}\n', start));
     expect(body).toContain('parseModuleToSong(');
     for (const own of ['parseWithOpenMPT', 'convertMODModule', 'convertXMModule', 'convertModule(', 'nativeData', 'dmfSong', 'loadModuleFile']) {
