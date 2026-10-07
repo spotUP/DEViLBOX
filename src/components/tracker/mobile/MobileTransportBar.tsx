@@ -11,6 +11,7 @@ import { useTransportStore, useTrackerStore, useEditorStore, useInstrumentStore 
 import { haptics } from '@/utils/haptics';
 import { useShallow } from 'zustand/react/shallow';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 interface MobileTransportBarProps {
   /** Channel index for portrait mode navigation */
@@ -173,7 +174,7 @@ export const MobileTransportBar: React.FC<MobileTransportBarProps> = ({
         onChange={(v) => { haptics.selection(); setCurrentInstrument(parseInt(v, 10)); }}
         options={instruments.map((inst) => ({
           value: String(inst.id),
-          label: inst.name.substring(0, 12),
+          label: instrumentDisplayName(inst).substring(0, 12),
         }))}
         className="text-[10px] bg-dark-bgTertiary border border-dark-border rounded h-8 px-1.5 text-text-primary font-mono truncate flex-shrink min-w-0 max-w-[90px]"
       />

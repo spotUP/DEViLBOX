@@ -14,6 +14,7 @@ import { SavePresetDialog } from './presets';
 import * as LucideIcons from 'lucide-react';
 import { Settings, Sparkles, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 type EditorTab = 'sound' | 'effects';
 
@@ -101,6 +102,7 @@ export const InstrumentEditorPopout: React.FC = () => {
               <input
                 type="text"
                 value={currentInstrument.name}
+                placeholder={instrumentDisplayName(currentInstrument)}
                 onChange={(e) => updateInstrument(currentInstrument.id, { name: e.target.value })}
                 className="bg-transparent text-text-primary font-semibold text-lg focus:outline-none focus:ring-1 focus:ring-accent-primary rounded px-1 -ml-1"
               />

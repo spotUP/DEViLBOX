@@ -257,7 +257,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
           onChange={(v) => setSelectedInstrument(parseInt(v, 10))}
           options={nativeData.instruments.map((inst, i) => ({
             value: String(i),
-            label: `${i.toString(16).toUpperCase().padStart(2, '0')}: ${inst.name || 'Unnamed'}`,
+            label: `${i.toString(16).toUpperCase().padStart(2, '0')}: ${inst.name?.trim() || ''}`,
           }))}
         />
       </div>

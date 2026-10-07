@@ -481,7 +481,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   }
 
   const instNum = String(targetInstrument.id).padStart(2, '0');
-  const instrumentName = `${instNum}: ${targetInstrument.name || synthType}`;
+  const instrumentName = `${instNum}: ${targetInstrument.name?.trim() || synthType}`;
   const fxCount = targetInstrument.effects?.length ?? 0;
 
 

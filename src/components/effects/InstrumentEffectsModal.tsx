@@ -15,6 +15,7 @@ import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@con
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
 import { INSTRUMENT_FX_PRESETS, type InstrumentFxPreset } from '@constants/fxPresets';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 interface InstrumentEffectsModalProps {
   isOpen: boolean;
@@ -165,7 +166,7 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
           <div className="flex items-center gap-3">
             <Settings size={20} className="text-accent-primary" />
             <h2 className="text-lg font-bold text-text-primary">
-              {currentInstrument.name || `Instrument ${currentInstrument.id}`} Effects
+              {instrumentDisplayName(currentInstrument)} Effects
             </h2>
             <span className="text-xs text-text-muted px-2 py-1 bg-dark-bg rounded">
               {currentInstrument.synthType}
