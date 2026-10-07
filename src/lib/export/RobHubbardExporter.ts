@@ -6,8 +6,9 @@
  * stores the original binary in `uadeEditableFileData`.
  *
  * Export strategy:
- *   1. If `uadeEditableFileData` exists, return it verbatim. Any live edits
- *      made via UADE chip RAM patching are already baked into this buffer.
+ *   1. If the original module is available, compare the grid with the grid the module shows and
+ *      patch each edited cell into the block command it is drawn from (robHubbardEdits.ts).
+ *      Byte-exact where nothing was edited; edits that need a longer block come back as warnings.
  *   2. If no original binary is available, encode pattern data using standard
  *      ProTracker MOD 4-byte cell encoding as a best-effort fallback.
  *
@@ -16,6 +17,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { encodeRobHubbardCell } from '@/engine/uade/encoders/RobHubbardEncoder';
+import { applyRhGridEdits } from '@lib/import/formats/robHubbardEdits';
 
 // ── Result type ─────────────────────────────────────────────────────────────
 
@@ -49,11 +51,17 @@ export async function exportRobHubbard(
 ): Promise<RobHubbardExportResult> {
   const warnings: string[] = [];
 
-  // ── Path 1: Original binary available — return verbatim ─────────────────
+  // ── Path 1: Original module available - its own bytes with the grid's edits patched in ──
   if (song.uadeEditableFileData && song.uadeEditableFileData.byteLength > 0) {
     const baseName = sanitizeName(song.name);
+    let bytes: Uint8Array = new Uint8Array(song.uadeEditableFileData);
+    if (song.uadeVariableLayout) {
+      const r = applyRhGridEdits(bytes, song.patterns);
+      bytes = r.data;
+      warnings.push(...r.warnings);
+    }
     return {
-      data: new Blob([song.uadeEditableFileData], { type: 'application/octet-stream' }),
+      data: new Blob([bytes as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
       filename: deriveFilename(baseName, song.uadeEditableFileName),
       warnings,
     };

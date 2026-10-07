@@ -26,7 +26,7 @@ registerEditableFormat({ formatId: "benDaglish", label: "", patternCodec: { kind
 registerEditableFormat({ formatId: "c67", label: "", patternCodec: { kind: "variable" }, exporter: { module: "CDFM67Exporter", fn: "exportCDFM67", byLayout: true } });
 registerEditableFormat({ formatId: "chuckBiscuits", label: "Chuck Biscuits", patternCodec: { kind: "fixed" }, exporter: { module: "ChuckBiscuitsExporter", fn: "exportChuckBiscuits", byLayout: true } });
 registerEditableFormat({ formatId: "composer667", label: "Composer 667", patternCodec: { kind: "fixed" }, exporter: { module: "Composer667Exporter", fn: "exportComposer667", byLayout: true } });
-registerEditableFormat({ formatId: "davidWhittaker", label: "David Whittaker", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "davidWhittaker", label: "David Whittaker", patternCodec: { kind: "fixed" }, exporter: { module: "DavidWhittakerExporter", fn: "exportDavidWhittaker", byLayout: true } });
 registerEditableFormat({ formatId: "deltaMusic1", label: "Delta Music", patternCodec: { kind: "fixed" }, exporter: { module: "DeltaMusic1Exporter", fn: "exportDeltaMusic1", byLayout: true } });
 registerEditableFormat({ formatId: "deltaMusic2", label: "Delta Music 2", patternCodec: { kind: "fixed" }, exporter: { module: "DeltaMusic2Exporter", fn: "exportDeltaMusic2", byLayout: true } });
 registerEditableFormat({ formatId: "digiBooster", label: "DigiBooster", patternCodec: { kind: "fixed" } });
@@ -89,7 +89,7 @@ registerEditableFormat({ formatId: "pt36", label: "ProTracker 3.6", patternCodec
 registerEditableFormat({ formatId: "ptm", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "pumaTracker", label: "Puma Tracker", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "quadraComposer", label: "Quadra Composer", patternCodec: { kind: "fixed" }, exporter: { module: "QuadraComposerExporter", fn: "exportQuadraComposer", byLayout: true } });
-registerEditableFormat({ formatId: "robHubbard", label: "Rob Hubbard", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "robHubbard", label: "Rob Hubbard", patternCodec: { kind: "fixed" }, exporter: { module: "RobHubbardExporter", fn: "exportRobHubbard", byLayout: true } });
 registerEditableFormat({ formatId: "ronKlaren", label: "Ron Klaren", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "rtm", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "s3m", label: "S3M", patternCodec: { kind: "variable" } });
