@@ -262,25 +262,26 @@ int tfmx_load_instrument(void* /*ctx*/, int handle, const uint8_t* blob, uint32_
 }
 
 /**
- * Convert a typed key (MIDI) to the note value of a pattern row. The key's
- * grid note is MIDI - 11 (xmConversions.noteToMidi) and the Hippel TFMX grid
- * shows a row's note as note + 1 (period table index 0 = 1712 = C-0 = grid
- * note 1; JochenHippel7VParser tfmxNoteToXM), so the row note is MIDI - 12.
+ * The pattern note byte a key plays. The caller (TFMXSynth.hippelKeyNoteByte)
+ * computes it: the grid names a note by the pitch the decoder plays - the
+ * period table entry of pattern note + the sound sequence's transpose - so the
+ * byte for a key is the inverse of that, which needs the instrument's sequence
+ * transpose and the table (HippelTfmxWalk.hippelNoteByteFor). Bytes 0 and 1
+ * are no note to the decoder; bit 7 is pitch-only, so 2..$7F.
  */
-static int midiToTfmxNote(int midi) {
-  int note = midi - 12;
-  if (note < 1)  note = 1;
-  if (note > 95) note = 95;
+static int clampPatternNote(int note) {
+  if (note < 2)    note = 2;
+  if (note > 0x7F) note = 0x7F;
   return note;
 }
 
 EMSCRIPTEN_KEEPALIVE
-void tfmx_note_on(void* /*ctx*/, int handle, int midiNote, int /*velocity*/) {
+void tfmx_note_on(void* /*ctx*/, int handle, int patternNote, int /*velocity*/) {
   if (handle < 0 || handle >= MAX_PLAYERS) return;
   TFMXPlayer& p = gPlayers[handle];
   if (!p.decoder || !p.miniMod || !p.loaded) return;
 
-  const int tfmxNote = midiToTfmxNote(midiNote);
+  const int tfmxNote = clampPatternNote(patternNote);
 
   // Update pattern row 0: trigger note using VolModSeq index 0
   // byte0: bits6-0 = note; bit7 set means "pitch only, keep the instrument"

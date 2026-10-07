@@ -12,9 +12,10 @@
  *                       transpose by the replayer)
  *           bits 5..7 = effect / volume / extra flags (format-dependent)
  *
- * The reference parser maps TFMX note 0..63 to XM note 1..64 via
- * `xmNote = tfmxNote + 1` (see `tfmxNoteToXM` in JochenHippel7VParser.ts),
- * so the inverse here is `tfmxNote = xmNote - 1` clamped to 0..63.
+ * The parser's decodeCell names a note byte by the pitch the player looks up
+ * for it (HippelTfmxWalk.hippelCellNote, the octave below C-0 included), so
+ * the inverse here is the pattern note that plays that pitch
+ * (hippelNoteByteFor).
  *
  * This encoder writes a "fresh" cell — it doesn't preserve the existing
  * portamento bit or the high-bit info flags because the encoder signature
@@ -24,6 +25,7 @@
  */
 
 import type { TrackerCell } from '@/types';
+import { hippelNoteByteFor } from '@/lib/import/formats/HippelTfmxWalk';
 
 export function encodeTFMX7VCell(cell: TrackerCell): Uint8Array {
   const buf = new Uint8Array(2);
@@ -31,11 +33,11 @@ export function encodeTFMX7VCell(cell: TrackerCell): Uint8Array {
   // XM note 0 means "empty" — both bytes stay zero so the replayer
   // skips the row (note & 0x7f === 0 → empty cell, see TFMX_processPattern
   // in libtfmxaudiodecoder/Jochen/TFMX.cpp:153).
-  if (!cell.note || cell.note <= 0) return applyByteExactCarriers(buf, cell);
+  if (!cell.note) return applyByteExactCarriers(buf, cell);
 
-  // XM 1..96 → TFMX 0..63 (clamp into the 6-bit note range; the period
-  // table only has 64 entries so anything past that is silently clamped).
-  const tfmxNote = Math.max(0, Math.min(63, (cell.note - 1) | 0));
+  // The pattern note the player plays the cell's note with (no transpose: the round-trip codec's view).
+  const tfmxNote = hippelNoteByteFor(cell.note, 0);
+  if (tfmxNote === null) return applyByteExactCarriers(buf, cell);
   buf[0] = tfmxNote & 0x7f;
 
   // Instrument 1..N is volume sequence n-1, stored in the info byte's low

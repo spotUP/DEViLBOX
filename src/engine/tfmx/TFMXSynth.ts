@@ -20,6 +20,8 @@ import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { TFMXEngine } from './TFMXEngine';
 import { tfmxNoteForKey } from './tfmxKeyNote';
+import { hippelNoteByteFor } from '@/lib/import/formats/HippelTfmxWalk';
+import { midiToNoteValue, noteValueToPitch } from '@/lib/tracker/noteValue';
 
 export class TFMXSynth implements DevilboxSynth {
   readonly name = 'TFMXSynth';
@@ -32,6 +34,8 @@ export class TFMXSynth implements DevilboxSynth {
   /** TFMX Professional: the instrument is a macro of the module; its keys go to the keyboard decoder. */
   private _macroIndex = -1;
   private _keyLoadedFor: ArrayBuffer | null = null;
+  /** Hippel TFMX: the sequence transpose the decoder adds to a note this instrument starts (0 = none). */
+  private _keySeq = 0;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -48,6 +52,9 @@ export class TFMXSynth implements DevilboxSynth {
       this._ownsEngineConnection = true;
     }
   }
+
+  /** Hippel TFMX: the instrument's sound-sequence transpose at a note start (InstrumentMetadata.hippelKeySeq). */
+  setKeySeq(seq: number): void { this._keySeq = seq; }
 
   /** Make this a TFMX Professional macro instrument (the module's macro table index). */
   setMacroIndex(index: number): void { this._macroIndex = index; }
@@ -125,7 +132,7 @@ export class TFMXSynth implements DevilboxSynth {
     this.engine.sendMessage({
       type: 'noteOn',
       handle: this._playerHandle,
-      note: midiNote,
+      note: hippelKeyNoteByte(midiNote, this._keySeq),
       velocity: vel,
     });
   }
@@ -257,4 +264,20 @@ export function serializeTFMXConfig(cfg: TFMXConfig): ArrayBuffer {
   buf.set(smpData, off);
 
   return buf.buffer;
+}
+
+/**
+ * Hippel TFMX keyboard voice: the pattern note byte (2..$7F) the mini-module
+ * plays for a key. The key's grid note is MIDI - 11 (C-0 = 12; MIDI 0..11 =
+ * the octave below C-0), and the grid names a note by the pitch the decoder
+ * plays - the period table entry of pattern note + sequence transpose - so the
+ * byte is the inverse of that (hippelNoteByteFor), with the instrument's own
+ * sequence transpose. A sequence that fixes the pitch ignores the byte.
+ */
+export function hippelKeyNoteByte(midi: number, keySeq: number): number {
+  const v = midiToNoteValue(Math.max(0, Math.min(107, Math.round(midi))));
+  const byte = v === 0 ? null : hippelNoteByteFor(v, 0, keySeq);
+  if (byte !== null) return byte;
+  const pitch = noteValueToPitch(v) ?? 1;
+  return Math.max(2, Math.min(0x7f, pitch - 1 - Math.max(0, keySeq)));
 }

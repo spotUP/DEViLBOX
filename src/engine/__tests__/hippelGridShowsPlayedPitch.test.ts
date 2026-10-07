@@ -7,7 +7,8 @@
  * (libtfmxaudiodecoder in the TFMX wasm) logs the pitch it looks up per note
  * start; the grid, built with the transposes it reports (hippelPlayedPitch),
  * must show exactly that, on every corpus .hip / .hip7. Notes below the
- * notation's C-0 (warp's bass) are shown, not clamped to note 1, and editing a
+ * notation's C-0 (warp's bass) are shown in the octave below it (c_1..b_1, no
+ * octave shift), not clamped to note 1, and editing a
  * cell sets the pattern note so the played pitch becomes the typed note.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -19,6 +20,7 @@ import { parseJochenHippel7VFile } from '@/lib/import/formats/JochenHippel7VPars
 import { parseJochenHippelAmigaSogFile } from '@/lib/import/formats/JochenHippelSTParser';
 import { hippelPlayedPitch } from '@/lib/import/formats/hippelPlayedPitch';
 import { periodToPitch } from '@/lib/amiga/periodNotes';
+import { isLowOctaveNote, noteValueToPitch, pitchToNoteValue } from '@/lib/tracker/noteValue';
 import { rebuildHippelModule } from '@/engine/hippel/rebuildHippelModule';
 import { loadTfmxWalkModule, HIPPEL_TFMX_CORPUS, type TfmxWalkHost } from './helpers/tfmxWalkHost';
 
@@ -66,15 +68,14 @@ describe('Hippel grid note is the pitch the decoder plays', () => {
     expect(song.gridUnmatchedReason).toBeUndefined();
     const starts = noteStarts(song, bytes, 30_000);
     expect(starts.length, 'note starts in the first pass').toBeGreaterThan(200);
-    const pitches = starts.map((s) => periodToPitch(s.period));
-    const bias = Math.min(...pitches) < 1 ? 12 : 0;
     let moved = 0;
     for (const s of starts) {
       const cell = song.patterns[s.pattern].channels[s.voice].rows[s.row];
-      expect(cell.note, `${rel} pattern ${s.pattern} voice ${s.voice} row ${s.row} (period ${s.period})`).toBe(periodToPitch(s.period) + bias);
+      // The pitch itself, no octave shift (owner decision 2026-10-07): the grid holds the octave below C-0
+      expect(noteValueToPitch(cell.note), `${rel} pattern ${s.pattern} voice ${s.voice} row ${s.row} (period ${s.period})`).toBe(periodToPitch(s.period));
       if (cell.hippelSeq) moved++;
     }
-    console.log(`[hippel played pitch] ${rel}: ${starts.length} note starts, ${moved} moved by a sound sequence, octave bias ${bias}`);
+    console.log(`[hippel played pitch] ${rel}: ${starts.length} note starts, ${moved} moved by a sound sequence`);
   }, 120_000);
 
   it('warp: notes below the notation range are shown at their own pitch, never clamped to C-0', async () => {
@@ -86,30 +87,42 @@ describe('Hippel grid note is the pitch the decoder plays', () => {
     expect(below.length, 'the song plays below C-0').toBeGreaterThan(100);
     const shown = new Set(below.map((s) => song.patterns[s.pattern].channels[s.voice].rows[s.row].note));
     expect(shown.size, 'distinct low pitches stay distinct').toBeGreaterThanOrEqual(3);
+    // Shown in the octave below C-0 (c_1 .. b_1), not an octave up: every such cell is a low-octave value at its pitch
+    for (const s of below) {
+      const note = song.patterns[s.pattern].channels[s.voice].rows[s.row].note;
+      expect(isLowOctaveNote(note), `pattern ${s.pattern} voice ${s.voice} row ${s.row}: ${note}`).toBe(true);
+      expect(noteValueToPitch(note)).toBe(periodToPitch(s.period));
+    }
+    // and the notes at or above C-0 are not shifted either
+    const above = starts.find((s) => periodToPitch(s.period) >= 1)!;
+    expect(song.patterns[above.pattern].channels[above.voice].rows[above.row].note).toBe(periodToPitch(above.period));
   }, 120_000);
 
   it.each(HIPPEL_TFMX_CORPUS)('%s: typing a note into a cell makes the decoder play that note', async (rel) => {
     const bytes = new Uint8Array(readFileSync(join(ROOT, rel)));
     const song = await parsePlayed(rel, bytes);
     const starts = noteStarts(song, bytes, 30_000);
-    // A sequence-pitched start (not fixed) and, where the song has one, a plain start; each one semitone up.
+    // A sequence-pitched start (not fixed), where the song has one a plain start, and one in the octave below C-0
+    // (warp); each one semitone up.
+    const plain = (s: typeof starts[number]) => (song.patterns[s.pattern].channels[s.voice].rows[s.row].hippelSeq ?? 0) >= 0;
     const targets = [
       starts.find((s) => (song.patterns[s.pattern].channels[s.voice].rows[s.row].hippelSeq ?? 0) > 0),
       starts.find((s) => song.patterns[s.pattern].channels[s.voice].rows[s.row].hippelSeq === undefined),
+      starts.find((s) => plain(s) && periodToPitch(s.period) < 0),
     ].filter((s): s is NonNullable<typeof s> => !!s);
     expect(targets.length, 'a start to edit').toBeGreaterThan(0);
+    if (rel.startsWith('hippel/warp')) expect(targets.some((t) => periodToPitch(t.period) < 0), 'warp: an edit inside the octave below C-0').toBe(true);
     for (const t of targets) {
       const patterns = song.patterns.map((p) => ({ channels: p.channels.map((c) => ({ rows: c.rows.map((x): TrackerCell => ({ ...x })) })) }));
       const cell = patterns[t.pattern].channels[t.voice].rows[t.row];
-      const typed = cell.note + 1;
+      const typed = pitchToNoteValue(noteValueToPitch(cell.note)! + 1);
       cell.note = typed;
       const rebuilt = rebuildHippelModule(song.hippelFileData!, patterns, song.instruments.length)!;
       expect(rebuilt.refused, 'the edit has room').toEqual([]);
       expect(rebuilt.written).toBe(1);
       const after = host.walk(rebuilt.bytes, 0, t.tick + 2).records.find((r) => r[1] === 2 && r[0] === t.tick && r[2] === t.voice)!;
       expect(after, 'sentinel: the decoder started the note').toBeDefined();
-      const bias = cell.note - 1 - periodToPitch(t.period);
-      expect(periodToPitch(after[5]) + bias, `${rel}: the decoder now plays the typed note`).toBe(typed);
+      expect(pitchToNoteValue(periodToPitch(after[5])), `${rel}: the decoder now plays the typed note`).toBe(typed);
     }
   }, 120_000);
 });

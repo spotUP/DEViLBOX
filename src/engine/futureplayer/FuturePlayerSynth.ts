@@ -9,7 +9,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { FuturePlayerEngine } from './FuturePlayerEngine';
-import { fpKeyToTableIndex } from '@/lib/import/formats/fpGrid';
+import { fpKeyIndexForMidi } from '@/lib/import/formats/fpGrid';
 
 export class FuturePlayerSynth implements DevilboxSynth {
   readonly name = 'FuturePlayerSynth';
@@ -19,7 +19,6 @@ export class FuturePlayerSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _instrumentPtr = 0;  // raw binary offset for this instrument
-  private _octaveBias = 0;      // octaves (a multiple of 12) the song's grid shows its notes above the pitch they play
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -48,11 +47,10 @@ export class FuturePlayerSynth implements DevilboxSynth {
       } else {
         midiNote = note;
       }
-      // The key stands for the grid note n = MIDI n + 11 (xmConversions); the grid shows the pitch the player plays
-      // (shifted up by the song's octave bias), so the key plays the period table entry of that pitch
-      const gridNote = Math.max(1, Math.min(96, midiNote - 11));
+      // The key stands for the pitch MIDI - 11 (C-0 = 12; MIDI 0..11 = the octave below C-0); the grid shows the
+      // pitch the player plays, so the key plays the period table entry of that pitch
       const vol = Math.round((velocity ?? 0.8) * 127);
-      this.engine.noteOn(this._instrumentPtr, fpKeyToTableIndex(gridNote, this._octaveBias), vol);
+      this.engine.noteOn(this._instrumentPtr, fpKeyIndexForMidi(midiNote), vol);
     } else if (note === undefined) {
       // Whole-song playback: only an explicit play with no note. A typed key
       // on an instrument without a pointer must stay silent, never start the
@@ -80,9 +78,6 @@ export class FuturePlayerSynth implements DevilboxSynth {
         break;
       case 'instrumentPtr':
         this._instrumentPtr = Math.max(0, Math.round(value));
-        break;
-      case 'octaveBias':
-        this._octaveBias = Math.round(value);
         break;
     }
   }

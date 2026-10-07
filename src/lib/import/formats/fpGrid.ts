@@ -13,6 +13,7 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToPitch } from '@/lib/amiga/periodNotes';
+import { pitchToNoteValue, PITCH_HIGHEST, PITCH_LOWEST } from '@/lib/tracker/noteValue';
 import { FP_FX } from './fpEffectGlyphs';
 import { WALK_ROWS_PER_PATTERN, walkLayout, walkTickPosition, type WalkLayout } from './walkLayout';
 import { FP_PERIODS, FP_WALK, fpReleaseRate, type FpWalk, type FpWalkEvent } from './fpWalk';
@@ -21,27 +22,12 @@ export const FP_ROWS_PER_PATTERN = WALK_ROWS_PER_PATTERN;
 const EFFECT_SLOTS = 5;
 
 /**
- * The pitch (periodNotes naming, 428 = 25) a table period plays; null when it names none. The player's table
- * reaches below C-0 (its lowest entry plays 24 semitones under it), so the pitch can be 0 or negative:
- * fpOctaveBias lifts a whole song into the grid's notes 1..96.
+ * The pitch (periodNotes naming, 428 = 25 = C-2) a table period plays; null when it names none. The player's
+ * table reaches two octaves below C-0 (its lowest entry plays 24 semitones under it): the grid shows the octave
+ * directly below C-0 (noteValue.ts), a song lower than that has notes the grid cannot name (unnamedNotes).
  */
 export function fpPeriodPitch(period: number): number | null {
   return period > 0 ? periodToPitch(period) : null;
-}
-
-/**
- * The octaves (a multiple of 12) a song's notes are shown above the pitch they play, because the player
- * plays below C-0 (note 1): every note of the song moves together, so intervals and the pitch an edit sets
- * stay exact. 0 when the song stays inside the grid.
- */
-export function fpOctaveBias(walk: Pick<FpWalk, 'events'>): number {
-  let min = Infinity;
-  for (const e of walk.events) {
-    if (e.kind !== FP_WALK.note && e.kind !== FP_WALK.legato) continue;
-    const n = fpPeriodPitch(e.period);
-    if (n !== null && n < min) min = n;
-  }
-  return min >= 1 || min === Infinity ? 0 : 12 * Math.ceil((1 - min) / 12);
 }
 
 /** The index of the player's period table that plays pitch `pitch` (periodNotes naming), or -1. */
@@ -51,23 +37,26 @@ export function fpTableIndexOfPitch(pitch: number): number {
 }
 
 /**
- * The period table index a typed grid note stands for in a song shifted up by `bias`: what the keyboard
- * preview plays (fp_note_on takes a table index, the sample's own base note is the replayer's to subtract).
- * The nearest entry when the note is outside the table.
+ * The period table index a key's pitch (1 = C-0, linear below it) stands for: what the keyboard preview plays
+ * (fp_note_on takes a table index, the sample's own base note is the replayer's to subtract). The nearest entry
+ * when the pitch is outside the table.
  */
-export function fpKeyToTableIndex(gridNote: number, bias: number): number {
-  const i = fpTableIndexOfPitch(gridNote - bias);
+export function fpKeyToTableIndex(pitch: number): number {
+  const i = fpTableIndexOfPitch(pitch);
   if (i >= 0) return i;
   const pitch0 = fpPeriodPitch(FP_PERIODS[0]) ?? 0;
-  return Math.max(0, Math.min(FP_PERIODS.length - 1, gridNote - bias - pitch0));
+  return Math.max(0, Math.min(FP_PERIODS.length - 1, pitch - pitch0));
 }
 
-/** The tracker note (1..96) a table period plays in a song shifted up by `bias`; 0 when the period names none. */
-export function fpPeriodToNote(period: number, bias = 0): number {
+/** The period table index a typed key (MIDI; its pitch is MIDI - 11, C-0 = 12) plays: what FuturePlayerSynth sends. */
+export function fpKeyIndexForMidi(midi: number): number {
+  return fpKeyToTableIndex(Math.max(PITCH_LOWEST, Math.min(PITCH_HIGHEST, Math.round(midi) - 11)));
+}
+
+/** The grid note a table period plays (stored value, the octave below C-0 included); 0 when the grid has no such note. */
+export function fpPeriodToNote(period: number): number {
   const n = fpPeriodPitch(period);
-  if (n === null) return 0;
-  const shown = n + bias;
-  return shown >= 1 && shown <= 96 ? shown : 0;
+  return n === null ? 0 : pitchToNoteValue(n);
 }
 
 /** The Future Player grid's layout and playhead mapping are the shared walk ones (walkLayout.ts). */
@@ -105,8 +94,6 @@ export interface FpGrid {
   layout: FpLayout;
   /** Per pattern, voice and row: what the cell was drawn from (null for cells that show no note). */
   cellSources: Array<Array<Array<FPCellSource | null>>>;
-  /** Octaves (a multiple of 12) every note is shown above the pitch it plays (fpOctaveBias). */
-  bias: number;
   /** Notes whose period names no tracker note. */
   unnamedNotes: number;
   /** Rows where more commands ran on one voice than the cell has effect columns. */
@@ -148,7 +135,6 @@ export function buildFpGridFromWalk(walk: FpWalk, ctx: FpGridContext): FpGrid {
   const instrCmd = new Array<number>(channels).fill(-1);
   let overflowRows = 0;
   let unnamedNotes = 0;
-  const bias = fpOctaveBias(walk);
 
   for (const e of walk.events) {
     if (e.voice >= channels) continue;
@@ -165,7 +151,7 @@ export function buildFpGridFromWalk(walk: FpWalk, ctx: FpGridContext): FpGrid {
     };
     if (e.kind === FP_WALK.instrument) { instrCmd[e.voice] = e.off; continue; }
     if (e.kind === FP_WALK.note || e.kind === FP_WALK.legato) {
-      const n = fpPeriodToNote(e.period, bias);
+      const n = fpPeriodToNote(e.period);
       if (n === 0) unnamedNotes++;
       cell.note = n;
       const retrigger = e.kind === FP_WALK.note;
@@ -202,5 +188,5 @@ export function buildFpGridFromWalk(walk: FpWalk, ctx: FpGridContext): FpGrid {
     cellSources.push(src.map((s) => s.slice(start, start + len)));
     start += len;
   });
-  return { patterns, songPositions, layout, cellSources, bias, unnamedNotes, overflowRows };
+  return { patterns, songPositions, layout, cellSources, unnamedNotes, overflowRows };
 }

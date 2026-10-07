@@ -27,7 +27,10 @@ import { join } from 'node:path';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { parseJochenHippel7VFile } from '@/lib/import/formats/JochenHippel7VParser';
 import { parseJochenHippelAmigaSogFile } from '@/lib/import/formats/JochenHippelSTParser';
-import { hippelGrid, hippelIndexToXm, hippelNoteIndex, readHippelTfmx } from '@/lib/import/formats/HippelTfmxWalk';
+import { readHippelTfmx } from '@/lib/import/formats/HippelTfmxWalk';
+import { hippelPlayedPitch } from '@/lib/import/formats/hippelPlayedPitch';
+import { periodToPitch } from '@/lib/amiga/periodNotes';
+import { pitchToNoteValue } from '@/lib/tracker/noteValue';
 import { mapHippelCells, rebuildHippelModule } from '@/engine/hippel/rebuildHippelModule';
 import { hippelRowAt } from '@/engine/hippel/hippelCellSpans';
 import { loadTfmxWalkModule, HIPPEL_TFMX_CORPUS, type TfmxWalkHost } from './helpers/tfmxWalkHost';
@@ -35,10 +38,13 @@ import { loadTfmxWalkModule, HIPPEL_TFMX_CORPUS, type TfmxWalkHost } from './hel
 const ROOT = join(process.cwd(), 'public/data/songs');
 const TICKS = 30_000;
 
-function parse(rel: string, bytes: Uint8Array): TrackerSong {
+/** The song as the app opens it: the parser with the decoder's played pitches (hippelPlayedPitch), the one grid there is. */
+async function parse(rel: string, bytes: Uint8Array): Promise<TrackerSong> {
   const buffer = bytes.slice().buffer as ArrayBuffer;
   const name = rel.split('/').pop()!;
-  return rel.endsWith('.hip7') ? parseJochenHippel7VFile(buffer, name) : parseJochenHippelAmigaSogFile(buffer, name);
+  const played = await hippelPlayedPitch(bytes, async (b, s, t) => host.walk(b, s, t).records);
+  expect(played, 'the decoder reported its pitches (sentinel)').not.toBeNull();
+  return rel.endsWith('.hip7') ? parseJochenHippel7VFile(buffer, name, played!) : parseJochenHippelAmigaSogFile(buffer, name, played!);
 }
 
 let host: TfmxWalkHost;
@@ -50,8 +56,6 @@ beforeAll(async () => { host = await loadTfmxWalkModule(); });
  */
 function holdGridToDecoder(rel: string, bytes: Uint8Array, song: TrackerSong): { notes: number; rows: number; patterns: number; rowCounts: number[] } {
   const m = readHippelTfmx(bytes)!;
-  // Parsed without the decoder's sequence transposes: the pattern notes, an octave up when the song plays below C-0.
-  const bias = hippelGrid(m, 0).bias;
   const { records, voices } = host.walk(bytes, 0, TICKS);
   expect(records.length, 'the decoder walk ran (sentinel)').toBeGreaterThan(1000);
   expect(song.numChannels).toBe(voices);
@@ -94,8 +98,9 @@ function holdGridToDecoder(rel: string, bytes: Uint8Array, song: TrackerSong): {
         } else {
           const s = started.get(`${r[0]}:${v}`);
           expect(s, `${where}: the decoder starts the note`).toBeDefined();
-          expect(cell.note, `${where}: the note the voice reads (note ${noteByte & 0x7f}, transpose ${r[7]})`)
-            .toBe(hippelIndexToXm(hippelNoteIndex(noteByte & 0x7f, r[7]), bias));
+          // The pitch the decoder starts the note on, at its own octave (below C-0 too: no shift)
+          expect(cell.note, `${where}: the pitch the voice plays (note ${noteByte & 0x7f}, transpose ${r[7]}, period ${s![5]})`)
+            .toBe(pitchToNoteValue(periodToPitch(s![5])));
           const sequence = s![9];
           expect(cell.instrument, `${where}: the volume sequence it starts`)
             .toBe((noteByte & 0x80) !== 0 ? 0 : sequence < m.nVolume ? sequence + 1 : 0);
@@ -120,18 +125,18 @@ function holdGridToDecoder(rel: string, bytes: Uint8Array, song: TrackerSong): {
 }
 
 describe('Hippel Amiga TFMX grid is the decoder walk', () => {
-  it.each(HIPPEL_TFMX_CORPUS)('%s: every step, row, note and instrument of every voice', (rel) => {
+  it.each(HIPPEL_TFMX_CORPUS)('%s: every step, row, note and instrument of every voice', async (rel) => {
     const bytes = new Uint8Array(readFileSync(join(ROOT, rel)));
-    const song = parse(rel, bytes);
+    const song = await parse(rel, bytes);
     expect(song.gridUnmatchedReason).toBeUndefined();
     const done = holdGridToDecoder(rel, bytes, song);
     console.log(`[hippel grid] ${rel}: ${done.patterns} steps, rows per step ${[...new Set(done.rowCounts)].join('/')}, ${done.notes} notes over ${done.rows} voice rows`);
     expect(done.notes).toBeGreaterThan(200);
   }, 120_000);
 
-  it.each(HIPPEL_TFMX_CORPUS)('%s: the reported position maps to the row voice 0 last read', (rel) => {
+  it.each(HIPPEL_TFMX_CORPUS)('%s: the reported position maps to the row voice 0 last read', async (rel) => {
     const bytes = new Uint8Array(readFileSync(join(ROOT, rel)));
-    const song = parse(rel, bytes);
+    const song = await parse(rel, bytes);
     const spans = mapHippelCells(song.hippelFileData!, song.instruments.length)!;
     expect(spans.length, 'the cell spans the playhead maps through').toBe(song.patterns.length);
     const session = host.open(bytes, 0);
@@ -159,9 +164,9 @@ describe('Hippel Amiga TFMX grid is the decoder walk', () => {
     expect(rowsShown.size, 'the playhead moved through the song').toBeGreaterThan(100);
   }, 120_000);
 
-  it.each(HIPPEL_TFMX_CORPUS)('%s: an unedited grid writes the file back byte for byte; an edited note is the note the decoder then reads', (rel) => {
+  it.each(HIPPEL_TFMX_CORPUS)('%s: an unedited grid writes the file back byte for byte; an edited note is the note the decoder then reads', async (rel) => {
     const bytes = new Uint8Array(readFileSync(join(ROOT, rel)));
-    const song = parse(rel, bytes);
+    const song = await parse(rel, bytes);
     const same = rebuildHippelModule(song.hippelFileData!, song.patterns, song.instruments.length)!;
     expect(same.refused).toEqual([]);
     expect(same.written).toBe(0);
@@ -180,7 +185,7 @@ describe('Hippel Amiga TFMX grid is the decoder walk', () => {
     expect(out.refused).toEqual([]);
     expect(out.written).toBeGreaterThan(0);
     // The decoder reads the edited byte on that row of that step, and the reparsed grid shows the note.
-    const heard = parse(rel, out.bytes);
+    const heard = await parse(rel, out.bytes);
     expect(heard.patterns[p].channels[1].rows[r].note).toBe(note + 2);
     const walk = host.walk(out.bytes, 0, TICKS).records;
     const first = walk.find((x) => x[1] === 0 && x[2] === 0)![3];
@@ -189,20 +194,20 @@ describe('Hippel Amiga TFMX grid is the decoder walk', () => {
     expect(row[5] & 0x7f, 'the note byte the decoder reads on that row').toBe((was[5] & 0x7f) + 2);
   }, 120_000);
 
-  it('a break note ends a step early on every voice: the grid pattern is that short, as the decoder walks it', () => {
+  it('a break note ends a step early on every voice: the grid pattern is that short, as the decoder walks it', async () => {
     const rel = 'hippel/warp (ingame 2).hip';
     const original = new Uint8Array(readFileSync(join(ROOT, rel)));
     const m = readHippelTfmx(original)!;
     const bytes = original.slice();
     // The break (note byte 1) on row 8 of every pattern: every step is 8 rows long, on every voice.
     for (let p = 0; p < m.nPatterns; p++) bytes[m.patternsOff + p * 0x40 + 8 * 2] = 1;
-    const song = parse(rel, bytes);
+    const song = await parse(rel, bytes);
     expect(song.gridUnmatchedReason).toBeUndefined();
     expect(song.patterns.every((p) => p.length === 8)).toBe(true);
     holdGridToDecoder(rel, bytes, song);
   }, 120_000);
 
-  it('voices that leave a step on different rows have no pattern-per-step grid: the scope view, with the reason', () => {
+  it('voices that leave a step on different rows have no pattern-per-step grid: the scope view, with the reason', async () => {
     const rel = 'hippel/warp (ingame 2).hip';
     const original = new Uint8Array(readFileSync(join(ROOT, rel)));
     const m = readHippelTfmx(original)!;
@@ -215,7 +220,7 @@ describe('Hippel Amiga TFMX grid is the decoder walk', () => {
     expect(step, 'the corpus has a step with different patterns on voices 0 and 1').toBeGreaterThanOrEqual(0);
     const p1 = original[m.trackOff + step * m.stepLen + m.columnSize];
     bytes[m.patternsOff + p1 * 0x40 + 8 * 2] = 1;
-    const song = parse(rel, bytes);
+    const song = await parse(rel, bytes);
     expect(song.gridUnmatchedReason).toMatch(/different rows/);
     expect(song.patterns.length).toBe(1);
     expect(song.patterns[0].channels.every((c) => c.rows.every((r) => r.note === 0))).toBe(true);

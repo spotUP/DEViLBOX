@@ -40,7 +40,7 @@ import type { InstrumentConfig, TFMXConfig, UADEChipRamInfo, Pattern, TrackerCel
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeTFMX7VCell } from '@/engine/uade/encoders/TFMX7VEncoder';
 import type { HippelAuxSpan, HippelCellSpan, HippelCellSpans } from '@/engine/hippel/hippelCellSpans';
-import { hippelCellNote, hippelGrid, hippelNoteByteFor, readHippelTfmx, type HippelGrid, type HippelPlayed } from './HippelTfmxWalk';
+import { hippelCellNote, hippelGrid, hippelKeySeqs, hippelNoteByteFor, readHippelTfmx, type HippelGrid, type HippelPlayed } from './HippelTfmxWalk';
 
 const MIN_FILE_SIZE = 32;
 
@@ -303,8 +303,7 @@ function decodeTFMX7VPattern(
       cell.note = c.note;
       cell.instrument = c.instrument;
       if (c.seq !== 0) cell.hippelSeq = c.seq;
-      if (c.note > 0 && walked.bias !== 0) cell.hippelBias = walked.bias;
-      spans[voice][row] = tfmx7VSpan(c.offset, cell, sv.transpose, sv.soundTranspose, c.noteByte, walked.bias);
+      spans[voice][row] = tfmx7VSpan(c.offset, cell, sv.transpose, sv.soundTranspose, c.noteByte);
     }
     // The step's fourth byte per voice is a track-table command. `0xFx` sets
     // the voice's volume for the step (TFMX_7V_trackTabCmd); the grid shows
@@ -367,20 +366,20 @@ function tfmx7VVoiceVolumeSpan(cmdOff: number): HippelAuxSpan {
  * Writing a cell subtracts the step's transposes again and keeps the bits the
  * grid does not show: portamento and the info byte's top three bits.
  */
-function tfmx7VSpan(offset: number, baseline: TrackerCell, tr: number, st: number, baseNoteByte: number, bias: number): HippelCellSpan {
+function tfmx7VSpan(offset: number, baseline: TrackerCell, tr: number, st: number, baseNoteByte: number): HippelCellSpan {
   return {
     offset, length: 2, baseline,
     // The cell as the file decodes it, under the sound-sequence transpose the cell carries (hippelSeq).
-    baselineFor: (cell) => ({ ...baseline, note: hippelCellNote(baseNoteByte, tr, cell.hippelSeq ?? 0, bias) }),
+    baselineFor: (cell) => ({ ...baseline, note: hippelCellNote(baseNoteByte, tr, cell.hippelSeq ?? 0) }),
     encode(cell, file) {
       const oldNote = file[offset];
       const oldInfo = file[offset + 1];
       if ((cell.note ?? 0) === 0) return new Uint8Array([0, 0]);
       const seq = cell.hippelSeq ?? 0;
       // The pattern note under which the player plays the typed note. A note the byte already plays is kept.
-      const noteVal = (oldNote & 0x7F) >= 2 && hippelCellNote(oldNote, tr, seq, bias) === cell.note
+      const noteVal = (oldNote & 0x7F) >= 2 && hippelCellNote(oldNote, tr, seq) === cell.note
         ? oldNote & 0x7F
-        : hippelNoteByteFor(cell.note, tr, seq, bias);
+        : hippelNoteByteFor(cell.note, tr, seq);
       if (noteVal === null) return null; // a fixed-pitch sound sequence, or a note the table does not reach
       const porta = (oldNote & 0x7F) !== 0 ? oldNote & 0x80 : 0;
       let info = oldInfo;
@@ -404,10 +403,10 @@ const EFFECT_SPEED = 0x0f;
  * the byte span behind it. A speed change shows as the speed effect on the
  * first row that runs at the new speed. `unmatched` says why there is no grid.
  */
-function decodeTFMX7VGrid(layout: ReturnType<typeof readTFMX7VLayout>, played?: HippelPlayed, bias?: number): {
+function decodeTFMX7VGrid(layout: ReturnType<typeof readTFMX7VLayout>, played?: HippelPlayed): {
   rows: TrackerCell[][][]; spans: HippelCellSpans; walked: HippelGrid; speed: number;
 } {
-  const walked = hippelGrid(layout.m, 0, played, bias);
+  const walked = hippelGrid(layout.m, 0, played);
   const trackColumnSize = (layout.trackStepLen / layout.voices) | 0; // 3 (4V) or 4 (7V)
   const rows: TrackerCell[][][] = [];
   const spans: HippelCellSpans = [];
@@ -430,12 +429,12 @@ function decodeTFMX7VGrid(layout: ReturnType<typeof readTFMX7VLayout>, played?: 
 }
 
 /** The byte span behind every grid cell of a Hippel TFMX module (4 or 7 voices), as the parser lays the grid out. */
-export function mapJochenHippel7VCells(buf: Uint8Array, bias?: number): HippelCellSpans {
+export function mapJochenHippel7VCells(buf: Uint8Array): HippelCellSpans {
   // A 7V file's song is where the 7V player's check finds it; any other Hippel TFMX file's (.hip) where the decoder does.
   const songOff = isJochenHippel7VFormat(buf) ? findTFMX7VSongOffset(buf) : -1;
   const m = readHippelTfmx(buf, songOff >= 0 ? songOff : undefined);
   if (!m) return [];
-  return decodeTFMX7VGrid(readTFMX7VLayout(buf, m.header), undefined, bias).spans;
+  return decodeTFMX7VGrid(readTFMX7VLayout(buf, m.header)).spans;
 }
 
 export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string, played?: HippelPlayed): TrackerSong {
@@ -545,7 +544,19 @@ function buildHippelTfmxSong(buffer: ArrayBuffer, filename: string, songOff: num
   const songPositions: number[] = [];
 
   const grid = decodeTFMX7VGrid(layout, played);
-  grid.rows.forEach((channelRows, patIdx) => {
+  // The grid names every note by the pitch the decoder plays (sound sequences shift or fix it), which only
+  // the decoder knows (hippelPlayedPitch): without its report there is no grid, never a second one of pattern notes.
+  const unmatched = grid.walked.unmatched
+    ?? (played ? null : 'the TFMX decoder did not report the pitches it plays, and the grid shows only those');
+  if (!unmatched) {
+    // A typed key plays the pitch the grid names: the keyboard voice subtracts the instrument's sequence transpose.
+    const keySeqs = hippelKeySeqs(grid.walked);
+    for (const inst of instruments) {
+      const seq = keySeqs.get(inst.id);
+      if (seq !== undefined && seq !== 0) inst.metadata = { ...inst.metadata, hippelKeySeq: seq };
+    }
+  }
+  if (!unmatched) grid.rows.forEach((channelRows, patIdx) => {
     const step = grid.walked.steps[patIdx].step;
     trackerPatterns.push({
       id: `pattern-${patIdx}`,
@@ -576,7 +587,6 @@ function buildHippelTfmxSong(buffer: ArrayBuffer, filename: string, songOff: num
   });
 
   // No guessed grid: an empty pattern, and the scope view with the reason.
-  const unmatched = grid.walked.unmatched;
   if (trackerPatterns.length === 0) {
     const emptyRows: TrackerCell[] = Array.from({ length: 32 }, () => emptyCell());
     trackerPatterns.push({
