@@ -393,7 +393,7 @@ export async function parseJasonPageFile(
         instruments.push(
           createSamplerInstrument(
             i + 1,
-            `Sample ${i + 1}`,
+            '',
             pcm,
             64,
             8287,
@@ -404,7 +404,7 @@ export async function parseJasonPageFile(
       } else {
         instruments.push({
           id: i + 1,
-          name: `Sample ${i + 1}`,
+          name: '',
           type: 'synth' as const,
           synthType: 'Synth' as const,
           effects: [],
@@ -423,7 +423,7 @@ export async function parseJasonPageFile(
     for (let i = 0; i < MAX_SAMPLES; i++) {
       instruments.push({
         id: i + 1,
-        name: `Sample ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],

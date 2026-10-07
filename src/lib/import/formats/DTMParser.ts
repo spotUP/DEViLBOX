@@ -489,7 +489,7 @@ export async function parseDTMFile(
       // Placeholder for empty instrument slot
       instruments.push({
         id,
-        name:      `Sample ${id}`,
+        name:      '',
         type:      'sample'  as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -505,7 +505,7 @@ export async function parseDTMFile(
     if (!rawPCM || rawPCM.length === 0) {
       instruments.push({
         id,
-        name:      hdr.name || `Sample ${id}`,
+        name:      hdr.name || '',
         type:      'sample'  as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -548,7 +548,7 @@ export async function parseDTMFile(
 
     const inst = createSamplerInstrument(
       id,
-      hdr.name || `Sample ${id}`,
+      hdr.name || '',
       pcm8,
       hdr.volume,
       sampleRate,

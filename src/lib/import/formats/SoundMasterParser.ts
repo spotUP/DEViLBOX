@@ -165,7 +165,7 @@ function stripSoundMasterPrefix(name: string): string {
 function recordInstrument(song: SmSong, i: number): InstrumentConfig {
   const m = song.module;
   const rec = m.instruments[i];
-  const name = `Instrument ${i + 1}`;
+  const name = '';
   const placeholder = { id: i + 1, name, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig;
   const sample = (rec[10] ? m.wave[rec[9]] ?? 0 : rec[0]) & 31;
   const slot = m.samples[sample];

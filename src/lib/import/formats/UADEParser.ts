@@ -2383,7 +2383,7 @@ function buildClassicSong(
   for (const [, instrId] of sampleMap) {
     instruments.push({
       id: instrId,
-      name: `Sample ${String(instrId - 1).padStart(2, '0')}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'Sampler' as const,
       effects: [],

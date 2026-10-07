@@ -325,7 +325,7 @@ export async function parse669File(
 
   const instruments: InstrumentConfig[] = sampleHeaders.map((hdr, i) => {
     const id   = i + 1;
-    const name = hdr.filename || `Sample ${id}`;
+    const name = hdr.filename || '';
 
     if (hdr.length === 0 || hdr.length >= 0x4000000) {
       return {

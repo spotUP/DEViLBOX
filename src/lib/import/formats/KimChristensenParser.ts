@@ -256,11 +256,11 @@ export function parseKimChristensenFile(buffer: ArrayBuffer, filename: string): 
       if (fileOff + length <= buf.length && length > 0) {
         const pcm = buf.slice(fileOff, fileOff + length);
         instruments.push(createSamplerInstrument(
-          i + 1, `KIM Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+          i + 1, '', pcm, 64, 8287, 0, 0,
         ));
       } else {
         instruments.push({
-          id: i + 1, name: `KIM Sample ${i + 1}`, type: 'synth' as const,
+          id: i + 1, name: '', type: 'synth' as const,
           synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
         } as InstrumentConfig);
       }
@@ -269,7 +269,7 @@ export function parseKimChristensenFile(buffer: ArrayBuffer, filename: string): 
 
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
   }

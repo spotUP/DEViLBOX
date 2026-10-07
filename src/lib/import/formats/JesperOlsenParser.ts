@@ -251,7 +251,7 @@ export function parseJesperOlsenFile(buffer: ArrayBuffer, filename: string, subs
   const instruments: InstrumentConfig[] = table.map((at, i) => {
     const ins = m.instruments.find((x) => x.at === at)!;
     const { pcm, loopStart, loopEnd } = instrumentSample(m, buf, ins);
-    const name = iffName(buf, ins) || `Instrument ${i + 1}`;
+    const name = iffName(buf, ins) || '';
     if (pcm.length === 0) {
       return { id: i + 1, name, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig;
     }

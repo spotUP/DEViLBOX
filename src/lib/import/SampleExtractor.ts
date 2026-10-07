@@ -172,7 +172,7 @@ function extractMOD(data: Uint8Array): ExtractionResult {
     }
 
     samples.push({
-      name: header.name || `Sample ${i + 1}`,
+      name: header.name || '',
       sampleRate: 8363,  // Standard Amiga sample rate
       channels: 1,
       bitDepth: 8,
@@ -294,7 +294,7 @@ function extractXM(data: Uint8Array): ExtractionResult {
       else if ((info.type & 0x03) === 2) loopType = 'pingpong';
 
       samples.push({
-        name: info.name || instName || `Sample ${samples.length + 1}`,
+        name: info.name || instName || '',
         sampleRate: 8363,  // Will be adjusted by relNote
         channels: 1,
         bitDepth: is16Bit ? 16 : 8,
@@ -374,7 +374,7 @@ function extractS3M(data: Uint8Array): ExtractionResult {
     }
 
     samples.push({
-      name: name || `Sample ${i + 1}`,
+      name: name || '',
       sampleRate: c4Speed || 8363,
       channels: 1,  // We only handle mono for now
       bitDepth: is16Bit ? 16 : 8,
@@ -482,7 +482,7 @@ function extractIT(data: Uint8Array): ExtractionResult {
     if (isLooped) loopType = isPingPong ? 'pingpong' : 'forward';
 
     samples.push({
-      name: name || `Sample ${i + 1}`,
+      name: name || '',
       sampleRate: c5Speed || 8363,
       channels: 1, // Only mono extraction supported
       bitDepth: is16Bit ? 16 : 8,

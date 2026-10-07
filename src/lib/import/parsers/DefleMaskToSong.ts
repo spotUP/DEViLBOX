@@ -63,7 +63,7 @@ export function parseDefleMaskToTrackerSong(buffer: ArrayBuffer, fileName: strin
   // Build instruments as ChipSynth placeholders
   const instruments: InstrumentConfig[] = dmf.instruments.map((inst, idx) => ({
     id: idx + 1,
-    name: inst.name || `Instrument ${idx + 1}`,
+    name: inst.name || '',
     type: 'synth' as const,
     synthType: 'ChipSynth' as const,
     chipType: dmf.system.chipType,

@@ -239,7 +239,7 @@ function parseMusicMakerFile(
 
         instruments.push(createSamplerInstrument(
           i + 1,
-          inamNames.get(i) ?? `Sample ${i + 1}`,
+          inamNames.get(i) ?? '',
           pcm,
           64,               // default volume (max)
           AMIGA_SAMPLE_RATE,
@@ -950,7 +950,7 @@ export function parseMusicMakerSongFile(
   for (let i = 0; i < instruments.count; i++) {
     if (!instruments.lens[i * 4] && !names[i]) continue;
     instrumentConfigs.push({
-      id: i + 1, name: names[i] || `Instrument ${i + 1}`, type: 'synth' as const,
+      id: i + 1, name: names[i] || '', type: 'synth' as const,
       synthType: 'MusicMakerSynth' as const, effects: [] as [], volume: 0, pan: 0,
     });
   }

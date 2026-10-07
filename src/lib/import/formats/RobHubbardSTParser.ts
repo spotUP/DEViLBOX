@@ -451,7 +451,7 @@ export function parseRobHubbardSTFile(buffer: ArrayBuffer, filename: string, _mo
   const moduleName = baseName.replace(/^rho\./i, '').replace(/\.rho$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
+    id: 1, name: '', type: 'synth' as const,
     synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig];
 
@@ -479,7 +479,7 @@ export function parseRobHubbardSTFile(buffer: ArrayBuffer, filename: string, _mo
       while (instruments.length < maxInstr) {
         instruments.push({
           id: instruments.length + 1,
-          name: `Sample ${instruments.length + 1}`,
+          name: '',
           type: 'synth' as const,
           synthType: 'Synth' as const,
           effects: [],

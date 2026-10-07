@@ -493,7 +493,7 @@ function convertFurnaceInstrument(
   // Create the instrument config
   const instrument: InstrumentConfig = {
     id: instrumentId,
-    name: parsed.name || `Furnace Inst ${instrumentId}`,
+    name: parsed.name || '',
     type: 'synth' as const,
     synthType,
     envelope: {
@@ -598,7 +598,7 @@ function convertSampleToInstrument(
   // Create instrument
   const instrument: InstrumentConfig = {
     id: instrumentId,
-    name: sample.name || parentInstrument.name || `Instrument ${instrumentId}`,
+    name: sample.name || parentInstrument.name || '',
     type: 'sample' as const,
     synthType: 'Sampler',
     sample: sampleConfig,

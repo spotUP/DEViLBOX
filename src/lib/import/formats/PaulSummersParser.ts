@@ -95,7 +95,7 @@ export function parsePaulSummersFile(buffer: ArrayBuffer, filename: string): Tra
   const instruments: InstrumentConfig[] = [
     {
       id: 1,
-      name: 'Sample 1',
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

@@ -631,7 +631,7 @@ export async function parseRTMFile(
     const insBodyLen = Math.min(insObjHdr.objectSize, 341);
     if (cursor + insBodyLen > buffer.byteLength) {
       // Instrument body unreadable — emit blank and stop
-      instruments.push(blankInstrument(sampleSeq + 1, insObjHdr.name || `Instrument ${instr + 1}`));
+      instruments.push(blankInstrument(sampleSeq + 1, insObjHdr.name || ''));
       sampleSeq++;
       break;
     }
@@ -639,7 +639,7 @@ export async function parseRTMFile(
     const insHdr = readInstrumentHeader(v, cursor, insBodyLen);
     cursor       += insObjHdr.objectSize;
 
-    const instrName  = insObjHdr.name || `Instrument ${instr + 1}`;
+    const instrName  = insObjHdr.name || '';
     const numSamples = insHdr.numSamples;
 
     if (numSamples === 0) {

@@ -79,7 +79,7 @@ export async function parseSpeedySystemFile(
 
   const instruments: InstrumentConfig[] = Array.from({ length: 16 }, (_, i) => ({
     id:        i + 1,
-    name:      `Sample ${i + 1}`,
+    name:      '',
     type:      'synth' as const,
     synthType: 'Synth' as const,
     effects:   [],

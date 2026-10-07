@@ -34,7 +34,6 @@ import {
   sunSynthToConfig,
 } from './SunTronicV13';
 import type { SunV13Score, SunCmdWidths } from './SunTronicV13';
-import { sunSynthDescriptiveName } from '@/lib/suntronic/synthName';
 import { decodeSunGroup, encodeSunGroup } from './sunGroupCodec';
 import { decodeSunBlockPool, buildSunTronicNativeData, buildPoolRowIndex } from './sunNativeData';
 import { walkSunTronic, sunWalkClockSkew } from '@/engine/suntronic/SunTronicWalk';
@@ -473,7 +472,7 @@ function buildV13Instruments(
 
   for (let i = 0; i < score.sampledInstruments.length; i++) {
     const rec = score.sampledInstruments[i];
-    const name = score.instrumentNames[rec.slotIndex] ?? `Sample ${i + 1}`;
+    const name = score.instrumentNames[rec.slotIndex] ?? '';
     const data = findV13Companion(companionFiles, name);
     const byteLen = rec.lengthWords * 2;
     if (data && data.byteLength > 0) {
@@ -505,7 +504,7 @@ function buildV13Instruments(
       // Derive a descriptive name from the decoded synthesis type + arp/vibrato
       // presence (the format stores no name for synth records). Falls back to a
       // bare `Synth N` for slots that don't decode.
-      name: rec ? sunSynthDescriptiveName(sunSynthToConfig(rec), i) : `Synth ${i + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: rec ? ('SunTronicSynth' as const) : ('Synth' as const),
       sunTronic: rec ? sunSynthToConfig(rec) : undefined,

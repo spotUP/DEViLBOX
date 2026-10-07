@@ -126,7 +126,7 @@ export function parseImagesMusicSystemFile(buffer: ArrayBuffer, filename: string
 
   for (let i = 0; i < MAX_SAMPLES; i++) {
     const descOff = 20 + i * 30;
-    const name = readAmigaStr(buf, descOff, 22) || `IMS Sample ${i + 1}`;
+    const name = readAmigaStr(buf, descOff, 22) || '';
     const lenWords = u16BE(buf, descOff + 22);
     const lenBytes = lenWords * 2;
     const loopStart = u16BE(buf, descOff + 26) * 2;

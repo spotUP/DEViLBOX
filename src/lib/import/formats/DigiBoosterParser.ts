@@ -234,7 +234,7 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
     if (sampleIdx < 0 || sampleIdx >= dbSamples.length) {
       return {
         id: i + 1,
-        name: instr.name || `Instrument ${i + 1}`,
+        name: instr.name || '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],
@@ -263,7 +263,7 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
 
     return createSamplerInstrument(
       i + 1,
-      instr.name || samp.name || `Sample ${i + 1}`,
+      instr.name || samp.name || '',
       pcm8,
       samp.volume,
       8287,
@@ -594,7 +594,7 @@ function parseOriginalDigiBooster(buf: Uint8Array, filename: string): TrackerSon
     if (s.length === 0) {
       instruments.push({
         id,
-        name: s.name || `Sample ${id}`,
+        name: s.name || '',
         type: 'sample' as const,
         synthType: 'Sampler' as const,
         effects: [],
@@ -609,7 +609,7 @@ function parseOriginalDigiBooster(buf: Uint8Array, filename: string): TrackerSon
     if (pcmLen <= 0) {
       instruments.push({
         id,
-        name: s.name || `Sample ${id}`,
+        name: s.name || '',
         type: 'sample' as const,
         synthType: 'Sampler' as const,
         effects: [],
@@ -625,7 +625,7 @@ function parseOriginalDigiBooster(buf: Uint8Array, filename: string): TrackerSon
 
     const hasLoop = s.loopLength > 2;
     const loopEnd = hasLoop ? s.loopStart + s.loopLength : 0;
-    const inst = createSamplerInstrument(id, s.name || `Sample ${id}`, pcm, s.volume, 8287, s.loopStart, loopEnd);
+    const inst = createSamplerInstrument(id, s.name || '', pcm, s.volume, 8287, s.loopStart, loopEnd);
     instruments.push(inst);
   }
 

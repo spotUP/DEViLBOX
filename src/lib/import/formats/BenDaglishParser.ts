@@ -682,7 +682,7 @@ export async function parseBenDaglishFile(
           const loopEndBytes = hasLoop ? loopStartBytes + loopLenWords * 2 : 0;
 
           instruments.push(createSamplerInstrument(
-            i + 1, `BD Sample ${i + 1}`, pcm, 64, 8287,
+            i + 1, '', pcm, 64, 8287,
             Math.max(0, loopStartBytes), Math.max(0, loopEndBytes)
           ));
           samplesExtracted = true;
@@ -696,7 +696,7 @@ export async function parseBenDaglishFile(
     for (let i = 0; i < DEFAULT_INSTRUMENTS; i++) {
       instruments.push({
         id: i + 1,
-        name: `BD Sample ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'BenDaglishSynth' as const,
         effects: [],

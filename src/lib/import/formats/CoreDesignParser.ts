@@ -189,7 +189,7 @@ function extractCoreDesignSamples(buf: Uint8Array, codeStart: number): Instrumen
     const sampleAreaRelative = u32BE(buf, entryOff + 6);
     if (sampleAreaRelative === 0) {
       instruments.push({
-        id: i + 1, name: `CORE Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
       continue;
@@ -198,7 +198,7 @@ function extractCoreDesignSamples(buf: Uint8Array, codeStart: number): Instrumen
     const sampleAreaFileOff = sampleAreaRelative + codeStart;
     if (sampleAreaFileOff + 2 > buf.length) {
       instruments.push({
-        id: i + 1, name: `CORE Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
       continue;
@@ -212,11 +212,11 @@ function extractCoreDesignSamples(buf: Uint8Array, codeStart: number): Instrumen
     if (lengthBytes > 0 && lengthBytes < 0x100000 && pcmStart + lengthBytes <= buf.length) {
       const pcm = buf.slice(pcmStart, pcmStart + lengthBytes);
       instruments.push(createSamplerInstrument(
-        i + 1, `CORE Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+        i + 1, '', pcm, 64, 8287, 0, 0,
       ));
     } else {
       instruments.push({
-        id: i + 1, name: `CORE Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
     }
@@ -273,7 +273,7 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
   // Fallback: single placeholder instrument
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
   }

@@ -2805,7 +2805,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
 
     return {
       id: idx + 1,
-      name: inst.name || `Instrument ${idx + 1}`,
+      name: inst.name || '',
       samples,
       fadeout: 0,
       volumeType: 'none' as const,

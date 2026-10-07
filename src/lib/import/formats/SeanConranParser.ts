@@ -153,7 +153,7 @@ export async function parseSeanConranFile(
   for (let i = 0; i < NUM_PLACEHOLDER_INSTRUMENTS; i++) {
     instruments.push({
       id: i + 1,
-      name: `Sample ${i + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

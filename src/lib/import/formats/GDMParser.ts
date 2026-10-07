@@ -444,7 +444,7 @@ export async function parseGDMFile(
     if (sampleHeaderCursor + SAMPLE_HEADER_SIZE > buffer.byteLength) break;
 
     sampleInfos.push({
-      name:      readString(v, sampleHeaderCursor + 0,  32) || `Sample ${s + 1}`,
+      name:      readString(v, sampleHeaderCursor + 0,  32) || '',
       fileName:  readString(v, sampleHeaderCursor + 32, 12),
       length:    u32le(v, sampleHeaderCursor + 45),
       loopBegin: u32le(v, sampleHeaderCursor + 49),

@@ -161,7 +161,7 @@ export function parseSpecialFXFile(buffer: ArrayBuffer, filename: string): Track
         for (let i = 0; i < sampleCount; i++) {
           instruments.push({
             id: i + 1,
-            name: `Sample ${i + 1} (${candidates[i]} bytes)`,
+            name: '',
             type: 'synth' as const,
             synthType: 'Synth' as const,
             effects: [],
@@ -189,7 +189,7 @@ export function parseSpecialFXFile(buffer: ArrayBuffer, filename: string): Track
         for (let i = 0; i < sampleCount; i++) {
           instruments.push({
             id: i + 1,
-            name: `Sample ${i + 1} (${candidates6[i]} bytes)`,
+            name: '',
             type: 'synth' as const,
             synthType: 'Synth' as const,
             effects: [],
@@ -207,7 +207,7 @@ export function parseSpecialFXFile(buffer: ArrayBuffer, filename: string): Track
   // Fallback: single placeholder
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
     sampleCount = 1;

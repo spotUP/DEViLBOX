@@ -154,7 +154,7 @@ export async function parseBenDaglishSIDFile(
   for (let i = 0; i < 3; i++) {
     instruments.push({
       id: i + 1,
-      name: `SID Voice ${i + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

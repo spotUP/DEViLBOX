@@ -331,7 +331,7 @@ function decompressMDL16(src: Uint8Array, numSamples: number): Int16Array {
 function blankInstrument(id: number, name: string): InstrumentConfig {
   return {
     id,
-    name: name || `Sample ${id}`,
+    name: name || '',
     type:      'sample'  as const,
     synthType: 'Sampler' as const,
     effects:   [],
@@ -399,7 +399,7 @@ function createSamplerInstrument16(
 
   return {
     id,
-    name: name.replace(/\0/g, '').trim() || `Sample ${id}`,
+    name: name.replace(/\0/g, '').trim() || '',
     type:      'sample'  as const,
     synthType: 'Sampler' as const,
     effects:   [],
@@ -828,7 +828,7 @@ export async function parseMDLFile(
 
         // Read sample data from SA chunk
         if (!saChunk || smpLength === 0 || saOff >= saEnd) {
-          instruments[sampleIndex] = blankInstrument(sampleIndex, smpName || `Sample ${sampleIndex}`);
+          instruments[sampleIndex] = blankInstrument(sampleIndex, smpName || '');
           continue;
         }
 
@@ -851,12 +851,12 @@ export async function parseMDLFile(
               pcm16[i] = (smpRaw[i * 2 + 1] << 8) | smpRaw[i * 2];
             }
             instruments[sampleIndex] = createSamplerInstrument16(
-              sampleIndex, smpName || `Sample ${sampleIndex}`,
+              sampleIndex, smpName || '',
               pcm16, smpVolume, sampleRate, loopStart, loopEnd,
             );
           } else {
             instruments[sampleIndex] = createSamplerInstrument(
-              sampleIndex, smpName || `Sample ${sampleIndex}`,
+              sampleIndex, smpName || '',
               smpRaw, Math.round(smpVolume * 64 / 255), sampleRate, loopStart, loopEnd,
             );
           }
@@ -880,7 +880,7 @@ export async function parseMDLFile(
             }
           }
           instruments[sampleIndex] = createSamplerInstrument16(
-            sampleIndex, smpName || `Sample ${sampleIndex}`,
+            sampleIndex, smpName || '',
             pcm16, smpVolume, sampleRate, loopStart, loopEnd,
           );
         } else {
@@ -891,7 +891,7 @@ export async function parseMDLFile(
             pcm8 = smpRaw;
           }
           instruments[sampleIndex] = createSamplerInstrument(
-            sampleIndex, smpName || `Sample ${sampleIndex}`,
+            sampleIndex, smpName || '',
             pcm8, Math.round(smpVolume * 64 / 255), sampleRate, loopStart, loopEnd,
           );
         }

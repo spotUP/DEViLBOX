@@ -116,7 +116,7 @@ export function parseCinter4File(bytes: Uint8Array, filename: string): TrackerSo
     const replength = readU16BE();
     rawConfigs.push({
       id: r + 1,
-      name: `Raw Sample ${r + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'Cinter4Synth' as const,
       effects: [],
@@ -166,7 +166,7 @@ export function parseCinter4File(bytes: Uint8Array, filename: string): TrackerSo
     const version = cinter4DetectVersion(words);
     const params = cinter4WordsToParams(words, version);
     const id = nRaw + inst.index + 1;
-    return buildCinter4Instrument(id, `Instrument ${id}`, {
+    return buildCinter4Instrument(id, '', {
       params,
       lengthWords: inst.length,
       replenWords: inst.replength,

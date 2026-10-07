@@ -156,7 +156,7 @@ export function parseSynTrackerFile(buffer: ArrayBuffer, filename: string): Trac
   // Instruments (display-only — audio comes from UADE)
   const instruments: InstrumentConfig[] = [];
   for (let i = 0; i < Math.max(numSamples, 1); i++) {
-    const name = sampleNames[i] || (i < 16 ? `Synth Wave ${i}` : `Sample ${i}`);
+    const name = sampleNames[i] || '';
     instruments.push({
       id: i + 1,
       name,

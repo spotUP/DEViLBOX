@@ -462,12 +462,12 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
       const loopEnd   = isOneShot ? 0 : rawPcm.length;
 
       instrConfigs.push(
-        createSamplerInstrument(id, `Instrument ${id}`, rawPcm, 64, c3Rate, loopStart, loopEnd)
+        createSamplerInstrument(id, '', rawPcm, 64, c3Rate, loopStart, loopEnd)
       );
     } else {
       instrConfigs.push({
         id,
-        name: `Instrument ${id}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'SoundFactory2WasmSynth' as const,
         effects: [],

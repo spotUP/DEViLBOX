@@ -655,7 +655,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const rkConfig = buildRonKlarenConfig(instr, undefined);
       instrumentConfigs.push({
         id,
-        name: `Instrument ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'RonKlarenSynth' as const,
         ronKlaren: rkConfig,
@@ -676,7 +676,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const loopStart = instr.isSample ? 0 : 0;
       const loopEnd = (!instr.isSample && pcmBytes.length > 0) ? pcmBytes.length : 0;
 
-      const samplerInstr = createSamplerInstrument(id, instr.isSample ? `Sample ${i + 1}` : `Synth ${i + 1}`, pcmBytes, 64, sampleRate, loopStart, loopEnd);
+      const samplerInstr = createSamplerInstrument(id, '', pcmBytes, 64, sampleRate, loopStart, loopEnd);
       // Attach RonKlaren config to all instruments (sample or synthesis)
       const rkConfig = buildRonKlarenConfig(instr, pcm);
       samplerInstr.ronKlaren = rkConfig;
@@ -686,7 +686,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const rkConfig = buildRonKlarenConfig(instr, undefined);
       instrumentConfigs.push({
         id,
-        name: `Instrument ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'RonKlarenSynth' as const,
         ronKlaren: rkConfig,

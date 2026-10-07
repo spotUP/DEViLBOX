@@ -646,7 +646,7 @@ export function convertHivelyToTrackerSong(mod: HivelyModule, fileName: string):
   // ── Convert instruments ──
   const instruments: InstrumentConfig[] = mod.instruments.map((ins, idx) => ({
     id: idx + 1,
-    name: ins.name || `Instrument ${idx + 1}`,
+    name: ins.name || '',
     type: 'synth' as const,
     synthType: 'HivelySynth' as const,
     effects: [],

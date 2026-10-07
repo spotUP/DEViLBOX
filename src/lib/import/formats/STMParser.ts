@@ -506,7 +506,7 @@ export async function parseSTMFile(
   // Instruments
   const instruments: InstrumentConfig[] = sampleHeaders.map((hdr, i) => {
     const id   = i + 1;
-    const name = hdr.filename.replace(/\0/g, '').trim() || `Sample ${id}`;
+    const name = hdr.filename.replace(/\0/g, '').trim() || '';
 
     const sampleFileOff = hdr.offset << 4;
     const length        = hdr.length;

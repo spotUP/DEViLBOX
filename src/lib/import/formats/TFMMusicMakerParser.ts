@@ -167,7 +167,7 @@ export async function parseTfmMusicMakerFile(buffer: ArrayBuffer | Uint8Array, f
     const at = layout.instrumentNames + (id - 1) * 16;
     const blank = h.subarray(at, at + 16).every((c) => c === 0xff);
     return {
-      id, name: (blank ? '' : text(h, at, 16)) || `Instrument ${id}`,
+      id, name: (blank ? '' : text(h, at, 16)) || '',
       type: 'synth' as const, synthType: 'TFMSynth' as const, effects: [] as [], volume: 0, pan: 0,
     };
   });

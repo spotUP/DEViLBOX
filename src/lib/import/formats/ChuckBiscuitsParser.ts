@@ -407,7 +407,7 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
 
   const instruments: InstrumentConfig[] = sampleHeaders.map((hdr, i) => {
     const id   = i + 1;
-    const name = hdr.name || `Sample ${id}`;
+    const name = hdr.name || '';
     const pcm  = decodedSamples[i];
 
     if (!pcm || pcm.length === 0) {

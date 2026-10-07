@@ -360,7 +360,7 @@ export async function parseDaveLoweFile(
         // Empty/invalid sample — create a silent placeholder
         instruments.push({
           id: i + 1,
-          name: `Sample ${i + 1}`,
+          name: '',
           type: 'synth' as const,
           synthType: 'Synth' as const,
           effects: [],
@@ -381,7 +381,7 @@ export async function parseDaveLoweFile(
 
       instruments.push(createSamplerInstrument(
         i + 1,
-        embeddedAuthor ? `${embeddedAuthor} ${i + 1}` : `DL Sample ${i + 1}`,
+        embeddedAuthor ? `${embeddedAuthor} ${i + 1}` : '',
         pcm, 64, 8287,
         loopStart, loopEnd,
       ));
@@ -392,7 +392,7 @@ export async function parseDaveLoweFile(
   if (instruments.length === 0) {
     instruments.push({
       id: 1,
-      name: 'Sample 1',
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

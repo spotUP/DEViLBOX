@@ -114,7 +114,7 @@ export function parseFredGrayFile(buffer: ArrayBuffer, filename: string): Tracke
         for (let i = 0; i < sampleCount; i++) {
           instruments.push({
             id: i + 1,
-            name: `Sample ${i + 1}`,
+            name: '',
             type: 'synth' as const,
             synthType: 'Synth' as const,
             effects: [],
@@ -131,7 +131,7 @@ export function parseFredGrayFile(buffer: ArrayBuffer, filename: string): Tracke
   // Fallback: single placeholder
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
     sampleCount = 1;

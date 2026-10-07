@@ -574,7 +574,7 @@ export async function parseSidMon2File(
 
     trackerInstruments.push({
       id: i,
-      name: smp?.name || `Instrument ${i}`,
+      name: smp?.name || '',
       type: 'synth' as const,
       synthType: 'SidMonSynth' as const,
       sidMon: config,

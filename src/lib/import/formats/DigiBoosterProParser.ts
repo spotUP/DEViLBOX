@@ -448,7 +448,7 @@ function buildInstrumentConfig(
 
   const hasLoop = inst.loopLength > 0 && (inst.flags & 3) !== 0;
   const loopEnd = hasLoop ? inst.loopStart + inst.loopLength : 0;
-  const name    = inst.name || `Instrument ${id}`;
+  const name    = inst.name || '';
 
   if (!pcm || pcm.frames === 0 || pcm.data.length === 0) {
     return {

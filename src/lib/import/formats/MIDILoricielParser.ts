@@ -701,7 +701,7 @@ export function parseMIDILoricielFile(buffer: ArrayBuffer, filename: string, com
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^midi\./i, '').replace(/\.mid$/i, '') || baseName;
   const instruments: InstrumentConfig[] = dec.bank.samples.map((s, i) =>
-    createSamplerInstrument(i + 1, `Sample ${i + 1}`, bankBytes.subarray(s.data, s.data + s.length), 64, 8287, 0, 0));
+    createSamplerInstrument(i + 1, '', bankBytes.subarray(s.data, s.data + s.length), 64, 8287, 0, 0));
   const patterns = toPatterns(dec.grid, dec.layout, filename);
   const firstTimer = dec.schedule.tempos.filter((t) => t.row === 0).pop()?.timer ?? loricielTimer(LORICIEL_DEFAULT_TEMPO, dec.schedule.division);
 

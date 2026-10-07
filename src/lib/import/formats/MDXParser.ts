@@ -711,7 +711,7 @@ export function parseMDXFile(buffer: ArrayBuffer): TrackerSong {
     const voice = allVoices.get(voiceNum)!;
     const instId = i + 1;
     voiceToInstId.set(voiceNum, instId);
-    instruments.push(opmVoiceToInstrument(voice, instId, `OPM Voice ${voiceNum}`));
+    instruments.push(opmVoiceToInstrument(voice, instId, ''));
   }
 
   // If no voices were extracted, create a default OPM instrument

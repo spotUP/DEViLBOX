@@ -46,12 +46,12 @@ function instrumentConfigs(m: ActionamicsModule, size: number): InstrumentConfig
       const loopStart = sample.loopLength > 1 ? sample.loopStart * 2 : 0;
       const loopEnd = sample.loopLength > 1 ? (sample.loopStart + sample.loopLength) * 2 : 0;
       // 8287 Hz: the Amiga PAL C-3 rate; the sample header's effect speed is a modulation counter, not a rate.
-      const instr = createSamplerInstrument(id, sample.name || `Instrument ${id}`, new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 64, 8287, loopStart, loopEnd);
+      const instr = createSamplerInstrument(id, sample.name || '', new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 64, 8287, loopStart, loopEnd);
       instr.uadeChipRam = chipRam;
       return instr;
     }
     return {
-      id, name: sample?.name || `Instrument ${id}`, type: 'synth' as const, synthType: 'ActionamicsWasmSynth' as const,
+      id, name: sample?.name || '', type: 'synth' as const, synthType: 'ActionamicsWasmSynth' as const,
       effects: [], volume: 0, pan: 0, uadeChipRam: chipRam,
     } as InstrumentConfig;
   });

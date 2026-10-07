@@ -264,7 +264,7 @@ export async function parseJamCrackerFile(
     const isAM    = (inst.flags & 0x02) !== 0;
     const hasLoop = (inst.flags & 0x01) !== 0;
     const pcm     = sampleBuffers[i];
-    const name    = inst.name || `Sample ${i + 1}`;
+    const name    = inst.name || '';
 
     // Build JamCracker-specific config for all instruments
     const jcConfig: JamCrackerConfig = {

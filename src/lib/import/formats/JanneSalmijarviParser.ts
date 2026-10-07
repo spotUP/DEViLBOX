@@ -80,7 +80,7 @@ export function parseJanneSalmijarviFile(buffer: ArrayBuffer, filename: string):
 
   for (let i = 0; i < 31; i++) {
     const descOff = 20 + i * 30;
-    const name = readAmigaStr(buf, descOff, 22) || `JS Sample ${i + 1}`;
+    const name = readAmigaStr(buf, descOff, 22) || '';
     const lenWords = u16BE(buf, descOff + 22);
     const lenBytes = lenWords * 2;
     const loopStart = u16BE(buf, descOff + 26) * 2;
@@ -104,7 +104,7 @@ export function parseJanneSalmijarviFile(buffer: ArrayBuffer, filename: string):
 
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
   }

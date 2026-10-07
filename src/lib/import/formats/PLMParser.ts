@@ -317,7 +317,7 @@ export async function parsePLMFile(
     }
 
     const smpHeaderSize  = u8(v, smpOff + 4);
-    const smpName        = readString(v, smpOff + 6, 32) || `Sample ${smp + 1}`;
+    const smpName        = readString(v, smpOff + 6, 32) || '';
     const panningByte    = u8(v, smpOff + 50);
     const volume         = Math.min(u8(v, smpOff + 51), 64);
     const flags          = u8(v, smpOff + 52);
@@ -642,9 +642,9 @@ function makeEmptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
 }
 
-function makeEmptySampleMeta(idx: number): PLMSampleMeta {
+function makeEmptySampleMeta(_idx: number): PLMSampleMeta {
   return {
-    name:       `Sample ${idx + 1}`,
+    name:       '',
     panning:    null,
     volume:     64,
     is16Bit:    false,

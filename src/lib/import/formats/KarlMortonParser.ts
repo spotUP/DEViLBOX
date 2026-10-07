@@ -510,7 +510,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     if (!sc) continue;
 
     const id   = i + 1;
-    const name = sc.name || `Sample ${id}`;
+    const name = sc.name || '';
 
     if (sc.size === 0 || sc.dataOffset + sc.size > bytes.length) {
       const kmSilentChipRam: UADEChipRamInfo = {

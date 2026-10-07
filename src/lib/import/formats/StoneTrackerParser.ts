@@ -184,7 +184,7 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
     const at = 6 + (id - 1) * 32;
     const name = id <= nbSamples ? text(bank, at, 8) : '';
     return {
-      id, name: name || `Sample ${id}`,
+      id, name: name || '',
       type: 'synth' as const, synthType: 'StoneTrackerSynth' as const, effects: [] as [], volume: 0, pan: 0,
     };
   });

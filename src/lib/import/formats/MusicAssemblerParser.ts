@@ -663,7 +663,7 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
       // No sample data — placeholder
       instrumentConfigs.push({
         id:         instrId,
-        name:       `Instrument ${instrId}`,
+        name:       '',
         type:       'synth' as const,
         synthType:  'MusicAssemblerSynth' as const,
         effects:    [],
@@ -680,7 +680,7 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
       // Synthesis wavetable — no real PCM; create synth placeholder
       instrumentConfigs.push({
         id:         instrId,
-        name:       si.name || `Instrument ${instrId}`,
+        name:       si.name || '',
         type:       'synth' as const,
         synthType:  'MusicAssemblerSynth' as const,
         effects:    [],
@@ -696,7 +696,7 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
       if (dataOff + lengthBytes > bytes.length) {
         instrumentConfigs.push({
           id:         instrId,
-          name:       si.name || `Instrument ${instrId}`,
+          name:       si.name || '',
           type:       'synth' as const,
           synthType:  'MusicAssemblerSynth' as const,
           effects:    [],
@@ -718,13 +718,13 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
       }
 
       instrumentConfigs.push(
-        createSamplerInstrument(instrId, si.name || `Sample ${sIdx}`, pcm, 64, PCM_BASE_RATE, loopStart, loopEnd)
+        createSamplerInstrument(instrId, si.name || '', pcm, 64, PCM_BASE_RATE, loopStart, loopEnd)
       );
     } else {
       // Length == 0 or 1 → empty
       instrumentConfigs.push({
         id:         instrId,
-        name:       si.name || `Instrument ${instrId}`,
+        name:       si.name || '',
         type:       'synth' as const,
         synthType:  'MusicAssemblerSynth' as const,
         effects:    [],

@@ -564,7 +564,7 @@ export async function parseSymphonieProFile(
           const loopStart = Math.floor((si.loopStart / (100 * 65536)) * si.samples.length);
           const loopEnd = Math.floor(((si.loopStart + si.loopLen) / (100 * 65536)) * si.samples.length);
 
-          inst['name'] = si.name || `Instrument ${i + 1}`;
+          inst['name'] = si.name || '';
           inst['volume'] = si.volume > 0 ? -12 + (si.volume / 100) * 12 : -60;
           inst['sample'] = {
             audioBuffer: wavBuffer,
@@ -813,7 +813,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   const instruments: InstrumentConfig[] = cappedInstruments.length > 0
     ? cappedInstruments.map((si, i) => ({
         id:        i + 1,
-        name:      si.name || `Instrument ${i + 1}`,
+        name:      si.name || '',
         type:      'synth' as const,
         synthType: 'SymphonieSynth' as SynthType,
         effects:   [],
@@ -1805,7 +1805,7 @@ export async function parseSymphonieForPlayback(
     }
 
     instruments.push({
-      name:           si.name || `Instrument ${i + 1}`,
+      name:           si.name || '',
       type:           si.type,
       volume,
       tune,
@@ -1824,7 +1824,7 @@ export async function parseSymphonieForPlayback(
   // Trim trailing empty instruments (no sample data, no name, Silent/Kill type)
   while (instruments.length > 0) {
     const last = instruments[instruments.length - 1];
-    if (last.samples !== null || (last.type >= 0 && last.name !== `Instrument ${instruments.length}`)) break;
+    if (last.samples !== null || (last.type >= 0 && last.name !== '')) break;
     instruments.pop();
   }
 

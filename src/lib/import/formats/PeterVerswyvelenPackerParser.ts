@@ -293,7 +293,7 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
     if (length > 0) {
       instruments.push({
         id: i + 1,
-        name: `Sample ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],
@@ -316,7 +316,7 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
     while (instruments.length < extracted.instrumentCount) {
       instruments.push({
         id: instruments.length + 1,
-        name: `Sample ${instruments.length + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],
@@ -352,7 +352,7 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
     if (instruments.length === 0) {
       instruments.push({
         id: 1,
-        name: 'Sample 1',
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],

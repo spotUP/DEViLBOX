@@ -331,11 +331,11 @@ export function parseMartinWalkerFile(buffer: ArrayBuffer, filename: string): Tr
       if (sampleLen > 0 && sampleLen < 0x100000 && pcmFileOff + sampleLen <= buf.length) {
         const pcm = buf.slice(pcmFileOff, pcmFileOff + sampleLen);
         instruments.push(createSamplerInstrument(
-          i + 1, `MW Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+          i + 1, '', pcm, 64, 8287, 0, 0,
         ));
       } else {
         instruments.push({
-          id: i + 1, name: `MW Sample ${i + 1}`, type: 'synth' as const,
+          id: i + 1, name: '', type: 'synth' as const,
           synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
         } as InstrumentConfig);
       }
@@ -345,7 +345,7 @@ export function parseMartinWalkerFile(buffer: ArrayBuffer, filename: string): Tr
   // Fallback: single placeholder instrument
   if (instruments.length === 0) {
     instruments.push({
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
   }

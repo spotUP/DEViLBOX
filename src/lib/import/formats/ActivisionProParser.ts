@@ -551,7 +551,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         const loopEnd   = hasLoop ? s.loopStart + s.loopLength : 0;
 
         instrumentConfigs.push(
-          createSamplerInstrument(id, `Sample ${sampleIdx}`, pcm, instr.volume || 64, sampleRate, loopStart, loopEnd)
+          createSamplerInstrument(id, '', pcm, instr.volume || 64, sampleRate, loopStart, loopEnd)
         );
         continue;
       }
@@ -559,7 +559,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
     instrumentConfigs.push({
       id,
-      name: `Instrument ${id}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'ActivisionProWasmSynth' as const,
       effects: [],

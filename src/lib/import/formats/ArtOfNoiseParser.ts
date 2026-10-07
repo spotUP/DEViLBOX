@@ -613,11 +613,11 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
         const loopEnd   = hasLoop ? byteLoopStart + byteLoopLength : 0;
 
         instrumentConfigs.push({
-          ...createSamplerInstrument(id, instr.name || `Sample ${i}`, pcm, si.volume, sampleRate, loopStart, loopEnd),
+          ...createSamplerInstrument(id, instr.name || '', pcm, si.volume, sampleRate, loopStart, loopEnd),
           uadeChipRam: chipRam,
         });
       } else {
-        instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || `Instrument ${i}`), uadeChipRam: chipRam });
+        instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || ''), uadeChipRam: chipRam });
       }
     } else if (instr.type === 'synth' && waveForms) {
       const si = instr as AonSynthInstrument;
@@ -638,14 +638,14 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
         const sampleRate = aonPeriodToRate(refPeriod);
 
         instrumentConfigs.push({
-          ...createSamplerInstrument(id, instr.name || `Synth ${i}`, pcm, si.volume, sampleRate, 0, playLen),
+          ...createSamplerInstrument(id, instr.name || '', pcm, si.volume, sampleRate, 0, playLen),
           uadeChipRam: chipRam,
         });
       } else {
-        instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || `Instrument ${i}`), uadeChipRam: chipRam });
+        instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || ''), uadeChipRam: chipRam });
       }
     } else {
-      instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || `Instrument ${i}`), uadeChipRam: chipRam });
+      instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || ''), uadeChipRam: chipRam });
     }
   }
 
@@ -936,7 +936,7 @@ function reparseinstruments(
 function makeSynthPlaceholder(id: number, name: string): InstrumentConfig {
   return {
     id,
-    name: name.replace(/\0/g, '').trim() || `Instrument ${id}`,
+    name: name.replace(/\0/g, '').trim() || '',
     type: 'synth' as const,
     synthType: 'ArtOfNoiseSynth' as const,
     effects: [],

@@ -340,7 +340,7 @@ export async function parseUNICFile(
     const xmFinetune = mod2XMFinetune(-rawFT); // OpenMPT: MOD2XMFineTune(-finetune)
 
     sampleHeaders.push({
-      name:      readString(v, base, 20) || `Sample ${s + 1}`,
+      name:      readString(v, base, 20) || '',
       length:    u16(v, base + 22),
       volume:    u8(v, base + 25),
       loopStart: u16(v, base + 26),

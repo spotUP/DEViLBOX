@@ -362,7 +362,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
         const _dssChipRamInfo: UADEChipRamInfo = { moduleBase: 0, moduleSize: bytes.length, instrBase: SAMPLE_INFO_BASE + i * SAMPLE_INFO_SIZE, instrSize: SAMPLE_INFO_SIZE, sections: {} };
         instruments.push({
           id,
-          name: info.name.trim() || `Sample ${id}`,
+          name: info.name.trim() || '',
           type: 'synth' as const,
           synthType: 'DssWasmSynth' as const,
           effects: [],
@@ -382,7 +382,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
         const _dssChipRamInfo2: UADEChipRamInfo = { moduleBase: 0, moduleSize: bytes.length, instrBase: SAMPLE_INFO_BASE + i * SAMPLE_INFO_SIZE, instrSize: SAMPLE_INFO_SIZE, sections: {} };
         instruments.push({
           id,
-          name: info.name.trim() || `Sample ${id}`,
+          name: info.name.trim() || '',
           type: 'synth' as const,
           synthType: 'DssWasmSynth' as const,
           effects: [],
@@ -414,7 +414,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
       const sampleRate = info.frequency > 0 ? info.frequency : periodToFreq(c3Period);
 
       const _dssChipRam: UADEChipRamInfo = { moduleBase: 0, moduleSize: bytes.length, instrBase: SAMPLE_INFO_BASE + i * SAMPLE_INFO_SIZE, instrSize: SAMPLE_INFO_SIZE, sections: {} };
-      const _dssInst = createSamplerInstrument(id, info.name.trim() || "Sample " + id, pcm, info.volume, sampleRate, loopStartBytes, loopEndBytes);
+      const _dssInst = createSamplerInstrument(id, info.name.trim() || '', pcm, info.volume, sampleRate, loopStartBytes, loopEndBytes);
       instruments.push({ ..._dssInst, uadeChipRam: _dssChipRam });
     }
 

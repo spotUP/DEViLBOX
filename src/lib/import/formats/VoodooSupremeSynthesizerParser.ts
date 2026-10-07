@@ -25,7 +25,7 @@ export function parseVoodooSupremeSynthesizerFile(buffer: ArrayBuffer, filename:
   const instruments: InstrumentConfig[] = [];
   for (let i = 0; i < 4; i++) {
     instruments.push({
-      id: i + 1, name: `VSS Synth ${i + 1}`,
+      id: i + 1, name: '',
       type: 'synth' as const, synthType: 'VoodooWasmSynth' as const,
       effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);

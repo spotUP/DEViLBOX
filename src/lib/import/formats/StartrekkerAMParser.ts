@@ -160,7 +160,7 @@ export function parseStartrekkerAMFile(
     if (!name && sampleLen === 0 && !isAM) continue;
 
     if (!name) {
-      name = isAM ? `AM ${wfName} ${i + 1}` : `Sample ${i + 1}`;
+      name = isAM ? `AM ${wfName} ${i + 1}` : '';
     }
 
     if (isAM) {

@@ -267,7 +267,7 @@ export async function parseSTPFile(
     if (effectiveLoopStart > loopEnd) { effectiveLoopStart = 0; loopEnd = 0; }
     else if (loopEnd > effectiveLoopStart) hasLoop = true;
 
-    const finalName = sampleName || samplePath || `Sample ${actualSmp}`;
+    const finalName = sampleName || samplePath || '';
 
     sampleInfos.set(actualSmp, {
       index:     actualSmp,
@@ -436,7 +436,7 @@ export async function parseSTPFile(
     if (!info || info.length === 0) {
       instruments.push({
         id,
-        name:      info?.name ?? `Sample ${id}`,
+        name:      info?.name ?? '',
         type:      'sample' as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -772,7 +772,7 @@ function buildMinimalSong(
     const info = sampleInfos.get(i);
     instruments.push({
       id:        i,
-      name:      info?.name ?? `Sample ${i}`,
+      name:      info?.name ?? '',
       type:      'sample' as const,
       synthType: 'Sampler' as const,
       effects:   [],

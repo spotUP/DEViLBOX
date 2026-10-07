@@ -311,7 +311,7 @@ export async function parseSoundFXFile(
       };
       instruments.push({
         id: i,
-        name: sample?.name || `Sample ${i}`,
+        name: sample?.name || '',
         type: 'synth' as const,
         synthType: 'SoundFxWasmSynth' as const,
         effects: [],
@@ -356,7 +356,7 @@ export async function parseSoundFXFile(
 
     const instr = createSamplerInstrument(
       i,
-      sample.name || `Sample ${i}`,
+      sample.name || '',
       pcm,
       sample.volume,
       8287, // Standard Amiga C-3 sample rate

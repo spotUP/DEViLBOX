@@ -116,7 +116,7 @@ export function parseSCUMMFile(buffer: ArrayBuffer, filename: string): TrackerSo
 
   const instruments: InstrumentConfig[] = Array.from({ length: sampleCount }, (_, i) => ({
     id: i + 1,
-    name: `SCUMM Sound ${i + 1}`,
+    name: '',
     type: 'sample' as const,
     synthType: 'Sampler' as const,
     effects: [],

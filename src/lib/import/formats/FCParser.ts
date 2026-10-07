@@ -973,7 +973,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
 
     instruments.push({
       id,
-      name: `FC Inst ${instrIdx + 1}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'FCSynth' as const,
       fc: config,
@@ -1018,12 +1018,12 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
         const loopStart = def.loopLen > 1 ? def.loopStart : 0;
         const loopEnd   = def.loopLen > 1 ? def.loopStart + def.loopLen * 2 : 0;
         const instr = createSamplerInstrument(
-          id, `Sample ${waveIdx}`, samplePCMs[waveIdx], 64, 8287, loopStart, loopEnd
+          id, '', samplePCMs[waveIdx], 64, 8287, loopStart, loopEnd
         );
         instr.uadeChipRam = chipRam;
         instruments.push(instr);
       } else {
-        const instr = makePlaceholder(id, `Sample ${waveIdx}`);
+        const instr = makePlaceholder(id, '');
         instr.uadeChipRam = chipRam;
         instruments.push(instr);
       }

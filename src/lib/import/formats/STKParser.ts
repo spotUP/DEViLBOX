@@ -443,7 +443,7 @@ export async function parseSTKFile(
   for (let smp = 0; smp < NUM_SAMPLES; smp++) {
     const info = sampleInfos[smp];
     const id   = smp + 1;
-    const name = info.name || `Sample ${id}`;
+    const name = info.name || '';
 
     const lengthBytes = info.lengthWords * 2;
 

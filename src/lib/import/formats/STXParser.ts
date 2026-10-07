@@ -409,7 +409,7 @@ function makeEmptyPattern(
 function makeEmptyInstrumentConfig(id: number, name: string): InstrumentConfig {
   return {
     id,
-    name: name || `Sample ${id}`,
+    name: name || '',
     type:      'sample' as const,
     synthType: 'Sampler' as const,
     effects:   [],
@@ -519,7 +519,7 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
     const smpOff = sampleParapointers[si] << 4;
 
     if (smpOff === 0 || smpOff + 80 > buffer.byteLength) {
-      instruments.push(makeEmptyInstrumentConfig(id, `Sample ${id}`));
+      instruments.push(makeEmptyInstrumentConfig(id, ''));
       continue;
     }
 
@@ -527,14 +527,14 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
     // Only PCM samples (type 1) are playable
     if (hdr.sampleType !== 1) {
-      const name = hdr.name.replace(/\0/g, '').trim() || `Sample ${id}`;
+      const name = hdr.name.replace(/\0/g, '').trim() || '';
       instruments.push(makeEmptyInstrumentConfig(id, name));
       continue;
     }
 
     const name = hdr.name.replace(/\0/g, '').trim() ||
                  hdr.filename.replace(/\0/g, '').trim() ||
-                 `Sample ${id}`;
+                 '';
 
     // Skip compressed (DP30ADPCM) and empty samples
     if (hdr.pack === 1 || hdr.length === 0 ||

@@ -189,7 +189,7 @@ export async function parseIMSFile(
   for (let s = 0; s < MAX_SAMPLES; s++) {
     const base = 20 + s * 30;
     sampleHeaders.push({
-      name:      readString(v, base,      22) || `Sample ${s + 1}`,
+      name:      readString(v, base,      22) || '',
       length:    u16(v, base + 22),
       finetune:  i8(v, base + 24),
       volume:    u8(v, base + 25),

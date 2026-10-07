@@ -307,7 +307,7 @@ function _parse669(bytes: Uint8Array, filename: string): TrackerSong | null {
 
   const instruments: InstrumentConfig[] = sampleHeaders.map((hdr, i) => {
     const id   = i + 1;
-    const name = hdr.filename || `Sample ${id}`;
+    const name = hdr.filename || '';
 
     if (hdr.length === 0 || hdr.length >= 0x4000000) {
       return { id, name, type: 'sample' as const, synthType: 'Sampler' as const, effects: [], volume: -60, pan: 0 } as InstrumentConfig;

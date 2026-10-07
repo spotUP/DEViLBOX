@@ -141,7 +141,7 @@ export async function parseAndrewPartonFile(
     if (ptr === 0 || len === 0) {
       // Empty sample slot — push placeholder
       instruments.push({
-        id: i + 1, name: `Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
       continue;
@@ -165,7 +165,7 @@ export async function parseAndrewPartonFile(
       const pcm = buf.slice(pcmOff, pcmOff + safeLen);
       instruments.push(createSamplerInstrument(
         i + 1,
-        name || `Sample ${i + 1}`,
+        name || '',
         pcm,
         64,     // volume (EPS_Volume = 64)
         8287,   // Amiga PAL ~8287 Hz base sample rate
@@ -174,7 +174,7 @@ export async function parseAndrewPartonFile(
       ));
     } else {
       instruments.push({
-        id: i + 1, name: name || `Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: name || '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
     }
@@ -185,7 +185,7 @@ export async function parseAndrewPartonFile(
   if (instruments.length === 0) {
     for (let i = 0; i < 8; i++) {
       instruments.push({
-        id: i + 1, name: `Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
     }

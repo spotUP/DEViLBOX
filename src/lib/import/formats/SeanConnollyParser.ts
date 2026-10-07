@@ -91,7 +91,7 @@ export function parseSeanConnollyFile(buffer: ArrayBuffer, filename: string): Tr
 
   const instruments: InstrumentConfig[] = Array.from({ length: sampleCount }, (_, i) => ({
     id: i + 1,
-    name: `EMS Sample ${i + 1}`,
+    name: '',
     type: 'sample' as const,
     synthType: 'Sampler' as const,
     effects: [],

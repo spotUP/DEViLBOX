@@ -426,7 +426,7 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
 
     if (!pcm || pcm.length === 0) {
       instruments.push({
-        id, name: meta.name || `Sample ${id}`,
+        id, name: meta.name || '',
         type: 'sample' as const, synthType: 'Sampler' as const,
         effects: [], volume: 0, pan: 0,
         uadeChipRam: { moduleBase: 0, moduleSize: buf.length, instrBase: GTK_HEADER_SIZE + i * sampleHeaderSize, instrSize: sampleHeaderSize } as UADEChipRamInfo,
@@ -451,7 +451,7 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
     const loopEnd   = meta.hasLoop ? meta.loopEnd   : 0;
     const rate      = meta.sampleRate > 0 ? meta.sampleRate : 8363;
     const _gtkChipRam: UADEChipRamInfo = { moduleBase: 0, moduleSize: buf.length, instrBase: GTK_HEADER_SIZE + i * sampleHeaderSize, instrSize: sampleHeaderSize, sections: {} };
-    const _gtkInst = createSamplerInstrument(id, meta.name || "Sample " + id, mono8, vol, rate, loopStart, loopEnd);
+    const _gtkInst = createSamplerInstrument(id, meta.name || '', mono8, vol, rate, loopStart, loopEnd);
     instruments.push({ ..._gtkInst, uadeChipRam: _gtkChipRam });
 
   }
@@ -929,7 +929,7 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
 
       if (!smpData || smpData.pcm.length === 0) {
         instruments.push({
-          id: insNum, name: instr.name || `Instrument ${insNum}`,
+          id: insNum, name: instr.name || '',
           type: 'sample' as const, synthType: 'Sampler' as const,
           effects: [], volume: 0, pan: 0,
           uadeChipRam: { moduleBase: 0, moduleSize: buf.length, instrBase: instr.instrBase, instrSize: 308 } as UADEChipRamInfo,
@@ -941,7 +941,7 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
       const vol   = smpData.volume > 0 ? Math.min(smpData.volume / 4, 64) : 64;
       const rate  = smpData.sampleFreq > 0 ? smpData.sampleFreq : 8363;
 
-      const _gt2iInst = createSamplerInstrument(insNum, instr.name || "Instrument " + insNum, mono8, vol, rate, smpData.hasLoop ? smpData.loopStart : 0, smpData.hasLoop ? smpData.loopEnd : 0);
+      const _gt2iInst = createSamplerInstrument(insNum, instr.name || '', mono8, vol, rate, smpData.hasLoop ? smpData.loopStart : 0, smpData.hasLoop ? smpData.loopEnd : 0);
       instruments.push({ ..._gt2iInst, uadeChipRam: { moduleBase: 0, moduleSize: buf.length, instrBase: instr.instrBase, instrSize: 308 } as UADEChipRamInfo });
     }
   } else {
@@ -951,7 +951,7 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
       const smpData = sampleMap.get(smpNum)!;
       if (smpData.pcm.length === 0) {
         instruments.push({
-          id: smpNum, name: smpData.name || `Sample ${smpNum}`,
+          id: smpNum, name: smpData.name || '',
           type: 'sample' as const, synthType: 'Sampler' as const,
           effects: [], volume: 0, pan: 0,
           uadeChipRam: { moduleBase: 0, moduleSize: buf.length, instrBase: smpData.instrBase, instrSize: smpData.instrSize } as UADEChipRamInfo,
@@ -963,7 +963,7 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
       const vol   = smpData.volume > 0 ? Math.min(smpData.volume / 4, 64) : 64;
       const rate  = smpData.sampleFreq > 0 ? smpData.sampleFreq : 8363;
 
-      const _gt2sInst = createSamplerInstrument(smpNum, smpData.name || "Sample " + smpNum, mono8, vol, rate, smpData.hasLoop ? smpData.loopStart : 0, smpData.hasLoop ? smpData.loopEnd : 0);
+      const _gt2sInst = createSamplerInstrument(smpNum, smpData.name || '', mono8, vol, rate, smpData.hasLoop ? smpData.loopStart : 0, smpData.hasLoop ? smpData.loopEnd : 0);
       instruments.push({ ..._gt2sInst, uadeChipRam: { moduleBase: 0, moduleSize: buf.length, instrBase: smpData.instrBase, instrSize: smpData.instrSize } as UADEChipRamInfo });
     }
   }

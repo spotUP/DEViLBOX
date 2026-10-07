@@ -596,7 +596,7 @@ function _parseMadTracker2(bytes: Uint8Array, filename: string): TrackerSong | n
     const id = i + 1;
     instruments.push({
       id,
-      name:      ic.name || `Instrument ${id}`,
+      name:      ic.name || '',
       type:      'sample' as const,
       synthType: 'Sampler' as const,
       effects:   [],

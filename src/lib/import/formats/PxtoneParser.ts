@@ -278,7 +278,7 @@ export async function parsePxtoneFile(
   // In x1x format, instruments and units are 1:1 — use unit names as instrument names
   // when assiWOIC names are absent (empty strings from instrument scanning)
   const resolvedInstrNames = meta.instrumentNames.map((name, i) =>
-    name || meta.unitNames[i] || `Instrument ${i + 1}`
+    name || meta.unitNames[i] || ''
   );
 
   const instruments: InstrumentConfig[] = resolvedInstrNames.length > 0
@@ -292,7 +292,7 @@ export async function parsePxtoneFile(
         pan: 0,
       } as InstrumentConfig))
     : [{
-        id: 1, name: 'Sample 1', type: 'synth' as const,
+        id: 1, name: '', type: 'synth' as const,
         synthType: 'PxtoneSynth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig];
 

@@ -178,7 +178,7 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
   for (let i = 0; i < loaded.instrumentBinaries.length; i++) {
     const binary = loaded.instrumentBinaries[i];
     if (binary.length < 8) {
-      instruments.push({ id: i + 1, name: `Instrument ${i}`, type: 'synth', synthType: 'ChipSynth', config: {} } as unknown as InstrumentConfig);
+      instruments.push({ id: i + 1, name: '', type: 'synth', synthType: 'ChipSynth', config: {} } as unknown as InstrumentConfig);
       continue;
     }
 
@@ -202,7 +202,7 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
       // Build ParsedInstrument for the converter
       const parsed: import('@/types/tracker').ParsedInstrument = {
         id: i + 1,
-        name: furIns.name || `Instrument ${i}`,
+        name: furIns.name || '',
         samples: [],
         fadeout: 0,
         volumeType: 'none',
@@ -251,7 +251,7 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
       instruments.push(...converted.map((inst, j) => ({ ...inst, id: i + 1 + j })));
     } catch (err) {
       console.warn(`[FurnaceToSong] Failed to parse instrument ${i}:`, err);
-      instruments.push({ id: i + 1, name: `Instrument ${i}`, type: 'synth', synthType: 'ChipSynth', config: {} } as unknown as InstrumentConfig);
+      instruments.push({ id: i + 1, name: '', type: 'synth', synthType: 'ChipSynth', config: {} } as unknown as InstrumentConfig);
     }
   }
 

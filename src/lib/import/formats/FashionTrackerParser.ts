@@ -337,7 +337,7 @@ export function parseFashionTrackerFile(buffer: ArrayBuffer, filename: string): 
   for (let i = 1; i <= numInstruments; i++) {
     instruments.push({
       id: i,
-      name: `Sample ${i}`,
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

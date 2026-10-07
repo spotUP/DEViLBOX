@@ -299,7 +299,7 @@ function parsePreTrackerBuffer(buf: Uint8Array, filename: string): TrackerSong {
   const songTitle = readStr(buf, 20, 16) || filename.replace(/\.[^/.]+$/, '');
 
   const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'sample' as const,
+    id: 1, name: '', type: 'sample' as const,
     synthType: 'Sampler' as const, effects: [], volume: -60, pan: 0,
   } as InstrumentConfig];
 
@@ -533,7 +533,7 @@ function parseMODBuffer(
       // Silent placeholder stub
       instruments.push({
         id,
-        name:      hdr.name || `Sample ${id}`,
+        name:      hdr.name || '',
         type:      'sample' as const,
         synthType: 'Sampler' as const,
         effects:   [],
@@ -558,7 +558,7 @@ function parseMODBuffer(
     instruments.push(
       createSamplerInstrument(
         id,
-        hdr.name || `Sample ${id}`,
+        hdr.name || '',
         rawPcm,
         hdr.volume,
         8287,       // Amiga standard C-3 sample rate (matches ICEParser / OktalyzerParser)

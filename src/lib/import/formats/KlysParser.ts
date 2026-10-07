@@ -479,7 +479,7 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
   for (let i = 0; i < numInstruments; i++) {
     instruments.push({
       id: i + 1,
-      name: `Inst ${i.toString(16).toUpperCase().padStart(2, '0')}`,
+      name: '',
       type: 'Klystrack' as InstrumentConfig['type'],
       synthType: 'KlysSynth',
       volume: -6,

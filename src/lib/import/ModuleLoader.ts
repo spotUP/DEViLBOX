@@ -536,7 +536,7 @@ function convertDefleMaskToDevilbox(dmf: DMFModule): {
   // Convert instruments
   const instruments: ParsedInstrument[] = dmf.instruments.map((inst, idx) => ({
     id: idx + 1,
-    name: inst.name || `Instrument ${idx + 1}`,
+    name: inst.name || '',
     samples: [], // DefleMask uses FM/PSG synthesis, not samples
     fadeout: 0,
     volumeType: 'none' as const,

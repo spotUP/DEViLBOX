@@ -386,7 +386,7 @@ export async function parseRJPFile(
       instruments.push(
         createSamplerInstrument(
           i + 1,
-          `Sample ${i + 1}`,
+          '',
           pcm,
           64, // full volume
           8287, // Amiga C-3 rate
@@ -398,7 +398,7 @@ export async function parseRJPFile(
       // Placeholder instrument
       instruments.push({
         id: i + 1,
-        name: `Sample ${i + 1}`,
+        name: '',
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],
@@ -419,7 +419,7 @@ export async function parseRJPFile(
   if (instruments.length === 0) {
     instruments.push({
       id: 1,
-      name: 'Sample 1',
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

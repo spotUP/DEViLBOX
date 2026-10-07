@@ -238,11 +238,11 @@ function extractOldFormatSamples(buf: Uint8Array): InstrumentConfig[] {
     if (sampleLen > 0 && pcmFileOff + sampleLen <= len) {
       const pcm = buf.slice(pcmFileOff, pcmFileOff + sampleLen);
       instruments.push(createSamplerInstrument(
-        i + 1, `ASH Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+        i + 1, '', pcm, 64, 8287, 0, 0,
       ));
     } else {
       instruments.push({
-        id: i + 1, name: `ASH Sample ${i + 1}`, type: 'synth' as const,
+        id: i + 1, name: '', type: 'synth' as const,
         synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig);
     }
@@ -294,7 +294,7 @@ export function parseAshleyHoggFile(buffer: ArrayBuffer, filename: string): Trac
   // Fallback placeholder if no samples found
   if (instruments.length === 0) {
     instruments = [{
-      id: 1, name: 'Sample 1', type: 'synth' as const,
+      id: 1, name: '', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig];
   }

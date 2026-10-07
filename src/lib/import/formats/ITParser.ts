@@ -371,7 +371,7 @@ function readITSample(
   const flags         = u8(v, smpOff + 0x12);
   const vol           = Math.min(u8(v, smpOff + 0x13), 64);
   const sampleName    = readString(v, smpOff + 0x14, 26);
-  const name          = sampleName.replace(/\0/g, '').trim() || `Sample ${id}`;
+  const name          = sampleName.replace(/\0/g, '').trim() || '';
   const cvt           = u8(v, smpOff + 0x2E);
   const dfp           = u8(v, smpOff + 0x2F);
   const length        = u32le(v, smpOff + 0x30);
@@ -657,7 +657,7 @@ function decodeITPattern(
 function makeEmptyInstrumentConfig(id: number, name: string): InstrumentConfig {
   return {
     id,
-    name: name || `Sample ${id}`,
+    name: name || '',
     type:      'sample' as const,
     synthType: 'Sampler' as const,
     effects:   [],
@@ -780,18 +780,18 @@ export function parseITFile(buffer: ArrayBuffer, filename: string): TrackerSong 
       const insOff = instOffsets[ii];
 
       if (insOff === 0 || insOff + 554 > buffer.byteLength) {
-        instruments.push(makeEmptyInstrumentConfig(id, `Instrument ${id}`));
+        instruments.push(makeEmptyInstrumentConfig(id, ''));
         continue;
       }
 
       // Verify "IMPI" magic
       if (u8(v, insOff) !== 0x49 || u8(v, insOff + 1) !== 0x4D ||
           u8(v, insOff + 2) !== 0x50 || u8(v, insOff + 3) !== 0x49) {
-        instruments.push(makeEmptyInstrumentConfig(id, `Instrument ${id}`));
+        instruments.push(makeEmptyInstrumentConfig(id, ''));
         continue;
       }
 
-      const insName  = readString(v, insOff + 0x20, 26).replace(/\0/g, '').trim() || `Instrument ${id}`;
+      const insName  = readString(v, insOff + 0x20, 26).replace(/\0/g, '').trim() || '';
       const fadeout  = u16le(v, insOff + 0x14);
       const volEnv   = readEnvelope(v, insOff + 0x130);
       const panEnv   = readEnvelope(v, insOff + 0x182);
@@ -857,7 +857,7 @@ export function parseITFile(buffer: ArrayBuffer, filename: string): TrackerSong 
       const ps = parsedSamples[si];
 
       if (!ps) {
-        const name = `Sample ${id}`;
+        const name = '';
         instruments.push(makeEmptyInstrumentConfig(id, name));
         continue;
       }

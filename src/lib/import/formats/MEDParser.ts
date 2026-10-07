@@ -368,7 +368,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     const instr = instrs[i];
     if (!instr) break;
 
-    const name = instrNames[i] || `Instrument ${i + 1}`;
+    const name = instrNames[i] || '';
 
     // Get the absolute pointer to this instrument's data block
     const instrPtr = instrPtrs[i] || 0;
