@@ -2301,6 +2301,24 @@ class UADEProcessor extends AudioWorkletProcessor {
     if (this._wasm && this._wasm._uade_wasm_isolate_channels) this._wasm._uade_wasm_isolate_channels(mask & 0x0F);
   }
 
+  /**
+   * Post the engine's clocks. tickCount is CIA-A Timer A (the enhanced scan's row
+   * clock); playerTickCount is CIA-A Timer B with its interrupt enabled, the timer
+   * the score runs every DTP_Interrupt player on - Timer A stays 0 for those, so a
+   * grid of player ticks follows playerTickCount. audioTime is the start of the
+   * block these counts were read after: when the main thread shows them it adds
+   * the output latency to get the moment they are heard.
+   */
+  _postPosition(audioTime, totalFrames) {
+    this.port.postMessage({
+      type: 'position',
+      tickCount: this._wasm._uade_wasm_get_tick_count(),
+      playerTickCount: this._wasm._uade_wasm_get_player_tick_count ? this._wasm._uade_wasm_get_player_tick_count() : 0,
+      totalFrames,
+      audioTime
+    });
+  }
+
   process(_inputs, outputs) {
     const outL = outputs[0][0];
     const outR = outputs[0][1] || outputs[0][0];  // Mono fallback
@@ -2422,6 +2440,18 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._wasm._uade_wasm_get_channel_snapshot(this._channelBuf);
       const snap = new Uint32Array(this._wasm.HEAPU8.buffer, this._channelBuf, 16);
 
+      // The player's interrupt count moves at 50 Hz; a grid of player ticks is
+      // timed by the block it moves in, so post that block's position now. At the
+      // 20 Hz cadence alone a row change was reported up to 50 ms after the tick
+      // that started it and the playhead trailed the sound.
+      if (this._wasm._uade_wasm_get_player_tick_count) {
+        const playerTicks = this._wasm._uade_wasm_get_player_tick_count();
+        if (playerTicks !== this._lastPostedPlayerTick) {
+          this._lastPostedPlayerTick = playerTicks;
+          this._postPosition(currentTime, this._wasm._uade_wasm_get_total_frames());
+        }
+      }
+
       // Post at ~20Hz (every ~50ms), not every render call
       if (currentTime - this._lastChannelPost > 0.05) {
         const channels = [];
@@ -2445,18 +2475,10 @@ class UADEProcessor extends AudioWorkletProcessor {
           totalFrames
         });
 
-        // Post position update with CIA tick count for audio/visual sync.
-        // tickCount is CIA-A Timer A (the enhanced scan's row clock);
-        // playerTickCount is CIA-A Timer B with its interrupt enabled, the
-        // timer the score runs every DTP_Interrupt player on - Timer A stays
-        // 0 for those, so a grid of player ticks follows playerTickCount.
-        this.port.postMessage({
-          type: 'position',
-          tickCount: this._wasm._uade_wasm_get_tick_count(),
-          playerTickCount: this._wasm._uade_wasm_get_player_tick_count ? this._wasm._uade_wasm_get_player_tick_count() : 0,
-          totalFrames,
-          audioTime: currentTime
-        });
+        // Position update with CIA tick counts (see _postPosition). Posted here at
+        // the 20 Hz channel cadence for the Timer A clock; a player-tick grid also gets
+        // one the block its count moves (below).
+        this._postPosition(currentTime, totalFrames);
 
         // Post per-channel VU levels derived from Paula volume registers
         const levels = new Float32Array(4);
