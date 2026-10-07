@@ -638,12 +638,13 @@ export async function tryRouteFormat(
         if (prefs.davidWhittaker !== 'uade') {
       try {
         const { parseDavidWhittakerFile } = await import('@lib/import/formats/DavidWhittakerParser');
-        const dwResult = parseDavidWhittakerFile(buffer, originalFileName);
-        // Check if native parser produced any notes; if not, fall to UADE
+        const dwResult = await parseDavidWhittakerFile(buffer, originalFileName);
+        // A song the replayer's walk could not be matched to opens in the scope view (no guessed grid);
+        // check if native parser produced any notes; if not, fall to UADE
         const dwNotes = dwResult.patterns.reduce((sum: number, p: any) =>
           sum + p.channels.reduce((cs: number, ch: any) =>
             cs + ch.rows.filter((r: any) => r.note > 0).length, 0), 0);
-        if (dwNotes > 0) return dwResult;
+        if (dwNotes > 0 || (dwResult as { gridEstimated?: boolean }).gridEstimated) return dwResult;
         console.warn(`[DavidWhittakerParser] 0 notes extracted, falling back to UADE`);
       } catch (err) {
         console.warn(`[DavidWhittakerParser] Native parse failed for ${filename}, falling back to UADE:`, err);

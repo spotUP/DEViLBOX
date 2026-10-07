@@ -28,6 +28,8 @@ import type { DavidWhittakerConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { DEFAULT_DAVID_WHITTAKER } from '@/types/instrument';
 import { davidWhittakerEncoder } from '@/engine/uade/encoders/DavidWhittakerEncoder';
+import { walkDavidWhittaker, DW_WALK } from './DavidWhittakerWasmExtractor';
+import { buildDWGridFromWalk } from './davidWhittakerGrid';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -59,20 +61,6 @@ function u32BE(buf: Uint8Array, off: number): number {
           (buf[off + 3] & 0xFF);
 }
 
-
-// ── Note conversion ───────────────────────────────────────────────────────────
-
-/**
- * Convert a DW/Amiga note index (0-59, into 60-entry period table) to a
- * tracker note value (1-96, FT2 style).
- *
- * Amiga period table index 0 = C-1 (ProTracker) = C-2 (FT2) = tracker note 25.
- * So: tracker_note = amiga_index + 25.
- */
-function amigaIndexToTrackerNote(idx: number): number {
-  const n = idx + 25;
-  return (n >= 1 && n <= 96) ? n : 0;
-}
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
@@ -514,14 +502,13 @@ function dwCommandLen(buf: Uint8Array, scan: DWParseResult, pos: number): number
 
 /**
  * Decode one contiguous block (from `startAddr` to and including its -128 marker)
- * into one command-row per stream command. `sampleRef.cur` tracks the running
- * 1-based instrument across the block (updated on sample-change commands).
+ * into one carrier row per stream command (cutoff=len, period=b0, pan=b1, resonance=b2). The
+ * rows are the byte-exact source only: what the grid shows comes from the replayer's walk.
  */
 function decodeDWBlock(
   buf: Uint8Array,
   scan: DWParseResult,
   startAddr: number,
-  sampleRef: { cur: number },
 ): { rows: TrackerCell[]; byteSize: number } {
   const rows: TrackerCell[] = [];
   let pos = startAddr;
@@ -531,21 +518,8 @@ function decodeDWBlock(
     const len = dwCommandLen(buf, scan, pos);
     if (pos + len > buf.length) break;
 
-    // Display fields (carrier bytes below make the round-trip byte-exact regardless).
-    let note = 0;
-    let instrument = 0;
-    if (value >= 0) {
-      note = amigaIndexToTrackerNote(value) || 49;
-      instrument = sampleRef.cur;
-    } else if (value >= scan.com2 && value < -32) {
-      sampleRef.cur = (value - scan.com2) + 1;
-      instrument = sampleRef.cur;
-    } else if (value === -126) {
-      note = 97; // rest / note-off
-    }
-
     const cell: TrackerCell = {
-      note, instrument, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
       // Carrier: exact source bytes of this command.
       cutoff: len,
       period: buf[pos] & 0xFF,
@@ -580,120 +554,40 @@ function enumerateChannelBlocks(buf: Uint8Array, scan: DWParseResult, trackPtr: 
   return addrs;
 }
 
-interface DWVariableResult {
-  patterns: Pattern[];
-  songPositions: number[];
+interface DWFilePatterns {
   filePatternAddrs: number[];
   filePatternSizes: number[];
-  trackMap: number[][];
+  /** Canonical carrier rows of each block: one cell per stream command (cutoff=len, period=b0, pan=b1, resonance=b2). */
+  blockRows: TrackerCell[][];
+  /** The original bytes of each block. */
+  blockRawBytes: Uint8Array[];
+  addrToFp: Map<number, number>;
 }
 
 /**
- * Build the byte-exact variable pattern layout for one DW song.
- *
- * Each channel independently steps through an ordered list of block addresses (a
- * shorter list wraps to its start, as the replayer restarts it).
- * Blocks are deduplicated into file-patterns (filePatternAddrs/Sizes); one
- * tracker "step" corresponds to one entry across all channels' block lists.
- * trackMap[step][ch] resolves to the file-pattern index for that block (-1 only if the
- * channel has no list). Each channel's rows carry the block's exact source
- * bytes so the variable encoder reproduces the file byte-for-byte.
+ * The song's command blocks as file patterns: every block any voice's position list names, deduplicated,
+ * each with its carrier rows (the byte-exact source) and original bytes. The display grid is not made
+ * here: it is the replayer's walk (davidWhittakerGrid.ts), and the carriers live off-grid on the layout.
  */
-function buildDWVariablePatterns(
-  buf: Uint8Array,
-  scan: DWParseResult,
-  song: DWSong,
-  numChannels: number,
-): DWVariableResult | null {
-  // Per-channel ordered block-address lists.
-  const channelBlocks: number[][] = [];
-  for (let ch = 0; ch < numChannels; ch++) {
-    const trackPtr = ch < song.tracks.length ? song.tracks[ch] : 0;
-    channelBlocks.push(enumerateChannelBlocks(buf, scan, trackPtr));
-  }
-
-  const numSteps = channelBlocks.reduce((m, l) => Math.max(m, l.length), 0);
-  if (numSteps === 0) return null;
-
-  // Deduplicate block addresses into file-patterns; decode each unique block once.
+function buildDWFilePatterns(buf: Uint8Array, scan: DWParseResult, song: DWSong, numChannels: number): DWFilePatterns {
   const addrToFp = new Map<number, number>();
   const filePatternAddrs: number[] = [];
   const filePatternSizes: number[] = [];
-  const fpRows: TrackerCell[][] = [];
-  const fpFor = (addr: number): number => {
-    let fp = addrToFp.get(addr);
-    if (fp === undefined) {
-      const { rows, byteSize } = decodeDWBlock(buf, scan, addr, { cur: 1 });
-      fp = filePatternAddrs.length;
-      addrToFp.set(addr, fp);
+  const blockRows: TrackerCell[][] = [];
+  const blockRawBytes: Uint8Array[] = [];
+  for (let ch = 0; ch < numChannels; ch++) {
+    const trackPtr = ch < song.tracks.length ? song.tracks[ch] : 0;
+    for (const addr of enumerateChannelBlocks(buf, scan, trackPtr)) {
+      if (addrToFp.has(addr)) continue;
+      const { rows, byteSize } = decodeDWBlock(buf, scan, addr);
+      addrToFp.set(addr, filePatternAddrs.length);
       filePatternAddrs.push(addr);
       filePatternSizes.push(byteSize);
-      fpRows.push(rows);
+      blockRows.push(rows);
+      blockRawBytes.push(buf.slice(addr, addr + byteSize));
     }
-    return fp;
-  };
-
-  const patterns: Pattern[] = [];
-  const songPositions: number[] = [];
-  const trackMap: number[][] = [];
-  const voiceSounding: boolean[] = new Array(numChannels).fill(false);
-
-  for (let step = 0; step < numSteps; step++) {
-    const stepTrackMap: number[] = [];
-    const perChannelRows: TrackerCell[][] = [];
-    let maxRows = 0;
-
-    for (let ch = 0; ch < numChannels; ch++) {
-      const list = channelBlocks[ch];
-      // A channel whose position list is shorter than the longest loops it (the
-      // replayer restarts every channel's list on its own: apb.dw voice 0 is one
-      // eight-note block that repeats under voice 1's seven).
-      if (list.length > 0) {
-        const fp = fpFor(list[step % list.length]);
-        stepTrackMap.push(fp);
-        // Clone the decoded rows so per-step patterns don't share cell objects, and show a
-        // note-off only where the replayer stops a sounding voice: a mute command on a voice
-        // that is already silent (apb.dw voices 3 and 4 mute every row) changes nothing.
-        const rows = fpRows[fp].map(c => {
-          const cell = { ...c };
-          if (cell.note > 0 && cell.note < 97) voiceSounding[ch] = true;
-          else if (cell.note === 97) { if (voiceSounding[ch]) voiceSounding[ch] = false; else cell.note = 0; }
-          return cell;
-        });
-        perChannelRows.push(rows);
-        if (rows.length > maxRows) maxRows = rows.length;
-      } else {
-        stepTrackMap.push(-1);
-        perChannelRows.push([]);
-      }
-    }
-    if (maxRows === 0) maxRows = 1;
-
-    const channels: ChannelData[] = [];
-    for (let ch = 0; ch < numChannels; ch++) {
-      const rows = perChannelRows[ch];
-      // Pad with carrier-less rows (cutoff undefined) — the encoder emits nothing
-      // for them, so padding does not affect byte-exactness.
-      while (rows.length < maxRows) {
-        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-      }
-      channels.push({
-        id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false, solo: false, collapsed: false,
-        volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null, color: null, rows,
-      });
-    }
-
-    patterns.push({
-      id: `pattern-${step}`, name: `Pattern ${step}`, length: maxRows, channels,
-    });
-    songPositions.push(step);
-    trackMap.push(stepTrackMap);
   }
-
-  return { patterns, songPositions, filePatternAddrs, filePatternSizes, trackMap };
+  return { filePatternAddrs, filePatternSizes, blockRows, blockRawBytes, addrToFp };
 }
 
 // ── Main parser ───────────────────────────────────────────────────────────────
@@ -708,7 +602,7 @@ function buildDWVariablePatterns(
  *                     DavidWhittaker is a compiled Amiga binary; use UADEEngine.scanMemoryForMagic
  *                     with the 0x47fa (lea x,a3) opcode to find the actual base address.
  */
-export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, moduleBase = 0): TrackerSong {
+export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, moduleBase = 0): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   const baseName = filename.replace(/\.[^.]+$/, '');
 
@@ -811,53 +705,55 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     } as InstrumentConfig);
   }
 
-  // ── Extract real patterns as a byte-exact variable layout ──────────────────
+  // ── The grid is the replayer's own walk ────────────────────────────────────
+  // What the grid shows is what davidwhittaker.c's track reader executes (no second reader in
+  // TypeScript to guess with); the module's command blocks only supply the byte-exact carriers.
   const CHANNELS = scanResult?.channels || 4;
-  const ROWS = 64;
-
   let patterns: Pattern[] = [];
   let songPositions: number[] = [0];
   let initialSpeed = 6;
-  let variable: DWVariableResult | null = null;
+  let filePatterns: DWFilePatterns | null = null;
+  let blockAtStart: number[][] = [];
+  let unmatched: string | null = null;
 
   if (scanResult && scanResult.songs.length > 0) {
     const song = scanResult.songs[0];
     initialSpeed = song.speed || 6;
-    variable = buildDWVariablePatterns(buf, scanResult, song, CHANNELS);
-    if (variable) {
-      patterns = variable.patterns;
-      songPositions = variable.songPositions;
+    filePatterns = buildDWFilePatterns(buf, scanResult, song, CHANNELS);
+    try {
+      const walk = await walkDavidWhittaker(buffer);
+      const grid = buildDWGridFromWalk(walk);
+      const known = new Set(filePatterns.filePatternAddrs);
+      const stray = walk.events.find((e) => e.block !== 0xffffffff && !known.has(e.block));
+      if (stray) unmatched = `the replayer ran a block at ${stray.block.toString(16)} the module scan does not know`;
+      else if (grid.overflowRows > 0) unmatched = `${grid.overflowRows} rows run more commands on one voice than a cell has effect columns`;
+      else if (walk.events.every((e) => e.kind !== DW_WALK.note)) unmatched = 'the replayer starts no note';
+      else {
+        patterns = grid.patterns;
+        songPositions = grid.songPositions;
+        blockAtStart = grid.blockAtStart;
+      }
+    } catch (err) {
+      unmatched = `the replayer could not walk the song: ${err instanceof Error ? err.message : String(err)}`;
     }
+  } else {
+    unmatched = 'the module scan found no song';
   }
 
-  // Fallback: if no patterns were extracted, create a stub (no variable layout —
-  // an unfaithful grid must NOT claim byte-exactness).
+  // No guessed grid: a song the replayer's walk cannot be matched to opens in the scope view
+  // (gridEstimated), with an empty grid and the reason recorded.
   if (patterns.length === 0) {
+    console.warn(`[DavidWhittakerParser] ${filename}: no grid - ${unmatched}`);
     const channelData: ChannelData[] = [];
     for (let ch = 0; ch < CHANNELS; ch++) {
-      const rows: TrackerCell[] = [];
-      for (let r = 0; r < ROWS; r++) {
-        if (r === 0 && ch < instruments.length) {
-          rows.push({
-            note: 49, instrument: ch + 1, volume: 0,
-            effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-          });
-        } else {
-          rows.push({
-            note: 0, instrument: 0, volume: 0,
-            effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-          });
-        }
-      }
       channelData.push({
         id: `channel-${ch}`, name: `Channel ${ch + 1}`,
         muted: false, solo: false, collapsed: false,
-        volume: 100, pan: 0, instrumentId: null, color: null, rows,
+        volume: 100, pan: 0, instrumentId: null, color: null,
+        rows: Array.from({ length: 64 }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 })),
       });
     }
-    patterns = [{
-      id: 'pattern-0', name: 'Pattern 1', length: ROWS, channels: channelData,
-    }];
+    patterns = [{ id: 'pattern-0', name: 'Pattern 1', length: 64, channels: channelData }];
     songPositions = [0];
   }
 
@@ -881,19 +777,25 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     uadeEditableFileName: filename,
   };
 
-  if (variable) {
+  if (filePatterns && !unmatched) {
     const uadeVariableLayout: UADEVariablePatternLayout = {
       formatId: 'davidWhittaker',
       numChannels: CHANNELS,
-      numFilePatterns: variable.filePatternAddrs.length,
+      numFilePatterns: filePatterns.filePatternAddrs.length,
       rowsPerPattern: patterns.map(p => p.length),
       moduleSize: buffer.byteLength,
       encoder: davidWhittakerEncoder,
-      filePatternAddrs: variable.filePatternAddrs,
-      filePatternSizes: variable.filePatternSizes,
-      trackMap: variable.trackMap,
+      filePatternAddrs: filePatterns.filePatternAddrs,
+      filePatternSizes: filePatterns.filePatternSizes,
+      // the block each voice is playing when a pattern starts
+      trackMap: blockAtStart.map((row) => row.map((addr) => (addr >= 0 ? (filePatterns!.addrToFp.get(addr) ?? -1) : -1))),
+      blockRows: filePatterns.blockRows,
+      blockRawBytes: filePatterns.blockRawBytes,
     };
     (result as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout = uadeVariableLayout;
+  } else {
+    (result as unknown as { gridEstimated: boolean; dwGridUnmatched: string | null }).gridEstimated = true;
+    (result as unknown as { dwGridUnmatched: string | null }).dwGridUnmatched = unmatched;
   }
 
   return result;

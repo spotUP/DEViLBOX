@@ -4,7 +4,8 @@
  * expose every instrument the replayer's tables hold, so each instrument id a
  * pattern cell references exists.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { installDwNodeFetch } from './helpers/dwNodeFetch';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -26,21 +27,25 @@ function usedInstruments(song: TrackerSong): number[] {
   return [...used].sort((a, b) => a - b);
 }
 
+let restoreDwFetch = () => {};
+beforeAll(() => { restoreDwFetch = installDwNodeFetch(); });
+afterAll(() => restoreDwFetch());
+
 describe('David Whittaker instrument walk', () => {
   for (const f of ['formats/apb.dw', 'david-whittaker/garfield2+.dw']) {
-    it(`${f}: every instrument the grid plays exists, from the replayer's own sample table`, () => {
+    it(`${f}: every instrument the grid plays exists, from the replayer's own sample table`, async () => {
       const ab = load(f);
       const scan = scanDWStructures(new Uint8Array(ab));
       expect(scan?.samples.length).toBeGreaterThan(1);
-      const song = parseDavidWhittakerFile(ab, f);
+      const song = await parseDavidWhittakerFile(ab, f);
       const used = usedInstruments(song);
       expect(used.length).toBeGreaterThan(1);
       expect(song.instruments.length).toBe(scan!.samples.length);
       expect(Math.max(...used)).toBeLessThanOrEqual(song.instruments.length);
     });
   }
-  it('apb.dw has 15 instruments (4 used by the song are all present)', () => {
-    expect(parseDavidWhittakerFile(load('formats/apb.dw'), 'apb.dw').instruments).toHaveLength(15);
+  it('apb.dw has 15 instruments (4 used by the song are all present)', async () => {
+    expect((await parseDavidWhittakerFile(load('formats/apb.dw'), 'apb.dw')).instruments).toHaveLength(15);
   });
 });
 

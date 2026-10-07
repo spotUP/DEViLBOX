@@ -18,6 +18,7 @@ import { FRED_EFFECT_GLYPH } from '@/lib/import/formats/fredEffectGlyphs';
 import { SM_EFFECT_GLYPH } from '@/lib/import/formats/soundMasterEffectGlyphs';
 import { AST_EFFECT_GLYPH } from '@/lib/import/formats/actionamicsEffectGlyphs';
 import { AVP_EFFECT_GLYPH } from '@/lib/import/formats/activisionProEffectGlyphs';
+import { DW_EFFECT_GLYPH } from '@/lib/import/formats/davidWhittakerEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import type {
@@ -881,6 +882,9 @@ export class TrackerGLRenderer {
               } else if (AVP_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Activision Pro private operations (block 0xB0..0xB9)
                 effStr = AVP_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (DW_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // David Whittaker track commands (block 0xC0..0xD4)
+                effStr = DW_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }

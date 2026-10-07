@@ -22,6 +22,7 @@ import { FRED_EFFECT_GLYPH } from '@/lib/import/formats/fredEffectGlyphs';
 import { SM_EFFECT_GLYPH } from '@/lib/import/formats/soundMasterEffectGlyphs';
 import { AST_EFFECT_GLYPH } from '@/lib/import/formats/actionamicsEffectGlyphs';
 import { AVP_EFFECT_GLYPH } from '@/lib/import/formats/activisionProEffectGlyphs';
+import { DW_EFFECT_GLYPH } from '@/lib/import/formats/davidWhittakerEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 
@@ -372,7 +373,7 @@ export class TrackerCanvas2DRenderer {
           const effStr = eff === 0 && effp === 0
             ? '···'
             // SunTronic (0x40..0x4F) / SNX (0x60..0x62) / Sound Player (0x63..0x69) / Fred Editor (0x70..0x73) / Sound Master (0x74..0x78) private control effects
-            : `${SUN_EFFECT_GLYPH[eff] ?? SNX_EFFECT_GLYPH[eff] ?? SPL_EFFECT_GLYPH[eff] ?? FRED_EFFECT_GLYPH[eff] ?? SM_EFFECT_GLYPH[eff] ?? AST_EFFECT_GLYPH[eff] ?? AVP_EFFECT_GLYPH[eff] ?? EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
+            : `${SUN_EFFECT_GLYPH[eff] ?? SNX_EFFECT_GLYPH[eff] ?? SPL_EFFECT_GLYPH[eff] ?? FRED_EFFECT_GLYPH[eff] ?? SM_EFFECT_GLYPH[eff] ?? AST_EFFECT_GLYPH[eff] ?? AVP_EFFECT_GLYPH[eff] ?? DW_EFFECT_GLYPH[eff] ?? EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
           ctx.fillText(effStr, effBaseX, y);
         }
       }
