@@ -13,7 +13,7 @@ import type {
   ClipboardData,
 } from '@typedefs';
 import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
-import { getTrackerReplayer, peekTrackerReplayer } from '@engine/TrackerReplayer';
+import { peekTrackerReplayer } from '@engine/TrackerReplayer';
 import { sendCellEditsToEngine, changedCells, type LiveCellEdit } from '@engine/replayer/liveCellEdits';
 import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
@@ -60,8 +60,8 @@ export function debouncedWasmEngineReexport(): void {
   _wasmReexportTimer = setTimeout(() => {
     _wasmReexportTimer = null;
     try {
-      const replayer = getTrackerReplayer();
-      const song = replayer.getSong();
+      // peek, never construct: no replayer means no song loaded into an engine
+      const song = peekTrackerReplayer()?.getSong();
       if (!song) return;
       const sourceFormat = song.patterns[0]?.importMetadata?.sourceFormat;
 
@@ -180,7 +180,7 @@ export function debouncedWasmEngineReexport(): void {
 /** Grid cells to the engine playing the loaded song (see liveCellEdits). */
 function sendCellEdits(edits: LiveCellEdit[]): void {
   let song: import('@engine/TrackerReplayer').TrackerSong | null = null;
-  try { song = getTrackerReplayer().getSong(); } catch { return; /* replayer not initialized */ }
+  song = peekTrackerReplayer()?.getSong() ?? null;
   void sendCellEditsToEngine(song, edits).catch((err) => {
     console.warn('[TrackerStore] live cell edit failed:', err);
   });
@@ -200,16 +200,16 @@ function syncBulkEdit(
   }
 
   // Furnace WASM sequencer sync — iterate all cells
-  try {
-    const replayer = getTrackerReplayer();
+  const furnaceReplayer = peekTrackerReplayer();
+  if (furnaceReplayer) {
     for (let ch = 0; ch < pattern.channels.length; ch++) {
       const rows = pattern.channels[ch].rows;
       for (let row = 0; row < rows.length; row++) {
         const cell = rows[row];
-        replayer.syncCellToWasmSequencer(ch, patternIndex, row, cell);
+        furnaceReplayer.syncCellToWasmSequencer(ch, patternIndex, row, cell);
       }
     }
-  } catch { /* replayer not initialized */ }
+  }
 
   // The changed cells to the engine playing the song (native replayer or UADE).
   sendCellEdits(changedCells(patternIndex, pattern, before));
@@ -551,9 +551,7 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       useHistoryStore.getState().pushAction('EDIT_CELL', 'Edit cell', patternIndex, beforePattern, get().patterns[patternIndex]);
       // Apply the edit to a Furnace song: its native data, and the sequencer while it runs
-      try {
-        getTrackerReplayer().syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, cellUpdate);
-      } catch { /* replayer not initialized yet */ }
+      peekTrackerReplayer()?.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, cellUpdate);
       // Sync edit to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
       // Bridge is the primary edit path for libopenmpt formats — statically imported
       // to eliminate the async window where the store and soundlib could diverge.
@@ -694,11 +692,9 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       useHistoryStore.getState().pushAction('CLEAR_CELL', 'Clear cell', patternIndex, beforePattern, get().patterns[patternIndex]);
       // Sync the cleared cell to a Furnace song (editor units: 0 = empty)
-      try {
-        getTrackerReplayer().syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, {
-          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-        });
-      } catch { /* replayer not initialized yet */ }
+      peekTrackerReplayer()?.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, {
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      });
       // Sync clear to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
       if (OpenMPTEditBridge.isActive()) {
         OpenMPTEditBridge.syncCellClear(patternIndex, channelIndex, rowIndex);
@@ -2096,8 +2092,8 @@ export const useTrackerStore = create<TrackerStore>()(
           if (fromReplayer) return;
 
           // If playing, tell the replayer to seek to this position
-          const replayer = getTrackerReplayer();
-          if (replayer.isPlaying()) {
+          const replayer = peekTrackerReplayer(); // nothing can be playing without one
+          if (replayer?.isPlaying()) {
             // ONLY seek if the replayer isn't already at this position.
             if (replayer.getCurrentPosition() !== positionIndex) {
               // Maintain current row when jumping positions manually
