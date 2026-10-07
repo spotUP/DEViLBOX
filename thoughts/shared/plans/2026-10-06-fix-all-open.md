@@ -151,7 +151,7 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 
 - [ ] N1 Owner rule 2026-10-07: never invent instrument names. Unnamed in the original = empty name (no "Synth N", "DW Inst N", "Instrument N"). Audit every parser that fabricates names, fix at one place if a shared helper does it, and a CI test over the corpus that no parsed instrument name matches a generated pattern unless the file stores it. The UI shows the number for an unnamed instrument. Keep every slot the file has (never drop or compact empty slots); an empty slot keeps the file's name (authors write messages there).
 
-- [ ] UI1 Pattern editor relayout is janky, mostly ON SONG LOAD (owner 2026-10-07): "when the pattern editor redraws a new layout it struggles and things jump around". Measure first (frame timeline during a song load / channel-count change / pattern-length change: layout shifts, intermediate states rendered, worker canvas resize, multiple re-renders), then make the switch one clean frame: compute the new layout before showing it, no intermediate sizes, no flash.
+- [x] UI1 Pattern editor relayout is janky, mostly ON SONG LOAD (owner 2026-10-07): "when the pattern editor redraws a new layout it struggles and things jump around". Measure first (frame timeline during a song load / channel-count change / pattern-length change: layout shifts, intermediate states rendered, worker canvas resize, multiple re-renders), then make the switch one clean frame: compute the new layout before showing it, no intermediate sizes, no flash.
 
 ## Batch T - tests
 - [x] T1 `src/__tests__/format-parsers.test.ts`: 4 cases fail on missing `.test-formats` fixtures.

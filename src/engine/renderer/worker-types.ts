@@ -152,7 +152,13 @@ export type TrackerWorkerMsg =
       selection: SelectionSnapshot | null;
       channelLayout: ChannelLayoutSnapshot;
     }
-  | { type: 'patterns'; patterns: PatternSnapshot[]; currentPatternIndex: number }
+  | {
+      type: 'patterns';
+      patterns: PatternSnapshot[];
+      currentPatternIndex: number;
+      /** The channel layout of these patterns follows: keep the old picture until it arrives (layoutHold.ts). */
+      awaitLayout?: boolean;
+    }
   | { type: 'scroll'; x: number }
   | { type: 'cursor'; cursor: CursorSnapshot }
   | { type: 'selection'; selection: SelectionSnapshot | null }
