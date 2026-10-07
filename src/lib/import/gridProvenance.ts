@@ -228,7 +228,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   soundControl: 'fail',
   soundMaster: 'pass',
   soundPlayer: 'fail',
-  soundmon: 'fail',
+  soundmon: 'pass',
   sonicArranger: 'pass',
   stm: 'n/a',
   stp: 'n/a',
