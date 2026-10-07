@@ -168,6 +168,27 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     }
   }, [isOpen, modalData]);
 
+  // The one call of the native export router in this dialog: the Export button and the question
+  // "is there a Native export for this song?" both ask it. The router (not a list of editor modes
+  // kept here, which missed SunTronic mule.src and Ben Daglish) is what knows which exporter a
+  // song takes, so the Native option is offered when it returns a result. Loaded when asked: it
+  // pulls in every exporter. The song is the one the stores hold (null): the replayer's copy is only
+  // rebuilt when playback starts, so an edit made since the last play was missing.
+  const runNativeExport = useCallback(async () => {
+    const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
+    return exportNativeSong(null, {});
+  }, []);
+
+  const [nativeAvailable, setNativeAvailable] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    let current = true;
+    // A refusal (a note the format cannot hold) is the router reaching a format's own writer: the
+    // option stays and the refusal is shown when it is chosen.
+    runNativeExport().then((r) => r !== null, () => true).then((available) => { if (current) setNativeAvailable(available); });
+    return () => { current = false; };
+  }, [isOpen, patterns, editorMode, uadeEditableFileData, runNativeExport]);
+
   // ── Shared handler: export song ─────────────────────────────────────────────
 
   const handleExportSong = useCallback((onClose: () => void) => {
@@ -244,8 +265,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     // playback starts, so an edit made since the last play was missing.
     const { useTrackerStore } = await import('@stores/useTrackerStore');
     const hasSong = useTrackerStore.getState().patterns.length > 0;
-    const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
-    const result = await exportNativeSong(null, {});
+    const result = await runNativeExport();
 
     if (!result) {
       notify.error(hasSong ? 'No native exporter available for this format' : 'No song loaded');
@@ -265,7 +285,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
       notify.success(`Native format exported: ${result.filename}`);
     }
     onClose();
-  }, []);
+  }, [runNativeExport]);
 
   // ── Shared handler: import file ─────────────────────────────────────────────
 
@@ -379,6 +399,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportFur,
     handleExportNano,
     handleExportNative,
+    nativeAvailable,
     handleImportFile,
   };
 }
