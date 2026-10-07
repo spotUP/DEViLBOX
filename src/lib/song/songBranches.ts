@@ -18,8 +18,6 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore, buildInstrumentConfig } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { useProjectStore } from '@/stores/useProjectStore';
-import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
@@ -248,11 +246,8 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
   // Loading an external song — prevent auto-save from overwriting user's saved project
   clearExplicitlySaved();
 
-  const { loadPatterns, setPatternOrder, setCurrentPattern, reset: resetTracker } = useTrackerStore.getState();
-  const { addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
-  const { setBPM, reset: resetTransport } = useTransportStore.getState();
-  const { setMetadata } = useProjectStore.getState();
-  const { reset: resetAutomation } = useAutomationStore.getState();
+  const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+  const { addInstrument } = useInstrumentStore.getState();
   const engine = getToneEngine();
 
   const filename = file.name.toLowerCase();
@@ -407,8 +402,8 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
     }
   }
 
-  // Whole songs (.dbx, MIDI, SunVox) reset inside applySong; the TD-3 pattern
-  // import below is the one path here that manages the stores itself.
+  // Whole songs (.dbx, MIDI, SunVox, TD-3 replace) reset inside applySong; the
+  // TD-3 append below is an edit and writes the stores itself.
 
   // === .dbx - DEViLBOX project ===
   if (filename.endsWith('.dbx')) {
@@ -464,16 +459,11 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
 
   // === .sqs/.seq - TD-3 pattern files ===
   if (filename.endsWith('.sqs') || filename.endsWith('.seq')) {
-    await stopActivePlaybackForIncomingSong(engine);
-    // Replace mode starts clean; append mode (replacePatterns false) keeps
-    // the song and adds the patterns to it.
-    if (!options.preserveInstruments && options.replacePatterns !== false) {
-      resetAutomation();
-      resetTransport();
-      resetTracker();
-      resetInstruments();
-      engine.disposeAllInstruments();
-    }
+    // Replace mode is a song load: it is applied by applySong like every other
+    // (the outgoing song is already unloaded by withSongLoad). Append mode
+    // (replacePatterns false, or instruments preserved) is an edit of the
+    // loaded song and writes the stores directly.
+    const replaceSong = Boolean(options.replacePatterns) && !options.preserveInstruments;
     const { parseTD3File } = await import('@lib/import/TD3PatternLoader');
     const { td3StepsToTrackerCells } = await import('@/midi/sysex/TD3PatternTranslator');
     const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
@@ -495,12 +485,13 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
       }
     } else {
       tb303Instrument = createDefaultTB303Instrument();
-      addInstrument(tb303Instrument);
+      if (!replaceSong) addInstrument(tb303Instrument);
     }
 
-    // Convert to tracker patterns
-    const currentInstruments = useInstrumentStore.getState().instruments;
-    const instrumentIndex = currentInstruments.findIndex(i => i.id === tb303Instrument.id) + 1;
+    // Convert to tracker patterns. A replaced song holds only the TB-303.
+    const instrumentIndex = replaceSong
+      ? 1
+      : useInstrumentStore.getState().instruments.findIndex(i => i.id === tb303Instrument.id) + 1;
 
     // Filter out empty TD3 patterns (all rests / no notes) — the TD-3 often
     // stores unused initialization patterns at the start of the file.
@@ -537,33 +528,35 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
       };
     });
 
+    const importedMessage = `Imported ${importedPatterns.length} TD-3 pattern(s)${
+      td3File.patterns.length > importedPatterns.length
+        ? ` (${td3File.patterns.length - importedPatterns.length} empty skipped)`
+        : ''
+    }`;
+
+    if (replaceSong) {
+      const firstTempo = td3File.patterns[0]?.tempo;
+      await applySong({
+        instruments: [tb303Instrument], patterns: importedPatterns, order: importedPatterns.map((_, i) => i),
+        bpm: firstTempo && firstTempo > 0 ? firstTempo : 125, speed: 6,
+        metadata: {
+          name: file.name.replace(/\.(sqs|seq)$/i, '') || 'TD-3 Patterns',
+          author: 'TD-3 Import',
+          description: `Imported from ${td3File.name} v${td3File.version}`,
+        },
+        originalModuleData: null,
+        engine: {},
+      }, 'import');
+      return { success: true, message: importedMessage };
+    }
+
     const existingPatterns = options.replacePatterns ? [] : useTrackerStore.getState().patterns;
     const allPatterns = [...existingPatterns, ...importedPatterns];
     loadPatterns(allPatterns);
     setCurrentPattern(existingPatterns.length);
     setPatternOrder(allPatterns.map((_, i) => i));
 
-    // Set song metadata when loading as a new song
-    if (options.replacePatterns) {
-      const songName = file.name.replace(/\.(sqs|seq)$/i, '') || 'TD-3 Patterns';
-      setMetadata({
-        name: songName,
-        author: 'TD-3 Import',
-        description: `Imported from ${td3File.name} v${td3File.version}`,
-      });
-      // Set BPM from first pattern if available
-      const firstTempo = td3File.patterns[0]?.tempo;
-      if (firstTempo && firstTempo > 0) setBPM(firstTempo);
-    }
-
-    return {
-      success: true,
-      message: `Imported ${importedPatterns.length} TD-3 pattern(s)${
-        td3File.patterns.length > importedPatterns.length
-          ? ` (${td3File.patterns.length - importedPatterns.length} empty skipped)`
-          : ''
-      }`
-    };
+    return { success: true, message: importedMessage };
   }
 
   // === .sunvox - SunVox project (replace project) ===
