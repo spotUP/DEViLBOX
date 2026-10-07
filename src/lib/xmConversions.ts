@@ -16,6 +16,7 @@ import { davidWhittakerEffectToString } from './import/formats/davidWhittakerEff
 import { benDaglishEffectToString } from './import/formats/benDaglishEffectGlyphs';
 import { robHubbardEffectToString } from './import/formats/robHubbardEffectGlyphs';
 import { futurePlayerEffectToString } from './import/formats/fpEffectGlyphs';
+import { musicAssemblerEffectToString } from './import/formats/maEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
@@ -302,6 +303,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Future Player stream commands (reserved block 0xF3..0xFA).
   const fp = futurePlayerEffectToString(effTyp, eff);
   if (fp !== null) return fp;
+
+  // Music Assembler track and position commands (reserved block 0xFB..0xFE).
+  const ma = musicAssemblerEffectToString(effTyp, eff);
+  if (ma !== null) return ma;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;

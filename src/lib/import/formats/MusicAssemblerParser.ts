@@ -27,8 +27,10 @@
  *
  * Channel map: [0, 3, 1, 2] (non-linear Amiga LRRL assignment)
  *
- * Period table: 48 entries (4 octaves × 12 notes). Index 12 = 856 = XM C-3.
- *   xmNote = 37 + (maNoteIdx - 12)
+ * Period table: 48 entries (4 octaves x 12 notes), index 0 = 1712 = note 1 (periodNotes naming).
+ *
+ * The grid is the player's walk (maWalk.ts, held to the original 68k player in UADE by
+ * musicAssemblerWalkMatchesPlayer.test.ts) drawn by maGrid.ts; the module's tables are read by maModule.ts.
  *
  * Position list: 2 bytes per entry. Terminated by TrackNumber 0xff or 0xfe.
  *   byte0 = TrackNumber
@@ -58,201 +60,16 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { musicAssemblerEncoder } from '@/engine/uade/encoders/MusicAssemblerEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { isMusicAssemblerModule, loadMaModule, MA_PAL_CLOCK } from './maModule';
+import { walkMusicAssembler } from './maWalk';
+import { buildMaGridFromWalk } from './maGrid';
 
-// ── Constants ─────────────────────────────────────────────────────────────
-
-/** PAL Amiga clock frequency (Hz) */
-const PAL_CLOCK = 3546895;
-
-/**
- * Music Assembler period table — 48 entries (4 octaves × 12 notes).
- * Index 12 = 856 (Amiga C-3 / XM C-3 = note 37).
- * Copied verbatim from NostalgicPlayer MusicAssembler/Tables.cs.
- */
-const MA_PERIODS: number[] = [
-  1712, 1616, 1524, 1440, 1356, 1280, 1208, 1140, 1076, 1016,  960,  906,
-   856,  808,  762,  720,  678,  640,  604,  570,  538,  508,  480,  453,
-   428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240,  226,
-   214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120,  113,
-];
-
-/**
- * Index in MA_PERIODS corresponding to XM note 37 (C-3, period 856).
- */
-const MA_REFERENCE_IDX = 12; // MA_PERIODS[12] = 856
-
-/**
- * XM note number for the MA reference period (Amiga C-1 = XM 13, displays "C-1").
- */
-const XM_REFERENCE_NOTE = 13;
-
-/**
- * Channel map from MusicAssemblerWorker.cs Tables.ChannelMap.
- * Maps voice index → actual Amiga channel (LRRL hard stereo).
- */
-const CHANNEL_MAP = [0, 3, 1, 2];
-
-/**
- * PAL sample rate at Amiga C-3 (period 214): 3546895 / (2 × 214) ≈ 8287 Hz.
- */
-const PCM_BASE_RATE = Math.round(PAL_CLOCK / (2 * 214)); // 8287 Hz
-
-// ── Utility ────────────────────────────────────────────────────────────────
-
-function u16BE(buf: Uint8Array, off: number): number {
-  return ((buf[off] << 8) | buf[off + 1]) >>> 0;
-}
-
-function s16(buf: Uint8Array, off: number): number {
-  const v = (buf[off] << 8) | buf[off + 1];
-  return v < 0x8000 ? v : v - 0x10000;
-}
-
-function s32BE(buf: Uint8Array, off: number): number {
-  const v = ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]);
-  return v;
-}
-
-function s8v(v: number): number {
-  return v < 128 ? v : v - 256;
-}
-
-/** Convert Music Assembler note index → XM note (0 = no note). */
-function maNoteToXM(n: number): number {
-  if (n === 0) return 0;
-  return XM_REFERENCE_NOTE + (n - MA_REFERENCE_IDX);
-}
-
-/** Decode a null-terminated Amiga Latin-1 string from buf[off..off+len). */
-function readString(buf: Uint8Array, off: number, len: number): string {
-  let s = '';
-  for (let i = 0; i < len; i++) {
-    const c = buf[off + i];
-    if (c === 0) break;
-    s += String.fromCharCode(c);
-  }
-  return s.trim();
-}
-
-// ── Offset extraction (mirrors MusicAssemblerWorker.cs) ──────────────────
-
-interface ExtractedOffsets {
-  subSongCount: number;
-  subSongSpeedOffset: number;
-  subSongPositionListOffset: number;
-  moduleStartOffset: number;
-  instrumentInfoOffsetOffset: number;
-  sampleInfoOffsetOffset: number;
-  tracksOffsetOffset: number;
-}
-
-/**
- * Extract all data offsets from the M68k player bytecode.
- * Returns null if the file doesn't match the Music Assembler player signature.
- */
-function extractOffsets(buf: Uint8Array): ExtractedOffsets | null {
-  const searchLength = buf.length;
-
-  // ── ExtractInfoFromInitFunction ─────────────────────────────────────────
-  // Find init function start: signed 16-bit displacement at bytes[2..3] + 2
-  const startOfInit = s16(buf, 2) + 2;
-  if (startOfInit < 0 || startOfInit >= searchLength) return null;
-
-  let index = startOfInit;
-
-  // Find CMPI.W (0xb0 0x7c) — compare immediate word to register
-  while (index < searchLength - 4) {
-    if (buf[index] === 0xb0 && buf[index + 1] === 0x7c) break;
-    index += 2;
-  }
-  if (index >= searchLength - 4) return null;
-
-  const subSongCount = (buf[index + 2] << 8) | buf[index + 3];
-  index += 4;
-
-  // Find LEA.L pc-relative (0x49 0xfa) → subSongSpeedOffset
-  while (index < searchLength - 4) {
-    if (buf[index] === 0x49 && buf[index + 1] === 0xfa) break;
-    index += 2;
-  }
-  if (index >= searchLength - 4) return null;
-
-  const subSongSpeedOffset = s16(buf, index + 2) + index + 2;
-  index += 4;
-
-  // Find LEA.L pc-relative2 (0x49 0xfb) → subSongPositionListOffset
-  // displacement is only 1 byte (signed byte at index+3)
-  while (index < searchLength - 4) {
-    if (buf[index] === 0x49 && buf[index + 1] === 0xfb) break;
-    index += 2;
-  }
-  if (index >= searchLength - 4) return null;
-
-  const subSongPositionListOffset = s8v(buf[index + 3]) + index + 2;
-
-  // ── ExtractInfoFromPlayFunction ─────────────────────────────────────────
-  // Start scanning from 0x0c (the play function entry)
-  const startOfPlay = 0x0c;
-  index = startOfPlay;
-
-  // Find LEA.L (0x43 0xfa) → moduleStartOffset
-  while (index < searchLength - 4) {
-    if (buf[index] === 0x43 && buf[index + 1] === 0xfa) break;
-    index += 2;
-  }
-  if (index >= searchLength - 4) return null;
-
-  const moduleStartOffset = s16(buf, index + 2) + index + 2;
-  index += 4;
-
-  // Find ADDA.L (0xd3 0xfa) → instrumentInfoOffsetOffset
-  while (index < searchLength - 8) {
-    if (buf[index] === 0xd3 && buf[index + 1] === 0xfa) break;
-    index += 2;
-  }
-  if (index >= searchLength - 8) return null;
-
-  const instrumentInfoOffsetOffset = s16(buf, index + 2) + index + 2;
-
-  // Next instruction must be ADDA.L (0xd5 0xfa) → sampleInfoOffsetOffset
-  if (buf[index + 4] !== 0xd5 || buf[index + 5] !== 0xfa) return null;
-  const sampleInfoOffsetOffset = s16(buf, index + 6) + index + 6;
-  index += 8;
-
-  // Find BSR.B (0x61) — branch to subroutine with 8-bit displacement
-  while (index < searchLength - 2) {
-    if (buf[index] === 0x61) break;
-    index += 2;
-  }
-  if (index >= searchLength - 2) return null;
-
-  // Follow branch: displacement is signed byte at index+1; new index = s8(disp) + index + 2
-  index = s8v(buf[index + 1]) + index + 2;
-  if (index < 0 || index >= searchLength) return null;
-
-  // Find ADDA.L (0xdb 0xfa) → tracksOffsetOffset
-  while (index < searchLength - 4) {
-    if (buf[index] === 0xdb && buf[index + 1] === 0xfa) break;
-    index += 2;
-  }
-  if (index >= searchLength - 4) return null;
-
-  const tracksOffsetOffset = s16(buf, index + 2) + index + 2;
-
-  return {
-    subSongCount,
-    subSongSpeedOffset,
-    subSongPositionListOffset,
-    moduleStartOffset,
-    instrumentInfoOffsetOffset,
-    sampleInfoOffsetOffset,
-    tracksOffsetOffset,
-  };
-}
+/** PAL sample rate at Amiga C-3 (period 214): 3546895 / (2 × 214) ≈ 8287 Hz. */
+const PCM_BASE_RATE = Math.round(MA_PAL_CLOCK / (2 * 214)); // 8287 Hz
 
 // ── Format Identification ──────────────────────────────────────────────────
 
@@ -261,19 +78,7 @@ function extractOffsets(buf: Uint8Array): ExtractedOffsets | null {
  * Checks M68k player code signature, then attempts full offset extraction.
  */
 export function isMusicAssemblerFormat(bytes: Uint8Array): boolean {
-  if (bytes.length < 0x622) return false;
-
-  // Check mandatory M68k bytecode sequence at fixed positions
-  if (
-    bytes[0]  !== 0x60 || bytes[1]  !== 0x00 ||
-    bytes[4]  !== 0x60 || bytes[5]  !== 0x00 ||
-    bytes[8]  !== 0x60 || bytes[9]  !== 0x00 ||
-    bytes[12] !== 0x48 || bytes[13] !== 0xe7
-  ) return false;
-
-  // Use a 0x700-byte search window (matching MusicAssemblerWorker.cs)
-  const searchBuf = bytes.length >= 0x700 ? bytes.subarray(0, 0x700) : bytes;
-  return extractOffsets(searchBuf) !== null;
+  return isMusicAssemblerModule(bytes);
 }
 
 // ── Parser ─────────────────────────────────────────────────────────────────
@@ -290,376 +95,23 @@ export function parseMusicAssemblerFile(bytes: Uint8Array, filename: string): Tr
   }
 }
 
-// ── Position list ──────────────────────────────────────────────────────────
-
-interface MAPositionEntry {
-  trackNumber: number;
-  transpose: number;
-  repeatCounter: number;
-}
-
-function loadPositionList(bytes: Uint8Array, off: number): MAPositionEntry[] | null {
-  const list: MAPositionEntry[] = [];
-  for (;;) {
-    if (off + 2 > bytes.length) return null;
-    const trackNumber = bytes[off++];
-    const rawByte     = bytes[off++];
-
-    // From LoadSinglePositionList in MusicAssemblerWorker.cs:
-    //   ushort val = (ushort)(byt << 4);
-    //   byt = (byte)((val & 0xff) >> 1);
-    //   posInfo.Transpose = (byte)(val >> 8);
-    //   posInfo.RepeatCounter = (sbyte)byt;
-    const val       = (rawByte << 4) & 0xffff;
-    const transpose = (val >> 8) & 0xff;
-    const repeatRaw = (val & 0xff) >> 1;
-    const repeatCounter = s8v(repeatRaw);
-
-    list.push({ trackNumber, transpose, repeatCounter });
-
-    if (trackNumber === 0xff || trackNumber === 0xfe) break;
-  }
-  return list;
-}
-
-// ── Track loader ────────────────────────────────────────────────────────────
-
-function loadSingleTrack(bytes: Uint8Array, off: number): Uint8Array | null {
-  const trackBytes: number[] = [];
-
-  for (;;) {
-    if (off >= bytes.length) return null;
-    let byt = bytes[off++];
-    trackBytes.push(byt);
-
-    if ((byt & 0x80) !== 0) {
-      if ((byt & 0x40) !== 0) {
-        // Read b1
-        if (off >= bytes.length) return null;
-        byt = bytes[off++];
-        trackBytes.push(byt);
-        // Read b2
-        if (off >= bytes.length) return null;
-        byt = bytes[off++];
-        trackBytes.push(byt);
-        // Optionally read b3
-        if ((byt & 0x80) !== 0) {
-          if (off >= bytes.length) return null;
-          byt = bytes[off++];
-          trackBytes.push(byt);
-        }
-      }
-      // else: high-bit set but not bit 6 → just the 1 byte already pushed
-    } else {
-      // Read b1
-      if (off >= bytes.length) return null;
-      byt = bytes[off++];
-      trackBytes.push(byt);
-      // Optionally read b2
-      if ((byt & 0x80) !== 0) {
-        if (off >= bytes.length) return null;
-        byt = bytes[off++];
-        trackBytes.push(byt);
-      }
-    }
-
-    // Peek next byte for end-of-track check
-    if (off >= bytes.length) return null;
-    const nextByte = bytes[off];
-    if (nextByte === 0xff) {
-      trackBytes.push(nextByte);
-      off++;
-      break;
-    }
-    // Not end — continue reading (nextByte is the first byte of the next event)
-  }
-
-  return new Uint8Array(trackBytes);
-}
-
-// ── Decode a single track into rows ─────────────────────────────────────────
-
-interface MATrackRow {
-  note: number;       // MA note index (0 = no note)
-  instrument: number; // instrument index (0-based, -1 = no change)
-  release: boolean;   // key-off event
-  delay: number;      // row delay counter (from last byte read)
-}
-
-/**
- * Decode track events matching the C replayer's ma_get_next_row_in_track() exactly.
- *
- * Three event types based on high bits of first byte:
- *   (b0 & 0x80) == 0:             Note event (no instrument change)
- *   (b0 & 0x80) != 0, (b0 & 0x40) == 0:  Release event
- *   (b0 & 0x80) != 0, (b0 & 0x40) != 0:  Instrument + note event
- *
- * The last byte read in each event becomes the row delay counter.
- */
-function decodeTrack(track: Uint8Array): MATrackRow[] {
-  const rows: MATrackRow[] = [];
-  let off = 0;
-
-  while (off < track.length) {
-    const b0 = track[off++];
-    if (b0 === 0xff) break;
-
-    let note = 0;
-    let instrument = -1;
-    let release = false;
-    let lastByte = b0;
-
-    if ((b0 & 0x80) === 0) {
-      // ── Note event (no instrument change) ──
-      // b0 bits 5-0 = note index
-      // b0 bit 6: if 0, retrigger; if 1, legato (both still set note)
-      note = b0 & 0x3f;
-
-      if (off >= track.length) break;
-      const b1 = track[off++];
-      lastByte = b1;
-
-      if ((b1 & 0x80) !== 0) {
-        // Portamento/vibrato: strip high bit, read one more byte
-        lastByte = b1 & 0x7f;
-        if (off >= track.length) break;
-        // portamento_or_vibrato_value (skip for display)
-        off++;
-      }
-    } else if ((b0 & 0x40) === 0) {
-      // ── Release event ──
-      // b0 bits 5-0 used as delay directly (lastByte = b0 & 0x3f)
-      release = true;
-      lastByte = b0 & 0x3f;
-    } else {
-      // ── Instrument + note event ──
-      // b0 bits 5-0 = instrument index
-      instrument = b0 & 0x3f;
-
-      if (off >= track.length) break;
-      const b1 = track[off++];
-      // b1 bits 5-0 = note index
-      note = b1 & 0x3f;
-
-      if (off >= track.length) break;
-      const b2 = track[off++];
-      lastByte = b2;
-
-      if ((b2 & 0x80) !== 0) {
-        // Portamento/vibrato: strip high bit, read one more byte
-        lastByte = b2 & 0x7f;
-        if (off >= track.length) break;
-        // portamento_or_vibrato_value (skip for display)
-        off++;
-      }
-    }
-
-    rows.push({ note, instrument, release, delay: (lastByte << 24) >> 24 });
-  }
-
-  return rows;
-}
-
-// ── Main parser ─────────────────────────────────────────────────────────────
-
 function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong | null {
-  if (!isMusicAssemblerFormat(bytes)) return null;
+  const m = loadMaModule(bytes);
+  if (!m) return null;
 
-  // Use 0x700-byte search window for offset extraction
-  const searchBuf = bytes.length >= 0x700 ? bytes.subarray(0, 0x700) : bytes;
-  const offsets = extractOffsets(searchBuf);
-  if (!offsets) return null;
-
-  const {
-    subSongCount,
-    subSongSpeedOffset,
-    subSongPositionListOffset,
-    moduleStartOffset,
-    instrumentInfoOffsetOffset,
-    sampleInfoOffsetOffset,
-    tracksOffsetOffset,
-  } = offsets;
-
-  if (subSongCount <= 0 || subSongCount > 256) return null;
-
-  // ── Load sub-song speed list ─────────────────────────────────────────────
-  if (subSongSpeedOffset + subSongCount > bytes.length) return null;
-  const speedList = bytes.subarray(subSongSpeedOffset, subSongSpeedOffset + subSongCount);
-
-  // ── Load sub-song position list offsets ─────────────────────────────────
-  // Each sub-song has 4 position list offsets (one per voice), each u16 BE
-  // Layout: subSongCount * 4 entries of u16 BE
-  const posListTableOff = subSongPositionListOffset;
-  if (posListTableOff + subSongCount * 4 * 2 > bytes.length) return null;
-
-  interface MASongInfo {
-    startSpeed: number;
-    positionListOffsets: number[]; // 4 offsets (relative to moduleStartOffset)
-  }
-  const subSongs: MASongInfo[] = [];
-
-  for (let i = 0; i < subSongCount; i++) {
-    const base = posListTableOff + i * 8; // 4 × u16BE = 8 bytes per sub-song
-    const pl0 = u16BE(bytes, base + 0);
-    const pl1 = u16BE(bytes, base + 2);
-    const pl2 = u16BE(bytes, base + 4);
-    const pl3 = u16BE(bytes, base + 6);
-
-    // Filter out dummy sub-songs (consecutive offsets = empty sub-song)
-    if ((pl0 + 2) === pl1 && (pl1 + 2) === pl2 && (pl2 + 2) === pl3) continue;
-
-    subSongs.push({
-      startSpeed: speedList[i] || 6,
-      positionListOffsets: [pl0, pl1, pl2, pl3],
-    });
-  }
-
-  if (subSongs.length === 0) return null;
-
-  // ── Load all unique position lists ──────────────────────────────────────
-  const positionListCache = new Map<number, MAPositionEntry[]>();
-
-  for (const song of subSongs) {
-    for (const plOff of song.positionListOffsets) {
-      if (positionListCache.has(plOff)) continue;
-      const absOff = moduleStartOffset + plOff;
-      if (absOff >= bytes.length) continue;
-      const pl = loadPositionList(bytes, absOff);
-      if (pl) positionListCache.set(plOff, pl);
-    }
-  }
-
-  // ── Determine number of tracks ─────────────────────────────────────────
-  let maxTrackNumber = 0;
-  for (const pl of positionListCache.values()) {
-    for (const entry of pl) {
-      if (entry.trackNumber !== 0xff && entry.trackNumber !== 0xfe) {
-        if (entry.trackNumber > maxTrackNumber) maxTrackNumber = entry.trackNumber;
-      }
-    }
-  }
-  const numberOfTracks = maxTrackNumber + 1;
-
-  // ── Load tracks start offset ────────────────────────────────────────────
-  if (tracksOffsetOffset + 4 > bytes.length) return null;
-  const tracksRelOffset = s32BE(bytes, tracksOffsetOffset);
-  const tracksStartOffset = tracksRelOffset + moduleStartOffset;
-
-  // ── Load track offset table ─────────────────────────────────────────────
-  // Track offsets are stored at moduleStartOffset as u16 BE table
-  if (moduleStartOffset + numberOfTracks * 2 > bytes.length) return null;
-  const trackOffsetTable: number[] = [];
-  for (let i = 0; i < numberOfTracks; i++) {
-    trackOffsetTable.push(u16BE(bytes, moduleStartOffset + i * 2));
-  }
-
-  // ── Load each track ─────────────────────────────────────────────────────
-  const tracks: (Uint8Array | null)[] = new Array(numberOfTracks).fill(null);
-  for (let i = 0; i < numberOfTracks; i++) {
-    const trackOff = tracksStartOffset + trackOffsetTable[i];
-    if (trackOff < 0 || trackOff >= bytes.length) continue;
-    tracks[i] = loadSingleTrack(bytes, trackOff);
-  }
-
-  // ── Decode tracks into rows ─────────────────────────────────────────────
-  const decodedTracks: MATrackRow[][] = tracks.map(t => t ? decodeTrack(t) : []);
-
-  // ── Load instrument info ─────────────────────────────────────────────────
-  if (instrumentInfoOffsetOffset + 4 > bytes.length) return null;
-  const instrStartRel = s32BE(bytes, instrumentInfoOffsetOffset);
-  if (sampleInfoOffsetOffset + 4 > bytes.length) return null;
-  const sampleStartRel = s32BE(bytes, sampleInfoOffsetOffset);
-
-  const numberOfInstruments = (sampleStartRel - instrStartRel) / 16;
-  if (numberOfInstruments < 0 || numberOfInstruments > 256) return null;
-
-  const instrAbsOff = moduleStartOffset + instrStartRel;
-  if (instrAbsOff + numberOfInstruments * 16 > bytes.length) return null;
-
-  interface MAInstrument {
-    sampleNumber: number;
-    attack: number;
-    decaySustain: number;
-    vibratoDelay: number;
-    release: number;
-    vibratoSpeed: number;
-    vibratoLevel: number;
-    arpeggio: number;
-    fxArpSpdLp: number;
-    hold: number;
-    keyWaveRate: number;
-    waveLevelSpeed: number;
-  }
-  const instruments: MAInstrument[] = [];
-  for (let i = 0; i < numberOfInstruments; i++) {
-    const base = instrAbsOff + i * 16;
-    instruments.push({
-      sampleNumber:  bytes[base + 0],
-      attack:        bytes[base + 1],
-      decaySustain:  bytes[base + 2],
-      vibratoDelay:  bytes[base + 3],
-      release:       bytes[base + 4],
-      vibratoSpeed:  bytes[base + 5],
-      vibratoLevel:  bytes[base + 6],
-      arpeggio:      bytes[base + 7],
-      fxArpSpdLp:    bytes[base + 8],
-      hold:          bytes[base + 9],
-      keyWaveRate:   bytes[base + 10],
-      waveLevelSpeed: bytes[base + 11],
-      // bytes[base+12..15] = padding (4 bytes)
-    });
-  }
-
-  // ── Load sample info ─────────────────────────────────────────────────────
-  const sampleAbsOff = moduleStartOffset + sampleStartRel;
-
-  // Number of samples: (min positionList offset + moduleStartOffset - sampleAbsOff) / 24
-  // From MusicAssemblerWorker.cs:
-  //   int numberOfSamples = (positionLists.Keys.Min() + moduleStartOffset - sampleStartOffset) / 24;
-  let minPosListOffset = Infinity;
-  for (const k of positionListCache.keys()) {
-    if (k < minPosListOffset) minPosListOffset = k;
-  }
-  if (!isFinite(minPosListOffset)) return null;
-
-  const numberOfSamples = Math.floor((minPosListOffset + moduleStartOffset - sampleAbsOff) / 24);
-  if (numberOfSamples < 0 || numberOfSamples > 256) return null;
-  if (sampleAbsOff + numberOfSamples * 24 > bytes.length) return null;
-
-  interface MASample {
-    name: string;
-    dataOffset: number; // absolute byte offset into `bytes`, or -1 if no data
-    lengthWords: number;
-    loopLengthWords: number;
-  }
-  const sampleInfos: MASample[] = [];
-
-  for (let i = 0; i < numberOfSamples; i++) {
-    const base = sampleAbsOff + i * 24;
-    const relOff    = s32BE(bytes, base + 0);
-    const lengthW   = u16BE(bytes, base + 4);
-    const loopW     = u16BE(bytes, base + 6);
-    const name      = readString(bytes, base + 8, 16);
-
-    const dataOff = relOff < 0 ? -1 : sampleAbsOff + relOff;
-
-    sampleInfos.push({
-      name,
-      dataOffset: dataOff,
-      lengthWords: lengthW,
-      loopLengthWords: loopW,
-    });
-  }
+  const { samples, subSongs, tracks, numberOfTracks, tracksStartOffset, trackOffsetTable } = m;
+  const numberOfInstruments = m.instruments.length;
+  const numberOfSamples = samples.length;
 
   // ── Build InstrumentConfigs ─────────────────────────────────────────────
   const instrumentConfigs: InstrumentConfig[] = [];
 
   for (let i = 0; i < numberOfInstruments; i++) {
-    const instr   = instruments[i];
+    const instr   = m.instruments[i];
     const instrId = i + 1;
     const sIdx    = instr.sampleNumber;
 
-    if (sIdx >= numberOfSamples || sampleInfos[sIdx].dataOffset < 0) {
+    if (sIdx >= numberOfSamples || samples[sIdx].dataOffset < 0) {
       // No sample data — placeholder
       instrumentConfigs.push({
         id:         instrId,
@@ -674,7 +126,7 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
       continue;
     }
 
-    const si = sampleInfos[sIdx];
+    const si = samples[sIdx];
 
     if (si.lengthWords > 1 && si.lengthWords <= 128) {
       // Synthesis wavetable — no real PCM; create synth placeholder
@@ -735,149 +187,56 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
     }
   }
 
-  // ── Build patterns ──────────────────────────────────────────────────────
-  // Use sub-song 0 as the primary song.
+  // ── The grid: the player's walk of sub-song 0, or none ───────────────────
   const primarySong = subSongs[0];
-  if (!primarySong) return null;
+  const walk = walkMusicAssembler(m, 0);
+  let grid = walk ? buildMaGridFromWalk(walk, m) : null;
+  let unmatched: string | undefined;
+  if (!walk) unmatched = 'the module has no sub-song to walk';
+  else if (walk.stop === 'ended') { unmatched = walk.endReason ?? 'the player ends the song on an event it cannot read'; grid = null; }
 
-  // Amiga hard stereo panning (LRRL): channels 0,3 = left; 1,2 = right
-  const CHANNEL_PAN = [-50, 50, 50, -50];
-
-  // Collect the position lists for this sub-song in channel-map order
-  const voicePosLists: MAPositionEntry[][] = [];
-  for (let v = 0; v < 4; v++) {
-    const plOff = primarySong.positionListOffsets[CHANNEL_MAP[v]];
-    const pl    = positionListCache.get(plOff);
-    voicePosLists.push(pl ?? []);
-  }
-
-  // Determine song length (max position count across all 4 voices, excluding terminators)
-  const voicePositionCounts = voicePosLists.map(pl =>
-    pl.filter(e => e.trackNumber !== 0xff && e.trackNumber !== 0xfe).length
-  );
-  const maxPositions = Math.max(...voicePositionCounts, 0);
-
-  // Determine how many rows are in each track (scan the decoded tracks)
-  function trackRowCount(trackIdx: number): number {
-    if (trackIdx >= decodedTracks.length) return 16;
-    return Math.max(decodedTracks[trackIdx].length, 1);
-  }
-
-  // Build one pattern per position slot
-  const patterns: Pattern[] = [];
-  const songPositions: number[] = [];
-
-  for (let posIdx = 0; posIdx < maxPositions; posIdx++) {
-    // Determine pattern length = max rows across the 4 voices at this position
-    let patternLen = 16;
-    for (let v = 0; v < 4; v++) {
-      const pl = voicePosLists[v];
-      if (posIdx < pl.length) {
-        const entry     = pl[posIdx];
-        const trackIdx  = entry.trackNumber;
-        if (trackIdx !== 0xff && trackIdx !== 0xfe) {
-          const rowCount = trackRowCount(trackIdx);
-          if (rowCount > patternLen) patternLen = rowCount;
-        }
-      }
-    }
-
-    const cells: TrackerCell[][] = Array.from({ length: patternLen }, () =>
-      Array.from({ length: 4 }, () => ({
-        note: 0, instrument: 0, volume: 0,
-        effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-      } as TrackerCell))
-    );
-
-    for (let v = 0; v < 4; v++) {
-      const pl = voicePosLists[v];
-      if (posIdx >= pl.length) continue;
-
-      const entry    = pl[posIdx];
-      if (entry.trackNumber === 0xff || entry.trackNumber === 0xfe) continue;
-
-      const trackIdx = entry.trackNumber;
-      if (trackIdx >= decodedTracks.length) continue;
-
-      const trackRows = decodedTracks[trackIdx];
-      const transpose = entry.transpose;
-
-      let lastInstrument = 0;
-      for (let row = 0; row < Math.min(trackRows.length, patternLen); row++) {
-        const tr = trackRows[row];
-
-        // Track instrument across events (instrument -1 = no change)
-        if (tr.instrument >= 0) {
-          lastInstrument = tr.instrument + 1; // convert 0-based to 1-based
-        }
-
-        let xmNote = 0;
-        if (tr.release) {
-          xmNote = 97; // XM key-off
-        } else if (tr.note !== 0) {
-          // Apply transpose (signed byte added to note index)
-          const rawNote = tr.note + transpose;
-          const clamped = Math.max(1, Math.min(MA_PERIODS.length - 1, rawNote));
-          xmNote = maNoteToXM(clamped);
-        }
-
-        cells[row][v] = {
-          note:       xmNote,
-          instrument: xmNote !== 0 || tr.release ? lastInstrument : 0,
-          volume:     0,
-          effTyp:     0,
-          eff:        0,
-          effTyp2:    0,
-          eff2:       0,
-        };
-      }
-    }
-
-    const patIdx = patterns.length;
-    patterns.push({
-      id:     `pattern-${patIdx}`,
-      name:   `Pattern ${patIdx}`,
-      length: patternLen,
+  let patterns = grid?.patterns;
+  let songPositions = grid?.songPositions;
+  if (!patterns || !songPositions) {
+    // No guessed grid: the song opens in the scope view (gridUnmatchedReason) over an empty pattern.
+    console.warn(`[MusicAssemblerParser] ${filename}: no grid - ${unmatched}`);
+    patterns = [{
+      id: 'pattern-0',
+      name: 'Pattern 0',
+      length: 64,
       channels: Array.from({ length: 4 }, (_, chIdx) => ({
-        id:           `channel-${chIdx}`,
-        name:         `Channel ${chIdx + 1}`,
-        muted:        false,
-        solo:         false,
-        collapsed:    false,
-        volume:       100,
-        pan:          CHANNEL_PAN[chIdx],
-        instrumentId: null,
-        color:        null,
-        rows:         cells.map(row => row[chIdx]),
+        id: `channel-${chIdx}`,
+        name: `Channel ${chIdx + 1}`,
+        muted: false, solo: false, collapsed: false,
+        volume: 100,
+        pan: chIdx === 0 || chIdx === 2 ? -50 : 50,
+        instrumentId: null, color: null,
+        rows: Array.from({ length: 64 }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } as TrackerCell)),
       })),
-      importMetadata: {
-        sourceFormat:            'MusicAssembler' as const,
-        sourceFile:              filename,
-        importedAt:              new Date().toISOString(),
-        originalChannelCount:    4,
-        originalPatternCount:    maxPositions,
-        originalInstrumentCount: numberOfInstruments,
-      },
-    });
-
-    songPositions.push(patIdx);
+    }];
+    songPositions = [0];
   }
-
-  if (patterns.length === 0) return null;
+  patterns = patterns.map((pat) => ({
+    ...pat,
+    importMetadata: {
+      sourceFormat: 'MusicAssembler' as const,
+      sourceFile: filename,
+      importedAt: new Date().toISOString(),
+      originalChannelCount: 4,
+      originalPatternCount: patterns!.length,
+      originalInstrumentCount: numberOfInstruments,
+    },
+  }));
 
   const baseName = filename.replace(/\.[^/.]+$/, '');
 
-  // ── Build uadeVariableLayout for chip RAM editing ─────────────────────────
-  // Each file-level track is a variable-length byte stream. Build the mapping
-  // from (trackerPatternIdx, channelIdx) → file track index.
+  // ── Build uadeVariableLayout: the tracks, byte-exact ───────────────────────
+  // Each file-level track is a variable-length byte stream. Per-byte carrier rows
+  // (cutoff=1, period=byte) let the encoder reproduce each track verbatim; the grid
+  // above is the walk, which does not map pattern by pattern onto tracks (trackMap
+  // is empty: edits are written by maGridEdits.ts from what each cell was drawn from).
   const filePatternAddrs: number[] = [];
   const filePatternSizes: number[] = [];
-
-  // Per-byte carrier rows: a Music Assembler track is a variable-length command
-  // stream (events run 1..4 bytes, 0xff terminator), not a fixed grid. tracks[i]
-  // holds the verbatim on-disk bytes, so per-byte carriers (cutoff=1, period=byte)
-  // let the encoder reproduce each track verbatim; the editable display grid stays
-  // carrier-less.
   const blockRows: TrackerCell[][] = [];
   for (let i = 0; i < numberOfTracks; i++) {
     const trackOff = tracksStartOffset + trackOffsetTable[i];
@@ -896,32 +255,13 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
     blockRows.push(cells);
   }
 
-  // trackMap[trackerPatIdx][chIdx] = file-level track index
-  const trackMap: number[][] = [];
-  for (let posIdx = 0; posIdx < maxPositions; posIdx++) {
-    const chMap: number[] = [];
-    for (let v = 0; v < 4; v++) {
-      const pl = voicePosLists[v];
-      if (posIdx < pl.length) {
-        const entry = pl[posIdx];
-        if (entry.trackNumber !== 0xff && entry.trackNumber !== 0xfe &&
-            entry.trackNumber < numberOfTracks) {
-          chMap.push(entry.trackNumber);
-        } else {
-          chMap.push(-1);
-        }
-      } else {
-        chMap.push(-1);
-      }
-    }
-    trackMap.push(chMap);
-  }
+  const trackMap: number[][] = patterns.map(() => []);
 
   const uadeVariableLayout: UADEVariablePatternLayout = {
     formatId: 'musicAssembler',
     numChannels: 4,
     numFilePatterns: numberOfTracks,
-    rowsPerPattern: decodedTracks.map(t => Math.max(t.length, 1)),
+    rowsPerPattern: tracks.map((t) => Math.max(t ? t.length : 0, 1)),
     moduleSize: bytes.length,
     encoder: musicAssemblerEncoder,
     filePatternAddrs,
@@ -937,11 +277,12 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
     instruments:     instrumentConfigs,
     songPositions,
     songLength:      songPositions.length,
-    restartPosition: 0,
+    restartPosition: grid ? grid.layout.restartPosition : 0,
     numChannels:     4,
-    initialSpeed:    primarySong.startSpeed || 6,
+    initialSpeed:    walk ? walk.speed : (primarySong.startSpeed || 6),
     initialBPM:      125,
     maFileData:      new Uint8Array(bytes).buffer.slice(0) as ArrayBuffer,
     uadeVariableLayout,
+    ...(grid ? {} : { gridUnmatchedReason: unmatched ?? 'the grid was not matched to the player' }),
   };
 }

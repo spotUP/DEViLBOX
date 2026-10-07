@@ -21,6 +21,7 @@ if(EMSCRIPTEN)
         "_player_get_channel_levels" "_player_get_note_start_counts"
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration" "_player_set_channel_gain"
+        "_player_get_ticks_played" "_player_get_tick_marks" "_player_get_tick_speed"
         "_ma_get_num_tracks" "_ma_get_track_length" "_ma_get_cell" "_ma_set_cell"
         "_ma_note_on_preview" "_ma_note_off_preview" "_ma_render_preview_buf"
         "_ma_get_instrument_count"

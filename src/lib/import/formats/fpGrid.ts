@@ -14,9 +14,10 @@
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToPitch } from '@/lib/amiga/periodNotes';
 import { FP_FX } from './fpEffectGlyphs';
+import { WALK_ROWS_PER_PATTERN, walkLayout, walkTickPosition, type WalkLayout } from './walkLayout';
 import { FP_PERIODS, FP_WALK, fpReleaseRate, type FpWalk, type FpWalkEvent } from './fpWalk';
 
-export const FP_ROWS_PER_PATTERN = 64;
+export const FP_ROWS_PER_PATTERN = WALK_ROWS_PER_PATTERN;
 const EFFECT_SLOTS = 5;
 
 /**
@@ -69,51 +70,10 @@ export function fpPeriodToNote(period: number, bias = 0): number {
   return shown >= 1 && shown <= 96 ? shown : 0;
 }
 
-/** Where the grid's patterns begin and how long each is: 64 rows, the loop's first row starting one. */
-export interface FpLayout {
-  rows: number;
-  /** First row of the loop body; -1 when the song does not loop. */
-  loopRow: number;
-  /** Ticks per row. */
-  speed: number;
-  /** Rows of each pattern, in order. */
-  patternLengths: number[];
-  /** Pattern the song restarts at (the loop's first); 0 without a loop. */
-  restartPosition: number;
-  /** How the walk ended: a loop, every voice ended, or the row cap (the song plays on past the grid). */
-  stop: FpWalk['stop'];
-}
-
-export function fpLayout(walk: Pick<FpWalk, 'rows' | 'loopRow' | 'speed' | 'stop'>): FpLayout {
-  const lengths: number[] = [];
-  const cut = (from: number, to: number): void => {
-    for (let r = from; r < to; r += FP_ROWS_PER_PATTERN) lengths.push(Math.min(FP_ROWS_PER_PATTERN, to - r));
-  };
-  const loopRow = walk.stop === 'loop' ? walk.loopRow : -1;
-  let restartPosition = 0;
-  if (loopRow > 0) { cut(0, loopRow); restartPosition = lengths.length; cut(loopRow, walk.rows); } else cut(0, Math.max(1, walk.rows));
-  return { rows: Math.max(1, walk.rows), loopRow, speed: walk.speed, patternLengths: lengths, restartPosition, stop: walk.stop };
-}
-
-/**
- * The grid position (song order index, row of that pattern) the player is on at its `ticks`-th interrupt
- * (1-based), or null when the grid does not reach it (the song plays on past a capped grid).
- */
-export function fpTickPosition(layout: FpLayout, ticks: number): { songPos: number; row: number } | null {
-  if (ticks < 1) return null;
-  let r = Math.floor((ticks - 1) / layout.speed);
-  if (r >= layout.rows) {
-    if (layout.loopRow >= 0) r = layout.loopRow + ((r - layout.loopRow) % (layout.rows - layout.loopRow));
-    else if (layout.stop === 'ended') r = layout.rows - 1;
-    else return null;
-  }
-  let start = 0;
-  for (let p = 0; p < layout.patternLengths.length; p++) {
-    if (r < start + layout.patternLengths[p]) return { songPos: p, row: r - start };
-    start += layout.patternLengths[p];
-  }
-  return null;
-}
+/** The Future Player grid's layout and playhead mapping are the shared walk ones (walkLayout.ts). */
+export type FpLayout = WalkLayout;
+export const fpLayout = walkLayout;
+export const fpTickPosition = walkTickPosition;
 
 type Fx = [effTyp: number, eff: number];
 

@@ -19,6 +19,8 @@ class MaProcessor extends AudioWorkletProcessor {
     this.processCount = 0;
     this.previewActive = false;
     this.muteMask = 0xFFFFFFFF;
+    // Playhead: the last row posted (the replayer's own tick count, 50 Hz, is the clock)
+    this.lastPostedRow = -1;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -60,6 +62,7 @@ class MaProcessor extends AudioWorkletProcessor {
             }
 
             heapU8.set(uint8Data, wasmPtr);
+            this.lastPostedRow = -1;
             this.module._player_init(wasmPtr, uint8Data.length);
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
@@ -74,6 +77,7 @@ class MaProcessor extends AudioWorkletProcessor {
         break;
 
       case 'stop':
+        this.lastPostedRow = -1;
         if (this.module && typeof this.module._player_stop === 'function') {
           this.module._player_stop();
           this.port.postMessage({ type: 'stopped' });
@@ -81,6 +85,7 @@ class MaProcessor extends AudioWorkletProcessor {
         break;
 
       case 'setSubsong':
+        this.lastPostedRow = -1;
         if (this.module && typeof this.module._player_set_subsong === 'function') {
           this.module._player_set_subsong(data.subsong);
         }
@@ -350,6 +355,22 @@ class MaProcessor extends AudioWorkletProcessor {
   }
 
 
+  /**
+   * The row the player is on, when it changes: { type: 'position', ticks } with the player's own tick count (it ticks at
+   * 50 Hz; the first tick reads every voice's first event, row r reads on tick 1 + r * speed). The engine maps it to the grid.
+   */
+  postPlayhead() {
+    const m = this.module;
+    if (typeof m._player_get_ticks_played !== 'function') return;
+    const ticks = m._player_get_ticks_played();
+    if (ticks < 1) return;
+    const speed = Math.max(1, m._player_get_tick_speed());
+    const row = Math.floor((ticks - 1) / speed);
+    if (row === this.lastPostedRow) return;
+    this.lastPostedRow = row;
+    this.port.postMessage({ type: 'position', ticks });
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.module) return true;
     const output = outputs[0];
@@ -374,6 +395,7 @@ class MaProcessor extends AudioWorkletProcessor {
           outputR[i] = this.interleavedBuf[i * 2 + 1];
         }
       }
+      if (!this.previewActive) this.postPlayhead();
     }
 
     if (++this.processCount >= 8 && this.levelsPtr && typeof this.module._player_get_channel_levels === 'function') {
