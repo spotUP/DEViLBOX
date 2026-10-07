@@ -22,6 +22,8 @@ import { parseSonicArrangerFile } from '@/lib/import/formats/SonicArrangerParser
 import { saNoteForKey } from '@/engine/sonic-arranger/saKeyNote';
 import { parseDeltaMusic1File } from '@/lib/import/formats/DeltaMusic1Parser';
 import { dm1NoteForKey } from '@/engine/deltamusic1/dm1KeyNote';
+import { parseDeltaMusic2File } from '@/lib/import/formats/DeltaMusic2Parser';
+import { dm2NoteForKey } from '@/engine/deltamusic2/dm2KeyNote';
 import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT, fromOnset } from './keyboardPreviewHarness';
 
 const corpus = (n: string) => {
@@ -343,6 +345,63 @@ describe('Delta Music 1: a key never starts the song, and key release silences t
   it('triplex1.dm: silent before a key, sounds on a key, silent after release', async () => {
     const ab = corpus('delta-music/triplex1.dm');
     const b = await startWorklet('deltamusic1', 'DeltaMusic1', emscriptenTransform);
+    await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+    await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
+    await b.send({ type: 'noteOn', instrument: 0, note: 40 });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
+    await b.send({ type: 'noteOff' });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
+  });
+});
+
+describe.each(['formats/anthrox_intro.dm2', 'delta-music-2/asperity megademo 3.dm2'])('Delta Music 2 %s: a typed note is the replayer voice, as the song plays it', (name) => {
+  it('the first note of each voice has the song\'s pitch, level and envelope', async () => {
+    const ab = corpus(name);
+    const song = parseDeltaMusic2File(new Uint8Array(ab), name) as unknown as GridSong;
+    let measured = 0;
+    for (let ch = 0; ch < 4; ch++) {
+      // The voice's first note, if its row has no effect mapped to the grid: an effect (arpeggio,
+      // bend, volume) changes what the replayer makes of the note, which a key cannot say.
+      let n = null as { note: number; ins: number; tick: number } | null;
+      let done = false, rowsBefore = 0;
+      for (const pi of song.songPositions) {
+        song.patterns[pi].channels[ch].rows.forEach((c, row) => {
+          if (done || c.note <= 0) return;
+          done = true;
+          if (c.instrument > 0 && !c.effTyp && !c.eff) n = { note: c.note, ins: c.instrument, tick: (rowsBefore + row) * song.initialSpeed };
+        });
+        if (done) break;
+        rowsBefore += song.patterns[pi].length;
+      }
+      if (!n) continue;
+      const a = await startWorklet('deltamusic2', 'DeltaMusic2', emscriptenTransform);
+      await a.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await a.send({ type: 'setChannelMask', mask: 1 << ch });
+      await a.send({ type: 'play' });
+      const out = renderTicks(a.proc, 3000, ch === 1 || ch === 2 ? 1 : 0);
+      const on = rmsPerTick(out, 3000).findIndex((v) => v >= 0.02);
+      // the note must sound when its row plays; if the voice is silent then, the song voice is not this note
+      if (on < 0 || Math.abs(on - n.tick) > song.initialSpeed) continue;
+      const ticks = 5;
+      const b = await startWorklet('deltamusic2', 'DeltaMusic2', emscriptenTransform);
+      await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+      await b.send({ type: 'noteOn', instrument: n.ins - 1, note: dm2NoteForKey(n.note + 11) });
+      const pr = renderTicks(b.proc, ticks + 12, 0);
+      const pOn = rmsPerTick(pr, ticks + 12).findIndex((v) => v >= 0.02);
+      expect(pOn, `${name} voice ${ch}: the key sounds`).toBeGreaterThanOrEqual(0);
+      expectSameVoice(`${name} voice ${ch}`, fromOnset(out, on, ticks, 1e-3), fromOnset(pr, pOn, ticks, 1e-3), ticks);
+      measured++;
+    }
+    expect(measured, 'the song has a voice to measure').toBeGreaterThan(0);
+  });
+});
+
+describe('Delta Music 2: a key never starts the song, and key release silences the voice', () => {
+  it('anthrox_intro.dm2: silent before a key, sounds on a key, silent after release', async () => {
+    const ab = corpus('formats/anthrox_intro.dm2');
+    const b = await startWorklet('deltamusic2', 'DeltaMusic2', emscriptenTransform);
     await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
     await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);

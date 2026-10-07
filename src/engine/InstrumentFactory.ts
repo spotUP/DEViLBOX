@@ -34,6 +34,7 @@ import { OctaMEDSynth } from './octamed/OctaMEDSynth';
 import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
 import { SonicArrangerSynth } from './sonic-arranger/SonicArrangerSynth';
 import { DeltaMusic1Synth } from './deltamusic1/DeltaMusic1Synth';
+import { DeltaMusic2Synth } from './deltamusic2/DeltaMusic2Synth';
 import { SymphonieSynth } from './symphonie/SymphonieSynth';
 import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { FuturePlayerSynth } from './futureplayer/FuturePlayerSynth';
@@ -890,9 +891,15 @@ export class InstrumentFactory {
         break;
       }
 
-      case 'UADESynth':
-      case 'UADEEditableSynth':
       case 'DeltaMusic2Synth': {
+        const dm2Synth = new DeltaMusic2Synth();
+        dm2Synth.setInstrumentNumber(config.id ?? 0);
+        instrument = dm2Synth;
+        break;
+      }
+
+      case 'UADESynth':
+      case 'UADEEditableSynth': {
         const uadeSynth = new UADESynth();
         if (config.uade) {
           // Fire-and-forget: load the file data into the UADE engine

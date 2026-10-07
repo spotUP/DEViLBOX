@@ -249,6 +249,11 @@ struct Dm2Module {
     float tick_accumulator;
     float ticks_per_frame;
 
+    // Keyboard preview: the module cut down to one note on voice 0 (dm2_preview_note)
+    bool preview;
+    bool preview_done;
+    uint32_t preview_block;      // first of the two appended blocks: [+0] the note line, [+1] empty
+    Dm2Track preview_tracks[2];  // [0] voice 0's one-entry track, [1] the other voices'
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -507,6 +512,12 @@ static void dm2_process_channel(Dm2Module* m, int channel_number, Dm2ChannelInfo
 
     if (m->playing_info.tick == 0) {
         if (channel->block_position == 0) {
+            if (m->preview && channel->current_track_position >= 0) {
+                // the one-note song ends with its block: it does not restart the note
+                m->preview_done = true;
+                for (int i = 0; i < 4; i++) m->channels[i].active = false;
+                return;
+            }
             Dm2Track* track = &channel->track[channel->next_track_position];
             channel->transpose = track->transpose;
             channel->block = m->blocks[track->block_number];
@@ -585,6 +596,8 @@ static void dm2_process_channel(Dm2Module* m, int channel_number, Dm2ChannelInfo
 }
 
 static void play_tick(Dm2Module* m) {
+    if (m->preview_done)
+        return;
     generate_noise_waveform(m);
 
     m->playing_info.tick--;
@@ -1214,4 +1227,54 @@ size_t dm2_export(const Dm2Module* module, uint8_t* out, size_t max_size) {
     if (max_size < total) return 0;
     memcpy(out, module->original_data, total);
     return total;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Keyboard preview: one note of one instrument through the replayer's own note handling
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Cut the module down to one 16-row block played once by voice 0: row 0 plays `note` (the period
+ * index the player adds its track transpose to) of the 0-based `instrument`, the other voices an
+ * empty block. The song's instruments (volume and vibrato tables, sound table, arpeggio) are the
+ * replayer's.
+ */
+bool dm2_preview_note(Dm2Module* m, int instrument, int note) {
+    if (!m || instrument < 0 || instrument >= 128 || !m->instruments[instrument]) return false;
+
+    if (!m->preview) {
+        Dm2BlockLine** b = (Dm2BlockLine**)realloc(m->blocks, ((size_t)m->num_blocks + 2) * sizeof(Dm2BlockLine*));
+        if (!b) return false;
+        m->blocks = b;
+        m->blocks[m->num_blocks] = (Dm2BlockLine*)calloc(16, sizeof(Dm2BlockLine));
+        m->blocks[m->num_blocks + 1] = (Dm2BlockLine*)calloc(16, sizeof(Dm2BlockLine));
+        if (!m->blocks[m->num_blocks] || !m->blocks[m->num_blocks + 1]) return false;
+        m->preview_block = m->num_blocks;
+        m->num_blocks += 2;
+        m->preview_tracks[0].block_number = (uint8_t)m->preview_block;
+        m->preview_tracks[1].block_number = (uint8_t)(m->preview_block + 1);
+        m->preview = true;
+    }
+    if (m->preview_block + 1 > 255) return false;   // block numbers are bytes
+
+    Dm2BlockLine* line = &m->blocks[m->preview_block][0];
+    memset(line, 0, sizeof(Dm2BlockLine));
+    line->instrument = (uint8_t)instrument;
+    line->note = (uint8_t)note;
+
+    initialize_sound(m);
+    for (int i = 0; i < 4; i++) {
+        Dm2ChannelInfo* ch = &m->channels[i];
+        ch->track = &m->preview_tracks[i == 0 ? 0 : 1];
+        ch->track_loop_position = 0;
+        ch->track_length = 1;
+    }
+    m->preview_done = false;
+    return true;
+}
+
+void dm2_preview_stop(Dm2Module* m) {
+    if (!m) return;
+    m->preview_done = true;
+    for (int i = 0; i < 4; i++) m->channels[i].active = false;
 }
