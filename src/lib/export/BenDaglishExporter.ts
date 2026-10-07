@@ -1,18 +1,19 @@
 /**
  * BenDaglishExporter.ts - native export for Ben Daglish modules (.bd).
  *
- * A Ben Daglish module is a compiled 68k player with its track streams. The grid is the
- * replayer's walk (benDaglishGrid.ts), so a cell is not a byte of the file: a note cell is the
- * period a note command's byte, the voice's transposes and the sample's base note give.
+ * A Ben Daglish module is a compiled 68k player with its track streams. The grid is the replayer's walk
+ * (benDaglishGrid.ts), so a cell is not a byte of the file: a note cell is the period a note command's byte,
+ * the voice's transposes and the sample's base note give.
  *
- * Export is the module as loaded, byte for byte. A grid edit has no writer yet (plan unit
- * G16-benDaglish in thoughts/shared/plans/2026-10-07-grid-from-replayer-walk.md): the grid is
- * compared with the grid the module itself shows and every edited cell comes back as a
- * warning, so an edit is never dropped without the owner being told.
+ * Export is the module as loaded with each edited note written into its note command (benDaglishEdits.ts, G24).
+ * What the walk grid cannot place in place (a note on a blank row, a removed note, an instrument or effect change)
+ * comes back as a warning, so an edit is never dropped without the owner being told.
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import { parseBenDaglishFile } from '@lib/import/formats/BenDaglishParser';
+import { applyBdGridEdits } from '@lib/import/formats/benDaglishEdits';
+import { walkBenDaglish } from '@lib/import/formats/BenDaglishWasmExtractor';
+import { editedCells, getGridBaseline } from '@/lib/song/gridBaseline';
 
 export interface BenDaglishExportResult {
   data: Uint8Array;
@@ -23,16 +24,10 @@ export interface BenDaglishExportResult {
 export async function exportBenDaglish(song: TrackerSong): Promise<BenDaglishExportResult> {
   const src = song.uadeEditableFileData;
   if (!src) throw new Error('Ben Daglish export needs the module the song was loaded from');
-  const name = song.uadeEditableFileName ?? 'song.bd';
-  const original = await parseBenDaglishFile(src.slice(0), name);
-  let edited = 0;
-  song.patterns.forEach((pattern, p) => pattern.channels.forEach((channel, ch) => channel.rows.forEach((cell, r) => {
-    const was = original.patterns[p]?.channels[ch]?.rows[r];
-    if (!was || was.note !== cell.note || was.instrument !== cell.instrument || was.volume !== cell.volume
-      || was.effTyp !== cell.effTyp || was.eff !== cell.eff || was.effTyp2 !== cell.effTyp2 || was.eff2 !== cell.eff2) edited++;
-  })));
-  const warnings = edited > 0
-    ? [`${edited} edited cell(s) were not written: Ben Daglish grid edits have no writer yet, the file is the module as loaded`]
-    : [];
-  return { data: new Uint8Array(src), filename: name.split('/').pop() ?? name, warnings };
+  const name = (song.uadeEditableFileName ?? 'song.bd').split('/').pop() ?? 'song.bd';
+  const trackOffsets = song.uadeVariableLayout?.filePatternAddrs;
+  if (!trackOffsets || (getGridBaseline() && editedCells(song.patterns).length === 0)) return { data: new Uint8Array(src), filename: name, warnings: [] };
+  const walk = await walkBenDaglish(src.slice(0));
+  const res = applyBdGridEdits(new Uint8Array(src), walk, trackOffsets, song.patterns);
+  return { data: res.data, filename: name, warnings: res.warnings };
 }

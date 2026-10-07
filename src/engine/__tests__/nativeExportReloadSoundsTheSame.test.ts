@@ -116,7 +116,8 @@ const FORMATS: FormatRow[] = [
   { key: 'jochenHippel7V', rig: 'tfmx', files: corpus(['.hip7', '.hip']) },
   { key: 'davidWhittaker', rig: 'paula', files: corpus(['.dw']) },
   { key: 'robHubbard', rig: 'paula', files: corpus(['.rh']) },
-  { key: 'benDaglish', rig: 'paula', files: corpus(['.bd']) },
+  // a sample map (BD_FX.sampleMap) picks the sample by note range: an edited note may cross into another sample's range
+  { key: 'benDaglish', rig: 'paula', files: corpus(['.bd']), noteSelectsSample: true },
   { key: 'jochenHippelST', rig: 'paula', sampleEvery: 2, uadeName: () => 'song.hst', files: corpus(['.hst', '.sog']) },
   { key: 'suntronic', rig: 'paula', sampleEvery: 24, files: sunTronicCorpus() },
   { key: 'activisionPro', rig: 'paula', files: corpus(['.avp']) },
@@ -352,7 +353,6 @@ const withoutPitch = (t: Trace): Trace => Object.assign(t.map((v) => v.filter((e
  * Key: format key, or `<format key>|<file name>`; value per stage.
  */
 const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
-  benDaglish: { edited: 'G16-benDaglish: grid edits have no writer (the walk grid has no cell-to-command-byte map)' },
   'suntronic|smooth': { unedited: 'G16-sunSmooth: the score has no notes, the song parses to a stub and the router exports a MOD of it', edited: 'G16-sunSmooth: no note to edit' },
 };
 
