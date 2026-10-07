@@ -80,6 +80,28 @@ type SunEffectsSource = Pick<
 // table the eagleplayer fills at init from each module's arp/vibrato data (row 0,
 // the non-arp row, is all zeros), so it is zero-filled here (see the ctor note).
 
+/** One GETNEXTNOTE call as the replayer ran it: the row it decoded and everything in the group. */
+export interface SunWalkGroup {
+  channel: number;
+  /** Sequence position the row belongs to (before the end-of-row position advance). */
+  position: number;
+  /** Row within the position ($2d, the notes-within-position counter). */
+  row: number;
+  /** Player step (one PAL vblank) this row was decoded on. */
+  step: number;
+  /** Hunk#1 index of the group's first byte, and the byte after its 0x00 terminator. */
+  start: number;
+  end: number;
+  /** The voice's transpose and rows-per-position while this row was decoded. */
+  transpose: number;
+  /** Every pitch byte of the group in stream order: the pitch the player computed
+   *  (`~byte - transpose`, 8-bit), the select staged at that moment, and whether it
+   *  fired a note-on (a pitch byte with no staged select does not). */
+  notes: Array<{ pitch: number; sel: number; fired: boolean }>;
+  /** Every control opcode of the group in stream order, with its operand bytes. */
+  ops: Array<{ op: number; args: number[] }>;
+}
+
 /** A voice's runtime state — field names mirror the loaded voice-struct offsets. */
 interface SunPlayerVoice {
   channel: number;      // 0..3
@@ -156,6 +178,11 @@ const u8 = (b: number): number => b & 0xff;
 export interface SunPlayerOptions {
   /** subsong index (default 0). */
   subsong?: number;
+  /** Walk only: run the sequencer (tempo counters, GETNEXTNOTE, position loads) and skip
+   *  EFFECTS. The note-stream walk does not depend on EFFECTS state (the tie counter is
+   *  dead code), so a grid/oracle walk over a whole song runs several times faster. Do not
+   *  render audio from a walk-only player. */
+  walkOnly?: boolean;
   /** audio-buffer tick period in samples (UADE EFFECTS/period fires once per this;
    *  measured 1024, uniform 39/39 both songs — probe-tick-rate). */
   audioTickSamples?: number;
@@ -236,9 +263,16 @@ export class SunTronicPlayer {
    *  no effect on audio. Used to build the editable grid from the real player
    *  decode (single source of truth) and to measure grid/player divergence. */
   rowRecorder: ((channel: number, position: number, row: number, note: number) => void) | null = null;
+  /** Walk hook: invoked once per GETNEXTNOTE with the whole group (see SunWalkGroup). */
+  groupRecorder: ((group: SunWalkGroup) => void) | null = null;
+  /** Walk hook: a voice finished the sequence (restarted at position 0, or stopped). */
+  passRecorder: ((channel: number, stopped: boolean) => void) | null = null;
+  private readonly walkOnly: boolean;
+  private stepCount = 0;
 
   constructor(score: SunV13Score, opts: SunPlayerOptions = {}) {
     this.audioTick = opts.audioTickSamples ?? 1024;
+    this.walkOnly = opts.walkOnly ?? false;
     // 882.759 = 1024*25/29 = the emulated PAL vblank fire period in samples (44100/
     // 882.759 = 49.957 Hz). The player fires once per vblank; the golden latches once
     // per audioTick (1024). The beat of the two clocks gives di = ciaTick/(audioTick-
@@ -353,10 +387,13 @@ export class SunTronicPlayer {
     const h1 = this.h1;
     let a1 = v.cursor;
     let didReset = false;
+    const walk = this.groupRecorder
+      ? { channel: v.channel, position: v.position, row: v.tempoNote, step: this.stepCount, start: a1, end: a1, transpose: v.transpose, notes: [], ops: [] } as SunWalkGroup
+      : null;
     // guard against runaway loops on malformed streams
     for (let guard = 0; guard < 4096; guard++) {
       const d0 = h1[a1++] ?? 0;
-      if (d0 === 0x00) { v.cursor = a1; return didReset; } // end of note group — store cursor
+      if (d0 === 0x00) { v.cursor = a1; if (walk) { walk.end = a1; this.groupRecorder!(walk); } return didReset; } // end of note group — store cursor
       if (d0 < 0x80) { v.stagedSel = d0; continue; } // positive → stage select byte
       if (d0 >= 0xb8) {
         // PITCH (0x2697c): $8 = (~d0 - transpose)<<8, clear finetune + slide
@@ -368,6 +405,7 @@ export class SunTronicPlayer {
         const nxt = h1[a1] ?? 0;
         if (nxt >= 0x01 && nxt <= 0x7f) { v.stagedSel = nxt; a1++; }
         const sel = v.stagedSel;
+        if (walk) walk.notes.push({ pitch: note, sel, fired: sel !== 0 });
         if (sel === 0) continue;
         v.synthFlag = 0;
         this.noteOn(v, sel);
@@ -376,7 +414,9 @@ export class SunTronicPlayer {
         continue;
       }
       // control opcode 0x80..0xb7 → dispatch (a1 already past opcode byte)
+      const argStart = a1;
       a1 = this.controlOpcode(v, d0, a1);
+      if (walk) walk.ops.push({ op: d0, args: Array.from(h1.subarray(argStart, a1)) });
     }
     v.cursor = a1;
     return didReset;
@@ -587,12 +627,14 @@ export class SunTronicPlayer {
       // phantom retriggers (audible garbage + ghost notes with no grid row) for
       // the rest of playback. Idle the voice (DMA off) = silence at song end,
       // matching UADE. 6 corpus stop-songs affected (nebulus*, time0003/50/60).
-      if (this.seqEndKind !== 'restart') { v.flags = 0xfe; return; }
+      if (this.seqEndKind !== 'restart') { v.flags = 0xfe; this.passRecorder?.(v.channel, true); return; }
+      this.passRecorder?.(v.channel, false);
       v.position = 0;
       entry = this.sequence[0];
       if (!entry) return;
     }
     if ((entry.trackPtrs[0] >>> 0) === 0) {                 // entry[0]==0 → restart marker
+      this.passRecorder?.(v.channel, false);
       v.position = 0;
       entry = this.sequence[0];
       if (!entry) return;
@@ -604,7 +646,7 @@ export class SunTronicPlayer {
     // (audible: wrong-octave lead + collapsed voices on the 2nd loop only; skip-to-
     // position rebuilds fresh state so it never showed there).
     const first = entry.trackPtrs[0] >>> 0;
-    if ((first & 0x80000000) !== 0) { v.flags = 0xfe; return; } // <0 → note-off
+    if ((first & 0x80000000) !== 0) { v.flags = 0xfe; this.passRecorder?.(v.channel, true); return; } // <0 → note-off
     v.transpose = s8(entry.transposes[v.channel]);
     v.cursor = entry.trackPtrs[v.channel];
   }
@@ -629,6 +671,7 @@ export class SunTronicPlayer {
   }
 
   private stepAll(): void {
+    this.stepCount++;
     this.stepMasterFade();
     for (const v of this.voices) {
       if (v.flags === 0xfe) continue; // DMA-off/idle
@@ -656,7 +699,7 @@ export class SunTronicPlayer {
           if (v.flags === 0xfe) continue; // new position idles this voice
         }
       }
-      this.stepEffects(v, false);
+      if (!this.walkOnly) this.stepEffects(v, false);
     }
   }
 
