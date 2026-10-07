@@ -28,6 +28,8 @@ bool sd2_has_ended(const Sd2Module* module);
 
 // Track editing API
 int sd2_get_num_tracks(const Sd2Module* module);
+int sd2_get_play_position(const Sd2Module* module);
+int sd2_get_play_row(const Sd2Module* module);
 int sd2_get_track_length(const Sd2Module* module, int track_idx);
 uint32_t sd2_get_cell(const Sd2Module* module, int track_idx, int row);
 void sd2_set_cell(Sd2Module* module, int track_idx, int row,

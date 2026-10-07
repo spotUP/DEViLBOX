@@ -23,6 +23,7 @@ size_t sf_render(SfModule* module, float* interleaved_stereo, size_t frames);
 size_t sf_render_multi(SfModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames);
 
 bool sf_has_ended(const SfModule* module);
+int sf_get_play_tick(const SfModule* module);
 
 // Edit API
 int sf_get_instrument_count(const SfModule* module);

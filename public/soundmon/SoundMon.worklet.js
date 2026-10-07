@@ -45,7 +45,7 @@ class SoundMonProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; break;
+      case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._sm_select_subsong(this.handle, 0);
@@ -203,6 +203,16 @@ class SoundMonProcessor extends AudioWorkletProcessor {
 
     this.mixPreview(outputL, outputR, numSamples);
 
+    // Playhead: the step and row the music is on, posted when they change (the engine's
+    // onPositionUpdate; the grid is songPositions x rows).
+    const playRow = this.module._sm_get_play_row(this.handle);
+    if (playRow >= 0) {
+      const songPos = this.module._sm_get_play_step(this.handle);
+      if (songPos !== this._lastSongPos || playRow !== this._lastRow) {
+        this._lastSongPos = songPos; this._lastRow = playRow;
+        this.port.postMessage({ type: 'position', songPos, row: playRow });
+      }
+    }
     if (this.module._sm_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });
     return true;
   }

@@ -176,6 +176,9 @@ typedef struct Sd2Module {
     // Playback state
     int8_t current_position;
     uint8_t current_row;
+    // Playhead: the position and row whose notes get_note read last (-1 until a row has played).
+    int play_position;
+    int play_row;
     uint8_t pattern_length;
     uint8_t current_rast;
     uint8_t current_rast2;
@@ -737,6 +740,8 @@ static void find_note(Sd2Module* mod, VoiceInfo* vi) {
 static void init_sound(Sd2Module* mod) {
     mod->current_position = 0;
     mod->current_row = 0;
+    mod->play_position = -1;
+    mod->play_row = -1;
     mod->pattern_length = 64;
     mod->current_rast = 0;
     mod->current_rast2 = 0;
@@ -1350,6 +1355,9 @@ static void player_tick(Sd2Module* mod) {
         mod->current_rast = 0;
         mod->current_rast2 = 0;
 
+        mod->play_position = (int)mod->current_position;
+        mod->play_row = (int)mod->current_row;
+
         for (int i = 0; i < 4; i++) {
             get_note(mod, &mod->voices[i]);
         }
@@ -1879,6 +1887,15 @@ static uint32_t encode_track(const DecodedCell* cells, int num_rows, uint8_t* ou
     }
 
     return pos;
+}
+
+// Playhead: the order position and the row of it that is sounding; -1 before the first row.
+int sd2_get_play_position(const Sd2Module* mod) {
+    return mod ? mod->play_position : -1;
+}
+
+int sd2_get_play_row(const Sd2Module* mod) {
+    return mod ? mod->play_row : -1;
 }
 
 int sd2_get_num_tracks(const Sd2Module* mod) {

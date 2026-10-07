@@ -188,6 +188,10 @@ typedef struct FcModule {
     bool end_reached;
     bool has_ended;
 
+    // Playhead: the sequence position and pattern row whose notes were read last (-1 before the first row).
+    int play_pos;
+    int play_row;
+
     // Timing
     float tick_accumulator;
     float ticks_per_frame;
@@ -387,6 +391,12 @@ static void fc_new_note(FcModule* m, uint32_t chan) {
 
             mark_visited(m, voi->song_pos);
         }
+    }
+
+    // Playhead: voice 0 carries the song position and row (the grid's order position and row).
+    if (chan == 0) {
+        m->play_pos = (int)voi->song_pos;
+        m->play_row = (int)voi->pattern_pos;
     }
 
     // Get the pattern row
@@ -788,6 +798,8 @@ static void play_tick(FcModule* m) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void initialize_sound(FcModule* m, int start_position) {
+    m->play_pos = -1;
+    m->play_row = -1;
     // Initialize speed
     uint16_t spd = m->sequences[start_position].speed;
     if (spd == 0)
@@ -1653,6 +1665,15 @@ bool fc_has_ended(const FcModule* module) {
 
 int fc_get_instrument_count(const FcModule* module) {
     return module ? (int)module->vol_num : 0;
+}
+
+// Playhead: sequence position and row of it that is sounding; -1 before the first row.
+int fc_get_play_pos(const FcModule* module) {
+    return module ? module->play_pos : -1;
+}
+
+int fc_get_play_row(const FcModule* module) {
+    return module ? module->play_row : -1;
 }
 
 int fc_get_num_patterns(const FcModule* module) {

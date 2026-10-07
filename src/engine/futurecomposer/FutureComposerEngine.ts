@@ -4,6 +4,7 @@
  * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
@@ -28,6 +29,8 @@ function futurecomposerTransform(code: string): string {
 export class FutureComposerEngine extends WASMChannelOutputsEngine {
   private static instance: FutureComposerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private readonly _positions = new PositionCallbacks();
 
   private _songEndCallback: (() => void) | null = null;
 
@@ -88,6 +91,9 @@ export class FutureComposerEngine extends WASMChannelOutputsEngine {
         case 'songEnd':
           this._songEndCallback?.();
           break;
+        case 'position':
+          this._positions.emit(data);
+          break;
         case 'error':
           console.error('[FutureComposerEngine]', data.message);
           break;
@@ -130,7 +136,13 @@ export class FutureComposerEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
   }
 
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
+  }
+
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     if (FutureComposerEngine.instance === this) FutureComposerEngine.instance = null;
   }

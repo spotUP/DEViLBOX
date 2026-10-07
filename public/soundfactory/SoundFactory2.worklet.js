@@ -45,7 +45,7 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; break;
+      case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._sf_select_subsong(this.handle, 0);
@@ -171,6 +171,17 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
       }
     }
 
+    // Playhead: the importer's grid is one row per 50 Hz tick in patterns of 64
+    // rows (SoundFactoryParser ROWS_PER_PATTERN), so the replayer's tick is the
+    // global row; posted when it changes (the engine's onPositionUpdate).
+    const playTick = this.module._sf_get_play_tick(this.handle);
+    if (playTick >= 0) {
+      const songPos = Math.floor(playTick / 64), playRow = playTick % 64;
+      if (songPos !== this._lastSongPos || playRow !== this._lastRow) {
+        this._lastSongPos = songPos; this._lastRow = playRow;
+        this.port.postMessage({ type: 'position', songPos, row: playRow });
+      }
+    }
     if (this.module._sf_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });
     return true;
   }
