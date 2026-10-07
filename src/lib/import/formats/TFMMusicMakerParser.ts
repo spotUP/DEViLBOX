@@ -25,7 +25,7 @@ const CHANNELS = 6;
 const LINES = 256;
 const XM_KEY_OFF = 97;
 
-interface Layout {
+export interface Layout {
   v13: boolean;
   signature: number;
   headerSize: number;
@@ -45,18 +45,18 @@ interface Layout {
 }
 
 // ZXTune Version05 / Version13 RawHeader offsets (sizes 1981904 / 4341209).
-const V05: Layout = {
+export const V05: Layout = {
   v13: false, signature: 0, headerSize: 1981904, interleave: 1, positionsCount: 2, loopPosition: 3,
   creationDate: 4, saveDate: 6, author: 10, title: 74, positions: 522, instrumentNames: 778,
   patternsSizes: 15568, patterns: 15824, patternSize: 7680, channelSize: 1280,
 };
-const V13: Layout = {
+export const V13: Layout = {
   v13: true, signature: 8, headerSize: 4341209, interleave: 10, positionsCount: 11, loopPosition: 12,
   creationDate: 13, saveDate: 15, author: 19, title: 83, positions: 531, instrumentNames: 787,
   patternsSizes: 15577, patterns: 15833, patternSize: 16896, channelSize: 2816,
 };
 
-const hasSignature = (b: Uint8Array): boolean =>
+export const hasSignature = (b: Uint8Array): boolean =>
   b.length >= 8 && [...SIGNATURE].every((c, i) => b[i] === c.charCodeAt(0));
 
 /**
@@ -86,6 +86,36 @@ export function decompressTfm(bytes: Uint8Array, layout: Layout = hasSignature(b
     last = -1; // ZXTune: disable doubled sequences
   }
   return out;
+}
+
+/**
+ * The inverse of decompressTfm: `header` (the unpacked fixed header) as the RLE stream a file carries. A run of
+ * three or more equal bytes is the byte, then 0x80 and the run length as a 7-bit varint (last group flagged 0x80);
+ * a literal 0x80 is 0x80 with counter 0. A run marker leaves the decoder with no `last` byte, so the next run
+ * starts with a literal again (ZXTune: no doubled sequences).
+ */
+export function compressTfm(header: Uint8Array, layout: Layout): Uint8Array {
+  const out: number[] = [];
+  for (let n = 0; n < layout.signature; n++) out.push(header[n]);
+  let i = layout.signature;
+  let last = -1;
+  while (i < header.length) {
+    const b = header[i];
+    if (b === 0x80) { out.push(0x80, 0x80); i++; continue; }
+    let run = 1;
+    while (i + run < header.length && header[i + run] === b) run++;
+    out.push(b);
+    last = b;
+    if (run >= 3 && last === b) {
+      out.push(0x80);
+      let c = run;
+      while (c >= 0x80) { out.push(c & 0x7f); c >>= 7; }
+      out.push(c | 0x80);
+      last = -1;
+      i += run;
+    } else i++;
+  }
+  return new Uint8Array(out);
 }
 
 const validDate = (h: Uint8Array, at: number): boolean => {
