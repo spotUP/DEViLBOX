@@ -214,10 +214,37 @@ bar test first (revert check: it must fail on the old grid), then fix.
   + the runner (BenDaglish id, held) with bdEngineMatchesUade.test.ts as the engine-vs-UADE gate: if
   the port differs from UADE the grid follows UADE and the port is fixed first. Test:
   src/engine/__tests__/benDaglishGridMatchesPlayer.test.ts.
-- **U6 Re-verify sweep (S-M).** One parametrised test applying assertGridIsPlayersWalk with each
-  format's existing oracle to the 13 re-verify formats; output a pass/fail table; every failure
-  becomes its own unit in the next free slot. Test:
-  src/engine/__tests__/reverifiedGridsArePlayersWalk.test.ts. Needs U1.
+- **U6 Re-verify sweep (S-M). RUN 2026-10-07; table below, new units W2-a..W2-f opened.** Test:
+  src/engine/__tests__/reverifiedGridsArePlayersWalk.test.ts (34 songs, every in-repo corpus song of the 13
+  formats; Paula note-on reader shared with gridVsPaula.ts via tools/uade-audit/gridVsPaulaCore.ts).
+  Limits, stated plainly: the whole-corpus check covers bar item 1-2 as NOTE ORDER and PITCH STEPS only (intervals; instruments,
+  note-offs, commands, row timing are NOT compared by it). The interval score is lenient (a shuffled grid still scores 1.0 on
+  sparse voices) and blind to arpeggio/slide writers (Sound Master, Activision, Actionamics score 0.3-0.5 here while their own
+  exact-timing tests pass). So a verdict is exact only where an exact oracle exists.
+
+  | Format (corpus songs) | Verdict | Evidence |
+  |---|---|---|
+  | Activision Pro (1) | PASS 1/1 | activisionProGridMatchesUade (exact timing, period, retrigger) + playhead test |
+  | Digital Sonix & Chrome (13) | PASS 12/13 notes, 1 open | all 13: UADE note-ons are the grid's first notes in order on every voice (new exact test, whole song or 200 s); 4 songs of 1 note each equal. OPEN: fanfares.dsc, UADE plays 287/364/533/577 note-ons in 200 s, grid shows 14/3/14/3 (W2-a) |
+  | Fred Editor (4) | PASS 3/3 testable, 1 untestable | fredEditorGridMatchesPlayer exact on fireworks ii, rebels, bomb jack; fuzzball-title: UADE refuses the file (ret -1), only the instrument/command test applies |
+  | Sound Master (3) | PASS 3/3 | soundMasterGridMatchesPlayer exact (period + row) on all three |
+  | Actionamics (1) | PASS 1/1 | actionamicsGridMatchesPlayer (worklet event log) |
+  | Sonic Arranger (2) | NOTE ORDER OK 2/2, timing/instr/commands UNVERIFIED | yardstick 0.99-1.00; almighty exact opening on all voices, mega end 0.43-0.54 exact-prefix (W2-b) |
+  | Dave Lowe (1) | NOTE ORDER OK, 1 voice to look at | yardstick 1.00x4; voice 2 exact-prefix 0.42 (W2-b) |
+  | Dave Lowe New (1) | UNVERIFIED | yardstick 0.88-1.00 (UADE does play m-bison here), exact-prefix 0.01-0.14 (W2-b) |
+  | Rob Hubbard (2) | NOTE ORDER: 1 voice FAILS the yardstick | skateordie ch1 0.59-0.60 (grid ch1 bass line vs UADE voice 1; exact-prefix 0.03) while ch0/2/3 are exact; centurion_battle ch2/3 exact-prefix 0.00 (W2-c) |
+  | Delta Music 1 (2) | UNVERIFIED, likely FAIL | yardstick 0.28-0.30 on 7 of 8 channels, exact-prefix 0.00; existing test pins the opening notes of two voices only (W2-d) |
+  | Digital Sound Studio (2) | PASS 2/2 notes | exact leading notes on every voice (floor 0.95 asserted, shuffle-teeth on zrimay) |
+  | InStereo 1 (1) | UNVERIFIED, likely FAIL | yardstick 0.25/0.69/0.64/1.00 (W2-e) |
+  | InStereo 2 (2) | UNVERIFIED, likely FAIL | yardstick 0.28-0.50 on all 8 channels (W2-e) |
+
+  New units (no failure was confirmed small; each needs an exact oracle first):
+  - W2-a DSC fanfares: UADE re-arms pitch 16 on voices 1 and 3 hundreds of times, the grid holds it as one note. Find whether the record loops (grid should show retriggers) or the oracle counts sample-loop re-arms.
+  - W2-b Sonic Arranger, Dave Lowe, Dave Lowe New: exact oracle (timing, instruments, note-offs, commands) from the wasm event log / runner; mega end.sa, incredibleshrinkingsphere voice 2, m-bison.dln.
+  - W2-c Rob Hubbard: skateordie voice 1 against UADE voice records; centurion_battle voices 2-3.
+  - W2-d Delta Music 1: exact oracle from DeltaMusic1Replayer's event log; both corpus songs.
+  - W2-e InStereo 1 and 2: exact oracle from the replayers' event logs; three corpus songs.
+  - W2-f Fred Editor fuzzball-title: no UADE oracle; decide whether the replayer log is the oracle.
 
 ### Wave 3
 
