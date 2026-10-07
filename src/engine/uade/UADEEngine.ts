@@ -163,6 +163,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
   private static instance: UADEEngine | null = null;
   private static previewInstance: UADEEngine | null = null;
+  private static deckInstance: UADEEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _rejectInit: ((err: Error) => void) | null = null;
@@ -277,6 +278,23 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       UADEEngine.previewInstance = new UADEEngine();
     }
     return UADEEngine.previewInstance!;
+  }
+
+  /**
+   * The engine a DJ DECK LOAD scans and parses on (plan 2026-10-07, U2.6a). Its
+   * own worklet and /uade filesystem, separate from the editor's engine (a deck
+   * load replaced the editor song's module and companions) and from the
+   * preview engine (a deck load replaced the module a browser preview was
+   * playing).
+   */
+  static getDeckInstance(): UADEEngine {
+    const currentCtx = getDevilboxAudioContext();
+    const d = UADEEngine.deckInstance;
+    if (!d || d._disposed || d._poisoned || d.audioContext !== currentCtx) {
+      if (d && !d._disposed) d.dispose();
+      UADEEngine.deckInstance = new UADEEngine();
+    }
+    return UADEEngine.deckInstance!;
   }
 
   /** Check if a live singleton instance exists (without creating one). */
@@ -1306,6 +1324,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     }
     if (UADEEngine.previewInstance === this) {
       UADEEngine.previewInstance = null;
+    }
+    if (UADEEngine.deckInstance === this) {
+      UADEEngine.deckInstance = null;
     }
   }
 }

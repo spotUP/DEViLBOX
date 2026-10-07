@@ -67,7 +67,8 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { seekDeckAudio, cueDeck } from '@/engine/dj/DJActions';
 import { subscribeRendering, isRenderingFileName } from '@/engine/dj/DJTrackLoader';
 import { markSeek } from './seekGuard';
-import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { openDeckTrack } from '@/lib/song/openSong';
+import { acquireForDeck } from '@/lib/song/acquireSource';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
@@ -1754,7 +1755,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
               addedAt: Date.now(),
             });
           } else {
-            const song = await parseModuleToSong(file);
+            const { song } = await openDeckTrack({ kind: 'file', file });
             cacheSong(file.name, song);
             const bpmResult = detectBPM(song);
             const duration = estimateSongDuration(song);
@@ -1863,30 +1864,25 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       if (track.fileName.startsWith('modland:')) {
         const modlandPath = track.fileName.slice('modland:'.length);
         try {
-          const { downloadModlandFile, downloadUADECompanions } = await import('@/lib/modlandApi');
-          // Every partner file Modland lists beside the module (TFMX smpl, dum/ins
-          // and its shared bank, jpn/smp, ...) goes into UADE's virtual FS.
-          const [buffer, found] = await Promise.all([
-            downloadModlandFile(modlandPath),
-            downloadUADECompanions(modlandPath),
-          ]);
           const filename = modlandPath.split('/').pop() || 'download.mod';
-          const companions = found.length > 0 ? found : undefined;
 
           if (isAudioFile(filename)) {
-            await engine.loadAudioToDeck(deckId, buffer, track.fileName);
+            const { downloadModlandFile } = await import('@/lib/modlandApi');
+            await engine.loadAudioToDeck(deckId, await downloadModlandFile(modlandPath), track.fileName);
             useDJStore.getState().setDeckViewMode('vinyl');
           } else if (isUADEFormat(filename)) {
+            // Every partner file Modland lists beside the module (TFMX smpl, dum/ins
+            // and its shared bank, jpn/smp, ...) travels with the load.
+            const { bytes, companions } = await acquireForDeck({ kind: 'modland', path: modlandPath });
             // Pass track.fileName as the identity so the playlist row's
             // scrubber/isPlaying match works (otherwise the deck stores
             // `slipstream3.fc` and the row looks for `modland:pub/.../...`).
-            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName, companions);
+            await loadUADEToDeck(engine, deckId, bytes, filename, true, undefined, track.trackName, track.fileName, companions);
             useDJStore.getState().setDeckViewMode('visualizer');
           } else {
-            const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-            const song = await parseModuleToSong(blob);
+            const { song, bytes } = await openDeckTrack({ kind: 'modland', path: modlandPath }, deckId);
             cacheSong(track.fileName, song);
-            await loadSongToDeck(song, track.fileName, deckId, buffer);
+            await loadSongToDeck(song, track.fileName, deckId, bytes);
           }
           return;
         } catch (err) {
@@ -1948,8 +1944,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
               await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName);
               useDJStore.getState().setDeckViewMode('visualizer');
             } else {
-              const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-              const song = await parseModuleToSong(blob);
+              const { song } = await openDeckTrack({ kind: 'bytes', name: filename, bytes: buffer }, deckId);
               cacheSong(track.fileName, song);
               await loadSongToDeck(song, track.fileName, deckId, buffer);
             }
@@ -1988,8 +1983,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
               await loadUADEToDeck(engine, deckId, buffer, plainFilename, true, undefined, track.trackName, 'local:' + plainFilename);
               useDJStore.getState().setDeckViewMode('visualizer');
             } else {
-              const blob = new File([buffer], plainFilename, { type: 'application/octet-stream' });
-              const song = await parseModuleToSong(blob);
+              const { song } = await openDeckTrack({ kind: 'bytes', name: plainFilename, bytes: buffer }, deckId);
               cacheSong('local:' + plainFilename, song);
               await loadSongToDeck(song, 'local:' + plainFilename, deckId, buffer);
             }
@@ -2030,7 +2024,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
             await engine.loadAudioToDeck(deckId, rawBuffer, 'local:' + file.name);
             useDJStore.getState().setDeckViewMode('vinyl');
           } else {
-            const song = await parseModuleToSong(file);
+            const { song } = await openDeckTrack({ kind: 'file', file }, deckId);
             cacheSong('local:' + file.name, song);
             await loadSongToDeck(song, 'local:' + file.name, deckId, rawBuffer);
           }
@@ -2272,7 +2266,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
               addedAt: Date.now(),
             });
           } else {
-            const song = await parseModuleToSong(file);
+            const { song } = await openDeckTrack({ kind: 'file', file });
             cacheSong(file.name, song);
             const bpmResult = detectBPM(song);
             const duration = estimateSongDuration(song);
