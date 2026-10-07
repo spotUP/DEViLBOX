@@ -13,7 +13,7 @@ import type {
   ClipboardData,
 } from '@typedefs';
 import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerReplayer, peekTrackerReplayer } from '@engine/TrackerReplayer';
 import { sendCellEditsToEngine, changedCells, type LiveCellEdit } from '@engine/replayer/liveCellEdits';
 import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
@@ -534,8 +534,9 @@ export const useTrackerStore = create<TrackerStore>()(
           // which resets the scheduler timeline, causing ~100ms drift per pattern.
           if (fromReplayer) return;
           // If playing, tell the replayer to jump to this pattern
-          const replayer = getTrackerReplayer();
-          if (replayer.isPlaying()) {
+          // peek, never construct: nothing can be playing without a replayer
+          const replayer = peekTrackerReplayer();
+          if (replayer?.isPlaying()) {
             replayer.jumpToPattern(index);
           }
         }
