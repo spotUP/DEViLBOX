@@ -196,7 +196,13 @@ bar test first (revert check: it must fail on the old grid), then fix.
 
 ### Wave 2
 
-- **U4 Hippel family (M): Hippel .hip (Amiga), 7V, ST reopen.** Reuse
+- **U4 Hippel family (M): Hippel .hip (Amiga), 7V, ST reopen. DONE 2026-10-07 (dac96670a decoder walk export, 8f1d24a69 .hip + 7V grids, ST tests in jochenHippelSTGridMatchesPlayer.test.ts).**
+  Result: .hip and 7V grids are a TS walk (src/lib/import/formats/HippelTfmxWalk.ts) held tick for tick to the TFMX decoder's own walk
+  export (tfmx_module_walk_*), tests hippelTfmxWalkMatchesDecoder + hippelTfmxGridMatchesPlayer (not the plan's file names; the oracle is
+  the decoder that plays them, not UADE voice records). ST: no corpus failure reproduced - every subsong, whole pass, grid cell and
+  playhead held to the player's voice records; the owner's failing row is still needed. Open: sound-sequence pitch (an instrument's own
+  transposition or fixed note) is not in the cell; ST step attenuation ($Fx) not checked against a player field; only subsong 0 of .hip/.hip7
+  (the engine plays subsong 0). Original brief: Reuse
   src/lib/import/formats/JochenHippelSTModule.ts (COSO / raw TFMX decode + simulate) for the Amiga
   `.hip` (AmigaFormatParsers.ts:2213 currently an empty pattern); 7V: JochenHippel7VParser.ts:272;
   ST: apply bar items 1-8 to all 8 corpus files and get the owner's failing row. Oracle: voice records
