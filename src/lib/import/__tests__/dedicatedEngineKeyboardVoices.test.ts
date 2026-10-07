@@ -51,7 +51,13 @@ describe('dedicated-engine synth instruments keep a keyboard voice', () => {
     const pcm = { audioBuffer: new ArrayBuffer(8) };
     // A synth the replayer has a preview voice for keeps it even when the parser rendered PCM for it.
     expect(dedicatedEngineSynthType({ synthType: 'SoundMonSynth', sample: pcm })).toBe('SoundMonSynth');
-    expect(dedicatedEngineSynthType({ synthType: 'DigMugSynth', sample: pcm })).toBe('Sampler');
+    // ... and so do the K2 replayer voices: the PCM these parsers render is one fixed-pitch loop of the waveform
+    // (an octave off, a bleep, the same pitch on every key), not the instrument.
+    for (const t of ['DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'SonicArrangerSynth', 'InStereo1Synth', 'InStereo2Synth', 'StartrekkerAMSynth', 'DavidWhittakerSynth']) {
+      expect(dedicatedEngineSynthType({ synthType: t, sample: pcm }), t).toBe(t);
+    }
+    // a type without a keyboard voice is still flattened when it has PCM
+    expect(dedicatedEngineSynthType({ synthType: 'DssWasmSynth', sample: pcm })).toBe('Sampler');
     expect(dedicatedEngineSynthType({ synthType: 'SoundMonSynth' })).toBe('SoundMonSynth');
     expect(dedicatedEngineSynthType({ synthType: 'DigMugSynth', sample: { audioBuffer: new ArrayBuffer(0) } })).toBe('DigMugSynth');
     expect(dedicatedEngineSynthType({ synthType: 'DssWasmSynth' })).toBe('Sampler');

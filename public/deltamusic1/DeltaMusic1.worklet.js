@@ -50,7 +50,7 @@ class DeltaMusic1Processor extends AudioWorkletProcessor {
       }
       case 'previewLoad': this.previewLoad(data.buffer); break;
       case 'noteOn': if (this.previewHandle) this.module._dm1_preview_note(this.previewHandle, data.instrument, data.note); break;
-      case 'noteOff': if (this.previewHandle) this.module._dm1_preview_stop(this.previewHandle); break;
+      case 'noteOff': if (this.previewHandle) this.module._dm1_preview_release(this.previewHandle); break;
       case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop':
         this.playing = false;

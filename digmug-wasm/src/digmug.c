@@ -1892,11 +1892,13 @@ bool dm_preview_note(DmModule* m, int instrument, int note) {
     m->tracks[note_track].rows[0].note = (uint8_t)note;
     m->tracks[note_track].rows[0].instrument = (uint8_t)instrument;
 
-    // one position; sequence layout [channel * seq_len + position], seq_len 1
-    DmSequence* seq = (DmSequence*)calloc(4, sizeof(DmSequence));
-    DmSequence* seq2 = (DmSequence*)calloc(4, sizeof(DmSequence));
+    // 40 positions (the note on the first, silence after: a held key is not cut at one 64 row pattern);
+    // sequence layout [channel * seq_len + position]
+    const uint32_t PREVIEW_POSITIONS = 40;
+    DmSequence* seq = (DmSequence*)calloc(4 * PREVIEW_POSITIONS, sizeof(DmSequence));
+    DmSequence* seq2 = (DmSequence*)calloc(4 * PREVIEW_POSITIONS, sizeof(DmSequence));
     if (!seq || !seq2) { free(seq); free(seq2); return false; }
-    for (int k = 0; k < 4; k++) { seq[k].track_number = (uint8_t)empty_track; seq2[k].track_number = (uint8_t)empty_track; }
+    for (uint32_t k = 0; k < 4 * PREVIEW_POSITIONS; k++) { seq[k].track_number = (uint8_t)empty_track; seq2[k].track_number = (uint8_t)empty_track; }
     seq[0].track_number = (uint8_t)note_track;
     // track numbers are bytes in the file: a module with 254+ tracks has no room for the two extras
     if (note_track > 255 || empty_track > 255) { free(seq); free(seq2); return false; }
@@ -1907,10 +1909,10 @@ bool dm_preview_note(DmModule* m, int instrument, int note) {
     m->preview_seq2 = seq2;
     initialize_sound(m, m->sub_song_number);
     m->current_sequence = seq;
-    m->current_sequence_len = 1;
+    m->current_sequence_len = PREVIEW_POSITIONS;
     m->current_sequence2 = m->module_type == DM_TYPE_DIGITAL_MUGICIAN2 ? seq2 : nullptr;
-    m->current_sequence2_len = 1;
-    m->song_length = 1;
+    m->current_sequence2_len = PREVIEW_POSITIONS;
+    m->song_length = PREVIEW_POSITIONS;
     m->preview_done = false;
     return true;
 }

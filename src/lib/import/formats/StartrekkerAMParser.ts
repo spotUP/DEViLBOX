@@ -16,6 +16,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { StartrekkerAMConfig } from '@/types/instrument/exotic';
 import { createSamplerInstrument } from './AmigaUtils';
+import { periodToNote } from '@/lib/amiga/periodNotes';
 
 const NT_MAGIC_V12 = 'ST1.2 ModuleINFO';
 const NT_MAGIC_V13 = 'ST1.3 ModuleINFO';
@@ -51,24 +52,8 @@ function parseNTInstrument(ntBuf: Uint8Array, instrIndex: number): StartrekkerAM
   };
 }
 
-// ProTracker period table for note lookup
-const PERIOD_TABLE = [
-  856,808,762,720,678,640,604,570,538,508,480,453,
-  428,404,381,360,339,320,302,285,269,254,240,226,
-  214,202,190,180,170,160,151,143,135,127,120,113,
-];
-
-function periodToNote(period: number): number {
-  if (period === 0) return 0;
-  // Find closest period in table; note number = index + 1 (1-based)
-  let best = 0;
-  let bestDist = 99999;
-  for (let i = 0; i < PERIOD_TABLE.length; i++) {
-    const dist = Math.abs(PERIOD_TABLE[i] - period);
-    if (dist < bestDist) { bestDist = dist; best = i; }
-  }
-  return best + 1;  // 1-based note
-}
+// A MOD cell's period is named by the one Amiga naming (src/lib/amiga/periodNotes.ts: 856 = C-1 = note 13,
+// 428 = C-2 = note 25), as every other Amiga format's grid and a typed key are.
 
 /** Verify NT file has the correct 16-byte header.
  *  StarTrekker AM ships in multiple revisions — v1.2 and v1.3 differ only in
@@ -264,7 +249,7 @@ export function parseStartrekkerAMFile(
         const effCmd = b2 & 0x0F;
         const effParam = b3;
 
-        const note = periodToNote(period);
+        const note = periodToNote(period);   // shared naming (periodNotes)
 
         return {
           note,
