@@ -92,8 +92,8 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             await this._previewNoteOn(msg.instr, msg.period);
             break;
         case 'noteOff':
-            this._pvActive = false;
-            if (this._pvWasm) this._pvWasm._player_stop();
+            // key-up: the AM envelope runs on to its own release; the voice ends itself
+            if (this._pvWasm) this._pvWasm._player_set_hold(0);
             break;
         case 'setPatternCell':
             if (this._wasm && this._wasm._player_set_pattern_cell) {
@@ -124,7 +124,20 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
         mod[pat] = (instr & 0xF0) | ((period >> 8) & 0x0F);
         mod[pat + 1] = period & 0xFF;
         mod[pat + 2] = (instr & 0x0F) << 4;
-        mod[0x3B6] = 1;                      // the song is that one pattern
+        // The song is the note's pattern, then an emptied pattern repeated: a held key is not retriggered
+        // when the 64 rows end. (Without a second pattern in the module it is that one pattern.)
+        let maxPat = 0;
+        for (let i = 0; i < 128; i++) if (mod[0x3B8 + i] > maxPat) maxPat = mod[0x3B8 + i];
+        if (maxPat >= 1) {
+            const other = order0 === 0 ? 1 : 0;
+            const opat = 0x43C + other * 1024;
+            mod.fill(0, opat, opat + 1024);
+            mod[0x3B8 + 1] = other;
+            mod[0x3B6] = 2;
+            mod[0x3B7] = 1;                  // the restart position: the empty pattern
+        } else {
+            mod[0x3B6] = 1;
+        }
         if (!this._pvWasm) {
             this._pvWasm = await this._createFn({ ...this._config });
             this._pvPtr = this._pvWasm._malloc(this._FRAMES * 2 * 4);
@@ -136,6 +149,7 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
         // lead-in: the first row plays at the end of the sixth 20 ms tick
         const lead = Math.ceil((sampleRate / 50) * 6 / this._FRAMES) * this._FRAMES;
         for (let done = 0; done < lead; done += this._FRAMES) w._player_render(this._pvPtr, this._FRAMES);
+        w._player_set_hold(1);               // a key is down: the AM sustain waits
         this._pvActive = true;
     }
 

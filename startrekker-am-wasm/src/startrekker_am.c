@@ -158,6 +158,7 @@ static uint8_t  s_counter    = 0;
 static uint16_t s_pattpos    = 0;
 static uint8_t  s_songpos    = 0;
 static uint8_t  s_break_flag = 0;
+static int      s_hold       = 0;   // keyboard preview: the sustain stage waits while the key is down
 static uint16_t s_dmacon_new = 0;
 
 // Sample start pointers (computed during init, like mt_samplestarts)
@@ -688,8 +689,10 @@ static void mt_amhandler(void) {
                 }
             }
         } else if (phase == 4) {
-            // Sustain: count down
-            if (v->am_sustain_cnt > 0) {
+            // Sustain: count down (a held key waits here)
+            if (s_hold) {
+                /* key down: stay in sustain */
+            } else if (v->am_sustain_cnt > 0) {
                 v->am_sustain_cnt--;
             } else {
                 v->am_adsr_phase = 5;
@@ -842,3 +845,6 @@ void sam_music(void) {
     // AM handler runs every tick
     mt_amhandler();
 }
+
+// Keyboard preview: a key is down (the sustain stage waits) or up (the AM envelope runs on to its release).
+void sam_set_hold(int on) { s_hold = on ? 1 : 0; }

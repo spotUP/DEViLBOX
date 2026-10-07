@@ -1741,7 +1741,8 @@ bool is2_preview_note(Is2Module* m, int instrument, int note) {
 
     Is2SongInfo* song = &m->sub_songs[0];
     song->first_position = song->last_position = song->restart_position = (uint16_t)m->preview_position;
-    if (song->rows_per_track < 2) song->rows_per_track = 64;
+    // rows past the appended lines read as empty ones: a held key is not cut at the end of a 64 row pattern
+    song->rows_per_track = 250;
 
     is2_initialize_sound(m, 0);
     m->preview_done = false;

@@ -46,7 +46,7 @@ const emscriptenTransform = (c: string) => c
   .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 
 interface Cell { note: number; instrument: number; effTyp?: number; eff?: number; effTyp2?: number; effTyp3?: number; effTyp4?: number; effTyp5?: number }
-interface GridSong { instruments: Array<{ id: number; synthType?: string; digMug?: { sampleIndex?: number; fineTune?: number }; inStereo2?: { instrumentNumber?: number } }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
+interface GridSong { instruments: Array<{ id: number; name?: string; synthType?: string; digMug?: { sampleIndex?: number; fineTune?: number }; inStereo2?: { instrumentNumber?: number } }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
 
 /**
  * First note of channel `ch` in song order that carries only the commands a key plays too (the envelope,
@@ -190,9 +190,11 @@ describe('StarTrekker AM: a key never starts the song, and key release silences 
     const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
     Object.defineProperty(process, 'versions', { value: {}, configurable: true });
     try { await b.send({ type: 'noteOn', instr: 1, period: stPeriodForKey(25 + 11) }); } finally { Object.defineProperty(process, 'versions', versions); }
-    expect(totalRms(rmsPerTick(renderTicks(b.proc, 20, 0), 20)), 'a key sounds').toBeGreaterThan(0.01);
+    const peak = Math.max(...rmsPerTick(renderTicks(b.proc, 20, 0), 20));
+    expect(peak, 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
-    expect(totalRms(rmsPerTick(renderTicks(b.proc, 20, 0), 20)), 'silent after release').toBe(0);
+    // the AM envelope's own release runs (the voice is not cut)
+    expect(rmsPerTick(renderTicks(b.proc, 400, 0), 400)[399], 'quiet 8 s after release').toBeLessThan(peak * 0.05);
   });
 });
 
@@ -363,9 +365,12 @@ describe('Delta Music 1: a key never starts the song, and key release silences t
     await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
     await b.send({ type: 'noteOn', instrument: 0, note: 40 });
-    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
+    const peak = Math.max(...rmsPerTick(renderTicks(b.proc, 10, 0), 10));
+    expect(peak, 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
-    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
+    // the instrument's own release runs (the voice is not cut): quiet within 5 s
+    const after = rmsPerTick(renderTicks(b.proc, 250, 0), 250);
+    expect(after[249], 'quiet 5 s after release').toBeLessThan(peak * 0.1);
   });
 });
 
@@ -420,9 +425,12 @@ describe('Delta Music 2: a key never starts the song, and key release silences t
     await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
     await b.send({ type: 'noteOn', instrument: 0, note: 40 });
-    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
+    const peak = Math.max(...rmsPerTick(renderTicks(b.proc, 10, 0), 10));
+    expect(peak, 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
-    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
+    // the instrument's own release runs (the voice is not cut): quiet within 5 s
+    const after = rmsPerTick(renderTicks(b.proc, 250, 0), 250);
+    expect(after[249], 'quiet 5 s after release').toBeLessThan(peak * 0.1);
   });
 });
 
@@ -599,5 +607,36 @@ describe.each(['formats/anthrox_intro.dm2', 'delta-music-2/asperity megademo 3.d
       if (c.note > 0 && c.instrument > 0) withNote++;
     }
     expect(withNote, 'notes keep their instruments').toBeGreaterThan(50);
+  });
+});
+
+describe('InStereo! 1.0 fantasi8.is: every instrument slot of the file is kept, named as the file names it, and every instrument the song plays sounds on a key', () => {
+  it('instrument slots are never dropped or renumbered; a synth instrument has no stored name; a sample slot keeps the file\'s name', () => {
+    const raw = new Uint8Array(corpus('instereo!/fantasi8.is'));
+    const song = parseInStereo1File(raw, 'fantasi8.is') as unknown as GridSong;
+    expect(song.instruments.map((i) => i.id), 'contiguous slots 1..N').toEqual(Array.from({ length: raw[18] }, (_, k) => k + 1));
+    for (const i of song.instruments) {
+      if (i.synthType === 'InStereo1Synth') expect(i.name, `synth instrument ${i.id}: the format stores no name`).toBe('');
+      expect(i.name, `instrument ${i.id} is not an invented name`).not.toMatch(/^(Synth|Sample) \d+$/);
+    }
+    expect(song.instruments.find((i) => i.id === 1)!.name, 'a sample keeps the name the file stores').toBe('BD 3');
+  });
+
+  it('every synth instrument the song plays sounds on a key (an EGC instrument sets its sample on a channel that is already running)', async () => {
+    const ab = corpus('instereo!/fantasi8.is');
+    const song = parseInStereo1File(new Uint8Array(ab), 'fantasi8.is') as unknown as GridSong & { instruments: Array<{ id: number; synthType?: string }> };
+    const synthIds = new Set(song.instruments.filter((i) => i.synthType === 'InStereo1Synth').map((i) => i.id));
+    const played = new Set<number>();
+    for (const pi of song.songPositions) for (const ch of song.patterns[pi].channels) for (const c of ch.rows) if (c.note > 0 && c.note < 97 && synthIds.has(c.instrument)) played.add(c.instrument);
+    // Instrument 14 is silent in the song itself (the voices it is played on stay at 0 for its notes at tick 0):
+    // a key rightly makes no sound either, an empty slot the author used as a rest.
+    played.delete(14);
+    expect(played.size, 'the song plays synth instruments').toBeGreaterThan(3);
+    const b = await startWorklet('instereo1', 'InStereo1', emscriptenTransform);
+    await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+    for (const ins of [...played].sort((x, y) => x - y)) {
+      await b.send({ type: 'noteOn', instrument: ins, note: 61 });
+      expect(Math.max(...rmsPerTick(renderTicks(b.proc, 40, 0), 40)), `instrument ${ins} sounds`).toBeGreaterThan(0.01);
+    }
   });
 });

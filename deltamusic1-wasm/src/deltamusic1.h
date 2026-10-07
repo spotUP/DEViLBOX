@@ -44,6 +44,7 @@ size_t dm1_export(const Dm1Module* module, uint8_t* out, size_t max_size);
 // Keyboard preview: one note of one instrument through the replayer's own note handling
 bool dm1_preview_note(Dm1Module* module, int instrument, int note);
 void dm1_preview_stop(Dm1Module* module);
+void dm1_preview_release(Dm1Module* module);
 
 
 #ifdef __cplusplus

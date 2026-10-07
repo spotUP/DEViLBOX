@@ -128,6 +128,7 @@ typedef struct Dm2ChannelInfo {
     uint8_t vibrato_position;
     uint8_t vibrato_sustain;
     bool retrigger_sound;
+    bool hold;                 // keyboard preview: a volume sustain waits while the key is down
 
     // Mixer state
     int8_t* ch_sample_data;
@@ -253,7 +254,7 @@ struct Dm2Module {
     bool preview;
     bool preview_done;
     uint32_t preview_block;      // first of the two appended blocks: [+0] the note line, [+1] empty
-    Dm2Track preview_tracks[2];  // [0] voice 0's one-entry track, [1] the other voices'
+    Dm2Track preview_tracks[2][64];  // [0] voice 0's track (the note block, then empty blocks), [1] the other voices' (empty blocks)
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -433,8 +434,10 @@ static void dm2_vibrato_handler(Dm2ChannelInfo* channel, Dm2Instrument* inst) {
 }
 
 static void dm2_volume_handler(Dm2ChannelInfo* channel, Dm2Instrument* inst) {
-    if (channel->volume_sustain != 0)
-        channel->volume_sustain--;
+    if (channel->volume_sustain != 0) {
+        if (!channel->hold)
+            channel->volume_sustain--;
+    }
     else {
         Dm2VolumeInfo* info = &inst->volume_table[channel->volume_position];
 
@@ -512,7 +515,7 @@ static void dm2_process_channel(Dm2Module* m, int channel_number, Dm2ChannelInfo
 
     if (m->playing_info.tick == 0) {
         if (channel->block_position == 0) {
-            if (m->preview && channel->current_track_position >= 0) {
+            if (m->preview && channel->current_track_position == (short)channel->track_length - 1) {
                 // the one-note song ends with its block: it does not restart the note
                 m->preview_done = true;
                 for (int i = 0; i < 4; i++) m->channels[i].active = false;
@@ -1251,8 +1254,11 @@ bool dm2_preview_note(Dm2Module* m, int instrument, int note) {
         if (!m->blocks[m->num_blocks] || !m->blocks[m->num_blocks + 1]) return false;
         m->preview_block = m->num_blocks;
         m->num_blocks += 2;
-        m->preview_tracks[0].block_number = (uint8_t)m->preview_block;
-        m->preview_tracks[1].block_number = (uint8_t)(m->preview_block + 1);
+        // 64 blocks of 16 rows: the note on the first, silence after, so a held key is not cut at one block
+        for (int k = 0; k < 64; k++) {
+            m->preview_tracks[0][k].block_number = (uint8_t)(m->preview_block + (k == 0 ? 0 : 1));
+            m->preview_tracks[1][k].block_number = (uint8_t)(m->preview_block + 1);
+        }
         m->preview = true;
     }
     if (m->preview_block + 1 > 255) return false;   // block numbers are bytes
@@ -1265,9 +1271,10 @@ bool dm2_preview_note(Dm2Module* m, int instrument, int note) {
     initialize_sound(m);
     for (int i = 0; i < 4; i++) {
         Dm2ChannelInfo* ch = &m->channels[i];
-        ch->track = &m->preview_tracks[i == 0 ? 0 : 1];
+        ch->track = m->preview_tracks[i == 0 ? 0 : 1];
         ch->track_loop_position = 0;
-        ch->track_length = 1;
+        ch->track_length = 64;
+        ch->hold = (i == 0);   // a key is down: the volume table's sustain waits for key-up
     }
     m->preview_done = false;
     return true;
@@ -1277,4 +1284,10 @@ void dm2_preview_stop(Dm2Module* m) {
     if (!m) return;
     m->preview_done = true;
     for (int i = 0; i < 4; i++) m->channels[i].active = false;
+}
+
+/** Key-up: the sustain waits no more and the instrument's own volume table runs on to its end. */
+void dm2_preview_release(Dm2Module* m) {
+    if (!m) return;
+    for (int i = 0; i < 4; i++) m->channels[i].hold = false;
 }
