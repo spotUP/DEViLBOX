@@ -134,7 +134,7 @@ export async function exportSoundFX(
         }
 
         sampleSlots.push({
-          name: (inst.name || `Sample ${i + 1}`).slice(0, 22),
+          name: (inst.name || '').slice(0, 22),
           pcm,
           volume: vol,
           loopStart,

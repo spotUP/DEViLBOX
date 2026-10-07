@@ -176,7 +176,7 @@ export async function exportZoundMonitor(
       writeU32BE(output, off, 0);
 
       // 40-byte filename
-      const name = inst.name || `Sample ${i + 1}`;
+      const name = inst.name || '';
       writeString(output, off + 4, name, 40);
 
       // Volume (byte at offset 44)

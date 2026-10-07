@@ -32,13 +32,13 @@ export function createInstrumentsForModule(
     ['sawtooth', 'square', 'triangle', 'sine'];
 
   for (const instNum of Array.from(usedInstruments).sort((a, b) => a - b)) {
-    const name = instrumentNames[instNum - 1] || `Instrument ${instNum}`;
+    const name = instrumentNames[instNum - 1] || '';
     const sampleUrl = sampleUrls?.get(instNum);
 
     if (sampleUrl) {
       instruments.push({
         id: instNum,
-        name: name.trim() || `Sample ${instNum}`,
+        name: name.trim() || '',
         type: 'sample' as const,
         synthType: 'Sampler',
         effects: [],
@@ -50,7 +50,7 @@ export function createInstrumentsForModule(
       const oscType = oscillatorTypes[(instNum - 1) % oscillatorTypes.length];
       instruments.push({
         id: instNum,
-        name: name.trim() || `Instrument ${instNum}`,
+        name: name.trim() || '',
         type: 'synth' as const,
         synthType: 'Synth',
         oscillator: { ...DEFAULT_OSCILLATOR, type: oscType },

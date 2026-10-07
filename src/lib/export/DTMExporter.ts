@@ -376,7 +376,7 @@ export async function exportDTM(
       writeU32BE(ev, 48, smp.sampleRate);
     } else {
       // Empty sample: all zeros except name
-      const instName = song.instruments[i]?.name || `Sample ${i + 1}`;
+      const instName = song.instruments[i]?.name || '';
       writeStr(entry, 20, instName, 22);
       writeU8(entry, 43, 8); // bitDepth = 8
     }
