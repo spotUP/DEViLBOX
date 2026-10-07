@@ -37,6 +37,7 @@ import type { SunV13Score, SunCmdWidths } from './SunTronicV13';
 import { sunSynthDescriptiveName } from '@/lib/suntronic/synthName';
 import { decodeSunGroup, encodeSunGroup } from './sunGroupCodec';
 import { decodeSunBlockPool, buildSunTronicNativeData, buildPoolRowIndex } from './sunNativeData';
+import { walkSunTronic, sunWalkClockSkew } from '@/engine/suntronic/SunTronicWalk';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -730,5 +731,31 @@ function parseSunTronicV13File(
   };
 
   if (song.patterns.length === 0) console.warn('[SunTronic V1.3] no patterns extracted');
+
+  // The grid is the replayer's walk or it is not shown (owner, 2026-10-06: no guessed
+  // grids). The walk shares one row index across voices only while the voices share a
+  // row clock; a song whose voices do not (per-voice speed) opens in the scope view with
+  // the reason recorded, and carries no editable grid.
+  let unmatched: string | null = null;
+  try {
+    unmatched = sunWalkClockSkew(walkSunTronic(score)).reason;
+  } catch (err) {
+    unmatched = `the replayer could not walk the song: ${err instanceof Error ? err.message : String(err)}`;
+  }
+  if (unmatched) {
+    console.warn(`[SunTronic V1.3] ${filename}: no grid - ${unmatched}`);
+    const rows = Array.from({ length: V13_ROWS_PER_PATTERN }, emptyV13Cell);
+    song.patterns = [{
+      ...patterns[0],
+      id: 'pattern-0', name: 'Pattern 0', length: V13_ROWS_PER_PATTERN,
+      channels: patterns[0].channels.map((c) => ({ ...c, rows: rows.map((r) => ({ ...r })) })),
+    }];
+    song.songPositions = [0];
+    song.songLength = 1;
+    delete song.uadeVariableLayout;
+    delete song.sunTronicNative;
+    song.gridEstimated = true;
+    (song as unknown as { gridUnmatchedReason: string }).gridUnmatchedReason = unmatched;
+  }
   return song;
 }

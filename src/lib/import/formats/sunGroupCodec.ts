@@ -110,8 +110,11 @@ export function decodeSunGroup(
       // is exactly `curInstr != 0` here. A pitch byte with no instrument ever
       // staged sets the Paula period only (silent glide target) — the player does
       // NOT retrigger, so the grid must NOT show a note there (that was a phantom
-      // "ghost note"). First qualifying note wins (walkV13Voice behaviour).
-      if (cell.note === 0 && curInstr !== 0) {
+      // "ghost note"). The LAST qualifying note wins: every pitch byte of a group fires
+      // on the same player step and each note-on replaces the voice's instrument, so the
+      // note that sounds is the last one (mic-0001 voice 3 row 57: four retriggers of one
+      // pitch on instruments 1,2,1,2 sound instrument 2).
+      if (curInstr !== 0) {
         // Pitch decode MUST mirror the player byte-for-byte (SunTronicPlayer
         // getNextNote:364 `u8(~d0 - v.transpose)`): the 68k does `MOVE.B`, so the
         // transpose subtraction wraps to 8 bits BEFORE the pitch-table lookup.
