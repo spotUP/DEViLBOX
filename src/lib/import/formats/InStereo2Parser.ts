@@ -489,6 +489,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
 
     // Build InStereo2Config for the synth editor
     const is20Config: InStereo2Config = {
+      instrumentNumber: i + 1,
       volume: instr.volume,
       waveformLength: instr.waveformLength,
       portamentoSpeed: instr.portamentoSpeed,

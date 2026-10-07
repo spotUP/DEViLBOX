@@ -319,6 +319,8 @@ export interface SonicArrangerConfig {
  * vibrato, and portamento. Two 256-byte waveforms per instrument.
  */
 export interface InStereo2Config {
+  /** The replayer's number for this synth instrument (1-63): what a track line selects it with. */
+  instrumentNumber?: number;
   volume: number;           // 0-64
   waveformLength: number;   // effective waveform length (2-256)
   portamentoSpeed: number;  // 0-255

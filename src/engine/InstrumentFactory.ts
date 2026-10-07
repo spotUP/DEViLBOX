@@ -36,6 +36,7 @@ import { SonicArrangerSynth } from './sonic-arranger/SonicArrangerSynth';
 import { DeltaMusic1Synth } from './deltamusic1/DeltaMusic1Synth';
 import { DeltaMusic2Synth } from './deltamusic2/DeltaMusic2Synth';
 import { InStereo1Synth } from './instereo1/InStereo1Synth';
+import { InStereo2Synth } from './instereo2/InStereo2Synth';
 import { SymphonieSynth } from './symphonie/SymphonieSynth';
 import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { FuturePlayerSynth } from './futureplayer/FuturePlayerSynth';
@@ -889,6 +890,13 @@ export class InstrumentFactory {
         const is1Synth = new InStereo1Synth();
         is1Synth.setInstrumentNumber(config.id ?? 0);
         instrument = is1Synth;
+        break;
+      }
+
+      case 'InStereo2Synth': {
+        const is2Synth = new InStereo2Synth();
+        is2Synth.setInstrumentNumber(config.inStereo2?.instrumentNumber ?? 0);
+        instrument = is2Synth;
         break;
       }
 
