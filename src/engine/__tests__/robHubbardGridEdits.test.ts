@@ -3,12 +3,15 @@
  * fix-all-open; same gap David Whittaker had). A note, an instrument (the sample-change command in
  * force) and a note-to-rest edit each change the bytes of the command the cell is drawn from, and
  * the export differs from the module in those bytes only. Re-importing shows the edits.
+ * A note is named by the period it plays (the table entry scaled by its sample), so the edited
+ * note's byte is the table index that period names, not the tracker note minus 25.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseRobHubbardFile, buildRobHubbardGrid } from '@/lib/import/formats/RobHubbardParser';
 import { exportRobHubbard } from '@/lib/export/RobHubbardExporter';
+import { rhNotePeriod, rhPeriodToNote } from '@/lib/import/formats/robHubbardGrid';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const SONGS = ['rob-hubbard/skateordie.rh', 'formats/centurion_battle.rh'];
@@ -51,10 +54,16 @@ describe.each(SONGS)('Rob Hubbard grid edits reach the module: %s', (name) => {
 
     const edited = structuredClone(song.patterns);
     const cell = (pk: Pick): Rec => edited[pk.p].channels[ch(pk)].rows[pk.row] as unknown as Rec;
-    const oldNote = cell(pn).note!;
-    cell(pn).note = oldNote < 90 ? oldNote + 3 : oldNote - 3;
+    // three table steps up the player's period table, on the sample the voice plays the note with
+    const { periods, samples } = grid.walk.module;
+    const pnSource = grid.cellSources[pn.p][ch(pn)][pn.row]!;
+    const oldByte = orig[cmdOff(pn.fp, pn.cmd) + 1];
+    const newByte = oldByte + 3;
+    const rel = samples[pnSource.sample].relative;
+    cell(pn).note = rhPeriodToNote(rhNotePeriod(orig, periods, newByte, rel));
+    expect(cell(pn).note, 'the edited note is a different note').not.toBe(grid.patterns[pn.p].channels[ch(pn)].rows[pn.row].note);
     const oldIns = cell(pi).instrument!;
-    cell(pi).instrument = oldIns === 5 ? 6 : 5;
+    cell(pi).instrument = oldIns === 1 ? 2 : 1; // samples the module has: index 0 and 1 are PCM in both songs
     cell(pr).note = 97;
 
     const r = await exportRobHubbard({ ...song, patterns: edited } as TrackerSong);
@@ -66,7 +75,7 @@ describe.each(SONGS)('Rob Hubbard grid edits reach the module: %s', (name) => {
     const expected = [cmdOff(pn.fp, pn.cmd) + 1, cmdOff(pi.fp, pi.sc) + 1, cmdOff(pr.fp, pr.cmd), cmdOff(pr.fp, pr.cmd) + 1];
     // a rest keeps its duration: [dur, note] -> [-126, dur]; both bytes change unless equal
     for (const d of diff) expect(expected, `byte ${d} is one of the edited command bytes`).toContain(d);
-    expect(bytes[cmdOff(pn.fp, pn.cmd) + 1]).toBe(cell(pn).note! - 25);
+    expect(bytes[cmdOff(pn.fp, pn.cmd) + 1]).toBe(newByte);
     expect(bytes[cmdOff(pi.fp, pi.sc) + 1]).toBe(cell(pi).instrument! - 1);
     expect(bytes[cmdOff(pr.fp, pr.cmd)]).toBe(0x82);
     expect(bytes[cmdOff(pr.fp, pr.cmd) + 1]).toBe(orig[cmdOff(pr.fp, pr.cmd)]);
@@ -77,7 +86,9 @@ describe.each(SONGS)('Rob Hubbard grid edits reach the module: %s', (name) => {
     const at = (pk: Pick): Rec => again.patterns[pk.p].channels[ch(pk)].rows[pk.row] as unknown as Rec;
     expect(at(pn).note).toBe(cell(pn).note);
     expect(at(pi).instrument).toBe(cell(pi).instrument);
-    expect(at(pr).note).toBe(97);
+    // a rest is a note-off only where it stops a sounding voice (an earlier rest leaves the cell blank)
+    expect([0, 97]).toContain(at(pr).note);
+    expect(at(pr).note).not.toBe(grid.patterns[pr.p].channels[ch(pr)].rows[pr.row].note);
     expect(g2.blockRows.length).toBe(grid.blockRows.length);
   });
 
