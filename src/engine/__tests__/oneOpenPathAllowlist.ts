@@ -17,13 +17,11 @@ export interface AllowedCaller {
 }
 
 export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
-  { file: 'src/App.tsx', fn: 'App', callee: 'importModuleFile', count: 1, removedBy: 'U2.2' },
   { file: 'src/bridge/handlers/writeHandlers.ts', fn: 'exportMod', callee: 'exportWithOpenMPT', count: 1, removedBy: 'U3b' },
   { file: 'src/bridge/handlers/writeHandlers.ts', fn: 'exportNative', callee: 'exportNativeSong', count: 1, removedBy: 'U3b' },
   { file: 'src/bridge/handlers/writeHandlers.ts', fn: 'exportWav', callee: 'captureAudioLiveToBuffer', count: 1, removedBy: 'U3a' },
   { file: 'src/bridge/handlers/writeHandlers.ts', fn: 'exportWav', callee: 'renderPatternToAudio', count: 2, removedBy: 'U3a' },
   { file: 'src/bridge/handlers/writeHandlers.ts', fn: 'exportWav', callee: 'renderUADEToWav', count: 1, removedBy: 'U3a' },
-  { file: 'src/bridge/handlers/writeHandlers.ts', fn: 'loadFile', callee: 'importModuleFile', count: 1, removedBy: 'U2.2' },
   { file: 'src/components/dialogs/FilePreviewPanel.tsx', fn: 'ModlandPanel', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.5' },
   { file: 'src/components/dialogs/FilePreviewPanel.tsx', fn: 'OnlinePanel', callee: 'addCompanionFile', count: 1, removedBy: 'U2.5' },
   { file: 'src/components/dialogs/FilePreviewPanel.tsx', fn: 'OnlinePanel', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.5' },
@@ -40,8 +38,6 @@ export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
   { file: 'src/components/dj/DJPlaylistPanel.tsx', fn: 'DJPlaylistPanel', callee: 'parseModuleToSong', count: 4, removedBy: 'U2.6b' },
   { file: 'src/components/dj/DJView.tsx', fn: 'DJView', callee: 'parseModuleToSong', count: 1, removedBy: 'U2.6b' },
   { file: 'src/components/instruments/controls/OctaMEDControls.tsx', fn: 'OctaMEDControls', callee: 'exportSongToMOD', count: 1, removedBy: 'U3b' },
-  { file: 'src/components/jukebox/JukeboxPanel.tsx', fn: 'JukeboxPanel', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.2' },
-  { file: 'src/components/jukebox/JukeboxPanel.tsx', fn: 'JukeboxPanel', callee: 'gatherCompanions', count: 1, removedBy: 'U2.2' },
   { file: 'src/components/tracker/FT2Toolbar/FT2Toolbar.tsx', fn: 'handleSave', callee: 'exportNativeSong', count: 1, removedBy: 'U3b' },
   { file: 'src/components/tracker/FT2Toolbar/FT2Toolbar.tsx', fn: 'handleSave', callee: 'exportWithOpenMPT', count: 1, removedBy: 'U3b' },
   { file: 'src/components/tracker/MaxTraxView.tsx', fn: 'runExportDownload', callee: 'exportNativeSong', count: 1, removedBy: 'U3b' },
@@ -52,8 +48,7 @@ export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
   { file: 'src/engine/dj/DJTrackLoader.ts', fn: 'preRenderTrackInternal', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.6a' },
   { file: 'src/engine/dj/DJTrackLoader.ts', fn: 'preRenderTrackInternal', callee: 'parseModuleToSong', count: 3, removedBy: 'U2.6a' },
   { file: 'src/engine/dj/DJUADEPrerender.ts', fn: 'loadUADEToDeck', callee: 'parseModuleToSong', count: 1, removedBy: 'U2.6a' },
-  { file: 'src/engine/tour/tourScript.ts', fn: 'loadTrackerSong', callee: 'importModuleFile', count: 1, removedBy: 'U2.2' },
-  { file: 'src/engine/tour/tourScript.ts', fn: 'searchAndLoadModland', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.2' },
+  { file: 'src/engine/tour/tourScript.ts', fn: 'searchAndLoadModland', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.6b' },
   { file: 'src/engine/uade/UADEEngine.ts', fn: 'loadTune', callee: 'addCompanionFile', count: 1, removedBy: 'U4.1 (stays: UADE engine family)' },
   { file: 'src/engine/uade/UADESynth.ts', fn: 'setInstrument', callee: 'addCompanionFile', count: 1, removedBy: 'U4.1 (stays: UADE engine family)' },
   { file: 'src/hooks/dialogs/useExportDialog.ts', fn: 'useExportDialog', callee: 'applySong', count: 1, removedBy: 'U2.4' },
@@ -80,6 +75,9 @@ export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
   { file: 'src/lib/file/UnifiedFileLoader.ts', fn: 'loadV2MFile', callee: 'applySong', count: 1, removedBy: 'U2.2' },
   { file: 'src/lib/import/formats/UADEParser.ts', fn: 'parseUADEFile', callee: 'addCompanionFile', count: 1, removedBy: 'U4.1 (stays: UADE engine family)' },
   { file: 'src/lib/import/prepareModuleImport.ts', fn: 'prepareModuleImport', callee: 'addCompanionFile', count: 1, removedBy: 'U2.5' },
+  { file: 'src/lib/song/openSong.ts', fn: 'acquire', callee: 'downloadUADECompanions', count: 1, removedBy: 'U2.5' },
+  { file: 'src/lib/song/openSong.ts', fn: 'acquire', callee: 'gatherCompanions', count: 1, removedBy: 'U2.5' },
+  { file: 'src/lib/song/openSong.ts', fn: 'route', callee: 'importModuleFile', count: 1, removedBy: 'U4.1 (stays: openSong owner)' },
   { file: 'src/lib/modlandApi.ts', fn: 'modlandCompanions', callee: 'gatherCompanions', count: 1, removedBy: 'U2.5' },
   { file: 'src/stores/useTabsStore.ts', fn: 'restoreState', callee: 'applySong', count: 1, removedBy: 'U2.4' },
 ];

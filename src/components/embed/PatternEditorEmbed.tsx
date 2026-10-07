@@ -27,7 +27,7 @@ import { getToneEngine } from '../../engine/ToneEngine';
 import { usePatternPlayback } from '../../hooks/audio/usePatternPlayback';
 import { useGlobalKeyboardHandler } from '../../hooks/useGlobalKeyboardHandler';
 import { initKeyboardRouter, destroyKeyboardRouter } from '../../engine/keyboard/KeyboardRouter';
-import { loadFile } from '../../lib/file/UnifiedFileLoader';
+import { openSong } from '../../lib/song/openSong';
 
 const ALLOWED_ORIGINS = new Set([
   'http://localhost:5173',
@@ -140,8 +140,9 @@ export function PatternEditorEmbed() {
           try {
             const blob = new Blob([data.arrayBuffer]);
             const file = new File([blob], data.filename);
-            const result = await loadFile(file);
-            if (result.success === true) {
+            // The parent's PLAY message starts playback once audio is unlocked.
+            const result = await openSong({ kind: 'file', file }, { origin: 'embed', start: audioReady ? 'song' : false });
+            if (result.ok) {
               setLoadedFile(data.filename);
               postToParent('FILE_LOADED', { filename: data.filename });
             }

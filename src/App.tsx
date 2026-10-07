@@ -59,6 +59,7 @@ import { useGlobalPTT } from '@hooks/useGlobalPTT';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
 import { loadFile } from '@lib/file/UnifiedFileLoader';
+import { openSong } from '@lib/song/openSong';
 import { pickCompanionsFromDrop } from '@lib/import/companionDrop';
 import { expectedCompanionNames } from '@lib/import/companionResolver';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
@@ -806,10 +807,10 @@ function App() {
   // Load song file after confirmation (uses unified file loader)
   const loadSongFile = useCallback(async (file: File) => {
     try {
-      const result = await loadFile(file, { requireConfirmation: false });
-      if (result.success === true) {
-        notify.success(result.message);
-      } else if (result.success === false) {
+      const result = await openSong({ kind: 'file', file }, { origin: 'dialog' });
+      if (result.ok) {
+        if (!result.notified) notify.success(result.message);
+      } else {
         void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
       }
     } catch (err) {
@@ -869,7 +870,7 @@ function App() {
     try {
       const result = await loadFile(file, { requireConfirmation: true, companionFiles });
 
-      if (result.success === 'pending-confirmation' || result.success === 'pending-import') {
+      if (result.success === 'pending-confirmation') {
         useUIStore.getState().setPendingModuleFile(result.file);
         // loadFile deferred to the import-confirmation dialog, which re-imports from
         // pendingCompanionFiles — but we consumed+cleared those above. Restore them so
@@ -1195,15 +1196,11 @@ function App() {
               setShowFileBrowser(false);
               try {
                 const file = new File([buffer], filename);
-                const result = await loadFile(file, { requireConfirmation: false, companionFiles });
-                if (result.success === 'pending-import') {
-                  // Auto-import without the dialog: the same import it runs.
-                  const { importModuleFile } = await import('@lib/file/UnifiedFileLoader');
-                  await importModuleFile(file, { companionFiles });
-                } else if (result.success === true) {
-                  notify.success(result.message);
-                } else if (result.success === false) {
-                  void showAlert({ title: 'Load Failed', message: result.error || 'Could not load file' });
+                const result = await openSong({ kind: 'file', file, companions: companionFiles }, { origin: 'filebrowser' });
+                if (result.ok) {
+                  if (!result.notified) notify.success(result.message);
+                } else {
+                  void showAlert({ title: 'Load Failed', message: `${filename}: ${result.error}` });
                 }
               } catch (error) {
                 console.error('Failed to load tracker module:', error);

@@ -11,7 +11,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { LoudnessMeterPanel } from '@/components/audio/LoudnessMeterPanel';
-import { useSongLoadStore } from '@/stores/useSongLoadStore';
+import { useSongLoadStore, OPEN_PHASE_LABEL } from '@/stores/useSongLoadStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { WifiOff } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -385,6 +385,20 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   const [showLoudness, setShowLoudness] = useReactState(false);
   const online = useOnlineStatus();
   const loadingSong = useSongLoadStore((s) => (s.depth > 0 ? s.label || 'song' : null));
+  const loadPhase = useSongLoadStore((s) => s.phase);
+  const loadStartedAt = useSongLoadStore((s) => s.startedAt);
+  // Elapsed seconds of the load in flight; ticks only while a song loads.
+  const [loadElapsed, setLoadElapsed] = useReactState(0);
+  useEffect(() => {
+    if (!loadingSong) return;
+    const tick = () => setLoadElapsed(Math.max(0, Math.floor((performance.now() - loadStartedAt) / 1000)));
+    tick();
+    const id = window.setInterval(tick, 500);
+    return () => window.clearInterval(id);
+  }, [loadingSong, loadStartedAt, setLoadElapsed]);
+  const loadingText = loadingSong
+    ? `Loading ${loadingSong}${OPEN_PHASE_LABEL[loadPhase] ? ` - ${OPEN_PHASE_LABEL[loadPhase]}` : ''} (${loadElapsed} s)`
+    : '';
   const localTotalPages = Math.max(1, Math.ceil(contextKnobs.length / 8));
 
   // Effective page state — curated banks use MIDI store, others use local
@@ -531,8 +545,8 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
           {/* A song is loading: the old one is already gone */}
           {loadingSong && (
             <>
-              <span className="text-accent-warning text-[10px] font-bold uppercase truncate max-w-[240px]" title={`Loading ${loadingSong}`}>
-                Loading {loadingSong}
+              <span className="text-accent-warning text-[10px] font-bold uppercase truncate max-w-[420px]" title={loadingText}>
+                {loadingText}
               </span>
               <div className="w-px h-3 bg-border opacity-50"></div>
             </>
