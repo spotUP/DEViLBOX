@@ -37,10 +37,23 @@ describe.each(['ft2', 'default'] as const)('instrument list columns (%s)', (vari
     const { container } = render(<InstrumentList variant={variant} />);
     const r = rows(container);
     expect(r).toHaveLength(4);
-    const templates = new Set(r.map((el) => el.style.gridTemplateColumns));
-    expect(templates.size).toBe(1);
-    const tracks = [...templates][0].split(/\s+(?![^(]*\))/).length;
+    // The list is one grid; every row is a subgrid spanning all of its tracks.
+    for (const el of r) {
+      expect(el.style.gridTemplateColumns).toBe('subgrid');
+      expect(el.style.gridColumn).toBe('1 / -1');
+    }
+    const list = r[0].closest<HTMLElement>('.grid:not([data-instrument-id])')!;
+    const tracks = list.style.gridTemplateColumns.split(/\s+(?![^(]*\))/).length;
     for (const el of r) expect(el.children.length - el.querySelectorAll(':scope > .pointer-events-none').length).toBe(tracks);
+  });
+
+  it('right-aligns every column except the instrument name', () => {
+    load(LIST);
+    const { container } = render(<InstrumentList variant={variant} />);
+    for (const el of rows(container)) {
+      expect(el.className).toMatch(/\bjustify-items-end\b/);
+      expect((el.children[2] as HTMLElement).className).toMatch(/\bjustify-self-start\b/);
+    }
   });
 
   it('shows no name for an unnamed instrument and keeps art spacing verbatim', () => {

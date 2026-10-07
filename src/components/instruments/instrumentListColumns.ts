@@ -1,8 +1,9 @@
 /**
- * Column tracks of the instrument list. Every row of one list renders the same
- * template, so slot, icon, name, badges, status and actions line up row to row
- * and at any panel width (like the tracker's own columns) instead of following
- * whatever each row's content happens to need.
+ * Column tracks of the instrument list. The list is one grid and every row is
+ * a subgrid of it, so slot, icon, name, badges, status and actions line up row
+ * to row. Badge, status and action tracks are max-content: as wide as the
+ * widest cell in the list and no wider (owner 2026-10-07: "very wide with lots
+ * of space between the columns").
  */
 
 export interface InstrumentColumnsInput {
@@ -20,8 +21,6 @@ export interface InstrumentColumnsInput {
   hasStatus: boolean;
   /** Most action buttons any row shows; 0 when actions are off. */
   actionSlots: number;
-  /** Width of one action button, in rem. */
-  actionSlotRem?: number;
 }
 
 export const INSTRUMENT_COLUMN_ORDER = ['slot', 'icon', 'name', 'type', 'channel', 'role', 'status', 'loop', 'actions'] as const;
@@ -45,12 +44,12 @@ export function instrumentGridTemplate(i: InstrumentColumnsInput): string {
       case 'slot': return '1.75rem';
       case 'icon': return '1rem';
       case 'name': return i.artMode ? `${Math.max(8, i.longestNameLength)}ch` : 'minmax(5rem, 1fr)';
-      case 'type': return '4.5rem';
-      case 'channel': return '3rem';
-      case 'role': return '4.25rem';
-      case 'status': return '5rem';
-      case 'loop': return '2rem';
-      case 'actions': return `${(i.actionSlots * (i.actionSlotRem ?? 1)).toFixed(2)}rem`;
+      case 'type': return 'max-content';
+      case 'channel': return 'max-content';
+      case 'role': return 'max-content';
+      case 'status': return 'max-content';
+      case 'loop': return 'max-content';
+      case 'actions': return 'max-content';
     }
   }).join(' ');
 }

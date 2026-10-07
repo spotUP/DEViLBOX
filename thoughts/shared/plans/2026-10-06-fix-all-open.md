@@ -53,6 +53,55 @@ Measured 2026-10-06 (grep of call sites, src/ excluding tests):
 - [ ] G21 Low octave (G15, 6bcdf48aa): a note below C-0 cannot be typed - setCurrentOctave clamps to 1..7; only transpose, MCP or paste reach it. Allow the low octave in keyboard entry.
 - [x] G20 PRIORITY The Export dialog offers no Native option for SunTronic mule.src (owner 2026-10-07) although exportNativeSong exports it (G16 test called the router directly, not the dialog). The dialog's option list must come from the same registry the router uses (one source); test: for every format with a native exporter, the dialog shows the option and choosing it produces the same bytes as the router.
 - [ ] G19 PRIORITY (owner: "i bet its the same for all other formats that are similiar" - first step: table over EVERY editable format: engine that plays it by default, whether a grid edit reaches that engine on the next play, measured by a test, not read from code) Live edits are not heard (owner 2026-10-07, SunTronic mule.src: added notes, pressed play, edit not heard). SunTronic plays through UADE by default, which plays the original file bytes; the edit only reaches an export. Same class as G6 (tick-grid edits only reach the file through export). Every editable format must hear an edit on the next play: either the native engine plays the edited module (preferred, owner rule: native over UADE) or the edit is written into UADE's chip RAM / reloaded module. Also adding a note on an empty row must be allowed (G5). Test through the real edit path: setCell -> play -> the replayer stream contains the new note.
+
+### G19 measured table (liveEditHeard.test.ts, 2026-10-07)
+
+Engine = the registry descriptor that plays the song. Before = the module the engine was loaded with on the next play carried the edit (route kept it). After = the same after editedModuleForPlay (the next play loads the native export of the stores, run through the parse a reload runs; layout patch when the exporter does not carry the edit). Add = a note on an empty row reaches the exported module (G5).
+
+| format | engine | live route | edit heard before | edit heard after | note on empty row |
+|---|---|---|---|---|---|
+| actionamics | ActionamicsReplayer | actionamics-module | yes | pass | no |
+| activisionPro | ActivisionProReplayer | activisionPro-module | yes | pass | no |
+| benDaglish | BenDaglish | none | no | fail | no |
+| daveLowe | EaglePlayer | none | no | pass | no |
+| davidWhittaker | DavidWhittakerReplayer | none | no | pass | no |
+| deltaMusic1 | DeltaMusic1Replayer | track-index | no | pass | yes |
+| deltaMusic2 | DeltaMusic2Replayer | track-index | no | pass | yes |
+| digi | UADEEditable | none | no | pass | yes |
+| digitalSonixChrome | UADEEditable | chip-ram | no | pass | no |
+| digitalSoundStudio | DssReplayer | grid-cell | no | fail | no |
+| faceTheMusic | FaceTheMusicReplayer | grid-cell | no | pass | yes |
+| fc | FutureComposerReplayer | grid-cell | no | pass | yes |
+| fred | FredReplayer2 | fred-module | yes | pass | yes |
+| futurePlayer | FuturePlayer | none | no | pass | no |
+| hippelCoso | Hippel | none | no | pass | no |
+| hvl | Hively | chip-ram | no | pass | no |
+| inStereo2 | InStereo2Replayer | track-index | no | pass | yes |
+| inStereoAmbiguous | InStereo1Replayer | track-index | no | pass | yes |
+| jamcracker | JamCracker | chip-ram | no | pass | yes |
+| jochenHippel7V | Hippel | chip-ram | no | pass | no |
+| jochenHippelST | UADEEditable | chip-ram | no | pass | yes |
+| maxTrax | MaxTrax | none | no | fail | no |
+| musicAssembler | MusicAssembler | none | no | pass | n/a |
+| okt | OktalyzerReplayer | grid-cell | no | pass | yes |
+| pumaTracker | PumaTracker | none | no | pass | yes |
+| quadraComposer | QuadraComposerReplayer | grid-cell | no | pass | no |
+| robHubbard | UADEEditable | none | no | pass | no |
+| sidmon1 | SidMon1Replayer | grid-cell | yes | pass | no |
+| sidmon2 | SidMon2 | none | no | fail | no |
+| soundControl | SoundControlReplayer | chip-ram | no | pass | no |
+| soundMaster | UADEEditable | chip-ram | no | pass | yes |
+| soundPlayer | EaglePlayer | chip-ram | yes | pass | no |
+| soundmon | SoundMonReplayer | track-index | no | pass | no |
+| suntronic | SunTronicSong | none | no | pass | yes |
+| synthesis | SynthesisReplayer | track-index | no | pass | yes |
+| tcbTracker | UADEEditable | chip-ram | no | pass | yes |
+| tfmMusicMaker | TFM | none | no | fail | no |
+| tfmx | TFMXModule | chip-ram | yes | pass | no |
+
+TypeScript-scheduler / libopenmpt formats (669, amf, composer667, cheesecutter, dtm, far, fur, gdm, it, mdl, med, mod, mtm, plm, psm, ptm, rtm, s3m, sidFactory2, stm, stp, stx, ult, unic, xm): the grid is what plays, n/a.
+Not measurable in node (named in UNMEASURED in the test, with reason): dmf, soundfx, artOfNoise, steveTurner, goatTracker, anders0land, fmTracker, imagoOrpheus, cdfm67, karlMorton, madTracker2, nru, iffSmus, digitalSymphony, graoumfTracker2, symphoniePro, digiBoosterPro, chuckBiscuits, gameMusicCreator, ams, iceTracker, musicMaker, stoneTracker, kt, xrns.
+Open heard-fail units: benDaglish (G16), digitalSoundStudio, maxTrax, sidmon2, tfmMusicMaker (reasons in gridProvenance LIVE_EDIT_WHY).
 - [x] G18 PRIORITY Rob Hubbard skateordie.rh: patterns look correct but are NOT synced to the music (owner 2026-10-07: a CONSTANT offset, cursor BEHIND the music - not drift, not stuck; output latency measured 28 ms (not the cause); also 231 audio underruns (1.2 s) in 2 min seen live; points at a start-delay or row-origin mismatch: audio output latency not compensated, UADE pre-roll/init ticks, the walk counting from a different first tick, or the grid starting one row/block early) although robHubbardPlayheadFollowsUade passes (cba774ad8, playhead via uadePlayerTickGrid). Find why the live app differs from the test: which engine plays it in the app (UADE vs RH WASM), whether position reports reach useWasmPositionStore, tick rate / grid row mapping, speed; test through the real app path (NativeEngineRouting).
 - [ ] G17 Shared tracks (Hippel, SunTronic, Fred): an edit to a cell whose track several positions share changes every position after export/reload, but the editor shows it only in the edited cell. Recommended: the editor echoes the edit into every cell that plays the same track data (the grid must show what plays). Owner decision pending.
 - [x] G16 (DONE d78bb169c for 11 of 12 formats: nativeExportReloadSoundsTheSame.test.ts; Hippel held while U4 lands, Ben Daglish edit writer = plan unit G16-benDaglish, SunTronic smooth = G16-sunSmooth) (owner manual check PASS 2026-10-07: lethalxcess-intro.hip7 export native -> reload sounds the same, edit round trip OK) PRIORITY - owner's definition of "fully editable" (2026-10-07): export to the native format, load it again, and it sounds the same; then the same after an edit. Add ONE generic round-trip test over the native export router (nativeExportRouter / export_native): for every editable format (start with the WALK formats: DW, RH, BD, Hippel .hip/.hip7/ST, SunTronic, Activision Pro, Fred, Actionamics, Sound Master, Digital Sonix & Chrome, SidMon 1) and every corpus song: export unedited -> bytes equal the original; edit one note -> export -> re-import -> grid shows the edit and the rendered audio differs only where the edit is (render both through the replayer, compare per voice). Today only cell codecs are tested (e.g. tfmx7vRoundtrip.test.ts checks encodeCell/decodeCell, not export -> reload -> sound). Add this to the bar in 2026-10-07-grid-from-replayer-walk.md so every later unit must pass it.
@@ -65,6 +114,12 @@ Measured 2026-10-06 (grep of call sites, src/ excluding tests):
 
 - [ ] G22 UADE formats on the Timer A clock (no uadePlayerTickGrid) still post position at 20 Hz: latency-compensated now (2e8f1e2ca) but up to 50 ms quantization. Post per player tick like the uadePlayerTickGrid path.
 - [ ] G23 Export dialog probes Native availability by running the full export on open and on every song change (3fdf11774) - ask the registry whether a native exporter exists instead of exporting to find out.
+
+- [ ] K6 delitracker-custom/bards tale.cus: instruments cannot be played on the keyboard (owner 2026-10-07). DeliTracker customs are compiled 68k players run by UADE (UADESynth - a key plays nothing and says so since 23032f437). Find whether the song's samples can be located (UADE chip-RAM sample scan / Paula DMA pointers during play) and played as Sampler instruments at the replayer's rate; if not, say exactly why per format. Check the other UADE-only formats for the same.
+
+- [ ] P14 PRIORITY AHX/Hively editor (editorMode 'hively', owner 2026-10-07, amanda.ahx): with record mode on, keys write notes into the tracker store (measured: pattern 0 ch 0 rows 0-13 hold the typed notes) but the Hively editor view does not show them, and a red square on the right of the view steps down per key. Two sources of truth: the Hively view reads its own track data, edits go to the tracker store. One store must own the cells; the Hively view must render and edit the same data (and the engine must hear it, G19), and its cursor must sit where the edit goes. Check the other format-specific editor modes (sc68, klystrack, musicline, gtultra, maxtrax, ...) for the same split. Owner 2026-10-07: "use the protracker and ft2 sources and see how they do it" - model edit/record/jam behaviour on pt2-clone (/Users/spot/Code/Reference Code/pt2-clone-master and third-party/pt2-clone-master) and ft2-clone (/Users/spot/Code/ft2-clone): edit mode off = keys only jam; edit mode on and stopped = key writes the note at the cursor and moves by edit step; recording while playing = note written at the playback row (FT2 record/quantize); one pattern buffer the view draws and the replayer reads; cursor drawn in that one view. Cite the source functions in the plan.
+
+- [ ] UI4 Sample instrument editor: loop points cannot be dragged (owner 2026-10-07). Find the loop handles' pointer handling in the sample editor (waveform canvas), fix, test a drag through the real component changes loopStart/loopEnd and reaches the playing sampler.
 
 ## Batch D - dub (running)
 - [x] D1 Channel send audible: end-to-end guard channelSendEchoIsAudible.test.ts (8a899d711). -34 dB was return vs BASS-boosted master; echo sits -13.8 dB under the dry channel at Return 0.431, -5.9 dB on Tubby. No engine defect.
@@ -177,7 +232,7 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 - [x] UI1 Pattern editor relayout is janky, mostly ON SONG LOAD (owner 2026-10-07): "when the pattern editor redraws a new layout it struggles and things jump around". Measure first (frame timeline during a song load / channel-count change / pattern-length change: layout shifts, intermediate states rendered, worker canvas resize, multiple re-renders), then make the switch one clean frame: compute the new layout before showing it, no intermediate sizes, no flash.
 
 - [x] UI3 Instrument list has no proper columns - messy and unaligned (owner 2026-10-07). Fixed columns like a tracker: slot number, name (fixed width, blank when unnamed, art names verbatim), type badge, status (Load Failed), actions; aligned across rows and panel widths. Also replace raw colours (text-red-400 on the Delete icon, text-orange-400 on Load .mli) with token classes, and give the actions visible labels/tooltips so the red Delete icon is clear. Type icon before the name: owner decision 2026-10-07 - one neutral token colour for every synth type (was per-type colours, Sampler rose read as an error), tooltip names the type, in its own aligned column.
-- [x] UI2 Load dialog / file browser (owner 2026-10-07): (a) does not trap keyboard input - keys reach the tracker/keyboard behind it (use the shared isTextEntryTarget / data-captures-typing marker, 7a6840350, or modal focus trap via the Modal component); (b) does not remember the last folder and scroll position - reopen where it was; (c) the Online (Modland) search does not keep the last query - restore the query and results. Per-viewer convenience: localStorage with try/catch is fine. Tests per item.
+- [x] UI2 OWNER PASS typing trap 2026-10-07 Load dialog / file browser (owner 2026-10-07): (a) does not trap keyboard input - keys reach the tracker/keyboard behind it (use the shared isTextEntryTarget / data-captures-typing marker, 7a6840350, or modal focus trap via the Modal component); (b) does not remember the last folder and scroll position - reopen where it was; (c) the Online (Modland) search does not keep the last query - restore the query and results. Per-viewer convenience: localStorage with try/catch is fine. Tests per item.
   Done 2026-10-07: shared useDialogTypingTrap on all 8 load dialogs; fileBrowserMemory (folder, scroll, Online query+results); instrumentListColumns grid. Owner test pending at http://localhost:5174.
 
 ## Batch T - tests
