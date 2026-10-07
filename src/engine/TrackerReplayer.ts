@@ -4191,6 +4191,12 @@ export function getTrackerReplayer(): TrackerReplayer {
   return instance;
 }
 
+/** The replayer if one was ever constructed, else null. Never constructs: a caller that only
+ *  acts on a PLAYING replayer asks this, so a store action does not build the audio graph. */
+export function peekTrackerReplayer(): TrackerReplayer | null {
+  return instance;
+}
+
 export function disposeTrackerReplayer(): void {
   if (instance) {
     instance.dispose();
