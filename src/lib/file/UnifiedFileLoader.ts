@@ -8,7 +8,7 @@
  */
 
 import { withSongLoad } from '@/lib/song/songLifecycle';
-import { setSongLoadPhase, useSongLoadStore } from '@/stores/useSongLoadStore';
+import { setSongLoadPhase, useSongLoadStore, throwIfSongLoadCancelled } from '@/stores/useSongLoadStore';
 import type { OpenOrigin } from '@/lib/song/openSong';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
@@ -34,10 +34,9 @@ import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
 
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 import { applySong } from '@/lib/song/applySong';
+import type { PreparedModule, PrepareHooks } from '@/lib/import/prepareModuleImport';
 
 export interface FileLoadOptions {
-  /** Whether to show confirmation dialog before replacing project (song formats only) */
-  requireConfirmation?: boolean;
   /** Whether to preserve existing instruments (for additive imports like TD-3 in some UX flows) */
   preserveInstruments?: boolean;
   /** 0-based subsong index for multi-subsong formats (passed to parseModuleToSong) */
@@ -150,6 +149,7 @@ async function importTrackerModuleUnloaded(
     return;
   }
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+  throwIfSongLoadCancelled();
   setSongLoadPhase('parse');
   const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
   if (!song.patterns.length) {
@@ -170,6 +170,7 @@ async function importTrackerModuleUnloaded(
     }
     if (rawData) (song as { cinter4RawData?: ArrayBuffer }).cinter4RawData = rawData;
   }
+  throwIfSongLoadCancelled();
   setSongLoadPhase('apply');
   const knownFormat = (['MOD', 'XM', 'IT', 'S3M'] as const).find((f) => f === song.format) ?? 'UNKNOWN';
   await applySong({
@@ -197,21 +198,39 @@ async function importTrackerModuleUnloaded(
  * Each of those read and applied the song its own way before (2026-09-29
  * audit), so the same file loaded differently depending on how it arrived.
  */
-export async function importModuleFile(file: File, options: Partial<ImportOptions> = {}): Promise<void> {
+export async function importModuleFile(
+  file: File,
+  options: Partial<ImportOptions> & { prepared?: PreparedModule } = {},
+): Promise<void> {
   // The outgoing song leaves before the scan in prepareModuleImport, not after it.
   return withSongLoad(file.name, () => importModuleFileUnloaded(file, options));
 }
 
-async function importModuleFileUnloaded(file: File, options: Partial<ImportOptions>): Promise<void> {
-  const companions = options.companionFiles
-    ? Array.from(options.companionFiles, ([name, data]) => new File([data], name))
-    : [];
+/**
+ * Read a module file into what the import needs (UADE pre-scan, header
+ * metadata or libopenmpt's). The one caller of prepareModuleImport: openSong's
+ * prepareSong (the import dialog's preview and the interactive open) and
+ * importModuleFile both read through it.
+ */
+export async function prepareModuleFile(file: File, companions: File[] = [], hooks: PrepareHooks = {}): Promise<PreparedModule> {
   const { prepareModuleImport } = await import('@/lib/import/prepareModuleImport');
+  return prepareModuleImport(file, companions, hooks);
+}
+
+async function importModuleFileUnloaded(file: File, options: Partial<ImportOptions> & { prepared?: PreparedModule }): Promise<void> {
+  const { prepared: given, ...importOptions } = options;
   setSongLoadPhase('scan');
-  const { info, uadeMetadata } = await prepareModuleImport(file, companions);
+  let prepared = given;
+  if (!prepared) {
+    const companions = options.companionFiles
+      ? Array.from(options.companionFiles, ([name, data]) => new File([data], name))
+      : [];
+    prepared = await prepareModuleFile(file, companions);
+  }
+  throwIfSongLoadCancelled();
   // The dialog imports with libopenmpt on; importTrackerModule still keeps
   // native-only formats off it.
-  await importTrackerModule(info, { useLibopenmpt: true, subsong: 0, uadeMetadata, ...options });
+  await importTrackerModule(prepared.info, { useLibopenmpt: true, subsong: 0, uadeMetadata: prepared.uadeMetadata, ...importOptions });
 }
 
 /**
@@ -268,16 +287,11 @@ export async function loadFile(
         useUIStore.getState().setPendingTD3File(file);
         return { success: 'pending-confirmation', file };
       }
-      // Module and project songs wait for the import dialog when asked to;
-      // streaming and self-contained formats (V2M, AdPlug, GoatTracker,
-      // SunVox) and header-detected files load straight away.
-      if ((kind === 'module' || kind === 'project' || kind === 'td3') && options.requireConfirmation) {
-        return { success: 'pending-confirmation', file };
-      }
       const result = await openSong(
         { kind: 'file', file, companions: options.companionFiles },
         {
           origin: options.origin ?? 'filebrowser',
+          askForChoices: false, // loadFile opens the song as it is; the dialog step is openSong's, for the interactive callers
           subsong: options.subsong,
           uadeMetadata: options.uadeMetadata,
           midiOptions: options.midiOptions,

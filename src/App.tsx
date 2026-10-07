@@ -59,7 +59,8 @@ import { useGlobalPTT } from '@hooks/useGlobalPTT';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
 import { loadFile } from '@lib/file/UnifiedFileLoader';
-import { openSong } from '@lib/song/openSong';
+import { openSong, classifySong } from '@lib/song/openSong';
+import { openUserSong } from '@lib/song/openUserSong';
 import { pickCompanionsFromDrop } from '@lib/import/companionDrop';
 import { expectedCompanionNames } from '@lib/import/companionResolver';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
@@ -868,17 +869,16 @@ function App() {
     }
 
     try {
-      const result = await loadFile(file, { requireConfirmation: true, companionFiles });
-
-      if (result.success === 'pending-confirmation') {
-        useUIStore.getState().setPendingModuleFile(result.file);
-        // loadFile deferred to the import-confirmation dialog, which re-imports from
-        // pendingCompanionFiles — but we consumed+cleared those above. Restore them so
-        // the dialog still gets the companions (e.g. a Sonix song's Instruments/ folder).
-        if (pendingCompanions.length > 0) {
-          useUIStore.getState().setPendingCompanionFiles(pendingCompanions);
-        }
-      } else if (result.success === true) {
+      // A song goes through openSong, which shows the import dialog only when
+      // the file has a real choice (subsongs, a missing partner file, settings).
+      if (await classifySong(file)) {
+        await openUserSong(file, 'drop', companionFiles, (message) => {
+          void showAlert({ title: 'Load Failed', message: withCompanionHint(file, companionFiles, message) });
+        });
+        return;
+      }
+      const result = await loadFile(file, { companionFiles });
+      if (result.success === true) {
         notify.success(result.message);
       } else if (result.success === false) {
         void showAlert({ title: 'Load Failed', message: withCompanionHint(file, companionFiles, result.error || `Could not load ${file.name}`) });
@@ -1181,7 +1181,7 @@ function App() {
               // .dbx project files (JSON format) - validate and load via unified loader
               try {
                 const file = new File([JSON.stringify(data)], filename, { type: 'application/json' });
-                const result = await loadFile(file, { requireConfirmation: false });
+                const result = await loadFile(file);
                 if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {
@@ -1194,23 +1194,11 @@ function App() {
             }}
             onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
               setShowFileBrowser(false);
-              try {
-                const file = new File([buffer], filename);
-                const result = await openSong({ kind: 'file', file, companions: companionFiles }, { origin: 'filebrowser' });
-                if (result.ok) {
-                  if (!result.notified) notify.success(result.message);
-                } else {
-                  void showAlert({ title: 'Load Failed', message: `${filename}: ${result.error}` });
-                }
-              } catch (error) {
-                console.error('Failed to load tracker module:', error);
-                // Surface the actual reason (UADE dispatch error, missing
-                // companion, parser throw, etc.) instead of a flat
-                // "Failed to load file" — otherwise the user has no way
-                // to tell a companion 404 apart from a parse crash.
-                const reason = error instanceof Error ? error.message : String(error);
-                void showAlert({ title: 'Load Failed', message: `${filename}: ${reason}` });
-              }
+              await openUserSong(new File([buffer], filename), 'filebrowser', companionFiles, (message) => {
+                // The actual reason (UADE dispatch error, missing companion, parser
+                // throw) so a companion 404 is told apart from a parse crash.
+                void showAlert({ title: 'Load Failed', message: message.startsWith(filename) ? message : `${filename}: ${message}` });
+              });
             }}
           />
         )}
@@ -1266,7 +1254,7 @@ function App() {
           initialFile={pendingTD3File}
           onImport={async (file, replacePatterns) => {
             useUIStore.getState().setPendingTD3File(null);
-            const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
+            const result = await loadFile(file, { replacePatterns });
             if (result.success === true) notify.success(result.message);
             else if (result.success === false) void showAlert({ title: 'Load Failed', message: result.error || 'Could not load file' });
           }}

@@ -13,8 +13,9 @@ import {
   isSupportedModule,
   type ModuleInfo,
 } from '@lib/import/ModuleLoader';
-import { prepareModuleImport, detectNativeFormat } from '@lib/import/prepareModuleImport';
-import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
+import { detectNativeFormat } from '@lib/import/prepareModuleImport';
+import { prepareSong, type PreparedSong } from '@/lib/song/openSong';
+import { expectedCompanion as getExpectedCompanion, needsCompanionPrompt } from '@/lib/song/importChoice';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@lib/songdb';
 import type { SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
@@ -23,7 +24,6 @@ import { getFormatCapabilities, type FormatCapabilityInfo } from '@lib/import/Fo
 import { Info } from 'lucide-react';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
-import { expectedCompanionNames } from '@lib/import/companionResolver';
 import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
 export interface ImportOptions {
@@ -43,18 +43,9 @@ interface ImportModuleDialogProps {
   onClose: () => void;
   onImport: (info: ModuleInfo, options: ImportOptions) => void | Promise<void>;
   initialFile?: File | null; // Pre-loaded file (from drag-drop)
+  /** The song openSong already read for this file: shown as is, not scanned a second time. */
+  initialPrepared?: PreparedSong | null;
   companionFiles?: File[];    // Additional files for multi-file formats (e.g. SMUS instruments)
-}
-
-/**
- * For multi-file formats, the companion names the module expects beside it,
- * from the one companion resolver (bob4e.dum -> bob4e.ins, mdat.x -> smpl.x).
- */
-function getExpectedCompanion(filename: string): { names: string[]; description: string } | null {
-  const basename = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
-  const names = expectedCompanionNames(basename);
-  if (names.length === 0) return null;
-  return { names, description: names.join(' or ') };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -64,6 +55,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   onClose,
   onImport,
   initialFile,
+  initialPrepared,
   companionFiles,
 }) => {
   const typingTrap = useDialogTypingTrap();
@@ -94,11 +86,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const companionFilesRef = useRef<File[]>(companionFiles ?? []);
   useEffect(() => { companionFilesRef.current = companionFiles ?? []; }, [companionFiles]);
 
-  const setFormatEngine = useSettingsStore((s) => s.setFormatEngine);
-
   // Derived format state
   const nativeFmt  = detectNativeFormat(loadedFileName);
-  const isNativeOnly = !!(nativeFmt?.nativeOnly);
 
   // Format capability warnings
   const formatCapabilities: FormatCapabilityInfo | null = moduleInfo
@@ -119,12 +108,20 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   // Formats that require companion files (e.g. external Instruments/ folder)
   // Shown as a warning when none were loaded alongside the module.
-  const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus', 'zoundMonitor']);
-  const needsCompanionFiles =
-    activeCompanions.length === 0 && (
-      (nativeFmt !== null && MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key)) ||
-      getExpectedCompanion(loadedFileName) !== null
-    );
+  const needsCompanionFiles = needsCompanionPrompt(loadedFileName, activeCompanions.length);
+
+  const showPrepared = useCallback((prepared: PreparedSong) => {
+    if (prepared.songKind !== 'module' || !prepared.info) {
+      setError(`Not a tracker module: ${prepared.file.name}`);
+      return;
+    }
+    if (prepared.uadeMetadata) setUadeMetadata(prepared.uadeMetadata);
+    if (prepared.sidInfo) {
+      setSidHeader(prepared.sidInfo);
+      setSelectedSubsong(prepared.sidInfo.defaultSubsong);
+    }
+    setModuleInfo(prepared.info);
+  }, []);
 
   const handleFileSelect = useCallback(async (file: File, overrideCompanions?: File[]) => {
     if (!isSupportedModule(file.name)) {
@@ -156,18 +153,18 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     try {
       // Fire-and-forget songdb lookup (non-blocking, display only)
       file.arrayBuffer().then(buf => lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo));
-      // How the file is read for import is prepareModuleImport's - the same
-      // for this dialog and every dialog-free way in (importModuleFile).
-      const prepared = await prepareModuleImport(file, companions, {
-        onUadeProgress: (progress, phase) => { setUadeInitProgress(progress); setUadeInitPhase(phase); },
-        onUadeScanStart: () => { uadeScanActiveRef.current = true; },
-      });
-      if (prepared.uadeMetadata) setUadeMetadata(prepared.uadeMetadata);
-      if (prepared.sidInfo) {
-        setSidHeader(prepared.sidInfo);
-        setSelectedSubsong(prepared.sidInfo.defaultSubsong);
-      }
-      setModuleInfo(prepared.info);
+      // How the file is read for import is prepareSong's - the same read the
+      // interactive open and every dialog-free way in use.
+      const companionMap = new Map<string, ArrayBuffer>();
+      for (const c of companions) companionMap.set(companionRelativeName(file, c), await c.arrayBuffer());
+      const prepared = await prepareSong(
+        { kind: 'file', file, companions: companionMap.size ? companionMap : undefined },
+        {
+          onUadeProgress: (progress, phase) => { setUadeInitProgress(progress); setUadeInitPhase(phase); },
+          onUadeScanStart: () => { uadeScanActiveRef.current = true; },
+        },
+      );
+      showPrepared(prepared);
     } catch (err) {
       // Don't show "Scan cancelled" as an error — that's expected from handleClose
       if (!(err instanceof Error && err.message === 'Scan cancelled')) {
@@ -177,22 +174,26 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       uadeScanActiveRef.current = false;
       setIsLoading(false);
     }
-  }, []);
+  }, [showPrepared]);
 
-  // Auto-load file if provided (from drag-drop)
+  // Auto-load file if provided (from drag-drop): the song openSong already
+  // prepared is shown as is; a file that could not be scanned yet (it waits for
+  // a partner file) or arrives alone is prepared here.
   useEffect(() => {
-    if (initialFile && isOpen) {
+    if (!isOpen) return;
+    if (initialPrepared?.info) {
+      activeMainFileRef.current = initialPrepared.file;
+      setActiveCompanions(companionFilesRef.current);
+      setLoadedFileName(initialPrepared.file.name.toLowerCase());
+      showPrepared(initialPrepared);
+    } else if (initialFile) {
       handleFileSelect(initialFile);
     }
-  }, [initialFile, isOpen, handleFileSelect]);
+  }, [initialFile, initialPrepared, isOpen, handleFileSelect, showPrepared]);
 
   const handleImport = useCallback(async () => {
     if (!moduleInfo) return;
-    // Always use native parser when available; always use UADE enhanced (editable) mode.
-    if (nativeFmt && !isNativeOnly) {
-      setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native');
-    }
-    setFormatEngine('uade', 'enhanced');
+    // The choices go to this one open only (D4): the dialog writes no settings.
     // Convert companion File[] to Map<string, ArrayBuffer> for the import pipeline
     let companionMap: Map<string, ArrayBuffer> | undefined;
     if (activeCompanions.length > 0) {
@@ -211,7 +212,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       setIsImporting(false);
     }
     onClose();
-  }, [moduleInfo, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions]);
+  }, [moduleInfo, onImport, onClose, selectedSubsong, activeCompanions, uadeMetadata]);
 
   // Keep ref in sync so the Enter key handler always calls the latest version
   useEffect(() => { handleImportRef.current = handleImport; }, [handleImport]);

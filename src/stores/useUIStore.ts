@@ -118,7 +118,6 @@ interface UIStore {
   // Transient UI state (not persisted)
   statusMessage: string;
   prevStatusMessage: string;
-  pendingModuleFile: File | null;  // Module file pending import (set by drag-drop, consumed by TrackerView)
   pendingCompanionFiles: File[];   // Companion files for multi-file formats (e.g. SMUS instruments)
   pendingAudioFile: File | null;   // Audio sample file pending import (adds sampler instrument)
   pendingTD3File: File | null;     // TD-3 pattern file pending import (.sqs/.seq)
@@ -200,7 +199,6 @@ interface UIStore {
   setPatternEditorPoppedOut: (v: boolean) => void;
 
   // Module import actions
-  setPendingModuleFile: (file: File | null) => void;
   setPendingCompanionFiles: (files: File[]) => void;
   setPendingAudioFile: (file: File | null) => void;
   setPendingTD3File: (file: File | null) => void;
@@ -318,7 +316,6 @@ export const useUIStore = create<UIStore>()(
       // Transient state
       statusMessage: 'All Right',
       prevStatusMessage: 'All Right',
-      pendingModuleFile: null,
       pendingCompanionFiles: [],
       pendingAudioFile: null,
       pendingTD3File: null,
@@ -704,10 +701,6 @@ export const useUIStore = create<UIStore>()(
         }),
 
       // Module import actions
-      setPendingModuleFile: (file) =>
-        set((state) => {
-          state.pendingModuleFile = file;
-        }),
       setPendingCompanionFiles: (files) =>
         set((state) => {
           state.pendingCompanionFiles = files;
