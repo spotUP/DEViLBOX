@@ -31,13 +31,11 @@ import {
 
 const meterFeed = new ChannelMeterFeed();
 
-/** UADE only strips ESM markers — no HEAP rewrites (the worklet handles memory views itself). */
-export function uadeTransform(code: string): string {
-  return code
-    .replace(/import\.meta\.url/g, "'.'")
-    .replace(/export\s+default\s+\w+;?/g, '')
-    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];');
-}
+import { uadeTransform } from './uadeGlue';
+import { UadeScanClient } from './UadeScanClient';
+import type { UadeScanResult } from './uadeWorkletHost';
+import { getScanParams } from './uadeScanLists';
+export { uadeTransform };
 
 export interface UADEScanRow {
   period: number;
@@ -116,6 +114,26 @@ export interface UADEMetadata {
   enhancedScan?: UADEEnhancedScanData;   // Enhanced scan data with samples + effects
   shortScanTicks?: UADETickSnapshot[];   // Tick snapshots from short scan (compiled replayers)
   scanStats?: UADEScanStats;             // How much the scan rendered and what ended it
+}
+
+/** The worklet's (or the scan worker's) `loaded` message as the metadata `load()` resolves with. */
+export function uadeMetaFromLoaded(data: Record<string, any>): UADEMetadata { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const meta: UADEMetadata = {
+    player: data.player ?? 'Unknown',
+    formatName: uadeFormatLabel(data.formatName, data.player),
+    minSubsong: data.minSubsong ?? 1,
+    maxSubsong: data.maxSubsong ?? 1,
+    subsongCount: data.subsongCount ?? 1,
+    startSubsong: data.startSubsong ?? 0,
+    scanData: data.scanData,
+  };
+  if (data.enhancedScan) {
+    meta.enhancedScan = { ...data.enhancedScan, warnings: data.enhancedScan.warnings ?? [] };
+  }
+  // Tick snapshots from a short scan (captured before the WASM reinit)
+  if (data.shortScanTicks) meta.shortScanTicks = data.shortScanTicks;
+  if (data.scanStats) meta.scanStats = data.scanStats;
+  return meta;
 }
 
 /** What the grid scan did, reported by the worklet (ledger F7). */
@@ -215,6 +233,11 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   // Pending getWatchpointHits requests: Map<requestId, {resolve, reject}>
   private _wpHitsPending = new Map<number, { resolve: (v: WatchpointHit[]) => void; reject: (e: Error) => void }>();
   private _wpHitsNextId = 0;
+
+  /** The scan runs in a worker with its own UADE instance, never on the audio thread. */
+  readonly scanClient = new UadeScanClient();
+  /** Tick snapshots were switched on by the caller: the scan, in the worker, switches them on too. */
+  private _tickSnapshotsOn = false;
 
   // Live tick capture: accumulated snapshots from playback for incremental pattern reconstruction
   private _liveTickSnapshots: UADETickSnapshot[] = [];
@@ -333,30 +356,8 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
 
         case 'loaded':
           if (this._resolveLoad) {
-            const meta: UADEMetadata = {
-              player: data.player ?? 'Unknown',
-              formatName: uadeFormatLabel(data.formatName, data.player),
-              minSubsong: data.minSubsong ?? 1,
-              maxSubsong: data.maxSubsong ?? 1,
-              subsongCount: data.subsongCount ?? 1,
-              startSubsong: data.startSubsong ?? 0,
-              scanData: data.scanData,
-            };
-            // Include enhanced scan data if available
-            if (data.enhancedScan) {
-              meta.enhancedScan = {
-                ...data.enhancedScan,
-                warnings: data.enhancedScan.warnings ?? [],
-              };
-            }
-            // Include tick snapshots from short scan (captured before WASM reinit)
-            if (data.shortScanTicks) {
-              meta.shortScanTicks = data.shortScanTicks;
-            }
-            if (data.scanStats) {
-              meta.scanStats = data.scanStats;
-              this.lastScanStats = data.scanStats;
-            }
+            const meta = uadeMetaFromLoaded(data);
+            if (meta.scanStats) this.lastScanStats = meta.scanStats;
             this._resolveLoad(meta);
             this._resolveLoad = null;
             this._rejectLoad = null;
@@ -654,36 +655,56 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    *   name UADE opens them under. The call owns them: this set REPLACES the previous load's
    *   (none given = none), so nothing is written out of band and no earlier song's file stays.
    */
-  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number, looping?: boolean, pinSubsong = false, companions?: UADECompanions): Promise<UADEMetadata> {
+  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number, looping?: boolean, pinSubsong = false, companions?: UADECompanions, signal?: AbortSignal): Promise<UADEMetadata> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
+
+    // Clone buffer before transferring (caller may need it later for subsong switching)
+    // Ensure we have a real ArrayBuffer — Uint8Array.slice() returns a Uint8Array,
+    // which is not transferable. ArrayBuffer.slice() returns an ArrayBuffer.
+    const raw: ArrayBuffer = data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer as ArrayBuffer;
+    const toBuffer = (b: ArrayBuffer | Uint8Array): ArrayBuffer => (b instanceof ArrayBuffer ? b : (b as Uint8Array).buffer as ArrayBuffer).slice(0);
+    const companionList = () => [...(companions ?? [])].map(([filename, buf]) => ({ filename, buffer: toBuffer(buf) }));
+    const hint = uadePlayerHint(filenameHint);
+
+    // The scan (a full offline render, seconds for a long song) runs in the scan
+    // worker; the audio thread only loads the song for playback, scan skipped.
+    let scanned: UadeScanResult | null = null;
+    if (!skipScan) {
+      scanned = await this.scanClient.scan({
+        buffer: toBuffer(raw), filenameHint: hint, subsong, scanTimeoutSec,
+        companions: companionList(), tickSnapshots: this._tickSnapshotsOn,
+      }, this.audioContext?.sampleRate ?? 44100, signal);
+    }
 
     this._loadPromise = new Promise<UADEMetadata>((resolve, reject) => {
       this._resolveLoad = resolve;
       this._rejectLoad = reject;
     });
-
-    // Clone buffer before transferring (caller may need it later for subsong switching)
-    // Ensure we have a real ArrayBuffer — Uint8Array.slice() returns a Uint8Array,
-    // which is not transferable. ArrayBuffer.slice() returns an ArrayBuffer.
-    const raw = data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer;
-    const transferBuf = raw.slice(0);
-    const companionList = [...(companions ?? [])].map(([filename, buf]) => ({
-      filename,
-      buffer: (buf instanceof ArrayBuffer ? buf : (buf as Uint8Array).buffer).slice(0),
-    }));
+    const transferBuf = toBuffer(raw);
+    const loadCompanions = companionList();
     this.workletNode.port.postMessage(
-      { type: 'load', buffer: transferBuf, filenameHint: uadePlayerHint(filenameHint), skipScan, subsong, scanTimeoutSec, pinSubsong, companions: companionList },
-      [transferBuf, ...companionList.map((c) => c.buffer)]
+      scanned
+        // The subsong the scan settled on (the first audible one when none was asked for) is the one to play: pinned, so the worklet does not probe again.
+        ? { type: 'load', buffer: transferBuf, filenameHint: hint, skipScan: true, subsong: Number(scanned.startSubsong ?? subsong), scanTimeoutSec, pinSubsong: true, companions: loadCompanions }
+        : { type: 'load', buffer: transferBuf, filenameHint: hint, skipScan, subsong, scanTimeoutSec, pinSubsong, companions: loadCompanions },
+      [transferBuf, ...loadCompanions.map((c) => c.buffer)]
     );
 
-    const meta = await this._loadPromise;
+    let meta = await this._loadPromise;
+    if (scanned) {
+      meta = uadeMetaFromLoaded(scanned);
+      if (meta.scanStats) this.lastScanStats = meta.scanStats;
+    }
 
     // Looping is otherwise decided by whether a scan happened to run — the
     // scan sets it to 0 so it can terminate, `skipScan` sets it to 1. A caller
-    // that skips a scan it never needed says what it wants instead.
-    if (looping !== undefined) {
-      this.workletNode.port.postMessage({ type: 'setLooping', value: looping });
+    // that skips a scan it never needed says what it wants instead. After a
+    // worker scan the worklet's own load skipped it, so the state a scan would
+    // have left is set here, from the same table.
+    const loops = looping ?? (scanned ? getScanParams(filenameHint).loops : undefined);
+    if (loops !== undefined) {
+      this.workletNode.port.postMessage({ type: 'setLooping', value: loops });
     }
     return meta;
   }
@@ -710,7 +731,6 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * scan (2026-09-24).
    */
   async loadForPlayback(data: ArrayBuffer, filenameHint: string, subsong = 0, pinSubsong = false, companions?: UADECompanions): Promise<void> {
-    const { getScanParams } = await import('./uadeScanLists');
     await this.load(data, filenameHint, true, subsong, undefined, getScanParams(filenameHint).loops, pinSubsong, companions);
   }
 
@@ -737,6 +757,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * immediately so the caller can clean up.
    */
   cancelLoad(): void {
+    this.scanClient.cancel();
     if (this._rejectLoad) {
       this._rejectLoad(new Error('Scan cancelled'));
     }
@@ -1204,6 +1225,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
 
   /** Enable or disable CIA tick snapshot capture. */
   enableTickSnapshots(enable: boolean): void {
+    this._tickSnapshotsOn = enable;
     this.workletNode?.port.postMessage({ type: 'enableTickSnapshots', enable });
   }
 
@@ -1315,6 +1337,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
       if (this._isolationSlotMasks[i] !== null) this.removeIsolation(i);
     }
     this._isolationSlotMasks.fill(null);
+    this.scanClient.dispose();
     super.dispose();
     this._positionCallbacks.clear();
     this._channelCallbacks.clear();

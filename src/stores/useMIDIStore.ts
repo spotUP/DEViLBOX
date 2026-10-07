@@ -1326,8 +1326,12 @@ export const useMIDIStore = create<MIDIStore>()(
 // ============================================================================
 
 // Defer subscription to avoid circular dependency — useInstrumentStore may not
-// be initialized yet when this module first loads.
-queueMicrotask(() => {
+// be initialized yet when this module first loads. A bundler evaluates the
+// whole cycle before the first microtask; a module loader that awaits between
+// modules (the test runner, entering through the UADE engine) does not, so
+// wait until the store exists instead of assuming one microtask is enough.
+function subscribeToInstrumentSelection(): void {
+  if (!useInstrumentStore) { setTimeout(subscribeToInstrumentSelection, 0); return; }
   useInstrumentStore.subscribe((state, prevState) => {
     if (state.currentInstrumentId !== prevState.currentInstrumentId) {
       const instrument = state.instruments.find(i => i.id === state.currentInstrumentId);
@@ -1353,5 +1357,6 @@ queueMicrotask(() => {
       });
     }
   });
-});
+}
+queueMicrotask(subscribeToInstrumentSelection);
 
