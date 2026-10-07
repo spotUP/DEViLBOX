@@ -589,3 +589,15 @@ describe('TFMX Professional tfmx/mdat.hbtitle: a typed note is the module\'s own
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 30, 0), 30)), 'silent after release').toBeLessThan(1e-4);
   });
 });
+
+describe.each(['formats/anthrox_intro.dm2', 'delta-music-2/asperity megademo 3.dm2'])('Delta Music 2 %s: instrument numbers show only on notes', (name) => {
+  it('the replayer reads a row\'s instrument only with a note, so no cell shows one without', () => {
+    const song = parseDeltaMusic2File(new Uint8Array(corpus(name)), name) as unknown as GridSong;
+    let withNote = 0;
+    for (const pi of song.songPositions) for (const ch of song.patterns[pi].channels) for (const c of ch.rows) {
+      if (c.instrument > 0) expect(c.note > 0, 'an instrument number on a row without a note').toBe(true);
+      if (c.note > 0 && c.instrument > 0) withNote++;
+    }
+    expect(withNote, 'notes keep their instruments').toBeGreaterThan(50);
+  });
+});

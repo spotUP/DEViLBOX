@@ -508,7 +508,9 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
         }
 
         // DEViLBOX instruments are 1-based
-        const instrId = line.instrument < dm2Instruments.length ? line.instrument + 1 : 0;
+        // The replayer reads a row's instrument only when the row has a note (dm2_process_channel):
+        // on a note-less row the byte is unused and must not show as an instrument number.
+        const instrId = line.note > 0 && line.instrument < dm2Instruments.length ? line.instrument + 1 : 0;
 
         // Effect mapping: DM2 effects → XM effects
         let effTyp = 0;
