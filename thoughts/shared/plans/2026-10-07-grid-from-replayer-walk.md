@@ -232,7 +232,7 @@ bar test first (revert check: it must fail on the old grid), then fix.
   | Sonic Arranger (2) | NOTE ORDER OK 2/2, timing/instr/commands UNVERIFIED | yardstick 0.99-1.00; almighty exact opening on all voices, mega end 0.43-0.54 exact-prefix (W2-b) |
   | Dave Lowe (1) | NOTE ORDER OK, 1 voice to look at | yardstick 1.00x4; voice 2 exact-prefix 0.42 (W2-b) |
   | Dave Lowe New (1) | UNVERIFIED | yardstick 0.88-1.00 (UADE does play m-bison here), exact-prefix 0.01-0.14 (W2-b) |
-  | Rob Hubbard (2) | NOTE ORDER: 1 voice FAILS the yardstick | skateordie ch1 0.59-0.60 (grid ch1 bass line vs UADE voice 1; exact-prefix 0.03) while ch0/2/3 are exact; centurion_battle ch2/3 exact-prefix 0.00 (W2-c) |
+  | Rob Hubbard (2) | PASS 2/2, exact (W2-c DONE 2026-10-07, cba774ad8) | was: skateordie ch1 0.59 (notes named by table index + 25, not by the period the sample scale gives). Now every Paula note-on of both songs is the grid note on its row with the grid instrument's sample: skateordie 2432/1672/925/251 note-ons over the whole 243 s pass, centurion_battle through its song end (robHubbardGridIsPlayersWalk.test.ts); yardstick 1.00, exact-prefix 1.00 on every playing channel |
   | Delta Music 1 (2) | UNVERIFIED, likely FAIL | yardstick 0.28-0.30 on 7 of 8 channels, exact-prefix 0.00; existing test pins the opening notes of two voices only (W2-d) |
   | Digital Sound Studio (2) | PASS 2/2 notes | exact leading notes on every voice (floor 0.95 asserted, shuffle-teeth on zrimay) |
   | InStereo 1 (1) | UNVERIFIED, likely FAIL | yardstick 0.25/0.69/0.64/1.00 (W2-e) |
@@ -241,7 +241,7 @@ bar test first (revert check: it must fail on the old grid), then fix.
   New units (no failure was confirmed small; each needs an exact oracle first):
   - W2-a DSC fanfares: UADE re-arms pitch 16 on voices 1 and 3 hundreds of times, the grid holds it as one note. Find whether the record loops (grid should show retriggers) or the oracle counts sample-loop re-arms.
   - W2-b Sonic Arranger, Dave Lowe, Dave Lowe New: exact oracle (timing, instruments, note-offs, commands) from the wasm event log / runner; mega end.sa, incredibleshrinkingsphere voice 2, m-bison.dln.
-  - W2-c Rob Hubbard: skateordie voice 1 against UADE voice records; centurion_battle voices 2-3.
+  - [x] W2-c Rob Hubbard: DONE (cba774ad8), see the table row.
   - W2-d Delta Music 1: exact oracle from DeltaMusic1Replayer's event log; both corpus songs.
   - W2-e InStereo 1 and 2: exact oracle from the replayers' event logs; three corpus songs.
   - W2-f Fred Editor fuzzball-title: no UADE oracle; decide whether the replayer log is the oracle.
