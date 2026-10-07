@@ -137,6 +137,19 @@ async function applyProjectExtras(x: ProjectExtras): Promise<void> {
   }
 }
 
+/** Hand a GoatTracker song to the GTUltra store: loaded now if its engine is up, else when it comes up (useGTUltraEngineInit). */
+async function fillGTUltraStore(bytes: Uint8Array, name: string): Promise<void> {
+  const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
+  const gt = useGTUltraStore.getState();
+  if (gt.engine) {
+    gt.engine.loadSong(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
+    // loadSong triggers onSongLoaded -> refreshSongInfo, which refreshes orders / patterns / instruments / tables.
+  } else {
+    gt.setPendingSongData(new Uint8Array(bytes));
+  }
+  gt.setSongName(name);
+}
+
 /** Replace the current song with `song`. */
 export async function applySong(song: SongToApply, source: SongSource): Promise<void> {
   const engine = getToneEngine();
@@ -173,6 +186,10 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   const format = useFormatStore.getState();
   format.setOriginalModuleData(song.originalModuleData);
   format.applyEditorMode(song.engine);
+  // GoatTracker's engine holds its own song: the GTUltra store is filled from
+  // the applied song's bytes (a file open, a restore, a tab and a sync all
+  // arrive here), never written beside it by an opener.
+  if (song.engine.goatTrackerData) await fillGTUltraStore(song.engine.goatTrackerData, song.metadata.name);
 
   const transport = useTransportStore.getState();
   transport.setBPM(song.bpm);

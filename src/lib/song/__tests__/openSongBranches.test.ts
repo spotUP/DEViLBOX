@@ -75,13 +75,32 @@ describe('every branch behind openSong is reached through it', { timeout: 120000
     expect(useTrackerStore.getState().patterns.length).toBeGreaterThan(0);
   });
 
-  it('GoatTracker opens through openSong into the GTUltra store, not the tracker stores', async () => {
+  it('GoatTracker opens through the one apply step: unloaded first, generation bumped, GTUltra store filled from the applied song', async () => {
     const rel = 'public/data/songs/goat-tracker-ultra/$3jammar-akhbar.sng';
-    const r = await open(basename(rel), bytesOf(rel));
-    expect(r).toMatchObject({ ok: true, kind: 'goatTracker' });
-    expect(vi.mocked(branches.loadSongFile)).toHaveBeenCalledTimes(1);
+    const { useSongLoadStore } = await import('@/stores/useSongLoadStore');
     const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
-    expect(useGTUltraStore.getState().pendingSongData?.byteLength).toBe(bytesOf(rel).byteLength);
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    useGTUltraStore.getState().setPendingSongData(null);
+    const before = useSongLoadStore.getState().generation;
+    let generationAtApply = -1;
+    let appliedBytes = 0;
+    const real = (await vi.importActual<typeof import('@/lib/song/applySong')>('@/lib/song/applySong')).applySong;
+    vi.mocked(applySong).mockImplementationOnce(async (song, source) => {
+      generationAtApply = useSongLoadStore.getState().generation;
+      appliedBytes = song.engine.goatTrackerData?.byteLength ?? 0;
+      await real(song, source);
+    });
+
+    const r = await open(basename(rel), bytesOf(rel));
+
+    expect(r).toMatchObject({ ok: true, kind: 'goatTracker', editorMode: 'goattracker' });
+    expect(vi.mocked(branches.loadSongFile)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(applySong)).toHaveBeenCalledTimes(1);
+    expect(generationAtApply).toBeGreaterThan(before);
+    expect(appliedBytes).toBe(bytesOf(rel).byteLength);
+    expect(useFormatStore.getState().goatTrackerData?.byteLength).toBe(appliedBytes);
+    expect(useGTUltraStore.getState().pendingSongData?.byteLength).toBe(appliedBytes);
+    expect(useGTUltraStore.getState().songName).toBe('$3jammar-akhbar');
   });
 
   it('AdPlug opens through openSong, extracts, and applies the song once', async () => {

@@ -27,6 +27,7 @@ import { useCloudSync } from './hooks/useCloudSync';
 import { useMediaSession } from './hooks/useMediaSession';
 import { setRecoveryPrompt } from './lib/persistence/recoveryPrompt';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
+import { setupInstrumentSelectionSync } from './midi/instrumentSelectionWiring';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getJingleEngine } from '@engine/jingle/JingleEngine';
 import { injectMouthPatterns, teardownMouthPatterns } from '@engine/jingle/JinglePatterns';
@@ -310,6 +311,7 @@ function App() {
   // stream for us and the dashboard shows the tune instead of nothing.
   useMediaSession();
   useEffect(() => { setupCloudSyncSubscribers(); }, []);
+  useEffect(() => setupInstrumentSelectionSync(), []);
 
   // Auto-reconnect SID hardware (WebUSB/ASID) from saved settings
   useEffect(() => {

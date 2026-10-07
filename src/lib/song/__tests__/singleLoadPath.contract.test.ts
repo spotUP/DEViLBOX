@@ -53,7 +53,8 @@ const ALLOWED: Record<string, string> = {
   'engine/uade/UADEChipRAMPatternReader.ts': 'partial: live pattern read-back from the playing UADE engine',
   'engine/uade/UADEEngine.ts': 'partial: patterns reconstructed from the loaded UADE song',
   'engine/gtultra/useGTUltraEngineInit.ts': 'partial: GoatTracker engine owns its song; mirrors its instruments',
-  'lib/file/UnifiedFileLoader.ts': 'partial: TD-3 pattern import (replace/append), DB303 pattern append, GoatTracker editor mode (its engine holds the song)',
+  'lib/file/UnifiedFileLoader.ts': 'partial: DB303 pattern append',
+  'lib/song/songBranches.ts': 'partial: TD-3 pattern import (replace/append); its replace mode still resets the stores by hand (U4.2 sibling, open)',
 };
 
 // Each case walks every source file with synchronous reads: 1-2 s alone on a

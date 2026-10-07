@@ -33,7 +33,7 @@ export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
   { file: 'src/lib/song/songBranches.ts', fn: 'importTrackerModuleUnloaded', callee: 'applySong', count: 1, why: BRANCH },
   { file: 'src/lib/song/songBranches.ts', fn: 'prepareModuleFile', callee: 'prepareModuleImport', count: 1, why: `${BRANCH}; prepareSong's one scan` },
   { file: 'src/lib/song/songBranches.ts', fn: 'importModuleFileUnloaded', callee: 'importTrackerModule', count: 1, why: BRANCH },
-  { file: 'src/lib/song/songBranches.ts', fn: 'loadSongFile', callee: 'applySong', count: 4, why: `${BRANCH}: SunVox, MIDI, .dbx project, GoatTracker` },
+  { file: 'src/lib/song/songBranches.ts', fn: 'loadSongFile', callee: 'applySong', count: 5, why: `${BRANCH}: SunVox (two shapes), MIDI, .dbx project, GoatTracker` },
   { file: 'src/lib/song/songBranches.ts', fn: 'loadSongFile', callee: 'importTrackerModule', count: 1, why: `${BRANCH}: an unknown-name file routed by header` },
   { file: 'src/lib/song/songBranches.ts', fn: 'loadV2MFile', callee: 'applySong', count: 1, why: BRANCH },
   { file: 'src/lib/song/songBranches.ts', fn: 'applyAdPlugSong', callee: 'applySong', count: 1, why: BRANCH },
