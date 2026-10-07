@@ -406,11 +406,20 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
           }
         }
         instrConfigs.push({
-          ...createSamplerInstrument(id, samplesInfo[sampleIdx]?.name || `Sample ${i}`, pcmData, instr.volume, PAL_C3_RATE, loopStart, loopEnd),
+          ...createSamplerInstrument(id, samplesInfo[sampleIdx]?.name ?? '', pcmData, instr.volume, PAL_C3_RATE, loopStart, loopEnd),
+          // the file's own name for the sample, or none: never an invented one
+          name: samplesInfo[sampleIdx]?.name ?? '',
           uadeChipRam: chipRam,
         });
       } else {
-        instrConfigs.push({ ...makeSynthPlaceholder(id, `Sample ${i}`), uadeChipRam: chipRam });
+        // An instrument slot whose sample holds no data: kept (never dropped or renumbered), silent, under the
+        // name the file stores for that sample slot (authors write messages there), '' when it has none.
+        instrConfigs.push({
+          id, name: samplesInfo[sampleIdx]?.name ?? '',
+          type: 'sample' as const, synthType: 'Sampler' as const,
+          effects: [], volume: -60, pan: 0,
+          uadeChipRam: chipRam,
+        } as unknown as InstrumentConfig);
       }
     } else {
       // Synth instrument — use waveform table
@@ -458,18 +467,23 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
           egTable: egcTbl,
           waveform1: Array.from(wave),
           waveform2: new Array(256).fill(0),
-          name: `Synth ${i}`,
+          name: '',   // the format stores no name for a synth instrument
         };
 
         instrConfigs.push({
-          ...createSamplerInstrument(id, `Synth ${i}`, pcmUint8, instr.volume, SYNTH_RATE, 0, playLen),
+          ...createSamplerInstrument(id, '', pcmUint8, instr.volume, SYNTH_RATE, 0, playLen),
+          name: '',   // the format stores no name for a synth instrument
           type: 'synth' as const,
           synthType: 'InStereo1Synth' as const,
           inStereo1: is10Config,
           uadeChipRam: chipRam,
         } as unknown as InstrumentConfig);
       } else {
-        instrConfigs.push({ ...makeSynthPlaceholder(id, `Synth ${i}`), uadeChipRam: chipRam });
+        // no waveform table to build the synth from: the slot stays, empty and unnamed
+        instrConfigs.push({
+          id, name: '', type: 'synth' as const, synthType: 'InStereo1Synth' as const,
+          effects: [], volume: -60, pan: 0, uadeChipRam: chipRam,
+        } as unknown as InstrumentConfig);
       }
     }
   }
@@ -624,18 +638,6 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
-}
-
-function makeSynthPlaceholder(id: number, name: string): InstrumentConfig {
-  return {
-    id,
-    name,
-    type: 'synth' as const,
-    synthType: 'Synth' as const,
-    effects: [],
-    volume: 0,
-    pan: 0,
-  } as InstrumentConfig;
 }
 
 function makeEmptyPattern(filename: string, numChannels: number, rowsPerTrack: number): Pattern {
