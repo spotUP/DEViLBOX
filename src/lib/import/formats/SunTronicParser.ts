@@ -754,8 +754,7 @@ function parseSunTronicV13File(
     song.songLength = 1;
     delete song.uadeVariableLayout;
     delete song.sunTronicNative;
-    song.gridEstimated = true;
-    (song as unknown as { gridUnmatchedReason: string }).gridUnmatchedReason = unmatched;
+    song.gridUnmatchedReason = unmatched;
   }
   return song;
 }
