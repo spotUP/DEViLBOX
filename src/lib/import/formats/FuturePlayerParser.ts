@@ -474,7 +474,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
       volume: -6,
       pan: 0,
       futurePlayer: config,
-      metadata: { fpInstrPtr: instrPtr, fpIsWavetable: meta.isWavetable, fpSampleSize: meta.sampleSize, fpOctaveBias: grid?.bias ?? 0 },
+      metadata: { fpInstrPtr: instrPtr, fpIsWavetable: meta.isWavetable, fpSampleSize: meta.sampleSize },
     } as unknown as InstrumentConfig);
   });
 

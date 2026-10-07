@@ -18,13 +18,16 @@ import { startWorklet, stereoOutputs, ROOT } from './workletHarness';
 import { renderTicks, rmsPerTick, risingEdges, totalRms, db, FPT } from './keyboardPreviewHarness';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { parseFuturePlayerFile } from '@/lib/import/formats/FuturePlayerParser';
-import { fpKeyToTableIndex } from '@/lib/import/formats/fpGrid';
+import { fpKeyIndexForMidi } from '@/lib/import/formats/fpGrid';
+import { noteValueToMidi } from '@/lib/tracker/noteValue';
+import { hippelPlayedPitch } from '@/lib/import/formats/hippelPlayedPitch';
+import { loadTfmxWalkModule } from './helpers/tfmxWalkHost';
 import { fpCodeSection, walkFuturePlayer } from '@/lib/import/formats/fpWalk';
 import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
 import { parseSteveTurnerFile } from '@/lib/import/formats/SteveTurnerParser';
 import { parseHivelyFile } from '@/lib/import/formats/HivelyParser';
 import { parseJochenHippel7VFile } from '@/lib/import/formats/JochenHippel7VParser';
-import { serializeTFMXConfig } from '@/engine/tfmx/TFMXSynth';
+import { serializeTFMXConfig, hippelKeyNoteByte } from '@/engine/tfmx/TFMXSynth';
 import { HivelySynth, hvlNoteForKey } from '@/engine/hively/HivelySynth';
 import { hivelyTransform } from '@/engine/hively/HivelyEngine';
 
@@ -100,8 +103,7 @@ describe('Future Player: the keyboard plays the instrument the module defines, a
       const song = parseFuturePlayerFile(ab, name) as unknown as GridSong & { instruments: Array<{ id: number; metadata: { fpInstrPtr: number } }> };
       const n = firstNote(song, song.instruments.map((i) => i.id));
       const ptr = song.instruments.find((i) => i.id === n.ins)!.metadata.fpInstrPtr;
-      // the grid shows the pitch the player plays (shifted up by the song's octave bias): the key plays that table entry
-      const bias = (song.instruments.find((i) => i.id === n.ins) as unknown as { metadata: { fpOctaveBias: number } }).metadata.fpOctaveBias;
+      // the grid shows the pitch the player plays: the key of that grid note (MIDI, as the keyboard sends it) plays that table entry
       const ticks = holdTicks(song, n, 12);
       const a = await startWorklet('futureplayer', 'FuturePlayer');
       await a.send({ type: 'loadTune', buffer: ab });
@@ -116,7 +118,7 @@ describe('Future Player: the keyboard plays the instrument the module defines, a
       const s = renderTicks(a.proc, 40 + Math.ceil(startFrame / FPT), side).subarray(startFrame);
       const b = await startWorklet('futureplayer', 'FuturePlayer');
       await b.send({ type: 'loadTune', buffer: ab });
-      await b.send({ type: 'noteOn', instrPtr: ptr, note: fpKeyToTableIndex(n.note, bias), velocity: 100 });
+      await b.send({ type: 'noteOn', instrPtr: ptr, note: fpKeyIndexForMidi(noteValueToMidi(n.note)!), velocity: 100 });
       const p = renderTicks(b.proc, 40, 0);
       expectSameVoice(name, s, p, ticks);
     });
@@ -128,7 +130,7 @@ describe('Future Player: the keyboard plays the instrument the module defines, a
       const ptr = song.instruments.find((i) => i.id === n.ins)!.metadata.fpInstrPtr;
       const b = await startWorklet('futureplayer', 'FuturePlayer');
       await b.send({ type: 'loadTune', buffer: ab });
-      await b.send({ type: 'noteOn', instrPtr: ptr, note: fpKeyToTableIndex(n.note, 0), velocity: 100 });
+      await b.send({ type: 'noteOn', instrPtr: ptr, note: fpKeyIndexForMidi(noteValueToMidi(n.note)!), velocity: 100 });
       renderTicks(b.proc, 6, 0);
       await b.send({ type: 'noteOff' });
       const after = rmsPerTick(renderTicks(b.proc, 60, 0), 60);
@@ -299,8 +301,13 @@ describe('TFMX voice (Hippel TFMX / 7V instruments): the keyboard plays the deco
   it('ghostbattle_gameover.hip7: a typed note sounds with the pitch and level of the same note in the song', async () => {
     const name = 'ghostbattle_gameover.hip7';
     const ab = corpus(name);
-    const song = parseJochenHippel7VFile(ab, name) as unknown as GridSong & { instruments: Array<{ id: number; tfmx: Parameters<typeof serializeTFMXConfig>[0] }> };
+    // The grid as the app opens it: the pitches the decoder plays (sound-sequence transposes included)
+    const host = await loadTfmxWalkModule();
+    const played = await hippelPlayedPitch(new Uint8Array(ab), async (b, s, t) => host.walk(b, s, t).records);
+    const song = parseJochenHippel7VFile(ab, name, played!) as unknown as GridSong & { instruments: Array<{ id: number; tfmx: Parameters<typeof serializeTFMXConfig>[0]; metadata?: { hippelKeySeq?: number } }> };
     const n = firstNote(song, song.instruments.map((i) => i.id));
+    const keySeq = song.instruments.find((i) => i.id === n.ins)!.metadata?.hippelKeySeq ?? 0;
+    expect(keySeq, 'the note\'s instrument has a sound-sequence transpose (the case the key must undo)').not.toBe(0);
     expect(n.row).toBe(0);
     const ticks = 5;
     const a = await startWorklet('tfmx', 'TFMX');
@@ -311,7 +318,8 @@ describe('TFMX voice (Hippel TFMX / 7V instruments): the keyboard plays the deco
     const sc = capture(a.proc, ticks + 1);
     const sPow = sc.power.slice(1), sMix = sc.mix.subarray(FPT);
     // The same voice, left or right of the mix, as an edge count of the first output
-    const key = n.note + 11;
+    // The key the keyboard sends for the grid note, as TFMXSynth maps it to the mini-module's pattern note
+    const key = hippelKeyNoteByte(noteValueToMidi(n.note)!, keySeq);
     const b = await startWorklet('tfmx', 'TFMX');
     await b.send({ type: 'createPlayer' });
     const handle = (b.posted.find((p) => (p as { type?: string }).type === 'playerCreated') as unknown as { handle: number }).handle;

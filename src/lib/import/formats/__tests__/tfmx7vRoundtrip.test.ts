@@ -19,15 +19,16 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseJochenHippel7VFile } from '../JochenHippel7VParser';
+import { hippelPlayedForTest } from '@/engine/__tests__/helpers/tfmxWalkHost';
 
 const FIXTURE = join(process.cwd(), 'public/data/songs/formats/ghostbattle_gameover.hip7');
 
 describe('TFMX-7V pattern codec', () => {
-  it('encodeCell is a byte-exact inverse of decodeCell over every pattern row', () => {
+  it('encodeCell is a byte-exact inverse of decodeCell over every pattern row', async () => {
     const b = readFileSync(FIXTURE);
     const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
     const raw = new Uint8Array(ab);
-    const song = parseJochenHippel7VFile(ab, 'ghostbattle_gameover.hip7');
+    const song = parseJochenHippel7VFile(ab, 'ghostbattle_gameover.hip7', await hippelPlayedForTest(ab));
     const layout = song.uadePatternLayout;
     expect(layout, 'layout present').toBeTruthy();
     if (!layout || !layout.decodeCell || !layout.encodeCell || !layout.getCellFileOffset) {
