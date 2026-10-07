@@ -487,6 +487,30 @@
       "matchPct": 1,
       "cells": 1408,
       "bytes": 6689
+    },
+    "benDaglish": {
+      "exporter": "BenDaglishExporter.exportBenDaglish",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 63200,
+      "bytes": 63200
+    },
+    "davidWhittaker": {
+      "exporter": "DavidWhittakerExporter.exportDavidWhittaker",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 45810,
+      "bytes": 45810
+    },
+    "robHubbard": {
+      "exporter": "RobHubbardExporter.exportRobHubbard",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 271846,
+      "bytes": 271846
     }
   },
   "missingFixture": [

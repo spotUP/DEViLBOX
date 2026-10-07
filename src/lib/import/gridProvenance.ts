@@ -30,7 +30,35 @@ export interface GridProvenance {
   planUnit?: string;
   /** SCOPE: why there is no grid. */
   reason?: string;
+  /**
+   * Owner's definition of fully editable (G16): export to the native format, load it again, it sounds
+   * the same; edit a note, export, load, the edit is heard and nothing else moved. Held by
+   * nativeExportReloadSoundsTheSame.test.ts for every key in EXPORT_ROUND_TRIP; absent = not yet under
+   * the round trip (every unit must bring its format under it, plan bar item 9).
+   */
+  exportRoundTrip?: ExportRoundTrip;
 }
+
+export type ExportRoundTrip = 'pass' | 'fail' | 'n/a';
+
+/**
+ * Per-format status of the native export round trip (src/engine/__tests__/nativeExportReloadSoundsTheSame.test.ts,
+ * which fails when a row here disagrees with its KNOWN defects). 'fail' rows name their plan unit there.
+ */
+export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
+  jochenHippel7V: 'n/a', // held out of the run while U4's uncommitted Hippel work lands; 6 of 6 passed before it
+  davidWhittaker: 'pass',
+  robHubbard: 'pass',
+  benDaglish: 'fail',
+  jochenHippelST: 'pass',
+  suntronic: 'fail',
+  activisionPro: 'pass',
+  fred: 'pass',
+  actionamics: 'pass',
+  soundMaster: 'pass',
+  digitalSonixChrome: 'pass',
+  sidmon1: 'pass',
+};
 
 export const GRID_PLAN_FILE = 'thoughts/shared/plans/2026-10-07-grid-from-replayer-walk.md';
 
@@ -248,9 +276,12 @@ export const DIRECT_GRIDS: readonly string[] = [
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {
-  if (key in WALK_GRIDS) return { source: 'WALK', oracleTest: WALK_GRIDS[key] };
-  if (key in RECONSTRUCTED_GRIDS) return { source: 'RECONSTRUCTED', planUnit: RECONSTRUCTED_GRIDS[key] };
-  if (key in SCOPE_GRIDS) return { source: 'SCOPE', reason: SCOPE_GRIDS[key] };
-  if (DIRECT_GRIDS.includes(key)) return { source: 'DIRECT' };
-  return null;
+  const base = ((): GridProvenance | null => {
+    if (key in WALK_GRIDS) return { source: 'WALK', oracleTest: WALK_GRIDS[key] };
+    if (key in RECONSTRUCTED_GRIDS) return { source: 'RECONSTRUCTED', planUnit: RECONSTRUCTED_GRIDS[key] };
+    if (key in SCOPE_GRIDS) return { source: 'SCOPE', reason: SCOPE_GRIDS[key] };
+    if (DIRECT_GRIDS.includes(key)) return { source: 'DIRECT' };
+    return null;
+  })();
+  return base && key in EXPORT_ROUND_TRIP ? { ...base, exportRoundTrip: EXPORT_ROUND_TRIP[key] } : base;
 }
