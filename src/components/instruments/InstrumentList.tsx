@@ -13,6 +13,9 @@ import { getSynthInfo } from '@constants/synthCategories';
 import { getSynthBadge } from '@constants/channelTypeCompat';
 import { instrumentGridTemplate } from './instrumentListColumns';
 
+/** Each row takes the list's column tracks, so cells align across rows. */
+const ROW_SUBGRID: React.CSSProperties = { gridTemplateColumns: 'subgrid', gridColumn: '1 / -1' };
+
 const isSamplePlayer = (synthType: string): boolean => synthType === 'Sampler' || synthType === 'Player';
 import { analyzeSong, type InstrumentRole, type DrumPart, type InstrumentVerdict } from '@/bridge/analysis/songAnalyzer';
 import { useInstrumentLabelStore, songLabelKey, type InstrumentLabel } from '@stores/useInstrumentLabelStore';
@@ -567,7 +570,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     hasStatus,
     hasLoop: !isFT2,
     actionSlots,
-    actionSlotRem: isFT2 ? 1 : 1.75,
   });
 
   // Show action bar if any action buttons are enabled
@@ -617,7 +619,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         className={`flex-1 overflow-y-auto ${isFT2 ? 'scrollbar-ft2 min-h-0' : 'scrollbar-modern'}${artMode ? ' overflow-x-auto instrument-list--art' : ''}`}
         style={!isFT2 ? { maxHeight } : undefined}
       >
-        <div className={`flex flex-col${artMode ? ' w-max min-w-full' : ''}`}>
+        <div className={`grid${artMode ? ' w-max min-w-full' : ''}`} style={{ gridTemplateColumns: gridTemplate }}>
         {visibleInstruments.map((instrument) => {
           // The slot number the pattern cells name - not the list position:
           // a song with empty slots keeps its gaps (micro15.mod: 13, 16, 18).
@@ -629,7 +631,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
           if (isFT2) {
             // FT2 Styling
             return (
-              <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id} onEdit={() => onEditInstrument?.(instrument.id)}>
+              <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id} onEdit={() => onEditInstrument?.(instrument.id)} className="contents">
               <div
                 ref={isSelected ? selectedRef : undefined}
                 data-instrument-id={instrument.id}
@@ -640,10 +642,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 onPointerCancel={handlePreviewUp}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
-                style={{ gridTemplateColumns: gridTemplate }}
+                style={ROW_SUBGRID}
                 className={`
                   instrument-list-item
-                  grid items-center gap-x-2 px-2 py-1.5 cursor-pointer
+                  grid items-center justify-items-end gap-x-2 px-2 py-1.5 cursor-pointer
                   transition-all duration-200 ease-out group relative ${artMode ? '' : 'overflow-hidden'}
                   ${isSelected
                     ? 'bg-ft2-cursor text-ft2-bg'
@@ -685,7 +687,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     onBlur={handleSaveEdit}
                     onKeyDown={handleEditKeyDown}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-xs font-mono bg-ft2-bg border border-ft2-cursor px-1 py-0.5 rounded text-ft2-text focus:outline-none w-24"
+                    className="justify-self-start text-xs font-mono bg-ft2-bg border border-ft2-cursor px-1 py-0.5 rounded text-ft2-text focus:outline-none w-24"
                     autoFocus
                   />
                 ) : (
@@ -701,7 +703,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                        Reported 2026-09-22 with the instrument list at roughly
                        240px: every badge — Sampler, PCM and the role — sat past
                        the right edge with nothing to show they existed. */
-                    className={`text-xs font-mono cursor-text ${artMode
+                    className={`justify-self-start text-xs font-mono cursor-text ${artMode
                       ? 'instrument-art-name whitespace-pre shrink-0'
                       : 'whitespace-nowrap min-w-0 truncate'}`}
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
@@ -873,7 +875,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
           // Default Styling
           return (
-            <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id} onEdit={() => onEditInstrument?.(instrument.id)}>
+            <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id} onEdit={() => onEditInstrument?.(instrument.id)} className="contents">
               <div
                 ref={isSelected ? selectedRef : undefined}
                 data-instrument-id={instrument.id}
@@ -884,9 +886,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 onPointerCancel={handlePreviewUp}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
-                style={{ gridTemplateColumns: gridTemplate }}
+                style={ROW_SUBGRID}
                 className={`
-                  group grid items-center gap-x-2 px-3 py-2 cursor-pointer transition-all relative
+                  group grid items-center justify-items-end gap-x-2 px-3 py-2 cursor-pointer transition-all relative
                   ${isSelected
                     ? 'bg-accent-primary/20 border-l-2 border-accent-primary'
                     : 'hover:bg-dark-bgHover border-l-2 border-transparent'
@@ -921,13 +923,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     onBlur={handleSaveEdit}
                     onKeyDown={handleEditKeyDown}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-sm bg-dark-bg border border-accent-primary px-1 py-0.5 rounded text-text-primary focus:outline-none w-28"
+                    className="justify-self-start text-sm bg-dark-bg border border-accent-primary px-1 py-0.5 rounded text-text-primary focus:outline-none w-28"
                     autoFocus
                   />
                 ) : (
                   <span
                     className={`
-                      text-sm whitespace-nowrap min-w-0 truncate cursor-text
+                      justify-self-start text-sm whitespace-nowrap min-w-0 truncate cursor-text
                       ${isSelected ? 'text-text-primary' : 'text-text-secondary'}
                     `}
                     onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}

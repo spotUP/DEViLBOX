@@ -23,6 +23,8 @@ interface InstrumentContextMenuProps {
   onEdit?: () => void;
   onSavePreset?: () => void;
   children: React.ReactNode;
+  /** Class for the wrapper element (the instrument list passes "contents" so its rows stay subgrid items). */
+  className?: string;
 }
 
 export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
@@ -30,6 +32,7 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
   onEdit,
   onSavePreset,
   children,
+  className,
 }) => {
   const { position, open, close, isOpen } = useContextMenu();
   const instruments = useInstrumentStore((s) => s.instruments);
@@ -164,7 +167,7 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
   ]);
 
   return (
-    <div onContextMenu={open}>
+    <div onContextMenu={open} className={className}>
       {children}
       {isOpen && (
         <ContextMenu
