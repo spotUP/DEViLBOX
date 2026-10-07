@@ -16,17 +16,16 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { drainPaulaLog, PaulaNoteOns, type PaulaLogHost } from './gridOracle';
 import { startWorklet, songBuffer, stereoOutputs } from './workletHarness';
 import { parseSoundMasterFile } from '@/lib/import/formats/SoundMasterParser';
 import { playerTickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
 import { uadePlayerHint } from '@/lib/import/uadePlayerHint';
 
-interface Wasm {
-  HEAPU8: Uint8Array;
+type Wasm = PaulaLogHost & {
   _malloc(n: number): number;
   _uade_wasm_enable_paula_log(on: number): void;
-  _uade_wasm_get_paula_log(ptr: number, max: number): number;
-}
+};
 
 async function playAndCompare(path: string, seconds: number): Promise<{ checked: number; wrong: string[]; lastRow: { pos: number; row: number } }> {
   const file = path.split('/').pop()!;
@@ -45,7 +44,7 @@ async function playAndCompare(path: string, seconds: number): Promise<{ checked:
   const wasm = proc._wasm as Wasm;
   wasm._uade_wasm_enable_paula_log(1);
   const logPtr = wasm._malloc(512 * 12);
-  const pointerWrites = [0, 0, 0, 0];
+  const noteRule = new PaulaNoteOns('twoPointers');
   const wrong: string[] = [];
   let checked = 0;
   let lastRow = { pos: -1, row: -1 };
@@ -54,18 +53,10 @@ async function playAndCompare(path: string, seconds: number): Promise<{ checked:
     proc._lastChannelPost = -1; // open the 50 ms throttle: this block posts its position
     const before = posted.length;
     proc.process([], stereoOutputs(37));
-    const n = wasm._uade_wasm_get_paula_log(logPtr, 512);
-    const u32 = new Uint32Array(wasm.HEAPU8.buffer, logPtr, n * 3);
     const noteOns: Array<[number, number]> = [];
-    for (let i = 0; i < n; i++) {
-      const w = u32[i * 3];
-      const ch = w >>> 24, reg = (w >>> 16) & 0xff, value = w & 0xffff;
-      if (ch > 3) continue;
-      if (reg === 1) pointerWrites[ch]++;
-      else if (reg === 3) {
-        if (pointerWrites[ch] >= 2) noteOns.push([ch, value]);
-        pointerWrites[ch] = 0;
-      }
+    for (const w of drainPaulaLog(wasm, logPtr)) {
+      const period = noteRule.push(w);
+      if (period !== null) noteOns.push([w.voice, period]);
     }
     const pos = posted.slice(before).find((m) => m.type === 'position') as { playerTickCount?: number } | undefined;
     if (!pos) { expect(b, 'only the first block (throttle initialised there) posts nothing').toBe(0); continue; }

@@ -18,7 +18,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { loadUADEModule, refreshHeap, type UADEModule } from '../../../tools/uade-audit/uadeRenderCore';
+import { openUade, PaulaSession, PaulaNoteOns, PAULA_CHUNK, chipRamEngine, type PaulaLogModule, type PaulaWrite } from './gridOracle';
 import { decodeSoundMasterModule, encodeSoundMasterModule } from '@/lib/import/formats/SoundMasterModule';
 import { SmSong, soundMasterGrid } from '@/lib/import/formats/soundMasterGrid';
 import { parseSoundMasterFile } from '@/lib/import/formats/SoundMasterParser';
@@ -36,14 +36,6 @@ vi.mock('@/engine/uade/UADEEngine', () => ({ UADEEngine: { hasInstance: () => tr
 const scanGrid = vi.hoisted(() => ({ name: 'uade-scan-grid', patterns: [], instruments: [] }));
 vi.mock('@lib/import/formats/UADEParser', () => ({ parseUADEFile: vi.fn(async () => scanGrid) }));
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
-import type { UADEEngine } from '@/engine/uade/UADEEngine';
-
-interface LogModule extends UADEModule {
-  _uade_wasm_enable_paula_log(on: number): void;
-  _uade_wasm_get_paula_log(outPtr: number, max: number): number;
-  _uade_wasm_read_memory(addr: number, dst: number, len: number): number;
-  _uade_wasm_write_memory(addr: number, src: number, len: number): number;
-}
 
 const SONGS = 'public/data/songs';
 const CORPUS = [
@@ -51,7 +43,6 @@ const CORPUS = [
   { path: 'sound-master-ii-v3/doofus 3.sm3', layout: 'offsets', steps: 416, notes: [3024, 2175, 1861, 0] },
   { path: 'sound-master-ii-v1/futureshock-level 3.smpro', layout: 'fixed', steps: 147, notes: [964, 904, 500, 294] },
 ] as const;
-const CHUNK = 441; // 10 ms
 /** UADE's default subsong timeout (uadeconf.c subsong_timeout). */
 const UADE_TIMEOUT_S = 512;
 
@@ -91,87 +82,35 @@ function gridNoteOns(song: SmSong): ShownNote[][] {
   return out;
 }
 
-/** Paula note-ons per voice: a period written after two sample-pointer writes since the last period. */
-class PaulaNotes {
-  readonly notes: Array<Array<{ t: number; period: number }>> = [[], [], [], []];
-  private readonly lc = [0, 0, 0, 0];
-  private readonly mod: LogModule;
-  private readonly logPtr: number;
-  constructor(mod: LogModule, logPtr: number) { this.mod = mod; this.logPtr = logPtr; }
-  drain(ms: number): void {
-    const n = this.mod._uade_wasm_get_paula_log(this.logPtr, 512);
-    refreshHeap(this.mod);
-    const u32 = new Uint32Array(this.mod.HEAPU8.buffer, this.logPtr, n * 3);
-    for (let i = 0; i < n; i++) {
-      const w = u32[i * 3];
-      const ch = w >>> 24, reg = (w >>> 16) & 0xff, value = w & 0xffff;
-      if (ch > 3) continue;
-      if (reg === 1) this.lc[ch]++;
-      else if (reg === 3) {
-        if (this.lc[ch] >= 2) this.notes[ch].push({ t: ms, period: value });
-        this.lc[ch] = 0;
-      }
-    }
-  }
-}
-
-/** Load into UADE (log on from before the load), render up to `seconds`, calling `at` once at `at.seconds`. */
+/** Load into UADE (log on from before the load), render up to `seconds`, calling `at` once at `at.seconds`. Paula note-ons per voice. */
 async function renderPaula(
-  mod: LogModule, bytes: Uint8Array, name: string, seconds: number,
+  mod: PaulaLogModule, bytes: Uint8Array, name: string, seconds: number,
   at?: { seconds: number; run: () => Promise<void> },
 ): Promise<{ notes: Array<Array<{ t: number; period: number }>>; endedS: number }> {
-  const ptr = mod._malloc(bytes.length);
-  refreshHeap(mod);
-  mod.HEAPU8.set(bytes, ptr);
-  const hintPtr = mod._malloc(name.length * 4 + 1);
-  mod.stringToUTF8(name, hintPtr, name.length * 4 + 1);
-  mod._uade_wasm_stop();
-  mod._uade_wasm_set_looping(0);
-  mod._uade_wasm_set_one_subsong(1);
-  mod._uade_wasm_enable_paula_log(1);
-  const ret = mod._uade_wasm_load(ptr, bytes.length, hintPtr);
-  mod._free(ptr); mod._free(hintPtr);
-  if (ret !== 0) throw new Error(`UADE refused ${name} (${ret})`);
-  const pL = mod._malloc(CHUNK * 4), pR = mod._malloc(CHUNK * 4), logPtr = mod._malloc(512 * 12);
-  const paula = new PaulaNotes(mod, logPtr);
-  paula.drain(0);
+  const session = new PaulaSession(mod, bytes, name);
+  const rule = new PaulaNoteOns('twoPointers');
+  const notes: Array<Array<{ t: number; period: number }>> = [[], [], [], []];
+  const feed = (writes: PaulaWrite[], ms: number): void => {
+    for (const w of writes) {
+      const period = rule.push(w);
+      if (period !== null) notes[w.voice].push({ t: ms, period });
+    }
+  };
+  feed(session.drain(), 0);
   let ran = false;
   let f = 0;
-  for (; f < 44100 * seconds; f += CHUNK) {
+  for (; f < 44100 * seconds; f += PAULA_CHUNK) {
     if (at && !ran && f >= 44100 * at.seconds) { ran = true; await at.run(); }
-    if (mod._uade_wasm_render(pL, pR, CHUNK) <= 0) break;
-    paula.drain((f / 44100) * 1000);
+    const writes = session.step();
+    if (!writes) break;
+    feed(writes, (f / 44100) * 1000);
   }
-  mod._uade_wasm_enable_paula_log(0);
-  mod._free(pL); mod._free(pR); mod._free(logPtr);
-  mod._uade_wasm_stop();
-  return { notes: paula.notes, endedS: f / 44100 };
+  session.close();
+  return { notes, endedS: f / 44100 };
 }
 
-/** The UADEEngine surface UADEChipEditor uses, backed by the wasm module's chip RAM. */
-function chipRamEngine(mod: LogModule): UADEEngine {
-  return {
-    readMemory: async (addr: number, len: number) => {
-      const p = mod._malloc(len);
-      mod._uade_wasm_read_memory(addr, p, len);
-      refreshHeap(mod);
-      const out = mod.HEAPU8.slice(p, p + len);
-      mod._free(p);
-      return out;
-    },
-    writeMemory: async (addr: number, data: Uint8Array) => {
-      const p = mod._malloc(data.length);
-      refreshHeap(mod);
-      mod.HEAPU8.set(data, p);
-      mod._uade_wasm_write_memory(addr, p, data.length);
-      mod._free(p);
-    },
-  } as unknown as UADEEngine;
-}
-
-async function withUade<T>(run: (mod: LogModule) => Promise<T>): Promise<T> {
-  const mod = (await loadUADEModule(false)) as LogModule;
-  expect(mod._uade_wasm_init(44100)).toBe(0);
+async function withUade<T>(run: (mod: PaulaLogModule) => Promise<T>): Promise<T> {
+  const mod = await openUade();
   try {
     return await run(mod);
   } finally {

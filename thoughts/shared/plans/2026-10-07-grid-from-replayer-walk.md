@@ -171,7 +171,7 @@ bar test first (revert check: it must fail on the old grid), then fix.
 
 ### Wave 1
 
-- **U1 Oracle kit (M).** Files: new src/engine/__tests__/gridOracle.ts (paula log reader from
+- **U1 Oracle kit (M) - DONE 2026-10-07.** Paula-log load/render/drain/note-on rules and chip-RAM access now live in src/engine/__tests__/gridOracle.ts (PaulaSession, PaulaNoteOns, drainPaulaLog, chipRamEngine) plus compareGridToWalk (bar items 1-3 and 5); the 8 copy-pasting tests (sidmon1, activisionPro, fredEditor, digitalSonixChrome, soundMaster x2, dscPlayhead, hippelST) are re-pointed, behaviour unchanged (45 tests green). Not done from the original brief: the voice-record sampler and the event-log reader were not extracted (no second user yet). Files: new src/engine/__tests__/gridOracle.ts (paula log reader from
   sidmon1GridMatchesUade.test.ts, voice-record sampler from jochenHippelSTGridMatchesPlayer.test.ts,
   event-log reader from actionamicsGridMatchesPlayer.test.ts, and `assertGridIsPlayersWalk(song, events)`
   implementing the bar items 1-5); migrate sidmon1 and hippel-ST tests onto it as proof and delete the
