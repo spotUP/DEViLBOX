@@ -71,6 +71,10 @@ const char* sa_get_instrument_name(const SaModule* module, int inst);
 // Returns bytes written, or 0 on failure. If out_buffer is NULL, returns required size.
 size_t sa_export(const SaModule* module, uint8_t* out_buffer, size_t max_size);
 
+// Keyboard preview: one note of one instrument through the replayer's own note-on
+bool sa_preview_note(SaModule* module, int instrument, int note);
+void sa_preview_stop(SaModule* module);
+
 #ifdef __cplusplus
 }
 #endif

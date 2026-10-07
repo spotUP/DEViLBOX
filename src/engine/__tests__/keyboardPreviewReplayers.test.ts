@@ -18,7 +18,9 @@ import { parseStartrekkerAMFile } from '@/lib/import/formats/StartrekkerAMParser
 import { stPeriodForKey } from '@/engine/startrekker-am/stKeyNote';
 import { parseDigitalMugicianFile } from '@/lib/import/formats/DigitalMugicianParser';
 import { dmNoteForKey } from '@/engine/digmug/dmKeyNote';
-import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT } from './keyboardPreviewHarness';
+import { parseSonicArrangerFile } from '@/lib/import/formats/SonicArrangerParser';
+import { saNoteForKey } from '@/engine/sonic-arranger/saKeyNote';
+import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT, fromOnset } from './keyboardPreviewHarness';
 
 const corpus = (n: string) => {
   const f = readFileSync(resolve(ROOT, 'public/data/songs', n));
@@ -229,6 +231,62 @@ describe('Digital Mugician: a key never starts the song, and key release silence
     await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
     await b.send({ type: 'noteOn', instrument: 9, note: 30 });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
+    await b.send({ type: 'noteOff' });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
+  });
+});
+
+describe.each(['sonic-arranger/mega end.sa'])('Sonic Arranger %s: a typed note is the replayer voice, as the song plays it', (name) => {
+  it('the first note of each voice has the song\'s pitch, level and envelope', async () => {
+    const ab = corpus(name);
+    const song = (await parseSonicArrangerFile(ab, name)) as unknown as GridSong & { patterns: Array<{ channels: Array<{ rows: Array<{ note: number; instrument: number; saEffect?: number; saEffectArg?: number; saArpTable?: number }> }> }> };
+    let measured = 0;
+    for (let ch = 0; ch < 4; ch++) {
+      // The voice's first note, if it is a plain one (no effect, arpeggio table 0): an effect or an
+      // arpeggio changes what the replayer makes of the note, which a key cannot say.
+      let n = null as { note: number; ins: number } | null;
+      let done = false;
+      for (const pi of song.songPositions) {
+        for (const c of song.patterns[pi].channels[ch].rows) {
+          if (done || c.note <= 0 || c.note >= 97) continue;
+          done = true;
+          if (c.instrument > 0 && !c.saEffect && !c.saEffectArg && !c.saArpTable) n = { note: c.note, ins: c.instrument };
+        }
+        if (done) break;
+      }
+      if (!n) continue;
+      const a = await startWorklet('sonic-arranger', 'SonicArranger', emscriptenTransform);
+      await a.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await a.send({ type: 'setChannelMask', mask: 1 << ch });
+      await a.send({ type: 'play' });
+      const out = renderTicks(a.proc, 3000, ch === 1 || ch === 2 ? 1 : 0);
+      const on = rmsPerTick(out, 3000).findIndex((v) => v >= 0.02);
+      if (on < 0) continue;
+      const ticks = Math.max(4, Math.min(8, song.initialSpeed - 1));   // before the voice's next row
+      const b = await startWorklet('sonic-arranger', 'SonicArranger', emscriptenTransform);
+      await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+      await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+      await b.send({ type: 'noteOn', instrument: n.ins, note: saNoteForKey(n.note + 11) });
+      const pr = renderTicks(b.proc, ticks + 12, 0);
+      const pOn = rmsPerTick(pr, ticks + 12).findIndex((v) => v >= 0.02);
+      expect(pOn, `${name} voice ${ch}: the key sounds`).toBeGreaterThanOrEqual(0);
+      // the song's tempo need not be 50 Hz, so compare from each voice's first audible sample, not a tick edge
+      expectSameVoice(`${name} voice ${ch}`, fromOnset(out, on, ticks, 1e-3), fromOnset(pr, pOn, ticks, 1e-3), ticks);
+      measured++;
+    }
+    expect(measured, 'the song has a voice to measure').toBeGreaterThan(0);
+  });
+});
+
+describe('Sonic Arranger: a key never starts the song, and key release silences the voice', () => {
+  it('mega end.sa: silent before a key, sounds on a key, silent after release', async () => {
+    const ab = corpus('sonic-arranger/mega end.sa');
+    const b = await startWorklet('sonic-arranger', 'SonicArranger', emscriptenTransform);
+    await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
+    await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
+    await b.send({ type: 'noteOn', instrument: 4, note: 49 });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);

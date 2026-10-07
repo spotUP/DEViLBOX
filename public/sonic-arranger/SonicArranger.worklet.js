@@ -7,6 +7,9 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
     super();
     this.module = null;
     this.handle = 0;
+    this.previewHandle = 0;   // a second copy of the module that plays keyboard notes, whether or not the song plays
+    this.previewPtr = 0;      // mono buffer the preview renders into
+    this.previewKey = null;   // the module bytes the preview copy was made from
     this.chPtrs = [0, 0, 0, 0];
     this.interleavedPtr = 0;
     this.interleavedBuf = null;
@@ -42,12 +45,15 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
+      case 'previewLoad': this.previewLoad(data.buffer); break;
+      case 'noteOn': if (this.previewHandle) this.module._sa_preview_note(this.previewHandle, data.instrument, data.note); break;
+      case 'noteOff': if (this.previewHandle) this.module._sa_preview_stop(this.previewHandle); break;
       case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop': this.playing = false; if (this.handle) this.module._sa_select_subsong(this.handle, 0); this.port.postMessage({ type: 'stopped' }); break;
       case 'pause': this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._sa_select_subsong(this.handle, data.subsong); break;
       case 'setChannelMask': if (this.handle) this.module._sa_set_channel_mask(this.handle, data.mask); break;
-      case 'setTrackCell': { if (this.handle && this.module._sa_set_cell) { this.module._sa_set_cell(this.handle, data.index, data.note, data.instrument, data.arpeggio, data.effect, data.effectArg); } break; }      case 'setInstrumentParam': {        if (this.handle && this.module._sa_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._sa_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'dispose': this.cleanup(); break;
+      case 'setTrackCell': { if (this.handle && this.module._sa_set_cell) { this.module._sa_set_cell(this.handle, data.index, data.note, data.instrument, data.arpeggio, data.effect, data.effectArg); } break; }      case 'setInstrumentParam': {        if ((this.handle || this.previewHandle) && this.module._sa_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          if (this.handle) this.module._sa_set_instrument_param(this.handle, data.instrument, pPtr, data.value); if (this.previewHandle) this.module._sa_set_instrument_param(this.previewHandle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'dispose': this.cleanup(); break;
     }
   }
   async initWasm(rate, wasmBinary, jsCode) {
@@ -87,6 +93,7 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
       const frameBytes = this.bufferSize * 4;
       this.interleavedPtr = this.module._malloc(this.bufferSize * 2 * 4);
       for (let i = 0; i < 4; i++) this.chPtrs[i] = this.module._malloc(frameBytes);
+      this.previewPtr = this.module._malloc(frameBytes);
       if (!this.interleavedPtr) { this.port.postMessage({ type: 'error', message: 'malloc failed' }); return; }
       this.updateBufferViews();
       this.initialized = true;
@@ -105,16 +112,47 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
       this.lastHeapBuffer = heapF32.buffer;
     }
   }
+  /** Make the preview copy of the module (the replayer plays the keys itself, apart from the song). */
+  previewLoad(buffer) {
+    if (!this.module || !buffer) return;
+    if (this.previewKey === buffer && this.previewHandle) return;
+    if (this.previewHandle) { this.module._sa_destroy(this.previewHandle); this.previewHandle = 0; }
+    const bytes = new Uint8Array(buffer);
+    const ptr = this.module._malloc(bytes.length);
+    if (!ptr) return;
+    this.module.HEAPU8.set(bytes, ptr);
+    this.previewHandle = this.module._sa_create(ptr, bytes.length, sampleRate);
+    this.module._free(ptr);
+    this.previewKey = buffer;
+    if (this.previewHandle) this.module._sa_preview_stop(this.previewHandle);
+  }
+
   cleanup() {
+    if (this.module && this.previewHandle) { this.module._sa_destroy(this.previewHandle); this.previewHandle = 0; this.previewKey = null; }
     if (this.module && this.handle) { this.module._sa_destroy(this.handle); this.handle = 0; }
     if (this.module) {
       if (this.interleavedPtr) { this.module._free(this.interleavedPtr); this.interleavedPtr = 0; }
+      if (this.previewPtr) { this.module._free(this.previewPtr); this.previewPtr = 0; }
       for (let i = 0; i < 4; i++) { if (this.chPtrs[i]) { this.module._free(this.chPtrs[i]); this.chPtrs[i] = 0; } }
     }
     this.interleavedBuf = null; this.chBufs = null; this.module = null; this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
   }
+  /** Keyboard voice: the preview copy's channel 0, added to both sides (the song pans its channels hard). */
+  addPreview(outputL, outputR, numSamples) {
+    if (!this.previewHandle || !this.previewPtr) return;
+    const m = this.module;
+    m._sa_render_multi(this.previewHandle, this.previewPtr, 0, 0, 0, numSamples);
+    const heap = m.HEAPF32 || new Float32Array(m.wasmMemory.buffer);
+    const base = this.previewPtr >> 2;
+    for (let i = 0; i < numSamples; i++) {
+      const v = heap[base + i];
+      outputL[i] += v;
+      outputR[i] += v;
+    }
+  }
+
   process(inputs, outputs) {
-    if (!this.initialized || !this.module || !this.handle || !this.playing) return true;
+    if (!this.initialized || !this.module) return true;
     const output = outputs[0];
     if (!output || output.length < 2) return true;
     const outputL = output[0], outputR = output[1];
@@ -122,6 +160,12 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
     const numSamples = Math.min(outputL.length, this.bufferSize);
     this.updateBufferViews();
     if (!this.chBufs) return true;
+    const songPlays = this.handle && this.playing;
+    if (!songPlays) {
+      outputL.fill(0); outputR.fill(0);
+      this.addPreview(outputL, outputR, numSamples);
+      return true;
+    }
     const rendered = this.module._sa_render_multi(this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], numSamples);
     if (rendered > 0) {
       // A voice in an isolation slot leaves the mix; channel-outputs.js
@@ -153,6 +197,7 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'position', songPos, row: playRow });
       }
     }
+    this.addPreview(outputL, outputR, rendered > 0 ? rendered : numSamples);
     if (this.module._sa_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });
     return true;
   }

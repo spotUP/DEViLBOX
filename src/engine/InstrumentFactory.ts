@@ -872,6 +872,7 @@ export class InstrumentFactory {
 
       case 'SonicArrangerSynth': {
         const saSynth = new SonicArrangerSynth();
+        saSynth.setInstrumentNumber(config.id ?? 0);
         if (config.sonicArranger) {
           saSynth.setInstrument(config.sonicArranger).catch(err =>
             console.error('[InstrumentFactory] SonicArranger load failed:', err)
