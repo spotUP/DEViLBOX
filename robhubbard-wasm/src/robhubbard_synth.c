@@ -411,12 +411,12 @@ void rh_note_on(void *ctxPtr, int handle, int note, int velocity) {
   (void)velocity; /* Rob Hubbard uses per-instrument volume, not velocity */
 
   /* The keyboard key for a grid cell is MIDI = grid note + 11 (xmConversions
-   * noteToMidi), and the grid shows RH note byte b as b + 25 - but UADE's own
-   * Rob Hubbard player plays grid note N at PERIODS[N - 22] (skateordie.rh: grid
-   * 41 -> period 566 = PERIODS[19] x 0.993; grid 56 -> 238 = PERIODS[34] x 0.992),
-   * so the table index of a key is key - 11 - 22. The old key - 24 sounded
-   * 9 semitones above the song's note. */
-  int noteIdx = rh_clampNote(note - 33);
+   * noteToMidi), and the grid names a note by the Paula period the player starts it
+   * with (ProTracker naming, note 1 = period 1712 = RH_PERIODS[0]): the table
+   * index of a key is key - 11 - 1. (Until 2026-10-07 the grid named a note by
+   * the stream's note byte + 25, which is not what plays; the index was then
+   * key - 33 to land on the period UADE played.) */
+  int noteIdx = rh_clampNote(note - 12);
   if (noteIdx < 0)  noteIdx = 0;
   if (noteIdx > 83) noteIdx = 83;
 
