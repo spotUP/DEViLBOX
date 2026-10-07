@@ -46,7 +46,7 @@ export type ExportRoundTrip = 'pass' | 'fail' | 'n/a';
  * which fails when a row here disagrees with its KNOWN defects). 'fail' rows name their plan unit there.
  */
 export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
-  jochenHippel7V: 'n/a', // held out of the run while U4's uncommitted Hippel work lands; 6 of 6 passed before it
+  jochenHippel7V: 'pass',
   davidWhittaker: 'pass',
   robHubbard: 'pass',
   benDaglish: 'fail',
