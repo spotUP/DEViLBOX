@@ -152,7 +152,7 @@ export const LIVE_EDIT_WHY: Record<string, string> = {
 export type AddOnEmptyRow = 'pass' | 'fail' | 'n/a';
 export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   '669': 'n/a',
-  actionamics: 'fail',
+  actionamics: 'pass',
   activisionPro: 'fail',
   amf: 'n/a',
   benDaglish: 'fail',
@@ -193,7 +193,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   ptm: 'n/a',
   pumaTracker: 'pass',
   quadraComposer: 'fail',
-  robHubbard: 'fail',
+  robHubbard: 'pass',
   rtm: 'n/a',
   s3m: 'n/a',
   sidFactory2: 'n/a',

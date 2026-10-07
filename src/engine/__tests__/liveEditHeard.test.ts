@@ -234,10 +234,16 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
         const s2 = useTrackerStore.getState();
         let empty: { p: number; ch: number; r: number } | null = null;
         let any = 0;
+        // The blank row straight after a note (a command-stream voice holds that note across it), else the first blank row.
+        let fallback: { p: number; ch: number; r: number } | null = null;
         s2.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell: Cell, r) => {
           if (cell.note > 0 && !any) any = cell.note;
-          if (!empty && cell.note === 0 && p === 0 && r > 0) empty = { p, ch, r };
+          if (p !== 0 || r === 0 || cell.note !== 0) return;
+          fallback ??= { p, ch, r };
+          if (!empty && c.rows[r - 1].note > 0 && c.rows[r - 1].note < 97) empty = { p, ch, r };
         })));
+        empty ??= fallback;
+        if (empty) any = s2.patterns[0].channels[(empty as { ch: number }).ch].rows[(empty as { r: number }).r - 1].note > 0 ? s2.patterns[0].channels[(empty as { ch: number }).ch].rows[(empty as { r: number }).r - 1].note : any;
         if (empty && any) {
           const e = empty as { p: number; ch: number; r: number };
           s2.setCurrentPattern(e.p);
