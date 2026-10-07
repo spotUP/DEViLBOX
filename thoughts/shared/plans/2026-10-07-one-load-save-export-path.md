@@ -284,6 +284,21 @@ present; editor stores untouched.
 - Reachability: openSong with a UADE song -> the worklet receives `skipScan:
   true` (sentinel on the posted message), the worker scan ran once.
 
+#### U2.7 result (2026-10-07, owner's tab via MCP, audio-thread stall = longest span `AudioContext.currentTime` stood still)
+Decision: the worker hosts UADE.worklet.js itself (src/engine/uade/uadeWorkletHost.ts, own WASM instance), so there is no second copy of the scan; scan equality is by construction and proven over 14 corpus formats + a DeliTracker custom.
+Before (scan in the worklet) -> after (scan in src/workers/uade-scan.worker.ts), same rows both ways:
+- centurion_battle.rh 73 rows: stall 75 ms -> 4 ms
+- 45.okta 1029 rows: 1135 -> 13
+- baseheads.ma 157: 1255 -> 9
+- bards tale.cus 145: 15115 (wall cap) -> 9 (worker scan 5.1 s)
+- a sleep so deep.mod 145: 2299 -> 36
+- cockwise.mug 5047: 2044 -> 15
+- dynablaster.ast 921: 4495 -> 9
+- hybris.fp 16384: 5407 -> 47
+Main-thread long tasks: 0 before and after, except hybris.fp (2 tasks, max 71 ms: receiving the 16384-row result).
+Cost: the scan itself runs 0-30 percent slower in the worker (e.g. dynablaster 4.5 s -> 6.0 s) and the worklet then loads the song once more for playback. The browser's own underrun counter stayed 0 in both (it counts playback underruns, not graph stalls).
+Open: the 15 s wall cap (SCAN_WALL_MS) was set to protect the audio thread and could now be raised.
+
 ### U2.8 - Import-time walks off the main thread
 `hippelPlayedPitch` (97-118 ms per hip7 load, TFMX wasm) and `maWalk`
 (~55 ms, baseheads.ma) into `src/workers/songWalk.worker.ts`; walkers already
@@ -324,7 +339,7 @@ services, and the parsers' internal recursion (`ChipDumpParsers`,
 - [x] U2.5 companions owned by the call, previews as a target. Done: UADEEngine.load/loadForPlayback take companions and the worklet replaces the set per load (addCompanionFile removed from engine and worklet); callers moved: loadTune, UADESynth, UADEParser, prepareModuleImport, FilePreviewPanel and DJModlandBrowser previews; acquire moved to src/lib/song/acquireSource.ts (the only caller of downloadUADECompanions/gatherCompanions in the open path; FilePreviewPanel and useFileNavigation use it). Deviation: previews use UADEEngine.getPreviewInstance() (own engine) instead of openSong(target:'preview'); the DJ deck/tour/jukebox-playlist callers of downloadUADECompanions stay for U2.6.
 - [x] U2.6a DJ engine loaders. Done: openSong deck target (OpenOptions.target {deck}; openDeckTrack = the throwing wrapper): acquire (publishes no editor load phase) + parse on the deck's own UADE engine (UADEEngine.getDeckInstance, withDeckUADEEngine scope in UADEParser), returns song + bytes + companions; DJTrackLoader (6 sites), DJUADEPrerender, DJPlaylistPrecache / DJPlaylistAnalyzer (acquireModlandCompanions). Deviation: the engine hand-off (pipeline render, loadAudioToDeck) stays in each loader; the call returns the song. Test: src/engine/dj/__tests__/deckLoadOpensThroughOpenSong.contract.test.ts (revert-checked both tests)
 - [x] U2.6b DJ components. Done: DJFileBrowser, DJView, DJDeck, DJPlaylistModal (6), DJPlaylistPanel (4), DJModlandBrowser (5), tourScript on openDeckTrack / acquireForDeck; every Modland deck load carries companions (20 parsed with none before). Allowlist: 17 entries / 32 calls removed, 1 owner entry added (openDeckSong)
-- [ ] U2.7 UADE scan in a worker (measure gate first)
+- [x] U2.7 UADE scan in a worker (measured 2026-10-07; see U2.7 result)
 - [ ] U2.8 Hippel / MA walks in a worker
 - [ ] U3a one audio export
 - [ ] U3b one module / MIDI export input
