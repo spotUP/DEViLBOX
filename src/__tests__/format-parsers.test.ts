@@ -56,7 +56,9 @@ describe('Format parser tests with real Modland files', () => {
   it('DavidWhittaker: apb.dw', async () => {
     const buf = readFileSync(resolve(BASE, 'apb.dw'));
     const { parseDavidWhittakerFile } = await import('@lib/import/formats/DavidWhittakerParser');
-    const song = parseDavidWhittakerFile(buf.buffer as ArrayBuffer, 'apb.dw');
+    const { installDwNodeFetch } = await import('@/lib/import/__tests__/helpers/dwNodeFetch');
+    const restore = installDwNodeFetch();
+    const song = await parseDavidWhittakerFile(buf.buffer as ArrayBuffer, 'apb.dw').finally(restore);
     logResult('DavidWhittaker', song);
 
     expect(song).toBeTruthy();
