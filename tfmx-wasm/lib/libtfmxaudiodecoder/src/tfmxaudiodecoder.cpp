@@ -169,6 +169,26 @@ int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset) {
     return 1;
 }
 
+int tfmxdec_walk_enable(void* decoder, int on) {
+    TFMX_DECLARE_DECODER;
+    return p->dec.walkEnable(on != 0) ? 1 : 0;
+}
+
+void tfmxdec_walk_run(void* decoder, int ticks) {
+    TFMX_DECLARE_DECODER;
+    for (int i = 0; i < ticks; i++) p->dec.run();
+}
+
+int tfmxdec_walk_count(void* decoder) {
+    TFMX_DECLARE_DECODER;
+    return p->dec.walkCount();
+}
+
+const int32_t* tfmxdec_walk_data(void* decoder) {
+    TFMX_DECLARE_DECODER;
+    return (const int32_t*)p->dec.walkData();
+}
+
 void tfmxdec_preview_macro(void* decoder, int macroIdx, int note,
                            int volume, int channel) {
     TFMX_DECLARE_DECODER;

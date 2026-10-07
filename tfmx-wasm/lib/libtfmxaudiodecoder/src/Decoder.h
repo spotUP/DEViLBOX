@@ -60,6 +60,18 @@ public:
      * next pattern byte the voice reads. False when the decoder cannot say.
      */
     virtual bool getPlayPosition(int& /*step*/, udword& /*offset*/) { return false; }
+
+    /**
+     * DEViLBOX extension: the walk. While on, a decoder that supports it
+     * records every track-step load and every pattern row a voice reads, with
+     * the tick (run() calls since the walk was switched on) it happened on.
+     * walkEnable(true) clears the record. Records are walkRecordInts() ints
+     * each: tick, kind (0 step load, 1 row read), voice, step (counted from
+     * the song's first), then kind-specific fields (see HippelDecoder.cpp).
+     */
+    virtual bool walkEnable(bool /*on*/) { return false; }
+    virtual int walkCount() { return 0; }
+    virtual const int* walkData() { return 0; }
     
     virtual ubyte getVoices() { return 0; }
     virtual int getSongs() { return 0; }
