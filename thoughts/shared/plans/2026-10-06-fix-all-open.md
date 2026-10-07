@@ -30,7 +30,18 @@ Measured 2026-10-06 (grep of call sites, src/ excluding tests):
 - [x] G1 (263074ed5) Classify the 77 jukebox rows flagged incorrect / missing notes / out of sync / frozen (scratch grid-targets.txt) -> plan thoughts/shared/plans/2026-10-07-grid-from-replayer-walk.md (agent running).
 - [ ] G2 Execute the plan in waves of at most 3 agents.
 - [ ] G3 (agent stopped 2026-10-07 to free a slot; its partial edits may sit uncommitted in TrackerReplayer.ts, davidWhittakerGridVoices.test.ts, sunTronicGridMatchesPlayer.test.ts) One typed 'grid unmatched' field on the song (DW uses dwGridUnmatched, SunTronic gridUnmatchedReason, both cast) - one field, one scope-view decision, all formats use it.
-- [ ] G4 SunTronic posts no playhead position (SunTronicSongEngine); grid scrolls on the tracker scheduler.
+- [x] G4 SunTronic posts no playhead position - DONE 2026-10-07 (234a04fdd): SunPlayhead + SunTronicSongEngine.onPositionUpdate; test sunTronicPlayhead.test.ts checks every reported row against the walk's player steps (shift-by-one fails).
+- [ ] G11 Owner 2026-10-07: "find all reconstructed grids, we need to address all of them". When the current waves calm down: audit EVERY parser (not only the jukebox-flagged ones) for grids that are reconstructed/estimated rather than a direct decode of a pattern format or the replayer's own walk - static guessers, UADE tick reconstructors ("Classic tick reconstructor"), heuristic track walkers. Table: format | grid source file:line | class | verdict; every reconstructed one becomes a unit in 2026-10-07-grid-from-replayer-walk.md; CI guard so a new parser cannot ship a reconstructed grid without being listed.
+- [x] G-Hippel (dac96670a, 8f1d24a69, 673b87365) .hip/.hip7 grids are the TFMX decoder's own walk; Hippel ST all 8 corpus files / 15 subsongs match.
+- [ ] G12 Subsongs: DW (P9), Ben Daglish (G8), Hippel/Hippel 7V engines play and show only subsong 0. One shared subsong mechanism for native command-stream formats.
+- [ ] G13 Hippel 7V: the grid note is pattern note + step transpose; the instrument's sound-sequence pitch offset/fixed pitch (96-100% of 7V notes) is not in the cell, so the shown note can differ from the heard pitch.
+- [ ] G14 Hippel grids: notes below the notation range show as C-0 and edits to them are refused; extend the note range rather than clamp.
+- [ ] G10 PRIORITY NEXT: Rob Hubbard grid is still a guess (owner 2026-10-07, skateordie.rh "guesstimated notes"). Give it the DW treatment: grid from the RH replayer's own walk for every corpus .rh song, commands in effect columns, byte-exact carriers, edits from 94aec53cb kept, G7 instrument reset fixed with it.
+- [ ] G5 Command-stream tick-grid edits (DW, RH; 94aec53cb) only patch bytes in place: an edit needing a longer block (a note on a blank row, removing a note) is refused. Owner goal: full editing - re-encode the block (and shift later offsets) instead of refusing.
+- [ ] G6 Tick-grid edits reach the file only through export; the live-edit path for variable layouts (rewriteVariablePattern) has no caller, so the playing engine never hears an edit.
+- [ ] G7 Rob Hubbard grid instrument resets to 1 at each block start (decodeRHBlock called with {cur:1}).
+- [ ] G8 Ben Daglish: edit write-back not wired (grid a8634520c); parses only subsong 0 (Motorhead has 3) - same as P9 for DW.
+- [ ] G9 withFallback (withNativeThenUADE): a native walk that cannot be matched falls through to the UADE scan grid when the song has 0 notes; it must open the scope view (part of G3).
 - [ ] J2 Other jukebox flags still open: load failed 14 (ay-amadeus, composer-670, 3 DefleMask rows, amiga catch-all, speedySystem, synthPack, adpcmMono, ufo, 3 Sonix rows, sunvox), silent 7 (actionamics, DevEd dmf, imagoOrpheus, musicLine, organya, paulRobotham, tcbTracker), empty patterns 19. Re-check each against today's fixes, fix the rest.
 
 ## Batch D - dub (running)
