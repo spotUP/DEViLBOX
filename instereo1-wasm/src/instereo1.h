@@ -48,6 +48,10 @@ void is1_set_instrument_param(Is1Module* module, int inst, const char* param, fl
 
 size_t is1_export(const Is1Module* module, uint8_t* out, size_t max_size);
 
+// Keyboard preview: one note of one instrument through the replayer's own note-on
+bool is1_preview_note(Is1Module* module, int instrument, int note);
+void is1_preview_stop(Is1Module* module);
+
 
 #ifdef __cplusplus
 }
