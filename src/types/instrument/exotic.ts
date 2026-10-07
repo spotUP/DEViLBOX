@@ -177,6 +177,10 @@ export interface SidMonConfig {
  * Digital Mugician (V1/V2) instrument configuration.
  */
 export interface DigMugConfig {
+  /** The 1-based sample byte the replayer's cells select this instrument with. */
+  sampleIndex?: number;
+  /** The instrument's finetune group (0-15, sixteenths of a semitone flat): the replayer looks notes up in that period group. */
+  fineTune?: number;
   wavetable: [number, number, number, number]; // 4 waveform indices
   waveBlend: number;         // 0-63: blend position across 4 waves
   waveSpeed: number;         // 0-63: morph rate

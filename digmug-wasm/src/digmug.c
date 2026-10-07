@@ -225,6 +225,12 @@ typedef struct DmModule {
 
     // Amiga filter state (low-pass)
     bool amiga_filter;
+
+    // Keyboard preview: the module cut down to one note on voice 0 (dm_preview_note)
+    bool preview;
+    bool preview_done;
+    DmSequence* preview_seq;     // owned: the one-position sequences (voices 0-2 / DMU2 voices 3-6)
+    DmSequence* preview_seq2;
 } DmModule;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1034,6 +1040,8 @@ static void do_effects(DmModule* m, int channel_number) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void play_it(DmModule* m) {
+    if (m->preview_done)
+        return;
     m->ch_tab[0] = 0x80;
     m->ch_tab[1] = 0x80;
     m->ch_tab[2] = 0x80;
@@ -1062,6 +1070,12 @@ static void play_it(DmModule* m) {
             m->new_pattern = true;
 
             m->current_position++;
+            if (m->preview && m->current_position == m->song_length) {
+                // the one-note song ends with its pattern: it does not restart the note
+                m->preview_done = true;
+                for (int i = 0; i < m->number_of_channels; i++) m->channels[i].active = false;
+                return;
+            }
             if (m->current_position == m->song_length) {
                 if (m->current_sub_song->loop_song)
                     m->current_position = m->current_sub_song->loop_position;
@@ -1679,6 +1693,8 @@ void dm_destroy(DmModule* module) {
 
     if (module->tracks)
         free(module->tracks);
+    free(module->preview_seq);
+    free(module->preview_seq2);
 
     if (module->instruments)
         free(module->instruments);
@@ -1829,4 +1845,59 @@ size_t dm_export(const DmModule* module, uint8_t* out, size_t max_size) {
     if (max_size < total) return 0;
     memcpy(out, module->original_data, total);
     return total;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Keyboard preview: one note of one instrument through the replayer's own play_note / do_effects
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Cut the module down to one position whose voice 0 plays `note` of the 1-based instrument
+ * `instrument` on row 0 (the note byte the replayer looks up: finetune and the instrument's own
+ * envelope, arpeggio and effects are the replayer's), the other voices an empty track. The song's
+ * sequences are replaced, not the instruments, so the sound is the song's own.
+ */
+bool dm_preview_note(DmModule* m, int instrument, int note) {
+    if (!m || instrument < 1 || (uint32_t)instrument > m->number_of_instruments) return false;
+
+    if (!m->preview) {
+        // two extra tracks: [n] the note row, [n+1] empty
+        DmTrack* t = (DmTrack*)realloc(m->tracks, ((size_t)m->number_of_tracks + 2) * sizeof(DmTrack));
+        if (!t) return false;
+        m->tracks = t;
+        memset(&m->tracks[m->number_of_tracks], 0, 2 * sizeof(DmTrack));
+        m->preview = true;
+    }
+    uint16_t note_track = m->number_of_tracks, empty_track = (uint16_t)(m->number_of_tracks + 1);
+    memset(&m->tracks[note_track], 0, sizeof(DmTrack));
+    m->tracks[note_track].rows[0].note = (uint8_t)note;
+    m->tracks[note_track].rows[0].instrument = (uint8_t)instrument;
+
+    // one position; sequence layout [channel * seq_len + position], seq_len 1
+    DmSequence* seq = (DmSequence*)calloc(4, sizeof(DmSequence));
+    DmSequence* seq2 = (DmSequence*)calloc(4, sizeof(DmSequence));
+    if (!seq || !seq2) { free(seq); free(seq2); return false; }
+    for (int k = 0; k < 4; k++) { seq[k].track_number = (uint8_t)empty_track; seq2[k].track_number = (uint8_t)empty_track; }
+    seq[0].track_number = (uint8_t)note_track;
+    // track numbers are bytes in the file: a module with 254+ tracks has no room for the two extras
+    if (note_track > 255 || empty_track > 255) { free(seq); free(seq2); return false; }
+
+    free(m->preview_seq);
+    free(m->preview_seq2);
+    m->preview_seq = seq;
+    m->preview_seq2 = seq2;
+    initialize_sound(m, m->sub_song_number);
+    m->current_sequence = seq;
+    m->current_sequence_len = 1;
+    m->current_sequence2 = m->module_type == DM_TYPE_DIGITAL_MUGICIAN2 ? seq2 : nullptr;
+    m->current_sequence2_len = 1;
+    m->song_length = 1;
+    m->preview_done = false;
+    return true;
+}
+
+void dm_preview_stop(DmModule* m) {
+    if (!m) return;
+    m->preview_done = true;
+    for (int i = 0; i < m->number_of_channels; i++) m->channels[i].active = false;
 }

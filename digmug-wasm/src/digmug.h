@@ -38,6 +38,10 @@ float dm_get_instrument_param(const DmModule* module, int inst, const char* para
 void dm_set_instrument_param(DmModule* module, int inst, const char* param, float value);
 size_t dm_export(const DmModule* module, uint8_t* out, size_t max_size);
 
+// Keyboard preview: one note of one instrument through the replayer's own note-on
+bool dm_preview_note(DmModule* module, int instrument, int note);
+void dm_preview_stop(DmModule* module);
+
 
 #ifdef __cplusplus
 }

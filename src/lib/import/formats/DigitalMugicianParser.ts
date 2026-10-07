@@ -444,6 +444,8 @@ export async function parseDigitalMugicianFile(
         : undefined;
 
       const config: DigMugConfig = {
+        sampleIndex: sampleIdx,
+        fineTune: sample.finetune >> 6,
         wavetable: [0, 0, 0, 0],
         waveBlend: 0,
         waveSpeed: 0,
@@ -498,6 +500,8 @@ export async function parseDigitalMugicianFile(
         : undefined;
 
       const config: DigMugConfig = {
+        sampleIndex: sampleIdx,
+        fineTune: sample.finetune >> 6,
         wavetable: [sample.wave, sample.wave, sample.wave, sample.wave],
         waveBlend: 0,
         waveSpeed: 0,
