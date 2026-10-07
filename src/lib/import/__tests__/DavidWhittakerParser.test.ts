@@ -1,7 +1,8 @@
 /**
  * DavidWhittakerParser Tests - Format capability analysis
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { installDwNodeFetch } from './helpers/dwNodeFetch';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isDavidWhittakerFormat, parseDavidWhittakerFile } from '../formats/DavidWhittakerParser';
@@ -28,12 +29,16 @@ describe('isDavidWhittakerFormat', () => {
   });
 });
 
+let restoreFetch = () => {};
+beforeAll(() => { restoreFetch = installDwNodeFetch(); });
+afterAll(() => restoreFetch());
+
 describe('parseDavidWhittakerFile — apb.dw', () => {
-  it('parses without throwing', () => {
-    expect(() => parseDavidWhittakerFile(loadBuf(FILE1), 'apb.dw')).not.toThrow();
+  it('parses without throwing', async () => {
+    await expect(parseDavidWhittakerFile(loadBuf(FILE1), 'apb.dw')).resolves.toBeTruthy();
   });
-  it('reports format capabilities', () => {
-    const song = parseDavidWhittakerFile(loadBuf(FILE1), 'apb.dw');
+  it('reports format capabilities', async () => {
+    const song = await parseDavidWhittakerFile(loadBuf(FILE1), 'apb.dw');
     const report = analyzeFormat(song, 'apb.dw');
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
@@ -42,11 +47,11 @@ describe('parseDavidWhittakerFile — apb.dw', () => {
 });
 
 describe('parseDavidWhittakerFile — garfield2+.dw', () => {
-  it('parses without throwing', () => {
-    expect(() => parseDavidWhittakerFile(loadBuf(FILE2), 'garfield2+.dw')).not.toThrow();
+  it('parses without throwing', async () => {
+    await expect(parseDavidWhittakerFile(loadBuf(FILE2), 'garfield2+.dw')).resolves.toBeTruthy();
   });
-  it('reports format capabilities', () => {
-    const song = parseDavidWhittakerFile(loadBuf(FILE2), 'garfield2+.dw');
+  it('reports format capabilities', async () => {
+    const song = await parseDavidWhittakerFile(loadBuf(FILE2), 'garfield2+.dw');
     const report = analyzeFormat(song, 'garfield2+.dw');
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');

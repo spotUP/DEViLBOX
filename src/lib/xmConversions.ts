@@ -12,6 +12,7 @@ import { fredEffectToString } from './import/formats/fredEffectGlyphs';
 import { soundMasterEffectToString } from './import/formats/soundMasterEffectGlyphs';
 import { actionamicsEffectToString } from './import/formats/actionamicsEffectGlyphs';
 import { activisionProEffectToString } from './import/formats/activisionProEffectGlyphs';
+import { davidWhittakerEffectToString } from './import/formats/davidWhittakerEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 
 /**
@@ -282,6 +283,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Activision Pro private operations (reserved block 0xB0..0xB9).
   const avp = activisionProEffectToString(effTyp, eff);
   if (avp !== null) return avp;
+
+  // David Whittaker track commands (reserved block 0xC0..0xD4).
+  const dw = davidWhittakerEffectToString(effTyp, eff);
+  if (dw !== null) return dw;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;

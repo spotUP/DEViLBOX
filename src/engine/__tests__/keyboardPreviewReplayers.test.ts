@@ -8,7 +8,9 @@
  * Reachability is proved once per format here: the preview is driven through the same
  * worklet messages the synth sends (previewLoad / noteOn), never through the song's play.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { DW_FX } from '@/lib/import/formats/davidWhittakerEffectGlyphs';
+import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { startWorklet, ROOT, type WorkletProc } from './workletHarness';
@@ -40,14 +42,19 @@ const emscriptenTransform = (c: string) => c
   .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
   .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 
-interface Cell { note: number; instrument: number; effTyp?: number; eff?: number }
+interface Cell { note: number; instrument: number; effTyp?: number; eff?: number; effTyp2?: number; effTyp3?: number; effTyp4?: number; effTyp5?: number }
 interface GridSong { instruments: Array<{ id: number; synthType?: string; digMug?: { sampleIndex?: number; fineTune?: number } }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
 
-/** First note of channel `ch` in song order that is a plain note (no effect), with its instrument. */
+/**
+ * First note of channel `ch` in song order that carries only the commands a key plays too (the envelope,
+ * arpeggio and channel transpose the song pairs with the sample), with its instrument.
+ */
 function firstNoteOnChannel(song: GridSong, ch: number): { note: number; ins: number } | null {
+  const paired = new Set([DW_FX.envelope, DW_FX.arpeggio, DW_FX.channelTranspose]);
   for (const pi of song.songPositions) {
     for (const cell of song.patterns[pi].channels[ch]?.rows ?? []) {
-      if (cell.note > 0 && cell.note < 97 && cell.instrument > 0 && !cell.effTyp && !cell.eff) return { note: cell.note, ins: cell.instrument };
+      const fx = [cell.effTyp, cell.effTyp2, cell.effTyp3, cell.effTyp4, cell.effTyp5].filter((t): t is number => !!t);
+      if (cell.note > 0 && cell.note < 97 && cell.instrument > 0 && fx.every((t) => paired.has(t as never))) return { note: cell.note, ins: cell.instrument };
     }
   }
   return null;
@@ -74,10 +81,12 @@ function expectSameVoice(label: string, song: Float32Array, prev: Float32Array, 
 }
 
 describe.each(['formats/apb.dw', 'david-whittaker/garfield2+.dw'])('David Whittaker %s: a typed note is the replayer voice, as the song plays it', (name) => {
-  const parsed = parseDavidWhittakerFile(corpus(name), name) as unknown as GridSong;
+  let restoreFetch = () => {};
+  beforeAll(() => { restoreFetch = installDwNodeFetch(); });
+  afterAll(() => restoreFetch());
   it(`${name}: the first note of each voice has the song's pitch, level and envelope`, async () => {
     const ab = corpus(name);
-    const song = parseDavidWhittakerFile(ab, name) as unknown as GridSong;
+    const song = await parseDavidWhittakerFile(ab, name) as unknown as GridSong;
     // A sample several voices use carries each voice's channel transpose; the preview takes the one
     // the voice that sounds the sample first has, so only that voice is compared (voices that never
     // sound in the first 400 ticks, like apb.dw's 2 and 3 which only rest, have no first note to measure).
@@ -113,6 +122,7 @@ describe.each(['formats/apb.dw', 'david-whittaker/garfield2+.dw'])('David Whitta
     const a = await startWorklet('davidwhittaker', 'DavidWhittaker', emscriptenTransform);
     await a.send({ type: 'loadModule', moduleData: ab });
     const m = (a.proc as unknown as { module: { _dw_get_instrument_count(h: number): number }; handle: number });
+    const parsed = await parseDavidWhittakerFile(ab, name) as unknown as GridSong;
     expect(parsed.instruments.length).toBe(m.module._dw_get_instrument_count(m.handle));
   });
 

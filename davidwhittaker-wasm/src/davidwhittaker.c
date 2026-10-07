@@ -293,6 +293,17 @@ struct DwModule {
     int* scan_transpose;     // channel transpose and half-volume flag the song has on the channel at that first note
     int* scan_half;
     bool scanning;
+    // Note trace (dw_trace): channel, sample and track byte of every note the song starts
+    bool tracing;
+    // Walk (dw_walk): every command the replayer executes, with the tick it ran on
+    bool walking;
+    int walk_tick;
+    int walk_pos;                  // byte position of the command being executed in its track
+    int walk_count, walk_max;
+    int32_t* walk_out;             // 7 ints per event
+    int walk_wrap_tick[8];         // tick at which each channel first reached the end of its position list (-1: not yet)
+    int trace_count;
+    int16_t trace[4096][3];
     uint8_t preview_track[8];
     uint8_t preview_idle[2];
 
@@ -1607,6 +1618,45 @@ static void do_frame_stuff(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc);
 static void change_square_waveform(DwModule* m);
 static void stop_module(DwModule* m);
 
+/** Event kinds of dw_walk, in the replayer's own terms. a / b are the command's arguments. */
+enum {
+    DW_WALK_NOTE = 0,            // a: sample index (-1 none), b: track byte (the note before any transpose)
+    DW_WALK_WAIT = 1,            // a: rows to wait (including the current one)
+    DW_WALK_SAMPLE = 2,          // a: sample index
+    DW_WALK_ENVELOPE = 3,        // a: envelope index
+    DW_WALK_ARPEGGIO = 4,        // a: arpeggio index
+    DW_WALK_END_OF_TRACK = 5,    // a: the position the channel moves to, b: 1 when it wrapped to its restart position
+    DW_WALK_SLIDE = 6,           // a: speed (signed), b: delay counter
+    DW_WALK_MUTE = 7,
+    DW_WALK_WAIT_ROW = 8,        // wait until next row
+    DW_WALK_STOP_SONG = 9,
+    DW_WALK_GLOBAL_TRANSPOSE = 10, // a: semitones (signed)
+    DW_WALK_VIBRATO = 11,        // a: speed, b: maximum
+    DW_WALK_VIBRATO_OFF = 12,
+    DW_WALK_VOLUME_FADE = 13,    // effect 8 as volume fade: a: speed
+    DW_WALK_CHANNEL_TRANSPOSE = 14, // effect 8 as channel transpose: a: semitones (signed)
+    DW_WALK_HALF_VOLUME_ON = 15, // effect 8 as half volume on
+    DW_WALK_HALF_VOLUME_OFF = 16, // effect 9 as half volume off
+    DW_WALK_RESTART = 17,        // effect 9 as position restart (two argument bytes skipped; the loader owns it)
+    DW_WALK_SPEED = 18,          // a: speed (ticks per row)
+    DW_WALK_DELAY_SPEED = 19,    // set speed on a player whose speed is a delay counter: a: counter speed
+    DW_WALK_GLOBAL_FADE = 20,    // a: speed
+    DW_WALK_GLOBAL_VOLUME = 21,  // a: volume 0-64
+    DW_WALK_SOUNDFX = 22,        // effects 12/13 where they start or stop a sound effect (unsupported): a: argument
+    DW_WALK_NOP = 23             // an effect the player ignores
+};
+
+static void walk_event(DwModule* m, DwChannelInfo* ch, int kind, int a, int b) {
+    if (!m->walking || m->walk_count >= m->walk_max) return;
+    uint32_t trk = 0xFFFFFFFFu;
+    for (int i = 0; i < m->track_count; i++)
+        if (m->tracks[i].data == ch->track_data) { trk = m->tracks[i].offset + (uint32_t)m->start_offset; break; }
+    int32_t* e = m->walk_out + (size_t)m->walk_count * 7;
+    e[0] = m->walk_tick; e[1] = ch->channel_number; e[2] = (int32_t)trk; e[3] = m->walk_pos;
+    e[4] = kind; e[5] = a; e[6] = b;
+    m->walk_count++;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ChangeSquareWaveform
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1641,6 +1691,13 @@ static void change_square_waveform(DwModule* m) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void handle_end_of_track_effect(DwModule* m, DwChannelInfo* ch) {
+    {
+        bool wraps = ch->current_position >= ch->position_list_length;
+        if (m->walking && ch->channel_number < 8 && wraps && m->walk_wrap_tick[ch->channel_number] < 0)
+            m->walk_wrap_tick[ch->channel_number] = m->walk_tick;
+        if (ch->position_list_length > 0)
+            walk_event(m, ch, DW_WALK_END_OF_TRACK, wraps ? (int)ch->restart_position + 1 : (int)ch->current_position + 1, wraps ? 1 : 0);
+    }
     // Move to next position
     if (ch->current_position >= ch->position_list_length) {
         ch->current_position = (uint16_t)(ch->restart_position + 1);
@@ -1706,22 +1763,28 @@ static bool do_effects(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc, DwEff
                 ch->slide_speed = (int8_t)ch->track_data[ch->track_data_position++];
                 ch->slide_counter = ch->track_data[ch->track_data_position++];
                 ch->slide_enabled = true;
+                walk_event(m, ch, DW_WALK_SLIDE, ch->slide_speed, ch->slide_counter);
                 break;
 
             case DW_EFFECT_MUTE:
+                walk_event(m, ch, DW_WALK_MUTE, mc->active ? 1 : 0, 0);
                 mixer_mute(mc);
                 return true;
 
             case DW_EFFECT_WAIT_UNTIL_NEXT_ROW:
+                walk_event(m, ch, DW_WALK_WAIT_ROW, 0, 0);
                 return true;
 
             case DW_EFFECT_STOP_SONG:
+                walk_event(m, ch, DW_WALK_STOP_SONG, 0, 0);
                 stop_module(m);
                 return true;
 
             case DW_EFFECT_GLOBAL_TRANSPOSE:
-                if (m->enable_global_transpose)
+                if (m->enable_global_transpose) {
                     m->playing_info.transpose = (int8_t)ch->track_data[ch->track_data_position++];
+                    walk_event(m, ch, DW_WALK_GLOBAL_TRANSPOSE, m->playing_info.transpose, 0);
+                } else walk_event(m, ch, DW_WALK_NOP, 5, 0);
                 break;
 
             case DW_EFFECT_START_VIBRATO:
@@ -1730,60 +1793,76 @@ static bool do_effects(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc, DwEff
                     ch->vibrato_speed = ch->track_data[ch->track_data_position++];
                     ch->vibrato_max_value = ch->track_data[ch->track_data_position++];
                     ch->vibrato_value = 0;
-                }
+                    walk_event(m, ch, DW_WALK_VIBRATO, ch->vibrato_speed, ch->vibrato_max_value);
+                } else walk_event(m, ch, DW_WALK_NOP, 6, 0);
                 break;
 
             case DW_EFFECT_STOP_VIBRATO:
-                if (m->enable_vibrato)
+                if (m->enable_vibrato) {
                     ch->vibrato_direction = 0;
+                    walk_event(m, ch, DW_WALK_VIBRATO_OFF, 0, 0);
+                } else walk_event(m, ch, DW_WALK_NOP, 7, 0);
                 break;
 
             case DW_EFFECT_EFFECT8:
-                if (m->enable_volume_fade)
+                if (m->enable_volume_fade) {
                     m->playing_info.volume_fade_speed = ch->track_data[ch->track_data_position++];
-                else if (m->enable_channel_transpose)
+                    walk_event(m, ch, DW_WALK_VOLUME_FADE, m->playing_info.volume_fade_speed, 0);
+                } else if (m->enable_channel_transpose) {
                     ch->transpose = (int8_t)ch->track_data[ch->track_data_position++];
-                else if (m->enable_half_volume)
+                    walk_event(m, ch, DW_WALK_CHANNEL_TRANSPOSE, ch->transpose, 0);
+                } else if (m->enable_half_volume) {
                     ch->enable_half_volume = true;
+                    walk_event(m, ch, DW_WALK_HALF_VOLUME_ON, 0, 0);
+                } else walk_event(m, ch, DW_WALK_NOP, 8, 0);
                 break;
 
             case DW_EFFECT_EFFECT9:
-                if (m->enable_half_volume)
+                if (m->enable_half_volume) {
                     ch->enable_half_volume = false;
-                else {
+                    walk_event(m, ch, DW_WALK_HALF_VOLUME_OFF, 0, 0);
+                } else {
                     // Position restart is handled in the loader
                     ch->track_data_position += 2;
+                    walk_event(m, ch, DW_WALK_RESTART, 0, 0);
                 }
                 break;
 
             case DW_EFFECT_SET_SPEED:
-                if (m->enable_delay_speed)
+                if (m->enable_delay_speed) {
                     m->playing_info.delay_counter_speed = ch->track_data[ch->track_data_position++];
-                else
+                    walk_event(m, ch, DW_WALK_DELAY_SPEED, m->playing_info.delay_counter_speed, 0);
+                } else {
                     m->playing_info.speed = ch->track_data[ch->track_data_position++];
+                    walk_event(m, ch, DW_WALK_SPEED, m->playing_info.speed, 0);
+                }
                 break;
 
             case DW_EFFECT_GLOBAL_VOLUME_FADE:
                 m->playing_info.global_volume_fade_speed = ch->track_data[ch->track_data_position++];
                 m->playing_info.global_volume_fade_counter = m->playing_info.global_volume_fade_speed;
+                walk_event(m, ch, DW_WALK_GLOBAL_FADE, m->playing_info.global_volume_fade_speed, 0);
                 break;
 
             case DW_EFFECT_SET_GLOBAL_VOLUME:
-                if (m->enable_set_global_volume)
+                if (m->enable_set_global_volume) {
                     m->playing_info.global_volume = ch->track_data[ch->track_data_position++];
-                else {
+                    walk_event(m, ch, DW_WALK_GLOBAL_VOLUME, m->playing_info.global_volume, 0);
+                } else {
                     // Start sound effect (not supported)
-                    ch->track_data_position++;
+                    walk_event(m, ch, DW_WALK_SOUNDFX, ch->track_data[ch->track_data_position++], 0);
                 }
                 break;
 
             case DW_EFFECT_START_OR_STOP_SOUNDFX:
                 // If effect C is global volume, this is start sound effect. If not, it is stop sound effect
-                if (m->enable_set_global_volume)
-                    ch->track_data_position++;
+                if (m->enable_set_global_volume) {
+                    walk_event(m, ch, DW_WALK_SOUNDFX, ch->track_data[ch->track_data_position++], 1);
+                } else walk_event(m, ch, DW_WALK_NOP, 13, 0);
                 break;
 
             case DW_EFFECT_STOP_SOUNDFX:
+                walk_event(m, ch, DW_WALK_NOP, 14, 0);
                 break;
         }
     }
@@ -1799,10 +1878,12 @@ static bool do_track_command(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc,
     if (track_command >= 0xe0) {
         // Set number of rows to wait including the current one
         ch->speed = (uint16_t)((track_command - 0xdf) * m->playing_info.speed);
+        walk_event(m, ch, DW_WALK_WAIT, track_command - 0xdf, 0);
     }
     else if (!m->old_player && (track_command >= m->new_sample_cmd)) {
         // Set sample to use
         ch->current_sample_info = &m->samples[track_command - m->new_sample_cmd];
+        walk_event(m, ch, DW_WALK_SAMPLE, track_command - m->new_sample_cmd, 0);
     }
     else if (m->enable_envelopes && (track_command >= m->new_envelope_cmd)) {
         // Use envelope
@@ -1811,6 +1892,7 @@ static bool do_track_command(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc,
         ch->envelope_list_length = m->envelope_lengths[env_idx];
         ch->envelope_list_position = 1;
         ch->envelope_speed = ch->envelope_list[0];
+        walk_event(m, ch, DW_WALK_ENVELOPE, env_idx, 0);
     }
     else if (m->enable_arpeggio && (track_command >= m->new_arpeggio_cmd)) {
         // Use arpeggio
@@ -1818,6 +1900,7 @@ static bool do_track_command(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc,
         ch->arpeggio_list = m->arpeggios[arp_idx];
         ch->arpeggio_list_length = m->arpeggio_lengths[arp_idx];
         ch->arpeggio_list_position = 0;
+        walk_event(m, ch, DW_WALK_ARPEGGIO, arp_idx, 0);
     }
     else {
         // Do effects
@@ -1840,6 +1923,7 @@ static void read_track_commands(DwModule* m, DwChannelInfo* ch, DwMixerChannel* 
             break;
         }
 
+        m->walk_pos = ch->track_data_position;
         uint8_t track_byte = ch->track_data[ch->track_data_position++];
 
         if ((track_byte & 0x80) != 0) {
@@ -1849,6 +1933,13 @@ static void read_track_commands(DwModule* m, DwChannelInfo* ch, DwMixerChannel* 
         else {
             // Play the note
             ch->note = track_byte;
+            walk_event(m, ch, DW_WALK_NOTE, m->old_player ? track_byte / 12 : (ch->current_sample_info ? (int)(ch->current_sample_info - m->samples) : -1), track_byte);
+            if (m->tracing && m->trace_count < 4096) {
+                m->trace[m->trace_count][0] = (int16_t)ch->channel_number;
+                m->trace[m->trace_count][1] = (int16_t)(m->old_player ? track_byte / 12 : (ch->current_sample_info ? (int)(ch->current_sample_info - m->samples) : -1));
+                m->trace[m->trace_count][2] = (int16_t)track_byte;
+                m->trace_count++;
+            }
 
             if (m->old_player) {
                 int sample_number = track_byte / 12;
@@ -2055,6 +2146,7 @@ static void stop_module(DwModule* m) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void play_tick(DwModule* m) {
+    m->walk_tick++;
     if (m->enable_delay_counter) {
         m->playing_info.delay_counter += m->playing_info.delay_counter_speed;
         if (m->playing_info.delay_counter > 255) {
@@ -2580,4 +2672,66 @@ void dw_preview_stop(DwModule* m) {
         m->channels[i].speed_counter = 2;
         m->channels[i].current_sample_info = nullptr;
     }
+}
+
+/**
+ * Run the current subsong for `ticks` ticks and write each note it starts as (channel, sample index,
+ * track byte) triples; returns the number of notes. What the replayer plays, per note, for the grid to be checked against.
+ */
+int dw_trace(DwModule* m, int ticks, int16_t* out, int max_notes) {
+    if (!m || !out || max_notes <= 0) return 0;
+    int saved = m->current_song;
+    initialize_sound(m, saved);
+    m->tracing = true;
+    m->trace_count = 0;
+    for (int t = 0; t < ticks && m->trace_count < 4096; t++) play_tick(m);
+    m->tracing = false;
+    int n = m->trace_count < max_notes ? m->trace_count : max_notes;
+    memcpy(out, m->trace, (size_t)n * 3 * sizeof(int16_t));
+    initialize_sound(m, saved);
+    for (int i = 0; i < m->number_of_channels; i++) mixer_mute(&m->mixer_channels[i]);
+    return n;
+}
+
+/**
+ * Run the current subsong from its start and write every command the replayer executes, each as 7
+ * int32: tick, channel, file offset of the command's block (-1 for the empty track), byte position
+ * of the command in it, kind (DW_WALK_*), a, b. Stops when every channel has reached the end of its
+ * position list once (the song is then the first pass of the longest channel, the shorter ones
+ * looping inside it as the replayer loops them) or after `max_ticks`. info[0] ticks run, info[1] the
+ * tick the last channel finished its first pass, info[2..9] each channel's first-pass tick (-1 never),
+ * info[10] channels, info[11] number of samples. Returns the event count.
+ */
+int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* info) {
+    if (!m || !out || max_events <= 0) return 0;
+    int saved = m->current_song;
+    initialize_sound(m, saved);
+    m->walking = true;
+    m->walk_tick = -1;     // the first play_tick is tick 0
+    m->walk_count = 0;
+    m->walk_max = max_events;
+    m->walk_out = out;
+    for (int i = 0; i < 8; i++) m->walk_wrap_tick[i] = -1;
+    int ticks = 0;
+    for (; ticks < max_ticks && m->walk_count < max_events; ticks++) {
+        play_tick(m);
+        bool all = true;
+        for (int i = 0; i < m->number_of_channels && i < 8; i++) {
+            if (m->channels[i].position_list_length == 0) continue;   // a voice with no track
+            if (m->walk_wrap_tick[i] < 0) all = false;
+        }
+        if (all) { ticks++; break; }
+    }
+    m->walking = false;
+    int done = 0;
+    for (int i = 0; i < m->number_of_channels && i < 8; i++) if (m->walk_wrap_tick[i] > done) done = m->walk_wrap_tick[i];
+    if (info) {
+        info[0] = ticks; info[1] = done;
+        for (int i = 0; i < 8; i++) info[2 + i] = i < m->number_of_channels ? m->walk_wrap_tick[i] : -1;
+        info[10] = m->number_of_channels; info[11] = m->number_of_samples;
+    }
+    int n = m->walk_count;
+    initialize_sound(m, saved);
+    for (int i = 0; i < m->number_of_channels; i++) mixer_mute(&m->mixer_channels[i]);
+    return n;
 }

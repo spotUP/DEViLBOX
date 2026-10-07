@@ -40,6 +40,12 @@ int dw_preview_arpeggio(const DwModule* module, int sample);
 bool dw_preview_note(DwModule* module, int sample, int note, int envelope, int arpeggio);
 void dw_preview_stop(DwModule* module);
 
+// What the replayer plays: (channel, sample index, track byte) of each note the subsong starts in `ticks` ticks
+int dw_trace(DwModule* module, int ticks, int16_t* out, int max_notes);
+
+// Every command the replayer executes (7 int32 per event: tick, channel, block file offset, byte position, kind, a, b)
+int dw_walk(DwModule* module, int max_ticks, int32_t* out, int max_events, int32_t* info);
+
 
 #ifdef __cplusplus
 }
