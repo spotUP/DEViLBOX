@@ -821,6 +821,13 @@ void pt2_sampled_on_mouse_up(int x, int y)
 {
 	(void)x; (void)y;
 	releasePressedButton();
+
+	/* A loop pin drag writes the sample's loop start/length here and nowhere
+	** else tells the host: the desktop player consumes updateCurrSampleRepeat/
+	** Replen from its UI loop, this port has none. Report once on release. */
+	if (ui.leftLoopPinMoving || ui.rightLoopPinMoving)
+		notifyParamChanges();
+
 	mouse.leftButtonPressed = false;
 	mouse.rightButtonPressed = false;
 	mouse.buttonState = 0;
