@@ -20,6 +20,7 @@ import { withNativeDefault, withNativeThenUADE, callUADE, getBasename, injectUAD
 import { tryChipDumpParse } from './ChipDumpParsers';
 import { tryUADEPrefixParse } from './UADEPrefixParsers';
 import { tryPCTrackerParse } from './PCTrackerParsers';
+import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
 
 /**
  * Check if a filename matches a list of extensions, either as suffix (.ext) or prefix (ext.).
@@ -644,7 +645,7 @@ export async function tryRouteFormat(
         const dwNotes = dwResult.patterns.reduce((sum: number, p: any) =>
           sum + p.channels.reduce((cs: number, ch: any) =>
             cs + ch.rows.filter((r: any) => r.note > 0).length, 0), 0);
-        if (dwNotes > 0 || (dwResult as { gridEstimated?: boolean }).gridEstimated) return dwResult;
+        if (dwNotes > 0 || gridOpensInScopeView(dwResult)) return dwResult;
         console.warn(`[DavidWhittakerParser] 0 notes extracted, falling back to UADE`);
       } catch (err) {
         console.warn(`[DavidWhittakerParser] Native parse failed for ${filename}, falling back to UADE:`, err);

@@ -393,6 +393,11 @@ export interface TrackerSong {
    * song shows the scope view until its format is reverse-engineered.
    */
   gridEstimated?: boolean;
+  /**
+   * A native parser walked the replayer and could not match its grid to the walk:
+   * the song opens in the scope view with this reason (see gridOpensInScopeView).
+   */
+  gridUnmatchedReason?: string;
   /** Subsong to start (0-based index into the player's min..max), the native subsong model's start field */
   eaglePlayerSubsong?: number;
   /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */

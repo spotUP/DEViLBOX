@@ -11,7 +11,7 @@
  * held to UADE's Paula period writes, one per voice per vblank, so the walk is the original's.
  *
  * A song whose voices do not share a row clock cannot be shown as rows side by side: it opens
- * in the scope view with the reason recorded (gridEstimated + gridUnmatchedReason).
+ * in the scope view with the reason recorded (gridUnmatchedReason).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -96,13 +96,13 @@ describe('SunTronic V1.3 grid is the replayer walk', () => {
       if (skew.reason) {
         // No guessed grid: the scope view, with the reason recorded and nothing editable.
         unmatched.push(name);
-        if (!song.gridEstimated) failures.push(`${name}: voices off the row clock (${skew.reason}) but the grid is shown`);
-        if ((song as unknown as { gridUnmatchedReason?: string }).gridUnmatchedReason !== skew.reason) failures.push(`${name}: reason not recorded`);
+        if (!song.gridUnmatchedReason) failures.push(`${name}: voices off the row clock (${skew.reason}) but the grid is shown`);
+        if (song.gridUnmatchedReason !== skew.reason) failures.push(`${name}: reason not recorded`);
         if (song.uadeVariableLayout || song.sunTronicNative) failures.push(`${name}: scope-view song still carries an editable layout`);
         continue;
       }
       aligned++;
-      if (song.gridEstimated) failures.push(`${name}: aligned song opened in the scope view`);
+      if (song.gridUnmatchedReason) failures.push(`${name}: aligned song opened in the scope view`);
       const bad = compareGridToWalk(song, walkCells(score, walk), { limit: 4 });
       for (const b of bad) failures.push(`${name}: ${b}`);
       // Rows: the grid holds exactly the rows the walk decoded (padding to whole patterns is empty).
@@ -141,8 +141,7 @@ describe('SunTronic V1.3 grid is the replayer walk', () => {
   it('smooth: voices on their own row clocks (per-voice speed) open the scope view with the reason recorded', () => {
     const e = find('smooth');
     const song = parseSunTronicFile(toBuffer(e), e.name);
-    expect(song.gridEstimated).toBe(true);
-    expect((song as unknown as { gridUnmatchedReason: string }).gridUnmatchedReason).toMatch(/different row clocks/);
+    expect(song.gridUnmatchedReason).toMatch(/different row clocks/);
     expect(song.patterns.every((p) => p.channels.every((c) => c.rows.every((r) => r.note === 0)))).toBe(true);
   });
 

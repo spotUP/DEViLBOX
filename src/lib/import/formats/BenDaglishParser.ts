@@ -800,8 +800,7 @@ export async function parseBenDaglishFile(
   if (uadeVariableLayout) {
     (result as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout = uadeVariableLayout;
   } else {
-    (result as unknown as { gridEstimated: boolean }).gridEstimated = true;
-    (result as unknown as { gridUnmatchedReason?: string }).gridUnmatchedReason = unmatched ?? undefined;
+    result.gridUnmatchedReason = unmatched ?? 'the grid was not matched to the replayer';
   }
   return result;
 }

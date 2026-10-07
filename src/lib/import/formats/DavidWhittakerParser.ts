@@ -794,8 +794,7 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
     };
     (result as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout = uadeVariableLayout;
   } else {
-    (result as unknown as { gridEstimated: boolean; dwGridUnmatched: string | null }).gridEstimated = true;
-    (result as unknown as { dwGridUnmatched: string | null }).dwGridUnmatched = unmatched;
+    result.gridUnmatchedReason = unmatched ?? 'the grid was not matched to the replayer';
   }
 
   return result;

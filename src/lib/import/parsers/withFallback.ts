@@ -18,6 +18,7 @@ import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 // 60-odd engines), so songs with an engine of their own were handed to UADE
 // too. The registry module is data only; importing it loads no engine.
 import { playsOnDedicatedEngine } from '@/engine/replayer/wasmEngineRegistry';
+import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
 
 /** Common context passed through all fallback helpers */
 export interface FallbackContext {
@@ -163,7 +164,8 @@ export async function withNativeThenUADE(
         // no parser at all (eco.gray, spacestation.jmf, count duckula.scr,
         // ..., ledger F6). The `native` branch below already falls through on
         // zero notes; this branch did not.
-        if (result && countNotes(result) === 0) {
+        // A song flagged unmatched (gridUnmatchedReason) is the scope-view answer: keep it and its reason.
+        if (result && countNotes(result) === 0 && !gridOpensInScopeView(result)) {
           console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}; UADE builds the grid`);
           return callUADE(ctx);
         }
@@ -240,7 +242,7 @@ export async function withNativeThenUADE(
         // Defense-in-depth: if native parser returned 0 notes across all patterns,
         // it's likely a stub parser that couldn't actually parse the file.
         // Fall through to UADE instead of returning empty data.
-        if (countNotes(result) === 0) {
+        if (countNotes(result) === 0 && !gridOpensInScopeView(result)) {
           console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}, falling back to UADE`);
           return callUADE(ctx);
         }
