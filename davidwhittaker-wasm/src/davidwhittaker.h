@@ -33,6 +33,13 @@ float dw_get_instrument_param(const DwModule* module, int inst, const char* para
 void dw_set_instrument_param(DwModule* module, int inst, const char* param, float value);
 size_t dw_export(const DwModule* module, uint8_t* out, size_t max_size);
 
+// Keyboard preview: one note of one sample through the replayer's own track reader
+void dw_preview_scan(DwModule* module);
+int dw_preview_envelope(const DwModule* module, int sample);
+int dw_preview_arpeggio(const DwModule* module, int sample);
+bool dw_preview_note(DwModule* module, int sample, int note, int envelope, int arpeggio);
+void dw_preview_stop(DwModule* module);
+
 
 #ifdef __cplusplus
 }
