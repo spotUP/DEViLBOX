@@ -359,3 +359,72 @@ Music Assembler (grid = decoded track events zipped per position, voices drift),
 the position independently), Sawteeth (per-part speed, channels not row-aligned), Ron Klaren (sparse opcode scan),
 Future Player (flattened subroutine graph). Each is blocked on its own grid-from-walk unit (U7, U8, U12, U13, U15); position
 reporting comes with that walk.
+
+## G11 additions: every other reconstructed grid (2026-10-07, thoughts/shared/research/2026-10-07_reconstructed-grids-audit.md)
+
+Source: the registry audit. 144 of 279 FORMAT_REGISTRY keys are classed RECONSTRUCTED (a static guesser, heuristic walker, UADE scan or a stub grid that falls to the UADE scan); the 25 listed in the 61-format table above keep their U-ids, the rest become the units below. Guard: src/engine/__tests__/gridProvenanceGuard.test.ts + src/lib/import/gridProvenance.ts: a key with no entry, or RECONSTRUCTED without a unit id defined in this file, fails CI.
+Size rule used here: asm source of the player in third-party/uade-3.05/amigasrc = M, binary-only player or no source = L (reverse work). Sizes are estimates, not measured. Class column of the research doc is from the 10-06 provenance audit (H rows = judged from code/header, no corpus song).
+
+- **U28 C-bin family (Wave 10, owner decision D1)**: GlueMon, Jason Brooke, Fred Gray, Earache, Beathoven Synthesizer (uade_bss), David Hanney (uade_dh), Tim Follin (uade_tf). Recommended in D1: keep the scope view. Registry keys carry U28 so the guard accepts them until D1 is answered.
+- **G11-uade-only (M to start, then per format)**: the 61 `uade_*` registry keys have no native parser entry. Step 1: map each key to the parser AmigaFormatParsers.ts routes its prefix to (e.g. uade_ast to Actionamics, uade_fredmon to Fred, uade_hip/uade_sog to Hippel ST, uade_sun to SunTronic, uade_tomy to Tomy, uade_rkl to Ron Klaren) and move the key to that format's class in gridProvenance.ts; step 2: what is left is a true UADE-scan grid, one unit each. Not verified per key in this audit.
+
+| Unit | Format (registry key) | Engine | Oracle | Size |
+|---|---|---|---|---|
+| G11-midi | midi | none (sampler) | the .mid event list (quantise round-trip: no note lost or moved by more than half a row) | S |
+| G11-soundFactory | soundFactory | SoundFactory2Replayer | UADE Paula + SoundFactory2Replayer event log | M |
+| G11-magneticFieldsPacker | magneticFieldsPacker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/MagneticFieldsPacker | M |
+| G11-speedySystem | speedySystem | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-tronic | tronic | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-medley | medley | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/medley; Replayers/MedleySoundEditor | M |
+| G11-lme | lme | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/LME | M |
+| G11-markCooksey | markCooksey | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/mark_cooksey_old | M |
+| G11-quartet | quartet | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Quartet; Replayers/Quartet | M |
+| G11-synthPack | synthPack | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Synth Pack | M |
+| G11-mmdc | mmdc | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/MMDC | M |
+| G11-psa | psa | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/PSA | M |
+| G11-tme | tme | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/TME; Replayers/TheMusicalEnlightment | M |
+| G11-laxity | laxity | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-musicMaker4V | musicMaker4V | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/music_maker | M |
+| G11-specialFX | specialFX | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/SpecialFX | M |
+| G11-timeTracker | timeTracker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/TimeTracker | M |
+| G11-cinemaware | cinemaware | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Cinemaware | M |
+| G11-novoTradePacker | novoTradePacker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/NovoTradePacker | M |
+| G11-alcatrazPacker | alcatrazPacker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Alcatraz_Packer | M |
+| G11-bladePacker | bladePacker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/BladePacker | M |
+| G11-multiMediaSound | multiMediaSound | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/MultiMedia_Sound; Replayers/MultimediaSound | M |
+| G11-seanConran | seanConran | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/SeanConran | M |
+| G11-thomasHermann | thomasHermann | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/ThomasHermann | M |
+| G11-titanicsPacker | titanicsPacker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Titanics Packer | M |
+| G11-krisHatlelid | krisHatlelid | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/KrisHatlelid | M |
+| G11-ntsp | ntsp | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/NTSP-system | M |
+| G11-moshPacker | moshPacker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Mosh Packer | M |
+| G11-jankoMrsicFlogel | jankoMrsicFlogel | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/JankoMrsic-Flogel | M |
+| G11-nickPellingPacker | nickPellingPacker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Nick Pelling Packer | M |
+| G11-steveBarrett | steveBarrett | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/SteveBarrett | M |
+| G11-paulSummers | paulSummers | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/PaulSummers | M |
+| G11-martinWalker | martinWalker | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/MartinWalker | M |
+| G11-paulShields | paulShields | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/PaulShields | M |
+| G11-paulRobotham | paulRobotham | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/PaulRobotham | M |
+| G11-pierreAdane | pierreAdane | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/PierreAdanePacker | M |
+| G11-andrewParton | andrewParton | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Andrew Parton | M |
+| G11-kimChristensen | kimChristensen | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Kim Christensen | M |
+| G11-adpcmMono | adpcmMono | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/ADPCM_mono | M |
+| G11-janneSalmijarvi | janneSalmijarvi | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Janne Salmijarvi Optimizer | M |
+| G11-maximumEffect | maximumEffect | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Maximum_Effect | M |
+| G11-midiLoriciel | midiLoriciel | EaglePlayer | EaglePlayer runner voice records + UADE Paula | M |
+| G11-onEscapee | onEscapee | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/onEscapee | M |
+| G11-paulTonge | paulTonge | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/Paul Tonge | M |
+| G11-maniacsOfNoise | maniacsOfNoise | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-mdx | mdx | Mdxmini | mdxmini register log | M |
+| G11-pmd | pmd | Pmdmini | pmdmini register log | M |
+| G11-piyoPiyo | piyoPiyo | PiyoPiyo | PiyoPiyo replayer event stream (chords) | S |
+| G11-adplug | adplug | UADE | AdPlug OPL register writes | M |
+| G11-ufo | ufo | UADE | UADE Paula (gridVsPaula) + voice records; asm in amigasrc/wanted_team/UFO | M |
+| G11-scumm | scumm | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-seanConnolly | seanConnolly | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-artAndMagic | artAndMagic | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-mikeDavies | mikeDavies | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-markII | markII | UADE | UADE Paula (gridVsPaula) + voice records | L |
+| G11-sonicArrangerSas | sonicArrangerSas | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-aProSys | aProSys | UADE | UADE Paula + traceModuleReads (binary only) | L |
+| G11-amiga_formats_catchall | amiga_formats_catchall | UADE | UADE Paula (gridVsPaula) + voice records | L |
