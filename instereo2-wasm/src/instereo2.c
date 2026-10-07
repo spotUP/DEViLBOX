@@ -275,6 +275,13 @@ typedef struct Is2Module {
 
     // Position visit tracking
     uint8_t visited[1024];
+
+    // Keyboard preview: the module cut down to one note on voice 0 (is2_preview_note)
+    bool preview;
+    bool preview_done;
+    int preview_position;     // the one-note position's index
+    int preview_visits;
+    int preview_line;         // first of the two appended track lines: [+0] the note, [+1] empty
 } Is2Module;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -996,6 +1003,12 @@ static void is2_play_voice(Is2Module* m, Is2VoiceInfo* v, Is2Channel* ch) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void is2_get_next_position(Is2Module* m) {
+    if (m->preview && ++m->preview_visits > 1) {
+        // the one-note song ends with its position: it does not restart the note
+        m->preview_done = true;
+        for (int i = 0; i < 4; i++) is2_ch_mute(&m->channels[i]);
+        return;
+    }
     m->playing_info.song_position++;
 
     if (m->playing_info.song_position > (int16_t)m->current_song_info->last_position)
@@ -1287,6 +1300,8 @@ static void is2_update_effects(Is2Module* m) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void is2_play_tick(Is2Module* m) {
+    if (m->preview_done)
+        return;
     m->playing_info.speed_counter++;
 
     if (m->playing_info.speed_counter >= m->playing_info.current_speed) {
@@ -1683,4 +1698,59 @@ size_t is2_export(const Is2Module* module, uint8_t* out, size_t max_size) {
     if (max_size < total) return 0;
     memcpy(out, module->original_data, total);
     return total;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Keyboard preview: one note of one instrument through the replayer's own play_voice and effects
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Cut the module down to one position whose voice 0 plays `note` (1-108, an index into the period
+ * table) of `instrument` (the replayer's number: 1-63 a synth, 64-127 a sample) on row 0, the other
+ * voices silent. A position and two track lines are appended; the instruments, samples and tables
+ * are the song's own.
+ */
+bool is2_preview_note(Is2Module* m, int instrument, int note) {
+    if (!m || instrument < 1 || instrument > 127 || m->num_sub_songs < 1 || m->num_positions >= 1000) return false;
+
+    if (!m->preview) {
+        Is2TrackLine* t = (Is2TrackLine*)realloc(m->track_lines, ((size_t)m->num_track_lines + 2) * sizeof(Is2TrackLine));
+        if (!t) return false;
+        m->track_lines = t;
+        memset(&m->track_lines[m->num_track_lines], 0, 2 * sizeof(Is2TrackLine));
+
+        Is2SinglePositionInfo** p = (Is2SinglePositionInfo**)realloc(m->positions, ((size_t)m->num_positions + 1) * sizeof(Is2SinglePositionInfo*));
+        if (!p) return false;
+        m->positions = p;
+        m->positions[m->num_positions] = (Is2SinglePositionInfo*)calloc(4, sizeof(Is2SinglePositionInfo));
+        if (!m->positions[m->num_positions]) return false;
+
+        m->preview_line = m->num_track_lines;
+        m->preview_position = m->num_positions;
+        m->positions[m->preview_position][0].start_track_row = (uint16_t)m->preview_line;
+        for (int k = 1; k < 4; k++) m->positions[m->preview_position][k].start_track_row = (uint16_t)(m->preview_line + 1);
+        m->num_track_lines += 2;
+        m->num_positions++;
+        m->preview = true;
+    }
+
+    Is2TrackLine* line = &m->track_lines[m->preview_line];
+    memset(line, 0, sizeof(Is2TrackLine));
+    line->note = (uint8_t)note;
+    line->instrument = (uint8_t)instrument;
+
+    Is2SongInfo* song = &m->sub_songs[0];
+    song->first_position = song->last_position = song->restart_position = (uint16_t)m->preview_position;
+    if (song->rows_per_track < 2) song->rows_per_track = 64;
+
+    is2_initialize_sound(m, 0);
+    m->preview_done = false;
+    m->preview_visits = 0;
+    return true;
+}
+
+void is2_preview_stop(Is2Module* m) {
+    if (!m) return;
+    m->preview_done = true;
+    for (int i = 0; i < 4; i++) is2_ch_mute(&m->channels[i]);
 }
