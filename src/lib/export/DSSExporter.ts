@@ -354,3 +354,24 @@ export async function exportDSS(
     warnings,
   };
 }
+
+/**
+ * The module the song was loaded with, with each edited grid cell written where it lives (G24).
+ * Everything the grid does not show (sample PCM, loop words, header) is the original's bytes, so an unedited
+ * song exports byte-for-byte; exportDSS above rebuilds the sample data from the instruments and does not.
+ */
+export async function exportDssEdited(song: TrackerSong): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+  const source = song.dssFileData;
+  if (!source) throw new Error('Digital Sound Studio export needs the loaded module');
+  const out = new Uint8Array(source.slice(0));
+  const { editedCells } = await import('@/lib/song/gridBaseline');
+  const { encodeDSSCell } = await import('@/engine/uade/encoders/DSSEncoder');
+  const warnings: string[] = [];
+  for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
+    const at = PATTERN_DATA_OFF + pattern * BYTES_PER_PATTERN + row * BYTES_PER_ROW + channel * BYTES_PER_CELL;
+    if (channel >= CHANNELS || row >= ROWS_PER_PATTERN || at + 4 > out.length) { warnings.push(`Cell ${pattern}:${row}:${channel} has no place in the module.`); continue; }
+    out.set(encodeDSSCell(cell), at);
+  }
+  const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return { data: new Blob([out as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }), filename: `${baseName}.dss`, warnings };
+}
