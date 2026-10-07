@@ -11,12 +11,11 @@ import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore , useFo
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerView } from '@hooks/views/useTrackerView';
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
+import { SongLoadPanel } from './SongLoadPanel';
+import { ImportDialogHost } from '@components/dialogs/ImportDialogHost';
 import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
 import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
-import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
-import { ImportFurnaceDialog } from '@components/dialogs/ImportFurnaceDialog';
-import { ImportMIDIDialog } from '@components/dialogs/ImportMIDIDialog';
 import { ImportAudioDialog } from '@components/dialogs/ImportAudioDialog';
 import { SunVoxImportDialog } from '@components/instruments/SunVoxImportDialog';
 import { ScaleVolumeDialog } from './ScaleVolumeDialog';
@@ -191,9 +190,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const cursorChannelIndex = useCursorStore((state) => state.cursor.channelIndex);
 
   const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
-  const pendingModuleFile = useUIStore((state) => state.pendingModuleFile);
-  const setPendingModuleFile = useUIStore((state) => state.setPendingModuleFile);
-  const pendingCompanionFiles = useUIStore((state) => state.pendingCompanionFiles);
   const pendingAudioFile = useUIStore((state) => state.pendingAudioFile);
   const setPendingAudioFile = useUIStore((state) => state.setPendingAudioFile);
   const pendingSunVoxFile = useUIStore((state) => state.pendingSunVoxFile);
@@ -216,7 +212,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   }, [editorFullscreen, toggleEditorFullscreen]);
 
   // Import handlers (extracted to hook)
-  const { handleModuleImport, handleSunVoxImport } = useModuleImport();
+  const { handleSunVoxImport } = useModuleImport();
 
   // GT Ultra DAW mode — hook must be called before any early returns (rules of hooks)
   const gtViewMode = useGTUltraStore((s) => s.viewMode);
@@ -391,14 +387,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     return () => window.removeEventListener('keydown', handleDialogShortcuts);
   }, [handleDialogShortcuts]);
 
-  // React to pending module file (set by drag-drop in App.tsx)
-  useEffect(() => {
-    if (pendingModuleFile) {
-      setShowImportModule(true);
-      // Don't clear yet - ImportModuleDialog needs it
-    }
-  }, [pendingModuleFile, setShowImportModule]);
-
   // NOTE: usePatternPlayback() is called in App.tsx so it persists across view switches
 
   // Randomize handler
@@ -496,7 +484,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         )}
 
         {/* Pattern Editor / Grid Sequencer - Flex item 1 */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden" data-tracker-editor="true">
+        <div className="relative flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden" data-tracker-editor="true">
+          <SongLoadPanel />
           {viewMode === 'tracker' ? (
             (() => {
               // Determine if this is a custom format editor that can be popped out
@@ -767,29 +756,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         })()}
       />
       <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
-      {/\.(fur|dmf)$/i.test(pendingModuleFile?.name ?? '') ? (
-        <ImportFurnaceDialog
-          isOpen={showImportModule}
-          onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
-          onImport={handleModuleImport}
-          initialFile={pendingModuleFile}
-        />
-      ) : /\.(mid|midi)$/i.test(pendingModuleFile?.name ?? '') ? (
-        <ImportMIDIDialog
-          isOpen={showImportModule}
-          onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
-          onImport={handleModuleImport}
-          initialFile={pendingModuleFile}
-        />
-      ) : (
-        <ImportModuleDialog
-          isOpen={showImportModule}
-          onClose={() => { setShowImportModule(false); setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
-          onImport={handleModuleImport}
-          initialFile={pendingModuleFile}
-          companionFiles={pendingCompanionFiles}
-        />
-      )}
+      <ImportDialogHost open={showImportModule} onClose={() => setShowImportModule(false)} />
 
       {/* Audio sample import dialog */}
       <ImportAudioDialog
