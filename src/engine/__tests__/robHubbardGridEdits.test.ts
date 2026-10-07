@@ -92,21 +92,26 @@ describe.each(SONGS)('Rob Hubbard grid edits reach the module: %s', (name) => {
     expect(g2.blockRows.length).toBe(grid.blockRows.length);
   });
 
-  it('an edit that needs a longer block is refused with a warning and leaves the module untouched', async () => {
+  it('a note on a blank row a note covers splits that command: the module grows, no warning, re-import shows the note', async () => {
     const orig = load(name);
     const song = await parseRobHubbardFile(ab(orig), name.split('/').pop()!) as TrackerSong;
     const grid = buildRobHubbardGrid(orig)!;
-    const edited = structuredClone(song.patterns);
-    // a blank continuation row (no command, not a release marker)
-    let done = false;
-    for (let p = 0; p < grid.patterns.length && !done; p++) for (let ch = 0; ch < 4 && !done; ch++) for (let row = 0; row < 64 && !done; row++) {
-      if (grid.cellSources[p][ch][row] === null && grid.patterns[p].channels[ch].rows[row].note === 0) {
-        (edited[p].channels[ch].rows[row] as unknown as Rec).note = 40; done = true;
-      }
+    // a blank continuation row straight after a note, so the note's duration covers it
+    let at: { p: number; ch: number; row: number } | null = null;
+    for (let p = 0; p < grid.patterns.length && !at; p++) for (let ch = 0; ch < 4 && !at; ch++) for (let row = 1; row < 64 && !at; row++) {
+      const prev = grid.patterns[p].channels[ch].rows[row - 1];
+      if (grid.cellSources[p][ch][row] === null && grid.patterns[p].channels[ch].rows[row].note === 0 && prev.note > 0 && prev.note < 97) at = { p, ch, row };
     }
-    expect(done).toBe(true);
+    expect(at, 'the song has such a row').toBeTruthy();
+    const edited = structuredClone(song.patterns);
+    const target = edited[at!.p].channels[at!.ch].rows[at!.row] as unknown as Rec;
+    target.note = grid.patterns[at!.p].channels[at!.ch].rows[at!.row - 1].note;
+    target.instrument = grid.patterns[at!.p].channels[at!.ch].rows[at!.row - 1].instrument;
     const r = await exportRobHubbard({ ...song, patterns: edited } as TrackerSong);
-    expect(r.warnings.length).toBe(1);
-    expect(new Uint8Array(await r.data.arrayBuffer())).toEqual(orig);
+    expect(r.warnings).toEqual([]);
+    const bytes = new Uint8Array(await r.data.arrayBuffer());
+    expect(bytes.length).toBeGreaterThan(orig.length);
+    const again = await parseRobHubbardFile(ab(bytes), name.split('/').pop()!) as TrackerSong;
+    expect((again.patterns[at!.p].channels[at!.ch].rows[at!.row] as unknown as Rec).note).toBe(target.note);
   });
 });

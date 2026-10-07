@@ -48,6 +48,9 @@ const NATIVE_AUDITION_SYNTHS = new Set([
   // one fixed-pitch loop of the waveform (an octave off, a bleep), not the instrument.
   'DavidWhittakerSynth', 'StartrekkerAMSynth', 'DigMugSynth', 'SonicArrangerSynth',
   'DeltaMusic1Synth', 'DeltaMusic2Synth', 'InStereo1Synth', 'InStereo2Synth',
+  // K7: Rob Hubbard plays through UADE (injectUADE), so the clobber below made every instrument a
+  // UADEEditableSynth whose key plays nothing; the keyboard voice is the replayer's own (robhubbard_synth.c).
+  'RobHubbardSynth',
 ]);
 
 /**
