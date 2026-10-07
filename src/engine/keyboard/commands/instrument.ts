@@ -4,6 +4,7 @@
 
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
+import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 /**
  * Select previous instrument
@@ -53,7 +54,7 @@ function createSetInstrumentCommand(num: number) {
     if (index >= 0 && index < instruments.length) {
       const instrument = instruments[index];
       setCurrentInstrument(instrument.id);
-      useUIStore.getState().setStatusMessage(`Instrument ${num}: ${instrument.name || instrument.id}`, false, 1000);
+      useUIStore.getState().setStatusMessage(`Instrument ${num}: ${instrumentDisplayName(instrument)}`, false, 1000);
     } else {
       useUIStore.getState().setStatusMessage(`Instrument ${num} not loaded`, false, 1000);
     }

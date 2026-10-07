@@ -12,6 +12,7 @@ import { getSynthInfo } from '@constants/synthCategories';
 import { HardwareUIWrapper, hasHardwareUI } from './hardware/HardwareUIWrapper';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SynthType } from '@typedefs/instrument';
+import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 export const HardwareUIPopout: React.FC = () => {
   const instruments = useInstrumentStore((s) => s.instruments);
@@ -41,7 +42,7 @@ export const HardwareUIPopout: React.FC = () => {
   useEffect(() => {
     if (currentInstrument) {
       const info = getSynthInfo(currentInstrument.synthType);
-      document.title = `${info.shortName} — ${currentInstrument.name}`;
+      document.title = `${info.shortName} — ${instrumentDisplayName(currentInstrument)}`;
     }
   }, [currentInstrument?.id, currentInstrument?.name, currentInstrument?.synthType]);
 
@@ -65,7 +66,7 @@ export const HardwareUIPopout: React.FC = () => {
             <ChevronLeft size={16} />
           </button>
           <span className={`text-xs font-bold ${synthInfo.color}`}>{synthInfo.shortName}</span>
-          <span className="text-sm text-text-primary font-medium">{currentInstrument.name}</span>
+          <span className="text-sm text-text-primary font-medium">{instrumentDisplayName(currentInstrument)}</span>
           <span className="text-xs text-text-muted font-mono">
             ({hwIdx + 1}/{hwInstruments.length})
           </span>

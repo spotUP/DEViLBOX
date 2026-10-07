@@ -12,6 +12,7 @@ import { instrumentTypeLabel, instrumentTypeColor } from '@/bridge/analysis/Audi
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
 import { useClickOutside } from '@hooks/useClickOutside';
+import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 type InstrumentSelectorProps = Record<string, never>;
 
@@ -169,7 +170,7 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = () => {
                   {formatValue(instrument.id)}
                 </span>
                 <IconComponent size={12} className={info.color} />
-                <span className="flex-1 text-xs truncate">{instrument.name}</span>
+                <span className="flex-1 text-xs truncate">{instrumentDisplayName(instrument)}</span>
                 {(() => {
                   const r = cedResults.get(instrument.id);
                   return r && r.instrumentType !== 'unknown' ? (

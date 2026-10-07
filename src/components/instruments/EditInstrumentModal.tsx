@@ -53,6 +53,7 @@ import {
 } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
+import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 // ============================================================================
 // SYNTH TYPE CATEGORIZATION HELPERS
@@ -499,6 +500,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                         <input
                           type="text"
                           value={currentInstrument.name}
+                          placeholder={instrumentDisplayName(currentInstrument)}
                           onChange={(e) => updateInstrument(currentInstrument.id, { name: e.target.value })}
                           className="bg-transparent text-text-primary font-semibold text-lg focus:outline-none focus:ring-1 focus:ring-accent-primary rounded px-1 -ml-1"
                         />
