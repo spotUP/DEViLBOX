@@ -9,6 +9,7 @@
 import type { TrackerCell } from '@/types';
 import { mapHippelCoSoCells } from '@lib/import/formats/HippelCoSoParser';
 import { isJochenHippel7VFormat, mapJochenHippel7VCells } from '@lib/import/formats/JochenHippel7VParser';
+import { findHippelTfmxHeader } from '@lib/import/formats/HippelTfmxWalk';
 import { patchEditedCells, type HippelCellSpans, type HippelPatchResult } from './hippelCellSpans';
 
 function isCoSo(buf: Uint8Array): boolean {
@@ -21,11 +22,16 @@ function isCoSo(buf: Uint8Array): boolean {
  * @param instrumentCount the loaded song's instrument count (CoSo shows
  *                        instrument 0 for a volume sequence past the last one)
  */
-/** The cell spans of a Hippel module with an editable grid (CoSo, 7V), else null. */
+/** The cell spans of a Hippel module with an editable grid (CoSo, TFMX 4V and 7V), else null. */
 export function mapHippelCells(fileData: ArrayBuffer | Uint8Array, instrumentCount: number): HippelCellSpans | null {
   const buf = fileData instanceof Uint8Array ? fileData : new Uint8Array(fileData);
   if (isCoSo(buf)) return mapHippelCoSoCells(buf, instrumentCount);
   if (isJochenHippel7VFormat(buf)) return mapJochenHippel7VCells(buf);
+  // .hip: a TFMX song behind replay code, the decoder's own header search.
+  if (findHippelTfmxHeader(buf) !== null) {
+    const spans = mapJochenHippel7VCells(buf);
+    return spans.length > 0 ? spans : null;
+  }
   return null;
 }
 
