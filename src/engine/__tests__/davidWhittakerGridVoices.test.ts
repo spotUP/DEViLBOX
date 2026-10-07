@@ -39,8 +39,7 @@ const emscriptenTransform = (c: string) => c
 interface Cell { note: number; instrument: number; effTyp?: number; eff?: number; effTyp2?: number; eff2?: number; effTyp3?: number; eff3?: number; effTyp4?: number; eff4?: number; effTyp5?: number; eff5?: number }
 interface GridSong {
   songPositions: number[];
-  gridEstimated?: boolean;
-  dwGridUnmatched?: string | null;
+  gridUnmatchedReason?: string;
   patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }>;
   uadeVariableLayout?: UADEVariablePatternLayout;
 }
@@ -58,7 +57,7 @@ describe.each(SONGS)('David Whittaker %s: the grid is what the replayer plays', 
   it('is drawn (not the scope-view fallback) and every walk block is a block of the layout', async () => {
     const ab = corpus(name);
     const song = await parseDavidWhittakerFile(ab, name) as unknown as GridSong;
-    expect(song.gridEstimated, `no grid: ${song.dwGridUnmatched}`).toBeFalsy();
+    expect(song.gridUnmatchedReason, 'no grid').toBeFalsy();
     const layout = song.uadeVariableLayout!;
     const known = new Set(layout.filePatternAddrs);
     const walk = await walkDavidWhittaker(ab);
