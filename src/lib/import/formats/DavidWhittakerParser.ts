@@ -636,6 +636,7 @@ function buildDWVariablePatterns(
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
   const trackMap: number[][] = [];
+  const voiceSounding: boolean[] = new Array(numChannels).fill(false);
 
   for (let step = 0; step < numSteps; step++) {
     const stepTrackMap: number[] = [];
@@ -650,8 +651,15 @@ function buildDWVariablePatterns(
       if (list.length > 0) {
         const fp = fpFor(list[step % list.length]);
         stepTrackMap.push(fp);
-        // Clone the decoded rows so per-step patterns don't share cell objects.
-        const rows = fpRows[fp].map(c => ({ ...c }));
+        // Clone the decoded rows so per-step patterns don't share cell objects, and show a
+        // note-off only where the replayer stops a sounding voice: a mute command on a voice
+        // that is already silent (apb.dw voices 3 and 4 mute every row) changes nothing.
+        const rows = fpRows[fp].map(c => {
+          const cell = { ...c };
+          if (cell.note > 0 && cell.note < 97) voiceSounding[ch] = true;
+          else if (cell.note === 97) { if (voiceSounding[ch]) voiceSounding[ch] = false; else cell.note = 0; }
+          return cell;
+        });
         perChannelRows.push(rows);
         if (rows.length > maxRows) maxRows = rows.length;
       } else {
