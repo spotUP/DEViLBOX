@@ -58,6 +58,7 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 
 - [x] F3 FIXED d7a948e52 (CustomSelect; test channelRoleUsesCustomSelect). Dub Deck channel card: the channel role dropdown is still a native <select>; use CustomSelect (project rule).
 - [ ] F4 DubDeckStrip.tsx bus row STYLE and ECHO dropdowns are native <select>; use CustomSelect.
+- [ ] J1 Jukebox filter finds any corpus song by file name, not only each format's chosen song (owner could not reach apb.dw, 2026-10-07).
 
 ## Batch L - load / route / companions
 - [!] L1 `black glass ][ - muzik0.670`: not CDFM 670; format research, route. -- BLOCKED: header 06 0b 09 09 09 00 e9 28 ... is no known tracker signature (not CDFM 670, not libopenmpt); needs format RE or an owner pointer to the player
@@ -103,12 +104,15 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 - [x] K4 FIXED d264a01a0 (measured 0.500 kbd/song at 8287 Hz, 0.125-1.33 for other stored rates on 23 corpus songs; keyboardPeriod through ToneEngine; keyboardPeriodSamplers.test). Sampler base note may be one octave under the grid for Amiga samples (measure).
 
 ## Batch P - parsers / editing
-- [x] P1 `apb.dw` shows 1 instrument of 4 used.
+- [x] P1 OWNER PASS 2026-10-07 (apb.dw 15 playable instruments) `apb.dw` shows 1 instrument of 4 used.
 - [x] P2 `insects_in_space.jt` shows 2 of 16.
 - [x] P3 Hippel CoSo grid instrument omits track-table sound transpose. (91f4f881a)
 - [x] P4 OctaMED synth vol-table F4/FA and wave-table F7 not modelled. (9c66ba43d, UADE-checked)
 - [x] P5 Track-index engines may get the grid's pattern index for edits (SoundMon, DigMug, SonicArranger, DM1/2, InStereo1/2, Synthesis).
 - [x] P6 (f1dffabb6) Undo/redo and macro paste reach no engine.
+- [x] P7 David Whittaker grid showed one voice (apb.dw: owner heard and saw one channel). Cause: a channel whose position list is shorter than the longest was left empty after its list ended; the replayer loops it (apb voice 0 is one 8-note block under voice 1's 7 positions; garfield2+ voice 2 had 48 of 68 positions). buildDWVariablePatterns wraps a shorter list. Test davidWhittakerGridVoices.test.ts (revert-checked: 1 of 8 and 48 of 68 positions). apb.dw voices 2 and 3 are silent in the replayer's subsong 0 and UADE plays 2 events each there; apb subsong 1 (310/310/87/87 Paula writes) is a 4-voice tune the grid does not show (parser reads only the first song).
+
+- [ ] P8 Infogrames native parser returns 0 notes for bob4e.dum (so it opens the scope view, black until play); UADE formatName 'Unknown' for it. Make the native parser read the song (oracle: UADE Paula log).
 
 ## Batch T - tests
 - [x] T1 `src/__tests__/format-parsers.test.ts`: 4 cases fail on missing `.test-formats` fixtures.
