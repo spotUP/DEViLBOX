@@ -9,7 +9,7 @@
  */
 
 import { useTrackerStore, useTransportStore } from '@stores';
-import { applySong } from '@/lib/song/applySong';
+import { openSavedSong } from '@/lib/song/openSong';
 import { savedSongToApply } from '@/lib/song/savedSong';
 import { snapshotSong } from '@/lib/song/snapshotSong';
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
@@ -37,7 +37,7 @@ export function applyRemotePatch(msg: DataChannelMsg): void {
     // The song goes in like every load. The apply is async: hold the
     // no-rebroadcast guard until it has landed, or its store writes echo back.
     applyingRemote = true;
-    void applySong(savedSongToApply(msg.project), 'sync')
+    void openSavedSong({ name: msg.project.metadata?.name || 'shared song', source: 'sync', song: () => savedSongToApply(msg.project) })
       .catch((err) => console.error('[SongSync] could not apply the remote song:', err))
       .finally(() => { applyingRemote = false; });
     return;

@@ -28,8 +28,6 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useDubStore } from '@/stores/useDubStore';
 import { ensureBusIsFed } from '@/lib/dub/seedSendOnEnable';
 import { getToneEngine } from '@/engine/ToneEngine';
-import { useSongLoadStore } from '@/stores/useSongLoadStore';
-import { unloadSong } from './songLifecycle';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { MixerSnapshot } from '@stores/useMixerStore';
@@ -142,9 +140,8 @@ async function applyProjectExtras(x: ProjectExtras): Promise<void> {
 /** Replace the current song with `song`. */
 export async function applySong(song: SongToApply, source: SongSource): Promise<void> {
   const engine = getToneEngine();
-  // An opener inside withSongLoad has already unloaded; a direct caller
-  // (restore, tab, sync) gets the same unload here.
-  if (!useSongLoadStore.getState().unloadedForLoad) await unloadSong();
+  // Only an opener (openSong / openSavedSong, inside withSongLoad) applies a
+  // song, and it has already unloaded the outgoing one.
 
   // Per-song state. The dub sends are fader positions for one song, written
   // back from the audio graph - a new song inherited the last one's moves

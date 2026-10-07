@@ -7,7 +7,6 @@ import { immer } from 'zustand/middleware/immer';
 import { useTrackerStore } from './useTrackerStore';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useProjectStore } from './useProjectStore';
-import { applySong } from '@/lib/song/applySong';
 import { savedSongToApply, type SavedSongFields } from '@/lib/song/savedSong';
 import { snapshotSong } from '@/lib/song/snapshotSong';
 
@@ -50,14 +49,15 @@ const captureCurrentState = (): TabState => ({
 });
 
 /**
- * Make a tab's song the current song - applySong, like every load: stops the
+ * Make a tab's song the current song - openSavedSong, like every load: stops the
  * outgoing song (native replayers included), resets per-song state, applies
  * the song and its editor mode.
  */
 const restoreState = (state: TabState) => {
   void (async () => {
     try {
-      await applySong(savedSongToApply(structuredClone(state.song)), 'tab');
+      const { openSavedSong } = await import('@/lib/song/openSong');
+      await openSavedSong({ name: state.song.metadata?.name || 'tab', source: 'tab', song: () => savedSongToApply(structuredClone(state.song)) });
       useTrackerStore.getState().setCurrentPattern(state.currentPatternIndex);
       if (state.currentInstrumentId !== null) {
         useInstrumentStore.getState().setCurrentInstrument(state.currentInstrumentId);

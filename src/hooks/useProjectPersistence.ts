@@ -15,7 +15,7 @@ import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/persistence/migrations';
 import type { SerializedCompanionFiles } from '@/lib/export/exporters';
-import { applySong } from '@/lib/song/applySong';
+import { openSavedSong } from '@/lib/song/openSong';
 import { savedSongToApply } from '@/lib/song/savedSong';
 import { setRestoredEditsPending } from '@/lib/song/gridBaseline';
 import { restoreFromStoredBytes } from '@/lib/song/restoreFromStoredBytes';
@@ -441,12 +441,20 @@ export async function applySavedProject(project: SavedProject, opts?: { fromReco
   // The stored module bytes are decoded again by today's decoder; the user's
   // edited cells, instruments, mixer and the rest of the project come from the
   // save (restoreFromStoredBytes.ts says when it keeps the saved song instead).
-  const stored = savedSongToApply(project);
-  const restored = await restoreFromStoredBytes(stored, project.gridBaseline);
-  console.log(`[restore] ${restored.redecoded ? 're-decoded from the stored module bytes' : `kept as saved (${restored.reason})`}`);
-  await applySong({ ...restored.song, gridBaseline: restored.baseline }, opts?.fromRecovery ? 'recovery' : 'project');
+  // The re-decode runs inside the open, after the outgoing song is unloaded.
+  let redecoded = false;
+  await openSavedSong({
+    name: project.metadata?.name || 'saved project',
+    source: opts?.fromRecovery ? 'recovery' : 'project',
+    song: async () => {
+      const restored = await restoreFromStoredBytes(savedSongToApply(project), project.gridBaseline);
+      console.log(`[restore] ${restored.redecoded ? 're-decoded from the stored module bytes' : `kept as saved (${restored.reason})`}`);
+      redecoded = restored.redecoded;
+      return { ...restored.song, gridBaseline: restored.baseline };
+    },
+  });
   // The engine plays the stored (original) bytes: its first start sends the edited cells again.
-  if (restored.redecoded) setRestoredEditsPending(true);
+  if (redecoded) setRestoredEditsPending(true);
 
   // Recovery restore must stay never-saved + dirty so the scheduler re-arms;
   // the default (explicit-slot) load marks saved. Decision is the pure
@@ -581,7 +589,7 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
   try {
     const project = data as SavedProject;
     if (!prepareSavedProject(project, 'reject')) return false;
-    await applySong(savedSongToApply(project), 'project');
+    await openSavedSong({ name: project.metadata?.name || 'project', source: 'project', song: () => savedSongToApply(project) });
     useProjectStore.getState().markAsSaved();
     return true;
   } catch (err) {
@@ -613,7 +621,7 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
   try {
     const project = await idbGetRevision(key);
     if (!project || !prepareSavedProject(project, 'accept')) return false;
-    await applySong(savedSongToApply(project), 'revision');
+    await openSavedSong({ name: project.metadata?.name || 'revision', source: 'revision', song: () => savedSongToApply(project) });
     useProjectStore.getState().markAsSaved();
     // Restoring user's own revision — auto-save is safe
     explicitlySaved = true;

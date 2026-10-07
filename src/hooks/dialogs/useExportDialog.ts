@@ -306,11 +306,11 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
           if (data) {
             // One parser, one apply for every saved song (this restored its
             // own subset of the project by hand).
-            const [{ applySong }, { savedSongToApply }] = await Promise.all([
-              import('@/lib/song/applySong'),
+            const [{ openSavedSong }, { savedSongToApply }] = await Promise.all([
+              import('@/lib/song/openSong'),
               import('@/lib/song/savedSong'),
             ]);
-            await applySong(savedSongToApply(data), 'project');
+            await openSavedSong({ name: data.metadata.name, source: 'project', song: () => savedSongToApply(data) });
             notify.success(`Song "${data.metadata.name}" imported!`);
           }
           break;
