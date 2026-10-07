@@ -19,8 +19,94 @@ import { rhNotePeriod, rhPeriodToNote, rhTableLength } from './robHubbardGrid';
 
 const SAMPLE_CHANGE = 0x80; // -128
 const REST = 0x82;          // -126
+const ROWS = 64;
 
 export interface RhEditResult { data: Uint8Array; patched: number; warnings: string[] }
+
+/** A note put on a blank row (G5). */
+interface RhAdd { p: number; ch: number; row: number; note: number; instrument: number; where: string }
+
+type RhGridResult = NonNullable<ReturnType<typeof buildRobHubbardGrid>>;
+
+/**
+ * Notes on blank rows: each splits the note or rest command that covers its row into the part before it
+ * and the new note (the new note takes the rest of the duration), the block is rebuilt from its commands
+ * and, being longer, written at the end of the module with the u32 entries of every track list that named
+ * the old block pointed at it (the player reads block addresses as file offsets, so nothing after the old
+ * block moves). A voice's sample is restored after a new note that changes it.
+ */
+function growBlocks(
+  source: Uint8Array, grid: RhGridResult, adds: RhAdd[],
+  noteByte: (n: number, sample: number) => number, warnings: string[],
+): { data: Uint8Array; patched: number } {
+  // per voice, the command each row is inside of: the last note or rest command at or before it
+  const perChannel = (ch: number): Array<{ src: NonNullable<RhGridResult['cellSources'][number][number][number]>; row: number }> => {
+    const out: Array<{ src: NonNullable<RhGridResult['cellSources'][number][number][number]>; row: number }> = [];
+    grid.cellSources.forEach((pat, p) => pat[ch]?.forEach((s, r) => { if (s) out.push({ src: s, row: p * ROWS + r }); }));
+    return out;
+  };
+  const cover = new Map<string, { fp: number; cmd: number; add: Array<{ k: number; note: number; sample: number; ins: number }> }>();
+  for (const a of adds) {
+    const at = a.p * ROWS + a.row;
+    const before = perChannel(a.ch).filter((e) => e.row < at).pop();
+    if (!before) { warnings.push(`${a.where}: no command of the module covers this row; not written`); continue; }
+    const carrier = grid.blockRows[before.src.fp][before.src.cmd];
+    const dur = carrier.period === REST ? (carrier.pan ?? 0) : (carrier.period ?? 0);
+    const k = at - before.row;
+    if (dur >= 0x80 || k >= dur) { warnings.push(`${a.where}: the command before it ends before this row (a rest the grid does not show); not written`); continue; }
+    const sample = a.instrument > 0 ? a.instrument - 1 : before.src.sample;
+    const nb = noteByte(a.note, sample);
+    if (nb < 0) { warnings.push(`${a.where}: no note of the player's period table plays as note ${a.note} on sample ${sample + 1}; not written`); continue; }
+    const key = `${before.src.fp}:${before.src.cmd}`;
+    const g = cover.get(key) ?? { fp: before.src.fp, cmd: before.src.cmd, add: [] };
+    g.add.push({ k, note: nb, sample, ins: before.src.sample });
+    cover.set(key, g);
+  }
+  let out = new Uint8Array(source);
+  let patched = 0;
+  const moved = new Map<number, number>();
+  const byBlock = new Map<number, Array<ReturnType<typeof cover.get> & object>>();
+  for (const g of cover.values()) byBlock.set(g.fp, [...(byBlock.get(g.fp) ?? []), g]);
+  for (const [fp, groups] of byBlock) {
+    const addr = grid.filePatternAddrs[fp];
+    const cmds = grid.blockRows[fp];
+    let pos = addr;
+    const bytes: number[][] = cmds.map((c) => { const b = Array.from(out.slice(pos, pos + (c.cutoff ?? 0))); pos += c.cutoff ?? 0; return b; });
+    for (const g of groups.sort((x, y) => y.cmd - x.cmd)) {
+      const old = bytes[g.cmd];
+      const isRest = old[0] === REST;
+      const total = isRest ? old[1] : old[0];
+      const adding = g.add.sort((x, y) => x.k - y.k);
+      const seq: number[][] = [isRest ? [REST, adding[0].k] : [adding[0].k, old[1]]];
+      let inForce = adding[0].ins;
+      adding.forEach((a, i) => {
+        const len = (i + 1 < adding.length ? adding[i + 1].k : total) - a.k;
+        if (a.sample !== inForce) { seq.push([SAMPLE_CHANGE, a.sample]); inForce = a.sample; }
+        seq.push([len, a.note]);
+      });
+      if (inForce !== adding[0].ins) seq.push([SAMPLE_CHANGE, adding[0].ins]);
+      bytes.splice(g.cmd, 1, ...seq);
+    }
+    // append the rebuilt block, word aligned, and repoint every track list entry that named the old one
+    if (out.length % 2) out = Uint8Array.from([...out, 0]);
+    const fresh = out.length;
+    out = Uint8Array.from([...out, ...bytes.flat()]);
+    moved.set(addr, fresh);
+    patched += bytes.flat().length;
+  }
+  const dv = new DataView(out.buffer);
+  for (const song of grid.walk.module.songs) {
+    for (const list of song.tracks) {
+      for (let tp = list; tp && tp + 4 <= out.length; tp += 4) {
+        const v = dv.getUint32(tp);
+        if (!v) break;
+        const to = moved.get(v);
+        if (to !== undefined) { dv.setUint32(tp, to); patched += 4; }
+      }
+    }
+  }
+  return { data: out, patched };
+}
 
 export function applyRhGridEdits(source: Uint8Array, edited: Pattern[]): RhEditResult {
   const out = new Uint8Array(source);
@@ -43,6 +129,7 @@ export function applyRhGridEdits(source: Uint8Array, edited: Pattern[]): RhEditR
     for (let b = 0; b < tableLen; b++) if (rhPeriodToNote(rhNotePeriod(source, periods, b, rel)) === n) return b;
     return -1;
   };
+  const adds: RhAdd[] = [];
   const wanted = new Map<number, { value: number; why: string }>();
   const want = (off: number, value: number, why: string): void => {
     const prev = wanted.get(off);
@@ -66,8 +153,9 @@ export function applyRhGridEdits(source: Uint8Array, edited: Pattern[]): RhEditR
         const where = `pattern ${p} voice ${ch + 1} row ${row}`;
         const src = grid.cellSources[p][ch][row];
         if (!src) {
-          // a cell the player ran no note or note-off command on: a note there needs a command the block does not have
-          if ((c.note ?? 0) !== 0) warnings.push(`${where}: a note where the module has no command needs a longer block; not written`);
+          // a cell the player ran no note or note-off command on: a note there splits the command that covers it
+          if ((c.note ?? 0) > 0 && (c.note ?? 0) < 97) adds.push({ p, ch, row, note: c.note ?? 0, instrument: c.instrument ?? 0, where });
+          else if ((c.note ?? 0) !== 0) warnings.push(`${where}: a note-off on a blank row is not written`);
           continue;
         }
         const carrier = grid.blockRows[src.fp][src.cmd];
@@ -103,5 +191,7 @@ export function applyRhGridEdits(source: Uint8Array, edited: Pattern[]): RhEditR
   }
   let patched = 0;
   for (const [off, { value }] of wanted) if (out[off] !== value) { out[off] = value; patched++; }
-  return { data: out, patched, warnings };
+  if (adds.length === 0) return { data: out, patched, warnings };
+  const grown = growBlocks(out, grid, adds, noteByte, warnings);
+  return { data: grown.data, patched: patched + grown.patched, warnings };
 }

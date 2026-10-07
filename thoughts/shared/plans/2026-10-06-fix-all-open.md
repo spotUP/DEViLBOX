@@ -60,7 +60,7 @@ Engine = the registry descriptor that plays the song. Before = the module the en
 
 | format | engine | live route | edit heard before | edit heard after | note on empty row |
 |---|---|---|---|---|---|
-| actionamics | ActionamicsReplayer | actionamics-module | yes | pass | no |
+| actionamics | ActionamicsReplayer | actionamics-module | yes | pass | pass (measured with the corrected row pick) |
 | activisionPro | ActivisionProReplayer | activisionPro-module | yes | pass | no |
 | benDaglish | BenDaglish | none | no | fail | no |
 | daveLowe | EaglePlayer | none | no | pass | no |
@@ -86,7 +86,7 @@ Engine = the registry descriptor that plays the song. Before = the module the en
 | okt | OktalyzerReplayer | grid-cell | no | pass | yes |
 | pumaTracker | PumaTracker | none | no | pass | yes |
 | quadraComposer | QuadraComposerReplayer | grid-cell | no | pass | no |
-| robHubbard | UADEEditable | none | no | pass | no |
+| robHubbard | UADEEditable | none | no | pass | pass (G5 landed) |
 | sidmon1 | SidMon1Replayer | grid-cell | yes | pass | no |
 | sidmon2 | SidMon2 | none | no | fail | no |
 | soundControl | SoundControlReplayer | chip-ram | no | pass | no |
@@ -101,6 +101,7 @@ Engine = the registry descriptor that plays the song. Before = the module the en
 
 TypeScript-scheduler / libopenmpt formats (669, amf, composer667, cheesecutter, dtm, far, fur, gdm, it, mdl, med, mod, mtm, plm, psm, ptm, rtm, s3m, sidFactory2, stm, stp, stx, ult, unic, xm): the grid is what plays, n/a.
 Not measurable in node (named in UNMEASURED in the test, with reason): dmf, soundfx, artOfNoise, steveTurner, goatTracker, anders0land, fmTracker, imagoOrpheus, cdfm67, karlMorton, madTracker2, nru, iffSmus, digitalSymphony, graoumfTracker2, symphoniePro, digiBoosterPro, chuckBiscuits, gameMusicCreator, ams, iceTracker, musicMaker, stoneTracker, kt, xrns.
+G5 open: davidWhittaker (needs C-side exports of track extents, pointer width and position-list entries, then the same split-and-relocate as robHubbardEdits.growBlocks; a wait command precedes the note it times, so the split also restores the wait in force), futurePlayer, hippelCoso, hvl, jochenHippel7V, quadraComposer, soundControl, tfmx, sidmon1, soundmon, activisionPro, benDaglish, digitalSonixChrome, daveLowe, soundPlayer (each: the writer refuses or the cell has no place; not yet looked at).
 Open heard-fail units: benDaglish (G16), digitalSoundStudio, maxTrax, sidmon2, tfmMusicMaker (reasons in gridProvenance LIVE_EDIT_WHY).
 - [x] G18 PRIORITY Rob Hubbard skateordie.rh: patterns look correct but are NOT synced to the music (owner 2026-10-07: a CONSTANT offset, cursor BEHIND the music - not drift, not stuck; output latency measured 28 ms (not the cause); also 231 audio underruns (1.2 s) in 2 min seen live; points at a start-delay or row-origin mismatch: audio output latency not compensated, UADE pre-roll/init ticks, the walk counting from a different first tick, or the grid starting one row/block early) although robHubbardPlayheadFollowsUade passes (cba774ad8, playhead via uadePlayerTickGrid). Find why the live app differs from the test: which engine plays it in the app (UADE vs RH WASM), whether position reports reach useWasmPositionStore, tick rate / grid row mapping, speed; test through the real app path (NativeEngineRouting).
 - [ ] G17 Shared tracks (Hippel, SunTronic, Fred): an edit to a cell whose track several positions share changes every position after export/reload, but the editor shows it only in the edited cell. Recommended: the editor echoes the edit into every cell that plays the same track data (the grid must show what plays). Owner decision pending.
@@ -124,6 +125,10 @@ Open heard-fail units: benDaglish (G16), digitalSoundStudio, maxTrax, sidmon2, t
 - [ ] P14e MaxTrax has no keyboard entry (double click only): decide whether it gets one.
 
 - [ ] UI4 Sample instrument editor: loop points cannot be dragged (owner 2026-10-07). Find the loop handles' pointer handling in the sample editor (waveform canvas), fix, test a drag through the real component changes loopStart/loopEnd and reaches the playing sampler.
+
+- [ ] P14f PRIORITY (owner 2026-10-07, AHX after 133f267ba): (a) after clicking the REC button you must click the pattern editor before keys edit - the format canvas only takes keys when focused; clicking a transport button must not strand input (pt2/ft2: edit keys work regardless of which button was clicked); (b) Tab before clicking the editor moves only the active-channel indicator, not the cursor - the format canvas keeps its own cursor apart from the tracker cursor store. One cursor store (row, channel, column) for every editor mode; the window handler and the canvas read and move the same cursor; key entry in format modes routes through the shared rule (formatEntryPlan.ts) without needing canvas focus.
+
+- [ ] UI5 AHX (amanda.ahx) instrument list shows only names, no type/channel chips like other formats (owner 2026-10-07). Same InstrumentList (TrackerView.tsx:732, variant ft2, showBadges = isFT2 || !compact), so the chips are hidden by something mode- or panel-specific: NOT fullscreen (owner confirmed) - so a HivelySynth badge/channel lookup returning nothing, or the hively editor's layout. Find it, make every editor mode show the same chips, test with a HivelySynth list.
 
 ## Batch D - dub (running)
 - [x] D1 Channel send audible: end-to-end guard channelSendEchoIsAudible.test.ts (8a899d711). -34 dB was return vs BASS-boosted master; echo sits -13.8 dB under the dry channel at Return 0.431, -5.9 dB on Tubby. No engine defect.
