@@ -552,7 +552,7 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
 
       configs.push({
         id: i,
-        name: inst.name?.trim() || `Instrument ${i.toString(16).toUpperCase().padStart(2, '0')}`,
+        name: inst.name?.trim() || '',
         type: 'synth',
         synthType: 'GTUltraSynth',
         volume: 0,

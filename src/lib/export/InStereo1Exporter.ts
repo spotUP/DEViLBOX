@@ -224,7 +224,7 @@ export async function exportInStereo1(song: TrackerSong): Promise<InStereo1Expor
         const sampleIdx = samples.length;
         sampleMap.set(inst.id, sampleIdx);
         samples.push({
-          name: inst.name || `Sample ${inst.id}`,
+          name: inst.name || '',
           pcmData,
         });
 

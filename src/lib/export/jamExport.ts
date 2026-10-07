@@ -103,7 +103,7 @@ export function exportSongToJam(song: TrackerSong): JamExportResult {
       continue;
     }
 
-    instrNames.push((inst.name || `Sample ${i + 1}`).slice(0, 31));
+    instrNames.push((inst.name || '').slice(0, 31));
 
     // Check for JamCracker AM synth
     const jcConfig = (inst as unknown as Record<string, unknown>).jamCracker as

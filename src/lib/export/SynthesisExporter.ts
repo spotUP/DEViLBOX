@@ -131,7 +131,7 @@ export async function exportSynthesis(
       const pcm = extractPCM(inst.sample.audioBuffer);
       const sampleIdx = samplePCMs.length;
       samplePCMs.push(pcm);
-      sampleNames.push((inst.name ?? `Sample ${sampleIdx}`).substring(0, 27));
+      sampleNames.push((inst.name ?? '').substring(0, 27));
       sampleLengths.push(pcm.length);
 
       // Determine loop
