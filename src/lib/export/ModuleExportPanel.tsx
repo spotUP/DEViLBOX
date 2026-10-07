@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify } from '@stores';
-import { exportWithOpenMPT, type OpenMPTExportOptions } from './OpenMPTExporter';
+import { exportModuleFile } from './moduleExportService';
+import type { OpenMPTExportOptions } from './OpenMPTExporter';
 import { exportCinterModFile, downloadBytes } from './Cinter4ModSave';
 import { getOriginalModuleDataForExport, base64ToBuffer } from './exporters';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -36,7 +37,7 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   exportMode,
   onClose,
 }) => {
-  const { patterns, patternOrder } = useTrackerStore();
+  const { patterns } = useTrackerStore();
   const { instruments } = useInstrumentStore();
   const { metadata } = useProjectStore();
   const { bpm, speed } = useTransportStore();
@@ -84,7 +85,7 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
         if (!hasNotes) { notify.error('Cinter export: this song has no pattern notes to write.'); return false; }
         if (crunched) {
           const { exportCinterCrunched } = await import('./Cinter4ModSave');
-          const c = await exportCinterCrunched(patterns, instruments, patternOrder, {
+          const c = await exportCinterCrunched({
             moduleName: metadata.name || 'cinter', bpm, speed, originalModBytes: originalModBytes(),
           });
           downloadBytes(c.songdata, c.filename);
@@ -97,7 +98,7 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
             notify.success(`Crunched "${c.filename}" (${kb} KB)${c.rawSamples.length ? ' + .raw samples' : ''}.`);
           }
         } else {
-          const res = await exportCinterModFile(patterns, instruments, patternOrder, {
+          const res = await exportCinterModFile({
             stripCinter: false, moduleName: metadata.name || 'cinter',
             bpm, speed, channels: Math.min(channelCount, maxChannels),
           });
@@ -126,7 +127,7 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
       initialSpeed: speed,
     };
 
-    const result = await exportWithOpenMPT(patterns, instruments, patternOrder, opts);
+    const result = await exportModuleFile(opts);
 
     const url = URL.createObjectURL(result.data);
     const a = document.createElement('a');

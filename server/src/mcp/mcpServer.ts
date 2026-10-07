@@ -2292,12 +2292,12 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'export_wav',
-    'Render current pattern or full song to WAV audio. Returns base64-encoded WAV data in `wavBase64`. Works for all formats (Tone.js synths, OctaMED, ProTracker MOD, and native WASM engines). For live-capture formats (native engines), this is two-phase: first call returns a captureId; poll with that captureId until status is "done". Pass `format: "mp3"` to receive MP3 data in `mp3Base64` instead.',
+    'Render current pattern or full song to WAV audio. Returns base64-encoded WAV data in `wavBase64`. One render for every song: a real-time capture of the engine output, identical to the Export panel. Two-phase: first call returns a captureId; poll with that captureId until status is "done". Pass `format: "mp3"` to receive MP3 data in `mp3Base64` instead.',
     {
-      scope: z.enum(['pattern', 'song']).optional().describe('Export scope: "pattern" (default) or "song" (all patterns in order)'),
+      scope: z.enum(['pattern', 'song']).optional().describe('Export scope: "song" (default, all patterns in order) or "pattern"'),
       patternIndex: z.number().optional().describe('Pattern index to export (default: current pattern). Only used when scope="pattern".'),
       captureId: z.string().optional().describe('Poll a running live-capture by its ID (returned from a previous export_wav/export_mp3 call). When provided, returns status "capturing" or "done" with the encoded audio.'),
-      maxDurationSec: z.number().optional().describe('Cap live-capture duration in seconds (default 60). Ignored for offline renders.'),
+      maxDurationSec: z.number().optional().describe('Cap the capture duration in seconds (default: the whole song).'),
       format: z.enum(['wav', 'mp3']).optional().describe('Output format: "wav" (default, lossless 16-bit PCM) or "mp3" (lossy, smaller files — good for posting to chat / web).'),
       kbps: z.number().optional().describe('MP3 bitrate in kbps (default 192). Only used when format="mp3". Common values: 128 (small), 192 (good), 320 (archival).'),
     },
@@ -2308,7 +2308,7 @@ export function createMcpServer(): McpServer {
     'export_mp3',
     'Render current pattern or full song to MP3 audio. Returns base64-encoded MP3 data in `mp3Base64`. Sibling of `export_wav` that defaults to MP3 output — smaller files, good for chat / web sharing. Same two-phase live-capture flow (first call returns captureId, poll until status="done"). Default bitrate is 192 kbps.',
     {
-      scope: z.enum(['pattern', 'song']).optional().describe('Export scope: "pattern" (default) or "song" (all patterns in order)'),
+      scope: z.enum(['pattern', 'song']).optional().describe('Export scope: "song" (default, all patterns in order) or "pattern"'),
       patternIndex: z.number().optional().describe('Pattern index to export (default: current pattern). Only used when scope="pattern".'),
       captureId: z.string().optional().describe('Poll a running live-capture by its ID (returned from a previous export_wav/export_mp3 call).'),
       maxDurationSec: z.number().optional().describe('Cap live-capture duration in seconds (default 60).'),
