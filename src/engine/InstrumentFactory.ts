@@ -28,6 +28,7 @@ import { FredSynth } from './fred/FredSynth';
 import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
 import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
 import { SteveTurnerSynth } from './steveturner/SteveTurnerSynth';
+import { StartrekkerAMSynth } from './startrekker-am/StartrekkerAMSynth';
 import { SidMon1Synth } from './sidmon1/SidMon1Synth';
 import { OctaMEDSynth } from './octamed/OctaMEDSynth';
 import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
@@ -815,6 +816,13 @@ export class InstrumentFactory {
         // Set 0-based instrument index for note preview
         stSynth.setInstrumentIndex((config.id ?? 1) - 1);
         instrument = stSynth;
+        break;
+      }
+
+      case 'StartrekkerAMSynth': {
+        const amSynth = new StartrekkerAMSynth();
+        amSynth.setInstrumentNumber(config.id ?? 0);
+        instrument = amSynth;
         break;
       }
 

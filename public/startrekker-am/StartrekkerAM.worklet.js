@@ -79,6 +79,21 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             if (this._wasm && this._wasm._player_set_nt_param) {
                 this._wasm._player_set_nt_param(msg.instr, msg.offset, msg.value);
             }
+            if (this._pvWasm && this._pvWasm._player_set_nt_param) {
+                this._pvWasm._player_set_nt_param(msg.instr, msg.offset, msg.value);
+            }
+            break;
+        case 'previewLoad':
+            // The song's module and AM data, for the keyboard copy of the replayer.
+            this._pvMod = new Uint8Array(msg.mod);
+            this._pvNt = new Uint8Array(msg.nt);
+            break;
+        case 'noteOn':
+            await this._previewNoteOn(msg.instr, msg.period);
+            break;
+        case 'noteOff':
+            this._pvActive = false;
+            if (this._pvWasm) this._pvWasm._player_stop();
             break;
         case 'setPatternCell':
             if (this._wasm && this._wasm._player_set_pattern_cell) {
@@ -92,6 +107,36 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
         default:
             break;
         }
+    }
+
+    /**
+     * Keyboard note: a second copy of the replayer (its own WASM instance, so the song is untouched)
+     * plays the song's module cut down to one row, instrument `instr` at `period` on voice 0. The
+     * replayer's own note-on, AM envelope and Paula mixer make the sound. It starts a row late
+     * (the replayer plays a row every `speed` ticks), so the lead-in is run unheard.
+     */
+    async _previewNoteOn(instr, period) {
+        if (!this._createFn || !this._pvMod || !this._pvNt) return;
+        const mod = this._pvMod.slice();
+        const order0 = mod[0x3B8];
+        const pat = 0x43C + order0 * 1024;
+        mod.fill(0, pat, pat + 1024);
+        mod[pat] = (instr & 0xF0) | ((period >> 8) & 0x0F);
+        mod[pat + 1] = period & 0xFF;
+        mod[pat + 2] = (instr & 0x0F) << 4;
+        mod[0x3B6] = 1;                      // the song is that one pattern
+        if (!this._pvWasm) {
+            this._pvWasm = await this._createFn({ ...this._config });
+            this._pvPtr = this._pvWasm._malloc(this._FRAMES * 2 * 4);
+        }
+        const w = this._pvWasm;
+        w._player_init(sampleRate);
+        const mp = w._malloc(mod.length); w.HEAPU8.set(mod, mp); w._player_load_mod(mp, mod.length); w._free(mp);
+        const np = w._malloc(this._pvNt.length); w.HEAPU8.set(this._pvNt, np); w._player_load_nt(np, this._pvNt.length); w._free(np);
+        // lead-in: the first row plays at the end of the sixth 20 ms tick
+        const lead = Math.ceil((sampleRate / 50) * 6 / this._FRAMES) * this._FRAMES;
+        for (let done = 0; done < lead; done += this._FRAMES) w._player_render(this._pvPtr, this._FRAMES);
+        this._pvActive = true;
     }
 
     async _initWasm(sampleRate, wasmBinary, jsCode) {
@@ -115,6 +160,8 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
             const config = { noInitialRun: true };
             if (wasmBinary) config.wasmBinary = wasmBinary;
 
+            this._createFn = createFn;
+            this._config = config;
             this._wasm = await createFn(config);
             // Use the actual AudioContext sample rate for correct pitch and speed
             this._wasm._player_init(sampleRate || sampleRate === 0 ? sampleRate : WORKLET_SAMPLE_RATE);
@@ -159,12 +206,15 @@ class StartrekkerAMProcessor extends AudioWorkletProcessor {
         const frames = outL ? outL.length : 128;
 
         wasm._player_render(this._outPtr, frames);
+        const pv = this._pvActive && this._pvWasm && this._pvPtr ? this._pvWasm : null;
+        if (pv) pv._player_render(this._pvPtr, frames);
 
         const heap = new Float32Array(wasm.HEAPF32.buffer, this._outPtr, frames * 2);
         if (outL && outR) {
+            const pvh = pv ? new Float32Array(pv.HEAPF32.buffer, this._pvPtr, frames * 2) : null;
             for (let i = 0; i < frames; i++) {
-                outL[i] = heap[i * 2];
-                outR[i] = heap[i * 2 + 1];
+                outL[i] = heap[i * 2] + (pvh ? pvh[i * 2] : 0);
+                outR[i] = heap[i * 2 + 1] + (pvh ? pvh[i * 2 + 1] : 0);
             }
         }
 

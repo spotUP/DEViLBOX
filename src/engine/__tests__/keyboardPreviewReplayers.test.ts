@@ -14,6 +14,8 @@ import { resolve } from 'node:path';
 import { startWorklet, ROOT, type WorkletProc } from './workletHarness';
 import { parseDavidWhittakerFile } from '@/lib/import/formats/DavidWhittakerParser';
 import { dwNoteForKey } from '@/engine/davidwhittaker/dwKeyNote';
+import { parseStartrekkerAMFile } from '@/lib/import/formats/StartrekkerAMParser';
+import { stPeriodForKey } from '@/engine/startrekker-am/stKeyNote';
 import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT } from './keyboardPreviewHarness';
 
 const corpus = (n: string) => {
@@ -30,7 +32,7 @@ const emscriptenTransform = (c: string) => c
   .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 
 interface Cell { note: number; instrument: number; effTyp?: number; eff?: number }
-interface GridSong { instruments: unknown[]; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
+interface GridSong { instruments: Array<{ id: number; synthType?: string }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
 
 /** First note of channel `ch` in song order that is a plain note (no effect), with its instrument. */
 function firstNoteOnChannel(song: GridSong, ch: number): { note: number; ins: number } | null {
@@ -115,5 +117,59 @@ describe.each(['formats/apb.dw', 'david-whittaker/garfield2+.dw'])('David Whitta
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
+  });
+});
+
+describe.each(['startrekker-am/amsyntdemo.mod'])('StarTrekker AM %s: a typed note is the replayer voice, as the song plays it', (name) => {
+  it('the first note of each voice that starts on an AM instrument has the song\'s pitch, level and envelope', async () => {
+    const mod = corpus(name), nt = corpus(`${name}.nt`);
+    const song = parseStartrekkerAMFile(mod, name, nt) as unknown as GridSong;
+    const am = new Set(song.instruments.filter((i) => i.synthType === 'StartrekkerAMSynth').map((i) => i.id));
+    let measured = 0;
+    for (let ch = 0; ch < 4; ch++) {
+      let n: { note: number; ins: number } | null = null, done = false;
+      for (const pi of song.songPositions) {
+        for (const c of song.patterns[pi].channels[ch].rows) if (!done && c.note > 0) { done = true; if (am.has(c.instrument) && (!c.effTyp || c.effTyp === 15)) n = { note: c.note, ins: c.instrument }; }
+      }
+      if (!n) continue;   // the voice starts on a sampled instrument (or one with an effect): nothing AM to compare
+      const a = await startWorklet('startrekker-am', 'StartrekkerAM');
+      await a.send({ type: 'loadMod', data: mod.slice(0) });
+      await a.send({ type: 'loadNt', data: nt.slice(0) });
+      await a.send({ type: 'setMuteMask', mask: 1 << ch });
+      const out = renderTicks(a.proc, 300, ch === 1 || ch === 2 ? 1 : 0);
+      if (!rmsPerTick(out, 300).some((v) => v >= 0.02)) continue;
+      const on = rmsPerTick(out, 300).findIndex((v) => v >= 0.02);
+      const ticks = 8;
+      const sAudio = out.subarray(on * FPT, (on + ticks) * FPT);
+
+      const b = await startWorklet('startrekker-am', 'StartrekkerAM');
+      await b.send({ type: 'previewLoad', mod: mod.slice(0), nt: nt.slice(0) });
+      // The worklet makes the keyboard copy of the replayer on the first key; like the harness's own
+      // init, it must not see Node's process.versions or the Emscripten glue takes the Node path.
+      const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
+      Object.defineProperty(process, 'versions', { value: {}, configurable: true });
+      try { await b.send({ type: 'noteOn', instr: n.ins, period: stPeriodForKey(n.note + 11) }); } finally { Object.defineProperty(process, 'versions', versions); }
+      const pr = renderTicks(b.proc, ticks + 12, 0);
+      const pOn = rmsPerTick(pr, ticks + 12).findIndex((v) => v >= 0.02);
+      expect(pOn, `${name} voice ${ch}: the key sounds`).toBeGreaterThanOrEqual(0);
+      expectSameVoice(`${name} voice ${ch}`, sAudio, pr.subarray(pOn * FPT, (pOn + ticks) * FPT), ticks);
+      measured++;
+    }
+    expect(measured, 'the song has an AM voice to measure').toBeGreaterThan(0);
+  });
+});
+
+describe('StarTrekker AM: a key never starts the song, and key release silences the voice', () => {
+  it('amsyntdemo.mod: silent before a key, sounds on a key, silent after release', async () => {
+    const name = 'startrekker-am/amsyntdemo.mod';
+    const b = await startWorklet('startrekker-am', 'StartrekkerAM');
+    await b.send({ type: 'previewLoad', mod: corpus(name), nt: corpus(`${name}.nt`) });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 20, 0), 20)), 'silent before a key').toBe(0);
+    const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
+    Object.defineProperty(process, 'versions', { value: {}, configurable: true });
+    try { await b.send({ type: 'noteOn', instr: 1, period: stPeriodForKey(25 + 11) }); } finally { Object.defineProperty(process, 'versions', versions); }
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 20, 0), 20)), 'a key sounds').toBeGreaterThan(0.01);
+    await b.send({ type: 'noteOff' });
+    expect(totalRms(rmsPerTick(renderTicks(b.proc, 20, 0), 20)), 'silent after release').toBe(0);
   });
 });
