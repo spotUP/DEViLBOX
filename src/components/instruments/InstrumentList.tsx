@@ -760,7 +760,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   const open = rolePickerFor === instrument.id;
                   const toggle = (e: React.MouseEvent) => { e.stopPropagation(); setRolePickerFor(open ? null : instrument.id); };
                   return (
-                    <div className="instrument-badge instrument-badge--part relative shrink-0">
+                    <div className="instrument-badge instrument-badge--role relative shrink-0">
                       <span
                         className={`text-[9px] px-1 py-0.5 rounded font-mono font-bold border shrink-0 cursor-pointer ${
                           isSelected
