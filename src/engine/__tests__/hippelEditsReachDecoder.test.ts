@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { HippelCellSpans } from '../hippel/hippelCellSpans';
+import { parseHippel7VPlayed } from './helpers/tfmxWalkHost';
 
 const ROOT = resolve(__dirname, '../../..');
 const reloads: ArrayBuffer[] = [];
@@ -23,7 +24,7 @@ vi.mock('@/engine/tfmx/TFMXEngine', () => ({
 }));
 vi.mock('@engine/TrackerReplayer', async (orig) => ({
   ...(await orig<object>()),
-  getTrackerReplayer: () => ({ getSong: () => loaded, syncCellToWasmSequencer: () => {}, setChannelMuteMask: () => {} }),
+  getTrackerReplayer: () => ({ getSong: () => loaded, syncCellToWasmSequencer: () => {}, setChannelMuteMask: () => {}, isPlaying: () => false }),
 }));
 
 function file(rel: string): ArrayBuffer {
@@ -36,8 +37,7 @@ async function parse(kind: 'coso' | '7v'): Promise<TrackerSong> {
     const { parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
     return parseHippelCoSoFile(file('public/data/songs/formats/prehistoric_tale.hipc'), 'prehistoric_tale.hipc');
   }
-  const { parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
-  return parseJochenHippel7VFile(file('public/data/songs/formats/ghostbattle_gameover.hip7'), 'ghostbattle_gameover.hip7');
+  return parseHippel7VPlayed(file('public/data/songs/formats/ghostbattle_gameover.hip7'), 'ghostbattle_gameover.hip7');
 }
 
 /** A note cell on a track step whose note transpose is not zero. */
@@ -48,7 +48,8 @@ function transposedNote(song: TrackerSong, spansOf: (b: Uint8Array) => HippelCel
     for (let ch = 0; ch < song.patterns[p].channels.length; ch++) {
       if (transposeAt(buf, p, ch) === 0) continue;
       const rows = song.patterns[p].channels[ch].rows;
-      const r = rows.findIndex((c, i) => c.note > 0 && c.note < 90 && spans[p]?.[ch]?.[i]);
+      // A note no sound sequence moves (hippelSeq absent), so shown = pattern note + step transpose
+      const r = rows.findIndex((c, i) => c.note > 0 && c.note < 90 && !c.hippelSeq && spans[p]?.[ch]?.[i]);
       if (r >= 0) return { p, ch, r };
     }
   }
@@ -104,13 +105,14 @@ describe('a Hippel song', { timeout: 60000 }, () => {
 
   it('reaches the decoder from a grid edit on a 7V song, transpose undone', async () => {
     const song = await parse('7v');
-    const { mapJochenHippel7VCells, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
+    const { mapJochenHippel7VCells } = await import('@lib/import/formats/JochenHippel7VParser');
     // A step's note transpose, read off its first note: shown = raw + transpose + 1.
     const spans7V = mapJochenHippel7VCells(new Uint8Array(song.hippelFileData!));
     const { p, ch, r } = transposedNote(song, mapJochenHippel7VCells, (b, pp, cc) => {
       const row = (spans7V[pp]?.[cc] ?? []).findIndex((s) => s && (b[s.offset] & 0x7F) > 1);
       if (row < 0) return 0;
-      return song.patterns[pp].channels[cc].rows[row].note - 1 - (b[spans7V[pp][cc][row]!.offset] & 0x7F);
+      const cell = song.patterns[pp].channels[cc].rows[row];
+      return cell.hippelSeq ? 0 : cell.note - 1 - (b[spans7V[pp][cc][row]!.offset] & 0x7F);
     });
 
     loaded = song;
@@ -127,7 +129,7 @@ describe('a Hippel song', { timeout: 60000 }, () => {
     vi.useRealTimers();
     await vi.waitFor(() => expect(reloads.length).toBe(1));
 
-    const heard = parseJochenHippel7VFile(reloads[0], 'ghostbattle_gameover.hip7');
+    const heard = await parseHippel7VPlayed(reloads[0], 'ghostbattle_gameover.hip7');
     expect(heard.patterns[p].channels[ch].rows[r].note).toBe(target);
   });
 });

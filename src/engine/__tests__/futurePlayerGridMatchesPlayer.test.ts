@@ -25,7 +25,8 @@ import { parseFuturePlayerFile } from '@/lib/import/formats/FuturePlayerParser';
 import {
   fpCodeSection, fpSongs, walkFuturePlayer, fpReleaseRate, FP_WALK,
 } from '@/lib/import/formats/fpWalk';
-import { fpLayout, fpTickPosition, fpPeriodToNote, fpOctaveBias, FP_ROWS_PER_PATTERN } from '@/lib/import/formats/fpGrid';
+import { fpLayout, fpTickPosition, fpPeriodToNote, fpPeriodPitch, FP_ROWS_PER_PATTERN } from '@/lib/import/formats/fpGrid';
+import { isPitchedNote, noteValueToPitch } from '@/lib/tracker/noteValue';
 import { FP_FX } from '@/lib/import/formats/fpEffectGlyphs';
 import { xmEffectToString } from '@/lib/xmConversions';
 import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
@@ -93,14 +94,13 @@ describe('Future Player: the grid is the player\'s walk', () => {
       const cells: WalkCell[][] = Array.from({ length: 4 }, () => Array.from({ length: rows }, () => ({ note: 0, instrument: 0, fx: [] as Array<[number, number]> })));
       const sounding = [false, false, false, false];
       const arp = new Map<number, number>();
-      const bias = fpOctaveBias(walk);
       for (const e of walk.events) {
         const r = (e.tick - 1) / walk.speed;
         expect(Number.isInteger(r), `event at tick ${e.tick} is on a row`).toBe(true);
         const c = cells[e.voice][r];
         switch (e.kind) {
-          case FP_WALK.note: c.note = fpPeriodToNote(e.period, bias); c.instrument = ptrToId.get(e.b) ?? 0; sounding[e.voice] = true; break;
-          case FP_WALK.legato: c.note = fpPeriodToNote(e.period, bias); c.fx!.push([FP_FX.legato, 0]); sounding[e.voice] = true; break;
+          case FP_WALK.note: c.note = fpPeriodToNote(e.period); c.instrument = ptrToId.get(e.b) ?? 0; sounding[e.voice] = true; break;
+          case FP_WALK.legato: c.note = fpPeriodToNote(e.period); c.fx!.push([FP_FX.legato, 0]); sounding[e.voice] = true; break;
           case FP_WALK.rest: if (sounding[e.voice] && fpReleaseRate(code, e.b) > 0) c.note = 97; sounding[e.voice] = false; break;
           case FP_WALK.portamento: c.fx!.push([FP_FX.portamento, Math.min(e.a, 255)]); break;
           case FP_WALK.arpTable: if (!arp.has(e.a)) arp.set(e.a, arp.size + 1); c.fx!.push([FP_FX.arpTable, arp.get(e.a)!]); break;
@@ -121,8 +121,16 @@ describe('Future Player: the grid is the player\'s walk', () => {
       }
       // the notes named by the player's period: every note cell is the name of a period of the table
       let named = 0;
-      for (const p of song.patterns) for (const ch of p.channels) for (const r of ch.rows) if (r.note > 0 && r.note < 97) named++;
+      for (const p of song.patterns) for (const ch of p.channels) for (const r of ch.rows) if (isPitchedNote(r.note)) named++;
       expect(named).toBe(walk.events.filter((e) => e.kind === FP_WALK.note || e.kind === FP_WALK.legato).length);
+      // at the pitch the player plays it, with no octave shift: the lowest note shown is the lowest pitch played
+      const played = walk.events.filter((e) => e.kind === FP_WALK.note || e.kind === FP_WALK.legato).map((e) => fpPeriodPitch(e.period)!);
+      let lowestShown = Infinity;
+      for (const p of song.patterns) for (const ch of p.channels) for (const r of ch.rows) {
+        const pitch = noteValueToPitch(r.note);
+        if (pitch !== null) lowestShown = Math.min(lowestShown, pitch);
+      }
+      expect(lowestShown, 'the lowest note shown is the lowest pitch played').toBe(Math.min(...played));
     });
 
     it('every instrument pointer subsong 0 sets has its slot, in order, and none has an invented name', () => {

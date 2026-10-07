@@ -16,6 +16,7 @@
 import type { Pattern } from '@/types';
 import { buildFuturePlayerGrid } from './FuturePlayerParser';
 import { fpTableIndexOfPitch } from './fpGrid';
+import { noteValueToPitch } from '@/lib/tracker/noteValue';
 
 export interface FpEditResult { data: Uint8Array; patched: number; warnings: string[] }
 
@@ -58,9 +59,10 @@ export function applyFpGridEdits(source: Uint8Array, edited: Pattern[], instrume
         }
         if (dNote) {
           const n = c.note ?? 0;
-          if (n < 1 || n > 96) warnings.push(`${where}: ${n === 0 ? 'a removed note needs a shorter block' : 'a note-off is a rest, which has no note byte to patch'}; not written`);
+          const pitch = noteValueToPitch(n);
+          if (pitch === null) warnings.push(`${where}: ${n === 0 ? 'a removed note needs a shorter block' : 'a note-off is a rest, which has no note byte to patch'}; not written`);
           else {
-            const idx = fpTableIndexOfPitch(n - grid.bias);
+            const idx = fpTableIndexOfPitch(pitch);
             if (idx < 0) warnings.push(`${where}: no entry of the player's period table plays note ${n}; not written`);
             else {
               const byte = (idx - src.delta + 256) & 0x7f;

@@ -170,8 +170,12 @@ export interface InstrumentMetadata {
   };
   /** FuturePlayer instrument pointer (from .fp import) */
   fpInstrPtr?: number;
-  /** Future Player: octaves (a multiple of 12) the song's grid shows its notes above the pitch they play (the keyboard preview plays the pitch the key's grid note shows) */
-  fpOctaveBias?: number;
+  /**
+   * Jochen Hippel TFMX: the sound-sequence transpose the decoder applies when this instrument starts a note
+   * (the most frequent over the song's notes; negative = the sequence fixes the pitch). The keyboard voice
+   * subtracts it so a typed key plays the pitch the grid names (G15b).
+   */
+  hippelKeySeq?: number;
 }
 
 export interface SampleConfig {

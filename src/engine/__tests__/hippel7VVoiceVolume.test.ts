@@ -18,6 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { parseHippel7VPlayed } from './helpers/tfmxWalkHost';
 
 const ROOT = resolve(__dirname, '../../..');
 const QUIET = 'public/data/songs/hippel-7v/lethalxcess-intro.hip7';
@@ -42,11 +43,11 @@ function trackTable(b: Uint8Array) {
 
 describe('a Hippel 7V grid', { timeout: 60000 }, () => {
   it('shows a voice turned down for a step in row 0 of its volume column', async () => {
-    const { parseJochenHippel7VFile, tfmx7VVoiceVolumeColumn } = await import('@lib/import/formats/JochenHippel7VParser');
+    const { tfmx7VVoiceVolumeColumn } = await import('@lib/import/formats/JochenHippel7VParser');
     for (const [rel, expectQuiet] of [[QUIET, true], [GOOD, false]] as const) {
       const ab = file(rel);
       const b = new Uint8Array(ab);
-      const song = parseJochenHippel7VFile(ab, rel.split('/').pop()!);
+      const song = await parseHippel7VPlayed(ab, rel.split('/').pop()!);
       const tt = trackTable(b);
       let shown = 0, quiet = 0, commands = 0;
       for (let p = 0; p < song.patterns.length; p++) {
@@ -91,10 +92,9 @@ describe('a Hippel 7V grid', { timeout: 60000 }, () => {
   });
 
   it('writes a volume edit into the step command and nothing else', async () => {
-    const { parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
     const { rebuildHippelModule } = await import('../hippel/rebuildHippelModule');
     const ab = file(QUIET);
-    const song = parseJochenHippel7VFile(ab, 'lethalxcess-intro.hip7');
+    const song = await parseHippel7VPlayed(ab, 'lethalxcess-intro.hip7');
     const original = new Uint8Array(ab);
     // A step with a voice at 6 % (0xFF) that has notes in it.
     const tt = trackTable(original);
@@ -116,10 +116,10 @@ describe('a Hippel 7V grid', { timeout: 60000 }, () => {
     for (let i = 0; i < original.length; i++) if (out.bytes[i] !== original[i]) changed.push(i);
     expect(changed).toEqual([cmdOff]);
     expect(out.bytes[cmdOff]).toBe(0xf0);
-    const again = parseJochenHippel7VFile(out.bytes.buffer as ArrayBuffer, 'x.hip7');
+    const again = await parseHippel7VPlayed(out.bytes.buffer as ArrayBuffer, 'x.hip7');
     expect(again.patterns[p].channels[v].rows[0].volume).toBe(0x50);
     // A volume on any other row has no bytes behind it and is refused.
-    const fresh = parseJochenHippel7VFile(ab, 'lethalxcess-intro.hip7');
+    const fresh = await parseHippel7VPlayed(ab, 'lethalxcess-intro.hip7');
     fresh.patterns[p].channels[v].rows[5].volume = 0x30;
     const refused = rebuildHippelModule(ab, fresh.patterns, fresh.instruments.length)!;
     expect(refused.written).toBe(0);
@@ -127,11 +127,10 @@ describe('a Hippel 7V grid', { timeout: 60000 }, () => {
   });
 
   it('numbers instruments from 1, the volume sequence plus one, as CoSo does', async () => {
-    const { parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
     const { rebuildHippelModule } = await import('../hippel/rebuildHippelModule');
     const ab = file(GOOD);
     const b = new Uint8Array(ab);
-    const song = parseJochenHippel7VFile(ab, 'ghostbattle_gameover.hip7');
+    const song = await parseHippel7VPlayed(ab, 'ghostbattle_gameover.hip7');
     const tt = trackTable(b);
     let checked = 0;
     for (let p = 0; p < song.patterns.length && checked < 200; p++) {
@@ -162,6 +161,6 @@ describe('a Hippel 7V grid', { timeout: 60000 }, () => {
     expect(out.refused).toEqual([]);
     const off = tt.patterns + b[stepOff + v * 4] * 64 + r * 2 + 1;
     expect(out.bytes[off] & 0x1f).toBe(((target - 1) - st) & 0x1f);
-    expect(parseJochenHippel7VFile(out.bytes.buffer as ArrayBuffer, 'x.hip7').patterns[p].channels[v].rows[r].instrument).toBe(target);
+    expect((await parseHippel7VPlayed(out.bytes.buffer as ArrayBuffer, 'x.hip7')).patterns[p].channels[v].rows[r].instrument).toBe(target);
   });
 });

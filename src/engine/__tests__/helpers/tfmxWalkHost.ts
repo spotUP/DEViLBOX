@@ -5,7 +5,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { HippelWalkRecord } from '@/lib/import/formats/HippelTfmxWalk';
+import type { HippelPlayed, HippelWalkRecord } from '@/lib/import/formats/HippelTfmxWalk';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 /** The Hippel Amiga TFMX corpus: file under public/data/songs, and the voices the decoder plays it with. */
 export const HIPPEL_TFMX_CORPUS: Array<[string, number]> = [
@@ -108,4 +109,26 @@ export async function loadTfmxWalkModule(): Promise<TfmxWalkHost> {
       return { records: session.records(), voices: session.voices };
     },
   };
+}
+
+let sharedHost: Promise<TfmxWalkHost> | null = null;
+
+/**
+ * The sound-sequence transposes the decoder applies at each note (hippelPlayedPitch), from the TFMX wasm in node:
+ * what the app hands the Hippel parsers at import. A Hippel grid exists only with them (G15c).
+ */
+export async function hippelPlayedForTest(bytes: Uint8Array | ArrayBuffer): Promise<HippelPlayed> {
+  sharedHost ??= loadTfmxWalkModule();
+  const host = await sharedHost;
+  const { hippelPlayedPitch } = await import('@/lib/import/formats/hippelPlayedPitch');
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const played = await hippelPlayedPitch(b, async (x, s, t) => host.walk(x, s, t).records);
+  if (!played) throw new Error('the TFMX decoder could not walk the song');
+  return played;
+}
+
+/** A Hippel 7V file parsed as the app opens it (with the decoder's played pitches). */
+export async function parseHippel7VPlayed(buffer: ArrayBuffer, name: string): Promise<TrackerSong> {
+  const { parseJochenHippel7VFile } = await import('@/lib/import/formats/JochenHippel7VParser');
+  return parseJochenHippel7VFile(buffer, name, await hippelPlayedForTest(buffer));
 }

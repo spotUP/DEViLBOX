@@ -1882,7 +1882,6 @@ export class ToneEngine {
           const fpPtr = config.metadata?.fpInstrPtr;
           if (typeof fpPtr === 'number' && fpPtr > 0) {
             (cached as any).set('instrumentPtr', fpPtr);
-            (cached as any).set('octaveBias', config.metadata?.fpOctaveBias ?? 0);
           }
         } else if (cached && config.synthType === 'JamCrackerSynth') {
           const jcIdx = typeof config.id === 'number' ? config.id - 1 : 0;
@@ -1929,7 +1928,6 @@ export class ToneEngine {
             const fpPtr = config.metadata?.fpInstrPtr;
             if (typeof fpPtr === 'number' && fpPtr > 0) {
               (existingSynth as any).set('instrumentPtr', fpPtr);
-              (existingSynth as any).set('octaveBias', config.metadata?.fpOctaveBias ?? 0);
             }
           } else if (config.synthType === 'JamCrackerSynth') {
             const jcIdx = typeof config.id === 'number' ? config.id - 1 : 0;

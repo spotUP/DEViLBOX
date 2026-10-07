@@ -29,6 +29,7 @@
  * the scope view.
  */
 import { periodToPitch } from '@/lib/amiga/periodNotes';
+import { noteValueToPitch, pitchToNoteValue, PITCH_LOWEST } from '@/lib/tracker/noteValue';
 
 export const HIPPEL_PATTERN_SIZE = 0x40;
 export const HIPPEL_ROWS = 0x20;
@@ -67,22 +68,14 @@ export function hippelNoteIndex(note: number, transpose: number): number {
   return t & 0x7f;
 }
 
-/**
- * The octave a song's grid is shifted up when the player plays below C-0 (the
- * period table's own lowest octave, indices 60-71, sounds one octave under the
- * notation's note 1). 0 otherwise, so a song that stays in range keeps
- * ProTracker naming (428 = note 25 = C-2).
- */
-export const HIPPEL_LOW_BIAS = 12;
-
-/** The pitch of a period-table index in ProTracker naming; at or below 0 under C-0. */
+/** The pitch of a period-table index in ProTracker naming (1 = C-0); the table's indices 60-71 play the octave below it (-11..0). */
 export function hippelIndexToPitch(index: number): number {
   return periodToPitch(Math.max(PERIOD_MIN, HIPPEL_PERIODS[index & 0x7f]));
 }
 
-/** The grid note of a period-table index, `bias` notes up (HIPPEL_LOW_BIAS for a song that plays below C-0). */
-export function hippelIndexToXm(index: number, bias = 0): number {
-  return Math.max(1, hippelIndexToPitch(index) + bias);
+/** The grid note of a period-table index: its pitch as the grid stores it, the octave below C-0 included (noteValue.ts). */
+export function hippelIndexToXm(index: number): number {
+  return pitchToNoteValue(Math.max(PITCH_LOWEST, hippelIndexToPitch(index)));
 }
 
 /**
@@ -96,23 +89,25 @@ export function hippelPlayedIndex(noteByte: number, transpose: number, seq = 0):
 }
 
 /** The grid note a pattern note plays under a track transpose and sequence transpose; 0 when the row has none (note byte & $7F of 0 or 1). */
-export function hippelCellNote(noteByte: number, transpose: number, seq = 0, bias = 0): number {
+export function hippelCellNote(noteByte: number, transpose: number, seq = 0): number {
   const n = noteByte & 0x7f;
-  return n < 2 ? 0 : hippelIndexToXm(hippelPlayedIndex(n, transpose, seq), bias);
+  return n < 2 ? 0 : hippelIndexToXm(hippelPlayedIndex(n, transpose, seq));
 }
 
 /**
  * The pattern note (2..$7F) under which the player plays grid note `note`, the
- * one nearest the plain `note - 1 - bias - transpose - seq`; null when none does
+ * one nearest the plain `pitch - 1 - transpose - seq`; null when none does
  * (a fixed-pitch sound sequence ignores the pattern note, or the note is
  * outside what the table reaches).
  */
-export function hippelNoteByteFor(note: number, transpose: number, seq = 0, bias = 0): number | null {
+export function hippelNoteByteFor(note: number, transpose: number, seq = 0): number | null {
   if (seq < 0) return null;
-  const guess = Math.min(0x7f, Math.max(2, note - 1 - bias - transpose - seq));
+  const pitch = noteValueToPitch(note);
+  if (pitch === null) return null;
+  const guess = Math.min(0x7f, Math.max(2, pitch - 1 - transpose - seq));
   for (let d = 0; d <= 0x7f; d++) {
     for (const n of d === 0 ? [guess] : [guess + d, guess - d]) {
-      if (n >= 2 && n <= 0x7f && hippelCellNote(n, transpose, seq, bias) === note) return n;
+      if (n >= 2 && n <= 0x7f && hippelCellNote(n, transpose, seq) === note) return n;
     }
   }
   return null;
@@ -359,10 +354,30 @@ export interface HippelGrid {
   steps: HippelWalkStep[];
   /** Cells by [step in `steps`][voice][row]. */
   cells: HippelWalkCell[][][];
-  /** Octave the grid's notes are shifted up (HIPPEL_LOW_BIAS when the song plays below C-0), else 0. */
-  bias: number;
   /** Why no grid can be shown, or null. */
   unmatched: string | null;
+}
+
+/**
+ * Per instrument, the sound-sequence transpose the decoder applied when the
+ * instrument started its notes (the most frequent one when they differ): what
+ * the keyboard voice subtracts so a typed key plays the pitch the grid names.
+ */
+export function hippelKeySeqs(grid: Pick<HippelGrid, 'cells'>): Map<number, number> {
+  const counts = new Map<number, Map<number, number>>();
+  for (const step of grid.cells) for (const voice of step) for (const c of voice) {
+    if (c.instrument <= 0 || c.note === 0) continue;
+    const byInst = counts.get(c.instrument) ?? new Map<number, number>();
+    byInst.set(c.seq, (byInst.get(c.seq) ?? 0) + 1);
+    counts.set(c.instrument, byInst);
+  }
+  const out = new Map<number, number>();
+  for (const [inst, bySeq] of counts) {
+    let best = 0, bestCount = -1;
+    for (const [seq, n] of bySeq) if (n > bestCount) { best = seq; bestCount = n; }
+    out.set(inst, best);
+  }
+  return out;
 }
 
 /** Ticks the grid walk runs: enough for any pass of 256 steps at speed 15. */
@@ -375,10 +390,10 @@ export function passTicks(sub: HippelSubsong): number {
  * loading together, until the first step is loaded again (the loop). The
  * rows of a step are the ticks the speed counter reloaded in it.
  */
-export function hippelGrid(m: HippelTfmx, index: number, played?: HippelPlayed, biasOverride?: number): HippelGrid {
+export function hippelGrid(m: HippelTfmx, index: number, played?: HippelPlayed): HippelGrid {
   const sub = hippelSubsong(m, index);
   const log = walkHippelTfmx(m, index, passTicks(sub));
-  const empty = (unmatched: string): HippelGrid => ({ steps: [], cells: [], bias: 0, unmatched });
+  const empty = (unmatched: string): HippelGrid => ({ steps: [], cells: [], unmatched });
   const loads = log.filter((r) => r[1] === 0);
   const perVoice: HippelWalkRecord[][] = Array.from({ length: m.voices }, (_, v) => loads.filter((r) => r[2] === v));
   // A pass: voice 0's loads from the first step to the one before it loads the first step again.
@@ -417,22 +432,16 @@ export function hippelGrid(m: HippelTfmx, index: number, played?: HippelPlayed, 
     });
     readIndex += reads.length;
   }
-  // The notes each cell plays, then the song's octave bias: the one shift that keeps every note at or above note 1.
+  // The notes each cell plays: the pitch the decoder looks up, the octave below C-0 included.
   const cells: HippelWalkCell[][][] = steps.map((st) => st.voices.map((sv, v) => Array.from({ length: st.rows }, (_, r) => {
     const offset = m.patternsOff + sv.pattern * HIPPEL_PATTERN_SIZE + r * 2;
     const noteByte = m.buf[offset];
     const seq = played?.get(hippelPlayedKey(st.step, v, r)) ?? 0;
     return { note: 0, instrument: 0, offset, noteByte, seq };
   })));
-  let lowest = 1;
   steps.forEach((st, i) => st.voices.forEach((sv, v) => cells[i][v].forEach((c) => {
-    if ((c.noteByte & 0x7f) >= 2) lowest = Math.min(lowest, hippelIndexToPitch(hippelPlayedIndex(c.noteByte, sv.transpose, c.seq)));
-  })));
-  // Without the decoder's transposes a cell's pitch is a guess (a sound sequence fixes most), so no shift is judged from it.
-  const bias = biasOverride ?? (played && lowest < 1 ? HIPPEL_LOW_BIAS : 0);
-  steps.forEach((st, i) => st.voices.forEach((sv, v) => cells[i][v].forEach((c) => {
-    c.note = hippelCellNote(c.noteByte, sv.transpose, c.seq, bias);
-    if (c.note > 0 && (c.noteByte & 0x80) === 0) {
+    c.note = hippelCellNote(c.noteByte, sv.transpose, c.seq);
+    if (c.note !== 0 && (c.noteByte & 0x80) === 0) {
       const seq = ((m.buf[c.offset + 1] & 0x1f) + sv.soundTranspose) & 0xff;
       c.instrument = seq < m.nVolume ? seq + 1 : 0;
     }
@@ -446,5 +455,5 @@ export function hippelGrid(m: HippelTfmx, index: number, played?: HippelPlayed, 
       }
     }
   }
-  return { steps, cells, bias, unmatched: null };
+  return { steps, cells, unmatched: null };
 }

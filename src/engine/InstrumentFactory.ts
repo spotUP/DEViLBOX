@@ -701,7 +701,6 @@ export class InstrumentFactory {
         const fpPtr = config.metadata?.fpInstrPtr;
         if (typeof fpPtr === 'number' && fpPtr > 0) {
           fpSynth.set('instrumentPtr', fpPtr);
-          fpSynth.set('octaveBias', config.metadata?.fpOctaveBias ?? 0);
         }
         instrument = fpSynth;
         break;
@@ -766,6 +765,8 @@ export class InstrumentFactory {
         // A TFMX Professional instrument is a macro of the module: its keys go to the module's own replayer
         const macroIdx = (config.metadata as { tfmxMacroIndex?: number } | undefined)?.tfmxMacroIndex;
         if (typeof macroIdx === 'number') tfmxSynth.setMacroIndex(macroIdx);
+        const keySeq = config.metadata?.hippelKeySeq;
+        if (typeof keySeq === 'number') tfmxSynth.setKeySeq(keySeq);
         if (config.tfmx) {
           tfmxSynth.setInstrument(config.tfmx).catch(err =>
             console.error('[InstrumentFactory] TFMX load failed:', err)
