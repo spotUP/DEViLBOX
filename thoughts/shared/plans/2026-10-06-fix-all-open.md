@@ -101,7 +101,7 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 - [x] K1 FIXED d52222288 (SidMonSynth songSlot -> Sd2Engine.noteOn; keyboardSidMon2Synth.test). SidMon 2 keys reach the generic Sampler; wire SidMonSynth (NATIVE_AUDITION_SYNTHS + isWASMSynth), keep the sample editor.
 - [ ] K2 NOT STARTED (needs owner go-ahead per format: each is a replayer preview voice in C + wasm rebuild + oracle test, Hippel CoSo took ~570 lines; InStereo1/2, DeltaMusic1/2, DigMug, SonicArranger have other agents' uncommitted wasm/worklet edits in the same files). Silent synth stubs: DigMug, DavidWhittaker, SonicArranger, InStereo1/2, DeltaMusic1/2, StartrekkerAM synth classes; TFMX Pro instruments.
   - [x] K2-DW DavidWhittaker: key = dw_preview_note on a second copy of the module in the worklet (replayer's own track reader; envelope, arpeggio, channel transpose paired by dw_preview_scan). apb.dw voices 0/1 0.00 cents, 0.00 dB; garfield2+ voices 1/3 3.6/0.0 cents, 0.0 dB (keyboardPreviewReplayers.test.ts, revert-checked key map and transpose). Limitation: a sample shared by voices with different channel transposes plays the first voice's.
-  - [ ] K2-STAR StartrekkerAM
+  - [x] K2-STAR StartrekkerAM: new StartrekkerAMSynth (was an unknown type falling to a Tone synth). A key = second copy of the replayer in the worklet playing the song's MOD cut to one row (instrument at the key's period on voice 0), lead-in run unheard. amsyntdemo.mod voices 0/1/3: 0.00 cents, 0.00 dB, 0.00 dB per tick. Corpus caveat: silent sleep.mod and shortsong1.mod voices start on sampled instruments, so only amsyntdemo gives AM first notes. Keys use the song's NT as loaded; edits via setNtParam are forwarded to the preview copy.
   - [ ] K2-DM DigMug
   - [ ] K2-SA SonicArranger
   - [ ] K2-DM1 DeltaMusic1 / DeltaMusic2 (K2-DM2)
@@ -119,6 +119,7 @@ Mechanism (no parallel system): one hold move `channelShape` {effect 1-6, amount
 - [x] P6 (f1dffabb6) Undo/redo and macro paste reach no engine.
 - [x] P7 David Whittaker grid showed one voice (apb.dw: owner heard and saw one channel). Cause: a channel whose position list is shorter than the longest was left empty after its list ended; the replayer loops it (apb voice 0 is one 8-note block under voice 1's 7 positions; garfield2+ voice 2 had 48 of 68 positions). buildDWVariablePatterns wraps a shorter list. Test davidWhittakerGridVoices.test.ts (revert-checked: 1 of 8 and 48 of 68 positions). apb.dw voices 2 and 3 are silent in the replayer's subsong 0 and UADE plays 2 events each there; apb subsong 1 (310/310/87/87 Paula writes) is a 4-voice tune the grid does not show (parser reads only the first song).
 
+- [ ] P9 David Whittaker: parser reads only subsong 0; apb.dw subsong 1 is the 4-voice tune (UADE 310/310/87/87 Paula writes). Expose subsongs like other multi-song formats; open on the first non-silent one.
 - [ ] P8 Infogrames native parser returns 0 notes for bob4e.dum (so it opens the scope view, black until play); UADE formatName 'Unknown' for it. Make the native parser read the song (oracle: UADE Paula log).
 
 ## Batch T - tests

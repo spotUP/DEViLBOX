@@ -161,6 +161,20 @@ export class StartrekkerAMEngine extends WASMSingletonBase {
     this.workletNode?.port.postMessage({ type: 'setNtParam', instr, offset, value: value & 0xFFFF });
   }
 
+  /** Hand the worklet the song's module and AM data for its keyboard copy of the replayer. */
+  previewLoad(mod: ArrayBuffer, nt: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'previewLoad', mod, nt });
+  }
+
+  /** One key: MOD instrument `instr` (1-31) at Amiga period `period`, played by the replayer itself. */
+  noteOn(instr: number, period: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', instr, period });
+  }
+
+  noteOff(): void {
+    this.workletNode?.port.postMessage({ type: 'noteOff' });
+  }
+
   /** Get current voice state snapshot */
   getVoiceState(): Array<{ instr: number; pos: number }> {
     return this._voiceState;
