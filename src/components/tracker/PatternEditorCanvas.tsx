@@ -749,7 +749,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const numRows = formatChannels[chIdx]?.patternLength ?? 0;
       const containerHeight = container.clientHeight;
       const ROW_H = rowHeightRef.current;
-      const currentDisplayRow = formatIsPlayingRef.current ? formatCurrentRowRef.current : formatCursor.rowIndex;
+      const currentDisplayRow = resolveScrollRow(formatIsPlayingRef.current, useEditorStore.getState().followPlayback, formatCurrentRowRef.current, formatCursor.rowIndex);
       const centerLineTop = Math.floor(containerHeight / 2) - ROW_H / 2;
       const rowOffset = Math.floor((relY - centerLineTop) / ROW_H);
       const rowIdx = Math.max(0, Math.min(numRows - 1, currentDisplayRow + rowOffset));
@@ -968,7 +968,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
       const ROW_H = rowHeightRef.current;
       const centerLineTop = Math.floor(containerRef.current.clientHeight / 2) - ROW_H / 2;
-      const currentDisplayRow = formatIsPlayingRef.current ? formatCurrentRowRef.current : formatCursor.rowIndex;
+      const currentDisplayRow = resolveScrollRow(formatIsPlayingRef.current, useEditorStore.getState().followPlayback, formatCurrentRowRef.current, formatCursor.rowIndex);
       const rowOffset = Math.floor((relY - centerLineTop) / ROW_H);
       const rowIndex = Math.max(0, currentDisplayRow + rowOffset);
       const channelIndex = chIdx >= 0 ? chIdx : 0;
@@ -2181,7 +2181,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // to prevent it from scrolling when FormatPlaybackState is globally active.
         const fpsActive = fps.isPlaying && formatIsPlayingRef.current;
         isPlaying = fpsActive;
-        playRow = fpsActive ? fps.row : formatCurrentRowRef.current;
+        playRow = resolveScrollRow(fpsActive, useEditorStore.getState().followPlayback, fpsActive ? fps.row : formatCurrentRowRef.current, formatCursorRef.current.rowIndex);
         if (fpsActive && fps.rowDuration > 0) {
           const ts = useTransportStore.getState();
           if (ts.smoothScrolling) {
@@ -2308,7 +2308,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // ── Read cursor/selection ──────────────────────────────────────
       const cursor = isFormatModeRef.current
-        ? { rowIndex: formatCurrentRowRef.current, channelIndex: formatCursorRef.current.channelIndex, columnType: '0', digitIndex: 0, noteColumnIndex: 0 }
+        ? { rowIndex: formatCursorRef.current.rowIndex, channelIndex: formatCursorRef.current.channelIndex, columnType: String(formatCursorRef.current.columnIndex), digitIndex: 0, noteColumnIndex: 0 }
         : { rowIndex: cs.cursor.rowIndex, channelIndex: cs.cursor.channelIndex,
             columnType: cs.cursor.columnType, digitIndex: cs.cursor.digitIndex,
             noteColumnIndex: cs.cursor.noteColumnIndex ?? 0 };
@@ -2485,10 +2485,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const fps = getFormatPlaybackState();
           const fpsSmooth = fps.isPlaying && formatIsPlayingRef.current;
           const newPlaying = formatIsPlayingRef.current;
-          let newRow = fpsSmooth ? fps.row : formatCurrentRowRef.current;
+          // Which row the view shows is the classic editor's rule (resolveScrollRow): the play head only while playing AND
+          // following, otherwise the edit cursor - so stopped, or with follow off, the view sits on the cursor.
+          const followPlayback = useEditorStore.getState().followPlayback;
+          const viewFollows = newPlaying && followPlayback;
+          let newRow = resolveScrollRow(newPlaying, followPlayback, fpsSmooth ? fps.row : formatCurrentRowRef.current, formatCursorRef.current.rowIndex);
           let smoothOffset = 0;
 
-          if (fpsSmooth && fps.rowDuration > 0) {
+          if (viewFollows && fpsSmooth && fps.rowDuration > 0) {
             const transportState = useTransportStore.getState();
             if (transportState.smoothScrolling) {
               // Smooth scrolling: clock provides constant-rate row + sub-pixel offset
@@ -2518,14 +2522,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             // so arrow key navigation scrolls the view. Worker renderers use
             // cursor.rowIndex when !isPlaying, but format mode skips the normal
             // cursor→worker subscription, so we push it here.
-            if (!newPlaying) {
-              bridge.post({ type: 'cursor', cursor: {
-                rowIndex:     formatCurrentRowRef.current,
-                channelIndex: formatCursorRef.current.channelIndex,
-                columnType:   '0',
-                digitIndex:   0,
-              }});
-            }
+            // (the cursor the worker draws is the shared cursor, never the play head's row)
+            bridge.post({ type: 'cursor', cursor: {
+              rowIndex:     formatCursorRef.current.rowIndex,
+              channelIndex: formatCursorRef.current.channelIndex,
+              columnType:   String(formatCursorRef.current.columnIndex),
+              digitIndex:   0,
+            }});
           }
         }
 

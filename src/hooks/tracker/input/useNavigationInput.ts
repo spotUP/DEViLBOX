@@ -16,6 +16,7 @@ import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './input
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
 import { isManualRowNavAllowed } from '@lib/tracker/playbackNavigation';
 import { nextTabChannel } from '@lib/tracker/tabNavigation';
+import { jumpRow, startHeldRepeat } from '@lib/tracker/cursorNavigation';
 
 export const useNavigationInput = (refs: TrackerInputRefs) => {
   const { cursorRef, selectionRef } = refs;
@@ -180,7 +181,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
         e.preventDefault();
         const jump = useEditorStore.getState().activeBehavior.pageJumpSize;
-        moveCursorToRow(Math.max(0, cursorRef.current.rowIndex - jump));
+        moveCursorToRow(jumpRow('PageUp', cursorRef.current.rowIndex, pattern.length, jump));
         return true;
       }
 
@@ -189,7 +190,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         if (!isManualRowNavAllowed(isPlaying, useEditorStore.getState().followPlayback)) return false;
         e.preventDefault();
         const jump = useEditorStore.getState().activeBehavior.pageJumpSize;
-        moveCursorToRow(Math.min(pattern.length - 1, cursorRef.current.rowIndex + jump));
+        moveCursorToRow(jumpRow('PageDown', cursorRef.current.rowIndex, pattern.length, jump));
         return true;
       }
 
@@ -328,31 +329,12 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         if (selecting) endSelection();
         // Start RAF-driven scroll (time-based throttle — refresh-rate independent)
         heldArrowRef.current = { dir, selecting };
-        if (!arrowRafRef.current) {
-          const keyDownTime = performance.now();
-          let initialDelayPassed = false;
-          let lastMoveTime = keyDownTime;
-          const INITIAL_DELAY = 250; // ms before first repeat (matches typical OS key repeat delay)
-          const MOVE_INTERVAL = 50; // ~20 moves/sec after initial delay
-          const tick = (now: number) => {
-            const held = heldArrowRef.current;
-            if (!held) { arrowRafRef.current = 0; return; }
-            if (!initialDelayPassed) {
-              if (now - keyDownTime >= INITIAL_DELAY) {
-                initialDelayPassed = true;
-                lastMoveTime = now;
-                moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
-                if (held.selecting) endSelectionRef.current();
-              }
-            } else if (now - lastMoveTime >= MOVE_INTERVAL) {
-              lastMoveTime = now;
-              moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
-              if (held.selecting) endSelectionRef.current();
-            }
-            arrowRafRef.current = requestAnimationFrame(tick);
-          };
-          arrowRafRef.current = requestAnimationFrame(tick);
-        }
+        startHeldRepeat(arrowRafRef, () => heldArrowRef.current, () => {
+          const held = heldArrowRef.current;
+          if (!held) return;
+          moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
+          if (held.selecting) endSelectionRef.current();
+        });
         return true;
       }
 
@@ -375,31 +357,12 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         moveCursor('left', { preserveSelection: selecting });
         if (selecting) endSelection();
         heldArrowRef.current = { dir: 'left', selecting };
-        if (!arrowRafRef.current) {
-          const keyDownTime = performance.now();
-          let initialDelayPassed = false;
-          let lastMoveTime = keyDownTime;
-          const INITIAL_DELAY = 250;
-          const MOVE_INTERVAL = 50;
-          const tick = (now: number) => {
-            const held = heldArrowRef.current;
-            if (!held) { arrowRafRef.current = 0; return; }
-            if (!initialDelayPassed) {
-              if (now - keyDownTime >= INITIAL_DELAY) {
-                initialDelayPassed = true;
-                lastMoveTime = now;
-                moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
-                if (held.selecting) endSelectionRef.current();
-              }
-            } else if (now - lastMoveTime >= MOVE_INTERVAL) {
-              lastMoveTime = now;
-              moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
-              if (held.selecting) endSelectionRef.current();
-            }
-            arrowRafRef.current = requestAnimationFrame(tick);
-          };
-          arrowRafRef.current = requestAnimationFrame(tick);
-        }
+        startHeldRepeat(arrowRafRef, () => heldArrowRef.current, () => {
+          const held = heldArrowRef.current;
+          if (!held) return;
+          moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
+          if (held.selecting) endSelectionRef.current();
+        });
         return true;
       }
 
@@ -422,31 +385,12 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         moveCursor('right', { preserveSelection: selecting });
         if (selecting) endSelection();
         heldArrowRef.current = { dir: 'right', selecting };
-        if (!arrowRafRef.current) {
-          const keyDownTime = performance.now();
-          let initialDelayPassed = false;
-          let lastMoveTime = keyDownTime;
-          const INITIAL_DELAY = 250;
-          const MOVE_INTERVAL = 50;
-          const tick = (now: number) => {
-            const held = heldArrowRef.current;
-            if (!held) { arrowRafRef.current = 0; return; }
-            if (!initialDelayPassed) {
-              if (now - keyDownTime >= INITIAL_DELAY) {
-                initialDelayPassed = true;
-                lastMoveTime = now;
-                moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
-                if (held.selecting) endSelectionRef.current();
-              }
-            } else if (now - lastMoveTime >= MOVE_INTERVAL) {
-              lastMoveTime = now;
-              moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
-              if (held.selecting) endSelectionRef.current();
-            }
-            arrowRafRef.current = requestAnimationFrame(tick);
-          };
-          arrowRafRef.current = requestAnimationFrame(tick);
-        }
+        startHeldRepeat(arrowRafRef, () => heldArrowRef.current, () => {
+          const held = heldArrowRef.current;
+          if (!held) return;
+          moveCursorRef.current(held.dir, { preserveSelection: held.selecting });
+          if (held.selecting) endSelectionRef.current();
+        });
         return true;
       }
 

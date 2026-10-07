@@ -79,7 +79,7 @@ for (const [mode, columns] of [['hively', HIVELY_COLUMNS], ['klystrack', KLYS_CO
       press(recButton, 'Tab');
       expect(useCursorStore.getState().cursor.channelIndex).toBe(2);
       press(recButton, 'Tab');
-      expect(host.getCursor().channelIndex).toBe(2); // clamped to the format's own channels
+      expect(host.getCursor().channelIndex).toBe(0); // wraps like the classic editor (P14g)
     });
 
     it('typing in a text input still goes to the input, not the song', () => {
