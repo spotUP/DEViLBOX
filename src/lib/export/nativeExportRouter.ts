@@ -161,36 +161,24 @@ async function isCinterLoaded(): Promise<boolean> {
 
 /** Baked full re-loadable .mod (FT2 toolbar Save). Cinter voices kept as PCM. */
 async function exportCinterSaveFromStores(): Promise<RawExportResult | null> {
-  const { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore } = await import('@stores');
+  const { useTransportStore, useProjectStore } = await import('@stores');
   const { exportCinterModFile } = await import('./Cinter4ModSave');
-  const trackerState = useTrackerStore.getState();
   const { bpm, speed } = useTransportStore.getState();
   const moduleName = useProjectStore.getState().metadata?.name || 'song';
-  const res = await exportCinterModFile(
-    trackerState.patterns,
-    useInstrumentStore.getState().instruments,
-    trackerState.patternOrder,
-    { stripCinter: false, moduleName, bpm, speed },
-  );
+  const res = await exportCinterModFile({ stripCinter: false, moduleName, bpm, speed });
   return { data: res.data, filename: res.filename, warnings: [] };
 }
 
 /** Crunched one-way .cinter4 (+ .raw companion) — Export dialog / MCP. */
 async function exportCinterCrunchedFromStores(): Promise<RawExportResult | null> {
-  const { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore } = await import('@stores');
+  const { useTransportStore, useProjectStore } = await import('@stores');
   const { exportCinterCrunched } = await import('./Cinter4ModSave');
   const { getOriginalModuleDataForExport, base64ToBuffer } = await import('./exporters');
-  const trackerState = useTrackerStore.getState();
   const { bpm, speed } = useTransportStore.getState();
   const moduleName = useProjectStore.getState().metadata?.name || 'cinter';
   const omd = getOriginalModuleDataForExport();
   const originalModBytes = omd?.format === 'MOD' ? new Uint8Array(base64ToBuffer(omd.base64)) : undefined;
-  const c = await exportCinterCrunched(
-    trackerState.patterns,
-    useInstrumentStore.getState().instruments,
-    trackerState.patternOrder,
-    { moduleName, bpm, speed, originalModBytes },
-  );
+  const c = await exportCinterCrunched({ moduleName, bpm, speed, originalModBytes });
   const warnings = c.errors.length > 0
     ? [`${c.errors.length} unsupported-command warning(s) during Cinter crunch`]
     : [];

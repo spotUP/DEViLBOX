@@ -1,219 +1,14 @@
 /**
- * Audio Export - Render pattern/song to WAV file
- * Uses Tone.js Offline rendering for accurate timing.
- * UADE-backed formats are rendered through the real UADE engine for accurate playback.
+ * Audio export primitives: encoders, the live capture of the engine's export
+ * tap, the raw UADE render and the per-channel stems. Callers do not use these
+ * directly: `audioExportService.exportAudio` is the one entry point
+ * (plan 2026-10-07-one-load-save-export-path, U3a).
  */
 
 import * as Tone from 'tone';
 import { Mp3Encoder } from '@breezystack/lamejs';
-import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
-
-/** Synth node that can play notes */
-interface PlayableSynth extends Tone.ToneAudioNode {
-  triggerAttackRelease(note: string, duration: number | string, time?: number, velocity?: number): this;
-}
-
-interface AudioExportOptions {
-  sampleRate?: number;
-  channels?: number;
-  onProgress?: (progress: number) => void;
-}
-
-/**
- * Convert XM note number to Tone.js note string
- * XM: 1-96 = C-0 to B-7, 97 = note off
- */
-function xmNoteToToneNote(note: number): string {
-  if (note <= 0 || note > 96) return '';
-  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const semitone = (note - 1) % 12;
-  const octave = Math.floor((note - 1) / 12);
-  return `${noteNames[semitone]}${octave}`;
-}
-
-/**
- * Render a pattern to audio buffer using Tone.js Offline
- */
-export async function renderPatternToAudio(
-  pattern: Pattern,
-  instruments: InstrumentConfig[],
-  bpm: number,
-  options: AudioExportOptions = {}
-): Promise<AudioBuffer> {
-  const { sampleRate = 44100, onProgress } = options;
-
-  // Calculate pattern duration
-  const beatsPerRow = 0.25; // 4 rows per beat
-  const secondsPerRow = (60 / bpm) * beatsPerRow;
-  const patternDuration = pattern.length * secondsPerRow;
-
-  // Add a small tail for reverb/delay to ring out
-  const tailDuration = 2;
-  const totalDuration = patternDuration + tailDuration;
-
-  onProgress?.(0);
-
-  // Render offline
-  const buffer = await Tone.Offline(({ transport }) => {
-    transport.bpm.value = bpm;
-
-    // Create synths for each instrument used
-    // Use ToneAudioNode as base type to support all synth types
-    const synths = new Map<number, Tone.ToneAudioNode>();
-
-    // Determine which instruments are used in the pattern
-    const usedInstrumentIds = new Set<number>();
-    pattern.channels.forEach((channel) => {
-      if (channel.instrumentId !== null) {
-        usedInstrumentIds.add(channel.instrumentId);
-      }
-      channel.rows.forEach((cell) => {
-        if (cell.instrument !== null) {
-          usedInstrumentIds.add(cell.instrument);
-        }
-      });
-    });
-
-    // Create synths for used instruments
-    instruments.forEach((inst) => {
-      if (!usedInstrumentIds.has(inst.id)) return;
-
-      let synth: Tone.ToneAudioNode;
-
-      switch (inst.synthType) {
-        case 'MonoSynth':
-          synth = new Tone.MonoSynth({
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            oscillator: { type: inst.oscillator?.type || 'sawtooth' } as any,
-            envelope: {
-              attack: inst.envelope?.attack ?? 0.01,
-              decay: inst.envelope?.decay ?? 0.2,
-              sustain: inst.envelope?.sustain ?? 0.5,
-              release: inst.envelope?.release ?? 0.5,
-            },
-            filter: {
-              type: inst.filter?.type || 'lowpass',
-              frequency: inst.filter?.frequency ?? 2000,
-              Q: inst.filter?.Q ?? 1,
-            },
-          }).toDestination();
-          break;
-        case 'FMSynth':
-          synth = new Tone.PolySynth(Tone.FMSynth).toDestination();
-          break;
-        case 'ToneAM':
-          synth = new Tone.PolySynth(Tone.AMSynth).toDestination();
-          break;
-        case 'DuoSynth':
-          synth = new Tone.DuoSynth().toDestination();
-          break;
-        case 'PluckSynth':
-          synth = new Tone.PluckSynth().toDestination();
-          break;
-        case 'MetalSynth':
-          synth = new Tone.MetalSynth().toDestination();
-          break;
-        case 'MembraneSynth':
-          synth = new Tone.MembraneSynth().toDestination();
-          break;
-        case 'NoiseSynth':
-          synth = new Tone.NoiseSynth().toDestination();
-          break;
-        case 'Sampler':
-          // Create sampler with uploaded sample
-          if (inst.parameters?.sampleUrl) {
-            synth = new Tone.Sampler({
-              urls: { C4: inst.parameters.sampleUrl as string },
-              volume: inst.volume || -12,
-            }).toDestination();
-          } else {
-            // Skip if no sample loaded
-            return;
-          }
-          break;
-        case 'Player':
-          // Create player with uploaded sample
-          if (inst.parameters?.sampleUrl) {
-            synth = new Tone.Player({
-              url: inst.parameters.sampleUrl as string,
-              volume: inst.volume || -12,
-            }).toDestination();
-          } else {
-            // Skip if no sample loaded
-            return;
-          }
-          break;
-        default:
-          // Default to PolySynth with Synth
-          synth = new Tone.PolySynth(Tone.Synth, {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            oscillator: { type: inst.oscillator?.type || 'sawtooth' } as any,
-            envelope: {
-              attack: inst.envelope?.attack ?? 0.01,
-              decay: inst.envelope?.decay ?? 0.2,
-              sustain: inst.envelope?.sustain ?? 0.5,
-              release: inst.envelope?.release ?? 0.5,
-            },
-          }).toDestination();
-      }
-
-      synths.set(inst.id, synth);
-    });
-
-    // Schedule all notes
-    pattern.channels.forEach((channel) => {
-      const defaultInstrumentId = channel.instrumentId ?? 0;
-
-      channel.rows.forEach((cell, rowIndex) => {
-        // Skip empty cells (note 0 = no note in XM format)
-        if (cell.note === 0) return;
-        // Skip note off (note 97 in XM format)
-        if (cell.note === 97) return;
-
-        const time = rowIndex * secondsPerRow;
-        const instrumentId = cell.instrument ?? defaultInstrumentId;
-        const synth = synths.get(instrumentId);
-
-        if (!synth) return;
-
-        // Calculate note duration (until next note or note off)
-        let duration = secondsPerRow;
-        for (let nextRow = rowIndex + 1; nextRow < pattern.length; nextRow++) {
-          const nextCell = channel.rows[nextRow];
-          if (nextCell.note !== 0) {
-            duration = (nextRow - rowIndex) * secondsPerRow;
-            break;
-          }
-        }
-
-        const toneNote = xmNoteToToneNote(cell.note);
-        if (!toneNote) return; // Skip if note conversion failed
-        const velocity = cell.volume !== 0 ? cell.volume / 64 : 0.8;
-
-        transport.schedule((t) => {
-          try {
-            if ('triggerAttackRelease' in synth) {
-              (synth as PlayableSynth).triggerAttackRelease(toneNote, duration, t, velocity);
-            }
-          } catch (e) {
-            console.warn(`Failed to trigger note ${toneNote}:`, e);
-          }
-        }, time);
-      });
-    });
-
-    transport.start(0);
-
-    onProgress?.(50);
-  }, totalDuration, 2, sampleRate);
-
-  onProgress?.(100);
-
-  // ToneAudioBuffer.get() returns the underlying AudioBuffer
-  return buffer.get() as AudioBuffer;
-}
 
 /**
  * Convert AudioBuffer to WAV blob
@@ -365,20 +160,12 @@ interface CaptureOptions {
   unmuteAll?: boolean;
 }
 
-export function captureAudioLive(
-  durationSec: number,
-  onProgressOrOptions?: ((percent: number) => void) | CaptureOptions,
-): Promise<Blob> {
-  return captureAudioLiveToBuffer(durationSec, onProgressOrOptions)
-    .then((buffer) => audioBufferToWav(buffer));
-}
-
 /**
- * Same as `captureAudioLive` but returns the raw `AudioBuffer` instead of a
- * WAV-encoded Blob. Used by the MP3 encoder and any path that wants to
- * post-process the capture before writing it to disk.
+ * Capture the export tap for `durationSec` seconds and return the raw
+ * `AudioBuffer`. The caller must start playback BEFORE awaiting it so no
+ * samples are missed (captureLiveSong does).
  */
-export function captureAudioLiveToBuffer(
+function captureAudioLiveToBuffer(
   durationSec: number,
   onProgressOrOptions?: ((percent: number) => void) | CaptureOptions,
 ): Promise<AudioBuffer> {
@@ -562,69 +349,9 @@ export async function renderUADEToWav(
   return blob;
 }
 
-/**
- * Export a UADE module as WAV file (download).
- */
-export async function exportUADEAsWav(
-  fileData: ArrayBuffer,
-  filename: string,
-  outputFilename: string,
-  subsong = 0,
-  onProgress?: (progress: number) => void,
-): Promise<void> {
-  const wavBlob = await renderUADEToWav(fileData, filename, subsong, onProgress);
-
-  // Download the file
-  const url = URL.createObjectURL(wavBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = outputFilename.endsWith('.wav') ? outputFilename : `${outputFilename}.wav`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
 // ==========================================================================
 // LIVE CAPTURE EXPORT — the canonical "what you hear" export path
 // ==========================================================================
-
-/**
- * Exports the full song to WAV by capturing the live audio graph from
- * `exportTap` (post safety-limiter, pre master-volume). This is the
- * authoritative export path for accurate "sounds exactly like what you
- * hear" results because it includes:
- *   - Every synth DEViLBOX supports (TB303, DB303, DubSiren, Furnace, UADE,
- *     Hively, libopenmpt, etc.) — because they're all already wired into
- *     the running engine graph
- *   - Every per-instrument effect in the user's instrument configs
- *   - Every per-channel insert effect in useMixerStore
- *   - Every master FX from useAudioStore.masterEffects
- *   - Stereo separation + per-channel panning
- *   - Live tempo / speed / groove / swing settings
- *   - Every in-song tracker effect (pitch slides, arpeggios, vibrato,
- *     speed changes, pattern jumps, etc.) because the real replayer
- *     is executing
- *
- * Runs in real time — a 3-minute song takes 3 minutes to capture.
- *
- * `options.unmuteAll = true` temporarily unmutes every channel for the
- * duration of the capture (mute/solo state restored after), useful for
- * a "full mix" export even if the user is currently soloing one channel.
- */
-export async function exportLiveCaptureToWav(
-  options: {
-    durationSec?: number;
-    unmuteAll?: boolean;
-    onProgress?: (progress: number) => void;
-    filename?: string;
-  } = {},
-): Promise<Blob> {
-  const buffer = await captureLiveSong(options);
-  const blob = audioBufferToWav(buffer);
-  maybeDownload(blob, options.filename, 'wav');
-  return blob;
-}
 
 /**
  * Encode an AudioBuffer to a FLAC Blob (lossless). Lazy-loads the encoder —
@@ -654,56 +381,46 @@ export async function audioBufferToOgg(buffer: AudioBuffer, quality = 5): Promis
   return new Blob([bytes as unknown as BlobPart], { type: 'audio/ogg' });
 }
 
-/**
- * Live-capture siblings that emit FLAC / OGG instead of WAV.
- */
-export async function exportLiveCaptureToFlac(
-  options: {
-    durationSec?: number;
-    unmuteAll?: boolean;
-    onProgress?: (progress: number) => void;
-    filename?: string;
-    bitDepth?: 16 | 24;
-  } = {},
-): Promise<Blob> {
-  const buffer = await captureLiveSong(options);
-  const blob = await audioBufferToFlac(buffer, options.bitDepth ?? 16);
-  maybeDownload(blob, options.filename, 'flac');
-  return blob;
-}
+export type AudioFormat = 'wav' | 'mp3' | 'flac' | 'ogg';
 
-export async function exportLiveCaptureToOgg(
-  options: {
-    durationSec?: number;
-    unmuteAll?: boolean;
-    onProgress?: (progress: number) => void;
-    filename?: string;
-    quality?: number;
-  } = {},
-): Promise<Blob> {
-  const buffer = await captureLiveSong(options);
-  const blob = await audioBufferToOgg(buffer, options.quality ?? 5);
-  maybeDownload(blob, options.filename, 'ogg');
-  return blob;
+/** The one encoder switch: every caller turns a captured buffer into a file through it. */
+export async function encodeAudioBuffer(buffer: AudioBuffer, format: AudioFormat, kbps = 192): Promise<Blob> {
+  switch (format) {
+    case 'mp3': return audioBufferToMp3(buffer, kbps);
+    case 'flac': return audioBufferToFlac(buffer);
+    case 'ogg': return audioBufferToOgg(buffer);
+    default: return audioBufferToWav(buffer);
+  }
 }
 
 /**
- * Live-capture sibling of `exportLiveCaptureToWav` that emits MP3 instead
- * of WAV. `kbps` defaults to 192 — pass 320 for archival or 128 for smaller.
+ * Length of the full song in seconds (+2 s tail): libopenmpt-backed songs ask
+ * the engine, everything else sums the pattern rows at the transport's tempo.
  */
-export async function exportLiveCaptureToMp3(
-  options: {
-    durationSec?: number;
-    unmuteAll?: boolean;
-    onProgress?: (progress: number) => void;
-    filename?: string;
-    kbps?: number;
-  } = {},
-): Promise<Blob> {
-  const buffer = await captureLiveSong(options);
-  const blob = audioBufferToMp3(buffer, options.kbps ?? 192);
-  maybeDownload(blob, options.filename, 'mp3');
-  return blob;
+export async function estimateSongSeconds(): Promise<number> {
+  const { useTransportStore } = await import('@/stores/useTransportStore');
+  const { useTrackerStore } = await import('@/stores/useTrackerStore');
+  const { useFormatStore } = await import('@/stores/useFormatStore');
+  if (useFormatStore.getState().libopenmptFileData) {
+    try {
+      const { LibopenmptEngine } = await import('@/engine/libopenmpt/LibopenmptEngine');
+      if (LibopenmptEngine.hasInstance()) {
+        const sec = LibopenmptEngine.getInstance().getDurationSeconds();
+        if (sec > 0) return sec + 2;
+      }
+    } catch { /* fall through to the row estimate */ }
+  }
+  const t = useTransportStore.getState();
+  const tr = useTrackerStore.getState();
+  const bpm = t.bpm || 125;
+  const speed = t.speed || 6;
+  const secPerRow = (speed * 60) / (bpm * 24);
+  let totalRows = 0;
+  for (const patIdx of tr.patternOrder) {
+    const pat = tr.patterns[patIdx];
+    totalRows += pat ? (pat.channels[0]?.rows?.length ?? 64) : 64;
+  }
+  return Math.max(5, totalRows * secPerRow + 2);
 }
 
 /**
@@ -715,29 +432,18 @@ export async function exportLiveCaptureToMp3(
  * 50–300 ms after the tap connects, and we don't want that dead air in
  * exported files. See `trimLeadingSilence` for the threshold / cap.
  */
-async function captureLiveSong(options: {
+export async function captureLiveSong(options: {
   durationSec?: number;
+  /** Upper bound on the (given or estimated) capture length. */
+  maxDurationSec?: number;
   unmuteAll?: boolean;
   onProgress?: (progress: number) => void;
 }): Promise<AudioBuffer> {
   const { onProgress, unmuteAll } = options;
 
   let durationSec = options.durationSec;
-  if (!durationSec || durationSec <= 0) {
-    const { useTransportStore } = await import('@/stores/useTransportStore');
-    const { useTrackerStore } = await import('@/stores/useTrackerStore');
-    const t = useTransportStore.getState();
-    const tr = useTrackerStore.getState();
-    const bpm = t.bpm || 125;
-    const speed = t.speed || 6;
-    const secPerRow = (speed * 60) / (bpm * 24);
-    let totalRows = 0;
-    for (const patIdx of tr.patternOrder) {
-      const pat = tr.patterns[patIdx];
-      totalRows += pat ? (pat.channels[0]?.rows?.length ?? 64) : 64;
-    }
-    durationSec = Math.max(5, totalRows * secPerRow + 2);
-  }
+  if (!durationSec || durationSec <= 0) durationSec = await estimateSongSeconds();
+  if (options.maxDurationSec && options.maxDurationSec > 0) durationSec = Math.min(durationSec, options.maxDurationSec);
 
   const { useTransportStore } = await import('@/stores/useTransportStore');
   const restore = startTransportForCapture(useTransportStore.getState, useTransportStore.getState);
@@ -840,7 +546,7 @@ export function trimLeadingSilence(
   return out;
 }
 
-function maybeDownload(blob: Blob, filename: string | undefined, ext: 'wav' | 'mp3' | 'flac' | 'ogg'): void {
+export function maybeDownload(blob: Blob, filename: string | undefined, ext: 'wav' | 'mp3' | 'flac' | 'ogg'): void {
   if (!filename) return;
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -881,6 +587,7 @@ export interface StemResult {
  */
 export async function exportLiveCaptureStems(options: {
   durationSec?: number;
+  maxDurationSec?: number;
   format?: 'wav' | 'mp3' | 'flac' | 'ogg';
   kbps?: number;
   /** (stemIndex, totalStems, percentOfCurrentStem) */
@@ -924,15 +631,10 @@ export async function exportLiveCaptureStems(options: {
 
       const buffer = await captureLiveSong({
         durationSec: options.durationSec,
+        maxDurationSec: options.maxDurationSec,
         onProgress: (p) => options.onProgress?.(ch, numChannels, p),
       });
-      const blob = format === 'mp3'
-        ? audioBufferToMp3(buffer, kbps)
-        : format === 'flac'
-          ? await audioBufferToFlac(buffer)
-          : format === 'ogg'
-            ? await audioBufferToOgg(buffer)
-            : audioBufferToWav(buffer);
+      const blob = await encodeAudioBuffer(buffer, format, kbps);
       const channelName = refPattern.channels[ch]?.name || `Channel ${ch + 1}`;
       results.push({ channelIndex: ch, channelName, blob, format });
     }

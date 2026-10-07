@@ -2717,56 +2717,64 @@ export async function runRegressionSuite(params: Record<string, unknown>): Promi
 // ─── Export Tools ────────────────────────────────────────────────────────────
 
 /**
- * Async live-capture registry.
- * Captures run in the background; callers poll with the captureId.
- * Stored on `window` so Vite HMR module reloads don't lose in-flight captures.
+ * Async export registry.
+ * An export runs in the background (a capture is real time); callers poll with
+ * the captureId. Stored on `window` so Vite HMR module reloads do not lose
+ * in-flight exports.
  */
 interface CaptureEntry {
   status: 'capturing' | 'done' | 'error';
-  /** Raw capture. Encoded to WAV/MP3 at poll time so the same capture can
-   *  be returned in either format without re-running playback. */
-  audioBuffer?: AudioBuffer;
+  result?: import('../../lib/export/audioExportService').ExportAudioResult;
   error?: string;
   startedAt: number;
-  /** Format the capture was started with — used when a poll omits `format`. */
-  format?: 'wav' | 'mp3';
-  /** MP3 bitrate in kbps. Only consulted when encoding MP3. */
-  kbps?: number;
 }
 const _liveCaptures: Map<string, CaptureEntry> =
   (window as any).__devilboxLiveCaptures ??
   ((window as any).__devilboxLiveCaptures = new Map<string, CaptureEntry>());
 
-/** Export current pattern or song to WAV, returning base64-encoded WAV data */
+// Chunk size MUST be a multiple of 3 so btoa() never emits mid-string padding.
+// 8190 = 3 x 2730 - produces clean base64 with padding only at the very end.
+async function blobToBase64(blob: Blob): Promise<{ b64: string; size: number }> {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let b64 = '';
+  for (let i = 0; i < bytes.length; i += 8190) {
+    b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + 8190)));
+  }
+  return { b64, size: buf.byteLength };
+}
+
+const AUDIO_FORMATS = ['wav', 'mp3', 'flac', 'ogg'] as const;
+function audioFormatParam(params: Record<string, unknown>): (typeof AUDIO_FORMATS)[number] {
+  const f = (params.format as string | undefined)?.toLowerCase();
+  return (AUDIO_FORMATS as readonly string[]).includes(f ?? '') ? (f as (typeof AUDIO_FORMATS)[number]) : 'wav';
+}
+
+/**
+ * Export the song or one pattern as audio. Starts `exportAudio` (the one audio
+ * export: the same call the Export panel makes) and returns a captureId; poll
+ * with `export_wav(captureId)` or `patternIndex: -1` until status is "done".
+ */
 export async function exportWav(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
-    // ── Format selection: 'wav' (default) or 'mp3' ───────────────────────────
-    const rawFormat = (params.format as string | undefined)?.toLowerCase();
-    const format: 'wav' | 'mp3' = rawFormat === 'mp3' ? 'mp3' : 'wav';
-    const kbps = typeof params.kbps === 'number' ? params.kbps : 192;
-    const audioKey = format === 'mp3' ? 'mp3Base64' : 'wavBase64';
-    const audioMime = format === 'mp3' ? 'audio/mpeg' : 'audio/wav';
+    const format = audioFormatParam(params);
 
-    // ── Phase 2 fast-path: poll an in-progress live capture ──────────────────
-    // Triggered by patternIndex=-1 (works with existing MCP schema) or captureId param.
-    // Captures are stored on window.__devilboxLiveCaptures (survives HMR).
+    // Poll an in-progress export (patternIndex=-1 works with the existing MCP schema).
     const isPoll = params.captureId || (params.patternIndex as number) === -1;
     if (isPoll) {
       const captureId = (params.captureId as string | undefined);
-      // Find the entry: by id if provided, otherwise the most recent one
       let entry: CaptureEntry | undefined;
       let foundId: string | undefined;
       if (captureId) {
         entry = _liveCaptures.get(captureId);
         foundId = captureId;
       } else {
-        // Pick the most recent entry
         for (const [id, e] of _liveCaptures) {
           if (!entry || e.startedAt > entry.startedAt) { entry = e; foundId = id; }
         }
       }
       if (!entry || !foundId) {
-        return { error: 'No pending capture found. Start one with export_wav/export_mp3(scope:"song") first.' };
+        return { error: 'No pending capture found. Start one with export_wav/export_mp3 first.' };
       }
       if (entry.status === 'capturing') {
         const elapsed = ((Date.now() - entry.startedAt) / 1000).toFixed(1);
@@ -2776,263 +2784,50 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
         _liveCaptures.delete(foundId);
         return { error: entry.error ?? 'Capture failed' };
       }
-      // Done — encode to the requested format (poll's `format` wins; else fall
-      // back to whichever format the capture was originally started with).
-      const pollFormat: 'wav' | 'mp3' = rawFormat
-        ? (rawFormat === 'mp3' ? 'mp3' : 'wav')
-        : (entry.format ?? 'wav');
-      const pollKey = pollFormat === 'mp3' ? 'mp3Base64' : 'wavBase64';
-      const { audioBufferToWav, audioBufferToMp3 } = await import('../../lib/export/audioExport');
-      const doneBuffer = entry.audioBuffer!;
-      const doneBlob = pollFormat === 'mp3'
-        ? audioBufferToMp3(doneBuffer, entry.kbps ?? kbps)
-        : audioBufferToWav(doneBuffer);
+      const done = entry.result!;
       _liveCaptures.delete(foundId);
-      const doneArrBuf = await doneBlob.arrayBuffer();
-      const doneBytes = new Uint8Array(doneArrBuf);
-      let doneB64 = '';
-      for (let i = 0; i < doneBytes.length; i += 8190) {
-        doneB64 += btoa(String.fromCharCode(...doneBytes.subarray(i, i + 8190)));
-      }
+      const { b64, size } = await blobToBase64(done.blob!);
       return {
         ok: true,
         captureId: foundId,
         status: 'done',
-        method: 'live-capture',
-        scope: 'song',
-        format: pollFormat,
-        mimeType: pollFormat === 'mp3' ? 'audio/mpeg' : 'audio/wav',
-        durationSec: +(doneBuffer.length / doneBuffer.sampleRate).toFixed(2),
-        sizeBytes: doneArrBuf.byteLength,
-        [pollKey]: doneB64,
+        method: done.method,
+        scope: done.scope,
+        format: done.format,
+        mimeType: done.mimeType,
+        durationSec: done.durationSec,
+        sizeBytes: size,
+        [`${done.format}Base64`]: b64,
       };
     }
 
-    const scope = (params.scope as string) || 'song';
-    const patternIndex = params.patternIndex as number | undefined;
-
-    const tracker = useTrackerStore.getState();
-    const instruments = useInstrumentStore.getState().instruments;
-    const transport = useTransportStore.getState();
-
-    const {
-      getUADEInstrument,
-      renderUADEToWav,
-      captureAudioLiveToBuffer,
-      renderPatternToAudio,
-      audioBufferToWav,
-      audioBufferToMp3,
-    } = await import('../../lib/export/audioExport');
-
-    // WAV Blob → AudioBuffer (UADE renders directly to WAV, decode for MP3).
-    async function wavBlobToAudioBuffer(wavBlob: Blob): Promise<AudioBuffer> {
-      const arr = await wavBlob.arrayBuffer();
-      const toneCtx = (await import('tone')).getContext();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ctx: AudioContext = (toneCtx as any).rawContext ?? (toneCtx as any)._context ?? toneCtx;
-      return await ctx.decodeAudioData(arr.slice(0));
-    }
-
-    // Encode a buffer to the user-requested format (WAV or MP3).
-    function encode(buffer: AudioBuffer): Blob {
-      return format === 'mp3' ? audioBufferToMp3(buffer, kbps) : audioBufferToWav(buffer);
-    }
-
-    // ── Determine the active format ──────────────────────────────────────────
-    // Synth types that can render offline WITHOUT pre-loading audio buffers.
-    // Sampler/Player are excluded: Tone.Offline never loads their sample URLs,
-    // so they produce silence. Songs using these must use live capture instead.
-    const OFFLINE_SYNTH_TYPES = new Set([
-      'MonoSynth', 'PolySynth', 'DuoSynth', 'FMSynth', 'ToneAM',
-      'MembraneSynth', 'MetalSynth', 'NoiseSynth', 'PluckSynth',
-    ]);
-    // Check format store for native engines that bypass Tone.js entirely
-    const { useFormatStore } = await import('../../stores/useFormatStore');
-    const fmt = useFormatStore.getState();
-    const hasNativeEngine = !!(
-      fmt.libopenmptFileData || fmt.uadeEditableFileData ||
-      fmt.hivelyFileData || fmt.klysFileData || fmt.musiclineFileData ||
-      fmt.c64SidFileData || fmt.jamCrackerFileData || fmt.futurePlayerFileData ||
-      fmt.preTrackerFileData || fmt.maFileData || fmt.hippelFileData ||
-      fmt.sonixFileData || fmt.pxtoneFileData || fmt.organyaFileData || fmt.sawteethFileData ||
-      fmt.eupFileData || fmt.ixsFileData || fmt.psycleFileData ||
-      fmt.sc68FileData || fmt.zxtuneFileData || fmt.pumaTrackerFileData ||
-      fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData || fmt.sd2FileData ||
-      fmt.symphonieFileData || fmt.v2mFileData || fmt.goatTrackerData || fmt.ayFileData
-    );
-    const isToneOnly = !hasNativeEngine && instruments.every(
-      i => !i || !i.synthType || OFFLINE_SYNTH_TYPES.has(i.synthType),
-    );
-
-    // ── Helper: blob → base64 ────────────────────────────────────────────────
-    // Chunk size MUST be a multiple of 3 so btoa() never emits mid-string padding.
-    // 8190 = 3 × 2730 — produces clean base64 with padding only at the very end.
-    async function blobToBase64(blob: Blob): Promise<string> {
-      const buf = await blob.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let b64 = '';
-      for (let i = 0; i < bytes.length; i += 8190) {
-        b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + 8190)));
-      }
-      return b64;
-    }
-
-    // ── Helper: estimate song duration from BPM/speed/patterns ──────────────
-    async function estimateSongDuration(): Promise<number> {
-      // For libopenmpt-backed files, ask the engine directly.
-      if (fmt.libopenmptFileData) {
-        try {
-          const { LibopenmptEngine } = await import('../../engine/libopenmpt/LibopenmptEngine');
-          if (LibopenmptEngine.hasInstance()) {
-            const sec = LibopenmptEngine.getInstance().getDurationSeconds();
-            if (sec > 0) return sec + 2; // +2 s tail
-          }
-        } catch { /* fall through to estimate */ }
-      }
-      const bpm = transport.bpm || 125;
-      const speed = transport.speed || 6;
-      const secPerRow = (speed * 60) / (bpm * 24);
-      let totalRows = 0;
-      for (const patIdx of tracker.patternOrder) {
-        const pat = tracker.patterns[patIdx];
-        totalRows += pat ? (pat.channels[0]?.rows?.length ?? 64) : 64;
-      }
-      return Math.max(5, totalRows * secPerRow + 2); // +2 s tail
-    }
-
-    // ── 1. UADE path: accurate offline render ────────────────────────────────
-    const uadeInst = getUADEInstrument(instruments);
-    if (uadeInst?.uade?.fileData) {
-      const wavBlob = await renderUADEToWav(
-        uadeInst.uade.fileData,
-        uadeInst.uade.filename ?? 'module',
-      );
-      // UADE writes WAV directly. For MP3 we decode and re-encode.
-      const outBlob = format === 'mp3'
-        ? audioBufferToMp3(await wavBlobToAudioBuffer(wavBlob), kbps)
-        : wavBlob;
-      const arrayBuf = await outBlob.arrayBuffer();
-      const base64 = await blobToBase64(outBlob);
-      const wavDuration = +((arrayBuf.byteLength - 44) / (44100 * 4)).toFixed(2);
-      return {
-        ok: true,
-        method: 'uade-offline',
-        scope: 'song',
-        format,
-        mimeType: audioMime,
-        sizeBytes: arrayBuf.byteLength,
-        ...(format === 'wav' ? { durationSec: wavDuration } : {}),
-        [audioKey]: base64,
-      };
-    }
-
-    // ── 2. Tone.js-only path: offline render (instant, works for single pattern too) ──
-    if (isToneOnly) {
-      const bpm = transport.bpm || 125;
-      if (scope === 'pattern') {
-        const idx = patternIndex ?? tracker.currentPatternIndex;
-        const pattern = tracker.patterns[idx];
-        if (!pattern) return { error: `Pattern ${idx} not found` };
-        const audioBuffer = await renderPatternToAudio(pattern, instruments, bpm);
-        const outBlob = encode(audioBuffer);
-        const base64 = await blobToBase64(outBlob);
-        const arrayBuf = await outBlob.arrayBuffer();
-        return {
-          ok: true,
-          method: 'tone-offline',
-          scope: 'pattern',
-          format,
-          mimeType: audioMime,
-          patternIndex: idx,
-          sampleRate: audioBuffer.sampleRate,
-          durationSec: +(audioBuffer.length / audioBuffer.sampleRate).toFixed(2),
-          sizeBytes: arrayBuf.byteLength,
-          [audioKey]: base64,
-        };
-      }
-      // Song: render patterns in order
-      const sequence = tracker.patternOrder;
-      const buffers: AudioBuffer[] = [];
-      for (const idx of sequence) {
-        const pattern = tracker.patterns[idx];
-        if (!pattern) continue;
-        buffers.push(await renderPatternToAudio(pattern, instruments, bpm));
-      }
-      if (buffers.length === 0) return { error: 'No patterns in sequence to export' };
-      const totalLength = buffers.reduce((s, b) => s + b.length, 0);
-      const sampleRate = buffers[0].sampleRate;
-      const combined = new OfflineAudioContext(2, totalLength, sampleRate)
-        .createBuffer(2, totalLength, sampleRate);
-      let off = 0;
-      for (const buf of buffers) {
-        for (let ch = 0; ch < 2; ch++) {
-          combined.getChannelData(ch).set(buf.getChannelData(Math.min(ch, buf.numberOfChannels - 1)), off);
-        }
-        off += buf.length;
-      }
-      const outBlob = encode(combined);
-      const base64 = await blobToBase64(outBlob);
-      const arrayBuf = await outBlob.arrayBuffer();
-      return {
-        ok: true,
-        method: 'tone-offline',
-        scope: 'song',
-        format,
-        mimeType: audioMime,
-        patterns: sequence.length,
-        sampleRate,
-        durationSec: +(totalLength / sampleRate).toFixed(2),
-        sizeBytes: arrayBuf.byteLength,
-        [audioKey]: base64,
-      };
-    }
-
-    // ── 3. Universal live-capture path: works for all native WASM engines ────
-    // Two-phase: first call starts the capture and returns a captureId.
-    // Subsequent calls with captureId are handled by the fast-path at top of function.
-
-    // ── Start a new capture ────────────────────────────────────────────────
-    const maxDurationSec = typeof params.maxDurationSec === 'number'
-      ? params.maxDurationSec
-      : 60;
-    const rawDurationSec = await estimateSongDuration();
-    const durationSec = Math.min(rawDurationSec, maxDurationSec);
-
+    const scope = params.scope === 'pattern' ? 'pattern' : 'song';
+    const { exportAudio } = await import('../../lib/export/audioExportService');
     const captureId = crypto.randomUUID();
-    const entry: CaptureEntry = {
-      status: 'capturing',
-      startedAt: Date.now(),
-      format,
-      kbps,
-    };
+    const entry: CaptureEntry = { status: 'capturing', startedAt: Date.now() };
     _liveCaptures.set(captureId, entry);
 
-    // Fire-and-forget: capture runs in background. We store the raw AudioBuffer
-    // so the poll step can encode to WAV or MP3 on demand.
-    captureAudioLiveToBuffer(durationSec)
-      .then(audioBuffer => {
-        entry.status = 'done';
-        entry.audioBuffer = audioBuffer;
-      })
-      .catch(err => {
-        entry.status = 'error';
-        entry.error = (err as Error).message;
-      });
-
-    // Start playback from the beginning
-    await seekTo({ position: 0 });
-    await play({});
+    // Fire-and-forget: the export runs in the background; the poll reads the result.
+    exportAudio({
+      scope,
+      format,
+      patternIndex: typeof params.patternIndex === 'number' ? params.patternIndex : undefined,
+      kbps: typeof params.kbps === 'number' ? params.kbps : undefined,
+      maxDurationSec: typeof params.maxDurationSec === 'number' ? params.maxDurationSec : undefined,
+      unmuteAll: typeof params.unmuteAll === 'boolean' ? params.unmuteAll : undefined,
+      raw: params.raw === true,
+    })
+      .then((result) => { entry.status = 'done'; entry.result = result; })
+      .catch((err) => { entry.status = 'error'; entry.error = (err as Error).message; });
 
     const pollTool = format === 'mp3' ? 'export_mp3' : 'export_wav';
     return {
       ok: true,
       captureId,
       status: 'capturing',
-      method: 'live-capture',
-      scope: 'song',
+      method: params.raw === true ? 'uade-raw' : 'live-capture',
+      scope,
       format,
-      mimeType: audioMime,
-      estimatedDurationSec: +durationSec.toFixed(2),
       instructions: `Poll with ${pollTool}(captureId: "${captureId}") until status is "done"`,
     };
   } catch (e) {
@@ -3050,35 +2845,30 @@ export async function exportMp3(params: Record<string, unknown>): Promise<Record
 }
 
 /**
- * Export every channel as its own WAV or MP3 via live-solo capture. Real-time
- * wall-clock is N × song duration — a 16-channel 3-minute song takes ~48
- * minutes. Callers should not poll this like a fast request; it returns when
- * every channel is done. Returns base64-encoded blobs per stem.
+ * Export every channel as its own file via live-solo capture (`exportAudio`,
+ * scope 'stems'). Real-time wall-clock is N x song duration. Returns when
+ * every channel is done, with base64-encoded blobs per stem.
  */
 export async function exportStems(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
-    const rawFormat = (params.format as string | undefined)?.toLowerCase();
-    const format: 'wav' | 'mp3' = rawFormat === 'mp3' ? 'mp3' : 'wav';
-    const kbps = typeof params.kbps === 'number' ? params.kbps : 192;
-
-    const { exportLiveCaptureStems } = await import('../../lib/export/audioExport');
-    const stems = await exportLiveCaptureStems({ format, kbps });
+    const format = audioFormatParam(params);
+    const { exportAudio } = await import('../../lib/export/audioExportService');
+    const { stems = [] } = await exportAudio({
+      scope: 'stems',
+      format,
+      kbps: typeof params.kbps === 'number' ? params.kbps : undefined,
+    });
 
     const out: Array<Record<string, unknown>> = [];
     for (const s of stems) {
-      const buf = await s.blob.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let b64 = '';
-      for (let i = 0; i < bytes.length; i += 8190) {
-        b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + 8190)));
-      }
+      const { b64, size } = await blobToBase64(s.blob);
       out.push({
         channelIndex: s.channelIndex,
         channelName: s.channelName,
         format: s.format,
-        mimeType: s.format === 'mp3' ? 'audio/mpeg' : 'audio/wav',
-        sizeBytes: buf.byteLength,
-        [s.format === 'mp3' ? 'mp3Base64' : 'wavBase64']: b64,
+        mimeType: s.blob.type,
+        sizeBytes: size,
+        [`${s.format}Base64`]: b64,
       });
     }
     return {
@@ -3130,35 +2920,17 @@ export async function exportPatternText(params: Record<string, unknown>): Promis
 /** Export song/pattern to MIDI, returning base64-encoded MIDI data */
 export async function exportMidi(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
-    const scope = (params.scope as string) || 'pattern';
-    const patternIndex = params.patternIndex as number | undefined;
-
-    const tracker = useTrackerStore.getState();
-    const transport = useTransportStore.getState();
-    const bpm = transport.bpm;
-    const timeSignature: [number, number] = [4, 4];
-
-    const { exportPatternToMIDI, exportSongToMIDI } = await import('../../lib/export/midiExport');
-
-    if (scope === 'song') {
-      const midiData = exportSongToMIDI(
-        tracker.patterns,
-        tracker.patternOrder.map(i => tracker.patterns[i]?.id).filter(Boolean) as string[],
-        bpm,
-        timeSignature,
-        [], // No automation curves via MCP for now
-      );
-      const base64 = btoa(String.fromCharCode(...midiData));
-      return { ok: true, scope: 'song', sizeBytes: midiData.byteLength, midiBase64: base64 };
-    } else {
-      const idx = patternIndex ?? tracker.currentPatternIndex;
-      const pattern = tracker.patterns[idx];
-      if (!pattern) return { error: `Pattern ${idx} not found` };
-
-      const midiData = exportPatternToMIDI(pattern, bpm, timeSignature);
-      const base64 = btoa(String.fromCharCode(...midiData));
-      return { ok: true, scope: 'pattern', patternIndex: idx, sizeBytes: midiData.byteLength, midiBase64: base64 };
-    }
+    const scope = params.scope === 'song' ? 'song' : 'pattern';
+    const { exportMidiFile } = await import('../../lib/export/moduleExportService');
+    const result = await exportMidiFile({
+      scope,
+      patternIndex: typeof params.patternIndex === 'number' ? params.patternIndex : undefined,
+    });
+    const base64 = btoa(String.fromCharCode(...result.data));
+    return {
+      ok: true, scope, sizeBytes: result.data.byteLength, midiBase64: base64,
+      ...(result.patternIndex !== undefined ? { patternIndex: result.patternIndex } : {}),
+    };
   } catch (e) {
     return { error: `exportMidi failed: ${(e as Error).message}` };
   }
@@ -3169,21 +2941,9 @@ export async function exportMod(params: Record<string, unknown>): Promise<Record
   try {
     const format = ((params.format as string) ?? 'mod') as 'mod' | 'xm' | 'it' | 's3m';
 
-    // The current song as encoders take it (sample buffers intact).
-    const { liveTrackerSong } = await import('../../lib/song/liveSong');
-    const song = liveTrackerSong();
-    const { exportWithOpenMPT } = await import('../../lib/export/OpenMPTExporter');
-    const result = await exportWithOpenMPT(
-      song.patterns,
-      song.instruments,
-      song.songPositions,
-      {
-        format,
-        moduleName: song.name,
-        initialBPM:   song.initialBPM,
-        initialSpeed: song.initialSpeed,
-      },
-    );
+    // The live song (edits included): the same input the Export panel uses.
+    const { exportModuleFile } = await import('../../lib/export/moduleExportService');
+    const result = await exportModuleFile({ format });
 
     const arrayBuf = await result.data.arrayBuffer();
     const bytes = new Uint8Array(arrayBuf);

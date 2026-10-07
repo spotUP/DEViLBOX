@@ -252,10 +252,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       // last render would write the song as it was when the toolbar went away.
       // Partial liveness is the worst outcome — it saves a mix of current and
       // stale, which no reload can detect.
-      const { patterns, patternOrder: order } = useTrackerStore.getState();
+      const { patterns } = useTrackerStore.getState();
       const { instruments } = useInstrumentStore.getState();
       const { metadata } = useProjectStore.getState();
-      const { bpm } = useTransportStore.getState();
       const srcFmt = patterns[0]?.importMetadata?.sourceFormat as string | undefined;
       const isCinterSong = instruments.some(
         (i) => (i.parameters as Record<string, unknown> | undefined)?.cinter === 1,
@@ -263,7 +262,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       const maxCh = Math.max(...patterns.map(p => p.channels.length));
       if ((srcFmt === 'MOD' || isCinterSong) && !hasAnyConfirmedFormatViolation() && maxCh <= 4 && instruments.length <= 31) {
         try {
-          const { speed: spd } = useTransportStore.getState();
           const { downloadBytes } = await import('@lib/export/Cinter4ModSave');
           if (isCinterSong) {
             // Save = a re-loadable working file: full MOD with the Cinter voices
@@ -274,10 +272,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             const res = await exportNativeSong(null, { cinterMode: 'save' });
             if (res) downloadBytes(res.data, res.filename);
           } else {
-            const { exportWithOpenMPT } = await import('@lib/export/OpenMPTExporter');
-            const res = await exportWithOpenMPT(patterns, instruments, order, {
+            const { exportModuleFile } = await import('@lib/export/moduleExportService');
+            const res = await exportModuleFile({
               format: 'mod', moduleName: metadata.name || 'song', channelLimit: 4,
-              initialBPM: bpm, initialSpeed: spd,
             });
             downloadBytes(new Uint8Array(await res.data.arrayBuffer()),
               `${(metadata.name || 'song').replace(/[^a-zA-Z0-9._-]/g, '_')}.mod`);

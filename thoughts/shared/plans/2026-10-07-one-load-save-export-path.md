@@ -333,6 +333,11 @@ Not done: no live tab measurement (MCP not connected for this run); the browser 
   export_midi. Test: OctaMED export after an unplayed edit contains the edit.
 - Save is already one reader (`snapshotSong`); U3 only adds it to the guard.
 
+#### U3 result (2026-10-08)
+U3a. `src/lib/export/audioExportService.ts` `exportAudio({format, scope: song|pattern|stems, raw, ...})`. Canonical render = live capture of the export tap (what the owner hears: every engine, instrument / channel / master effects, mute and solo; stems are live-solo captures of the same tap so they sum to the mix). Rejected: Tone-offline `renderPatternToAudio` (plain Tone synths only, samplers silent, no tracker effects or mixer; deleted, 180 lines) and UADE offline as the default (bypasses the mixer, so it never equals the panel). The UADE offline render stays as the explicit `raw` option (the panel's Shift-style "module as shipped", WAV only). Moved: AudioExportPanel (song, pattern, raw, stems), MCP export_wav / export_mp3 / export_stems (now also flac / ogg, `raw`, `unmuteAll`). Deleted: exportLiveCaptureToWav/Mp3/Flac/Ogg, captureAudioLive, exportUADEAsWav; `captureAudioLiveToBuffer` is private; one `encodeAudioBuffer` and one `estimateSongSeconds` (the MCP's libopenmpt duration moved into it, so the panel gets it too). Behaviour changes on the MCP side: UADE and Tone-only songs are live-captured now (were offline), `unmuteAll` defaults true like the panel, the 60 s default cap is gone (maxDurationSec only when given), the poll returns the format the capture started with. Known, not changed: pattern scope captures from the song start for the selected pattern's length (the transport has no "play pattern N once" for capture).
+U3b. `src/lib/export/moduleExportService.ts`: `exportModuleFile` (OpenMPT MOD/XM/IT/S3M), `exportBakedMod`, `exportMidiFile`; each reads `liveTrackerSong()`, callers pass options only. Moved: ModuleExportPanel, FT2Toolbar Save, Cinter4ModSave (`exportCinterModFile` / `exportCinterCrunched` lost their patterns / instruments / order parameters; callers in nativeExportRouter, useTrackerStore, ModuleExportPanel), OctaMEDControls (hand-built song removed), MidiExportPanel, MCP export_mod / export_midi. MIDI divergences removed: the panel exported every pattern in storage order, MCP the order list; the panel included automation, MCP did not (both: order list + automation now). Native export already had one router (every caller passes null = live).
+Guard: allowlist 33 -> 27 entries (U3a/U3b entries 17 -> 0; 10 callers removed, 3 owner entries added, 7 relabelled "stays"). Tests: src/lib/export/__tests__/audioExportOnePath.contract.test.tsx (panel and MCP: sentinel + identical bytes; stems), moduleExportOneInput.contract.test.tsx (panel / OctaMED button / MCP, edit since load, sentinel counts). The OpenMPT WASM does not load in node, so that test replaces its writer with one that serialises what it is given: it proves the INPUT is one, not OpenMPT's bytes. Revert-checked: panel maxDurationSec mutation fails the audio equality; OctaMED back on a direct exportSongToMOD fails the sentinel.
+
 ### U4.1 - Guard final state
 Allowlist reduced to: `openSong.ts`, `songLifecycle.ts`, `acquireSource.ts`,
 the UADE engine family for `addCompanionFile`, `applySong.ts`, the export
@@ -351,8 +356,8 @@ services, and the parsers' internal recursion (`ChipDumpParsers`,
 - [x] U2.6b DJ components. Done: DJFileBrowser, DJView, DJDeck, DJPlaylistModal (6), DJPlaylistPanel (4), DJModlandBrowser (5), tourScript on openDeckTrack / acquireForDeck; every Modland deck load carries companions (20 parsed with none before). Allowlist: 17 entries / 32 calls removed, 1 owner entry added (openDeckSong)
 - [x] U2.7 UADE scan in a worker (measured 2026-10-07; see U2.7 result)
 - [x] U2.8 Hippel / MA / FP walks in a worker (measured 2026-10-07; see U2.8 result)
-- [ ] U3a one audio export
-- [ ] U3b one module / MIDI export input
+- [x] U3a one audio export (2026-10-08; see U3 result)
+- [x] U3b one module / MIDI export input (2026-10-08; see U3 result)
 - [ ] U4.1 guard final state
 
 ## Verification
