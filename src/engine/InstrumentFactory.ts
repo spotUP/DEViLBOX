@@ -35,6 +35,7 @@ import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
 import { SonicArrangerSynth } from './sonic-arranger/SonicArrangerSynth';
 import { DeltaMusic1Synth } from './deltamusic1/DeltaMusic1Synth';
 import { DeltaMusic2Synth } from './deltamusic2/DeltaMusic2Synth';
+import { InStereo1Synth } from './instereo1/InStereo1Synth';
 import { SymphonieSynth } from './symphonie/SymphonieSynth';
 import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { FuturePlayerSynth } from './futureplayer/FuturePlayerSynth';
@@ -881,6 +882,13 @@ export class InstrumentFactory {
           );
         }
         instrument = saSynth;
+        break;
+      }
+
+      case 'InStereo1Synth': {
+        const is1Synth = new InStereo1Synth();
+        is1Synth.setInstrumentNumber(config.id ?? 0);
+        instrument = is1Synth;
         break;
       }
 

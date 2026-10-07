@@ -228,6 +228,11 @@ struct Is1Module {
     float tick_accumulator;
     float ticks_per_frame;
 
+    // Keyboard preview: the module cut down to one note on voice 0 (is1_preview_note)
+    bool preview;
+    bool preview_done;
+    uint16_t preview_position;   // the one-note position's index
+    int preview_visits;
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -759,6 +764,12 @@ static void get_next_row(Is1Module* m) {
     m->speed_counter = 0;
 
     if (m->row_position >= m->rows_per_track) {
+        if (m->preview && m->preview_visits++ > 0) {
+            // the one-note song ends with its position: it does not restart the note
+            m->preview_done = true;
+            for (int i = 0; i < 4; i++) mix_mute(&m->mix_channels[i]);
+            return;
+        }
         m->row_position = 0;
 
         if (m->song_position > m->current_song_info->last_position)
@@ -813,6 +824,8 @@ static void get_next_row(Is1Module* m) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void play_tick(Is1Module* m) {
+    if (m->preview_done)
+        return;
     m->speed_counter++;
 
     if (m->speed_counter >= m->current_speed)
@@ -1476,4 +1489,52 @@ size_t is1_export(const Is1Module* module, uint8_t* out, size_t max_size) {
     if (max_size < total) return 0;
     memcpy(out, module->original_data, total);
     return total;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Keyboard preview: one note of one instrument through the replayer's own play_row and effects
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Cut the module down to one position whose voice 0 plays `note` (1-108, an index into the period
+ * table) of the 1-based `instrument` on row 0, the other voices silent. The position is appended
+ * and the note line goes in the first of the 64 padding track lines past the song's, so the
+ * instruments, waveforms and tables are the song's own.
+ */
+bool is1_preview_note(Is1Module* m, int instrument, int note) {
+    if (!m || instrument < 1 || instrument > m->num_instruments || m->num_sub_songs < 1) return false;
+
+    if (!m->preview) {
+        Is1SinglePositionInfo** p = (Is1SinglePositionInfo**)realloc(m->positions, ((size_t)m->total_positions + 1) * sizeof(Is1SinglePositionInfo*));
+        if (!p) return false;
+        m->positions = p;
+        m->positions[m->total_positions] = (Is1SinglePositionInfo*)calloc(4, sizeof(Is1SinglePositionInfo));
+        if (!m->positions[m->total_positions]) return false;
+        m->preview_position = m->total_positions;
+        m->positions[m->preview_position][0].start_track_row = (uint16_t)m->total_track_rows;
+        for (int k = 1; k < 4; k++) m->positions[m->preview_position][k].start_track_row = (uint16_t)(m->total_track_rows + 1);
+        m->total_positions++;
+        m->preview = true;
+    }
+
+    Is1TrackLine* line = &m->track_lines[m->total_track_rows];
+    memset(line, 0, sizeof(Is1TrackLine));
+    line->note = (uint8_t)note;
+    line->instrument = (uint8_t)instrument;
+
+    Is1SongInfo* song = &m->sub_songs[0];
+    song->first_position = song->last_position = song->restart_position = m->preview_position;
+    if (song->rows_per_track < 2 || song->rows_per_track > 62) song->rows_per_track = 62;
+
+    initialize_sound(m, 0);
+    m->preview_done = false;
+    m->preview_visits = 0;
+    m->tick_accumulator = m->ticks_per_frame;   // the first row plays with the first frame
+    return true;
+}
+
+void is1_preview_stop(Is1Module* m) {
+    if (!m) return;
+    m->preview_done = true;
+    for (int i = 0; i < 4; i++) mix_mute(&m->mix_channels[i]);
 }
