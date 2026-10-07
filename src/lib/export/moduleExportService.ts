@@ -16,6 +16,7 @@
 import { liveTrackerSong } from '@/lib/song/liveSong';
 import { exportWithOpenMPT, type OpenMPTExportOptions, type OpenMPTExportResult } from './OpenMPTExporter';
 import { exportSongToMOD, type ModExportResult } from './modExport';
+import type { ExportNativeOptions, NativeExportResult } from './nativeExportRouter';
 import { exportPatternToMIDI, exportSongToMIDI } from './midiExport';
 import type { MIDIExportOptions } from './midiTypes';
 
@@ -30,6 +31,16 @@ export async function exportModuleFile(
     initialSpeed: song.initialSpeed,
     ...options,
   });
+}
+
+/**
+ * The song's own native format (the format it was loaded in, edits included),
+ * from the stores. The one door to the native export router: callers pass
+ * options, never a song. Null when nothing can be exported.
+ */
+export async function exportNativeFile(options: ExportNativeOptions = {}): Promise<NativeExportResult | null> {
+  const { exportNativeSong } = await import('./nativeExportRouter');
+  return exportNativeSong(null, options);
 }
 
 /** The ProTracker MOD writer with synth voices baked to samples, from the live song. */

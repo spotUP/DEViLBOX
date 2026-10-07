@@ -85,7 +85,7 @@ describe('switching songs', () => {
   });
 
   it('the old song stops before the new one is scanned and parsed, and a failed load leaves no load in flight', async () => {
-    const { importModuleFile } = await import('@/lib/file/UnifiedFileLoader');
+    const { importModuleFile } = await import('@/lib/song/songBranches');
     await expect(importModuleFile(new File([new Uint8Array(4)], 'next.mod'))).rejects.toThrow('stop here');
     expect(order.log).toEqual(['old song stopped', 'scan', 'parse']);
     expect(useSongLoadStore.getState().depth).toBe(0);

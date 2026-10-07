@@ -14,7 +14,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, UADEConfig } from '@/types/instrument';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
-import type { UADEEnhancedScanRow, UADEMetadata } from '@/engine/uade/UADEEngine';
+import type { UADEEngine, UADEEnhancedScanRow, UADEMetadata } from '@/engine/uade/UADEEngine';
 import { enhancedSamplesAreUnusable, nativeGridHasNotes } from '@lib/import/uadeScanQuality';
 import { createSamplerInstrument } from './AmigaUtils';
 
@@ -438,26 +438,6 @@ async function tryReadChipRamNames(
 }
 
 /**
- * Which engine a parse scans on. The editor's by default; a DJ deck load runs
- * its parse inside withDeckUADEEngine so the scan lands on the deck's own
- * engine and never replaces the editor song's module or companions (plan
- * 2026-10-07, U2.6a). Deck parses run one at a time: the scope is a module
- * variable, so two overlapping deck parses would restore each other's scope.
- */
-let parseOnDeckEngine = false;
-let deckParseQueue: Promise<unknown> = Promise.resolve();
-
-export function withDeckUADEEngine<T>(fn: () => Promise<T>): Promise<T> {
-  const run = async (): Promise<T> => {
-    parseOnDeckEngine = true;
-    try { return await fn(); } finally { parseOnDeckEngine = false; }
-  };
-  const result = deckParseQueue.then(run, run);
-  deckParseQueue = result.catch(() => undefined);
-  return result;
-}
-
-/**
  * Parse an exotic Amiga music file via UADE scan.
  *
  * If the WASM has enhanced exports (read_memory, get_channel_extended, get_cia_state),
@@ -477,6 +457,8 @@ export async function parseUADEFile(
   subsong = 0,
   preScannedMeta?: UADEMetadata,
   companionFiles?: Map<string, ArrayBuffer>,
+  /** The engine the scan runs on. A deck load passes the deck's own; absent = the editor's. */
+  uadeEngine?: UADEEngine,
 ): Promise<TrackerSong> {
   const { UADEEngine } = await import('@engine/uade/UADEEngine');
   const { periodToNoteIndex } = await import('@engine/effects/PeriodTables');
@@ -490,7 +472,7 @@ export async function parseUADEFile(
 
   // Initialize UADE engine; reuse pre-scanned metadata from the dialog when available
   // (avoids a second full scan which can take several seconds per file)
-  const engine = parseOnDeckEngine ? UADEEngine.getDeckInstance() : UADEEngine.getInstance();
+  const engine = uadeEngine ?? UADEEngine.getInstance();
   await engine.ready();
 
   // Enable CIA tick snapshot capture BEFORE the scan so snapshots are accumulated

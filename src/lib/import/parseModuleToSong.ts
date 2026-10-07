@@ -15,7 +15,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import type { UADEMetadata } from '@/engine/uade/UADEEngine';
+import type { UADEEngine, UADEMetadata } from '@/engine/uade/UADEEngine';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { isAudioFile } from '@/lib/audioFileUtils';
 
@@ -45,7 +45,7 @@ interface ParseOptions {
  * Format engine preferences (Settings → Format Engine) control which parser
  * is used for formats supported by multiple engines (MOD, HVL, MED, FC, etc.).
  */
-export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata, midiOptions?: ParseOptions['midiOptions'], companionFiles?: Map<string, ArrayBuffer>): Promise<TrackerSong> {
+export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata, midiOptions?: ParseOptions['midiOptions'], companionFiles?: Map<string, ArrayBuffer>, uadeEngine?: UADEEngine): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
   let buffer = await file.arrayBuffer();
   const prefs = getFormatEngine();
@@ -104,14 +104,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   const { tryRouteFormat } = await import('./parsers/AmigaFormatParsers');
-  const routed = await tryRouteFormat(buffer, filename, file.name, prefs, subsong, preScannedMeta, companionFiles);
+  const routed = await tryRouteFormat(buffer, filename, file.name, prefs, subsong, preScannedMeta, companionFiles, uadeEngine);
   if (routed) return routed;
 
   // ── Final fallback: libopenmpt + UADE ──────────────────────────────────────
   // MOD files can be routed to UADE for authentic Amiga playback
   if ((filename.endsWith('.mod') || filename.endsWith('.m15')) && prefs.mod === 'uade') {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   const { parseTrackerModule } = await import('./parsers/PatternExtractor');
@@ -145,6 +145,6 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
         console.log(`[parseModuleToSong] No MOD signature at 1080, trying UADE as packed MOD: ${uadeFileName}`);
       }
     }
-    return await parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return await parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 }

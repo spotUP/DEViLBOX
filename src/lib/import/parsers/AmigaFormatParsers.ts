@@ -14,7 +14,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { UADEMetadata } from '@/engine/uade/UADEEngine';
+import type { UADEEngine, UADEMetadata } from '@/engine/uade/UADEEngine';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { withNativeDefault, withNativeThenUADE, callUADE, getBasename, injectUADEPlayback, type FallbackContext } from './withFallback';
 import { tryChipDumpParse } from './ChipDumpParsers';
@@ -102,8 +102,10 @@ export async function tryRouteFormat(
   subsong: number,
   preScannedMeta?: UADEMetadata,
   companionFiles?: Map<string, ArrayBuffer>,
+  /** The UADE engine the scan runs on (a deck's own, or the editor's when absent). */
+  uadeEngine?: UADEEngine,
 ): Promise<TrackerSong | null> {
-  const ctx: FallbackContext = { buffer, originalFileName, prefs, subsong, preScannedMeta, companionFiles };
+  const ctx: FallbackContext = { buffer, originalFileName, prefs, subsong, preScannedMeta, companionFiles, uadeEngine };
 
   // ── StarTrekker AM on a plain .mod (companion <name>.mod.nt) ─────────────
   // The AM instruments live in the .nt; the TS MOD engine plays it silent.
@@ -245,7 +247,7 @@ export async function tryRouteFormat(
     }
     // User explicitly requested UADE
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(ctx.buffer, ctx.originalFileName, ctx.prefs.uade ?? 'enhanced', ctx.subsong, ctx.preScannedMeta, ctx.companionFiles);
+    return parseUADEFile(ctx.buffer, ctx.originalFileName, ctx.prefs.uade ?? 'enhanced', ctx.subsong, ctx.preScannedMeta, ctx.companionFiles, ctx.uadeEngine);
   }
 
   // ── Delta Music 2.0 ──────────────────────────────────────────────────────
@@ -274,7 +276,7 @@ export async function tryRouteFormat(
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
@@ -362,7 +364,7 @@ export async function tryRouteFormat(
       console.warn(`[JamCrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Quadra Composer ───────────────────────────────────────────────────────
@@ -391,7 +393,7 @@ export async function tryRouteFormat(
       console.warn(`[AMOSMusicBankParser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Sonic Arranger ────────────────────────────────────────────────────────
@@ -437,7 +439,7 @@ export async function tryRouteFormat(
       console.warn(`[InStereo2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── InStereo! 1.0 (.is10 — unambiguous) ──────────────────────────────────
@@ -458,7 +460,7 @@ export async function tryRouteFormat(
       console.warn(`[InStereo1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── InStereo! (.is — ambiguous: detect by magic) ─────────────────────────
@@ -492,7 +494,7 @@ export async function tryRouteFormat(
       console.warn(`[InStereo2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── PreTracker ───────────────────────────────────────────────────────────
@@ -507,7 +509,7 @@ export async function tryRouteFormat(
       console.warn(`[PreTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Jochen Hippel CoSo ────────────────────────────────────────────────────
@@ -523,7 +525,7 @@ export async function tryRouteFormat(
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Rob Hubbard ───────────────────────────────────────────────────────────
@@ -570,7 +572,7 @@ export async function tryRouteFormat(
     } catch (err) {
       console.warn(`[TFMX] Native parse failed, falling back to UADE:`, err);
       const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-      return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+      return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     }
   }
 
@@ -657,7 +659,7 @@ export async function tryRouteFormat(
     
     // Last resort: UADE (handles obscure Amiga formats with .sid extension)
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── David Whittaker (.dw / .dwold) ───────────────────────────────────────
@@ -1602,7 +1604,7 @@ export async function tryRouteFormat(
   // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['md'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles);
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = originalFileName;
     return song;
@@ -1650,7 +1652,7 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['qpa', 'sqt', 'qts', '4v'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     const qFile = toUADEPrefixName(originalFileName, ['qpa', 'sqt', 'qts', '4v']);
-    const song = await parseUADEFile(buffer, qFile, 'enhanced', subsong, preScannedMeta, companionFiles);
+    const song = await parseUADEFile(buffer, qFile, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = qFile;
     return song;
@@ -1842,7 +1844,7 @@ export async function tryRouteFormat(
   // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['uds'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles);
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = originalFileName;
     return song;
@@ -1912,7 +1914,7 @@ export async function tryRouteFormat(
   // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['tits'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles);
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = originalFileName;
     return song;
@@ -1941,7 +1943,7 @@ export async function tryRouteFormat(
   if (await isUfoRoute(filename, buffer)) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     const musFile = toUADEPrefixName(originalFileName, ['mus', 'ufo']);
-    const song = await parseUADEFile(buffer, musFile, 'enhanced', subsong, preScannedMeta, companionFiles);
+    const song = await parseUADEFile(buffer, musFile, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = musFile;
     return song;
@@ -1994,7 +1996,7 @@ export async function tryRouteFormat(
   // ── Special FX (JD.* prefix) ──────────────────────────────────────────────
   if (matchesExt(filename, ['jd'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['jd']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['jd']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Sound Player / Steve Barrett (SJS.* prefix) ───────────────────────────
@@ -2024,7 +2026,7 @@ export async function tryRouteFormat(
   // ── Peter Verswyvelen Packer (PVP.* prefix) ───────────────────────────────
   if (matchesExt(filename, ['pvp'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['pvp']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['pvp']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Wally Beben (WB.* prefix) ─────────────────────────────────────────────
@@ -2053,7 +2055,7 @@ export async function tryRouteFormat(
   // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['snk'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles);
+    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = originalFileName;
     return song;
@@ -2265,7 +2267,7 @@ export async function tryRouteFormat(
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── MaxTrax (.mxtx) — native parser, native engine ────────────────────────────
@@ -2292,7 +2294,7 @@ export async function tryRouteFormat(
     const { adscRouteFor } = await import('@lib/import/adscRoute');
     if (adscRouteFor(companionFiles?.keys() ?? []) === 'uade') {
       const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-      return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+      return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     }
     const { parseStartrekkerAMFile } = await import('@lib/import/formats/StartrekkerAMParser');
 
@@ -2370,7 +2372,7 @@ export async function tryRouteFormat(
   // ── Rob Hubbard ST (RHO.* prefix) ─────────────────────────────────────────
   if (matchesExt(filename, ['rho'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['rho']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['rho']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Rob Hubbard (RH.* prefix) ─────────────────────────────────────────────
@@ -2453,31 +2455,31 @@ export async function tryRouteFormat(
   // may differ from .thm files so isThomasHermannFormat may not match; use stub directly.
   if (matchesExt(filename, ['tw'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['tw']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['tw']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
   // ── Darius Zendeh (.dz / DZ.* prefix) ────────────────────────────────────
   // Stub parser: filename-based title + 4 placeholder instruments. UADE classic audio.
   if (matchesExt(filename, ['dz'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dz']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dz']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Dynamic Synthesizer (.dns) ────────────────────────────────────────────
   if (matchesExt(filename, ['dns'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dns']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dns']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── Voodoo Supreme Synthesizer (.vss) ─────────────────────────────────────
   if (matchesExt(filename, ['vss'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['vss']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['vss']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
 
   // ── SynTracker (.synmod) ──────────────────────────────────────────────────
   if (matchesExt(filename, ['synmod'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['synmod']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['synmod']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
   // ── Mark II (.mk2 / .mkii / MK2.* prefix) ────────────────────────────────
   // Stub parser: filename-based title + 4 placeholder instruments. UADE classic audio.
@@ -2516,7 +2518,7 @@ export async function tryRouteFormat(
   // Enhanced scan gives garbled "mok [CIA unreliable...]" title due to MIDI clone format.
   if (matchesExt(filename, ['mok'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
   // ── SunTronic / TSM (.sun / .tsm / tsm.* prefix, V1.3 .src / .pc) ────────
   // The Sun Machine — Amiga synthetic music exe. Raw rips (.sun/.tsm): native
@@ -2631,7 +2633,7 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['jcbo', 'jcb', 'jb'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     const jbFile = toUADEPrefixName(originalFileName, ['jcbo', 'jcb', 'jb']);
-    const song = await parseUADEFile(buffer, jbFile, 'enhanced', subsong, preScannedMeta, companionFiles);
+    const song = await parseUADEFile(buffer, jbFile, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = jbFile;
     return song;
@@ -2809,7 +2811,7 @@ export async function tryRouteFormat(
   }
 
   // ── UADE-only prefix formats + catch-all ─────────────────────────────────
-  { const uadeResult = await tryUADEPrefixParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta, companionFiles);
+  { const uadeResult = await tryUADEPrefixParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta, companionFiles, uadeEngine);
     if (uadeResult) return uadeResult; }
 
   // ── PC tracker formats (S3M, IT, XM, MOD) — native then libopenmpt ──────

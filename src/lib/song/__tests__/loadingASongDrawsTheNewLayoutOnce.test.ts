@@ -61,7 +61,7 @@ function modelWorker(hold: boolean) {
 }
 
 async function loadSongs() {
-  const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+  const { importTrackerModule } = await import('@/lib/song/songBranches');
   const { snapshotSong } = await import('../snapshotSong');
   const { savedSongToApply } = await import('../savedSong');
   const path = 'src/__tests__/fixtures/micro15-goto80.mod';

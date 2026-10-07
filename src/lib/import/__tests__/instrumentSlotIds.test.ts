@@ -49,7 +49,7 @@ describe('instrument slot ids on import', () => {
   it('the imported song plays slot 16 where the cells say 16 (through importTrackerModule)', async () => {
     // The dialog's ModuleInfo for a MOD: the native parse ModuleLoader makes
     // (loadWithNativeParser's MOD branch) - the branch that numbered by index.
-    const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+    const { importTrackerModule } = await import('@/lib/song/songBranches');
     const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
     const bytes = readFileSync(MICRO15);

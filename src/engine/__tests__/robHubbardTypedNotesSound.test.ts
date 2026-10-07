@@ -50,7 +50,7 @@ beforeAll(() => {
 async function load(): Promise<Uint8Array> {
   const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs', REL)));
   const file = new File([bytes.slice().buffer as ArrayBuffer], basename(REL));
-  const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+  const { importTrackerModule } = await import('@/lib/song/songBranches');
   await importTrackerModule({
     metadata: { title: basename(REL), type: 'MOD', channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1, duration: 0 },
     arrayBuffer: await file.arrayBuffer(), file,

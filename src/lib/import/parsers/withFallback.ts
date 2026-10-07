@@ -11,7 +11,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import type { UADEMetadata } from '@/engine/uade/UADEEngine';
+import type { UADEEngine, UADEMetadata } from '@/engine/uade/UADEEngine';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 // "Has a dedicated engine" is asked of the engine registry itself. Two
 // hand-written lists stood here, copied from it and disagreeing (11 and 24 of
@@ -29,6 +29,8 @@ export interface FallbackContext {
   preScannedMeta?: UADEMetadata;
   /** Companion files (e.g. SMPL.* for MIDI-Loriciel, .ssd for Paul Robotham) */
   companionFiles?: Map<string, ArrayBuffer>;
+  /** The UADE engine a scan runs on; absent = the editor's. A deck parse passes its own. */
+  uadeEngine?: UADEEngine;
 }
 
 /**
@@ -105,7 +107,7 @@ export async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
   return parseUADEFile(
     ctx.buffer, ctx.originalFileName,
     ctx.prefs.uade ?? 'enhanced', ctx.subsong, ctx.preScannedMeta,
-    ctx.companionFiles,
+    ctx.companionFiles, ctx.uadeEngine,
   );
 }
 
