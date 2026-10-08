@@ -13,6 +13,7 @@ import { useOscilloscopeStore, liveScopeFrame } from '@stores/useOscilloscopeSto
 import { useMixerStore } from '@stores/useMixerStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { channelLayout, scopeCells } from './channelLayout';
 
 const STRIP_HEIGHT = 72;
 
@@ -158,13 +159,11 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
         } catch { /* engine not ready */ }
       }
 
+      const cells = scopeCells(nc, cw, channelLayout);
       for (let i = 0; i < nc; i++) {
-        // Always stretch to full width — equal spacing across canvas
-        const gap = 1;
-        const totalGaps = nc - 1;
-        const scopeW = (cw - totalGaps * gap) / nc;
-        const x = i * (scopeW + gap);
-        const w = scopeW;
+        // Over the channel's own pattern column (owner 2026-10-08)
+        const { x, w } = cells[i];
+        if (w < 2 || x + w <= 0 || x >= cw) continue;
 
         const y = 1;
         const h = ch - 2;
@@ -222,15 +221,18 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
     return () => cancelAnimationFrame(animRef.current);
   }, [drawWaveform]);
 
-  // Click a channel scope to toggle its mute (solo with modifier). The strip is
-  // full-width with `numChannels` equal cells, so channel = floor(x / cellWidth).
+  // Click a channel scope to toggle its mute (solo with modifier): the cell
+  // under the pointer, laid out like the drawing (scopeCells).
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const nc = numChRef.current;
     if (nc <= 0 || rect.width <= 0) return;
-    const ch = Math.min(nc - 1, Math.max(0, Math.floor(((e.clientX - rect.left) / rect.width) * nc)));
+    const px = e.clientX - rect.left;
+    const hit = scopeCells(nc, rect.width, channelLayout).findIndex((c) => px >= c.x && px < c.x + c.w);
+    if (hit < 0) return;
+    const ch = hit;
     const mixer = useMixerStore.getState();
     if (e.altKey || e.metaKey) {
       // Alt/Cmd-click = solo toggle (isolate this channel).

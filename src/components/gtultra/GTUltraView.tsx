@@ -18,7 +18,7 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { TrackScopesStrip } from '@/components/tracker/TrackScopesStrip';
 import { GTU_COLUMNS } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
-import { GTOrderMatrix, GT_ORDER_MATRIX_HEIGHT, GT_ORDER_MATRIX_COLLAPSED_HEIGHT } from './GTOrderMatrix';
+import { GTOrderMatrix, GT_ORDER_MATRIX_COLLAPSED_HEIGHT } from './GTOrderMatrix';
 import { useGTKeyboardHandler } from './GTKeyboardHandler';
 import { useGTDAWKeyboardHandler } from '../../hooks/useGTDAWKeyboardHandler';
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
@@ -56,7 +56,6 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
   useGTUltraEngineInit();
 
   const toggleOrdersCollapsed = useCallback(() => setOrdersCollapsed(v => !v), []);
-  const matrixH = ordersCollapsed ? GT_ORDER_MATRIX_COLLAPSED_HEIGHT : GT_ORDER_MATRIX_HEIGHT;
 
   // DAW mode renders the modern visual editor
   if (viewMode === 'daw') {
@@ -80,10 +79,13 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
             <GTToolbar />
           </div>
 
-          <div style={{ height: matrixH, flexShrink: 0 }}>
+          {/* Half the pattern editor's height (flex 1 : 2), clipped so the
+              matrix never draws over the scopes strip below it. */}
+          <div style={ordersCollapsed
+            ? { height: GT_ORDER_MATRIX_COLLAPSED_HEIGHT, flexShrink: 0, overflow: 'hidden' }
+            : { flex: '1 1 0', minHeight: 0, overflow: 'hidden' }}>
             <GTOrderMatrix
               width={containerWidth}
-              height={matrixH}
               collapsed={ordersCollapsed}
               onToggleCollapse={toggleOrdersCollapsed}
             />
@@ -93,7 +95,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
 
       {!editorFullscreen && <TrackScopesStrip channelCount={channels.length} />}
 
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flex: '2 1 0', minHeight: 0, overflow: 'hidden' }}>
         <PatternEditorCanvas
           formatColumns={GTU_COLUMNS}
           formatChannels={channels}
