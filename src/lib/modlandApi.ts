@@ -120,7 +120,7 @@ export async function getModlandFormats(): Promise<ModlandFormat[]> {
   return data.formats;
 }
 
-export async function downloadModlandFile(fullPath: string): Promise<ArrayBuffer> {
+export async function downloadModlandFile(fullPath: string, onProgress?: (progress: DownloadProgress) => void): Promise<ArrayBuffer> {
   const response = await fetch(
     `${API_URL}/modland/download?path=${encodeURIComponent(fullPath)}`
   );
@@ -131,7 +131,42 @@ export async function downloadModlandFile(fullPath: string): Promise<ArrayBuffer
     const err = await response.json().catch(() => ({ error: 'Download failed' }));
     throw new Error(err.error || 'Download failed');
   }
-  return response.arrayBuffer();
+  return readBodyWithProgress(response, onProgress);
+}
+
+/** How far a download is: bytes in, of `total` (null when the server sent no Content-Length). */
+export interface DownloadProgress {
+  received: number;
+  total: number | null;
+}
+
+/**
+ * A response body as one buffer, reporting each chunk as it arrives. The one
+ * download-progress source: every row that shows a download reads it through
+ * the callback. Without a callback, or a body that cannot stream, the plain read.
+ */
+export async function readBodyWithProgress(
+  response: Response,
+  onProgress?: (progress: DownloadProgress) => void,
+): Promise<ArrayBuffer> {
+  if (!onProgress || !response.body) return response.arrayBuffer();
+  const length = Number(response.headers.get('content-length'));
+  const total = Number.isFinite(length) && length > 0 ? length : null;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  onProgress({ received, total });
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    onProgress({ received, total });
+  }
+  const out = new Uint8Array(received);
+  let at = 0;
+  for (const c of chunks) { out.set(c, at); at += c.byteLength; }
+  return out.buffer;
 }
 
 /**
