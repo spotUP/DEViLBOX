@@ -350,8 +350,20 @@ extern "C" {
 
 /* --- Lifecycle --- */
 
+/* A song's playback settings come from the 0x1f block of a GTUltra .sng. A
+ * GoatTracker 2 .sng has no such block (its speed multiplier is a pack option
+ * of the exporter), so a song without one plays at 1x PAL with the default
+ * hard restart - never at what the previous song left behind. multiplier 0
+ * is GoatTracker's own value for 25 Hz, so it is not a missing value. */
+static void gt_default_song_settings(void) {
+    editorInfo.multiplier = 1;
+    editorInfo.ntsc = 0;
+    editorInfo.adparam = 0;
+}
+
 EMSCRIPTEN_KEEPALIVE
 void gt_init(int sampleRate, int model) {
+    gt_default_song_settings();
     gt_sample_rate = sampleRate;
     gt_initialized = 1;
 
@@ -387,6 +399,7 @@ int gt_load_sng(const unsigned char* data, int len) {
     fwrite(data, 1, len, f);
     fclose(f);
     strcpy(songfilename, "/tmp/temp.sng");
+    gt_default_song_settings();
     int ok = loadsong(&gtObject, 0);
 
     /* Sync gt_sid_count from loaded song metadata so gt_get_channel_count()
@@ -420,7 +433,6 @@ EMSCRIPTEN_KEEPALIVE
 int gt_export_prg(unsigned char* outBuf, int maxLen) {
     if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
     if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
-    if (editorInfo.multiplier == 0) editorInfo.multiplier = 1;
     editorInfo.optimizepulse = 1;
     editorInfo.optimizerealtime = 1;
     editorInfo.finevibrato = 1;
@@ -451,7 +463,6 @@ EMSCRIPTEN_KEEPALIVE
 int gt_export_sid(unsigned char* outBuf, int maxLen) {
     if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
     if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
-    if (editorInfo.multiplier == 0) editorInfo.multiplier = 1;
     editorInfo.optimizepulse = 1;
     editorInfo.optimizerealtime = 1;
     editorInfo.finevibrato = 1;
@@ -480,6 +491,7 @@ int gt_export_sid(unsigned char* outBuf, int maxLen) {
 
 EMSCRIPTEN_KEEPALIVE
 void gt_new_song(void) {
+    gt_default_song_settings();
     clearsong(1, 1, 1, 1, 1, &gtObject);
 }
 
@@ -493,15 +505,15 @@ void gt_play(int songNum, int fromPos, int fromRow) {
      * may lack it, leaving all fields at zero. Match the export-path defaults. */
     if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
     if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
-    if (editorInfo.multiplier == 0) editorInfo.multiplier = 1;
 
     /* Update framerate from multiplier + PAL/NTSC — sound_init() is never called
      * from the WASM bridge, so framerate stays at its static initializer (50).
-     * Songs with multiplier > 1 need proportionally higher tick rates. */
-    if (editorInfo.ntsc)
-        framerate = NTSCFRAMERATE * editorInfo.multiplier;
+     * Songs with multiplier > 1 need proportionally higher tick rates, and
+     * multiplier 0 is the half-speed (25 Hz) setting (gsound.c sound_init). */
+    if (editorInfo.multiplier)
+        framerate = (editorInfo.ntsc ? NTSCFRAMERATE : PALFRAMERATE) * editorInfo.multiplier;
     else
-        framerate = PALFRAMERATE * editorInfo.multiplier;
+        framerate = (editorInfo.ntsc ? NTSCFRAMERATE : PALFRAMERATE) / 2;
 
     /* Sync SID count from song metadata (6ch = dual SID, 9ch = triple, etc.) */
     gt_sid_count = (editorInfo.maxSIDChannels + 2) / 3;
