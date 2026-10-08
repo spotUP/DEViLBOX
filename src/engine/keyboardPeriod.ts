@@ -54,3 +54,19 @@ export function keyboardVelocity(
   const v = modPlayback.defaultVolume;
   return v !== undefined && v >= 0 && v < 64 ? velocity * (v / 64) : velocity;
 }
+
+/**
+ * The period that plays an Amiga Sampler at the rate it is stored at: the instrument-list audition. It used to name
+ * the sample's base note (C3) and let the engine take the ratio to the base note, which was natural pitch until a
+ * key took the grid note's period (C3 = grid C-3 = period 214 = twice the stored 8287 Hz, one octave too high).
+ * Undefined when the instrument does not play by period; the caller then names the base note as before.
+ */
+export function naturalPeriod(config: {
+  sample?: { sampleRate?: number };
+  metadata?: { modPlayback?: { usePeriodPlayback?: boolean; periodMultiplier?: number } };
+}): number | undefined {
+  const mp = config.metadata?.modPlayback;
+  const rate = config.sample?.sampleRate;
+  if (!mp?.usePeriodPlayback || !mp.periodMultiplier || !rate) return undefined;
+  return mp.periodMultiplier / rate;
+}
