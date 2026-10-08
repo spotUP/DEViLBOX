@@ -57,6 +57,11 @@ interface NoteOn { chunk: number; period: number; len: number }
 
 /** Per voice the note-ons UADE's player makes: a sample pointer, then the period (AUDxLEN read from the same burst). */
 function paulaNoteOns(mod: PaulaLogModule, bytes: Uint8Array, name: string, seconds: number): { ons: NoteOn[][]; endedAt: number | null } {
+  // One module serves every song of the corpus. A soft load after a rendered song keeps the core's
+  // timing state, so the second song's player ticks fell up to a chunk later than the grid's rows
+  // (skateordie after budokan: 12 notes 4 chunks late; alone it is exact). The app never soft-loads
+  // after a render (UADE.worklet.js full-resets); the oracle loads the way the app does.
+  (mod as unknown as { _uade_wasm_full_reset(): number })._uade_wasm_full_reset();
   const s = new PaulaSession(mod, bytes, name);
   const ons: NoteOn[][] = [[], [], [], []];
   const armed = [false, false, false, false];
