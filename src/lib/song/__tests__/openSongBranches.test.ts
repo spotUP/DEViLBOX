@@ -63,13 +63,17 @@ describe('every branch behind openSong is reached through it', { timeout: 120000
     vi.mocked(applySong).mockClear();
   });
 
+  // The editor mode of a branch comes from its format (applyEditorMode on the
+  // song's engine fields): the branches that fill their own store without a
+  // custom editor (SunVox has its own pattern view, V2M and MIDI play through
+  // a feeder) open in the classic editor; only GoatTracker has an editor mode.
   it.each([
-    ['MIDI', 'public/data/songs/midi/drum_song.mid', 'project', 'loadSongFile'],
-    ['SunVox', 'public/data/songs/sunvox/last blow.sunvox', 'sunvox', 'loadSongFile'],
-    ['V2M', 'test-data/test.v2m', 'v2m', 'loadV2MFile'],
-  ] as const)('%s opens through openSong and its branch applies the song once', async (_label, rel, kind, branch) => {
+    ['MIDI', 'public/data/songs/midi/drum_song.mid', 'project', 'loadSongFile', 'classic'],
+    ['SunVox', 'public/data/songs/sunvox/last blow.sunvox', 'sunvox', 'loadSongFile', 'classic'],
+    ['V2M', 'test-data/test.v2m', 'v2m', 'loadV2MFile', 'classic'],
+  ] as const)('%s opens through openSong and its branch applies the song once', async (_label, rel, kind, branch, editorMode) => {
     const r = await open(basename(rel), bytesOf(rel));
-    expect(r).toMatchObject({ ok: true, kind });
+    expect(r).toMatchObject({ ok: true, kind, editorMode });
     expect(vi.mocked(branches[branch])).toHaveBeenCalledTimes(1);
     expect(vi.mocked(applySong)).toHaveBeenCalledTimes(1);
     expect(useTrackerStore.getState().patterns.length).toBeGreaterThan(0);
@@ -101,6 +105,9 @@ describe('every branch behind openSong is reached through it', { timeout: 120000
     expect(useFormatStore.getState().goatTrackerData?.byteLength).toBe(appliedBytes);
     expect(useGTUltraStore.getState().pendingSongData?.byteLength).toBe(appliedBytes);
     expect(useGTUltraStore.getState().songName).toBe('$3jammar-akhbar');
+    // The GoatTracker editor is the view, never the scope view: the mode is the format's.
+    expect(useFormatStore.getState().editorMode).toBe('goattracker');
+    expect(useFormatStore.getState().c64SidFileData).toBeNull();
   });
 
   it('AdPlug opens through openSong, extracts, and applies the song once', async () => {
