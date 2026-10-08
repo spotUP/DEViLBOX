@@ -380,9 +380,13 @@ export async function parseRJPFile(
     const loopEnd = loopStart + loopLenW * 2;
     const lengthBytes = (oneShotW + loopLenW) * 2;
 
-    if (smpBuf && smpOffset + lengthBytes <= smpBuf.length && lengthBytes > 2) {
+    // The descriptor's offset names a 4-byte sample header (2 words); the player points Paula 4 bytes past it.
+    // Measured against the sample bytes in chip RAM (richardJosephKeys.test.ts): the PCM from the descriptor's
+    // offset itself started with the header (a click on every key and note) and ended 4 bytes short.
+    const SAMPLE_HEADER_BYTES = 4;
+    if (smpBuf && smpOffset + SAMPLE_HEADER_BYTES + lengthBytes <= smpBuf.length && lengthBytes > 2) {
       // Extract real PCM from companion file
-      const pcm = smpBuf.slice(smpOffset, smpOffset + lengthBytes);
+      const pcm = smpBuf.slice(smpOffset + SAMPLE_HEADER_BYTES, smpOffset + SAMPLE_HEADER_BYTES + lengthBytes);
       instruments.push(
         createSamplerInstrument(
           i + 1,
