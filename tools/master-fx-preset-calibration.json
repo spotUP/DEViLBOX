@@ -8,7 +8,8 @@
     "chainDb": 0,
     "makeUpDb": 0,
     "oldMakeUpDb": -3.4,
-    "at": "2026-09-30T10:21:36.795Z"
+    "at": "2026-09-30T10:21:36.795Z",
+    "chain": "[[\"wasm\",\"Leslie\",true,30,[[\"acceleration\",0.5],[\"doppler\",0.4],[\"drumDepth\",0.3],[\"drumRate\",5.9],[\"hornDepth\",0.5],[\"hornRate\",6.8],[\"speed\",0],[\"width\",0.7]]],[\"tonejs\",\"TapeSaturation\",true,25,[[\"drive\",30],[\"tone\",10000]]]]"
   },
   "Chip Metal": {
     "name": "Chip Metal",
@@ -25,7 +26,8 @@
     "chainDb": 2.9,
     "makeUpDb": -2.9,
     "oldMakeUpDb": -1.7,
-    "at": "2026-09-30T05:30:39.957Z"
+    "at": "2026-09-30T05:30:39.957Z",
+    "chain": "[[\"wasm\",\"EQ8Band\",true,100,[[\"highShelfFreq\",10000],[\"highShelfGain\",-3],[\"hpFreq\",35],[\"lowShelfFreq\",90],[\"lowShelfGain\",0],[\"lpFreq\",12000],[\"mix\",1],[\"peak1Freq\",250],[\"peak1Gain\",0],[\"peak1Q\",1],[\"peak2Freq\",900],[\"peak2Gain\",0],[\"peak2Q\",1],[\"peak3Freq\",3000],[\"peak3Gain\",0],[\"peak3Q\",1],[\"peak4Freq\",8000],[\"peak4Gain\",-2],[\"peak4Q\",1]]],[\"wasm\",\"SwedishChainsaw\",true,65,[[\"ampGain\",100],[\"bass\",100],[\"middle\",100],[\"pedalGain\",100],[\"tight\",100],[\"treble\",100],[\"volume\",50]]],[\"wasm\",\"EQ8Band\",true,100,[[\"highShelfFreq\",9000],[\"highShelfGain\",-2],[\"hpFreq\",30],[\"lowShelfFreq\",90],[\"lowShelfGain\",3],[\"lpFreq\",16000],[\"mix\",1],[\"peak1Freq\",400],[\"peak1Gain\",-3],[\"peak1Q\",1],[\"peak2Freq\",900],[\"peak2Gain\",0],[\"peak2Q\",1],[\"peak3Freq\",2500],[\"peak3Gain\",1.5],[\"peak3Q\",1.2],[\"peak4Freq\",8000],[\"peak4Gain\",0],[\"peak4Q\",1]]],[\"tonejs\",\"SidechainCompressor\",true,100,[[\"attack\",0.003],[\"knee\",6],[\"ratio\",3],[\"release\",0.12],[\"scFilterType\",\"lowpass\"],[\"scFreq\",150],[\"scQ\",0.7],[\"sidechainGain\",100],[\"sidechainSource\",-2],[\"threshold\",-24]]],[\"wasm\",\"MultibandComp\",true,100,[[\"highCrossover\",4000],[\"highGain\",1],[\"highRatio\",2],[\"highThreshold\",-22],[\"lowCrossover\",150],[\"lowGain\",1],[\"lowRatio\",3],[\"lowThreshold\",-20],[\"midGain\",1],[\"midRatio\",2.5],[\"midThreshold\",-22]]],[\"wasm\",\"TransientDesigner\",true,100,[[\"attack\",0.3],[\"output\",1],[\"sustain\",-0.1]]],[\"wasm\",\"DragonflyRoom\",true,10,[[\"damping\",60],[\"decay\",25],[\"earlyLevel\",80],[\"predelay\",5],[\"size\",0.5],[\"width\",80]]],[\"wasm\",\"Maximizer\",true,100,[[\"ceiling\",-1],[\"mix\",1],[\"release\",60]]]]"
   },
   "Room Glue": {
     "name": "Room Glue",
@@ -37,7 +39,8 @@
     "makeUpDb": 3.2,
     "oldMakeUpDb": 4.3,
     "at": "2026-09-30T05:30:49.799Z",
-    "songDb": 0.2
+    "songDb": 0.2,
+    "chain": "[[\"wasm\",\"MVerb\",true,15,[[\"bandwidth\",0.7],[\"damping\",0.6],[\"decay\",0.3],[\"density\",0.5],[\"earlyMix\",0.7],[\"gain\",1],[\"mix\",0.3],[\"predelay\",0],[\"size\",0.4]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.01],[\"ratio\",2.5],[\"release\",0.2],[\"threshold\",-16]]]]"
   },
   "Immersive": {
     "name": "Immersive",
@@ -51,7 +54,8 @@
     "makeUpDb": 4.6,
     "oldMakeUpDb": 4.2,
     "at": "2026-09-30T05:30:59.636Z",
-    "songDb": -0.1
+    "songDb": -0.1,
+    "chain": "[[\"tonejs\",\"Chorus\",true,10,[[\"depth\",0.15],[\"frequency\",0.2]]],[\"wasm\",\"MVerb\",true,12,[[\"bandwidth\",0.6],[\"damping\",0.5],[\"decay\",0.4],[\"density\",0.6],[\"earlyMix\",0.6],[\"gain\",1],[\"mix\",0.35],[\"predelay\",0.01],[\"size\",0.6]]],[\"tonejs\",\"StereoWidener\",true,100,[[\"width\",0.6]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.02],[\"ratio\",2],[\"release\",0.25],[\"threshold\",-16]]]]"
   },
   "Leslie Cabinet": {
     "name": "Leslie Cabinet",
@@ -62,7 +66,8 @@
     "makeUpDb": 0.8,
     "oldMakeUpDb": 5.5,
     "at": "2026-09-30T05:31:09.477Z",
-    "songDb": -0.4
+    "songDb": -0.4,
+    "chain": "[[\"wasm\",\"Leslie\",true,60,[[\"acceleration\",0.5],[\"doppler\",0.6],[\"drumDepth\",0.5],[\"drumRate\",5.9],[\"hornDepth\",0.7],[\"hornRate\",6.8],[\"speed\",1],[\"width\",0.8]]]]"
   },
   "Hall Reverb": {
     "name": "Hall Reverb",
@@ -73,7 +78,8 @@
     "makeUpDb": 0.5,
     "oldMakeUpDb": 3.2,
     "at": "2026-09-30T05:31:19.275Z",
-    "songDb": 0.3
+    "songDb": 0.3,
+    "chain": "[[\"tonejs\",\"Reverb\",true,30,[[\"decay\",5],[\"preDelay\",0.04]]]]"
   },
   "VHS Tape": {
     "name": "VHS Tape",
@@ -108,7 +114,8 @@
     "chainDb": 2.5,
     "makeUpDb": -2.5,
     "oldMakeUpDb": -5,
-    "at": "2026-09-30T10:24:11.353Z"
+    "at": "2026-09-30T10:24:11.353Z",
+    "chain": "[[\"tonejs\",\"BitCrusher\",true,20,[[\"bits\",12]]],[\"tonejs\",\"Vibrato\",true,30,[[\"depth\",0.15],[\"frequency\",2],[\"maxDelay\",0.005],[\"type\",\"sine\"]]],[\"tonejs\",\"TapeSaturation\",true,50,[[\"drive\",40],[\"tone\",9000]]]]"
   },
   "Lo-Fi Radio": {
     "name": "Lo-Fi Radio",
@@ -119,7 +126,8 @@
     "chainDb": 4.4,
     "makeUpDb": -4.4,
     "oldMakeUpDb": -4.2,
-    "at": "2026-09-30T10:24:21.058Z"
+    "at": "2026-09-30T10:24:21.058Z",
+    "chain": "[[\"tonejs\",\"BitCrusher\",true,60,[[\"bits\",8]]],[\"tonejs\",\"Tremolo\",true,40,[[\"depth\",0.6],[\"frequency\",4],[\"type\",\"sine\"]]]]"
   },
   "Dub / Reggae": {
     "name": "Dub / Reggae",
@@ -145,7 +153,8 @@
     "makeUpDb": 4.9,
     "oldMakeUpDb": 9.4,
     "at": "2026-09-30T05:32:17.911Z",
-    "songDb": 0.5
+    "songDb": 0.5,
+    "chain": "[[\"wasm\",\"MVerb\",true,20,[[\"bandwidth\",0.5],[\"damping\",0.4],[\"decay\",0.6],[\"density\",0.7],[\"earlyMix\",0.4],[\"gain\",1],[\"mix\",0.4],[\"predelay\",0.04],[\"size\",0.85]]],[\"tonejs\",\"StereoWidener\",true,100,[[\"width\",0.6]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.03],[\"ratio\",2],[\"release\",0.4],[\"threshold\",-20]]]]"
   },
   "Psychedelic": {
     "name": "Psychedelic",
@@ -158,7 +167,8 @@
     "makeUpDb": 0,
     "oldMakeUpDb": 9.9,
     "at": "2026-09-30T05:32:27.688Z",
-    "songDb": -1.2
+    "songDb": -1.2,
+    "chain": "[[\"wasm\",\"Leslie\",true,50,[[\"acceleration\",0.5],[\"doppler\",0.5],[\"drumDepth\",0.5],[\"drumRate\",5.9],[\"hornDepth\",0.7],[\"hornRate\",6.8],[\"speed\",1],[\"width\",0.8]]],[\"tonejs\",\"Phaser\",true,30,[[\"Q\",4],[\"baseFrequency\",300],[\"frequency\",0.2],[\"octaves\",4],[\"stages\",8]]],[\"tonejs\",\"Reverb\",true,25,[[\"decay\",3],[\"preDelay\",0.02]]]]"
   },
   "Synthwave": {
     "name": "Synthwave",
@@ -182,7 +192,8 @@
     "chainDb": -2,
     "makeUpDb": 2,
     "oldMakeUpDb": -2.3,
-    "at": "2026-09-30T10:25:19.340Z"
+    "at": "2026-09-30T10:25:19.340Z",
+    "chain": "[[\"tonejs\",\"Chorus\",true,40,[[\"depth\",0.7],[\"frequency\",0.8]]],[\"tonejs\",\"TapeSaturation\",true,40,[[\"drive\",50],[\"tone\",8000]]],[\"tonejs\",\"Reverb\",true,60,[[\"decay\",7],[\"preDelay\",0.04]]]]"
   },
   "Garage / 2-Step": {
     "name": "Garage / 2-Step",
@@ -241,7 +252,8 @@
     "makeUpDb": -1.9,
     "oldMakeUpDb": 2.3,
     "at": "2026-09-30T05:33:36.117Z",
-    "songDb": -1.1
+    "songDb": -1.1,
+    "chain": "[[\"tonejs\",\"Phaser\",true,60,[[\"Q\",6],[\"baseFrequency\",350],[\"frequency\",0.3],[\"octaves\",3],[\"stages\",10]]]]"
   },
   "Auto-Pan": {
     "name": "Auto-Pan",
@@ -252,7 +264,8 @@
     "makeUpDb": -0.6,
     "oldMakeUpDb": 1,
     "at": "2026-09-30T05:33:45.918Z",
-    "songDb": 0.1
+    "songDb": 0.1,
+    "chain": "[[\"tonejs\",\"AutoPanner\",true,70,[[\"depth\",0.8],[\"frequency\",0.25],[\"type\",\"sine\"]]]]"
   },
   "Vibrato Wobble": {
     "name": "Vibrato Wobble",
@@ -263,7 +276,8 @@
     "makeUpDb": -1.3,
     "oldMakeUpDb": 1.3,
     "at": "2026-09-30T05:33:55.686Z",
-    "songDb": 0
+    "songDb": 0,
+    "chain": "[[\"tonejs\",\"Vibrato\",true,50,[[\"depth\",0.3],[\"frequency\",3],[\"maxDelay\",0.005],[\"type\",\"sine\"]]]]"
   },
   "Feedback Loop": {
     "name": "Feedback Loop",
@@ -284,7 +298,8 @@
     "makeUpDb": 0,
     "oldMakeUpDb": 0.6,
     "at": "2026-09-30T05:34:19.231Z",
-    "songDb": -0.6
+    "songDb": -0.6,
+    "chain": "[[\"wam\",\"WAMStonePhaser\",true,60,[]]]"
   },
   "Small Room": {
     "name": "Small Room",
@@ -295,7 +310,8 @@
     "makeUpDb": 1.7,
     "oldMakeUpDb": 3.9,
     "at": "2026-09-30T05:34:29.007Z",
-    "songDb": 0.3
+    "songDb": 0.3,
+    "chain": "[[\"wasm\",\"MVerb\",true,30,[[\"bandwidth\",0.8],[\"damping\",0.7],[\"decay\",0.2],[\"density\",0.4],[\"earlyMix\",0.8],[\"gain\",1],[\"mix\",0.4],[\"predelay\",0],[\"size\",0.25]]]]"
   },
   "Plate Shimmer": {
     "name": "Plate Shimmer",
@@ -306,7 +322,8 @@
     "makeUpDb": 2.2,
     "oldMakeUpDb": 4.7,
     "at": "2026-09-30T05:34:38.782Z",
-    "songDb": 1
+    "songDb": 1,
+    "chain": "[[\"wasm\",\"MVerb\",true,45,[[\"bandwidth\",0.6],[\"damping\",0.3],[\"decay\",0.75],[\"density\",0.8],[\"earlyMix\",0.3],[\"gain\",1],[\"mix\",0.5],[\"predelay\",0.02],[\"size\",0.9]]]]"
   },
   "Cathedral": {
     "name": "Cathedral",
@@ -328,7 +345,8 @@
     "makeUpDb": 3.1,
     "oldMakeUpDb": -10.2,
     "at": "2026-09-30T05:34:58.310Z",
-    "songDb": -0.1
+    "songDb": -0.1,
+    "chain": "[[\"wasm\",\"SpringReverb\",true,50,[[\"damping\",0.35],[\"decay\",0.6],[\"diffusion\",0.6],[\"drip\",0.7],[\"mix\",0.4],[\"tension\",0.5]]]]"
   },
   "Ping Pong Hall": {
     "name": "Ping Pong Hall",
@@ -350,7 +368,8 @@
     "makeUpDb": 2.6,
     "oldMakeUpDb": 5.3,
     "at": "2026-09-30T05:35:17.837Z",
-    "songDb": 1.1
+    "songDb": 1.1,
+    "chain": "[[\"wasm\",\"MVerb\",true,50,[[\"bandwidth\",0.3],[\"damping\",0.8],[\"decay\",0.85],[\"density\",0.7],[\"earlyMix\",0.3],[\"gain\",1],[\"mix\",1],[\"predelay\",0.02],[\"size\",0.9]]]]"
   },
   "Tight Room": {
     "name": "Tight Room",
@@ -361,7 +380,8 @@
     "makeUpDb": 2,
     "oldMakeUpDb": 3.5,
     "at": "2026-09-30T05:35:27.589Z",
-    "songDb": 0.3
+    "songDb": 0.3,
+    "chain": "[[\"wasm\",\"MVerb\",true,40,[[\"bandwidth\",0.7],[\"damping\",0.6],[\"decay\",0.3],[\"density\",0.4],[\"earlyMix\",0.7],[\"gain\",1],[\"mix\",1],[\"predelay\",0],[\"size\",0.3]]]]"
   },
   "Spacey Delay": {
     "name": "Spacey Delay",
@@ -384,7 +404,8 @@
     "makeUpDb": 6.3,
     "oldMakeUpDb": -30.8,
     "at": "2026-09-30T05:35:47.125Z",
-    "songDb": -0.2
+    "songDb": -0.2,
+    "chain": "[[\"tonejs\",\"SpaceEcho\",true,50,[[\"bpmSync\",1],[\"echoVolume\",0.85],[\"intensity\",0.65],[\"mode\",4],[\"rate\",300],[\"reverbVolume\",0.25],[\"syncDivision\",\"1/4\"]]],[\"wasm\",\"SpringReverb\",true,25,[[\"damping\",0.4],[\"decay\",0.5],[\"diffusion\",0.7],[\"drip\",0.6],[\"mix\",0.35],[\"tension\",0.45]]]]"
   },
   "King Tubby Filter": {
     "name": "King Tubby Filter",
@@ -395,7 +416,8 @@
     "chainDb": 0,
     "makeUpDb": 0,
     "oldMakeUpDb": 0,
-    "at": "2026-09-30T10:26:31.452Z"
+    "at": "2026-09-30T10:26:31.452Z",
+    "chain": "[[\"tonejs\",\"DubFilter\",true,100,[[\"cutoff\",30],[\"gain\",1.3],[\"resonance\",20]]],[\"tonejs\",\"SpaceEcho\",true,35,[[\"bpmSync\",1],[\"echoVolume\",0.7],[\"intensity\",0.5],[\"mode\",4],[\"rate\",375],[\"reverbVolume\",0.15],[\"syncDivision\",\"1/8d\"]]]]"
   },
   "Phaser Dub": {
     "name": "Phaser Dub",
@@ -407,7 +429,8 @@
     "makeUpDb": 3.6,
     "oldMakeUpDb": 0,
     "at": "2026-09-30T05:36:06.642Z",
-    "songDb": -1.1
+    "songDb": -1.1,
+    "chain": "[[\"tonejs\",\"BiPhase\",true,35,[[\"depthA\",0.7],[\"depthB\",0.5],[\"feedback\",0.4],[\"rateA\",0.3],[\"rateB\",3],[\"routing\",0]]],[\"tonejs\",\"SpaceEcho\",true,40,[[\"bpmSync\",1],[\"echoVolume\",0.8],[\"intensity\",0.6],[\"mode\",4],[\"rate\",500],[\"reverbVolume\",0.2],[\"syncDivision\",\"1/4\"]]]]"
   },
   "Tape Echo Wash": {
     "name": "Tape Echo Wash",
@@ -418,7 +441,8 @@
     "makeUpDb": 3.6,
     "oldMakeUpDb": -2.4,
     "at": "2026-09-30T05:36:16.425Z",
-    "songDb": 0.8
+    "songDb": 0.8,
+    "chain": "[[\"tonejs\",\"RETapeEcho\",true,45,[[\"dirt\",0.15],[\"echoVolume\",0.8],[\"flutter\",0.2],[\"inputBleed\",0.05],[\"intensity\",0.6],[\"loopAmount\",0],[\"mode\",3],[\"playheadFilter\",1],[\"repeatRate\",0.5],[\"wow\",0.3]]]]"
   },
   "Dub Chamber": {
     "name": "Dub Chamber",
@@ -430,7 +454,8 @@
     "makeUpDb": 6.2,
     "oldMakeUpDb": -15.4,
     "at": "2026-09-30T05:36:26.182Z",
-    "songDb": -0.8
+    "songDb": -0.8,
+    "chain": "[[\"wasm\",\"SpringReverb\",true,60,[[\"damping\",0.45],[\"decay\",0.65],[\"diffusion\",0.65],[\"drip\",0.5],[\"mix\",1],[\"tension\",0.5]]],[\"tonejs\",\"SpaceEcho\",true,40,[[\"bass\",0.6],[\"echoVolume\",0.7],[\"intensity\",0.5],[\"mode\",2],[\"rate\",300],[\"reverbVolume\",0.2],[\"treble\",0.4]]]]"
   },
   "Aelapse Dub": {
     "name": "Aelapse Dub",
@@ -440,7 +465,8 @@
     "chainDb": -1.5,
     "makeUpDb": 1.5,
     "oldMakeUpDb": 1.5,
-    "at": "2026-09-30T12:32:35.547Z"
+    "at": "2026-09-30T12:32:35.547Z",
+    "chain": "[[\"wasm\",\"Aelapse\",true,60,[[\"delayActive\",100],[\"delayCutHi\",24.6],[\"delayCutLow\",44.3],[\"delayDrift\",20],[\"delayDryWet\",50],[\"delayFeedback\",45.8],[\"delayMode\",0],[\"delaySaturation\",30],[\"delayTime\",27],[\"springsActive\",100],[\"springsChaos\",20],[\"springsDamp\",40],[\"springsDecay\",50],[\"springsDryWet\",40],[\"springsLength\",60],[\"springsScatter\",30],[\"springsShape\",50],[\"springsTone\",50],[\"springsWidth\",70]]]]"
   },
   "Mad Professor Studio": {
     "name": "Mad Professor Studio",
@@ -451,7 +477,8 @@
     "makeUpDb": 2.6,
     "oldMakeUpDb": -2.4,
     "at": "2026-09-30T05:36:45.698Z",
-    "songDb": 1
+    "songDb": 1,
+    "chain": "[[\"wasm\",\"MadProfessorPlate\",true,45,[[\"damping\",0.75],[\"decay\",0.85],[\"density\",0.8],[\"hpfHz\",200],[\"lpfHz\",5000],[\"predelay\",0.18],[\"size\",0.7]]]]"
   },
   "Mad Professor Cathedral": {
     "name": "Mad Professor Cathedral",
@@ -474,7 +501,8 @@
     "makeUpDb": 5.8,
     "oldMakeUpDb": -3.1,
     "at": "2026-09-30T05:37:05.347Z",
-    "songDb": 1.2
+    "songDb": 1.2,
+    "chain": "[[\"tonejs\",\"RETapeEcho\",true,40,[[\"dirt\",0.1],[\"echoVolume\",0.8],[\"flutter\",0.1],[\"inputBleed\",0.05],[\"intensity\",0.55],[\"loopAmount\",0],[\"mode\",3],[\"playheadFilter\",1],[\"repeatRate\",0.5],[\"wow\",0.15]]],[\"wasm\",\"MadProfessorPlate\",true,35,[[\"damping\",0.78],[\"decay\",0.8],[\"density\",0.75],[\"hpfHz\",220],[\"lpfHz\",5200],[\"predelay\",0.2],[\"size\",0.65]]]]"
   },
   "Dattorro Tubby": {
     "name": "Dattorro Tubby",
@@ -485,7 +513,8 @@
     "makeUpDb": 3,
     "oldMakeUpDb": -1.8,
     "at": "2026-09-30T05:37:15.101Z",
-    "songDb": 0.5
+    "songDb": 0.5,
+    "chain": "[[\"wasm\",\"DattorroPlate\",true,35,[[\"damping\",0.25],[\"decay\",0.7],[\"decayDiffusion\",0.45],[\"inputDiffusion\",0.72],[\"preFilter\",0.55],[\"predelay\",0.08]]]]"
   },
   "Dattorro Infinite": {
     "name": "Dattorro Infinite",
@@ -496,7 +525,8 @@
     "makeUpDb": 1.7,
     "oldMakeUpDb": -5.4,
     "at": "2026-09-30T05:37:24.877Z",
-    "songDb": -1.7
+    "songDb": -1.7,
+    "chain": "[[\"wasm\",\"DattorroPlate\",true,60,[[\"damping\",0.2],[\"decay\",0.98],[\"decayDiffusion\",0.65],[\"inputDiffusion\",0.85],[\"preFilter\",0.8],[\"predelay\",0.2]]]]"
   },
   "Dattorro Steel": {
     "name": "Dattorro Steel",
@@ -507,7 +537,8 @@
     "makeUpDb": 3.3,
     "oldMakeUpDb": -2.9,
     "at": "2026-09-30T05:37:34.701Z",
-    "songDb": -0.3
+    "songDb": -0.3,
+    "chain": "[[\"wasm\",\"DattorroPlate\",true,45,[[\"damping\",0.15],[\"decay\",0.88],[\"decayDiffusion\",0.55],[\"inputDiffusion\",0.78],[\"preFilter\",0.6],[\"predelay\",0.12]]]]"
   },
   "Dattorro + King Tubby": {
     "name": "Dattorro + King Tubby",
@@ -518,7 +549,8 @@
     "chainDb": -0.6,
     "makeUpDb": 0.6,
     "oldMakeUpDb": 0.6,
-    "at": "2026-09-30T10:26:41.173Z"
+    "at": "2026-09-30T10:26:41.173Z",
+    "chain": "[[\"tonejs\",\"DubFilter\",true,100,[[\"cutoff\",40],[\"gain\",1.2],[\"resonance\",30]]],[\"wasm\",\"DattorroPlate\",true,50,[[\"damping\",0.2],[\"decay\",0.9],[\"decayDiffusion\",0.6],[\"inputDiffusion\",0.8],[\"preFilter\",0.65],[\"predelay\",0.1]]]]"
   },
   "Dattorro + Tape Wash": {
     "name": "Dattorro + Tape Wash",
@@ -530,7 +562,8 @@
     "makeUpDb": 5.9,
     "oldMakeUpDb": -3.6,
     "at": "2026-09-30T05:37:54.246Z",
-    "songDb": -0.5
+    "songDb": -0.5,
+    "chain": "[[\"tonejs\",\"SpaceEcho\",true,35,[[\"bpmSync\",1],[\"echoVolume\",0.8],[\"intensity\",0.55],[\"mode\",4],[\"rate\",375],[\"reverbVolume\",0.15],[\"syncDivision\",\"1/4\"]]],[\"wasm\",\"DattorroPlate\",true,40,[[\"damping\",0.25],[\"decay\",0.85],[\"decayDiffusion\",0.55],[\"inputDiffusion\",0.78],[\"preFilter\",0.7],[\"predelay\",0.15]]]]"
   },
   "Moog Acid": {
     "name": "Moog Acid",
@@ -541,7 +574,8 @@
     "chainDb": -3.1,
     "makeUpDb": 3.1,
     "oldMakeUpDb": 3.1,
-    "at": "2026-09-30T10:27:10.419Z"
+    "at": "2026-09-30T10:27:10.419Z",
+    "chain": "[[\"wasm\",\"MoogFilter\",true,100,[[\"cutoff\",1500],[\"drive\",0.4],[\"filterMode\",0],[\"model\",0],[\"resonance\",60]]],[\"wasm\",\"Leslie\",true,30,[[\"acceleration\",0.5],[\"doppler\",0.4],[\"drumDepth\",0.3],[\"drumRate\",5.5],[\"hornDepth\",0.5],[\"hornRate\",6],[\"speed\",1],[\"width\",0.7]]]]"
   },
   "Gated Snare": {
     "name": "Gated Snare",
@@ -553,7 +587,8 @@
     "makeUpDb": 2.4,
     "oldMakeUpDb": 3.8,
     "at": "2026-09-30T05:38:13.799Z",
-    "songDb": 0
+    "songDb": 0,
+    "chain": "[[\"tonejs\",\"Reverb\",true,70,[[\"decay\",0.8],[\"preDelay\",0]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.001],[\"ratio\",20],[\"release\",0.05],[\"threshold\",-35]]]]"
   },
   "Chorus Lead": {
     "name": "Chorus Lead",
@@ -565,7 +600,8 @@
     "makeUpDb": 1.5,
     "oldMakeUpDb": 4.4,
     "at": "2026-09-30T05:38:23.571Z",
-    "songDb": 0.6
+    "songDb": 0.6,
+    "chain": "[[\"tonejs\",\"Chorus\",true,50,[[\"delayTime\",3.5],[\"depth\",0.7],[\"frequency\",1.5]]],[\"tonejs\",\"StereoWidener\",true,100,[[\"width\",0.7]]]]"
   },
   "Phaser Lead": {
     "name": "Phaser Lead",
@@ -576,7 +612,8 @@
     "makeUpDb": -2.3,
     "oldMakeUpDb": 1.1,
     "at": "2026-09-30T05:38:33.338Z",
-    "songDb": -0.2
+    "songDb": -0.2,
+    "chain": "[[\"tonejs\",\"Phaser\",true,60,[[\"baseFrequency\",1000],[\"frequency\",0.5],[\"octaves\",3]]]]"
   },
   "Shimmer Pad": {
     "name": "Shimmer Pad",
@@ -587,7 +624,8 @@
     "chainDb": 1,
     "makeUpDb": -1,
     "oldMakeUpDb": -4.2,
-    "at": "2026-09-30T10:27:29.873Z"
+    "at": "2026-09-30T10:27:29.873Z",
+    "chain": "[[\"tonejs\",\"TapeSaturation\",true,30,[[\"drive\",25],[\"tone\",10000]]],[\"tonejs\",\"Chorus\",true,40,[[\"delayTime\",5],[\"depth\",0.8],[\"frequency\",0.3]]]]"
   },
   "Thick Chorus": {
     "name": "Thick Chorus",
@@ -599,7 +637,8 @@
     "makeUpDb": 0.8,
     "oldMakeUpDb": 1.5,
     "at": "2026-09-30T05:38:52.916Z",
-    "songDb": 0
+    "songDb": 0,
+    "chain": "[[\"tonejs\",\"Chorus\",true,45,[[\"depth\",0.6],[\"frequency\",0.5]]],[\"tonejs\",\"StereoWidener\",true,100,[[\"width\",0.6]]]]"
   },
   "Phaser Jet": {
     "name": "Phaser Jet",
@@ -610,7 +649,8 @@
     "makeUpDb": 2.9,
     "oldMakeUpDb": 2,
     "at": "2026-09-30T05:39:02.671Z",
-    "songDb": 0
+    "songDb": 0,
+    "chain": "[[\"tonejs\",\"BiPhase\",true,50,[[\"depthA\",0.8],[\"depthB\",0.9],[\"feedback\",0.6],[\"rateA\",0.2],[\"rateB\",0.15],[\"routing\",1]]]]"
   },
   "Tremolo Gate": {
     "name": "Tremolo Gate",
@@ -622,7 +662,8 @@
     "makeUpDb": -1.5,
     "oldMakeUpDb": 1.8,
     "at": "2026-09-30T05:39:12.459Z",
-    "songDb": 0.2
+    "songDb": 0.2,
+    "chain": "[[\"tonejs\",\"Tremolo\",true,70,[[\"depth\",0.8],[\"frequency\",8]]],[\"tonejs\",\"AutoPanner\",true,40,[[\"frequency\",2]]]]"
   },
   "Wah Sweep": {
     "name": "Wah Sweep",
@@ -633,7 +674,8 @@
     "chainDb": 2.6,
     "makeUpDb": -2.6,
     "oldMakeUpDb": -1.7,
-    "at": "2026-09-30T10:27:59.045Z"
+    "at": "2026-09-30T10:27:59.045Z",
+    "chain": "[[\"tonejs\",\"AutoWah\",true,65,[[\"Q\",4],[\"baseFrequency\",300],[\"octaves\",4],[\"sensitivity\",-20]]],[\"tonejs\",\"Phaser\",true,20,[[\"Q\",4],[\"baseFrequency\",500],[\"frequency\",0.5],[\"octaves\",3]]]]"
   },
   "Ambient Space": {
     "name": "Ambient Space",
@@ -692,7 +734,8 @@
     "makeUpDb": 3.8,
     "oldMakeUpDb": 5.5,
     "at": "2026-09-30T05:40:11.185Z",
-    "songDb": -0.3
+    "songDb": -0.3,
+    "chain": "[[\"wasm\",\"ShimmerReverb\",true,60,[[\"damping\",45],[\"decay\",78],[\"modDepth\",15],[\"modRate\",25],[\"pitch\",12],[\"predelay\",25],[\"shimmer\",55],[\"size\",75]]],[\"tonejs\",\"AmbientDelay\",true,30,[[\"diffusion\",30],[\"feedback\",40],[\"filterFreq\",2000],[\"filterQ\",1.2],[\"filterType\",\"lowpass\"],[\"modDepth\",10],[\"modRate\",20],[\"stereoSpread\",60],[\"taps\",2],[\"time\",500]]]]"
   },
   "Radiowave": {
     "name": "Radiowave",
@@ -740,7 +783,8 @@
     "makeUpDb": -2.6,
     "oldMakeUpDb": -4,
     "at": "2026-09-30T05:40:50.344Z",
-    "songDb": -0.4
+    "songDb": -0.4,
+    "chain": "[[\"wasm\",\"TapeDelay\",true,50,[[\"delayTime\",0.375],[\"drive\",0.3],[\"feedback\",0.5],[\"flutterDepth\",0.1],[\"flutterRate\",5],[\"mix\",0.5],[\"toneFreq\",3000],[\"wowDepth\",0.15],[\"wowRate\",0.5]]]]"
   },
   "Ambient Echo": {
     "name": "Ambient Echo",
@@ -751,7 +795,8 @@
     "makeUpDb": 2.5,
     "oldMakeUpDb": -3.7,
     "at": "2026-09-30T05:41:00.139Z",
-    "songDb": -0.8
+    "songDb": -0.8,
+    "chain": "[[\"tonejs\",\"AmbientDelay\",true,60,[[\"diffusion\",25],[\"feedback\",55],[\"filterFreq\",2500],[\"filterQ\",1.5],[\"filterType\",\"lowpass\"],[\"modDepth\",15],[\"modRate\",25],[\"stereoSpread\",50],[\"taps\",2],[\"time\",375]]]]"
   },
   "Tape Echo": {
     "name": "Tape Echo",
@@ -762,7 +807,8 @@
     "makeUpDb": 3.5,
     "oldMakeUpDb": -1.9,
     "at": "2026-09-30T05:41:09.909Z",
-    "songDb": 0.8
+    "songDb": 0.8,
+    "chain": "[[\"wasm\",\"RETapeEcho\",true,60,[[\"dirt\",0.2],[\"echoVolume\",0.8],[\"flutter\",0.1],[\"inputBleed\",0],[\"intensity\",0.55],[\"loopAmount\",0],[\"mode\",3],[\"playheadFilter\",1],[\"repeatRate\",0.45],[\"wow\",0.15]]]]"
   },
   "Stereo Ping Pong": {
     "name": "Stereo Ping Pong",
@@ -783,7 +829,8 @@
     "makeUpDb": 4.8,
     "oldMakeUpDb": 6.6,
     "at": "2026-09-30T05:41:29.571Z",
-    "songDb": -0.1
+    "songDb": -0.1,
+    "chain": "[[\"tonejs\",\"SpaceEcho\",true,60,[[\"bass\",0.5],[\"echoVolume\",0.8],[\"intensity\",0.55],[\"mode\",3],[\"rate\",350],[\"reverbVolume\",0.3],[\"treble\",0.6]]]]"
   },
   "RE-201 King Tubby": {
     "name": "RE-201 King Tubby",
@@ -795,7 +842,8 @@
     "oldMakeUpDb": -2,
     "at": "2026-09-30T05:41:39.346Z",
     "songDb": 2.6,
-    "songCorrected": true
+    "songCorrected": true,
+    "chain": "[[\"wasm\",\"RE201\",true,55,[[\"bass\",0.8],[\"delayMode\",7],[\"echoVolume\",0.9],[\"inputLevel\",1.2],[\"intensity\",0.72],[\"repeatRate\",0.25],[\"reverbVolume\",0.55],[\"treble\",0.25]]]]"
   },
   "RE-201 Spring Only": {
     "name": "RE-201 Spring Only",
@@ -806,7 +854,8 @@
     "makeUpDb": 5.6,
     "oldMakeUpDb": -3,
     "at": "2026-09-30T05:41:49.136Z",
-    "songDb": 0.8
+    "songDb": 0.8,
+    "chain": "[[\"wasm\",\"RE201\",true,50,[[\"bass\",0.5],[\"delayMode\",0],[\"reverbVolume\",0.8],[\"treble\",0.6]]]]"
   },
   "RE-201 Runaway": {
     "name": "RE-201 Runaway",
@@ -817,7 +866,8 @@
     "makeUpDb": -16.6,
     "oldMakeUpDb": -1.5,
     "at": "2026-09-30T05:41:58.987Z",
-    "songDb": 15
+    "songDb": 15,
+    "chain": "[[\"wasm\",\"RE201\",true,60,[[\"bass\",0.75],[\"delayMode\",10],[\"echoVolume\",0.95],[\"inputLevel\",1.8],[\"intensity\",0.82],[\"repeatRate\",0.35],[\"reverbVolume\",0.7],[\"treble\",0.4]]]]"
   },
   "Dub Plate Special": {
     "name": "Dub Plate Special",
@@ -828,7 +878,8 @@
     "makeUpDb": -4.2,
     "oldMakeUpDb": -1.8,
     "at": "2026-09-30T05:42:08.773Z",
-    "songDb": 0.1
+    "songDb": 0.1,
+    "chain": "[[\"wasm\",\"AnotherDelay\",true,55,[[\"damping\",0.4],[\"delayTime\",500],[\"feedback\",0.75],[\"flutterDepth\",0.04],[\"flutterFreq\",2.5],[\"gain\",1.5],[\"highpass\",180],[\"lowpass\",2800],[\"reverbEnabled\",1],[\"roomSize\",0.65],[\"width\",1],[\"wowDepth\",0.015],[\"wowFreq\",0.2]]]]"
   },
   "Midnight Dub Delay": {
     "name": "Midnight Dub Delay",
@@ -839,7 +890,8 @@
     "makeUpDb": -1.3,
     "oldMakeUpDb": -2.2,
     "at": "2026-09-30T05:42:18.566Z",
-    "songDb": 0.5
+    "songDb": 0.5,
+    "chain": "[[\"wasm\",\"AnotherDelay\",true,50,[[\"damping\",0.25],[\"delayTime\",600],[\"feedback\",0.7],[\"flutterDepth\",0.04],[\"flutterFreq\",2],[\"gain\",1.3],[\"highpass\",250],[\"lowpass\",1800],[\"reverbEnabled\",1],[\"roomSize\",0.7],[\"width\",1],[\"wowDepth\",0.02],[\"wowFreq\",0.1]]]]"
   },
   "RE-201 + Dattorro": {
     "name": "RE-201 + Dattorro",
@@ -852,7 +904,8 @@
     "oldMakeUpDb": -4,
     "at": "2026-09-30T05:42:28.372Z",
     "songDb": 2.1,
-    "songCorrected": true
+    "songCorrected": true,
+    "chain": "[[\"wasm\",\"RE201\",true,50,[[\"bass\",0.7],[\"delayMode\",7],[\"echoVolume\",0.8],[\"inputLevel\",1.1],[\"intensity\",0.65],[\"repeatRate\",0.3],[\"reverbVolume\",0.3],[\"treble\",0.3]]],[\"wasm\",\"DattorroPlate\",true,35,[[\"damping\",0.25],[\"decay\",0.82],[\"decayDiffusion\",0.55],[\"inputDiffusion\",0.78],[\"preFilter\",0.65],[\"predelay\",0.12]]]]"
   },
   "Clean Fender": {
     "name": "Clean Fender",
@@ -863,7 +916,8 @@
     "chainDb": -8.3,
     "makeUpDb": 8.3,
     "oldMakeUpDb": 8.5,
-    "at": "2026-09-30T08:17:48.930Z"
+    "at": "2026-09-30T08:17:48.930Z",
+    "chain": "[[\"neural\",\"Neural\",true,80,[[\"drive\",25],[\"level\",85],[\"presence\",55]]],[\"wasm\",\"SpringReverb\",true,25,[[\"damping\",0.5],[\"decay\",0.4],[\"diffusion\",0.6],[\"drip\",0.3],[\"mix\",0.3],[\"tension\",0.4]]]]"
   },
   "Dumble Lead": {
     "name": "Dumble Lead",
@@ -887,7 +941,8 @@
     "chainDb": -5.4,
     "makeUpDb": 5.4,
     "oldMakeUpDb": 9.1,
-    "at": "2026-09-30T08:18:57.512Z"
+    "at": "2026-09-30T08:18:57.512Z",
+    "chain": "[[\"neural\",\"Neural\",true,60,[[\"drive\",10],[\"level\",70],[\"presence\",35]]],[\"tonejs\",\"Chorus\",true,15,[[\"depth\",0.2],[\"frequency\",0.3]]],[\"wasm\",\"MVerb\",true,30,[[\"bandwidth\",0.5],[\"damping\",0.3],[\"decay\",0.5],[\"density\",0.7],[\"earlyMix\",0.4],[\"gain\",1],[\"mix\",0.4],[\"predelay\",0.03],[\"size\",0.6]]]]"
   },
   "El Coyote Blues": {
     "name": "El Coyote Blues",
@@ -899,7 +954,8 @@
     "chainDb": -1.3,
     "makeUpDb": 1.3,
     "oldMakeUpDb": 2.9,
-    "at": "2026-09-30T08:19:11.235Z"
+    "at": "2026-09-30T08:19:11.235Z",
+    "chain": "[[\"neural\",\"Neural\",true,80,[[\"drive\",45],[\"level\",85],[\"presence\",50]]],[\"tonejs\",\"Tremolo\",true,25,[[\"depth\",0.4],[\"frequency\",4]]],[\"wasm\",\"SpringReverb\",true,25,[[\"damping\",0.4],[\"decay\",0.5],[\"diffusion\",0.6],[\"drip\",0.5],[\"mix\",0.3],[\"tension\",0.5]]]]"
   },
   "TS9 + Spring": {
     "name": "TS9 + Spring",
@@ -910,7 +966,8 @@
     "chainDb": -3.4,
     "makeUpDb": 3.4,
     "oldMakeUpDb": 4.7,
-    "at": "2026-09-30T08:19:38.672Z"
+    "at": "2026-09-30T08:19:38.672Z",
+    "chain": "[[\"neural\",\"Neural\",true,70,[[\"drive\",50],[\"level\",85],[\"tone\",55]]],[\"wasm\",\"SpringReverb\",true,30,[[\"damping\",0.4],[\"decay\",0.5],[\"diffusion\",0.6],[\"drip\",0.5],[\"mix\",0.35],[\"tension\",0.5]]]]"
   },
   "Big Muff Doom": {
     "name": "Big Muff Doom",
@@ -922,7 +979,8 @@
     "chainDb": 1.2,
     "makeUpDb": -1.2,
     "oldMakeUpDb": 0.9,
-    "at": "2026-10-08T18:28:53.639Z"
+    "at": "2026-10-08T18:28:53.639Z",
+    "chain": "[[\"neural\",\"Neural\",true,85,[[\"bass\",40],[\"drive\",70],[\"level\",80],[\"tone\",90],[\"treble\",70]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-0.5],[\"low\",2],[\"mid\",0.5]]],[\"tonejs\",\"Reverb\",true,35,[[\"decay\",5],[\"preDelay\",0.04]]]]"
   },
   "RAT + Delay": {
     "name": "RAT + Delay",
@@ -944,7 +1002,8 @@
     "chainDb": -1.5,
     "makeUpDb": 1.5,
     "oldMakeUpDb": 1.5,
-    "at": "2026-09-30T08:20:33.554Z"
+    "at": "2026-09-30T08:20:33.554Z",
+    "chain": "[[\"neural\",\"Neural\",true,75,[[\"drive\",55],[\"level\",85],[\"tone\",50]]],[\"wasm\",\"Leslie\",true,45,[[\"acceleration\",0.5],[\"doppler\",0.6],[\"drumDepth\",0.5],[\"drumRate\",5.9],[\"hornDepth\",0.7],[\"hornRate\",6.8],[\"speed\",1],[\"width\",0.8]]]]"
   },
   "Paula Dub Sirens": {
     "name": "Paula Dub Sirens",
@@ -1014,7 +1073,8 @@
     "chainDb": -5.1,
     "makeUpDb": 5.1,
     "oldMakeUpDb": 5,
-    "at": "2026-10-08T18:29:21.074Z"
+    "at": "2026-10-08T18:29:21.074Z",
+    "chain": "[[\"neural\",\"Neural\",true,45,[[\"drive\",50],[\"level\",80],[\"presence\",55]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.003],[\"ratio\",4],[\"release\",0.1],[\"threshold\",-14]]],[\"wasm\",\"SpringReverb\",true,20,[[\"damping\",0.4],[\"decay\",0.45],[\"diffusion\",0.6],[\"drip\",0.4],[\"mix\",0.3],[\"tension\",0.5]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",0.5],[\"low\",2],[\"mid\",0.5]]]]"
   },
   "SID Stadium": {
     "name": "SID Stadium",
@@ -1067,7 +1127,8 @@
     "chainDb": -4.4,
     "makeUpDb": 4.4,
     "oldMakeUpDb": 4.5,
-    "at": "2026-09-30T08:16:40.325Z"
+    "at": "2026-09-30T08:16:40.325Z",
+    "chain": "[[\"neural\",\"Neural\",true,25,[[\"drive\",20],[\"level\",100],[\"presence\",50]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.015],[\"ratio\",2.5],[\"release\",0.25],[\"threshold\",-16]]]]"
   },
   "Blackstar Clean": {
     "name": "Blackstar Clean",
@@ -1079,7 +1140,8 @@
     "chainDb": -3.1,
     "makeUpDb": 3.1,
     "oldMakeUpDb": 2.8,
-    "at": "2026-10-08T18:26:34.482Z"
+    "at": "2026-10-08T18:26:34.482Z",
+    "chain": "[[\"neural\",\"Neural\",true,20,[[\"drive\",15],[\"level\",100],[\"presence\",55]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",0.5],[\"low\",1],[\"mid\",0.5]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.015],[\"ratio\",2.5],[\"release\",0.25],[\"threshold\",-16]]]]"
   },
   "Tube Screamer Glue": {
     "name": "Tube Screamer Glue",
@@ -1090,7 +1152,8 @@
     "chainDb": -3.3,
     "makeUpDb": 3.3,
     "oldMakeUpDb": 4.1,
-    "at": "2026-09-30T08:17:07.770Z"
+    "at": "2026-09-30T08:17:07.770Z",
+    "chain": "[[\"neural\",\"Neural\",true,18,[[\"drive\",20],[\"level\",100],[\"tone\",55]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.01],[\"ratio\",3],[\"release\",0.2],[\"threshold\",-15]]]]"
   },
   "Sovtek Warmth": {
     "name": "Sovtek Warmth",
@@ -1102,7 +1165,8 @@
     "chainDb": -3.9,
     "makeUpDb": 3.9,
     "oldMakeUpDb": 5.3,
-    "at": "2026-09-30T10:29:21.161Z"
+    "at": "2026-09-30T10:29:21.161Z",
+    "chain": "[[\"neural\",\"Neural\",true,22,[[\"drive\",35],[\"level\",100],[\"presence\",45]]],[\"wasm\",\"TapeSimulator\",true,20,[[\"bias\",45],[\"character\",30],[\"drive\",20],[\"hiss\",3],[\"shame\",10],[\"speed\",1]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.015],[\"ratio\",2.5],[\"release\",0.25],[\"threshold\",-16]]]]"
   },
   "Filmosound Master": {
     "name": "Filmosound Master",
@@ -1114,7 +1178,8 @@
     "chainDb": -3.9,
     "makeUpDb": 3.9,
     "oldMakeUpDb": 3.7,
-    "at": "2026-10-08T18:26:48.196Z"
+    "at": "2026-10-08T18:26:48.196Z",
+    "chain": "[[\"neural\",\"Neural\",true,30,[[\"drive\",25],[\"level\",100],[\"presence\",40]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-1],[\"low\",2],[\"mid\",1]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.02],[\"ratio\",2],[\"release\",0.3],[\"threshold\",-18]]]]"
   },
   "Crunch Marshall": {
     "name": "Crunch Marshall",
@@ -1125,7 +1190,8 @@
     "chainDb": 0,
     "makeUpDb": 0,
     "oldMakeUpDb": -0.6,
-    "at": "2026-10-08T18:28:12.487Z"
+    "at": "2026-10-08T18:28:12.487Z",
+    "chain": "[[\"neural\",\"Neural\",true,80,[[\"drive\",55],[\"level\",75],[\"presence\",50]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-0.5],[\"low\",1.5],[\"mid\",0.5]]]]"
   },
   "High Gain Mesa": {
     "name": "High Gain Mesa",
@@ -1136,7 +1202,8 @@
     "chainDb": -3.5,
     "makeUpDb": 3.5,
     "oldMakeUpDb": 4.2,
-    "at": "2026-09-30T08:18:16.368Z"
+    "at": "2026-09-30T08:18:16.368Z",
+    "chain": "[[\"neural\",\"Neural\",true,80,[[\"drive\",40],[\"level\",75],[\"presence\",45]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.003],[\"ratio\",4],[\"release\",0.1],[\"threshold\",-14]]]]"
   },
   "Sovtek Doom": {
     "name": "Sovtek Doom",
@@ -1147,7 +1214,8 @@
     "chainDb": -0.1,
     "makeUpDb": 0,
     "oldMakeUpDb": -1,
-    "at": "2026-10-08T18:28:26.212Z"
+    "at": "2026-10-08T18:28:26.212Z",
+    "chain": "[[\"neural\",\"Neural\",true,85,[[\"drive\",60],[\"level\",85],[\"presence\",40]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-1],[\"low\",2],[\"mid\",0.5]]]]"
   },
   "ENGL Metal": {
     "name": "ENGL Metal",
@@ -1159,7 +1227,8 @@
     "chainDb": -1.7,
     "makeUpDb": 1.7,
     "oldMakeUpDb": 1,
-    "at": "2026-10-08T18:28:39.921Z"
+    "at": "2026-10-08T18:28:39.921Z",
+    "chain": "[[\"neural\",\"Neural\",true,85,[[\"drive\",55],[\"level\",80],[\"presence\",55]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.003],[\"ratio\",4],[\"release\",0.1],[\"threshold\",-14]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-0.5],[\"low\",1.5],[\"mid\",0.5]]]]"
   },
   "Revv G3 Chug": {
     "name": "Revv G3 Chug",
@@ -1170,7 +1239,8 @@
     "chainDb": -2.5,
     "makeUpDb": 2.5,
     "oldMakeUpDb": 4.1,
-    "at": "2026-09-30T08:20:19.831Z"
+    "at": "2026-09-30T08:20:19.831Z",
+    "chain": "[[\"neural\",\"Neural\",true,85,[[\"drive\",70],[\"level\",80],[\"tone\",55]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.002],[\"ratio\",6],[\"release\",0.08],[\"threshold\",-10]]]]"
   },
   "Aguilar Bass Grit": {
     "name": "Aguilar Bass Grit",
@@ -1182,7 +1252,8 @@
     "chainDb": -2.1,
     "makeUpDb": 2.1,
     "oldMakeUpDb": 1.8,
-    "at": "2026-10-08T18:29:07.367Z"
+    "at": "2026-10-08T18:29:07.367Z",
+    "chain": "[[\"neural\",\"Neural\",true,70,[[\"drive\",45],[\"level\",85],[\"tone\",55]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.005],[\"ratio\",4],[\"release\",0.12],[\"threshold\",-14]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",0],[\"low\",2],[\"mid\",0.5]]]]"
   },
   "SID Crunch Box": {
     "name": "SID Crunch Box",
@@ -1194,7 +1265,8 @@
     "chainDb": -2.2,
     "makeUpDb": 2.2,
     "oldMakeUpDb": 2.5,
-    "at": "2026-10-08T18:29:34.774Z"
+    "at": "2026-10-08T18:29:34.774Z",
+    "chain": "[[\"neural\",\"Neural\",true,35,[[\"drive\",45],[\"level\",100],[\"tone\",55]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",1.5],[\"low\",2],[\"mid\",1]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.004],[\"ratio\",4],[\"release\",0.12],[\"threshold\",-14]]]]"
   },
   "Analog Warmth": {
     "name": "Analog Warmth",
@@ -1206,7 +1278,8 @@
     "chainDb": -1.2,
     "makeUpDb": 1.2,
     "oldMakeUpDb": 0.9,
-    "at": "2026-10-08T14:51:26.989Z"
+    "at": "2026-10-08T14:51:26.989Z",
+    "chain": "[[\"tonejs\",\"TapeSaturation\",true,30,[[\"drive\",35],[\"tone\",10000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.01],[\"ratio\",3],[\"release\",0.2],[\"threshold\",-16]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-0.5],[\"low\",1.5],[\"mid\",0]]]]"
   },
   "Tape Machine": {
     "name": "Tape Machine",
@@ -1217,7 +1290,8 @@
     "chainDb": -2.4,
     "makeUpDb": 2.4,
     "oldMakeUpDb": 1.3,
-    "at": "2026-09-30T10:20:44.144Z"
+    "at": "2026-09-30T10:20:44.144Z",
+    "chain": "[[\"wasm\",\"TapeSimulator\",true,40,[[\"bias\",45],[\"character\",35],[\"drive\",25],[\"hiss\",5],[\"shame\",15],[\"speed\",1]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.015],[\"ratio\",2.5],[\"release\",0.25],[\"threshold\",-18]]]]"
   },
   "Tube Console": {
     "name": "Tube Console",
@@ -1229,7 +1303,8 @@
     "chainDb": -1.5,
     "makeUpDb": 1.5,
     "oldMakeUpDb": 1.2,
-    "at": "2026-10-08T14:51:36.754Z"
+    "at": "2026-10-08T14:51:36.754Z",
+    "chain": "[[\"tonejs\",\"Chebyshev\",true,12,[[\"order\",2]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-1],[\"low\",2],[\"mid\",0.5]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.008],[\"ratio\",3],[\"release\",0.18],[\"threshold\",-15]]]]"
   },
   "Warm Bass": {
     "name": "Warm Bass",
@@ -1240,7 +1315,8 @@
     "chainDb": -1.1,
     "makeUpDb": 1.1,
     "oldMakeUpDb": 0,
-    "at": "2026-09-30T10:21:03.570Z"
+    "at": "2026-09-30T10:21:03.570Z",
+    "chain": "[[\"tonejs\",\"TapeSaturation\",true,60,[[\"drive\",40],[\"tone\",8000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.01],[\"ratio\",4],[\"release\",0.15],[\"threshold\",-20]]]]"
   },
   "Warm Overdrive": {
     "name": "Warm Overdrive",
@@ -1286,7 +1362,8 @@
     "chainDb": -0.3,
     "makeUpDb": 0,
     "oldMakeUpDb": 0.7,
-    "at": "2026-10-08T18:20:22.965Z"
+    "at": "2026-10-08T18:20:22.965Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",0.5],[\"low\",2],[\"mid\",-1]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.005],[\"knee\",6],[\"ratio\",10],[\"release\",0.15],[\"threshold\",-26]]],[\"tonejs\",\"Distortion\",true,10,[[\"drive\",0.1]]]]"
   },
   "Big Muff Wall": {
     "name": "Big Muff Wall",
@@ -1297,7 +1374,8 @@
     "chainDb": -2.4,
     "makeUpDb": 2.4,
     "oldMakeUpDb": 2.4,
-    "at": "2026-10-08T18:50:05.085Z"
+    "at": "2026-10-08T18:50:05.085Z",
+    "chain": "[[\"wam\",\"WAMBigMuff\",true,50,[]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.005],[\"ratio\",6],[\"release\",0.15],[\"threshold\",-12]]]]"
   },
   "Swedish Chainsaw": {
     "name": "Swedish Chainsaw",
@@ -1308,7 +1386,8 @@
     "chainDb": 3.4,
     "makeUpDb": -3.4,
     "oldMakeUpDb": -3.4,
-    "at": "2026-10-08T18:20:48.662Z"
+    "at": "2026-10-08T18:20:48.662Z",
+    "chain": "[[\"wasm\",\"SwedishChainsaw\",true,100,[[\"ampGain\",100],[\"bass\",100],[\"middle\",100],[\"pedalGain\",100],[\"tight\",0],[\"treble\",100],[\"volume\",50]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.003],[\"ratio\",4],[\"release\",0.1],[\"threshold\",-14]]]]"
   },
   "Modern Precision": {
     "name": "Modern Precision",
@@ -1326,7 +1405,8 @@
     "chainDb": 4.8,
     "makeUpDb": -4.8,
     "oldMakeUpDb": -4.7,
-    "at": "2026-10-08T18:20:58.444Z"
+    "at": "2026-10-08T18:20:58.444Z",
+    "chain": "[[\"wasm\",\"EQ8Band\",true,100,[[\"highShelfFreq\",11000],[\"highShelfGain\",1.5],[\"hpFreq\",30],[\"lowShelfFreq\",90],[\"lowShelfGain\",1],[\"lpFreq\",19000],[\"mix\",1],[\"peak1Freq\",260],[\"peak1Gain\",-1.5],[\"peak1Q\",1.1],[\"peak2Freq\",900],[\"peak2Gain\",0],[\"peak2Q\",1],[\"peak3Freq\",3400],[\"peak3Gain\",-1],[\"peak3Q\",1.8],[\"peak4Freq\",8000],[\"peak4Gain\",0],[\"peak4Q\",1]]],[\"wasm\",\"ResonanceTamer\",true,100,[[\"amount\",0.35],[\"character\",\"transparent\"],[\"mix\",1]]],[\"wasm\",\"DynamicEQ\",true,100,[[\"attack\",10],[\"detectFreq\",190],[\"detectQ\",1.2],[\"maxGain\",-4],[\"mix\",1],[\"processFreq\",190],[\"processQ\",1.2],[\"release\",120],[\"threshold\",-26]]],[\"tonejs\",\"SidechainCompressor\",true,100,[[\"attack\",0.004],[\"knee\",6],[\"ratio\",3],[\"release\",0.14],[\"scFilterType\",\"lowpass\"],[\"scFreq\",150],[\"scQ\",0.7],[\"sidechainGain\",100],[\"sidechainSource\",-2],[\"threshold\",-26]]],[\"wasm\",\"MultibandComp\",true,100,[[\"highCrossover\",4500],[\"highGain\",1],[\"highRatio\",2],[\"highThreshold\",-24],[\"lowCrossover\",150],[\"lowGain\",1],[\"lowRatio\",2.5],[\"lowThreshold\",-22],[\"midGain\",1],[\"midRatio\",2],[\"midThreshold\",-20]]],[\"wasm\",\"TransientDesigner\",true,100,[[\"attack\",0.15],[\"output\",1],[\"sustain\",-0.05]]],[\"wasm\",\"Exciter\",true,100,[[\"amount\",0.25],[\"blend\",0.4],[\"ceil\",16000],[\"frequency\",6000],[\"mix\",1]]],[\"wasm\",\"MultibandEnhancer\",true,100,[[\"harmonics\",0.08],[\"highCross\",8000],[\"highWidth\",1],[\"lowCross\",150],[\"lowWidth\",0],[\"midCross\",2000],[\"midWidth\",1],[\"mix\",1],[\"topWidth\",1]]],[\"wasm\",\"Maximizer\",true,100,[[\"ceiling\",-1],[\"mix\",1],[\"release\",60]]]]"
   },
   "Modern Club Pump": {
     "name": "Modern Club Pump",
@@ -1345,7 +1425,8 @@
     "chainDb": 6.3,
     "makeUpDb": -6.3,
     "oldMakeUpDb": -6.2,
-    "at": "2026-10-08T18:21:08.215Z"
+    "at": "2026-10-08T18:21:08.215Z",
+    "chain": "[[\"wasm\",\"EQ8Band\",true,100,[[\"highShelfFreq\",10000],[\"highShelfGain\",2],[\"hpFreq\",28],[\"lowShelfFreq\",70],[\"lowShelfGain\",5],[\"lpFreq\",19000],[\"mix\",1],[\"peak1Freq\",300],[\"peak1Gain\",-2],[\"peak1Q\",1],[\"peak2Freq\",900],[\"peak2Gain\",0],[\"peak2Q\",1],[\"peak3Freq\",3000],[\"peak3Gain\",-0.5],[\"peak3Q\",1.5],[\"peak4Freq\",8000],[\"peak4Gain\",0],[\"peak4Q\",1]]],[\"wasm\",\"ResonanceTamer\",true,100,[[\"amount\",0.3],[\"character\",\"transparent\"],[\"mix\",1]]],[\"tonejs\",\"SidechainCompressor\",true,100,[[\"attack\",0.002],[\"knee\",3],[\"ratio\",6],[\"release\",0.18],[\"scFilterType\",\"lowpass\"],[\"scFreq\",150],[\"scQ\",0.7],[\"sidechainGain\",100],[\"sidechainSource\",-2],[\"threshold\",-30]]],[\"wasm\",\"BassEnhancer\",true,100,[[\"amount\",0.6],[\"drive\",0.1],[\"frequency\",60],[\"mix\",1]]],[\"wasm\",\"MultibandComp\",true,100,[[\"highCrossover\",4000],[\"highGain\",1],[\"highRatio\",2.5],[\"highThreshold\",-24],[\"lowCrossover\",140],[\"lowGain\",1],[\"lowRatio\",4],[\"lowThreshold\",-24],[\"midGain\",1],[\"midRatio\",3],[\"midThreshold\",-22]]],[\"wasm\",\"TransientDesigner\",true,100,[[\"attack\",0.25],[\"output\",1],[\"sustain\",-0.1]]],[\"wasm\",\"Exciter\",true,100,[[\"amount\",0.3],[\"blend\",0.45],[\"ceil\",16000],[\"frequency\",5000],[\"mix\",1]]],[\"wasm\",\"MultibandEnhancer\",true,100,[[\"harmonics\",0.12],[\"highCross\",8000],[\"highWidth\",1],[\"lowCross\",140],[\"lowWidth\",0],[\"midCross\",2000],[\"midWidth\",1],[\"mix\",1],[\"topWidth\",1]]],[\"wasm\",\"Clipper\",true,100,[[\"ceiling\",-1.5],[\"inputGain\",1.5],[\"softness\",0.6]]],[\"wasm\",\"Maximizer\",true,100,[[\"ceiling\",-0.8],[\"mix\",1],[\"release\",50]]]]"
   },
   "Modern Glue & Air": {
     "name": "Modern Glue & Air",
@@ -1361,7 +1442,8 @@
     "chainDb": 2.8,
     "makeUpDb": -2.8,
     "oldMakeUpDb": -2.8,
-    "at": "2026-10-08T18:21:17.994Z"
+    "at": "2026-10-08T18:21:17.994Z",
+    "chain": "[[\"wasm\",\"EQ8Band\",true,100,[[\"highShelfFreq\",12000],[\"highShelfGain\",2],[\"hpFreq\",25],[\"lowShelfFreq\",100],[\"lowShelfGain\",0.5],[\"lpFreq\",20000],[\"mix\",1],[\"peak1Freq\",240],[\"peak1Gain\",-1],[\"peak1Q\",0.9],[\"peak2Freq\",900],[\"peak2Gain\",0],[\"peak2Q\",1],[\"peak3Freq\",3500],[\"peak3Gain\",-0.5],[\"peak3Q\",1.5],[\"peak4Freq\",8000],[\"peak4Gain\",0],[\"peak4Q\",1]]],[\"wasm\",\"ResonanceTamer\",true,100,[[\"amount\",0.25],[\"character\",\"transparent\"],[\"mix\",1]]],[\"tonejs\",\"SidechainCompressor\",true,100,[[\"attack\",0.006],[\"knee\",8],[\"ratio\",2],[\"release\",0.1],[\"scFilterType\",\"lowpass\"],[\"scFreq\",150],[\"scQ\",0.7],[\"sidechainGain\",100],[\"sidechainSource\",-2],[\"threshold\",-24]]],[\"wasm\",\"GOTTComp\",true,100,[[\"attack\",15],[\"highCross\",5000],[\"highRatio\",2],[\"highThresh\",-22],[\"lowCross\",160],[\"lowRatio\",2],[\"lowThresh\",-20],[\"midRatio\",1.8],[\"midThresh\",-20],[\"mix\",0.7],[\"release\",150]]],[\"wasm\",\"Exciter\",true,100,[[\"amount\",0.3],[\"blend\",0.35],[\"ceil\",18000],[\"frequency\",8000],[\"mix\",1]]],[\"wasm\",\"MultibandEnhancer\",true,100,[[\"harmonics\",0.05],[\"highCross\",8000],[\"highWidth\",1],[\"lowCross\",160],[\"lowWidth\",0],[\"midCross\",2000],[\"midWidth\",1],[\"mix\",1],[\"topWidth\",1]]],[\"wasm\",\"Maximizer\",true,100,[[\"ceiling\",-1],[\"mix\",1],[\"release\",80]]]]"
   },
   "Modern Amiga Master": {
     "name": "Modern Amiga Master",
@@ -1378,7 +1460,8 @@
     "chainDb": 6.4,
     "makeUpDb": -6.4,
     "oldMakeUpDb": -6.2,
-    "at": "2026-10-08T18:21:27.767Z"
+    "at": "2026-10-08T18:21:27.767Z",
+    "chain": "[[\"wasm\",\"EQ8Band\",true,100,[[\"highShelfFreq\",10000],[\"highShelfGain\",-1],[\"hpFreq\",35],[\"lowShelfFreq\",90],[\"lowShelfGain\",2.5],[\"lpFreq\",16000],[\"mix\",1],[\"peak1Freq\",280],[\"peak1Gain\",-1],[\"peak1Q\",1],[\"peak2Freq\",900],[\"peak2Gain\",0],[\"peak2Q\",1],[\"peak3Freq\",3500],[\"peak3Gain\",-1.5],[\"peak3Q\",1.5],[\"peak4Freq\",8000],[\"peak4Gain\",-4],[\"peak4Q\",0.8]]],[\"wasm\",\"ResonanceTamer\",true,100,[[\"amount\",0.45],[\"character\",\"warm\"],[\"mix\",1]]],[\"wasm\",\"BassEnhancer\",true,100,[[\"amount\",0.3],[\"drive\",0.05],[\"frequency\",80],[\"mix\",1]]],[\"tonejs\",\"SidechainCompressor\",true,100,[[\"attack\",0.004],[\"knee\",6],[\"ratio\",3],[\"release\",0.14],[\"scFilterType\",\"lowpass\"],[\"scFreq\",150],[\"scQ\",0.7],[\"sidechainGain\",100],[\"sidechainSource\",-2],[\"threshold\",-26]]],[\"wasm\",\"MultibandComp\",true,100,[[\"highCrossover\",4000],[\"highGain\",2],[\"highRatio\",2.5],[\"highThreshold\",-24],[\"lowCrossover\",150],[\"lowGain\",2],[\"lowRatio\",3],[\"lowThreshold\",-22],[\"midGain\",2],[\"midRatio\",2],[\"midThreshold\",-20]]],[\"wasm\",\"TransientDesigner\",true,100,[[\"attack\",0.2],[\"output\",1],[\"sustain\",0]]],[\"wasm\",\"MultibandEnhancer\",true,100,[[\"harmonics\",0.12],[\"highCross\",8000],[\"highWidth\",0.9],[\"lowCross\",150],[\"lowWidth\",0],[\"midCross\",2000],[\"midWidth\",0.8],[\"mix\",1],[\"topWidth\",1]]],[\"wasm\",\"Maximizer\",true,100,[[\"ceiling\",-1],[\"mix\",1],[\"release\",60]]]]"
   },
   "Dusty Grooves": {
     "name": "Dusty Grooves",
@@ -1390,7 +1473,8 @@
     "chainDb": -1.6,
     "makeUpDb": 1.6,
     "oldMakeUpDb": 1.6,
-    "at": "2026-10-08T18:21:48.085Z"
+    "at": "2026-10-08T18:21:48.085Z",
+    "chain": "[[\"wasm\",\"VinylNoise\",true,25,[[\"age\",35],[\"dropout\",5],[\"dust\",40],[\"eccentricity\",10],[\"ghostEcho\",10],[\"hiss\",30],[\"innerGroove\",15],[\"pinch\",25],[\"riaa\",45],[\"speed\",5.5],[\"stylusResonance\",40],[\"warp\",5],[\"wornStylus\",20]]],[\"tonejs\",\"TapeSaturation\",true,20,[[\"drive\",30],[\"tone\",9000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.015],[\"ratio\",2.5],[\"release\",0.25],[\"threshold\",-18]]]]"
   },
   "Lo-Fi Master": {
     "name": "Lo-Fi Master",
@@ -1403,7 +1487,8 @@
     "chainDb": -1.3,
     "makeUpDb": 1.3,
     "oldMakeUpDb": 1.4,
-    "at": "2026-10-08T18:21:57.917Z"
+    "at": "2026-10-08T18:21:57.917Z",
+    "chain": "[[\"wasm\",\"TapeSimulator\",true,30,[[\"bias\",40],[\"character\",30],[\"drive\",20],[\"hiss\",8],[\"shame\",12],[\"speed\",1]]],[\"wasm\",\"ToneArm\",true,20,[[\"coil\",35],[\"flutter\",8],[\"hiss\",5],[\"pops\",3],[\"riaa\",55],[\"rpm\",33.333],[\"stylus\",20],[\"wow\",10]]],[\"tonejs\",\"Filter\",true,100,[[\"Q\",0.5],[\"frequency\",12000],[\"type\",\"lowpass\"]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.02],[\"ratio\",2.5],[\"release\",0.3],[\"threshold\",-18]]]]"
   },
   "Vinyl Record": {
     "name": "Vinyl Record",
@@ -1413,7 +1498,8 @@
     "chainDb": 0,
     "makeUpDb": 0,
     "oldMakeUpDb": 0,
-    "at": "2026-10-08T18:22:07.707Z"
+    "at": "2026-10-08T18:22:07.707Z",
+    "chain": "[[\"wasm\",\"VinylNoise\",true,40,[[\"age\",40],[\"dropout\",8],[\"dust\",50],[\"eccentricity\",15],[\"ghostEcho\",15],[\"hiss\",40],[\"innerGroove\",20],[\"pinch\",30],[\"riaa\",55],[\"speed\",5.5],[\"stylusResonance\",45],[\"warp\",8],[\"wornStylus\",30]]]]"
   },
   "Broken Sampler": {
     "name": "Broken Sampler",
@@ -1425,7 +1511,8 @@
     "chainDb": 5.5,
     "makeUpDb": -5.5,
     "oldMakeUpDb": -5.5,
-    "at": "2026-10-08T18:22:17.454Z"
+    "at": "2026-10-08T18:22:17.454Z",
+    "chain": "[[\"tonejs\",\"BitCrusher\",true,55,[[\"bits\",6]]],[\"tonejs\",\"Distortion\",true,30,[[\"drive\",0.4]]],[\"tonejs\",\"Filter\",true,100,[[\"Q\",1.5],[\"frequency\",5000],[\"type\",\"lowpass\"]]]]"
   },
   "Lo-Fi Drums": {
     "name": "Lo-Fi Drums",
@@ -1436,7 +1523,8 @@
     "chainDb": -0.5,
     "makeUpDb": 0.5,
     "oldMakeUpDb": 0.5,
-    "at": "2026-10-08T18:50:14.849Z"
+    "at": "2026-10-08T18:50:14.849Z",
+    "chain": "[[\"tonejs\",\"BitCrusher\",true,60,[[\"bits\",10]]],[\"tonejs\",\"TapeDegradation\",true,40,[[\"dropouts\",0],[\"flutter\",10],[\"hiss\",0],[\"saturation\",30],[\"toneShift\",40],[\"wow\",15]]]]"
   },
   "Lo-Fi Tape": {
     "name": "Lo-Fi Tape",
@@ -1446,7 +1534,8 @@
     "chainDb": -3.3,
     "makeUpDb": 3.3,
     "oldMakeUpDb": 3.4,
-    "at": "2026-10-08T18:22:27.181Z"
+    "at": "2026-10-08T18:22:27.181Z",
+    "chain": "[[\"tonejs\",\"TapeDegradation\",true,80,[[\"dropouts\",5],[\"flutter\",25],[\"hiss\",20],[\"saturation\",40],[\"toneShift\",35],[\"wow\",35]]]]"
   },
   "Techno": {
     "name": "Techno",
@@ -1458,7 +1547,8 @@
     "chainDb": 0.9,
     "makeUpDb": -0.9,
     "oldMakeUpDb": 1.3,
-    "at": "2026-10-08T18:22:36.907Z"
+    "at": "2026-10-08T18:22:36.907Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",0.5],[\"highFrequency\",5000],[\"low\",8],[\"lowFrequency\",90],[\"mid\",-1]]],[\"tonejs\",\"TapeSaturation\",true,15,[[\"drive\",40],[\"tone\",11000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.003],[\"knee\",6],[\"ratio\",6],[\"release\",0.1],[\"threshold\",-22]]]]"
   },
   "Hip Hop": {
     "name": "Hip Hop",
@@ -1470,7 +1560,8 @@
     "chainDb": 0.3,
     "makeUpDb": 0,
     "oldMakeUpDb": 0.9,
-    "at": "2026-10-08T18:22:46.627Z"
+    "at": "2026-10-08T18:22:46.627Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",0],[\"highFrequency\",5000],[\"low\",6],[\"lowFrequency\",100],[\"mid\",0.5]]],[\"tonejs\",\"TapeSaturation\",true,20,[[\"drive\",30],[\"tone\",8000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.01],[\"ratio\",3.5],[\"release\",0.2],[\"threshold\",-16]]]]"
   },
   "Hardstyle": {
     "name": "Hardstyle",
@@ -1482,7 +1573,8 @@
     "chainDb": 2,
     "makeUpDb": -2,
     "oldMakeUpDb": 1.8,
-    "at": "2026-10-08T18:22:56.345Z"
+    "at": "2026-10-08T18:22:56.345Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",1],[\"highFrequency\",5000],[\"low\",13],[\"lowFrequency\",70],[\"mid\",-0.5]]],[\"tonejs\",\"TapeSaturation\",true,20,[[\"drive\",50],[\"tone\",12000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.005],[\"knee\",6],[\"ratio\",10],[\"release\",0.08],[\"threshold\",-22]]]]"
   },
   "Acid House": {
     "name": "Acid House",
@@ -1493,7 +1585,8 @@
     "chainDb": 3.7,
     "makeUpDb": -3.7,
     "oldMakeUpDb": -3.7,
-    "at": "2026-10-08T18:23:16.262Z"
+    "at": "2026-10-08T18:23:16.262Z",
+    "chain": "[[\"tonejs\",\"AutoFilter\",true,70,[[\"baseFrequency\",300],[\"depth\",0.9],[\"frequency\",1],[\"octaves\",3],[\"type\",\"sawtooth\"]]],[\"tonejs\",\"Distortion\",true,30,[[\"drive\",0.3]]]]"
   },
   "DJ Booth": {
     "name": "DJ Booth",
@@ -1505,7 +1598,8 @@
     "chainDb": 1.4,
     "makeUpDb": -1.4,
     "oldMakeUpDb": 1,
-    "at": "2026-10-08T18:23:26.021Z"
+    "at": "2026-10-08T18:23:26.021Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",1],[\"highFrequency\",5000],[\"low\",4],[\"lowFrequency\",120],[\"mid\",0]]],[\"tonejs\",\"TapeSaturation\",true,15,[[\"drive\",30],[\"tone\",11000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.005],[\"knee\",10],[\"ratio\",3.5],[\"release\",0.12],[\"threshold\",-20]]]]"
   },
   "Vinyl DJ": {
     "name": "Vinyl DJ",
@@ -1517,7 +1611,8 @@
     "chainDb": -1.5,
     "makeUpDb": 1.5,
     "oldMakeUpDb": 1.4,
-    "at": "2026-10-08T18:23:35.732Z"
+    "at": "2026-10-08T18:23:35.732Z",
+    "chain": "[[\"wasm\",\"ToneArm\",true,30,[[\"coil\",35],[\"flutter\",4],[\"hiss\",8],[\"pops\",5],[\"riaa\",55],[\"rpm\",33.333],[\"stylus\",20],[\"wow\",6]]],[\"tonejs\",\"TapeSaturation\",true,15,[[\"drive\",25],[\"tone\",10000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.01],[\"ratio\",3],[\"release\",0.2],[\"threshold\",-16]]]]"
   },
   "Warehouse Rave": {
     "name": "Warehouse Rave",
@@ -1529,7 +1624,8 @@
     "chainDb": -0.5,
     "makeUpDb": 0.5,
     "oldMakeUpDb": 2.1,
-    "at": "2026-10-08T18:23:45.474Z"
+    "at": "2026-10-08T18:23:45.474Z",
+    "chain": "[[\"wasm\",\"TapeSimulator\",true,35,[[\"bias\",40],[\"character\",45],[\"drive\",40],[\"hiss\",10],[\"shame\",20],[\"speed\",1]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",1],[\"low\",2],[\"mid\",-1]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.003],[\"knee\",6],[\"ratio\",8],[\"release\",0.1],[\"threshold\",-24]]]]"
   },
   "Filter Sweep": {
     "name": "Filter Sweep",
@@ -1539,7 +1635,8 @@
     "chainDb": 1.6,
     "makeUpDb": -1.6,
     "oldMakeUpDb": -1.6,
-    "at": "2026-10-08T18:23:55.204Z"
+    "at": "2026-10-08T18:23:55.204Z",
+    "chain": "[[\"tonejs\",\"AutoFilter\",true,80,[[\"baseFrequency\",200],[\"depth\",0.8],[\"frequency\",0.5],[\"octaves\",4],[\"type\",\"sine\"]]]]"
   },
   "Vox Amp Crunch": {
     "name": "Vox Amp Crunch",
@@ -1549,7 +1646,8 @@
     "chainDb": -2.1,
     "makeUpDb": 2.1,
     "oldMakeUpDb": 2.1,
-    "at": "2026-10-08T18:24:08.955Z"
+    "at": "2026-10-08T18:24:08.955Z",
+    "chain": "[[\"wam\",\"WAMVoxAmp\",true,40,[]]]"
   },
   "Acid Bass": {
     "name": "Acid Bass",
@@ -1560,7 +1658,8 @@
     "chainDb": 4.5,
     "makeUpDb": -4.5,
     "oldMakeUpDb": -4.5,
-    "at": "2026-10-08T18:24:18.685Z"
+    "at": "2026-10-08T18:24:18.685Z",
+    "chain": "[[\"tonejs\",\"Filter\",true,100,[[\"Q\",8],[\"frequency\",1200],[\"rolloff\",-24],[\"type\",\"lowpass\"]]],[\"tonejs\",\"Distortion\",true,50,[[\"drive\",0.6],[\"oversample\",\"2x\"]]]]"
   },
   "Sub Bass": {
     "name": "Sub Bass",
@@ -1571,7 +1670,8 @@
     "chainDb": -2.4,
     "makeUpDb": 2.4,
     "oldMakeUpDb": 2.4,
-    "at": "2026-10-08T18:24:28.453Z"
+    "at": "2026-10-08T18:24:28.453Z",
+    "chain": "[[\"tonejs\",\"Filter\",true,100,[[\"Q\",1],[\"frequency\",200],[\"rolloff\",-24],[\"type\",\"lowpass\"]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.005],[\"ratio\",8],[\"release\",0.1],[\"threshold\",-15]]]]"
   },
   "Acid Screamer": {
     "name": "Acid Screamer",
@@ -1582,7 +1682,8 @@
     "chainDb": 1.3,
     "makeUpDb": -1.3,
     "oldMakeUpDb": -1.3,
-    "at": "2026-10-08T18:24:38.231Z"
+    "at": "2026-10-08T18:24:38.231Z",
+    "chain": "[[\"wasm\",\"MoogFilter\",true,100,[[\"cutoff\",2000],[\"drive\",0.6],[\"filterMode\",0],[\"model\",0],[\"resonance\",70]]],[\"tonejs\",\"Distortion\",true,25,[[\"drive\",0.3]]]]"
   },
   "Dark Pad": {
     "name": "Dark Pad",
@@ -1593,7 +1694,8 @@
     "chainDb": -1.6,
     "makeUpDb": 1.6,
     "oldMakeUpDb": 1.6,
-    "at": "2026-10-08T18:24:57.935Z"
+    "at": "2026-10-08T18:24:57.935Z",
+    "chain": "[[\"tonejs\",\"Filter\",true,100,[[\"Q\",1],[\"frequency\",3000],[\"rolloff\",-12],[\"type\",\"lowpass\"]]],[\"tonejs\",\"TapeDegradation\",true,50,[[\"dropouts\",0],[\"flutter\",15],[\"hiss\",10],[\"saturation\",20],[\"toneShift\",30],[\"wow\",25]]]]"
   },
   "Crystal Castles Vocal": {
     "name": "Crystal Castles Vocal",
@@ -1604,7 +1706,8 @@
     "chainDb": -0.3,
     "makeUpDb": 0,
     "oldMakeUpDb": 0,
-    "at": "2026-10-08T18:25:07.683Z"
+    "at": "2026-10-08T18:25:07.683Z",
+    "chain": "[[\"tonejs\",\"BitCrusher\",true,50,[[\"bits\",8]]],[\"tonejs\",\"TapeDegradation\",true,40,[[\"dropouts\",5],[\"flutter\",30],[\"hiss\",20],[\"saturation\",25],[\"toneShift\",25],[\"wow\",40]]]]"
   },
   "Crystal Castles Void": {
     "name": "Crystal Castles Void",
@@ -1615,7 +1718,8 @@
     "chainDb": -4.3,
     "makeUpDb": 4.3,
     "oldMakeUpDb": 4.3,
-    "at": "2026-10-08T18:25:17.424Z"
+    "at": "2026-10-08T18:25:17.424Z",
+    "chain": "[[\"wasm\",\"ShimmerReverb\",true,30,[[\"damping\",50],[\"decay\",70],[\"modDepth\",25],[\"modRate\",35],[\"pitch\",12],[\"predelay\",10],[\"shimmer\",35],[\"size\",70]]],[\"tonejs\",\"TapeDegradation\",true,30,[[\"dropouts\",10],[\"flutter\",30],[\"hiss\",25],[\"saturation\",20],[\"toneShift\",25],[\"wow\",40]]]]"
   },
   "Industrial": {
     "name": "Industrial",
@@ -1627,7 +1731,8 @@
     "chainDb": 2.2,
     "makeUpDb": -2.2,
     "oldMakeUpDb": -2,
-    "at": "2026-10-08T18:25:27.153Z"
+    "at": "2026-10-08T18:25:27.153Z",
+    "chain": "[[\"tonejs\",\"Distortion\",true,50,[[\"drive\",0.65]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.001],[\"ratio\",8],[\"release\",0.08],[\"threshold\",-10]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",2],[\"low\",1.5],[\"mid\",1]]]]"
   },
   "Fuzz Box": {
     "name": "Fuzz Box",
@@ -1639,7 +1744,8 @@
     "chainDb": -1.6,
     "makeUpDb": 1.6,
     "oldMakeUpDb": 1.6,
-    "at": "2026-10-08T18:25:36.912Z"
+    "at": "2026-10-08T18:25:36.912Z",
+    "chain": "[[\"tonejs\",\"TapeSaturation\",true,50,[[\"drive\",55],[\"tone\",6000]]],[\"tonejs\",\"Filter\",true,100,[[\"Q\",0.8],[\"frequency\",5500],[\"type\",\"lowpass\"]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.005],[\"ratio\",3],[\"release\",0.12],[\"threshold\",-14]]]]"
   },
   "Paula Punchline": {
     "name": "Paula Punchline",
@@ -1651,7 +1757,8 @@
     "chainDb": 2.9,
     "makeUpDb": -2.9,
     "oldMakeUpDb": 1.1,
-    "at": "2026-10-08T18:25:46.702Z"
+    "at": "2026-10-08T18:25:46.702Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",1],[\"highFrequency\",6000],[\"low\",9],[\"lowFrequency\",90],[\"mid\",-1]]],[\"tonejs\",\"TapeSaturation\",true,25,[[\"drive\",35],[\"tone\",10000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.05],[\"knee\",6],[\"ratio\",3],[\"release\",0.1],[\"threshold\",-20]]]]"
   },
   "Amiga Bass Cannon": {
     "name": "Amiga Bass Cannon",
@@ -1664,7 +1771,8 @@
     "chainDb": 5.4,
     "makeUpDb": -5.4,
     "oldMakeUpDb": 0.8,
-    "at": "2026-10-08T18:25:56.476Z"
+    "at": "2026-10-08T18:25:56.476Z",
+    "chain": "[[\"wasm\",\"BassEnhancer\",true,100,[[\"amount\",0.7],[\"drive\",0.3],[\"frequency\",80],[\"mix\",0.6]]],[\"tonejs\",\"TapeSaturation\",true,40,[[\"drive\",45],[\"tone\",8000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.04],[\"knee\",6],[\"ratio\",6],[\"release\",0.12],[\"threshold\",-22]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-1],[\"highFrequency\",5000],[\"low\",10],[\"lowFrequency\",80],[\"mid\",-0.5]]]]"
   },
   "Tracker Dance Floor": {
     "name": "Tracker Dance Floor",
@@ -1677,7 +1785,8 @@
     "chainDb": 2,
     "makeUpDb": -2,
     "oldMakeUpDb": 1.1,
-    "at": "2026-10-08T18:26:06.303Z"
+    "at": "2026-10-08T18:26:06.303Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",-0.5],[\"highFrequency\",8000],[\"low\",10],[\"lowFrequency\",100],[\"mid\",-0.5]]],[\"wasm\",\"Exciter\",true,100,[[\"amount\",0.6],[\"blend\",0.5],[\"ceil\",16000],[\"frequency\",7500]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.04],[\"knee\",6],[\"ratio\",8],[\"release\",0.1],[\"threshold\",-26]]],[\"tonejs\",\"TapeSaturation\",true,10,[[\"drive\",30],[\"tone\",10000]]]]"
   },
   "Paula's Revenge": {
     "name": "Paula's Revenge",
@@ -1692,7 +1801,8 @@
     "chainDb": 2.7,
     "makeUpDb": -2.7,
     "oldMakeUpDb": 2.1,
-    "at": "2026-10-08T18:26:57.930Z"
+    "at": "2026-10-08T18:26:57.930Z",
+    "chain": "[[\"wasm\",\"BassEnhancer\",true,100,[[\"amount\",0.85],[\"drive\",0.4],[\"frequency\",90],[\"mix\",0.7]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",0],[\"highFrequency\",6000],[\"low\",10],[\"lowFrequency\",100],[\"mid\",0]]],[\"wasm\",\"Exciter\",true,100,[[\"amount\",0.55],[\"blend\",0.5],[\"ceil\",16000],[\"frequency\",7000]]],[\"tonejs\",\"TapeSaturation\",true,15,[[\"drive\",35],[\"tone\",9000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.003],[\"knee\",6],[\"ratio\",8],[\"release\",0.1],[\"threshold\",-16]]],[\"wasm\",\"Limiter\",true,100,[[\"attack\",1],[\"ceiling\",-0.3],[\"knee\",0],[\"lookahead\",5],[\"release\",50],[\"threshold\",-2]]]]"
   },
   "Amiga Tape Warmth": {
     "name": "Amiga Tape Warmth",
@@ -1704,7 +1814,8 @@
     "chainDb": -1.9,
     "makeUpDb": 1.9,
     "oldMakeUpDb": 1.7,
-    "at": "2026-10-08T18:27:07.641Z"
+    "at": "2026-10-08T18:27:07.641Z",
+    "chain": "[[\"wasm\",\"TapeSimulator\",true,40,[[\"bias\",50],[\"character\",40],[\"drive\",30],[\"hiss\",3],[\"shame\",15],[\"speed\",1]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-1.5],[\"low\",2],[\"mid\",0.5]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.015],[\"ratio\",2.5],[\"release\",0.25],[\"threshold\",-18]]]]"
   },
   "Amiga Multiband": {
     "name": "Amiga Multiband",
@@ -1715,7 +1826,8 @@
     "chainDb": 4.9,
     "makeUpDb": -4.9,
     "oldMakeUpDb": -4.3,
-    "at": "2026-10-08T18:27:17.351Z"
+    "at": "2026-10-08T18:27:17.351Z",
+    "chain": "[[\"wasm\",\"MultibandComp\",true,100,[[\"highCrossover\",4000],[\"highGain\",1.5],[\"highRatio\",2.5],[\"highThreshold\",-12],[\"lowCrossover\",200],[\"lowGain\",1.5],[\"lowRatio\",5],[\"lowThreshold\",-18],[\"midGain\",0.7],[\"midRatio\",3],[\"midThreshold\",-14]]],[\"tonejs\",\"TapeSaturation\",true,20,[[\"drive\",30],[\"tone\",12000]]]]"
   },
   "Retro Arcade": {
     "name": "Retro Arcade",
@@ -1728,7 +1840,8 @@
     "chainDb": 5.4,
     "makeUpDb": -5.4,
     "oldMakeUpDb": 0,
-    "at": "2026-10-08T18:27:27.080Z"
+    "at": "2026-10-08T18:27:27.080Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",4.5],[\"highFrequency\",3000],[\"low\",12],[\"lowFrequency\",120],[\"mid\",0]]],[\"wasm\",\"TransientDesigner\",true,100,[[\"attack\",0.4],[\"output\",0.85],[\"sustain\",-0.15]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.02],[\"ratio\",4],[\"release\",0.1],[\"threshold\",-16]]],[\"tonejs\",\"TapeSaturation\",true,10,[[\"drive\",20],[\"tone\",11000]]]]"
   },
   "SID Bass Machine": {
     "name": "SID Bass Machine",
@@ -1741,7 +1854,8 @@
     "chainDb": 3.4,
     "makeUpDb": -3.4,
     "oldMakeUpDb": 1,
-    "at": "2026-10-08T18:27:36.805Z"
+    "at": "2026-10-08T18:27:36.805Z",
+    "chain": "[[\"wasm\",\"BassEnhancer\",true,100,[[\"amount\",0.75],[\"drive\",0.35],[\"frequency\",70],[\"mix\",0.65]]],[\"tonejs\",\"TapeSaturation\",true,35,[[\"drive\",45],[\"tone\",7000]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.005],[\"knee\",6],[\"ratio\",5],[\"release\",0.1],[\"threshold\",-22]]],[\"tonejs\",\"EQ3\",true,100,[[\"high\",-0.5],[\"highFrequency\",5000],[\"low\",8],[\"lowFrequency\",70],[\"mid\",0]]]]"
   },
   "SID Raw Power": {
     "name": "SID Raw Power",
@@ -1753,7 +1867,8 @@
     "chainDb": 1.8,
     "makeUpDb": -1.8,
     "oldMakeUpDb": 1,
-    "at": "2026-10-08T18:27:46.520Z"
+    "at": "2026-10-08T18:27:46.520Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",0.5],[\"highFrequency\",6000],[\"low\",9],[\"lowFrequency\",100],[\"mid\",0]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.02],[\"knee\",6],[\"ratio\",8],[\"release\",0.1],[\"threshold\",-24]]],[\"tonejs\",\"TapeSaturation\",true,12,[[\"drive\",30],[\"tone\",11000]]]]"
   },
   "Clean Master": {
     "name": "Clean Master",
@@ -1788,7 +1903,8 @@
     "chainDb": -1.5,
     "makeUpDb": 1.5,
     "oldMakeUpDb": 1.4,
-    "at": "2026-10-08T18:49:51.331Z"
+    "at": "2026-10-08T18:49:51.331Z",
+    "chain": "[[\"tonejs\",\"EQ3\",true,100,[[\"high\",1],[\"low\",2],[\"mid\",0]]],[\"tonejs\",\"Compressor\",true,100,[[\"attack\",0.001],[\"knee\",0],[\"ratio\",20],[\"release\",0.05],[\"threshold\",-24]]],[\"wasm\",\"Limiter\",true,100,[[\"attack\",1],[\"ceiling\",-0.3],[\"knee\",0],[\"lookahead\",5],[\"release\",50],[\"threshold\",-3]]]]"
   },
   "House": {
     "name": "House",

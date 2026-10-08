@@ -15,8 +15,62 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FX_PRESETS } from '../fxPresets';
+import { presetChainFingerprint } from '../presetChainFingerprint';
 
-type Row = { name: string; types: string[]; chainDb: number; makeUpDb: number };
+type Row = { name: string; types: string[]; chainDb: number; makeUpDb: number; chain?: string };
+
+/**
+ * Make-ups measured on a chain the preset no longer has: retuned (f85a8e8c8 and
+ * earlier) or holding an EQ3 / Filter whose gain became real dB (b730c5da5,
+ * 6c9b00955) after the measurement. The live re-measure of 2026-10-08
+ * (3c9dae257) skipped them because the tool skipped any preset it had a row
+ * for. `npx tsx tools/master-fx-preset-calibration.ts` now measures exactly
+ * these (their rows carry no chain fingerprint), then `--write`; each one that
+ * is re-measured leaves this list. Big Room among them: 4.6 dB measured with a
+ * -12 dB / 30 dB-knee compressor, now -22 dB / 8 dB knee.
+ */
+const AWAITING_LIVE_REMEASURE = new Set([
+  'VHS Tape',
+  'Cassette Dub',
+  'Dub / Reggae',
+  'Synthwave',
+  'Garage / 2-Step',
+  'Big Room',
+  'Echo Out',
+  'Dub Echo',
+  'Feedback Loop',
+  'Cathedral',
+  'Ping Pong Hall',
+  'Spacey Delay',
+  'Mad Professor Cathedral',
+  'Ambient Space',
+  'Dreamy Haze',
+  'Underwater',
+  'Frozen',
+  'Radiowave',
+  'Haunted',
+  'Cosmic',
+  'Stereo Ping Pong',
+  'Dumble Lead',
+  'RAT + Delay',
+  'Paula Dub Sirens',
+  'Chipgold',
+  'Paula Sings',
+  'Exotic Shimmer',
+  'SID Stadium',
+  'SID Acid Trip',
+  'SID Neon Nights',
+  'Warm Overdrive',
+  'Tube Screamer Glow',
+  'Club Ready',
+  'Clean Master',
+  'Balanced',
+  'House',
+  'Drum & Bass',
+  'Punchy Drums',
+  'Clean Vocal',
+  'Transparent',
+]);
 const measured = JSON.parse(readFileSync(join(process.cwd(), 'tools/master-fx-preset-calibration.json'), 'utf8')) as Record<string, Row>;
 const kept = (r: Row) => r.name === 'RE-201 Runaway';
 
@@ -29,6 +83,17 @@ describe('master FX preset make-up gains', () => {
       expect(preset, r.name).toBeDefined();
       expect(preset!.gainCompensationDb ?? 0, r.name).toBeCloseTo(r.makeUpDb, 5);
     }
+  });
+
+  it('were measured on the chain each preset has now (a retune is measured again)', () => {
+    const stale: string[] = [];
+    for (const r of Object.values(measured)) {
+      const preset = FX_PRESETS.find((p) => p.name === r.name);
+      if (!preset) continue;
+      if (r.chain !== presetChainFingerprint(preset.effects as never)) stale.push(r.name);
+    }
+    expect(stale.filter((n) => !AWAITING_LIVE_REMEASURE.has(n)), 'retuned since their make-up was measured').toEqual([]);
+    expect([...AWAITING_LIVE_REMEASURE].filter((n) => !stale.includes(n)), 're-measured: remove from AWAITING_LIVE_REMEASURE').toEqual([]);
   });
 
   it('Hall Reverb no longer gets a +3.2 dB boost', () => {
