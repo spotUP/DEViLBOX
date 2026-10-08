@@ -10,7 +10,7 @@
  * existed is not "fully analysed" (it is re-analysed), and a current entry
  * carries the extended data back out.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({
   engine: null as unknown,
@@ -51,6 +51,7 @@ type Internals = {
 };
 
 describe('the incoming Auto DJ deck holds the unified DJTrackAnalysis', () => {
+  beforeAll(() => { corpusTrack('longIntro'); corpusTrack('steady'); corpusTrack('short'); }, 120_000);
   beforeEach(async () => {
     holder.transitions = 0;
     const { DJEngine } = await vi.importActual<typeof import('../DJEngine')>('../DJEngine');

@@ -12,6 +12,7 @@ import { enableMapSet } from 'immer';
 import type { SeratoCuePoint, SeratoLoop, SeratoBeatMarker } from '@/lib/serato/seratoMetadata';
 import type { BeatGridData } from '@/engine/dj/DJAudioCache';
 import type { DJTrackAnalysis } from '@/engine/dj/autodj/types';
+import type { AutoDJTelemetry } from '@/engine/dj/autodj/telemetry';
 
 // Immer needs MapSet support to draft `Set<number>` fields (fxTargetChannels).
 // Calling at module load is idempotent — main.tsx calls it too, but tests
@@ -339,6 +340,16 @@ interface DJState {
    * default path.
    */
   autoDJSmartCuts: boolean;
+  /** DJ style profile name (plan section 30). */
+  autoDJStyle: string;
+  /** Session creative risk budget 0..1 (plan section 54); -1 = the style's own. */
+  autoDJCreativeRisk: number;
+  /** Performance order: indices into the user playlist, next track first (plan section 10). Never the playlist itself. */
+  autoDJSessionOrder: number[];
+  /** Telemetry snapshot for the debug view (plan section 44), written by the session controller. */
+  autoDJTelemetry: AutoDJTelemetry | null;
+  /** DJ FX actions engaged right now, by action id -> deck (the pad lights from this, whoever fired it). */
+  djFxActive: Record<string, DeckId | null>;
   /** Pre-separate stems for upcoming playlist tracks in the background */
   stemPreSeparation: boolean;
   /** Enable auto-dub for streamed audio decks — fires dub moves timed to
@@ -423,7 +434,10 @@ interface DJActions {
   setAutoDJEnabled: (enabled: boolean) => void;
   setAutoDJStatus: (status: AutoDJStatus) => void;
   setAutoDJTrackIndices: (current: number, next: number) => void;
-  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s' }>) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number }>) => void;
+  setAutoDJSessionOrder: (order: number[]) => void;
+  setDjFxActive: (id: string, deck: DeckId | null) => void;
+  setAutoDJTelemetry: (telemetry: AutoDJTelemetry | null) => void;
 }
 
 type DJStore = DJState & DJActions;
@@ -469,6 +483,11 @@ export const useDJStore = create<DJStore>()(
     autoDJShuffle: false,
     autoDJWithFilter: true,
     autoDJSmartCuts: false,
+    autoDJStyle: 'Classic',
+    autoDJCreativeRisk: -1,
+    autoDJSessionOrder: [] as number[],
+    autoDJTelemetry: null as AutoDJTelemetry | null,
+    djFxActive: {} as Record<string, DeckId | null>,
     stemPreSeparation: false,
     streamAutoDub: false,
     stemModel: '4s' as const,
@@ -793,6 +812,21 @@ export const useDJStore = create<DJStore>()(
         state.autoDJStatus = status;
       }),
 
+    setAutoDJSessionOrder: (order) =>
+      set((state) => {
+        state.autoDJSessionOrder = order;
+      }),
+
+    setDjFxActive: (id, deck) =>
+      set((state) => {
+        if (deck === null) delete state.djFxActive[id]; else state.djFxActive[id] = deck;
+      }),
+
+    setAutoDJTelemetry: (telemetry) =>
+      set((state) => {
+        state.autoDJTelemetry = telemetry;
+      }),
+
     setAutoDJTrackIndices: (current, next) =>
       set((state) => {
         state.autoDJCurrentTrackIndex = current;
@@ -805,6 +839,8 @@ export const useDJStore = create<DJStore>()(
         if (config.shuffle !== undefined) state.autoDJShuffle = config.shuffle;
         if (config.withFilter !== undefined) state.autoDJWithFilter = config.withFilter;
         if (config.smartCuts !== undefined) state.autoDJSmartCuts = config.smartCuts;
+        if (config.style !== undefined) state.autoDJStyle = config.style;
+        if (config.creativeRisk !== undefined) state.autoDJCreativeRisk = config.creativeRisk;
         if (config.stemPreSeparation !== undefined) state.stemPreSeparation = config.stemPreSeparation;
         if (config.streamAutoDub !== undefined) state.streamAutoDub = config.streamAutoDub;
         if (config.stemModel !== undefined) state.stemModel = config.stemModel;

@@ -25,6 +25,11 @@ import { loadPlaylistTrackToDeck } from './DJTrackLoader';
 import { keyCompatibility } from './DJKeyUtils';
 import { detectDrumBreakTail, isChordChangeImminent } from './smartCuts';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { getSessionController, type SessionTrack } from './autodj/sessionController';
+import { executeTransition, type ExecutionHandle } from './autodj/transitionExecutor';
+import { buildDJTrackAnalysis, summaryFromPipeline } from './autodj/trackAnalysis';
+import { getDecisionLog } from './autodj/decisionLog';
+import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
 
 // ── Transition Types ────────────────────────────────────────────────────────
 
@@ -139,6 +144,17 @@ class DJAutoDJ {
   // force-completing.
   private static readonly TRANSITION_TIMEOUT_MS = 45_000;
   private static readonly CROSSFADER_STUCK_POLLS = 10; // 5 seconds at 500ms
+  /**
+   * The intelligence above this state machine (plan sections 56, 57): the
+   * session controller plans the order, the transition and its fallback; the
+   * executor runs the plan. This class only answers "what execution state
+   * are we in". `plan` is the anticipated transition (made when the preload
+   * finished), `incomingAnalysis` the next track's analysis before it is on
+   * a deck, `execution` the running plan.
+   */
+  private plan: DJTransitionPlan | null = null;
+  private incomingAnalysis: DJTrackAnalysis | null = null;
+  private execution: ExecutionHandle | null = null;
 
 
   // ── Public API ───────────────────────────────────────────────────────────
@@ -209,23 +225,11 @@ class DJAutoDJ {
     store.setAutoDJEnabled(true);
     store.setAutoDJStatus('playing');
 
-    // Auto-sort the playlist using smart mix when analysis data is available.
-    // This gives the best harmonic/energy flow without requiring the user to
-    // manually sort before enabling Auto DJ.
-    try {
-      const { smartSort } = await import('./DJPlaylistSort');
-      const hasAnalysis = playlist.tracks.some(t => t.bpm && t.bpm > 0 && t.musicalKey);
-      if (hasAnalysis) {
-        const sorted = smartSort([...playlist.tracks]);
-        const plId = useDJPlaylistStore.getState().activePlaylistId;
-        if (plId) {
-          useDJPlaylistStore.getState().sortTracks(plId, sorted);
-          console.log('[AutoDJ] Applied smart mix sort to playlist');
-        }
-      }
-    } catch (err) {
-      console.warn('[AutoDJ] Smart sort failed:', err);
-    }
+    // The performance order is the session controller's (plan section 10):
+    // the user's playlist is never re-sorted by Auto DJ.
+    this.plan = null;
+    this.incomingAnalysis = null;
+    this.execution = null;
 
     // Apply playlist's saved master FX if present
     if (playlist.masterEffects && playlist.masterEffects.length > 0) {
@@ -294,6 +298,17 @@ class DJAutoDJ {
         this.disable();
         return 'Could not load any tracks from playlist — check network connection';
       }
+    }
+
+    // Start the session: order planned from the current track, memory reset.
+    try {
+      const controller = getSessionController();
+      controller.startSession(this.sessionTracks(), finalCurrentIdx);
+      const d = useDJStore.getState().decks[this.activeDeck];
+      const first = playlist.tracks[finalCurrentIdx];
+      controller.onTrackStarted(finalCurrentIdx, d.trackAnalysis, { artist: first?.author ?? null, bpm: d.beatGrid?.bpm || d.detectedBPM, key: d.musicalKey, energy: d.energy });
+    } catch (err) {
+      console.warn('[AutoDJ] session controller failed to start:', err);
     }
 
     // Now compute nextIndex — exactly once, against the final currentIndex
@@ -509,7 +524,8 @@ class DJAutoDJ {
         // Preload when: time is low, duration unknown, OR position has been frozen
         // (staleCount > 12 = ~6 seconds of frozen position at 500ms poll interval)
         const positionFrozen = this.staleCount > 12 && timeRemaining < Infinity;
-        const shouldPreload = timeRemaining < PRELOAD_LEAD_TIME_SEC || timeRemaining === Infinity || positionFrozen;
+        const shouldPreload = timeRemaining < this.preloadLeadSec() || timeRemaining === Infinity || positionFrozen;
+        if (this.pollCount % 4 === 0) this.publishTelemetry(timeRemaining);
         if (shouldPreload && !this.preloading && !this.preloadedDeck) {
           if (positionFrozen) {
             console.warn(`[AutoDJ] Position frozen at ${timeRemaining.toFixed(1)}s for ${this.staleCount} polls — forcing preload`);
@@ -553,6 +569,20 @@ class DJAutoDJ {
             this.patternDeferCount = 0;
             this.triggerTransition(store.autoDJTransitionBars);
             break;
+          }
+          break;
+        }
+        if (this.plan) {
+          // Plan-driven (plan section 32): trigger when the outgoing deck
+          // reaches the planned mix-out point minus the load lead; the
+          // executor then waits for the exact grid moment.
+          const position = this.getOutgoingPosition();
+          const lead = getSessionController().loadLeadSec;
+          if (this.pollCount % 4 === 0) this.publishTelemetry(timeRemaining);
+          if (position >= this.plan.startTimeSec - lead || timeRemaining <= Math.max(transitionDuration, lead)) {
+            console.log(`[AutoDJ] Triggering planned ${this.plan.style} at ${position.toFixed(1)}s (plan start ${this.plan.startTimeSec.toFixed(1)}s)`);
+            this.patternDeferCount = 0;
+            this.triggerTransition(store.autoDJTransitionBars);
           }
           break;
         }
@@ -714,6 +744,7 @@ class DJAutoDJ {
     }
     this.preloading = true;
     console.log('[AutoDJ] preloadNextTrack() START');
+    try { getSessionController().preloadStarted(); } catch { /* */ }
 
     // Single try/finally guarantees the preloading flag always resets, even
     // on unexpected sync throws (e.g. isServerUnreachable, computeNextIndex).
@@ -769,6 +800,7 @@ class DJAutoDJ {
             this.preRenderedTrack = { track, data: preRendered };
             this.preloadedDeck = this.idleDeck;
             this.preloadFailCount = 0;
+            this.anticipate(track, nextIdx, preRendered);
 
             useDJStore.getState().setAutoDJTrackIndices(
               useDJStore.getState().autoDJCurrentTrackIndex,
@@ -1012,11 +1044,19 @@ class DJAutoDJ {
     }
 
     // Skip: use skipTransition which starts immediately (no quantize delay).
-    // Normal transitions wait for the next downbeat for a beat-matched blend.
+    // Normal transitions run the session controller's plan through the
+    // executor (plan sections 15, 60); the legacy functions remain the
+    // emergency path when no plan can be made.
+    const planned = isSkip ? null : this.finalizePlan();
     if (isSkip) {
       this.transitionCancel = skipTransition(
         this.activeDeck, this.idleDeck, bars, store.autoDJWithFilter,
       );
+    } else if (planned) {
+      this.transitionCancel = this.executePlan(planned);
+      console.log(`[AutoDJ] PLAN ${planned.style} ${planned.durationBars}-bar: ${this.activeDeck} → ${this.idleDeck} at ${planned.startTimeSec.toFixed(1)}s, incoming from ${planned.incomingPosition.toFixed(1)}s`);
+      // The executor flips the sweep flag (onSweepStarted) once its automation clock runs.
+      return;
     } else {
       switch (transType) {
         case 'cut':
@@ -1197,8 +1237,19 @@ class DJAutoDJ {
     const playlist = this.getActivePlaylist();
     const trackCount = playlist?.tracks.length ?? 1;
 
-    // Advance indices
+    // Advance indices: the controller records the new track and replans the
+    // order before the next index is read from it.
     const newCurrentIdx = store.autoDJNextTrackIndex;
+    this.plan = null;
+    this.incomingAnalysis = null;
+    this.execution = null;
+    try {
+      const d = useDJStore.getState().decks[this.activeDeck];
+      const t = playlist?.tracks[newCurrentIdx];
+      getSessionController().onTrackStarted(newCurrentIdx, d.trackAnalysis, { artist: t?.author ?? null, bpm: d.beatGrid?.bpm || d.detectedBPM, key: d.musicalKey, energy: d.energy });
+    } catch (err) {
+      console.warn('[AutoDJ] controller onTrackStarted failed:', err);
+    }
     const newNextIdx = this.computeNextIndex(newCurrentIdx, trackCount);
 
     store.setAutoDJTrackIndices(newCurrentIdx, newNextIdx);
@@ -1288,6 +1339,10 @@ class DJAutoDJ {
   private getTransitionDurationSec(): number {
     const state = useDJStore.getState();
     const deckState = state.decks[this.activeDeck];
+    if (this.plan) {
+      const bpm = deckState.beatGrid?.bpm || deckState.detectedBPM || deckState.effectiveBPM || 125;
+      return (this.plan.durationBeats * 60) / bpm;
+    }
     const bpm = deckState.beatGrid?.bpm || deckState.detectedBPM || deckState.effectiveBPM || 125;
     const beatsPerBar = deckState.beatGrid?.timeSignature || 4;
     const totalBeats = state.autoDJTransitionBars * beatsPerBar;
@@ -1298,6 +1353,13 @@ class DJAutoDJ {
     if (trackCount <= 1) return 0;
 
     const store = useDJStore.getState();
+    if (!store.autoDJShuffle) {
+      // The session order (plan sections 8, 10), never the playlist's own order.
+      try {
+        const next = getSessionController().nextIndex();
+        if (next !== null && next !== currentIndex && next >= 0 && next < trackCount) return next;
+      } catch { /* fall through to sequential */ }
+    }
     if (store.autoDJShuffle) {
       // Regenerate if empty or exhausted — checked BEFORE increment so that
       // the first call after a fresh shuffle reads index 0 (the old code
@@ -1323,6 +1385,126 @@ class DJAutoDJ {
     }
     this.shuffleOrder = indices;
     this.shufflePosition = -1;  // next computeNextIndex ++ yields 0
+  }
+
+  // ── Private: session controller glue (plan sections 32-34, 44) ─────────
+
+  /** Auto DJ only ever uses decks A and B (deck C is the thru/sampler deck). */
+  private ab(deck: DeckId): 'A' | 'B' { return deck === 'B' ? 'B' : 'A'; }
+
+  private sessionTracks(): SessionTrack[] {
+    const playlist = this.getActivePlaylist();
+    if (!playlist) return [];
+    return playlist.tracks.map((track, index) => ({ index, id: track.id, name: track.trackName, artist: track.author ?? null, track }));
+  }
+
+  private preloadLeadSec(): number {
+    try {
+      const playlist = this.getActivePlaylist();
+      const next = playlist?.tracks[useDJStore.getState().autoDJNextTrackIndex] ?? null;
+      const outgoing = useDJStore.getState().decks[this.activeDeck].trackAnalysis;
+      return getSessionController().preloadTiming(next, outgoing).leadSec;
+    } catch {
+      return PRELOAD_LEAD_TIME_SEC;
+    }
+  }
+
+  private getOutgoingPosition(): number {
+    try {
+      const deck = getDJEngine().getDeck(this.activeDeck);
+      if (deck.playbackMode === 'audio') return deck.audioPlayer.getPosition();
+      return deck.replayer.getElapsedMs() / 1000;
+    } catch {
+      return useDJStore.getState().decks[this.activeDeck].audioPosition;
+    }
+  }
+
+  /**
+   * Anticipatory planning (plan section 32): the preload finished, so the
+   * incoming analysis exists before the track is on a deck. Build it, store
+   * its summary on the playlist track (the set planner reads it next time),
+   * and plan the transition now.
+   */
+  private anticipate(track: PlaylistTrack, index: number, preRendered: { duration: number; analysis?: import('./DJPipeline').PipelineResult['analysis']; song?: TrackerSong }): void {
+    try {
+      const controller = getSessionController();
+      controller.preloadFinished();
+      controller.setTracks(this.sessionTracks());
+      if (!preRendered.analysis) { this.incomingAnalysis = null; this.plan = null; return; }
+      this.incomingAnalysis = buildDJTrackAnalysis({
+        id: track.fileName, durationSec: preRendered.duration, analysis: preRendered.analysis,
+        extended: preRendered.analysis.extended ?? null, song: preRendered.song ?? null,
+      });
+      const summary = summaryFromPipeline(preRendered, track.id, preRendered.song ?? null);
+      const plId = useDJPlaylistStore.getState().activePlaylistId;
+      if (summary && plId && !track.djSummary) useDJPlaylistStore.getState().updateTrackMeta(plId, index, { djSummary: summary });
+      const outgoing = useDJStore.getState().decks[this.activeDeck].trackAnalysis;
+      this.plan = controller.planTransitionFor(outgoing, this.incomingAnalysis, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition());
+    } catch (err) {
+      console.warn('[AutoDJ] anticipatory planning failed:', err);
+      this.plan = null;
+    }
+  }
+
+  /** The final plan from the live position and both decks' analyses (the incoming deck is loaded now). */
+  private finalizePlan(): DJTransitionPlan | null {
+    try {
+      const decks = useDJStore.getState().decks;
+      const outgoing = decks[this.activeDeck].trackAnalysis;
+      const incoming = decks[this.idleDeck].trackAnalysis ?? this.incomingAnalysis;
+      const plan = getSessionController().planTransitionFor(outgoing, incoming, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition());
+      this.plan = plan;
+      return plan;
+    } catch (err) {
+      console.warn('[AutoDJ] plan failed, legacy transition:', err);
+      getDecisionLog().record('EMERGENCY', [`plan failed: ${err instanceof Error ? err.message : String(err)}`]);
+      return null;
+    }
+  }
+
+  /** Run a plan through the executor; the sweep flag flips when its automation clock runs, as the legacy sweeps do. */
+  private executePlan(planned: DJTransitionPlan): () => void {
+    const out = this.activeDeck;
+    const handle = executeTransition(planned, {
+      waitForStart: () => this.waitForDeckPosition(out, planned.startTimeSec),
+      onSweepStarted: () => { this.transitionSweepStarted = true; },
+      onComplete: (result) => {
+        if (this.execution === handle) this.execution = null;
+        try { getSessionController().onTransitionComplete(result, planned); } catch { /* */ }
+      },
+    });
+    this.execution = handle;
+    return () => handle.cancel();
+  }
+
+  /** Resolve when the deck reaches `targetSec` (the planned grid moment), or on a safety timeout. */
+  private waitForDeckPosition(deck: DeckId, targetSec: number): Promise<void> {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      const check = () => {
+        let pos = 0;
+        try { pos = getDJEngine().getDeck(deck).audioPlayer.getPosition(); } catch { pos = targetSec; }
+        const remaining = targetSec - pos;
+        if (remaining <= 0.008 || Date.now() - start > Math.max(3000, remaining * 1500 + 3000)) { resolve(); return; }
+        setTimeout(check, Math.min(15, Math.max(1, remaining * 1000 - 5)));
+      };
+      check();
+    });
+  }
+
+  private publishTelemetry(timeRemaining: number): void {
+    try {
+      const controller = getSessionController();
+      const decks = useDJStore.getState().decks;
+      const playlist = this.getActivePlaylist();
+      const s = useDJStore.getState();
+      const ctx = controller.context({
+        currentDeck: this.ab(this.activeDeck), incomingDeck: this.preloadedDeck ? this.ab(this.preloadedDeck) : undefined,
+        currentTrack: decks[this.activeDeck].trackAnalysis, incomingTrack: decks[this.idleDeck].trackAnalysis ?? this.incomingAnalysis,
+        currentPosition: this.getOutgoingPosition(), timeRemainingSec: Number.isFinite(timeRemaining) ? timeRemaining : -1,
+      });
+      controller.publishTelemetry(ctx, playlist?.tracks[s.autoDJCurrentTrackIndex]?.trackName ?? null, playlist?.tracks[s.autoDJNextTrackIndex]?.trackName ?? null);
+    } catch { /* telemetry must never break the DJ */ }
   }
 
   /** Check if the active deck is actually playing (reads engine first, falls back to store). */

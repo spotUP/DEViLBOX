@@ -74,8 +74,13 @@ export function corpusTrackerSong(): TrackerSong {
     mk('p3', 'break', [none, none, none, none, none, pad]),
     mk('p4', 'full', [kick, none, hat, bass, lead, pad]),
   ];
+  // Instruments carry the evidence the Dub Deck's identity reads (names, drum types).
+  const instruments = [
+    { id: 1, name: 'Kick', drumMachine: { drumType: 'kick' } }, { id: 2, name: 'Snare', drumMachine: { drumType: 'snare' } },
+    { id: 3, name: 'HiHat', drumMachine: { drumType: 'hihat' } }, { id: 4, name: 'Bass' }, { id: 5, name: 'Lead' }, { id: 6, name: 'Pad' },
+  ];
   return {
-    name: 'corpus tracker', format: 'MOD', patterns, instruments: [], songPositions: [0, 1, 1, 2, 2, 3, 4, 4],
+    name: 'corpus tracker', format: 'MOD', patterns, instruments, songPositions: [0, 1, 1, 2, 2, 3, 4, 4],
     songLength: 8, restartPosition: 0, numChannels: 6, initialSpeed: 6, initialBPM: 125,
   } as unknown as TrackerSong;
 }

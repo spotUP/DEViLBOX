@@ -17,17 +17,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from '@/engine/dj/DJEngine';
-import { setDeckPitch } from '@/engine/dj/DJActions';
-import {
-  filterSweep,
-  filterReset,
-  echoOut,
-  quantizedEQKill,
-  instantEQKill,
-  getQuantizeMode,
-  type EQBand,
-} from '@/engine/dj/DJQuantizedFX';
+import { fireDjFx, releaseDjFx, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
 import { beatJump } from '@/engine/dj/DJBeatJump';
 import { fire as fireDubMove } from '@/engine/dub/DubRouter';
 
@@ -161,10 +151,16 @@ const JUMP_PADS: PadDef[] = [
   { id: 'jump-fwd-16', label: '►►', sublabel: '16', color: 'indigo', activeColor: 'indigo', mode: 'instant' },
 ];
 
-const BAND_MAP: Record<string, EQBand> = {
-  'kill-low': 'low',
-  'kill-mid': 'mid',
-  'kill-hi': 'high',
+/** Deck FX pad -> DJ FX registry action (one path for the pad, MIDI, keyboard and the Auto DJ). */
+const DECK_PAD_ACTIONS: Record<string, DjFxActionId> = {
+  'hpf-sweep': 'fx_deck_hpf_sweep',
+  'lpf-sweep': 'fx_deck_lpf_sweep',
+  'filter-reset': 'fx_deck_filter_reset',
+  'echo-out': 'fx_deck_echo_out',
+  'kill-low': 'fx_deck_kill_lo',
+  'kill-mid': 'fx_deck_kill_mid',
+  'kill-hi': 'fx_deck_kill_hi',
+  'brake': 'fx_deck_brake',
 };
 
 const BEAT_JUMPS: Record<string, number> = {
@@ -199,15 +195,14 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
   const [activePads, setActivePads] = useState<Set<string>>(new Set());
   const cancelRefs = useRef<Map<string, () => void>>(new Map());
   const flashTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const filterResetTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Cleanup stray timers on unmount
   useEffect(() => {
     return () => {
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-      if (filterResetTimerRef.current) clearTimeout(filterResetTimerRef.current);
     };
   }, []);
+  const djFxActive = useDJStore((s) => s.djFxActive);
   const killLow = useDJStore((s) => s.decks[deckId].eqLowKill);
   const killMid = useDJStore((s) => s.decks[deckId].eqMidKill);
   const killHigh = useDJStore((s) => s.decks[deckId].eqHighKill);
@@ -249,92 +244,26 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     });
   }, []);
 
+  // Deck FX pads fire the DJ FX registry (DjFxActions): the one path the
+  // keyboard, MIDI, the MCP and the Auto DJ use too. The pad lights from the
+  // store flag the registry sets, whoever fired the action.
   const activateFXPad = useCallback((padId: string) => {
-    // For toggle-style pads: if already active, just cancel (don't restart)
-    if (padId === 'echo-out' && cancelRefs.current.has(padId)) {
-      cancelPad(padId);
+    const actionId = DECK_PAD_ACTIONS[padId];
+    if (!actionId) return;
+    // Toggle-style: a second press on an engaged echo-out releases it.
+    if (padId === 'echo-out' && useDJStore.getState().djFxActive[actionId] === deckId) {
+      releaseDjFx(actionId, { deck: deckId, source: 'pad' });
       return;
     }
-
-    // Cancel conflicting filter pads (HPF and LPF are mutually exclusive)
+    // HPF and LPF are mutually exclusive.
     if (padId === 'hpf-sweep' || padId === 'lpf-sweep') {
       const opposing = padId === 'hpf-sweep' ? 'lpf-sweep' : 'hpf-sweep';
-      if (cancelRefs.current.has(opposing)) {
-        cancelPad(opposing);
+      if (useDJStore.getState().djFxActive[DECK_PAD_ACTIONS[opposing]] === deckId) {
+        releaseDjFx(DECK_PAD_ACTIONS[opposing], { deck: deckId, source: 'pad' });
       }
     }
-
-    cancelPad(padId);
-    setActivePads((prev) => new Set(prev).add(padId));
-
-    let cancelFn: (() => void) | undefined;
-
-    switch (padId) {
-      case 'hpf-sweep':
-        cancelFn = filterSweep(deckId, -0.85, 4, () => cancelPad(padId));
-        break;
-      case 'lpf-sweep':
-        cancelFn = filterSweep(deckId, 0.85, 4, () => cancelPad(padId));
-        break;
-      case 'filter-reset':
-        cancelFn = filterReset(deckId);
-        filterResetTimerRef.current = setTimeout(() => cancelPad(padId), 150);
-        break;
-      case 'echo-out':
-        cancelFn = echoOut(deckId, 8, () => cancelPad(padId));
-        break;
-      case 'kill-low':
-      case 'kill-mid':
-      case 'kill-hi': {
-        const band = BAND_MAP[padId];
-        useDJStore.getState().setDeckEQKill(deckId, band, true);
-        if (getQuantizeMode() !== 'off') {
-          cancelFn = quantizedEQKill(deckId, band, true);
-        } else {
-          instantEQKill(deckId, band, true);
-        }
-        break;
-      }
-      case 'brake': {
-        try {
-          const engine = getDJEngine();
-          const deck = engine.getDeck(deckId);
-          const state = useDJStore.getState().decks[deckId];
-          const bpm = state.beatGrid?.bpm || state.detectedBPM || state.effectiveBPM || 120;
-          const durationMs = (2 * 60 / bpm) * 1000;
-
-          let rafId = 0;
-          const startTime = performance.now();
-          const animate = () => {
-            const elapsed = performance.now() - startTime;
-            const progress = Math.min(1, elapsed / durationMs);
-            const rate = 1 - progress * progress;
-            setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
-            if (progress < 1) {
-              rafId = requestAnimationFrame(animate);
-            } else {
-              try { deck.pause(); } catch { /* engine may be gone */ }
-              useDJStore.getState().setDeckPlaying(deckId, false);
-              setDeckPitch(deckId, 0);
-              cancelPad(padId);
-            }
-          };
-          rafId = requestAnimationFrame(animate);
-          cancelFn = () => {
-            cancelAnimationFrame(rafId);
-            setDeckPitch(deckId, 0);
-          };
-        } catch {
-          cancelPad(padId);
-        }
-        break;
-      }
-    }
-
-    if (cancelFn) {
-      cancelRefs.current.set(padId, cancelFn);
-    }
-  }, [deckId, cancelPad]);
+    fireDjFx(actionId, { deck: deckId, source: 'pad' });
+  }, [deckId]);
 
   const activateDubPad = useCallback((padId: string, mode: 'momentary' | 'instant') => {
     const moveId = DUB_PAD_MAP[padId];
@@ -411,34 +340,17 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       if (pad.id in DUB_PAD_MAP) {
         // Dub hold-kind — dispose the returned handle.
         cancelPad(pad.id);
-      } else if (pad.id === 'hpf-sweep' || pad.id === 'lpf-sweep') {
-        cancelPad(pad.id);
-        filterReset(deckId);
-      } else if (pad.id === 'kill-low' || pad.id === 'kill-mid' || pad.id === 'kill-hi') {
-        // Release kill — unmute the band
-        const band = BAND_MAP[pad.id];
-        cancelPad(pad.id);
-        useDJStore.getState().setDeckEQKill(deckId, band, false);
-        if (getQuantizeMode() !== 'off') {
-          quantizedEQKill(deckId, band, false);
-        } else {
-          instantEQKill(deckId, band, false);
-        }
-      } else if (pad.id === 'brake') {
-        // Cancel brake animation immediately on release
-        cancelPad(pad.id);
-      } else if (pad.id === 'filter-reset') {
-        if (filterResetTimerRef.current) {
-          clearTimeout(filterResetTimerRef.current);
-          filterResetTimerRef.current = undefined;
-        }
-        cancelPad(pad.id);
+      } else if (pad.id in DECK_PAD_ACTIONS && pad.id !== 'echo-out') {
+        // Release through the registry: sweeps return to centre, kills unmute, the brake restores pitch.
+        releaseDjFx(DECK_PAD_ACTIONS[pad.id], { deck: deckId, source: 'pad' });
       }
     }
   }, [deckId, cancelPad]);
 
   const isActive = (padId: string) => {
     if (padId in killState) return killState[padId];
+    const actionId = DECK_PAD_ACTIONS[padId];
+    if (actionId) return djFxActive[actionId] === deckId;
     return activePads.has(padId);
   };
 

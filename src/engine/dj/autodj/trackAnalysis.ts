@@ -413,6 +413,16 @@ export function summarizeTrack(a: DJTrackAnalysis): DJTrackSummary {
   };
 }
 
+/** The summary of a pipeline result (render + analysis), for the playlist track it came from. */
+export function summaryFromPipeline(result: { duration: number; analysis?: PipelineResult['analysis'] }, id = 'track', song?: TrackerSong | null): DJTrackSummary | null {
+  if (!result.analysis) return null;
+  try {
+    return summarizeTrack(buildDJTrackAnalysis({ id, durationSec: result.duration, analysis: result.analysis, extended: result.analysis.extended ?? null, song: song ?? null }));
+  } catch {
+    return null;
+  }
+}
+
 /** A summary for a track that only has the legacy playlist fields (bpm, key, energy). */
 export function summaryFromLegacy(track: { bpm: number; musicalKey?: string; energy?: number; duration: number; rmsDb?: number; peakDb?: number }): DJTrackSummary {
   const key = parseMusicalKey(track.musicalKey);

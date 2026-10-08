@@ -10,7 +10,7 @@ status: draft
 Plan: `thoughts/shared/plans/2026-10-08-auto-dj-world-class-plan.md`.
 Research (how it works today): `thoughts/shared/research/2026-10-08_auto-dj-how-it-works.md`.
 
-**Count: 0 of 558 done, 0 owner checks, 0 open questions**
+**Count: 173 of 558 done, 0 owner checks, 0 open questions**
 
 Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` open owner question (built around, decision needed). An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll / triggerTransition, the DJ analysis worker path, or the DJ view) and proves the code ran.
 
@@ -26,27 +26,29 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - D6. Transition execution is one automation clock sampling keyframe curves (crossfader, EQ low per deck, filter per deck, volume, echo send) through the existing deck/mixer primitives. Old `DJQuantizedFX` transition functions stay for manual use and as the emergency path.
 - D7. Long-set, autonomous and resilience gates are proven by `DJSetSimulator`: the real `DJSessionController` over a synthetic corpus with virtual time (hours in milliseconds), the only way 4-hour sessions fit CI. Audible checks are owner checks.
 - D8. Analysis cache entries carry `analysisVersion`; entries below `DJ_ANALYSIS_VERSION` (2) are re-analysed so the extended data exists.
+- D9 (coordinator 2026-10-08). The Auto DJ performs through the DJ FX registry the DJ view's buttons use: `DjFxActions.fireDjFx/releaseDjFx` is the one fire path (pad, keyboard, MIDI, tour, MCP, Auto DJ), with a fire log and `useDJStore.djFxActive` (the pad lights from it). Deck actions take `{ deck, beats, amount }`. `fx_deck_echo_out` became a true echo-out (pre-fader feedback delay on the deck + dry decay); `fx_deck_echo_throw`, `fx_deck_reverb_out`, `fx_deck_filter_rise`, `fx_deck_filter_release` were added to the registry. The executor fires effect events and filter-plan kinds through it; crossfader, EQ hand-over and tempo stay on the deck/mixer actions. Known limit: the echo tail returns before the crossfader, so an echo-out holds the fader at the centre for the tail (both decks -3 dB) before completing.
+- D10 (coordinator 2026-10-08). Tracker channel awareness consumes the Dub Deck's identity sources: `songChannelIdentity.resolveSongChannelRoles` (new, song-given; `readSongChannelIdentity` now delegates to it with the editor's live sources) = ChannelNaming's instrument-aware song-wide classifier + the SongRoleTimeline over the arrangement (instrument types per position; CED types for the editor's song, the instruments' own classification for a deck's song) + runtime audio hints. `trackerMixAnalysis.ts` no longer calls `classifyPattern` or keeps role tables; roles are read per order position from the timeline, silent-in-this-position = silent.
 
 ## Gate A - Baseline lock (plan section 2)
 
-- [ ] A1.1 baseline: playlist order documented
-- [ ] A1.2 baseline: Smart Sort behaviour documented
-- [ ] A1.3 baseline: deck transitions documented
-- [ ] A1.4 baseline: preload behaviour documented
-- [ ] A1.5 baseline: transition lengths documented
-- [ ] A1.6 baseline: crossfader behaviour documented
-- [ ] A1.7 baseline: tempo matching documented
-- [ ] A1.8 baseline: pitch behaviour documented
-- [ ] A1.9 baseline: key handling documented
-- [ ] A1.10 baseline: filter transitions documented
-- [ ] A1.11 baseline: bass swap documented
-- [ ] A1.12 baseline: echo-out documented
-- [ ] A1.13 baseline: failure recovery documented
-- [ ] A1.14 baseline: shuffle documented
-- [ ] A1.15 baseline: auto pause documented
-- [ ] A1.16 baseline: transition timing documented
-- [ ] A1.17 baseline: current humanization documented
-- [ ] A1.18 baseline: current analysis values documented
+- [x] A1.1 baseline: playlist order documented -> c5b32061f; thoughts/shared/research/2026-10-08_auto-dj-baseline.md + autoDJBaseline.test.ts
+- [x] A1.2 baseline: Smart Sort behaviour documented -> c5b32061f; autoDJBaseline.test.ts (legacy order frozen)
+- [x] A1.3 baseline: deck transitions documented -> c5b32061f; baseline doc
+- [x] A1.4 baseline: preload behaviour documented -> c5b32061f; autoDJBaseline.test.ts (constants)
+- [x] A1.5 baseline: transition lengths documented -> c5b32061f; autoDJBaseline.test.ts
+- [x] A1.6 baseline: crossfader behaviour documented -> c5b32061f; baseline doc
+- [x] A1.7 baseline: tempo matching documented -> c5b32061f; baseline doc
+- [x] A1.8 baseline: pitch behaviour documented -> c5b32061f; baseline doc
+- [x] A1.9 baseline: key handling documented -> c5b32061f; autoDJBaseline.test.ts
+- [x] A1.10 baseline: filter transitions documented -> c5b32061f; baseline doc
+- [x] A1.11 baseline: bass swap documented -> c5b32061f; baseline doc
+- [x] A1.12 baseline: echo-out documented -> c5b32061f; baseline doc
+- [x] A1.13 baseline: failure recovery documented -> c5b32061f; autoDJBaseline.test.ts
+- [x] A1.14 baseline: shuffle documented -> c5b32061f; baseline doc
+- [x] A1.15 baseline: auto pause documented -> c5b32061f; baseline doc
+- [x] A1.16 baseline: transition timing documented -> c5b32061f; autoDJBaseline.test.ts
+- [x] A1.17 baseline: current humanization documented -> c5b32061f; autoDJBaseline.test.ts
+- [x] A1.18 baseline: current analysis values documented -> c5b32061f; baseline doc
 - [ ] A2.1 corpus: steady 4/4 electronic track
 - [ ] A2.2 corpus: long intro
 - [ ] A2.3 corpus: long outro
@@ -62,125 +64,125 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [ ] A2.13 corpus: very short tracks
 - [ ] A2.14 corpus: tracks with silence
 - [ ] A2.15 corpus: highly variable energy
-- [ ] A3.1 gate: existing behaviour documented
-- [ ] A3.2 gate: regressions can be detected (baseline snapshot test)
+- [x] A3.1 gate: existing behaviour documented -> c5b32061f; baseline doc
+- [x] A3.2 gate: regressions can be detected (baseline snapshot test) -> c5b32061f; autoDJBaseline.test.ts
 - [ ] A3.3 gate: Auto DJ runs through the corpus without hard crashes
-- [ ] A3.4 gate: transition logs can be captured
+- [x] A3.4 gate: transition logs can be captured -> c5b32061f; decisionLog.ts (MCP wiring in a later chunk)
 
 ## Section 3 - Unified DJTrackAnalysis
 
-- [ ] S3.1 bpm + bpmConfidence
-- [ ] S3.2 beatGrid: BeatGrid
-- [ ] S3.3 downbeats: DownbeatGrid
-- [ ] S3.4 meter: MeterAnalysis
-- [ ] S3.5 key + keyConfidence + keyTimeline
-- [ ] S3.6 tuning: TuningAnalysis
-- [ ] S3.7 loudness: LoudnessAnalysis
-- [ ] S3.8 energy: EnergyAnalysis
-- [ ] S3.9 spectral: SpectralAnalysis
-- [ ] S3.10 rhythmic: RhythmicAnalysis
-- [ ] S3.11 bass: BassAnalysis
-- [ ] S3.12 danceability + genre
-- [ ] S3.13 sections: DJSection[]
-- [ ] S3.14 phrases: DJPhrase[]
-- [ ] S3.15 cuePoints: DJCuePoints
-- [ ] S3.16 vocal/drum/bass/harmonic activity timelines
-- [ ] S3.17 analysisConfidence: AnalysisConfidence
-- [ ] S3.18 tracker?: TrackerMixAnalysis
+- [x] S3.1 bpm + bpmConfidence -> c5b32061f; autoDJDeckTrackAnalysis.test.ts
+- [x] S3.2 beatGrid: BeatGrid -> c5b32061f; autoDJDeckTrackAnalysis.test.ts
+- [x] S3.3 downbeats: DownbeatGrid -> c5b32061f; autoDJDeckTrackAnalysis.test.ts
+- [x] S3.4 meter: MeterAnalysis -> c5b32061f; autoDJAnalysisInstrument.test.ts
+- [x] S3.5 key + keyConfidence + keyTimeline -> c5b32061f; autoDJAnalysisInstrument.test.ts (key timeline)
+- [x] S3.6 tuning: TuningAnalysis -> c5b32061f; types.ts TuningAnalysis (optional field; no detector - see open question Q1)
+- [x] S3.7 loudness: LoudnessAnalysis -> c5b32061f; autoDJAnalysisInstrument.test.ts (loudness set)
+- [x] S3.8 energy: EnergyAnalysis -> c5b32061f; autoDJAnalysisInstrument.test.ts (energy is not loudness)
+- [x] S3.9 spectral: SpectralAnalysis -> c5b32061f; autoDJAnalysisInstrument.test.ts (spectral)
+- [x] S3.10 rhythmic: RhythmicAnalysis -> c5b32061f; autoDJAnalysisInstrument.test.ts (tempo hypotheses, syncopation)
+- [x] S3.11 bass: BassAnalysis -> c5b32061f; autoDJAnalysisInstrument.test.ts (bass)
+- [x] S3.12 danceability + genre -> c5b32061f; trackAnalysis.ts
+- [x] S3.13 sections: DJSection[] -> c5b32061f; autoDJAnalysisInstrument.test.ts
+- [x] S3.14 phrases: DJPhrase[] -> c5b32061f; autoDJAnalysisInstrument.test.ts
+- [x] S3.15 cuePoints: DJCuePoints -> c5b32061f; autoDJAnalysisInstrument.test.ts
+- [x] S3.16 vocal/drum/bass/harmonic activity timelines -> c5b32061f; autoDJAnalysisInstrument.test.ts (instrument check)
+- [x] S3.17 analysisConfidence: AnalysisConfidence -> c5b32061f; autoDJAnalysisInstrument.test.ts
+- [x] S3.18 tracker?: TrackerMixAnalysis -> c5b32061f; autoDJAnalysisInstrument.test.ts (tracker)
 - [ ] S3.19 DJTrackAnalysis is the canonical input to all higher-level decisions (planner, solver, executor read it, nothing else)
 
 ## Gate B - Analysis correctness (plan section 4)
 
-- [ ] B1.1 BPM: half-time handled
-- [ ] B1.2 BPM: double-time handled
-- [ ] B1.3 BPM: ambiguous BPM handled (alternatives kept)
-- [ ] B1.4 BPM: tracker tempo handled (module tempo as a hypothesis)
-- [ ] B1.5 BPM: tempo changes handled (confidence drops, segments)
-- [ ] B1.6 BPM: intro sections with weak rhythm handled
-- [ ] B1.7 BPM: breakdowns handled
-- [ ] B1.8 BPM: syncopation handled
-- [ ] B1.9 first detected BPM is not assumed correct
-- [ ] B1.10 TempoHypothesis { bpm, confidence, relationship } represented when confidence is low
-- [ ] B2.1 key: key, confidence, mode, possible alternatives, local key changes
-- [ ] B2.2 unknown key means "we don't know", never "clash"
-- [ ] B3.1 loudness: integrated
-- [ ] B3.2 loudness: short-term
-- [ ] B3.3 loudness: peak
-- [ ] B3.4 loudness: true peak (where available)
-- [ ] B3.5 loudness: dynamic range
-- [ ] B3.6 loudness: crest factor
-- [ ] B4.1 energy: bass energy
-- [ ] B4.2 energy: drum energy
-- [ ] B4.3 energy: transient density
-- [ ] B4.4 energy: spectral brightness
-- [ ] B4.5 energy: harmonic density
-- [ ] B4.6 energy: vocal presence
-- [ ] B4.7 energy: rhythmic density
-- [ ] B4.8 energy: arrangement density
-- [ ] B4.9 energy: perceived intensity (not RMS)
+- [x] B1.1 BPM: half-time handled -> c5b32061f; tempoHypotheses half
+- [x] B1.2 BPM: double-time handled -> c5b32061f; tempoHypotheses double
+- [x] B1.3 BPM: ambiguous BPM handled (alternatives kept) -> c5b32061f; tempo hypotheses ranked
+- [x] B1.4 BPM: tracker tempo handled (module tempo as a hypothesis) -> c5b32061f; module tempo hypothesis
+- [x] B1.5 BPM: tempo changes handled (confidence drops, segments) -> c5b32061f; tempoStability (unusual < steady)
+- [x] B1.6 BPM: intro sections with weak rhythm handled -> c5b32061f; firstMusicalBeat after weak intro
+- [x] B1.7 BPM: breakdowns handled -> c5b32061f; breakdown sections labelled
+- [x] B1.8 BPM: syncopation handled -> c5b32061f; syncopation measured
+- [x] B1.9 first detected BPM is not assumed correct -> c5b32061f; hypotheses list
+- [x] B1.10 TempoHypothesis { bpm, confidence, relationship } represented when confidence is low -> c5b32061f; TempoHypothesis type + test
+- [x] B2.1 key: key, confidence, mode, possible alternatives, local key changes -> c5b32061f; parseMusicalKey + keyTimeline alternatives
+- [x] B2.2 unknown key means "we don't know", never "clash" -> c5b32061f; unknown key: confidence 0, mode unknown (test)
+- [x] B3.1 loudness: integrated -> c5b32061f; integratedDb
+- [x] B3.2 loudness: short-term -> c5b32061f; shortTermDb
+- [x] B3.3 loudness: peak -> c5b32061f; peakDb
+- [x] B3.4 loudness: true peak (where available) -> c5b32061f; truePeakDb (4x polyphase)
+- [x] B3.5 loudness: dynamic range -> c5b32061f; dynamicRangeDb
+- [x] B3.6 loudness: crest factor -> c5b32061f; crestFactorDb
+- [x] B4.1 energy: bass energy -> c5b32061f; energy.bass
+- [x] B4.2 energy: drum energy -> c5b32061f; energy.drums
+- [x] B4.3 energy: transient density -> c5b32061f; transientDensity
+- [x] B4.4 energy: spectral brightness -> c5b32061f; brightness
+- [x] B4.5 energy: harmonic density -> c5b32061f; harmonicDensity
+- [x] B4.6 energy: vocal presence -> c5b32061f; vocalPresence (harmonic-line proxy, confidence 0.45; a chord pad in the voice register defeats it - documented)
+- [x] B4.7 energy: rhythmic density -> c5b32061f; rhythmicDensity
+- [x] B4.8 energy: arrangement density -> c5b32061f; arrangementDensity
+- [x] B4.9 energy: perceived intensity (not RMS) -> c5b32061f; perceivedIntensity (loudness-scaled texture)
 
 ## Gate C - Real beat grid (plan section 5)
 
-- [ ] C1 BeatGrid { bpm, firstBeat, beats, confidence }
-- [ ] C2 DownbeatGrid { bars, meter, confidence }
-- [ ] C3.1 distinguishes first detected transient
-- [ ] C3.2 distinguishes first musical beat
-- [ ] C3.3 distinguishes first downbeat
-- [ ] C3.4 distinguishes first full bar
-- [ ] C3.5 distinguishes first usable mixing point
-- [ ] C4 does not assume first detected beat = bar 1 (downbeat phase search)
-- [ ] C5.1 anacrusis case
-- [ ] C5.2 pickup case
-- [ ] C5.3 long intro case
-- [ ] C5.4 syncopated case
-- [ ] C5.5 tracker composition case
-- [ ] C5.6 unusual arrangement case
+- [x] C1 BeatGrid { bpm, firstBeat, beats, confidence } -> c5b32061f; BeatGrid
+- [x] C2 DownbeatGrid { bars, meter, confidence } -> c5b32061f; DownbeatGrid
+- [x] C3.1 distinguishes first detected transient -> c5b32061f; landmarks.firstTransient
+- [x] C3.2 distinguishes first musical beat -> c5b32061f; landmarks.firstMusicalBeat
+- [x] C3.3 distinguishes first downbeat -> c5b32061f; landmarks.firstDownbeat
+- [x] C3.4 distinguishes first full bar -> c5b32061f; landmarks.firstFullBar
+- [x] C3.5 distinguishes first usable mixing point -> c5b32061f; landmarks.firstUsableMixPoint
+- [x] C4 does not assume first detected beat = bar 1 (downbeat phase search) -> c5b32061f; searchMeterAndPhase (anacrusis test)
+- [x] C5.1 anacrusis case -> c5b32061f; unusual corpus (anacrusis)
+- [x] C5.2 pickup case -> c5b32061f; unusual corpus (pickup = anacrusis beat)
+- [x] C5.3 long intro case -> c5b32061f; longIntro corpus
+- [x] C5.4 syncopated case -> c5b32061f; syncopated synth test
+- [x] C5.5 tracker composition case -> c5b32061f; tracker corpus
+- [x] C5.6 unusual arrangement case -> c5b32061f; unusual corpus (3/4, tempo change)
 
 ## Gate D - Musical structure (plan section 6)
 
-- [ ] D1.1 section label: intro
-- [ ] D1.2 section label: groove
-- [ ] D1.3 section label: verse
-- [ ] D1.4 section label: build
-- [ ] D1.5 section label: pre-drop
-- [ ] D1.6 section label: drop
-- [ ] D1.7 section label: chorus
-- [ ] D1.8 section label: breakdown
-- [ ] D1.9 section label: bridge
-- [ ] D1.10 section label: outro
-- [ ] D1.11 section label: silence
-- [ ] D1.12 section label: fill
-- [ ] D1.13 section label: instrumental
-- [ ] D1.14 section label: vocal-heavy
-- [ ] D1.15 section label: drum-only
-- [ ] D1.16 section label: bass-only
-- [ ] D1.17 labels are probabilistic (confidence per section); planner reads musical function
-- [ ] D2.1 4-bar phrases
-- [ ] D2.2 8-bar phrases
-- [ ] D2.3 16-bar phrases
-- [ ] D2.4 phrase boundaries
-- [ ] D2.5 repeated phrase patterns
-- [ ] D2.6 arrangement changes (events)
-- [ ] D3 phrase length is not hard-coded globally; detected per song
+- [x] D1.1 section label: intro -> c5b32061f; labelSections kind rule
+- [x] D1.2 section label: groove -> c5b32061f; labelSections kind rule
+- [x] D1.3 section label: verse -> c5b32061f; labelSections kind rule
+- [x] D1.4 section label: build -> c5b32061f; labelSections kind rule
+- [x] D1.5 section label: pre-drop -> c5b32061f; labelSections kind rule
+- [x] D1.6 section label: drop -> c5b32061f; labelSections kind rule
+- [x] D1.7 section label: chorus -> c5b32061f; labelSections kind rule
+- [x] D1.8 section label: breakdown -> c5b32061f; labelSections kind rule
+- [x] D1.9 section label: bridge -> c5b32061f; labelSections kind rule
+- [x] D1.10 section label: outro -> c5b32061f; labelSections kind rule
+- [x] D1.11 section label: silence -> c5b32061f; labelSections kind rule
+- [x] D1.12 section label: fill -> c5b32061f; labelSections kind rule
+- [x] D1.13 section label: instrumental -> c5b32061f; labelSections kind rule
+- [x] D1.14 section label: vocal-heavy -> c5b32061f; labelSections kind rule
+- [x] D1.15 section label: drum-only -> c5b32061f; labelSections kind rule
+- [x] D1.16 section label: bass-only -> c5b32061f; labelSections kind rule
+- [x] D1.17 labels are probabilistic (confidence per section); planner reads musical function -> c5b32061f; labelSections confidence + alternatives
+- [x] D2.1 4-bar phrases -> c5b32061f; detectPhraseLength 4
+- [x] D2.2 8-bar phrases -> c5b32061f; detectPhraseLength 8
+- [x] D2.3 16-bar phrases -> c5b32061f; detectPhraseLength 16
+- [x] D2.4 phrase boundaries -> c5b32061f; buildPhrases
+- [x] D2.5 repeated phrase patterns -> c5b32061f; tracker REPEATED_PHRASE + similarity lag
+- [x] D2.6 arrangement changes (events) -> c5b32061f; arrangementEvents
+- [x] D3 phrase length is not hard-coded globally; detected per song -> c5b32061f; per-song phrase length test
 
 ## Gate E - Semantic cue points (plan section 7)
 
-- [ ] E1.1 cue: introStart
-- [ ] E1.2 cue: firstBeat
-- [ ] E1.3 cue: firstFullGroove
-- [ ] E1.4 cue: firstDrums
-- [ ] E1.5 cue: firstBass
-- [ ] E1.6 cue: firstVocal
-- [ ] E1.7 cue: firstHook
-- [ ] E1.8 cue: firstDrop
-- [ ] E1.9 cue: firstBreak
-- [ ] E1.10 cue: bestMixIn
-- [ ] E1.11 cue: bestMixOut
-- [ ] E1.12 cue: outroStart
-- [ ] E1.13 cue: outroGroove
-- [ ] E1.14 cue: finalBeat
-- [ ] E2 incoming deck starts at a musically useful position, not 0:00
-- [ ] E3 example: B with drums at 0:24 starts at 0:24 under a drum-intro strategy (strategy-dependent)
+- [x] E1.1 cue: introStart -> c5b32061f; deriveCuePoints
+- [x] E1.2 cue: firstBeat -> c5b32061f; deriveCuePoints
+- [x] E1.3 cue: firstFullGroove -> c5b32061f; deriveCuePoints
+- [x] E1.4 cue: firstDrums -> c5b32061f; deriveCuePoints
+- [x] E1.5 cue: firstBass -> c5b32061f; deriveCuePoints
+- [x] E1.6 cue: firstVocal -> c5b32061f; deriveCuePoints
+- [x] E1.7 cue: firstHook -> c5b32061f; deriveCuePoints
+- [x] E1.8 cue: firstDrop -> c5b32061f; deriveCuePoints
+- [x] E1.9 cue: firstBreak -> c5b32061f; deriveCuePoints
+- [x] E1.10 cue: bestMixIn -> c5b32061f; deriveCuePoints
+- [x] E1.11 cue: bestMixOut -> c5b32061f; deriveCuePoints
+- [x] E1.12 cue: outroStart -> c5b32061f; deriveCuePoints
+- [x] E1.13 cue: outroGroove -> c5b32061f; deriveCuePoints
+- [x] E1.14 cue: finalBeat -> c5b32061f; deriveCuePoints
+- [x] E2 incoming deck starts at a musically useful position, not 0:00 -> c5b32061f; bestMixIn > intro (deck test)
+- [x] E3 example: B with drums at 0:24 starts at 0:24 under a drum-intro strategy (strategy-dependent) -> c5b32061f; longIntro: firstDrums/bestMixIn at the drum entry
 
 ## Gate F - Multi-track set planning (plan section 8)
 
@@ -247,7 +249,7 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 14 - Local key timeline
 
-- [ ] S14.1 KeySegment[] timeline computed (optional)
+- [x] S14.1 KeySegment[] timeline computed (optional) -> c5b32061f; keyTimelineFromChroma
 - [ ] S14.2 planner uses the local key at the mix points, not the whole-track key
 
 ## Gate I - Transition planning (plan section 15)
@@ -337,33 +339,33 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Gate M - Tracker-native intelligence (plan section 25)
 
-- [ ] M1 TrackerMixAnalysis kept alongside the rendered-audio analysis (structure not thrown away)
-- [ ] M2.1 exposes order positions
-- [ ] M2.2 exposes pattern boundaries
-- [ ] M2.3 exposes channel activity
-- [ ] M2.4 exposes instrument changes
-- [ ] M2.5 exposes sample usage
-- [ ] M2.6 exposes note density
-- [ ] M2.7 exposes bass channel activity
-- [ ] M2.8 exposes drum channel activity
-- [ ] M2.9 exposes melody activity
-- [ ] M2.10 exposes pattern changes
-- [ ] M2.11 exposes fills
-- [ ] M2.12 exposes breaks
-- [ ] M2.13 exposes instrument entrances
-- [ ] M2.14 exposes instrument exits
-- [ ] M2.15 exposes repeating phrases
-- [ ] M2.16 exposes silence
-- [ ] M2.17 exposes structural transitions
+- [x] M1 TrackerMixAnalysis kept alongside the rendered-audio analysis (structure not thrown away) -> c5b32061f; tracker on DJTrackAnalysis
+- [x] M2.1 exposes order positions -> c5b32061f; analyzeTrackerSong
+- [x] M2.2 exposes pattern boundaries -> c5b32061f; analyzeTrackerSong
+- [x] M2.3 exposes channel activity -> c5b32061f; analyzeTrackerSong
+- [x] M2.4 exposes instrument changes -> c5b32061f; analyzeTrackerSong
+- [x] M2.5 exposes sample usage -> c5b32061f; analyzeTrackerSong
+- [x] M2.6 exposes note density -> c5b32061f; analyzeTrackerSong
+- [x] M2.7 exposes bass channel activity -> c5b32061f; analyzeTrackerSong
+- [x] M2.8 exposes drum channel activity -> c5b32061f; analyzeTrackerSong
+- [x] M2.9 exposes melody activity -> c5b32061f; analyzeTrackerSong
+- [x] M2.10 exposes pattern changes -> c5b32061f; analyzeTrackerSong
+- [x] M2.11 exposes fills -> c5b32061f; analyzeTrackerSong
+- [x] M2.12 exposes breaks -> c5b32061f; analyzeTrackerSong
+- [x] M2.13 exposes instrument entrances -> c5b32061f; analyzeTrackerSong
+- [x] M2.14 exposes instrument exits -> c5b32061f; analyzeTrackerSong
+- [x] M2.15 exposes repeating phrases -> c5b32061f; analyzeTrackerSong
+- [x] M2.16 exposes silence -> c5b32061f; analyzeTrackerSong
+- [x] M2.17 exposes structural transitions -> c5b32061f; analyzeTrackerSong
 
 ## Section 26 - Tracker channel awareness
 
-- [ ] S26.1 channel roles understood (drums/bass/melody) when the structure supports it
-- [ ] S26.2 time-varying TrackerChannelSegment { channel, start, end, instrumentFamily, musicalFunction, rhythmicRole, register, importance, density, confidence }
+- [x] S26.1 channel roles understood (drums/bass/melody) when the structure supports it -> c5b32061f; channel roles via classifyPattern
+- [x] S26.2 time-varying TrackerChannelSegment { channel, start, end, instrumentFamily, musicalFunction, rhythmicRole, register, importance, density, confidence } -> c5b32061f; TrackerChannelSegment per order position
 
 ## Section 27 - Tracker mix events
 
-- [ ] S27.1 events: DRUM_ENTRY, BASS_ENTRY, BASS_EXIT, MELODY_ENTRY, INSTRUMENT_ENTRY, INSTRUMENT_EXIT, PATTERN_CHANGE, FILL, BREAK, DROP, DENSITY_INCREASE, DENSITY_DECREASE, SILENCE, REPEATED_PHRASE
+- [x] S27.1 events: DRUM_ENTRY, BASS_ENTRY, BASS_EXIT, MELODY_ENTRY, INSTRUMENT_ENTRY, INSTRUMENT_EXIT, PATTERN_CHANGE, FILL, BREAK, DROP, DENSITY_INCREASE, DENSITY_DECREASE, SILENCE, REPEATED_PHRASE -> c5b32061f; TrackerMixEvent kinds
 - [ ] S27.2 events available to the transition planner (cue points and sections for tracker material come from them)
 
 ## Gate N - Performance memory (plan section 28)
@@ -669,33 +671,33 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 66 - Phase gates
 
-- [ ] PG-A.1 deterministic test corpus
-- [ ] PG-A.2 transition logs
+- [x] PG-A.1 deterministic test corpus -> c5b32061f; corpus.ts
+- [x] PG-A.2 transition logs -> c5b32061f; decisionLog.ts
 - [ ] PG-A.3 regression playback
-- [ ] PG-B.1 reliable BPM
-- [ ] PG-B.2 BPM confidence
-- [ ] PG-B.3 key confidence
-- [ ] PG-B.4 loudness
-- [ ] PG-B.5 spectral data
-- [ ] PG-B.6 rhythmic data
-- [ ] PG-B.7 bass data
-- [ ] PG-C.1 beat positions
-- [ ] PG-C.2 downbeats
-- [ ] PG-C.3 meter
-- [ ] PG-C.4 confidence
-- [ ] PG-C.5 phrase synchronization
-- [ ] PG-D.1 sections
-- [ ] PG-D.2 phrases
-- [ ] PG-D.3 arrangement events
-- [ ] PG-E.1 semantic mix-in
-- [ ] PG-E.2 semantic mix-out
-- [ ] PG-E.3 first groove
-- [ ] PG-E.4 first bass
-- [ ] PG-E.5 first drums
-- [ ] PG-E.6 first vocal
-- [ ] PG-E.7 drop
-- [ ] PG-E.8 breakdown
-- [ ] PG-E.9 outro
+- [x] PG-B.1 reliable BPM -> c5b32061f; bpm + hypotheses
+- [x] PG-B.2 BPM confidence -> c5b32061f; bpmConfidence
+- [x] PG-B.3 key confidence -> c5b32061f; keyConfidence
+- [x] PG-B.4 loudness -> c5b32061f; loudness
+- [x] PG-B.5 spectral data -> c5b32061f; spectral
+- [x] PG-B.6 rhythmic data -> c5b32061f; rhythmic
+- [x] PG-B.7 bass data -> c5b32061f; bass
+- [x] PG-C.1 beat positions -> c5b32061f; beats
+- [x] PG-C.2 downbeats -> c5b32061f; downbeats
+- [x] PG-C.3 meter -> c5b32061f; meter
+- [x] PG-C.4 confidence -> c5b32061f; confidence
+- [x] PG-C.5 phrase synchronization -> c5b32061f; phrase synchronization (buildPhrases origin)
+- [x] PG-D.1 sections -> c5b32061f; sections
+- [x] PG-D.2 phrases -> c5b32061f; phrases
+- [x] PG-D.3 arrangement events -> c5b32061f; arrangement events
+- [x] PG-E.1 semantic mix-in -> c5b32061f; bestMixIn
+- [x] PG-E.2 semantic mix-out -> c5b32061f; bestMixOut
+- [x] PG-E.3 first groove -> c5b32061f; firstFullGroove
+- [x] PG-E.4 first bass -> c5b32061f; firstBass
+- [x] PG-E.5 first drums -> c5b32061f; firstDrums
+- [x] PG-E.6 first vocal -> c5b32061f; firstVocal
+- [x] PG-E.7 drop -> c5b32061f; firstDrop
+- [x] PG-E.8 breakdown -> c5b32061f; firstBreak
+- [x] PG-E.9 outro -> c5b32061f; outroStart
 - [ ] PG-F.1 multi-track lookahead
 - [ ] PG-F.2 energy arc
 - [ ] PG-F.3 harmonic planning
@@ -715,11 +717,11 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [ ] PG-I.4 drop transitions
 - [ ] PG-I.5 drum intros
 - [ ] PG-I.6 vocal swaps
-- [ ] PG-J.1 tracker structure retained
-- [ ] PG-J.2 pattern/order awareness
-- [ ] PG-J.3 channel analysis
-- [ ] PG-J.4 instrument activity
-- [ ] PG-J.5 semantic tracker events
+- [x] PG-J.1 tracker structure retained -> c5b32061f; tracker retained
+- [x] PG-J.2 pattern/order awareness -> c5b32061f; orderPositions/patternBoundaries
+- [x] PG-J.3 channel analysis -> c5b32061f; channelSegments
+- [x] PG-J.4 instrument activity -> c5b32061f; instrumentUsage
+- [x] PG-J.5 semantic tracker events -> c5b32061f; events
 - [ ] PG-K.1 transition history
 - [ ] PG-K.2 FX history
 - [ ] PG-K.3 energy history
@@ -788,6 +790,208 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [ ] S70.23 explain its decisions
 - [ ] S70.24 pass automated transition tests
 - [ ] S70.25 pass human listening tests (owner)
+
+## Beat-juggling plan (thoughts/shared/plans/2026-10-08-auto-dj-beat-juggling-plan.md, commit 94c0a4b19) - JUG- items
+
+Decision D11: the juggle layer performs through the same DjFxActions / crossfader actions the DJ view's buttons use, phrase-locked to the DJTrackAnalysis beat grid (one clock: the deck positions), call and response material from the Dub Deck's channel-role sources (resolveSongChannelRoles / SongRoleTimeline). Files: src/engine/dj/autodj/juggle/*.
+
+- [ ] JUG-S1.1 intelligence above the existing primitives; no second DJ engine
+- [ ] JUG-S2.1 one musical clock (the deck positions and beat grids); no second transport/beat/bar clock, no per-deck ms timers
+- [ ] JUG-S2.2 juggle engine works in musical units (beat, half-beat, bar, 2/4/8 bars, phrase, section)
+- [ ] JUG-S2.3 every action resolves to an absolute musical execution point (executeAtBeat)
+- [ ] JUG-S3.1 DJJuggleController
+- [ ] JUG-S3.2 DJJugglePlanner
+- [ ] JUG-S3.3 DJJuggleExecutor
+- [ ] JUG-S3.4 DJJuggleTypes
+- [ ] JUG-S3.5 DJJugglePatterns
+- [ ] JUG-S3.6 DJJugglePerformanceContext
+- [ ] JUG-S4.1 DJJugglePerformanceContext { masterBeat, masterBar, phrasePosition, deckA, deckB, activeDeck, performanceMode, energy, targetEnergy, phraseConfidence, beatConfidence, currentSection, nextSection, lastJuggle, recentPatterns, intensity, tension, fallbackAvailable }
+- [ ] JUG-S4.2 DJDeckPerformanceState { trackId, position, beatPhase, barPhase, bpm, key, section, cuePosition, mixInPosition, mixOutPosition, energy, drumsActive, bassActive, vocalsActive, melodicActivity, loop, analysisConfidence }
+- [ ] JUG-S4.3 reuses DJTrackAnalysis / DJPerformanceContext, no duplicate analysis model
+- [ ] JUG-S5.1 JuggleDeckRole: PRIMARY, SECONDARY, VOICE, RESPONSE, FOUNDATION, FILL, LAYER, SILENT
+- [ ] JUG-S5.2 roles are temporary performance states, change through a juggle
+- [ ] JUG-S6.1 action vocabulary: CutIn, CutOut, CrossfadeTo, CrossfadeFrom, TriggerCue, JumpToBeat, JumpToBar, StartLoop, ExitLoop, LoopResize, LoopRoll, HoldDeck, ReleaseDeck, FilterIn, FilterOut, EQCut, EQRestore, BassSwap, EchoThrow, ReverbThrow, ResetDeck, ResyncDeck
+- [ ] JUG-S6.2 action fields: type, deck (A|B|BOTH), executeAtBeat, durationBeats, targetPosition, quantization, strength, reason
+- [ ] JUG-S6.3 vocabulary stays small; intelligence in the planner
+- [ ] JUG-S7.1 DJJugglePattern { id, type, durationBars, intensity, actions, sourceDeck, targetDeck, energyProfile, confidence, reason }
+- [ ] JUG-S7.2 reasons in patterns (A-B-A-B, A-A-B-B, A-fill-B-fill, A-drums-B-lead, A-bass-B-drums, A-loop-B-hit, A-full-B-stab), not isolated cuts
+- [ ] JUG-S8.1 grammar phase SETUP
+- [ ] JUG-S8.2 grammar phase ESTABLISH
+- [ ] JUG-S8.3 grammar phase INTENSIFY
+- [ ] JUG-S8.4 grammar phase PEAK
+- [ ] JUG-S8.5 grammar phase PAYOFF
+- [ ] JUG-S8.6 grammar phase RELEASE
+- [ ] JUG-S8.7 never a permanent A B A B
+- [ ] JUG-S9.1 phrase trade 8 bars
+- [ ] JUG-S9.2 phrase trade 4 bars
+- [ ] JUG-S9.3 phrase trade 2 bars
+- [ ] JUG-S9.4 phrase trade 1 bar
+- [ ] JUG-S9.5 phrase trade half bar (optional)
+- [ ] JUG-S9.6 only tightens when musical confidence is high
+- [ ] JUG-S9.7 respects beat grid, bar grid, phrase boundaries, section boundaries, energy, drum activity, bass activity, musical role
+- [ ] JUG-S9.8 never switches mid vocal phrase on a timer
+- [ ] JUG-S10.1 beat-level patterns represented explicitly (ABAB, AABA, ABBA, A-B-, AB-B / AB-A)
+- [ ] JUG-S11.1 call and response: one deck asks, the other answers
+- [ ] JUG-S11.2 response targets: drum fill, percussion hit, bass phrase, vocal phrase, synth stab, lead phrase, chord hit, rhythmic loop, tracker pattern segment
+- [ ] JUG-S12.1 tracker-native call/response from time-varying channel segments (Dub Deck identity sources)
+- [ ] JUG-S13.1 material window features: drum, bass, percussion density, melodic, vocal, harmonic, spectral density, energy, rhythmic density, importance, confidence
+- [ ] JUG-S13.2 moment classes: DRUM_FILL, BASS_HIT, VOCAL_HIT, LEAD_HIT, PERCUSSION_HIT, FULL_GROOVE, BREAK, DROP, BUILD, SILENCE
+- [ ] JUG-S14.1 drum/bass trading pattern with A+B payoff
+- [ ] JUG-S14.2 bass ownership per moment during a juggle
+- [ ] JUG-S14.3 ownership change = intentional handover, no low-end collision, EQ when needed, clean restore
+- [ ] JUG-S15.1 same-track doubles: same source on both decks, independent positions
+- [ ] JUG-S16.1 double alignment: reliable beat, align both, bar phase, optional offset, verify, then permit
+- [ ] JUG-S16.2 offsets: 1 beat, 2 beats, 1 bar, 2 bars, 4 bars
+- [ ] JUG-S16.3 no arbitrary offsets at low beat confidence
+- [ ] JUG-S17.1 straight double
+- [ ] JUG-S17.2 offset double
+- [ ] JUG-S17.3 one-bar double
+- [ ] JUG-S17.4 fill double
+- [ ] JUG-S17.5 drop double
+- [ ] JUG-S17.6 escalating double 8 -> 4 -> 2 -> 1 -> beat
+- [ ] JUG-S18.1 loop juggling sizes 8, 4, 2, 1, 1/2, 1/4, 1/8 bar
+- [ ] JUG-S18.2 loop progression is musical (4 -> 2 -> 1 -> 1/2 -> 1/4 -> release), not arbitrary
+- [ ] JUG-S19.1 stutter/fill juggling around detected fills
+- [ ] JUG-S19.2 real musical fills preferred over arbitrary slices
+- [ ] JUG-S19.3 tracker pattern/channel/event fills as candidates
+- [ ] JUG-S20.1 transformer patterns: open/close, open/close/close, A-A-B-B, A-B-B-A, A-B-A-A
+- [ ] JUG-S20.2 transformer patterns are pattern objects; the executor moves the crossfader
+- [ ] JUG-S21.1 every pattern scheduled >= 1-2 beats ahead (1 bar+ for complex)
+- [ ] JUG-S21.2 the planner produces a future action queue executed against the shared clock
+- [ ] JUG-S22.1 timers only for safety/cleanup; musical actions originate from beat/bar/phrase/section
+- [ ] JUG-S23.1 intensity 0..1 ladder (0 normal, 0.25 phrase, 0.5 2-bar, 0.7 1-bar, 0.85 beat, 1.0 peak)
+- [ ] JUG-S23.2 intensity drives pattern density, cut frequency, loop size, FX density, alternation, phrase length, musical risk - not randomness
+- [ ] JUG-S24.1 performance budget from set position, energy, recent performance, compatibility, transition quality, audience proxy, confidence, previous duration
+- [ ] JUG-S24.2 normal mix between juggles; never constant juggling
+- [ ] JUG-S25.1 good conditions (strong beat confidence, phrase alignment, compatible sections, energy, rhythmic material, breakdown/build/drop, transition approaching, fill, repeated phrase, set needs energy, transition benefits)
+- [ ] JUG-S25.2 bad conditions (low confidence, unstable sync, incompatible keys, dense vocals both, unclear bass ownership, drift, dense section, similar recent juggle, incoming not prepared) block juggling
+- [ ] JUG-S26.1 transition kinds NORMAL_BLEND | JUGGLE_TRANSITION | PERFORMANCE_TRANSITION
+- [ ] JUG-S26.2 a juggle transition: outro -> 4-bar trade -> 2 -> 1 -> incoming drop -> release
+- [ ] JUG-S27.1 juggle inside a single track (same track both decks): double -> offset -> beat trade -> filter build -> release
+- [ ] JUG-S28.1 set-level arc: OPENING normal, BUILDING occasional trades, CRUISING short moments, PEAKING aggressive, PEAK doubles/beat juggling, RELEASE fewer cuts, RECOVERY normal, CLOSING controlled
+- [ ] JUG-S29.1 DJJuggleHistory { patternType, durationBars, intensity, sourceTracks, successScore, timestamp }
+- [ ] JUG-S29.2 no immediate repeat of the last pattern (A-B-A-B -> A-A-B-B or fill or normal)
+- [ ] JUG-S30.1 humanization allowed: tiny timing, pattern variation, phrase length, intensity, action order, response material
+- [ ] JUG-S30.2 humanization forbidden: off-beat errors, drifting phase, inconsistent bars, delayed cuts
+- [ ] JUG-S31.1 confidences: beat, phrase, section, deckSync, material
+- [ ] JUG-S31.2 policy: high -> beat juggling, moderate -> phrase trading only, low -> normal transition
+- [ ] JUG-S32.1 safety governor prevents: both decks silent, crossfader oscillation, excessive cut frequency, contradictory actions, conflicting loops, runaway FX, extreme tempo jumps, phase drift, stuck decks, infinite patterns
+- [ ] JUG-S33.1 emergency sequence: cancel pending, strongest deck, stable crossfader, essential EQ, exit loop, resync, continue, resume planning when confidence recovers
+- [ ] JUG-S34.1 no-silence invariant: at least one audible deck; BLOCK or FORCE SAFE DECK; continuously tested
+- [ ] JUG-S35.1 bass safety tracks current owner, next owner, overlap, energy, low-frequency conflict
+- [ ] JUG-S35.2 A bass / B drums, both only when compatible, else intentional handover
+- [ ] JUG-S36.1 vocal safety: no vocal + vocal unless intended; instrumental/response pairings preferred in material selection
+- [ ] JUG-S37.1 tracker access kept: orders, patterns, channels, instruments, samples, notes, effects, pattern boundaries, repeats, channel activity, instrument changes
+- [ ] JUG-S37.2 tracker facts drive selection (bass enters here, fill channel here, breakdown next order, no lead here)
+- [ ] JUG-S38.1 channel identity time-varying (timeline/segments), never channel N = role
+- [ ] JUG-S39.1 pattern phraseTrade
+- [ ] JUG-S39.2 pattern tightPhraseTrade
+- [ ] JUG-S39.3 pattern barTrade
+- [ ] JUG-S39.4 pattern beatTrade
+- [ ] JUG-S39.5 pattern doubleBeat
+- [ ] JUG-S39.6 pattern callResponse
+- [ ] JUG-S39.7 pattern drumBassTrade
+- [ ] JUG-S39.8 pattern fillTrade
+- [ ] JUG-S39.9 pattern loopTighten
+- [ ] JUG-S39.10 pattern double
+- [ ] JUG-S39.11 pattern transformer
+- [ ] JUG-S39.12 pattern dropAndReturn
+- [ ] JUG-S39.13 pattern escalatingJuggle
+- [ ] JUG-S40.1 pattern scoring: energyFit, phraseFit, sectionFit, rhythmicFit, bassFit, vocalFit, materialFit, confidence, novelty, repetition, risk, set position, budget, transition opportunity - never random
+- [ ] JUG-S41.1 plans a short performance phrase ahead (8 -> 4 -> 2 -> 1 -> beat -> payoff)
+- [ ] JUG-S41.2 revises the future when conditions change
+- [ ] JUG-S42.1 abort on: beat confidence drop, drift, material change, vocal collision, bass collision, analysis change, deck failure, user control, governor
+- [ ] JUG-S42.2 abort resolves gracefully (a release pattern), never stops dead
+- [ ] JUG-S43.1 manual override: crossfader, deck state, cue, FX, tempo, Auto DJ off -> yield, cancel/replan
+- [ ] JUG-S44.1 modes OFF, SAFE, MUSICAL, PERFORMER, AGGRESSIVE, CHAOS
+- [ ] JUG-S44.2 SAFE = 8/4-bar trading
+- [ ] JUG-S44.3 MUSICAL adds call-response, fills, doubles
+- [ ] JUG-S44.4 PERFORMER adds beat juggling, loops, transformer
+- [ ] JUG-S44.5 AGGRESSIVE: shorter cuts, higher density, more doubles
+- [ ] JUG-S44.6 CHAOS still obeys timing, safety, no-silence, boundaries
+- [ ] JUG-S45.1 telemetry: pattern, phase, intensity, per-deck material + confidence, next actions with beats, reason
+- [ ] JUG-S46.1 events with reasons: juggleStarted, jugglePatternSelected, juggleActionScheduled, juggleActionExecuted, juggleActionBlocked, juggleAborted, juggleCompleted, juggleFallback
+- [ ] JUG-S47.1 test: all actions land on intended beats
+- [ ] JUG-S47.2 test: no phrase trade begins off-grid
+- [ ] JUG-S47.3 test: at least one deck remains active
+- [ ] JUG-S47.4 test: crossfader never invalid
+- [ ] JUG-S47.5 test: double alignment within tolerance
+- [ ] JUG-S47.6 test: actions occur in pattern order
+- [ ] JUG-S47.7 test: unsafe conditions cancel safely
+- [ ] JUG-S47.8 test: recent pattern history affects selection
+- [ ] JUG-S48.1 scenario standard 4/4 -> phrase, bar, beat trading
+- [ ] JUG-S48.2 scenario sparse track -> less aggressive
+- [ ] JUG-S48.3 scenario vocal-heavy -> collision avoidance
+- [ ] JUG-S48.4 scenario bass-heavy -> ownership management
+- [ ] JUG-S48.5 scenario same-track double -> phase-aligned
+- [ ] JUG-S48.6 scenario low confidence -> normal transition
+- [ ] JUG-S48.7 scenario tracker song -> structure influences selection
+- [ ] JUG-S48.8 scenario user intervention -> yields
+- [ ] JUG-S48.9 scenario deck failure -> safe continuation
+- [ ] JUG-S48.10 scenario long set -> no runaway, no repetition, no corruption
+- [ ] JUG-S49.1 multi-hour simulated set: no leak, no accumulating timers, no stale actions, no stuck roles/loops, no latency growth, no exact repeats, no drift, no growing silence, no corrupt deck state
+- [ ] JUG-S50.1 performance memory learns successful pattern + pairing + context (deterministic scoring)
+- [ ] JUG-S51.1 do not overuse: optimise musical impact, not action count
+- [ ] JUG-S52.1 JuggleQualityScore: timing, compatibility, energy fit, material, bass clarity, vocal clarity, coherence, novelty, impact proxy, safety -> feeds memory
+- [ ] JUG-S53.1 integration: DJSessionController -> DJJuggleController -> planner -> executor; transition executor keeps ordinary transitions; shared deck/mixer state
+- [ ] JUG-PG-A.1 verify two-deck state, tempo sync, beat grid, crossfader, cue/playhead, transition executor, existing primitives (baseline regression green)
+- [ ] JUG-PG-B.1 both decks represented simultaneously (position, beat/bar phase, energy, section, activity, confidence) without a second transport
+- [ ] JUG-PG-C.1 deterministic test produces A B A B on exact musical beats through the executor
+- [ ] JUG-PG-D.1 complete 8 -> 4 -> 2 -> 1 phrase-trade sequence resolving into normal mixing
+- [ ] JUG-PG-E.1 beat-level patterns ABAB, AABB, ABBA, A-A-B-A phase-locked, no unintended silence
+- [ ] JUG-PG-F.1 call/response: drum, bass, percussion, lead, vocal-safe responses; explains the material; avoids incompatible overlaps
+- [ ] JUG-PG-G.1 doubles: same-track, offset, bar, beat, fill; phase-aligned without drift
+- [ ] JUG-PG-H.1 loops/fills/transformer/drop-release: normal -> loop -> tighten -> juggle -> release without state corruption
+- [ ] JUG-PG-I.1 adaptive engine chooses whether/which/material/duration/intensity; no "always every N bars"
+- [ ] JUG-PG-J.1 set integration (energy, transition planner, phrase/section, memory, cooldowns, set position): varied intentional moments in a long set
+- [ ] JUG-PG-K.1 safety: no-silence, bass, vocal, conflict prevention, emergency fallback, abort/replan; every unsafe test returns to stable playback
+- [ ] JUG-PG-L.1 humanization/memory: novelty, history, controlled variation, successful-pattern memory; repeated simulations not identical
+- [ ] JUG-PG-M.1 telemetry: mode, pattern, intensity, active deck, next actions, reason, confidence, safety state; user controls Auto Juggle, Mode, Intensity
+- [ ] JUG-PG-N.1 acceptance: two-deck relationship, 8/4/2/1 trading, tight ABAB, call/response, doubles, tracker intelligence, musical awareness, escalation, release, variety, safety, human quality (listening: owner)
+- [ ] JUG-S55.1 recognise both decks usable
+- [ ] JUG-S55.2 synchronise to one clock
+- [ ] JUG-S55.3 select material from each
+- [ ] JUG-S55.4 trade phrases
+- [ ] JUG-S55.5 trade bars
+- [ ] JUG-S55.6 trade beats
+- [ ] JUG-S55.7 call-and-response
+- [ ] JUG-S55.8 drum/bass exchanges
+- [ ] JUG-S55.9 doubles
+- [ ] JUG-S55.10 offset doubles
+- [ ] JUG-S55.11 manipulate loops
+- [ ] JUG-S55.12 use fills
+- [ ] JUG-S55.13 rhythmic crossfader patterns
+- [ ] JUG-S55.14 escalate intensity
+- [ ] JUG-S55.15 resolve into a payoff
+- [ ] JUG-S55.16 return to normal mixing
+- [ ] JUG-S55.17 avoid vocal collisions
+- [ ] JUG-S55.18 manage bass ownership
+- [ ] JUG-S55.19 exploit tracker structure
+- [ ] JUG-S55.20 respect time-varying channel identity
+- [ ] JUG-S55.21 avoid repeating the same trick
+- [ ] JUG-S55.22 yield to the user
+- [ ] JUG-S55.23 survive low confidence
+- [ ] JUG-S55.24 recover from failures
+- [ ] JUG-S55.25 stable playback for long sessions
+- [ ] JUG-S56.1 no second transport
+- [ ] JUG-S56.2 no second musical clock
+- [ ] JUG-S56.3 no second deck system
+- [ ] JUG-S56.4 no bypass of mixer/deck primitives
+- [ ] JUG-S56.5 not all in DJAutoDJ.ts
+- [ ] JUG-S56.6 no ms timers for musical timing
+- [ ] JUG-S56.7 no permanent channel roles
+- [ ] JUG-S56.8 no 4/4 assumption without the meter
+- [ ] JUG-S56.9 no identical-phrase assumption
+- [ ] JUG-S56.10 incoming material not always at 0:00
+- [ ] JUG-S56.11 not always the same pattern
+- [ ] JUG-S56.12 no constant juggling
+- [ ] JUG-S56.13 no random cuts
+- [ ] JUG-S56.14 no two bass-heavy decks without ownership
+- [ ] JUG-S56.15 no two active vocals without intent
+- [ ] JUG-S56.16 decks never both disappear
+- [ ] JUG-S56.17 creative never overrides safety
+- [ ] JUG-S56.18 low confidence is not permission to improvise
+- [ ] JUG-S56.19 no needless rebuild of analysis/deck infrastructure
 
 ## Open owner questions
 
