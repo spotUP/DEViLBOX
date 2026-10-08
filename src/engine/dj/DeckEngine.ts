@@ -61,6 +61,8 @@ export class DeckEngine {
   readonly stemPlayer: DeckStemPlayer;
   readonly physics: TurntablePhysics;
   private _playbackMode: PlaybackMode = 'audio';
+  /** The tracker song the deck holds for its pattern data. Playback is always audio; this is not a mode. */
+  private _loadedSong: TrackerSong | null = null;
   private _stemMode = false; // When true, stem player drives audio output
   /** Key lock (master tempo): when true, the pitch fader changes tempo only;
    *  sample pitch and synth detune stay at their original values. Tracker path
@@ -457,6 +459,7 @@ export class DeckEngine {
     }
 
     this.replayer.loadSong(song);
+    this._loadedSong = song;
     // Apply the user's stereo separation settings (loadSong sets format default;
     // these override it with the user's preferences, matching tracker view behavior)
     const settings = useSettingsStore.getState();
@@ -1919,13 +1922,19 @@ export class DeckEngine {
   }
 
   /**
-   * Read-only access to the deck's currently loaded tracker song.
-   * Returns null in audio-file mode or when no song is loaded.
-   * Used by Auto-DJ Smart Cuts for pattern-data transition decisions.
+   * Read-only access to the tracker song the deck holds for its pattern data.
+   * Null when the track on the deck came without a song (an MP3, a WAV).
+   * Playback is always audio, so this does not depend on the playback mode:
+   * Auto DJ's chord deferral and Smart Cuts read the song through it, and
+   * with a mode check they never saw one.
    */
   getLoadedSong(): TrackerSong | null {
-    if (this._playbackMode !== 'tracker') return null;
-    return this.replayer.getSong();
+    return this._loadedSong;
+  }
+
+  /** Forget the held song: the track now on the deck has none. */
+  clearLoadedSong(): void {
+    this._loadedSong = null;
   }
 
   /**

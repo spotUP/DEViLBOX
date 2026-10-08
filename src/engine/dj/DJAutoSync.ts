@@ -12,6 +12,7 @@
 
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from './DJEngine';
+import { setDeckPitch } from './DJActions';
 import type { DeckId } from './DeckEngine';
 import type { BeatGridData } from './DJAudioCache';
 
@@ -81,7 +82,10 @@ export function syncBPMToOther(deckId: DeckId, otherDeckId: DeckId): number {
   const semitones = 12 * Math.log2(bestRatio);
   const clamped = Math.max(-AUTO_SYNC_MAX_SEMITONES, Math.min(AUTO_SYNC_MAX_SEMITONES, semitones));
 
-  store.setDeckPitch(deckId, clamped);
+  // The one pitch action: it moves the deck engine's playback rate AND the
+  // store. Writing only the store left the incoming deck at its own tempo
+  // while the UI showed it matched.
+  setDeckPitch(deckId, clamped);
 
   return clamped;
 }
