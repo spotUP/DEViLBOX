@@ -164,6 +164,9 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
   soundMaster: 'pass',
   suntronic: 'fail',
   tcbTracker: 'fail',
+  // tfmx: tfmxLiveSwap.test.ts - the worklet reloads the module and seeks to the time played; the position is kept to ~30 ms
+  // (envelope-correlated with the edited module played from the start), not sample for sample.
+  tfmx: 'pass',
 };
 
 /** Why a LIVE_WHILE_PLAYING row is 'fail', and why the other formats are not in the table (G24). */
@@ -233,7 +236,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   sidmon2: 'fail',
   soundControl: 'pass',
   soundMaster: 'pass',
-  soundPlayer: 'fail',
+  soundPlayer: 'pass',
   soundmon: 'pass',
   sonicArranger: 'pass',
   stm: 'n/a',
@@ -243,7 +246,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
-  tfmx: 'fail',
+  tfmx: 'pass',
   ult: 'n/a',
   unic: 'n/a',
   xm: 'n/a',

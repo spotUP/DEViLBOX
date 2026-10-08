@@ -48,6 +48,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
 
   /** The subsong loadTune started; a reload (a macro edit, a grid edit) keeps it. */
   private _subsong = 0;
+  private _smplData: ArrayBuffer | null = null;
 
   private constructor() {
     super();
@@ -181,6 +182,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
   async loadTune(mdatData: ArrayBuffer, smplData?: ArrayBuffer, subsong = 0): Promise<{ voices: number; songs: number; duration: number }> {
     await this._initPromise;
     this._subsong = subsong;
+    this._smplData = smplData ?? null;
     if (!this.workletNode) throw new Error('TFMXEngine not initialized');
 
     const mdatCopy = mdatData.slice(0);
@@ -208,6 +210,14 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
    * buffer is shipped to the worklet which runs `_tfmx_load_module` again.
    * If playback was active before reload it resumes automatically.
    */
+  /**
+   * Swap the playing module for an edited one without restarting (G24): reloadModule, which the worklet follows with a seek to the
+   * time already played. The sample companion is the one the song was loaded with unless the caller has it.
+   */
+  swapModule(mdatData: ArrayBuffer, smplData?: ArrayBuffer | null): void {
+    this.reloadModule(mdatData, smplData ?? this._smplData);
+  }
+
   reloadModule(mdatData: ArrayBuffer, smplData?: ArrayBuffer | null): void {
     if (!this.workletNode) return;
     const mdatCopy = mdatData.slice(0);
