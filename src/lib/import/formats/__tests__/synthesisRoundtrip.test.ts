@@ -38,7 +38,9 @@ describe('Synthesis pattern codec', () => {
       for (let r = 0; r < layout.rowsPerPattern; r++) {
         for (let c = 0; c < layout.numChannels; c++) {
           const off = getCellFileOffset(layout, p, r, c);
-          if (off < 0 || off + layout.bytesPerCell > raw.length) continue;
+          // 0 is the layouts' "no cell here" (350df1492 gave Synthesis a real
+          // getCellFileOffset; a row past a voice's track returns 0, the file header).
+          if (off < layout.patternDataFileOffset || off + layout.bytesPerCell > raw.length) continue;
           const orig = raw.subarray(off, off + layout.bytesPerCell);
           if ((orig[0] ?? 0) > 0) sawNote = true;
           const re = layout.encodeCell(layout.decodeCell(orig));

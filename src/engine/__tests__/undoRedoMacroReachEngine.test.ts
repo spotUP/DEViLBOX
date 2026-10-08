@@ -33,15 +33,16 @@ vi.mock('@/engine/dss/DssEngine', () => ({
     }),
   },
 }));
-vi.mock('@engine/TrackerReplayer', async (orig) => ({
-  ...(await orig<object>()),
-  getTrackerReplayer: () => ({
+vi.mock('@engine/TrackerReplayer', async (orig) => {
+  // The store reads the live replayer through peekTrackerReplayer (05c130258: an edit never constructs it).
+  const replayer = {
     getSong: () => loaded,
     syncCellToWasmSequencer: () => {},
     setChannelMuteMask: () => {},
     isPlaying: () => false,
-  }),
-}));
+  };
+  return { ...(await orig<object>()), getTrackerReplayer: () => replayer, peekTrackerReplayer: () => replayer };
+});
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
 

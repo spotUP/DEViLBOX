@@ -63,8 +63,13 @@ describe('StarTrekker AM .mod + .mod.nt', () => {
     const { parseModuleToSong } = await import('../parseModuleToSong');
     const comps = companionMap(AM_DIR, 'amsyntdemo.mod');
     expect([...comps.keys()]).toContain('amsyntdemo.mod.nt');
-    await parseModuleToSong(fileOf(AM_DIR, 'amsyntdemo.mod'), 0, undefined, undefined, comps);
-    expect(calls).toEqual([{ name: 'amsyntdemo.mod', companions: ['amsyntdemo.mod.nt'] }]);
+    const song = await parseModuleToSong(fileOf(AM_DIR, 'amsyntdemo.mod'), 0, undefined, undefined, comps);
+    // The pair opens on the native StarTrekker AM parser (grid, AM synth
+    // instruments from the .nt), not UADE's parse; UADE still PLAYS the pair
+    // because the song carries the .nt as its companion (ae5e076c5 era route,
+    // AmigaFormatParsers 'StarTrekker AM on a plain .mod').
+    expect(calls).toEqual([]);
+    expect([...((song as { uadeCompanionFiles?: Map<string, ArrayBuffer> }).uadeCompanionFiles?.keys() ?? [])]).toEqual(['amsyntdemo.mod.nt']);
   }, 60_000);
 
   it('a plain .mod without the .nt is not claimed by the rule', async () => {

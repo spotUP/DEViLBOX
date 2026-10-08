@@ -29,15 +29,16 @@ vi.mock('@/engine/fred-replayer/FredReplayerEngine', async (orig) => ({
   FredReplayerEngine: { hasInstance: () => true, getInstance: () => ({ replaceModule }) },
 }));
 let loaded: TrackerSong | null = null;
-vi.mock('@engine/TrackerReplayer', async (orig) => ({
-  ...(await orig<object>()),
-  getTrackerReplayer: () => ({
+vi.mock('@engine/TrackerReplayer', async (orig) => {
+  // The store reads the live replayer through peekTrackerReplayer (05c130258: an edit never constructs it).
+  const replayer = {
     getSong: () => loaded,
     syncCellToWasmSequencer: () => {},
     setChannelMuteMask: () => {},
     isPlaying: () => false,
-  }),
-}));
+  };
+  return { ...(await orig<object>()), getTrackerReplayer: () => replayer, peekTrackerReplayer: () => replayer };
+});
 
 const bytes = (p: string) => new Uint8Array(readFileSync(resolve(ROOT, p)));
 const settle = () => new Promise((r) => setTimeout(r, 20));

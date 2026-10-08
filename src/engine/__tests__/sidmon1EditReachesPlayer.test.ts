@@ -97,7 +97,9 @@ describe('an edited SidMon 1 song still plays, and plays the edit', () => {
     const setCell = vi.spyOn(SidMon1ReplayerEngine.prototype, 'setCell');
     const ts = await import('@engine/TrackerReplayer');
     const { liveTrackerSong } = await import('@/lib/song/liveSong');
-    vi.spyOn(ts, 'getTrackerReplayer').mockReturnValue({ getSong: () => liveTrackerSong(), syncCellToWasmSequencer() {}, setChannelMuteMask() {}, isPlaying: () => false } as never);
+    const live = { getSong: () => liveTrackerSong(), syncCellToWasmSequencer() {}, setChannelMuteMask() {}, isPlaying: () => false } as never;
+    vi.spyOn(ts, 'getTrackerReplayer').mockReturnValue(live);
+    vi.spyOn(ts, 'peekTrackerReplayer').mockReturnValue(live); // the store peeks (05c130258)
 
     useTrackerStore.setState({ currentPatternIndex: step });
     const before = await play(ab, [], moduleRow);

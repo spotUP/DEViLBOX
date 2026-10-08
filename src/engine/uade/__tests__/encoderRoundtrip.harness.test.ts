@@ -25,7 +25,7 @@
  *     src/engine/uade/__tests__/encoderRoundtrip.harness.test.ts
  * then review the diff (matchPct must not drop, unexercised must not grow) and commit it.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -43,6 +43,7 @@ import {
 // accounting below sees every registered codec, not only the ones a parser pulled in.
 import '../encoders';
 import { ENCODER_FIXTURES, type EncoderFixture } from './fixtures.map';
+import { installWasmNodeFetches } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 
 const ROOT = process.cwd();
 const RATCHET_PATH = join(ROOT, 'src/engine/uade/__tests__/encoderRoundtrip.ratchet.json');
@@ -130,7 +131,8 @@ function roundTripFixed(raw: Uint8Array, layout: UADEPatternLayout, song: Tracke
     for (let r = 0; r < rowsPerPattern; r++) {
       for (let c = 0; c < numChannels; c++) {
         const off = getCellFileOffset(layout, p, r, c);
-        if (off < 0 || off + bytesPerCell > raw.length) continue;
+        // 0 is the layouts' "no cell here" (a Synthesis row past a voice's track), not the file header.
+        if (off <= 0 || off + bytesPerCell > raw.length) continue;
         const orig = raw.subarray(off, off + bytesPerCell);
         let cell: TrackerCell | undefined;
         if (decodeCell) {
@@ -236,13 +238,23 @@ const results: FormatResult[] = [];
 // Formats exercised (their codec was actually round-tripped, case-insensitive).
 const exercised = new Set<string>();
 
-const runAll = (async () => {
-  for (const entry of ENCODER_FIXTURES) {
-    const r = await measure(entry);
-    results.push(r);
-    if (r.status === 'byte-exact' || r.status === 'lossy') exercised.add(r.formatId.toLowerCase());
-  }
-})();
+// David Whittaker and Ben Daglish match their grid to the replayer's own walk at import
+// (3e69d8f0a, a8634520c) and only a matched grid carries a layout, so the parse needs the
+// replayer wasm; fetch answers from public/ the way the parsers' own tests do.
+let restoreFetch: (() => void) | null = null;
+let runAll: Promise<void>;
+
+beforeAll(() => {
+  restoreFetch = installWasmNodeFetches([['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd']]);
+  runAll = (async () => {
+    for (const entry of ENCODER_FIXTURES) {
+      const r = await measure(entry);
+      results.push(r);
+      if (r.status === 'byte-exact' || r.status === 'lossy') exercised.add(r.formatId.toLowerCase());
+    }
+  })();
+});
+afterAll(async () => { await runAll?.catch(() => undefined); restoreFetch?.(); });
 
 function computeUnexercised(): string[] {
   const registered = [...listPatternEncoderFormatIds(), ...listVariableEncoderFormatIds()];

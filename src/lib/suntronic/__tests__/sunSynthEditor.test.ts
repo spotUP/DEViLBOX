@@ -116,12 +116,12 @@ describe('SunTronic parser names decoded synths descriptively', () => {
     const synths = song.instruments.filter((i) => i.synthType === 'SunTronicSynth');
     expect(synths.length).toBeGreaterThan(0);
 
-    // Every decoded synth carries a descriptive type-derived name; none is left
-    // as the bare "Synth N" fallback (the pre-fix behaviour).
-    const TYPE_LABELS = /^(Morph|Pulse-Noise|Splice|Resample|Smooth)\b/;
+    // The format stores no synth name, and since 08c67996f no parser invents
+    // one: a decoded synth is '' (the UI shows its number). The descriptive
+    // label is a UI-side derivation from the config (sunSynthDescriptiveName).
     synths.forEach((inst) => {
-      expect(inst.name).not.toMatch(/^Synth \d+$/);
-      expect(inst.name).toMatch(TYPE_LABELS);
+      expect(inst.name).toBe('');
+      expect(inst.sunTronic).toBeDefined();
     });
   });
 });

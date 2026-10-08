@@ -32,7 +32,8 @@ vi.mock('@/lib/modland/ModlandDetector', () => ({ checkModlandFile: vi.fn(async 
 vi.mock('@engine/TrackerReplayer', async (orig) => {
   // The replayer's song is the live one: the store's edit hook hands the cell to the engine that plays it.
   const replayer: object = new Proxy({}, { get: (_t, k) => (k === 'getSong' ? () => (globalThis as { __liveSong?: () => unknown }).__liveSong?.() ?? null : () => undefined) });
-  return { ...(await orig<object>()), getTrackerReplayer: () => replayer };
+  // The store reads the live replayer through peekTrackerReplayer (05c130258: an edit never constructs it).
+  return { ...(await orig<object>()), getTrackerReplayer: () => replayer, peekTrackerReplayer: () => replayer };
 });
 // UADE's engine instance is the test's wasm module: the live-edit routes write chip RAM through it.
 vi.mock('@/engine/uade/UADEEngine', () => ({
@@ -306,7 +307,10 @@ describe('the live-edit table is complete', () => {
 // ---------------------------------------------------------------------------
 
 /** Formats UADE plays (Paula stream = sound) and the chunk the edit is written at. */
-const LIVE_UADE = ['robHubbard', 'suntronic', 'jochenHippelST', 'soundMaster', 'digitalSonixChrome', 'tcbTracker'];
+// jochenHippelST left this list with a627f3cca: the registry starts the native HippelSt engine for it, the edit goes to
+// its worklet ('hippelst-module'), and UADE's Paula stream never sees it. Its live-while-playing measurement belongs to
+// the native engine (open item 1 of thoughts/shared/plans/2026-10-08-hippel-st-native.md, hippelStLiveEditHeard).
+const LIVE_UADE = ['robHubbard', 'suntronic', 'soundMaster', 'digitalSonixChrome', 'tcbTracker'];
 
 interface LiveMeasured { status: LiveEditStatus; detail: string }
 export const liveMeasured: Record<string, LiveMeasured> = {};
