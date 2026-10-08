@@ -531,7 +531,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       const dy = e.clientY - pitchDragStartYRef.current;
       const pitchDelta = (dy / 120) * 8; // 120px = full ±8 semitone range
       const newPitch = Math.max(-8, Math.min(8, pitchDragStartValueRef.current + pitchDelta));
-      useDJStore.getState().setDeckPitch(deckId, newPitch);
+      DJActions.setDeckPitch(deckId, newPitch);
     };
     const onUp = () => { pitchDragRef.current = false; };
     window.addEventListener('pointermove', onMove);
@@ -548,7 +548,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
   const handlePitchDoubleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    useDJStore.getState().setDeckPitch(deckId, 0);
+    DJActions.setDeckPitch(deckId, 0);
   }, [deckId]);
 
   // ── 33/45 RPM toggle ─────────────────────────────────────────────────────

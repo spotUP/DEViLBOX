@@ -363,7 +363,6 @@ interface DJActions {
   setDeckState: (deck: DeckId, partial: Partial<DeckState>) => void;
   setDeckPlaying: (deck: DeckId, playing: boolean) => void;
   setDeckPosition: (deck: DeckId, songPos: number, pattPos: number) => void;
-  setDeckPitch: (deck: DeckId, offset: number) => void;
   setDeckEQ: (deck: DeckId, band: 'low' | 'mid' | 'high', dB: number) => void;
   setDeckEQKill: (deck: DeckId, band: 'low' | 'mid' | 'high', kill: boolean) => void;
   setDeckFilter: (deck: DeckId, position: number) => void;
@@ -572,15 +571,6 @@ export const useDJStore = create<DJStore>()(
       set((state) => {
         state.decks[deck].songPos = songPos;
         state.decks[deck].pattPos = pattPos;
-      }),
-
-    setDeckPitch: (deck, offset) =>
-      set((state) => {
-        const safe = Number.isFinite(offset) ? offset : 0;
-        const clamped = Math.max(-16, Math.min(16, safe));
-        state.decks[deck].pitchOffset = clamped;
-        const baseBPM = state.decks[deck].detectedBPM || 120;
-        state.decks[deck].effectiveBPM = Math.round(baseBPM * Math.pow(2, clamped / 12) * 100) / 100;
       }),
 
     setDeckEQ: (deck, band, dB) =>

@@ -18,6 +18,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { setDeckPitch } from '@/engine/dj/DJActions';
 import {
   filterSweep,
   filterReset,
@@ -308,20 +309,20 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
             const elapsed = performance.now() - startTime;
             const progress = Math.min(1, elapsed / durationMs);
             const rate = 1 - progress * progress;
-            useDJStore.getState().setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
+            setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
             if (progress < 1) {
               rafId = requestAnimationFrame(animate);
             } else {
               try { deck.pause(); } catch { /* engine may be gone */ }
               useDJStore.getState().setDeckPlaying(deckId, false);
-              useDJStore.getState().setDeckPitch(deckId, 0);
+              setDeckPitch(deckId, 0);
               cancelPad(padId);
             }
           };
           rafId = requestAnimationFrame(animate);
           cancelFn = () => {
             cancelAnimationFrame(rafId);
-            useDJStore.getState().setDeckPitch(deckId, 0);
+            setDeckPitch(deckId, 0);
           };
         } catch {
           cancelPad(padId);
