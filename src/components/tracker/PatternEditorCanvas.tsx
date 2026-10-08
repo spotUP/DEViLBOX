@@ -10,7 +10,7 @@ import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useE
 import { useMixerStore } from '@stores/useMixerStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
-import { channelLayout } from './channelLayout';
+import { channelLayout, type ChannelLayout } from './channelLayout';
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
@@ -140,6 +140,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   hideAutomationLanes: hideAutoLanesProp = false,
   formatChannelOffset = 0,
 }) => {
+  // The column layout the track scopes align to comes from the main editor
+  // only; a sub-editor (the GoatTracker order matrix, a perf list) keeps its
+  // own, or the scopes would line up with whichever canvas scrolled last.
+  const ownLayoutRef = useRef<ChannelLayout>({ offsets: [], widths: [], scrollLeft: 0, numChannels: 0 });
+  const layoutOut = hideVUMeters ? ownLayoutRef.current : channelLayout;
   const { isMobile } = useResponsiveSafe();
 
   const isFormatMode = !!formatColumns;
@@ -480,9 +485,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   useEffect(() => {
     channelOffsetsRef.current = channelOffsets;
     channelWidthsRef.current = channelWidths;
-    channelLayout.offsets = channelOffsets;
-    channelLayout.widths = channelWidths;
-    channelLayout.numChannels = numChannels;
+    layoutOut.offsets = channelOffsets;
+    layoutOut.widths = channelWidths;
+    layoutOut.numChannels = numChannels;
   }, [channelOffsets, channelWidths, numChannels]);
 
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
@@ -1388,7 +1393,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // Calculate target scroll to center the channel
       const targetScroll = mobileChannelIndex * channelWidth;
       scrollLeftRef.current = targetScroll;
-      channelLayout.scrollLeft = targetScroll;
+      layoutOut.scrollLeft = targetScroll;
       bridgeRef.current?.post({ type: 'scroll', x: targetScroll });
       setScrollLeft(targetScroll);
     }
@@ -1422,7 +1427,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (next === scrollLeftRef.current) return;
 
     scrollLeftRef.current = next;
-    channelLayout.scrollLeft = next;
+    layoutOut.scrollLeft = next;
     bridgeRef.current?.post({ type: 'scroll', x: next });
     setScrollLeft(next);
     if (headerScrollRef.current) headerScrollRef.current.scrollLeft = next;
@@ -2381,7 +2386,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const next = Math.min(scrollLeftRef.current, maxScroll);
       if (next !== scrollLeftRef.current) {
         scrollLeftRef.current = next;
-        channelLayout.scrollLeft = next;
+        layoutOut.scrollLeft = next;
         bridge?.post({ type: 'scroll', x: next });
         setScrollLeft(next);
         if (headerScrollRef.current) headerScrollRef.current.scrollLeft = next;
@@ -2805,7 +2810,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   useEffect(() => {
     if (allChannelsFit && scrollLeft > 0) {
       scrollLeftRef.current = 0;
-      channelLayout.scrollLeft = 0;
+      layoutOut.scrollLeft = 0;
       bridgeRef.current?.post({ type: 'scroll', x: 0 });
       setScrollLeft(0);
     }
@@ -2887,7 +2892,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
             // Post directly to worker — no React re-render needed for canvas
             scrollLeftRef.current = newScrollLeft;
-            channelLayout.scrollLeft = newScrollLeft;
+            layoutOut.scrollLeft = newScrollLeft;
             bridgeRef.current?.post({ type: 'scroll', x: newScrollLeft });
 
             setScrollLeft(newScrollLeft);
@@ -2910,7 +2915,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const handleHeaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const left = e.currentTarget.scrollLeft;
     scrollLeftRef.current = left;
-    channelLayout.scrollLeft = left;
+    layoutOut.scrollLeft = left;
     bridgeRef.current?.post({ type: 'scroll', x: left });
     setScrollLeft(left);
     if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = left;
@@ -2920,7 +2925,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const handleBottomScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const left = e.currentTarget.scrollLeft;
     scrollLeftRef.current = left;
-    channelLayout.scrollLeft = left;
+    layoutOut.scrollLeft = left;
     bridgeRef.current?.post({ type: 'scroll', x: left });
     setScrollLeft(left);
     if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
