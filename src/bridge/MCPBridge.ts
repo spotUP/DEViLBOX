@@ -208,6 +208,7 @@ import {
 } from './handlers/djHandlers';
 
 import { RELAY_WS_URL } from './relayEndpoint';
+import { createReloadGate } from '../lib/dev/engineReloadGate';
 
 const WS_URL = RELAY_WS_URL;
 const INITIAL_BACKOFF_MS = 500;
@@ -570,6 +571,21 @@ function autoRestoreForAgent(): void {
 }
 onRecoveryPromptOpen(() => { queueMicrotask(autoRestoreForAgent); });
 
+/**
+ * Dev only: a Vite save under src/engine|stores|bridge|audio|midi asks the page
+ * to reload. While a bridge call is running (a master-FX measurement lasts up
+ * to 90 s) or ran in the last few seconds, the reload waits; otherwise another
+ * agent's save looked like a tab crash mid-measurement (2026-10-08).
+ */
+let callsInFlight = 0;
+let lastCallActivityAt = 0;
+const engineReloadGate = createReloadGate({
+  inFlight: () => callsInFlight > 0,
+  sinceLastActivityMs: () => (lastCallActivityAt === 0 ? Infinity : Date.now() - lastCallActivityAt),
+  reload: () => window.location.reload(),
+});
+import.meta.hot?.on('devilbox:engine-changed', engineReloadGate);
+
 async function handleMessage(data: string): Promise<void> {
   let request: BridgeRequest;
   try {
@@ -593,11 +609,16 @@ async function handleMessage(data: string): Promise<void> {
     return;
   }
 
+  callsInFlight++;
+  lastCallActivityAt = Date.now();
   try {
     const result = await handler(request.params ?? {});
     send({ id: request.id, type: 'result', data: annotateBlockingDialog(request.method, result) });
   } catch (e) {
     send({ id: request.id, type: 'error', error: (e as Error).message });
+  } finally {
+    callsInFlight--;
+    lastCallActivityAt = Date.now();
   }
 }
 

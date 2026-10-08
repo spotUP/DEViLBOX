@@ -47,24 +47,31 @@ function generateVersionFile() {
  * ones the running audio graph holds - two stores, two engine singletons, a UI
  * that reads one while audio uses the other. Both showed up as "stale" state
  * that only a manual reload cleared (2026-09-29). UI components keep HMR.
+ *
+ * The page gets a custom event, not a bare full-reload, so it can hold the
+ * reload while an agent is mid-measurement (src/lib/dev/engineReloadGate.ts,
+ * wired in src/bridge/MCPBridge.ts). A bare full-reload made another agent's
+ * save of src/engine/dj/** look like a tab crash in the middle of a measurement
+ * (2026-10-08).
  */
+const ENGINE_CHANGED_EVENT = 'devilbox:engine-changed';
 function reloadOnEngineChange() {
   const ENGINE_CODE = /[\\/]src[\\/](engine|stores|bridge|audio|midi)[\\/]/;
   const WORKLET_CODE = /[\\/]public[\\/].*\.(worklet\.js|js)$/;
   return {
     name: 'devilbox-reload-on-engine-change',
     apply: 'serve' as const,
-    configureServer(server: { watcher: { on(e: string, cb: (f: string) => void): void }; ws: { send(p: { type: string; path?: string }): void } }) {
+    configureServer(server: { watcher: { on(e: string, cb: (f: string) => void): void }; ws: { send(event: string, data?: unknown): void } }) {
       server.watcher.on('change', (file: string) => {
-        if (WORKLET_CODE.test(file) && /worklet/i.test(file)) server.ws.send({ type: 'full-reload', path: '*' });
+        if (WORKLET_CODE.test(file) && /worklet/i.test(file)) server.ws.send(ENGINE_CHANGED_EVENT);
       });
     },
-    handleHotUpdate(ctx: { file: string; server: { ws: { send(p: { type: string; path?: string }): void } } }) {
+    handleHotUpdate(ctx: { file: string; server: { ws: { send(event: string, data?: unknown): void } } }) {
       // Test files and everything under __tests__ (fixtures, helpers) are
       // never app code: a labels JSON under src/bridge/.../__tests__/fixtures
       // reloaded the tab on every write (2026-09-29).
       if (!ENGINE_CODE.test(ctx.file) || /\.test\.tsx?$/.test(ctx.file) || /[\\/]__tests__[\\/]/.test(ctx.file)) return;
-      ctx.server.ws.send({ type: 'full-reload', path: '*' });
+      ctx.server.ws.send(ENGINE_CHANGED_EVENT);
       return [];
     },
   };
