@@ -17,6 +17,8 @@ class BdProcessor extends AudioWorkletProcessor {
     this.initializing = false;
     this.processCount = 0;
     this.muteMask = 0xFFFFFFFF;
+    this.framesPlayed = 0;      // frames rendered since the song started: a swapped-in module catches up to here
+    this.subsong = 0;
     this._lastSongPos = -1;
     this._lastRow = -1;
 
@@ -64,6 +66,8 @@ class BdProcessor extends AudioWorkletProcessor {
             // The tune the song's grid shows; init starts on subsong 0.
             if (data.subsong > 0 && typeof this.module._player_set_subsong === 'function') this.module._player_set_subsong(data.subsong);
             this._lastSongPos = -1; this._lastRow = -1;
+            this.framesPlayed = 0;
+            this.subsong = data.subsong > 0 ? data.subsong : 0;
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
 
@@ -76,8 +80,13 @@ class BdProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'swapModule':
+        this.swapModule(data.moduleData, data.subsong);
+        break;
+
       case 'stop':
         if (this.module && typeof this.module._player_stop === 'function') {
+          this.framesPlayed = 0;
           this.module._player_stop();
           this.port.postMessage({ type: 'stopped' });
         }
@@ -228,6 +237,34 @@ class BdProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /**
+   * An edited module takes the place of the playing one without a restart (G24). The player is one global instance, so the
+   * module is loaded afresh and run silently for the frames already played, in the blocks they were played in (the replayer is
+   * deterministic); from there it is the edited module played from the start, at the position the listener is at.
+   */
+  swapModule(moduleData, subsong) {
+    if (!this.module || typeof this.module._player_init !== 'function' || !moduleData) return;
+    const bytes = new Uint8Array(moduleData);
+    const malloc = this.module._malloc || this.module.malloc;
+    const free = this.module._free || this.module.free;
+    const ptr = malloc(bytes.length);
+    if (!ptr) { this.port.postMessage({ type: 'error', message: 'malloc failed for module data' }); return; }
+    (this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer)).set(bytes, ptr);
+    this.module._player_init(ptr, bytes.length);
+    free(ptr);
+    const tune = typeof subsong === 'number' && subsong > 0 ? subsong : this.subsong;
+    if (tune > 0 && typeof this.module._player_set_subsong === 'function') this.module._player_set_subsong(tune);
+    this.applyMuteMask();
+    this.updateBufferViews();
+    let left = this.framesPlayed;
+    while (left > 0) {
+      const n = Math.min(this.bufferSize, left);
+      this.module._player_render(this.interleavedPtr, n);
+      left -= n;
+    }
+    this.port.postMessage({ type: 'moduleSwapped', frames: this.framesPlayed });
+  }
+
   updateBufferViews() {
     if (!this.module || !this.interleavedPtr) return;
     const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
@@ -274,6 +311,7 @@ class BdProcessor extends AudioWorkletProcessor {
       if (this.interleavedBuf) {
         const rendered = this.module._player_render(this.interleavedPtr, numSamples);
         if (rendered > 0) {
+          this.framesPlayed += rendered;
           for (let i = 0; i < rendered; i++) {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];

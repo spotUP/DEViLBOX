@@ -149,6 +149,8 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
 export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
   // davidWhittaker: a native worklet engine, measured by davidWhittakerLiveSwap.test.ts (the real worklet and WASM, the store's own route).
   davidWhittaker: 'pass',
+  // benDaglish: likewise, benDaglishLiveSwap.test.ts (note edits; the exporter writes no other BD edit).
+  benDaglish: 'pass',
   digitalSonixChrome: 'pass',
   jochenHippelST: 'pass',
   robHubbard: 'pass',

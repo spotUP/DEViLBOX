@@ -98,6 +98,11 @@ export class BdEngine extends WASMSingletonBase {
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
   }
 
+  /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */
+  swapModule(buffer: ArrayBuffer, subsong = 0): void {
+    this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer, subsong });
+  }
+
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
