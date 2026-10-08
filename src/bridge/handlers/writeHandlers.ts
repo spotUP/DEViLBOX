@@ -787,7 +787,8 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
     // while the tone is wrong ("sounds like it's stuck in a jar").
     const BANDS = [63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
     const specIn = new Float32Array(2048), specFx = new Float32Array(2048);
-    const bandIn = new Array(BANDS.length).fill(0), bandFx = new Array(BANDS.length).fill(0);
+    const specCh = new Float32Array(2048);
+    const bandIn = new Array(BANDS.length).fill(0), bandFx = new Array(BANDS.length).fill(0), bandCh = new Array(BANDS.length).fill(0);
     const addBands = (spec: Float32Array, acc: number[]) => {
       const binHz = ctx.sampleRate / 4096;
       BANDS.forEach((c, b) => {
@@ -798,12 +799,13 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
     const fIn = new Float32Array(4096), fFx = new Float32Array(4096);
     let xy = 0, xx = 0, yy = 0;
     const energy: Record<string, number> = {};
+    const peak: Record<string, number> = {};
     // Noise is steady: 20 reads. A song is not: read back-to-back windows
     // (4096 samples = 85 ms) for `seconds`, input and output together.
     const reads = song ? Math.round((seconds * 1000) / 85) : 20;
     for (let i = 0; i < reads; i++) {
       await wait(song ? 85 : 80);
-      for (const t of taps) for (const an of t.a) { an.getFloatTimeDomainData(f); let e = 0; for (const x of f) e += x * x; energy[t.name] = (energy[t.name] ?? 0) + e; }
+      for (const t of taps) for (const an of t.a) { an.getFloatTimeDomainData(f); let e = 0; let pk = peak[t.name] ?? 0; for (const x of f) { e += x * x; const ax = Math.abs(x); if (ax > pk) pk = ax; } energy[t.name] = (energy[t.name] ?? 0) + e; peak[t.name] = pk; }
       // Polarity: lag-0 correlation of the input and the effect output, left
       // channel, read in the same render quantum. Near -1 = inverted: blending
       // it with the dry signal cancels.
@@ -811,6 +813,8 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
       if (inTap && fxTap) {
         inTap.a[0].getFloatFrequencyData(specIn); fxTap.a[0].getFloatFrequencyData(specFx);
         addBands(specIn, bandIn); addBands(specFx, bandFx);
+        const chTap = taps.find((t) => t.name === 'chain');
+        if (chTap) { chTap.a[0].getFloatFrequencyData(specCh); addBands(specCh, bandCh); }
         inTap.a[0].getFloatTimeDomainData(fIn); fxTap.a[0].getFloatTimeDomainData(fFx);
         for (let k = 0; k < fIn.length; k++) { xy += fIn[k] * fFx[k]; xx += fIn[k] * fIn[k]; yy += fFx[k] * fFx[k]; }
       }
@@ -821,6 +825,11 @@ export async function measureMasterEffect(params: Record<string, unknown>): Prom
     if (ctx.currentTime === startTime) return { error: 'The audio clock is not running - click the DEViLBOX tab once to start audio.' };
     return { ok: true, type, wet: Number(params.wet ?? 100), correlation,
       bandsDb: Object.fromEntries(BANDS.map((c, b) => [c, Math.round(10 * Math.log10((bandFx[b] || 1e-20) / (bandIn[b] || 1e-20)) * 10) / 10])),
+      // The same octave bands for the whole chain output (after the make-up gain), vs the input.
+      chainBandsDb: Object.fromEntries(BANDS.map((c, b) => [c, Math.round(10 * Math.log10((bandCh[b] || 1e-20) / (bandIn[b] || 1e-20)) * 10) / 10])),
+      // Crest = peak over the run / RMS over the run, per tap (both channels): the punch of a song.
+      crestDb: Object.fromEntries(Object.keys(energy).map((k) => [k, Math.round(20 * Math.log10((peak[k] || 1e-9) / Math.sqrt((energy[k] || 1e-12) / (reads * 2 * 4096))) * 10) / 10])),
+      rmsDb: Object.fromEntries(Object.keys(energy).map((k) => [k, Math.round(10 * Math.log10((energy[k] || 1e-12) / (reads * 2 * 4096)) * 10) / 10])),
       effectDb: db('effect'), chainDb: db('chain'), compensationDb: Math.round((db('chain') - db('effect')) * 10) / 10 };
   } finally {
     try { src?.stop(); src?.disconnect(); } catch { /* ok */ }

@@ -163,7 +163,7 @@ export function applyEffectParametersDiff(
 
     case 'EQ3': {
       // Node is a Gain wrapper with _eq3Filters: [lowFilter, midFilter, highFilter]
-      const filters = (node as unknown as Record<string, unknown>)._eq3Filters as Tone.Filter[] | undefined;
+      const filters = (node as unknown as Record<string, unknown>)._eq3Filters as Tone.BiquadFilter[] | undefined;
       if (filters && filters.length === 3) {
         if ('low' in changed) filters[0].gain.rampTo(changed.low as number, R);
         if ('mid' in changed) filters[1].gain.rampTo(changed.mid as number, R);

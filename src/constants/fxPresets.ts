@@ -41,7 +41,7 @@ export interface FxPreset {
 
 export const FX_PRESETS: FxPreset[] = [
   // ═══ CLEAN ═══
-  { name: 'Clean Master', description: 'Gentle glue compression + tonal balance — transparent finishing', tags: ['Clean'], gainCompensationDb: 2.3,
+  { name: 'Clean Master', description: 'Gentle glue compression + tonal balance — transparent finishing', tags: ['Clean'], gainCompensationDb: 1.6,
     effects: [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1, mid: 0, high: 0.5 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -18, ratio: 2.5, attack: 0.01, release: 0.2 } },
@@ -50,7 +50,7 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 1.5, attack: 0.03, release: 0.3 } },
     ] },
-  { name: 'Balanced', description: 'EQ sculpting + light compression + widening', tags: ['Clean', 'Wide'], gainCompensationDb: 6.5,
+  { name: 'Balanced', description: 'EQ sculpting + light compression + widening', tags: ['Clean', 'Wide'], gainCompensationDb: 2.5,
     effects: [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: -0.5, high: 1 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 2, attack: 0.015, release: 0.25 } },
@@ -102,7 +102,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.12 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 18, parameters: { drive: 40, tone: 11000 } },
     ] },
-  { name: 'Brick Wall', description: 'Hard limiting for maximum loudness', tags: ['Loud'], gainCompensationDb: 2.7,
+  { name: 'Brick Wall', description: 'Hard limiting for maximum loudness', tags: ['Loud'], gainCompensationDb: 1.4,
     effects: [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 0, high: 1 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -8, ratio: 12, attack: 0.001, release: 0.05 } },
@@ -298,13 +298,13 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 15, parameters: { drive: 40, tone: 11000 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 5, attack: 0.003, release: 0.1 } },
     ] },
-  { name: 'House', description: 'Warm low-end + smooth tops + glue comp', tags: ['Genre', 'DJ'], gainCompensationDb: 5.3,
+  { name: 'House', description: 'Warm low-end + smooth tops + glue comp', tags: ['Genre', 'DJ'], gainCompensationDb: 1,
     effects: [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 0.5, high: 1 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 3, attack: 0.008, release: 0.18 } },
       { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 100, parameters: { width: 0.5 } },
     ] },
-  { name: 'Drum & Bass', description: 'Tight transients + sub weight + air', tags: ['Genre', 'DJ'], gainCompensationDb: 2.7,
+  { name: 'Drum & Bass', description: 'Tight transients + sub weight + air', tags: ['Genre', 'DJ'], gainCompensationDb: 1.5,
     effects: [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -0.5, high: 1.0 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 5, attack: 0.002, release: 0.08 } },
@@ -565,7 +565,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'wasm', type: 'MoogFilter', enabled: true, wet: 100, parameters: { cutoff: 2000, resonance: 70, drive: 0.6, model: 0, filterMode: 0 } },
       { category: 'tonejs', type: 'Distortion', enabled: true, wet: 25, parameters: { drive: 0.3 } },
     ] },
-  { name: 'Punchy Drums', description: 'Compression + EQ boost for attack', tags: ['Drums', 'Compression'], gainCompensationDb: 1.2,
+  { name: 'Punchy Drums', description: 'Compression + EQ boost for attack', tags: ['Drums', 'Compression'],
     effects: [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -24, ratio: 6, attack: 0.002, release: 0.08 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: -0.5, high: 2.0, lowFrequency: 200, highFrequency: 4000 } },
@@ -594,7 +594,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Filter', enabled: true, wet: 100, parameters: { type: 'lowpass', frequency: 3000, rolloff: -12, Q: 1 } },
       { category: 'tonejs', type: 'TapeDegradation', enabled: true, wet: 50, parameters: { wow: 25, flutter: 15, hiss: 10, dropouts: 0, saturation: 20, toneShift: 30 } },
     ] },
-  { name: 'Clean Vocal', description: 'Compression + EQ for clean vocal chain', tags: ['Vocals', 'Clean'], gainCompensationDb: 2.4,
+  { name: 'Clean Vocal', description: 'Compression + EQ for clean vocal chain', tags: ['Vocals', 'Clean'], gainCompensationDb: 1.9,
     effects: [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -18, ratio: 3, attack: 0.01, release: 0.2 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: -2.0, mid: 1.5, high: 0.5, lowFrequency: 300, highFrequency: 5000 } },
@@ -750,7 +750,7 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'wasm', type: 'RE201', enabled: true, wet: 50, parameters: { delayMode: 0, reverbVolume: 0.8, bass: 0.5, treble: 0.6 } },
     ] },
-  { name: 'RE-201 Runaway', description: 'RE-201 near-runaway feedback — Lee Perry madness', tags: ['Delay', 'Dub', 'Dub Echo', 'Dub Siren', 'Creative'], gainCompensationDb: -1.5,
+  { name: 'RE-201 Runaway', description: 'RE-201 near-runaway feedback — Lee Perry madness', tags: ['Delay', 'Dub', 'Dub Echo', 'Dub Siren', 'Creative'], gainCompensationDb: -16.6,
     effects: [
       { category: 'wasm', type: 'RE201', enabled: true, wet: 60, parameters: { bass: 0.75, treble: 0.4, delayMode: 10, repeatRate: 0.35, intensity: 0.82, echoVolume: 0.95, reverbVolume: 0.7, inputLevel: 1.8 } },
     ] },
@@ -884,22 +884,22 @@ export const FX_PRESETS: FxPreset[] = [
   // ═══ RETRO HARDWARE — AMIGA CLUB ═══
   { name: 'Paula Punchline', description: 'Ultimate Amiga club preset — bass lift, tape warmth, punchy glue', tags: ['Amiga', 'Loud', 'Bass'], gainCompensationDb: 1.1,
     effects: [
-      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -0.5, high: 1.0, lowFrequency: 120, highFrequency: 6000 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 9.0, mid: -1.0, high: 1.0, lowFrequency: 90, highFrequency: 6000 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 25, parameters: { drive: 35, tone: 10000 } },
-      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.12 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 3, attack: 0.03, release: 0.1 } },
     ] },
   { name: 'Amiga Bass Cannon', description: 'Thunderous 8-bit bass — sub enhancement, saturation, heavy compression', tags: ['Amiga', 'Bass', 'Loud'], gainCompensationDb: 0.8,
     effects: [
       { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 80, amount: 0.7, drive: 0.3, mix: 0.6 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 45, tone: 8000 } },
-      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 6, attack: 0.005, release: 0.1 } },
-      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -0.5, high: -1.0, lowFrequency: 100, highFrequency: 5000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 4, attack: 0.02, release: 0.1 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 10.0, mid: -0.5, high: -1.0, lowFrequency: 80, highFrequency: 5000 } },
     ] },
   { name: 'Tracker Dance Floor', description: 'ProTracker rave — aggressive compression, bass, hihat sizzle', tags: ['Amiga', 'DJ', 'Loud'], gainCompensationDb: 1.1,
     effects: [
-      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -0.5, high: -0.5, lowFrequency: 150, highFrequency: 8000 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 8.0, mid: -0.5, high: -0.5, lowFrequency: 100, highFrequency: 8000 } },
       { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 7500, amount: 0.25, blend: 0.25, ceil: 14000 } },
-      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.03, release: 0.1 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 10, parameters: { drive: 30, tone: 10000 } },
     ] },
   { name: "Paula's Revenge", description: 'Maximum energy — exciter, bass boost, hard limiting, tape grit', tags: ['Amiga', 'Loud', 'Grit'], gainCompensationDb: 2.1,
