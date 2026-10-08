@@ -19,6 +19,7 @@ import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
+import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
 import { DeckKeyLock } from './DeckKeyLock';
 import { computeKeyLockShift } from './computeKeyLockShift';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
@@ -920,6 +921,40 @@ export class DeckEngine {
 
     this.songRowMs = rowMsArr;
     return times;
+  }
+
+  // ── Heard position (the one source for every DJ visual) ──────────────────
+
+  /**
+   * Audio mode: the position the listener hears now - the player's position
+   * minus the output latency at the current playback rate (audioLatency.ts).
+   * Every DJ visual (waveform playhead, beat grid, overview, turntable, lights
+   * derived from the time index) reads this through the DJ store.
+   */
+  getHeardPosition(): number {
+    const player = this._stemMode ? this.stemPlayer : this.audioPlayer;
+    const ctx = Tone.getContext().rawContext as AudioContext;
+    return heardPositionSec(player.getPosition(), player.getPlaybackRate(), outputLatencySec(ctx));
+  }
+
+  /**
+   * Tracker mode: the row the listener hears now, from the replayer's display
+   * ring (queued at heard times by PlaybackCoordinator), with the elapsed time
+   * at that row from the song time index. Null when the ring has nothing yet.
+   */
+  getHeardTrackerState(): { songPos: number; pattPos: number; elapsedMs: number | null } | null {
+    const ctx = Tone.getContext().rawContext as AudioContext;
+    const state = this.replayer.getStateAtTime(ctx.currentTime);
+    if (!state) return null;
+    const songPos = state.position;
+    const pattPos = state.row;
+    let elapsedMs: number | null = null;
+    if (this.songTimeIndex.length > songPos) {
+      const rowMs = this.songRowMs[songPos];
+      const into = state.duration > 0 ? Math.max(0, Math.min(1, (ctx.currentTime - state.time) / state.duration)) : 0;
+      elapsedMs = (this.songTimeIndex[songPos] ?? 0) + (rowMs ? (pattPos + into) * rowMs : 0);
+    }
+    return { songPos, pattPos, elapsedMs };
   }
 
   /** Map elapsed ms to { songPos, pattPos } using the pre-built time index */

@@ -14,6 +14,7 @@
  */
 
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
+import { outputLatencySec } from './audioLatency';
 import { isReplacedInstrument } from './replayer/hybridInstruments';
 import { isLowOctaveNote, isPitchedNote, noteValueToPitch } from '@/lib/tracker/noteValue';
 import * as Tone from 'tone';
@@ -3081,8 +3082,10 @@ export class TrackerReplayer {
 
     // Queue display state for audio-synced UI (tick 0 = start of row)
     // Use swung time (safeTime) so visual follows the same timing as audio
+    // The ring holds HEARD times (audioLatency.ts): the scheduled time plus the output latency, as the
+    // engine-driven path queues through PlaybackCoordinator.dispatchEnginePosition.
     if (this.currentTick === 0) {
-      this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0, tickInterval * this.speed);
+      this.queueDisplayState(safeTime + outputLatencySec(this.coordinator.context.audioContext), this.pattPos, patternNum, this.songPos, 0, tickInterval * this.speed);
     }
 
     // Note processing: when no WASM engine is active (_suppressNotes = false),
@@ -3583,7 +3586,7 @@ export class TrackerReplayer {
       const ch0Speed = (grooves?.[0] ?? 0) > 0 && this.channelGrooveToggle[0]
         ? ((grooves ?? [])[0] ?? fallback)
         : (speeds?.[0] ?? fallback);
-      this.queueDisplayState(time, ch0Patt, ch0Pat, ch0Song, 0, tickInterval * ch0Speed);
+      this.queueDisplayState(time + outputLatencySec(this.coordinator.context.audioContext), ch0Patt, ch0Pat, ch0Song, 0, tickInterval * ch0Speed);
       if (this.onRowChange) this.onRowChange(ch0Patt, ch0Pat, ch0Song);
     }
 

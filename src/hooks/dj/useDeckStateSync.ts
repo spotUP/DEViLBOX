@@ -47,7 +47,9 @@ export function useDeckStateSync(deckId: DeckId): void {
           // This prevents position freezing when the Tone.js Player state briefly flickers
           // or the browser throttles the audio context.
           if ((isEngPlaying || isStorePlaying) && !isSeekActive(deckId)) {
-            const pos = deck.audioPlayer.getPosition();
+            // The HEARD position (DeckEngine.getHeardPosition): what the listener hears now, not where
+            // the player has rendered to. Every DJ visual reads this field.
+            const pos = deck.getHeardPosition();
             const dur = deck.audioPlayer.getDuration();
             const update: Record<string, unknown> = {
               audioPosition: pos,
@@ -77,9 +79,12 @@ export function useDeckStateSync(deckId: DeckId): void {
           if (replayer.isPlaying()) {
             // Coalesce all deck state into a single setDeckState call
             // to avoid multiple Immer writes per poll
+            // The HEARD row from the replayer's display ring (scheduled rows run up to the lookahead
+            // ahead of the ear); the replayer's own counters only when the ring has nothing yet.
+            const heard = deck.getHeardTrackerState();
             const deckUpdate: Record<string, unknown> = {
-              songPos: replayer.getSongPos(),
-              pattPos: replayer.getPattPos(),
+              songPos: heard ? heard.songPos : replayer.getSongPos(),
+              pattPos: heard ? heard.pattPos : replayer.getPattPos(),
             };
 
             if (deck.isPatternActive()) {
@@ -91,7 +96,7 @@ export function useDeckStateSync(deckId: DeckId): void {
               if (faderGain !== prevF) deckUpdate.scratchFaderGain = faderGain;
             } else {
               const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
-              deckUpdate.elapsedMs = replayer.getElapsedMs();
+              deckUpdate.elapsedMs = heard?.elapsedMs ?? replayer.getElapsedMs();
               deckUpdate.effectiveBPM = liveBPM;
               // Relay BPM changes to ScratchPlayback for LFO resync
               try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
