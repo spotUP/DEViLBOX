@@ -269,7 +269,11 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
           s2.setCurrentPattern(e.p);
           // A typed note takes the instrument in use: the one of the note above it.
           const above = s2.patterns[0].channels[e.ch].rows[e.r - 1];
-          s2.setCell(e.ch, e.r, { note: any, ...(above.note > 0 && above.instrument > 0 ? { instrument: above.instrument } : {}) });
+          if (key === 'hvl') {
+            // Hively's edit authority is its native track pool: a keystroke goes through hivelyEdit, never setCell (G5).
+            const { editHivelyCell } = await import('@/components/hively/hivelyEdit');
+            editHivelyCell(e.p, e.ch, e.r, 'note', any);
+          } else s2.setCell(e.ch, e.r, { note: any, ...(above.note > 0 && above.instrument > 0 ? { instrument: above.instrument } : {}) });
           await settle();
           const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
           const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
