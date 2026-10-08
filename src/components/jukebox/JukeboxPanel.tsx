@@ -52,6 +52,9 @@ interface IndexEntry {
    *  fetches one from Modland on demand. 121 of the registry's formats are in
    *  this state, and a list that simply omitted them would hide the gap. */
   fromModland?: boolean;
+  /** A single corpus file found by name. `id` stays the format row's id, so a
+   *  report lands on that row; `uid` tells this row from the format row. */
+  uid?: string;
 }
 
 interface SongIndex {
@@ -64,6 +67,8 @@ interface SongIndex {
 
 const ROW_HEIGHT = 20;
 const PAGE = 12;
+/** Songs found by file name shown at most; a one-letter filter would match thousands. */
+const MAX_FILE_ROWS = 200;
 
 export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [index, setIndex] = useState<SongIndex | null>(null);
@@ -111,6 +116,16 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     return [...index.entries, ...gapRows];
   }, [index]);
 
+  /** Every corpus file [path, format row id], fetched when a filter is first typed. */
+  const [fileIndex, setFileIndex] = useState<Array<[string, string | null]> | null>(null);
+  useEffect(() => {
+    if (!filter.trim() || fileIndex) return;
+    void fetch('/data/songs/files.json')
+      .then((r) => r.json())
+      .then((j: { files: Array<[string, string | null]> }) => setFileIndex(j.files))
+      .catch(() => setStatus('no file index — run: npx tsx --tsconfig tsconfig.app.json scripts/build-song-index.ts'));
+  }, [filter, fileIndex]);
+
   const rows = useMemo(() => {
     if (!index) return [];
     const q = filter.trim().toLowerCase();
@@ -118,11 +133,32 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     // Every term must appear somewhere in the row — "fur nes" finds the
     // Furnace NES row without caring about order.
     const terms = q.split(/\s+/);
-    return allEntries.filter((e) => {
+    const formatRows = allEntries.filter((e) => {
       const hay = `${e.label} ${e.formatKey ?? ''}`.toLowerCase();
       return terms.every((t) => hay.includes(t));
     });
-  }, [index, allEntries, filter]);
+    // Songs found by file name follow the format rows. The list is one row per
+    // format, so a song that is not its format's chosen one is reachable only
+    // this way.
+    const byId = new Map(allEntries.map((e) => [e.id, e]));
+    const fileRows: IndexEntry[] = [];
+    for (const [path, rowId] of fileIndex ?? []) {
+      const name = path.slice('/data/songs/'.length).toLowerCase();
+      if (!terms.every((t) => name.includes(t))) continue;
+      const owner = rowId ? byId.get(rowId) : undefined;
+      fileRows.push({
+        id: owner?.id ?? `file-${path}`,
+        uid: `file:${path}`,
+        label: path.slice('/data/songs/'.length),
+        formatKey: owner?.formatKey ?? null,
+        files: [path],
+        total: 1,
+        dir: owner?.dir ?? '',
+      });
+      if (fileRows.length >= MAX_FILE_ROWS) break;
+    }
+    return [...formatRows, ...fileRows];
+  }, [index, allEntries, filter, fileIndex]);
 
   const row = rows[Math.min(selected, rows.length - 1)];
   /** The Modland song a gap row last fetched, by row id - what its report names. */
@@ -224,7 +260,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     // wrong match is visible rather than silently judged.
     if (row.fromModland) {
       setStatus(`searching Modland for ${row.label.replace('  (Modland)', '')}…`);
-      setPlayingId(row.id);
+      setPlayingId(row.uid ?? row.id);
       try {
         const term = row.label.replace('  (Modland)', '').trim();
         const res = await searchModland({ q: term, limit: 1 });
@@ -245,7 +281,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     if (!file) return;
     const name = file.split('/').pop() ?? 'song';
     setStatus(`playing ${name}`);
-    setPlayingId(row.id);
+    setPlayingId(row.uid ?? row.id);
     try {
       const blob = cache.current.get(file) ?? await (await fetch(file)).blob();
       cache.current.set(file, blob);
@@ -435,13 +471,13 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           const verdict = judged[e.id];
           return (
             <div
-              key={e.id}
+              key={e.uid ?? e.id}
               data-selected={isSel}
               onClick={() => { setSelected(i); setTake(0); }}
               onDoubleClick={() => void play()}
               style={{ height: ROW_HEIGHT }}
               className={`px-2 flex items-center gap-2 cursor-pointer border-l-2 ${
-                playingId === e.id
+                playingId === (e.uid ?? e.id)
                   ? 'border-accent-primary bg-accent-primary/15 text-accent-primary'
                   : isSel ? 'border-transparent bg-dark-bgActive text-text-primary' : 'border-transparent text-text-secondary hover:bg-dark-bgHover'
               }`}
@@ -456,7 +492,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                   Visualizer
                 </span>
               )}
-              {playingId === e.id && <Play size={10} className="shrink-0 text-accent-primary" aria-label="Playing" />}
+              {playingId === (e.uid ?? e.id) && <Play size={10} className="shrink-0 text-accent-primary" aria-label="Playing" />}
               {verdict && (
                 <span
                   className={`shrink-0 ${isGoodVerdict(verdict) ? 'text-accent-success' : 'text-accent-error'}`}
