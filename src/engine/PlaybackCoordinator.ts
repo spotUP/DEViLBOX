@@ -19,6 +19,8 @@
  * Display state for audio-synced UI updates (BassoonTracker pattern).
  * One entry per row dispatch, scheduled at the audio time the row becomes audible.
  */
+import { outputLatencySec } from './audioLatency';
+
 export interface DisplayState {
   time: number;      // Web Audio time when this state becomes active
   row: number;       // Pattern row
@@ -348,8 +350,7 @@ export class PlaybackCoordinator {
     const patternNum = this.resolvePatternForPosition(position);
     let time: number;
     if (audioTime != null && ctx.audioContext) {
-      const latency = ctx.audioContext.outputLatency ?? ctx.audioContext.baseLatency ?? 0;
-      time = audioTime + latency;
+      time = audioTime + outputLatencySec(ctx.audioContext);
     } else if (ctx.audioContext) {
       time = ctx.audioContext.currentTime;
     } else {
