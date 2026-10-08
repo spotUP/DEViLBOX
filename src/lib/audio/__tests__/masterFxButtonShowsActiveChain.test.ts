@@ -12,9 +12,10 @@ describe('Master FX button', () => {
     const s = masterFxButtonState([{ type: 'EQ3', enabled: true }, { type: 'Chorus', enabled: true }, { type: 'Compressor', enabled: false }], false);
     expect(s.activeCount).toBe(2);
     expect(s.label).toBe('Master FX (2)');
-    // Active uses the standard "on" look: an accent fill, not the idle background.
-    expect(s.toneClass).toMatch(/bg-accent-primary\/20/);
-    expect(s.toneClass).not.toMatch(/bg-dark-bgSecondary/);
+    // Active keeps the idle background and turns the text to the accent colour.
+    expect(s.toneClass).toMatch(/bg-dark-bgSecondary/);
+    expect(s.toneClass).toMatch(/text-accent-primary/);
+    expect(s.toneClass).not.toMatch(/text-text-secondary/);
     expect(s.title).toMatch(/EQ3, Chorus/);
   });
 
