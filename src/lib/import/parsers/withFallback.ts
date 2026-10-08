@@ -19,6 +19,7 @@ import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 // too. The registry module is data only; importing it loads no engine.
 import { playsOnDedicatedEngine } from '@/engine/replayer/wasmEngineRegistry';
 import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
+import { levelSamplerForUade } from '@/lib/import/uadeKeyLevel';
 
 /** Common context passed through all fallback helpers */
 export interface FallbackContext {
@@ -51,7 +52,7 @@ const NATIVE_AUDITION_SYNTHS = new Set([
   'DavidWhittakerSynth', 'StartrekkerAMSynth', 'DigMugSynth', 'SonicArrangerSynth',
   'DeltaMusic1Synth', 'DeltaMusic2Synth', 'InStereo1Synth', 'InStereo2Synth',
   // K7: Rob Hubbard plays through UADE (injectUADE), so the clobber below made every instrument a
-  // UADEEditableSynth whose key plays nothing; the keyboard voice is the replayer's own (robhubbard_synth.c).
+  // UADEEditableSynth whose key plays nothing; the keyboard voice is the replayer own voice (robhubbard_synth.c).
   'RobHubbardSynth',
 ]);
 
@@ -227,6 +228,13 @@ export async function withNativeThenUADE(
               // still plays through UADE via uadeEditableFileData (suppressNotes),
               // but auditioning the instrument plays THAT voice, not the module.
               if (NATIVE_AUDITION_SYNTHS.has(inst.synthType)) continue;
+              // A Sampler the native parser filled with the file's own PCM keeps its voice: the song still plays
+              // through UADE, but a key on the instrument plays that sample (period playback), where a
+              // UADEEditableSynth key plays nothing (K8: Richard Joseph .sng/.ins held 24 such instruments).
+              if (inst.synthType === 'Sampler' && ((inst.sample?.audioBuffer?.byteLength ?? 0) > 0 || !!inst.sample?.url)) {
+                levelSamplerForUade(inst);
+                continue;
+              }
               inst.synthType = 'UADEEditableSynth';
             }
           }
