@@ -14,6 +14,7 @@ import { ImportFurnaceDialog } from '@components/dialogs/ImportFurnaceDialog';
 import { ImportMIDIDialog } from '@components/dialogs/ImportMIDIDialog';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { openSong } from '@/lib/song/openSong';
+import { reportLoadFailure } from '@/lib/song/reportLoadFailure';
 import { useImportRequestStore, answerImportRequest } from '@/lib/song/importRequest';
 import { notify } from '@stores/useNotificationStore';
 
@@ -45,7 +46,7 @@ export const ImportDialogHost: React.FC<ImportDialogHostProps> = ({ open, onClos
       { origin: 'dialog', subsong: options.subsong, useLibopenmpt: options.useLibopenmpt, midiOptions: options.midiOptions },
     );
     // A toast the user can select and copy from, kept until closed (duration 0).
-    if (!result.ok && !result.cancelled) notify.error(`Load failed - ${file.name}: ${result.error}`, 0);
+    if (!result.ok && !result.cancelled) reportLoadFailure(`${file.name}: ${result.error}`);
   }, []);
 
   if (/\.(fur|dmf)$/i.test(fileName)) {
