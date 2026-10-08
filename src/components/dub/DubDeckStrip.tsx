@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { notify } from '@stores/useNotificationStore';
 import { useHoverTooltip } from '@/components/ui';
 import { useDubStore } from '@/stores/useDubStore';
+import { setAutoDubPower, setDubBusPower } from '@/lib/dub/dubPower';
 import { anySendAudible } from '@/lib/dub/sendAudibility';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
@@ -288,7 +289,6 @@ export const DubDeckStrip: React.FC = () => {
   const setQuantize = useDubStore(s => s.setQuantize);
 
   const autoDubEnabled = useDubStore(s => s.autoDubEnabled);
-  const setAutoDubEnabled = useDubStore(s => s.setAutoDubEnabled);
   const autoDubPersona = useDubStore(s => s.autoDubPersona);
   const setAutoDubPersona = useDubStore(s => s.setAutoDubPersona);
   const setAutoDubIntensity = useDubStore(s => s.setAutoDubIntensity);
@@ -959,11 +959,8 @@ export const DubDeckStrip: React.FC = () => {
   // AutoDub toggle — enables/disables autonomous performer. Bus auto-enables.
   // Preserve characterPreset when enabling so the preset dropdown doesn't flip to Custom.
   const handleAutoDubToggle = useCallback(() => {
-    if (!autoDubEnabled && !busEnabled) {
-      setDubBus({ enabled: true, characterPreset: dubBusSettings.characterPreset });
-    }
-    setAutoDubEnabled(!autoDubEnabled);
-  }, [autoDubEnabled, busEnabled, setDubBus, setAutoDubEnabled, dubBusSettings.characterPreset]);
+    setAutoDubPower(!autoDubEnabled);
+  }, [autoDubEnabled]);
 
   // Audition the current style — applies channel sends (deferred from applyStyle to avoid
   // immediately triggering comb sweeps) THEN fires the signature move once.
@@ -1890,14 +1887,7 @@ export const DubDeckStrip: React.FC = () => {
               ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
-          onClick={() => {
-            const next = !busEnabled;
-            // A performer with no bus is not a performer. Leaving AutoDub
-            // running here is what let it go on muting channels after the bus
-            // was switched off, and its own toggle was disabled at the time.
-            if (!next && autoDubEnabled) setAutoDubEnabled(false);
-            setDubBus({ enabled: next });
-          }}
+          onClick={() => setDubBusPower(!busEnabled)}
           title={busEnabled ? 'Dub Bus ON — click to disable' : 'Dub Bus OFF — click to enable'}
         >
           Bus {busEnabled ? 'ON' : 'OFF'}
