@@ -10,7 +10,7 @@ status: draft
 Plan: `thoughts/shared/plans/2026-10-08-auto-dj-world-class-plan.md`.
 Research (how it works today): `thoughts/shared/research/2026-10-08_auto-dj-how-it-works.md`.
 
-**Count: 471 of 760 done, 25 owner checks, 0 open questions** (world-class plan 558 items + beat-juggling plan JUG- 197 + found during the run)
+**Count: 657 of 737 done, 27 owner checks, 0 open questions** (regenerated with grep over the checkbox lines, which is the canonical count; the earlier 760 added the owner-check and found items by hand; world-class plan + beat-juggling plan JUG- 197 + found items) (world-class plan 558 items + beat-juggling plan JUG- 197 + found during the run)
 
 Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` open owner question (built around, decision needed). An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll / triggerTransition, the DJ analysis worker path, or the DJ view) and proves the code ran.
 
@@ -795,203 +795,203 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 Decision D11: the juggle layer performs through the same DjFxActions / crossfader actions the DJ view's buttons use, phrase-locked to the DJTrackAnalysis beat grid (one clock: the deck positions), call and response material from the Dub Deck's channel-role sources (resolveSongChannelRoles / SongRoleTimeline). Files: src/engine/dj/autodj/juggle/*.
 
-- [ ] JUG-S1.1 intelligence above the existing primitives; no second DJ engine
-- [ ] JUG-S2.1 one musical clock (the deck positions and beat grids); no second transport/beat/bar clock, no per-deck ms timers
-- [ ] JUG-S2.2 juggle engine works in musical units (beat, half-beat, bar, 2/4/8 bars, phrase, section)
-- [ ] JUG-S2.3 every action resolves to an absolute musical execution point (executeAtBeat)
-- [ ] JUG-S3.1 DJJuggleController
-- [ ] JUG-S3.2 DJJugglePlanner
-- [ ] JUG-S3.3 DJJuggleExecutor
-- [ ] JUG-S3.4 DJJuggleTypes
-- [ ] JUG-S3.5 DJJugglePatterns
-- [ ] JUG-S3.6 DJJugglePerformanceContext
-- [ ] JUG-S4.1 DJJugglePerformanceContext { masterBeat, masterBar, phrasePosition, deckA, deckB, activeDeck, performanceMode, energy, targetEnergy, phraseConfidence, beatConfidence, currentSection, nextSection, lastJuggle, recentPatterns, intensity, tension, fallbackAvailable }
-- [ ] JUG-S4.2 DJDeckPerformanceState { trackId, position, beatPhase, barPhase, bpm, key, section, cuePosition, mixInPosition, mixOutPosition, energy, drumsActive, bassActive, vocalsActive, melodicActivity, loop, analysisConfidence }
-- [ ] JUG-S4.3 reuses DJTrackAnalysis / DJPerformanceContext, no duplicate analysis model
-- [ ] JUG-S5.1 JuggleDeckRole: PRIMARY, SECONDARY, VOICE, RESPONSE, FOUNDATION, FILL, LAYER, SILENT
-- [ ] JUG-S5.2 roles are temporary performance states, change through a juggle
-- [ ] JUG-S6.1 action vocabulary: CutIn, CutOut, CrossfadeTo, CrossfadeFrom, TriggerCue, JumpToBeat, JumpToBar, StartLoop, ExitLoop, LoopResize, LoopRoll, HoldDeck, ReleaseDeck, FilterIn, FilterOut, EQCut, EQRestore, BassSwap, EchoThrow, ReverbThrow, ResetDeck, ResyncDeck
-- [ ] JUG-S6.2 action fields: type, deck (A|B|BOTH), executeAtBeat, durationBeats, targetPosition, quantization, strength, reason
-- [ ] JUG-S6.3 vocabulary stays small; intelligence in the planner
-- [ ] JUG-S7.1 DJJugglePattern { id, type, durationBars, intensity, actions, sourceDeck, targetDeck, energyProfile, confidence, reason }
-- [ ] JUG-S7.2 reasons in patterns (A-B-A-B, A-A-B-B, A-fill-B-fill, A-drums-B-lead, A-bass-B-drums, A-loop-B-hit, A-full-B-stab), not isolated cuts
-- [ ] JUG-S8.1 grammar phase SETUP
-- [ ] JUG-S8.2 grammar phase ESTABLISH
-- [ ] JUG-S8.3 grammar phase INTENSIFY
-- [ ] JUG-S8.4 grammar phase PEAK
-- [ ] JUG-S8.5 grammar phase PAYOFF
-- [ ] JUG-S8.6 grammar phase RELEASE
-- [ ] JUG-S8.7 never a permanent A B A B
-- [ ] JUG-S9.1 phrase trade 8 bars
-- [ ] JUG-S9.2 phrase trade 4 bars
-- [ ] JUG-S9.3 phrase trade 2 bars
-- [ ] JUG-S9.4 phrase trade 1 bar
-- [ ] JUG-S9.5 phrase trade half bar (optional)
-- [ ] JUG-S9.6 only tightens when musical confidence is high
-- [ ] JUG-S9.7 respects beat grid, bar grid, phrase boundaries, section boundaries, energy, drum activity, bass activity, musical role
-- [ ] JUG-S9.8 never switches mid vocal phrase on a timer
-- [ ] JUG-S10.1 beat-level patterns represented explicitly (ABAB, AABA, ABBA, A-B-, AB-B / AB-A)
-- [ ] JUG-S11.1 call and response: one deck asks, the other answers
-- [ ] JUG-S11.2 response targets: drum fill, percussion hit, bass phrase, vocal phrase, synth stab, lead phrase, chord hit, rhythmic loop, tracker pattern segment
-- [ ] JUG-S12.1 tracker-native call/response from time-varying channel segments (Dub Deck identity sources)
-- [ ] JUG-S13.1 material window features: drum, bass, percussion density, melodic, vocal, harmonic, spectral density, energy, rhythmic density, importance, confidence
-- [ ] JUG-S13.2 moment classes: DRUM_FILL, BASS_HIT, VOCAL_HIT, LEAD_HIT, PERCUSSION_HIT, FULL_GROOVE, BREAK, DROP, BUILD, SILENCE
-- [ ] JUG-S14.1 drum/bass trading pattern with A+B payoff
-- [ ] JUG-S14.2 bass ownership per moment during a juggle
-- [ ] JUG-S14.3 ownership change = intentional handover, no low-end collision, EQ when needed, clean restore
-- [ ] JUG-S15.1 same-track doubles: same source on both decks, independent positions
-- [ ] JUG-S16.1 double alignment: reliable beat, align both, bar phase, optional offset, verify, then permit
-- [ ] JUG-S16.2 offsets: 1 beat, 2 beats, 1 bar, 2 bars, 4 bars
-- [ ] JUG-S16.3 no arbitrary offsets at low beat confidence
-- [ ] JUG-S17.1 straight double
-- [ ] JUG-S17.2 offset double
-- [ ] JUG-S17.3 one-bar double
-- [ ] JUG-S17.4 fill double
-- [ ] JUG-S17.5 drop double
-- [ ] JUG-S17.6 escalating double 8 -> 4 -> 2 -> 1 -> beat
-- [ ] JUG-S18.1 loop juggling sizes 8, 4, 2, 1, 1/2, 1/4, 1/8 bar
-- [ ] JUG-S18.2 loop progression is musical (4 -> 2 -> 1 -> 1/2 -> 1/4 -> release), not arbitrary
-- [ ] JUG-S19.1 stutter/fill juggling around detected fills
-- [ ] JUG-S19.2 real musical fills preferred over arbitrary slices
-- [ ] JUG-S19.3 tracker pattern/channel/event fills as candidates
-- [ ] JUG-S20.1 transformer patterns: open/close, open/close/close, A-A-B-B, A-B-B-A, A-B-A-A
-- [ ] JUG-S20.2 transformer patterns are pattern objects; the executor moves the crossfader
-- [ ] JUG-S21.1 every pattern scheduled >= 1-2 beats ahead (1 bar+ for complex)
-- [ ] JUG-S21.2 the planner produces a future action queue executed against the shared clock
-- [ ] JUG-S22.1 timers only for safety/cleanup; musical actions originate from beat/bar/phrase/section
-- [ ] JUG-S23.1 intensity 0..1 ladder (0 normal, 0.25 phrase, 0.5 2-bar, 0.7 1-bar, 0.85 beat, 1.0 peak)
-- [ ] JUG-S23.2 intensity drives pattern density, cut frequency, loop size, FX density, alternation, phrase length, musical risk - not randomness
-- [ ] JUG-S24.1 performance budget from set position, energy, recent performance, compatibility, transition quality, audience proxy, confidence, previous duration
-- [ ] JUG-S24.2 normal mix between juggles; never constant juggling
-- [ ] JUG-S25.1 good conditions (strong beat confidence, phrase alignment, compatible sections, energy, rhythmic material, breakdown/build/drop, transition approaching, fill, repeated phrase, set needs energy, transition benefits)
-- [ ] JUG-S25.2 bad conditions (low confidence, unstable sync, incompatible keys, dense vocals both, unclear bass ownership, drift, dense section, similar recent juggle, incoming not prepared) block juggling
-- [ ] JUG-S26.1 transition kinds NORMAL_BLEND | JUGGLE_TRANSITION | PERFORMANCE_TRANSITION
-- [ ] JUG-S26.2 a juggle transition: outro -> 4-bar trade -> 2 -> 1 -> incoming drop -> release
-- [ ] JUG-S27.1 juggle inside a single track (same track both decks): double -> offset -> beat trade -> filter build -> release
-- [ ] JUG-S28.1 set-level arc: OPENING normal, BUILDING occasional trades, CRUISING short moments, PEAKING aggressive, PEAK doubles/beat juggling, RELEASE fewer cuts, RECOVERY normal, CLOSING controlled
-- [ ] JUG-S29.1 DJJuggleHistory { patternType, durationBars, intensity, sourceTracks, successScore, timestamp }
-- [ ] JUG-S29.2 no immediate repeat of the last pattern (A-B-A-B -> A-A-B-B or fill or normal)
-- [ ] JUG-S30.1 humanization allowed: tiny timing, pattern variation, phrase length, intensity, action order, response material
-- [ ] JUG-S30.2 humanization forbidden: off-beat errors, drifting phase, inconsistent bars, delayed cuts
-- [ ] JUG-S31.1 confidences: beat, phrase, section, deckSync, material
-- [ ] JUG-S31.2 policy: high -> beat juggling, moderate -> phrase trading only, low -> normal transition
-- [ ] JUG-S32.1 safety governor prevents: both decks silent, crossfader oscillation, excessive cut frequency, contradictory actions, conflicting loops, runaway FX, extreme tempo jumps, phase drift, stuck decks, infinite patterns
-- [ ] JUG-S33.1 emergency sequence: cancel pending, strongest deck, stable crossfader, essential EQ, exit loop, resync, continue, resume planning when confidence recovers
-- [ ] JUG-S34.1 no-silence invariant: at least one audible deck; BLOCK or FORCE SAFE DECK; continuously tested
-- [ ] JUG-S35.1 bass safety tracks current owner, next owner, overlap, energy, low-frequency conflict
-- [ ] JUG-S35.2 A bass / B drums, both only when compatible, else intentional handover
-- [ ] JUG-S36.1 vocal safety: no vocal + vocal unless intended; instrumental/response pairings preferred in material selection
-- [ ] JUG-S37.1 tracker access kept: orders, patterns, channels, instruments, samples, notes, effects, pattern boundaries, repeats, channel activity, instrument changes
-- [ ] JUG-S37.2 tracker facts drive selection (bass enters here, fill channel here, breakdown next order, no lead here)
-- [ ] JUG-S38.1 channel identity time-varying (timeline/segments), never channel N = role
-- [ ] JUG-S39.1 pattern phraseTrade
-- [ ] JUG-S39.2 pattern tightPhraseTrade
-- [ ] JUG-S39.3 pattern barTrade
-- [ ] JUG-S39.4 pattern beatTrade
-- [ ] JUG-S39.5 pattern doubleBeat
-- [ ] JUG-S39.6 pattern callResponse
-- [ ] JUG-S39.7 pattern drumBassTrade
-- [ ] JUG-S39.8 pattern fillTrade
-- [ ] JUG-S39.9 pattern loopTighten
-- [ ] JUG-S39.10 pattern double
-- [ ] JUG-S39.11 pattern transformer
-- [ ] JUG-S39.12 pattern dropAndReturn
-- [ ] JUG-S39.13 pattern escalatingJuggle
-- [ ] JUG-S40.1 pattern scoring: energyFit, phraseFit, sectionFit, rhythmicFit, bassFit, vocalFit, materialFit, confidence, novelty, repetition, risk, set position, budget, transition opportunity - never random
-- [ ] JUG-S41.1 plans a short performance phrase ahead (8 -> 4 -> 2 -> 1 -> beat -> payoff)
-- [ ] JUG-S41.2 revises the future when conditions change
-- [ ] JUG-S42.1 abort on: beat confidence drop, drift, material change, vocal collision, bass collision, analysis change, deck failure, user control, governor
-- [ ] JUG-S42.2 abort resolves gracefully (a release pattern), never stops dead
-- [ ] JUG-S43.1 manual override: crossfader, deck state, cue, FX, tempo, Auto DJ off -> yield, cancel/replan
-- [ ] JUG-S44.1 modes OFF, SAFE, MUSICAL, PERFORMER, AGGRESSIVE, CHAOS
-- [ ] JUG-S44.2 SAFE = 8/4-bar trading
-- [ ] JUG-S44.3 MUSICAL adds call-response, fills, doubles
-- [ ] JUG-S44.4 PERFORMER adds beat juggling, loops, transformer
-- [ ] JUG-S44.5 AGGRESSIVE: shorter cuts, higher density, more doubles
-- [ ] JUG-S44.6 CHAOS still obeys timing, safety, no-silence, boundaries
-- [ ] JUG-S45.1 telemetry: pattern, phase, intensity, per-deck material + confidence, next actions with beats, reason
-- [ ] JUG-S46.1 events with reasons: juggleStarted, jugglePatternSelected, juggleActionScheduled, juggleActionExecuted, juggleActionBlocked, juggleAborted, juggleCompleted, juggleFallback
-- [ ] JUG-S47.1 test: all actions land on intended beats
-- [ ] JUG-S47.2 test: no phrase trade begins off-grid
-- [ ] JUG-S47.3 test: at least one deck remains active
-- [ ] JUG-S47.4 test: crossfader never invalid
-- [ ] JUG-S47.5 test: double alignment within tolerance
-- [ ] JUG-S47.6 test: actions occur in pattern order
-- [ ] JUG-S47.7 test: unsafe conditions cancel safely
-- [ ] JUG-S47.8 test: recent pattern history affects selection
-- [ ] JUG-S48.1 scenario standard 4/4 -> phrase, bar, beat trading
-- [ ] JUG-S48.2 scenario sparse track -> less aggressive
-- [ ] JUG-S48.3 scenario vocal-heavy -> collision avoidance
-- [ ] JUG-S48.4 scenario bass-heavy -> ownership management
-- [ ] JUG-S48.5 scenario same-track double -> phase-aligned
-- [ ] JUG-S48.6 scenario low confidence -> normal transition
-- [ ] JUG-S48.7 scenario tracker song -> structure influences selection
-- [ ] JUG-S48.8 scenario user intervention -> yields
-- [ ] JUG-S48.9 scenario deck failure -> safe continuation
-- [ ] JUG-S48.10 scenario long set -> no runaway, no repetition, no corruption
-- [ ] JUG-S49.1 multi-hour simulated set: no leak, no accumulating timers, no stale actions, no stuck roles/loops, no latency growth, no exact repeats, no drift, no growing silence, no corrupt deck state
-- [ ] JUG-S50.1 performance memory learns successful pattern + pairing + context (deterministic scoring)
-- [ ] JUG-S51.1 do not overuse: optimise musical impact, not action count
-- [ ] JUG-S52.1 JuggleQualityScore: timing, compatibility, energy fit, material, bass clarity, vocal clarity, coherence, novelty, impact proxy, safety -> feeds memory
-- [ ] JUG-S53.1 integration: DJSessionController -> DJJuggleController -> planner -> executor; transition executor keeps ordinary transitions; shared deck/mixer state
-- [ ] JUG-PG-A.1 verify two-deck state, tempo sync, beat grid, crossfader, cue/playhead, transition executor, existing primitives (baseline regression green)
-- [ ] JUG-PG-B.1 both decks represented simultaneously (position, beat/bar phase, energy, section, activity, confidence) without a second transport
-- [ ] JUG-PG-C.1 deterministic test produces A B A B on exact musical beats through the executor
-- [ ] JUG-PG-D.1 complete 8 -> 4 -> 2 -> 1 phrase-trade sequence resolving into normal mixing
-- [ ] JUG-PG-E.1 beat-level patterns ABAB, AABB, ABBA, A-A-B-A phase-locked, no unintended silence
-- [ ] JUG-PG-F.1 call/response: drum, bass, percussion, lead, vocal-safe responses; explains the material; avoids incompatible overlaps
-- [ ] JUG-PG-G.1 doubles: same-track, offset, bar, beat, fill; phase-aligned without drift
-- [ ] JUG-PG-H.1 loops/fills/transformer/drop-release: normal -> loop -> tighten -> juggle -> release without state corruption
-- [ ] JUG-PG-I.1 adaptive engine chooses whether/which/material/duration/intensity; no "always every N bars"
-- [ ] JUG-PG-J.1 set integration (energy, transition planner, phrase/section, memory, cooldowns, set position): varied intentional moments in a long set
-- [ ] JUG-PG-K.1 safety: no-silence, bass, vocal, conflict prevention, emergency fallback, abort/replan; every unsafe test returns to stable playback
-- [ ] JUG-PG-L.1 humanization/memory: novelty, history, controlled variation, successful-pattern memory; repeated simulations not identical
-- [ ] JUG-PG-M.1 telemetry: mode, pattern, intensity, active deck, next actions, reason, confidence, safety state; user controls Auto Juggle, Mode, Intensity
-- [ ] JUG-PG-N.1 acceptance: two-deck relationship, 8/4/2/1 trading, tight ABAB, call/response, doubles, tracker intelligence, musical awareness, escalation, release, variety, safety, human quality (listening: owner)
-- [ ] JUG-S55.1 recognise both decks usable
-- [ ] JUG-S55.2 synchronise to one clock
-- [ ] JUG-S55.3 select material from each
-- [ ] JUG-S55.4 trade phrases
-- [ ] JUG-S55.5 trade bars
-- [ ] JUG-S55.6 trade beats
-- [ ] JUG-S55.7 call-and-response
-- [ ] JUG-S55.8 drum/bass exchanges
-- [ ] JUG-S55.9 doubles
-- [ ] JUG-S55.10 offset doubles
-- [ ] JUG-S55.11 manipulate loops
-- [ ] JUG-S55.12 use fills
-- [ ] JUG-S55.13 rhythmic crossfader patterns
-- [ ] JUG-S55.14 escalate intensity
-- [ ] JUG-S55.15 resolve into a payoff
-- [ ] JUG-S55.16 return to normal mixing
-- [ ] JUG-S55.17 avoid vocal collisions
-- [ ] JUG-S55.18 manage bass ownership
-- [ ] JUG-S55.19 exploit tracker structure
-- [ ] JUG-S55.20 respect time-varying channel identity
-- [ ] JUG-S55.21 avoid repeating the same trick
-- [ ] JUG-S55.22 yield to the user
-- [ ] JUG-S55.23 survive low confidence
-- [ ] JUG-S55.24 recover from failures
-- [ ] JUG-S55.25 stable playback for long sessions
-- [ ] JUG-S56.1 no second transport
-- [ ] JUG-S56.2 no second musical clock
-- [ ] JUG-S56.3 no second deck system
-- [ ] JUG-S56.4 no bypass of mixer/deck primitives
-- [ ] JUG-S56.5 not all in DJAutoDJ.ts
-- [ ] JUG-S56.6 no ms timers for musical timing
-- [ ] JUG-S56.7 no permanent channel roles
-- [ ] JUG-S56.8 no 4/4 assumption without the meter
-- [ ] JUG-S56.9 no identical-phrase assumption
-- [ ] JUG-S56.10 incoming material not always at 0:00
-- [ ] JUG-S56.11 not always the same pattern
-- [ ] JUG-S56.12 no constant juggling
-- [ ] JUG-S56.13 no random cuts
-- [ ] JUG-S56.14 no two bass-heavy decks without ownership
-- [ ] JUG-S56.15 no two active vocals without intent
-- [ ] JUG-S56.16 decks never both disappear
-- [ ] JUG-S56.17 creative never overrides safety
-- [ ] JUG-S56.18 low confidence is not permission to improvise
-- [ ] JUG-S56.19 no needless rebuild of analysis/deck infrastructure
+- [x] JUG-S1.1 intelligence above the existing primitives; no second DJ engine -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S2.1 one musical clock (the deck positions and beat grids); no second transport/beat/bar clock, no per-deck ms timers -> 0edb37304; the executor clock is the deck position through fractionalBeatAt (analysisClock); the 15 ms timer only samples it (autoDJBeatJuggling.test.ts JUG-PG-C exact beats)
+- [x] JUG-S2.2 juggle engine works in musical units (beat, half-beat, bar, 2/4/8 bars, phrase, section) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S2.3 every action resolves to an absolute musical execution point (executeAtBeat) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S3.1 DJJuggleController -> 0edb37304; autoDJJuggleReachesTheDecks.test.ts
+- [x] JUG-S3.2 DJJugglePlanner -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S3.3 DJJuggleExecutor -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S3.4 DJJuggleTypes -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S3.5 DJJugglePatterns -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S3.6 DJJugglePerformanceContext -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S4.1 DJJugglePerformanceContext { masterBeat, masterBar, phrasePosition, deckA, deckB, activeDeck, performanceMode, energy, targetEnergy, phraseConfidence, beatConfidence, currentSection, nextSection, lastJuggle, recentPatterns, intensity, tension, fallbackAvailable } -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S4.2 DJDeckPerformanceState { trackId, position, beatPhase, barPhase, bpm, key, section, cuePosition, mixInPosition, mixOutPosition, energy, drumsActive, bassActive, vocalsActive, melodicActivity, loop, analysisConfidence } -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S4.3 reuses DJTrackAnalysis / DJPerformanceContext, no duplicate analysis model -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S5.1 JuggleDeckRole: PRIMARY, SECONDARY, VOICE, RESPONSE, FOUNDATION, FILL, LAYER, SILENT -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S5.2 roles are temporary performance states, change through a juggle -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S6.1 action vocabulary: CutIn, CutOut, CrossfadeTo, CrossfadeFrom, TriggerCue, JumpToBeat, JumpToBar, StartLoop, ExitLoop, LoopResize, LoopRoll, HoldDeck, ReleaseDeck, FilterIn, FilterOut, EQCut, EQRestore, BassSwap, EchoThrow, ReverbThrow, ResetDeck, ResyncDeck -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S6.2 action fields: type, deck (A|B|BOTH), executeAtBeat, durationBeats, targetPosition, quantization, strength, reason -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S6.3 vocabulary stays small; intelligence in the planner -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S7.1 DJJugglePattern { id, type, durationBars, intensity, actions, sourceDeck, targetDeck, energyProfile, confidence, reason } -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S7.2 reasons in patterns (A-B-A-B, A-A-B-B, A-fill-B-fill, A-drums-B-lead, A-bass-B-drums, A-loop-B-hit, A-full-B-stab), not isolated cuts -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S8.1 grammar phase SETUP -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S8.2 grammar phase ESTABLISH -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S8.3 grammar phase INTENSIFY -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S8.4 grammar phase PEAK -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S8.5 grammar phase PAYOFF -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S8.6 grammar phase RELEASE -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S8.7 never a permanent A B A B -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S9.1 phrase trade 8 bars -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S9.2 phrase trade 4 bars -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S9.3 phrase trade 2 bars -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S9.4 phrase trade 1 bar -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S9.5 phrase trade half bar (optional) -> 0edb37304; exempt: half-bar trades are optional in the plan; the transformer pattern carries the half-beat gates (autoDJBeatJuggling.test.ts JUG-S20)
+- [x] JUG-S9.6 only tightens when musical confidence is high -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S9.7 respects beat grid, bar grid, phrase boundaries, section boundaries, energy, drum activity, bass activity, musical role -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S9.8 never switches mid vocal phrase on a timer -> 0edb37304; autoDJBeatJuggling.test.ts
+- [ ] JUG-S10.1 beat-level patterns represented explicitly (ABAB, AABA, ABBA, A-B-, AB-B / AB-A) -> open: ABAB (beatTrade), AABB (doubleBeat) and the transformer gates exist; AABA, ABBA, A-B- are not explicit patterns yet
+- [x] JUG-S11.1 call and response: one deck asks, the other answers -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S11.2 response targets: drum fill, percussion hit, bass phrase, vocal phrase, synth stab, lead phrase, chord hit, rhythmic loop, tracker pattern segment -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S12.1 tracker-native call/response from time-varying channel segments (Dub Deck identity sources) -> 0edb37304; autoDJBeatJuggling.test.ts JUG-S12 (tracker windows from resolveSongChannelRoles / SongRoleTimeline segments via trackerMixAnalysis; source = tracker)
+- [x] JUG-S13.1 material window features: drum, bass, percussion density, melodic, vocal, harmonic, spectral density, energy, rhythmic density, importance, confidence -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S13.2 moment classes: DRUM_FILL, BASS_HIT, VOCAL_HIT, LEAD_HIT, PERCUSSION_HIT, FULL_GROOVE, BREAK, DROP, BUILD, SILENCE -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S14.1 drum/bass trading pattern with A+B payoff -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S14.2 bass ownership per moment during a juggle -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S14.3 ownership change = intentional handover, no low-end collision, EQ when needed, clean restore -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S15.1 same-track doubles: same source on both decks, independent positions -> 0edb37304; double pattern + ResyncDeck through DJAutoSync (same source on both decks, independent positions; loading the double is manual, see JUG-S27.1)
+- [x] JUG-S16.1 double alignment: reliable beat, align both, bar phase, optional offset, verify, then permit -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S16.2 offsets: 1 beat, 2 beats, 1 bar, 2 bars, 4 bars -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S16.3 no arbitrary offsets at low beat confidence -> 0edb37304; autoDJBeatJuggling.test.ts
+- [ ] JUG-S17.1 straight double -> open: the double pattern always trades with an offset; a straight (zero-offset) double is not a separate pattern
+- [x] JUG-S17.2 offset double -> 0edb37304; autoDJBeatJuggling.test.ts
+- [ ] JUG-S17.3 one-bar double -> open: one-bar double not a separate pattern (the double pattern trades bars then beats)
+- [ ] JUG-S17.4 fill double -> open: fill double not implemented (fills are traded against the other track in fillTrade)
+- [ ] JUG-S17.5 drop double -> open: drop double not implemented
+- [x] JUG-S17.6 escalating double 8 -> 4 -> 2 -> 1 -> beat -> 0edb37304; autoDJBeatJuggling.test.ts
+- [ ] JUG-S18.1 loop juggling sizes 8, 4, 2, 1, 1/2, 1/4, 1/8 bar -> open: loop ladder is 4 -> 2 -> 1 -> 1/2 -> 1/4 bars (loopTighten); 8 bars and 1/8 bar missing
+- [x] JUG-S18.2 loop progression is musical (4 -> 2 -> 1 -> 1/2 -> 1/4 -> release), not arbitrary -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S19.1 stutter/fill juggling around detected fills -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S19.2 real musical fills preferred over arbitrary slices -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S19.3 tracker pattern/channel/event fills as candidates -> 0edb37304; autoDJBeatJuggling.test.ts
+- [ ] JUG-S20.1 transformer patterns: open/close, open/close/close, A-A-B-B, A-B-B-A, A-B-A-A -> open: transformer is open/close half-beat gates; open/close/close, A-A-B-B, A-B-B-A, A-B-A-A gate shapes not yet patterns
+- [x] JUG-S20.2 transformer patterns are pattern objects; the executor moves the crossfader -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S21.1 every pattern scheduled >= 1-2 beats ahead (1 bar+ for complex) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S21.2 the planner produces a future action queue executed against the shared clock -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S22.1 timers only for safety/cleanup; musical actions originate from beat/bar/phrase/section -> 0edb37304; only the watchdog and the sampling interval are timers; every action has executeAtBeat (autoDJBeatJuggling.test.ts JUG-S32 watchdog)
+- [x] JUG-S23.1 intensity 0..1 ladder (0 normal, 0.25 phrase, 0.5 2-bar, 0.7 1-bar, 0.85 beat, 1.0 peak) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S23.2 intensity drives pattern density, cut frequency, loop size, FX density, alternation, phrase length, musical risk - not randomness -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S24.1 performance budget from set position, energy, recent performance, compatibility, transition quality, audience proxy, confidence, previous duration -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S24.2 normal mix between juggles; never constant juggling -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S25.1 good conditions (strong beat confidence, phrase alignment, compatible sections, energy, rhythmic material, breakdown/build/drop, transition approaching, fill, repeated phrase, set needs energy, transition benefits) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S25.2 bad conditions (low confidence, unstable sync, incompatible keys, dense vocals both, unclear bass ownership, drift, dense section, similar recent juggle, incoming not prepared) block juggling -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S26.1 transition kinds NORMAL_BLEND | JUGGLE_TRANSITION | PERFORMANCE_TRANSITION -> 0edb37304; autoDJBeatJuggling.test.ts
+- [ ] JUG-S26.2 a juggle transition: outro -> 4-bar trade -> 2 -> 1 -> incoming drop -> release -> open: the JUGGLE_TRANSITION prelude is wired (DJAutoDJ.maybeStartJugglePrelude starts the incoming deck 8 bars early, muted, grid-locked; the controller trades into the mix-in) but has no reachability test through the pre-rendered path yet
+- [ ] JUG-S27.1 juggle inside a single track (same track both decks): double -> offset -> beat trade -> filter build -> release -> open: a single-track juggle needs the current track loaded onto the idle deck (loadDouble); doubles run only when both decks hold the same track already
+- [x] JUG-S28.1 set-level arc: OPENING normal, BUILDING occasional trades, CRUISING short moments, PEAKING aggressive, PEAK doubles/beat juggling, RELEASE fewer cuts, RECOVERY normal, CLOSING controlled -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S29.1 DJJuggleHistory { patternType, durationBars, intensity, sourceTracks, successScore, timestamp } -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S29.2 no immediate repeat of the last pattern (A-B-A-B -> A-A-B-B or fill or normal) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S30.1 humanization allowed: tiny timing, pattern variation, phrase length, intensity, action order, response material -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S30.2 humanization forbidden: off-beat errors, drifting phase, inconsistent bars, delayed cuts -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S31.1 confidences: beat, phrase, section, deckSync, material -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S31.2 policy: high -> beat juggling, moderate -> phrase trading only, low -> normal transition -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S32.1 safety governor prevents: both decks silent, crossfader oscillation, excessive cut frequency, contradictory actions, conflicting loops, runaway FX, extreme tempo jumps, phase drift, stuck decks, infinite patterns -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S33.1 emergency sequence: cancel pending, strongest deck, stable crossfader, essential EQ, exit loop, resync, continue, resume planning when confidence recovers -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S34.1 no-silence invariant: at least one audible deck; BLOCK or FORCE SAFE DECK; continuously tested -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S35.1 bass safety tracks current owner, next owner, overlap, energy, low-frequency conflict -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S35.2 A bass / B drums, both only when compatible, else intentional handover -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S36.1 vocal safety: no vocal + vocal unless intended; instrumental/response pairings preferred in material selection -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S37.1 tracker access kept: orders, patterns, channels, instruments, samples, notes, effects, pattern boundaries, repeats, channel activity, instrument changes -> 0edb37304; trackerMixAnalysis keeps orders/patterns/channels/instruments/events/repeats; juggleMaterial reads events + channelSegments (autoDJBeatJuggling.test.ts JUG-S12)
+- [x] JUG-S37.2 tracker facts drive selection (bass enters here, fill channel here, breakdown next order, no lead here) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S38.1 channel identity time-varying (timeline/segments), never channel N = role -> 0edb37304; trackerRolesIn reads time-varying channelSegments, never channel N = role (autoDJBeatJuggling.test.ts JUG-S12)
+- [x] JUG-S39.1 pattern phraseTrade -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.2 pattern tightPhraseTrade -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.3 pattern barTrade -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.4 pattern beatTrade -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.5 pattern doubleBeat -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.6 pattern callResponse -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.7 pattern drumBassTrade -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.8 pattern fillTrade -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.9 pattern loopTighten -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.10 pattern double -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.11 pattern transformer -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.12 pattern dropAndReturn -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S39.13 pattern escalatingJuggle -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S40.1 pattern scoring: energyFit, phraseFit, sectionFit, rhythmicFit, bassFit, vocalFit, materialFit, confidence, novelty, repetition, risk, set position, budget, transition opportunity - never random -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S41.1 plans a short performance phrase ahead (8 -> 4 -> 2 -> 1 -> beat -> payoff) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S41.2 revises the future when conditions change -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S42.1 abort on: beat confidence drop, drift, material change, vocal collision, bass collision, analysis change, deck failure, user control, governor -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S42.2 abort resolves gracefully (a release pattern), never stops dead -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S43.1 manual override: crossfader, deck state, cue, FX, tempo, Auto DJ off -> yield, cancel/replan -> 0edb37304; autoDJJuggleReachesTheDecks.test.ts
+- [x] JUG-S44.1 modes OFF, SAFE, MUSICAL, PERFORMER, AGGRESSIVE, CHAOS -> 0edb37304; autoDJJuggleReachesTheDecks.test.ts
+- [x] JUG-S44.2 SAFE = 8/4-bar trading -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S44.3 MUSICAL adds call-response, fills, doubles -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S44.4 PERFORMER adds beat juggling, loops, transformer -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S44.5 AGGRESSIVE: shorter cuts, higher density, more doubles -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S44.6 CHAOS still obeys timing, safety, no-silence, boundaries -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S45.1 telemetry: pattern, phase, intensity, per-deck material + confidence, next actions with beats, reason -> 0edb37304; autoDJJuggleReachesTheDecks.test.ts
+- [x] JUG-S46.1 events with reasons: juggleStarted, jugglePatternSelected, juggleActionScheduled, juggleActionExecuted, juggleActionBlocked, juggleAborted, juggleCompleted, juggleFallback -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S47.1 test: all actions land on intended beats -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S47.2 test: no phrase trade begins off-grid -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S47.3 test: at least one deck remains active -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S47.4 test: crossfader never invalid -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S47.5 test: double alignment within tolerance -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S47.6 test: actions occur in pattern order -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S47.7 test: unsafe conditions cancel safely -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S47.8 test: recent pattern history affects selection -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.1 scenario standard 4/4 -> phrase, bar, beat trading -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.2 scenario sparse track -> less aggressive -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.3 scenario vocal-heavy -> collision avoidance -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.4 scenario bass-heavy -> ownership management -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.5 scenario same-track double -> phase-aligned -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.6 scenario low confidence -> normal transition -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.7 scenario tracker song -> structure influences selection -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.8 scenario user intervention -> yields -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.9 scenario deck failure -> safe continuation -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S48.10 scenario long set -> no runaway, no repetition, no corruption -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S49.1 multi-hour simulated set: no leak, no accumulating timers, no stale actions, no stuck roles/loops, no latency growth, no exact repeats, no drift, no growing silence, no corrupt deck state -> 0edb37304; autoDJBeatJuggling.test.ts JUG-S48.10 / S49 (one simulated hour: pending timers <= 2, none left, no immediate repeats, no stuck loops, crossfader valid, budget < 60 %)
+- [x] JUG-S50.1 performance memory learns successful pattern + pairing + context (deterministic scoring) -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S51.1 do not overuse: optimise musical impact, not action count -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S52.1 JuggleQualityScore: timing, compatibility, energy fit, material, bass clarity, vocal clarity, coherence, novelty, impact proxy, safety -> feeds memory -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S53.1 integration: DJSessionController -> DJJuggleController -> planner -> executor; transition executor keeps ordinary transitions; shared deck/mixer state -> 0edb37304; DJAutoDJ.juggleTick -> DJJuggleController -> jugglePlanner -> juggleExecutor -> juggleDeckSink -> DJActions; the session controller supplies set phase/energy; the transition executor keeps transitions (autoDJJuggleReachesTheDecks.test.ts)
+- [x] JUG-PG-A.1 verify two-deck state, tempo sync, beat grid, crossfader, cue/playhead, transition executor, existing primitives (baseline regression green) -> 0edb37304; djViewRegressions 85/85, autoDJMixNow 3/3, autoDJFiresTheDjFxActions, autoDJPlannedTransition, autoDJLongSetSimulation, autoDJGoldenTransitions, loopEndRegression all green (121 tests) after the wiring
+- [x] JUG-PG-B.1 both decks represented simultaneously (position, beat/bar phase, energy, section, activity, confidence) without a second transport -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-PG-C.1 deterministic test produces A B A B on exact musical beats through the executor -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-PG-D.1 complete 8 -> 4 -> 2 -> 1 phrase-trade sequence resolving into normal mixing -> 0edb37304; autoDJBeatJuggling.test.ts
+- [ ] JUG-PG-E.1 beat-level patterns ABAB, AABB, ABBA, A-A-B-A phase-locked, no unintended silence -> open: ABAB, AABB, transformer gates and dropAndReturn phase-locked without silence (autoDJBeatJuggling.test.ts JUG-PG-E); ABBA and A-A-B-A missing (see JUG-S10.1)
+- [x] JUG-PG-F.1 call/response: drum, bass, percussion, lead, vocal-safe responses; explains the material; avoids incompatible overlaps -> 0edb37304; autoDJBeatJuggling.test.ts
+- [ ] JUG-PG-G.1 doubles: same-track, offset, bar, beat, fill; phase-aligned without drift -> open: same-track and offset doubles phase-aligned (autoDJBeatJuggling.test.ts JUG-PG-G); bar/beat/fill double variants missing (see JUG-S17.x)
+- [x] JUG-PG-H.1 loops/fills/transformer/drop-release: normal -> loop -> tighten -> juggle -> release without state corruption -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-PG-I.1 adaptive engine chooses whether/which/material/duration/intensity; no "always every N bars" -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-PG-J.1 set integration (energy, transition planner, phrase/section, memory, cooldowns, set position): varied intentional moments in a long set -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-PG-K.1 safety: no-silence, bass, vocal, conflict prevention, emergency fallback, abort/replan; every unsafe test returns to stable playback -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-PG-L.1 humanization/memory: novelty, history, controlled variation, successful-pattern memory; repeated simulations not identical -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-PG-M.1 telemetry: mode, pattern, intensity, active deck, next actions, reason, confidence, safety state; user controls Auto Juggle, Mode, Intensity -> 0edb37304; autoDJJuggleReachesTheDecks.test.ts (telemetry published from the poll loop) + autoDJDebugPanel.test.tsx JUG-PG-M (section rows) + DJAutoDJPanel Auto Juggle / Juggle Intensity selects
+- [ ] JUG-PG-N.1 acceptance: two-deck relationship, 8/4/2/1 trading, tight ABAB, call/response, doubles, tracker intelligence, musical awareness, escalation, release, variety, safety, human quality (listening: owner) -> Owner check 8 (listening: two-deck relationship, 8/4/2/1 trading, call/response, doubles, escalation, release, variety, human quality)
+- [x] JUG-S55.1 recognise both decks usable -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.2 synchronise to one clock -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.3 select material from each -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.4 trade phrases -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.5 trade bars -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.6 trade beats -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.7 call-and-response -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.8 drum/bass exchanges -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.9 doubles -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.10 offset doubles -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.11 manipulate loops -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.12 use fills -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.13 rhythmic crossfader patterns -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.14 escalate intensity -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.15 resolve into a payoff -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.16 return to normal mixing -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.17 avoid vocal collisions -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.18 manage bass ownership -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.19 exploit tracker structure -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.20 respect time-varying channel identity -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.21 avoid repeating the same trick -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.22 yield to the user -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.23 survive low confidence -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.24 recover from failures -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S55.25 stable playback for long sessions -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.1 no second transport -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.2 no second musical clock -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.3 no second deck system -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.4 no bypass of mixer/deck primitives -> 0edb37304; autoDJJuggleReachesTheDecks.test.ts
+- [x] JUG-S56.5 not all in DJAutoDJ.ts -> 0edb37304; autoDJJuggleReachesTheDecks.test.ts
+- [x] JUG-S56.6 no ms timers for musical timing -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.7 no permanent channel roles -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.8 no 4/4 assumption without the meter -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.9 no identical-phrase assumption -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.10 incoming material not always at 0:00 -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.11 not always the same pattern -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.12 no constant juggling -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.13 no random cuts -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.14 no two bass-heavy decks without ownership -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.15 no two active vocals without intent -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.16 decks never both disappear -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.17 creative never overrides safety -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.18 low confidence is not permission to improvise -> 0edb37304; autoDJBeatJuggling.test.ts
+- [x] JUG-S56.19 no needless rebuild of analysis/deck infrastructure -> 0edb37304; autoDJBeatJuggling.test.ts
 
 ## Found during the run (new items, never shrink the plan)
 
@@ -999,6 +999,8 @@ Decision D11: the juggle layer performs through the same DjFxActions / crossfade
 - [x] FIX-2 humanize hash was signed: a negative fxOffsetMs made beat-0 effects never fire -> 0f3d488c5; autoDJFiresTheDjFxActions.test.ts (brake case asserts offsets >= 0)
 - [x] FIX-3 executor emergency path could leave both decks silent when the incoming deck could not start -> 45187d1f3; autoDJLongSetSimulation.test.ts (deckFailure: outgoing kept playing)
 - [x] FIX-4 gain staging: the auto-gain trim could push a track's true peak above the ceiling -> 0f3d488c5; trimFor caps by headroom (golden corpus loudness invariant)
+- [x] DJ3 (from the fix-all ledger, owner live report 2026-10-08: "the visuals dont feel synced to the audio in dj view ... all visuals feel laggy") every DJ visual drew the deck's rendered position; outputLatency (28 ms) + baseLatency (5.3 ms) were read nowhere under the DJ code, and in tracker mode useDeckStateSync read the scheduler counters (up to 250 ms lookahead ahead of the ear) -> 4445519bf; src/engine/audioLatency.ts is the one latency source (PlaybackCoordinator engine path + the replayer's TS-scheduled rows queue heard times; DeckEngine.getHeardPosition / getHeardTrackerState feed useDeckStateSync, which every DJ visual reads); heardPositionIsAudioMinusLatency.test.ts (0 and +-8 % pitch, ring at heard time) + djVisualsReadTheHeardPosition.test.tsx (store position = audio position - latency x rate at 0 / +8 / -8 %; tracker row from the ring). Owner check 7.
+- [ ] FOUND-2 src/hooks/audio/__tests__/playheadFeedIsNotPerFormat.ratchet.test.ts fails on committed code ("useWasmPositionStore.getState().setPosition( is gone from usePatternPlayback"); usePatternPlayback.ts is clean in the working tree, so a landed commit by another agent removed the feed the ratchet guards - not touched by this run, reported to the coordinator
 - [ ] FOUND-1 DJStemPreloader module cycle: addTrack's dynamic import of the stem preloader throws "Cannot access MAX_DURATION_S before initialization" under the Auto DJ test import order (foreign module, not fixed here; the test injects its playlist with importPlaylists)
 
 ## Owner checks (steps at http://localhost:5174, LOCAL dev server on the working tree)
@@ -1008,6 +1010,8 @@ Decision D11: the juggle layer performs through the same DjFxActions / crossfade
 3. Press Mix Now mid-track. PASS: the mix starts within a second; if the next track fails to load, the one after it plays (status never stays "preloading").
 4. Press the deck's Echo pad on the playing deck. PASS: the echo tail keeps ringing after the dry signal fades (real echo), the pad lights, and dj_auto_dj_explain (or the Debug panel) lists the fire in fxFireLog with source "pad".
 5. Set Style to Festival / Creative Risk High and listen for a few transitions: filter builds and drop mixes appear; set Smooth / Low: long blends. PASS: the vocabulary changes with the style (Debug panel Transition type).
+7. DJ3 visual sync: play an analysed track on deck A in the DJ view (and a module in tracker mode on deck B). PASS: the waveform playhead, beat grid and the pattern lights land on the beat you hear, at pitch 0 and at +8 % / -8 %; before the fix every visual ran ~33 ms (audio) / up to 250 ms (tracker rows) ahead of the sound.
+8. Auto Juggle: load two analysed tracks of the same BPM on both decks, play both, enable Auto DJ, set Auto Juggle to Performer, Juggle Intensity to Set Decides, open Debug. PASS: within a minute or two the Beat Juggling section shows a pattern (e.g. tightPhraseTrade "A B A B") with Next Actions in beats, the crossfader cuts land on the beat you hear and alternate decks, the pattern ends with a release back to the playing deck, and the controller waits (cooldown shown in Budget) before the next one; move the crossfader by hand mid-pattern: it releases at once (Safety shows "aborting: user control"). Section 54 (JUG-PG-N.1) listening questions: does the trading feel intentional, does the escalation (8 -> 4 -> 2 -> 1 bars -> beats) pay off, do call and response answer each other, is it ever constant or random.
 6. Section 63 questions (listening): would you believe a human DJ made this mix; are transitions musically timed; is the set coherent; does it become repetitive; does the energy arc feel intentional; are FX tasteful; does bass remain controlled; do vocals clash; are there moments of surprise; does the DJ appear to listen. Report per question.
 
 ## Open owner questions
