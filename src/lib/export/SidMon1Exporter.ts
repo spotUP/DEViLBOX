@@ -17,6 +17,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { SidMon1Config } from '@/types/instrument/exotic';
+import type { TrackerCell } from '@/types';
 
 export interface SidMon1ExportResult {
   data: Blob;
@@ -42,6 +43,7 @@ export async function exportSidMon1(song: TrackerSong): Promise<SidMon1ExportRes
 
   // Cells the user changed: note or instrument differs from the loaded grid.
   let written = 0;
+  const grow: Array<{ p: number; r: number; ch: number; cell: TrackerCell }> = [];
   const steps = Math.min(loaded.patterns.length, song.patterns.length);
   for (let p = 0; p < steps; p++) {
     for (let ch = 0; ch < layout.numChannels; ch++) {
@@ -50,7 +52,11 @@ export async function exportSidMon1(song: TrackerSong): Promise<SidMon1ExportRes
       for (let r = 0; r < Math.min(was.length, now.length); r++) {
         if ((was[r].note ?? 0) === (now[r].note ?? 0) && (was[r].instrument ?? 0) === (now[r].instrument ?? 0)) continue;
         const runs = layout.writeCell!(p, r, ch, now[r]);
-        if (runs.length === 0) { warnings.push(`step ${p} row ${r} voice ${ch}: no module row to write`); continue; }
+        if (runs.length === 0) {
+          // A note on a cell inside a long row: the row covering it is split afterwards (G5).
+          if ((was[r].note ?? 0) === 0 && (now[r].note ?? 0) > 0) { grow.push({ p, r, ch, cell: now[r] }); continue; }
+          warnings.push(`step ${p} row ${r} voice ${ch}: no module row to write`); continue;
+        }
         for (const run of runs) out.set(run.bytes, run.offset);
         written++;
       }
@@ -72,6 +78,18 @@ export async function exportSidMon1(song: TrackerSong): Promise<SidMon1ExportRes
     now.arpeggio?.forEach((v, k) => { if (v !== was.arpeggio?.[k]) out[base + 4 + k] = v & 0xFF; });
     if (now.mainWave?.some((v, k) => v !== was.mainWave?.[k])) warnings.push(`instrument ${i + 1}: waveform edits are not exported`);
   });
+  // Notes on blank rows. Each insertion moves what follows it, so the module is parsed again after every one.
+  let module: Uint8Array = out;
+  for (const g of grow) {
+    const fresh = parseSidMon1File(module.slice().buffer as ArrayBuffer, song.name || 'module').uadePatternLayout!;
+    // An earlier split of the same long row may have given this cell a row of its own: then it is an in-place edit.
+    const runs = fresh.writeCell!(g.p, g.r, g.ch, g.cell);
+    if (runs.length > 0) { module = module.slice(); for (const run of runs) module.set(run.bytes, run.offset); written++; continue; }
+    const next = fresh.growCell!(module, g.p, g.r, g.ch, g.cell);
+    if (typeof next === 'string') { warnings.push(`step ${g.p} row ${g.r} voice ${g.ch}: ${next}`); continue; }
+    module = next;
+    written++;
+  }
   if (written > 0) warnings.push(`${written} edited cell(s) written into the module`);
 
   const baseName = (song.name || 'untitled')
@@ -80,7 +98,7 @@ export async function exportSidMon1(song: TrackerSong): Promise<SidMon1ExportRes
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
   return {
-    data: new Blob([out], { type: 'application/octet-stream' }),
+    data: new Blob([module.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }),
     filename: `${baseName || 'untitled'}.sid1`,
     warnings,
   };

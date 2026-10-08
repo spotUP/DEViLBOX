@@ -21,6 +21,7 @@ import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { SidMon1Config, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSidMon1Cell, sm1IndexToXM, xmToSm1Index } from '@/engine/uade/encoders/SidMon1Encoder';
+import { sidmon1InsertRow } from './sidmon1Edits';
 import { walkSidMon1, type Sm1Cell, type Sm1RawRow, type Sm1Track } from './sidmon1Grid';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
@@ -526,6 +527,30 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
       if ((cell.instrument ?? 0) !== shown.instrument) bytes[1] = (cell.instrument ?? 0) & 0xFF;
       working.set(bytes, off);
       return [{ offset: off, bytes }];
+    },
+    // A note on a cell inside a long row: the row covering it is split and a new row carries the note (G5).
+    growCell: (module, pattern, row, channel, cell) => {
+      const note = cell.note ?? 0;
+      if (note <= 0 || note >= 97) return 'only a note can be put on a blank row of this module';
+      const cells = steps[pattern]?.cells[channel];
+      const here = cells?.[row];
+      if (!cells || !here || here.row >= 0) return 'this cell is a module row; it is edited in place';
+      let start = row - 1;
+      while (start >= 0 && cells[start].row < 0) start--;
+      if (start < 0) return 'the row covering this cell began in the step before; a blank row there is not written';
+      const covering = cells[start].row;
+      const k = row - start;
+      const speed = patRows[covering].speed;
+      if (k > speed) return 'the row covering this cell ends before it; not written';
+      const raw = xmToSm1Index(note) - tracks[here.track].transpose;
+      if (raw < 1 || raw > 254) return `no note of the module's table plays as note ${note} on this track`;
+      const rawNote = versionTag === 0x1444 ? (raw - 469) & 0xff : raw;
+      const instrument = cell.instrument ?? 0;
+      if (versionTag === 0x1444 && instrument > 59) return 'instrument numbers above 59 are stored remapped in this version; not written';
+      const next = module.slice();
+      next[patDataOffset + covering * 5 + 4] = k - 1;
+      const grown = sidmon1InsertRow(next, position, covering + 1, Uint8Array.of(rawNote, instrument & 0xff, 0, 0, speed - k));
+      return grown;
     },
   };
 
