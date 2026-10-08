@@ -13,6 +13,8 @@ const STORE_NAME = 'audioCache';
 const MAX_CACHE_SIZE_MB = 2000; // 2 GB limit (gig playlists need 200+ tracks)
 const MAX_CACHE_ENTRIES = 1000; // Max 1000 cached files
 
+import type { ExtendedAnalysis } from './autodj/types';
+
 export interface CachedAudio {
   hash: string;           // SHA-256 of source file
   filename: string;       // Original filename (for display)
@@ -35,6 +37,7 @@ export interface CachedAudio {
   rmsDb?: number;                  // RMS loudness in dB (for auto-gain)
   peakDb?: number;                 // Peak level in dB
   analysisVersion?: number;        // Bump to re-analyze when algorithm improves
+  extended?: ExtendedAnalysis;     // Auto DJ extended analysis (version 2+)
   
   // ── Genre classification ──
   genrePrimary?: string;           // e.g. "Electronic", "Hip Hop"
@@ -366,6 +369,7 @@ export async function updateCacheAnalysis(
     onsets?: number[];
     frequencyPeaks?: number[][];
     analysisVersion?: number;
+    extended?: ExtendedAnalysis;
     // Genre classification
     genrePrimary?: string;
     genreSubgenre?: string;

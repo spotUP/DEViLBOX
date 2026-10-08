@@ -11,6 +11,7 @@ import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import type { SeratoCuePoint, SeratoLoop, SeratoBeatMarker } from '@/lib/serato/seratoMetadata';
 import type { BeatGridData } from '@/engine/dj/DJAudioCache';
+import type { DJTrackAnalysis } from '@/engine/dj/autodj/types';
 
 // Immer needs MapSet support to draft `Set<number>` fields (fxTargetChannels).
 // Calling at module load is idempotent — main.tsx calls it too, but tests
@@ -158,6 +159,8 @@ export interface DeckState {
   mood: string | null;              // e.g. "Energetic", "Chill"
   energy: number;                   // 0-1 (low → high energy)
   danceability: number;             // 0-1
+  /** The unified Auto DJ analysis of the loaded track (plan section 3); null until the pipeline applies one. */
+  trackAnalysis: DJTrackAnalysis | null;
 
   // Stem separation
   stemsAvailable: boolean;          // stems loaded and ready for playback
@@ -263,6 +266,7 @@ const makeDefaultDeckState = (): DeckState => ({
   mood: null,
   energy: 0.5,
   danceability: 0.5,
+  trackAnalysis: null,
 
   // Stems
   stemsAvailable: false,
@@ -554,6 +558,7 @@ export const useDJStore = create<DJStore>()(
           state.decks[deck].keyConfidence = 0;
           state.decks[deck].energy = 0.5;
           state.decks[deck].danceability = 0.5;
+          state.decks[deck].trackAnalysis = null;
           state.decks[deck].genrePrimary = null;
           state.decks[deck].genreSubgenre = null;
           state.decks[deck].genreConfidence = 0;
