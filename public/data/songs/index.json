@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-06T21:45:54.033Z",
+  "generated": "2026-10-08T07:56:18.245Z",
   "perEntry": 6,
   "registryTotal": 279,
   "covered": 167,
@@ -62,7 +62,7 @@
     {
       "id": "ay-amadeus",
       "label": "ay-amadeus",
-      "formatKey": "ayStructured",
+      "formatKey": "ay",
       "files": [
         "/data/songs/ay-amadeus/aztec theme.amad"
       ],
@@ -70,14 +70,14 @@
       "dir": "/data/songs/ay-amadeus"
     },
     {
-      "id": "ay-emul",
-      "label": "ay-emul",
-      "formatKey": "ay",
+      "id": "ay-strc",
+      "label": "ay-strc",
+      "formatKey": "ayStructured",
       "files": [
-        "/data/songs/ay-emul/spring.emul"
+        "/data/songs/ay-strc/mega mix 1.strc"
       ],
       "total": 1,
-      "dir": "/data/songs/ay-emul"
+      "dir": "/data/songs/ay-strc"
     },
     {
       "id": "behringer-td-3",
@@ -989,16 +989,6 @@
         "/data/songs/formats/sidewinder2.riff"
       ],
       "total": 2,
-      "dir": "/data/songs/formats"
-    },
-    {
-      "id": "formats-robHubbard",
-      "label": "formats / Rob Hubbard",
-      "formatKey": "robHubbard",
-      "files": [
-        "/data/songs/formats/centurion_battle.rh"
-      ],
-      "total": 1,
       "dir": "/data/songs/formats"
     },
     {
@@ -2062,6 +2052,17 @@
       ],
       "total": 1,
       "dir": "/data/songs/richard-joseph"
+    },
+    {
+      "id": "rob-hubbard",
+      "label": "rob-hubbard",
+      "formatKey": "robHubbard",
+      "files": [
+        "/data/songs/rob-hubbard/budokan.rh",
+        "/data/songs/rob-hubbard/skateordie.rh"
+      ],
+      "total": 2,
+      "dir": "/data/songs/rob-hubbard"
     },
     {
       "id": "s98",
@@ -4026,6 +4027,7 @@
           "bombfusion.riff"
         ],
         "rob-hubbard": [
+          "budokan.rh",
           "skateordie.rh"
         ],
         "rob-hubbard-st": [
@@ -28446,6 +28448,7 @@
     },
     "/data/songs/rob-hubbard": {
       "siblings": [
+        "budokan.rh",
         "skateordie.rh"
       ]
     },

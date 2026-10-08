@@ -25,6 +25,8 @@ import { companionFilesIn, isInSampleDirectory, isNonSongAsset, partnerlessFiles
 const ROOT = process.cwd();
 const SONGS_ROOT = join(ROOT, 'public/data/songs');
 const OUT = join(SONGS_ROOT, 'index.json');
+/** Every playable corpus file, for the jukebox's file-name search. */
+const FILES_OUT = join(SONGS_ROOT, 'files.json');
 
 /** Enough takes to move on when the first file of a format is a bad example —
  *  which happened twice in one night — without shipping 15k names. */
@@ -193,6 +195,10 @@ function withoutCompanions(_dir: string, files: string[]): string[] {
   return files.filter((f) => !isInSampleDirectory(relative(SONGS_ROOT, f)) && !isNonSongAsset(relative(SONGS_ROOT, f).split(sep).join('/')) && !isCompanionFile(f));
 }
 
+/** Every song file with the format (and chip) it detected as, so a file can be
+ *  found by name and reported against its format's row. */
+const allSongFiles: Array<{ path: string; formatKey: string | null; subformat?: string }> = [];
+
 function addRows(dirLabel: string, dir: string, allFiles: string[], subformat?: string): void {
   const files = withoutCompanions(dir, allFiles);
   if (files.length === 0) return;
@@ -202,6 +208,7 @@ function addRows(dirLabel: string, dir: string, allFiles: string[], subformat?: 
     const key = det?.key ?? null;
     const list = byFormat.get(key);
     if (list) list.push(f); else byFormat.set(key, [f]);
+    allSongFiles.push({ path: webPath(f), formatKey: key, ...(subformat ? { subformat } : {}) });
   }
 
   const several = byFormat.size > 1;
@@ -294,3 +301,23 @@ console.log(
   `[song-index] ${entries.length} rows (${covered.size}/${FORMAT_REGISTRY.length} registry formats covered, `
   + `${gaps.length} with no test song) → ${relative(ROOT, OUT)}`,
 );
+
+/**
+ * The file index: [web path, row id] for every song file, the row id being the
+ * one-per-format row the file belongs to (Furnace: per chip), or null when the
+ * registry cannot name the file. Not folded into index.json: the jukebox loads
+ * that at once, and this one only when somebody types a file name.
+ */
+const rowIdFor = new Map<string, string>();
+for (const e of entries) {
+  if (!e.formatKey) continue;
+  const perChip = e.dir.startsWith('/data/songs/furnace/') && e.subformat;
+  rowIdFor.set(perChip ? `${e.formatKey}/${e.subformat}` : e.formatKey, e.id);
+}
+const fileRows = allSongFiles.map((f) => {
+  const perChip = f.path.startsWith('/data/songs/furnace/') && f.subformat;
+  const rowId = f.formatKey ? rowIdFor.get(perChip ? `${f.formatKey}/${f.subformat}` : f.formatKey) ?? null : null;
+  return [f.path, rowId] as [string, string | null];
+}).sort((a, b) => a[0].localeCompare(b[0]));
+writeFileSync(FILES_OUT, `${JSON.stringify({ files: fileRows })}\n`);
+console.log(`[song-index] ${fileRows.length} files -> ${relative(ROOT, FILES_OUT)}`);
