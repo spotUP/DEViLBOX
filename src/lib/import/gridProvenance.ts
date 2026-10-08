@@ -147,6 +147,8 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
  * names the reason a row is 'fail' or absent.
  */
 export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
+  // davidWhittaker: a native worklet engine, measured by davidWhittakerLiveSwap.test.ts (the real worklet and WASM, the store's own route).
+  davidWhittaker: 'pass',
   digitalSonixChrome: 'pass',
   jochenHippelST: 'pass',
   robHubbard: 'pass',
