@@ -9,11 +9,8 @@
  * output. Runs each machine through the real worklet in a child process.
  */
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { runBuzzChild, lastJsonLine, CPU_BUDGET_S } from './fixtures/runBuzzChild';
 import { BUZZMACHINE_INFO, BuzzmachineType } from '../BuzzmachineEngine';
-
-const RUNNER = resolve(__dirname, 'fixtures/runBuzzMachine.cjs');
 
 /** [type, file, pitched] - pitched synths must play C4 (261.6 Hz). */
 const SYNTHS: [string, string, boolean][] = [
@@ -23,27 +20,25 @@ const SYNTHS: [string, string, boolean][] = [
   ['MakkM4', 'Makk_M4', true], ['CyanPhaseDTMF', 'CyanPhase_DTMF', false], ['ElenzilFrequencyBomb', 'Elenzil_FrequencyBomb', true],
 ];
 
-function play(type: string, file: string) {
+async function play(type: string, file: string) {
   const info = BUZZMACHINE_INFO[type as BuzzmachineType];
   const layout = info?.parameters?.map((p) => ({ byteOffset: p.byteOffset, size: p.type === 'word' ? 2 : 1, isTrack: p.isTrack ?? false })) ?? [];
-  const r = spawnSync(process.execPath, [RUNNER, type, file, 'note'], {
-    timeout: 8000, encoding: 'utf8', env: { ...process.env, BUZZ_LAYOUT: JSON.stringify(layout) },
-  });
-  expect(r.signal, `${type} hung`).toBeNull();
-  const line = r.stdout.split('\n').reverse().find((l) => l.startsWith('{'));
+  const r = await runBuzzChild([type, file, 'note'], { ...process.env, BUZZ_LAYOUT: JSON.stringify(layout) });
+  expect(r.hung, `${type} hung (over ${CPU_BUDGET_S} s of CPU)`).toBeNull();
+  const line = lastJsonLine(r.stdout);
   expect(line, r.stderr.slice(-400)).toBeTruthy();
   return JSON.parse(line!);
 }
 
 describe('Buzz synth machines', () => {
   for (const [type, file, pitched] of SYNTHS) {
-    it(`${type} plays a note${pitched ? ' at C4' : ''}`, () => {
-      const res = play(type, file);
+    it(`${type} plays a note${pitched ? ' at C4' : ''}`, async () => {
+      const res = await play(type, file);
       expect(res.msgs).toEqual(['initialized']);
       expect(res.finite).toBe(true);
       expect(res.outRms).toBeGreaterThan(0.01);
       expect(res.clippedFraction).toBeLessThan(0.5);
       if (pitched) expect(Math.abs(12 * Math.log2(res.f0 / 261.63))).toBeLessThan(1);
-    }, 15000);
+    }, 150000);
   }
 });
