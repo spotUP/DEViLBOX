@@ -11,6 +11,9 @@ import type { BridgeRequest, BridgeResponse } from './protocol';
 import { RELAY_REPLACED_CLOSE_CODE, RELAY_AGENT_ATTACHED } from './protocol';
 import { isRecoveryPromptOpen, resolveRecoveryPrompt as resolveRecovery, onRecoveryPromptOpen } from '../lib/persistence/recoveryPrompt';
 import { useNotificationStore } from '@stores/useNotificationStore';
+import { useTransportStore } from '@stores/useTransportStore';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { useDJStore } from '@stores/useDJStore';
 import {
   getSongInfo,
   getFullState,
@@ -581,9 +584,23 @@ onRecoveryPromptOpen(() => { queueMicrotask(autoRestoreForAgent); });
  */
 let callsInFlight = 0;
 let lastCallActivityAt = 0;
+let lastUserInputAt = 0;
+if (typeof window !== 'undefined') {
+  for (const type of ['pointerdown', 'keydown', 'wheel'] as const) {
+    window.addEventListener(type, () => { lastUserInputAt = Date.now(); }, { capture: true, passive: true });
+  }
+}
+/** Music is playing anywhere: the tracker transport, a native engine's scopes, or a DJ deck. */
+function audioPlaying(): boolean {
+  if (useTransportStore.getState().isPlaying) return true;
+  if (useOscilloscopeStore.getState().isActive) return true;
+  const decks = useDJStore.getState().decks as Record<string, { isPlaying?: boolean }>;
+  return Object.values(decks).some((d) => d.isPlaying);
+}
 const engineReloadGate = createReloadGate({
   inFlight: () => callsInFlight > 0,
   sinceLastActivityMs: () => (lastCallActivityAt === 0 ? Infinity : Date.now() - lastCallActivityAt),
+  listening: () => audioPlaying() || Date.now() - lastUserInputAt < 15_000,
   reload: () => window.location.reload(),
 });
 import.meta.hot?.on('devilbox:engine-changed', engineReloadGate);

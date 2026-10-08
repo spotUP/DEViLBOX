@@ -23,6 +23,14 @@ export interface ReloadGateOptions {
   /** Milliseconds since the last bridge call started or finished (Infinity if never). */
   sinceLastActivityMs: () => number;
   reload: () => void;
+  /**
+   * True while the person is listening or working in the tab (audio playing,
+   * or input in the last few seconds). The reload waits for as long as this
+   * holds - no cap - because a reload stops the music: an agent saving engine
+   * code reloaded the page in the middle of the owner's listening tests
+   * (2026-10-08, "cant test now as the page reloads as its worked on").
+   */
+  listening?: () => boolean;
   quietMs?: number;
   maxWaitMs?: number;
   pollMs?: number;
@@ -30,15 +38,16 @@ export interface ReloadGateOptions {
 
 /** Returns request(): ask for a reload; many requests while waiting become one reload. */
 export function createReloadGate(opts: ReloadGateOptions): () => void {
-  const { inFlight, sinceLastActivityMs, reload, quietMs = 10_000, maxWaitMs = 300_000, pollMs = 500 } = opts;
+  const { inFlight, sinceLastActivityMs, reload, listening = () => false, quietMs = 10_000, maxWaitMs = 300_000, pollMs = 500 } = opts;
   let waiting: ReturnType<typeof setInterval> | null = null;
   return () => {
     if (waiting) return;
-    const idle = () => !inFlight() && sinceLastActivityMs() >= quietMs;
+    const idle = () => !listening() && !inFlight() && sinceLastActivityMs() >= quietMs;
     if (idle()) { reload(); return; }
     const started = Date.now();
     waiting = setInterval(() => {
-      if (idle() || Date.now() - started >= maxWaitMs) {
+      // The cap only frees a stuck bridge call; it never cuts off a listener.
+      if (idle() || (!listening() && Date.now() - started >= maxWaitMs)) {
         clearInterval(waiting as ReturnType<typeof setInterval>);
         waiting = null;
         reload();
