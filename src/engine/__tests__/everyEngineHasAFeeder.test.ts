@@ -18,8 +18,8 @@ import { join, relative } from 'node:path';
 import { WASM_ENGINES } from '../replayer/wasmEngineRegistry';
 
 const ROOT = join(__dirname, '../../..');
-/** Where songs are built: the parsers and the file loader that hands songs to the store. */
-const IMPORT_DIRS = [join(ROOT, 'src/lib/import'), join(ROOT, 'src/lib/file')];
+/** Where songs are built: the parsers, the file loader, and the branch bodies behind openSong (bdee75e5c moved the V2M, SunVox, AdPlug ... openers there). */
+const IMPORT_DIRS = [join(ROOT, 'src/lib/import'), join(ROOT, 'src/lib/file'), join(ROOT, 'src/lib/song')];
 
 /** Engines that import cannot reach today, each with the reason. */
 const KNOWN_UNREACHED: Record<string, string> = {

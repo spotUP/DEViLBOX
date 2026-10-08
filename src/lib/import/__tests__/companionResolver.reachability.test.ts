@@ -23,13 +23,17 @@ describe('companion discovery reaches the resolver', () => {
   });
 
   it('file browser and jukebox: one shared fetch that asks the resolver; the four-pair table is gone', () => {
+    // U2.5 (333e95e73): acquireSource.ts is the one caller of gatherCompanions;
+    // the file browser and openSong (the jukebox's door) go through it.
     const nav = read('src/components/dialogs/useFileNavigation.ts');
-    expect(nav).toContain("import { gatherCompanions } from '@lib/import/companionFetch';");
+    expect(nav).toContain("import { acquireNeighbourCompanions } from '@/lib/song/acquireSource';");
     expect(nav).not.toContain('COMPANION_PREFIXES');
     expect(nav).not.toContain('resolveCompanions(');
     const jukebox = read('src/components/jukebox/JukeboxPanel.tsx');
-    expect(jukebox).toContain('await gatherCompanions(name, directoryOfFile(file), bytes)');
+    expect(jukebox).not.toContain('gatherCompanions(');
     expect(jukebox).not.toContain('resolveCompanions(');
+    const acquire = read('src/lib/song/acquireSource.ts');
+    expect(acquire).toContain('await gatherCompanions(name, dir, bytes)');
     const fetcher = read('src/lib/import/companionFetch.ts');
     expect(fetcher).toContain('const resolved = resolveCompanions(filename, listing);');
   });

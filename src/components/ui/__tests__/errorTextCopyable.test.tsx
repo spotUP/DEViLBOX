@@ -25,7 +25,9 @@ describe('error text can be copied', () => {
 
   it('a failed import reports through a toast, not a modal alert; dialog messages are selectable', () => {
     const root = join(__dirname, '../../../..');
-    const imp = readFileSync(join(root, 'src/hooks/tracker/useModuleImport.ts'), 'utf8');
+    // useModuleImport's handler was deleted by ce3d50326 (U2.3); the import
+    // dialog host is where an interactive open reports its failure now.
+    const imp = readFileSync(join(root, 'src/components/dialogs/ImportDialogHost.tsx'), 'utf8');
     expect(imp).toContain('notify.error(`Load failed');
     expect(imp).not.toContain("title: 'Load Failed'");
     expect(readFileSync(join(root, 'src/components/common/ConfirmDialog.tsx'), 'utf8')).toMatch(/\{message\}<\/p>/);

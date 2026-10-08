@@ -26,7 +26,7 @@ import * as path from 'path';
 
 describe('SunTronic header-detected load (contract)', () => {
   const source = fs.readFileSync(
-    path.resolve(__dirname, '../UnifiedFileLoader.ts'),
+    path.resolve(__dirname, '../../song/songBranches.ts'),
     'utf-8',
   );
   const lines = source.split('\n');
