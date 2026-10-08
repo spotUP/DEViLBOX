@@ -55,6 +55,7 @@ import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder
 import { DEFAULT_ROB_HUBBARD } from '@/types/instrument';
 import { robHubbardEncoder } from '@/engine/uade/encoders/RobHubbardEncoder';
 import { loadRhModule, rhCommandLength, walkRobHubbard, type RhWalk } from './rhWalk';
+import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 import { buildRHGridFromWalk, type RHCellSource, type RhGrid } from './robHubbardGrid';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -364,10 +365,10 @@ export type { RHCellSource };
  * Build the grid from the player's walk plus the byte-exact variable layout of one RH song.
  * Returns the reason instead when the song cannot be matched to the walk.
  */
-function buildRHVariablePatterns(buf: Uint8Array, numChannels: number): RHVariableResult | { unmatched: string } {
-  const walk = walkRobHubbard(buf);
+function buildRHVariablePatterns(buf: Uint8Array, numChannels: number, tune = 0): RHVariableResult | { unmatched: string } {
+  const walk = walkRobHubbard(buf, { song: tune });
   if (!walk) return { unmatched: 'the module scan found no song, sample or period tables' };
-  const song = loadRhModule(buf)!.songs[0];
+  const song = loadRhModule(buf)!.songs[tune];
   const variant = walk.module.variant;
 
   // Dedup the blocks every voice's track list names into file-patterns.
@@ -415,8 +416,8 @@ function buildRHVariablePatterns(buf: Uint8Array, numChannels: number): RHVariab
 }
 
 /** The grid the module shows, with the block command behind every cell (what an edit is compared with and written to). */
-export function buildRobHubbardGrid(buf: Uint8Array): (RHVariableResult & { blocks: Array<{ addr: number; size: number }> }) | null {
-  const grid = buildRHVariablePatterns(buf, 4);
+export function buildRobHubbardGrid(buf: Uint8Array, tune = 0): (RHVariableResult & { blocks: Array<{ addr: number; size: number }> }) | null {
+  const grid = buildRHVariablePatterns(buf, 4, tune);
   if ('unmatched' in grid) return null;
   return { ...grid, blocks: grid.filePatternAddrs.map((addr, i) => ({ addr, size: grid.filePatternSizes[i] })) };
 }
@@ -444,10 +445,14 @@ export async function parseRobHubbardFile(
   buffer: ArrayBuffer,
   filename: string,
   moduleBase = 0,
+  /** The song of the module's table the grid is built from (0-based); absent, the first the player's walk makes a sound in. */
+  subsong?: number,
 ): Promise<TrackerSong> {
   if (!isRobHubbardFormat(buffer, filename)) {
     throw new Error('Not a Rob Hubbard module');
   }
+  const tunes = await chooseFileSubsong(fileSubsongFormatByKey('robHubbard')!, buffer, filename, subsong)
+    .catch((): FileSubsongs => ({ count: 1, current: 0, fileName: filename }));
 
   const buf = new Uint8Array(buffer);
 
@@ -518,7 +523,7 @@ export async function parseRobHubbardFile(
   let variable: RHVariableResult | null = null;
   let unmatched: string | undefined;
 
-  const built = buildRHVariablePatterns(buf, NUM_CHANNELS);
+  const built = buildRHVariablePatterns(buf, NUM_CHANNELS, tunes.current);
   if ('unmatched' in built) {
     unmatched = built.unmatched;
   } else {
@@ -571,6 +576,7 @@ export async function parseRobHubbardFile(
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    ...fileSubsongsField(tunes),
   };
 
   if (variable) {

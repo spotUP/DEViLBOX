@@ -38,11 +38,12 @@ function isSynthWave(m: MaModuleData, instr: number): boolean {
   return sample !== null && sample.dataOffset >= 0 && sample.lengthWords <= 128;
 }
 
-export function applyMaGridEdits(source: Uint8Array, edited: Pattern[]): MaEditResult {
+/** `subsong`: the sub-song the edited grid shows (the song's fileSubsongs.current). */
+export function applyMaGridEdits(source: Uint8Array, edited: Pattern[], subsong = 0): MaEditResult {
   const out = new Uint8Array(source);
   const warnings: string[] = [];
   const m = loadMaModule(source);
-  const walk = m ? walkMusicAssembler(m, 0) : null;
+  const walk = m ? walkMusicAssembler(m, subsong) : null;
   if (!m || !walk || walk.stop === 'ended') return { data: out, patched: 0, warnings: [`the module has no matched grid to write edits into (${walk?.endReason ?? 'no walk'})`] };
   const grid = buildMaGridFromWalk(walk, m);
   const wanted = new Map<number, { value: number; why: string }>();

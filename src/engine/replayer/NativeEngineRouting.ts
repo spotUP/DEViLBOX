@@ -462,7 +462,7 @@ export async function startNativeEngines(
         if (desc.key === 'Hippel' && song.hippelFileData) {
           const { mapHippelCells } = await import('@/engine/hippel/rebuildHippelModule');
           const { hippelRowAt } = await import('@/engine/hippel/hippelCellSpans');
-          const spans = mapHippelCells(song.hippelFileData, song.instruments.length);
+          const spans = mapHippelCells(song.hippelFileData, song.instruments.length, song.fileSubsongs?.current ?? 0);
           if (spans) {
             trackSubscription((instance as unknown as import('@/engine/tfmx/TFMXEngine').TFMXEngine).onPositionUpdate((u) => {
               if (u.step === undefined || u.step < 0 || u.patternOffset === undefined || u.patternOffset < 0) return;

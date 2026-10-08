@@ -18,7 +18,7 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
-function tfmxTransform(code: string): string {
+export function tfmxTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -45,6 +45,9 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
   private _positionCallbacks: Array<(update: TFMXModulePosition) => void> = [];
   private _moduleLoadedResolvers: Array<(info: { voices: number; songs: number; duration: number }) => void> = [];
+
+  /** The subsong loadTune started; a reload (a macro edit, a grid edit) keeps it. */
+  private _subsong = 0;
 
   private constructor() {
     super();
@@ -174,8 +177,10 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
    * Load a full TFMX module (mdat + optional smpl companion) for playback.
    * Returns module info: { voices, songs, duration }.
    */
-  async loadTune(mdatData: ArrayBuffer, smplData?: ArrayBuffer): Promise<{ voices: number; songs: number; duration: number }> {
+  /** `subsong`: the song of the module's table to play (0-based) - for a Hippel song, the tune its grid shows. */
+  async loadTune(mdatData: ArrayBuffer, smplData?: ArrayBuffer, subsong = 0): Promise<{ voices: number; songs: number; duration: number }> {
     await this._initPromise;
+    this._subsong = subsong;
     if (!this.workletNode) throw new Error('TFMXEngine not initialized');
 
     const mdatCopy = mdatData.slice(0);
@@ -191,7 +196,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
       type: 'loadModule',
       mdatBuffer: mdatCopy,
       smplBuffer: smplCopy,
-      subsong: 0,
+      subsong,
     }, transfers);
 
     return promise;
@@ -213,7 +218,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
       type: 'reloadModule',
       mdatBuffer: mdatCopy,
       smplBuffer: smplCopy,
-      subsong: 0,
+      subsong: this._subsong,
     }, transfers);
   }
 

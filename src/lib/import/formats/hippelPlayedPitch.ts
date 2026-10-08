@@ -71,19 +71,19 @@ export const runHippelWalk: HippelDecoderWalker = async (bytes, subsong, ticks) 
 };
 
 /**
- * The sound-sequence transposes the decoder applies at each note of subsong 0,
+ * The sound-sequence transposes the decoder applies at each note of subsong `subsong`,
  * for `hippelGrid`. Null when the decoder cannot run the song (the grid then
  * shows the pattern notes, as before).
  */
-export async function hippelPlayedPitch(bytes: Uint8Array, walker?: HippelDecoderWalker): Promise<HippelPlayed | null> {
+export async function hippelPlayedPitch(bytes: Uint8Array, walker?: HippelDecoderWalker, subsong = 0): Promise<HippelPlayed | null> {
   const m = readHippelTfmx(bytes);
   if (!m) return null;
   try {
-    const ticks = passTicks(hippelSubsong(m, 0));
+    const ticks = passTicks(hippelSubsong(m, subsong));
     // The import path walks in the walk worker, which also reduces the records to the transposes
     // (a Hippel 7V walk is 243 thousand records: shipping them back is as dear as the walk). A
     // walker passed in (the tests' own decoder host) returns the records and is reduced here.
-    return walker ? hippelPlayedFromRecords(await walker(bytes, 0, ticks)) : await songWalks.hippelPlayed(bytes, 0, ticks);
+    return walker ? hippelPlayedFromRecords(await walker(bytes, subsong, ticks)) : await songWalks.hippelPlayed(bytes, subsong, ticks);
   } catch (err) {
     if (err instanceof WalkCancelledError) throw err;
     console.warn('[hippelPlayedPitch] the decoder could not walk the song; the grid shows pattern notes:', err);

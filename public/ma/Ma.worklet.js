@@ -66,6 +66,8 @@ class MaProcessor extends AudioWorkletProcessor {
             this.module._player_init(wasmPtr, uint8Data.length);
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
+            // The tune the song's grid shows; init starts on sub-song 0.
+            if (data.subsong > 0 && typeof this.module._player_set_subsong === 'function') this.module._player_set_subsong(data.subsong);
 
             this.applyMuteMask();
 

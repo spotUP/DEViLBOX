@@ -30,7 +30,7 @@ export async function exportAsFuturePlayer(song: TrackerSong): Promise<FuturePla
   const r = applyFpGridEdits(new Uint8Array(fileData), song.patterns, (id) => {
     const ins = song.instruments.find((i) => i.id === id) as unknown as { metadata?: { fpInstrPtr?: number } } | undefined;
     return ins?.metadata?.fpInstrPtr;
-  });
+  }, song.fileSubsongs?.current ?? 0);
   warnings.push(...r.warnings);
   return {
     data: new Blob([r.data as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
