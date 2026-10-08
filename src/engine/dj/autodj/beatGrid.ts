@@ -1,0 +1,205 @@
+/**
+ * Real beat grid (plan section 5): beats with strengths, a downbeat grid
+ * found by a phase search (never "first detected beat = bar 1"), the meter,
+ * and the five landmarks the planner must tell apart.
+ *
+ * Pure functions over the beat list and the extended timelines.
+ */
+import type {
+  Bar, Beat, BeatGrid, DownbeatGrid, ExtendedAnalysis, GridLandmarks, MeterAnalysis,
+} from './types';
+
+export interface BeatGridInput {
+  beats: number[];
+  /** The legacy downbeats, used only when no timelines exist. */
+  downbeats: number[];
+  bpm: number;
+  bpmConfidence: number;
+  timeSignature: number;
+  extended: ExtendedAnalysis | null;
+  durationSec: number;
+}
+
+export interface BeatGridResult {
+  beatGrid: BeatGrid;
+  downbeats: DownbeatGrid;
+  meter: MeterAnalysis;
+  landmarks: GridLandmarks;
+}
+
+/** Read a timeline at a time in seconds (0 outside). */
+export function timelineAt(values: number[], hopSec: number, t: number): number {
+  if (values.length === 0) return 0;
+  const i = Math.floor(t / hopSec);
+  if (i < 0 || i >= values.length) return 0;
+  return values[i];
+}
+
+/** The strongest reading in the 300 ms after the beat: a hit at the end of a hop lands in the next one. */
+function windowMax(values: number[], hopSec: number, t: number, windowSec = 0.3): number {
+  let m = 0;
+  for (let u = t; u <= t + windowSec; u += hopSec) m = Math.max(m, timelineAt(values, hopSec, u));
+  return m;
+}
+
+function beatStrengths(beats: number[], ext: ExtendedAnalysis | null): number[] {
+  if (!ext) return beats.map(() => 0.5);
+  return beats.map((t) => {
+    const b = windowMax(ext.bass, ext.hopSec, t);
+    const d = windowMax(ext.drums, ext.hopSec, t);
+    return Math.min(1, 0.6 * b + 0.6 * d);
+  });
+}
+
+/**
+ * Phase search: for every meter and every phase, how much louder are the
+ * candidate downbeats than the other beats. The best pair wins, and the
+ * margin to the runner-up is the confidence.
+ */
+export function searchMeterAndPhase(strengths: number[], candidates: number[] = [4, 3]): {
+  beatsPerBar: number; phase: number; confidence: number; alternatives: Array<{ beatsPerBar: number; score: number }>;
+} {
+  const scores: Array<{ beatsPerBar: number; phase: number; score: number }> = [];
+  for (const P of candidates) {
+    if (strengths.length < P * 2) continue;
+    for (let p = 0; p < P; p++) {
+      let on = 0, onN = 0, off = 0, offN = 0;
+      for (let i = 0; i < strengths.length; i++) {
+        if (i % P === p) { on += strengths[i]; onN++; } else { off += strengths[i]; offN++; }
+      }
+      const score = (onN ? on / onN : 0) - (offN ? off / offN : 0);
+      scores.push({ beatsPerBar: P, phase: p, score });
+    }
+  }
+  if (scores.length === 0) {
+    return { beatsPerBar: 4, phase: 0, confidence: 0, alternatives: [] };
+  }
+  scores.sort((a, b) => b.score - a.score);
+  const best = scores[0];
+  const second = scores[1];
+  const spread = Math.max(1e-6, Math.abs(best.score) + (second ? Math.abs(second.score) : 0));
+  const confidence = second ? Math.min(1, Math.max(0, (best.score - second.score) / spread + 0.3)) : 0.5;
+  const altMap = new Map<number, number>();
+  for (const s of scores) altMap.set(s.beatsPerBar, Math.max(altMap.get(s.beatsPerBar) ?? -Infinity, s.score));
+  const alternatives = [...altMap.entries()].map(([beatsPerBar, score]) => ({ beatsPerBar, score }));
+  return { beatsPerBar: best.beatsPerBar, phase: best.phase, confidence, alternatives };
+}
+
+/** 1 for perfectly regular inter-beat intervals, 0 for chaos. */
+export function beatRegularity(beats: number[]): number {
+  if (beats.length < 3) return 0;
+  const ivs: number[] = [];
+  for (let i = 1; i < beats.length; i++) ivs.push(beats[i] - beats[i - 1]);
+  const m = ivs.reduce((a, b) => a + b, 0) / ivs.length;
+  if (m <= 0) return 0;
+  const v = ivs.reduce((a, b) => a + (b - m) * (b - m), 0) / ivs.length;
+  const cv = Math.sqrt(v) / m;
+  return Math.max(0, Math.min(1, 1 - cv * 5));
+}
+
+export function buildBeatGrids(input: BeatGridInput): BeatGridResult {
+  const { beats, extended, bpmConfidence, durationSec } = input;
+  const strengths = beatStrengths(beats, extended);
+
+  let beatsPerBar = input.timeSignature || 4;
+  let phase = 0;
+  let meterConfidence = 0.3;
+  let alternatives: Array<{ beatsPerBar: number; score: number }> = [];
+  if (extended && beats.length >= 8) {
+    const found = searchMeterAndPhase(strengths);
+    beatsPerBar = found.beatsPerBar;
+    phase = found.phase;
+    meterConfidence = found.confidence;
+    alternatives = found.alternatives;
+  } else if (beats.length > 0 && input.downbeats.length > 0) {
+    // Legacy grid: downbeats were every N-th beat from beat 0.
+    const idx = beats.indexOf(input.downbeats[0]);
+    phase = idx >= 0 ? idx % beatsPerBar : 0;
+  }
+
+  // First musical beat: the first beat whose neighbourhood carries rhythm.
+  let firstMusicalIdx = 0;
+  if (extended && beats.length > 0) {
+    const p95 = [...strengths].sort((a, b) => a - b)[Math.floor(strengths.length * 0.95)] || 1;
+    for (let i = 0; i < beats.length; i++) {
+      let s = 0, n = 0;
+      for (let j = i; j < Math.min(beats.length, i + 4); j++) { s += strengths[j]; n++; }
+      if (strengths[i] >= 0.3 * p95 && n && s / n >= 0.3 * p95) { firstMusicalIdx = i; break; }
+    }
+  }
+
+  const beatObjs: Beat[] = beats.map((time, index) => ({
+    time,
+    index,
+    strength: strengths[index],
+    isDownbeat: index >= phase && (index - phase) % beatsPerBar === 0,
+  }));
+
+  // Bars from the phase offset forward.
+  const bars: Bar[] = [];
+  let barIndex = 0;
+  for (let i = phase; i < beats.length; i += beatsPerBar) {
+    const beatIdx: number[] = [];
+    for (let j = i; j < Math.min(beats.length, i + beatsPerBar); j++) beatIdx.push(j);
+    const start = beats[i];
+    const end = i + beatsPerBar < beats.length
+      ? beats[i + beatsPerBar]
+      : start + (beatIdx.length) * (input.bpm > 0 ? 60 / input.bpm : 0.5);
+    bars.push({ index: barIndex++, start, end, downbeat: start, beats: beatIdx, full: beatIdx.length === beatsPerBar });
+  }
+
+  const firstDownbeatIdx = (() => {
+    for (let i = firstMusicalIdx; i < beats.length; i++) if (i >= phase && (i - phase) % beatsPerBar === 0) return i;
+    return Math.min(beats.length - 1, Math.max(0, phase));
+  })();
+  const firstFullBar = bars.find((b) => b.full && b.beats[0] >= firstDownbeatIdx);
+  const firstFullBarTime = firstFullBar ? firstFullBar.start : (beats[firstDownbeatIdx] ?? 0);
+
+  // First usable mixing point: a full bar with drums under it.
+  let firstUsableMixPoint = firstFullBarTime;
+  if (extended) {
+    for (const bar of bars) {
+      if (!bar.full || bar.start < firstFullBarTime) continue;
+      let s = 0, n = 0;
+      for (let t = bar.start; t < bar.end; t += extended.hopSec) { s += timelineAt(extended.drums, extended.hopSec, t); n++; }
+      if (n && s / n >= 0.3) { firstUsableMixPoint = bar.start; break; }
+    }
+  }
+
+  const regularity = beatRegularity(beats);
+  const gridConfidence = beats.length === 0 ? 0 : Math.min(1, 0.5 * bpmConfidence + 0.5 * regularity);
+
+  const beatGrid: BeatGrid = {
+    bpm: input.bpm,
+    firstBeat: beats[firstMusicalIdx] ?? 0,
+    beats: beatObjs,
+    confidence: gridConfidence,
+  };
+  const downbeats: DownbeatGrid = {
+    bars,
+    meter: { beatsPerBar, confidence: meterConfidence },
+    confidence: Math.min(1, gridConfidence * (0.5 + 0.5 * meterConfidence)),
+    phaseOffset: phase,
+  };
+  const meter: MeterAnalysis = { beatsPerBar, confidence: meterConfidence, alternatives };
+  const landmarks: GridLandmarks = {
+    firstTransient: extended ? extended.firstTransient : (beats[0] ?? 0),
+    firstMusicalBeat: beats[firstMusicalIdx] ?? 0,
+    firstDownbeat: beats[firstDownbeatIdx] ?? 0,
+    firstFullBar: firstFullBarTime,
+    firstUsableMixPoint: Math.min(durationSec, firstUsableMixPoint),
+  };
+  return { beatGrid, downbeats, meter, landmarks };
+}
+
+/** Index of the bar containing `t` (last bar when past the end, 0 before). */
+export function barIndexAt(grid: DownbeatGrid, t: number): number {
+  const bars = grid.bars;
+  if (bars.length === 0) return 0;
+  let lo = 0, hi = bars.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (bars[mid].start <= t) lo = mid; else hi = mid - 1;
+  }
+  return lo;
+}

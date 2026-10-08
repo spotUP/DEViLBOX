@@ -19,11 +19,14 @@
 import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile } from './DJAudioCache';
 import type { CachedAudio } from './DJAudioCache';
 import { lookupServerAnalysis, storeServerAnalysis } from '@/lib/analysisCache';
-import { useDJStore } from '@/stores/useDJStore';
+import { useDJStore, type DeckState } from '@/stores/useDJStore';
 import type { DeckId } from './DeckEngine';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { getDJEngineIfActive } from './DJEngine';
 import type { BeatGridData } from './DJAudioCache';
 import { autoMatchOnLoad } from './DJAutoSync';
+import type { ExtendedAnalysis } from './autodj/types';
+import { buildDJTrackAnalysis, DJ_ANALYSIS_VERSION } from './autodj/trackAnalysis';
 import { DemucsEngine } from '@engine/demucs/DemucsEngine';
 import type { StemResult } from '@engine/demucs/types';
 
@@ -108,6 +111,8 @@ export interface PipelineResult {
       energy: number;
       danceability: number;
     };
+    /** Auto DJ extended analysis (activity timelines, loudness set, spectral, chroma); null for legacy entries. */
+    extended?: ExtendedAnalysis | null;
   } | null;
 }
 
@@ -138,7 +143,13 @@ export function analysisFromCachedAudio(cached: CachedAudio): PipelineResult['an
       energy: cached.energy ?? 0.5,
       danceability: cached.danceability ?? 0.5,
     },
+    extended: cached.extended ?? null,
   };
+}
+
+/** A cache entry is fully analysed when it has the beat grid AND the current extended analysis. */
+export function isCacheFullyAnalyzed(cached: CachedAudio): boolean {
+  return !!cached.beatGrid && !!cached.bpm && (cached.analysisVersion ?? 1) >= DJ_ANALYSIS_VERSION && !!cached.extended;
 }
 
 // ── WAV Encoder ──────────────────────────────────────────────────────────────
@@ -509,7 +520,7 @@ export class DJPipeline {
   ): Promise<PipelineResult> {
     // Check cache
     const cached = await getCachedAudio(fileBuffer);
-    if (cached && cached.beatGrid && cached.bpm && cached.audioData.byteLength > 0) {
+    if (cached && isCacheFullyAnalyzed(cached) && cached.audioData.byteLength > 0) {
       // Fully cached + analyzed — return immediately
       console.log(`[DJPipeline] Full cache hit for ${filename}`);
 
@@ -556,10 +567,13 @@ export class DJPipeline {
       };
     }
 
-    if (cached && !cached.beatGrid) {
-      // Audio cached but not analyzed — check server cache first
+    if (cached && !isCacheFullyAnalyzed(cached)) {
+      // Audio cached but not analyzed (or analysed before the Auto DJ extended
+      // analysis existed) — check server cache first for a never-analysed entry.
+      // The server carries no extended analysis, so an old local entry goes
+      // straight to the local analysis below.
       const hash = await hashFile(fileBuffer);
-      const serverAnalysis = await lookupServerAnalysis(hash);
+      const serverAnalysis = cached.beatGrid ? null : await lookupServerAnalysis(hash);
 
       if (serverAnalysis && serverAnalysis.bpm > 0 && serverAnalysis.beats.length > 0) {
         // Server cache hit — merge analysis into local cache
@@ -708,14 +722,32 @@ export class DJPipeline {
    */
   applyAnalysisToDeck(deckId: DeckId, analysis: PipelineResult['analysis']): void {
     if (!analysis) {
-      useDJStore.getState().setDeckState(deckId, { analysisState: 'ready' });
+      useDJStore.getState().setDeckState(deckId, { analysisState: 'ready', trackAnalysis: null });
       return;
     }
     const autoTrimDb = computeAutoTrim(analysis.rmsDb, analysis.peakDb);
     const deckState = useDJStore.getState().decks[deckId];
     const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
+    // The unified DJTrackAnalysis (plan section 3): the canonical input to
+    // every Auto DJ decision, built once per load from the pipeline analysis,
+    // the extended worker data and the loaded module (tracker structure).
+    let trackAnalysis: DeckState['trackAnalysis'] = null;
+    try {
+      let song: TrackerSong | null = null;
+      try { song = getDJEngineIfActive()?.getDeck(deckId).getLoadedSong() ?? null; } catch { song = null; }
+      trackAnalysis = buildDJTrackAnalysis({
+        id: deckState.fileName ?? deckId,
+        durationSec: deckState.durationMs > 0 ? deckState.durationMs / 1000 : 0,
+        analysis,
+        extended: analysis.extended ?? null,
+        song,
+      });
+    } catch (err) {
+      console.warn(`[DJPipeline] DJTrackAnalysis failed for deck ${deckId}:`, err);
+    }
     useDJStore.getState().setDeckState(deckId, {
       analysisState: 'ready',
+      trackAnalysis,
       beatGrid: {
         beats: analysis.beats,
         downbeats: analysis.downbeats,
@@ -918,7 +950,8 @@ export class DJPipeline {
           musicalKey: analysis.musicalKey,
           keyConfidence: analysis.keyConfidence,
           frequencyPeaks: analysis.frequencyPeaks,
-          analysisVersion: 1,
+          analysisVersion: analysis.extended ? DJ_ANALYSIS_VERSION : 1,
+          extended: analysis.extended ?? undefined,
           // Genre classification
           genrePrimary: analysis.genre.primary,
           genreSubgenre: analysis.genre.subgenre,
