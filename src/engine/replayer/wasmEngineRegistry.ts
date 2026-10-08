@@ -76,6 +76,11 @@ export interface NativeEngineDescriptor {
    * edit (set, clear, bulk) of a song this engine plays there.
    */
   gridCellEdits?: true;
+  /**
+   * The engine's instance has swapModule(module, ...loadArgs): it takes the edited module while it plays and runs on from the
+   * position already played (engineModuleSwap.ts). sendCellEditsToEngine hands every grid edit of a song this engine plays there.
+   */
+  liveSwap?: true;
   /** Optional post-start hook for engine-specific setup (e.g., Klys onSongData) */
   onStarted?: (instance: WASMSingletonEngine, song: TrackerSong) => void;
 }
@@ -898,6 +903,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
   },
   {
     key: 'DavidWhittakerReplayer',
+    liveSwap: true,
     synthType: 'DavidWhittakerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'davidWhittakerFileData',

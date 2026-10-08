@@ -12,6 +12,8 @@
  *     row (trackIndexCellEdits), never the grid's pattern number;
  *   - a registry engine with `gridCellEdits` takes each cell through its
  *     setCell(pattern, row, channel, note, instrument, effTyp, eff, volume);
+ *   - a `liveSwap` engine (David Whittaker) takes the whole edited module and plays on from the position it was at
+ *     (engineModuleSwap.ts);
  *   - an eagleplayer song whose format re-encodes its whole module from
  *     grid edits (eaglePlayerModuleEdits: MIDI Loriciel) gets a new module;
  *   - a Fred Editor song (FredReplayer2) re-encodes its module and the
@@ -52,7 +54,7 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
 /** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
 export type LiveEditRoute =
   | 'fred-module' | 'actionamics-module' | 'activisionPro-module'
-  | 'track-index' | 'grid-cell' | 'eagleplayer-module' | 'hippelst-module' | 'chip-ram' | 'uade-module' | 'none';
+  | 'track-index' | 'grid-cell' | 'engine-swap' | 'eagleplayer-module' | 'hippelst-module' | 'chip-ram' | 'uade-module' | 'none';
 
 /**
  * The route `sendCellEditsToEngine` takes for `song`, decided from the song alone (no engine
@@ -68,6 +70,7 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   if (desc?.key === 'ActivisionProReplayer') return at('activisionPro-module');
   if (desc && isTrackIndexEngine(desc.key)) return at('track-index');
   if (desc?.gridCellEdits) return at('grid-cell');
+  if (desc?.liveSwap) return at('engine-swap');
   if (desc?.key === 'HippelSt') return at('hippelst-module');
   if (desc?.key === 'EaglePlayer' && song.eaglePlayerId && hasModuleEncoder(song)) return at('eagleplayer-module');
   if (song.uadePatternLayout) return at('chip-ram');
@@ -140,6 +143,12 @@ export async function sendCellEditsToEngine(
     case 'hippelst-module': {
       const { applyHippelStEdits } = await import('../hippelst/hippelStEdits');
       await applyHippelStEdits(song, edits);
+      return;
+    }
+    // A native worklet engine that takes the whole edited module and runs on from the position played.
+    case 'engine-swap': {
+      const { applyEditedModuleToEngine } = await import('./engineModuleSwap');
+      await applyEditedModuleToEngine(song, desc!);
       return;
     }
     case 'chip-ram': {
