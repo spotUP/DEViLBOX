@@ -295,8 +295,7 @@ export function syncDeckBPM(deckId: DeckId, otherDeckId?: DeckId): void {
 
     if (thisState.beatGrid && otherState.beatGrid) {
       // Precise beat-grid sync + phase align
-      const semitones = syncBPMToOther(deckId, resolvedOther);
-      store.setDeckPitch(deckId, semitones);
+      syncBPMToOther(deckId, resolvedOther);
       phaseAlign(deckId, resolvedOther);
     } else if (otherDeck.playbackMode === 'audio' || thisDeck.playbackMode === 'audio') {
       // Audio mode — match via detected BPM
@@ -305,13 +304,13 @@ export function syncDeckBPM(deckId: DeckId, otherDeckId?: DeckId): void {
       if (targetBPM > 0 && thisBPMBase > 0) {
         const ratio = targetBPM / thisBPMBase;
         const semitones = 12 * Math.log2(ratio);
-        store.setDeckPitch(deckId, semitones);
+        setDeckPitch(deckId, semitones);
       }
     } else {
       // Tracker mode
       if (!otherDeck.replayer.getSong()) return;
       const semitones = DJBeatSync.syncBPM(otherDeck, thisDeck);
-      store.setDeckPitch(deckId, semitones);
+      setDeckPitch(deckId, semitones);
     }
 
     // Auto-play this deck if it isn't already playing

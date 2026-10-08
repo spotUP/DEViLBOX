@@ -17,6 +17,7 @@
  */
 
 import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile } from './DJAudioCache';
+import type { CachedAudio } from './DJAudioCache';
 import { lookupServerAnalysis, storeServerAnalysis } from '@/lib/analysisCache';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from './DeckEngine';
@@ -108,6 +109,36 @@ export interface PipelineResult {
       danceability: number;
     };
   } | null;
+}
+
+/**
+ * The analysis a fully analysed cache entry stands for, in the shape the
+ * pipeline returns for a fresh analysis. Null when the entry was never
+ * analysed (no beat grid or no BPM). One mapping for the cache-hit return of
+ * loadOrEnqueue and for Auto DJ's pre-rendered load.
+ */
+export function analysisFromCachedAudio(cached: CachedAudio): PipelineResult['analysis'] {
+  if (!cached.beatGrid || !cached.bpm) return null;
+  return {
+    bpm: cached.bpm,
+    bpmConfidence: cached.bpmConfidence ?? 0,
+    beats: cached.beatGrid.beats ?? [],
+    downbeats: cached.beatGrid.downbeats ?? [],
+    timeSignature: cached.beatGrid.timeSignature ?? 4,
+    musicalKey: cached.musicalKey ?? 'Unknown',
+    keyConfidence: cached.keyConfidence ?? 0,
+    frequencyPeaks: cached.frequencyPeaks ?? [],
+    rmsDb: cached.rmsDb ?? -100,
+    peakDb: cached.peakDb ?? -100,
+    genre: {
+      primary: cached.genrePrimary ?? 'Unknown',
+      subgenre: cached.genreSubgenre ?? 'Unknown',
+      confidence: cached.genreConfidence ?? 0,
+      mood: cached.mood ?? 'Unknown',
+      energy: cached.energy ?? 0.5,
+      danceability: cached.danceability ?? 0.5,
+    },
+  };
 }
 
 // ── WAV Encoder ──────────────────────────────────────────────────────────────
@@ -521,26 +552,7 @@ export class DJPipeline {
         duration: cached.duration,
         sampleRate: cached.sampleRate,
         waveformPeaks: new Float32Array(cached.waveformPeaks),
-        analysis: {
-          bpm: cached.bpm!,
-          bpmConfidence: cached.bpmConfidence ?? 0,
-          beats: cached.beatGrid?.beats ?? [],
-          downbeats: cached.beatGrid?.downbeats ?? [],
-          timeSignature: cached.beatGrid?.timeSignature ?? 4,
-          musicalKey: cached.musicalKey ?? 'Unknown',
-          keyConfidence: cached.keyConfidence ?? 0,
-          frequencyPeaks: cached.frequencyPeaks ?? [],
-          rmsDb: cached.rmsDb ?? -100,
-          peakDb: cached.peakDb ?? -100,
-          genre: {
-            primary: cached.genrePrimary ?? 'Unknown',
-            subgenre: cached.genreSubgenre ?? 'Unknown',
-            confidence: cached.genreConfidence ?? 0,
-            mood: cached.mood ?? 'Unknown',
-            energy: cached.energy ?? 0.5,
-            danceability: cached.danceability ?? 0.5,
-          },
-        },
+        analysis: analysisFromCachedAudio(cached),
       };
     }
 
@@ -686,7 +698,15 @@ export class DJPipeline {
    * when an in-flight dedup caller attaches a second deck to the same render.
    */
   private applyResultToDeck(deckId: DeckId, result: PipelineResult): void {
-    const { analysis } = result;
+    this.applyAnalysisToDeck(deckId, result.analysis);
+  }
+
+  /**
+   * Put an analysis on a deck: beat grid, key, energy, genre, trim. Public so
+   * a track loaded from a finished analysis (Auto DJ's pre-rendered load)
+   * lands on the deck it is loaded to, not on no deck.
+   */
+  applyAnalysisToDeck(deckId: DeckId, analysis: PipelineResult['analysis']): void {
     if (!analysis) {
       useDJStore.getState().setDeckState(deckId, { analysisState: 'ready' });
       return;

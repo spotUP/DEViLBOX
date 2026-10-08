@@ -9,7 +9,8 @@ import type { PlaylistTrack } from '@/stores/useDJPlaylistStore';
 import type { DeckId } from './DeckEngine';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from './DJEngine';
-import { getDJPipeline } from './DJPipeline';
+import { getDJPipeline, analysisFromCachedAudio } from './DJPipeline';
+import type { PipelineResult } from './DJPipeline';
 import { openDeckTrack } from '@/lib/song/openSong';
 import { detectBPM } from './DJBeatDetector';
 import { cacheSong, getCachedSong } from './DJSongCache';
@@ -28,6 +29,8 @@ export interface PreRenderedTrack {
   song?: TrackerSong;
   waveformPeaks?: Float32Array;
   duration: number;
+  /** The analysis of the render (beat grid, key, energy), applied to the deck the track is loaded to. */
+  analysis?: PipelineResult['analysis'];
 }
 
 /**
@@ -151,6 +154,13 @@ export async function loadPreRenderedTrackToDeck(
       preRendered.song ?? getCachedSong(originalTrack.fileName),
       preRendered.waveformPeaks, // Skip expensive peak recomputation
     );
+    // The analysis belongs to the deck the track now sits on. The preload
+    // renders with no deck, so nothing else ever set the beat grid, key and
+    // energy of the incoming deck (loading cleared the grid and left the key
+    // and energy of the track before).
+    if (preRendered.analysis) {
+      getDJPipeline().applyAnalysisToDeck(deckId, preRendered.analysis);
+    }
     console.log(`[DJTrackLoader] Pre-rendered track loaded successfully`);
     return true;
   } catch (err) {
@@ -175,6 +185,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         song: cachedSong,
         waveformPeaks: cached.waveformPeaks instanceof Float32Array
           ? cached.waveformPeaks : new Float32Array(cached.waveformPeaks),
+        analysis: analysisFromCachedAudio(cached),
       };
     }
   } catch (err) {
@@ -219,6 +230,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         song,
         waveformPeaks: result.waveformPeaks,
         duration: result.duration || 0,
+        analysis: result.analysis,
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -246,6 +258,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         bpm: result.analysis?.bpm || 125,
         waveformPeaks: result.waveformPeaks,
         duration: result.duration || 0,
+        analysis: result.analysis,
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -290,6 +303,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         song,
         waveformPeaks: result.waveformPeaks,
         duration: result.duration || 0,
+        analysis: result.analysis,
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -333,6 +347,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         song,
         waveformPeaks: result.waveformPeaks,
         duration: result.duration || 0,
+        analysis: result.analysis,
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -926,14 +926,18 @@ class DJAutoDJ {
       console.warn(`[AutoDJ] ⚠️ No pre-rendered track available, deck should already have track loaded`);
     }
 
-    const outState = store.decks[this.activeDeck];
-    const inState = store.decks[this.idleDeck];
+    // Read the decks AFTER the load: the `store` snapshot above predates it, so
+    // the incoming deck looked like the track it replaced (no beat grid, the
+    // old key and energy) when the transition type was chosen.
+    const afterLoad = useDJStore.getState();
+    const outState = afterLoad.decks[this.activeDeck];
+    const inState = afterLoad.decks[this.idleDeck];
 
     // Smart Cuts — when enabled, pass loaded song data so selectTransitionType
     // can override with evidence-based decisions (drum-break tail cut,
     // chord-change defer, harmonic bass-swap). The store flag is
     // `autoDJSmartCuts` (defaults false). We only fetch songs for tracker-
-    // format decks; audio-file decks return null from getLoadedSong.
+    // format decks; a track without a song returns null from getLoadedSong.
     let outSong: TrackerSong | null = null;
     let inSong: TrackerSong | null = null;
     if (store.autoDJSmartCuts) {

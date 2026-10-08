@@ -329,9 +329,10 @@ interface DJState {
    *   - defer to crossfade when a chord change is imminent
    *   - make harmonic bass-swap deterministic (vs 30% random roll) for
    *     key-compatible high-energy pairs
-   * Requires both decks loaded with tracker-format songs — audio-file
-   * decks return null from DeckEngine.getLoadedSong() and the
-   * overrides fall through to the default path.
+   * Requires both decks loaded with tracker-format songs — a deck holding
+   * a track without a song (an MP3) returns null from
+   * DeckEngine.getLoadedSong() and the overrides fall through to the
+   * default path.
    */
   autoDJSmartCuts: boolean;
   /** Pre-separate stems for upcoming playlist tracks in the background */
@@ -547,6 +548,17 @@ export const useDJStore = create<DJStore>()(
           state.decks[deck].beatGrid = null;
           state.decks[deck].frequencyPeaks = null;
           state.decks[deck].waveformPeaks = null;
+          // The previous track's key, energy and genre are not this track's:
+          // a deck loaded without an analysis kept them (Auto DJ chose its
+          // transition from the track two loads back).
+          state.decks[deck].musicalKey = null;
+          state.decks[deck].keyConfidence = 0;
+          state.decks[deck].energy = 0.5;
+          state.decks[deck].danceability = 0.5;
+          state.decks[deck].genrePrimary = null;
+          state.decks[deck].genreSubgenre = null;
+          state.decks[deck].genreConfidence = 0;
+          state.decks[deck].mood = null;
         }
         Object.assign(state.decks[deck], partial);
       }),

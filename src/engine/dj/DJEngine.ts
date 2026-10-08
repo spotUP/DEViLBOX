@@ -186,6 +186,10 @@ export class DJEngine {
       const offset = DECK_ID_OFFSETS[id];
       this.remapInstrumentIds(song, offset);
       await deck.loadSong(song);
+    } else {
+      // A track without a song must not leave the previous one behind for
+      // Auto DJ's pattern-aware decisions.
+      deck.clearLoadedSong();
     }
 
     const info = await deck.loadAudioFile(buffer, filename, precomputedPeaks);
