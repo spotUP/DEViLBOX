@@ -197,7 +197,11 @@ export function computeImprovDelta(
       return Math.sin(beatPhase * 2 * Math.PI) * depth * energy;
 
     case 'energy-reactive': {
-      const rawDelta = (energy - prevEnergy) * depth * 8;
+      // Proportional: the full depth is a swing of the whole 0..1 energy range
+      // in one tick. It was `* 8`, which made a swing of 0.125 the full depth;
+      // a drum loop swings 0.3-0.4 on every kick, so a 12 dB persona hit +12 dB
+      // on every band at every beat and -12 dB on the next tick.
+      const rawDelta = (energy - prevEnergy) * depth;
       return Math.max(-depth, Math.min(depth, rawDelta));
     }
 
