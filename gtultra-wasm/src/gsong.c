@@ -405,6 +405,24 @@ int saveinstrument(void)
 	return 0;
 }
 
+// The GTUltra settings block (ID 0x1f, written by savesong): FV/R0/P0/HR/SIDType & Speed.
+// The ID byte is already read. Shared by the GTS5 loader and the GTS! (GoatTracker 1) loader.
+static void readGTUltraSettingsBlock(FILE *handle)
+{
+	editorInfo.usefinevib = (unsigned int)fread8(handle);		// FV
+	editorInfo.optimizepulse = (unsigned int)fread8(handle);		// PO
+	editorInfo.optimizerealtime = (unsigned int)fread8(handle);		// RO
+	editorInfo.ntsc = (unsigned int)fread8(handle);		// editorInfo.ntsc / PAL
+	editorInfo.sidmodel = (unsigned int)fread8(handle);	// editorInfo.sidmodel
+	editorInfo.adparam = (unsigned int)freadle32(handle);	// HR
+	editorInfo.multiplier = (unsigned int)freadle32(handle);	// speed editorInfo.multiplier
+	editorInfo.maxSIDChannels = (int)freadle32(handle);		// sid channels
+	stereoMode = (unsigned int)fread8(handle);
+
+	validateStereoMode();
+	reInitSID();
+}
+
 int loadedSongCount = 0;
 
 
@@ -542,18 +560,7 @@ int loadsong(GTOBJECT *gt, int gt2relocMode)
 				// JP: New. Load GTUltra settings (FV/R0/P0/HR/SIDType & Speed)
 				if (ID == 0x1f)	// ID for info
 				{
-					editorInfo.usefinevib = (unsigned int)fread8(handle);		// FV
-					editorInfo.optimizepulse = (unsigned int)fread8(handle);		// PO
-					editorInfo.optimizerealtime = (unsigned int)fread8(handle);		// RO
-					editorInfo.ntsc = (unsigned int)fread8(handle);		// editorInfo.ntsc / PAL
-					editorInfo.sidmodel = (unsigned int)fread8(handle);	// editorInfo.sidmodel
-					editorInfo.adparam = (unsigned int)freadle32(handle);	// HR
-					editorInfo.multiplier = (unsigned int)freadle32(handle);	// speed editorInfo.multiplier
-					editorInfo.maxSIDChannels = (int)freadle32(handle);		// sid channels
-					stereoMode = (unsigned int)fread8(handle);
-
-					validateStereoMode();
-					reInitSID();
+					readGTUltraSettingsBlock(handle);
 					getNext++;
 				}
 
@@ -1156,6 +1163,37 @@ int loadsong(GTOBJECT *gt, int gt2relocMode)
 						if (!pattern[c][d * 4 + 2])
 							pattern[c][d * 4 + 3] = 0;
 					}
+				}
+			}
+
+			// A GoatTracker 1 song made from a packed SID carries the pack options after the
+			// filter table: the GTUltra settings block (0x1f: speed multiplier, NTSC, hard restart
+			// AD/SR) and the hard restart length in frames (0x9c, GoatTracker 1's /R option).
+			// The instruments' hard restart gatetimer is length * multiplier, as the GoatTracker 1
+			// editor computes it (goattrk.c: gatetimer = multiplier * hardrestart).
+			{
+				unsigned char optionID = 0;
+				int optionsSeen = 0;
+				int hardrestartFrames = 2;
+				while (fread(&optionID, 1, 1, handle) == 1)
+				{
+					if (optionID == 0x1f)
+					{
+						readGTUltraSettingsBlock(handle);
+						optionsSeen = 1;
+					}
+					else if (optionID == 0x9c)
+					{
+						hardrestartFrames = fread8(handle);
+						optionsSeen = 1;
+					}
+					else break;
+				}
+				if (optionsSeen)
+				{
+					int gt1gate = editorInfo.multiplier ? hardrestartFrames * (int)editorInfo.multiplier : 1;
+					for (c = 1; c < 32; c++)
+						instr[c].gatetimer = (instr[c].gatetimer & 0xc0) | (gt1gate & 0x3f);
 				}
 			}
 		}
