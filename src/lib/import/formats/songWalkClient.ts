@@ -27,8 +27,8 @@ export class WalkCancelledError extends Error {
 
 export type WalkRequest =
   | { kind: 'hippel'; bytes: Uint8Array; subsong: number; ticks: number }
-  | { kind: 'ma'; bytes: Uint8Array; subsong: number }
-  | { kind: 'fp'; code: Uint8Array; subsong: number };
+  | { kind: 'ma'; bytes: Uint8Array; subsong: number; maxRows?: number }
+  | { kind: 'fp'; code: Uint8Array; subsong: number; maxRows?: number };
 
 export type WalkResult =
   | { kind: 'hippel'; played: HippelPlayed }
@@ -57,10 +57,10 @@ export async function runWalk(req: WalkRequest): Promise<WalkResult> {
   if (req.kind === 'ma') {
     const [{ loadMaModule }, { walkMusicAssembler }] = await Promise.all([import('./maModule'), import('./maWalk')]);
     const m = loadMaModule(req.bytes);
-    return { kind: 'ma', walk: m ? walkMusicAssembler(m, req.subsong) : null };
+    return { kind: 'ma', walk: m ? walkMusicAssembler(m, req.subsong, { maxRows: req.maxRows }) : null };
   }
   const { walkFuturePlayer } = await import('./fpWalk');
-  return { kind: 'fp', walk: walkFuturePlayer(req.code, req.subsong) };
+  return { kind: 'fp', walk: walkFuturePlayer(req.code, req.subsong, { maxRows: req.maxRows }) };
 }
 
 /** The worker's body: run the walk, pack the result; `transfer` lists the buffers to move, not copy. */
@@ -145,13 +145,14 @@ export class SongWalkClient {
     return (r as Extract<WalkResult, { kind: 'hippel' }>).played;
   }
 
-  async musicAssembler(bytes: Uint8Array, subsong = 0): Promise<MaWalk | null> {
-    const r = await this.run({ kind: 'ma', bytes: bytes.slice(), subsong });
+  /** `maxRows` bounds the walk (the subsong picker only needs the first note); default is the importer's full walk. */
+  async musicAssembler(bytes: Uint8Array, subsong = 0, maxRows?: number): Promise<MaWalk | null> {
+    const r = await this.run({ kind: 'ma', bytes: bytes.slice(), subsong, maxRows });
     return (r as Extract<WalkResult, { kind: 'ma' }>).walk;
   }
 
-  async futurePlayer(code: Uint8Array, subsong = 0): Promise<FpWalk | null> {
-    const r = await this.run({ kind: 'fp', code: code.slice(), subsong });
+  async futurePlayer(code: Uint8Array, subsong = 0, maxRows?: number): Promise<FpWalk | null> {
+    const r = await this.run({ kind: 'fp', code: code.slice(), subsong, maxRows });
     return (r as Extract<WalkResult, { kind: 'fp' }>).walk;
   }
 
