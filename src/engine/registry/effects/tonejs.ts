@@ -10,6 +10,7 @@ import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { EffectDescriptor } from '../EffectDescriptor';
 import { EffectRegistry } from '../EffectRegistry';
+import { createEq3Bands } from '../../factories/eq3Bands';
 import { paramNumber } from './paramNumber';
 import { createBitCrusher } from '../../tone/bitCrusher';
 
@@ -481,34 +482,10 @@ const tonejs: EffectDescriptor[] = [
       const p = c.parameters;
       const lowFreq = paramNumber(p.lowFrequency, 250);
       const highFreq = paramNumber(p.highFrequency, 3500);
-      // Use three serial peaking filters instead of Tone.EQ3's multiband split,
-      // which has inherent phase cancellation causing ~11dB insertion loss.
-      const eqInput = new Tone.Gain(1);
-      const lowFilter = new Tone.Filter({
-        type: 'peaking' as BiquadFilterType,
-        frequency: lowFreq,
-        gain: paramNumber(p.low, 0),
-        Q: 0.5,
+      return createEq3Bands({
+        low: paramNumber(p.low, 0), mid: paramNumber(p.mid, 0), high: paramNumber(p.high, 0),
+        lowFrequency: lowFreq, highFrequency: highFreq,
       });
-      const midFilter = new Tone.Filter({
-        type: 'peaking' as BiquadFilterType,
-        frequency: Math.sqrt(lowFreq * highFreq),
-        gain: paramNumber(p.mid, 0),
-        Q: 0.7,
-      });
-      const highFilter = new Tone.Filter({
-        type: 'peaking' as BiquadFilterType,
-        frequency: highFreq,
-        gain: paramNumber(p.high, 0),
-        Q: 0.5,
-      });
-      eqInput.chain(lowFilter, midFilter, highFilter);
-      (eqInput as unknown as Record<string, unknown>)._eq3Filters = [lowFilter, midFilter, highFilter];
-      Object.defineProperty(eqInput, 'output', {
-        value: (highFilter as unknown as { output: unknown }).output,
-        configurable: true,
-      });
-      return eqInput;
     },
     getDefaultParameters: () => ({ low: 0, mid: 0, high: 0, lowFrequency: 250, highFrequency: 3500 }),
     presets: [
