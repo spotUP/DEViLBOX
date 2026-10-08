@@ -1,5 +1,5 @@
 /**
- * AYParser.ts — ZX Spectrum .ay (Project AY "ZXAY" container, EMUL payload)
+ * AYParser.ts — ZX Spectrum .ay (Project AY "ZXAY" container, EMUL and AMAD payloads)
  *
  * Playback is aylet (third-party/aylet-0.5, GPL-2) compiled to wasm: the song
  * carries the whole file as `ayFileData` and `AyletEngine` runs the tune's
@@ -155,35 +155,38 @@ export function ayContainerType(buffer: ArrayBuffer): string | null {
   return String.fromCharCode(b[4], b[5], b[6], b[7]);
 }
 
+/** True for the ZXAY payloads the wasm plays: EMUL (Z80 code) and AMAD (Amadeus, FXM song data). */
 export function isAYFormat(buffer: ArrayBuffer): boolean {
-  return ayContainerType(buffer) === 'EMUL';
+  const t = ayContainerType(buffer);
+  return t === 'EMUL' || t === 'AMAD';
 }
 
-/** True for the ZXAY payloads that need a host-side replayer (STRC, AMAD). */
+/** True for the ZXAY payloads that still need a host-side replayer nobody ported (STRC). */
 export function isAYStructuredFormat(buffer: ArrayBuffer): boolean {
-  const t = ayContainerType(buffer);
-  return t === 'STRC' || t === 'AMAD';
+  return ayContainerType(buffer) === 'STRC';
 }
 
 /**
- * STRC and AMAD are ZXAY files whose song data is NOT a Z80 program: it is
- * a structure for a replayer that lived in the host (DeliAY on the Amiga,
- * AY_Emul on Windows). No player in reach implements those replayers -
- * aylet, ayfly, libayemu, ZXTune and deadbeef all play EMUL only - so the
- * refusal says exactly that instead of "Unsupported file format".
+ * STRC is a ZXAY payload whose song data is NOT a Z80 program: it is a
+ * structure for a replayer that lived in the host (DeliAY on the Amiga,
+ * AY_Emul on Windows). No player in reach implements it, so the refusal says
+ * exactly that instead of "Unsupported file format". (AMAD, the other such
+ * payload, plays: the FXM player in the aylet wasm, third-party/fxm.)
  * See thoughts/shared/research/2026-10-04_ay-strc-amad.md.
  */
 export async function parseAYStructuredFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
   const type = ayContainerType(buffer);
-  const kind = type === 'AMAD' ? 'AMAD (Amadeus)' : type === 'STRC' ? 'STRC (structure)' : type ?? 'unknown';
+  const kind = type === 'STRC' ? 'STRC (structure)' : type ?? 'unknown';
   throw new Error(
     `${filename}: ZXAY ${kind} payload. The song is data for a replayer that lived in DeliAY / AY_Emul, ` +
-    `not Z80 code, and no available player implements it; only ZXAY EMUL files play (via aylet).`,
+    `not Z80 code, and no available player implements it; only ZXAY EMUL and AMAD files play (via aylet).`,
   );
 }
 
 export async function parseAYFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
   if (!isAYFormat(buffer)) throw new Error('Not a valid AY file');
+  // AMAD plays the same way: the aylet wasm runs its FXM player where an EMUL
+  // file has Z80 code, and the grid is drawn from the AY registers either way.
   const buf = new Uint8Array(buffer);
 
   const numSongs  = (buf[OFF_NUM_SONGS] ?? 0) + 1;
@@ -214,7 +217,7 @@ export async function parseAYFile(buffer: ArrayBuffer, filename: string): Promis
     pattern = emptyPattern(3);
   }
 
-  const name = songName(buf, firstSong) || misc || filename.replace(/\.(ay|emul)$/i, '');
+  const name = songName(buf, firstSong) || misc || filename.replace(/\.(ay|emul|amad)$/i, '');
 
   return {
     name: name + (author ? ` — ${author}` : ''),

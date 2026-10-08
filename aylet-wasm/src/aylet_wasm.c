@@ -45,6 +45,12 @@ int ay_track=0;
 static int ay_current_reg=0;
 static int do_cpc=0;
 
+/* FXM / ZXAYAMAD player (third-party/fxm/FXM.c): one fxm_loop() per 1/50 s
+ * frame leaves the 14 AY registers in fxm_get_registers(). */
+extern int fxm_init(const unsigned char *fxm,unsigned int len);
+extern void fxm_loop(void);
+extern int *fxm_get_registers(void);
+
 extern void z80_frame_reset(unsigned char *data,unsigned char *stacketc);
 extern void z80_run_frame(void);
 
@@ -53,6 +59,8 @@ static int g_sample_rate=44100;
 static int g_sound_up=0;
 static int g_loaded=0;
 static int g_finished=0;
+static int g_amad=0;				/* playing a ZXAYAMAD file on the FXM player, not Z80 code */
+static unsigned char *g_amad_data=NULL;		/* FXM keeps pointers into the file: our own copy */
 static unsigned int g_mute_mask=0xffffffffu;	/* bit n set = AY channel n audible */
 static unsigned char g_ay_shadow[16];		/* last value the tune wrote per register */
 static unsigned long g_frames_played=0;
@@ -374,6 +382,7 @@ EMSCRIPTEN_KEEPALIVE
 void aylet_wasm_stop(void)
 {
 g_loaded=0;
+g_amad=0;
 g_finished=0;
 g_ring_len=g_ring_pos=0;
 }
@@ -385,6 +394,30 @@ int aylet_wasm_load(const unsigned char *data,int len,int track)
 {
 if(!g_sound_up) return -1;
 aylet_wasm_stop();
+if(len>=8 && memcmp(data,"ZXAYAMAD",8)==0)
+  {
+  /* The Amadeus payload is FXM song data, not Z80 code: the FXM player
+   * replaces the Z80 and feeds the same AY emulation. */
+  free_aydata();
+  free(g_amad_data);
+  if((g_amad_data=malloc(len))==NULL) return -2;
+  memcpy(g_amad_data,data,len);
+  if(!fxm_init(g_amad_data,(unsigned int)len)) return -2;
+  sound_end();
+  g_sound_up=0;
+  if(!sound_init()) return -1;
+  g_sound_up=1;
+  tsmax=FRAME_STATES_128;
+  sound_ay_reset();
+  memset(g_ay_shadow,0,sizeof(g_ay_shadow));
+  ay_track=0;
+  g_frames_played=0;
+  g_fade_at=g_fade_len=0;
+  g_finished=0;
+  g_amad=1;
+  g_loaded=1;
+  return 0;
+  }
 if(!read_ay_mem(data,len)) return -2;
 /* sound.c keeps the AY stereo delay lines and the tone/envelope counters
  * across songs; a fresh sound_init() clears them, or the tail of the last
@@ -445,6 +478,21 @@ for(reg=8;reg<=10;reg++)
 /* One frame of the Z80, then one 1/50 s frame of audio into the ring. */
 static void run_one_frame(void)
 {
+if(g_amad)
+  {
+  int r;
+  const int *regs=fxm_get_registers();
+  fxm_loop();
+  /* every register is written at the frame's start, as the player's own
+   * output routine does (tstates=0), then the frame is closed */
+  tstates=0;
+  for(r=0;r<14;r++) ay_write_masked(r,regs[r]&0xff);
+  tstates=tsmax;
+  g_frames_played++;
+  sound_frame(1);
+  tstates=0;
+  return;
+  }
 z80_run_frame();
 if(g_fade_at>0 && g_frames_played==(unsigned long)g_fade_at)
   {
