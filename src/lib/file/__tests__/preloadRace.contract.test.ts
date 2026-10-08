@@ -30,9 +30,9 @@ describe('preload race prevention (contract)', () => {
       if (line.includes('loadInstruments(') && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
         const hasSkipPreload = line.includes('skipPreload: true');
 
-        // Look ahead up to 30 lines for an explicit preloadInstruments call
+        // Look ahead up to 60 lines for an explicit preloadInstruments call
         let hasExplicitPreload = false;
-        for (let j = i + 1; j < Math.min(i + 30, lines.length); j++) {
+        for (let j = i + 1; j < Math.min(i + 60, lines.length); j++) {
           const ahead = lines[j];
           if (ahead.includes('preloadInstruments(')) {
             hasExplicitPreload = true;

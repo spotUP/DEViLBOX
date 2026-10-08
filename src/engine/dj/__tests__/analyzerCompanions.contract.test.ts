@@ -20,9 +20,9 @@ const remoteSection = SRC.slice(SRC.indexOf('── Remote track'));
 
 describe('DJPlaylistAnalyzer companion handling', () => {
   it('downloads companions (TFMX smpl included) BEFORE the render in the remote section', () => {
-    // The companion download ("downloadUADECompanions") must appear before
+    // The companion download (acquireModlandCompanions, since U2.5 333e95e73) must appear before
     // any "loadOrEnqueue" call in the remote-track analysis section.
-    const companionIdx = remoteSection.indexOf('downloadUADECompanions');
+    const companionIdx = remoteSection.indexOf('acquireModlandCompanions');
     const firstEnqueue = remoteSection.indexOf('loadOrEnqueue');
     expect(companionIdx).toBeGreaterThan(0);
     expect(firstEnqueue).toBeGreaterThan(0);

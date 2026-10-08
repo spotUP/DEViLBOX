@@ -35,8 +35,12 @@ describe('the jukebox loads a Sonix song with its instruments', () => {
 
   it('the panel resolves against the song file directory and a failed load is a toast', () => {
     const src = readFileSync('src/components/jukebox/JukeboxPanel.tsx', 'utf8');
-    expect(src).toContain('gatherCompanions(name, directoryOfFile(file), bytes)');
+    // Since U2.5 (333e95e73) the panel hands openSong a url source and
+    // acquireSource resolves companions against that url's own directory.
+    expect(src).toContain("loadAndPlay({ kind: 'url', url: file,");
     expect(src).not.toMatch(/gatherCompanions\([^)]*row\.dir/);
+    const acquire = readFileSync('src/lib/song/acquireSource.ts', 'utf8');
+    expect(acquire).toContain('acquireNeighbourCompanions(name, directoryOfFile(src.url), bytes)');
     expect(src).toContain('notify.error(`Load failed');
   });
 });

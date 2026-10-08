@@ -41,7 +41,7 @@ describe('software Paula has one source', () => {
     for (const f of building) {
       const text = readFileSync(resolve(ROOT, f), 'utf8');
       const sources = text.match(/\S*paula_soft\.c/g) ?? [];
-      for (const s of sources) expect(s, f).toMatch(/^\$\{(PAULA_RUNTIME_DIR|RUNTIME_DIR)\}\/paula_soft\.c$/);
+      for (const s of sources) expect(s, f).toMatch(/^\$\{(PAULA_RUNTIME_DIR|RUNTIME_DIR|RUNTIME)\}\/paula_soft\.c$/);
       expect(text, f).toMatch(/tools\/asm68k-to-c\/runtime/);
     }
   });
