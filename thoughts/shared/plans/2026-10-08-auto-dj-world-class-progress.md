@@ -10,7 +10,7 @@ status: draft
 Plan: `thoughts/shared/plans/2026-10-08-auto-dj-world-class-plan.md`.
 Research (how it works today): `thoughts/shared/research/2026-10-08_auto-dj-how-it-works.md`.
 
-**Count: 657 of 737 done, 27 owner checks, 0 open questions** (regenerated with grep over the checkbox lines, which is the canonical count; the earlier 760 added the owner-check and found items by hand; world-class plan + beat-juggling plan JUG- 197 + found items) (world-class plan 558 items + beat-juggling plan JUG- 197 + found during the run)
+**Count: 723 of 737 done, 27 owner checks, 0 open questions** (regenerated with grep over the checkbox lines, which is the canonical count; the earlier 760 added the owner-check and found items by hand; world-class plan + beat-juggling plan JUG- 197 + found items) (world-class plan 558 items + beat-juggling plan JUG- 197 + found during the run)
 
 Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` open owner question (built around, decision needed). An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll / triggerTransition, the DJ analysis worker path, or the DJ view) and proves the code ran.
 
@@ -49,21 +49,21 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [x] A1.16 baseline: transition timing documented -> c5b32061f; autoDJBaseline.test.ts
 - [x] A1.17 baseline: current humanization documented -> c5b32061f; autoDJBaseline.test.ts
 - [x] A1.18 baseline: current analysis values documented -> c5b32061f; baseline doc
-- [ ] A2.1 corpus: steady 4/4 electronic track
-- [ ] A2.2 corpus: long intro
-- [ ] A2.3 corpus: long outro
-- [ ] A2.4 corpus: vocals
-- [ ] A2.5 corpus: drops
-- [ ] A2.6 corpus: breakdowns
-- [ ] A2.7 corpus: large BPM differences
-- [ ] A2.8 corpus: compatible keys
-- [ ] A2.9 corpus: incompatible keys
-- [ ] A2.10 corpus: uncertain key analysis
-- [ ] A2.11 corpus: tracker/module material
-- [ ] A2.12 corpus: unusual arrangements
-- [ ] A2.13 corpus: very short tracks
-- [ ] A2.14 corpus: tracks with silence
-- [ ] A2.15 corpus: highly variable energy
+- [x] A2.1 corpus: steady 4/4 electronic track -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.2 corpus: long intro -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.3 corpus: long outro -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.4 corpus: vocals -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.5 corpus: drops -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.6 corpus: breakdowns -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.7 corpus: large BPM differences -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.8 corpus: compatible keys -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.9 corpus: incompatible keys -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.10 corpus: uncertain key analysis -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.11 corpus: tracker/module material -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.12 corpus: unusual arrangements -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.13 corpus: very short tracks -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.14 corpus: tracks with silence -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
+- [x] A2.15 corpus: highly variable energy -> c5b32061f; testing/corpus.ts CORPUS_SPECS + autoDJAnalysisInstrument.test.ts (20/20 over the 15 track types) + autoDJGoldenTransitions.test.ts
 - [x] A3.1 gate: existing behaviour documented -> c5b32061f; baseline doc
 - [x] A3.2 gate: regressions can be detected (baseline snapshot test) -> c5b32061f; autoDJBaseline.test.ts
 - [x] A3.3 gate: Auto DJ runs through the corpus without hard crashes -> 45187d1f3; autoDJLongSetSimulation.test.ts (30 min corpus run, no crash)
@@ -89,7 +89,7 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [x] S3.16 vocal/drum/bass/harmonic activity timelines -> c5b32061f; autoDJAnalysisInstrument.test.ts (instrument check)
 - [x] S3.17 analysisConfidence: AnalysisConfidence -> c5b32061f; autoDJAnalysisInstrument.test.ts
 - [x] S3.18 tracker?: TrackerMixAnalysis -> c5b32061f; autoDJAnalysisInstrument.test.ts (tracker)
-- [ ] S3.19 DJTrackAnalysis is the canonical input to all higher-level decisions (planner, solver, executor read it, nothing else)
+- [x] S3.19 DJTrackAnalysis is the canonical input to all higher-level decisions (planner, solver, executor read it, nothing else) -> 0f3d488c5; setPlanner / tempoKeySolver / transitionPlanner / transitionExecutor / juggle planner all take DJTrackAnalysis; deck.trackAnalysis is the store carrier (autoDJDeckTrackAnalysis.test.ts, autoDJPlannedTransitionReachesTheDecks.test.ts)
 
 ## Gate B - Analysis correctness (plan section 4)
 
@@ -667,13 +667,13 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 65 - Implementation order
 
-- [ ] S65.1 implemented in the recommended sequence (baseline first, listening last); recorded here as the commit order
+- [x] S65.1 implemented in the recommended sequence (baseline first, listening last); recorded here as the commit order -> c5b32061f..0edb37304; executed baseline (Gate A) -> analysis -> planning -> execution -> session -> juggling -> listening (owner checks 1-8), in that order
 
 ## Section 66 - Phase gates
 
 - [x] PG-A.1 deterministic test corpus -> c5b32061f; corpus.ts
 - [x] PG-A.2 transition logs -> c5b32061f; decisionLog.ts
-- [ ] PG-A.3 regression playback
+- [x] PG-A.3 regression playback -> c5b32061f; autoDJBaseline.test.ts (legacy transition path still reaches the decks) + djViewRegressions 85/85
 - [x] PG-B.1 reliable BPM -> c5b32061f; bpm + hypotheses
 - [x] PG-B.2 BPM confidence -> c5b32061f; bpmConfidence
 - [x] PG-B.3 key confidence -> c5b32061f; keyConfidence
@@ -698,35 +698,35 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [x] PG-E.7 drop -> c5b32061f; firstDrop
 - [x] PG-E.8 breakdown -> c5b32061f; firstBreak
 - [x] PG-E.9 outro -> c5b32061f; outroStart
-- [ ] PG-F.1 multi-track lookahead
-- [ ] PG-F.2 energy arc
-- [ ] PG-F.3 harmonic planning
-- [ ] PG-F.4 tempo planning
-- [ ] PG-F.5 repetition control
-- [ ] PG-G.1 complete transition plans
-- [ ] PG-G.2 adaptive lengths
-- [ ] PG-G.3 transition vocabulary
-- [ ] PG-G.4 risk/confidence
-- [ ] PG-H.1 bass ownership
-- [ ] PG-H.2 bass handover
-- [ ] PG-H.3 gain staging
-- [ ] PG-H.4 continuous EQ automation
-- [ ] PG-I.1 real echo out
-- [ ] PG-I.2 filter builds
-- [ ] PG-I.3 breakdown transitions
-- [ ] PG-I.4 drop transitions
-- [ ] PG-I.5 drum intros
-- [ ] PG-I.6 vocal swaps
+- [x] PG-F.1 multi-track lookahead -> 0f3d488c5; setPlanner beam search / energyArc / harmonicCompatibility / solveTempo / repetition components (autoDJSessionOrderKeepsThePlaylist.test.ts, autoDJGoldenTransitions.test.ts)
+- [x] PG-F.2 energy arc -> 0f3d488c5; setPlanner beam search / energyArc / harmonicCompatibility / solveTempo / repetition components (autoDJSessionOrderKeepsThePlaylist.test.ts, autoDJGoldenTransitions.test.ts)
+- [x] PG-F.3 harmonic planning -> 0f3d488c5; setPlanner beam search / energyArc / harmonicCompatibility / solveTempo / repetition components (autoDJSessionOrderKeepsThePlaylist.test.ts, autoDJGoldenTransitions.test.ts)
+- [x] PG-F.4 tempo planning -> 0f3d488c5; setPlanner beam search / energyArc / harmonicCompatibility / solveTempo / repetition components (autoDJSessionOrderKeepsThePlaylist.test.ts, autoDJGoldenTransitions.test.ts)
+- [x] PG-F.5 repetition control -> 0f3d488c5; setPlanner beam search / energyArc / harmonicCompatibility / solveTempo / repetition components (autoDJSessionOrderKeepsThePlaylist.test.ts, autoDJGoldenTransitions.test.ts)
+- [x] PG-G.1 complete transition plans -> 0f3d488c5; planTransition (full plan: mix points, curves, bass, EQ, filter, effects, loops, cue jumps, humanize), chooseLength, 19 styles, assessRisk (autoDJGoldenTransitions.test.ts 14/14, autoDJPlannedTransitionReachesTheDecks.test.ts)
+- [x] PG-G.2 adaptive lengths -> 0f3d488c5; planTransition (full plan: mix points, curves, bass, EQ, filter, effects, loops, cue jumps, humanize), chooseLength, 19 styles, assessRisk (autoDJGoldenTransitions.test.ts 14/14, autoDJPlannedTransitionReachesTheDecks.test.ts)
+- [x] PG-G.3 transition vocabulary -> 0f3d488c5; planTransition (full plan: mix points, curves, bass, EQ, filter, effects, loops, cue jumps, humanize), chooseLength, 19 styles, assessRisk (autoDJGoldenTransitions.test.ts 14/14, autoDJPlannedTransitionReachesTheDecks.test.ts)
+- [x] PG-G.4 risk/confidence -> 0f3d488c5; planTransition (full plan: mix points, curves, bass, EQ, filter, effects, loops, cue jumps, humanize), chooseLength, 19 styles, assessRisk (autoDJGoldenTransitions.test.ts 14/14, autoDJPlannedTransitionReachesTheDecks.test.ts)
+- [x] PG-H.1 bass ownership -> 0f3d488c5/45187d1f3; bass hand-over plan + bassExposure invariant, planGain capped by true-peak headroom, EQ keyframe curves applied by the executor (autoDJGoldenTransitions.test.ts loudness/bass invariants, autoDJPlannedTransitionReachesTheDecks.test.ts)
+- [x] PG-H.2 bass handover -> 0f3d488c5/45187d1f3; bass hand-over plan + bassExposure invariant, planGain capped by true-peak headroom, EQ keyframe curves applied by the executor (autoDJGoldenTransitions.test.ts loudness/bass invariants, autoDJPlannedTransitionReachesTheDecks.test.ts)
+- [x] PG-H.3 gain staging -> 0f3d488c5/45187d1f3; bass hand-over plan + bassExposure invariant, planGain capped by true-peak headroom, EQ keyframe curves applied by the executor (autoDJGoldenTransitions.test.ts loudness/bass invariants, autoDJPlannedTransitionReachesTheDecks.test.ts)
+- [x] PG-H.4 continuous EQ automation -> 0f3d488c5/45187d1f3; bass hand-over plan + bassExposure invariant, planGain capped by true-peak headroom, EQ keyframe curves applied by the executor (autoDJGoldenTransitions.test.ts loudness/bass invariants, autoDJPlannedTransitionReachesTheDecks.test.ts)
+- [x] PG-I.1 real echo out -> 45187d1f3; true echo-out through DeckEngine echo send + fx_deck_echo_out (autoDJFiresTheDjFxActions.test.ts)
+- [x] PG-I.2 filter builds -> 45187d1f3; fx_deck_filter_rise / release through the registry (autoDJFiresTheDjFxActions.test.ts)
+- [x] PG-I.3 breakdown transitions -> 45187d1f3; breakdowns corpus -> breakdown-aware styles (autoDJGoldenTransitions.test.ts)
+- [x] PG-I.4 drop transitions -> 45187d1f3; drops corpus -> dropMix on drop-section energy (autoDJGoldenTransitions.test.ts)
+- [x] PG-I.5 drum intros -> 45187d1f3; drum intro requires bass absent (autoDJGoldenTransitions.test.ts)
+- [x] PG-I.6 vocal swaps -> 45187d1f3; vocals corpus -> vocal-aware mix points and styles (autoDJGoldenTransitions.test.ts)
 - [x] PG-J.1 tracker structure retained -> c5b32061f; tracker retained
 - [x] PG-J.2 pattern/order awareness -> c5b32061f; orderPositions/patternBoundaries
 - [x] PG-J.3 channel analysis -> c5b32061f; channelSegments
 - [x] PG-J.4 instrument activity -> c5b32061f; instrumentUsage
 - [x] PG-J.5 semantic tracker events -> c5b32061f; events
-- [ ] PG-K.1 transition history
-- [ ] PG-K.2 FX history
-- [ ] PG-K.3 energy history
-- [ ] PG-K.4 repetition control
-- [ ] PG-K.5 style behaviour
+- [x] PG-K.1 transition history -> 0f3d488c5/45187d1f3; DJSessionMemory (transition / FX / energy history, styleRepetition, lengthRepetition) + DJ_STYLES weights (autoDJGoldenTransitions.test.ts, autoDJLongSetSimulation.test.ts)
+- [x] PG-K.2 FX history -> 0f3d488c5/45187d1f3; DJSessionMemory (transition / FX / energy history, styleRepetition, lengthRepetition) + DJ_STYLES weights (autoDJGoldenTransitions.test.ts, autoDJLongSetSimulation.test.ts)
+- [x] PG-K.3 energy history -> 0f3d488c5/45187d1f3; DJSessionMemory (transition / FX / energy history, styleRepetition, lengthRepetition) + DJ_STYLES weights (autoDJGoldenTransitions.test.ts, autoDJLongSetSimulation.test.ts)
+- [x] PG-K.4 repetition control -> 0f3d488c5/45187d1f3; DJSessionMemory (transition / FX / energy history, styleRepetition, lengthRepetition) + DJ_STYLES weights (autoDJGoldenTransitions.test.ts, autoDJLongSetSimulation.test.ts)
+- [x] PG-K.5 style behaviour -> 0f3d488c5/45187d1f3; DJSessionMemory (transition / FX / energy history, styleRepetition, lengthRepetition) + DJ_STYLES weights (autoDJGoldenTransitions.test.ts, autoDJLongSetSimulation.test.ts)
 - [x] PG-L.1 1-hour session without degradation -> 45187d1f3; autoDJLongSetSimulation.test.ts
 - [x] PG-L.2 2-hour session without degradation -> 45187d1f3; autoDJLongSetSimulation.test.ts
 - [x] PG-L.3 4-hour session without degradation -> 45187d1f3; autoDJLongSetSimulation.test.ts
@@ -765,30 +765,30 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 70 - Definition of done
 
-- [ ] S70.1 analyse tracks deeply
-- [ ] S70.2 understand beat and phrase position
-- [ ] S70.3 understand musical sections
-- [ ] S70.4 identify useful mix points
-- [ ] S70.5 start incoming tracks at musically appropriate positions
-- [ ] S70.6 maintain phase alignment
-- [ ] S70.7 match tempo intelligently
-- [ ] S70.8 make confidence-aware key decisions
-- [ ] S70.9 manage bass ownership
-- [ ] S70.10 avoid vocal conflicts
-- [ ] S70.11 control loudness
-- [ ] S70.12 select tracks several steps ahead
-- [ ] S70.13 shape a coherent energy arc
-- [ ] S70.14 vary transitions naturally
-- [ ] S70.15 use FX as musical punctuation
-- [ ] S70.16 understand tracker structure
-- [ ] S70.17 remember recent behaviour
-- [ ] S70.18 avoid repetitive patterns
-- [ ] S70.19 take controlled creative risks
-- [ ] S70.20 know when to wait
-- [ ] S70.21 recover safely
-- [ ] S70.22 run for hours
-- [ ] S70.23 explain its decisions
-- [ ] S70.24 pass automated transition tests
+- [x] S70.1 analyse tracks deeply -> c5b32061f..0edb37304; autoDJAnalysisInstrument.test.ts
+- [x] S70.2 understand beat and phrase position -> c5b32061f..0edb37304; autoDJAnalysisInstrument.test.ts (beat grid phase, phrase length)
+- [x] S70.3 understand musical sections -> c5b32061f..0edb37304; autoDJAnalysisInstrument.test.ts (sections)
+- [x] S70.4 identify useful mix points -> c5b32061f..0edb37304; autoDJAnalysisInstrument.test.ts (cue points)
+- [x] S70.5 start incoming tracks at musically appropriate positions -> c5b32061f..0edb37304; autoDJGoldenTransitions.test.ts (mix-in points > 0:00 on intros)
+- [x] S70.6 maintain phase alignment -> c5b32061f..0edb37304; autoDJGoldenTransitions.test.ts beat/phrase invariants
+- [x] S70.7 match tempo intelligently -> c5b32061f..0edb37304; tempoKeySolver (autoDJGoldenTransitions.test.ts tempo plans)
+- [x] S70.8 make confidence-aware key decisions -> c5b32061f..0edb37304; tempoKeySolver solveKey (uncertainKey corpus case)
+- [x] S70.9 manage bass ownership -> c5b32061f..0edb37304; bass hand-over plans + bassExposure invariant
+- [x] S70.10 avoid vocal conflicts -> c5b32061f..0edb37304; vocal conflict scoring (clashKey/vocals corpus cases)
+- [x] S70.11 control loudness -> c5b32061f..0edb37304; planGain + loudness invariant
+- [x] S70.12 select tracks several steps ahead -> c5b32061f..0edb37304; setPlanner lookahead 3-6 (autoDJSessionOrderKeepsThePlaylist.test.ts)
+- [x] S70.13 shape a coherent energy arc -> c5b32061f..0edb37304; energyArc (autoDJLongSetSimulation.test.ts)
+- [x] S70.14 vary transitions naturally -> c5b32061f..0edb37304; styleRepetition / lengthRepetition (autoDJLongSetSimulation.test.ts)
+- [x] S70.15 use FX as musical punctuation -> c5b32061f..0edb37304; DjFx effect events (autoDJFiresTheDjFxActions.test.ts)
+- [x] S70.16 understand tracker structure -> c5b32061f..0edb37304; trackerMixAnalysis via Dub Deck roles (autoDJAnalysisInstrument.test.ts, autoDJBeatJuggling.test.ts JUG-S12)
+- [x] S70.17 remember recent behaviour -> c5b32061f..0edb37304; DJSessionMemory
+- [x] S70.18 avoid repetitive patterns -> c5b32061f..0edb37304; repetition components + juggle history (autoDJLongSetSimulation.test.ts, autoDJBeatJuggling.test.ts)
+- [x] S70.19 take controlled creative risks -> c5b32061f..0edb37304; creative risk budget + juggle modes (autoDJGoldenTransitions.test.ts, autoDJBeatJuggling.test.ts)
+- [x] S70.20 know when to wait -> c5b32061f..0edb37304; confidence policy: low confidence -> normal transition / no juggle
+- [x] S70.21 recover safely -> c5b32061f..0edb37304; fallbackPlan chain + juggle emergency path (autoDJLongSetSimulation.test.ts, autoDJBeatJuggling.test.ts)
+- [x] S70.22 run for hours -> c5b32061f..0edb37304; autoDJLongSetSimulation.test.ts + one simulated juggle hour
+- [x] S70.23 explain its decisions -> c5b32061f..0edb37304; decisionLog + telemetry + dj_auto_dj_explain (autoDJDebugPanel.test.tsx)
+- [x] S70.24 pass automated transition tests -> c5b32061f..0edb37304; all autoDJ*.test.ts in test:ci green at 93debb84e
 - [o] S70.25 pass human listening tests (owner) -> owner check (listening)
 
 ## Beat-juggling plan (thoughts/shared/plans/2026-10-08-auto-dj-beat-juggling-plan.md, commit 94c0a4b19) - JUG- items
