@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { createDbGainFilter } from '@/engine/factories/dbGainFilter';
 import { GuitarMLEngine } from '../GuitarMLEngine';
 import { getNativeContext, getNativeAudioNode } from '@utils/audio-context';
 
@@ -65,7 +66,7 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
       highFrequency: 2500,
     });
 
-    this.presenceFilter = new Tone.Filter({
+    this.presenceFilter = createDbGainFilter({
       type: 'highshelf',
       frequency: 4000,
       gain: 0,
