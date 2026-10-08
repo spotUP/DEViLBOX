@@ -152,6 +152,8 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
   // benDaglish: likewise, benDaglishLiveSwap.test.ts (note edits; the exporter writes no other BD edit).
   benDaglish: 'pass',
   digitalSonixChrome: 'pass',
+  // hvl: hivelyLiveEdit.test.ts - the view's edit writes the step into the running tune (hively_set_track_step), no module swap.
+  hvl: 'pass',
   jochenHippelST: 'pass',
   // musicAssembler, pumaTracker, sidmon2: the same measurement (musicAssemblerLiveSwap, pumaTrackerLiveSwap, sidMon2LiveSwap .test.ts).
   musicAssembler: 'pass',

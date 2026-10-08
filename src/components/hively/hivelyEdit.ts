@@ -47,6 +47,24 @@ export function projectHivelyTrack(trackIdx: number, rows?: readonly number[]): 
   });
 }
 
+/**
+ * Hand rows of a native track to the running Hively tune (G24): the engine's own memory write (hively_set_track_step), so the
+ * edit is heard the next time the song reaches the step, with no restart. No engine running, nothing to do: the next play loads the
+ * edited module.
+ */
+function pushHivelyTrackToEngine(trackIdx: number, rows?: readonly number[]): void {
+  const track = useFormatStore.getState().hivelyNative?.tracks[trackIdx];
+  if (!track) return;
+  void import('@/engine/hively/HivelyEngine').then(({ HivelyEngine }) => {
+    if (!HivelyEngine.hasInstance()) return;
+    const engine = HivelyEngine.getInstance();
+    for (const r of rows ?? track.steps.map((_, i) => i)) {
+      const st = track.steps[r];
+      if (st) engine.setTrackStep(trackIdx, r, st.note, st.instrument, st.fx, st.fxParam, st.fxb, st.fxbParam);
+    }
+  });
+}
+
 /** Edit one cell of the position shown by the view: channel `channelIdx`, row `rowIdx`, column `columnKey`. */
 export function editHivelyCell(position: number, channelIdx: number, rowIdx: number, columnKey: string, value: number): void {
   const fmt = useFormatStore.getState();
@@ -56,6 +74,7 @@ export function editHivelyCell(position: number, channelIdx: number, rowIdx: num
   if (!native || !update || trackIdx === undefined || trackIdx < 0 || !native.tracks[trackIdx]?.steps[rowIdx]) return;
   fmt.setHivelyTrackStep(trackIdx, rowIdx, update);
   projectHivelyTrack(trackIdx, [rowIdx]);
+  pushHivelyTrackToEngine(trackIdx, [rowIdx]);
 }
 
 /** Undo / redo the last native step edit and project the track it touched. Returns false when there was nothing. */
@@ -65,6 +84,7 @@ export function undoHively(): boolean {
   if (!entry) return false;
   fmt.undoHivelyTrackStep();
   projectHivelyTrack(entry.trackIndex, [entry.stepIndex]);
+  pushHivelyTrackToEngine(entry.trackIndex, [entry.stepIndex]);
   return true;
 }
 export function redoHively(): boolean {
@@ -73,6 +93,7 @@ export function redoHively(): boolean {
   if (!entry) return false;
   fmt.redoHivelyTrackStep();
   projectHivelyTrack(entry.trackIndex, [entry.stepIndex]);
+  pushHivelyTrackToEngine(entry.trackIndex, [entry.stepIndex]);
   return true;
 }
 
@@ -80,10 +101,12 @@ export function redoHively(): boolean {
 export function insertHivelyRow(trackIdx: number, rowIdx: number): void {
   useFormatStore.getState().insertHivelyTrackRow(trackIdx, rowIdx);
   projectHivelyTrack(trackIdx);
+  pushHivelyTrackToEngine(trackIdx);
 }
 export function deleteHivelyRow(trackIdx: number, rowIdx: number): void {
   useFormatStore.getState().deleteHivelyTrackRow(trackIdx, rowIdx);
   projectHivelyTrack(trackIdx);
+  pushHivelyTrackToEngine(trackIdx);
 }
 
 /** The view's `onFormatCellChange` for the position it shows. */
