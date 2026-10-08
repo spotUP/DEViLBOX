@@ -158,6 +158,7 @@ export function applyEffectParametersDiff(
         if ('ratio' in changed) node.ratio.rampTo(changed.ratio as number, R);
         if ('attack' in changed) node.attack.rampTo(changed.attack as number, R);
         if ('release' in changed) node.release.rampTo(changed.release as number, R);
+        if ('knee' in changed) node.knee.rampTo(changed.knee as number, R);
       }
       break;
 
