@@ -942,6 +942,23 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/suntronic/SunTronicSongEngine')).SunTronicSongEngine as unknown as WASMSingletonStatic,
   },
   {
+    // Jochen Hippel Atari ST (.hst, .sog TFMX-ST/MMME, .soc COSO-ST): the Wanted Team
+    // ST player transpiled to C (hippelst-wasm) leaves the YM2149 registers each 50 Hz
+    // tick, Furnace's YM2149 core makes the sound. The playback image the grid is a
+    // reading of (HstSongEdit.image) is the module; the subsong is the one the grid shows
+    // (the format store's uadeEditableCurrentSubsong, read at load, as UADE's loadTune does).
+    key: 'HippelSt',
+    synthType: 'HippelStSongSynth',
+    suppressNotes: true,
+    fileDataKey: 'hippelStFileData',
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/hippelst/HippelStEngine')).HippelStEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'UADEEditable',
     synthType: 'UADEEditableSynth',
     suppressNotes: true,
