@@ -1753,5 +1753,84 @@
     "makeUpDb": 1,
     "oldMakeUpDb": 6.1,
     "at": "2026-09-30T10:30:58.801Z"
+  },
+  "Clean Master": {
+    "name": "Clean Master",
+    "types": [
+      "EQ3",
+      "Compressor"
+    ],
+    "chainDb": -1.6,
+    "makeUpDb": 1.6,
+    "oldMakeUpDb": 2.3,
+    "at": "2026-10-08T11:20:40.218Z"
+  },
+  "Balanced": {
+    "name": "Balanced",
+    "types": [
+      "EQ3",
+      "Compressor",
+      "StereoWidener"
+    ],
+    "chainDb": -2.5,
+    "makeUpDb": 2.5,
+    "oldMakeUpDb": 6.5,
+    "at": "2026-10-08T11:21:50.963Z"
+  },
+  "Brick Wall": {
+    "name": "Brick Wall",
+    "types": [
+      "EQ3",
+      "Compressor"
+    ],
+    "chainDb": -1.4,
+    "makeUpDb": 1.4,
+    "oldMakeUpDb": 2.7,
+    "at": "2026-10-08T11:22:00.833Z"
+  },
+  "House": {
+    "name": "House",
+    "types": [
+      "EQ3",
+      "Compressor",
+      "StereoWidener"
+    ],
+    "chainDb": -1,
+    "makeUpDb": 1,
+    "oldMakeUpDb": 5.3,
+    "at": "2026-10-08T11:22:10.740Z"
+  },
+  "Drum & Bass": {
+    "name": "Drum & Bass",
+    "types": [
+      "EQ3",
+      "Compressor"
+    ],
+    "chainDb": -1.5,
+    "makeUpDb": 1.5,
+    "oldMakeUpDb": 2.7,
+    "at": "2026-10-08T11:22:20.656Z"
+  },
+  "Punchy Drums": {
+    "name": "Punchy Drums",
+    "types": [
+      "Compressor",
+      "EQ3"
+    ],
+    "chainDb": 0.2,
+    "makeUpDb": 0,
+    "oldMakeUpDb": 1.2,
+    "at": "2026-10-08T11:22:30.452Z"
+  },
+  "Clean Vocal": {
+    "name": "Clean Vocal",
+    "types": [
+      "Compressor",
+      "EQ3"
+    ],
+    "chainDb": -1.9,
+    "makeUpDb": 1.9,
+    "oldMakeUpDb": 2.4,
+    "at": "2026-10-08T11:22:40.291Z"
   }
 }

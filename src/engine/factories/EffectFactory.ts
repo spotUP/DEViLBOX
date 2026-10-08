@@ -8,6 +8,7 @@ import * as Tone from 'tone';
 import { getWetPathGain } from './effectGainCompensation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
+import { createEq3Bands } from './eq3Bands';
 import { TapeSaturation } from '../effects/TapeSaturation';
 import { NeuralEffectWrapper } from '../effects/NeuralEffectWrapper';
 import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
@@ -511,37 +512,12 @@ export async function createEffect(
       });
       break;
 
-    case 'EQ3': {
-      // Use three serial peaking filters instead of Tone.EQ3's multiband split,
-      // which has inherent phase cancellation causing ~11dB insertion loss.
-      // Peaking filters are transparent at 0dB gain (no band splitting).
-      const eqInput = new Tone.Gain(1);
-      const lowFilter = new Tone.Filter({
-        type: 'peaking' as BiquadFilterType,
-        frequency: p.lowFrequency || 250,
-        gain: p.low || 0,
-        Q: 0.5,
+    case 'EQ3':
+      node = createEq3Bands({
+        low: p.low || 0, mid: p.mid || 0, high: p.high || 0,
+        lowFrequency: p.lowFrequency || 250, highFrequency: p.highFrequency || 3500,
       });
-      const midFilter = new Tone.Filter({
-        type: 'peaking' as BiquadFilterType,
-        frequency: Math.sqrt((p.lowFrequency || 250) * (p.highFrequency || 3500)),
-        gain: p.mid || 0,
-        Q: 0.7,
-      });
-      const highFilter = new Tone.Filter({
-        type: 'peaking' as BiquadFilterType,
-        frequency: p.highFrequency || 3500,
-        gain: p.high || 0,
-        Q: 0.5,
-      });
-      eqInput.chain(lowFilter, midFilter, highFilter);
-      // Store filters for parameter updates
-      (eqInput as unknown as Record<string, unknown>)._eq3Filters = [lowFilter, midFilter, highFilter];
-      // Override output so chain connects FROM highFilter
-      Object.defineProperty(eqInput, 'output', { value: (highFilter as unknown as { output: unknown }).output, configurable: true });
-      node = eqInput;
       break;
-    }
 
     case 'Filter':
       node = new Tone.Filter({
