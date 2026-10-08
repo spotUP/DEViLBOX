@@ -64,6 +64,51 @@ function warmToneNoiseCaches(Tone: typeof import('tone')): void {
   }
 }
 
+/** Impulse responses Tone is still rendering — see `holdToneImpulseResponses`. */
+const pendingImpulseResponses = new Set<Promise<unknown>>();
+
+/**
+ * Make Tone.Reverb's impulse response a thing the rig can wait for.
+ *
+ * Reverb.generate() renders its IR on a nested Tone.OfflineContext and sets it
+ * on the convolver only when that render resolves. Two things made that land
+ * mid-render, at a different block each time (first differing sample 2304 or
+ * 2432, about 1 run in 2): the nested render yields through `setTimeout`,
+ * which the rig has faked, so it advanced only on the render's own 10 ms
+ * steps; and nothing waited for it. SpaceEchoEffect builds one Reverb, so the
+ * echo bus gained its reverb tail at whichever step the nested render
+ * happened to finish on (O3b, 2026-10-08).
+ *
+ * The render is run without its timer yields, and every generate() is
+ * recorded so `toneImpulseResponsesSettled` can wait for the buffer to be set
+ * before the audio render starts.
+ */
+function holdToneImpulseResponses(Tone: typeof import('tone')): void {
+  const offline = Tone.OfflineContext.prototype as unknown as { render: (asynchronous?: boolean) => Promise<unknown>; _rigPatched?: boolean };
+  if (!offline._rigPatched) {
+    const render = offline.render;
+    offline.render = function (this: unknown) { return render.call(this, false); };
+    offline._rigPatched = true;
+  }
+  const reverb = Tone.Reverb.prototype as unknown as { generate: () => Promise<unknown>; _rigPatched?: boolean };
+  if (!reverb._rigPatched) {
+    const generate = reverb.generate;
+    reverb.generate = function (this: unknown) {
+      const done = generate.call(this);
+      pendingImpulseResponses.add(done);
+      const forget = () => { pendingImpulseResponses.delete(done); };
+      done.then(forget, forget);
+      return done;
+    };
+    reverb._rigPatched = true;
+  }
+}
+
+/** Resolve once every impulse response Tone started has been set on its convolver. */
+async function toneImpulseResponsesSettled(): Promise<void> {
+  while (pendingImpulseResponses.size > 0) await Promise.all([...pendingImpulseResponses].map((p) => p.catch(() => undefined)));
+}
+
 /** Call from afterAll: the rig leaves fake timers and a seeded Math.random installed between renders. */
 export function releaseDubBusRigClock(): void {
   vi.useRealTimers();
@@ -95,6 +140,7 @@ export function loadDubBus(): Promise<{ Tone: typeof import('tone'); DubBus: typ
     servePublicToFetch();
     loaded = (async () => {
       const Tone = await import('tone');
+      holdToneImpulseResponses(Tone);
       warmToneNoiseCaches(Tone);
       const { DubBus } = await import('@/engine/dub/DubBus');
       return { Tone, DubBus };
@@ -122,6 +168,7 @@ export async function makeDubBusRig(seconds: number): Promise<DubBusRig> {
   // Every worklet module and WASM file the bus asked for, plus a quiet spell
   // for the 'ready' messages that splice each processor in.
   await audioLoadsSettled();
+  await toneImpulseResponsesSettled();
 
   const render = async (actions: TimelineAction[] = [], stepSec = 0.01): Promise<AudioBuffer> => {
     const pending = [...actions].sort((a, b) => a.at - b.at);
@@ -134,7 +181,7 @@ export async function makeDubBusRig(seconds: number): Promise<DubBusRig> {
     // processor's thread reads them. Holding the render while they arrive
     // makes a change apply at the block it was made in, not a random later
     // one — without this, identical renders differed by 2 dB.
-    const settleMessages = (ran: boolean) => realDelay(ran ? MESSAGE_SETTLE_MS : 1);
+    const settleMessages = async (ran: boolean) => { await realDelay(ran ? MESSAGE_SETTLE_MS : 1); await toneImpulseResponsesSettled(); };
     await settleMessages(runDue(0));
     const steps = Math.floor(seconds / stepSec) - 1;
     let suspendFailure: unknown = null;
