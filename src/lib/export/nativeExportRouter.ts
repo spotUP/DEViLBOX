@@ -338,6 +338,24 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     }
   }
 
+  // A format with a fixed cell layout and no exporter of its own (Dave Lowe, Sound Player ...): the module the song was loaded from with
+  // each edited cell's bytes written where the layout puts it - the file Stop and Play would load, and the one a reload reads.
+  if (!result && layoutFormatId && song.uadePatternLayout?.encodeCell && !song.uadePatternLayout.writeCell) {
+    const source = song.uadeEditableFileData ?? song.eaglePlayerFileData;
+    if (source) {
+      const { patchModuleByLayout } = await import('./layoutPatch');
+      const patched = patchModuleByLayout(source, song.uadePatternLayout, song.patterns);
+      const ext = (song.uadeEditableFileName ?? '').split('.').pop() || 'bin';
+      result = {
+        data: patched.bytes,
+        filename: `${baseName}.${ext}`,
+        warnings: patched.unplaced.length > 0
+          ? [`${patched.unplaced.length} note(s) typed on rows the module has no place for were not saved (pattern:channel:row ${patched.unplaced.slice(0, 8).map((u) => `${u.pattern}:${u.channel}:${u.row}`).join(', ')})`]
+          : [],
+      };
+    }
+  }
+
   // Chip-RAM readback — captures live pattern edits for any running UADE format.
   // Only when a chip-RAM layout exists AND UADE is live; NEVER return raw bytes here.
   if (!result && layoutFormatId) {
