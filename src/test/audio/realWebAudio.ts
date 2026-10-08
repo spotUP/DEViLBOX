@@ -54,6 +54,35 @@ const GLOBALS = [
   'OscillatorNode', 'PannerNode', 'PeriodicWave', 'StereoPannerNode', 'WaveShaperNode',
 ] as const;
 
+/** Contexts the quiet stand-in has handed out: a test can assert nothing real was opened. */
+export const quietContextsCreated = { count: 0 };
+
+/**
+ * `new AudioContext()` from node-web-audio-api is a REAL-TIME context: it opens
+ * the machine's output device. Tone.js builds its default context at import
+ * (`Transport = getContext().transport`), so any test that installs the real
+ * globals and imports Tone opened the speakers (2026-10-08: the owner heard it
+ * in a meeting). Every realtime constructor is a context that renders nothing
+ * and cannot reach a device: an OfflineAudioContext that is never rendered.
+ * Rendering is always done on an explicit OfflineAudioContext.
+ */
+function blockRealtimeAudio(): void {
+  const Offline = (webAudio as unknown as { OfflineAudioContext: new (c: number, n: number, sr: number) => object }).OfflineAudioContext;
+  class QuietContext extends (Offline as unknown as new (c: number, n: number, sr: number) => object) {
+    constructor(options?: { sampleRate?: number }) {
+      // Proof switch: with this set, any code that reaches for a realtime context fails loudly instead of making one.
+      if (process.env.AUDIO_CONTEXT_THROWS === '1') throw new Error('a realtime AudioContext was requested');
+      super(2, 48000, options?.sampleRate ?? 48000);
+      quietContextsCreated.count++;
+    }
+  }
+  const g = globalThis as unknown as Record<string, unknown> & { window?: Record<string, unknown> };
+  for (const name of ['AudioContext', 'webkitAudioContext']) {
+    g[name] = QuietContext;
+    if (g.window) g.window[name] = QuietContext;
+  }
+}
+
 export function installRealWebAudio(): void {
   const g = globalThis as unknown as Record<string, unknown>;
   const src = webAudio as unknown as Record<string, unknown>;
@@ -66,6 +95,7 @@ export function installRealWebAudio(): void {
   if (typeof g.window === 'object' && g.window) {
     for (const name of GLOBALS) (g.window as Record<string, unknown>)[name] = src[name];
   }
+  blockRealtimeAudio();
 }
 
 /**
