@@ -11,6 +11,8 @@
  * whole-song engines' (nativeSubsongs) are other models of the same idea; these formats have a
  * grid per tune, so a switch reopens the file at the tune rather than moving a playhead.
  */
+import { WalkCancelledError } from './formats/songWalkClient';
+
 /** What a song carries about its tunes: how many, which one the grid shows, and the file it came from. */
 export interface FileSubsongs {
   count: number;
@@ -98,9 +100,9 @@ const FORMATS: Record<string, FileSubsongFormat> = {
       return loadMaModule(new Uint8Array(bytes))?.subSongs.length ?? 0;
     },
     audible: async (bytes, subsong) => {
-      const [{ loadMaModule }, { walkMusicAssembler, MA_WALK }] = await Promise.all([import('./formats/maModule'), import('./formats/maWalk')]);
-      const m = loadMaModule(new Uint8Array(bytes));
-      const walk = m ? walkMusicAssembler(m, subsong, { maxRows: AUDIBLE_ROWS }) : null;
+      // The walk runs in the import walk worker, never on the main thread (U2.8, importWalksRunInWorker).
+      const [{ songWalks }, { MA_WALK }] = await Promise.all([import('./formats/songWalkClient'), import('./formats/maWalk')]);
+      const walk = await songWalks.musicAssembler(new Uint8Array(bytes), subsong, AUDIBLE_ROWS);
       return !!walk && walk.events.some((e) => e.kind === MA_WALK.note || e.kind === MA_WALK.legato);
     },
   },
@@ -112,8 +114,8 @@ const FORMATS: Record<string, FileSubsongFormat> = {
       return fpSongs(fpCodeSection(new Uint8Array(bytes))).length;
     },
     audible: async (bytes, subsong) => {
-      const { fpCodeSection, walkFuturePlayer, FP_WALK } = await import('./formats/fpWalk');
-      const walk = walkFuturePlayer(fpCodeSection(new Uint8Array(bytes)), subsong, { maxRows: AUDIBLE_ROWS });
+      const [{ songWalks }, { fpCodeSection, FP_WALK }] = await Promise.all([import('./formats/songWalkClient'), import('./formats/fpWalk')]);
+      const walk = await songWalks.futurePlayer(fpCodeSection(new Uint8Array(bytes)), subsong, AUDIBLE_ROWS);
       return !!walk && walk.events.some((e) => e.kind === FP_WALK.note || e.kind === FP_WALK.legato);
     },
   },
@@ -148,7 +150,8 @@ export async function chooseFileSubsong(format: FileSubsongFormat, bytes: ArrayB
   const count = Math.max(1, await format.count(bytes));
   if (requested !== undefined && requested >= 0 && requested < count) return { count, current: requested, fileName };
   for (let i = 0; i < count; i++) {
-    if (await format.audible(bytes, i).catch(() => false)) return { count, current: i, fileName };
+    // A Cancel ends the open; any other failure of the probe means "does not sound".
+    if (await format.audible(bytes, i).catch((err: unknown) => { if (err instanceof WalkCancelledError) throw err; return false; })) return { count, current: i, fileName };
   }
   return { count, current: 0, fileName };
 }

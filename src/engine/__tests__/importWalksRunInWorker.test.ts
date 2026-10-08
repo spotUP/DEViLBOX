@@ -102,7 +102,9 @@ describe('import walks run in the walk worker (reachability, one per walk)', () 
     state.calls.ma.length = 0;
     const started = songWalks.walksStarted;
     await parseModuleToSong(new File([read(MA[0])], 'baseheads.ma'));
-    expect(songWalks.walksStarted).toBe(started + 1);
+    // Every walk function call is one worker walk: the default tune's audibility
+    // probe (fileSubsongs.chooseFileSubsong, 0f9a5ff01) and the grid's own walk.
+    expect(songWalks.walksStarted - started).toBe(state.calls.ma.length);
     expect(songWalks.walksInline).toBe(0);
     expect(state.calls.ma.length).toBeGreaterThan(0);
     expect(state.calls.ma.every((inWorker) => inWorker)).toBe(true);
@@ -112,7 +114,7 @@ describe('import walks run in the walk worker (reachability, one per walk)', () 
     state.calls.fp.length = 0;
     const started = songWalks.walksStarted;
     await parseModuleToSong(new File([read(FP[0])], 'imploder drums.fp'));
-    expect(songWalks.walksStarted).toBe(started + 1);
+    expect(songWalks.walksStarted - started).toBe(state.calls.fp.length);
     expect(state.calls.fp.length).toBeGreaterThan(0);
     expect(state.calls.fp.every((inWorker) => inWorker)).toBe(true);
   });
