@@ -677,6 +677,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
   },
   {
     key: 'SoundControlReplayer',
+    liveSwap: true,
     synthType: 'SoundControlWasmSynth',
     suppressNotes: true,
     fileDataKey: 'soundControlFileData',
