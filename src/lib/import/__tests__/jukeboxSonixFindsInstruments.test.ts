@@ -41,6 +41,6 @@ describe('the jukebox loads a Sonix song with its instruments', () => {
     expect(src).not.toMatch(/gatherCompanions\([^)]*row\.dir/);
     const acquire = readFileSync('src/lib/song/acquireSource.ts', 'utf8');
     expect(acquire).toContain('acquireNeighbourCompanions(name, directoryOfFile(src.url), bytes)');
-    expect(src).toContain('notify.error(`Load failed');
+    expect(src).toContain('reportLoadFailure(`');
   });
 });
