@@ -103,13 +103,36 @@ export function cellPeriod(cell: { note?: number; period?: number } | undefined,
 }
 
 /**
- * Whether a song's cells play by Amiga periods: everything but the formats
- * that store note numbers (XM, IT, S3M, AdPlug). The one rule behind
- * TrackerReplayer's period mode, ToneEngine.amigaPeriodSong (K4) and the
- * editor's typing octave (K12).
+ * The song formats whose cells do NOT carry Amiga periods: note numbers
+ * (XM, IT, S3M, AdPlug, Hively's AHX / HVL, Furnace, XRNS) or the register
+ * data of a chip / game-music player (the sound is made by the tune's own
+ * program, the grid only shows it). Every other format string is an Amiga
+ * tracker or player - MOD and its ~100 parsers, OKT, MED, FC, JamCracker,
+ * MusicLine, UADE ... - whose cells are periods.
+ *
+ * The set is read off the format registry (FormatRegistry.ts): every
+ * chip-dump and c64-chip entry's parser names its format here, plus the PC
+ * and note-number trackers; typingOctaveFollowsTheSong.test.ts counts the
+ * registry again and fails when a parser of those families names a format
+ * this table lacks.
+ */
+export const NOTE_NUMBER_FORMATS: ReadonlySet<string> = new Set([
+  // PC / note-number trackers
+  'XM', 'IT', 'S3M', 'AdPlug', 'AHX', 'HVL', 'KT', 'FUR', 'DMF', 'XRNS', 'Organya', 'PxTone',
+  // C64
+  'SID',
+  // chip and game-music players (registry families chip-dump, c64-chip)
+  'VGM', 'S98', 'YM', 'NSF', 'SAP', 'ASAP', 'GBS', 'AY', 'KSS', 'HES', 'SPC', 'GYM', 'SNDH', 'ZXTune',
+  'MDX', 'PMD', 'FMP', 'PiyoPiyo', 'TFM',
+]);
+
+/**
+ * Whether a song's cells play by Amiga periods: everything but the
+ * NOTE_NUMBER_FORMATS. The one rule behind TrackerReplayer's period mode,
+ * ToneEngine.amigaPeriodSong (K4) and the editor's typing octave (K12).
  */
 export function songUsesAmigaPeriods(format: string): boolean {
-  return !(format === 'XM' || format === 'IT' || format === 'S3M' || format === 'AdPlug');
+  return !NOTE_NUMBER_FORMATS.has(format);
 }
 
 /**
