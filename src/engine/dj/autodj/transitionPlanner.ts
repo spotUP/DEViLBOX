@@ -74,7 +74,8 @@ function activity(tl: { values: number[]; hopSec: number }, from: number, to: nu
 }
 
 /** Deterministic 0..1 from a seed (unsigned at every step: a signed XOR once made fxOffsetMs negative). */
-function hash(seed: number, salt: number): number {
+/** Deterministic unit hash in [0, 1): the one humanization source for every planner. */
+export function hash(seed: number, salt: number): number {
   let x = (seed * 2654435761 + salt * 40503) >>> 0;
   x = (x ^ (x >>> 13)) >>> 0;
   x = Math.imul(x, 0x5bd1e995) >>> 0;

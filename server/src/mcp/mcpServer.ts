@@ -2599,7 +2599,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'dj_auto_dj_explain',
-    'Why did the Auto DJ do that: the debug telemetry (current track, next track, planned transition, confidence, risk, why this track, why this transition), the structured decision log (SELECT_NEXT_TRACK, PLAN_TRANSITION, FALLBACK, EXECUTE_TRANSITION, ADAPT ...) and the DJ FX actions it fired.',
+    'Why did the Auto DJ do that: the debug telemetry (current track, next track, planned transition, confidence, risk, why this track, why this transition), the beat-juggling telemetry (mode, pattern, phase, intensity, per-deck material and roles, next actions, reason, safety, budget), the structured decision log (SELECT_NEXT_TRACK, PLAN_TRANSITION, FALLBACK, EXECUTE_TRANSITION, ADAPT ...) and the DJ FX actions it fired.',
     { limit: z.number().int().min(1).max(400).optional().describe('How many decisions / FX fires to return (default 30)') },
     (p) => call('dj_auto_dj_explain', p),
   );

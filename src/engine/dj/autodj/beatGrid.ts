@@ -203,3 +203,35 @@ export function barIndexAt(grid: DownbeatGrid, t: number): number {
   }
   return lo;
 }
+
+/**
+ * Fractional beat index at time `t` on a beat grid: 3.25 = a quarter past
+ * beat 3. Before the first beat / after the last the local period extends
+ * the grid. The one mapping from a deck position to musical time.
+ */
+export function fractionalBeatAt(grid: BeatGrid, t: number): number {
+  const beats = grid.beats;
+  if (beats.length === 0) return t * grid.bpm / 60;
+  const period = grid.bpm > 0 ? 60 / grid.bpm : (beats.length > 1 ? beats[1].time - beats[0].time : 0.5);
+  if (t < beats[0].time) return (t - beats[0].time) / period;
+  let lo = 0, hi = beats.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (beats[mid].time <= t) lo = mid; else hi = mid - 1;
+  }
+  const next = lo + 1 < beats.length ? beats[lo + 1].time : beats[lo].time + period;
+  const span = Math.max(1e-6, next - beats[lo].time);
+  return lo + (t - beats[lo].time) / span;
+}
+
+/** Seconds of fractional beat `b` on the grid (inverse of fractionalBeatAt). */
+export function timeAtBeat(grid: BeatGrid, b: number): number {
+  const beats = grid.beats;
+  const period = grid.bpm > 0 ? 60 / grid.bpm : 0.5;
+  if (beats.length === 0) return b * period;
+  if (b < 0) return beats[0].time + b * period;
+  const i = Math.floor(b);
+  const frac = b - i;
+  if (i >= beats.length - 1) return beats[beats.length - 1].time + (b - (beats.length - 1)) * period;
+  return beats[i].time + frac * (beats[i + 1].time - beats[i].time);
+}

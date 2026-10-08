@@ -18,6 +18,9 @@ import { Button } from '@/components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { DJ_STYLE_NAMES } from '@/engine/dj/autodj/types';
 import { DJAutoDJDebugPanel } from './DJAutoDJDebugPanel';
+import { JUGGLE_MODES, type JuggleMode } from '@/engine/dj/autodj/juggle/juggleTypes';
+
+const JUGGLE_MODE_LABELS: Record<JuggleMode, string> = { OFF: 'Off', SAFE: 'Safe', MUSICAL: 'Musical', PERFORMER: 'Performer', AGGRESSIVE: 'Aggressive', CHAOS: 'Chaos' };
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
   idle: 'OFF',
@@ -57,6 +60,8 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const streamAutoDub = useDJStore((s) => s.streamAutoDub);
   const setConfig = useDJStore((s) => s.setAutoDJConfig);
   const djStyle = useDJStore((s) => s.autoDJStyle);
+  const juggleMode = useDJStore((s) => s.autoDJJuggleMode);
+  const juggleIntensity = useDJStore((s) => s.autoDJJuggleIntensity);
   const creativeRisk = useDJStore((s) => s.autoDJCreativeRisk);
   const [showDebug, setShowDebug] = useState(false);
 
@@ -537,6 +542,29 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           ]}
           className="text-[10px]"
           title="Session creative risk budget: higher permits shorter transitions, larger tempo moves, more FX, deliberate cuts"
+        />
+        <span className="text-text-muted">Auto Juggle:</span>
+        <CustomSelect
+          value={juggleMode}
+          onChange={(v) => setConfig({ juggleMode: v })}
+          options={JUGGLE_MODES.map((m) => ({ value: m, label: JUGGLE_MODE_LABELS[m] }))}
+          className="text-[10px]"
+          title="Beat juggling between the two decks: Safe trades 8 and 4 bar phrases, Musical adds call and response, fills and doubles, Performer adds beat juggling, loops and transformer cuts, Aggressive shortens the cuts, Chaos is the densest but still obeys timing and safety"
+        />
+        <span className="text-text-muted">Juggle Intensity:</span>
+        <CustomSelect
+          value={juggleIntensity < 0 ? 'set' : String(juggleIntensity)}
+          onChange={(v) => setConfig({ juggleIntensity: v === 'set' ? -1 : Number(v) })}
+          options={[
+            { value: 'set', label: 'Set Decides' },
+            { value: '0.25', label: 'Phrases' },
+            { value: '0.5', label: 'Two Bars' },
+            { value: '0.7', label: 'One Bar' },
+            { value: '0.85', label: 'Beats' },
+            { value: '1', label: 'Peak' },
+          ]}
+          className="text-[10px]"
+          title="Juggle intensity ladder: phrase trading, two-bar trading, one-bar trading, beat juggling, peak"
         />
         <div className="flex-1" />
         <Button variant="ghost" onClick={() => setShowDebug((v) => !v)} title="Show the Auto DJ plan, confidence, risk and the reasons for every decision">

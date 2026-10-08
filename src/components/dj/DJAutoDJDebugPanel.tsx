@@ -31,8 +31,11 @@ export const DJAutoDJDebugPanel: React.FC<{ telemetry?: AutoDJTelemetry | null }
   const t = telemetry ?? fromStore;
   if (!t) {
     return (
-      <div className="text-[10px] font-mono text-text-muted p-2" data-testid="autodj-debug-empty">
-        Auto DJ Debug: no telemetry yet. Enable Auto DJ to see the plan.
+      <div className="text-[10px] font-mono space-y-2">
+        <div className="text-text-muted p-2" data-testid="autodj-debug-empty">
+          Auto DJ Debug: no telemetry yet. Enable Auto DJ to see the plan.
+        </div>
+        <JuggleSection />
       </div>
     );
   }
@@ -115,6 +118,39 @@ export const DJAutoDJDebugPanel: React.FC<{ telemetry?: AutoDJTelemetry | null }
       <Section title="Session Order">
         <div className="text-text-secondary">{t.sessionOrder.length ? t.sessionOrder.map((o) => `${o.index + 1}. ${o.name}`).join('  >  ') : 'No session order yet'}</div>
       </Section>
+      <JuggleSection />
     </div>
+  );
+};
+
+/** Juggling plan section 45: mode, pattern, phase, intensity, per-deck material and roles, next actions, reason, safety. */
+const JuggleSection: React.FC = () => {
+  const j = useDJStore((s) => s.autoDJJuggleTelemetry);
+  if (!j) {
+    return (
+      <Section title="Beat Juggling">
+        <div className="text-text-muted" data-testid="autodj-juggle-empty">Auto Juggle has not run yet.</div>
+      </Section>
+    );
+  }
+  return (
+    <Section title="Beat Juggling">
+      <div data-testid="autodj-juggle">
+        <Row label="Juggle Mode" value={j.mode} />
+        <Row label="Juggle Active" value={j.active ? 'yes' : 'no'} />
+        <Row label="Pattern" value={j.pattern ? `${j.pattern} (${j.sequence ?? ''})` : '-'} />
+        <Row label="Pattern Phase" value={j.phase ?? '-'} />
+        <Row label="Intensity" value={fmt(j.intensity)} />
+        <Row label="Active Deck" value={j.activeDeck} />
+        <Row label="Deck A" value={`${j.deckA.role} - ${j.deckA.material.join(', ') || '-'} (${fmt(j.deckA.confidence)})`} />
+        <Row label="Deck B" value={`${j.deckB.role} - ${j.deckB.material.join(', ') || '-'} (${fmt(j.deckB.confidence)})`} />
+        <Row label="Next Actions" value={j.nextActions.length ? j.nextActions.map((a) => `${a.type} ${a.deck} @ ${a.beat.toFixed(1)}`).join(', ') : '-'} />
+        <Row label="Confidence" value={fmt(j.confidence)} />
+        <Row label="Safety" value={j.safety} />
+        <Row label="Budget" value={`${(j.budget.juggledFraction * 100).toFixed(0)} % juggled, cooldown ${Math.round(j.budget.cooldownSec)} s`} />
+        <Row label="Last Quality" value={j.lastQuality ? fmt(j.lastQuality.overall) : '-'} />
+        <div className="text-text-secondary">{j.reason}</div>
+      </div>
+    </Section>
   );
 };

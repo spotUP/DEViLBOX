@@ -1,0 +1,297 @@
+/**
+ * Juggle controller (juggling plan sections 3, 4, 24, 29, 33, 42, 43, 45, 46,
+ * 50, 53): builds the two-deck performance context from the deck analyses
+ * and positions (no second transport), asks the planner for a juggle on
+ * every Auto DJ tick, runs it through the executor against the shared clock,
+ * watches for abort conditions and manual overrides, keeps the history and
+ * the learned memory, and publishes telemetry. The transition executor keeps
+ * ordinary transitions; this layer only performs between them.
+ */
+import { fractionalBeatAt } from '../beatGrid';
+import { timelineAt, barIndexAt } from '../beatGrid';
+import { realTimers, type ExecutorTimers } from '../transitionExecutor';
+import type { DJTrackAnalysis, SetEnergyPhase } from '../types';
+import { classifyWindow, materialRefs } from './juggleMaterial';
+import { phaseAt, rolesAt } from './jugglePatterns';
+import { budgetFor, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
+import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
+import type {
+  DJDeckPerformanceState, DJJuggleHistory, DJJugglePerformanceContext, DJPerformanceMode, JuggleMode, JuggleQualityScore,
+  JuggleTelemetry, DJJugglePatternType,
+} from './juggleTypes';
+
+type AB = 'A' | 'B';
+
+export interface DeckInput {
+  trackId: string;
+  analysis: DJTrackAnalysis | null;
+  positionSec: number;
+  playing: boolean;
+  bpm: number;
+  loop?: { startSec: number; endSec: number; lengthBeats: number } | null;
+}
+
+export interface TickInput {
+  masterDeck: AB;
+  decks: Record<AB, DeckInput>;
+  setPhase: SetEnergyPhase;
+  energy: number;
+  targetEnergy: number;
+  performanceMode: DJPerformanceMode;
+  /** Seconds until the planned transition starts; null when none is planned. */
+  transitionApproachingSec: number | null;
+  /** The user moved something (crossfader, deck, cue, FX, tempo) since the last tick. */
+  userControl?: string | null;
+}
+
+export interface JuggleControllerDeps {
+  sink: JuggleActionSink;
+  /** The clock for a deck: fractional beats on the deck's own grid. */
+  clockFor: (deck: AB, analysis: DJTrackAnalysis, position: () => number) => JuggleClock;
+  positionOf: (deck: AB) => number;
+  timers?: ExecutorTimers;
+  now?: () => number;
+  onEvent?: (e: JuggleEvent) => void;
+  onTelemetry?: (t: JuggleTelemetry) => void;
+  seed?: number;
+}
+
+export interface JuggleTickResult {
+  started: boolean;
+  active: boolean;
+  decision: JuggleDecision | null;
+  aborted: string | null;
+}
+
+const RECENT = 6;
+
+export class DJJuggleController {
+  private mode: JuggleMode = 'OFF';
+  private intensityOverride = -1;
+  private execution: JuggleExecution | null = null;
+  private execCtx: DJJugglePerformanceContext | null = null;
+  private history: DJJuggleHistory[] = [];
+  private learned = new Map<string, number>();
+  private juggledSec = 0;
+  private startedAt: number;
+  private lastJuggleAt = -Infinity;
+  private lastDecision: JuggleDecision | null = null;
+  private lastQuality: JuggleQualityScore | null = null;
+  private lastCtx: DJJugglePerformanceContext | null = null;
+  private pendingAbort: string | null = null;
+  private counter = 0;
+  readonly events: JuggleEvent[] = [];
+  readonly counts: Record<string, number> = { ticks: 0, started: 0, completed: 0, aborted: 0, fallbacks: 0 };
+
+  private deps: JuggleControllerDeps;
+
+  constructor(deps: JuggleControllerDeps) {
+    this.deps = deps;
+    this.startedAt = this.now();
+  }
+
+  private now(): number { return (this.deps.now ?? this.deps.timers?.now ?? realTimers.now)(); }
+
+  setMode(mode: JuggleMode): void { this.mode = mode; if (mode === 'OFF' && this.execution) this.abort('Auto Juggle off'); }
+  getMode(): JuggleMode { return this.mode; }
+  setIntensity(v: number): void { this.intensityOverride = v; }
+  isActive(): boolean { return !!this.execution?.active(); }
+  getHistory(): readonly DJJuggleHistory[] { return this.history; }
+  getLastDecision(): JuggleDecision | null { return this.lastDecision; }
+  currentExecution(): JuggleExecution | null { return this.execution; }
+  /** Pending timers and executions: the leak check for long sets. */
+  openWork(): number { return this.execution?.active() ? 1 : 0; }
+
+  /** Section 43: a manual override yields at once; the rest of the pattern is released. */
+  noteUserControl(what: string): void { if (this.execution?.active()) this.pendingAbort = `user control: ${what}`; }
+
+  /** Section 42.2: graceful abort - release to the strongest deck. */
+  abort(reason: string): void { if (this.execution?.active()) this.execution.abort(reason); }
+
+  /** Section 33: emergency - cancel pending, strongest deck, stable crossfader, loops out, continue. */
+  emergency(reason: string): void {
+    if (this.execution?.active()) this.execution.cancel(`emergency: ${reason}`);
+    const st = this.deps.sink.state();
+    const safe: AB = st.audible.A ? 'A' : st.audible.B ? 'B' : st.playing.A ? 'A' : st.playing.B ? 'B' : st.crossfader <= 0.5 ? 'A' : 'B';
+    const info = { beatSec: 0.5, beatNow: 0, patternBeat: 0 };
+    this.deps.sink.apply({ type: 'ReleaseDeck', deck: safe, executeAtBeat: 0, reason: `emergency: ${reason}` }, info);
+    this.deps.sink.apply({ type: 'ResetDeck', deck: 'BOTH', executeAtBeat: 0, reason: 'emergency: clean state' }, info);
+    this.record({ kind: 'juggleAborted', beat: 0, reason: `emergency: ${reason}` });
+    this.lastJuggleAt = this.now();
+  }
+
+  private record(e: JuggleEvent): void {
+    this.events.push(e);
+    if (this.events.length > 400) this.events.splice(0, this.events.length - 400);
+    this.deps.onEvent?.(e);
+  }
+
+  // ── Context (sections 4, 31, 38) ───────────────────────────────────────────
+
+  private deckState(deck: AB, input: DeckInput): DJDeckPerformanceState {
+    const a = input.analysis;
+    const pos = input.positionSec;
+    if (!a) {
+      return { deck, trackId: input.trackId, position: pos, beatPhase: 0, barPhase: 0, beatIndex: 0, bpm: input.bpm, energy: 0, drumsActive: false, bassActive: false, vocalsActive: false, melodicActivity: 0, loop: input.loop ?? null, analysisConfidence: 0, playing: input.playing, analysis: null };
+    }
+    const beat = fractionalBeatAt(a.beatGrid, pos);
+    const bpb = a.meter.beatsPerBar || 4;
+    const refs = materialRefs(a);
+    const at = (tl: { values: number[]; hopSec: number }, ref: number) => timelineAt(tl.values, tl.hopSec || 0.25, pos) / ref;
+    const section = a.sections.find((s) => s.start <= pos && pos < s.end);
+    return {
+      deck, trackId: input.trackId, position: pos, beatPhase: beat - Math.floor(beat), barPhase: ((beat % bpb) + bpb) % bpb / bpb, beatIndex: beat,
+      bpm: input.bpm || a.bpm, key: a.key.name, section, cuePosition: a.cuePoints.bestMixIn, mixInPosition: a.cuePoints.bestMixIn, mixOutPosition: a.cuePoints.bestMixOut,
+      energy: Math.min(1, at(a.intensity, refs.intensity)), drumsActive: at(a.drumActivity, refs.drums) > 0.4, bassActive: at(a.bassActivity, refs.bass) > 0.4,
+      vocalsActive: a.vocalActivity.confidence > 0 && at(a.vocalActivity, refs.vocal) > 0.5, melodicActivity: Math.min(1, at(a.harmonicActivity, refs.harmonic)),
+      loop: input.loop ?? null, analysisConfidence: a.analysisConfidence.overall, playing: input.playing, analysis: a,
+    };
+  }
+
+  buildContext(input: TickInput): DJJugglePerformanceContext {
+    const A = this.deckState('A', input.decks.A);
+    const B = this.deckState('B', input.decks.B);
+    const master = input.masterDeck === 'A' ? A : B;
+    const ma = master.analysis;
+    const bpb = ma?.meter.beatsPerBar || 4;
+    const phrase = ma?.phrases.find((p) => p.start <= master.position && master.position < p.end);
+    const phraseLengthBars = phrase?.lengthBars ?? ma?.phraseLengthBars ?? 8;
+    const masterBar = ma ? barIndexAt(ma.downbeats, master.position) : Math.floor(master.beatIndex / bpb);
+    const phrasePosition = phrase ? Math.max(0, Math.min(0.999, (master.position - phrase.start) / Math.max(1e-6, phrase.end - phrase.start))) : ((masterBar % phraseLengthBars) + master.barPhase) / phraseLengthBars;
+    const bpmA = A.bpm || 1, bpmB = B.bpm || 1;
+    const tempoMatch = Math.abs(bpmA - bpmB) / Math.max(bpmA, bpmB);
+    const bothPlaying = A.playing && B.playing && !!A.analysis && !!B.analysis;
+    const deckSyncConfidence = bothPlaying ? Math.max(0, 1 - tempoMatch * 20) * Math.min(A.analysis!.beatGrid.confidence, B.analysis!.beatGrid.confidence) : 0;
+    const sameTrack = !!A.analysis && !!B.analysis && A.trackId === B.trackId;
+    const nowSec = this.now() / 1000;
+    const last = this.history[this.history.length - 1];
+    const secondsSinceLastJuggle = Number.isFinite(this.lastJuggleAt) ? (this.now() - this.lastJuggleAt) / 1000 : Infinity;
+    const sectionIdx = ma ? ma.sections.indexOf(master.section!) : -1;
+    return {
+      masterDeck: input.masterDeck, masterBeat: master.beatIndex, masterBar, phrasePosition, phraseLengthBars, beatsPerBar: bpb,
+      deckA: A, deckB: B, activeDeck: input.masterDeck, performanceMode: input.performanceMode, energy: input.energy, targetEnergy: input.targetEnergy, setPhase: input.setPhase,
+      phraseConfidence: phrase?.confidence ?? (ma ? ma.analysisConfidence.downbeat * 0.8 : 0), beatConfidence: ma?.beatGrid.confidence ?? 0,
+      sectionConfidence: master.section?.confidence ?? 0, deckSyncConfidence, materialConfidence: Math.min(A.analysisConfidence, B.analysisConfidence),
+      currentSection: master.section, nextSection: sectionIdx >= 0 ? ma?.sections[sectionIdx + 1] : undefined,
+      lastJuggle: last, recentPatterns: this.history.slice(-RECENT), intensity: this.lastDecision?.intensity ?? 0,
+      tension: Math.max(0, input.targetEnergy - input.energy), fallbackAvailable: A.playing || B.playing, sameTrackOnBothDecks: sameTrack,
+      transitionApproachingSec: input.transitionApproachingSec, elapsedSec: nowSec - this.startedAt / 1000, juggledSec: this.juggledSec, secondsSinceLastJuggle,
+    };
+  }
+
+  // ── Tick (sections 21, 24, 41, 42) ─────────────────────────────────────────
+
+  tick(input: TickInput): JuggleTickResult {
+    this.counts.ticks++;
+    const ctx = this.buildContext(input);
+    this.lastCtx = ctx;
+    if (input.userControl) this.noteUserControl(input.userControl);
+    if (this.execution?.active()) {
+      // Section 42: abort conditions while performing.
+      const reason = this.pendingAbort ?? this.abortReason(ctx, input);
+      if (reason) { this.pendingAbort = null; this.execution.abort(reason); }
+      this.publish(ctx);
+      return { started: false, active: this.execution.active(), decision: this.lastDecision, aborted: reason };
+    }
+    if (input.userControl) { this.lastJuggleAt = this.now(); this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
+    if (this.mode === 'OFF') { this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
+    if (input.performanceMode !== 'JUGGLE' && input.performanceMode !== 'JUGGLE_TRANSITION') { this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
+    const decision = planJuggle(ctx, { mode: this.mode, intensityOverride: this.intensityOverride, learned: (t, c) => this.learnedFor(t, c), seed: (this.deps.seed ?? 0) + this.counter++ });
+    this.lastDecision = decision;
+    if (!decision.pattern) { this.publish(ctx); return { started: false, active: false, decision, aborted: null }; }
+    this.start(decision, ctx, input);
+    this.publish(ctx);
+    return { started: true, active: true, decision, aborted: null };
+  }
+
+  private abortReason(ctx: DJJugglePerformanceContext, input: TickInput): string | null {
+    if (this.mode === 'OFF') return 'Auto Juggle off';
+    if (!ctx.deckA.playing || !ctx.deckB.playing) return 'deck failure: a deck stopped';
+    if (ctx.beatConfidence < 0.5) return 'beat confidence dropped';
+    if (ctx.deckSyncConfidence < 0.5) return 'decks drifted apart';
+    if (input.performanceMode !== 'JUGGLE' && input.performanceMode !== 'JUGGLE_TRANSITION') return 'transition took over';
+    if (this.execCtx && (ctx.deckA.trackId !== this.execCtx.deckA.trackId || ctx.deckB.trackId !== this.execCtx.deckB.trackId)) return 'track changed';
+    if (ctx.deckA.vocalsActive && ctx.deckB.vocalsActive && this.execution && rolesAt(this.execution.pattern, ctx.masterBeat - this.execution.startBeat).A === 'LAYER') return 'vocal collision';
+    return null;
+  }
+
+  private start(decision: JuggleDecision, ctx: DJJugglePerformanceContext, input: TickInput): void {
+    const pattern = decision.pattern!;
+    const masterInput = input.decks[input.masterDeck];
+    const clock = this.deps.clockFor(input.masterDeck, masterInput.analysis!, () => this.deps.positionOf(input.masterDeck));
+    this.execCtx = ctx;
+    this.counts.started++;
+    this.record({ kind: 'jugglePatternSelected', beat: ctx.masterBeat, reason: decision.reason, pattern: pattern.id });
+    const startedAt = this.now();
+    const exec = executeJuggle(pattern, decision.startBeat, {
+      clock, sink: this.deps.sink, timers: this.deps.timers, onEvent: (e) => this.record(e),
+      abortCheck: () => this.pendingAbort,
+    });
+    this.execution = exec;
+    exec.done.then((result) => this.finish(pattern, result, ctx, startedAt, decision)).catch(() => { /* never throws */ });
+  }
+
+  private finish(pattern: JuggleExecution['pattern'], result: JuggleExecutionResult, ctx: DJJugglePerformanceContext, startedAt: number, decision: JuggleDecision): void {
+    this.pendingAbort = null;
+    this.juggledSec += (this.now() - startedAt) / 1000;
+    this.lastJuggleAt = this.now();
+    this.counts.fallbacks += result.fallbacks;
+    if (result.completed) this.counts.completed++; else this.counts.aborted++;
+    const quality = scoreJuggleQuality(pattern, result.trace, ctx, { fallbacks: result.fallbacks, aborted: result.aborted });
+    this.lastQuality = quality;
+    const entry: DJJuggleHistory = {
+      patternType: pattern.type, durationBars: pattern.durationBars, intensity: pattern.intensity, sourceTracks: [ctx.deckA.trackId, ctx.deckB.trackId],
+      successScore: quality.overall, timestamp: this.now(), sequence: pattern.sequence, sectionKind: ctx.currentSection?.kind, setPhase: ctx.setPhase, energy: ctx.energy,
+    };
+    this.history.push(entry);
+    if (this.history.length > 64) this.history.splice(0, this.history.length - 64);
+    // Section 50: learned memory, deterministic EMA per pattern + context.
+    const key = this.memoryKey(pattern.type, ctx);
+    const prev = this.learned.get(key);
+    this.learned.set(key, prev === undefined ? quality.overall : prev * 0.7 + quality.overall * 0.3);
+    if (!result.completed && !result.aborted) this.record({ kind: 'juggleFallback', beat: result.endBeat, reason: `${decision.pattern?.type}: ${result.reason}` });
+    if (this.execution && !this.execution.active()) this.execution = null;
+    this.deps.onTelemetry?.(this.telemetry());
+  }
+
+  private memoryKey(type: DJJugglePatternType, ctx: DJJugglePerformanceContext): string { return `${type}|${ctx.setPhase}|${ctx.currentSection?.kind ?? '-'}`; }
+  private learnedFor(type: DJJugglePatternType, ctx: DJJugglePerformanceContext): number | null { return this.learned.get(this.memoryKey(type, ctx)) ?? null; }
+
+  /** The release pattern for an external emergency on a known master deck. */
+  releaseNow(primary: AB, beatsPerBar: number): void {
+    const pattern = releasePattern(primary, beatsPerBar);
+    const info = { beatSec: 0.5, beatNow: 0, patternBeat: 0 };
+    for (const a of pattern.actions) this.deps.sink.apply(a, info);
+  }
+
+  // ── Telemetry (section 45) ─────────────────────────────────────────────────
+
+  telemetry(ctx: DJJugglePerformanceContext | null = this.lastCtx): JuggleTelemetry {
+    const exec = this.execution?.active() ? this.execution : null;
+    const beat = ctx ? ctx.masterBeat - (exec?.startBeat ?? 0) : 0;
+    const roles = exec ? rolesAt(exec.pattern, beat) : { A: 'PRIMARY' as const, B: 'SILENT' as const };
+    const materialOf = (d: DJDeckPerformanceState): string[] => d.analysis ? classifyWindow(d.analysis, d.deck, d.position, 1).classes : [];
+    const budget = ctx ? budgetFor(ctx, this.mode) : null;
+    const d = this.lastDecision;
+    return {
+      mode: this.mode, active: !!exec, pattern: exec?.pattern.type ?? null, sequence: exec?.pattern.sequence ?? null, phase: exec ? phaseAt(exec.pattern, beat) : null,
+      intensity: d?.intensity ?? 0, activeDeck: ctx?.activeDeck ?? 'A',
+      deckA: { material: ctx ? materialOf(ctx.deckA) : [], confidence: ctx?.deckA.analysisConfidence ?? 0, role: roles.A },
+      deckB: { material: ctx ? materialOf(ctx.deckB) : [], confidence: ctx?.deckB.analysisConfidence ?? 0, role: roles.B },
+      nextActions: exec ? exec.nextActions(6) : [], reason: d?.reason ?? 'no decision yet', confidence: d ? Math.min(ctx?.beatConfidence ?? 0, ctx?.deckSyncConfidence ?? 0) : 0,
+      safety: this.pendingAbort ? `aborting: ${this.pendingAbort}` : d?.blocked.length ? `blocked: ${d.blocked[0]}` : 'clear',
+      budget: { juggledFraction: budget?.fraction ?? 0, secondsSinceLastJuggle: ctx?.secondsSinceLastJuggle ?? Infinity, cooldownSec: budget?.cooldownSec ?? 0 },
+      lastQuality: this.lastQuality, history: this.history.slice(-5).map((h) => ({ type: h.patternType, bars: h.durationBars, score: h.successScore })),
+    };
+  }
+
+  private publish(ctx: DJJugglePerformanceContext): void { this.deps.onTelemetry?.(this.telemetry(ctx)); }
+}
+
+/** The default clock: the deck's position mapped through its analysis beat grid. */
+export function analysisClock(analysis: DJTrackAnalysis, position: () => number, bpmOverride?: () => number): JuggleClock {
+  return {
+    beatNow: () => fractionalBeatAt(analysis.beatGrid, position()),
+    beatSec: () => 60 / Math.max(60, bpmOverride?.() || analysis.bpm),
+  };
+}
