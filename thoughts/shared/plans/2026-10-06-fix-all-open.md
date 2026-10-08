@@ -189,6 +189,8 @@ G5 add-on-empty-row after: soundmon, digitalSoundStudio, tfmMusicMaker, quadraCo
 - [x] UI6 App.tsx (~817-891, ~1190-1261) still shows modal showAlert 'Load Failed' on drop/open paths - owner wants copyable toasts (dcb4e8b5d); route to notify.error and extend errorTextCopyable to cover them.
 - [x] P19 SynthesisEncoder drops the arpeggio high nibble of byte 2 on write - an edited Synthesis file with arpeggios loses them (space sound.syn has none). Fix the encoder, round-trip test with an arpeggio cell.
 
+- [ ] P19b SynthesisExporter.ts:233 hardcodes arpeggio: 0 when rebuilding a file from the grid - a full re-export still drops arpeggios (live edit/patch path fixed in 114bcd01b). Read the arpeggio from the original bytes or add it to the cell.
+
 ## Batch D - dub (running)
 - [x] D1 Channel send audible: end-to-end guard channelSendEchoIsAudible.test.ts (8a899d711). -34 dB was return vs BASS-boosted master; echo sits -13.8 dB under the dry channel at Return 0.431, -5.9 dB on Tubby. No engine defect.
 - [x] D2 `everyDubToggleChangesEngineSong.test.ts` fails on Starve (and Liquid once), independent of sends fix. DONE 6fe6cf9d1: not Starve - the off-vs-off noise floor moved -50..-41 dBFS because the rig left main-thread Math.random unseeded (SpaceEchoEffect wow rate) and Tone filled its noise caches on the first rig. Rig now seeds per rig + warms Tone noise caches; renders bit-identical (dubBusRigIsDeterministic.test.ts); toggle test also needs an absolute -45 dBFS change (all 9 toggles measure -30.1..-18.7).
