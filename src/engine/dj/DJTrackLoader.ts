@@ -143,7 +143,12 @@ export async function loadPreRenderedTrackToDeck(
       wavFilename, // Use .wav extension to avoid UADE code path
       preRendered.trackName,
       preRendered.bpm,
-      undefined, // Do NOT pass song - we only want audio playback, no UADE reinit
+      // The song drives the pattern display (Auto DJ's next deck showed the
+      // oscilloscope without it, owner 2026-10-08). Playback stays the WAV;
+      // the song only fills the deck's replayer, as the direct modland load
+      // has done since decks got their own UADE instance (U2.6c) - the April
+      // UADE re-init crash this once avoided came from the shared instance.
+      preRendered.song ?? getCachedSong(originalTrack.fileName),
       preRendered.waveformPeaks, // Skip expensive peak recomputation
     );
     console.log(`[DJTrackLoader] Pre-rendered track loaded successfully`);
@@ -398,9 +403,11 @@ async function loadPlaylistTrackToDeckInternal(
     const cached = await getCachedAudioByFilename(track.fileName);
     if (cached && cached.audioData.byteLength > 0) {
       console.log(`[DJTrackLoader] Using cached audio for: ${track.fileName}`);
-      // Retrieve the song from the song cache so pattern display works
-      // (without this, deck B shows oscilloscope instead of pattern data)
-      const cachedSong = getCachedSong(track.fileName);
+      // The song drives the deck's pattern display. The in-memory song cache
+      // is empty after a reload, so a track played from the audio cache got
+      // the oscilloscope instead (owner 2026-10-08: Auto DJ's second deck).
+      // The audio cache keeps the module's own bytes: parse those, one open.
+      const cachedSong = getCachedSong(track.fileName) ?? await songFromCachedSource(track.fileName, cached.sourceData, deckId);
       await getDJEngine().loadAudioToDeck(
         deckId, cached.audioData, track.fileName,
         track.trackName || cached.filename,
@@ -606,5 +613,20 @@ async function loadPlaylistTrackToDeckInternal(
       console.warn(`[DJTrackLoader] Local plain-filename load failed: ${track.trackName || filename} — ${msg}`);
       return false;
     }
+  }
+}
+
+/** The tracker song for a cached render, parsed from the module bytes the audio cache keeps. */
+async function songFromCachedSource(fileName: string, source: ArrayBuffer | undefined, deckId: DeckId): Promise<TrackerSong | undefined> {
+  if (!source || source.byteLength === 0) return undefined;
+  const name = fileName.replace(/^modland:/, '').split('/').pop() || fileName;
+  if (isAudioFile(name)) return undefined;
+  try {
+    const { song } = await openDeckTrack({ kind: 'bytes', name, bytes: source.slice(0) }, deckId);
+    cacheSong(fileName, song);
+    return song;
+  } catch (err) {
+    console.warn('[DJTrackLoader] Cached source did not parse:', fileName, err);
+    return undefined;
   }
 }
