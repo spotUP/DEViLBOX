@@ -55,7 +55,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
         await this.initWasm(data.wasmBinary, data.jsCode);
         break;
       case 'loadTune':
-        this.loadTune(data.buffer);
+        this.loadTune(data.buffer, data.subsong);
         break;
       case 'play':
         this.playing = true;
@@ -218,7 +218,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
     }
   }
 
-  loadTune(buffer) {
+  loadTune(buffer, subsong) {
     if (!this.wasm || !this.initialized) return;
 
     // Stop previous tune
@@ -237,6 +237,8 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
 
     if (result === 0) {
       this.tuneLoaded = true;
+      // The tune the song's grid shows; init starts on subsong 0.
+      if (subsong > 0) this.wasm._fp_wasm_set_subsong(subsong);
       this.resetRingBuffer();
       this.resamplePos = 0.0;
 

@@ -26,8 +26,27 @@ export interface FileSubsongFormat {
   fileDataField: string;
   /** Tunes in the file; 0 when it is not this format. */
   count(bytes: ArrayBuffer): Promise<number>;
+  /** File names this format owns that the format registry has no native key for (matched when the registry finds none). */
+  names?: RegExp;
   /** Does tune `subsong` start a note? Decided by the replayer's walk, never by a header guess. */
   audible(bytes: ArrayBuffer, subsong: number): Promise<boolean>;
+}
+
+/** The Hippel TFMX family (7V and the Amiga module): the decoder's subsong table, a tune sounds when its walked grid has steps. */
+function hippelTfmxFormat(key: string): FileSubsongFormat {
+  return {
+    key,
+    fileDataField: 'hippelFileData',
+    count: async (bytes) => {
+      const { hippelTfmxModule } = await import('./formats/JochenHippel7VParser');
+      return hippelTfmxModule(new Uint8Array(bytes))?.nSongs ?? 0;
+    },
+    audible: async (bytes, subsong) => {
+      const [{ hippelTfmxModule }, { hippelGrid }] = await Promise.all([import('./formats/JochenHippel7VParser'), import('./formats/HippelTfmxWalk')]);
+      const m = hippelTfmxModule(new Uint8Array(bytes));
+      return !!m && subsong < m.nSongs && hippelGrid(m, subsong).steps.length > 0;
+    },
+  };
 }
 
 const FORMATS: Record<string, FileSubsongFormat> = {
@@ -41,13 +60,75 @@ const FORMATS: Record<string, FileSubsongFormat> = {
       return walk.events.some((e) => e.kind === DW_WALK.note);
     },
   },
+  hippelCoso: {
+    key: 'hippelCoso',
+    fileDataField: 'hippelFileData',
+    count: async (bytes) => (await import('./formats/HippelCoSoParser')).cosoSubsongCount(new Uint8Array(bytes)),
+    audible: async (bytes, subsong) => (await import('./formats/HippelCoSoParser')).cosoTuneHasNotes(new Uint8Array(bytes), subsong),
+  },
+  jochenHippel7V: hippelTfmxFormat('jochenHippel7V'),
+  // The Amiga SOG./MCMD. module (.hip, .mcmd): a TFMX song behind replay code; the registry has no native key for it.
+  jochenHippelAmiga: { ...hippelTfmxFormat('jochenHippelAmiga'), names: /\.(hip|mcmd)$|(^|\/)(hip|mcmd)\./ },
+  // Played by UADE (UADEEngine.loadTune starts the tune from the format store); the player numbers its songs from 0, like the module's table.
+  robHubbard: {
+    key: 'robHubbard',
+    fileDataField: 'uadeEditableFileData',
+    count: async (bytes) => (await import('./formats/rhWalk')).loadRhModule(new Uint8Array(bytes))?.songs.length ?? 0,
+    audible: async (bytes, subsong) => {
+      const { walkRobHubbard, RH_WALK } = await import('./formats/rhWalk');
+      const walk = walkRobHubbard(new Uint8Array(bytes), { song: subsong, maxTicks: 8000 });
+      return !!walk && walk.events.some((e) => e.kind === RH_WALK.note);
+    },
+  },
+  benDaglish: {
+    key: 'benDaglish',
+    fileDataField: 'bdFileData',
+    count: async (bytes) => (await import('./formats/BenDaglishWasmExtractor')).bdSubsongCount(bytes),
+    audible: async (bytes, subsong) => {
+      const { walkBenDaglish, BD_WALK } = await import('./formats/BenDaglishWasmExtractor');
+      const walk = await walkBenDaglish(bytes, subsong);
+      return walk.events.some((e) => e.kind === BD_WALK.note);
+    },
+  },
+  musicAssembler: {
+    key: 'musicAssembler',
+    fileDataField: 'maFileData',
+    count: async (bytes) => {
+      const { loadMaModule } = await import('./formats/maModule');
+      return loadMaModule(new Uint8Array(bytes))?.subSongs.length ?? 0;
+    },
+    audible: async (bytes, subsong) => {
+      const [{ loadMaModule }, { walkMusicAssembler, MA_WALK }] = await Promise.all([import('./formats/maModule'), import('./formats/maWalk')]);
+      const m = loadMaModule(new Uint8Array(bytes));
+      const walk = m ? walkMusicAssembler(m, subsong, { maxRows: AUDIBLE_ROWS }) : null;
+      return !!walk && walk.events.some((e) => e.kind === MA_WALK.note || e.kind === MA_WALK.legato);
+    },
+  },
+  futurePlayer: {
+    key: 'futurePlayer',
+    fileDataField: 'futurePlayerFileData',
+    count: async (bytes) => {
+      const { fpCodeSection, fpSongs } = await import('./formats/fpWalk');
+      return fpSongs(fpCodeSection(new Uint8Array(bytes))).length;
+    },
+    audible: async (bytes, subsong) => {
+      const { fpCodeSection, walkFuturePlayer, FP_WALK } = await import('./formats/fpWalk');
+      const walk = walkFuturePlayer(fpCodeSection(new Uint8Array(bytes)), subsong, { maxRows: AUDIBLE_ROWS });
+      return !!walk && walk.events.some((e) => e.kind === FP_WALK.note || e.kind === FP_WALK.legato);
+    },
+  },
 };
+
+/** Rows of a tune searched for its first note: a tune silent that long is silent (an intro rest is not). */
+const AUDIBLE_ROWS = 2048;
 
 /** The registered format of a file name, or null for a file that has one tune or is no such format. */
 export async function fileSubsongFormat(fileName: string, head?: Uint8Array): Promise<FileSubsongFormat | null> {
   const { detectNativeFormat } = await import('@lib/import/prepareModuleImport');
-  const key = detectNativeFormat(fileName.toLowerCase(), head)?.key;
-  return key ? FORMATS[key] ?? null : null;
+  const lower = fileName.toLowerCase();
+  const key = detectNativeFormat(lower, head)?.key;
+  if (key && FORMATS[key]) return FORMATS[key];
+  return Object.values(FORMATS).find((f) => f.names?.test(lower)) ?? null;
 }
 
 export function fileSubsongFormatByKey(key: string): FileSubsongFormat | null {

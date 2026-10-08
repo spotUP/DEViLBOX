@@ -25,6 +25,7 @@ import type { FuturePlayerConfig } from '@/types/instrument/exotic';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeFuturePlayerPattern } from '@/engine/uade/encoders/FuturePlayerEncoder';
 import { fpCodeSection, fpSongs, walkFuturePlayer, FP_WALK, type FpWalk } from './fpWalk';
+import { fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 import { buildFpGridFromWalk, type FpGrid } from './fpGrid';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
@@ -217,10 +218,10 @@ export interface FpModuleGrid {
 }
 
 /** Walk subsong 0 of a module with the replayer's own reader and draw it as the grid. */
-export function buildFuturePlayerGrid(rawBuf: Uint8Array, precomputedWalk?: FpWalk | null): FpModuleGrid {
+export function buildFuturePlayerGrid(rawBuf: Uint8Array, precomputedWalk?: FpWalk | null, subsong = 0): FpModuleGrid {
   const code = fpCodeSection(rawBuf);
   // The import path hands in the walk the walk worker made (songWalkClient); without one the walk runs here.
-  const walk = precomputedWalk !== undefined ? precomputedWalk : walkFuturePlayer(code, 0);
+  const walk = precomputedWalk !== undefined ? precomputedWalk : walkFuturePlayer(code, subsong);
   const instrumentMap = new Map<number, number>();
   const arpMap = new Map<number, number>();
   if (walk) {
@@ -230,7 +231,7 @@ export function buildFuturePlayerGrid(rawBuf: Uint8Array, precomputedWalk?: FpWa
       if (e.kind === FP_WALK.arpTable && !arpMap.has(e.a)) arpMap.set(e.a, arpMap.size + 1);
     }
   }
-  if (!walk) return { code, walk, grid: null, unmatched: 'the module has no subsong 0 to walk', instrumentMap };
+  if (!walk) return { code, walk, grid: null, unmatched: `the module has no subsong ${subsong} to walk`, instrumentMap };
   const grid = buildFpGridFromWalk(walk, {
     code,
     instrId: (ptr) => instrumentMap.get(ptr) ?? 0,
@@ -259,7 +260,8 @@ function emptyFuturePlayerConfig(): FuturePlayerConfig {
   };
 }
 
-export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string, walk0?: FpWalk | null): TrackerSong {
+/** `walk0`: the walk of the chosen subsong (the import's worker made it); `tunes`: that subsong (lib/import/fileSubsongs), absent: subsong 0. */
+export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string, walk0?: FpWalk | null, tunes?: FileSubsongs): TrackerSong {
   const rawBuf = new Uint8Array(buffer);
 
   if (!isFuturePlayerFormat(rawBuf)) {
@@ -290,11 +292,12 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string, wal
   if (subsongs.length === 0) {
     throw new Error('No subsongs found');
   }
-  const sub = subsongs[0];
+  const tune = tunes && tunes.current < subsongs.length ? tunes.current : 0;
+  const sub = subsongs[tune];
 
   // ── Walk subsong 0 with the replayer's own reader, draw it as the grid ─
 
-  const { walk, grid, unmatched, instrumentMap } = buildFuturePlayerGrid(rawBuf, walk0);
+  const { walk, grid, unmatched, instrumentMap } = buildFuturePlayerGrid(rawBuf, walk0, tune);
   const ROWS_PER_PATTERN = 64;
 
   let patterns: TrackerSong['patterns'];
@@ -525,6 +528,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string, wal
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     futurePlayerFileData: buffer.slice(0),
+    ...(tunes ? fileSubsongsField({ ...tunes, current: tune }) : {}),
     uadeVariableLayout,
     ...(grid ? {} : { gridUnmatchedReason: unmatched ?? 'the grid was not matched to the player' }),
   };

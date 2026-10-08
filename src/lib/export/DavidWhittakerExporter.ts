@@ -60,7 +60,7 @@ export async function exportDavidWhittaker(
     let bytes: Uint8Array = new Uint8Array(original);
     // a song whose grid did not match the walk opened in the scope view: it has no grid to write back
     if (song.uadeVariableLayout) {
-      const walk = await walkDavidWhittaker(original);
+      const walk = await walkDavidWhittaker(original, undefined, song.fileSubsongs?.current ?? 0);
       const r = applyDwGridEdits(bytes, walk, song.patterns);
       bytes = r.data;
       warnings.push(...r.warnings);

@@ -25,9 +25,9 @@ export class MaEngine extends WASMSingletonBase {
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private readonly _positions = new PositionCallbacks();
-  /** The grid's layout of sub-song 0 (the importer's, from the same walk); null for another sub-song (no grid to follow). */
+  /** The grid's layout of the song's tune (the importer's, from the same walk); null for another sub-song (no grid to follow). */
   private _layout: WalkLayout | null = null;
-  private _layoutOfSubsong0: WalkLayout | null = null;
+  private _layoutOfTune: WalkLayout | null = null;
 
   private _requestId = 0;
   private _pendingRequests = new Map<number, (data: any) => void>();
@@ -129,15 +129,16 @@ export class MaEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
-  async loadTune(buffer: ArrayBuffer): Promise<void> {
+  /** Load the module and start on `subsong` (0-based) - the tune the song's grid shows. */
+  async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('MaEngine not initialized');
-    // the importer's grid layout of sub-song 0, from the same walk
+    // the importer's grid layout of the tune, from the same walk
     const m = loadMaModule(new Uint8Array(buffer));
-    const walk = m ? walkMusicAssembler(m, 0) : null;
-    this._layoutOfSubsong0 = walk && walk.stop !== 'ended' ? walkLayout(walk) : null;
-    this._layout = this._layoutOfSubsong0;
-    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    const walk = m ? walkMusicAssembler(m, subsong) : null;
+    this._layoutOfTune = walk && walk.stop !== 'ended' ? walkLayout(walk) : null;
+    this._layout = this._layoutOfTune;
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
   }
 
   /** The row and song-order index the replayer is on, as the grid shows them. */

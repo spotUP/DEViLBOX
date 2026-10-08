@@ -123,6 +123,7 @@ export function debouncedWasmEngineReexport(): void {
               song.hippelFileData!,
               useTrackerStore.getState().patterns,
               useInstrumentStore.getState().instruments.length,
+              useFormatStore.getState().fileSubsongs?.current ?? 0,
             );
             if (!rebuilt) return;
             if (rebuilt.refused.length > 0) {

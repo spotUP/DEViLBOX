@@ -14,6 +14,7 @@ interface BdWasmModule {
   _player_init(data: number, size: number): number;
   _player_stop(): void;
   _player_set_subsong(n: number): void;
+  _player_get_subsong_count(): number;
   _bd_walk_song(maxTicks: number, out: number, maxEvents: number, info: number): number;
   HEAPU8: Uint8Array;
 }
@@ -109,6 +110,22 @@ export async function walkBenDaglish(buffer: ArrayBuffer, subsong = 0, maxTicks 
   } finally {
     M._free(out);
     M._free(info);
+    M._player_stop();
+  }
+}
+
+/** Subsongs the replayer finds in the file; 0 when it refuses the file. */
+export async function bdSubsongCount(buffer: ArrayBuffer): Promise<number> {
+  const M = await getModule();
+  const data = new Uint8Array(buffer);
+  const p = M._malloc(data.length);
+  M.HEAPU8.set(data, p);
+  const ok = M._player_init(p, data.length);
+  M._free(p);
+  if (ok !== 0) return 0;
+  try {
+    return M._player_get_subsong_count();
+  } finally {
     M._player_stop();
   }
 }

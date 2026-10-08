@@ -27,7 +27,7 @@ export async function exportBenDaglish(song: TrackerSong): Promise<BenDaglishExp
   const name = (song.uadeEditableFileName ?? 'song.bd').split('/').pop() ?? 'song.bd';
   const trackOffsets = song.uadeVariableLayout?.filePatternAddrs;
   if (!trackOffsets || (getGridBaseline() && editedCells(song.patterns).length === 0)) return { data: new Uint8Array(src), filename: name, warnings: [] };
-  const walk = await walkBenDaglish(src.slice(0));
+  const walk = await walkBenDaglish(src.slice(0), song.fileSubsongs?.current ?? 0);
   const res = applyBdGridEdits(new Uint8Array(src), walk, trackOffsets, song.patterns);
   return { data: res.data, filename: name, warnings: res.warnings };
 }

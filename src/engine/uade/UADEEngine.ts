@@ -747,7 +747,10 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     // subsong: UADE plays exactly that one, never the first-audible probe's pick.
     // Its UADE number counts from the player's lowest (`first`; Hippel ST's is 1).
     const first = state.uadeEditableSubsongs?.first ?? 0;
-    await this.loadForPlayback(buffer, fileName, first + state.uadeEditableCurrentSubsong, !!state.uadeEditableSubsongs?.orders, state.uadeCompanionFiles ?? undefined);
+    // A command-stream file whose parser drew one tune (state.fileSubsongs, e.g. Rob Hubbard) is played on that tune too.
+    const tune = state.fileSubsongs;
+    const subsong = tune ? first + tune.current : first + state.uadeEditableCurrentSubsong;
+    await this.loadForPlayback(buffer, fileName, subsong, !!state.uadeEditableSubsongs?.orders || !!tune, state.uadeCompanionFiles ?? undefined);
   }
 
   /**

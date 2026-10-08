@@ -22,6 +22,7 @@ import { tryUADEPrefixParse } from './UADEPrefixParsers';
 import { tryPCTrackerParse } from './PCTrackerParsers';
 import { songWalks, WalkCancelledError, type SongWalkClient } from '@/lib/import/formats/songWalkClient';
 import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
+import { chooseFileSubsong, fileSubsongFormatByKey } from '@/lib/import/fileSubsongs';
 
 /**
  * Check if a filename matches a list of extensions, either as suffix (.ext) or prefix (ext.).
@@ -520,7 +521,7 @@ export async function tryRouteFormat(
       try {
         const { isHippelCoSoFormat, parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
         if (isHippelCoSoFormat(buffer)) {
-          return parseHippelCoSoFile(buffer, originalFileName);
+          return parseHippelCoSoFile(buffer, originalFileName, 0, requestedSubsong);
         }
       } catch (err) {
         console.warn(`[HippelCoSoParser] Native parse failed for ${filename}, falling back to UADE:`, err);
@@ -538,7 +539,7 @@ export async function tryRouteFormat(
     return withNativeThenUADE('robHubbard', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
         const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
-        if (isRobHubbardFormat(ab, name)) return parseRobHubbardFile(ab, name);
+        if (isRobHubbardFormat(ab, name)) return parseRobHubbardFile(ab, name, 0, requestedSubsong);
         return null;
       },
       'RobHubbardParser', { injectUADE: true });
@@ -818,11 +819,13 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['ma'])) {
     const { isMusicAssemblerFormat, parseMusicAssemblerFile } = await import('@lib/import/formats/MusicAssemblerParser');
     // The player's walk (the grid) runs in the walk worker, not on the main thread.
-    const maWalk = isMusicAssemblerFormat(new Uint8Array(buffer))
-      ? await walkOffMainThread((c) => c.musicAssembler(new Uint8Array(buffer), 0))
+    const isMa = isMusicAssemblerFormat(new Uint8Array(buffer));
+    const maTunes = isMa ? await chooseFileSubsong(fileSubsongFormatByKey('musicAssembler')!, buffer, originalFileName, requestedSubsong) : undefined;
+    const maWalk = isMa
+      ? await walkOffMainThread((c) => c.musicAssembler(new Uint8Array(buffer), maTunes?.current ?? 0))
       : undefined;
     return withNativeThenUADE('musicAssembler', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseMusicAssemblerFile(bytes as Uint8Array, name, maWalk),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseMusicAssemblerFile(bytes as Uint8Array, name, maWalk, maTunes),
       'MusicAssemblerParser', { isFormat: isMusicAssemblerFormat, usesBytes: true, injectUADE: true });
   }
 
@@ -876,7 +879,7 @@ export async function tryRouteFormat(
     return withNativeThenUADE('benDaglish', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
         const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
-        if (isBenDaglishFormat(ab, name)) return parseBenDaglishFile(ab, name);
+        if (isBenDaglishFormat(ab, name)) return parseBenDaglishFile(ab, name, requestedSubsong);
         return null;
       },
       'BenDaglishParser', { injectUADE: true });
@@ -1693,11 +1696,13 @@ export async function tryRouteFormat(
     const { isFuturePlayerFormat, parseFuturePlayerFile } = await import('@lib/import/formats/FuturePlayerParser');
     // The reader's walk (the grid) runs in the walk worker, not on the main thread.
     const { fpCodeSection } = await import('@lib/import/formats/fpWalk');
-    const fpWalk = isFuturePlayerFormat(buffer)
-      ? await walkOffMainThread((c) => c.futurePlayer(fpCodeSection(new Uint8Array(buffer)), 0))
+    const isFp = isFuturePlayerFormat(buffer);
+    const fpTunes = isFp ? await chooseFileSubsong(fileSubsongFormatByKey('futurePlayer')!, buffer, originalFileName, requestedSubsong) : undefined;
+    const fpWalk = isFp
+      ? await walkOffMainThread((c) => c.futurePlayer(fpCodeSection(new Uint8Array(buffer)), fpTunes?.current ?? 0))
       : undefined;
     return withNativeThenUADE('futurePlayer', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFuturePlayerFormat(buf as ArrayBuffer)) return parseFuturePlayerFile(buf as ArrayBuffer, name, fpWalk); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFuturePlayerFormat(buf as ArrayBuffer)) return parseFuturePlayerFile(buf as ArrayBuffer, name, fpWalk, fpTunes); return null; },
       'FuturePlayerParser', { injectUADE: true });
   }
 
@@ -2241,9 +2246,10 @@ export async function tryRouteFormat(
     const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
     const { hippelPlayedPitch } = await import('@lib/import/formats/hippelPlayedPitch');
     // The pitch the decoder plays per note (sound sequences shift or fix it) is what the grid shows.
-    const played = await hippelPlayedPitch(new Uint8Array(buffer));
+    const hip7Tunes = isJochenHippel7VFormat(buffer) ? await chooseFileSubsong(fileSubsongFormatByKey('jochenHippel7V')!, buffer, originalFileName, requestedSubsong) : undefined;
+    const played = await hippelPlayedPitch(new Uint8Array(buffer), undefined, hip7Tunes?.current ?? 0);
     return withNativeThenUADE('jochenHippel7V', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name, played ?? undefined); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name, played ?? undefined, hip7Tunes); return null; },
       'JochenHippel7VParser');
   }
 
@@ -2266,8 +2272,9 @@ export async function tryRouteFormat(
         const { isJochenHippelAmigaSogFormat, parseJochenHippelAmigaSogFile } = await import('@lib/import/formats/JochenHippelSTParser');
         if (isJochenHippelAmigaSogFormat(buffer)) {
           const { hippelPlayedPitch } = await import('@lib/import/formats/hippelPlayedPitch');
-          const played = await hippelPlayedPitch(new Uint8Array(buffer));
-          return parseJochenHippelAmigaSogFile(buffer, originalFileName, played ?? undefined);
+          const sogTunes = await chooseFileSubsong(fileSubsongFormatByKey('jochenHippelAmiga')!, buffer, originalFileName, requestedSubsong);
+          const played = await hippelPlayedPitch(new Uint8Array(buffer), undefined, sogTunes.current);
+          return parseJochenHippelAmigaSogFile(buffer, originalFileName, played ?? undefined, sogTunes);
         }
       } catch (err) {
         if (err instanceof WalkCancelledError) throw err;

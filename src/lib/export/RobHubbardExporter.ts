@@ -56,7 +56,7 @@ export async function exportRobHubbard(
     const baseName = sanitizeName(song.name);
     let bytes: Uint8Array = new Uint8Array(song.uadeEditableFileData);
     if (song.uadeVariableLayout) {
-      const r = applyRhGridEdits(bytes, song.patterns);
+      const r = applyRhGridEdits(bytes, song.patterns, song.fileSubsongs?.current ?? 0);
       bytes = r.data;
       warnings.push(...r.warnings);
     }

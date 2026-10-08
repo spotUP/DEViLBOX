@@ -23,7 +23,7 @@ export async function exportAsMusicAssembler(song: TrackerSong): Promise<MusicAs
   }
 
   const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-  const r = applyMaGridEdits(new Uint8Array(fileData), song.patterns);
+  const r = applyMaGridEdits(new Uint8Array(fileData), song.patterns, song.fileSubsongs?.current ?? 0);
   return {
     data: new Blob([r.data as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
     filename: `${baseName}.ma`,

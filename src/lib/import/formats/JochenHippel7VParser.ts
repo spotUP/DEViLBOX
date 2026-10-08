@@ -40,7 +40,8 @@ import type { InstrumentConfig, TFMXConfig, UADEChipRamInfo, Pattern, TrackerCel
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeTFMX7VCell } from '@/engine/uade/encoders/TFMX7VEncoder';
 import type { HippelAuxSpan, HippelCellSpan, HippelCellSpans } from '@/engine/hippel/hippelCellSpans';
-import { hippelCellNote, hippelGrid, hippelKeySeqs, hippelNoteByteFor, readHippelTfmx, type HippelGrid, type HippelPlayed } from './HippelTfmxWalk';
+import { hippelCellNote, hippelGrid, hippelKeySeqs, hippelNoteByteFor, readHippelTfmx, type HippelGrid, type HippelPlayed, type HippelTfmx } from './HippelTfmxWalk';
+import { fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 
 const MIN_FILE_SIZE = 32;
 
@@ -403,10 +404,10 @@ const EFFECT_SPEED = 0x0f;
  * the byte span behind it. A speed change shows as the speed effect on the
  * first row that runs at the new speed. `unmatched` says why there is no grid.
  */
-function decodeTFMX7VGrid(layout: ReturnType<typeof readTFMX7VLayout>, played?: HippelPlayed): {
+function decodeTFMX7VGrid(layout: ReturnType<typeof readTFMX7VLayout>, played?: HippelPlayed, subsong = 0): {
   rows: TrackerCell[][][]; spans: HippelCellSpans; walked: HippelGrid; speed: number;
 } {
-  const walked = hippelGrid(layout.m, 0, played);
+  const walked = hippelGrid(layout.m, subsong, played);
   const trackColumnSize = (layout.trackStepLen / layout.voices) | 0; // 3 (4V) or 4 (7V)
   const rows: TrackerCell[][][] = [];
   const spans: HippelCellSpans = [];
@@ -429,15 +430,22 @@ function decodeTFMX7VGrid(layout: ReturnType<typeof readTFMX7VLayout>, played?: 
 }
 
 /** The byte span behind every grid cell of a Hippel TFMX module (4 or 7 voices), as the parser lays the grid out. */
-export function mapJochenHippel7VCells(buf: Uint8Array): HippelCellSpans {
+export function mapJochenHippel7VCells(buf: Uint8Array, subsong = 0): HippelCellSpans {
   // A 7V file's song is where the 7V player's check finds it; any other Hippel TFMX file's (.hip) where the decoder does.
   const songOff = isJochenHippel7VFormat(buf) ? findTFMX7VSongOffset(buf) : -1;
   const m = readHippelTfmx(buf, songOff >= 0 ? songOff : undefined);
   if (!m) return [];
-  return decodeTFMX7VGrid(readTFMX7VLayout(buf, m.header)).spans;
+  return decodeTFMX7VGrid(readTFMX7VLayout(buf, m.header), undefined, subsong).spans;
 }
 
-export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string, played?: HippelPlayed): TrackerSong {
+/** The decoder's view of a Hippel TFMX file (7V or the Amiga SOG/hip module): its header, sections and subsong table. */
+export function hippelTfmxModule(buf: Uint8Array): HippelTfmx | null {
+  const songOff = isJochenHippel7VFormat(buf) ? findTFMX7VSongOffset(buf) : -1;
+  return readHippelTfmx(buf, songOff >= 0 ? songOff : undefined);
+}
+
+/** `played`: the pitches the decoder plays in subsong `tunes.current`; `tunes`: that subsong (lib/import/fileSubsongs), absent: subsong 0. */
+export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string, played?: HippelPlayed, tunes?: FileSubsongs): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isJochenHippel7VFormat(buf)) throw new Error('Not a Jochen Hippel 7V module');
   // Find the song header inside the file (handles loader-stub wrapping)
@@ -446,7 +454,7 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string, p
     throw new Error('TFMX-7V: could not locate song header');
   }
   const baseName = filename.split('/').pop() ?? filename;
-  return buildHippelTfmxSong(buffer, filename, songOff, `${baseName.replace(/^(hip7|s7g)\./i, '') || baseName} [Jochen Hippel 7V]`, 'tfmx7v', played);
+  return buildHippelTfmxSong(buffer, filename, songOff, `${baseName.replace(/^(hip7|s7g)\./i, '') || baseName} [Jochen Hippel 7V]`, 'tfmx7v', played, tunes);
 }
 
 /**
@@ -454,18 +462,19 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string, p
  * (.hip, SOG.), as the grid the decoder walks. Null when the file has no TFMX
  * song the decoder finds (MCMD modules).
  */
-export function parseHippelTfmxAmigaFile(buffer: ArrayBuffer, filename: string, played?: HippelPlayed): TrackerSong | null {
+export function parseHippelTfmxAmigaFile(buffer: ArrayBuffer, filename: string, played?: HippelPlayed, tunes?: FileSubsongs): TrackerSong | null {
   const buf = new Uint8Array(buffer);
   const m = readHippelTfmx(buf);
   if (!m) return null;
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^(sog|mcmd)\./i, '').replace(/\.(hip|mcmd)$/i, '') || baseName;
-  return buildHippelTfmxSong(buffer, filename, m.header, `${moduleName} [Jochen Hippel]`, 'tfmx7v', played);
+  return buildHippelTfmxSong(buffer, filename, m.header, `${moduleName} [Jochen Hippel]`, 'tfmx7v', played, tunes);
 }
 
-function buildHippelTfmxSong(buffer: ArrayBuffer, filename: string, songOff: number, name: string, layoutId: string, played?: HippelPlayed): TrackerSong {
+function buildHippelTfmxSong(buffer: ArrayBuffer, filename: string, songOff: number, name: string, layoutId: string, played?: HippelPlayed, tunes?: FileSubsongs): TrackerSong {
   const buf = new Uint8Array(buffer);
   const layout = readTFMX7VLayout(buf, songOff);
+  const tune = tunes && tunes.current < layout.numSongs ? tunes.current : 0;
   const { sampleHeaders, sampleData } = extractSamples(
     buf, layout.sampleHeadersOff, layout.numSamples, layout.sampleDataOff,
   );
@@ -543,7 +552,7 @@ function buildHippelTfmxSong(buffer: ArrayBuffer, filename: string, songOff: num
   const trackerPatterns: Pattern[] = [];
   const songPositions: number[] = [];
 
-  const grid = decodeTFMX7VGrid(layout, played);
+  const grid = decodeTFMX7VGrid(layout, played, tune);
   // The grid names every note by the pitch the decoder plays (sound sequences shift or fix it), which only
   // the decoder knows (hippelPlayedPitch): without its report there is no grid, never a second one of pattern notes.
   const unmatched = grid.walked.unmatched
@@ -677,6 +686,7 @@ function buildHippelTfmxSong(buffer: ArrayBuffer, filename: string, songOff: num
     // on 2026-09-22 came from the old Hippel WASM, which played nothing at all.
     hippelFileData: buffer.slice(0),
     uadePatternLayout,
+    ...(tunes ? fileSubsongsField({ ...tunes, current: tune }) : {}),
     ...(unmatched ? { gridUnmatchedReason: unmatched } : {}),
   };
 }

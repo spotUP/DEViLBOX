@@ -35,6 +35,7 @@ import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder
 import { createSamplerInstrument } from './AmigaUtils';
 import { benDaglishEncoder } from '@/engine/uade/encoders/BenDaglishEncoder';
 import { walkBenDaglish, BD_WALK } from './BenDaglishWasmExtractor';
+import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 import { buildBDGridFromWalk } from './benDaglishGrid';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -582,10 +583,14 @@ export function isBenDaglishFormat(buffer: ArrayBuffer, filename?: string): bool
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive module name)
  */
+/** `subsong`: the tune the grid is built from (0-based); absent, the first the replayer's walk makes a sound in. */
 export async function parseBenDaglishFile(
   buffer: ArrayBuffer,
   filename: string,
+  subsong?: number,
 ): Promise<TrackerSong> {
+  const tunes = await chooseFileSubsong(fileSubsongFormatByKey('benDaglish')!, buffer, filename, subsong)
+    .catch((): FileSubsongs => ({ count: 1, current: 0, fileName: filename }));
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
@@ -720,7 +725,7 @@ export async function parseBenDaglishFile(
     unmatched = 'the module scan found no tracks';
   } else {
     try {
-      const walk = await walkBenDaglish(buffer);
+      const walk = await walkBenDaglish(buffer, tunes.current);
       const grid = buildBDGridFromWalk(walk);
       const stray = walk.events.find((e) => e.track >= carriers.trackFileOffsets.length);
       if (stray) unmatched = `the replayer ran track ${stray.track} the module scan does not know`;
@@ -796,6 +801,7 @@ export async function parseBenDaglishFile(
     bdFileData: buffer.slice(0),
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    ...fileSubsongsField(tunes),
   };
   if (uadeVariableLayout) {
     (result as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout = uadeVariableLayout;

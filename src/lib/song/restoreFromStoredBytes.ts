@@ -71,7 +71,9 @@ export async function restoreFromStoredBytes(
   try {
     const parseFn = parse ?? (await import('@/lib/import/parseModuleToSong')).parseModuleToSong;
     const companions = eng.uadeCompanionFiles as Map<string, ArrayBuffer> | undefined;
-    fresh = await parseFn(new File([bytes], name), 0, undefined, undefined, companions);
+    // The tune the saved grid shows (a command-stream file with several, lib/import/fileSubsongs).
+    const tune = (eng.fileSubsongs as { current?: number } | null | undefined)?.current ?? 0;
+    fresh = await parseFn(new File([bytes], name), tune, undefined, undefined, companions);
   } catch (err) {
     console.warn('[restore] re-decoding the stored module failed, keeping the saved song:', err);
     return kept('the parse failed');

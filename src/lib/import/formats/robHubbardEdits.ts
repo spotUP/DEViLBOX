@@ -108,10 +108,11 @@ function growBlocks(
   return { data: out, patched };
 }
 
-export function applyRhGridEdits(source: Uint8Array, edited: Pattern[]): RhEditResult {
+/** `subsong`: the song of the module's table the edited grid shows (the song's fileSubsongs.current). */
+export function applyRhGridEdits(source: Uint8Array, edited: Pattern[], subsong = 0): RhEditResult {
   const out = new Uint8Array(source);
   const warnings: string[] = [];
-  const grid = buildRobHubbardGrid(source);
+  const grid = buildRobHubbardGrid(source, subsong);
   if (!grid) return { data: out, patched: 0, warnings: ['the module has no song to write the grid into'] };
 
   // file offset of every command of every block

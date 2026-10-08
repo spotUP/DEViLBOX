@@ -54,6 +54,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { HippelCoSoConfig, HippelCoSoSampleData, HippelCoSoSampleEntry, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { fileSubsongsField, chooseFileSubsong, fileSubsongFormatByKey, type FileSubsongs } from '../fileSubsongs';
 import { hippelCoSoEncoder } from '@/engine/uade/encoders/HippelCoSoEncoder';
 import type { HippelCellSpan, HippelCellSpans } from '@/engine/hippel/hippelCellSpans';
 
@@ -282,6 +283,8 @@ export async function parseHippelCoSoFile(
   buffer: ArrayBuffer,
   filename: string,
   moduleBase = 0,
+  /** The subsong the grid is built from (0-based); absent, the first the module has a song for. */
+  subsong?: number,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
 
@@ -336,7 +339,10 @@ export async function parseHippelCoSoFile(
 
   // ── Parse songs ───────────────────────────────────────────────────────────
   const songs = readCoSoSongs(buf, numSongs, songsOff, tracksOff);
-  const song = songs[0]; // use subsong 0
+  const tunes = await chooseFileSubsong(fileSubsongFormatByKey('hippelCoso')!, buffer, filename, subsong)
+    .catch((): FileSubsongs => ({ count: 1, current: 0, fileName: filename }));
+  const tune = tunes.current < songs.length ? tunes.current : 0;
+  const song = songs[tune];
 
   // ── Parse volseqs to extract instruments ─────────────────────────────────
   // The volseqs table contains uint16 offsets (absolute positions in file).
@@ -661,6 +667,7 @@ export async function parseHippelCoSoFile(
     linearPeriods: false,
     hippelFileData: buffer.slice(0),
     uadeVariableLayout: variableLayout,
+    ...fileSubsongsField({ ...tunes, current: tune }),
   };
 }
 
@@ -668,6 +675,40 @@ interface CoSoSong {
   pointer: number;  // absolute byte offset into tracks area
   length: number;   // number of track bytes
   speed: number;
+}
+
+/**
+ * The subsongs of a CoSo module: the songs of the table from the first, up to the first that has
+ * no steps (the table ends in a one-step dummy). The decoder numbers a subsong by its table slot,
+ * so a tune's number is its slot.
+ */
+export function cosoSubsongCount(buf: Uint8Array): number {
+  if (buf.length < 28) return 0;
+  const songsOff = u32BE(buf, 20);
+  const headersOff = u32BE(buf, 24);
+  const n = Math.max(1, Math.floor((headersOff - songsOff) / 6));
+  let usable = 0;
+  for (let i = 0; i < n; i++) {
+    const base = songsOff + i * 6;
+    if (base + 6 > buf.length) break;
+    if ((u16BE(buf, base + 2) - u16BE(buf, base) + 1) * 12 <= 12) break;
+    usable++;
+  }
+  return Math.max(1, usable);
+}
+
+/** Does subsong `tune` of a CoSo module start a note? Decided on the steps the decoder reads. */
+export function cosoTuneHasNotes(buf: Uint8Array, tune: number): boolean {
+  const patternsOff = u32BE(buf, 12);
+  const tracksOff = u32BE(buf, 16);
+  const songsOff = u32BE(buf, 20);
+  const headersOff = u32BE(buf, 24);
+  const songs = readCoSoSongs(buf, Math.max(1, Math.floor((headersOff - songsOff) / 6)), songsOff, tracksOff);
+  const song = songs[tune];
+  if (!song || tune >= cosoSubsongCount(buf)) return false;
+  // Instrument 0 for a volume sequence past the last: only the notes are asked about here.
+  const grid = decodeCoSoGrid(buf, patternsOff, song.pointer, Math.floor(song.length / 12), 0);
+  return grid.rows.some((step) => step.some((voice) => voice.some((cell) => cell.note > 0)));
 }
 
 /** The subsong table; a module with none gets one minimal song. */
@@ -697,13 +738,14 @@ function readCoSoSongs(buf: Uint8Array, numSongs: number, songsOff: number, trac
  * the grid out (subsong 0). `instrumentCount` is the parsed song's, since a
  * cell shows instrument 0 for a volume sequence past the last instrument.
  */
-export function mapHippelCoSoCells(buf: Uint8Array, instrumentCount: number): HippelCellSpans {
+export function mapHippelCoSoCells(buf: Uint8Array, instrumentCount: number, subsong = 0): HippelCellSpans {
   const patternsOff = u32BE(buf, 12);
   const tracksOff = u32BE(buf, 16);
   const songsOff = u32BE(buf, 20);
   const headersOff = u32BE(buf, 24);
   const numSongs = Math.max(1, Math.floor((headersOff - songsOff) / 6));
-  const song = readCoSoSongs(buf, numSongs, songsOff, tracksOff)[0];
+  const songs = readCoSoSongs(buf, numSongs, songsOff, tracksOff);
+  const song = songs[subsong] ?? songs[0];
   return decodeCoSoGrid(buf, patternsOff, song.pointer, Math.floor(song.length / 12), instrumentCount).spans;
 }
 
