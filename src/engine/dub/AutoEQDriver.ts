@@ -42,7 +42,8 @@ export function setAutoEqSnapshot(snapshot: EQSnapshot | null): void {
 
 let _improvTimer: ReturnType<typeof setInterval> | null = null;
 let _improvRampTimer: ReturnType<typeof setInterval> | null = null;
-let _prevEnergy = 0;
+/** Loudness at the previous tick; null until the first tick of a session has seen one. */
+let _prevEnergy: number | null = null;
 /** Per-band gain delta from improv loop (indices 0-3 = parametric bands P1-P4). */
 const _improvBandDeltas = [0, 0, 0, 0];
 /** Deltas applied in the PREVIOUS tick — subtracted before applying new deltas
@@ -206,7 +207,7 @@ function improvTick(): void {
           : effectiveDepth * 0.3;  // Sweet spot: gentle boost
       }
     } else {
-      delta = computeImprovDelta(cfg.driver, beatPhase, energy, _prevEnergy, effectiveDepth);
+      delta = computeImprovDelta(cfg.driver, beatPhase, energy, _prevEnergy ?? energy, effectiveDepth);
     }
 
     _improvBandDeltas[bandIdx] = Math.max(-effectiveDepth, Math.min(effectiveDepth, delta));
@@ -269,7 +270,7 @@ export function stopAutoEqDriver(): void {
  * what made the two concerns hard to separate in the first place.
  */
 export function resetAutoEqDriver(): void {
-  _prevEnergy = 0;
+  _prevEnergy = null;
   _improvBandDeltas.fill(0);
   _prevImprovBandDeltas.fill(0);
 }

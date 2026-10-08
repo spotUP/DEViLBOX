@@ -263,7 +263,11 @@ export const AUTO_DUB_PERSONAS: Record<AutoDubPersonaId, AutoDubPersona> = {
     variance: 0.05,
     signatureMove: 'ghostReverb',
     densityBias: 0.3,
-    improvConfig: { driver: 'energy-reactive', liveBands: [0, 1, 2, 3], depth: 12, rate: 1.4 },
+    // Energy-reactive moves the bands by the change in loudness, so it is
+    // level modulation: the 8 kHz band is left out (a transient must never
+    // lift the air band) and the depth sits with the other personas', not at
+    // 12 dB on four bands (treble bursts, 2026-10-08).
+    improvConfig: { driver: 'energy-reactive', liveBands: [0, 1, 2], depth: 6, rate: 1.4 },
     riddimConfig: { enabled: true, freqBars: 8, holdBars: 8 },
   },
 
