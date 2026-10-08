@@ -301,6 +301,7 @@ struct DwModule {
     int walk_pos;                  // byte position of the command being executed in its track
     int walk_count, walk_max;
     int32_t* walk_out;             // 7 ints per event
+    int walk_stop_tick;            // tick of the first stop-song command (-1: none); the walk ends there, as the original player's song does
     int walk_wrap_tick[8];         // tick at which each channel first reached the end of its position list (-1: not yet)
     int trace_count;
     int16_t trace[4096][3];
@@ -1745,6 +1746,7 @@ static bool do_effects(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc, DwEff
                 break;
 
             case 1:     // StopSong
+                if (m->walking && m->walk_stop_tick < 0) m->walk_stop_tick = m->walk_tick;
                 stop_module(m);
                 return true;
 
@@ -1777,6 +1779,7 @@ static bool do_effects(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc, DwEff
 
             case DW_EFFECT_STOP_SONG:
                 walk_event(m, ch, DW_WALK_STOP_SONG, 0, 0);
+                if (m->walking && m->walk_stop_tick < 0) m->walk_stop_tick = m->walk_tick;
                 stop_module(m);
                 return true;
 
@@ -2700,7 +2703,7 @@ int dw_trace(DwModule* m, int ticks, int16_t* out, int max_notes) {
  * Run the current subsong from its start and write every command the replayer executes, each as 7
  * int32: tick, channel, file offset of the command's block (-1 for the empty track), byte position
  * of the command in it, kind (DW_WALK_*), a, b. Stops when every channel has reached the end of its
- * position list once (the song is then the first pass of the longest channel, the shorter ones
+ * position list once or the first stop-song command ran (the song is then the first pass of the longest channel, the shorter ones
  * looping inside it as the replayer loops them) or after `max_ticks`. info[0] ticks run, info[1] the
  * tick the last channel finished its first pass, info[2..9] each channel's first-pass tick (-1 never),
  * info[10] channels, info[11] number of samples. Returns the event count.
@@ -2715,6 +2718,7 @@ int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* i
     m->walk_max = max_events;
     m->walk_out = out;
     for (int i = 0; i < 8; i++) m->walk_wrap_tick[i] = -1;
+    m->walk_stop_tick = -1;
     int ticks = 0;
     for (; ticks < max_ticks && m->walk_count < max_events; ticks++) {
         play_tick(m);
@@ -2724,10 +2728,13 @@ int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* i
             if (m->walk_wrap_tick[i] < 0) all = false;
         }
         if (all) { ticks++; break; }
+        // A stop-song ends the song: the replayer resets and would play the tune again from its start, which is not the tune's first pass.
+        if (m->walk_stop_tick >= 0) { ticks++; break; }
     }
     m->walking = false;
     int done = 0;
     for (int i = 0; i < m->number_of_channels && i < 8; i++) if (m->walk_wrap_tick[i] > done) done = m->walk_wrap_tick[i];
+    if (m->walk_stop_tick > done) done = m->walk_stop_tick;
     if (info) {
         info[0] = ticks; info[1] = done;
         for (int i = 0; i < 8; i++) info[2 + i] = i < m->number_of_channels ? m->walk_wrap_tick[i] : -1;

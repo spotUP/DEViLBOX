@@ -7,7 +7,7 @@
  * seconds. A grid whose rows are 50 Hz replayer ticks therefore needs initialSpeed 1 at 125 BPM;
  * the module's own song speed there puts the cursor at a third, a fifth or a sixth of the sound.
  */
-import { PaulaSession, PaulaNoteOns, PAULA_CHUNK, type PaulaLogModule, type PaulaWrite } from './gridOracle';
+import { PaulaSession, PaulaNoteOns, PAULA_CHUNK, PAULA_REG, readChipRam, type PaulaLogModule, type PaulaWrite } from './gridOracle';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const MS_PER_CHUNK = (PAULA_CHUNK / 44100) * 1000;
@@ -32,13 +32,32 @@ export function gridOnsets(song: Pick<TrackerSong, 'patterns' | 'songPositions' 
   return out;
 }
 
-/** Per Paula voice, the seconds at which the player started a note in the first `seconds` of the session. */
-export function paulaOnsetsOf(sess: PaulaSession, seconds: number): number[][] {
+/**
+ * Per Paula voice, the seconds at which the player started a note in the first `seconds` of the session.
+ *
+ * `audibleOnly`: skip a note-on whose sample data (pointer and length as the voice holds them) is all
+ * zero. A player that "mutes" by pointing the voice at a silent buffer (David Whittaker command 0x82:
+ * the 64 zero bytes after the last sample) writes the same pointer and period registers a note does,
+ * and the register log cannot tell it from one; the data can.
+ */
+export function paulaOnsetsOf(sess: PaulaSession, seconds: number, audibleOnly = false): number[][] {
   const ons = new PaulaNoteOns('armed');
   const out: number[][] = [[], [], [], []];
+  const ptr = [0, 0, 0, 0];
+  const len = [0, 0, 0, 0];
+  const silent = (v: number): boolean => {
+    if (!audibleOnly || len[v] === 0) return false;
+    return readChipRam(sess.mod, ptr[v], Math.min(len[v] * 2, 4096)).every((b) => b === 0);
+  };
   const feed = (writes: PaulaWrite[], ms: number): void => {
     for (const w of writes) {
+      if (w.voice <= 3) {
+        if (w.reg === PAULA_REG.LCH) ptr[w.voice] = (((w.value & 0xffff) << 16) | (ptr[w.voice] & 0xffff)) >>> 0;
+        else if (w.reg === PAULA_REG.LCL) ptr[w.voice] = ((ptr[w.voice] & 0xffff0000) | (w.value & 0xffff)) >>> 0;
+        else if (w.reg === PAULA_REG.LEN) len[w.voice] = w.value;
+      }
       if (ons.push(w) === null || w.voice > 3) continue;
+      if (silent(w.voice)) continue;
       const l = out[w.voice];
       if (l.length === 0 || ms - l[l.length - 1] > SAME_NOTE_MS) l.push(ms);
     }
@@ -64,6 +83,21 @@ export function onsetCoverage(grid: number[][], paula: number[][], span: number,
     out.push({ voice, notes: inSpan.length, hit: inSpan.filter((t) => paula[voice].some((p) => Math.abs(p - t) * 1000 <= toleranceMs)).length });
   });
   return out;
+}
+
+/**
+ * Per voice, BOTH ways, silent voices included: how many grid notes sit on a player note-on, and how many
+ * player note-ons (in the first `span` seconds) sit on a grid note. A voice that neither has a note on
+ * counts as compared (both empty); a voice where only one side has notes fails with 0 coverage.
+ */
+export interface VoiceMatch { voice: number; grid: number; player: number; gridHit: number; playerHit: number }
+export function onsetMatch(grid: number[][], paula: number[][], span: number, toleranceMs: number): VoiceMatch[] {
+  const near = (list: number[], t: number): boolean => list.some((p) => Math.abs(p - t) * 1000 <= toleranceMs);
+  return grid.map((g, voice) => {
+    const gs = g.filter((t) => t <= span);
+    const ps = (paula[voice] ?? []).filter((t) => t <= span);
+    return { voice, grid: gs.length, player: ps.length, gridHit: gs.filter((t) => near(ps, t)).length, playerHit: ps.filter((t) => near(gs, t)).length };
+  });
 }
 
 export { MS_PER_CHUNK };
