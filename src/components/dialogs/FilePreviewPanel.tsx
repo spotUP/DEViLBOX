@@ -44,6 +44,7 @@ interface ModlandPanelProps {
   onClose: () => void;
 }
 
+import { DownloadProgressBorder, useDownloadProgress } from './downloadProgress';
 const MODLAND_LIMIT = 50;
 
 export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTrackerModule, onClose }) => {
@@ -57,6 +58,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
   const [modlandOffset, setModlandOffset] = useState(0);
   const [modlandHasMore, setModlandHasMore] = useState(false);
   const [modlandDownloading, setModlandDownloading] = useState<Set<string>>(new Set());
+  const modlandProgress = useDownloadProgress();
   const [modlandRatings, setModlandRatings] = useState<RatingMap>({});
   const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
@@ -135,7 +137,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
         // WITH the load (onLoadTrackerModule -> loadFile -> prepareModuleImport),
         // never pre-written into the UADE filesystem: a bob4e.dum loaded that
         // way reached UADE without bob4.ins (2026-10-06).
-        const buffer = await downloadModlandFile(file.full_path);
+        const buffer = await downloadModlandFile(file.full_path, modlandProgress.report(file.full_path));
         const companions = await acquireModlandCompanions(file.full_path, buffer);
 
         markKnownSource(file.filename);   // it came from Modland: not a contribution candidate
@@ -149,9 +151,10 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
           next.delete(file.full_path);
           return next;
         });
+        modlandProgress.clear(file.full_path);
       }
     },
-    [onLoadTrackerModule, onClose],
+    [onLoadTrackerModule, onClose, modlandProgress.report, modlandProgress.clear],
   );
 
   const handleModlandRate = useCallback(async (key: string, star: number) => {
@@ -234,7 +237,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
               {modlandResults.map((file) => (
                 <div
                   key={file.full_path}
-                  className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
+                  className="relative overflow-hidden flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
                              hover:bg-dark-bgHover hover:border-dark-border transition-colors group cursor-pointer"
                   onDoubleClick={() => handleModlandLoad(file)}
                 >
@@ -278,6 +281,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
                       Load
                     </button>
                   )}
+                  {modlandDownloading.has(file.full_path) && <DownloadProgressBorder progress={modlandProgress.progress[file.full_path]} />}
                 </div>
               ))}
 
@@ -716,6 +720,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
   const [offset, setOffset] = useState(remembered?.offset ?? 0);
   const [hasMore, setHasMore] = useState(remembered?.hasMore ?? false);
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
+  const downloadProgress = useDownloadProgress();
   const [ratings, setRatings] = useState<RatingMap>({});
   const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
@@ -829,7 +834,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
 
   /** Download an item and return {buffer, filename, companions}. Shared by
    *  handleLoad (load+close) and handlePreview (load+play, keep dialog open). */
-  const downloadItem = useCallback(async (item: OnlineResult) => {
+  const downloadItem = useCallback(async (item: OnlineResult, onProgress?: (p: import('@/lib/modlandApi').DownloadProgress) => void) => {
     let buffer: ArrayBuffer;
     let companions: Map<string, ArrayBuffer> | undefined;
     let filename = item.filename;
@@ -847,7 +852,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
       filename = normalized.filename;
     } else {
       try {
-        buffer = await downloadModlandFile(item.key);
+        buffer = await downloadModlandFile(item.key, onProgress);
       } catch (fetchErr) {
         throw new Error(`Modland download failed: ${(fetchErr as Error).message}`);
       }
@@ -877,15 +882,16 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     setDownloading(prev => new Set(prev).add(item.key));
     setError(null);
     try {
-      const { buffer, filename, companions } = await downloadItem(item);
+      const { buffer, filename, companions } = await downloadItem(item, downloadProgress.report(item.key));
       await onLoadTrackerModule(buffer, filename, companions);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to download');
     } finally {
       setDownloading(prev => { const s = new Set(prev); s.delete(item.key); return s; });
+      downloadProgress.clear(item.key);
     }
-  }, [onLoadTrackerModule, onClose, downloadItem, stopPreview]);
+  }, [onLoadTrackerModule, onClose, downloadItem, stopPreview, downloadProgress.report, downloadProgress.clear]);
 
   const handlePreview = useCallback(async (item: OnlineResult) => {
     // Toggle off if already previewing this item
@@ -895,7 +901,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     setDownloading(prev => new Set(prev).add(item.key));
     setError(null);
     try {
-      const { buffer, filename, companions } = await downloadItem(item);
+      const { buffer, filename, companions } = await downloadItem(item, downloadProgress.report(item.key));
 
       // SID files → C64SIDEngine direct playback
       if (item.source === 'hvsc' || /\.sid$/i.test(filename)) {
@@ -961,8 +967,9 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
       setPreviewingKey(null);
     } finally {
       setDownloading(prev => { const s = new Set(prev); s.delete(item.key); return s; });
+      downloadProgress.clear(item.key);
     }
-  }, [previewingKey, stopPreview, downloadItem]);
+  }, [previewingKey, stopPreview, downloadItem, downloadProgress.report, downloadProgress.clear]);
 
   const handleRate = useCallback(async (item: OnlineResult, star: number) => {
     if (!isLoggedIn) { setShowAuthModal(true); return; }
@@ -1046,7 +1053,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
               {results.map((item) => (
                 <div
                   key={`${item.source}:${item.key}`}
-                  className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
+                  className="relative overflow-hidden flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
                              hover:bg-dark-bgHover hover:border-dark-border transition-colors group cursor-pointer"
                   onDoubleClick={() => handleLoad(item)}
                 >
@@ -1101,6 +1108,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
                       </button>
                     </>
                   )}
+                  {downloading.has(item.key) && <DownloadProgressBorder progress={downloadProgress.progress[item.key]} />}
                 </div>
               ))}
 
