@@ -319,7 +319,7 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // the samples the from-scratch CoSo serializer cannot rebuild.
     const { rebuildHippelModule } = await import('@engine/hippel/rebuildHippelModule');
     // A song with no grid (the scope view, gridUnmatchedReason) has no edits: its placeholder pattern is not one.
-    const rebuilt = rebuildHippelModule(song.hippelFileData, song.gridUnmatchedReason ? [] : song.patterns, song.instruments.length, song.fileSubsongs?.current ?? 0);
+    const rebuilt = rebuildHippelModule(song.hippelFileData, song.gridUnmatchedReason ? [] : song.patterns, song.instruments.length, song.fileSubsongs?.current ?? 0, (n) => song.instruments.find((x) => x.id === n)?.metadata?.hippelKeySeq ?? 0);
     if (rebuilt) {
       const warnings = rebuilt.refused.length > 0
         ? [`${rebuilt.refused.length} edit(s) have no room in the module and were not saved (pattern:channel:row ${rebuilt.refused.slice(0, 8).join(', ')})`]

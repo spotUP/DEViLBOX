@@ -41,8 +41,10 @@ export function rebuildHippelModule(
   instrumentCount: number,
   /** The subsong the grid shows (the song's fileSubsongs.current). */
   subsong = 0,
+  /** instrument number -> the sound-sequence transpose its notes play under (see patchEditedCells). */
+  keySeq?: (instrument: number) => number,
 ): HippelPatchResult | null {
   const buf = fileData instanceof Uint8Array ? fileData : new Uint8Array(fileData);
   const spans = mapHippelCells(buf, instrumentCount, subsong);
-  return spans ? patchEditedCells(buf, spans, patterns) : null;
+  return spans ? patchEditedCells(buf, spans, patterns, keySeq) : null;
 }

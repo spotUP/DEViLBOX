@@ -250,44 +250,57 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
       let add: Measured['add'] = 'n/a';
       // MaxTrax: notes are made by the editor's own score ops (no tracker-grid cell to put on an empty row).
       if (desc && key !== 'maxTrax') {
+        // Candidate blank cells of the first pattern, those straight after a note first (a command-stream voice holds that note
+        // across them). A row between a format's timing units (David Whittaker counts waits in speed units) cannot start a note:
+        // the cell passes when the first candidate that CAN is written and reloads with the note (at most 12 are tried).
         await load(rel);
         const s2 = useTrackerStore.getState();
-        let empty: { p: number; ch: number; r: number } | null = null;
-        let any = 0;
-        // The blank row straight after a note (a command-stream voice holds that note across it), else the first blank row.
-        let fallback: { p: number; ch: number; r: number } | null = null;
+        type Cand = { p: number; ch: number; r: number; any: number };
+        const after: Cand[] = [];
+        const other: Cand[] = [];
+        let anyNote = 0;
+        s2.patterns.forEach((pat) => pat.channels.forEach((c) => c.rows.forEach((cell: Cell) => { if (cell.note > 0 && !anyNote) anyNote = cell.note; })));
         s2.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell: Cell, r) => {
-          if (cell.note > 0 && !any) any = cell.note;
           if (p !== 0 || r === 0 || cell.note !== 0) return;
-          fallback ??= { p, ch, r };
-          if (!empty && c.rows[r - 1].note > 0 && c.rows[r - 1].note < 97) empty = { p, ch, r };
+          const prev = c.rows[r - 1];
+          if (prev.note > 0 && prev.note < 97) after.push({ p, ch, r, any: prev.note });
+          else other.push({ p, ch, r, any: anyNote });
         })));
-        empty ??= fallback;
-        if (empty) any = s2.patterns[0].channels[(empty as { ch: number }).ch].rows[(empty as { r: number }).r - 1].note > 0 ? s2.patterns[0].channels[(empty as { ch: number }).ch].rows[(empty as { r: number }).r - 1].note : any;
-        if (empty && any) {
-          const e = empty as { p: number; ch: number; r: number };
-          s2.setCurrentPattern(e.p);
+        // The blank run after the first note that has one: its rows one by one (a format that times a note in units of N rows takes a note on the Nth).
+        const run: Cand[] = [];
+        for (const c of after) {
+          const rows = s2.patterns[0].channels[c.ch].rows;
+          let n = 0;
+          while (c.r + n < rows.length && rows[c.r + n].note === 0) n++;
+          if (n >= 12) { for (let q = 0; q < 12; q++) run.push({ p: 0, ch: c.ch, r: c.r + q, any: c.any }); break; }
+        }
+        const candidates = [...run, ...after, ...other].filter((c) => c.any > 0).slice(0, 14);
+        const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
+        const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+        let ok = false;
+        for (let k = 0; k < candidates.length && !ok; k++) {
+          const e = candidates[k];
+          if (k > 0) await load(rel);
+          const s3 = useTrackerStore.getState();
+          s3.setCurrentPattern(e.p);
           // A typed note takes the instrument in use: the one of the note above it.
-          const above = s2.patterns[0].channels[e.ch].rows[e.r - 1];
+          const above = s3.patterns[0].channels[e.ch].rows[e.r - 1];
           if (key === 'hvl') {
             // Hively's edit authority is its native track pool: a keystroke goes through hivelyEdit, never setCell (G5).
             const { editHivelyCell } = await import('@/components/hively/hivelyEdit');
-            editHivelyCell(e.p, e.ch, e.r, 'note', any);
-          } else s2.setCell(e.ch, e.r, { note: any, ...(above.note > 0 && above.instrument > 0 ? { instrument: above.instrument } : {}) });
+            editHivelyCell(e.p, e.ch, e.r, 'note', e.any);
+          } else s3.setCell(e.ch, e.r, { note: e.any, ...(above.note > 0 && above.instrument > 0 ? { instrument: above.instrument } : {}) });
           await settle();
-          const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
-          const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-          let ok = false;
           try {
             const out = await exportNativeSong(null, {});
             if (out) {
               const back = await parseModuleToSong(new File([new Uint8Array(out.data).buffer as ArrayBuffer], name)) as unknown as { patterns: Array<{ channels: Array<{ rows: Cell[] }> }> };
-              ok = back.patterns[e.p]?.channels[e.ch]?.rows[e.r]?.note === any;
-              if (process.env.G24_DEBUG && !ok) console.log('[g24add]', key, 'cell', JSON.stringify(e), 'wanted', any, 'back', JSON.stringify(back.patterns[e.p]?.channels[e.ch]?.rows[e.r]), 'warnings', JSON.stringify(out.warnings), 'sizes', out.data.length);
+              ok = back.patterns[e.p]?.channels[e.ch]?.rows[e.r]?.note === e.any;
+              if (process.env.G24_DEBUG && !ok) console.log('[g24add]', key, 'cell', JSON.stringify(e), 'wanted', e.any, 'back', JSON.stringify(back.patterns[e.p]?.channels[e.ch]?.rows[e.r]), 'warnings', JSON.stringify(out.warnings).slice(0, 300), 'sizes', out.data.length);
             }
           } catch (err) { ok = false; if (process.env.G24_DEBUG) console.log('[g24add]', key, 'threw', String(err).slice(0, 160)); }
-          add = ok ? 'yes' : 'no';
         }
+        add = candidates.length === 0 ? 'n/a' : ok ? 'yes' : 'no';
       }
       measured[key] = { engine: desc?.key ?? 'tracker', route: route.route, status, add };
       console.log(`[liveEdit] ${key} engine=${desc?.key ?? 'tracker'} route=${route.route} before=${before} heard=${status} add=${add}`);
