@@ -646,7 +646,7 @@ export interface GainPlan {
   };
 }
 
-export type EffectKind = 'echo-out' | 'reverb-out' | 'delay-throw' | 'filter-rise' | 'clean-release' | 'reverb-expansion';
+export type EffectKind = 'echo-out' | 'reverb-out' | 'delay-throw' | 'filter-rise' | 'clean-release' | 'reverb-expansion' | 'brake';
 
 export interface DJEffectEvent {
   kind: EffectKind;

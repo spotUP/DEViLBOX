@@ -15,8 +15,9 @@ import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useInstrumentTypeStore } from '@/stores/useInstrumentTypeStore';
 import { useChannelTypeStore } from '@/stores/useChannelTypeStore';
 import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
-import { classifySongRoles } from '@/bridge/analysis/ChannelNaming';
-import { getAllRuntimeChannelRoles, mergeOfflineAndRuntimeRoles } from '@/bridge/analysis/ChannelAudioClassifier';
+import { classifySongRoles, classifyInstrument } from '@/bridge/analysis/ChannelNaming';
+import { getAllRuntimeChannelRoles, mergeOfflineAndRuntimeRoles, type RuntimeRoleHint } from '@/bridge/analysis/ChannelAudioClassifier';
+import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 import { buildSongRoleTimeline, getRolesAtPosition, type SongRoleTimeline } from '@/bridge/analysis/SongRoleTimeline';
 import { resolveChannelNames } from '@/lib/tracker/channelNames';
 import type { Pattern } from '@/types/tracker';
@@ -84,6 +85,72 @@ function getCedTimeline(patterns: Pattern[], patternOrder: number[]): SongRoleTi
  *       channels to `bass|percussion|lead` when runtime strongly disagrees.
  *       Keeps strong offline roles intact so runtime doesn't override a
  *       correctly-detected bass/perc with a transient misread. */
+/**
+ * Channel roles for a given song (not the editor's): the Auto DJ reads a
+ * deck's module through this (plan sections 25-27); the editor path below
+ * adds its live sources (runtime audio evidence, CED, performer-set roles).
+ *
+ * Roles merge the way the Dub Deck's do: the song-wide instrument-aware
+ * classifier (ChannelNaming.classifySongRoles), promoted by runtime audio
+ * hints where given, overridden over time by the role timeline (instrument
+ * types per position), then by explicit per-channel roles.
+ */
+export interface SongChannelRolesInput {
+  patterns: Pattern[];
+  patternOrder: number[];
+  instruments: InstrumentConfig[];
+  runtimeHints?: ReadonlyArray<RuntimeRoleHint | null>;
+  /** A CED/instrument-type timeline; when omitted one is built from the instruments' own classification. */
+  timeline?: SongRoleTimeline | null;
+  explicitRoles?: ReadonlyArray<ChannelRole | null | undefined>;
+}
+
+export interface SongChannelRoles {
+  /** Song-wide role per channel (after every merge, at position 0). */
+  roles: ChannelRole[];
+  /** Roles over time; `getRolesAtPosition(timeline, pos, row)` for a position. */
+  timeline: SongRoleTimeline | null;
+  /** Roles before the timeline and explicit overrides: the per-song baseline. */
+  baseRoles: ChannelRole[];
+}
+
+/** Instrument type from the instrument's own classification (name, drum type, sample spectrum), for songs the CED has not seen. */
+function instrumentTypesFromConfigs(instruments: InstrumentConfig[]): { types: Map<number, InstrumentType>; confidences: Map<number, number> } {
+  const types = new Map<number, InstrumentType>();
+  const confidences = new Map<number, number>();
+  for (const inst of instruments) {
+    if (!inst || typeof inst.id !== 'number') continue;
+    const c = classifyInstrument(inst);
+    const type: InstrumentType | null = c.role === 'percussion'
+      ? (c.subrole === 'kick' ? 'kick' : c.subrole === 'snare' ? 'snare' : c.subrole === 'hat' ? 'hihat' : 'percussion')
+      : c.role === 'bass' ? 'bass' : c.role === 'pad' ? 'pad' : c.role === 'lead' ? 'synthesizer'
+      : c.role === 'chord' || c.role === 'arpeggio' || c.role === 'skank' ? 'keyboard' : null;
+    if (type && c.confidence > 0) { types.set(inst.id, type); confidences.set(inst.id, c.confidence); }
+  }
+  return { types, confidences };
+}
+
+export function resolveSongChannelRoles(input: SongChannelRolesInput): SongChannelRoles {
+  const { patterns, patternOrder } = input;
+  if (!Array.isArray(patterns) || patterns.length === 0) return { roles: [], timeline: null, baseRoles: [] };
+  const lookup = new Map<number, InstrumentConfig>();
+  for (const inst of input.instruments) if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
+  const offlineRoles = classifySongRoles(patterns, lookup, patternOrder);
+  const baseRoles = input.runtimeHints ? mergeOfflineAndRuntimeRoles(offlineRoles, input.runtimeHints) : offlineRoles.slice();
+  let timeline = input.timeline ?? null;
+  if (timeline === null && input.timeline === undefined) {
+    const { types, confidences } = instrumentTypesFromConfigs(input.instruments);
+    timeline = types.size > 0 ? buildSongRoleTimeline(patterns, patternOrder, types, confidences) : null;
+  }
+  let roles = baseRoles.slice();
+  if (timeline) {
+    const atStart = getRolesAtPosition(timeline, 0, 0, 0.3);
+    roles = roles.map((r, ch) => atStart[ch] ?? r);
+  }
+  if (input.explicitRoles) roles = roles.map((r, ch) => input.explicitRoles![ch] ?? r);
+  return { roles, timeline, baseRoles };
+}
+
 export function readSongChannelIdentity(): SongChannelIdentity {
   const empty = { roles: [] as ChannelRole[], pattern: null, names: [], currentRow: 0 };
   try {
@@ -114,25 +181,27 @@ export function readSongChannelIdentity(): SongChannelIdentity {
     if (!pattern || !pattern.channels?.length) return empty;
 
     const insts = useInstrumentStore.getState().instruments;
-    const lookup = new Map<number, InstrumentConfig>();
-    for (const inst of insts) {
-      if (inst && typeof inst.id === 'number') lookup.set(inst.id, inst);
-    }
 
     // Trigger CED instrument classification in the background (no-op if already running).
     useInstrumentTypeStore.getState().classifyInstruments(insts);
 
-    const offlineRoles = classifySongRoles(patterns, lookup, useTrackerStore.getState().patternOrder);
-    const runtimeHints = getAllRuntimeChannelRoles(offlineRoles.length);
-    let mergedRoles = mergeOfflineAndRuntimeRoles(offlineRoles, runtimeHints);
-
-    // Overlay CED timeline roles where available. CED knows the CURRENT
-    // instrument at each song position, so it tracks mid-song instrument
-    // switches that static classifySongRoles misses.
     const patternOrder: number[] = tracker.patternOrder ?? [];
     const positionIndex: number = tracker.currentPositionIndex ?? 0;
     const currentRow = transport.currentRow ?? 0;
     const cedTimeline = getCedTimeline(patterns, patternOrder);
+    // The same resolution the Auto DJ uses for a deck's song (song-wide
+    // instrument-aware roles promoted by runtime audio evidence), with the
+    // editor's live overlays added below.
+    const resolved = resolveSongChannelRoles({
+      patterns, patternOrder, instruments: insts,
+      runtimeHints: getAllRuntimeChannelRoles(pattern.channels.length),
+      timeline: cedTimeline,
+    });
+    let mergedRoles = resolved.baseRoles;
+
+    // Overlay CED timeline roles where available. CED knows the CURRENT
+    // instrument at each song position, so it tracks mid-song instrument
+    // switches that static classifySongRoles misses.
     if (cedTimeline) {
       // Only override roles where CED had at least 0.3 confidence at that position.
       const cedRoles = getRolesAtPosition(cedTimeline, positionIndex, currentRow, 0.3);

@@ -192,6 +192,12 @@ export class DeckEngine {
   private _reverbNode: ConvolverNode | null = null;
   private _reverbWet: GainNode | null = null;
   private _reverbActive = false;
+  // Auto DJ echo send (pre-fader feedback delay, returned past the channel gain).
+  private _echoSend: GainNode | null = null;
+  private _echoDelay: DelayNode | null = null;
+  private _echoFeedback: GainNode | null = null;
+  private _echoTone: BiquadFilterNode | null = null;
+  private _echoWet: GainNode | null = null;
 
   /**
    * Safely ramp deckGain to a target value using the RAW native AudioParam.
@@ -294,6 +300,33 @@ export class DeckEngine {
       this._reverbWet.connect(limiter);
     } catch (err) {
       console.warn('[DeckEngine] reverb send setup failed:', err);
+    }
+
+    // Auto DJ echo send: a feedback delay fed pre-fader, returned to the
+    // limiter past the channel gain, so an echo-out keeps ringing after the
+    // dry signal has left the mix (plan section 18). Silent until used.
+    try {
+      this._echoSend = ctx.createGain();
+      this._echoSend.gain.value = 0;
+      this._echoDelay = ctx.createDelay(2.0);
+      this._echoDelay.delayTime.value = 0.375;
+      this._echoFeedback = ctx.createGain();
+      this._echoFeedback.gain.value = 0.55;
+      this._echoTone = ctx.createBiquadFilter();
+      this._echoTone.type = 'lowpass';
+      this._echoTone.frequency.value = 4200;
+      this._echoWet = ctx.createGain();
+      this._echoWet.gain.value = 0.6;
+      const nativeLPF2 = getNativeAudioNode(this.filterLPF as unknown as Record<string, unknown>);
+      if (nativeLPF2) nativeLPF2.connect(this._echoSend);
+      this._echoSend.connect(this._echoDelay);
+      this._echoDelay.connect(this._echoTone);
+      this._echoTone.connect(this._echoFeedback);
+      this._echoFeedback.connect(this._echoDelay);
+      this._echoTone.connect(this._echoWet);
+      this._echoWet.connect(limiter);
+    } catch (err) {
+      console.warn('[DeckEngine] echo send setup failed:', err);
     }
 
     // Create TrackerReplayer connected to our deckGain input
@@ -1534,6 +1567,51 @@ export class DeckEngine {
     // Slow fade-out (500ms) so the reverb tail finishes naturally
     this._reverbSend.gain.linearRampToValueAtTime(0, now + 0.5);
   }
+
+  // ==========================================================================
+  // AUTO DJ SENDS (echo-out, reverb-out): pre-fader, returned past the fader
+  // ==========================================================================
+
+  /** Echo send level 0..1 (ramped 20 ms). The tail keeps ringing after the dry signal leaves. */
+  setEchoSend(level: number): void {
+    if (!this._echoSend) return;
+    const v = Math.max(0, Math.min(1, level));
+    const now = Tone.getContext().rawContext.currentTime;
+    const g = this._echoSend.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(v, now + 0.02);
+  }
+
+  getEchoSend(): number { return this._echoSend ? this._echoSend.gain.value : 0; }
+
+  /** Echo time in seconds (beat-synced by the caller) and feedback 0..0.95. */
+  setEchoParams(timeSec: number, feedback: number): void {
+    if (!this._echoDelay || !this._echoFeedback) return;
+    const now = Tone.getContext().rawContext.currentTime;
+    const t = Math.max(0.02, Math.min(2, timeSec));
+    this._echoDelay.delayTime.cancelScheduledValues(now);
+    this._echoDelay.delayTime.setValueAtTime(this._echoDelay.delayTime.value, now);
+    this._echoDelay.delayTime.linearRampToValueAtTime(t, now + 0.05);
+    const fb = Math.max(0, Math.min(0.95, feedback));
+    this._echoFeedback.gain.cancelScheduledValues(now);
+    this._echoFeedback.gain.setValueAtTime(this._echoFeedback.gain.value, now);
+    this._echoFeedback.gain.linearRampToValueAtTime(fb, now + 0.05);
+  }
+
+  /** Reverb send level 0..1 for Auto DJ reverb-outs (the scratch reverb send, driven directly). */
+  setReverbSend(level: number): void {
+    if (!this._reverbSend) return;
+    const v = Math.max(0, Math.min(1, level));
+    const now = Tone.getContext().rawContext.currentTime;
+    const g = this._reverbSend.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(v, now + 0.03);
+    this._reverbActive = v > 0;
+  }
+
+  getReverbSend(): number { return this._reverbSend ? this._reverbSend.gain.value : 0; }
 
   /** Get current scratch state for UI feedback (turntable spin, pattern scroll, fader indicators).
    *  Returns velocity (signed rate multiplier) and faderGain (0-1). */

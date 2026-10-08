@@ -4,12 +4,21 @@
  * pattern boundaries in seconds, time-varying channel roles, instrument
  * usage, density timelines and semantic mix events.
  *
- * Pure over a TrackerSong. Channel identity is per order position, never
- * permanent (plan section 26).
+ * Channel identity comes from the Dub Deck's own sources
+ * (songChannelIdentity.resolveSongChannelRoles: ChannelNaming's
+ * instrument-aware song-wide classifier, the SongRoleTimeline over the
+ * arrangement, promoted by runtime audio evidence when the song is the
+ * editor's) - one source of truth, no parallel classifier. Roles are read
+ * per order position from the timeline, never treated as permanent (plan
+ * section 26); a channel silent in a position is silent there.
+ *
+ * Pure over a TrackerSong.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern } from '@/types/tracker';
-import { classifyPattern, type ChannelRole } from '@/bridge/analysis/MusicAnalysis';
+import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
+import { resolveSongChannelRoles } from '@/engine/dub/songChannelIdentity';
+import { getRolesAtPosition } from '@/bridge/analysis/SongRoleTimeline';
 import type {
   ActivityTimeline, InstrumentFamily, MusicalFunction, Register, RhythmicRole,
   TrackerChannelSegment, TrackerMixAnalysis, TrackerMixEvent, TrackerOrderPosition,
@@ -140,6 +149,11 @@ export function analyzeTrackerSong(song: TrackerSong, renderedDurationSec?: numb
   const seenSignatures = new Map<string, number>();
 
   const numChannels = song.numChannels || (song.patterns[0]?.channels.length ?? 0);
+  const identity = resolveSongChannelRoles({
+    patterns: song.patterns,
+    patternOrder: positions.map((p) => p.patternIndex),
+    instruments: Array.isArray(song.instruments) ? song.instruments : [],
+  });
   let prevRoles: Array<ChannelRole | null> = new Array(numChannels).fill(null);
   let prevDensity = -1;
   let prevSignature = '';
@@ -150,7 +164,16 @@ export function analyzeTrackerSong(song: TrackerSong, renderedDurationSec?: numb
     const end = T(pos.end);
     patternBoundaries.push(start);
     if (!pattern) return;
-    const analyses = classifyPattern(pattern);
+    // Roles at this position from the Dub Deck's timeline (instrument types
+    // over the arrangement), the song-wide role beneath; empty here = empty.
+    const atPosition = identity.timeline ? getRolesAtPosition(identity.timeline, p, 0, 0.3) : [];
+    const analyses = pattern.channels.map((ch, idx) => {
+      const notes: number[] = [];
+      for (const cell of ch?.rows ?? []) if (cell && cell.note >= 1 && cell.note <= 96) notes.push(cell.note);
+      const rowsHere = ch?.rows.length || 1;
+      const role: ChannelRole = notes.length === 0 ? 'empty' : (atPosition[idx] ?? identity.roles[idx] ?? identity.baseRoles[idx] ?? 'empty');
+      return { role, noteCount: notes.length, density: notes.length / rowsHere, avgPitch: notes.length ? notes.reduce((a, b) => a + b, 0) / notes.length : 0 };
+    });
     const rows = pos.rows || 1;
     const rowsPerBeat = 4;
     const sig = patternSignature(pattern);

@@ -16,9 +16,9 @@ import { bpmToMs, type SyncDivision } from '../bpmSync';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useDJStore } from '../../stores/useDJStore';
 import { getDJEngine } from '../dj/DJEngine';
-import { filterSweep, filterReset, echoOut, instantEQKill, cancelAllAutomation, getQuantizeMode, setQuantizeMode, type QuantizeMode } from '../dj/DJQuantizedFX';
+import { filterSweep, filterReset, echoOut, instantEQKill, quantizedEQKill, cancelAllAutomation, getQuantizeMode, setQuantizeMode, type QuantizeMode } from '../dj/DJQuantizedFX';
 import { beatJump, triggerHotCue } from '../dj/DJBeatJump';
-import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, getDeckChannelMuteMask, setDeckSlipEnabled, setDeckKeyLock } from '../dj/DJActions';
+import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, getDeckChannelMuteMask, setDeckSlipEnabled, setDeckKeyLock, setDeckEchoSend, setDeckEchoParams, setDeckReverbSend, setDeckFilter } from '../dj/DJActions';
 import { syncBPMToOther } from '../dj/DJAutoSync';
 import type { DeckId } from '../dj/DeckEngine';
 import type { DubBusSettings } from '../../types/dub';
@@ -45,7 +45,8 @@ export type DjFxActionId =
   | 'fx_dub_siren' | 'fx_air_horn' | 'fx_laser' | 'fx_noise_riser'
   // Deck FX (real DJ engine effects targeting the active deck)
   | 'fx_deck_hpf_sweep' | 'fx_deck_lpf_sweep' | 'fx_deck_filter_reset'
-  | 'fx_deck_echo_out'
+  | 'fx_deck_echo_out' | 'fx_deck_echo_throw' | 'fx_deck_reverb_out'
+  | 'fx_deck_filter_rise' | 'fx_deck_filter_release'
   | 'fx_deck_kill_lo' | 'fx_deck_kill_mid' | 'fx_deck_kill_hi'
   | 'fx_deck_brake'
   | 'fx_deck_jump_m16' | 'fx_deck_jump_m4' | 'fx_deck_jump_m1'
@@ -73,13 +74,26 @@ export type DjFxActionId =
   // Key lock toggle
   | 'fx_keylock_toggle';
 
+/**
+ * Options a caller may pass when firing an action. Deck actions default to
+ * the active deck; the Auto DJ names the deck it performs on and the beat
+ * length of the move (plan sections 17-19, 53).
+ */
+export interface DjFxFireOptions {
+  deck?: DeckId;
+  /** Length of the move in beats (sweeps, echo tails). */
+  beats?: number;
+  /** Amount 0..1 (send level, depth). */
+  amount?: number;
+}
+
 export interface DjFxAction {
   id: DjFxActionId;
   name: string;
   category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot' | 'deck' | 'hotcue' | 'loop' | 'transport' | 'mixer' | 'channel';
   mode: 'momentary' | 'oneshot'; // momentary = hold to engage, oneshot = fire and forget
-  engage: () => void;
-  disengage: () => void;
+  engage: (opts?: DjFxFireOptions) => void;
+  disengage: (opts?: DjFxFireOptions) => void;
 }
 
 // ─── State tracking ───────────────────────────────────────────────
@@ -1082,6 +1096,19 @@ function getActiveDeckId(): DeckId {
 // Track cancel functions for deck sweeps so disengage can stop them
 const deckSweepCancels = new Map<string, () => void>();
 
+function deckBeatSec(deckId: DeckId): number {
+  try {
+    const state = useDJStore.getState().decks[deckId];
+    const bpm = state.beatGrid?.bpm || state.detectedBPM || state.effectiveBPM || 120;
+    return 60 / bpm;
+  } catch {
+    return 0.5;
+  }
+}
+
+/** Remember which deck a momentary action was engaged on, so its release lands on the same deck. */
+const engagedDeck = new Map<string, DeckId>();
+
 function createDeckFilterSweep(direction: 'hpf' | 'lpf'): DjFxAction {
   const target = direction === 'hpf' ? -0.85 : 0.85;
   const id = direction === 'hpf' ? 'fx_deck_hpf_sweep' : 'fx_deck_lpf_sweep';
@@ -1090,17 +1117,19 @@ function createDeckFilterSweep(direction: 'hpf' | 'lpf'): DjFxAction {
     name: direction === 'hpf' ? 'Deck HPF' : 'Deck LPF',
     category: 'deck',
     mode: 'momentary',
-    engage() {
-      const deckId = getActiveDeckId();
-      const cancel = filterSweep(deckId, target, 4);
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
+      const cancel = filterSweep(deckId, target, opts?.beats ?? 4);
       deckSweepCancels.set(this.id, cancel);
     },
-    disengage() {
+    disengage(opts) {
       // Cancel the forward sweep
       const cancel = deckSweepCancels.get(this.id);
       if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
       // Sweep back to center at the same speed (4 beats)
-      const deckId = getActiveDeckId();
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
       const returnCancel = filterSweep(deckId, 0, 4);
       deckSweepCancels.set(this.id + '_return', returnCancel);
     },
@@ -1113,8 +1142,8 @@ function createDeckFilterReset(): DjFxAction {
     name: 'Deck Filter Reset',
     category: 'deck',
     mode: 'oneshot',
-    engage() {
-      const deckId = getActiveDeckId();
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
       filterReset(deckId);
       cancelAllAutomation();
     },
@@ -1122,20 +1151,158 @@ function createDeckFilterReset(): DjFxAction {
   };
 }
 
+/**
+ * Filter rise (plan section 19, 53 "build -> filter rise"): the deck starts
+ * high-passed and opens to flat over `beats` beats. Used on the incoming deck
+ * of a filter build; a pad or MIDI press does the same on the active deck.
+ */
+function createDeckFilterRise(): DjFxAction {
+  return {
+    id: 'fx_deck_filter_rise',
+    name: 'Deck Filter Rise',
+    category: 'deck',
+    mode: 'momentary',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
+      setDeckFilter(deckId, -0.8);
+      const cancel = filterSweep(deckId, 0, opts?.beats ?? 16, () => { setDeckFilter(deckId, 0); setDjFxActive('fx_deck_filter_rise', null); });
+      deckSweepCancels.set(this.id, cancel);
+    },
+    disengage(opts) {
+      const cancel = deckSweepCancels.get(this.id);
+      if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
+      setDeckFilter(deckId, 0);
+    },
+  };
+}
+
+/**
+ * Filter release (plan section 19 "release"): the deck's low end leaves
+ * through a continuous high-pass rise over `beats` beats, most of it in the
+ * last quarter. The outgoing deck of a blend; the pad does it on the active deck.
+ */
+function createDeckFilterRelease(): DjFxAction {
+  return {
+    id: 'fx_deck_filter_release',
+    name: 'Deck Filter Release',
+    category: 'deck',
+    mode: 'momentary',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
+      const beats = opts?.beats ?? 16;
+      // Two stages: gentle to -0.35 over the first 60 %, then up to -0.9.
+      const first = filterSweep(deckId, -0.35, Math.max(1, Math.floor(beats * 0.6)), () => {
+        if (!deckSweepCancels.has(this.id)) return;
+        const second = filterSweep(deckId, -0.9, Math.max(1, Math.ceil(beats * 0.4)), () => setDjFxActive('fx_deck_filter_release', null));
+        deckSweepCancels.set(this.id, second);
+      });
+      deckSweepCancels.set(this.id, first);
+    },
+    disengage(opts) {
+      const cancel = deckSweepCancels.get(this.id);
+      if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
+      setDeckFilter(deckId, 0);
+    },
+  };
+}
+
+/**
+ * True echo-out (plan section 18): the deck's pre-fader echo send rises
+ * (beat-synced dotted eighth, feedback 0.62) while the dry signal decays and
+ * the deck stops; the tail keeps ringing past the channel gain. The same
+ * action for the pad, MIDI and the Auto DJ.
+ */
 function createDeckEchoOut(): DjFxAction {
+  let tailTimer: ReturnType<typeof setTimeout> | null = null;
   return {
     id: 'fx_deck_echo_out',
     name: 'Deck Echo Out',
     category: 'deck',
     mode: 'momentary',
-    engage() {
-      const deckId = getActiveDeckId();
-      const cancel = echoOut(deckId, 8);
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
+      const beats = opts?.beats ?? 8;
+      const beatSec = deckBeatSec(deckId);
+      setDeckEchoParams(deckId, beatSec * 0.75, 0.62);
+      setDeckEchoSend(deckId, opts?.amount ?? 0.85);
+      const cancel = echoOut(deckId, beats, () => {
+        // Dry gone, deck stopped: let the tail ring, then close the send.
+        if (tailTimer) clearTimeout(tailTimer);
+        tailTimer = setTimeout(() => { setDeckEchoSend(deckId, 0); setDjFxActive('fx_deck_echo_out', null); tailTimer = null; }, Math.min(4000, beatSec * 8 * 1000));
+      });
       deckSweepCancels.set(this.id, cancel);
     },
-    disengage() {
+    disengage(opts) {
       const cancel = deckSweepCancels.get(this.id);
       if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
+      if (tailTimer) { clearTimeout(tailTimer); tailTimer = null; }
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
+      setDeckEchoSend(deckId, 0);
+    },
+  };
+}
+
+/** Echo throw (plan section 53 "phrase ending -> delay throw"): a short burst into the echo, then the tail. */
+function createDeckEchoThrow(): DjFxAction {
+  let tailTimer: ReturnType<typeof setTimeout> | null = null;
+  return {
+    id: 'fx_deck_echo_throw',
+    name: 'Deck Echo Throw',
+    category: 'deck',
+    mode: 'momentary',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
+      const beatSec = deckBeatSec(deckId);
+      setDeckEchoParams(deckId, beatSec, 0.5);
+      setDeckEchoSend(deckId, opts?.amount ?? 0.7);
+      const holdMs = (opts?.beats ?? 2) * beatSec * 1000;
+      if (tailTimer) clearTimeout(tailTimer);
+      tailTimer = setTimeout(() => { setDeckEchoSend(deckId, 0); setDjFxActive('fx_deck_echo_throw', null); tailTimer = null; }, holdMs);
+    },
+    disengage(opts) {
+      if (tailTimer) { clearTimeout(tailTimer); tailTimer = null; }
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
+      setDeckEchoSend(deckId, 0);
+    },
+  };
+}
+
+/** Reverb out (plan section 53 "breakdown -> reverb expansion"): the reverb send opens while the dry decays. */
+function createDeckReverbOut(): DjFxAction {
+  let tailTimer: ReturnType<typeof setTimeout> | null = null;
+  return {
+    id: 'fx_deck_reverb_out',
+    name: 'Deck Reverb Out',
+    category: 'deck',
+    mode: 'momentary',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
+      setDeckReverbSend(deckId, opts?.amount ?? 0.8);
+      const beats = opts?.beats ?? 8;
+      const cancel = echoOut(deckId, beats, () => {
+        if (tailTimer) clearTimeout(tailTimer);
+        tailTimer = setTimeout(() => { setDeckReverbSend(deckId, 0); setDjFxActive('fx_deck_reverb_out', null); tailTimer = null; }, 1500);
+      });
+      deckSweepCancels.set(this.id, cancel);
+    },
+    disengage(opts) {
+      const cancel = deckSweepCancels.get(this.id);
+      if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
+      if (tailTimer) { clearTimeout(tailTimer); tailTimer = null; }
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
+      setDeckReverbSend(deckId, 0);
     },
   };
 }
@@ -1148,13 +1315,18 @@ function createDeckEQKill(band: 'low' | 'mid' | 'high'): DjFxAction {
     name: `Deck Kill ${bandLabel}`,
     category: 'deck',
     mode: 'momentary',
-    engage() {
-      const deckId = getActiveDeckId();
-      instantEQKill(deckId, band, true);
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
+      // The kill button reads the store at once; the engine follows the quantize setting.
+      useDJStore.getState().setDeckEQKill(deckId, band, true);
+      if (getQuantizeMode() !== 'off') quantizedEQKill(deckId, band, true); else instantEQKill(deckId, band, true);
     },
-    disengage() {
-      const deckId = getActiveDeckId();
-      instantEQKill(deckId, band, false);
+    disengage(opts) {
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
+      useDJStore.getState().setDeckEQKill(deckId, band, false);
+      if (getQuantizeMode() !== 'off') quantizedEQKill(deckId, band, false); else instantEQKill(deckId, band, false);
     },
   };
 }
@@ -1166,13 +1338,13 @@ function createDeckBrake(): DjFxAction {
     name: 'Deck Brake',
     category: 'deck',
     mode: 'momentary',
-    engage() {
-      const deckId = getActiveDeckId();
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
       try {
         const deck = getDJEngine().getDeck(deckId);
-        const state = useDJStore.getState().decks[deckId];
-        const bpm = state.beatGrid?.bpm || state.detectedBPM || state.effectiveBPM || 120;
-        const durationMs = (2 * 60 / bpm) * 1000;
+        const beatSec = deckBeatSec(deckId);
+        const durationMs = (opts?.beats ?? 2) * beatSec * 1000;
 
         const startTime = performance.now();
         const animate = () => {
@@ -1186,15 +1358,17 @@ function createDeckBrake(): DjFxAction {
             try { deck.pause(); } catch { /* */ }
             useDJStore.getState().setDeckPlaying(deckId, false);
             setDeckPitch(deckId, 0);
+            setDjFxActive('fx_deck_brake', null);
           }
         };
         brakeRaf = requestAnimationFrame(animate);
       } catch { /* engine not ready */ }
     },
-    disengage() {
+    disengage(opts) {
       cancelAnimationFrame(brakeRaf);
       brakeRaf = 0;
-      const deckId = getActiveDeckId();
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
       setDeckPitch(deckId, 0);
     },
   };
@@ -1206,13 +1380,15 @@ function createHalfSpeed(): DjFxAction {
     name: 'Half Speed',
     category: 'tape',
     mode: 'momentary',
-    engage() {
-      const deckId = getActiveDeckId();
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      engagedDeck.set(this.id, deckId);
       // -12 semitones = half speed (one octave down)
       setDeckPitch(deckId, -12);
     },
-    disengage() {
-      const deckId = getActiveDeckId();
+    disengage(opts) {
+      const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      engagedDeck.delete(this.id);
       setDeckPitch(deckId, 0);
     },
   };
@@ -1528,6 +1704,10 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   createDeckFilterSweep('lpf'),
   createDeckFilterReset(),
   createDeckEchoOut(),
+  createDeckEchoThrow(),
+  createDeckReverbOut(),
+  createDeckFilterRise(),
+  createDeckFilterRelease(),
   createDeckEQKill('low'),
   createDeckEQKill('mid'),
   createDeckEQKill('high'),
@@ -1597,3 +1777,56 @@ export function disengageAllDjFx(): void {
     cleanupFx(id);
   }
 }
+
+// ─── The one fire path ──────────────────────────────────────────────
+//
+// The pad, the keyboard, MIDI, the MCP and the Auto DJ all fire an action
+// here, the way Auto Dub fires dub moves through the DubRouter: the store
+// flag the pad reads is set, the fire log records who fired what, and the
+// action's own engage/disengage runs. Nothing performs an effect by
+// another route.
+
+export type DjFxSource = 'pad' | 'keyboard' | 'midi' | 'mcp' | 'autodj' | 'tour';
+
+export interface DjFxFireLogEntry {
+  time: number;
+  id: DjFxActionId;
+  deck: DeckId | null;
+  source: DjFxSource;
+  kind: 'fire' | 'release';
+  beats?: number;
+  amount?: number;
+}
+
+const FX_FIRE_LOG_CAP = 200;
+const _fxFireLog: DjFxFireLogEntry[] = [];
+/** Fire counts per action id (the reachability sentinel). */
+export const djFxFireCounts: Record<string, number> = {};
+
+function setDjFxActive(id: DjFxActionId, deck: DeckId | null): void {
+  try { useDJStore.getState().setDjFxActive(id, deck); } catch { /* store not ready */ }
+}
+
+export function fireDjFx(id: DjFxActionId, opts: DjFxFireOptions & { source: DjFxSource }): boolean {
+  const action = DJ_FX_ACTION_MAP[id];
+  if (!action) return false;
+  const deck = opts.deck ?? (action.category === 'deck' ? getActiveDeckId() : null);
+  setDjFxActive(id, action.mode === 'momentary' ? deck : null);
+  djFxFireCounts[id] = (djFxFireCounts[id] ?? 0) + 1;
+  _fxFireLog.push({ time: Date.now(), id, deck, source: opts.source, kind: 'fire', beats: opts.beats, amount: opts.amount });
+  if (_fxFireLog.length > FX_FIRE_LOG_CAP) _fxFireLog.shift();
+  try { action.engage(opts); } catch (err) { console.warn(`[DjFx] ${id} engage failed:`, err); setDjFxActive(id, null); return false; }
+  return true;
+}
+
+export function releaseDjFx(id: DjFxActionId, opts: DjFxFireOptions & { source: DjFxSource }): void {
+  const action = DJ_FX_ACTION_MAP[id];
+  if (!action) return;
+  _fxFireLog.push({ time: Date.now(), id, deck: opts.deck ?? null, source: opts.source, kind: 'release' });
+  if (_fxFireLog.length > FX_FIRE_LOG_CAP) _fxFireLog.shift();
+  try { action.disengage(opts); } catch (err) { console.warn(`[DjFx] ${id} disengage failed:`, err); }
+  setDjFxActive(id, null);
+}
+
+export function getDjFxFireLog(): readonly DjFxFireLogEntry[] { return _fxFireLog; }
+export function clearDjFxFireLog(): void { _fxFireLog.length = 0; for (const k of Object.keys(djFxFireCounts)) delete djFxFireCounts[k]; }

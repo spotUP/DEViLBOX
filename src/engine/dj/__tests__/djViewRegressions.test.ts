@@ -164,12 +164,22 @@ describe('FX pad release handlers', () => {
     expect(src).toMatch(/handlePadUp[\s\S]*?brake/);
   });
 
-  it('DeckFXPads handlePadUp handles filter-reset release', () => {
-    const src = fs.readFileSync(
+  it('filter-reset release lives in the DJ FX registry the pad maps to (one path for pad, MIDI and Auto DJ)', () => {
+    // The pad no longer carries its own filter-reset handler: it maps the pad
+    // to the registry action, and the registry's one-shot owns the release.
+    const pads = fs.readFileSync(
       path.resolve(__dirname, '../../../components/dj/DeckFXPads.tsx'),
       'utf-8',
     );
-    expect(src).toMatch(/handlePadUp[\s\S]*?filter-reset/);
+    expect(pads).toMatch(/DECK_PAD_ACTIONS[\s\S]*?'filter-reset': 'fx_deck_filter_reset'/);
+    expect(pads).toMatch(/handlePadUp[\s\S]*?releaseDjFx\(DECK_PAD_ACTIONS\[pad\.id\]/);
+    const registry = fs.readFileSync(
+      path.resolve(__dirname, '../../drumpad/DjFxActions.ts'),
+      'utf-8',
+    );
+    const action = registry.match(/id: 'fx_deck_filter_reset'[\s\S]*?disengage\(\)[^\n]*/);
+    expect(action).not.toBeNull();
+    expect(action![0]).toContain("mode: 'oneshot'");
   });
 });
 

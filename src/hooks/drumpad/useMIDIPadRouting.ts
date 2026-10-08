@@ -30,7 +30,7 @@ import { getAudioContext } from '../../audio/AudioContextSingleton';
 import { getNativeAudioNode } from '../../utils/audio-context';
 import { applyVelocityCurve, PAD_INSTRUMENT_BASE, MPK_SLOT_COUNT, mpkSlotId } from '../../types/drumpad';
 import type { ScratchActionId } from '../../types/drumpad';
-import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
+import { fireDjFx, releaseDjFx } from '../../engine/drumpad/DjFxActions';
 import { DUB_ACTION_HANDLERS } from '../../engine/dub/DubActions';
 import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
@@ -391,7 +391,7 @@ export function useMIDIPadRouting() {
             SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
           }
           if (pad.djFxAction) {
-            DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+            releaseDjFx(pad.djFxAction, { source: 'midi' });
             setFxPadActive(padId, false);
           }
           if (pad.dubAction) {
@@ -510,7 +510,7 @@ export function useMIDIPadRouting() {
 
       // Toggle OFF: second press on an already-active toggle pad disengages.
       if (fxMode === 'toggle' && _heldPads.has(padId)) {
-        DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+        releaseDjFx(pad.djFxAction, { source: 'midi' });
         setFxPadActive(padId, false);
         _heldPads.delete(padId);
         return;
@@ -526,7 +526,7 @@ export function useMIDIPadRouting() {
 
       const engageFx = () => {
         if (!pad.djFxAction) return;
-        DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
+        fireDjFx(pad.djFxAction, { source: 'midi' });
         setFxPadActive(padId, true);
         // Only 'sustain' and 'toggle' need held-state tracking so releasePad
         // can disengage (sustain) or the next press can disengage (toggle).
@@ -675,7 +675,7 @@ export function useMIDIPadRouting() {
       // Only sustain mode disengages on release. Oneshot actions run their
       // own timeline; toggle was handled above.
       if (pad.playMode === 'sustain') {
-        DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+        releaseDjFx(pad.djFxAction, { source: 'midi' });
         setFxPadActive(padId, false);
       }
     }

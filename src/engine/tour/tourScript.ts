@@ -448,9 +448,8 @@ async function setDrumBank(bank: 'A' | 'B'): Promise<void> {
 /** Engage a DJ FX action (from the DJ FX program pad set) */
 async function engageDjFx(actionId: string): Promise<void> {
   try {
-    const { DJ_FX_ACTION_MAP } = await import('@/engine/drumpad/DjFxActions');
-    const action = DJ_FX_ACTION_MAP[actionId as keyof typeof DJ_FX_ACTION_MAP];
-    if (action) action.engage();
+    const { fireDjFx } = await import('@/engine/drumpad/DjFxActions');
+    fireDjFx(actionId as import('@/engine/drumpad/DjFxActions').DjFxActionId, { source: 'tour' });
   } catch (err) {
     console.warn(`[Tour] Failed to engage DJ FX ${actionId}:`, err);
   }
@@ -459,9 +458,8 @@ async function engageDjFx(actionId: string): Promise<void> {
 /** Disengage a DJ FX action */
 async function disengageDjFx(actionId: string): Promise<void> {
   try {
-    const { DJ_FX_ACTION_MAP } = await import('@/engine/drumpad/DjFxActions');
-    const action = DJ_FX_ACTION_MAP[actionId as keyof typeof DJ_FX_ACTION_MAP];
-    if (action) action.disengage();
+    const { releaseDjFx } = await import('@/engine/drumpad/DjFxActions');
+    releaseDjFx(actionId as import('@/engine/drumpad/DjFxActions').DjFxActionId, { source: 'tour' });
   } catch (err) {
     console.warn(`[Tour] Failed to disengage DJ FX ${actionId}:`, err);
   }

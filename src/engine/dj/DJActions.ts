@@ -25,8 +25,6 @@ import { quantizedEQKill, getQuantizeMode, quantizeAction, cancelAllAutomation }
 import { syncBPMToOther, phaseAlign, snapPositionToBeat } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
 import { getAutoDJ } from './DJAutoDJ';
-import { smartSort } from './DJPlaylistSort';
-import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { DeckId, FaderLFODivision } from './DeckEngine';
 
 // ── Batched store writes for continuous controls ───────────────────────
@@ -534,6 +532,21 @@ export function togglePFL(deckId: DeckId): void {
  * Enable/disable key lock (master tempo) for a deck.
  * When enabled, pitch slider changes only affect tempo, not musical key.
  */
+/** Auto DJ echo send level (pre-fader feedback delay on the deck). */
+export function setDeckEchoSend(deckId: DeckId, level: number): void {
+  try { getDJEngine().getDeck(deckId).setEchoSend(level); } catch { /* engine not ready */ }
+}
+
+/** Auto DJ echo time (seconds) and feedback. */
+export function setDeckEchoParams(deckId: DeckId, timeSec: number, feedback: number): void {
+  try { getDJEngine().getDeck(deckId).setEchoParams(timeSec, feedback); } catch { /* engine not ready */ }
+}
+
+/** Auto DJ reverb send level. */
+export function setDeckReverbSend(deckId: DeckId, level: number): void {
+  try { getDJEngine().getDeck(deckId).setReverbSend(level); } catch { /* engine not ready */ }
+}
+
 export function setDeckKeyLock(deckId: DeckId, enabled: boolean): void {
   useDJStore.getState().setDeckKeyLock(deckId, enabled);
   try {
@@ -1009,15 +1022,9 @@ export async function stopRecording(
 /** Enable Auto DJ — plays through the active playlist with beatmatched transitions.
  *  Returns null on success, or an error message string on failure. */
 export async function enableAutoDJ(startIndex?: number): Promise<string | null> {
-  // Smart-sort the playlist before starting for optimal BPM/key/energy flow
-  const { activePlaylistId, playlists, sortTracks } = useDJPlaylistStore.getState();
-  if (activePlaylistId) {
-    const playlist = playlists.find((p) => p.id === activePlaylistId);
-    if (playlist && playlist.tracks.length >= 2) {
-      const sorted = smartSort([...playlist.tracks]);
-      sortTracks(activePlaylistId, sorted);
-    }
-  }
+  // The performance order is the session controller's (plan section 10):
+  // Auto DJ never re-sorts the user's playlist. Smart Sort stays a manual
+  // playlist action.
   return await getAutoDJ().enable(startIndex);
 }
 

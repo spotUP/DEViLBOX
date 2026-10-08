@@ -11,6 +11,8 @@
 import { useDJPlaylistStore, type PlaylistTrack, type DJPlaylist } from '@/stores/useDJPlaylistStore';
 import { cacheSourceFile, getCachedAudioByFilename } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
+import { summaryFromPipeline } from './autodj/trackAnalysis';
+import type { DJTrackSummary } from './autodj/types';
 import { isAudioFile } from '@/lib/audioFileUtils';
 
 // ── Concurrency guard ────────────────────────────────────────────────────────
@@ -313,6 +315,7 @@ export async function analyzePlaylist(
                 energy: pipelineResult.analysis.genre?.energy ?? 0,
                 duration: pipelineResult.duration,
                 analysisSkipped: false,
+                djSummary: summaryFromPipeline(pipelineResult, track.id) ?? undefined,
               });
             }
           } else if (audioBuffer && audioBuffer.byteLength > 0 && cached) {
@@ -330,6 +333,7 @@ export async function analyzePlaylist(
                 energy: pipelineResult.analysis.genre?.energy ?? 0,
                 duration: pipelineResult.duration,
                 analysisSkipped: false,
+                djSummary: summaryFromPipeline(pipelineResult, track.id) ?? undefined,
               });
             }
           } else {
@@ -472,7 +476,7 @@ export async function analyzePlaylist(
         // only has UADE, which can't handle SIDs (every HVSC track was failing
         // with 422). The client-side pipeline has WebSID rendering + Essentia
         // analysis baked in and already returns bpm/musicalKey/energy/duration.
-        let result: { bpm: number; musicalKey: string; energy: number; duration: number; rmsDb?: number; peakDb?: number };
+        let result: { bpm: number; musicalKey: string; energy: number; duration: number; rmsDb?: number; peakDb?: number; djSummary?: DJTrackSummary | null };
 
         // Pre-fetch companion files (TFMX smpl, Startrekker .nt, etc.) BEFORE
         // any render call — the render worker needs them in virtual FS.
@@ -502,6 +506,7 @@ export async function analyzePlaylist(
             duration: pipelineResult.duration,
             rmsDb: pipelineResult.analysis.rmsDb,
             peakDb: pipelineResult.analysis.peakDb,
+            djSummary: summaryFromPipeline(pipelineResult, track.id),
           };
         } else {
           // Modland tracker formats → server-side UADE (fast, uses server cache).
@@ -558,8 +563,9 @@ export async function analyzePlaylist(
 
         // Update the playlist track with analysis results — by id, so a
         // mid-run reorder doesn't land the write on the wrong row.
-        const meta: Partial<Pick<PlaylistTrack, 'bpm' | 'musicalKey' | 'energy' | 'duration' | 'rmsDb' | 'peakDb'>> = {};
+        const meta: Partial<Pick<PlaylistTrack, 'bpm' | 'musicalKey' | 'energy' | 'duration' | 'rmsDb' | 'peakDb' | 'djSummary'>> = {};
         if (result.bpm > 0) meta.bpm = result.bpm;
+        if (result.djSummary) meta.djSummary = result.djSummary;
         if (result.musicalKey) meta.musicalKey = result.musicalKey;
         if (result.energy != null) meta.energy = result.energy;
         if (result.duration > 0) meta.duration = result.duration;
