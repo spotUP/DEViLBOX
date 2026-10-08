@@ -48,7 +48,8 @@ describe('a Hippel CoSo song', { timeout: 60000 }, () => {
     expect(route.key).toBe('Hippel');
     const { TFMXEngine } = await import('../tfmx/TFMXEngine');
     expect(await route.dynamicResolver!()).toBe(TFMXEngine);
-    expect(route.getLoadArgs!(song)).toEqual([]);
+    // no sample file (a single-file module), the song's first tune
+    expect(route.getLoadArgs!(song)).toEqual([undefined, 0]);
 
     const p = new Processor();
     const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;

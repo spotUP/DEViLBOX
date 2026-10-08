@@ -155,6 +155,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'futurePlayerFileData',
     loadMethod: 'loadTune',
+    getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0],
     supportsPause: true,
     supportsResume: true,
     needsDirectRouting: true,
@@ -179,6 +180,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'maFileData',
     loadMethod: 'loadTune',
+    getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,
@@ -191,6 +193,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'bdFileData',
     loadMethod: 'loadTune',
+    getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,
@@ -214,7 +217,8 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     // Hippel song played silence (prehistoric_tale.hipc, 2026-09-28). A
     // single-file module has no companion smpl file.
     dynamicResolver: async () => (await import('@/engine/tfmx/TFMXEngine')).TFMXEngine as unknown as WASMSingletonStatic,
-    getLoadArgs: () => [],
+    // smplData: none (a single-file module); the tune is the song's subsong.
+    getLoadArgs: (song) => [undefined, song.fileSubsongs?.current ?? 0],
   },
   {
     key: 'Sonix',

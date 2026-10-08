@@ -22,12 +22,12 @@ export interface FpEditResult { data: Uint8Array; patched: number; warnings: str
 
 /**
  * `source` is the module's file; `edited` the song's patterns as they are now; `instrumentPtr` maps an instrument
- * slot to the pointer it stands for (the parsed song's instrument metadata).
+ * slot to the pointer it stands for (the parsed song's instrument metadata); `subsong` the subsong the grid shows.
  */
-export function applyFpGridEdits(source: Uint8Array, edited: Pattern[], instrumentPtr: (id: number) => number | undefined): FpEditResult {
+export function applyFpGridEdits(source: Uint8Array, edited: Pattern[], instrumentPtr: (id: number) => number | undefined, subsong = 0): FpEditResult {
   const out = new Uint8Array(source);
   const warnings: string[] = [];
-  const m = buildFuturePlayerGrid(source);
+  const m = buildFuturePlayerGrid(source, undefined, subsong);
   if (!m.grid) return { data: out, patched: 0, warnings: [`the module has no matched grid to write edits into (${m.unmatched ?? 'no walk'})`] };
   const grid = m.grid;
   const base = m.code.byteOffset - source.byteOffset; // file offset of the code section

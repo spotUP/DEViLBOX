@@ -61,6 +61,8 @@ class BdProcessor extends AudioWorkletProcessor {
 
             heapU8.set(uint8Data, wasmPtr);
             this.module._player_init(wasmPtr, uint8Data.length);
+            // The tune the song's grid shows; init starts on subsong 0.
+            if (data.subsong > 0 && typeof this.module._player_set_subsong === 'function') this.module._player_set_subsong(data.subsong);
             this._lastSongPos = -1; this._lastRow = -1;
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);

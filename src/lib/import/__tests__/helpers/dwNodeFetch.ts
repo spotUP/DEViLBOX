@@ -19,6 +19,12 @@ export function installDwNodeFetch(): () => void {
  * fetching both (an extractor in the AyletWasmExtractor pattern: DavidWhittaker, Bd).
  */
 export function installWasmNodeFetch(dir: string, name: string): () => void {
+  return installWasmNodeFetches([[dir, name]]);
+}
+
+/** The same for several bundles at once (a song whose import fetches more than one: Hippel's decoder, DW's replayer). */
+export function installWasmNodeFetches(bundles: ReadonlyArray<readonly [dir: string, name: string]>): () => void {
+  const [[dir, name]] = bundles;
   const g = globalThis as Record<string, unknown>;
   const hadSelf = typeof g.self !== 'undefined';
   if (!hadSelf) g.self = globalThis;
@@ -28,10 +34,11 @@ export function installWasmNodeFetch(dir: string, name: string): () => void {
   const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
   Object.defineProperty(process, 'versions', { value: {}, configurable: true });
   vi.stubGlobal('fetch', async (url: string) => {
-    const m = new RegExp(`${dir}/(${name}\\.(?:js|wasm))$`).exec(url);
-    if (!m) throw new Error(`unexpected fetch in test: ${url}`);
-    const bytes = readFileSync(resolve(ROOT, 'public', dir, m[1]));
-    return new Response(bytes, { status: 200 });
+    for (const [d, n] of bundles) {
+      const m = new RegExp(`${d}/(${n}\\.(?:js|wasm))$`).exec(url);
+      if (m) return new Response(readFileSync(resolve(ROOT, 'public', d, m[1])), { status: 200 });
+    }
+    throw new Error(`unexpected fetch in test: ${url}`);
   });
   return () => {
     vi.unstubAllGlobals();

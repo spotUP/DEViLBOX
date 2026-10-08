@@ -49,9 +49,11 @@ export class FuturePlayerEngine extends WASMSingletonBase {
   private _requestId = 0;
 
   private readonly _positions = new PositionCallbacks();
-  /** The grid's layout (the importer's, from the same walk) while subsong 0 plays; null otherwise (no grid to follow). */
+  /** The grid's layout (the importer's, from the same walk) while the song's tune plays; null otherwise (no grid to follow). */
   private _layout: FpLayout | null = null;
-  private _layoutOfSubsong0: FpLayout | null = null;
+  private _layoutOfTune: FpLayout | null = null;
+  /** The subsong the song's grid shows (0-based): the layout belongs to it. */
+  private _tune = 0;
 
   private _patternResolves = new Map<number, (data: FPPatternData) => void>();
   private _voiceLengthsResolves = new Map<number, (lengths: number[]) => void>();
@@ -187,14 +189,16 @@ export class FuturePlayerEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
-  async loadTune(buffer: ArrayBuffer): Promise<FuturePlayerTuneInfo> {
+  /** Load the module and start on `subsong` (0-based) - the tune the song's grid shows. */
+  async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<FuturePlayerTuneInfo> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('FuturePlayerEngine not initialized');
 
-    // the importer's grid layout of subsong 0, from the same walk (the buffer is transferred below)
-    const walk = walkFuturePlayer(fpCodeSection(new Uint8Array(buffer)), 0);
-    this._layoutOfSubsong0 = walk ? fpLayout(walk) : null;
-    this._layout = this._layoutOfSubsong0;
+    // the importer's grid layout of the tune, from the same walk (the buffer is transferred below)
+    const walk = walkFuturePlayer(fpCodeSection(new Uint8Array(buffer)), subsong);
+    this._tune = subsong;
+    this._layoutOfTune = walk ? fpLayout(walk) : null;
+    this._layout = this._layoutOfTune;
 
     this._tunePromise = new Promise<FuturePlayerTuneInfo>((resolve, reject) => {
       this._resolveTune = resolve;
@@ -202,7 +206,7 @@ export class FuturePlayerEngine extends WASMSingletonBase {
     });
 
     this.workletNode.port.postMessage(
-      { type: 'loadTune', buffer },
+      { type: 'loadTune', buffer, subsong },
       [buffer]
     );
 
@@ -222,8 +226,8 @@ export class FuturePlayerEngine extends WASMSingletonBase {
   }
 
   setSubsong(subsong: number): void {
-    // the grid is subsong 0's: no position to report for another
-    this._layout = subsong === 0 ? this._layoutOfSubsong0 : null;
+    // the grid is the song's tune's: no position to report for another
+    this._layout = subsong === this._tune ? this._layoutOfTune : null;
     this.workletNode?.port.postMessage({ type: 'setSubsong', subsong });
   }
 
