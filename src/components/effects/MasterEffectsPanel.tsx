@@ -23,8 +23,9 @@ import { CSS } from '@dnd-kit/utilities';
 import type { EffectConfig, AudioEffectType as EffectType } from '../../types/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
-import { useFormatStore } from '@stores/useFormatStore';
-import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
+import { useChannelIsolation } from '@hooks/useChannelIsolation';
+import { requestChannelRouting, usePendingChannelRouting } from '@/lib/masterFx/quantizedChannelRouting';
+import { MasterFxQuantizeSwitch } from './MasterFxQuantizeSwitch';
 import { Settings, Volume2, X, ChevronDown, Save } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
 import { useClickOutside } from '@hooks/useClickOutside';
@@ -47,11 +48,13 @@ interface SortableVisualEffectProps {
   onWetChange: (wet: number) => void;
   onChannelSelect: (channels: number[] | undefined) => void;
   numChannels: number;
-  /** Whether the current format supports per-channel isolation */
+  /** Whether the playing engine can take a channel out of the mix */
   isolationSupported: boolean;
+  /** Why not, shown beside the disabled channel buttons */
+  isolationReason: string | null;
 }
 
-function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange, onChannelSelect, numChannels, isolationSupported }: SortableVisualEffectProps) {
+function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange, onChannelSelect, numChannels, isolationSupported, isolationReason }: SortableVisualEffectProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
@@ -151,13 +154,14 @@ function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, on
         />
       </div>
 
-      {/* Channel routing selector — only for formats with multi-output isolation */}
-      {isolationSupported && <div className="mx-2 mb-2 mt-1 p-1.5 rounded-lg bg-dark-bg/60 border border-dark-border/40">
+      {/* Channel routing selector - disabled, with the reason, when the playing engine cannot isolate channels */}
+      <div className="mx-2 mb-2 mt-1 p-1.5 rounded-lg bg-dark-bg/60 border border-dark-border/40">
         <div className="flex items-center gap-1.5 mb-1.5">
           <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Route</span>
           <button
             onClick={selectAll}
-            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
+            disabled={!isolationSupported}
+            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               !hasSelection
                 ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
                 : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-transparent'
@@ -180,7 +184,8 @@ function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, on
               <button
                 key={i}
                 onClick={() => toggleChannel(i)}
-                className={`w-5 h-5 text-[9px] font-bold rounded transition-colors ${
+                disabled={!isolationSupported}
+                className={`w-5 h-5 text-[9px] font-bold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                   isSelected && hasSelection
                     ? 'bg-accent-primary/30 text-accent-primary border border-accent-primary/50'
                     : isSelected
@@ -194,7 +199,10 @@ function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, on
             );
           })}
         </div>
-      </div>}
+        {!isolationSupported && isolationReason && (
+          <p className="mt-1.5 text-[9px] text-accent-warning">{isolationReason}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -240,8 +248,9 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
 
   // Per-channel isolation only available for multi-output worklet engines
-  const editorMode = useFormatStore(s => s.editorMode);
-  const isolationSupported = supportsChannelIsolation(editorMode);
+  const { usable: isolationSupported, reason: isolationReason } = useChannelIsolation();
+  // A channel pick waiting for its beat is shown at once; the routing follows.
+  const pendingRouting = usePendingChannelRouting((s) => s.pending);
 
   // Keep masterEffects ref in sync to avoid stale closures (critical for smooth knobs)
   const masterEffectsRef = useRef(masterEffects);
@@ -487,7 +496,8 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   }, [scheduleStoreFlush]);
 
   const handleChannelSelect = useCallback((effectId: string, channels: number[] | undefined) => {
-    updateMasterEffect(effectId, { selectedChannels: channels });
+    requestChannelRouting(effectId, { selectedChannels: channels, channelRole: undefined },
+      (id, routing) => updateMasterEffect(id, routing));
   }, [updateMasterEffect]);
 
   // Group effects by group for the add menu
@@ -650,6 +660,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
           <span className="text-accent-primary font-bold whitespace-nowrap flex items-center gap-1">
             <Volume2 size={12} /> OUTPUT
           </span>
+          <span className="ml-auto pl-3"><MasterFxQuantizeSwitch /></span>
         </div>
       </div>
 
@@ -665,7 +676,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
               {masterEffects.map((effect) => (
                 <SortableVisualEffect
                   key={effect.id}
-                  effect={effect}
+                  effect={pendingRouting[effect.id] ? { ...effect, ...pendingRouting[effect.id] } : effect}
                   onToggle={() => handleToggle(effect.id)}
                   onBassLockToggle={() => handleBassLockToggle(effect.id)}
                   onRemove={() => handleRemove(effect.id)}
@@ -675,6 +686,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                   onChannelSelect={(channels) => handleChannelSelect(effect.id, channels)}
                   numChannels={numChannels}
                   isolationSupported={isolationSupported}
+                  isolationReason={isolationReason}
                 />
               ))}
             </SortableContext>

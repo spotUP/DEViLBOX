@@ -50,17 +50,22 @@ export function scheduleWasmEffectRebuild(): void {
     _wasmRebuildTimer = null;
     void (async () => {
       try {
-        const { getActiveIsolationEngine } = await import('../engine/tone/ChannelRoutedEffects');
-        const engine = await getActiveIsolationEngine();
+        const { refreshChannelIsolation } = await import('../engine/tone/ChannelRoutedEffects');
+        // The same answer the master chain used to decide where each effect
+        // lives (engine running, isolation slots, no hybrid playback).
+        const { engine } = await refreshChannelIsolation();
         if (!engine) {
-          console.log('[MixerStore] scheduleWasmEffectRebuild: no isolation-capable engine available');
-          return;
-        }
-
-        // Skip isolation when hybrid playback is active — native Tone.js synths
-        // bypass the WASM worklet, so isolation can't capture their audio.
-        const { getTrackerReplayer } = await import('../engine/TrackerReplayer');
-        if (getTrackerReplayer().hasReplacedInstruments) {
+          console.log('[MixerStore] scheduleWasmEffectRebuild: channels cannot be isolated - effects aimed at channels stay on the whole mix');
+          // The chain may have taken them off the master while an engine was
+          // still there. Rebuild it so they go back; with no engine it keeps
+          // every effect global, so this cannot loop.
+          const { useAudioStore } = await import('./useAudioStore');
+          const { targetsChannels } = await import('../engine/tone/sidechainKey');
+          const effects = useAudioStore.getState().masterEffects;
+          if (effects.some((fx) => fx.enabled && targetsChannels(fx))) {
+            const { getToneEngine } = await import('../engine/ToneEngine');
+            await getToneEngine().rebuildMasterEffects(effects);
+          }
           return;
         }
 

@@ -5,8 +5,7 @@ import { InstrumentFactory } from '../InstrumentFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { getEffectGainCompensation } from '../factories/effectGainCompensation';
 import { applyWetGain } from '../factories/EffectFactory';
-import { useFormatStore } from '../../stores/useFormatStore';
-import { supportsChannelIsolation } from './ChannelRoutedEffects';
+import { refreshChannelIsolation, getChannelIsolationSnapshot } from './ChannelRoutedEffects';
 import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel, channelRoleTargets, onSongChange } from './sidechainKey';
 
 export interface MasterEffectsContext {
@@ -26,11 +25,6 @@ export interface MasterEffectsContext {
 const scExternalSources = new WeakMap<Tone.ToneAudioNode, AudioNode>();
 // Track which sidechain effects use isolation taps (for cleanup on source change)
 const scIsolationChannels = new WeakMap<Tone.ToneAudioNode, { channel: number; scInput: AudioNode }>();
-
-// Lazy-cached reference to getTrackerReplayer — populated on first rebuildMasterEffects
-// to avoid circular imports. Used by the synchronous canUseParameterUpdatePath.
-type ReplayerGetter = () => { hasReplacedInstruments: boolean };
-let _cachedGetTrackerReplayer: ReplayerGetter | null = null;
 
 // Lazy resolver for ToneEngine — avoids circular import deadlock
 // (MasterEffectsChain is imported by ToneEngine, so dynamic import hangs)
@@ -195,6 +189,9 @@ export async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChanne
  * Called when effects are added, removed, or reordered
  */
 export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: EffectConfig[]): Promise<void> {
+  // Ask first: the fast path below compares against where each effect lives,
+  // which depends on whether channels can be isolated right now.
+  await refreshChannelIsolation();
   // Fast path: if only parameters changed (no add/remove/reorder), just update params
   if (canUseParameterUpdatePath(ctx, effects)) {
     updateEffectParameters(ctx, effects);
@@ -224,30 +221,13 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Filter to only enabled effects
   const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
 
-  // Check if isolation is available for the current format AND an engine is
-  // actually running. supportsChannelIsolation is a static mode check; when
-  // no WASM multi-output engine is active (e.g. classic mode with Tone.js
-  // synths), channel-targeted effects must stay in the global chain —
-  // otherwise they silently vanish (no global chain node, no WASM slot).
-  // Additionally, when hybrid playback is active (Tone.js synths replacing
-  // WASM channels), isolation cannot capture the native synth audio —
-  // it only captures the WASM worklet output which is muted for replaced
-  // instruments. Keep all effects in the global chain in this case.
-  const modeSupportsIsolation = supportsChannelIsolation(useFormatStore.getState().editorMode);
-  let isolationAvailable = false;
-  if (modeSupportsIsolation) {
-    try {
-      const { getActiveIsolationEngine } = await import('./ChannelRoutedEffects');
-      const engine = await getActiveIsolationEngine();
-      if (engine !== null && engine.isAvailable()) {
-        // Check for hybrid playback — replaced instruments bypass WASM worklet
-        const { getTrackerReplayer } = await import('../TrackerReplayer');
-        _cachedGetTrackerReplayer = getTrackerReplayer;
-        const replayer = getTrackerReplayer();
-        isolationAvailable = !replayer.hasReplacedInstruments;
-      }
-    } catch { /* engine not available */ }
-  }
+  // Whether channels can be taken out of the mix: ONE answer shared with the
+  // slot builder and the panel (resolveChannelIsolation). When it says no -
+  // no multi-output engine, an engine without isolation slots, or hybrid
+  // playback with native synths - every effect stays in the global chain and
+  // its channel selection is ignored; otherwise it would leave this chain for
+  // slots that never get built and vanish.
+  const isolationAvailable = (await refreshChannelIsolation()).engine !== null;
 
   // Separate global effects from channel-targeted effects.
   // When isolation isn't available, treat all effects as global (ignore selectedChannels).
@@ -288,6 +268,10 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   };
 
   if (globalEffects.length === 0) {
+    // A newer rebuild already decided otherwise (it saw different isolation
+    // state): this one is stale, and tearing the chain down now would drop the
+    // effects that rebuild just put there.
+    if (myVersion !== ctx.masterEffectsRebuildVersion) return;
     // No global effects — tear down old chain and connect directly to BLEP input
     teardownOldChain();
     ctx.masterEffectsInput.connect(ctx.blepInput);
@@ -475,22 +459,9 @@ export function canUseParameterUpdatePath(ctx: MasterEffectsContext, newEffects:
   // For the fast path, compare GLOBAL effects (no selectedChannels) against current chain.
   // If selectedChannels changed, we need a full rebuild to move effects between
   // the global serial chain and the per-channel WASM isolation system.
-  // When isolation isn't available (no engine, or hybrid playback with native synths),
-  // all effects are global — selectedChannels is ignored.
-  let isolationAvailable = supportsChannelIsolation(useFormatStore.getState().editorMode);
-  if (isolationAvailable) {
-    if (!_cachedGetTrackerReplayer) {
-      // No cached replayer getter → we haven't confirmed a WASM engine is running.
-      // Assume isolation is NOT available (safe default — keeps all effects in global chain).
-      isolationAvailable = false;
-    } else {
-      // Hybrid playback: native synths bypass the WASM worklet, so isolation can't
-      // capture their audio. Treat all effects as global to keep them audible.
-      try {
-        if (_cachedGetTrackerReplayer().hasReplacedInstruments) isolationAvailable = false;
-      } catch { /* replayer not initialized */ }
-    }
-  }
+  // The answer is the one the last rebuild took (rebuildMasterEffects refreshes
+  // it first), so both agree on where an effect lives.
+  const isolationAvailable = getChannelIsolationSnapshot().engine !== null;
   const globalNew = isolationAvailable
     ? enabledNew.filter(fx => !isChannelTargeted(fx))
     : enabledNew;

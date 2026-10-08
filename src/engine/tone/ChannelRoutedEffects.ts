@@ -1214,7 +1214,7 @@ let _playingIsolationEngine: IsolationCapableEngine | null = null;
 export function setPlayingIsolationEngine(engine: IsolationCapableEngine | null): void {
   const changed = engine !== _playingIsolationEngine;
   _playingIsolationEngine = engine;
-  if (changed && engine) void rebuildForNewEngine();
+  if (changed) void rebuildForNewEngine(engine !== null);
 }
 
 /**
@@ -1226,14 +1226,17 @@ export function setPlayingIsolationEngine(engine: IsolationCapableEngine | null)
  * master effects aimed at channels 2-4 played nowhere (2026-09-30, with the
  * engine's context bug). Rebuild both now.
  */
-async function rebuildForNewEngine(): Promise<void> {
+async function rebuildForNewEngine(started: boolean): Promise<void> {
   try {
     const [{ useAudioStore }, { getToneEngine }, { scheduleWasmEffectRebuild }, { targetsChannels }] = await Promise.all([
       import('../../stores/useAudioStore'), import('../ToneEngine'), import('../../stores/useMixerStore'), import('./sidechainKey'),
     ]);
+    await refreshChannelIsolation();
     const effects = useAudioStore.getState().masterEffects;
+    // An engine going away puts the effects aimed at channels back on the
+    // whole mix just as one starting takes them off it.
     if (effects.some((fx) => fx.enabled && targetsChannels(fx))) await getToneEngine().rebuildMasterEffects(effects);
-    scheduleWasmEffectRebuild(); // mixer inserts, and the slots themselves
+    if (started) scheduleWasmEffectRebuild(); // mixer inserts, and the slots themselves
   } catch (e) {
     console.warn('[ChannelRoutedEffects] rebuild for the new engine failed:', e);
   }
@@ -1275,6 +1278,83 @@ export async function getActiveIsolationEngine(): Promise<IsolationCapableEngine
     } catch { /* engine module not loaded */ }
   }
   return null;
+}
+
+/**
+ * Whether channels can be taken out of the mix right now, and if not, why.
+ *
+ * ONE answer for everything that has to agree about it. The master chain
+ * decides whether an effect aimed at channels leaves the whole-mix chain; the
+ * slot builder (scheduleWasmEffectRebuild) decides whether it then lands in an
+ * isolation slot; the panel decides whether the channel buttons work. They
+ * each used to ask in their own way (a static editor-mode check, an engine
+ * lookup, a hybrid-playback check made in only one of the two places, and
+ * `supportsIsolationSlots` checked only by the slot builder), so the chain
+ * could take an effect off the master that the slot builder then declined to
+ * route: the effect was in neither place and played nowhere ("the master
+ * effects still often die if i click the channel buttons", 2026-10-08).
+ */
+export interface ChannelIsolationStatus {
+  /** The engine to route through, when channels can be isolated. */
+  engine: IsolationCapableEngine | null;
+  /** Why not, in words for the panel; null when isolation works. */
+  reason: string | null;
+}
+
+const NO_ISOLATION: ChannelIsolationStatus = {
+  engine: null,
+  reason: 'The playing engine mixes all channels together, so an effect cannot be aimed at one. It processes the whole mix.',
+};
+
+export async function resolveChannelIsolation(): Promise<ChannelIsolationStatus> {
+  let engine: IsolationCapableEngine | null = null;
+  if (_playingIsolationEngine?.isAvailable()) {
+    engine = _playingIsolationEngine;
+  } else {
+    let editorMode = 'classic';
+    try {
+      const { useFormatStore } = await import('../../stores/useFormatStore');
+      editorMode = useFormatStore.getState().editorMode;
+    } catch { /* fallback to classic */ }
+    // The mode check keeps a stale singleton of an engine that is not playing
+    // from answering for a song it has nothing to do with.
+    if (supportsChannelIsolation(editorMode)) engine = await getActiveIsolationEngine();
+  }
+  if (!engine || !engine.isAvailable() || !engine.getWorkletNode()) return NO_ISOLATION;
+  if (engine.supportsIsolationSlots?.() === false) {
+    return { engine: null, reason: 'This engine renders channels for the dub sends only, so an effect cannot be taken off one channel. It processes the whole mix.' };
+  }
+  try {
+    const { getTrackerReplayer } = await import('../TrackerReplayer');
+    // Native synths replacing the WASM channels bypass the worklet, so an
+    // isolation slot would carry silence.
+    if (getTrackerReplayer().hasReplacedInstruments) {
+      return { engine: null, reason: 'Some instruments are played by built-in synths, which cannot be taken out of the mix per channel. The effect processes the whole mix.' };
+    }
+  } catch { /* replayer not initialised: nothing is replaced */ }
+  return { engine, reason: null };
+}
+
+let _isolationSnapshot: ChannelIsolationStatus = NO_ISOLATION;
+const _isolationListeners = new Set<() => void>();
+
+/** The last answer of `refreshChannelIsolation`, for synchronous callers (UI, the fast path). */
+export function getChannelIsolationSnapshot(): ChannelIsolationStatus {
+  return _isolationSnapshot;
+}
+
+export function subscribeChannelIsolation(listener: () => void): () => void {
+  _isolationListeners.add(listener);
+  return () => { _isolationListeners.delete(listener); };
+}
+
+/** Ask again and publish the answer. */
+export async function refreshChannelIsolation(): Promise<ChannelIsolationStatus> {
+  const next = await resolveChannelIsolation();
+  if (next.engine === _isolationSnapshot.engine && next.reason === _isolationSnapshot.reason) return _isolationSnapshot;
+  _isolationSnapshot = next;
+  for (const l of [..._isolationListeners]) l();
+  return next;
 }
 
 /**
