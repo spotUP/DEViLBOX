@@ -21,13 +21,21 @@ function isSongByName(name: string): boolean {
 describe('the jukebox song index offers no companion file as a song', () => {
   it('names no StarTrekker .nt, shared bank or partnerless module as a row file', () => {
     const offending: string[] = [];
+    // One companion verdict per directory, not one per file in it: the
+    // per-file recomputation took 3.9 s alone and timed out the pre-push gate
+    // under load (2026-10-08).
+    const badByDir = new Map<string, Set<string>>();
     for (const entry of index.entries) {
       for (const f of entry.files) {
         const dir = f.slice(0, f.lastIndexOf('/'));
         const name = f.slice(f.lastIndexOf('/') + 1).toLowerCase();
         const listing = index.dirs[dir];
         if (!listing) continue;
-        const bad = new Set([...companionFilesIn(listing, isSongByName), ...partnerlessFilesIn(listing)].map((c) => c.toLowerCase()));
+        let bad = badByDir.get(dir);
+        if (!bad) {
+          bad = new Set([...companionFilesIn(listing, isSongByName), ...partnerlessFilesIn(listing)].map((c) => c.toLowerCase()));
+          badByDir.set(dir, bad);
+        }
         if (bad.has(name)) offending.push(`${entry.id}: ${f}`);
       }
     }
