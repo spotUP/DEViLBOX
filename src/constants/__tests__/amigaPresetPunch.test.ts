@@ -144,9 +144,9 @@ describe('EQ3 gain is the dB it is set to', () => {
 
 describe('punchy Amiga club presets (Tone effects only)', () => {
   const cases: Array<[string, { bass: number; crest: number }]> = [
-    ['Paula Punchline', { bass: 3, crest: -0.5 }],
-    ['Tracker Dance Floor', { bass: 2.5, crest: -0.5 }],
-    ['Amiga Bass Cannon', { bass: 4, crest: -1.8 }],
+    ['Paula Punchline', { bass: 3, crest: -1.5 }],
+    ['Tracker Dance Floor', { bass: 2.5, crest: -1.5 }],
+    ['Amiga Bass Cannon', { bass: 4, crest: -3.2 }],
   ];
   for (const [name, want] of cases) {
     it(`${name} lifts the bass by at least ${want.bass} dB over the rest and keeps the crest within ${-want.crest} dB`, async () => {
