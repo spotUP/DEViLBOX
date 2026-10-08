@@ -191,6 +191,10 @@ G5 add-on-empty-row after: soundmon, digitalSoundStudio, tfmMusicMaker, quadraCo
 
 - [ ] P19b SynthesisExporter.ts:233 hardcodes arpeggio: 0 when rebuilding a file from the grid - a full re-export still drops arpeggios (live edit/patch path fixed in 114bcd01b). Read the arpeggio from the original bytes or add it to the cell.
 
+- [ ] E16 Buzz FSM Chorus (third-party/buzzmachines-master/FSM/Chorus/Chorus.cpp) Work() loops forever when numTracks > 1 and a track's MinDelay <= 1 sample (maxs <= 0, so never advances) - a real hang the tests cannot reach yet. Fix the loop, rebuild, test with 2 tracks and MinDelay 1. (Test-side Node shutdown deadlock fixed in 2a2551114.)
+
+- [ ] K12 OWNER DECISION 2026-10-08: keep ProTracker naming (428 = C-2, range C-1..B-3) for all Amiga formats. Typed keys sound an octave+ above the song because the editor octave defaults to 4. When a song using Amiga periods is loaded, the editor's typing octave follows ProTracker (lower key row = C-2 at octave 2, upper row one above), and the octave display stays within C-1..B-3 range sensibly; other formats keep their own default.
+
 ## Batch D - dub (running)
 - [x] D1 Channel send audible: end-to-end guard channelSendEchoIsAudible.test.ts (8a899d711). -34 dB was return vs BASS-boosted master; echo sits -13.8 dB under the dry channel at Return 0.431, -5.9 dB on Tubby. No engine defect.
 - [x] D2 `everyDubToggleChangesEngineSong.test.ts` fails on Starve (and Liquid once), independent of sends fix. DONE 6fe6cf9d1: not Starve - the off-vs-off noise floor moved -50..-41 dBFS because the rig left main-thread Math.random unseeded (SpaceEchoEffect wow rate) and Tone filled its noise caches on the first rig. Rig now seeds per rig + warms Tone noise caches; renders bit-identical (dubBusRigIsDeterministic.test.ts); toggle test also needs an absolute -45 dBFS change (all 9 toggles measure -30.1..-18.7).
