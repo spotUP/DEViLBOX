@@ -6,6 +6,8 @@
  * opened by the ⚙ gear icon next to the AUTO DUB button.
  */
 
+import { Toggle } from '@components/controls/Toggle';
+import { setAutoDubPower } from '@/lib/dub/dubPower';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDubStore } from '@/stores/useDubStore';
@@ -164,6 +166,8 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-text-secondary font-bold text-xs">AUTO DUB SETTINGS</span>
+        {/* On here switches the Dub Bus on too: the DJ view has no bus switch of its own. */}
+        <Toggle label="Auto Dub" value={enabled} onChange={setAutoDubPower} />
       </div>
 
       {/* Active persona hint */}

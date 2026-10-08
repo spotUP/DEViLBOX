@@ -1081,7 +1081,7 @@ export async function setDubBusSettings(params: Record<string, unknown>): Promis
 export async function setAutoDubConfig(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { useDubStore } = await import('../../stores/useDubStore');
   const s = useDubStore.getState();
-  if (typeof params.enabled === 'boolean') s.setAutoDubEnabled(params.enabled);
+  if (typeof params.enabled === 'boolean') (await import('../../lib/dub/dubPower')).setAutoDubPower(params.enabled);
   if (typeof params.persona === 'string') s.setAutoDubPersona(params.persona as Parameters<typeof s.setAutoDubPersona>[0]);
   if (typeof params.intensity === 'number') s.setAutoDubIntensity(params.intensity);
 
