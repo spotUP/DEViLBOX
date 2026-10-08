@@ -29,18 +29,20 @@ export function expectedCompanion(filename: string): { names: string[]; descript
 }
 
 /** The format needs partner files and none are in hand. */
-export function needsCompanionPrompt(filename: string, companionCount: number): boolean {
+export function needsCompanionPrompt(filename: string, companionCount: number, head?: Uint8Array): boolean {
   if (companionCount > 0) return false;
-  const nativeFmt = detectNativeFormat(filename.toLowerCase());
+  // By content when the bytes are in hand: a name alone cannot tell the three .sng formats apart (U4.5).
+  const nativeFmt = detectNativeFormat(filename.toLowerCase(), head);
   return (nativeFmt !== null && MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key)) || expectedCompanion(filename) !== null;
 }
 
 /** The D1 rule: does this prepared song need the import dialog? */
-export function needsImportChoice(p: Pick<PreparedSong, 'file' | 'songKind' | 'companions' | 'uadeMetadata' | 'sidInfo' | 'fileSubsongs'>): boolean {
+export function needsImportChoice(p: Pick<PreparedSong, 'file' | 'songKind' | 'companions' | 'uadeMetadata' | 'sidInfo' | 'fileSubsongs'> & { info?: { arrayBuffer?: ArrayBuffer } }): boolean {
   if (OWN_DIALOG.test(p.file.name)) return true;
   if (p.songKind !== 'module') return false;
   if ((p.uadeMetadata?.subsongCount ?? 0) > 1) return true;
   if ((p.sidInfo?.subsongs ?? 0) > 1) return true;
   if ((p.fileSubsongs?.count ?? 0) > 1) return true;
-  return needsCompanionPrompt(p.file.name, p.companions?.size ?? 0);
+  const head = p.info?.arrayBuffer ? new Uint8Array(p.info.arrayBuffer, 0, Math.min(128, p.info.arrayBuffer.byteLength)) : undefined;
+  return needsCompanionPrompt(p.file.name, p.companions?.size ?? 0, head);
 }
