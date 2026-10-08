@@ -114,10 +114,14 @@ export function pcm8ToWAV(
   writeStr(view, 36, 'data');
   view.setUint32(40, dataSize, true);
 
-  // Convert 8-bit signed (two's complement) → 16-bit signed
-  // Wraps around source data for padded samples
+  // Convert 8-bit signed (two's complement) → 16-bit signed.
+  // Padding: a looping waveform repeats to the minimum length (the loop plays it again anyway); a one-shot is
+  // padded with silence. Repeating a one-shot played it again after its end, so a key on a 179-word drum hit
+  // sounded 1.4 times and rang 2.7 dB hot (uadeSamplerKeys.test.ts, Jeroen Tel stormlord title.jt).
+  const looped = _loopEnd > _loopStart && _loopEnd > 2;
   let offset = 44;
   for (let i = 0; i < numSamples; i++) {
+    if (!looped && i >= srcLen) { view.setInt16(offset, 0, true); offset += 2; continue; }
     // Reinterpret unsigned byte as signed
     const s8 = (pcm[i % srcLen] < 128) ? pcm[i % srcLen] : pcm[i % srcLen] - 256;
     view.setInt16(offset, s8 * 256, true);

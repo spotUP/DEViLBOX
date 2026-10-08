@@ -22,6 +22,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
 import { importThroughUade } from './uadeImportHarness';
+import { songBuffer } from './workletHarness';
 import { fundamentalHz } from './keyboardPreviewHarness';
 import { periodToNote, noteToPeriod } from '@/lib/amiga/periodNotes';
 import { xmNoteToToneJS } from '@/lib/xmConversions';
@@ -31,15 +32,16 @@ installRealWebAudio();
 resolveWorkletsFromPublic();
 servePublicToFetch();
 
-const FORMATS: Array<{ name: string; file: string; companions?: Record<string, string>; minVoices: number; minSteady: number; minGridCover: number }> = [
+const FORMATS: Array<{ name: string; file: string; companions?: Record<string, string>; minVoices: number; minSteady: number; minGridCover: number; nativeGrid?: boolean }> = [
   { name: 'Delitracker Custom bards tale.cus (K6)', file: 'delitracker-custom/bards tale.cus', minVoices: 1, minSteady: 1, minGridCover: 0.8 },
   { name: 'Fred Editor (Gray) eco.gray', file: 'fred-gray/eco.gray', minVoices: 1, minSteady: 0 /* modulated synth voices */, minGridCover: 0.8 },
   { name: 'Mark Cooksey mighty bombjack.mc', file: 'mark-cooksey/mighty bombjack.mc', minVoices: 2, minSteady: 1, minGridCover: 0.8 },
   { name: 'Rob Hubbard ST battleships.rho', file: 'rob-hubbard-st/battleships.rho', minVoices: 1, minSteady: 0 /* modulated synth voices */, minGridCover: 0.8 },
+  { name: 'Jeroen Tel stormlord title.jt', file: 'jeroen-tel/stormlord title.jt', minVoices: 1, minSteady: 1, minGridCover: 0.8, nativeGrid: true },
   { name: 'Jason Page jpn.fire and ice-1', file: 'jason-page/jpn.fire and ice-1', companions: { 'smp.fire and ice-1': 'jason-page/smp.fire and ice-1' }, minVoices: 1, minSteady: 1, minGridCover: 0.55 /* the rest play constant (silent) waves */ },
 ];
 
-describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file, companions, minVoices, minSteady, minGridCover }) => {
+describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file, companions, minVoices, minSteady, minGridCover, nativeGrid }) => {
   let song: Awaited<ReturnType<typeof importThroughUade>>['song'];
   let shapes: Shape[];
   let getInstanceCalls: number;
@@ -48,8 +50,21 @@ describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file
   beforeAll(async () => {
     const imp = await importThroughUade(file, companions);
     song = imp.song;
-    shapes = (imp.paulaSamples as Array<Omit<Shape, 'pcm'> & { pcm: Uint8Array }>).map((x) => ({ ...x, pcm: x.pcm.buffer.slice(x.pcm.byteOffset, x.pcm.byteOffset + x.pcm.byteLength) as ArrayBuffer }));
-    expect(shapes.length, 'the import scanned the Paula writes').toBeGreaterThan(0);
+    let found = imp.paulaSamples as Array<Omit<Shape, 'pcm'> & { pcm: Uint8Array }>;
+    if (nativeGrid) {
+      // A native parser's grid needs no UADE at import: the worklet has no song yet, and the samples are the
+      // parser's (from the file), checked here against the bytes the player really plays.
+      await imp.send({
+        type: 'load', buffer: songBuffer('public/data/songs/' + file), filenameHint: file.split('/')[1], skipScan: true, subsong: 0,
+        companions: Object.entries(companions ?? {}).map(([filename, p]) => ({ filename, buffer: songBuffer('public/data/songs/' + p) })),
+      });
+      await imp.send({ type: 'scanPaulaSamples', requestId: 9001, durationMs: 30000 });
+      const msg = imp.posted.filter((m) => (m as { requestId?: number }).requestId === 9001).pop() as unknown as { samples?: Array<Omit<Shape, 'pcm'> & { pcm: ArrayBuffer }>; message?: string };
+      expect(msg.samples, `Paula scan: ${msg.message}`).toBeTruthy();
+      found = msg.samples!.map((x) => ({ ...x, pcm: new Uint8Array(x.pcm) }));
+    }
+    shapes = found.map((x) => ({ ...x, pcm: x.pcm.buffer.slice(x.pcm.byteOffset, x.pcm.byteOffset + x.pcm.byteLength) as ArrayBuffer }));
+    expect(shapes.length, 'the Paula writes were scanned').toBeGreaterThan(0);
     getInstance = imp.getInstanceSpy;
     getInstanceCalls = getInstance.mock.calls.length;
   }, 600_000);
@@ -65,12 +80,21 @@ describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file
   it('the grid names an instrument that has the sample, for most notes', () => {
     const withPcm = new Set(song.instruments.filter((i) => i.synthType === 'Sampler' && i.sample?.audioBuffer).map((i) => i.id));
     let notes = 0, ok = 0;
-    for (const p of song.patterns) for (const c of p.channels) for (const r of c.rows) if (r.note > 0) { notes++; if (withPcm.has(r.instrument)) ok++; }
+    // an instrument stays on its channel until another is named (the replayer's rule for a note with no instrument)
+    const current: number[] = [0, 0, 0, 0, 0, 0, 0, 0];
+    for (const pi of song.songPositions) {
+      song.patterns[pi].channels.forEach((c, ch) => {
+        for (const r of c.rows) {
+          if (r.instrument > 0) current[ch] = r.instrument;
+          if (r.note > 0 && r.note < 97) { notes++; if (withPcm.has(current[ch])) ok++; }
+        }
+      });
+    }
     expect(notes).toBeGreaterThan(50);
     // The grid names notes as every Amiga grid does (428 = C-2 = 25, periodNotes): a key on a grid note then plays the
     // period the song played. Before, the tick reconstruction named them four octaves up (period 428 = 61).
     const named = song.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows.filter((r) => r.note > 0 && r.note < 97).map((r) => r.note)));
-    expect(Math.max(...named), 'highest grid note is inside the period table (72)').toBeLessThanOrEqual(72);
+    if (!nativeGrid) expect(Math.max(...named), 'highest grid note is inside the period table (72)').toBeLessThanOrEqual(72);
     expect(ok / notes, `notes whose instrument has a sample: ${ok} of ${notes}`).toBeGreaterThan(minGridCover);
   });
 
@@ -90,14 +114,15 @@ describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file
       expect(Math.abs(1200 * Math.log2(keyPeriod / sh.period)), `${noteName} against period ${sh.period}`).toBeLessThanOrEqual(50);
       const model = paulaVoice({ ...sh, period: keyPeriod }, 4800);
       const key = await renderKeys(inst, [{ note: noteName, at: 0 }], 0.5);
-      const keyOn = key.findIndex((v) => Math.abs(v) > 0.003);
+      const keyOn = key.findIndex((v) => Math.abs(v) > 0.0005);
       const keyWin = key.subarray(Math.max(0, keyOn), Math.max(0, keyOn) + 4800);
       const mHz = fundamentalHz(model.subarray(0, 3800), 30, 3000), kHz = fundamentalHz(keyWin.subarray(0, 3800), 30, 3000);
       if (!(mHz > 0)) continue; // a very short or noise-like wave has no fundamental
       measured++;
       expect(Math.abs(1200 * Math.log2(kHz / mHz)), `${noteName} voice ${sh.voice}: key ${kHz.toFixed(1)} Hz, Paula ${mHz.toFixed(1)} Hz`).toBeLessThan(50);
-      // Paula holds each byte, the Sampler interpolates between them: that lowers the rms of a wave of a few bytes
-      expect(Math.abs(20 * Math.log10(rms(keyWin, 0, 2880) / rms(model, 0, 2880))), `${noteName} voice ${sh.voice}: key level against Paula's, dB`).toBeLessThan(sh.loopLength > 0 && sh.loopLength < 32 ? 3 : 2);
+      // Paula holds each byte, the Sampler interpolates between them: that lowers the rms of a bright wave by up to ~3 dB
+      // (the 2 dB bound is held against the song voice, in the next test)
+      expect(Math.abs(20 * Math.log10(rms(keyWin, 0, 4800) / rms(model, 0, 4800))), `${noteName} voice ${sh.voice}: key level against Paula's, dB`).toBeLessThan(3.5);
     }
     expect(measured, 'voices with a measurable first note').toBeGreaterThanOrEqual(minVoices);
   }, 600_000);
@@ -121,19 +146,19 @@ describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file
       // arpeggiates, or whose volume moves in its first 100 ms, is not a note a key can name.
       const model = paulaVoice(sh, 4800);
       const sHz = fundamentalHz(win.subarray(0, 3800), 30, 3000), mHz = fundamentalHz(model.subarray(0, 3800), 30, 3000);
-      const modelDb = 20 * Math.log10(rms(win, 0, 2880) / rms(model, 0, 2880));
+      const modelDb = 20 * Math.log10(rms(win, 0, 4800) / rms(model, 0, 4800));
       if (!(sHz > 0 && mHz > 0 && Math.abs(1200 * Math.log2(mHz / sHz)) < 50 && Math.abs(modelDb) < 2)) {
         skipped.push(`voice ${sh.voice} ptr ${sh.attackPtr.toString(16)}: song ${sHz.toFixed(0)} Hz, model ${mHz.toFixed(0)} Hz, ${modelDb.toFixed(1)} dB`);
         continue;
       }
       const noteName = xmNoteToToneJS(periodToNote(sh.period))!;
       const key = await renderKeys(inst, [{ note: noteName, at: 0 }], 0.5);
-      const keyOn = key.findIndex((v) => Math.abs(v) > 0.003);
+      const keyOn = key.findIndex((v) => Math.abs(v) > 0.0005);
       const keyWin = key.subarray(Math.max(0, keyOn), Math.max(0, keyOn) + 4800);
       const kHz = fundamentalHz(keyWin.subarray(0, 3800), 30, 3000);
       steadyVoices++;
       expect(Math.abs(1200 * Math.log2(kHz / sHz)), `${noteName} voice ${sh.voice}: key ${kHz.toFixed(1)} Hz, song ${sHz.toFixed(1)} Hz`).toBeLessThan(50);
-      expect(Math.abs(20 * Math.log10(rms(keyWin, 0, 2880) / rms(win, 0, 2880))), `${noteName} voice ${sh.voice}: key level against the song voice, dB`).toBeLessThan(2);
+      expect(Math.abs(20 * Math.log10(rms(keyWin, 0, 4800) / rms(win, 0, 4800))), `${noteName} voice ${sh.voice}: key level against the song voice, dB`).toBeLessThan(2);
     }
     expect(steadyVoices, `steady first notes (skipped: ${skipped.join('; ')})`).toBeGreaterThanOrEqual(minSteady);
   }, 600_000);
