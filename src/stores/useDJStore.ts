@@ -13,6 +13,7 @@ import type { SeratoCuePoint, SeratoLoop, SeratoBeatMarker } from '@/lib/serato/
 import type { BeatGridData } from '@/engine/dj/DJAudioCache';
 import type { DJTrackAnalysis } from '@/engine/dj/autodj/types';
 import type { AutoDJTelemetry } from '@/engine/dj/autodj/telemetry';
+import type { JuggleTelemetry } from '@/engine/dj/autodj/juggle/juggleTypes';
 
 // Immer needs MapSet support to draft `Set<number>` fields (fxTargetChannels).
 // Calling at module load is idempotent — main.tsx calls it too, but tests
@@ -348,6 +349,12 @@ interface DJState {
   autoDJSessionOrder: number[];
   /** Telemetry snapshot for the debug view (plan section 44), written by the session controller. */
   autoDJTelemetry: AutoDJTelemetry | null;
+  /** Auto Juggle mode (juggling plan section 44). */
+  autoDJJuggleMode: string;
+  /** Auto Juggle intensity 0..1; -1 = the set decides. */
+  autoDJJuggleIntensity: number;
+  /** Juggle telemetry (juggling plan section 45), written by the juggle controller. */
+  autoDJJuggleTelemetry: JuggleTelemetry | null;
   /** DJ FX actions engaged right now, by action id -> deck (the pad lights from this, whoever fired it). */
   djFxActive: Record<string, DeckId | null>;
   /** Pre-separate stems for upcoming playlist tracks in the background */
@@ -434,10 +441,11 @@ interface DJActions {
   setAutoDJEnabled: (enabled: boolean) => void;
   setAutoDJStatus: (status: AutoDJStatus) => void;
   setAutoDJTrackIndices: (current: number, next: number) => void;
-  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number }>) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number; juggleMode: string; juggleIntensity: number }>) => void;
   setAutoDJSessionOrder: (order: number[]) => void;
   setDjFxActive: (id: string, deck: DeckId | null) => void;
   setAutoDJTelemetry: (telemetry: AutoDJTelemetry | null) => void;
+  setAutoDJJuggleTelemetry: (telemetry: JuggleTelemetry | null) => void;
 }
 
 type DJStore = DJState & DJActions;
@@ -487,6 +495,9 @@ export const useDJStore = create<DJStore>()(
     autoDJCreativeRisk: -1,
     autoDJSessionOrder: [] as number[],
     autoDJTelemetry: null as AutoDJTelemetry | null,
+    autoDJJuggleMode: 'OFF',
+    autoDJJuggleIntensity: -1,
+    autoDJJuggleTelemetry: null as JuggleTelemetry | null,
     djFxActive: {} as Record<string, DeckId | null>,
     stemPreSeparation: false,
     streamAutoDub: false,
@@ -822,6 +833,11 @@ export const useDJStore = create<DJStore>()(
         if (deck === null) delete state.djFxActive[id]; else state.djFxActive[id] = deck;
       }),
 
+    setAutoDJJuggleTelemetry: (telemetry) =>
+      set((state) => {
+        state.autoDJJuggleTelemetry = telemetry;
+      }),
+
     setAutoDJTelemetry: (telemetry) =>
       set((state) => {
         state.autoDJTelemetry = telemetry;
@@ -841,6 +857,8 @@ export const useDJStore = create<DJStore>()(
         if (config.smartCuts !== undefined) state.autoDJSmartCuts = config.smartCuts;
         if (config.style !== undefined) state.autoDJStyle = config.style;
         if (config.creativeRisk !== undefined) state.autoDJCreativeRisk = config.creativeRisk;
+        if (config.juggleMode !== undefined) state.autoDJJuggleMode = config.juggleMode;
+        if (config.juggleIntensity !== undefined) state.autoDJJuggleIntensity = config.juggleIntensity;
         if (config.stemPreSeparation !== undefined) state.stemPreSeparation = config.stemPreSeparation;
         if (config.streamAutoDub !== undefined) state.streamAutoDub = config.streamAutoDub;
         if (config.stemModel !== undefined) state.stemModel = config.stemModel;

@@ -55,6 +55,30 @@ describe('Auto DJ debug view', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/components/dj/DJAutoDJDebugPanel.tsx'), 'utf8');
     expect(/\p{Extended_Pictographic}/u.test(src)).toBe(false);
     expect(src).not.toMatch(/text-(red|green|blue|amber|violet|cyan|rose|emerald)-\d{3}/);
+  }, 60_000);
+
+  it('JUG-PG-M: the Beat Juggling section shows mode, pattern, phase, intensity, per-deck material and roles, next actions, reason and safety', () => {
+    useDJStore.getState().setAutoDJTelemetry(null);
+    useDJStore.getState().setAutoDJJuggleTelemetry({
+      mode: 'PERFORMER', active: true, pattern: 'beatTrade', sequence: 'A B A B A+B A', phase: 'PEAK', intensity: 0.85, activeDeck: 'A',
+      deckA: { material: ['FULL_GROOVE'], confidence: 0.9, role: 'VOICE' }, deckB: { material: ['DRUM_FILL'], confidence: 0.8, role: 'RESPONSE' },
+      nextActions: [{ deck: 'B', type: 'CutIn', beat: 41 }], reason: 'beatTrade (A B A B) at 0.85 intensity: strong beat confidence', confidence: 0.9, safety: 'clear',
+      budget: { juggledFraction: 0.1, secondsSinceLastJuggle: 120, cooldownSec: 90 }, lastQuality: null, history: [{ type: 'phraseTrade', bars: 16, score: 0.8 }],
+    });
+    const { getByTestId } = render(<DJAutoDJDebugPanel telemetry={null} />);
+    const text = getByTestId('autodj-juggle').textContent ?? '';
+    for (const label of ['Juggle Mode', 'Juggle Active', 'Pattern', 'Pattern Phase', 'Intensity', 'Active Deck', 'Deck A', 'Deck B', 'Next Actions', 'Confidence', 'Safety', 'Budget']) {
+      expect(text, label).toContain(label);
+    }
+    expect(text).toContain('PERFORMER');
+    expect(text).toContain('beatTrade (A B A B A+B A)');
+    expect(text).toContain('PEAK');
+    expect(text).toContain('VOICE - FULL_GROOVE');
+    expect(text).toContain('RESPONSE - DRUM_FILL');
+    expect(text).toContain('CutIn B @ 41.0');
+    expect(text).toContain('strong beat confidence');
+    expect(text).toContain('10 % juggled, cooldown 90 s');
+    useDJStore.getState().setAutoDJJuggleTelemetry(null);
   });
 
   it('without telemetry it says so in full words', () => {

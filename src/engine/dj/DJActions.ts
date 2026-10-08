@@ -646,6 +646,33 @@ export function setDeckLineLoop(deckId: DeckId, size: number): void {
 }
 
 /**
+ * Set an audio-mode loop region in seconds (snapped to the beat grid by the
+ * deck). The one path for the deck's loop buttons, the MCP and the Auto DJ.
+ */
+export function setDeckAudioLoop(deckId: DeckId, loopInSec: number, loopOutSec: number): void {
+  try {
+    getDJEngine().getDeck(deckId).setAudioLoop(loopInSec, loopOutSec);
+  } catch { /* engine not ready */ }
+  batchDJSet(`${deckId}-audioLoop`, (state) => {
+    state.decks[deckId].audioLoopIn = loopInSec;
+    state.decks[deckId].audioLoopOut = loopOutSec;
+    state.decks[deckId].loopActive = true;
+  });
+}
+
+/** Clear the audio-mode loop region. */
+export function clearDeckAudioLoop(deckId: DeckId): void {
+  try {
+    getDJEngine().getDeck(deckId).clearAudioLoop();
+  } catch { /* engine not ready */ }
+  batchDJSet(`${deckId}-audioLoop`, (state) => {
+    state.decks[deckId].audioLoopIn = null;
+    state.decks[deckId].audioLoopOut = null;
+    state.decks[deckId].loopActive = false;
+  });
+}
+
+/**
  * Clear the active line loop on the deck.
  */
 export function clearDeckLineLoop(deckId: DeckId): void {

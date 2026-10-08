@@ -83,6 +83,7 @@ export async function getAutoDJExplain(params: Record<string, unknown>): Promise
     style: s.autoDJStyle,
     sessionOrder: s.autoDJSessionOrder,
     telemetry: s.autoDJTelemetry,
+    juggle: { mode: s.autoDJJuggleMode, intensity: s.autoDJJuggleIntensity, telemetry: s.autoDJJuggleTelemetry },
     decisions: getDecisionLog().list(limit),
     decisionCounts: { ...getDecisionLog().counts },
     fxFireLog: getDjFxFireLog().slice(-limit),

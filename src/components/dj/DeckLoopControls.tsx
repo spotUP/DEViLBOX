@@ -9,6 +9,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { clearDeckAudioLoop, setDeckAudioLoop } from '@/engine/dj/DJActions';
 
 interface DeckLoopControlsProps {
   deckId: 'A' | 'B' | 'C';
@@ -41,11 +42,11 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
 
     if (playbackMode === 'audio') {
       if (loopActive) {
-        deck.clearAudioLoop();
+        clearDeckAudioLoop(deckId);
         setDeckLoop(deckId, 'off', false);
         activeBarRef.current = null;
       } else if (audioLoopIn !== null && audioLoopOut !== null && audioLoopOut > audioLoopIn) {
-        deck.setAudioLoop(audioLoopIn, audioLoopOut);
+        setDeckAudioLoop(deckId, audioLoopIn, audioLoopOut);
         setDeckLoop(deckId, 'line', true);
       }
     } else {
@@ -84,7 +85,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
 
       const currentOut = store.decks[deckId].audioLoopOut;
       if (currentOut !== null && currentOut > pos) {
-        deck.setAudioLoop(pos, currentOut);
+        setDeckAudioLoop(deckId, pos, currentOut);
         store.setDeckLoop(deckId, 'line', true);
       }
     } catch { /* engine not ready */ }
@@ -100,7 +101,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
 
       const currentIn = store.decks[deckId].audioLoopIn;
       if (currentIn !== null && pos > currentIn) {
-        deck.setAudioLoop(currentIn, pos);
+        setDeckAudioLoop(deckId, currentIn, pos);
         store.setDeckLoop(deckId, 'line', true);
       }
     } catch { /* engine not ready */ }
@@ -108,12 +109,8 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
 
   const handleClearAudioLoop = useCallback(() => {
     try {
-      const engine = getDJEngine();
-      const deck = engine.getDeck(deckId);
-      deck.clearAudioLoop();
+      clearDeckAudioLoop(deckId);
       const store = useDJStore.getState();
-      store.setAudioLoopIn(deckId, null);
-      store.setAudioLoopOut(deckId, null);
       store.setDeckLoop(deckId, 'off', false);
       activeBarRef.current = null;
     } catch { /* engine not ready */ }
@@ -148,9 +145,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
         const outPos = inPos + loopDuration;
 
         const store = useDJStore.getState();
-        store.setAudioLoopIn(deckId, inPos);
-        store.setAudioLoopOut(deckId, outPos);
-        deck.setAudioLoop(inPos, outPos);
+        setDeckAudioLoop(deckId, inPos, outPos);
         store.setDeckLoop(deckId, 'line', true);
         activeBarRef.current = bars;
       } catch { /* engine not ready */ }
