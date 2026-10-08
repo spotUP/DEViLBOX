@@ -35,7 +35,7 @@ describe('Auto DJ tempo sync reaches the audio engine', () => {
     engine.pitchCalls.length = 0;
     useDJStore.getState().setDeckState('A', { beatGrid: grid(120), detectedBPM: 120, effectiveBPM: 120, isPlaying: true });
     useDJStore.getState().setDeckState('B', { beatGrid: grid(128), detectedBPM: 128, effectiveBPM: 128, isPlaying: false });
-    useDJStore.getState().setDeckPitch('B', 0);
+    useDJStore.setState((st) => { st.decks.B.pitchOffset = 0; });
   });
 
   it('a crossfade into a faster track changes the incoming deck playback rate, not just the readout', async () => {

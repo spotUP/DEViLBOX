@@ -18,6 +18,7 @@ import { useDJStore } from '../stores/useDJStore';
 import { useDrumPadStore } from '../stores/useDrumPadStore';
 import { useMixerStore } from '../stores/useMixerStore';
 import { DJBeatSync } from '../engine/dj/DJBeatSync';
+import { setDeckPitch } from '../engine/dj/DJActions';
 import { getTrackerScratchController } from '../engine/TrackerScratchController';
 import { useVocoderStore } from '../stores/useVocoderStore';
 import type {
@@ -642,14 +643,14 @@ export class DJControllerMapper {
         case 'sync_a': {
           try {
             const semitones = DJBeatSync.syncBPM(engine.deckB, engine.deckA);
-            store.setDeckPitch('A', semitones);
+            setDeckPitch('A', semitones);
           } catch { /* other deck may not be loaded */ }
           break;
         }
         case 'sync_b': {
           try {
             const semitones = DJBeatSync.syncBPM(engine.deckA, engine.deckB);
-            store.setDeckPitch('B', semitones);
+            setDeckPitch('B', semitones);
           } catch { /* other deck may not be loaded */ }
           break;
         }
