@@ -37,6 +37,8 @@ export interface ExecutionResult {
   fellBack: 'none' | 'fallback' | 'emergency';
   error?: string;
   trace: ExecutionTrace;
+  /** False when the incoming deck could not be started: the outgoing was kept playing (no-silence rule). */
+  incomingPlaying: boolean;
 }
 
 export interface ExecuteOptions {
@@ -153,15 +155,33 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
   };
 
   const emergency = (error: string) => {
-    // Plain crossfade to the incoming over four beats, then stop the outgoing. Never a hard cut from a software failure.
+    // Plain crossfade to the incoming over four beats, then stop the outgoing. Never a hard cut from a software failure,
+    // and never both decks silent: if the incoming cannot start, the outgoing keeps playing on its own side.
     trace.events.push(`emergency: ${error}`);
     trace.fellBack = 'emergency';
-    try { getDJEngine().getDeck(inc).play().catch(() => {}); } catch { /* */ }
+    const incomingDeck = (() => { try { return getDJEngine().getDeck(inc); } catch { return null; } })();
+    const keepOutgoing = () => {
+      trace.events.push('incoming deck silent: outgoing kept playing');
+      try { setCrossfader(out === 'A' ? 0 : 1); } catch { /* */ }
+      try { resetDeckAfterTransition(out); } catch { /* */ }
+      try { getDJEngine().getDeck(out).play().catch(() => {}); } catch { /* */ }
+      useDJStore.getState().setDeckPlaying(out, true);
+      finish({ completed: false, fellBack: 'emergency', error: `${error}; incoming deck silent`, trace, incomingPlaying: false });
+    };
+    let playFailed = false;
+    try { incomingDeck?.play().catch(() => { playFailed = true; }); } catch { playFailed = true; }
     const start = timers.now();
     const from = useDJStore.getState().crossfaderPosition;
     const durationMs = 4 * beatSec * 1000;
     if (intervalId !== null) timers.clearInterval(intervalId);
     intervalId = timers.setInterval(() => {
+      let incomingAlive = true;
+      try { incomingAlive = !playFailed && (incomingDeck ? incomingDeck.isPlaying() : true); } catch { incomingAlive = !playFailed; }
+      if (!incomingAlive) {
+        if (intervalId !== null) { timers.clearInterval(intervalId); intervalId = null; }
+        keepOutgoing();
+        return;
+      }
       const p = Math.min(1, (timers.now() - start) / durationMs);
       try { setCrossfader(from + (target - from) * p); } catch { /* */ }
       if (p >= 1) {
@@ -169,7 +189,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
         useDJStore.getState().setDeckPlaying(out, false);
         try { resetDeckAfterTransition(out); } catch { /* */ }
         trace.completed = true;
-        finish({ completed: true, fellBack: 'emergency', error, trace });
+        finish({ completed: true, fellBack: 'emergency', error, trace, incomingPlaying: true });
       }
     }, tickMs);
   };
@@ -245,10 +265,12 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
             try { getDJEngine().getDeck(inc).clearAudioLoop(); } catch { /* */ }
           }
           if ((sampleCounter++ & 7) === 0) {
-            const s = useDJStore.getState();
+            // The values this executor applied (store writes are rAF-batched and lag the engine).
             trace.samples.push({
-              beat, crossfader: s.crossfaderPosition, outgoingLow: s.decks[out].eqLow, incomingLow: s.decks[inc].eqLow,
-              outgoingFilter: s.decks[out].filterPosition, incomingFilter: s.decks[inc].filterPosition, outgoingVolume: s.decks[out].volume,
+              beat, crossfader: lastValues.get('crossfader') ?? useDJStore.getState().crossfaderPosition,
+              outgoingLow: lastValues.get('outgoing.eqLow') ?? 0, incomingLow: lastValues.get('incoming.eqLow') ?? 0,
+              outgoingFilter: lastValues.get('outgoing.filter') ?? 0, incomingFilter: lastValues.get('incoming.filter') ?? 0,
+              outgoingVolume: lastValues.get('outgoing.volume') ?? 1,
             });
           }
         } catch (err) {
@@ -273,7 +295,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
           } catch { /* a reset failure must not block completion */ }
           trace.completed = true;
           trace.events.push('complete');
-          finish({ completed: true, fellBack: 'none', trace });
+          finish({ completed: true, fellBack: 'none', trace, incomingPlaying: true });
         }
       }, tickMs);
     } catch (err) {
@@ -293,7 +315,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       try { setDeckEchoSend(out, 0); setDeckReverbSend(out, 0); } catch { /* */ }
       for (const f of filterActionsFor(plan.filterPlan.kind, plan.durationBeats)) releaseDjFx(f.action, { deck: f.deck === 'outgoing' ? out : inc, source: 'autodj' });
       for (const e of plan.effects) { const a = EFFECT_ACTIONS[e.kind]; if (a) releaseDjFx(a, { deck: e.deck === 'outgoing' ? out : inc, source: 'autodj' }); }
-      finish({ completed: false, fellBack: trace.fellBack, error: 'cancelled', trace });
+      finish({ completed: false, fellBack: trace.fellBack, error: 'cancelled', trace, incomingPlaying: (() => { try { return getDJEngine().getDeck(inc).isPlaying(); } catch { return false; } })() });
     },
   };
 }

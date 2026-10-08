@@ -67,6 +67,28 @@ export function getDJPlaylistState(): Record<string, unknown> {
   };
 }
 
+/**
+ * Auto DJ explanation (plan sections 44, 45): the telemetry the debug view
+ * shows, the structured decision log ("why did you do that?") and the DJ FX
+ * fire log (which pad actions the Auto DJ fired, as Auto Dub's fire log).
+ */
+export async function getAutoDJExplain(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const limit = typeof params.limit === 'number' ? params.limit : 30;
+  const { getDecisionLog } = await import('../../engine/dj/autodj/decisionLog');
+  const { getDjFxFireLog } = await import('../../engine/drumpad/DjFxActions');
+  const s = useDJStore.getState();
+  return {
+    enabled: s.autoDJEnabled,
+    status: s.autoDJStatus,
+    style: s.autoDJStyle,
+    sessionOrder: s.autoDJSessionOrder,
+    telemetry: s.autoDJTelemetry,
+    decisions: getDecisionLog().list(limit),
+    decisionCounts: { ...getDecisionLog().counts },
+    fxFireLog: getDjFxFireLog().slice(-limit),
+  };
+}
+
 // ─── Write: Transport ───────────────────────────────────────────────────────
 
 export async function djTogglePlay(params: Record<string, unknown>): Promise<Record<string, unknown>> {

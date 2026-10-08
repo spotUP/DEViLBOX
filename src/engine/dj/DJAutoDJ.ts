@@ -440,30 +440,43 @@ class DJAutoDJ {
       const playlist = this.getActivePlaylist();
       if (!playlist) return;
 
-      const nextIdx = store.autoDJNextTrackIndex;
-      const track = nextIdx < playlist.tracks.length ? playlist.tracks[nextIdx] : undefined;
-      if (!track) {
-        // Track was removed — clamp index and retry on next skip
-        if (playlist.tracks.length === 0) return;
-        const fallbackIdx = Math.min(nextIdx, playlist.tracks.length - 1);
-        store.setAutoDJTrackIndices(store.autoDJCurrentTrackIndex, fallbackIdx);
-        return;
-      }
-
+      if (playlist.tracks.length === 0) return;
+      let nextIdx = Math.min(store.autoDJNextTrackIndex, playlist.tracks.length - 1);
       store.setAutoDJStatus('preloading');
 
-      const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
-
-      // Bail if user disabled Auto DJ during the load
-      if (!useDJStore.getState().autoDJEnabled) {
-        console.log('[AutoDJ] skip cancelled — user disabled');
-        return;
+      // Mix Now must mix NOW: a queued track that fails to load (a Modland
+      // timeout marks it bad) is skipped and the next loadable track is taken,
+      // the way the preload path does. Owner live test 2026-10-08: the button
+      // "did nothing" because it retried the same bad track and left the
+      // state in 'preloading'.
+      for (let attempts = 0; attempts < MAX_SKIP_ATTEMPTS; attempts++) {
+        const current = useDJPlaylistStore.getState().playlists.find((p) => p.id === playlist.id) ?? playlist;
+        const track = current.tracks[nextIdx];
+        if (!track) break;
+        if (!track.isBad || attempts >= MAX_SKIP_ATTEMPTS - 10) {
+          const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
+          // Bail if user disabled Auto DJ during the load
+          if (!useDJStore.getState().autoDJEnabled) {
+            console.log('[AutoDJ] skip cancelled — user disabled');
+            return;
+          }
+          if (loaded) {
+            useDJStore.getState().setAutoDJTrackIndices(useDJStore.getState().autoDJCurrentTrackIndex, nextIdx);
+            this.preloadedDeck = this.idleDeck;
+            this.triggerTransition(SKIP_TRANSITION_BARS, true);
+            return;
+          }
+        }
+        // Bad or unloadable: replan around it and try the next candidate.
+        try { const c = getSessionController(); c.setTracks(this.sessionTracks()); c.replanSession(); } catch { /* */ }
+        nextIdx = this.computeNextIndex(nextIdx, current.tracks.length);
+        // Never the track that is playing now.
+        if (nextIdx === useDJStore.getState().autoDJCurrentTrackIndex) nextIdx = (nextIdx + 1) % current.tracks.length;
+        console.warn(`[AutoDJ] Mix Now: track unloadable, trying index ${nextIdx} (attempt ${attempts + 1}/${MAX_SKIP_ATTEMPTS})`);
       }
-
-      if (loaded) {
-        this.preloadedDeck = this.idleDeck;
-        this.triggerTransition(SKIP_TRANSITION_BARS, true);
-      }
+      // Nothing loadable: back to playing, the current track continues.
+      console.error('[AutoDJ] Mix Now: no loadable track found');
+      useDJStore.getState().setAutoDJStatus('playing');
     }
   }
 

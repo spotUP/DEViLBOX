@@ -15,6 +15,9 @@ import { analyzePlaylist, playlistNeedsAnalysis, trackHasRemoteSource, type Anal
 import { Modal } from '@/components/ui/Modal';
 import { ModalHeader } from '@/components/ui/ModalHeader';
 import { Button } from '@/components/ui/Button';
+import { CustomSelect } from '@components/common/CustomSelect';
+import { DJ_STYLE_NAMES } from '@/engine/dj/autodj/types';
+import { DJAutoDJDebugPanel } from './DJAutoDJDebugPanel';
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
   idle: 'OFF',
@@ -53,6 +56,9 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const stemModel = useDJStore((s) => s.stemModel);
   const streamAutoDub = useDJStore((s) => s.streamAutoDub);
   const setConfig = useDJStore((s) => s.setAutoDJConfig);
+  const djStyle = useDJStore((s) => s.autoDJStyle);
+  const creativeRisk = useDJStore((s) => s.autoDJCreativeRisk);
+  const [showDebug, setShowDebug] = useState(false);
 
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
   const playlists = useDJPlaylistStore((s) => s.playlists);
@@ -506,6 +512,42 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           <Wand2 size={12} />
         </button>
       </div>
+
+      {/* DJ style and creative risk (plan sections 30, 54): the planner's
+          weights and the session's risk budget. Full words, design-system
+          selects, no hidden knobs. */}
+      <div className="flex items-center gap-2 mt-2">
+        <span className="text-text-muted">Style:</span>
+        <CustomSelect
+          value={djStyle}
+          onChange={(v) => setConfig({ style: v })}
+          options={DJ_STYLE_NAMES.map((name) => ({ value: name, label: name }))}
+          className="text-[10px]"
+          title="DJ style profile: changes the planner's weights, transition lengths, FX use and risk tolerance"
+        />
+        <span className="text-text-muted">Creative Risk:</span>
+        <CustomSelect
+          value={creativeRisk < 0 ? 'style' : String(creativeRisk)}
+          onChange={(v) => setConfig({ creativeRisk: v === 'style' ? -1 : Number(v) })}
+          options={[
+            { value: 'style', label: 'Style Default' },
+            { value: '0.15', label: 'Low' },
+            { value: '0.45', label: 'Medium' },
+            { value: '0.75', label: 'High' },
+          ]}
+          className="text-[10px]"
+          title="Session creative risk budget: higher permits shorter transitions, larger tempo moves, more FX, deliberate cuts"
+        />
+        <div className="flex-1" />
+        <Button variant="ghost" onClick={() => setShowDebug((v) => !v)} title="Show the Auto DJ plan, confidence, risk and the reasons for every decision">
+          {showDebug ? 'Hide Debug' : 'Debug'}
+        </Button>
+      </div>
+      {showDebug && (
+        <div className="mt-2">
+          <DJAutoDJDebugPanel />
+        </div>
+      )}
 
       {/* 404 fix dialog — pick correct Modland match */}
       {fixDialog && (

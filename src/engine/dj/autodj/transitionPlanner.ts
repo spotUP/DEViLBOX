@@ -123,9 +123,11 @@ export function chooseMixOut(a: DJTrackAnalysis, position: number, lengthSec: nu
     }
   }
   if (candidates.length === 0) {
-    // Nothing fits: the latest possible boundary, or now.
-    const t = Math.max(earliest, Math.min(latest, a.cuePoints.bestMixOut ?? latest));
-    return { time: t, bar: barIndexAt(a.downbeats, t), reasons: ['no phrase boundary fits: nearest usable point'], score: 0, phrase: null };
+    // Nothing fits in the room left: the first bar boundary from here (still on
+    // the grid, the length is shortened by the caller), else now.
+    const bar = a.downbeats.bars.find((b) => b.start >= earliest - 1e-6);
+    const t = bar ? bar.start : earliest;
+    return { time: t, bar: bar ? bar.index : barIndexAt(a.downbeats, t), reasons: ['no phrase boundary fits the room left: next bar boundary'], score: 0, phrase: null };
   }
   candidates.sort((x, y) => y.score - x.score);
   return candidates[0];
@@ -228,7 +230,7 @@ export function scoreStyles(ctx: {
 
   // Always available: the blends.
   add('longBlend', 0.5 + ctx.drumScore * 0.3 + (ctx.outroRoomBars >= 16 ? 0.2 : 0) - Math.abs(ctx.energyDelta) * 0.4 - ctx.vocalRisk * 0.3 - ctx.clashRisk * 0.3, 'drums and keys compatible, room on both tracks');
-  add('shortBlend', 0.45 + Math.abs(ctx.energyDelta) * 0.3 + ctx.vocalRisk * 0.2 + ctx.clashRisk * 0.2 + (ctx.outroRoomBars < 8 ? 0.2 : 0), 'a quick move: energy change, vocals or little room');
+  add('shortBlend', 0.45 + Math.max(0, Math.abs(ctx.energyDelta) - 0.15) * 0.6 + ctx.vocalRisk * 0.2 + ctx.clashRisk * 0.2 + (ctx.outroRoomBars < 4 ? 0.25 : 0), 'a quick move: a big energy change, vocals or little room');
   if (lowConf) return out; // Low confidence: only the robust blends (plan section 35).
 
   // Bass handling.
@@ -236,14 +238,16 @@ export function scoreStyles(ctx: {
   if (ctx.clashRisk > 0.3 && ctx.clashRisk < 0.7) add('EQSwap', 0.5 + ctx.clashRisk * 0.3, 'harmonic tension: swap the bands instead of blending full range');
   // Filters as punctuation.
   if (ctx.energyDelta > 0.1 || ctx.inSection?.kind === 'build' || ctx.inSection?.kind === 'intro') add('filterBuild', 0.45 + ctx.energyDelta * 0.6 + fx * 0.2, 'energy rises: a controlled filter rise into the incoming section');
-  if (ctx.energyDelta < -0.1 || ctx.outSection?.kind === 'outro') add('filterRelease', 0.4 + Math.abs(Math.min(0, ctx.energyDelta)) * 0.5 + fx * 0.1, 'energy settles: release the outgoing low end through the filter');
+  if (ctx.energyDelta < -0.1 || ctx.outSection?.kind === 'outro') add('filterRelease', 0.5 + Math.abs(Math.min(0, ctx.energyDelta)) * 0.8 + fx * 0.1, 'energy settles: release the outgoing low end through the filter');
   // Echo / reverb / delay as punctuation (plan section 53).
   if (ctx.outgoingVocalEnding || ctx.outSection?.kind === 'vocal-heavy' || ctx.outSection?.kind === 'chorus') add('echoOut', 0.5 + fx * 0.4 - ctx.memory.recentFX.filter((f) => f === 'echo-out').length * 0.15, 'a phrase-ending vocal or stab is the echo source');
   if (ctx.outSection?.kind === 'breakdown' && fx > 0.3) add('reverbOut', 0.4 + fx * 0.3, 'breakdown: reverb expansion');
   if (ctx.outSection?.kind === 'groove' && fx > 0.5 && ctx.drumScore > 0.6) add('delayThrow', 0.35 + fx * 0.3, 'phrase ending: a delay throw');
   // Structural moves (plan section 23).
   if (ctx.outSection?.kind === 'breakdown' && ctx.outroRoomBars >= 8) add('breakdownMix', 0.65 + fx * 0.1, 'the outgoing breakdown is the transition window');
-  if (ctx.incoming.cuePoints.firstDrop !== undefined && ctx.energyDelta > 0 && ctx.creativeRisk > 0.3) add('dropMix', 0.55 + ctx.creativeRisk * 0.3 + (ctx.setPhaseIsPeak() ? 0.15 : 0), 'bring the incoming drop in exactly as the outgoing leaves');
+  const dropSection = ctx.incoming.sections.find((s) => s.kind === 'drop');
+  const dropLifts = dropSection ? dropSection.energy > ctx.outgoing.energy.perceivedIntensity - 0.05 : ctx.energyDelta > 0;
+  if (ctx.incoming.cuePoints.firstDrop !== undefined && dropLifts && ctx.creativeRisk > 0.3) add('dropMix', 0.6 + ctx.creativeRisk * 0.3 + (ctx.setPhaseIsPeak() ? 0.2 : 0), 'bring the incoming drop in exactly as the outgoing leaves');
   if (ctx.incomingHasDrumIntro && (ctx.outSection?.kind === 'groove' || ctx.outSection?.kind === 'instrumental' || ctx.outSection?.kind === 'outro')) add('drumIntroMix', 0.6 + ctx.drumScore * 0.2, 'incoming drums under the outgoing melodic section');
   if (ctx.vocalRisk > 0.3) add('vocalSwap', 0.55 + ctx.vocalRisk * 0.4, 'vocals on both: swap through an instrumental stretch');
   if (ctx.drumScore < 0.5) add('percussionSwap', 0.5 + (0.5 - ctx.drumScore) * 0.6, 'drum patterns fight: swap the percussion, not the whole mix');
@@ -253,9 +257,11 @@ export function scoreStyles(ctx: {
   if (ctx.tempoMethod === 'double-time') add('doubleTimeJump', 0.6 + ctx.creativeRisk * 0.2, 'double-time relationship');
   if (ctx.tempoMethod === 'half-time') add('halfTimeJump', 0.6 + ctx.creativeRisk * 0.2, 'half-time relationship');
   // Cuts: exceptional, justified (plan section 24).
-  const cutOk = ctx.style.cutFrequency > 0 && ctx.creativeRisk >= 0.5 && ctx.confidence >= 0.75;
+  // A cut needs the grid above all: both beat grids trusted, a cut-friendly style, the risk budget and a structural trigger.
+  const gridConf = Math.min(ctx.outgoing.analysisConfidence.beatGrid, ctx.incoming.analysisConfidence.beatGrid, ctx.outgoing.analysisConfidence.downbeat);
+  const cutOk = ctx.style.cutFrequency > 0 && ctx.creativeRisk >= 0.5 && gridConf >= 0.75 && ctx.confidence >= 0.6;
   if (cutOk && (ctx.incoming.cuePoints.firstDrop !== undefined || ctx.outSection?.kind === 'silence' || ctx.smartCuts)) {
-    add('hardCut', 0.35 + ctx.style.cutFrequency * 0.4 + ctx.creativeRisk * 0.2, 'structural justification for a cut (drop, silence or drum-break tail)');
+    add('hardCut', 0.5 + ctx.style.cutFrequency * 0.5 + ctx.creativeRisk * 0.3 + (ctx.setPhaseIsPeak() ? 0.15 : 0) + (ctx.smartCuts ? 0.1 : 0), 'structural justification for a cut (drop, silence or drum-break tail)');
   }
   return out;
 }
@@ -486,8 +492,11 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   const outroRoomSec = (outgoing.cuePoints.finalBeat ?? outgoing.durationSec) - prelimOut.time;
   const outroRoomBars = Math.max(0, Math.floor(outroRoomSec / barSec));
   const incomingIntro = incoming.sections.find((s) => s.kind === 'intro');
-  const incomingHasDrumIntro = (incoming.cuePoints.firstDrums ?? 0) < (incoming.cuePoints.firstBass ?? incoming.durationSec) - 2 * barSec
-    || (!!incomingIntro && activity(incoming.drumActivity, incomingIntro.start, incomingIntro.end) > 0.3);
+  // A drum intro: drums run for two bars before the bass arrives, or the intro
+  // section itself carries drums. A bass playing from the first bar is not one.
+  const inBassStart = activity(incoming.bassActivity, incoming.cuePoints.firstDrums ?? 0, (incoming.cuePoints.firstDrums ?? 0) + 2 * barSec);
+  const incomingHasDrumIntro = (incoming.cuePoints.firstBass !== undefined && (incoming.cuePoints.firstDrums ?? 0) < incoming.cuePoints.firstBass - 2 * barSec && inBassStart < 0.2)
+    || (!!incomingIntro && activity(incoming.drumActivity, incomingIntro.start, incomingIntro.end) > 0.3 && activity(incoming.bassActivity, incomingIntro.start, incomingIntro.end) < 0.2);
   const outgoingVocalEnding = outgoing.vocalActivity.confidence > 0 && activity(outgoing.vocalActivity, Math.max(0, prelimOut.time - 2 * barSec), prelimOut.time) > 0.4
     && activity(outgoing.vocalActivity, prelimOut.time, prelimOut.time + 2 * barSec) < 0.25;
   const setPhaseIsPeak = () => input.setPhase === 'PEAK' || input.setPhase === 'PEAKING';
@@ -515,11 +524,16 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   });
   let durationBars = transitionStyle === 'hardCut' ? 1 : length.bars;
   if (tempoPlan.method === 'avoid') durationBars = Math.min(durationBars, 4);
+  // Final mix points with the real length; when the outgoing has less room than
+  // the length, halve the length (never below 2 bars) and look again.
+  let mixOut = chooseMixOut(outgoing, input.outgoingPosition, durationBars * barSec, leadSec, style.phraseStrictness);
+  const finalBeatSec = outgoing.cuePoints.finalBeat ?? outgoing.durationSec;
+  while (durationBars > 2 && mixOut.time + durationBars * barSec > finalBeatSec + 0.5) {
+    durationBars = Math.max(2, Math.floor(durationBars / 2));
+    mixOut = chooseMixOut(outgoing, input.outgoingPosition, durationBars * barSec, leadSec, style.phraseStrictness);
+  }
   const durationBeats = durationBars * beatsPerBar;
   const lengthSec = durationBars * barSec;
-
-  // Final mix points with the real length.
-  const mixOut = chooseMixOut(outgoing, input.outgoingPosition, lengthSec, leadSec, style.phraseStrictness);
   const mixIn = chooseMixIn(incoming, transitionStyle, lengthSec);
   const startBeat = beatIndexAt(outgoing, mixOut.time);
   const endBeat = startBeat + durationBeats;
