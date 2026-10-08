@@ -29,7 +29,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
-import { amigaNoteToXM } from './AmigaUtils';
+import { amigaNoteToXM, createSamplerInstrument } from './AmigaUtils';
 
 // NOTE: uadePatternLayout not added — Jeroen Tel uses variable-length byte stream
 // encoding per track (not fixed-size cells). Requires UADEVariablePatternLayout with
@@ -42,6 +42,8 @@ const MIN_FILE_SIZE = 1701;
 
 /** Maximum number of instruments to create as placeholders. */
 const MAX_INSTRUMENTS = 128;
+/** Semitones the player's notes sit above ProTracker's index (see the grid build). */
+const JT_NOTE_OFFSET = 1;
 
 // ── Format detection ───────────────────────────────────────────────────────
 
@@ -82,7 +84,7 @@ function readWord(buf: Uint8Array, off: number): number {
 }
 
 /** Result of scanning the 68k code for data table pointers. */
-interface JTDataPointers {
+export interface JTDataPointers {
   origin: number;
   trackTableOff: number;
   subsongTableOff: number;
@@ -212,6 +214,36 @@ function countSampleTableEntries(buf: Uint8Array, ptrs: JTDataPointers): number 
     if (readLong(buf, t + i * 4) !== 0) last = i + 1;
   }
   return last;
+}
+
+/**
+ * The sample of instrument `index` (0-based), from the record the player reads for an instrument change
+ * (table[index] -> record). Layout, read off the records and checked against the bytes in chip RAM
+ * (jeroenTelKeys.test.ts): word volume, word length in words, long sample address, long loop address, word
+ * loop length in words (one word = play once, then silence); addresses are in the player's own origin.
+ * Null when the record names bytes outside the file.
+ */
+export function readJTSample(buf: Uint8Array, ptrs: JTDataPointers, index: number): { volume: number; pcm: Uint8Array; loopStart: number; loopEnd: number } | null {
+  const slot = ptrs.sampleTableOff + index * 4;
+  if (slot + 4 > buf.length) return null;
+  const rec = (readLong(buf, slot) - ptrs.origin) >>> 0;
+  if (rec + 16 > buf.length) return null;
+  const volume = readWord(buf, rec);
+  const lenBytes = readWord(buf, rec + 2) * 2;
+  const start = (readLong(buf, rec + 4) - ptrs.origin) >>> 0;
+  const loopAt = (readLong(buf, rec + 8) - ptrs.origin) >>> 0;
+  const loopBytes = readWord(buf, rec + 12) * 2;
+  if (lenBytes <= 2 || start + lenBytes > buf.length) return null;
+  const attack = buf.slice(start, start + lenBytes);
+  if (loopBytes <= 2) return { volume, pcm: attack, loopStart: 0, loopEnd: 0 };
+  const rel = loopAt - start;
+  if (loopAt >= start && rel + loopBytes <= lenBytes) return { volume, pcm: attack, loopStart: rel, loopEnd: rel + loopBytes };
+  if (loopAt + loopBytes > buf.length) return { volume, pcm: attack, loopStart: 0, loopEnd: 0 };
+  // the loop lies outside the attack: one buffer, the attack and then the loop
+  const pcm = new Uint8Array(lenBytes + loopBytes);
+  pcm.set(attack, 0);
+  pcm.set(buf.subarray(loopAt, loopAt + loopBytes), lenBytes);
+  return { volume, pcm, loopStart: lenBytes, loopEnd: lenBytes + loopBytes };
 }
 
 // ── Track data parsing ────────────────────────────────────────────────────
@@ -452,6 +484,12 @@ export async function parseJeroenTelFile(
   const instruments: InstrumentConfig[] = [];
 
   for (let i = 0; i < numInstruments; i++) {
+    // The record names the sample: the instrument is a Sampler (a key plays it; the song plays through UADE).
+    const smp = ptrs ? readJTSample(buf, ptrs, i) : null;
+    if (smp) {
+      instruments.push(createSamplerInstrument(i + 1, '', smp.pcm, Math.min(64, smp.volume), 8287, smp.loopStart, smp.loopEnd));
+      continue;
+    }
     instruments.push({
       id: i + 1,
       name: '',
@@ -564,8 +602,12 @@ export async function parseJeroenTelFile(
         // the note/instrument on the first row and empty rows for the rest)
         const rows: TrackerCell[] = [];
         for (const entry of entries) {
+          // JT note n plays the period ProTracker's index n + 1 does. Measured against the Paula writes of
+          // stormlord title.jt: with index + 12 every grid note sat one semitone under the period the player
+          // wrote (voice 2: grid 25, 24, 32, 31 against periods 404, 428, 269, 285 = notes 26, 25, 33, 32), so a
+          // key on a grid note sounded a semitone away from the song's note.
           const noteVal = entry.note > 0
-            ? amigaNoteToXM(entry.note + vstep.transpose)
+            ? amigaNoteToXM(entry.note + vstep.transpose) + JT_NOTE_OFFSET
             : 0;
 
           // Clamp note to valid XM range
