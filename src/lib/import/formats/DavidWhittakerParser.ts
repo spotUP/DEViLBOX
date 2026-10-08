@@ -724,7 +724,6 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
 
   if (scanResult && scanResult.songs.length > 0) {
     const song = scanResult.songs[tune];
-    initialSpeed = song.speed || 6;
     filePatterns = buildDWFilePatterns(buf, scanResult, song, CHANNELS);
     try {
       const walk = await walkDavidWhittaker(buffer, undefined, tune);
@@ -738,6 +737,11 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
         patterns = grid.patterns;
         songPositions = grid.songPositions;
         blockAtStart = grid.blockAtStart;
+        // A grid row is one 50 Hz replayer tick (the module's song speed is how many ticks the
+        // TRACK waits per wait unit, and is already in the timeline), so the scheduler that moves
+        // the cursor must spend one tick per row: initialSpeed 1 at 125 BPM = 20 ms. The module's
+        // speed there ran the cursor at a third (speed 3) or a fifth of the sound.
+        initialSpeed = 1;
       }
     } catch (err) {
       unmatched = `the replayer could not walk the song: ${err instanceof Error ? err.message : String(err)}`;
