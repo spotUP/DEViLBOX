@@ -74,6 +74,7 @@ export const FILE_DATA_FIELDS = [
   'piyoPiyoFileData',
   'tfmFileData',
   'sndhFileData',             // Atari ST SNDH for PsgplayEngine
+  'hippelStFileData',         // Jochen Hippel Atari ST playback image for HippelStEngine
   'gmeFileData',              // NSF/GBS/HES/KSS/SPC/VGM/GYM for GmeEngine (game-music-emu)
   's98FileData',              // S98 register log for S98Engine (ymfm)
   'stoneTrackerFileData',

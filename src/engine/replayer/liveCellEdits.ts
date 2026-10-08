@@ -52,7 +52,7 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
 /** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
 export type LiveEditRoute =
   | 'fred-module' | 'actionamics-module' | 'activisionPro-module'
-  | 'track-index' | 'grid-cell' | 'eagleplayer-module' | 'chip-ram' | 'uade-module' | 'none';
+  | 'track-index' | 'grid-cell' | 'eagleplayer-module' | 'hippelst-module' | 'chip-ram' | 'uade-module' | 'none';
 
 /**
  * The route `sendCellEditsToEngine` takes for `song`, decided from the song alone (no engine
@@ -68,6 +68,7 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   if (desc?.key === 'ActivisionProReplayer') return at('activisionPro-module');
   if (desc && isTrackIndexEngine(desc.key)) return at('track-index');
   if (desc?.gridCellEdits) return at('grid-cell');
+  if (desc?.key === 'HippelSt') return at('hippelst-module');
   if (desc?.key === 'EaglePlayer' && song.eaglePlayerId && hasModuleEncoder(song)) return at('eagleplayer-module');
   if (song.uadePatternLayout) return at('chip-ram');
   // A module UADE plays whose edit only the exporter can place (G24): the exported bytes are diffed into chip RAM.
@@ -133,6 +134,12 @@ export async function sendCellEditsToEngine(
     case 'eagleplayer-module': {
       const { applyEaglePlayerModuleEdits } = await import('../eagleplayer/eaglePlayerModuleEdits');
       await applyEaglePlayerModuleEdits(song, edits);
+      return;
+    }
+    // Hippel ST: a grid cell is a row event of the playback image the native player runs; the engine takes the image again.
+    case 'hippelst-module': {
+      const { applyHippelStEdits } = await import('../hippelst/hippelStEdits');
+      await applyHippelStEdits(song, edits);
       return;
     }
     case 'chip-ram': {

@@ -120,6 +120,8 @@ export interface FormatStore {
   piyoPiyoFileData: ArrayBuffer | null;
   tfmFileData: ArrayBuffer | null;
   sndhFileData: ArrayBuffer | null;
+  /** Jochen Hippel Atari ST playback image for HippelStEngine */
+  hippelStFileData: ArrayBuffer | null;
   /** SNDH subtune PsgplayEngine starts (1-based), with sndhFileData */
   sndhSubtune: number | null;
   /** NSF/NSFE, GBS, HES, KSS, SPC, VGM/VGZ or GYM file for GmeEngine (game-music-emu) */
@@ -305,7 +307,7 @@ export interface FormatStore {
   setMaxTraxData: (data: MaxTraxData | null) => void;
   mutateMaxTraxScore: (scoreIndex: number, fn: (score: MaxTraxScore) => void) => void;
   mutateMaxTraxSample: (sampleIndex: number, mutation: MaxTraxSampleMutation) => void;
-  applyEditorMode: (song: { format?: string; linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; eupFmBankData?: ArrayBuffer; eupPcmBankData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; sndhFileData?: ArrayBuffer; gmeFileData?: ArrayBuffer; s98FileData?: ArrayBuffer; asapFileData?: ArrayBuffer; ayFileData?: ArrayBuffer; qsfFileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; gridEstimated?: boolean; gridUnmatchedReason?: string; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; sunTronicNative?: SunTronicNativeData; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
+  applyEditorMode: (song: { format?: string; linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; eupFmBankData?: ArrayBuffer; eupPcmBankData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; sndhFileData?: ArrayBuffer; hippelStFileData?: ArrayBuffer; gmeFileData?: ArrayBuffer; s98FileData?: ArrayBuffer; asapFileData?: ArrayBuffer; ayFileData?: ArrayBuffer; qsfFileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; gridEstimated?: boolean; gridUnmatchedReason?: string; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; sunTronicNative?: SunTronicNativeData; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   setActivisionProSubsongs: (count: number) => void;
   /** The engine reports the subsong it plays; the start field follows, so play after stop resumes it. */
@@ -545,6 +547,7 @@ export const useFormatStore = create<FormatStore>()(
     piyoPiyoFileData: null,
     tfmFileData: null,
     sndhFileData: null,
+    hippelStFileData: null,
     sndhSubtune: null,
     gmeFileData: null,
     gmeTrack: null,
@@ -1125,6 +1128,7 @@ export const useFormatStore = create<FormatStore>()(
         state.piyoPiyoFileData = (song as any).piyoPiyoFileData ?? null;
         state.tfmFileData = (song as any).tfmFileData ?? null;
         state.sndhFileData = (song as any).sndhFileData ?? null;
+        state.hippelStFileData = song.hippelStFileData ?? null;
         state.sndhSubtune = (song as any).sndhSubtune ?? null;
         state.gmeFileData = (song as any).gmeFileData ?? null;
         state.gmeTrack = (song as any).gmeTrack ?? null;
@@ -1471,6 +1475,7 @@ export const useFormatStore = create<FormatStore>()(
       state.piyoPiyoFileData = null;
       state.tfmFileData = null;
       state.sndhFileData = null;
+      state.hippelStFileData = null;
       state.sndhSubtune = null;
       state.gmeFileData = null;
       state.gmeTrack = null;

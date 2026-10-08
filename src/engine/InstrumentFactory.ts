@@ -27,6 +27,7 @@ import { TFMXSynth } from './tfmx/TFMXSynth';
 import { FredSynth } from './fred/FredSynth';
 import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
 import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
+import { HippelStSynth } from './hippelst/HippelStSynth';
 import { SteveTurnerSynth } from './steveturner/SteveTurnerSynth';
 import { StartrekkerAMSynth } from './startrekker-am/StartrekkerAMSynth';
 import { SidMon1Synth } from './sidmon1/SidMon1Synth';
@@ -843,6 +844,17 @@ export class InstrumentFactory {
           );
         }
         instrument = rhSynth;
+        break;
+      }
+
+      case 'HippelStSynth': {
+        const hstSynth = new HippelStSynth();
+        const idx = (config.metadata as { hippelStInstrument?: number } | undefined)?.hippelStInstrument;
+        if (typeof idx === 'number') hstSynth.setInstrumentIndex(idx);
+        hstSynth.setInstrument().catch(err =>
+          console.error('[InstrumentFactory] Hippel ST key player load failed:', err)
+        );
+        instrument = hstSynth;
         break;
       }
 

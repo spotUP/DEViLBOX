@@ -21,6 +21,7 @@ static int g_typeAdr, g_typePlay, g_typeSid;
 /* The 68k stack the player pushes words on (MOVE.W D0,-(SP) splits a word into bytes). */
 static uint8_t g_stack[256];
 static int g_ticks = 0, g_firstEnd = 0;
+static int g_posStep = 0, g_posRow = -1;
 
 /* Everything the player keeps is in _ds (state, mode flags) and the song image: put both back
  * as they were when the song was loaded, then run InitPlay (it sets the table pointers). */
@@ -73,17 +74,42 @@ void hst_start(int sub1)
     if (last - first < 0) { tab[0] = tab[1] = tab[2] = tab[3] = 0; }
   }
   WRITE32((uintptr_t)SongEnds, 0);
-  g_ticks = 0; g_firstEnd = 0;
+  g_ticks = 0; g_firstEnd = 0; g_posStep = 0; g_posRow = -1;
   d0 = (uint32_t)sub1;
   Init();
 }
 
+/* Where voice 0 is: the step it plays (an index into the step table) and the row in it. A row is
+ * every player tick on which the speed counter runs out (all voices read their next event then);
+ * voice 0 loading a step, or the song ending, makes that row the first of its step. */
+static void track_position(int fired, uint32_t stepOffBefore, uint32_t endsBefore)
+{
+  uint8_t *v0 = (uint8_t *)lbL000E72;
+  uint32_t off = READ16((uintptr_t)(v0 + 0x14));
+  if (fired) {
+    if (off != stepOffBefore || READ32((uintptr_t)SongEnds) != endsBefore) g_posRow = 0; else g_posRow++;
+  }
+  {
+    int32_t rel = (int32_t)(READ32((uintptr_t)v0) - READ32((uintptr_t)lbL000F52)) + (int32_t)off - 12;
+    g_posStep = rel / 12;
+  }
+}
+
 void hst_tick(void)
 {
+  uint8_t *v0 = (uint8_t *)lbL000E72;
+  int fired = READ16((uintptr_t)lbW000E6C) == 1;
+  uint32_t before = READ16((uintptr_t)(v0 + 0x14));
+  uint32_t endsBefore = READ32((uintptr_t)SongEnds);
   Play();
   g_ticks++;
   if (!g_firstEnd && READ32((uintptr_t)SongEnds)) g_firstEnd = g_ticks;
+  track_position(fired, before, endsBefore);
 }
+
+int hst_ticks(void) { return g_ticks; }
+int hst_pos_step(void) { return g_posStep; }
+int hst_pos_row(void) { return g_posRow < 0 ? 0 : g_posRow; }
 
 /* The tick (1-based, since hst_start) on which the song first ended, 0 if it has not. */
 int hst_first_end(void) { return g_firstEnd; }
@@ -110,4 +136,33 @@ int hst_state(uint8_t *out, int max)
   if (n > max) n = max;
   memcpy(out, lbL000E26, (size_t)n);
   return n;
+}
+
+
+/* ---- The keyboard voice ----
+ * A second instance of this module holds the same song; its sequencer is parked (the speed counter
+ * never runs out) and a key starts a note on voice 0 exactly as a pattern row does: the player's
+ * own note-start code runs on a stream of [info, extra]. The other voices stay silent in the mixer. */
+void hst_key_prepare(void)
+{
+  WRITE16((uintptr_t)lbW000E6C, 0x7fff);
+  WRITE16((uintptr_t)lbW000E6E, 0x7fff);
+}
+
+void hst_key_on(int note, int instrument, int transpose, int attenuation)
+{
+  int info = instrument & 0x1f;
+  static uint8_t stream[4];
+  uint8_t *v0 = (uint8_t *)lbL000E72;
+  v0[0x20] = (uint8_t)(instrument - info);   /* the step's sound transpose reaches instruments past 31 */
+  v0[0x30] = (uint8_t)attenuation; v0[0x31] = 0;   /* the step's volume attenuation ($Fx), none on a plain key */
+  v0[0x21] = (uint8_t)transpose;               /* the step's note transpose, as the song voice has it */
+  stream[0] = (uint8_t)info; stream[1] = 0; stream[2] = stream[3] = 0;
+  d5 = 0;
+  a0 = (uint32_t)(uintptr_t)v0;
+  a1 = (uint32_t)(uintptr_t)stream;
+  d0 = (uint32_t)(note & 0xff);
+  v0[0x1a] = 0;          /* wait counters: nothing is read from the stream after this */
+  lbC000854();
+  WRITE16((uintptr_t)lbW000E6C, 0x7fff);
 }

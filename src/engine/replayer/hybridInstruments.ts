@@ -29,7 +29,7 @@ export const NATIVE_WHOLE_PLAYER_TYPES: ReadonlySet<string> = new Set([
   // WASM player-pool synths — each has a fixed-size pool, must dedup
   'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth',
   'FredSynth', 'OctaMEDSynth',
-  'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth',
+  'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'HippelStSynth',
   'DavidWhittakerSynth', 'SonicArrangerSynth',
   'InStereo2Synth', 'InStereo1Synth', 'StartrekkerAMSynth',
   'DeltaMusic1Synth', 'DeltaMusic2Synth',

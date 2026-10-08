@@ -472,12 +472,26 @@ export async function startNativeEngines(
           }
         }
 
+        // Hippel ST position sync: the native player reports the step voice 0 plays and the row
+        // in it. Steps are the grid's patterns; the song position is the step's place in the order
+        // of the subsong the grid shows (the format store holds it, a subsong switch changes it).
+        if (desc.key === 'HippelSt') {
+          const { useFormatStore } = await import('@stores/useFormatStore');
+          trackSubscription((instance as unknown as import('@/engine/hippelst/HippelStEngine').HippelStEngine).onPositionUpdate((u) => {
+            const f = useFormatStore.getState();
+            const order = f.uadeEditableSubsongs?.orders?.[f.uadeEditableCurrentSubsong] ?? song.songPositions;
+            const at = order.indexOf(u.step);
+            if (at >= 0) reportEnginePosition(desc.key, u.row, at);
+          }));
+          console.log('[NativeEngineRouting] HippelSt position sync wired');
+        }
+
         // Generic position sync for WASM engines with onPositionUpdate.
         // IMPORTANT: Do NOT call store.play() or set isPlaying here — that triggers
         // usePatternPlayback reload effect → startNativeEngines() → infinite respawn loop.
         // The TrackerReplayer.play() already sets isPlaying via the normal flow.
         // We only update currentRow so the pattern editor scrolls.
-        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable' && desc.key !== 'TFMXModule' && desc.key !== 'Hippel') {
+        if ('onPositionUpdate' in instance && typeof (instance as any).onPositionUpdate === 'function' && desc.key !== 'Hively' && desc.key !== 'UADEEditable' && desc.key !== 'TFMXModule' && desc.key !== 'Hippel' && desc.key !== 'HippelSt') {
           // Wire position updates to the lightweight WASM position store.
           // This bypasses useTransportStore entirely to avoid triggering
           // the usePatternPlayback effect chain (which causes recursive engine spawns).
