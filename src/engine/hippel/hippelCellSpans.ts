@@ -82,6 +82,12 @@ export function patchEditedCells(
   original: Uint8Array,
   spans: HippelCellSpans,
   patterns: readonly GridPattern[],
+  /**
+   * The sound-sequence transpose a note of this instrument plays under (instrument.metadata.hippelKeySeq: what a typed key
+   * subtracts). A note put on a blank row carries none of its own, so it takes the instrument's, or the typed pitch would
+   * come out that far higher once the module is played (G5).
+   */
+  keySeq: (instrument: number) => number = () => 0,
 ): HippelPatchResult {
   const bytes = original.slice();
   const refused: string[] = [];
@@ -99,7 +105,8 @@ export function patchEditedCells(
           continue;
         }
         if (differs(cell, span.baselineFor?.(cell) ?? span.baseline)) {
-          const enc = span.encode(cell, bytes);
+          const seq = cell.hippelSeq === undefined && (span.baseline.note ?? 0) === 0 ? keySeq(cell.instrument ?? 0) : 0;
+          const enc = span.encode(seq !== 0 ? { ...cell, hippelSeq: seq } : cell, bytes);
           if (!enc || enc.length !== span.length) { refused.push(`${p}:${ch}:${r}`); continue; }
           bytes.set(enc, span.offset);
           written++;

@@ -91,6 +91,7 @@ typedef struct DwSample {
 
 typedef struct DwPositionList {
     uint32_t* track_offsets;
+    size_t* entry_offsets;              // file offset of each track_offsets entry (G5: an edit repoints the entry)
     int track_offset_count;
     uint16_t restart_position;
 } DwPositionList;
@@ -1093,6 +1094,7 @@ static bool load_position_list(DwModule* m, DwStream* stream, uint32_t start_pos
 
     if (start_position == 0) {
         result->track_offsets = nullptr;
+        result->entry_offsets = nullptr;
         result->track_offset_count = 0;
         result->restart_position = 0;
         return false;
@@ -1105,16 +1107,19 @@ static bool load_position_list(DwModule* m, DwStream* stream, uint32_t start_pos
 
     int capacity = 256;
     uint32_t* pos_list = (uint32_t*)malloc(capacity * sizeof(uint32_t));
+    size_t* entry_list = (size_t*)malloc(capacity * sizeof(size_t));
     int pos_count = 0;
     uint16_t restart_position = 0;
 
     for (;;) {
+        size_t entry_pos = stream->pos;
         uint32_t track_offset = m->uses_32bit_pointers ? stream_read_be32(stream) : stream_read_be16(stream);
         if ((track_offset == 0) || (track_offset >= stream->size) || ((track_offset & 0x8000) != 0))
             break;
 
         if (stream_eof(stream)) {
             free(pos_list);
+            free(entry_list);
             return false;
         }
 
@@ -1123,13 +1128,16 @@ static bool load_position_list(DwModule* m, DwStream* stream, uint32_t start_pos
         if (pos_count >= capacity) {
             capacity *= 2;
             pos_list = (uint32_t*)realloc(pos_list, capacity * sizeof(uint32_t));
+            entry_list = (size_t*)realloc(entry_list, capacity * sizeof(size_t));
         }
+        entry_list[pos_count] = entry_pos;
         pos_list[pos_count++] = track_offset;
 
         int new_position_list_offset = 0;
         int arp_count = 0, env_count = 0;
         if (!load_and_parse_track(m, stream, track_offset, &new_position_list_offset, &arp_count, &env_count)) {
             free(pos_list);
+            free(entry_list);
             return false;
         }
 
@@ -1148,6 +1156,7 @@ static bool load_position_list(DwModule* m, DwStream* stream, uint32_t start_pos
     }
 
     result->track_offsets = pos_list;
+    result->entry_offsets = entry_list;
     result->track_offset_count = pos_count;
     result->restart_position = restart_position;
     return true;
@@ -2484,8 +2493,11 @@ void dw_destroy(DwModule* module) {
 
     // Free song info
     if (module->song_info_list) {
-        for (int i = 0; i < module->song_info_count; i++)
+        for (int i = 0; i < module->song_info_count; i++) {
+            if (module->song_info_list[i].position_lists)
+                for (int c = 0; c < module->number_of_channels; c++) free(module->song_info_list[i].position_lists[c].entry_offsets);
             free(module->song_info_list[i].position_lists);
+        }
         free(module->song_info_list);
     }
 
@@ -2706,7 +2718,7 @@ int dw_trace(DwModule* m, int ticks, int16_t* out, int max_notes) {
  * position list once or the first stop-song command ran (the song is then the first pass of the longest channel, the shorter ones
  * looping inside it as the replayer loops them) or after `max_ticks`. info[0] ticks run, info[1] the
  * tick the last channel finished its first pass, info[2..9] each channel's first-pass tick (-1 never),
- * info[10] channels, info[11] number of samples. Returns the event count.
+ * info[10] channels, info[11] number of samples, info[12] the subsong's initial speed. Returns the event count.
  */
 int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* info) {
     if (!m || !out || max_events <= 0) return 0;
@@ -2739,9 +2751,45 @@ int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* i
         info[0] = ticks; info[1] = done;
         for (int i = 0; i < 8; i++) info[2 + i] = i < m->number_of_channels ? m->walk_wrap_tick[i] : -1;
         info[10] = m->number_of_channels; info[11] = m->number_of_samples;
+        info[12] = (saved >= 0 && saved < m->song_info_count) ? m->song_info_list[saved].speed : 0;
     }
     int n = m->walk_count;
     initialize_sound(m, saved);
     for (int i = 0; i < m->number_of_channels; i++) mixer_mute(&m->mixer_channels[i]);
+    return n;
+}
+
+/**
+ * The module's track storage as the loader read it (G5: a note on a blank row grows a track, which is then rewritten
+ * at the end of the module and every position-list entry that named it repointed). Each record is 4 int32:
+ *   [0, file offset of the track, length in bytes (the end-of-track command included), 0]
+ *   [1, file offset of a position-list entry, entry width in bytes (2 or 4), file offset of the track it names]
+ *   [2, start offset (a pointer is relative to it), pointer width in bytes, 1 for an old player]   (always the first record)
+ * Entries of every subsong and voice, in file order of reading. Returns the record count (at most max_records).
+ */
+int dw_layout(const DwModule* m, int32_t* out, int max_records) {
+    if (!m || !out || max_records <= 0) return 0;
+    int n = 0;
+    {
+        int32_t* r = out;
+        r[0] = 2; r[1] = m->start_offset; r[2] = m->uses_32bit_pointers ? 4 : 2; r[3] = m->old_player ? 1 : 0;
+        n++;
+    }
+    for (int i = 0; i < m->track_count && n < max_records; i++) {
+        int32_t* r = out + (size_t)n * 4;
+        r[0] = 0; r[1] = (int32_t)(m->tracks[i].offset + (uint32_t)m->start_offset); r[2] = m->tracks[i].length; r[3] = 0;
+        n++;
+    }
+    for (int s = 0; s < m->song_info_count; s++) {
+        for (int c = 0; c < m->number_of_channels; c++) {
+            const DwPositionList* pl = &m->song_info_list[s].position_lists[c];
+            for (int e = 0; e < pl->track_offset_count && n < max_records; e++) {
+                int32_t* r = out + (size_t)n * 4;
+                r[0] = 1; r[1] = (int32_t)pl->entry_offsets[e]; r[2] = m->uses_32bit_pointers ? 4 : 2;
+                r[3] = (int32_t)(pl->track_offsets[e] + (uint32_t)m->start_offset);
+                n++;
+            }
+        }
+    }
     return n;
 }

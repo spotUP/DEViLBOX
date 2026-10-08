@@ -124,6 +124,7 @@ export function debouncedWasmEngineReexport(): void {
               useTrackerStore.getState().patterns,
               useInstrumentStore.getState().instruments.length,
               useFormatStore.getState().fileSubsongs?.current ?? 0,
+              (n) => useInstrumentStore.getState().instruments.find((x) => x.id === n)?.metadata?.hippelKeySeq ?? 0,
             );
             if (!rebuilt) return;
             if (rebuilt.refused.length > 0) {

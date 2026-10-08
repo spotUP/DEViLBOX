@@ -17,6 +17,7 @@ interface DwWasmModule {
   _dw_subsong_count(handle: number): number;
   _dw_select_subsong(handle: number, subsong: number): boolean;
   _dw_walk(handle: number, maxTicks: number, out: number, maxEvents: number, info: number): number;
+  _dw_layout(handle: number, out: number, maxRecords: number): number;
   HEAPU8: Uint8Array;
 }
 
@@ -67,7 +68,23 @@ export interface DwWalkEvent {
   b: number;
 }
 
+/** The module's track storage as the loader read it (davidwhittaker.c dw_layout). */
+export interface DwLayout {
+  /** A pointer in a position list is relative to this file offset. */
+  startOffset: number;
+  /** Pointer width in bytes: 2 (the high bit of the value must stay clear) or 4. */
+  pointerWidth: number;
+  oldPlayer: boolean;
+  /** Every distinct track: its file offset and byte length (the end-of-track command included). */
+  tracks: Array<{ offset: number; length: number }>;
+  /** Every position-list entry of every subsong and voice: where it is, and the file offset of the track it names. */
+  entries: Array<{ at: number; track: number }>;
+}
+
 export interface DwWalk {
+  /** Ticks per speed unit in the walked subsong's first tick (the wait command counts speed units). */
+  speed: number;
+  layout: DwLayout;
   events: DwWalkEvent[];
   /** Ticks run, up to the first pass of the longest voice. */
   ticks: number;
@@ -110,13 +127,34 @@ export async function walkDavidWhittaker(buffer: ArrayBuffer, maxTicks = 60_000,
         pos: dv.getInt32(o + 12, true), kind: dv.getInt32(o + 16, true), a: dv.getInt32(o + 20, true), b: dv.getInt32(o + 24, true),
       });
     }
-    const inf = Array.from({ length: 12 }, (_, i) => dv.getInt32(info + i * 4, true));
+    const inf = Array.from({ length: 13 }, (_, i) => dv.getInt32(info + i * 4, true));
     const channels = inf[10];
-    return { events, ticks: inf[1] + 1, wrapTicks: inf.slice(2, 2 + channels), channels, samples: inf[11] };
+    const layout = readLayout(M, handle);
+    return { speed: inf[12], layout, events, ticks: inf[1] + 1, wrapTicks: inf.slice(2, 2 + channels), channels, samples: inf[11] };
   } finally {
     M._free(out);
     M._free(info);
     M._dw_destroy(handle);
+  }
+}
+
+const MAX_LAYOUT_RECORDS = 16_384;
+
+function readLayout(M: DwWasmModule, handle: number): DwLayout {
+  const out = M._malloc(MAX_LAYOUT_RECORDS * 16);
+  try {
+    const n = M._dw_layout(handle, out, MAX_LAYOUT_RECORDS);
+    const dv = new DataView(M.HEAPU8.buffer);
+    const layout: DwLayout = { startOffset: 0, pointerWidth: 2, oldPlayer: false, tracks: [], entries: [] };
+    for (let i = 0; i < n; i++) {
+      const r = [0, 4, 8, 12].map((o) => dv.getInt32(out + i * 16 + o, true));
+      if (r[0] === 0) layout.tracks.push({ offset: r[1], length: r[2] });
+      else if (r[0] === 1) layout.entries.push({ at: r[1], track: r[3] });
+      else { layout.startOffset = r[1]; layout.pointerWidth = r[2]; layout.oldPlayer = r[3] === 1; }
+    }
+    return layout;
+  } finally {
+    M._free(out);
   }
 }
 
