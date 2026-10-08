@@ -30,6 +30,7 @@ import { AddInstrumentDialog } from './AddInstrumentDialog';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { subscribeInstrumentAttacks } from '@/engine/instrumentPlaybackTracker';
 import { getToneEngine } from '@engine/ToneEngine';
+import { naturalPeriod } from '@engine/keyboardPeriod';
 import * as Tone from 'tone';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
@@ -290,7 +291,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       }
 
       // Main path: trigger attack, hold until mouseUp releases
-      engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst);
+      engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst, naturalPeriod(inst));
       isPreviewingRef.current = true;
       previewInfoRef.current = { instId: inst.id, note: previewNote, inst };
     } catch (error) {
