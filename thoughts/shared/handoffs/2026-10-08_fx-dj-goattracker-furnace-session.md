@@ -52,6 +52,25 @@ when they say so.
   work in progress plus never-committed files (changelog.ts, format-state.json
   - never commit those). Do not reset or stash.
 
+## Update after stop (Auto DJ agent, late 2026-10-08)
+
+- Auto DJ: **657 of 737 done, 27 owner checks, 0 open questions**. Beat
+  juggling landed (0edb37304); ledger 93debb84e.
+- **DJ3 landed (4445519bf)**: one latency source `src/engine/audioLatency.ts`
+  (outputLatency, else baseLatency); DeckEngine.getHeardPosition /
+  getHeardTrackerState feed useDeckStateSync, the one writer every DJ visual
+  reads; PlaybackCoordinator and the replayer queue heard times. Tests
+  heardPositionIsAudioMinusLatency, djVisualsReadTheHeardPosition. Owner check 7.
+- 11 JUG items open: AABA/ABBA/A-B- beat-pattern shapes; straight/one-bar/
+  fill/drop double variants; 8-bar and 1/8-bar loops; transformer gate shapes;
+  JUGGLE_TRANSITION prelude reachability through the pre-rendered path;
+  single-track juggle needs a loadDouble.
+- **Will fail the push gate**: `src/hooks/audio/__tests__/playheadFeedIsNotPerFormat.ratchet.test.ts`
+  fails on COMMITTED code - a landed commit removed the playhead feed the
+  ratchet guards (usePatternPlayback.ts). Find which commit (likely e28fbeea1,
+  the FX8 rebuild change, or the Auto DJ's DJ3 work), restore the feed or move
+  the guard to where the feed now lives - never delete the ratchet.
+
 ## Critical references
 
 - Ledger: `thoughts/shared/plans/2026-10-06-fix-all-open.md`
@@ -113,14 +132,13 @@ when they say so.
 
 ## Next steps (ordered)
 
-1. Check the push result; fix and retry until it lands; verify live buildHash.
+1. Check the push result; fix the playheadFeedIsNotPerFormat ratchet first (see Update); retry until it lands; verify live buildHash.
 2. **FX9 (priority)**: flicking Master FX channel buttons kills all audio -
    ShimmerReverb WASM `Aborted(OOM)`: each click re-creates the WASM effect,
    old instances not freed. Fix: move nodes instead of re-creating; free WASM
    on dispose; stop the double rebuild. Owner: reload the tab to get audio back.
-3. Restart the Auto DJ Fable agent from its ledger (471/760) with the same
-   brief; it owns DJ3 (DJ visuals ~33 ms ahead: baseLatency 5.3 + outputLatency
-   28 ms, no DJ code compensates; reuse PlaybackCoordinator's latency source).
+3. Restart the Auto DJ Fable agent from its ledger (657/737) with the same
+   brief for the 11 open JUG items; DJ3 is done (owner check 7).
 4. Get the owner's Furnace/DefleMask "still broken" songs + symptom; reopen
    with the register lock-step guard.
 5. E18b: GoatTracker VU meters dead live - a second producer writes 4 silent
