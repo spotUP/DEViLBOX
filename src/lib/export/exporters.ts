@@ -15,6 +15,9 @@ import type { AutoDubPersonaId } from '@/stores/useDubStore';
 import { compressProject, decompressProject } from '@/lib/projectCompression';
 import { FILE_DATA_FIELDS } from '@engine/formatFileDataFields';
 import { encodeMaxTrax, parseMaxTrax } from '@lib/import/formats/maxtrax/maxtraxFormat';
+import { useSF2Store, sf2PayloadOf } from '@stores/useSF2Store';
+import { useCheeseCutterStore, cheeseCutterPayloadOf } from '@stores/useCheeseCutterStore';
+import { toTypedJson, fromTypedJson } from '@/lib/persistence/typedJson';
 
 // ── Binary FileData field names in useFormatStore ──
 // Single source of truth lives in `src/engine/formatFileDataFields.ts` and is
@@ -115,6 +118,16 @@ export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
   if (state.furnaceNative) result.furnaceNative = state.furnaceNative;
   if (state.hivelyNative) result.hivelyNative = state.hivelyNative;
   if (state.klysNative) result.klysNative = state.klysNative;
+  // The native models whose presence picks the editor: a save without them came back classic (U4.3).
+  if (state.tfmxNative) result.tfmxNative = state.tfmxNative;
+  if (state.sunTronicNative) result.sunTronicNative = state.sunTronicNative;
+  // SID Factory 2 / CheeseCutter keep the song in their own store, edits included.
+  if (state.editorMode === 'sidfactory2' && useSF2Store.getState().loaded) {
+    result.sf2StoreData = toTypedJson(sf2PayloadOf(useSF2Store.getState()));
+  }
+  if (state.editorMode === 'cheesecutter' && useCheeseCutterStore.getState().loaded) {
+    result.cheeseCutterStoreData = toTypedJson(cheeseCutterPayloadOf(useCheeseCutterStore.getState()));
+  }
   if (state.hivelyMeta) result.hivelyMeta = state.hivelyMeta;
   if (state.furnaceSubsongs) result.furnaceSubsongs = state.furnaceSubsongs;
   if (state.furnaceActiveSubsong) result.furnaceActiveSubsong = state.furnaceActiveSubsong;
@@ -220,9 +233,8 @@ export function decodeNativeEngineFields(
   // Copy JSON-serializable metadata
   if (nativeEngineMeta) {
     for (const [key, val] of Object.entries(nativeEngineMeta)) {
-      if (key !== 'editorMode') {
-        songObj[key] = val;
-      }
+      if (key === 'sf2StoreData' || key === 'cheeseCutterStoreData') songObj[key] = fromTypedJson(val);
+      else if (key !== 'editorMode') songObj[key] = val;
     }
   }
   return songObj;

@@ -67,7 +67,7 @@ export interface CCPlaybackPosition {
 
 // ── Store state ─────────────────────────────────────────────────────────
 
-interface CheeseCutterState {
+export interface CheeseCutterState {
   loaded: boolean;
   version: number;
   clock: number;           // 0=PAL, 1=NTSC
@@ -326,3 +326,16 @@ export const useCheeseCutterStore = create<CheeseCutterState>()(
       }),
   })),
 );
+
+/** The loaded song as the load payload again - edits included - for a save (the inverse of loadData). */
+export function cheeseCutterPayloadOf(s: CheeseCutterState): CheeseCutterLoadPayload {
+  return {
+    version: s.version, clock: s.clock, speedMultiplier: s.speedMultiplier, sidModel: s.sidModel,
+    title: s.title, author: s.author, release: s.release,
+    subtuneCount: s.subtuneCount, currentSubtune: s.currentSubtune, subtuneSpeeds: s.subtuneSpeeds,
+    highlight: s.highlight, highlightOffset: s.highlightOffset,
+    sequences: s.sequences, trackLists: s.trackLists, instruments: s.instruments,
+    waveTable: s.waveTable, pulseTable: s.pulseTable, filterTable: s.filterTable, commandTable: s.commandTable,
+    pointerTable: s.pointerTable,
+  };
+}

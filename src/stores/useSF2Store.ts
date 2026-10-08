@@ -1278,3 +1278,29 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     });
   },
 }));
+
+/**
+ * The loaded song as the load payload again - edits included - for a save
+ * (the inverse of loadSF2Data). Song 0's order lists are the payload's, the
+ * others travel in allSongOrderLists; the song being edited is the live one.
+ */
+export function sf2PayloadOf(s: SF2StoreState): SF2LoadPayload {
+  const all = s.allSongOrderLists.map((lists, i) => (i === s.currentSong ? s.orderLists : lists));
+  return {
+    rawFileData: s.rawFileData as Uint8Array,
+    loadAddress: s.loadAddress,
+    descriptor: s.descriptor as SF2Descriptor,
+    driverCommon: s.driverCommon as SF2DriverCommon,
+    musicData: s.musicData as SF2MusicData,
+    tableDefs: s.tableDefs,
+    instrumentDescriptions: s.instrumentDescriptions,
+    c64Memory: s.c64Memory as Uint8Array,
+    sequences: s.sequences,
+    orderLists: all[0] ?? s.orderLists,
+    instruments: s.instruments,
+    songName: s.songName,
+    songCount: s.songCount,
+    songNames: s.songNames,
+    allSongOrderLists: all,
+  };
+}

@@ -1624,8 +1624,9 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     // One open path for every opener: classification, unload, routing, the
     // module import and the engine/editor read-back all live in openSong.
     const { openSong } = await import('../../lib/song/openSong');
-    const { detectFormat } = await import('../../lib/import/FormatRegistry');
-    const format = detectFormat(filename);
+    // By content where the name is shared: a GoatTracker .sng is not a Zound Monitor song (U4.3).
+    const { detectFormatFromContent } = await import('../../lib/import/FormatRegistry');
+    const format = detectFormatFromContent(filename, bytes);
     const subsong = (params.subsong as number) ?? 0;
 
     const opened = await openSong(

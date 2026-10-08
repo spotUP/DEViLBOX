@@ -14,7 +14,7 @@ import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/persistence/migrations';
-import type { SerializedCompanionFiles } from '@/lib/export/exporters';
+import { getNativeEngineDataForExport, type SerializedCompanionFiles } from '@/lib/export/exporters';
 import { openSavedSong } from '@/lib/song/openSong';
 import { savedSongToApply } from '@/lib/song/savedSong';
 import { setRestoredEditsPending } from '@/lib/song/gridBaseline';
@@ -536,6 +536,15 @@ export async function loadProjectFromStorage(): Promise<boolean> {
 export const putRecoverySnapshotForTest = idbPutRecovery;
 export const getRecoverySnapshotForTest = idbGetRecovery;
 export const deleteRecoverySnapshotForTest = idbDeleteRecovery;
+/** Is there a song worth a recovery snapshot in the stores right now? */
+export function liveProjectHasContent(): boolean {
+  return hasProjectContent({
+    instrumentCount: useInstrumentStore.getState().instruments.length,
+    patternCount: useTrackerStore.getState().patterns.length,
+    hasNativeSong: getNativeEngineDataForExport() !== null,
+  });
+}
+
 export function makeEmptyTestSnapshot(): SavedProject {
   return buildSavedProject();
 }
@@ -677,6 +686,7 @@ export function useProjectPersistence() {
         !!saved && hasProjectContent({
           instrumentCount: saved.instruments?.length ?? 0,
           patternCount: saved.patterns?.length ?? 0,
+          hasNativeSong: !!saved.nativeEngineData,
         });
 
       const rec = await idbGetRecovery().catch(() => null);
@@ -684,6 +694,7 @@ export function useProjectPersistence() {
         !!rec && hasProjectContent({
           instrumentCount: rec.instruments?.length ?? 0,
           patternCount: rec.patterns?.length ?? 0,
+          hasNativeSong: !!rec.nativeEngineData,
         });
 
       const decision = decideBootRestore({
@@ -811,9 +822,7 @@ export function useProjectPersistence() {
 
   const writeRecoveryNow = useCallback(() => {
     const isDirty = useProjectStore.getState().isDirty;
-    const instrumentCount = useInstrumentStore.getState().instruments.length;
-    const patternCount = useTrackerStore.getState().patterns.length;
-    const hasContent = hasProjectContent({ instrumentCount, patternCount });
+    const hasContent = liveProjectHasContent();
     if (!shouldWriteRecovery({ explicitlySaved, isDirty, hasContent })) return;
     try {
       idbPutRecovery(buildSavedProject()).catch((err) => {

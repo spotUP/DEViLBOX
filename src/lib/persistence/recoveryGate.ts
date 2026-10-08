@@ -29,8 +29,16 @@ export function shouldWriteRecovery(args: {
 export function hasProjectContent(args: {
   instrumentCount: number;
   patternCount: number;
+  /**
+   * The song lives in a native engine (its module bytes are held): a
+   * GoatTracker song is one placeholder pattern and no instruments in the
+   * tracker store, and without this a freshly opened one counted as a
+   * pristine boot - no recovery snapshot was written, and the next boot
+   * restored the song from before it (U4.3, 2026-10-08).
+   */
+  hasNativeSong?: boolean;
 }): boolean {
-  return args.instrumentCount > 0 || args.patternCount > 1;
+  return args.instrumentCount > 0 || args.patternCount > 1 || args.hasNativeSong === true;
 }
 
 /** On boot: should the Restore/Discard prompt appear? */
