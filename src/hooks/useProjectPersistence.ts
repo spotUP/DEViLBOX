@@ -14,7 +14,7 @@ import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/persistence/migrations';
-import { getNativeEngineDataForExport, type SerializedCompanionFiles } from '@/lib/export/exporters';
+import { hasNativeEngineData, type SerializedCompanionFiles } from '@/lib/export/exporters';
 import { openSavedSong } from '@/lib/song/openSong';
 import { savedSongToApply } from '@/lib/song/savedSong';
 import { setRestoredEditsPending } from '@/lib/song/gridBaseline';
@@ -541,7 +541,7 @@ export function liveProjectHasContent(): boolean {
   return hasProjectContent({
     instrumentCount: useInstrumentStore.getState().instruments.length,
     patternCount: useTrackerStore.getState().patterns.length,
-    hasNativeSong: getNativeEngineDataForExport() !== null,
+    hasNativeSong: hasNativeEngineData(),
   });
 }
 
