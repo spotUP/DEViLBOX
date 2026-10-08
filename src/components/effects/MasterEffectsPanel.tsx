@@ -214,6 +214,8 @@ const USER_MASTER_FX_PRESETS_KEY = 'master-fx-user-presets';
 interface UserMasterFxPreset {
   name: string;
   effects: EffectConfig[];
+  /** The make-up gain the chain was saved with, dB (absent in presets saved before 2026-10-08: none). */
+  gainCompensationDb?: number;
 }
 
 export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEffectsPanelProps>(({ hideHeader = false }, ref) => {
@@ -314,6 +316,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     const userPresets = getUserPresets();
     userPresets.push({
       name: presetName.trim(),
+      gainCompensationDb: useAudioStore.getState().presetGainCompensationDb,
       effects: masterEffects.map(fx => ({ ...fx })), // Clone the effects
     });
     localStorage.setItem(USER_MASTER_FX_PRESETS_KEY, JSON.stringify(userPresets));
@@ -338,7 +341,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
-    setMasterEffects(effects, 0);
+    setMasterEffects(effects, preset.gainCompensationDb);
   }, [setMasterEffects]);
 
   // Clear all effects — the menu stays open so the owner can audition presets.

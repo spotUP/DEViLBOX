@@ -48,6 +48,8 @@ const USER_MASTER_FX_PRESETS_KEY = 'master-fx-user-presets';
 interface UserMasterFxPreset {
   name: string;
   effects: EffectConfig[];
+  /** The make-up gain the chain was saved with, dB (absent in presets saved before 2026-10-08: none). */
+  gainCompensationDb?: number;
 }
 
 // AVAILABLE_EFFECTS now imported from unifiedEffects.ts (60 total: 23 Tone.js + 37 Neural)
@@ -141,6 +143,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     const userPresets = getUserPresets();
     userPresets.push({
       name: presetName.trim(),
+      gainCompensationDb: useAudioStore.getState().presetGainCompensationDb,
       effects: masterEffects.map(fx => ({ ...fx })),
     });
     localStorage.setItem(USER_MASTER_FX_PRESETS_KEY, JSON.stringify(userPresets));
@@ -164,7 +167,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
-    setMasterEffects(effects, 0);
+    setMasterEffects(effects, preset.gainCompensationDb);
   }, [setMasterEffects]);
 
   // Clear the whole master chain — the menu stays open so the owner can audition presets.

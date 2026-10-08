@@ -79,6 +79,7 @@ export function snapshotDJEnvironment(): DJEnvironment {
 
     // Master effects
     masterEffects: JSON.parse(JSON.stringify(audio.masterEffects)),
+    masterGainCompensationDb: audio.presetGainCompensationDb,
 
     // Drumpad
     drumpad: {
@@ -124,7 +125,7 @@ export function restoreDJEnvironment(env: DJEnvironment): void {
 
   // ── Master effects ─────────────────────────────────────────────────
   if (Array.isArray(env.masterEffects)) {
-    audioStore.setMasterEffects(env.masterEffects);
+    audioStore.setMasterEffects(env.masterEffects, env.masterGainCompensationDb);
   }
 
   // ── Drumpad ────────────────────────────────────────────────────────
