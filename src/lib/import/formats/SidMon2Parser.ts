@@ -99,6 +99,8 @@ interface S2Row {
   effect: number;
   param: number;
   speed: number;
+  /** File byte offset of the row's first byte. */
+  offset: number;
 }
 
 interface S2Sample {
@@ -420,7 +422,7 @@ export async function parseSidMon2File(
       pointerJ++;
     }
 
-    const row: S2Row = { note: 0, sample: 0, effect: 0, param: 0, speed: 0 };
+    const row: S2Row = { note: 0, sample: 0, effect: 0, param: 0, speed: 0, offset: pos };
     const value = readByte(data, pos); pos++; i++;
 
     if (value === 0) {
@@ -608,6 +610,8 @@ export async function parseSidMon2File(
   const MAX_PATTERN_LEN = 256; // Safety bound
   let currentPatternLen = 64;  // SidMon II default, can be changed by effect 0x76
   const trackerPatterns: Pattern[] = [];
+  // Every grid note cell and the file byte of the note command that played it (G24: a note edit is a byte patch).
+  const noteCells: Array<{ pattern: number; channel: number; row: number; offset: number; note: number }> = [];
 
   // Voice state for simulation
   interface VoiceState {
@@ -691,6 +695,7 @@ export async function parseSidMon2File(
 
               // Map note to XM using period table for accuracy
               xmNote = sidmonNoteToXM(voice.note, 0);
+              if (xmNote > 0) noteCells.push({ pattern: trackPos, channel: ch, row: patRow, offset: rowData.offset, note: xmNote });
 
               // Reset ADSR
               voice.adsrPos = 4;
@@ -934,6 +939,7 @@ export async function parseSidMon2File(
     filePatternSizes,
     trackMap,
     blockRows,
+    noteBytes: noteCells,
   };
 
   return {
