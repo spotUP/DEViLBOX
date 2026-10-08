@@ -23,10 +23,11 @@ export function masterFxButtonState(
   const title = activeCount > 0
     ? `Master effects chain: ${active.map((e) => e.type ?? 'effect').join(', ')}`
     : 'Master effects chain (no effects active)';
-  const toneClass = panelOpen
+  // Active uses the app's standard "on" button look (accent fill); an open
+  // panel adds a ring on top, so open and active are both visible at once.
+  const base = activeCount > 0
     ? 'bg-accent-primary/20 text-accent-primary'
-    : activeCount > 0
-      ? 'bg-dark-bgSecondary text-accent-warning border border-accent-warning/50 hover:text-text-primary'
-      : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary';
+    : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary';
+  const toneClass = panelOpen ? `${base} ring-1 ring-accent-primary` : base;
   return { activeCount, label, title, toneClass };
 }

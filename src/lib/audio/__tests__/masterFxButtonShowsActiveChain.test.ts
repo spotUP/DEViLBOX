@@ -12,16 +12,16 @@ describe('Master FX button', () => {
     const s = masterFxButtonState([{ type: 'EQ3', enabled: true }, { type: 'Chorus', enabled: true }, { type: 'Compressor', enabled: false }], false);
     expect(s.activeCount).toBe(2);
     expect(s.label).toBe('Master FX (2)');
-    expect(s.toneClass).toMatch(/text-accent-warning/);
-    // The button keeps its normal background; only the text and border mark it active.
-    expect(s.toneClass).toMatch(/bg-dark-bgSecondary/);
+    // Active uses the standard "on" look: an accent fill, not the idle background.
+    expect(s.toneClass).toMatch(/bg-accent-primary\/20/);
+    expect(s.toneClass).not.toMatch(/bg-dark-bgSecondary/);
     expect(s.title).toMatch(/EQ3, Chorus/);
   });
 
   it('looks idle with no enabled effects, and as open while its panel is open', () => {
     expect(masterFxButtonState([], false).toneClass).toMatch(/bg-dark-bgSecondary/);
     expect(masterFxButtonState([{ type: 'X', enabled: false }], false).label).toBe('Master FX');
-    expect(masterFxButtonState([{ type: 'EQ3', enabled: true }], true).toneClass).toMatch(/accent-primary/);
+    expect(masterFxButtonState([{ type: 'EQ3', enabled: true }], true).toneClass).toMatch(/ring-accent-primary/);
   });
 
   it('is wired to the live master chain in the main controls bar', () => {
