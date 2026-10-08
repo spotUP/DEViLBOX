@@ -26,7 +26,7 @@ export function masterFxButtonState(
   const toneClass = panelOpen
     ? 'bg-accent-primary/20 text-accent-primary'
     : activeCount > 0
-      ? 'bg-accent-warning/15 text-accent-warning border border-accent-warning/50'
+      ? 'bg-dark-bgSecondary text-accent-warning border border-accent-warning/50 hover:text-text-primary'
       : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary';
   return { activeCount, label, title, toneClass };
 }

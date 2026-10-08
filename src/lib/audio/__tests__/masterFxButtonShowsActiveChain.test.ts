@@ -12,7 +12,9 @@ describe('Master FX button', () => {
     const s = masterFxButtonState([{ type: 'EQ3', enabled: true }, { type: 'Chorus', enabled: true }, { type: 'Compressor', enabled: false }], false);
     expect(s.activeCount).toBe(2);
     expect(s.label).toBe('Master FX (2)');
-    expect(s.toneClass).toMatch(/accent-warning/);
+    expect(s.toneClass).toMatch(/text-accent-warning/);
+    // The button keeps its normal background; only the text and border mark it active.
+    expect(s.toneClass).toMatch(/bg-dark-bgSecondary/);
     expect(s.title).toMatch(/EQ3, Chorus/);
   });
 
