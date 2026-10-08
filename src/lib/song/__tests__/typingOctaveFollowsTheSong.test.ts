@@ -27,7 +27,8 @@ import { openSong } from '@/lib/song/openSong';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { NOTE_MAP } from '@/hooks/tracker/input/inputConstants';
 import { gridNoteOfName } from '@/engine/keyboardPeriod';
-import { noteToPeriod, typingOctaveFor, songUsesAmigaPeriods } from '@/lib/amiga/periodNotes';
+import { noteToPeriod, typingOctaveFor, songUsesAmigaPeriods, NOTE_NUMBER_FORMATS } from '@/lib/amiga/periodNotes';
+import { FORMAT_REGISTRY } from '@/lib/import/FormatRegistry';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const open = (rel: string) => {
@@ -59,8 +60,48 @@ describe('the typing octave follows the opened song', { timeout: 120000 }, () =>
     expect(useEditorStore.getState().currentOctave).toBe(4);
   });
 
-  it('the rule: only the note-number formats keep octave 4', () => {
-    for (const f of ['XM', 'IT', 'S3M', 'AdPlug']) { expect(songUsesAmigaPeriods(f)).toBe(false); expect(typingOctaveFor(f)).toBe(4); }
-    for (const f of ['MOD', 'UADE', 'OKT']) { expect(songUsesAmigaPeriods(f)).toBe(true); expect(typingOctaveFor(f)).toBe(2); }
+  // K12b: the rule had been "everything but XM / IT / S3M / AdPlug", so a SID, a game-music dump or a Hively song
+  // opened two octaves down too, with ProTracker period semantics in the replayer.
+  it.each([
+    ['SID', 'public/data/songs/sid/abaddon-starfish-test.sid'],
+    ['HVL', 'public/data/songs/hivelytracker/waiting for a message.hvl'],
+    ['AHX', 'public/data/songs/ahx/amanda.ahx'],
+    ['NSF', 'public/data/songs/nsf/dr mario.nsf'],
+    ['VGM', 'public/data/songs/vgm/BeyondSN.vgm'],
+    ['KT', 'public/data/songs/klystrack/Ocean Loader III.kt'],
+    ['Furnace', 'public/data/songs/furnace/amiga/bruno_time.fur'],
+  ])('%s keeps typing octave 4', async (_label, rel) => {
+    useEditorStore.getState().setCurrentOctave(2);
+    expect((await open(rel)).ok).toBe(true);
+    expect(useEditorStore.getState().currentOctave).toBe(4);
+  });
+
+  // The replayer cannot be built in node (Tone needs a browser): its period mode is the same rule by reference.
+  it('TrackerReplayer takes its period mode from the same rule', () => {
+    const tr = readFileSync(resolve(ROOT, 'src/engine/TrackerReplayer.ts'), 'utf8');
+    expect(tr).toContain('this.useXMPeriods = !songUsesAmigaPeriods(song.format);');
+  });
+
+  it('the rule: only the note-number and chip formats keep octave 4', () => {
+    for (const f of ['XM', 'IT', 'S3M', 'AdPlug', 'SID', 'HVL', 'AHX', 'NSF', 'VGM']) { expect(songUsesAmigaPeriods(f)).toBe(false); expect(typingOctaveFor(f)).toBe(4); }
+    for (const f of ['MOD', 'UADE', 'OKT', 'MED', 'FC', 'JamCracker', 'ML']) { expect(songUsesAmigaPeriods(f)).toBe(true); expect(typingOctaveFor(f)).toBe(2); }
+  });
+
+  // The table is read off the registry: every parser of a chip-dump / C64 entry names its format in it.
+  it('every chip-dump and C64 registry parser names a format the table lists', () => {
+    const modules = new Set<string>();
+    for (const f of FORMAT_REGISTRY) {
+      if ((f.family === 'chip-dump' || f.family === 'c64-chip') && f.nativeParser) modules.add(f.nativeParser.module.replace(/^@lib\/import\/formats\//, ''));
+    }
+    expect(modules.size).toBeGreaterThanOrEqual(15);
+    const missing: string[] = [];
+    for (const m of modules) {
+      const src = readFileSync(resolve(ROOT, 'src/lib/import/formats', `${m}.ts`), 'utf8');
+      for (const [, fmt] of src.matchAll(/\bformat: ?'([A-Za-z0-9 ]+)'/g)) {
+        // QSF dumps are named 'MOD' by their parser - a parser naming open item, not this table's.
+        if (fmt !== 'MOD' && !NOTE_NUMBER_FORMATS.has(fmt)) missing.push(`${m}: ${fmt}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });
