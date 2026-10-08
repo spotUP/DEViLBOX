@@ -9,7 +9,7 @@
  *     triggered=1 events across all channels. Fallback to 6 (ProTracker default).
  *  2. Group snapshots into rows: each row spans `speed` CIA ticks.
  *  3. For each row read the channel state at the first tick of that row.
- *  4. Map period → XM note using amigaPeriodToNote (MIDI 0-127 → XM 1-96).
+ *  4. Map period → note with periodNotes.periodToNote (ProTracker naming, 428 = C-2).
  *  5. Map lc (chip RAM address) → instrument index via samplePtrToInstrIndex.
  *  6. Suppress held notes: if same period + lc as prior row, emit empty note.
  *  7. Detect basic effects:
@@ -19,7 +19,7 @@
 
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { UADETickSnapshot } from './UADEEngine';
-import { amigaPeriodToNote } from './amigaPeriodToNote';
+import { periodToNote } from '@/lib/amiga/periodNotes';
 import { idGenerator } from '@utils/idGenerator';
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -45,15 +45,6 @@ function emptyCell(): TrackerCell {
     effTyp2:    0,
     eff2:       0,
   };
-}
-
-/**
- * Convert an Amiga MIDI note (0-127 from amigaPeriodToNote) to XM note (1-96).
- * XM: 1 = C-0, 13 = C-1, 25 = C-2, etc. Formula: xm = midi + 1.
- */
-function midiToXmNote(midiNote: number): number {
-  const xm = midiNote + 1;
-  return Math.max(1, Math.min(96, xm));
 }
 
 /**
@@ -379,11 +370,10 @@ export function reconstructPatterns(
           const isNewNote = hasTriggered || !isHeldLegacy;
 
           if (isNewNote) {
-            // Map period → XM note
-            const noteInfo = amigaPeriodToNote(state.period);
-            if (noteInfo !== null) {
-              cell.note = midiToXmNote(noteInfo.note);
-            }
+            // Map period → note, in the one naming every Amiga-period cell has (428 = 25 = C-2): a key on
+            // the grid note then plays the period the song played, and the instrument's Sampler pitch follows.
+            const note = periodToNote(state.period);
+            if (note > 0) cell.note = note;
 
             // Map lc → instrument index
             const instrIdx = samplePtrToInstrIndex.get(state.lc);

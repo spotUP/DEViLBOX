@@ -102,6 +102,28 @@ export interface WatchpointHit {
   wpSlot:  number;
 }
 
+/** One sample a compiled player's Paula DMA plays (UADEEngine.scanPaulaSamples). */
+export interface UADEPaulaSample {
+  voice: number;
+  /** Period and channel volume (0-64) of the first note that started it. */
+  period: number;
+  volume: number;
+  /** Times the song started it, and the 10 ms render chunk of the first start. */
+  count: number;
+  firstChunk: number;
+  attackPtr: number;
+  /** Words. */
+  attackLen: number;
+  /** The pointer / length (words) written after the note start; null = never rewritten (the attack loops itself). */
+  loopPtr: number | null;
+  loopLen: number;
+  /** The attack bytes, followed by the loop bytes when the loop lies outside the attack. */
+  pcm: Uint8Array;
+  /** Byte offsets into pcm; loopLength 0 = plays once. */
+  loopStart: number;
+  loopLength: number;
+}
+
 export interface UADEMetadata {
   player: string;       // Detected eagleplayer name (e.g. "JochenHippel")
   formatName: string;   // Human-readable format (e.g. "Jochen Hippel")
@@ -209,6 +231,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   private _rejectSubsongScan: ((err: Error) => void) | null = null;
   // Queued isolated channel renders: Map<channelIndex, {resolve, reject}>
   private _isolateChannelPending: Map<number, { resolve: (result: { channelIndex: number; pcm: ArrayBuffer; sampleRate: number; framesWritten: number }) => void; reject: (err: Error) => void }> = new Map();
+  // Pending Paula sample scans: Map<requestId, {resolve, reject}>
+  private _paulaSamplesPending = new Map<number, { resolve: (samples: UADEPaulaSample[]) => void; reject: (err: Error) => void }>();
+  private _paulaSamplesNextId = 0;
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _channelCallbacks: Set<ChannelCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
@@ -463,6 +488,24 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
           if (pending) {
             pending.resolve({ channelIndex: data.channelIndex, pcm: data.pcm, sampleRate: data.sampleRate, framesWritten: data.framesWritten });
             this._isolateChannelPending.delete(data.channelIndex);
+          }
+          break;
+        }
+
+        case 'paulaSamples': {
+          const pending = this._paulaSamplesPending.get(data.requestId);
+          if (pending) {
+            this._paulaSamplesPending.delete(data.requestId);
+            pending.resolve((data.samples as Array<Omit<UADEPaulaSample, 'pcm'> & { pcm: ArrayBuffer }>).map((x) => ({ ...x, pcm: new Uint8Array(x.pcm) })));
+          }
+          break;
+        }
+
+        case 'paulaSamplesError': {
+          const pending = this._paulaSamplesPending.get(data.requestId);
+          if (pending) {
+            this._paulaSamplesPending.delete(data.requestId);
+            pending.reject(new Error(data.message));
           }
           break;
         }
@@ -1090,6 +1133,22 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
 
     this.workletNode.port.postMessage({ type: 'scanSubsong', subsong });
     return this._subsongScanPromise;
+  }
+
+  /**
+   * The samples the loaded player's DMA plays, from the Paula register write log (see the worklet's
+   * _scanPaulaSamples): attack bytes with the loop that follows them, the period and channel volume of the
+   * first note, how often the song starts it. Most-played first. Reloads the song for playback afterwards.
+   */
+  async scanPaulaSamples(durationMs = 20000): Promise<UADEPaulaSample[]> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const requestId = this._paulaSamplesNextId++;
+    const promise = new Promise<UADEPaulaSample[]>((resolve, reject) => {
+      this._paulaSamplesPending.set(requestId, { resolve, reject });
+    });
+    this.workletNode.port.postMessage({ type: 'scanPaulaSamples', requestId, durationMs });
+    return promise;
   }
 
   /**

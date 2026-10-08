@@ -185,6 +185,10 @@ class UADEProcessor extends AudioWorkletProcessor {
         this._scanInstrumentIsolated(data.channelIndex, data.durationMs || 30000);
         break;
 
+      case 'scanPaulaSamples':
+        this._scanPaulaSamples(data.requestId, data.durationMs || 20000);
+        break;
+
       case 'setInstrumentSample': {
         if (!this._wasm || !this._ready) {
           console.warn('[UADE.worklet] setInstrumentSample called before WASM ready — ignoring');
@@ -2187,6 +2191,152 @@ class UADEProcessor extends AudioWorkletProcessor {
       if (this._wasm) this._wasm._uade_wasm_mute_channels(0x0F);
       const msg = err instanceof Error ? err.message : String(err);
       this.port.postMessage({ type: 'instrumentIsolatedError', channelIndex, message: msg });
+    }
+  }
+
+  /**
+   * The samples a compiled player really plays: Paula DMA, read from register WRITES.
+   *
+   * The enhanced scan polls the channel registers once per render chunk, so a player that starts a note by
+   * writing (pointer, length) for the attack and, a moment later, (pointer, length) of the loop to follow
+   * it shows the loop only; the attack is seen by chance. The Paula write log has every write in order:
+   * a period write after a pointer write is a note start (the attack: pointer and length as written), the
+   * pointer/length written after it and before the next note start are what the DMA reloads at the end of
+   * the attack (the loop; a length of one word is "play once, then silence"). No write after the note
+   * start means the attack loops itself.
+   *
+   * Reloads from this._lastData, renders `durationMs`, reloads for playback. Posts
+   * { type: 'paulaSamples', requestId, samples: [{ voice, period, volume, firstChunk, count, attackPtr, attackLen,
+   * loopPtr, loopLen, pcm, loopStart, loopLength }] } where pcm is the attack bytes followed by the loop bytes when
+   * the loop lies outside the attack (loopStart / loopLength are byte offsets into pcm; loopLength 0 = play once),
+   * or { type: 'paulaSamplesError', requestId, message }.
+   */
+  _scanPaulaSamples(requestId, durationMs) {
+    const fail = (message) => this.port.postMessage({ type: 'paulaSamplesError', requestId, message });
+    const w = this._wasm;
+    if (!w || !this._ready) return fail('WASM not ready');
+    if (!this._lastData || !this._lastHint) return fail('No file loaded');
+    if (!w._uade_wasm_enable_paula_log || !w._uade_wasm_get_paula_log) return fail('Paula log not in this WASM build');
+    const MAX_BYTES = 131072;
+    const LOG_MAX = 512;
+    let tmpL = 0, tmpR = 0, logPtr = 0, memBuf = 0;
+    try {
+      w._uade_wasm_stop();
+      w._uade_wasm_enable_paula_log(1);
+      const ret = this._loadIntoWasm(this._lastData, this._lastHint);
+      if (ret !== 0) { w._uade_wasm_enable_paula_log(0); return fail('Reload failed (ret=' + ret + ')'); }
+      const sr = sampleRate || 44100;
+      const CHUNK = Math.max(64, Math.round(sr / 100)); // 10 ms
+      const chunks = Math.ceil(durationMs / 10);
+      tmpL = w._malloc(CHUNK * 4);
+      tmpR = w._malloc(CHUNK * 4);
+      logPtr = w._malloc(LOG_MAX * 12);
+      memBuf = w._malloc(MAX_BYTES);
+      w._uade_wasm_set_looping(0);
+
+      const read = (addr, bytes) => {
+        const n = Math.min(Math.max(0, bytes), MAX_BYTES);
+        if (n === 0) return new Uint8Array(0);
+        w._uade_wasm_read_memory(addr, memBuf, n);
+        return new Uint8Array(w.HEAPU8.buffer, memBuf, n).slice();
+      };
+      const voices = [0, 1, 2, 3].map(() => ({ lch: 0, lcl: 0, len: 0, vol: 0, perPtr: -1, perLen: -1, cur: null }));
+      const shapes = new Map();
+      // Which writes make a note start: a period write after the (pointer, length) pair CHANGED since the last
+      // period write (a vibrato or slide writes the period again with the same pair). The pair that changes
+      // again within LOOP_WINDOW chunks of the note start is what the DMA reloads at the end of the attack
+      // (the last one written wins); a pair that changes later is the next note.
+      const LOOP_WINDOW = 4;
+      const settle = (v) => {
+        const c = v.cur;
+        if (!c || c.settled) return;
+        c.settled = true;
+        const attack = read(c.attackPtr, c.attackLen * 2);
+        if (attack.length === 0) return;
+        let pcm = attack, loopStart = 0, loopLength = 0;
+        if (c.loopPtr === null) {
+          loopLength = attack.length; // never rewritten: the DMA loops the attack
+        } else if (c.loopLen > 1) {
+          const rel = c.loopPtr - c.attackPtr;
+          if (rel >= 0 && rel + c.loopLen * 2 <= attack.length) { loopStart = rel; loopLength = c.loopLen * 2; }
+          else {
+            const loop = read(c.loopPtr, c.loopLen * 2);
+            pcm = new Uint8Array(attack.length + loop.length);
+            pcm.set(attack, 0); pcm.set(loop, attack.length);
+            loopStart = attack.length; loopLength = loop.length;
+          }
+        }
+        const key = c.attackPtr + ':' + c.attackLen + ':' + (c.loopPtr === null ? 'self' : c.loopPtr + ':' + c.loopLen);
+        let sh = shapes.get(key);
+        if (!sh) {
+          sh = { voice: c.voice, period: c.period, volume: c.volume, firstChunk: c.chunk, count: 0, attackPtr: c.attackPtr, attackLen: c.attackLen,
+            loopPtr: c.loopPtr, loopLen: c.loopLen, pcm, loopStart, loopLength };
+          shapes.set(key, sh);
+        }
+        sh.count++;
+        if (!sh.volume && c.volume) sh.volume = c.volume;
+      };
+
+      for (let k = 0; k < chunks; k++) {
+        const r = w._uade_wasm_render(tmpL, tmpR, CHUNK);
+        if (r <= 0) break;
+        const n = w._uade_wasm_get_paula_log(logPtr, LOG_MAX);
+        const raw = new Uint32Array(w.HEAPU8.buffer, logPtr, n * 3);
+        for (let i = 0; i < n; i++) {
+          const w0 = raw[i * 3];
+          const ch = w0 >>> 24, reg = (w0 >>> 16) & 0xff, val = w0 & 0xffff;
+          if (ch > 3) continue;
+          const v = voices[ch];
+          if (reg === 0) v.lch = val;
+          else if (reg === 1) v.lcl = val;
+          else if (reg === 2) v.len = val;
+          else if (reg === 4) {
+            v.vol = val;
+            // the channel volume the note settles at: the last write within the loop window of its start
+            if (v.cur && !v.cur.settled && k - v.cur.chunk <= LOOP_WINDOW) v.cur.volume = Math.min(64, val);
+          } else if (reg === 3 && val >= 60 && val <= 7000) {
+            // the hardware ignores bit 0 of the pointer (words)
+            const ptr = (((v.lch << 16) | v.lcl) & ~1) >>> 0;
+            if (ptr === v.perPtr && v.len === v.perLen) continue; // the same pair: a period update
+            v.perPtr = ptr; v.perLen = v.len;
+            const c = v.cur;
+            if (c && k - c.chunk <= LOOP_WINDOW && !c.settled) {
+              c.loopPtr = ptr; c.loopLen = v.len;
+              continue;
+            }
+            settle(v);
+            // one word is a silent stub (UADE's idle buffer at start-up, a player's "off"), not a sample
+            if (v.len <= 1) { v.cur = null; continue; }
+            v.cur = { voice: ch, period: val, volume: Math.min(64, v.vol), chunk: k, attackPtr: ptr, attackLen: v.len, loopPtr: null, loopLen: 0, settled: false };
+          }
+        }
+        // the loop window is over: read the bytes now (a player may rewrite its waveform memory later)
+        for (const v of voices) if (v.cur && !v.cur.settled && k - v.cur.chunk > LOOP_WINDOW) settle(v);
+      }
+      for (const v of voices) settle(v);
+
+      w._free(tmpL); w._free(tmpR); w._free(logPtr); w._free(memBuf);
+      tmpL = tmpR = logPtr = memBuf = 0;
+      w._uade_wasm_enable_paula_log(0);
+      // Reload for normal playback
+      w._uade_wasm_stop();
+      const ret2 = this._loadIntoWasm(this._lastData, this._lastHint);
+      if (ret2 !== 0) console.warn('[UADE.worklet] Post-paula-scan reload failed (ret=' + ret2 + ')');
+      this._playing = false;
+
+      // A shape whose channel volume was never above 0 is not heard (UADE's own idle buffer at start-up is one).
+      const samples = [...shapes.values()].filter((x) => x.volume > 0).sort((a, b) => b.count - a.count);
+      const transfer = [];
+      const out = samples.map((s2) => {
+        const buf = s2.pcm.buffer.slice(s2.pcm.byteOffset, s2.pcm.byteOffset + s2.pcm.byteLength);
+        transfer.push(buf);
+        return { ...s2, pcm: buf };
+      });
+      this.port.postMessage({ type: 'paulaSamples', requestId, samples: out }, transfer);
+    } catch (err) {
+      for (const p of [tmpL, tmpR, logPtr, memBuf]) if (p) w._free(p);
+      try { w._uade_wasm_enable_paula_log(0); } catch (e) { /* ignore */ }
+      fail(err instanceof Error ? err.message : String(err));
     }
   }
 
