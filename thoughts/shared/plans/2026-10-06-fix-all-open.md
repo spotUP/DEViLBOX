@@ -185,7 +185,7 @@ G5 add-on-empty-row after: soundmon, digitalSoundStudio, tfmMusicMaker, quadraCo
 - [ ] P18 Grid clock unverified: Future Player (rows are speed interrupts; note starts re-arm every tick, note-on oracle fails) and Hippel TFMX Amiga warp.hip (probe failed with AudioContext error) - measure with a different oracle (period changes, not re-arms).
 
 - [ ] O3b dubBusRigIsDeterministic flaky (~1 in 3 alone under load): the rig waits for a quiet period instead of a ready signal from every worklet; first differing sample 2304 (block 18). Make the rig wait for explicit worklet ready messages.
-- [ ] UI6 App.tsx (~817-891, ~1190-1261) still shows modal showAlert 'Load Failed' on drop/open paths - owner wants copyable toasts (dcb4e8b5d); route to notify.error and extend errorTextCopyable to cover them.
+- [x] UI6 App.tsx (~817-891, ~1190-1261) still shows modal showAlert 'Load Failed' on drop/open paths - owner wants copyable toasts (dcb4e8b5d); route to notify.error and extend errorTextCopyable to cover them.
 - [x] P19 SynthesisEncoder drops the arpeggio high nibble of byte 2 on write - an edited Synthesis file with arpeggios loses them (space sound.syn has none). Fix the encoder, round-trip test with an arpeggio cell.
 
 ## Batch D - dub (running)

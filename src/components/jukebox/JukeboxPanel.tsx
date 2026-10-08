@@ -38,7 +38,7 @@ import {
   type JukeboxVerdict, type JukeboxFault,
 } from '@/lib/jukebox/faultReports';
 import { searchModland } from '@/lib/modlandApi';
-import { notify } from '@stores/useNotificationStore';
+import { reportLoadFailure } from '@/lib/song/reportLoadFailure';
 
 interface IndexEntry {
   id: string;
@@ -186,7 +186,7 @@ export const JukeboxPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     setStatus(`LOAD FAILED — ${short}: ${message}`);
     // A toast that stays until closed and can be copied from: the status line
     // alone let every Sonix row fail with nothing to read (2026-10-06).
-    notify.error(`Load failed - ${short}: ${message}`, 0);
+    reportLoadFailure(`${short}: ${message}`);
     const { id } = reportCtx.current;
     if (!id) return;
     const faults = setFault(faultsOf(judgedRef.current[id]), LOAD_FAILED.id, true);
