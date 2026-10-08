@@ -110,6 +110,22 @@ export function getNativeEngineDataForExport(): Record<string, string> | null {
 }
 
 /**
+ * Whether the stores hold a native engine song (the same fields the save
+ * serializes), without serializing it. getNativeEngineDataForExport encodes
+ * every buffer as base64; asking "is there a song?" through it cost a full
+ * encode per call and made a second reader of the save data.
+ */
+export function hasNativeEngineData(): boolean {
+  const store = useFormatStore.getState();
+  if (store.maxTraxData) return true;
+  const state = store as unknown as Record<string, unknown>;
+  return BINARY_FILE_DATA_FIELDS.some((field) => {
+    const val = state[field];
+    return !!val && (val instanceof ArrayBuffer || val instanceof Uint8Array);
+  });
+}
+
+/**
  * Collect JSON-serializable native engine metadata for saving.
  */
 export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
