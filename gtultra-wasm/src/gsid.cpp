@@ -282,6 +282,27 @@ int sid_debug()
 // TrueStereo = each buffer size = samples*2
 // Left = 0-samples-1
 // Right = samples>s(amples*2)-1
+// Point every existing chip's scope tap at tap[chip*3+voice] (cap samples each)
+// and restart it. tap == NULL turns the taps off.
+void sid_set_voice_taps(short *tap, int cap)
+{
+	SID *chips[4] = { sid, sid2, sid3, sid4 };
+	for (int c = 0; c < 4; c++)
+	{
+		if (!chips[c]) continue;
+		if (tap) chips[c]->set_voice_tap(tap + (c*3+0)*cap, tap + (c*3+1)*cap, tap + (c*3+2)*cap, cap);
+		else chips[c]->set_voice_tap(0, 0, 0, 0);
+	}
+}
+
+// Samples the chip's tap received since sid_set_voice_taps.
+int sid_voice_tap_count(int chip)
+{
+	SID *chips[4] = { sid, sid2, sid3, sid4 };
+	SID *c = (chip >= 0 && chip < 4) ? chips[chip] : 0;
+	return c ? c->voice_tap_count() : 0;
+}
+
 int sid_fillbuffer(short *lptr, short *rptr, short *lptr2, short *rptr2, int samples, int bufferHalfSize,unsigned int adparam)
 {
 	int tdelta;
