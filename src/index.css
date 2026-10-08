@@ -430,6 +430,28 @@
     display: none; /* Chrome, Safari, Opera */
   }
 
+  /* Always visible, accent thumb: macOS overlay scrollbars hide until the user
+     scrolls, so a song wider than the window gave no sign it could scroll
+     (owner 2026-10-08). Chrome keeps a styled ::-webkit-scrollbar classic and
+     visible, but only while scrollbar-color/scrollbar-width are unset - they
+     are inherited, so reset them here. */
+  .scrollbar-always {
+    scrollbar-color: auto;
+    scrollbar-width: auto;
+  }
+  .scrollbar-always::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+  }
+  .scrollbar-always::-webkit-scrollbar-track {
+    background: var(--color-bg-tertiary);
+  }
+  .scrollbar-always::-webkit-scrollbar-thumb {
+    background-color: var(--color-accent);
+    border-radius: 5px;
+    min-width: 40px;
+  }
+
   .scrollbar-modern {
     scrollbar-width: thin;
     scrollbar-color: var(--color-accent) var(--color-bg-secondary);
