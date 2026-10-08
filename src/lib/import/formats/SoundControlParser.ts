@@ -55,6 +55,7 @@ import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSoundControl40Cell, encodeSoundControl3xCell } from '@/engine/uade/encoders/SoundControlEncoder';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import { soundControlSplitWait, soundControlAppendNote } from './soundControlEdits';
 
 // ── Utility ────────────────────────────────────────────────────────────────
 
@@ -404,18 +405,24 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
 
   // trackRowFileOffsets[trackNum][expandedRowIdx] = file byte offset (or -1 for non-editable wait rows)
   const trackRowFileOffsets = new Map<number, number[]>();
+  // The wait event a blank row is part of (file offset, which tick of it, its length): where a note typed on it splits the wait (G5).
+  const trackRowWaits = new Map<number, Array<{ at: number; k: number; n: number } | null>>();
+  // Where each track ends (its end marker's file offset) and how many rows it has: a note past its end is put in front of the marker.
+  const trackEnds = new Map<number, { at: number; rows: number }>();
 
   function trackToRows(trackNum: number): TrackerCell[] {
     const track = tracks[trackNum];
     if (!track) return [emptyCell()];
     const cells: TrackerCell[] = [];
     const rowOffsets: number[] = [];
+    const rowWaits: Array<{ at: number; k: number; n: number } | null> = [];
     for (const row of track) {
-      if (row.isEnd) break;
+      if (row.isEnd) { trackEnds.set(trackNum, { at: row.fileOffset, rows: cells.length }); break; }
       if (row.isWait) {
         for (let w = 0; w < Math.max(1, row.wait); w++) {
           cells.push(emptyCell());
           rowOffsets.push(-1); // wait rows are not directly editable
+          rowWaits.push({ at: row.fileOffset, k: w, n: Math.max(1, row.wait) });
         }
         continue;
       }
@@ -435,13 +442,16 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
           eff2: 0,
         });
         rowOffsets.push(row.fileOffset);
+        rowWaits.push(null);
       }
     }
     if (cells.length === 0) {
       cells.push(emptyCell());
       rowOffsets.push(-1);
+      rowWaits.push(null);
     }
     trackRowFileOffsets.set(trackNum, rowOffsets);
+    trackRowWaits.set(trackNum, rowWaits);
     return cells;
   }
 
@@ -537,6 +547,21 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
       const offsets = trackRowFileOffsets.get(trackNum);
       if (!offsets || row >= offsets.length) return -1;
       return offsets[row]; // -1 for non-editable wait rows
+    },
+    // A note on a row that is a tick of a wait: the wait is split around it (soundControlEdits.ts).
+    growCell: (module, pattern, row, channel, cell) => {
+      const note = cell.note ?? 0;
+      if (note <= 0 || note >= 97) return 'only a note can be put on a blank row of this module';
+      const pos = positions[pattern];
+      const trackNum = pos ? (pos[channel] ?? 0) : -1;
+      const wait = trackRowWaits.get(trackNum)?.[row];
+      const four = encodeCell({ ...cell, volume: (cell.volume ?? 0) > 0 ? cell.volume : 64 });
+      try {
+        if (wait) return soundControlSplitWait(module, wait.at, wait.k, wait.n, four);
+        const end = trackEnds.get(trackNum);
+        if (end && row >= end.rows) return soundControlAppendNote(module, end.at, row - end.rows, four);
+      } catch (err) { return String(err); }
+      return 'this row is a note row of the track';
     },
   };
 

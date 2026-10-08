@@ -274,7 +274,13 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
           while (c.r + n < rows.length && rows[c.r + n].note === 0) n++;
           if (n >= 12) { for (let q = 0; q < 12; q++) run.push({ p: 0, ch: c.ch, r: c.r + q, any: c.any }); break; }
         }
-        const candidates = [...run, ...after, ...other].filter((c) => c.any > 0).slice(0, 14);
+        // Then the blank cells straight after a note, one voice after the other (a voice's track may end early and the rest of its
+        // pattern be padding, which no format can take a note on), then any blank cell.
+        const byVoice = new Map<number, Cand[]>();
+        for (const c of after) byVoice.set(c.ch, [...(byVoice.get(c.ch) ?? []), c]);
+        const interleaved: Cand[] = [];
+        for (let q = 0; q < 3; q++) for (const list of byVoice.values()) if (list[q]) interleaved.push(list[q]);
+        const candidates = [...run, ...interleaved, ...after, ...other].filter((c) => c.any > 0).slice(0, 26);
         const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
         const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
         let ok = false;

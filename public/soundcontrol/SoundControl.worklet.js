@@ -13,6 +13,9 @@ class SoundControlProcessor extends AudioWorkletProcessor {
     this.initialized = false;
     this.playing = false;
     this.bufferSize = 128;
+    this.framesPlayed = 0;      // frames the song has rendered since it last started: a swapped-in module catches up to here
+    this.channelMask = null;
+    this.subsong = 0;
     this.lastHeapBuffer = null;
     this.initializing = false;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
@@ -41,6 +44,8 @@ class SoundControlProcessor extends AudioWorkletProcessor {
           const subsongCount = this.module._sc_subsong_count(this.handle);
           if (typeof data.subsong === 'number' && data.subsong > 0) this.module._sc_select_subsong(this.handle, data.subsong);
           this.playing = false;
+          this.framesPlayed = 0;
+          this.subsong = typeof data.subsong === 'number' && data.subsong > 0 ? data.subsong : 0;
           this.port.postMessage({ type: 'moduleLoaded', subsongCount, channels: 4 });
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
@@ -48,12 +53,14 @@ class SoundControlProcessor extends AudioWorkletProcessor {
       case 'play': this.playing = true; break;
       case 'stop':
         this.playing = false;
-        if (this.handle) this.module._sc_select_subsong(this.handle, 0);
+        if (this.handle) this.module._sc_select_subsong(this.handle, this.subsong || 0);
+        this.framesPlayed = 0;
         this.port.postMessage({ type: 'stopped' });
         break;
       case 'pause': this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._sc_select_subsong(this.handle, data.subsong); break;
-      case 'setChannelMask': if (this.handle) this.module._sc_set_channel_mask(this.handle, data.mask); break;
+      case 'setChannelMask': this.channelMask = data.mask; if (this.handle) this.module._sc_set_channel_mask(this.handle, data.mask); break;
+      case 'swapModule': this.swapModule(data.moduleData, data.subsong); break;
       case 'setCell': {        if (this.handle && this.module._sc_set_cell) {          this.module._sc_set_cell(this.handle, data.index, data.row, data.channel, data.note, data.instrument, data.effect, data.effectArg);        }        break;      }      case 'setInstrumentParam': {        if (this.handle && this.module._sc_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._sc_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }            case 'getInstrumentParam': {
         if (!this.handle || !this.module) break;
         const m = this.module;
@@ -124,6 +131,36 @@ class SoundControlProcessor extends AudioWorkletProcessor {
     } catch (error) { this.initializing = false; this.port.postMessage({ type: 'error', message: error.message }); }
   }
 
+  /**
+   * An edited module takes the place of the playing one without a restart (G24). The replayer is deterministic, so the new
+   * module is run silently for the frames the song has already played, in the blocks it was played in; from there it is the
+   * edited module played from the start, at the position the listener is at. The old handle plays until the swap, so the
+   * output never goes silent; the catch-up costs one render of the song so far.
+   */
+  swapModule(moduleData, subsong) {
+    if (!this.module || !this.handle || !moduleData) return;
+    const bytes = new Uint8Array(moduleData);
+    const ptr = this.module._malloc(bytes.length);
+    if (!ptr) { this.port.postMessage({ type: 'error', message: 'malloc failed' }); return; }
+    this.module.HEAPU8.set(bytes, ptr);
+    const fresh = this.module._sc_create(ptr, bytes.length, sampleRate);
+    this.module._free(ptr);
+    if (!fresh) { this.port.postMessage({ type: 'error', message: 'swapModule: sc_create failed' }); return; }
+    const tune = typeof subsong === 'number' && subsong > 0 ? subsong : (this.subsong || 0);
+    if (tune > 0) this.module._sc_select_subsong(fresh, tune);
+    if (this.channelMask !== null) this.module._sc_set_channel_mask(fresh, this.channelMask);
+    let left = this.framesPlayed;
+    while (left > 0) {
+      const n = Math.min(this.bufferSize, left);
+      this.module._sc_render_multi(fresh, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], n);
+      left -= n;
+    }
+    const old = this.handle;
+    this.handle = fresh;
+    this.module._sc_destroy(old);
+    this.port.postMessage({ type: 'moduleSwapped', frames: this.framesPlayed });
+  }
+
   updateBufferViews() {
     if (!this.module || !this.interleavedPtr) return;
     const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
@@ -162,6 +199,7 @@ class SoundControlProcessor extends AudioWorkletProcessor {
       this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], numSamples);
 
     if (rendered > 0) {
+      this.framesPlayed += rendered;
       // Mix to stereo: channels 0,3 → left; channels 1,2 → right (Amiga panning)
       // A voice in an isolation slot leaves the mix; channel-outputs.js
       // carries it (and the per-channel dub sends).

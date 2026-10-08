@@ -34,6 +34,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { editedCells } from '@/lib/song/gridBaseline';
 
 // ── Binary write helpers ────────────────────────────────────────────────────
 
@@ -143,6 +144,37 @@ export async function exportSoundControl(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
+
+  // The module as loaded with each edited note written into its 4-byte event (the layout's own cell writer, the one a live
+  // chip-RAM edit uses). The from-scratch build below re-encodes every sample from its WAV and writes a header the player
+  // does not accept for a module it read (sc_create fails on its output), so a song that has its module is never rebuilt.
+  const loaded = song.soundControlFileData;
+  const layout = song.uadePatternLayout;
+  if (loaded && layout?.encodeCell && layout.getCellFileOffset) {
+    let out: Uint8Array = new Uint8Array(loaded.slice(0));
+    const grow: Array<{ pattern: number; row: number; channel: number; cell: TrackerSong['patterns'][number]['channels'][number]['rows'][number] }> = [];
+    for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
+      const at = layout.getCellFileOffset(pattern, row, channel);
+      if (at < 0 || at + layout.bytesPerCell > out.length) {
+        if ((cell.note ?? 0) > 0) grow.push({ pattern, row, channel, cell });
+        continue;
+      }
+      out.set(layout.encodeCell(cell), at);
+    }
+    // Notes on rows that are ticks of a wait (G5): each split moves what follows, so the module is parsed again after every one.
+    const { parseSoundControlFile } = await import('@/lib/import/formats/SoundControlParser');
+    for (const g of grow) {
+      const fresh = parseSoundControlFile(out, song.name || 'module')?.uadePatternLayout;
+      const at = fresh?.getCellFileOffset?.(g.pattern, g.row, g.channel) ?? -1;
+      // An earlier split of the same wait may have made this row a note row of its own: then it is an in-place edit.
+      if (fresh && at >= 0) { out = out.slice(); out.set(fresh.encodeCell(g.cell), at); continue; }
+      const next = fresh?.growCell?.(out, g.pattern, g.row, g.channel, g.cell);
+      if (!next || typeof next === 'string') warnings.push(`pattern ${g.pattern} voice ${g.channel + 1} row ${g.row}: ${next ?? 'the module could not be read again'}; not written`);
+      else out = next;
+    }
+    const name = (song.name || 'untitled').replace(/\s*\[Sound Control\]\s*/i, '').replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'untitled';
+    return { data: new Blob([out.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${name}.sc`, warnings };
+  }
 
   if (song.numChannels > NUM_CHANNELS) {
     warnings.push(
