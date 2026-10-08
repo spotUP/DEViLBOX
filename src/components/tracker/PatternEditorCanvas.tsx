@@ -3482,6 +3482,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             channelWidths={channelWidths}
             scrollLeft={scrollLeft}
             editRowY={dimensions.height / 2}
+            channelCount={isFormatMode ? numChannels : undefined}
           />
         </div>
         )}

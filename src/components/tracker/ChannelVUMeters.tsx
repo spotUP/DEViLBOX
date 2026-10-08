@@ -52,15 +52,17 @@ interface ChannelVUMetersProps {
   channelWidths?: number[];
   scrollLeft?: number;
   editRowY?: number;  // CSS-px Y of the edit row center line
+  /** Channels drawn. A format editor (GoatTracker) owns its channels; the tracker pattern is a blank. */
+  channelCount?: number;
 }
 
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowY: editRowYProp }) => {
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowY: editRowYProp, channelCount }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
   })));
   const pattern = patterns[currentPatternIndex];
-  const numChannels = pattern?.channels.length || 4;
+  const numChannels = channelCount || pattern?.channels.length || 4;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const meterStates = useRef<MeterState[]>([]);

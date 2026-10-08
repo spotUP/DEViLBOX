@@ -88,6 +88,12 @@ public:
   // n-bit output.
   int output(int bits, short *left, short *right);
 
+  // Per-voice scope tap. Each output sample the chip produces also writes
+  // the three voices' pre-filter output (Int16, DC removed) at
+  // tap[voice][tap_pos++], until tap_cap is reached. Null = off.
+  void set_voice_tap(short *v0, short *v1, short *v2, int cap);
+  int voice_tap_count() const { return voice_tap_pos; }
+
 protected:
   static double I0(double x);
   RESID_INLINE int clock_fast(cycle_count& delta_t, short* buf, int n, int bufferHalfSize,
@@ -100,6 +106,10 @@ protected:
                int n, int bufferHalfSize, int interleave);
 
   Voice voice[3];
+  short *voice_tap[3];
+  int voice_tap_pos;
+  int voice_tap_cap;
+  void tap_voices();
   Filter filter;
   ExternalFilter extfilt;
   Potentiometer potx;

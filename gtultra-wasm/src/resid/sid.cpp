@@ -43,6 +43,9 @@
 SID::SID()
 {
 	// Initialize pointers.
+	voice_tap[0] = voice_tap[1] = voice_tap[2] = 0;
+	voice_tap_pos = 0;
+	voice_tap_cap = 0;
 	sampleL = 0;
 	sampleR = 0;
 	fir = 0;
@@ -118,6 +121,27 @@ void SID::input(int sample)
 // Read sample from audio output.
 // Both 16-bit and n-bit output is provided.
 // ----------------------------------------------------------------------------
+void SID::set_voice_tap(short *v0, short *v1, short *v2, int cap)
+{
+	voice_tap[0] = v0;
+	voice_tap[1] = v1;
+	voice_tap[2] = v2;
+	voice_tap_pos = 0;
+	voice_tap_cap = cap;
+}
+
+void SID::tap_voices()
+{
+	if (!voice_tap[0] || voice_tap_pos >= voice_tap_cap) return;
+	for (int v = 0; v < 3; v++) {
+		int o = voice[v].output_ac() >> 4;
+		if (o > 32767) o = 32767;
+		if (o < -32768) o = -32768;
+		voice_tap[v][voice_tap_pos] = (short)o;
+	}
+	voice_tap_pos++;
+}
+
 int SID::output(short *left, short *right)
 {
 
@@ -864,6 +888,7 @@ int SID::clock_fast(cycle_count& delta_t, short* buf, int n, int bufferHalfSize,
 		sample_offset = (next_sample_offset & FIXP_MASK) - (1 << (FIXP_SHIFT - 1));
 
 		output(&L, &R);
+		tap_voices();
 		buf[s *interleave] = L;
 		buf[bufferHalfSize + (s*interleave)] = R;
 
@@ -919,6 +944,7 @@ int SID::clock_interpolate(cycle_count& delta_t, short* buf, int n, int bufferHa
 
 
 		output(&sample_nowL, &sample_nowR);
+		tap_voices();
 
 		//		short sample_now = output();
 		buf[s *interleave] = sample_prevL + (sample_offset*(sample_nowL - sample_prevL) >> FIXP_SHIFT);

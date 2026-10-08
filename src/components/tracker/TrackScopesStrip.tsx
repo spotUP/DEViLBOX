@@ -16,13 +16,18 @@ import { getToneEngine } from '@engine/ToneEngine';
 
 const STRIP_HEIGHT = 72;
 
-export const TrackScopesStrip: React.FC = memo(() => {
+export interface TrackScopesStripProps {
+  /** Channels drawn. A format editor (GoatTracker) owns its channels; the tracker pattern is a blank. */
+  channelCount?: number;
+}
+
+export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channelCount }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
   })));
   const pattern = patterns[currentPatternIndex];
-  const numChannels = pattern?.channels.length || 4;
+  const numChannels = channelCount || pattern?.channels.length || 4;
   const isPlaying = useTransportStore(s => s.isPlaying);
   const oscActive = useOscilloscopeStore(s => s.isActive);
 

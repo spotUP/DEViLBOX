@@ -39,6 +39,10 @@ public:
   // Range [-2048*255, 2047*255].
   RESID_INLINE sound_sample output();
 
+  // Waveform centred on the oscillator's mid value and scaled by the envelope,
+  // without the chip's DC offsets: what a scope draws. Range [-2048*255, 2047*255].
+  RESID_INLINE sound_sample output_ac();
+
   RESID_INLINE float getPan();
 
 protected:
@@ -72,6 +76,12 @@ sound_sample Voice::output()
 {
   // Multiply oscillator output with envelope output.
   return (wave.output() - wave_zero)*envelope.output() + voice_DC;
+}
+
+RESID_INLINE
+sound_sample Voice::output_ac()
+{
+  return (wave.output() - 0x800)*envelope.output();
 }
 
 RESID_INLINE

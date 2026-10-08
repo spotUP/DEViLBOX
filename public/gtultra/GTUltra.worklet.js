@@ -11,6 +11,9 @@ class GTUltraProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.jamActive = false; // True when jam notes need audio processing
     this.posCounter = 0;
+    // Per-voice audio for the oscilloscopes and channel meters (enableOsc)
+    this.oscEnabled = false;
+    this._stream = null;
 
     // Wrapped WASM functions
     this._init = null;
@@ -65,6 +68,9 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._getChannelCount = this.module.cwrap('gt_get_channel_count', 'number', []);
           this._getTablePositions = this.module.cwrap('gt_get_table_positions', 'number', ['number']);
           this._getMaxChannels = this._getChannelCount;
+          // Each SID voice's own output, written by reSID beside the mix
+          this._getVoiceTap = this.module.cwrap('gt_get_voice_tap', 'number', ['number']);
+          this._getVoiceTapCount = this.module.cwrap('gt_get_voice_tap_count', 'number', ['number']);
 
           // Editing
           this._setPatternCell = this.module.cwrap('gt_set_pattern_cell', null, ['number', 'number', 'number', 'number', 'number', 'number']);
@@ -169,10 +175,20 @@ class GTUltraProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'enableOsc':
+        this.oscEnabled = true;
+        break;
+
+      case 'disableOsc':
+        this.oscEnabled = false;
+        break;
+
       case 'stop': {
         if (!this.ready) return;
         this._stop();
         this.playing = false;
+        // The audio stops being one stream: never join it to the next play
+        if (this._stream) this._stream.discontinue();
         break;
       }
 
@@ -559,6 +575,23 @@ class GTUltraProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < frames; i++) {
       outL[i] = heapF32[offL + i];
       if (outR !== outL) outR[i] = heapF32[offR + i];
+    }
+
+    // Per-voice audio (worklets/channel-stream.js): the voices reSID just
+    // rendered, 3 per SID chip, in channel order.
+    if (this.oscEnabled && globalThis.DevilboxChannelStream && this._getVoiceTap) {
+      const numCh = this._getMaxChannels ? this._getMaxChannels() : 3;
+      const views = [];
+      let n = Infinity;
+      for (let ch = 0; ch < numCh; ch++) {
+        const cnt = this._getVoiceTapCount(ch);
+        views.push(new Int16Array(this.module.HEAPU8.buffer, this._getVoiceTap(ch), cnt));
+        if (cnt < n) n = cnt;
+      }
+      if (views.length > 0 && n > 0 && n !== Infinity) {
+        this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+        this._stream.writeInt16(views, n);
+      }
     }
 
     // Send position updates every 2 blocks (~5.8ms at 44.1kHz) for smooth scrolling
