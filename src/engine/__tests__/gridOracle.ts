@@ -288,3 +288,23 @@ export function compareGridToWalk(
   }
   return out;
 }
+
+/**
+ * The Paula writes of `bytes` played from the start, as `chunk:voice:register:value` strings, one entry per write of
+ * voices 0..3 (voice-tagged so a test can compare voices apart). A module that does not play yields [].
+ */
+export async function paulaEventStream(bytes: Uint8Array, name: string, seconds = 8): Promise<string[]> {
+  const uade = await openUade();
+  const session = new PaulaSession(uade, bytes, name);
+  const out: string[] = [];
+  const add = (c: number, w: PaulaWrite[]) => { for (const x of w) if (x.voice < 4) out.push(`${c}:${x.voice}:${x.reg}:${x.value}`); };
+  add(0, session.drain());
+  for (let c = 1; c <= seconds * 100; c++) { const w = session.step(); if (!w) break; add(c, w); }
+  session.close();
+  return out;
+}
+
+/** Split a paulaEventStream by voice; each entry keeps its `chunk:reg:value`. */
+export function eventsOfVoice(events: readonly string[], voice: number): string[] {
+  return events.filter((e) => e.split(':')[1] === String(voice)).map((e) => e.replace(`:${voice}:`, ':'));
+}
