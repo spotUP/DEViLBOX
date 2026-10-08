@@ -27,7 +27,7 @@ describe('TFMX note edits', { timeout: 120000 }, () => {
     song.patterns.forEach((pat) => pat.channels.forEach((ch) => ch.rows.forEach((cell) => {
       if (cell.note <= 0 || cell.note >= 97 || cell.effTyp === 0x03 || n > 300) return;
       const typed = { note: cell.note, instrument: cell.instrument, volume: cell.volume, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
-      expect(layout.decodeCell(layout.encodeCell(typed as never)).note).toBe(cell.note);
+      expect(layout.decodeCell!(layout.encodeCell!(typed as never)).note).toBe(cell.note);
       n++;
     })));
     expect(n, 'note cells checked (sentinel)').toBeGreaterThan(20);

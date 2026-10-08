@@ -185,7 +185,9 @@ export function applyEffectParametersDiff(
         if ('Q' in changed) node.Q.rampTo(changed.Q as number, R);
         if ('type' in changed) node.type = changed.type as Tone.Filter['type'];
         if ('rolloff' in changed) node.rolloff = changed.rolloff as Tone.FilterRollOff;
-        if ('gain' in changed) node.gain.rampTo(changed.gain as number, R);
+        // dB, carried unconverted (createDbGainFilter): a linear ramp, since
+        // rampTo's exponential ramp for 'decibels' clamps a cut to 0 dB.
+        if ('gain' in changed) node.gain.linearRampTo(changed.gain as number, R);
       }
       break;
 

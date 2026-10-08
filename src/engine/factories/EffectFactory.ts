@@ -5,6 +5,7 @@
 
 import { paramNumber, paramOptional } from '../registry/effects/paramNumber';
 import * as Tone from 'tone';
+import { createFilterEffect } from './dbGainFilter';
 import { getWetPathGain } from './effectGainCompensation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
@@ -520,13 +521,7 @@ export async function createEffect(
       break;
 
     case 'Filter':
-      node = new Tone.Filter({
-        type: p.type || 'lowpass',
-        frequency: p.frequency || 5000,
-        rolloff: p.rolloff || -12,
-        Q: p.Q || 1,
-        gain: p.gain || 0,
-      });
+      node = createFilterEffect(p as Parameters<typeof createFilterEffect>[0]);
       break;
 
     case 'JCReverb': {

@@ -7,6 +7,7 @@
  */
 
 import * as Tone from 'tone';
+import { createFilterEffect } from '@/engine/factories/dbGainFilter';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { EffectDescriptor } from '../EffectDescriptor';
 import { EffectRegistry } from '../EffectRegistry';
@@ -83,9 +84,9 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.Filter({
-        type: (p.type as BiquadFilterType) || 'lowpass', frequency: paramNumber(p.frequency, 5000),
-        rolloff: (paramNumber(p.rolloff, -12)) as -12 | -24 | -48 | -96, Q: paramNumber(p.Q, 1), gain: paramNumber(p.gain, 0),
+      return createFilterEffect({
+        type: p.type as BiquadFilterType, frequency: paramNumber(p.frequency, 5000),
+        rolloff: paramNumber(p.rolloff, -12), Q: paramNumber(p.Q, 1), gain: paramNumber(p.gain, 0),
       });
     },
     getDefaultParameters: () => ({ type: 'lowpass', frequency: 5000, rolloff: -12, Q: 1, gain: 0 }),
