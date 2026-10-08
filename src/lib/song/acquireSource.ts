@@ -37,7 +37,7 @@ export async function acquire(src: SongSourceRef, publishPhase = true): Promise<
       return { file: new File([src.bytes], src.name, { type: 'application/octet-stream' }), companions: src.companions };
     case 'modland': {
       const { downloadModlandFile } = await import('@/lib/modlandApi');
-      const bytes = await downloadModlandFile(src.path);
+      const bytes = await downloadModlandFile(src.path, src.onProgress);
       phase();
       const name = src.path.split('/').pop() ?? 'song';
       return {

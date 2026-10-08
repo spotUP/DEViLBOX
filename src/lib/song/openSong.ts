@@ -73,7 +73,7 @@ export type SongSourceRef =
   | PreparedSong
   | { kind: 'file'; file: File; companions?: Map<string, ArrayBuffer> }
   | { kind: 'bytes'; name: string; bytes: ArrayBuffer; companions?: Map<string, ArrayBuffer> }
-  | { kind: 'modland'; path: string }
+  | { kind: 'modland'; path: string; onProgress?: (progress: import('@/lib/modlandApi').DownloadProgress) => void }
   /** A song served by this app (bundled library); partner files are resolved beside it. */
   | { kind: 'url'; url: string; name?: string; bytes?: ArrayBuffer };
 
