@@ -129,6 +129,11 @@ export class MaEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
+  /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */
+  swapModule(buffer: ArrayBuffer, subsong = 0): void {
+    this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer, subsong });
+  }
+
   /** Load the module and start on `subsong` (0-based) - the tune the song's grid shows. */
   async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<void> {
     await this._initPromise;

@@ -54,11 +54,19 @@ export async function openWorklet(opts: { dir: string; name: string; factory: st
     else if (proc.port.onmessage) { await proc.port.onmessage({ data }); }
     await new Promise((r) => setTimeout(r, 0));
   };
-  await send({
-    type: 'init', sampleRate: SAMPLE_RATE,
-    wasmBinary: readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.wasm`)).buffer.slice(0),
-    jsCode: readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.js`), 'utf8'),
-  });
+  // An emscripten bundle that also targets node takes `process.versions.node` for its host and reaches for require(); a worklet is a
+  // browser scope, so the module is created with no node in sight.
+  const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
+  Object.defineProperty(process, 'versions', { value: {}, configurable: true });
+  try {
+    await send({
+      type: 'init', sampleRate: SAMPLE_RATE,
+      wasmBinary: readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.wasm`)).buffer.slice(0),
+      jsCode: readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.js`), 'utf8'),
+    });
+  } finally {
+    Object.defineProperty(process, 'versions', versions);
+  }
   const render = (blocks: number): Float32Array[] => {
     const out: Float32Array[] = [];
     for (let b = 0; b < blocks; b++) {

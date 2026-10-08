@@ -14,11 +14,14 @@ import { Sd2Engine } from '@/engine/sidmon2/Sd2Engine';
 import { editedCells } from '@/lib/song/gridBaseline';
 
 /** The module with the note edits of `song` written into its note commands. Returns the bytes and what was not written. */
-export function writeSidMon2NoteEdits(song: TrackerSong, module: ArrayBuffer): { data: ArrayBuffer; warnings: string[] } {
+export function writeSidMon2NoteEdits(song: TrackerSong, module: ArrayBuffer, loaded: ArrayBuffer | null = song.sd2FileData ?? null): { data: ArrayBuffer; warnings: string[] } {
   const layout = song.uadeVariableLayout;
   const notes = layout?.noteBytes;
   if (!notes) return { data: module, warnings: [] };
   const out = new Uint8Array(module.slice(0));
+  // An edited byte is the LOADED module's byte moved by the cell's change, never the running engine's: that one already carries
+  // an earlier live edit of the same cell (G24), which would be added twice.
+  const from = loaded ? new Uint8Array(loaded) : out;
   const at = new Map(notes.map((n) => [`${n.pattern}:${n.channel}:${n.row}`, n]));
   const warnings: string[] = [];
   for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
@@ -28,7 +31,7 @@ export function writeSidMon2NoteEdits(song: TrackerSong, module: ArrayBuffer): {
       continue;
     }
     if (cell.note === n.note) continue;
-    const nb = (out[n.offset] ?? 0) + (cell.note - n.note);
+    const nb = (from[n.offset] ?? 0) + (cell.note - n.note);
     if (cell.note < 1 || cell.note > 96) warnings.push(`pattern ${pattern} voice ${channel + 1} row ${row}: a removed note needs a different command; not written`);
     else if (nb < 1 || nb > 72) warnings.push(`pattern ${pattern} voice ${channel + 1} row ${row}: note ${cell.note} is outside the player's 72 notes; not written`);
     else out[n.offset] = nb;
