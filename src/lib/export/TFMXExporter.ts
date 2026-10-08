@@ -27,6 +27,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { encodeTFMXCell } from '@/engine/uade/encoders/TFMXEncoder';
+import { editedCells } from '@/lib/song/gridBaseline';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,26 @@ export interface TFMXExportResult {
 
 export async function exportTFMX(song: TrackerSong): Promise<TFMXExportResult> {
   const warnings: string[] = [];
+
+  // The module as loaded with each edited command word written in place (the layout's own cell writer, the one a live edit uses).
+  // The from-scratch build below drops every pattern past 128 and rewrites the module's tables, so a song that has its module is
+  // never rebuilt. A row of the grid is a command word of the pattern: a wait (F3 xx, "wait xx+1 jiffies") typed over with a note
+  // becomes the note-with-wait command of the same length and the same wait, so the song keeps its timing and its size.
+  const loaded = song.tfmxFileData;
+  const layout = song.uadePatternLayout;
+  if (loaded && layout?.encodeCell && layout.getCellFileOffset) {
+    const out = new Uint8Array(loaded.slice(0));
+    for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
+      const at = layout.getCellFileOffset(pattern, row, channel);
+      if (at < 0 || at + 4 > out.length) {
+        if ((cell.note ?? 0) > 0) warnings.push(`pattern ${pattern} voice ${channel + 1} row ${row}: a note on a row no command word covers needs a longer pattern; not written`);
+        continue;
+      }
+      out.set(layout.encodeCell(cell), at);
+    }
+    const name = (song.name || 'untitled').replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'untitled';
+    return { data: new Blob([out.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: `mdat.${name}`, warnings };
+  }
 
   // ── 1. Collect TFMX patterns from all tracker patterns ──────────────────
   // Each tracker pattern has NUM_CHANNELS channels. Each channel's rows become

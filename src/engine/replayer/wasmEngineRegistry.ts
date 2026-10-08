@@ -651,6 +651,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
   },
   {
     key: 'TFMXModule',
+    liveSwap: true,
     synthType: 'TFMXModuleSynth',
     suppressNotes: true,
     fileDataKey: 'tfmxFileData',

@@ -22,6 +22,8 @@ export interface LiveSwapSpec {
   swapMessage(module: ArrayBuffer, loadArgs: unknown[]): Record<string, unknown>;
   pre: number;
   post: number;
+  /** How the audio after the swap is compared with the edited module played from the start (default: sample for sample). */
+  sameTail?(after: Float32Array[], oracleTail: Float32Array[]): boolean;
 }
 
 export interface LiveSwapResult {
@@ -79,7 +81,7 @@ export async function measureLiveSwap(spec: LiveSwapSpec, at: { p: number; ch: n
   edit();
   await sendCellEditsToEngine(liveTrackerSong(), [{ pattern: at.p, row: at.row, channel: at.ch, cell: useTrackerStore.getState().patterns[at.p].channels[at.ch].rows[at.row] }]);
   await settle();
-  const swapped = live.posted.some((m) => m.type === 'moduleSwapped');
+  const swapped = live.posted.some((m) => m.type === 'moduleSwapped' || (m.type === 'moduleReloaded' && m.ok === true));
   if (!swapped && process.env.LS_DEBUG) console.log('[ls] not swapped; worklet posted', JSON.stringify(live.posted.map((m) => [m.type, m.message])), 'swap error', swapError);
   const after = live.render(spec.post);
   (globalThis as { __liveEngine?: unknown }).__liveEngine = undefined;
@@ -119,7 +121,7 @@ export async function assertLiveSwap(
     expectFn(r.routeIs, 'the song is edited through the engine-swap route').toBe('engine-swap');
     expectFn(r.swapped, 'the worklet swapped the module (sentinel)').toBe(true);
     expectFn(sameAudio(r.before, r.oracleAll.slice(0, spec.pre)), 'before the edit it is the song').toBe(true);
-    expectFn(sameAudio(r.after, r.oracleAll.slice(spec.pre)), 'after the edit it is the edited module at the same position').toBe(true);
+    expectFn((spec.sameTail ?? sameAudio)(r.after, r.oracleAll.slice(spec.pre)), 'after the edit it is the edited module at the same position').toBe(true);
     expectFn(heard, 'and the edit is heard').toBe(true);
     return cell;
   }
