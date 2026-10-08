@@ -213,6 +213,12 @@ export interface UADEVariablePatternLayout {
   filePatternAddrs: number[];
 
   /**
+   * Formats whose grid is a reading of the player (a simulation, not a cell array): each grid note cell and the file byte
+   * of the command that played it, with the note the grid showed. A note edit is that byte moved by the cell's change.
+   */
+  noteBytes?: Array<{ pattern: number; channel: number; row: number; offset: number; note: number }>;
+
+  /**
    * Original byte sizes of each file-level pattern's encoded data.
    * filePatternSizes[filePatIdx] = byte count.
    * Re-encoded data must fit within this limit (overflow = reject edit).
