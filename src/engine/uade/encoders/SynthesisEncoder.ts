@@ -14,7 +14,7 @@
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 
-function encodeSynthesisCell(cell: TrackerCell): Uint8Array {
+function encodeSynthesisCell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
   const out = new Uint8Array(4);
   const note = cell.note ?? 0;
 
@@ -30,10 +30,11 @@ function encodeSynthesisCell(cell: TrackerCell): Uint8Array {
   // Byte 1: instrument
   out[1] = (cell.instrument ?? 0) & 0xFF;
 
-  // Byte 2: arpeggio (high nibble, from volume field or separate) | effect (low nibble)
-  // The parser stores arpeggio index separately but we don't have a field for it in TrackerCell
-  // It would have been stored in volume or lost. Use 0 for arpeggio.
-  out[2] = (cell.effTyp ?? 0) & 0x0F;
+  // Byte 2: arpeggio (high nibble) | effect (low nibble). The grid has no field
+  // for the arpeggio, so an edit keeps the stored high nibble (the layout sets
+  // encodeOverStored); without a stored cell (a new file) it is 0.
+  const storedArpeggio = stored && stored.length >= 3 ? stored[2] & 0xF0 : 0;
+  out[2] = storedArpeggio | ((cell.effTyp ?? 0) & 0x0F);
 
   // Byte 3: effect argument
   out[3] = (cell.eff ?? 0) & 0xFF;
