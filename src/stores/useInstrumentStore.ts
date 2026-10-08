@@ -919,7 +919,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             const wasmSynthTypes = [
               'JamCrackerSynth', 'MaxTraxSynth', 'FCSynth', 'SoundMonSynth', 'SidMonSynth',
               'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'FredSynth', 'TFMXSynth',
-              'SonicArrangerSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'DavidWhittakerSynth',
+              'SonicArrangerSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'HippelStSynth', 'DavidWhittakerSynth',
               'OctaMEDSynth', 'SidMon1Synth', 'MusicLineSynth', 'KlysSynth',
             ];
             if (wasmSynthTypes.includes(updatedInstrument.synthType)) {

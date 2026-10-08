@@ -363,6 +363,8 @@ export interface TrackerSong {
   tfmFileData?: ArrayBuffer;
   /** Atari ST SNDH file (raw or ICE!-packed) for PsgplayEngine (PSG play: 68000 + YM2149 + MFP + STE DMA) */
   sndhFileData?: ArrayBuffer;
+  /** Jochen Hippel Atari ST playback image (HstSongEdit.image) for HippelStEngine (the WT ST player in WASM + a YM2149 core) */
+  hippelStFileData?: ArrayBuffer;
   /** SNDH subtune PsgplayEngine starts (1-based; absent = the file's default) */
   sndhSubtune?: number;
   /** NSF/NSFE, GBS, HES, KSS, SPC, VGM/VGZ or GYM file for GmeEngine (game-music-emu) */

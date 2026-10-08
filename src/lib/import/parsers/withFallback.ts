@@ -54,6 +54,8 @@ const NATIVE_AUDITION_SYNTHS = new Set([
   // K7: Rob Hubbard plays through UADE (injectUADE), so the clobber below made every instrument a
   // UADEEditableSynth whose key plays nothing; the keyboard voice is the replayer own voice (robhubbard_synth.c).
   'RobHubbardSynth',
+  // K9: Hippel ST plays on its own engine (HippelStEngine); a key starts the instrument on its keyboard player.
+  'HippelStSynth',
 ]);
 
 /**
@@ -68,7 +70,7 @@ const NATIVE_AUDITION_SYNTHS = new Set([
  */
 export const KEYBOARD_VOICE_SYNTHS: ReadonlySet<string> = new Set([
   'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth', 'FCSynth', 'FredSynth',
-  'TFMXSynth', 'OctaMEDSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth',
+  'TFMXSynth', 'OctaMEDSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'HippelStSynth',
   'DavidWhittakerSynth', 'SonicArrangerSynth', 'InStereo1Synth', 'InStereo2Synth',
   'StartrekkerAMSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'FuturePlayerSynth',
   'SunTronicSynth',

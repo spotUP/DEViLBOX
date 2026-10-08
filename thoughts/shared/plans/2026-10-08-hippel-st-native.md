@@ -58,3 +58,31 @@ behaviour (state machine, formats, effect semantics), not a line-by-line transla
 or from the song files. The Amiga `Jochen Hippel_v1.asm` already in third-party/uade-3.05 is UADE's, not ours.
 
 - Licence decision (owner 2026-10-08): "we dont need to keep it private" - commit the transpiled Hippel ST player and its asm under third-party/ with an origin/licence README.
+
+## Progress (2026-10-08, stopped at main's request)
+
+Decision change: the player is NOT hand-ported; it is the WT asm through tools/asm68k-to-c (owner), committed
+with its origin in third-party/hippelst/README.md. Exactness is by construction and by oracle.
+
+DONE (committed): C player (hippelst-wasm/src/hippelst_play.c, regen.sh), three transpiler bugs fixed with tests
+(RMW on (An)+/-(An); MOVEA.W sign extension; byte through SP steps 2), oracle test hippelStNativeMatchesPlayer
+(8 songs, every subsong, 1500 ticks, 11 YM regs equal to UADE's shadow, in test:ci).
+DONE (this commit): YM render (Furnace ay8910 + blip_buf, ym_render.cpp), position tracking, keyboard player
+(hst_key_on runs the player's own note start), worklet, HippelStEngine, HippelStSynth, registry entry 'HippelSt'
+(before UADEEditable; song field hippelStFileData), routing position wiring, live-edit route 'hippelst-module',
+tests hippelStNativeReachability (import -> registry -> engine class -> worklet; audio == decoder core, position ==
+decoder, key sounds) and hippelStKeysMatchSongVoice (key regs == song voice regs per instrument; within 50 cents /
+2 dB; silent exactly when the volume sequence has no volume).
+
+OPEN (next steps, in order):
+1. Live edit measured: edit a cell via sendCellEditsToEngine, worklet audio == decoder core of the edited image
+   (write hippelStLiveEditHeard.test.ts; the code path applyHippelStEdits exists, untested).
+2. Revert-checks of: key volume/attenuation resets, MOVEA.W/RMW/SP transpiler fixes (core), reload path.
+3. Provenance + ratchet guards: gridProvenance/formatNameSymmetry were not run; run them.
+4. Known: V2M feeder test (everyEngineHasAFeeder) fails independent of this work; JochenHippelSTParser.test.ts
+   needs files under "Reference Music/" that are absent (pre-existing).
+5. Not modelled: SID command (old/new) and digi drums ($EC) are Paula-side in the WT player; the corpus
+   registers match without them, usage in the corpus not counted. Volume >= 16 (YM envelope mode) is played as
+   volume 12 (WT's Amiga table entry 16 = half amplitude).
+6. Owner test (LOCAL http://localhost:5174): open public/data/songs/hippel-st/crown england.hst, press play
+   (YM sound, not Paula), press keys on instruments 1-9, edit a note while playing.

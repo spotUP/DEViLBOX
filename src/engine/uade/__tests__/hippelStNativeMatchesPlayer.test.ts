@@ -105,9 +105,9 @@ async function uadeShadowTicks(image: Uint8Array, name: string, ticks: number, s
   if (mod._uade_wasm_load(ptr, image.length, hp) !== 0) throw new Error('uade load');
   const pL = mod._malloc(64 * 4), pR = mod._malloc(64 * 4);
   const hitsPtr = mod._malloc(256 * 16);
-  const state = Array.from({ length: HST_YM_REGS }, (_, r) => (r === 7 ? 0xff : 0));
+  const state: number[] = Array.from({ length: HST_YM_REGS }, (_, r) => (r === 7 ? 0xff : 0));
   const regs = new Uint8Array(ticks * HST_YM_REGS);
-  let n = 0;
+  let n: number = 0;
   const drain = (): void => {
     const count = mod._uade_wasm_get_watchpoint_hits(hitsPtr, 256);
     refreshHeap(mod);

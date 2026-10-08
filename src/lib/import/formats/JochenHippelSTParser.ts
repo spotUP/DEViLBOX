@@ -165,7 +165,9 @@ export function parseJochenHippelSTFile(buffer: ArrayBuffer, filename: string, s
 
   const instruments: InstrumentConfig[] = Array.from({ length: edit.volSeqs }, (_, i) => ({
     id: i + 1, name: `Volume sequence ${i}`, type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    // A key starts the volume sequence (and the sound sequence it names) on the native player's keyboard voice.
+    synthType: 'HippelStSynth' as const, effects: [], volume: 0, pan: 0,
+    metadata: { hippelStInstrument: i },
   } as InstrumentConfig));
 
   const speedOf = (i: number) => hstSubsongRange(m, i).speed;
@@ -188,8 +190,10 @@ export function parseJochenHippelSTFile(buffer: ArrayBuffer, filename: string, s
     patterns, instruments,
     songPositions, songLength: songPositions.length, restartPosition: 0, numChannels: NUM_CHANNELS,
     initialSpeed: speedOf(index), initialBPM: 125, linearPeriods: false,
-    // UADE's ST player plays the playback image (named .hst: the `sog` and
-    // `soc` names reach the Amiga Hippel players).
+    // The native ST player (HippelStEngine) plays the playback image; so does UADE's ST player when
+    // asked to (named .hst: the `sog` and `soc` names reach the Amiga Hippel players). The registry
+    // starts the native engine, the exporter and the grid edits read the same image.
+    hippelStFileData: edit.image.buffer.slice(edit.image.byteOffset, edit.image.byteOffset + edit.image.byteLength) as ArrayBuffer,
     uadeEditableFileData: edit.image.buffer.slice(edit.image.byteOffset, edit.image.byteOffset + edit.image.byteLength) as ArrayBuffer,
     uadeEditableFileName: `${stem}.hst`,
     // Rows are `speed` player interrupts from the first one (proven against
