@@ -3030,7 +3030,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           <div
             ref={bottomScrollRef}
             onScroll={handleBottomScroll}
-            className={`flex-shrink-0 h-3 bg-dark-bgTertiary border-b border-dark-border overflow-x-auto scrollbar-modern ${allChannelsFit ? 'hidden' : ''}`}
+            className={`flex-shrink-0 h-3 bg-dark-bgTertiary border-b border-dark-border overflow-x-auto scrollbar-always ${allChannelsFit ? 'hidden' : ''}`}
             style={{ paddingLeft: LINE_NUMBER_WIDTH }}
           >
             <div style={{ width: totalChannelsWidth, height: 1 }} />
