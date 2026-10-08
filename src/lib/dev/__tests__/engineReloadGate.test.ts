@@ -34,4 +34,17 @@ describe('a dev-server reload no longer lands in the middle of an agent measurem
     vi.advanceTimersByTime(2_000);
     expect(reload).toHaveBeenCalledTimes(1);
   });
+
+  // Owner, 2026-10-08: "cant test now as the page reloads as its worked on".
+  it('never reloads while the person is listening or working, however long, then reloads once', () => {
+    const reload = vi.fn();
+    let listening = true;
+    const gate = createReloadGate({ inFlight: () => false, sinceLastActivityMs: () => Infinity, listening: () => listening, reload, maxWaitMs: 30_000 });
+    gate();
+    vi.advanceTimersByTime(30 * 60_000); // half an hour of music, past the cap
+    expect(reload).not.toHaveBeenCalled();
+    listening = false;
+    vi.advanceTimersByTime(1_000);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
 });
