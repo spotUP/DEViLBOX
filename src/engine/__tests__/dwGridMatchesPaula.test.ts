@@ -19,7 +19,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { openUade, PaulaSession, readChipRam, type PaulaLogModule } from './gridOracle';
-import { rowSeconds, gridOnsets, paulaOnsetsOf, onsetCoverage } from './gridClockOracle';
+import { rowSeconds, gridOnsets, paulaOnsetsOf, onsetMatch } from './gridClockOracle';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { parseDavidWhittakerFile } from '@/lib/import/formats/DavidWhittakerParser';
 import { walkDavidWhittaker, dwSubsongCount, DW_WALK } from '@/lib/import/formats/DavidWhittakerWasmExtractor';
@@ -56,7 +56,7 @@ function tableOffset(mod: PaulaLogModule, bytes: Uint8Array, name: string): numb
 function paulaOnsets(mod: PaulaLogModule, bytes: Uint8Array, name: string, table: number, tune: number, seconds: number): number[][] {
   const patched = bytes.slice();
   patched.copyWithin(table, table + 10 * tune, table + 10 * tune + 10);
-  return paulaOnsetsOf(new PaulaSession(mod, patched, name, { subsong: 1 }), seconds);
+  return paulaOnsetsOf(new PaulaSession(mod, patched, name, { subsong: 1 }), seconds, true);
 }
 
 describe('David Whittaker grids against the original player (UADE Paula note-ons)', { timeout: 900_000 }, () => {
@@ -73,6 +73,8 @@ describe('David Whittaker grids against the original player (UADE Paula note-ons
       expect(table, 'the song table was found from the player in chip RAM').toBeGreaterThan(0);
       const count = await dwSubsongCount(ab);
       let compared = 0;
+      const rows: string[] = [];
+      const misses: string[] = [];
       for (let tune = 0; tune < count; tune++) {
         const walk = await walkDavidWhittaker(ab.slice(0), 60_000, tune);
         if (!walk.events.some((e) => e.kind === DW_WALK.note)) continue;       // a silent tune has nothing to compare
@@ -82,12 +84,20 @@ describe('David Whittaker grids against the original player (UADE Paula note-ons
         const grid = gridOnsets(song);
         // a fresh UADE per tune: a second load in one instance carries the first tune's state over
         const paula = paulaOnsets(await openUade(), bytes, name, table, tune, span + 1);
-        for (const { voice, notes, hit } of onsetCoverage(grid, paula, span, TOLERANCE_MS)) {
-          expect(hit / notes, `${name} tune ${tune} voice ${voice + 1}: ${hit} of ${notes} grid notes sit on a note the player starts (row = ${rowSeconds(song) * 1000} ms)`).toBeGreaterThanOrEqual(MIN_COVERAGE);
+        // every voice, silent ones too: 0x82 points a voice at 64 zero bytes (a Paula pointer + period write that
+        // is no sound), so the original's audible note-ons on voices 3 and 4 of apb.dw tune 0 are none, as the grid's
+        if (process.env.DW_TABLE) rows.push(`tune ${tune} span ${span.toFixed(2)} stop ${stop?.tick} ticks ${walk.ticks} paula ${paula.map((l) => l.filter((t) => t <= span).map((t) => t.toFixed(2)).join('/')).join(' | ')} grid ${grid.map((l) => l.filter((t) => t <= span).map((t) => t.toFixed(2)).join('/')).join(' | ')}`);
+        for (const m of onsetMatch(grid, paula, span, TOLERANCE_MS)) {
+          const what = `${name} tune ${tune} voice ${m.voice + 1}: grid ${m.grid} notes (${m.gridHit} on a player note), player ${m.player} audible note-ons (${m.playerHit} on a grid note), row = ${rowSeconds(song) * 1000} ms`;
+          const ok = (hit: number, n: number): boolean => n === 0 || hit / n >= MIN_COVERAGE;
+          if (!ok(m.gridHit, m.grid) || !ok(m.playerHit, m.player) || (m.player === 0) !== (m.grid === 0)) misses.push(what);
+          rows.push(`${name} tune ${tune} v${m.voice + 1}: grid ${m.grid} hit ${m.gridHit} | player ${m.player} hit ${m.playerHit}`);
           compared++;
         }
       }
-      expect(compared, 'voices compared').toBeGreaterThanOrEqual(name === 'apb.dw' ? 14 : 4);
+      if (process.env.DW_TABLE) console.log(rows.join('\n'));
+      expect(misses, 'voices where the grid and the player disagree').toEqual([]);
+      expect(compared, 'voices compared').toBeGreaterThanOrEqual(name === 'apb.dw' ? 32 : 12);
     });
   }
 });
