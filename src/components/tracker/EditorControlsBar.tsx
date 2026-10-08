@@ -14,6 +14,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
 import { useAudioStore } from '@stores/useAudioStore';
+import { masterFxButtonState } from '@/lib/audio/masterFxButtonState';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useEditorControls } from '@hooks/views/useEditorControls';
 import { BG_MODES, getBgModeLabel } from './TrackerVisualBackground';
@@ -85,6 +86,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // DOM-only: UI store for view-mode switching and groove dialog command
   const modalOpen = useUIStore(s => s.modalOpen);
+  const masterFx = masterFxButtonState(useAudioStore(s => s.masterEffects), modalOpen === 'masterFx');
   const dialogOpen = useUIStore(s => s.dialogOpen);
   const closeDialogCommand = useUIStore(s => s.closeDialogCommand);
 
@@ -274,14 +276,11 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Master FX */}
         <button
           onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
-          className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
-            modalOpen === 'masterFx'
-              ? 'bg-accent-primary/20 text-accent-primary'
-              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-          }`}
-          title="Master effects chain"
+          className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${masterFx.toneClass}`}
+          title={masterFx.title}
+          data-master-fx-active={masterFx.activeCount > 0 ? 'true' : 'false'}
         >
-          Master FX
+          {masterFx.label}
         </button>
 
         {/* Channel Selector (grid and piano roll views) */}
