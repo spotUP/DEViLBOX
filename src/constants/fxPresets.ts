@@ -102,7 +102,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -22, ratio: 4, attack: 0.02, release: 0.12, knee: 6 } },
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 18, parameters: { drive: 40, tone: 11000 } },
     ] },
-  { name: 'Brick Wall', description: 'Hard limiting for maximum loudness', tags: ['Loud'], gainCompensationDb: 1.4,
+  { name: 'Brick Wall', description: 'Hard limiting for maximum loudness', tags: ['Loud'], gainCompensationDb: 1.5,
     effects: [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 0, high: 1 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -24, ratio: 20, attack: 0.001, release: 0.05, knee: 0 } },
