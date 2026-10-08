@@ -21,6 +21,7 @@ import {
   setDeckSlipEnabled,
   setDeckRepitchLock,
   djPanic,
+  setDeckPitch,
 } from '@/engine/dj/DJActions';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
 import { beatJump, triggerHotCue, activateSeratoLoop } from '@/engine/dj/DJBeatJump';
@@ -113,7 +114,7 @@ export function useDJKeyboardHandler(): void {
       case 'w':
         if (shift) {
           // Pitch up (coarse)
-          store.setDeckPitch('A', store.decks.A.pitchOffset + 1);
+          setDeckPitch('A', store.decks.A.pitchOffset + 1);
         } else {
           // Cue (jump to cue point)
           cueDeck('A', store.decks.A.cuePoint);
@@ -139,10 +140,10 @@ export function useDJKeyboardHandler(): void {
       case 's':
         if (shift) {
           // Pitch down (coarse)
-          store.setDeckPitch('A', store.decks.A.pitchOffset - 1);
+          setDeckPitch('A', store.decks.A.pitchOffset - 1);
         } else {
           // Pitch reset
-          store.setDeckPitch('A', 0);
+          setDeckPitch('A', 0);
         }
         break;
 
@@ -207,7 +208,7 @@ export function useDJKeyboardHandler(): void {
       case 'o':
         if (shift) {
           // Pitch up (coarse)
-          store.setDeckPitch('B', store.decks.B.pitchOffset + 1);
+          setDeckPitch('B', store.decks.B.pitchOffset + 1);
         } else {
           // Cue
           cueDeck('B', store.decks.B.cuePoint);
@@ -233,10 +234,10 @@ export function useDJKeyboardHandler(): void {
       case 'k':
         if (shift) {
           // Pitch down (coarse)
-          store.setDeckPitch('B', store.decks.B.pitchOffset - 1);
+          setDeckPitch('B', store.decks.B.pitchOffset - 1);
         } else {
           // Pitch reset
-          store.setDeckPitch('B', 0);
+          setDeckPitch('B', 0);
         }
         break;
 
@@ -313,10 +314,10 @@ export function useDJKeyboardHandler(): void {
           if (stateA.beatGrid && stateB.beatGrid) {
             const semitones = syncBPMToOther('B', 'A');
             phaseAlign('B', 'A', 'beat');
-            store.setDeckPitch('B', semitones);
+            setDeckPitch('B', semitones);
           } else {
             const semitones = DJBeatSync.syncBPM(engine.deckA, engine.deckB);
-            store.setDeckPitch('B', semitones);
+            setDeckPitch('B', semitones);
           }
         }
         break;
@@ -389,10 +390,10 @@ export function useDJKeyboardHandler(): void {
         if (store.decks.A.beatGrid && store.decks.B.beatGrid) {
           const sem = syncBPMToOther('A', 'B');
           phaseAlign('A', 'B', 'beat');
-          store.setDeckPitch('A', sem);
+          setDeckPitch('A', sem);
         } else {
           const sem = DJBeatSync.syncBPM(engine.deckB, engine.deckA);
-          store.setDeckPitch('A', sem);
+          setDeckPitch('A', sem);
         }
         break;
       }

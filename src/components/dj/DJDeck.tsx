@@ -8,7 +8,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { setDeckPitch, setDeckChannelMuteMask, setDeckRepitchLock } from '@/engine/dj/DJActions';
+import { setDeckChannelMuteMask, setDeckRepitchLock } from '@/engine/dj/DJActions';
 import { openDeckTrack } from '@/lib/song/openSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
@@ -51,16 +51,6 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     const peaks = s.decks[deckId].waveformPeaks;
     return !!(peaks && peaks.length > 0);
   });
-
-  // Subscribe to pitch changes in store and propagate to engine
-  // This catches ALL pitch sources (slider, keyboard, sync button) in one place
-  useEffect(() => {
-    const unsubscribe = useDJStore.subscribe(
-      (state) => state.decks[deckId].pitchOffset,
-      (newPitch) => { setDeckPitch(deckId, newPitch); },
-    );
-    return unsubscribe;
-  }, [deckId]);
 
   // Subscribe to repitchLock changes and push to the engine.
   useEffect(() => {

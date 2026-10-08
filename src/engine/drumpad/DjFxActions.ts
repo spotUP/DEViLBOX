@@ -793,7 +793,7 @@ function rampDeckStop(
       // quadratic = tape feel (gradual); cubic = vinyl feel (abrupt, late drop)
       const eased = shape === 'cubic' ? progress * progress * progress : progress * progress;
       const rate = startRate * Math.max(0.01, 1 - eased);
-      useDJStore.getState().setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
+      setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
       if (progress < 1) {
         rafRef.raf = requestAnimationFrame(animate);
       } else {
@@ -801,7 +801,7 @@ function rampDeckStop(
         useDJStore.getState().setDeckPlaying(deckId, false);
         // Snap pitch back to the pre-stop value so the next play() resumes
         // at the DJ's tempo instead of stuck at -infinity semitones.
-        useDJStore.getState().setDeckPitch(deckId, startPitch);
+        setDeckPitch(deckId, startPitch);
         rafRef.raf = 0;
       }
     };
@@ -1179,13 +1179,13 @@ function createDeckBrake(): DjFxAction {
           const elapsed = performance.now() - startTime;
           const progress = Math.min(1, elapsed / durationMs);
           const rate = 1 - progress * progress; // quadratic deceleration
-          useDJStore.getState().setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
+          setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
           if (progress < 1) {
             brakeRaf = requestAnimationFrame(animate);
           } else {
             try { deck.pause(); } catch { /* */ }
             useDJStore.getState().setDeckPlaying(deckId, false);
-            useDJStore.getState().setDeckPitch(deckId, 0);
+            setDeckPitch(deckId, 0);
           }
         };
         brakeRaf = requestAnimationFrame(animate);
@@ -1195,7 +1195,7 @@ function createDeckBrake(): DjFxAction {
       cancelAnimationFrame(brakeRaf);
       brakeRaf = 0;
       const deckId = getActiveDeckId();
-      useDJStore.getState().setDeckPitch(deckId, 0);
+      setDeckPitch(deckId, 0);
     },
   };
 }
@@ -1209,11 +1209,11 @@ function createHalfSpeed(): DjFxAction {
     engage() {
       const deckId = getActiveDeckId();
       // -12 semitones = half speed (one octave down)
-      useDJStore.getState().setDeckPitch(deckId, -12);
+      setDeckPitch(deckId, -12);
     },
     disengage() {
       const deckId = getActiveDeckId();
-      useDJStore.getState().setDeckPitch(deckId, 0);
+      setDeckPitch(deckId, 0);
     },
   };
 }

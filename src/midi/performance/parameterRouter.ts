@@ -1168,8 +1168,9 @@ function getDJRoutes(): Record<string, DJRouteHandler> {
     'dj.deckB.filterQ': (v) => getDJEngine().deckB.setFilterResonance(0.5 + v * 14.5),
 
     // Pitch: 0-1 maps to -6..+6 semitones
-    'dj.deckA.pitch': (v) => getDJEngine().deckA.setPitch(-6 + v * 12),
-    'dj.deckB.pitch': (v) => getDJEngine().deckB.setPitch(-6 + v * 12),
+    // Through the one pitch action: engine immediately, store on the next frame.
+    'dj.deckA.pitch': (v) => DJActions.setDeckPitch('A', -6 + v * 12),
+    'dj.deckB.pitch': (v) => DJActions.setDeckPitch('B', -6 + v * 12),
 
     // Scratch velocity: 0-1 maps to -4..+4 (center = stopped)
     'dj.deckA.scratchVelocity': (v) => getDJEngine().deckA.setScratchVelocity(-4 + v * 8),
@@ -1260,9 +1261,6 @@ interface DJMutableState {
     eqPreset: string | null;
     filterPosition: number;
     filterResonance: number;
-    pitchOffset: number;
-    effectiveBPM: number;
-    detectedBPM: number;
     scratchVelocity: number;
   }>;
 }
@@ -1318,20 +1316,6 @@ function applyDJMutation(state: DJMutableState, param: string, value: number): v
     case 'dj.deckB.filterQ':
       state.decks.B.filterResonance = clamp(0.5 + value * 14.5, 0.5, 15);
       break;
-    case 'dj.deckA.pitch': {
-      const c = clamp(-6 + value * 12, -16, 16);
-      state.decks.A.pitchOffset = c;
-      const base = state.decks.A.detectedBPM || 120;
-      state.decks.A.effectiveBPM = Math.round(base * Math.pow(2, c / 12) * 100) / 100;
-      break;
-    }
-    case 'dj.deckB.pitch': {
-      const c = clamp(-6 + value * 12, -16, 16);
-      state.decks.B.pitchOffset = c;
-      const base = state.decks.B.detectedBPM || 120;
-      state.decks.B.effectiveBPM = Math.round(base * Math.pow(2, c / 12) * 100) / 100;
-      break;
-    }
     case 'dj.deckA.scratchVelocity':
       state.decks.A.scratchVelocity = clamp(-4 + value * 8, -8, 8);
       break;
