@@ -10,6 +10,7 @@
  * survive React Strict Mode remounts).
  */
 
+import { decodeSampleAtOwnRate } from './decodeSampleAtOwnRate';
 import React, { useRef, useEffect, useState } from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { EnvelopePoints, AutoVibrato } from '@typedefs/tracker';
@@ -198,21 +199,7 @@ async function decodePCM(instrument: InstrumentConfig): Promise<{ pcm: Int16Arra
   const sample = instrument.sample;
   if (!sample) return null;
 
-  let audioBuffer: AudioBuffer | null = null;
-
-  try {
-    if (sample.audioBuffer && sample.audioBuffer.byteLength > 0) {
-      const ctx = new OfflineAudioContext(1, 1, 44100);
-      audioBuffer = await ctx.decodeAudioData(sample.audioBuffer.slice(0));
-    } else if (sample.url) {
-      const resp = await fetch(sample.url);
-      const arrayBuf = await resp.arrayBuffer();
-      const ctx = new OfflineAudioContext(1, 1, 44100);
-      audioBuffer = await ctx.decodeAudioData(arrayBuf);
-    }
-  } catch {
-    return null;
-  }
+  const audioBuffer = await decodeSampleAtOwnRate(sample);
 
   if (!audioBuffer) return null;
 
