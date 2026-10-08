@@ -149,7 +149,7 @@ export function parseGoatTrackerSng(b: Uint8Array): GTSongData | null {
 }
 
 /** Write a GTS5 .sng (gsong.c savesong). */
-export function writeGoatTrackerSng(song: GTSongData): Uint8Array {
+export function writeGoatTrackerSng(song: GTSongData, settings?: GTPlaySettings): Uint8Array {
   const out: number[] = [0x47, 0x54, 0x53, 0x35];
   writeText(out, song.name, 32);
   writeText(out, song.author, 32);
@@ -180,6 +180,12 @@ export function writeGoatTrackerSng(song: GTSongData): Uint8Array {
     out.push(rows.length + 1);
     for (const r of rows) out.push(r[0], r[1], r[2], r[3]);
     out.push(GT_ENDPATT, 0, 0, 0);
+  }
+  if (settings) {
+    // GTUltra's editor settings (gsong.c savesong): the engine reads them back
+    // on load, which is how a multispeed or 25 Hz song reaches its tick rate.
+    const le32 = (v: number): number[] => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+    out.push(0x1f, 0, 0, 0, settings.ntsc ? 1 : 0, 0, ...le32(settings.adparam), ...le32(settings.multiplier), ...le32(3), 0);
   }
   return new Uint8Array(out);
 }
@@ -271,8 +277,19 @@ export interface GT2SidLayout {
   firstNoHr: number;
   firstLegato: number;
   defaultTempo: number;
-  /** Speed multiplier the SID was packed with (1 = 50/60 Hz, 0 = 25 Hz). The .sng does not store it. */
+  /** Speed multiplier the SID was packed with (1 = 50/60 Hz, 0 = 25 Hz). A GoatTracker 2 .sng does not store it; GTUltra's settings block does. */
   multiplier: number;
+  /** Packed for NTSC (PSID clock flag). */
+  ntsc: boolean;
+  /** Hard restart ADSR as GoatTracker's -A option: attack/decay in the high byte, sustain/release in the low; 0 when the build has no hard restart. */
+  adparam: number;
+}
+
+/** What GTUltra's .sng settings block (ID 0x1f, gsong.c) carries that a plain GoatTracker 2 .sng does not. */
+export interface GTPlaySettings {
+  multiplier: number;
+  ntsc: boolean;
+  adparam: number;
 }
 
 export interface GT2SidDecode {
@@ -485,6 +502,9 @@ function decode(file: Uint8Array): GT2SidDecode {
   // (greloc.c speedcode: ldx #lo / stx $dc04 / ldx #hi / stx $dc05) in front of
   // the player; 0 is the half-speed (25 Hz) setting.
   const multiplier = speedMultiplier(file, mem, load);
+  const ntsc = (file[0x77] & 0x0c) === 0x08;
+  // lda #SRPARAM (hrAt+1) ... lda #ADPARAM (after the sr store).
+  const adparam = hrAt.length ? (mem[hrAt[0] + 3 + srStore.length] << 8) | mem[hrAt[0] + 1] : 0;
   let firstNoHr: number;
   let firstLegato = 0xff;
   if (nohrCmp.length) {
@@ -632,7 +652,7 @@ function decode(file: Uint8Array): GT2SidDecode {
     song,
     layout: {
       songs, patterns, instruments: I, hasPulse, hasFilter, hasInstrVib, fixedParams: !notFixed,
-      noWaveDelay, simplePulse, speedZero, tableSizes: [W, Pn, F, Sp], firstNoHr, firstLegato, defaultTempo, multiplier,
+      noWaveDelay, simplePulse, speedZero, tableSizes: [W, Pn, F, Sp], firstNoHr, firstLegato, defaultTempo, multiplier, ntsc, adparam,
     },
   };
 }
@@ -789,7 +809,7 @@ export function goatTrackerSongBytes(filename: string, bytes: Uint8Array): Uint8
   if (name.endsWith('.sng')) return isGoatTrackerSng(bytes) ? bytes : null;
   if (name.endsWith('.sid')) {
     const decoded = decodeGoatTracker2Sid(bytes);
-    return decoded ? writeGoatTrackerSng(decoded.song) : null;
+    return decoded ? writeGoatTrackerSng(decoded.song, decoded.layout) : null;
   }
   return null;
 }
