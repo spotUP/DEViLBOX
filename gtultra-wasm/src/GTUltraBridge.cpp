@@ -578,10 +578,15 @@ void gt_render_audio(float* outL, float* outR, int frames) {
         }
     }
 
-    /* Convert Sint16 buffers to float L/R (SID0+SID2=L, SID1+SID3=R) */
+    /* Convert Sint16 buffers to float L/R. Only the song's own chips are
+     * mixed: SID0 (+SID2) left, SID1 (+SID3) right. A one-chip song is mono
+     * on both sides - mixing the idle second chip put the music on the left
+     * only and the idle chip's DC offset on the right. */
     for (int i = 0; i < samplesToRender; i++) {
-        outL[i] = (sid0buf[i] + sid2buf[i]) / 32768.0f;
-        outR[i] = (sid1buf[i] + sid3buf[i]) / 32768.0f;
+        int l = sid0buf[i] + (gt_sid_count >= 3 ? sid2buf[i] : 0);
+        int r = (gt_sid_count >= 2 ? sid1buf[i] : sid0buf[i]) + (gt_sid_count >= 4 ? sid3buf[i] : 0);
+        outL[i] = l / 32768.0f;
+        outR[i] = r / 32768.0f;
     }
 }
 
