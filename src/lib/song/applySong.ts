@@ -82,6 +82,8 @@ export interface ProjectExtras {
   automation?: AutomationCurve[];
   /** A project restores its own master chain; an import keeps the user's. */
   masterEffects?: EffectConfig[];
+  /** The chain's preset make-up gain, dB: restored with the chain it was measured for. */
+  masterGainCompensationDb?: number;
   grooveTemplateId?: string;
   linearPeriods?: boolean;
   /** Instrument ids replaced with synths for hybrid playback. */
@@ -95,7 +97,7 @@ export interface ProjectExtras {
 /** Restore a project's state beyond the song, after the song is in place. */
 async function applyProjectExtras(x: ProjectExtras): Promise<void> {
   if (x.linearPeriods != null) useEditorStore.getState().setLinearPeriods(x.linearPeriods);
-  if (x.masterEffects) useAudioStore.getState().setMasterEffects(x.masterEffects);
+  if (x.masterEffects) useAudioStore.getState().setMasterEffects(x.masterEffects, x.masterGainCompensationDb);
   useTransportStore.getState().setGrooveTemplate(x.grooveTemplateId || 'straight');
   if (x.mixer) useMixerStore.getState().loadMixerState(x.mixer);
   // setDubBus merges over defaults, so an older file missing newer fields loads.

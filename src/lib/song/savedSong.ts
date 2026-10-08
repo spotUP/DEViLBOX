@@ -36,6 +36,8 @@ export interface SavedSongFields {
   /** SongExport: the automation curves. */
   automationCurves?: AutomationCurve[];
   masterEffects?: EffectConfig[];
+  /** The master chain's preset make-up gain, dB (absent: none). */
+  masterGainCompensationDb?: number;
   grooveTemplateId?: string;
   trackerFormat?: string;
   linearPeriods?: boolean;
@@ -99,6 +101,7 @@ export function savedSongToApply(data: SavedSongFields): SongToApply {
   const extras: ProjectExtras = {
     automation: curves,
     masterEffects: data.masterEffects,
+    masterGainCompensationDb: data.masterGainCompensationDb,
     grooveTemplateId: data.grooveTemplateId,
     linearPeriods: data.linearPeriods,
     replacedInstruments: data.replacedInstruments,

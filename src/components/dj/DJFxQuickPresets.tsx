@@ -25,6 +25,8 @@ import type { EffectConfig, AudioEffectType } from '@typedefs/instrument';
 interface UserMasterFxPreset {
   name: string;
   effects: EffectConfig[];
+  /** The make-up gain the chain was saved with, dB (absent in presets saved before 2026-10-08: none). */
+  gainCompensationDb?: number;
 }
 
 const USER_PRESETS_KEY = 'master-fx-user-presets';
@@ -209,7 +211,7 @@ export const DJFxQuickPresets: React.FC = () => {
         ...fx,
         id: `master-fx-${Date.now()}-${i}`,
       }));
-      applyPreset(effects, preset.name, 0); // user presets have no measured compensation
+      applyPreset(effects, preset.name, preset.gainCompensationDb);
     },
     [applyPreset],
   );

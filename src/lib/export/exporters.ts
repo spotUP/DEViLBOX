@@ -253,6 +253,7 @@ export interface SongExport {
   automation?: Record<string, unknown>; // Legacy nested format or array of curves
   automationCurves?: AutomationCurve[]; // New: flat array of all automation curves
   masterEffects?: EffectConfig[]; // Global effects chain
+  masterGainCompensationDb?: number; // The chain's preset make-up gain, dB
   grooveTemplateId?: string; // Groove/swing template ID
   speed?: number; // Ticks per row (default 6)
   trackerFormat?: string; // 'MOD' | 'XM' | 'IT' | 'S3M' | etc.

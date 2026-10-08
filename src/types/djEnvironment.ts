@@ -77,6 +77,8 @@ export interface DJEnvironment {
 
   /** Master FX chain (reverb, delay, etc.) */
   masterEffects: EffectConfig[];
+  /** The chain's preset make-up gain, dB (absent: none). */
+  masterGainCompensationDb?: number;
 
   // ── Drumpad state ────────────────────────────────────────────────────
 
