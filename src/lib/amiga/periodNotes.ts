@@ -101,3 +101,28 @@ export function cellPeriod(cell: { note?: number; period?: number } | undefined,
   if (cell.period && cell.period > 0 && (periodToNote(cell.period) === cell.note || periodToPtNote(cell.period) === cell.note)) return cell.period;
   return noteToPeriod(cell.note, finetune);
 }
+
+/**
+ * Whether a song's cells play by Amiga periods: everything but the formats
+ * that store note numbers (XM, IT, S3M, AdPlug). The one rule behind
+ * TrackerReplayer's period mode, ToneEngine.amigaPeriodSong (K4) and the
+ * editor's typing octave (K12).
+ */
+export function songUsesAmigaPeriods(format: string): boolean {
+  return !(format === 'XM' || format === 'IT' || format === 'S3M' || format === 'AdPlug');
+}
+
+/**
+ * The octave the lower key row (Z..M) types at, so the keyboard maps as in
+ * ProTracker: pt2-clone's keyOctave is zero-initialised = OCTAVE_HIGH
+ * (pt2_header.h:162), where Z is scancode2NoteHi 12 = C-2 = period 428
+ * (pt2_edit.c:42) and Q is 24 = C-3; F1 (OCTAVE_LOW) would put Z at C-1.
+ */
+export const PROTRACKER_TYPING_OCTAVE = 2;
+/** The editor's typing octave for every other format. */
+export const DEFAULT_TYPING_OCTAVE = 4;
+
+/** The typing octave a song of this format starts with. */
+export function typingOctaveFor(format: string): number {
+  return songUsesAmigaPeriods(format) ? PROTRACKER_TYPING_OCTAVE : DEFAULT_TYPING_OCTAVE;
+}
