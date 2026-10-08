@@ -1087,6 +1087,58 @@ extern "C" void furnace_cmd_log_set_global_chan(int globalChan) {
 }
 
 /**
+ * A per-channel trait of the platform that runs a chip, asked of the platform
+ * itself (the virtuals playback.cpp calls on disCont[...].dispatch), so the
+ * sequencer never keeps a hand-copied table of them:
+ *   0 getPortaFloor(ch)   1 keyOffAffectsArp(ch)   2 keyOffAffectsPorta(ch)
+ *   3 getLegacyAlwaysSetVolume()   4 getWantPreNote()
+ * Returns -1 for an unknown handle, channel or trait.
+ */
+EMSCRIPTEN_KEEPALIVE
+int furnace_dispatch_chan_trait(int handle, int chan, int trait) {
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end()) return -1;
+  DispatchInstance* inst = it->second;
+  if (chan < 0 || chan >= inst->numChannels) return -1;
+  switch (trait) {
+    case 0: return inst->dispatch->getPortaFloor(chan);
+    case 1: return inst->dispatch->keyOffAffectsArp(chan) ? 1 : 0;
+    case 2: return inst->dispatch->keyOffAffectsPorta(chan) ? 1 : 0;
+    case 3: return inst->dispatch->getLegacyAlwaysSetVolume() ? 1 : 0;
+    case 4: return inst->dispatch->getWantPreNote() ? 1 : 0;
+    default: return -1;
+  }
+}
+
+/**
+ * Register-write dump of one chip (DivDispatch::toggleRegisterDump /
+ * getRegisterWrites, what Furnace's VGM export reads after every tick), so a
+ * song's register stream can be lock-stepped against the reference's .vgm.
+ */
+EMSCRIPTEN_KEEPALIVE
+void furnace_dispatch_reg_dump(int handle, int enable) {
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end()) return;
+  it->second->dispatch->toggleRegisterDump(enable != 0);
+  it->second->dispatch->getRegisterWrites().clear();
+}
+
+/**
+ * Copy up to `max` dumped writes as (addr, val) int pairs into `out`, clear
+ * them, and return how many were copied.
+ */
+EMSCRIPTEN_KEEPALIVE
+int furnace_dispatch_reg_writes(int handle, int* out, int max) {
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end() || !out) return 0;
+  std::vector<DivRegWrite>& w = it->second->dispatch->getRegisterWrites();
+  int n = (int)w.size() < max ? (int)w.size() : max;
+  for (int i = 0; i < n; i++) { out[i * 2] = (int)w[i].addr; out[i * 2 + 1] = (int)w[i].val; }
+  w.clear();
+  return n;
+}
+
+/**
  * Send a command to the dispatch.
  */
 EMSCRIPTEN_KEEPALIVE

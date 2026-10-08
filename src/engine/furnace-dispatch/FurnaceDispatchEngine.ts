@@ -1482,6 +1482,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       const waveData = new Uint8Array(8 + wt.data.length * 4);
       const view = new DataView(waveData.buffer);
       view.setInt32(0, wt.width, true);
+      // The second field is DivWavetable::max (furnace_dispatch_set_wavetable); `height` is that max.
       view.setInt32(4, wt.height, true);
       for (let j = 0; j < wt.data.length; j++) {
         view.setInt32(8 + j * 4, wt.data[j], true);
@@ -2083,13 +2084,22 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         }
         _log(`[FurnaceDispatchEngine] uploaded ${moduleSamples.length} module samples`);
       }
+      // The song's wavetables, the same way: a Game Boy / PCE / N163 wave channel played
+      // the chip's default wave unless an instrument synth had happened to upload them
+      // (No Geodudes on Mt Amber.dmf: wave RAM 0xff 0xfe 0xed... where Furnace writes the song's wave).
+      for (const chipId of chipIds) this.uploadModuleWavetablesToPlatform(chipId, true);
       // ALWAYS reset chips between songs — without this, stale register state
       // from the previous song persists (wrong instruments, waveforms, envelopes).
       // Pure synthesis chips (SID, GB, AY, etc.) have no samples but still need
       // their registers cleared for the new song's instruments to take effect.
+      // forceIns only for a start away from the top, as Furnace's playSub does
+      // (engine.cpp: `if (goal>0 || goalRow>0) dispatch->forceIns()`): from the top it
+      // wrote every channel's instrument registers ahead of the song's first tick
+      // (Game Boy NRx2 = 0x08 on all channels, register lock-step against Furnace's VGM).
+      const seeking = opts.initialSongPos > 0 || opts.initialPattPos > 0;
       for (const chipId of chipIds) {
         this.reset(chipId);
-        this.forceIns(chipId);
+        if (seeking) this.forceIns(chipId);
       }
       _log(`[FurnaceDispatchEngine] reset ${chipIds.length} chips for new song`);
 

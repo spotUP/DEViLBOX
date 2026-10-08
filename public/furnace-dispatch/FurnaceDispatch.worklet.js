@@ -954,10 +954,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     // Set tick rate
     this.wasm.setTickRate(handle, this.tickRate);
 
-    // Enable linear pitch by default for musical note input
-    // Flag index 1 is linearPitch (index 0 is limitSlides: this wrote 2 there and
-    // left the pitch model non-linear, so a pitch offset meant register units).
-    this.wasm.setCompatFlag(handle, 1, 2); // linearPitch = 2 (full linear)
+    // A new chip starts on Furnace's default compat flags (DivCompatFlags::setDefaults:
+    // linear pitch, pitch slide speed 4, ...); a song's own flags replace them before it plays.
 
     console.log('[FurnaceDispatch Worklet] Created platform', platformType,
                 'handle', handle, 'channels', numChannels,
