@@ -63,7 +63,7 @@ export async function isolatedVoice(file: string, companions: Record<string, str
   return out;
 }
 
-export interface KeyPress { note: string; at: number }
+export interface KeyPress { note: string; at: number; period?: number }
 /** The instrument on the real ToneEngine, rendered offline: what the keyboard plays. One render per call (a fresh engine). */
 export async function renderKeys(config: InstrumentConfig, presses: KeyPress[], secs: number): Promise<Float32Array> {
   vi.resetModules();
@@ -86,7 +86,7 @@ export async function renderKeys(config: InstrumentConfig, presses: KeyPress[], 
     await audioLoadsSettled();
     vi.spyOn(engine as unknown as { isContextActuallyRunning(): boolean }, 'isContextActuallyRunning').mockReturnValue(true);
     for (const p of presses) {
-      engine.triggerNoteAttack(cfg.id, p.note, p.at, 1, cfg, undefined, false, false); // as useNoteInput's keydown
+      engine.triggerNoteAttack(cfg.id, p.note, p.at, 1, cfg, p.period, false, false); // as useNoteInput's keydown
     }
     const out = await ctx.startRendering();
     return out.getChannelData(0).slice();
