@@ -9,9 +9,10 @@
  * sound.c renders the AY.
  *
  * Drives the real bundle (public/aylet/Aylet.js + .wasm) on the corpus song
- * `spring.emul`, and proves the two sibling payloads are refused, not
- * misplayed: STRC and AMAD are host-side replayer structures no player in
- * reach implements (thoughts/shared/research/2026-10-04_ay-strc-amad.md).
+ * `spring.emul`, and proves the STRC sibling payload is refused, not
+ * misplayed: it is a host-side replayer structure no player in reach
+ * implements (thoughts/shared/research/2026-10-04_ay-strc-amad.md). The
+ * AMAD payload plays on the FXM player: ayletPlaysAmad.test.ts.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -21,7 +22,6 @@ import { runInThisContext } from 'node:vm';
 const ROOT = resolve(__dirname, '../../..');
 const EMUL = resolve(ROOT, 'public/data/songs/ay-emul/spring.emul');
 const STRC = resolve(ROOT, 'public/data/songs/ay-strc/mega mix 1.strc');
-const AMAD = resolve(ROOT, 'public/data/songs/ay-amadeus/aztec theme.amad');
 
 interface Mod {
   _malloc(n: number): number; _free(p: number): void;
@@ -111,9 +111,8 @@ describe('aylet plays a ZXAY EMUL file', { timeout: 120000 }, () => {
     expect(a).toBeLessThan(all);
   });
 
-  it('refuses the STRC and AMAD payloads instead of misplaying them', () => {
+  it('refuses the STRC payload instead of misplaying it', () => {
     expect(load(STRC)).toBe(-2);
-    expect(load(AMAD)).toBe(-2);
     mod._aylet_wasm_stop();
   });
 

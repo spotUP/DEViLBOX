@@ -60,7 +60,7 @@ export async function tryChipDumpParse(
   }
 
   // ── AY — ZX Spectrum AY (ZXAY EMUL) ───────────────────────────────────────
-  // `.emul` too: the corpus names these files after the ZXAY SUBTYPE instead
+  // `.emul` and `.amad` too: the corpus names these files after the ZXAY SUBTYPE instead
   // of the container, and `ay-emul/spring.emul` begins with the bytes
   // `ZXAYEMUL`. Playback is aylet in wasm (AyletEngine); the parser draws the
   // grid and carries the file as `ayFileData`.
@@ -69,15 +69,16 @@ export async function tryChipDumpParse(
   // why registering `.emul` there was not enough on its own. Every branch in
   // this file re-decides what the registry already knows; deriving them from
   // the registry is the fix, and it is bigger than this change.
-  if (/\.(ay|emul)$/.test(filename)) {
+  if (/\.(ay|emul|amad)$/.test(filename)) {
     const { parseAYFile } = await import('@lib/import/formats/AYParser');
     return parseAYFile(buffer, originalFileName);
   }
 
-  // ── AY STRC / AMAD — same container, host-side replayer payload ─────────
-  // No available player implements these replayers; the parser throws the
-  // reason (thoughts/shared/research/2026-10-04_ay-strc-amad.md).
-  if (/\.(strc|amad)$/.test(filename)) {
+  // ── AY STRC — same container, host-side replayer payload ────────────────
+  // No available player implements it; the parser throws the reason
+  // (thoughts/shared/research/2026-10-04_ay-strc-amad.md). `.amad` (Amadeus,
+  // FXM data) is an AY payload the aylet wasm plays, routed above.
+  if (/\.strc$/.test(filename)) {
     const { parseAYStructuredFile } = await import('@lib/import/formats/AYParser');
     return parseAYStructuredFile(buffer, originalFileName);
   }

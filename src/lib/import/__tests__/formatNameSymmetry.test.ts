@@ -75,15 +75,15 @@ describe('a format answers to its name written either way round', () => {
    * `parseAYFile` reads — and was refused with "Unsupported file format" for
    * its name alone (2026-09-24).
    *
-   * `.strc` and `.amad` stay unsupported on purpose: same container,
-   * different payload (`ZXAYSTRC`, `ZXAYAMAD`), and the parser only knows
-   * the EMUL layout. An honest refusal beats a parse failure further in.
+   * `.strc` is recognised only to be refused: same container, different payload
+   * (`ZXAYSTRC`), and no player implements it. An honest refusal beats a parse
+   * failure further in. `.amad` (`ZXAYAMAD`, FXM data) plays on the aylet wasm.
    */
   it('knows a ZXAY file named after its subtype', () => {
     expect(detectFormat('spring.emul')?.key).toBe('ay');
     expect(detectFormat('tune.ay')?.key).toBe('ay');
-    expect(detectFormat('mega mix 1.strc')).toBeNull();
-    expect(detectFormat('aztec theme.amad')).toBeNull();
+    expect(detectFormat('mega mix 1.strc')?.key).toBe('ayStructured');
+    expect(detectFormat('aztec theme.amad')?.key).toBe('ay');
   });
 
   /**

@@ -11,6 +11,7 @@ set(SOURCES
     ${AYLET_DIR}/sound.c
     src/z80_frame.c
     src/aylet_wasm.c
+    ${CMAKE_SOURCE_DIR}/../third-party/fxm/FXM.c
 )
 
 add_executable(Aylet ${SOURCES})
