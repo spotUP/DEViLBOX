@@ -88,6 +88,23 @@ describe('a GoatTracker .sng lands in GoatTracker from every entry', { timeout: 
     });
   }
 
+  // Owner, 2026-10-08: the Modland HVSC Jammar_akhbar.sid, then the dropped
+  // .sng - the status bar still showed the SID's title and subsongs, because
+  // the song's header info outlived the song (U4.6).
+  it('a song opened after a SID no longer carries the SID header or the SongDB info', async () => {
+    const { openUserSong } = await import('@/lib/song/openUserSong');
+    useFormatStore.getState().setSidMetadata({
+      format: 'PSID', version: 2, title: 'Jammar akhbar', author: 'Shogoon', copyright: '2021',
+      chipModel: '8580', clockSpeed: 'PAL', subsongs: 2, defaultSubsong: 0, currentSubsong: 0,
+      secondSID: false, thirdSID: false,
+    });
+    useFormatStore.getState().setSongDBInfo({ authors: ['x'], publishers: [], album: '', year: '', format: 'SID', duration_ms: 1 });
+    await openUserSong(fileOf(GT), 'drop', undefined, () => {});
+    expect(landed()).toEqual(['goattracker', 1]);
+    expect(useFormatStore.getState().sidMetadata).toBeNull();
+    expect(useFormatStore.getState().songDBInfo).toBeNull();
+  });
+
   it('jukebox: a url source with the jukebox origin', async () => {
     const buf = bytes(GT);
     vi.stubGlobal('fetch', vi.fn(async (url: string) => String(url).endsWith('.sng') ? new Response(buf as unknown as BodyInit) : new Response('', { status: 404 })));

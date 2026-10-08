@@ -16,6 +16,7 @@ import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { releaseEngineSubscriptions } from '@/engine/replayer/NativeEngineRouting';
+import { useFormatStore } from '@/stores/useFormatStore';
 
 /** The generation of the song that is current now. */
 export function currentSongGeneration(): number {
@@ -29,6 +30,9 @@ export async function unloadSong(): Promise<void> {
   useSongLoadStore.setState({ generation });
   useOscilloscopeStore.getState().unload(generation);
   useWasmPositionStore.getState().clear();
+  // The song's header info belongs to the song: only some openers set it, so
+  // one left over showed a SID's title and subsongs for the next song (U4.6).
+  useFormatStore.getState().clearSongInfo();
 
   useTransportStore.getState().stop();
   getToneEngine().releaseAll();
