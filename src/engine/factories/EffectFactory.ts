@@ -510,6 +510,7 @@ export async function createEffect(
         ratio: p.ratio || 12,
         attack: p.attack || 0.003,
         release: p.release || 0.25,
+        knee: paramNumber(p.knee, 30),
       });
       break;
 

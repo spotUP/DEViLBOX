@@ -433,9 +433,12 @@ const tonejs: EffectDescriptor[] = [
       return new Tone.Compressor({
         threshold: paramNumber(p.threshold, -24), ratio: paramNumber(p.ratio, 12),
         attack: paramNumber(p.attack, 0.003), release: paramNumber(p.release, 0.25),
+        // Tone's own default: a 30 dB soft knee, which spreads a 4:1 compressor
+        // over so wide a range that a -14 dB threshold barely moves a -10 dB peak.
+        knee: paramNumber(p.knee, 30),
       });
     },
-    getDefaultParameters: () => ({ threshold: -24, ratio: 12, attack: 0.003, release: 0.25 }),
+    getDefaultParameters: () => ({ threshold: -24, ratio: 12, attack: 0.003, release: 0.25, knee: 30 }),
     presets: [
       { name: 'Gentle Glue', params: { threshold: -18, ratio: 2, attack: 0.01, release: 0.15 } },
       { name: 'Punchy', params: { threshold: -20, ratio: 6, attack: 0.001, release: 0.1 } },
