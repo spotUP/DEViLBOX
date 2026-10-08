@@ -305,92 +305,6 @@ enum {
 // Per-platform helper functions
 // ============================================================
 
-// getPortaFloor: minimum portamento note per platform
-// (from platform/*.cpp getPortaFloor() implementations)
-static int getPortaFloor(int chipId, int subIdx) {
-  switch (chipId) {
-    case SEQ_CHIP_GB:
-      return 24; // C-2
-    case SEQ_CHIP_SMS:
-    case SEQ_CHIP_SAA1099:
-      return 12; // C-1
-    case SEQ_CHIP_GENESIS:
-    case SEQ_CHIP_GENESIS_EXT:
-      // FM channels (0-5): 0, extended ch3 ops: 0, PSG channels (6+): 12
-      return (subIdx >= 6) ? 12 : 0;
-    case SEQ_CHIP_YM2612:
-    case SEQ_CHIP_YM2612_EXT:
-      return 0;
-    case SEQ_CHIP_OPL:
-    case SEQ_CHIP_OPL2:
-    case SEQ_CHIP_OPL3:
-      // OPL: FM channels have no floor, but drums/rhythm (ch>melodicChans) do
-      // Simplified: melodic channels = 0, others = 12
-      return (subIdx >= 6) ? 12 : 0;
-    case SEQ_CHIP_OPLL:
-      // OPLL: FM=0, rhythm channels (9+) = 12
-      return (subIdx >= 9) ? 12 : 0;
-    case SEQ_CHIP_LYNX:
-      return 12;
-    default:
-      return 0;
-  }
-}
-
-// keyOffAffectsPorta: whether note-off should stop portamento
-// (from platform/*.cpp keyOffAffectsPorta() implementations)
-static bool getKeyOffAffectsPorta(int chipId, int subIdx) {
-  switch (chipId) {
-    case SEQ_CHIP_SMS:
-    case SEQ_CHIP_LYNX:
-      return true;
-    case SEQ_CHIP_GENESIS:
-    case SEQ_CHIP_GENESIS_EXT:
-      // PSG channels (6+) are affected
-      return (subIdx >= 6);
-    default:
-      return false;
-  }
-}
-
-// keyOffAffectsArp: whether note-off should reset arpeggio
-// (from platform/*.cpp keyOffAffectsArp() implementations — default true in Furnace)
-static bool getKeyOffAffectsArp(int chipId, int subIdx) {
-  switch (chipId) {
-    case SEQ_CHIP_SMS:
-    case SEQ_CHIP_GB:
-    case SEQ_CHIP_LYNX:
-    case SEQ_CHIP_SAA1099:
-      return true;
-    case SEQ_CHIP_GENESIS:
-    case SEQ_CHIP_GENESIS_EXT:
-      return (subIdx >= 6); // PSG channels
-    default:
-      return true; // Furnace default: most platforms return true
-  }
-}
-
-// getLegacyAlwaysSetVolume: platforms that override to return false
-// (base DivDispatch returns true; only PSG-like chips return false)
-static bool getLegacyAlwaysSetVolume(int chipId) {
-  switch (chipId) {
-    case SEQ_CHIP_SMS:
-    case SEQ_CHIP_AY8910:
-    case SEQ_CHIP_AY8930:
-    case SEQ_CHIP_SAA1099:
-    case SEQ_CHIP_LYNX:
-      return false;
-    default:
-      return true; // FM chips and most others return true
-  }
-}
-
-// getWantPreNote: whether platform wants PRE_NOTE dispatch before note-on
-// (only C64/SID2 in Furnace)
-static bool getWantPreNote(int chipId) {
-  return (chipId == SEQ_CHIP_C64_6581 || chipId == SEQ_CHIP_C64_8580 || chipId == SEQ_CHIP_SID2);
-}
-
 // ============================================================
 // Vibrato and tremolo lookup tables (from engine.cpp)
 // ============================================================
@@ -444,6 +358,7 @@ extern "C" void furnace_cmd_log_tick();
 extern "C" void furnace_cmd_log_set_global_chan(int globalChan);
 extern "C" void furnace_cmd_log_pause();
 extern "C" void furnace_cmd_log_resume();
+extern "C" int furnace_dispatch_chan_trait(int handle, int chan, int trait);
 
 static int dispatchHandle = 0;
 
@@ -607,6 +522,40 @@ static int getLoopModality() {
 }
 
 #define COMPAT(flag) (g_seq.compatFlags & (flag))
+
+// ============================================================
+// Per-channel platform traits
+// ============================================================
+
+// The traits playback.cpp asks of the dispatch that runs a channel
+// (disCont[dispatchOfChan[i]].dispatch->...(dispatchChanOfChan[i])), asked of
+// the real platform instance through the wrapper - not a table copied here:
+// hand tables drifted (porta floor 60 notes low, key-off arp reset on every
+// chip including the Game Boy).
+enum SeqChanTrait { TRAIT_PORTA_FLOOR = 0, TRAIT_KEYOFF_ARP = 1, TRAIT_KEYOFF_PORTA = 2,
+                    TRAIT_LEGACY_ALWAYS_SET_VOLUME = 3, TRAIT_WANT_PRE_NOTE = 4 };
+
+// -1 when the channel has no dispatch (upstream: dispatchChanOfChan[i] < 0).
+static int chanTrait(int chan, SeqChanTrait trait) {
+  if (chan < 0 || chan >= g_seq.numChannels) return -1;
+  int handle = g_seq.chanDispatchHandle[chan];
+  int subChan = (int)g_seq.chanSubIdx[chan];
+  if (handle <= 0) { handle = dispatchHandle; subChan = chan; }
+  if (handle <= 0) return -1;
+  return furnace_dispatch_chan_trait(handle, subChan, (int)trait);
+}
+
+// limitSlides' slide-down target (playback.cpp:1038, 1683): the platform's floor note, else -60.
+static int slideDownTarget(int chan) {
+  if (!COMPAT(SEQ_COMPAT_LIMIT_SLIDES)) return -60;
+  int floor = chanTrait(chan, TRAIT_PORTA_FLOOR);
+  return floor < 0 ? -60 : floor;
+}
+static bool keyOffAffectsPorta(int chan) { return chanTrait(chan, TRAIT_KEYOFF_PORTA) == 1; }
+static bool keyOffAffectsArp(int chan) { return chanTrait(chan, TRAIT_KEYOFF_ARP) == 1; }
+static bool legacyAlwaysSetVolume(int chan) { return chanTrait(chan, TRAIT_LEGACY_ALWAYS_SET_VOLUME) == 1; }
+static bool wantPreNote(int chan) { return chanTrait(chan, TRAIT_WANT_PRE_NOTE) == 1; }
+
 
 // Dispatch HINT_PORTA with clamped values (matches Furnace reference)
 #define HINT_PORTA(ch_idx, pNote, pSpeed) \
@@ -1479,7 +1428,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         ch.stopOnOff = false;
       }
-      if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
+      if (keyOffAffectsPorta(i)) {
         ch.portaNote = -1;
         ch.portaSpeed = -1;
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
@@ -1499,7 +1448,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         ch.stopOnOff = false;
       }
-      if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
+      if (keyOffAffectsPorta(i)) {
         ch.portaNote = -1;
         ch.portaSpeed = -1;
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
@@ -1518,7 +1467,7 @@ static void seqProcessRow(int i, bool afterDelay) {
     ch.note = noteVal - 60;  // Convert from pattern note to signed note
 
     // Per-platform: reset arp on new note if the chip requires it
-    if (!ch.keyOn && getKeyOffAffectsArp(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
+    if (!ch.keyOn && keyOffAffectsArp(i)) {
       ch.arp = 0;
       dispatchCmd(DIV_CMD_HINT_ARPEGGIO, i, ch.arp);
     }
@@ -1552,7 +1501,7 @@ static void seqProcessRow(int i, bool afterDelay) {
   if (volVal != -1 && !noApplyVolume) {
     // COMPAT FLAG: oldAlwaysSetVolume — in legacy mode, only set volume if it changed
     // getLegacyAlwaysSetVolume() overrides: FM chips always set volume even with compat flag
-    if (!COMPAT(SEQ_COMPAT_OLD_ALWAYS_SET_VOLUME) || getLegacyAlwaysSetVolume(g_seq.chanChipId[i]) || (MIN(ch.volMax, ch.volume) >> 8) != volVal) {
+    if (!COMPAT(SEQ_COMPAT_OLD_ALWAYS_SET_VOLUME) || legacyAlwaysSetVolume(i) || (MIN(ch.volMax, ch.volume) >> 8) != volVal) {
       // Let dispatchCmd know we can do MIDI aftertouch if there isn't a note
       if (noteVal == -1) {
         ch.midiAftertouch = true;
@@ -1681,7 +1630,7 @@ static void seqProcessRow(int i, bool afterDelay) {
           ch.inPorta = false;
           if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
         } else {
-          ch.portaNote = (COMPAT(SEQ_COMPAT_LIMIT_SLIDES) && g_seq.chanChipId[i] != 0) ? getPortaFloor(g_seq.chanChipId[i], g_seq.chanSubIdx[i]) - 60 : -60;
+          ch.portaNote = slideDownTarget(i);
           ch.portaSpeed = effectVal;
           ch.portaStop = true;
           ch.stopOnOff = false;
@@ -2141,7 +2090,8 @@ static void seqProcessRow(int i, bool afterDelay) {
           HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         }
       } else if (!ch.noteOnInhibit) {
-        dispatchCmd(DIV_CMD_VOLUME, i, ch.volume >> 8);
+        // playback.cpp:1615 sends the note alone; a VOLUME ahead of it overrode the
+        // instrument's own envelope volume (Game Boy NR12 0xF0 where Furnace writes 0xC0).
         dispatchCmd(DIV_CMD_NOTE_ON, i, ch.note, ch.volume >> 8);
         ch.releasing = false;
         ch.goneThroughNote = true;
@@ -2158,6 +2108,7 @@ static void seqProcessRow(int i, bool afterDelay) {
     if (!ch.keyOn && ch.scheduledSlideReset) {
       ch.portaNote = -1;
       ch.portaSpeed = -1;
+      HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
       ch.scheduledSlideReset = false;
       ch.inPorta = false;
     }
@@ -2199,7 +2150,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
         break;
       case 0xf2: // single pitch slide down
-        ch.portaNote = (COMPAT(SEQ_COMPAT_LIMIT_SLIDES) && g_seq.chanChipId[i] != 0) ? getPortaFloor(g_seq.chanChipId[i], g_seq.chanSubIdx[i]) - 60 : -60;
+        ch.portaNote = slideDownTarget(i);
         ch.portaSpeed = effectVal;
         ch.portaStop = true;
         ch.stopOnOff = false;
@@ -2308,7 +2259,7 @@ static void seqNextRow() {
   // Post row: schedule PRE_NOTE and oneTickCut (from Furnace playback.cpp:1892-1990)
   // Furnace reads the NEXT row (after advancement) to decide oneTickCut scheduling
   for (int i = 0; i < g_seq.numChannels; i++) {
-    bool wantPreNote = getWantPreNote(g_seq.chanChipId[i]);
+    bool wantPreNote = ::wantPreNote(i);
 
     // PRE_NOTE dispatch for C64/SID2 (gate timing from post-row path)
     if (wantPreNote && !g_seq.chan[i].legato) {
@@ -2800,7 +2751,7 @@ static bool seqNextTick() {
                 ch.stopOnOff = false;
               }
               // Per-platform: some chips reset portamento on note-off
-              if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
+              if (keyOffAffectsPorta(i)) {
                 ch.portaNote = -1;
                 ch.portaSpeed = -1;
                 HINT_PORTA(i, ch.portaNote, ch.portaSpeed);

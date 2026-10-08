@@ -389,7 +389,10 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     for (let p = 0; p < len; p++) {
       data.push(api.fur_get_wave_data(i, p));
     }
-    wavetables.push({ data, width: len, height: max + 1 });
+    // height is the wave's max value, as the .fur WAVE block stores it and the TS parser reads it
+    // (FurnaceSongParser). As max + 1 the dispatch scaled every sample by max/(max+1): Game Boy
+    // wave RAM one step off on every nibble (No Geodudes on Mt Amber.dmf against Furnace's VGM).
+    wavetables.push({ data, width: len, height: max });
   }
 
   // Read samples

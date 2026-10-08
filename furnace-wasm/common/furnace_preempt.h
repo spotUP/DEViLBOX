@@ -345,7 +345,30 @@ struct DivCompatFlags {
   bool oldCenterRate;
   bool noVolSlideReset;
 
-  void setDefaults() { memset(this, 0, sizeof(DivCompatFlags)); }
+  // song.cpp DivCompatFlags::setDefaults, 1:1. A zeroed struct (linearPitch 0,
+  // pitchSlideSpeed 0, properNoiseLayout false, ...) is not Furnace's default:
+  // a chip that never got a song's flags ran in another pitch model.
+  void setDefaults() {
+    memset(this, 0, sizeof(DivCompatFlags));
+    limitSlides=false; linearPitch=1; pitchSlideSpeed=4; loopModality=2; delayBehavior=2;
+    jumpTreatment=0; properNoiseLayout=true; waveDutyIsVol=false; resetMacroOnPorta=false;
+    legacyVolumeSlides=false; compatibleArpeggio=false; noteOffResetsSlides=true;
+    targetResetsSlides=true; arpNonPorta=false; algMacroBehavior=false;
+    brokenShortcutSlides=false; ignoreDuplicateSlides=false; stopPortaOnNoteOff=false;
+    continuousVibrato=false; brokenDACMode=false; oneTickCut=false;
+    newInsTriggersInPorta=true; arp0Reset=true; brokenSpeedSel=false;
+    noSlidesOnFirstTick=false; rowResetsArpPos=false; ignoreJumpAtEnd=false;
+    buggyPortaAfterSlide=false; gbInsAffectsEnvelope=true; sharedExtStat=true;
+    ignoreDACModeOutsideIntendedChannel=false; e1e2AlsoTakePriority=false;
+    newSegaPCM=true; fbPortaPause=false; snDutyReset=false; pitchMacroIsLinear=true;
+    oldOctaveBoundary=false; noOPN2Vol=false; newVolumeScaling=true; volMacroLinger=true;
+    brokenOutVol=false; brokenOutVol2=false; e1e2StopOnSameNote=false;
+    brokenPortaArp=false; snNoLowPeriods=false; disableSampleMacro=false;
+    oldArpStrategy=false; brokenPortaLegato=false; brokenFMOff=false;
+    preNoteNoEffect=false; oldDPCM=false; resetArpPhaseOnNewNote=false;
+    ceilVolumeScaling=false; oldAlwaysSetVolume=false; oldSampleOffset=false;
+    oldCenterRate=true; noVolSlideReset=false;
+  }
   bool areDefaults() { DivCompatFlags d; d.setDefaults(); return memcmp(this, &d, sizeof(DivCompatFlags)) == 0; }
   bool readData(SafeReader& reader) { return true; }
   void putData(SafeWriter* w) {}
@@ -630,11 +653,16 @@ public:
       int bf = period ?
                (int)round((clock / fbase) / divider) :
                (int)round(fbase * (divider / clock));
+      // engine.cpp: an F-num/block chip (OPN, OPL, OPLL, ...) gets the block
+      // conversion here. Returning bf alone put the raw frequency into the
+      // F-num/block register of every FM chip in linear pitch - every .fur and
+      // every DefleMask module - so a YM2612 C-2 played as block 1 F-num 0x210
+      // where Furnace writes block 2 F-num 0x284 (RaveOfDoom.fur, VGM lock-step).
       if (blockBits > 0) {
-        return bf;
-      } else {
-        return bf;
+        if (fixedBlock > 0) return convertFnumFixedBlock(bf, blockBits, fixedBlock - 1);
+        return convertFnumBlock(bf, blockBits, nbase >> 7, clock, divider);
       }
+      return bf;
     }
     return period ?
              base - pitch - pitch2 :
@@ -650,53 +678,57 @@ public:
     return note + arp;
   }
 
+  // CONVERT_FNUM_BLOCK / CONVERT_FNUM_FIXEDBLOCK of engine.cpp, shared by
+  // calcFreq and calcBaseFreqFNumBlock as upstream shares the macros.
+  int convertFnumBlock(int bf, int bits, int note, double clock, double divider) {
+    double tuning = song.tuning;
+    if (tuning < 400.0) tuning = 400.0;
+    if (tuning > 500.0) tuning = 500.0;
+    int boundaryBottom = (int)(tuning * pow(2.0, 0.25) * (divider / clock));
+    int boundaryTop = (int)(2.0 * tuning * pow(2.0, 0.25) * (divider / clock));
+    while (boundaryTop > ((1 << bits) - 1)) {
+      boundaryTop >>= 1;
+      boundaryBottom >>= 1;
+    }
+    int block = note / 12;
+    if (block < 0) block = 0;
+    if (block > 7) block = 7;
+    bf >>= block;
+    if (bf < 0) bf = 0;
+    // octave boundaries
+    while (bf > 0 && bf < boundaryBottom && block > 0) {
+      bf <<= 1;
+      block--;
+    }
+    if (bf > boundaryTop) {
+      while (block < 7 && bf > boundaryTop) {
+        bf >>= 1;
+        block++;
+      }
+      if (bf > ((1 << bits) - 1)) {
+        bf = (1 << bits) - 1;
+      }
+    }
+    return bf | (block << bits);
+  }
+
+  int convertFnumFixedBlock(int bf, int bits, int block) {
+    bf >>= block;
+    if (bf < 0) bf = 0;
+    if (bf > ((1 << bits) - 1)) {
+      bf = (1 << bits) - 1;
+    }
+    return bf | (block << bits);
+  }
+
   // F-num/block calculation for FM chips - matches Furnace engine.cpp
   int calcBaseFreqFNumBlock(double clock, double divider, int note, int bits, int fixedBlock) {
     if (song.compatFlags.linearPitch) {
       return (note << 7);
     }
     int bf = (int)calcBaseFreq(clock, divider, note, false);
-
-    if (fixedBlock > 0) {
-      // CONVERT_FNUM_FIXEDBLOCK
-      int block = fixedBlock - 1;
-      bf >>= block;
-      if (bf < 0) bf = 0;
-      if (bf > ((1 << bits) - 1)) {
-        bf = (1 << bits) - 1;
-      }
-      return bf | (block << bits);
-    } else {
-      // CONVERT_FNUM_BLOCK
-      double tuning = song.tuning;
-      if (tuning < 400.0) tuning = 400.0;
-      if (tuning > 500.0) tuning = 500.0;
-      int boundaryBottom = (int)(tuning * pow(2.0, 0.25) * (divider / clock));
-      int boundaryTop = (int)(2.0 * tuning * pow(2.0, 0.25) * (divider / clock));
-      while (boundaryTop > ((1 << bits) - 1)) {
-        boundaryTop >>= 1;
-        boundaryBottom >>= 1;
-      }
-      int block = note / 12;
-      if (block < 0) block = 0;
-      if (block > 7) block = 7;
-      bf >>= block;
-      if (bf < 0) bf = 0;
-      while (bf > 0 && bf < boundaryBottom && block > 0) {
-        bf <<= 1;
-        block--;
-      }
-      if (bf > boundaryTop) {
-        while (block < 7 && bf > boundaryTop) {
-          bf >>= 1;
-          block++;
-        }
-        if (bf > ((1 << bits) - 1)) {
-          bf = (1 << bits) - 1;
-        }
-      }
-      return bf | (block << bits);
-    }
+    if (fixedBlock > 0) return convertFnumFixedBlock(bf, bits, fixedBlock - 1);
+    return convertFnumBlock(bf, bits, note, clock, divider);
   }
 
   // Center rate - used for sample playback rate calculation
