@@ -38,7 +38,7 @@ vi.mock('@/utils/audio-context', () => ({
   noteToMidi: (n: string) => (n === 'C4' ? 60 : 36),
 }));
 
-import { HivelySynth } from '../HivelySynth';
+import { HivelySynth, hvlNoteForKey } from '../HivelySynth';
 import type { HivelyConfig } from '@/types/instrument';
 
 const config = {
@@ -74,7 +74,7 @@ describe('HivelySynth with a pending instrument', () => {
     resolveHandle!(0);
     await settle();
     expect(noteOns()).toHaveLength(1);
-    expect(noteOns()[0]).toMatchObject({ handle: 0, note: 60 });
+    expect(noteOns()[0]).toMatchObject({ handle: 0, note: hvlNoteForKey(60) }) // C4 = MIDI 60 -> replayer note 50 (5f8045cbc: was MIDI + 1, 11 semitones sharp);
   });
 
   it('a synth with no instrument still starts the song (the tune player)', () => {
