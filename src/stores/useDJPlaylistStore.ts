@@ -16,6 +16,7 @@ import { pushToCloud, pullFromCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
 import type { EffectConfig } from '@/types/instrument/effects';
 import type { DJEnvironment } from '@/types/djEnvironment';
+import type { DJTrackSummary } from '@/engine/dj/autodj/types';
 import { useAudioStore } from '@/stores/useAudioStore';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -61,6 +62,8 @@ export interface PlaylistTrack {
   badFailCount?: number;
   /** Per-song master FX preset key — overrides global master FX when this song plays */
   masterFxPreset?: string;
+  /** Compact Auto DJ analysis summary (plan section 3), written by the playlist analyser and by Auto DJ when a render arrives. */
+  djSummary?: DJTrackSummary;
 }
 
 export interface DJPlaylist {
@@ -115,9 +118,9 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary'>>) => void;
   /** Batch-update multiple tracks in a single Immer transaction (single re-render). */
-  batchUpdateTrackMeta: (playlistId: string, updates: Array<{ index: number; meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>> }>) => void;
+  batchUpdateTrackMeta: (playlistId: string, updates: Array<{ index: number; meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary'>> }>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   /** Remember the last track loaded to a deck from this playlist.
    *  Modal uses it to scroll-restore on open and after search clear. */

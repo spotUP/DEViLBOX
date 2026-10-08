@@ -14,6 +14,8 @@
  */
 
 import { analyzeKey } from './analyzeKey';
+import { runAnalysisStages } from './djAnalysisStages';
+import type { ExtendedAnalysis } from '@/engine/dj/autodj/types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +71,8 @@ interface AnalysisResult {
   rmsDb: number;                // RMS loudness in dB (for auto-gain)
   peakDb: number;               // Peak level in dB
   genre: GenreResult;           // Genre classification
+  /** Auto DJ extended analysis: activity timelines, loudness set, spectral, chroma. */
+  extended: ExtendedAnalysis;
 }
 
 // ── Essentia Engine State ────────────────────────────────────────────────────
@@ -932,60 +936,22 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         await initEssentia();
         postProgress(id, 5);
 
-        // Mix to mono for analysis
-        const mono = mixToMono(pcmLeft, pcmRight);
-        postProgress(id, 10);
-
-        // 1. Rhythm analysis (BPM + beats)
-        const rhythm = analyzeRhythm(mono, essentiaInstance);
-        postProgress(id, 40);
-
-        // 2. Key detection
-        const keyResult = analyzeKey(mono, sampleRate, essentiaInstance);
-        postProgress(id, 60);
-
-        // 3. Downbeat detection
-        const { downbeats, timeSignature } = detectDownbeats(
-          rhythm.beats, mono, sampleRate,
+        // Stages 1-6 (rhythm, key, downbeats, band peaks, loudness, genre)
+        // plus the Auto DJ extended analysis, sequenced in djAnalysisStages
+        // so the product path is testable without essentia.
+        const result: AnalysisResult = runAnalysisStages<InstrumentHints>(
+          { pcmLeft, pcmRight, sampleRate, numBins, instrumentHints: (msg as AnalyzeRequest).instrumentHints },
+          {
+            mixToMono,
+            analyzeRhythm: (mono) => analyzeRhythm(mono, essentiaInstance),
+            analyzeKey: (mono, sr) => analyzeKey(mono, sr, essentiaInstance),
+            detectDownbeats,
+            computeFrequencyPeaks,
+            computeLoudness,
+            classifyGenre,
+          },
+          (p) => postProgress(id, p),
         );
-        postProgress(id, 70);
-
-        // 4. Frequency-band waveform peaks
-        const frequencyPeaks = computeFrequencyPeaks(pcmLeft, pcmRight, sampleRate, numBins);
-        postProgress(id, 85);
-
-        // 5. Loudness analysis (RMS + peak) for auto-gain
-        const loudness = computeLoudness(mono);
-        postProgress(id, 90);
-
-        // 6. Genre classification
-        const genre = classifyGenre(
-          rhythm.bpm,
-          keyResult.key,
-          timeSignature,
-          frequencyPeaks,
-          loudness.rmsDb,
-          rhythm.beats,
-          mono,
-          sampleRate,
-          (msg as AnalyzeRequest).instrumentHints,
-        );
-        postProgress(id, 98);
-
-        const result: AnalysisResult = {
-          bpm: rhythm.bpm,
-          bpmConfidence: rhythm.confidence,
-          beats: rhythm.beats,
-          downbeats,
-          timeSignature,
-          musicalKey: keyResult.key,
-          keyConfidence: keyResult.confidence,
-          onsets: rhythm.beats, // Use beat positions as onset markers
-          frequencyPeaks,
-          rmsDb: loudness.rmsDb,
-          peakDb: loudness.peakDb,
-          genre,
-        };
 
         postProgress(id, 100);
         (self as unknown as Worker).postMessage({ type: 'analysisComplete', id, result });
