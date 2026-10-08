@@ -919,10 +919,10 @@
       "EQ3",
       "Reverb"
     ],
-    "chainDb": -0.9,
-    "makeUpDb": 0.9,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T12:41:46.834Z"
+    "chainDb": 1.2,
+    "makeUpDb": -1.2,
+    "oldMakeUpDb": 0.9,
+    "at": "2026-10-08T18:28:53.639Z"
   },
   "RAT + Delay": {
     "name": "RAT + Delay",
@@ -1011,10 +1011,10 @@
       "SpringReverb",
       "EQ3"
     ],
-    "chainDb": -5,
-    "makeUpDb": 5,
-    "oldMakeUpDb": 5.3,
-    "at": "2026-09-30T08:21:00.972Z"
+    "chainDb": -5.1,
+    "makeUpDb": 5.1,
+    "oldMakeUpDb": 5,
+    "at": "2026-10-08T18:29:21.074Z"
   },
   "SID Stadium": {
     "name": "SID Stadium",
@@ -1076,10 +1076,10 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -2.8,
-    "makeUpDb": 2.8,
-    "oldMakeUpDb": 3.5,
-    "at": "2026-09-30T08:16:54.040Z"
+    "chainDb": -3.1,
+    "makeUpDb": 3.1,
+    "oldMakeUpDb": 2.8,
+    "at": "2026-10-08T18:26:34.482Z"
   },
   "Tube Screamer Glue": {
     "name": "Tube Screamer Glue",
@@ -1111,10 +1111,10 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -3.7,
-    "makeUpDb": 3.7,
-    "oldMakeUpDb": 3.5,
-    "at": "2026-09-30T08:17:35.201Z"
+    "chainDb": -3.9,
+    "makeUpDb": 3.9,
+    "oldMakeUpDb": 3.7,
+    "at": "2026-10-08T18:26:48.196Z"
   },
   "Crunch Marshall": {
     "name": "Crunch Marshall",
@@ -1122,10 +1122,10 @@
       "Neural",
       "EQ3"
     ],
-    "chainDb": 0.6,
-    "makeUpDb": -0.6,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T08:18:02.647Z"
+    "chainDb": 0,
+    "makeUpDb": 0,
+    "oldMakeUpDb": -0.6,
+    "at": "2026-10-08T18:28:12.487Z"
   },
   "High Gain Mesa": {
     "name": "High Gain Mesa",
@@ -1144,10 +1144,10 @@
       "Neural",
       "EQ3"
     ],
-    "chainDb": 1,
-    "makeUpDb": -1,
-    "oldMakeUpDb": -1.1,
-    "at": "2026-09-30T08:18:43.793Z"
+    "chainDb": -0.1,
+    "makeUpDb": 0,
+    "oldMakeUpDb": -1,
+    "at": "2026-10-08T18:28:26.212Z"
   },
   "ENGL Metal": {
     "name": "ENGL Metal",
@@ -1156,10 +1156,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": -1,
-    "makeUpDb": 1,
-    "oldMakeUpDb": 2.5,
-    "at": "2026-09-30T08:19:24.957Z"
+    "chainDb": -1.7,
+    "makeUpDb": 1.7,
+    "oldMakeUpDb": 1,
+    "at": "2026-10-08T18:28:39.921Z"
   },
   "Revv G3 Chug": {
     "name": "Revv G3 Chug",
@@ -1179,10 +1179,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": -1.8,
-    "makeUpDb": 1.8,
-    "oldMakeUpDb": 2.3,
-    "at": "2026-09-30T08:20:47.253Z"
+    "chainDb": -2.1,
+    "makeUpDb": 2.1,
+    "oldMakeUpDb": 1.8,
+    "at": "2026-10-08T18:29:07.367Z"
   },
   "SID Crunch Box": {
     "name": "SID Crunch Box",
@@ -1191,10 +1191,10 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -2.5,
-    "makeUpDb": 2.5,
-    "oldMakeUpDb": 6.3,
-    "at": "2026-09-30T08:21:14.680Z"
+    "chainDb": -2.2,
+    "makeUpDb": 2.2,
+    "oldMakeUpDb": 2.5,
+    "at": "2026-10-08T18:29:34.774Z"
   },
   "Analog Warmth": {
     "name": "Analog Warmth",
@@ -1283,10 +1283,10 @@
       "Compressor",
       "Distortion"
     ],
-    "chainDb": -0.7,
-    "makeUpDb": 0.7,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T12:30:48.168Z"
+    "chainDb": -0.3,
+    "makeUpDb": 0,
+    "oldMakeUpDb": 0.7,
+    "at": "2026-10-08T18:20:22.965Z"
   },
   "Big Muff Wall": {
     "name": "Big Muff Wall",
@@ -1307,8 +1307,8 @@
     ],
     "chainDb": 3.4,
     "makeUpDb": -3.4,
-    "oldMakeUpDb": -4.4,
-    "at": "2026-09-30T10:22:19.686Z"
+    "oldMakeUpDb": -3.4,
+    "at": "2026-10-08T18:20:48.662Z"
   },
   "Modern Precision": {
     "name": "Modern Precision",
@@ -1323,10 +1323,10 @@
       "MultibandEnhancer",
       "Maximizer"
     ],
-    "chainDb": 4.7,
-    "makeUpDb": -4.7,
-    "oldMakeUpDb": -5.6,
-    "at": "2026-09-30T10:22:33.667Z"
+    "chainDb": 4.8,
+    "makeUpDb": -4.8,
+    "oldMakeUpDb": -4.7,
+    "at": "2026-10-08T18:20:58.444Z"
   },
   "Modern Club Pump": {
     "name": "Modern Club Pump",
@@ -1342,10 +1342,10 @@
       "Clipper",
       "Maximizer"
     ],
-    "chainDb": 6.2,
-    "makeUpDb": -6.2,
-    "oldMakeUpDb": -3.7,
-    "at": "2026-09-30T10:22:43.470Z"
+    "chainDb": 6.3,
+    "makeUpDb": -6.3,
+    "oldMakeUpDb": -6.2,
+    "at": "2026-10-08T18:21:08.215Z"
   },
   "Modern Glue & Air": {
     "name": "Modern Glue & Air",
@@ -1360,8 +1360,8 @@
     ],
     "chainDb": 2.8,
     "makeUpDb": -2.8,
-    "oldMakeUpDb": -7.7,
-    "at": "2026-09-30T10:22:53.243Z"
+    "oldMakeUpDb": -2.8,
+    "at": "2026-10-08T18:21:17.994Z"
   },
   "Modern Amiga Master": {
     "name": "Modern Amiga Master",
@@ -1375,10 +1375,10 @@
       "MultibandEnhancer",
       "Maximizer"
     ],
-    "chainDb": 6.2,
-    "makeUpDb": -6.2,
-    "oldMakeUpDb": 0.2,
-    "at": "2026-09-30T10:23:03.025Z"
+    "chainDb": 6.4,
+    "makeUpDb": -6.4,
+    "oldMakeUpDb": -6.2,
+    "at": "2026-10-08T18:21:27.767Z"
   },
   "Dusty Grooves": {
     "name": "Dusty Grooves",
@@ -1389,8 +1389,8 @@
     ],
     "chainDb": -1.6,
     "makeUpDb": 1.6,
-    "oldMakeUpDb": 5.4,
-    "at": "2026-09-30T10:23:12.804Z"
+    "oldMakeUpDb": 1.6,
+    "at": "2026-10-08T18:21:48.085Z"
   },
   "Lo-Fi Master": {
     "name": "Lo-Fi Master",
@@ -1400,10 +1400,10 @@
       "Filter",
       "Compressor"
     ],
-    "chainDb": -1.4,
-    "makeUpDb": 1.4,
-    "oldMakeUpDb": 0.6,
-    "at": "2026-09-30T10:23:22.593Z"
+    "chainDb": -1.3,
+    "makeUpDb": 1.3,
+    "oldMakeUpDb": 1.4,
+    "at": "2026-10-08T18:21:57.917Z"
   },
   "Vinyl Record": {
     "name": "Vinyl Record",
@@ -1412,8 +1412,8 @@
     ],
     "chainDb": 0,
     "makeUpDb": 0,
-    "oldMakeUpDb": 1,
-    "at": "2026-09-30T10:23:42.167Z"
+    "oldMakeUpDb": 0,
+    "at": "2026-10-08T18:22:07.707Z"
   },
   "Broken Sampler": {
     "name": "Broken Sampler",
@@ -1425,7 +1425,7 @@
     "chainDb": 5.5,
     "makeUpDb": -5.5,
     "oldMakeUpDb": -5.5,
-    "at": "2026-09-30T12:30:57.968Z"
+    "at": "2026-10-08T18:22:17.454Z"
   },
   "Lo-Fi Drums": {
     "name": "Lo-Fi Drums",
@@ -1443,10 +1443,10 @@
     "types": [
       "TapeDegradation"
     ],
-    "chainDb": -3.4,
-    "makeUpDb": 3.4,
-    "oldMakeUpDb": -5.3,
-    "at": "2026-09-30T10:24:40.469Z"
+    "chainDb": -3.3,
+    "makeUpDb": 3.3,
+    "oldMakeUpDb": 3.4,
+    "at": "2026-10-08T18:22:27.181Z"
   },
   "Techno": {
     "name": "Techno",
@@ -1455,10 +1455,10 @@
       "TapeSaturation",
       "Compressor"
     ],
-    "chainDb": -1.3,
-    "makeUpDb": 1.3,
-    "oldMakeUpDb": 5.4,
-    "at": "2026-09-30T10:24:50.191Z"
+    "chainDb": 0.9,
+    "makeUpDb": -0.9,
+    "oldMakeUpDb": 1.3,
+    "at": "2026-10-08T18:22:36.907Z"
   },
   "Hip Hop": {
     "name": "Hip Hop",
@@ -1467,10 +1467,10 @@
       "TapeSaturation",
       "Compressor"
     ],
-    "chainDb": -0.9,
-    "makeUpDb": 0.9,
-    "oldMakeUpDb": 4.9,
-    "at": "2026-09-30T10:24:59.919Z"
+    "chainDb": 0.3,
+    "makeUpDb": 0,
+    "oldMakeUpDb": 0.9,
+    "at": "2026-10-08T18:22:46.627Z"
   },
   "Hardstyle": {
     "name": "Hardstyle",
@@ -1479,10 +1479,10 @@
       "TapeSaturation",
       "Compressor"
     ],
-    "chainDb": -1.8,
-    "makeUpDb": 1.8,
-    "oldMakeUpDb": 4.8,
-    "at": "2026-09-30T10:25:09.622Z"
+    "chainDb": 2,
+    "makeUpDb": -2,
+    "oldMakeUpDb": 1.8,
+    "at": "2026-10-08T18:22:56.345Z"
   },
   "Acid House": {
     "name": "Acid House",
@@ -1492,8 +1492,8 @@
     ],
     "chainDb": 3.7,
     "makeUpDb": -3.7,
-    "oldMakeUpDb": -3.8,
-    "at": "2026-09-30T12:31:27.240Z"
+    "oldMakeUpDb": -3.7,
+    "at": "2026-10-08T18:23:16.262Z"
   },
   "DJ Booth": {
     "name": "DJ Booth",
@@ -1502,10 +1502,10 @@
       "TapeSaturation",
       "Compressor"
     ],
-    "chainDb": -1,
-    "makeUpDb": 1,
-    "oldMakeUpDb": 5.6,
-    "at": "2026-09-30T10:25:38.827Z"
+    "chainDb": 1.4,
+    "makeUpDb": -1.4,
+    "oldMakeUpDb": 1,
+    "at": "2026-10-08T18:23:26.021Z"
   },
   "Vinyl DJ": {
     "name": "Vinyl DJ",
@@ -1514,10 +1514,10 @@
       "TapeSaturation",
       "Compressor"
     ],
-    "chainDb": -1.4,
-    "makeUpDb": 1.4,
-    "oldMakeUpDb": 5.4,
-    "at": "2026-09-30T10:25:48.532Z"
+    "chainDb": -1.5,
+    "makeUpDb": 1.5,
+    "oldMakeUpDb": 1.4,
+    "at": "2026-10-08T18:23:35.732Z"
   },
   "Warehouse Rave": {
     "name": "Warehouse Rave",
@@ -1526,10 +1526,10 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -2.1,
-    "makeUpDb": 2.1,
-    "oldMakeUpDb": 2.4,
-    "at": "2026-09-30T10:25:58.243Z"
+    "chainDb": -0.5,
+    "makeUpDb": 0.5,
+    "oldMakeUpDb": 2.1,
+    "at": "2026-10-08T18:23:45.474Z"
   },
   "Filter Sweep": {
     "name": "Filter Sweep",
@@ -1538,8 +1538,8 @@
     ],
     "chainDb": 1.6,
     "makeUpDb": -1.6,
-    "oldMakeUpDb": -2,
-    "at": "2026-09-30T10:26:07.981Z"
+    "oldMakeUpDb": -1.6,
+    "at": "2026-10-08T18:23:55.204Z"
   },
   "Vox Amp Crunch": {
     "name": "Vox Amp Crunch",
@@ -1548,8 +1548,8 @@
     ],
     "chainDb": -2.1,
     "makeUpDb": 2.1,
-    "oldMakeUpDb": -1.4,
-    "at": "2026-09-30T10:26:21.731Z"
+    "oldMakeUpDb": 2.1,
+    "at": "2026-10-08T18:24:08.955Z"
   },
   "Acid Bass": {
     "name": "Acid Bass",
@@ -1560,7 +1560,7 @@
     "chainDb": 4.5,
     "makeUpDb": -4.5,
     "oldMakeUpDb": -4.5,
-    "at": "2026-09-30T12:32:45.306Z"
+    "at": "2026-10-08T18:24:18.685Z"
   },
   "Sub Bass": {
     "name": "Sub Bass",
@@ -1570,8 +1570,8 @@
     ],
     "chainDb": -2.4,
     "makeUpDb": 2.4,
-    "oldMakeUpDb": 3.4,
-    "at": "2026-09-30T10:27:00.718Z"
+    "oldMakeUpDb": 2.4,
+    "at": "2026-10-08T18:24:28.453Z"
   },
   "Acid Screamer": {
     "name": "Acid Screamer",
@@ -1581,8 +1581,8 @@
     ],
     "chainDb": 1.3,
     "makeUpDb": -1.3,
-    "oldMakeUpDb": -1.5,
-    "at": "2026-09-30T12:32:55.112Z"
+    "oldMakeUpDb": -1.3,
+    "at": "2026-10-08T18:24:38.231Z"
   },
   "Dark Pad": {
     "name": "Dark Pad",
@@ -1592,8 +1592,8 @@
     ],
     "chainDb": -1.6,
     "makeUpDb": 1.6,
-    "oldMakeUpDb": 0.7,
-    "at": "2026-09-30T10:27:39.579Z"
+    "oldMakeUpDb": 1.6,
+    "at": "2026-10-08T18:24:57.935Z"
   },
   "Crystal Castles Vocal": {
     "name": "Crystal Castles Vocal",
@@ -1603,8 +1603,8 @@
     ],
     "chainDb": -0.3,
     "makeUpDb": 0,
-    "oldMakeUpDb": 2.3,
-    "at": "2026-09-30T10:27:49.303Z"
+    "oldMakeUpDb": 0,
+    "at": "2026-10-08T18:25:07.683Z"
   },
   "Crystal Castles Void": {
     "name": "Crystal Castles Void",
@@ -1614,8 +1614,8 @@
     ],
     "chainDb": -4.3,
     "makeUpDb": 4.3,
-    "oldMakeUpDb": 8.9,
-    "at": "2026-09-30T10:28:28.330Z"
+    "oldMakeUpDb": 4.3,
+    "at": "2026-10-08T18:25:17.424Z"
   },
   "Industrial": {
     "name": "Industrial",
@@ -1624,10 +1624,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": 2,
-    "makeUpDb": -2,
-    "oldMakeUpDb": -1.4,
-    "at": "2026-09-30T12:33:44.011Z"
+    "chainDb": 2.2,
+    "makeUpDb": -2.2,
+    "oldMakeUpDb": -2,
+    "at": "2026-10-08T18:25:27.153Z"
   },
   "Fuzz Box": {
     "name": "Fuzz Box",
@@ -1638,8 +1638,8 @@
     ],
     "chainDb": -1.6,
     "makeUpDb": 1.6,
-    "oldMakeUpDb": -0.5,
-    "at": "2026-09-30T10:29:07.314Z"
+    "oldMakeUpDb": 1.6,
+    "at": "2026-10-08T18:25:36.912Z"
   },
   "Paula Punchline": {
     "name": "Paula Punchline",
@@ -1648,10 +1648,10 @@
       "TapeSaturation",
       "Compressor"
     ],
-    "chainDb": -1.1,
-    "makeUpDb": 1.1,
-    "oldMakeUpDb": 4.9,
-    "at": "2026-09-30T10:29:30.925Z"
+    "chainDb": 2.9,
+    "makeUpDb": -2.9,
+    "oldMakeUpDb": 1.1,
+    "at": "2026-10-08T18:25:46.702Z"
   },
   "Amiga Bass Cannon": {
     "name": "Amiga Bass Cannon",
@@ -1661,10 +1661,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": -0.8,
-    "makeUpDb": 0.8,
-    "oldMakeUpDb": 3.4,
-    "at": "2026-09-30T10:29:40.674Z"
+    "chainDb": 5.4,
+    "makeUpDb": -5.4,
+    "oldMakeUpDb": 0.8,
+    "at": "2026-10-08T18:25:56.476Z"
   },
   "Tracker Dance Floor": {
     "name": "Tracker Dance Floor",
@@ -1674,24 +1674,25 @@
       "Compressor",
       "TapeSaturation"
     ],
-    "chainDb": -1.1,
-    "makeUpDb": 1.1,
-    "oldMakeUpDb": -0.2,
-    "at": "2026-09-30T10:29:50.474Z"
+    "chainDb": 2,
+    "makeUpDb": -2,
+    "oldMakeUpDb": 1.1,
+    "at": "2026-10-08T18:26:06.303Z"
   },
   "Paula's Revenge": {
     "name": "Paula's Revenge",
     "types": [
       "BassEnhancer",
+      "EQ3",
       "Exciter",
       "TapeSaturation",
       "Compressor",
       "Limiter"
     ],
-    "chainDb": -2.1,
-    "makeUpDb": 2.1,
-    "oldMakeUpDb": -1.4,
-    "at": "2026-09-30T10:30:00.221Z"
+    "chainDb": 2.7,
+    "makeUpDb": -2.7,
+    "oldMakeUpDb": 2.1,
+    "at": "2026-10-08T18:26:57.930Z"
   },
   "Amiga Tape Warmth": {
     "name": "Amiga Tape Warmth",
@@ -1700,10 +1701,10 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -1.7,
-    "makeUpDb": 1.7,
-    "oldMakeUpDb": 0,
-    "at": "2026-09-30T10:30:09.975Z"
+    "chainDb": -1.9,
+    "makeUpDb": 1.9,
+    "oldMakeUpDb": 1.7,
+    "at": "2026-10-08T18:27:07.641Z"
   },
   "Amiga Multiband": {
     "name": "Amiga Multiband",
@@ -1711,10 +1712,10 @@
       "MultibandComp",
       "TapeSaturation"
     ],
-    "chainDb": 4.3,
-    "makeUpDb": -4.3,
-    "oldMakeUpDb": -9.8,
-    "at": "2026-10-08T14:09:52.251Z"
+    "chainDb": 4.9,
+    "makeUpDb": -4.9,
+    "oldMakeUpDb": -4.3,
+    "at": "2026-10-08T18:27:17.351Z"
   },
   "Retro Arcade": {
     "name": "Retro Arcade",
@@ -1724,10 +1725,10 @@
       "Compressor",
       "TapeSaturation"
     ],
-    "chainDb": -0.4,
-    "makeUpDb": 0,
-    "oldMakeUpDb": 6.3,
-    "at": "2026-09-30T10:30:39.263Z"
+    "chainDb": 5.4,
+    "makeUpDb": -5.4,
+    "oldMakeUpDb": 0,
+    "at": "2026-10-08T18:27:27.080Z"
   },
   "SID Bass Machine": {
     "name": "SID Bass Machine",
@@ -1737,10 +1738,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": -1,
-    "makeUpDb": 1,
-    "oldMakeUpDb": 2.9,
-    "at": "2026-09-30T10:30:49.025Z"
+    "chainDb": 3.4,
+    "makeUpDb": -3.4,
+    "oldMakeUpDb": 1,
+    "at": "2026-10-08T18:27:36.805Z"
   },
   "SID Raw Power": {
     "name": "SID Raw Power",
@@ -1749,10 +1750,10 @@
       "Compressor",
       "TapeSaturation"
     ],
-    "chainDb": -1,
-    "makeUpDb": 1,
-    "oldMakeUpDb": 6.1,
-    "at": "2026-09-30T10:30:58.801Z"
+    "chainDb": 1.8,
+    "makeUpDb": -1.8,
+    "oldMakeUpDb": 1,
+    "at": "2026-10-08T18:27:46.520Z"
   },
   "Clean Master": {
     "name": "Clean Master",
