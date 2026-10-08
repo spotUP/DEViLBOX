@@ -105,9 +105,11 @@ describe('a dropped GoatTracker song', () => {
     engine.play();
     const out = [[new Float32Array(128), new Float32Array(128)]];
     const peaks = new Array<number>(channels).fill(0);
+    let energy = 0, sideDiff = 0;
     // The song brings its voices in one by one: run until all three have sounded.
     for (let block = 0; block < 4000 && peaks.some((p) => p <= 0.01); block++) {
       worklet.processor().process([], out);
+      for (let i = 0; i < 128; i++) { energy += Math.abs(out[0][0][i]); sideDiff += Math.abs(out[0][0][i] - out[0][1][i]); }
       const frame = liveScopeFrame();
       if (!frame) continue;
       for (let c = 0; c < channels; c++) {
@@ -117,6 +119,11 @@ describe('a dropped GoatTracker song', () => {
       }
     }
     for (let c = 0; c < channels; c++) expect(peaks[c], `channel ${c + 1} meter level`).toBeGreaterThan(0.01);
+
+    // A one-chip song plays on both speakers (owner 2026-10-08: "is the audio
+    // only in the left speaker?" - the idle second chip was mixed on the right).
+    expect(energy).toBeGreaterThan(1);
+    expect(sideDiff).toBe(0);
 
     // Each channel carries its own voice, not one mix copied three times.
     const last = useOscilloscopeStore.getState().channelData;
