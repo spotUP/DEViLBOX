@@ -26,6 +26,8 @@ typedef struct
 int sid_debug();
 
 void sid_init(int speed, unsigned m, unsigned ntsc, unsigned interpolate, unsigned customclockrate, unsigned usefp);
+void sid_set_voice_taps(short *tap, int cap);
+int sid_voice_tap_count(int chip);
 int sid_fillbuffer(short *lptr, short *rptr, short* lptr2, short* rptr2, int samples, int bufferHalfSize, unsigned int adparam);
 unsigned char sid_getorder(unsigned char index, unsigned int adparam);
 

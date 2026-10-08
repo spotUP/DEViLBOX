@@ -519,6 +519,24 @@ void gt_stop(void) {
     stopsong(&gtObject);
 }
 
+/* Per-voice output of the last gt_render_audio call, for the scopes and the
+ * channel meters: voice = chip*3 + voice-in-chip, Int16, DC removed. */
+#define GT_TAP_CAP 32768
+static short gt_voice_tap[12][GT_TAP_CAP];
+
+EMSCRIPTEN_KEEPALIVE
+short* gt_get_voice_tap(int voice) {
+    if (voice < 0 || voice >= 12) return 0;
+    return gt_voice_tap[voice];
+}
+
+/* Samples the last render wrote into each voice's tap. */
+EMSCRIPTEN_KEEPALIVE
+int gt_get_voice_tap_count(int voice) {
+    if (voice < 0 || voice >= 12) return 0;
+    return sid_voice_tap_count(voice / 3);
+}
+
 EMSCRIPTEN_KEEPALIVE
 void gt_render_audio(float* outL, float* outR, int frames) {
     /* Render audio via reSID into temp buffers then convert to float */
@@ -541,6 +559,9 @@ void gt_render_audio(float* outL, float* outR, int frames) {
         gt_playroutine_accumulator -= samplesPerTick;
         playroutine(&gtObject);
     }
+
+    /* Per-voice scope taps: the chips write each voice's output beside the mix */
+    sid_set_voice_taps(&gt_voice_tap[0][0], GT_TAP_CAP);
 
     /* Run play routine + fill SID buffer */
     sid_fillbuffer(sid0buf, sid1buf, sid2buf, sid3buf, samplesToRender, samplesToRender, editorInfo.adparam);

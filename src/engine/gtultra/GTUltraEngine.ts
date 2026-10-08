@@ -6,6 +6,7 @@
  */
 
 import { preprocessEmscriptenJS } from '../mame/mame-wasm-loader';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 // Cache fetched WASM+JS across instances
 let modulePromise: Promise<{ wasmBinary: ArrayBuffer; jsCode: string }> | null = null;
@@ -76,6 +77,8 @@ export class GTUltraEngine {
 
     // Load worklet module (once per context)
     if (!workletLoaded.has(this.context)) {
+      // Shared per-voice stream (oscilloscopes, channel meters), before the engine's own worklet
+      await this.context.audioWorklet.addModule(`${baseUrl}worklets/channel-stream.js`);
       await this.context.audioWorklet.addModule(
         `${baseUrl}gtultra/GTUltra.worklet.js${CACHE_BUST}`
       );
@@ -112,6 +115,10 @@ export class GTUltraEngine {
     this.workletNode.port.onmessage = (e) => this.handleMessage(e.data);
     this.workletNode.connect(this.outputNode);
 
+    // Every sample of every SID voice (worklets/channel-stream.js) feeds the
+    // shared oscilloscope store, which the channel scopes and meters read.
+    this.workletNode.port.postMessage({ type: 'enableOsc' });
+
     // Keepalive — ensures process() runs even when idle
     const keepalive = this.context.createGain();
     keepalive.gain.value = 0;
@@ -135,9 +142,17 @@ export class GTUltraEngine {
       case 'error':
         this.callbacks.onError?.(msg.error as string);
         break;
-      case 'songLoaded':
+      case 'oscData':
+        useOscilloscopeStore.getState().updateChannelData(
+          msg.channels as Int16Array[], msg.frame as number, msg.sampleRate as number,
+        );
+        break;
+      case 'songLoaded': {
+        const n = msg.channelCount as number | undefined;
+        if (msg.ok && n) useOscilloscopeStore.getState().setChipInfo(n, 0, Array.from({ length: n }, (_, i) => `CH${i + 1}`));
         this.callbacks.onSongLoaded?.(msg.ok as boolean, msg.channelCount as number | undefined);
         break;
+      }
       case 'position':
         this.callbacks.onPosition?.(msg as unknown as GTUltraPosition);
         break;
@@ -222,6 +237,7 @@ export class GTUltraEngine {
 
   stop(): void {
     this.post({ type: 'stop' });
+    useOscilloscopeStore.getState().clear();
   }
 
   // --- Jam mode ---
@@ -409,6 +425,8 @@ export class GTUltraEngine {
     if (this.disposed) return;
     this.disposed = true;
     if (this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'disableOsc' });
+      useOscilloscopeStore.getState().clear();
       this.workletNode.disconnect();
       this.workletNode = null;
     }
