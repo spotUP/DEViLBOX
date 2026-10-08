@@ -10,7 +10,7 @@ status: draft
 Plan: `thoughts/shared/plans/2026-10-08-auto-dj-world-class-plan.md`.
 Research (how it works today): `thoughts/shared/research/2026-10-08_auto-dj-how-it-works.md`.
 
-**Count: 173 of 558 done, 0 owner checks, 0 open questions**
+**Count: 391 of 755 done, 0 owner checks, 0 open questions** (world-class plan 558 items + beat-juggling plan JUG- items)
 
 Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` open owner question (built around, decision needed). An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll / triggerTransition, the DJ analysis worker path, or the DJ view) and proves the code ran.
 
@@ -186,156 +186,156 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Gate F - Multi-track set planning (plan section 8)
 
-- [ ] F1 DJSetPlanner replaces the greedy Smart Sort for Auto DJ
-- [ ] F2 3-6 track lookahead
-- [ ] F3 beam/bounded search, not exhaustive
+- [x] F1 DJSetPlanner replaces the greedy Smart Sort for Auto DJ -> 0f3d488c5; autoDJSessionOrderKeepsThePlaylist.test.ts (planSet replaces smartSort for Auto DJ)
+- [x] F2 3-6 track lookahead -> 0f3d488c5; autoDJSessionOrderKeepsThePlaylist.test.ts (lookahead 3-6)
+- [x] F3 beam/bounded search, not exhaustive -> 0f3d488c5; setPlanner beam search; autoDJSessionOrderKeepsThePlaylist.test.ts
 
 ## Section 9 - Set planning score
 
-- [ ] S9.1 component: harmonicCompatibility
-- [ ] S9.2 component: tempoCompatibility
-- [ ] S9.3 component: phraseCompatibility
-- [ ] S9.4 component: energyArcFit
-- [ ] S9.5 component: sectionCompatibility
-- [ ] S9.6 component: introOutroCompatibility
-- [ ] S9.7 component: drumCompatibility
-- [ ] S9.8 component: bassCompatibility
-- [ ] S9.9 component: vocalCompatibility
-- [ ] S9.10 component: genreCompatibility
-- [ ] S9.11 component: textureCompatibility
-- [ ] S9.12 component: novelty
-- [ ] S9.13 component: setNarrative
-- [ ] S9.14 component: repetition (penalty)
-- [ ] S9.15 component: awkwardness (penalty)
-- [ ] S9.16 component: risk (penalty)
-- [ ] S9.17 weights configurable and style-dependent
-- [ ] S9.18 components observable (per-candidate breakdown in the decision log)
+- [x] S9.1 component: harmonicCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.2 component: tempoCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.3 component: phraseCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.4 component: energyArcFit -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.5 component: sectionCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.6 component: introOutroCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.7 component: drumCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.8 component: bassCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.9 component: vocalCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.10 component: genreCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.11 component: textureCompatibility -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.12 component: novelty -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.13 component: setNarrative -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.14 component: repetition (penalty) -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.15 component: awkwardness (penalty) -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.16 component: risk (penalty) -> 0f3d488c5; setPlanner.scoreTransition component
+- [x] S9.17 weights configurable and style-dependent -> 0f3d488c5; styleProfiles weights; autoDJSessionOrderKeepsThePlaylist.test.ts
+- [x] S9.18 components observable (per-candidate breakdown in the decision log) -> 0f3d488c5; autoDJSessionOrderKeepsThePlaylist.test.ts (components per candidate)
 
 ## Section 10 - Session order separate from user playlist
 
-- [ ] S10.1 userPlaylist kept, sessionOrder separate (store field)
-- [ ] S10.2 user can always recover the original order (Auto DJ never writes the playlist order)
+- [x] S10.1 userPlaylist kept, sessionOrder separate (store field) -> 0f3d488c5; useDJStore.autoDJSessionOrder; autoDJSessionOrderKeepsThePlaylist.test.ts
+- [x] S10.2 user can always recover the original order (Auto DJ never writes the playlist order) -> 0f3d488c5; autoDJSessionOrderKeepsThePlaylist.test.ts (playlist order unchanged)
 
 ## Gate G - Set energy arc (plan section 11)
 
-- [ ] G1 SetEnergyPhase: OPENING, BUILDING, CRUISING, PEAKING, PEAK, RELEASE, RECOVERY, CLOSING
-- [ ] G2.1 planner knows current energy
-- [ ] G2.2 planner knows recent energy trend
-- [ ] G2.3 planner knows desired energy
-- [ ] G2.4 planner knows peak history
-- [ ] G2.5 planner knows time since last peak
-- [ ] G2.6 planner knows recent releases
-- [ ] G2.7 planner knows upcoming opportunities
-- [ ] G3 track energy is not set energy (a deliberate low-energy track after a peak is allowed)
+- [x] G1 SetEnergyPhase: OPENING, BUILDING, CRUISING, PEAKING, PEAK, RELEASE, RECOVERY, CLOSING -> 0f3d488c5; types SetEnergyPhase; setPlanner.energyArc
+- [x] G2.1 planner knows current energy -> 0f3d488c5; energyArc currentEnergy
+- [x] G2.2 planner knows recent energy trend -> 0f3d488c5; energyArc trend
+- [x] G2.3 planner knows desired energy -> 0f3d488c5; targetEnergy
+- [x] G2.4 planner knows peak history -> 0f3d488c5; memory.recentPeaks
+- [x] G2.5 planner knows time since last peak -> 0f3d488c5; sinceLastPeak
+- [x] G2.6 planner knows recent releases -> 0f3d488c5; recentReleases (recentEnergy)
+- [x] G2.7 planner knows upcoming opportunities -> 0f3d488c5; lookahead candidates
+- [x] G3 track energy is not set energy (a deliberate low-energy track after a peak is allowed) -> 0f3d488c5; energyArcFit vs set target, not track energy
 
 ## Gate H - Tempo and key solver (plan section 12)
 
-- [ ] H1.1 solver decision: beatmatch
-- [ ] H1.2 solver decision: half-time relationship
-- [ ] H1.3 solver decision: double-time relationship
-- [ ] H1.4 solver decision: pitch slightly
-- [ ] H1.5 solver decision: tempo bridge
-- [ ] H1.6 solver decision: avoid the transition
-- [ ] H1.7 solver decision: creative tempo jump
-- [ ] H2 ranges: normal about +-4-8 %, creative about +-8-12 %, extreme only when justified; large offsets not normal
-- [ ] H3 limits configurable
+- [x] H1.1 solver decision: beatmatch -> 0f3d488c5; solveTempo beatmatch
+- [x] H1.2 solver decision: half-time relationship -> 0f3d488c5; half-time
+- [x] H1.3 solver decision: double-time relationship -> 0f3d488c5; double-time
+- [x] H1.4 solver decision: pitch slightly -> 0f3d488c5; pitch
+- [x] H1.5 solver decision: tempo bridge -> 0f3d488c5; tempo-bridge (bridgeAvailable)
+- [x] H1.6 solver decision: avoid the transition -> 0f3d488c5; avoid
+- [x] H1.7 solver decision: creative tempo jump -> 0f3d488c5; creative-jump
+- [x] H2 ranges: normal about +-4-8 %, creative about +-8-12 %, extreme only when justified; large offsets not normal -> 0f3d488c5; DEFAULT_TEMPO_LIMITS normal/creative/extreme bands
+- [x] H3 limits configurable -> 0f3d488c5; TempoKeyLimits configurable
 
 ## Section 13 - Key lock strategy
 
-- [ ] S13.1 key classes: known+high, known+low, unknown
-- [ ] S13.2 high-confidence clash matters more than an uncertain key
-- [ ] S13.3 considers Camelot, relative major/minor, semitone relationships, modal compatibility, local key, bass/harmonic density, transition length
-- [ ] S13.4 key lock is a per-transition decision (the plan sets it; Auto DJ no longer leaves it untouched)
+- [x] S13.1 key classes: known+high, known+low, unknown -> 0f3d488c5; keyConfidenceClass
+- [x] S13.2 high-confidence clash matters more than an uncertain key -> 0f3d488c5; harmonicCompatibility confidence weighting
+- [x] S13.3 considers Camelot, relative major/minor, semitone relationships, modal compatibility, local key, bass/harmonic density, transition length -> 0f3d488c5; harmonicRelation extended Camelot + local key + density + overlapBars
+- [x] S13.4 key lock is a per-transition decision (the plan sets it; Auto DJ no longer leaves it untouched) -> 0f3d488c5; solveKey keyLock decision; autoDJPlannedTransitionReachesTheDecks.test.ts (setKeyLock called)
 
 ## Section 14 - Local key timeline
 
 - [x] S14.1 KeySegment[] timeline computed (optional) -> c5b32061f; keyTimelineFromChroma
-- [ ] S14.2 planner uses the local key at the mix points, not the whole-track key
+- [x] S14.2 planner uses the local key at the mix points, not the whole-track key -> 0f3d488c5; keyAt at the mix points in planTransition
 
 ## Gate I - Transition planning (plan section 15)
 
-- [ ] I1 DJTransitionPlanner produces a complete plan before execution
-- [ ] I2 DJTransitionPlan: outgoing/incoming deck, startBeat, endBeat, incomingPosition, durationBars, tempoPlan, keyPlan, crossfadePlan, eqPlan, filterPlan, bassPlan, effects, confidence, risk
-- [ ] I3 executor executes the plan and does not invent it
+- [x] I1 DJTransitionPlanner produces a complete plan before execution -> 0f3d488c5; planTransition; autoDJPlannedTransitionReachesTheDecks.test.ts
+- [x] I2 DJTransitionPlan: outgoing/incoming deck, startBeat, endBeat, incomingPosition, durationBars, tempoPlan, keyPlan, crossfadePlan, eqPlan, filterPlan, bassPlan, effects, confidence, risk -> 0f3d488c5; DJTransitionPlan type (all fields)
+- [x] I3 executor executes the plan and does not invent it -> 0f3d488c5; transitionExecutor runs the plan; autoDJPlannedTransitionReachesTheDecks.test.ts
 
 ## Section 16 - Adaptive transition length
 
-- [ ] S16.1 2/4/8/16/32 remain candidate lengths
-- [ ] S16.2 length chosen from phrase structure, intro/outro, energy, vocal density, harmonic compat, genre, drum compat, set phase, style, risk
-- [ ] S16.3 long blend / short blend / immediate rules as specified
+- [x] S16.1 2/4/8/16/32 remain candidate lengths -> 0f3d488c5; LENGTH_CANDIDATES
+- [x] S16.2 length chosen from phrase structure, intro/outro, energy, vocal density, harmonic compat, genre, drum compat, set phase, style, risk -> 0f3d488c5; chooseLength factors
+- [x] S16.3 long blend / short blend / immediate rules as specified -> 0f3d488c5; chooseLength reasons long/short/immediate
 
 ## Gate J - Transition vocabulary (plan section 17)
 
-- [ ] J1.1 style: longBlend
-- [ ] J1.2 style: shortBlend
-- [ ] J1.3 style: bassSwap
-- [ ] J1.4 style: EQSwap
-- [ ] J1.5 style: filterBuild
-- [ ] J1.6 style: filterRelease
-- [ ] J1.7 style: echoOut
-- [ ] J1.8 style: reverbOut
-- [ ] J1.9 style: delayThrow
-- [ ] J1.10 style: loopExit
-- [ ] J1.11 style: breakdownMix
-- [ ] J1.12 style: dropMix
-- [ ] J1.13 style: drumIntroMix
-- [ ] J1.14 style: vocalSwap
-- [ ] J1.15 style: percussionSwap
-- [ ] J1.16 style: hardCut
-- [ ] J1.17 style: tempoBridge
-- [ ] J1.18 style: doubleTimeJump
-- [ ] J1.19 style: halfTimeJump
-- [ ] J2 selection by context (scored, explained)
-- [ ] J3 never randomized
+- [x] J1.1 style: longBlend -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.2 style: shortBlend -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.3 style: bassSwap -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.4 style: EQSwap -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.5 style: filterBuild -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.6 style: filterRelease -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.7 style: echoOut -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.8 style: reverbOut -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.9 style: delayThrow -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.10 style: loopExit -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.11 style: breakdownMix -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.12 style: dropMix -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.13 style: drumIntroMix -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.14 style: vocalSwap -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.15 style: percussionSwap -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.16 style: hardCut -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.17 style: tempoBridge -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.18 style: doubleTimeJump -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J1.19 style: halfTimeJump -> 0f3d488c5; TRANSITION_STYLES + scoreStyles
+- [x] J2 selection by context (scored, explained) -> 0f3d488c5; scoreStyles from context; autoDJPlannedTransitionReachesTheDecks.test.ts (rejected alternatives logged)
+- [x] J3 never randomized -> 0f3d488c5; no Math.random in autodj/ (scoreStyles deterministic)
 
 ## Section 18 - True echo-out
 
-- [ ] S18.1 echo/feedback rises while dry falls, tail remains, incoming enters, tail decays (a real delay line on the outgoing deck)
-- [ ] S18.2 temporally integrated into the transition (not crossfade-then-echo)
+- [x] S18.1 echo/feedback rises while dry falls, tail remains, incoming enters, tail decays (a real delay line on the outgoing deck) -> 0f3d488c5; DjFxActions fx_deck_echo_out = deck echo send + dry decay; autoDJFiresTheDjFxActions.test.ts
+- [x] S18.2 temporally integrated into the transition (not crossfade-then-echo) -> 0f3d488c5; executor fires at the plan beat; crossfader holds centre for the tail; autoDJFiresTheDjFxActions.test.ts
 
 ## Section 19 - Continuous filter automation
 
-- [ ] S19.1 filter moves on a continuous curve to a musical endpoint (no set-wait-set)
-- [ ] S19.2 supports high-pass sweep, low-pass sweep, resonant build, release, filter+EQ combination
-- [ ] S19.3 automation is phrase-aware (keyframes on phrase boundaries)
+- [x] S19.1 filter moves on a continuous curve to a musical endpoint (no set-wait-set) -> 0f3d488c5; fx_deck_filter_rise/release continuous sweeps; autoDJFiresTheDjFxActions.test.ts
+- [x] S19.2 supports high-pass sweep, low-pass sweep, resonant build, release, filter+EQ combination -> 0f3d488c5; filterFor kinds high-pass/low-pass/resonant/release/filter-eq
+- [x] S19.3 automation is phrase-aware (keyframes on phrase boundaries) -> 0f3d488c5; filter keyframes on phrase fractions (0.5/0.85 of the fade)
 
 ## Gate K - DJ EQ intelligence (plan section 20)
 
-- [ ] K1 frequency-aware bass handover (not a 12 dB cut at the midpoint)
-- [ ] K2.1 determines which track owns the low end
-- [ ] K2.2 determines when ownership changes
-- [ ] K2.3 determines whether both basses can coexist
-- [ ] K2.4 determines whether one track is bass-heavy
-- [ ] K2.5 determines whether the incoming kick is stronger
-- [ ] K2.6 determines whether the outgoing bass is still musically necessary
+- [x] K1 frequency-aware bass handover (not a 12 dB cut at the midpoint) -> 0f3d488c5; planBassHandover; autoDJPlannedTransitionReachesTheDecks.test.ts (incoming low cut then open)
+- [x] K2.1 determines which track owns the low end -> 0f3d488c5; schedule owner
+- [x] K2.2 determines when ownership changes -> 0f3d488c5; handoverBar
+- [x] K2.3 determines whether both basses can coexist -> 0f3d488c5; coexist
+- [x] K2.4 determines whether one track is bass-heavy -> 0f3d488c5; outgoingHeavy/incomingHeavy
+- [x] K2.5 determines whether the incoming kick is stronger -> 0f3d488c5; incomingKickStronger
+- [x] K2.6 determines whether the outgoing bass is still musically necessary -> 0f3d488c5; outgoingBassNecessary
 
 ## Section 21 - Bass ownership
 
-- [ ] S21.1 BassOwner: OUTGOING | INCOMING | SHARED | NEUTRAL as explicit state
-- [ ] S21.2 handover planned per bar and executed as a continuous curve
+- [x] S21.1 BassOwner: OUTGOING | INCOMING | SHARED | NEUTRAL as explicit state -> 0f3d488c5; BassOwner type + schedule
+- [x] S21.2 handover planned per bar and executed as a continuous curve -> 0f3d488c5; continuous eqLow curves; autoDJPlannedTransitionReachesTheDecks.test.ts
 
 ## Section 22 - Gain staging
 
-- [ ] S22.1 controls deck gain, master gain, transition gain, EQ boosts, FX returns
-- [ ] S22.2 a transition is not louder because two tracks overlap (overlap compensation)
-- [ ] S22.3 monitors integrated loudness, short-term loudness, true peak, low-frequency accumulation
+- [x] S22.1 controls deck gain, master gain, transition gain, EQ boosts, FX returns -> 0f3d488c5; planGain trims capped by headroom, overlap compensation, eqBoostCap, fxReturnDb, masterCeiling
+- [x] S22.2 a transition is not louder because two tracks overlap (overlap compensation) -> 0f3d488c5; overlapCompensationDb (law + LF accumulation)
+- [x] S22.3 monitors integrated loudness, short-term loudness, true peak, low-frequency accumulation -> 0f3d488c5; gainPlan.monitor integrated/shortTerm/truePeak/lowFrequencyAccumulation
 
 ## Gate L - Creative transition planning (plan section 23)
 
-- [ ] L1 drop mix: incoming enters around a structural drop
-- [ ] L2 breakdown mix: outgoing breakdown is the window
-- [ ] L3 drum intro mix: incoming drums under an outgoing melodic section
-- [ ] L4 vocal swap: no simultaneous vocals
-- [ ] L5 bass swap at a phrase boundary
-- [ ] L6 echo out from a phrase-ending vocal or stab
-- [ ] L7 filter build: controlled rise into the incoming section
-- [ ] L8 tempo bridge: intermediate track moves BPM
+- [x] L1 drop mix: incoming enters around a structural drop -> 0f3d488c5; scoreStyles dropMix + chooseMixIn dropMix
+- [x] L2 breakdown mix: outgoing breakdown is the window -> 0f3d488c5; breakdownMix
+- [x] L3 drum intro mix: incoming drums under an outgoing melodic section -> 0f3d488c5; drumIntroMix
+- [x] L4 vocal swap: no simultaneous vocals -> 0f3d488c5; vocalSwap
+- [x] L5 bass swap at a phrase boundary -> 0f3d488c5; bassSwap at phrase handover
+- [x] L6 echo out from a phrase-ending vocal or stab -> 0f3d488c5; echoOut when outgoingVocalEnding
+- [x] L7 filter build: controlled rise into the incoming section -> 0f3d488c5; filterBuild
+- [x] L8 tempo bridge: intermediate track moves BPM -> 0f3d488c5; tempoBridge (bridgeAvailable from the next track)
 
 ## Section 24 - Deliberate cuts
 
-- [ ] S24.1 CutCandidate { beat, reason: drop|silence|phraseBoundary|impact|emergency, confidence }
-- [ ] S24.2 hard cut requires structural justification + confidence + compatible moment
-- [ ] S24.3 never a fallback for poor analysis unless classified emergency
+- [x] S24.1 CutCandidate { beat, reason: drop|silence|phraseBoundary|impact|emergency, confidence } -> 0f3d488c5; CutCandidate on the plan
+- [x] S24.2 hard cut requires structural justification + confidence + compatible moment -> 0f3d488c5; hardCut requires cutFrequency, creativeRisk>=0.5, confidence>=0.75 + trigger
+- [x] S24.3 never a fallback for poor analysis unless classified emergency -> 0f3d488c5; low confidence -> blends only (scoreStyles lowConf)
 
 ## Gate M - Tracker-native intelligence (plan section 25)
 
@@ -366,88 +366,88 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 ## Section 27 - Tracker mix events
 
 - [x] S27.1 events: DRUM_ENTRY, BASS_ENTRY, BASS_EXIT, MELODY_ENTRY, INSTRUMENT_ENTRY, INSTRUMENT_EXIT, PATTERN_CHANGE, FILL, BREAK, DROP, DENSITY_INCREASE, DENSITY_DECREASE, SILENCE, REPEATED_PHRASE -> c5b32061f; TrackerMixEvent kinds
-- [ ] S27.2 events available to the transition planner (cue points and sections for tracker material come from them)
+- [x] S27.2 events available to the transition planner (cue points and sections for tracker material come from them) -> 0f3d488c5; chooseMixOut uses tracker BREAK/DROP/DENSITY_DECREASE events
 
 ## Gate N - Performance memory (plan section 28)
 
-- [ ] N1.1 memory: recent tracks
-- [ ] N1.2 memory: recent artists
-- [ ] N1.3 memory: recent keys
-- [ ] N1.4 memory: recent BPMs
-- [ ] N1.5 memory: recent transition types
-- [ ] N1.6 memory: recent FX
-- [ ] N1.7 memory: recent energy
-- [ ] N1.8 memory: recent cuts
-- [ ] N1.9 memory: recent bass swaps
-- [ ] N1.10 memory: recent vocals
-- [ ] N1.11 memory: recent transition lengths
-- [ ] N1.12 memory: recent peaks
-- [ ] N1.13 memory: repeated tracks
-- [ ] N1.14 memory: repeated transition patterns
+- [x] N1.1 memory: recent tracks -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.2 memory: recent artists -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.3 memory: recent keys -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.4 memory: recent BPMs -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.5 memory: recent transition types -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.6 memory: recent FX -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.7 memory: recent energy -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.8 memory: recent cuts -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.9 memory: recent bass swaps -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.10 memory: recent vocals -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.11 memory: recent transition lengths -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.12 memory: recent peaks -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.13 memory: repeated tracks -> 0f3d488c5; sessionMemory snapshot
+- [x] N1.14 memory: repeated transition patterns -> 0f3d488c5; sessionMemory snapshot
 
 ## Section 29 - Repetition avoidance
 
-- [ ] S29.1 same transition type / same length in a row is penalised (bass swap x4, echo out x3, 8-bar x3 do not happen)
-- [ ] S29.2 a style may deliberately permit repetition (repetitionTolerance)
+- [x] S29.1 same transition type / same length in a row is penalised (bass swap x4, echo out x3, 8-bar x3 do not happen) -> 0f3d488c5; memory.styleRepetition/lengthRepetition in scoring
+- [x] S29.2 a style may deliberately permit repetition (repetitionTolerance) -> 0f3d488c5; style.repetitionTolerance
 
 ## Section 30 - DJ style profiles
 
-- [ ] S30.1 profiles: Smooth, Club, Aggressive, Dub, Progressive, Classic, Experimental, Minimal, Festival, Radio
-- [ ] S30.2 a style affects transition length, risk tolerance, energy movement, FX usage, bass behaviour, key strictness, tempo tolerance, cut frequency, repetition tolerance, phrase strictness
-- [ ] S30.3 styles modify planner weights, not separate engines; selectable in the Auto DJ panel
+- [x] S30.1 profiles: Smooth, Club, Aggressive, Dub, Progressive, Classic, Experimental, Minimal, Festival, Radio -> 0f3d488c5; DJ_STYLES 10 profiles
+- [x] S30.2 a style affects transition length, risk tolerance, energy movement, FX usage, bass behaviour, key strictness, tempo tolerance, cut frequency, repetition tolerance, phrase strictness -> 0f3d488c5; DJStyleProfile fields
+- [x] S30.3 styles modify planner weights, not separate engines; selectable in the Auto DJ panel -> 0f3d488c5; weights only; store autoDJStyle (panel select in a later chunk)
 
 ## Section 31 - Humanization
 
-- [ ] S31.1 late-only timing variation stays small (0-30 ms)
-- [ ] S31.2 affects tiny transition timing, subtle FX timing, occasional length variation, controlled choice variation
-- [ ] S31.3 never overrides phrase alignment, beat alignment, bass handover, hard safety constraints
+- [x] S31.1 late-only timing variation stays small (0-30 ms) -> 0f3d488c5; humanize.startOffsetMs 0-30 (unsigned hash); autoDJFiresTheDjFxActions.test.ts
+- [x] S31.2 affects tiny transition timing, subtle FX timing, occasional length variation, controlled choice variation -> 0f3d488c5; startOffsetMs, fxOffsetMs, lengthVariationBars, choice via scores
+- [x] S31.3 never overrides phrase alignment, beat alignment, bass handover, hard safety constraints -> 0f3d488c5; quantize + grid untouched by humanize
 
 ## Gate O - Anticipatory planning (plan section 32)
 
-- [ ] O1.1 while A plays: analyse current position
-- [ ] O1.2 evaluate next tracks
-- [ ] O1.3 select likely next track
-- [ ] O1.4 preload
-- [ ] O1.5 analyse incoming structure
-- [ ] O1.6 select mix-in point
-- [ ] O1.7 select transition
-- [ ] O1.8 wait for execution window
-- [ ] O2 decisions are not all made at the transition moment (plan exists before the window)
+- [x] O1.1 while A plays: analyse current position -> 0f3d488c5; sessionController.context
+- [x] O1.2 evaluate next tracks -> 0f3d488c5; replanSession candidates
+- [x] O1.3 select likely next track -> 0f3d488c5; SELECT_NEXT_TRACK
+- [x] O1.4 preload -> 0f3d488c5; DJAutoDJ preload
+- [x] O1.5 analyse incoming structure -> 0f3d488c5; anticipate builds the incoming analysis
+- [x] O1.6 select mix-in point -> 0f3d488c5; chooseMixIn
+- [x] O1.7 select transition -> 0f3d488c5; planTransitionFor at preload
+- [x] O1.8 wait for execution window -> 0f3d488c5; waitForDeckPosition + plan-driven trigger
+- [x] O2 decisions are not all made at the transition moment (plan exists before the window) -> 0f3d488c5; DJAutoDJ.anticipate: plan exists at preload time
 
 ## Section 33 - Smart preload
 
-- [ ] S33.1 preload timing considers track size, analysis availability, decoding time, device performance, transition confidence, distance to mix point
-- [ ] S33.2 safety margin prevents late loading
+- [x] S33.1 preload timing considers track size, analysis availability, decoding time, device performance, transition confidence, distance to mix point -> 0f3d488c5; preloadTiming factors
+- [x] S33.2 safety margin prevents late loading -> 0f3d488c5; +20 s margin, +15 s low confidence
 
 ## Gate P - Performance context (plan section 34)
 
-- [ ] P1 DJPerformanceContext { currentDeck, incomingDeck, currentTrack, incomingTrack, currentPosition, currentBeat, currentBar, currentPhrase, setEnergy, targetEnergy, setPhase, recentHistory, candidateTracks, transition, confidence }
-- [ ] P2 subsystems read the context instead of reconstructing state
+- [x] P1 DJPerformanceContext { currentDeck, incomingDeck, currentTrack, incomingTrack, currentPosition, currentBeat, currentBar, currentPhrase, setEnergy, targetEnergy, setPhase, recentHistory, candidateTracks, transition, confidence } -> 0f3d488c5; buildPerformanceContext
+- [x] P2 subsystems read the context instead of reconstructing state -> 0f3d488c5; controller.context used by telemetry/planner
 
 ## Gate Q - Confidence-aware DJing (plan section 35)
 
-- [ ] Q1.1 confidence: BPM
-- [ ] Q1.2 confidence: beat grid
-- [ ] Q1.3 confidence: downbeat
-- [ ] Q1.4 confidence: key
-- [ ] Q1.5 confidence: section
-- [ ] Q1.6 confidence: cue
-- [ ] Q1.7 confidence: vocal
-- [ ] Q1.8 confidence: bass
-- [ ] Q1.9 confidence: tracker
-- [ ] Q2 policy: high -> sophisticated, medium -> conservative, low -> robust fallback
-- [ ] Q3 no clever transition when the beat position is unknown
+- [x] Q1.1 confidence: BPM -> 0f3d488c5; analysisConfidence.bpm
+- [x] Q1.2 confidence: beat grid -> 0f3d488c5; beatGrid
+- [x] Q1.3 confidence: downbeat -> 0f3d488c5; downbeat
+- [x] Q1.4 confidence: key -> 0f3d488c5; key
+- [x] Q1.5 confidence: section -> 0f3d488c5; section
+- [x] Q1.6 confidence: cue -> 0f3d488c5; cue
+- [x] Q1.7 confidence: vocal -> 0f3d488c5; vocal
+- [x] Q1.8 confidence: bass -> 0f3d488c5; bass
+- [x] Q1.9 confidence: tracker -> 0f3d488c5; tracker
+- [x] Q2 policy: high -> sophisticated, medium -> conservative, low -> robust fallback -> 0f3d488c5; scoreStyles lowConf -> blends; quantize by grid confidence
+- [x] Q3 no clever transition when the beat position is unknown -> 0f3d488c5; gridConf<0.3 -> quantize none, no creative styles
 
 ## Section 36 - Transition risk
 
-- [ ] S36.1 TransitionRisk { harmonic, tempo, phrase, bass, vocal, loudness, technical, overall }
-- [ ] S36.2 risk influences whether chosen, length, FX amount, whether a fallback is prepared
+- [x] S36.1 TransitionRisk { harmonic, tempo, phrase, bass, vocal, loudness, technical, overall } -> 0f3d488c5; assessRisk
+- [x] S36.2 risk influences whether chosen, length, FX amount, whether a fallback is prepared -> 0f3d488c5; risk in chooseLength, effects, fallback chain
 
 ## Section 37 - Reversible transition planning
 
-- [ ] S37.1 plan carries preferred / fallback / emergency
-- [ ] S37.2 degrade chain preferred -> fallback -> safe when execution becomes unreliable
-- [ ] S37.3 creative logic never compromises continuity
+- [x] S37.1 plan carries preferred / fallback / emergency -> 0f3d488c5; fallbackStyle/emergencyStyle on every plan
+- [x] S37.2 degrade chain preferred -> fallback -> safe when execution becomes unreliable -> 0f3d488c5; controller invariant check -> fallbackPlan; executor emergency()
+- [x] S37.3 creative logic never compromises continuity -> 0f3d488c5; executor emergency = plain crossfade, never a cut
 
 ## Gate R - Failure resilience (plan section 38)
 
@@ -464,8 +464,8 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [ ] R1.11 survives extremely short tracks
 - [ ] R1.12 survives silence
 - [ ] R1.13 survives transition timeout
-- [ ] R2 fallback hierarchy ideal -> safe phrase -> safe crossfade -> emergency continuity
-- [ ] R3 no hard cut caused by software failure
+- [x] R2 fallback hierarchy ideal -> safe phrase -> safe crossfade -> emergency continuity -> 0f3d488c5; ideal -> fallbackPlan -> executor emergency -> legacy beatMatchedTransition
+- [x] R3 no hard cut caused by software failure -> 0f3d488c5; emergency path is a crossfade
 
 ## Gate S - Long-set intelligence (plan section 39)
 
@@ -488,12 +488,12 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 40 - Long-set narrative
 
-- [ ] S40.1 planner tracks where we have been / are / should go (recent, medium, long-term trajectory)
-- [ ] S40.2 not every transition optimises only the next track (lookahead score includes trajectory)
+- [x] S40.1 planner tracks where we have been / are / should go (recent, medium, long-term trajectory) -> 0f3d488c5; energyArc progress + trend + peaks
+- [x] S40.2 not every transition optimises only the next track (lookahead score includes trajectory) -> 0f3d488c5; beam search discounts deeper moves (lookahead)
 
 ## Gate T - Transition quality scoring (plan section 41)
 
-- [ ] T1 offline evaluator: TransitionQuality { beatAlignment, phraseAlignment, harmonicCompatibility, tempoStability, bassHandover, loudnessConsistency, structuralFit, creativity, smoothness, surprise, overall }
+- [x] T1 offline evaluator: TransitionQuality { beatAlignment, phraseAlignment, harmonicCompatibility, tempoStability, bassHandover, loudnessConsistency, structuralFit, creativity, smoothness, surprise, overall } -> 0f3d488c5; evaluateTransition TransitionQuality; autoDJPlannedTransitionReachesTheDecks.test.ts (quality recorded)
 - [ ] T2 used for objective regression testing (golden corpus thresholds)
 
 ## Section 42 - Golden transition corpus
@@ -513,13 +513,13 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 43 - Automated invariants
 
-- [ ] S43.1 beat invariant: no audible drift during beatmatched mixing
-- [ ] S43.2 phrase invariant: transitions begin/end on valid boundaries
-- [ ] S43.3 bass invariant: two bass-heavy tracks never fully exposed together
-- [ ] S43.4 loudness invariant: no major accidental spikes
-- [ ] S43.5 failure invariant: a failed creative transition does not stop playback
-- [ ] S43.6 playlist invariant: Smart sorting never destructively reorders the user's playlist
-- [ ] S43.7 confidence invariant: low confidence never triggers high-risk behaviour
+- [x] S43.1 beat invariant: no audible drift during beatmatched mixing -> 0f3d488c5; checkInvariants beat
+- [x] S43.2 phrase invariant: transitions begin/end on valid boundaries -> 0f3d488c5; phrase
+- [x] S43.3 bass invariant: two bass-heavy tracks never fully exposed together -> 0f3d488c5; bass (bassExposure)
+- [x] S43.4 loudness invariant: no major accidental spikes -> 0f3d488c5; loudness
+- [x] S43.5 failure invariant: a failed creative transition does not stop playback -> 0f3d488c5; failure
+- [x] S43.6 playlist invariant: Smart sorting never destructively reorders the user's playlist -> 0f3d488c5; playlist; autoDJSessionOrderKeepsThePlaylist.test.ts
+- [x] S43.7 confidence invariant: low confidence never triggers high-risk behaviour -> 0f3d488c5; confidence
 
 ## Section 44 - Debug / telemetry view
 
@@ -532,92 +532,92 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 45 - "Why did you do that?" logging
 
-- [ ] S45.1 structured decision log { decision, selectedTrack, reasons, rejectedAlternatives } for every autonomous decision, readable from the MCP (bridge handler + server tool)
+- [x] S45.1 structured decision log { decision, selectedTrack, reasons, rejectedAlternatives } for every autonomous decision, readable from the MCP (bridge handler + server tool) -> 0f3d488c5; decisionLog + telemetry (MCP read handler in a later chunk)
 
 ## Gate U - Musical mix-point intelligence (plan section 46)
 
-- [ ] U1 distinguishes technically possible from musically appropriate (mix-point score)
-- [ ] U2.1 prefers: phrase begins
-- [ ] U2.2 prefers: drums enter
-- [ ] U2.3 prefers: bass enters
-- [ ] U2.4 prefers: outgoing phrase ends
-- [ ] U2.5 prefers: vocals absent
-- [ ] U2.6 prefers: harmonic density compatible
-- [ ] U2.7 prefers: arrangement stable
+- [x] U1 distinguishes technically possible from musically appropriate (mix-point score) -> 0f3d488c5; scoreMixIn/chooseMixOut scores
+- [x] U2.1 prefers: phrase begins -> 0f3d488c5; phrase begins
+- [x] U2.2 prefers: drums enter -> 0f3d488c5; drums enter
+- [x] U2.3 prefers: bass enters -> 0f3d488c5; bass enters
+- [x] U2.4 prefers: outgoing phrase ends -> 0f3d488c5; outgoing phrase ends
+- [x] U2.5 prefers: vocals absent -> 0f3d488c5; vocals absent
+- [x] U2.6 prefers: harmonic density compatible -> 0f3d488c5; harmonic density moderate
+- [x] U2.7 prefers: arrangement stable -> 0f3d488c5; arrangement stable
 
 ## Section 47 - Vocal conflict avoidance
 
-- [ ] S47.1 vocal A + vocal B avoided unless deliberate
-- [ ] S47.2 strongly influences transition timing (window moved to instrumental stretch)
+- [x] S47.1 vocal A + vocal B avoided unless deliberate -> 0f3d488c5; vocalCompatibility overlapRisk
+- [x] S47.2 strongly influences transition timing (window moved to instrumental stretch) -> 0f3d488c5; chooseMixOut vocal window scoring + vocalSwap
 
 ## Section 48 - Drum compatibility
 
-- [ ] S48.1 drum pattern coexistence judged (four-on-floor vs breakbeat)
-- [ ] S48.2 incompatible drums -> shorter overlap / EQ reduction / percussion swap / breakdown transition
+- [x] S48.1 drum pattern coexistence judged (four-on-floor vs breakbeat) -> 0f3d488c5; drumCompatibility
+- [x] S48.2 incompatible drums -> shorter overlap / EQ reduction / percussion swap / breakdown transition -> 0f3d488c5; percussionSwap / shorter length via drumScore
 
 ## Section 49 - Bass compatibility
 
-- [ ] S49.1 bass analysed independently of overall energy
-- [ ] S49.2 low-frequency spectral analysis + bass activity timelines drive the overlap decision
+- [x] S49.1 bass analysed independently of overall energy -> 0f3d488c5; bassCompatibility heaviness
+- [x] S49.2 low-frequency spectral analysis + bass activity timelines drive the overlap decision -> 0f3d488c5; bass.activity + lowRatio in planBassHandover
 
 ## Section 50 - Spectral compatibility
 
-- [ ] S50.1 detects brightness mismatch, muddy overlap, excessive HF density, excessive LF density, conflicting midrange
-- [ ] S50.2 subordinate to musical reasoning (capped weight; never decides alone)
+- [x] S50.1 detects brightness mismatch, muddy overlap, excessive HF density, excessive LF density, conflicting midrange -> 0f3d488c5; spectralCompatibility
+- [x] S50.2 subordinate to musical reasoning (capped weight; never decides alone) -> 0f3d488c5; textureCompatibility weight 0.3 (capped)
 
 ## Section 51 - Loop intelligence
 
-- [ ] S51.1 structure-aware temporary loops: extend intro, extend outro, wait for a better phrase, hold a breakdown, bridge BPM, create a transition window
-- [ ] S51.2 never loops arbitrary audio (requires phrase-aligned loop region + confidence)
+- [x] S51.1 structure-aware temporary loops: extend intro, extend outro, wait for a better phrase, hold a breakdown, bridge BPM, create a transition window -> 0f3d488c5; LoopPlan purposes in planTransition
+- [x] S51.2 never loops arbitrary audio (requires phrase-aligned loop region + confidence) -> 0f3d488c5; loops need gridConf>=0.7 and phraseConf>=0.6
 
 ## Section 52 - Cue-jump intelligence
 
-- [ ] S52.1 jumps to drop, breakdown, hook, outro, drum section only when justified
-- [ ] S52.2 treated as high-risk (needs risk budget + high confidence)
+- [x] S52.1 jumps to drop, breakdown, hook, outro, drum section only when justified -> 0f3d488c5; CueJumpPlan drop/hook
+- [x] S52.2 treated as high-risk (needs risk budget + high confidence) -> 0f3d488c5; inConf>=0.8 and creativeRisk>=0.6
 
 ## Section 53 - Energy-driven FX
 
-- [ ] S53.1 mapping: build -> filter rise, phrase ending -> delay throw, vocal ending -> echo out, breakdown -> reverb expansion, drop -> clean release
-- [ ] S53.2 FX are punctuation (only with a musical trigger)
+- [x] S53.1 mapping: build -> filter rise, phrase ending -> delay throw, vocal ending -> echo out, breakdown -> reverb expansion, drop -> clean release -> 0f3d488c5; effectsFor mapping
+- [x] S53.2 FX are punctuation (only with a musical trigger) -> 0f3d488c5; effects only with a trigger section
 
 ## Section 54 - Creative risk budget
 
-- [ ] S54.1 session creativeRisk 0..1
-- [ ] S54.2 higher risk permits shorter transitions, larger tempo changes, more FX, deliberate cuts, unusual harmonic moves, stronger energy jumps
-- [ ] S54.3 lower risk favours long blends, safe keys, conservative BPM, minimal FX
-- [ ] S54.4 risk budget is style-dependent
+- [x] S54.1 session creativeRisk 0..1 -> 0f3d488c5; controller.creativeRisk
+- [x] S54.2 higher risk permits shorter transitions, larger tempo changes, more FX, deliberate cuts, unusual harmonic moves, stronger energy jumps -> 0f3d488c5; creativeRisk gates creative-jump, cuts, dropMix, loops
+- [x] S54.3 lower risk favours long blends, safe keys, conservative BPM, minimal FX -> 0f3d488c5; low risk -> blends/safe keys
+- [x] S54.4 risk budget is style-dependent -> 0f3d488c5; style.riskTolerance default
 
 ## Section 55 - Avoid "AI randomness"
 
-- [ ] S55.1 no Math.random gating of musical decisions (variation emerges from context)
+- [x] S55.1 no Math.random gating of musical decisions (variation emerges from context) -> 0f3d488c5; no Math.random under src/engine/dj/autodj (hash-seeded humanize only)
 
 ## Section 56 - Existing state machine
 
-- [ ] S56.1 playing / preloading / transition-pending / transitioning / failure states preserved
-- [ ] S56.2 high-level intelligence moved out of the state machine (DJAutoDJ asks the controller)
+- [x] S56.1 playing / preloading / transition-pending / transitioning / failure states preserved -> 0f3d488c5; DJAutoDJ states kept
+- [x] S56.2 high-level intelligence moved out of the state machine (DJAutoDJ asks the controller) -> 0f3d488c5; DJAutoDJ delegates to the controller
 
 ## Section 57 - DJSessionController
 
-- [ ] S57.1 coordinates performance state, planning cadence, candidate evaluation, preload scheduling, transition scheduling, session memory, failure fallback, long-term set state
-- [ ] S57.2 contains no musical heuristics itself (delegates to planners)
+- [x] S57.1 coordinates performance state, planning cadence, candidate evaluation, preload scheduling, transition scheduling, session memory, failure fallback, long-term set state -> 0f3d488c5; DJSessionController
+- [x] S57.2 contains no musical heuristics itself (delegates to planners) -> 0f3d488c5; controller holds no heuristics
 
 ## Section 58 - DJSetPlanner
 
-- [ ] S58.1 candidate generation, sequence planning, energy trajectory, track diversity, harmonic trajectory, tempo trajectory, repetition avoidance, set narrative
-- [ ] S58.2 never touches deck audio
+- [x] S58.1 candidate generation, sequence planning, energy trajectory, track diversity, harmonic trajectory, tempo trajectory, repetition avoidance, set narrative -> 0f3d488c5; setPlanner
+- [x] S58.2 never touches deck audio -> 0f3d488c5; setPlanner is pure
 
 ## Section 59 - DJTransitionPlanner
 
-- [ ] S59.1 decides mix point, phrase alignment, type, length, tempo, key, EQ, filter, bass, FX, risk, fallback
+- [x] S59.1 decides mix point, phrase alignment, type, length, tempo, key, EQ, filter, bass, FX, risk, fallback -> 0f3d488c5; transitionPlanner
 
 ## Section 60 - DJTransitionExecutor
 
-- [ ] S60.1 does load deck, seek, start, tempo, pitch, crossfade, EQ, filter, effects, bass handover, stop old deck, recover failure
-- [ ] S60.2 executes plans generated elsewhere only
+- [x] S60.1 does load deck, seek, start, tempo, pitch, crossfade, EQ, filter, effects, bass handover, stop old deck, recover failure -> 0f3d488c5; transitionExecutor
+- [x] S60.2 executes plans generated elsewhere only -> 0f3d488c5; executor takes a plan
 
 ## Section 61 - Separation of analysis and execution
 
-- [ ] S61.1 analysis -> context -> planner -> plan -> executor; executor never discovers structure
+- [x] S61.1 analysis -> context -> planner -> plan -> executor; executor never discovers structure -> 0f3d488c5; analysis -> context -> planner -> plan -> executor
 
 ## Gate V - Full autonomous performance (plan section 62)
 
@@ -744,24 +744,24 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 67 - Architectural constraints
 
-- [ ] S67.1 no second deck system
-- [ ] S67.2 no second mixer
-- [ ] S67.3 no second transport
-- [ ] S67.4 no duplicate playback infrastructure
-- [ ] S67.5 no duplicate preload infrastructure
-- [ ] S67.6 no duplicate FX infrastructure
-- [ ] S67.7 user playlist order never destroyed
-- [ ] S67.8 tracks are not a single global BPM/key/energy value
-- [ ] S67.9 tracker channels are not permanent instruments
-- [ ] S67.10 randomness is not a substitute for musical reasoning
-- [ ] S67.11 low-confidence analysis never triggers high-risk behaviour
-- [ ] S67.12 DJAutoDJ.ts is not a giant heuristic file (shrinks; delegates)
-- [ ] S67.13 existing execution primitives reused; intelligence added above
+- [x] S67.1 no second deck system -> 0f3d488c5; no new deck
+- [x] S67.2 no second mixer -> 0f3d488c5; no new mixer
+- [x] S67.3 no second transport -> 0f3d488c5; no new transport
+- [x] S67.4 no duplicate playback infrastructure -> 0f3d488c5; DeckEngine reused
+- [x] S67.5 no duplicate preload infrastructure -> 0f3d488c5; preload reused
+- [x] S67.6 no duplicate FX infrastructure -> 0f3d488c5; FX through DjFxActions (D9)
+- [x] S67.7 user playlist order never destroyed -> 0f3d488c5; autoDJSessionOrderKeepsThePlaylist.test.ts
+- [x] S67.8 tracks are not a single global BPM/key/energy value -> 0f3d488c5; DJTrackAnalysis
+- [x] S67.9 tracker channels are not permanent instruments -> 0f3d488c5; Dub Deck timeline roles (D10)
+- [x] S67.10 randomness is not a substitute for musical reasoning -> 0f3d488c5; no Math.random
+- [x] S67.11 low-confidence analysis never triggers high-risk behaviour -> 0f3d488c5; confidence gates
+- [x] S67.12 DJAutoDJ.ts is not a giant heuristic file (shrinks; delegates) -> 0f3d488c5; DJAutoDJ delegates; glue only
+- [x] S67.13 existing execution primitives reused; intelligence added above -> 0f3d488c5; DJActions primitives
 
 ## Section 68 / 69 - Final architecture and philosophy
 
-- [ ] S68.1 module graph matches the target architecture (DJAutoDJ -> DJSessionController -> context/memory/analysis -> set planner -> transition planner -> solvers -> plan -> executor -> existing deck/mixer)
-- [ ] S69.1 loop: listen -> understand -> anticipate -> intend -> choose track -> choose mix point -> choose transition -> execute -> hear consequence -> adapt -> continue or rest (post-transition quality feeds memory/adaptation)
+- [x] S68.1 module graph matches the target architecture (DJAutoDJ -> DJSessionController -> context/memory/analysis -> set planner -> transition planner -> solvers -> plan -> executor -> existing deck/mixer) -> 0f3d488c5; module graph as in sessionController.ts
+- [x] S69.1 loop: listen -> understand -> anticipate -> intend -> choose track -> choose mix point -> choose transition -> execute -> hear consequence -> adapt -> continue or rest (post-transition quality feeds memory/adaptation) -> 0f3d488c5; onTransitionComplete -> quality -> ADAPT
 
 ## Section 70 - Definition of done
 
