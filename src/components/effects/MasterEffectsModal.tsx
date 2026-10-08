@@ -29,8 +29,9 @@ import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/inst
 import { useAudioStore } from '@stores/useAudioStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore } from '@stores/useTrackerStore';
-import { useFormatStore } from '@stores/useFormatStore';
-import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
+import { useChannelIsolation } from '@hooks/useChannelIsolation';
+import { requestChannelRouting, usePendingChannelRouting } from '@/lib/masterFx/quantizedChannelRouting';
+import { MasterFxQuantizeSwitch } from './MasterFxQuantizeSwitch';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
 import { useClickOutside } from '@hooks/useClickOutside';
 import { EffectParameterEditor } from './EffectParameterEditor';
@@ -77,15 +78,18 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
   const channelNames = useTrackerStore(useShallow(s =>
     s.patterns[s.currentPatternIndex]?.channels?.map((ch) => ch.name ?? '') ?? []));
-  const editorMode = useFormatStore(s => s.editorMode);
-  const isolationSupported = supportsChannelIsolation(editorMode);
+  const { usable: isolationSupported, reason: isolationReason } = useChannelIsolation();
+  // A channel pick waiting for its beat is shown at once; the routing follows.
+  const pendingRouting = usePendingChannelRouting((s) => s.pending);
 
   // Picking channels by hand ends a preset's role-based targeting.
   const handleChannelSelect = useCallback((effectId: string, channels: number[] | undefined) => {
-    updateMasterEffect(effectId, { selectedChannels: channels, channelRole: undefined });
+    requestChannelRouting(effectId, { selectedChannels: channels, channelRole: undefined },
+      (id, routing) => updateMasterEffect(id, routing));
   }, [updateMasterEffect]);
   const handleChannelRole = useCallback((effectId: string, role: EffectConfig['channelRole']) => {
-    updateMasterEffect(effectId, { selectedChannels: undefined, channelRole: role });
+    requestChannelRouting(effectId, { selectedChannels: undefined, channelRole: role },
+      (id, routing) => updateMasterEffect(id, routing));
   }, [updateMasterEffect]);
 
   // Derive editingEffect from store (never stale)
@@ -319,6 +323,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
               </span>
             </div>
 
+            <MasterFxQuantizeSwitch />
+
             {/* Presets Dropdown */}
             <div className="relative">
               <button
@@ -469,7 +475,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                     {masterEffects.map((effect) => (
                       <SortableEffectItem
                         key={effect.id}
-                        effect={effect}
+                        effect={pendingRouting[effect.id] ? { ...effect, ...pendingRouting[effect.id] } : effect}
                         isSelected={editingEffectId === effect.id}
                         onSelect={() => setEditingEffectId(effect.id)}
                         onToggle={() => handleToggle(effect.id)}
@@ -481,6 +487,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         numChannels={numChannels}
                         channelNames={channelNames}
                         isolationSupported={isolationSupported}
+                        isolationReason={isolationReason}
                       />
                     ))}
                   </SortableContext>
@@ -624,10 +631,13 @@ export interface SortableEffectItemProps {
   onKeyChange: (source: number) => void;
   numChannels: number;
   channelNames: string[];
+  /** Whether the playing engine can take a channel out of the mix. */
   isolationSupported: boolean;
+  /** Why not, shown beside the disabled channel buttons. */
+  isolationReason?: string | null;
 }
 
-export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onChannelRole, onKeyChange, numChannels, channelNames, isolationSupported }: SortableEffectItemProps) {
+export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onChannelRole, onKeyChange, numChannels, channelNames, isolationSupported, isolationReason = null }: SortableEffectItemProps) {
   const sidechainKeyed = EffectRegistry.get(effect.type)?.sidechainKeyed === true;
   const nonDrums = effect.channelRole === 'nonDrums';
   const allChannels = !nonDrums && !Array.isArray(effect.selectedChannels);
@@ -813,7 +823,7 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
       {/* Only the controls stop the click: the row's empty space selects the
           card like the rest of it. The whole row used to swallow clicks, so
           the lower half of every card did nothing (2026-09-29). */}
-      {isolationSupported && <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }}>
+      <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <span
             className="text-[10px] font-semibold uppercase tracking-wider"
@@ -824,7 +834,8 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
           </span>
           <button
             onClick={(e) => { e.stopPropagation(); onChannelSelect(undefined); }}
-            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
+            disabled={!isolationSupported}
+            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               allChannels
                 ? 'text-white/90 border'
                 : 'text-white/30 hover:text-white/50 border border-transparent'
@@ -835,7 +846,8 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onChannelRole(nonDrums ? undefined : 'nonDrums'); }}
-            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
+            disabled={!isolationSupported}
+            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               nonDrums
                 ? 'text-white/90 border'
                 : 'text-white/30 hover:text-white/50 border border-transparent'
@@ -873,7 +885,8 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
                     onChannelSelect(Array.from(current).sort((a, b) => a - b));
                   }
                 }}
-                className="w-5 h-5 text-[9px] font-bold rounded transition-colors"
+                disabled={!isolationSupported}
+                className="w-5 h-5 text-[9px] font-bold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
                   background: isOn && Array.isArray(sel) ? `${enc.accent}30` : 'rgba(255,255,255,0.04)',
                   border: isOn && Array.isArray(sel) ? `1px solid ${enc.accent}60` : '1px solid rgba(255,255,255,0.08)',
@@ -886,7 +899,10 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
             );
           })}
         </div>
-      </div>}
+        {!isolationSupported && isolationReason && (
+          <p className="mt-1.5 text-[9px] text-accent-warning">{isolationReason}</p>
+        )}
+      </div>
     </div>  );
 }
 

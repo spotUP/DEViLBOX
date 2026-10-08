@@ -22,6 +22,8 @@ const effects = [{ id: 'a', type: 'Reverb', enabled: true, selectedChannels: [1,
 vi.mock('@/stores/useAudioStore', () => ({ useAudioStore: { getState: () => ({ masterEffects: effects }) } }));
 vi.mock('@/engine/ToneEngine', () => ({ getToneEngine: () => ({ rebuildMasterEffects }) }));
 vi.mock('@/stores/useMixerStore', () => ({ scheduleWasmEffectRebuild }));
+// Whether the engine can isolate asks the replayer about hybrid playback; the real one is slow to load.
+vi.mock('@/engine/TrackerReplayer', () => ({ getTrackerReplayer: () => ({ hasReplacedInstruments: false }) }));
 
 const src = (p: string) => readFileSync(join(process.cwd(), 'src', p), 'utf8');
 
@@ -37,7 +39,7 @@ describe('channel-targeted master effects', () => {
 
   it('a newly started engine rebuilds the chain and the slots', async () => {
     const { setPlayingIsolationEngine } = await import('../ChannelRoutedEffects');
-    const engine = { addIsolation() {}, removeIsolation() {}, isAvailable: () => true } as never;
+    const engine = { addIsolation() {}, removeIsolation() {}, isAvailable: () => true, getWorkletNode: () => ({}) } as never;
     setPlayingIsolationEngine(engine);
     await vi.waitFor(() => expect(scheduleWasmEffectRebuild).toHaveBeenCalled());
     expect(rebuildMasterEffects).toHaveBeenCalledWith(effects);

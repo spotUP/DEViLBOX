@@ -54,3 +54,37 @@ describe('master chain card click area', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 });
+
+describe('master chain card on an engine that cannot isolate channels', () => {
+  it('disables the channel buttons and says why, instead of letting a click move the effect nowhere', () => {
+    const onChannelSelect = vi.fn();
+    const effect = { id: 'fx1', category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: {} };
+    render(
+      <DndContext>
+        <SortableContext items={['fx1']}>
+          <SortableEffectItem
+            effect={effect as never}
+            isSelected={false}
+            onSelect={() => {}}
+            onToggle={() => {}}
+            onRemove={() => {}}
+            onWetChange={() => {}}
+            onChannelSelect={onChannelSelect}
+            onChannelRole={() => {}}
+            onKeyChange={() => {}}
+            numChannels={4}
+            channelNames={[]}
+            isolationSupported={false}
+            isolationReason="The playing engine mixes all channels together."
+          />
+        </SortableContext>
+      </DndContext>,
+    );
+    const button = screen.getByTitle('Channel 2') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect((screen.getByText('NO DRUMS') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onChannelSelect).not.toHaveBeenCalled();
+    expect(screen.getByText('The playing engine mixes all channels together.')).toBeTruthy();
+  });
+});

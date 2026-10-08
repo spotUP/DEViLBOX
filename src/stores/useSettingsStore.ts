@@ -233,6 +233,8 @@ interface SettingsStore {
   welcomeJingleEnabled: boolean;
   /** A subsong that ends (silence) starts the next one of the file; off = the song stops, as before. */
   autoAdvanceSubsongs: boolean;
+  /** Master FX channel buttons take effect on the next bar line of the playing song. */
+  masterFxQuantize: boolean;
 
   // Actions
   setAmigaLimits: (enabled: boolean) => void;
@@ -264,6 +266,7 @@ interface SettingsStore {
   setMaxHeadroomMode: (enabled: boolean) => void;
   setWelcomeJingleEnabled: (v: boolean) => void;
   setAutoAdvanceSubsongs: (v: boolean) => void;
+  setMasterFxQuantize: (v: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -445,6 +448,7 @@ export const useSettingsStore = create<SettingsStore>()(
       vuMeterMirror: false,  // Default: VU meters extend upward
       maxHeadroomMode: false,
       welcomeJingleEnabled: true,  // Play startup jingle on first interaction
+      masterFxQuantize: true,      // Owner, 2026-10-08: channel on/offs in the master FX are quantized, switch on by default
       autoAdvanceSubsongs: true,   // Owner, 2026-10-05: "just skip to next subsong when it ends"
 
       // SID Hardware defaults
@@ -613,6 +617,8 @@ export const useSettingsStore = create<SettingsStore>()(
       set((state) => { state.welcomeJingleEnabled = v; }),
     setAutoAdvanceSubsongs: (v) =>
       set((state) => { state.autoAdvanceSubsongs = v; }),
+    setMasterFxQuantize: (v) =>
+      set((state) => { state.masterFxQuantize = v; }),
     })),
     {
       name: 'devilbox-settings',
@@ -738,6 +744,7 @@ export const useSettingsStore = create<SettingsStore>()(
         welcomeJingleEnabled: state.welcomeJingleEnabled,
         // Additive: a save without it merges in the default (on), no version bump.
         autoAdvanceSubsongs: state.autoAdvanceSubsongs,
+        masterFxQuantize: state.masterFxQuantize,
       }),
     }
   )

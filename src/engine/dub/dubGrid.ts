@@ -108,12 +108,19 @@ export function getCurrentRow(): number {
  *   'offbeat' the next "&" between beats (the King Tubby placement: the hit
  *             lands off the beat so its echoes fill the onbeats)
  *   'bar'     the next downbeat only, for the largest gestures
+ *   'beat'    the next beat - for switches (the master FX channel buttons)
+ *
+ * `strictNext` waits for the NEXT boundary even when the one just passed is
+ * nearer. A throw wants the nearest (a late press still lands in its capture
+ * window); a routing switch has no window, and firing it half a beat after the
+ * grid would be audibly off it.
  */
 export function msToNextGridBoundary(
-  quantize: DubBusSettings['throwQuantize'],
+  quantize: DubBusSettings['throwQuantize'] | 'beat',
   bpm: number,
   rowNow: number = getCurrentRow(),
   ticksPerRow?: number,
+  strictNext = false,
 ): number {
   if (quantize === 'off') return 0;
   if (!Number.isFinite(rowNow) || !Number.isFinite(bpm)) return 0;
@@ -125,6 +132,9 @@ export function msToNextGridBoundary(
   if (quantize === 'bar') {
     const barPos = beatPos / 4;              // 4/4 until MusicalClock lands
     beatsAway = (Math.floor(barPos) + 1 - barPos) * 4;
+  } else if (quantize === 'beat') {
+    const phase = beatPos - Math.floor(beatPos);
+    beatsAway = phase < 1e-6 ? 0 : 1 - phase;
   } else {
     const phase = beatPos - Math.floor(beatPos);
     const targets =
@@ -138,6 +148,7 @@ export function msToNextGridBoundary(
   // Interval between boundaries, so "how late am I" can be judged against it.
   const intervalBeats =
     quantize === 'bar' ? 4
+    : quantize === 'beat' ? 1
     : quantize === '1/16' ? 0.25
     : 0.5;
 
@@ -152,7 +163,7 @@ export function msToNextGridBoundary(
   // the press was late, and a late hit played immediately still lands inside
   // the capture window. Only genuinely early presses wait.
   const beatsSincePrev = intervalBeats - beatsAway;
-  if (beatsSincePrev < beatsAway) return 0;
+  if (!strictNext && beatsSincePrev < beatsAway) return 0;
 
   const ms = beatsAway * beatMs;
   return ms < 4 ? 0 : ms;
