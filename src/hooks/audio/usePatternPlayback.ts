@@ -7,6 +7,7 @@
  * - Ticks 1+: process continuous effects
  */
 
+import { masterChainKey } from '@utils/masterChainKey';
 import { useEffect, useMemo, useRef, startTransition } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, useSettingsStore , useFormatStore } from '@stores';
@@ -48,7 +49,7 @@ export const usePatternPlayback = () => {
     setCurrentRowThrottled: s.setCurrentRowThrottled,
   })));
   const { instruments, instrumentLoadVersion } = useInstrumentStore(useShallow((s) => ({ instruments: s.instruments, instrumentLoadVersion: s.instrumentLoadVersion })));
-  const { masterEffects } = useAudioStore(useShallow((s) => ({ masterEffects: s.masterEffects })));
+  const { masterEffects, presetGainCompensationDb } = useAudioStore(useShallow((s) => ({ masterEffects: s.masterEffects, presetGainCompensationDb: s.presetGainCompensationDb })));
   // Pattern depends on currentPatternIndex and currentPositionIndex.
   // We use refs for these to prevent the main playback loop from restarting 
   // every time the UI position updates.
@@ -138,9 +139,11 @@ export const usePatternPlayback = () => {
   // Parameter updates are handled by updateMasterEffectParams in the store.
   // Note: selectedChannels and channelRole are included so that toggling channel routing
   // triggers a rebuild (channel-targeted effects are routed via WASM isolation).
+  // The preset make-up gain is built into the chain (MasterEffectsChain), so a
+  // change of it alone, with the same effects, must rebuild too.
   const masterEffectsKey = useMemo(
-    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}:${(e.selectedChannels || []).join(',')}:${e.channelRole ?? ''}`).join('|'),
-    [masterEffects]
+    () => masterChainKey(masterEffects, presetGainCompensationDb),
+    [masterEffects, presetGainCompensationDb]
   );
   useEffect(() => {
     engineRef.current.rebuildMasterEffects(masterEffects);

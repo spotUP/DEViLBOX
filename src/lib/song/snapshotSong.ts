@@ -86,6 +86,8 @@ export function snapshotSong(): SavedSongFields {
     }),
     automation: automationState.curves,
     masterEffects: audioState.masterEffects,
+    // The chain's make-up gain belongs to the chain: without it a restored preset plays 3-5 dB quieter than it was calibrated.
+    ...(audioState.presetGainCompensationDb !== 0 ? { masterGainCompensationDb: audioState.presetGainCompensationDb } : {}),
     ...(transportState.grooveTemplateId !== 'straight' ? { grooveTemplateId: transportState.grooveTemplateId } : {}),
     ...(transportState.speed !== 6 ? { speed: transportState.speed } : {}),
     ...(trackerFormat ? { trackerFormat } : {}),

@@ -706,6 +706,8 @@ export function getAudioState(): Record<string, unknown> {
     sampleBusGain: audio.sampleBusGain,
     synthBusGain: audio.synthBusGain,
     autoGain: audio.autoGain,
+    /** The preset make-up gain the master chain is built with (MasterEffectsChain reads it from this store). */
+    presetGainCompensationDb: audio.presetGainCompensationDb,
     masterEffects: audio.masterEffects.map((fx) => ({
       id: fx.id,
       type: fx.type,
