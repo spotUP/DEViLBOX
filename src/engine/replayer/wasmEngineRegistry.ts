@@ -194,6 +194,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
   },
   {
     key: 'BenDaglish',
+    liveSwap: true,
     synthType: 'BenDaglishSynth',
     suppressNotes: true,
     fileDataKey: 'bdFileData',
