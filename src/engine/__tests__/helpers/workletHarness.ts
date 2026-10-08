@@ -32,7 +32,7 @@ export interface WorkletHarness {
   render(blocks: number): Float32Array[];
 }
 
-export async function openWorklet(opts: { dir: string; name: string; factory: string; worklet?: string }): Promise<WorkletHarness> {
+export async function openWorklet(opts: { dir: string; name: string; factory: string; worklet?: string; transformJs?: (code: string) => string }): Promise<WorkletHarness> {
   const g = globalThis as Record<string, unknown>;
   g.self ??= globalThis;
   (g.self as Record<string, unknown>).location ??= { href: `file:///${opts.dir}/${opts.name}.js` };
@@ -62,7 +62,8 @@ export async function openWorklet(opts: { dir: string; name: string; factory: st
     await send({
       type: 'init', sampleRate: SAMPLE_RATE,
       wasmBinary: readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.wasm`)).buffer.slice(0),
-      jsCode: readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.js`), 'utf8'),
+      // The same glue the engine class hands its worklet (its `transformJS`).
+      jsCode: (opts.transformJs ?? ((c: string) => c))(readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.js`), 'utf8')),
     });
   } finally {
     Object.defineProperty(process, 'versions', versions);
