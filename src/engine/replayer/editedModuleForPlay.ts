@@ -13,7 +13,8 @@
  */
 import type { TrackerSong } from '../TrackerReplayer';
 import type { NativeEngineDescriptor } from './wasmEngineRegistry';
-import { getCellFileOffset, encodeVariableBlock } from '../uade/UADEPatternEncoder';
+import { encodeVariableBlock } from '../uade/UADEPatternEncoder';
+import { patchModuleByLayout } from '@/lib/export/layoutPatch';
 import { gridIsEdited, sampleIsEdited, editedCells } from '@/lib/song/gridBaseline';
 
 /** Engines whose module is not a file the exporter writes (a one-way crunch), so a reload is not the engine's data. */
@@ -29,16 +30,8 @@ function patchedByLayout(song: TrackerSong, desc: NativeEngineDescriptor): Uint8
   const source = song[desc.fileDataKey] as ArrayBuffer | Uint8Array | undefined;
   // A layout with its own cell writer (SidMon 1: patchModuleCell) already wrote the edit into the module the song carries.
   if (!layout?.encodeCell || layout.writeCell || !source) return null;
-  const buf = new Uint8Array(source instanceof Uint8Array ? source : new Uint8Array(source)).slice();
-  let patched = 0;
-  for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
-    const offset = getCellFileOffset(layout, pattern, row, channel);
-    if (offset < 0 || offset + layout.bytesPerCell > buf.length) continue;
-    const stored = layout.encodeOverStored ? buf.slice(offset, offset + layout.bytesPerCell) : undefined;
-    const encoded = layout.encodeCell(cell, stored);
-    for (let i = 0; i < encoded.length; i++) if (buf[offset + i] !== encoded[i]) { buf[offset + i] = encoded[i]; patched++; }
-  }
-  return patched > 0 ? buf : null;
+  const { bytes, patched } = patchModuleByLayout(source, layout, song.patterns);
+  return patched > 0 ? bytes : null;
 }
 
 /**
