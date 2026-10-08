@@ -101,6 +101,11 @@ export class SoundControlEngine extends WASMChannelOutputsEngine {
     this.workletNode.connect(this.output, 0);
   }
 
+  /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */
+  swapModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer });
+  }
+
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SoundControlEngine not initialized');

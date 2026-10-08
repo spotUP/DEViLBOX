@@ -39,23 +39,23 @@ function applySoundControlCarriers(out: Uint8Array, cell: TrackerCell): void {
 
 /**
  * Reverse of sc40NoteToXm: XM note → SC 4.0+ period table index (1-based).
- * sc40NoteToXm does: idx + 37 → xmNote, so reverse: xmNote - 37 + 1 = xmNote - 36
+ * sc40NoteToXm does: idx + 13 → xmNote (SoundControlParser), so reverse: xmNote - 13 + 1 = xmNote - 12
  */
 function xmToSc40Note(xmNote: number): number {
   if (xmNote === 0) return 0;
-  const idx = xmNote - 37;
+  const idx = xmNote - 13;
   if (idx < 0 || idx >= 36) return 0;
   return idx + 1; // 1-based index
 }
 
 /**
  * Reverse of sc3xNoteToXm: XM note → SC 3.x note byte (octave<<4 | noteInOct).
- * sc3xNoteToXm does: (octave-1)*12 + round(noteInOct/10*12) + 37
- * Reverse: subtract 37, divide by 12 to get octave, find closest noteInOct
+ * sc3xNoteToXm does: (octave-1)*12 + round(noteInOct/10*12) + 13 (SoundControlParser)
+ * Reverse: subtract 13, divide by 12 to get octave, find closest noteInOct
  */
 function xmToSc3xNote(xmNote: number): number {
   if (xmNote === 0) return 0;
-  const raw = xmNote - 37;
+  const raw = xmNote - 13;
   if (raw < 0) return 0;
   const octave = Math.floor(raw / 12) + 1;
   const semitone = raw % 12;
