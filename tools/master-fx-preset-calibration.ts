@@ -10,7 +10,8 @@
  * master effects input, energy of both channels. The make-up is -chainDb.
  *
  * Resumable: each preset's result goes to tools/master-fx-preset-calibration.json
- * as it completes and is skipped next run.
+ * as it completes, with the fingerprint of the chain it measured, and is skipped
+ * next run while the preset's chain is still that chain (a retune re-measures it).
  *   npx tsx tools/master-fx-preset-calibration.ts --containing Reverb --containing Delay  # presets using these types
  *   npx tsx tools/master-fx-preset-calibration.ts --only "Hall Reverb"                    # one (repeatable)
  *   npx tsx tools/master-fx-preset-calibration.ts --redo ...                              # re-measure
@@ -22,11 +23,14 @@ import WebSocket from 'ws';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { presetChainFingerprint, type ChainEffect } from '../src/constants/presetChainFingerprint';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(DIR, 'master-fx-preset-calibration.json');
 const PRESETS_TS = path.join(DIR, '../src/constants/fxPresets.ts');
 type Row = { name: string; types: string[]; chainDb: number; makeUpDb: number; oldMakeUpDb: number; at: string;
+  /** presetChainFingerprint of the chain this row measured; a preset whose chain differs is measured again. */
+  chain?: string;
   /** --song: the chain's level (with its make-up) on the playing song, dB. */
   songDb?: number };
 
@@ -83,7 +87,7 @@ ws.on('open', async () => {
     // start, so presets edited since were measured with their OLD parameters.
     const p = await import('/src/constants/fxPresets.ts?t=' + Date.now());
     return p.FX_PRESETS.map((x) => ({ name: x.name, gainCompensationDb: x.gainCompensationDb ?? 0, effects: x.effects }));
-  })()` })).result as { name: string; gainCompensationDb: number; effects: { type: string }[] }[];
+  })()` })).result as { name: string; gainCompensationDb: number; effects: ChainEffect[] }[];
   for (const p of presets) {
     const types = p.effects.map((e) => e.type);
     if (only.length && !only.includes(p.name)) continue;
@@ -97,14 +101,16 @@ ws.on('open', async () => {
       console.log(`${p.name.padEnd(28)} song ${String(r.chainDb).padStart(6)} dB with make-up ${p.gainCompensationDb}  [${types.join('+')}]`);
       continue;
     }
-    if (!args.includes('--redo') && store[p.name]) continue;
+    // Skip only a row measured on this very chain: a retuned preset is measured again.
+    const chain = presetChainFingerprint(p.effects);
+    if (!args.includes('--redo') && store[p.name]?.chain === chain) continue;
     const r = await call('measure_master_effect', { effects: p.effects, gainCompensationDb: 0, seconds: 4, settleMs: slow ? 8000 : 4000 }).catch((e) => ({ error: (e as Error).message }));
     if (r.error) {
       console.log(`ERR ${p.name}: ${r.error}`);
       if (/No browser connected|audio clock/.test(r.error)) break; // the rest would all fail the same way
       continue;
     }
-    store[p.name] = { name: p.name, types, chainDb: r.chainDb, makeUpDb: makeUp(r.chainDb), oldMakeUpDb: p.gainCompensationDb, at: new Date().toISOString() };
+    store[p.name] = { name: p.name, types, chainDb: r.chainDb, makeUpDb: makeUp(r.chainDb), oldMakeUpDb: p.gainCompensationDb, at: new Date().toISOString(), chain };
     fs.writeFileSync(OUT, JSON.stringify(store, null, 2));
     console.log(`${p.name.padEnd(28)} chain ${String(r.chainDb).padStart(6)} dB  make-up ${store[p.name].makeUpDb} (was ${p.gainCompensationDb})  [${types.join('+')}]`);
   }
