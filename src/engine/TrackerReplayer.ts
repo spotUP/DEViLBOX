@@ -566,7 +566,7 @@ export interface TrackerSong {
 // compatibility with any caller that imports it from this module.
 export type { DisplayState } from './PlaybackCoordinator';
 import { PlaybackCoordinator, type DisplayState } from './PlaybackCoordinator';
-import { cellPeriod } from '@/lib/amiga/periodNotes';
+import { cellPeriod, songUsesAmigaPeriods } from '@/lib/amiga/periodNotes';
 
 export class TrackerReplayer {
   // Song data
@@ -1991,7 +1991,7 @@ export class TrackerReplayer {
 
     // FT2 XM period system: use for XM/IT/S3M files, not for MOD/HVL/AHX
     // XM, IT, S3M and AdPlug all use note numbers (1-96/120) instead of Amiga periods
-    this.useXMPeriods = song.format === 'XM' || song.format === 'IT' || song.format === 'S3M' || song.format === 'AdPlug';
+    this.useXMPeriods = !songUsesAmigaPeriods(song.format);
     this.linearPeriods = song.linearPeriods ?? (song.format === 'XM' || song.format === 'AdPlug');
     getToneEngine().amigaPeriodSong = !this.useXMPeriods;
 
