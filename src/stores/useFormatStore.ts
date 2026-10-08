@@ -303,6 +303,8 @@ export interface FormatStore {
   setMusicLineMetadataField: (field: string, value: string) => void;
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
+  /** Clear the outgoing song's header info (SID header, SongDB lookup) at unload. */
+  clearSongInfo: () => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
   setMaxTraxData: (data: MaxTraxData | null) => void;
   mutateMaxTraxScore: (scoreIndex: number, fn: (score: MaxTraxScore) => void) => void;
@@ -1068,6 +1070,7 @@ export const useFormatStore = create<FormatStore>()(
     }),
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
+    clearSongInfo: () => set((state) => { state.sidMetadata = null; state.songDBInfo = null; }),
     setOriginalModuleData: (data) => set((state) => { state.originalModuleData = data; }),
 
     applyEditorMode: (song) => {
