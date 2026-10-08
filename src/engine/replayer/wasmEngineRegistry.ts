@@ -181,6 +181,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
   },
   {
     key: 'MusicAssembler',
+    liveSwap: true,
     synthType: 'MusicAssemblerSynth',
     suppressNotes: true,
     fileDataKey: 'maFileData',
@@ -521,6 +522,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
   },
   {
     key: 'PumaTracker',
+    liveSwap: true,
     synthType: 'PumaTrackerSynth',
     suppressNotes: true,
     fileDataKey: 'pumaTrackerFileData',
@@ -611,6 +613,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
   },
   {
     key: 'SidMon2',
+    liveSwap: true,
     synthType: 'SidMon2Synth',
     suppressNotes: true,
     fileDataKey: 'sd2FileData',
