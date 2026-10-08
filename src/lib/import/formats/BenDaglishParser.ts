@@ -795,7 +795,9 @@ export async function parseBenDaglishFile(
     songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: 6,
+    // A grid row is one 50 Hz replayer tick (the walk's timeline), so the scheduler that moves the
+    // cursor spends one tick per row: speed 1 at 125 BPM = 20 ms. Speed 6 ran it at a sixth of the sound.
+    initialSpeed: 1,
     initialBPM: 125,
     linearPeriods: false,
     bdFileData: buffer.slice(0),
