@@ -37,6 +37,8 @@ import { isGoatTrackerSong as isGoatTrackerSng } from './GoatTrackerDetect';
 // The GoatTracker song model (the .sng file's content)
 // ---------------------------------------------------------------------------
 
+import { decodeGoatTracker1Sid, type GT1SidDecode } from './GoatTracker1Sid';
+
 export const GT_MAX_INSTR = 64;
 export const GT_TABLES = 4;
 export const GT_WTBL = 0;
@@ -181,13 +183,18 @@ export function writeGoatTrackerSng(song: GTSongData, settings?: GTPlaySettings)
     for (const r of rows) out.push(r[0], r[1], r[2], r[3]);
     out.push(GT_ENDPATT, 0, 0, 0);
   }
-  if (settings) {
-    // GTUltra's editor settings (gsong.c savesong): the engine reads them back
-    // on load, which is how a multispeed or 25 Hz song reaches its tick rate.
-    const le32 = (v: number): number[] => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
-    out.push(0x1f, 0, 0, 0, settings.ntsc ? 1 : 0, 0, ...le32(settings.adparam), ...le32(settings.multiplier), ...le32(3), 0);
-  }
+  if (settings) out.push(...gtUltraSettingsBlock(settings));
   return new Uint8Array(out);
+}
+
+/**
+ * GTUltra's editor settings block (gsong.c savesong, ID 0x1f): the engine reads
+ * it back on load, which is how a multispeed or 25 Hz song reaches its tick
+ * rate. Valid after a GTS5 song and after a GTS! (GoatTracker 1) song.
+ */
+export function gtUltraSettingsBlock(settings: GTPlaySettings): number[] {
+  const le32 = (v: number): number[] => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  return [0x1f, 0, 0, 0, settings.ntsc ? 1 : 0, 0, ...le32(settings.adparam), ...le32(settings.multiplier), ...le32(3), 0];
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +210,7 @@ interface SidImage {
   copyright: string;
 }
 
-function loadSidImage(file: Uint8Array): SidImage | null {
+export function loadSidImage(file: Uint8Array): SidImage | null {
   if (file.length < 0x7c) return null;
   const magic = String.fromCharCode(file[0], file[1], file[2], file[3]);
   if (magic !== 'PSID' && magic !== 'RSID') return null;
@@ -809,7 +816,25 @@ export function goatTrackerSongBytes(filename: string, bytes: Uint8Array): Uint8
   if (name.endsWith('.sng')) return isGoatTrackerSng(bytes) ? bytes : null;
   if (name.endsWith('.sid')) {
     const decoded = decodeGoatTracker2Sid(bytes);
-    return decoded ? writeGoatTrackerSng(decoded.song, decoded.layout) : null;
+    if (decoded) return writeGoatTrackerSng(decoded.song, decoded.layout);
+    const img = loadSidImage(bytes);
+    const gt1 = img ? decodeGoatTracker1Sid(bytes, img) : null;
+    return gt1 ? goatTracker1SngWithSettings(gt1) : null;
   }
   return null;
+}
+
+/**
+ * A GoatTracker 1 SID's GTS! song followed by the pack options the engine reads
+ * back (gsong.c, GoatTracker 1 import): the GTUltra settings block (speed
+ * multiplier, NTSC, hard restart AD/SR) and 0x9c, the hard restart length in frames.
+ */
+function goatTracker1SngWithSettings(d: GT1SidDecode): Uint8Array {
+  const block = gtUltraSettingsBlock(d.settings);
+  const out = new Uint8Array(d.sng.length + block.length + 2);
+  out.set(d.sng, 0);
+  out.set(block, d.sng.length);
+  out[d.sng.length + block.length] = 0x9c;
+  out[d.sng.length + block.length + 1] = d.settings.hardRestartFrames;
+  return out;
 }

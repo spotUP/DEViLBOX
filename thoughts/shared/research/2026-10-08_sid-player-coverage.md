@@ -212,23 +212,44 @@ multiplier from the PSID (`layout.multiplier`); wiring it into GTUltra
 GoatTracker V1.x (1,377, 2.4%) is the closest follow-up in effort: same
 author, older player, opens in the same editor.
 
-## GoatTracker V1 (S1b) - stopped at the source question (2026-10-08)
+## GoatTracker V1 (S1b) - GoatTracker 1.53 builds decode; other revisions stay SIDs (2026-10-08)
 
-Not started; blocked on the answer key. Cadaver's tools page lists GoatTracker
-1.x only as binaries (V1.53 goattrk.zip, V1.53 Stereo gstereo.zip, V1.25
-goatold.zip, tweak and ninja converters) - no source. GT1 had no .sng that
-GT2 reads (different song file, different player). Without the GT1 packer
-source the layout would be inferred from compiled players, which the owner's
-rule (never guess offsets) rules out as the primary route.
+Sources (from cadaver.github.io/tools, GPL v2, read only): goattrk.zip = GoatTracker v1.53
+(src/goattrk.c relocator() + packpattern(), goattrk.dat holds player1.bin, gmusic.s = the
+game player) and goatold.zip = v1.25 (SRC/GOATTRK.C, PLAYER1-5.S/.BIN, "musicroutine 11.x").
 
-Plan if pursued:
-1. Get the V1.53 zips (the sandbox here could not fetch them; owner or a
-   networked session). Check whether the package carries player sources
-   (the V1 player is 6502 asm inside the exe's relocator data).
-2. Build a GT1 answer key: pack GT1 songs with the V1.53 packer (run under
-   DOSBox) from its own song files; add 3-5 real HVSC GoatTracker_V1.x tunes
-   (DeepSID list in this doc) as extra checks.
-3. Decide the target: GT1's data model (3 channels, instrument/table sizes) is
-   a subset of GT2's; the decoder would emit GTS5 through the same
-   writeGoatTrackerSng. Estimate: 1-2 days once the packer output layout is
-   known, since there is no source to read it from.
+Findings:
+- The GTUltra engine already loads GoatTracker 1 songs: gsong.c "Goattracker 1.xx import"
+  reads a GTS! file (the format 1.53 saves; 31 instruments with their own wave table, pulse
+  fields in the instrument, one 64-entry filter table). The decoder therefore returns a GTS!
+  file and the engine converts; no table conversion is duplicated in TypeScript.
+- Detection is the SIDId entry GoatTracker_V1.x (sidid.cfg, cited in GoatTracker1Sid.ts); its
+  GT_V1.4_2SID / GT_V1.5_2SID sub-entries are the stereo builds (rejected).
+- Decoding is template-matched, not scanned: goatTracker1Player.ts embeds player1.bin (1373
+  bytes). The 1.53 packer rewrites only table operands ($40xx-$47xx), code operands, four
+  hard-restart slots and the author text; a SID whose player equals that image byte for byte
+  gives the table addresses from those operands, and the data must tile to the last file byte
+  (instruments, wave, notes, song table, pattern table, filters, orderlists, patterns).
+- The packed song loses: instrument names (empty), the low nibble of the pulse limits, the
+  bit 0 of pulse speed, repeated instrument numbers, filters above the highest used, tempo 2
+  (packed to the same byte as 3, decoded as 3), arpeggio parameter $80 (decoded as 0).
+- Speed multiplier, NTSC and hard restart ADSR/length come from the speedcode, the PSID flags
+  and the player's four hard-restart slots; they travel after the GTS! data as the GTUltra
+  settings block (0x1f) plus a new block 0x9c (hard restart frames, GoatTracker 1 /R option);
+  gsong.c reads both for GTS! and sets the instruments' gatetimer = frames * multiplier.
+
+Answer key: nintendo, dojo, funktest, loader, mwremix, 2x_speed (the v1.53 example songs)
+packed with a port of the 1.53 relocator and packpattern (written from goattrk.c, never run
+from the zip) in four option sets each (1x / 2x / 4x NTSC, hard restart 1 and 2 frames,
+ADSR, start address): 24 of 24 decode to exactly the source song as the packer keeps it.
+Real HVSC GoatTracker_V1.x tunes (every third tune of the 1,386, 419 downloaded): 49 decode
+(11.7 %), the rest stay SIDs.
+
+Why the other 88 %: other player revisions. In the 70-tune sample: 40 % run a 1.5-1.52 player
+(one PHA/PLA pair and a rewritten loop differ from 1.53; the packer's instrument pulse flag
+encoding changed in 1.53 too - "fixed packer behaviour with no hardrestart/no pulseinit
+instruments"), 16 % a 1.4x player, about 20 % the 1.1-1.25 "musicroutine 11.x" players (whose
+songs have no filter table and raw pulse bytes, a different data model that the engine does
+not load), a few patched players, 4 % stereo. No source exists for 1.4-1.52, so no template
+and no data layout can be read: rejected, per the known-players-only decision. v1.25 has
+source; it is a different song model (not representable as a 1.53 GTS!), not built.
