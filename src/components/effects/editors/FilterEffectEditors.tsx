@@ -103,6 +103,7 @@ export const CompressorEditor: React.FC<VisualEffectEditorProps> = ({
   const ratio = getParam(effect, 'ratio', 12);
   const attack = getParam(effect, 'attack', 0.003);
   const release = getParam(effect, 'release', 0.25);
+  const knee = getParam(effect, 'knee', 30);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
@@ -151,6 +152,16 @@ export const CompressorEditor: React.FC<VisualEffectEditorProps> = ({
             size="sm"
             color="#10b981"
             formatValue={(v) => `${Math.round(v * 1000)}ms`}
+          />
+          <Knob
+            value={knee}
+            min={0}
+            max={40}
+            onChange={(v) => onUpdateParameter('knee', v)}
+            label="Knee"
+            size="sm"
+            color="#10b981"
+            formatValue={(v) => `${Math.round(v)}dB`}
           />
         </div>
       </section>
