@@ -252,16 +252,17 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
 
   const filename = file.name.toLowerCase();
 
-  // === GoatTracker .sng — detect BEFORE state reset ===
+  // === GoatTracker .sng (or a GoatTracker-2-compiled .sid) — detect BEFORE state reset ===
   // GT songs bypass the classic tracker pipeline entirely.  We must detect them
   // before the full state reset below, otherwise instruments are cleared and
   // React flushes a black pattern editor during the async gap.
-  if (filename.endsWith('.sng')) {
-    const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
+  if (filename.endsWith('.sng') || filename.endsWith('.sid')) {
+    const { goatTrackerSongBytes } = await import('../import/formats/GoatTrackerSid');
     // Use pre-read buffer if available (avoids double file.arrayBuffer() call)
     const gtBuf = preReadBuffer ?? await file.arrayBuffer();
-    if (isGoatTrackerSong(gtBuf)) {
-      console.log('[UnifiedFileLoader] GoatTracker .sng detected — routing to GTUltra engine');
+    const gtSong = goatTrackerSongBytes(filename, new Uint8Array(gtBuf));
+    if (gtSong) {
+      console.log('[UnifiedFileLoader] GoatTracker song detected — routing to GTUltra engine');
       // The song is applied like every other: applySong resets the per-song
       // stores and fills the GTUltra store from the applied song's
       // goatTrackerData (U4.2). The outgoing song is already unloaded by
@@ -272,9 +273,9 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
       const placeholderPattern = { ...blank, channels: blank.channels.map((c, i) => ({ ...c, name: `Voice ${i + 1}` })) };
       await applySong({
         instruments: [], patterns: [placeholderPattern], order: [0], bpm: 125, speed: 6,
-        metadata: { name: file.name.replace(/\.sng$/i, '') },
+        metadata: { name: file.name.replace(/\.(sng|sid)$/i, '') },
         originalModuleData: null,
-        engine: { goatTrackerData: new Uint8Array(gtBuf) },
+        engine: { goatTrackerData: gtSong },
       }, 'import');
 
       return {

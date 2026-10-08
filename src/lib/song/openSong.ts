@@ -160,6 +160,12 @@ export async function classifySong(file: File): Promise<SongKind | null> {
     ? detectFormatFromContent(filename, new Uint8Array(await file.arrayBuffer()))
     : null;
   if (byContent?.key === 'goatTracker') return 'goatTracker';
+  // A SID compiled by GoatTracker 2 opens as the GoatTracker song it was built
+  // from (known by the player's signature); any other SID stays a SID.
+  if (filename.endsWith('.sid')) {
+    const { goatTrackerSongBytes } = await import('@/lib/import/formats/GoatTrackerSid');
+    if (goatTrackerSongBytes(filename, new Uint8Array(await file.arrayBuffer()))) return 'goatTracker';
+  }
   if (isAdPlugWasmFormat(filename) && (byContent?.key ?? 'adplug') === 'adplug') return 'adplug';
 
   if (isSongFormat(filename)) {
