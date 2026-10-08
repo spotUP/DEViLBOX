@@ -119,7 +119,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   s3m: 'n/a',
   sidFactory2: 'n/a',
   sidmon1: 'pass',
-  sidmon2: 'fail',
+  sidmon2: 'pass',
   soundControl: 'pass',
   soundMaster: 'pass',
   soundPlayer: 'pass',
@@ -164,7 +164,6 @@ export const LIVE_WHILE_PLAYING_WHY: Record<string, string> = {
 
 /** Why a LIVE_EDIT row is 'fail' (plan unit in thoughts/shared/plans/2026-10-06-fix-all-open.md, G19). */
 export const LIVE_EDIT_WHY: Record<string, string> = {
-  sidmon2: 'G19-sidmon2: the export reads the running engine (none on play) and the variable encoder returns 212 bytes for a 62-byte slot',
 };
 
 /**
