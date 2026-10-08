@@ -1,3 +1,10 @@
+// Theme colours are CSS variables, which Tailwind cannot fade on its own:
+// with a plain 'var(--x)' an opacity modifier such as bg-accent-primary/20
+// generated no CSS at all, so every faded tint in the app was silently
+// missing. color-mix takes Tailwind's <alpha-value>, so /NN works and a
+// class without a modifier stays the solid colour.
+const tone = (name) => `color-mix(in srgb, var(${name}) calc(<alpha-value> * 100%), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -45,47 +52,47 @@ export default {
       colors: {
         // Theme-aware colors using CSS variables
         dark: {
-          bg: 'var(--color-bg)',
-          bgSecondary: 'var(--color-bg-secondary)',
-          bgTertiary: 'var(--color-bg-tertiary)',
-          bgHover: 'var(--color-bg-hover)',
-          bgActive: 'var(--color-bg-active)',
-          border: 'var(--color-border)',
-          borderLight: 'var(--color-border-light)',
+          bg: tone('--color-bg'),
+          bgSecondary: tone('--color-bg-secondary'),
+          bgTertiary: tone('--color-bg-tertiary'),
+          bgHover: tone('--color-bg-hover'),
+          bgActive: tone('--color-bg-active'),
+          border: tone('--color-border'),
+          borderLight: tone('--color-border-light'),
         },
         // Text colors
         text: {
-          primary: 'var(--color-text)',
-          secondary: 'var(--color-text-secondary)',
-          muted: 'var(--color-text-muted)',
-          inverse: 'var(--color-text-inverse)',
+          primary: tone('--color-text'),
+          secondary: tone('--color-text-secondary'),
+          muted: tone('--color-text-muted'),
+          inverse: tone('--color-text-inverse'),
         },
         // Accent colors
         accent: {
-          primary: 'var(--color-accent)',
-          secondary: 'var(--color-accent-secondary)',
-          highlight: 'var(--color-accent-highlight)',
-          warning: 'var(--color-warning)',
-          error: 'var(--color-error)',
-          success: 'var(--color-success)',
+          primary: tone('--color-accent'),
+          secondary: tone('--color-accent-secondary'),
+          highlight: tone('--color-accent-highlight'),
+          warning: tone('--color-warning'),
+          error: tone('--color-error'),
+          success: tone('--color-success'),
         },
         // Tracker-specific colors
         tracker: {
           row: {
-            even: 'var(--color-tracker-row-even)',
-            odd: 'var(--color-tracker-row-odd)',
-            highlight: 'var(--color-tracker-row-highlight)',
-            current: 'var(--color-tracker-row-current)',
-            cursor: 'var(--color-tracker-row-cursor)',
+            even: tone('--color-tracker-row-even'),
+            odd: tone('--color-tracker-row-odd'),
+            highlight: tone('--color-tracker-row-highlight'),
+            current: tone('--color-tracker-row-current'),
+            cursor: tone('--color-tracker-row-cursor'),
           },
           cell: {
-            note: 'var(--color-cell-note)',
-            instrument: 'var(--color-cell-instrument)',
-            volume: 'var(--color-cell-volume)',
-            effect: 'var(--color-cell-effect)',
-            accent: 'var(--color-cell-accent)',
-            slide: 'var(--color-cell-slide)',
-            empty: 'var(--color-cell-empty)',
+            note: tone('--color-cell-note'),
+            instrument: tone('--color-cell-instrument'),
+            volume: tone('--color-cell-volume'),
+            effect: tone('--color-cell-effect'),
+            accent: tone('--color-cell-accent'),
+            slide: tone('--color-cell-slide'),
+            empty: tone('--color-cell-empty'),
           }
         }
       },
