@@ -1,8 +1,8 @@
 {
-  "generated": "2026-10-08T07:56:18.245Z",
+  "generated": "2026-10-08T10:51:01.520Z",
   "perEntry": 6,
   "registryTotal": 279,
-  "covered": 167,
+  "covered": 168,
   "entries": [
     {
       "id": "actionamics",
@@ -2046,7 +2046,7 @@
     {
       "id": "richard-joseph",
       "label": "richard-joseph",
-      "formatKey": "zoundMonitor",
+      "formatKey": "richardJoseph",
       "files": [
         "/data/songs/richard-joseph/cannon fodder (intro).sng"
       ],
@@ -2363,6 +2363,16 @@
       ],
       "total": 2,
       "dir": "/data/songs/ym"
+    },
+    {
+      "id": "zoundmonitor",
+      "label": "zoundmonitor",
+      "formatKey": "zoundMonitor",
+      "files": [
+        "/data/songs/zoundmonitor/sonjavanveen.sng"
+      ],
+      "total": 1,
+      "dir": "/data/songs/zoundmonitor"
     }
   ],
   "dirs": {
@@ -2829,6 +2839,7 @@
     },
     "/data/songs": {
       "siblings": [
+        "files.json",
         "index.json",
         "modules.json"
       ],
@@ -31596,10 +31607,6 @@
     {
       "formatKey": "qsf",
       "label": "QSF"
-    },
-    {
-      "formatKey": "richardJoseph",
-      "label": "Richard Joseph"
     },
     {
       "formatKey": "uade_rhst",

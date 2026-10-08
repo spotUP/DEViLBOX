@@ -91,7 +91,9 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   useEffect(() => { companionFilesRef.current = companionFiles ?? []; }, [companionFiles]);
 
   // Derived format state
-  const nativeFmt  = detectNativeFormat(loadedFileName);
+  // By content once the module is read: one extension can name several formats (.sng, U4.5).
+  const moduleHead = moduleInfo?.arrayBuffer ? new Uint8Array(moduleInfo.arrayBuffer, 0, Math.min(128, moduleInfo.arrayBuffer.byteLength)) : undefined;
+  const nativeFmt  = detectNativeFormat(loadedFileName, moduleHead);
 
   // Format capability warnings
   const formatCapabilities: FormatCapabilityInfo | null = moduleInfo
@@ -112,7 +114,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   // Formats that require companion files (e.g. external Instruments/ folder)
   // Shown as a warning when none were loaded alongside the module.
-  const needsCompanionFiles = needsCompanionPrompt(loadedFileName, activeCompanions.length);
+  const needsCompanionFiles = needsCompanionPrompt(loadedFileName, activeCompanions.length, moduleHead);
 
   const showPrepared = useCallback((prepared: PreparedSong) => {
     if (prepared.songKind !== 'module' || !prepared.info) {
@@ -272,7 +274,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   // Stash the main file while waiting for companion selection
   const pendingMainFileRef = useRef<File | null>(null);
 
-  const handleSingleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSingleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
     e.target.value = '';
     if (files.length === 0) return;
@@ -288,7 +290,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     }
 
     // ZoundMonitor .sng files need a Samples/ directory — auto-prompt for folder
-    const fmt = detectNativeFormat(mainFile.name.toLowerCase());
+    const fmt = detectNativeFormat(mainFile.name.toLowerCase(), new Uint8Array(await mainFile.slice(0, 128).arrayBuffer()));
     if (fmt?.key === 'zoundMonitor' && companions.length === 0 && samplesFolderInputRef.current) {
       pendingMainFileRef.current = mainFile;
       samplesFolderInputRef.current.click();

@@ -8,6 +8,7 @@
  * Adding a new format = adding one entry here. No other file needs format lists.
  */
 
+import { isGoatTrackerSong } from './formats/GoatTrackerDetect';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { isUADEFormat } from './formats/UADEParser';
 import { isSunTronicV13Format } from './formats/SunTronicV13';
@@ -2603,8 +2604,14 @@ export function detectFormatFromContent(filename: string, bytes: Uint8Array): Fo
 
   switch (ext) {
     case 'sng':
-      // GoatTracker: GTS2..GTS5 magic. Zound Monitor is `sng.<name>`, never this.
-      if (ascii(0, 'GTS')) return byKey('goatTracker');
+      // THE .sng rule (U4.5), the only one: every opener (drop, file browser,
+      // jukebox, MCP, restore), the song index and the sweep reach it here.
+      // Three formats use .sng. GoatTracker carries its GTS!..GTS5 magic,
+      // Richard Joseph 'RJP' + 'SMOD'; what is left is Zound Monitor, the only
+      // other claimant (the registry's name-only answer for every .sng, which
+      // is why a name alone must never classify one).
+      if (isGoatTrackerSong(bytes)) return byKey('goatTracker');
+      if (ascii(0, 'RJP') && ascii(4, 'SMOD')) return byKey('richardJoseph');
       break;
     case 'dtm':
       // Digital Tracker (Atari Falcon, libopenmpt) starts 'D.T.'; AdPlug's DTM
