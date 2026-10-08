@@ -54,8 +54,8 @@ when they say so.
 
 ## Update after stop (Auto DJ agent, late 2026-10-08)
 
-- Auto DJ: **657 of 737 done, 27 owner checks, 0 open questions**. Beat
-  juggling landed (0edb37304); ledger 93debb84e.
+- Auto DJ FINAL: **723 of 737 done, 27 owner checks, 0 open questions** (ledger 5dadb665e). Beat
+  juggling landed (0edb37304: 13-pattern library, planner, executor on the beat-grid clock, Auto Juggle + Juggle Intensity selects, debug section). The 11 open JUG items ARE wanted - the owner ordered every item incl. optionals; do not re-ask. Also open: FOUND-1 (DJStemPreloader import cycle), FOUND-2 (the ratchet below). Owner checks 1-8 in its ledger (7 = DJ3 sync, 8 = Auto Juggle).
 - **DJ3 landed (4445519bf)**: one latency source `src/engine/audioLatency.ts`
   (outputLatency, else baseLatency); DeckEngine.getHeardPosition /
   getHeardTrackerState feed useDeckStateSync, the one writer every DJ visual
@@ -137,8 +137,8 @@ when they say so.
    ShimmerReverb WASM `Aborted(OOM)`: each click re-creates the WASM effect,
    old instances not freed. Fix: move nodes instead of re-creating; free WASM
    on dispose; stop the double rebuild. Owner: reload the tab to get audio back.
-3. Restart the Auto DJ Fable agent from its ledger (657/737) with the same
-   brief for the 11 open JUG items; DJ3 is done (owner check 7).
+3. Restart the Auto DJ Fable agent from its ledger (723/737) with the same
+   brief for the 11 open JUG items + FOUND-1; DJ3 and juggling are done (owner checks 7, 8).
 4. Get the owner's Furnace/DefleMask "still broken" songs + symptom; reopen
    with the register lock-step guard.
 5. E18b: GoatTracker VU meters dead live - a second producer writes 4 silent
