@@ -11,10 +11,7 @@
  * fails the test instead of hanging the runner.
  */
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
-
-const RUNNER = resolve(__dirname, 'fixtures/runBuzzMachine.cjs');
+import { runBuzzChild, lastJsonLine, CPU_BUDGET_S } from './fixtures/runBuzzChild';
 
 const EFFECTS: [string, string][] = [
   ['ArguruDistortion', 'Arguru_Distortion'], ['ElakSVF', 'Elak_SVF'], ['ElakDist2', 'Elak_Dist2'],
@@ -29,31 +26,33 @@ const EFFECTS: [string, string][] = [
 
 describe('Buzz effect machines', () => {
   for (const [type, file] of EFFECTS) {
-    it(`${type} initialises, finishes 400 blocks, and passes audio`, () => {
-      // A hang is infinite; 30 s tells it apart as well as 8 s did, and the
-      // full pre-push gate on a loaded machine stretched a 0.6 s init past
-      // 8 s twice (GeonikCompressor, DedaCodeStereoGain, 2026-10-04).
-      const r = spawnSync(process.execPath, [RUNNER, type, file, 'both'], { timeout: 30000, encoding: 'utf8' });
-      expect(r.signal, `${type} hung (killed after 30 s)`).toBeNull();
-      const line = r.stdout.split('\n').reverse().find((l) => l.startsWith('{'));
+    it(`${type} initialises, finishes 400 blocks, and passes audio`, async () => {
+      // A hang spins forever, so the budget is CPU time, not wall time: the
+      // full pre-push gate starves a 0.1 s child for tens of seconds (it killed
+      // FSMChorus at 30 s after it had printed its result, 2026-10-08).
+      const r = await runBuzzChild([type, file, 'both']);
+      expect(r.hung, `${type} hung (${r.cpuSeconds} s CPU, budget ${CPU_BUDGET_S}); output tail: ${r.stdout.slice(-300)} ${r.stderr.slice(-300)}`).toBeNull();
+      const line = lastJsonLine(r.stdout);
       expect(line, r.stderr.slice(-400)).toBeTruthy();
       const res = JSON.parse(line!);
       expect(res.msgs).toEqual(['initialized']);
       expect(res.outRms).toBeGreaterThan(0.005);
-    }, 40000);
+    }, 150000);
   }
 
-  it('Jeskola Freeverb at its defaults stays within 3 dB of the input (its LowCut 0 integrated sub-bass)', () => {
+  it('Jeskola Freeverb at its defaults stays within 3 dB of the input (its LowCut 0 integrated sub-bass)', async () => {
     // LowCut 0 set a 0.001 Hz high-pass whose float coefficients put a pole
     // on z = 1: +18 dB overall on pink noise, all of it below 63 Hz.
-    const r = spawnSync(process.execPath, [RUNNER, 'JeskolaFreeverb', 'Jeskola_Freeverb', 'pink'], { timeout: 15000, encoding: 'utf8' });
-    const res = JSON.parse(r.stdout.split('\n').reverse().find((l) => l.startsWith('{'))!);
+    const r = await runBuzzChild(['JeskolaFreeverb', 'Jeskola_Freeverb', 'pink']);
+    expect(r.hung).toBeNull();
+    const res = JSON.parse(lastJsonLine(r.stdout)!);
     expect(Math.abs(res.gainDb), `${res.gainDb.toFixed(1)} dB`).toBeLessThan(3);
-  }, 20000);
+  }, 150000);
 
-  it('a disposed machine stops its processor (disposed nodes ran for the rest of the session)', () => {
-    const r = spawnSync(process.execPath, [RUNNER, 'JeskolaFreeverb', 'Jeskola_Freeverb', 'dispose'], { timeout: 8000, encoding: 'utf8' });
-    const res = JSON.parse(r.stdout.split('\n').reverse().find((l) => l.startsWith('{'))!);
+  it('a disposed machine stops its processor (disposed nodes ran for the rest of the session)', async () => {
+    const r = await runBuzzChild(['JeskolaFreeverb', 'Jeskola_Freeverb', 'dispose']);
+    expect(r.hung).toBeNull();
+    const res = JSON.parse(lastJsonLine(r.stdout)!);
     expect(res.keepsRunning).toBe(false);
-  }, 15000);
+  }, 150000);
 });
