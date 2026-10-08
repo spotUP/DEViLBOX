@@ -30,4 +30,20 @@ describe('track scopes line up with the pattern columns', () => {
     const src = readFileSync(resolve(__dirname, '../TrackScopesStrip.tsx'), 'utf8');
     expect(src.match(/scopeCells\(nc, /g)?.length).toBe(2);
   });
+
+  // Owner, same day, GoatTracker view: "channel oscillators are doubled" - the
+  // view mounted a second strip under the app-wide one, which sat over the
+  // order sidebar, left of the pattern columns.
+  it('shifts by where the editor starts inside a wider strip', () => {
+    expect(scopeCells(3, 1200, layout, 80).map((c) => c.x)).toEqual([120, 280, 440]);
+  });
+
+  it('is mounted once, by the tracker view, and measures the editor\'s left edge', () => {
+    const gt = readFileSync(resolve(__dirname, '../../gtultra/GTUltraView.tsx'), 'utf8');
+    expect(gt).not.toMatch(/<TrackScopesStrip/);
+    const strip = readFileSync(resolve(__dirname, '../TrackScopesStrip.tsx'), 'utf8');
+    expect(strip.match(/originShiftFor\(canvas, channelLayout\)/g)?.length).toBe(2);
+    const canvas = readFileSync(resolve(__dirname, '../PatternEditorCanvas.tsx'), 'utf8');
+    expect(canvas).toMatch(/layoutOut\.origin = containerRef\.current;/);
+  });
 });

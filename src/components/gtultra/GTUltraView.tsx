@@ -15,7 +15,6 @@
 
 import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import { TrackScopesStrip } from '@/components/tracker/TrackScopesStrip';
 import { GTU_COLUMNS } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
 import { GTOrderMatrix, GT_ORDER_MATRIX_COLLAPSED_HEIGHT } from './GTOrderMatrix';
@@ -92,8 +91,6 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
           </div>
         </>
       )}
-
-      {!editorFullscreen && <TrackScopesStrip channelCount={channels.length} />}
 
       <div style={{ flex: '2 1 0', minHeight: 0, overflow: 'hidden' }}>
         <PatternEditorCanvas

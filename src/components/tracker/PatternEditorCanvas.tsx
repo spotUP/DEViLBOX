@@ -488,6 +488,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     layoutOut.offsets = channelOffsets;
     layoutOut.widths = channelWidths;
     layoutOut.numChannels = numChannels;
+    layoutOut.origin = containerRef.current;
   }, [channelOffsets, channelWidths, numChannels]);
 
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
@@ -2583,7 +2584,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
 
       const trackerState   = useTrackerStore.getState();
-      let currentRow   = useCursorStore.getState().cursor.rowIndex;
+      // A format sub-editor that does not play (an order matrix, an instrument
+      // table) shows its own rows: its own cursor, never the song's play row.
+      // Riding the WASM or replayer row made the GoatTracker order matrix
+      // scroll with the pattern, one order step per pattern row (owner
+      // 2026-10-08: "it scrolls at the same speed as the pattern editor").
+      const idleFormatEditor = isFormatModeRef.current && !formatIsPlayingRef.current;
+      let currentRow   = idleFormatEditor ? formatCursorRef.current.rowIndex : useCursorStore.getState().cursor.rowIndex;
       let activePatternIdx = trackerState.currentPatternIndex;
       let smoothOffset = 0;
       let songPosition: number | undefined;
@@ -2597,7 +2604,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // moment that engine stops driving, or a stopped song would keep
       // showing the last pattern it happened to reach.
       if (!wasmPos.active) wasmPatternRef.current = null;
-      if (wasmPos.active && !fpsIsActive) {
+      if (idleFormatEditor) {
+        // keep its own cursor row (above)
+      } else if (wasmPos.active && !fpsIsActive) {
         currentRow = wasmPos.row;
         // Row and pattern come from the SAME clock — see wasmPatternHold.ts.
         const resolved = resolveWasmPattern({
