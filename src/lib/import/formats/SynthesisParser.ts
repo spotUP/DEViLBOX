@@ -538,6 +538,8 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
     numPatterns: NOP,
     moduleSize: bytes.length,
     encodeCell: encodeSynthesisCell,
+    // Byte 2 holds the arpeggio index in its high nibble; the grid has no field for it.
+    encodeOverStored: true,
     decodeCell: (raw: Uint8Array): TrackerCell => {
       const noteIdx = raw[0];
       const instrument = raw[1];
