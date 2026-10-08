@@ -211,3 +211,24 @@ multiplier from the PSID (`layout.multiplier`); wiring it into GTUltra
 
 GoatTracker V1.x (1,377, 2.4%) is the closest follow-up in effort: same
 author, older player, opens in the same editor.
+
+## GoatTracker V1 (S1b) - stopped at the source question (2026-10-08)
+
+Not started; blocked on the answer key. Cadaver's tools page lists GoatTracker
+1.x only as binaries (V1.53 goattrk.zip, V1.53 Stereo gstereo.zip, V1.25
+goatold.zip, tweak and ninja converters) - no source. GT1 had no .sng that
+GT2 reads (different song file, different player). Without the GT1 packer
+source the layout would be inferred from compiled players, which the owner's
+rule (never guess offsets) rules out as the primary route.
+
+Plan if pursued:
+1. Get the V1.53 zips (the sandbox here could not fetch them; owner or a
+   networked session). Check whether the package carries player sources
+   (the V1 player is 6502 asm inside the exe's relocator data).
+2. Build a GT1 answer key: pack GT1 songs with the V1.53 packer (run under
+   DOSBox) from its own song files; add 3-5 real HVSC GoatTracker_V1.x tunes
+   (DeepSID list in this doc) as extra checks.
+3. Decide the target: GT1's data model (3 channels, instrument/table sizes) is
+   a subset of GT2's; the decoder would emit GTS5 through the same
+   writeGoatTrackerSng. Estimate: 1-2 days once the packer output layout is
+   known, since there is no source to read it from.
