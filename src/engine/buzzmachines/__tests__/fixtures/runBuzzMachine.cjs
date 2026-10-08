@@ -17,8 +17,12 @@ delete globalThis.setTimeout; delete globalThis.clearTimeout;
 new Function(...Object.keys(scope), fs.readFileSync(path.join(ROOT, 'public/Buzzmachine.worklet.js'), 'utf8'))(...Object.values(scope));
 const p = new Processor();
 p.port.onmessage({ data: { type: 'init', wasmBinary: fs.readFileSync(path.join(ROOT, `public/buzzmachines/${file}.wasm`)).buffer, jsCode: fs.readFileSync(path.join(ROOT, `public/buzzmachines/${file}.js`), 'utf8'), machineType: type, paramLayout: JSON.parse(process.env.BUZZ_LAYOUT || '[]') } });
+// Wait for the worklet's own reply to the init message (initialized or error), not a fixed
+// 500 ms: a loaded machine compiles the WASM later, and process() before init only bypasses.
+// The parent bounds a child that never replies (CPU budget plus wall backstop).
+const ready = (go) => { if (posted.length) go(); else realSetTimeout(() => ready(go), 5); };
 // Then run process() for 200 blocks with no input (as a disposed node would), and with input.
-realSetTimeout(() => {
+ready(() => {
   const out = [[new Float32Array(128), new Float32Array(128)]];
   const t0 = Date.now();
   const mode = process.argv[4] || 'both';
@@ -93,4 +97,4 @@ realSetTimeout(() => {
   }
   console.log(JSON.stringify({ type, msgs: posted.map((m) => m.type + (m.error ? ':' + m.error : '')), processMs: Date.now() - t0, outRms: Math.sqrt(out[0][0].reduce((s, v) => s + v * v, 0) / 128) }));
   process.exit(0);
-}, 500);
+});
