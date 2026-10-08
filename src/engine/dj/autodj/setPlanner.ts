@@ -163,7 +163,8 @@ export function scoreTransition(
 
   // Penalties.
   components.repetition = (played ? 1 : 0) * (1 - input.style.repetitionTolerance) + (sameKeyRun ? 0.3 : 0);
-  components.awkwardness = (d.score < 0.4 ? 0.4 : 0) + (b.bothHeavy ? 0.4 : 0) + (v.overlapRisk > 0.5 ? 0.4 : 0) + (to.durationSec < 45 ? 0.5 : 0);
+  // A high-confidence key clash is awkward in itself (a DJ hears it), beyond the harmonic score.
+  components.awkwardness = (d.score < 0.4 ? 0.4 : 0) + (b.bothHeavy ? 0.4 : 0) + (v.overlapRisk > 0.5 ? 0.4 : 0) + (to.durationSec < 45 ? 0.5 : 0) + (h.clashRisk > 0.5 ? 0.6 * input.style.keyStrictness : 0);
   if (to.durationSec < 45) rejections.push('very short track');
   const uncertainty = 1 - to.confidence.overall;
   components.risk = Math.min(1, h.clashRisk * 0.5 + (t.score < 0.5 ? 0.3 : 0) + uncertainty * 0.3) * (1 - input.creativeRisk * 0.5);
