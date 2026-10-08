@@ -41,4 +41,15 @@ describe('GoatTracker order matrix', () => {
     expect(view).toMatch(/\{ flex: '1 1 0', minHeight: 0, overflow: 'hidden' \}/);
     expect(view).toMatch(/<div style=\{\{ flex: '2 1 0', minHeight: 0, overflow: 'hidden' \}\}>\s*<PatternEditorCanvas\s*formatColumns=\{GTU_COLUMNS\}/);
   });
+
+  // Owner, same day: "the pattern position matrix ... scrolls at the same
+  // speed as the pattern editor": the idle sub-editor rode the WASM play row.
+  it('does not scroll with the pattern while the song plays', () => {
+    const canvas = readFileSync(resolve(__dirname, '../PatternEditorCanvas.tsx'), 'utf8');
+    expect(canvas).toMatch(/const idleFormatEditor = isFormatModeRef\.current && !formatIsPlayingRef\.current;/);
+    expect(canvas).toMatch(/let currentRow\s+= idleFormatEditor \? formatCursorRef\.current\.rowIndex/);
+    expect(canvas).toMatch(/if \(idleFormatEditor\) \{[^}]*\} else if \(wasmPos\.active && !fpsIsActive\)/);
+    const matrix = readFileSync(resolve(__dirname, '../../gtultra/GTOrderMatrix.tsx'), 'utf8');
+    expect(matrix).toMatch(/formatIsPlaying=\{false\}/);
+  });
 });
