@@ -5,6 +5,11 @@ function is68kReg(name: string): boolean {
   return /^[da][0-7]$|^sp$|^pc$/i.test(name);
 }
 
+function isStackReg(reg: string): boolean {
+  const r = reg.toLowerCase();
+  return r === 'sp' || r === 'a7';
+}
+
 function sizeStr(size: Size): string {
   switch (size) { case 'B': return '8'; case 'W': return '16'; default: return '32'; }
 }
@@ -175,8 +180,9 @@ export function emitOperand(op: Operand, size: Size = 'L'): string {
     case 'immediate': return immValue(op);
     case 'address': {
       const bits = sizeStr(size);
-      if (op.mode === 'post_inc') return `READ${bits}_POST(${op.reg})`;
-      if (op.mode === 'pre_dec') return `READ${bits}_PRE(${op.reg})`;
+      const sp8 = bits === '8' && isStackReg(op.reg) ? '_SP' : '';
+      if (op.mode === 'post_inc') return `READ${bits}_POST${sp8}(${op.reg})`;
+      if (op.mode === 'pre_dec') return `READ${bits}_PRE${sp8}(${op.reg})`;
       return `READ${bits}(${op.reg})`;
     }
     case 'disp': {
@@ -222,8 +228,9 @@ function regWrite(op: Operand, value: string, size: Size): string {
   }
   const bits = sizeStr(size);
   if (op.kind === 'address') {
-    if (op.mode === 'post_inc') return `WRITE${bits}_POST(${op.reg}, ${value});`;
-    if (op.mode === 'pre_dec') return `WRITE${bits}_PRE(${op.reg}, ${value});`;
+    const sp8 = bits === '8' && isStackReg(op.reg) ? '_SP' : '';
+    if (op.mode === 'post_inc') return `WRITE${bits}_POST${sp8}(${op.reg}, ${value});`;
+    if (op.mode === 'pre_dec') return `WRITE${bits}_PRE${sp8}(${op.reg}, ${value});`;
     // Only use hw_write for actual 68k registers (may point to hardware).
     // Data labels used in address mode (e.g. (SUBSONG)) use plain WRITE.
     if (is68kReg(op.reg)) {
@@ -319,7 +326,37 @@ function addrSrc(size: Size | undefined, srcRead: string): string {
   return size === 'L' ? `(int32_t)(${srcRead})` : `(int32_t)(int16_t)(${srcRead})`;
 }
 
+/**
+ * Read-modify-write instructions whose memory destination is `(An)+` or `-(An)`.
+ * The core emitters read the destination (READ_POST / READ_PRE moves An) and then
+ * write it (WRITE_POST / WRITE_PRE moves An again), so the write lands one step
+ * past the operand (`subq.w #1,(a5)+` wrote the NEXT word).  The 68k computes the
+ * address once: pre-decrement before, post-increment after, the operation itself
+ * on plain `(An)`.
+ */
+const RMW_MNEMONICS = new Set([
+  'ADD', 'ADDI', 'ADDQ', 'SUB', 'SUBI', 'SUBQ', 'AND', 'ANDI', 'OR', 'ORI', 'EOR', 'EORI',
+  'NEG', 'NEGX', 'NOT', 'BCHG', 'BSET', 'BCLR', 'ASL', 'ASR', 'LSL', 'LSR', 'ROL', 'ROR', 'ROXL', 'ROXR',
+]);
+
 export function emitInstruction(node: InstructionNode): string {
+  const ops = node.operands;
+  if (RMW_MNEMONICS.has(node.mnemonic) && ops.length >= 1) {
+    const di = ops.length - 1;
+    const d = ops[di];
+    // A single operand is the destination only for the one-operand forms (memory shift/NEG/NOT).
+    const isDest = ops.length >= 2 || ['NEG', 'NEGX', 'NOT', 'ASL', 'ASR', 'LSL', 'LSR', 'ROL', 'ROR', 'ROXL', 'ROXR'].includes(node.mnemonic);
+    if (isDest && d.kind === 'address' && (d.mode === 'post_inc' || d.mode === 'pre_dec')) {
+      const bytes = (node.size ?? 'L') === 'B' ? 1 : (node.size ?? 'L') === 'W' ? 2 : 4;
+      const plain: Operand = { kind: 'address', mode: 'indirect', reg: d.reg };
+      const core = emitInstructionCore({ ...node, operands: ops.map((o, i) => (i === di ? plain : o)) });
+      return d.mode === 'pre_dec' ? `${d.reg} -= ${bytes};\n  ${core}` : `${core}\n  ${d.reg} += ${bytes};`;
+    }
+  }
+  return emitInstructionCore(node);
+}
+
+function emitInstructionCore(node: InstructionNode): string {
   const { mnemonic, size, operands: ops } = node;
   const s = size ?? 'L';
   const src = ops[0] ? emitOperand(ops[0], s) : '';
@@ -347,6 +384,10 @@ export function emitInstruction(node: InstructionNode): string {
         if (ops[0].kind === 'immediate' && Number.isNaN(ops[0].value)) {
           moveVal = `(uint32_t)(uintptr_t)${moveVal}`;
         }
+        // A word moved into an address register is sign-extended to the whole register
+        // (MOVEA.W 0(A2,D1.W),A2 loads a pointer offset; writing only the low word kept
+        // the old high word and made the pointer 0x10000 too far).
+        if (s === 'W' && dst.kind === 'register') return `${dst.name} = (uint32_t)(int32_t)(int16_t)(${moveVal});`;
         return regWrite(dst, moveVal, s);
       }
       // 68k MOVE sets N and Z flags based on the moved value; clears V and C.
