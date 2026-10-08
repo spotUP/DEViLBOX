@@ -1757,29 +1757,29 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'ay',
     label: 'AY',
-    description: 'ZX Spectrum AY (ZXAY EMUL) — aylet WASM replayer with native pattern display',
+    description: 'ZX Spectrum AY (ZXAY EMUL and AMAD) — aylet WASM replayer (Z80 or FXM player) with native pattern display',
     family: 'chip-dump',
     matchMode: 'extension',
     // `.emul` because the corpus stores these files named after the ZXAY
     // SUBTYPE rather than the container: `ay-emul/spring.emul` begins with
     // the bytes `ZXAYEMUL`. Playback is aylet (third-party/aylet-0.5) in
     // wasm, fed the whole file; AYParser draws the grid (ledger F15).
-    extRegex: /\.(ay|emul)$/i,
+    extRegex: /\.(ay|emul|amad)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/AYParser', parseFn: 'parseAYFile', detectFn: 'isAYFormat' },
   },
   {
     key: 'ayStructured',
-    label: 'AY (STRC / AMAD)',
-    description: 'ZX Spectrum AY — ZXAY STRC / AMAD payloads (no replayer available; refused with the reason)',
+    label: 'AY (STRC)',
+    description: 'ZX Spectrum AY — ZXAY STRC payloads (no replayer available; refused with the reason)',
     family: 'chip-dump',
     matchMode: 'extension',
-    // Same ZXAY container as `ay`, different payload: `ZXAYSTRC` and
-    // `ZXAYAMAD` are data for a replayer that lived in the host (DeliAY /
-    // AY_Emul), not Z80 code, and no player in reach implements it. The
+    // Same ZXAY container as `ay`, different payload: `ZXAYSTRC` is data for
+    // a replayer that lived in the host (DeliAY / AY_Emul), not Z80 code, and
+    // no player in reach implements it (`ZXAYAMAD` plays: see `ay`). The
     // parser throws the reason so the user reads that instead of
     // "Unsupported file format". thoughts/shared/research/2026-10-04_ay-strc-amad.md
-    extRegex: /\.(strc|amad)$/i,
+    extRegex: /\.strc$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/AYParser', parseFn: 'parseAYStructuredFile', detectFn: 'isAYStructuredFormat' },
   },
