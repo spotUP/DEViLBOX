@@ -81,6 +81,12 @@ export interface UADEPatternLayout {
    * per-cell byte view of chip RAM, so there is no chip-RAM read-back.
    */
   writeCell?: (pattern: number, row: number, channel: number, cell: TrackerCell) => Array<{ offset: number; bytes: Uint8Array }>;
+  /**
+   * A cell no stored row covers (a command-stream or timed-row format: the cell lies inside a row that lasts
+   * several grid rows). Takes the module as it is now; returns the WHOLE module with the cell's note put in by growing the module (G5), or the
+   * reason it cannot. The module grows, so later offsets of this layout are stale: the caller parses the result again.
+   */
+  growCell?: (module: Uint8Array, pattern: number, row: number, channel: number, cell: TrackerCell) => Uint8Array | string;
 }
 
 // ─── Cell Offset Calculation ──────────────────────────────────────────────────
