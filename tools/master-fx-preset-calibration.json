@@ -1203,10 +1203,10 @@
       "Compressor",
       "EQ3"
     ],
-    "chainDb": -0.9,
-    "makeUpDb": 0.9,
-    "oldMakeUpDb": 3.8,
-    "at": "2026-09-30T10:20:34.378Z"
+    "chainDb": -1.2,
+    "makeUpDb": 1.2,
+    "oldMakeUpDb": 0.9,
+    "at": "2026-10-08T14:51:26.989Z"
   },
   "Tape Machine": {
     "name": "Tape Machine",
@@ -1226,10 +1226,10 @@
       "EQ3",
       "Compressor"
     ],
-    "chainDb": -1.2,
-    "makeUpDb": 1.2,
-    "oldMakeUpDb": 0.6,
-    "at": "2026-09-30T10:20:53.851Z"
+    "chainDb": -1.5,
+    "makeUpDb": 1.5,
+    "oldMakeUpDb": 1.2,
+    "at": "2026-10-08T14:51:36.754Z"
   },
   "Warm Bass": {
     "name": "Warm Bass",
@@ -1271,10 +1271,10 @@
       "Compressor",
       "TapeSaturation"
     ],
-    "chainDb": -1,
-    "makeUpDb": 1,
-    "oldMakeUpDb": 4.5,
-    "at": "2026-09-30T10:21:46.508Z"
+    "chainDb": 1.7,
+    "makeUpDb": -1.7,
+    "oldMakeUpDb": 1,
+    "at": "2026-10-08T14:51:46.539Z"
   },
   "Pumping": {
     "name": "Pumping",
@@ -1711,10 +1711,10 @@
       "MultibandComp",
       "TapeSaturation"
     ],
-    "chainDb": 9.8,
-    "makeUpDb": -9.8,
-    "oldMakeUpDb": -1.3,
-    "at": "2026-09-30T10:30:19.723Z"
+    "chainDb": 4.3,
+    "makeUpDb": -4.3,
+    "oldMakeUpDb": -9.8,
+    "at": "2026-10-08T14:09:52.251Z"
   },
   "Retro Arcade": {
     "name": "Retro Arcade",
@@ -1832,5 +1832,15 @@
     "makeUpDb": 1.9,
     "oldMakeUpDb": 2.4,
     "at": "2026-10-08T11:22:40.291Z"
+  },
+  "Transparent": {
+    "name": "Transparent",
+    "types": [
+      "Compressor"
+    ],
+    "chainDb": -1.8,
+    "makeUpDb": 1.8,
+    "oldMakeUpDb": 2.4,
+    "at": "2026-10-08T14:51:17.238Z"
   }
 }
