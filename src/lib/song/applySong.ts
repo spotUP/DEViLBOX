@@ -34,6 +34,8 @@ import type { MixerSnapshot } from '@stores/useMixerStore';
 import type { DubBusSettings } from '@/types/dub';
 import { repairStoredDubBusVoicing } from '@/types/dub';
 import { migrateDubLaneEvents } from './migrateDubLaneEvents';
+import { typingOctaveFor } from '@/lib/amiga/periodNotes';
+import { liveSongFormat } from './liveSong';
 import { baselineOf, setGridBaseline, type GridBaseline } from './gridBaseline';
 
 type FormatState = ReturnType<typeof useFormatStore.getState>;
@@ -186,6 +188,8 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   const format = useFormatStore.getState();
   format.setOriginalModuleData(song.originalModuleData);
   format.applyEditorMode(song.engine);
+  // The keyboard maps like the song's own tracker (K12): ProTracker's octave for Amiga-period songs.
+  useEditorStore.getState().setCurrentOctave(typingOctaveFor(liveSongFormat()));
   // GoatTracker's engine holds its own song: the GTUltra store is filled from
   // the applied song's bytes (a file open, a restore, a tab and a sync all
   // arrive here), never written beside it by an opener.
