@@ -28,10 +28,35 @@ describe('error text can be copied', () => {
     // useModuleImport's handler was deleted by ce3d50326 (U2.3); the import
     // dialog host is where an interactive open reports its failure now.
     const imp = readFileSync(join(root, 'src/components/dialogs/ImportDialogHost.tsx'), 'utf8');
-    expect(imp).toContain('notify.error(`Load failed');
+    expect(imp).toContain('reportLoadFailure(');
     expect(imp).not.toContain("title: 'Load Failed'");
     expect(readFileSync(join(root, 'src/components/common/ConfirmDialog.tsx'), 'utf8')).toMatch(/\{message\}<\/p>/);
     expect(readFileSync(join(root, 'src/components/common/ConfirmDialog.tsx'), 'utf8')).toContain('select-text cursor-text">{message}');
+  });
+});
+
+describe('every load-failure path reports through the one copyable toast', () => {
+  afterEach(() => { cleanup(); useNotificationStore.setState({ notifications: [] } as never); });
+
+  it('reportLoadFailure is a sticky error toast with a selectable message', async () => {
+    const { reportLoadFailure } = await import('@/lib/song/reportLoadFailure');
+    render(<ToastNotification />);
+    act(() => { reportLoadFailure('bob4e.dum: file not found'); });
+    const n = useNotificationStore.getState().notifications[0];
+    expect(n?.type).toBe('error');
+    expect(n?.duration).toBe(0);
+    expect(document.querySelector('[role="alert"] p')?.textContent).toContain('Load failed - bob4e.dum: file not found');
+  });
+
+  it('App drop, dialog, file browser, project and TD-3 paths use it, no modal Load Failed alert is left', () => {
+    const root = join(__dirname, '../../../..');
+    const app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+    expect(app).not.toContain("title: 'Load Failed'");
+    expect(app).not.toMatch(/showAlert\(\{[^}]*Load/);
+    // drop x3, dialog x2, project x2, file browser, TD-3
+    expect((app.match(/reportLoadFailure\(/g) ?? []).length).toBeGreaterThanOrEqual(9);
+    // the toast is raised in one place only
+    expect(readFileSync(join(root, 'src/components/jukebox/JukeboxPanel.tsx'), 'utf8')).not.toContain('notify.error(`Load failed');
   });
 });
 

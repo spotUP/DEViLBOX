@@ -71,7 +71,7 @@ import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
 import { PeerVideoWindow } from '@components/collaboration/PeerVideoWindow';
 import { ExposeOverlay } from '@components/ui/ExposeOverlay';
 import { GlobalConfirmDialog } from '@components/common/GlobalConfirmDialog';
-import { showAlert } from '@stores/useConfirmStore';
+import { reportLoadFailure } from '@/lib/song/reportLoadFailure';
 import { DJErrorBoundary } from './components/dj/DJErrorBoundary';
 import { TourOverlay } from './components/tour/TourOverlay';
 import { useTourStore } from '@stores/useTourStore';
@@ -814,12 +814,12 @@ function App() {
       if (result.ok) {
         if (!result.notified) notify.success(result.message);
       } else {
-        void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
+        reportLoadFailure(result.error || `Could not load ${file.name}`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[App.loadSongFile] load threw:', err);
-      void showAlert({ title: 'Load Failed', message: `${file.name}: ${msg}` });
+      reportLoadFailure(`${file.name}: ${msg}`);
     }
   }, []);
 
@@ -875,7 +875,7 @@ function App() {
       // the file has a real choice (subsongs, a missing partner file, settings).
       if (await classifySong(file)) {
         await openUserSong(file, 'drop', companionFiles, (message) => {
-          void showAlert({ title: 'Load Failed', message: withCompanionHint(file, companionFiles, message) });
+          reportLoadFailure(withCompanionHint(file, companionFiles, message));
         });
         return;
       }
@@ -883,12 +883,12 @@ function App() {
       if (result.success === true) {
         notify.success(result.message);
       } else if (result.success === false) {
-        void showAlert({ title: 'Load Failed', message: withCompanionHint(file, companionFiles, result.error || `Could not load ${file.name}`) });
+        reportLoadFailure(withCompanionHint(file, companionFiles, result.error || `Could not load ${file.name}`));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[App.handleFileDrop] load threw:', err);
-      void showAlert({ title: 'Load Failed', message: withCompanionHint(file, companionFiles, `${file.name}: ${msg}`) });
+      reportLoadFailure(withCompanionHint(file, companionFiles, `${file.name}: ${msg}`));
     }
   }, []);
 
@@ -1187,11 +1187,11 @@ function App() {
                 if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {
-                  void showAlert({ title: 'Load Failed', message: result.error || 'Could not load project' });
+                  reportLoadFailure(result.error || 'Could not load project');
                 }
               } catch (error) {
                 console.error('Failed to load project:', error);
-                void showAlert({ title: 'Load Failed', message: 'Failed to load project' });
+                reportLoadFailure('Failed to load project');
               }
             }}
             onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
@@ -1199,7 +1199,7 @@ function App() {
               await openUserSong(new File([buffer], filename), 'filebrowser', companionFiles, (message) => {
                 // The actual reason (UADE dispatch error, missing companion, parser
                 // throw) so a companion 404 is told apart from a parse crash.
-                void showAlert({ title: 'Load Failed', message: message.startsWith(filename) ? message : `${filename}: ${message}` });
+                reportLoadFailure(message.startsWith(filename) ? message : `${filename}: ${message}`);
               });
             }}
           />
@@ -1258,7 +1258,7 @@ function App() {
             useUIStore.getState().setPendingTD3File(null);
             const result = await loadFile(file, { replacePatterns });
             if (result.success === true) notify.success(result.message);
-            else if (result.success === false) void showAlert({ title: 'Load Failed', message: result.error || 'Could not load file' });
+            else if (result.success === false) reportLoadFailure(result.error || 'Could not load file');
           }}
         />
       </Suspense>
