@@ -84,6 +84,11 @@ static inline void _wr32(uintptr_t a,uint32_t v) { memcpy((void*)a,&v,4); }
 #define WRITE8_PRE(r,v)   ({ (r)-=1; WRITE8(r,v); })
 #define WRITE16_PRE(r,v)  ({ (r)-=2; WRITE16(r,v); })
 #define WRITE32_PRE(r,v)  ({ (r)-=4; WRITE32(r,v); })
+/* A byte access through the stack pointer steps it by 2 (A7 stays word aligned on the 68000). */
+#define READ8_POST_SP(r)   ({ uint32_t _r=(r); (r)+=2; READ8(_r); })
+#define READ8_PRE_SP(r)    ({ (r)-=2; READ8(r); })
+#define WRITE8_POST_SP(r,v) ({ WRITE8(r,v); (r)+=2; })
+#define WRITE8_PRE_SP(r,v)  ({ (r)-=2; WRITE8(r,v); })
 
 /* -- Rotation Helpers -------------------------------------------------
  * ROL32(v,n) -- rotate 32-bit value left by n bits

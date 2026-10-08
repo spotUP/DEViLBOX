@@ -126,3 +126,39 @@ test('MOVE.W d0,$DFF0A8 (Paula volume ch0)', () => {
 test('MOVE.W #$8200,$DFF096 (DMACON)', () => {
   expect(emit('MOVE.W #$8200,$DFF096')).toContain('paula_dma_write(');
 });
+
+// A read-modify-write on (An)+ / -(An) computes the address once. The core emitters
+// moved An on the read and again on the write, so `subq.w #1,(a5)+` wrote the NEXT word
+// (the Hippel ST speed counter: the reload value was zeroed, the song stood still).
+test('SUBQ.W #1,(a5)+ reads and writes the same word, then steps a5 once', () => {
+  const c = emit('SUBQ.W #1,(a5)+');
+  expect(c).not.toContain('READ16_POST');
+  expect(c).not.toContain('WRITE16_POST');
+  expect(c).toContain('READ16(a5)');
+  expect(c).toMatch(/a5 \+= 2;\s*$/);
+});
+test('ADDQ.B #1,-(a3) steps a3 first, then reads and writes it', () => {
+  const c = emit('ADDQ.B #1,-(a3)');
+  expect(c).toMatch(/^a3 -= 1;/);
+  expect(c).not.toContain('_PRE');
+});
+test('MOVE.W (a5),-(a5) is not a read-modify-write and keeps its pre-decrement', () => {
+  expect(emit('MOVE.W (a5),-(a5)')).toContain('WRITE16_PRE(a5');
+});
+
+// A word moved into an address register is sign-extended over the whole register
+// (Hippel ST: MOVEA.W 0(A2,D1.W),A2 left the old high word, so every sound and volume
+// sequence pointer was 0x10000 past the song).
+test('MOVEA.W (a2),a2 sign-extends into the whole register', () => {
+  expect(emit('MOVEA.W (a2),a2')).toContain('a2 = (uint32_t)(int32_t)(int16_t)');
+});
+test('MOVEA.W d0,a1 sign-extends too', () => {
+  expect(emit('MOVEA.W d0,a1')).toContain('a1 = (uint32_t)(int32_t)(int16_t)');
+});
+
+// A byte pushed or popped through the stack pointer moves it by 2 (A7 stays word aligned).
+// `move.w d0,-(sp)` + `move.b (sp)+,x` leaked one byte of stack per call (Hippel ST Play).
+test('MOVE.B (sp)+,d0 steps sp by two', () => { expect(emit('MOVE.B (sp)+,d0')).toContain('READ8_POST_SP(sp)'); });
+test('MOVE.B d0,-(sp) steps sp by two', () => { expect(emit('MOVE.B d0,-(sp)')).toContain('WRITE8_PRE_SP(sp'); });
+test('MOVE.B (a0)+,d0 steps by one', () => { expect(emit('MOVE.B (a0)+,d0')).toContain('READ8_POST(a0)'); });
+test('MOVE.W d0,-(sp) steps by two as ever', () => { expect(emit('MOVE.W d0,-(sp)')).toContain('WRITE16_PRE(sp'); });
