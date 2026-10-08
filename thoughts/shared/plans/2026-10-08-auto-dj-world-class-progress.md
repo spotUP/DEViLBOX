@@ -10,7 +10,7 @@ status: draft
 Plan: `thoughts/shared/plans/2026-10-08-auto-dj-world-class-plan.md`.
 Research (how it works today): `thoughts/shared/research/2026-10-08_auto-dj-how-it-works.md`.
 
-**Count: 391 of 755 done, 0 owner checks, 0 open questions** (world-class plan 558 items + beat-juggling plan JUG- items)
+**Count: 471 of 760 done, 25 owner checks, 0 open questions** (world-class plan 558 items + beat-juggling plan JUG- 197 + found during the run)
 
 Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` open owner question (built around, decision needed). An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll / triggerTransition, the DJ analysis worker path, or the DJ view) and proves the code ran.
 
@@ -66,7 +66,7 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [ ] A2.15 corpus: highly variable energy
 - [x] A3.1 gate: existing behaviour documented -> c5b32061f; baseline doc
 - [x] A3.2 gate: regressions can be detected (baseline snapshot test) -> c5b32061f; autoDJBaseline.test.ts
-- [ ] A3.3 gate: Auto DJ runs through the corpus without hard crashes
+- [x] A3.3 gate: Auto DJ runs through the corpus without hard crashes -> 45187d1f3; autoDJLongSetSimulation.test.ts (30 min corpus run, no crash)
 - [x] A3.4 gate: transition logs can be captured -> c5b32061f; decisionLog.ts (MCP wiring in a later chunk)
 
 ## Section 3 - Unified DJTrackAnalysis
@@ -451,40 +451,40 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Gate R - Failure resilience (plan section 38)
 
-- [ ] R1.1 survives preload failure
-- [ ] R1.2 survives decode failure
-- [ ] R1.3 survives analysis failure
-- [ ] R1.4 survives missing key
-- [ ] R1.5 survives missing beat grid
-- [ ] R1.6 survives malformed tracker data
-- [ ] R1.7 survives unavailable cue point
-- [ ] R1.8 survives deck failure
-- [ ] R1.9 survives effect failure
-- [ ] R1.10 survives unexpected track length
-- [ ] R1.11 survives extremely short tracks
-- [ ] R1.12 survives silence
-- [ ] R1.13 survives transition timeout
+- [x] R1.1 survives preload failure -> 45187d1f3; autoDJLongSetSimulation.test.ts preload
+- [x] R1.2 survives decode failure -> 45187d1f3; autoDJLongSetSimulation.test.ts decode
+- [x] R1.3 survives analysis failure -> 45187d1f3; autoDJLongSetSimulation.test.ts analysis -> legacy path
+- [x] R1.4 survives missing key -> 45187d1f3; autoDJLongSetSimulation.test.ts missingKey
+- [x] R1.5 survives missing beat grid -> 45187d1f3; autoDJLongSetSimulation.test.ts missingGrid
+- [x] R1.6 survives malformed tracker data -> 45187d1f3; autoDJLongSetSimulation.test.ts malformedTracker
+- [x] R1.7 survives unavailable cue point -> 45187d1f3; autoDJLongSetSimulation.test.ts noCue
+- [x] R1.8 survives deck failure -> 45187d1f3; autoDJLongSetSimulation.test.ts deckFailure -> emergency, outgoing kept
+- [x] R1.9 survives effect failure -> 45187d1f3; autoDJLongSetSimulation.test.ts effectFailure
+- [x] R1.10 survives unexpected track length -> 45187d1f3; autoDJLongSetSimulation.test.ts unexpectedLength
+- [x] R1.11 survives extremely short tracks -> 45187d1f3; autoDJLongSetSimulation.test.ts short
+- [x] R1.12 survives silence -> 45187d1f3; autoDJLongSetSimulation.test.ts silence
+- [x] R1.13 survives transition timeout -> 45187d1f3; autoDJLongSetSimulation.test.ts transitionTimeout -> watchdog emergency
 - [x] R2 fallback hierarchy ideal -> safe phrase -> safe crossfade -> emergency continuity -> 0f3d488c5; ideal -> fallbackPlan -> executor emergency -> legacy beatMatchedTransition
 - [x] R3 no hard cut caused by software failure -> 0f3d488c5; emergency path is a crossfade
 
 ## Gate S - Long-set intelligence (plan section 39)
 
-- [ ] S1.1 30-minute session test
-- [ ] S1.2 1-hour session test
-- [ ] S1.3 2-hour session test
-- [ ] S1.4 4-hour session test
-- [ ] S2.1 measure: transition quality
-- [ ] S2.2 measure: energy coherence
-- [ ] S2.3 measure: repetition
-- [ ] S2.4 measure: key conflicts
-- [ ] S2.5 measure: tempo drift
-- [ ] S2.6 measure: loudness drift
-- [ ] S2.7 measure: transition variety
-- [ ] S2.8 measure: track diversity
-- [ ] S2.9 measure: CPU stability (planning time per decision bounded)
-- [ ] S2.10 measure: memory usage (memory structures bounded)
-- [ ] S2.11 measure: preload failures
-- [ ] S2.12 measure: analysis failures
+- [x] S1.1 30-minute session test -> 45187d1f3; autoDJLongSetSimulation.test.ts 30 minutes
+- [x] S1.2 1-hour session test -> 45187d1f3; autoDJLongSetSimulation.test.ts 1 hour
+- [x] S1.3 2-hour session test -> 45187d1f3; autoDJLongSetSimulation.test.ts 2 hours
+- [x] S1.4 4-hour session test -> 45187d1f3; autoDJLongSetSimulation.test.ts 4 hours
+- [x] S2.1 measure: transition quality -> 45187d1f3; autoDJLongSetSimulation.test.ts meanQuality/minQuality
+- [x] S2.2 measure: energy coherence -> 45187d1f3; autoDJLongSetSimulation.test.ts energyCoherence
+- [x] S2.3 measure: repetition -> 45187d1f3; autoDJLongSetSimulation.test.ts maxStyleRun
+- [x] S2.4 measure: key conflicts -> 45187d1f3; autoDJLongSetSimulation.test.ts keyConflicts
+- [x] S2.5 measure: tempo drift -> 45187d1f3; autoDJLongSetSimulation.test.ts tempoDriftMax (crossfader range proxy; the executor pitches once per plan)
+- [x] S2.6 measure: loudness drift -> 45187d1f3; autoDJLongSetSimulation.test.ts loudnessMaxTruePeakDb
+- [x] S2.7 measure: transition variety -> 45187d1f3; autoDJLongSetSimulation.test.ts distinctStyles
+- [x] S2.8 measure: track diversity -> 45187d1f3; autoDJLongSetSimulation.test.ts trackRepeats
+- [x] S2.9 measure: CPU stability (planning time per decision bounded) -> 45187d1f3; autoDJLongSetSimulation.test.ts planningMsMax/mean
+- [x] S2.10 measure: memory usage (memory structures bounded) -> 45187d1f3; autoDJLongSetSimulation.test.ts memoryRecords <= 64, decisionLogSize <= 400, pendingTimersAtEnd 0
+- [x] S2.11 measure: preload failures -> 45187d1f3; autoDJLongSetSimulation.test.ts preloadFailures
+- [x] S2.12 measure: analysis failures -> 45187d1f3; autoDJLongSetSimulation.test.ts analysisFailures
 
 ## Section 40 - Long-set narrative
 
@@ -494,22 +494,22 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 ## Gate T - Transition quality scoring (plan section 41)
 
 - [x] T1 offline evaluator: TransitionQuality { beatAlignment, phraseAlignment, harmonicCompatibility, tempoStability, bassHandover, loudnessConsistency, structuralFit, creativity, smoothness, surprise, overall } -> 0f3d488c5; evaluateTransition TransitionQuality; autoDJPlannedTransitionReachesTheDecks.test.ts (quality recorded)
-- [ ] T2 used for objective regression testing (golden corpus thresholds)
+- [x] T2 used for objective regression testing (golden corpus thresholds) -> 45187d1f3; autoDJGoldenTransitions.test.ts (thresholds per scenario)
 
 ## Section 42 - Golden transition corpus
 
-- [ ] S42.1 golden: long blend
-- [ ] S42.2 golden: bass swap
-- [ ] S42.3 golden: breakdown mix
-- [ ] S42.4 golden: drop mix
-- [ ] S42.5 golden: drum intro
-- [ ] S42.6 golden: vocal swap
-- [ ] S42.7 golden: echo out
-- [ ] S42.8 golden: filter build
-- [ ] S42.9 golden: filter release
-- [ ] S42.10 golden: tempo bridge
-- [ ] S42.11 golden: deliberate cut
-- [ ] S42.12 corpus runs as regression tests
+- [x] S42.1 golden: long blend -> 45187d1f3; autoDJGoldenTransitions.test.ts (long blend)
+- [x] S42.2 golden: bass swap -> 45187d1f3; autoDJGoldenTransitions.test.ts (bass swap)
+- [x] S42.3 golden: breakdown mix -> 45187d1f3; autoDJGoldenTransitions.test.ts (breakdown mix)
+- [x] S42.4 golden: drop mix -> 45187d1f3; autoDJGoldenTransitions.test.ts (drop mix)
+- [x] S42.5 golden: drum intro -> 45187d1f3; autoDJGoldenTransitions.test.ts (drum intro)
+- [x] S42.6 golden: vocal swap -> 45187d1f3; autoDJGoldenTransitions.test.ts (vocal swap)
+- [x] S42.7 golden: echo out -> 45187d1f3; autoDJGoldenTransitions.test.ts (echo out)
+- [x] S42.8 golden: filter build -> 45187d1f3; autoDJGoldenTransitions.test.ts (filter build)
+- [x] S42.9 golden: filter release -> 45187d1f3; autoDJGoldenTransitions.test.ts (filter release)
+- [x] S42.10 golden: tempo bridge -> 45187d1f3; autoDJGoldenTransitions.test.ts (tempo bridge)
+- [x] S42.11 golden: deliberate cut -> 45187d1f3; autoDJGoldenTransitions.test.ts (deliberate cut)
+- [x] S42.12 corpus runs as regression tests -> 45187d1f3; autoDJGoldenTransitions.test.ts
 
 ## Section 43 - Automated invariants
 
@@ -523,12 +523,12 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Section 44 - Debug / telemetry view
 
-- [ ] S44.1 view: current track (BPM, key, key confidence, energy, set phase, current bar, current phrase)
-- [ ] S44.2 view: next track (BPM, key, energy, mix-in point, mix-out point)
-- [ ] S44.3 view: transition (type, length, tempo plan, key plan, bass plan, EQ plan, filter plan)
-- [ ] S44.4 view: confidence and risk
-- [ ] S44.5 view: why this track? why this transition? (explanation lines with +/- signs)
-- [ ] S44.6 DOM, design-system components, token classes, full English labels
+- [x] S44.1 view: current track (BPM, key, key confidence, energy, set phase, current bar, current phrase) -> 45187d1f3; autoDJDebugPanel.test.tsx
+- [x] S44.2 view: next track (BPM, key, energy, mix-in point, mix-out point) -> 45187d1f3; autoDJDebugPanel.test.tsx
+- [x] S44.3 view: transition (type, length, tempo plan, key plan, bass plan, EQ plan, filter plan) -> 45187d1f3; autoDJDebugPanel.test.tsx
+- [x] S44.4 view: confidence and risk -> 45187d1f3; autoDJDebugPanel.test.tsx
+- [x] S44.5 view: why this track? why this transition? (explanation lines with +/- signs) -> 45187d1f3; autoDJDebugPanel.test.tsx
+- [x] S44.6 DOM, design-system components, token classes, full English labels -> 45187d1f3; autoDJDebugPanel.test.tsx (no emoji, no raw colour classes)
 
 ## Section 45 - "Why did you do that?" logging
 
@@ -621,49 +621,49 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 
 ## Gate V - Full autonomous performance (plan section 62)
 
-- [ ] V1.1 10-track run
-- [ ] V1.2 25-track run
-- [ ] V1.3 50-track run
-- [ ] V1.4 100-track run
-- [ ] V2.1 evaluate musical continuity
-- [ ] V2.2 evaluate transition variety
-- [ ] V2.3 evaluate energy trajectory
-- [ ] V2.4 evaluate harmonic quality
-- [ ] V2.5 evaluate tempo stability
-- [ ] V2.6 evaluate bass quality
-- [ ] V2.7 evaluate vocal handling
-- [ ] V2.8 evaluate structural timing
-- [ ] V2.9 evaluate repetition
-- [ ] V2.10 evaluate failure handling
+- [x] V1.1 10-track run -> 45187d1f3; autoDJLongSetSimulation.test.ts 10 tracks
+- [x] V1.2 25-track run -> 45187d1f3; autoDJLongSetSimulation.test.ts 25
+- [x] V1.3 50-track run -> 45187d1f3; autoDJLongSetSimulation.test.ts 50
+- [x] V1.4 100-track run -> 45187d1f3; autoDJLongSetSimulation.test.ts 100
+- [x] V2.1 evaluate musical continuity -> 45187d1f3; autoDJLongSetSimulation.test.ts invariantFailures 0 / completed
+- [x] V2.2 evaluate transition variety -> 45187d1f3; autoDJLongSetSimulation.test.ts distinctStyles
+- [x] V2.3 evaluate energy trajectory -> 45187d1f3; autoDJLongSetSimulation.test.ts energyCoherence
+- [x] V2.4 evaluate harmonic quality -> 45187d1f3; autoDJLongSetSimulation.test.ts keyConflicts
+- [x] V2.5 evaluate tempo stability -> 45187d1f3; autoDJLongSetSimulation.test.ts tempo plan bands + beat invariant
+- [x] V2.6 evaluate bass quality -> 45187d1f3; autoDJLongSetSimulation.test.ts bass invariant (bassExposure)
+- [x] V2.7 evaluate vocal handling -> 45187d1f3; autoDJLongSetSimulation.test.ts vocal risk in quality
+- [x] V2.8 evaluate structural timing -> 45187d1f3; autoDJLongSetSimulation.test.ts phrase invariant
+- [x] V2.9 evaluate repetition -> 45187d1f3; autoDJLongSetSimulation.test.ts maxStyleRun
+- [x] V2.10 evaluate failure handling -> 45187d1f3; autoDJLongSetSimulation.test.ts resilience test
 
 ## Section 63 - Human-listener evaluation (owner checks)
 
-- [ ] S63.1 would you believe a human DJ made this mix?
-- [ ] S63.2 are transitions musically timed?
-- [ ] S63.3 is the set coherent?
-- [ ] S63.4 does it become repetitive?
-- [ ] S63.5 does the energy arc feel intentional?
-- [ ] S63.6 are FX tasteful?
-- [ ] S63.7 does bass remain controlled?
-- [ ] S63.8 do vocals clash?
-- [ ] S63.9 are there moments of surprise?
-- [ ] S63.10 does the DJ appear to listen to the music?
+- [o] S63.1 would you believe a human DJ made this mix? -> owner check (listening session)
+- [o] S63.2 are transitions musically timed? -> owner check (listening session)
+- [o] S63.3 is the set coherent? -> owner check (listening session)
+- [o] S63.4 does it become repetitive? -> owner check (listening session)
+- [o] S63.5 does the energy arc feel intentional? -> owner check (listening session)
+- [o] S63.6 are FX tasteful? -> owner check (listening session)
+- [o] S63.7 does bass remain controlled? -> owner check (listening session)
+- [o] S63.8 do vocals clash? -> owner check (listening session)
+- [o] S63.9 are there moments of surprise? -> owner check (listening session)
+- [o] S63.10 does the DJ appear to listen to the music? -> owner check (listening session)
 
 ## Section 64 - World-class acceptance criteria (listener-reported; automated proxies built)
 
-- [ ] S64.1 transitions feel intentional
-- [ ] S64.2 tracks enter at appropriate musical moments
-- [ ] S64.3 phrase alignment feels natural
-- [ ] S64.4 bass changes sound like a real DJ
-- [ ] S64.5 energy rises and falls naturally
-- [ ] S64.6 vocals rarely collide
-- [ ] S64.7 FX appear purposeful
-- [ ] S64.8 transitions are varied
-- [ ] S64.9 the set has a narrative
-- [ ] S64.10 the DJ occasionally surprises
-- [ ] S64.11 the system knows when to wait
-- [ ] S64.12 the system recovers gracefully
-- [ ] S64.13 the set remains coherent over long durations
+- [o] S64.1 transitions feel intentional -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.2 tracks enter at appropriate musical moments -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.3 phrase alignment feels natural -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.4 bass changes sound like a real DJ -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.5 energy rises and falls naturally -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.6 vocals rarely collide -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.7 FX appear purposeful -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.8 transitions are varied -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.9 the set has a narrative -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.10 the DJ occasionally surprises -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.11 the system knows when to wait -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.12 the system recovers gracefully -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
+- [o] S64.13 the set remains coherent over long durations -> owner check (listening; automated proxy in autoDJLongSetSimulation.test.ts / autoDJGoldenTransitions.test.ts)
 
 ## Section 65 - Implementation order
 
@@ -727,20 +727,20 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [ ] PG-K.3 energy history
 - [ ] PG-K.4 repetition control
 - [ ] PG-K.5 style behaviour
-- [ ] PG-L.1 1-hour session without degradation
-- [ ] PG-L.2 2-hour session without degradation
-- [ ] PG-L.3 4-hour session without degradation
-- [ ] PG-M.1 survives preload failure without stopping playback
-- [ ] PG-M.2 survives analysis failure
-- [ ] PG-M.3 survives missing key
-- [ ] PG-M.4 survives missing beat grid
-- [ ] PG-M.5 survives malformed content
-- [ ] PG-M.6 survives deck failure
-- [ ] PG-M.7 survives effect failure
-- [ ] PG-N.1 automated evaluation passes
-- [ ] PG-N.2 golden transition corpus passes
-- [ ] PG-N.3 human listening tests (owner)
-- [ ] PG-N.4 long-set evaluation passes
+- [x] PG-L.1 1-hour session without degradation -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-L.2 2-hour session without degradation -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-L.3 4-hour session without degradation -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-M.1 survives preload failure without stopping playback -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-M.2 survives analysis failure -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-M.3 survives missing key -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-M.4 survives missing beat grid -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-M.5 survives malformed content -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-M.6 survives deck failure -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-M.7 survives effect failure -> 45187d1f3; autoDJLongSetSimulation.test.ts
+- [x] PG-N.1 automated evaluation passes -> 45187d1f3; autoDJGoldenTransitions.test.ts + autoDJLongSetSimulation.test.ts
+- [x] PG-N.2 golden transition corpus passes -> 45187d1f3; autoDJGoldenTransitions.test.ts
+- [o] PG-N.3 human listening tests (owner) -> owner check (listening)
+- [x] PG-N.4 long-set evaluation passes -> 45187d1f3; autoDJLongSetSimulation.test.ts
 
 ## Section 67 - Architectural constraints
 
@@ -789,7 +789,7 @@ IDs: gate letter + number for the plan's gate sections (A-V), `Sn.m` for non-gat
 - [ ] S70.22 run for hours
 - [ ] S70.23 explain its decisions
 - [ ] S70.24 pass automated transition tests
-- [ ] S70.25 pass human listening tests (owner)
+- [o] S70.25 pass human listening tests (owner) -> owner check (listening)
 
 ## Beat-juggling plan (thoughts/shared/plans/2026-10-08-auto-dj-beat-juggling-plan.md, commit 94c0a4b19) - JUG- items
 
@@ -992,6 +992,23 @@ Decision D11: the juggle layer performs through the same DjFxActions / crossfade
 - [ ] JUG-S56.17 creative never overrides safety
 - [ ] JUG-S56.18 low confidence is not permission to improvise
 - [ ] JUG-S56.19 no needless rebuild of analysis/deck infrastructure
+
+## Found during the run (new items, never shrink the plan)
+
+- [x] FIX-1 Mix Now did nothing when the queued track failed to load (owner live test 2026-10-08): skip() retried the same bad track and parked in 'preloading'; now skips to the next loadable track through the controller's order, never the playing one -> 45187d1f3; autoDJMixNowStartsTheTransition.test.ts (3 cases incl. the bad-track case)
+- [x] FIX-2 humanize hash was signed: a negative fxOffsetMs made beat-0 effects never fire -> 0f3d488c5; autoDJFiresTheDjFxActions.test.ts (brake case asserts offsets >= 0)
+- [x] FIX-3 executor emergency path could leave both decks silent when the incoming deck could not start -> 45187d1f3; autoDJLongSetSimulation.test.ts (deckFailure: outgoing kept playing)
+- [x] FIX-4 gain staging: the auto-gain trim could push a track's true peak above the ceiling -> 0f3d488c5; trimFor caps by headroom (golden corpus loudness invariant)
+- [ ] FOUND-1 DJStemPreloader module cycle: addTrack's dynamic import of the stem preloader throws "Cannot access MAX_DURATION_S before initialization" under the Auto DJ test import order (foreign module, not fixed here; the test injects its playlist with importPlaylists)
+
+## Owner checks (steps at http://localhost:5174, LOCAL dev server on the working tree)
+
+1. Open the DJ view, load a playlist of 10+ analysed tracks (Analyze first), press Auto DJ. PASS: the playlist order on screen does not change; the Auto DJ panel's "Debug" button shows Session Order, Why This Track with "+ ..." lines, and a planned Transition before the track ends.
+2. Let two transitions play. PASS: the incoming track does not start at 0:00 when it has an intro (Debug: Mix-In Point > 0:00); the bass of the incoming arrives after the outgoing bass leaves (one low end at a time); no loudness jump at the overlap.
+3. Press Mix Now mid-track. PASS: the mix starts within a second; if the next track fails to load, the one after it plays (status never stays "preloading").
+4. Press the deck's Echo pad on the playing deck. PASS: the echo tail keeps ringing after the dry signal fades (real echo), the pad lights, and dj_auto_dj_explain (or the Debug panel) lists the fire in fxFireLog with source "pad".
+5. Set Style to Festival / Creative Risk High and listen for a few transitions: filter builds and drop mixes appear; set Smooth / Low: long blends. PASS: the vocabulary changes with the style (Debug panel Transition type).
+6. Section 63 questions (listening): would you believe a human DJ made this mix; are transitions musically timed; is the set coherent; does it become repetitive; does the energy arc feel intentional; are FX tasteful; does bass remain controlled; do vocals clash; are there moments of surprise; does the DJ appear to listen. Report per question.
 
 ## Open owner questions
 
