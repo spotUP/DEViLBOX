@@ -16,7 +16,7 @@ import { DB303Synth, DB303Synth as JC303Synth } from './db303';
 // MAMESynth imported via MAMEBaseSynth
 import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
 import { InstrumentFactory } from './InstrumentFactory';
-import { keyboardPeriod } from './keyboardPeriod';
+import { keyboardPeriod, keyboardVelocity } from './keyboardPeriod';
 import { periodToNoteIndex, getPeriodExtended, _registerToneEngineRef } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { shimAudioListenerParams } from './tone/firefoxAudioListenerShim';
@@ -3076,6 +3076,7 @@ export class ToneEngine {
     channelIndex?: number,
     hammer?: boolean
   ): void {
+    velocity = keyboardVelocity(config.metadata?.modPlayback, velocity, this.amigaPeriodSong, period);
     period = keyboardPeriod(config.metadata?.modPlayback, note, this.amigaPeriodSong, period);
     if (ToneEngine.NOTE_DEBUG) {
       console.log(`[NOTE] ▶ attack id=${instrumentId} ${config.synthType} ${note} ch=${channelIndex ?? '-'} vel=${velocity.toFixed(2)}`);
@@ -3924,6 +3925,7 @@ export class ToneEngine {
     nnaAction: number = 0,  // IT New Note Action: 0=Cut, 1=Cont, 2=Off, 3=Fade
     hammer?: boolean        // TT-303 hammer: legato without pitch glide
   ): void {
+    velocity = keyboardVelocity(config.metadata?.modPlayback, velocity, this.amigaPeriodSong, period);
     period = keyboardPeriod(config.metadata?.modPlayback, note, this.amigaPeriodSong, period);
     const safeTime = this.getSafeTime(time);
     if (safeTime === null) {

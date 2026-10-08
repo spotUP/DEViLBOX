@@ -36,3 +36,21 @@ export function keyboardPeriod(
   if (!modPlayback?.usePeriodPlayback || !amigaMode) return undefined;
   return noteToPeriod(gridNoteOfName(note)) || undefined;
 }
+
+/**
+ * The velocity of a key on an Amiga-period Sampler: the sample's default volume. The song plays a note of the
+ * instrument at that channel volume (the module's sample volume, or the volume the player started the
+ * sample at), a key carries only a velocity of 1, so a key was as loud as the loudest possible note and
+ * louder than the song's own (uadeSamplerKeys.test.ts: +8.8 dB on a volume-38 sample). `given` is the
+ * period the replayer passed: its cell carries its own volume, so only a key (no period given) is scaled.
+ */
+export function keyboardVelocity(
+  modPlayback: { usePeriodPlayback?: boolean; defaultVolume?: number } | undefined,
+  velocity: number,
+  amigaMode: boolean,
+  given?: number,
+): number {
+  if (given || !amigaMode || !modPlayback?.usePeriodPlayback) return velocity;
+  const v = modPlayback.defaultVolume;
+  return v !== undefined && v >= 0 && v < 64 ? velocity * (v / 64) : velocity;
+}

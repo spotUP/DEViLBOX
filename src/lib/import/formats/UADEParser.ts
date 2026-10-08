@@ -14,8 +14,9 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, UADEConfig } from '@/types/instrument';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
-import type { UADEEngine, UADEEnhancedScanRow, UADEMetadata } from '@/engine/uade/UADEEngine';
-import { enhancedSamplesAreUnusable, nativeGridHasNotes } from '@lib/import/uadeScanQuality';
+import type { UADEEngine, UADEEnhancedScanRow, UADEMetadata, UADEPaulaSample } from '@/engine/uade/UADEEngine';
+import { enhancedSamplesAreUnusable, isDegenerateSample, nativeGridHasNotes } from '@lib/import/uadeScanQuality';
+import { uadeKeyVolume } from '@lib/import/uadeKeyLevel';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // Amiga C-3 reference sample rate (PAL: 3546895 / 428 ≈ 8287 Hz; industry standard 8363 Hz)
@@ -1171,7 +1172,7 @@ export async function parseUADEFile(
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
-    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex, await scanClassicPaulaSamples(engine));
     // Ensure uadeEditableFileData is set so the UADEEditable engine starts and plays.
     // Without this, no engine calls play() and the song is silent.
     classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
@@ -1232,7 +1233,7 @@ export async function parseUADEFile(
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
-    const classicSong = buildClassicSong(songName, prefix, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    const classicSong = buildClassicSong(songName, prefix, filename, buffer, metadata, activeScanRows, periodToNoteIndex, await scanClassicPaulaSamples(engine));
     classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
     classicSong.uadeEditableFileName ??= filename;
     if (companionFiles && companionFiles.size > 0) {
@@ -1251,7 +1252,7 @@ export async function parseUADEFile(
   ]);
   if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {
     console.warn(`[UADEParser] ${ext.toUpperCase()} uses synthesis waveforms; running per-channel isolated renders`);
-    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex, await scanClassicPaulaSamples(engine));
 
     // Render each Paula channel in isolation so users get real waveforms for the
     // Sampler editor, even though these formats synthesize everything via 68k code.
@@ -1318,7 +1319,7 @@ export async function parseUADEFile(
   if (mode === 'enhanced' && activeEnhancedScan
       && enhancedSamplesAreUnusable(activeEnhancedScan.samples as Record<number, { pcm?: Uint8Array | ArrayBuffer | null }>)) {
     console.log(`[UADEParser] enhanced scan recovered no usable samples for ${filename}; forcing classic UADESynth streaming`);
-    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex, await scanClassicPaulaSamples(engine));
     classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
     classicSong.uadeEditableFileName ??= filename;
     if (companionFiles && companionFiles.size > 0) {
@@ -1390,7 +1391,7 @@ export async function parseUADEFile(
 
   // Classic mode: UADESynth playback with display-only patterns
   const classicResult = buildClassicSong(
-    songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex,
+    songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex, await scanClassicPaulaSamples(engine),
   );
   classicResult.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
   classicResult.uadeEditableFileName ??= filename;
@@ -1960,6 +1961,72 @@ function buildSampleLabel(instrIdx: number, typicalPeriod: number, loopLength: n
   return `Sample ${num}${noteName}${loopSuffix}`;
 }
 
+/** One DMA sample the enhanced scan captured, as UADEParser reads it. */
+type ScannedSample = NonNullable<UADEMetadata['enhancedScan']>['samples'][number];
+
+/**
+ * A Sampler instrument from a sample the scan captured at chip RAM address `ptr`. One place builds it for the
+ * enhanced grid and for the classic (compiled player) grid, so a key on the instrument plays the samples
+ * the player's DMA read, at the period of the key (the Sampler plays by period, whatever rate is stored).
+ * `volume` (0-64) is the instrument default: the keyboard plays it at the channel volume the song used.
+ */
+function scanSamplerInstrument(instrId: number, instrName: string, ptr: number, sample: ScannedSample, volume: number, upsample = true): InstrumentConfig {
+  // Calculate sample rate from typical playback period
+  // Amiga PAL: sampleRate = 3546895 / period  (NOT /2 — that's a common off-by-one)
+  // Period 428 → 8287 Hz (C-3), period 214 → 16574 Hz (C-4)
+  const rawRate = sample.typicalPeriod > 0
+    ? Math.round(3546895 / sample.typicalPeriod)
+    : 8287;
+
+  // Reconstruct Uint8Array from transferred data
+  let pcm = sample.pcm instanceof Uint8Array
+    ? sample.pcm
+    : new Uint8Array(sample.pcm);
+
+  // Upsample low-rate captures to the Amiga standard rate (8363 Hz).
+  // Formats like Maniacs of Noise play samples at low periods (high period values)
+  // giving capture rates as low as ~2750 Hz.  Storing at that rate means the
+  // ToneEngine must apply playbackRate << 1 for normal notes, which causes
+  // interpolation artefacts (beepy/clicky timbre).  Upsampling to 8363 Hz brings
+  // the playback ratio close to 1.0 for typical notes and produces cleaner audio.
+  // Also clamp to Web Audio API maximum (96000 Hz) for very high-pitch captures.
+  let sampleRate: number;
+  if (upsample && rawRate < AMIGA_STANDARD_RATE) {
+    pcm = linearUpsample(pcm, rawRate, AMIGA_STANDARD_RATE);
+    sampleRate = AMIGA_STANDARD_RATE;
+  } else {
+    // Without the upsampling the buffer keeps its bytes (period playback fixes the pitch whatever rate is
+    // stored), at a rate Web Audio accepts.
+    sampleRate = Math.min(96000, upsample ? rawRate : Math.max(AMIGA_STANDARD_RATE, rawRate));
+  }
+
+  // Clamp loopEnd to pcm.length — wlen from DMA can exceed extracted bytes if sample
+  // was truncated by MEM_READ_BUF_SIZE during capture.
+  // When PCM was upsampled, scale loop positions by the same ratio.
+  const upsampleRatio = upsample ? sampleRate / rawRate : 1;
+  const scaledLoopStart = upsample && rawRate < AMIGA_STANDARD_RATE
+    ? Math.round(sample.loopStart * upsampleRatio)
+    : sample.loopStart;
+  const rawLoopEnd = sample.loopLength > 0 ? sample.loopStart + sample.loopLength : 0;
+  const scaledLoopEnd = rawLoopEnd > 0
+    ? (upsample && rawRate < AMIGA_STANDARD_RATE ? Math.round(rawLoopEnd * upsampleRatio) : rawLoopEnd)
+    : 0;
+  const loopEnd = scaledLoopEnd > 0 ? Math.min(scaledLoopEnd, pcm.length) : 0;
+
+  const instr = createSamplerInstrument(
+    instrId,
+    instrName,
+    pcm,
+    volume,
+    sampleRate,
+    scaledLoopStart,
+    loopEnd,
+  );
+  // Attach chip RAM address so SampleEditor can call write-back after edits.
+  if (instr.sample) instr.sample.uadeSamplePtr = ptr;
+  return instr;
+}
+
 /**
  * Build fully editable TrackerSong from enhanced scan data.
  * Creates real Sampler instruments with extracted PCM audio.
@@ -1994,62 +2061,12 @@ function buildEnhancedSong(
     const instrId = nextInstrId++;
     sampleMap.set(ptr, instrId);
 
-    // Calculate sample rate from typical playback period
-    // Amiga PAL: sampleRate = 3546895 / period  (NOT /2 — that's a common off-by-one)
-    // Period 428 → 8287 Hz (C-3), period 214 → 16574 Hz (C-4)
-    const rawRate = sample.typicalPeriod > 0
-      ? Math.round(3546895 / sample.typicalPeriod)
-      : 8287;
-
-    // Reconstruct Uint8Array from transferred data
-    let pcm = sample.pcm instanceof Uint8Array
-      ? sample.pcm
-      : new Uint8Array(sample.pcm);
-
-    // Upsample low-rate captures to the Amiga standard rate (8363 Hz).
-    // Formats like Maniacs of Noise play samples at low periods (high period values)
-    // giving capture rates as low as ~2750 Hz.  Storing at that rate means the
-    // ToneEngine must apply playbackRate << 1 for normal notes, which causes
-    // interpolation artefacts (beepy/clicky timbre).  Upsampling to 8363 Hz brings
-    // the playback ratio close to 1.0 for typical notes and produces cleaner audio.
-    // Also clamp to Web Audio API maximum (96000 Hz) for very high-pitch captures.
-    let sampleRate: number;
-    if (rawRate < AMIGA_STANDARD_RATE) {
-      pcm = linearUpsample(pcm, rawRate, AMIGA_STANDARD_RATE);
-      sampleRate = AMIGA_STANDARD_RATE;
-    } else {
-      sampleRate = Math.min(96000, rawRate);
-    }
-
-    // Clamp loopEnd to pcm.length — wlen from DMA can exceed extracted bytes if sample
-    // was truncated by MEM_READ_BUF_SIZE during capture.
-    // When PCM was upsampled, scale loop positions by the same ratio.
-    const upsampleRatio = sampleRate / rawRate;
-    const scaledLoopStart = rawRate < AMIGA_STANDARD_RATE
-      ? Math.round(sample.loopStart * upsampleRatio)
-      : sample.loopStart;
-    const rawLoopEnd = sample.loopLength > 0 ? sample.loopStart + sample.loopLength : 0;
-    const scaledLoopEnd = rawLoopEnd > 0
-      ? (rawRate < AMIGA_STANDARD_RATE ? Math.round(rawLoopEnd * upsampleRatio) : rawLoopEnd)
-      : 0;
-    const loopEnd = scaledLoopEnd > 0 ? Math.min(scaledLoopEnd, pcm.length) : 0;
-
     // Use extracted name if available; otherwise build contextual label
     const extractedName = extractedNames?.[instrId - 1];
     const instrName = extractedName
       || buildSampleLabel(instrId, sample.typicalPeriod, sample.loopLength);
 
-    const instr = createSamplerInstrument(
-      instrId,
-      instrName,
-      pcm,
-      64, // Full volume
-      sampleRate,
-      scaledLoopStart,
-      loopEnd,
-    );
-    // Attach chip RAM address so SampleEditor can call write-back after edits.
-    if (instr.sample) instr.sample.uadeSamplePtr = ptr;
+    const instr = scanSamplerInstrument(instrId, instrName, ptr, sample, 64);
     instruments.push(instr);
   }
 
@@ -2279,6 +2296,8 @@ async function reconstructClassicPatterns(
       const ptr = (inst as any).sample?.uadeSamplePtr;
       if (ptr != null) samplePtrToInstrIndex.set(ptr, idx + 1);
     });
+    // The pointers the Paula scan tied to an instrument (an attack and the loop that follows it are one)
+    for (const [ptr, instrId] of classicPointerInstruments.get(song) ?? []) samplePtrToInstrIndex.set(ptr, instrId);
 
     // VBlank-timed formats: force speed 6
     const vblankPrefix = basename.split('.')[0]?.toLowerCase() ?? '';
@@ -2332,18 +2351,30 @@ function buildClassicSong(
   metadata: UADEMetadata,
   scanRows: Array<Array<{ period: number; volume: number; samplePtr: number }>>,
   periodToNoteIndex: (period: number, finetune?: number) => number,
+  paulaSamples: UADEPaulaSample[],
 ): TrackerSong {
-  // Build instrument map from unique sample pointers
-  const sampleMap = new Map<number, number>();
-  let nextInstrId = 2; // 1 = UADESynth playback engine
+  // Instruments from the samples the player's DMA plays. A grid pointer is the pointer the registers held at
+  // a tick, which is the loop's once the attack has been latched; the Paula scan ties an attack and the loop
+  // that follows it into one sample, so both pointers name one instrument.
+  const shapes = paulaSamples.filter((sh) => !isDegenerateSample(sh.pcm)).slice(0, MAX_CLASSIC_SAMPLES);
+  const shapeByPtr = new Map<number, number>();
+  shapes.forEach((sh, i) => { if (!shapeByPtr.has(sh.attackPtr)) shapeByPtr.set(sh.attackPtr, i); });
+  shapes.forEach((sh, i) => { if (sh.loopPtr !== null && !shapeByPtr.has(sh.loopPtr)) shapeByPtr.set(sh.loopPtr, i); });
 
+  const sampleMap = new Map<number, number>();   // grid pointer -> instrument id
+  const shapeInstrument = new Map<number, number>(); // shape index -> instrument id
+  let nextInstrId = 2; // 1 = UADESynth playback engine
   for (const row of scanRows) {
     for (const ch of row) {
-      if (ch.samplePtr > 0 && !sampleMap.has(ch.samplePtr)) {
-        sampleMap.set(ch.samplePtr, nextInstrId++);
-      }
+      if (ch.samplePtr <= 0 || sampleMap.has(ch.samplePtr)) continue;
+      const shape = shapeByPtr.get((ch.samplePtr & ~1) >>> 0); // the hardware ignores bit 0
+      if (shape === undefined) { sampleMap.set(ch.samplePtr, nextInstrId++); continue; }
+      if (!shapeInstrument.has(shape)) shapeInstrument.set(shape, nextInstrId++);
+      sampleMap.set(ch.samplePtr, shapeInstrument.get(shape)!);
     }
   }
+  // Samples the song plays that no grid pointer names (the scan's ticks missed them) are instruments too.
+  shapes.forEach((_, i) => { if (!shapeInstrument.has(i)) shapeInstrument.set(i, nextInstrId++); });
 
   // Create UADESynth instrument
   const uadeConfig: UADEConfig = {
@@ -2360,22 +2391,48 @@ function buildClassicSong(
     },
   };
 
-  const instruments: InstrumentConfig[] = [
-    {
-      id: 1,
-      name: name || 'UADE Song',
-      type: 'synth' as const,
-      synthType: 'UADESynth' as const,
-      effects: [],
-      volume: -6,
-      pan: 0,
-      uade: uadeConfig,
-    },
-  ];
+  const instrumentById = new Map<number, InstrumentConfig>();
+  instrumentById.set(1, {
+    id: 1,
+    name: name || 'UADE Song',
+    type: 'synth' as const,
+    synthType: 'UADESynth' as const,
+    effects: [],
+    volume: -6,
+    pan: 0,
+    uade: uadeConfig,
+  });
 
-  // Create display instruments for each detected sample
-  for (const [, instrId] of sampleMap) {
-    instruments.push({
+  // The channel volume the song first played each sample at: the instrument's default, so a key sounds as the
+  // song's note does.
+  const volumeByPtr = new Map<number, number>();
+  for (const row of scanRows) {
+    for (const ch of row) if (ch.samplePtr > 0 && ch.volume > 0 && !volumeByPtr.has(ch.samplePtr)) volumeByPtr.set(ch.samplePtr, Math.min(64, ch.volume));
+  }
+
+  for (const [shape, instrId] of shapeInstrument) {
+    const sh = shapes[shape];
+    const instr = scanSamplerInstrument(instrId, '', sh.attackPtr, {
+      pcm: sh.pcm, length: sh.pcm.length, loopStart: sh.loopStart, loopLength: sh.loopLength, typicalPeriod: sh.period,
+    } as ScannedSample, uadeKeyVolume(sh.volume > 0 ? sh.volume : (volumeByPtr.get(sh.attackPtr) ?? 64)), false);
+    // An attack with its loop elsewhere is two chip RAM regions in one buffer: the sample editor's write-back
+    // (one region at one address) must not take it for one.
+    if (instr.sample && sh.loopPtr !== null && sh.pcm.length > sh.attackLen * 2) delete instr.sample.uadeSamplePtr;
+    instrumentById.set(instrId, instr);
+  }
+
+  // A pointer the Paula scan did not name: the enhanced scan's sample at that address when it carries a
+  // waveform, else a display slot.
+  for (const [ptr, instrId] of sampleMap) {
+    if (instrumentById.has(instrId)) continue;
+    const scanned = metadata.enhancedScan?.samples[ptr] as ScannedSample | undefined;
+    const bytes = scanned?.pcm ? (scanned.pcm instanceof Uint8Array ? scanned.pcm : new Uint8Array(scanned.pcm)) : null;
+    if (scanned && bytes && !isDegenerateSample(bytes)) {
+      const fromScan = scanSamplerInstrument(instrId, '', ptr, scanned, uadeKeyVolume(volumeByPtr.get(ptr) ?? 64), false);
+      instrumentById.set(instrId, fromScan);
+      continue;
+    }
+    instrumentById.set(instrId, {
       id: instrId,
       name: '',
       type: 'synth' as const,
@@ -2385,6 +2442,7 @@ function buildClassicSong(
       pan: 0,
     });
   }
+  const instruments: InstrumentConfig[] = [...instrumentById.entries()].sort((x, y) => x[0] - y[0]).map(([, v]) => v);
 
   // Build patterns from scan data (64 rows per pattern)
   const ROWS_PER_PATTERN = 64;
@@ -2470,7 +2528,7 @@ function buildClassicSong(
     songPositions.push(pat);
   }
 
-  return {
+  const song: TrackerSong = {
     name,
     format: 'UADE' as TrackerFormat,
     // Rebuilt from UADE's Paula scan, not decoded from the file: a guess.
@@ -2484,6 +2542,27 @@ function buildClassicSong(
     initialSpeed: 6,
     initialBPM: 125,
   };
+  classicPointerInstruments.set(song, sampleMap);
+  return song;
+}
+
+/** Most samples a compiled player's Paula scan turns into instruments. */
+const MAX_CLASSIC_SAMPLES = 64;
+
+/** Grid pointer -> instrument id of a classic song, for the tick reconstruction (the scan rows name instruments by pointer). */
+const classicPointerInstruments = new WeakMap<TrackerSong, Map<number, number>>();
+
+/**
+ * The samples a compiled player really plays (Paula register writes, see the worklet's _scanPaulaSamples).
+ * A worklet without the scan, or a failed one, gives none: the classic song then keeps its display slots.
+ */
+async function scanClassicPaulaSamples(engine: UADEEngine): Promise<UADEPaulaSample[]> {
+  try {
+    return typeof engine.scanPaulaSamples === 'function' ? await engine.scanPaulaSamples(30000) : [];
+  } catch (err) {
+    console.warn('[UADEParser] Paula sample scan failed (non-critical):', err);
+    return [];
+  }
 }
 
 /** Map common file extensions to human-readable format names */

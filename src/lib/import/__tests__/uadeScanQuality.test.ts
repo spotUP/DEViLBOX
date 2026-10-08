@@ -27,6 +27,12 @@ describe('isDegenerateSample', () => {
     expect(isDegenerateSample(WAVE)).toBe(false);
   });
 
+  it('accepts a full-swing square wave of -128 and 127 (bytes 0x80 and 0x7F, a signed swing of 255)', () => {
+    // Jason Page's PWM waveforms: read as unsigned the two bytes differ by 1 and the sample looked like DC
+    const square = Uint8Array.from({ length: 128 }, (_, i) => (i < 64 ? 0x80 : 0x7f));
+    expect(isDegenerateSample(square)).toBe(false);
+  });
+
   it('accepts a quiet waveform that still swings', () => {
     const quiet = Uint8Array.from({ length: 64 }, (_, i) => 0x80 + (i % 2 ? MIN_SAMPLE_SWING : 0));
     expect(isDegenerateSample(quiet)).toBe(false);

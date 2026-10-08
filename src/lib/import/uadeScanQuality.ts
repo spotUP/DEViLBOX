@@ -31,10 +31,10 @@ export const MIN_SAMPLE_BYTES = 8;
  */
 export function isDegenerateSample(pcm: Uint8Array | null | undefined): boolean {
   if (!pcm || pcm.length < MIN_SAMPLE_BYTES) return true;
-  let min = 255;
-  let max = 0;
+  let min = 127;
+  let max = -128;
   for (let i = 0; i < pcm.length; i++) {
-    const v = pcm[i];
+    const v = (pcm[i] << 24) >> 24; // the bytes are signed: a square wave of -128 and 127 is the full swing
     if (v < min) min = v;
     if (v > max) max = v;
   }
