@@ -129,6 +129,11 @@ export class PumaTrackerEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
+  /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */
+  swapModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer });
+  }
+
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PumaTrackerEngine not initialized');

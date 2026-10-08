@@ -153,7 +153,11 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
   benDaglish: 'pass',
   digitalSonixChrome: 'pass',
   jochenHippelST: 'pass',
+  // musicAssembler, pumaTracker, sidmon2: the same measurement (musicAssemblerLiveSwap, pumaTrackerLiveSwap, sidMon2LiveSwap .test.ts).
+  musicAssembler: 'pass',
+  pumaTracker: 'pass',
   robHubbard: 'pass',
+  sidmon2: 'pass',
   soundMaster: 'pass',
   suntronic: 'fail',
   tcbTracker: 'fail',
