@@ -71,6 +71,8 @@ when they say so.
   the FX8 rebuild change, or the Auto DJ's DJ3 work), restore the feed or move
   the guard to where the feed now lives - never delete the ratchet.
 
+- **CI1 landed (d8c173d0d)**: `scripts/git-hooks/pre-push` now tests the PUSHED commit - `git archive` of each pushed sha into a temp dir, node_modules symlinked, same type-check / test:ci / test:compliance, dir removed on exit/INT/TERM; test `prePushGateTestsTheCommit` (3 of 4 fail on the old hook). keyboardRealKeys race fixed (awaited noteOn/keyNote handler promises; StarTrekker AM second WASM instance, Steve Turner preview chain). NOT YET PROVEN: one full run of the new hook never finished under load (3 h) - watch the first real push: a snapshot holds only tracked files, so a test needing a gitignored file would fail or hang there; also time it (old gate ~125 s idle; archive of the 2.2 GB tree adds to it).
+
 ## Critical references
 
 - Ledger: `thoughts/shared/plans/2026-10-06-fix-all-open.md`
