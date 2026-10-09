@@ -134,7 +134,15 @@ when they say so.
 
 ## Next steps (ordered)
 
-1. Check the push result; fix the playheadFeedIsNotPerFormat ratchet first (see Update); retry until it lands; verify live buildHash.
+1. The 23:35 push FAILED (319 commits still local): 2 of 8077 tests -
+   `masterPresetClaims.test.ts` "Genre, DJ presets do what their descriptions
+   say > every claim measures" (possibly the make-up/chain changes in b4c2f469f
+   or a retune interacting) and `jochenHippelSTSong.test.ts` "hippel-st/crown
+   arabia.hst import route" (check against the Hippel ST commits af04ca752 /
+   a627f3cca and the Furnace ay8910 change in 91fbf6332). Run each alone first
+   to separate real failures from load; also fix the playheadFeedIsNotPerFormat
+   ratchet (see Update). Then push with the new CI1 gate (tests the pushed
+   commit, so agents' WIP no longer matters); verify live buildHash.
 2. **FX9 (priority)**: flicking Master FX channel buttons kills all audio -
    ShimmerReverb WASM `Aborted(OOM)`: each click re-creates the WASM effect,
    old instances not freed. Fix: move nodes instead of re-creating; free WASM
