@@ -198,7 +198,26 @@ beforeAll(() => { restoreFetch = installDwNodeFetch(); });
 afterAll(() => restoreFetch());
 
 describe.each(FORMATS)('$name: the keyboard, through the real import and key path', (f) => {
+  // The sound of a key is made by two asynchronous steps the old test covered with a guessed 30 ms sleep that a
+  // loaded machine overruns (the first note-on of the StarTrekker AM worklet instantiates a second WASM instance;
+  // the Steve Turner synth loads its preview module in an unawaited promise chain): so the test waits for each
+  // step. (1) The synth's note message reaching the engine, (2) the worklet having handled every message sent.
+  let sent: unknown[] = [];
+  let pending: Promise<void>[] = [];
+  const settled = async () => { while (pending.length) { const p = pending; pending = []; await Promise.all(p); } };
+  const isNoteMessage = (m: unknown) => ['noteOn', 'keyNote'].includes((m as { type?: string }).type ?? '');
+  const keyDown = async (synth: Keyed, key: string): Promise<void> => {
+    const from = sent.length;
+    synth.triggerAttack(key, 0, 1);
+    const deadline = Date.now() + 15000;
+    while (!sent.slice(from).some(isNoteMessage)) {
+      if (Date.now() > deadline) throw new Error(`${f.name}: key ${key} never reached the engine as a note message`);
+      await new Promise((r) => setTimeout(r, 1));
+    }
+    await settled();
+  };
   async function setup(hold = false): Promise<{ synth: Keyed; proc: WorkletProc; inst: Inst }> {
+    pending = []; sent = [];
     const song = await parseModuleToSong(new File([corpus(f.song)], f.song.split('/').pop()!), 0, undefined, undefined,
       f.companion ? new Map([[f.companion.split('/').pop()!, corpus(f.companion)]]) : undefined);
     const inst = (hold && f.holdPick ? f.holdPick : f.pick)(song.instruments as unknown as Inst[]);
@@ -206,7 +225,7 @@ describe.each(FORMATS)('$name: the keyboard, through the real import and key pat
     // the engine's loaded-song state the synth reads (applySong does this on a real load)
     useFormatStore.setState({ ...(Object.fromEntries(Object.entries(song).filter(([k]) => /FileData$|NtData$|SmplData$/.test(k))) as object) } as never);
     const w = await startWorklet(f.worklet[0], f.worklet[1], emscriptenTransform);
-    const synth = await f.make(inst!, (m) => { void w.send(m); });
+    const synth = await f.make(inst!, (m) => { sent.push(m); pending.push(w.send(m)); });
     return { synth, proc: w.proc, inst: inst! };
   }
   const versionsOff = async <T,>(fn: () => Promise<T> | T): Promise<T> => {
@@ -219,13 +238,13 @@ describe.each(FORMATS)('$name: the keyboard, through the real import and key pat
     const { synth, proc } = await setup();
     const hz: number[] = [];
     for (const key of ['C2', 'D2', 'C3']) {
-      await versionsOff(async () => { synth.triggerAttack(key, 0, 1); await new Promise((r) => setTimeout(r, 30)); });
+      await versionsOff(() => keyDown(synth, key));
       const out = renderTicks(proc, 8, 0);
       const level = rmsPerTick(out, 8);
       expect(Math.max(...level), `${f.name} key ${key} sounds`).toBeGreaterThan(0.005);
       hz.push(fundamentalHz(out.subarray(2 * FPT, 8 * FPT), 30, 4000));
       synth.triggerRelease();
-      await new Promise((r) => setTimeout(r, 30));
+      await settled();
       renderTicks(proc, 4, 0);
     }
     expect(hz.every((h) => h > 0), `pitches ${hz.join(', ')}`).toBe(true);
@@ -236,12 +255,12 @@ describe.each(FORMATS)('$name: the keyboard, through the real import and key pat
 
   it.runIf(f.sustains !== false)('a key held for 2.4 s keeps sounding (the instrument sustains while the key is down) and key-up lets the release end it', async () => {
     const { synth, proc } = await setup(true);
-    await versionsOff(async () => { synth.triggerAttack('C2', 0, 1); await new Promise((r) => setTimeout(r, 30)); });
+    await versionsOff(() => keyDown(synth, 'C2'));
     const held = rmsPerTick(renderTicks(proc, 120, 0), 120);
     const peak = Math.max(...held);
     expect(Math.max(...held.slice(60, 120)), `${f.name}: still sounding between 1.2 s and 2.4 s of a held key (peak ${peak.toFixed(3)})`).toBeGreaterThan(Math.max(0.001, peak * 0.05));
     synth.triggerRelease();
-    await new Promise((r) => setTimeout(r, 30));
+    await settled();
     const after = rmsPerTick(renderTicks(proc, 250, 0), 250);
     expect(after[249], `${f.name}: quiet 5 s after key-up (peak ${peak.toFixed(3)})`).toBeLessThan(peak * 0.1);
   });

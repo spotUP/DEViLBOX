@@ -16,6 +16,12 @@
 #   - `npm run test:ci`         (vitest)           ~65 s
 #   - `npm run test:compliance` (tracker fx)       ~2 s
 #
+# SNAPSHOT: the gate tests the commit being pushed, never the working tree.
+# Each pushed sha is extracted (git archive) into a temporary directory that
+# reuses this checkout's node_modules and is removed on every exit path, so
+# other agents' unfinished edits cannot fail the push and a green gate really
+# describes the pushed commit. The extraction adds its own time to the gate.
+#
 # DOCUMENTATION-ONLY FAST PATH: a push whose every changed file is `*.md`,
 # `thoughts/**` or `docs/**` skips all three. Markdown cannot break tsc or
 # vitest, and publishing a handoff should not cost two minutes. Note that
@@ -58,6 +64,11 @@ run_step() {
   fi
 }
 
+# The pre-push protocol arrives on stdin; read it once so both the docs-only
+# check and the commit-to-test selection can use it.
+PUSH_REFS=""
+[ -t 0 ] || PUSH_REFS="$(cat)"
+
 is_docs_path() {
   case "$1" in
     *.md|thoughts/*|docs/*) return 0 ;;
@@ -73,7 +84,7 @@ docs_only_push() {
   local _lref local_sha _rref remote_sha files f
 
   # Interactive invocation (no ref list piped in) — cannot scope, so gate.
-  [ -t 0 ] && return 1
+  [ -n "$PUSH_REFS" ] || return 1
 
   while read -r _lref local_sha _rref remote_sha; do
     [ -n "${local_sha:-}" ] || continue
@@ -87,7 +98,7 @@ docs_only_push() {
       saw_any=1
       is_docs_path "$f" || return 1
     done <<< "$files"
-  done
+  done <<< "$PUSH_REFS"
 
   [ "$saw_any" = 1 ]
 }
@@ -98,8 +109,54 @@ if docs_only_push; then
   exit 0
 fi
 
-run_step "type-check"      npm run --silent type-check
-run_step "test:ci"         npm run --silent test:ci
-run_step "test:compliance" npm run --silent test:compliance
+# The gate tests the commit being pushed, never the working tree: several
+# agents edit the tree all day, and their unfinished edits must not fail (or
+# falsely pass) the push. Each pushed commit is materialised into a temporary
+# directory (git archive: no lasting worktree, no index or ref changes) that
+# reuses this checkout's node_modules, and removed again on every exit path.
+SNAP=""
+cleanup_snapshot() { [ -n "$SNAP" ] && rm -rf "$SNAP"; SNAP=""; }
+trap cleanup_snapshot EXIT
+# On a signal the running step (npm/tsc/vitest) is stopped first, or it would keep running in a directory
+# that is being deleted.
+stop_children() { pkill -TERM -P $$ 2>/dev/null || true; }
+trap 'stop_children; cleanup_snapshot; exit 130' INT
+trap 'stop_children; cleanup_snapshot; exit 143' TERM
+
+in_snapshot() { ( cd "$SNAP" && "$@" ); }
+
+materialise() {
+  local sha=$1 top nm
+  top="$(pwd)"
+  SNAP="$(mktemp -d "${TMPDIR:-/tmp}/devilbox-prepush.XXXXXX")"
+  echo "${YLW}[pre-push] testing commit ${sha:0:9} (snapshot, not the working tree)…${RST}" >&2
+  git archive "$sha" | tar -x -C "$SNAP"
+  for nm in node_modules server/node_modules; do
+    if [ -d "$top/$nm" ] && [ -d "$SNAP/$(dirname "$nm")" ]; then
+      ln -s "$top/$nm" "$SNAP/$nm"
+    fi
+  done
+}
+
+# Commits to test: every distinct non-delete local sha of the push; HEAD when
+# invoked by hand with no ref list.
+SHAS=""
+if [ -n "$PUSH_REFS" ]; then
+  while read -r _l lsha _r _rs; do
+    [ -n "${lsha:-}" ] || continue
+    [ "$lsha" = "0000000000000000000000000000000000000000" ] && continue
+    case " $SHAS " in *" $lsha "*) ;; *) SHAS="$SHAS $lsha" ;; esac
+  done <<< "$PUSH_REFS"
+else
+  SHAS="$(git rev-parse HEAD)"
+fi
+
+for sha in $SHAS; do
+  materialise "$sha"
+  run_step "type-check"      in_snapshot npm run --silent type-check
+  run_step "test:ci"         in_snapshot npm run --silent test:ci
+  run_step "test:compliance" in_snapshot npm run --silent test:compliance
+  cleanup_snapshot
+done
 
 echo "${GRN}[pre-push] all checks passed${RST}" >&2
