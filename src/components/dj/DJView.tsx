@@ -18,6 +18,7 @@ import { useTransportStore } from '@/stores';
 import { useUIStore } from '@/stores/useUIStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
+import { handOverToDJ } from '@/lib/playback/oneProgrammeAtATime';
 import { DJDeck } from './DJDeck';
 import { DJMixer } from './DJMixer';
 import { DJCratePanel } from './DJCratePanel';
@@ -132,23 +133,15 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
 
   // Initialize DJEngine on mount, silence tracker + dispose on unmount
   useEffect(() => {
-    // Stop tracker playback and release all notes before DJ mode starts
-    const { isPlaying, stop } = useTransportStore.getState();
-    if (isPlaying) stop();
-    const toneEngine = getToneEngine();
-    toneEngine.releaseAll();
+    // Entering the DJ view never stops the tracker (owner decision 2026-10-10:
+    // one programme at a time, and a view switch alone changes nothing). The
+    // tracker's global pitch/rate would leak into DJ audio (wrong speed), so it
+    // is reset here when the tracker is silent; when it is playing, the reset
+    // happens when a deck starts and takes the output (handOverToDJ).
+    if (!useTransportStore.getState().isPlaying) void handOverToDJ();
 
     // Ensure AudioContext is running (browser may have suspended it)
     void Tone.start().catch(() => { /* needs user gesture — togglePlay will retry */ });
-
-    // Reset global audio state on ENTRY too, not just on exit. If the user
-    // left tracker view with a pitch/BPM offset (or reloaded the page with
-    // persisted state), that global playback rate leaks into DJ audio and
-    // makes tracks play at the wrong speed — intermittently, matching the
-    // "happens occasionally" symptom. Matches the unmount reset below.
-    toneEngine.setGlobalPlaybackRate(1.0);
-    toneEngine.setGlobalDetune(0);
-    useTransportStore.getState().setGlobalPitch(0);
 
     engineRef.current = getDJEngine();
     setDJModeActive(true);
