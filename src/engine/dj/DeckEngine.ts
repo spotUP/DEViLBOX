@@ -577,14 +577,15 @@ export class DeckEngine {
    *
    * Mechanism:
    *   1. Force channelGain to 0 (output silent — user hears nothing).
-   *   2. Resume the audio player at position 0 — audio flows through
+   *   2. Resume the audio player where it stands — audio flows through
    *      `keyLock → deckGain → filter → captureNode`. The captureNode
    *      is wired INLINE (wireIntoChain) and writes every incoming
    *      frame to the ring buffer regardless of whether downstream is
    *      audible.
    *   3. After ~150 ms (ring buffer is 2048 frames ≈ 46 ms at 44.1 kHz,
    *      so 150 ms is 3× safety margin), pause the player and seek it
-   *      back to 0 so the next user-triggered play starts cleanly.
+   *      back to where it stood - or to the target of a real seek that
+   *      landed meanwhile - so the next play starts where it was asked to.
    *   4. Restore channelGain.
    *
    * Guarded against: ongoing playback (priming would disrupt it), prior
@@ -649,8 +650,17 @@ export class DeckEngine {
       gainParam.cancelScheduledValues(now);
       gainParam.setValueAtTime(0, now);
 
+      // Prime from where the transport is and put it back there afterwards -
+      // unless a real seek lands while priming holds the player (Auto DJ's
+      // executor seeks the freshly loaded incoming deck to the planned entry
+      // point right after the load): then that seek is where the player stays.
+      // Priming used to seek to 0 on exit unconditionally, so the incoming
+      // deck started at 0.0 instead of its planned entry, off the grid.
+      const resumeAt = this.audioPlayer.getPosition();
+      let ownSeekCount = this.audioPlayer.seekCount;
       try {
-        this.audioPlayer.seek(0);
+        this.audioPlayer.seek(resumeAt);
+        ownSeekCount = this.audioPlayer.seekCount;
         this.audioPlayer.resume();
         // Give the capture worklet time to fill the ring buffer. Ring is
         // 2048 frames ≈ 46 ms @ 44.1 kHz; 150 ms is 3× safety margin to
@@ -663,8 +673,10 @@ export class DeckEngine {
         }
       } finally {
         // Always pause + seek-back + restore gain, even if resume() threw.
+        const soughtMeanwhile = this.audioPlayer.seekCount !== ownSeekCount;
+        const restoreTo = soughtMeanwhile ? this.audioPlayer.lastSeekTarget : resumeAt;
         try { this.audioPlayer.pause(); } catch { /* ok */ }
-        this.audioPlayer.seek(0);
+        this.audioPlayer.seek(restoreTo);
         const restoreAt = (Tone.getContext().rawContext as AudioContext).currentTime;
         gainParam.cancelScheduledValues(restoreAt);
         gainParam.setValueAtTime(prevValue, restoreAt);

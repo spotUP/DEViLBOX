@@ -67,6 +67,18 @@ export function isRenderingFileName(fileName: string): boolean {
   return renderingFileNames.has(fileName);
 }
 
+/** Mark a playlist track bad in the active playlist after a failed pre-render. */
+async function markPreRenderFailed(track: PlaylistTrack, reason: string): Promise<void> {
+  const { useDJPlaylistStore } = await import('@/stores/useDJPlaylistStore');
+  const playlistId = useDJPlaylistStore.getState().activePlaylistId;
+  if (!playlistId) return;
+  const playlist = useDJPlaylistStore.getState().playlists.find(p => p.id === playlistId);
+  const index = playlist?.tracks.findIndex(t => t.id === track.id);
+  if (index !== undefined && index >= 0) {
+    useDJPlaylistStore.getState().markTrackBad(playlistId, index, reason);
+  }
+}
+
 /**
  * Pre-render a track in the background WITHOUT loading to a deck.
  * This isolates UADE crashes from the audio playback thread.
@@ -103,22 +115,18 @@ export async function preRenderTrack(track: PlaylistTrack): Promise<PreRenderedT
       }
     }
     
+    // A render that produced nothing (source not in the cache, download or
+    // decode failed) is a failed load like a thrown one: the track is marked
+    // bad so Auto DJ's planner leaves it out of the next order. Unmarked, the
+    // session order kept offering the same track and the skip loop fell
+    // through onto the track that was playing.
+    if (!result) await markPreRenderFailed(track, 'pre-render produced no audio');
+
     return result;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`[DJTrackLoader] Pre-render failed for ${track.fileName}:`, reason);
-
-    // Mark track as bad in the playlist
-    const { useDJPlaylistStore } = await import('@/stores/useDJPlaylistStore');
-    const playlistId = useDJPlaylistStore.getState().activePlaylistId;
-    if (playlistId) {
-      const playlist = useDJPlaylistStore.getState().playlists.find(p => p.id === playlistId);
-      const index = playlist?.tracks.findIndex(t => t.id === track.id);
-      if (index !== undefined && index >= 0) {
-        useDJPlaylistStore.getState().markTrackBad(playlistId, index, reason);
-      }
-    }
-
+    await markPreRenderFailed(track, reason);
     return null;
   } finally {
     markRenderingEnd(track.fileName);
