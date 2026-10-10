@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { appendFileSync } from 'node:fs';
 import { FX_PRESETS } from '../fxPresets';
 import { PRESET_CLAIMS, LIVE_CLAIMS, LIVE_UNVERIFIED, liveOnlyReason, type Claim, type ClaimGroup } from '../masterPresetClaims';
-import { PresetRig, type Fx } from '@/test/audio/masterChainRig';
+import { PresetRig, renderChain, sine, type Fx } from '@/test/audio/masterChainRig';
 
 async function measure(rig: PresetRig, c: Claim): Promise<number> {
   const m = c.m;
@@ -77,6 +77,21 @@ for (const group of (Object.keys(PRESET_CLAIMS) as ClaimGroup[]).filter((g) => !
     }, 1_800_000);
   });
 }
+
+describe('a measurement is a property of the chain, not of the tests before it', () => {
+  // Tone.Reverb builds its impulse from Math.random. Unseeded, Shoegaze's
+  // saturation claim read -32 to -42 dB depending on what ran first, and failed
+  // the push gate only inside the full suite.
+  it('a reverb renders the same samples whatever drew Math.random before it', async () => {
+    const reverb = FX_PRESETS.find((x) => x.name === 'Shoegaze')!.effects.filter((e) => e.type === 'Reverb') as Fx[];
+    const once = async () => (await renderChain(reverb, sine(1000, -12, 2)))[0];
+    const a = await once();
+    for (let i = 0; i < 1000; i++) Math.random();
+    const b = await once();
+    let diff = 0; for (let i = 0; i < a.length; i++) diff = Math.max(diff, Math.abs(a[i] - b[i]));
+    expect(diff).toBe(0);
+  }, 120_000);
+});
 
 describe('every master FX preset has claims, or a stated reason it has none offline', () => {
   const claimed = new Set(Object.values(PRESET_CLAIMS).flatMap((g) => Object.keys(g)));
