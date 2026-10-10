@@ -43,6 +43,10 @@ import './utils/synthTester'
 import { installIOSAudioUnlock } from './utils/ios-audio-unlock'
 installIOSAudioUnlock();
 
+// One programme at a time: tracker playback and DJ decks never play together.
+import { installOneProgrammeAtATime } from './lib/playback/oneProgrammeAtATime'
+installOneProgrammeAtATime();
+
 // MCP Bridge: Connect to MCP server for programmatic tracker control
 // Always initialized so the AI panel's MCP tools work in any browser
 import('./bridge/MCPBridge').then(({ initMCPBridge }) => initMCPBridge());
