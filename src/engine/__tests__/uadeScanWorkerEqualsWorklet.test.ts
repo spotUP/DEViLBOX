@@ -4,35 +4,40 @@
  * with its own WASM instance (uadeWorkletHost.ts), so this proves the host does
  * not change what a scan produces - the sample, the grid, the instruments, the
  * tempo, the metadata - over a sample of the UADE corpus, one song per format
- * (test-data/uade-corpus-sweep.json), plus a DeliTracker custom with its tick ring.
+ * (SAMPLE_SONGS), plus a DeliTracker custom with its tick ring.
  * Runs the real worklet and WASM twice per song.
  */
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { startWorklet, songBuffer, ROOT, type WorkletMsg } from '@/engine/__tests__/workletHarness';
 import { uadeTransform } from '@/engine/uade/uadeGlue';
 import { createUadeWorkletHost } from '@/engine/uade/uadeWorkletHost';
 import { getScanParams } from '@/engine/uade/uadeScanLists';
 import { uadePlayerHint } from '@/lib/import/uadePlayerHint';
 
-type Sweep = Record<string, { verdict: string; format: string; companions?: unknown[] }>;
-const sweep = JSON.parse(readFileSync(join(ROOT, 'test-data/uade-corpus-sweep.json'), 'utf8')) as Sweep;
-
-/** One scannable, companion-free, playing song per format, evenly thinned to SAMPLE. */
-const SAMPLE = 14;
-function corpusSample(): string[] {
-  const byFormat = new Map<string, string>();
-  for (const [name, v] of Object.entries(sweep)) {
-    if (v.verdict !== 'PLAYS' || (v.companions?.length ?? 0) > 0 || byFormat.has(v.format)) continue;
-    if (getScanParams(name).skipScan) continue;
-    if (!existsSync(resolve(ROOT, 'public/data/songs/formats', name))) continue;
-    byFormat.set(v.format, `public/data/songs/formats/${name}`);
-  }
-  const all = [...byFormat.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, p]) => p);
-  const step = all.length / SAMPLE;
-  return Array.from({ length: Math.min(SAMPLE, all.length) }, (_, i) => all[Math.floor(i * step)]);
-}
+/**
+ * One scannable, companion-free, playing song per format, evenly thinned to 14:
+ * drawn once from the sound-check sweep (test-data/uade-corpus-sweep.json, a
+ * local, gitignored record) and frozen here, so the test runs from a clean
+ * checkout and does not move when the sweep is re-run.
+ */
+const SAMPLE_SONGS = [
+  'public/data/songs/formats/gettysburg.avp',
+  'public/data/songs/formats/terramex.bds',
+  'public/data/songs/formats/apb.dw',
+  'public/data/songs/formats/doxtro3.dss',
+  'public/data/songs/formats/hybris.fp',
+  'public/data/songs/formats/redoctober-sub-docking.ims',
+  'public/data/songs/formats/ikari_warriors.jb',
+  'public/data/songs/formats/cockwise.mug',
+  'public/data/songs/formats/45.okta',
+  'public/data/songs/formats/centurion_battle.rh',
+  'public/data/songs/formats/count_duckula.scr',
+  'public/data/songs/formats/operation_stealth.sfx',
+  'public/data/songs/formats/offroad.jpo',
+  'public/data/songs/formats/dynablaster.ast',
+];
 const CUSTOM = 'public/data/songs/delitracker-custom/bards tale.cus';
 
 /** The scan's result without the wall clock, which differs by design. */
@@ -64,7 +69,7 @@ async function bothScans(path: string, tickSnapshots: boolean) {
 }
 
 describe('UADE scan: worker result equals the worklet result', { timeout: 600_000 }, () => {
-  const sample = corpusSample();
+  const sample = SAMPLE_SONGS;
 
   it('samples a spread of formats', () => {
     expect(sample.length).toBeGreaterThanOrEqual(8);

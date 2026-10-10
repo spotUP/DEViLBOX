@@ -70,7 +70,7 @@ describe('every branch behind openSong is reached through it', { timeout: 120000
   it.each([
     ['MIDI', 'public/data/songs/midi/drum_song.mid', 'project', 'loadSongFile', 'classic'],
     ['SunVox', 'public/data/songs/sunvox/last blow.sunvox', 'sunvox', 'loadSongFile', 'classic'],
-    ['V2M', 'test-data/test.v2m', 'v2m', 'loadV2MFile', 'classic'],
+    ['V2M', 'src/__tests__/fixtures/open-song/test.v2m', 'v2m', 'loadV2MFile', 'classic'],
   ] as const)('%s opens through openSong and its branch applies the song once', async (_label, rel, kind, branch, editorMode) => {
     const r = await open(basename(rel), bytesOf(rel));
     expect(r).toMatchObject({ ok: true, kind, editorMode });
@@ -120,7 +120,7 @@ describe('every branch behind openSong is reached through it', { timeout: 120000
     vi.mocked(branches.loadSongFile).mockClear();
     vi.mocked(applySong).mockClear();
 
-    const rel = 'adplug-wasm/adplug-adplug-2.4/test/testmus/ADAGIO.DFM';
+    const rel = 'src/__tests__/fixtures/open-song/ADAGIO.DFM';
     const r = await open(basename(rel), bytesOf(rel));
 
     expect(r, JSON.stringify(r)).toMatchObject({ ok: true, kind: 'adplug' });
