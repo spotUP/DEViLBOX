@@ -12,6 +12,9 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { isSeekActive } from '@/components/dj/seekGuard';
 import type { DeckId } from '@/engine/dj/DeckEngine';
+import * as Tone from 'tone';
+import { heardDeckRow, trackerRowFrom } from './heardDeckRow';
+import { heardAnchorMs, type ClockAnchor, type OutputClockSource } from '@/engine/audioLatency';
 
 export function useDeckStateSync(deckId: DeckId): void {
   const animFrameRef = useRef<number>(0);
@@ -51,13 +54,21 @@ export function useDeckStateSync(deckId: DeckId): void {
             // the player has rendered to. Every DJ visual reads this field.
             const pos = deck.getHeardPosition();
             const dur = deck.audioPlayer.getDuration();
+            // The clock anchor: the heard position, when it reaches the ear and
+            // how fast it moves - per-frame visuals extrapolate it between polls.
+            const positionAnchor: ClockAnchor = {
+              positionSec: pos,
+              rate: isEngPlaying ? deck.audioPlayer.getPlaybackRate() : 0,
+              anchorMs: heardAnchorMs(Tone.getContext().rawContext as unknown as OutputClockSource),
+            };
             const update: Record<string, unknown> = {
               audioPosition: pos,
               elapsedMs: pos * 1000,
               durationMs: dur * 1000,
+              positionAnchor,
             };
             // Derive pattern position from audio time for pre-rendered modules
-            const tp = deck.getPositionAtTime(pos * 1000);
+            const tp = heardDeckRow(deck, positionAnchor, positionAnchor.anchorMs);
             if (tp) {
               update.songPos = tp.songPos;
               update.pattPos = tp.pattPos;
@@ -82,10 +93,8 @@ export function useDeckStateSync(deckId: DeckId): void {
             // The HEARD row from the replayer's display ring (scheduled rows run up to the lookahead
             // ahead of the ear); the replayer's own counters only when the ring has nothing yet.
             const heard = deck.getHeardTrackerState();
-            const deckUpdate: Record<string, unknown> = {
-              songPos: heard ? heard.songPos : replayer.getSongPos(),
-              pattPos: heard ? heard.pattPos : replayer.getPattPos(),
-            };
+            const row = trackerRowFrom(heard, replayer);
+            const deckUpdate: Record<string, unknown> = { songPos: row.songPos, pattPos: row.pattPos };
 
             if (deck.isPatternActive()) {
               // Push scratch velocity + fader gain to store so UI reacts
@@ -96,7 +105,14 @@ export function useDeckStateSync(deckId: DeckId): void {
               if (faderGain !== prevF) deckUpdate.scratchFaderGain = faderGain;
             } else {
               const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
-              deckUpdate.elapsedMs = heard?.elapsedMs ?? replayer.getElapsedMs();
+              const elapsedMs = heard?.elapsedMs ?? replayer.getElapsedMs();
+              deckUpdate.elapsedMs = elapsedMs;
+              // Song time advances at the tempo multiplier; anchored where it is heard.
+              deckUpdate.positionAnchor = {
+                positionSec: elapsedMs / 1000,
+                rate: replayer.getTempoMultiplier(),
+                anchorMs: heardAnchorMs(Tone.getContext().rawContext as unknown as OutputClockSource),
+              } satisfies ClockAnchor;
               deckUpdate.effectiveBPM = liveBPM;
               // Relay BPM changes to ScratchPlayback for LFO resync
               try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }

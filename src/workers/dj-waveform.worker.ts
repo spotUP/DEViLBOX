@@ -6,6 +6,7 @@
  */
 
 import type { WaveformMsg, SerializedCuePoint, WaveformOverviewState, DeckColors } from '../engine/renderer/worker-types';
+import { clockNowMs, positionAtFrame, type ClockAnchor } from '../engine/audioLatency';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,8 @@ let dpr = 1, width = 400, height = 120;
 
 let waveformPeaks: number[] | null = null;
 let durationMs    = 0;
+// The heard-position clocks; each frame draws them extrapolated to its time.
+let anchor: ClockAnchor = { positionSec: 0, rate: 0, anchorMs: 0 };
 let audioPosition = 0;
 let cuePoints: SerializedCuePoint[] = [];
 let dirty         = true;
@@ -30,6 +33,7 @@ let dirty         = true;
 // Other deck state (for overlay)
 let otherPeaks: number[] | null = null;
 let otherDurationMs    = 0;
+let otherAnchor: ClockAnchor = { positionSec: 0, rate: 0, anchorMs: 0 };
 let otherAudioPosition = 0;
 
 // Overview state
@@ -80,7 +84,7 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
       dpr           = msg.dpr; width = msg.width; height = msg.height;
       waveformPeaks = msg.waveformPeaks;
       durationMs    = msg.durationMs;
-      audioPosition = msg.audioPosition;
+      anchor        = msg.anchor;
       cuePoints     = msg.cuePoints;
       applyOverview(msg.overview);
       startRAF();
@@ -92,7 +96,7 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
       dirty = true;
       break;
     case 'position':
-      audioPosition = msg.audioPosition;
+      anchor = msg.anchor;
       dirty = true;
       break;
     case 'cuePoints':
@@ -106,7 +110,7 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
     case 'otherDeck':
       if (msg.peaks !== null) otherPeaks = msg.peaks;
       otherDurationMs    = msg.durationMs;
-      otherAudioPosition = msg.audioPosition;
+      otherAnchor        = msg.anchor;
       dirty = true;
       break;
     case 'resize':
@@ -128,7 +132,14 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
 
 function startRAF(): void {
   const tick = () => {
-    if (dirty) renderFrame();
+    // A moving clock changes the picture every frame; a paused one only on a message.
+    if (anchor.rate !== 0 || otherAnchor.rate !== 0) dirty = true;
+    if (dirty) {
+      const now = clockNowMs();
+      audioPosition      = positionAtFrame(anchor, now, durationMs > 0 ? durationMs / 1000 : Infinity);
+      otherAudioPosition = positionAtFrame(otherAnchor, now, otherDurationMs > 0 ? otherDurationMs / 1000 : Infinity);
+      renderFrame();
+    }
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

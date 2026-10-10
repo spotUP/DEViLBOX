@@ -40,7 +40,7 @@ function snapshotDeck(d: ReturnType<typeof useDJStore.getState>['decks']['A']): 
     loopActive:       d.loopActive,
     patternLoopStart: d.patternLoopStart,
     patternLoopEnd:   d.patternLoopEnd,
-    audioPosition:    d.audioPosition,
+    anchor:           d.positionAnchor,
     durationMs:       d.durationMs,
     // Convert Float32Array → plain number[] for structured clone
     waveformPeaks:    d.waveformPeaks ? Array.from(d.waveformPeaks) : null,
@@ -92,13 +92,13 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     const unsubPos = useDJStore.subscribe(
       (s) => {
         const d = s.decks[deckId];
-        return { audioPosition: d.audioPosition, songPos: d.songPos, totalPositions: d.totalPositions };
+        return { anchor: d.positionAnchor, songPos: d.songPos, totalPositions: d.totalPositions };
       },
       () => {
         const d = useDJStore.getState().decks[deckId];
         bridgeRef.current?.post({ type: 'state', ...snapshotDeck(d) });
       },
-      { equalityFn: (a, b) => a.audioPosition === b.audioPosition && a.songPos === b.songPos && a.totalPositions === b.totalPositions },
+      { equalityFn: (a, b) => a.anchor === b.anchor && a.songPos === b.songPos && a.totalPositions === b.totalPositions },
     );
 
     // Structural state subscription (fires on track load, cue, loop changes — rare)

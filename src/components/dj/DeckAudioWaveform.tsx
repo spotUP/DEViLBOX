@@ -85,15 +85,16 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
       dpr, width: w, height: h,
       waveformPeaks:  deck.waveformPeaks ? Array.from(deck.waveformPeaks) : null,
       durationMs:     deck.durationMs,
-      audioPosition:  deck.audioPosition,
+      anchor:         deck.positionAnchor,
       cuePoints:      deck.seratoCuePoints,
       overview:       snapshotOverview(deckId, container),
     }, [offscreen]);
 
-    // Position (high-frequency, ~60fps from DJDeck rAF poller)
+    // Position clock (each store position write re-anchors it); the worker
+    // extrapolates it to every frame.
     const unsubPos = useDJStore.subscribe(
-      (s) => s.decks[deckId].audioPosition,
-      (audioPosition) => bridgeRef.current?.post({ type: 'position', audioPosition }),
+      (s) => s.decks[deckId].positionAnchor,
+      (anchor) => bridgeRef.current?.post({ type: 'position', anchor }),
     );
 
     // Waveform peaks (on track load)
@@ -141,19 +142,19 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
       type: 'otherDeck',
       peaks: otherInit.waveformPeaks ? Array.from(otherInit.waveformPeaks) : null,
       durationMs: otherInit.durationMs,
-      audioPosition: otherInit.audioPosition,
+      anchor: otherInit.positionAnchor,
     });
 
     // Other deck position (high-frequency)
     const unsubOtherPos = useDJStore.subscribe(
-      (s) => s.decks[otherDeckId].audioPosition,
-      (pos) => {
+      (s) => s.decks[otherDeckId].positionAnchor,
+      (anchor) => {
         const od = useDJStore.getState().decks[otherDeckId];
         bridgeRef.current?.post({
           type: 'otherDeck',
           peaks: null, // don't resend peaks on every position update
           durationMs: od.durationMs,
-          audioPosition: pos,
+          anchor,
         });
       },
     );
@@ -167,7 +168,7 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
           type: 'otherDeck',
           peaks: peaks ? Array.from(peaks) : null,
           durationMs: od.durationMs,
-          audioPosition: od.audioPosition,
+          anchor: od.positionAnchor,
         });
       },
     );

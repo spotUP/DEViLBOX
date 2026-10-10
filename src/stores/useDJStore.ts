@@ -11,6 +11,7 @@ import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import type { SeratoCuePoint, SeratoLoop, SeratoBeatMarker } from '@/lib/serato/seratoMetadata';
 import type { BeatGridData } from '@/engine/dj/DJAudioCache';
+import { clockNowMs, positionAtFrame, type ClockAnchor } from '@/engine/audioLatency';
 import type { DJTrackAnalysis } from '@/engine/dj/autodj/types';
 import type { AutoDJTelemetry } from '@/engine/dj/autodj/telemetry';
 import type { JuggleTelemetry } from '@/engine/dj/autodj/juggle/juggleTypes';
@@ -138,6 +139,13 @@ export interface DeckState {
   playbackMode: 'tracker' | 'audio';
   durationMs: number;             // total duration for audio files (ms)
   audioPosition: number;          // current position in seconds
+  /**
+   * The heard-position clock: audioPosition (tracker: elapsedMs) at an instant
+   * plus its rate. Per-frame visuals extrapolate it with positionAtFrame
+   * instead of drawing the held 20 Hz value. Every write of the position
+   * re-anchors it; stopping the deck freezes it.
+   */
+  positionAnchor: ClockAnchor;
   waveformPeaks: Float32Array | null;  // for waveform display
 
   // Serato metadata (populated when loading Serato-analyzed tracks)
@@ -245,6 +253,7 @@ const makeDefaultDeckState = (): DeckState => ({
   playbackMode: 'tracker',
   durationMs: 0,
   audioPosition: 0,
+  positionAnchor: { positionSec: 0, rate: 0, anchorMs: 0 },
   waveformPeaks: null,
 
   // Serato metadata
@@ -450,6 +459,23 @@ interface DJActions {
 
 type DJStore = DJState & DJActions;
 
+/**
+ * The deck's position anchor follows every position write that does not
+ * carry its own anchor (seeks, cue jumps, loads): re-anchored at the written
+ * position now, moving at the previous rate while the deck plays. A stop
+ * freezes it where it is heard.
+ */
+function keepPositionAnchor(d: DeckState, partial: Partial<DeckState>): void {
+  if (partial.positionAnchor !== undefined) return;
+  const now = clockNowMs();
+  const written = partial.audioPosition ?? (partial.elapsedMs !== undefined ? partial.elapsedMs / 1000 : undefined);
+  if (written !== undefined) {
+    d.positionAnchor = { positionSec: written, rate: d.isPlaying ? d.positionAnchor.rate : 0, anchorMs: now };
+  } else if (partial.isPlaying === false && d.positionAnchor.rate !== 0) {
+    d.positionAnchor = { positionSec: positionAtFrame(d.positionAnchor, now), rate: 0, anchorMs: now };
+  }
+}
+
 export const useDJStore = create<DJStore>()(
   subscribeWithSelector(immer((set) => ({
     // Initial state
@@ -595,11 +621,13 @@ export const useDJStore = create<DJStore>()(
           state.decks[deck].mood = null;
         }
         Object.assign(state.decks[deck], partial);
+        keepPositionAnchor(state.decks[deck], partial);
       }),
 
     setDeckPlaying: (deck, playing) =>
       set((state) => {
         state.decks[deck].isPlaying = playing;
+        keepPositionAnchor(state.decks[deck], { isPlaying: playing });
       }),
 
     setDeckPosition: (deck, songPos, pattPos) =>

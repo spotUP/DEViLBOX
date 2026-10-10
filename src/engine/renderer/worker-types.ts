@@ -4,6 +4,8 @@
  * the main thread and worker threads.
  */
 
+import type { ClockAnchor } from '../audioLatency';
+
 // ─── Theme snapshot ──────────────────────────────────────────────────────────
 
 export interface ThemeSnapshot {
@@ -241,7 +243,8 @@ export interface OverviewState {
   loopActive: boolean;
   patternLoopStart: number;
   patternLoopEnd: number;
-  audioPosition: number;
+  /** Heard-position clock; the worker extrapolates it to each frame (positionAtFrame). */
+  anchor: ClockAnchor;
   durationMs: number;
   waveformPeaks: number[] | null;
   /** 3-band frequency peaks: [low[], mid[], high[]] — null until analysis completes */
@@ -279,12 +282,12 @@ export interface WaveformOverviewState {
 }
 
 export type WaveformMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; waveformPeaks: number[] | null; durationMs: number; audioPosition: number; cuePoints: SerializedCuePoint[]; overview: WaveformOverviewState }
+  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; waveformPeaks: number[] | null; durationMs: number; anchor: ClockAnchor; cuePoints: SerializedCuePoint[]; overview: WaveformOverviewState }
   | { type: 'waveformPeaks'; peaks: number[] | null; durationMs: number }
-  | { type: 'position'; audioPosition: number }
+  | { type: 'position'; anchor: ClockAnchor }
   | { type: 'cuePoints'; cuePoints: SerializedCuePoint[] }
   | { type: 'overview'; overview: WaveformOverviewState }
-  | { type: 'otherDeck'; peaks: number[] | null; durationMs: number; audioPosition: number }
+  | { type: 'otherDeck'; peaks: number[] | null; durationMs: number; anchor: ClockAnchor }
   | { type: 'resize'; w: number; h: number; dpr: number }
   | { type: 'stemPeaks'; stems: Record<string, number[]> | null };
 
@@ -304,9 +307,9 @@ export interface AnalysisBeatGrid {
 }
 
 export type BeatGridMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; beatGrid: BeatMarker[]; analysisBeatGrid: AnalysisBeatGrid | null; durationMs: number; audioPosition: number; positionFraction: number }
+  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; beatGrid: BeatMarker[]; analysisBeatGrid: AnalysisBeatGrid | null; durationMs: number; anchor: ClockAnchor; positionFraction: number }
   | { type: 'beatGrid'; beatGrid: BeatMarker[]; analysisBeatGrid: AnalysisBeatGrid | null; durationMs: number }
-  | { type: 'position'; audioPosition: number; positionFraction: number }
+  | { type: 'position'; anchor: ClockAnchor; positionFraction: number }
   | { type: 'resize'; w: number; h: number; dpr: number };
 
 // ─── Piano Keyboard ──────────────────────────────────────────────────────────
