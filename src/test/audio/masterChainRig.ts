@@ -117,6 +117,26 @@ function toneDb(x: Float32Array, hz: number, from: number, to: number): number {
 
 /** Render a mono input (both channels) through the chain; the preset make-up is applied at the end. */
 export async function renderChain(fxs: readonly Fx[] | null, input: Float32Array, makeUpDb = 0, retry = 0): Promise<Stereo> {
+  // Effects that build noise at construction (Tone.Reverb's impulse) draw on
+  // Math.random, so an unseeded render depends on whatever ran before it:
+  // Shoegaze's 1 kHz THD read -32 to -42 dB across identical rigs. Seed it per
+  // render so every measurement is a property of the chain alone. Dry and wet
+  // renders overlap (Promise.all), so the original is restored by the last one out.
+  if (seededRenders++ === 0) { unseededRandom = Math.random; Math.random = seededRandom; }
+  try {
+    return await renderChainSeeded(fxs, input, makeUpDb, retry);
+  } finally {
+    if (--seededRenders === 0) Math.random = unseededRandom;
+  }
+}
+
+let seededRenders = 0;
+let unseededRandom = Math.random;
+let randomState = 0;
+let noiseCacheFilled = false;
+function seededRandom(): number { randomState = (randomState * 1664525 + 1013904223) >>> 0; return randomState / 4294967296; }
+
+async function renderChainSeeded(fxs: readonly Fx[] | null, input: Float32Array, makeUpDb: number, retry: number): Promise<Stereo> {
   await setup();
   const Tone = await import('tone');
   await import('@/engine/registry/effects'); // the app registers its effects at startup
@@ -124,6 +144,11 @@ export async function renderChain(fxs: readonly Fx[] | null, input: Float32Array
   const seconds = input.length / SR;
   const ctx = new OfflineAudioContext(2, input.length, SR);
   Tone.setContext(ctx as never);
+  // Tone.Noise fills a process-wide buffer cache on its first start, then starts each
+  // instance at a random offset: fill it before the seed is reset, or the first
+  // reverb rendered in a process reads a different offset from every later one.
+  if (!noiseCacheFilled) { for (const type of ['white', 'pink', 'brown'] as const) new Tone.Noise({ type }).start(0).dispose(); noiseCacheFilled = true; }
+  randomState = 0x9e3779b9;
   const src = ctx.createBufferSource();
   const buf = ctx.createBuffer(2, input.length, SR);
   buf.copyToChannel(new Float32Array(input), 0); buf.copyToChannel(new Float32Array(input), 1);
@@ -149,7 +174,7 @@ export async function renderChain(fxs: readonly Fx[] | null, input: Float32Array
   void seconds;
   const res: Stereo = [out.getChannelData(0).slice(), out.getChannelData(1).slice()];
   // A worklet that was not spliced in yet (the machine was busy) renders digital silence: try again, slower.
-  if (fxs && rmsDb(input, 0) > -90 && rmsDb(res[0], 0) < -150 && retry < 3) return renderChain(fxs, input, makeUpDb, retry + 1);
+  if (fxs && rmsDb(input, 0) > -90 && rmsDb(res[0], 0) < -150 && retry < 3) return renderChainSeeded(fxs, input, makeUpDb, retry + 1);
   return res;
 }
 
@@ -174,13 +199,22 @@ export class PresetRig {
     const [d, w] = await Promise.all([this.run(`sine${hz}@${levelDb}`, () => sine(hz, levelDb), false), this.run(`sine${hz}@${levelDb}`, () => sine(hz, levelDb), true)]);
     return rmsDb(w[0], SR) - rmsDb(d[0], SR);
   }
-  /** Harmonics 2..6 of a sine, dB below the fundamental at the output. */
+  /**
+   * Harmonics 2..6 of a sine, dB below the fundamental at the output, power-
+   * averaged over five fundamentals within 2 % of `hz`. A reverb's noise
+   * impulse has a jagged response, so one sine reads its harmonics through
+   * whatever peaks and notches it happens to land on: Shoegaze's saturation
+   * read -30 to -45 dB with the impulse alone changing.
+   */
   async thdDb(hz: number, levelDb = -12): Promise<number> {
-    const w = await this.run(`sine${hz}@${levelDb}`, () => sine(hz, levelDb), true);
     const from = SR, to = SR * 3;
-    const f = toneDb(w[0], hz, from, to);
-    let h = 0; for (let k = 2; k <= 6; k++) if (hz * k < SR / 2.2) h += 10 ** (toneDb(w[0], hz * k, from, to) / 10);
-    return 10 * Math.log10(h + 1e-12) - f;
+    let f = 0, h = 0;
+    for (const at of [1, 0.98, 0.99, 1.01, 1.02].map((r) => hz * r)) {
+      const w = await this.run(`sine${at}@${levelDb}`, () => sine(at, levelDb), true);
+      f += 10 ** (toneDb(w[0], at, from, to) / 10);
+      for (let k = 2; k <= 6; k++) if (at * k < SR / 2.2) h += 10 ** (toneDb(w[0], at * k, from, to) / 10);
+    }
+    return 10 * Math.log10(h + 1e-12) - 10 * Math.log10(f + 1e-12);
   }
   /** Compression: a sine at `hz` stepped -40 dBFS -> `hiDb`; the step in dB minus the rise of the output. */
   async staticGrDb(hz = 1000, hiDb = -10): Promise<number> {
@@ -316,6 +350,11 @@ export async function renderStereo(fxs: readonly Fx[] | null, input: Stereo, mak
   const n = input[0].length;
   const ctx = new OfflineAudioContext(2, n, SR);
   Tone.setContext(ctx as never);
+  // Tone.Noise fills a process-wide buffer cache on its first start, then starts each
+  // instance at a random offset: fill it before the seed is reset, or the first
+  // reverb rendered in a process reads a different offset from every later one.
+  if (!noiseCacheFilled) { for (const type of ['white', 'pink', 'brown'] as const) new Tone.Noise({ type }).start(0).dispose(); noiseCacheFilled = true; }
+  randomState = 0x9e3779b9;
   const src = ctx.createBufferSource();
   const buf = ctx.createBuffer(2, n, SR);
   buf.copyToChannel(new Float32Array(input[0]), 0); buf.copyToChannel(new Float32Array(input[1]), 1);
