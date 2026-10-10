@@ -24,7 +24,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SOURCE = join(process.cwd(), 'src/hooks/audio/usePatternPlayback.ts');
-const FEED = 'useWasmPositionStore.getState().setPosition(';
+// The scheduler's writer. Since 60c07e19c the engine writes setPosition (and
+// owns the store until clear()); this hook writes setSchedulerPosition, which
+// the store ignores while an engine owns it.
+const FEED = 'useWasmPositionStore.getState().setSchedulerPosition(';
 
 /** The condition guarding the position feed, as written in the source. */
 function guardOfTheFeed(): string {
