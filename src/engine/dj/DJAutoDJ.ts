@@ -481,11 +481,8 @@ class DJAutoDJ {
             return;
           }
         }
-        // Bad or unloadable: replan around it and try the next candidate.
-        try { const c = getSessionController(); c.setTracks(this.sessionTracks()); c.replanSession(); } catch { /* */ }
-        nextIdx = this.computeNextIndex(nextIdx, current.tracks.length);
-        // Never the track that is playing now.
-        if (nextIdx === useDJStore.getState().autoDJCurrentTrackIndex) nextIdx = (nextIdx + 1) % current.tracks.length;
+        // Bad or unloadable: replan around it and try the next candidate (never the playing track).
+        nextIdx = this.nextIndexAfterUnloadable(nextIdx, current.tracks.length);
         console.warn(`[AutoDJ] Mix Now: track unloadable, trying index ${nextIdx} (attempt ${attempts + 1}/${MAX_SKIP_ATTEMPTS})`);
       }
       // Nothing loadable: back to playing, the current track continues.
@@ -676,19 +673,30 @@ class DJAutoDJ {
         // Old logic compared raw movement vs 0.01 which falsely flagged slow
         // legitimate fades (32-bar at 125 BPM moves only ~0.008/poll) as
         // stuck and force-snapped the crossfader mid-fade.
+        //
+        // The guard only watches a legacy sweep that is running with the
+        // incoming deck audible. Before the sweep starts the fader is held on
+        // purpose: a planned transition waits for its grid moment (the plan is
+        // finalised at trigger time and may start a phrase later), and forcing
+        // the fader then fades the set to a deck that is not playing - which
+        // the executor's first curve sample then pulls back ("over, back, over
+        // again"). A running executor owns the fader for the whole blend: its
+        // curves may hold the fader still on purpose, and it has its own
+        // emergency path.
+        const sweepAudible = this.transitionSweepStarted && !this.execution && this.deckPlaying(this.idleDeck);
         const prevDistance = this.lastCrossfaderValue < 0
           ? Infinity
           : Math.abs(this.lastCrossfaderValue - crossfaderTarget);
         const currDistance = Math.abs(crossfader - crossfaderTarget);
         // Progressing = distance to target decreased by ANY amount
-        if (currDistance < prevDistance) {
+        if (!sweepAudible || currDistance < prevDistance) {
           this.crossfaderStuckCount = 0;
         } else {
           this.crossfaderStuckCount++;
         }
         this.lastCrossfaderValue = crossfader;
 
-        if (this.crossfaderStuckCount >= DJAutoDJ.CROSSFADER_STUCK_POLLS && !crossfaderDone) {
+        if (sweepAudible && this.crossfaderStuckCount >= DJAutoDJ.CROSSFADER_STUCK_POLLS && !crossfaderDone) {
           console.warn(`[AutoDJ] Crossfader stuck at ${crossfader.toFixed(2)} for ${this.crossfaderStuckCount} polls — forcing to ${crossfaderTarget}`);
           try { getDJEngine().setCrossfader(crossfaderTarget); } catch { /* */ }
           store.setCrossfader(crossfaderTarget);
@@ -811,7 +819,7 @@ class DJAutoDJ {
         if (track.isBad && attempts < MAX_SKIP_ATTEMPTS - 10) {
           console.log(`[AutoDJ] Skipping bad track ${nextIdx}: ${track.trackName} (reason: ${track.badReason})`);
           attempts++;
-          nextIdx = this.computeNextIndex(nextIdx, playlist.tracks.length);
+          nextIdx = this.nextIndexAfterUnloadable(nextIdx, playlist.tracks.length);
           continue;
         }
 
@@ -872,7 +880,7 @@ class DJAutoDJ {
         }
 
         attempts++;
-        nextIdx = this.computeNextIndex(nextIdx, playlist.tracks.length);
+        nextIdx = this.nextIndexAfterUnloadable(nextIdx, playlist.tracks.length);
         console.warn(`[AutoDJ] Skipping unloadable track, trying next index ${nextIdx} (attempt ${attempts}/${MAX_SKIP_ATTEMPTS})`);
       }
 
@@ -1234,9 +1242,16 @@ class DJAutoDJ {
 
   private completeTransition(): void {
     console.log('[AutoDJ] completeTransition() START');
-    this.transitionCancel = null;
     this.transitionSweepStarted = false;
     this.jugglePreludeStarted = false;
+    // Whatever completed the transition (the sweep itself, the timeout guard,
+    // the incoming-not-playing guard), its automation stops here: a running
+    // executor or legacy sweep would otherwise keep writing the crossfader
+    // toward the deck this method is about to stop. Cancelling a finished
+    // executor or sweep is a no-op.
+    const cancelAutomation = this.transitionCancel;
+    this.transitionCancel = null;
+    try { cancelAutomation?.(); } catch (err) { console.warn('[AutoDJ] cancelling transition automation failed:', err); }
 
     // Stop and reset the outgoing deck
     try {
@@ -1379,15 +1394,25 @@ class DJAutoDJ {
     return (totalBeats * 60) / bpm;
   }
 
-  private computeNextIndex(currentIndex: number, trackCount: number): number {
+  /**
+   * The playlist index to queue after `fromIndex`. `playingIndex` is the track
+   * on air: it is never returned while another track exists, whichever branch
+   * picks (the session order, shuffle, sequential). In the normal case the two
+   * are the same; the skip-past-a-failed-track paths pass the failed index as
+   * `fromIndex` and the playing track separately - before, the sequential
+   * fallback there stepped from the failed track straight onto the playing one
+   * and Auto DJ mixed the playing track into itself.
+   */
+  private computeNextIndex(fromIndex: number, trackCount: number, playingIndex: number = fromIndex): number {
     if (trackCount <= 1) return 0;
+    const usable = (i: number) => i >= 0 && i < trackCount && i !== fromIndex && i !== playingIndex;
 
     const store = useDJStore.getState();
     if (!store.autoDJShuffle) {
       // The session order (plan sections 8, 10), never the playlist's own order.
       try {
         const next = getSessionController().nextIndex();
-        if (next !== null && next !== currentIndex && next >= 0 && next < trackCount) return next;
+        if (next !== null && usable(next)) return next;
       } catch { /* fall through to sequential */ }
     }
     if (store.autoDJShuffle) {
@@ -1396,14 +1421,37 @@ class DJAutoDJ {
       // incremented first, which skipped the 0th slot of every cycle and
       // also fell through to 0 on the very first call when the order was
       // still empty).
-      if (this.shufflePosition + 1 >= this.shuffleOrder.length) {
-        this.generateShuffleOrder(trackCount, currentIndex);
+      for (let tries = 0; tries <= trackCount; tries++) {
+        if (this.shufflePosition + 1 >= this.shuffleOrder.length) {
+          this.generateShuffleOrder(trackCount, playingIndex);
+        }
+        this.shufflePosition++;
+        const next = this.shuffleOrder[this.shufflePosition];
+        if (next !== undefined && usable(next)) return next;
       }
-      this.shufflePosition++;
-      return this.shuffleOrder[this.shufflePosition] ?? 0;
     }
 
-    return (currentIndex + 1) % trackCount;
+    for (let step = 1; step < trackCount; step++) {
+      const next = (fromIndex + step) % trackCount;
+      if (usable(next)) return next;
+    }
+    // Only the failed track and the playing one exist: retry the failed one, never the one on air.
+    return fromIndex !== playingIndex ? fromIndex : (fromIndex + 1) % trackCount;
+  }
+
+  /**
+   * The next candidate after `failedIndex` could not be loaded (or is marked
+   * bad). The controller replans its order first - the loader has marked the
+   * track bad, so the new order leaves it out - and the playing track is
+   * never the answer.
+   */
+  private nextIndexAfterUnloadable(failedIndex: number, trackCount: number): number {
+    try {
+      const controller = getSessionController();
+      controller.setTracks(this.sessionTracks());
+      controller.replanSession();
+    } catch { /* sequential fallback below */ }
+    return this.computeNextIndex(failedIndex, trackCount, useDJStore.getState().autoDJCurrentTrackIndex);
   }
 
   private generateShuffleOrder(trackCount: number, currentIndex: number): void {
@@ -1510,12 +1558,17 @@ class DJAutoDJ {
   /** Resolve when the deck reaches `targetSec` (the planned grid moment), or on a safety timeout. */
   private waitForDeckPosition(deck: DeckId, targetSec: number): Promise<void> {
     return new Promise((resolve) => {
-      const start = Date.now();
+      // The safety deadline is fixed once, from the wait the plan asked for.
+      // Recomputing it from the shrinking `remaining` on every check made it
+      // fire seconds before the planned grid moment (a 9 s wait resolved at
+      // ~6.6 s), starting the incoming deck off-grid: double kicks in the blend.
+      let deadline = Infinity;
       const check = () => {
         let pos = 0;
         try { pos = getDJEngine().getDeck(deck).audioPlayer.getPosition(); } catch { pos = targetSec; }
         const remaining = targetSec - pos;
-        if (remaining <= 0.008 || Date.now() - start > Math.max(3000, remaining * 1500 + 3000)) { resolve(); return; }
+        if (deadline === Infinity) deadline = Date.now() + Math.max(3000, remaining * 1500 + 3000);
+        if (remaining <= 0.008 || Date.now() > deadline) { resolve(); return; }
         setTimeout(check, Math.min(15, Math.max(1, remaining * 1000 - 5)));
       };
       check();

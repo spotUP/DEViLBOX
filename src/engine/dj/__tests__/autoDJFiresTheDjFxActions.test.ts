@@ -99,6 +99,18 @@ describe('the Auto DJ fires the DJ FX actions the pads use', () => {
     await handle.promise;
   });
 
+  it('cancelling a finished transition does not report it again (Auto DJ cancels on every completion)', async () => {
+    const plan: DJTransitionPlan = { ...basePlan(), style: 'filterBuild', durationBars: 2, durationBeats: 8, effects: [], filterPlan: { kind: 'resonant-build', curves: [], resonance: 2.5 } };
+    const results: unknown[] = [];
+    const handle = executeTransition(plan, { tickMs: 5, beatSec: 0.02, onComplete: (r) => results.push(r) });
+    const done = await handle.promise;
+    expect(done.completed).toBe(true);
+    const releasesBefore = getDjFxFireLog().filter((e) => e.kind !== 'fire').length;
+    handle.cancel();
+    expect(results.length).toBe(1);
+    expect(getDjFxFireLog().filter((e) => e.kind !== 'fire').length).toBe(releasesBefore);
+  });
+
   it('a brake effect fires fx_deck_brake; the pad fires the same action and lights from the same flag', async () => {
     const plan: DJTransitionPlan = { ...basePlan(), style: 'hardCut', durationBars: 1, durationBeats: 4, effects: [{ kind: 'brake', deck: 'outgoing', beat: 0, lengthBeats: 2, amount: 1, reason: 'test' }], filterPlan: { kind: 'none', curves: [], resonance: 1 } };
     const handle = executeTransition(plan, { tickMs: 5, beatSec: 0.02 });

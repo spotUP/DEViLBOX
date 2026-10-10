@@ -148,8 +148,11 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
     applyTarget(plan, t, v);
   };
 
+  let finished = false;
   const finish = (result: ExecutionResult) => {
     if (intervalId !== null) { timers.clearInterval(intervalId); intervalId = null; }
+    if (finished) return;
+    finished = true;
     opts.onComplete?.(result);
     resolveDone(result);
   };
@@ -310,6 +313,10 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
     plan,
     promise,
     cancel: () => {
+      // Cancelling a finished execution is a no-op: Auto DJ cancels on every
+      // completion, and a second finish would report the transition twice and
+      // release the incoming deck's effects mid-track.
+      if (finished) return;
       cancelled = true;
       if (intervalId !== null) { timers.clearInterval(intervalId); intervalId = null; }
       try { setDeckEchoSend(out, 0); setDeckReverbSend(out, 0); } catch { /* */ }

@@ -41,6 +41,12 @@ export class DeckAudioPlayer {
   // Pending seek offset for when player is stopped
   private _pendingOffset: number | null = null;
 
+  // Every seek is counted and its target kept, so a temporary user of the
+  // transport (the deck's scratch-buffer priming) can tell that a real seek
+  // landed while it held the player, and leave the player where that seek put it.
+  private _seekCount = 0;
+  private _lastSeekTarget = 0;
+
   // Audio loop region (seconds)
   private _loopIn: number | null = null;
   private _loopOut: number | null = null;
@@ -223,6 +229,8 @@ export class DeckAudioPlayer {
   seek(seconds: number): void {
     const wasPlaying = this.player.state === 'started';
     const clamped = Math.max(0, Math.min(seconds, this._duration));
+    this._seekCount++;
+    this._lastSeekTarget = clamped;
     // Reset rate tracking to match new seek position
     this._rateChangePos = clamped;
     this._rateChangeTime = Tone.now();
@@ -375,6 +383,16 @@ export class DeckAudioPlayer {
 
   getDuration(): number {
     return this._duration;
+  }
+
+  /** How many seeks this player has taken (see `_seekCount`). */
+  get seekCount(): number {
+    return this._seekCount;
+  }
+
+  /** The position the most recent seek asked for, in seconds. */
+  get lastSeekTarget(): number {
+    return this._lastSeekTarget;
   }
 
   isLoaded(): boolean {
