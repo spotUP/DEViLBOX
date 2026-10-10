@@ -29,6 +29,24 @@ async function stopDJ(): Promise<void> {
   for (const id of decks) stopDeck(id);
 }
 
+/**
+ * The output passes to the DJ decks: the tracker stops, its notes release, and
+ * the tracker's global pitch and rate go back to neutral - they are ToneEngine
+ * globals and would otherwise leak into DJ audio (wrong speed). Runs when a
+ * deck starts while the tracker plays, and on entering the DJ view when the
+ * tracker is silent; never on a view switch alone while the tracker plays.
+ */
+export async function handOverToDJ(): Promise<void> {
+  const transport = useTransportStore.getState();
+  if (transport.isPlaying) transport.stop();
+  const { getToneEngine } = await import('@/engine/ToneEngine');
+  const engine = getToneEngine();
+  engine.releaseAll();
+  engine.setGlobalPlaybackRate(1.0);
+  engine.setGlobalDetune(0);
+  useTransportStore.getState().setGlobalPitch(0);
+}
+
 let unsubscribe: (() => void) | null = null;
 
 /** Call once at startup. Returns the uninstaller (tests). */
@@ -41,7 +59,7 @@ export function installOneProgrammeAtATime(): () => void {
     (s) => DECK_IDS.map((id) => s.decks[id].isPlaying),
     (now, before) => {
       const started = now.some((playing, i) => playing && !before[i]);
-      if (started && useTransportStore.getState().isPlaying) useTransportStore.getState().stop();
+      if (started && useTransportStore.getState().isPlaying) void handOverToDJ();
     },
     { equalityFn: (a, b) => a.every((v, i) => v === b[i]) },
   );

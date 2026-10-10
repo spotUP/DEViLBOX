@@ -10,9 +10,13 @@ const { stopDeck, disableAutoDJ } = vi.hoisted(() => ({
   disableAutoDJ: vi.fn(async () => (await import('@/stores/useDJStore')).useDJStore.setState({ autoDJEnabled: false })),
 }));
 vi.mock('@/engine/dj/DJActions', () => ({ stopDeck, disableAutoDJ }));
+const engine = vi.hoisted(() => ({ releaseAll: vi.fn(), setGlobalPlaybackRate: vi.fn(), setGlobalDetune: vi.fn() }));
+vi.mock('@/engine/ToneEngine', () => ({ getToneEngine: () => engine }));
 
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useDJStore } from '@/stores/useDJStore';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { installOneProgrammeAtATime } from '../oneProgrammeAtATime';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -39,12 +43,22 @@ describe('the tracker and the DJ decks never play together', () => {
     expect(useTransportStore.getState().isPlaying).toBe(true);
   });
 
-  it('starting a deck while the tracker plays stops the tracker', () => {
+  it('starting a deck while the tracker plays stops the tracker and resets its pitch and rate', async () => {
     useTransportStore.setState({ isPlaying: true });
     const stop = vi.spyOn(useTransportStore.getState(), 'stop');
     useDJStore.getState().setDeckPlaying('B', true);
+    await flush();
     expect(stop).toHaveBeenCalledTimes(1);
+    expect(engine.setGlobalPlaybackRate).toHaveBeenCalledWith(1.0);
     expect(useDJStore.getState().decks.B.isPlaying).toBe(true);
+  });
+
+  it('entering the DJ view does not stop a playing tracker', () => {
+    // Owner 2026-10-10: "the dj view killed the tracker view when i switched to it".
+    // The mount used to call useTransportStore stop() unconditionally (since bad3f3d3b).
+    const src = readFileSync(join(process.cwd(), 'src/components/dj/DJView.tsx'), 'utf8');
+    expect(src).not.toMatch(/if \(isPlaying\) stop\(\)/);
+    expect(src).toContain('if (!useTransportStore.getState().isPlaying) void handOverToDJ();');
   });
 
   it('leaves the other side alone when it is not playing', async () => {
