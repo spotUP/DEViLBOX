@@ -80,6 +80,20 @@ describe('scripts/git-hooks/pre-push gates the pushed commit, not the working tr
     expect(runHook(green).code).toBe(0);
   });
 
+  it('lets a test ask git which files the pushed commit tracks', () => {
+    // softwarePaulaSingleCopy runs `git ls-files`; a bare git-archive tree had
+    // no repository, so the 2026-10-10 push failed with "Command failed: git ls-files".
+    writeFileSync(join(repo, 'package.json'), JSON.stringify({
+      name: 'fake', version: '0.0.0',
+      scripts: { 'type-check': 'true', 'test:ci': 'git ls-files | grep -qx check.txt', 'test:compliance': 'true' },
+    }));
+    git('add', 'package.json');
+    const sha = commitCheck('ok\n');
+    const r = runHook(sha);
+    expect(r.err).toContain('all checks passed');
+    expect(r.code).toBe(0);
+  });
+
   it('leaves no snapshot directory behind, after a pass or a failure', () => {
     runHook(commitCheck('ok\n'));
     expect(snapshots()).toEqual([]);
