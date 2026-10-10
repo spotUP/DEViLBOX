@@ -8,6 +8,7 @@
  */
 
 import type { BeatGridMsg, BeatMarker, AnalysisBeatGrid } from '../engine/renderer/worker-types';
+import { clockNowMs, positionAtFrame, type ClockAnchor } from '../engine/audioLatency';
 
 // ─── Worker state ─────────────────────────────────────────────────────────────
 
@@ -18,6 +19,9 @@ let dpr = 1, width = 400, height = 24;
 let beatGrid: BeatMarker[] = [];
 let analysisBeatGrid: AnalysisBeatGrid | null = null;
 let durationMs       = 0;
+// The heard-position clock; each frame draws it extrapolated to its time.
+let anchor: ClockAnchor = { positionSec: 0, rate: 0, anchorMs: 0 };
+let drawnHalfPx = -1;
 let audioPosition    = 0;
 let positionFraction = 0;
 let dirty            = true;
@@ -36,7 +40,7 @@ self.onmessage = (e: MessageEvent<BeatGridMsg>) => {
       beatGrid         = msg.beatGrid;
       analysisBeatGrid = msg.analysisBeatGrid;
       durationMs       = msg.durationMs;
-      audioPosition    = msg.audioPosition;
+      anchor           = msg.anchor;
       positionFraction = msg.positionFraction;
       startRAF();
       (self as unknown as Worker).postMessage({ type: 'ready' });
@@ -48,7 +52,7 @@ self.onmessage = (e: MessageEvent<BeatGridMsg>) => {
       dirty = true;
       break;
     case 'position':
-      audioPosition    = msg.audioPosition;
+      anchor           = msg.anchor;
       positionFraction = msg.positionFraction;
       dirty = true;
       break;
@@ -67,7 +71,16 @@ self.onmessage = (e: MessageEvent<BeatGridMsg>) => {
 
 function startRAF(): void {
   const tick = () => {
-    if (dirty) renderFrame();
+    // A moving clock repaints when the playhead has moved half a device pixel
+    // (a whole-track bar moves ~1 px a second); a paused one only on a message.
+    const pos = positionAtFrame(anchor, clockNowMs(), durationMs > 0 ? durationMs / 1000 : Infinity);
+    const halfPx = durationMs > 0 ? Math.round((pos / (durationMs / 1000)) * width * dpr * 2) : 0;
+    if (halfPx !== drawnHalfPx) dirty = true;
+    if (dirty) {
+      audioPosition = pos;
+      drawnHalfPx = halfPx;
+      renderFrame();
+    }
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

@@ -16,18 +16,41 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanvas';
 import { DJOscilloscope } from '@/components/visualization/DJOscilloscope';
+import { heardDeckRow, type DeckRow } from '@/hooks/dj/heardDeckRow';
+import { clockNowMs } from '@/engine/audioLatency';
 
 interface DeckPatternDisplayProps {
   deckId: 'A' | 'B' | 'C';
 }
 
 export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }) => {
-  const songPos = useDJStore((s) => s.decks[deckId].songPos);
-  const pattPos = useDJStore((s) => s.decks[deckId].pattPos);
+  const storeSongPos = useDJStore((s) => s.decks[deckId].songPos);
+  const storePattPos = useDJStore((s) => s.decks[deckId].pattPos);
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
   const fileName = useDJStore((s) => s.decks[deckId].fileName);
   const totalPositions = useDJStore((s) => s.decks[deckId].totalPositions);
   const activePatternName = useDJStore((s) => s.decks[deckId].activePatternName);
+
+  // While the deck plays, the row is the one heard at each frame (the store
+  // row is a 20 Hz sample, up to 50 ms late). Re-renders only on a row change.
+  const [heardRow, setHeardRow] = useState<DeckRow | null>(null);
+  useEffect(() => {
+    if (!isPlaying || activePatternName) { setHeardRow(null); return; }
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      if (document.hidden) return;
+      try {
+        const deck = getDJEngine().getDeck(deckId);
+        const row = heardDeckRow(deck, useDJStore.getState().decks[deckId].positionAnchor, clockNowMs());
+        if (row) setHeardRow((prev) => (prev && prev.songPos === row.songPos && prev.pattPos === row.pattPos ? prev : row));
+      } catch { /* engine not ready */ }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [deckId, isPlaying, activePatternName]);
+  const songPos = heardRow ? heardRow.songPos : storeSongPos;
+  const pattPos = heardRow ? heardRow.pattPos : storePattPos;
 
   // During backward scratch phases, accumulate a visual backward offset.
   // pattPos from the replayer won't move backward (replayer is frozen), so we

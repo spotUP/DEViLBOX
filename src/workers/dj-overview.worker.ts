@@ -6,6 +6,7 @@
  */
 
 import type { OverviewMsg, OverviewState, DeckColors } from '../engine/renderer/worker-types';
+import { clockNowMs, positionAtFrame, type ClockAnchor } from '../engine/audioLatency';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,9 @@ let totalPositions  = 1;
 let cuePoint        = -1;
 let loopActive      = false;
 let patternLoopStart = 0, patternLoopEnd = 0;
+// The heard-position clock; each frame draws it extrapolated to its time.
+let anchor: ClockAnchor = { positionSec: 0, rate: 0, anchorMs: 0 };
+let drawnHalfPx = -1;
 let audioPosition   = 0;
 let durationMs      = 0;
 let waveformPeaks: number[] | null = null;
@@ -127,7 +131,7 @@ function applyStateMsg(msg: OverviewState): void {
   loopActive       = msg.loopActive;
   patternLoopStart = msg.patternLoopStart;
   patternLoopEnd   = msg.patternLoopEnd;
-  audioPosition    = msg.audioPosition;
+  anchor           = msg.anchor;
   durationMs       = msg.durationMs;
   waveformPeaks    = msg.waveformPeaks;
   frequencyPeaks   = msg.frequencyPeaks;
@@ -137,7 +141,16 @@ function applyStateMsg(msg: OverviewState): void {
 
 function startRAF(): void {
   const tick = () => {
-    if (dirty || pulsePhase > 0) renderFrame();
+    // A moving clock repaints when the playhead has moved half a device pixel
+    // (a whole-track bar moves ~1 px a second); a paused one only on a message.
+    const pos = positionAtFrame(anchor, clockNowMs(), durationMs > 0 ? durationMs / 1000 : Infinity);
+    const halfPx = durationMs > 0 ? Math.round((pos / (durationMs / 1000)) * width * dpr * 2) : 0;
+    if (halfPx !== drawnHalfPx) dirty = true;
+    if (dirty || pulsePhase > 0) {
+      audioPosition = pos;
+      drawnHalfPx = halfPx;
+      renderFrame();
+    }
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

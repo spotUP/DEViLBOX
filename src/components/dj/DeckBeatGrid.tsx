@@ -71,16 +71,16 @@ export const DeckBeatGrid: React.FC<DeckBeatGridProps> = ({ deckId, height = 24 
       beatGrid:         deck.seratoBeatGrid,
       analysisBeatGrid: deck.beatGrid as AnalysisBeatGrid | null,
       durationMs:       deck.durationMs,
-      audioPosition:    deck.audioPosition,
+      anchor:           deck.positionAnchor,
       positionFraction: posFrac,
     }, [offscreen]);
 
     // Position updates
     const unsubPos = useDJStore.subscribe(
-      (s) => [s.decks[deckId].audioPosition, s.decks[deckId].songPos, s.decks[deckId].totalPositions] as const,
-      ([audioPos, sPos, total]) => {
+      (s) => [s.decks[deckId].positionAnchor, s.decks[deckId].songPos, s.decks[deckId].totalPositions] as const,
+      ([anchor, sPos, total]) => {
         const frac = total > 0 ? (sPos + 0.5) / total : 0;
-        bridgeRef.current?.post({ type: 'position', audioPosition: audioPos, positionFraction: frac });
+        bridgeRef.current?.post({ type: 'position', anchor, positionFraction: frac });
       },
     );
 

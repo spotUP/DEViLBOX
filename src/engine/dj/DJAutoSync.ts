@@ -15,6 +15,7 @@ import { getDJEngine } from './DJEngine';
 import { setDeckPitch } from './DJActions';
 import type { DeckId } from './DeckEngine';
 import type { BeatGridData } from './DJAudioCache';
+import { clockNowMs, deckPositionAt } from '@/engine/audioLatency';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -359,13 +360,13 @@ function getBestBPM(deckState: { beatGrid: BeatGridData | null; detectedBPM: num
   return 0;
 }
 
+/**
+ * The heard position now: the deck's clock anchor extrapolated to this
+ * moment (audio: audioPosition; tracker: elapsedMs / 1000), so beat events
+ * land on the frame they are heard instead of the next 20 Hz store write.
+ */
 function getCurrentPosition(deckId: DeckId): number {
-  const state = useDJStore.getState().decks[deckId];
-  if (state.playbackMode === 'audio') {
-    return state.audioPosition;
-  }
-  // For tracker mode, convert position to approximate seconds
-  return state.elapsedMs / 1000;
+  return deckPositionAt(useDJStore.getState().decks[deckId], clockNowMs());
 }
 
 export function getPhaseInfo(deckId: DeckId): PhaseInfo | null {
