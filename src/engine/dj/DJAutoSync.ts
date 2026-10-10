@@ -23,14 +23,14 @@ export type SyncMode = 'bpm' | 'beat' | 'bar';
 interface PhaseInfo {
   /** Current position in seconds */
   position: number;
-  /** Index of the nearest beat */
-  nearestBeatIdx: number;
-  /** Time of the nearest beat */
-  nearestBeatTime: number;
-  /** Phase within current beat (0-1, where 0 = on beat) */
+  /** Index of the beat in progress: the last grid beat at or before the position (-1 before the first beat) */
+  beatIdx: number;
+  /** How far into the beat in progress the position is, from the grid (0 = on the beat, 1 = next beat) */
+  beatFraction: number;
+  /** Beat of the bar in progress, 0-based (0 = downbeat); -1 before the first beat */
+  beatInBar: number;
+  /** Phase within the beat period (0-1, where 0 = on beat), referenced to the nearest beat */
   beatPhase: number;
-  /** Index of the nearest downbeat */
-  nearestDownbeatIdx: number;
   /** Phase within current bar (0-1, where 0 = on downbeat) */
   barPhase: number;
 }
@@ -372,54 +372,82 @@ export function getPhaseInfo(deckId: DeckId): PhaseInfo | null {
   const state = useDJStore.getState().decks[deckId];
   const beatGrid = state.beatGrid;
   if (!beatGrid || beatGrid.beats.length === 0) return null;
+  return phaseAt(beatGrid, getCurrentPosition(deckId));
+}
 
-  const position = getCurrentPosition(deckId);
+/** Index of the last entry of a sorted list at or before `t`; -1 when `t` precedes them all. */
+function floorIndex(sorted: number[], t: number): number {
+  let lo = 0, hi = sorted.length - 1, found = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] <= t) { found = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return found;
+}
+
+/** Index of the entry of a sorted list nearest to `t` (the list is non-empty). */
+function nearestIndex(sorted: number[], t: number): number {
+  const f = floorIndex(sorted, t);
+  if (f < 0) return 0;
+  if (f >= sorted.length - 1) return f;
+  return t - sorted[f] <= sorted[f + 1] - t ? f : f + 1;
+}
+
+/**
+ * Beat and bar phase of a beat grid at a position (seconds). Pure.
+ *
+ * The current beat is the last grid beat at or before the position (a beat
+ * event happens when the heard position CROSSES a beat), never the nearest
+ * one - the nearest beat flips half a beat early.
+ */
+export function phaseAt(beatGrid: BeatGridData, position: number): PhaseInfo | null {
   const beats = beatGrid.beats;
   const downbeats = beatGrid.downbeats;
+  if (beats.length === 0) return null;
+  const beatPeriod = beatGrid.bpm > 0 ? 60 / beatGrid.bpm : 0.5;
+  const timeSignature = beatGrid.timeSignature > 0 ? beatGrid.timeSignature : 4;
 
-  // Find nearest beat
-  let nearestBeatIdx = 0;
-  let nearestBeatDist = Math.abs(position - beats[0]);
-  for (let i = 1; i < beats.length; i++) {
-    const dist = Math.abs(position - beats[i]);
-    if (dist < nearestBeatDist) {
-      nearestBeatDist = dist;
-      nearestBeatIdx = i;
-    }
-    if (beats[i] > position + nearestBeatDist) break; // Early exit — beats are sorted
+  // The beat in progress and how far into it the position is, from the grid.
+  const beatIdx = floorIndex(beats, position);
+  let beatFraction = 0;
+  if (beatIdx >= 0) {
+    const next = beatIdx + 1 < beats.length ? beats[beatIdx + 1] : beats[beatIdx] + beatPeriod;
+    const len = next - beats[beatIdx];
+    beatFraction = len > 0 ? Math.min(1, Math.max(0, (position - beats[beatIdx]) / len)) : 0;
   }
 
-  // Compute beat phase (0 = on beat, 0.5 = between beats)
-  const beatPeriod = beatGrid.bpm > 0 ? 60 / beatGrid.bpm : 0.5;
+  // Beat of the bar: grid beats counted from the bar's downbeat (the last
+  // downbeat at or before the position; the first one before it).
+  let beatInBar = -1;
+  if (beatIdx >= 0) {
+    let barBeatIdx = 0;
+    if (downbeats.length > 0) {
+      const d = Math.max(0, floorIndex(downbeats, position));
+      barBeatIdx = nearestIndex(beats, downbeats[d]);
+    }
+    beatInBar = (((beatIdx - barBeatIdx) % timeSignature) + timeSignature) % timeSignature;
+  }
+
+  // Phase within the beat period, referenced to the nearest grid beat
+  // (0 = on beat). Sync and quantize measure phase this way.
+  const nearestBeatIdx = nearestIndex(beats, position);
   const beatPhase = ((position - beats[nearestBeatIdx]) % beatPeriod + beatPeriod) % beatPeriod / beatPeriod;
 
-  // Find nearest downbeat
-  let nearestDownbeatIdx = 0;
-  if (downbeats.length > 0) {
-    let downbeatDist = Math.abs(position - downbeats[0]);
-    for (let i = 1; i < downbeats.length; i++) {
-      const dist = Math.abs(position - downbeats[i]);
-      if (dist < downbeatDist) {
-        downbeatDist = dist;
-        nearestDownbeatIdx = i;
-      }
-      if (downbeats[i] > position + downbeatDist) break;
-    }
-  }
-
-  // Bar phase
-  const barPeriod = beatPeriod * beatGrid.timeSignature;
-  const barRef = downbeats.length > 0 ? downbeats[nearestDownbeatIdx] : beats[0];
+  // Bar phase, referenced to the nearest downbeat.
+  const barPeriod = beatPeriod * timeSignature;
+  const barRef = downbeats.length > 0 ? downbeats[nearestIndex(downbeats, position)] : beats[0];
   const barPhase = ((position - barRef) % barPeriod + barPeriod) % barPeriod / barPeriod;
 
-  return {
-    position,
-    nearestBeatIdx,
-    nearestBeatTime: beats[nearestBeatIdx],
-    beatPhase,
-    nearestDownbeatIdx,
-    barPhase,
-  };
+  return { position, beatIdx, beatFraction, beatInBar, beatPhase, barPhase };
+}
+
+/**
+ * True when a beat-event consumer (flash, lights) should fire: the current
+ * beat changed since the previous reading and the position is on a beat.
+ * `prevBeatIdx` null means there was no previous reading (no event).
+ */
+export function beatCrossed(prevBeatIdx: number | null, beatIdx: number): boolean {
+  return prevBeatIdx !== null && beatIdx >= 0 && beatIdx !== prevBeatIdx;
 }
 
 function seekDeck(deckId: DeckId, targetSec: number): void {
