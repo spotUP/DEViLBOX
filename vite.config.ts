@@ -131,6 +131,12 @@ export default defineConfig({
     // work. 2 workers keeps local runs responsive; CI overrides via
     // VITEST_MAX_WORKERS when it wants more parallelism.
     maxWorkers: process.env.VITEST_MAX_WORKERS ? Number(process.env.VITEST_MAX_WORKERS) : 2,
+    // A timeout is a hang detector, not a speed assertion. Vitest's 5 s default
+    // failed working tests in the pre-push gate when two workers share a busy
+    // machine: a first import that lazy-loads a route (Hippel ST 915 ms idle)
+    // or a registry (mameChipWiring, its file 179 s under load, 2.5 s idle)
+    // crossed it. A test that asserts speed says so itself.
+    testTimeout: 30_000,
     server: {
       deps: {
         inline: ['tone'], // Tone.js uses extensionless ESM imports that Node can't resolve without bundling
