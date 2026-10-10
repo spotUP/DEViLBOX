@@ -5,11 +5,11 @@
  * indicators. Beat 1 (downbeat) is highlighted in the deck's accent color.
  * The current beat glows brightly; a subtle fill bar shows sub-beat position.
  *
- * Polls at RAF speed via getPhaseInfo from DJAutoSync.
+ * Polls at RAF speed via getPhaseInfo from DJAutoSync: the lit light is the
+ * beat the heard position last crossed, its brightness the fraction into it.
  */
 
 import React, { useRef, useEffect, useState } from 'react';
-import type { PhaseInfo } from '@/engine/dj/DJAutoSync';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
@@ -20,18 +20,26 @@ interface DeckBeatPhaseProps {
 
 const BEAT_COUNT = 4;
 
-// Threshold: if phase is within this range of 0 or 1, consider "on beat"
+// The first part of a beat counts as "on beat" (glow, full brightness).
 const ON_BEAT_THRESHOLD = 0.12;
+
+/** Brightness of the lit beat light at a fraction into its beat. */
+export function beatLightBrightness(beatFraction: number): number {
+  return beatFraction < ON_BEAT_THRESHOLD ? 1.0 : Math.max(0.3, 1.0 - beatFraction * 0.8);
+}
 
 export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
   const hasBeatGrid = useDJStore((s) => !!s.decks[deckId].beatGrid);
-  const timeSignature = useDJStore((s) => s.decks[deckId].beatGrid?.timeSignature ?? 4);
   const viz = useDeckVisualizationData(deckId);
 
-  const [phase, setPhase] = useState<PhaseInfo | null>(null);
+  // React state changes only when the lit light or its glow changes; the
+  // brightness follows the sub-beat position every frame through the refs.
+  const [currentBeat, setCurrentBeat] = useState(-1);
+  const [isOnBeat, setIsOnBeat] = useState(false);
+  const brightnessRef = useRef(1);
+  const overlayRefs = useRef<(HTMLDivElement | null)[]>([]);
   const rafRef = useRef<number>(0);
   const mountedRef = useRef(true);
-  const prevBeatIdxRef = useRef(-1);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -41,12 +49,15 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
       rafRef.current = requestAnimationFrame(tick);
       // Perf: no polling while the tab is hidden.
       if (document.hidden) return;
-      const newPhase = viz.getBeatPhase();
-      // Only update state when beat index changes to reduce re-renders
-      if (newPhase?.nearestBeatIdx !== prevBeatIdxRef.current) {
-        prevBeatIdxRef.current = newPhase?.nearestBeatIdx ?? -1;
-        setPhase(newPhase);
-      }
+      const phase = viz.getBeatPhase();
+      // The beat in progress (the last beat the heard position crossed).
+      const beat = phase && phase.beatInBar >= 0 ? phase.beatInBar % BEAT_COUNT : -1;
+      const fraction = phase ? phase.beatFraction : 0;
+      setCurrentBeat(beat);
+      setIsOnBeat(beat >= 0 && fraction < ON_BEAT_THRESHOLD);
+      brightnessRef.current = beatLightBrightness(fraction);
+      const el = beat >= 0 ? overlayRefs.current[beat] : null;
+      if (el) el.style.opacity = String(brightnessRef.current);
     };
 
     rafRef.current = requestAnimationFrame(tick);
@@ -56,17 +67,6 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
       cancelAnimationFrame(rafRef.current);
     };
   }, [deckId, viz]);
-
-  // Which beat of the bar are we on? (0-indexed)
-  const currentBeat = phase
-    ? Math.floor(phase.barPhase * timeSignature) % BEAT_COUNT
-    : -1;
-
-  // Sub-beat phase within current beat (0-1)
-  const subBeatPhase = phase ? phase.beatPhase : 0;
-
-  // Is this beat "on" (close to the beat boundary)?
-  const isOnBeat = subBeatPhase < ON_BEAT_THRESHOLD || subBeatPhase > (1 - ON_BEAT_THRESHOLD);
 
   const isA = deckId === 'A';
   const accentColor = isA ? '#3b82f6' : '#f97316'; // blue / orange
@@ -97,9 +97,7 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
         const isActive = i === currentBeat;
         const isDownbeat = i === 0;
         // Brightness ramps down across the sub-beat phase
-        const brightness = isActive
-          ? isOnBeat ? 1.0 : Math.max(0.3, 1.0 - subBeatPhase * 0.8)
-          : 0.08;
+        const brightness = isActive ? brightnessRef.current : 0.08;
 
         const color = isDownbeat ? accentColor : '#ffffff';
 
@@ -115,6 +113,7 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
           >
             {/* Lit overlay */}
             <div
+              ref={(el) => { overlayRefs.current[i] = el; }}
               className="absolute inset-0 rounded-sm"
               style={{
                 backgroundColor: color,

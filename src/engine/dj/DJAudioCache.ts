@@ -368,6 +368,8 @@ export async function updateCacheAnalysis(
     keyConfidence?: number;
     onsets?: number[];
     frequencyPeaks?: number[][];
+    rmsDb?: number;
+    peakDb?: number;
     analysisVersion?: number;
     extended?: ExtendedAnalysis;
     // Genre classification

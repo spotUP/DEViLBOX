@@ -33,16 +33,22 @@ import type { StemResult } from '@engine/demucs/types';
 // ── Auto-gain ────────────────────────────────────────────────────────────────
 
 const TARGET_RMS_DB = -6;
-const UNANALYZED_FALLBACK_TRIM_DB = 9; // unanalyzed tracks get a conservative lift
+/**
+ * A track whose loudness was never measured plays at unity. An unknown level
+ * is not a quiet one: the old +9 dB "conservative lift" drove every
+ * unanalysed track into the deck limiter (continuous 2-3 dB gain reduction,
+ * pumping kick, the DJ view always sounding processed while the tracker view
+ * did not).
+ */
+const UNANALYZED_FALLBACK_TRIM_DB = 0;
 
 /**
  * Compute auto-gain trim in dB from analysis data.
  * Pure RMS-based targeting — no peak clamp. The master limiter at -0.3 dBFS
  * is the real ceiling, so auto-gain can push cold tracks up to +18 dB freely.
  *
- * When a track has no analysis data (rmsDb <= -80, the sentinel), we fall
- * back to a +9 dB lift — loud enough to match drumpad synths without
- * exceeding the limiter's ability to catch peaks.
+ * When a track has no loudness measurement (rmsDb <= -80, the sentinel) the
+ * trim is 0 dB: no measurement, no gain.
  */
 export function computeAutoTrim(rmsDb: number, _peakDb: number): number {
   if (rmsDb <= -80) return UNANALYZED_FALLBACK_TRIM_DB;
@@ -122,8 +128,22 @@ export interface PipelineResult {
  * analysed (no beat grid or no BPM). One mapping for the cache-hit return of
  * loadOrEnqueue and for Auto DJ's pre-rendered load.
  */
+/**
+ * The cached loudness. Entries written before the analysis update stored
+ * rmsDb/peakDb have none of their own; their extended analysis carries the
+ * same measurement (mean-square RMS and peak of the mono render), so that is
+ * read instead of reporting the track as unmeasured.
+ */
+export function cachedLoudness(cached: CachedAudio): { rmsDb: number; peakDb: number } {
+  return {
+    rmsDb: cached.rmsDb ?? cached.extended?.loudness.integratedDb ?? -100,
+    peakDb: cached.peakDb ?? cached.extended?.loudness.peakDb ?? -100,
+  };
+}
+
 export function analysisFromCachedAudio(cached: CachedAudio): PipelineResult['analysis'] {
   if (!cached.beatGrid || !cached.bpm) return null;
+  const { rmsDb, peakDb } = cachedLoudness(cached);
   return {
     bpm: cached.bpm,
     bpmConfidence: cached.bpmConfidence ?? 0,
@@ -133,8 +153,8 @@ export function analysisFromCachedAudio(cached: CachedAudio): PipelineResult['an
     musicalKey: cached.musicalKey ?? 'Unknown',
     keyConfidence: cached.keyConfidence ?? 0,
     frequencyPeaks: cached.frequencyPeaks ?? [],
-    rmsDb: cached.rmsDb ?? -100,
-    peakDb: cached.peakDb ?? -100,
+    rmsDb,
+    peakDb,
     genre: {
       primary: cached.genrePrimary ?? 'Unknown',
       subgenre: cached.genreSubgenre ?? 'Unknown',
@@ -527,8 +547,7 @@ export class DJPipeline {
       // Update deck state immediately
       if (deckId) {
         // Auto-gain: target -6 dB RMS
-        const rmsDb = cached.rmsDb ?? -100;
-        const peakDb = cached.peakDb ?? -100;
+        const { rmsDb, peakDb } = cachedLoudness(cached);
         const autoTrimDb = computeAutoTrim(rmsDb, peakDb);
         const deckState = useDJStore.getState().decks[deckId];
         const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
@@ -591,6 +610,8 @@ export class DJPipeline {
           musicalKey: serverAnalysis.musicalKey,
           keyConfidence: serverAnalysis.keyConfidence,
           frequencyPeaks: serverAnalysis.frequencyPeaks,
+          rmsDb: serverAnalysis.rmsDb,
+          peakDb: serverAnalysis.peakDb,
           analysisVersion: serverAnalysis.analysisVersion,
           genrePrimary: serverAnalysis.genrePrimary,
           genreSubgenre: serverAnalysis.genreSubgenre,
@@ -950,6 +971,10 @@ export class DJPipeline {
           musicalKey: analysis.musicalKey,
           keyConfidence: analysis.keyConfidence,
           frequencyPeaks: analysis.frequencyPeaks,
+          // The loudness the trim is computed from: without it every later
+          // cache hit read -100 dB and got the unanalysed trim.
+          rmsDb: analysis.rmsDb,
+          peakDb: analysis.peakDb,
           analysisVersion: analysis.extended ? DJ_ANALYSIS_VERSION : 1,
           extended: analysis.extended ?? undefined,
           // Genre classification

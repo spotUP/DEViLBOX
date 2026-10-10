@@ -16,6 +16,7 @@ import {
 import { DeckPatternDisplay } from './DeckPatternDisplay';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 import { useDJStore } from '@/stores/useDJStore';
+import { beatCrossed } from '@/engine/dj/DJAutoSync';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import {
   VISUALIZER_MODES,
@@ -76,16 +77,16 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
   // in a ref so the gated hook can drive it without a self-restarting effect.
   const [beatFlashOpacity, setBeatFlashOpacity] = useState(0);
   const flashDecayRef = useRef(0);
-  const prevBeatIdxRef = useRef(-1);
+  const prevBeatIdxRef = useRef<number | null>(null);
 
   const beatFlashFrame = useCallback((): boolean => {
     const phase = viz.getBeatPhase();
     if (phase) {
-      // Detect beat transition (nearest beat index changed)
-      if (phase.nearestBeatIdx !== prevBeatIdxRef.current && prevBeatIdxRef.current >= 0) {
+      // Flash when the heard position crosses a beat (the beat in progress changed)
+      if (beatCrossed(prevBeatIdxRef.current, phase.beatIdx)) {
         flashDecayRef.current = 1.0; // trigger flash
       }
-      prevBeatIdxRef.current = phase.nearestBeatIdx;
+      prevBeatIdxRef.current = phase.beatIdx;
     }
     // Decay the flash
     if (flashDecayRef.current > 0.01) {
@@ -106,7 +107,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
   useEffect(() => {
     if (!isPlaying) {
       flashDecayRef.current = 0;
-      prevBeatIdxRef.current = -1;
+      prevBeatIdxRef.current = null;
       setBeatFlashOpacity(0);
     }
   }, [isPlaying]);
