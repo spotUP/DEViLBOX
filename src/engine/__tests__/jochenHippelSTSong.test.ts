@@ -186,8 +186,5 @@ describe('Jochen Hippel ST import route (the app entry point)', () => {
     expect(song.uadePatternLayout?.formatId).toBe('jochenHippelST');
     expect(song.uadeEditableFileName).toMatch(/\.hst$/);
     expect(eq(hstSourceOfImage(new Uint8Array(song.uadeEditableFileData!))!, load(rel))).toBe(true);
-    // The first case pays for the route's lazy imports (915 ms cold vs 20 ms
-    // warm, idle machine). Inside the full pre-push run it passed 5 s and timed
-    // out; the route, not its load time, is what this test checks.
-  }, 30_000);
+  });
 });
