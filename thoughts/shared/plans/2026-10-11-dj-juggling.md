@@ -537,6 +537,84 @@ private standalone: { phase: 'loading' | 'cued' | 'running'; trigger: JuggleTrig
 
 **P4 success criteria**: with one deck playing a module track (grid confidence 1) in MUSICAL/CRUISING, cooldown elapsed and a build ahead within a phrase, Auto DJ loads the double, starts it on the master's downbeat with heard-phase error < 5 ms after the bend, performs one pattern (crossfader moves >= 2), and hands back: idle stopped, crossfader on the master within 1 bar of the pattern end.
 
+**P4 as built (2026-10-11, deviations from the text above)**
+
+Owner rule source: the music-theory juggling plan
+`thoughts/shared/plans/2026-10-08-auto-dj-beat-juggling-plan.md` (cited as
+"owner §N") wins over this plan; audit
+`thoughts/shared/research/2026-10-11_juggling-vs-music-theory-plan.md` rows 29, 30, 32
+were closed here.
+
+- Migration (8.2): `autoDJJuggleMode` is not persisted anywhere (no zustand
+  persist middleware on `useDJStore`, not in the DJ environment snapshot
+  `src/lib/dj/djEnvironment.ts`, not in saved projects; grep of `juggleMode` over
+  `src/`). So there is no stored OFF to tell apart from a user's OFF and no
+  migration: the default is MUSICAL from this build on; a user's OFF lasts the
+  session as before. Test: R4 file, "Auto Juggle defaults to MUSICAL".
+- Owner §53 ("do not rewrite DJAutoDJ into a giant controller"): the setup,
+  hold and hand-back live in `src/engine/dj/autodj/juggle/standaloneJuggle.ts`
+  (`StandaloneJuggle`), not in `DJAutoDJ`; Auto DJ only lends the idle deck
+  (`idleDeckBusy`, `nextOption`, `loadNextForTease`) and calls `end()` at the
+  interlocks.
+- P4.1: the double context's `deckSyncConfidence` is the master grid's
+  confidence (what the controller computes for two copies of one grid), not 1.
+  The opportunity also runs `planJuggle` on that context: no pattern for the
+  double, no setup (MUSICAL's only same-track pattern is `double`, which needs
+  intensity >= 0.45). The transition guard keeps room for the mode's longest
+  pattern. Owner §25: a `next` tease is judged by `conditions()` on the real
+  pair (next track from its cue on the idle deck at the master's tempo, built
+  by the controller's `buildContext`); any conflict or an unjudged pair means
+  the double (audit row 29).
+- P4.2: `useDecodedBuffer` is named `adoptDecodedBuffer` (not a hook). No
+  tracker song on the double: the song a deck holds is remapped in place to
+  that deck's instrument ids and `getCachedSong` can return that very object,
+  so a second load would remap it twice; the pattern view stays on the source
+  deck. Cached stems are looked up with the source's file bytes.
+- P4.3 setup follows owner §16 in order: the master's grid (reliable beat),
+  cue on the master's next downbeat while stopped, tempo match, start on that
+  bar (`quantizedPlay`, now cancellable), measured heard beat phase within 5 ms
+  (`verified`), and only then does the controller plan; the offset comes from
+  the pattern's ResyncDeck (owner §16 list). Hold-sync bends in beat phase
+  (keeps a whole-beat offset). Stand-alone juggles start in `playing` and in
+  `transition-pending` (a pre-rendered next track only exists there).
+- Owner §43 (never fight the user): a track the user loads on the idle deck,
+  or the crossfader moved off the master while no pattern runs, makes the layer
+  let go of the deck without stopping it (decision log `JUGGLE`).
+- Owner §17/§35/§44 (audit row 30): `double` is phrase-level now - SETUP
+  offset, 2-bar then 1-bar trades, the silent copy re-cued to zero offset and
+  its bass killed before the 1-bar layered payoff, released with the reset
+  (9 bars, `patternBars` 9). Beat juggling a double is PERFORMER's
+  (beatTrade / transformer). MUSICAL is the owner's table: phrase trading plus
+  call-response, fills and doubles - `drumBassTrade` (1-bar cuts) moved out of
+  MUSICAL (PERFORMER and up keep it). `fillTrade`'s layered drop kills the fill
+  deck's bass. Test: every MUSICAL pattern cuts on bars only and every layer
+  has one bass owner.
+- P4.4: pause also hands back (no poll loop would hold or end it); an idle deck
+  holding the next track for its transition (preloaded, no pre-render left) is
+  never used for a double. Hand-backs at the interlocks are immediate (the
+  transition / skip needs the deck now); pattern aborts still resolve through
+  the release (owner §42).
+- P4.5: the debug view gains a "Stand-alone" row; while nothing is set up,
+  Safety reads `stand-alone: <why not>` (the planner's own "both decks must
+  play" said nothing with one deck playing).
+- Budget (owner §24/§28/§31): stand-alone juggles count in the controller's
+  one history, cooldown and juggled fraction (the same `budgetFor` the
+  transition ladder's follow-up will use).
+- R4 negative case: a transition 40 s away (not 20 s): at 20 s the planner's
+  own "transition imminent" blocks; 40 s shows the stand-alone guard itself.
+- P4.LS: its own file (`autoDJStandaloneJuggleLongSet.test.ts`) through
+  `getAutoDJ()`, sharing `standaloneJuggleHarness.ts` with R4; the corpus
+  `drops` analysis tiled to an hour through the real builder. Measured: in
+  MUSICAL on one track with no transition, ONE double per hour - `double` is
+  MUSICAL's only same-track pattern and the planner never repeats the last
+  pattern (owner §49 / scenario 10); in a real set the transitions in between
+  free it again. PERFORMER (beatTrade / transformer / loopTighten on a double)
+  is run for 30 min to prove repeated juggles keep the cooldown and fraction.
+  The file runs ~6.5 min on this machine (1 h of fake clock at 500 ms polls).
+- Not done here (P3-scope audit rows, left for the follow-up agent): ladder
+  length / phrase alignment, ladder budget bypass, ladder mode table, module
+  grid confidence 1.
+
 ### Phase P5 - Ledger, docs, cleanup
 
 - **P5.1** Tick in `thoughts/shared/plans/2026-10-08-auto-dj-world-class-progress.md`: JUG-S26.2 (P3 test), JUG-S27.1 (P4 test), recompute the count line with the checkbox grep.
@@ -563,7 +641,7 @@ Each test is written first and seen failing (Gate 2).
 
 ## 5. Checklist
 
-Count: 29 of 46 done.
+Count: 37 of 46 done.
 
 P0 - probes
 - [ ] JUGX-P0.1 juggle-block reason histogram (10 min, MCP)
@@ -608,14 +686,14 @@ P3 - juggle-transition style
 - [x] JUGX-P3.TC type-check clean - after fdf858a51
 
 P4 - stand-alone juggles
-- [ ] JUGX-P4.1 `juggleOpportunity` + unit tests
-- [ ] JUGX-P4.2 `loadDoubleToDeck` (decoded-buffer reuse, analysis copy) + test
-- [ ] JUGX-P4.3 setup / hold-sync / hand-back in `DJAutoDJ`
-- [ ] JUGX-P4.4 interlocks (preload, skip, Mix Now, play-at, transition, disable)
-- [ ] JUGX-P4.5 telemetry `standalone` + debug view row
-- [ ] JUGX-P4.LS long-set simulation budget + leak assertions
-- [ ] JUGX-P4.R4 reachability test R4 red, then green
-- [ ] JUGX-P4.TC type-check clean
+- [x] JUGX-P4.1 `juggleOpportunity` + unit tests - 81d6cffb1; pair judged by the planner's conditions ff29d23a4 (audit row 29)
+- [x] JUGX-P4.2 `loadDoubleToDeck` (decoded-buffer reuse, analysis copy) + test - a062d35b8 (red with a re-decoding version: 2 decodes)
+- [x] JUGX-P4.3 setup / hold-sync / hand-back - 20c58189e (in `standaloneJuggle.ts`, owner §53; owner §16 order, audit row 32)
+- [x] JUGX-P4.4 interlocks (preload, skip, Mix Now, play-at, transition, disable; + pause, user takes the idle deck) - 20c58189e
+- [x] JUGX-P4.5 telemetry `standalone` + debug view row - 42e3ae481
+- [x] JUGX-P4.LS long-set simulation budget + leak assertions - 20c58189e (`autoDJStandaloneJuggleLongSet.test.ts`: MUSICAL 1 h, PERFORMER 30 min)
+- [x] JUGX-P4.R4 reachability test R4 red, then green - 20c58189e (red with the opportunity unwired and the default OFF: 3 of 3 failed)
+- [x] JUGX-P4.TC type-check clean - after 20c58189e
 
 P5 - ledger, docs
 - [ ] JUGX-P5.1 world-class progress ledger ticked + count recomputed
