@@ -83,15 +83,18 @@ describe('moduleBeatGrid', () => {
   const plain = (speed: number, bpm: number) => song([pattern('a', 64), pattern('b', 64)], [0, 1], { speed, bpm });
 
   it('speed 6 / tempo 125 is 125 BPM', () => {
-    expect(musicalBpm(6, 125)).toBeCloseTo(125, 9);
+    expect(musicalBpm(6, 125, 4)).toBeCloseTo(125, 9);
     const s = plain(6, 125);
     expect(moduleBeatGrid(s, walkEnd(s))?.bpm).toBe(125);
   });
 
-  it('speed 3 / tempo 125 is 250 BPM', () => {
-    expect(musicalBpm(3, 125)).toBeCloseTo(250, 9);
+  it('speed 3 / tempo 125 without drums is 125 BPM: a beat is 24 ticks (8 rows), not 4 rows', () => {
+    expect(musicalBpm(3, 125, 4)).toBeCloseTo(250, 9);
+    expect(musicalBpm(3, 125, 8)).toBeCloseTo(125, 9);
     const s = plain(3, 125);
-    expect(moduleBeatGrid(s, walkEnd(s))?.bpm).toBe(250);
+    const g = moduleBeatGrid(s, walkEnd(s))!;
+    expect(g.bpm).toBe(125);
+    expect(g.rowsPerBeat).toBe(8);
   });
 
   it('a beat every 4 rows and a downbeat every 16 rows from each pattern start', () => {
@@ -123,9 +126,10 @@ describe('moduleBeatGrid', () => {
     const cap = end / 2;
     expect(moduleBeatGrid(s, cap)).toBeNull();
     const g = moduleBeatGrid(s, cap, { renderCapSec: cap })!;
-    expect(g.bpm).toBe(250);
+    expect(g.bpm).toBe(125);
     expect(g.beats.every((t) => t < cap)).toBe(true);
-    expect(g.beats).toHaveLength(48);
+    // 192 rows rendered, a beat every 8 rows at speed 3.
+    expect(g.beats).toHaveLength(24);
   });
 
   it('a render 5 % longer than the walk is not trusted: null', () => {
@@ -134,12 +138,11 @@ describe('moduleBeatGrid', () => {
     expect(moduleBeatGrid(s, walkEnd(s) * 1.05)).toBeNull();
   });
 
-  it('a time-weighted BPM over a tempo change', () => {
-    // Half the time at speed 6 (125), half the rows at speed 3 (250): 64 rows each.
-    const s = song([pattern('a', 64), pattern('b', 64, { 0: [0x0f, 3] })], [0, 1]);
+  it('the BPM is the tempo the song plays longest; a short slow-down does not drag it', () => {
+    // 64 rows at speed 6 / 141, then 16 rows ramping down to tempo 64.
+    const s = song([pattern('a', 64), pattern('b', 16, { 0: [0x0f, 0x60], 8: [0x0f, 0x40] })], [0, 0, 1], { bpm: 141 });
     const g = moduleBeatGrid(s, walkEnd(s))!;
-    const t6 = 64 * rowSeconds(6, 125), t3 = 64 * rowSeconds(3, 125);
-    expect(g.bpm).toBeCloseTo((125 * t6 + 250 * t3) / (t6 + t3), 2);
+    expect(g.bpm).toBe(141);
   });
 });
 

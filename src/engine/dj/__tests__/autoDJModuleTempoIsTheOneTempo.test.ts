@@ -1,11 +1,12 @@
 /**
  * One tempo per track (dj-juggling plan P1, reachability test R1). A module
- * at speed 3 / tick tempo 125 plays 250 BPM. Through the real Auto DJ - enable,
+ * at speed 3 / tick tempo 125 with its backbeat every 16 rows plays 125 BPM
+ * (a beat is 8 rows). Through the real Auto DJ - enable,
  * the preload finishing (anticipate), the transition loading the preloaded
  * track with the real loadPreRenderedTrackToDeck, DJEngine.loadAudioToDeck and
  * DJPipeline.applyAnalysisToDeck - the deck BPM, the deck beat grid, the
  * DJTrackAnalysis and the playlist BPM all read the module's own timing, never
- * the audio analysis' 125 (the DJ-K split: playlist 94, deck 140.95).
+ * the audio analysis' 140.95 (the DJ-K split: playlist 94, deck 140.95).
  * Fake deck engine, no audio.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -113,14 +114,13 @@ describe('a module\'s own tempo is the one tempo: deck, grid, analysis and playl
     vi.restoreAllMocks();
   });
 
-  it('speed 3 / tempo 125: deck detectedBPM, deck grid, trackAnalysis and playlist bpm are all 250', async () => {
+  it('speed 3 / tempo 125: deck detectedBPM, deck grid, trackAnalysis and playlist bpm are all the module 125', async () => {
     const song = { ...corpusTrackerSong(), initialSpeed: 3 } as TrackerSong;
     const { positions } = timeOrderPositions(song);
     // The render: the song plus a short decay tail.
     renderSec = positions[positions.length - 1].end + 0.4;
-    // The audio analysis heard the module at its tick tempo (125): the reading the module grid replaces.
-    const audio = corpusPipelineAnalysis(corpusTrack('tracker'));
-    expect(audio.bpm).toBe(125);
+    // The audio analysis' reading (the DJ-K deck number): what the module grid replaces.
+    const audio = corpusPipelineAnalysis(corpusTrack('tracker'), { bpm: 140.95 });
     holder.preRendered = { wavData: new ArrayBuffer(8), filename: 'speed3.mod', trackName: 'speed3', bpm: audio.bpm, song, duration: renderSec, analysis: audio };
 
     expect(await getAutoDJ().enable(0)).toBeNull();
@@ -135,15 +135,15 @@ describe('a module\'s own tempo is the one tempo: deck, grid, analysis and playl
     const deck = useDJStore.getState().decks.B;
     const playlistTrack = useDJPlaylistStore.getState().playlists.find((p) => p.id === useDJPlaylistStore.getState().activePlaylistId)!.tracks[1];
     expect(deck.trackAnalysis?.tempoSource).toBe('module');
-    expect(deck.trackAnalysis?.bpm).toBeCloseTo(250, 2);
+    expect(deck.trackAnalysis?.bpm).toBeCloseTo(125, 2);
     expect(deck.trackAnalysis?.beatGrid.confidence).toBe(1);
-    expect(deck.detectedBPM).toBeCloseTo(250, 2);
-    expect(deck.beatGrid?.bpm).toBeCloseTo(250, 2);
-    // The deck grid is the module's: a beat every 4 rows (0.24 s at 250 BPM), a bar every 16.
-    expect(deck.beatGrid!.beats[1] - deck.beatGrid!.beats[0]).toBeCloseTo(0.24, 6);
-    expect(deck.beatGrid!.downbeats[1] - deck.beatGrid!.downbeats[0]).toBeCloseTo(0.96, 6);
-    expect(playlistTrack.bpm).toBeCloseTo(250, 2);
-    expect(playlistTrack.djSummary?.bpm).toBeCloseTo(250, 2);
+    expect(deck.detectedBPM).toBeCloseTo(125, 2);
+    expect(deck.beatGrid?.bpm).toBeCloseTo(125, 2);
+    // The deck grid is the module's: a beat every 8 rows (0.48 s at 125 BPM), a bar every 32.
+    expect(deck.beatGrid!.beats[1] - deck.beatGrid!.beats[0]).toBeCloseTo(0.48, 6);
+    expect(deck.beatGrid!.downbeats[1] - deck.beatGrid!.downbeats[0]).toBeCloseTo(1.92, 6);
+    expect(playlistTrack.bpm).toBeCloseTo(125, 2);
+    expect(playlistTrack.djSummary?.bpm).toBeCloseTo(125, 2);
   }, 30_000);
 
   it('a render that does not match the walk: all four read the audio analysis', async () => {
@@ -151,7 +151,7 @@ describe('a module\'s own tempo is the one tempo: deck, grid, analysis and playl
     const { positions } = timeOrderPositions(song);
     // 10 % longer than the walk: a loop the walk did not follow; the song's timing is not trusted.
     renderSec = positions[positions.length - 1].end * 1.1;
-    const audio = corpusPipelineAnalysis(corpusTrack('tracker'));
+    const audio = corpusPipelineAnalysis(corpusTrack('tracker'), { bpm: 140.95 });
     holder.preRendered = { wavData: new ArrayBuffer(8), filename: 'speed3.mod', trackName: 'speed3', bpm: audio.bpm, song, duration: renderSec, analysis: audio };
 
     expect(await getAutoDJ().enable(0)).toBeNull();
@@ -163,9 +163,9 @@ describe('a module\'s own tempo is the one tempo: deck, grid, analysis and playl
     const deck = useDJStore.getState().decks.B;
     const playlistTrack = useDJPlaylistStore.getState().playlists.find((p) => p.id === useDJPlaylistStore.getState().activePlaylistId)!.tracks[1];
     expect(deck.trackAnalysis?.tempoSource).toBe('audio');
-    expect(deck.trackAnalysis?.bpm).toBe(125);
-    expect(deck.detectedBPM).toBe(125);
-    expect(deck.beatGrid?.bpm).toBe(125);
-    expect(playlistTrack.bpm).toBe(125);
+    expect(deck.trackAnalysis?.bpm).toBe(140.95);
+    expect(deck.detectedBPM).toBe(140.95);
+    expect(deck.beatGrid?.bpm).toBe(140.95);
+    expect(playlistTrack.bpm).toBe(140.95);
   }, 30_000);
 });

@@ -11,6 +11,10 @@ Keep each fixture as small as possible so CI stays fast.
   Mortimer Twang, famously 2118 bytes in total. Released on Modland as a
   demonstration of how small a real tracker song can be. Perfect for parser
   smoke tests because every byte is deliberate.
+- `ultraux-vision.mod` — "ultraux vision" by DWB (Modland
+  pub/modules/Protracker/DWB), 89 KB. Speed 3 / tempo 141 with a beat every
+  8 rows: the case that showed speed alone does not give the musical BPM
+  (detectBPMIsSpeedAware.test.ts; owner: ~136-141 BPM, not 272).
 
 ## Loading in tests
 
