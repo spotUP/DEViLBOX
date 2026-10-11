@@ -22,6 +22,7 @@ import { getPhaseInfo, phaseAlign, quantizedPlay, syncBPMToOther } from '../../D
 import { engageAutoKeyLock, releaseAutoKeyLock, resetDeckAfterTransition } from '../transitionExecutor';
 import { getDecisionLog } from '../decisionLog';
 import type { DJTrackAnalysis } from '../types';
+import { barIndexAt } from '../beatGrid';
 import type { DJJuggleController, TickInput } from './juggleController';
 import { juggleOpportunity, type JuggleOpportunity, type NextTrackOption } from './juggleOpportunity';
 import type { JuggleTrigger, StandaloneSource } from './juggleTypes';
@@ -34,6 +35,36 @@ export function mixInPhraseStartOf(a: DJTrackAnalysis): number {
   const mixIn = a.cuePoints.bestMixIn ?? 0;
   const phrase = [...a.phrases].reverse().find((p) => p.start <= mixIn + 0.01);
   return phrase?.start ?? mixIn;
+}
+
+/** Index of the bar of a grid whose start is nearest to `t`. */
+function nearestBar(a: DJTrackAnalysis, t: number): number {
+  const bars = a.downbeats.bars;
+  const i = barIndexAt(a.downbeats, t);
+  return i + 1 < bars.length && Math.abs(bars[i + 1].start - t) < Math.abs(bars[i].start - t) ? i + 1 : i;
+}
+
+/**
+ * Where a teased next track is cued when it starts on the master's bar at
+ * `masterStartSec` (owner plan sections 9, 41: both tracks' phrases run
+ * together): as many bars before one of its phrase starts (its mix-in
+ * phrase, or a later one) as the master has bars left to its next phrase
+ * start, so the two phrase grids meet there. Without a master phrase ahead,
+ * the mix-in phrase start.
+ */
+export function teaseCueSec(master: DJTrackAnalysis, masterStartSec: number, incoming: DJTrackAnalysis): number {
+  const mixIn = mixInPhraseStartOf(incoming);
+  const startBar = nearestBar(master, masterStartSec);
+  const next = master.phrases.find((p) => p.startBar >= startBar);
+  if (!next) return mixIn;
+  const barsLeft = next.startBar - startBar;
+  const bars = incoming.downbeats.bars;
+  for (const phrase of incoming.phrases) {
+    if (phrase.start < mixIn - 0.01) continue;
+    const cueBar = phrase.startBar - barsLeft;
+    if (cueBar >= 0 && cueBar < bars.length) return bars[cueBar].start;
+  }
+  return mixIn;
 }
 
 export interface StandaloneDeps {
@@ -130,8 +161,13 @@ export class StandaloneJuggle {
     this.state!.fileName = useDJStore.getState().decks[idle].fileName;
 
     // Owner plan section 16 steps 1-3: a reliable beat (the master's grid), the same beat, the bar phase.
+    // A teased next track starts on the master's next bar, cued so its phrases meet the master's (sections 9, 41).
     const analysis = useDJStore.getState().decks[idle].trackAnalysis;
-    const cue = op.source === 'double' ? this.nextDownbeatOf(active) : analysis ? mixInPhraseStartOf(analysis) : null;
+    const masterAnalysis = useDJStore.getState().decks[active].trackAnalysis;
+    const startSec = this.nextDownbeatOf(active);
+    const cue = op.source === 'double' ? startSec
+      : !analysis ? null
+      : masterAnalysis && startSec !== null ? teaseCueSec(masterAnalysis, startSec, analysis) : mixInPhraseStartOf(analysis);
     if (cue !== null) seekDeckAudio(idle, cue);
     let semitones = 0;
     try { semitones = syncBPMToOther(idle, active); } catch { /* grid missing */ }
