@@ -145,3 +145,51 @@ export function attachChannelScopes(wav: ArrayBuffer, track: ChannelScopeTrack |
 export function channelScopesFor(wav: ArrayBuffer): ChannelScopeTrack | undefined {
   return byWav.get(wav);
 }
+
+/**
+ * Whether the deck shows the combined ALL scope: only a deck with no per-channel
+ * signal (an audio file, or a render from before the scope track existed). A deck
+ * with channel scopes shows CH1..CH4 alone - ALL is a sum the channels already show.
+ */
+export function showsAllScope(channelScopeCount: number): boolean {
+  return channelScopeCount <= 0;
+}
+
+/**
+ * Cache entries written by a render that knew about scope tracks carry this
+ * version (CachedAudio.scopeRenderVersion), whether or not the engine had a
+ * per-channel tap. An entry without it was rendered before e193fc143 and is
+ * re-rendered once, in the background, for its scope track.
+ */
+export const CHANNEL_SCOPE_RENDER_VERSION = 1;
+
+/** What a re-render for scopes needs from a cache entry. */
+export interface ScopelessOrigin {
+  hash: string;
+  filename: string;
+  /** Duration of the cached WAV; the re-render must match it to line up with the audio the deck plays. */
+  duration: number;
+}
+
+/** True when `entry` is an old-shape cache entry that can be re-rendered for its scope track from its own source bytes. */
+export function needsChannelScopeRerender(entry: {
+  audioData?: ArrayBuffer; sourceData?: ArrayBuffer; channelScopes?: ChannelScopeTrack; scopeRenderVersion?: number;
+}): boolean {
+  return !!entry.audioData && entry.audioData.byteLength > 0
+    && !!entry.sourceData && entry.sourceData.byteLength > 0
+    && !entry.channelScopes
+    && (entry.scopeRenderVersion ?? 0) < CHANNEL_SCOPE_RENDER_VERSION;
+}
+
+// The cache entry each scopeless WAV came from, keyed by the WAV bytes a deck loads.
+const scopelessOrigins = new WeakMap<ArrayBuffer, ScopelessOrigin>();
+
+/** Record that `wav` was read from an old-shape cache entry that wants a scope re-render. */
+export function noteScopelessWav(wav: ArrayBuffer, origin: ScopelessOrigin): void {
+  scopelessOrigins.set(wav, origin);
+}
+
+/** The old-shape cache entry `wav` was read from, if it wants a scope re-render. */
+export function scopelessOriginOf(wav: ArrayBuffer): ScopelessOrigin | undefined {
+  return scopelessOrigins.get(wav);
+}

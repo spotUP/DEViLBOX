@@ -14,7 +14,10 @@ const MAX_CACHE_SIZE_MB = 2000; // 2 GB limit (gig playlists need 200+ tracks)
 const MAX_CACHE_ENTRIES = 1000; // Max 1000 cached files
 
 import type { ExtendedAnalysis } from './autodj/types';
-import { attachChannelScopes, type ChannelScopeTrack } from './channelScopeTrack';
+import {
+  attachChannelScopes, noteScopelessWav, needsChannelScopeRerender, CHANNEL_SCOPE_RENDER_VERSION,
+  type ChannelScopeTrack,
+} from './channelScopeTrack';
 
 export interface CachedAudio {
   hash: string;           // SHA-256 of source file
@@ -53,11 +56,21 @@ export interface CachedAudio {
 
   // ── Per-channel scope track rendered with audioData (channelScopeTrack.ts) ──
   channelScopes?: ChannelScopeTrack;
+  /** Set by a render that knew about scope tracks (CHANNEL_SCOPE_RENDER_VERSION), with or without a per-channel tap. */
+  scopeRenderVersion?: number;
 }
 
-/** A cache entry as read: its scope track attached to its WAV bytes, so the deck that loads them finds it. */
+/**
+ * A cache entry as read: its scope track attached to its WAV bytes, so the deck that loads them finds it.
+ * An old-shape entry (no track, never scope-rendered) is noted on its WAV so the load that follows can
+ * ask for the background re-render (DJChannelScopeRerender).
+ */
 function withChannelScopes<T extends CachedAudio | null | undefined>(entry: T): T {
-  if (entry?.audioData && entry.channelScopes) attachChannelScopes(entry.audioData, entry.channelScopes);
+  if (!entry?.audioData) return entry;
+  if (entry.channelScopes) attachChannelScopes(entry.audioData, entry.channelScopes);
+  else if (needsChannelScopeRerender(entry)) {
+    noteScopelessWav(entry.audioData, { hash: entry.hash, filename: entry.filename, duration: entry.duration });
+  }
   return entry;
 }
 
@@ -205,6 +218,7 @@ export async function cacheAudio(
       sizeBytes,
       sourceData: existingSource || sourceFile.slice(0), // preserve or store source
       channelScopes,
+      scopeRenderVersion: CHANNEL_SCOPE_RENDER_VERSION,
     };
 
     // Check if adding this entry would exceed limits
@@ -419,6 +433,71 @@ export async function updateCacheAnalysis(
     });
   } catch (err) {
     console.error('[DJAudioCache] Failed to update analysis:', err);
+  }
+}
+
+/** The cache entry stored under `hash` (no LRU touch), or null. */
+export async function getCachedEntryByHash(hash: string): Promise<CachedAudio | null> {
+  try {
+    const database = await initDB();
+    return await new Promise<CachedAudio | null>((resolve) => {
+      const req = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(hash);
+      req.onsuccess = () => resolve((req.result as CachedAudio | undefined) ?? null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Store the scope track a background re-render produced on an existing entry
+ * and mark the entry scope-rendered. Nothing else changes: the audio, the
+ * waveform and the analysis stay as they are (the deck may be playing them).
+ * `track` undefined = the render had no per-channel tap; the entry is marked
+ * so it is not re-rendered again.
+ */
+export async function setCacheChannelScopes(hash: string, track: ChannelScopeTrack | undefined): Promise<void> {
+  try {
+    const database = await initDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const getReq = store.get(hash);
+      getReq.onsuccess = () => {
+        const entry = getReq.result as CachedAudio | undefined;
+        if (!entry) { resolve(); return; }
+        if (track) entry.channelScopes = track;
+        entry.scopeRenderVersion = CHANNEL_SCOPE_RENDER_VERSION;
+        const putReq = store.put(entry);
+        putReq.onsuccess = () => resolve();
+        putReq.onerror = () => reject(putReq.error);
+      };
+      getReq.onerror = () => reject(getReq.error);
+    });
+  } catch (err) {
+    console.error('[DJAudioCache] Failed to store channel scopes:', err);
+  }
+}
+
+/** Every old-shape entry that wants a scope re-render (cursor scan: one entry in memory at a time). */
+export async function listScopelessEntries(): Promise<Array<{ hash: string; filename: string; duration: number }>> {
+  try {
+    const database = await initDB();
+    return await new Promise((resolve) => {
+      const out: Array<{ hash: string; filename: string; duration: number }> = [];
+      const req = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) { resolve(out); return; }
+        const e = cursor.value as CachedAudio;
+        if (needsChannelScopeRerender(e)) out.push({ hash: e.hash, filename: e.filename, duration: e.duration });
+        cursor.continue();
+      };
+      req.onerror = () => resolve(out);
+    });
+  } catch {
+    return [];
   }
 }
 
