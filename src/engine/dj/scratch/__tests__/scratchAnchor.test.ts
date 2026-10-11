@@ -115,7 +115,7 @@ describe('the planner grid (section 8, SCR-P3.6)', () => {
   });
 
   it('1/32 only for one-step gestures under 110 BPM', () => {
-    const stab = getGesture('forwardStab');
+    const stab = getGesture('laser'); // one-step stroke (SA-B2: the forward stab is an eighth)
     const orbit = getGesture('orbit');
     expect(stab.durationSteps).toBeLessThanOrEqual(1);
     expect(allowedGrids(stab, 100)).toContain('1/32');

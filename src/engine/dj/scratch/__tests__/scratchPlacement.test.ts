@@ -177,10 +177,10 @@ describe('humanize (section 35, SCR-P4.8)', () => {
     }
   });
 
-  it('a stab at 174 BPM (drum and bass) stays exactly on the grid', () => {
-    expect(getGesture('forwardStab').durationSteps).toBeLessThanOrEqual(1);
-    for (let i = 0; i < 50; i++) expect(humanizeMs({ beat: 8.5, gesture: 'forwardStab' }, lfsr(i + 1), 174, null)).toBe(0);
-    expect(humanizeMs({ beat: 8.5, gesture: 'chirp' }, lfsr(3), 174, null)).not.toBe(0);
+  it('a one-step stroke at 174 BPM (drum and bass) stays exactly on the grid', () => {
+    expect(getGesture('laser').durationSteps).toBeLessThanOrEqual(1);
+    for (let i = 0; i < 50; i++) expect(humanizeMs({ beat: 8.5, gesture: 'laser' }, lfsr(i + 1), 174, null)).toBe(0);
+    expect(humanizeMs({ beat: 8.5, gesture: 'forwardStab' }, lfsr(3), 174, null)).not.toBe(0);
   });
 });
 

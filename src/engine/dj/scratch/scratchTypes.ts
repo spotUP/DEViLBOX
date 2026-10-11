@@ -80,7 +80,8 @@ export interface ScratchGesture {
   id: ScratchGestureId;
   /** Full English UI label (CLAUDE.md: never an abbreviation). */
   name: string;
-  /** Planner default length in 16th steps (Up Rough `_GESTURE_STEPS`). */
+  /** The gesture's one length in 16th steps: placed by the planner, released on by the
+   *  executor, run by the stroke (`cycleBeats` is derived from it). */
   durationSteps: number;
   /** Calm -> busy rank read from the definition: fader windows + hand reversals. */
   activity: number;
@@ -105,7 +106,7 @@ export interface ScratchGesture {
   requiresReverse: boolean;
   /** May be performed on a scratch-crate record (section 38/39). */
   allowsSampleSource: boolean;
-  /** Execution cycle in beats of the looping pattern player. */
+  /** Derived: durationSteps / 4 / strokes - one stroke cycle of the pattern player. */
   cycleBeats: number;
   /** Linear interpolation between velocity keyframes. */
   interpolateVelocity: boolean;
