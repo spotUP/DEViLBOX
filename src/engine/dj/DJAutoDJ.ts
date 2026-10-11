@@ -1725,6 +1725,12 @@ class DJAutoDJ {
       const userControl = j.isActive() && last !== null && Math.abs(s.crossfaderPosition - last) > 0.05 ? 'crossfader' : null;
       const performanceMode: DJPerformanceMode = this.execution?.plan.style === 'juggleTransition' && j.isActive() ? 'JUGGLE_TRANSITION'
         : transitioning ? 'NORMAL_MIX' : 'JUGGLE';
+      // Owner plan section 43: the idle deck plays outside a transition and outside this layer's own
+      // stand-alone juggle: the user started it. They decide; the controller plans only with decks it was lent.
+      if (!transitioning && !j.isActive() && !standalone.active() && this.deckPlaying(this.idleDeck)) {
+        j.setStandalone(null, 'user control: the idle deck was started by hand');
+        return;
+      }
       const input = this.tickInput(performanceMode, timeRemaining, userControl);
       j.tick(input);
       if (performanceMode === 'JUGGLE' && !j.isActive()) standalone.consider(status, input);
