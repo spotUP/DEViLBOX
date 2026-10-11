@@ -41,6 +41,20 @@ const ENERGY_JUMP_SCALE = 60;     // multiplied by diff² — 0.1 = 0.6, 0.3 = 5
 const ENERGY_DIRECTION_BONUS = -3; // bonus when energy moves in the same direction as previous transition
 // Energy steps in the 0.05-0.2 range get a small bonus (see transitionScore)
 
+/** A key's confidence from the track's analysis summary; none recorded = unknown (0). */
+function keyConfidenceOf(t: PlaylistTrack): number {
+  const c = t.djSummary?.keyConfidence;
+  return typeof c === 'number' && Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 0;
+}
+
+/** The key term: the Camelot relation's score blended toward the unknown penalty by sqrt(confA * confB). */
+export function keyTerm(a: PlaylistTrack, b: PlaylistTrack): number {
+  if (!a.musicalKey || !b.musicalKey) return KEY_UNKNOWN_PENALTY;
+  const relation = KEY_SCORE[keyCompatibility(a.musicalKey, b.musicalKey)] ?? 0;
+  const weight = Math.sqrt(keyConfidenceOf(a) * keyConfidenceOf(b));
+  return KEY_UNKNOWN_PENALTY + (relation - KEY_UNKNOWN_PENALTY) * weight;
+}
+
 /** Score how well track B follows track A (lower = better match) */
 function transitionScore(
   a: PlaylistTrack,
@@ -62,12 +76,10 @@ function transitionScore(
   }
 
   // ── Key ──
-  if (a.musicalKey && b.musicalKey) {
-    const compat = keyCompatibility(a.musicalKey, b.musicalKey);
-    score += KEY_SCORE[compat] ?? 0;
-  } else {
-    score += KEY_UNKNOWN_PENALTY;
-  }
+  // Weighted by how sure both keys are (owner juggling plan section 31), the way the transition
+  // planner's harmonic rule weighs them (sqrt of the joint confidence): a clash between two
+  // uncertain readings costs about what an unknown key costs, not +50.
+  score += keyTerm(a, b);
 
   // ── Energy ──
   const eA = a.energy ?? 0.5;

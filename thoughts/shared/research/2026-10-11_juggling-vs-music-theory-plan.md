@@ -49,7 +49,7 @@ code, not listened to.
 | 20 | §42 | Abort resolves gracefully, never stops dead | Aborted ladder -> trace `ladder aborted: release now`, the release curve still runs (`transitionExecutor.ts:290-296`) | CONFORMS |
 | 21 | §43 | Yield to the user | A user-started incoming keeps its position (`transitionExecutor.ts:248-251`); user control during a juggle goes through the controller's existing abort path (`juggleController.ts:231`) | CONFORMS |
 | 22 | §34, §35 (during the ladder) | At least one audible deck; no blind bass layering | Trades are crossfader cuts between two playing decks; release is a cut with full-range EQ on both (`transitionPlanner.ts:361-362,410-412`): one bass at a time | CONFORMS |
-| 23 | §14, §35 | Intentional bass handover avoiding low-end collision ("cut A bass, bring B bass") | Planned transitions hand over at `const cut = -12` dB (`transitionPlanner.ts:408`), not a kill; the juggle layer itself hands over with true kills (`juggleDeckSink.ts:112-114`). Two rules for one musical act, and -12 dB leaves the outgoing bass under the incoming (this is DJ1 (f)) | DEVIATES |
+| 23 | §14, §35 | Intentional bass handover avoiding low-end collision ("cut A bass, bring B bass") | Planned transitions hand over at `const cut = -12` dB (`transitionPlanner.ts:408`), not a kill; the juggle layer itself hands over with true kills (`juggleDeckSink.ts:112-114`). Two rules for one musical act, and -12 dB leaves the outgoing bass under the incoming (this is DJ1 (f)) | CONFORMS (fixed 207495d4f, JUGX-CONFORM) |
 | 24 | §53 | Transition executor owns ordinary transitions; juggle executor owns performance actions; shared deck state | The executor's trade stage hands the ladder to the juggle controller and resumes with the release (`transitionExecutor.ts:290-296`); the prelude in `DJAutoDJ` was deleted (fdf858a51) | CONFORMS |
 | 25 | §45, §46 | Telemetry and events with reasons | Ladder decision carries `juggle transition: <reason>` (`juggleController.ts:216-219`); executor trace `juggle ladder 4-2-1` (`transitionExecutor.ts:291`) | CONFORMS |
 | 26 | §47 | Deterministic harness: actions land on intended beats | R3 asserts the cut beats through `getAutoDJ()` (`autoDJJuggleTransitionReachesTheDecks.test.ts`, fdf858a51); R2 asserts zero seeks on playing decks. Not run in this audit | CONFORMS |
@@ -66,7 +66,7 @@ progress), N-A 0.
 
 ## 2. Fixes for DEVIATES / MISSING rows
 
-JUGX-CONFORM status (2026-10-11): rows 3, 5, 6 fixed in 3c083f24c; rows 9, 11-17 in 6c55b4a5f. Row 23 and DJ1 (d)-(g) still open (work in progress, see `thoughts/spot/jugx-conform-ledger.md`).
+JUGX-CONFORM status (2026-10-11): rows 3, 5, 6 fixed in 3c083f24c; rows 9, 11-17 in 6c55b4a5f; row 23 and DJ1 (d)-(f) in 207495d4f; DJ1 (g) in the commit that carries this note. Rows 29, 30, 32 were closed by P4 (ff29d23a4, 20c58189e).
 
 | # | Fix (file, what to change) | Scope |
 |---|---|---|
@@ -87,6 +87,14 @@ JUGX-CONFORM status (2026-10-11): rows 3, 5, 6 fixed in 3c083f24c; rows 9, 11-17
 | 32 | P4.3 setup must perform §16's six steps in order (reliable beat, align, bar phase, offset from §16's list, verify phase, then permit) and keep the bend-vs-recue rule of row 9 | P4-scope |
 
 ## 3. DJ1 (d)-(g) (`thoughts/shared/plans/2026-10-06-fix-all-open.md:242`)
+
+JUGX-CONFORM: all four now CONFORM. (d) legacy echo-out crossfader follows the planned echo-out law, (e) legacy
+beat-matched and skip blends raise the high-pass along the planned curve, (f) both paths hand the bass over with the
+kill switch (207495d4f; shapes in `autodj/transitionCurves.ts`). (g) the playlist key and energy come from the
+DJTrackAnalysis summary in every analyser branch (the server's own key/energy are no longer written) and in Auto DJ's
+anticipation; Smart Sort blends the key score toward the unknown penalty by sqrt(confA * confB) from the summary's key
+confidence (missing = unknown). Not test-covered: the Modland server branch's piggyback summary (covered by code reading
+and the local-branch test only). The findings below are the original audit text.
 
 The juggling plan is the only owner music-theory text audited here; it has no explicit rule for
 echo-out crossfader shape or filter-sweep law, so (d) and (e) are judged by its general rules

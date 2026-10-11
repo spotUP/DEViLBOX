@@ -27,7 +27,7 @@ import { detectDrumBreakTail, isChordChangeImminent } from './smartCuts';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { getSessionController, type SessionTrack } from './autodj/sessionController';
 import { executeTransition, releaseAutoKeyLock, type ExecutionHandle } from './autodj/transitionExecutor';
-import { buildDJTrackAnalysis, summarizeTrack } from './autodj/trackAnalysis';
+import { buildDJTrackAnalysis, playlistMetaFromSummary, summarizeTrack } from './autodj/trackAnalysis';
 import { getDecisionLog } from './autodj/decisionLog';
 import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
 import { DJJuggleController, analysisClock, type TickInput } from './autodj/juggle/juggleController';
@@ -1540,7 +1540,7 @@ class DJAutoDJ {
       // when the track had no summary yet.
       const summary = summarizeTrack(this.incomingAnalysis);
       const plId = useDJPlaylistStore.getState().activePlaylistId;
-      if (plId) useDJPlaylistStore.getState().updateTrackMeta(plId, index, { bpm: summary.bpm, djSummary: summary });
+      if (plId) useDJPlaylistStore.getState().updateTrackMeta(plId, index, { ...playlistMetaFromSummary(summary), djSummary: summary });
       const outgoing = useDJStore.getState().decks[this.activeDeck].trackAnalysis;
       this.plan = controller.planTransitionFor(outgoing, this.incomingAnalysis, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition(), this.juggleBudget());
     } catch (err) {

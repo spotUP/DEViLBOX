@@ -44,4 +44,22 @@ describe('the playlist analyser writes the module tempo', () => {
     expect(track.bpm).toBeCloseTo(125, 2);
     expect(track.djSummary?.bpm).toBeCloseTo(125, 2);
   }, 30_000);
+
+  it('the playlist key and energy come from the same analysis as the tempo, with the key confidence beside them (owner plan sections 2, 31)', async () => {
+    // Essentia's own energy reading (genre.energy) disagrees with the DJ analysis' perceived intensity.
+    holder.analysis = corpusPipelineAnalysis(corpusTrack('steady'), { genre: { primary: 'Electronic', subgenre: 'Techno', confidence: 0.6, mood: 'Energetic', energy: 0.02, danceability: 0.7 } });
+    const pl = useDJPlaylistStore.getState();
+    const id = `analyse-key-${Date.now()}`;
+    pl.importPlaylists([{ id, name: 'analyse key', createdAt: Date.now(), updatedAt: Date.now(), tracks: [
+      { id: 'wav', fileName: 'steady.wav', trackName: 'steady', format: 'WAV', bpm: 0, duration: 0, addedAt: 0 },
+    ] }]);
+    const r = await analyzePlaylist(id);
+    expect(r.analyzed).toBe(1);
+    const track = useDJPlaylistStore.getState().playlists.find((p) => p.id === id)!.tracks[0];
+    expect(track.djSummary).toBeDefined();
+    expect(track.energy).toBeCloseTo(track.djSummary!.energy.perceivedIntensity, 9);
+    expect(track.energy).not.toBeCloseTo(0.02, 2);
+    expect(track.musicalKey).toBe(track.djSummary!.key);
+    expect(track.djSummary!.keyConfidence).toBeGreaterThan(0);
+  }, 30_000);
 });
