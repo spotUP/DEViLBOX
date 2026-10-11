@@ -15,12 +15,11 @@
  */
 import { MODE_PATTERNS } from './jugglePatterns';
 import { budgetFor, conditions, confidencePolicy, nextPhraseStartBeat, patternBars, planJuggle, POLICY_MIN } from './jugglePlanner';
-import type { DJDeckPerformanceState, DJJugglePerformanceContext, JuggleMode, LibraryPatternType } from './juggleTypes';
+import type { DJDeckPerformanceState, DJJugglePerformanceContext, JuggleMode, JuggleTrigger, LibraryPatternType, StandaloneSource } from './juggleTypes';
 import { JUGGLE_PATTERN_TYPES } from './juggleTypes';
 import type { DJSection, DJTrackAnalysis } from '../types';
 
-export type JuggleTrigger = 'break' | 'build' | 'phraseEnd' | 'energy';
-export type StandaloneSource = 'double' | 'next';
+export type { JuggleTrigger, StandaloneSource };
 
 export interface JuggleOpportunity {
   trigger: JuggleTrigger;
@@ -30,8 +29,14 @@ export interface JuggleOpportunity {
   reason: string;
 }
 
-/** The pre-rendered next track, and whether it suits a tease (tempo band none/normal, no key clash). */
-export interface NextTrackOption { analysis: DJTrackAnalysis; compatible: boolean }
+/**
+ * The pre-rendered next track, and whether it suits a tease: `compatible` is
+ * the anticipated plan's verdict (tempo band none/normal, no key clash);
+ * `pair` is the context with the next track playing on the idle deck from
+ * its cue, so the planner's own conditions judge the pair that would really
+ * play (keys heard there, vocals, bass) - owner plan section 25.
+ */
+export interface NextTrackOption { analysis: DJTrackAnalysis; compatible: boolean; pair?: DJJugglePerformanceContext }
 
 /** Room kept between a stand-alone juggle's end and the planned transition. */
 export const STANDALONE_TRANSITION_MARGIN_SEC = 30;
@@ -114,7 +119,12 @@ export function juggleOpportunity(
   const decision = planJuggle(h, { mode, intensityOverride: opts.intensityOverride ?? -1, seed: opts.seed });
   if (!decision.pattern) { why.push(`no pattern fits a double: ${decision.reason}`); return null; }
 
-  const tease = !!next && next.compatible && ctx.transitionApproachingSec !== null && ctx.transitionApproachingSec <= NEXT_TEASE_MAX_SEC;
+  let tease = !!next && next.compatible && ctx.transitionApproachingSec !== null && ctx.transitionApproachingSec <= NEXT_TEASE_MAX_SEC;
+  if (tease) {
+    // The pair that would play, judged by the planner's own conditions; any conflict means the double.
+    const bad = next!.pair ? conditions(next!.pair).bad : ['the next track was not judged as a pair'];
+    if (bad.length) { tease = false; why.push(`no tease of the next track: ${bad[0]}`); }
+  }
   const source: StandaloneSource = tease ? 'next' : 'double';
   const what = source === 'double' ? 'a double of the playing track' : 'a tease of the next track';
   const moment = trigger === 'break' ? 'a breakdown ahead' : trigger === 'build' ? 'a build ahead' : trigger === 'phraseEnd' ? 'the phrase ends' : 'the set needs energy';

@@ -243,7 +243,7 @@ describe('call and response material', () => {
 // ── Gate G: doubles ─────────────────────────────────────────────────────────
 
 describe('doubles', () => {
-  it('JUG-PG-G / S16: the double resyncs the copy with an allowed offset, trades bars then beats and pays off aligned', async () => {
+  it('JUG-PG-G / S16: the double resyncs the copy with an allowed offset, trades whole bars only and pays off aligned with one bass (owner plan sections 16, 17, 35)', async () => {
     const ctx = ctxFor({ sameTrackOnBothDecks: true }, { A: 'steady', B: 'steady' });
     const offset = doubleOffset(ctx, 5);
     expect([1, 2, 4, 8, 16]).toContain(offset);
@@ -255,6 +255,21 @@ describe('doubles', () => {
     expect(resync?.action.targetPosition).toBe(20);
     const cuts = sink.applied.filter((a) => a.action.type === 'CutIn');
     for (const c of cuts) expect(Math.abs(c.beat - Math.round(c.beat))).toBeLessThan(0.05);
+    // Phrase-level: every trade on a bar (the beat-level escalation is PERFORMER's beatTrade / transformer).
+    const { pattern } = await run('double', { double: { offsetBeats: offset, primaryPosition: 20 } });
+    for (const a of pattern.actions.filter((x) => x.type === 'CutIn')) expect(a.executeAtBeat % 4, `cut at pattern beat ${a.executeAtBeat}`).toBe(0);
+    // Before the layer the silent copy is re-cued to zero offset, and the copy's bass is killed while both play.
+    const hold = pattern.actions.find((a) => a.type === 'HoldDeck')!;
+    const realign = pattern.actions.filter((a) => a.type === 'ResyncDeck').at(-1)!;
+    expect(realign.beats).toBe(0);
+    expect(realign.executeAtBeat).toBeLessThan(hold.executeAtBeat);
+    const silentAtRealign = pattern.roles.filter((r) => r.beat <= realign.executeAtBeat).at(-1)!;
+    expect(silentAtRealign.B).toBe('SILENT');
+    const bassCut = pattern.actions.find((a) => a.type === 'EQCut');
+    expect(bassCut?.deck).toBe('B');
+    expect(bassCut!.executeAtBeat).toBeLessThanOrEqual(hold.executeAtBeat);
+    const reset = pattern.actions.find((a) => a.type === 'ResetDeck' && a.deck === 'B');
+    expect(reset!.executeAtBeat).toBeGreaterThan(hold.executeAtBeat);
   });
 
   it('JUG-S48.5: with the same track on both decks the planner only offers doubles and loop/beat work', () => {
@@ -262,6 +277,25 @@ describe('doubles', () => {
     expect(d.pattern).not.toBeNull();
     expect(['double', 'loopTighten', 'beatTrade', 'transformer']).toContain(d.pattern!.type);
     expect(d.candidates.find((c) => c.type === 'phraseTrade')?.blocked).toContain('same track: doubles only');
+  });
+});
+
+// ── Owner plan section 44 / 35: the MUSICAL vocabulary ─────────────────────
+
+describe('MUSICAL follows the owner\'s mode table', () => {
+  it('MUSICAL is phrase trading plus call-response, fills and doubles: no beat cuts, and every layered moment has one bass owner', () => {
+    expect([...MODE_PATTERNS.MUSICAL].sort()).toEqual(['callResponse', 'double', 'fillTrade', 'phraseTrade', 'tightPhraseTrade']);
+    for (const type of MODE_PATTERNS.MUSICAL as LibraryPatternType[]) {
+      const pattern = PATTERN_BUILDERS[type](params({ double: { offsetBeats: 4, primaryPosition: 20 } }));
+      for (const a of pattern.actions.filter((x) => x.type === 'CutIn')) expect(a.executeAtBeat % 4, `${type}: cut at beat ${a.executeAtBeat}`).toBe(0);
+      for (const hold of pattern.actions.filter((x) => x.type === 'HoldDeck')) {
+        // A low band out on one deck at or before the layer, and not given back before it.
+        const owner = pattern.actions.filter((x) => (x.type === 'EQCut' || x.type === 'BassSwap') && x.executeAtBeat <= hold.executeAtBeat).at(-1);
+        expect(owner, `${type}: layer at beat ${hold.executeAtBeat} without a bass owner`).toBeDefined();
+        const restored = pattern.actions.some((x) => (x.type === 'EQRestore' || x.type === 'ResetDeck') && (x.deck === owner!.deck || x.deck === 'BOTH') && x.executeAtBeat > owner!.executeAtBeat && x.executeAtBeat <= hold.executeAtBeat);
+        expect(restored, `${type}: bass restored before the layer`).toBe(false);
+      }
+    }
   });
 });
 
