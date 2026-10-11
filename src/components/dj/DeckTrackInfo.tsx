@@ -12,6 +12,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
 import { camelotDisplay, camelotColor, keyCompatibility, keyCompatibilityColor } from '@/engine/dj/DJKeyUtils';
 import { DeckBeatPhase } from './DeckBeatPhase';
+import { TapTempoButton } from '@components/ui/TapTempoButton';
 
 interface DeckTrackInfoProps {
   deckId: 'A' | 'B' | 'C';
@@ -168,6 +169,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
         <span className="text-xs text-text-muted uppercase tracking-wider">
           BPM
         </span>
+        <TapTempoButton />
 
         {/* Pitch percentage */}
         {pitchPercent && (
