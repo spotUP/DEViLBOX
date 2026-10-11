@@ -24,6 +24,8 @@ export interface SinkState { playing: { A: boolean; B: boolean }; audible: { A: 
 export interface JuggleActionSink {
   apply(action: DJJuggleAction, info: { beatSec: number; beatNow: number; patternBeat: number }): void;
   state(): SinkState;
+  /** Undo what the pattern changed that outlives its actions (filter moves): called once on every exit path. */
+  restore?(): void;
 }
 
 export interface JuggleEvent {
@@ -157,6 +159,7 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
     if (finished) return;
     finished = true;
     if (interval !== null) timers.clearInterval(interval);
+    try { opts.sink.restore?.(); } catch { /* a restore failure must not block the exit */ }
     if (watchdog !== null) timers.clearTimeout(watchdog);
     for (; cursor < queue.length; cursor++) trace.push({ action: queue[cursor].action, scheduledBeat: queue[cursor].at, firedBeat: null, status: 'skipped', reason });
     emit(completed ? 'juggleCompleted' : 'juggleAborted', reason);

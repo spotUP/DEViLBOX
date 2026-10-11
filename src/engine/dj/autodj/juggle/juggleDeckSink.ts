@@ -44,15 +44,28 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
     loopStart[deck] = start;
     setDeckAudioLoop(deck, start, start + beats * beatSec);
   };
+  /** Filter position each deck had before the pattern first moved it: what every exit path hands back. */
+  const filterBefore: Partial<Record<AB, number>> = {};
+  const noteFilter = (deck: AB): void => {
+    if (filterBefore[deck] !== undefined) return;
+    let pos = useDJStore.getState().decks[deck].filterPosition;
+    try { pos = getDJEngine().getDeck(deck).getFilterPosition(); } catch { /* engine not ready: the store value */ }
+    filterBefore[deck] = pos;
+  };
+  const restoreFilter = (deck: AB): void => {
+    releaseDjFx('fx_deck_filter_rise', { deck, source: 'autodj' });
+    releaseDjFx('fx_deck_filter_release', { deck, source: 'autodj' });
+    setDeckFilter(deck, filterBefore[deck] ?? 0);
+    delete filterBefore[deck];
+  };
   const reset = (deck: AB): void => {
     clearDeckAudioLoop(deck); loopStart[deck] = null;
     setDeckEQKill(deck, 'low', false);
-    setDeckFilter(deck, 0);
     releaseDjFx('fx_deck_echo_throw', { deck, source: 'autodj' });
-    releaseDjFx('fx_deck_filter_rise', { deck, source: 'autodj' });
-    releaseDjFx('fx_deck_filter_release', { deck, source: 'autodj' });
+    restoreFilter(deck);
   };
   return {
+    restore(): void { for (const d of ['A', 'B'] as const) if (filterBefore[d] !== undefined) restoreFilter(d); },
     lastCrossfader: () => lastCrossfader,
     state(): SinkState {
       const s = useDJStore.getState();
@@ -79,8 +92,8 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
         case 'LoopResize': if (d) loop(d, action.beats ?? 4, info.beatSec); break;
         case 'LoopRoll': if (d) { loopStart[d] = null; loop(d, action.beats ?? 1, info.beatSec); } break;
         case 'ExitLoop': if (d) { clearDeckAudioLoop(d); loopStart[d] = null; } break;
-        case 'FilterIn': if (d) fireDjFx('fx_deck_filter_rise', { deck: d, beats: action.durationBeats ?? 8, amount: action.strength, source: 'autodj' }); break;
-        case 'FilterOut': if (d) fireDjFx('fx_deck_filter_release', { deck: d, beats: action.durationBeats ?? 4, source: 'autodj' }); break;
+        case 'FilterIn': if (d) { noteFilter(d); fireDjFx('fx_deck_filter_rise', { deck: d, beats: action.durationBeats ?? 8, amount: action.strength, source: 'autodj' }); } break;
+        case 'FilterOut': if (d) { noteFilter(d); fireDjFx('fx_deck_filter_release', { deck: d, beats: action.durationBeats ?? 4, source: 'autodj' }); } break;
         case 'EQCut': if (d) setDeckEQKill(d, 'low', true); break;
         case 'EQRestore': if (d) setDeckEQKill(d, 'low', false); break;
         case 'BassSwap': if (d) { setDeckEQKill(d === 'A' ? 'B' : 'A', 'low', true); setDeckEQKill(d, 'low', false); } break;
