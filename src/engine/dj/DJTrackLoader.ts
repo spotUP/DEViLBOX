@@ -202,9 +202,7 @@ export async function loadPreRenderedTrackToDeck(
     // renders with no deck, so nothing else ever set the beat grid, key and
     // energy of the incoming deck (loading cleared the grid and left the key
     // and energy of the track before).
-    if (preRendered.analysis) {
-      getDJPipeline().applyAnalysisToDeck(deckId, preRendered.analysis);
-    }
+    applyLoadedAnalysis(deckId, preRendered.analysis);
     console.log(`[DJTrackLoader] Pre-rendered track loaded successfully`);
     await recordLoad(originalTrack, { ok: true });
     return true;
@@ -465,6 +463,7 @@ async function loadPlaylistTrackToDeckInternal(
         isPlaying: false,
         ...(cachedSong ? { totalPositions: cachedSong.songLength, songPos: 0, pattPos: 0 } : {}),
       });
+      applyLoadedAnalysis(deckId, analysisFromCachedAudio(cached));
       return true;
     }
   } catch (err) {
@@ -512,6 +511,7 @@ async function loadPlaylistTrackToDeckInternal(
         result.analysis?.bpm || bpmResult.bpm,
         song,
       );
+      applyLoadedAnalysis(deckId, result.analysis);
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -545,6 +545,7 @@ async function loadPlaylistTrackToDeckInternal(
         track.trackName || filename,
         result.analysis?.bpm || 125,
       );
+      applyLoadedAnalysis(deckId, result.analysis);
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -595,6 +596,7 @@ async function loadPlaylistTrackToDeckInternal(
         result.analysis?.bpm || bpmResult.bpm,
         song,
       );
+      applyLoadedAnalysis(deckId, result.analysis);
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -643,6 +645,7 @@ async function loadPlaylistTrackToDeckInternal(
         result.analysis?.bpm || bpmResult.bpm,
         song,
       );
+      applyLoadedAnalysis(deckId, result.analysis);
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -650,6 +653,18 @@ async function loadPlaylistTrackToDeckInternal(
       return false;
     }
   }
+}
+
+/**
+ * Put the track's analysis on the deck once the deck holds the track. The
+ * pipeline's own apply runs during the render, before loadAudioToDeck: the
+ * load then changed the deck's fileName (the .wav name), which clears the
+ * beat grid, and the analysis was built with the deck's previous song. The
+ * cached-audio load never applied one at all. Same call as the Auto DJ
+ * pre-rendered load (loadPreRenderedTrackToDeck): one tempo per track.
+ */
+function applyLoadedAnalysis(deckId: DeckId, analysis: PipelineResult['analysis'] | undefined): void {
+  if (analysis) getDJPipeline().applyAnalysisToDeck(deckId, analysis);
 }
 
 /**
