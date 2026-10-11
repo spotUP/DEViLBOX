@@ -7,6 +7,57 @@ status: draft
 
 # Session handoff - 2026-10-09 to 2026-10-11
 
+## Update (later 2026-10-11) - read this first
+
+Owner asked to stop starting agents and restart the session. The local
+ledger thoughts/lars/todos.md has every item with its commit; trust it.
+
+Landed since the first version of this handoff (all on main, NOT pushed):
+1c2a90aab deck trim 0 dB (tracker applies no normalisation), 55660b941
+safety-only limiters (unity within 0.15 dB), 7fe5e15d2 key lock returns to
+the deck after a transition, 7bb312e9a meters/scopes delayed by output
+latency, 9d41d6072 turntable views on the heard clock, cfd4b808c + 9b376a315
+store import cycle cut (117 -> 75 modules), df64943a2 THE ECHO / double hits:
+the cue output <audio autoplay> played the cue mix (master at -6 dB) on the
+speakers when no cue device was chosen, 23c50852a + 41522e8e2 filters
+returned after Auto DJ / juggle moves, 59157a056 juggle gate (shared key
+compatibility, sync only when both decks play, intensity honours config),
+ce3de53e4 playlist seed resolver, b503df399 menus topmost (MENU_Z_INDEX) and
+Auto DJ panel wraps, 17545d71e jukebox test waits for its server.
+
+Push: pinned push of 17545d71e running at handoff time (scratchpad
+push4.log). Previous run (9b376a315): 7 failures in 4 files, 3 load timeouts
+that pass alone, 1 real test defect fixed in 17545d71e. If the push failed,
+re-run each failure alone first. Verify version.json buildHash on
+devilbox.uprough.net after it lands.
+
+Agents running at handoff (their commits land on main; check git log):
+- calm colour pass on src/components/dj + src/components/dub (owner palette
+  CALM: tokens; one identity colour per deck; one active accent;
+  error/warning/success only for real states; meters keep gradient; dub move
+  buttons neutral when idle) with a ratchet test.
+- playlist seed rebuild from ~/Downloads/Playlists/*.prg (74 HippoPlayer
+  files, full URLs) keeping every URL; hippoplayer.se /data/Modules now 404,
+  site is TAWS (WB.html, Work:Modules) - find mapping + server proxy.
+
+Queued (owner-ordered, in order):
+1. Juggling: plan then build - stand-alone artistic juggles anywhere in the
+   set (owner: "a juggle is not only a transition, it could happen anywhere
+   in an artistic way to make the music better and excite the crowd"; needs
+   the idle deck loaded with a double or the next track), juggle-transition as
+   a planner-chosen style replacing the broken prelude, module beat grid from
+   the song's own timing (owner: yes).
+2. Key lock adds ~91 ms latency (a key-locked deck plays behind in a mix).
+3. Turntables sometimes jump in Auto DJ (candidates: cue of the stopped deck,
+   juggle prelude phaseAlign seeking a playing deck, clock re-anchor).
+4. Per-channel visualizers in the DJ view are dead (decks play pre-rendered
+   stereo audio - per-channel source missing?).
+5. Dead seed entries policy (owner asked why; answer: hippoplayer-only files).
+6. FX9 (ShimmerReverb OOM on channel flicks), carried from 2026-10-08.
+
+Owner verified this session: tracker play stops the DJ set; visuals synced;
+a clean Auto DJ mix; FX7 Amiga Multiband.
+
 ## Task(s)
 
 1. **Push the 319+ local commits** left by the 2026-10-08 session (handoff
