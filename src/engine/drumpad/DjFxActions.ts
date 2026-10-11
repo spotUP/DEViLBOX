@@ -1166,13 +1166,17 @@ function createDeckFilterRise(): DjFxAction {
       const deckId = opts?.deck ?? getActiveDeckId();
       engagedDeck.set(this.id, deckId);
       setDeckFilter(deckId, -0.8);
+      const key = `${this.id}:${deckId}`;
+      deckSweepCancels.get(key)?.();
       const cancel = filterSweep(deckId, 0, opts?.beats ?? 16, () => { setDeckFilter(deckId, 0); setDjFxActive('fx_deck_filter_rise', null); });
-      deckSweepCancels.set(this.id, cancel);
+      deckSweepCancels.set(key, cancel);
     },
     disengage(opts) {
-      const cancel = deckSweepCancels.get(this.id);
-      if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
       const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      // The sweep belongs to the deck it runs on: cancelling another deck's sweep leaves this one moving.
+      const key = `${this.id}:${deckId}`;
+      const cancel = deckSweepCancels.get(key);
+      if (cancel) { cancel(); deckSweepCancels.delete(key); }
       engagedDeck.delete(this.id);
       setDeckFilter(deckId, 0);
     },
@@ -1194,18 +1198,22 @@ function createDeckFilterRelease(): DjFxAction {
       const deckId = opts?.deck ?? getActiveDeckId();
       engagedDeck.set(this.id, deckId);
       const beats = opts?.beats ?? 16;
+      const key = `${this.id}:${deckId}`;
+      deckSweepCancels.get(key)?.();
       // Two stages: gentle to -0.35 over the first 60 %, then up to -0.9.
       const first = filterSweep(deckId, -0.35, Math.max(1, Math.floor(beats * 0.6)), () => {
-        if (!deckSweepCancels.has(this.id)) return;
+        if (!deckSweepCancels.has(key)) return;
         const second = filterSweep(deckId, -0.9, Math.max(1, Math.ceil(beats * 0.4)), () => setDjFxActive('fx_deck_filter_release', null));
-        deckSweepCancels.set(this.id, second);
+        deckSweepCancels.set(key, second);
       });
-      deckSweepCancels.set(this.id, first);
+      deckSweepCancels.set(key, first);
     },
     disengage(opts) {
-      const cancel = deckSweepCancels.get(this.id);
-      if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
       const deckId = opts?.deck ?? engagedDeck.get(this.id) ?? getActiveDeckId();
+      // The sweep belongs to the deck it runs on: cancelling another deck's sweep leaves this one moving.
+      const key = `${this.id}:${deckId}`;
+      const cancel = deckSweepCancels.get(key);
+      if (cancel) { cancel(); deckSweepCancels.delete(key); }
       engagedDeck.delete(this.id);
       setDeckFilter(deckId, 0);
     },
