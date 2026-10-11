@@ -1732,6 +1732,10 @@ function wantsRecordVoice(gestureId: ScratchGestureId, opts?: DjFxFireOptions): 
 function engageRecordGesture(id: string, gestureId: ScratchGestureId, opts?: DjFxFireOptions): void {
   const deckId = opts?.deck ?? getActiveDeckId();
   const role = opts?.role;
+  // A second fire of the same gesture replaces its voice: release the old
+  // one first, or it loops on with no handle left to stop it.
+  scratchVoiceHandles.get(id)?.release(opts?.at);
+  scratchVoiceHandles.delete(id);
   const handle = getScratchVoicePool().perform(getGesture(gestureId), {
     record: opts?.record ?? (opts?.scratchSource?.type === 'CRATE' ? opts.scratchSource.recordId : undefined),
     role,
@@ -1742,6 +1746,12 @@ function engageRecordGesture(id: string, gestureId: ScratchGestureId, opts?: DjF
     at: opts?.at,
   });
   if (handle) scratchVoiceHandles.set(id, handle);
+}
+
+/** Release every gesture playing on the scratch record voice. */
+function releaseRecordGestures(): void {
+  for (const handle of scratchVoiceHandles.values()) handle.release();
+  scratchVoiceHandles.clear();
 }
 
 function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
@@ -1780,6 +1790,8 @@ function createScratchStop(): DjFxAction {
       const deckId = opts?.deck ?? getActiveDeckId();
       stopDeckPattern(deckId);
       try { useDJStore.getState().setDeckPattern(deckId, null); } catch { /* store not ready */ }
+      // Stop means every scratch: the record voice's held gestures too.
+      releaseRecordGestures();
     },
     disengage() {},
   };
