@@ -11,7 +11,10 @@
 import { useDJPlaylistStore, type PlaylistTrack, type DJPlaylist } from '@/stores/useDJPlaylistStore';
 import { cacheSourceFile, getCachedAudioByFilename } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
-import { summaryFromPipeline } from './autodj/trackAnalysis';
+import { summaryFromPipeline, moduleTempo } from './autodj/trackAnalysis';
+import { songFromCachedSource } from './DJTrackLoader';
+import { getCachedSong } from './DJSongCache';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { DJTrackSummary } from './autodj/types';
 import { isAudioFile } from '@/lib/audioFileUtils';
 
@@ -20,6 +23,18 @@ import { isAudioFile } from '@/lib/audioFileUtils';
 // both wrote to the store with stale indices and doubled the Modland traffic.
 // Module-level set so the guard survives React re-renders.
 const inflightAnalyses = new Set<string>();
+
+/** The playlist analyser renders a preview of this many seconds. */
+const ANALYSIS_RENDER_CAP_SEC = 90;
+
+/**
+ * The tracker song of a playlist track, for its tempo (one tempo per track:
+ * the module's own timing, as on the deck). None for audio files and SIDs.
+ */
+async function songForAnalysis(track: PlaylistTrack, bytes: ArrayBuffer | null | undefined, name: string): Promise<TrackerSong | null> {
+  if (isAudioFile(name) || track.fileName.startsWith('hvsc:') || name.toLowerCase().endsWith('.sid')) return null;
+  return getCachedSong(track.fileName) ?? (await songFromCachedSource(track.fileName, bytes ?? undefined)) ?? null;
+}
 
 /** Whether analyzePlaylist is currently running for the given playlist id. */
 export function isAnalysisInflight(playlistId: string): boolean {
@@ -302,38 +317,42 @@ export async function analyzePlaylist(
 
           if (sourceBuffer && sourceBuffer.byteLength > 0) {
             // Have raw source — render + analyze through the pipeline
-            const pipelineResult = await getDJPipeline().loadOrEnqueue(sourceBuffer, filename, undefined, 'low', undefined, 90);
+            const pipelineResult = await getDJPipeline().loadOrEnqueue(sourceBuffer, filename, undefined, 'low', undefined, ANALYSIS_RENDER_CAP_SEC);
             if (!pipelineResult.analysis) {
               throw new Error('Local pipeline returned no analysis');
             }
+            const song = await songForAnalysis(track, sourceBuffer, filename);
+            const summary = summaryFromPipeline(pipelineResult, track.id, song, ANALYSIS_RENDER_CAP_SEC);
 
             const curr = resolveCurrent(trackId);
             if (curr) {
               queueMetaUpdate(curr.index, {
-                bpm: pipelineResult.analysis.bpm,
+                bpm: summary?.bpm ?? pipelineResult.analysis.bpm,
                 musicalKey: pipelineResult.analysis.musicalKey,
                 energy: pipelineResult.analysis.genre?.energy ?? 0,
                 duration: pipelineResult.duration,
                 analysisSkipped: false,
-                djSummary: summaryFromPipeline(pipelineResult, track.id) ?? undefined,
+                djSummary: summary ?? undefined,
               });
             }
           } else if (audioBuffer && audioBuffer.byteLength > 0 && cached) {
             // Have rendered audio but no source — can still analyze the WAV
-            const pipelineResult = await getDJPipeline().loadOrEnqueue(audioBuffer, filename, undefined, 'low', undefined, 90);
+            const pipelineResult = await getDJPipeline().loadOrEnqueue(audioBuffer, filename, undefined, 'low', undefined, ANALYSIS_RENDER_CAP_SEC);
             if (!pipelineResult.analysis) {
               throw new Error('Local pipeline returned no analysis');
             }
+            const song = await songForAnalysis(track, null, filename);
+            const summary = summaryFromPipeline(pipelineResult, track.id, song, ANALYSIS_RENDER_CAP_SEC);
 
             const curr = resolveCurrent(trackId);
             if (curr) {
               queueMetaUpdate(curr.index, {
-                bpm: pipelineResult.analysis.bpm,
+                bpm: summary?.bpm ?? pipelineResult.analysis.bpm,
                 musicalKey: pipelineResult.analysis.musicalKey,
                 energy: pipelineResult.analysis.genre?.energy ?? 0,
                 duration: pipelineResult.duration,
                 analysisSkipped: false,
-                djSummary: summaryFromPipeline(pipelineResult, track.id) ?? undefined,
+                djSummary: summary ?? undefined,
               });
             }
           } else {
@@ -495,18 +514,20 @@ export async function analyzePlaylist(
         }
 
         if (needsLocalPipeline) {
-          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', companions, 90);
+          const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', companions, ANALYSIS_RENDER_CAP_SEC);
           if (!pipelineResult.analysis) {
             throw new Error('Local pipeline returned no analysis');
           }
+          const song = await songForAnalysis(track, buffer, filename);
+          const summary = summaryFromPipeline(pipelineResult, track.id, song, ANALYSIS_RENDER_CAP_SEC);
           result = {
-            bpm: pipelineResult.analysis.bpm,
+            bpm: summary?.bpm ?? pipelineResult.analysis.bpm,
             musicalKey: pipelineResult.analysis.musicalKey,
             energy: pipelineResult.analysis.genre?.energy ?? 0,
             duration: pipelineResult.duration,
             rmsDb: pipelineResult.analysis.rmsDb,
             peakDb: pipelineResult.analysis.peakDb,
-            djSummary: summaryFromPipeline(pipelineResult, track.id),
+            djSummary: summary,
           };
         } else {
           // Modland tracker formats → server-side UADE (fast, uses server cache).
@@ -559,6 +580,9 @@ export async function analyzePlaylist(
             energy: number;
             duration: number;
           };
+          // One tempo per track: the module's own timing over the server's full render, as on the deck.
+          const mg = moduleTempo(await songForAnalysis(track, buffer, filename), result.duration);
+          if (mg) result.bpm = mg.bpm;
         }
 
         // Update the playlist track with analysis results — by id, so a
@@ -592,7 +616,7 @@ export async function analyzePlaylist(
         try {
           await cacheSourceFile(buffer, filename);
           if (!needsLocalPipeline && !isAudioFile(filename) && !isHVSC) {
-            const piggybackResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', companions, 90);
+            const piggybackResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low', companions, ANALYSIS_RENDER_CAP_SEC);
             // Capture loudness from the local render for Modland tracks —
             // the server's /render/analyze response only returns bpm / key /
             // energy / duration, so without this the track has no rmsDb for

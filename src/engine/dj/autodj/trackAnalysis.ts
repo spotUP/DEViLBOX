@@ -19,7 +19,7 @@ import { buildBeatGrids, timelineAt } from './beatGrid';
 import { arrangementEvents, barFeatures, buildPhrases, detectPhraseLength, labelSections, perceivedIntensity, segmentBoundaries, type BarFeatures } from './structure';
 import { deriveCuePoints } from './cuePoints';
 import { analyzeTrackerSong } from './trackerMixAnalysis';
-import { moduleBeatGrid } from './moduleBeatGrid';
+import { moduleBeatGrid, type ModuleBeatGrid } from './moduleBeatGrid';
 import { smooth } from './activityTimelines';
 
 /**
@@ -182,6 +182,18 @@ export interface BuildAnalysisInput {
   analysis: PipelineAnalysis;
   extended?: ExtendedAnalysis | null;
   song?: TrackerSong | null;
+  /** The render was capped at this many seconds (a preview render); see ModuleBeatGridOptions. */
+  renderCapSec?: number;
+}
+
+/**
+ * The module's own tempo and grid for a render of `durationSec`, or null (no
+ * song, no patterns, or a walk that disagrees with the render). The one
+ * place that decides whether a track's tempo comes from the module.
+ */
+export function moduleTempo(song: TrackerSong | null | undefined, durationSec: number, renderCapSec?: number): ModuleBeatGrid | null {
+  if (!song || !Array.isArray(song.patterns) || song.patterns.length === 0 || !(durationSec > 0)) return null;
+  try { return moduleBeatGrid(song, durationSec, { renderCapSec }); } catch { return null; }
 }
 
 function tl(values: number[], hopSec: number, confidence: number): ActivityTimeline {
@@ -199,10 +211,7 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
   const extIsReal = !!input.extended;
 
   // One tempo source: the module's own timing when its walk matches the render, else the audio analysis.
-  let mg: ReturnType<typeof moduleBeatGrid> = null;
-  if (song && Array.isArray(song.patterns) && song.patterns.length > 0 && input.durationSec > 0) {
-    try { mg = moduleBeatGrid(song, input.durationSec); } catch { mg = null; }
-  }
+  const mg = moduleTempo(song, input.durationSec, input.renderCapSec);
   const tempo = mg
     ? { beats: mg.beats, downbeats: mg.downbeats, bpm: mg.bpm, bpmConfidence: 1, timeSignature: mg.beatsPerBar }
     : { beats: analysis.beats, downbeats: analysis.downbeats, bpm: analysis.bpm, bpmConfidence: analysis.bpmConfidence, timeSignature: analysis.timeSignature };
@@ -433,10 +442,10 @@ export function summarizeTrack(a: DJTrackAnalysis): DJTrackSummary {
 }
 
 /** The summary of a pipeline result (render + analysis), for the playlist track it came from. */
-export function summaryFromPipeline(result: { duration: number; analysis?: PipelineResult['analysis'] }, id = 'track', song?: TrackerSong | null): DJTrackSummary | null {
+export function summaryFromPipeline(result: { duration: number; analysis?: PipelineResult['analysis'] }, id = 'track', song?: TrackerSong | null, renderCapSec?: number): DJTrackSummary | null {
   if (!result.analysis) return null;
   try {
-    return summarizeTrack(buildDJTrackAnalysis({ id, durationSec: result.duration, analysis: result.analysis, extended: result.analysis.extended ?? null, song: song ?? null }));
+    return summarizeTrack(buildDJTrackAnalysis({ id, durationSec: result.duration, analysis: result.analysis, extended: result.analysis.extended ?? null, song: song ?? null, renderCapSec }));
   } catch {
     return null;
   }

@@ -652,8 +652,11 @@ async function loadPlaylistTrackToDeckInternal(
   }
 }
 
-/** The tracker song for a cached render, parsed from the module bytes the audio cache keeps. */
-async function songFromCachedSource(fileName: string, source: ArrayBuffer | undefined, deckId: DeckId): Promise<TrackerSong | undefined> {
+/**
+ * The tracker song for a cached render, parsed from the module bytes the
+ * audio cache keeps (the deck open; no deck for the playlist analyser).
+ */
+export async function songFromCachedSource(fileName: string, source: ArrayBuffer | undefined, deckId?: DeckId): Promise<TrackerSong | undefined> {
   if (!source || source.byteLength === 0) return undefined;
   const name = fileName.replace(/^modland:/, '').split('/').pop() || fileName;
   if (isAudioFile(name)) return undefined;
