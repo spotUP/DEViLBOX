@@ -13,7 +13,7 @@ import { findCallAndResponse, upcomingWindows } from './juggleMaterial';
 import { MODE_PATTERNS, PATTERN_BUILDERS, PATTERN_INTENSITY, type PatternParams } from './jugglePatterns';
 import type {
   DJJuggleAction, DJJugglePattern, DJJugglePatternType, DJJugglePerformanceContext, JuggleCandidate, JuggleMode,
-  JuggleQualityScore, MaterialWindow,
+  JuggleQualityScore, LibraryPatternType, MaterialWindow,
 } from './juggleTypes';
 import type { SetEnergyPhase } from '../types';
 
@@ -160,7 +160,7 @@ export function nextBarStartBeat(ctx: DJJugglePerformanceContext, minLeadBeats =
   return next;
 }
 
-export function scorePattern(type: DJJugglePatternType, ctx: DJJugglePerformanceContext, intensity: number, policy: ConfidencePolicy, opts: PlannerOptions, material: JuggleDecision['material']): JuggleCandidate {
+export function scorePattern(type: LibraryPatternType, ctx: DJJugglePerformanceContext, intensity: number, policy: ConfidencePolicy, opts: PlannerOptions, material: JuggleDecision['material']): JuggleCandidate {
   const c: Record<string, number> = {};
   const reasons: string[] = [];
   const blocked: string[] = [];
@@ -223,7 +223,7 @@ export function scorePattern(type: DJJugglePatternType, ctx: DJJugglePerformance
 
 function hasLayer(type: DJJugglePatternType): boolean { return ['beatTrade', 'drumBassTrade', 'fillTrade', 'double', 'dropAndReturn', 'escalatingJuggle'].includes(type); }
 
-export function patternBars(type: DJJugglePatternType, ctx: DJJugglePerformanceContext): number {
+export function patternBars(type: LibraryPatternType, ctx: DJJugglePerformanceContext): number {
   const phrase = Math.max(4, Math.min(8, ctx.phraseLengthBars));
   switch (type) {
     case 'phraseTrade': return phrase * 2;
@@ -276,7 +276,8 @@ export function planJuggle(ctx: DJJugglePerformanceContext, opts: PlannerOptions
     material = { call: cr?.call, response: cr?.response, fill: fills[0] };
   }
 
-  const candidates = (Object.keys(PATTERN_INTENSITY) as DJJugglePatternType[])
+  // The library only: the transition ladder is the transition executor's, never a stand-alone choice.
+  const candidates = (Object.keys(PATTERN_INTENSITY) as DJJugglePatternType[]).filter((t): t is LibraryPatternType => t !== 'transitionLadder')
     .map((t) => scorePattern(t, ctx, intensity, policy, opts, material))
     .sort((x, y) => y.score - x.score);
   const best = candidates.find((cnd) => cnd.blocked.length === 0 && cnd.score > 0.45);
@@ -285,7 +286,7 @@ export function planJuggle(ctx: DJJugglePerformanceContext, opts: PlannerOptions
   const beatsPerBar = ctx.beatsPerBar;
   const phraseBars = Math.max(2, Math.min(8, ctx.phraseLengthBars));
   const params: PatternParams = { primary, beatsPerBar, intensity, phraseBars, material, confidence: best.components.confidence, seed, double: ctx.sameTrackOnBothDecks ? { offsetBeats: doubleOffset(ctx, seed), primaryPosition: voice.position } : undefined };
-  const pattern = PATTERN_BUILDERS[best.type](params);
+  const pattern = PATTERN_BUILDERS[best.type as LibraryPatternType](params);
   // Phrase lock (section 9.7, 21.1): long patterns start on a phrase, short ones on a bar, every one >= 1 bar ahead.
   const startBeat = PHRASE_PATTERNS.includes(best.type) || pattern.durationBars >= 4 ? nextPhraseStartBeat(ctx, beatsPerBar) : nextBarStartBeat(ctx, beatsPerBar);
   const reason = `${best.type} (${pattern.sequence}) at ${intensity.toFixed(2)} intensity: ${cond.good.slice(0, 3).join(', ')}${best.reasons.length ? '; ' + best.reasons.slice(0, 2).join(', ') : ''}${pattern.reason ? '; ' + pattern.reason : ''}`;

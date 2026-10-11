@@ -54,9 +54,14 @@ export interface DJJuggleAction {
 
 export type DJJugglePatternType =
   | 'phraseTrade' | 'tightPhraseTrade' | 'barTrade' | 'beatTrade' | 'doubleBeat' | 'callResponse' | 'drumBassTrade'
-  | 'fillTrade' | 'loopTighten' | 'double' | 'transformer' | 'dropAndReturn' | 'escalatingJuggle';
+  | 'fillTrade' | 'loopTighten' | 'double' | 'transformer' | 'dropAndReturn' | 'escalatingJuggle'
+  /** The juggle transition's ladder (juggling plan section 26): run by the transition executor, never chosen by the planner. */
+  | 'transitionLadder';
 
-export const JUGGLE_PATTERN_TYPES: readonly DJJugglePatternType[] = [
+/** The library the juggle planner chooses from: every pattern but the transition ladder. */
+export type LibraryPatternType = Exclude<DJJugglePatternType, 'transitionLadder'>;
+
+export const JUGGLE_PATTERN_TYPES: readonly LibraryPatternType[] = [
   'phraseTrade', 'tightPhraseTrade', 'barTrade', 'beatTrade', 'doubleBeat', 'callResponse', 'drumBassTrade', 'fillTrade',
   'loopTighten', 'double', 'transformer', 'dropAndReturn', 'escalatingJuggle',
 ];

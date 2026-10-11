@@ -13,7 +13,7 @@ import { PATTERN_BUILDERS, PATTERN_INTENSITY, MODE_PATTERNS, type PatternParams 
 import { planJuggle, confidencePolicy, doubleOffset, patternBars, scoreJuggleQuality } from '../autodj/juggle/jugglePlanner';
 import { findCallAndResponse, classifyWindow, upcomingWindows } from '../autodj/juggle/juggleMaterial';
 import { DJJuggleController, analysisClock, type TickInput } from '../autodj/juggle/juggleController';
-import { JUGGLE_PATTERN_TYPES, JUGGLE_ACTION_TYPES, type DJJuggleAction, type DJJugglePerformanceContext, type JuggleMode, type DJJugglePatternType } from '../autodj/juggle/juggleTypes';
+import { JUGGLE_PATTERN_TYPES, JUGGLE_ACTION_TYPES, type DJJuggleAction, type DJJugglePerformanceContext, type JuggleMode, type LibraryPatternType } from '../autodj/juggle/juggleTypes';
 import type { DJTrackAnalysis, SetEnergyPhase } from '../autodj/types';
 
 // ── Fakes: a sink that records, a clock from virtual time ───────────────────
@@ -51,7 +51,7 @@ function virtualClock(timers: VirtualTimers, beatSec = BEAT_SEC): JuggleClock { 
 
 const params = (over: Partial<PatternParams> = {}): PatternParams => ({ primary: 'A', beatsPerBar: 4, intensity: 0.8, phraseBars: 8, confidence: 0.9, seed: 1, ...over });
 
-async function run(patternType: DJJugglePatternType, p: Partial<PatternParams> = {}, playing = { A: true, B: true }) {
+async function run(patternType: LibraryPatternType, p: Partial<PatternParams> = {}, playing = { A: true, B: true }) {
   const timers = new VirtualTimers();
   const sink = fakeSink(playing);
   const pattern = PATTERN_BUILDERS[patternType](params(p));
@@ -343,7 +343,7 @@ describe('juggle planner: adaptive, safe, never random', () => {
     expect(spent.blocked.join()).toMatch(/budget/);
     const soon = planJuggle(ctxFor({ transitionApproachingSec: 60 }), PLAN);
     expect(soon.candidates.find((c) => c.type === 'escalatingJuggle')!.blocked.join()).toMatch(/bars/);
-    expect(soon.pattern === null || patternBars(soon.pattern.type, ctxFor()) <= 24).toBe(true);
+    expect(soon.pattern === null || patternBars(soon.pattern.type as LibraryPatternType, ctxFor()) <= 24).toBe(true);
     expect(planJuggle(ctxFor({ transitionApproachingSec: 10 }), PLAN).blocked).toContain('transition imminent');
   });
 

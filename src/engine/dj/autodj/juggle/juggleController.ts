@@ -14,7 +14,7 @@ import { keyAt } from '../trackAnalysis';
 import { shiftedKeyName } from '../tempoKeySolver';
 import type { DJTrackAnalysis, SetEnergyPhase } from '../types';
 import { classifyWindow, materialRefs } from './juggleMaterial';
-import { phaseAt, rolesAt } from './jugglePatterns';
+import { PATTERN_INTENSITY, phaseAt, rolesAt, transitionLadder } from './jugglePatterns';
 import { budgetFor, confidencePolicy, intensityFor, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
 import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
 import type {
@@ -57,6 +57,8 @@ export interface JuggleControllerDeps {
   now?: () => number;
   onEvent?: (e: JuggleEvent) => void;
   onTelemetry?: (t: JuggleTelemetry) => void;
+  /** Called when a performed pattern ends (completed, aborted or fallen back), after the history is written. */
+  onFinish?: (result: JuggleExecutionResult) => void;
   seed?: number;
 }
 
@@ -188,6 +190,38 @@ export class DJJuggleController {
     };
   }
 
+  // ── Juggle transition (section 26) ─────────────────────────────────────────
+
+  /**
+   * Run a juggle transition's ladder now - the transition executor's trade
+   * stage. The outgoing (`input.masterDeck`) and the incoming trade the
+   * planned rungs from the bar the incoming started on (within a quarter
+   * beat, else the next bar), then the incoming is released. It starts through
+   * the same path as a planned juggle (history, memory, telemetry, abort
+   * checks). Resolves when released or aborted.
+   */
+  performLadder(input: TickInput, ladder: { ladderBars: number[]; target: AB }): Promise<JuggleExecutionResult> {
+    if (this.mode === 'OFF') {
+      return Promise.resolve({ completed: false, aborted: true, reason: 'Auto Juggle off', trace: [], fallbacks: 0, events: [], endBeat: 0 });
+    }
+    if (this.execution?.active()) this.execution.abort('juggle transition took over');
+    const ctx = this.buildContext(input);
+    this.lastCtx = ctx;
+    const bpb = ctx.beatsPerBar;
+    const pattern = transitionLadder({
+      primary: input.masterDeck, beatsPerBar: bpb, intensity: PATTERN_INTENSITY.transitionLadder, phraseBars: ctx.phraseLengthBars,
+      confidence: Math.min(ctx.beatConfidence, ctx.deckSyncConfidence), seed: (this.deps.seed ?? 0) + this.counter++, ladderBars: ladder.ladderBars, target: ladder.target,
+    });
+    const startBeat = Math.ceil((ctx.masterBeat - 0.25) / bpb) * bpb;
+    const decision: JuggleDecision = {
+      pattern, candidates: [], reason: `juggle transition: ${pattern.reason}`, blocked: [], policy: confidencePolicy(ctx), intensity: pattern.intensity, startBeat,
+    };
+    this.lastDecision = decision;
+    this.start(decision, ctx, input);
+    this.publish(ctx);
+    return this.execution!.done;
+  }
+
   // ── Tick (sections 21, 24, 41, 42) ─────────────────────────────────────────
 
   tick(input: TickInput): JuggleTickResult {
@@ -271,6 +305,7 @@ export class DJJuggleController {
     if (!result.completed && !result.aborted) this.record({ kind: 'juggleFallback', beat: result.endBeat, reason: `${decision.pattern?.type}: ${result.reason}` });
     if (this.execution && !this.execution.active()) this.execution = null;
     this.deps.onTelemetry?.(this.telemetry());
+    this.deps.onFinish?.(result);
   }
 
   private memoryKey(type: DJJugglePatternType, ctx: DJJugglePerformanceContext): string { return `${type}|${ctx.setPhase}|${ctx.currentSection?.kind ?? '-'}`; }
