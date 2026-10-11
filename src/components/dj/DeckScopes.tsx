@@ -15,6 +15,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
+import { DECK_SCOPE_CHANNELS } from '@/engine/dj/channelScopeTrack';
 
 interface DeckScopesProps {
   deckId: 'A' | 'B' | 'C';
@@ -22,7 +23,7 @@ interface DeckScopesProps {
   size?: number;
 }
 
-const NUM_CHANNELS = 4;
+const NUM_CHANNELS = DECK_SCOPE_CHANNELS;
 
 interface ScopeCanvasProps {
   deckId: 'A' | 'B' | 'C';
@@ -192,6 +193,7 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
   const channelMask = useDJStore((s) => s.decks[deckId].channelMask);
   const fxTargetChannels = useDJStore((s) => s.decks[deckId].fxTargetChannels);
   const mode = useDJStore((s) => s.decks[deckId].channelModeUI);
+  const channelScopeCount = useDJStore((s) => s.decks[deckId].channelScopeCount);
 
   const isChannelEnabled = (index: number): boolean => (channelMask & (1 << index)) !== 0;
   const isFxTargeted = (index: number): boolean => fxTargetChannels.has(index);
@@ -237,7 +239,8 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
 
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
-      {Array.from({ length: NUM_CHANNELS }, (_, i) => (
+      {/* One scope per channel the deck has a signal for; an audio file has none and shows ALL only. */}
+      {Array.from({ length: Math.min(NUM_CHANNELS, channelScopeCount) }, (_, i) => (
         <ScopeCanvas
           key={i}
           deckId={deckId}

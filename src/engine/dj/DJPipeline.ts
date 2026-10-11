@@ -28,6 +28,7 @@ import { autoMatchOnLoad, pitchedBpm } from './DJAutoSync';
 import type { ExtendedAnalysis } from './autodj/types';
 import { buildDJTrackAnalysis, DJ_AUDIO_ANALYSIS_VERSION } from './autodj/trackAnalysis';
 import { DemucsEngine } from '@engine/demucs/DemucsEngine';
+import { attachChannelScopes, type ChannelScopeTrack } from './channelScopeTrack';
 import type { StemResult } from '@engine/demucs/types';
 
 // ── Auto-gain ────────────────────────────────────────────────────────────────
@@ -52,6 +53,15 @@ export function computeAutoTrim(_rmsDb: number, _peakDb: number): number {
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+/** What the render worker returns: the stereo mix and, where the engine has a per-channel tap, each channel's signal. */
+interface RenderOutput {
+  left: Float32Array;
+  right: Float32Array;
+  sampleRate: number;
+  duration: number;
+  channelScopes?: ChannelScopeTrack;
+}
 
 export type TaskPriority = 'high' | 'normal' | 'low';
 
@@ -286,7 +296,7 @@ export class DJPipeline {
 
   // Pending render/analysis callbacks keyed by task id
   private renderCallbacks = new Map<string, {
-    resolve: (data: { left: Float32Array; right: Float32Array; sampleRate: number; duration: number }) => void;
+    resolve: (data: RenderOutput) => void;
     reject: (err: Error) => void;
   }>();
 
@@ -371,11 +381,11 @@ export class DJPipeline {
       }
 
       case 'renderComplete': {
-        const { id, left, right, sampleRate, duration } = msg;
+        const { id, left, right, sampleRate, duration, channelScopes } = msg;
         const cb = this.renderCallbacks.get(id);
         if (cb) {
           this.renderCallbacks.delete(id);
-          cb.resolve({ left, right, sampleRate, duration });
+          cb.resolve({ left, right, sampleRate, duration, channelScopes });
         }
         break;
       }
@@ -935,6 +945,9 @@ export class DJPipeline {
       // Debug: Check WAV output
       console.log(`[DJPipeline] WAV encoded: ${wavData.byteLength} bytes, duration: ${duration.toFixed(2)}s, PCM frames: ${left.length}`);
 
+      // The per-channel scope track travels with the WAV it was rendered with.
+      attachChannelScopes(wavData, renderResult.channelScopes);
+
       // Cache the audio immediately (before analysis)
       this.emitTaskProgress(task.id, 49);
       await cacheAudio(
@@ -945,6 +958,7 @@ export class DJPipeline {
         waveformPeaks,
         sampleRate,
         2, // stereo
+        renderResult.channelScopes,
       );
 
       console.log(
@@ -1100,12 +1114,7 @@ export class DJPipeline {
 
   // ── Worker Communication ─────────────────────────────────────────────────
 
-  private doRender(task: PipelineTask): Promise<{
-    left: Float32Array;
-    right: Float32Array;
-    sampleRate: number;
-    duration: number;
-  }> {
+  private doRender(task: PipelineTask): Promise<RenderOutput> {
     return new Promise((resolve, reject) => {
       if (!this.renderWorker) {
         reject(new Error('Render worker not initialized'));

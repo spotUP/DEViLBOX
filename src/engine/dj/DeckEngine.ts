@@ -21,6 +21,7 @@ import { createReverbIR } from './reverbIR';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
+import { channelScopesFor, channelScopeWindow, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
@@ -121,6 +122,9 @@ export class DeckEngine {
 
   // Instrument IDs from the currently loaded song (for output override cleanup)
   private currentSongInstrumentIds: number[] = [];
+
+  /** Per-channel scope signal of the loaded audio (setChannelScopes). */
+  private _channelScopes: ChannelScopeTrack | undefined;
 
   // Track which native engine keys this deck has rerouted (Furnace, UADE, Hively — for cleanup)
   private routedNativeEngines: Set<string> = new Set();
@@ -495,6 +499,9 @@ export class DeckEngine {
     // In DJ view, we ALWAYS use audio mode for sound output.
     // Tracker replayer is only used for position tracking and visual feedback.
     this._playbackMode = 'audio';
+    // The previous track's scope signal goes with it; the audio load that
+    // follows brings this song's.
+    this.setChannelScopes(undefined);
 
     // Clear pattern-scratch state from the previous track. Without this, a
     // stuck patternScratchActive=true would steer setScratchVelocity into
@@ -563,6 +570,7 @@ export class DeckEngine {
    */
   async loadAudioFile(buffer: ArrayBuffer, filename: string, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
     this.prepareAudioLoad();
+    this.setChannelScopes(channelScopesFor(buffer));
     const info = await this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
     // Fire-and-forget prime so the scratch ring buffer has content even
     // before the user presses play. Mirrors a real turntable: a loaded
@@ -575,11 +583,28 @@ export class DeckEngine {
    * Load a buffer another deck already decoded - a double of its track (plan
    * 2026-10-11-dj-juggling, P4.2). Same deck state as a file load, no decode.
    */
-  async loadDecodedAudio(audioBuffer: AudioBuffer, originalBytes: ArrayBuffer | null, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
+  async loadDecodedAudio(audioBuffer: AudioBuffer, originalBytes: ArrayBuffer | null, precomputedPeaks?: Float32Array, channelScopes?: ChannelScopeTrack): Promise<AudioFileInfo> {
     this.prepareAudioLoad();
+    this.setChannelScopes(channelScopes);
     const info = await this.audioPlayer.loadDecodedBuffer(audioBuffer, originalBytes, precomputedPeaks);
     void this._primeScratchBuffer();
     return info;
+  }
+
+  /**
+   * The per-channel scope signal of the loaded audio (channelScopeTrack.ts):
+   * set with every audio load, none for audio without one.
+   */
+  private setChannelScopes(track: ChannelScopeTrack | undefined): void {
+    this._channelScopes = track;
+    useDJStore.getState().setDeckState(this.id, {
+      channelScopeCount: track ? Math.min(DECK_SCOPE_CHANNELS, track.channels.length) : 0,
+    });
+  }
+
+  /** The per-channel scope track of the loaded audio, if it has one (a double carries it to the other deck). */
+  get channelScopes(): ChannelScopeTrack | undefined {
+    return this._channelScopes;
   }
 
   /** What every audio load does first: stop, leave stem and pattern-scratch mode, switch the deck to audio. */
@@ -2222,8 +2247,17 @@ export class DeckEngine {
     return this.waveformAnalyser.getValue() as Float32Array;
   }
 
-  /** Get per-channel waveform data for oscilloscope display (128 samples each) */
-  getChannelWaveforms(maxChannels = 4): Float32Array[] {
+  /**
+   * Per-channel waveforms for the deck scopes, at the position the listener
+   * hears: the window of the loaded audio's scope track (rendered with it,
+   * channelScopeTrack.ts) ending at getHeardPosition(). A replayer playing
+   * live (tracker mode) reads its own channel analysers. Empty when the deck
+   * has no per-channel signal.
+   */
+  getChannelWaveforms(maxChannels = DECK_SCOPE_CHANNELS): Float32Array[] {
+    if (this._playbackMode === 'audio') {
+      return this._channelScopes ? channelScopeWindow(this._channelScopes, this.getHeardPosition(), maxChannels) : [];
+    }
     return this.replayer.getChannelWaveforms(maxChannels);
   }
 

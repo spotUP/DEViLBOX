@@ -14,6 +14,7 @@ const MAX_CACHE_SIZE_MB = 2000; // 2 GB limit (gig playlists need 200+ tracks)
 const MAX_CACHE_ENTRIES = 1000; // Max 1000 cached files
 
 import type { ExtendedAnalysis } from './autodj/types';
+import { attachChannelScopes, type ChannelScopeTrack } from './channelScopeTrack';
 
 export interface CachedAudio {
   hash: string;           // SHA-256 of source file
@@ -49,6 +50,15 @@ export interface CachedAudio {
 
   // ── Source file (for offline re-rendering) ──
   sourceData?: ArrayBuffer;        // Original module file bytes (MOD/XM/IT etc.)
+
+  // ── Per-channel scope track rendered with audioData (channelScopeTrack.ts) ──
+  channelScopes?: ChannelScopeTrack;
+}
+
+/** A cache entry as read: its scope track attached to its WAV bytes, so the deck that loads them finds it. */
+function withChannelScopes<T extends CachedAudio | null | undefined>(entry: T): T {
+  if (entry?.audioData && entry.channelScopes) attachChannelScopes(entry.audioData, entry.channelScopes);
+  return entry;
 }
 
 /** Beat grid data — compatible with Serato beat markers */
@@ -123,7 +133,7 @@ export async function getCachedAudio(fileBuffer: ArrayBuffer): Promise<CachedAud
         if (entry) {
           // Update access time (LRU)
           void touchCacheEntry(hash);
-          resolve(entry);
+          resolve(withChannelScopes(entry));
         } else {
           resolve(null);
         }
@@ -164,6 +174,7 @@ export async function cacheAudio(
   waveformPeaks: Float32Array,
   sampleRate: number,
   numberOfChannels: number,
+  channelScopes?: ChannelScopeTrack,
 ): Promise<void> {
   try {
     const database = await initDB();
@@ -193,6 +204,7 @@ export async function cacheAudio(
       timestamp: Date.now(),
       sizeBytes,
       sourceData: existingSource || sourceFile.slice(0), // preserve or store source
+      channelScopes,
     };
 
     // Check if adding this entry would exceed limits
@@ -566,7 +578,7 @@ export async function getCachedFilenames(): Promise<Set<string>> {
 export async function getCachedAudioByFilename(filename: string): Promise<CachedAudio | null> {
   try {
     const database = await initDB();
-    return new Promise((resolve) => {
+    return withChannelScopes(await new Promise<CachedAudio | null>((resolve) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       // Use the filename index (v2+) to load ONE matching record instead of getAll().
@@ -604,7 +616,7 @@ export async function getCachedAudioByFilename(filename: string): Promise<Cached
         };
         request.onerror = () => resolve(null);
       }
-    });
+    }));
   } catch {
     return null;
   }

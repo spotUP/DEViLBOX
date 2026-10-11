@@ -233,6 +233,7 @@ export async function loadDoubleToDeck(source: DeckId, target: DeckId): Promise<
     await engine.loadDecodedAudioToDeck(target, audioBuffer, {
       fileName: from.fileName, trackName: from.trackName, bpm: from.detectedBPM,
       peaks: player.getWaveformPeaks() ?? undefined, fileBytes: player.getOriginalFileBytes(),
+      channelScopes: engine.getDeck(source).channelScopes,
     });
     // The analysis the source deck carries now, in one write (the load above set the file name, so nothing clears it).
     const now = useDJStore.getState().decks[source];
