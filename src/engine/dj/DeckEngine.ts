@@ -559,6 +559,28 @@ export class DeckEngine {
    * Switches the deck to 'audio' playback mode.
    */
   async loadAudioFile(buffer: ArrayBuffer, filename: string, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
+    this.prepareAudioLoad();
+    const info = await this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
+    // Fire-and-forget prime so the scratch ring buffer has content even
+    // before the user presses play. Mirrors a real turntable: a loaded
+    // record is scratch-audible regardless of motor state.
+    void this._primeScratchBuffer();
+    return info;
+  }
+
+  /**
+   * Load a buffer another deck already decoded - a double of its track (plan
+   * 2026-10-11-dj-juggling, P4.2). Same deck state as a file load, no decode.
+   */
+  async loadDecodedAudio(audioBuffer: AudioBuffer, originalBytes: ArrayBuffer | null, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
+    this.prepareAudioLoad();
+    const info = await this.audioPlayer.loadDecodedBuffer(audioBuffer, originalBytes, precomputedPeaks);
+    void this._primeScratchBuffer();
+    return info;
+  }
+
+  /** What every audio load does first: stop, leave stem and pattern-scratch mode, switch the deck to audio. */
+  private prepareAudioLoad(): void {
     // Stop any current playback
     this.replayer.stop();
     this.audioPlayer.stop();
@@ -582,13 +604,6 @@ export class DeckEngine {
     // Clear pattern-scratch state from previous track (see loadSong).
     this.patternScratchActive = false;
     this.patternScratchDir = 1;
-
-    const info = await this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
-    // Fire-and-forget prime so the scratch ring buffer has content even
-    // before the user presses play. Mirrors a real turntable: a loaded
-    // record is scratch-audible regardless of motor state.
-    void this._primeScratchBuffer();
-    return info;
   }
 
   /**

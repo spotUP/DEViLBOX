@@ -89,17 +89,7 @@ export class DeckAudioPlayer {
       throw new Error(`File too large (${(buffer.byteLength / 1024 / 1024).toFixed(0)} MB, max ${MAX_FILE_SIZE / 1024 / 1024} MB)`);
     }
 
-    const myVersion = ++this._loadVersion;
-
-    // Release previous track resources before loading new ones
-    if (this._originalFileBytes) {
-      this._originalFileBytes = null;
-    }
-    if (this.player?.buffer?.loaded) {
-      try { this.player.buffer.dispose(); } catch { /* ignore */ }
-    }
-
-    this._originalFileBytes = buffer.slice(0);
+    const myVersion = this.beginLoad(buffer.slice(0));
     console.log(`[DeckAudioPlayer] loadAudioFile: ${filename}, buffer size: ${buffer.byteLength} bytes`);
     
     // Decode audio with cross-browser support
@@ -125,6 +115,32 @@ export class DeckAudioPlayer {
       console.log(`[DeckAudioPlayer] Decoded ${result.format} using WASM fallback`);
     }
 
+    return this.adoptDecodedBuffer(audioBuffer, precomputedPeaks);
+  }
+
+  /**
+   * Load an already decoded buffer - a double of the track another deck
+   * plays (plan 2026-10-11-dj-juggling, P4.2): no decode, no render. The
+   * AudioBuffer is shared (Web Audio lets several sources play one buffer);
+   * `originalBytes` are the source deck's file bytes (stems, export).
+   */
+  async loadDecodedBuffer(audioBuffer: AudioBuffer, originalBytes: ArrayBuffer | null, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
+    this.beginLoad(originalBytes);
+    return this.adoptDecodedBuffer(audioBuffer, precomputedPeaks);
+  }
+
+  /** A new load supersedes any in flight: release the previous track and keep the new file's bytes. */
+  private beginLoad(originalBytes: ArrayBuffer | null): number {
+    const version = ++this._loadVersion;
+    if (this.player?.buffer?.loaded) {
+      try { this.player.buffer.dispose(); } catch { /* ignore */ }
+    }
+    this._originalFileBytes = originalBytes;
+    return version;
+  }
+
+  /** The tail of every load: the decoded buffer on the player, its length and its overview peaks. */
+  private async adoptDecodedBuffer(audioBuffer: AudioBuffer, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
     // Store in Tone.Player
     const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
     this.player.buffer = toneBuffer;
