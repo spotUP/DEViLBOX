@@ -16,6 +16,7 @@ import type { AudioFileInfo } from './DeckAudioPlayer';
 import type { DJSetRecorder } from './recording/DJSetRecorder';
 import type { TrackSource } from './recording/DJSetEvent';
 import { DJMicEngine } from './DJMicEngine';
+import type { ChannelScopeTrack } from './channelScopeTrack';
 
 // Instrument ID offsets to avoid collisions with the tracker view (IDs 1-999)
 // and between decks. Each deck gets a 10000-wide namespace.
@@ -233,7 +234,7 @@ export class DJEngine {
    */
   async loadDecodedAudioToDeck(
     id: DeckId, audioBuffer: AudioBuffer,
-    meta: { fileName: string; trackName?: string; bpm?: number; peaks?: Float32Array; fileBytes: ArrayBuffer | null },
+    meta: { fileName: string; trackName?: string; bpm?: number; peaks?: Float32Array; fileBytes: ArrayBuffer | null; channelScopes?: ChannelScopeTrack },
     song?: TrackerSong,
   ): Promise<AudioFileInfo> {
     const deck = this.getDeck(id);
@@ -243,7 +244,7 @@ export class DJEngine {
     } else {
       deck.clearLoadedSong();
     }
-    const info = await deck.loadDecodedAudio(audioBuffer, meta.fileBytes, meta.peaks);
+    const info = await deck.loadDecodedAudio(audioBuffer, meta.fileBytes, meta.peaks, meta.channelScopes);
     this.afterAudioLoaded(id, info, meta, song);
     return info;
   }

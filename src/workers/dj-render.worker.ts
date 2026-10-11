@@ -20,7 +20,20 @@
  *   Worker → Main:   { type: 'ready' }
  */
 
+import {
+  ChannelScopeTrackBuilder, DECK_SCOPE_CHANNELS, channelScopeTransferables,
+  type ChannelScopeTrack,
+} from '@/engine/dj/channelScopeTrack';
+
 // ── Types ────────────────────────────────────────────────────────────────────
+
+/** A render: the stereo mix, and each channel's own signal where the engine has a per-channel tap. */
+interface RenderResult {
+  left: Float32Array;
+  right: Float32Array;
+  sampleRate: number;
+  channelScopes?: ChannelScopeTrack;
+}
 
 interface RenderRequest {
   type: 'render';
@@ -395,7 +408,7 @@ async function renderWithUADE(
   id: string,
   companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
   maxSeconds = 600,
-): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
+): Promise<RenderResult> {
   // Force fresh UADE instance for each render — the IPC state machine
   // gets corrupted after a render cycle and cannot be reused.
   uadeReady = false;
@@ -515,7 +528,7 @@ async function renderWithUADEContinue(
   subsong: number,
   id: string,
   maxSeconds = 600,
-): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
+): Promise<RenderResult> {
   // Set subsong if specified
   if (subsong > 0) {
     wasm._uade_wasm_set_subsong(subsong);
@@ -538,6 +551,18 @@ async function renderWithUADEContinue(
 
   const tmpL = wasm._malloc(CHUNK * 4);
   const tmpR = wasm._malloc(CHUNK * 4);
+
+  // Paula's 4 channels, from the emulator's per-channel FIFO (the tap the
+  // tracker scopes stream from, UADE.worklet.js). The FIFO is consumed at the
+  // pace of the main output, so its samples line up with the mix; drain what
+  // the load left in it first. The FIFO holds at most 8192 frames.
+  const CH_FIFO = 8192;
+  const hasChannelTap = typeof wasm._uade_wasm_read_channel_samples === 'function';
+  const chPtrs: number[] = hasChannelTap ? [0, 1, 2, 3].map(() => wasm._malloc(CH_FIFO * 4)) : [];
+  const scopes = hasChannelTap ? new ChannelScopeTrackBuilder(4, sampleRate) : null;
+  const readChannels = (max: number): number =>
+    wasm._uade_wasm_read_channel_samples(chPtrs[0], chPtrs[1], chPtrs[2], chPtrs[3], max);
+  if (hasChannelTap) readChannels(CH_FIFO);
 
   const audioChunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
@@ -594,6 +619,13 @@ async function renderWithUADEContinue(
       trailingSilenceFrames = 0;
     }
 
+    if (scopes) {
+      const n = readChannels(CHUNK);
+      const heap = wasm.HEAPF32 as Float32Array;
+      const bases = chPtrs.map((p) => p >> 2);
+      scopes.push(n, (ch, i) => heap[bases[ch] + i]);
+    }
+
     audioChunks.push({ left: leftData, right: rightData });
     totalFrames += CHUNK;
 
@@ -606,6 +638,7 @@ async function renderWithUADEContinue(
 
   wasm._free(tmpL);
   wasm._free(tmpR);
+  for (const p of chPtrs) wasm._free(p);
 
   if (totalFrames === 0) {
     throw new Error(`UADE rendered 0 frames for ${safeFilename}`);
@@ -633,7 +666,7 @@ async function renderWithUADEContinue(
   }
   console.log(`[DJRenderWorker/UADE] ${safeFilename} rendered: ${totalFrames} frames (${(totalFrames/sampleRate).toFixed(1)}s), nonZero: ${nonZero}/${Math.min(totalFrames, 44100)}, maxAmp: ${maxAmp.toFixed(4)}`);
 
-  return { left, right, sampleRate };
+  return { left, right, sampleRate, channelScopes: scopes?.finish() };
 }
 
 // ── Hively Engine State ──────────────────────────────────────────────────────
@@ -686,7 +719,7 @@ async function renderWithHively(
   filename: string,
   subsong: number,
   id: string,
-): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
+): Promise<RenderResult> {
   await initHively();
   const wasm = hivelyInstance;
   const sampleRate = 44100;
@@ -724,10 +757,54 @@ async function renderWithHively(
   const positions = wasm._hively_get_positions();
   let lastProgressPct = 10;
 
+  // Each channel's own signal: the split render the Hively worklet uses for
+  // its scopes (Hively.worklet.js) - tick once, render the mix, then re-render
+  // the same frame once per channel with only that channel audible.
+  const hasSplit = typeof wasm._hively_tick_frame === 'function'
+    && typeof wasm._hively_render_frame === 'function'
+    && typeof wasm._hively_set_channel_gain === 'function';
+  const tuneChannels: number = wasm._hively_get_channels ? wasm._hively_get_channels() : 4;
+  const scopeChannels = hasSplit ? Math.min(tuneChannels, DECK_SCOPE_CHANNELS) : 0;
+  const scopes = scopeChannels > 0 ? new ChannelScopeTrackBuilder(scopeChannels, sampleRate) : null;
+  const solo: Float32Array[] = Array.from({ length: scopeChannels }, () => new Float32Array(frameSamples * 2));
+  const setGains = (only: number): void => {
+    for (let c = 0; c < tuneChannels; c++) wasm._hively_set_channel_gain(c, only < 0 || c === only ? 1.0 : 0.0);
+  };
+
   while (totalFrames < maxFrames) {
     if (wasm._hively_is_song_end()) break;
 
-    const samples = wasm._hively_decode_frame(decodePtrL, decodePtrR);
+    let samples: number;
+    if (scopes) {
+      wasm._hively_tick_frame();
+      wasm._hively_save_voice_positions();
+      setGains(-1);
+      samples = wasm._hively_render_frame(decodePtrL, decodePtrR);
+      if (samples > 0) {
+        // The mix is read below; keep it out of the way of the solo renders.
+        const heap = wasm.HEAPF32 as Float32Array;
+        const mixL = heap.slice(decodePtrL >> 2, (decodePtrL >> 2) + samples);
+        const mixR = heap.slice(decodePtrR >> 2, (decodePtrR >> 2) + samples);
+        let n = samples;
+        for (let ch = 0; ch < scopeChannels; ch++) {
+          wasm._hively_restore_voice_positions();
+          setGains(ch);
+          const got = wasm._hively_render_frame(decodePtrL, decodePtrR);
+          const h = wasm.HEAPF32 as Float32Array;
+          const oL = decodePtrL >> 2;
+          const oR = decodePtrR >> 2;
+          n = Math.min(n, Math.max(0, got));
+          if (solo[ch].length < got) solo[ch] = new Float32Array(got);
+          for (let i = 0; i < got; i++) solo[ch][i] = (h[oL + i] + h[oR + i]) * 0.5;
+        }
+        setGains(-1);
+        (wasm.HEAPF32 as Float32Array).set(mixL, decodePtrL >> 2);
+        (wasm.HEAPF32 as Float32Array).set(mixR, decodePtrR >> 2);
+        scopes.push(samples, (ch, i) => (i < n ? solo[ch][i] : 0));
+      }
+    } else {
+      samples = wasm._hively_decode_frame(decodePtrL, decodePtrR);
+    }
     if (samples <= 0) break;
 
     const heapF32 = wasm.HEAPF32;
@@ -771,7 +848,7 @@ async function renderWithHively(
 
   postProgress(id, 85);
   console.log(`[DJRenderWorker/Hively] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames`);
-  return { left, right, sampleRate };
+  return { left, right, sampleRate, channelScopes: scopes?.finish() };
 }
 
 // ── WebSID (C64 SID) Engine State ────────────────────────────────────────────
@@ -888,7 +965,7 @@ async function renderWithSID(
   filename: string,
   subsong: number,
   id: string,
-): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
+): Promise<RenderResult> {
   await initSID();
   const mod = sidModule;
   const sampleRate = 44100;
@@ -926,7 +1003,9 @@ async function renderWithSID(
   const procBufSize = 8192; // processing buffer size (samples per compute call)
   const ret = mod.ccall('emu_load_file', 'number',
     ['string', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-    [filename, buf, data.length, sampleRate, procBufSize, 0, basicBuf, charBuf, kernalBuf, 0]);
+    // scopeEnabled = 1: WebSID records each voice's output as a trace stream
+    // beside the audio buffer (the DeepSID scopes' source).
+    [filename, buf, data.length, sampleRate, procBufSize, 1, basicBuf, charBuf, kernalBuf, 0]);
 
   mod._free(buf);
   if (kernalBuf) mod._free(kernalBuf);
@@ -955,6 +1034,9 @@ async function renderWithSID(
   let totalFrames = 0;
   let lastProgressPct = 10;
   let songEnded = false;
+  const hasTrace = typeof mod._emu_get_trace_streams === 'function' && typeof mod._emu_number_trace_streams === 'function';
+  const voices = hasTrace ? Math.min(DECK_SCOPE_CHANNELS, mod._emu_number_trace_streams()) : 0;
+  const scopes = voices > 0 ? new ChannelScopeTrackBuilder(voices, sampleRate) : null;
 
   while (totalFrames < maxFrames && !songEnded) {
     // emu_compute_audio_samples returns >0 when song ends
@@ -983,6 +1065,15 @@ async function renderWithSID(
 
     chunks.push({ left: chunkL, right: chunkR });
     totalFrames += framesThisChunk;
+
+    if (scopes) {
+      // An array of pointers to one Int16 stream per voice, numSamples long.
+      const table = mod._emu_get_trace_streams() >> 2;
+      const heap32 = mod.HEAP32 as Int32Array;
+      const heap16 = mod.HEAP16 as Int16Array;
+      const bases = Array.from({ length: voices }, (_, v) => heap32[table + v] >> 1);
+      scopes.push(framesThisChunk, (v, i) => heap16[bases[v] + i] / 32768);
+    }
 
     // Progress based on position or time
     if (maxPos > 0) {
@@ -1020,7 +1111,7 @@ async function renderWithSID(
 
   postProgress(id, 85);
   console.log(`[DJRenderWorker/WebSID] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames, songEnded: ${songEnded}`);
-  return { left, right, sampleRate };
+  return { left, right, sampleRate, channelScopes: scopes?.finish() };
 }
 
 /**
@@ -1150,7 +1241,7 @@ async function renderWithLibopenmpt(
   filename: string,
   id: string,
   maxSeconds = 600,
-): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
+): Promise<RenderResult> {
   await initLibopenmpt();
   const lib = openmptLib;
 
@@ -1192,6 +1283,12 @@ async function renderWithLibopenmpt(
   const leftPtr = lib._malloc(CHUNK * 4);
   const rightPtr = lib._malloc(CHUNK * 4);
 
+  // Each channel's own signal: one solo instance per channel, the way the
+  // libopenmpt worklet feeds its scopes (chiptune3.worklet.js createOscInstance_),
+  // rendered in lockstep with the main module.
+  const solos = createLibopenmptSolos(lib, fileBytes, ext, CHUNK);
+  const scopes = solos.length > 0 ? new ChannelScopeTrackBuilder(solos.length, sampleRate) : null;
+
   const chunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
   const MAX_FRAMES = sampleRate * maxSeconds;
@@ -1208,6 +1305,14 @@ async function renderWithLibopenmpt(
     chunks.push({ left: leftData, right: rightData });
     totalFrames += rendered;
 
+    if (scopes) {
+      const counts = solos.map((solo) => Math.max(0, lib._openmpt_module_read_float_stereo(solo.modulePtr, sampleRate, rendered, solo.leftPtr, solo.rightPtr)));
+      const heap = lib.HEAPF32 as Float32Array;
+      scopes.push(rendered, (ch, i) => (i < counts[ch]
+        ? (heap[(solos[ch].leftPtr >> 2) + i] + heap[(solos[ch].rightPtr >> 2) + i]) * 0.5
+        : 0));
+    }
+
     if (totalFrames % (sampleRate * 5) < CHUNK) {
       const pct = Math.min(80, 15 + (totalFrames / MAX_FRAMES) * 65);
       postProgress(id, pct);
@@ -1217,6 +1322,11 @@ async function renderWithLibopenmpt(
   lib._free(leftPtr);
   lib._free(rightPtr);
   lib._openmpt_module_destroy(modulePtr);
+  for (const solo of solos) {
+    lib._openmpt_module_ext_destroy(solo.extPtr);
+    lib._free(solo.leftPtr);
+    lib._free(solo.rightPtr);
+  }
 
   if (totalFrames === 0) {
     throw new Error(`libopenmpt rendered 0 frames for ${filename}`);
@@ -1233,7 +1343,53 @@ async function renderWithLibopenmpt(
   }
 
   postProgress(id, 85);
-  return { left, right, sampleRate };
+  return { left, right, sampleRate, channelScopes: scopes?.finish() };
+}
+
+interface LibopenmptSolo { extPtr: number; modulePtr: number; leftPtr: number; rightPtr: number }
+
+/**
+ * One libopenmpt instance per shown channel, every other channel muted
+ * through the 'interactive' interface before the first tick, configured like
+ * the main render. Empty when the build has no ext API.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createLibopenmptSolos(lib: any, fileBytes: Uint8Array, ext: string, chunk: number): LibopenmptSolo[] {
+  if (!lib._openmpt_module_ext_create_from_memory || !lib._openmpt_module_ext_get_interface || !lib.wasmTable) return [];
+  const solos: LibopenmptSolo[] = [];
+  let numChannels = 0;
+  for (let ch = 0; ch < DECK_SCOPE_CHANNELS; ch++) {
+    if (numChannels > 0 && ch >= numChannels) break;
+    const filePtr = lib._malloc(fileBytes.length);
+    lib.HEAPU8.set(fileBytes, filePtr);
+    const extPtr = lib._openmpt_module_ext_create_from_memory(filePtr, fileBytes.length, 0, 0, 0, 0, 0, 0, 0);
+    lib._free(filePtr);
+    if (!extPtr) break;
+    const modulePtr = lib._openmpt_module_ext_get_module(extPtr);
+    // set_channel_mute_status is the 11th pointer of the 'interactive' interface struct (16 pointers).
+    const ifacePtr = lib._malloc(64);
+    lib.HEAPU8.fill(0, ifacePtr, ifacePtr + 64);
+    const stack = lib.stackSave();
+    const ok = lib._openmpt_module_ext_get_interface(extPtr, asciiToStack(lib, 'interactive'), ifacePtr, 64);
+    lib.stackRestore(stack);
+    const muteFunc = ok ? lib.HEAPU32[(ifacePtr + 40) >> 2] : 0;
+    lib._free(ifacePtr);
+    if (!modulePtr || !muteFunc) { lib._openmpt_module_ext_destroy(extPtr); break; }
+    numChannels = lib._openmpt_module_get_num_channels(modulePtr);
+    if (ch >= numChannels) { lib._openmpt_module_ext_destroy(extPtr); break; }
+    const mute = lib.wasmTable.get(muteFunc);
+    for (let c = 0; c < numChannels; c++) mute(extPtr, c, c === ch ? 0 : 1);
+    lib._openmpt_module_set_repeat_count(modulePtr, 0);
+    lib._openmpt_module_set_render_param(modulePtr, 2 /* SEPARATION */, 100);
+    if (ext === 'mod' || ext === 'nst' || ext === 'stk' || ext === 'm15') {
+      const st = lib.stackSave();
+      lib._openmpt_module_ctl_set(modulePtr, asciiToStack(lib, 'render.resampler.emulate_amiga'), asciiToStack(lib, '1'));
+      lib._openmpt_module_ctl_set(modulePtr, asciiToStack(lib, 'render.resampler.emulate_amiga_type'), asciiToStack(lib, 'a1200'));
+      lib.stackRestore(st);
+    }
+    solos.push({ extPtr, modulePtr, leftPtr: lib._malloc(chunk * 4), rightPtr: lib._malloc(chunk * 4) });
+  }
+  return solos;
 }
 
 // ── Message Handling ─────────────────────────────────────────────────────────
@@ -1255,7 +1411,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     case 'render': {
       const { id, fileBuffer, filename, subsong = 0, companions, maxSeconds } = msg;
       try {
-        let result: { left: Float32Array; right: Float32Array; sampleRate: number };
+        let result: RenderResult;
 
         // Format routing with priority order:
         // 1. C64 SID (magic number detection)
@@ -1302,8 +1458,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             right: result.right,
             sampleRate: result.sampleRate,
             duration,
+            channelScopes: result.channelScopes,
           },
-          [result.left.buffer, result.right.buffer],
+          [result.left.buffer, result.right.buffer, ...channelScopeTransferables(result.channelScopes)],
         );
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);

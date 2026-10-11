@@ -172,6 +172,9 @@ export interface DeckState {
   /** The unified Auto DJ analysis of the loaded track (plan section 3); null until the pipeline applies one. */
   trackAnalysis: DJTrackAnalysis | null;
 
+  /** Channels the deck has a per-channel scope signal for (channelScopeTrack.ts); 0 = none (an audio file, or a render without a per-channel tap). */
+  channelScopeCount: number;
+
   // Stem separation
   stemsAvailable: boolean;          // stems loaded and ready for playback
   stemNames: string[];              // e.g. ['drums', 'bass', 'vocals', 'other']
@@ -278,6 +281,7 @@ const makeDefaultDeckState = (): DeckState => ({
   energy: 0.5,
   danceability: 0.5,
   trackAnalysis: null,
+  channelScopeCount: 0,
 
   // Stems
   stemsAvailable: false,
