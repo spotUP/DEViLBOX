@@ -143,7 +143,7 @@ export class ScratchRecordVoice {
     this.ring.setBounds(record.safe[0], record.safe[1]);
     this.record = record;
     this.lastClamped = 0;
-    this.cue('vowel');
+    this.moveNeedle('vowel');
   }
 
   private clampToSafe(sec: number): number {
@@ -168,8 +168,12 @@ export class ScratchRecordVoice {
 
   /** Drop the needle (section 18 true re-cue), now or at context time `when`. Returns the position used. */
   cue(at: ScratchCue, when?: number): number {
-    const sec = this.resolveCue(at);
     scratchVoiceStats.cues++;
+    return this.moveNeedle(at, when);
+  }
+
+  private moveNeedle(at: ScratchCue, when?: number): number {
+    const sec = this.resolveCue(at);
     this.cuePosition = sec;
     this.position = sec;
     this.ring.seek(sec, when);

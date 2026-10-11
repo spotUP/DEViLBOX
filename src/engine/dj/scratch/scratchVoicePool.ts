@@ -42,7 +42,8 @@ export interface PerformHandle {
   readonly voice: ScratchRecordVoice | null;
   /** Resolves with the stroke result once the record is loaded and the gesture started. */
   readonly started: Promise<StrokeResult>;
-  release(): void;
+  /** Stop now, or - with `at` (context seconds) - stop sample-accurately at that time. */
+  release(at?: number): void;
 }
 
 export type RecordFetcher = (record: ScratchRecord, ctx: BaseAudioContext) => Promise<AudioBuffer>;
@@ -121,6 +122,7 @@ export class ScratchVoicePool {
     if (!record) return null;
     let voice: ScratchRecordVoice | null = null;
     let cancelled = false;
+    let stopAt: number | undefined;
     scratchPoolStats.performs++;
     const started = (async (): Promise<StrokeResult> => {
       await this.ready;
@@ -131,18 +133,25 @@ export class ScratchVoicePool {
         await voice.load(record, buffer);
       }
       if (cancelled) return { ok: false, reason: 'released before the gesture started' };
-      return voice.playGesture(gesture, opts.bpm, {
+      const result = voice.playGesture(gesture, opts.bpm, {
         cue: opts.cue ?? this.anchor ?? undefined,
         ambience: opts.ambience,
         velocity: opts.velocity,
         at: opts.at,
       });
+      // a scheduled stop that arrived while the record was still loading
+      if (stopAt !== undefined && result.ok) voice.release(stopAt);
+      return result;
     })();
     this.track(started);
     return {
       get voice() { return voice; },
       started,
-      release: () => { cancelled = true; if (voice?.busy) voice.release(); },
+      release: (at?: number) => {
+        if (at !== undefined) { if (voice?.busy) voice.release(at); else stopAt = at; return; }
+        cancelled = true;
+        if (voice?.busy) voice.release();
+      },
     };
   }
 

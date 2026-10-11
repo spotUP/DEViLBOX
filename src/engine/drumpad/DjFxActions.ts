@@ -107,6 +107,8 @@ export interface DjFxFireOptions {
   scratchSource?: ScratchSource;
   /** Musical role of the event (ambience by role, voice choice). */
   role?: ScratchRole;
+  /** Record gestures: context time (seconds) the gesture starts at, sample-accurate (the executor's planned beat). */
+  at?: number;
   /** Release: let the running pattern cycle finish instead of a hard stop. */
   finishCycle?: boolean;
   /** Deck gestures: called with the quantize wait when the start is deferred. */
@@ -1737,6 +1739,7 @@ function engageRecordGesture(id: string, gestureId: ScratchGestureId, opts?: DjF
     ambience: ambienceFor(role ?? 'ACCENT'),
     velocity: opts?.amount,
     cue: opts?.anchor,
+    at: opts?.at,
   });
   if (handle) scratchVoiceHandles.set(id, handle);
 }
@@ -1758,7 +1761,7 @@ function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
     },
     disengage(opts) {
       const handle = scratchVoiceHandles.get(this.id);
-      if (handle) { scratchVoiceHandles.delete(this.id); handle.release(); return; }
+      if (handle) { scratchVoiceHandles.delete(this.id); handle.release(opts?.at); return; }
       const deckId = opts?.deck ?? scratchDeck.get(this.id) ?? getActiveDeckId();
       scratchDeck.delete(this.id);
       if (opts?.finishCycle) finishDeckPatternCycle(deckId); else stopDeckPattern(deckId);

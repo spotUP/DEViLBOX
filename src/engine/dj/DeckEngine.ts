@@ -28,6 +28,8 @@ import { HEARD_DELAY_MAX_SEC, syncHeardDelay, type LatencySource } from '../audi
 import { computeKeyLockShift } from './computeKeyLockShift';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
+import { recueDeck, type DeckRecueResult } from './scratch/deckRecue';
+import type { DeckScratchSnapshot } from './scratch/scratchSnapshot';
 
 export type PlaybackMode = 'tracker' | 'audio';
 
@@ -1613,6 +1615,58 @@ export class DeckEngine {
   private scratchEffectSink: ((param: number, deck: DeckId) => boolean) | null = null;
   setScratchEffectSink(sink: ((param: number, deck: DeckId) => boolean) | null): void {
     this.scratchEffectSink = sink;
+  }
+
+  /** The state a scratch touches on this deck (owner scratch plan section 60). */
+  captureScratchSnapshot(): DeckScratchSnapshot {
+    return {
+      rate: this._playbackMode === 'audio' ? this.audioPlayer.getPlaybackRate() : this.replayer.getTempoMultiplier(),
+      channelGain: this.channelGain.gain.value,
+      captureFrozen: this.scratchBuffer?.captureFrozen ?? false,
+      suppressNotes: this.replayer.isSuppressNotes,
+    };
+  }
+
+  /**
+   * Give back what a scratch changed: only the values that moved are written.
+   * `suppressNotes` is never forced (2026-09-30: forcing it off froze the
+   * pattern view of WASM-played songs): the snapshot verifies it, the
+   * replayer owns it.
+   */
+  restoreScratchSnapshot(s: DeckScratchSnapshot): void {
+    const now = this.captureScratchSnapshot();
+    if (Math.abs(now.rate - s.rate) > 1e-3) {
+      if (this._playbackMode === 'audio') this.audioPlayer.setPlaybackRate(s.rate);
+      else { this.replayer.setPitchMultiplier(s.rate); this.replayer.setTempoMultiplier(s.rate); }
+    }
+    if (Math.abs(now.channelGain - s.channelGain) > 1e-3) {
+      this.releaseChannelGainParam();
+      this.channelGain.gain.value = s.channelGain;
+    }
+    if (now.captureFrozen !== s.captureFrozen) {
+      if (s.captureFrozen) this.scratchBuffer?.freezeCapture(); else this.scratchBuffer?.unfreezeCapture();
+    }
+  }
+
+  /**
+   * True re-cue (owner scratch plan section 18): put the deck's play position
+   * back on `anchorSec` before a returns-to-anchor stroke. Only while the
+   * fader window is closed; see `recueDeck` for the rule and the result.
+   */
+  recueScratch(anchorSec: number): DeckRecueResult {
+    return recueDeck({
+      playbackMode: this._playbackMode === 'audio' ? 'audio' : 'tracker',
+      isFaderWindowClosed: () => this.scratchPlayback.currentFaderGain === 0,
+      seekAudio: (sec) => { if (this._stemMode) this.stemPlayer.seek(sec); else this.audioPlayer.seek(sec); },
+      cueTracker: (sec) => {
+        const at = this.getPositionAtTime(sec * 1000);
+        if (!at) return false;
+        this.cue(at.songPos, at.pattPos);
+        return true;
+      },
+      resetRing: () => this.scratchBuffer?.resetCapture(),
+      rearmRing: () => this.scratchBuffer?.startScratch(0, 'write'),
+    }, anchorSec);
   }
 
   /** Play a named scratch pattern (with optional beat quantization) */
