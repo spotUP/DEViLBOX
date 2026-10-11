@@ -14,13 +14,13 @@
  * changes by > 2% (handled in DJDeck RAF via deck.notifyBPMChange).
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
 import { getGesture } from '@/engine/dj/scratch/scratchGestureCatalog';
+import { fireDjFx, releaseDjFx } from '@/engine/drumpad/DjFxActions';
+import { fxIdForPattern } from '@/engine/dj/scratch/scratchActionMap';
 import {
-  playDeckPattern,
-  finishDeckPatternCycle,
   startDeckFaderLFO,
   stopDeckFaderLFO,
 } from '@/engine/dj/DJActions';
@@ -47,9 +47,6 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
 
   const [waitingPattern, setWaitingPattern] = useState<string | null>(null);
 
-  // Hold vs tap: >= TAP_MS held → stop immediately on release; < TAP_MS → finish current cycle
-  const TAP_MS = 300;
-  const pressTimeRef = useRef<number>(0);
 
   const isB = deckId === 'B';
   const deckColor = isB ? 'text-deck-b' : 'text-deck-a';
@@ -65,21 +62,26 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
     // Ignore if any routine is already running (including this one)
     if (activePatternName !== null) return;
 
-    pressTimeRef.current = performance.now();
     const store = useDJStore.getState();
 
     setWaitingPattern(patternName);
     let quantizeWaitMs = 0;
 
-    try {
-      playDeckPattern(deckId, patternName, (waitMs) => {
+    // One action path (owner scratch plan section 81): the button fires the
+    // same registry action the pads, keyboard, MIDI, MCP and Auto DJ use.
+    const fxId = fxIdForPattern(patternName);
+    const ok = fxId !== null && fireDjFx(fxId, {
+      deck: deckId,
+      source: 'pad',
+      onWaiting: (waitMs) => {
         quantizeWaitMs = waitMs;
         setTimeout(() => {
           setWaitingPattern(null);
           store.setDeckPattern(deckId, patternName);
         }, waitMs);
-      });
-    } catch {
+      },
+    });
+    if (!ok) {
       setWaitingPattern(null);
       return;
     }
@@ -90,15 +92,10 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
     }
   }, [deckId, activePatternName]);
 
-  const handlePatternPointerUp = useCallback((_patternName: string) => {
-    const held = performance.now() - pressTimeRef.current;
-    if (held < TAP_MS) {
-      // Tap: one-shot — let current cycle finish then stop
-      finishDeckPatternCycle(deckId);
-    } else {
-      // Hold release: finish current cycle gracefully (no abrupt cut)
-      finishDeckPatternCycle(deckId);
-    }
+  const handlePatternPointerUp = useCallback((patternName: string) => {
+    // Tap or hold release: let the current cycle finish (no abrupt cut)
+    const fxId = fxIdForPattern(patternName);
+    if (fxId) releaseDjFx(fxId, { deck: deckId, source: 'pad', finishCycle: true });
     // Always clear active state so button goes inactive immediately
     useDJStore.getState().setDeckPattern(deckId, null);
     setWaitingPattern(null);

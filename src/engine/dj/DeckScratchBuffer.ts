@@ -29,7 +29,7 @@ export const TRACKER_SCRATCH_BUFFER_ID = 3;
 export const SCRATCH_RECORD_RING_BASE = 4;
 
 /** Reachability sentinels for the record mode (SCR-P2.R2). */
-export const scratchRingStats = { loads: 0, startAtFrames: [] as number[], rateCurves: 0, faderWindows: 0 };
+export const scratchRingStats = { loads: 0, startAtFrames: [] as number[], seekFrames: [] as number[], rateCurves: 0, faderWindows: 0 };
 
 /** A frame-accurate rate point relative to the message's arrival. */
 export interface RingRatePoint { frame: number; rate: number }
@@ -375,7 +375,9 @@ export class DeckScratchBuffer {
   seek(sec: number, at?: number): void {
     this.requireRecord();
     if (!this.initialized) return;
-    this.playbackNode.port.postMessage({ type: 'seek', positionFrames: Math.round(sec * this.ctx.sampleRate), at });
+    const positionFrames = Math.round(sec * this.ctx.sampleRate);
+    scratchRingStats.seekFrames.push(positionFrames);
+    this.playbackNode.port.postMessage({ type: 'seek', positionFrames, at });
   }
 
   /** Frame-accurate rate automation relative to `at` / now (see `RingRateCurveOptions`). */
