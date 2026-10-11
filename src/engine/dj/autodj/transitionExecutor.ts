@@ -61,9 +61,59 @@ export interface ExecuteOptions {
    * start and the release (juggling plan section 26). Resolves when the
    * ladder released onto the incoming or was aborted; the release curves run
    * after it. `refused`: nothing was traded (the incoming was never heard) -
-   * the plan's normal-blend fallback runs instead of the release.
+   * the plan's normal-blend fallback runs instead of the release. Aborted
+   * after the incoming was heard: the fallback blend runs too, onto the
+   * incoming as it plays, ending on the ladder's landing (resumeBlendAfterHeardAbort).
    */
   performTrade?: (juggle: NonNullable<DJTransitionPlan['juggle']>) => Promise<{ completed: boolean; refused?: boolean; reason?: string }>;
+  /** The outgoing deck's position now (seconds of its track): where a heard ladder abort's blend is placed. */
+  outgoingPosition?: () => number;
+}
+
+/** Scale a curve's keyframe beats by `k` (a blend run over a shorter length keeps its shape). */
+const scaleCurve = (c: AutomationCurve, k: number): AutomationCurve => ({ ...c, keyframes: c.keyframes.map((f) => ({ ...f, beat: f.beat * k })) });
+
+/**
+ * A juggle transition whose ladder aborted after the incoming was heard
+ * (drift, a vocal collision, the governor): the juggle released to the
+ * outgoing (owner plan section 33: the strongest deck, a stable fader) and the
+ * incoming plays on beneath it, in its phrase, from the ladder's start - it
+ * cannot be re-cued without an audible jump. The graceful resolve (section 42)
+ * is the plan's normal-blend fallback - its style, curves and bass handover -
+ * run onto the incoming as it plays and ENDING on the ladder's landing: the
+ * incoming phrase start (its drop) the ladder was handing over on, and where
+ * the outgoing's room is guaranteed. It runs the fallback's planned length
+ * when that fits between the next bar and the landing, else it is compressed
+ * into the bars left (one bar at least, from the next bar) - never the 1-bar
+ * release cut a ladder's length before the drop.
+ */
+export function resumeBlendAfterHeardAbort(plan: DJTransitionPlan, fallback: DJTransitionPlan, nowSec: number, beatSec: number): DJTransitionPlan {
+  const bpb = plan.beatsPerBar || 4;
+  const barSec = beatSec * bpb;
+  const landingSec = plan.startTimeSec + (plan.juggle?.tradeBeats ?? 0) * beatSec;
+  const nextBarSec = plan.startTimeSec + Math.ceil((nowSec - plan.startTimeSec) / barSec - 1e-6) * barSec;
+  const barsLeft = Math.round((landingSec - nextBarSec) / barSec);
+  const bars = Math.max(1, Math.min(fallback.durationBars, barsLeft));
+  const startTimeSec = barsLeft >= 1 ? landingSec - bars * barSec : nextBarSec;
+  const k = bars / Math.max(1, fallback.durationBars);
+  const startBeat = plan.startBeat + Math.round((startTimeSec - plan.startTimeSec) / beatSec);
+  return {
+    ...fallback,
+    id: `${fallback.id}-heard`,
+    startTimeSec, startBeat, endBeat: startBeat + bars * bpb,
+    durationBars: bars, durationBeats: bars * bpb,
+    crossfadePlan: { ...fallback.crossfadePlan, curve: scaleCurve(fallback.crossfadePlan.curve, k), lengthBeats: fallback.crossfadePlan.lengthBeats * k },
+    eqPlan: { ...fallback.eqPlan, curves: fallback.eqPlan.curves.map((c) => scaleCurve(c, k)) },
+    filterPlan: { ...fallback.filterPlan, curves: fallback.filterPlan.curves.map((c) => scaleCurve(c, k)) },
+    bassPlan: {
+      ...fallback.bassPlan, curves: fallback.bassPlan.curves.map((c) => scaleCurve(c, k)),
+      schedule: fallback.bassPlan.schedule.map((s) => ({ ...s, bar: s.bar * k })), handoverBar: fallback.bassPlan.handoverBar * k,
+    },
+    effects: fallback.effects.map((e) => ({ ...e, beat: e.beat * k, lengthBeats: e.lengthBeats * k })),
+    // The incoming already plays from the ladder's start: no loop or cue jump re-places either deck.
+    loop: undefined, cueJump: undefined,
+    reasons: [...fallback.reasons, `ladder aborted after the incoming was heard: ${fallback.style} ${bars} bars onto the ladder's landing at ${landingSec.toFixed(1)} s`],
+  };
 }
 
 export interface ExecutionHandle {
@@ -302,22 +352,32 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
         try { traded = await opts.performTrade(plan.juggle); } catch { traded = { completed: false }; }
         if (cancelled) return;
         const fallback = plan.juggle.fallback;
-        if (!traded.completed && traded.refused && fallback) {
-          // Nothing was traded and the incoming was never heard (the crossfader still holds the outgoing): a
-          // normal transition plays, the plan's own fallback blend from its own phrase and mix-in - never the
-          // 1-bar release, a cut onto the incoming a whole ladder before its drop (owner plan sections 31, 33, 42).
-          trace.events.push(`ladder refused${traded.reason ? ` (${traded.reason})` : ''}: ${fallback.style} ${fallback.durationBars} bars at ${fallback.startTimeSec.toFixed(1)} s`);
+        const outgoingPlays = (() => { try { return getDJEngine().getDeck(out).isPlaying(); } catch { return false; } })();
+        // A ladder that did not complete resolves as a normal transition, the plan's own fallback blend - never
+        // the 1-bar release, a cut onto the incoming a ladder's length before its drop (owner plan sections 31,
+        // 33, 42). Refused (the incoming never heard, the crossfader still on the outgoing): the blend from its
+        // own phrase and mix-in. Aborted after the incoming was heard (the juggle released to the outgoing, the
+        // incoming plays on beneath it): the blend onto the incoming as it plays, ending on the ladder's landing.
+        // An outgoing that stopped leaves only the incoming: the release below completes onto it.
+        const blend = traded.completed || !fallback ? null
+          : traded.refused ? fallback
+          : outgoingPlays && opts.outgoingPosition ? resumeBlendAfterHeardAbort(plan, fallback, opts.outgoingPosition(), beatSec)
+          : null;
+        if (blend) {
+          trace.events.push(`ladder ${traded.refused ? 'refused' : 'aborted after the incoming was heard'}${traded.reason ? ` (${traded.reason})` : ''}: ${blend.style} ${blend.durationBars} bars at ${blend.startTimeSec.toFixed(1)} s`);
           trace.fellBack = 'fallback';
-          // The silent incoming stops; the blend cues it at its own mix-in.
-          try { getDJEngine().getDeck(inc).stop(); } catch { /* */ }
-          useDJStore.getState().setDeckPlaying(inc, false);
-          const inner = executeTransition(fallback, { ...opts, performTrade: undefined, onComplete: undefined, onSweepStarted: undefined });
+          if (traded.refused) {
+            // The silent incoming stops; the blend cues it at its own mix-in.
+            try { getDJEngine().getDeck(inc).stop(); } catch { /* */ }
+            useDJStore.getState().setDeckPlaying(inc, false);
+          }
+          const inner = executeTransition(blend, { ...opts, performTrade: undefined, onComplete: undefined, onSweepStarted: undefined });
           fallbackHandle = inner;
           void inner.promise.then((r) => {
             trace.events.push(...r.trace.events);
             trace.samples.push(...r.trace.samples);
             trace.completed = r.completed;
-            finish({ ...r, fellBack: r.fellBack === 'emergency' ? 'emergency' : 'fallback', trace, executedPlan: fallback });
+            finish({ ...r, fellBack: r.fellBack === 'emergency' ? 'emergency' : 'fallback', trace, executedPlan: blend });
           });
           return;
         }
