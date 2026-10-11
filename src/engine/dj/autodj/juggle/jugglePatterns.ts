@@ -55,8 +55,8 @@ function cutTo(b: Builder, deck: 'A' | 'B', at: number, phase: JugglePhase, reas
   b.seq.push(deck);
 }
 
-function layer(b: Builder, at: number, phase: JugglePhase, reason: string): void {
-  b.actions.push({ type: 'HoldDeck', deck: 'BOTH', executeAtBeat: at, quantization: 'bar', phase, reason });
+function layer(b: Builder, at: number, phase: JugglePhase, reason: string, verifyPhaseOf?: 'A' | 'B'): void {
+  b.actions.push({ type: 'HoldDeck', deck: 'BOTH', executeAtBeat: at, quantization: 'bar', phase, reason, ...(verifyPhaseOf ? { verifyPhaseOf } : {}) });
   b.roles.push({ beat: at, A: 'LAYER', B: 'LAYER' });
   b.seq.push('A+B');
 }
@@ -285,13 +285,18 @@ export function double(p: PatternParams): DJJugglePattern {
     trade(b, p.primary, bpb, 1, 'INTENSIFY', 'bar');
   }
   phase(b, 'INTENSIFY', b.beat, b.beat + rung * bpb);
-  cutTo(b, p.primary, b.beat, 'INTENSIFY', `${rung}-bar: ${p.primary} alone while the copy lines up`, 'bar');
-  // The copy is silent from here: one re-cue to zero offset (a cue jump of an unheard deck), its bass out.
-  b.actions.push({ type: 'ResyncDeck', deck: copy, executeAtBeat: b.beat, targetPosition: target, beats: 0, quantization: 'bar', phase: 'INTENSIFY', reason: 'the copy lines up with the original for the payoff' });
-  b.actions.push({ type: 'EQCut', deck: copy, executeAtBeat: b.beat, quantization: 'bar', phase: 'INTENSIFY', reason: `one bassline in the payoff: ${p.primary} keeps the bass` });
+  const cutOut = b.beat;
+  cutTo(b, p.primary, cutOut, 'INTENSIFY', `${rung}-bar: ${p.primary} alone while the copy lines up`, 'bar');
   b.beat += rung * bpb;
+  const layerAt = b.beat;
+  // One re-cue of the copy to zero offset while it is fully silent (a cue jump of an unheard deck, never
+  // inside the cut's sweep): a bar before the layer, at least a beat after the cut-out. Its bass goes out.
+  const recueAt = Math.max(cutOut + RECUE_AFTER_CUT_BEATS, layerAt - bpb);
+  b.actions.push({ type: 'ResyncDeck', deck: copy, executeAtBeat: recueAt, targetPosition: target, beats: 0, quantization: 'bar', phase: 'INTENSIFY', reason: 'the copy lines up with the original for the payoff' });
+  b.actions.push({ type: 'EQCut', deck: copy, executeAtBeat: recueAt, quantization: 'bar', phase: 'INTENSIFY', reason: `one bassline in the payoff: ${p.primary} keeps the bass` });
   phase(b, 'PAYOFF', b.beat, b.beat + rung * bpb);
-  layer(b, b.beat, 'PAYOFF', `both copies together, the bass on ${p.primary}`);
+  // Two copies a few ms apart comb-filter: the layer plays only when the copy's measured bar phase is verified.
+  layer(b, b.beat, 'PAYOFF', `both copies together, the bass on ${p.primary}`, copy);
   b.beat += rung * bpb;
   phase(b, 'RELEASE', b.beat, b.beat);
   release(b, p.primary, b.beat);
