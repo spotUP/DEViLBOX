@@ -49,7 +49,11 @@ export function useDeckStateSync(deckId: DeckId): void {
           // Always update position when either the engine or store says we're playing.
           // This prevents position freezing when the Tone.js Player state briefly flickers
           // or the browser throttles the audio context.
-          if ((isEngPlaying || isStorePlaying) && !isSeekActive(deckId)) {
+          // A moving anchor on a deck whose player is stopped (a load's
+          // silent scratch-buffer priming plays ~150 ms) is written once
+          // more at rate 0 - otherwise the turntables keep turning.
+          const anchorMoving = store.decks[deckId].positionAnchor.rate !== 0;
+          if ((isEngPlaying || isStorePlaying || anchorMoving) && !isSeekActive(deckId)) {
             // The HEARD position (DeckEngine.getHeardPosition): what the listener hears now, not where
             // the player has rendered to. Every DJ visual reads this field.
             const pos = deck.getHeardPosition();
