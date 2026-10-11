@@ -6,6 +6,10 @@
  *   - `modland:<full_path>`  — downloaded from the Modland mirror
  *   - `hvsc:<path>`          — downloaded from HVSC via the server proxy
  *   - `local:<name>`         — bytes stored in IndexedDB by Add Files / drop
+ *   - `http(s)://...`        — any other URL, downloaded through the server
+ *                              proxy (`remoteSources.ts`); the HippoPlayer
+ *                              playlists the seed is built from point at
+ *                              hippoplayer.se, AmigaRemix, modules.pl, ...
  *
  * A *bare* name ("quickening.mod") is the legacy pre-`local:` form. It only
  * loads when that exact name happens to be cached in this browser's
@@ -15,12 +19,13 @@
  * whoever built the seed fell back to the bare name whenever its Modland
  * lookup missed.
  *
- * This module holds the one resolver used both offline (to fix the seed,
- * `tools/resolve-bundled-playlist-sources.ts`) and at runtime (to repair a
- * persisted copy of a seed playlist from the fixed seed).
+ * The seed is now built by `tools/convert-hippo-playlists.ts`, which keeps
+ * every entry's source; this module holds the resolver it uses to re-find a
+ * Modland file that moved, and the runtime repair that brings a persisted
+ * copy of a seed playlist up to the seed's sources.
  */
 
-const SOURCE_PREFIX = /^(modland|hvsc|local):/;
+const SOURCE_PREFIX = /^(modland|hvsc|local|https?):/i;
 
 /** True when the entry carries no source prefix (legacy bare name). */
 export function isBareFileName(fileName: string): boolean {
@@ -31,6 +36,20 @@ export function isBareFileName(fileName: string): boolean {
 export function sourceBaseName(fileName: string): string {
   const withoutPrefix = fileName.replace(SOURCE_PREFIX, '');
   return withoutPrefix.slice(withoutPrefix.lastIndexOf('/') + 1);
+}
+
+/** `%28` -> `(`, leaving a name untouched when it holds a `%` that is not an escape. */
+export function decodePathEscapes(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
+/** What identifies an entry across source changes: its file name, unescaped, lower-cased. */
+function sourceKey(fileName: string): string {
+  return decodePathEscapes(sourceBaseName(fileName)).toLowerCase();
 }
 
 /** `pub/modules/<format>/<author>` of a Modland full path. */
@@ -94,14 +113,17 @@ interface RepairablePlaylist {
 }
 
 /**
- * Repair persisted copies of the bundled seed playlists: every bare entry
- * whose seed counterpart (same playlist id, same basename) now carries a
- * source takes that source, and its bad flag — earned only because it could
- * not load — is cleared. Mutates `playlists` in place (Immer-draft safe).
+ * Bring persisted copies of the bundled seed playlists up to the seed's
+ * sources. An entry whose source the seed no longer holds — a bare name (no
+ * source, never loads), a Modland path that moved, a basename guess the seed
+ * has since replaced with the playlist's own URL — takes the seed source with
+ * the same file name, when exactly one seed source has that name. Its bad
+ * flag, earned because it could not load, is cleared. `local:` entries the
+ * user added are never touched. Mutates `playlists` in place (Immer-draft safe).
  *
  * @returns the number of entries repaired
  */
-export function repairBareSourcesFromSeed(
+export function repairSourcesFromSeed(
   playlists: RepairablePlaylist[],
   seed: readonly { id: string; tracks: readonly { fileName: string }[] }[],
 ): number {
@@ -109,17 +131,19 @@ export function repairBareSourcesFromSeed(
   for (const seedPlaylist of seed) {
     const playlist = playlists.find((p) => p.id === seedPlaylist.id);
     if (!playlist) continue;
-    const sourceByBase = new Map<string, string>();
-    for (const t of seedPlaylist.tracks) {
-      if (!isBareFileName(t.fileName)) {
-        sourceByBase.set(sourceBaseName(t.fileName).toLowerCase(), t.fileName);
-      }
+    const seedSources = new Set(seedPlaylist.tracks.map((t) => t.fileName));
+    const sourcesByKey = new Map<string, Set<string>>();
+    for (const source of seedSources) {
+      const key = sourceKey(source);
+      const set = sourcesByKey.get(key);
+      if (set) set.add(source);
+      else sourcesByKey.set(key, new Set([source]));
     }
     for (const track of playlist.tracks) {
-      if (!isBareFileName(track.fileName)) continue;
-      const source = sourceByBase.get(track.fileName.toLowerCase());
-      if (!source) continue;
-      track.fileName = source;
+      if (seedSources.has(track.fileName) || /^local:/.test(track.fileName)) continue;
+      const candidates = sourcesByKey.get(sourceKey(track.fileName));
+      if (candidates?.size !== 1) continue;
+      track.fileName = candidates.values().next().value as string;
       track.isBad = false;
       track.badReason = undefined;
       track.badTimestamp = undefined;

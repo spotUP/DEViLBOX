@@ -17,6 +17,55 @@ import { cacheSong, getCachedSong } from './DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { getCachedAudioByFilename } from './DJAudioCache';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { SongSourceRef } from '@/lib/song/openSong';
+import { decodePathEscapes, sourceBaseName } from '@/lib/dj/playlistTrackSource';
+import { isRemoteUrlSource, remoteSourceProxyUrl } from '@/lib/dj/remoteSources';
+
+/** A playlist track fetched over the network by path: Modland, or an http(s) URL through the server's download proxy. */
+interface RemoteTrackSource {
+  /** The file's own name (extension decides audio vs module). */
+  name: string;
+  /** What `openDeckTrack` opens: the bytes plus partner files beside them. */
+  ref: SongSourceRef;
+  /** The bytes alone, for audio files that need no parse. */
+  fetchBytes: () => Promise<ArrayBuffer>;
+}
+
+/**
+ * The network source of a playlist entry, or null when it is not one
+ * (`hvsc:`, `local:`, bare). Throws for an http(s) source on a host the proxy
+ * does not serve (a live stream, a dead host): it can never load, and the
+ * message is the reason the playlist shows.
+ */
+export function remoteTrackSource(fileName: string): RemoteTrackSource | null {
+  if (fileName.startsWith('modland:')) {
+    const path = fileName.slice('modland:'.length);
+    return {
+      name: path.split('/').pop() || 'download.mod',
+      ref: { kind: 'modland', path },
+      fetchBytes: async () => (await import('@/lib/modlandApi')).downloadModlandFile(path),
+    };
+  }
+  if (isRemoteUrlSource(fileName)) {
+    const url = remoteSourceProxyUrl(fileName);
+    if (!url) {
+      let host = fileName;
+      try { host = new URL(fileName).host; } catch { /* keep the source */ }
+      throw new Error(`Cannot load (source not supported): ${host}`);
+    }
+    const name = decodePathEscapes(sourceBaseName(fileName));
+    return {
+      name,
+      ref: { kind: 'url', url, name },
+      fetchBytes: async () => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+        return res.arrayBuffer();
+      },
+    };
+  }
+  return null;
+}
 
 /**
  * Pre-rendered track data ready for instant deck loading
@@ -200,16 +249,15 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
     console.warn('[DJTrackLoader] Cache lookup failed:', err);
   }
 
-  // Modland tracks: download and render in background
-  if (track.fileName.startsWith('modland:')) {
-    const modlandPath = track.fileName.slice('modland:'.length);
+  // Network tracks (Modland, http(s) URLs via the proxy): download and render in background
+  const remote = remoteTrackSource(track.fileName);
+  if (remote) {
     try {
-      const { downloadModlandFile } = await import('@/lib/modlandApi');
-      const filename = modlandPath.split('/').pop() || 'download.mod';
+      const filename = remote.name;
 
       if (isAudioFile(filename)) {
         // Audio file - no rendering needed
-        const buffer = await downloadModlandFile(modlandPath);
+        const buffer = await remote.fetchBytes();
         return {
           wavData: buffer,
           filename: track.fileName,
@@ -222,7 +270,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
       // Tracker file - render in background (UADE crashes happen here, isolated from playback).
       // One open: the download, the partner files (TFMX smpl.*, .nt, banks) and the parse;
       // Auto DJ pre-render without the partners silently fails with UADE -1.
-      const { bytes: buffer, song, companionList: companions } = await openDeckTrack({ kind: 'modland', path: modlandPath });
+      const { bytes: buffer, song, companionList: companions } = await openDeckTrack(remote.ref);
       cacheSong(track.fileName, song);
       const bpmResult = detectBPM(song);
 
@@ -242,7 +290,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[DJTrackLoader] Pre-render failed: ${track.trackName || modlandPath} — ${msg}`);
+      console.warn(`[DJTrackLoader] Pre-render failed: ${track.trackName || track.fileName} — ${msg}`);
       return null;
     }
   }
@@ -457,20 +505,19 @@ async function loadPlaylistTrackToDeckInternal(
     console.warn('[DJTrackLoader] Cache lookup failed:', err);
   }
 
-  // Modland tracks: auto-download from server
-  if (track.fileName.startsWith('modland:')) {
-    const modlandPath = track.fileName.slice('modland:'.length);
+  // Network tracks (Modland, http(s) URLs via the proxy): auto-download from server
+  const remote = remoteTrackSource(track.fileName);
+  if (remote) {
     try {
-      const filename = modlandPath.split('/').pop() || 'download.mod';
+      const filename = remote.name;
 
       if (isAudioFile(filename)) {
-        const { downloadModlandFile } = await import('@/lib/modlandApi');
-        await getDJEngine().loadAudioToDeck(deckId, await downloadModlandFile(modlandPath), track.fileName);
+        await getDJEngine().loadAudioToDeck(deckId, await remote.fetchBytes(), track.fileName);
         return true;
       }
 
       // Tracker file: one open on this deck (download, partner files, parse), then render, analyze, load
-      const { bytes: buffer, song, companionList: companions } = await openDeckTrack({ kind: 'modland', path: modlandPath }, deckId);
+      const { bytes: buffer, song, companionList: companions } = await openDeckTrack(remote.ref, deckId);
       cacheSong(track.fileName, song);
       const bpmResult = detectBPM(song);
 
@@ -502,7 +549,7 @@ async function loadPlaylistTrackToDeckInternal(
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[DJTrackLoader] Parse/load failed for: ${track.trackName || modlandPath} — ${msg}`);
+      console.warn(`[DJTrackLoader] Parse/load failed for: ${track.trackName || track.fileName} — ${msg}`);
       return false;
     }
   }

@@ -9,10 +9,9 @@ import db from '../db/database';
 import {
   getIndexStatus,
   getFormats,
-  getCachedFile,
-  cacheFile,
   forceReindex,
 } from '../services/modlandIndexer';
+import { createDownloadLimiter, sendCachedRemoteFile } from '../services/cachedRemoteDownload';
 import {
   findByHash,
   getSamplesBySongId,
@@ -24,24 +23,7 @@ const router = Router();
 
 // ── Download rate limiting (10/min sliding window to modland) ───────────────
 
-const downloadTimestamps: number[] = [];
-const MAX_DOWNLOADS_PER_MINUTE = 10;
-
-function isRateLimited(): boolean {
-  const now = Date.now();
-  const oneMinuteAgo = now - 60_000;
-
-  // Remove old timestamps
-  while (downloadTimestamps.length > 0 && downloadTimestamps[0] < oneMinuteAgo) {
-    downloadTimestamps.shift();
-  }
-
-  return downloadTimestamps.length >= MAX_DOWNLOADS_PER_MINUTE;
-}
-
-function recordDownload() {
-  downloadTimestamps.push(Date.now());
-}
+const downloadLimiter = createDownloadLimiter(10);
 
 // ── GET /api/modland/status ─────────────────────────────────────────────────
 
@@ -191,60 +173,20 @@ router.get('/list', (req: Request, res: Response) => {
 // ── GET /api/modland/download ───────────────────────────────────────────────
 
 router.get('/download', async (req: Request, res: Response) => {
-  try {
-    const remotePath = (req.query.path as string || '').trim();
+  const remotePath = (req.query.path as string || '').trim();
 
-    // Security: must start with pub/modules/
-    if (!remotePath.startsWith('pub/modules/')) {
-      return res.status(400).json({ error: 'Invalid path' });
-    }
-
-    // Check server cache first
-    const cached = getCachedFile(remotePath);
-    if (cached) {
-      const filename = remotePath.split('/').pop() || 'download';
-      res.set({
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': cached.length.toString(),
-      });
-      return res.send(cached);
-    }
-
-    // Rate limit outbound requests to modland
-    if (isRateLimited()) {
-      return res.status(429).json({ error: 'Rate limited — try again in a moment' });
-    }
-
-    recordDownload();
-
-    // Fetch from modland
-    const url = `https://ftp.modland.com/${remotePath}`;
-    console.log(`[Modland] Downloading: ${url}`);
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: `Modland returned ${response.status}`,
-      });
-    }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-
-    // Cache for future requests
-    cacheFile(remotePath, buffer);
-
-    const filename = remotePath.split('/').pop() || 'download';
-    res.set({
-      'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': buffer.length.toString(),
-    });
-    res.send(buffer);
-  } catch (err) {
-    console.error('[Modland] Download error:', err);
-    res.status(500).json({ error: 'Download failed' });
+  // Security: must start with pub/modules/
+  if (!remotePath.startsWith('pub/modules/')) {
+    return res.status(400).json({ error: 'Invalid path' });
   }
+
+  await sendCachedRemoteFile(res, {
+    cacheKey: remotePath,
+    upstreamUrl: `https://ftp.modland.com/${remotePath}`,
+    filename: remotePath.split('/').pop() || 'download',
+    limiter: downloadLimiter,
+    label: 'Modland',
+  });
 });
 
 // ── POST /api/modland/lookup-hash ───────────────────────────────────────────
