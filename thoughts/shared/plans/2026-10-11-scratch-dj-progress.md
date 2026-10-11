@@ -1,0 +1,394 @@
+---
+date: 2026-10-11
+topic: Scratch DJ (owner plan 2026-10-08-dj-view-scratch-plan.md) - execution ledger with a stable ID per requirement
+tags: [dj, scratch, turntablism, auto-dj, plan, ledger, reachability]
+status: draft
+---
+
+# Scratch DJ - progress ledger
+
+Owner plan: `thoughts/shared/plans/2026-10-08-dj-view-scratch-plan.md` (95 numbered sections, gates A-P, a 30-point definition of done).
+Research (how it works today): `thoughts/shared/research/2026-10-08_scratch-system-how-it-works.md`.
+Ledger entry: `thoughts/shared/plans/2026-10-06-fix-all-open.md` SCRP.
+Protocol: `~/.claude/REACHABILITY_PROTOCOL.md` (ID, red first, reachability with a sentinel, ratchet, N of M).
+
+**Count: 0 of 125 done (121 automated + 4 owner checks), 0 exempted** (canonical count = `grep -c '^- \[ \] SCR-'` over this file; recompute on every tick)
+
+Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` built around an open owner decision. An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll, `fireDjFx(..., {source})`, the DJ view panel, the MCP bridge) and proves the new code ran (call count or sentinel) with the stated numbers.
+
+IDs: `SCR-P<phase>.<n>`; `SCR-P<phase>.R<n>` reachability tests; `SCR-P<phase>.TC` type-check. Every owner-plan section number maps to at least one ID in section "Coverage map" at the end.
+
+Owner decisions already made (2026-10-11): scratch runs now, after juggling P1+P2 and before Dub Studio; the Up Rough scratch samples are redistributable and are committed (`public/data/samples/packs/scratch-originals/scratch_bank_metadata.json`, each entry's `packFile` is the byte-identical pack WAV, incl. `scratch_057.wav`).
+
+## What exists today (measured from the code, 2026-10-11)
+
+- Hands: `src/engine/dj/DeckEngine.ts` `startScratch()` :1112, `setScratchVelocity(v)` :1147 (signed, clamped [-4, 4]; backward phases read the ring through `DeckScratchBuffer`), `stopScratch(decayMs)` :1291 (decay, hard reset of gain/rate, `phaseAlign` after decay+350 ms when quantize is on), `playPattern` :1590, `stopPattern` :1629, `finishPatternCycle` :1675, `startFaderLFO` :1680, `getChannelGainParam()` :1579 (the per-deck fader), `getScratchState()` :1781, `bendRate` :913 (juggling P2), `getHeardPosition()` :1062. Pre-fader reverb send :199-312 and Auto DJ echo send :206-211.
+- Ring reader: `src/engine/dj/DeckScratchBuffer.ts` (`startScratch(rate, 'middle'|'write')`, `setScratchRate`, `snapScratchRate`, `stopScratch`, `freezeCapture`) over `public/worklets/scratch-buffer.worklet.js` (384 lines; module-level rings per `bufferId` 0/1/2 decks, 3 tracker; playback messages `start`, `setRate`, `startFromWrite`, `stop`, `snapRate`; capture messages `freeze`, `unfreeze`, `sourceRunning`, `reset`). There is no "load a static record into a ring" and no "start at position P" message yet.
+- Patterns: `src/engine/dj/DJScratchEngine.ts` `SCRATCH_PATTERNS` (19: Baby, Transformer, Flare, Hydroplane, Crab, Orbit, Chirp, Stab, Scribble, Tear, Uzi, Twiddle, 8-Finger Crab, 3-Click Flare, Laser, Phaser, Tweak, Drag, Vibrato), `ScratchPlayback` (setInterval tick :764, phase from `replayer.getElapsedMs() % cycle` :737, fader via channel gain :846, transformer/crab chops by duty :826-835). Tests: `src/engine/dj/__tests__/scratchPatterns.test.ts`, `scratchActions.test.ts`, `scratchBackwardFromNeedle.test.ts`, `src/engine/keyboard/commands/__tests__/djScratch.test.ts`, `src/engine/__tests__/scratchRestoresSuppressNotes.test.ts`.
+- Action paths (three, parallel): `ScratchActionId` (`src/types/drumpad.ts:43`, 19 + stop + 5 LFO), keyboard commands `src/engine/keyboard/commands/djScratch.ts`, pads `src/hooks/drumpad/useMIDIPadRouting.ts`, `DeckScratch.tsx`, the `Xnn` tracker effect (`DeckEngine._handleScratchEffect` :1793). The DJ FX registry `src/engine/drumpad/DjFxActions.ts` (`DJ_FX_ACTIONS`, `fireDjFx(id, {source})` :1818, `djFxFireCounts`, fire log, `DjFxSource` incl. `'autodj'`) is what the Auto DJ executor fires (`transitionExecutor.ts` `EFFECT_ACTIONS` :95). Scratch is not in it.
+- Musical context (Auto DJ): `src/engine/dj/autodj/types.ts` (`DJTrackAnalysis`, `BeatGrid`, `DownbeatGrid`, `DJSection`/`SectionKind`, `DJPhrase`, `DJCuePoints`, `ActivityTimeline`, `ArrangementEvent`, `TrackerMixAnalysis` with `TrackerChannelSegment` :268, `DJPerformanceContext` :816, `DJTransitionPlan` :716 with `juggle?` field, `TransitionStyle` 20 styles incl. `juggleTransition`), `moduleBeatGrid.ts` (module tempo is the one tempo source, `tempoSource: 'module'|'audio'`), `structure.ts` (`buildPhrases`, `labelSections`), `activityTimelines.ts`, `performanceContext.ts`, `sessionMemory.ts`, `decisionLog.ts`, `telemetry.ts`, `styleProfiles.ts` (`DJ_STYLES`).
+- Juggling (concurrent agent, plan `2026-10-11-dj-juggling.md`, P1+P2 landed, P3+P4 in flight): `src/engine/dj/autodj/juggle/*` (`DJJuggleController.tick(TickInput)`, `PHASE_BUDGET`/`MODE_SHAPE`/`budgetFor` in `jugglePlanner.ts`, `JuggleMode` OFF/SAFE/MUSICAL/PERFORMER/AGGRESSIVE/CHAOS, `DJPerformanceMode`, `juggleMaterial.ts` `classifyWindow`/`findCallAndResponse`), `DJAutoDJ.ts` (`juggleTick` :1672 called from the poll :536, `tickInput()` :1648, `getJuggle()` :1615), store `autoDJJuggleMode/Intensity/Telemetry`, `DJAutoDJPanel.tsx` :551-575, `DJAutoDJDebugPanel.tsx` `JuggleSection` :127, harness `src/engine/dj/__tests__/juggleTransitionHarness.ts`, simulator `src/engine/dj/autodj/testing/setSimulator.ts`.
+- Crate: 57 WAVs on disk; `src/constants/samplePacks.ts:496` lists 001-053 (052 skipped) so 054-057 are invisible to the pack; metadata has 50 records (12 categories; 42 clean, 8 `PRE_RENDERED_SCRATCH`; anchors/safe ranges in samples at 22,050 Hz, not the file's 44.1 kHz - research doc 5.3; 10 recommended gesture ids, 13 roles, 5 styles; 7 files without a record: 020, 040, 049, 053, 054, 055, 056).
+- `useDJStore` is not persisted (no `persist`/`partialize` in `src/stores/useDJStore.ts`): a new default mode needs no localStorage migration.
+
+## Architecture decisions (made before the first edit, CLAUDE.md "analyse first")
+
+- D1. New code lives in `src/engine/dj/scratch/` (owner section 80 file list, repository naming): `scratchTypes.ts`, `scratchGestureCatalog.ts`, `scratchCatalogue.ts`, `ScratchRecordVoice.ts`, `scratchAnchor.ts`, `scratchFaderModel.ts`, `scratchContext.ts`, `scratchStyles.ts`, `scratchPlacement.ts`, `scratchRoutines.ts`, `scratchArc.ts`, `ScratchSourceSelector.ts`, `scratchMemory.ts`, `ScratchSafety.ts`, `ScratchExecutor.ts`, `DJScratchDJ.ts`, `scratchTelemetry.ts`. `DJAutoDJ.ts` only gains a `scratchTick` next to `juggleTick` (section 4: DJAutoDJ is not the brain).
+- D2. One action path: scratch moves become DJ FX registry actions (`fx_scratch_<gesture>`, `fx_scratch_stop`, `fx_scratch_throw`, `fx_scratch_record`, `fx_scratch_release`, category `'scratch'`), fired by pads, keyboard, MIDI, MCP, tour and Auto DJ through `fireDjFx(id, {source})`. `ScratchActionId` stays as the pad/keyboard alias type mapped onto registry ids (no user-visible id change), and the registry is the single executor (section 81, research 5.2).
+- D3. `SCRATCH_PATTERNS` is derived from the gesture catalogue (one table, `ScratchPattern` extended with the gesture fields); the 19 existing frame sets are kept as the execution curves of their gestures, no second catalogue.
+- D4. The scratch record voice is a new mode of the existing worklet: a static record written into its own ring id (4 + voice index) with `load`, `startAt(positionFrames, rate)`, `position` report messages; signed-rate Hermite playback is reused unchanged (section 16: extension, not a second transport). It feeds a scratch bus (one `GainNode` chain per voice: HP 160 Hz, presence peak 2.2 kHz +2 dB (Q 0.7, the reference's +0.22 band 1.5-3 kHz), `WaveShaper` tanh drive 0.09, delay 0.20 s feedback 0.32 mix 0.14, convolver room 0.28 (the `DeckEngine._createReverbIR` IR), LP 5 kHz, 75 % headroom) into `DJMixerEngine.samplerInput` (bypasses the crossfader, like the sampler). No new DSP framework.
+- D5. Position-driven gestures are executed by a pure converter `positionCurveToRateCurve(handPath, durationSec)` feeding `setScratchVelocity`; a deck re-cue uses `DeckEngine.seek` only when the deck is not playing to the listener (fader closed window) and otherwise the ring (`startFromWrite`/`startAt`); a record re-cue is a `startAt` message. The planner never sees rates.
+- D6. The placement brain is pure and deterministic: an integer LFSR (`s ^= s<<13; s ^= s>>17; s ^= s<<5`, 31-bit mask, `/65535`) seeded by `seed*71 + bar*7 + crc32(section)%97`, ported from `tools/scratch.py` so Python fixtures can be replayed in vitest.
+- D7. The hands budget is one shared module `src/engine/dj/autodj/performanceBudget.ts` (budget 6, costs from section 27, `scratchPermission = max(0, min(4, budget - juggleLevel - transitionCost - fxCost))`), consumed by the scratch planner and (after JUGX-P4 lands) by `jugglePlanner.budgetFor`. Shared touch point with the juggling agent: see "Concurrency".
+- D8. Scratch inside a transition is a `DJTransitionPlan.scratch?` field (role `scratchAccent | scratchFeature | scratchTransition | scratchBattle`, events) planned by `transitionPlanner` and performed by the executor through an `opts.performScratch` hook, the same shape as `performTrade` for juggling.
+- D9. Telemetry, decision log and MCP reuse the Auto DJ ones: `DecisionKind` gains `'scratch'`, `AutoDJTelemetry` gains `scratch`, `dj_auto_dj_explain` returns it, `DJAutoDJDebugPanel` gets a `ScratchSection`; config through `setAutoDJConfig` + one MCP tool `dj_auto_scratch` (bridge handler + server tool, memory "extend the MCP").
+- D10. Safety is a separate pure validator (`ScratchSafety.check(request, state)`) with final authority (section 59); the creative modules never touch the engine, only `ScratchExecutor` does, and every executor start records the before-state it must restore (section 60, precedent 2026-09-30).
+
+## Concurrency with the juggling agent (P3+P4 in flight)
+
+Files the juggling agent is editing now: `DJAutoDJ.ts`, `transitionExecutor.ts`, `transitionPlanner.ts`, `types.ts` (`DJTransitionPlan`), `juggle/*`, `useDJStore.ts` (`setAutoDJConfig`), `DJAutoDJPanel.tsx`, `DJAutoDJDebugPanel.tsx`, `telemetry.ts`, `setSimulator.ts`.
+
+- Phases P0-P6 of this ledger touch none of them (new files under `src/engine/dj/scratch/`, `DJScratchEngine.ts`, `DeckEngine.ts` scratch methods, `DeckScratchBuffer.ts`, the worklet, `DjFxActions.ts`, `samplePacks.ts`). Order of work: P0 -> P6 first.
+- Phases P7-P9 edit the shared files. Rule: start P7 only after `JUGX-P3.7` (executor trade stage) and `JUGX-P4.3` (stand-alone setup/hand-back in `DJAutoDJ`) are committed; before each edit `git log -1 -- <file>` and rebase on the file's head; additions only (a `scratchTick` next to `juggleTick`, a `performScratch` next to `performTrade`, a `scratch?` field next to `juggle?`), never a rewrite of their code. If JUGX-P4 is still open when P6 closes, P7 starts with the executor/planner items (P7.1-P7.6) and holds the `DJAutoDJ.ts` items until P4.3 lands.
+- D7 (hands budget) changes `jugglePlanner.budgetFor` callers: do it as the last P7 item, after P4 lands, in one commit that keeps the juggle tests green.
+
+## Spec numbers (absolute, from the owner plan or the reference generator where the owner plan gives none)
+
+- Gesture vocabulary (section 9): 22 ids: baby, babySlow, forwardStab, backwardStab, chirp, chirpDouble, transformer4, transformer8, flare1, flare2, orbit, crab, scribble, hydroplane, tearForward, tearReverse, twiddle, drag, laser, phaser, tweak, vibrato; plus throws `drop`, `dropPhrase` (section 41) and the existing extras uzi, eightFingerCrab, threeClickFlare = 27 ids.
+- Levels (section 31): L1 baby, babySlow, drag, forwardStab (+ backwardStab); L2 chirp, chirpDouble, transformer4, tearForward; L3 flare1, flare2, transformer8, scribble, tearReverse; L4 orbit, crab, hydroplane, threeClickFlare, eightFingerCrab (+ uzi, laser, phaser, tweak, twiddle, vibrato as L3 accents).
+- Styles (section 32 + `STYLE_PALETTE`): oldSchool max L2 density 0.5 bias baby/forwardStab/drag/chirp fx 0; boomBap max L3 density 0.6 bias forwardStab/baby/chirp/tearForward fx 0.1; electro max L4 density 0.75 bias transformer8/flare1/chirp fx 0.5; battle max L4 density 1.0 no bias fx 0.25; loFi max L2 density 0.35 bias drag/babySlow/chirp(slow) fx 0.05.
+- Density states (section 21/22, `DENSITY_RATE`): none 0, veryLow 0.09, low 0.18, medium 0.4, high 0.7, showcase 1.4 phrases per bar; expected per bar = rate x 3.0 on a phrase-end bar, x 0.35 otherwise (showcase: 2.2 / 3.0); never more than 4 per bar; preferred steps [15, 15, 8, 7, 6, 0]; roles by step: >=15 turnaround, 6-8 answer, else accent.
+- Rest probability by role (section 23, `REST_PROB_BY_ROLE`): feature 0.06, theme 0.18, answer 0.20, intro 0.30, default 0.20; transition adaptive (= the transition style's risk, section 45).
+- Validation (section 21 `validate_phrase`): reject when every bar of >2 scratches; >4 gestures in a bar; all the same gesture over >3 events. Repair: a bar >4 keeps 1; when every bar is busy, odd bars are emptied.
+- Humanize (section 35): per-event offset in [-8, +10] ms, never across a beat boundary, never the same offset twice in a row, none for gestures with `durationSteps <= 1` at >= 140 BPM.
+- Arc (section 29): bars 0-4 ESTABLISH, 4-8 BUILD, 8-12 DEVELOP, 12-16 CALL_RESPONSE, 16-20 INTENSIFY, 20-24 FEATURE, 24-28 PEAK, 28-31 BURST, 31-32 RESOLUTION; a 32-bar feature has at least 4 bars with no event (section 74 "genuine rests"; the reference arc flags 12 silence-eligible bars).
+- Hands budget (section 27): budget 6; costs normalBlend 0, eqMove 1, filterMove 1, shortScratch 1, complexScratch 2, phraseJuggle 2, beatJuggle 3, aggressiveJuggle 4.
+- Performance budget (section 55): 0-25 normal DJ, 25-50 occasional scratch, 50-75 performance, 75-100 feature/battle; returns toward 0 after a feature (-10 per bar).
+- Modes (section 62): SAFE {baby, forwardStab, chirp} density <= low; MUSICAL + {chirpDouble, transformer4, transformer8, tearForward, call/response, throws} density <= medium; PERFORMER + {flare1, flare2, orbit, scribble, doubles, juggle} density <= high; BATTLE full vocabulary, showcase.
+- Scratch bus (section 42): HP 160 Hz, presence 1.5-3 kHz, tanh drive 0.09, delay 0.20 s, feedback 0.32, mix 0.14, reverb 0.28, LP 5 kHz.
+- Catalogue (section 14/70): 50 records, anchors in seconds = samples / 22050; every clean record has `safe[0] <= safeReverse[0] < anchorVowel <= safeForward[0] < safeForward[1] <= safe[1] <= duration`.
+- Golden scenarios (section 69): Boom Bap 92 BPM medium energy; Peak Battle 100 BPM high; House (four-on-floor 124 BPM); Drum & Bass 174 BPM; vocal track; breakdown; drop; low confidence (beat confidence 0.4).
+
+---
+
+## Phase P0 - Baseline lock, crate audit, licensing (Gate A, sections 14, 15)
+
+- [ ] SCR-P0.1 Baseline doc `thoughts/shared/research/2026-10-11_scratch-baseline.md`: manual scratch, the 19 patterns, platter (`DeckTurntable.tsx` -> `DJActions.startScratch`), crossfader (`DJActions.setCrossfader`), stop/release (`stopScratch` decay 200 ms, hard reset +50 ms, phase align +350 ms), tracker scratch (`TrackerScratchController`), audio scratch; numbers read from the code. Done: doc committed with `file:line` refs. Test: `src/engine/dj/__tests__/scratchBaseline.test.ts` freezes `SCRATCH_PATTERNS.length === 19`, the canonical order, `ScratchActionId` count 25, decay constants.
+- [ ] SCR-P0.2 Existing scratch tests pass as the lock: run the five scratch suites listed above once (`VITEST_MAX_WORKERS=2`), record the result in the baseline doc. Done: all green on the commit before P1 starts.
+- [ ] SCR-P0.3 `samplePacks.ts:496` lists 001-057 (052 still skipped) so the four new files reach the pack (`SCRATCH_FX` built from the catalogue file list, not a hard-coded count). Done: `SCRATCH_ORIGINALS_PACK.samples.fx.length === 56`. Test: `src/constants/__tests__/scratchPackLists057.test.ts` (fails before: 52).
+- [ ] SCR-P0.4 Provenance note `public/data/samples/packs/scratch-originals/PROVENANCE.md`: source (Up Rough Demo System, owner's recordings), redistribution decision (owner 2026-10-11), byte-identity check command. Done: file committed; `scratchCatalogueFiles.test.ts` (P2.3) reads it exists.
+- [ ] SCR-P0.5 Probe: anchor sample rate. Script `tools/scratch-catalogue-probe.ts` prints per record `duration_ms` vs `safe[1]/22050` and `/44100`; the 22,050 Hz reading must fit every record (ONE: 8459/22050 = 384 ms < 435 ms). Done: output table in the baseline doc; loader (P2.1) uses the probed rate constant.
+- [ ] SCR-P0.6 Probe: ring/record voice feasibility. Measure in the worklet (offline `AudioContext` via `installRealWebAudio`) the Hermite reader's output when the ring holds a static buffer: expected the same samples back at rate 1 (RMS diff < 1e-4). Done: numbers in the baseline doc, decides D4 vs a second reader.
+- [ ] SCR-P0.TC type-check clean.
+
+## Phase P1 - Gesture catalogue and data model (Gate B, sections 9, 10, 19, 20, 31, 32, 33, 34, 38, 39, 67)
+
+- [ ] SCR-P1.1 `scratchTypes.ts`: `ScratchGestureId` (27 ids), `ScratchGesture` (section 10 fields: durationSteps, activity, difficulty 1-4, styles, roles, handPath, velocityCurve, faderWindows, cutLeadMs, trueReverse, returnsToAnchor, recommendedBpm, intensity, requiresReverse, allowsSampleSource), `ScratchRole` (INTRO, THEME, ANSWER, ACCENT, FILL, FEATURE, TRANSITION, OUTRO), `ScratchDJStyle` (oldSchool, boomBap, electro, battle, loFi), `ScratchFaderWindow {open: [start, end] fraction; curve: 'deck' | 'crossfader'}`, `ScratchHandPath [{t, position, grip}]`, `ScratchEvent` (section 83), `ScratchSource` (section 84), `ScratchAnchor`. Done: exported types used by every later module. Test: type-level only (TC).
+- [ ] SCR-P1.2 `scratchGestureCatalog.ts`: the 27 gestures with hand paths ported from `tools/scratch.py GESTURES` (A = 1 stroke unit), fader windows (chirp [(0.06,0.44),(0.56,0.94)] lead -2 ms; chirpDouble four windows; orbit four; forwardStab (0,0.42); backwardStab (0.45,1); transformer4/8 and hydroplane as cut patterns 4/8/12; crab finger clicks; flare1/2 one/two cuts), `durationSteps` from `_GESTURE_STEPS`, `activity` computed (windows + reversals, `gestureActivity()`), `difficulty` from the level ladder, `returnsToAnchor` true for forwardStab, backwardStab, laser, chirp, cut-like gestures. Done: 27 entries. Test: `src/engine/dj/scratch/__tests__/gestureCatalog.test.ts` - count 27, ids unique, every field present, `activity` monotone baby < chirp < orbit, `gestureActivity('drop') === 0`.
+- [ ] SCR-P1.3 `SCRATCH_PATTERNS` derived from the catalogue (D3): each legacy pattern keeps its frames as the gesture's `velocityCurve`; the 19 names/order preserved (keyboard indexes by position). Done: `scratchPatterns.test.ts` still passes unchanged; new assertion: every `ScratchPattern` carries `gestureId`. Test: that file + `gestureCatalog.test.ts` "every legacy pattern maps to a gesture".
+- [ ] SCR-P1.4 Fader model (section 19): `scratchFaderModel.ts` `faderGainAt(gesture, fraction, bpm)` -> 0/1 from open/cut windows, cut lead, ramp duration (3 ms default, velocity-dependent up to 8 ms), battle response (cut-in distance 0.05). Done: pure function; `ScratchPlayback._tickPattern` reads it instead of the inline duty table (one source). Test: `faderModel.test.ts` - chirp open at 0.2, cut at 0.5; transformer8 at 120 BPM has 8 cuts per beat; lead shifts a window by -2 ms.
+- [ ] SCR-P1.5 Deck fader vs crossfader (section 20): `ScratchFaderWindow.curve` decides the target; `'deck'` -> `getChannelGainParam()`, `'crossfader'` -> `DJActions.setCrossfader` (deck trading, A/B cuts). Done: `ScratchExecutor` (P3) routes by the field; never substitutes. Test: `faderModel.test.ts` "crossfader windows are not applied to the channel gain" (sentinel on both setters).
+- [ ] SCR-P1.6 Levels (section 31): `GESTURE_LEVELS` 1-4 as listed in Spec numbers; `maxLevelFor(mode, style)`. Test: `scratchStyles.test.ts` - every gesture has exactly one level; crab is L4; forwardStab L1.
+- [ ] SCR-P1.7 Style palettes (section 32): `scratchStyles.ts` `SCRATCH_STYLES` with max level, density scale, bias, fx amount, rest scale per the Spec numbers; configurable (a record, not code in Auto DJ). Test: `scratchStyles.test.ts` - five styles, loFi density 0.35, battle max level 4, oldSchool never yields crab.
+- [ ] SCR-P1.8 Genre hints (section 33): `genreToScratchStyle(genre: GenreAnalysis | DJStyleName)` for hipHop, breakbeat, electro, house, techno, drumAndBass, jungle, downtempo, experimental -> style + modifiers (density x, phrase length, fx x, rest x, allowed level cap, duration cap). Test: `scratchStyles.test.ts` - house -> electro palette with density x0.5 and transformer bias; drumAndBass -> duration cap 2 steps; downtempo -> loFi; unknown -> boomBap unchanged.
+- [ ] SCR-P1.9 BPM-aware suitability (section 34): `gestureSuitability(gesture, bpm)` 0..1 (not a prohibition): >= 160 BPM: long gestures (`durationSteps >= 3`) x0.3, crab/scribble x0.6; <= 85 BPM: baby/drag/chirp x1.2 and longer phrases allowed. Test: `scratchStyles.test.ts` - drag at 174 BPM < 0.4, drag at 80 BPM >= 1.0; nothing returns 0 except `recommendedBpm` violations.
+- [ ] SCR-P1.10 Source/gesture compatibility (section 38) and clean vs pre-scratched (section 39): `compatibleGestures(record)` from the catalogue's `recommended_gestures` mapped to ids (forward_stab -> forwardStab, transformer8, flare1, tear_fwd -> tearForward, cut -> forwardStab); pre-scratched records allow only `drop` (one-shot FX/accent/transition), `allowsSampleSource` false for them in the record voice. Test: `scratchCatalogue.test.ts` (P2) - COUNT records allow forwardStab+transformer8; `SCRATCH_005` allows only drop.
+- [ ] SCR-P1.11 Pattern data tests (section 67): `gestureCatalog.test.ts` adds anchor validity (returnsToAnchor gestures end at position 0 +- 0.05), safe-range validity (hand path within [-2.1, 2.1] strokes), gesture/style compatibility (every style's bias is in its allowed levels), gesture/difficulty validity (level 1-4), fader window validity (0 <= start < end <= 1, non-overlapping), cut lead validity (|lead| <= 10 ms). Done: all six assertions present and green.
+- [ ] SCR-P1.12 Full English names for the UI (`DeckScratch.tsx`, pads): gesture `name` is the UI label ("Transformer", "Eight-Finger Crab", not "Trans"/"8Crb"); `shortName` is no longer rendered anywhere (grep proves 0 renderers). Test: `src/components/dj/__tests__/deckScratchLabels.test.tsx` renders the buttons and asserts no label matches `/^[A-Z][a-z]{0,4}$|\d[A-Z]/` abbreviations.
+- [ ] SCR-P1.R1 Reachability: `src/engine/dj/__tests__/scratchGestureReachesTheDeck.test.ts` - `fireDjFx('fx_scratch_chirp', {deck: 'A', source: 'keyboard'})` (P2.9 registry) on a mocked `DJEngine` deck: sentinel `faderGainAt` call count >= 4 within one beat at 120 BPM; `setScratchVelocity` receives both signs (chirp reverses); channel gain set to 0 inside a cut window and 1 inside an open window. Red first.
+- [ ] SCR-P1.TC type-check clean.
+
+## Phase P2 - Record catalogue, scratch record voice, scratch bus, registry (Gates C, sections 11, 14, 16, 42, 43, 70, 71, 81, 82)
+
+- [ ] SCR-P2.1 `scratchCatalogue.ts`: loads `scratch_bank_metadata.json` (fetch once, cached), converts anchors/safe ranges/word slices from samples at 22,050 Hz to seconds, maps `packFile` to the pack URL (`SCRATCH_BASE_PATH`), exposes `ScratchRecord` (canonicalName, file, category, roles, styles, gestures, anchors {attack, vowel, tail}, safe, safeForward, safeReverse, wordSlices, clean, preScratched, durationSec, voicedAmount, onsetRate, transientCount). Done: 50 records. Test: `scratchCatalogue.test.ts` - 50 records; ONE anchorVowel = 3300/22050 s; `THREE_TWO_ONE` has 3 word slices; 8 pre-scratched.
+- [ ] SCR-P2.2 Catalogue query (Gate C completion): `findRecords({role?, category?, gesture?, style?, level?, clean?})` scored by roleFit + styleFit + gestureFit + anchorQuality (voicedAmount) - repetition; "a vocal source suitable for chirp at level 2" returns an AH_VOWEL or YEAH_RESPONSE record. Test: `scratchCatalogue.test.ts` - that query's first result is clean, has chirp in its gestures, category in {AH_VOWEL, YEAH_RESPONSE, FRESH}.
+- [ ] SCR-P2.3 Catalogue file tests (section 70): `src/engine/dj/scratch/__tests__/scratchCatalogueFiles.test.ts` reads the pack dir: every record's `packFile` exists, `safe[0] <= safeReverse[0] < anchorVowel <= safeForward[0] < safeForward[1] <= safe[1] <= durationSec` (+1 ms), every recommended gesture id resolves in the catalogue, the 7 unreferenced files are listed as "FX pack only" (never a performer source). Done: all 50 pass; the 7 named in the test's expectation.
+- [ ] SCR-P2.4 Worklet record mode (D4): `scratch-buffer.worklet.js` playback processor gains messages `load {bufferId, left, right}` (writes a static record into ring `bufferId`, sets `totalWritten`, marks `static[bufferId]`), `startAt {positionFrames, rate}`, `seek {positionFrames}`, and posts `position` every 128 frames while playing; static rings never capture. Done: `DeckScratchBuffer` exposes `loadRecord(buffer)`, `startAt(sec, rate)`, `seek(sec)`, `onPosition`. Test: `src/engine/dj/__tests__/scratchRecordRing.test.ts` with the offline context: a 1 s record played at rate 1 from 0.3 s returns the same samples (RMS diff < 1e-4); at rate -1 the frames come out reversed; `position` reports advance by 128.
+- [ ] SCR-P2.5 `ScratchRecordVoice.ts`: one voice per Auto Scratch (pool of 2: THEME + ANSWER can overlap), `load(record)`, `cue(anchor)`, `stroke(positionCurve)`, `fader(window)`, `release()`; keeps position within `safe` (clamps and logs a safety event), reverse only inside `safeReverse`, forward inside `safeForward`; velocity curve -> rate through D5's converter. Done: voice drives its ring without touching any deck. Test: `scratchRecordVoice.test.ts` - a forward stroke past `safeForward[1]` is clamped; a reverse request outside `safeReverse` is refused with reason; `release()` leaves gain 0 within 3 ms ramp.
+- [ ] SCR-P2.6 Scratch bus (section 42, D4): `scratchBus.ts` builds the chain with the Spec numbers from the reference, one per voice, into `DJMixerEngine.samplerInput`; a `level` AudioParam (0..1) and `ambience` 0..1 that scales delay mix (0..0.14) and reverb (0..0.28). Done: chain measurable. Test: `scratchBus.test.ts` (offline render): a 100 Hz tone is attenuated >= 12 dB vs 1 kHz (HP 160); a 8 kHz tone attenuated >= 12 dB vs 1 kHz (LP 5 k); with ambience 1 an impulse has energy at 0.20 s (delay) within +-5 ms; ambience 0 has none.
+- [ ] SCR-P2.7 Ambience by role (section 43): `ambienceFor(role, isFinal)`: ordinary 0..0.2, feature 0.5, final event optional 1.0 (echo tail); never an echo-out and a scratch throw on the same source in the same bar (planner rule, P7.8). Test: `scratchBus.test.ts` - ACCENT -> <= 0.2, FEATURE -> 0.5, final OUTRO -> 1.0.
+- [ ] SCR-P2.8 Sample audio tests (section 71): `scratchRecordVoiceAudio.test.ts` over one record per category (12): forward scratch, reverse scratch, anchor return, rapid repeat (8 stabs in 1 s), stop, release; assert no click (max sample-to-sample jump < 0.5 FS), no runaway position (always within `safe`), no silence where a window is open (RMS > -60 dBFS), no DC (mean < 0.01), no stuck voice (gain 0 after release + 10 ms). Done: 12 x 6 assertions green.
+- [ ] SCR-P2.9 Registry actions (D2, sections 81, 82): `DjFxActions.ts` category `'scratch'`: `fx_scratch_<gestureId>` (27, momentary: engage = play gesture on the deck or the record voice by opts, disengage = release), `fx_scratch_stop`, `fx_scratch_throw` (clean drop of a record/word), `fx_scratch_cue` (re-cue to anchor), `fx_scratch_anchor` (set anchor), `fx_scratch_loop`, `fx_scratch_record` (select record), `fx_scratch_release`; `DjFxFireOptions` gains `record?`, `anchor?`, `source?: ScratchSource`. `ScratchActionId` values map 1:1 onto registry ids (`SCRATCH_ACTION_TO_FX`), keyboard commands, pad routing, `DeckScratch.tsx` and the `Xnn` effect call `fireDjFx`/`releaseDjFx`. Done: grep shows `playDeckPattern` has one caller (the registry). Test: `src/engine/dj/__tests__/scratchActionsOnePath.test.ts` - keyboard command, pad id, `Xnn` and MCP all increment `djFxFireCounts['fx_scratch_chirp']`; the old direct call path has 0 callers (static grep assertion over `src/`).
+- [ ] SCR-P2.10 Set recorder (`DJSetEvent.ts` scratchStart/scratchStop) records registry scratch fires with the gesture id and source, so a recorded set replays Auto Scratch through the same path. Test: `src/engine/dj/recording/__tests__/scratchEventsRecorded.test.ts`.
+- [ ] SCR-P2.R2 Reachability: `src/engine/dj/__tests__/scratchRecordVoiceReachesTheBus.test.ts` - `fireDjFx('fx_scratch_forwardStab', {source: 'mcp', record: 'AH_STANDARD'})` on the offline context: sentinel `ScratchRecordVoice.stroke` count 1, worklet receives `load` once and `startAt` with positionFrames = round(3300/22050 x sampleRate) (+-1), scratch bus output RMS > -40 dBFS during the open window, deck A `setScratchVelocity` count 0 (the deck is not hijacked, section 16). Red first.
+- [ ] SCR-P2.TC type-check clean.
+
+## Phase P3 - Anchors, true re-cue, position-driven gestures (Gate D, sections 11, 17, 18, 60)
+
+- [ ] SCR-P3.1 `scratchAnchor.ts`: `ScratchAnchor` for records (attack/vowel/tail/word from the catalogue) and decks (`DeckScratchAnchor {positionSec, beat, kind: 'downbeat'|'snare'|'vocalOnset'|'hit'}`), `anchorFor(source, role)`; safe ranges for a deck anchor = +-1 beat forward, -0.5 beat reverse. Test: `scratchAnchor.test.ts` - vowel for THEME, attack for ACCENT/count, tail for OUTRO; deck anchor ranges in seconds at 120 BPM.
+- [ ] SCR-P3.2 Position-to-rate converter (section 17, D5): `positionCurveToRateCurve(handPath, durationSec, sampleRate)` -> `[{t, rate}]` with rate = d(position)/dt in units of natural speed, smoothed at reversals (grip), clamped [-4, 4]. Test: `scratchAnchor.test.ts` - baby over 1 beat at 120 BPM: integral of the curve = 0 (returns home) +-1 ms; forwardStab: integral = 1.3 A then returns; laser requested 5.0 is clamped to 4.0 and reported.
+- [ ] SCR-P3.3 True re-cue on records (section 18): `ScratchRecordVoice.cue(anchor)` before every `returnsToAnchor` gesture: `startAt(anchor)` inside the closed fader window; a 4-stab phrase hits the same position 4 times. Test: `scratchRecordVoice.test.ts` - start positions of 4 stabs equal within 1 ms; without re-cue (legacy drift) they advance (the test proves the old behaviour differs).
+- [ ] SCR-P3.4 True re-cue on decks: `DeckEngine.recueScratch(anchorSec)` - only while the fader window is closed: audio mode `audioPlayer.seek(anchor)` + ring `reset`, tracker mode `replayer` position set (`cueDeck` path) with suppressNotes untouched; otherwise ring-only (`startFromWrite`) and the planner is told `returnsToAnchor` is not available (safety). Done: repeated deck stabs stay on the anchor within 1 beat of drift. Test: `src/engine/dj/__tests__/deckRecueKeepsTheAnchor.test.ts` - 4 stabs, `seek` count 4 with the same argument; on a deck the listener hears (window open) `seek` count 0.
+- [ ] SCR-P3.5 Executor core: `ScratchExecutor.ts` turns a `ScratchEvent` into engine calls at `executeAtBeat` on the deck's beat clock (`analysisClock`, juggleController.ts:346, reused): cue -> stroke (rate curve ticks at 5 ms via one `setInterval`, the pattern of `ScratchPlayback`) -> fader windows -> release; every start snapshots `{rate, channelGain, captureFrozen, suppressNotes, crossfader, busLevel}` and release restores exactly those values (section 60). Test: `scratchExecutor.test.ts` - fake clock; event at beat 8 fires at 8.000 +- 0.005; after release the snapshot equals the state before (deep equal, incl. suppressNotes true and false cases, the 2026-09-30 regression shape).
+- [ ] SCR-P3.6 Sixteenth/eighth/thirty-second grid (section 8): `stepToBeat(bar, step, grid)` for 1/8, 1/16, 1/32; the planner's default 1/16; 1/32 only for gestures with `durationSteps <= 1` under 110 BPM; never milliseconds in the planner (grep rule in the test). Test: `scratchAnchor.test.ts` - `{bar: 17, step: 14}` -> beat 68.875 at 4/4 1/16 (the owner's example).
+- [ ] SCR-P3.R3 Reachability: `src/engine/dj/__tests__/scratchRecueReachesTheRecord.test.ts` - `fireDjFx('fx_scratch_forwardStab', {source: 'autodj', record: 'COUNT'})` x4 through the executor on the offline context: sentinel `ScratchRecordVoice.cue` count 4, four `startAt` messages with identical positionFrames, restore snapshot applied once per release (sentinel count 4), bus RMS > -40 dBFS in each open window. Red first.
+- [ ] SCR-P3.TC type-check clean.
+
+## Phase P4 - Musical clock, context, placement brain, rests, humanize, routines, word slices, throws (Gates E, F; sections 5, 6, 7, 8, 21, 22, 23, 35, 36, 37, 40, 41, 66, 69)
+
+- [ ] SCR-P4.1 `scratchContext.ts` `buildScratchContext(input)`: the section 5 `ScratchPerformanceContext` from `DJPerformanceContext` + `DJTrackAnalysis` (masterBeat/bar from the beat grid, phrasePosition from `DJPhrase`, section/nextSection, beat/phrase confidence, energy/targetEnergy, activeDeck/outgoing/incoming, vocal/drum/bass/melodic activity from `ActivityTimeline` at the bar, transitionType, juggleIntensity, transitionIntensity, scratchPermission (P7.11), recentGestures/Sources/Routines from memory, style). No second analysis (section 6). Test: `scratchContext.test.ts` on a corpus analysis: bar 17 beat 68 at phrase position 1/8; vocalActivity equals the timeline value; `nextSection` is the following `DJSection`.
+- [ ] SCR-P4.2 Musical clock (section 7, Gate E): the scheduler's beat source is the master deck's grid (`analysisClock`), not `elapsed % cycle`; `ScratchPlayback.play` phase for Auto Scratch uses `beatAt(position)`; the hierarchy beat -> bar -> phrase -> section comes from `DJPhrase`/`DJSection`. Test: `scratchExecutor.test.ts` - an event planned on bar 4 step 0 fires at the grid's downbeat time of bar 4 (+-5 ms) even when `elapsedMs % cycle` says otherwise (grid offset 180 ms in the fixture).
+- [ ] SCR-P4.3 Deterministic PRNG (section 36, D6): `scratchRandom.ts` LFSR identical to Python; fixture `src/engine/dj/scratch/__tests__/fixtures/lfsr.json` of the first 32 values for seeds 1, 7, 12345 generated from `tools/scratch.py`. Test: `scratchRandom.test.ts` byte-equal.
+- [ ] SCR-P4.4 Density and vocabulary (sections 21, 22): `scratchPlacement.ts` `sectionDensity(style, section, scale)` (ladder shift `round((scale-0.8)*2.5)`), `DENSITY_RATE`, `vocabulary(gestures, count)` ranked calm -> busy, `pickGesture(vocab, energy, role, rnd, last)` (band around `energy*(n-1)` + role shift turnaround 1.0 / answer 0.5, never the same gesture twice running). More energy = higher maximum, larger vocabulary, shorter rests - not more events every bar. Test: `scratchPlacement.test.ts` - battle+showcase -> 'showcase'; loFi+verse -> 'none'; energy 1.0 picks from the busy band; energy 0.2 never picks L4; a run of 50 picks never repeats consecutively.
+- [ ] SCR-P4.5 `planPhrase(ctx, bar, seed)` (section 21): expected per bar per the Spec numbers, k <= 4, steps `[15,15,8,7,6,0]`, roles by step, velocity = 0.55 + 0.25 rnd + 0.2 energy (`PLAN_VEL`), returns `ScratchEvent[]` with bar/step/beat/gesture/velocity/role. Test: `scratchPlacement.test.ts` - fixture `fixtures/plan_phrase.json` (Python output for boombap/hook/bars 0-15/seed 3) matches step/gesture/role exactly; phrase-end bar carries >= 3x the events of a mid bar on average over 64 bars.
+- [ ] SCR-P4.6 Rests (section 23): `restProbability(role, ctx)` per the Spec numbers; a rest is a planned `REST` decision (state machine P6.4), not an absence; at least 25 % of bars in any 16-bar window stay empty outside showcase. Test: `scratchPlacement.test.ts` - 1000 bars at MUSICAL boomBap: empty-bar fraction >= 0.25; FEATURE role rests <= 10 %.
+- [ ] SCR-P4.7 Validate and repair (section 21, Gate F): `validatePhrase(events, bars)` and `repairPhrase(events)` per the Spec numbers. Test: `scratchPlacement.test.ts` - every-bar input fails validation and repair empties odd bars; a 5-event bar is cut to 1; the repaired output always validates.
+- [ ] SCR-P4.8 Humanize (section 35): `humanizeMs(event, rnd, bpm)` in [-8, +10] ms, clamped so `executeAt + offset` stays within the event's beat, no repeated offset, 0 for `durationSteps <= 1` at >= 140 BPM; applied at execution, never to the plan's beats (phase safe). Test: `scratchPlacement.test.ts` - 10 000 draws all within range; no two consecutive equal; DnB 174 BPM stab offset 0.
+- [ ] SCR-P4.9 Vocal awareness (section 24): density x (1 - vocalActivity) unless the event's role is ANSWER to a vocal; never a dense routine (> 2 events) in a bar where vocalActivity > 0.7 unless role ANSWER. Test: `scratchPlacement.test.ts` - vocalActivity 0.9 bars yield <= 1 event unless ANSWER; a vocal "call" window yields an ANSWER event in the following bar.
+- [ ] SCR-P4.10 Routines (section 37): `scratchRoutines.ts` ports the 8 named routines (phraseEnd, hookCallResponse, electroTransformer, chirpFlareShowcase, introDrag, snareAnswer, phraseReconstruction, default) as semantic events `{role, gesture, sourceRole, step, bars}`; `SECTION_ROUTINE` map (intro -> introDrag, verse -> phraseEnd, hook/call -> hookCallResponse, response -> snareAnswer, breakdown -> phraseReconstruction, showcase -> chirpFlareShowcase, outro -> introDrag). Test: `scratchRoutines.test.ts` - 8 routines, every event's gesture exists, every `sourceRole` maps to a catalogue role, `hookCallResponse` has CALL then ANSWER order.
+- [ ] SCR-P4.11 Word-slice intelligence (section 40): `wordPlan(record, pattern)` with patterns WHOLE, LAST_WORD, WORD(n), ANCHOR_VOWEL and the sequence WHOLE -> LAST -> LAST -> WHOLE; anchors come from `wordSlices[i].vowel`. Test: `scratchRoutines.test.ts` - `IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT` (9 slices): LAST_WORD anchor = slice 9 vowel in seconds; `THREE_TWO_ONE` WORD(2) = "2".
+- [ ] SCR-P4.12 Throw then scratch (section 41): a phrase whose source is a record opens with a `drop` (clean, fader open, natural rate, full word) or `dropPhrase` (full bar for records > 1.5 s) before the first chopping gesture, unless the same record was thrown within the last 8 bars. Test: `scratchPlacement.test.ts` - first FRESH phrase starts with drop; `AH_FRESH_FULL_PHRASE` (2.2 s) gets dropPhrase; a repeat within 8 bars has no drop.
+- [ ] SCR-P4.13 Deterministic unit tests (section 66): same seed + context = same events (deep equal); different seed = valid but different; high energy = higher max level in the output; vocal heavy = fewer events; low confidence (beatConfidence 0.4) = only L1 gestures and no routine. Test: `scratchDeterminism.test.ts` with the five cases.
+- [ ] SCR-P4.14 Golden performances (section 69): `scratchGolden.test.ts` with 8 fixed-seed scenarios (Spec numbers) asserting the stated vocabulary and shape: Boom Bap 92 -> set of gestures within {baby, forwardStab, chirp, chirpDouble, tearForward} and a CALL/ANSWER pair; Peak Battle 100 -> contains flare, orbit, transformer, crab and >= 4 empty bars of 32; House -> <= 1 vocal-record event per 8 bars, transformer accents on steps 6-8; DnB 174 -> all gestures `durationSteps <= 2`, no drag; Vocal -> density reduced or ANSWER events only; Breakdown -> throw, baby, chirp, rest; Drop -> escalation (level rises over 4 bars), <= 2-bar feature, release event; Low confidence -> no L3/L4, mode behaves as SAFE. Golden event lists stored in `fixtures/golden/*.json` and compared exactly.
+- [ ] SCR-P4.R4 Reachability: `src/engine/dj/__tests__/autoScratchLandsOnTheGrid.test.ts` - `getAutoDJ().enable()` with Auto Scratch MUSICAL (P7/P9 wiring; until then the test drives `DJScratchDJ.tick()` through the controller's public entry and is upgraded in P7.R7): sentinels `planPhrase` count >= 1 and `ScratchExecutor.execute` count = planned event count; every executed event's fire time within [-8, +10] ms of its grid beat time; humanize offsets not all equal. Red first.
+- [ ] SCR-P4.TC type-check clean.
+
+## Phase P5 - Source selection: crate, deck, tracker-native (Gates G, K; sections 12, 13, 38, 39, 84-88)
+
+- [ ] SCR-P5.1 `ScratchSource` model (section 84) in `scratchTypes.ts`: CRATE {recordId, anchor}, DECK {deck, anchor}, TRACKER_CHANNEL {deck, channelId, segmentId, anchor}, TRACKER_SAMPLE {deck, sampleId, anchor}. TC only.
+- [ ] SCR-P5.2 `ScratchSourceSelector.ts` scoring (section 13): musicalRoleFit + sectionFit + styleFit + gestureCompatibility + anchorQuality + energyFit + novelty + phraseFit - vocalCollision - bassConflict - repetition - confidenceRisk, each term 0..1 with the weights in a table (one ladder); returns the best source with its reasons. Test: `scratchSourceSelector.test.ts` - breakdown prefers AH/YEAH/FRESH voice records; drum break prefers COUNT/snare/kick; high-energy drop prefers stab/chirp/transformer-compatible sources; low-energy transition prefers baby/drag-compatible; the same source twice running is penalised below an alternative.
+- [ ] SCR-P5.3 Deck source (section 12 C, 88): a DECK source is chosen when the deck's material at the bar is drums/percussive (`classifyWindow` from `juggleMaterial.ts`, reused) and no vocal; anchors from the beat grid (downbeat, snare on beats 2/4 from the drum timeline). Test: `scratchSourceSelector.test.ts` - house transition context -> DECK; vocal bar -> not DECK.
+- [ ] SCR-P5.4 Extracted song material (sections 12 B, 87): `extractedAnchors(analysis, bar)` from `ArrangementEvent` and activity onsets (vocalOnset, snare, kick, stab, fill, phraseHit) as temporary `DeckScratchAnchor`s with safe ranges of one event length. Test: `scratchSourceSelector.test.ts` - a corpus track with a vocal onset at bar 9 yields a vocalOnset anchor at that time (+-20 ms); none when the timeline is flat.
+- [ ] SCR-P5.5 Tracker channel segments (sections 85, 86, Gate K): `trackerScratchMaterial(analysis.trackerMix, bar)` reads `TrackerChannelSegment` for the current order position ("what is this channel doing now"): percussion/bass/lead/vocal-like segments become TRACKER_CHANNEL sources with the segment's start as anchor; never a permanent channel class. Test: `scratchSourceSelector.test.ts` - channel 4 percussion at bars 0-16 and bass at 16-32: bar 8 -> percussion source, bar 20 -> bass source (rejected under bassConflict when the master's bass activity > 0.6).
+- [ ] SCR-P5.6 Tracker sample source: TRACKER_SAMPLE from the deck song's instrument (via `useInstrumentStore` sample data of the deck's song) rendered into a record ring (P2.4 `load`), anchor = sample attack. Test: `scratchSourceSelector.test.ts` + `scratchRecordVoice.test.ts` - a tracker deck's snare instrument loads into ring 5 with duration = sample length / rate.
+- [ ] SCR-P5.7 Three-source strategy (section 88): the four example contexts resolve as stated: hip-hop breakdown -> CRATE vocal; tracker demo -> TRACKER_SAMPLE; house transition -> DECK; vocal call/response -> song vocal hit (extracted anchor). Test: `scratchSourceSelector.test.ts` - the four fixtures.
+- [ ] SCR-P5.R5 Reachability: `src/engine/dj/__tests__/autoScratchPicksTheSourceByContext.test.ts` - through `DJScratchDJ.tick()` on two corpus contexts (breakdown of a vocal track; house four-on-floor transition): sentinel `ScratchSourceSelector.select` count 2; first decision `source.type === 'CRATE'` with a voice category, second `'DECK'`; decision log entries carry the score terms. Red first.
+- [ ] SCR-P5.TC type-check clean.
+
+## Phase P6 - Performance arc, states, evaluation, memory, cooldowns, budgets, quality (Gates H, M; sections 29, 30, 50-56, 89, 90)
+
+- [ ] SCR-P6.1 `scratchArc.ts`: the section 29 arc as a configurable template (phases with bars, energy, level cap, source role, density scale, silenceAllowed); not tied to 32 bars (`scaleArc(template, bars)` for 8/16/32/64). Test: `scratchArc.test.ts` - 9 phases cover 0-32 exactly once; `scaleArc(16)` keeps the order and ratios.
+- [ ] SCR-P6.2 Arc follows the set (section 30): `arcForSection(sectionKind, setPhase)`: intro sparse, build more, drop short feature, groove accents, breakdown space/vocal, build escalation, drop peak burst, outro resolution. Test: `scratchArc.test.ts` - the 8 mappings yield the stated density/level.
+- [ ] SCR-P6.3 Performance arc test (section 74): a complete 32-bar feature generated deterministically has the 9 phases in order (establish, build, call, response, develop, feature, peak, burst, resolution labels in telemetry), level non-decreasing until PEAK, >= 4 empty bars, a RESOLUTION event in bar 31. Test: `scratchArc.test.ts` "32-bar feature".
+- [ ] SCR-P6.4 States (sections 50, 51): `DJScratchDJ.ts` state machine IDLE, LISTENING, SETUP, THROW, SCRATCHING, CALL, RESPONSE, ESCALATING, FEATURE, RESOLVING, REST, ABORTING with the section 51 transitions (LISTENING -> opportunity -> source -> anchor -> gesture -> SETUP -> THROW -> SCRATCHING -> REST -> EVALUATE -> {REST, ANSWER, ESCALATE, RESOLVE}); ABORTING from any state. Test: `scratchStateMachine.test.ts` - every transition in the table reachable; illegal ones throw; ABORTING always ends in IDLE with restore called.
+- [ ] SCR-P6.5 Evaluation after each phrase (section 52): `evaluatePhrase(trace, ctx)` answers fit, energy delta, vocal collision, bass clarity, timing stability (max |fired - scheduled|), repetition, audience-energy proxy (setEnergy trend) and chooses continue / answer / escalate / rest / resolve. Test: `scratchEvaluate.test.ts` - a collision -> rest; rising energy and no repetition -> escalate; a 3rd repetition -> resolve.
+- [ ] SCR-P6.6 Memory (section 53, 90): `scratchMemory.ts` ring of the last 16 gestures/sources/routines/intensities/transition types and successful pairings (source+gesture at section->section with the quality score); a pairing scored >= 0.8 gets +0.1 preference, <= 0.4 gets -0.2, transparent and deterministic (no ML). Test: `scratchMemory.test.ts` - AH+chirp after AH+chirp is penalised below YEAH+baby; a good breakdown->drop pairing is preferred next time.
+- [ ] SCR-P6.7 Cooldowns (section 54): per gesture (crab 16 bars, scribble 8, baby 2, default 4), per source (AH_STANDARD 8 bars, default 4), per routine 16 bars, per intensity tier (feature 32 bars), per performance type (battle 64 bars). Test: `scratchMemory.test.ts` - crab again within 16 bars is blocked; baby after 2 bars allowed.
+- [ ] SCR-P6.8 Performance budget (section 55): `scratchBudget.ts` tracks scratch/juggle/FX/transition energy 0-100 with the Spec bands; a feature pushes to >= 75, then -10 per bar back toward 0. Test: `scratchBudget.test.ts` - band labels at 10/30/60/90; decay reaches < 25 within 6 bars after a feature.
+- [ ] SCR-P6.9 Peak performance mode (section 56): at setPhase PEAK with budget >= 75: advanced gestures, 1/32 subdivisions, juggle, doubles, call/response, throws, transformer, flare, crab allowed - still through safety (beat alignment, bass, vocal, no-silence, conflicts, max cut rate 16 per beat, emergency fallback). Test: `scratchStateMachine.test.ts` - PEAK unlocks L4 and 1/32; the safety check still rejects a 20-cut/beat request.
+- [ ] SCR-P6.10 Quality score (section 89): `scoreScratchQuality(trace, ctx)` -> {timing, musicalFit, sourceQuality, gestureQuality, phraseCoherence, energyFit, vocalClarity, bassClarity, novelty, transitionQuality, total} stored in memory. Test: `scratchEvaluate.test.ts` - a trace with 0 ms error, no collisions and 3 distinct gestures scores >= 0.8; one with 40 ms errors scores timing <= 0.3.
+- [ ] SCR-P6.11 Opportunity finder (DoD 1): `findOpportunity(ctx)` returns the next candidate bar/role or null: phrase-end bars, after-snare steps, breakdown entry, drop approach, vocal call, outgoing deck phrase end; requires beatConfidence >= 0.6 and phraseConfidence >= 0.5 for anything above L1. Test: `scratchOpportunity.test.ts` - a corpus track: opportunities at the last bar of each phrase; none while confidence < 0.6 except L1 accents.
+- [ ] SCR-P6.R6 Reachability: `src/engine/dj/__tests__/autoScratchPerformsTheArc.test.ts` - `DJScratchDJ` driven by a fake clock over a 32-bar PEAK window in PERFORMER mode on the offline context: sentinel `scratchArc.phaseAt` count 32 (one per bar), telemetry shows the 9 phase labels in order, >= 4 empty bars, memory holds 16 entries, final state IDLE and the restore snapshot applied. Red first.
+- [ ] SCR-P6.TC type-check clean.
+
+## Phase P7 - Auto DJ integration: transitions, juggling, hands budget, dub/FX, priority (Gates I, J; sections 4, 24-28, 44-49, 81-83) - starts after JUGX-P3.7 and JUGX-P4.3
+
+- [ ] SCR-P7.1 `DJTransitionPlan.scratch?` (D8, `types.ts`): `{kind: 'scratchAccent'|'scratchFeature'|'scratchTransition'|'scratchBattle', events: ScratchEvent[], source: ScratchSource, startBeat, endBeat, fxRequest?: 'dry'|'dubbed'|'transition'}`. Additive field next to `juggle?`. TC + planner test.
+- [ ] SCR-P7.2 Transition compatibility (section 45): `scratchCompatibility(style)` table: good longBlend+sparse, shortBlend+chirp, breakdownMix+vocal, dropMix+transformer, hardCut+stab, drumIntroMix+drum; risky echoOut+heavy, vocalSwap+vocal, bassSwap+bass source, filterBuild+dense -> the planner lowers density/level or rejects with a reason in `plan.rejected`. Test: `src/engine/dj/autodj/__tests__/transitionPlannerScratch.test.ts` - the 6 good pairs produce `plan.scratch`, the 4 risky pairs produce none or a reduced one with the reason string.
+- [ ] SCR-P7.3 Scratch as a transition (section 46): style-neutral `scratchTransition` kind: 4-bar scratch feature on the outgoing material, transformer cuts, incoming enters at the drop, release; chosen when Auto Scratch >= PERFORMER, creativeRisk >= 0.5, incoming drop known. Test: planner test - the fixture yields `scratch.kind === 'scratchTransition'` with events in the last 4 outgoing bars.
+- [ ] SCR-P7.4 Outgoing-deck performance (section 47): at the outgoing phrase end with the incoming ready: scratch outgoing material (DECK source), reduce outgoing, incoming drops. Test: planner test - events have `deck === outgoing`, end before `incomingPosition`'s downbeat.
+- [ ] SCR-P7.5 Vocal response (section 48): an incoming vocal onset in the first 2 bars of a transition yields an ANSWER event (YEAH_RESPONSE record) on the next step 6-8, flagged `role: 'ANSWER'` (a call/response, not an FX event). Test: planner test - fixture with `firstVocal` inside the window produces exactly one ANSWER before the incoming groove bar.
+- [ ] SCR-P7.6 Executor hook (D8): `transitionExecutor.ts` `opts.performScratch?(plan.scratch)` runs alongside the curves (not before the release like the trade stage); trace line `scratch <kind> <n> events`. Additive. Test: `src/engine/dj/__tests__/autoDJTransitionScratchHook.test.ts` - with a plan carrying `scratch`, the hook is awaited once; without it never.
+- [ ] SCR-P7.7 `scratchTick` in `DJAutoDJ.ts` next to `juggleTick` (called from the poll): builds the context (P4.1) from `tickInput()`'s data, runs `DJScratchDJ.tick()`, passes `performanceMode` (NORMAL_MIX during a transition unless `plan.scratch`), user control (crossfader moved > 0.05 vs the executor's last value, platter, deck gain, cue, transport), and publishes telemetry (D9). Additive. Test: `src/engine/dj/__tests__/autoDJScratchTickRuns.test.ts` - enable with mode MUSICAL: tick sentinel count >= 1 per two polls; mode OFF with no active performance: 0.
+- [ ] SCR-P7.8 Dub/FX requests (section 44): the performer declares `fxRequest` dry / dubbed / transition; the executor maps it to bus ambience (P2.7) or `fireDjFx('fx_deck_echo_throw'|'fx_dub_echo', {source: 'autodj'})`; never direct Dub engine calls (grep assertion); no echo-out and a scratch throw on the same source in the same bar. Test: `autoDJTransitionScratchHook.test.ts` - dubbed -> one registry fire; dry -> none; echoOut style + throw in the same bar is rejected by the planner.
+- [ ] SCR-P7.9 Scratch + juggle performance (sections 26, 49, Gate J): when `DJJuggleController.isActive()`: scratch events may be ANSWER/ACCENT only on the sink's silent deck side or a CRATE source; the peak sequence A/B trade + scratch response + A+B payoff is a routine (`juggleResponse`) chosen only when `scratchPermission >= 2`. Test: `src/engine/dj/__tests__/autoScratchWithJuggle.test.ts` (uses `juggleTransitionHarness.ts`): during a ladder, no scratch event targets the audible deck; crossfader writes come only from the juggle sink (scratch crossfader sentinel 0); scratch remains audible on the bus; the release returns the grid (phase error < 5 ms).
+- [ ] SCR-P7.10 Priority order (section 28): `resolveConflicts(requests)` orders timing stability > deck sync > transition integrity > bass ownership > vocal clarity > beat juggling > scratch feature > secondary FX > humanization; a scratch never delays a phase correction or a transition start. Test: `scratchSafety.test.ts` - a scratch request at the transition start beat is moved after the start; a bend in progress blocks a deck re-cue.
+- [ ] SCR-P7.11 Hands budget (section 27, D7): `src/engine/dj/autodj/performanceBudget.ts` with the Spec costs; `scratchPermission(juggleLevel, transitionCost, fxCost)`; the scratch planner caps its level by it; `jugglePlanner.budgetFor` reads the same module (last P7 item, after JUGX-P4). Test: `performanceBudget.test.ts` - juggle 3 + filter 1 -> scratch <= 2; aggressive juggle 4 + bass swap 1 + echo 1 -> scratch 0; the 6-way pile-up from the owner's example is rejected.
+- [ ] SCR-P7.12 Session memory and decision log (D9): `DecisionKind` gains `'scratch'`; every autonomous scratch logs the section 65 fields (reasons, source, gesture, placement beat, duration) through `decisionLog.ts`; `sessionMemory` gains scratch counts for the set planner's variety term. Test: `src/engine/dj/__tests__/autoScratchDecisionLogged.test.ts` - one decision per performed phrase with `source`, `gesture`, `placement`.
+- [ ] SCR-P7.R7 Reachability (section 68, Gate I): `src/engine/dj/__tests__/autoDJScratchReachesTheDecks.test.ts` - `getAutoDJ().enable()` (harness of `autoDJJuggleTransitionReachesTheDecks.test.ts`), Auto Scratch MUSICAL, corpus pair, poll loop to a breakdown: sentinels `findOpportunity` >= 1, `ScratchSourceSelector.select` >= 1, `planPhrase` >= 1, `ScratchExecutor.execute` = planned count, `DeckEngine.setScratchVelocity` or `ScratchRecordVoice.stroke` > 0 on the real fake deck; fired beats within [-8, +10] ms of the grid; the restore snapshot applied after the phrase; Auto DJ decided WHETHER to scratch (a second run with `autoDJScratchMode: 'OFF'` has all counts 0). Red first.
+- [ ] SCR-P7.R8 Reachability (section 76, scratch + transition): `src/engine/dj/__tests__/autoDJTransitionWithScratch.test.ts` - six planned transitions (longBlend, shortBlend, dropMix, breakdownMix, hardCut, echoOut) through `getAutoDJ()`: `performScratch` sentinel count = 5 (echoOut rejects heavy scratch -> 0 or a reduced accent), each performed scratch ends before the plan's `endBeat`, crossfader curve untouched by scratch (sentinel), no silence (both decks' gains never 0 at the same time while the scratch bus is silent). Red first.
+- [ ] SCR-P7.TC type-check clean.
+
+## Phase P8 - Safety, release, grid re-entry, restoration, user override, resilience, long set (Gate L; sections 57-60, 63, 72, 73)
+
+- [ ] SCR-P8.1 `ScratchSafety.ts` governor (section 59): blocks both decks silent, invalid deck, invalid source, unsafe sample range, conflicting scratch actions (two on one deck), excessive rate (> 4), excessive cut density (> 16 cuts/beat), vocal collision (vocalActivity > 0.7 and not ANSWER), bass collision (bass source while master bass > 0.6), stuck scratch state (SCRATCHING > 8 bars without an event); final authority over the planner. Test: `scratchSafety.test.ts` - one case per rule, each returns the rule name.
+- [ ] SCR-P8.2 Release (section 57): `planRelease(ctx)` = final gesture -> final word/stab -> fader close (3-8 ms ramp) -> scratch tail (bus ambience) -> grid re-entry; `stopPattern()` alone is never the end of an Auto Scratch phrase (grep sentinel: executor's release path calls `planRelease`). Test: `scratchExecutor.test.ts` - the release trace has the 5 steps in order.
+- [ ] SCR-P8.3 Grid re-entry (section 58): target deck + target beat chosen; the gesture ends before the boundary (>= 1 step); source state restored; `phaseAlign(deck, other, 'beat', 'auto')` (bend on a playing deck, juggling P2) if |error| > 3 ms; fader restored; normal playback resumes; never an ambiguous timing state (state IDLE, no timers). Test: `src/engine/dj/__tests__/scratchReentryKeepsThePhase.test.ts` - after a feature on a 40 ms-off fake deck, `bendRate` count 1, `seek` on a playing deck 0, phase error < 5 ms.
+- [ ] SCR-P8.4 State restoration everywhere (section 60): every executor operation restores rate, gain, capture freeze, suppressNotes, crossfader, bus level to the snapshot (not defaults). Test: extend `src/engine/__tests__/scratchRestoresSuppressNotes.test.ts` with the Auto Scratch path (both before-states), plus `scratchExecutor.test.ts` deep-equal after every gesture type (27 cases).
+- [ ] SCR-P8.5 Manual override (section 63): any user touch on platter (`DJActions.startScratch` source user), crossfader, deck gain, scratch control (registry fire with source != 'autodj'), cue, transport -> the performer yields the affected control within one poll, ABORTING -> IDLE, then re-evaluates (LISTENING) instead of resuming. Test: `src/engine/dj/__tests__/autoScratchYieldsToTheUser.test.ts` - a user `fx_scratch_baby` fire mid-phrase: executor stops within 1 poll, no further `setScratchVelocity` from the executor (sentinel), state LISTENING, snapshot restored.
+- [ ] SCR-P8.6 Real-time resilience (section 72): BPM change, tempo sync change, deck change, manual intervention, transition cancel, Auto DJ stop/disable, deck load, deck unload while a scratch is active -> graceful abort or replan, never a stuck voice/fader/deck. Test: `src/engine/dj/__tests__/autoScratchSurvivesSetEvents.test.ts` - 8 events, each: executor aborted or replanned (sentinel), restore applied, all timers cleared (`vi.getTimerCount() === 0`).
+- [ ] SCR-P8.7 Long-set simulation (section 73): `setSimulator.ts` gains Auto Scratch (additive option) and a 4-hour virtual run asserts no stale events (every planned event executed or aborted), no leak (memory ring <= 16, voices <= 2, timers 0 at the end), no stuck fader/deck/voice, no source used > 3 times in 16 bars, no routine > 2 times in 32 bars, phase drift < 5 ms at every re-entry. Test: `src/engine/dj/autodj/__tests__/setSimulatorScratchLongSet.test.ts`.
+- [ ] SCR-P8.8 Emergency fallback: any executor exception -> `ScratchSafety.emergencyRelease()` (gain ramps closed, voices stopped, snapshot restored, state IDLE) and the Auto DJ continues (the poll never throws). Test: `autoScratchSurvivesSetEvents.test.ts` - an injected throw inside `stroke` ends in IDLE with the deck playing at its rest rate.
+- [ ] SCR-P8.R9 Reachability (Gate L): `src/engine/dj/__tests__/autoScratchReturnsToNormalDJ.test.ts` - through `getAutoDJ()`: three unsafe scenarios (both decks silent request, bass source over a bass-heavy bar, user crossfader grab) -> sentinel `ScratchSafety.check` count 3 with the rule names, every one ends with normal DJ operation (crossfader at the executor's value, decks playing, state IDLE, restore applied). Red first.
+- [ ] SCR-P8.TC type-check clean.
+
+## Phase P9 - DJ view UX, debug view, decision log view, MCP (Gate N; sections 61, 62, 64, 65)
+
+- [ ] SCR-P9.1 Store (`useDJStore.ts`, additive, no persistence): `autoDJScratchMode: 'OFF'|'SAFE'|'MUSICAL'|'PERFORMER'|'BATTLE'` (default per owner decision 1), `autoDJScratchIntensity` (-1 = set), `autoDJScratchStyle` ('auto' | 5 styles), `autoDJScratchSource` ('auto'|'sample'|'deck'|'both'), `autoDJScratchLevel` (-1 = auto, 1-4), `autoDJScratchTelemetry`; `setAutoDJConfig` accepts them. Test: `src/stores/__tests__/useDJStoreScratchConfig.test.ts`.
+- [ ] SCR-P9.2 Modes (section 62): `scratchModeShape(mode)` -> allowed gestures and density cap per the Spec numbers; BATTLE still runs the governor. Test: `scratchStyles.test.ts` - SAFE never yields transformer; BATTLE yields crab but the governor still rejects 20 cuts/beat.
+- [ ] SCR-P9.3 Panel (`DJAutoDJPanel.tsx`, next to Auto Juggle :551): "Auto Scratch" (`CustomSelect` Off/Safe/Musical/Performer/Battle), "Scratch Intensity", "Scratch Style" (Auto/Old School/Boom Bap/Electro/Battle/Lo-Fi), "Scratch Source" (Auto/Sample/Deck/Both), "Scratch Level" (Auto/1-4); design-system components, token classes, full English labels, no implementation knobs. Test: `src/components/dj/__tests__/autoDJPanelScratch.test.tsx` - changing each control writes the store field; labels full words.
+- [ ] SCR-P9.4 Debug view (section 64): `DJAutoDJDebugPanel.tsx` `ScratchSection` showing state, style, level, energy, source, anchor, gesture, role, bar, step, next, reason, confidence, scratch budget n/6, juggle budget n/6 from `autoDJScratchTelemetry`. Test: `autoDJDebugPanel.test.tsx` extended - renders the 15 rows from a fixture telemetry.
+- [ ] SCR-P9.5 Telemetry (D9): `scratchTelemetry.ts` builds the section 64 record each tick; `AutoDJTelemetry.scratch` carries it; `publishTelemetry` includes it. Test: `scratchTelemetry.test.ts` + the debug panel test.
+- [ ] SCR-P9.6 Decision log view (section 65): `formatDecision` renders `'scratch'` entries as the section 65 block (reasons, source, gesture, placement, duration); the panel's decision list shows them. Test: `src/engine/dj/autodj/__tests__/decisionLogScratch.test.ts`.
+- [ ] SCR-P9.7 MCP: `dj_auto_dj_explain` returns `scratch` telemetry + last 10 scratch decisions; new tool `dj_auto_scratch` (bridge `MCPBridge.ts` handler + `server/src/mcp/mcpServer.ts` tool) sets mode/intensity/style/source/level through `setAutoDJConfig`; `dj_get_state` reports `autoScratch`. `docs/MCP_DEBUGGING_GUIDE.md` updated. Test: `src/bridge/__tests__/mcpAutoScratch.test.ts` - the handler writes the store and the explain payload has `scratch`.
+- [ ] SCR-P9.8 Manual scratch controls stay (`DeckScratch.tsx` buttons, pads, keyboard, MIDI) and fire the registry; Auto Scratch yields to them (P8.5). Test: `scratchActionsOnePath.test.ts` (P2.9) covers the fire path; `autoScratchYieldsToTheUser.test.ts` the yield.
+- [ ] SCR-P9.R10 Reachability (Gate N): `src/components/dj/__tests__/autoScratchFromTheDJView.test.tsx` - render `DJAutoDJPanel` + the debug panel, select Auto Scratch "Musical" and Style "Boom Bap", enable Auto DJ through the panel's button with the mocked engine harness: `DJScratchDJ.tick` sentinel >= 1, telemetry rows render state and style "boomBap", the MCP explain payload equals the panel's data (one source). Red first.
+- [ ] SCR-P9.TC type-check clean.
+
+## Phase P10 - Real-audio acceptance, world-class acceptance, definition of done, ledger (Gates O, P; sections 91-95, DoD)
+
+- [ ] SCR-P10.1 Reachability requirement (section 91): the R tests R1-R10 are listed in `thoughts/shared/plans/2026-10-11-scratch-dj-progress.md` with entry point, sentinel and numbers (this file's table below kept current), all inside the `test:ci` glob (`src/**`). Done: table complete, `npx vitest run --reporter=dot <the 10 files>` green.
+- [ ] SCR-P10.2 Knob sweep (protocol section 2): a probe `src/engine/dj/scratch/__tests__/scratchKnobsMoveTheOutput.test.ts` sweeps every declared config field (mode, intensity, style, source, level, seed) within one seed and asserts the event hash changes across the field's range, or the field carries a written exemption in the test. Validated on a known-live (mode) and a known-dead (a dummy field) first.
+- [ ] SCR-P10.3 Definition of done table: the 30 DoD points each mapped to the test that proves it (table in this file, section "DoD map"), every row green. Done: table filled with file + assertion names.
+- [ ] SCR-P10.4 Ledger and docs: fix-all-open SCRP line updated with the count; `docs/MCP_DEBUGGING_GUIDE.md` scratch section; memory note `project_scratch_dj.md`; handoff only if anything stays open.
+- [ ] SCR-P10.5 Golden fixtures regenerated from the final planner and committed (`fixtures/golden/*.json`), with the command to regenerate in the test header.
+- [ ] SCR-P10.R11 Reachability (whole product): `src/engine/dj/__tests__/autoDJHasATurntablist.test.ts` - the section 93 scenario through `getAutoDJ()` on the corpus (groove A, incoming B with a drop, PERFORMER): the decision trace contains in order a COUNT forwardStab (sparse), a rest, a chirp answer on A's fill, a YEAH transformer before B's drop, a scratch response during the juggle trade, a FRESH x3 throw-and-chop at the peak, a final stab, fader close, re-entry with phase error < 5 ms, then normal mixing with 0 scratch events for >= 8 bars. Red first.
+- [ ] SCR-P10.TC type-check clean, `npm run lint` clean on `src/engine/dj/scratch/**`.
+
+### Owner checks (Gates O and P; a human ear decides, collected under "Blocked on me")
+
+- [ ] SCR-P10.O1 Gate O listening (section 92 O): LOCAL `http://localhost:5174` DJ view, Auto DJ on, Auto Scratch MUSICAL then BATTLE, a boom-bap and a house playlist: baby, chirp, stab, transformer, flare, orbit, crab, scribble, sample scratch, deck scratch, call/response, scratch + juggle, scratch transition each heard at least once over 20 minutes (the debug view names them). PASS: musically convincing, no clicks, no stuck fader, re-entry on the beat. FAIL: name the gesture and the timestamp.
+- [ ] SCR-P10.O2 Gate P world-class (section 92 P): the 10 intelligences (source, anchor, technique, timing, density, phrase, performance/rest, interaction, set, restraint) judged over one 30-minute set; PASS per line.
+- [ ] SCR-P10.O3 Restraint (section 77): over 30 minutes in MUSICAL, most of the set has no scratch; the owner counts the scratch phrases (expected <= 1 per 2 minutes outside features).
+- [ ] SCR-P10.O4 Scratch bus tone (section 42 numbers) on the owner's monitors; adjust the chain constants only from this listening, in one commit.
+
+---
+
+## Reachability tests (one per feature, through the real entry point)
+
+| ID | File | Entry | Sentinel | Asserted numbers |
+|----|------|-------|----------|------------------|
+| R1 | `src/engine/dj/__tests__/scratchGestureReachesTheDeck.test.ts` | `fireDjFx('fx_scratch_chirp', {source:'keyboard'})` | `faderGainAt` >= 4 per beat | both velocity signs; gain 0 in cut, 1 in open windows |
+| R2 | `src/engine/dj/__tests__/scratchRecordVoiceReachesTheBus.test.ts` | `fireDjFx(..., {record:'AH_STANDARD'})` | `ScratchRecordVoice.stroke` = 1 | `startAt` frames = round(3300/22050 x sr); bus RMS > -40 dBFS; deck `setScratchVelocity` = 0 |
+| R3 | `src/engine/dj/__tests__/scratchRecueReachesTheRecord.test.ts` | 4 x `fireDjFx(forwardStab, {source:'autodj'})` | `cue` = 4 | 4 identical positions; 4 restores |
+| R4 | `src/engine/dj/__tests__/autoScratchLandsOnTheGrid.test.ts` | `DJScratchDJ.tick()` then (P7) `getAutoDJ().enable()` | `planPhrase` >= 1; executed = planned | fire time in [-8, +10] ms of the grid beat |
+| R5 | `src/engine/dj/__tests__/autoScratchPicksTheSourceByContext.test.ts` | `DJScratchDJ.tick()` on two contexts | `select` = 2 | CRATE voice in a breakdown; DECK in a house transition |
+| R6 | `src/engine/dj/__tests__/autoScratchPerformsTheArc.test.ts` | 32-bar PEAK window, PERFORMER | `phaseAt` = 32 | 9 phases in order; >= 4 empty bars; IDLE + restore at the end |
+| R7 | `src/engine/dj/__tests__/autoDJScratchReachesTheDecks.test.ts` | `getAutoDJ().enable()`, poll to a breakdown | opportunity/select/plan/execute counts | executed = planned; [-8,+10] ms; OFF run = 0 |
+| R8 | `src/engine/dj/__tests__/autoDJTransitionWithScratch.test.ts` | 6 planned transitions | `performScratch` = 5 | ends before `endBeat`; crossfader untouched; no silence |
+| R9 | `src/engine/dj/__tests__/autoScratchReturnsToNormalDJ.test.ts` | 3 unsafe scenarios via `getAutoDJ()` | `ScratchSafety.check` = 3 | rule names; IDLE; restore |
+| R10 | `src/components/dj/__tests__/autoScratchFromTheDJView.test.tsx` | the DJ view panel | `DJScratchDJ.tick` >= 1 | telemetry rows; MCP payload = panel data |
+| R11 | `src/engine/dj/__tests__/autoDJHasATurntablist.test.ts` | `getAutoDJ()` section 93 scenario | decision trace order | re-entry < 5 ms; >= 8 bars without scratch after |
+
+Each test is written first and seen failing (Gate 2). Behaviour is tested where it lives (the pure modules' tests above); these eleven prove the wiring once each.
+
+## Automated verification (summary)
+
+Per phase: `npm run type-check` (`tsc -b --force`), then `VITEST_MAX_WORKERS=2 npx vitest run <the phase's files>` - never the full suite by hand (the hooks run it on push). Offline audio through `installRealWebAudio` with the AudioContext stub (memory: audio tests can reach the speakers). One test command at a time.
+
+## Manual verification (owner; collected under "Blocked on me")
+
+LOCAL first: `npm run dev:fullstack`, browser at `http://localhost:5174`, DJ view (Auto DJ panel). LIVE after push: `https://devilbox.uprough.net` (confirm `version.json` buildHash first).
+
+- M1 Auto Scratch control visible next to Auto Juggle; selecting Musical and pressing Auto DJ shows a Scratch section in the Debug view within one phrase.
+- M2 Sample scratch does not hijack a deck: while a crate scratch plays, both deck waveforms keep moving at their rate.
+- M3 Re-cued stabs: in BATTLE a COUNT "3" stab repeats on the same syllable, never drifting into "2".
+- M4 Manual override: grab the crossfader during a scratch feature; the scratch stops within a beat and does not resume by itself.
+- M5 Gates O/P listening (P10.O1-O4).
+
+## Owner decisions needed (genuine product choices; each built around a default until answered)
+
+1. **Default Auto Scratch mode for new sessions.** Recommended: `MUSICAL` (matches the juggle default decided 2026-10-11; SAFE would never show the feature, OFF hides it). No migration needed (store not persisted).
+2. **Does Auto Scratch run without Auto DJ** (accompanying a manual mix on the master deck)? Recommended: Auto DJ only in this plan (the owner plan's definition of done is "Auto DJ has acquired a turntablist"); a stand-alone performer is a follow-up item, not silently added.
+3. **The 7 crate files without metadata** (020, 040, 049, 053, 054, 055, 056). Recommended: FX pack only (never a performer source, section 70) until records are produced for them with the Up Rough analyser; listed in `PROVENANCE.md`.
+4. **Scratch bus user control.** Recommended: no extra knob; bus level follows Scratch Intensity and the chain constants are fixed to the reference numbers, tuned once from P10.O4. Alternative: a "Scratch Level" knob in the panel.
+5. **Scratch Style selector vs genre-only.** Recommended: a Style selector with "Auto" (derived from the track's `GenreAnalysis` and the Auto DJ style) plus the five palettes, as section 61 lists Style; genre never dictates alone (section 33).
+
+## Not in this plan
+
+- Porting the offline turntable physics, NumPy renderer or macro language (section 79; `parse_macro` optional and declined).
+- Tracker-view scratch patterns (`TrackerScratchController` fader-only duty tables, research 1.7) - a separate unification item.
+- Machine-learned preference (section 90 forbids it).
+
+## Coverage map (owner-plan section -> item IDs)
+
+| Section | IDs |
+|---------|-----|
+| Mission, 1, 2, 3, 4, 94, 95 | D1-D10, P7.7, P10.R11 |
+| 5 | P4.1 |
+| 6 | P4.1 (no second analysis) |
+| 7 | P4.2 |
+| 8 | P3.6 |
+| 9 | P1.2 |
+| 10 | P1.1, P1.2, P1.3 |
+| 11 | P2.1, P3.1 |
+| 12 | P5.1, P5.3, P5.4, P2.1 |
+| 13 | P5.2 |
+| 14 | P2.1, P0.3 |
+| 15 | P0.4 (owner decided 2026-10-11) |
+| 16 | P2.4, P2.5, P2.R2 |
+| 17 | P3.2 |
+| 18 | P3.3, P3.4, P3.R3 |
+| 19 | P1.4 |
+| 20 | P1.5 |
+| 21 | P4.4, P4.5, P4.7 |
+| 22 | P4.4 |
+| 23 | P4.6 |
+| 24 | P4.9 |
+| 25 | P4.10, P7.5, P7.9 |
+| 26 | P7.9 |
+| 27 | P7.11 |
+| 28 | P7.10 |
+| 29 | P6.1 |
+| 30 | P6.2 |
+| 31 | P1.6 |
+| 32 | P1.7 |
+| 33 | P1.8, decision 5 |
+| 34 | P1.9 |
+| 35 | P4.8 |
+| 36 | P4.3, P4.13 |
+| 37 | P4.10 |
+| 38 | P1.10, P2.2 |
+| 39 | P1.10 |
+| 40 | P4.11 |
+| 41 | P4.12 |
+| 42 | P2.6, P10.O4, decision 4 |
+| 43 | P2.7 |
+| 44 | P7.8 |
+| 45 | P7.2 |
+| 46 | P7.3 |
+| 47 | P7.4 |
+| 48 | P7.5 |
+| 49 | P7.9 |
+| 50, 51 | P6.4 |
+| 52 | P6.5 |
+| 53 | P6.6 |
+| 54 | P6.7 |
+| 55 | P6.8 |
+| 56 | P6.9 |
+| 57 | P8.2 |
+| 58 | P8.3 |
+| 59 | P8.1 |
+| 60 | P3.5, P8.4 |
+| 61 | P9.1, P9.3, decisions 1, 2, 5 |
+| 62 | P9.2 |
+| 63 | P8.5 |
+| 64 | P9.4, P9.5 |
+| 65 | P7.12, P9.6 |
+| 66 | P4.13 |
+| 67 | P1.11 |
+| 68 | P7.R7 |
+| 69 | P4.14, P10.5 |
+| 70 | P2.3 |
+| 71 | P2.8 |
+| 72 | P8.6 |
+| 73 | P8.7 |
+| 74 | P6.3 |
+| 75 | P7.9 |
+| 76 | P7.R8 |
+| 77 | P4.6, P10.O3 |
+| 78 | P4.3, P4.13 (deterministic, contextual) |
+| 79 | Not in this plan (noted), P3.2 ports the gesture mathematics only |
+| 80 | D1 |
+| 81 | D2, P2.9 |
+| 82 | P2.9 |
+| 83 | P1.1 (ScratchEvent) |
+| 84 | P5.1 |
+| 85, 86 | P5.5 |
+| 87 | P5.4 |
+| 88 | P5.7 |
+| 89 | P6.10 |
+| 90 | P6.6 |
+| 91 | P10.1 |
+| 92 Gate A | P0.1-P0.2 |
+| 92 Gate B | P1.2-P1.11 |
+| 92 Gate C | P2.1-P2.3 |
+| 92 Gate D | P3.3, P3.4 |
+| 92 Gate E | P4.2 |
+| 92 Gate F | P4.4-P4.7 |
+| 92 Gate G | P5.2-P5.7 |
+| 92 Gate H | P6.1-P6.3 |
+| 92 Gate I | P7.1-P7.8, P7.12, P7.R7 |
+| 92 Gate J | P7.9, P7.11 |
+| 92 Gate K | P5.5, P5.6 |
+| 92 Gate L | P8.1-P8.8, P8.R9 |
+| 92 Gate M | P4.3, P4.8, P6.6, P6.7 |
+| 92 Gate N | P9.1-P9.8, P9.R10 |
+| 92 Gate O | P10.O1, P10.O4 |
+| 92 Gate P | P10.O2 |
+| 93 | P10.R11 |
+| Definition of done 1-30 | P10.3 (DoD map below) |
+
+## DoD map (owner plan "Definition of done" 1-30 -> proving test; filled with assertion names at P10.3)
+
+1 opportunity P6.11 · 2 source P5.2 · 3 anchor P3.1 · 4 technique P4.4/P1.9 · 5 grid P4.2 · 6 density P4.4 · 7 rest P4.6 · 8 call/response P4.10/P7.5 · 9 throw P4.12 · 10 anchor repeat P3.3 · 11 re-cued stabs P3.R3 · 12 deck engine P1.R1 · 13 samples without hijack P2.R2 · 14 live deck P5.3 · 15 tracker P5.5/P5.6 · 16 routines P4.10 · 17 32-bar arc P6.3 · 18 escalate P6.5 · 19 juggling P7.9 · 20 hands budget P7.11 · 21 vocal/bass P4.9/P8.1 · 22 transitions P7.R8 · 23 dub/FX P7.8 · 24 memory P6.6 · 25 repetition P6.7 · 26 yield P8.5 · 27 restore P8.4 · 28 recover P8.8 · 29 re-entry P8.3 · 30 stop P8.2.
