@@ -641,14 +641,14 @@ Each test is written first and seen failing (Gate 2).
 
 ## 5. Checklist
 
-Count: 37 of 46 done.
+Count: 39 of 46 done.
 
 P0 - probes
-- [ ] JUGX-P0.1 juggle-block reason histogram (10 min, MCP)
-- [ ] JUGX-P0.2 confirm audio-mode nudge no-op (C6)
-- [ ] JUGX-P0.3 tempo truth for ultraux vision / imaginia
-- [ ] JUGX-P0.4 walk-vs-render agreement, 30 recent tracker tracks, resumable rows
-- [ ] JUGX-P0.5 key-lock latency read from the code + measured
+- [ ] JUGX-P0.1 juggle-block reason histogram (10 min, MCP) - OPEN: needs a live 10-minute Auto DJ run in the owner's browser (see P0 results)
+- [ ] JUGX-P0.2 confirm audio-mode nudge no-op (C6) - OPEN at runtime; code + red-before test say yes (see P0 results)
+- [x] JUGX-P0.3 tempo truth for ultraux vision / imaginia - measured offline 2026-10-11 (P0 results); render duration folded into P0.4
+- [ ] JUGX-P0.4 walk-vs-render agreement, 30 recent tracker tracks, resumable rows - OPEN: needs the browser's pre-render (see P0 results); MODULE_GRID_TOLERANCE stays 2 % unprobed
+- [x] JUGX-P0.5 key-lock latency read from the code + measured - measured offline in P2 (P2 as built), reported live by fd16700f9
 
 P1 - module grid, one tempo source
 - [x] JUGX-P1.1 `moduleBeatGrid.ts` + pure tests - 9bfba2fde (revised bc4de83b9: no stretch onto the render; e5ede3d05: rows per beat from the song)
@@ -744,4 +744,39 @@ LIVE after push: `https://devilbox.uprough.net` (confirm `version.json` buildHas
 
 ## P0 results
 
-(filled in by P0 before P1 starts)
+(filled in 2026-10-11 after P1-P4, audit m9; offline where the probe allows, open where it needs the browser)
+
+- **P0.1 (OPEN)** juggle-block reason histogram. Needs a 10-minute Auto DJ run
+  in the owner's browser through the MCP (`dj_auto_dj_explain` each minute),
+  with audio playing. Not run. Since c98a2f1c3 the low-confidence reason names
+  the confidence and its value (`low confidence (phrase 0.30 < 0.5): ...`), so
+  the histogram will say which confidence blocks.
+- **P0.2 (OPEN at runtime)** audio-mode nudge. Code before deb43fcca:
+  `DeckEngine.nudge()` only set the tracker replayer's nudge, a no-op on an
+  audio deck; the regression test in `deckBendRestoresTheRate.test.ts` was red
+  on that code. The MCP check on a live deck (`dj_nudge`, position over 2 s)
+  was not run (needs the browser).
+- **P0.3 (measured offline)** `timeOrderPositions` / `moduleBeatGrid` /
+  `detectBPM` on the modland-cache files:
+
+  | Song | Initial speed / tempo | Tempo commands | Time per speed/tempo | Walk | 6*bpm/speed | Module grid | detectBPM |
+  |---|---|---|---|---|---|---|---|
+  | ultraux vision | 3 / 141 | 50 | 168.5 s at 3/141; closing slow-down 128 -> 32 (3.2 s); 5 s at 16/32 | 176.73 s, 50 positions | 282 | 141 BPM, 8 rows a beat (drums confirm, confidence 1), 4/4 (meter 1), phrases 4 bars at 0.72 | 141 exact |
+  | imaginia | 3 / 125 | 6 (all 3/125) | 142.1 s at 3/125 | 142.08 s, 37 positions | 250 | 125 BPM, 8 rows a beat (convention, 0.7), 4/4 (meter 1), phrases 4 bars at 0.875 | 125 exact |
+
+  The wrong producer was the 4-rows-a-beat formula (`6*bpm/speed`: 282 /
+  250); since P1.3 every producer
+  reads the module grid and agrees (141 / 125). The historical playlist value
+  (94) and deck value (140.95) were not re-read (live state), and the rendered
+  WAV duration needs the browser render: folded into P0.4.
+- **P0.4 (OPEN)** walk vs render agreement. The 30 recently played tracker
+  tracks come from the owner's playlists (`dj_get_playlist_state`) and their
+  durations from the browser's pre-render. Offline substitute tried: UADE
+  headless (`tools/uade-audit/uadeRenderCore.renderToSamples`, looping off)
+  on the 28 local `.mod` files never ends a ProTracker song (18 ran to the
+  900 s cap, 2 ended at 692 / 729 s, 8 failed to load), so it cannot stand in
+  for the render length. `MODULE_GRID_TOLERANCE` stays at the 2 % default,
+  unprobed.
+- **P0.5 (measured)** see "P2 as built": impulse probe 90.7 / 87.0 / 90.7 /
+  83.3 ms at 0 / -1 / +1 / -3 semitones, `SETTING_INITIAL_LATENCY` 91.7 /
+  88.2 / 94.6 / 81.4 ms; the code reports the setting live (fd16700f9).
