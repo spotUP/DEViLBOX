@@ -65,47 +65,61 @@ export interface ModuleBeatGrid {
 }
 
 /**
- * A tracker module's phrase grid (owner plan sections 31, 37): its phrases
- * start where the order list moves to another pattern - exact times, not an
- * audio guess - and are counted in 4, 8 or 16 bars between those starts.
+ * A tracker module's phrase grid (owner plan sections 31, 37): phrases of 4,
+ * 8 or 16 bars that start on the song's own pattern starts - exact times from
+ * the order walk, not an audio guess.
  */
 export interface ModulePhraseGrid {
-  /** Bars per phrase: the longest of 4/8/16 that the stretches between pattern changes are whole multiples of. */
+  /** Bars per phrase: the longest of 4/8/16 whose grid sits on the pattern starts and that the pattern changes fall on; 4 when none does. */
   lengthBars: number;
-  /** Share of the stretches between pattern changes that are whole phrases of that length (the audio detector's threshold, PHRASE_BOUNDARY_SUPPORT), or PHRASE_UNALIGNED_CONFIDENCE. */
+  /**
+   * Mean of the grid's alignment (share of its phrase starts that land on a
+   * pattern start, or a whole phrase into a longer pattern) and its change fit
+   * (share of the pattern changes that land on a phrase start);
+   * PHRASE_UNALIGNED_CONFIDENCE when the 4-bar grid itself misses the patterns.
+   */
   confidence: number;
-  /** Bar index of every phrase start: bar 0, each pattern change, and every lengthBars bars between them. */
+  /** Bar index of every phrase start. */
   startBars: number[];
 }
 
 /**
  * The phrase grid of an order walk, from the bar each played position starts
- * on. A position that repeats the previous pattern continues its phrase; a
- * change of pattern is an arrangement boundary. A song of one repeated
- * pattern falls back to every position start. Null with fewer than two
- * boundaries: nothing to count.
+ * on. Bar 0 starts a phrase; each next phrase starts lengthBars later when
+ * that lands on a pattern start or a whole phrase into a longer pattern, and
+ * otherwise (a 3-bar pattern, a pattern break) restarts on the start of the
+ * pattern it lands in. A position that repeats the previous pattern continues
+ * the music; a change of pattern is an arrangement boundary, and the phrase
+ * length is the one those changes fall on (the audio detector's threshold,
+ * PHRASE_BOUNDARY_SUPPORT). Null for a song too short to count.
  */
 export function modulePhrases(patternIndices: number[], positionBars: number[], totalBars: number): ModulePhraseGrid | null {
-  const all = positionBars.filter((b, p) => p > 0 && b > 0 && b < totalBars);
   const changes = positionBars.filter((b, p) => p > 0 && b > 0 && b < totalBars && patternIndices[p] !== patternIndices[p - 1]);
-  const bounds = [...new Set(changes.length >= 2 ? changes : all)];
-  if (bounds.length < 2) return null;
-  // Phrases restart at every boundary, so a length fits where the stretch between two boundaries is a whole
-  // number of phrases (a pattern break shifts the bars after it, not the fit).
-  const anchors = [0, ...bounds];
-  const spans = anchors.slice(1).map((b, i) => b - anchors[i]);
-  let lengthBars = 4;
-  let confidence = PHRASE_UNALIGNED_CONFIDENCE;
+  const positionStartOf = (bar: number) => { let s = 0; for (const b of positionBars) if (b <= bar) s = b; return s; };
+  const grid = (lag: number) => {
+    const startBars = [0];
+    let hits = 0, misses = 0;
+    for (let cur = 0; cur + lag < totalBars;) {
+      const next = cur + lag;
+      const ps = positionStartOf(next);
+      if ((next - ps) % lag === 0) { hits++; cur = next; } else { misses++; cur = ps; }
+      startBars.push(cur);
+    }
+    const on = new Set(startBars);
+    const alignment = hits + misses > 0 ? hits / (hits + misses) : null;
+    const changeFit = changes.length ? changes.filter((b) => on.has(b)).length / changes.length : 0;
+    return { startBars, alignment, changeFit };
+  };
   for (const lag of PHRASE_LENGTHS) {
-    const support = spans.filter((n) => n % lag === 0).length / spans.length;
-    if (support >= PHRASE_BOUNDARY_SUPPORT) { lengthBars = lag; confidence = support; break; }
+    const g = grid(lag);
+    if (g.alignment !== null && g.alignment >= PHRASE_BOUNDARY_SUPPORT && g.changeFit >= PHRASE_BOUNDARY_SUPPORT) {
+      return { lengthBars: lag, confidence: (g.alignment + g.changeFit) / 2, startBars: g.startBars };
+    }
   }
-  const startBars: number[] = [];
-  anchors.forEach((a, i) => {
-    const next = anchors[i + 1] ?? totalBars;
-    for (let b = a; b < next; b += lengthBars) startBars.push(b);
-  });
-  return { lengthBars, confidence, startBars };
+  const g = grid(4);
+  if (g.alignment === null) return null;
+  const confidence = g.alignment >= PHRASE_BOUNDARY_SUPPORT ? (g.alignment + g.changeFit) / 2 : PHRASE_UNALIGNED_CONFIDENCE;
+  return { lengthBars: 4, confidence, startBars: g.startBars };
 }
 
 /**

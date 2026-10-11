@@ -289,24 +289,29 @@ describe('the drums that set the beat are found per order position (owner plan s
 
 describe('the module phrase grid is read from the order list (audit 2026-10-11 M1, owner plan section 37)', () => {
   it('pattern changes every 8 bars count in 8-bar phrases at full confidence; a repeated pattern continues its phrase', () => {
-    // Order a a b b a a b b, 4 bars each: changes at bars 8, 16, 24.
+    // Order a a b b a a b b, 4 bars each: changes at bars 8, 16, 24 (16 bars would miss two of three).
     expect(modulePhrases([0, 0, 1, 1, 0, 0, 1, 1], [0, 4, 8, 12, 16, 20, 24, 28], 32)).toEqual({ lengthBars: 8, confidence: 1, startBars: [0, 8, 16, 24] });
   });
 
-  it('3-bar patterns sit on no 4/8/16 grid: counted in 4s at the unaligned confidence, restarted at every change', () => {
+  it('2-bar patterns that all differ: 4-bar phrases on every other pattern start; 3 of the 7 changes on them', () => {
+    const g = modulePhrases([0, 1, 2, 3, 4, 5, 6, 7], [0, 2, 4, 6, 8, 10, 12, 14], 16)!;
+    expect(g.lengthBars).toBe(4);
+    expect(g.startBars).toEqual([0, 4, 8, 12]);
+    expect(g.confidence).toBeCloseTo((1 + 3 / 7) / 2, 12);
+  });
+
+  it('3-bar patterns sit on no 4-bar grid: the unaligned confidence, phrases restarted on each pattern', () => {
     expect(modulePhrases([0, 1, 2, 3], [0, 3, 6, 9], 12)).toEqual({ lengthBars: 4, confidence: 0.3, startBars: [0, 3, 6, 9] });
   });
 
-  it('a pattern break that shortens a position moves the phrases with the next pattern change', () => {
-    // Patterns of 4 bars, the second cut to 2 bars (D00): the changes fall on bars 4, 6, 10, 14.
-    const g = modulePhrases([0, 1, 2, 3, 4], [0, 4, 6, 10, 14], 18)!;
-    expect(g.lengthBars).toBe(4);
-    expect(g.confidence).toBe(0.75);
-    expect(g.startBars).toEqual([0, 4, 6, 10, 14]);
+  it('a pattern break that shortens a position restarts the phrase on the next pattern', () => {
+    // 4-bar patterns, the second cut to 2 bars (D00): positions on bars 0, 4, 6, 10, 14. The 4-bar grid misses
+    // once (bar 8 is inside the pattern from 6) and restarts at 6: alignment 3/4, every change on a phrase start.
+    expect(modulePhrases([0, 1, 2, 3, 4], [0, 4, 6, 10, 14], 18)).toEqual({ lengthBars: 4, confidence: 0.875, startBars: [0, 4, 6, 10, 14] });
   });
 
-  it('one pattern repeated: every position start is a boundary; one boundary is too little to count', () => {
-    expect(modulePhrases([0, 0, 0, 0], [0, 4, 8, 12], 16)).toEqual({ lengthBars: 4, confidence: 1, startBars: [0, 4, 8, 12] });
-    expect(modulePhrases([0, 1], [0, 4], 8)).toBeNull();
+  it('one pattern repeated: aligned, but no change says the length: 4 bars at 0.5; too short to count: null', () => {
+    expect(modulePhrases([0, 0, 0, 0], [0, 4, 8, 12], 16)).toEqual({ lengthBars: 4, confidence: 0.5, startBars: [0, 4, 8, 12] });
+    expect(modulePhrases([0], [0], 4)).toBeNull();
   });
 });
