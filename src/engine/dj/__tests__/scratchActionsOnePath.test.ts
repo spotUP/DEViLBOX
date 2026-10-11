@@ -6,7 +6,8 @@
  * callers left (static assertion over `src/`).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const holder = vi.hoisted(() => ({ deck: null as unknown }));
@@ -39,15 +40,6 @@ function fakeDeck() {
     stopPattern() { this.stopCalls++; },
     finishPatternCycle() { this.finishCalls++; },
   };
-}
-
-function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name);
-    if (statSync(p).isDirectory()) { if (name !== '__tests__' && name !== 'node_modules') walk(p, out); }
-    else if (/\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name)) out.push(p);
-  }
-  return out;
 }
 
 describe('every scratch trigger fires the registry (SCR-P2.9)', () => {
@@ -147,15 +139,15 @@ describe('every scratch trigger fires the registry (SCR-P2.9)', () => {
       'src/engine/dj/DeckEngine.ts',         // the method itself
       'src/engine/dj/DJScratchEngine.ts',    // the pattern player
     ]);
-    const offenders: string[] = [];
-    for (const file of walk(join(process.cwd(), 'src'))) {
-      const rel = file.slice(process.cwd().length + 1);
-      if (allowed.has(rel)) continue;
-      const src = readFileSync(file, 'utf8');
-      if (/\b(deck|getDeck\([^)]*\))\.(playPattern|stopPattern|finishPatternCycle)\(/.test(src) || /\b(playDeckPattern|stopDeckPattern|finishDeckPatternCycle)\(/.test(src)) {
-        offenders.push(rel);
-      }
-    }
+    // git grep, not a JS walk: reading all of src/ (~35 MB) in the test
+    // process took 83 s on a loaded machine and timed out the push gate.
+    // --untracked keeps a new, not yet added file in the scan.
+    const pattern = String.raw`\b(deck|getDeck\([^)]*\))\.(playPattern|stopPattern|finishPatternCycle)\(|\b(playDeckPattern|stopDeckPattern|finishDeckPatternCycle)\(`;
+    const res = spawnSync('git', ['grep', '--untracked', '-lP', pattern, '--',
+      'src/*.ts', 'src/*.tsx', ':!*.test.ts', ':!*.test.tsx', ':!**/__tests__/**'], { cwd: process.cwd(), encoding: 'utf8' });
+    // git grep exits 1 when nothing matches; anything else is a broken scan, not a pass
+    expect(res.status === 0 || res.status === 1, res.stderr).toBe(true);
+    const offenders = res.stdout.split('\n').filter((rel) => rel && !allowed.has(rel));
     expect(offenders).toEqual([]);
     // the Xnn effect goes through the sink DJEngine wires to the registry
     const deckSrc = readFileSync(join(process.cwd(), 'src/engine/dj/DeckEngine.ts'), 'utf8');
