@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import planFixture from './fixtures/plan_phrase.json';
 import {
   sectionDensity, DENSITY_RATE, vocabulary, pickGesture, planVocabulary, planPhrase, planBars, validatePhrase, repairPhrase,
-  humanizeMs, restProbability, withThrow, pyRound, type PlacedScratch, type ScratchSection,
+  humanizeMs, restProbability, effortKey, withThrow, pyRound, type PlacedScratch, type ScratchSection,
 } from '../scratchPlacement';
 import { lfsr } from '../scratchRandom';
 import { getGesture } from '../scratchGestureCatalog';
@@ -36,7 +36,10 @@ describe('density states and vocabulary (sections 21, 22, SCR-P4.4)', () => {
   it('the vocabulary ranks calm to busy and thins to evenly spaced entries', () => {
     const all = planVocabulary('battle', 'BATTLE');
     const v = vocabulary(all);
-    for (let i = 1; i < v.length; i++) expect(getGesture(v[i]!).activity).toBeGreaterThanOrEqual(getGesture(v[i - 1]!).activity);
+    for (let i = 1; i < v.length; i++) expect(effortKey(v[i]!)).toBeGreaterThanOrEqual(effortKey(v[i - 1]!));
+    // the ladder leads: a level 1 gesture never ranks above a level 4 one
+    const levels = v.map((g) => getGesture(g).difficulty);
+    expect(levels).toEqual([...levels].sort());
     const three = vocabulary(all, 3);
     expect(three).toHaveLength(3);
     expect(three[0]).toBe(v[0]);
@@ -88,7 +91,7 @@ describe('planPhrase equals the Python reference (section 21, SCR-P4.5)', () => 
     for (let seed = 1; seed <= 20; seed++) {
       for (let bar = 0; bar < 64; bar++) {
         const n = planPhrase({ style: 'boomBap', section: 'call', bar, bars: 64, seed, gestures: planVocabulary('boomBap', 'MUSICAL') }).length;
-        if ([3, 7, 15, 63].includes(bar)) { endEvents += n; endBars++; } else { midEvents += n; midBars++; }
+        if ([3, 7, 15].includes(bar % 16)) { endEvents += n; endBars++; } else { midEvents += n; midBars++; }
       }
     }
     expect(endEvents / endBars).toBeGreaterThanOrEqual(3 * (midEvents / midBars));
@@ -114,8 +117,11 @@ describe('rests (section 23, SCR-P4.6)', () => {
 
   it('a feature rests at most 10 % of its bars', () => {
     const r = planBars({ style: 'boomBap', section: 'showcase', barRole: 'FEATURE', fromBar: 0, count: 1000, bars: 1000, seed: 5, gestures: planVocabulary('boomBap', 'MUSICAL') });
-    expect(r.rests.length / 1000).toBeLessThanOrEqual(0.10);
-    expect(r.rests.length).toBeGreaterThan(0);
+    const drawn = r.rests.filter((x) => x.reason === 'rest-probability');
+    expect(drawn.length / 1000).toBeLessThanOrEqual(0.10);
+    expect(drawn.length).toBeGreaterThan(0);
+    // and a showcase still keeps four empty bars in every 32
+    for (let w = 0; w + 32 <= 1000; w += 32) expect(r.bars.slice(w, w + 32).filter((b) => b.length === 0).length).toBeGreaterThanOrEqual(4);
   });
 
   it('role probabilities: feature 0.06, theme 0.18, answer 0.20, intro 0.30; a transition takes the transition risk', () => {
