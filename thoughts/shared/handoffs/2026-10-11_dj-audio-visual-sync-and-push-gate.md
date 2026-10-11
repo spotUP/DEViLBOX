@@ -55,6 +55,34 @@ Queued (owner-ordered, in order):
 5. Dead seed entries policy (owner asked why; answer: hippoplayer-only files).
 6. FX9 (ShimmerReverb OOM on channel flicks), carried from 2026-10-08.
 
+
+### Final additions before restart
+
+- Calm palette landed: 2040678e4 (deck identity tokens --color-deck-a/b/c in
+  src/index.css, src/lib/deckIdentity.ts), 66aa4c6f6 (dub), 128a24f16 (DJ +
+  siren), 03d40e117 (ratchet calmPalette.test.ts). Raw hue classes 351 -> 0.
+  Open: default theme --color-warning == --color-accent (#f59e0b), so a
+  warning looks like a live state; mute and fx channel modes share a colour.
+- Playlist sources landed: bc140123d (seed keeps every source: 3591 Modland,
+  627 HVSC, 463 URL, 0 bare; hippoplayer.se moved to
+  https://hippoplayer.se/webdata/Modules/...; new server proxy
+  /api/remote/<host>/<path>), 42af5f08d (isBad: one store action sets it on a
+  failed load, clears it on a successful load/render). Agent handoff:
+  thoughts/shared/handoffs/2026-10-11_playlist-sources-hippoplayer.md.
+- DEPLOY RISK to check before pushing bc140123d: server/src/routes/remote.ts
+  imports ../../../src/lib/dj/remoteSources.ts. `cd server && npx tsc -p .`
+  already fails (TS6059 rootDir / TS5097) on pre-existing mcpServer.ts and
+  modlandIndexer.ts imports of the same kind, so production must run the
+  server through tsx - confirm how the Hetzner server starts (server
+  package.json start = `node dist/index.js`, which would need tsc).
+- New queue items (after the 6 listed above): DJ-J per-channel visualizers
+  dead in the DJ view; DJ-K tempo mixes (planner says "beyond the creative
+  range: short transition only" yet picks longBlend; an extreme tempo gap must
+  trigger cut/echo-out; one tempo source per track - module tempo from the
+  song).
+- Push: pinned 17545d71e was in the gate at restart (scratchpad push4.log).
+  Everything after it (colour, playlist, isBad commits) needs a further push.
+
 Owner verified this session: tracker play stops the DJ set; visuals synced;
 a clean Auto DJ mix; FX7 Amiga Multiband.
 
