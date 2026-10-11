@@ -8,6 +8,7 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { platterPositionSec } from './DeckCssTurntable';
 import { useThemeStore } from '@stores';
 import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
@@ -86,14 +87,15 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
       { equalityFn: (a, b) => a.isPlaying === b.isPlaying && a.effectiveBPM === b.effectiveBPM },
     );
 
-    // Position subscription — drives rotation from actual audio position
-    const unsubPos = useDJStore.subscribe(
-      (s) => {
-        const d = s.decks[deckId];
-        return d.playbackMode === 'audio' ? d.audioPosition : d.elapsedMs / 1000;
-      },
-      (posSec) => bridgeRef.current?.post({ type: 'position', posSec }),
-    );
+    // Position: the HEARD position, sampled every frame (the store's 20 Hz
+    // position is held between writes and the raw player runs ahead of the ear).
+    let posRaf = 0;
+    const postPosition = () => {
+      bridgeRef.current?.post({ type: 'position', posSec: platterPositionSec(deckId) });
+      posRaf = requestAnimationFrame(postPosition);
+    };
+    posRaf = requestAnimationFrame(postPosition);
+    const unsubPos = () => cancelAnimationFrame(posRaf);
 
     // Pattern scratch velocity → turntable spin.
     // When a scratch pattern is active, forward velocity to the worker so the
