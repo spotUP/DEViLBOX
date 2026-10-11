@@ -801,7 +801,9 @@ export interface TransitionRecord {
 
 export type DecisionKind =
   | 'SELECT_NEXT_TRACK' | 'PLAN_SESSION_ORDER' | 'PLAN_TRANSITION' | 'EXECUTE_TRANSITION'
-  | 'FALLBACK' | 'PRELOAD' | 'WAIT' | 'LOOP' | 'CUE_JUMP' | 'SET_PHASE' | 'EMERGENCY' | 'ADAPT';
+  | 'FALLBACK' | 'PRELOAD' | 'WAIT' | 'LOOP' | 'CUE_JUMP' | 'SET_PHASE' | 'EMERGENCY' | 'ADAPT'
+  /** A stand-alone juggle: trigger, source and how it ended (plan 2026-10-11-dj-juggling, P4.3). */
+  | 'JUGGLE';
 
 export interface DecisionLogEntry {
   seq: number;

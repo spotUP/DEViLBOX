@@ -147,6 +147,7 @@ const JuggleSection: React.FC = () => {
         <Row label="Next Actions" value={j.nextActions.length ? j.nextActions.map((a) => `${a.type} ${a.deck} @ ${a.beat.toFixed(1)}`).join(', ') : '-'} />
         <Row label="Confidence" value={fmt(j.confidence)} />
         <Row label="Safety" value={j.safety} />
+        <Row label="Stand-alone" value={j.standalone ? `${j.standalone.source} on ${j.standalone.deck} (${j.standalone.trigger}), ${j.standalone.phase}` : '-'} />
         <Row label="Budget" value={`${(j.budget.juggledFraction * 100).toFixed(0)} % juggled, cooldown ${Math.round(j.budget.cooldownSec)} s`} />
         <Row label="Last Quality" value={j.lastQuality ? fmt(j.lastQuality.overall) : '-'} />
         <div className="text-text-secondary">{j.reason}</div>
