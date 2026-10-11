@@ -343,6 +343,8 @@ export interface DJTrackAnalysis {
 
   bpm: number;
   bpmConfidence: number;
+  /** Where bpm, the beat grid and the bars come from: the module's own timing walk, or the audio analysis. */
+  tempoSource: 'module' | 'audio';
 
   beatGrid: BeatGrid;
   downbeats: DownbeatGrid;

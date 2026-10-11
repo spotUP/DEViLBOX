@@ -19,9 +19,18 @@ import { buildBeatGrids, timelineAt } from './beatGrid';
 import { arrangementEvents, barFeatures, buildPhrases, detectPhraseLength, labelSections, perceivedIntensity, segmentBoundaries, type BarFeatures } from './structure';
 import { deriveCuePoints } from './cuePoints';
 import { analyzeTrackerSong } from './trackerMixAnalysis';
+import { moduleBeatGrid } from './moduleBeatGrid';
 import { smooth } from './activityTimelines';
 
-export const DJ_ANALYSIS_VERSION = 2;
+/**
+ * Version of the DJTrackAnalysis / DJTrackSummary format. 3: tempo, grid and
+ * bars come from the module's own timing when it matches the render
+ * (tempoSource). Not the audio-cache gate: the cached audio analysis did not
+ * change, so DJ_AUDIO_ANALYSIS_VERSION stays and no cached track is re-analysed.
+ */
+export const DJ_ANALYSIS_VERSION = 3;
+/** Version of the cached audio analysis (extended worker data); a cache entry below it is re-analysed. */
+export const DJ_AUDIO_ANALYSIS_VERSION = 2;
 
 export type PipelineAnalysis = NonNullable<PipelineResult['analysis']>;
 
@@ -189,9 +198,17 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
   const ext = input.extended ?? legacyExtended(analysis.frequencyPeaks, durationSec, analysis.rmsDb, analysis.peakDb);
   const extIsReal = !!input.extended;
 
+  // One tempo source: the module's own timing when its walk matches the render, else the audio analysis.
+  let mg: ReturnType<typeof moduleBeatGrid> = null;
+  if (song && Array.isArray(song.patterns) && song.patterns.length > 0 && input.durationSec > 0) {
+    try { mg = moduleBeatGrid(song, input.durationSec); } catch { mg = null; }
+  }
+  const tempo = mg
+    ? { beats: mg.beats, downbeats: mg.downbeats, bpm: mg.bpm, bpmConfidence: 1, timeSignature: mg.beatsPerBar }
+    : { beats: analysis.beats, downbeats: analysis.downbeats, bpm: analysis.bpm, bpmConfidence: analysis.bpmConfidence, timeSignature: analysis.timeSignature };
   const grids = buildBeatGrids({
-    beats: analysis.beats, downbeats: analysis.downbeats, bpm: analysis.bpm,
-    bpmConfidence: analysis.bpmConfidence, timeSignature: analysis.timeSignature, extended: ext, durationSec,
+    ...tempo, extended: ext, durationSec,
+    fixed: mg ? { beatsPerBar: mg.beatsPerBar, confidence: mg.confidence } : undefined,
   });
 
   let features: BarFeatures[] = [];
@@ -219,8 +236,8 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
 
   // Rhythmic
   const hop = ext?.hopSec ?? 0.25;
-  const beats = analysis.beats;
-  const beatPeriod = analysis.bpm > 0 ? 60 / analysis.bpm : 0.5;
+  const beats = tempo.beats;
+  const beatPeriod = tempo.bpm > 0 ? 60 / tempo.bpm : 0.5;
   let onsetsPerBeat = 1;
   let fourOnFloor = 0.5;
   let syncopation = 0.3;
@@ -239,13 +256,14 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
     fourOnFloor = onM + offM > 0 ? Math.max(0, Math.min(1, (onM - offM) / (onM + offM) + 0.5)) : 0.5;
     syncopation = onM + offM > 0 ? Math.max(0, Math.min(1, offM / (onM + offM))) : 0.3;
   }
-  const moduleBpm = song ? detectBPM(song).bpm : null;
+  // The module grid IS the normal hypothesis; without it the module's own BPM is an alternative to the audio reading.
+  const moduleBpm = song && !mg ? detectBPM(song).bpm : null;
   const rhythmic: RhythmicAnalysis = {
     onsetsPerBeat,
     fourOnFloorScore: fourOnFloor,
     syncopation,
-    drumPattern: !ext ? 'unknown' : fourOnFloor > 0.65 ? 'four-on-floor' : syncopation > 0.55 ? 'breakbeat' : onsetsPerBeat < 0.5 ? 'sparse' : analysis.bpm < 95 && analysis.bpm > 0 ? 'half-time' : 'four-on-floor',
-    tempoHypotheses: tempoHypotheses(analysis.bpm, analysis.bpmConfidence, onsetsPerBeat, moduleBpm),
+    drumPattern: !ext ? 'unknown' : fourOnFloor > 0.65 ? 'four-on-floor' : syncopation > 0.55 ? 'breakbeat' : onsetsPerBeat < 0.5 ? 'sparse' : tempo.bpm < 95 && tempo.bpm > 0 ? 'half-time' : 'four-on-floor',
+    tempoHypotheses: tempoHypotheses(tempo.bpm, tempo.bpmConfidence, onsetsPerBeat, moduleBpm),
     tempoStability: tempoStability(beats),
   };
 
@@ -309,7 +327,7 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
 
   const sectionConf = sections.length ? meanOf(sections.map((s) => s.confidence)) : 0;
   const analysisConfidence: AnalysisConfidence = {
-    bpm: analysis.bpmConfidence,
+    bpm: tempo.bpmConfidence,
     beatGrid: grids.beatGrid.confidence,
     downbeat: grids.downbeats.confidence,
     key: keyConfidence,
@@ -333,8 +351,9 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
     id,
     durationSec,
     version: DJ_ANALYSIS_VERSION,
-    bpm: analysis.bpm,
-    bpmConfidence: analysis.bpmConfidence,
+    bpm: tempo.bpm,
+    bpmConfidence: tempo.bpmConfidence,
+    tempoSource: mg ? 'module' : 'audio',
     beatGrid: grids.beatGrid,
     downbeats: grids.downbeats,
     meter: grids.meter,

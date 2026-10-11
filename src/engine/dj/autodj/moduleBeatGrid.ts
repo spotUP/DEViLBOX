@@ -25,7 +25,7 @@ export interface ModuleBeatGrid {
   beats: number[];
   /** Seconds; bar 1 = row 0 of every order position, then every 16 rows. */
   downbeats: number[];
-  /** Musical BPM on the rendered audio, time-weighted over the song (4 rows a beat). */
+  /** Musical BPM, time-weighted over the song (4 rows a beat). */
   bpm: number;
   beatsPerBar: number;
   confidence: 1;
@@ -37,13 +37,27 @@ export function musicalBpm(speed: number, tickBpm: number): number {
   return 60 / (TRACKER_ROWS_PER_BEAT * rowSeconds(speed, tickBpm));
 }
 
-/** The song's own grid, or null when the timing walk does not match the rendered audio. */
-export function moduleBeatGrid(song: TrackerSong, renderedDurationSec: number): ModuleBeatGrid | null {
+export interface ModuleBeatGridOptions {
+  /**
+   * The render was capped at this many seconds (the playlist analyser renders
+   * a 90 s preview). A capped render cannot confirm the song's length, so the
+   * agreement check is skipped and the grid covers the rendered part.
+   */
+  renderCapSec?: number;
+}
+
+/**
+ * The song's own grid, or null when the timing walk does not match the
+ * rendered audio. Beats sit at the walk's times: the replayer plays the
+ * song's timing exactly, and a render longer than the walk is its tail (a
+ * decay, a fade), not a slower song, so the grid is never stretched onto it.
+ */
+export function moduleBeatGrid(song: TrackerSong, renderedDurationSec: number, opts: ModuleBeatGridOptions = {}): ModuleBeatGrid | null {
   const { positions, rowTimes } = timeOrderPositions(song);
   const walkEnd = positions[positions.length - 1]?.end ?? 0;
   if (walkEnd <= 0 || !(renderedDurationSec > 0)) return null;
-  const scale = renderedDurationSec / walkEnd;
-  if (Math.abs(scale - 1) > MODULE_GRID_TOLERANCE) return null;
+  const capped = opts.renderCapSec !== undefined && renderedDurationSec >= opts.renderCapSec - 0.5 && walkEnd > renderedDurationSec;
+  if (!capped && Math.abs(renderedDurationSec / walkEnd - 1) > MODULE_GRID_TOLERANCE) return null;
   const beats: number[] = [];
   const downbeats: number[] = [];
   const rowsPerBar = TRACKER_ROWS_PER_BEAT * TRACKER_BEATS_PER_BAR;
@@ -53,14 +67,15 @@ export function moduleBeatGrid(song: TrackerSong, renderedDurationSec: number): 
       const row = startRow + i;
       // A beat every 4th pattern row, a bar every 16th; each position starts a bar (bar 1 = its first row).
       if (i !== 0 && row % TRACKER_ROWS_PER_BEAT !== 0) continue;
-      const t = times[i] * scale;
+      const t = times[i];
+      if (t >= renderedDurationSec) return; // past the rendered audio
       beats.push(t);
       if (i === 0 || row % rowsPerBar === 0) downbeats.push(t);
     }
   });
-  // Time-weighted musical BPM = beats per minute over the rendered audio (the deck plays the render).
+  // Time-weighted musical BPM = beats per minute over the whole walk.
   const playedRows = positions.reduce((n, p) => n + p.rows, 0);
-  const bpm = (60 * playedRows / TRACKER_ROWS_PER_BEAT) / renderedDurationSec;
+  const bpm = (60 * playedRows / TRACKER_ROWS_PER_BEAT) / walkEnd;
   return {
     beats, downbeats, bpm: Math.round(bpm * 100) / 100,
     beatsPerBar: TRACKER_BEATS_PER_BAR, confidence: 1, source: 'module',

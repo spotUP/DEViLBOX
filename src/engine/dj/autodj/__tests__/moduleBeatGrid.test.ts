@@ -108,12 +108,24 @@ describe('moduleBeatGrid', () => {
     expect(g.source).toBe('module');
   });
 
-  it('scales the grid onto a render within the tolerance', () => {
+  it('a render with a tail (within the tolerance) keeps the song\'s beats: never stretched', () => {
     const s = plain(6, 125);
     const end = walkEnd(s);
-    const g = moduleBeatGrid(s, end * 1.01)!;
+    const g = moduleBeatGrid(s, end * 1.015)!;
     expect(g).not.toBeNull();
-    expect(g.beats[g.beats.length - 1]).toBeCloseTo((end - 4 * rowSeconds(6, 125)) * 1.01, 6);
+    expect(g.bpm).toBe(125);
+    expect(g.beats[g.beats.length - 1]).toBeCloseTo(end - 4 * rowSeconds(6, 125), 9);
+  });
+
+  it('a render capped at its preview length gives the grid of the rendered part and the song\'s BPM', () => {
+    const s = song([pattern('a', 64), pattern('b', 64)], [0, 1, 0, 1, 0, 1], { speed: 3 });
+    const end = walkEnd(s);
+    const cap = end / 2;
+    expect(moduleBeatGrid(s, cap)).toBeNull();
+    const g = moduleBeatGrid(s, cap, { renderCapSec: cap })!;
+    expect(g.bpm).toBe(250);
+    expect(g.beats.every((t) => t < cap)).toBe(true);
+    expect(g.beats).toHaveLength(48);
   });
 
   it('a render 5 % longer than the walk is not trusted: null', () => {
