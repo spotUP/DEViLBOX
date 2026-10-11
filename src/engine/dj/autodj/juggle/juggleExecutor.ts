@@ -104,7 +104,7 @@ export interface JuggleExecution {
   nextActions(count: number): Array<{ deck: string; type: DJJuggleAction['type']; beat: number }>;
 }
 
-const CUT_TYPES = new Set<DJJuggleAction['type']>(['CutIn', 'CutOut', 'CrossfadeTo', 'CrossfadeFrom', 'HoldDeck', 'ReleaseDeck']);
+const CUT_TYPES = new Set<DJJuggleAction['type']>(['CutIn', 'CutOut', 'HoldDeck', 'ReleaseDeck']);
 const FX_TYPES = new Set<DJJuggleAction['type']>(['EchoThrow', 'ReverbThrow', 'FilterIn', 'FilterOut']);
 
 export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts: JuggleExecutionOptions): JuggleExecution {
@@ -153,7 +153,7 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
       if (n > maxCuts) return `excessive cut frequency (${n} in one beat)`;
       cutsInBeat.set(key, n);
     }
-    if (action.type === 'CutOut' || action.type === 'CrossfadeFrom') {
+    if (action.type === 'CutOut') {
       const target = action.deck === 'A' ? 'B' : 'A';
       if (action.deck !== 'BOTH' && !st.playing[target]) return 'would silence both decks';
     }

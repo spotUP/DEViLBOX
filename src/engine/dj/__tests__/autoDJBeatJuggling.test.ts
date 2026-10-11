@@ -31,8 +31,7 @@ function fakeSink(playing: { A: boolean; B: boolean }) {
       const d = action.deck;
       switch (action.type) {
         case 'CutIn': case 'ReleaseDeck': crossfader = d === 'A' ? 0 : d === 'B' ? 1 : 0.5; break;
-        case 'CutOut': case 'CrossfadeFrom': crossfader = d === 'A' ? 1 : d === 'B' ? 0 : 0.5; break;
-        case 'CrossfadeTo': crossfader = action.targetPosition ?? crossfader; break;
+        case 'CutOut': crossfader = d === 'A' ? 1 : d === 'B' ? 0 : 0.5; break;
         case 'HoldDeck': crossfader = 0.5; break;
         case 'StartLoop': case 'LoopResize': case 'LoopRoll': if (d !== 'BOTH') loops[d] = true; break;
         case 'ExitLoop': if (d !== 'BOTH') loops[d] = false; break;

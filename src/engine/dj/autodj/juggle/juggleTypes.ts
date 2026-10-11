@@ -23,7 +23,7 @@ export type JugglePhase = 'SETUP' | 'ESTABLISH' | 'INTENSIFY' | 'PEAK' | 'PAYOFF
 export const JUGGLE_PHASES: readonly JugglePhase[] = ['SETUP', 'ESTABLISH', 'INTENSIFY', 'PEAK', 'PAYOFF', 'RELEASE'];
 
 export type DJJuggleActionType =
-  | 'CutIn' | 'CutOut' | 'CrossfadeTo' | 'CrossfadeFrom' | 'TriggerCue' | 'JumpToBeat' | 'JumpToBar'
+  | 'CutIn' | 'CutOut' | 'TriggerCue' | 'JumpToBeat' | 'JumpToBar'
   | 'StartLoop' | 'ExitLoop' | 'LoopResize' | 'LoopRoll' | 'HoldDeck' | 'ReleaseDeck'
   | 'FilterIn' | 'FilterOut' | 'EQCut' | 'EQRestore' | 'BassSwap' | 'EchoThrow' | 'ReverbThrow'
   | 'ResetDeck' | 'ResyncDeck'
@@ -31,7 +31,7 @@ export type DJJuggleActionType =
   | 'PhaseLock';
 
 export const JUGGLE_ACTION_TYPES: readonly DJJuggleActionType[] = [
-  'CutIn', 'CutOut', 'CrossfadeTo', 'CrossfadeFrom', 'TriggerCue', 'JumpToBeat', 'JumpToBar', 'StartLoop', 'ExitLoop',
+  'CutIn', 'CutOut', 'TriggerCue', 'JumpToBeat', 'JumpToBar', 'StartLoop', 'ExitLoop',
   'LoopResize', 'LoopRoll', 'HoldDeck', 'ReleaseDeck', 'FilterIn', 'FilterOut', 'EQCut', 'EQRestore', 'BassSwap',
   'EchoThrow', 'ReverbThrow', 'ResetDeck', 'ResyncDeck', 'PhaseLock',
 ];
@@ -44,7 +44,7 @@ export interface DJJuggleAction {
   /** Beats from the pattern start (the pattern is placed on an absolute master beat by the executor). */
   executeAtBeat: number;
   durationBeats?: number;
-  /** Seconds on the deck (loops, cues, jumps) or a crossfader position for CrossfadeTo. */
+  /** Seconds on the deck (loops, cues, jumps). */
   targetPosition?: number;
   /** Loop length in beats (StartLoop/LoopResize) or jump size in beats. */
   beats?: number;
