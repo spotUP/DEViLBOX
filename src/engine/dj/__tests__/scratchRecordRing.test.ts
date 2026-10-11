@@ -50,8 +50,10 @@ async function renderRecord(rate: number, startSec: number): Promise<{ L: Float3
   ring.onPosition = (p) => { positions.push(p.frames); };
 
   const startFrame = quantum(startSec);
-  void ctx.suspend(startFrame / SR).then(() => {
+  void ctx.suspend(startFrame / SR).then(async () => {
     ring.startAt(START_SEC, rate);
+    // the start message reaches the worklet on a macrotask; resuming before it lands starts the render without the drop (CI: first frame NaN)
+    await new Promise((r) => setTimeout(r, 50));
     return ctx.resume();
   });
   const out = await ctx.startRendering();
@@ -63,6 +65,7 @@ async function renderRecord(rate: number, startSec: number): Promise<{ L: Float3
   // by alignment, not by the first non-zero sample.
   let first = startFrame;
   while (first < total && L[first] === 0) first++;
+  expect(first, 'the needle drop was never heard').toBeLessThan(total - 1);
   return { L, sig, firstFrame: first - 1, positions, ring };
 }
 
