@@ -26,6 +26,7 @@ import { SCALES, isNoteInScale } from '../../lib/scales';
 import { useMIDI } from '../../hooks/useMIDI';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { playheadRowNow } from '@engine/playheadRow';
 
 const NOTE_NAMES = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'] as const;
 const NOTE_NAMES_FORWARD = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -81,6 +82,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   // Smooth scroll tracking refs
   const currentScrollRef = useRef<number>(0);
   const rafIdRef = useRef<number>(0);
+  const playheadLineRef = useRef<HTMLDivElement>(null);
 
   // Use a ref to access current steps without causing callback recreation
   const stepsRef = useRef(gridPattern.steps);
@@ -160,21 +162,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     const LABEL_WIDTH = 48;
 
     const animate = () => {
-      // Use current step for discrete scrolling
-      const activeStep = currentStep;
-      
-      // Calculate target scroll position
-      const stepPosition = LABEL_WIDTH + (activeStep * CELL_WIDTH);
+      // The playhead is continuous, so the scroll follows it directly: no lerp to chase a stepping target
+      const stepPosition = LABEL_WIDTH + (playheadRowNow(currentRow) % maxSteps) * CELL_WIDTH;
       const containerWidth = container.clientWidth;
 
       // Keep the playhead in the center third of the view
-      const targetScroll = Math.max(0, stepPosition - containerWidth * 0.4);
-
-      // Apply with minimal lerp for smoothness without lag
-      const lerpFactor = 0.3;
-      currentScrollRef.current += (targetScroll - currentScrollRef.current) * lerpFactor;
-
-      // Apply scroll
+      currentScrollRef.current = Math.max(0, stepPosition - containerWidth * 0.4);
       container.scrollLeft = currentScrollRef.current;
 
       rafIdRef.current = requestAnimationFrame(animate);
@@ -190,7 +183,23 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         rafIdRef.current = 0;
       }
     };
-  }, [isPlaying, smoothScrolling, cellSize, currentStep]);
+  }, [isPlaying, smoothScrolling, cellSize, currentRow, maxSteps]);
+
+  // Playhead line: slides between steps every frame, from the same continuous row as the scroll
+  useEffect(() => {
+    const line = playheadLineRef.current;
+    if (!line) return;
+    if (!isPlaying) { line.style.display = 'none'; return; }
+    line.style.display = 'block';
+    let raf = 0;
+    const move = () => {
+      const x = 48 + (playheadRowNow(currentRow) % maxSteps) * (cellSize + 4);
+      line.style.transform = `translateX(${x}px)`;
+      raf = requestAnimationFrame(move);
+    };
+    raf = requestAnimationFrame(move);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, cellSize, currentRow, maxSteps]);
 
   // Handle MIDI CC messages for parameter control
   useEffect(() => {
@@ -429,6 +438,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           onKeyDown={handleKeyDown}
           tabIndex={0}
         >
+          <div
+            ref={playheadLineRef}
+            className="absolute top-0 bottom-0 left-0 w-0.5 bg-accent-error pointer-events-none"
+            style={{ display: 'none', zIndex: 20 }}
+            data-testid="grid-playhead"
+          />
           {/* Step numbers header */}
           <div className="flex items-center mb-1 pl-12 relative" role="row" style={{ zIndex: 10 }}>
             {stepIndices.map((stepIdx) => {
