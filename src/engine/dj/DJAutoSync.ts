@@ -244,11 +244,13 @@ export function onNextDownbeat(deckId: DeckId, callback: () => void): () => void
  * 
  * @param deckId - The deck to start playing
  * @param mode - 'beat' for next beat, 'bar' for next downbeat (recommended)
+ * @param opts.cancelled - asked when the boundary arrives: true = do not start (the caller gave the deck up meanwhile)
  * @returns Promise that resolves when playback starts, or immediately if no master
  */
 export async function quantizedPlay(
   deckId: DeckId,
   mode: 'beat' | 'bar' = 'bar',
+  opts: { cancelled?: () => boolean } = {},
 ): Promise<void> {
   const store = useDJStore.getState();
   const otherDeckId: DeckId = deckId === 'A' ? 'B' : deckId === 'B' ? 'A' : 'A';
@@ -283,6 +285,7 @@ export async function quantizedPlay(
   
   return new Promise((resolve) => {
     setTimeout(async () => {
+      if (opts.cancelled?.()) { resolve(); return; }
       try {
         const engine = getDJEngine();
         const deck = engine.getDeck(deckId);

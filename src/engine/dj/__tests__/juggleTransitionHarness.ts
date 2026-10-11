@@ -53,10 +53,13 @@ export function fakeDeck(id: 'A' | 'B', startSec: number, playing: boolean, onPl
   const rebase = () => { pos = position(); at = Date.now(); };
   const d = {
     id, playbackMode: 'audio' as const,
-    seeksWhilePlaying: 0, seeks: [] as number[], bends: [] as Array<{ ratio: number; ms: number }>, startedAt: null as number | null,
+    seeksWhilePlaying: 0, seeks: [] as number[], bends: [] as Array<{ ratio: number; ms: number }>, startedAt: null as number | null, stoppedAt: null as number | null,
     position,
     play: async () => { rebase(); if (!isPlaying) { d.startedAt = Date.now(); onPlay(pos); } isPlaying = true; },
-    stop: () => { rebase(); isPlaying = false; }, isPlaying: () => isPlaying,
+    stop: () => { rebase(); if (isPlaying) d.stoppedAt = Date.now(); isPlaying = false; }, isPlaying: () => isPlaying,
+    cue: (t: number) => d.audioPlayer.seek(t),
+    /** A double's load (DeckEngine.loadDecodedAudio): the deck stops at the start of the shared buffer. */
+    loadDecodedAudio: async () => { rebase(); isPlaying = false; pos = 0; return { duration: 600, sampleRate: 44100, numberOfChannels: 2, waveformPeaks: new Float32Array(0) }; },
     bendRate: (ratio: number, ms: number) => {
       d.bends.push({ ratio, ms });
       rebase(); rate = ratio;
@@ -70,6 +73,7 @@ export function fakeDeck(id: 'A' | 'B', startSec: number, playing: boolean, onPl
     audioPlayer: {
       seek: (t: number) => { if (isPlaying) d.seeksWhilePlaying++; d.seeks.push(t); pos = t; at = Date.now(); },
       getPosition: () => position(), getDuration: () => 600, stop: () => {},
+      getAudioBuffer: () => ({}) as AudioBuffer, getWaveformPeaks: () => null, getOriginalFileBytes: () => null,
     },
     replayer: { getElapsedMs: () => position() * 1000 },
   };

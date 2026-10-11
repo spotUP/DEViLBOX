@@ -33,6 +33,9 @@ import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
 import { DJJuggleController, analysisClock, type TickInput } from './autodj/juggle/juggleController';
 import { createDeckJuggleSink } from './autodj/juggle/juggleDeckSink';
 import { juggleModeOf, type DJPerformanceMode } from './autodj/juggle/juggleTypes';
+import type { NextTrackOption } from './autodj/juggle/juggleOpportunity';
+import { StandaloneJuggle, mixInPhraseStartOf } from './autodj/juggle/standaloneJuggle';
+import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
 import { registerAutoDJ } from './autoDJInstance';
 import { phaseAlign } from './DJAutoSync';
 
@@ -171,6 +174,8 @@ class DJAutoDJ {
   private plan: DJTransitionPlan | null = null;
   private incomingAnalysis: DJTrackAnalysis | null = null;
   private execution: ExecutionHandle | null = null;
+  /** Stand-alone juggles on the idle deck (plan 2026-10-11-dj-juggling, P4): created with the juggle controller. */
+  private standaloneJuggle: StandaloneJuggle | null = null;
 
 
   // ── Public API ───────────────────────────────────────────────────────────
@@ -334,6 +339,7 @@ class DJAutoDJ {
     this.preloading = false;
     this.preloadedDeck = null;
     this.preRenderedTrack = null;
+    this.endStandalone('Auto DJ restarted');
     this.startPolling();
     const finalIdx = useDJStore.getState().autoDJCurrentTrackIndex;
     console.log(`[AutoDJ] Enabled — starting from track ${finalIdx + 1}/${playlist.tracks.length}`);
@@ -344,6 +350,7 @@ class DJAutoDJ {
   disable(): void {
     this.stopPolling();
     this.cancelTransition();
+    this.endStandalone('Auto DJ off');
     this.juggle?.abort('Auto DJ off');
     this.preloading = false;
     this.preloadedDeck = null;
@@ -360,6 +367,8 @@ class DJAutoDJ {
     const wasTransitioning = useDJStore.getState().autoDJStatus === 'transitioning';
     this.stopPolling();
     this.cancelTransition();
+    // Without the poll loop nothing would hold the double in phase or hand it back.
+    this.endStandalone('Auto DJ paused');
 
     if (wasTransitioning) {
       // Don't leave the decks mid-mixed with the crossfader frozen partway.
@@ -398,6 +407,7 @@ class DJAutoDJ {
     if (!playlist || index < 0 || index >= playlist.tracks.length) return;
 
     this.cancelTransition();
+    this.endStandalone('user control: play at');
     this.preloading = false;
     this.preloadedDeck = null;
     // CRITICAL: clear any stale pre-rendered track from a previous preload.
@@ -432,6 +442,7 @@ class DJAutoDJ {
     const store = useDJStore.getState();
     if (!store.autoDJEnabled) return;
     this.juggle?.noteUserControl('skip');
+    this.endStandalone('user control: skip');
     this.juggle?.abort('user control: skip');
 
     // If a transition is in progress, fast-complete it first so indices
@@ -957,6 +968,9 @@ class DJAutoDJ {
   private async triggerTransition(userBars: number, isSkip: boolean = false): Promise<void> {
     const store = useDJStore.getState();
     if (!this.preloadedDeck) return;
+    // The transition needs the idle deck: a stand-alone juggle there hands back first (the
+    // opportunity's transition guard makes this the exception).
+    this.endStandalone('transition');
 
     // Flip status IMMEDIATELY, before any await, so the poll loop doesn't
     // re-enter triggerTransition while loadPreRenderedTrackToDeck is in flight
@@ -1295,6 +1309,7 @@ class DJAutoDJ {
     this.plan = null;
     this.incomingAnalysis = null;
     this.execution = null;
+    this.standaloneJuggle?.forget();
     try {
       const d = useDJStore.getState().decks[this.activeDeck];
       const t = playlist?.tracks[newCurrentIdx];
@@ -1623,6 +1638,7 @@ class DJAutoDJ {
         positionOf: (deck) => this.deckPosition(deck),
         clockFor: (deck, analysis, position) => analysisClock(analysis, position, () => useDJStore.getState().decks[deck].effectiveBPM || 0),
         onTelemetry: (t) => useDJStore.getState().setAutoDJJuggleTelemetry(t),
+        onFinish: (r) => this.standaloneJuggle?.onPatternFinished(r.completed ? 'pattern completed' : `pattern ended: ${r.reason}`),
         seed: Date.now() & 0xffff,
       });
     }
@@ -1653,7 +1669,9 @@ class DJAutoDJ {
     const decks = useDJStore.getState().decks;
     const ctx = getSessionController().context({
       currentDeck: this.ab(this.activeDeck), incomingDeck: this.preloadedDeck ? this.ab(this.preloadedDeck) : undefined,
-      currentTrack: decks[this.activeDeck].trackAnalysis, incomingTrack: decks[this.idleDeck].trackAnalysis ?? this.incomingAnalysis,
+      currentTrack: decks[this.activeDeck].trackAnalysis,
+      // A double on the idle deck is the playing track again, not the next one.
+      incomingTrack: this.standaloneJuggle?.source() === 'double' ? this.incomingAnalysis : decks[this.idleDeck].trackAnalysis ?? this.incomingAnalysis,
       currentPosition: outgoingPosition, timeRemainingSec: Number.isFinite(timeRemaining) ? timeRemaining : -1,
     });
     return {
@@ -1678,7 +1696,11 @@ class DJAutoDJ {
     const j = this.getJuggle();
     j.setMode(mode);
     j.setIntensity(s.autoDJJuggleIntensity);
-    if (mode === 'OFF' && !j.isActive()) return;
+    if (mode === 'OFF' && !j.isActive()) { this.endStandalone('Auto Juggle off'); return; }
+    const standalone = this.getStandalone();
+    standalone.hold();
+    // Owner plan section 16: a double is juggled only once its phase is verified.
+    if (standalone.verifying() && !j.isActive()) return;
     if (!j.isActive() && this.pollCount % 2 === 1) return;
     try {
       const transitioning = status === 'transitioning';
@@ -1686,10 +1708,71 @@ class DJAutoDJ {
       const userControl = j.isActive() && last !== null && Math.abs(s.crossfaderPosition - last) > 0.05 ? 'crossfader' : null;
       const performanceMode: DJPerformanceMode = this.execution?.plan.style === 'juggleTransition' && j.isActive() ? 'JUGGLE_TRANSITION'
         : transitioning ? 'NORMAL_MIX' : 'JUGGLE';
-      j.tick(this.tickInput(performanceMode, timeRemaining, userControl));
+      const input = this.tickInput(performanceMode, timeRemaining, userControl);
+      j.tick(input);
+      if (performanceMode === 'JUGGLE' && !j.isActive()) standalone.consider(status, input);
     } catch (err) {
       console.warn('[AutoDJ] juggle tick failed:', err instanceof Error ? err.message : err);
     }
+  }
+
+  // ── Stand-alone juggles (plan 2026-10-11-dj-juggling, P4.3, P4.4) ──────────
+
+  /** The stand-alone juggle layer (created with the controller); Auto DJ only lends it the idle deck. */
+  private getStandalone(): StandaloneJuggle {
+    if (!this.standaloneJuggle) {
+      this.standaloneJuggle = new StandaloneJuggle({
+        controller: () => this.getJuggle(),
+        decks: () => ({ active: this.activeDeck, idle: this.idleDeck }),
+        deckPlaying: (deck) => this.deckPlaying(deck),
+        idleDeckBusy: (status) => this.idleDeckBusy(status),
+        nextOption: (input) => this.nextOption(input),
+        loadNext: (deck) => this.loadNextForTease(deck),
+        loadDouble: async (source, target) => (await import('./DJTrackLoader')).loadDoubleToDeck(source, target),
+      });
+    }
+    return this.standaloneJuggle;
+  }
+
+  /** Hand the idle deck back now (skip, Mix Now, play-at, a transition, pause, disable: owner plan section 43). */
+  private endStandalone(outcome: string): void { this.standaloneJuggle?.end(outcome); }
+
+  /** Null when the idle deck is Auto DJ's to lend now, else why not. */
+  private idleDeckBusy(status: string): string | null {
+    if (status !== 'playing' && status !== 'transition-pending') return `waiting for Auto DJ (${status})`;
+    if (this.preloading) return 'the next track is loading';
+    if (this.execution || this.transitionCancel) return 'a transition owns the decks';
+    if (this.preloadedDeck === this.idleDeck && !this.preRenderedTrack) return 'the next track waits on the idle deck';
+    return null;
+  }
+
+  /**
+   * The pre-rendered next track as a tease candidate: compatible when the
+   * anticipated plan's tempo and key verdicts allow it, and judged as the
+   * pair that would play - the next track from its cue on the idle deck at
+   * the master's tempo, through the controller's one context builder.
+   */
+  private nextOption(input: TickInput): NextTrackOption | null {
+    if (!this.preRenderedTrack || !this.incomingAnalysis || !this.plan) return null;
+    const band = this.plan.tempoPlan.band;
+    const compatible = (band === 'none' || band === 'normal') && this.plan.keyPlan.clashRisk <= HARMONIC_CLASH_REJECT;
+    const idle = this.ab(this.idleDeck);
+    const master = input.decks[input.masterDeck];
+    const pair = this.getJuggle().buildContext({
+      ...input,
+      decks: { ...input.decks, [idle]: { trackId: this.incomingAnalysis.id, analysis: this.incomingAnalysis, positionSec: mixInPhraseStartOf(this.incomingAnalysis), playing: true, bpm: master.bpm } },
+    });
+    return { analysis: this.incomingAnalysis, compatible, pair };
+  }
+
+  /** The tease loads the pre-rendered next track now; the transition later finds it on the deck ("already loaded"). */
+  private async loadNextForTease(deck: DeckId): Promise<boolean> {
+    const pre = this.preRenderedTrack;
+    if (!pre) return false;
+    const { loadPreRenderedTrackToDeck } = await import('./DJTrackLoader');
+    const loaded = await loadPreRenderedTrackToDeck(pre.data, pre.track, deck);
+    if (loaded && this.preRenderedTrack === pre) { this.preRenderedTrack = null; this.preloadedDeck = deck; }
+    return loaded;
   }
 
   private publishTelemetry(timeRemaining: number): void {
