@@ -24,7 +24,7 @@ import type { DeckId } from './DeckEngine';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { getDJEngineIfActive } from './DJEngine';
 import type { BeatGridData } from './DJAudioCache';
-import { autoMatchOnLoad } from './DJAutoSync';
+import { autoMatchOnLoad, pitchedBpm } from './DJAutoSync';
 import type { ExtendedAnalysis } from './autodj/types';
 import { buildDJTrackAnalysis, DJ_AUDIO_ANALYSIS_VERSION } from './autodj/trackAnalysis';
 import { DemucsEngine } from '@engine/demucs/DemucsEngine';
@@ -761,15 +761,28 @@ export class DJPipeline {
     } catch (err) {
       console.warn(`[DJPipeline] DJTrackAnalysis failed for deck ${deckId}:`, err);
     }
+    // One tempo per track: the deck grid and BPM are the analysis' (the
+    // module's own timing for a tracker song whose walk matches the render),
+    // replacing the interim detectBPM / header value the load wrote.
+    const bpm = trackAnalysis?.bpm ?? analysis.bpm;
     useDJStore.getState().setDeckState(deckId, {
       analysisState: 'ready',
       trackAnalysis,
-      beatGrid: {
-        beats: analysis.beats,
-        downbeats: analysis.downbeats,
-        bpm: analysis.bpm,
-        timeSignature: analysis.timeSignature,
-      },
+      beatGrid: trackAnalysis
+        ? {
+            beats: trackAnalysis.beatGrid.beats.map((b) => b.time),
+            downbeats: trackAnalysis.downbeats.bars.map((b) => b.start),
+            bpm,
+            timeSignature: trackAnalysis.meter.beatsPerBar,
+          }
+        : {
+            beats: analysis.beats,
+            downbeats: analysis.downbeats,
+            bpm: analysis.bpm,
+            timeSignature: analysis.timeSignature,
+          },
+      detectedBPM: bpm,
+      effectiveBPM: pitchedBpm(bpm, deckState.pitchOffset),
       musicalKey: analysis.musicalKey,
       keyConfidence: analysis.keyConfidence,
       frequencyPeaks: analysis.frequencyPeaks.map(b => new Float32Array(b)),

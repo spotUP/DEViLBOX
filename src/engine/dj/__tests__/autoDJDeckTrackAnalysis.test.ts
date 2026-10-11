@@ -42,7 +42,7 @@ import { analysisFromCachedAudio, isCacheFullyAnalyzed } from '../DJPipeline';
 import type { CachedAudio } from '../DJAudioCache';
 import { corpusTrack, corpusPipelineAnalysis } from '../autodj/testing/corpus';
 import { computeExtendedAnalysis } from '../autodj/activityTimelines';
-import { DJ_ANALYSIS_VERSION } from '../autodj/trackAnalysis';
+import { DJ_ANALYSIS_VERSION, DJ_AUDIO_ANALYSIS_VERSION } from '../autodj/trackAnalysis';
 
 type Internals = {
   activeDeck: 'A' | 'B'; idleDeck: 'A' | 'B'; preloadedDeck: 'A' | 'B' | null;
@@ -126,7 +126,7 @@ describe('the incoming Auto DJ deck holds the unified DJTrackAnalysis', () => {
     expect(analysisFromCachedAudio({ ...base, analysisVersion: 1 })!.extended).toBeNull();
     const track = corpusTrack('short');
     const extended = computeExtendedAnalysis(track.pcm, track.sampleRate, { beats: track.beats });
-    const current = { ...base, analysisVersion: DJ_ANALYSIS_VERSION, extended };
+    const current = { ...base, analysisVersion: DJ_AUDIO_ANALYSIS_VERSION, extended };
     expect(isCacheFullyAnalyzed(current)).toBe(true);
     expect(analysisFromCachedAudio(current)!.extended).toBe(extended);
   });

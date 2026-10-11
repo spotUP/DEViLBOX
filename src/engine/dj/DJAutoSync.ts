@@ -389,6 +389,11 @@ export function autoMatchOnLoad(deckId: DeckId): void {
   phaseAlign(deckId, otherDeckId, 'bar');
 }
 
+/** A deck's effective BPM: its base BPM at a pitch offset in semitones, to 0.01 BPM. */
+export function pitchedBpm(baseBpm: number, semitones: number): number {
+  return Math.round(baseBpm * Math.pow(2, semitones / 12) * 100) / 100;
+}
+
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 function getBestBPM(deckState: { beatGrid: BeatGridData | null; detectedBPM: number; effectiveBPM: number }): number {

@@ -29,11 +29,11 @@ vi.mock('../DJAudioCache', async (orig) => {
   };
 });
 vi.mock('@/lib/analysisCache', () => ({ lookupServerAnalysis: async () => null, storeServerAnalysis: () => {} }));
-vi.mock('../DJAutoSync', () => ({ autoMatchOnLoad: () => {} }));
+vi.mock('../DJAutoSync', async (orig) => ({ ...(await orig<typeof import('../DJAutoSync')>()), autoMatchOnLoad: () => {} }));
 
 import { useDJStore } from '@/stores/useDJStore';
 import { DJPipeline, computeAutoTrim, type PipelineResult } from '../DJPipeline';
-import { DJ_ANALYSIS_VERSION } from '../autodj/trackAnalysis';
+import { DJ_AUDIO_ANALYSIS_VERSION } from '../autodj/trackAnalysis';
 import { DECK_LIMITER_THRESHOLD_DB } from '../djLimiter';
 
 function analysis(rmsDb: number, peakDb: number): NonNullable<PipelineResult['analysis']> {
@@ -90,7 +90,7 @@ describe('a DJ deck is not gained into the limiter', () => {
     holder.cached = {
       hash: 'hash', filename: 'track.mod', audioData: new ArrayBuffer(64), duration: 120, waveformPeaks: [0, 0], sampleRate: 44100,
       numberOfChannels: 2, timestamp: 0, sizeBytes: 64,
-      beatGrid: { beats: [0, 0.48], downbeats: [0], bpm: 125, timeSignature: 4 }, bpm: 125, analysisVersion: DJ_ANALYSIS_VERSION,
+      beatGrid: { beats: [0, 0.48], downbeats: [0], bpm: 125, timeSignature: 4 }, bpm: 125, analysisVersion: DJ_AUDIO_ANALYSIS_VERSION,
       extended: { loudness: { integratedDb: -12, shortTermMaxDb: -10, peakDb: -0.5, truePeakDb: -0.4, dynamicRangeDb: 6, crestFactorDb: 11.5 } },
     };
     await pipeline(analysis(-12, -0.5)).loadOrEnqueue(new ArrayBuffer(8), 'track.mod', 'A');

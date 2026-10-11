@@ -22,7 +22,7 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import type { DJSet } from './recording/DJSetFormat';
 import { quantizedEQKill, getQuantizeMode, quantizeAction, cancelAllAutomation } from './DJQuantizedFX';
-import { syncBPMToOther, phaseAlign, snapPositionToBeat } from './DJAutoSync';
+import { syncBPMToOther, phaseAlign, snapPositionToBeat, pitchedBpm } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
 import { existingAutoDJ } from './autoDJInstance';
 import type { DeckId, FaderLFODivision } from './DeckEngine';
@@ -892,7 +892,7 @@ export function setDeckPitch(deckId: DeckId, semitones: number): void {
   batchDJSet(`${deckId}-pitch`, (state) => {
     state.decks[deckId].pitchOffset = clamped;
     const baseBPM = state.decks[deckId].detectedBPM || 120;
-    state.decks[deckId].effectiveBPM = Math.round(baseBPM * Math.pow(2, clamped / 12) * 100) / 100;
+    state.decks[deckId].effectiveBPM = pitchedBpm(baseBPM, clamped);
   });
 }
 
