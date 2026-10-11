@@ -227,6 +227,30 @@ export function onPhraseGroup(a: DJTrackAnalysis, t: number): boolean {
   return (idx - (phrase?.startBar ?? 0)) % 4 === 0;
 }
 
+/** Is `t` a bar start on which one of the track's phrases starts (no phrases: the bar grid counted in its phrase length)? */
+export function onPhraseStart(a: DJTrackAnalysis, t: number): boolean {
+  const bars = a.downbeats.bars;
+  if (bars.length === 0) return false;
+  const tol = 0.1 * (60 / (a.bpm > 0 ? a.bpm : 125));
+  const at = bars[barIndexAt(a.downbeats, t + tol)];
+  if (Math.abs(at.start - t) > tol) return false;
+  if (a.phrases.length > 0) return a.phrases.some((p) => p.startBar === at.index);
+  return at.index % Math.max(1, a.phraseLengthBars) === 0;
+}
+
+/**
+ * Does a ladder of `tradeBars` from `start` run with the track's phrases (owner plan sections 9, 41):
+ * it starts on a phrase start and either nests inside that phrase (the phrase is a whole number of
+ * ladders) or spans whole phrases, its release landing on a phrase start - no rung straddles a phrase.
+ */
+function ladderOnPhrases(a: DJTrackAnalysis, start: number, release: number, tradeBars: number): boolean {
+  if (!onPhraseStart(a, start)) return false;
+  const phrase = phraseAt(a, start + 1e-3);
+  const phraseBars = Math.max(1, phrase?.lengthBars ?? a.phraseLengthBars);
+  if (tradeBars < phraseBars) return phraseBars % tradeBars === 0;
+  return tradeBars % phraseBars === 0 && onPhraseStart(a, release);
+}
+
 /** Is a cut at `t` inside a sung phrase of the track (vocals on both sides of it)? Owner plan section 9: never switch halfway through a vocal phrase. */
 function midVocalPhrase(a: DJTrackAnalysis, t: number, beatSec: number): boolean {
   if (!(a.vocalActivity.confidence > 0)) return false;
@@ -249,9 +273,10 @@ export interface LadderChoice { ladderBars: number[]; tradeBeats: number; mixOut
  * - the outgoing starts it on one of its phrase boundaries, with the trades
  *   plus 2 bars left, as close as possible to where an ordinary transition
  *   would hand over (`handOverSec`) - never a bare bar boundary (section 9);
- * - the incoming starts on a 4-bar group of its own phrase grid and the
- *   release lands on one (its drop when the drop sits there), so both tracks'
- *   phrases run together through every trade (sections 9, 41);
+ * - the incoming starts on one of its own phrase starts and the ladder nests
+ *   in that phrase or spans whole phrases (the release on a phrase start, its
+ *   drop when the drop sits there), so both tracks' phrases run together
+ *   through every trade (sections 9, 41);
  * - no cut falls inside a sung phrase of either deck (section 9).
  * `tradeBeats = 2 * sum(ladderBars) * beatsPerBar`. Null when none fits (reasons in `why`).
  */
@@ -286,9 +311,10 @@ export function chooseLadder(
     lands.push({ time: usable, reasons: ['no drop in reach: the ladder lands on the best mix-in'] });
     lands.push({ time: usable + tradeSec, reasons: ['the ladder trades from the incoming mix-in'] });
     for (const p of incoming.phrases) if (p.start > usable) lands.push({ time: p.start, reasons: ['the ladder lands on an incoming phrase'] });
+    for (const p of incoming.phrases) if (p.start >= usable) lands.push({ time: p.start + tradeSec, reasons: ['the ladder trades from an incoming phrase'] });
     const mixIn = lands.find((l) => l.time - tradeSec >= -1e-6 && l.time + barSec <= incoming.durationSec
-      && onPhraseGroup(incoming, l.time) && onPhraseGroup(incoming, Math.max(0, l.time - tradeSec)));
-    if (!mixIn) { why.push(`${name} ladder: the incoming has no ${tradeBars} bars between two of its phrase groups`); continue; }
+      && ladderOnPhrases(incoming, Math.max(0, l.time - tradeSec), l.time, tradeBars));
+    if (!mixIn) { why.push(`${name} ladder: the incoming has no phrase start that ${tradeBars} bars run with`); continue; }
     const incomingPosition = Math.max(0, mixIn.time - tradeSec);
     // The outgoing: its phrase starts in the room, nearest the hand-over aim first.
     const aim = Math.max(earliest, Math.min(latest, handOverSec - (tradeBars + 1) * barSec));
