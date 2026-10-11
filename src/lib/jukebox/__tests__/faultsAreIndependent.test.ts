@@ -76,6 +76,7 @@ describe('faults are independent', () => {
 describe('reporting round trip', () => {
   const PORT = 4590 + Math.floor(Math.random() * 100);
   let child: ChildProcess;
+  const SERVER_START_MS = 60_000;
   const realFetch = globalThis.fetch;
 
   beforeAll(async () => {
@@ -83,13 +84,20 @@ describe('reporting round trip', () => {
     const state = join(dir, 'state.json');
     writeFileSync(state, JSON.stringify({ sonix: { status: 'works', patternQuality: 'full', editability: 'full' } }));
     child = spawn('npx', ['tsx', 'tools/format-server.ts', `--port=${PORT}`, `--state=${state}`], { stdio: 'pipe' });
-    for (let i = 0; i < 100; i++) {
-      try { if ((await realFetch(`http://localhost:${PORT}/get-data`)).ok) break; } catch { /* not up yet */ }
-      await new Promise((r) => setTimeout(r, 100));
+    // Wait for the server, however long `npx tsx` takes to start on a busy
+    // machine - and never run the tests without it. The old loop gave up after
+    // 10 s and went on regardless, so under the pre-push gate's load every case
+    // failed against no server with "expected [] to deeply equal [...]".
+    let up = false;
+    const deadline = Date.now() + SERVER_START_MS;
+    while (!up && Date.now() < deadline) {
+      try { up = (await realFetch(`http://localhost:${PORT}/get-data`)).ok; } catch { /* not up yet */ }
+      if (!up) await new Promise((r) => setTimeout(r, 100));
     }
+    if (!up) throw new Error(`tools/format-server.ts did not answer on port ${PORT} within ${SERVER_START_MS / 1000} s`);
     vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
       realFetch(url.replace(':4444', `:${PORT}`), init));
-  }, 20000);
+  }, SERVER_START_MS + 5000);
 
   afterAll(() => { vi.unstubAllGlobals(); child?.kill(); });
   afterEach(() => undefined);
