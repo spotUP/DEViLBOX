@@ -21,7 +21,8 @@
 
 import type { DeckScratchBuffer, RingRatePoint, RingRateCurveOptions, RingFaderWindowsOptions, RingPositionReport } from '../DeckScratchBuffer';
 import type { ScratchRecord } from './scratchCatalogue';
-import type { ScratchGesture, ScratchVelocityPoint } from './scratchTypes';
+import type { ScratchGesture, ScratchHandPath, ScratchVelocityPoint } from './scratchTypes';
+import { positionCurveToRateCurve } from './scratchAnchor';
 import { faderWindowsMs, faderRampSec, cycleMs } from './scratchFaderModel';
 
 /** The ring surface the voice uses (DeckScratchBuffer in record mode; a fake in tests). */
@@ -60,7 +61,7 @@ export interface ScratchVoiceSafetyEvent {
 }
 
 /** Reachability sentinels (SCR-P2.R2, P2.8). */
-export const scratchVoiceStats = { strokes: 0, clamps: 0, refused: 0, releases: 0 };
+export const scratchVoiceStats = { strokes: 0, clamps: 0, refused: 0, releases: 0, cues: 0 };
 
 /** Minimum safe reverse room (seconds) a reverse stroke needs behind the needle. */
 export const MIN_REVERSE_ROOM_SEC = 0.001;
@@ -168,6 +169,7 @@ export class ScratchRecordVoice {
   /** Drop the needle (section 18 true re-cue), now or at context time `when`. Returns the position used. */
   cue(at: ScratchCue, when?: number): number {
     const sec = this.resolveCue(at);
+    scratchVoiceStats.cues++;
     this.cuePosition = sec;
     this.position = sec;
     this.ring.seek(sec, when);
@@ -180,11 +182,42 @@ export class ScratchRecordVoice {
    * refused; a path that leaves `safe` is logged as a clamp (the ring holds).
    */
   stroke(curve: readonly ScratchVelocityPoint[], durationSec: number, opts: StrokeOptions = {}): StrokeResult {
-    const r = this.record;
-    if (!r) return { ok: false, reason: 'no record loaded' };
+    if (!this.record) return { ok: false, reason: 'no record loaded' };
     if (curve.length === 0 || durationSec <= 0) return { ok: false, reason: 'empty stroke' };
     const interpolate = opts.interpolate ?? false;
     const ex = predictExcursion(curve, durationSec, interpolate);
+    const points = velocityCurveToRatePoints(curve, durationSec, this.ring.sampleRate, { loop: opts.loop });
+    return this.launch(ex, points, durationSec, interpolate, opts);
+  }
+
+  /**
+   * The position-driven stroke (section 17, D5): a hand path in stroke units
+   * becomes a rate curve by `positionCurveToRateCurve` (rate = d(position)/dt,
+   * smoothed at reversals, clamped at +-4 and reported), then runs through the
+   * same safety checks and the same ring message as `stroke`.
+   */
+  strokePath(handPath: ScratchHandPath, durationSec: number, opts: StrokeOptions = {}): StrokeResult & { requestedPeak?: number } {
+    if (!this.record) return { ok: false, reason: 'no record loaded' };
+    if (handPath.length === 0 || durationSec <= 0) return { ok: false, reason: 'empty stroke' };
+    const sr = this.ring.sampleRate;
+    const conv = positionCurveToRateCurve(handPath, durationSec, sr);
+    // excursion in seconds of record from the held rates
+    let pos = 0, min = 0, max = 0;
+    for (let i = 0; i < conv.points.length; i++) {
+      const end = i + 1 < conv.points.length ? conv.points[i + 1]!.t : durationSec;
+      pos += conv.points[i]!.rate * (end - conv.points[i]!.t);
+      min = Math.min(min, pos); max = Math.max(max, pos);
+    }
+    const cycleFrames = Math.max(1, Math.round(durationSec * sr));
+    const points: RingRatePoint[] = conv.points.map((p) => ({ frame: Math.round(p.t * sr), rate: p.rate }));
+    points.push({ frame: cycleFrames, rate: opts.loop ? (conv.points[0]?.rate ?? 0) : 0 });
+    const res = this.launch({ min, max, end: pos }, points, durationSec, false, opts);
+    return { ...res, requestedPeak: conv.requestedPeak };
+  }
+
+  /** Safety checks (section 11) and the ring message shared by both stroke kinds. */
+  private launch(ex: { min: number; max: number; end: number }, points: RingRatePoint[], durationSec: number, interpolate: boolean, opts: StrokeOptions): StrokeResult {
+    const r = this.record!;
     const start = this.cuePosition;
     const goesBackward = ex.min < -1e-9;
     if (goesBackward && start - r.safeReverse[0] < MIN_REVERSE_ROOM_SEC) {
@@ -200,12 +233,10 @@ export class ScratchRecordVoice {
       clamped = true;
       this.log('clampReverse', `stroke would reach ${(start + ex.min).toFixed(3)} s before safeReverse[0] ${r.safeReverse[0].toFixed(3)} s`);
     }
-    const sr = this.ring.sampleRate;
-    const points = velocityCurveToRatePoints(curve, durationSec, sr, { loop: opts.loop });
     const ringOpts: RingRateCurveOptions = {
       interpolate,
       loop: !!opts.loop,
-      cycleFrames: Math.max(1, Math.round(durationSec * sr)),
+      cycleFrames: Math.max(1, Math.round(durationSec * this.ring.sampleRate)),
       returnToAnchor: !!opts.returnToAnchor,
     };
     this.ring.rateCurve(points, ringOpts, opts.at);
@@ -238,7 +269,7 @@ export class ScratchRecordVoice {
    * `drop` alone). Throws cue the attack and ride forward with the fader
    * open; hand gestures cue the vowel and loop with a return to the anchor.
    */
-  playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number } = {}): StrokeResult {
+  playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number; drive?: 'velocity' | 'hand' } = {}): StrokeResult {
     const r = this.record;
     if (!r) return { ok: false, reason: 'no record loaded' };
     const isThrow = gesture.id === 'drop' || gesture.id === 'dropPhrase';
@@ -254,12 +285,16 @@ export class ScratchRecordVoice {
     } else {
       this.fader(gesture, bpm, { loop: gesture.loop, velocity: opts.velocity, at: opts.at });
     }
-    return this.stroke(gesture.velocityCurve, durationSec, {
+    const strokeOpts: StrokeOptions = {
       loop: gesture.loop,
       returnToAnchor: gesture.loop && gesture.returnsToAnchor,
       interpolate: gesture.interpolateVelocity,
       at: opts.at,
-    });
+    };
+    // `drive: 'hand'` performs the gesture's hand path (section 17, D5); the default keeps the
+    // tuned velocity keyframes the owner has heard (the hand path's reference strokes are small).
+    if (opts.drive === 'hand' && gesture.handPath && !isThrow) return this.strokePath(gesture.handPath, durationSec, strokeOpts);
+    return this.stroke(gesture.velocityCurve, durationSec, strokeOpts);
   }
 
   /** Silence within the ring's 3 ms gain ramp, worklet stopped, voice free; now or at context time `at`. */

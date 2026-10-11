@@ -127,7 +127,13 @@ export interface ScratchAnchor {
 export interface DeckScratchAnchor {
   position: number;
   safe: readonly [number, number];
+  /** Beat of the deck's grid the anchor sits on (P3.1). */
+  beat?: number;
+  kind?: DeckAnchorKind;
 }
+
+/** What the deck anchor marks (section 84). */
+export type DeckAnchorKind = 'downbeat' | 'snare' | 'vocalOnset' | 'hit';
 
 /** Section 84 source model. */
 export type ScratchSource =
