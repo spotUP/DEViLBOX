@@ -15,6 +15,7 @@
  */
 
 import * as Tone from 'tone';
+import { contextNow, stopPlayerNow } from './stopPlayerNow';
 import type { StemResult } from '../demucs/types';
 
 interface StemSlot {
@@ -192,14 +193,12 @@ export class DeckStemPlayer {
     this.onRunningChange?.();
   }
 
+  /** Pause now (see stopPlayerNow); the paused position is where the audio stopped. */
   pause(): void {
     if (!this._loaded) return;
-    this._pendingOffset = this.getPosition();
+    this._pendingOffset = this._positionAt(contextNow());
     for (const { player } of this.stems.values()) {
-      if (player.state === 'started') {
-        player.fadeOut = 0.01;
-        player.stop();
-      }
+      if (player.state === 'started') stopPlayerNow(player);
     }
     this._rateTrackingActive = false;
     this.onRunningChange?.();
@@ -207,10 +206,7 @@ export class DeckStemPlayer {
 
   stop(): void {
     for (const { player } of this.stems.values()) {
-      if (player.state === 'started') {
-        player.fadeOut = 0.01;
-        player.stop();
-      }
+      if (player.state === 'started') stopPlayerNow(player);
     }
     this._pendingOffset = null;
     this._rateTrackingActive = false;
@@ -296,12 +292,16 @@ export class DeckStemPlayer {
 
   /** Get current position using rate-change checkpoint tracking. */
   getPosition(): number {
+    return this._positionAt(Tone.now());
+  }
+
+  /** Playback position at context time `now` (never before the last start). */
+  private _positionAt(now: number): number {
     if (!this._loaded) return 0;
     if (this._pendingOffset !== null) return this._pendingOffset;
 
     if (this._rateTrackingActive && this.isPlaying()) {
-      const now = Tone.now();
-      const elapsed = (now - this._rateChangeTime) * this._playbackRate;
+      const elapsed = Math.max(0, now - this._rateChangeTime) * this._playbackRate;
       const raw = this._rateChangePos + elapsed;
       return this._duration > 0 ? ((raw % this._duration) + this._duration) % this._duration : 0;
     }
