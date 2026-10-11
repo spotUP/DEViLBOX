@@ -20,7 +20,7 @@
  */
 
 import { barSeed, lfsr, type ScratchRandom } from './scratchRandom';
-import { getGesture, isScratchGestureId, SCRATCH_GESTURES } from './scratchGestureCatalog';
+import { getGesture, gestureBeats, isScratchGestureId, SCRATCH_GESTURES } from './scratchGestureCatalog';
 import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
 import { DEFAULT_GRID, stepToBeat, STEPS_PER_BEAT, type ScratchGrid } from './scratchAnchor';
 import type { ScratchDJStyle, ScratchGestureId, ScratchRole } from './scratchTypes';
@@ -74,8 +74,12 @@ export function sectionDensity(style: ScratchDJStyle, section: ScratchSection | 
   return DENSITY_ORDER[Math.max(0, Math.min(DENSITY_ORDER.length - 1, i))]!;
 }
 
-/** Preferred grid steps (reference `_STEPS`; 16 clamped to 15). */
-export const PREFERRED_STEPS: readonly number[] = [15, 15, 8, 7, 6, 0];
+/**
+ * Preferred grid steps (reference `_STEPS = [15, 16 - 1, 8, 7, 6, 0]`). The reference clamps its
+ * 16 to 15 and so plans two gestures on one step; 16 is the next bar's downbeat, outside the bar:
+ * it is drawn (the random stream stays the reference's) and never placed (audit SA-B1).
+ */
+export const PREFERRED_STEPS: readonly number[] = [15, 16, 8, 7, 6, 0];
 /** Phrase-end bars of a 16-bar phrase carry most of the scratching. */
 export const PHRASE_END_BARS: readonly number[] = [3, 7, 15];
 /** Never more than this many gestures in a bar (section 30). */
@@ -160,6 +164,41 @@ export function pickGesture(vocab: readonly ScratchGestureId[], energy: number, 
   return band[Math.min(band.length - 1, Math.trunc(rnd() * band.length))]!;
 }
 
+// ─── One hand (sections 8, 21, 83; audit SA-B1) ──────────────────────────
+
+/** Where a placed gesture ends, in beats: its start plus its one length (`gestureBeats`). */
+export const placedEnd = (e: Pick<PlacedScratch, 'beat' | 'gesture'>): number => e.beat + gestureBeats(e.gesture);
+
+/** One hand on one record performs one gesture at a time: does `e` start before `other` ends (or vice versa)? */
+export function overlapsOneHand(a: Pick<PlacedScratch, 'beat' | 'gesture'>, b: Pick<PlacedScratch, 'beat' | 'gesture'>): boolean {
+  return a.beat < placedEnd(b) - 1e-9 && b.beat < placedEnd(a) - 1e-9;
+}
+
+/** Pairs of events that overlap (validation). */
+export function oneHandConflicts(events: readonly PlacedScratch[]): number {
+  const sorted = [...events].sort((x, y) => x.beat - y.beat);
+  let n = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length && sorted[j]!.beat < placedEnd(sorted[i]!) - 1e-9; j++) n++;
+  }
+  return n;
+}
+
+/**
+ * The events one hand can perform, in time order: an event starts only after the one before it
+ * ends; a later event that would start inside a sounding gesture is dropped (the sounding one has
+ * the record). Priority inside a bar is the placement's own (`planPhrase`); across bars, time.
+ */
+export function oneHand<T extends Pick<PlacedScratch, 'beat' | 'gesture'>>(events: readonly T[]): T[] {
+  const out: T[] = [];
+  for (const e of [...events].sort((x, y) => x.beat - y.beat)) {
+    const last = out[out.length - 1];
+    if (last && e.beat < placedEnd(last) - 1e-9) continue;
+    out.push(e);
+  }
+  return out;
+}
+
 // ─── One bar (section 21) ────────────────────────────────────────────────
 
 export interface PlacedScratch {
@@ -188,6 +227,9 @@ export interface PlanPhraseInput {
   scale?: number;
   /** Replaces the resolved phrases-per-bar rate. */
   rateOverride?: number;
+  /** Replaces the section's density state (the planner's mode-capped state, SA-M6): the
+   *  showcase multipliers and rest window follow the state actually played. */
+  density?: DensityState;
   planVel?: Partial<typeof PLAN_VEL>;
   gestureCount?: number;
   beatsPerBar?: number;
@@ -202,11 +244,14 @@ export function expectedPerBar(density: DensityState, rate: number, phraseEnd: b
 /**
  * The reference `plan_phrase` for one bar: k scratches (floor + fractional-probability
  * rounding, at most 4) on the preferred steps, each a gesture picked by energy and role.
- * Most bars stay silent.
+ * Most bars stay silent. Of the reference's k, only what one hand can perform is placed
+ * (SA-B1): the reference's step 16 is outside the bar, and a candidate that would start
+ * inside (or run into) an already placed gesture is dropped, in the reference's priority
+ * order (turnaround, answer, accent). The draws are the reference's either way.
  */
 export function planPhrase(input: PlanPhraseInput): PlacedScratch[] {
   const pv = { ...PLAN_VEL, ...input.planVel };
-  const density = sectionDensity(input.style, input.section, input.scale);
+  const density = input.density ?? sectionDensity(input.style, input.section, input.scale);
   let rate = DENSITY_RATE[density];
   if (input.rateOverride !== undefined) rate = input.rateOverride;
   if (rate <= 0) return [];
@@ -223,18 +268,23 @@ export function planPhrase(input: PlanPhraseInput): PlacedScratch[] {
   const beatsPerBar = input.beatsPerBar ?? 4;
   const grid = input.grid ?? DEFAULT_GRID;
   const placed: PlacedScratch[] = [];
+  const perBar = stepsPerBar(grid, beatsPerBar);
   let last: ScratchGestureId | null = null;
-  for (const raw of PREFERRED_STEPS) {
-    if (placed.length >= k) break;
-    const placementRole = roleForStep(raw);
+  let drawn = 0;
+  for (const step of PREFERRED_STEPS) {
+    if (drawn >= k) break;
+    drawn++;
+    const placementRole = roleForStep(step);
     const g = pickGesture(vocab, phraseEnd ? Math.min(1.0, energy + 0.15) : energy, placementRole, rnd, last);
     last = g;
     const vel = pv.base + pv.rand * rnd() + pv.energy * energy;
-    const step = Math.min(raw, 15);
-    placed.push({
+    if (step >= perBar) continue; // the reference's 16: the next bar's downbeat, not this bar
+    const e: PlacedScratch = {
       bar: input.bar, step, beat: stepToBeat({ bar: input.bar, step }, grid, beatsPerBar), gesture: g,
       velocity: Math.min(1.0, vel), placementRole, role: SCRATCH_ROLE_OF[placementRole],
-    });
+    };
+    if (placed.some((p) => overlapsOneHand(p, e))) continue;
+    placed.push(e);
   }
   return placed;
 }
@@ -265,19 +315,26 @@ export function validatePhrase(placed: readonly (readonly PlacedScratch[])[], _b
   if (perBar.some((c) => c > MAX_PER_BAR)) issues.push('too busy (>4 gestures/bar)');
   const gestures = placed.flat().map((p) => p.gesture);
   if (gestures.length > 3 && new Set(gestures).size === 1) issues.push('every scratch uses the same gesture (s.30)');
+  const conflicts = oneHandConflicts(placed.flat());
+  if (conflicts) issues.push(`${conflicts} gesture(s) start before the one before ends (one hand, s.21)`);
   return issues;
 }
 
-/** Auto-repair (s.31): a bar over 4 keeps its first event; when every bar is busy the odd bars are emptied. */
+/**
+ * Auto-repair (s.31): a bar over 4 keeps its first event; when every bar is busy the odd bars are
+ * emptied; what one hand cannot perform is dropped (a later gesture inside a sounding one, SA-B1).
+ */
 export function repairPhrase(placed: readonly (readonly PlacedScratch[])[], keep: ReadonlySet<number> = new Set()): PlacedScratch[][] {
   if (!placed.some((p) => p.length)) return placed.map((p) => [...p]);
   const everyBusy = placed.every((x) => x.length > 0);
-  return placed.map((p, i) => {
+  const repaired = placed.map((p, i) => {
     let bar = [...p];
     if (bar.length > MAX_PER_BAR) bar = bar.slice(0, 1);
     if (i % 2 === 1 && everyBusy && !keep.has(i)) bar = [];
     return bar;
   });
+  const performable = new Set(oneHand(repaired.flat()));
+  return repaired.map((bar) => bar.filter((e) => performable.has(e)));
 }
 
 // ─── Humanize (section 35) ───────────────────────────────────────────────
@@ -321,6 +378,13 @@ export interface PlanBarsInput extends Omit<PlanPhraseInput, 'bar'> {
   transitionRisk?: number;
   /** Palette rest multiplier (section 32 `restScale`) x genre. */
   restScale?: number;
+  /**
+   * Bars whose events are already decided (a named routine, section 37), by bar index: they
+   * replace `planPhrase` for that bar and then take the same vocal rule, one-hand rule, open
+   * space and repair as any planned bar; only the drawn rest skips them (a routine is a
+   * deliberate choice, not a density draw). SA-M6.
+   */
+  fixedBars?: ReadonlyMap<number, readonly PlacedScratch[]>;
 }
 
 export interface PlanBarsResult {
@@ -330,7 +394,8 @@ export interface PlanBarsResult {
   issues: string[];
 }
 
-const VOCAL_BUSY = 0.7;
+/** A bar with more vocal than this is the vocal's (section 24). */
+export const VOCAL_BUSY = 0.7;
 
 function barRoleOf(events: readonly PlacedScratch[], explicit?: ScratchRole): ScratchRole {
   if (explicit) return explicit;
@@ -349,7 +414,7 @@ export function planBars(input: PlanBarsInput): PlanBarsResult {
   const { fromBar, count, vocalByBar, barRole } = input;
   const rests: PlannedRest[] = [];
   const bars: PlacedScratch[][] = [];
-  const density = sectionDensity(input.style, input.section, input.scale);
+  const density = input.density ?? sectionDensity(input.style, input.section, input.scale);
   const showcase = density === 'showcase';
   const restScale = input.restScale ?? SCRATCH_STYLES[input.style].restScale;
   const vocalAt = (i: number): number => vocalByBar?.[i] ?? 0;
@@ -358,7 +423,8 @@ export function planBars(input: PlanBarsInput): PlanBarsResult {
     const vocal = vocalAt(i);
     const baseRate = input.rateOverride ?? DENSITY_RATE[density];
     const energy = input.energyByBar?.[i] ?? input.energy;
-    let events = planPhrase({ ...input, bar, energy, rateOverride: baseRate * (1 - Math.max(0, Math.min(1, vocal))) });
+    const fixed = input.fixedBars?.get(bar);
+    let events = fixed ? [...fixed] : planPhrase({ ...input, bar, energy, density, rateOverride: baseRate * (1 - Math.max(0, Math.min(1, vocal))) });
     // a vocal call just ended: answer it (section 24)
     const afterCall = i > 0 && vocalAt(i - 1) > VOCAL_BUSY && vocal <= VOCAL_BUSY;
     if (afterCall && !events.some((e) => e.role === 'ANSWER') && baseRate > 0) {
@@ -374,7 +440,7 @@ export function planBars(input: PlanBarsInput): PlanBarsResult {
       events = answers.length ? answers.slice(0, 2) : events.slice(0, 1);
     }
     // a deliberate rest (section 23)
-    if (events.length && !afterCall) {
+    if (events.length && !afterCall && !fixed) {
       const role = barRoleOf(events, barRole);
       const rnd = lfsr(barSeed(input.seed, bar, input.section) + 0x51);
       if (rnd() < Math.min(0.95, restProbability(role, { transitionRisk: input.transitionRisk }) * restScale)) {
@@ -384,6 +450,11 @@ export function planBars(input: PlanBarsInput): PlanBarsResult {
     }
     bars.push(events);
   }
+  // one hand across bar lines: a turnaround that runs into the next bar keeps the record (SA-B1)
+  {
+    const performable = new Set(oneHand(bars.flat()));
+    for (let i = 0; i < bars.length; i++) bars[i] = bars[i]!.filter((e) => performable.has(e));
+  }
   // open space: a quarter of every 16 bars stays empty, an eighth in a showcase (section 74)
   {
     const win = showcase ? 32 : 16;
@@ -392,9 +463,11 @@ export function planBars(input: PlanBarsInput): PlanBarsResult {
       // a showcase still keeps genuine rests: at least 4 of 32 bars (section 74)
       const need = Math.ceil((end - w) * (showcase ? 0.125 : 0.25));
       let empty = bars.slice(w, end).filter((b) => b.length === 0).length;
-      // empty the least important busy bars first: mid-phrase bars, then the earliest
+      // empty the least important busy bars first: mid-phrase bars, then the earliest; a routine
+      // bar and a phrase end go last
+      const late = (k: number): number => Number(PHRASE_END_BARS.includes((fromBar + k) % 16) || !!input.fixedBars?.has(fromBar + k));
       const busy = [...Array(end - w).keys()].map((k) => w + k).filter((k) => bars[k]!.length > 0)
-        .sort((a, b) => Number(PHRASE_END_BARS.includes((fromBar + a) % 16)) - Number(PHRASE_END_BARS.includes((fromBar + b) % 16)) || a - b);
+        .sort((a, b) => late(a) - late(b) || a - b);
       for (const k of busy) {
         if (empty >= need) break;
         rests.push({ bar: fromBar + k, reason: 'open-space', role: barRoleOf(bars[k]!, barRole) });
@@ -404,8 +477,8 @@ export function planBars(input: PlanBarsInput): PlanBarsResult {
     }
   }
   const issues = validatePhrase(bars, count);
-  // the answer to a vocal call is not thinned away
-  const answers = new Set(bars.flatMap((b, k) => (b.some((e) => e.role === 'ANSWER') && vocalAt(k - 1) > VOCAL_BUSY ? [k] : [])));
+  // the answer to a vocal call and a routine are not thinned away
+  const answers = new Set(bars.flatMap((b, k) => ((b.some((e) => e.role === 'ANSWER') && vocalAt(k - 1) > VOCAL_BUSY) || input.fixedBars?.has(fromBar + k) ? [k] : [])));
   const repaired = issues.length ? repairPhrase(bars, answers) : bars;
   return { bars: repaired, rests, issues };
 }

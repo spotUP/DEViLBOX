@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import planFixture from './fixtures/plan_phrase.json';
 import {
   sectionDensity, DENSITY_RATE, vocabulary, pickGesture, planVocabulary, planPhrase, planBars, validatePhrase, repairPhrase,
-  humanizeMs, restProbability, effortKey, withThrow, pyRound, type PlacedScratch, type ScratchSection,
+  humanizeMs, restProbability, effortKey, withThrow, pyRound, overlapsOneHand, type PlacedScratch, type ScratchSection,
 } from '../scratchPlacement';
 import { lfsr } from '../scratchRandom';
 import { getGesture } from '../scratchGestureCatalog';
@@ -74,8 +74,18 @@ describe('planPhrase equals the Python reference (section 21, SCR-P4.5)', () => 
         ({ veryLow: 'veryLow', very_low: 'veryLow' } as Record<string, string>)[c.density] ?? c.density);
       c.plan.forEach((bar, i) => {
         const got = planPhrase({ style: c.style as ScratchDJStyle, section: c.section, bar: i, bars: c.bars, seed: c.seed, gestures: c.gestures as ScratchGestureId[] });
+        // the reference output, minus what one hand cannot play (SA-B1): its second step-15 entry
+        // is its clamped 16 (the next bar's downbeat), and a gesture that would start inside a
+        // placed one is dropped in the reference's priority order
+        const kept: Array<(typeof bar)[number]> = [];
+        bar.forEach((x, k) => {
+          if (k === 1 && x[0] === 15 && bar[0]![0] === 15) return;
+          const e = { beat: (x[0] as number) / 4, gesture: x[1] as ScratchGestureId };
+          if (kept.some((y) => overlapsOneHand({ beat: (y[0] as number) / 4, gesture: y[1] as ScratchGestureId }, e))) return;
+          kept.push(x);
+        });
         expect(got.map((g) => [g.step, g.gesture, g.velocity, g.placementRole]).map(([s, g, v, r]) => [s, g, Math.round((v as number) * 1e12), r]))
-          .toEqual(bar.map(([s, g, v, r]) => [s, g, Math.round((v as number) * 1e12), r]));
+          .toEqual(kept.map(([s, g, v, r]) => [s, g, Math.round((v as number) * 1e12), r]));
       });
     });
   }
@@ -195,6 +205,17 @@ describe('vocal awareness (section 24, SCR-P4.9)', () => {
         if (answers.length === 0) expect(bar.length).toBeLessThanOrEqual(1);
       }
     }
+  });
+
+  it('a busy bar under a 0.9 vocal is cut to one event, an answer bar keeps its answers (bars the vocal rate cannot thin, SA-M5)', () => {
+    const answer = (bar: number, step: number): PlacedScratch => ({ ...ev(bar, step, 'chirp'), placementRole: 'answer', role: 'ANSWER' });
+    const fixedBars = new Map<number, PlacedScratch[]>([
+      [1, [ev(1, 0, 'chirp'), ev(1, 4, 'chirp'), ev(1, 8, 'laser')]],
+      [2, [answer(2, 0), ev(2, 4, 'laser'), answer(2, 8)]],
+    ]);
+    const r = planBars({ ...base, seed: 1, fromBar: 0, count: 4, vocalByBar: Array(4).fill(0.9), fixedBars });
+    expect(r.bars[1]!.map((e) => e.step)).toEqual([0]);
+    expect(r.bars[2]!.map((e) => e.role)).toEqual(['ANSWER', 'ANSWER']);
   });
 
   it('density follows the vocal: a bar at 0.9 plans far fewer events than a bar at 0', () => {
