@@ -3,17 +3,18 @@
  *
  * In tracker modules the tempo is two numbers set by Fxx (the S3M / IT
  * importers normalise A / T to Fxx): F01-F1F speed (ticks per row) and
- * F20-FFF tick tempo. At 4 rows a beat the musical BPM is 6 * tempo / speed,
- * so speed 3 / tempo 125 plays 250 BPM and speed 12 / tempo 125 plays 62.5.
+ * F20-FFF tick tempo. The musical BPM also needs the rows per beat, which
+ * the speed alone does not give: songRowsPerBeat reads it from the song (the
+ * 24-ticks-a-beat convention, corrected by the drums' backbeat).
  *
  * Strategy: walk the order list as the replayer plays it (the same walk the
- * module beat grid uses) and take the speed / tempo pair the song spends the
- * most time at.
+ * module beat grid uses), take the speed / tempo pair the song spends the
+ * most time at, and the song's rows per beat.
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { timeOrderPositions } from './autodj/trackerMixAnalysis';
-import { musicalBpm } from './autodj/moduleBeatGrid';
+import { musicalBpm, dominantTempo, songRowsPerBeat } from './autodj/moduleBeatGrid';
 
 export interface BPMDetectionResult {
   bpm: number;
@@ -23,15 +24,14 @@ export interface BPMDetectionResult {
 
 /**
  * Detect the primary musical BPM of a tracker song: the speed / tempo pair it
- * plays longest, at 4 rows a beat.
+ * plays longest, at the song's own rows per beat.
  */
 export function detectBPM(song: TrackerSong): BPMDetectionResult {
-  const { tempoSeconds, tempoCommands } = timeOrderPositions(song);
-  let dominant: { speed: number; bpm: number; seconds: number } | null = null;
-  for (const e of tempoSeconds) if (!dominant || e.seconds > dominant.seconds) dominant = e;
-  const speed = dominant?.speed ?? (song.initialSpeed > 0 ? song.initialSpeed : 6);
-  const tempo = dominant?.bpm ?? (song.initialBPM > 0 ? song.initialBPM : 125);
-  const bpm = Math.round(musicalBpm(speed, tempo) * 100) / 100;
+  const walk = timeOrderPositions(song);
+  const { tempoCommands } = walk;
+  const { speed, bpm: tempo } = dominantTempo(song, walk);
+  const { rowsPerBeat } = songRowsPerBeat(song, walk);
+  const bpm = Math.round(musicalBpm(speed, tempo, rowsPerBeat) * 100) / 100;
 
   if (tempoCommands > 0) {
     return { bpm, confidence: 'exact', source: `Fxx speed ${speed} / tempo ${tempo} (${tempoCommands} speed/tempo commands)` };
