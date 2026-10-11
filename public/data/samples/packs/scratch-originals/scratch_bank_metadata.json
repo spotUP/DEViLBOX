@@ -1,0 +1,2592 @@
+{
+  "ONE": {
+    "filename": "1.wav",
+    "canonical_name": "ONE",
+    "literal_phrase": "1",
+    "category": "COUNT",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "intro",
+      "count",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "old_school",
+      "electro"
+    ],
+    "duration_ms": 434.9,
+    "centroid": 1519.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 5,
+    "onset_rate": 11.5,
+    "pitch_flip_rate": 55.2,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 3300,
+    "anchor_tail": 8459,
+    "safe": [
+      289,
+      8459
+    ],
+    "safe_forward": [
+      3300,
+      8459
+    ],
+    "safe_reverse": [
+      289,
+      3300
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_024.wav"
+  },
+  "TWO": {
+    "filename": "2.wav",
+    "canonical_name": "TWO",
+    "literal_phrase": "2",
+    "category": "COUNT",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "intro",
+      "count",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "old_school",
+      "electro"
+    ],
+    "duration_ms": 721.8,
+    "centroid": 2062.0,
+    "voiced_amount": 0.9,
+    "noise_amount": 0.1,
+    "transient_count": 4,
+    "onset_rate": 5.5,
+    "pitch_flip_rate": 44.3,
+    "pre_scratched": false,
+    "anchor_attack": 1320,
+    "anchor_vowel": 1980,
+    "anchor_tail": 14353,
+    "safe": [
+      797,
+      14353
+    ],
+    "safe_forward": [
+      1980,
+      14353
+    ],
+    "safe_reverse": [
+      797,
+      1980
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_025.wav"
+  },
+  "THREE_TWO_ONE": {
+    "filename": "3-2-1.wav",
+    "canonical_name": "THREE_TWO_ONE",
+    "literal_phrase": "3 2 1",
+    "category": "COUNT",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "intro",
+      "count",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "old_school",
+      "electro"
+    ],
+    "duration_ms": 1816.3,
+    "centroid": 1819.0,
+    "voiced_amount": 0.97,
+    "noise_amount": 0.03,
+    "transient_count": 14,
+    "onset_rate": 7.7,
+    "pitch_flip_rate": 45.7,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 33880,
+    "anchor_tail": 38761,
+    "safe": [
+      87,
+      38761
+    ],
+    "safe_forward": [
+      33880,
+      38761
+    ],
+    "safe_reverse": [
+      87,
+      33880
+    ],
+    "word_slices": [
+      {
+        "name": "3",
+        "start": 143,
+        "end": 3072,
+        "vowel": 1683
+      },
+      {
+        "name": "2",
+        "start": 3072,
+        "end": 31232,
+        "vowel": 16052
+      },
+      {
+        "name": "1",
+        "start": 31232,
+        "end": 37864,
+        "vowel": 33872
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_010.wav"
+  },
+  "THREE": {
+    "filename": "3.wav",
+    "canonical_name": "THREE",
+    "literal_phrase": "3",
+    "category": "COUNT",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "intro",
+      "count",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "old_school",
+      "electro"
+    ],
+    "duration_ms": 697.3,
+    "centroid": 1866.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 6,
+    "onset_rate": 8.6,
+    "pitch_flip_rate": 53.1,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 1980,
+    "anchor_tail": 14876,
+    "safe": [
+      55,
+      14876
+    ],
+    "safe_forward": [
+      1980,
+      14876
+    ],
+    "safe_reverse": [
+      55,
+      1980
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_026.wav"
+  },
+  "A_YEAH": {
+    "filename": "a-yeah.wav",
+    "canonical_name": "A_YEAH",
+    "literal_phrase": "a yeah",
+    "category": "YEAH_RESPONSE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "forward_stab",
+      "chirp",
+      "drag"
+    ],
+    "recommended_roles": [
+      "answer",
+      "hook",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 922.4,
+    "centroid": 2210.0,
+    "voiced_amount": 0.91,
+    "noise_amount": 0.09,
+    "transient_count": 17,
+    "onset_rate": 18.4,
+    "pitch_flip_rate": 56.4,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 16060,
+    "anchor_tail": 20059,
+    "safe": [
+      43,
+      20059
+    ],
+    "safe_forward": [
+      16060,
+      20059
+    ],
+    "safe_reverse": [
+      43,
+      16060
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_050.wav"
+  },
+  "AH_ALT_3": {
+    "filename": "aaaaah_alt3.wav",
+    "canonical_name": "AH_ALT_3",
+    "literal_phrase": "aaaaah alt3",
+    "category": "AH_VOWEL",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "chirp",
+      "flare1",
+      "orbit",
+      "tear_fwd",
+      "scribble",
+      "drag",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "hook",
+      "showcase",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "battle",
+      "lofi"
+    ],
+    "duration_ms": 892.0,
+    "centroid": 1762.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 15,
+    "onset_rate": 16.8,
+    "pitch_flip_rate": 50.4,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 3300,
+    "anchor_tail": 19400,
+    "safe": [
+      43,
+      19400
+    ],
+    "safe_forward": [
+      3300,
+      19400
+    ],
+    "safe_reverse": [
+      43,
+      3300
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_042.wav"
+  },
+  "AH_ALT_2": {
+    "filename": "aaaaah_alt_2.wav",
+    "canonical_name": "AH_ALT_2",
+    "literal_phrase": "aaaaah alt 2",
+    "category": "AH_VOWEL",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "chirp",
+      "flare1",
+      "orbit",
+      "tear_fwd",
+      "scribble",
+      "drag",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "hook",
+      "showcase",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "battle",
+      "lofi"
+    ],
+    "duration_ms": 892.0,
+    "centroid": 1762.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 15,
+    "onset_rate": 16.8,
+    "pitch_flip_rate": 50.4,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 3300,
+    "anchor_tail": 19399,
+    "safe": [
+      43,
+      19399
+    ],
+    "safe_forward": [
+      3300,
+      19399
+    ],
+    "safe_reverse": [
+      43,
+      3300
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_052.wav"
+  },
+  "AH_FRESH_FULL_PHRASE": {
+    "filename": "aaaah-fresh-that-was-fresh.wav",
+    "canonical_name": "AH_FRESH_FULL_PHRASE",
+    "literal_phrase": "aaaah fresh that was fresh",
+    "category": "FRESH",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp",
+      "transformer8",
+      "flare1"
+    ],
+    "recommended_roles": [
+      "hook",
+      "phrase_end",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "electro"
+    ],
+    "duration_ms": 2207.1,
+    "centroid": 2990.0,
+    "voiced_amount": 0.59,
+    "noise_amount": 0.41,
+    "transient_count": 31,
+    "onset_rate": 14.0,
+    "pitch_flip_rate": 49.4,
+    "pre_scratched": true,
+    "anchor_attack": 440,
+    "anchor_vowel": 1980,
+    "anchor_tail": 48353,
+    "safe": [
+      0,
+      48353
+    ],
+    "safe_forward": [
+      1980,
+      48353
+    ],
+    "safe_reverse": [
+      0,
+      1980
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_044.wav"
+  },
+  "AH_STANDARD": {
+    "filename": "aaaah.wav",
+    "canonical_name": "AH_STANDARD",
+    "literal_phrase": "aaaah",
+    "category": "AH_VOWEL",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "chirp",
+      "flare1",
+      "orbit",
+      "tear_fwd",
+      "scribble",
+      "drag",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "hook",
+      "showcase",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "battle",
+      "lofi"
+    ],
+    "duration_ms": 936.6,
+    "centroid": 1757.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 15,
+    "onset_rate": 16.0,
+    "pitch_flip_rate": 47.0,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 3300,
+    "anchor_tail": 19558,
+    "safe": [
+      26,
+      19558
+    ],
+    "safe_forward": [
+      3300,
+      19558
+    ],
+    "safe_reverse": [
+      26,
+      3300
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_001.wav"
+  },
+  "AH_ALT": {
+    "filename": "aaaah_alt.wav",
+    "canonical_name": "AH_ALT",
+    "literal_phrase": "aaaah alt",
+    "category": "AH_VOWEL",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "chirp",
+      "flare1",
+      "orbit",
+      "tear_fwd",
+      "scribble",
+      "drag",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "hook",
+      "showcase",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "battle",
+      "lofi"
+    ],
+    "duration_ms": 760.4,
+    "centroid": 2239.0,
+    "voiced_amount": 0.89,
+    "noise_amount": 0.11,
+    "transient_count": 12,
+    "onset_rate": 15.8,
+    "pitch_flip_rate": 65.8,
+    "pre_scratched": true,
+    "anchor_attack": 1760,
+    "anchor_vowel": 2860,
+    "anchor_tail": 16383,
+    "safe": [
+      44,
+      16383
+    ],
+    "safe_forward": [
+      2860,
+      16383
+    ],
+    "safe_reverse": [
+      44,
+      2860
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_009.wav"
+  },
+  "LONG_AH_YEAH": {
+    "filename": "aaah-yeah.wav",
+    "canonical_name": "LONG_AH_YEAH",
+    "literal_phrase": "aaah yeah",
+    "category": "YEAH_RESPONSE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "forward_stab",
+      "chirp",
+      "drag"
+    ],
+    "recommended_roles": [
+      "answer",
+      "hook",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 876.7,
+    "centroid": 2525.0,
+    "voiced_amount": 0.77,
+    "noise_amount": 0.23,
+    "transient_count": 14,
+    "onset_rate": 16.0,
+    "pitch_flip_rate": 45.6,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 2640,
+    "anchor_tail": 18845,
+    "safe": [
+      14,
+      18845
+    ],
+    "safe_forward": [
+      2640,
+      18845
+    ],
+    "safe_reverse": [
+      14,
+      2640
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_037.wav"
+  },
+  "ALRIGHT_STOP": {
+    "filename": "allright_stop.wav",
+    "canonical_name": "ALRIGHT_STOP",
+    "literal_phrase": "allright stop",
+    "category": "DJ_COMMAND",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "cut"
+    ],
+    "recommended_roles": [
+      "intro",
+      "transition",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 923.4,
+    "centroid": 2682.0,
+    "voiced_amount": 0.77,
+    "noise_amount": 0.23,
+    "transient_count": 10,
+    "onset_rate": 10.8,
+    "pitch_flip_rate": 36.8,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 11220,
+    "anchor_tail": 15371,
+    "safe": [
+      67,
+      15371
+    ],
+    "safe_forward": [
+      11220,
+      15371
+    ],
+    "safe_reverse": [
+      67,
+      11220
+    ],
+    "word_slices": [
+      {
+        "name": "ALLRIGHT",
+        "start": 208,
+        "end": 3328,
+        "vowel": 1088
+      },
+      {
+        "name": "STOP",
+        "start": 3328,
+        "end": 14471,
+        "vowel": 11248
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_007.wav"
+  },
+  "AH_YEAH": {
+    "filename": "ayeah.wav",
+    "canonical_name": "AH_YEAH",
+    "literal_phrase": "ayeah",
+    "category": "YEAH_RESPONSE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "forward_stab",
+      "chirp",
+      "drag"
+    ],
+    "recommended_roles": [
+      "answer",
+      "hook",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 736.2,
+    "centroid": 1705.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 14,
+    "onset_rate": 19.0,
+    "pitch_flip_rate": 40.8,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 9020,
+    "anchor_tail": 15996,
+    "safe": [
+      62,
+      15996
+    ],
+    "safe_forward": [
+      9020,
+      15996
+    ],
+    "safe_reverse": [
+      62,
+      9020
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_031.wav"
+  },
+  "BOY": {
+    "filename": "boy.wav",
+    "canonical_name": "BOY",
+    "literal_phrase": "boy",
+    "category": "SHORT_EXCLAMATION",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "answer",
+      "accent"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "old_school"
+    ],
+    "duration_ms": 449.7,
+    "centroid": 2076.0,
+    "voiced_amount": 0.98,
+    "noise_amount": 0.02,
+    "transient_count": 6,
+    "onset_rate": 13.3,
+    "pitch_flip_rate": 51.1,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 3520,
+    "anchor_tail": 8792,
+    "safe": [
+      62,
+      8792
+    ],
+    "safe_forward": [
+      3520,
+      8792
+    ],
+    "safe_reverse": [
+      62,
+      3520
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_033.wav"
+  },
+  "CHECK_THIS_OUT": {
+    "filename": "check-this-out.wav",
+    "canonical_name": "CHECK_THIS_OUT",
+    "literal_phrase": "check this out",
+    "category": "DJ_COMMAND",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "cut"
+    ],
+    "recommended_roles": [
+      "intro",
+      "transition",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 808.6,
+    "centroid": 2986.0,
+    "voiced_amount": 0.68,
+    "noise_amount": 0.32,
+    "transient_count": 7,
+    "onset_rate": 8.7,
+    "pitch_flip_rate": 40.8,
+    "pre_scratched": true,
+    "anchor_attack": 1760,
+    "anchor_vowel": 2200,
+    "anchor_tail": 17024,
+    "safe": [
+      63,
+      17024
+    ],
+    "safe_forward": [
+      2200,
+      17024
+    ],
+    "safe_reverse": [
+      63,
+      2200
+    ],
+    "word_slices": [
+      {
+        "name": "CHECK",
+        "start": 79,
+        "end": 1536,
+        "vowel": 807
+      },
+      {
+        "name": "THIS",
+        "start": 1536,
+        "end": 8960,
+        "vowel": 2196
+      },
+      {
+        "name": "OUT",
+        "start": 8960,
+        "end": 16700,
+        "vowel": 11160
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_030.wav"
+  },
+  "DO_IT_AGAIN": {
+    "filename": "do-it-again.wav",
+    "canonical_name": "DO_IT_AGAIN",
+    "literal_phrase": "do it again",
+    "category": "DJ_COMMAND",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "cut"
+    ],
+    "recommended_roles": [
+      "intro",
+      "transition",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 789.1,
+    "centroid": 2514.0,
+    "voiced_amount": 0.93,
+    "noise_amount": 0.07,
+    "transient_count": 11,
+    "onset_rate": 13.9,
+    "pitch_flip_rate": 39.3,
+    "pre_scratched": true,
+    "anchor_attack": 220,
+    "anchor_vowel": 660,
+    "anchor_tail": 16393,
+    "safe": [
+      43,
+      16393
+    ],
+    "safe_forward": [
+      660,
+      16393
+    ],
+    "safe_reverse": [
+      43,
+      660
+    ],
+    "word_slices": [
+      {
+        "name": "DO",
+        "start": 0,
+        "end": 3840,
+        "vowel": 660
+      },
+      {
+        "name": "IT",
+        "start": 3840,
+        "end": 9728,
+        "vowel": 4940
+      },
+      {
+        "name": "AGAIN",
+        "start": 9728,
+        "end": 15927,
+        "vowel": 10608
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_034.wav"
+  },
+  "EY_YO": {
+    "filename": "ey-yo.wav",
+    "canonical_name": "EY_YO",
+    "literal_phrase": "ey yo",
+    "category": "INTRO_ANNOUNCEMENT",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "drag",
+      "forward_stab"
+    ],
+    "recommended_roles": [
+      "intro",
+      "drop_cue"
+    ],
+    "recommended_styles": [
+      "electro",
+      "old_school"
+    ],
+    "duration_ms": 603.2,
+    "centroid": 3044.0,
+    "voiced_amount": 0.81,
+    "noise_amount": 0.19,
+    "transient_count": 11,
+    "onset_rate": 18.2,
+    "pitch_flip_rate": 38.1,
+    "pre_scratched": true,
+    "anchor_attack": 220,
+    "anchor_vowel": 6820,
+    "anchor_tail": 12891,
+    "safe": [
+      53,
+      12891
+    ],
+    "safe_forward": [
+      6820,
+      12891
+    ],
+    "safe_reverse": [
+      53,
+      6820
+    ],
+    "word_slices": [
+      {
+        "name": "EY",
+        "start": 0,
+        "end": 3840,
+        "vowel": 1760
+      },
+      {
+        "name": "YO",
+        "start": 3840,
+        "end": 12871,
+        "vowel": 6920
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_015.wav"
+  },
+  "FRESH_YEAH": {
+    "filename": "fresh-yeah.wav",
+    "canonical_name": "FRESH_YEAH",
+    "literal_phrase": "fresh yeah",
+    "category": "FRESH",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp",
+      "transformer8",
+      "flare1"
+    ],
+    "recommended_roles": [
+      "hook",
+      "phrase_end",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "electro"
+    ],
+    "duration_ms": 1277.3,
+    "centroid": 3584.0,
+    "voiced_amount": 0.25,
+    "noise_amount": 0.75,
+    "transient_count": 19,
+    "onset_rate": 14.9,
+    "pitch_flip_rate": 49.3,
+    "pre_scratched": true,
+    "anchor_attack": 2420,
+    "anchor_vowel": 17600,
+    "anchor_tail": 26356,
+    "safe": [
+      65,
+      26356
+    ],
+    "safe_forward": [
+      17600,
+      26356
+    ],
+    "safe_reverse": [
+      65,
+      17600
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_011.wav"
+  },
+  "FRESH_STANDARD": {
+    "filename": "fresh.wav",
+    "canonical_name": "FRESH_STANDARD",
+    "literal_phrase": "fresh",
+    "category": "FRESH",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp",
+      "transformer8",
+      "flare1"
+    ],
+    "recommended_roles": [
+      "hook",
+      "phrase_end",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "electro"
+    ],
+    "duration_ms": 967.8,
+    "centroid": 3742.0,
+    "voiced_amount": 0.08,
+    "noise_amount": 0.92,
+    "transient_count": 14,
+    "onset_rate": 14.5,
+    "pitch_flip_rate": 46.5,
+    "pre_scratched": true,
+    "anchor_attack": 3520,
+    "anchor_vowel": 4180,
+    "anchor_tail": 19177,
+    "safe": [
+      31,
+      19177
+    ],
+    "safe_forward": [
+      4180,
+      19177
+    ],
+    "safe_reverse": [
+      31,
+      4180
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_003.wav"
+  },
+  "FRESH_ALT": {
+    "filename": "fresh_alt.wav",
+    "canonical_name": "FRESH_ALT",
+    "literal_phrase": "fresh alt",
+    "category": "FRESH",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp",
+      "transformer8",
+      "flare1"
+    ],
+    "recommended_roles": [
+      "hook",
+      "phrase_end",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "electro"
+    ],
+    "duration_ms": 627.6,
+    "centroid": 3761.0,
+    "voiced_amount": 0.22,
+    "noise_amount": 0.78,
+    "transient_count": 9,
+    "onset_rate": 14.3,
+    "pitch_flip_rate": 47.8,
+    "pre_scratched": true,
+    "anchor_attack": 660,
+    "anchor_vowel": 1100,
+    "anchor_tail": 12671,
+    "safe": [
+      15,
+      12671
+    ],
+    "safe_forward": [
+      1100,
+      12671
+    ],
+    "safe_reverse": [
+      15,
+      1100
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_043.wav"
+  },
+  "FRESH_ALT_4": {
+    "filename": "fresh_alt_4.wav",
+    "canonical_name": "FRESH_ALT_4",
+    "literal_phrase": "fresh alt 4",
+    "category": "FRESH",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp",
+      "transformer8",
+      "flare1"
+    ],
+    "recommended_roles": [
+      "hook",
+      "phrase_end",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "electro"
+    ],
+    "duration_ms": 931.1,
+    "centroid": 3913.0,
+    "voiced_amount": 0.12,
+    "noise_amount": 0.88,
+    "transient_count": 11,
+    "onset_rate": 11.8,
+    "pitch_flip_rate": 41.9,
+    "pre_scratched": true,
+    "anchor_attack": 2200,
+    "anchor_vowel": 2860,
+    "anchor_tail": 16103,
+    "safe": [
+      48,
+      16103
+    ],
+    "safe_forward": [
+      2860,
+      16103
+    ],
+    "safe_reverse": [
+      48,
+      2860
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_035.wav"
+  },
+  "HE_CUT_THE_MUSIC": {
+    "filename": "he-cut-the-music-so.much-class.wav",
+    "canonical_name": "HE_CUT_THE_MUSIC",
+    "literal_phrase": "he cut the music so.much class",
+    "category": "LONG_SPECIALTY_PHRASE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "drag"
+    ],
+    "recommended_roles": [
+      "intro",
+      "specialty"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 2285.2,
+    "centroid": 2030.0,
+    "voiced_amount": 0.82,
+    "noise_amount": 0.18,
+    "transient_count": 30,
+    "onset_rate": 13.1,
+    "pitch_flip_rate": 39.8,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 6160,
+    "anchor_tail": 50218,
+    "safe": [
+      78,
+      50218
+    ],
+    "safe_forward": [
+      6160,
+      50218
+    ],
+    "safe_reverse": [
+      78,
+      6160
+    ],
+    "word_slices": [
+      {
+        "name": "HE",
+        "start": 159,
+        "end": 2816,
+        "vowel": 1039
+      },
+      {
+        "name": "CUT",
+        "start": 2816,
+        "end": 13312,
+        "vowel": 6116
+      },
+      {
+        "name": "THE",
+        "start": 13312,
+        "end": 27136,
+        "vowel": 21892
+      },
+      {
+        "name": "MUSIC",
+        "start": 27136,
+        "end": 34816,
+        "vowel": 31536
+      },
+      {
+        "name": "SO.MUCH",
+        "start": 34816,
+        "end": 43264,
+        "vowel": 37236
+      },
+      {
+        "name": "CLASS",
+        "start": 43264,
+        "end": 50151,
+        "vowel": 44804
+      }
+    ],
+    "factory_safe": false,
+    "packFile": "scratch_036.wav"
+  },
+  "HERE_WE_GO_AGAIN": {
+    "filename": "here-we-go-again.wav",
+    "canonical_name": "HERE_WE_GO_AGAIN",
+    "literal_phrase": "here we go again",
+    "category": "DJ_COMMAND",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "cut"
+    ],
+    "recommended_roles": [
+      "intro",
+      "transition",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 898.7,
+    "centroid": 1535.0,
+    "voiced_amount": 0.99,
+    "noise_amount": 0.01,
+    "transient_count": 11,
+    "onset_rate": 12.2,
+    "pitch_flip_rate": 36.7,
+    "pre_scratched": true,
+    "anchor_attack": 220,
+    "anchor_vowel": 1540,
+    "anchor_tail": 19038,
+    "safe": [
+      83,
+      19038
+    ],
+    "safe_forward": [
+      1540,
+      19038
+    ],
+    "safe_reverse": [
+      83,
+      1540
+    ],
+    "word_slices": [
+      {
+        "name": "HERE",
+        "start": 79,
+        "end": 3072,
+        "vowel": 739
+      },
+      {
+        "name": "WE",
+        "start": 3072,
+        "end": 5376,
+        "vowel": 4172
+      },
+      {
+        "name": "GO",
+        "start": 5376,
+        "end": 9472,
+        "vowel": 6916
+      },
+      {
+        "name": "AGAIN",
+        "start": 9472,
+        "end": 18808,
+        "vowel": 13212
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_017.wav"
+  },
+  "HEY_HEY": {
+    "filename": "hey-hey.wav",
+    "canonical_name": "HEY_HEY",
+    "literal_phrase": "hey hey",
+    "category": "SHORT_EXCLAMATION",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "answer",
+      "accent"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "old_school"
+    ],
+    "duration_ms": 1010.8,
+    "centroid": 2521.0,
+    "voiced_amount": 0.82,
+    "noise_amount": 0.18,
+    "transient_count": 11,
+    "onset_rate": 10.9,
+    "pitch_flip_rate": 52.4,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 2200,
+    "anchor_tail": 21764,
+    "safe": [
+      69,
+      21764
+    ],
+    "safe_forward": [
+      2200,
+      21764
+    ],
+    "safe_reverse": [
+      69,
+      2200
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_038.wav"
+  },
+  "HEY": {
+    "filename": "hey.wav",
+    "canonical_name": "HEY",
+    "literal_phrase": "hey",
+    "category": "SHORT_EXCLAMATION",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "answer",
+      "accent"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "old_school"
+    ],
+    "duration_ms": 647.1,
+    "centroid": 2136.0,
+    "voiced_amount": 0.81,
+    "noise_amount": 0.19,
+    "transient_count": 9,
+    "onset_rate": 13.9,
+    "pitch_flip_rate": 60.3,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 1100,
+    "anchor_tail": 12905,
+    "safe": [
+      80,
+      12905
+    ],
+    "safe_forward": [
+      1100,
+      12905
+    ],
+    "safe_reverse": [
+      80,
+      1100
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_046.wav"
+  },
+  "HIP_HOP": {
+    "filename": "hip-hop.wav",
+    "canonical_name": "HIP_HOP",
+    "literal_phrase": "hip hop",
+    "category": "HIP_HOP_TAG",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "hook",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 408.3,
+    "centroid": 2297.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 7,
+    "onset_rate": 17.1,
+    "pitch_flip_rate": 31.8,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 1540,
+    "anchor_tail": 8674,
+    "safe": [
+      91,
+      8674
+    ],
+    "safe_forward": [
+      1540,
+      8674
+    ],
+    "safe_reverse": [
+      91,
+      1540
+    ],
+    "word_slices": [],
+    "factory_safe": false,
+    "packFile": "scratch_019.wav"
+  },
+  "GENERIC_HIT": {
+    "filename": "hit.wav",
+    "canonical_name": "GENERIC_HIT",
+    "literal_phrase": "hit",
+    "category": "FX",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "chirp",
+      "forward_stab",
+      "transformer8",
+      "drag"
+    ],
+    "recommended_roles": [
+      "accent",
+      "transition"
+    ],
+    "recommended_styles": [
+      "electro"
+    ],
+    "duration_ms": 297.9,
+    "centroid": 3240.0,
+    "voiced_amount": 0.14,
+    "noise_amount": 0.86,
+    "transient_count": 5,
+    "onset_rate": 16.8,
+    "pitch_flip_rate": 36.9,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 440,
+    "anchor_tail": 6336,
+    "safe": [
+      48,
+      6336
+    ],
+    "safe_forward": [
+      440,
+      6336
+    ],
+    "safe_reverse": [
+      48,
+      440
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_032.wav"
+  },
+  "IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT": {
+    "filename": "if-you-really-like-to-rock-the-funky-beat.wav",
+    "canonical_name": "IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT",
+    "literal_phrase": "if you really like to rock the funky beat",
+    "category": "LONG_SPECIALTY_PHRASE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "drag"
+    ],
+    "recommended_roles": [
+      "intro",
+      "specialty"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 2442.9,
+    "centroid": 2585.0,
+    "voiced_amount": 0.81,
+    "noise_amount": 0.19,
+    "transient_count": 21,
+    "onset_rate": 8.6,
+    "pitch_flip_rate": 42.6,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 17380,
+    "anchor_tail": 53832,
+    "safe": [
+      112,
+      53832
+    ],
+    "safe_forward": [
+      17380,
+      53832
+    ],
+    "safe_reverse": [
+      112,
+      17380
+    ],
+    "word_slices": [
+      {
+        "name": "IF",
+        "start": 65,
+        "end": 8192,
+        "vowel": 505
+      },
+      {
+        "name": "YOU",
+        "start": 8192,
+        "end": 15872,
+        "vowel": 11492
+      },
+      {
+        "name": "REALLY",
+        "start": 15872,
+        "end": 22784,
+        "vowel": 17412
+      },
+      {
+        "name": "LIKE",
+        "start": 22784,
+        "end": 27648,
+        "vowel": 23664
+      },
+      {
+        "name": "TO",
+        "start": 27648,
+        "end": 30464,
+        "vowel": 28528
+      },
+      {
+        "name": "ROCK",
+        "start": 30464,
+        "end": 36096,
+        "vowel": 33324
+      },
+      {
+        "name": "THE",
+        "start": 36096,
+        "end": 46848,
+        "vowel": 44676
+      },
+      {
+        "name": "FUNKY",
+        "start": 46848,
+        "end": 49408,
+        "vowel": 48168
+      },
+      {
+        "name": "BEAT",
+        "start": 49408,
+        "end": 53679,
+        "vowel": 49628
+      }
+    ],
+    "factory_safe": false,
+    "packFile": "scratch_057.wav"
+  },
+  "LADIES_AND_GENTLEMEN": {
+    "filename": "ladies-and-gentlemen.wav",
+    "canonical_name": "LADIES_AND_GENTLEMEN",
+    "literal_phrase": "ladies and gentlemen",
+    "category": "INTRO_ANNOUNCEMENT",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "drag",
+      "forward_stab"
+    ],
+    "recommended_roles": [
+      "intro",
+      "drop_cue"
+    ],
+    "recommended_styles": [
+      "electro",
+      "old_school"
+    ],
+    "duration_ms": 1277.5,
+    "centroid": 1915.0,
+    "voiced_amount": 0.9,
+    "noise_amount": 0.1,
+    "transient_count": 8,
+    "onset_rate": 6.3,
+    "pitch_flip_rate": 39.1,
+    "pre_scratched": true,
+    "anchor_attack": 220,
+    "anchor_vowel": 15180,
+    "anchor_tail": 25836,
+    "safe": [
+      349,
+      25836
+    ],
+    "safe_forward": [
+      15180,
+      25836
+    ],
+    "safe_reverse": [
+      349,
+      15180
+    ],
+    "word_slices": [
+      {
+        "name": "LADIES",
+        "start": 504,
+        "end": 5120,
+        "vowel": 4024
+      },
+      {
+        "name": "AND",
+        "start": 5120,
+        "end": 13056,
+        "vowel": 7100
+      },
+      {
+        "name": "GENTLEMEN",
+        "start": 13056,
+        "end": 23664,
+        "vowel": 15256
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_029.wav"
+  },
+  "LASER_FX": {
+    "filename": "laser.wav",
+    "canonical_name": "LASER_FX",
+    "literal_phrase": "laser",
+    "category": "FX",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "chirp",
+      "forward_stab",
+      "transformer8",
+      "drag"
+    ],
+    "recommended_roles": [
+      "accent",
+      "transition"
+    ],
+    "recommended_styles": [
+      "electro"
+    ],
+    "duration_ms": 865.4,
+    "centroid": 4237.0,
+    "voiced_amount": 0.06,
+    "noise_amount": 0.94,
+    "transient_count": 17,
+    "onset_rate": 19.6,
+    "pitch_flip_rate": 57.8,
+    "pre_scratched": true,
+    "anchor_attack": 660,
+    "anchor_vowel": 4620,
+    "anchor_tail": 18837,
+    "safe": [
+      35,
+      18837
+    ],
+    "safe_forward": [
+      4620,
+      18837
+    ],
+    "safe_reverse": [
+      35,
+      4620
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_008.wav"
+  },
+  "NOW_LONG": {
+    "filename": "noooow.wav",
+    "canonical_name": "NOW_LONG",
+    "literal_phrase": "noooow",
+    "category": "LONG_VOWEL_OR_HYPE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "drag",
+      "transformer8",
+      "baby",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "intro",
+      "breakdown",
+      "showcase"
+    ],
+    "recommended_styles": [
+      "lofi",
+      "battle"
+    ],
+    "duration_ms": 978.1,
+    "centroid": 1756.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 17,
+    "onset_rate": 17.4,
+    "pitch_flip_rate": 45.0,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 3080,
+    "anchor_tail": 20097,
+    "safe": [
+      10,
+      20097
+    ],
+    "safe_forward": [
+      3080,
+      20097
+    ],
+    "safe_reverse": [
+      10,
+      3080
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_022.wav"
+  },
+  "OOH_LONG": {
+    "filename": "ooh.wav",
+    "canonical_name": "OOH_LONG",
+    "literal_phrase": "ooh",
+    "category": "LONG_VOWEL_OR_HYPE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "drag",
+      "transformer8",
+      "baby",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "intro",
+      "breakdown",
+      "showcase"
+    ],
+    "recommended_styles": [
+      "lofi",
+      "battle"
+    ],
+    "duration_ms": 495.9,
+    "centroid": 1956.0,
+    "voiced_amount": 0.98,
+    "noise_amount": 0.02,
+    "transient_count": 9,
+    "onset_rate": 18.1,
+    "pitch_flip_rate": 54.4,
+    "pre_scratched": true,
+    "anchor_attack": 220,
+    "anchor_vowel": 3740,
+    "anchor_tail": 10480,
+    "safe": [
+      51,
+      10480
+    ],
+    "safe_forward": [
+      3740,
+      10480
+    ],
+    "safe_reverse": [
+      51,
+      3740
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_012.wav"
+  },
+  "SAY_WHAT": {
+    "filename": "say-what.wav",
+    "canonical_name": "SAY_WHAT",
+    "literal_phrase": "say what",
+    "category": "DJ_COMMAND",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "cut"
+    ],
+    "recommended_roles": [
+      "intro",
+      "transition",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 539.1,
+    "centroid": 2001.0,
+    "voiced_amount": 0.96,
+    "noise_amount": 0.04,
+    "transient_count": 10,
+    "onset_rate": 18.5,
+    "pitch_flip_rate": 48.2,
+    "pre_scratched": true,
+    "anchor_attack": 220,
+    "anchor_vowel": 5940,
+    "anchor_tail": 11576,
+    "safe": [
+      54,
+      11576
+    ],
+    "safe_forward": [
+      5940,
+      11576
+    ],
+    "safe_reverse": [
+      54,
+      5940
+    ],
+    "word_slices": [
+      {
+        "name": "SAY",
+        "start": 0,
+        "end": 4608,
+        "vowel": 440
+      },
+      {
+        "name": "WHAT",
+        "start": 4608,
+        "end": 11525,
+        "vowel": 5928
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_018.wav"
+  },
+  "SCRATCH_005": {
+    "filename": "scratch_005.wav",
+    "canonical_name": "SCRATCH_005",
+    "literal_phrase": "scratch 005",
+    "category": "PRE_RENDERED_SCRATCH",
+    "source_is_clean": false,
+    "source_is_pre_scratched": true,
+    "recommended_gestures": [],
+    "recommended_roles": [
+      "unknown"
+    ],
+    "recommended_styles": [],
+    "duration_ms": 960.8,
+    "centroid": 1809.0,
+    "voiced_amount": 0.97,
+    "noise_amount": 0.03,
+    "transient_count": 12,
+    "onset_rate": 12.5,
+    "pitch_flip_rate": 50.0,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 8360,
+    "anchor_tail": 18249,
+    "safe": [
+      89,
+      18249
+    ],
+    "safe_forward": [
+      8360,
+      18249
+    ],
+    "safe_reverse": [
+      89,
+      8360
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_005.wav"
+  },
+  "SCRATCH_006": {
+    "filename": "scratch_006.wav",
+    "canonical_name": "SCRATCH_006",
+    "literal_phrase": "scratch 006",
+    "category": "PRE_RENDERED_SCRATCH",
+    "source_is_clean": false,
+    "source_is_pre_scratched": true,
+    "recommended_gestures": [],
+    "recommended_roles": [
+      "unknown"
+    ],
+    "recommended_styles": [],
+    "duration_ms": 571.1,
+    "centroid": 2897.0,
+    "voiced_amount": 0.54,
+    "noise_amount": 0.46,
+    "transient_count": 11,
+    "onset_rate": 19.3,
+    "pitch_flip_rate": 57.8,
+    "pre_scratched": true,
+    "anchor_attack": 2640,
+    "anchor_vowel": 5940,
+    "anchor_tail": 12305,
+    "safe": [
+      31,
+      12305
+    ],
+    "safe_forward": [
+      5940,
+      12305
+    ],
+    "safe_reverse": [
+      31,
+      5940
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_006.wav"
+  },
+  "SCRATCH_013": {
+    "filename": "scratch_013.wav",
+    "canonical_name": "SCRATCH_013",
+    "literal_phrase": "scratch 013",
+    "category": "PRE_RENDERED_SCRATCH",
+    "source_is_clean": false,
+    "source_is_pre_scratched": true,
+    "recommended_gestures": [],
+    "recommended_roles": [
+      "unknown"
+    ],
+    "recommended_styles": [],
+    "duration_ms": 621.2,
+    "centroid": 2569.0,
+    "voiced_amount": 0.49,
+    "noise_amount": 0.51,
+    "transient_count": 9,
+    "onset_rate": 14.5,
+    "pitch_flip_rate": 59.6,
+    "pre_scratched": true,
+    "anchor_attack": 5720,
+    "anchor_vowel": 7260,
+    "anchor_tail": 11827,
+    "safe": [
+      42,
+      11827
+    ],
+    "safe_forward": [
+      7260,
+      11827
+    ],
+    "safe_reverse": [
+      42,
+      7260
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_013.wav"
+  },
+  "SCRATCH_027": {
+    "filename": "scratch_027.wav",
+    "canonical_name": "SCRATCH_027",
+    "literal_phrase": "scratch 027",
+    "category": "PRE_RENDERED_SCRATCH",
+    "source_is_clean": false,
+    "source_is_pre_scratched": true,
+    "recommended_gestures": [],
+    "recommended_roles": [
+      "unknown"
+    ],
+    "recommended_styles": [],
+    "duration_ms": 1143.0,
+    "centroid": 2150.0,
+    "voiced_amount": 0.9,
+    "noise_amount": 0.1,
+    "transient_count": 11,
+    "onset_rate": 9.6,
+    "pitch_flip_rate": 56.0,
+    "pre_scratched": true,
+    "anchor_attack": 440,
+    "anchor_vowel": 3080,
+    "anchor_tail": 21947,
+    "safe": [
+      36,
+      21947
+    ],
+    "safe_forward": [
+      3080,
+      21947
+    ],
+    "safe_reverse": [
+      36,
+      3080
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_027.wav"
+  },
+  "SCRATCH_028": {
+    "filename": "scratch_028.wav",
+    "canonical_name": "SCRATCH_028",
+    "literal_phrase": "scratch 028",
+    "category": "PRE_RENDERED_SCRATCH",
+    "source_is_clean": false,
+    "source_is_pre_scratched": true,
+    "recommended_gestures": [],
+    "recommended_roles": [
+      "unknown"
+    ],
+    "recommended_styles": [],
+    "duration_ms": 632.2,
+    "centroid": 1417.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 4,
+    "onset_rate": 6.3,
+    "pitch_flip_rate": 60.1,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 4180,
+    "anchor_tail": 13684,
+    "safe": [
+      76,
+      13684
+    ],
+    "safe_forward": [
+      4180,
+      13684
+    ],
+    "safe_reverse": [
+      76,
+      4180
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_028.wav"
+  },
+  "SCRATCH_039": {
+    "filename": "scratch_039.wav",
+    "canonical_name": "SCRATCH_039",
+    "literal_phrase": "scratch 039",
+    "category": "PRE_RENDERED_SCRATCH",
+    "source_is_clean": false,
+    "source_is_pre_scratched": true,
+    "recommended_gestures": [],
+    "recommended_roles": [
+      "unknown"
+    ],
+    "recommended_styles": [],
+    "duration_ms": 753.9,
+    "centroid": 2084.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 13,
+    "onset_rate": 17.2,
+    "pitch_flip_rate": 41.1,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 5280,
+    "anchor_tail": 16174,
+    "safe": [
+      71,
+      16174
+    ],
+    "safe_forward": [
+      5280,
+      16174
+    ],
+    "safe_reverse": [
+      71,
+      5280
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_039.wav"
+  },
+  "SCRATCH_048": {
+    "filename": "scratch_048.wav",
+    "canonical_name": "SCRATCH_048",
+    "literal_phrase": "scratch 048",
+    "category": "PRE_RENDERED_SCRATCH",
+    "source_is_clean": false,
+    "source_is_pre_scratched": true,
+    "recommended_gestures": [],
+    "recommended_roles": [
+      "unknown"
+    ],
+    "recommended_styles": [],
+    "duration_ms": 2000.0,
+    "centroid": 2001.0,
+    "voiced_amount": 0.97,
+    "noise_amount": 0.03,
+    "transient_count": 34,
+    "onset_rate": 17.0,
+    "pitch_flip_rate": 47.0,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 3300,
+    "anchor_tail": 43743,
+    "safe": [
+      135,
+      43743
+    ],
+    "safe_forward": [
+      3300,
+      43743
+    ],
+    "safe_reverse": [
+      135,
+      3300
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_048.wav"
+  },
+  "SCRATCH_051": {
+    "filename": "scratch_051.wav",
+    "canonical_name": "SCRATCH_051",
+    "literal_phrase": "scratch 051",
+    "category": "PRE_RENDERED_SCRATCH",
+    "source_is_clean": false,
+    "source_is_pre_scratched": true,
+    "recommended_gestures": [],
+    "recommended_roles": [
+      "unknown"
+    ],
+    "recommended_styles": [],
+    "duration_ms": 278.7,
+    "centroid": 2070.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 6,
+    "onset_rate": 21.5,
+    "pitch_flip_rate": 39.5,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 3960,
+    "anchor_tail": 5815,
+    "safe": [
+      69,
+      5815
+    ],
+    "safe_forward": [
+      3960,
+      5815
+    ],
+    "safe_reverse": [
+      69,
+      3960
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_051.wav"
+  },
+  "STOP_THAT": {
+    "filename": "stop-that.wav",
+    "canonical_name": "STOP_THAT",
+    "literal_phrase": "stop that",
+    "category": "DJ_COMMAND",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "cut"
+    ],
+    "recommended_roles": [
+      "intro",
+      "transition",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 808.6,
+    "centroid": 3248.0,
+    "voiced_amount": 0.75,
+    "noise_amount": 0.25,
+    "transient_count": 10,
+    "onset_rate": 12.4,
+    "pitch_flip_rate": 44.5,
+    "pre_scratched": true,
+    "anchor_attack": 4180,
+    "anchor_vowel": 4620,
+    "anchor_tail": 17297,
+    "safe": [
+      708,
+      17297
+    ],
+    "safe_forward": [
+      4620,
+      17297
+    ],
+    "safe_reverse": [
+      708,
+      4620
+    ],
+    "word_slices": [
+      {
+        "name": "STOP",
+        "start": 757,
+        "end": 3584,
+        "vowel": 2170
+      },
+      {
+        "name": "THAT",
+        "start": 3584,
+        "end": 16871,
+        "vowel": 4464
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_021.wav"
+  },
+  "THE_LIKS": {
+    "filename": "the-l-i-k-s.wav",
+    "canonical_name": "THE_LIKS",
+    "literal_phrase": "the l i k s",
+    "category": "HIP_HOP_TAG",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "hook",
+      "reconstruction"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 2712.8,
+    "centroid": 2258.0,
+    "voiced_amount": 0.89,
+    "noise_amount": 0.11,
+    "transient_count": 32,
+    "onset_rate": 11.8,
+    "pitch_flip_rate": 50.1,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 17380,
+    "anchor_tail": 59587,
+    "safe": [
+      100,
+      59587
+    ],
+    "safe_forward": [
+      17380,
+      59587
+    ],
+    "safe_reverse": [
+      100,
+      17380
+    ],
+    "word_slices": [],
+    "factory_safe": false,
+    "packFile": "scratch_016.wav"
+  },
+  "UH_HAH": {
+    "filename": "uh-hah.wav",
+    "canonical_name": "UH_HAH",
+    "literal_phrase": "uh hah",
+    "category": "YEAH_RESPONSE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "forward_stab",
+      "chirp",
+      "drag"
+    ],
+    "recommended_roles": [
+      "answer",
+      "hook",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 561.5,
+    "centroid": 2564.0,
+    "voiced_amount": 0.45,
+    "noise_amount": 0.55,
+    "transient_count": 10,
+    "onset_rate": 17.8,
+    "pitch_flip_rate": 30.3,
+    "pre_scratched": true,
+    "anchor_attack": 5060,
+    "anchor_vowel": 7480,
+    "anchor_tail": 12107,
+    "safe": [
+      59,
+      12107
+    ],
+    "safe_forward": [
+      7480,
+      12107
+    ],
+    "safe_reverse": [
+      59,
+      7480
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_045.wav"
+  },
+  "UH_SHORT": {
+    "filename": "uh.wav",
+    "canonical_name": "UH_SHORT",
+    "literal_phrase": "uh",
+    "category": "SHORT_EXCLAMATION",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "forward_stab",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "answer",
+      "accent"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "old_school"
+    ],
+    "duration_ms": 252.3,
+    "centroid": 2560.0,
+    "voiced_amount": 0.6,
+    "noise_amount": 0.4,
+    "transient_count": 4,
+    "onset_rate": 15.9,
+    "pitch_flip_rate": 35.7,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 440,
+    "anchor_tail": 4281,
+    "safe": [
+      35,
+      4281
+    ],
+    "safe_forward": [
+      440,
+      4281
+    ],
+    "safe_reverse": [
+      35,
+      440
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_004.wav"
+  },
+  "WELCOME_TO_THE_NEXT_LEVEL": {
+    "filename": "welcome-to-the-next-level.wav",
+    "canonical_name": "WELCOME_TO_THE_NEXT_LEVEL",
+    "literal_phrase": "welcome to the next level",
+    "category": "INTRO_ANNOUNCEMENT",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "drag",
+      "forward_stab"
+    ],
+    "recommended_roles": [
+      "intro",
+      "drop_cue"
+    ],
+    "recommended_styles": [
+      "electro",
+      "old_school"
+    ],
+    "duration_ms": 1950.2,
+    "centroid": 2029.0,
+    "voiced_amount": 0.92,
+    "noise_amount": 0.08,
+    "transient_count": 12,
+    "onset_rate": 6.2,
+    "pitch_flip_rate": 34.9,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 1540,
+    "anchor_tail": 36388,
+    "safe": [
+      16,
+      36388
+    ],
+    "safe_forward": [
+      1540,
+      36388
+    ],
+    "safe_reverse": [
+      16,
+      1540
+    ],
+    "word_slices": [
+      {
+        "name": "WELCOME",
+        "start": 0,
+        "end": 4352,
+        "vowel": 1540
+      },
+      {
+        "name": "TO",
+        "start": 4352,
+        "end": 10496,
+        "vowel": 5672
+      },
+      {
+        "name": "THE",
+        "start": 10496,
+        "end": 15360,
+        "vowel": 12916
+      },
+      {
+        "name": "NEXT",
+        "start": 15360,
+        "end": 21760,
+        "vowel": 17120
+      },
+      {
+        "name": "LEVEL",
+        "start": 21760,
+        "end": 31693,
+        "vowel": 24840
+      }
+    ],
+    "factory_safe": true,
+    "packFile": "scratch_014.wav"
+  },
+  "WHOO_LONG": {
+    "filename": "whooo.wav",
+    "canonical_name": "WHOO_LONG",
+    "literal_phrase": "whooo",
+    "category": "LONG_VOWEL_OR_HYPE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "drag",
+      "transformer8",
+      "baby",
+      "chirp"
+    ],
+    "recommended_roles": [
+      "intro",
+      "breakdown",
+      "showcase"
+    ],
+    "recommended_styles": [
+      "lofi",
+      "battle"
+    ],
+    "duration_ms": 413.9,
+    "centroid": 1117.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 5,
+    "onset_rate": 12.1,
+    "pitch_flip_rate": 36.2,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 2860,
+    "anchor_tail": 8156,
+    "safe": [
+      98,
+      8156
+    ],
+    "safe_forward": [
+      2860,
+      8156
+    ],
+    "safe_reverse": [
+      98,
+      2860
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_047.wav"
+  },
+  "YEAH_BOY": {
+    "filename": "yeah-boy.wav",
+    "canonical_name": "YEAH_BOY",
+    "literal_phrase": "yeah boy",
+    "category": "YEAH_RESPONSE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "forward_stab",
+      "chirp",
+      "drag"
+    ],
+    "recommended_roles": [
+      "answer",
+      "hook",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 1740.9,
+    "centroid": 2602.0,
+    "voiced_amount": 0.62,
+    "noise_amount": 0.38,
+    "transient_count": 23,
+    "onset_rate": 13.2,
+    "pitch_flip_rate": 46.0,
+    "pre_scratched": true,
+    "anchor_attack": 1100,
+    "anchor_vowel": 24640,
+    "anchor_tail": 37663,
+    "safe": [
+      180,
+      37663
+    ],
+    "safe_forward": [
+      24640,
+      37663
+    ],
+    "safe_reverse": [
+      180,
+      24640
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_041.wav"
+  },
+  "YEAH_STANDARD": {
+    "filename": "yeah.wav",
+    "canonical_name": "YEAH_STANDARD",
+    "literal_phrase": "yeah",
+    "category": "YEAH_RESPONSE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "forward_stab",
+      "chirp",
+      "drag"
+    ],
+    "recommended_roles": [
+      "answer",
+      "hook",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 509.8,
+    "centroid": 2122.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 5,
+    "onset_rate": 9.8,
+    "pitch_flip_rate": 27.5,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 1540,
+    "anchor_tail": 7582,
+    "safe": [
+      37,
+      7582
+    ],
+    "safe_forward": [
+      1540,
+      7582
+    ],
+    "safe_reverse": [
+      37,
+      1540
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_002.wav"
+  },
+  "YEAH_ALT": {
+    "filename": "yeah_alt.wav",
+    "canonical_name": "YEAH_ALT",
+    "literal_phrase": "yeah alt",
+    "category": "YEAH_RESPONSE",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "forward_stab",
+      "chirp",
+      "drag"
+    ],
+    "recommended_roles": [
+      "answer",
+      "hook",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap"
+    ],
+    "duration_ms": 550.9,
+    "centroid": 1232.0,
+    "voiced_amount": 1.0,
+    "noise_amount": 0.0,
+    "transient_count": 10,
+    "onset_rate": 18.2,
+    "pitch_flip_rate": 59.9,
+    "pre_scratched": true,
+    "anchor_attack": 0,
+    "anchor_vowel": 1100,
+    "anchor_tail": 11902,
+    "safe": [
+      119,
+      11902
+    ],
+    "safe_forward": [
+      1100,
+      11902
+    ],
+    "safe_reverse": [
+      119,
+      1100
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_023.wav"
+  }
+}
