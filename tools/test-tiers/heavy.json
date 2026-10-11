@@ -149,6 +149,10 @@
     {
       "file": "src/engine/__tests__/importWalksRunInWorker.test.ts",
       "ciSeconds": 15
+    },
+    {
+      "file": "src/engine/dj/__tests__/autoDJStandaloneJuggleLongSet.test.ts",
+      "ciSeconds": 390
     }
   ]
 }
