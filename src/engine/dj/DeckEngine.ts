@@ -587,9 +587,10 @@ export class DeckEngine {
    * Load a buffer another deck already decoded - a double of its track (plan
    * 2026-10-11-dj-juggling, P4.2). Same deck state as a file load, no decode.
    */
-  async loadDecodedAudio(audioBuffer: AudioBuffer, originalBytes: ArrayBuffer | null, precomputedPeaks?: Float32Array, channelScopes?: ChannelScopeTrack): Promise<AudioFileInfo> {
+  async loadDecodedAudio(audioBuffer: AudioBuffer, originalBytes: ArrayBuffer | null, precomputedPeaks?: Float32Array, channelScopes?: ChannelScopeTrack, sourceWav?: ArrayBuffer | null): Promise<AudioFileInfo> {
     this.prepareAudioLoad();
-    this._loadedWav = null;
+    // A double plays the very WAV of its source: a scope track the source gains later belongs to it too.
+    this._loadedWav = sourceWav ?? null;
     this.setChannelScopes(channelScopes);
     const info = await this.audioPlayer.loadDecodedBuffer(audioBuffer, originalBytes, precomputedPeaks);
     void this._primeScratchBuffer();
@@ -618,6 +619,11 @@ export class DeckEngine {
     attachChannelScopes(wav, track);
     this.setChannelScopes(track);
     return true;
+  }
+
+  /** The rendered WAV bytes the deck's audio came from (a double is loaded with its source's). */
+  get loadedWav(): ArrayBuffer | null {
+    return this._loadedWav;
   }
 
   /** The per-channel scope track of the loaded audio, if it has one (a double carries it to the other deck). */

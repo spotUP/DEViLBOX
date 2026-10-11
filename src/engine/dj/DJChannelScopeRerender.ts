@@ -16,6 +16,8 @@ import { getCachedEntryByHash, listScopelessEntries } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
 import { getDJEngineIfActive } from './DJEngine';
 import type { DeckId } from './DeckEngine';
+
+const DECK_IDS: readonly DeckId[] = ['A', 'B', 'C'];
 import { needsChannelScopeRerender } from './channelScopeTrack';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 
@@ -39,16 +41,22 @@ function renderOnce(origin: ScopelessOrigin): Promise<ChannelScopeTrack | undefi
 }
 
 /**
- * `wav` was just loaded on `deckId`: when it came from an old-shape cache
+ * `wav` was just loaded on a deck: when it came from an old-shape cache
  * entry, queue its scope re-render (once) and, when it finishes, attach the
- * track to the deck if the deck still holds that WAV. True when attached.
+ * track to every deck still holding that WAV. True when attached.
  */
-export async function requestChannelScopeRerender(wav: ArrayBuffer, deckId: DeckId): Promise<boolean> {
+export async function requestChannelScopeRerender(wav: ArrayBuffer): Promise<boolean> {
   const origin = scopelessOriginOf(wav);
   if (!origin) return false;
   const track = await renderOnce(origin);
   if (!track) return false;
-  return getDJEngineIfActive()?.getDeck(deckId).attachLateChannelScopes(wav, track) ?? false;
+  // Every deck holding this WAV gets the track: the one it was loaded on and any double of it.
+  const engine = getDJEngineIfActive();
+  let attached = false;
+  for (const id of DECK_IDS) {
+    try { if (engine?.getDeck(id).attachLateChannelScopes(wav, track)) attached = true; } catch { /* no such deck */ }
+  }
+  return attached;
 }
 
 let playlistPassStarted = false;
