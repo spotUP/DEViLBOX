@@ -48,8 +48,12 @@ function resolveSpecifier(spec: string, fromFile: string): string | null {
   return null;
 }
 
+const importCache = new Map<string, string[]>();
+
 /** Edges that exist at runtime: value imports and re-exports, not `import type`. */
 function runtimeImports(file: string): string[] {
+  const cached = importCache.get(file);
+  if (cached) return cached;
   const text = fs.readFileSync(file, 'utf8');
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const out: string[] = [];
@@ -68,6 +72,7 @@ function runtimeImports(file: string): string[] {
     const resolved = resolveSpecifier(spec.text, file);
     if (resolved) out.push(resolved);
   }
+  importCache.set(file, out);
   return out;
 }
 
@@ -94,5 +99,35 @@ describe('the song stores and the code that snapshots them', () => {
 
     expect(importChain('src/stores/useInstrumentStore.ts', 'src/lib/song/snapshotSong.ts')).toBeNull();
     expect(importChain('src/stores/useInstrumentStore.ts', 'src/hooks/useProjectPersistence.ts')).toBeNull();
+  }, 60000);
+
+  // The same cycle ran on through the DJ layer and the format engines:
+  // parameterRouter -> DJActions -> DJAutoDJ -> DJTrackLoader -> openSong ->
+  // songBranches -> songLifecycle, and ToneEngine -> InstrumentFactory -> the
+  // synths -> UADEEngine / MaEngine -> ToneEngine. Under load the gate saw
+  // `UADEEngine.prototype` / `MaEngine.prototype` of undefined and songLifecycle
+  // in its TDZ at songBranches.ts:74. DJActions now reaches the Auto DJ through
+  // dj/autoDJInstance.ts (and loads DJAutoDJ on demand), and the engines feed
+  // the meters through ChannelMeterFeed.report() instead of importing ToneEngine.
+  it('the store never statically reaches the song-open branches', () => {
+    expect(importChain('src/lib/song/songBranches.ts', 'src/stores/useInstrumentStore.ts')).not.toBeNull();
+    expect(importChain('src/stores/useInstrumentStore.ts', 'src/engine/dj/DJAutoDJ.ts')).toBeNull();
+    expect(importChain('src/stores/useInstrumentStore.ts', 'src/lib/song/songBranches.ts')).toBeNull();
+    expect(importChain('src/stores/useInstrumentStore.ts', 'src/lib/song/songLifecycle.ts')).toBeNull();
+  }, 60000);
+
+  it('no format engine shares an import cycle with the stores', () => {
+    const STORE = 'src/stores/useInstrumentStore.ts';
+    for (const engine of [
+      'src/engine/uade/UADEEngine.ts', 'src/engine/ma/MaEngine.ts', 'src/engine/jamcracker/JamCrackerEngine.ts',
+      'src/engine/sidmon1/SidMon1ReplayerEngine.ts', 'src/engine/pumatracker/PumaTrackerEngine.ts',
+      'src/engine/futureplayer/FuturePlayerEngine.ts', 'src/engine/libopenmpt/LibopenmptEngine.ts',
+      'src/engine/klystrack/KlysEngine.ts', 'src/engine/artofnoise/ArtOfNoiseEngine.ts',
+      'src/engine/pretracker/PreTrackerEngine.ts', 'src/engine/steveturner/SteveTurnerEngine.ts',
+    ]) {
+      // A cycle is a path both ways; print the one back to the store when there is.
+      const there = importChain(STORE, engine);
+      expect(there && importChain(engine, STORE), engine).toBeNull();
+    }
   }, 60000);
 });

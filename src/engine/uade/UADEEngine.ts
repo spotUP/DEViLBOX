@@ -14,7 +14,6 @@
 import { uadeFormatLabel } from './uadeFormatLabel';
 import { uadePlayerHint } from '@/lib/import/uadePlayerHint';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
-import { getToneEngine } from '@engine/ToneEngine';
 import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
 import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
@@ -432,13 +431,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
           break;
 
         case 'chLevels':
-          try {
-            const engine = getToneEngine();
-            const levels: number[] = data.levels;
-            const noteStarts: number[] | null = data.noteStarts;
-            if (noteStarts) meterFeed.feedCounted(engine, levels, noteStarts);
-            else meterFeed.feed(engine, levels);
-          } catch { /* ToneEngine not ready */ }
+          meterFeed.report(data.levels, data.noteStarts);
           break;
 
         case 'oscData':

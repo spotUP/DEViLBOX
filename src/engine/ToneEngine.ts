@@ -21,6 +21,7 @@ import { periodToNoteIndex, getPeriodExtended, _registerToneEngineRef } from './
 import { AmigaFilter } from './effects/AmigaFilter';
 import { shimAudioListenerParams } from './tone/firefoxAudioListenerShim';
 import { applyLoopToPlayer, sampleLoops } from './tone/samplePlayerLoop';
+import { registerChannelMeterSink } from './tone/channelMeterFeed';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
@@ -531,6 +532,9 @@ export class ToneEngine {
       ToneEngine.LIVE_VOICE_BASE_CHANNEL,
       ToneEngine.MAX_LIVE_VOICES
     );
+
+    // The format engines report channel levels through ChannelMeterFeed.report().
+    registerChannelMeterSink(this);
   }
 
   /**

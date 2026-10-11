@@ -10,7 +10,6 @@
  */
 
 import { getDevilboxAudioContext } from '@utils/audio-context';
-import { getToneEngine } from '@engine/ToneEngine';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -194,11 +193,8 @@ export class LibopenmptEngine {
         // channel that is still sounding moves it by less than any jump threshold.
         if (chState) countRowNoteStarts(this._noteStarts, chState as ArrayLike<number>);
         if (chLevels) {
-          try {
-            const engine = getToneEngine();
-            // Levels go to the level feed; note starts to the note feed
-            meterFeed.feedCounted(engine, chLevels, this._noteStarts);
-          } catch { /* ToneEngine not ready */ }
+          // Levels go to the level feed; note starts to the note feed
+          meterFeed.report(chLevels, this._noteStarts);
         }
         if (chState && this._onChannelState) {
           const arr = chState as Float64Array;

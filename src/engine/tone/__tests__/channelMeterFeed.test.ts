@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ChannelMeterFeed } from '../channelMeterFeed';
+import { ChannelMeterFeed, registerChannelMeterSink } from '../channelMeterFeed';
 import { countRowNoteStarts } from '../../libopenmpt/LibopenmptEngine';
 import { engineFedMeterTarget } from '@/components/tracker/waveformVuLevel';
 
@@ -82,9 +82,9 @@ describe('libopenmpt flashes on the pattern rows, not on VU jumps', () => {
     countRowNoteStarts(counts, [48, 1, 0, 0, 0, 0, 60, 2, 0, 0, 0, 0]);
     expect(counts).toEqual([2, 1]);
   });
-  it('the engine feeds the counts through feedCounted', () => {
+  it('the engine reports the counts with its levels', () => {
     const src = readFileSync(resolve(__dirname, '../../libopenmpt/LibopenmptEngine.ts'), 'utf8');
-    expect(src).toContain('meterFeed.feedCounted(');
+    expect(src).toContain('meterFeed.report(chLevels, this._noteStarts)');
     expect(src).not.toContain('meterFeed.feed(');
   });
 });
@@ -92,7 +92,33 @@ describe('libopenmpt flashes on the pattern rows, not on VU jumps', () => {
 describe('engines feed per-frame levels through the split feed, never as note triggers', () => {
   it.each(ENGINES)('%s', (name) => {
     const src = readFileSync(resolve(__dirname, '../../', `${name}.ts`), 'utf8');
-    expect(src).toContain('meterFeed.feed(');
+    expect(src).toContain('meterFeed.report(');
     expect(src).not.toMatch(/engine\.triggerChannelMeter\(/);
+  });
+});
+
+// The engines report to the meters ToneEngine registers, not to a ToneEngine
+// they import (that import put them in the store import cycle).
+describe('an engine level report reaches the registered meters', () => {
+  it('counted when the engine reports note starts, by level jump otherwise', () => {
+    const s = sink();
+    registerChannelMeterSink(s);
+    try {
+      const counted = new ChannelMeterFeed();
+      counted.report([0.5], [1]); counted.report([0.5], [2]);
+      expect(s.triggers).toEqual([[0, 0.5], [0, 0.5]]); // a retrigger at the same level still flashes
+      const byLevel = new ChannelMeterFeed();
+      byLevel.report([0.5]); byLevel.report([0.5], null);
+      expect(s.triggers.length).toBe(3); // a steady level flashes once
+      expect(s.levels).toEqual([[0.5], [0.5], [0.5], [0.5]]);
+    } finally { registerChannelMeterSink(null); }
+  });
+  it('ToneEngine registers itself as the meters when it is created', () => {
+    const src = readFileSync(resolve(__dirname, '../../ToneEngine.ts'), 'utf8');
+    expect(src).toContain('registerChannelMeterSink(this);');
+  });
+  it('before ToneEngine exists there are no meters, and nothing is fed', () => {
+    registerChannelMeterSink(null);
+    expect(() => new ChannelMeterFeed().report([0.5], [1])).not.toThrow();
   });
 });

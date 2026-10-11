@@ -6,7 +6,6 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
-import { getToneEngine } from '@engine/ToneEngine';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { fpCodeSection, walkFuturePlayer } from '@/lib/import/formats/fpWalk';
@@ -137,13 +136,7 @@ export class FuturePlayerEngine extends WASMSingletonBase {
         }
 
         case 'chLevels':
-          try {
-            const engine = getToneEngine();
-            const levels: number[] = data.levels;
-            const noteStarts: number[] | null = data.noteStarts;
-            if (noteStarts) meterFeed.feedCounted(engine, levels, noteStarts);
-            else meterFeed.feed(engine, levels);
-          } catch { /* ToneEngine not ready */ }
+          meterFeed.report(data.levels, data.noteStarts);
           break;
 
         case 'pattern-data': {
