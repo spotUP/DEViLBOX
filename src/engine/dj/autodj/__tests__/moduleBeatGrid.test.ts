@@ -106,8 +106,8 @@ describe('moduleBeatGrid', () => {
     expect(g.beats[1]).toBeCloseTo(4 * row, 9);
     // Downbeats: rows 0, 16, 32 of pattern a, then row 0 of pattern b (bar 1 = row 0 of every position).
     expect(g.downbeats.map((t) => t / row)).toEqual([0, 16, 32, 40, 56, 72, 88].map((r) => expect.closeTo(r, 6)));
+    // No drums: the pattern lengths (16 beats each) say 4/4; the beat level rests on the speed convention.
     expect(g.beatsPerBar).toBe(4);
-    expect(g.confidence).toBe(1);
     expect(g.source).toBe('module');
   });
 
@@ -155,11 +155,115 @@ describe('buildBeatGrids with a fixed meter (module timing)', () => {
       beats: g.beats, downbeats: g.downbeats, bpm: g.bpm, bpmConfidence: 1, timeSignature: 4,
       extended: null, durationSec: walkEnd(s), fixed: { beatsPerBar: 4, confidence: 1 },
     });
+    // 40 rows is 10 beats: two 4-beat bars and a 2-beat bar.
     expect(r.downbeats.bars.map((b) => b.beats.length)).toEqual([4, 4, 2, 4, 4, 4, 4]);
     expect(r.downbeats.bars.map((b) => b.start)).toEqual(g.downbeats);
     expect(r.beatGrid.beats.filter((b) => b.isDownbeat).map((b) => b.time)).toEqual(g.downbeats);
     expect(r.beatGrid.confidence).toBe(1);
     expect(r.downbeats.confidence).toBe(1);
     expect(r.meter).toMatchObject({ beatsPerBar: 4, confidence: 1 });
+  });
+});
+
+// ── Owner juggling plan sections 31, 38, 56 (audit 2026-10-11 rows 3, 5, 6) ──
+
+/** Instruments the channel identity can name: a kick, a snare (drum machine types) and a 303 bass. */
+const KICK = 1, SNARE = 2, BASS = 3;
+const drumKit = [
+  { id: KICK, name: 'kick', type: 'synth', synthType: 'Synth', drumMachine: { drumType: 'kick' } },
+  { id: SNARE, name: 'snare', type: 'synth', synthType: 'Synth', drumMachine: { drumType: 'snare' } },
+  { id: BASS, name: 'bass', type: 'synth', synthType: 'TB303' },
+];
+
+/** A pattern of `rows` rows over `chans` channels; `notes[ch][row] = instrument`. */
+function notes(id: string, rows: number, chans: Array<Record<number, number>>): Pattern {
+  return {
+    id, name: id, length: rows,
+    channels: chans.map((hits, ch) => ({
+      id: `c${ch}`, name: `c${ch}`, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: null, color: null,
+      rows: Array.from({ length: rows }, (_, r) => { const c = empty(); if (hits[r]) { c.note = 49; c.instrument = hits[r]; } return c; }),
+    })),
+  } as unknown as Pattern;
+}
+
+/** Instrument `inst` every `step` rows from `from`. */
+const every = (rows: number, step: number, inst: number, from = 0): Record<number, number> => {
+  const m: Record<number, number> = {};
+  for (let r = from; r < rows; r += step) m[r] = inst;
+  return m;
+};
+
+function drumSong(patterns: Pattern[], order: number[], opts: { speed?: number; bpm?: number } = {}): TrackerSong {
+  return { ...song(patterns, order, opts), instruments: drumKit, numChannels: patterns[0].channels.length } as unknown as TrackerSong;
+}
+
+describe('the module grid reads the meter from the song (owner plan section 56)', () => {
+  it('a waltz: drums that repeat every three beats make 3/4 bars, not 4/4', () => {
+    // 48 rows = 12 beats (a whole number of 3/4 and of 4/4 bars): kick on beat 1, snare on beats 2 and 3.
+    const bar: Record<number, number> = {};
+    for (let r = 0; r < 48; r += 12) { bar[r] = KICK; bar[r + 4] = SNARE; bar[r + 8] = SNARE; }
+    const s = drumSong([notes('w', 48, [bar])], [0, 0, 0, 0]);
+    const g = moduleBeatGrid(s, walkEnd(s))!;
+    expect(g.beatsPerBar).toBe(3);
+    expect(g.meterConfidence).toBeGreaterThanOrEqual(0.6);
+    const row = rowSeconds(6, 125);
+    // A bar every 12 rows (3 beats of 4 rows).
+    expect(g.downbeats.slice(0, 5).map((t) => Math.round(t / row))).toEqual([0, 12, 24, 36, 48]);
+  });
+
+  it('a backbeat that repeats every four beats is 4/4 with confidence from the drums', () => {
+    const s = drumSong([notes('f', 64, [{ ...every(64, 8, KICK), ...every(64, 8, SNARE, 4) }])], [0, 0, 0]);
+    const g = moduleBeatGrid(s, walkEnd(s))!;
+    expect(g.beatsPerBar).toBe(4);
+    expect(g.meterConfidence).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it('the DJ analysis of a 3/4 module carries the song\'s meter into its bars', async () => {
+    const { buildDJTrackAnalysis } = await import('../trackAnalysis');
+    const { corpusPipelineAnalysis, corpusTrack } = await import('../testing/corpus');
+    const bar: Record<number, number> = {};
+    for (let r = 0; r < 48; r += 12) { bar[r] = KICK; bar[r + 4] = SNARE; bar[r + 8] = SNARE; }
+    const s = drumSong([notes('w', 48, [bar])], [0, 0, 0, 0, 0, 0, 0, 0]);
+    const end = walkEnd(s);
+    const a = buildDJTrackAnalysis({ id: 'waltz', durationSec: end, analysis: corpusPipelineAnalysis(corpusTrack('steady')), extended: null, song: s });
+    expect(a.meter.beatsPerBar).toBe(3);
+    expect(a.downbeats.bars.slice(1, 4).map((b) => b.beats.length)).toEqual([3, 3, 3]);
+  });
+});
+
+describe('the module grid confidence reflects its evidence (owner plan section 31)', () => {
+  it('a beat level no drum confirms (the speed convention alone) is below the beat-juggling minimum, at phrase level', async () => {
+    const { POLICY_MIN } = await import('../juggle/jugglePlanner');
+    const s = song([pattern('a', 64), pattern('b', 64)], [0, 1]);
+    const g = moduleBeatGrid(s, walkEnd(s))!;
+    expect(g.confidence).toBeLessThan(POLICY_MIN.beat.beat);
+    expect(g.confidence).toBeGreaterThanOrEqual(POLICY_MIN.phrase.beat);
+    const r = buildBeatGrids({
+      beats: g.beats, downbeats: g.downbeats, bpm: g.bpm, bpmConfidence: g.confidence, timeSignature: g.beatsPerBar,
+      extended: null, durationSec: walkEnd(s), fixed: { beatsPerBar: g.beatsPerBar, confidence: g.confidence, meterConfidence: g.meterConfidence },
+    });
+    expect(r.beatGrid.confidence).toBe(g.confidence);
+    expect(r.meter.confidence).toBe(g.meterConfidence);
+    expect(r.downbeats.confidence).toBe(Math.min(g.confidence, g.meterConfidence));
+  });
+
+  it('a backbeat on the conventional level confirms the beat: confidence 1', () => {
+    const s = drumSong([notes('f', 64, [{ ...every(64, 8, KICK), ...every(64, 8, SNARE, 4) }])], [0, 0, 0]);
+    expect(moduleBeatGrid(s, walkEnd(s))!.confidence).toBe(1);
+  });
+});
+
+describe('the drums that set the beat are found per order position (owner plan section 38)', () => {
+  it('drums that move to another channel after the first pattern still decide the beat level', () => {
+    // Speed 6 / tempo 80: 4 rows a beat is 80 BPM, 2 rows a beat 160. Pattern a: a stray kick on channel 0,
+    // the bass on channel 1. Pattern b (the rest of the song): the bass moves to channel 0, the kit to channel 1 -
+    // kick every 4 rows, snare between them: a backbeat at 2 rows a beat.
+    const a = notes('a', 64, [{ 0: KICK, 32: KICK }, { 0: BASS }]);
+    const b = notes('b', 64, [every(64, 4, BASS), { ...every(64, 4, KICK), ...every(64, 4, SNARE, 2) }]);
+    const s = drumSong([a, b], [0, 1, 1, 1, 1], { bpm: 80 });
+    const g = moduleBeatGrid(s, walkEnd(s))!;
+    expect(g.rowsPerBeat).toBe(2);
+    expect(g.bpm).toBe(160);
+    expect(g.confidence).toBe(1);
   });
 });

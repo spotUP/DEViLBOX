@@ -20,10 +20,11 @@ export interface BeatGridInput {
   durationSec: number;
   /**
    * Known meter (module timing): skips the phase search; the bars are the
-   * given `downbeats` (each must be one of `beats`) and the grid, downbeat
-   * and meter confidence are this value.
+   * given `downbeats` (each must be one of `beats`). `confidence` is the
+   * beat grid's, `meterConfidence` the meter's (default: `confidence`); the
+   * downbeat grid is as sure as the lesser of the two.
    */
-  fixed?: { beatsPerBar: number; confidence: number };
+  fixed?: { beatsPerBar: number; confidence: number; meterConfidence?: number };
 }
 
 export interface BeatGridResult {
@@ -113,7 +114,7 @@ export function buildBeatGrids(input: BeatGridInput): BeatGridResult {
   let alternatives: Array<{ beatsPerBar: number; score: number }> = [];
   if (input.fixed) {
     beatsPerBar = input.fixed.beatsPerBar;
-    meterConfidence = input.fixed.confidence;
+    meterConfidence = input.fixed.meterConfidence ?? input.fixed.confidence;
   } else if (extended && beats.length >= 8) {
     const found = searchMeterAndPhase(strengths);
     beatsPerBar = found.beatsPerBar;
@@ -199,7 +200,7 @@ export function buildBeatGrids(input: BeatGridInput): BeatGridResult {
   const downbeats: DownbeatGrid = {
     bars,
     meter: { beatsPerBar, confidence: meterConfidence },
-    confidence: input.fixed ? input.fixed.confidence : Math.min(1, gridConfidence * (0.5 + 0.5 * meterConfidence)),
+    confidence: input.fixed ? Math.min(input.fixed.confidence, meterConfidence) : Math.min(1, gridConfidence * (0.5 + 0.5 * meterConfidence)),
     phaseOffset: phase,
   };
   const meter: MeterAnalysis = { beatsPerBar, confidence: meterConfidence, alternatives };

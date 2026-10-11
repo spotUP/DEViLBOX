@@ -213,11 +213,11 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
   // One tempo source: the module's own timing when its walk matches the render, else the audio analysis.
   const mg = moduleTempo(song, input.durationSec, input.renderCapSec);
   const tempo = mg
-    ? { beats: mg.beats, downbeats: mg.downbeats, bpm: mg.bpm, bpmConfidence: 1, timeSignature: mg.beatsPerBar }
+    ? { beats: mg.beats, downbeats: mg.downbeats, bpm: mg.bpm, bpmConfidence: mg.confidence, timeSignature: mg.beatsPerBar }
     : { beats: analysis.beats, downbeats: analysis.downbeats, bpm: analysis.bpm, bpmConfidence: analysis.bpmConfidence, timeSignature: analysis.timeSignature };
   const grids = buildBeatGrids({
     ...tempo, extended: ext, durationSec,
-    fixed: mg ? { beatsPerBar: mg.beatsPerBar, confidence: mg.confidence } : undefined,
+    fixed: mg ? { beatsPerBar: mg.beatsPerBar, confidence: mg.confidence, meterConfidence: mg.meterConfidence } : undefined,
   });
 
   let features: BarFeatures[] = [];
