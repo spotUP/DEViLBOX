@@ -14,6 +14,7 @@ import { bendToPhase, lockBarPhase, phaseErrorSec, syncBPMToOther } from '../../
 import { fireDjFx, releaseDjFx } from '../../../drumpad/DjFxActions';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DJJuggleAction } from './juggleTypes';
+import { createCrossfaderSweeper, JUGGLE_CUT_SWEEP_MS } from './crossfaderSweep';
 import type { JuggleActionSink, SinkState } from './juggleExecutor';
 
 type AB = 'A' | 'B';
@@ -51,7 +52,9 @@ export function crossfaderFor(deck: 'A' | 'B' | 'BOTH'): number { return deck ==
 export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () => number | null } {
   let lastCrossfader: number | null = null;
   const loopStart: Record<AB, number | null> = { A: null, B: null };
-  const move = (v: number): void => { lastCrossfader = v; setCrossfader(v); };
+  const sweeper = createCrossfaderSweeper(() => useDJStore.getState().crossfaderPosition, (v) => { lastCrossfader = v; setCrossfader(v); });
+  /** A fast fader sweep to v; a crossfade action passes its own length in ms. */
+  const move = (v: number, ms: number = JUGGLE_CUT_SWEEP_MS): void => { lastCrossfader = v; sweeper.sweepTo(v, ms); };
   const loop = (deck: AB, beats: number, beatSec: number): void => {
     const start = loopStart[deck] ?? barStartBefore(deck, deckPosition(deck));
     loopStart[deck] = start;
@@ -97,8 +100,9 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
       const d = action.deck === 'BOTH' ? null : action.deck;
       switch (action.type) {
         case 'CutIn': move(crossfaderFor(action.deck)); break;
-        case 'CutOut': case 'CrossfadeFrom': move(crossfaderFor(d === 'A' ? 'B' : d === 'B' ? 'A' : 'BOTH')); break;
-        case 'CrossfadeTo': move(action.targetPosition ?? crossfaderFor(action.deck)); break;
+        case 'CutOut': move(crossfaderFor(d === 'A' ? 'B' : d === 'B' ? 'A' : 'BOTH')); break;
+        case 'CrossfadeFrom': move(crossfaderFor(d === 'A' ? 'B' : d === 'B' ? 'A' : 'BOTH'), action.durationBeats ? action.durationBeats * info.beatSec * 1000 : JUGGLE_CUT_SWEEP_MS); break;
+        case 'CrossfadeTo': move(action.targetPosition ?? crossfaderFor(action.deck), action.durationBeats ? action.durationBeats * info.beatSec * 1000 : JUGGLE_CUT_SWEEP_MS); break;
         case 'HoldDeck': move(0.5); break;
         case 'ReleaseDeck': move(crossfaderFor(action.deck)); break;
         case 'TriggerCue': if (d) triggerHotCue(d, Math.round(action.targetPosition ?? 0)); break;
