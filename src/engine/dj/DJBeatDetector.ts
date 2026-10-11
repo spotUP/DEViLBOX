@@ -1,16 +1,19 @@
 /**
- * DJBeatDetector - Scan module patterns for Fxx commands to detect BPM
+ * DJBeatDetector - the musical BPM of a tracker song from its own timing.
  *
- * In tracker modules, BPM is set by the Fxx effect command:
- *   - F01-F1F: set speed (ticks per row)
- *   - F20-FFF: set BPM directly
+ * In tracker modules the tempo is two numbers set by Fxx (the S3M / IT
+ * importers normalise A / T to Fxx): F01-F1F speed (ticks per row) and
+ * F20-FFF tick tempo. At 4 rows a beat the musical BPM is 6 * tempo / speed,
+ * so speed 3 / tempo 125 plays 250 BPM and speed 12 / tempo 125 plays 62.5.
  *
- * Strategy: scan first few patterns for the initial BPM. If no Fxx found,
- * use the song's initialBPM field.
+ * Strategy: walk the order list as the replayer plays it (the same walk the
+ * module beat grid uses) and take the speed / tempo pair the song spends the
+ * most time at.
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import type { Pattern } from '@/types';
+import { timeOrderPositions } from './autodj/trackerMixAnalysis';
+import { musicalBpm } from './autodj/moduleBeatGrid';
 
 export interface BPMDetectionResult {
   bpm: number;
@@ -19,88 +22,25 @@ export interface BPMDetectionResult {
 }
 
 /**
- * Detect the primary BPM of a tracker song by scanning Fxx effect commands.
+ * Detect the primary musical BPM of a tracker song: the speed / tempo pair it
+ * plays longest, at 4 rows a beat.
  */
 export function detectBPM(song: TrackerSong): BPMDetectionResult {
-  // First: use the song's declared initial BPM
-  const initialBPM = song.initialBPM;
+  const { tempoSeconds, tempoCommands } = timeOrderPositions(song);
+  let dominant: { speed: number; bpm: number; seconds: number } | null = null;
+  for (const e of tempoSeconds) if (!dominant || e.seconds > dominant.seconds) dominant = e;
+  const speed = dominant?.speed ?? (song.initialSpeed > 0 ? song.initialSpeed : 6);
+  const tempo = dominant?.bpm ?? (song.initialBPM > 0 ? song.initialBPM : 125);
+  const bpm = Math.round(musicalBpm(speed, tempo) * 100) / 100;
 
-  // Scan song order for Fxx commands to find the "most common" BPM
-  const bpmCounts = new Map<number, number>();
-  let speed = song.initialSpeed;
-
-  // Scan up to first 8 patterns in song order
-  const scanLimit = Math.min(song.songLength, 8);
-  for (let pos = 0; pos < scanLimit; pos++) {
-    const patternIndex = song.songPositions[pos];
-    const pattern = song.patterns[patternIndex];
-    if (!pattern) continue;
-
-    scanPatternForBPM(pattern, song.format, bpmCounts, speed);
+  if (tempoCommands > 0) {
+    return { bpm, confidence: 'exact', source: `Fxx speed ${speed} / tempo ${tempo} (${tempoCommands} speed/tempo commands)` };
   }
-
-  // If we found explicit BPM commands, use the most common one
-  if (bpmCounts.size > 0) {
-    let maxCount = 0;
-    let dominantBPM = initialBPM;
-    for (const [bpm, count] of bpmCounts) {
-      if (count > maxCount) {
-        maxCount = count;
-        dominantBPM = bpm;
-      }
-    }
-    return {
-      bpm: dominantBPM,
-      confidence: 'exact',
-      source: `Fxx effect (found ${bpmCounts.size} BPM commands)`,
-    };
+  if (speed !== 6 || tempo !== 125) {
+    return { bpm, confidence: 'estimated', source: `Song header speed ${speed} / tempo ${tempo}` };
   }
-
-  // Fall back to song header BPM
-  if (initialBPM > 0 && initialBPM !== 125) {
-    return {
-      bpm: initialBPM,
-      confidence: 'estimated',
-      source: 'Song header initialBPM',
-    };
-  }
-
-  // Default: 125 BPM (standard tracker tempo)
-  return {
-    bpm: 125,
-    confidence: 'default',
-    source: 'Default (no BPM data found)',
-  };
-}
-
-/**
- * Scan a single pattern for Fxx BPM commands.
- */
-function scanPatternForBPM(
-  pattern: Pattern,
-  format: string,
-  bpmCounts: Map<number, number>,
-  _speed: number,
-): void {
-  for (const channel of pattern.channels) {
-    for (const cell of channel.rows) {
-      const effTyp = cell.effTyp ?? 0;
-      const eff = cell.eff ?? 0;
-      if (!effTyp && !eff) continue;
-
-      // MOD/XM: effect F (0x0F)
-      // IT/S3M: effect T (tempo) has different numbering, but in our
-      // normalized format it's also stored as the appropriate effect type.
-      const isFxx =
-        (format === 'MOD' || format === 'XM') && effTyp === 0x0F ||
-        (format === 'IT' || format === 'S3M') && effTyp === 0x14; // Txx
-
-      if (isFxx && eff >= 0x20) {
-        // Direct BPM setting
-        bpmCounts.set(eff, (bpmCounts.get(eff) ?? 0) + 1);
-      }
-    }
-  }
+  // Default: speed 6 / tempo 125 = 125 BPM (standard tracker tempo)
+  return { bpm, confidence: 'default', source: 'Default (no BPM data found)' };
 }
 
 /**
