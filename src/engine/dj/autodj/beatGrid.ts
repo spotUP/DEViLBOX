@@ -18,6 +18,12 @@ export interface BeatGridInput {
   timeSignature: number;
   extended: ExtendedAnalysis | null;
   durationSec: number;
+  /**
+   * Known meter (module timing): skips the phase search; the bars are the
+   * given `downbeats` (each must be one of `beats`) and the grid, downbeat
+   * and meter confidence are this value.
+   */
+  fixed?: { beatsPerBar: number; confidence: number };
 }
 
 export interface BeatGridResult {
@@ -105,7 +111,10 @@ export function buildBeatGrids(input: BeatGridInput): BeatGridResult {
   let phase = 0;
   let meterConfidence = 0.3;
   let alternatives: Array<{ beatsPerBar: number; score: number }> = [];
-  if (extended && beats.length >= 8) {
+  if (input.fixed) {
+    beatsPerBar = input.fixed.beatsPerBar;
+    meterConfidence = input.fixed.confidence;
+  } else if (extended && beats.length >= 8) {
     const found = searchMeterAndPhase(strengths);
     beatsPerBar = found.beatsPerBar;
     phase = found.phase;
@@ -128,28 +137,39 @@ export function buildBeatGrids(input: BeatGridInput): BeatGridResult {
     }
   }
 
+  // Downbeat beat indices: the given bars (fixed meter) or every beatsPerBar-th beat from the phase.
+  const downbeatIdx: number[] = [];
+  if (input.fixed) {
+    const at = new Set(input.downbeats);
+    beats.forEach((t, i) => { if (at.has(t)) downbeatIdx.push(i); });
+  } else {
+    for (let i = phase; i < beats.length; i += beatsPerBar) downbeatIdx.push(i);
+  }
+  if (input.fixed) phase = downbeatIdx[0] ?? 0;
+  const isDownbeatIdx = new Set(downbeatIdx);
+
   const beatObjs: Beat[] = beats.map((time, index) => ({
     time,
     index,
     strength: strengths[index],
-    isDownbeat: index >= phase && (index - phase) % beatsPerBar === 0,
+    isDownbeat: isDownbeatIdx.has(index),
   }));
 
-  // Bars from the phase offset forward.
+  // Bars from downbeat to downbeat.
   const bars: Bar[] = [];
-  let barIndex = 0;
-  for (let i = phase; i < beats.length; i += beatsPerBar) {
+  downbeatIdx.forEach((i, k) => {
+    const nextIdx = k + 1 < downbeatIdx.length ? downbeatIdx[k + 1] : Math.min(beats.length, i + beatsPerBar);
     const beatIdx: number[] = [];
-    for (let j = i; j < Math.min(beats.length, i + beatsPerBar); j++) beatIdx.push(j);
+    for (let j = i; j < nextIdx; j++) beatIdx.push(j);
     const start = beats[i];
-    const end = i + beatsPerBar < beats.length
-      ? beats[i + beatsPerBar]
+    const end = nextIdx < beats.length
+      ? beats[nextIdx]
       : start + (beatIdx.length) * (input.bpm > 0 ? 60 / input.bpm : 0.5);
-    bars.push({ index: barIndex++, start, end, downbeat: start, beats: beatIdx, full: beatIdx.length === beatsPerBar });
-  }
+    bars.push({ index: k, start, end, downbeat: start, beats: beatIdx, full: beatIdx.length === beatsPerBar });
+  });
 
   const firstDownbeatIdx = (() => {
-    for (let i = firstMusicalIdx; i < beats.length; i++) if (i >= phase && (i - phase) % beatsPerBar === 0) return i;
+    for (const i of downbeatIdx) if (i >= firstMusicalIdx) return i;
     return Math.min(beats.length - 1, Math.max(0, phase));
   })();
   const firstFullBar = bars.find((b) => b.full && b.beats[0] >= firstDownbeatIdx);
@@ -167,7 +187,8 @@ export function buildBeatGrids(input: BeatGridInput): BeatGridResult {
   }
 
   const regularity = beatRegularity(beats);
-  const gridConfidence = beats.length === 0 ? 0 : Math.min(1, 0.5 * bpmConfidence + 0.5 * regularity);
+  const gridConfidence = input.fixed ? input.fixed.confidence
+    : beats.length === 0 ? 0 : Math.min(1, 0.5 * bpmConfidence + 0.5 * regularity);
 
   const beatGrid: BeatGrid = {
     bpm: input.bpm,
@@ -178,7 +199,7 @@ export function buildBeatGrids(input: BeatGridInput): BeatGridResult {
   const downbeats: DownbeatGrid = {
     bars,
     meter: { beatsPerBar, confidence: meterConfidence },
-    confidence: Math.min(1, gridConfidence * (0.5 + 0.5 * meterConfidence)),
+    confidence: input.fixed ? input.fixed.confidence : Math.min(1, gridConfidence * (0.5 + 0.5 * meterConfidence)),
     phaseOffset: phase,
   };
   const meter: MeterAnalysis = { beatsPerBar, confidence: meterConfidence, alternatives };
