@@ -32,28 +32,23 @@ import type { StemResult } from '@engine/demucs/types';
 
 // ── Auto-gain ────────────────────────────────────────────────────────────────
 
-const TARGET_RMS_DB = -6;
 /**
- * A track whose loudness was never measured plays at unity. An unknown level
- * is not a quiet one: the old +9 dB "conservative lift" drove every
- * unanalysed track into the deck limiter (continuous 2-3 dB gain reduction,
- * pumping kick, the DJ view always sounding processed while the tracker view
- * did not).
- */
-const UNANALYZED_FALLBACK_TRIM_DB = 0;
-
-/**
- * Compute auto-gain trim in dB from analysis data.
- * Pure RMS-based targeting — no peak clamp. The master limiter at -0.3 dBFS
- * is the real ceiling, so auto-gain can push cold tracks up to +18 dB freely.
+ * A deck plays a song at the level the same song has in the tracker view
+ * (owner decision 2026-10-11, "match tracker level"). The tracker applies no
+ * per-song loudness normalisation: the sample and synth bus gains are manual
+ * (0 dB by default), the optional bus auto-gain only balances the sample bus
+ * against the synth bus, and the master volume defaults to 0 dB. So the
+ * matching trim is 0 dB for every track, measured or not - the deck plays the
+ * rendered song as rendered, and the deck limiter only catches overs.
  *
- * When a track has no loudness measurement (rmsDb <= -80, the sentinel) the
- * trim is 0 dB: no measurement, no gain.
+ * The old policy pushed every track to -6 dB RMS (+8 dB for a typical module
+ * at -14 dB RMS), which put a crest-12 dB track's peaks ~6 dB over the deck
+ * limiter: continuous limiting, a pumping kick, the DJ view sounding
+ * processed next to the tracker view. Before that, an unmeasured track got
+ * +9 dB. The arguments stay so every caller keeps one policy function.
  */
-export function computeAutoTrim(rmsDb: number, _peakDb: number): number {
-  if (rmsDb <= -80) return UNANALYZED_FALLBACK_TRIM_DB;
-  const rmsBasedTrim = TARGET_RMS_DB - rmsDb;
-  return Math.max(-12, Math.min(18, rmsBasedTrim));
+export function computeAutoTrim(_rmsDb: number, _peakDb: number): number {
+  return 0;
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
