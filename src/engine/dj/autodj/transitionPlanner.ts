@@ -13,7 +13,7 @@ import { bassCompatibility, drumCompatibility, harmonicCompatibility, vocalCompa
 import { planGain, sharedBarsOf } from './gainStaging';
 import { solveKey, solveTempo, type TempoKeyLimits } from './tempoKeySolver';
 import { keyAt, summarizeTrack } from './trackAnalysis';
-import { timelineAt, barIndexAt } from './beatGrid';
+import { timelineAt, barIndexAt, trackBeatConfidence } from './beatGrid';
 import type {
   AutomationCurve, BassHandoverPlan, BassOwner, CutCandidate, CueJumpPlan, DJEffectEvent, DJPhrase,
   DJSection, DJStyleProfile, DJTrackAnalysis, DJTransitionPlan, EQPlan, HumanizePlan, LoopPlan,
@@ -185,7 +185,7 @@ export function chooseMixIn(a: DJTrackAnalysis, style: TransitionStyle, lengthSe
 
 /**
  * The pair's confidences in the juggle layer's terms (owner plan section 31):
- * beat = both grids and both downbeat grids; sync = how well two beatmatched
+ * beat = both tracks' beat confidence (trackBeatConfidence: grid and bars); sync = how well two beatmatched
  * decks on these grids hold; phrase = both tracks' phrase confidence;
  * material = both analyses. The juggle layer's confidencePolicy reads them.
  */
@@ -193,7 +193,7 @@ export function pairConfidence(outgoing: DJTrackAnalysis, incoming: DJTrackAnaly
   const o = outgoing.analysisConfidence, i = incoming.analysisConfidence;
   const phraseOf = (a: DJTrackAnalysis) => (a.phrases.length ? mean(a.phrases.map((p) => p.confidence)) : a.analysisConfidence.downbeat * 0.8);
   return {
-    beatConfidence: Math.min(o.beatGrid, i.beatGrid, o.downbeat, i.downbeat),
+    beatConfidence: Math.min(trackBeatConfidence(outgoing), trackBeatConfidence(incoming)),
     deckSyncConfidence: Math.min(o.beatGrid, i.beatGrid),
     phraseConfidence: Math.min(phraseOf(outgoing), phraseOf(incoming)),
     materialConfidence: Math.min(o.overall, i.overall),
