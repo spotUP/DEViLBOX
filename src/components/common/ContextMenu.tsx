@@ -12,6 +12,14 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+
+/**
+ * An open menu is the topmost layer: it opens from whatever the person is
+ * looking at, including fixed panels and dialogs (up to z 999999). At the old
+ * default of 100 every select inside the Auto DJ panel (z 99989, over a
+ * click-catching backdrop at 99988) opened behind it and could not be used.
+ */
+export const MENU_Z_INDEX = 1_000_000;
 import { ChevronRight, Check, Circle } from 'lucide-react';
 import { useClickOutside } from '@hooks/useClickOutside';
 
@@ -62,7 +70,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onClose,
   className = '',
   minWidth,
-  zIndex = 100,
+  zIndex = MENU_Z_INDEX,
   autoFocus = true,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
