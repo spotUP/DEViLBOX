@@ -30,6 +30,21 @@ export interface JuggleActionSink {
   phaseError?(deck: 'A' | 'B'): number | null;
 }
 
+/** A deck's heard bar phase counts as verified within this of the other deck's (owner plan section 16; the P4 criteria's 5 ms). */
+export const PHASE_VERIFIED_SEC = 0.005;
+
+/**
+ * Why `deck` is not verified in bar phase with the other deck (the sink's
+ * measured heard error against PHASE_VERIFIED_SEC), or null when it is - or
+ * when the sink cannot measure at all (a test sink without a grid).
+ */
+export function phaseUnverified(sink: Pick<JuggleActionSink, 'phaseError'>, deck: 'A' | 'B'): string | null {
+  if (!sink.phaseError) return null;
+  const err = sink.phaseError(deck);
+  if (err === null) return `deck ${deck} phase cannot be measured`;
+  return Math.abs(err) <= PHASE_VERIFIED_SEC ? null : `deck ${deck} ${(err * 1000).toFixed(1)} ms off the other deck's bars`;
+}
+
 export interface JuggleEvent {
   kind: JuggleEventKind;
   beat: number;
@@ -126,6 +141,11 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
 
   /** Section 32: the governor's reasons to block an action, or null. */
   const govern = (action: DJJuggleAction, now: number): string | null => {
+    // Section 16: an action that needs two decks in phase (a double's layer) is skipped when they are not.
+    if (action.verifyPhaseOf) {
+      const off = phaseUnverified(opts.sink, action.verifyPhaseOf);
+      if (off) return `phase not verified (${off}): skipped, what plays holds`;
+    }
     const st = opts.sink.state();
     if (CUT_TYPES.has(action.type)) {
       const key = Math.floor(now);

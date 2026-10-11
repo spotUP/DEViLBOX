@@ -52,6 +52,12 @@ export interface DJJuggleAction {
   strength?: number;
   reason?: string;
   phase?: JugglePhase;
+  /**
+   * Fire only when this deck's heard bar phase is verified against the other
+   * deck's (owner plan section 16: align, verify, then permit); out of
+   * tolerance the action is skipped and what plays holds.
+   */
+  verifyPhaseOf?: 'A' | 'B';
 }
 
 export type DJJugglePatternType =
