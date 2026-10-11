@@ -160,3 +160,27 @@ describe('nudging an audio deck moves its playback rate', () => {
     expect(replayer.tempo).toBe(1);
   });
 });
+
+describe('a held nudge button bends until it is released', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('audio deck: stays bent for as long as the button is held, then returns to the fader rate', () => {
+    const { d, audioPlayer } = deck('audio');
+    d.holdNudge(2);
+    expect(audioPlayer.rate).toBeCloseTo(1.02, 9);
+    vi.advanceTimersByTime(5000);
+    expect(audioPlayer.rate).toBeCloseTo(1.02, 9);
+    d.releaseNudge();
+    expect(audioPlayer.rate).toBe(1);
+  });
+
+  it('tracker deck: the nudge offset holds until release, then clears', () => {
+    const { d, replayer } = deck('tracker');
+    d.holdNudge(-5);
+    expect(replayer.nudges.at(-1)).toEqual([-5, Number.MAX_SAFE_INTEGER]);
+    d.releaseNudge();
+    expect(replayer.nudges.at(-1)).toEqual([0, 0]);
+  });
+});
+

@@ -632,6 +632,20 @@ export function nudgeDeck(deckId: DeckId, offset: number, ticks = 8): void {
   } catch { /* engine not ready */ }
 }
 
+/** Press-and-hold nudge: bent by `offset` until releaseNudgeDeck. */
+export function holdNudgeDeck(deckId: DeckId, offset: number): void {
+  try {
+    getDJEngine().getDeck(deckId).holdNudge(offset);
+  } catch { /* engine not ready */ }
+}
+
+/** Release a held nudge: the deck returns to its fader rate. */
+export function releaseNudgeDeck(deckId: DeckId): void {
+  try {
+    getDJEngine().getDeck(deckId).releaseNudge();
+  } catch { /* engine not ready */ }
+}
+
 // ============================================================================
 // LOOP
 // ============================================================================
