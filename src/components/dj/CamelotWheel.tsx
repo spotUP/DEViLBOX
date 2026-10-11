@@ -144,7 +144,7 @@ export const CamelotWheel: React.FC<CamelotWheelProps> = ({ size = 108 }) => {
                 d={sectorPath(cx, cy, rI, rO, t0, t1)}
                 fill={fill}
                 fillOpacity={opacity}
-                stroke={occupied ? '#ffffff' : 'rgba(0,0,0,0.35)'}
+                stroke={occupied ? 'var(--color-text)' : 'rgba(0,0,0,0.35)'}
                 strokeWidth={occupied ? 1.4 : 0.5}
               />
               <text
@@ -154,7 +154,7 @@ export const CamelotWheel: React.FC<CamelotWheelProps> = ({ size = 108 }) => {
                 dominantBaseline="central"
                 fontSize={seg.ring === 'B' ? 7 : 6}
                 fontFamily="monospace"
-                fill={occupied ? '#000000' : 'rgba(255,255,255,0.75)'}
+                fill={occupied ? 'var(--color-bg)' : 'var(--color-text-secondary)'}
                 fontWeight={occupied ? 700 : 400}
                 style={{ pointerEvents: 'none' }}
               >
@@ -173,7 +173,7 @@ export const CamelotWheel: React.FC<CamelotWheelProps> = ({ size = 108 }) => {
           fontSize={focusKey ? 11 : 8}
           fontFamily="monospace"
           fontWeight={700}
-          fill={focusKey ? '#f3f4f6' : analysing ? '#eab308' : '#6b7280'}
+          fill={focusKey ? 'var(--color-text)' : analysing ? 'var(--color-accent)' : 'var(--color-text-muted)'}
         >
           {focusKey ? camelotDisplay(focusKey) : analysing ? '···' : '—'}
         </text>
@@ -184,7 +184,7 @@ export const CamelotWheel: React.FC<CamelotWheelProps> = ({ size = 108 }) => {
         {deckKeys.map((d) => {
           const disp = d.key ? camelotDisplay(d.key) : anyKey || !analysing ? '—' : '···';
           return (
-            <span key={d.deckId} className="tabular-nums" style={{ color: d.key ? camelotColor(d.key) : '#6b7280' }}>
+            <span key={d.deckId} className="tabular-nums" style={{ color: d.key ? camelotColor(d.key) : 'var(--color-text-muted)' }}>
               {d.deckId} {disp}
             </span>
           );

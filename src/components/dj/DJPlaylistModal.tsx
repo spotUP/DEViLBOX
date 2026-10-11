@@ -7,6 +7,7 @@
  * Uses design system tokens throughout — no raw Tailwind colors.
  */
 
+import { deckAccent } from '@lib/deckIdentity';
 import React, { useState, useCallback, useRef, useEffect, useMemo, useSyncExternalStore } from 'react';
 import {
   DndContext,
@@ -364,9 +365,9 @@ function useIsPreRendering(fileName: string): boolean {
 }
 
 const DECK_COLOR: Record<DeckId, string> = {
-  A: 'bg-accent-primary',
-  B: 'bg-accent-error',
-  C: 'bg-accent-success',
+  A: 'bg-deck-a',
+  B: 'bg-deck-b',
+  C: 'bg-deck-c',
 };
 
 const TrackScrubber: React.FC<{ deckId: DeckId }> = React.memo(({ deckId }) => {
@@ -534,7 +535,7 @@ function useStemStatus(fileName: string): StemJobStatus | 'unknown' | null {
 
 const STEM_STATUS_BADGE: Record<string, { label: string; color: string; title: string }> = {
   cached:     { label: '✂', color: 'text-accent-success',  title: 'Stems ready' },
-  separating: { label: '⚙', color: 'text-accent-warning animate-spin-slow', title: 'Separating stems…' },
+  separating: { label: '⚙', color: 'text-accent-primary animate-spin-slow', title: 'Separating stems…' },
   queued:     { label: '⏳', color: 'text-text-muted',      title: 'Queued for separation' },
   failed:     { label: '✗', color: 'text-accent-error',     title: 'Stem separation failed' },
 };
@@ -665,15 +666,15 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         ) : playingDeckId ? (
           <span
             className="text-[20px] font-bold"
-            style={{ color: playingDeckId === 'A' ? '#00d4ff' : playingDeckId === 'B' ? '#ef4444' : '#22c55e' }}
+            style={{ color: deckAccent(playingDeckId) }}
             title={`Playing on deck ${playingDeckId}`}
           >
             {playingDeckId}
           </span>
         ) : track.played ? (
-          <span className="text-accent-success/50 text-[20px]" title="Played">✓</span>
+          <span className="text-text-muted text-[20px]" title="Played">✓</span>
         ) : isAutoDJCurrent ? (
-          <span className="text-accent-success text-[20px]" title="Now playing">▶</span>
+          <span className="text-accent-primary text-[20px]" title="Now playing">▶</span>
         ) : isAutoDJNext ? (
           <span className="text-accent-primary text-[20px]" title="Up next">▸</span>
         ) : null}
@@ -724,7 +725,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         {track.energy != null && track.energy > 0 ? (
           <div className="w-full h-2 bg-dark-bgTertiary rounded-full overflow-hidden" title={`Energy: ${Math.round(track.energy * 100)}%`}>
             <div
-              className="h-full rounded-full bg-accent-warning"
+              className="h-full rounded-full bg-accent-primary"
               style={{ width: `${track.energy * 100}%` }}
             />
           </div>
@@ -3536,10 +3537,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                 {/* Preview strip */}
                 {previewingIndex != null && activePlaylist.tracks[previewingIndex] && (
                   <div className="px-3 py-1.5 border-t border-dark-border bg-dark-bg flex items-center gap-2">
-                    <button onClick={stopPreview} className="p-1 text-accent-success hover:text-accent-success/80 transition-colors" title="Stop preview">
+                    <button onClick={stopPreview} className="p-1 text-accent-primary hover:text-accent-primary/80 transition-colors" title="Stop preview">
                       <Square size={12} />
                     </button>
-                    <span className="text-[11px] font-mono text-accent-success">▶ Preview:</span>
+                    <span className="text-[11px] font-mono text-accent-primary">▶ Preview:</span>
                     <span className="text-[11px] font-mono text-text-primary truncate flex-1 min-w-0">
                       {activePlaylist.tracks[previewingIndex].trackName}
                     </span>
@@ -3592,10 +3593,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                   {precacheProgress && (
                     <div className="flex items-center gap-2">
                       <div className="w-24 h-1.5 bg-dark-bgTertiary rounded-full overflow-hidden">
-                        <div className="h-full bg-accent-warning transition-all duration-300"
+                        <div className="h-full bg-accent-primary transition-all duration-300"
                           style={{ width: `${(precacheProgress.current / precacheProgress.total) * 100}%` }} />
                       </div>
-                      <span className="text-accent-warning">{precacheProgress.current}/{precacheProgress.total}</span>
+                      <span className="text-accent-primary">{precacheProgress.current}/{precacheProgress.total}</span>
                     </div>
                   )}
 

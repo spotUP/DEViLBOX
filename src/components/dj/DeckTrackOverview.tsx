@@ -251,7 +251,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
           style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
         >
           <div 
-            className={`h-full transition-all duration-500 ease-out ${analysisState === 'rendering' ? 'bg-blue-500/40' : 'bg-purple-500/40'}`}
+            className={`h-full transition-all duration-500 ease-out ${analysisState === 'rendering' ? 'bg-accent-primary/20' : 'bg-dark-bgTertiary/40'}`}
             style={{ width: `${analysisProgress}%` }}
           />
           <div className="absolute inset-0 flex items-center justify-center">

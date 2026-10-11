@@ -14,19 +14,19 @@ type StreamPlatform = 'youtube' | 'twitch' | 'custom';
 const PLATFORM_INFO: Record<StreamPlatform, { label: string; color: string; placeholder: string; help: string }> = {
   youtube: {
     label: 'YouTube',
-    color: 'bg-red-600 hover:bg-red-700',
+    color: 'bg-dark-bgActive hover:bg-dark-bgHover',
     placeholder: 'xxxx-xxxx-xxxx-xxxx',
     help: 'YouTube Studio → Go Live → Stream → Stream key',
   },
   twitch: {
     label: 'Twitch',
-    color: 'bg-purple-600 hover:bg-purple-700',
+    color: 'bg-dark-bgActive hover:bg-dark-bgHover',
     placeholder: 'live_xxxxxxxxxxxxxxxxx',
     help: 'Twitch Dashboard → Settings → Stream → Primary Stream key',
   },
   custom: {
     label: 'Custom RTMP',
-    color: 'bg-gray-600 hover:bg-gray-700',
+    color: 'bg-dark-bgActive hover:bg-dark-bgHover',
     placeholder: 'rtmp://server/app/key',
     help: 'Full RTMP URL including stream key',
   },

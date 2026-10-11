@@ -50,9 +50,9 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
   const pressTimeRef = useRef<number>(0);
 
   const isB = deckId === 'B';
-  const deckColor = isB ? 'text-red-400' : 'text-blue-400';
-  const deckActiveBg = isB ? 'bg-red-900/40 border-red-500/60' : 'bg-blue-900/40 border-blue-500/60';
-  const deckWaitBg = isB ? 'bg-red-900/20 border-red-500/30' : 'bg-blue-900/20 border-blue-500/30';
+  const deckColor = isB ? 'text-deck-b' : 'text-deck-a';
+  const deckActiveBg = isB ? 'bg-deck-b/20 border-deck-b/60' : 'bg-deck-a/20 border-deck-a/60';
+  const deckWaitBg = isB ? 'bg-deck-b/10 border-deck-b/30' : 'bg-deck-a/10 border-deck-a/30';
 
   // ── Pattern buttons ──────────────────────────────────────────────────────
 

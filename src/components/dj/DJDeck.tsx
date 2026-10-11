@@ -388,9 +388,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
 
   const isB = deckId === 'B';
   const deckNum = deckId === 'A' ? '1' : deckId === 'B' ? '2' : '3';
-  const deckColor = deckId === 'A' ? 'text-blue-400' : deckId === 'B' ? 'text-red-400' : 'text-emerald-400';
-  const deckBorderColor = deckId === 'A' ? 'border-blue-900/30' : deckId === 'B' ? 'border-red-900/30' : 'border-emerald-900/30';
-  const deckHighlight = deckId === 'A' ? 'border-blue-500/60' : deckId === 'B' ? 'border-red-500/60' : 'border-emerald-500/60';
+  const deckColor = deckId === 'A' ? 'text-deck-a' : deckId === 'B' ? 'text-deck-b' : 'text-deck-c';
+  const deckBorderColor = deckId === 'A' ? 'border-deck-a/30' : deckId === 'B' ? 'border-deck-b/30' : 'border-deck-c/30';
+  const deckHighlight = deckId === 'A' ? 'border-deck-a/60' : deckId === 'B' ? 'border-deck-b/60' : 'border-deck-c/60';
 
   return (
     <div

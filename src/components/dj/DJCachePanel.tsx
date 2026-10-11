@@ -79,7 +79,7 @@ export const DJCachePanel: React.FC<DJCachePanelProps> = ({ className }) => {
           disabled={loading}
           className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono rounded
                      bg-dark-bgTertiary border border-dark-borderLight
-                     hover:bg-red-900/20 hover:border-red-800/30 hover:text-red-400
+                     hover:bg-dark-bgHover hover:border-dark-borderLight/30 hover:text-text-primary
                      text-text-muted transition-colors disabled:opacity-50"
           title="Clear cache"
         >

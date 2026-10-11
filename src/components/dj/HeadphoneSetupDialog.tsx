@@ -272,17 +272,17 @@ export const HeadphoneSetupDialog: React.FC<HeadphoneSetupDialogProps> = ({ isOp
               <div className="p-3 rounded bg-dark-bgTertiary border border-dark-borderLight space-y-2">
                 <div className="text-xs text-text-primary font-medium">How to use:</div>
                 <div className="flex items-start gap-2 text-xs text-text-secondary">
-                  <Volume2 size={14} className="flex-shrink-0 mt-0.5 text-accent-warning" />
+                  <Volume2 size={14} className="flex-shrink-0 mt-0.5 text-accent-primary" />
                   <div>
-                    Press the <span className="font-mono bg-accent-warning/20 text-accent-warning px-1 rounded">A</span> or{' '}
-                    <span className="font-mono bg-accent-warning/20 text-accent-warning px-1 rounded">B</span> button
+                    Press the <span className="font-mono bg-accent-primary/20 text-accent-primary px-1 rounded">A</span> or{' '}
+                    <span className="font-mono bg-accent-primary/20 text-accent-primary px-1 rounded">B</span> button
                     next to the headphone icon to preview that deck in your headphones (PFL).
                   </div>
                 </div>
                 <div className="flex items-start gap-2 text-xs text-text-secondary">
-                  <Headphones size={14} className="flex-shrink-0 mt-0.5 text-[#66ccff]" />
+                  <Headphones size={14} className="flex-shrink-0 mt-0.5 text-accent-primary" />
                   <div>
-                    Use the <span className="font-mono text-[#66ccff]">CUE ↔ MST</span> slider
+                    Use the <span className="font-mono text-accent-primary">CUE ↔ MST</span> slider
                     to blend between your cued deck and the main mix in your headphones.
                   </div>
                 </div>

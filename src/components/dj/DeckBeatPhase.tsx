@@ -9,6 +9,7 @@
  * beat the heard position last crossed, its brightness the fraction into it.
  */
 
+import { deckAccent } from '@lib/deckIdentity';
 import React, { useRef, useEffect, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from '@/engine/dj/DeckEngine';
@@ -68,8 +69,7 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
     };
   }, [deckId, viz]);
 
-  const isA = deckId === 'A';
-  const accentColor = isA ? '#3b82f6' : '#f97316'; // blue / orange
+  const accentColor = deckAccent(deckId);
   const dimColor = 'rgba(255,255,255,0.08)';
 
   if (!hasBeatGrid) {
@@ -99,7 +99,7 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
         // Brightness ramps down across the sub-beat phase
         const brightness = isActive ? brightnessRef.current : 0.08;
 
-        const color = isDownbeat ? accentColor : '#ffffff';
+        const color = isDownbeat ? accentColor : 'var(--color-text)';
 
         return (
           <div

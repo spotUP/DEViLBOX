@@ -35,23 +35,23 @@ export class DJErrorBoundary extends React.Component<Props, State> {
       return (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          height: '100%', background: '#1a1a1a', color: '#fff', fontFamily: 'monospace', gap: 16,
+          height: '100%', background: 'var(--color-bg)', color: 'var(--color-text)', fontFamily: 'monospace', gap: 16,
         }}>
           <div style={{ fontSize: 18, fontWeight: 'bold' }}>
             {this.props.viewName} View Crashed
           </div>
-          <div style={{ fontSize: 12, color: '#888', maxWidth: 400, textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 400, textAlign: 'center' }}>
             {this.state.error?.message ?? 'Unknown error'}
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={this.handleRetry} style={{
-              padding: '8px 20px', background: '#2a6', color: '#fff', border: 'none',
+              padding: '8px 20px', background: 'var(--color-accent)', color: 'var(--color-text-inverse)', border: 'none',
               borderRadius: 4, cursor: 'pointer', fontSize: 14,
             }}>
               Retry
             </button>
             <button onClick={this.handleReload} style={{
-              padding: '8px 20px', background: '#444', color: '#fff', border: 'none',
+              padding: '8px 20px', background: 'var(--color-bg-active)', color: 'var(--color-text)', border: 'none',
               borderRadius: 4, cursor: 'pointer', fontSize: 14,
             }}>
               Reload Page

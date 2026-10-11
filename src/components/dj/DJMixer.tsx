@@ -47,9 +47,9 @@ export const DJMixer: React.FC = () => {
         {/* Deck A knobs — stacked vertically, kill buttons on outside (left) */}
         <div className="flex flex-col items-center gap-0.5">
           <MixerFilterKnob deckId="A" />
-          <MixerEQBandKnob deckId="A" band="high" label="HI" color="#00d4ff" side="left" />
-          <MixerEQBandKnob deckId="A" band="mid" label="MID" color="#cccccc" side="left" />
-          <MixerEQBandKnob deckId="A" band="low" label="LO" color="#ff8800" side="left" />
+          <MixerEQBandKnob deckId="A" band="high" label="HI" side="left" />
+          <MixerEQBandKnob deckId="A" band="mid" label="MID" side="left" />
+          <MixerEQBandKnob deckId="A" band="low" label="LO" side="left" />
         </div>
 
         {/* Deck A fader — stretches full height */}
@@ -68,9 +68,9 @@ export const DJMixer: React.FC = () => {
         {/* Deck B knobs — stacked vertically, kill buttons on outside (right) */}
         <div className="flex flex-col items-center gap-0.5">
           <MixerFilterKnob deckId="B" />
-          <MixerEQBandKnob deckId="B" band="high" label="HI" color="#00d4ff" side="right" />
-          <MixerEQBandKnob deckId="B" band="mid" label="MID" color="#cccccc" side="right" />
-          <MixerEQBandKnob deckId="B" band="low" label="LO" color="#ff8800" side="right" />
+          <MixerEQBandKnob deckId="B" band="high" label="HI" side="right" />
+          <MixerEQBandKnob deckId="B" band="mid" label="MID" side="right" />
+          <MixerEQBandKnob deckId="B" band="low" label="LO" side="right" />
         </div>
 
         {thirdDeck && (
@@ -78,9 +78,9 @@ export const DJMixer: React.FC = () => {
             <MixerChannelStrip deckId="C" stretch />
             <div className="flex flex-col items-center gap-0.5">
               <MixerFilterKnob deckId="C" />
-              <MixerEQBandKnob deckId="C" band="high" label="HI" color="#00d4ff" side="right" />
-              <MixerEQBandKnob deckId="C" band="mid" label="MID" color="#cccccc" side="right" />
-              <MixerEQBandKnob deckId="C" band="low" label="LO" color="#ff8800" side="right" />
+              <MixerEQBandKnob deckId="C" band="high" label="HI" side="right" />
+              <MixerEQBandKnob deckId="C" band="mid" label="MID" side="right" />
+              <MixerEQBandKnob deckId="C" band="low" label="LO" side="right" />
             </div>
           </>
         )}
@@ -112,7 +112,7 @@ export const DJMixer: React.FC = () => {
             step={0.01}
             value={returnGain}
             onChange={handleReturnGainChange}
-            className="flex-1 accent-accent-highlight cursor-pointer"
+            className="flex-1 accent-accent-primary cursor-pointer"
             title={`FX wet level: ${(returnGain * 100).toFixed(0)}%`}
           />
           <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
@@ -134,7 +134,7 @@ export const DJMixer: React.FC = () => {
           onClick={() => setShowBroadcast(v => !v)}
           className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
             showBroadcast
-              ? 'bg-red-900/40 border-red-700/60 text-red-300'
+              ? 'bg-accent-primary/20 border-accent-primary/60 text-accent-primary'
               : 'bg-dark-bgSecondary border-dark-border text-text-secondary hover:text-text-primary'
           }`}
         >

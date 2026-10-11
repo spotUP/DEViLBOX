@@ -303,7 +303,7 @@ export const DJFxQuickPresets: React.FC = () => {
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono border transition-all
           ${activePresetName
-            ? 'border-green-600/60 bg-green-950/30 text-green-400'
+            ? 'border-accent-primary/60 bg-accent-primary/20 text-accent-primary'
             : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
       >
@@ -390,10 +390,10 @@ export const DJFxQuickPresets: React.FC = () => {
           {/* User presets */}
           {userPresets.length > 0 && (
             <div className="border-b border-dark-border">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400/70">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-text-secondary/70">
                 <Star size={10} />
                 My Presets
-                {user && <Cloud size={9} className="ml-auto text-green-500/50" aria-label="Synced to account" />}
+                {user && <Cloud size={9} className="ml-auto text-accent-success/50" aria-label="Synced to account" />}
                 {!user && <CloudOff size={9} className="ml-auto text-text-muted/30" aria-label="Local only — log in to sync" />}
               </div>
               {userPresets.map((preset) => (
@@ -402,7 +402,7 @@ export const DJFxQuickPresets: React.FC = () => {
                   onClick={() => applyUserPreset(preset)}
                   className={`group flex items-center w-full px-3 py-1.5 text-left text-xs font-mono transition-colors
                     ${activePresetName === preset.name
-                      ? 'bg-amber-950/30 text-amber-300'
+                      ? 'bg-accent-primary/20 text-accent-primary'
                       : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
                     }`}
                 >
@@ -412,7 +412,7 @@ export const DJFxQuickPresets: React.FC = () => {
                   </span>
                   <Trash2
                     size={11}
-                    className="shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 text-red-400 transition-opacity"
+                    className="shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 text-text-secondary transition-opacity"
                     onClick={(e) => deleteUserPreset(preset.name, e)}
                   />
                 </button>

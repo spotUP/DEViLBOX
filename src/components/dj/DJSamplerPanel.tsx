@@ -185,7 +185,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider">
+          <span className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-wider">
             Sampler
           </span>
           {/* Program selector */}
@@ -217,7 +217,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
               onClick={() => setBank(bank)}
               className={`w-5 h-5 text-[9px] font-bold font-mono rounded transition-colors ${
                 currentBank === bank
-                  ? 'bg-amber-600 text-text-primary'
+                  ? 'bg-accent-primary text-text-inverse'
                   : 'bg-dark-bgSecondary border border-dark-border text-text-muted hover:text-text-primary'
               }`}
             >
@@ -230,7 +230,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
           <DubBusPanel />
           <button
             onClick={() => engineRef.current?.stopAll()}
-            className="px-1.5 py-0.5 text-[9px] font-mono text-red-400 hover:text-red-300 bg-dark-bgSecondary border border-dark-border rounded transition-colors"
+            className="px-1.5 py-0.5 text-[9px] font-mono text-text-secondary hover:text-text-primary bg-dark-bgSecondary border border-dark-border rounded transition-colors"
             title="Stop all"
           >
             ■

@@ -88,7 +88,7 @@ export const MixerTransition: React.FC = () => {
           transition-all duration-100
           ${
             automating && direction === 'A→B'
-              ? 'bg-accent-highlight/40 text-accent-highlight border border-accent-highlight/50 animate-pulse'
+              ? 'bg-accent-primary/40 text-accent-primary border border-accent-primary/50 animate-pulse'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:bg-dark-bgHover hover:text-text-secondary'
           }
           disabled:opacity-30
@@ -104,7 +104,7 @@ export const MixerTransition: React.FC = () => {
         onClick={() => handleQuickCut('A')}
         className="flex items-center gap-0.5 px-1.5 h-7 rounded text-[9px] font-bold
           bg-dark-bgTertiary text-text-muted border border-dark-border
-          hover:bg-amber-600/20 hover:text-amber-300 transition-all duration-100"
+          hover:bg-dark-bgHover hover:text-text-primary transition-all duration-100"
         title="Quick cut to A (on downbeat if quantized)"
       >
         <Zap size={8} />A
@@ -115,8 +115,8 @@ export const MixerTransition: React.FC = () => {
         <button
           onClick={cancelCurrent}
           className="flex items-center gap-0.5 px-1.5 h-7 rounded text-[9px] font-bold
-            bg-red-600/30 text-red-300 border border-red-500/40
-            hover:bg-red-600/50 transition-all duration-100"
+            bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/40
+            hover:bg-dark-bgHover transition-all duration-100"
           title="Cancel automation"
         >
           <X size={10} />
@@ -130,7 +130,7 @@ export const MixerTransition: React.FC = () => {
         onClick={() => handleQuickCut('B')}
         className="flex items-center gap-0.5 px-1.5 h-7 rounded text-[9px] font-bold
           bg-dark-bgTertiary text-text-muted border border-dark-border
-          hover:bg-amber-600/20 hover:text-amber-300 transition-all duration-100"
+          hover:bg-dark-bgHover hover:text-text-primary transition-all duration-100"
         title="Quick cut to B (on downbeat if quantized)"
       >
         B<Zap size={8} />
@@ -145,7 +145,7 @@ export const MixerTransition: React.FC = () => {
           transition-all duration-100
           ${
             automating && direction === 'B→A'
-              ? 'bg-accent-highlight/40 text-accent-highlight border border-accent-highlight/50 animate-pulse'
+              ? 'bg-accent-primary/40 text-accent-primary border border-accent-primary/50 animate-pulse'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:bg-dark-bgHover hover:text-text-secondary'
           }
           disabled:opacity-30

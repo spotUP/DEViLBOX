@@ -213,7 +213,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
 
       {/* Error display */}
       {error && (
-        <div className="text-red-400 text-[10px] font-mono px-2 py-1 bg-red-900/20 rounded border border-red-900/30">
+        <div className="text-text-secondary text-[10px] font-mono px-2 py-1 bg-dark-bgTertiary/20 rounded border border-dark-borderLight/30">
           {error}
         </div>
       )}
@@ -256,7 +256,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                   <div className="flex items-center gap-1.5">
                     <div className="text-text-primary text-xs font-mono truncate">{file.name}</div>
                     {file.isCached && (
-                      <span className="text-[8px] font-mono px-1 py-0.5 bg-green-900/30 text-green-400 rounded border border-green-700/30">
+                      <span className="text-[8px] font-mono px-1 py-0.5 bg-dark-bgTertiary/30 text-text-secondary rounded border border-dark-borderLight/30">
                         CACHED
                       </span>
                     )}
@@ -282,7 +282,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                       addedAt: Date.now(),
                     });
                   }}
-                  className="p-1 text-text-muted hover:text-amber-400 transition-colors
+                  className="p-1 text-text-muted hover:text-text-primary transition-colors
                              opacity-0 group-hover:opacity-100"
                   title="Add to active playlist"
                 >
@@ -293,8 +293,8 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                 <button
                   onClick={() => loadToDeck(file, 'A')}
                   className="px-2 py-1 text-[10px] font-mono font-bold rounded
-                             bg-blue-900/30 text-blue-400 border border-blue-800/50
-                             hover:bg-blue-800/40 hover:text-blue-300 transition-colors
+                             bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                             hover:bg-dark-bgHover hover:text-text-primary transition-colors
                              opacity-0 group-hover:opacity-100"
                 >
                   1
@@ -302,8 +302,8 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                 <button
                   onClick={() => loadToDeck(file, 'B')}
                   className="px-2 py-1 text-[10px] font-mono font-bold rounded
-                             bg-red-900/30 text-red-400 border border-red-800/50
-                             hover:bg-red-800/40 hover:text-red-300 transition-colors
+                             bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                             hover:bg-dark-bgHover hover:text-text-primary transition-colors
                              opacity-0 group-hover:opacity-100"
                 >
                   2
@@ -312,8 +312,8 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                   <button
                     onClick={() => loadToDeck(file, 'C')}
                     className="px-2 py-1 text-[10px] font-mono font-bold rounded
-                               bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
-                               hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
+                               bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                               hover:bg-dark-bgHover hover:text-text-primary transition-colors
                                opacity-0 group-hover:opacity-100"
                   >
                     3

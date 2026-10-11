@@ -9,6 +9,7 @@
  * - Fader closed (gain=0): track groove lights up with deck color + "CUT" label
  */
 
+import { deckAccent } from '@lib/deckIdentity';
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -187,7 +188,7 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, st
           >
             <span
               className="text-[8px] font-mono font-bold tracking-wider"
-              style={{ color: isB ? '#f87171' : '#60a5fa' }}
+              style={{ color: deckAccent(isB ? 'B' : 'A') }}
             >
               CUT
             </span>
@@ -202,7 +203,7 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, st
 
       {/* Trim/auto-gain indicator */}
       {trimGain !== 0 && (
-        <div className="text-[8px] font-mono text-accent-highlight opacity-70" title={`Auto-gain trim: ${trimGain > 0 ? '+' : ''}${trimGain.toFixed(1)}dB`}>
+        <div className="text-[8px] font-mono text-accent-primary opacity-70" title={`Auto-gain trim: ${trimGain > 0 ? '+' : ''}${trimGain.toFixed(1)}dB`}>
           AG {trimGain > 0 ? '+' : ''}{trimGain.toFixed(0)}
         </div>
       )}

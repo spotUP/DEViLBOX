@@ -697,7 +697,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Globe size={14} className="text-green-400" />
+          <Globe size={14} className="text-text-secondary" />
           <h3 className="text-text-primary text-sm font-mono font-bold tracking-wider uppercase">
             Online
           </h3>
@@ -707,7 +707,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
             </span>
           )}
           {status && status.status === 'indexing' && (
-            <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1">
+            <span className="text-[10px] font-mono text-text-secondary flex items-center gap-1">
               <Loader2 size={10} className="animate-spin" /> Indexing...
             </span>
           )}
@@ -730,7 +730,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
             placeholder="Search online archives..."
             className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
                        rounded text-text-primary placeholder:text-text-muted/40
-                       focus:border-green-600 focus:outline-none transition-colors"
+                       focus:border-dark-borderLight focus:outline-none transition-colors"
           />
         </div>
         <CustomSelect
@@ -760,7 +760,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
 
       {/* Error display */}
       {error && (
-        <div className="flex items-center gap-1.5 text-red-400 text-[10px] font-mono px-2 py-1 bg-red-900/20 rounded border border-red-900/30">
+        <div className="flex items-center gap-1.5 text-text-secondary text-[10px] font-mono px-2 py-1 bg-dark-bgTertiary/20 rounded border border-dark-borderLight/30">
           <AlertCircle size={10} />
           {error}
         </div>
@@ -788,7 +788,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                 onPointerLeave={() => setHoveredIdx((prev) => (prev === idx ? null : prev))}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-colors cursor-pointer ${
                   idx === selectedIndex
-                    ? 'bg-green-900/20 border-green-700/50'
+                    ? 'bg-accent-primary/20 border-accent-primary/50'
                     : 'bg-dark-bg border-dark-borderLight hover:border-dark-border'
                 }`}
               >
@@ -798,8 +798,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                     {file.filename}
                   </div>
                   <div className="flex gap-3 text-[10px] text-text-muted font-mono items-center">
-                    <span className={file.source === 'hvsc' ? 'text-blue-400' : ''}>{file.format}</span>
-                    {file.source === 'hvsc' && <span className="text-blue-400/60 text-[9px]">HVSC</span>}
+                    <span className={file.source === 'hvsc' ? 'text-text-secondary' : ''}>{file.format}</span>
+                    {file.source === 'hvsc' && <span className="text-text-secondary/60 text-[9px]">HVSC</span>}
                     <span className="text-text-muted/60">{file.author}</span>
                     <StarRating
                       avg={ratings[file.key]?.avg ?? file.avg_rating ?? 0}
@@ -812,7 +812,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
 
                 {/* Actions */}
                 {isDownloading(file.key) && previewingKey !== file.key ? (
-                  <Loader2 size={12} className="animate-spin text-green-400" />
+                  <Loader2 size={12} className="animate-spin text-text-secondary" />
                 ) : (
                   <>
                     <button
@@ -828,7 +828,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); addToPlaylist(file); }}
-                      className={`p-1 text-text-muted hover:text-amber-400 transition-opacity ${
+                      className={`p-1 text-text-muted hover:text-text-primary transition-opacity ${
                         hoveredIdx === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'
                       }`}
                       title="Add to active playlist"
@@ -838,8 +838,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                     <button
                       onClick={(e) => { e.stopPropagation(); loadToDeck(file, 'A'); }}
                       className={`px-2 py-1 text-[10px] font-mono font-bold rounded
-                                 bg-blue-900/30 text-blue-400 border border-blue-800/50
-                                 hover:bg-blue-800/40 hover:text-blue-300 transition-opacity ${
+                                 bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                                 hover:bg-dark-bgHover hover:text-text-primary transition-opacity ${
                         hoveredIdx === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'
                       }`}
                     >
@@ -848,8 +848,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                     <button
                       onClick={(e) => { e.stopPropagation(); loadToDeck(file, 'B'); }}
                       className={`px-2 py-1 text-[10px] font-mono font-bold rounded
-                                 bg-red-900/30 text-red-400 border border-red-800/50
-                                 hover:bg-red-800/40 hover:text-red-300 transition-opacity ${
+                                 bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                                 hover:bg-dark-bgHover hover:text-text-primary transition-opacity ${
                         hoveredIdx === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'
                       }`}
                     >
@@ -862,8 +862,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                         loadToDeck(file, 'C');
                       }}
                       className={`px-2 py-1 text-[10px] font-mono font-bold rounded
-                                 bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
-                                 hover:bg-emerald-800/40 hover:text-emerald-300 transition-opacity ${
+                                 bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                                 hover:bg-dark-bgHover hover:text-text-primary transition-opacity ${
                         hoveredIdx === idx
                           ? (thirdDeckActive ? 'opacity-100' : 'opacity-50')
                           : 'opacity-0 pointer-events-none'
@@ -900,7 +900,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         {/* Loading indicator for initial search */}
         {loading && results.length === 0 && (
           <div className="flex items-center justify-center py-8">
-            <Loader2 size={16} className="animate-spin text-green-400" />
+            <Loader2 size={16} className="animate-spin text-text-secondary" />
           </div>
         )}
       </div>

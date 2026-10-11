@@ -145,8 +145,8 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
         className={
           'px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border transition-colors shrink-0 ' +
           (repitchLock
-            ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
-            : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:border-accent-warning hover:text-accent-warning')
+            ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
+            : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:border-accent-primary hover:text-accent-primary')
         }
         onClick={() => setDeckRepitchLock(deckId, !repitchLock)}
         title={repitchLock

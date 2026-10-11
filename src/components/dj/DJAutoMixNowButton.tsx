@@ -32,9 +32,9 @@ export const DJAutoMixNowButton: React.FC = () => {
       disabled={disabled}
       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all ${
         isTransitioning
-          ? 'border-cyan-500 bg-cyan-900/30 text-cyan-400 animate-pulse cursor-wait'
+          ? 'border-accent-primary bg-accent-primary/20 text-accent-primary animate-pulse cursor-wait'
           : mixing
-            ? 'border-amber-500 bg-amber-900/30 text-amber-400 animate-pulse cursor-wait'
+            ? 'border-accent-primary bg-accent-primary/20 text-accent-primary animate-pulse cursor-wait'
             : 'border-accent-primary bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30 active:scale-95'
       }`}
       title={nextTrack ? `Mix now into: ${nextTrack.trackName}` : 'Mix to next track'}

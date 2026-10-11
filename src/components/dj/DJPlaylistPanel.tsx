@@ -224,15 +224,15 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
   const [isHovered, setIsHovered] = useState(false);
 
   const bgClass = isLoading
-    ? 'bg-cyan-900/20'
+    ? 'bg-accent-primary/20'
     : isDragging
       ? 'bg-accent-primary/20'
       : isSelected
         ? 'bg-accent-primary/10'
         : isAutoDJCurrent
-          ? 'bg-green-900/20'
+          ? 'bg-accent-primary/20'
           : isAutoDJNext
-            ? 'bg-blue-900/15'
+            ? 'bg-accent-primary/20'
             : isHovered
               ? 'bg-white/5'
               : '';
@@ -258,16 +258,16 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
         {index + 1}
       </span>
       {isLoading ? (
-        <span className="text-cyan-400 text-[9px] shrink-0 animate-pulse" title={`Loading to deck ${loadingDeckId}`}>
+        <span className="text-text-secondary text-[9px] shrink-0 animate-pulse" title={`Loading to deck ${loadingDeckId}`}>
           {loadingDeckId}
         </span>
       ) : track.isBad ? (
-        <span className="text-red-500 text-[9px] shrink-0" title={`Bad: ${track.badReason}`}>✗</span>
+        <span className="text-accent-error text-[9px] shrink-0" title={`Bad: ${track.badReason}`}>✗</span>
       ) : track.played ? (
-        <span className="text-green-500/50 text-[9px] shrink-0" title="Played">P</span>
+        <span className="text-text-muted text-[9px] shrink-0" title="Played">P</span>
       ) : null}
       <span className={`flex-1 text-xs font-mono truncate min-w-0 ${
-        isLoading ? 'text-cyan-400' : track.isBad ? 'text-red-500/90' : track.played ? 'text-text-muted/40' : 'text-text-secondary'
+        isLoading ? 'text-accent-primary' : track.isBad ? 'text-accent-error/90' : track.played ? 'text-text-muted/40' : 'text-text-secondary'
       }`}>
         {track.trackName}
       </span>
@@ -289,7 +289,7 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
       )}
       {/* Per-song FX preset indicator */}
       {track.masterFxPreset && (
-        <span className="text-[9px] font-mono text-purple-400 shrink-0 px-0.5 bg-purple-400/10 rounded" title={`FX: ${resolveFxPresetLabel(track.masterFxPreset)}`}>
+        <span className="text-[9px] font-mono text-text-secondary shrink-0 px-0.5 bg-dark-bgTertiary/10 rounded" title={`FX: ${resolveFxPresetLabel(track.masterFxPreset)}`}>
           FX
         </span>
       )}
@@ -297,7 +297,7 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
         {/* Preview button */}
         <button
           onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
-          className={`px-1 text-xs font-mono font-bold transition-colors ${isPreviewing ? 'text-green-400 hover:text-green-300' : 'text-text-muted/60 hover:text-text-muted'}`}
+          className={`px-1 text-xs font-mono font-bold transition-colors ${isPreviewing ? 'text-accent-primary hover:text-accent-primary' : 'text-text-muted/60 hover:text-text-muted'}`}
           title={isPreviewing ? 'Stop preview' : 'Preview track'}
         >{isPreviewing ? '■' : '▸'}</button>
         {/* FX preset selector — sources the full master FX_PRESETS library */}
@@ -321,25 +321,25 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
         </select>
         <button
           onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'A', index); }}
-          className="px-1 text-xs font-mono font-bold text-blue-400 hover:text-blue-300 transition-colors"
+          className="px-1 text-xs font-mono font-bold text-text-secondary hover:text-text-primary transition-colors"
           title="Deck 1"
         >1</button>
         <button
           onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'B', index); }}
-          className="px-1 text-xs font-mono font-bold text-red-400 hover:text-red-300 transition-colors"
+          className="px-1 text-xs font-mono font-bold text-text-secondary hover:text-text-primary transition-colors"
           title="Deck 2"
         >2</button>
         {thirdDeckActive && (
           <button
             onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'C', index); }}
-            className="px-1 text-xs font-mono font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+            className="px-1 text-xs font-mono font-bold text-text-secondary hover:text-text-primary transition-colors"
             title="Deck 3"
           >3</button>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(index); }}
           title="Remove from playlist"
-          className="p-0.5 text-accent-error hover:text-red-400 transition-colors"
+          className="p-0.5 text-accent-error hover:text-accent-error transition-colors"
         >
           <X size={8} />
         </button>
@@ -1469,7 +1469,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
               onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsCreating(false); }}
               placeholder="Name..."
               className="w-24 px-2 py-0.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight rounded text-text-primary placeholder:text-text-muted/40" />
-            <button onClick={handleCreate} title="Create playlist" className="p-0.5 text-green-400 hover:text-green-300"><Check size={12} /></button>
+            <button onClick={handleCreate} title="Create playlist" className="p-0.5 text-text-secondary hover:text-text-primary"><Check size={12} /></button>
             <button onClick={() => setIsCreating(false)} title="Cancel" className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
           </div>
         )}
@@ -1486,7 +1486,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             onKeyDown={(e) => { if (e.key === 'Enter') handleRename(editingId); if (e.key === 'Escape') setEditingId(null); }}
             onBlur={() => handleRename(editingId)}
             className="flex-1 px-2 py-0.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight rounded text-text-primary" />
-          <button onClick={() => handleRename(editingId)} title="Save new name" className="p-0.5 text-green-400 hover:text-green-300"><Check size={12} /></button>
+          <button onClick={() => handleRename(editingId)} title="Save new name" className="p-0.5 text-accent-success hover:text-accent-success"><Check size={12} /></button>
           <button onClick={() => setEditingId(null)} title="Cancel rename" className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
         </div>
       )}
@@ -1533,13 +1533,13 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           {precacheProgress ? (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px]">
-                <span className="text-amber-400">{precacheProgress.current}/{precacheProgress.total}</span>
-                <span className="text-green-400 ml-1">{precacheProgress.cached + precacheProgress.skipped} cached</span>
-                {precacheProgress.failed > 0 && <span className="text-red-400 ml-1">{precacheProgress.failed} fail</span>}
+                <span className="text-accent-primary">{precacheProgress.current}/{precacheProgress.total}</span>
+                <span className="text-accent-success ml-1">{precacheProgress.cached + precacheProgress.skipped} cached</span>
+                {precacheProgress.failed > 0 && <span className="text-accent-error ml-1">{precacheProgress.failed} fail</span>}
                 <span className="text-text-muted truncate ml-2 flex-1 text-right">{precacheProgress.trackName}</span>
               </div>
               <div className="h-1 bg-dark-bgTertiary rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500 transition-all duration-300"
+                <div className="h-full bg-dark-bgActive transition-all duration-300"
                   style={{ width: `${(precacheProgress.current / precacheProgress.total) * 100}%` }} />
               </div>
             </div>
@@ -1551,12 +1551,12 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
               })()}
               {onlineCount > 0 && (
                 <>
-                  <span className="text-green-400">{cachedCount}/{onlineCount} cached</span>
-                  {uncachedCount === 0 && <span className="text-green-500/80">Offline ready</span>}
+                  <span className="text-accent-success">{cachedCount}/{onlineCount} cached</span>
+                  {uncachedCount === 0 && <span className="text-accent-success/80">Offline ready</span>}
                   {uncachedCount > 0 && (
                     <button onClick={handlePrecache}
                       title="Download and cache all uncached tracks for offline playback"
-                      className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-700 bg-amber-900/20 text-amber-400 hover:bg-amber-900/40 transition-all">
+                      className="flex items-center gap-1 px-2 py-0.5 rounded border border-dark-borderLight bg-dark-bgTertiary/20 text-text-secondary hover:bg-dark-bgHover transition-all">
                       Cache ({uncachedCount})
                     </button>
                   )}
@@ -1567,13 +1567,13 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   <button onClick={handleRetestBadTracks}
                     disabled={retestingBad}
                     title="Re-test all tracks marked as bad (clears bad flag and attempts reload)"
-                    className="flex items-center gap-1 px-2 py-0.5 rounded border border-red-700 bg-red-900/20 text-red-400 hover:bg-red-900/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
+                    className="flex items-center gap-1 px-2 py-0.5 rounded border border-dark-borderLight bg-dark-bgTertiary/20 text-text-secondary hover:bg-dark-bgHover transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
                     {retestingBad ? 'Testing...' : `Re-test Bad (${badTrackCount})`}
                   </button>
                   <button
                     onClick={() => activePlaylistId && useDJPlaylistStore.getState().clearAllBadFlags(activePlaylistId)}
                     title="Clear all bad marks without re-testing — tracks will be retried on next load"
-                    className="flex items-center gap-1 px-2 py-0.5 rounded border border-yellow-700 bg-yellow-900/20 text-yellow-400 hover:bg-yellow-900/40 transition-all">
+                    className="flex items-center gap-1 px-2 py-0.5 rounded border border-dark-borderLight bg-dark-bgTertiary/20 text-text-secondary hover:bg-dark-bgHover transition-all">
                     Clear Marks
                   </button>
                 </>

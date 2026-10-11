@@ -72,7 +72,7 @@ export const MixerCueSection: React.FC = () => {
           onChange={handleCueVolumeChange}
           label="CUE"
           size="sm"
-          color="#ffcc00"
+          tone="neutral"
           defaultValue={1}
           hideValue
           title="Cue volume — headphone pre-fader listen level"
@@ -95,9 +95,9 @@ export const MixerCueSection: React.FC = () => {
             onContextMenu={(e) => { e.preventDefault(); handleCueMixChange(0.5); }}
             className="w-full h-2 appearance-none bg-dark-bgTertiary rounded-full cursor-pointer
               [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-4
-              [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-[#66ccff] [&::-webkit-slider-thumb]:border
-              [&::-webkit-slider-thumb]:border-[#66ccff]/50 [&::-webkit-slider-thumb]:shadow-sm
-              [&::-webkit-slider-thumb]:hover:bg-[#88ddff]"
+              [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-accent-primary [&::-webkit-slider-thumb]:border
+              [&::-webkit-slider-thumb]:border-accent-primary/50 [&::-webkit-slider-thumb]:shadow-sm
+              [&::-webkit-slider-thumb]:hover:bg-accent-primary/80"
             title="Cue crossfader — left = PFL only, center = blend, right = master only. Double-click to center."
           />
         </div>
@@ -111,7 +111,7 @@ export const MixerCueSection: React.FC = () => {
             className={`
               px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition-colors
               ${pflA
-                ? 'bg-accent-warning text-text-inverse'
+                ? 'bg-accent-primary text-text-inverse'
                 : 'bg-dark-bgTertiary text-text-muted border border-dark-borderLight hover:text-text-secondary'
               }
             `}
@@ -124,7 +124,7 @@ export const MixerCueSection: React.FC = () => {
             className={`
               px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition-colors
               ${pflB
-                ? 'bg-accent-warning text-text-inverse'
+                ? 'bg-accent-primary text-text-inverse'
                 : 'bg-dark-bgTertiary text-text-muted border border-dark-borderLight hover:text-text-secondary'
               }
             `}

@@ -82,9 +82,9 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           active:translate-y-[1px]
           ${
             isPending
-              ? 'bg-yellow-600 text-text-primary animate-pulse'
+              ? 'bg-accent-primary text-text-inverse animate-pulse'
               : isPlaying
-                ? 'bg-green-600 text-text-primary'
+                ? 'bg-accent-primary text-text-inverse'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }
         `}
@@ -103,7 +103,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           transition-all duration-100
           ${cuePending
             ? 'bg-accent-primary/30 text-accent-primary animate-pulse'
-            : 'bg-dark-bgTertiary text-accent-warning hover:bg-dark-bgHover'}
+            : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'}
         `}
         title={cuePending ? 'Waiting for beat...' : 'Cue'}
       >
@@ -120,7 +120,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           transition-all duration-100
           ${
             isSynced
-              ? 'bg-accent-highlight/30 text-accent-highlight'
+              ? 'bg-accent-primary/30 text-accent-primary'
               : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
           }
         `}
@@ -141,8 +141,8 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
             qMode === 'off'
               ? 'bg-dark-bgTertiary text-text-muted border-dark-border hover:bg-dark-bgHover'
               : qMode === 'beat'
-                ? 'bg-violet-600/40 text-violet-200 border-violet-400/60 shadow-[0_0_6px_rgba(139,92,246,0.3)]'
-                : 'bg-fuchsia-600/40 text-fuchsia-200 border-fuchsia-400/60 shadow-[0_0_6px_rgba(217,70,239,0.3)]'
+                ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60 shadow-glow-sm'
+                : 'bg-dark-bgTertiary/40 text-text-secondary border-dark-borderLight/60 shadow-glow-sm'
           }
         `}
         title={`Quantize: ${qMode.toUpperCase()}\nOFF = free play\nBEAT = snap to beat\nBAR = snap to bar\n(click to cycle)`}
@@ -160,7 +160,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           transition-all duration-100
           ${
             keyLockEnabled
-              ? 'bg-amber-600/30 text-amber-300 border-amber-500/40'
+              ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/40'
               : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
           }
         `}

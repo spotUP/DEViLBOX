@@ -69,9 +69,9 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
     const mutedColor = cs.getPropertyValue('--color-text-muted').trim() || '#686060';
     const accentColor = cs.getPropertyValue('--color-accent').trim() || '#ef4444';
     // Amber highlight — used to mark fx-target channels in fx mode.
-    // Matches the `accent-highlight` token used elsewhere on the dub UI
+    // Matches the `accent-primary` token used elsewhere on the dub UI
     // (bassLock chip, pedal glow) so the UX is colour-consistent.
-    const highlightColor = cs.getPropertyValue('--color-accent-highlight').trim() || '#f59e0b';
+    const highlightColor = cs.getPropertyValue('--color-accent').trim() || '#f59e0b';
 
     // Background — transparent, inherits from parent
     ctx.clearRect(0, 0, size, size);
@@ -270,7 +270,7 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
           flex items-center justify-center font-mono font-bold select-none
           rounded-sm border transition-colors duration-75
           ${isFxMode
-            ? 'bg-accent-highlight text-text-inverse border-accent-highlight'
+            ? 'bg-accent-primary text-text-inverse border-accent-primary'
             : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:bg-dark-bgHover'}
         `}
         style={{ width: 28, height: size, fontSize: 9, letterSpacing: '0.1em' }}

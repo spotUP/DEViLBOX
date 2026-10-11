@@ -3,9 +3,9 @@
  *
  * Row of 4 toggle buttons (1-4) + ALL + MUTE/FX mode chip.
  * Click semantic branches on `channelModeUI` (mirrors DeckScopes):
- *   'mute' → primary=bg-accent-primary (red). Click = mute/unmute.
+ *   'mute' → lit=bg-accent-primary. Click = mute/unmute.
  *            Shift+click = solo (mute everything else).
- *   'fx'   → primary=bg-accent-highlight (amber). Click = toggle fx target.
+ *   'fx'   → lit=bg-accent-primary (the mode chip says which). Click = toggle fx target.
  *            Shift+click = solo-in-fx-set (replace the target set with
  *            just this channel).
  */
@@ -96,8 +96,8 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
               ${
                 active
                   ? (isFxMode
-                      ? 'bg-accent-highlight text-text-inverse'
-                      : 'bg-accent-primary text-text-primary')
+                      ? 'bg-accent-primary text-text-inverse'
+                      : 'bg-accent-primary text-text-inverse')
                   : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
               }
             `}
@@ -123,7 +123,7 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
           ${
             isFxMode
               ? (noFxTargets
-                  ? 'bg-accent-highlight/60 text-text-inverse'
+                  ? 'bg-accent-primary/60 text-text-inverse'
                   : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover')
               : (allEnabled
                   ? 'bg-accent-primary/60 text-text-primary'
@@ -143,7 +143,7 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
           flex items-center justify-center font-mono font-bold select-none
           rounded-sm border transition-colors duration-75
           ${isFxMode
-            ? 'bg-accent-highlight text-text-inverse border-accent-highlight'
+            ? 'bg-accent-primary text-text-inverse border-accent-primary'
             : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:bg-dark-bgHover'}
         `}
         style={{ width: 32, height: BUTTON_SIZE, fontSize: 9, letterSpacing: '0.1em' }}

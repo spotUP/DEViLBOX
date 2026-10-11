@@ -108,7 +108,7 @@ export const DJVideoExport: React.FC = () => {
       {isRecording ? (
         <button
           onClick={handleStop}
-          className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white animate-pulse transition-all"
+          className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold bg-dark-bgActive hover:bg-dark-bgHover text-text-primary animate-pulse transition-all"
           title="Stop video recording"
         >
           <span className="w-2 h-2 rounded-sm bg-white" />

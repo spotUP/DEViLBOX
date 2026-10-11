@@ -381,8 +381,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         <div style={{
           position: 'absolute', top: 4, right: 4, zIndex: 9999,
           padding: '4px 8px', borderRadius: 4, fontSize: 11, fontFamily: 'monospace',
-          background: health.audioContext === 'suspended' ? '#a80' : '#a00',
-          color: '#fff', pointerEvents: 'none',
+          background: health.audioContext === 'suspended' ? 'var(--color-warning)' : 'var(--color-error)',
+          color: 'var(--color-text-inverse)', pointerEvents: 'none',
         }}>
           Audio: {health.audioContext}
         </div>
@@ -415,7 +415,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
               onClick={() => setThirdDeckActive(!thirdDeckActive)}
               className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
                 ${thirdDeckActive
-                  ? 'border-emerald-500 bg-emerald-900/20 text-emerald-400'
+                  ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
                   : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
                 }`}
               title="Toggle 3rd deck (Deck C)"
@@ -433,7 +433,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
               }}
               className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
                 ${showAutoDJ || autoDJEnabled
-                  ? 'border-green-500 bg-green-900/20 text-green-400'
+                  ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
                   : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
                 }`}
               title="Auto DJ — automatic beatmixed playlist playback"
@@ -523,9 +523,9 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       <div className={`flex flex-col w-full shrink-0 border-b relative transition-shadow duration-300 ${
         syncDriftMs !== null && syncDriftMs < 30
-          ? 'border-green-500/50 shadow-[0_0_12px_rgba(34,197,94,0.3)]'
+          ? 'border-accent-primary/50 shadow-glow-sm'
           : syncDriftMs !== null && syncDriftMs > 80
-            ? 'border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.2)]'
+            ? 'border-accent-primary/30 shadow-glow-sm'
             : 'border-dark-border'
       }`}>
         <DeckAudioWaveform deckId="A" />
@@ -534,10 +534,10 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         {syncDriftMs !== null && (
           <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-mono font-bold pointer-events-none z-10 ${
             syncDriftMs < 30
-              ? 'bg-green-500/80 text-white'
+              ? 'bg-accent-primary text-text-inverse'
               : syncDriftMs < 80
-                ? 'bg-yellow-500/80 text-black'
-                : 'bg-red-500/80 text-white'
+                ? 'bg-accent-primary text-text-inverse'
+                : 'bg-dark-bgActive text-text-primary'
           }`}>
             {syncDriftMs < 30 ? 'SYNCED' : `${syncDriftMs}ms`}
           </div>

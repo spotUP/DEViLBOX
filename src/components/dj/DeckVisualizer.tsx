@@ -342,7 +342,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
           <button
             className={`p-0.5 rounded transition-colors ${
               slideshowActive
-                ? 'bg-green-500/40 text-green-300 hover:bg-green-500/60'
+                ? 'bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30'
                 : 'bg-black/50 hover:bg-black/80 text-white/60 hover:text-text-primary/90'
             }`}
             onClick={toggleSlideshow}
