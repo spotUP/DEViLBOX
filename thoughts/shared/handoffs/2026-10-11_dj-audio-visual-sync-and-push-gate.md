@@ -25,8 +25,14 @@ status: draft
    at a time; starting either stops the other; a view switch alone changes
    nothing). DONE, 314297cc2 + 6f122a0d3. Owner confirmed tracker play stops
    the DJ set.
-6. **Circular import blocking the gate** (`savedProjectAfterAhx`). IN
-   PROGRESS (agent).
+6. **Circular import blocking the gate** (`savedProjectAfterAhx`). DONE,
+   cfd4b808c: explicit-save flag in a leaf module (`src/lib/persistence/explicitSave.ts`),
+   ratchet `songPersistenceImportCycle`. No await hangs: the cold import of
+   ~830 modules takes 18-40 s and a timed-out load races the next test inside
+   the cycle. A 117-module cycle remains (DJActions -> DJAutoDJ ->
+   DJTrackLoader -> openSong ...) with the same race for MaEngine/UADEEngine
+   ('prototype' / __vite_ssr_import_0__ errors): cut DJActions -> DJAutoDJ
+   after the DJ agent finishes.
 
 ## Critical references
 
@@ -135,10 +141,9 @@ status: draft
 1. Collect the two running agents' reports: (a) DJ agent - limiters safety
    only (no auto make-up gain, -1 dBFS, release >= 50 ms), key lock left on
    after Auto DJ transitions (verify, restore prior state), meters/scopes read
-   at currentTime - outputLatency; (b) circular-import agent -
-   `savedProjectAfterAhx` (case 1 hangs on `await import('@/stores/useFormatStore')`,
-   case 2 `useInstrumentStore` undefined at snapshotSong.ts:32); fix the cycle
-   at its root.
+   at currentTime - outputLatency; (b) then cut the remaining DJ import
+   cycle (DJActions -> DJAutoDJ), extend the songPersistenceImportCycle
+   ratchet.
 2. Run `npm run type-check` and the new tests once, then push on a QUIET
    machine (stop agents and the vtcon rigs): `git push origin main`. Time it.
    If anything fails, re-run each failure alone before treating it as real.
