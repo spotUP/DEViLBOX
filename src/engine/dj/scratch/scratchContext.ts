@@ -6,7 +6,7 @@
  * (section 6: no second analysis).
  */
 
-import { barIndexAt, fractionalBeatAt, timelineAt } from '../autodj/beatGrid';
+import { barIndexAt, fractionalBeatAt, timelineAt, trackBeatConfidence } from '../autodj/beatGrid';
 import type { DJPerformanceContext, DJPhrase, DJSection, DJTrackAnalysis, SectionKind, TransitionStyle } from '../autodj/types';
 import type { ScratchSection } from './scratchPlacement';
 import type { ScratchDJStyle } from './scratchTypes';
@@ -24,6 +24,7 @@ export interface ScratchPerformanceContext {
 
   bpm: number;
   meter: number;
+  /** `trackBeatConfidence`: the beat grid and the downbeat grid, the lesser. */
   beatConfidence: number;
   phraseConfidence: number;
 
@@ -112,7 +113,8 @@ export function buildScratchContext(input: ScratchContextInput): ScratchPerforma
     phraseBars,
     bpm: track.bpm,
     meter: track.meter.beatsPerBar,
-    beatConfidence: track.beatGrid.confidence,
+    // the beats AND the bars (an assumed meter lowers it): the Auto DJ's one definition (SA-M8)
+    beatConfidence: trackBeatConfidence(track),
     phraseConfidence: phrase?.confidence ?? 0,
     section,
     nextSection,

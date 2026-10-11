@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildScratchContext, scratchSectionFor, SECTION_OF_KIND } from '../scratchContext';
+import { planScratch } from '../scratchPlanner';
 import { SECTION_KINDS } from '../../autodj/types';
 import { fixtureAnalysis, fixturePerf } from './fixtures/analysisFixture';
 
@@ -24,8 +25,18 @@ describe('buildScratchContext (SCR-P4.1)', () => {
     expect(ctx.nextSection!.kind).toBe('breakdown');
     expect(ctx.bpm).toBe(120);
     expect(ctx.meter).toBe(4);
-    expect(ctx.beatConfidence).toBe(0.92);
+    expect(ctx.beatConfidence).toBe(0.9); // min(beat grid 0.92, downbeats 0.9)
     expect(ctx.phraseConfidence).toBe(0.85);
+  });
+
+  it('a module with sure beats but an assumed meter plans as SAFE: beat confidence is the beats AND the bars (SA-M8)', () => {
+    const t0 = fixtureAnalysis();
+    const assumed = { ...t0, analysisConfidence: { ...t0.analysisConfidence, beatGrid: 1, downbeat: 0.4 } };
+    const ctx = buildScratchContext({ perf: fixturePerf(assumed, 0.18 + 68 * 0.5 + 0.01), style: 'battle' })!;
+    expect(ctx.beatConfidence).toBe(0.4);
+    const plan = planScratch(ctx, { mode: 'BATTLE', seed: 3, fromBar: ctx.masterBar, bars: 16 });
+    expect(plan.mode).toBe('SAFE');
+    expect(plan.routine).toBeUndefined();
   });
 
   it('vocal activity equals the timeline value at the position; the other activities and the energy are read, not measured', () => {
