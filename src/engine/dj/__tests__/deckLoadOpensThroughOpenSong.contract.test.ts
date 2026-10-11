@@ -45,6 +45,8 @@ vi.mock('@/engine/dj/DJPipeline', () => ({
       probe.pipelineCalls.push({ filename, companions: companions?.map((c) => c.filename) });
       return { wavData: new ArrayBuffer(8), analysis: { bpm: 125 }, duration: 1 };
     }),
+    // The deck gets the analysis once it holds the track (deckLoadKeepsItsBeatGrid.test.ts).
+    applyAnalysisToDeck: vi.fn(),
   }),
 }));
 vi.mock('@/engine/dj/DJEngine', () => ({
