@@ -50,6 +50,7 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
     setDeckFilter(deck, 0);
     releaseDjFx('fx_deck_echo_throw', { deck, source: 'autodj' });
     releaseDjFx('fx_deck_filter_rise', { deck, source: 'autodj' });
+    releaseDjFx('fx_deck_filter_release', { deck, source: 'autodj' });
   };
   return {
     lastCrossfader: () => lastCrossfader,

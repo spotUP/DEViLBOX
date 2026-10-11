@@ -190,6 +190,11 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
     // and never both decks silent: if the incoming cannot start, the outgoing keeps playing on its own side.
     trace.events.push(`emergency: ${error}`);
     trace.fellBack = 'emergency';
+    // The registry's filter moves run for the planned length, far past this four-beat fade: end them on both decks
+    // now, or a live sweep keeps writing the filter of a deck the fade has already reset.
+    for (const f of filterActionsFor(plan.filterPlan.kind, plan.durationBeats)) {
+      try { releaseDjFx(f.action, { deck: f.deck === 'outgoing' ? out : inc, source: 'autodj' }); } catch { /* */ }
+    }
     const incomingDeck = (() => { try { return getDJEngine().getDeck(inc); } catch { return null; } })();
     const keepOutgoing = () => {
       trace.events.push('incoming deck silent: outgoing kept playing');
