@@ -26,6 +26,8 @@ export interface JuggleActionSink {
   state(): SinkState;
   /** Undo what the pattern changed that outlives its actions (filter moves): called once on every exit path. */
   restore?(): void;
+  /** The heard bar-phase error of a deck against the other deck, seconds (null: no grid to measure on). */
+  phaseError?(deck: 'A' | 'B'): number | null;
 }
 
 export interface JuggleEvent {

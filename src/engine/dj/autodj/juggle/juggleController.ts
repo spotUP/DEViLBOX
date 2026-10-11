@@ -14,8 +14,8 @@ import { keyAt } from '../trackAnalysis';
 import { shiftedKeyName } from '../tempoKeySolver';
 import type { DJTrackAnalysis, SetEnergyPhase } from '../types';
 import { classifyWindow, materialRefs } from './juggleMaterial';
-import { PATTERN_INTENSITY, phaseAt, rolesAt, transitionLadder } from './jugglePatterns';
-import { budgetFor, confidencePolicy, intensityFor, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
+import { PATTERN_INTENSITY, coarsenLadder, minLadderRung, phaseAt, rolesAt, transitionLadder } from './jugglePatterns';
+import { budgetFor, conditions, confidencePolicy, intensityFor, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
 import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
 import type {
   DJDeckPerformanceState, DJJuggleHistory, DJJugglePerformanceContext, DJPerformanceMode, JuggleMode, JuggleQualityScore,
@@ -70,6 +70,8 @@ export interface JuggleTickResult {
 }
 
 const RECENT = 6;
+/** The incoming's heard bar phase within this of the master's counts as verified (the R2 tolerance, owner plan section 16). */
+export const LADDER_PHASE_VERIFIED_SEC = 0.005;
 
 export class DJJuggleController {
   private mode: JuggleMode = 'OFF';
@@ -208,31 +210,64 @@ export class DJJuggleController {
   // ── Juggle transition (section 26) ─────────────────────────────────────────
 
   /**
+   * The juggle budget a transition plan reads (owner plan sections 24, 28,
+   * 29): whether the set arc, the cooldown and the juggled fraction allow a
+   * juggle now, why not, and the recent juggles the ladder varies against.
+   * Stand-alone juggles and juggle transitions share this one budget.
+   */
+  transitionBudget(input: TickInput): { allowed: boolean; reasons: string[]; recent: DJJuggleHistory[] } {
+    const ctx = this.buildContext(input);
+    const b = budgetFor(ctx, this.mode);
+    return { allowed: b.allowed, reasons: b.reasons, recent: this.history.slice(-RECENT) };
+  }
+
+  /**
    * Run a juggle transition's ladder now - the transition executor's trade
-   * stage. The outgoing (`input.masterDeck`) and the incoming trade the
-   * planned rungs from the bar the incoming started on (within a quarter
-   * beat, else the next bar), then the incoming is released. It starts through
-   * the same path as a planned juggle (history, memory, telemetry, abort
-   * checks). Resolves when released or aborted.
+   * stage. The pair is judged again on the decks as they are (owner plan
+   * sections 24, 25, 31): the budget and cooldown, the bad conditions (key
+   * clash, vocals on both decks, unstable sync) and the confidence, which
+   * may coarsen the planned rungs (A1 B1 A1 B1 becomes A2 B2, the same
+   * length) or call the ladder off. The incoming is locked to the
+   * outgoing's bars while it is silent and its heard phase must be verified
+   * before its first answer, or the ladder releases (section 16). The
+   * outgoing (`input.masterDeck`) and the incoming trade the rungs from the
+   * bar the incoming started on (within a quarter beat, else the next bar),
+   * then the incoming is released. Resolves when released or aborted.
    */
   performLadder(input: TickInput, ladder: { ladderBars: number[]; target: AB }): Promise<JuggleExecutionResult> {
-    if (this.mode === 'OFF') {
-      return Promise.resolve({ completed: false, aborted: true, reason: 'Auto Juggle off', trace: [], fallbacks: 0, events: [], endBeat: 0 });
-    }
+    const refuse = (reason: string): Promise<JuggleExecutionResult> => {
+      this.record({ kind: 'juggleAborted', beat: 0, reason });
+      return Promise.resolve({ completed: false, aborted: true, reason, trace: [], fallbacks: 0, events: [], endBeat: 0 });
+    };
+    if (this.mode === 'OFF') return refuse('Auto Juggle off');
     if (this.execution?.active()) this.execution.abort('juggle transition took over');
     const ctx = this.buildContext(input);
     this.lastCtx = ctx;
+    const policy = confidencePolicy(ctx);
+    const minRung = minLadderRung(this.mode, policy);
+    const budget = budgetFor(ctx, this.mode);
+    // The keys were judged by the transition plan at the join, with its key lock or shift (the decks'
+    // local keys here are read before that plan's tempo and key moves): every other bad condition holds.
+    const bad = conditions(ctx).bad.filter((r) => !r.startsWith('key clash'));
+    const blocked = [...(budget.allowed ? [] : budget.reasons), ...bad, ...(minRung === null ? [`${policy} confidence: normal transition`] : [])];
+    if (blocked.length) {
+      this.lastDecision = this.idleDecision(ctx, `juggle transition not performed: ${blocked.join('; ')}`);
+      this.publish(ctx);
+      return refuse(`juggle transition not performed: ${blocked.join('; ')}`);
+    }
     const bpb = ctx.beatsPerBar;
+    const ladderBars = coarsenLadder(ladder.ladderBars, minRung!);
     const pattern = transitionLadder({
       primary: input.masterDeck, beatsPerBar: bpb, intensity: PATTERN_INTENSITY.transitionLadder, phraseBars: ctx.phraseLengthBars,
-      confidence: Math.min(ctx.beatConfidence, ctx.deckSyncConfidence), seed: (this.deps.seed ?? 0) + this.counter++, ladderBars: ladder.ladderBars, target: ladder.target,
+      confidence: Math.min(ctx.beatConfidence, ctx.deckSyncConfidence), seed: (this.deps.seed ?? 0) + this.counter++, ladderBars, target: ladder.target,
     });
     const startBeat = Math.ceil((ctx.masterBeat - 0.25) / bpb) * bpb;
+    const coarsened = ladderBars.join('-') !== ladder.ladderBars.join('-') ? ` (${policy} confidence: ${ladder.ladderBars.join('-')} traded as ${ladderBars.join('-')})` : '';
     const decision: JuggleDecision = {
-      pattern, candidates: [], reason: `juggle transition: ${pattern.reason}`, blocked: [], policy: confidencePolicy(ctx), intensity: pattern.intensity, startBeat,
+      pattern, candidates: [], reason: `juggle transition: ${pattern.reason}${coarsened}`, blocked: [], policy, intensity: pattern.intensity, startBeat,
     };
     this.lastDecision = decision;
-    this.start(decision, ctx, input);
+    this.start(decision, ctx, input, { deck: ladder.target, beforeBeat: startBeat + ladderBars[0] * bpb });
     this.publish(ctx);
     return this.execution!.done;
   }
@@ -283,17 +318,35 @@ export class DJJuggleController {
     return null;
   }
 
-  private start(decision: JuggleDecision, ctx: DJJugglePerformanceContext, input: TickInput): void {
+  /**
+   * Start a decision. `verify`: the deck whose heard bar phase must be within
+   * LADDER_PHASE_VERIFIED_SEC of the master's before `beforeBeat` (its first
+   * audible bar), or the pattern releases gracefully (owner plan section 16).
+   */
+  private start(decision: JuggleDecision, ctx: DJJugglePerformanceContext, input: TickInput, verify?: { deck: AB; beforeBeat: number }): void {
     const pattern = decision.pattern!;
     const masterInput = input.decks[input.masterDeck];
     const clock = this.deps.clockFor(input.masterDeck, masterInput.analysis!, () => this.deps.positionOf(input.masterDeck));
+    const sink = this.deps.sink;
+    let verified = !verify || !sink.phaseError;
+    const phaseGate = (): string | null => {
+      if (verified) return null;
+      const err = sink.phaseError!(verify!.deck);
+      if (err !== null && Math.abs(err) <= LADDER_PHASE_VERIFIED_SEC) {
+        verified = true;
+        this.record({ kind: 'juggleActionExecuted', beat: clock.beatNow(), reason: `phase verified: deck ${verify!.deck} ${(err * 1000).toFixed(1)} ms from the master's bars`, pattern: pattern.id });
+        return null;
+      }
+      if (clock.beatNow() < verify!.beforeBeat - 0.25) return null;
+      return err === null ? `deck ${verify!.deck} phase cannot be measured before its first bar` : `deck ${verify!.deck} phase not verified before its first bar (${(err * 1000).toFixed(0)} ms off)`;
+    };
     this.execCtx = ctx;
     this.counts.started++;
     this.record({ kind: 'jugglePatternSelected', beat: ctx.masterBeat, reason: decision.reason, pattern: pattern.id });
     const startedAt = this.now();
     const exec = executeJuggle(pattern, decision.startBeat, {
       clock, sink: this.deps.sink, timers: this.deps.timers, onEvent: (e) => this.record(e),
-      abortCheck: () => this.pendingAbort,
+      abortCheck: () => this.pendingAbort ?? phaseGate(),
     });
     this.execution = exec;
     exec.done.then((result) => this.finish(pattern, result, ctx, startedAt, decision)).catch(() => { /* never throws */ });
@@ -310,6 +363,7 @@ export class DJJuggleController {
     const entry: DJJuggleHistory = {
       patternType: pattern.type, durationBars: pattern.durationBars, intensity: pattern.intensity, sourceTracks: [ctx.deckA.trackId, ctx.deckB.trackId],
       successScore: quality.overall, timestamp: this.now(), sequence: pattern.sequence, sectionKind: ctx.currentSection?.kind, setPhase: ctx.setPhase, energy: ctx.energy,
+      ladderBars: pattern.ladderBars,
     };
     this.history.push(entry);
     if (this.history.length > 64) this.history.splice(0, this.history.length - 64);

@@ -112,41 +112,60 @@ export function phaseAlign(
   mode: SyncMode = 'beat',
   method: PhaseAlignMethod = 'auto',
 ): void {
-  const store = useDJStore.getState();
-  const otherState = store.decks[otherDeckId];
-  if (!otherState.beatGrid) return;
-
-  const thisState = store.decks[deckId];
-  if (!thisState.beatGrid) return;
-
-  const otherPhase = getPhaseInfo(otherDeckId);
-  const thisPhase = getPhaseInfo(deckId);
-  if (!otherPhase || !thisPhase) return;
-
-  const thisPosition = getCurrentPosition(deckId);
-  const beatPeriod = thisState.beatGrid.bpm > 0 ? 60 / thisState.beatGrid.bpm : 0.5;
-  const barPeriod = beatPeriod * thisState.beatGrid.timeSignature;
-  const period = mode === 'bar' ? barPeriod : beatPeriod;
-
-  const otherPh = mode === 'bar' ? otherPhase.barPhase : otherPhase.beatPhase;
-  const thisPh = mode === 'bar' ? thisPhase.barPhase : thisPhase.beatPhase;
-
-  // Minimal phase correction: how much to nudge this deck so phases match
-  // Normalize to [-0.5, 0.5] so we never shift more than half a period
-  let phaseDiff = otherPh - thisPh;
-  if (phaseDiff > 0.5) phaseDiff -= 1;
-  if (phaseDiff < -0.5) phaseDiff += 1;
-
-  const errorSec = phaseDiff * period;
+  const errorSec = phaseErrorSec(deckId, otherDeckId, mode);
+  if (errorSec === null) return;
   if (method === 'auto' && isDeckPlaying(deckId)) {
     bendToPhase(deckId, errorSec);
     return;
   }
 
-  const seekTarget = thisPosition + errorSec;
+  const seekTarget = getCurrentPosition(deckId) + errorSec;
   if (seekTarget < 0) return; // don't seek before start
 
   seekDeck(deckId, seekTarget);
+}
+
+/**
+ * The heard phase error of this deck against the other deck's grid, in this
+ * deck's track seconds (positive = this deck is behind): the minimal
+ * correction, never more than half a beat ('beat') or half a bar ('bar').
+ * Null when either deck has no grid.
+ */
+export function phaseErrorSec(deckId: DeckId, otherDeckId: DeckId, mode: SyncMode = 'beat'): number | null {
+  const store = useDJStore.getState();
+  const thisGrid = store.decks[deckId].beatGrid;
+  if (!store.decks[otherDeckId].beatGrid || !thisGrid) return null;
+  const otherPhase = getPhaseInfo(otherDeckId);
+  const thisPhase = getPhaseInfo(deckId);
+  if (!otherPhase || !thisPhase) return null;
+  const beatPeriod = thisGrid.bpm > 0 ? 60 / thisGrid.bpm : 0.5;
+  const period = mode === 'bar' ? beatPeriod * thisGrid.timeSignature : beatPeriod;
+  const otherPh = mode === 'bar' ? otherPhase.barPhase : otherPhase.beatPhase;
+  const thisPh = mode === 'bar' ? thisPhase.barPhase : thisPhase.beatPhase;
+  // Normalize to [-0.5, 0.5] so we never shift more than half a period.
+  let phaseDiff = otherPh - thisPh;
+  if (phaseDiff > 0.5) phaseDiff -= 1;
+  if (phaseDiff < -0.5) phaseDiff += 1;
+  return phaseDiff * period;
+}
+
+/**
+ * Lock a deck to the other deck's bars before it is heard (owner juggling
+ * plan section 16: align, establish bar phase, verify, then juggle): within
+ * half a beat a rate bend; further, one exact re-cue while the deck cannot be
+ * heard (`silent`) - a cue jump by intent, never a skip anyone hears. An
+ * audible deck is only ever bent. Returns what it did.
+ */
+export function lockBarPhase(deckId: DeckId, otherDeckId: DeckId, silent: boolean): 'bend' | 'recue' | 'none' {
+  const errorSec = phaseErrorSec(deckId, otherDeckId, 'bar');
+  if (errorSec === null) return 'none';
+  const grid = useDJStore.getState().decks[deckId].beatGrid;
+  const beatPeriod = grid && grid.bpm > 0 ? 60 / grid.bpm : 0.5;
+  if (isDeckPlaying(deckId) && (Math.abs(errorSec) <= beatPeriod / 2 || !silent)) { bendToPhase(deckId, errorSec); return 'bend'; }
+  const target = getCurrentPosition(deckId) + errorSec;
+  if (target < 0) return 'none';
+  seekDeck(deckId, target);
+  return 'recue';
 }
 
 /** Phase errors below this are inaudible and left alone (seconds). */

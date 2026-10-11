@@ -332,14 +332,68 @@ export function escalatingJuggle(p: PatternParams): DJJugglePattern {
 }
 
 /**
- * The juggle transition's ladder (juggling plan section 26): the outgoing
- * (`primary`) and the incoming trade each rung's bars - 4, 2, 1 on a
- * beat-level grid - then the incoming is released (`target`), on the beat
- * the last trade ends. Not in the planner's library: the transition executor
- * runs it as its trade stage.
+ * The juggle transition's trading ladders (owner juggling plan sections 9,
+ * 26, 41, 44). Each is a whole phrase - 16 or 32 bars of trades - so the
+ * release lands on a phrase start of both tracks, and every rung starts on a
+ * multiple of its own trade length (A4 B4 from bar 0, A2 B2 from bar 8, A1 B1
+ * from bar 12), so no trade straddles a 4-bar group. `minRung` is the
+ * shortest trade: 4 bars is SAFE's 8/4-bar phrase trading, 2 bars MUSICAL's
+ * tight phrase trading, 1 bar PERFORMER's bar trading (section 41's own
+ * example: 4 4, 2 2, 1 1 1 1).
+ */
+export const LADDER_SHAPES: ReadonlyArray<{ bars: readonly number[]; minRung: 1 | 2 | 4 }> = [
+  { bars: [4, 2, 1, 1], minRung: 1 },
+  { bars: [8, 4, 2, 1, 1], minRung: 1 },
+  { bars: [4, 2, 2], minRung: 2 },
+  { bars: [8, 4, 2, 2], minRung: 2 },
+  { bars: [4, 4], minRung: 4 },
+  { bars: [8, 4, 4], minRung: 4 },
+  { bars: [8, 8], minRung: 4 },
+];
+
+/**
+ * The shortest rung a juggle transition may trade (owner plan section 44's
+ * mode table under section 31's confidence rule): SAFE trades 8/4-bar
+ * phrases, MUSICAL adds 2-bar trades, PERFORMER and up trade single bars -
+ * but only when the pair's confidence allows beat-level work ('beat');
+ * moderate confidence is phrase trading only, low confidence no juggle.
+ */
+export function minLadderRung(mode: import('./juggleTypes').JuggleMode, policy: 'beat' | 'phrase' | 'none'): 1 | 2 | 4 | null {
+  if (mode === 'OFF' || policy === 'none') return null;
+  if (mode === 'SAFE') return 4;
+  if (mode === 'MUSICAL') return 2;
+  return policy === 'beat' ? 1 : 2;
+}
+
+/**
+ * A ladder no finer than `minRung`, the same length: short rungs merge
+ * pairwise (A1 B1 A1 B1 becomes A2 B2), so a ladder whose confidence dropped
+ * after the incoming was cued still lands on the same bar.
+ */
+export function coarsenLadder(ladderBars: readonly number[], minRung: number): number[] {
+  let bars = [...ladderBars];
+  for (let guard = 0; guard < 8 && bars.some((b) => b < minRung); guard++) {
+    const out: number[] = [];
+    for (let i = 0; i < bars.length; i++) {
+      if (bars[i] < minRung && i + 1 < bars.length && bars[i + 1] === bars[i]) { out.push(bars[i] * 2); i++; } else out.push(bars[i]);
+    }
+    if (out.length === bars.length) break;
+    bars = out;
+  }
+  return bars;
+}
+
+/**
+ * The juggle transition's ladder (owner plan section 26): the incoming is
+ * locked to the outgoing's bars while it is not heard (SETUP, section 16),
+ * then the outgoing (`primary`) and the incoming trade each rung's bars, then
+ * the incoming is released (`target`) on the beat the last trade ends. Not in
+ * the planner's library: the transition executor runs it as its trade stage.
  */
 export function transitionLadder(p: PatternParams & { ladderBars: number[]; target: 'A' | 'B' }): DJJugglePattern {
   const b = newBuilder();
+  phase(b, 'SETUP', 0, 0);
+  b.actions.push({ type: 'PhaseLock', deck: p.target, executeAtBeat: 0, quantization: 'bar', phase: 'SETUP', reason: 'lock the incoming to the master bars before it is heard' });
   for (const bars of p.ladderBars) {
     const ph: JugglePhase = bars >= 4 ? 'ESTABLISH' : 'INTENSIFY';
     const start = b.beat;
@@ -348,7 +402,8 @@ export function transitionLadder(p: PatternParams & { ladderBars: number[]; targ
   }
   phase(b, 'RELEASE', b.beat, b.beat);
   release(b, p.target, b.beat, 'release into the incoming');
-  return finish('transitionLadder', p, b, { energyProfile: 'BUILD', reason: `${p.ladderBars.join(' -> ')} bar trades into the incoming`, targetDeck: p.target });
+  const pattern = finish('transitionLadder', p, b, { energyProfile: 'BUILD', reason: `${p.ladderBars.join(' -> ')} bar trades into the incoming`, targetDeck: p.target });
+  return { ...pattern, ladderBars: [...p.ladderBars] };
 }
 
 export const PATTERN_BUILDERS: Record<LibraryPatternType, (p: PatternParams) => DJJugglePattern> = {

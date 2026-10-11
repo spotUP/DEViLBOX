@@ -37,7 +37,6 @@ import type { NextTrackOption } from './autodj/juggle/juggleOpportunity';
 import { StandaloneJuggle, mixInPhraseStartOf } from './autodj/juggle/standaloneJuggle';
 import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
 import { registerAutoDJ } from './autoDJInstance';
-import { phaseAlign } from './DJAutoSync';
 
 // ── Transition Types ────────────────────────────────────────────────────────
 
@@ -1543,7 +1542,7 @@ class DJAutoDJ {
       const plId = useDJPlaylistStore.getState().activePlaylistId;
       if (plId) useDJPlaylistStore.getState().updateTrackMeta(plId, index, { bpm: summary.bpm, djSummary: summary });
       const outgoing = useDJStore.getState().decks[this.activeDeck].trackAnalysis;
-      this.plan = controller.planTransitionFor(outgoing, this.incomingAnalysis, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition());
+      this.plan = controller.planTransitionFor(outgoing, this.incomingAnalysis, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition(), this.juggleBudget());
     } catch (err) {
       console.warn('[AutoDJ] anticipatory planning failed:', err);
       this.plan = null;
@@ -1564,7 +1563,7 @@ class DJAutoDJ {
       const decks = useDJStore.getState().decks;
       const outgoing = decks[this.activeDeck].trackAnalysis;
       const incoming = decks[this.idleDeck].trackAnalysis ?? this.incomingAnalysis;
-      const plan = getSessionController().planTransitionFor(outgoing, incoming, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition());
+      const plan = getSessionController().planTransitionFor(outgoing, incoming, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition(), this.juggleBudget());
       this.plan = plan;
       return plan;
     } catch (err) {
@@ -1591,12 +1590,9 @@ class DJAutoDJ {
     const handle = executeTransition(planned, {
       waitForStart: () => this.waitForDeckPosition(out, planned.startTimeSec),
       onSweepStarted: () => { this.transitionSweepStarted = true; },
-      // A juggle transition's trade stage: lock the incoming to the outgoing's bars with a bend (the
-      // incoming plays now - never a seek), then the juggle controller trades the planned ladder.
-      performTrade: (j) => {
-        try { phaseAlign(planned.incomingDeck, planned.outgoingDeck, 'bar'); } catch { /* grid missing: the ladder trades as started */ }
-        return this.getJuggle().performLadder(this.tickInput('JUGGLE_TRANSITION', this.getTimeRemaining()), { ladderBars: j.ladderBars, target: planned.incomingDeck });
-      },
+      // A juggle transition's trade stage: the juggle controller locks the incoming to the outgoing's
+      // bars while it is silent, verifies the phase, and trades the planned ladder.
+      performTrade: (j) => this.getJuggle().performLadder(this.tickInput('JUGGLE_TRANSITION', this.getTimeRemaining()), { ladderBars: j.ladderBars, target: planned.incomingDeck }),
       onComplete: (result) => {
         if (this.execution === handle) this.execution = null;
         try { getSessionController().onTransitionComplete(result, planned); } catch { /* */ }
@@ -1627,6 +1623,19 @@ class DJAutoDJ {
   }
 
   // ── Beat juggling (juggling plan sections 24, 26, 43, 53) ───────────────────
+
+  /** The juggle budget a transition plan reads (owner plan sections 24, 28): undefined with Auto Juggle off. */
+  private juggleBudget(): import('./autodj/transitionPlanner').TransitionPlanInput['juggleState'] {
+    const mode = juggleModeOf(useDJStore.getState().autoDJJuggleMode);
+    if (mode === 'OFF') return undefined;
+    try {
+      const j = this.getJuggle();
+      j.setMode(mode);
+      return j.transitionBudget(this.tickInput('JUGGLE_TRANSITION', this.getTimeRemaining()));
+    } catch {
+      return undefined;
+    }
+  }
 
   /** Test/MCP access: the juggle controller (created on first use). */
   getJuggle(): DJJuggleController {

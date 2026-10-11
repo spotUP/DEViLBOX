@@ -13,7 +13,7 @@ import { getDecisionLog } from './decisionLog';
 import { DJSessionMemory } from './sessionMemory';
 import { getStyle } from './styleProfiles';
 import { planSet, type PlannerTrack } from './setPlanner';
-import { fallbackPlan, planTransition } from './transitionPlanner';
+import { fallbackPlan, planTransition, type TransitionPlanInput } from './transitionPlanner';
 import { juggleModeOf } from './juggle/juggleTypes';
 import { evaluateTransition, checkInvariants } from './transitionQuality';
 import { buildPerformanceContext } from './performanceContext';
@@ -210,7 +210,10 @@ export class DJSessionController {
    * soon as the incoming analysis exists, and again with the live position
    * just before execution). Returns null when the analyses are missing.
    */
-  planTransitionFor(outgoing: DJTrackAnalysis | null, incoming: DJTrackAnalysis | null, decks: { outgoing: 'A' | 'B'; incoming: 'A' | 'B' }, outgoingPosition: number): DJTransitionPlan | null {
+  planTransitionFor(
+    outgoing: DJTrackAnalysis | null, incoming: DJTrackAnalysis | null, decks: { outgoing: 'A' | 'B'; incoming: 'A' | 'B' }, outgoingPosition: number,
+    juggleState?: TransitionPlanInput['juggleState'],
+  ): DJTransitionPlan | null {
     if (!outgoing || !incoming) {
       getDecisionLog().record('EMERGENCY', [`no analysis for the ${!outgoing ? 'outgoing' : 'incoming'} deck: legacy crossfade`], { time: this.now() });
       this.plan = null;
@@ -222,7 +225,7 @@ export class DJSessionController {
       style: this.style, creativeRisk: this.creativeRisk, memory: this.memory.snapshot(), userBars: s.autoDJTransitionBars,
       withFilter: s.autoDJWithFilter, smartCuts: s.autoDJSmartCuts, setPhase: this.setPhase, targetEnergy: this.targetEnergy,
       leadSec: this.loadLeadSec, bridgeAvailable: this.bridgeAvailable(incoming), seed: this.memory.transitionCount + this.counts.transitionPlans * 7,
-      juggleMode: juggleModeOf(s.autoDJJuggleMode),
+      juggleMode: juggleModeOf(s.autoDJJuggleMode), juggleState,
     });
     const invariants = checkInvariants(plan, outgoing, incoming);
     const broken = invariants.filter((i) => !i.ok);
@@ -231,7 +234,7 @@ export class DJSessionController {
       const safe = fallbackPlan(plan, {
         outgoing, incoming, outgoingDeck: decks.outgoing, incomingDeck: decks.incoming, outgoingPosition, style: this.style, creativeRisk: this.creativeRisk,
         memory: this.memory.snapshot(), userBars: s.autoDJTransitionBars, withFilter: s.autoDJWithFilter, smartCuts: s.autoDJSmartCuts, setPhase: this.setPhase, targetEnergy: this.targetEnergy,
-        juggleMode: juggleModeOf(s.autoDJJuggleMode),
+        juggleMode: juggleModeOf(s.autoDJJuggleMode), juggleState,
       }, 'fallback');
       getDecisionLog().record('FALLBACK', broken.map((b) => `${b.name}: ${b.detail}`), { time: this.now(), details: { from: plan.style, to: safe.style } });
       this.counts.fallbacks++;

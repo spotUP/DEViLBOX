@@ -529,3 +529,51 @@ describe('juggle controller: a set with two decks', () => {
     expect(openCrossfaders.length).toBe(0);
   }, 120_000);
 });
+
+// ── The juggle transition's ladder as the owner plan asks (audit 2026-10-11 rows 9, 13, 14, 15, 16) ──
+
+describe('juggle controller: the transition ladder follows the owner plan', () => {
+  const ladderRun = async (opts: { mode?: JuggleMode; phaseError?: number; setPhase?: SetEnergyPhase; bpmB?: number; ladderBars?: number[] }) => {
+    const timers = new VirtualTimers();
+    const { c, sink, input } = simController(timers, { A: { id: 'steady', start: 15.2381, playing: true }, B: { id: 'compatibleKey', start: 0, playing: true } }, { mode: opts.mode ?? 'PERFORMER' });
+    if (opts.phaseError !== undefined) (sink as JuggleActionSink).phaseError = () => opts.phaseError!;
+    const base = input({ performanceMode: 'JUGGLE_TRANSITION', setPhase: opts.setPhase ?? 'PEAK' });
+    if (opts.bpmB !== undefined) base.decks.B.bpm = opts.bpmB;
+    const done = c.performLadder(base, { ladderBars: opts.ladderBars ?? [4, 2, 1, 1], target: 'B' });
+    await timers.run(80_000);
+    const result = await done;
+    const cutsB = sink.applied.filter((a) => a.action.type === 'CutIn' && a.action.deck === 'B');
+    return { c, sink, result, cutsB, pattern: c.currentExecution()?.pattern ?? c.getLastDecision()?.pattern ?? null };
+  };
+
+  it('section 16: the incoming whose bar phase is not verified before its first bar is never heard - the ladder releases', async () => {
+    const off = await ladderRun({ phaseError: 0.05 });
+    expect(off.result.completed).toBe(false);
+    expect(off.result.reason).toContain('phase not verified');
+    expect(off.cutsB).toHaveLength(0);
+    // Locked first: the PhaseLock reaches the sink before any cut.
+    expect(off.sink.applied[0].action.type).toBe('PhaseLock');
+    const locked = await ladderRun({ phaseError: 0.002 });
+    expect(locked.result.completed).toBe(true);
+    expect(locked.cutsB.length).toBe(4);
+  });
+
+  it('sections 31, 44: MUSICAL never trades single bars, and moderate confidence at the ladder coarsens 1-bar rungs to 2 - the same length', async () => {
+    const musical = await ladderRun({ mode: 'MUSICAL' });
+    expect(musical.c.getLastDecision()?.pattern?.ladderBars).toEqual([4, 2, 2]);
+    expect(musical.result.completed).toBe(true);
+    // The incoming 1 % off the master: the decks' sync is no longer beat-level.
+    const drift = await ladderRun({ bpmB: corpusAnalysis('compatibleKey').bpm * 1.01 });
+    expect(drift.c.getLastDecision()?.pattern?.ladderBars).toEqual([4, 2, 2]);
+    expect(drift.c.getLastDecision()?.reason).toContain('traded as 4-2-2');
+    const performer = await ladderRun({});
+    expect(performer.c.getLastDecision()?.pattern?.ladderBars).toEqual([4, 2, 1, 1]);
+  });
+
+  it('sections 24, 28: the juggle budget is checked again when the ladder starts - OPENING mixes normally', async () => {
+    const opening = await ladderRun({ setPhase: 'OPENING' });
+    expect(opening.result.completed).toBe(false);
+    expect(opening.result.reason).toContain('set phase OPENING');
+    expect(opening.sink.applied).toHaveLength(0);
+  });
+});
