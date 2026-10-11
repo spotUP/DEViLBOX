@@ -15,7 +15,7 @@ import type {
   DJJuggleAction, DJJugglePattern, DJJugglePatternType, DJJugglePerformanceContext, JuggleCandidate, JuggleMode,
   JuggleQualityScore, LibraryPatternType, MaterialWindow,
 } from './juggleTypes';
-import type { SetEnergyPhase } from '../types';
+import type { DJTrackAnalysis, SetEnergyPhase } from '../types';
 
 export type ConfidencePolicy = 'beat' | 'phrase' | 'none';
 
@@ -99,6 +99,17 @@ export function intensityFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, 
 
 export interface Conditions { good: string[]; bad: string[] }
 
+/**
+ * Two tracks in different meters (a 3/4 module against a 4/4 track) cannot be juggled: every cut is
+ * counted in one deck's bars and the other deck's bars drift a beat against them each bar (owner
+ * plan sections 25 bad timing, 56 the meter is consulted). Null when the meters agree. The one gate
+ * the juggle layer and the transition planner both read.
+ */
+export function meterMismatch(a: Pick<DJTrackAnalysis, 'meter'>, b: Pick<DJTrackAnalysis, 'meter'>): string | null {
+  const ma = a.meter.beatsPerBar || 4, mb = b.meter.beatsPerBar || 4;
+  return ma === mb ? null : `meters differ (${ma} against ${mb} beats per bar)`;
+}
+
 /** Section 25: good and bad conditions. Any bad condition blocks. */
 export function conditions(ctx: DJJugglePerformanceContext): Conditions {
   const good: string[] = [];
@@ -118,6 +129,10 @@ export function conditions(ctx: DJJugglePerformanceContext): Conditions {
     const h = harmonicCompatibility(ctx.deckA.key ?? null, ctx.deckA.keyConfidence, ctx.deckB.key ?? null, ctx.deckB.keyConfidence);
     if (h.clashRisk > HARMONIC_CLASH_REJECT) bad.push(`key clash (${h.reason})`);
     else if (h.relation !== 'unknown') good.push(`keys ${h.relation}`);
+  }
+  if (ctx.deckA.analysis && ctx.deckB.analysis) {
+    const meters = meterMismatch(ctx.deckA.analysis, ctx.deckB.analysis);
+    if (meters) bad.push(meters);
   }
   if (ctx.deckA.vocalsActive && ctx.deckB.vocalsActive) bad.push('dense vocals on both decks');
   if (ctx.deckA.drumsActive && ctx.deckB.drumsActive) good.push('rhythmic material on both decks');
