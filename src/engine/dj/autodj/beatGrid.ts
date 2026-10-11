@@ -6,7 +6,7 @@
  * Pure functions over the beat list and the extended timelines.
  */
 import type {
-  AnalysisConfidence, Bar, Beat, BeatGrid, DownbeatGrid, ExtendedAnalysis, GridLandmarks, MeterAnalysis,
+  AnalysisConfidence, Bar, Beat, BeatGrid, DownbeatGrid, ExtendedAnalysis, GridLandmarks, Meter, MeterAnalysis,
 } from './types';
 
 /**
@@ -236,6 +236,24 @@ export function barIndexAt(grid: DownbeatGrid, t: number): number {
     if (bars[mid].start <= t) lo = mid; else hi = mid - 1;
   }
   return lo;
+}
+
+/**
+ * The beat (raw beat index, the clock of `fractionalBeatAt`) where bar `bar` of a downbeat grid
+ * starts: the bar's first beat, so a grid whose first downbeat is not the first detected beat
+ * (`phaseOffset`) puts bar 0 on that downbeat, not on beat 0. Past either end of the bar list the
+ * bars continue at the meter. The one bar -> beat mapping for planners that speak bars (scratch
+ * audit SA-M1).
+ */
+export function barStartBeat(grid: { bars: readonly Pick<Bar, 'beats'>[]; meter?: Pick<Meter, 'beatsPerBar'>; phaseOffset?: number }, bar: number): number {
+  const bpb = grid.meter?.beatsPerBar || 4;
+  const bars = grid.bars;
+  const known = bars[bar]?.beats[0];
+  if (known !== undefined) return known;
+  if (bars.length === 0) return (grid.phaseOffset ?? 0) + bar * bpb;
+  if (bar < 0) return (bars[0]!.beats[0] ?? grid.phaseOffset ?? 0) + bar * bpb;
+  const last = bars.length - 1;
+  return (bars[last]!.beats[0] ?? 0) + (bar - last) * bpb;
 }
 
 /**

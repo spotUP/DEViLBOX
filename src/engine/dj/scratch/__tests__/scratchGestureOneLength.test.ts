@@ -20,7 +20,7 @@ const placed = (gesture: ScratchGestureId): PlacedScratch => ({
 function eventFor(gesture: ScratchGestureId) {
   const anchor = deckAnchor(10, 20, 'downbeat', 120);
   return toScratchEvents([placed(gesture)], { type: 'DECK', deck: 'A', anchor }, anchor, {
-    bpm: 120, seed: 1, humanize: false,
+    bpm: 120, seed: 1, humanize: false, downbeats: { bars: [] },
   })[0]!;
 }
 
