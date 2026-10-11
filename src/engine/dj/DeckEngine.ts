@@ -23,6 +23,7 @@ import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
+import { HEARD_DELAY_MAX_SEC, syncHeardDelay, type LatencySource } from '../audioLatency';
 import { computeKeyLockShift } from './computeKeyLockShift';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
@@ -191,6 +192,9 @@ export class DeckEngine {
   // to avoid any Tone.js interception that corrupts automation during scratch.
   private _rawDeckGainParam: AudioParam | null = null;
   private _brickwallLimiter: SafetyLimiter | null = null;
+  /** Delays feeding the scopes / the meter the heard signal (output latency). */
+  private _scopeDelay: DelayNode | null = null;
+  private _meterDelay: DelayNode | null = null;
 
   // Scratch/LFO reverb send — taps audio pre-fader, feeds through a short
   // reverb that bypasses the channelGain gate, creating a reverb tail that
@@ -273,13 +277,26 @@ export class DeckEngine {
       // (e.g., test doubles) — bypasses the limiter but keeps audio flowing.
       this.channelGain.connect(options.outputNode);
     }
+    // Visual taps read the HEARD signal: each goes through a delay of the
+    // output latency (audioLatency.syncHeardDelay), else scopes and meters
+    // lead the audio by outputLatency.
     // Analysers tap from channelGain (pre-limiter) for accurate waveform/spectrum display
-    this.channelGain.connect(this.waveformAnalyser);
-    this.channelGain.connect(this.fftAnalyser);
+    this._scopeDelay = ctx.createDelay(HEARD_DELAY_MAX_SEC);
+    this._meterDelay = ctx.createDelay(HEARD_DELAY_MAX_SEC);
+    this._syncHeardDelays();
+    if (nativeChannelGain) {
+      nativeChannelGain.connect(this._scopeDelay);
+      Tone.connect(this._scopeDelay, this.waveformAnalyser);
+      Tone.connect(this._scopeDelay, this.fftAnalyser);
+    } else {
+      this.channelGain.connect(this.waveformAnalyser);
+      this.channelGain.connect(this.fftAnalyser);
+    }
     // VU meter taps post-limiter to show actual output level
     const nativeMeterInput = getNativeAudioNode(this.meter as unknown as Record<string, unknown>);
     if (nativeMeterInput) {
-      safety.output.connect(nativeMeterInput);
+      safety.output.connect(this._meterDelay);
+      this._meterDelay.connect(nativeMeterInput);
     } else {
       this.channelGain.connect(this.meter);
     }
@@ -1926,7 +1943,15 @@ export class DeckEngine {
   // METERING
   // ==========================================================================
 
+  /** Keep the visual taps' delay at the current output latency. */
+  private _syncHeardDelays(): void {
+    const ctx = Tone.getContext().rawContext as unknown as LatencySource;
+    if (this._scopeDelay) syncHeardDelay(this._scopeDelay, ctx);
+    if (this._meterDelay) syncHeardDelay(this._meterDelay, ctx);
+  }
+
   getLevel(): number {
+    this._syncHeardDelays();
     return this.meter.getValue() as number;
   }
 
@@ -2039,6 +2064,7 @@ export class DeckEngine {
 
   /** Get waveform data (256 samples, -1 to +1) */
   getWaveform(): Float32Array {
+    this._syncHeardDelays();
     return this.waveformAnalyser.getValue() as Float32Array;
   }
 
@@ -2198,6 +2224,7 @@ export class DeckEngine {
 
   /** Get FFT data (1024 bins, dB values -100 to 0) */
   getFFT(): Float32Array {
+    this._syncHeardDelays();
     return this.fftAnalyser.getValue() as Float32Array;
   }
 
@@ -2254,6 +2281,8 @@ export class DeckEngine {
     this.eq3.dispose();
     this.deckGain.dispose();
     try { this._brickwallLimiter?.disconnect(); } catch { /* already disconnected */ }
+    try { this._scopeDelay?.disconnect(); } catch { /* already disconnected */ }
+    try { this._meterDelay?.disconnect(); } catch { /* already disconnected */ }
     try { this._reverbSend?.disconnect(); } catch { /* already disconnected */ }
     try { this._reverbNode?.disconnect(); } catch { /* already disconnected */ }
     try { this._reverbWet?.disconnect(); } catch { /* already disconnected */ }
