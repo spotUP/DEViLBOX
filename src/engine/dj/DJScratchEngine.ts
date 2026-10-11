@@ -38,6 +38,20 @@ export interface ScratchFrame {
   faderGain: number;  // 0–1 channel gain
 }
 
+/**
+ * A planned start (scratch audit SA-M2, SA-m5): the caller says where the stroke begins and how
+ * long it plays. The Auto Scratch executor starts a deck gesture on its planned beat, so the
+ * cycle begins at `phase` (0 = the start of the stroke) instead of the elapsed-time modulo that
+ * phase-aligns a hand-pressed pattern, with no quantize wait; the pattern ends itself after
+ * `cycles` whole cycles.
+ */
+export interface PatternStart {
+  /** 0..1 position in the cycle the stroke starts at. */
+  phase?: number;
+  /** Whole cycles to play, then end (the gesture's one length). */
+  cycles?: number;
+}
+
 export interface ScratchPattern {
   name: string;
   shortName: string;
@@ -173,6 +187,8 @@ export class ScratchPlayback {
   private patternLastTick = 0;
   private patternDurationMs = 0;
   private pendingStop = false; // set by finishCurrentCycle() to stop after this cycle completes
+  /** Whole cycles left before a planned pattern ends itself (null = loop until stopped). */
+  private cyclesLeft: number | null = null;
 
   /** Current scratch velocity (updated every tick). UI reads this for turntable spin + pattern scroll. */
   currentVelocity = 0;
@@ -220,7 +236,7 @@ export class ScratchPlayback {
   // PATTERN PLAYBACK
   // --------------------------------------------------------------------------
 
-  play(pattern: ScratchPattern, onWaiting?: (ms: number) => void): void {
+  play(pattern: ScratchPattern, onWaiting?: (ms: number) => void, start?: PatternStart): void {
     this.stopPattern();
 
     const bpm = this.getEffectiveBPM();
@@ -231,6 +247,14 @@ export class ScratchPlayback {
     const startLoop = () => {
       this.activePattern = pattern;
       this.patternLastTick = performance.now();
+      this.cyclesLeft = start?.cycles !== undefined ? Math.max(1, Math.round(start.cycles)) : null;
+
+      if (start) {
+        // a planned stroke begins where the plan says, on the beat it was fired on
+        this.patternElapsedMs = Math.max(0, Math.min(1, start.phase ?? 0)) * this.patternDurationMs;
+        this._startPatternInterval();
+        return;
+      }
 
       // Phase-align: start the pattern at the correct phase within the current
       // beat so scratch cycles lock to beat boundaries. This gives instant
@@ -250,7 +274,7 @@ export class ScratchPlayback {
       this._startPatternInterval();
     };
 
-    if (pattern.quantize) {
+    if (pattern.quantize && !start) {
       const delay = this.msUntilNextBeat(pattern.quantize);
       if (delay > 20) {
         onWaiting?.(delay);
@@ -276,7 +300,8 @@ export class ScratchPlayback {
     this.patternLastTick = now;
 
     if (this.patternElapsedMs >= this.patternDurationMs) {
-      if (!pattern.loop || this.pendingStop) {
+      if (this.cyclesLeft !== null) this.cyclesLeft--;
+      if (!pattern.loop || this.pendingStop || this.cyclesLeft === 0) {
         this.stopPattern();
         // Notify DeckEngine to decay pitch/tempo back to rest (pitch slider value)
         this.onPatternEnd?.();
@@ -383,6 +408,7 @@ export class ScratchPlayback {
     this.activePattern = null;
     this.patternElapsedMs = 0;
     this.pendingStop = false;
+    this.cyclesLeft = null;
     this.currentVelocity = 0;
     this.currentFaderGain = 1;
 
@@ -538,7 +564,7 @@ export class ScratchPlayback {
   // windows `faderGainAt` reads for the tick's UI estimate.
   // --------------------------------------------------------------------------
 
-  schedulePatternFader(pattern: ScratchPattern, bpm: number): void {
+  schedulePatternFader(pattern: ScratchPattern, bpm: number, start?: PatternStart): void {
     if (this.patternFaderTimeoutId !== null) {
       clearTimeout(this.patternFaderTimeoutId);
       this.patternFaderTimeoutId = null;
@@ -552,11 +578,13 @@ export class ScratchPlayback {
       const cycleSec = (60 / bpm) * gesture.cycleBeats;
       const now = ctx.currentTime;
       const ramp = faderRampSec(1);
-      const offsetSec = this._getBeatOffsetSec(deck, cycleSec);
+      // a planned stroke's cut grid starts with its stroke, not on elapsed time
+      const offsetSec = start ? 0 : this._getBeatOffsetSec(deck, cycleSec);
+      const cycles = start?.cycles !== undefined ? Math.max(1, Math.round(start.cycles)) : PATTERN_FADER_LOOKAHEAD;
       const windows = gesture.faderWindows.filter((w) => w.curve === 'deck');
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(1, now);
-      for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
+      for (let i = 0; i < cycles; i++) {
         const cycleStart = now + offsetSec + i * cycleSec;
         for (const w of windows) {
           const open = cycleStart + w.open[0] * cycleSec;
@@ -568,6 +596,7 @@ export class ScratchPlayback {
           gain.linearRampToValueAtTime(0, close);
         }
       }
+      if (start?.cycles !== undefined) return; // a planned stroke is scheduled whole: nothing to extend
       const totalMs = (offsetSec + PATTERN_FADER_LOOKAHEAD * cycleSec) * 1000;
       this.patternFaderTimeoutId = setTimeout(() => {
         this.patternFaderTimeoutId = null;

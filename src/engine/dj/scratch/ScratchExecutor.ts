@@ -210,7 +210,9 @@ export class ScratchExecutor {
 
   private finish(e: Entry, state: 'released' | 'cancelled'): void {
     if (e.state === 'running') {
-      this.deps.release(e.id, { ...e.opts, at: undefined, finishCycle: false });
+      // a deck stroke at its end beat finishes the cycle it is in (it plays whole cycles and ends
+      // itself); a cancel stops it now
+      this.deps.release(e.id, { ...e.opts, at: undefined, finishCycle: state === 'released' && e.event.source.type !== 'CRATE' });
       scratchExecutorStats.released++;
     }
     e.state = state;

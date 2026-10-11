@@ -1766,7 +1766,13 @@ function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
       if (wantsRecordVoice(gestureId, opts) || !pattern) { engageRecordGesture(this.id, gestureId, opts); return; }
       const deckId = opts?.deck ?? getActiveDeckId();
       scratchDeck.set(this.id, deckId);
-      playDeckPattern(deckId, pattern.name, opts?.onWaiting);
+      // a planned event (`beats` = its length): the stroke starts at its beginning now and plays
+      // whole cycles (SA-M2, SA-m5); a pressed pattern loops phase-aligned. `role` and `at` are
+      // record-voice only (bus ambience; sample-accurate worklet start).
+      const planned = opts?.beats !== undefined && opts.beats > 0
+        ? { phase: 0, cycles: Math.max(1, Math.round(opts.beats / gesture.cycleBeats)) }
+        : undefined;
+      playDeckPattern(deckId, pattern.name, opts?.onWaiting, planned);
       try { useDJStore.getState().setDeckPattern(deckId, pattern.name); } catch { /* store not ready */ }
     },
     disengage(opts) {

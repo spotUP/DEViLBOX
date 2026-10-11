@@ -31,6 +31,7 @@ function rig(opts: { suppressNotes?: boolean } = {}) {
   const fires: Array<{ id: string; at?: number; beat: number; record?: string; role?: string }> = [];
   const releases: string[] = [];
   const releaseAt: Array<number | undefined> = [];
+  const releaseFinish: Array<boolean | undefined> = [];
   const events: ScratchExecutorEvent[] = [];
   const recues: Array<[string, number]> = [];
   const deps: ScratchExecutorDeps = {
@@ -42,7 +43,7 @@ function rig(opts: { suppressNotes?: boolean } = {}) {
       if (!o.record) { state.rate = 0.4; state.channelGain = 0; state.captureFrozen = true; }
       return true;
     },
-    release: (id, o) => { releases.push(id); releaseAt.push(o.at); },
+    release: (id, o) => { releases.push(id); releaseAt.push(o.at); releaseFinish.push(o.finishCycle); },
     probe: {
       capture: () => ({ ...state }),
       restore: (s, fields) => { for (const f of fields) (state as unknown as Record<string, unknown>)[f] = s[f]; },
@@ -54,7 +55,7 @@ function rig(opts: { suppressNotes?: boolean } = {}) {
   const advance = (toSec: number) => {
     while (sec < toSec - 1e-9) { sec = Math.min(toSec, sec + 0.005); for (const i of [...intervals]) i.fn(); }
   };
-  return { deps, state, fires, releases, releaseAt, events, recues, advance, now: () => sec, intervals };
+  return { deps, state, fires, releases, releaseAt, releaseFinish, events, recues, advance, now: () => sec, intervals };
 }
 
 const crate = (recordId: string): ScratchSource => ({ type: 'CRATE', recordId, anchor: { position: 0.15, safe: [0, 1], safeForward: [0, 1], safeReverse: [0, 1] } });
@@ -171,6 +172,18 @@ describe('release restores exactly the state the run started from (section 60)',
     expect(r.state.channelGain).toBe(0); // still dirty: the second is running
     r.advance(5.4);
     expect(r.state).toEqual(before);
+  });
+
+  it('a deck gesture at its end beat finishes the cycle it is in (whole strokes, SA-B2); cancel stops it now', () => {
+    const r = rig();
+    const ex = new ScratchExecutor(r.deps);
+    ex.schedule(deckEvent(8));
+    r.advance(4.6);
+    expect(r.releaseFinish).toEqual([true]);
+    ex.schedule(deckEvent(12));
+    r.advance(6.1);
+    ex.cancel();
+    expect(r.releaseFinish).toEqual([true, false]);
   });
 
   it('cancel releases what runs, drops what waits, and restores', () => {
