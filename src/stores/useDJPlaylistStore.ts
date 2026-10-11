@@ -65,6 +65,12 @@ export interface PlaylistTrack {
   masterFxPreset?: string;
   /** Compact Auto DJ analysis summary (plan section 3), written by the playlist analyser and by Auto DJ when a render arrives. */
   djSummary?: DJTrackSummary;
+  /**
+   * Set by the playlist migration on a track whose key was read before analyses recorded a key
+   * confidence (a key, no djSummary): Smart Sort weighs that key as unknown until the track is
+   * analysed again. Any analysis write clears it.
+   */
+  keyConfidenceStale?: boolean;
 }
 
 export interface DJPlaylist {
@@ -121,9 +127,9 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary' | 'keyConfidenceStale'>>) => void;
   /** Batch-update multiple tracks in a single Immer transaction (single re-render). */
-  batchUpdateTrackMeta: (playlistId: string, updates: Array<{ index: number; meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary'>> }>) => void;
+  batchUpdateTrackMeta: (playlistId: string, updates: Array<{ index: number; meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary' | 'keyConfidenceStale'>> }>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   /** Remember the last track loaded to a deck from this playlist.
    *  Modal uses it to scroll-restore on open and after search clear. */
@@ -801,7 +807,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
     })),
     {
       name: 'devilbox-dj-playlists',
-      version: 2,
+      version: 3,
       // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       // !! NEVER SET state.playlists = [] IN A MIGRATION.                !!
       // !! On 2026-04-13, a destructive migration wiped 3 user playlists !!
@@ -812,6 +818,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         // Preserve existing playlists during migration; only init if missing
         if (!state.playlists) state.playlists = [];
         if (!state.activePlaylistId) state.activePlaylistId = null;
+        markKeyConfidenceStale(state.playlists as DJPlaylist[]);
         return state;
       },
       partialize: (state) => ({
@@ -856,6 +863,20 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
     },
   ),
 );
+
+/**
+ * v3: a track analysed before analyses recorded their key confidence has a key and no djSummary.
+ * Smart Sort cannot weigh that key, and the confidence is not recoverable from what was stored,
+ * so the track is marked for a fresh analysis (the Analyze actions pick it up, trackNeedsAnalysis).
+ * Mutates in place; never removes a track or a field.
+ */
+export function markKeyConfidenceStale(playlists: DJPlaylist[]): void {
+  for (const pl of playlists) {
+    for (const t of pl.tracks ?? []) {
+      if (t.musicalKey && !t.djSummary && !t.analysisSkipped) t.keyConfidenceStale = true;
+    }
+  }
+}
 
 // ── Internal: push undo snapshot (called inside immer set()) ────────────────
 
