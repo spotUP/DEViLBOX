@@ -14,6 +14,7 @@
  *   // stems = { drums: {left, right}, bass: {left, right}, ... }
  */
 
+import { requestPersistentStorage } from '@/lib/persistence/persistentStorage';
 import type {
   DemucsModelType,
   StemResult,
@@ -320,6 +321,7 @@ export class DemucsEngine {
   }
 
   private async saveModelToCache(model: DemucsModelType, data: ArrayBuffer): Promise<void> {
+    void requestPersistentStorage();
     try {
       const db = await this.openModelDB();
       return new Promise((resolve, reject) => {
