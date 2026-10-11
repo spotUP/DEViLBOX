@@ -21,6 +21,9 @@ export interface AudioFileInfo {
 }
 
 export class DeckAudioPlayer {
+  /** De-click fade on every start and stop, in seconds. */
+  static readonly FADE_S = 0.01;
+
   /** Called after play / pause / resume / stop change whether the source runs. */
   onRunningChange: (() => void) | null = null;
 
@@ -188,34 +191,54 @@ export class DeckAudioPlayer {
     this.onRunningChange?.();
   }
 
-  pause(): void {
+  /**
+   * Pause now. Returns the AudioContext time by which the output is silent.
+   *
+   * A bare Tone `player.stop()` is scheduled at Tone.now(), which is the
+   * context's currentTime PLUS its lookAhead (100 ms): the deck kept sounding
+   * for a tenth of a second after every pause, and a caller that held the deck
+   * muted around a pause (scratch-buffer priming on load) unmuted while it was
+   * still sounding - loading a track onto a stopped deck was audible. The stop
+   * is placed at the context's current time instead, and the paused position
+   * is where the audio actually stopped.
+   */
+  pause(): number {
+    const now = (Tone.getContext().rawContext as AudioContext).currentTime;
     if (this.player.state === 'started') {
       // Snapshot position before stopping so getPosition() returns it while paused
-      this._pendingOffset = this.getPosition();
-      this.player.fadeOut = 0.01;
-      this.player.stop();
+      this._pendingOffset = this._positionAt(now);
+      this.player.fadeOut = DeckAudioPlayer.FADE_S;
+      this.player.stop(now);
       this._rateTrackingActive = false;
     }
     this.onRunningChange?.();
+    return now + DeckAudioPlayer.FADE_S;
   }
 
-  /** Resume from pending offset (set by seek while paused). Single start, no overlapping sources. */
-  resume(): void {
-    if (!this._loaded || this.player.state === 'started') return;
-    this.player.fadeIn = 0.01;
+  /**
+   * Resume from pending offset (set by seek while paused). Single start, no
+   * overlapping sources. Returns the AudioContext time at which the audio
+   * starts (Tone schedules it one lookAhead ahead), or null when nothing started.
+   */
+  resume(): number | null {
+    if (!this._loaded || this.player.state === 'started') return null;
+    this.player.fadeIn = DeckAudioPlayer.FADE_S;
     const offset = this._pendingOffset ?? 0;
-    this.player.start(undefined, offset);
+    const at = Tone.now();
+    this.player.start(at, offset);
     this._pendingOffset = null;
     this._rateChangePos = offset;
-    this._rateChangeTime = Tone.now();
+    this._rateChangeTime = at;
     this._rateTrackingActive = true;
     this.onRunningChange?.();
+    return at;
   }
 
   stop(): void {
     if (this.player.state === 'started') {
-      this.player.fadeOut = 0.01;
-      this.player.stop();
+      // At the context's current time, not one lookAhead later (see pause()).
+      this.player.fadeOut = DeckAudioPlayer.FADE_S;
+      this.player.stop((Tone.getContext().rawContext as AudioContext).currentTime);
     }
     this._pendingOffset = null;
     this._rateTrackingActive = false;
@@ -340,23 +363,26 @@ export class DeckAudioPlayer {
    * Uses rate-change checkpoint tracking for accuracy during scratch.
    */
   getPosition(): number {
+    return this._positionAt(Tone.now());
+  }
+
+  /** Playback position at context time `now` (never before the last start). */
+  private _positionAt(now: number): number {
     if (!this._loaded) return 0;
     if (this._pendingOffset !== null) return this._pendingOffset;
 
     if (this._rateTrackingActive && this.player.state === 'started') {
-      const now = Tone.now();
-      const elapsed = (now - this._rateChangeTime) * this._playbackRate;
+      const elapsed = Math.max(0, now - this._rateChangeTime) * this._playbackRate;
       const raw = this._rateChangePos + elapsed;
       return this._duration > 0 ? ((raw % this._duration) + this._duration) % this._duration : 0;
     }
 
-    return this._getPositionFromToneState() ?? 0;
+    return this._getPositionFromToneState(now) ?? 0;
   }
 
   /** Read position from Tone.js internal state (original method, used as fallback) */
-  private _getPositionFromToneState(): number | null {
+  private _getPositionFromToneState(now: number = Tone.now()): number | null {
     try {
-      const now = Tone.now();
       const state = (this.player as any)._state;
       if (state) {
         const lastEvent = state.getValueAtTime(now);
@@ -366,7 +392,7 @@ export class DeckAudioPlayer {
             for (let i = events.length - 1; i >= 0; i--) {
               const evt = events[i];
               if (evt.state === 'started') {
-                const elapsed = (now - evt.time) * this._playbackRate;
+                const elapsed = Math.max(0, now - evt.time) * this._playbackRate;
                 const offset = evt.offset || 0;
                 const raw = offset + elapsed;
                 return this._duration > 0 ? raw % this._duration : 0;
