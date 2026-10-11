@@ -31,7 +31,12 @@ describe('pre-commit affected-test selection', () => {
     expect(affected(self)).toContain(self);
   });
 
-  it('a file outside src/ selects nothing', () => {
-    expect(affected('server/src/index.ts')).toEqual([]);
+  it('a change to a server file runs the src/ test that reads it', () => {
+    expect(affected('server/src/mcp/mcpServer.ts'))
+      .toContain('src/lib/import/__tests__/companionResolver.reachability.test.ts');
+  });
+
+  it('a file outside src/ and server/src/ selects nothing', () => {
+    expect(affected('scripts/build.ts')).toEqual([]);
   });
 });
