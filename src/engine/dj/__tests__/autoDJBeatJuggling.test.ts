@@ -67,7 +67,7 @@ async function run(patternType: DJJugglePatternType, p: Partial<PatternParams> =
 function ctxFor(over: Partial<DJJugglePerformanceContext> = {}, ids: { A: CorpusId; B: CorpusId } = { A: 'steady', B: 'compatibleKey' }): DJJugglePerformanceContext {
   const a = corpusAnalysis(ids.A), b = corpusAnalysis(ids.B);
   const deck = (d: 'A' | 'B', an: DJTrackAnalysis, id: string) => ({
-    deck: d, trackId: id, position: 20, beatPhase: 0, barPhase: 0, beatIndex: 40, bpm: 126, key: an.key.name, section: an.sections.find((s) => s.start <= 20 && 20 < s.end),
+    deck: d, trackId: id, position: 20, beatPhase: 0, barPhase: 0, beatIndex: 40, bpm: 126, key: an.key.name, keyConfidence: an.keyConfidence, section: an.sections.find((s) => s.start <= 20 && 20 < s.end),
     energy: 0.7, drumsActive: true, bassActive: true, vocalsActive: false, melodicActivity: 0.5, loop: null, analysisConfidence: 0.9, playing: true, analysis: an,
   });
   return {

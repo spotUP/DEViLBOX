@@ -119,7 +119,10 @@ export interface DJDeckPerformanceState {
   /** Absolute beat index on the deck's own grid. */
   beatIndex: number;
   bpm: number;
+  /** The key heard at `position`: the local key (keyAt), shifted by the deck's varispeed. */
   key?: string;
+  /** Confidence of `key` (the local segment's when one is used). */
+  keyConfidence: number;
   section?: DJSection;
   cuePosition?: number;
   mixInPosition?: number;

@@ -33,6 +33,7 @@ import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
 import { DJJuggleController, analysisClock, type TickInput } from './autodj/juggle/juggleController';
 import { createDeckJuggleSink } from './autodj/juggle/juggleDeckSink';
 import { JUGGLE_MODES, type JuggleMode } from './autodj/juggle/juggleTypes';
+import { POLICY_MIN } from './autodj/juggle/jugglePlanner';
 import { seekDeckAudio, setCrossfader } from './DJActions';
 import { registerAutoDJ } from './autoDJInstance';
 import { phaseAlign, syncBPMToOther } from './DJAutoSync';
@@ -1611,7 +1612,7 @@ class DJAutoDJ {
     const bpm = d.effectiveBPM || d.detectedBPM || analysis?.bpm || 0;
     const loop = d.loopActive && d.audioLoopIn !== null && d.audioLoopOut !== null
       ? { startSec: d.audioLoopIn, endSec: d.audioLoopOut, lengthBeats: (d.audioLoopOut - d.audioLoopIn) / (60 / Math.max(60, bpm)) } : null;
-    return { trackId: d.fileName ?? '', analysis, positionSec: this.deckPosition(deck), playing: this.deckPlaying(deck), bpm, loop };
+    return { trackId: d.fileName ?? '', analysis, positionSec: this.deckPosition(deck), playing: this.deckPlaying(deck), bpm, loop, keyShiftSemitones: d.keyLockEnabled ? 0 : d.pitchOffset };
   }
 
   /**
@@ -1664,7 +1665,10 @@ class DJAutoDJ {
     const j = this.getJuggle();
     if (j.getMode() === 'OFF' || j.getMode() === 'SAFE') return;
     const outgoing = useDJStore.getState().decks[this.activeDeck].trackAnalysis;
-    if (!outgoing || outgoing.beatGrid.confidence < 0.8 || this.incomingAnalysis.beatGrid.confidence < 0.8) return;
+    // The grids must carry at least phrase trading (the planner's own policy):
+    // a stricter bar here kept every moderate-grid pair out of the prelude.
+    const minGrid = POLICY_MIN.phrase.beat;
+    if (!outgoing || outgoing.beatGrid.confidence < minGrid || this.incomingAnalysis.beatGrid.confidence < minGrid) return;
     const bpm = useDJStore.getState().decks[this.activeDeck].effectiveBPM || outgoing.bpm;
     const barSec = (60 / Math.max(60, bpm)) * (outgoing.meter.beatsPerBar || 4);
     const preludeBars = 8;

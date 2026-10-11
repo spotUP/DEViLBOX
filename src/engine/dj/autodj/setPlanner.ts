@@ -10,7 +10,7 @@
 import {
   bassCompatibility, drumCompatibility, genreCompatibility, harmonicCompatibility, introOutroCompatibility,
   phraseCompatibility, sectionCompatibility, spectralCompatibility, tempoCompatibility, textureCompatibility,
-  vocalCompatibility,
+  vocalCompatibility, HARMONIC_CLASH_REJECT,
 } from './compatibility';
 import { summaryFromLegacy } from './trackAnalysis';
 import type {
@@ -120,7 +120,7 @@ export function scoreTransition(
 
   const h = harmonicCompatibility(from.key, from.keyConfidence, to.key, to.keyConfidence, { strictness: input.style.keyStrictness, overlapBars: input.style.transitionLengthBars });
   components.harmonicCompatibility = h.score;
-  if (h.score >= 0.8) reasons.push(`compatible key (${h.relation})`); else if (h.clashRisk > 0.5) rejections.push(`key clash risk ${h.clashRisk.toFixed(2)}`);
+  if (h.score >= 0.8) reasons.push(`compatible key (${h.relation})`); else if (h.clashRisk > HARMONIC_CLASH_REJECT) rejections.push(`key clash risk ${h.clashRisk.toFixed(2)}`);
 
   const t = tempoCompatibility(from.bpm, to.bpm, input.style.tempoTolerancePercent);
   components.tempoCompatibility = t.score;
@@ -164,7 +164,7 @@ export function scoreTransition(
   // Penalties.
   components.repetition = (played ? 1 : 0) * (1 - input.style.repetitionTolerance) + (sameKeyRun ? 0.3 : 0);
   // A high-confidence key clash is awkward in itself (a DJ hears it), beyond the harmonic score.
-  components.awkwardness = (d.score < 0.4 ? 0.4 : 0) + (b.bothHeavy ? 0.4 : 0) + (v.overlapRisk > 0.5 ? 0.4 : 0) + (to.durationSec < 45 ? 0.5 : 0) + (h.clashRisk > 0.5 ? 0.6 * input.style.keyStrictness : 0);
+  components.awkwardness = (d.score < 0.4 ? 0.4 : 0) + (b.bothHeavy ? 0.4 : 0) + (v.overlapRisk > 0.5 ? 0.4 : 0) + (to.durationSec < 45 ? 0.5 : 0) + (h.clashRisk > HARMONIC_CLASH_REJECT ? 0.6 * input.style.keyStrictness : 0);
   if (to.durationSec < 45) rejections.push('very short track');
   const uncertainty = 1 - to.confidence.overall;
   components.risk = Math.min(1, h.clashRisk * 0.5 + (t.score < 0.5 ? 0.3 : 0) + uncertainty * 0.3) * (1 - input.creativeRisk * 0.5);

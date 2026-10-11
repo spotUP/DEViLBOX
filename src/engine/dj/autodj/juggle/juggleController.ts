@@ -10,10 +10,12 @@
 import { fractionalBeatAt } from '../beatGrid';
 import { timelineAt, barIndexAt } from '../beatGrid';
 import { realTimers, type ExecutorTimers } from '../transitionExecutor';
+import { keyAt } from '../trackAnalysis';
+import { shiftedKeyName } from '../tempoKeySolver';
 import type { DJTrackAnalysis, SetEnergyPhase } from '../types';
 import { classifyWindow, materialRefs } from './juggleMaterial';
 import { phaseAt, rolesAt } from './jugglePatterns';
-import { budgetFor, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
+import { budgetFor, confidencePolicy, intensityFor, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
 import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
 import type {
   DJDeckPerformanceState, DJJuggleHistory, DJJugglePerformanceContext, DJPerformanceMode, JuggleMode, JuggleQualityScore,
@@ -29,6 +31,8 @@ export interface DeckInput {
   playing: boolean;
   bpm: number;
   loop?: { startSec: number; endSec: number; lengthBeats: number } | null;
+  /** Semitones the deck's varispeed moves the heard key (0 with key lock). */
+  keyShiftSemitones?: number;
 }
 
 export interface TickInput {
@@ -132,16 +136,21 @@ export class DJJuggleController {
     const a = input.analysis;
     const pos = input.positionSec;
     if (!a) {
-      return { deck, trackId: input.trackId, position: pos, beatPhase: 0, barPhase: 0, beatIndex: 0, bpm: input.bpm, energy: 0, drumsActive: false, bassActive: false, vocalsActive: false, melodicActivity: 0, loop: input.loop ?? null, analysisConfidence: 0, playing: input.playing, analysis: null };
+      return { deck, trackId: input.trackId, position: pos, beatPhase: 0, barPhase: 0, beatIndex: 0, bpm: input.bpm, keyConfidence: 0, energy: 0, drumsActive: false, bassActive: false, vocalsActive: false, melodicActivity: 0, loop: input.loop ?? null, analysisConfidence: 0, playing: input.playing, analysis: null };
     }
     const beat = fractionalBeatAt(a.beatGrid, pos);
     const bpb = a.meter.beatsPerBar || 4;
     const refs = materialRefs(a);
     const at = (tl: { values: number[]; hopSec: number }, ref: number) => timelineAt(tl.values, tl.hopSec || 0.25, pos) / ref;
     const section = a.sections.find((s) => s.start <= pos && pos < s.end);
+    // The key heard now, as the transition planner reads it: the local key at
+    // the position, moved by the varispeed shift.
+    const local = keyAt(a, pos);
+    const localName = local.key.mode === 'unknown' ? null : local.key.name;
+    const heardKey = shiftedKeyName(localName, input.keyShiftSemitones ?? 0) ?? localName ?? undefined;
     return {
       deck, trackId: input.trackId, position: pos, beatPhase: beat - Math.floor(beat), barPhase: ((beat % bpb) + bpb) % bpb / bpb, beatIndex: beat,
-      bpm: input.bpm || a.bpm, key: a.key.name, section, cuePosition: a.cuePoints.bestMixIn, mixInPosition: a.cuePoints.bestMixIn, mixOutPosition: a.cuePoints.bestMixOut,
+      bpm: input.bpm || a.bpm, key: heardKey, keyConfidence: localName ? local.confidence : 0, section, cuePosition: a.cuePoints.bestMixIn, mixInPosition: a.cuePoints.bestMixIn, mixOutPosition: a.cuePoints.bestMixOut,
       energy: Math.min(1, at(a.intensity, refs.intensity)), drumsActive: at(a.drumActivity, refs.drums) > 0.4, bassActive: at(a.bassActivity, refs.bass) > 0.4,
       vocalsActive: a.vocalActivity.confidence > 0 && at(a.vocalActivity, refs.vocal) > 0.5, melodicActivity: Math.min(1, at(a.harmonicActivity, refs.harmonic)),
       loop: input.loop ?? null, analysisConfidence: a.analysisConfidence.overall, playing: input.playing, analysis: a,
@@ -195,13 +204,23 @@ export class DJJuggleController {
     }
     if (input.userControl) { this.lastJuggleAt = this.now(); this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
     if (this.mode === 'OFF') { this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
-    if (input.performanceMode !== 'JUGGLE' && input.performanceMode !== 'JUGGLE_TRANSITION') { this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
+    if (input.performanceMode !== 'JUGGLE' && input.performanceMode !== 'JUGGLE_TRANSITION') {
+      // Not this layer's turn: say so, instead of publishing the reasons of a
+      // decision made before the transition took the decks.
+      this.lastDecision = this.idleDecision(ctx, `${input.performanceMode}: the transition owns the decks`);
+      this.publish(ctx);
+      return { started: false, active: false, decision: null, aborted: null };
+    }
     const decision = planJuggle(ctx, { mode: this.mode, intensityOverride: this.intensityOverride, learned: (t, c) => this.learnedFor(t, c), seed: (this.deps.seed ?? 0) + this.counter++ });
     this.lastDecision = decision;
     if (!decision.pattern) { this.publish(ctx); return { started: false, active: false, decision, aborted: null }; }
     this.start(decision, ctx, input);
     this.publish(ctx);
     return { started: true, active: true, decision, aborted: null };
+  }
+
+  private idleDecision(ctx: DJJugglePerformanceContext, reason: string): JuggleDecision {
+    return { pattern: null, candidates: [], reason, blocked: [reason], policy: confidencePolicy(ctx), intensity: intensityFor(ctx, this.mode, this.intensityOverride), startBeat: ctx.masterBeat };
   }
 
   private abortReason(ctx: DJJugglePerformanceContext, input: TickInput): string | null {
