@@ -589,7 +589,9 @@ export type AutomationTarget =
   | 'outgoing.eqHigh' | 'incoming.eqHigh'
   | 'outgoing.filter' | 'incoming.filter'
   | 'outgoing.volume' | 'incoming.volume'
-  | 'outgoing.echoSend' | 'outgoing.reverbSend';
+  | 'outgoing.echoSend' | 'outgoing.reverbSend'
+  /** The low-band kill switch (0 open, 1 killed): the bass handover's "cut A bass, bring B bass" (owner juggling plan sections 14, 35). */
+  | 'outgoing.lowKill' | 'incoming.lowKill';
 
 export interface Keyframe {
   /** Beats from the transition start. */

@@ -150,12 +150,16 @@ describe('a planned Auto DJ transition reaches the decks', () => {
     expect(pitch!.args[0] as number).toBeCloseTo(12 * Math.log2(126 / 124), 2);
     // Key lock is engaged only when the plan needs it; otherwise the deck's own setting is left alone.
     expect(calls.some((c) => c.deck === 'B' && c.fn === 'setKeyLock')).toBe(plan!.keyPlan.keyLock);
-    // Bass ownership: the incoming low band starts cut and ends open; the outgoing low band ends cut before the stop (plan sections 20, 21).
-    const inLow = calls.filter((c) => c.deck === 'B' && c.fn === 'setEQ' && c.args[0] === 'low').map((c) => c.args[1] as number);
-    expect(inLow[0]).toBeLessThanOrEqual(-6);
-    expect(Math.max(...inLow)).toBe(0);
-    const outLow = calls.filter((c) => c.deck === 'A' && c.fn === 'setEQ' && c.args[0] === 'low').map((c) => c.args[1] as number);
-    expect(Math.min(...outLow)).toBeLessThanOrEqual(-6);
+    // Bass ownership, one bass at a time (owner juggling plan sections 14, 35): the incoming low band starts
+    // killed and opens at the hand-over; the outgoing's is killed there, before the stop, and lifted by the reset.
+    const kills = (deck: 'A' | 'B') => calls.filter((c) => c.deck === deck && c.fn === 'setEQKill' && c.args[0] === 'low').map((c) => c.args[1] as boolean);
+    expect(kills('B')[0]).toBe(true);
+    expect(kills('B')[kills('B').length - 1]).toBe(false);
+    const outKillAt = calls.findIndex((c) => c.deck === 'A' && c.fn === 'setEQKill' && c.args[0] === 'low' && c.args[1] === true);
+    const outStopAt = calls.findIndex((c) => c.deck === 'A' && c.fn === 'stop');
+    expect(outKillAt).toBeGreaterThanOrEqual(0);
+    expect(outKillAt).toBeLessThan(outStopAt);
+    expect(kills('A')[kills('A').length - 1]).toBe(false);
     // Continuous crossfader over the plan: many samples, ending exactly on the incoming side; outgoing stopped and reset.
     expect(holder.crossfader.length).toBeGreaterThan(20);
     expect(holder.crossfader[holder.crossfader.length - 1]).toBe(1);

@@ -15,11 +15,12 @@ import { solveKey, solveTempo, type TempoKeyLimits } from './tempoKeySolver';
 import { keyAt, summarizeTrack } from './trackAnalysis';
 import { timelineAt, barIndexAt } from './beatGrid';
 import type {
-  AutomationCurve, BassHandoverPlan, BassOwner, CrossfadePlan, CutCandidate, CueJumpPlan, DJEffectEvent, DJPhrase,
-  DJSection, DJStyleProfile, DJTrackAnalysis, DJTransitionPlan, EQPlan, FilterPlan, HumanizePlan, LoopPlan,
+  AutomationCurve, BassHandoverPlan, BassOwner, CutCandidate, CueJumpPlan, DJEffectEvent, DJPhrase,
+  DJSection, DJStyleProfile, DJTrackAnalysis, DJTransitionPlan, EQPlan, HumanizePlan, LoopPlan,
   SessionMemorySnapshot, TransitionRisk, TransitionStyle,
 } from './types';
 import { TRANSITION_STYLES } from './types';
+import { crossfadeFor, curve, filterFor, stepCurve } from './transitionCurves';
 import { POLICY_MIN, PHASE_BUDGET, confidencePolicy, type ConfidencePolicy } from './juggle/jugglePlanner';
 import { LADDER_SHAPES, minLadderRung } from './juggle/jugglePatterns';
 import type { DJJuggleHistory, DJJugglePerformanceContext, JuggleMode } from './juggle/juggleTypes';
@@ -427,28 +428,6 @@ export function scoreStyles(ctx: {
 
 // ── Curves ──────────────────────────────────────────────────────────────────
 
-const curve = (target: AutomationCurve['target'], keyframes: AutomationCurve['keyframes']): AutomationCurve => ({ target, keyframes });
-
-function crossfadeFor(style: TransitionStyle, beats: number, toward: 0 | 1): CrossfadePlan {
-  const from = toward === 1 ? 0 : 1;
-  const to = toward;
-  // A juggle transition's ladder has already traded onto the incoming when the release starts: the release lands as a cut.
-  if (style === 'hardCut' || style === 'juggleTransition') return { curve: curve('crossfader', [{ beat: 0, value: from }, { beat: 0.01, value: to }]), lengthBeats: 0, law: 'cut' };
-  if (style === 'echoOut' || style === 'reverbOut') {
-    // The dry outgoing decays through the FX action; the tail returns before
-    // the crossfader, so the fader rests at the centre for the tail length
-    // (both decks at -3 dB) and completes in the last bar.
-    const mid = from + (to - from) * 0.5;
-    const tail = Math.max(2, beats - Math.min(4, beats));
-    return { curve: curve('crossfader', [{ beat: 0, value: from }, { beat: Math.min(2, beats), value: mid, curve: 'ease' }, { beat: tail, value: mid }, { beat: beats, value: to, curve: 'ease' }]), lengthBeats: beats, law: 'equal-power' };
-  }
-  if (style === 'dropMix') {
-    // Hold the outgoing until the last bar, then swing across so the drop owns the floor.
-    return { curve: curve('crossfader', [{ beat: 0, value: from }, { beat: Math.max(0, beats - 4), value: from + (to - from) * 0.4, curve: 'ease' }, { beat: beats, value: to, curve: 'ease' }]), lengthBeats: beats, law: 'equal-power' };
-  }
-  return { curve: curve('crossfader', [{ beat: 0, value: from }, { beat: beats, value: to, curve: 'ease' }]), lengthBeats: beats, law: 'equal-power' };
-}
-
 export function planBassHandover(ctx: {
   outgoing: DJTrackAnalysis; incoming: DJTrackAnalysis; durationBars: number; beatsPerBar: number; style: DJStyleProfile;
   transitionStyle: TransitionStyle; outStart: number; inStart: number; lengthSec: number;
@@ -478,64 +457,30 @@ export function planBassHandover(ctx: {
   if (sharedBars > 0 && handoverBar - sharedBars > 0) schedule.push({ bar: handoverBar - sharedBars, owner: 'SHARED' });
   schedule.push({ bar: handoverBar, owner: 'INCOMING' });
   const b = (bar: number) => bar * beatsPerBar;
-  const total = b(durationBars);
-  const cut = -12;
   const curves: AutomationCurve[] = [];
   // A cut, or a juggle's trades (one deck heard at a time): full range on both, nothing to hand over gradually.
   if (ctx.transitionStyle === 'hardCut' || ctx.transitionStyle === 'juggleTransition') {
     curves.push(curve('outgoing.eqLow', [{ beat: 0, value: 0 }]), curve('incoming.eqLow', [{ beat: 0, value: 0 }]));
   } else {
+    // One bass at a time (owner juggling plan sections 14, 35, the juggle layer's own rule): the incoming
+    // low band is killed until the hand-over, the outgoing's is killed from it - "cut A bass, bring B bass".
+    // A compatible pair shares one bar first, both at -6 dB.
     const sharedStart = Math.max(0, b(handoverBar - sharedBars));
     const handBeat = b(handoverBar);
-    // Outgoing low end: full until the shared bar, then down to the cut over a beat, held, back to 0 at the very end (deck reset).
-    curves.push(curve('outgoing.eqLow', [
-      { beat: 0, value: 0 }, { beat: Math.max(0, sharedStart - 0.5), value: 0 }, { beat: coexist ? handBeat : Math.min(total, handBeat + 1), value: coexist ? -6 : cut, curve: 'ease' },
-      ...(coexist ? [{ beat: Math.min(total, handBeat + 1), value: cut, curve: 'ease' as const }] : []),
-      { beat: Math.max(total, handBeat + 1.5), value: cut },
-    ]));
-    // Incoming low end: cut until the shared bar, rising to full at the hand-over.
-    curves.push(curve('incoming.eqLow', [
-      { beat: 0, value: cut }, { beat: Math.max(0, sharedStart - 0.5), value: cut }, { beat: coexist ? sharedStart + 0.5 : handBeat, value: coexist ? -6 : 0, curve: 'ease' },
-      ...(coexist ? [{ beat: handBeat, value: 0, curve: 'ease' as const }] : []),
-      { beat: Math.max(total, handBeat + 1), value: 0 },
-    ]));
+    if (coexist && sharedBars > 0 && sharedStart < handBeat) {
+      curves.push(curve('outgoing.eqLow', [{ beat: 0, value: 0 }, { beat: Math.max(0, sharedStart - 0.5), value: 0 }, { beat: sharedStart + 0.5, value: -6, curve: 'ease' }]));
+      curves.push(curve('incoming.eqLow', [{ beat: 0, value: -6 }, { beat: sharedStart + 0.5, value: -6 }, { beat: handBeat, value: 0, curve: 'ease' }]));
+      curves.push(stepCurve('incoming.lowKill', 1, 0, sharedStart));
+    } else {
+      curves.push(curve('outgoing.eqLow', [{ beat: 0, value: 0 }]), curve('incoming.eqLow', [{ beat: 0, value: 0 }]));
+      curves.push(stepCurve('incoming.lowKill', 1, 0, handBeat));
+    }
+    curves.push(stepCurve('outgoing.lowKill', 0, 1, handBeat));
   }
   const reason = outHeavy && inHeavy ? 'both heavy: strict hand-over, never both exposed'
-    : coexist ? `shared for one bar at bar ${handoverBar - 1}, incoming owns from bar ${handoverBar}`
-    : `incoming owns the low end from bar ${handoverBar}${incomingKickStronger ? ' (stronger kick)' : ''}${outgoingBassNecessary ? ' (outgoing bassline kept a bar longer)' : ''}`;
+    : coexist ? `shared for one bar at bar ${handoverBar - 1}, incoming owns from bar ${handoverBar} (outgoing bass killed)`
+    : `bass handed over at bar ${handoverBar}: outgoing killed, incoming in${incomingKickStronger ? ' (stronger kick)' : ''}${outgoingBassNecessary ? ' (outgoing bassline kept a bar longer)' : ''}`;
   return { schedule, curves, coexist, outgoingHeavy: outHeavy, incomingHeavy: inHeavy, incomingKickStronger, outgoingBassNecessary, handoverBar, reason };
-}
-
-function filterFor(style: TransitionStyle, beats: number, withFilter: boolean, resonanceBase: number): FilterPlan {
-  const none: FilterPlan = { kind: 'none', curves: [], resonance: resonanceBase };
-  switch (style) {
-    case 'filterBuild':
-      return { kind: 'resonant-build', resonance: Math.max(resonanceBase, 2.5), curves: [
-        curve('incoming.filter', [{ beat: 0, value: -0.8 }, { beat: beats, value: 0, curve: 'ease' }]),
-        curve('outgoing.filter', [{ beat: 0, value: 0 }, { beat: beats * 0.75, value: -0.7, curve: 'ease' }, { beat: beats, value: -0.95, curve: 'ease' }]),
-      ] };
-    case 'filterRelease':
-      return { kind: 'release', resonance: resonanceBase, curves: [
-        curve('outgoing.filter', [{ beat: 0, value: 0 }, { beat: beats * 0.6, value: -0.55, curve: 'ease' }, { beat: beats, value: -0.95, curve: 'ease' }]),
-        curve('incoming.filter', [{ beat: 0, value: 0.3 }, { beat: beats * 0.5, value: 0, curve: 'ease' }]),
-      ] };
-    case 'EQSwap':
-      return { kind: 'filter-eq', resonance: resonanceBase, curves: [
-        curve('outgoing.filter', [{ beat: 0, value: 0 }, { beat: beats, value: -0.6, curve: 'ease' }]),
-      ] };
-    case 'breakdownMix':
-      return { kind: 'low-pass-sweep', resonance: resonanceBase, curves: [
-        curve('incoming.filter', [{ beat: 0, value: 0.5 }, { beat: beats, value: 0, curve: 'ease' }]),
-      ] };
-    case 'hardCut': case 'echoOut': case 'reverbOut': case 'delayThrow': case 'juggleTransition':
-      return none;
-    default:
-      if (!withFilter) return none;
-      // Continuous high-pass on the outgoing, phrase-aware: most of the rise in the last phrase.
-      return { kind: 'high-pass-sweep', resonance: resonanceBase, curves: [
-        curve('outgoing.filter', [{ beat: 0, value: 0 }, { beat: beats * 0.5, value: -0.25, curve: 'ease' }, { beat: beats * 0.85, value: -0.6, curve: 'ease' }, { beat: beats, value: -0.9, curve: 'ease' }]),
-      ] };
-  }
 }
 
 function eqFor(style: TransitionStyle, beats: number): EQPlan {

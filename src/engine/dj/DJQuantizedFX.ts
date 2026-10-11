@@ -14,6 +14,7 @@ import { getDJEngine } from './DJEngine';
 import type { DeckId } from './DeckEngine';
 import { timeToNextBeat, timeToNextDownbeat, onNextBeat, onNextDownbeat, syncBPMToOther, phaseAlign } from './DJAutoSync';
 import { useDJStore } from '@/stores/useDJStore';
+import { crossfadeFor, filterFor, sampleCurve } from './autodj/transitionCurves';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -370,6 +371,49 @@ export function filterReset(deckId: DeckId): () => void {
   });
 }
 
+// ── Planned shapes (the Auto DJ planner's curves, transitionCurves) ─────────
+
+/**
+ * Play a keyframe curve over `beats` beats of the reference deck's tempo:
+ * the legacy transitions (used when no plan can be made) move the
+ * crossfader and the filter along the same shapes the planned path plays,
+ * never a snap or a step.
+ */
+function curveSweep(
+  key: string,
+  keyframes: Array<{ beat: number; value: number; curve?: 'linear' | 'ease' | 'exp' }>,
+  beats: number,
+  referenceDeckId: DeckId,
+  apply: (value: number) => void,
+  onDone?: () => void,
+): () => void {
+  cancelSweep(key);
+  const sweep: ActiveSweep = { id: 0, cancelled: false };
+  activeSweeps.set(key, sweep);
+  let bpm = 120;
+  try {
+    const state = useDJStore.getState().decks[referenceDeckId];
+    bpm = state.beatGrid?.bpm || state.detectedBPM || state.effectiveBPM || 120;
+  } catch { /* fallback */ }
+  const durationMs = Math.max(1, (beats * 60 / bpm) * 1000);
+  startSweepTimer(sweep, key, durationMs, (progress) => apply(sampleCurve(keyframes, progress * beats)), onDone);
+  return () => {
+    sweep.cancelled = true;
+    clearInterval(sweep.id as ReturnType<typeof setInterval>);
+    activeSweeps.delete(key);
+  };
+}
+
+function setCrossfaderNow(value: number): void {
+  try { getDJEngine().setCrossfader(value); } catch { /* engine not ready */ }
+  useDJStore.getState().setCrossfader(value);
+}
+
+function setFilterNow(deckId: DeckId, value: number): void {
+  try { getDJEngine().getDeck(deckId).setFilterPosition(value); } catch { /* engine not ready */ }
+  useDJStore.getState().setDeckFilter(deckId, value);
+}
+
 // ── Crossfader Automation ────────────────────────────────────────────────────
 
 /**
@@ -489,18 +533,11 @@ export function beatMatchedTransition(
       })
     );
 
-    // Optional: HPF sweep on outgoing deck (sweep to mid HPF over first half)
+    // Optional: the planned path's continuous high-pass rise on the outgoing deck (most of it in the
+    // last phrase), never a jump to full high-pass part-way through.
     if (withFilter) {
-      cancellers.push(
-        filterSweep(fromDeck, -0.6, Math.floor(totalBeats * 0.75), () => {
-          // At the end, fully HPF the outgoing deck
-          if (!cancelled) {
-            try {
-              getDJEngine().getDeck(fromDeck).setFilterPosition(-1);
-            } catch { /* engine not ready */ }
-          }
-        })
-      );
+      const hp = filterFor('longBlend', totalBeats, true, 1).curves.find((c) => c.target === 'outgoing.filter');
+      if (hp) cancellers.push(curveSweep(`filterSweep:${fromDeck}`, hp.keyframes, totalBeats, fromDeck, (v) => setFilterNow(fromDeck, v)));
     }
   });
 
@@ -566,13 +603,9 @@ export function skipTransition(
 
   // Optional HPF sweep on outgoing
   if (withFilter) {
-    cancellers.push(
-      filterSweep(fromDeck, -0.6, Math.floor(totalBeats * 0.75), () => {
-        if (!cancelled) {
-          try { getDJEngine().getDeck(fromDeck).setFilterPosition(-1); } catch { /* */ }
-        }
-      })
-    );
+    // The planned path's continuous high-pass rise, as in beatMatchedTransition.
+    const hp = filterFor('longBlend', totalBeats, true, 1).curves.find((c) => c.target === 'outgoing.filter');
+    if (hp) cancellers.push(curveSweep(`filterSweep:${fromDeck}`, hp.keyframes, totalBeats, fromDeck, (v) => setFilterNow(fromDeck, v)));
   }
 
   return () => {
@@ -691,7 +724,7 @@ export function bassSwapTransition(
 ): () => void {
   const cancellers: (() => void)[] = [];
   let cancelled = false;
-  /* True once we've set fromDeck's low EQ to -12 at the midpoint, so a cancel
+  /* True once fromDeck's low band is killed at the midpoint, so a cancel
    * after midpoint but before phase 2 completes can still restore it. Without
    * this, cancel would leave fromDeck permanently low-killed. */
   let bassKilled = false;
@@ -717,25 +750,21 @@ export function bassSwapTransition(
     cancellers.push(
       crossfaderSweep(0.5, halfBeats, fromDeck, () => {
         if (cancelled) return;
-        // At midpoint: kill outgoing bass, ensure incoming bass is full
-        try {
-          getDJEngine().getDeck(fromDeck).setEQ('low', -12);
-          useDJStore.getState().setDeckEQ(fromDeck, 'low', -12);
-          bassKilled = true;
-        } catch { /* */ }
+        // At midpoint: cut A bass, bring B bass - one bass at a time (owner juggling plan
+        // sections 14, 35; the planned handover and the juggle layer use the same kill).
+        instantEQKill(fromDeck, 'low', true);
+        instantEQKill(toDeck, 'low', false);
+        bassKilled = true;
 
         // Phase 2 (second half): complete crossfade
         const finalTarget = toDeck === 'A' ? 0 : toDeck === 'B' ? 1 : 0.5;
         cancellers.push(
           crossfaderSweep(finalTarget, halfBeats, fromDeck, () => {
             if (!cancelled) {
-              // Restore outgoing bass EQ for next use
-              try {
-                getDJEngine().getDeck(fromDeck).setEQ('low', 0);
-                useDJStore.getState().setDeckEQ(fromDeck, 'low', 0);
-                bassKilled = false;
-                getDJEngine().getDeck(fromDeck).stop();
-              } catch { /* */ }
+              // Restore the outgoing bass for next use
+              instantEQKill(fromDeck, 'low', false);
+              bassKilled = false;
+              try { getDJEngine().getDeck(fromDeck).stop(); } catch { /* */ }
               useDJStore.getState().setDeckPlaying(fromDeck, false);
             }
           })
@@ -750,20 +779,16 @@ export function bassSwapTransition(
     cancellers.forEach(c => c());
     /* Recovery: if we were cancelled after the bass was killed at midpoint,
      * restore the outgoing EQ so the deck isn't stuck with a low cut. */
-    if (bassKilled) {
-      try {
-        getDJEngine().getDeck(fromDeck).setEQ('low', 0);
-      } catch { /* engine not ready */ }
-      useDJStore.getState().setDeckEQ(fromDeck, 'low', 0);
-    }
+    if (bassKilled) instantEQKill(fromDeck, 'low', false);
   };
 }
 
 // ── Echo-Out Transition ────────────────────────────────────────────────────
 
 /**
- * Echo out the outgoing deck while snapping to incoming.
- * Combines echoOut volume fade with crossfader snap.
+ * Echo out the outgoing deck while the crossfader follows the planned
+ * echo-out law (transitionCurves.crossfadeFor): to the centre over two beats,
+ * held through the tail, across in the last bar - never a snap.
  */
 export function echoOutTransition(
   fromDeck: DeckId,
@@ -782,10 +807,9 @@ export function echoOutTransition(
     // Start incoming
     try { getDJEngine().getDeck(toDeck).play(); } catch { /* */ }
 
-    // Snap crossfader to incoming
-    const target = toDeck === 'A' ? 0 : toDeck === 'B' ? 1 : 0.5;
-    try { getDJEngine().setCrossfader(target); } catch { /* */ }
-    useDJStore.getState().setCrossfader(target);
+    // The crossfader follows the planned echo-out law.
+    const law = crossfadeFor('echoOut', beats, toDeck === 'A' ? 0 : 1);
+    cancellers.push(curveSweep('crossfaderSweep', law.curve.keyframes, beats, fromDeck, setCrossfaderNow));
 
     // Echo out the outgoing deck (volume fade)
     cancellers.push(

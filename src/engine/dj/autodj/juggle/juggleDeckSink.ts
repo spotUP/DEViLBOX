@@ -7,7 +7,7 @@
  */
 import { getDJEngine } from '../../DJEngine';
 import {
-  clearDeckAudioLoop, seekDeckAudio, setCrossfader, setDeckAudioLoop, setDeckEQKill, setDeckFilter,
+  clearDeckAudioLoop, seekDeckAudio, setCrossfader, setDeckAudioLoop, setDeckEQKillNow, setDeckFilter,
 } from '../../DJActions';
 import { beatJump, triggerHotCue } from '../../DJBeatJump';
 import { bendToPhase, lockBarPhase, phaseErrorSec, syncBPMToOther } from '../../DJAutoSync';
@@ -73,7 +73,7 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
   };
   const reset = (deck: AB): void => {
     clearDeckAudioLoop(deck); loopStart[deck] = null;
-    setDeckEQKill(deck, 'low', false);
+    setDeckEQKillNow(deck, 'low', false);
     releaseDjFx('fx_deck_echo_throw', { deck, source: 'autodj' });
     restoreFilter(deck);
   };
@@ -112,9 +112,9 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
         case 'ExitLoop': if (d) { clearDeckAudioLoop(d); loopStart[d] = null; } break;
         case 'FilterIn': if (d) { noteFilter(d); fireDjFx('fx_deck_filter_rise', { deck: d, beats: action.durationBeats ?? 8, amount: action.strength, source: 'autodj' }); } break;
         case 'FilterOut': if (d) { noteFilter(d); fireDjFx('fx_deck_filter_release', { deck: d, beats: action.durationBeats ?? 4, source: 'autodj' }); } break;
-        case 'EQCut': if (d) setDeckEQKill(d, 'low', true); break;
-        case 'EQRestore': if (d) setDeckEQKill(d, 'low', false); break;
-        case 'BassSwap': if (d) { setDeckEQKill(d === 'A' ? 'B' : 'A', 'low', true); setDeckEQKill(d, 'low', false); } break;
+        case 'EQCut': if (d) setDeckEQKillNow(d, 'low', true); break;
+        case 'EQRestore': if (d) setDeckEQKillNow(d, 'low', false); break;
+        case 'BassSwap': if (d) { setDeckEQKillNow(d === 'A' ? 'B' : 'A', 'low', true); setDeckEQKillNow(d, 'low', false); } break;
         case 'EchoThrow': if (d) fireDjFx('fx_deck_echo_throw', { deck: d, beats: action.durationBeats ?? 2, amount: action.strength ?? 0.6, source: 'autodj' }); break;
         case 'ReverbThrow': if (d) fireDjFx('fx_deck_reverb_out', { deck: d, beats: action.durationBeats ?? 4, amount: action.strength ?? 0.5, source: 'autodj' }); break;
         case 'ResetDeck': if (d) reset(d); else { reset('A'); reset('B'); } break;
