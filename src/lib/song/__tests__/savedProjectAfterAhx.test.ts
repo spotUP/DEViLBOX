@@ -14,6 +14,15 @@
  * overwrote the repair the localStorage boot path had just made (2026-10-01).
  */
 import { describe, it, expect, vi } from 'vitest';
+// Static imports: loading this graph (~830 modules, the whole song stack) is a
+// one-time cost of the file, paid at collection. Imported inside a test it was
+// billed to that test's timeout; under load it outlived it, and the second test
+// then raced the still-running load (see songPersistenceImportCycle.test.ts).
+import { useFormatStore } from '@/stores/useFormatStore';
+import { useMixerStore } from '@stores/useMixerStore';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { DEFAULT_DUB_BUS } from '@/types/dub';
+import { makeEmptyTestSnapshot, loadProjectFromObject } from '@hooks/useProjectPersistence';
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = {
@@ -29,10 +38,6 @@ vi.mock('@stores/useInstrumentTypeStore', () => ({
 
 describe('a saved project after an AHX', () => {
   it('opens in the classic editor with no AHX data and its own mixer', async () => {
-    const { useFormatStore } = await import('@/stores/useFormatStore');
-    const { useMixerStore } = await import('@stores/useMixerStore');
-    const { makeEmptyTestSnapshot, loadProjectFromObject } = await import('@hooks/useProjectPersistence');
-
     // A plain (MOD-like) project whose mixer has channel 1 at 37 %.
     const project = makeEmptyTestSnapshot() as unknown as Record<string, unknown>;
     project.patterns = [{ id: 'p0', name: 'P0', length: 64, channels: [] }];
@@ -57,10 +62,6 @@ describe('a saved project after an AHX', () => {
 
 describe('a project saved with the dub bus return closed', () => {
   it('opens with a tail it can be heard through', async () => {
-    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
-    const { DEFAULT_DUB_BUS } = await import('@/types/dub');
-    const { makeEmptyTestSnapshot, loadProjectFromObject } = await import('@/hooks/useProjectPersistence');
-
     // The CC47-53 wet bank dumped to its minimums, as it was on disk on
     // 2026-10-01. springWet at maximum proves the file's own values loaded
     // rather than the store falling back to factory wholesale.
