@@ -10,6 +10,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import type { DJSet } from './DJSetFormat';
 import type { DJSetEvent, TrackSource } from './DJSetEvent';
 import * as DJActions from '../DJActions';
+import { fireDjFx, releaseDjFx, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
 
 type DeckId = 'A' | 'B' | 'C';
 
@@ -176,17 +177,32 @@ export class DJSetPlayer {
         break;
 
       // ── Scratch ──
-      case 'scratchStart':
-        if (deck) {
+      case 'scratchStart': {
+        // A registry fire replays through the one path (SCR-P2.10); a
+        // platter scratch (no action) only mirrors the store.
+        const action = event.values?.action as DjFxActionId | undefined;
+        if (action) {
+          fireDjFx(action, {
+            deck,
+            source: 'set',
+            record: event.values?.record as string | undefined,
+            beats: event.values?.beats as number | undefined,
+            amount: event.values?.amount as number | undefined,
+          });
+        } else if (deck) {
           store.setDeckState(deck, {
             scratchActive: true,
             activePatternName: (event.values?.pattern as string) || null,
           });
         }
         break;
-      case 'scratchStop':
-        if (deck) store.setDeckState(deck, { scratchActive: false });
+      }
+      case 'scratchStop': {
+        const action = event.values?.action as DjFxActionId | undefined;
+        if (action) releaseDjFx(action, { deck, source: 'set' });
+        else if (deck) store.setDeckState(deck, { scratchActive: false });
         break;
+      }
       case 'faderLFO':
         if (deck && event.values) {
           store.setDeckState(deck, {

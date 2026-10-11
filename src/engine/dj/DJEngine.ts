@@ -7,6 +7,7 @@
 
 import * as Tone from 'tone';
 import { DeckEngine, type DeckId } from './DeckEngine';
+import { fireScratchEffect } from './scratch/scratchActionMap';
 import { DJMixerEngine, type CrossfaderCurve } from './DJMixerEngine';
 import { DJCueEngine } from './DJCueEngine';
 import { useDJStore } from '@/stores/useDJStore';
@@ -97,6 +98,10 @@ export class DJEngine {
     // crossfader, never on the channel fader.
     for (const deck of [this.deckA, this.deckB]) {
       deck.setScratchCrossfaderSink((position) => this.mixer.setCrossfader(position));
+    }
+    // The tracker `Xnn` scratch effect fires the DJ FX registry (section 81).
+    for (const deck of [this.deckA, this.deckB, this.deckC]) {
+      deck.setScratchEffectSink((param, id) => fireScratchEffect(param, id));
     }
 
     // Initialize cue engine (async, but non-blocking)

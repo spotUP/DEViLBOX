@@ -158,6 +158,11 @@
       "file": "src/engine/dj/scratch/__tests__/scratchRecordVoiceAudio.test.ts",
       "ciSeconds": 24,
       "note": "measured locally 2026-10-11 at load 29 (4.6 s unloaded); 12 offline worklet renders"
+    },
+    {
+      "file": "src/engine/dj/__tests__/scratchRecordVoiceReachesTheBus.test.ts",
+      "ciSeconds": 42,
+      "note": "measured locally 2026-10-11 at load ~29; offline worklet render through pool, voice and two buses"
     }
   ]
 }

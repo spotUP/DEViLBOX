@@ -12,6 +12,8 @@ import { getDJEngine } from '@engine/dj/DJEngine';
 import { useDJStore } from '@stores/useDJStore';
 import { useUIStore } from '@stores/useUIStore';
 import { SCRATCH_PATTERNS } from '@engine/dj/DJScratchEngine';
+import { fireDjFx, releaseDjFx } from '@engine/drumpad/DjFxActions';
+import { fxIdForPattern } from '@engine/dj/scratch/scratchActionMap';
 
 type DeckId = 'A' | 'B' | 'C';
 type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
@@ -32,41 +34,54 @@ function getActiveDeck(): DeckId {
   return 'A';
 }
 
+// Every pattern goes through the DJ FX registry (owner scratch plan section
+// 81, one action path): `fireDjFx` plays it on the deck, `releaseDjFx`
+// stops it. The guard below only keeps a held key from re-firing.
+
+function firePattern(deckId: DeckId, patternName: string): boolean {
+  const fxId = fxIdForPattern(patternName);
+  if (!fxId) return false;
+  let quantizeWaitMs = 0;
+  const ok = fireDjFx(fxId, {
+    deck: deckId,
+    source: 'keyboard',
+    onWaiting: (waitMs) => {
+      quantizeWaitMs = waitMs;
+      useUIStore.getState().setStatusMessage(`Scratch: ${patternName} (waiting…)`, false, waitMs + 200);
+    },
+  });
+  if (ok && quantizeWaitMs === 0) {
+    useUIStore.getState().setStatusMessage(`Scratch: ${patternName}`, false, 1200);
+  }
+  return ok;
+}
+
+function releasePattern(deckId: DeckId, patternName: string): void {
+  const fxId = fxIdForPattern(patternName);
+  if (fxId) releaseDjFx(fxId, { deck: deckId, source: 'keyboard' });
+}
+
 function triggerPattern(patternName: string): boolean {
   const deckId = getActiveDeck();
   const current = activePatterns[deckId];
 
-  try {
-    const deck = getDJEngine().getDeck(deckId);
+  // Same pattern running → stop it
+  if (current === patternName) {
+    releasePattern(deckId, patternName);
+    activePatterns[deckId] = null;
+    useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);
+    return true;
+  }
 
-    // Same pattern running → stop it
-    if (current === patternName) {
-      deck.stopPattern();
-      activePatterns[deckId] = null;
-      useDJStore.getState().setDeckPattern(deckId, null);
-      useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);
-      return true;
-    }
+  // Different pattern already running → ignore
+  if (current !== null) {
+    return true;
+  }
 
-    // Different pattern already running → ignore
-    if (current !== null) {
-      return true;
-    }
-
-    // Nothing running → set IMMEDIATE guard, then state
-    activePatterns[deckId] = patternName;
-    useDJStore.getState().setDeckPattern(deckId, patternName);
-    
-    let quantizeWaitMs = 0;
-    deck.playPattern(patternName, (waitMs) => {
-      quantizeWaitMs = waitMs;
-      useUIStore.getState().setStatusMessage(`Scratch: ${patternName} (waiting…)`, false, waitMs + 200);
-    });
-    
-    if (quantizeWaitMs === 0) {
-      useUIStore.getState().setStatusMessage(`Scratch: ${patternName}`, false, 1200);
-    }
-  } catch {
+  // Nothing running → set IMMEDIATE guard, then fire
+  activePatterns[deckId] = patternName;
+  if (!firePattern(deckId, patternName)) {
+    activePatterns[deckId] = null;
     useUIStore.getState().setStatusMessage('DJ engine not active', false, 1000);
   }
   return true;
@@ -82,23 +97,10 @@ function startPattern(patternName: string): boolean {
     return true;
   }
 
-  try {
-    const deck = getDJEngine().getDeck(deckId);
-    
-    // Set IMMEDIATE guard, then state
-    activePatterns[deckId] = patternName;
-    useDJStore.getState().setDeckPattern(deckId, patternName);
-    
-    let quantizeWaitMs = 0;
-    deck.playPattern(patternName, (waitMs) => {
-      quantizeWaitMs = waitMs;
-      useUIStore.getState().setStatusMessage(`Scratch: ${patternName} (waiting…)`, false, waitMs + 200);
-    });
-    
-    if (quantizeWaitMs === 0) {
-      useUIStore.getState().setStatusMessage(`Scratch: ${patternName}`, false, 1200);
-    }
-  } catch {
+  // Set IMMEDIATE guard, then fire
+  activePatterns[deckId] = patternName;
+  if (!firePattern(deckId, patternName)) {
+    activePatterns[deckId] = null;
     useUIStore.getState().setStatusMessage('DJ engine not active', false, 1000);
   }
   return true;
@@ -114,19 +116,13 @@ function stopPattern(): boolean {
     return true;
   }
 
-  try {
-    const deck = getDJEngine().getDeck(deckId);
-    // Hard-stop and decay pitch/tempo back to rest over 300ms. `finishPatternCycle`
-    // waits for the cycle to end before restoring pitch, and some patterns
-    // (Orbit, Stab, etc.) that end in a backward phase can leave the song
-    // pitched down if anything interrupts the cycle-end tick.
-    deck.stopPattern();
-    activePatterns[deckId] = null;
-    useDJStore.getState().setDeckPattern(deckId, null);
-    useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);
-  } catch {
-    useUIStore.getState().setStatusMessage('DJ engine not active', false, 1000);
-  }
+  // Hard-stop (the registry's release) and decay pitch/tempo back to rest.
+  // `finishCycle` waits for the cycle to end before restoring pitch, and some
+  // patterns (Orbit, Stab, etc.) that end in a backward phase can leave the
+  // song pitched down if anything interrupts the cycle-end tick.
+  releasePattern(deckId, current);
+  activePatterns[deckId] = null;
+  useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);
   return true;
 }
 
@@ -214,12 +210,10 @@ export function djScratchVibrato(start?: boolean): boolean {
 
 export function djScratchStop(): boolean {
   const deckId = getActiveDeck();
-  const store = useDJStore.getState();
-  try {
-    getDJEngine().getDeck(deckId).stopPattern();
-    store.setDeckPattern(deckId, null);
+  activePatterns[deckId] = null;
+  if (fireDjFx('fx_scratch_stop', { deck: deckId, source: 'keyboard' })) {
     useUIStore.getState().setStatusMessage('Scratch: stopped', false, 800);
-  } catch { /* engine not active */ }
+  }
   return true;
 }
 

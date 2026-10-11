@@ -36,30 +36,23 @@ import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
 import { resetDrumPadModulation } from '../../midi/performance/parameterRouter';
 import { useVocoderStore } from '../../stores/useVocoderStore';
-import {
-  djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
-  djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
-  djScratchUzi, djScratchTwiddle, djScratch8Crab, djScratch3Flare,
-  djScratchLaser, djScratchPhaser, djScratchTweak, djScratchDrag, djScratchVibrato,
-  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
-} from '../../engine/keyboard/commands/djScratch';
+import { djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132 } from '../../engine/keyboard/commands/djScratch';
+import { fireScratchAction } from '../../engine/dj/scratch/scratchActionMap';
 
-/* ── Scratch action lookup ── */
-const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, (start?: boolean) => boolean> = {
-  scratch_baby: djScratchBaby, scratch_trans: djScratchTrans,
-  scratch_flare: djScratchFlare, scratch_hydro: djScratchHydro,
-  scratch_crab: djScratchCrab, scratch_orbit: djScratchOrbit,
-  scratch_chirp: djScratchChirp, scratch_stab: djScratchStab,
-  scratch_scribble: djScratchScrbl, scratch_tear: djScratchTear,
-  scratch_uzi: djScratchUzi, scratch_twiddle: djScratchTwiddle,
-  scratch_8crab: djScratch8Crab, scratch_3flare: djScratch3Flare,
-  scratch_laser: djScratchLaser, scratch_phaser: djScratchPhaser,
-  scratch_tweak: djScratchTweak, scratch_drag: djScratchDrag,
-  scratch_vibrato: djScratchVibrato, scratch_stop: djScratchStop,
+/* ── Scratch action lookup ──
+ * Gestures fire through the DJ FX registry (owner scratch plan section 81,
+ * one action path: `fireScratchAction` -> `fireDjFx`, source `midi`); the
+ * fader LFO ids are deck controls and keep their handlers. */
+const LFO_HANDLERS: Partial<Record<ScratchActionId, (start?: boolean) => boolean>> = {
   fader_lfo_off: djFaderLFOOff, fader_lfo_1_4: djFaderLFO14,
   fader_lfo_1_8: djFaderLFO18, fader_lfo_1_16: djFaderLFO116,
   fader_lfo_1_32: djFaderLFO132,
 };
+function runScratchAction(id: ScratchActionId, start?: boolean): boolean {
+  const lfo = LFO_HANDLERS[id];
+  if (lfo) return lfo(start);
+  return fireScratchAction(id, start, 'midi');
+}
 
 // Accept wide MIDI note range - auto-detect controller mapping
 const MIDI_PAD_LO = 0;    // Accept any MIDI note
@@ -388,7 +381,7 @@ export function useMIDIPadRouting() {
           // running forever on bank switch / ESC / dj-panic. The handler
           // with start=false is the canonical "finish current cycle" path.
           if (pad.scratchAction) {
-            SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
+            runScratchAction(pad.scratchAction, false);
           }
           if (pad.djFxAction) {
             releaseDjFx(pad.djFxAction, { source: 'midi' });
@@ -455,7 +448,7 @@ export function useMIDIPadRouting() {
 
     // Scratch actions (start on note-on, stop on note-off via releasePad)
     if (pad.scratchAction) {
-      SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(true);
+      runScratchAction(pad.scratchAction, true);
     }
 
     // Dub-bus action — King Tubby-style deck tap/throw/mute/siren.
@@ -682,7 +675,7 @@ export function useMIDIPadRouting() {
 
     // Stop scratch action on release (finish current cycle gracefully)
     if (pad.scratchAction) {
-      SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
+      runScratchAction(pad.scratchAction, false);
     }
 
     // Release dub-bus action (hold-style only; throws already self-released).

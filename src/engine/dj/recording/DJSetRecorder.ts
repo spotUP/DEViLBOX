@@ -9,6 +9,7 @@
 import { useDJStore } from '@/stores/useDJStore';
 import type { DJSetEvent, TrackSource, DJEventType } from './DJSetEvent';
 import { continuousEvent, discreteEvent, loadEvent } from './DJSetEvent';
+import { subscribeDjFxFires } from '@/engine/drumpad/DjFxActions';
 import type { DJSet, DJSetTrack, DJSetMetadata } from './DJSetFormat';
 
 type DeckId = 'A' | 'B' | 'C';
@@ -83,6 +84,25 @@ export class DJSetRecorder {
 
   private _subscribeToStore(): void {
     const store = useDJStore;
+
+    // ── Registry scratch fires (owner scratch plan section 81; SCR-P2.10) ──
+    // A gesture fired through `fireDjFx` is recorded with its action id,
+    // gesture, source and record, so playback replays it through the same path.
+    this._unsubscribers.push(subscribeDjFxFires((entry, action) => {
+      if (action.category !== 'scratch') return;
+      const deck = entry.deck ?? undefined;
+      if (entry.kind === 'fire') {
+        const gesture = entry.id.startsWith('fx_scratch_') ? entry.id.slice('fx_scratch_'.length) : undefined;
+        const values: Record<string, unknown> = { action: entry.id, source: entry.source };
+        if (gesture) values.gesture = gesture;
+        if (entry.record) values.record = entry.record;
+        if (entry.beats !== undefined) values.beats = entry.beats;
+        if (entry.amount !== undefined) values.amount = entry.amount;
+        this._emit(discreteEvent(this.elapsed(), 'scratchStart', deck, values));
+      } else {
+        this._emit(discreteEvent(this.elapsed(), 'scratchStop', deck, { action: entry.id }));
+      }
+    }));
 
     // ── Global continuous params ──
     this._subscribeContinuous(

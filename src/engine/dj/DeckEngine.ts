@@ -1608,6 +1608,13 @@ export class DeckEngine {
     this.scratchPlayback.setCrossfaderSink(sink);
   }
 
+  /** Where the tracker `Xnn` scratch effect goes (owner scratch plan section
+   *  81, one action path): DJEngine wires the DJ FX registry. */
+  private scratchEffectSink: ((param: number, deck: DeckId) => boolean) | null = null;
+  setScratchEffectSink(sink: ((param: number, deck: DeckId) => boolean) | null): void {
+    this.scratchEffectSink = sink;
+  }
+
   /** Play a named scratch pattern (with optional beat quantization) */
   playPattern(name: string, onWaiting?: (ms: number) => void): void {
     const pattern = getPatternByName(name);
@@ -1796,15 +1803,10 @@ export class DeckEngine {
     const hi = (param >> 4) & 0x0F;
     const lo = param & 0x0F;
 
-    if (hi === 0x0) {
-      // Scratch pattern
-      const PATTERN_NAMES = ['', 'Baby Scratch', 'Transformer', 'Flare', 'Hydroplane', 'Crab', 'Orbit'];
-      if (lo === 0) {
-        this.stopPattern();
-      } else if (lo < PATTERN_NAMES.length) {
-        this.stopPattern();
-        this.playPattern(PATTERN_NAMES[lo]);
-      }
+    if (hi === 0x0 || hi === 0x2) {
+      // Scratch pattern slot (X00 stop, X01-X0F slots 1-15, X20-X2F slots 16+):
+      // through the registry sink, never a direct pattern call.
+      this.scratchEffectSink?.(param, this.id);
     } else if (hi === 0x1) {
       // Fader LFO
       const LFO_DIVS: (FaderLFODivision | null)[] = [null, '1/4', '1/8', '1/16', '1/32'];
