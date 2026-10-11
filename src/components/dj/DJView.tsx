@@ -214,11 +214,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
 
     const unsubscribeCueDevice = useDJStore.subscribe(
       (s) => s.cueDeviceId,
-      (deviceId) => {
-        if (deviceId) {
-          void engine.cueEngine.setCueDevice(deviceId);
-        }
-      }
+      // A cleared device silences the cue output (setCueDevice(null)).
+      (deviceId) => { void engine.cueEngine.setCueDevice(deviceId); }
     );
 
     // Push the PERSISTED cue device to the engine on mount. zustand

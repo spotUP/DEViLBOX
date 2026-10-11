@@ -103,6 +103,17 @@ export class DJCueEngine {
   // MULTI-OUTPUT MODE
   // ==========================================================================
 
+  /**
+   * The cue mix carries the master (cueMix 0.5 by default) and leaves through
+   * an <audio> element, whose own output path lags the AudioContext's. Played
+   * on the device the master already plays on, it is the whole mix a second
+   * time, later: every kick and clap doubled, an echo on the DJ view that the
+   * tracker view never had (owner 2026-10-11). It used to autoplay on the
+   * default device before any headphones were chosen.
+   *
+   * So the element is created silent and sounds only on a cue device that is
+   * not the main output (setCueDevice).
+   */
   private async initMultiOutput(): Promise<void> {
     const ctx = Tone.getContext().rawContext;
 
@@ -110,21 +121,35 @@ export class DJCueEngine {
     this.mediaStreamDest = (ctx as AudioContext).createMediaStreamDestination();
     this.cueMixer.connect(this.mediaStreamDest as unknown as AudioNode);
 
-    // Create an <audio> element to play the stream
     this.audioElement = new Audio();
-    this.audioElement.srcObject = this.mediaStreamDest!.stream;
-    this.audioElement.autoplay = true;
+    this.audioElement.srcObject = this.mediaStreamDest.stream;
+    this.audioElement.autoplay = false;
   }
 
-  /** Set the output device for cue/headphone monitoring */
-  async setCueDevice(deviceId: string): Promise<void> {
-    if (this.cueMode === 'multi-output' && this.audioElement) {
-      try {
-        // setSinkId routes the audio element's output to a specific device
-        await (this.audioElement as any).setSinkId(deviceId);
-      } catch (err) {
-        console.error('[DJCueEngine] Failed to set cue device:', err);
-      }
+  /** Whether the cue output is sounding (on a headphone device). */
+  isCueOutputPlaying(): boolean {
+    return !!this.audioElement && !this.audioElement.paused;
+  }
+
+  /**
+   * Route the cue mix to a headphone device. `null`, or a device that is the
+   * one the master plays on, leaves the cue output silent.
+   */
+  async setCueDevice(deviceId: string | null): Promise<void> {
+    const el = this.audioElement;
+    if (this.cueMode !== 'multi-output' || !el) return;
+    const ctx = Tone.getContext().rawContext as AudioContext & { sinkId?: string | object };
+    const mainSinkId = typeof ctx.sinkId === 'string' ? ctx.sinkId : '';
+    if (await cueDeviceIsMainOutput(deviceId, mainSinkId)) {
+      el.pause();
+      return;
+    }
+    try {
+      await (el as HTMLAudioElement & { setSinkId(id: string): Promise<void> }).setSinkId(deviceId as string);
+      await el.play();
+    } catch (err) {
+      el.pause();
+      console.error('[DJCueEngine] Failed to set cue device:', err);
     }
   }
 
@@ -257,5 +282,25 @@ export class DJCueEngine {
     this.pflGain.dispose();
     this.masterMixGain.dispose();
     this.cueMixer.dispose();
+  }
+}
+
+/**
+ * Whether a cue device would play on the device the master already plays on
+ * (`mainSinkId` is the AudioContext's sink: '' is the system default). No
+ * device, the 'default' alias, the main sink itself, or another id for the
+ * same physical device (same groupId) all count as the main output.
+ */
+export async function cueDeviceIsMainOutput(deviceId: string | null, mainSinkId: string): Promise<boolean> {
+  if (!deviceId) return true;
+  const mainId = mainSinkId || 'default';
+  if (deviceId === mainId) return true;
+  try {
+    const outputs = await DJCueEngine.getOutputDevices();
+    const group = (id: string) => outputs.find(d => d.deviceId === id)?.groupId;
+    const cueGroup = group(deviceId);
+    return !!cueGroup && cueGroup === group(mainId);
+  } catch {
+    return false;
   }
 }
