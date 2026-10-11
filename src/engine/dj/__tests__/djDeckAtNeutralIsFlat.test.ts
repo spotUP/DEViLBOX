@@ -12,8 +12,8 @@
  *
  * Renders the same buffer through a real DeckEngine (audio player -> key lock
  * -> deck gain -> EQ -> filters -> channel gain -> limiter) offline and
- * compares every band to the dry input. All bands must move together; what
- * remains common to them is the deck limiter's make-up gain (see below).
+ * compares every band to the dry input: unity, also through the mixer
+ * (owner decision 2026-10-11: the limiters are safety only, no make-up gain).
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -24,14 +24,23 @@ vi.mock('@/engine/ToneEngine', () => ({
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch, audioLoadsSettled } from '@/test/audio/realWebAudio';
 import { rmsDb, SR } from '@/test/audio/masterChainRig';
 
-async function throughDeck(input: Float32Array): Promise<Float32Array> {
+async function throughDeck(input: Float32Array, viaMixer = false): Promise<Float32Array> {
   installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch();
   const Tone = await import('tone');
   const ctx = new OfflineAudioContext(2, input.length, SR);
   Tone.setContext(ctx as never);
   const { DeckEngine } = await import('../DeckEngine');
-  const out = new Tone.Gain(1);
-  out.connect(Tone.getDestination().input as never);
+  let out: InstanceType<typeof Tone.Gain>;
+  if (viaMixer) {
+    // Deck A -> crossfader on A -> master -> the mixer's safety limiter -> destination.
+    const { DJMixerEngine } = await import('../DJMixerEngine');
+    const mixer = new DJMixerEngine();
+    mixer.setCrossfader(0);
+    out = mixer.inputA;
+  } else {
+    out = new Tone.Gain(1);
+    out.connect(Tone.getDestination().input as never);
+  }
   const deck = new DeckEngine({ id: 'A', outputNode: out });
   deck.setFilterPosition(0);
   for (const band of ['low', 'mid', 'high'] as const) deck.setEQ(band, 0, 0);
@@ -56,24 +65,35 @@ function steppedSines(): Float32Array {
   return x;
 }
 
+function bandGains(dry: Float32Array, wet: Float32Array): Record<number, number> {
+  const gains: Record<number, number> = {};
+  // Skip each segment's first 0.2 s: the filters' settling after the step.
+  BANDS.forEach((hz, b) => {
+    const from = b * SEGMENT + Math.round(SR * 0.2), to = (b + 1) * SEGMENT;
+    gains[hz] = rmsDb(wet, from, to) - rmsDb(dry, from, to);
+  });
+  return gains;
+}
+
 describe('a DJ deck at neutral settings', () => {
-  it('passes every band at the same gain: no notch at the EQ crossovers, no lift from the idle filters', async () => {
+  it('passes every band at unity gain: no notch at the EQ crossovers, no lift from the idle filters, no limiter make-up', async () => {
     const dry = steppedSines();
-    const wet = await throughDeck(dry);
-    const gains: Record<number, number> = {};
-    // Skip each segment's first 0.2 s: the filters' settling after the step.
-    BANDS.forEach((hz, b) => {
-      const from = b * SEGMENT + Math.round(SR * 0.2), to = (b + 1) * SEGMENT;
-      gains[hz] = rmsDb(wet, from, to) - rmsDb(dry, from, to);
-    });
-    const values = Object.values(gains);
-    const spread = Math.max(...values) - Math.min(...values);
-    expect(spread, JSON.stringify(gains)).toBeLessThan(0.3);
-    // What is common to all bands is the deck limiter's make-up gain, not the
-    // EQ or the filters: a DynamicsCompressorNode raises its output by
-    // (1 / curve(0 dBFS))^0.6 - threshold -3 dB, ratio 20 -> curve(0 dBFS) =
-    // -2.85 dB -> +1.71 dB. Recorded here so a change to it is a decision,
-    // not a side effect.
-    expect(gains[1000], JSON.stringify(gains)).toBeCloseTo(1.71, 1);
+    const gains = bandGains(dry, await throughDeck(dry));
+    for (const g of Object.values(gains)) expect(Math.abs(g), JSON.stringify(gains)).toBeLessThan(0.15);
   }, 600_000);
+
+  it('through the mixer (crossfader on the deck, master 1) the song still reaches the output at unity', async () => {
+    const dry = steppedSines();
+    const gains = bandGains(dry, await throughDeck(dry, true));
+    for (const g of Object.values(gains)) expect(Math.abs(g), JSON.stringify(gains)).toBeLessThan(0.15);
+  }, 600_000);
+
+  it('the safety limiters catch overs only: threshold -1 dBFS, release long enough not to ripple a kick', async () => {
+    installRealWebAudio();
+    const { createSafetyLimiter, compressorMakeupDb } = await import('../djLimiter');
+    const limiter = createSafetyLimiter(new OfflineAudioContext(2, 128, SR));
+    expect(limiter.input.threshold.value).toBe(-1);
+    expect(limiter.input.release.value).toBeGreaterThanOrEqual(0.05);
+    expect(20 * Math.log10(limiter.output.gain.value)).toBeCloseTo(-compressorMakeupDb(-1, 20), 4);
+  });
 });

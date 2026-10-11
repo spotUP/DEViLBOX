@@ -732,13 +732,14 @@ describe('Audio levels — gain staging defaults prevent clipping', () => {
     expect(parseFloat(setMasterMatch![1])).toBeLessThanOrEqual(1.5);
   });
 
-  it('deck brick-wall limiter threshold is -3 dBFS or lower', () => {
-    const deckSrc = fs.readFileSync(
-      path.resolve(__dirname, '../DeckEngine.ts'), 'utf-8',
-    );
-    const threshMatch = deckSrc.match(/limiter\.threshold\.value\s*=\s*(-[\d.]+)/);
-    expect(threshMatch).not.toBeNull();
-    expect(parseFloat(threshMatch![1])).toBeLessThanOrEqual(-3);
+  // Owner decision 2026-10-11: the deck and mixer limiters are safety only
+  // (-1 dBFS, unity below it), defined once in djLimiter.ts; their levels are
+  // measured by djDeckAtNeutralIsFlat. Here: both stages use that definition.
+  it('deck and mixer limiters are the shared safety limiter', () => {
+    for (const file of ['../DeckEngine.ts', '../DJMixerEngine.ts']) {
+      const src = fs.readFileSync(path.resolve(__dirname, file), 'utf-8');
+      expect(src, file).toContain('createSafetyLimiter(');
+    }
   });
 });
 

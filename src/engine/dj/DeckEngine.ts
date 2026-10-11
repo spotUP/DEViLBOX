@@ -22,7 +22,7 @@ import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
-import { DECK_LIMITER_THRESHOLD_DB } from './djLimiter';
+import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
 import { computeKeyLockShift } from './computeKeyLockShift';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
@@ -190,7 +190,7 @@ export class DeckEngine {
   // Raw native AudioParam for deckGain — bypasses Tone.Signal entirely
   // to avoid any Tone.js interception that corrupts automation during scratch.
   private _rawDeckGainParam: AudioParam | null = null;
-  private _brickwallLimiter: DynamicsCompressorNode | null = null;
+  private _brickwallLimiter: SafetyLimiter | null = null;
 
   // Scratch/LFO reverb send — taps audio pre-fader, feeds through a short
   // reverb that bypasses the channelGain gate, creating a reverb tail that
@@ -256,21 +256,18 @@ export class DeckEngine {
       console.error('[DeckEngine] audio chain wiring failed:', err);
     }
 
-    // Brick-wall limiter — prevents output from exceeding 0 dBFS regardless of
-    // internal gain transients from rapid scratch transitions or Player source overlap.
+    // Safety limiter (djLimiter.ts) — catches overs from internal gain
+    // transients (rapid scratch transitions, Player source overlap); unity
+    // gain below its threshold, so a deck at its tracker level is untouched.
     const ctx = Tone.getContext().rawContext as AudioContext;
-    const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = DECK_LIMITER_THRESHOLD_DB;
-    limiter.knee.value = 0;          // Hard knee (brick-wall)
-    limiter.ratio.value = 20;        // Near-infinite ratio
-    limiter.attack.value = 0.001;    // 1ms attack (catch transients)
-    limiter.release.value = 0.01;    // 10ms release (fast recovery)
-    this._brickwallLimiter = limiter;
+    const safety = createSafetyLimiter(ctx);
+    const limiter = safety.input;
+    this._brickwallLimiter = safety;
     const nativeChannelGain = getNativeAudioNode(this.channelGain as unknown as Record<string, unknown>);
     const nativeOutput = getNativeAudioNode(options.outputNode as unknown as Record<string, unknown>);
     if (nativeChannelGain && nativeOutput) {
       nativeChannelGain.connect(limiter);
-      limiter.connect(nativeOutput);
+      safety.output.connect(nativeOutput);
     } else {
       // Fallback to Tone-level wiring when either node has no native handle
       // (e.g., test doubles) — bypasses the limiter but keeps audio flowing.
@@ -282,7 +279,7 @@ export class DeckEngine {
     // VU meter taps post-limiter to show actual output level
     const nativeMeterInput = getNativeAudioNode(this.meter as unknown as Record<string, unknown>);
     if (nativeMeterInput) {
-      limiter.connect(nativeMeterInput);
+      safety.output.connect(nativeMeterInput);
     } else {
       this.channelGain.connect(this.meter);
     }
