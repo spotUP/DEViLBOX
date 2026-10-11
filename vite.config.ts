@@ -146,6 +146,18 @@ export default defineConfig({
     // or a registry (mameChipWiring, its file 179 s under load, 2.5 s idle)
     // crossed it. A test that asserts speed says so itself.
     testTimeout: 30_000,
+    env: {
+      // node-web-audio-api runs OfflineAudioContext.suspend() and
+      // startRendering() as two futures on its tokio runtime; with several
+      // runtime workers startRendering can be polled first, take the renderer,
+      // and reject a suspend scheduled before it ("cannot suspend when
+      // rendering has already started"), so the scheduled action never runs
+      // and the render is silent. One worker polls them in the order they were
+      // issued, as the spec requires. Read when the addon loads, so it is set
+      // before any test imports it.
+      // Regression: src/test/audio/__tests__/offlineSuspendBeforeRenderIsHonoured.test.ts
+      TOKIO_WORKER_THREADS: '1',
+    },
     server: {
       deps: {
         inline: ['tone'], // Tone.js uses extensionless ESM imports that Node can't resolve without bundling
