@@ -46,6 +46,12 @@ export function keyConfidenceClass(confidence: number, key: string | null): KeyC
   return confidence >= 0.6 ? 'known-high' : 'known-low';
 }
 
+/**
+ * Clash risk above which a pairing is rejected as strongly incompatible keys:
+ * the set planner rejects the candidate and the juggle gate refuses to juggle.
+ */
+export const HARMONIC_CLASH_REJECT = 0.5;
+
 export interface HarmonicResult extends Scored {
   relation: HarmonicRelation;
   /** 0..1 risk the clash is heard, after confidence weighting and the length rule. */

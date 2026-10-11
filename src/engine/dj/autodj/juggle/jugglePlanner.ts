@@ -8,6 +8,7 @@
  * Pure.
  */
 import { hash } from '../transitionPlanner';
+import { harmonicCompatibility, HARMONIC_CLASH_REJECT } from '../compatibility';
 import { findCallAndResponse, upcomingWindows } from './juggleMaterial';
 import { MODE_PATTERNS, PATTERN_BUILDERS, PATTERN_INTENSITY, type PatternParams } from './jugglePatterns';
 import type {
@@ -18,10 +19,17 @@ import type { SetEnergyPhase } from '../types';
 
 export type ConfidencePolicy = 'beat' | 'phrase' | 'none';
 
+/** Section 31.2: the confidences each policy needs. Anything that gates on juggling reads these. */
+export const POLICY_MIN = {
+  beat: { beat: 0.8, sync: 0.8, phrase: 0.6, material: 0.5 },
+  phrase: { beat: 0.6, sync: 0.6, phrase: 0.5 },
+} as const;
+
 /** Section 31.2: high -> beat juggling, moderate -> phrase trading only, low -> normal transition. */
 export function confidencePolicy(ctx: Pick<DJJugglePerformanceContext, 'beatConfidence' | 'phraseConfidence' | 'deckSyncConfidence' | 'materialConfidence'>): ConfidencePolicy {
-  if (ctx.beatConfidence >= 0.8 && ctx.deckSyncConfidence >= 0.8 && ctx.phraseConfidence >= 0.6 && ctx.materialConfidence >= 0.5) return 'beat';
-  if (ctx.beatConfidence >= 0.6 && ctx.deckSyncConfidence >= 0.6 && ctx.phraseConfidence >= 0.5) return 'phrase';
+  const b = POLICY_MIN.beat, p = POLICY_MIN.phrase;
+  if (ctx.beatConfidence >= b.beat && ctx.deckSyncConfidence >= b.sync && ctx.phraseConfidence >= b.phrase && ctx.materialConfidence >= b.material) return 'beat';
+  if (ctx.beatConfidence >= p.beat && ctx.deckSyncConfidence >= p.sync && ctx.phraseConfidence >= p.phrase) return 'phrase';
   return 'none';
 }
 
@@ -66,8 +74,10 @@ export function budgetFor(ctx: DJJugglePerformanceContext, mode: JuggleMode): Ph
 
 /** Section 23: the intensity ladder; the set decides unless the user overrides. */
 export function intensityFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, override: number, seed = 0): number {
+  // The user's override is the user's: only the mode's own cap bounds it. The
+  // set arc's cap shapes the intensity the set decides, not the one chosen.
+  if (override >= 0) return Math.min(MODE_SHAPE[mode].intensityCap, override);
   const cap = Math.min(PHASE_BUDGET[ctx.setPhase].maxIntensity, MODE_SHAPE[mode].intensityCap);
-  if (override >= 0) return Math.min(cap, override);
   const fromEnergy = 0.2 + 0.6 * ctx.energy + 0.2 * Math.max(0, ctx.targetEnergy - ctx.energy);
   const tension = ctx.tension * 0.2;
   // Humanization (section 30): small intensity variation, never timing.
@@ -83,34 +93,31 @@ export function conditions(ctx: DJJugglePerformanceContext): Conditions {
   const bad: string[] = [];
   if (ctx.beatConfidence >= 0.8) good.push('strong beat confidence'); else if (ctx.beatConfidence < 0.6) bad.push('low beat confidence');
   if (ctx.phraseConfidence >= 0.6) good.push('phrase alignment known');
-  if (ctx.deckSyncConfidence >= 0.8) good.push('decks in sync'); else if (ctx.deckSyncConfidence < 0.6) bad.push('unstable sync');
-  if (!ctx.deckA.playing || !ctx.deckB.playing) bad.push('both decks must play');
+  // Sync is a property of two running decks: with one stopped there is nothing
+  // to measure, and the stopped deck is the reason, not the sync.
+  const bothPlaying = ctx.deckA.playing && ctx.deckB.playing;
+  if (!bothPlaying) bad.push('both decks must play');
+  else if (ctx.deckSyncConfidence >= 0.8) good.push('decks in sync');
+  else if (ctx.deckSyncConfidence < 0.6) bad.push('unstable sync');
   if (!ctx.deckA.analysis || !ctx.deckB.analysis) bad.push('both decks need analysis');
   if (ctx.deckA.analysis && ctx.deckB.analysis && !ctx.sameTrackOnBothDecks) {
-    const kA = ctx.deckA.analysis.key, kB = ctx.deckB.analysis.key;
-    if (kA.camelot && kB.camelot && ctx.deckA.analysis.keyConfidence > 0.6 && ctx.deckB.analysis.keyConfidence > 0.6) {
-      const relation = camelotDistance(kA.camelot, kB.camelot);
-      if (relation > 2) bad.push('incompatible keys'); else good.push('compatible keys');
-    }
+    // The heard keys at the decks' positions, judged by the one harmonic rule
+    // the transition and set planners use (compatibility.ts).
+    const h = harmonicCompatibility(ctx.deckA.key ?? null, ctx.deckA.keyConfidence, ctx.deckB.key ?? null, ctx.deckB.keyConfidence);
+    if (h.clashRisk > HARMONIC_CLASH_REJECT) bad.push(`key clash (${h.reason})`);
+    else if (h.relation !== 'unknown') good.push(`keys ${h.relation}`);
   }
   if (ctx.deckA.vocalsActive && ctx.deckB.vocalsActive) bad.push('dense vocals on both decks');
   if (ctx.deckA.drumsActive && ctx.deckB.drumsActive) good.push('rhythmic material on both decks');
   if (ctx.currentSection && ['breakdown', 'build', 'drop', 'pre-drop'].includes(ctx.currentSection.kind)) good.push(`${ctx.currentSection.kind} section`);
   if (ctx.currentSection && ctx.currentSection.kind === 'vocal-heavy') bad.push('dense section');
   if (ctx.transitionApproachingSec !== null && ctx.transitionApproachingSec < 90 && ctx.transitionApproachingSec > 20) good.push('transition approaching');
-  if (ctx.transitionApproachingSec !== null && ctx.transitionApproachingSec <= 20) bad.push('transition imminent');
+  // A juggle transition performs INTO the transition: its start is the goal, not a threat.
+  if (ctx.performanceMode !== 'JUGGLE_TRANSITION' && ctx.transitionApproachingSec !== null && ctx.transitionApproachingSec <= 20) bad.push('transition imminent');
   if (ctx.targetEnergy > ctx.energy + 0.1) good.push('set needs energy');
   if (ctx.lastJuggle && ctx.secondsSinceLastJuggle < 45) bad.push('similar recent juggle');
   if (ctx.deckA.analysis?.tracker?.repeatedPhrases.length || ctx.deckB.analysis?.tracker?.repeatedPhrases.length) good.push('repeated phrase (tracker)');
   return { good, bad };
-}
-
-function camelotDistance(a: string, b: string): number {
-  const pa = /^(\d+)([AB])$/.exec(a), pb = /^(\d+)([AB])$/.exec(b);
-  if (!pa || !pb) return 0;
-  const na = Number(pa[1]), nb = Number(pb[1]);
-  const d = Math.min(Math.abs(na - nb), 12 - Math.abs(na - nb));
-  return d + (pa[2] === pb[2] ? 0 : 1);
 }
 
 export interface PlannerOptions {
