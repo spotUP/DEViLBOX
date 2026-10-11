@@ -6,7 +6,7 @@
  *
  * Pure.
  */
-import type { DJJuggleAction, DJJugglePattern, DJJugglePatternType, JuggleDeckRole, JugglePhase, MaterialWindow } from './juggleTypes';
+import type { DJJuggleAction, DJJugglePattern, DJJugglePatternType, JuggleDeckRole, JugglePhase, LibraryPatternType, MaterialWindow } from './juggleTypes';
 
 export interface PatternParams {
   primary: 'A' | 'B';
@@ -313,7 +313,27 @@ export function escalatingJuggle(p: PatternParams): DJJugglePattern {
   return finish('escalatingJuggle', p, b, { energyProfile: 'PEAK', reason: `${first} -> ${first / 2} -> 2 -> 1 bars -> beats -> payoff -> release` });
 }
 
-export const PATTERN_BUILDERS: Record<DJJugglePatternType, (p: PatternParams) => DJJugglePattern> = {
+/**
+ * The juggle transition's ladder (juggling plan section 26): the outgoing
+ * (`primary`) and the incoming trade each rung's bars - 4, 2, 1 on a
+ * beat-level grid - then the incoming is released (`target`), on the beat
+ * the last trade ends. Not in the planner's library: the transition executor
+ * runs it as its trade stage.
+ */
+export function transitionLadder(p: PatternParams & { ladderBars: number[]; target: 'A' | 'B' }): DJJugglePattern {
+  const b = newBuilder();
+  for (const bars of p.ladderBars) {
+    const ph: JugglePhase = bars >= 4 ? 'ESTABLISH' : 'INTENSIFY';
+    const start = b.beat;
+    trade(b, p.primary, bars * p.beatsPerBar, 1, ph, bars >= 2 ? 'bar' : 'beat');
+    phase(b, ph, start, b.beat);
+  }
+  phase(b, 'RELEASE', b.beat, b.beat);
+  release(b, p.target, b.beat, 'release into the incoming');
+  return finish('transitionLadder', p, b, { energyProfile: 'BUILD', reason: `${p.ladderBars.join(' -> ')} bar trades into the incoming`, targetDeck: p.target });
+}
+
+export const PATTERN_BUILDERS: Record<LibraryPatternType, (p: PatternParams) => DJJugglePattern> = {
   phraseTrade, tightPhraseTrade, barTrade, beatTrade, doubleBeat, callResponse, drumBassTrade, fillTrade,
   loopTighten, double, transformer, dropAndReturn, escalatingJuggle,
 };
@@ -322,6 +342,7 @@ export const PATTERN_BUILDERS: Record<DJJugglePatternType, (p: PatternParams) =>
 export const PATTERN_INTENSITY: Record<DJJugglePatternType, number> = {
   phraseTrade: 0.25, tightPhraseTrade: 0.4, callResponse: 0.45, fillTrade: 0.5, drumBassTrade: 0.5, barTrade: 0.7,
   double: 0.75, loopTighten: 0.75, dropAndReturn: 0.8, doubleBeat: 0.85, beatTrade: 0.85, transformer: 0.9, escalatingJuggle: 1.0,
+  transitionLadder: 0.6,
 };
 
 /** Which modes may use which patterns (juggling plan section 44). */

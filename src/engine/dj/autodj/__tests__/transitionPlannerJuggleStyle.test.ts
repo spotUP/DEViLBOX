@@ -12,7 +12,8 @@ import { planTransition, laddersFor, scoreStyles, type TransitionPlanInput } fro
 import { getStyle } from '../styleProfiles';
 import { DJSessionMemory } from '../sessionMemory';
 import type { DJTrackAnalysis, DJTransitionPlan } from '../types';
-import type { JuggleMode } from '../juggle/juggleTypes';
+import { JUGGLE_PATTERN_TYPES, type JuggleMode } from '../juggle/juggleTypes';
+import { MODE_PATTERNS, transitionLadder } from '../juggle/jugglePatterns';
 
 function plan(out: CorpusId, inc: CorpusId, mode: JuggleMode, opts: { position?: number; mutate?: (o: DJTrackAnalysis, i: DJTrackAnalysis) => void; setPhase?: string; creativeRisk?: number } = {}): DJTransitionPlan {
   // Copies: the corpus analyses are shared, a mutation must not leak into the next case.
@@ -119,5 +120,23 @@ describe('juggle transition style', () => {
     expect(p.startTimeSec).toBeGreaterThan(10 + 8 * barSec);
     expect(ladderEnd).toBeLessThanOrEqual((o.cuePoints.finalBeat ?? o.durationSec) + 0.5);
     expect(ladderEnd).toBeGreaterThan(blend.startTimeSec);
+  });
+});
+
+describe('transition ladder pattern (JUGX-P3.5)', () => {
+  it('4-2-1: six cuts on beats 0, 16, 32, 40, 48, 52 and the release onto the incoming on beat 56', () => {
+    const p = transitionLadder({ primary: 'A', target: 'B', beatsPerBar: 4, intensity: 0.6, phraseBars: 8, confidence: 1, ladderBars: [4, 2, 1] });
+    const cuts = p.actions.filter((a) => a.type === 'CutIn').map((a) => [a.executeAtBeat, a.deck]);
+    expect(cuts).toEqual([[0, 'A'], [16, 'B'], [32, 'A'], [40, 'B'], [48, 'A'], [52, 'B']]);
+    const rel = p.actions.find((a) => a.type === 'ReleaseDeck')!;
+    expect([rel.executeAtBeat, rel.deck]).toEqual([56, 'B']);
+    expect(p.actions.find((a) => a.type === 'ResetDeck')!.deck).toBe('A');
+    expect(p.durationBars).toBe(14);
+    expect(p.targetDeck).toBe('B');
+  });
+
+  it('is never in a mode\'s library: the stand-alone planner cannot choose it', () => {
+    for (const types of Object.values(MODE_PATTERNS)) expect(types).not.toContain('transitionLadder');
+    expect(JUGGLE_PATTERN_TYPES).not.toContain('transitionLadder');
   });
 });
