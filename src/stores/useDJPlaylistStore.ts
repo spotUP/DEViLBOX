@@ -18,7 +18,7 @@ import type { EffectConfig } from '@/types/instrument/effects';
 import type { DJEnvironment } from '@/types/djEnvironment';
 import type { DJTrackSummary } from '@/engine/dj/autodj/types';
 import { useAudioStore } from '@/stores/useAudioStore';
-import { isBareFileName, repairSourcesFromSeed } from '@/lib/dj/playlistTrackSource';
+import { applyLoadOutcome, isBareFileName, repairSourcesFromSeed } from '@/lib/dj/playlistTrackSource';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,7 +128,14 @@ interface DJPlaylistState {
   /** Remember the last track loaded to a deck from this playlist.
    *  Modal uses it to scroll-restore on open and after search clear. */
   setLastPlayedTrack: (playlistId: string, trackId: string) => void;
+  /** The owner marks a track bad by hand (context menu). Loaders report through recordTrackLoad instead. */
   markTrackBad: (playlistId: string, index: number, reason: string) => void;
+  /**
+   * THE writer of a load outcome: every entry with this source, in every
+   * playlist, is flagged bad on a failed load and cleared on a successful
+   * load or render. See `applyLoadOutcome`.
+   */
+  recordTrackLoad: (fileName: string, outcome: { ok: true } | { ok: false; reason: string }) => void;
   clearTrackBadFlag: (playlistId: string, index: number) => void;
   clearAllBadFlags: (playlistId: string) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
@@ -545,6 +552,15 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
             console.warn(`[DJPlaylist] Marked track ${index} as bad: ${track.trackName} - ${reason}`);
           }
         });
+      },
+
+      recordTrackLoad: (fileName, outcome) => {
+        if (!outcome.ok) console.warn(`[DJPlaylist] Load failed: ${fileName} - ${outcome.reason}`);
+        let changed = 0;
+        set((state) => {
+          changed = applyLoadOutcome(state.playlists, fileName, outcome, Date.now());
+        });
+        if (changed > 0) syncPlaylists();
       },
 
       clearTrackBadFlag: (playlistId: string, index: number) => {

@@ -116,16 +116,16 @@ export function isRenderingFileName(fileName: string): boolean {
   return renderingFileNames.has(fileName);
 }
 
-/** Mark a playlist track bad in the active playlist after a failed pre-render. */
-async function markPreRenderFailed(track: PlaylistTrack, reason: string): Promise<void> {
+/**
+ * Report a load attempt's outcome to the playlists (`recordTrackLoad`): a
+ * failure flags every entry with this source bad, a success clears it. The
+ * store is read now, never the caller's track snapshot: a snapshot taken
+ * before an earlier attempt failed says "not bad", and a guard on it left
+ * tracks that load and play flagged bad (owner 2026-10-11, "Anathema-Nr Seven").
+ */
+async function recordLoad(track: PlaylistTrack, outcome: { ok: true } | { ok: false; reason: string }): Promise<void> {
   const { useDJPlaylistStore } = await import('@/stores/useDJPlaylistStore');
-  const playlistId = useDJPlaylistStore.getState().activePlaylistId;
-  if (!playlistId) return;
-  const playlist = useDJPlaylistStore.getState().playlists.find(p => p.id === playlistId);
-  const index = playlist?.tracks.findIndex(t => t.id === track.id);
-  if (index !== undefined && index >= 0) {
-    useDJPlaylistStore.getState().markTrackBad(playlistId, index, reason);
-  }
+  useDJPlaylistStore.getState().recordTrackLoad(track.fileName, outcome);
 }
 
 /**
@@ -151,31 +151,18 @@ export async function preRenderTrack(track: PlaylistTrack): Promise<PreRenderedT
       timeoutPromise,
     ]);
     
-    // Success - clear bad flag if it was previously set
-    if (result && track.isBad) {
-      const { useDJPlaylistStore } = await import('@/stores/useDJPlaylistStore');
-      const playlistId = useDJPlaylistStore.getState().activePlaylistId;
-      if (playlistId) {
-        const playlist = useDJPlaylistStore.getState().playlists.find(p => p.id === playlistId);
-        const index = playlist?.tracks.findIndex(t => t.id === track.id);
-        if (index !== undefined && index >= 0) {
-          useDJPlaylistStore.getState().clearTrackBadFlag(playlistId, index);
-        }
-      }
-    }
-    
     // A render that produced nothing (source not in the cache, download or
     // decode failed) is a failed load like a thrown one: the track is marked
     // bad so Auto DJ's planner leaves it out of the next order. Unmarked, the
     // session order kept offering the same track and the skip loop fell
     // through onto the track that was playing.
-    if (!result) await markPreRenderFailed(track, 'pre-render produced no audio');
+    await recordLoad(track, result ? { ok: true } : { ok: false, reason: 'pre-render produced no audio' });
 
     return result;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`[DJTrackLoader] Pre-render failed for ${track.fileName}:`, reason);
-    await markPreRenderFailed(track, reason);
+    await recordLoad(track, { ok: false, reason });
     return null;
   } finally {
     markRenderingEnd(track.fileName);
@@ -219,6 +206,7 @@ export async function loadPreRenderedTrackToDeck(
       getDJPipeline().applyAnalysisToDeck(deckId, preRendered.analysis);
     }
     console.log(`[DJTrackLoader] Pre-rendered track loaded successfully`);
+    await recordLoad(originalTrack, { ok: true });
     return true;
   } catch (err) {
     console.error('[DJTrackLoader] Failed to load pre-rendered track:', err);
@@ -432,35 +420,13 @@ export async function loadPlaylistTrackToDeck(
       timeoutPromise,
     ]);
     
-    // Success - clear bad flag if it was previously set
-    if (result && track.isBad) {
-      const { useDJPlaylistStore } = await import('@/stores/useDJPlaylistStore');
-      const playlistId = useDJPlaylistStore.getState().activePlaylistId;
-      if (playlistId) {
-        const playlist = useDJPlaylistStore.getState().playlists.find(p => p.id === playlistId);
-        const index = playlist?.tracks.findIndex(t => t.id === track.id);
-        if (index !== undefined && index >= 0) {
-          useDJPlaylistStore.getState().clearTrackBadFlag(playlistId, index);
-        }
-      }
-    }
-    
+    await recordLoad(track, result ? { ok: true } : { ok: false, reason: 'load failed' });
     return result;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`[DJTrackLoader] Load failed for ${track.fileName}:`, reason);
     
-    // Mark track as bad in the playlist
-    const { useDJPlaylistStore } = await import('@/stores/useDJPlaylistStore');
-    const playlistId = useDJPlaylistStore.getState().activePlaylistId;
-    if (playlistId) {
-      const playlist = useDJPlaylistStore.getState().playlists.find(p => p.id === playlistId);
-      const index = playlist?.tracks.findIndex(t => t.id === track.id);
-      if (index !== undefined && index >= 0) {
-        useDJPlaylistStore.getState().markTrackBad(playlistId, index, reason);
-      }
-    }
-    
+    await recordLoad(track, { ok: false, reason });
     return false;
   }
 }
