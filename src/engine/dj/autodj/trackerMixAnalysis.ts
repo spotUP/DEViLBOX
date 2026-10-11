@@ -15,7 +15,8 @@
  * Pure over a TrackerSong.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import type { Pattern } from '@/types/tracker';
+import type { Pattern, TrackerCell } from '@/types/tracker';
+import { songUsesAmigaPeriods } from '@/lib/amiga/periodNotes';
 import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
 import { resolveSongChannelRoles } from '@/engine/dub/songChannelIdentity';
 import { getRolesAtPosition } from '@/bridge/analysis/SongRoleTimeline';
@@ -33,43 +34,112 @@ export function rowSeconds(speed: number, bpm: number): number {
   return s * (2.5 / b);
 }
 
-function isTempoCommand(format: string, effTyp: number): boolean {
-  if (format === 'IT' || format === 'S3M') return effTyp === 0x14;
-  return effTyp === 0x0f;
+/**
+ * Flow commands in the normalised effect numbering every importer writes (the
+ * S3M / IT parsers map A / T to Fxx, B to Bxx, C to Dxx) and the one numbering
+ * TrackerReplayer dispatches, for every format, in all eight effect columns.
+ */
+const EFF_POSITION_JUMP = 0x0b;
+const EFF_PATTERN_BREAK = 0x0d;
+const EFF_SPEED_TEMPO = 0x0f;
+
+function cellEffects(cell: TrackerCell): Array<[number, number]> {
+  return [
+    [cell.effTyp ?? 0, cell.eff ?? 0], [cell.effTyp2 ?? 0, cell.eff2 ?? 0],
+    [cell.effTyp3 ?? 0, cell.eff3 ?? 0], [cell.effTyp4 ?? 0, cell.eff4 ?? 0],
+    [cell.effTyp5 ?? 0, cell.eff5 ?? 0], [cell.effTyp6 ?? 0, cell.eff6 ?? 0],
+    [cell.effTyp7 ?? 0, cell.eff7 ?? 0], [cell.effTyp8 ?? 0, cell.eff8 ?? 0],
+  ];
 }
 
-/** Walk the order list and time every position, honouring Fxx / Txx commands. */
-export function timeOrderPositions(song: TrackerSong): { positions: TrackerOrderPosition[]; rowTimes: number[][] } {
+export interface OrderWalk {
+  /** Positions in play order (a forward Bxx skips some; a song loop ends the walk). */
+  positions: TrackerOrderPosition[];
+  /** Per played position, the start time of each played row: index i = pattern row startRow + i. */
+  rowTimes: number[][];
+  /** Seconds spent at each speed / tick-tempo pair. */
+  tempoSeconds: Array<{ speed: number; bpm: number; seconds: number }>;
+  /** Fxx speed / tempo commands met on the walk. */
+  tempoCommands: number;
+}
+
+/**
+ * Walk the order list as the replayer plays it and time every played row:
+ * Fxx speed / tempo, Dxx pattern break (BCD on Amiga-period formats, as the
+ * replayer reads it), Bxx position jump (a backward jump is the song loop
+ * and ends the walk), F00 stop. Pattern loops (E6x) and pattern delay (EEx)
+ * are not followed; a walk that misses them disagrees with the render and
+ * the caller's agreement check rejects it.
+ */
+export function timeOrderPositions(song: TrackerSong): OrderWalk {
   const positions: TrackerOrderPosition[] = [];
   const rowTimes: number[][] = [];
+  const spent = new Map<string, { speed: number; bpm: number; seconds: number }>();
+  let tempoCommands = 0;
   let speed = song.initialSpeed > 0 ? song.initialSpeed : 6;
   let bpm = song.initialBPM > 0 ? song.initialBPM : 125;
+  const bcdBreaks = songUsesAmigaPeriods(song.format);
   let t = 0;
   const length = Math.max(0, Math.min(song.songLength || song.songPositions.length, song.songPositions.length));
-  for (let pos = 0; pos < length; pos++) {
+  const visited = new Set<string>();
+  let pos = 0;
+  let startRow = 0;
+  let stop = false;
+  while (!stop && pos < length) {
+    const key = `${pos}:${startRow}`;
+    if (visited.has(key)) break;
+    visited.add(key);
     const patternIndex = song.songPositions[pos];
     const pattern = song.patterns[patternIndex];
     const rows = pattern?.channels[0]?.rows.length ?? pattern?.length ?? 64;
+    if (startRow >= rows) startRow = 0;
     const start = t;
     const times: number[] = [];
-    for (let r = 0; r < rows; r++) {
+    let nextPos = pos + 1;
+    let nextRow = 0;
+    for (let r = startRow; r < rows; r++) {
+      let jump: number | null = null;
+      let brk: number | null = null;
       if (pattern) {
         for (const ch of pattern.channels) {
           const cell = ch.rows[r];
           if (!cell) continue;
-          if (isTempoCommand(song.format, cell.effTyp ?? 0)) {
-            const v = cell.eff ?? 0;
-            if (v > 0 && v < 0x20) speed = v; else if (v >= 0x20) bpm = v;
+          for (const [typ, v] of cellEffects(cell)) {
+            if (typ === EFF_SPEED_TEMPO) {
+              if (v === 0) stop = true;
+              else { tempoCommands++; if (v < 0x20) speed = v; else bpm = v; }
+            } else if (typ === EFF_POSITION_JUMP) {
+              jump = v;
+            } else if (typ === EFF_PATTERN_BREAK) {
+              brk = bcdBreaks ? (v >> 4) * 10 + (v & 0x0f) : v;
+            }
           }
         }
       }
+      if (stop) break; // F00: the song stops at this row
+      const dt = rowSeconds(speed, bpm);
       times.push(t);
-      t += rowSeconds(speed, bpm);
+      t += dt;
+      const k = `${speed}/${bpm}`;
+      const e = spent.get(k);
+      if (e) e.seconds += dt; else spent.set(k, { speed, bpm, seconds: dt });
+      if (jump !== null || brk !== null) {
+        if (jump !== null) {
+          if (jump <= pos) stop = true; // song loop
+          nextPos = jump;
+        }
+        nextRow = brk ?? 0;
+        break;
+      }
     }
-    rowTimes.push(times);
-    positions.push({ index: pos, patternIndex, start, end: t, rows });
+    if (times.length > 0) {
+      rowTimes.push(times);
+      positions.push({ index: pos, patternIndex, start, end: t, rows: times.length, startRow });
+    }
+    pos = nextPos;
+    startRow = nextRow;
   }
-  return { positions, rowTimes };
+  return { positions, rowTimes, tempoSeconds: [...spent.values()], tempoCommands };
 }
 
 const ROLE_FAMILY: Record<ChannelRole, InstrumentFamily> = {
@@ -169,8 +239,10 @@ export function analyzeTrackerSong(song: TrackerSong, renderedDurationSec?: numb
     const atPosition = identity.timeline ? getRolesAtPosition(identity.timeline, p, 0, 0.3) : [];
     const analyses = pattern.channels.map((ch, idx) => {
       const notes: number[] = [];
-      for (const cell of ch?.rows ?? []) if (cell && cell.note >= 1 && cell.note <= 96) notes.push(cell.note);
-      const rowsHere = ch?.rows.length || 1;
+      // Only the rows the song plays here (a Dxx truncates, a Dxx before can start mid-pattern).
+      const playedRows = (ch?.rows ?? []).slice(pos.startRow, pos.startRow + pos.rows);
+      for (const cell of playedRows) if (cell && cell.note >= 1 && cell.note <= 96) notes.push(cell.note);
+      const rowsHere = playedRows.length || 1;
       const role: ChannelRole = notes.length === 0 ? 'empty' : (atPosition[idx] ?? identity.roles[idx] ?? identity.baseRoles[idx] ?? 'empty');
       return { role, noteCount: notes.length, density: notes.length / rowsHere, avgPitch: notes.length ? notes.reduce((a, b) => a + b, 0) / notes.length : 0 };
     });
@@ -221,7 +293,9 @@ export function analyzeTrackerSong(song: TrackerSong, renderedDurationSec?: numb
       for (let r = 0; r < chRows.length; r++) {
         const cell = chRows[r];
         if (!cell || cell.note < 1 || cell.note > 96) continue;
-        const t = T(rowTimes[p]?.[r] ?? pos.start);
+        const played = rowTimes[p]?.[r - pos.startRow];
+        if (played === undefined) continue; // a row the song never reaches (before a Dxx target, after a break)
+        const t = T(played);
         const h = Math.min(hops - 1, Math.floor(t / HOP_SEC));
         density[h] += 1;
         if (role === 'bass') bassTl[h] += 1;
@@ -235,10 +309,11 @@ export function analyzeTrackerSong(song: TrackerSong, renderedDurationSec?: numb
       }
       // Fill: a percussion channel much busier in the last 4 rows than before.
       if (role === 'percussion' && rows >= 16) {
-        const tail = noteCount(pattern, ch, rows - 4, rows);
-        const body = noteCount(pattern, ch, 0, rows - 4) / Math.max(1, (rows - 4) / 4);
+        const endRow = pos.startRow + rows;
+        const tail = noteCount(pattern, ch, endRow - 4, endRow);
+        const body = noteCount(pattern, ch, pos.startRow, endRow - 4) / Math.max(1, (rows - 4) / 4);
         if (tail >= 3 && tail > body * 2) {
-          events.push({ kind: 'FILL', time: T(rowTimes[p]?.[rows - 4] ?? pos.end), orderPosition: p, row: rows - 4, channel: ch, confidence: 0.7 });
+          events.push({ kind: 'FILL', time: T(rowTimes[p]?.[rows - 4] ?? pos.end), orderPosition: p, row: endRow - 4, channel: ch, confidence: 0.7 });
         }
       }
     });
