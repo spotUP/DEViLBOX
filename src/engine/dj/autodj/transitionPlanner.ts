@@ -9,7 +9,7 @@
  *
  * Pure. The executor runs what this returns.
  */
-import { bassCompatibility, drumCompatibility, harmonicCompatibility, vocalCompatibility, HARMONIC_CLASH_REJECT } from './compatibility';
+import { bassCompatibility, bassKeysCompatible, drumCompatibility, harmonicCompatibility, vocalCompatibility, HARMONIC_CLASH_REJECT } from './compatibility';
 import { planGain, sharedBarsOf } from './gainStaging';
 import { solveKey, solveTempo, type TempoKeyLimits } from './tempoKeySolver';
 import { keyAt, summarizeTrack } from './trackAnalysis';
@@ -457,6 +457,8 @@ export function scoreStyles(ctx: {
 export function planBassHandover(ctx: {
   outgoing: DJTrackAnalysis; incoming: DJTrackAnalysis; durationBars: number; beatsPerBar: number; style: DJStyleProfile;
   transitionStyle: TransitionStyle; outStart: number; inStart: number; lengthSec: number;
+  /** The basslines' keys at the join, as heard (after the key plan's shift or lock), sit together. */
+  bassKeysCompatible: boolean;
 }): BassHandoverPlan {
   const { durationBars, beatsPerBar } = ctx;
   const outHeavy = ctx.outgoing.bass.heaviness > 0.7;
@@ -466,7 +468,9 @@ export function planBassHandover(ctx: {
   const outBassAhead = activity(ctx.outgoing.bassActivity, ctx.outStart, ctx.outStart + ctx.lengthSec);
   const outgoingBassNecessary = ctx.outgoing.bass.melodic && outBassAhead > 0.4;
   const inBassStart = activity(ctx.incoming.bassActivity, ctx.inStart, ctx.inStart + ctx.lengthSec / 2);
-  const coexist = !(outHeavy && inHeavy) && ctx.style.bassBehaviour !== 'strict' && !(ctx.outgoing.bass.melodic && ctx.incoming.bass.melodic);
+  // Both basses share a bar only when the material is compatible (owner juggling plan section 35): light
+  // enough, not two melodic lines, and in keys that sit together.
+  const coexist = !(outHeavy && inHeavy) && ctx.style.bassBehaviour !== 'strict' && !(ctx.outgoing.bass.melodic && ctx.incoming.bass.melodic) && ctx.bassKeysCompatible;
   // Hand over at the phrase boundary nearest the middle (plan section 21).
   const phrase = ctx.outgoing.phraseLengthBars;
   let handoverBar = Math.round(durationBars / 2);
@@ -505,8 +509,8 @@ export function planBassHandover(ctx: {
   }
   const reason = outHeavy && inHeavy ? 'both heavy: strict hand-over, never both exposed'
     : coexist ? `shared for one bar at bar ${handoverBar - 1}, incoming owns from bar ${handoverBar} (outgoing bass killed)`
-    : `bass handed over at bar ${handoverBar}: outgoing killed, incoming in${incomingKickStronger ? ' (stronger kick)' : ''}${outgoingBassNecessary ? ' (outgoing bassline kept a bar longer)' : ''}`;
-  return { schedule, curves, coexist, outgoingHeavy: outHeavy, incomingHeavy: inHeavy, incomingKickStronger, outgoingBassNecessary, handoverBar, reason };
+    : `bass handed over at bar ${handoverBar}: outgoing killed, incoming in${incomingKickStronger ? ' (stronger kick)' : ''}${outgoingBassNecessary ? ' (outgoing bassline kept a bar longer)' : ''}${ctx.bassKeysCompatible ? '' : ' (bass keys not proven compatible: no shared bar)'}`;
+  return { schedule, curves, coexist, bassKeysCompatible: ctx.bassKeysCompatible, outgoingHeavy: outHeavy, incomingHeavy: inHeavy, incomingKickStronger, outgoingBassNecessary, handoverBar, reason };
 }
 
 function eqFor(style: TransitionStyle, beats: number): EQPlan {
@@ -695,7 +699,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   // Curves.
   const toward: 0 | 1 = input.incomingDeck === 'A' ? 0 : 1;
   const crossfadePlan = crossfadeFor(transitionStyle, durationBeats, toward);
-  const bassPlan = planBassHandover({ outgoing, incoming, durationBars, beatsPerBar, style, transitionStyle, outStart: mixOut.time, inStart: mixIn.time, lengthSec });
+  const bassPlan = planBassHandover({ outgoing, incoming, durationBars, beatsPerBar, style, transitionStyle, outStart: mixOut.time, inStart: mixIn.time, lengthSec, bassKeysCompatible: bassKeysCompatible(clash) });
   const filterPlan = filterFor(transitionStyle, durationBeats, input.withFilter, 1);
   const eqPlan = eqFor(transitionStyle, durationBeats);
   const effects = effectsFor(transitionStyle, durationBeats, style.fxUsage, outSection, sectionAt(incoming, mixIn.time), memory);
@@ -825,7 +829,7 @@ export function fallbackPlan(plan: DJTransitionPlan, input: TransitionPlanInput,
   const tempoPlan = level === 'emergency' ? { ...plan.tempoPlan, method: 'none' as const, incomingSemitones: 0, ratio: 1, percent: 0, keyLock: false, reason: 'emergency: no tempo change' } : plan.tempoPlan;
   const bassPlan = level === 'emergency'
     ? { ...plan.bassPlan, curves: [], schedule: [{ bar: 0, owner: 'SHARED' as const }], reason: 'emergency: plain crossfade' }
-    : planBassHandover({ outgoing: input.outgoing, incoming: input.incoming, durationBars: bars, beatsPerBar, style: input.style, transitionStyle: styleName, outStart: plan.startTimeSec, inStart: plan.incomingPosition, lengthSec: bars * (60 / Math.max(60, input.outgoing.bpm)) * beatsPerBar });
+    : planBassHandover({ outgoing: input.outgoing, incoming: input.incoming, durationBars: bars, beatsPerBar, style: input.style, transitionStyle: styleName, outStart: plan.startTimeSec, inStart: plan.incomingPosition, lengthSec: bars * (60 / Math.max(60, input.outgoing.bpm)) * beatsPerBar, bassKeysCompatible: plan.bassPlan.bassKeysCompatible });
   return {
     ...plan,
     id: `${plan.id}-${level}`,

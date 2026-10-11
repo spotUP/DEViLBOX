@@ -629,6 +629,8 @@ export interface BassHandoverPlan {
   schedule: Array<{ bar: number; owner: BassOwner }>;
   curves: AutomationCurve[];
   coexist: boolean;
+  /** The basslines' keys sit together (compatibility.ts bassKeysCompatible): a condition of `coexist`. */
+  bassKeysCompatible: boolean;
   outgoingHeavy: boolean;
   incomingHeavy: boolean;
   incomingKickStronger: boolean;

@@ -47,7 +47,7 @@ describe('one bass at a time: the planned handover kills (owner plan sections 14
     const o = structuredClone(corpusAnalysis('steady'));
     const i = structuredClone(corpusAnalysis('compatibleKey'));
     if (heavy) { o.bass.heaviness = 0.9; i.bass.heaviness = 0.9; }
-    return planBassHandover({ outgoing: o, incoming: i, durationBars: 8, beatsPerBar: 4, style: getStyle('Club'), transitionStyle: 'longBlend', outStart: 30, inStart: 0, lengthSec: 16 });
+    return planBassHandover({ outgoing: o, incoming: i, durationBars: 8, beatsPerBar: 4, style: getStyle('Club'), transitionStyle: 'longBlend', outStart: 30, inStart: 0, lengthSec: 16, bassKeysCompatible: true });
   };
   const at = (curves: AutomationCurve[], target: AutomationCurve['target'], beat: number, fallback: number) => {
     const c = curves.find((x) => x.target === target);

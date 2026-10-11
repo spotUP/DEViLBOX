@@ -61,6 +61,16 @@ export interface HarmonicResult extends Scored {
 }
 
 /**
+ * May two basslines share the low end (owner juggling plan section 35: "A bass, B bass only when the
+ * material is compatible")? Their keys must sit together - the same key, relative, or a fifth apart -
+ * and both be known with confidence: an unknown or weak key is no proof, so the basses hand over.
+ */
+export function bassKeysCompatible(h: Pick<HarmonicResult, 'relation' | 'classA' | 'classB'>): boolean {
+  const together = h.relation === 'same' || h.relation === 'relative' || h.relation === 'fifth-up' || h.relation === 'fifth-down';
+  return together && h.classA === 'known-high' && h.classB === 'known-high';
+}
+
+/**
  * Confidence-aware: unknown means "we don't know" (neutral), a low-confidence
  * reading pulls toward neutral, a high-confidence clash matters most. A short
  * overlap makes a clash matter less (plan section 13).
