@@ -205,7 +205,8 @@ export interface PlacedScratch {
   bar: number;
   /** 0-15 on the default grid. */
   step: number;
-  /** bar x beatsPerBar + step / stepsPerBeat. */
+  /** bar x beatsPerBar + step / stepsPerBeat: the plan's own beat (bar 0 = the downbeat grid's
+   *  first bar), for order and spacing; `toScratchEvents` puts it on the deck clock (SA-M1). */
   beat: number;
   gesture: ScratchGestureId;
   /** 0..1 stroke energy. */

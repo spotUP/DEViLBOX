@@ -14,7 +14,8 @@ import {
 import { routineFor, routineToPlaced, SCRATCH_ROUTINES, type RoutineName } from './scratchRoutines';
 import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
 import { getGesture, gestureBeats } from './scratchGestureCatalog';
-import { DEFAULT_GRID } from './scratchAnchor';
+import { DEFAULT_GRID, STEPS_PER_BEAT } from './scratchAnchor';
+import { barStartBeat } from '../autodj/beatGrid';
 import type { ScratchPerformanceContext } from './scratchContext';
 import type { ScratchRecord } from './scratchCatalogue';
 import type { ScratchAnchor, ScratchEvent, ScratchGestureId, ScratchSource, DeckScratchAnchor } from './scratchTypes';
@@ -159,18 +160,23 @@ export function humanizeAll(events: readonly PlacedScratch[], bpm: number, seed:
   return out;
 }
 
-/** Placed scratches + their source -> the executor's `ScratchEvent`s (the gesture's one length, whole stroke cycles). */
+/**
+ * Placed scratches + their source -> the executor's `ScratchEvent`s (the gesture's one length,
+ * whole stroke cycles). The plan speaks bars (bar 0 = the downbeat grid's first bar); the
+ * executor's clock speaks raw beats (`fractionalBeatAt`), so each event's beat is its bar's
+ * downbeat on that clock (`barStartBeat`, the grid's `phaseOffset` included) plus its step (SA-M1).
+ */
 export function toScratchEvents(
   events: readonly PlacedScratch[],
   source: ScratchSource,
   anchor: ScratchAnchor | DeckScratchAnchor,
-  opts: { bpm: number; seed: number; deck?: 'A' | 'B'; humanize?: boolean },
+  opts: { bpm: number; seed: number; downbeats: Parameters<typeof barStartBeat>[0]; deck?: 'A' | 'B'; humanize?: boolean },
 ): ScratchEvent[] {
   const offsets = opts.humanize === false ? events.map(() => 0) : humanizeAll(events, opts.bpm, opts.seed);
   return events.map((e, i) => {
     const g = getGesture(e.gesture);
     return {
-      executeAtBeat: e.beat,
+      executeAtBeat: barStartBeat(opts.downbeats, e.bar) + e.step / STEPS_PER_BEAT[DEFAULT_GRID],
       durationBeats: gestureBeats(e.gesture),
       role: e.role,
       source,
