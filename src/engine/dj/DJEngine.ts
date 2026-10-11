@@ -59,6 +59,8 @@ export class DJEngine {
     }
   }
 
+  private _unsubCrossfader: (() => void) | null = null;
+
   constructor() {
     // Create cue engine for headphone monitoring
     this.cueEngine = new DJCueEngine();
@@ -71,6 +73,21 @@ export class DJEngine {
 
     // Tap master output into cue engine for cue mix (PFL ↔ master blend)
     this.mixer.getMasterGain().connect(this.cueEngine.getMasterTap());
+
+    // The store's crossfader is the one source: the mixer follows it, so a
+    // caller that writes only the store (sync, Auto DJ, FX pads) can never
+    // leave the audible mix somewhere other than where the fader shows.
+    const store = useDJStore.getState();
+    this.mixer.setCurve(store.crossfaderCurve);
+    this.mixer.setCrossfader(store.crossfaderPosition);
+    this._unsubCrossfader = useDJStore.subscribe(
+      (s) => [s.crossfaderPosition, s.crossfaderCurve] as const,
+      ([position, curve]) => {
+        if (curve !== this.mixer.getCurve()) this.mixer.setCurve(curve);
+        if (position !== this.mixer.getCrossfader()) this.mixer.setCrossfader(position);
+      },
+      { equalityFn: (x, y) => x[0] === y[0] && x[1] === y[1] },
+    );
 
     // Create decks connected to mixer inputs
     this.deckA = new DeckEngine({ id: 'A', outputNode: this.mixer.inputA });
@@ -266,7 +283,7 @@ export class DJEngine {
     this.deckA.stop();
     this.deckB.stop();
     this.deckC.stop();
-    this.mixer.setCrossfader(0.5);
+    useDJStore.getState().setCrossfader(0.5);
   }
 
   // ==========================================================================
@@ -276,6 +293,8 @@ export class DJEngine {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this._unsubCrossfader?.();
+    this._unsubCrossfader = null;
 
     if (this._visibilityHandler) {
       document.removeEventListener('visibilitychange', this._visibilityHandler);
