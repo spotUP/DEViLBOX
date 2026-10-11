@@ -202,6 +202,9 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
       this.seekFade     = 0;
       this.clampCount   = 0;
       this._posSince    = 0;
+      this.queue        = [];    // [{atFrame, d}] record-mode messages scheduled ahead (sample-accurate)
+      this.seekDelay    = 0;
+      this.stopAfter    = 0;
     } else {
       this.bufferFrames = Math.round(sampleRate * BUFFER_SECONDS);
       this.ring         = getOrCreateRing(this.bufferId, sampleRate);
@@ -228,6 +231,20 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
 
     this.port.onmessage = (e) => {
       const d = e.data;
+      // Record mode: a message with `at` (context seconds) is applied at that
+      // frame by processRecord, sample-accurately; without `at`, now.
+      if (this.isRecord && typeof d.at === 'number' && d.at * sampleRate > currentFrame) {
+        this.queue.push({ atFrame: Math.round(d.at * sampleRate), d });
+        this.queue.sort((a, b) => a.atFrame - b.atFrame);
+        return;
+      }
+      this._apply(d, 0);
+    };
+  }
+
+  /** Apply a message; `offset` = frames into the current quantum it lands on (record mode). */
+  _apply(d, offset) {
+    {
       switch (d.type) {
         case 'start':
           this.ring         = getOrCreateRing(this.bufferId, sampleRate);
@@ -282,6 +299,7 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
         }
 
         case 'stop': {
+          if (this.isRecord && offset > 0) { this.stopAfter = offset; break; }
           this.active = false;
           this.targetRate = 0;
           this.smoothRate = 0;
@@ -299,6 +317,10 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           this.targetRate = d.rate;
           this.smoothRate = d.rate;
           this.prevSign   = Math.sign(d.rate);
+          break;
+
+        case 'setRateAt':
+          this.targetRate = d.rate;
           break;
 
         // ── Record mode (section 16) ──
@@ -350,6 +372,7 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           this.fadeCounter = ZERO_FADE_SAMPLES;   // fade in: a cue is a needle drop
           this.pendingSeek = -1;
           this.seekFade    = 0;
+          this.seekDelay   = offset;
           this.curve       = null;
           this.validFrames = this.bufferFrames;
           this.active      = true;
@@ -363,6 +386,7 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
             // fade out over 1 ms, jump, fade in (a click-free re-cue, section 18)
             this.pendingSeek = p;
             this.seekFade    = ZERO_FADE_SAMPLES;
+            this.seekDelay   = offset;
           } else {
             this.readPosF = p - this.smoothRate;
             this.startPos = p;
@@ -378,7 +402,7 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           this.curve = {
             points,
             idx: 0,
-            frame: 0,
+            frame: -offset,
             interpolate: !!d.interpolate,
             loop: !!d.loop,
             cycleFrames: Math.max(1, Math.round(d.cycleFrames || (points.length ? points[points.length - 1].frame : 1))),
@@ -388,7 +412,7 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
             this.startPos    = this.cuePos;
             this.readPosF    = this.cuePos - this.smoothRate;
             this.prevSign    = 0;
-            this.fadeCounter = ZERO_FADE_SAMPLES;
+            this.fadeCounter = ZERO_FADE_SAMPLES + offset;
             this.active      = true;
           }
           break;
@@ -401,7 +425,7 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           const rampFrames = Math.max(1, Math.round(d.rampFrames || sampleRate * 0.003));
           this.fader = {
             windows,
-            frame: 0,
+            frame: -offset,
             cycleFrames: Math.max(1, Math.round(d.cycleFrames || 1)),
             loop: !!d.loop,
             rampStep: 1 / rampFrames,
@@ -413,12 +437,12 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           // One static gain (0/1) with the same ramp; cancels window automation.
           this.fader = {
             windows: d.gain > 0.5 ? [[0, 0x7fffffff]] : [],
-            frame: 0, cycleFrames: 0x7fffffff, loop: false,
+            frame: -offset, cycleFrames: 0x7fffffff, loop: false,
             rampStep: 1 / Math.max(1, Math.round(d.rampFrames || sampleRate * 0.003)),
           };
           break;
       }
-    };
+    }
   }
 
   _clampPos(p) {
@@ -436,6 +460,11 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
   processRecord(outputs) {
     const out    = outputs[0];
     const frames = (out[0] && out[0].length) ? out[0].length : 128;
+    // scheduled messages landing in this quantum, with their sample offset
+    while (this.queue.length && this.queue[0].atFrame < currentFrame + frames) {
+      const q = this.queue.shift();
+      this._apply(q.d, Math.max(0, q.atFrame - currentFrame));
+    }
     if (!this.active || !this.ring) {
       if (out[0]) out[0].fill(0);
       if (out[1]) out[1].fill(0);
@@ -451,8 +480,13 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
     const fader = this.fader;
 
     for (let i = 0; i < frames; i++) {
+      if (this.stopAfter > 0 && --this.stopAfter === 0) {
+        this._apply({ type: 'stop' }, 0);
+        for (let k = i; k < frames; k++) { if (out[0]) out[0][k] = 0; if (out[1]) out[1][k] = 0; }
+        return true;
+      }
       // ── rate curve ──
-      if (curve) {
+      if (curve && curve.frame >= 0) {
         const pts = curve.points;
         while (curve.idx < pts.length && pts[curve.idx].frame <= curve.frame) curve.idx++;
         if (curve.interpolate && curve.idx > 0 && curve.idx < pts.length) {
@@ -464,6 +498,8 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
         } else if (pts.length) {
           target = pts[0].rate;
         }
+      }
+      if (curve) {
         curve.frame++;
         if (curve.frame >= curve.cycleFrames) {
           if (curve.loop) {
@@ -472,17 +508,20 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
             if (curve.returnToAnchor) { this.pendingSeek = this.cuePos; this.seekFade = ZERO_FADE_SAMPLES; }
           } else {
             this.curve = null;
+            const pts = curve.points;
             target = pts.length ? pts[pts.length - 1].rate : 0;
           }
         }
       }
       // ── fader windows ──
-      let gate = 1;
-      if (fader) {
+      let gate = faderGain >= 0.5 ? 1 : 0;
+      if (fader && fader.frame >= 0) {
         gate = 0;
         const f = fader.frame;
         const ws = fader.windows;
         for (let w = 0; w < ws.length; w++) { if (f >= ws[w][0] && f < ws[w][1]) { gate = 1; break; } }
+      }
+      if (fader) {
         fader.frame++;
         if (fader.frame >= fader.cycleFrames) {
           if (fader.loop) fader.frame -= fader.cycleFrames;
@@ -498,10 +537,12 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
       if (prevSign !== 0 && curSign !== 0 && curSign !== prevSign) fadeCounter = ZERO_FADE_SAMPLES;
       if (curSign !== 0) prevSign = curSign;
       let fadeGain = 1.0;
-      if (fadeCounter > 0) { fadeGain = 1.0 - (fadeCounter / ZERO_FADE_SAMPLES); fadeCounter--; }
+      if (fadeCounter > 0) { fadeGain = Math.max(0, 1.0 - (fadeCounter / ZERO_FADE_SAMPLES)); fadeCounter--; }
 
-      // ── pending seek: fade out, jump, fade in ──
-      if (this.pendingSeek >= 0) {
+      // ── pending seek: (delay), fade out, jump, fade in ──
+      if (this.pendingSeek >= 0 && this.seekDelay > 0) {
+        this.seekDelay--;
+      } else if (this.pendingSeek >= 0) {
         if (this.seekFade > 0) {
           fadeGain = Math.min(fadeGain, this.seekFade / ZERO_FADE_SAMPLES);
           this.seekFade--;
