@@ -20,6 +20,8 @@ import { filterSweep, filterReset, echoOut, instantEQKill, quantizedEQKill, canc
 import { beatJump, triggerHotCue } from '../dj/DJBeatJump';
 import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, getDeckChannelMuteMask, setDeckSlipEnabled, setDeckKeyLock, setDeckEchoSend, setDeckEchoParams, setDeckReverbSend, setDeckFilter } from '../dj/DJActions';
 import { syncBPMToOther } from '../dj/DJAutoSync';
+import { SCRATCH_PATTERNS, type ScratchPattern } from '../dj/DJScratchEngine';
+import { getGesture } from '../dj/scratch/scratchGestureCatalog';
 import type { DeckId } from '../dj/DeckEngine';
 import type { DubBusSettings } from '../../types/dub';
 import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
@@ -72,7 +74,14 @@ export type DjFxActionId =
   // Slip mode toggle
   | 'fx_slip_toggle'
   // Key lock toggle
-  | 'fx_keylock_toggle';
+  | 'fx_keylock_toggle'
+  // Scratch gestures on the active deck (owner scratch plan sections 81, 82; D2 one action path)
+  | 'fx_scratch_baby' | 'fx_scratch_transformer4' | 'fx_scratch_flare2' | 'fx_scratch_hydroplane'
+  | 'fx_scratch_crab' | 'fx_scratch_orbit' | 'fx_scratch_chirp' | 'fx_scratch_forwardStab'
+  | 'fx_scratch_scribble' | 'fx_scratch_tearForward' | 'fx_scratch_uzi' | 'fx_scratch_twiddle'
+  | 'fx_scratch_eightFingerCrab' | 'fx_scratch_threeClickFlare' | 'fx_scratch_laser'
+  | 'fx_scratch_phaser' | 'fx_scratch_tweak' | 'fx_scratch_drag' | 'fx_scratch_vibrato'
+  | 'fx_scratch_stop';
 
 /**
  * Options a caller may pass when firing an action. Deck actions default to
@@ -90,7 +99,7 @@ export interface DjFxFireOptions {
 export interface DjFxAction {
   id: DjFxActionId;
   name: string;
-  category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot' | 'deck' | 'hotcue' | 'loop' | 'transport' | 'mixer' | 'channel';
+  category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot' | 'deck' | 'hotcue' | 'loop' | 'transport' | 'mixer' | 'channel' | 'scratch';
   mode: 'momentary' | 'oneshot'; // momentary = hold to engage, oneshot = fire and forget
   engage: (opts?: DjFxFireOptions) => void;
   disengage: (opts?: DjFxFireOptions) => void;
@@ -1678,6 +1687,57 @@ const stutterActions = [
   createStutter('1/16'),
 ];
 
+// ─── Scratch gestures (owner scratch plan sections 81, 82) ─────────────
+//
+// One action per catalogue gesture that has a deck pattern: engage plays the
+// gesture on the deck (the same `DeckEngine.playPattern` the DeckScratch
+// buttons and the keyboard use), disengage releases it. The Auto DJ, pads,
+// keyboard, MIDI and MCP all fire these through `fireDjFx`.
+
+const scratchDeck = new Map<string, DeckId>();
+
+function createScratchGesture(pattern: ScratchPattern): DjFxAction {
+  const gesture = getGesture(pattern.gestureId);
+  return {
+    id: `fx_scratch_${gesture.id}` as DjFxActionId,
+    name: gesture.name,
+    category: 'scratch',
+    mode: 'momentary',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      scratchDeck.set(this.id, deckId);
+      getDJEngine().getDeck(deckId).playPattern(pattern.name);
+      try { useDJStore.getState().setDeckPattern(deckId, pattern.name); } catch { /* store not ready */ }
+    },
+    disengage(opts) {
+      const deckId = opts?.deck ?? scratchDeck.get(this.id) ?? getActiveDeckId();
+      scratchDeck.delete(this.id);
+      getDJEngine().getDeck(deckId).stopPattern();
+      try { useDJStore.getState().setDeckPattern(deckId, null); } catch { /* store not ready */ }
+    },
+  };
+}
+
+function createScratchStop(): DjFxAction {
+  return {
+    id: 'fx_scratch_stop',
+    name: 'Scratch Stop',
+    category: 'scratch',
+    mode: 'oneshot',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      getDJEngine().getDeck(deckId).stopPattern();
+      try { useDJStore.getState().setDeckPattern(deckId, null); } catch { /* store not ready */ }
+    },
+    disengage() {},
+  };
+}
+
+export const SCRATCH_FX_ACTIONS: DjFxAction[] = [
+  ...SCRATCH_PATTERNS.map(createScratchGesture),
+  createScratchStop(),
+];
+
 export const DJ_FX_ACTIONS: DjFxAction[] = [
   // Stutter
   ...stutterActions,
@@ -1763,6 +1823,8 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   createQuantizeCycle(),
   createSlipToggle(),
   createKeyLockToggle(),
+  // Scratch
+  ...SCRATCH_FX_ACTIONS,
 ];
 
 export const DJ_FX_ACTION_MAP: Record<DjFxActionId, DjFxAction> = Object.fromEntries(
@@ -1818,7 +1880,7 @@ function setDjFxActive(id: DjFxActionId, deck: DeckId | null): void {
 export function fireDjFx(id: DjFxActionId, opts: DjFxFireOptions & { source: DjFxSource }): boolean {
   const action = DJ_FX_ACTION_MAP[id];
   if (!action) return false;
-  const deck = opts.deck ?? (action.category === 'deck' ? getActiveDeckId() : null);
+  const deck = opts.deck ?? (action.category === 'deck' || action.category === 'scratch' ? getActiveDeckId() : null);
   setDjFxActive(id, action.mode === 'momentary' ? deck : null);
   djFxFireCounts[id] = (djFxFireCounts[id] ?? 0) + 1;
   _fxFireLog.push({ time: Date.now(), id, deck, source: opts.source, kind: 'fire', beats: opts.beats, amount: opts.amount });
