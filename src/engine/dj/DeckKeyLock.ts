@@ -11,10 +11,12 @@ import { getNativeAudioNode } from '@utils/audio-context';
  * toggles. When active, the node compensates for the `playbackRate`-driven
  * pitch shift so only tempo changes audibly.
  *
- * Latency: ~5 ms at 48 kHz in pitch-only mode (tempo = 1.0). Internal FIFO
- * primed with zeros; after the first processing block, in/out rate is 1:1.
- * Bypass swaps to a direct wire so there's NO added latency when Key Lock is
- * off — important for scratch / cue work where any lag is audible.
+ * Latency: ~91 ms at 48 kHz (SoundTouch's WSOLA window; 81-95 ms across
+ * +-3 semitones). The worklet reports it for the current setting and
+ * `latencySec()` hands it to the deck's heard position, so phase locks and
+ * visuals follow what the listener hears. Bypass swaps to a direct wire so
+ * there's NO added latency when Key Lock is off — important for scratch / cue
+ * work where any lag is audible.
  *
  * Per CLAUDE.md regression policy, the pitch/tempo decoupling math lives in
  * `computeKeyLockShift.ts` so the invariant is unit-testable without a
@@ -33,6 +35,10 @@ export class DeckKeyLock {
   private isActive = false;
   /** Pending setter messages queued before WASM loaded. */
   private pendingPitchSemis = 0;
+  /** True while the signal runs through the worklet (not the bypass wire). */
+  private routedThroughWorklet = false;
+  /** Processing latency the worklet last reported, seconds. */
+  private reportedLatencySec = 0;
 
   private static wasmBinary: ArrayBuffer | null = null;
   private static jsCode: string | null = null;
@@ -89,6 +95,14 @@ export class DeckKeyLock {
     }
   }
 
+  /**
+   * Seconds the key-locked signal lags its input: the worklet's reported
+   * processing latency while the signal runs through it, 0 on the bypass wire.
+   */
+  latencySec(): number {
+    return this.routedThroughWorklet ? this.reportedLatencySec : 0;
+  }
+
   get active(): boolean { return this.isActive; }
   get ready(): boolean { return this.isWasmReady; }
 
@@ -117,16 +131,40 @@ export class DeckKeyLock {
       try { this.workletNode.disconnect(); } catch { /* */ }
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawOutput);
+      this.routedThroughWorklet = true;
       // Re-apply last-set pitch in case we came back from a flushed state.
       this.setPitchSemiTones(this.pendingPitchSemis);
     } else {
       // BYPASSED: input → bypassGain → output. Flush worklet buffer if loaded.
+      this.routedThroughWorklet = false;
       if (this.workletNode) {
         try { this.workletNode.disconnect(); } catch { /* */ }
         this.clearBuffer();
       }
       this.input.connect(this.bypassGain);
       this.bypassGain.connect(this.output);
+    }
+  }
+
+  /** Messages from the SoundTouch worklet: ready, the processing latency, errors. */
+  private _onWorkletMessage(data: { type?: string; seconds?: unknown; error?: unknown }): void {
+    if (data.type === 'ready') {
+      this.isWasmReady = true;
+      // Re-apply any queued pitch in case user engaged key-lock before WASM was up.
+      if (this.pendingPitchSemis !== 0) {
+        this.workletNode?.port.postMessage({
+          type: 'parameter',
+          key: 'pitchSemis',
+          value: this.pendingPitchSemis,
+        });
+      }
+      // If the caller already engaged us, perform the rewire now.
+      if (this.isActive) this.rewire();
+    } else if (data.type === 'latency') {
+      const sec = Number(data.seconds);
+      if (Number.isFinite(sec) && sec >= 0) this.reportedLatencySec = sec;
+    } else if (data.type === 'error') {
+      console.error('[DeckKeyLock] WASM worklet error:', data.error);
     }
   }
 
@@ -142,23 +180,7 @@ export class DeckKeyLock {
 
       this.workletNode = new AudioWorkletNode(rawCtx, 'soundtouch-keylock-processor');
 
-      this.workletNode.port.onmessage = (event) => {
-        if (event.data.type === 'ready') {
-          this.isWasmReady = true;
-          // Re-apply any queued pitch in case user engaged key-lock before WASM was up.
-          if (this.pendingPitchSemis !== 0) {
-            this.workletNode?.port.postMessage({
-              type: 'parameter',
-              key: 'pitchSemis',
-              value: this.pendingPitchSemis,
-            });
-          }
-          // If the caller already engaged us, perform the rewire now.
-          if (this.isActive) this.rewire();
-        } else if (event.data.type === 'error') {
-          console.error('[DeckKeyLock] WASM worklet error:', event.data.error);
-        }
-      };
+      this.workletNode.port.onmessage = (event: MessageEvent) => this._onWorkletMessage(event.data);
 
       this.workletNode.port.postMessage({
         type: 'init',

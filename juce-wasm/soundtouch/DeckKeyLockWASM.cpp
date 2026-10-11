@@ -100,6 +100,17 @@ public:
         outputFIFO_.clear();
     }
 
+    /**
+     * Frames from a sample entering process() to it leaving: SoundTouch's own
+     * processing latency for the current pitch (SETTING_INITIAL_LATENCY).
+     * Probed natively against an impulse at 48 kHz, 128-frame blocks:
+     * reported 91.7 / 88.2 / 94.6 / 81.4 ms vs measured 90.7 / 87.0 / 90.7 /
+     * 83.3 ms at 0 / -1 / +1 / -3 semitones (the field figure was ~91 ms).
+     */
+    int getLatencyFrames() {
+        return st_->getSetting(SETTING_INITIAL_LATENCY);
+    }
+
     unsigned int getOutputSamples() {
         // Frames in our FIFO (not stereo samples).
         return static_cast<unsigned int>(outputFIFO_.size() / 2);
@@ -205,6 +216,7 @@ EMSCRIPTEN_BINDINGS(SoundTouchProcessor_bindings) {
         .function("setRate",            &devilbox::SoundTouchProcessor::setRate)
         .function("clearBuffer",        &devilbox::SoundTouchProcessor::clearBuffer)
         .function("getOutputSamples",   &devilbox::SoundTouchProcessor::getOutputSamples)
+        .function("getLatencyFrames",   &devilbox::SoundTouchProcessor::getLatencyFrames)
         .function("process",            &devilbox::SoundTouchProcessor::processJS);
 }
 #endif
