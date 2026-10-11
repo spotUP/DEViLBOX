@@ -495,7 +495,7 @@ export const ST02_PACK: SamplePack = {
 // pack directory.
 // ============================================================================
 
-const SCRATCH_BASE_PATH = 'data/samples/packs/scratch-originals';
+export const SCRATCH_BASE_PATH = 'data/samples/packs/scratch-originals';
 
 /** Pack files that exist but are kept out of the browser (click artifact). */
 export const SCRATCH_SKIPPED: readonly string[] = ['scratch_052.wav'];
