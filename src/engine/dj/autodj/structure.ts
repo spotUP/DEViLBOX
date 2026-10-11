@@ -66,6 +66,13 @@ function distance(a: BarFeatures, b: BarFeatures): number {
   );
 }
 
+/** The phrase lengths a song is counted in, longest first. */
+export const PHRASE_LENGTHS = [16, 8, 4] as const;
+/** Share of the arrangement boundaries that must sit on a phrase length before the song counts in it. */
+export const PHRASE_BOUNDARY_SUPPORT = 0.6;
+/** Phrase confidence when the boundaries sit on no phrase length (counted in 4s, alignment unknown). */
+export const PHRASE_UNALIGNED_CONFIDENCE = 0.3;
+
 /**
  * Phrase length per song (4, 8 or 16 bars): the spacing of the strong
  * arrangement boundaries decides (a song that changes every 8 bars counts in
@@ -82,11 +89,11 @@ export function detectPhraseLength(features: BarFeatures[], boundaries: number[]
     // The largest phrase length that most of the arrangement boundaries sit
     // on (weighted by how much the music changes there): a boundary on bar 16
     // supports 16, 8 and 4; one on bar 12 supports only 4.
-    for (const lag of [16, 8, 4]) {
+    for (const lag of PHRASE_LENGTHS) {
       const support = weighted.filter((x) => x.bar % lag === 0).reduce((acc, x) => acc + x.w, 0) / totalW;
-      if (support >= 0.6) return { lengthBars: lag, confidence: Math.min(1, support) };
+      if (support >= PHRASE_BOUNDARY_SUPPORT) return { lengthBars: lag, confidence: Math.min(1, support) };
     }
-    return { lengthBars: 4, confidence: 0.3 };
+    return { lengthBars: 4, confidence: PHRASE_UNALIGNED_CONFIDENCE };
   }
   const scores: Array<{ lag: number; score: number }> = [];
   for (const lag of lags) {
@@ -244,10 +251,23 @@ export function labelSections(features: BarFeatures[], bounds: number[], trackVo
   });
 }
 
-/** Phrases of the detected length, aligned to the first full bar and the section starts. */
-export function buildPhrases(features: BarFeatures[], sections: DJSection[], lengthBars: number, confidence: number): DJPhrase[] {
+/**
+ * Phrases of the detected length, aligned to the first full bar and the
+ * section starts. `startBars` (a tracker module's phrase starts, read from
+ * its order list) replaces that guess: each phrase runs to the next start.
+ */
+export function buildPhrases(features: BarFeatures[], sections: DJSection[], lengthBars: number, confidence: number, startBars?: number[]): DJPhrase[] {
   const phrases: DJPhrase[] = [];
   if (features.length === 0) return phrases;
+  if (startBars) {
+    const starts = startBars.filter((b) => b >= 0 && b < features.length);
+    starts.forEach((b, index) => {
+      const e = Math.min(features.length, starts[index + 1] ?? features.length);
+      const sectionIndex = Math.max(0, sections.findIndex((s) => s.startBar <= b && b < s.endBar));
+      phrases.push({ index, start: features[b].start, end: features[e - 1].end, startBar: b, lengthBars: e - b, confidence, sectionIndex });
+    });
+    return phrases;
+  }
   // Phrase origin: the section boundary that most other boundaries agree with (mod length).
   const boundaries = sections.map((s) => s.startBar);
   let bestOrigin = 0;
