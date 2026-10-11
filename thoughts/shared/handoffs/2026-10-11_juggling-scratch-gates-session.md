@@ -8,7 +8,7 @@ status: final
 # Handoff - session devilbox-6d (2026-10-11, afternoon to night)
 
 The work continues in session **devilbox-60** (started about 19:20). The ledger
-`thoughts/lars/todos.md` (last ~60 lines) has every item with its commit; trust
+`thoughts/spot/todos.md` (last ~60 lines) has every item with its commit; trust
 it over this summary.
 
 ## Task(s)
@@ -25,7 +25,7 @@ it over this summary.
 
 ## Critical references
 
-- Ledger: `thoughts/lars/todos.md` (per-person, not committed).
+- Ledger: `thoughts/spot/todos.md` (per-person, not committed).
 - Owner's music-theory plans (these win on musical rules):
   `thoughts/shared/plans/2026-10-08-auto-dj-beat-juggling-plan.md`,
   `thoughts/shared/plans/2026-10-08-dj-view-scratch-plan.md`.

@@ -288,7 +288,7 @@ re-touches a slider for the whole performance.
   parallel runs** (they scan the filesystem) and pass standalone. Not a
   regression signal.
 - `ECONNREFUSED … port 3000` noise in store tests is harmless.
-- `thoughts/spot/` is git-ignored; `thoughts/lars/todos.md` is left untracked
+- `thoughts/spot/` is git-ignored; `thoughts/spot/todos.md` is left untracked
   on purpose.
 
 ---

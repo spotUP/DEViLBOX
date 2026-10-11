@@ -7,7 +7,7 @@ status: draft
 
 # Auto DJ juggling - build it properly
 
-Owner order 2026-10-11 (thoughts/lars/todos.md DJ-H, line 172-175):
+Owner order 2026-10-11 (thoughts/spot/todos.md DJ-H, line 172-175):
 
 > "a juggle is not only a transition, it could happen anywhere in an artistic
 > way to make the music better and excite the crowd"
@@ -618,7 +618,7 @@ were closed here.
 ### Phase P5 - Ledger, docs, cleanup
 
 - **P5.1** Tick in `thoughts/shared/plans/2026-10-08-auto-dj-world-class-progress.md`: JUG-S26.2 (P3 test), JUG-S27.1 (P4 test), recompute the count line with the checkbox grep.
-- **P5.2** Tick in `thoughts/lars/todos.md`: DJ-F (2), DJ-H plan + build items, DJ-K tempo-source part (style choice part stays open), key-lock latency (P2.4).
+- **P5.2** Tick in `thoughts/spot/todos.md`: DJ-F (2), DJ-H plan + build items, DJ-K tempo-source part (style choice part stays open), key-lock latency (P2.4).
 - **P5.3** `docs/MCP_DEBUGGING_GUIDE.md`: the juggle telemetry `standalone` field and `tempoSource` on `dj_get_state` deck analysis.
 - **P5.4** Handoff `thoughts/shared/handoffs/2026-10-xx_dj-juggling.md` if anything is left open.
 

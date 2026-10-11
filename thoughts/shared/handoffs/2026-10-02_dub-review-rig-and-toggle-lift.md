@@ -34,7 +34,7 @@ status: draft
   <method> '<json>'` (scratch, uncommitted) drives the relay directly. It
   attaches to the NEWEST browser tab — a stale :5175 tab held it at the end.
 - `src/generated/changelog.ts` is modified by dev.sh — generated, don't commit.
-  `thoughts/lars/todos.md` is someone else's scratchpad — leave untracked.
+  `thoughts/spot/todos.md` is someone else's scratchpad — leave untracked.
 
 ## Commits this session (on main)
 

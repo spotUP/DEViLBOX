@@ -38,7 +38,7 @@ Owner reported, in order, and what happened:
   <method> '<json>'` (scratch, uncommitted). evaluate_script takes `{code}`
   and can `await import('/src/...')`.
 - Uncommitted, not mine: `src/generated/changelog.ts` (dev.sh),
-  `tools/format-state.json` (owner's format testing), `thoughts/lars/todos.md`.
+  `tools/format-state.json` (owner's format testing), `thoughts/spot/todos.md`.
 
 ## Ledger
 
