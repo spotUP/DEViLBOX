@@ -9,6 +9,7 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell } from '@/types/tracker';
 import { timeOrderPositions, rowSeconds } from '../trackerMixAnalysis';
 import { moduleBeatGrid, musicalBpm, MODULE_GRID_TOLERANCE } from '../moduleBeatGrid';
+import { buildBeatGrids } from '../beatGrid';
 
 const empty = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 
@@ -127,5 +128,23 @@ describe('moduleBeatGrid', () => {
     const g = moduleBeatGrid(s, walkEnd(s))!;
     const t6 = 64 * rowSeconds(6, 125), t3 = 64 * rowSeconds(3, 125);
     expect(g.bpm).toBeCloseTo((125 * t6 + 250 * t3) / (t6 + t3), 2);
+  });
+});
+
+describe('buildBeatGrids with a fixed meter (module timing)', () => {
+  it('bars follow the song downbeats, a short pattern makes a short bar, confidence is the given value', () => {
+    // 40 rows (Dxx at row 39) then 64: bars of 4, 4, 2 beats, then 4 x 4.
+    const s = song([pattern('a', 64, { 39: [0x0d, 0] }), pattern('b', 64)], [0, 1]);
+    const g = moduleBeatGrid(s, walkEnd(s))!;
+    const r = buildBeatGrids({
+      beats: g.beats, downbeats: g.downbeats, bpm: g.bpm, bpmConfidence: 1, timeSignature: 4,
+      extended: null, durationSec: walkEnd(s), fixed: { beatsPerBar: 4, confidence: 1 },
+    });
+    expect(r.downbeats.bars.map((b) => b.beats.length)).toEqual([4, 4, 2, 4, 4, 4, 4]);
+    expect(r.downbeats.bars.map((b) => b.start)).toEqual(g.downbeats);
+    expect(r.beatGrid.beats.filter((b) => b.isDownbeat).map((b) => b.time)).toEqual(g.downbeats);
+    expect(r.beatGrid.confidence).toBe(1);
+    expect(r.downbeats.confidence).toBe(1);
+    expect(r.meter).toMatchObject({ beatsPerBar: 4, confidence: 1 });
   });
 });
