@@ -20,7 +20,7 @@ import { getDJEngine } from '../../DJEngine';
 import type { DeckId } from '../../DeckEngine';
 import { seekDeckAudio } from '../../DJActions';
 import { lockBarPhase, phaseAlign, phaseErrorSec, quantizedPlay, syncBPMToOther } from '../../DJAutoSync';
-import { PHASE_VERIFIED_SEC, phaseUnverified } from './juggleExecutor';
+import { phaseUnverified } from './phaseVerification';
 import { engageAutoKeyLock, releaseAutoKeyLock, resetDeckAfterTransition } from '../transitionExecutor';
 import { getDecisionLog } from '../decisionLog';
 import type { DJTrackAnalysis } from '../types';
@@ -29,14 +29,12 @@ import type { DJJuggleController, TickInput } from './juggleController';
 import { juggleOpportunity, type JuggleOpportunity, type NextTrackOption } from './juggleOpportunity';
 import type { JuggleTrigger, StandaloneSource } from './juggleTypes';
 
-/** A double's heard bar phase within this of the master's counts as aligned (the P4 success criteria's 5 ms). */
-export const STANDALONE_PHASE_VERIFIED_SEC = PHASE_VERIFIED_SEC;
-
 /**
  * Owner plan section 16 steps 3 and 5: the idle deck's heard BAR phase is
- * within STANDALONE_PHASE_VERIFIED_SEC of the other deck's - a copy a whole
+ * within PHASE_VERIFIED_SEC of the other deck's - a copy a whole
  * beat off is on the beat but not on the bar, and is not verified. The
- * executor's one verification rule on the bar-phase measurement.
+ * juggle layer's one verification rule (phaseVerification) on the bar-phase
+ * measurement.
  */
 export function idleBarPhaseVerified(idle: DeckId): boolean {
   const other: DeckId = idle === 'A' ? 'B' : 'A';
