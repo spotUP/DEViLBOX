@@ -581,6 +581,8 @@ export async function analyzePlaylist(
           const curr = resolveCurrent(trackId);
           if (curr) {
             queueMetaUpdate(curr.index, { ...meta, analysisSkipped: false });
+            // The render that produced this analysis is a successful load.
+            useDJPlaylistStore.getState().recordTrackLoad(curr.track.fileName, { ok: true });
           }
         }
 

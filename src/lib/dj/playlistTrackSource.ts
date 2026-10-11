@@ -153,3 +153,40 @@ export function repairSourcesFromSeed(
   }
   return repaired;
 }
+
+/**
+ * Record the outcome of a load attempt on every playlist entry with this
+ * source. `isBad` means exactly "the last attempt to load this source
+ * failed": a failure sets it (with the reason), a successful load or render
+ * clears it. No other signal — analysis, tempo, a skip decision — writes it.
+ * Mutates `playlists` in place (Immer-draft safe).
+ *
+ * @returns the number of entries whose flag changed
+ */
+export function applyLoadOutcome(
+  playlists: RepairablePlaylist[],
+  fileName: string,
+  outcome: { ok: true } | { ok: false; reason: string },
+  now: number,
+): number {
+  let changed = 0;
+  for (const playlist of playlists) {
+    for (const track of playlist.tracks) {
+      if (track.fileName !== fileName) continue;
+      if (outcome.ok) {
+        if (!track.isBad && !track.badFailCount) continue;
+        track.isBad = false;
+        track.badReason = undefined;
+        track.badTimestamp = undefined;
+        track.badFailCount = 0;
+      } else {
+        track.isBad = true;
+        track.badReason = outcome.reason;
+        track.badTimestamp = now;
+        track.badFailCount = (track.badFailCount || 0) + 1;
+      }
+      changed++;
+    }
+  }
+  return changed;
+}

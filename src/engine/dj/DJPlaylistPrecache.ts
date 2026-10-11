@@ -173,6 +173,7 @@ export async function precachePlaylist(
 
       cached++;
       cachedNames.add(filename);
+      store.recordTrackLoad(track.fileName, { ok: true });
       onProgress?.({ current: cached + failed + skipped, total, cached, failed, skipped, trackName: track.trackName, status: 'cached' });
       console.log(`[Precache] ${cached + failed + skipped}/${total} — ${track.trackName} cached`);
     } catch (err) {
@@ -191,8 +192,8 @@ export async function precachePlaylist(
       }
       console.warn(`[Precache] ${cached + failed + skipped}/${total} FAIL — ${track.trackName}:`, err);
       
-      // Mark track as bad so it shows in the Re-test Bad list
-      store.markTrackBad(playlistId, index, msg);
+      // A failed load: flagged bad so it shows in the Re-test Bad list.
+      store.recordTrackLoad(track.fileName, { ok: false, reason: msg });
       
       onProgress?.({ current: cached + failed + skipped, total, cached, failed, skipped, trackName: track.trackName, status: 'error' });
     }
