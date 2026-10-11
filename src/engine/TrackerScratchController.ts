@@ -176,15 +176,16 @@ export class TrackerScratchController {
     const masterInput = getNativeAudioNode(engine.masterInput as unknown as Record<string, unknown>);
     const synthBus    = getNativeAudioNode(engine.synthBus    as unknown as Record<string, unknown>);
 
-    if (masterInput && synthBus) {
+    const captureInput = this.scratchBuffer.captureInput;
+    if (masterInput && synthBus && captureInput) {
       // Tap 1: ToneEngine masterInput → captureNode
       //   Captures: MOD/XM/IT/S3M (masterGain→separationNode→masterInput)
       //             + UADE/Hively/native WASM engines (nativeEngine→separationNode→masterInput)
-      masterInput.connect(this.scratchBuffer['captureNode']);
+      masterInput.connect(captureInput);
       // Tap 2: ToneEngine synthBus → captureNode
       //   Captures: Furnace chips, C64 SID, DB303, and all other ToneEngine synths
       //             (these bypass masterInput and flow through synthBus directly)
-      synthBus.connect(this.scratchBuffer['captureNode']);
+      synthBus.connect(captureInput);
       // Inject: playbackNode → playbackGain → masterInput (scratch audio playback)
       this.scratchBuffer.playbackGain.connect(masterInput);
       this.scratchBufferReady = true;
