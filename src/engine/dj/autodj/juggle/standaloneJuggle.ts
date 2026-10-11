@@ -8,8 +8,9 @@
  * Setup (owner plan section 16): load a double of the playing track (or the
  * pre-rendered next track) on the idle deck, cue it on the master's next
  * downbeat while it is stopped (a seek is right there), match its tempo,
- * start it on that bar, verify its heard beat phase, and only then let the
- * juggle controller plan with the two decks. While it runs, a rate bend
+ * start it on that bar, lock it to the master's bars while it is silent (a
+ * bend, else an exact re-cue), verify its heard bar phase, and only then let
+ * the juggle controller plan with the two decks. While it runs, a rate bend
  * keeps it on the master's beat (never a seek of a playing deck). The
  * controller's pattern release hands back: the idle deck stops, the
  * crossfader sits on the master.
@@ -18,7 +19,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '../../DJEngine';
 import type { DeckId } from '../../DeckEngine';
 import { seekDeckAudio } from '../../DJActions';
-import { phaseAlign, phaseErrorSec, quantizedPlay, syncBPMToOther } from '../../DJAutoSync';
+import { lockBarPhase, phaseAlign, phaseErrorSec, quantizedPlay, syncBPMToOther } from '../../DJAutoSync';
 import { PHASE_VERIFIED_SEC, phaseUnverified } from './juggleExecutor';
 import { engageAutoKeyLock, releaseAutoKeyLock, resetDeckAfterTransition } from '../transitionExecutor';
 import { getDecisionLog } from '../decisionLog';
@@ -106,9 +107,17 @@ interface State {
   reason: string;
   /** The idle deck's file once loaded: a different one means the user took the deck. */
   fileName: string | null;
-  /** The heard beat phase was measured on the master's (owner plan section 16: verify, then juggle). */
+  /** The heard bar phase was measured on the master's (owner plan section 16: verify, then juggle). */
   verified: boolean;
+  /** Re-cues of the silent copy onto the master's bars during the setup, and when the last one landed (ms). */
+  recues: number;
+  lastRecueAt: number;
 }
+
+/** Re-cues of a double that still misses the master's bars before the setup gives up (owner plan section 16). */
+export const DOUBLE_MAX_RECUES = 3;
+/** A re-cue settles (the seek reaches the heard position) before the bar phase is measured again. */
+const RECUE_SETTLE_MS = 250;
 
 export class StandaloneJuggle {
   private state: State | null = null;
@@ -155,7 +164,7 @@ export class StandaloneJuggle {
     const gen = ++this.gen;
     const { active, idle } = this.deps.decks();
     const j = this.deps.controller();
-    this.state = { phase: 'loading', trigger: op.trigger, source: op.source, deck: idle, gen, startedCount: j.counts.started, runningSince: 0, phraseSec, reason: op.reason, fileName: null, verified: false };
+    this.state = { phase: 'loading', trigger: op.trigger, source: op.source, deck: idle, gen, startedCount: j.counts.started, runningSince: 0, phraseSec, reason: op.reason, fileName: null, verified: false, recues: 0, lastRecueAt: 0 };
     this.publish();
     // The crowd hears the master only until a pattern cuts the double in.
     const masterCf = active === 'A' ? 0 : 1;
@@ -204,10 +213,11 @@ export class StandaloneJuggle {
   }
 
   /**
-   * Every poll: yield to the user (owner plan section 43), keep the idle
-   * deck on the master's beat with a rate bend (beat phase, so a double's
-   * whole-beat offset stays), verify the phase before the first pattern
-   * (section 16 steps 5-6), hand back when the idle deck stopped or no
+   * Every poll: yield to the user (owner plan section 43); before the first
+   * pattern lock the silent idle deck to the master's bars and verify its
+   * bar phase (section 16 steps 3, 5, 6; it gives up after DOUBLE_MAX_RECUES
+   * re-cues that do not land); once verified keep it on the master's beat
+   * with a rate bend (beat phase, so a pattern's whole-beat offset stays); hand back when the idle deck stopped or no
    * pattern started within two phrases.
    */
   hold(): void {
@@ -223,7 +233,21 @@ export class StandaloneJuggle {
     const started = j.counts.started > s.startedCount;
     if (!started && !j.isActive() && Date.now() - s.runningSince > 2 * s.phraseSec * 1000) { this.end('no pattern within two phrases'); return; }
     const master: DeckId = s.deck === 'A' ? 'B' : 'A';
-    if (!s.verified && idleBarPhaseVerified(s.deck)) { s.verified = true; this.publish(); }
+    if (!s.verified) {
+      if (Date.now() - s.lastRecueAt < RECUE_SETTLE_MS) return;
+      if (idleBarPhaseVerified(s.deck)) { s.verified = true; this.publish(); return; }
+      // Section 16 step 3 before step 5: the copy is silent (the fader holds the master, no pattern plans before
+      // verification), so it is locked to the master's BARS - a bend within half a beat, else one exact re-cue.
+      // A copy a whole beat off is on the beat but not on the bar: a beat-phase bend would keep it there.
+      let did: ReturnType<typeof lockBarPhase> = 'none';
+      try { did = lockBarPhase(s.deck, master, Math.abs(useDJStore.getState().crossfaderPosition - masterCf) < 0.001); } catch { /* grid missing */ }
+      if (did === 'recue') {
+        s.lastRecueAt = Date.now();
+        if (++s.recues > DOUBLE_MAX_RECUES) this.end(`the double's bar phase could not be corrected (${DOUBLE_MAX_RECUES} re-cues)`);
+      }
+      return;
+    }
+    // Verified: the copy stays on the master's beat (a pattern's whole-beat offsets stay).
     try { phaseAlign(s.deck, master, 'beat'); } catch { /* grid missing */ }
   }
 
