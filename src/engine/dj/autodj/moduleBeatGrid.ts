@@ -70,9 +70,9 @@ export interface ModuleBeatGrid {
  * audio guess - and are counted in 4, 8 or 16 bars between those starts.
  */
 export interface ModulePhraseGrid {
-  /** Bars per phrase: the longest of 4/8/16 the pattern changes sit on. */
+  /** Bars per phrase: the longest of 4/8/16 that the stretches between pattern changes are whole multiples of. */
   lengthBars: number;
-  /** Share of the pattern changes on that length (the audio detector's rule, PHRASE_BOUNDARY_SUPPORT), or PHRASE_UNALIGNED_CONFIDENCE. */
+  /** Share of the stretches between pattern changes that are whole phrases of that length (the audio detector's threshold, PHRASE_BOUNDARY_SUPPORT), or PHRASE_UNALIGNED_CONFIDENCE. */
   confidence: number;
   /** Bar index of every phrase start: bar 0, each pattern change, and every lengthBars bars between them. */
   startBars: number[];
@@ -90,13 +90,16 @@ export function modulePhrases(patternIndices: number[], positionBars: number[], 
   const changes = positionBars.filter((b, p) => p > 0 && b > 0 && b < totalBars && patternIndices[p] !== patternIndices[p - 1]);
   const bounds = [...new Set(changes.length >= 2 ? changes : all)];
   if (bounds.length < 2) return null;
+  // Phrases restart at every boundary, so a length fits where the stretch between two boundaries is a whole
+  // number of phrases (a pattern break shifts the bars after it, not the fit).
+  const anchors = [0, ...bounds];
+  const spans = anchors.slice(1).map((b, i) => b - anchors[i]);
   let lengthBars = 4;
   let confidence = PHRASE_UNALIGNED_CONFIDENCE;
   for (const lag of PHRASE_LENGTHS) {
-    const support = bounds.filter((b) => b % lag === 0).length / bounds.length;
+    const support = spans.filter((n) => n % lag === 0).length / spans.length;
     if (support >= PHRASE_BOUNDARY_SUPPORT) { lengthBars = lag; confidence = support; break; }
   }
-  const anchors = [0, ...bounds];
   const startBars: number[] = [];
   anchors.forEach((a, i) => {
     const next = anchors[i + 1] ?? totalBars;
