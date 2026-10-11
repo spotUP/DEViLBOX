@@ -18,7 +18,7 @@ import type { EffectConfig } from '@/types/instrument/effects';
 import type { DJEnvironment } from '@/types/djEnvironment';
 import type { DJTrackSummary } from '@/engine/dj/autodj/types';
 import { useAudioStore } from '@/stores/useAudioStore';
-import { isBareFileName, repairBareSourcesFromSeed } from '@/lib/dj/playlistTrackSource';
+import { isBareFileName, repairSourcesFromSeed } from '@/lib/dj/playlistTrackSource';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,6 +92,8 @@ export interface DJPlaylist {
 interface DJPlaylistState {
   playlists: DJPlaylist[];
   activePlaylistId: string | null;
+  /** The seed-sources revision persisted seed playlists were last repaired to (see SEED_SOURCES_REVISION). */
+  seedSourcesRevision: number;
 
   // ── Selection (ephemeral, not persisted) ──────────────────────────────
   selectedTrackIndices: number[];
@@ -130,8 +132,8 @@ interface DJPlaylistState {
   clearTrackBadFlag: (playlistId: string, index: number) => void;
   clearAllBadFlags: (playlistId: string) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
-  /** Give bare-named entries of seed playlists their source from the bundled seed. Returns the count repaired. */
-  repairBareSourcesFromSeed: (seed: DJPlaylist[]) => number;
+  /** Bring persisted seed playlists up to the bundled seed's sources and record the revision. Returns the count repaired. */
+  repairSourcesFromSeed: (seed: DJPlaylist[], revision: number) => number;
   setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => void;
   /** Save current DJ environment snapshot to the active playlist */
   saveEnvironmentToPlaylist: (playlistId: string) => void;
@@ -188,6 +190,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
     immer((set, _get) => ({
       playlists: [],
       activePlaylistId: null,
+      seedSourcesRevision: 0,
 
       // Ephemeral state
       selectedTrackIndices: [],
@@ -597,13 +600,14 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         });
       },
 
-      repairBareSourcesFromSeed: (seed: DJPlaylist[]) => {
+      repairSourcesFromSeed: (seed: DJPlaylist[], revision: number) => {
         let repaired = 0;
         set((state) => {
-          repaired = repairBareSourcesFromSeed(state.playlists, seed);
+          repaired = repairSourcesFromSeed(state.playlists, seed);
+          state.seedSourcesRevision = revision;
         });
         if (repaired > 0) {
-          console.log(`[DJPlaylistStore] Repaired ${repaired} playlist entries that had no source`);
+          console.log(`[DJPlaylistStore] Repaired ${repaired} seed playlist entries to the seed's sources`);
           syncPlaylists();
         }
         return repaired;
@@ -797,6 +801,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       partialize: (state) => ({
         playlists: state.playlists,
         activePlaylistId: state.activePlaylistId,
+        seedSourcesRevision: state.seedSourcesRevision,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -863,21 +868,31 @@ function pushUndo(state: DJPlaylistState): void {
 // ── Bundled seed playlists: import on first launch, repair afterwards ───────
 
 const BUNDLED_PLAYLISTS_URL = '/data/playlists/imported-prg.json';
+/**
+ * Bump whenever the seed's sources change, so persisted copies are repaired
+ * once. 1: bare names resolved through Modland/HVSC (ce3de53e4). 2: the seed
+ * rebuilt from the HippoPlayer playlists with every entry's own source
+ * (tools/convert-hippo-playlists.ts).
+ */
+export const SEED_SOURCES_REVISION = 2;
+const SEED_PLAYLIST_ID_PREFIX = 'playlist-prg-';
 let bundledImportAttempted = false;
 
 /**
- * First launch: import the bundled seed playlists. Later launches: repair
- * persisted seed playlists whose entries were stored as bare names (no
- * source — they can never load) from the seed, which now carries a source
- * for every entry an archive holds. See `src/lib/dj/playlistTrackSource.ts`.
+ * First launch: import the bundled seed playlists. Later launches: when the
+ * seed's sources changed since the last repair (or an entry has no source at
+ * all), bring persisted seed playlists up to the seed's sources. See
+ * `repairSourcesFromSeed` in `src/lib/dj/playlistTrackSource.ts`.
  */
 export async function syncBundledPlaylists(): Promise<void> {
   if (bundledImportAttempted) return;
   bundledImportAttempted = true;
 
-  const { playlists } = useDJPlaylistStore.getState();
+  const { playlists, seedSourcesRevision } = useDJPlaylistStore.getState();
   const needsImport = playlists.length === 0;
-  const needsRepair = playlists.some((p) => p.tracks.some((t) => isBareFileName(t.fileName)));
+  const needsRepair =
+    (seedSourcesRevision < SEED_SOURCES_REVISION && playlists.some((p) => p.id.startsWith(SEED_PLAYLIST_ID_PREFIX)))
+    || playlists.some((p) => p.tracks.some((t) => isBareFileName(t.fileName)));
   if (!needsImport && !needsRepair) return;
 
   try {
@@ -887,11 +902,12 @@ export async function syncBundledPlaylists(): Promise<void> {
     if (!Array.isArray(data) || data.length === 0) return;
     if (needsImport) {
       useDJPlaylistStore.getState().importPlaylists(data);
+      useDJPlaylistStore.setState({ seedSourcesRevision: SEED_SOURCES_REVISION });
       const first = useDJPlaylistStore.getState().playlists[0];
       if (first) useDJPlaylistStore.getState().setActivePlaylist(first.id);
       console.log(`[DJPlaylistStore] Imported ${data.length} bundled playlists`);
     } else {
-      useDJPlaylistStore.getState().repairBareSourcesFromSeed(data);
+      useDJPlaylistStore.getState().repairSourcesFromSeed(data, SEED_SOURCES_REVISION);
     }
   } catch {
     // Bundled file not available — no problem
