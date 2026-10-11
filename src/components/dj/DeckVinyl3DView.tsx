@@ -24,6 +24,7 @@
  * Lazy-loaded in DJDeck to avoid bloating the initial bundle.
  */
 
+import { deckAccent } from '@lib/deckIdentity';
 import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
@@ -42,12 +43,6 @@ const MODEL_PATH = '/models/turntable.glb';
 
 /** Scale: model is in cm, Three.js world is in metres. */
 const MODEL_SCALE = 0.01;
-
-const DECK_ACCENT: Record<string, string> = {
-  A: '#60a5fa',
-  B: '#f87171',
-  C: '#34d399',
-};
 
 // RPM speed constants
 const RPM_33 = 33;
@@ -124,7 +119,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   const playStateRef = useRef({ isPlaying, songPos, totalPositions, durationMs, playbackMode, pitchOffset });
   playStateRef.current = { isPlaying, songPos, totalPositions, durationMs, playbackMode, pitchOffset };
 
-  const accentColor = DECK_ACCENT[deckId] ?? '#60a5fa';
+  const accentColor = deckAccent(deckId);
 
   // ── Clone scene and classify meshes ───────────────────────────────────────
 

@@ -12,8 +12,6 @@ type DeckColors = DeckColorsExt;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DECK_ACCENT: Record<'A' | 'B' | 'C', string> = { A: '#60a5fa', B: '#f87171', C: '#34d399' };
-const DECK_LABEL:  Record<'A' | 'B' | 'C', string> = { A: '#1e2a3f', B: '#3f1e2a', C: '#1e3f2a' };
 const BASE_RPS  = 0.5556;   // 33⅓ RPM
 const BASE_BPM  = 120;
 const GROOVE_COUNT = 14;
@@ -26,8 +24,8 @@ let dpr = 1, width = 96, height = 96;
 let colors: DeckColors = {
   bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028',
   border: '#581014', borderLight: '#9c2028',
+  deckAccent: '#60a5fa', deckLabel: '#1e2a3f',
 };
-let deckId: 'A' | 'B' | 'C' = 'A';
 let isPlaying = false, effectiveBPM = 120;
 let scratchVelocity = 1, isScratchActive = false;
 let angle = 0, posSec = 0, dirty = true;
@@ -45,7 +43,7 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
       offCanvas.height = Math.round(msg.height * msg.dpr);
       ctx    = offCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
       dpr    = msg.dpr; width = msg.width; height = msg.height;
-      colors = msg.colors; deckId = msg.deckId;
+      colors = msg.colors;
       isPlaying = msg.isPlaying; effectiveBPM = msg.effectiveBPM;
       startRAF();
       (self as unknown as Worker).postMessage({ type: 'ready' });
@@ -145,8 +143,8 @@ function renderFrame(dt: number): void {
   const cx = width / 2, cy = height / 2;
   const radius      = Math.min(cx, cy) - 2;
   const labelRadius = radius * 0.38;
-  const markerColor = DECK_ACCENT[deckId];
-  const labelBg     = DECK_LABEL[deckId];
+  const markerColor = colors.deckAccent;
+  const labelBg     = colors.deckLabel;
 
   // Background
   ctx.fillStyle = colors.bg;

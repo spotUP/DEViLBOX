@@ -216,10 +216,14 @@ export interface DeckColors {
   bgSecondary: string;
   bgTertiary: string;
   border: string;
+  /** The deck's identity colour (src/lib/deckIdentity.ts), resolved on the main thread. */
+  deckAccent: string;
 }
 
 export interface DeckColorsExt extends DeckColors {
   borderLight: string;
+  /** The record-label surface under the platter, tinted with the deck colour. */
+  deckLabel: string;
 }
 
 // ─── Turntable ───────────────────────────────────────────────────────────────

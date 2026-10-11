@@ -76,6 +76,12 @@ export default {
           error: tone('--color-error'),
           success: tone('--color-success'),
         },
+        // DJ deck identity: one colour per deck (defined in index.css)
+        deck: {
+          a: tone('--color-deck-a'),
+          b: tone('--color-deck-b'),
+          c: tone('--color-deck-c'),
+        },
         // Tracker-specific colors
         tracker: {
           row: {

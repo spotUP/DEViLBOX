@@ -11,7 +11,6 @@ import { clockNowMs, positionAtFrame, type ClockAnchor } from '../engine/audioLa
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const OVERVIEW_H      = 16;   // px height of the overview strip
-const POSITION_COLOR  = '#ef4444';
 const CUE_COLOR       = '#f59e0b';
 const LOOP_COLOR      = 'rgba(6, 182, 212, 0.25)';
 const LOOP_BORDER     = 'rgba(6, 182, 212, 0.6)';
@@ -43,7 +42,7 @@ let patternLoopStart = 0;
 let patternLoopEnd   = 0;
 let cuePoint         = -1;
 let totalPositions   = 1;
-let colors: DeckColors = { bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028', border: '#581014' };
+let colors: DeckColors = { bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028', border: '#581014', deckAccent: '#60a5fa' };
 let beats: number[] | null = null;
 let downbeats: number[] | null = null;
 
@@ -231,7 +230,7 @@ function renderOverview(): void {
     // Position marker
     if (durationSec > 0) {
       const posX = (audioPosition / durationSec) * width;
-      ctx.fillStyle = POSITION_COLOR;
+      ctx.fillStyle = colors.deckAccent;
       ctx.fillRect(posX - 1, 0, 2, oh);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(posX, 0, 1, oh);

@@ -15,6 +15,7 @@ import { seekDeckAudio, startScratch, setScratchVelocity, stopScratch } from '@/
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import WaveformWorkerFactory from '@/workers/dj-waveform.worker.ts?worker';
 import { markSeek } from './seekGuard';
+import { deckAccent } from '@lib/deckIdentity';
 import type { WaveformMsg, WaveformOverviewState, DeckColors } from '@engine/renderer/worker-types';
 
 interface DeckAudioWaveformProps {
@@ -23,13 +24,14 @@ interface DeckAudioWaveformProps {
 
 const OVERVIEW_H = 16; // must match worker constant
 
-function snapshotColors(el: HTMLElement): DeckColors {
+function snapshotColors(el: HTMLElement, deckId: string): DeckColors {
   const cs = getComputedStyle(el);
   return {
     bg:          cs.getPropertyValue('--color-bg').trim()           || '#6e1418',
     bgSecondary: cs.getPropertyValue('--color-bg-secondary').trim() || '#7c1a1e',
     bgTertiary:  cs.getPropertyValue('--color-bg-tertiary').trim()  || '#8c2028',
     border:      cs.getPropertyValue('--color-border').trim()       || '#581014',
+    deckAccent:  deckAccent(deckId),
   };
 }
 
@@ -42,7 +44,7 @@ function snapshotOverview(deckId: 'A' | 'B' | 'C', container: HTMLElement): Wave
     patternLoopEnd:   d.patternLoopEnd,
     cuePoint:         d.cuePoint,
     totalPositions:   d.totalPositions,
-    colors:           snapshotColors(container),
+    colors:           snapshotColors(container, deckId),
     beats:            d.beatGrid?.beats ?? null,
     downbeats:        d.beatGrid?.downbeats ?? null,
   };

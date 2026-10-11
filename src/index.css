@@ -61,6 +61,15 @@
     --color-success: #22c55e;
     --color-warning: #f59e0b;
 
+    /* Deck identity: ONE colour per DJ deck, defined here and nowhere else.
+       Not themed on purpose: A/B/C must stay distinguishable on every theme,
+       and none of them may be a state colour (error red, success green,
+       warning amber). Read in CSS via the Tailwind tokens text-deck-a ...,
+       in canvas/WebGL code via deckIdentity() in src/lib/deckIdentity.ts. */
+    --color-deck-a: #60a5fa;
+    --color-deck-b: #c084fc;
+    --color-deck-c: #2dd4bf;
+
     /* Tracker row colors — warm amber-tinted backgrounds */
     --color-tracker-row-even: #1e1e1e;
     --color-tracker-row-odd: #222222;
