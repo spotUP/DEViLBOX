@@ -298,23 +298,27 @@ describe('DJTrackLoader live load path handles companions', () => {
     expect(liveLoadSection).not.toContain('downloadUADECompanions');
   });
 
-  it('gets the UADE companions from the deck open in the live load modland path', () => {
-    expect(liveLoadSection).toContain("openDeckTrack({ kind: 'modland'");
-    expect(liveLoadSection).toContain('companionList: companions');
+  // Network tracks (Modland, proxied URLs) resolve through remoteTrackSource;
+  // the live path opens remote.ref on the deck. Anchor on that resolve call.
+  const remoteAnchor = 'const remote = remoteTrackSource(track.fileName)';
+  const remoteSection = liveLoadSection.slice(liveLoadSection.indexOf(remoteAnchor));
+
+  it('resolves modland: entries to a modland open ref', () => {
+    const resolver = src.slice(src.indexOf('export function remoteTrackSource'));
+    expect(resolver).toContain("ref: { kind: 'modland', path }");
+  });
+
+  it('gets the UADE companions from the deck open in the live load network path', () => {
+    expect(liveLoadSection).toContain(remoteAnchor);
+    expect(remoteSection).toMatch(/companionList: companions \} = await openDeckTrack\(remote\.ref, deckId\)/);
   });
 
   it('passes companions to loadOrEnqueue in the live load path', () => {
-    const modlandSection = liveLoadSection.slice(
-      liveLoadSection.indexOf("startsWith('modland:')"),
-    );
-    expect(modlandSection).toMatch(/loadOrEnqueue\([^)]*companions/s);
+    expect(remoteSection).toMatch(/loadOrEnqueue\([^)]*companions/s);
   });
 
   it('uses .wav filename for loadAudioToDeck to avoid UADE re-init', () => {
-    const modlandSection = liveLoadSection.slice(
-      liveLoadSection.indexOf("startsWith('modland:')"),
-    );
-    expect(modlandSection).toContain("replace(/\\.[^.]+$/, '.wav')");
+    expect(remoteSection).toContain("replace(/\\.[^.]+$/, '.wav')");
   });
 });
 
