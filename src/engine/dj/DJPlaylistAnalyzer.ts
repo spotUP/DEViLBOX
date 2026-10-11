@@ -138,6 +138,8 @@ export function trackIsLocal(track: PlaylistTrack): boolean {
  */
 export function trackNeedsAnalysis(track: PlaylistTrack): boolean {
   if (track.analysisSkipped) return false;
+  // A key read before analyses recorded its confidence (store migration v3): analysed again once, any write clears it.
+  if (track.keyConfidenceStale) return trackHasRemoteSource(track) || trackIsLocal(track);
   if (track.bpm) return false;  // skip if bpm is truthy (non-zero, non-undefined)
   return trackHasRemoteSource(track) || trackIsLocal(track);
 }
@@ -264,7 +266,7 @@ export async function analyzePlaylist(
       useDJPlaylistStore.getState().batchUpdateTrackMeta(playlistId, batch as never);
     };
     const queueMetaUpdate = (index: number, meta: Record<string, unknown>) => {
-      pendingMetaUpdates.push({ index, meta });
+      pendingMetaUpdates.push({ index, meta: { ...meta, keyConfidenceStale: false } });
       if (!metaFlushTimer) {
         metaFlushTimer = setTimeout(flushMetaUpdates, 500);
       }
