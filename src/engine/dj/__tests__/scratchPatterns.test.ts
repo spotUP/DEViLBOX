@@ -122,6 +122,14 @@ describe('SCRATCH_PATTERNS registry', () => {
     }
   });
 
+  it('every pattern carries the catalogue gesture it executes (SCR-P1.3)', () => {
+    for (const p of SCRATCH_PATTERNS) {
+      expect(typeof p.gestureId, `${p.name}: gestureId`).toBe('string');
+      expect(p.gestureId.length).toBeGreaterThan(0);
+    }
+    expect(new Set(SCRATCH_PATTERNS.map((p) => p.gestureId)).size).toBe(SCRATCH_PATTERNS.length);
+  });
+
   it('quantize field is either false or one of "1/4" | "1/8"', () => {
     const valid = new Set([false, '1/4', '1/8'] as const);
     for (const p of SCRATCH_PATTERNS) {
