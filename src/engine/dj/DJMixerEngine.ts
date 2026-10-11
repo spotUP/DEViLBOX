@@ -27,6 +27,7 @@ import type { EffectConfig } from '@typedefs/instrument';
 import type { DJCueEngine } from './DJCueEngine';
 import type { DeckId } from './DeckEngine';
 import { effectiveBassLock } from './bassLockDefaults';
+import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
 
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 
@@ -74,7 +75,7 @@ export class DJMixerEngine {
   // Master chain
   private masterGain: Tone.Gain;
   private duckGain: Tone.Gain; // separate from masterGain — for mic ducking
-  private limiter: Tone.Compressor;
+  private limiter: SafetyLimiter;
   readonly masterMeter: Tone.Meter;
 
   // Master FX chain (inserted between masterGain and duckGain)
@@ -111,16 +112,9 @@ export class DJMixerEngine {
     this.duckGain = new Tone.Gain(1);
     this.chainGain = new Tone.Gain(1);
 
-    // Limiter: fast attack, high ratio compressor acting as a brickwall
-    // Attack 1ms catches crossfader transient spikes (10ms ramps)
-    // Release 50ms balances fast recovery for battle cuts vs pumping avoidance
-    this.limiter = new Tone.Compressor({
-      threshold: -1,
-      ratio: 20,
-      attack: 0.001,
-      release: 0.05,
-      knee: 0,
-    });
+    // Safety limiter (djLimiter.ts): brick-wall at -1 dBFS, unity below it.
+    // Attack 1ms catches crossfader transient spikes (10ms ramps).
+    this.limiter = createSafetyLimiter(Tone.getContext().rawContext as unknown as BaseAudioContext);
 
     this.masterMeter = new Tone.Meter({ smoothing: 0.8 });
 
@@ -136,12 +130,12 @@ export class DJMixerEngine {
 
       this.masterGain.connect(this.chainGain);
       this.chainGain.connect(this.duckGain);
-      this.duckGain.connect(this.limiter);
+      Tone.connect(this.duckGain, this.limiter.input);
 
       // Connect limiter to Destination INPUT (not .toDestination())
       // This allows DJ FX to tap from Destination OUTPUT
-      this.limiter.connect(Tone.getDestination().input as any);
-      this.limiter.connect(this.masterMeter);
+      Tone.connect(this.limiter.output, Tone.getDestination().input as any);
+      Tone.connect(this.limiter.output, this.masterMeter);
     } catch (err) {
       console.error('[DJMixerEngine] audio graph wiring failed:', err);
     }
@@ -557,7 +551,7 @@ export class DJMixerEngine {
     this.masterGain.dispose();
     this.chainGain.dispose();
     this.duckGain.dispose();
-    this.limiter.dispose();
+    this.limiter.disconnect();
     this.masterMeter.dispose();
   }
 }
