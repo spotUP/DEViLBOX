@@ -406,6 +406,16 @@ function profile(values: number[], parts = 8): number[] {
 }
 
 /** The compact summary stored on a playlist track. */
+/**
+ * A playlist row's tempo, key and energy, from the track's one analysis (the
+ * same DJTrackAnalysis the deck and the planners read; owner juggling plan
+ * sections 2 and 31: one producer, and the key's confidence travels in the
+ * summary). An unknown key writes none.
+ */
+export function playlistMetaFromSummary(summary: DJTrackSummary): { bpm: number; musicalKey?: string; energy: number } {
+  return { bpm: summary.bpm, ...(summary.key ? { musicalKey: summary.key } : {}), energy: summary.energy.perceivedIntensity };
+}
+
 export function summarizeTrack(a: DJTrackAnalysis): DJTrackSummary {
   const intro = a.sections.find((s) => s.kind === 'intro');
   const outro = [...a.sections].reverse().find((s) => s.kind === 'outro');

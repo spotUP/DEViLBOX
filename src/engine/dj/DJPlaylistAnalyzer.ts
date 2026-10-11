@@ -11,7 +11,7 @@
 import { useDJPlaylistStore, type PlaylistTrack, type DJPlaylist } from '@/stores/useDJPlaylistStore';
 import { cacheSourceFile, getCachedAudioByFilename } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
-import { summaryFromPipeline, moduleTempo } from './autodj/trackAnalysis';
+import { summaryFromPipeline, moduleTempo, playlistMetaFromSummary } from './autodj/trackAnalysis';
 import { songFromCachedSource } from './DJTrackLoader';
 import { getCachedSong } from './DJSongCache';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -327,9 +327,7 @@ export async function analyzePlaylist(
             const curr = resolveCurrent(trackId);
             if (curr) {
               queueMetaUpdate(curr.index, {
-                bpm: summary?.bpm ?? pipelineResult.analysis.bpm,
-                musicalKey: pipelineResult.analysis.musicalKey,
-                energy: pipelineResult.analysis.genre?.energy ?? 0,
+                ...(summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm }),
                 duration: pipelineResult.duration,
                 analysisSkipped: false,
                 djSummary: summary ?? undefined,
@@ -347,9 +345,7 @@ export async function analyzePlaylist(
             const curr = resolveCurrent(trackId);
             if (curr) {
               queueMetaUpdate(curr.index, {
-                bpm: summary?.bpm ?? pipelineResult.analysis.bpm,
-                musicalKey: pipelineResult.analysis.musicalKey,
-                energy: pipelineResult.analysis.genre?.energy ?? 0,
+                ...(summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm }),
                 duration: pipelineResult.duration,
                 analysisSkipped: false,
                 djSummary: summary ?? undefined,
@@ -495,7 +491,7 @@ export async function analyzePlaylist(
         // only has UADE, which can't handle SIDs (every HVSC track was failing
         // with 422). The client-side pipeline has WebSID rendering + Essentia
         // analysis baked in and already returns bpm/musicalKey/energy/duration.
-        let result: { bpm: number; musicalKey: string; energy: number; duration: number; rmsDb?: number; peakDb?: number; djSummary?: DJTrackSummary | null };
+        let result: { bpm: number; musicalKey: string; energy: number | null; duration: number; rmsDb?: number; peakDb?: number; djSummary?: DJTrackSummary | null };
 
         // Pre-fetch companion files (TFMX smpl, Startrekker .nt, etc.) BEFORE
         // any render call — the render worker needs them in virtual FS.
@@ -520,10 +516,11 @@ export async function analyzePlaylist(
           }
           const song = await songForAnalysis(track, buffer, filename);
           const summary = summaryFromPipeline(pipelineResult, track.id, song, ANALYSIS_RENDER_CAP_SEC);
+          const meta: { bpm: number; musicalKey?: string; energy?: number } = summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm };
           result = {
-            bpm: summary?.bpm ?? pipelineResult.analysis.bpm,
-            musicalKey: pipelineResult.analysis.musicalKey,
-            energy: pipelineResult.analysis.genre?.energy ?? 0,
+            bpm: meta.bpm,
+            musicalKey: meta.musicalKey ?? '',
+            energy: meta.energy ?? null,
             duration: pipelineResult.duration,
             rmsDb: pipelineResult.analysis.rmsDb,
             peakDb: pipelineResult.analysis.peakDb,
@@ -574,12 +571,15 @@ export async function analyzePlaylist(
             throw new Error(`Server render failed (${response.status}): ${errText}`);
           }
 
-          result = await response.json() as {
+          const served = await response.json() as {
             bpm: number;
             musicalKey: string;
             energy: number;
             duration: number;
           };
+          // The server's own key and energy are another producer's numbers (an unscaled key fit, RMS energy):
+          // only its tempo and length are used; key and energy come from the analysis below (piggyback render).
+          result = { bpm: served.bpm, musicalKey: '', energy: null, duration: served.duration };
           // One tempo per track: the module's own timing over the server's full render, as on the deck.
           const mg = moduleTempo(await songForAnalysis(track, buffer, filename), result.duration);
           if (mg) result.bpm = mg.bpm;
@@ -622,11 +622,15 @@ export async function analyzePlaylist(
             // energy / duration, so without this the track has no rmsDb for
             // auto-gain normalization. Save alongside the server metadata.
             if (piggybackResult.analysis) {
+              // The same analysis as the deck's: key, energy (and the module tempo) from its summary - one producer.
+              const song = await songForAnalysis(track, buffer, filename);
+              const summary = summaryFromPipeline(piggybackResult, track.id, song, ANALYSIS_RENDER_CAP_SEC);
               const curr2 = resolveCurrent(trackId);
               if (curr2) {
                 queueMetaUpdate(curr2.index, {
                   rmsDb: piggybackResult.analysis.rmsDb,
                   peakDb: piggybackResult.analysis.peakDb,
+                  ...(summary ? { musicalKey: playlistMetaFromSummary(summary).musicalKey, energy: summary.energy.perceivedIntensity, djSummary: summary } : {}),
                 });
               }
             }
