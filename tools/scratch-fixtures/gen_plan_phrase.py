@@ -1,7 +1,7 @@
 """Generates src/engine/dj/scratch/__tests__/fixtures/plan_phrase.json from the Up Rough reference
 (/Users/spot/Code/Up_Rough_Demo_System/tools/scratch.py) with numpy stubbed (only the placement brain runs).
 
-The reference ranks gestures with its own `gesture_activity`; DEViLBOX ranks its catalogue ids
+The reference ranks gestures with its own `gesture_activity`; DEViLBOX ranks its catalogue ids by level, then activity (`effortKey`)
 (`gestureActivity`). The fixture therefore feeds the reference the DEViLBOX ids and activity table
 (passed in `activity.json`), so a mismatch can only come from the port of the brain itself.
 Run: python3 tools/scratch-fixtures/gen_plan_phrase.py <activity.json> <out.json>

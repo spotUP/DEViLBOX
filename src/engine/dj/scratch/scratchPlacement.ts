@@ -20,7 +20,7 @@
  */
 
 import { barSeed, lfsr, type ScratchRandom } from './scratchRandom';
-import { getGesture, rankByActivity, SCRATCH_GESTURES } from './scratchGestureCatalog';
+import { getGesture, isScratchGestureId, SCRATCH_GESTURES } from './scratchGestureCatalog';
 import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
 import { DEFAULT_GRID, stepToBeat, STEPS_PER_BEAT, type ScratchGrid } from './scratchAnchor';
 import type { ScratchDJStyle, ScratchGestureId, ScratchRole } from './scratchTypes';
@@ -100,9 +100,18 @@ export const SCRATCH_ROLE_OF: Readonly<Record<PlacementRole, ScratchRole>> = {
 const THROWS: ReadonlySet<ScratchGestureId> = new Set<ScratchGestureId>(['drop', 'dropPhrase']);
 export const isThrowGesture = (id: ScratchGestureId): boolean => THROWS.has(id);
 
+/**
+ * How demanding a gesture is: its level first (section 31), then its activity (the reference
+ * ranking: fader windows + hand reversals). The reference ranks by activity alone because it has
+ * no levels; here a faderless L4 (hydroplane) would sit at the calm end and a low energy would
+ * pick it, so the ladder leads.
+ */
+export const effortKey = (id: ScratchGestureId): number => getGesture(id).difficulty * 100 + getGesture(id).activity;
+
 /** The palette's gestures ranked calm -> busy, optionally thinned to `count` evenly spaced entries. */
 export function vocabulary(gestures: readonly ScratchGestureId[], count?: number): ScratchGestureId[] {
-  const ranked = rankByActivity(gestures);
+  const ranked = [...new Set(gestures)].filter(isScratchGestureId)
+    .sort((a, b) => (effortKey(a) - effortKey(b)) || (a < b ? -1 : a > b ? 1 : 0));
   if (!count || count >= ranked.length) return ranked;
   const n = Math.max(1, Math.trunc(count));
   if (n === 1) return [ranked[Math.floor(ranked.length / 2)]!];
@@ -203,7 +212,8 @@ export function planPhrase(input: PlanPhraseInput): PlacedScratch[] {
   if (rate <= 0) return [];
   const rnd = lfsr(barSeed(input.seed, input.bar, input.section));
   const energy = input.energy ?? SECTION_ENERGY[input.section as ScratchSection] ?? 0.4;
-  const phraseEnd = PHRASE_END_BARS.includes(input.bar) || input.bar === input.bars - 1;
+  // the reference's bars 3, 7, 15 of a 16-bar phrase; a longer run repeats the 16-bar cycle
+  const phraseEnd = PHRASE_END_BARS.includes(input.bar % 16) || input.bar === input.bars - 1;
   const expected = expectedPerBar(density, rate, phraseEnd);
   let k = Math.trunc(expected);
   if (rnd() < expected - k) k++;
@@ -304,6 +314,8 @@ export interface PlanBarsInput extends Omit<PlanPhraseInput, 'bar'> {
   count: number;
   /** Vocal activity 0..1 per bar of the run (index 0 = fromBar). */
   vocalByBar?: readonly number[];
+  /** Energy per bar of the run (an escalation); `energy` for every bar when omitted. */
+  energyByBar?: readonly number[];
   /** Role the bars perform as, when not derived from steps (a showcase bar is a FEATURE). */
   barRole?: ScratchRole;
   transitionRisk?: number;
@@ -345,7 +357,8 @@ export function planBars(input: PlanBarsInput): PlanBarsResult {
     const bar = fromBar + i;
     const vocal = vocalAt(i);
     const baseRate = input.rateOverride ?? DENSITY_RATE[density];
-    let events = planPhrase({ ...input, bar, rateOverride: baseRate * (1 - Math.max(0, Math.min(1, vocal))) });
+    const energy = input.energyByBar?.[i] ?? input.energy;
+    let events = planPhrase({ ...input, bar, energy, rateOverride: baseRate * (1 - Math.max(0, Math.min(1, vocal))) });
     // a vocal call just ended: answer it (section 24)
     const afterCall = i > 0 && vocalAt(i - 1) > VOCAL_BUSY && vocal <= VOCAL_BUSY;
     if (afterCall && !events.some((e) => e.role === 'ANSWER') && baseRate > 0) {
@@ -371,11 +384,13 @@ export function planBars(input: PlanBarsInput): PlanBarsResult {
     }
     bars.push(events);
   }
-  // open space: a quarter of every 16-bar window stays empty outside a showcase (section 74)
-  if (!showcase) {
-    for (let w = 0; w < count; w += 16) {
-      const end = Math.min(count, w + 16);
-      const need = Math.ceil((end - w) * 0.25);
+  // open space: a quarter of every 16 bars stays empty, an eighth in a showcase (section 74)
+  {
+    const win = showcase ? 32 : 16;
+    for (let w = 0; w < count; w += win) {
+      const end = Math.min(count, w + win);
+      // a showcase still keeps genuine rests: at least 4 of 32 bars (section 74)
+      const need = Math.ceil((end - w) * (showcase ? 0.125 : 0.25));
       let empty = bars.slice(w, end).filter((b) => b.length === 0).length;
       // empty the least important busy bars first: mid-phrase bars, then the earliest
       const busy = [...Array(end - w).keys()].map((k) => w + k).filter((k) => bars[k]!.length > 0)

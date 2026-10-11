@@ -13,6 +13,9 @@ import { snapshotDiff } from '../scratchSnapshot';
 import type { ScratchEvent, ScratchSource } from '../scratchTypes';
 import { deckAnchor } from '../scratchAnchor';
 import type { ExecutorTimers } from '../../autodj/transitionExecutor';
+import { analysisClock } from '../../autodj/juggle/juggleController';
+import { fixtureAnalysis } from './fixtures/analysisFixture';
+import { stepToBeat } from '../scratchAnchor';
 
 /** A manual clock: time in seconds, 120 BPM (0.5 s per beat), beat = seconds / 0.5. */
 function rig(opts: { suppressNotes?: boolean } = {}) {
@@ -172,5 +175,23 @@ describe('release restores exactly the state the run started from (section 60)',
     expect(ex.active).toBe(0);
     r.advance(20);
     expect(r.fires).toHaveLength(1);
+  });
+});
+
+describe('the musical clock is the master deck grid (section 7, SCR-P4.2)', () => {
+  it('an event planned on bar 4 step 0 fires at the grid downbeat of bar 4 (+-5 ms), not where elapsed time modulo a cycle says', () => {
+    const track = fixtureAnalysis(); // first beat at 0.18 s: bar 4 starts at 0.18 + 8 s
+    const r = rig();
+    // the same executor, but its beat source is the analysis grid fed with the deck position
+    const clock = analysisClock(track, () => r.now());
+    const deps: ScratchExecutorDeps = { ...r.deps, clock };
+    const beat = stepToBeat({ bar: 4, step: 0 });
+    expect(beat).toBe(16);
+    new ScratchExecutor(deps).schedule(recordEvent(beat));
+    r.advance(8.4);
+    expect(r.fires).toHaveLength(1);
+    expect(Math.abs(r.fires[0]!.at! - 8.18)).toBeLessThan(0.005);
+    // the legacy phase (elapsed ms modulo a 2 s cycle) would put the bar start at a multiple of 2 s, 180 ms earlier
+    expect(Math.abs(r.fires[0]!.at! - 8.0)).toBeGreaterThan(0.1);
   });
 });
