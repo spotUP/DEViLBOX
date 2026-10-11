@@ -223,6 +223,9 @@ export class DJEngine {
     const info = await deck.loadAudioFile(buffer, filename, precomputedPeaks);
     console.log(`[DJEngine] loadAudioFile returned: duration=${info.duration.toFixed(2)}s, sampleRate=${info.sampleRate}, channels=${info.numberOfChannels}`);
     this.afterAudioLoaded(id, info, { fileName: filename, trackName, bpm, fileBytes: buffer }, song);
+    // A WAV read from a cache entry rendered before scope tracks gets its track re-rendered
+    // in the background (low priority) and attached here, without reloading the audio.
+    void import('./DJChannelScopeRerender').then((m) => m.requestChannelScopeRerender(buffer, id)).catch(() => {});
     return info;
   }
 

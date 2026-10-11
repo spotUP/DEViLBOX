@@ -16,7 +16,7 @@
  * @module DJPipeline
  */
 
-import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile } from './DJAudioCache';
+import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile, setCacheChannelScopes } from './DJAudioCache';
 import type { CachedAudio } from './DJAudioCache';
 import { lookupServerAnalysis, storeServerAnalysis } from '@/lib/analysisCache';
 import { useDJStore, type DeckState } from '@/stores/useDJStore';
@@ -63,6 +63,9 @@ interface RenderOutput {
   channelScopes?: ChannelScopeTrack;
 }
 
+/** A scope re-render must be this close in length to the cached WAV for its track to line up with it. */
+const SCOPE_RERENDER_DURATION_TOLERANCE_SEC = 0.5;
+
 export type TaskPriority = 'high' | 'normal' | 'low';
 
 export interface PipelineTask {
@@ -89,6 +92,15 @@ export interface PipelineTask {
    * fails with "uade_request_amiga_file: file not found" and returns -1.
    */
   companions?: Array<{ filename: string; buffer: ArrayBuffer }>;
+  /**
+   * Render only to read the per-channel scope track and store it on the
+   * existing cache entry (old-shape entries rendered before scope tracks).
+   * No WAV is encoded, no analysis runs, the cached audio and analysis are
+   * untouched, and nothing is applied to a deck: the caller attaches the
+   * track. `expectedDuration` is the cached WAV's length; a render of a
+   * different length cannot line up with it and is discarded.
+   */
+  scopesOnly?: { expectedDuration: number };
 }
 
 interface QueueEntry {
@@ -103,6 +115,8 @@ export interface PipelineResult {
   sampleRate: number;
   waveformPeaks: Float32Array;
   stems?: StemResult;
+  /** scopesOnly tasks: the scope track rendered (and stored on the cache entry); wavData is empty then. */
+  channelScopes?: ChannelScopeTrack;
   analysis: {
     bpm: number;
     bpmConfidence: number;
@@ -488,6 +502,25 @@ export class DJPipeline {
   ): Promise<PipelineResult> {
     const id = `${filename}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     return this.enqueue({ id, fileBuffer, filename, deckId, priority, companions, maxRenderSeconds });
+  }
+
+  /**
+   * Re-render an old-shape cache entry's source at LOW priority for its scope
+   * track only (see PipelineTask.scopesOnly). Resolves with the track stored
+   * on the entry, or undefined when the render had no per-channel tap or did
+   * not match the cached audio's length.
+   */
+  async renderChannelScopes(
+    source: ArrayBuffer,
+    filename: string,
+    expectedDuration: number,
+    companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
+  ): Promise<ChannelScopeTrack | undefined> {
+    const id = `scopes-${filename}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const result = await this.enqueue({
+      id, fileBuffer: source, filename, priority: 'low', companions, scopesOnly: { expectedDuration },
+    });
+    return result.channelScopes;
   }
 
   /**
@@ -907,6 +940,8 @@ export class DJPipeline {
     let wavData: ArrayBuffer;
     let waveformPeaks: Float32Array;
 
+    if (task.scopesOnly) return this.executeScopesOnly(task, task.scopesOnly.expectedDuration);
+
     if (task.analysisOnly && task.pcmLeft) {
       // Skip render — PCM already provided
       left = task.pcmLeft;
@@ -1110,6 +1145,30 @@ export class DJPipeline {
     );
 
     return { wavData, duration, sampleRate, waveformPeaks, stems, analysis };
+  }
+
+  /**
+   * A scopesOnly task: render, keep only the scope track, store it on the
+   * existing cache entry beside its untouched audio and analysis. The render
+   * is a full one (never maxRenderSeconds): it must cover the cached WAV.
+   * A failed render still marks the entry scope-rendered so a source that
+   * cannot render is not retried on every load.
+   */
+  private async executeScopesOnly(task: PipelineTask, expectedDuration: number): Promise<PipelineResult> {
+    const hash = await hashFile(task.fileBuffer);
+    let track: ChannelScopeTrack | undefined;
+    try {
+      const out = await this.doRender(task);
+      const aligned = Math.abs(out.duration - expectedDuration) <= SCOPE_RERENDER_DURATION_TOLERANCE_SEC;
+      if (aligned && out.channelScopes && out.channelScopes.channels.length > 0) track = out.channelScopes;
+      else console.log(`[DJPipeline] Scope re-render of ${task.filename} unused (${aligned ? 'no per-channel tap' : `length ${out.duration.toFixed(1)}s != cached ${expectedDuration.toFixed(1)}s`})`);
+    } finally {
+      await setCacheChannelScopes(hash, track);
+    }
+    return {
+      wavData: new ArrayBuffer(0), duration: expectedDuration, sampleRate: 0,
+      waveformPeaks: new Float32Array(0), analysis: null, channelScopes: track,
+    };
   }
 
   // ── Worker Communication ─────────────────────────────────────────────────

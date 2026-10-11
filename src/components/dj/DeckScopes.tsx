@@ -1,21 +1,22 @@
 /**
  * DeckScopes - Per-channel waveform oscilloscope display + mute/fx-target toggles
  *
- * 4 per-channel scopes + 1 combined "ALL" scope + MUTE/FX mode chip,
- * horizontally stacked. Click semantics branch on `channelModeUI`:
+ * 4 per-channel scopes + MUTE/FX mode chip, horizontally stacked. A deck with
+ * no per-channel signal (an audio file, an old cache entry) shows one combined
+ * "ALL" scope instead; a deck with channel scopes has no ALL. Click semantics branch on `channelModeUI`:
  *   'mute' → click toggles mute, shift=solo. Muted channels dim red.
  *   'fx'   → click toggles fx-target, shift=solo-in-fx-set. Targets get
  *            an amber ring. Picked channels are where DUB moves / EQ /
  *            filter sweeps get routed. Audio routing lands in a follow-up
  *            plan — for now the selection is visible + stored.
- * Click ALL → in mute mode: enable every channel. In fx mode: clear targets.
+ * Click ALL (channel-less decks only) → in mute mode: enable every channel. In fx mode: clear targets.
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
-import { DECK_SCOPE_CHANNELS } from '@/engine/dj/channelScopeTrack';
+import { DECK_SCOPE_CHANNELS, showsAllScope } from '@/engine/dj/channelScopeTrack';
 
 interface DeckScopesProps {
   deckId: 'A' | 'B' | 'C';
@@ -239,7 +240,7 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
 
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
-      {/* One scope per channel the deck has a signal for; an audio file has none and shows ALL only. */}
+      {/* One scope per channel the deck has a signal for; a deck with none (an audio file, an old cache entry) shows ALL only. */}
       {Array.from({ length: Math.min(NUM_CHANNELS, channelScopeCount) }, (_, i) => (
         <ScopeCanvas
           key={i}
@@ -252,15 +253,17 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
           onClick={(e) => handleChannelClick(i, e)}
         />
       ))}
-      <ScopeCanvas
-        deckId={deckId}
-        channel={-1}
-        size={size}
-        muted={false}
-        fxTargeted={false}
-        mode={mode}
-        onClick={handleAllClick}
-      />
+      {showsAllScope(channelScopeCount) && (
+        <ScopeCanvas
+          deckId={deckId}
+          channel={-1}
+          size={size}
+          muted={false}
+          fxTargeted={false}
+          mode={mode}
+          onClick={handleAllClick}
+        />
+      )}
       {/*
         Mode chip — toggles click semantic between MUTE (today's behaviour,
         writes channelMask) and FX (writes fxTargetChannels). Sits next to

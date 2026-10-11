@@ -21,7 +21,7 @@ import { createReverbIR } from './reverbIR';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
-import { channelScopesFor, channelScopeWindow, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
+import { attachChannelScopes, channelScopesFor, channelScopeWindow, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
@@ -125,6 +125,8 @@ export class DeckEngine {
 
   /** Per-channel scope signal of the loaded audio (setChannelScopes). */
   private _channelScopes: ChannelScopeTrack | undefined;
+  /** The rendered WAV bytes the deck's audio was loaded from (null for a double or a song-only load); a late scope track attaches only to the WAV it was rendered for. */
+  private _loadedWav: ArrayBuffer | null = null;
 
   // Track which native engine keys this deck has rerouted (Furnace, UADE, Hively — for cleanup)
   private routedNativeEngines: Set<string> = new Set();
@@ -502,6 +504,7 @@ export class DeckEngine {
     // The previous track's scope signal goes with it; the audio load that
     // follows brings this song's.
     this.setChannelScopes(undefined);
+    this._loadedWav = null;
 
     // Clear pattern-scratch state from the previous track. Without this, a
     // stuck patternScratchActive=true would steer setScratchVelocity into
@@ -570,6 +573,7 @@ export class DeckEngine {
    */
   async loadAudioFile(buffer: ArrayBuffer, filename: string, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
     this.prepareAudioLoad();
+    this._loadedWav = buffer;
     this.setChannelScopes(channelScopesFor(buffer));
     const info = await this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
     // Fire-and-forget prime so the scratch ring buffer has content even
@@ -585,6 +589,7 @@ export class DeckEngine {
    */
   async loadDecodedAudio(audioBuffer: AudioBuffer, originalBytes: ArrayBuffer | null, precomputedPeaks?: Float32Array, channelScopes?: ChannelScopeTrack): Promise<AudioFileInfo> {
     this.prepareAudioLoad();
+    this._loadedWav = null;
     this.setChannelScopes(channelScopes);
     const info = await this.audioPlayer.loadDecodedBuffer(audioBuffer, originalBytes, precomputedPeaks);
     void this._primeScratchBuffer();
@@ -600,6 +605,19 @@ export class DeckEngine {
     useDJStore.getState().setDeckState(this.id, {
       channelScopeCount: track ? Math.min(DECK_SCOPE_CHANNELS, track.channels.length) : 0,
     });
+  }
+
+  /**
+   * A scope track that arrived after the audio loaded (the background re-render
+   * of an old-shape cache entry): attach it to the deck without touching the
+   * audio or playback. Only when this deck still holds exactly `wav` and has no
+   * track yet, so a deck that moved on to another track is left alone.
+   */
+  attachLateChannelScopes(wav: ArrayBuffer, track: ChannelScopeTrack): boolean {
+    if (this._channelScopes || this._loadedWav !== wav) return false;
+    attachChannelScopes(wav, track);
+    this.setChannelScopes(track);
+    return true;
   }
 
   /** The per-channel scope track of the loaded audio, if it has one (a double carries it to the other deck). */

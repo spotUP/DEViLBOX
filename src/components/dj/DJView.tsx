@@ -131,6 +131,15 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
     return () => clearInterval(timer);
   }, []);
 
+  // Cached tracks rendered before the per-channel scopes existed gain them in the
+  // background (low priority, once per session). Delayed so it never competes with the view's own boot.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void import('@/engine/dj/DJChannelScopeRerender').then((m) => m.rerenderPlaylistChannelScopes()).catch(() => {});
+    }, 15_000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Initialize DJEngine on mount, silence tracker + dispose on unmount
   useEffect(() => {
     // Entering the DJ view never stops the tracker (owner decision 2026-10-10:
