@@ -1596,6 +1596,7 @@ class DJAutoDJ {
     this.transitionTimeoutMs = Math.max(DJAutoDJ.TRANSITION_TIMEOUT_MS, (Math.max(untilStartSec + this.getTransitionDurationSec(), fallbackSec)) * 1500 + 10_000);
     const handle = executeTransition(planned, {
       waitForStart: (p) => this.waitForDeckPosition(out, p.startTimeSec),
+      outgoingPosition: () => this.getOutgoingPosition(),
       onSweepStarted: () => { this.transitionSweepStarted = true; },
       // A juggle transition's trade stage: the juggle controller locks the incoming to the outgoing's
       // bars while it is silent, verifies the phase, and trades the planned ladder.
