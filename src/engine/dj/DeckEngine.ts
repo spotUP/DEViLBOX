@@ -1,7 +1,7 @@
 /**
  * DeckEngine - One DJ deck: owns a TrackerReplayer + audio chain
  *
- * Audio chain: TrackerReplayer.masterGain → deckGain → EQ3 → filter → channelGain → output
+ * Audio chain: TrackerReplayer.masterGain → deckGain → isolator EQ → filter → channelGain → output
  *                                                                  ↘ reverbSend → reverb → output (bypasses fader gate)
  *
  * The output node is provided by the DJMixerEngine (crossfader input).
@@ -21,6 +21,7 @@ import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
 import { DeckKeyLock } from './DeckKeyLock';
+import { DeckIsolatorEQ } from './DeckIsolatorEQ';
 import { computeKeyLockShift } from './computeKeyLockShift';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
@@ -50,6 +51,10 @@ export type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
 
 export type DeckId = 'A' | 'B' | 'C';
 
+/** The deck filter's open positions: biquads there pass the signal unchanged. */
+const HPF_OPEN_HZ = 1;
+const lpfOpenHz = (): number => Tone.getContext().sampleRate / 2;
+
 export interface DeckEngineOptions {
   id: DeckId;
   outputNode: Tone.ToneAudioNode;
@@ -77,7 +82,7 @@ export class DeckEngine {
 
   // Audio chain nodes
   private deckGain: Tone.Gain;
-  private eq3: Tone.EQ3;
+  private eq3: DeckIsolatorEQ;
   private filterHPF: Tone.Filter;
   private filterLPF: Tone.Filter;
   readonly channelGain: Tone.Gain;
@@ -95,7 +100,7 @@ export class DeckEngine {
    */
   private channelFXChains: Map<number, {
     tap: { output: GainNode; dispose(): void };
-    eq3: Tone.EQ3;
+    eq3: DeckIsolatorEQ;
     hpf: Tone.Filter;
     lpf: Tone.Filter;
   }> = new Map();
@@ -225,22 +230,22 @@ export class DeckEngine {
   constructor(options: DeckEngineOptions) {
     this.id = options.id;
 
-    // Create the audio chain nodes (order: replayer → deckGain → EQ3 → HPF → LPF → channelGain → output)
+    // Create the audio chain nodes (order: replayer → deckGain → isolator EQ → HPF → LPF → channelGain → output)
     this.deckGain = new Tone.Gain(1);
     // Cache raw native AudioParam to bypass Tone.Signal for scratch gain transitions
     const nativeGain = getNativeAudioNode(this.deckGain as unknown as Record<string, unknown>);
     if (nativeGain && 'gain' in nativeGain) {
       this._rawDeckGainParam = (nativeGain as GainNode).gain;
     }
-    this.eq3 = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
-    this.filterHPF = new Tone.Filter({ type: 'highpass', frequency: 20, Q: 1, rolloff: -12 });
-    this.filterLPF = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1, rolloff: -12 });
+    this.eq3 = new DeckIsolatorEQ({ low: 0, mid: 0, high: 0 });
+    this.filterHPF = new Tone.Filter({ type: 'highpass', frequency: HPF_OPEN_HZ, Q: 1, rolloff: -12 });
+    this.filterLPF = new Tone.Filter({ type: 'lowpass', frequency: lpfOpenHz(), Q: 1, rolloff: -12 });
     this.channelGain = new Tone.Gain(1);
     this.meter = new Tone.Meter({ smoothing: 0.8 });
     this.waveformAnalyser = new Tone.Analyser('waveform', 256);
     this.fftAnalyser = new Tone.FFT(1024);
 
-    // Wire: deckGain → EQ3 → HPF → LPF → channelGain → limiter → [output + meter + analyser]
+    // Wire: deckGain → isolator EQ → HPF → LPF → channelGain → limiter → [output + meter + analyser]
     try {
       this.deckGain.connect(this.eq3);
       this.eq3.connect(this.filterHPF);
@@ -1847,23 +1852,30 @@ export class DeckEngine {
     this.filterPosition = Math.max(-1, Math.min(1, position));
 
     // Both filters are always in the chain: eq3 → HPF → LPF → channelGain
-    // At center (0): HPF@20Hz + LPF@20kHz = transparent bypass
-    // Moving right (+): LPF sweeps down from 20kHz to 100Hz, HPF stays at 20Hz
-    // Moving left (-): HPF sweeps up from 20Hz to 10kHz, LPF stays at 20kHz
+    // The filter on the inactive side is fully OPEN, not parked at 20 Hz /
+    // 20 kHz: a resonant biquad parked there is audible (Q 1 dB peaks, the
+    // low end lifted ~1-3 dB near 30 Hz and the top near 15 kHz), so the
+    // centred knob coloured every deck. Open = HPF at ~1 Hz, LPF at Nyquist,
+    // where the biquads pass the signal unchanged.
+    // Moving right (+): LPF sweeps down from 20kHz to 100Hz, HPF open
+    // Moving left (-): HPF sweeps up from 20Hz to 10kHz, LPF open
 
     const RAMP = 0.03; // 30ms ramp for smooth sweeps
 
     let lpfTarget: number;
     let hpfTarget: number;
-    if (this.filterPosition >= 0) {
+    if (this.filterPosition > 0) {
       // LPF active: sweep 20kHz → 100Hz as position goes 0 → 1
       lpfTarget = Math.max(80, 20000 * Math.pow(100 / 20000, this.filterPosition));
-      hpfTarget = 20;
-    } else {
+      hpfTarget = HPF_OPEN_HZ;
+    } else if (this.filterPosition < 0) {
       // HPF active: sweep 20Hz → 10kHz as position goes 0 → -1
       const amount = -this.filterPosition; // 0..1
       hpfTarget = Math.min(18000, 20 * Math.pow(10000 / 20, amount));
-      lpfTarget = 20000;
+      lpfTarget = lpfOpenHz();
+    } else {
+      hpfTarget = HPF_OPEN_HZ;
+      lpfTarget = lpfOpenHz();
     }
     this.filterLPF.frequency.rampTo(lpfTarget, RAMP);
     this.filterHPF.frequency.rampTo(hpfTarget, RAMP);
@@ -2109,7 +2121,7 @@ export class DeckEngine {
       const tap = this.replayer.openChannelTap(ch);
       if (!tap) continue;
 
-      const eq3 = new Tone.EQ3({
+      const eq3 = new DeckIsolatorEQ({
         low: this.eqKillState.low ? -Infinity : this.eqValues.low,
         mid: this.eqKillState.mid ? -Infinity : this.eqValues.mid,
         high: this.eqKillState.high ? -Infinity : this.eqValues.high,
@@ -2129,15 +2141,15 @@ export class DeckEngine {
         rolloff: -12,
       });
 
-      // Wire tap.output (native GainNode) into Tone.js EQ3. `connect` on
+      // Wire tap.output (native GainNode) into the isolator EQ. `connect` on
       // a native GainNode accepts native destinations; getNativeAudioNode
-      // unwraps EQ3's input.
+      // unwraps the EQ's input.
       try {
         const eqIn = getNativeAudioNode(eq3 as unknown as Record<string, unknown>);
         if (eqIn) tap.output.connect(eqIn);
         else {
           // Fallback: Tone-to-Tone wiring would require wrapping the tap
-          // in Tone.Gain. If we can't unwrap EQ3, bail and tear down.
+          // in Tone.Gain. If we can't unwrap the EQ, bail and tear down.
           try { tap.dispose(); } catch { /* ok */ }
           try { eq3.dispose(); hpf.dispose(); lpf.dispose(); } catch { /* ok */ }
           continue;
@@ -2168,7 +2180,7 @@ export class DeckEngine {
 
   private _disposeChannelFXChain(
     ch: number,
-    chain: { tap: { dispose(): void }; eq3: Tone.EQ3; hpf: Tone.Filter; lpf: Tone.Filter },
+    chain: { tap: { dispose(): void }; eq3: DeckIsolatorEQ; hpf: Tone.Filter; lpf: Tone.Filter },
   ): void {
     // Un-route before disposing audio nodes so there's no "click" — the
     // replayer ramps fxRouteGain back to 1 over 10 ms and the tap still
