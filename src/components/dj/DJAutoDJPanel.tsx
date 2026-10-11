@@ -358,9 +358,14 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
                 <span className={`w-8 flex-shrink-0 ${isNext ? 'text-blue-400' : 'text-text-muted'}`}>
                   {isNext ? 'NEXT' : `${idx + 1}`}
                 </span>
-                <span className={`truncate flex-1 ${isNext ? 'text-text-secondary' : 'text-text-muted'}`}>
+                <span className={`truncate flex-1 ${track?.isBad ? 'text-text-muted line-through' : isNext ? 'text-text-secondary' : 'text-text-muted'}`}>
                   {track?.trackName ?? '—'}
                 </span>
+                {track?.isBad && (
+                  <span className="text-[9px] text-accent-error flex-shrink-0" title="This track could not be loaded; Auto DJ skips it">
+                    Cannot load
+                  </span>
+                )}
                 <button
                   onClick={() => handlePlayFromHere(idx)}
                   className="opacity-0 group-hover:opacity-100 text-[9px] px-1.5 py-0.5 rounded border border-dark-borderLight
@@ -381,7 +386,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
       )}
 
       {/* Config row */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {/* Transition bars */}
         <div className="flex items-center gap-1">
           <span className="text-text-muted mr-1">Bars:</span>
@@ -521,8 +526,8 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
       {/* DJ style and creative risk (plan sections 30, 54): the planner's
           weights and the session's risk budget. Full words, design-system
           selects, no hidden knobs. */}
-      <div className="flex items-center gap-2 mt-2">
-        <span className="text-text-muted">Style:</span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2">
+        <span className="text-text-muted whitespace-nowrap">Style:</span>
         <CustomSelect
           value={djStyle}
           onChange={(v) => setConfig({ style: v })}
@@ -530,7 +535,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className="text-[10px]"
           title="DJ style profile: changes the planner's weights, transition lengths, FX use and risk tolerance"
         />
-        <span className="text-text-muted">Creative Risk:</span>
+        <span className="text-text-muted whitespace-nowrap">Creative Risk:</span>
         <CustomSelect
           value={creativeRisk < 0 ? 'style' : String(creativeRisk)}
           onChange={(v) => setConfig({ creativeRisk: v === 'style' ? -1 : Number(v) })}
@@ -543,7 +548,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className="text-[10px]"
           title="Session creative risk budget: higher permits shorter transitions, larger tempo moves, more FX, deliberate cuts"
         />
-        <span className="text-text-muted">Auto Juggle:</span>
+        <span className="text-text-muted whitespace-nowrap">Auto Juggle:</span>
         <CustomSelect
           value={juggleMode}
           onChange={(v) => setConfig({ juggleMode: v })}
@@ -551,7 +556,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           className="text-[10px]"
           title="Beat juggling between the two decks: Safe trades 8 and 4 bar phrases, Musical adds call and response, fills and doubles, Performer adds beat juggling, loops and transformer cuts, Aggressive shortens the cuts, Chaos is the densest but still obeys timing and safety"
         />
-        <span className="text-text-muted">Juggle Intensity:</span>
+        <span className="text-text-muted whitespace-nowrap">Juggle Intensity:</span>
         <CustomSelect
           value={juggleIntensity < 0 ? 'set' : String(juggleIntensity)}
           onChange={(v) => setConfig({ juggleIntensity: v === 'set' ? -1 : Number(v) })}
