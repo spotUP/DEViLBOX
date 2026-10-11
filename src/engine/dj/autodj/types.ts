@@ -750,8 +750,13 @@ export interface DJTransitionPlan {
    * juggleTransition only: the trading ladder (bars per rung, outgoing then
    * incoming each rung) that runs from the transition start; `tradeBeats` is
    * its whole length. The release (`durationBars`) follows the ladder.
+   * `fallback`: the normal blend (the best style without the juggle, its own
+   * length, mix points and curves, planned from the ladder's start) that the
+   * executor runs when the trade stage is refused before the incoming was
+   * heard - never the 1-bar release, which would cut onto the incoming a
+   * whole ladder before its drop (owner juggling plan sections 31, 33, 42).
    */
-  juggle?: { ladderBars: number[]; tradeBeats: number };
+  juggle?: { ladderBars: number[]; tradeBeats: number; fallback?: DJTransitionPlan };
 
   confidence: number;
   risk: TransitionRisk;

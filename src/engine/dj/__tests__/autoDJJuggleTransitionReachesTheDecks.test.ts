@@ -96,7 +96,7 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
     holder.incomingPhraseConfidence = 0.9;
     const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER' });
     expect(anticipated?.style, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toBe('juggleTransition');
-    expect(anticipated!.juggle).toEqual({ ladderBars: [4, 2, 1, 1], tradeBeats: 64 });
+    expect(anticipated!.juggle).toMatchObject({ ladderBars: [4, 2, 1, 1], tradeBeats: 64 });
     let executedId: string | null = null;
     let executedStyle: string | null = null;
     dj.startPolling();
@@ -150,7 +150,7 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
   it('phrase-level grids trade no single bars: 4-2-2 in PERFORMER, and the transition completes', async () => {
     holder.incomingGridConfidence = 0.7;
     const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER', startSec: 0, outgoingGridConfidence: 0.7 });
-    expect(anticipated?.juggle, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toEqual({ ladderBars: [4, 2, 2], tradeBeats: 64 });
+    expect(anticipated?.juggle, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toMatchObject({ ladderBars: [4, 2, 2], tradeBeats: 64 });
     // The juggle controller is Auto DJ's own and outlives a test: count from here.
     const j = dj.getJuggle();
     const completedBefore = j.counts.completed;

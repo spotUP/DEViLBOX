@@ -237,7 +237,7 @@ export class DJJuggleController {
   performLadder(input: TickInput, ladder: { ladderBars: number[]; target: AB }): Promise<JuggleExecutionResult> {
     const refuse = (reason: string): Promise<JuggleExecutionResult> => {
       this.record({ kind: 'juggleAborted', beat: 0, reason });
-      return Promise.resolve({ completed: false, aborted: true, reason, trace: [], fallbacks: 0, events: [], endBeat: 0 });
+      return Promise.resolve({ completed: false, aborted: true, refused: true, reason, trace: [], fallbacks: 0, events: [], endBeat: 0 });
     };
     if (this.mode === 'OFF') return refuse('Auto Juggle off');
     if (this.execution?.active()) this.execution.abort('juggle transition took over');
@@ -269,7 +269,11 @@ export class DJJuggleController {
     this.lastDecision = decision;
     this.start(decision, ctx, input, { deck: ladder.target, beforeBeat: startBeat + ladderBars[0] * bpb });
     this.publish(ctx);
-    return this.execution!.done;
+    // An abort before the first cut onto the incoming (its phase never verified, the decks drifted) traded
+    // nothing: the incoming was never heard, and the transition resolves as if the ladder was refused.
+    return this.execution!.done.then((r) => (r.completed ? r : {
+      ...r, refused: !r.trace.some((t) => t.status === 'executed' && t.action.type === 'CutIn' && t.action.deck === ladder.target),
+    }));
   }
 
   // ── Tick (sections 21, 24, 41, 42) ─────────────────────────────────────────
