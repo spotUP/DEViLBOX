@@ -21,6 +21,7 @@
  * that already plays, and the juggle sink's ResyncDeck / JumpToBar keep a
  * playing deck in phase. Fake timers, fake engine, no audio.
  */
+import { JUGGLE_CUT_SWEEP_MS } from '../autodj/juggle/crossfaderSweep';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({
@@ -130,7 +131,9 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
     // The mixer received each value at its beat.
     for (let i = 0; i < offsets.length; i++) {
       const want = startBeat + offsets[i];
-      const hit = holder.crossfader.find((c) => c.v === values[i] && Math.abs(masterBeat(c.masterPos) - want) <= tick + 1e-6);
+      // a cut is a fast fader sweep: it starts on the beat and lands on its value within the sweep time
+      const sweepBeats = JUGGLE_CUT_SWEEP_MS / 1000 / BEAT;
+      const hit = holder.crossfader.find((c) => c.v === values[i] && masterBeat(c.masterPos) - want >= -tick - 1e-6 && masterBeat(c.masterPos) - want <= tick + sweepBeats + 0.05);
       expect(hit, `mixer crossfader ${values[i]} at master beat ${want}`).toBeDefined();
     }
     // The end state: crossfader on the incoming, outgoing stopped, Auto DJ playing the incoming.
@@ -159,6 +162,7 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
       if (dj.execution) executed = true;
       if (executed && useDJStore.getState().autoDJStatus !== 'transitioning' && !decks.A.isPlaying()) break;
     }
+    await vi.advanceTimersByTimeAsync(200); // the last cut is a fast sweep: let it land
     expect(j.counts.completed - completedBefore, `aborted: ${j.events.filter((e) => e.kind === 'juggleAborted').map((e) => e.reason).join('; ') || '-'}`).toBe(1);
     const cuts = j.events.slice(eventsBefore).filter((e) => e.kind === 'juggleActionExecuted' && (e.action?.type === 'CutIn' || e.action?.type === 'ReleaseDeck'));
     expect(cuts.map((e) => Math.round(e.beat - cuts[0].beat))).toEqual([0, 16, 32, 40, 48, 56, 64]);
