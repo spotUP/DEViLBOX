@@ -17,6 +17,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
+import { playheadRowNow } from '@engine/playheadRow';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { TrackerCell } from '@/types/tracker';
@@ -315,10 +316,12 @@ export const PianoRollView: React.FC<PianoRollViewProps> = ({
     // ── Playhead ─────────────────────────────────────────────────────────
 
     if (isPlaying) {
-      const px = PIANO_KEY_W + currentRow * COL_W + ox;
+      const heardRow = playheadRowNow(currentRow);
+      const px = PIANO_KEY_W + heardRow * COL_W + ox;
+      const rowX = PIANO_KEY_W + Math.floor(heardRow) * COL_W + ox;
       if (px >= PIANO_KEY_W && px < cw) {
         ctx.fillStyle = PLAYHEAD_COLOR + '30';
-        ctx.fillRect(px, HEADER_H, COL_W, ch - HEADER_H);
+        ctx.fillRect(rowX, HEADER_H, COL_W, ch - HEADER_H);
         ctx.strokeStyle = PLAYHEAD_COLOR;
         ctx.lineWidth = 2;
         ctx.beginPath();
