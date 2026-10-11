@@ -148,7 +148,8 @@ describe('a planned Auto DJ transition reaches the decks', () => {
     const pitch = calls.find((c) => c.deck === 'B' && c.fn === 'setPitch');
     expect(pitch).toBeDefined();
     expect(pitch!.args[0] as number).toBeCloseTo(12 * Math.log2(126 / 124), 2);
-    expect(calls.some((c) => c.deck === 'B' && c.fn === 'setKeyLock')).toBe(true);
+    // Key lock is engaged only when the plan needs it; otherwise the deck's own setting is left alone.
+    expect(calls.some((c) => c.deck === 'B' && c.fn === 'setKeyLock')).toBe(plan!.keyPlan.keyLock);
     // Bass ownership: the incoming low band starts cut and ends open; the outgoing low band ends cut before the stop (plan sections 20, 21).
     const inLow = calls.filter((c) => c.deck === 'B' && c.fn === 'setEQ' && c.args[0] === 'low').map((c) => c.args[1] as number);
     expect(inLow[0]).toBeLessThanOrEqual(-6);

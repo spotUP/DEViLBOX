@@ -111,6 +111,34 @@ export function planCurves(plan: DJTransitionPlan): AutomationCurve[] {
 }
 
 /** Reset a deck's transition state so the next use starts clean. */
+/**
+ * Key lock the Auto DJ engaged, per deck, with the deck's own state before it.
+ * A plan turns key lock on for an incoming deck it pitches by more than half a
+ * semitone; the deck then plays the whole track at that rate, so the lock
+ * stays on while the track plays (releasing it mid-track would jump the key).
+ * It is handed back when that track leaves the deck: wherever the deck is
+ * stopped as the outgoing deck (this executor's finish, the emergency fade,
+ * Auto DJ's completeTransition) - never while it still plays.
+ * A plan that does not need key lock leaves the deck's own setting alone.
+ */
+const autoKeyLock = new Map<'A' | 'B', boolean>();
+
+/** Engage key lock on `deck` for a plan that needs it, remembering the deck's own state. */
+export function engageAutoKeyLock(deck: 'A' | 'B', needed: boolean): void {
+  if (!needed) return;
+  const own = useDJStore.getState().decks[deck].keyLockEnabled;
+  if (!autoKeyLock.has(deck)) autoKeyLock.set(deck, own);
+  if (!own) setDeckKeyLock(deck, true);
+}
+
+/** The track Auto DJ locked has left `deck`: give the deck its own key-lock state back. */
+export function releaseAutoKeyLock(deck: 'A' | 'B'): void {
+  if (!autoKeyLock.has(deck)) return;
+  const own = autoKeyLock.get(deck)!;
+  autoKeyLock.delete(deck);
+  setDeckKeyLock(deck, own);
+}
+
 export function resetDeckAfterTransition(deck: 'A' | 'B'): void {
   setDeckEQ(deck, 'low', 0); setDeckEQ(deck, 'mid', 0); setDeckEQ(deck, 'high', 0);
   setDeckFilter(deck, 0);
@@ -190,6 +218,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       if (p >= 1) {
         try { getDJEngine().getDeck(out).stop(); } catch { /* */ }
         useDJStore.getState().setDeckPlaying(out, false);
+        releaseAutoKeyLock(out);
         try { resetDeckAfterTransition(out); } catch { /* */ }
         trace.completed = true;
         finish({ completed: true, fellBack: 'emergency', error, trace, incomingPlaying: true });
@@ -202,7 +231,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       // ── Prepare the incoming deck (plan sections 7, 12, 13) ─────────────
       seekDeckAudio(inc, Math.max(0, plan.incomingPosition));
       setDeckPitch(inc, plan.tempoPlan.incomingSemitones);
-      setDeckKeyLock(inc, plan.keyPlan.keyLock);
+      engageAutoKeyLock(inc, plan.keyPlan.keyLock);
       setDeckFilterResonance(inc, plan.filterPlan.resonance);
       setDeckFilterResonance(out, plan.filterPlan.resonance);
       // Filter kinds the registry performs own their targets; the plan's filter curves stay descriptive.
@@ -290,6 +319,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
             for (const a of firedActions) if (a.deck === out && a.action !== 'fx_deck_echo_out' && a.action !== 'fx_deck_reverb_out') releaseDjFx(a.action, { deck: out, source: 'autodj' });
             try { getDJEngine().getDeck(out).stop(); } catch { /* */ }
             useDJStore.getState().setDeckPlaying(out, false);
+            releaseAutoKeyLock(out);
             resetDeckAfterTransition(out);
             setDeckEQ(inc, 'low', 0); setDeckEQ(inc, 'mid', 0); setDeckEQ(inc, 'high', 0);
             setDeckFilter(inc, 0);

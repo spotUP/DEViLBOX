@@ -26,7 +26,7 @@ import { keyCompatibility } from './DJKeyUtils';
 import { detectDrumBreakTail, isChordChangeImminent } from './smartCuts';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { getSessionController, type SessionTrack } from './autodj/sessionController';
-import { executeTransition, type ExecutionHandle } from './autodj/transitionExecutor';
+import { executeTransition, releaseAutoKeyLock, type ExecutionHandle } from './autodj/transitionExecutor';
 import { buildDJTrackAnalysis, summaryFromPipeline } from './autodj/trackAnalysis';
 import { getDecisionLog } from './autodj/decisionLog';
 import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
@@ -1263,6 +1263,8 @@ class DJAutoDJ {
     useDJStore.getState().setDeckPlaying(this.activeDeck, false);
     useDJStore.getState().setDeckFilter(this.activeDeck, 0);
     useDJStore.getState().setDeckVolume(this.activeDeck, 1);
+    // The track Auto DJ key-locked has left the outgoing deck: its own key-lock state comes back.
+    releaseAutoKeyLock(this.ab(this.activeDeck));
 
     // Swap decks
     const oldActive = this.activeDeck;
