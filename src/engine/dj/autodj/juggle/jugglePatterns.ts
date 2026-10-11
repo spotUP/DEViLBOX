@@ -206,6 +206,8 @@ export function fillTrade(p: PatternParams): DJJugglePattern {
     b.beat += unit;
   }
   phase(b, 'PAYOFF', b.beat, b.beat + unit);
+  // One bassline in the drop (owner plan section 35): the groove deck keeps the low end, the release restores the fill deck's.
+  b.actions.push({ type: 'EQCut', deck: fillDeck, executeAtBeat: b.beat, quantization: 'bar', phase: 'PAYOFF', reason: `drop: ${p.primary} keeps the bass` });
   layer(b, b.beat, 'PAYOFF', 'drop: both');
   b.beat += unit;
   phase(b, 'RELEASE', b.beat, b.beat);
@@ -234,24 +236,40 @@ export function loopTighten(p: PatternParams): DJJugglePattern {
   return finish('loopTighten', p, b, { energyProfile: 'BUILD', reason: '4 -> 2 -> 1 -> 1/2 -> 1/4 bar loops, released on the bar', sourceDeck: p.primary, targetDeck: p.primary });
 }
 
+/**
+ * The same-track double (owner plan sections 15-17, 35): a phrase-level
+ * pattern - whole-bar trades between the original and its copy, never
+ * beat cuts (beat juggling a double is PERFORMER's beatTrade / transformer,
+ * section 44). The copy starts at an allowed offset (section 16's list);
+ * before the payoff layer the silent copy is re-cued to zero offset and its
+ * bass is killed, so the layer is one groove with one bassline, not the same
+ * bass against itself out of step (section 35). The release hands the bass
+ * back with the reset.
+ */
 export function double(p: PatternParams): DJJugglePattern {
   const b = newBuilder();
   const bpb = p.beatsPerBar;
+  const copy = other(p.primary);
   const offset = p.double?.offsetBeats ?? bpb;
   const target = (p.double?.primaryPosition ?? 0);
   phase(b, 'SETUP', 0, bpb);
-  b.actions.push({ type: 'ResyncDeck', deck: other(p.primary), executeAtBeat: 0, targetPosition: target, beats: offset, quantization: 'bar', phase: 'SETUP', reason: `same track, offset ${offset} beats` });
+  b.actions.push({ type: 'ResyncDeck', deck: copy, executeAtBeat: 0, targetPosition: target, beats: offset, quantization: 'bar', phase: 'SETUP', reason: `same track, offset ${offset} beats` });
   b.beat += bpb;
   phase(b, 'ESTABLISH', b.beat, b.beat + bpb * 4);
-  trade(b, p.primary, bpb, 2, 'ESTABLISH', 'bar');
-  phase(b, 'INTENSIFY', b.beat, b.beat + bpb * 2);
-  trade(b, p.primary, 1, bpb, 'INTENSIFY', 'beat');
+  trade(b, p.primary, bpb * 2, 1, 'ESTABLISH', 'bar');
+  phase(b, 'INTENSIFY', b.beat, b.beat + bpb * 3);
+  trade(b, p.primary, bpb, 1, 'INTENSIFY', 'bar');
+  cutTo(b, p.primary, b.beat, 'INTENSIFY', `${bpb}-beat trade: ${p.primary} speaks while the copy lines up`, 'bar');
+  // The copy is silent for this bar: one re-cue to zero offset (a cue jump of an unheard deck), its bass out.
+  b.actions.push({ type: 'ResyncDeck', deck: copy, executeAtBeat: b.beat, targetPosition: target, beats: 0, quantization: 'bar', phase: 'INTENSIFY', reason: 'the copy lines up with the original for the payoff' });
+  b.actions.push({ type: 'EQCut', deck: copy, executeAtBeat: b.beat, quantization: 'bar', phase: 'INTENSIFY', reason: `one bassline in the payoff: ${p.primary} keeps the bass` });
+  b.beat += bpb;
   phase(b, 'PAYOFF', b.beat, b.beat + bpb);
-  layer(b, b.beat, 'PAYOFF', 'both copies together');
+  layer(b, b.beat, 'PAYOFF', `both copies together, the bass on ${p.primary}`);
   b.beat += bpb;
   phase(b, 'RELEASE', b.beat, b.beat);
   release(b, p.primary, b.beat);
-  return finish('double', p, b, { energyProfile: 'PEAK', reason: `offset double (${offset} beats): bar trading, beat trading, payoff`, requiresDouble: true });
+  return finish('double', p, b, { energyProfile: 'PEAK', reason: `offset double (${offset} beats): 2-bar then 1-bar trades, aligned payoff with one bass`, requiresDouble: true });
 }
 
 export function transformer(p: PatternParams): DJJugglePattern {
@@ -348,7 +366,9 @@ export const PATTERN_INTENSITY: Record<DJJugglePatternType, number> = {
 /** Which modes may use which patterns (juggling plan section 44). */
 export const MODE_PATTERNS: Record<Exclude<import('./juggleTypes').JuggleMode, 'OFF'>, DJJugglePatternType[]> = {
   SAFE: ['phraseTrade', 'tightPhraseTrade'],
-  MUSICAL: ['phraseTrade', 'tightPhraseTrade', 'callResponse', 'fillTrade', 'double', 'drumBassTrade'],
+  // Owner plan section 44: MUSICAL adds call-response, fills and doubles to SAFE's phrase trading; drum/bass
+  // trading (1-bar cuts) and every beat-level pattern start at PERFORMER.
+  MUSICAL: ['phraseTrade', 'tightPhraseTrade', 'callResponse', 'fillTrade', 'double'],
   PERFORMER: ['phraseTrade', 'tightPhraseTrade', 'callResponse', 'fillTrade', 'double', 'drumBassTrade', 'barTrade', 'beatTrade', 'doubleBeat', 'loopTighten', 'transformer', 'dropAndReturn', 'escalatingJuggle'],
   AGGRESSIVE: ['tightPhraseTrade', 'callResponse', 'fillTrade', 'double', 'drumBassTrade', 'barTrade', 'beatTrade', 'doubleBeat', 'loopTighten', 'transformer', 'dropAndReturn', 'escalatingJuggle'],
   CHAOS: ['phraseTrade', 'tightPhraseTrade', 'callResponse', 'fillTrade', 'double', 'drumBassTrade', 'barTrade', 'beatTrade', 'doubleBeat', 'loopTighten', 'transformer', 'dropAndReturn', 'escalatingJuggle'],

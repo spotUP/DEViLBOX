@@ -13,7 +13,7 @@ import { juggleOpportunity } from '../juggleOpportunity';
 import type { DJJugglePerformanceContext, JuggleMode } from '../juggleTypes';
 import type { SetEnergyPhase } from '../../types';
 
-function contextFor(id: CorpusId, positionSec: number, opts: { setPhase?: SetEnergyPhase; energy?: number; targetEnergy?: number; transitionApproachingSec?: number | null } = {}): DJJugglePerformanceContext {
+function contextFor(id: CorpusId, positionSec: number, opts: { setPhase?: SetEnergyPhase; energy?: number; targetEnergy?: number; transitionApproachingSec?: number | null; idle?: { id: CorpusId; positionSec: number } } = {}): DJJugglePerformanceContext {
   const now = 1_000_000;
   const controller = new DJJuggleController({
     sink: { apply: () => {}, state: () => ({ crossfader: 0, playing: { A: true, B: false }, audible: { A: true, B: false }, loops: { A: false, B: false } }), restore: () => {} },
@@ -26,7 +26,7 @@ function contextFor(id: CorpusId, positionSec: number, opts: { setPhase?: SetEne
     masterDeck: 'A',
     decks: {
       A: { trackId: `${id}.wav`, analysis: a, positionSec, playing: true, bpm: a.bpm },
-      B: { trackId: '', analysis: null, positionSec: 0, playing: false, bpm: 0 },
+      B: opts.idle ? { trackId: `${opts.idle.id}.wav`, analysis: corpusAnalysis(opts.idle.id), positionSec: opts.idle.positionSec, playing: true, bpm: a.bpm } : { trackId: '', analysis: null, positionSec: 0, playing: false, bpm: 0 },
     },
     setPhase: opts.setPhase ?? 'CRUISING', energy: opts.energy ?? 0.6, targetEnergy: opts.targetEnergy ?? 0.65,
     performanceMode: 'JUGGLE', transitionApproachingSec: opts.transitionApproachingSec === undefined ? 400 : opts.transitionApproachingSec,
@@ -106,11 +106,22 @@ describe('juggleOpportunity: a stand-alone juggle where the music asks for one',
   });
 
   it('the pre-rendered next track is teased only when compatible and the transition is at most 180 s away', () => {
-    const next = { analysis: corpusAnalysis('compatibleKey'), compatible: true };
+    const next = { analysis: corpusAnalysis('compatibleKey'), compatible: true, pair: contextFor('drops', 50, { transitionApproachingSec: 150, idle: { id: 'compatibleKey', positionSec: 0 } }) };
     expect(judge(contextFor('drops', 50, { transitionApproachingSec: 150 }), 'MUSICAL', next).op?.source).toBe('next');
     expect(judge(contextFor('drops', 50, { transitionApproachingSec: 200 }), 'MUSICAL', next).op?.source).toBe('double');
     expect(judge(contextFor('drops', 50, { transitionApproachingSec: 150 }), 'MUSICAL', { ...next, compatible: false }).op?.source).toBe('double');
     expect(judge(contextFor('drops', 50, { transitionApproachingSec: 150 }), 'MUSICAL', null).op?.source).toBe('double');
+  });
+
+  it('the pair that would play is judged by the planner (owner plan section 25): a key clash or an unjudged pair means the double', () => {
+    // The heard key of the next track at its cue against the master's A minor: F# major is a clash at high confidence.
+    const pairCtx = contextFor('drops', 50, { transitionApproachingSec: 150, idle: { id: 'clashKey', positionSec: 0 } });
+    const clash = { analysis: corpusAnalysis('clashKey'), compatible: true, pair: { ...pairCtx, deckB: { ...pairCtx.deckB, key: 'F# major', keyConfidence: 0.95 } } };
+    const r = judge(contextFor('drops', 50, { transitionApproachingSec: 150 }), 'MUSICAL', clash);
+    expect(r.op?.source).toBe('double');
+    expect(r.why.join('; ')).toMatch(/no tease of the next track: key clash/);
+    const unjudged = judge(contextFor('drops', 50, { transitionApproachingSec: 150 }), 'MUSICAL', { analysis: corpusAnalysis('compatibleKey'), compatible: true });
+    expect(unjudged.op?.source).toBe('double');
   });
 
   it('too little energy for the double the mode allows (MUSICAL: double only, needs intensity >= 0.45): null with the planner reason', () => {

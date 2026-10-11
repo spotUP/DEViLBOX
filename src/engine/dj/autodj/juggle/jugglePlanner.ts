@@ -234,7 +234,7 @@ export function patternBars(type: LibraryPatternType, ctx: DJJugglePerformanceCo
     case 'drumBassTrade': return 6;
     case 'barTrade': return 4;
     case 'loopTighten': return 8;
-    case 'double': return 8;
+    case 'double': return 9;
     case 'dropAndReturn': return 3;
     case 'beatTrade': return 3;
     case 'doubleBeat': return 2;
