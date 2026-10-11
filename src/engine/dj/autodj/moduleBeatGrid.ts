@@ -212,37 +212,77 @@ function backbeatScore(walk: OrderWalk, hits: Array<Array<string[]>>, rowsPerBea
 }
 
 /**
+ * The share of the played positions a beat of rpb rows fits a whole number
+ * of times. A composer writes beats in rows: a 64-row pattern holds 16 beats
+ * of 4 rows or 8 of 8, never beats of 3, 5 or 6 rows.
+ */
+function beatLengthFit(walk: OrderWalk, rpb: number): number {
+  const ps = walk.positions;
+  return ps.length ? ps.filter((p) => p.rows % rpb === 0).length / ps.length : 0;
+}
+
+/**
+ * The beat level the song's speed and its pattern lengths agree on. The
+ * tracker convention (24 ticks a beat) when the patterns hold whole beats of
+ * it. Otherwise speed sets only the tempo and the convention is not the
+ * song's beat (speed 5 gives 5 rows, speed 8 gives 3, and a 64-row pattern
+ * holds neither a whole number of times): the beat is one of the two levels
+ * of plausible tempo the patterns do hold that sit either side of the
+ * convention, the nearer in tempo by default and the other a rival the drums
+ * may prefer (songRowsPerBeat). The pattern-length support is the phrase
+ * detector's (PHRASE_BOUNDARY_SUPPORT).
+ */
+function patternBeatLevel(walk: OrderWalk, speed: number, plausible: (rpb: number) => boolean): { rowsPerBeat: number; source: 'speed' | 'patterns'; rivals: number[] } {
+  const conventionRows = speedRowsPerBeat(speed);
+  const conventional = Math.max(1, Math.round(conventionRows));
+  if (walk.positions.length === 0 || beatLengthFit(walk, conventional) >= PHRASE_BOUNDARY_SUPPORT) return { rowsPerBeat: conventional, source: 'speed', rivals: [] };
+  const longest = walk.positions.reduce((n, p) => Math.max(n, p.rows), 0);
+  const fits = (rpb: number) => plausible(rpb) && beatLengthFit(walk, rpb) >= PHRASE_BOUNDARY_SUPPORT;
+  let finer = 0, coarser = 0;
+  for (let rpb = Math.ceil(conventionRows) - 1; rpb >= 1 && !finer; rpb--) if (fits(rpb)) finer = rpb;
+  for (let rpb = Math.floor(conventionRows) + 1; rpb <= longest && !coarser; rpb++) if (fits(rpb)) coarser = rpb;
+  const levels = [finer, coarser].filter((r) => r > 0)
+    .sort((a, b) => Math.abs(Math.log(a / conventionRows)) - Math.abs(Math.log(b / conventionRows)) || a - b);
+  if (levels.length === 0) return { rowsPerBeat: conventional, source: 'speed', rivals: [] };
+  return { rowsPerBeat: levels[0], source: 'patterns', rivals: levels.slice(1) };
+}
+
+/**
  * Rows per beat of a song, from the song itself. The tracker convention (a
  * beat is 24 ticks: 4 rows at speed 6, 8 at speed 3; the same rule as the
- * Auto Dub MusicalClock) is the default; the drums replace it with half
- * that when their backbeat fits that level clearly better and its tempo is
+ * Auto Dub MusicalClock), or the nearest level its pattern lengths hold
+ * when they do not hold the convention (patternBeatLevel), is the default;
+ * the drums replace it with half that, or with the other level the patterns
+ * hold, when their backbeat fits that level clearly better and its tempo is
  * plausible. Speed alone does not give the beat, so its confidence says
  * whether the drums confirmed the level (owner plan section 31).
  */
-export function songRowsPerBeat(song: TrackerSong, walk: OrderWalk = timeOrderPositions(song), perc = percussionAtFor(song, walk)): { rowsPerBeat: number; source: 'drums' | 'speed'; confidence: number } {
+export function songRowsPerBeat(song: TrackerSong, walk: OrderWalk = timeOrderPositions(song), perc = percussionAtFor(song, walk)): { rowsPerBeat: number; source: 'drums' | 'speed' | 'patterns'; confidence: number } {
   const { speed, bpm } = dominantTempo(song, walk);
-  const conventional = Math.max(1, Math.round(speedRowsPerBeat(speed)));
-  const hits = drumHits(song, walk, perc);
-  const anyDrums = hits.some((rows) => rows.some((h) => h.length > 0));
-  if (!anyDrums) return { rowsPerBeat: conventional, source: 'speed', confidence: BEAT_CONVENTION_CONFIDENCE };
   const plausible = (rpb: number) => {
     const b = musicalBpm(speed, bpm, rpb);
     return b >= PLAUSIBLE_BPM_MIN && b < PLAUSIBLE_BPM_MAX;
   };
+  const { rowsPerBeat: conventional, source: levelSource, rivals } = patternBeatLevel(walk, speed, plausible);
+  const hits = drumHits(song, walk, perc);
+  const anyDrums = hits.some((rows) => rows.some((h) => h.length > 0));
+  if (!anyDrums) return { rowsPerBeat: conventional, source: levelSource, confidence: BEAT_CONVENTION_CONFIDENCE };
   const base = backbeatScore(walk, hits, conventional);
-  let pick = { rowsPerBeat: conventional, source: 'speed' as 'drums' | 'speed', score: base };
+  let pick = { rowsPerBeat: conventional, source: levelSource as 'drums' | 'speed' | 'patterns', score: base };
   let rival = 0;
   // Only a finer beat can replace the convention: a composer at speed 3 may
   // write 4 rows a beat, but a beat coarser than 24 ticks is not a tracker
   // idiom, and a half-time drum pattern (kick on 1, snare on 3) must not
-  // halve a song (the corpus tracker track, 125 BPM at speed 6).
-  for (const rpb of [conventional / 2]) {
+  // halve a song (the corpus tracker track, 125 BPM at speed 6). When the
+  // patterns do not hold the convention, the level they hold on its other
+  // side is the exception: there the convention is no beat at all.
+  for (const rpb of new Set([conventional / 2, ...rivals])) {
     if (!Number.isInteger(rpb) || rpb < 1 || !plausible(rpb)) continue;
     const score = backbeatScore(walk, hits, rpb);
     rival = Math.max(rival, score);
     if (score >= base + DRUM_EVIDENCE_MARGIN && score > pick.score) pick = { rowsPerBeat: rpb, source: 'drums', score };
   }
-  // Confirmed: the drums chose the finer level, or they keep a backbeat on the conventional one with no close rival.
+  // Confirmed: the drums chose a rival level, or they keep a backbeat on the default one with no close rival.
   const confirmed = pick.source === 'drums' || (base >= BACKBEAT_CONFIRMS && rival < base + DRUM_EVIDENCE_MARGIN / 3);
   return { rowsPerBeat: pick.rowsPerBeat, source: pick.source, confidence: confirmed ? BEAT_CONFIRMED_CONFIDENCE : BEAT_CONVENTION_CONFIDENCE };
 }
