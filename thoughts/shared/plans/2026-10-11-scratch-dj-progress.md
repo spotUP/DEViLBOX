@@ -12,7 +12,7 @@ Research (how it works today): `thoughts/shared/research/2026-10-08_scratch-syst
 Ledger entry: `thoughts/shared/plans/2026-10-06-fix-all-open.md` SCRP.
 Protocol: `~/.claude/REACHABILITY_PROTOCOL.md` (ID, red first, reachability with a sentinel, ratchet, N of M).
 
-**Count: 0 of 125 done (121 automated + 4 owner checks), 0 exempted** (canonical count = `grep -c '^- \[ \] SCR-'` over this file; recompute on every tick)
+**Count: 7 of 125 done (121 automated + 4 owner checks), 0 exempted** (canonical count = `grep -c '^- \[ \] SCR-'` over this file; recompute on every tick)
 
 Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` built around an open owner decision. An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll, `fireDjFx(..., {source})`, the DJ view panel, the MCP bridge) and proves the new code ran (call count or sentinel) with the stated numbers.
 
@@ -73,13 +73,20 @@ Files the juggling agent is editing now: `DJAutoDJ.ts`, `transitionExecutor.ts`,
 
 ## Phase P0 - Baseline lock, crate audit, licensing (Gate A, sections 14, 15)
 
-- [ ] SCR-P0.1 Baseline doc `thoughts/shared/research/2026-10-11_scratch-baseline.md`: manual scratch, the 19 patterns, platter (`DeckTurntable.tsx` -> `DJActions.startScratch`), crossfader (`DJActions.setCrossfader`), stop/release (`stopScratch` decay 200 ms, hard reset +50 ms, phase align +350 ms), tracker scratch (`TrackerScratchController`), audio scratch; numbers read from the code. Done: doc committed with `file:line` refs. Test: `src/engine/dj/__tests__/scratchBaseline.test.ts` freezes `SCRATCH_PATTERNS.length === 19`, the canonical order, `ScratchActionId` count 25, decay constants.
-- [ ] SCR-P0.2 Existing scratch tests pass as the lock: run the five scratch suites listed above once (`VITEST_MAX_WORKERS=2`), record the result in the baseline doc. Done: all green on the commit before P1 starts.
-- [ ] SCR-P0.3 `samplePacks.ts:496` lists 001-057 (052 still skipped) so the four new files reach the pack (`SCRATCH_FX` built from the catalogue file list, not a hard-coded count). Done: `SCRATCH_ORIGINALS_PACK.samples.fx.length === 56`. Test: `src/constants/__tests__/scratchPackLists057.test.ts` (fails before: 52).
-- [ ] SCR-P0.4 Provenance note `public/data/samples/packs/scratch-originals/PROVENANCE.md`: source (Up Rough Demo System, owner's recordings), redistribution decision (owner 2026-10-11), byte-identity check command. Done: file committed; `scratchCatalogueFiles.test.ts` (P2.3) reads it exists.
-- [ ] SCR-P0.5 Probe: anchor sample rate. Script `tools/scratch-catalogue-probe.ts` prints per record `duration_ms` vs `safe[1]/22050` and `/44100`; the 22,050 Hz reading must fit every record (ONE: 8459/22050 = 384 ms < 435 ms). Done: output table in the baseline doc; loader (P2.1) uses the probed rate constant.
-- [ ] SCR-P0.6 Probe: ring/record voice feasibility. Measure in the worklet (offline `AudioContext` via `installRealWebAudio`) the Hermite reader's output when the ring holds a static buffer: expected the same samples back at rate 1 (RMS diff < 1e-4). Done: numbers in the baseline doc, decides D4 vs a second reader.
-- [ ] SCR-P0.TC type-check clean.
+- [x] SCR-P0.1 Baseline doc `thoughts/shared/research/2026-10-11_scratch-baseline.md`: manual scratch, the 19 patterns, platter (`DeckTurntable.tsx` -> `DJActions.startScratch`), crossfader (`DJActions.setCrossfader`), stop/release (`stopScratch` decay 200 ms, hard reset +50 ms, phase align +350 ms), tracker scratch (`TrackerScratchController`), audio scratch; numbers read from the code. Done: doc committed with `file:line` refs. Test: `src/engine/dj/__tests__/scratchBaseline.test.ts` freezes `SCRATCH_PATTERNS.length === 19`, the canonical order, `ScratchActionId` count 25, decay constants. - eb99826f0 (test); baseline doc lands with this plan commit
+- [x] SCR-P0.2 Existing scratch tests pass as the lock: run the five scratch suites listed above once (`VITEST_MAX_WORKERS=2`), record the result in the baseline doc. Done: all green on the commit before P1 starts. - 5 files / 61 tests green on 9ef33db07, recorded in the baseline doc section 9
+- [x] SCR-P0.3 `samplePacks.ts:496` lists 001-057 (052 still skipped) so the four new files reach the pack (`SCRATCH_FX` built from the catalogue file list, not a hard-coded count). Done: `SCRATCH_ORIGINALS_PACK.samples.fx.length === 56`. Test: `src/constants/__tests__/scratchPackLists057.test.ts` (fails before: 52). - 411100d5e
+- [x] SCR-P0.4 Provenance note `public/data/samples/packs/scratch-originals/PROVENANCE.md`: source (Up Rough Demo System, owner's recordings), redistribution decision (owner 2026-10-11), byte-identity check command. Done: file committed; `scratchCatalogueFiles.test.ts` (P2.3) reads it exists. - 9cf363525
+- [x] SCR-P0.5 Probe: anchor sample rate. Script `tools/scratch-catalogue-probe.ts` prints per record `duration_ms` vs `safe[1]/22050` and `/44100`; the 22,050 Hz reading must fit every record (ONE: 8459/22050 = 384 ms < 435 ms). Done: output table in the baseline doc; loader (P2.1) uses the probed rate constant. - eb99826f0; 22,050 Hz, 50/50 fit, median tail 0.964 (0.482 at 44,100)
+- [x] SCR-P0.6 Probe: ring/record voice feasibility. Measure in the worklet (offline `AudioContext` via `installRealWebAudio`) the Hermite reader's output when the ring holds a static buffer: expected the same samples back at rate 1 (RMS diff < 1e-4). Done: numbers in the baseline doc, decides D4 vs a second reader. - eb99826f0; bit-exact at startPos + 1, idle leak 0; D4 stands
+- [x] SCR-P0.TC type-check clean. - clean at eb99826f0 (tsc -b --force, 0 errors)
+
+**P0 as built (2026-10-11, deviations from the text above)**
+- P0.1's test cannot be red first: it freezes what already exists (a lock, not a feature). The release constants are asserted from the `DeckEngine.ts` / `DJScratchEngine.ts` source (default-parameter and literal values with no runtime handle); the 25 action ids through an exhaustive `Record<ScratchActionId, 1>` so the compiler checks the count too.
+- P0.3: `SCRATCH_FX` is built from the pack's `manifest.json` (a relative JSON import from `public/`; Vite transforms it as `manifest.json?import`, verified through `createServer().transformRequest`), not from `src/generated/file-manifest.json`. `SCRATCH_SKIPPED` exported for the test. The description string derives its count. `test:ci` is an explicit file list, not a glob: the three P0 tests were appended to it.
+- P0.5: the probe reads each pack WAV's `data` chunk for the true duration; both rates "fit" (safe[1] <= duration at either), so the discriminator is where the tail lands: 0.96 of the record at 22,050 Hz, 0.48 at 44,100 Hz. `duration_ms` in the metadata matches the files to < 1 ms for all 50. Byte identity vs the Up Rough crate: 50 of 50.
+- P0.6 ran offline (no live decks touched): result is bit-exact, not merely < 1e-4, and found a property P2.1 must carry: the reader does `readPosF += rate` before it interpolates, so `start {startPos: P}` emits ring[P + 1] first; `startAt` posts `anchorFrames - 1` or accepts a one-frame lead.
+- No live-app probe was needed; the owner's Auto DJ session was not touched.
 
 ## Phase P1 - Gesture catalogue and data model (Gate B, sections 9, 10, 19, 20, 31, 32, 33, 34, 38, 39, 67)
 
@@ -267,6 +274,8 @@ LOCAL first: `npm run dev:fullstack`, browser at `http://localhost:5174`, DJ vie
 - M5 Gates O/P listening (P10.O1-O4).
 
 ## Owner decisions needed (genuine product choices; each built around a default until answered)
+
+**DECIDED (owner 2026-10-11): all five recommended defaults below are accepted.**
 
 1. **Default Auto Scratch mode for new sessions.** Recommended: `MUSICAL` (matches the juggle default decided 2026-10-11; SAFE would never show the feature, OFF hides it). No migration needed (store not persisted).
 2. **Does Auto Scratch run without Auto DJ** (accompanying a manual mix on the master deck)? Recommended: Auto DJ only in this plan (the owner plan's definition of done is "Auto DJ has acquired a turntablist"); a stand-alone performer is a follow-up item, not silently added.
