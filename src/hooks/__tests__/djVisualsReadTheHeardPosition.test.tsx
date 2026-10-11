@@ -92,4 +92,15 @@ describe('DJ visuals read the heard position', () => {
     await poll();
     expect([useDJStore.getState().decks.A.songPos, useDJStore.getState().decks.A.pattPos]).toEqual([7, 40]);
   });
+
+  it('a stopped deck stops turning after a load primed its player for a moment', async () => {
+    useDJStore.getState().setDeckState('A', { isPlaying: false });
+    renderHook(() => useDeckStateSync('A'));
+    deck.playing = true; // the load's silent scratch-buffer priming
+    await poll();
+    expect(useDJStore.getState().decks.A.positionAnchor.rate).toBe(1);
+    deck.playing = false; // priming done; the store never said playing
+    await poll();
+    expect(useDJStore.getState().decks.A.positionAnchor.rate).toBe(0);
+  });
 });
