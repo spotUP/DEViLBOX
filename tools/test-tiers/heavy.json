@@ -1,0 +1,154 @@
+{
+  "_comment": "Test files that take 15 s or more in CI (measured on the CI run of 5e5cd94e0, 2026-10-11). They run in the nightly heavy tier (npm run test:heavy), not in the per-push fast tier (npm run test:ci). Re-measure from a CI log with tools/test-tiers/measure.sh.",
+  "thresholdSeconds": 15,
+  "files": [
+    {
+      "file": "src/constants/__tests__/masterPresetClaims.test.ts",
+      "ciSeconds": 1066
+    },
+    {
+      "file": "src/engine/dub/__tests__/channelShapeChangesOnlyItsSend.test.ts",
+      "ciSeconds": 510
+    },
+    {
+      "file": "src/engine/dub/__tests__/channelSendEchoIsAudible.test.ts",
+      "ciSeconds": 363
+    },
+    {
+      "file": "src/engine/dub/__tests__/dubBus.behaviour.test.ts",
+      "ciSeconds": 266
+    },
+    {
+      "file": "src/engine/__tests__/liveEditHeard.test.ts",
+      "ciSeconds": 252
+    },
+    {
+      "file": "src/engine/__tests__/nativeExportReloadSoundsTheSame.test.ts",
+      "ciSeconds": 250
+    },
+    {
+      "file": "src/engine/dub/__tests__/channelSendReachesBus.test.ts",
+      "ciSeconds": 243
+    },
+    {
+      "file": "src/engine/dub/__tests__/madProfessorTrebleBursts.test.ts",
+      "ciSeconds": 182
+    },
+    {
+      "file": "src/engine/__tests__/fileSubsongEngines.test.ts",
+      "ciSeconds": 169
+    },
+    {
+      "file": "src/engine/__tests__/uadeScanWorkerEqualsWorklet.test.ts",
+      "ciSeconds": 90
+    },
+    {
+      "file": "src/engine/__tests__/jochenHippelSTGridMatchesPlayer.test.ts",
+      "ciSeconds": 68
+    },
+    {
+      "file": "src/engine/dj/__tests__/autoDJLongSetSimulation.test.ts",
+      "ciSeconds": 54
+    },
+    {
+      "file": "src/engine/__tests__/uadeSamplerKeys.test.ts",
+      "ciSeconds": 48
+    },
+    {
+      "file": "src/lib/song/__tests__/typingOctaveFollowsTheSong.test.ts",
+      "ciSeconds": 45
+    },
+    {
+      "file": "src/engine/__tests__/sunTronicGridMatchesPlayer.test.ts",
+      "ciSeconds": 43
+    },
+    {
+      "file": "src/engine/__tests__/futurePlayerWalkMatchesPlayer.test.ts",
+      "ciSeconds": 37
+    },
+    {
+      "file": "src/engine/__tests__/reverifiedGridsArePlayersWalk.test.ts",
+      "ciSeconds": 33
+    },
+    {
+      "file": "src/engine/__tests__/musicAssemblerPlayheadFollowsGrid.test.ts",
+      "ciSeconds": 31
+    },
+    {
+      "file": "src/engine/dub/__tests__/dubBusRigIsDeterministic.test.ts",
+      "ciSeconds": 31
+    },
+    {
+      "file": "src/engine/__tests__/richardJosephKeys.test.ts",
+      "ciSeconds": 25
+    },
+    {
+      "file": "src/engine/__tests__/futurePlayerGridEdits.test.ts",
+      "ciSeconds": 25
+    },
+    {
+      "file": "src/engine/__tests__/gtultraRendersCorpus.test.ts",
+      "ciSeconds": 25
+    },
+    {
+      "file": "src/engine/dj/__tests__/autoDJAnalysisInstrument.test.ts",
+      "ciSeconds": 24
+    },
+    {
+      "file": "src/engine/dj/__tests__/autoDJBaseline.test.ts",
+      "ciSeconds": 22
+    },
+    {
+      "file": "src/engine/__tests__/soundMasterGridMatchesPlayer.test.ts",
+      "ciSeconds": 22
+    },
+    {
+      "file": "src/lib/song/__tests__/openSongBranches.test.ts",
+      "ciSeconds": 22
+    },
+    {
+      "file": "src/engine/dj/__tests__/autoDJSessionOrderKeepsThePlaylist.test.ts",
+      "ciSeconds": 20
+    },
+    {
+      "file": "src/engine/uade/__tests__/hippelStNativeMatchesPlayer.test.ts",
+      "ciSeconds": 20
+    },
+    {
+      "file": "src/engine/dj/__tests__/autoDJGoldenTransitions.test.ts",
+      "ciSeconds": 20
+    },
+    {
+      "file": "src/engine/__tests__/hippelTfmxGridMatchesPlayer.test.ts",
+      "ciSeconds": 19
+    },
+    {
+      "file": "src/lib/song/__tests__/fileSubsongs.test.ts",
+      "ciSeconds": 18
+    },
+    {
+      "file": "src/engine/__tests__/engineChannelOutputs.test.ts",
+      "ciSeconds": 17
+    },
+    {
+      "file": "src/engine/dj/__tests__/autoDJBeatJuggling.test.ts",
+      "ciSeconds": 17
+    },
+    {
+      "file": "src/engine/__tests__/musicAssemblerWalkMatchesPlayer.test.ts",
+      "ciSeconds": 16
+    },
+    {
+      "file": "src/engine/__tests__/futurePlayerGridMatchesPlayer.test.ts",
+      "ciSeconds": 16
+    },
+    {
+      "file": "src/engine/__tests__/oneOpenPath.contract.test.ts",
+      "ciSeconds": 16
+    },
+    {
+      "file": "src/engine/__tests__/importWalksRunInWorker.test.ts",
+      "ciSeconds": 15
+    }
+  ]
+}

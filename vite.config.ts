@@ -4,6 +4,15 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 
+// Test tiers (tools/test-tiers/heavy.json, measured from CI): the fast tier
+// (VITEST_TIER=fast, npm run test:ci) runs on every push and leaves the
+// heavy offline-render suites out; the heavy tier (VITEST_TIER=heavy,
+// npm run test:heavy) runs only those, nightly. Unset: every test.
+const testTier = process.env.VITEST_TIER as 'fast' | 'heavy' | undefined
+const heavyTestFiles: string[] = testTier
+  ? (JSON.parse(fs.readFileSync(path.resolve(__dirname, 'tools/test-tiers/heavy.json'), 'utf8')) as { files: { file: string }[] }).files.map((f) => f.file)
+  : []
+
 // Plugin to generate version.json for cache busting
 function generateVersionFile() {
   return {
@@ -122,8 +131,8 @@ export default defineConfig({
   base: '/',
   test: {
     // Vitest configuration
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['node_modules', 'Reference Code/**', 'dist', 'src/__tests__/ci/**'],
+    include: testTier === 'heavy' ? heavyTestFiles : ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules', 'Reference Code/**', 'dist', 'src/__tests__/ci/**', ...(testTier === 'fast' ? heavyTestFiles : [])],
     environment: 'happy-dom',
     // Cap worker pool HARD. Each worker is a full-core node process; on an
     // 8-core dev machine the old cap of 4 pinned half the CPU on every run
