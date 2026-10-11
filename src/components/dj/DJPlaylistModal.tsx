@@ -2056,11 +2056,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         try { applyPerSongMasterFx(track); } catch (err) {
           console.warn('[DJPlaylistModal] Failed to apply per-song FX:', err);
         }
-        // Auto-gain normalization — bring every track to ~the same loudness
-        // so you don't have to ride the channel faders between songs. Uses
-        // rmsDb/peakDb saved by the analyzer; if the track has neither
-        // (never analyzed), computeAutoTrim returns 0 and the deck plays at
-        // unity. Respects the user's per-deck autoGainEnabled toggle.
+        // Deck trim from the one policy (computeAutoTrim: the song plays at
+        // its tracker-view level, 0 dB). rmsDb/peakDb saved by the analyzer
+        // still reach the deck for the meters. Respects the user's per-deck
+        // autoGainEnabled toggle.
         try {
           if (track.rmsDb != null && track.peakDb != null) {
             const { computeAutoTrim } = await import('@/engine/dj/DJPipeline');

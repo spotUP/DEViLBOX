@@ -2,7 +2,7 @@
  * Gain staging (plan section 22): deck trims, overlap compensation, EQ boost
  * cap, FX return level and the loudness monitors the executor reports.
  *
- * Pure. Reuses the pipeline's auto-trim target (-6 dB RMS, clamped).
+ * Pure. Reuses the pipeline's deck trim policy (tracker level: 0 dB), capped by the master ceiling.
  */
 import { computeAutoTrim } from '../DJPipeline';
 import type { BassOwner, DJTrackAnalysis, GainPlan } from './types';

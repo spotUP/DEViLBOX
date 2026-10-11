@@ -22,6 +22,7 @@ import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
+import { DECK_LIMITER_THRESHOLD_DB } from './djLimiter';
 import { computeKeyLockShift } from './computeKeyLockShift';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
@@ -259,7 +260,7 @@ export class DeckEngine {
     // internal gain transients from rapid scratch transitions or Player source overlap.
     const ctx = Tone.getContext().rawContext as AudioContext;
     const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -3;   // Start limiting at -3 dBFS (professional headroom)
+    limiter.threshold.value = DECK_LIMITER_THRESHOLD_DB;
     limiter.knee.value = 0;          // Hard knee (brick-wall)
     limiter.ratio.value = 20;        // Near-infinite ratio
     limiter.attack.value = 0.001;    // 1ms attack (catch transients)

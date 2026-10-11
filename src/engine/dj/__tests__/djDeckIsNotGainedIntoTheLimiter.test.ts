@@ -34,6 +34,7 @@ vi.mock('../DJAutoSync', () => ({ autoMatchOnLoad: () => {} }));
 import { useDJStore } from '@/stores/useDJStore';
 import { DJPipeline, computeAutoTrim, type PipelineResult } from '../DJPipeline';
 import { DJ_ANALYSIS_VERSION } from '../autodj/trackAnalysis';
+import { DECK_LIMITER_THRESHOLD_DB } from '../djLimiter';
 
 function analysis(rmsDb: number, peakDb: number): NonNullable<PipelineResult['analysis']> {
   return {
@@ -65,9 +66,12 @@ describe('a DJ deck is not gained into the limiter', () => {
     expect(useDJStore.getState().decks.A.trimGain).toBe(0);
   });
 
-  it('a measured track still gets its loudness trim', () => {
-    pipeline(analysis(-14, -1)).applyAnalysisToDeck('A', analysis(-14, -1));
-    expect(useDJStore.getState().decks.A.trimGain).toBe(8);
+  it('a typical track (crest 12 dB) plays at its tracker level and reaches the deck limiter with its peaks below the threshold', () => {
+    // Owner decision 2026-10-11: decks match the tracker view's level (no per-song normalisation there), the limiter only catches overs.
+    pipeline(analysis(-16, -4)).applyAnalysisToDeck('A', analysis(-16, -4));
+    const trim = useDJStore.getState().decks.A.trimGain;
+    expect(trim).toBe(0);
+    expect(-4 + trim).toBeLessThan(DECK_LIMITER_THRESHOLD_DB);
   });
 
   it('the analysis written to the cache after a render carries the loudness the trim is computed from', async () => {
@@ -82,7 +86,7 @@ describe('a DJ deck is not gained into the limiter', () => {
     expect(holder.writes[0].peakDb).toBe(-1);
   });
 
-  it('a cache entry written before the fix is trimmed from its extended loudness, not treated as unmeasured', async () => {
+  it('a cache entry written before the fix reports its extended loudness, not -100 dB', async () => {
     holder.cached = {
       hash: 'hash', filename: 'track.mod', audioData: new ArrayBuffer(64), duration: 120, waveformPeaks: [0, 0], sampleRate: 44100,
       numberOfChannels: 2, timestamp: 0, sizeBytes: 64,
@@ -91,6 +95,6 @@ describe('a DJ deck is not gained into the limiter', () => {
     };
     await pipeline(analysis(-12, -0.5)).loadOrEnqueue(new ArrayBuffer(8), 'track.mod', 'A');
     expect(useDJStore.getState().decks.A.rmsDb).toBe(-12);
-    expect(useDJStore.getState().decks.A.trimGain).toBe(6);
+    expect(useDJStore.getState().decks.A.peakDb).toBe(-0.5);
   });
 });
