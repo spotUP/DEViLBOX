@@ -2,7 +2,8 @@
  * DeckScratch - Scratch preset buttons and fader LFO controls.
  *
  * Layout:
- *   [Baby] [Trans] [Flare] [Hydro] [Crab] [Orbit]    LFO: [OFF] [¼] [⅛] [⅟₁₆] [⅟₃₂]
+ *   [Baby Scratch] [Transformer] [Two-Click Flare] ...    LFO: [OFF] [¼] [⅛] [⅟₁₆] [⅟₃₂]
+ *   Button labels are the gesture's full English name (CLAUDE.md, ledger SCR-P1.12).
  *
  * Pattern buttons toggle looping scratch routines that combine velocity curves
  * and fader automation. Beat-quantized start: button pulses "WAIT" while waiting
@@ -16,6 +17,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
+import { getGesture } from '@/engine/dj/scratch/scratchGestureCatalog';
 import {
   playDeckPattern,
   finishDeckPatternCycle,
@@ -144,7 +146,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
               `}
               title={pattern.name}
             >
-              {isWaiting ? 'WAIT' : pattern.shortName}
+              {isWaiting ? 'WAIT' : getGesture(pattern.gestureId).name}
             </button>
           );
         })}

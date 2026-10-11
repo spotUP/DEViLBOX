@@ -46,6 +46,7 @@ export const DJ_FX_CATEGORY_COLORS: Record<string, number> = {
   'Distortion': DJ_DISTORTION,
   'Tape': DJ_TAPE,
   'Deck': DJ_DECK_FX,
+  'Scratch': DJ_SCRATCH,
 };
 
 export const ONE_SHOT_CATEGORY_COLORS: Record<string, number> = {
@@ -135,18 +136,18 @@ export const DEFAULT_ONESHOT_PADS: OneShotPadMapping[] = [
 export const DEFAULT_SCRATCH_PADS: ScratchPadMapping[] = [
   // Basic x4
   scPad('Baby',          'Basic',       DJ_SCRATCH,     'scratch_baby'),
-  scPad('Transform',     'Basic',       DJ_SCRATCH,     'scratch_trans'),
+  scPad('Transformer',   'Basic',       DJ_SCRATCH,     'scratch_trans'),
   scPad('Flare',         'Basic',       DJ_SCRATCH,     'scratch_flare'),
   scPad('Chirp',         'Basic',       DJ_SCRATCH,     'scratch_chirp'),
   // Advanced x4
   scPad('Crab',          'Advanced',    DJ_SCRATCH_ADV, 'scratch_crab'),
   scPad('Orbit',         'Advanced',    DJ_SCRATCH_ADV, 'scratch_orbit'),
-  scPad('Hydro',         'Advanced',    DJ_SCRATCH_ADV, 'scratch_hydro'),
+  scPad('Hydroplane',    'Advanced',    DJ_SCRATCH_ADV, 'scratch_hydro'),
   scPad('Tear',          'Advanced',    DJ_SCRATCH_ADV, 'scratch_tear'),
   // Expert x4
   scPad('Uzi',           'Expert',      DJ_SCRATCH_EXP, 'scratch_uzi'),
-  scPad('8-Crab',        'Expert',      DJ_SCRATCH_EXP, 'scratch_8crab'),
-  scPad('3-Flare',       'Expert',      DJ_SCRATCH_EXP, 'scratch_3flare'),
+  scPad('Eight-Finger Crab', 'Expert',      DJ_SCRATCH_EXP, 'scratch_8crab'),
+  scPad('Three-Click Flare', 'Expert',      DJ_SCRATCH_EXP, 'scratch_3flare'),
   scPad('Twiddle',       'Expert',      DJ_SCRATCH_EXP, 'scratch_twiddle'),
   // Special x3
   scPad('Laser',         'Special',     DJ_SCRATCH_EXP, 'scratch_laser'),
