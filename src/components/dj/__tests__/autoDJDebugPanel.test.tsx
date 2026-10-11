@@ -68,7 +68,7 @@ describe('Auto DJ debug view', () => {
     });
     const { getByTestId } = render(<DJAutoDJDebugPanel telemetry={null} />);
     const text = getByTestId('autodj-juggle').textContent ?? '';
-    for (const label of ['Juggle Mode', 'Juggle Active', 'Pattern', 'Pattern Phase', 'Intensity', 'Active Deck', 'Deck A', 'Deck B', 'Next Actions', 'Confidence', 'Safety', 'Stand-alone', 'Budget']) {
+    for (const label of ['Juggle Mode', 'Juggle State', 'Pattern', 'Pattern Phase', 'Intensity', 'Active Deck', 'Deck A', 'Deck B', 'Next Actions', 'Confidence', 'Safety', 'Stand-alone', 'Budget']) {
       expect(text, label).toContain(label);
     }
     expect(text).toContain('PERFORMER');

@@ -137,7 +137,7 @@ const JuggleSection: React.FC = () => {
     <Section title="Beat Juggling">
       <div data-testid="autodj-juggle">
         <Row label="Juggle Mode" value={j.mode} />
-        <Row label="Juggle Active" value={j.active ? 'yes' : 'no'} />
+        <Row label="Juggle State" value={j.active ? 'Juggling' : j.mode === 'OFF' ? 'Off' : `Waiting - ${j.safety}`} />
         <Row label="Pattern" value={j.pattern ? `${j.pattern} (${j.sequence ?? ''})` : '-'} />
         <Row label="Pattern Phase" value={j.phase ?? '-'} />
         <Row label="Intensity" value={fmt(j.intensity)} />
