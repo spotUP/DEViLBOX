@@ -27,6 +27,7 @@ vi.mock('tone', async (orig) => {
 
 import { DeckAudioPlayer } from '../DeckAudioPlayer';
 import { DeckEngine } from '../DeckEngine';
+import { DeckStemPlayer } from '../DeckStemPlayer';
 
 interface Span { from: number; to: number }
 
@@ -142,5 +143,27 @@ describe('loading a track onto a stopped deck makes no sound', () => {
     expect(ap.isCurrentlyPlaying()).toBe(false);
     // Started at 5.1 (one lookahead after resume), stopped at 6.0: 0.9 s played.
     expect(ap.getPosition()).toBeCloseTo(0.9, 6);
+  });
+});
+
+describe('pausing a deck in stem mode silences it at once', () => {
+  beforeEach(() => { raw.currentTime = 5; });
+
+  it('every stem stops by the time pause() returns, not one lookahead later', () => {
+    const stems = new Map([['drums', { player: tonePlayer() }], ['bass', { player: tonePlayer() }]]);
+    const sp = Object.assign(Object.create(DeckStemPlayer.prototype), {
+      stems, onRunningChange: null,
+      _loaded: true, _duration: 30, _playbackRate: 1,
+      _rateChangePos: 0, _rateChangeTime: 0, _rateTrackingActive: false, _pendingOffset: null,
+    }) as DeckStemPlayer;
+    sp.play();
+    raw.currentTime += 1;
+    sp.pause();
+    for (const { player } of stems.values()) {
+      expect(player.sounding[0].to).toBeLessThanOrEqual(raw.currentTime + DeckAudioPlayer.FADE_S);
+    }
+    expect(sp.isPlaying()).toBe(false);
+    // Started at 5.12 (play() schedules lookahead + 20 ms), stopped at 6.0.
+    expect(sp.getPosition()).toBeCloseTo(0.88, 6);
   });
 });

@@ -11,6 +11,7 @@
  */
 
 import * as Tone from 'tone';
+import { PLAYER_FADE_S, contextNow, stopPlayerNow } from './stopPlayerNow';
 import { decodeAudio, type DecodeResult } from '../../lib/audio/UnifiedAudioDecoder';
 
 export interface AudioFileInfo {
@@ -22,7 +23,7 @@ export interface AudioFileInfo {
 
 export class DeckAudioPlayer {
   /** De-click fade on every start and stop, in seconds. */
-  static readonly FADE_S = 0.01;
+  static readonly FADE_S = PLAYER_FADE_S;
 
   /** Called after play / pause / resume / stop change whether the source runs. */
   onRunningChange: (() => void) | null = null;
@@ -173,7 +174,7 @@ export class DeckAudioPlayer {
     }
 
     // Tiny fade-in (10ms) to prevent DC offset clicks/ticks
-    this.player.fadeIn = 0.01;
+    this.player.fadeIn = PLAYER_FADE_S;
     const startOffset = this._pendingOffset ?? 0;
     if (this._pendingOffset !== null) {
       this.player.start(undefined, this._pendingOffset);
@@ -192,27 +193,19 @@ export class DeckAudioPlayer {
   }
 
   /**
-   * Pause now. Returns the AudioContext time by which the output is silent.
-   *
-   * A bare Tone `player.stop()` is scheduled at Tone.now(), which is the
-   * context's currentTime PLUS its lookAhead (100 ms): the deck kept sounding
-   * for a tenth of a second after every pause, and a caller that held the deck
-   * muted around a pause (scratch-buffer priming on load) unmuted while it was
-   * still sounding - loading a track onto a stopped deck was audible. The stop
-   * is placed at the context's current time instead, and the paused position
-   * is where the audio actually stopped.
+   * Pause now (see stopPlayerNow). Returns the AudioContext time by which the
+   * output is silent; the paused position is where the audio actually stopped.
    */
   pause(): number {
-    const now = (Tone.getContext().rawContext as AudioContext).currentTime;
+    let silentAt = contextNow() + PLAYER_FADE_S;
     if (this.player.state === 'started') {
       // Snapshot position before stopping so getPosition() returns it while paused
-      this._pendingOffset = this._positionAt(now);
-      this.player.fadeOut = DeckAudioPlayer.FADE_S;
-      this.player.stop(now);
+      this._pendingOffset = this._positionAt(contextNow());
+      silentAt = stopPlayerNow(this.player);
       this._rateTrackingActive = false;
     }
     this.onRunningChange?.();
-    return now + DeckAudioPlayer.FADE_S;
+    return silentAt;
   }
 
   /**
@@ -236,9 +229,7 @@ export class DeckAudioPlayer {
 
   stop(): void {
     if (this.player.state === 'started') {
-      // At the context's current time, not one lookAhead later (see pause()).
-      this.player.fadeOut = DeckAudioPlayer.FADE_S;
-      this.player.stop((Tone.getContext().rawContext as AudioContext).currentTime);
+      stopPlayerNow(this.player);
     }
     this._pendingOffset = null;
     this._rateTrackingActive = false;
