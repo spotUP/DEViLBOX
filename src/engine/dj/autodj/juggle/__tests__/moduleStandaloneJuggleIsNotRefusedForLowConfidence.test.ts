@@ -80,18 +80,19 @@ describe('a 4/4 module with 64-row patterns reaches the stand-alone juggle gate'
 
     const a = buildDJTrackAnalysis({ id: 'shortsong1', durationSec: track.durationSec, analysis: pipeline, extended, song });
     expect(a.tempoSource).toBe('module');
-    // Order 0 0 1 1 0 0 1 2 2 2, 4 bars a pattern: the pattern changes at bars 8, 16, 24 and 28; three of the
-    // four sit on 8 bars, so the song counts in 8-bar phrases (confidence 3/4), restarted at the change on bar 28.
+    // Order 0 0 1 1 0 0 1 2 2 2, 4 bars a pattern: the pattern changes at bars 8, 16, 24 and 28. The 8-bar grid
+    // sits on pattern starts throughout (alignment 1) and three of the four changes fall on it (3/4): 8-bar
+    // phrases at (1 + 0.75) / 2.
     expect(walk.positions.map((p) => p.patternIndex)).toEqual([0, 0, 1, 1, 0, 0, 1, 2, 2, 2]);
     expect(a.phraseLengthBars).toBe(8);
-    expect(a.phrases.map((p) => p.startBar)).toEqual([0, 8, 16, 24, 28, 36]);
-    expect(a.phrases.map((p) => p.start)).toEqual([0, 2, 4, 6, 7, 9].map((i) => expect.closeTo(walk.positions[i].start, 6)));
-    expect(a.phrases.map((p) => p.confidence)).toEqual(Array(6).fill(0.75));
+    expect(a.phrases.map((p) => p.startBar)).toEqual([0, 8, 16, 24, 32]);
+    expect(a.phrases.map((p) => p.start)).toEqual([0, 2, 4, 6, 8].map((i) => expect.closeTo(walk.positions[i].start, 6)));
+    expect(a.phrases.map((p) => p.confidence)).toEqual(Array(5).fill(0.875));
 
     // Bar 15.5 (the last quarter of the phrase on bars 8-15): the gate passes on confidence.
     const barSec = 4 * 60 / 125;
     const ctx = contextAt(a, 15.5 * barSec);
-    expect(ctx.phraseConfidence).toBe(0.75);
+    expect(ctx.phraseConfidence).toBe(0.875);
     const why: string[] = [];
     const op = juggleOpportunity(ctx, 'MUSICAL', null, why);
     expect(why.join('; ')).not.toMatch(/low confidence/);
