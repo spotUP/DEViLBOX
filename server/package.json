@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "migrate": "node dist/db/migrate.js",
     "collab": "tsx collab-server.ts",
@@ -37,6 +38,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^2.1.0",
     "@types/ws": "^8.18.1",
+    "esbuild": "^0.27.3",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

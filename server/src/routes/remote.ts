@@ -6,7 +6,7 @@
  * client loader. Same cache as the Modland proxy, own rate limit.
  */
 import { Router, Request, Response } from 'express';
-import { remoteUpstreamUrl } from '../../../src/lib/dj/remoteSources.ts';
+import { remoteUpstreamUrl } from '../../../src/lib/dj/remoteSources';
 import { createDownloadLimiter, sendCachedRemoteFile } from '../services/cachedRemoteDownload';
 
 const router = Router();
