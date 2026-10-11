@@ -12,6 +12,7 @@ export function fixtureAnalysis(): DJTrackAnalysis {
   return {
     id: 'fixture', durationSec: 200, version: 1, bpm: 120, bpmConfidence: 0.9, tempoSource: 'audio',
     beatGrid: { bpm: 120, firstBeat, beats, confidence: 0.92 },
+    analysisConfidence: { bpm: 0.9, beatGrid: 0.92, downbeat: 0.9, key: 0.5, section: 0.8, cue: 0.5, vocal: 0.9, bass: 0.6, tracker: 0, overall: 0.8 },
     downbeats: { bars, confidence: 0.9 },
     meter: { beatsPerBar: 4, confidence: 0.9, alternatives: [] },
     sections: [
