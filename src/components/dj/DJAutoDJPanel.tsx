@@ -576,11 +576,12 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           {showDebug ? 'Hide Debug' : 'Debug'}
         </Button>
       </div>
-      {showDebug && (
-        <div className="mt-2 max-h-[60vh] overflow-y-auto" data-testid="autodj-debug-scroll">
+      <Modal isOpen={showDebug} onClose={() => setShowDebug(false)} size="2xl">
+        <ModalHeader title="Auto DJ Debug" onClose={() => setShowDebug(false)} />
+        <div className="p-3 max-h-[calc(90vh-4rem)] overflow-y-auto" data-testid="autodj-debug-scroll">
           <DJAutoDJDebugPanel />
         </div>
-      )}
+      </Modal>
 
       {/* 404 fix dialog — pick correct Modland match */}
       {fixDialog && (
