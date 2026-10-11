@@ -25,10 +25,11 @@ import { smooth } from './activityTimelines';
 /**
  * Version of the DJTrackAnalysis / DJTrackSummary format. 3: tempo, grid and
  * bars come from the module's own timing when it matches the render
- * (tempoSource). Not the audio-cache gate: the cached audio analysis did not
+ * (tempoSource). 4: a module's phrases and phrase confidence come from its
+ * order list (pattern changes), not the audio. Not the audio-cache gate: the cached audio analysis did not
  * change, so DJ_AUDIO_ANALYSIS_VERSION stays and no cached track is re-analysed.
  */
-export const DJ_ANALYSIS_VERSION = 3;
+export const DJ_ANALYSIS_VERSION = 4;
 /** Version of the cached audio analysis (extended worker data); a cache entry below it is re-analysed. */
 export const DJ_AUDIO_ANALYSIS_VERSION = 2;
 
@@ -232,10 +233,12 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
     trackVocal = meanOf(features.map((f) => f.vocal));
     const bounds = segmentBoundaries(features);
     sections = labelSections(features, bounds, trackVocal);
-    const pl = detectPhraseLength(features, bounds);
+    // A module's phrases come from its order list (pattern changes are exact); the audio guesses them otherwise.
+    const mp = mg?.phrase ?? null;
+    const pl = mp ?? detectPhraseLength(features, bounds);
     phraseLengthBars = pl.lengthBars;
     phraseConfidence = pl.confidence;
-    phrases = buildPhrases(features, sections, phraseLengthBars, phraseConfidence);
+    phrases = buildPhrases(features, sections, phraseLengthBars, phraseConfidence, mp?.startBars);
     events = arrangementEvents(features, sections);
   }
 

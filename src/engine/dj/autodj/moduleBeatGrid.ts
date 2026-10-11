@@ -12,6 +12,7 @@ import { timeOrderPositions, rowSeconds, type OrderWalk } from './trackerMixAnal
 import { resolveSongChannelRoles } from '@/engine/dub/songChannelIdentity';
 import { getRoleAtPosition } from '@/bridge/analysis/SongRoleTimeline';
 import { rowsPerBeat as speedRowsPerBeat, DEFAULT_BEATS_PER_BAR } from '@/lib/dub/musicalClock';
+import { PHRASE_BOUNDARY_SUPPORT, PHRASE_LENGTHS, PHRASE_UNALIGNED_CONFIDENCE } from './structure';
 
 /**
  * Confidence of a beat level the song's own drums confirm, and of one that
@@ -58,7 +59,50 @@ export interface ModuleBeatGrid {
   confidence: number;
   /** Meter confidence (songMeter). */
   meterConfidence: number;
+  /** The song's phrases, from its order list (see modulePhrases); null when the order has too little structure to read. */
+  phrase: ModulePhraseGrid | null;
   source: 'module';
+}
+
+/**
+ * A tracker module's phrase grid (owner plan sections 31, 37): its phrases
+ * start where the order list moves to another pattern - exact times, not an
+ * audio guess - and are counted in 4, 8 or 16 bars between those starts.
+ */
+export interface ModulePhraseGrid {
+  /** Bars per phrase: the longest of 4/8/16 the pattern changes sit on. */
+  lengthBars: number;
+  /** Share of the pattern changes on that length (the audio detector's rule, PHRASE_BOUNDARY_SUPPORT), or PHRASE_UNALIGNED_CONFIDENCE. */
+  confidence: number;
+  /** Bar index of every phrase start: bar 0, each pattern change, and every lengthBars bars between them. */
+  startBars: number[];
+}
+
+/**
+ * The phrase grid of an order walk, from the bar each played position starts
+ * on. A position that repeats the previous pattern continues its phrase; a
+ * change of pattern is an arrangement boundary. A song of one repeated
+ * pattern falls back to every position start. Null with fewer than two
+ * boundaries: nothing to count.
+ */
+export function modulePhrases(patternIndices: number[], positionBars: number[], totalBars: number): ModulePhraseGrid | null {
+  const all = positionBars.filter((b, p) => p > 0 && b > 0 && b < totalBars);
+  const changes = positionBars.filter((b, p) => p > 0 && b > 0 && b < totalBars && patternIndices[p] !== patternIndices[p - 1]);
+  const bounds = [...new Set(changes.length >= 2 ? changes : all)];
+  if (bounds.length < 2) return null;
+  let lengthBars = 4;
+  let confidence = PHRASE_UNALIGNED_CONFIDENCE;
+  for (const lag of PHRASE_LENGTHS) {
+    const support = bounds.filter((b) => b % lag === 0).length / bounds.length;
+    if (support >= PHRASE_BOUNDARY_SUPPORT) { lengthBars = lag; confidence = support; break; }
+  }
+  const anchors = [0, ...bounds];
+  const startBars: number[] = [];
+  anchors.forEach((a, i) => {
+    const next = anchors[i + 1] ?? totalBars;
+    for (let b = a; b < next; b += lengthBars) startBars.push(b);
+  });
+  return { lengthBars, confidence, startBars };
 }
 
 /**
@@ -256,6 +300,8 @@ export function moduleBeatGrid(song: TrackerSong, renderedDurationSec: number, o
   const rowsPerBeat = level.rowsPerBeat;
   const meter = songMeter(song, walk, rowsPerBeat, perc);
   const rowsPerBar = rowsPerBeat * meter.beatsPerBar;
+  /** The bar each played position starts on (positions inside the rendered audio). */
+  const positionBars: number[] = [];
   rowTimes.forEach((times, p) => {
     const startRow = positions[p].startRow;
     for (let i = 0; i < times.length; i++) {
@@ -265,14 +311,16 @@ export function moduleBeatGrid(song: TrackerSong, renderedDurationSec: number, o
       const t = times[i];
       if (t >= renderedDurationSec) return; // past the rendered audio
       beats.push(t);
+      if (i === 0) positionBars.push(downbeats.length);
       if (i === 0 || row % rowsPerBar === 0) downbeats.push(t);
     }
   });
+  const phrase = modulePhrases(positions.slice(0, positionBars.length).map((p) => p.patternIndex), positionBars, downbeats.length);
   // The BPM the song plays longest (an intro or a closing slow-down does not drag it); the beats carry every change.
   const { speed, bpm: tickBpm } = dominantTempo(song, walk);
   const bpm = musicalBpm(speed, tickBpm, rowsPerBeat);
   return {
     beats, downbeats, bpm: Math.round(bpm * 100) / 100,
-    beatsPerBar: meter.beatsPerBar, rowsPerBeat, confidence: level.confidence, meterConfidence: meter.confidence, source: 'module',
+    beatsPerBar: meter.beatsPerBar, rowsPerBeat, confidence: level.confidence, meterConfidence: meter.confidence, phrase, source: 'module',
   };
 }
