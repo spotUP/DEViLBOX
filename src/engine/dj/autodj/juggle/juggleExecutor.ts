@@ -49,6 +49,11 @@ export interface JuggleTraceEntry {
 export interface JuggleExecutionResult {
   completed: boolean;
   aborted: boolean;
+  /**
+   * The pattern ended before its target deck was ever heard: refused before it started, or aborted
+   * before the first cut onto that deck. Nothing was traded; the caller resolves without it.
+   */
+  refused?: boolean;
   reason: string;
   trace: JuggleTraceEntry[];
   fallbacks: number;

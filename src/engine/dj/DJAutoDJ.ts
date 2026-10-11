@@ -1579,23 +1579,30 @@ class DJAutoDJ {
     const deckAnalysis = decks[this.idleDeck].trackAnalysis;
     const sameTrack = !deckAnalysis || !this.incomingAnalysis || deckAnalysis.id === this.incomingAnalysis.id;
     return plan.outgoingDeck === this.ab(this.activeDeck) && plan.incomingDeck === this.ab(this.idleDeck)
-      && !!decks[this.activeDeck].trackAnalysis && sameTrack && plan.startTimeSec >= this.getOutgoingPosition();
+      && !!decks[this.activeDeck].trackAnalysis && sameTrack && plan.startTimeSec >= this.getOutgoingPosition()
+      // A juggle transition holds only while the juggle budget still allows it: a stand-alone juggle since
+      // the anticipation (a tease of this very track) spent the cooldown the transition was planned on, or
+      // Auto Juggle was turned off - the transition is planned again, a normal one (owner plan sections 24, 28).
+      && (plan.style !== 'juggleTransition' || this.juggleBudget()?.allowed === true);
   }
 
   /** Run a plan through the executor; the sweep flag flips when its automation clock runs, as the legacy sweeps do. */
   private executePlan(planned: DJTransitionPlan): () => void {
     const out = this.activeDeck;
     const untilStartSec = Math.max(0, planned.startTimeSec - this.getOutgoingPosition());
-    this.transitionTimeoutMs = Math.max(DJAutoDJ.TRANSITION_TIMEOUT_MS, (untilStartSec + this.getTransitionDurationSec()) * 1500 + 10_000);
+    // A juggle plan's refused-trade blend starts later and runs its own length: the guard covers whichever ends last.
+    const fallback = planned.juggle?.fallback;
+    const fallbackSec = fallback ? Math.max(0, fallback.startTimeSec - this.getOutgoingPosition()) + fallback.durationBeats * 60 / Math.max(60, fallback.tempoPlan.outgoingBpm || 125) : 0;
+    this.transitionTimeoutMs = Math.max(DJAutoDJ.TRANSITION_TIMEOUT_MS, (Math.max(untilStartSec + this.getTransitionDurationSec(), fallbackSec)) * 1500 + 10_000);
     const handle = executeTransition(planned, {
-      waitForStart: () => this.waitForDeckPosition(out, planned.startTimeSec),
+      waitForStart: (p) => this.waitForDeckPosition(out, p.startTimeSec),
       onSweepStarted: () => { this.transitionSweepStarted = true; },
       // A juggle transition's trade stage: the juggle controller locks the incoming to the outgoing's
       // bars while it is silent, verifies the phase, and trades the planned ladder.
       performTrade: (j) => this.getJuggle().performLadder(this.tickInput('JUGGLE_TRANSITION', this.getTimeRemaining()), { ladderBars: j.ladderBars, target: planned.incomingDeck }),
       onComplete: (result) => {
         if (this.execution === handle) this.execution = null;
-        try { getSessionController().onTransitionComplete(result, planned); } catch { /* */ }
+        try { getSessionController().onTransitionComplete(result, result.executedPlan ?? planned); } catch { /* */ }
       },
     });
     this.execution = handle;

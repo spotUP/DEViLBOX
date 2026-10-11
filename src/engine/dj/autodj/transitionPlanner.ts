@@ -644,7 +644,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     outgoingRoomBars: Math.max(2, outroRoomBars), incomingIntroBars, memory,
   });
   // A juggle transition: the ladder runs from the start, the release is one bar after it.
-  const juggle = transitionStyle === 'juggleTransition' && ladder ? { ladderBars: ladder.ladderBars, tradeBeats: ladder.tradeBeats } : undefined;
+  const juggle: DJTransitionPlan['juggle'] = transitionStyle === 'juggleTransition' && ladder ? { ladderBars: ladder.ladderBars, tradeBeats: ladder.tradeBeats } : undefined;
   let durationBars = transitionStyle === 'hardCut' || juggle ? 1 : length.bars;
   if (tempoPlan.method === 'avoid') durationBars = Math.min(durationBars, 4);
   // Final mix points with the real length; when the outgoing has less room than
@@ -739,7 +739,14 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     `gain: overlap ${gainPlan.overlapCompensationDb.toFixed(1)} dB, predicted true peak ${gainPlan.monitor.truePeakDb.toFixed(1)} dB`,
     `risk ${risk.overall.toFixed(2)}, confidence ${confidence.toFixed(2)}, fallback ${fallbackStyle}`,
   ];
-  if (juggle) reasons.push(`juggle: ${juggle.ladderBars.join(' -> ')} bar trades (${juggle.tradeBeats} beats), incoming from ${incomingPosition.toFixed(1)} s`);
+  if (juggle) {
+    // The trade stage judges the decks again and may refuse (cooldown, dense vocals, confidence: owner plan
+    // sections 24, 25, 31). Then a normal transition plays (section 31: low -> normal transition), planned
+    // here from the ladder's start: the best style without the juggle, with its own length and curves.
+    const fallback = planTransition({ ...input, juggleMode: 'OFF', juggleState: undefined, outgoingPosition: ladder!.mixOut.time, seed });
+    juggle.fallback = { ...fallback, id: `t${seed}-trade-refused` };
+    reasons.push(`juggle: ${juggle.ladderBars.join(' -> ')} bar trades (${juggle.tradeBeats} beats), incoming from ${incomingPosition.toFixed(1)} s; refused at the trades: ${fallback.style} ${fallback.durationBars} bars at ${fallback.startTimeSec.toFixed(1)} s`);
+  }
   else if (juggleMode !== 'OFF' && ladderWhy.length) reasons.push(`juggle: ${ladderWhy.join('; ')}`);
   if (loop) reasons.push(`loop: ${loop.reason}`);
   if (cueJump) reasons.push(`cue jump: ${cueJump.reason}`);

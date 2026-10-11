@@ -40,11 +40,13 @@ export interface ExecutionResult {
   trace: ExecutionTrace;
   /** False when the incoming deck could not be started: the outgoing was kept playing (no-silence rule). */
   incomingPlaying: boolean;
+  /** The plan that actually played when it is not the one executed: a refused juggle's normal-blend fallback. */
+  executedPlan?: DJTransitionPlan;
 }
 
 export interface ExecuteOptions {
-  /** Resolves when the quantised start moment arrives (the controller waits for the grid). */
-  waitForStart?: () => Promise<void>;
+  /** Resolves when the plan's quantised start moment arrives (the controller waits for the grid). */
+  waitForStart?: (plan: DJTransitionPlan) => Promise<void>;
   /** Called once the automation clock runs: the poll loop may now judge completion. */
   onSweepStarted?: () => void;
   onComplete?: (result: ExecutionResult) => void;
@@ -58,9 +60,10 @@ export interface ExecuteOptions {
    * juggleTransition: perform the plan's trading ladder between the incoming
    * start and the release (juggling plan section 26). Resolves when the
    * ladder released onto the incoming or was aborted; the release curves run
-   * after it either way.
+   * after it. `refused`: nothing was traded (the incoming was never heard) -
+   * the plan's normal-blend fallback runs instead of the release.
    */
-  performTrade?: (juggle: NonNullable<DJTransitionPlan['juggle']>) => Promise<{ completed: boolean }>;
+  performTrade?: (juggle: NonNullable<DJTransitionPlan['juggle']>) => Promise<{ completed: boolean; refused?: boolean; reason?: string }>;
 }
 
 export interface ExecutionHandle {
@@ -171,6 +174,8 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
   const trace: ExecutionTrace = { samples: [], events: [], startOffsetMs: opts.startOffsetMs ?? 0, completed: false, fellBack: 'none' };
   let cancelled = false;
   let intervalId: unknown = null;
+  /** A refused juggle's normal blend, executed in this one's place. */
+  let fallbackHandle: ExecutionHandle | null = null;
   let resolveDone: (r: ExecutionResult) => void = () => {};
   const promise = new Promise<ExecutionResult>((resolve) => { resolveDone = resolve; });
   const curves = planCurves(plan);
@@ -268,7 +273,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       if (cancelled) return;
 
       // ── Wait for the grid ───────────────────────────────────────────────
-      if (opts.waitForStart) await opts.waitForStart();
+      if (opts.waitForStart) await opts.waitForStart(plan);
       if (cancelled) return;
       if (plan.humanize.startOffsetMs > 2) await new Promise<void>((r) => { timers.setTimeout(r, plan.humanize.startOffsetMs); });
       if (cancelled) return;
@@ -293,10 +298,30 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       // ── Trade stage (juggleTransition): the ladder runs before the release curves ──
       if (plan.style === 'juggleTransition' && plan.juggle && opts.performTrade) {
         trace.events.push(`juggle ladder ${plan.juggle.ladderBars.join('-')}`);
-        let traded = false;
-        try { traded = (await opts.performTrade(plan.juggle)).completed; } catch { traded = false; }
+        let traded: { completed: boolean; refused?: boolean; reason?: string } = { completed: false };
+        try { traded = await opts.performTrade(plan.juggle); } catch { traded = { completed: false }; }
         if (cancelled) return;
-        if (!traded) trace.events.push('ladder aborted: release now');
+        const fallback = plan.juggle.fallback;
+        if (!traded.completed && traded.refused && fallback) {
+          // Nothing was traded and the incoming was never heard (the crossfader still holds the outgoing): a
+          // normal transition plays, the plan's own fallback blend from its own phrase and mix-in - never the
+          // 1-bar release, a cut onto the incoming a whole ladder before its drop (owner plan sections 31, 33, 42).
+          trace.events.push(`ladder refused${traded.reason ? ` (${traded.reason})` : ''}: ${fallback.style} ${fallback.durationBars} bars at ${fallback.startTimeSec.toFixed(1)} s`);
+          trace.fellBack = 'fallback';
+          // The silent incoming stops; the blend cues it at its own mix-in.
+          try { getDJEngine().getDeck(inc).stop(); } catch { /* */ }
+          useDJStore.getState().setDeckPlaying(inc, false);
+          const inner = executeTransition(fallback, { ...opts, performTrade: undefined, onComplete: undefined, onSweepStarted: undefined });
+          fallbackHandle = inner;
+          void inner.promise.then((r) => {
+            trace.events.push(...r.trace.events);
+            trace.samples.push(...r.trace.samples);
+            trace.completed = r.completed;
+            finish({ ...r, fellBack: r.fellBack === 'emergency' ? 'emergency' : 'fallback', trace, executedPlan: fallback });
+          });
+          return;
+        }
+        if (!traded.completed) trace.events.push('ladder aborted: release now');
       }
 
       const startedAt = timers.now();
@@ -383,6 +408,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       // release the incoming deck's effects mid-track.
       if (finished) return;
       cancelled = true;
+      if (fallbackHandle) { fallbackHandle.cancel(); return; }
       if (intervalId !== null) { timers.clearInterval(intervalId); intervalId = null; }
       try { setDeckEchoSend(out, 0); setDeckReverbSend(out, 0); } catch { /* */ }
       // A cancelled handover leaves neither deck without its bass.
