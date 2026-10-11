@@ -211,6 +211,41 @@ export class DJEngine {
 
     const info = await deck.loadAudioFile(buffer, filename, precomputedPeaks);
     console.log(`[DJEngine] loadAudioFile returned: duration=${info.duration.toFixed(2)}s, sampleRate=${info.sampleRate}, channels=${info.numberOfChannels}`);
+    this.afterAudioLoaded(id, info, { fileName: filename, trackName, bpm, fileBytes: buffer }, song);
+    return info;
+  }
+
+  /**
+   * Load a buffer another deck already decoded to a deck - a double of the
+   * track it plays (plan 2026-10-11-dj-juggling, P4.2): no decode, no render,
+   * the same store update as a file load. Without a song the deck keeps no
+   * previous one for pattern-aware decisions.
+   */
+  async loadDecodedAudioToDeck(
+    id: DeckId, audioBuffer: AudioBuffer,
+    meta: { fileName: string; trackName?: string; bpm?: number; peaks?: Float32Array; fileBytes: ArrayBuffer | null },
+    song?: TrackerSong,
+  ): Promise<AudioFileInfo> {
+    const deck = this.getDeck(id);
+    if (song) {
+      this.remapInstrumentIds(song, DECK_ID_OFFSETS[id]);
+      await deck.loadSong(song);
+    } else {
+      deck.clearLoadedSong();
+    }
+    const info = await deck.loadDecodedAudio(audioBuffer, meta.fileBytes, meta.peaks);
+    this.afterAudioLoaded(id, info, meta, song);
+    return info;
+  }
+
+  /** The tail of every audio load to a deck: the recorder, the deck's store state, cached stems. */
+  private afterAudioLoaded(
+    id: DeckId, info: AudioFileInfo,
+    meta: { fileName: string; trackName?: string; bpm?: number; fileBytes: ArrayBuffer | null },
+    song?: TrackerSong,
+  ): void {
+    const { fileName: filename, trackName, bpm } = meta;
+    const deck = this.getDeck(id);
 
     // Record track load event
     if (this.recorder?.isRecording) {
@@ -234,9 +269,7 @@ export class DJEngine {
     });
 
     // Auto-load cached stems if available (fire-and-forget)
-    void this.tryAutoLoadStems(id, deck, buffer).catch(() => {});
-
-    return info;
+    if (meta.fileBytes) void this.tryAutoLoadStems(id, deck, meta.fileBytes).catch(() => {});
   }
 
   /**

@@ -212,6 +212,44 @@ export async function loadPreRenderedTrackToDeck(
   }
 }
 
+/**
+ * Load a double of the track `source` plays onto `target` (plan
+ * 2026-10-11-dj-juggling, P4.2): the source deck's decoded buffer is reused
+ * (no decode, no render) and its analysis is copied - same track, same
+ * analysis object, no second analysis. Used by Auto DJ's stand-alone juggles.
+ *
+ * No tracker song on the double: the song a deck holds is remapped in place
+ * to that deck's instrument ids (and the song cache can hand back that very
+ * object), so loading it again would remap it twice. The double is a
+ * temporary performance copy; the pattern view stays on the source deck.
+ */
+export async function loadDoubleToDeck(source: DeckId, target: DeckId): Promise<boolean> {
+  try {
+    const engine = getDJEngine();
+    const player = engine.getDeck(source).audioPlayer;
+    const audioBuffer = player.getAudioBuffer();
+    const from = useDJStore.getState().decks[source];
+    if (!audioBuffer || !from.fileName) return false;
+    await engine.loadDecodedAudioToDeck(target, audioBuffer, {
+      fileName: from.fileName, trackName: from.trackName, bpm: from.detectedBPM,
+      peaks: player.getWaveformPeaks() ?? undefined, fileBytes: player.getOriginalFileBytes(),
+    });
+    // The analysis the source deck carries now, in one write (the load above set the file name, so nothing clears it).
+    const now = useDJStore.getState().decks[source];
+    useDJStore.getState().setDeckState(target, {
+      analysisState: now.analysisState, trackAnalysis: now.trackAnalysis, beatGrid: now.beatGrid,
+      musicalKey: now.musicalKey, keyConfidence: now.keyConfidence, detectedBPM: now.detectedBPM,
+      frequencyPeaks: now.frequencyPeaks, rmsDb: now.rmsDb, peakDb: now.peakDb, trimGain: now.trimGain,
+      genrePrimary: now.genrePrimary, genreSubgenre: now.genreSubgenre, genreConfidence: now.genreConfidence,
+      mood: now.mood, energy: now.energy, danceability: now.danceability,
+    });
+    return true;
+  } catch (err) {
+    console.error('[DJTrackLoader] Failed to load a double:', err);
+    return false;
+  }
+}
+
 async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRenderedTrack | null> {
   // Try cached audio first
   try {
