@@ -14,6 +14,7 @@ import { DJSessionMemory } from './sessionMemory';
 import { getStyle } from './styleProfiles';
 import { planSet, type PlannerTrack } from './setPlanner';
 import { fallbackPlan, planTransition } from './transitionPlanner';
+import { juggleModeOf } from './juggle/juggleTypes';
 import { evaluateTransition, checkInvariants } from './transitionQuality';
 import { buildPerformanceContext } from './performanceContext';
 import { buildTelemetry, type AutoDJTelemetry } from './telemetry';
@@ -221,6 +222,7 @@ export class DJSessionController {
       style: this.style, creativeRisk: this.creativeRisk, memory: this.memory.snapshot(), userBars: s.autoDJTransitionBars,
       withFilter: s.autoDJWithFilter, smartCuts: s.autoDJSmartCuts, setPhase: this.setPhase, targetEnergy: this.targetEnergy,
       leadSec: this.loadLeadSec, bridgeAvailable: this.bridgeAvailable(incoming), seed: this.memory.transitionCount + this.counts.transitionPlans * 7,
+      juggleMode: juggleModeOf(s.autoDJJuggleMode),
     });
     const invariants = checkInvariants(plan, outgoing, incoming);
     const broken = invariants.filter((i) => !i.ok);
@@ -229,6 +231,7 @@ export class DJSessionController {
       const safe = fallbackPlan(plan, {
         outgoing, incoming, outgoingDeck: decks.outgoing, incomingDeck: decks.incoming, outgoingPosition, style: this.style, creativeRisk: this.creativeRisk,
         memory: this.memory.snapshot(), userBars: s.autoDJTransitionBars, withFilter: s.autoDJWithFilter, smartCuts: s.autoDJSmartCuts, setPhase: this.setPhase, targetEnergy: this.targetEnergy,
+        juggleMode: juggleModeOf(s.autoDJJuggleMode),
       }, 'fallback');
       getDecisionLog().record('FALLBACK', broken.map((b) => `${b.name}: ${b.detail}`), { time: this.now(), details: { from: plan.style, to: safe.style } });
       this.counts.fallbacks++;

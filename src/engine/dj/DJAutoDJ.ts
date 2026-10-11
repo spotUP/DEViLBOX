@@ -32,7 +32,7 @@ import { getDecisionLog } from './autodj/decisionLog';
 import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
 import { DJJuggleController, analysisClock, type TickInput } from './autodj/juggle/juggleController';
 import { createDeckJuggleSink } from './autodj/juggle/juggleDeckSink';
-import { JUGGLE_MODES, type JuggleMode } from './autodj/juggle/juggleTypes';
+import { juggleModeOf } from './autodj/juggle/juggleTypes';
 import { POLICY_MIN } from './autodj/juggle/jugglePlanner';
 import { seekDeckAudio, setCrossfader } from './DJActions';
 import { registerAutoDJ } from './autoDJInstance';
@@ -1391,7 +1391,8 @@ class DJAutoDJ {
     const deckState = state.decks[this.activeDeck];
     if (this.plan) {
       const bpm = deckState.beatGrid?.bpm || deckState.detectedBPM || deckState.effectiveBPM || 125;
-      return (this.plan.durationBeats * 60) / bpm;
+      // A juggle transition's ladder runs before its release: the trigger lead covers both.
+      return ((this.plan.durationBeats + (this.plan.juggle?.tradeBeats ?? 0)) * 60) / bpm;
     }
     const bpm = deckState.beatGrid?.bpm || deckState.detectedBPM || deckState.effectiveBPM || 125;
     const beatsPerBar = deckState.beatGrid?.timeSignature || 4;
@@ -1625,7 +1626,7 @@ class DJAutoDJ {
    */
   private juggleTick(status: string, timeRemaining: number): void {
     const s = useDJStore.getState();
-    const mode = (JUGGLE_MODES as readonly string[]).includes(s.autoDJJuggleMode) ? (s.autoDJJuggleMode as JuggleMode) : 'OFF';
+    const mode = juggleModeOf(s.autoDJJuggleMode);
     if (mode === 'OFF' && !this.juggle) return;
     const j = this.getJuggle();
     j.setMode(mode);

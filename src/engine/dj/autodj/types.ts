@@ -575,12 +575,12 @@ export type TransitionStyle =
   | 'longBlend' | 'shortBlend' | 'bassSwap' | 'EQSwap' | 'filterBuild' | 'filterRelease'
   | 'echoOut' | 'reverbOut' | 'delayThrow' | 'loopExit' | 'breakdownMix' | 'dropMix'
   | 'drumIntroMix' | 'vocalSwap' | 'percussionSwap' | 'hardCut' | 'tempoBridge'
-  | 'doubleTimeJump' | 'halfTimeJump';
+  | 'doubleTimeJump' | 'halfTimeJump' | 'juggleTransition';
 
 export const TRANSITION_STYLES: readonly TransitionStyle[] = [
   'longBlend', 'shortBlend', 'bassSwap', 'EQSwap', 'filterBuild', 'filterRelease', 'echoOut',
   'reverbOut', 'delayThrow', 'loopExit', 'breakdownMix', 'dropMix', 'drumIntroMix', 'vocalSwap',
-  'percussionSwap', 'hardCut', 'tempoBridge', 'doubleTimeJump', 'halfTimeJump',
+  'percussionSwap', 'hardCut', 'tempoBridge', 'doubleTimeJump', 'halfTimeJump', 'juggleTransition',
 ];
 
 export type AutomationTarget =
@@ -744,6 +744,12 @@ export interface DJTransitionPlan {
   loop?: LoopPlan;
   cueJump?: CueJumpPlan;
   cut?: CutCandidate;
+  /**
+   * juggleTransition only: the trading ladder (bars per rung, outgoing then
+   * incoming each rung) that runs from the transition start; `tradeBeats` is
+   * its whole length. The release (`durationBars`) follows the ladder.
+   */
+  juggle?: { ladderBars: number[]; tradeBeats: number };
 
   confidence: number;
   risk: TransitionRisk;
