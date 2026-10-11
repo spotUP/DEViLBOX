@@ -632,7 +632,8 @@ export async function analyzePlaylist(
                 queueMetaUpdate(curr2.index, {
                   rmsDb: piggybackResult.analysis.rmsDb,
                   peakDb: piggybackResult.analysis.peakDb,
-                  ...(summary ? { musicalKey: playlistMetaFromSummary(summary).musicalKey, energy: summary.energy.perceivedIntensity, djSummary: summary } : {}),
+                  // One producer: tempo, key and energy all from this summary; an unknown key writes none (never `musicalKey: undefined`).
+                  ...(summary ? { ...playlistMetaFromSummary(summary), djSummary: summary } : {}),
                 });
               }
             }
