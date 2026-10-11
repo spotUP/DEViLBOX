@@ -168,7 +168,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-3 max-h-[400px]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Disc3 size={14} className="text-purple-400" />
+            <Disc3 size={14} className="text-text-secondary" />
             <h3 className="text-text-primary text-sm font-mono font-bold tracking-wider uppercase">
               Serato
             </h3>
@@ -181,7 +181,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
         </div>
 
         {error && (
-          <div className="flex items-center gap-1.5 text-red-400 text-[10px] font-mono px-2 py-1 bg-red-900/20 rounded border border-red-900/30">
+          <div className="flex items-center gap-1.5 text-text-secondary text-[10px] font-mono px-2 py-1 bg-dark-bgTertiary/20 rounded border border-dark-borderLight/30">
             <AlertCircle size={10} />
             {error}
           </div>
@@ -192,8 +192,8 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
           <p className="text-xs font-mono mb-3">Connect your Serato library</p>
           <button
             onClick={handleBrowse}
-            className="flex items-center gap-1.5 px-4 py-2 bg-purple-900/30 border border-purple-700/50
-                       rounded text-purple-300 text-xs font-mono hover:bg-purple-800/40 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 bg-dark-bgTertiary/30 border border-dark-borderLight/50
+                       rounded text-text-secondary text-xs font-mono hover:bg-dark-bgHover transition-colors"
           >
             <FolderOpen size={12} />
             Browse for _Serato_ folder
@@ -212,7 +212,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Disc3 size={14} className="text-purple-400" />
+            <Disc3 size={14} className="text-text-secondary" />
             <h3 className="text-text-primary text-sm font-mono font-bold tracking-wider uppercase">Serato</h3>
           </div>
           {onClose && (
@@ -220,7 +220,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
           )}
         </div>
         <div className="flex items-center justify-center py-8">
-          <Loader2 size={16} className="animate-spin text-purple-400" />
+          <Loader2 size={16} className="animate-spin text-text-secondary" />
           <span className="ml-2 text-xs font-mono text-text-muted">Reading Serato library...</span>
         </div>
       </div>
@@ -233,7 +233,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Disc3 size={14} className="text-purple-400" />
+          <Disc3 size={14} className="text-text-secondary" />
           <h3 className="text-text-primary text-sm font-mono font-bold tracking-wider uppercase">
             Serato
           </h3>
@@ -245,7 +245,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
         <div className="flex items-center gap-2">
           <button
             onClick={handleBrowse}
-            className="text-text-muted hover:text-purple-400 p-1 transition-colors"
+            className="text-text-muted hover:text-text-primary p-1 transition-colors"
             title="Change Serato library"
           >
             <FolderOpen size={12} />
@@ -260,7 +260,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-1.5 text-red-400 text-[10px] font-mono px-2 py-1 bg-red-900/20 rounded border border-red-900/30">
+        <div className="flex items-center gap-1.5 text-text-secondary text-[10px] font-mono px-2 py-1 bg-dark-bgTertiary/20 rounded border border-dark-borderLight/30">
           <AlertCircle size={10} />
           {error}
         </div>
@@ -277,7 +277,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
             placeholder="Search tracks..."
             className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
                        rounded text-text-primary placeholder:text-text-muted/40
-                       focus:border-purple-600 focus:outline-none transition-colors"
+                       focus:border-dark-borderLight focus:outline-none transition-colors"
           />
         </div>
        {/* Crate selector */}
@@ -308,7 +308,7 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
             key={key}
             onClick={() => toggleSort(key)}
             className={`${cls} hover:text-text-primary transition-colors text-left truncate ${
-              sortKey === key ? 'text-purple-400' : ''
+              sortKey === key ? 'text-accent-primary' : ''
             }`}
           >
             {label}
@@ -359,8 +359,8 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
                     <button
                       onClick={() => onLoadTrackToDevice(track, 'A')}
                       className="px-2 py-1 text-[10px] font-mono font-bold rounded
-                                 bg-blue-900/30 text-blue-400 border border-blue-800/50
-                                 hover:bg-blue-800/40 hover:text-blue-300 transition-colors
+                                 bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                                 hover:bg-dark-bgHover hover:text-text-primary transition-colors
                                  opacity-0 group-hover:opacity-100"
                     >
                       1
@@ -368,8 +368,8 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
                     <button
                       onClick={() => onLoadTrackToDevice(track, 'B')}
                       className="px-2 py-1 text-[10px] font-mono font-bold rounded
-                                 bg-red-900/30 text-red-400 border border-red-800/50
-                                 hover:bg-red-800/40 hover:text-red-300 transition-colors
+                                 bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                                 hover:bg-dark-bgHover hover:text-text-primary transition-colors
                                  opacity-0 group-hover:opacity-100"
                     >
                       2
@@ -378,8 +378,8 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
                       <button
                         onClick={() => onLoadTrackToDevice(track, 'C')}
                         className="px-2 py-1 text-[10px] font-mono font-bold rounded
-                                   bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
-                                   hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
+                                   bg-dark-bgTertiary/30 text-text-secondary border border-dark-borderLight/50
+                                   hover:bg-dark-bgHover hover:text-text-primary transition-colors
                                    opacity-0 group-hover:opacity-100"
                       >
                         3

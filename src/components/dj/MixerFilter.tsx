@@ -45,7 +45,7 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
         paramKey={deckId === 'A' ? 'dj.deckA.filter' : 'dj.deckB.filter'}
         label="FILTER"
         size="sm"
-        color="#aa44ff"
+        tone="neutral"
         bipolar
         defaultValue={0}
         formatValue={formatFilter}
@@ -59,7 +59,7 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
         paramKey={deckId === 'A' ? 'dj.deckA.filterQ' : 'dj.deckB.filterQ'}
         label="Q"
         size="sm"
-        color="#aa44ff"
+        tone="neutral"
         defaultValue={1}
         formatValue={(v) => v.toFixed(1)}
         title={`Deck ${deckNum} Filter Resonance — 0.5: gentle, 15: screaming`}

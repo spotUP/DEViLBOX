@@ -76,18 +76,18 @@ export const DJYouTubeUpload: React.FC<DJYouTubeUploadProps> = ({
               <p className="text-xs text-text-muted">Connect your YouTube account to upload videos directly.</p>
               <button
                 onClick={handleAuth}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-bold transition-colors"
+                className="px-4 py-2 bg-dark-bgActive hover:bg-dark-bgHover text-text-primary rounded text-sm font-bold transition-colors"
               >
                 Connect YouTube
               </button>
-              {error && <p className="text-xs text-red-400">{error}</p>}
+              {error && <p className="text-xs text-accent-error">{error}</p>}
             </div>
           ) : (
             <>
               {/* Connected info */}
               <div className="flex items-center justify-between text-xs">
-                <span className="text-green-400">Connected: {channelName || 'YouTube'}</span>
-                <button onClick={disconnect} className="text-text-muted hover:text-red-400 underline">Disconnect</button>
+                <span className="text-accent-success">Connected: {channelName || 'YouTube'}</span>
+                <button onClick={disconnect} className="text-text-muted hover:text-accent-error underline">Disconnect</button>
               </div>
 
               {!videoBlob ? (
@@ -97,7 +97,7 @@ export const DJYouTubeUpload: React.FC<DJYouTubeUploadProps> = ({
               ) : lastVideoUrl ? (
                 /* Upload complete */
                 <div className="text-center space-y-3 py-4">
-                  <p className="text-green-400 text-sm font-bold">Upload complete!</p>
+                  <p className="text-accent-success text-sm font-bold">Upload complete!</p>
                   <a
                     href={lastVideoUrl}
                     target="_blank"
@@ -153,7 +153,7 @@ export const DJYouTubeUpload: React.FC<DJYouTubeUploadProps> = ({
                     <div className="space-y-2">
                       <div className="w-full h-2 bg-dark-bg rounded overflow-hidden">
                         <div
-                          className="h-full bg-red-600 transition-all"
+                          className="h-full bg-dark-bgActive transition-all"
                           style={{ width: `${uploadProgress * 100}%` }}
                         />
                       </div>
@@ -164,13 +164,13 @@ export const DJYouTubeUpload: React.FC<DJYouTubeUploadProps> = ({
                   ) : (
                     <button
                       onClick={handleUpload}
-                      className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-bold transition-colors"
+                      className="w-full px-4 py-2 bg-dark-bgActive hover:bg-dark-bgHover text-text-primary rounded text-sm font-bold transition-colors"
                     >
                       Upload to YouTube
                     </button>
                   )}
 
-                  {error && <p className="text-xs text-red-400">{error}</p>}
+                  {error && <p className="text-xs text-accent-error">{error}</p>}
                 </>
               )}
             </>

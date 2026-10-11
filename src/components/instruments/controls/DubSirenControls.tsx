@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
+import { resolveColor } from '@components/ui/controlColor';
 import type { DubSirenConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Waves, Activity, Filter, Repeat, Speaker, Wind } from 'lucide-react';
@@ -22,7 +23,11 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
-  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#ff4444', { knob: '#ff8888' });
+  // CALM palette: the one accent for live state, neutral for everything else.
+  const { accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors(
+    resolveColor('var(--color-accent)'),
+    { knob: resolveColor('var(--color-text-secondary)') },
+  );
 
   const updateOsc = useCallback((updates: Partial<typeof config.oscillator>) => {
     onChange({ oscillator: { ...configRef.current.oscillator, ...updates } });
@@ -69,16 +74,16 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
               w-9 h-9 rounded border transition-all flex items-center justify-center
               ${currentType === type
                 ? `bg-dark-bgSecondary`
-                : 'bg-[#1a1a1a] border-dark-borderLight hover:border-dark-borderLight'
+                : 'bg-dark-bgTertiary border-dark-borderLight hover:border-dark-borderLight'
               }
             `}
             style={currentType === type ? { borderColor: accentColor, boxShadow: `0 0 10px ${accentColor}40` } : undefined}
             title={type}
           >
-            {type === 'sine' && <Waves size={14} color={currentType === type ? accentColor : '#666'} />}
-            {type === 'square' && <div className="w-3.5 h-3.5 border-t-2 border-r-2 border-b-0 border-l-2" style={{ borderColor: currentType === type ? accentColor : '#666' }} />}
-            {type === 'sawtooth' && <Activity size={14} color={currentType === type ? accentColor : '#666'} />}
-            {type === 'triangle' && <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-b-[8px] border-transparent border-b-current" style={{ color: currentType === type ? accentColor : '#666' }} />}
+            {type === 'sine' && <Waves size={14} color={currentType === type ? accentColor : 'var(--color-text-muted)'} />}
+            {type === 'square' && <div className="w-3.5 h-3.5 border-t-2 border-r-2 border-b-0 border-l-2" style={{ borderColor: currentType === type ? accentColor : 'var(--color-text-muted)' }} />}
+            {type === 'sawtooth' && <Activity size={14} color={currentType === type ? accentColor : 'var(--color-text-muted)'} />}
+            {type === 'triangle' && <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-b-[8px] border-transparent border-b-current" style={{ color: currentType === type ? accentColor : 'var(--color-text-muted)' }} />}
           </button>
         ))}
       </div>
@@ -90,8 +95,8 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       {/* Oscillator */}
       <div className={`p-3 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center gap-2 mb-3">
-          <Speaker size={14} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
-          <h3 className={`text-sm font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>OSCILLATOR</h3>
+          <Speaker size={14} className={'text-accent-primary'} />
+          <h3 className={`text-sm font-bold text-accent-primary`}>OSCILLATOR</h3>
         </div>
         <div className="flex items-center gap-6">
           {renderWaveSelector(config.oscillator.type, (t) => updateOsc({ type: t }), "Waveform")}
@@ -103,13 +108,13 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       <div className={`p-3 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Activity size={14} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
-            <h3 className={`text-sm font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>LFO</h3>
+            <Activity size={14} className={'text-accent-primary'} />
+            <h3 className={`text-sm font-bold text-accent-primary`}>LFO</h3>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <span className="text-[10px] text-text-muted">Enable</span>
             <input type="checkbox" checked={config.lfo.enabled} onChange={(e) => updateLFO({ enabled: e.target.checked })}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-red-500 checked:bg-red-500'}`} />
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer border-accent-primary checked:bg-accent-primary`} />
           </label>
         </div>
         <div className={`flex items-center gap-6 transition-opacity ${config.lfo.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
@@ -123,13 +128,13 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       <div className={`p-3 rounded-lg border ${panelBg}`} style={panelStyle}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Repeat size={14} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
-            <h3 className={`text-sm font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>DELAY</h3>
+            <Repeat size={14} className={'text-accent-primary'} />
+            <h3 className={`text-sm font-bold text-accent-primary`}>DELAY</h3>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <span className="text-[10px] text-text-muted">Enable</span>
             <input type="checkbox" checked={config.delay.enabled} onChange={(e) => updateDelay({ enabled: e.target.checked })}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-red-500 checked:bg-red-500'}`} />
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer border-accent-primary checked:bg-accent-primary`} />
           </label>
         </div>
         <div className={`flex items-center gap-6 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
@@ -142,8 +147,8 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
               onMouseDown={() => handleThrow(true)} onMouseUp={() => handleThrow(false)} onMouseLeave={() => handleThrow(false)}
               onTouchStart={() => handleThrow(true)} onTouchEnd={() => handleThrow(false)}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95
-                ${isCyanTheme ? 'bg-accent-highlight/20 border-2 border-accent-highlight text-accent-highlight' : 'bg-red-500/20 border-2 border-red-500 text-red-500'}
-                hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]`}
+                bg-accent-primary/20 border-2 border-accent-primary text-accent-primary
+                hover:shadow-glow-sm`}
               title="Momentary Delay Throw (Dub Style)"
             >
               <Wind size={16} />
@@ -158,27 +163,27 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
         <div className={`p-3 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Filter size={14} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
-              <h3 className={`text-sm font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>FILTER</h3>
+              <Filter size={14} className={'text-accent-primary'} />
+              <h3 className={`text-sm font-bold text-accent-primary`}>FILTER</h3>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <span className="text-[10px] text-text-muted">Enable</span>
               <input type="checkbox" checked={config.filter.enabled} onChange={(e) => updateFilter({ enabled: e.target.checked })}
-                className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-red-500 checked:bg-red-500'}`} />
+                className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer border-accent-primary checked:bg-accent-primary`} />
             </label>
           </div>
           <div className={`flex flex-col gap-3 transition-opacity ${config.filter.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
             <div className="flex gap-1.5 flex-wrap">
               {['lowpass', 'highpass', 'bandpass', 'notch'].map((type) => (
                 <button key={type} onClick={() => updateFilter({ type: type as 'lowpass' | 'highpass' | 'bandpass' | 'notch' })}
-                  className={`px-2 py-0.5 text-[10px] font-bold rounded border uppercase ${config.filter.type === type ? 'bg-dark-bgSecondary' : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted'}`}
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded border uppercase ${config.filter.type === type ? 'bg-dark-bgSecondary' : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted'}`}
                   style={config.filter.type === type ? { borderColor: accentColor, color: accentColor } : undefined}>{type}</button>
               ))}
             </div>
             <div className="flex gap-1.5">
               {([-12, -24, -48, -96] as const).map((roll) => (
                 <button key={roll} onClick={() => updateFilter({ rolloff: roll })}
-                  className={`px-2 py-0.5 text-[10px] font-bold rounded border ${config.filter.rolloff === roll ? 'bg-dark-bgSecondary' : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted'}`}
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded border ${config.filter.rolloff === roll ? 'bg-dark-bgSecondary' : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted'}`}
                   style={config.filter.rolloff === roll ? { borderColor: accentColor, color: accentColor } : undefined}>{roll}dB</button>
               ))}
             </div>
@@ -193,13 +198,13 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
         <div className={`p-3 rounded-lg border ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Waves size={14} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
-              <h3 className={`text-sm font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>REVERB</h3>
+              <Waves size={14} className={'text-accent-primary'} />
+              <h3 className={`text-sm font-bold text-accent-primary`}>REVERB</h3>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <span className="text-[10px] text-text-muted">Enable</span>
               <input type="checkbox" checked={config.reverb.enabled} onChange={(e) => updateReverb({ enabled: e.target.checked })}
-                className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-red-500 checked:bg-red-500'}`} />
+                className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer border-accent-primary checked:bg-accent-primary`} />
             </label>
           </div>
           <div className={`flex items-center gap-6 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>

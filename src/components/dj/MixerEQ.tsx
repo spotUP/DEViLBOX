@@ -38,7 +38,7 @@ export const MixerFilterKnob: React.FC<MixerEQProps> = ({ deckId }) => {
       onChange={handleChange}
       label="FLT"
       size="sm"
-      color="#aa44ff"
+      tone="neutral"
       bipolar
       defaultValue={0}
       formatValue={formatFilter}
@@ -54,9 +54,8 @@ export const MixerEQBandKnob: React.FC<{
   deckId: 'A' | 'B' | 'C';
   band: 'high' | 'mid' | 'low';
   label: string;
-  color: string;
   side: 'left' | 'right';
-}> = ({ deckId, band, label, color, side }) => {
+}> = ({ deckId, band, label, side }) => {
   const eqValue = useDJStore((s) => s.decks[deckId][`eq${band.charAt(0).toUpperCase() + band.slice(1)}` as 'eqHigh' | 'eqMid' | 'eqLow']);
   const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqHighKill' | 'eqMidKill' | 'eqLowKill';
   const killActive = useDJStore((s) => s.decks[deckId][killKey]);
@@ -95,7 +94,7 @@ export const MixerEQBandKnob: React.FC<{
         border transition-all duration-75
         ${
           killActive
-            ? 'bg-red-600 border-red-500 text-text-primary shadow-[0_0_6px_rgba(220,38,38,0.5)]'
+            ? 'bg-accent-primary border-accent-primary text-text-inverse shadow-glow-sm'
             : 'bg-dark-bgHover border-dark-borderLight text-text-secondary hover:bg-dark-bgActive hover:text-text-primary'
         }
       `}
@@ -115,7 +114,7 @@ export const MixerEQBandKnob: React.FC<{
         onChange={handleChange}
         label={label}
         size="sm"
-        color={color}
+        tone="neutral"
         bipolar
         defaultValue={0}
         formatValue={formatEQ}
@@ -133,9 +132,9 @@ export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <MixerFilterKnob deckId={deckId} />
-      <MixerEQBandKnob deckId={deckId} band="high" label="HI" color="#00d4ff" side={deckId === 'A' ? 'left' : 'right'} />
-      <MixerEQBandKnob deckId={deckId} band="mid" label="MID" color="#cccccc" side={deckId === 'A' ? 'left' : 'right'} />
-      <MixerEQBandKnob deckId={deckId} band="low" label="LO" color="#ff8800" side={deckId === 'A' ? 'left' : 'right'} />
+      <MixerEQBandKnob deckId={deckId} band="high" label="HI" side={deckId === 'A' ? 'left' : 'right'} />
+      <MixerEQBandKnob deckId={deckId} band="mid" label="MID" side={deckId === 'A' ? 'left' : 'right'} />
+      <MixerEQBandKnob deckId={deckId} band="low" label="LO" side={deckId === 'A' ? 'left' : 'right'} />
     </div>
   );
 };

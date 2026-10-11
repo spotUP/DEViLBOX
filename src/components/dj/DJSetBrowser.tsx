@@ -103,13 +103,13 @@ export const DJSetBrowser: React.FC = () => {
           display: 'flex', alignItems: 'center', gap: 4,
           padding: '4px 8px', cursor: isRecording ? 'not-allowed' : 'pointer',
           opacity: isRecording ? 0.5 : 1,
-          background: 'transparent', border: 'none', color: '#ccc', fontSize: 12,
+          background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', fontSize: 12,
         }}
       >
         <span>Sets</span>
         {total > 0 && (
           <span style={{
-            background: '#555', borderRadius: 8, padding: '1px 5px',
+            background: 'var(--color-bg-active)', borderRadius: 8, padding: '1px 5px',
             fontSize: 10, minWidth: 16, textAlign: 'center',
           }}>
             {total}
@@ -139,7 +139,7 @@ export const DJSetBrowser: React.FC = () => {
 
           {/* Error banner */}
           {error && (
-            <div style={{ padding: '6px 12px', background: '#3a1111', color: '#f88', fontSize: 11 }}>
+            <div style={{ padding: '6px 12px', background: 'var(--color-bg-tertiary)', color: 'var(--color-error)', fontSize: 11 }}>
               {error}
             </div>
           )}
@@ -181,8 +181,8 @@ export const DJSetBrowser: React.FC = () => {
                       <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
                         {isPlaying ? (
                           <button onClick={() => stopSetPlayback()} style={{
-                            background: '#c33', border: 'none', borderRadius: 3,
-                            color: '#fff', padding: '3px 8px', fontSize: 10, cursor: 'pointer',
+                            background: 'var(--color-error)', border: 'none', borderRadius: 3,
+                            color: 'var(--color-text-inverse)', padding: '3px 8px', fontSize: 10, cursor: 'pointer',
                           }}>
                             Stop
                           </button>
@@ -191,8 +191,8 @@ export const DJSetBrowser: React.FC = () => {
                             onClick={() => handlePlay(s.id)}
                             disabled={isPlayingSet}
                             style={{
-                              background: '#2a6', border: 'none', borderRadius: 3,
-                              color: '#fff', padding: '3px 8px', fontSize: 10,
+                              background: 'var(--color-accent)', border: 'none', borderRadius: 3,
+                              color: 'var(--color-text-inverse)', padding: '3px 8px', fontSize: 10,
                               cursor: isPlayingSet ? 'not-allowed' : 'pointer',
                               opacity: isPlayingSet && !isActive ? 0.4 : 1,
                             }}
@@ -205,9 +205,9 @@ export const DJSetBrowser: React.FC = () => {
                           <button
                             onClick={() => handleDelete(s.id)}
                             style={{
-                              background: confirmDelete === s.id ? '#c33' : '#333',
+                              background: confirmDelete === s.id ? 'var(--color-error)' : 'var(--color-bg-tertiary)',
                               border: 'none', borderRadius: 3,
-                              color: confirmDelete === s.id ? '#fff' : '#888',
+                              color: confirmDelete === s.id ? 'var(--color-text-inverse)' : 'var(--color-text-muted)',
                               padding: '3px 6px', fontSize: 10, cursor: 'pointer',
                             }}
                           >
@@ -219,10 +219,10 @@ export const DJSetBrowser: React.FC = () => {
 
                     {/* Preload progress bar */}
                     {isPreloading && (
-                      <div style={{ marginTop: 4, height: 3, background: '#333', borderRadius: 2 }}>
+                      <div style={{ marginTop: 4, height: 3, background: 'var(--color-bg-tertiary)', borderRadius: 2 }}>
                         <div style={{
                           width: `${preloadProgress * 100}%`, height: '100%',
-                          background: '#48f', borderRadius: 2, transition: 'width 0.2s',
+                          background: 'var(--color-accent)', borderRadius: 2, transition: 'width 0.2s',
                         }} />
                       </div>
                     )}
@@ -230,13 +230,13 @@ export const DJSetBrowser: React.FC = () => {
                     {/* Playback progress bar */}
                     {isPlaying && (
                       <div style={{ marginTop: 4 }}>
-                        <div style={{ height: 3, background: '#333', borderRadius: 2 }}>
+                        <div style={{ height: 3, background: 'var(--color-bg-tertiary)', borderRadius: 2 }}>
                           <div style={{
                             width: `${playbackProgress * 100}%`, height: '100%',
-                            background: '#2a6', borderRadius: 2, transition: 'width 0.3s',
+                            background: 'var(--color-accent)', borderRadius: 2, transition: 'width 0.3s',
                           }} />
                         </div>
-                        <div style={{ fontSize: 9, color: '#888', marginTop: 2 }}>
+                        <div style={{ fontSize: 9, color: 'var(--color-text-muted)', marginTop: 2 }}>
                           {formatDuration(playbackElapsed)} / {formatDuration(s.durationMs)}
                         </div>
                       </div>
@@ -249,9 +249,9 @@ export const DJSetBrowser: React.FC = () => {
 
           {/* Load more */}
           {setList.length < total && (
-            <div style={{ padding: 8, textAlign: 'center', borderTop: '1px solid #333' }}>
+            <div style={{ padding: 8, textAlign: 'center', borderTop: '1px solid var(--color-border)' }}>
               <button onClick={handleLoadMore} style={{
-                background: 'none', border: 'none', color: '#48f', fontSize: 11, cursor: 'pointer',
+                background: 'none', border: 'none', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer',
               }}>
                 Load more ({total - setList.length} remaining)
               </button>

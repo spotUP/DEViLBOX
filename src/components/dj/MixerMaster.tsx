@@ -111,7 +111,7 @@ export const MixerMaster: React.FC = () => {
         onChange={handleVolumeChange}
         label="MST"
         size="sm"
-        color="#ffffff"
+        tone="neutral"
         defaultValue={2.0}
         formatValue={formatMaster}
         hideValue
@@ -193,7 +193,7 @@ export const MixerMaster: React.FC = () => {
           onChange={setLimiterThreshold}
           label="Threshold"
           size="sm"
-          color="#ef4444"
+          tone="neutral"
           defaultValue={-1}
           formatValue={(v) => `${v.toFixed(0)} dB`}
           title="Limiter threshold — higher values allow more headroom before limiting kicks in"

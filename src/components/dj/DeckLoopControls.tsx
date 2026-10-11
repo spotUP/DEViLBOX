@@ -176,7 +176,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
           active:translate-y-[0.5px]
           ${
             loopActive
-              ? 'bg-accent-highlight text-dark-bg ring-2 ring-accent-highlight ring-offset-1 ring-offset-dark-bg shadow-[0_0_8px_rgba(0,255,255,0.4)]'
+              ? 'bg-accent-primary text-dark-bg ring-2 ring-accent-primary ring-offset-1 ring-offset-dark-bg shadow-glow-sm'
               : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover border border-dark-border'
           }
         `}
@@ -195,7 +195,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
               flex items-center justify-center font-mono font-bold
               transition-all duration-75 select-none rounded-l-sm
               ${audioLoopIn !== null
-                ? 'bg-accent-highlight/60 text-accent-highlight ring-1 ring-accent-highlight/50'
+                ? 'bg-accent-primary/60 text-accent-primary ring-1 ring-accent-primary/50'
                 : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
               }
             `}
@@ -210,7 +210,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
               flex items-center justify-center font-mono font-bold
               transition-all duration-75 select-none
               ${audioLoopOut !== null
-                ? 'bg-accent-highlight/60 text-accent-highlight ring-1 ring-accent-highlight/50'
+                ? 'bg-accent-primary/60 text-accent-primary ring-1 ring-accent-primary/50'
                 : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
               }
             `}
@@ -231,7 +231,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
                   transition-all duration-75 select-none
                   ${
                     isThisBar
-                      ? 'bg-accent-highlight text-dark-bg ring-1 ring-accent-highlight/60'
+                      ? 'bg-accent-primary text-dark-bg ring-1 ring-accent-primary/60'
                       : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
                   }
                 `}
@@ -245,7 +245,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
           <button
             onClick={handleClearAudioLoop}
             className="flex items-center justify-center font-mono font-bold rounded-r-sm
-              transition-all duration-75 select-none bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-red-400"
+              transition-all duration-75 select-none bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-primary"
             style={{ height: 40, width: 28, fontSize: 8 }}
             title="Clear loop"
           >
@@ -267,7 +267,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
                   transition-all duration-75 select-none
                   ${
                     isActive
-                      ? 'bg-accent-highlight text-dark-bg ring-1 ring-accent-highlight/60'
+                      ? 'bg-accent-primary text-dark-bg ring-1 ring-accent-primary/60'
                       : isSelected
                         ? 'bg-dark-borderLight text-text-primary'
                         : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
@@ -294,7 +294,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
           active:translate-y-[0.5px]
           ${
             slipEnabled
-              ? 'bg-amber-600 text-text-primary ring-2 ring-amber-500 ring-offset-1 ring-offset-dark-bg shadow-[0_0_8px_rgba(255,191,0,0.3)]'
+              ? 'bg-accent-primary text-text-inverse ring-2 ring-accent-primary ring-offset-1 ring-offset-dark-bg shadow-glow-sm'
               : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover border border-dark-border'
           }
         `}

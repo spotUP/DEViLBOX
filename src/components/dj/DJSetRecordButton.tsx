@@ -134,14 +134,14 @@ export const DJSetRecordButton: React.FC = () => {
       className={`
         flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all
         ${isRecording
-          ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
+          ? 'bg-accent-primary hover:bg-accent-primary/80 text-text-inverse animate-pulse'
           : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-secondary hover:text-text-primary'
         }
         ${saving ? 'opacity-50 cursor-wait' : isPlayingSet ? 'opacity-40 cursor-not-allowed' : ''}
       `}
       title={isRecording ? 'Stop recording' : 'Record DJ set'}
     >
-      <span className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
+      <span className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-text-inverse' : 'bg-dark-bgActive'}`} />
       {saving ? 'Saving...' : isRecording ? formatDuration(recordingDuration) : 'REC'}
     </button>
   );

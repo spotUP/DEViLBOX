@@ -15,6 +15,7 @@
  * manages its own grid alignment via the caller-provided source='live').
  */
 
+import { calmControlStyle } from '@components/ui/controlColor';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { fireDjFx, releaseDjFx, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
@@ -31,20 +32,18 @@ interface PadDef {
   id: string;
   label: string;
   sublabel?: string;
-  color: string;
-  activeColor: string;
   mode: 'momentary' | 'toggle' | 'instant';
 }
 
 const FX_PADS: PadDef[] = [
-  { id: 'hpf-sweep', label: 'High Pass', sublabel: '▲', color: 'violet', activeColor: 'violet', mode: 'momentary' },
-  { id: 'lpf-sweep', label: 'Low Pass', sublabel: '▼', color: 'blue', activeColor: 'blue', mode: 'momentary' },
-  { id: 'filter-reset', label: 'Filter', sublabel: 'reset', color: 'gray', activeColor: 'green', mode: 'momentary' },
-  { id: 'echo-out', label: 'Echo', sublabel: 'out', color: 'amber', activeColor: 'red', mode: 'toggle' },
-  { id: 'kill-low', label: 'Kill', sublabel: 'low', color: 'orange', activeColor: 'red', mode: 'momentary' },
-  { id: 'kill-mid', label: 'Kill', sublabel: 'mid', color: 'gray', activeColor: 'red', mode: 'momentary' },
-  { id: 'kill-hi', label: 'Kill', sublabel: 'high', color: 'cyan', activeColor: 'red', mode: 'momentary' },
-  { id: 'brake', label: 'Brake', sublabel: '⏎', color: 'rose', activeColor: 'rose', mode: 'momentary' },
+  { id: 'hpf-sweep', label: 'High Pass', sublabel: '▲', mode: 'momentary' },
+  { id: 'lpf-sweep', label: 'Low Pass', sublabel: '▼', mode: 'momentary' },
+  { id: 'filter-reset', label: 'Filter', sublabel: 'reset', mode: 'momentary' },
+  { id: 'echo-out', label: 'Echo', sublabel: 'out', mode: 'toggle' },
+  { id: 'kill-low', label: 'Kill', sublabel: 'low', mode: 'momentary' },
+  { id: 'kill-mid', label: 'Kill', sublabel: 'mid', mode: 'momentary' },
+  { id: 'kill-hi', label: 'Kill', sublabel: 'high', mode: 'momentary' },
+  { id: 'brake', label: 'Brake', sublabel: '⏎', mode: 'momentary' },
 ];
 
 // Dub-send pads — fire dub moves straight onto the bus from the deck,
@@ -53,14 +52,14 @@ const FX_PADS: PadDef[] = [
 // hold-style processors (filterDrop, dubSiren, reverseEcho, tapeWobble,
 // echoThrow). Hold pads use `momentary` so they release on pointer-up.
 const DUB_PADS: PadDef[] = [
-  { id: 'dub-slam',     label: 'Spring',  sublabel: 'slam',    color: 'amber',  activeColor: 'red',    mode: 'instant' },
-  { id: 'dub-drop',     label: 'Filter',  sublabel: 'drop',    color: 'cyan',   activeColor: 'cyan',   mode: 'momentary' },
-  { id: 'dub-siren',    label: 'Siren',   sublabel: 'fb loop', color: 'rose',   activeColor: 'rose',   mode: 'momentary' },
-  { id: 'dub-reverse',  label: 'Reverse', sublabel: 'echo',    color: 'violet', activeColor: 'violet', mode: 'momentary' },
-  { id: 'dub-wobble',   label: 'Wobble',  sublabel: 'tape',    color: 'orange', activeColor: 'orange', mode: 'momentary' },
-  { id: 'dub-throw',    label: 'Echo',    sublabel: 'throw',   color: 'sky',    activeColor: 'sky',    mode: 'momentary' },
-  { id: 'dub-time',     label: 'Delay',   sublabel: 'throw',   color: 'blue',   activeColor: 'blue',   mode: 'instant' },
-  { id: 'dub-master',   label: 'Master',  sublabel: 'drop',    color: 'rose',   activeColor: 'red',    mode: 'momentary' },
+  { id: 'dub-slam',     label: 'Spring',  sublabel: 'slam',    mode: 'instant' },
+  { id: 'dub-drop',     label: 'Filter',  sublabel: 'drop',    mode: 'momentary' },
+  { id: 'dub-siren',    label: 'Siren',   sublabel: 'fb loop', mode: 'momentary' },
+  { id: 'dub-reverse',  label: 'Reverse', sublabel: 'echo',    mode: 'momentary' },
+  { id: 'dub-wobble',   label: 'Wobble',  sublabel: 'tape',    mode: 'momentary' },
+  { id: 'dub-throw',    label: 'Echo',    sublabel: 'throw',   mode: 'momentary' },
+  { id: 'dub-time',     label: 'Delay',   sublabel: 'throw',   mode: 'instant' },
+  { id: 'dub-master',   label: 'Master',  sublabel: 'drop',    mode: 'momentary' },
 ];
 
 // pad.id → (moveId, trigger-or-hold). Hold moves dispose on pad release.
@@ -103,14 +102,14 @@ const DUB_PAD_MAP: Record<string, string> = {
 // Second-page dub pads — stabs + reverse/tape moves + bass textures.
 // Complements DUB_PADS (throw/hold moves) with hits and drones.
 const DUB2_PADS: PadDef[] = [
-  { id: 'dub2-stab',   label: 'Stab',    sublabel: 'dub',      color: 'amber',  activeColor: 'red',    mode: 'instant' },
-  { id: 'dub2-crack',  label: 'Crack',   sublabel: 'snare',    color: 'rose',   activeColor: 'rose',   mode: 'instant' },
-  { id: 'dub2-back',   label: 'Backward', sublabel: 'reverb',  color: 'violet', activeColor: 'violet', mode: 'instant' },
-  { id: 'dub2-scream', label: 'Scream',  sublabel: 'tubby',    color: 'cyan',   activeColor: 'red',    mode: 'momentary' },
-  { id: 'dub2-bass',   label: 'Bass',    sublabel: 'drone',    color: 'orange', activeColor: 'orange', mode: 'momentary' },
-  { id: 'dub2-crush',  label: 'Crush',   sublabel: 'bits',     color: 'gray',   activeColor: 'orange', mode: 'momentary' },
-  { id: 'dub2-build',  label: 'Build',   sublabel: 'echo',     color: 'sky',    activeColor: 'sky',    mode: 'instant' },
-  { id: 'dub2-tape',   label: 'Tape',    sublabel: 'stop',     color: 'teal',   activeColor: 'red',    mode: 'instant' },
+  { id: 'dub2-stab',   label: 'Stab',    sublabel: 'dub',      mode: 'instant' },
+  { id: 'dub2-crack',  label: 'Crack',   sublabel: 'snare',    mode: 'instant' },
+  { id: 'dub2-back',   label: 'Backward', sublabel: 'reverb',  mode: 'instant' },
+  { id: 'dub2-scream', label: 'Scream',  sublabel: 'tubby',    mode: 'momentary' },
+  { id: 'dub2-bass',   label: 'Bass',    sublabel: 'drone',    mode: 'momentary' },
+  { id: 'dub2-crush',  label: 'Crush',   sublabel: 'bits',     mode: 'momentary' },
+  { id: 'dub2-build',  label: 'Build',   sublabel: 'echo',     mode: 'instant' },
+  { id: 'dub2-tape',   label: 'Tape',    sublabel: 'stop',     mode: 'instant' },
 ];
 
 // Dub 3 — atmospheric / preset / mic moves. stereoDoubler widens,
@@ -118,14 +117,14 @@ const DUB2_PADS: PadDef[] = [
 // low-end drones, the two delay presets snap canonical timings (Tubby
 // 380 ms, Perry dotted-eighth), TOAST taps the DJ mic through the bus.
 const DUB3_PADS: PadDef[] = [
-  { id: 'dub3-wide',  label: 'Stereo',  sublabel: 'doubler', color: 'teal',   activeColor: 'teal',   mode: 'momentary' },
-  { id: 'dub3-ping',  label: 'Sonar',   sublabel: 'ping',    color: 'cyan',   activeColor: 'cyan',   mode: 'instant' },
-  { id: 'dub3-radio', label: 'Radio',   sublabel: 'riser',   color: 'amber',  activeColor: 'amber',  mode: 'instant' },
-  { id: 'dub3-sub',   label: 'Sub',     sublabel: 'swell',   color: 'orange', activeColor: 'orange', mode: 'instant' },
-  { id: 'dub3-subh',  label: 'Sub',     sublabel: 'harmonic', color: 'indigo', activeColor: 'indigo', mode: 'momentary' },
-  { id: 'dub3-p380',  label: '380ms',   sublabel: 'tubby',   color: 'blue',   activeColor: 'blue',   mode: 'instant' },
-  { id: 'dub3-pdot',  label: 'Dotted',  sublabel: '1/8d',    color: 'blue',   activeColor: 'blue',   mode: 'instant' },
-  { id: 'dub3-toast', label: 'Toast',   sublabel: 'mic',     color: 'rose',   activeColor: 'red',    mode: 'momentary' },
+  { id: 'dub3-wide',  label: 'Stereo',  sublabel: 'doubler', mode: 'momentary' },
+  { id: 'dub3-ping',  label: 'Sonar',   sublabel: 'ping',    mode: 'instant' },
+  { id: 'dub3-radio', label: 'Radio',   sublabel: 'riser',   mode: 'instant' },
+  { id: 'dub3-sub',   label: 'Sub',     sublabel: 'swell',   mode: 'instant' },
+  { id: 'dub3-subh',  label: 'Sub',     sublabel: 'harmonic', mode: 'momentary' },
+  { id: 'dub3-p380',  label: '380ms',   sublabel: 'tubby',   mode: 'instant' },
+  { id: 'dub3-pdot',  label: 'Dotted',  sublabel: '1/8d',    mode: 'instant' },
+  { id: 'dub3-toast', label: 'Toast',   sublabel: 'mic',     mode: 'momentary' },
 ];
 
 // Dub 4 — channel + transport edge cases. Only 3 pads here (the grid
@@ -135,20 +134,20 @@ const DUB3_PADS: PadDef[] = [
 //     on the deck — audible effect depends on what's on ch 0)
 //   STOP!  disrupts playback itself (not just the bus tail)
 const DUB4_PADS: PadDef[] = [
-  { id: 'dub4-mute',   label: 'Mute',     sublabel: 'ch 0',      color: 'gray',   activeColor: 'red',    mode: 'momentary' },
-  { id: 'dub4-cthrow', label: 'Channel',  sublabel: 'throw',     color: 'violet', activeColor: 'violet', mode: 'instant' },
-  { id: 'dub4-txstop', label: 'Stop',     sublabel: 'transport', color: 'rose',   activeColor: 'red',    mode: 'instant' },
+  { id: 'dub4-mute',   label: 'Mute',     sublabel: 'ch 0',      mode: 'momentary' },
+  { id: 'dub4-cthrow', label: 'Channel',  sublabel: 'throw',     mode: 'instant' },
+  { id: 'dub4-txstop', label: 'Stop',     sublabel: 'transport', mode: 'instant' },
 ];
 
 const JUMP_PADS: PadDef[] = [
-  { id: 'jump-back-16', label: '◄◄', sublabel: '16', color: 'indigo', activeColor: 'indigo', mode: 'instant' },
-  { id: 'jump-back-4', label: '◄◄', sublabel: '4', color: 'blue', activeColor: 'blue', mode: 'instant' },
-  { id: 'jump-back-1', label: '◄', sublabel: '1', color: 'sky', activeColor: 'sky', mode: 'instant' },
-  { id: 'jump-back-half', label: '◄', sublabel: '½', color: 'teal', activeColor: 'teal', mode: 'instant' },
-  { id: 'jump-fwd-half', label: '►', sublabel: '½', color: 'teal', activeColor: 'teal', mode: 'instant' },
-  { id: 'jump-fwd-1', label: '►', sublabel: '1', color: 'sky', activeColor: 'sky', mode: 'instant' },
-  { id: 'jump-fwd-4', label: '►►', sublabel: '4', color: 'blue', activeColor: 'blue', mode: 'instant' },
-  { id: 'jump-fwd-16', label: '►►', sublabel: '16', color: 'indigo', activeColor: 'indigo', mode: 'instant' },
+  { id: 'jump-back-16', label: '◄◄', sublabel: '16', mode: 'instant' },
+  { id: 'jump-back-4', label: '◄◄', sublabel: '4', mode: 'instant' },
+  { id: 'jump-back-1', label: '◄', sublabel: '1', mode: 'instant' },
+  { id: 'jump-back-half', label: '◄', sublabel: '½', mode: 'instant' },
+  { id: 'jump-fwd-half', label: '►', sublabel: '½', mode: 'instant' },
+  { id: 'jump-fwd-1', label: '►', sublabel: '1', mode: 'instant' },
+  { id: 'jump-fwd-4', label: '►►', sublabel: '4', mode: 'instant' },
+  { id: 'jump-fwd-16', label: '►►', sublabel: '16', mode: 'instant' },
 ];
 
 /** Deck FX pad -> DJ FX registry action (one path for the pad, MIDI, keyboard and the Auto DJ). */
@@ -172,22 +171,6 @@ const BEAT_JUMPS: Record<string, number> = {
   'jump-fwd-1': 1,
   'jump-fwd-4': 4,
   'jump-fwd-16': 16,
-};
-
-// Color map for pad states — static values so Tailwind purging isn't needed
-const PAD_COLORS: Record<string, { bg: string; text: string; border: string; glow: string }> = {
-  violet:  { bg: 'rgba(139,92,246,0.45)',  text: '#c4b5fd', border: 'rgba(139,92,246,0.6)',  glow: 'rgba(139,92,246,0.5)' },
-  blue:    { bg: 'rgba(59,130,246,0.45)',   text: '#93c5fd', border: 'rgba(59,130,246,0.6)',   glow: 'rgba(59,130,246,0.5)' },
-  green:   { bg: 'rgba(34,197,94,0.45)',    text: '#86efac', border: 'rgba(34,197,94,0.6)',    glow: 'rgba(34,197,94,0.5)' },
-  amber:   { bg: 'rgba(245,158,11,0.45)',   text: '#fcd34d', border: 'rgba(245,158,11,0.6)',   glow: 'rgba(245,158,11,0.5)' },
-  red:     { bg: 'rgba(239,68,68,0.50)',    text: '#fca5a5', border: 'rgba(239,68,68,0.6)',    glow: 'rgba(239,68,68,0.5)' },
-  orange:  { bg: 'rgba(249,115,22,0.45)',   text: '#fdba74', border: 'rgba(249,115,22,0.6)',   glow: 'rgba(249,115,22,0.5)' },
-  cyan:    { bg: 'rgba(6,182,212,0.45)',    text: '#67e8f9', border: 'rgba(6,182,212,0.6)',    glow: 'rgba(6,182,212,0.5)' },
-  rose:    { bg: 'rgba(244,63,94,0.45)',    text: '#fda4af', border: 'rgba(244,63,94,0.6)',    glow: 'rgba(244,63,94,0.5)' },
-  gray:    { bg: 'rgba(156,163,175,0.35)',  text: '#d1d5db', border: 'rgba(156,163,175,0.5)',  glow: 'rgba(156,163,175,0.4)' },
-  indigo:  { bg: 'rgba(99,102,241,0.45)',   text: '#a5b4fc', border: 'rgba(99,102,241,0.6)',   glow: 'rgba(99,102,241,0.5)' },
-  sky:     { bg: 'rgba(14,165,233,0.45)',   text: '#7dd3fc', border: 'rgba(14,165,233,0.6)',   glow: 'rgba(14,165,233,0.5)' },
-  teal:    { bg: 'rgba(20,184,166,0.45)',   text: '#5eead4', border: 'rgba(20,184,166,0.6)',   glow: 'rgba(20,184,166,0.5)' },
 };
 
 export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
@@ -370,7 +353,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           onClick={() => setPage('fx')}
           className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'fx'
-              ? 'bg-violet-600/30 text-violet-300 border border-violet-500/40'
+              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
         >
@@ -380,7 +363,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           onClick={() => setPage('jump')}
           className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'jump'
-              ? 'bg-sky-600/30 text-sky-300 border border-sky-500/40'
+              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
         >
@@ -390,7 +373,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           onClick={() => setPage('dub')}
           className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'dub'
-              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
           title={
@@ -405,7 +388,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           onClick={() => setPage('dub2')}
           className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'dub2'
-              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
           title={
@@ -420,7 +403,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           onClick={() => setPage('dub3')}
           className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'dub3'
-              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
           title={
@@ -435,7 +418,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           onClick={() => setPage('dub4')}
           className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
             page === 'dub4'
-              ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
           title={
@@ -447,7 +430,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
           DUB 4{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
         </button>
         {page === 'jump' && hasBeatGrid && (
-          <span className="text-[9px] text-green-400 ml-auto">● GRID</span>
+          <span className="text-[9px] text-text-secondary ml-auto">● GRID</span>
         )}
       </div>
 
@@ -456,10 +439,8 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
         {pads.map((pad) => {
           const active = isActive(pad.id);
           const pressed = activePads.has(pad.id);
-          const colorKey = active ? pad.activeColor : pad.color;
-          const colors = PAD_COLORS[colorKey] || PAD_COLORS.gray;
-          // Inactive pads use a subtle tint of their color so they look like buttons
-          const inactiveColors = PAD_COLORS[pad.color] || PAD_COLORS.gray;
+          // CALM palette: neutral at rest, the one accent while live.
+          const look = calmControlStyle(active);
           return (
             <button
               key={pad.id}
@@ -471,24 +452,14 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                 height: 48,
                 transition: pressed ? 'transform 50ms' : 'transform 120ms ease-out',
                 transform: pressed ? 'scale(0.92)' : 'scale(1)',
-                backgroundColor: active ? colors.bg : inactiveColors.bg.replace(/[\d.]+\)$/, '0.12)'),
-                color: active ? colors.text : inactiveColors.text,
-                border: `1px solid ${active ? colors.border : inactiveColors.border.replace(/[\d.]+\)$/, '0.35)')}`,
-                boxShadow: active ? `0 0 12px ${colors.glow}, inset 0 0 8px ${colors.glow}` : `inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.3)`,
+                backgroundColor: look.backgroundColor,
+                color: look.color,
+                border: `1px solid ${look.borderColor}`,
+                boxShadow: look.boxShadow ?? `inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.3)`,
                 opacity: active ? 1 : 0.85,
               }}
               title={`${pad.label} ${pad.sublabel ?? ''} (${pad.mode})`}
             >
-              {/* Active glow overlay */}
-              {active && (
-                <div
-                  className="absolute inset-0 rounded-md pointer-events-none"
-                  style={{
-                    background: `radial-gradient(circle at center, ${colors.glow} 0%, transparent 70%)`,
-                    opacity: 0.4,
-                  }}
-                />
-              )}
               {/* Press flash */}
               {pressed && (
                 <div
@@ -521,8 +492,8 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                   className="absolute top-0.5 right-0.5 rounded-sm px-1 font-mono font-bold pointer-events-none"
                   style={{
                     fontSize: 7,
-                    background: 'var(--color-accent-highlight, #f59e0b)',
-                    color: 'var(--color-text-inverse, #000)',
+                    background: 'var(--color-accent)',
+                    color: 'var(--color-text-inverse)',
                     lineHeight: '10px',
                   }}
                 >

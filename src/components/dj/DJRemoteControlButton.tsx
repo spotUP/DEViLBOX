@@ -91,7 +91,7 @@ export const DJRemoteControlButton: React.FC = () => {
         onClick={handleToggle}
         className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
           ${showPanel
-            ? 'border-blue-500 bg-blue-600 text-white'
+            ? 'border-accent-primary bg-accent-primary text-text-inverse'
             : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
         title="Connect iPhone controller"
@@ -129,7 +129,7 @@ export const DJRemoteControlButton: React.FC = () => {
               {/* Room code for manual entry */}
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-[10px] text-text-muted">Room:</span>
-                <span className="text-sm font-mono font-bold text-blue-400 tracking-wider">{roomCode}</span>
+                <span className="text-sm font-mono font-bold text-text-secondary tracking-wider">{roomCode}</span>
               </div>
 
               {/* Copy URL button */}
@@ -142,7 +142,7 @@ export const DJRemoteControlButton: React.FC = () => {
 
               {/* Mic status */}
               <div className="text-[10px] text-text-muted">
-                Mic: <span className={micStatus === 'connected' ? 'text-green-400' : micStatus === 'waiting' ? 'text-yellow-400' : 'text-text-muted'}>
+                Mic: <span className={micStatus === 'connected' ? 'text-accent-success' : micStatus === 'waiting' ? 'text-accent-warning' : 'text-text-muted'}>
                   {micStatus || 'initializing...'}
                 </span>
               </div>

@@ -80,7 +80,7 @@ export const DJMicControl: React.FC = () => {
         className={`
           px-2 py-1 rounded text-xs font-bold transition-all
           ${micEnabled
-            ? 'bg-green-600 hover:bg-green-700 text-white'
+            ? 'bg-accent-primary hover:bg-accent-primary/80 text-text-inverse'
             : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
           }
         `}
@@ -97,7 +97,7 @@ export const DJMicControl: React.FC = () => {
           step="0.01"
           value={micGain}
           onChange={handleGainChange}
-          className="w-16 h-1 accent-green-500"
+          className="w-16 h-1 accent-accent-primary"
           title={`Mic gain: ${Math.round(micGain * 100)}%`}
         />
       )}
@@ -122,7 +122,7 @@ export const DJMicControl: React.FC = () => {
         </button>
       )}
 
-      {error && <span className="text-[10px] text-red-400">{error}</span>}
+      {error && <span className="text-[10px] text-accent-error">{error}</span>}
     </div>
   );
 };

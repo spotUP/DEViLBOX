@@ -377,7 +377,7 @@ export const DJVocoderControl: React.FC = () => {
         onContextMenu={(e) => e.preventDefault()}
         className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all select-none touch-none
           ${!muted || globalPTT
-            ? 'border-green-500 bg-green-600 text-white shadow-[0_0_8px_rgba(34,197,94,0.4)]'
+            ? 'border-accent-primary bg-accent-primary text-text-inverse shadow-glow-sm'
             : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
         title="Hold to talk (or press Space) — release to let echo ring out"
@@ -390,14 +390,14 @@ export const DJVocoderControl: React.FC = () => {
         onClick={handleToggle}
         className={`relative overflow-hidden px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
           ${isActive
-            ? 'border-purple-500 bg-purple-600 text-white hover:bg-purple-700'
+            ? 'border-accent-primary bg-accent-primary text-text-inverse hover:bg-accent-primary/80'
             : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
         title={isActive ? 'Switch to clean mic' : 'Enable robot voice'}
       >
         {isActive && !muted && (
           <span
-            className="absolute inset-0 bg-purple-400 rounded-md pointer-events-none"
+            className="absolute inset-0 bg-dark-bgTertiary rounded-md pointer-events-none"
             style={{ opacity: amplitude * 0.5 }}
           />
         )}
@@ -434,7 +434,7 @@ export const DJVocoderControl: React.FC = () => {
         )}
       </button>
 
-      {error && <span className="text-[10px] text-red-400">{error}</span>}
+      {error && <span className="text-[10px] text-accent-error">{error}</span>}
 
       {/* ── Settings dropdown panel — portaled to escape overflow:hidden ── */}
       {showPanel && createPortal(
@@ -464,7 +464,7 @@ export const DJVocoderControl: React.FC = () => {
               <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1">Level</div>
               <div className="w-full h-2 bg-dark-bgTertiary rounded-sm overflow-hidden">
                 <div
-                  className={`h-full transition-[width] duration-75 ${isActive ? 'bg-purple-500' : 'bg-green-500'}`}
+                  className={`h-full transition-[width] duration-75 ${isActive ? 'bg-accent-primary' : 'bg-dark-bgActive'}`}
                   style={{ width: `${Math.min(100, (muted ? 0 : amplitude) * 300)}%` }}
                 />
               </div>
@@ -476,19 +476,19 @@ export const DJVocoderControl: React.FC = () => {
             <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1.5">Features</div>
             <div className="grid grid-cols-2 gap-1.5">
               <label className="flex items-center gap-1.5 cursor-pointer" title="Duck music volume while talking">
-                <input type="checkbox" checked={duckingEnabled} onChange={() => setDuckingEnabled(!duckingEnabled)} className="w-3 h-3 accent-amber-500" />
+                <input type="checkbox" checked={duckingEnabled} onChange={() => setDuckingEnabled(!duckingEnabled)} className="w-3 h-3 accent-accent-primary" />
                 <span className="text-text-secondary">Duck music</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer" title="Follow melody from active deck">
-                <input type="checkbox" checked={followMelodyEnabled} onChange={handleFollowMelodyToggle} className="w-3 h-3 accent-pink-500" />
+                <input type="checkbox" checked={followMelodyEnabled} onChange={handleFollowMelodyToggle} className="w-3 h-3 accent-accent-primary" />
                 <span className="text-text-secondary">Melody</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer" title="Pitch-correction autotune">
-                <input type="checkbox" checked={realTuneEnabled} onChange={handleRealTuneToggle} className="w-3 h-3 accent-pink-500" />
+                <input type="checkbox" checked={realTuneEnabled} onChange={handleRealTuneToggle} className="w-3 h-3 accent-accent-primary" />
                 <span className="text-text-secondary">Autotune</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer" title="Mic effects (echo/reverb)">
-                <input type="checkbox" checked={fxEnabled} onChange={handleFXToggle} className="w-3 h-3 accent-cyan-500" />
+                <input type="checkbox" checked={fxEnabled} onChange={handleFXToggle} className="w-3 h-3 accent-accent-primary" />
                 <span className="text-text-secondary">Mic FX</span>
               </label>
             </div>
@@ -502,14 +502,14 @@ export const DJVocoderControl: React.FC = () => {
                 value={String(tuneKey)}
                 onChange={handleTuneKeyChange}
                 options={KEY_NAMES.map((name, i) => ({ value: String(i), label: name }))}
-                className="px-1.5 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bg text-pink-400 w-14"
+                className="px-1.5 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bg text-text-secondary w-14"
                 zIndex={99992}
               />
               <CustomSelect
                 value={tuneScale}
                 onChange={handleTuneScaleChange}
                 options={SCALE_OPTIONS.map((s) => ({ value: s, label: s }))}
-                className="px-1.5 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bg text-pink-400 flex-1"
+                className="px-1.5 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bg text-text-secondary flex-1"
                 zIndex={99992}
               />
             </div>
@@ -526,7 +526,7 @@ export const DJVocoderControl: React.FC = () => {
                   value: name,
                   label: name === 'none' ? 'Dry' : name.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
                 }))}
-                className="flex-1 px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bg text-cyan-400"
+                className="flex-1 px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bg text-text-secondary"
                 zIndex={99992}
               />
             </div>
@@ -552,7 +552,7 @@ export const DJVocoderControl: React.FC = () => {
                 <input
                   type="range" min="0.25" max="4.0" step="0.05"
                   value={params.formantShift} onChange={handleFormantShift}
-                  className="flex-1 h-1 accent-purple-500"
+                  className="flex-1 h-1 accent-accent-primary"
                 />
                 <span className="text-[9px] text-text-muted w-8 text-right">{params.formantShift.toFixed(2)}x</span>
               </div>
@@ -561,7 +561,7 @@ export const DJVocoderControl: React.FC = () => {
                 <input
                   type="range" min="0" max="1" step="0.01"
                   value={params.wet} onChange={handleWet}
-                  className="flex-1 h-1 accent-purple-500"
+                  className="flex-1 h-1 accent-accent-primary"
                 />
                 <span className="text-[9px] text-text-muted w-8 text-right">{Math.round(params.wet * 100)}%</span>
               </div>

@@ -70,7 +70,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
   }, [displayKey, otherKey]);
 
   const keyColor = useMemo(() => {
-    if (!displayKey) return '#6b7280';
+    if (!displayKey) return 'var(--color-text-muted)';
     // If other deck has a key, show compatibility color; otherwise show the key's own color
     if (otherKey) return keyCompatibilityColor(keyCompat);
     return camelotColor(displayKey);
@@ -130,9 +130,9 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
   const analysisIndicator = useMemo(() => {
     const pct = analysisProgress > 0 ? ` ${analysisProgress}%` : '';
     switch (analysisState) {
-      case 'pending':   return { text: 'QUEUE', color: 'text-yellow-600' };
-      case 'rendering': return { text: `REND${pct}`,  color: 'text-blue-400' };
-      case 'analyzing': return { text: `ANLZ${pct}`,  color: 'text-purple-400' };
+      case 'pending':   return { text: 'QUEUE', color: 'text-accent-warning' };
+      case 'rendering': return { text: `REND${pct}`,  color: 'text-text-secondary' };
+      case 'analyzing': return { text: `ANLZ${pct}`,  color: 'text-text-secondary' };
       default:          return null;
     }
   }, [analysisState, analysisProgress]);
@@ -227,7 +227,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
                 className="h-full rounded-full transition-all duration-300"
                 style={{
                   width: `${energy * 100}%`,
-                  backgroundColor: energy > 0.7 ? '#f97316' : energy > 0.4 ? '#eab308' : '#22c55e',
+                  backgroundColor: 'var(--color-accent)',
                 }}
               />
             </div>
