@@ -203,6 +203,32 @@ describe('owner plan section 16: the incoming is locked and verified before it i
   }, 60_000);
 });
 
+describe('owner plan section 16: an incoming that cannot be put in phase is never cut to (audit M8b)', () => {
+  beforeEach(() => { holder.ladderBuilds = 0; holder.incomingGridConfidence = undefined; });
+  afterEach(() => { teardownJuggleTransition(); holder.incomingGridShiftSec = 0; holder.incomingPhraseConfidence = undefined; });
+
+  it('an incoming 0.9 s off whose re-cue does not land is never answered with a cut onto it: the ladder releases', async () => {
+    holder.incomingGridShiftSec = 0.9;
+    holder.incomingPhraseConfidence = 0.9;
+    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER' });
+    expect(anticipated?.style, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toBe('juggleTransition');
+    // A deck that ignores a seek once it plays: the re-cue cannot fix its phase.
+    const seek = decks.B.audioPlayer.seek;
+    decks.B.audioPlayer.seek = (t: number) => { if (decks.B.isPlaying()) return; seek(t); };
+    loadIncoming(holder);
+    (dj as unknown as { executePlan(p: DJTransitionPlan): () => void }).executePlan(anticipated!);
+    const j = dj.getJuggle();
+    for (let t = 0; t < 120_000; t += 20) {
+      await vi.advanceTimersByTimeAsync(20);
+      if (j.counts.completed + j.counts.aborted > 0 && !decks.A.isPlaying()) break;
+    }
+    const cutsToIncoming = j.events.filter((e) => e.kind === 'juggleActionExecuted' && e.action?.type === 'CutIn' && e.action.deck === 'B');
+    expect(cutsToIncoming.length, 'the ladder cut to an incoming whose phase was never verified').toBe(0);
+    expect(j.counts.aborted).toBe(1);
+    expect(j.events.some((e) => e.kind === 'juggleAborted' && /phase/.test(e.reason ?? ''))).toBe(true);
+  }, 60_000);
+});
+
 describe('no seek of a playing deck in the transition and juggle paths', () => {
   afterEach(() => teardownJuggleTransition());
 
