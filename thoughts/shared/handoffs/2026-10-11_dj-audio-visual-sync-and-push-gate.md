@@ -10,7 +10,7 @@ status: draft
 ## Update (later 2026-10-11) - read this first
 
 Owner asked to stop starting agents and restart the session. The local
-ledger thoughts/lars/todos.md has every item with its commit; trust it.
+ledger thoughts/spot/todos.md has every item with its commit; trust it.
 
 Landed since the first version of this handoff (all on main, NOT pushed):
 1c2a90aab deck trim 0 dB (tracker applies no normalisation), 55660b941
@@ -115,7 +115,7 @@ a clean Auto DJ mix; FX7 Amiga Multiband.
 
 ## Critical references
 
-- Ledger for this session: `thoughts/lars/todos.md` (gitignored, local) -
+- Ledger for this session: `thoughts/spot/todos.md` (gitignored, local) -
   trust it over this summary if they differ.
 - Plan ledger: `thoughts/shared/plans/2026-10-06-fix-all-open.md` (FX7 ticked
   at line 253, uncommitted).
@@ -205,7 +205,7 @@ a clean Auto DJ mix; FX7 Amiga Multiband.
 
 ## Artifacts
 
-- This handoff; `thoughts/lars/todos.md` (local ledger).
+- This handoff; `thoughts/spot/todos.md` (local ledger).
 - New tests: autoDJCrossfaderNeverFadesToAStoppedDeck,
   autoDJNeverMixesThePlayingTrackIntoItself,
   incomingDeckKeepsItsPlannedEntryPoint, djDeckIsNotGainedIntoTheLimiter,

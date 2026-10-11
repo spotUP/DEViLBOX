@@ -68,7 +68,7 @@ Recon only, no code written, for the next three cheap items:
   `evaluate_script` takes `{code}` as an EXPRESSION (no `return`, no
   top-level `await`; a promise expression is awaited).
 - Uncommitted, not mine, leave alone: `src/generated/changelog.ts` (dev.sh),
-  `tools/format-state.json` (owner's jukebox verdicts), `thoughts/lars/todos.md`,
+  `tools/format-state.json` (owner's jukebox verdicts), `thoughts/spot/todos.md`,
   `third-party/*` submodule noise. Stashes 0–2 belong to other agents — never pop.
 - Playback was stopped after the last measurement (`stop` → ok).
 
