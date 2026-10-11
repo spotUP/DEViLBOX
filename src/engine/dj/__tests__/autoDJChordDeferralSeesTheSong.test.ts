@@ -54,6 +54,8 @@ function chordSong(): TrackerSong {
 /** A deck whose song methods are the real DeckEngine ones. */
 function fakeDeck() {
   const deck = Object.assign(Object.create(DeckEngine.prototype), {
+    // a real deck has its id: loads write deck state (channel scopes) under it
+    id: 'A',
     _loadedSong: null,
     _playbackMode: 'audio',
     audioPlayer: { stop: () => {} },

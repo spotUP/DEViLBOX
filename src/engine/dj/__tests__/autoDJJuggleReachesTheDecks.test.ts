@@ -43,7 +43,7 @@ import { useDJPlaylistStore, type PlaylistTrack } from '@/stores/useDJPlaylistSt
 import { getAutoDJ } from '../DJAutoDJ';
 import { corpusAnalysis, corpusTrack, type CorpusId } from '../autodj/testing/corpus';
 import { setSessionController, DJSessionController } from '../autodj/sessionController';
-import { getDjFxFireLog, clearDjFxFireLog } from '@/engine/drumpad/DjFxActions';
+import { clearDjFxFireLog } from '@/engine/drumpad/DjFxActions';
 
 type Internals = {
   activeDeck: 'A' | 'B'; idleDeck: 'A' | 'B'; preloadedDeck: 'A' | 'B' | null; plan: unknown; pollCount: number;
@@ -122,39 +122,11 @@ describe('Auto Juggle reaches the decks through the DJ actions', () => {
     vi.restoreAllMocks();
   });
 
-  it('the poll loop starts a juggle that moves the mixer crossfader, the store position the slider reads, and publishes telemetry', async () => {
-    const dj = getAutoDJ() as unknown as Internals;
-    dj.startPolling();
-    // The set is at its peak: the budget allows a juggle at once.
-    const j = dj.getJuggle();
-    const seen = new Set<number>();
-    let telemetryActive = false;
-    for (let t = 0; t < 180_000 && !(seen.size >= 2 && !j.isActive() && telemetryActive); t += 500) {
-      await vi.advanceTimersByTimeAsync(500);
-      // What the deck ticker does in the app: the store positions follow the engine.
-      const s = useDJStore.getState();
-      s.setDeckState('A', { audioPosition: 10 + (Date.now() - holder.t0) / 1000 });
-      s.setDeckState('B', { audioPosition: 12 + (Date.now() - holder.t0) / 1000 });
-      seen.add(useDJStore.getState().crossfaderPosition);
-      if (useDJStore.getState().autoDJJuggleTelemetry?.active) telemetryActive = true;
-    }
-    expect(j.counts.started, `the controller started a juggle from the poll loop (ticks ${j.counts.ticks}; last decision: ${j.getLastDecision()?.reason ?? 'none'}; blocked: ${j.getLastDecision()?.blocked.join('; ') ?? '-'})`).toBeGreaterThanOrEqual(1);
-    expect(j.counts.completed, `aborted: ${j.events.filter((e) => e.kind === 'juggleAborted').map((e) => e.reason).join('; ') || '-'}; status ${useDJStore.getState().autoDJStatus}`).toBeGreaterThanOrEqual(1);
-    await vi.advanceTimersByTimeAsync(500);
-    // One path: the mixer saw the cuts and the store the slider reads moved with them.
-    expect(holder.crossfaderCalls.length).toBeGreaterThanOrEqual(3);
-    expect(holder.crossfaderCalls).toContain(1);
-    expect(seen.has(1) || seen.has(0.5)).toBe(true);
-    expect(useDJStore.getState().crossfaderPosition).toBe(0);
-    // Telemetry for the debug view and the MCP.
-    expect(telemetryActive).toBe(true);
-    const tel = useDJStore.getState().autoDJJuggleTelemetry!;
-    expect(tel.mode).toBe('PERFORMER');
-    expect(tel.history.length).toBeGreaterThanOrEqual(1);
-    expect(tel.reason.length).toBeGreaterThan(0);
-    // Effects, when the pattern used any, went through the DjFx registry as 'autodj'.
-    for (const e of getDjFxFireLog()) expect(e.source).toBe('autodj');
-  }, 60_000);
+  // The case 'the poll loop starts a juggle with both decks playing outside a transition' was
+  // removed 2026-10-12: owner plan section 43 makes that state the user's (they started the idle
+  // deck), so Auto DJ yields (autoDJStandaloneYieldsToAUserPlayedIdleDeck.test.ts). Juggle wiring
+  // is proven through the real paths: autoDJStandaloneJuggleReachesTheDecks.test.ts (stand-alone)
+  // and autoDJJuggleTransitionReachesTheDecks.test.ts (juggle transition).
 
   it('Auto Juggle off: the poll loop never moves the crossfader', async () => {
     useDJStore.getState().setAutoDJConfig({ juggleMode: 'OFF' });
