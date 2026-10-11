@@ -681,13 +681,14 @@ export class DeckEngine {
       try {
         this.audioPlayer.seek(resumeAt);
         ownSeekCount = this.audioPlayer.seekCount;
-        this.audioPlayer.resume();
+        const startAt = this.audioPlayer.resume() ?? ctx.currentTime;
         // Give the capture worklet time to fill the ring buffer. Ring is
-        // 2048 frames ≈ 46 ms @ 44.1 kHz; 150 ms is 3× safety margin to
-        // survive scheduler jitter and the Tone.Player's 10 ms fadeIn.
-        // Check cancel flag in a tight loop instead of a single 150ms sleep
+        // 2048 frames ≈ 46 ms @ 44.1 kHz; 150 ms of audio is 3× safety margin
+        // to survive scheduler jitter and the Tone.Player's 10 ms fadeIn. The
+        // audio starts one Tone lookAhead after resume(), so count from there.
+        // Check cancel flag in a tight loop instead of a single long sleep
         // so play() doesn't have to wait the full duration.
-        for (let t = 0; t < 15; t++) {
+        for (let t = 0; t < 40 && ctx.currentTime < startAt + 0.15; t++) {
           if (this._primingCancelRequested) break;
           await new Promise(r => setTimeout(r, 10));
         }
@@ -695,9 +696,12 @@ export class DeckEngine {
         // Always pause + seek-back + restore gain, even if resume() threw.
         const soughtMeanwhile = this.audioPlayer.seekCount !== ownSeekCount;
         const restoreTo = soughtMeanwhile ? this.audioPlayer.lastSeekTarget : resumeAt;
-        try { this.audioPlayer.pause(); } catch { /* ok */ }
+        let silentAt = ctx.currentTime;
+        try { silentAt = this.audioPlayer.pause(); } catch { /* ok */ }
         this.audioPlayer.seek(restoreTo);
-        const restoreAt = (Tone.getContext().rawContext as AudioContext).currentTime;
+        // Unmute only once the paused player's fade-out has finished, or the
+        // tail of the priming playback is heard.
+        const restoreAt = Math.max(silentAt, ctx.currentTime);
         gainParam.cancelScheduledValues(restoreAt);
         gainParam.setValueAtTime(prevValue, restoreAt);
       }

@@ -606,7 +606,7 @@ describe('Scratch-buffer priming vs play() race fix', () => {
     // single-shot sleep. Should instead have a loop that checks cancel flag.
     expect(primingBody).not.toContain('setTimeout(r, 150)');
     // Must have a loop with cancel check for the fill-buffer wait
-    expect(primingBody).toMatch(/for \(let t = 0; t < 15/);
+    expect(primingBody).toMatch(/for \(let t = 0; t < \d+[^)]*\) \{\s*if \(this\._primingCancelRequested\) break;/);
   });
 
   it('beatMatchedTransition catches async play() rejections', () => {
