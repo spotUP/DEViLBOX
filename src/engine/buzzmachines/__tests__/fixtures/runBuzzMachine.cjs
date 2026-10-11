@@ -16,7 +16,7 @@ const scope = {
 delete globalThis.setTimeout; delete globalThis.clearTimeout;
 new Function(...Object.keys(scope), fs.readFileSync(path.join(ROOT, 'public/Buzzmachine.worklet.js'), 'utf8'))(...Object.values(scope));
 const p = new Processor();
-p.port.onmessage({ data: { type: 'init', wasmBinary: fs.readFileSync(path.join(ROOT, `public/buzzmachines/${file}.wasm`)).buffer, jsCode: fs.readFileSync(path.join(ROOT, `public/buzzmachines/${file}.js`), 'utf8'), machineType: type, paramLayout: JSON.parse(process.env.BUZZ_LAYOUT || '[]') } });
+p.port.onmessage({ data: { type: 'init', wasmBinary: (() => { const b = fs.readFileSync(path.join(ROOT, `public/buzzmachines/${file}.wasm`)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); })(), jsCode: fs.readFileSync(path.join(ROOT, `public/buzzmachines/${file}.js`), 'utf8'), machineType: type, paramLayout: JSON.parse(process.env.BUZZ_LAYOUT || '[]') } });
 // Wait for the worklet's own reply to the init message (initialized or error), not a fixed
 // 500 ms: a loaded machine compiles the WASM later, and process() before init only bypasses.
 // The parent bounds a child that never replies (CPU budget plus wall backstop).

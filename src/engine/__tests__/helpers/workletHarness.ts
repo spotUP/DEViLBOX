@@ -14,6 +14,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(__dirname, '../../../..');
+
+/** A Buffer's bytes as their own ArrayBuffer: a Buffer may be a view into a larger backing store (Node 24.21 reads do), and `.buffer` alone hands the whole store to WebAssembly. */
+function exactArrayBuffer(b: Buffer): ArrayBuffer {
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+}
 export const BLOCK = 128;
 export const SAMPLE_RATE = 44100;
 
@@ -61,7 +66,7 @@ export async function openWorklet(opts: { dir: string; name: string; factory: st
   try {
     await send({
       type: 'init', sampleRate: SAMPLE_RATE,
-      wasmBinary: readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.wasm`)).buffer.slice(0),
+      wasmBinary: exactArrayBuffer(readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.wasm`))),
       // The same glue the engine class hands its worklet (its `transformJS`).
       jsCode: (opts.transformJs ?? ((c: string) => c))(readFileSync(resolve(ROOT, 'public', opts.dir, `${opts.name}.js`), 'utf8')),
     });
