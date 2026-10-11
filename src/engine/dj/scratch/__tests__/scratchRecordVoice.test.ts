@@ -187,3 +187,71 @@ describe('ScratchRecordVoice (section 16, SCR-P2.5)', () => {
     expect(scratchVoiceStats.releases).toBeGreaterThan(0);
   });
 });
+
+describe('true re-cue before every stab (section 18, SCR-P3.3)', () => {
+  const ONE = getScratchRecord('ONE')!; // COUNT record: forwardStab listed
+  const stab = getGesture('forwardStab');
+
+  async function voiceOn(record = ONE) {
+    const ring = fakeRing();
+    const voice = new ScratchRecordVoice(0, ring, fakeBus());
+    await voice.load(record, fakeBuffer(record.durationSec));
+    ring.calls.length = 0;
+    scratchVoiceStats.cues = 0;
+    return { ring, voice };
+  }
+
+  it('four stabs drop the needle on the same position (within 1 ms) with one cue each', async () => {
+    const { ring, voice } = await voiceOn();
+    for (let i = 0; i < 4; i++) expect(voice.playGesture(stab, 120).ok).toBe(true);
+    const seeks = ring.calls.filter((c) => c.type === 'seek').map((c) => c.args[0] as number);
+    expect(seeks).toHaveLength(4);
+    for (const s of seeks) expect(Math.abs(s - seeks[0]!)).toBeLessThan(0.001);
+    expect(scratchVoiceStats.cues).toBe(4);
+    expect(seeks[0]).toBeCloseTo(ONE.anchors.vowel, 9);
+  });
+
+  it('without the re-cue (the legacy drift) the needle starts each stab further on', async () => {
+    const { ring, voice } = await voiceOn();
+    voice.cue('vowel');
+    const starts: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      starts.push(voice.position); // where the head is when the next stab begins
+      voice.stroke(stab.velocityCurve, 0.5, { interpolate: stab.interpolateVelocity });
+    }
+    expect(ring.calls.filter((c) => c.type === 'seek')).toHaveLength(1);
+    expect(starts[3]! - starts[0]!).toBeGreaterThan(0.001);
+  });
+});
+
+describe('position-driven stroke (section 17, SCR-P3.2)', () => {
+  it('strokePath posts the converted rate curve, held steps, ending at rate 0', async () => {
+    const ring = fakeRing();
+    const voice = new ScratchRecordVoice(0, ring, fakeBus());
+    const ONE = getScratchRecord('ONE')!;
+    await voice.load(ONE, fakeBuffer(ONE.durationSec));
+    const res = voice.strokePath(getGesture('forwardStab').handPath!, 0.5, {});
+    expect(res.ok).toBe(true);
+    expect(res.requestedPeak).toBeGreaterThan(0);
+    const call = last(ring, 'rateCurve')!;
+    const pts = call.args[0] as RingRatePoint[];
+    expect(pts[0]).toEqual({ frame: 0, rate: expect.any(Number) });
+    expect(pts.at(-1)).toEqual({ frame: 24000, rate: 0 });
+    expect(pts.length).toBeGreaterThan(90); // 0.5 s in 5 ms steps
+    expect(call.args[1]).toMatchObject({ interpolate: false });
+  });
+
+  it('playGesture drive "hand" performs the hand path; the default keeps the tuned velocity keyframes', async () => {
+    const mk = async () => {
+      const ring = fakeRing();
+      const voice = new ScratchRecordVoice(0, ring, fakeBus());
+      const ONE = getScratchRecord('ONE')!;
+      await voice.load(ONE, fakeBuffer(ONE.durationSec));
+      return { ring, voice };
+    };
+    const a = await mk(); a.voice.playGesture(getGesture('forwardStab'), 120, { drive: 'hand' });
+    const b = await mk(); b.voice.playGesture(getGesture('forwardStab'), 120);
+    expect((last(a.ring, 'rateCurve')!.args[0] as unknown[]).length).toBeGreaterThan(50);
+    expect((last(b.ring, 'rateCurve')!.args[0] as unknown[]).length).toBeLessThan(5);
+  });
+});
