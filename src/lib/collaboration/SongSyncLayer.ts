@@ -12,7 +12,7 @@ import { useTrackerStore, useTransportStore } from '@stores';
 import { openSavedSong } from '@/lib/song/openSong';
 import { savedSongToApply } from '@/lib/song/savedSong';
 import { snapshotSong } from '@/lib/song/snapshotSong';
-import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
+import { clearExplicitlySaved } from '@/lib/persistence/explicitSave';
 import type { CollaborationClient } from './CollaborationClient';
 import type { DataChannelMsg, SavedProject } from './types';
 import type { Pattern } from '@typedefs';

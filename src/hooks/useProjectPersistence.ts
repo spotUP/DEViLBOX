@@ -21,6 +21,7 @@ import { setRestoredEditsPending } from '@/lib/song/gridBaseline';
 import { restoreFromStoredBytes } from '@/lib/song/restoreFromStoredBytes';
 import { snapshotSong } from '@/lib/song/snapshotSong';
 import { compressProject } from '@/lib/projectCompression';
+import { markExplicitlySaved, clearExplicitlySaved, setExplicitlySaved, isExplicitlySaved } from '@/lib/persistence/explicitSave';
 
 
 const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
@@ -31,37 +32,13 @@ const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
 const RECOVERY_INTERVAL = 20000; // 20 seconds
 const RECOVERY_DEBOUNCE = 5000; // 5 seconds after edits settle
 
-// ============================================================================
-// EXPLICIT SAVE TRACKING
-// ============================================================================
-// Tracks whether the user has explicitly saved this project (Ctrl+S / save button).
-// Auto-save and revision creation are gated on this flag to prevent:
-// - Auto-saving songs that were only loaded/played (not user's own work)
-// - Creating revisions for other people's songs loaded from files
-// - Overwriting saved state with an externally-loaded song
-let explicitlySaved = false;
+// Explicit-save flag: lives in a leaf module so song-load code can clear it
+// without importing this file (see lib/persistence/explicitSave.ts).
+export { markExplicitlySaved, clearExplicitlySaved, isExplicitlySaved } from '@/lib/persistence/explicitSave';
 
 // Module-level guard: prevents loadProjectFromStorage from running more than once
 // per page session, even if the hook remounts (e.g. due to Vite HMR).
 let hasLoadedFromStorage = false;
-
-/**
- * Mark the current project as explicitly saved by the user.
- * Called after Ctrl+S / save button and when restoring from IDB / revision.
- */
-export function markExplicitlySaved(): void { explicitlySaved = true; }
-
-/**
- * Clear the explicit-save flag. Called when loading external songs/files.
- * This prevents auto-save from overwriting the user's saved project with
- * someone else's song that was just loaded for playback.
- */
-export function clearExplicitlySaved(): void { explicitlySaved = false; }
-
-/**
- * Check if the current project has been explicitly saved at least once.
- */
-export function isExplicitlySaved(): boolean { return explicitlySaved; }
 
 // IndexedDB constants
 const IDB_NAME = 'devilbox';
@@ -393,11 +370,11 @@ export async function saveProjectToStorage(options?: { explicit?: boolean }): Pr
   const isExplicit = options?.explicit ?? false;
 
   if (isExplicit) {
-    explicitlySaved = true;
+    markExplicitlySaved();
   }
 
   // Skip auto-save for projects the user never explicitly saved
-  if (!explicitlySaved) {
+  if (!isExplicitlySaved()) {
     return false;
   }
 
@@ -462,7 +439,7 @@ export async function applySavedProject(project: SavedProject, opts?: { fromReco
   const projectStore = useProjectStore.getState();
   if (!opts?.fromRecovery) projectStore.markAsSaved();
   const flags = postLoadFlags({ fromRecovery: opts?.fromRecovery });
-  explicitlySaved = flags.explicitlySaved;
+  setExplicitlySaved(flags.explicitlySaved);
   if (flags.dirty) projectStore.markAsModified();
   return true;
 }
@@ -594,7 +571,7 @@ export function serializeProjectToBlob(): Blob {
  */
 export async function loadProjectFromObject(data: unknown): Promise<boolean> {
   // Loading from external file — not the user's saved project
-  explicitlySaved = false;
+  clearExplicitlySaved();
   try {
     const project = data as SavedProject;
     if (!prepareSavedProject(project, 'reject')) return false;
@@ -633,7 +610,7 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
     await openSavedSong({ name: project.metadata?.name || 'revision', source: 'revision', song: () => savedSongToApply(project) });
     useProjectStore.getState().markAsSaved();
     // Restoring user's own revision — auto-save is safe
-    explicitlySaved = true;
+    markExplicitlySaved();
     return true;
   } catch (err) {
     console.error('[Persistence] Failed to load revision:', err);
@@ -765,7 +742,7 @@ export function useProjectPersistence() {
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      if (!isDirty || !explicitlySaved) return;
+      if (!isDirty || !isExplicitlySaved()) return;
 
       idleCallbackRef.current = safeRequestIdleCallback(
         (deadline) => {
@@ -773,7 +750,7 @@ export function useProjectPersistence() {
             void saveProjectToStorage();
           } else {
             saveTimeoutRef.current = setTimeout(() => {
-              if (isDirty && explicitlySaved) {
+              if (isDirty && isExplicitlySaved()) {
                 void saveProjectToStorage();
               }
             }, 5000);
@@ -807,7 +784,7 @@ export function useProjectPersistence() {
     if (import.meta.env.DEV) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isDirty) {
-        if (explicitlySaved) void saveProjectToStorage();
+        if (isExplicitlySaved()) void saveProjectToStorage();
         e.preventDefault();
         e.returnValue = '';
       }
@@ -823,7 +800,7 @@ export function useProjectPersistence() {
   const writeRecoveryNow = useCallback(() => {
     const isDirty = useProjectStore.getState().isDirty;
     const hasContent = liveProjectHasContent();
-    if (!shouldWriteRecovery({ explicitlySaved, isDirty, hasContent })) return;
+    if (!shouldWriteRecovery({ explicitlySaved: isExplicitlySaved(), isDirty, hasContent })) return;
     try {
       idbPutRecovery(buildSavedProject()).catch((err) => {
         // IDB write rejected (quota / abort) — best-effort net, swallow.
@@ -837,7 +814,7 @@ export function useProjectPersistence() {
 
   // Debounced recovery write — coalesces edit bursts, never writes mid-drag.
   useEffect(() => {
-    if (!isDirty || explicitlySaved) return;
+    if (!isDirty || isExplicitlySaved()) return;
     if (recoveryDebounceRef.current) clearTimeout(recoveryDebounceRef.current);
     recoveryDebounceRef.current = setTimeout(writeRecoveryNow, RECOVERY_DEBOUNCE);
     return () => {

@@ -31,7 +31,7 @@ import { useModlandContributionModal } from '@/stores/useModlandContributionModa
 import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
 import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
 
-import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
+import { clearExplicitlySaved } from '@/lib/persistence/explicitSave';
 import { applySong } from '@/lib/song/applySong';
 import { emptyPattern } from '@/lib/import/formats/Sc68Parser';
 import type { PreparedModule, PrepareHooks } from '@/lib/import/prepareModuleImport';
