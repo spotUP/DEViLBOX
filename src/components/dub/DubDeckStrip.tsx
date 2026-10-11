@@ -1428,7 +1428,7 @@ export const DubDeckStrip: React.FC = () => {
                 // button above it and the mute below it share it.
                 `flex flex-row items-stretch gap-2.5 px-2 py-1.5 rounded border ${widthClass} transition-colors ` +
                 (channelFiring || isFlashed
-                  ? 'bg-accent-highlight/15 border-accent-highlight'
+                  ? 'bg-accent-primary/15 border-accent-primary'
                   : isHeld
                     ? 'bg-accent-primary/10 border-accent-primary'
                     : hasDubSend
@@ -1472,7 +1472,7 @@ export const DubDeckStrip: React.FC = () => {
                       (userRole === 'empty'
                         ? 'bg-accent-error/20 border-accent-error text-accent-error'
                         : userRole
-                          ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+                          ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
                           : 'bg-dark-bgTertiary border-dark-border text-text-muted')
                     }
                     title={
@@ -1506,7 +1506,7 @@ export const DubDeckStrip: React.FC = () => {
                           type="range" min={0} max={1} step={0.01}
                           value={reverbSend}
                           onChange={(e) => setChannelDubReverbSend(i, Number(e.target.value))}
-                          className="w-full accent-accent-secondary"
+                          className="w-full accent-accent-primary"
                           disabled={!busEnabled}
                           title={`Ch ${i + 1} dry spring reverb send ${Math.round(reverbSend * 100)}% — bypasses echo, feeds spring directly`}
                         />
@@ -1517,7 +1517,7 @@ export const DubDeckStrip: React.FC = () => {
                           type="range" min={0} max={1} step={0.01}
                           value={sweepAmt}
                           onChange={(e) => setChannelDubSweepAmount(i, Number(e.target.value))}
-                          className="w-full accent-accent-secondary"
+                          className="w-full accent-accent-primary"
                           disabled={!busEnabled}
                           title={`Ch ${i + 1} per-channel comb sweep ${Math.round(sweepAmt * 100)}%`}
                         />
@@ -1540,10 +1540,10 @@ export const DubDeckStrip: React.FC = () => {
                 className={
                   'px-2 py-0.5 rounded border w-full text-[10px] font-bold transition-all duration-150 ' +
                   (isTarget
-                    ? 'bg-accent-highlight/30 border-accent-highlight text-accent-highlight'
+                    ? 'bg-accent-primary/30 border-accent-primary text-accent-primary'
                     : isHeld
                       ? 'bg-accent-primary border-accent-primary text-text-inverse'
-                      : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-accent-highlight')
+                      : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary hover:border-accent-primary')
                 }
                 onClick={() => (isTarget ? clearOpTarget() : touchOpTarget(i))}
                 title={isTarget
@@ -1564,7 +1564,7 @@ export const DubDeckStrip: React.FC = () => {
                 value={dubSend}
                 size="md"
                 fillHeight
-                color={channelFiring ? 'accent-highlight' : 'accent-primary'}
+                color="accent-primary"
                 onChange={(v) => {
                   // A hand on the fader aims the op panel at that channel.
                   // This is how the desk answers "which channel" — the same
@@ -1615,7 +1615,7 @@ export const DubDeckStrip: React.FC = () => {
         className={
           'px-1 py-0.5 rounded border w-full text-[9px] font-mono leading-none transition-colors ' +
           (targetChannels.length === 1
-            ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+            ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
             : 'bg-dark-bgTertiary border-dark-border text-text-muted')
         }
         onClick={() => clearOpTarget()}
@@ -1703,7 +1703,7 @@ export const DubDeckStrip: React.FC = () => {
             className={
               'px-1 py-0.5 rounded border w-full text-[9px] font-mono leading-none transition-colors ' +
               (targetChannels.length === 1
-                ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+                ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
                 : 'bg-dark-bgTertiary border-dark-border text-text-muted')
             }
             onClick={() => clearOpTarget()}
@@ -1896,7 +1896,7 @@ export const DubDeckStrip: React.FC = () => {
           className={
             'px-2.5 py-1 rounded border transition-colors ' +
             (armed
-              ? `bg-accent-error/20 border-accent-error text-accent-error ${capturedRecently ? 'animate-pulse' : ''}`
+              ? `bg-accent-primary/20 border-accent-primary text-accent-primary ${capturedRecently ? 'animate-pulse' : ''}`
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => {
@@ -1922,7 +1922,7 @@ export const DubDeckStrip: React.FC = () => {
           {DUB_STYLES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
         <button
-          className="px-2 py-1 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors disabled:opacity-40"
+          className="px-2 py-1 rounded border bg-dark-bgTertiary border-dark-border text-text-muted hover:text-accent-primary hover:border-accent-primary transition-colors disabled:opacity-40"
           onClick={auditionCurrentStyle}
           disabled={!busEnabled}
           title={`Audition ${currentStyle.label} — apply channel sends + fire the signature move`}
@@ -1962,7 +1962,7 @@ export const DubDeckStrip: React.FC = () => {
         <button
           className={`px-2.5 py-1 rounded border transition-colors text-xs font-mono ${
             autoDubEnabled
-              ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+              ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
           onClick={handleAutoDubToggle}
@@ -1990,7 +1990,7 @@ export const DubDeckStrip: React.FC = () => {
         </button>
         <button
           ref={autoDubSettingsBtnRef}
-          className="px-1.5 py-1 rounded border bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-accent-highlight hover:border-accent-highlight transition-colors text-xs disabled:opacity-40"
+          className="px-1.5 py-1 rounded border bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-accent-primary hover:border-accent-primary transition-colors text-xs disabled:opacity-40"
           onClick={() => setAutoDubSettingsOpen(v => !v)}
           disabled={!busEnabled}
           title="Auto Dub settings — intensity and move blacklist"
@@ -1999,7 +1999,7 @@ export const DubDeckStrip: React.FC = () => {
         <button
           className={`px-1.5 py-1 rounded border transition-colors text-[9px] font-mono disabled:opacity-40 ${
             autoDubEqMode !== 'off'
-              ? 'border-accent-secondary bg-accent-secondary/10 text-accent-secondary'
+              ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted hover:text-text-primary'
           }`}
           onClick={() => {
@@ -2017,7 +2017,7 @@ export const DubDeckStrip: React.FC = () => {
           className={
             'px-2.5 py-1 rounded border transition-colors ' +
             (ghostBus
-              ? 'bg-accent-highlight/20 border-accent-highlight text-accent-highlight'
+              ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setGhostBus(!ghostBus)}
@@ -2030,7 +2030,7 @@ export const DubDeckStrip: React.FC = () => {
           className={
             'px-2.5 py-1 rounded border transition-colors ' +
             (masterChorus
-              ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
+              ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setMasterChorus(!masterChorus)}
@@ -2043,7 +2043,7 @@ export const DubDeckStrip: React.FC = () => {
           className={
             'px-2.5 py-1 rounded border transition-colors ' +
             (clubSim
-              ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
+              ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => setClubSim(!clubSim)}
@@ -2069,7 +2069,7 @@ export const DubDeckStrip: React.FC = () => {
           className={
             'px-2.5 py-1 rounded border transition-colors ' +
             (chainOrder !== 'echoSpring'
-              ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
+              ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
           onClick={() => {
@@ -2091,7 +2091,7 @@ export const DubDeckStrip: React.FC = () => {
             className={
               'px-2.5 py-1 rounded border transition-colors text-xs font-bold ' +
               (micActive
-                ? 'bg-accent-error/20 border-accent-error text-accent-error animate-pulse'
+                ? 'bg-accent-primary/20 border-accent-primary text-accent-primary animate-pulse'
                 : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary hover:border-accent-primary')
             }
             onClick={() => void toggleMic()}
@@ -2109,7 +2109,7 @@ export const DubDeckStrip: React.FC = () => {
                 setMicGain(g);
                 micTapRef.current?.setGain(g);
               }}
-              className="w-16 accent-accent-error"
+              className="w-16 accent-accent-primary"
               title={`Mic gain: ${micGain.toFixed(2)}×`}
             />
           )}
@@ -2125,7 +2125,7 @@ export const DubDeckStrip: React.FC = () => {
         <button
           className={`px-2.5 py-1 rounded font-semibold text-xs ${
             auditioning
-              ? 'bg-accent-highlight text-text-inverse'
+              ? 'bg-accent-primary text-text-inverse'
               : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }`}
           disabled={!busEnabled}
@@ -2159,7 +2159,7 @@ export const DubDeckStrip: React.FC = () => {
               value={liveReturnGain}
               onChange={(e) => setDubBus({ returnGain: Number(e.target.value) })}
               {...holdLiveParam('returnGain')}
-              className="flex-1 min-w-0 accent-accent-highlight cursor-pointer"
+              className="flex-1 min-w-0 accent-accent-primary cursor-pointer"
               title={`${DUB_BUS_PARAMS['dub.returnGain'].label}: ${(liveReturnGain * 100).toFixed(0)}% — the echo and reverb return's level in the mix`}
             />
             <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
@@ -2202,7 +2202,7 @@ export const DubDeckStrip: React.FC = () => {
               type="range" min={0} max={10} step={0.5}
               value={vinylLevel}
               onChange={(e) => setVinylLevel(Number(e.target.value))}
-              className="flex-1 min-w-0 accent-accent-warning cursor-pointer"
+              className="flex-1 min-w-0 accent-accent-primary cursor-pointer"
               title={`Vinyl wear: ${vinylLevel.toFixed(1)} / 10 — surface noise, clicks, wow and flutter, high-frequency roll-off, rumble, left/right drift. 0 = factory new, 10 = gutter-scraped Jamaican 7-inch.`}
             />
             <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
@@ -2220,7 +2220,7 @@ export const DubDeckStrip: React.FC = () => {
               value={liveEchoIntensity}
               onChange={(e) => setDubBus({ echoIntensity: Number(e.target.value) })}
               {...holdLiveParam('echoIntensity')}
-              className="flex-1 min-w-0 accent-accent-secondary cursor-pointer"
+              className="flex-1 min-w-0 accent-accent-primary cursor-pointer"
               title={`${DUB_BUS_PARAMS['dub.echoIntensity'].label}: ${(liveEchoIntensity * 100).toFixed(0)}% — the echo's feedback: how long the repeats last`}
             />
             <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
@@ -2280,7 +2280,7 @@ export const DubDeckStrip: React.FC = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-3 py-1 transition-colors uppercase tracking-wide ${
                 activeTab === tab
-                  ? 'text-accent-highlight border-b-2 border-accent-highlight bg-dark-bgTertiary'
+                  ? 'text-accent-primary border-b-2 border-accent-primary bg-dark-bgTertiary'
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
@@ -2359,7 +2359,7 @@ export const DubDeckStrip: React.FC = () => {
         {/* ── RATE — echo rate radio group: click to set, click again to restore ── */}
         <div className="flex items-start gap-1.5 text-xs">
           <span
-            className="text-accent-secondary/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
+            className="text-text-muted w-16 shrink-0 pt-0.5 font-bold tracking-wide"
             title="Echo rate presets — click to activate, click again to restore previous rate. Only one active at a time."
           >RATE ▸</span>
           <div className={MOVE_ROW_GRID}>
@@ -2386,7 +2386,7 @@ export const DubDeckStrip: React.FC = () => {
         {/* ── HOLD — press and hold for exact duration ── */}
         <div className="flex items-start gap-1.5 text-xs">
           <span
-            className="text-accent-warning/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
+            className="text-text-muted w-16 shrink-0 pt-0.5 font-bold tracking-wide"
             title="Press and hold — releases when you let go"
           >HOLD ▸</span>
           <div className={MOVE_ROW_GRID}>
@@ -2424,7 +2424,7 @@ export const DubDeckStrip: React.FC = () => {
         {/* ── TOGGLE — click once on, click again off (hands-free) ── */}
         <div className="flex items-start gap-1.5 text-xs">
           <span
-            className="text-accent-highlight/60 w-16 shrink-0 pt-0.5 font-bold tracking-wide"
+            className="text-text-muted w-16 shrink-0 pt-0.5 font-bold tracking-wide"
             title="Click to activate, click again to deactivate — stays on hands-free"
           >TOGGLE ▸</span>
           <div className={MOVE_ROW_GRID}>
@@ -2508,7 +2508,7 @@ export const DubDeckStrip: React.FC = () => {
                 doubleClickValue={0}
               />
               <Fader
-                label="MID" size="md" color="accent-secondary"
+                label="MID" size="md" color="accent-primary"
                 min={-12} max={6}
                 value={dubBusSettings.midScoopGainDb}
                 onChange={(v) => setDubBus({ midScoopGainDb: Math.round(v * 2) / 2, characterPreset: 'custom' })}
@@ -2518,7 +2518,7 @@ export const DubDeckStrip: React.FC = () => {
                 doubleClickValue={0}
               />
               <Fader
-                label="WIDTH" size="md" color="accent-highlight"
+                label="WIDTH" size="md" color="accent-primary"
                 min={0} max={2}
                 value={dubBusSettings.stereoWidth}
                 onChange={(v) => setDubBus({ stereoWidth: Math.round(v * 20) / 20, characterPreset: 'custom' })}
@@ -2535,7 +2535,7 @@ export const DubDeckStrip: React.FC = () => {
             </div>
             <div className="flex items-end gap-4 px-1">
               <Fader
-                label="SWEEP" size="md" color="accent-secondary"
+                label="SWEEP" size="md" color="accent-primary"
                 min={0} max={1}
                 value={liveSweepAmount}
                 onChange={(v) => setDubBus({ sweepAmount: Math.round(v * 100) / 100, characterPreset: 'custom' })}
@@ -2544,7 +2544,7 @@ export const DubDeckStrip: React.FC = () => {
                 title="Sweep wet amount"
               />
               <Fader
-                label="RATE" size="md" color="accent-secondary"
+                label="RATE" size="md" color="accent-primary"
                 min={0.05} max={3}
                 value={liveSweepRateHz}
                 onChange={(v) => setDubBus({ sweepRateHz: Math.round(v * 20) / 20, characterPreset: 'custom' })}
@@ -2555,7 +2555,7 @@ export const DubDeckStrip: React.FC = () => {
               <button
                 className={`self-center px-1.5 py-0.5 rounded text-[10px] font-mono border transition-colors w-16 shrink-0 ${
                   dubBusSettings.sweepMode === 'phaser'
-                    ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary'
+                    ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
                     : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted'
                 }`}
                 onClick={() => setDubBus({ sweepMode: dubBusSettings.sweepMode === 'phaser' ? 'comb' : 'phaser', characterPreset: 'custom' })}

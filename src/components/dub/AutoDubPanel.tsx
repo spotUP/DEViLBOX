@@ -32,7 +32,7 @@ function DriverBadge({ personaId }: { personaId: string }) {
   const driver = persona?.improvConfig?.driver ?? '';
   const label = DRIVER_LABELS[driver] ?? '—';
   return (
-    <span className="text-[8px] font-mono text-accent-highlight px-1 py-0.5 rounded border border-accent-highlight/30 shrink-0">
+    <span className="text-[8px] font-mono text-accent-primary px-1 py-0.5 rounded border border-accent-primary/30 shrink-0">
       {label}
     </span>
   );
@@ -176,7 +176,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
         if (!persona || currentPersonaId === 'custom') return null;
         return (
           <div className="mb-3 px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-[10px] text-text-muted leading-relaxed">
-            <span className="text-accent-highlight font-bold">{persona.label}: </span>
+            <span className="text-accent-primary font-bold">{persona.label}: </span>
             {persona.description}
           </div>
         );
@@ -189,7 +189,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
           type="range" min={0} max={1} step={0.01}
           value={intensity}
           onChange={(e) => setIntensity(Number(e.target.value))}
-          className="flex-1 accent-accent-highlight disabled:opacity-50"
+          className="flex-1 accent-accent-primary disabled:opacity-50"
           disabled={!enabled}
           title={`${(intensity * 100).toFixed(0)}%`}
         />
@@ -263,7 +263,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
           </span>
           <button
             type="button"
-            className="text-text-muted hover:text-accent-highlight text-xs"
+            className="text-text-muted hover:text-accent-primary text-xs"
             onClick={() => setBlacklist([])}
             disabled={blacklist.length === 0}
           >
@@ -282,7 +282,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
                   type="checkbox"
                   checked={allowed}
                   onChange={(e) => toggleMove(moveId, e.target.checked)}
-                  className="accent-accent-highlight"
+                  className="accent-accent-primary"
                 />
                 <span className={`text-xs ${allowed ? 'text-text-primary' : 'text-text-muted line-through'}`}>
                   {moveId}
@@ -310,7 +310,7 @@ export const AutoDubPanel: React.FC<AutoDubPanelProps> = ({ busEnabled, open: op
           type="button"
           className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all ${
             selfOpen || enabled
-              ? 'border-accent-highlight bg-accent-highlight/20 text-accent-highlight'
+              ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
               : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
           onClick={() => setSelfOpen(v => !v)}

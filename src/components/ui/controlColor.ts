@@ -116,6 +116,41 @@ export function deriveControlColors(color: string): ControlColors {
   };
 }
 
+/** The inline colours of a control in the CALM palette. */
+export interface CalmControlStyle {
+  color: string;
+  backgroundColor: string;
+  borderColor: string;
+  boxShadow: string | undefined;
+  /** The surface and edge a hover rule should show. */
+  hoverBackground: string;
+  hoverBorder: string;
+}
+
+/**
+ * The one look of a pad or button that is either idle or live (CALM palette,
+ * owner decision 2026-10-11).
+ *
+ * Idle is neutral: a wash of the secondary text colour. Live is the single
+ * accent at full strength behind dark text, with a glow. No other hue: what a
+ * control IS is said by its label and its place, not by a colour, so a row of
+ * them never reads as a paintbox. Dub move buttons and the deck FX pads both
+ * call this, so they cannot drift apart.
+ */
+export function calmControlStyle(active: boolean): CalmControlStyle {
+  const idle = deriveControlColors('var(--color-text-secondary)');
+  const live = deriveControlColors('var(--color-accent)');
+  const c = active ? live : idle;
+  return {
+    color: active ? 'var(--color-bg)' : idle.text,
+    backgroundColor: active ? live.text : idle.bg,
+    borderColor: active ? live.text : idle.border,
+    boxShadow: active ? `0 0 10px 2px ${live.glow}` : undefined,
+    hoverBackground: c.border,
+    hoverBorder: c.text,
+  };
+}
+
 /**
  * The named colours a control may carry.
  *

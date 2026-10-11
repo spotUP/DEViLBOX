@@ -554,7 +554,7 @@ export const ControllerShapedDeck: React.FC<ControllerShapedDeckProps> = ({
             // same control wherever the deck draws it.
             size="md"
             fillHeight
-            color={isMaster ? 'accent-highlight' : 'accent-primary'}
+            color="accent-primary"
             disabled={!busEnabled}
             doubleClickValue={1}
             paramKey={isMaster ? undefined : `dub.channelSend.ch${channelId}`}
