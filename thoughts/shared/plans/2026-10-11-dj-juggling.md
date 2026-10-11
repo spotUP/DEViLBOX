@@ -425,6 +425,58 @@ playing deck.
 - Unit (`transitionPlannerJuggleStyle.test.ts`): offered for a compatible corpus pair in MUSICAL; not offered in OFF/SAFE, extreme tempo band, key clash, vocal risk, or no room; ladder `[4,2,1]` at grid 1, `[8,4]` at grid 0.7; `incomingPosition + tradeBeats*beatSec` equals the mix-in.
 - Existing golden/plan tests keep passing (style list grew; no other style's score moved).
 
+**P3 as built (2026-10-11, deviations from the text above)**
+- `juggleMode` is optional on `TransitionPlanInput` (default OFF), so every
+  existing caller and golden test plans exactly as before.
+- Ladders: `laddersFor()` = `[4,2,1]` then `[2,1]` on a beat-level grid,
+  `[8,4]` then `[4,2]` on a phrase-level grid ("try the shorter ladder" read
+  as the halved ladder).
+- The ladder's start is aimed so it ends where an ordinary transition would
+  hand over (the preliminary mix-out plus the provisional length), clamped to
+  the room; the first phrase that fits made the outgoing leave at a third of
+  the corpus track. When no boundary fits from the aim, the latest bar start
+  that leaves the room.
+- Mix-in: the drop when it has the ladder's length before it, else the best
+  mix-in when it has; a mix-in at the start (most intros, e.g. the corpus) is
+  traded from and the release lands the ladder's length later. Without this
+  the style was never offered on a track whose mix-in is 0.
+- Gates tested where they live (`scoreStyles`): the corpus clash pair is
+  resolved by the key solver (semitone shift, clash risk 0.07) and the vocal
+  pair's overlap risk is 0.28, so a whole plan cannot show those gates.
+- Release: `crossfadeFor` / `planBassHandover` / `filterFor` treat
+  `juggleTransition` like `hardCut` (a cut at the start of the release bar,
+  full-range EQ, no filter); `humanize.startOffsetMs` is 0 (cuts from the
+  first beat). `fallbackPlan` drops the `juggle` field.
+- `DJJugglePatternType` gains `transitionLadder`; the planner's candidates are
+  `LibraryPatternType` (all but the ladder); `PATTERN_BUILDERS` is keyed by
+  the library type.
+- `performLadder` starts on the bar the incoming started on (within a quarter
+  beat), else the next bar; the executor's `onSweepStarted` still fires before
+  the ladder (the poll loop's completion check also needs the outgoing
+  stopped, which only the executor's finish does).
+- The ladder setup (Auto DJ `performTrade`) bends the incoming onto the
+  outgoing's bars before trading: R2 now proves the bend there (incoming grid
+  40 ms off its audio start).
+- `finalizePlan` keeps the anticipated plan only while it still holds: same
+  deck roles, the outgoing deck analysed, the same incoming track
+  (analysis id), its start not passed. Otherwise it re-plans (plan text said
+  "re-plan only when null").
+- Added (found while wiring): the transition watchdog was a fixed 45 s; an
+  8-4 ladder at 125 BPM is 46 s. It is now max(45 s, (wait to start + trade +
+  release) x 1.5 + 10 s) per executed plan; regression in R3's file.
+- Added: the executor never seeks an incoming deck that already plays (the
+  user started it); it keeps its place and is bent into phase.
+- Juggle sink (must-do from review): `ResyncDeck` measures the double's
+  offset from the other deck's live position, bends a playing copy within
+  half a beat and re-cues it with one exact seek only for a larger offset
+  (re-cueing the silent copy a bar ahead is musically a cue jump).
+  `JumpToBar` stays a seek: it is a cue jump by intent (needle drop on the
+  call / response / fill material, on the bar the deck is cut in on, the deck
+  silent until then); it now lands on the master's phase.
+- R3 shares `src/engine/dj/__tests__/juggleTransitionHarness.ts` with R2; the
+  harness warms the trigger's dynamic imports (a cold import let the fake
+  clock pass the plan start).
+
 **P3 success criteria**: the ladder pattern fires 6 cuts + 1 release on
 master-grid beats `0, 16, 32, 40, 48, 52, 56` (4/4, ladder 4-2-1) +-1 executor
 tick; final crossfader on the incoming; outgoing stopped at the end of the
@@ -511,7 +563,7 @@ Each test is written first and seen failing (Gate 2).
 
 ## 5. Checklist
 
-Count: 16 of 46 done.
+Count: 29 of 46 done.
 
 P0 - probes
 - [ ] JUGX-P0.1 juggle-block reason histogram (10 min, MCP)
@@ -541,19 +593,19 @@ P2 - bend, never seek, a playing deck
 - [x] JUGX-P2.TC type-check clean - fd16700f9 (tsc -b --force clean at each P2 commit)
 
 P3 - juggle-transition style
-- [ ] JUGX-P3.1 style + plan `juggle` field
-- [ ] JUGX-P3.2 planner input `juggleMode` from the session controller
-- [ ] JUGX-P3.3 `scoreStyles` gate + score
-- [ ] JUGX-P3.4 ladder, `incomingPosition`, room check, trigger lead
-- [ ] JUGX-P3.5 `transitionLadder` pattern
-- [ ] JUGX-P3.6 `performLadder` + `onFinish`
-- [ ] JUGX-P3.7 executor trade stage
-- [ ] JUGX-P3.8a prelude deleted (method, flag, call)
-- [ ] JUGX-P3.8b `JUGGLE_TRANSITION` mode during the ladder (C5)
-- [ ] JUGX-P3.8c `finalizePlan` keeps the anticipated plan (C4)
-- [ ] JUGX-P3.U planner style unit tests
-- [ ] JUGX-P3.R3 reachability test R3 red, then green
-- [ ] JUGX-P3.TC type-check clean
+- [x] JUGX-P3.1 style + plan `juggle` field - 303d512b7
+- [x] JUGX-P3.2 planner input `juggleMode` from the session controller - 303d512b7
+- [x] JUGX-P3.3 `scoreStyles` gate + score - 303d512b7
+- [x] JUGX-P3.4 ladder, `incomingPosition`, room check, trigger lead - 303d512b7 (ladder aimed at the hand-over, see P3 as built)
+- [x] JUGX-P3.5 `transitionLadder` pattern - 9b7fb7a8b
+- [x] JUGX-P3.6 `performLadder` + `onFinish` - 9b7fb7a8b
+- [x] JUGX-P3.7 executor trade stage - fdf858a51 (+ no seek of an already-playing incoming)
+- [x] JUGX-P3.8a prelude deleted (method, flag, call) - fdf858a51; R2 moved to the ladder setup
+- [x] JUGX-P3.8b `JUGGLE_TRANSITION` mode during the ladder (C5) - fdf858a51 (red: 'transition took over')
+- [x] JUGX-P3.8c `finalizePlan` keeps the anticipated plan (C4) - fdf858a51 (red: executed t7, anticipated t0)
+- [x] JUGX-P3.U planner style unit tests - 303d512b7, 9b7fb7a8b (`src/engine/dj/autodj/__tests__/transitionPlannerJuggleStyle.test.ts`)
+- [x] JUGX-P3.R3 reachability test R3 red, then green - fdf858a51 (red with the trade stage unwired: ladder built 0 times)
+- [x] JUGX-P3.TC type-check clean - after fdf858a51
 
 P4 - stand-alone juggles
 - [ ] JUGX-P4.1 `juggleOpportunity` + unit tests
