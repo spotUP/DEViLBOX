@@ -9,7 +9,7 @@
 import { barSeed, lfsr } from './scratchRandom';
 import {
   DENSITY_RATE, planBars, planVocabulary, pickGesture, vocabulary, humanizeMs, withThrow, isThrowGesture, sectionDensity,
-  DENSITY_ORDER, type DensityState, type PlacedScratch, type PlannedRest, type ThrowMemory,
+  DENSITY_ORDER, oneHand, validatePhrase, VOCAL_BUSY, type DensityState, type PlacedScratch, type PlannedRest, type ThrowMemory,
 } from './scratchPlacement';
 import { routineFor, routineToPlaced, SCRATCH_ROUTINES, type RoutineName } from './scratchRoutines';
 import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
@@ -104,16 +104,11 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
     ? Array.from({ length: opts.bars }, (_, i) => Math.min(1, ctx.energy * (0.5 + 0.5 * (opts.bars > 1 ? i / (opts.bars - 1) : 1)) + (opts.bars > 1 ? 0.3 * i / (opts.bars - 1) : 0.3)))
     : undefined;
   const barRole = capped === 'showcase' ? 'FEATURE' as const : undefined;
-  const planned = planBars({
-    style, section: ctx.sectionName, bars: opts.fromBar + opts.bars, seed: opts.seed, gestures, energy: ctx.energy,
-    fromBar: opts.fromBar, count: opts.bars, vocalByBar, energyByBar, rateOverride: rate, barRole,
-    restScale: SCRATCH_STYLES[style].restScale * (genre.restScale ?? 1),
-    beatsPerBar: ctx.meter, grid: DEFAULT_GRID,
-  });
-  const bars = planned.bars;
-  let routine: RoutineName | undefined;
 
-  // a named routine closes each phrase (section 37), unless the grid is not trusted
+  // a named routine closes each phrase (section 37), unless the grid is not trusted; its bars are
+  // planned bars like any other: the vocal rule, one hand, open space and repair apply (SA-M6)
+  let routine: RoutineName | undefined;
+  const fixedBars = new Map<number, PlacedScratch[]>();
   if ((opts.routines ?? true) && !eff.levelCap && eff.mode !== 'SAFE' && capped !== 'none') {
     const name = routineFor(style, ctx.sectionName);
     const r = SCRATCH_ROUTINES[name];
@@ -121,18 +116,34 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
     for (let start = first - (first % ctx.phraseBars); start < first + opts.bars; start += ctx.phraseBars) {
       const at = start + ctx.phraseBars - r.bars;
       if (at < first || at + r.bars > first + opts.bars) continue;
+      // never a dense routine over a strong vocal (section 24): those bars are planned like any other
+      if (Array.from({ length: r.bars }, (_, k) => vocalByBar[at - first + k] ?? 0).some((v) => v > VOCAL_BUSY)) {
+        reasons.push(`routine ${name} at bar ${at} skipped: vocal`);
+        continue;
+      }
       const placed = routineInVocabulary(routineToPlaced(r, at, DEFAULT_GRID, ctx.meter), gestures, opts.seed, ctx.sectionName);
-      for (let k = 0; k < r.bars; k++) bars[at - first + k] = placed.filter((p) => p.bar === at + k);
+      for (let k = 0; k < r.bars; k++) fixedBars.set(at + k, placed.filter((p) => p.bar === at + k));
       routine = name;
       reasons.push(`routine ${name} at bar ${at}`);
     }
   }
 
+  const planned = planBars({
+    style, section: ctx.sectionName, bars: opts.fromBar + opts.bars, seed: opts.seed, gestures, energy: ctx.energy,
+    fromBar: opts.fromBar, count: opts.bars, vocalByBar, energyByBar, rateOverride: rate, density: capped, barRole,
+    restScale: SCRATCH_STYLES[style].restScale * (genre.restScale ?? 1),
+    beatsPerBar: ctx.meter, grid: DEFAULT_GRID, fixedBars,
+  });
+  const bars = planned.bars;
+
   let events = bars.flat().sort((a, b) => a.beat - b.beat);
   if (opts.record && opts.throwMemory && events.length) {
     events = withThrow(events, opts.record, opts.throwMemory, { firstBar: opts.fromBar, beatsPerBar: ctx.meter });
   }
-  return { mode: eff.mode, events, bars, rests: planned.rests, routine, issues: planned.issues, reasons };
+  // the final plan is what one hand performs: routines and the throw included (SA-B1)
+  events = oneHand(events);
+  const finalBars = Array.from({ length: opts.bars }, (_, k) => events.filter((e) => e.bar === opts.fromBar + k));
+  return { mode: eff.mode, events, bars: finalBars, rests: planned.rests, routine, issues: validatePhrase(finalBars), reasons };
 }
 
 /** Humanize offsets for a plan (section 35), drawn once from the seed so a plan replays exactly. */
