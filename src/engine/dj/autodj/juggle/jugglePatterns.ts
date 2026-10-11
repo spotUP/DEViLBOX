@@ -22,7 +22,20 @@ export interface PatternParams {
   /** Confidence the planner computed for the context. */
   confidence: number;
   seed?: number;
+  /**
+   * The shortest trade the mode allows, in bars (minLadderRung): 1-bar trades
+   * are PERFORMER's vocabulary, never MUSICAL's (owner plan section 44).
+   * Unset = 2.
+   */
+  minRung?: 1 | 2 | 4;
 }
+
+/**
+ * A silent deck is re-cued no sooner than this many beats after it was cut
+ * out: the cut's fader sweep (JUGGLE_CUT_SWEEP_MS) has long finished, so the
+ * seek is never heard in its tail.
+ */
+export const RECUE_AFTER_CUT_BEATS = 1;
 
 const other = (d: 'A' | 'B'): 'A' | 'B' => (d === 'A' ? 'B' : 'A');
 
@@ -245,6 +258,13 @@ export function loopTighten(p: PatternParams): DJJugglePattern {
  * bass is killed, so the layer is one groove with one bassline, not the same
  * bass against itself out of step (section 35). The release hands the bass
  * back with the reset.
+ *
+ * One whole phrase on the phrase grid (sections 9, 47): it starts on a phrase
+ * start, every rung starts on a multiple of its own length, and the release
+ * lands on the next phrase start. SETUP is folded into the first trade (the
+ * copy is offset while the primary speaks). MUSICAL trades 2-bar rungs only
+ * (A2 B2 .. A2 | A+B 2 bars); 1-bar rungs are PERFORMER's (`minRung` 1:
+ * A2 B2 .. A1 B1 A1 | A+B 1 bar), section 44.
  */
 export function double(p: PatternParams): DJJugglePattern {
   const b = newBuilder();
@@ -252,24 +272,40 @@ export function double(p: PatternParams): DJJugglePattern {
   const copy = other(p.primary);
   const offset = p.double?.offsetBeats ?? bpb;
   const target = (p.double?.primaryPosition ?? 0);
-  phase(b, 'SETUP', 0, bpb);
-  b.actions.push({ type: 'ResyncDeck', deck: copy, executeAtBeat: 0, targetPosition: target, beats: offset, quantization: 'bar', phase: 'SETUP', reason: `same track, offset ${offset} beats` });
-  b.beat += bpb;
-  phase(b, 'ESTABLISH', b.beat, b.beat + bpb * 4);
-  trade(b, p.primary, bpb * 2, 1, 'ESTABLISH', 'bar');
-  phase(b, 'INTENSIFY', b.beat, b.beat + bpb * 3);
-  trade(b, p.primary, bpb, 1, 'INTENSIFY', 'bar');
-  cutTo(b, p.primary, b.beat, 'INTENSIFY', `${bpb}-beat trade: ${p.primary} speaks while the copy lines up`, 'bar');
-  // The copy is silent for this bar: one re-cue to zero offset (a cue jump of an unheard deck), its bass out.
+  const bars = doubleBars(p.phraseBars);
+  const rung = (p.minRung ?? 2) <= 1 ? 1 : 2;
+  phase(b, 'SETUP', 0, 0);
+  b.actions.push({ type: 'ResyncDeck', deck: copy, executeAtBeat: RECUE_AFTER_CUT_BEATS, targetPosition: target, beats: offset, quantization: 'bar', phase: 'SETUP', reason: `same track, offset ${offset} beats, while the copy is unheard` });
+  // The last 4 bars are the payoff run (PERFORMER: A1 B1 A1 | A+B, MUSICAL: A2 | A+B 2); before it, 2-bar trades.
+  const pairs = (bars - 4) / 4;
+  phase(b, 'ESTABLISH', 0, pairs * 4 * bpb);
+  trade(b, p.primary, bpb * 2, pairs, 'ESTABLISH', 'bar');
+  if (rung === 1) {
+    phase(b, 'INTENSIFY', b.beat, b.beat + bpb * 2);
+    trade(b, p.primary, bpb, 1, 'INTENSIFY', 'bar');
+  }
+  phase(b, 'INTENSIFY', b.beat, b.beat + rung * bpb);
+  cutTo(b, p.primary, b.beat, 'INTENSIFY', `${rung}-bar: ${p.primary} alone while the copy lines up`, 'bar');
+  // The copy is silent from here: one re-cue to zero offset (a cue jump of an unheard deck), its bass out.
   b.actions.push({ type: 'ResyncDeck', deck: copy, executeAtBeat: b.beat, targetPosition: target, beats: 0, quantization: 'bar', phase: 'INTENSIFY', reason: 'the copy lines up with the original for the payoff' });
   b.actions.push({ type: 'EQCut', deck: copy, executeAtBeat: b.beat, quantization: 'bar', phase: 'INTENSIFY', reason: `one bassline in the payoff: ${p.primary} keeps the bass` });
-  b.beat += bpb;
-  phase(b, 'PAYOFF', b.beat, b.beat + bpb);
+  b.beat += rung * bpb;
+  phase(b, 'PAYOFF', b.beat, b.beat + rung * bpb);
   layer(b, b.beat, 'PAYOFF', `both copies together, the bass on ${p.primary}`);
-  b.beat += bpb;
+  b.beat += rung * bpb;
   phase(b, 'RELEASE', b.beat, b.beat);
   release(b, p.primary, b.beat);
-  return finish('double', p, b, { energyProfile: 'PEAK', reason: `offset double (${offset} beats): 2-bar then 1-bar trades, aligned payoff with one bass`, requiresDouble: true });
+  return finish('double', p, b, { energyProfile: 'PEAK', reason: `offset double (${offset} beats): ${rung === 1 ? '2-bar then 1-bar' : '2-bar'} trades over ${bars} bars, aligned payoff with one bass`, requiresDouble: true });
+}
+
+/**
+ * Bars of the same-track double: whole phrases, at least 8 bars, a multiple
+ * of the 4-bar payoff run (an odd phrase length falls back to 8).
+ */
+export function doubleBars(phraseBars: number): number {
+  const phrase = Math.max(1, Math.round(phraseBars));
+  const bars = phrase * Math.ceil(8 / phrase);
+  return bars % 4 === 0 ? bars : 8;
 }
 
 export function transformer(p: PatternParams): DJJugglePattern {

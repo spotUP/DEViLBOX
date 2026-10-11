@@ -10,7 +10,7 @@
 import { hash } from '../transitionPlanner';
 import { harmonicCompatibility, HARMONIC_CLASH_REJECT } from '../compatibility';
 import { findCallAndResponse, upcomingWindows } from './juggleMaterial';
-import { MODE_PATTERNS, PATTERN_BUILDERS, PATTERN_INTENSITY, type PatternParams } from './jugglePatterns';
+import { doubleBars, minLadderRung, MODE_PATTERNS, PATTERN_BUILDERS, PATTERN_INTENSITY, type PatternParams } from './jugglePatterns';
 import type {
   DJJuggleAction, DJJugglePattern, DJJugglePatternType, DJJugglePerformanceContext, JuggleCandidate, JuggleMode,
   JuggleQualityScore, LibraryPatternType, MaterialWindow,
@@ -250,6 +250,11 @@ export function scorePattern(type: LibraryPatternType, ctx: DJJugglePerformanceC
 
 function hasLayer(type: DJJugglePatternType): boolean { return ['beatTrade', 'drumBassTrade', 'fillTrade', 'double', 'dropAndReturn', 'escalatingJuggle'].includes(type); }
 
+/** The phrase length a library pattern is built for, in bars (PatternParams.phraseBars). */
+export function patternPhraseBars(ctx: Pick<DJJugglePerformanceContext, 'phraseLengthBars'>): number {
+  return Math.max(2, Math.min(8, ctx.phraseLengthBars));
+}
+
 export function patternBars(type: LibraryPatternType, ctx: DJJugglePerformanceContext): number {
   const phrase = Math.max(4, Math.min(8, ctx.phraseLengthBars));
   switch (type) {
@@ -261,7 +266,7 @@ export function patternBars(type: LibraryPatternType, ctx: DJJugglePerformanceCo
     case 'drumBassTrade': return 6;
     case 'barTrade': return 4;
     case 'loopTighten': return 8;
-    case 'double': return 9;
+    case 'double': return doubleBars(patternPhraseBars(ctx));
     case 'dropAndReturn': return 3;
     case 'beatTrade': return 3;
     case 'doubleBeat': return 2;
@@ -311,8 +316,9 @@ export function planJuggle(ctx: DJJugglePerformanceContext, opts: PlannerOptions
   if (!best) return none(`no pattern fits: ${candidates.slice(0, 3).map((cnd) => `${cnd.type} (${cnd.blocked[0] ?? `score ${cnd.score.toFixed(2)}`})`).join(', ')}`);
 
   const beatsPerBar = ctx.beatsPerBar;
-  const phraseBars = Math.max(2, Math.min(8, ctx.phraseLengthBars));
-  const params: PatternParams = { primary, beatsPerBar, intensity, phraseBars, material, confidence: best.components.confidence, seed, double: ctx.sameTrackOnBothDecks ? { offsetBeats: doubleOffset(ctx, seed), primaryPosition: voice.position } : undefined };
+  const phraseBars = patternPhraseBars(ctx);
+  const minRung = minLadderRung(opts.mode, policy) ?? 2;
+  const params: PatternParams = { primary, beatsPerBar, intensity, phraseBars, material, confidence: best.components.confidence, seed, minRung, double: ctx.sameTrackOnBothDecks ? { offsetBeats: doubleOffset(ctx, seed), primaryPosition: voice.position } : undefined };
   const pattern = PATTERN_BUILDERS[best.type as LibraryPatternType](params);
   // Phrase lock (section 9.7, 21.1): long patterns start on a phrase, short ones on a bar, every one >= 1 bar ahead.
   const startBeat = PHRASE_PATTERNS.includes(best.type) || pattern.durationBars >= 4 ? nextPhraseStartBeat(ctx, beatsPerBar) : nextBarStartBeat(ctx, beatsPerBar);
