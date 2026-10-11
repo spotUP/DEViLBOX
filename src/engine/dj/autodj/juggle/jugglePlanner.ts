@@ -33,6 +33,18 @@ export function confidencePolicy(ctx: Pick<DJJugglePerformanceContext, 'beatConf
   return 'none';
 }
 
+/**
+ * Why the confidence policy is 'none' (section 45: telemetry with reasons):
+ * each confidence below the phrase-trading minimum, with its value.
+ */
+export function lowConfidenceReason(ctx: Pick<DJJugglePerformanceContext, 'beatConfidence' | 'phraseConfidence' | 'deckSyncConfidence'>): string {
+  const p = POLICY_MIN.phrase;
+  const short = ([['beat', ctx.beatConfidence, p.beat], ['sync', ctx.deckSyncConfidence, p.sync], ['phrase', ctx.phraseConfidence, p.phrase]] as const)
+    .filter(([, v, min]) => !(v >= min))
+    .map(([name, v, min]) => `${name} ${Number.isFinite(v) ? v.toFixed(2) : String(v)} < ${min}`);
+  return `low confidence (${short.join(', ')}): normal transition`;
+}
+
 export interface PhaseBudget { cooldownSec: number; maxIntensity: number; maxFraction: number; allowed: boolean }
 
 /** Section 28: the set-level juggling arc. */
@@ -260,7 +272,7 @@ export function planJuggle(ctx: DJJugglePerformanceContext, opts: PlannerOptions
   const budget = budgetFor(ctx, opts.mode);
   const cond = conditions(ctx);
   const blocked = [...budget.reasons, ...cond.bad];
-  if (policy === 'none') blocked.push('low confidence: normal transition');
+  if (policy === 'none') blocked.push(lowConfidenceReason(ctx));
   const none = (reason: string): JuggleDecision => ({ pattern: null, candidates: [], reason, blocked, policy, intensity, startBeat: nextPhraseStartBeat(ctx) });
   if (!budget.allowed || cond.bad.length || policy === 'none') return none(blocked.join('; '));
 

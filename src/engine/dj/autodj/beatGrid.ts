@@ -6,8 +6,20 @@
  * Pure functions over the beat list and the extended timelines.
  */
 import type {
-  Bar, Beat, BeatGrid, DownbeatGrid, ExtendedAnalysis, GridLandmarks, MeterAnalysis,
+  AnalysisConfidence, Bar, Beat, BeatGrid, DownbeatGrid, ExtendedAnalysis, GridLandmarks, MeterAnalysis,
 } from './types';
+
+/**
+ * A track's beat confidence (owner juggling plan section 31): its beats AND
+ * its bars - the beat grid and the downbeat grid with the meter (an assumed
+ * meter lowers the downbeat confidence). A cut on the beat of a wrong bar is
+ * as wrong as one off the beat. The one definition: the transition planner
+ * (juggle transitions) and the juggle controller (in-mix and stand-alone
+ * juggles, their abort checks) both read it.
+ */
+export function trackBeatConfidence(a: { analysisConfidence: Pick<AnalysisConfidence, 'beatGrid' | 'downbeat'> }): number {
+  return Math.min(a.analysisConfidence.beatGrid, a.analysisConfidence.downbeat);
+}
 
 export interface BeatGridInput {
   beats: number[];

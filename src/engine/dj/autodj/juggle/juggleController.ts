@@ -8,7 +8,7 @@
  * ordinary transitions; this layer only performs between them.
  */
 import { fractionalBeatAt } from '../beatGrid';
-import { timelineAt, barIndexAt } from '../beatGrid';
+import { timelineAt, barIndexAt, trackBeatConfidence } from '../beatGrid';
 import { realTimers, type ExecutorTimers } from '../transitionExecutor';
 import { keyAt } from '../trackAnalysis';
 import { shiftedKeyName } from '../tempoKeySolver';
@@ -195,10 +195,13 @@ export class DJJuggleController {
     const last = this.history[this.history.length - 1];
     const secondsSinceLastJuggle = Number.isFinite(this.lastJuggleAt) ? (this.now() - this.lastJuggleAt) / 1000 : Infinity;
     const sectionIdx = ma ? ma.sections.indexOf(master.section!) : -1;
+    // The pair's beat confidence, the one definition the transition planner reads too (pairConfidence):
+    // both decks' grids and bars when both are analysed, else the master's.
+    const beatConfidence = A.analysis && B.analysis ? Math.min(trackBeatConfidence(A.analysis), trackBeatConfidence(B.analysis)) : ma ? trackBeatConfidence(ma) : 0;
     return {
       masterDeck: input.masterDeck, masterBeat: master.beatIndex, masterBar, phrasePosition, phraseLengthBars, beatsPerBar: bpb,
       deckA: A, deckB: B, activeDeck: input.masterDeck, performanceMode: input.performanceMode, energy: input.energy, targetEnergy: input.targetEnergy, setPhase: input.setPhase,
-      phraseConfidence: phrase?.confidence ?? (ma ? ma.analysisConfidence.downbeat * 0.8 : 0), beatConfidence: ma?.beatGrid.confidence ?? 0,
+      phraseConfidence: phrase?.confidence ?? (ma ? ma.analysisConfidence.downbeat * 0.8 : 0), beatConfidence,
       sectionConfidence: master.section?.confidence ?? 0, deckSyncConfidence, materialConfidence: Math.min(A.analysisConfidence, B.analysisConfidence),
       currentSection: master.section, nextSection: sectionIdx >= 0 ? ma?.sections[sectionIdx + 1] : undefined,
       lastJuggle: last, recentPatterns: this.history.slice(-RECENT), intensity: this.lastDecision?.intensity ?? 0,

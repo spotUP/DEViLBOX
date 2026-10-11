@@ -129,4 +129,11 @@ describe('juggleOpportunity: a stand-alone juggle where the music asks for one',
     expect(op).toBeNull();
     expect(why.join('; ')).toMatch(/no pattern fits/);
   });
+
+  it('a low-confidence refusal names the confidence that failed and its value (audit m1, owner plan section 45)', () => {
+    const ctx = contextFor('drops', 50);
+    const { op, why } = judge({ ...ctx, phraseConfidence: 0.3 });
+    expect(op).toBeNull();
+    expect(why).toEqual(['low confidence (phrase 0.30 < 0.5): normal transition']);
+  });
 });

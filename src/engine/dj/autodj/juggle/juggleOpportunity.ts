@@ -14,7 +14,7 @@
  * Pure.
  */
 import { MODE_PATTERNS } from './jugglePatterns';
-import { budgetFor, conditions, confidencePolicy, nextPhraseStartBeat, patternBars, planJuggle, POLICY_MIN } from './jugglePlanner';
+import { budgetFor, conditions, confidencePolicy, lowConfidenceReason, nextPhraseStartBeat, patternBars, planJuggle, POLICY_MIN } from './jugglePlanner';
 import type { DJDeckPerformanceState, DJJugglePerformanceContext, JuggleMode, JuggleTrigger, LibraryPatternType, StandaloneSource } from './juggleTypes';
 import { JUGGLE_PATTERN_TYPES } from './juggleTypes';
 import type { DJSection, DJTrackAnalysis } from '../types';
@@ -86,7 +86,7 @@ export function juggleOpportunity(
   if (!budget.allowed) { why.push(...budget.reasons); return null; }
   const cond = conditions(h);
   if (cond.bad.length) { why.push(...cond.bad); return null; }
-  if (confidencePolicy(h) === 'none') { why.push('low confidence: normal transition'); return null; }
+  if (confidencePolicy(h) === 'none') { why.push(lowConfidenceReason(h)); return null; }
 
   const beatSec = 60 / Math.max(60, master.bpm || master.analysis.bpm);
   const bpb = ctx.beatsPerBar;
