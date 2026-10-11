@@ -225,7 +225,7 @@ export class DJEngine {
     this.afterAudioLoaded(id, info, { fileName: filename, trackName, bpm, fileBytes: buffer }, song);
     // A WAV read from a cache entry rendered before scope tracks gets its track re-rendered
     // in the background (low priority) and attached here, without reloading the audio.
-    void import('./DJChannelScopeRerender').then((m) => m.requestChannelScopeRerender(buffer, id)).catch(() => {});
+    void import('./DJChannelScopeRerender').then((m) => m.requestChannelScopeRerender(buffer)).catch(() => {});
     return info;
   }
 
@@ -237,7 +237,7 @@ export class DJEngine {
    */
   async loadDecodedAudioToDeck(
     id: DeckId, audioBuffer: AudioBuffer,
-    meta: { fileName: string; trackName?: string; bpm?: number; peaks?: Float32Array; fileBytes: ArrayBuffer | null; channelScopes?: ChannelScopeTrack },
+    meta: { fileName: string; trackName?: string; bpm?: number; peaks?: Float32Array; fileBytes: ArrayBuffer | null; channelScopes?: ChannelScopeTrack; sourceWav?: ArrayBuffer | null },
     song?: TrackerSong,
   ): Promise<AudioFileInfo> {
     const deck = this.getDeck(id);
@@ -247,7 +247,7 @@ export class DJEngine {
     } else {
       deck.clearLoadedSong();
     }
-    const info = await deck.loadDecodedAudio(audioBuffer, meta.fileBytes, meta.peaks, meta.channelScopes);
+    const info = await deck.loadDecodedAudio(audioBuffer, meta.fileBytes, meta.peaks, meta.channelScopes, meta.sourceWav);
     this.afterAudioLoaded(id, info, meta, song);
     return info;
   }

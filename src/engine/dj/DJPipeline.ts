@@ -66,6 +66,11 @@ interface RenderOutput {
 /** A scope re-render must be this close in length to the cached WAV for its track to line up with it. */
 const SCOPE_RERENDER_DURATION_TOLERANCE_SEC = 0.5;
 
+/** A background scope re-render was cut short so a user load could start; it is re-queued, not failed. */
+class ScopeRenderPreempted extends Error {
+  constructor() { super('Scope re-render preempted'); }
+}
+
 export type TaskPriority = 'high' | 'normal' | 'low';
 
 export interface PipelineTask {
@@ -306,6 +311,7 @@ export class DJPipeline {
   private queue: QueueEntry[] = [];
   private processing = false;
   private currentTaskId: string | null = null;
+  private currentScopesOnly = false;
   private currentDeckId: DeckId | null = null;
 
   // Pending render/analysis callbacks keyed by task id
@@ -483,6 +489,10 @@ export class DJPipeline {
           analysisState: 'pending',
         });
       }
+
+      // A user load never waits behind a background scope re-render: cut the
+      // running one short (it goes back to the end of the queue).
+      if (!task.scopesOnly) this.preemptScopesRender();
 
       // Kick the processor
       void this.processNext();
@@ -755,6 +765,21 @@ export class DJPipeline {
     return promise;
   }
 
+  /**
+   * Abort the running scopesOnly render, if that is what runs: the render
+   * worker is respawned (a render cannot be interrupted any other way) and the
+   * task's render promise rejects with ScopeRenderPreempted, which processNext
+   * turns into a re-queue.
+   */
+  private preemptScopesRender(): void {
+    if (!this.processing || !this.currentScopesOnly || !this.currentTaskId) return;
+    const cb = this.renderCallbacks.get(this.currentTaskId);
+    if (!cb) return;
+    this.renderCallbacks.delete(this.currentTaskId);
+    cb.reject(new ScopeRenderPreempted());
+    this.spawnRenderWorker();
+  }
+
   /** Number of queued tasks (not counting current). */
   get queueSize(): number {
     return this.queue.length;
@@ -879,6 +904,7 @@ export class DJPipeline {
     const entry = this.queue.shift()!;
     const { task, resolve, reject } = entry;
     this.currentTaskId = task.id;
+    this.currentScopesOnly = !!task.scopesOnly;
     this.currentDeckId = task.deckId ?? null;
 
     // Start progress interpolation ticker
@@ -912,9 +938,16 @@ export class DJPipeline {
         if (timeoutHandle !== null) clearTimeout(timeoutHandle);
       }
     } catch (err) {
-      console.error(`[DJPipeline] Task failed: ${task.filename}`, err);
-      reject(err instanceof Error ? err : new Error(String(err)));
+      if (err instanceof ScopeRenderPreempted) {
+        console.log(`[DJPipeline] Scope re-render of ${task.filename} preempted by a load; re-queued`);
+        this.queue.push(entry);
+        this.updateStoreQueue();
+      } else {
+        console.error(`[DJPipeline] Task failed: ${task.filename}`, err);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
     } finally {
+      this.currentScopesOnly = false;
       this.stopProgressTicker();
       this.processing = false;
       this.currentTaskId = null;
@@ -1162,9 +1195,13 @@ export class DJPipeline {
       const aligned = Math.abs(out.duration - expectedDuration) <= SCOPE_RERENDER_DURATION_TOLERANCE_SEC;
       if (aligned && out.channelScopes && out.channelScopes.channels.length > 0) track = out.channelScopes;
       else console.log(`[DJPipeline] Scope re-render of ${task.filename} unused (${aligned ? 'no per-channel tap' : `length ${out.duration.toFixed(1)}s != cached ${expectedDuration.toFixed(1)}s`})`);
-    } finally {
-      await setCacheChannelScopes(hash, track);
+    } catch (err) {
+      // A preempted render is retried later: the entry is not marked scope-rendered.
+      if (err instanceof ScopeRenderPreempted) throw err;
+      await setCacheChannelScopes(hash, undefined);
+      throw err;
     }
+    await setCacheChannelScopes(hash, track);
     return {
       wavData: new ArrayBuffer(0), duration: expectedDuration, sampleRate: 0,
       waveformPeaks: new Float32Array(0), analysis: null, channelScopes: track,
