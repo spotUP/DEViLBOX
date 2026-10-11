@@ -93,6 +93,11 @@ export class DJEngine {
     this.deckA = new DeckEngine({ id: 'A', outputNode: this.mixer.inputA });
     this.deckB = new DeckEngine({ id: 'B', outputNode: this.mixer.inputB });
     this.deckC = new DeckEngine({ id: 'C', outputNode: this.mixer.inputC });
+    // Scratch gestures with crossfader windows (section 20) cut on the mixer
+    // crossfader, never on the channel fader.
+    for (const deck of [this.deckA, this.deckB]) {
+      deck.setScratchCrossfaderSink((position) => this.mixer.setCrossfader(position));
+    }
 
     // Initialize cue engine (async, but non-blocking)
     void this.cueEngine.init().catch(err => {

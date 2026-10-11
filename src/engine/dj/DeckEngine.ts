@@ -1601,6 +1601,12 @@ export class DeckEngine {
     (this.channelGain.gain as unknown as { overridden: boolean }).overridden = false;
   }
 
+  /** Where a scratch gesture's `crossfader` fader windows are performed
+   *  (owner plan section 20); DJEngine wires the mixer crossfader. */
+  setScratchCrossfaderSink(sink: ((position: number) => void) | null): void {
+    this.scratchPlayback.setCrossfaderSink(sink);
+  }
+
   /** Play a named scratch pattern (with optional beat quantization) */
   playPattern(name: string, onWaiting?: (ms: number) => void): void {
     const pattern = getPatternByName(name);
@@ -1623,19 +1629,12 @@ export class DeckEngine {
 
     this.scratchPlayback.play(pattern, onWaiting);
 
-    // BPM-synced patterns with custom fader scheduling — must run AFTER
-    // `play()` because `play()` begins with a stopPattern() that cancels
-    // all scheduled gain values. Scheduling before play would leave the
-    // fader stuck at 1 (no chopping) — Crab/Transformer/8-Finger Crab
-    // would sound like normal playback.
-    const bpm = this.getEffectiveBPM();
-    if (pattern.name === 'Transformer') {
-      this.scratchPlayback.scheduleTransformerFader(bpm);
-    } else if (pattern.name === 'Crab') {
-      this.scratchPlayback.scheduleCrabFader(bpm);
-    } else if (pattern.name === '8-Finger Crab') {
-      this.scratchPlayback.scheduleEightFingerCrabFader(bpm);
-    }
+    // Cut-grid gestures (Transformer / Crab / Eight-Finger Crab) schedule
+    // their fader windows on the AudioParam — must run AFTER `play()`
+    // because `play()` begins with a stopPattern() that cancels all
+    // scheduled gain values. Scheduling before play would leave the fader
+    // stuck at 1 (no chopping) — they would sound like normal playback.
+    this.scratchPlayback.schedulePatternFader(pattern, this.getEffectiveBPM());
 
     this._enableReverbSend();
   }
