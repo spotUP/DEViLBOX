@@ -15,7 +15,7 @@ import { shiftedKeyName } from '../tempoKeySolver';
 import type { DJTrackAnalysis, SetEnergyPhase } from '../types';
 import { classifyWindow, materialRefs } from './juggleMaterial';
 import { PATTERN_INTENSITY, coarsenLadder, minLadderRung, phaseAt, rolesAt, transitionLadder } from './jugglePatterns';
-import { budgetFor, conditions, confidencePolicy, intensityFor, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
+import { budgetFor, conditions, confidencePolicy, intensityFor, lowConfidenceReason, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
 import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
 import type {
   DJDeckPerformanceState, DJJuggleHistory, DJJugglePerformanceContext, DJPerformanceMode, JuggleMode, JuggleQualityScore,
@@ -252,7 +252,7 @@ export class DJJuggleController {
     // The keys were judged by the transition plan at the join, with its key lock or shift (the decks'
     // local keys here are read before that plan's tempo and key moves): every other bad condition holds.
     const bad = conditions(ctx).bad.filter((r) => !r.startsWith('key clash'));
-    const blocked = [...(budget.allowed ? [] : budget.reasons), ...bad, ...(minRung === null ? [`${policy} confidence: normal transition`] : [])];
+    const blocked = [...(budget.allowed ? [] : budget.reasons), ...bad, ...(minRung === null ? [lowConfidenceReason(ctx)] : [])];
     if (blocked.length) {
       this.lastDecision = this.idleDecision(ctx, `juggle transition not performed: ${blocked.join('; ')}`);
       this.publish(ctx);
