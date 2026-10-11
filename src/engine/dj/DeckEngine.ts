@@ -1677,23 +1677,33 @@ export class DeckEngine {
   }
 
   /**
-   * Give back what a scratch changed: only the values that moved are written.
-   * `suppressNotes` is never forced (2026-09-30: forcing it off froze the
-   * pattern view of WASM-played songs): the snapshot verifies it, the
-   * replayer owns it.
+   * Give back what a scratch changed: only the fields given (the ones the scratch
+   * touched), only the values that moved. The rate goes back to the deck's REST
+   * (the pitch fader as it is now), not to the captured number: a pitch or sync
+   * move made while the scratch ran is kept (scratch audit SA-M4), and key lock
+   * keeps the pitch (SA-m6). `suppressNotes` is never forced (2026-09-30:
+   * forcing it off froze the pattern view of WASM-played songs): the snapshot
+   * verifies it, the replayer owns it.
    */
-  restoreScratchSnapshot(s: DeckScratchSnapshot): void {
+  restoreScratchSnapshot(s: Partial<DeckScratchSnapshot>): void {
     const now = this.captureScratchSnapshot();
-    if (Math.abs(now.rate - s.rate) > 1e-3) {
-      if (this._playbackMode === 'audio') this.audioPlayer.setPlaybackRate(s.rate);
-      else { this.replayer.setPitchMultiplier(s.rate); this.replayer.setTempoMultiplier(s.rate); }
-    }
-    if (Math.abs(now.channelGain - s.channelGain) > 1e-3) {
+    if (s.rate !== undefined && Math.abs(now.rate - this.restMultiplier) > 1e-3) this._applyRestRate();
+    if (s.channelGain !== undefined && Math.abs(now.channelGain - s.channelGain) > 1e-3) {
       this.releaseChannelGainParam();
       this.channelGain.gain.value = s.channelGain;
     }
-    if (now.captureFrozen !== s.captureFrozen) {
+    if (s.captureFrozen !== undefined && now.captureFrozen !== s.captureFrozen) {
       if (s.captureFrozen) this.scratchBuffer?.freezeCapture(); else this.scratchBuffer?.unfreezeCapture();
+    }
+  }
+
+  /** The deck at its rest rate: the pitch fader's multiplier; under key lock a tracker's pitch stays 1. */
+  private _applyRestRate(): void {
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.setPlaybackRate(this.restMultiplier);
+    } else {
+      this.replayer.setTempoMultiplier(this.restMultiplier);
+      this.replayer.setPitchMultiplier(this.keyLockEnabled ? 1 : this.restMultiplier);
     }
   }
 
@@ -1777,12 +1787,7 @@ export class DeckEngine {
 
     // Don't seek back — let the music continue from its current position.
     // Scratches are beat-synced and the DJ expects seamless flow back to normal playback.
-    if (this._playbackMode === 'audio') {
-      this.audioPlayer.setPlaybackRate(this.restMultiplier);
-    } else {
-      this.replayer.setTempoMultiplier(this.restMultiplier);
-      this.replayer.setPitchMultiplier(this.restMultiplier);
-    }
+    this._applyRestRate();
     this.patternScratchDir = 1;
   }
 

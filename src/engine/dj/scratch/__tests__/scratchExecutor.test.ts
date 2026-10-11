@@ -38,12 +38,15 @@ function rig(opts: { suppressNotes?: boolean } = {}) {
     contextTime: () => sec,
     fire: (id, o) => {
       fires.push({ id, at: o.at, beat: sec / 0.5, record: o.record, role: o.role });
-      // a scratch dirties the state it touches
-      state.rate = 0.4; state.channelGain = 0; state.captureFrozen = true; state.crossfader = 0.9; state.busLevel = 0.5;
+      // a deck gesture dirties its deck (rate, scratch fader, ring); a record gesture plays on its own voice
+      if (!o.record) { state.rate = 0.4; state.channelGain = 0; state.captureFrozen = true; }
       return true;
     },
     release: (id, o) => { releases.push(id); releaseAt.push(o.at); },
-    probe: { capture: () => ({ ...state }), restore: (s) => { Object.assign(state, s); } },
+    probe: {
+      capture: () => ({ ...state }),
+      restore: (s, fields) => { for (const f of fields) (state as unknown as Record<string, unknown>)[f] = s[f]; },
+    },
     recueDeck: (deck, a) => { recues.push([deck, a]); return { recued: true, mode: 'audio', returnsToAnchor: true }; },
     timers, tickMs: 5, lookaheadSec: 0.1,
     onEvent: (e) => events.push(e),
@@ -61,6 +64,14 @@ function recordEvent(beat: number, over: Partial<ScratchEvent> = {}): ScratchEve
   return {
     executeAtBeat: beat, durationBeats: 1, role: 'ACCENT', source, anchor: (source as { anchor: ScratchEvent['anchor'] }).anchor,
     gesture: 'forwardStab', velocity: 0.8, humanizeMs: 0, intensity: 0.5, returnToAnchor: true, ...over,
+  };
+}
+
+function deckEvent(beat: number, over: Partial<ScratchEvent> = {}): ScratchEvent {
+  const anchor = deckAnchor(10, 20, 'downbeat', 120);
+  return {
+    executeAtBeat: beat, durationBeats: 1, role: 'ACCENT', source: { type: 'DECK', deck: 'A', anchor }, anchor,
+    gesture: 'baby', velocity: 0.8, humanizeMs: 0, intensity: 0.5, deck: 'A', returnToAnchor: false, ...over,
   };
 }
 
@@ -137,11 +148,11 @@ describe('release restores exactly the state the run started from (section 60)',
       const r = rig({ suppressNotes });
       const before = { ...r.state };
       const ex = new ScratchExecutor(r.deps);
-      ex.schedule(recordEvent(8));
+      ex.schedule(deckEvent(8));
       r.advance(4.0);
       expect(snapshotDiff(before, r.state)).not.toEqual([]); // the scratch really changed things
       r.advance(4.6); // end beat 9
-      expect(r.releases).toEqual(['fx_scratch_forwardStab']);
+      expect(r.releases).toEqual(['fx_scratch_baby']);
       expect(r.state).toEqual(before);
       expect(r.state.suppressNotes).toBe(suppressNotes);
       expect(ex.active).toBe(0);
@@ -153,11 +164,11 @@ describe('release restores exactly the state the run started from (section 60)',
     const r = rig();
     const before = { ...r.state };
     const ex = new ScratchExecutor(r.deps);
-    ex.schedule(recordEvent(8, { durationBeats: 1, role: 'THEME' }));
-    ex.schedule(recordEvent(8.5, { durationBeats: 2, role: 'ANSWER', gesture: 'chirp' }));
+    ex.schedule(deckEvent(8, { durationBeats: 1, role: 'THEME' }));
+    ex.schedule(deckEvent(8.5, { durationBeats: 2, role: 'ANSWER', gesture: 'chirp', deck: 'B' }));
     r.advance(4.6); // first released
     expect(r.releases).toHaveLength(1);
-    expect(r.state.crossfader).toBe(0.9); // still dirty: the second is running
+    expect(r.state.channelGain).toBe(0); // still dirty: the second is running
     r.advance(5.4);
     expect(r.state).toEqual(before);
   });
@@ -166,8 +177,8 @@ describe('release restores exactly the state the run started from (section 60)',
     const r = rig();
     const before = { ...r.state };
     const ex = new ScratchExecutor(r.deps);
-    ex.schedule(recordEvent(8));
-    ex.schedule(recordEvent(40));
+    ex.schedule(deckEvent(8));
+    ex.schedule(deckEvent(40));
     r.advance(4.1);
     ex.cancel();
     expect(r.releases).toHaveLength(1);
