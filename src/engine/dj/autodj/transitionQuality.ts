@@ -9,6 +9,9 @@
 import { harmonicCompatibility, vocalCompatibility } from './compatibility';
 import { summarizeTrack } from './trackAnalysis';
 import { timelineAt } from './beatGrid';
+import { sampleCurve } from './transitionCurves';
+
+export { sampleCurve };
 import type { DJTrackAnalysis, DJTransitionPlan, TransitionQuality, TransitionStyle } from './types';
 
 export interface ExecutionTraceSample {
@@ -49,33 +52,20 @@ export function bassExposure(plan: DJTransitionPlan, trace?: ExecutionTrace): nu
   }
   const outLow = plan.bassPlan.curves.find((c) => c.target === 'outgoing.eqLow');
   const inLow = plan.bassPlan.curves.find((c) => c.target === 'incoming.eqLow');
+  const outKill = plan.bassPlan.curves.find((c) => c.target === 'outgoing.lowKill');
+  const inKill = plan.bassPlan.curves.find((c) => c.target === 'incoming.lowKill');
   if (!outLow || !inLow) return plan.style === 'hardCut' ? 0 : 1;
+  // A killed band is silent, whatever its dB curve says.
+  const low = (dB: typeof outLow, kill: typeof outKill, beat: number) => (kill && sampleCurve(kill.keyframes, beat) >= 0.5 ? -Infinity : sampleCurve(dB.keyframes, beat));
   let bad = 0, n = 0;
   for (let beat = 0; beat <= plan.durationBeats; beat += 0.5) {
-    const o = sampleCurve(outLow.keyframes, beat), i = sampleCurve(inLow.keyframes, beat);
+    const o = low(outLow, outKill, beat), i = low(inLow, inKill, beat);
     const x = sampleCurve(plan.crossfadePlan.curve.keyframes, beat);
     const mid = plan.incomingDeck === 'B' ? x > 0.25 && x < 0.75 : x > 0.25 && x < 0.75;
     n++;
     if (mid && o > -6 && i > -6) bad++;
   }
   return n ? bad / n : 0;
-}
-
-/** Linear/ease/exp keyframe interpolation (the executor uses the same function). */
-export function sampleCurve(keyframes: Array<{ beat: number; value: number; curve?: 'linear' | 'ease' | 'exp' }>, beat: number): number {
-  if (keyframes.length === 0) return 0;
-  if (beat <= keyframes[0].beat) return keyframes[0].value;
-  for (let i = 1; i < keyframes.length; i++) {
-    const a = keyframes[i - 1], b = keyframes[i];
-    if (beat <= b.beat) {
-      const span = b.beat - a.beat;
-      let t = span > 0 ? (beat - a.beat) / span : 1;
-      if (b.curve === 'ease') t = t * t * (3 - 2 * t);
-      else if (b.curve === 'exp') t = t * t;
-      return a.value + (b.value - a.value) * t;
-    }
-  }
-  return keyframes[keyframes.length - 1].value;
 }
 
 export function evaluateTransition(plan: DJTransitionPlan, outgoing: DJTrackAnalysis, incoming: DJTrackAnalysis, trace?: ExecutionTrace): TransitionQuality {

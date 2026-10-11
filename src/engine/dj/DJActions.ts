@@ -382,6 +382,16 @@ export function setDeckEQKill(
   }
 
   // Immediate (non-quantized)
+  setDeckEQKillNow(deckId, band, kill);
+}
+
+/**
+ * Kill or restore a band now, never quantized: for callers whose actions
+ * already land on the beat (Auto DJ's transition executor and juggle sink -
+ * a second quantize would push a bass handover to the next downbeat).
+ */
+export function setDeckEQKillNow(deckId: DeckId, band: 'low' | 'mid' | 'high', kill: boolean): void {
+  useDJStore.getState().setDeckEQKill(deckId, band, kill);
   try {
     getDJEngine().getDeck(deckId).setEQKill(band, kill);
   } catch { /* engine not ready */ }

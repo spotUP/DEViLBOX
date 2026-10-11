@@ -8,7 +8,7 @@
  */
 import { getDJEngine } from '../DJEngine';
 import {
-  seekDeckAudio, setCrossfader, setDeckEQ, setDeckEchoSend, setDeckFilter, setDeckFilterResonance,
+  seekDeckAudio, setCrossfader, setDeckEQ, setDeckEQKillNow, setDeckEchoSend, setDeckFilter, setDeckFilterResonance,
   setDeckKeyLock, setDeckPitch, setDeckReverbSend, setDeckVolume,
 } from '../DJActions';
 import { useDJStore } from '@/stores/useDJStore';
@@ -84,6 +84,7 @@ export function applyTarget(plan: DJTransitionPlan, target: AutomationTarget, va
     case 'eqLow': setDeckEQ(deck, 'low', value); break;
     case 'eqMid': setDeckEQ(deck, 'mid', value); break;
     case 'eqHigh': setDeckEQ(deck, 'high', value); break;
+    case 'lowKill': setDeckEQKillNow(deck, 'low', value >= 0.5); break;
     case 'filter': setDeckFilter(deck, value); break;
     case 'volume': setDeckVolume(deck, value); break;
     case 'echoSend': setDeckEchoSend(deck, value); break;
@@ -149,6 +150,7 @@ export function releaseAutoKeyLock(deck: 'A' | 'B'): void {
 
 export function resetDeckAfterTransition(deck: 'A' | 'B'): void {
   setDeckEQ(deck, 'low', 0); setDeckEQ(deck, 'mid', 0); setDeckEQ(deck, 'high', 0);
+  setDeckEQKillNow(deck, 'low', false);
   setDeckFilter(deck, 0);
   setDeckVolume(deck, 1);
   setDeckEchoSend(deck, 0);
@@ -204,6 +206,8 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       try { releaseDjFx(f.action, { deck: f.deck === 'outgoing' ? out : inc, source: 'autodj' }); } catch { /* */ }
     }
     const incomingDeck = (() => { try { return getDJEngine().getDeck(inc); } catch { return null; } })();
+    // The bass handover is abandoned: the incoming fades in with its low end.
+    try { setDeckEQKillNow(inc, 'low', false); } catch { /* */ }
     const keepOutgoing = () => {
       trace.events.push('incoming deck silent: outgoing kept playing');
       try { setCrossfader(out === 'A' ? 0 : 1); } catch { /* */ }
@@ -328,7 +332,9 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
             // The values this executor applied (store writes are rAF-batched and lag the engine).
             trace.samples.push({
               beat, crossfader: lastValues.get('crossfader') ?? useDJStore.getState().crossfaderPosition,
-              outgoingLow: lastValues.get('outgoing.eqLow') ?? 0, incomingLow: lastValues.get('incoming.eqLow') ?? 0,
+              // A killed band reads as -60 dB (the kill switch is -Infinity on the deck).
+              outgoingLow: (lastValues.get('outgoing.lowKill') ?? 0) >= 0.5 ? -60 : lastValues.get('outgoing.eqLow') ?? 0,
+              incomingLow: (lastValues.get('incoming.lowKill') ?? 0) >= 0.5 ? -60 : lastValues.get('incoming.eqLow') ?? 0,
               outgoingFilter: lastValues.get('outgoing.filter') ?? 0, incomingFilter: lastValues.get('incoming.filter') ?? 0,
               outgoingVolume: lastValues.get('outgoing.volume') ?? 1,
             });
@@ -350,6 +356,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
             releaseAutoKeyLock(out);
             resetDeckAfterTransition(out);
             setDeckEQ(inc, 'low', 0); setDeckEQ(inc, 'mid', 0); setDeckEQ(inc, 'high', 0);
+            setDeckEQKillNow(inc, 'low', false);
             setDeckFilter(inc, 0);
             setDeckFilterResonance(inc, 1);
             if (plan.loop && plan.loop.deck === 'incoming') { try { getDJEngine().getDeck(inc).clearAudioLoop(); } catch { /* */ } }
@@ -378,6 +385,8 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       cancelled = true;
       if (intervalId !== null) { timers.clearInterval(intervalId); intervalId = null; }
       try { setDeckEchoSend(out, 0); setDeckReverbSend(out, 0); } catch { /* */ }
+      // A cancelled handover leaves neither deck without its bass.
+      try { setDeckEQKillNow(out, 'low', false); setDeckEQKillNow(inc, 'low', false); } catch { /* */ }
       for (const f of filterActionsFor(plan.filterPlan.kind, plan.durationBeats)) releaseDjFx(f.action, { deck: f.deck === 'outgoing' ? out : inc, source: 'autodj' });
       for (const e of plan.effects) { const a = EFFECT_ACTIONS[e.kind]; if (a) releaseDjFx(a, { deck: e.deck === 'outgoing' ? out : inc, source: 'autodj' }); }
       finish({ completed: false, fellBack: trace.fellBack, error: 'cancelled', trace, incomingPlaying: (() => { try { return getDJEngine().getDeck(inc).isPlaying(); } catch { return false; } })() });
