@@ -13,8 +13,8 @@ import {
 } from './scratchPlacement';
 import { routineFor, routineToPlaced, SCRATCH_ROUTINES, type RoutineName } from './scratchRoutines';
 import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
-import { getGesture } from './scratchGestureCatalog';
-import { STEPS_PER_BEAT, DEFAULT_GRID } from './scratchAnchor';
+import { getGesture, gestureBeats } from './scratchGestureCatalog';
+import { DEFAULT_GRID } from './scratchAnchor';
 import type { ScratchPerformanceContext } from './scratchContext';
 import type { ScratchRecord } from './scratchCatalogue';
 import type { ScratchAnchor, ScratchEvent, ScratchGestureId, ScratchSource, DeckScratchAnchor } from './scratchTypes';
@@ -148,7 +148,7 @@ export function humanizeAll(events: readonly PlacedScratch[], bpm: number, seed:
   return out;
 }
 
-/** Placed scratches + their source -> the executor's `ScratchEvent`s (durations in beats of the gesture's steps). */
+/** Placed scratches + their source -> the executor's `ScratchEvent`s (the gesture's one length, whole stroke cycles). */
 export function toScratchEvents(
   events: readonly PlacedScratch[],
   source: ScratchSource,
@@ -160,7 +160,7 @@ export function toScratchEvents(
     const g = getGesture(e.gesture);
     return {
       executeAtBeat: e.beat,
-      durationBeats: g.durationSteps / STEPS_PER_BEAT[DEFAULT_GRID],
+      durationBeats: gestureBeats(e.gesture),
       role: e.role,
       source,
       anchor,

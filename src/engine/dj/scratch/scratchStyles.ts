@@ -171,9 +171,11 @@ export function genreToScratchStyle(genre: GenreAnalysis | DJStyleName | Scratch
 
 // ── Section 34 BPM-aware suitability ───────────────────────────────────────
 
+/** `longGestureSteps`: longer than one beat (a gesture's steps are its real stroke length since SA-B2;
+ *  most strokes are one beat, so "long" is what does not fit a beat at speed: drag, tweak). */
 export const BPM_SUITABILITY = {
   fastBpm: 160, slowBpm: 85,
-  longGestureAtFast: 0.3, longGestureSteps: 3, busyHandAtFast: 0.6, slowFavouriteAtSlow: 1.2,
+  longGestureAtFast: 0.3, longGestureSteps: 5, busyHandAtFast: 0.6, slowFavouriteAtSlow: 1.2,
 } as const;
 
 const BUSY_HAND: ReadonlySet<ScratchGestureId> = new Set(['crab', 'scribble', 'eightFingerCrab', 'uzi']);
