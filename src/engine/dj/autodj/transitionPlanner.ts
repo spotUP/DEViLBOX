@@ -21,7 +21,7 @@ import type {
 } from './types';
 import { TRANSITION_STYLES } from './types';
 import { crossfadeFor, curve, filterFor, stepCurve } from './transitionCurves';
-import { POLICY_MIN, PHASE_BUDGET, confidencePolicy, meterMismatch, type ConfidencePolicy } from './juggle/jugglePlanner';
+import { POLICY_MIN, PHASE_BUDGET, confidencePolicy, lowConfidenceReason, meterMismatch, type ConfidencePolicy } from './juggle/jugglePlanner';
 import { LADDER_SHAPES, minLadderRung } from './juggle/jugglePatterns';
 import type { DJJuggleHistory, DJJugglePerformanceContext, JuggleMode } from './juggle/juggleTypes';
 
@@ -640,7 +640,8 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   const ladderWhy: string[] = [];
   // A juggle transition is budgeted (owner plan sections 24, 28): the set arc, the cooldown, the juggled
   // fraction - and confidence-aware (section 31): the mode's shortest rung only at the pair's confidence.
-  const policy: ConfidencePolicy = confidencePolicy(pairConfidence(outgoing, incoming));
+  const pairConf = pairConfidence(outgoing, incoming);
+  const policy: ConfidencePolicy = confidencePolicy(pairConf);
   const minRung = minLadderRung(juggleMode, policy);
   const phaseAllowed = (PHASE_BUDGET as Record<string, { allowed: boolean }>)[input.setPhase]?.allowed !== false;
   // Different meters: the ladder's rungs would be counted in one deck's bars (owner plan sections 25, 56).
@@ -649,7 +650,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     if (meters) ladderWhy.push(`${meters}: normal transition`);
     if (!phaseAllowed) ladderWhy.push(`set phase ${input.setPhase}: normal mixing`);
     if (input.juggleState && !input.juggleState.allowed) ladderWhy.push(...input.juggleState.reasons);
-    if (minRung === null) ladderWhy.push(`${policy} confidence: normal transition`);
+    if (minRung === null) ladderWhy.push(lowConfidenceReason(pairConf));
   }
   const ladder = !meters && minRung !== null && phaseAllowed && (input.juggleState?.allowed ?? true)
     ? chooseLadder(outgoing, incoming, ladderCandidates(minRung, input.juggleState?.recent, seed), input.outgoingPosition, leadSec, prelimOut.time + provisionalBars * barSec, ladderWhy) : null;

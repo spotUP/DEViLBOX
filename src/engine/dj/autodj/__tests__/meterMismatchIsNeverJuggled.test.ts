@@ -22,8 +22,9 @@ function pair(incomingBeatsPerBar: number): { o: DJTrackAnalysis; i: DJTrackAnal
   return { o, i };
 }
 
-function plan(incomingBeatsPerBar: number) {
+function plan(incomingBeatsPerBar: number, mutate?: (o: DJTrackAnalysis, i: DJTrackAnalysis) => void) {
   const { o, i } = pair(incomingBeatsPerBar);
+  mutate?.(o, i);
   const input: TransitionPlanInput = {
     outgoing: o, incoming: i, outgoingDeck: 'A', incomingDeck: 'B', outgoingPosition: 10, style: getStyle('Club'),
     creativeRisk: 0.6, memory: new DJSessionMemory().snapshot(), userBars: 8, withFilter: true, smartCuts: false,
@@ -64,5 +65,13 @@ describe('JA-M6: two decks in different meters are never juggled', () => {
   it('a 3/4 deck against a 4/4 deck is a bad condition for an in-mix juggle and for the trade stage', () => {
     expect(badConditions(4).some((r) => r.startsWith('meters differ'))).toBe(false);
     expect(badConditions(3)).toContain('meters differ (4 against 3 beats per bar)');
+  });
+});
+
+describe('a juggle transition refused for confidence says which confidence and its value', () => {
+  it('phrases at 0.30: "low confidence (phrase 0.30 < 0.5): normal transition"', () => {
+    const p = plan(4, (o, i) => { for (const ph of [...o.phrases, ...i.phrases]) ph.confidence = 0.3; });
+    expect(p.style).not.toBe('juggleTransition');
+    expect(p.reasons.some((r) => r.includes('low confidence (phrase 0.30 < 0.5): normal transition')), p.reasons.join(' | ')).toBe(true);
   });
 });
