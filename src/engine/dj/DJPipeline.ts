@@ -26,7 +26,7 @@ import { getDJEngineIfActive } from './DJEngine';
 import type { BeatGridData } from './DJAudioCache';
 import { autoMatchOnLoad } from './DJAutoSync';
 import type { ExtendedAnalysis } from './autodj/types';
-import { buildDJTrackAnalysis, DJ_ANALYSIS_VERSION } from './autodj/trackAnalysis';
+import { buildDJTrackAnalysis, DJ_AUDIO_ANALYSIS_VERSION } from './autodj/trackAnalysis';
 import { DemucsEngine } from '@engine/demucs/DemucsEngine';
 import type { StemResult } from '@engine/demucs/types';
 
@@ -164,7 +164,7 @@ export function analysisFromCachedAudio(cached: CachedAudio): PipelineResult['an
 
 /** A cache entry is fully analysed when it has the beat grid AND the current extended analysis. */
 export function isCacheFullyAnalyzed(cached: CachedAudio): boolean {
-  return !!cached.beatGrid && !!cached.bpm && (cached.analysisVersion ?? 1) >= DJ_ANALYSIS_VERSION && !!cached.extended;
+  return !!cached.beatGrid && !!cached.bpm && (cached.analysisVersion ?? 1) >= DJ_AUDIO_ANALYSIS_VERSION && !!cached.extended;
 }
 
 // ── WAV Encoder ──────────────────────────────────────────────────────────────
@@ -970,7 +970,7 @@ export class DJPipeline {
           // cache hit read -100 dB and got the unanalysed trim.
           rmsDb: analysis.rmsDb,
           peakDb: analysis.peakDb,
-          analysisVersion: analysis.extended ? DJ_ANALYSIS_VERSION : 1,
+          analysisVersion: analysis.extended ? DJ_AUDIO_ANALYSIS_VERSION : 1,
           extended: analysis.extended ?? undefined,
           // Genre classification
           genrePrimary: analysis.genre.primary,
