@@ -9,7 +9,7 @@
  *
  * Pure. The executor runs what this returns.
  */
-import { bassCompatibility, drumCompatibility, harmonicCompatibility, vocalCompatibility } from './compatibility';
+import { bassCompatibility, drumCompatibility, harmonicCompatibility, vocalCompatibility, HARMONIC_CLASH_REJECT } from './compatibility';
 import { planGain, sharedBarsOf } from './gainStaging';
 import { solveKey, solveTempo, type TempoKeyLimits } from './tempoKeySolver';
 import { keyAt, summarizeTrack } from './trackAnalysis';
@@ -20,6 +20,8 @@ import type {
   SessionMemorySnapshot, TransitionRisk, TransitionStyle,
 } from './types';
 import { TRANSITION_STYLES } from './types';
+import { POLICY_MIN } from './juggle/jugglePlanner';
+import type { JuggleMode } from './juggle/juggleTypes';
 
 export interface TransitionPlanInput {
   outgoing: DJTrackAnalysis;
@@ -43,6 +45,8 @@ export interface TransitionPlanInput {
   bridgeAvailable?: boolean;
   /** Deterministic humanization seed (the transition count), never Math.random. */
   seed?: number;
+  /** The Auto Juggle mode: MUSICAL and up may plan a juggle transition (default OFF). */
+  juggleMode?: JuggleMode;
 }
 
 export const LENGTH_CANDIDATES = [2, 4, 8, 16, 32] as const;
@@ -150,6 +154,15 @@ export function chooseMixIn(a: DJTrackAnalysis, style: TransitionStyle, lengthSe
     }
     case 'hardCut': return { time: safe(c.firstHook ?? c.firstDrop ?? c.firstFullGroove, usable), reasons: ['cut straight into the hook'] };
     case 'breakdownMix': return { time: safe(c.firstFullGroove ?? c.firstDrums, usable), reasons: ['incoming groove under the outgoing breakdown'] };
+    case 'juggleTransition': {
+      // `lengthSec` is the ladder here and the time returned is where the release lands: the incoming
+      // starts that long before it. The drop when the incoming has the ladder's length before it, else
+      // the best mix-in; a mix-in at the very start (most intros) is traded from, the release lands after.
+      const drop = c.firstDrop;
+      if (drop !== undefined && drop - lengthSec >= 0 && drop < a.durationSec) return { time: drop, reasons: ['the ladder lands on the incoming drop'] };
+      if (usable - lengthSec >= 0) return { time: usable, reasons: ['no drop in reach: the ladder lands on the best mix-in'] };
+      return { time: usable + lengthSec, reasons: ['the ladder trades from the incoming mix-in'] };
+    }
     case 'vocalSwap': {
       const v = c.firstVocal;
       if (v !== undefined && v - lengthSec >= 0) return { time: Math.max(usable, v - lengthSec), reasons: ['incoming vocal arrives after the outgoing vocal has left'] };
@@ -157,6 +170,64 @@ export function chooseMixIn(a: DJTrackAnalysis, style: TransitionStyle, lengthSe
     }
     default: return { time: usable, reasons: [usable === c.bestMixIn ? 'the track\'s best mix-in point' : 'first usable mixing point'] };
   }
+}
+
+// ── Juggle-transition ladder (juggling plan section 26) ─────────────────────
+
+/**
+ * The trading ladders a juggle transition tries, in order: a beat-level grid
+ * trades down to one bar, a phrase-level grid stops at four; each is followed
+ * by its halved ladder when the first does not fit.
+ */
+export function laddersFor(gridConf: number): number[][] {
+  return gridConf >= POLICY_MIN.beat.beat ? [[4, 2, 1], [2, 1]] : [[8, 4], [4, 2]];
+}
+
+export interface LadderChoice { ladderBars: number[]; tradeBeats: number; mixOut: MixOutChoice; mixIn: MixInChoice; incomingPosition: number }
+
+/**
+ * The first ladder that fits: the outgoing keeps its trade bars + 2 bars of
+ * room after the mix-out, and the incoming has the trade length before its
+ * mix-in (the drop when known), so the last trade lands on it. Each rung is
+ * outgoing then incoming: `tradeBeats = 2 * sum(ladderBars) * beatsPerBar`.
+ * The ladder ends where an ordinary transition would hand over (`handOverSec`,
+ * the outgoing's mix-out plus its length) or as close before it as the room
+ * allows - never at the first phrase that fits, which would leave the
+ * outgoing track half played. Null when no ladder fits (reasons in `why`).
+ */
+export function chooseLadder(
+  outgoing: DJTrackAnalysis, incoming: DJTrackAnalysis, gridConf: number, outgoingPosition: number, leadSec: number, strictness: number,
+  handOverSec: number, why: string[] = [],
+): LadderChoice | null {
+  const beatsPerBar = outgoing.meter.beatsPerBar || 4;
+  const bpm = outgoing.bpm > 0 ? outgoing.bpm : 125;
+  const barSec = (60 / bpm) * beatsPerBar;
+  // The incoming plays beatmatched: a master beat is one incoming beat of its own track time.
+  const inBeatSec = 60 / (incoming.bpm > 0 ? incoming.bpm : bpm);
+  const finalBeat = outgoing.cuePoints.finalBeat ?? outgoing.durationSec;
+  for (const ladderBars of laddersFor(gridConf)) {
+    const tradeBars = 2 * ladderBars.reduce((x, y) => x + y, 0);
+    const tradeBeats = tradeBars * beatsPerBar;
+    const roomSec = (tradeBars + 2) * barSec;
+    const earliest = outgoingPosition + leadSec;
+    const latest = finalBeat - roomSec;
+    if (latest < earliest - 1e-6) { why.push(`${ladderBars.join('-')} ladder: the outgoing has no ${tradeBars + 2} bars left`); continue; }
+    // Aim the ladder's end (trades + release) at the hand-over, inside the room.
+    const aim = Math.max(earliest, Math.min(latest, handOverSec - (tradeBars + 1) * barSec));
+    let mixOut = chooseMixOut(outgoing, aim - leadSec - 0.05, roomSec, leadSec, strictness);
+    if (mixOut.time + roomSec > finalBeat + 0.5) {
+      // No boundary from the aim on: the latest bar start that still fits.
+      const bar = [...outgoing.downbeats.bars].reverse().find((x) => x.start >= earliest - 1e-6 && x.start <= latest + 1e-6);
+      if (!bar) { why.push(`${ladderBars.join('-')} ladder: no bar boundary leaves ${tradeBars + 2} bars`); continue; }
+      mixOut = { time: bar.start, bar: bar.index, reasons: ['latest bar boundary the ladder fits from'], score: 0, phrase: null };
+    }
+    const tradeSec = tradeBeats * inBeatSec;
+    const mixIn = chooseMixIn(incoming, 'juggleTransition', tradeSec);
+    const incomingPosition = mixIn.time - tradeSec;
+    if (incomingPosition < 0 || mixIn.time + barSec > incoming.durationSec) { why.push(`${ladderBars.join('-')} ladder: the incoming has no ${tradeBars + 1} bars from its mix-in`); continue; }
+    return { ladderBars, tradeBeats, mixOut, mixIn, incomingPosition };
+  }
+  return null;
 }
 
 // ── Length (plan section 16) ────────────────────────────────────────────────
@@ -217,6 +288,8 @@ export function scoreStyles(ctx: {
   vocalRisk: number; outgoingVocalEnding: boolean; drumScore: number; bothBassHeavy: boolean; energyDelta: number; clashRisk: number;
   tempoBand: string; tempoMethod: string; style: DJStyleProfile; creativeRisk: number; memory: SessionMemorySnapshot; smartCuts: boolean;
   outroRoomBars: number; incomingHasDrumIntro: boolean; confidence: number; setPhaseIsPeak: () => boolean;
+  /** Auto Juggle mode and whether a trading ladder fits both tracks (juggleTransition). */
+  juggleMode?: JuggleMode; ladderFits?: boolean;
 }): StyleScore[] {
   const out: StyleScore[] = [];
   const rep = (s: TransitionStyle) => {
@@ -264,6 +337,17 @@ export function scoreStyles(ctx: {
   if (cutOk && (ctx.incoming.cuePoints.firstDrop !== undefined || ctx.outSection?.kind === 'silence' || ctx.smartCuts)) {
     add('hardCut', 0.5 + ctx.style.cutFrequency * 0.5 + ctx.creativeRisk * 0.3 + (ctx.setPhaseIsPeak() ? 0.15 : 0) + (ctx.smartCuts ? 0.1 : 0), 'structural justification for a cut (drop, silence or drum-break tail)');
   }
+  // A juggle transition (juggling plan section 26): trade the two tracks down a ladder into the incoming drop.
+  // The juggle layer's own gates (POLICY_MIN, HARMONIC_CLASH_REJECT): one gate vocabulary.
+  const mode = ctx.juggleMode ?? 'OFF';
+  const juggleOk = mode !== 'OFF' && mode !== 'SAFE'
+    && (ctx.tempoBand === 'none' || ctx.tempoBand === 'normal')
+    && ctx.clashRisk <= HARMONIC_CLASH_REJECT && ctx.vocalRisk < 0.5 && ctx.drumScore >= 0.5
+    && gridConf >= POLICY_MIN.phrase.beat && !!ctx.ladderFits;
+  if (juggleOk) {
+    const performer = mode === 'PERFORMER' || mode === 'AGGRESSIVE' || mode === 'CHAOS';
+    add('juggleTransition', 0.5 + ctx.creativeRisk * 0.3 + (ctx.setPhaseIsPeak() ? 0.2 : 0) + (performer ? 0.15 : 0), 'compatible grids, keys and drums: trade the tracks into the drop');
+  }
   return out;
 }
 
@@ -274,7 +358,8 @@ const curve = (target: AutomationCurve['target'], keyframes: AutomationCurve['ke
 function crossfadeFor(style: TransitionStyle, beats: number, toward: 0 | 1): CrossfadePlan {
   const from = toward === 1 ? 0 : 1;
   const to = toward;
-  if (style === 'hardCut') return { curve: curve('crossfader', [{ beat: 0, value: from }, { beat: 0.01, value: to }]), lengthBeats: 0, law: 'cut' };
+  // A juggle transition's ladder has already traded onto the incoming when the release starts: the release lands as a cut.
+  if (style === 'hardCut' || style === 'juggleTransition') return { curve: curve('crossfader', [{ beat: 0, value: from }, { beat: 0.01, value: to }]), lengthBeats: 0, law: 'cut' };
   if (style === 'echoOut' || style === 'reverbOut') {
     // The dry outgoing decays through the FX action; the tail returns before
     // the crossfader, so the fader rests at the centre for the tail length
@@ -322,7 +407,8 @@ export function planBassHandover(ctx: {
   const total = b(durationBars);
   const cut = -12;
   const curves: AutomationCurve[] = [];
-  if (ctx.transitionStyle === 'hardCut') {
+  // A cut, or a juggle's trades (one deck heard at a time): full range on both, nothing to hand over gradually.
+  if (ctx.transitionStyle === 'hardCut' || ctx.transitionStyle === 'juggleTransition') {
     curves.push(curve('outgoing.eqLow', [{ beat: 0, value: 0 }]), curve('incoming.eqLow', [{ beat: 0, value: 0 }]));
   } else {
     const sharedStart = Math.max(0, b(handoverBar - sharedBars));
@@ -367,7 +453,7 @@ function filterFor(style: TransitionStyle, beats: number, withFilter: boolean, r
       return { kind: 'low-pass-sweep', resonance: resonanceBase, curves: [
         curve('incoming.filter', [{ beat: 0, value: 0.5 }, { beat: beats, value: 0, curve: 'ease' }]),
       ] };
-    case 'hardCut': case 'echoOut': case 'reverbOut': case 'delayThrow':
+    case 'hardCut': case 'echoOut': case 'reverbOut': case 'delayThrow': case 'juggleTransition':
       return none;
     default:
       if (!withFilter) return none;
@@ -430,7 +516,7 @@ export function assessRisk(ctx: {
   const bass = (ctx.bothBassHeavy ? 0.5 : 0.1) + (ctx.bassShared ? 0.2 : 0);
   const loudness = Math.max(0, Math.min(1, (ctx.truePeakDb + 1) / 3)) * 0.6 + ctx.lowFrequencyAccumulation * 0.4;
   const technical = 1 - Math.min(ctx.outConf, ctx.inConf);
-  const creative = ['hardCut', 'dropMix', 'loopExit', 'tempoBridge', 'doubleTimeJump', 'halfTimeJump'].includes(ctx.styleName) ? 0.15 : 0;
+  const creative = ['hardCut', 'dropMix', 'loopExit', 'tempoBridge', 'doubleTimeJump', 'halfTimeJump', 'juggleTransition'].includes(ctx.styleName) ? 0.15 : 0;
   const risk: TransitionRisk = {
     harmonic: Math.min(1, ctx.clashRisk), tempo, phrase: Math.min(1, phrase), bass: Math.min(1, bass), vocal: Math.min(1, ctx.vocalRisk),
     loudness: Math.min(1, loudness), technical: Math.min(1, technical), overall: 0,
@@ -501,11 +587,16 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   const outgoingVocalEnding = outgoing.vocalActivity.confidence > 0 && activity(outgoing.vocalActivity, Math.max(0, prelimOut.time - 2 * barSec), prelimOut.time) > 0.4
     && activity(outgoing.vocalActivity, prelimOut.time, prelimOut.time + 2 * barSec) < 0.25;
   const setPhaseIsPeak = () => input.setPhase === 'PEAK' || input.setPhase === 'PEAKING';
+  const juggleMode: JuggleMode = input.juggleMode ?? 'OFF';
+  const ladderWhy: string[] = [];
+  const ladder = juggleMode !== 'OFF' && juggleMode !== 'SAFE'
+    ? chooseLadder(outgoing, incoming, gridConf, input.outgoingPosition, leadSec, style.phraseStrictness, prelimOut.time + provisionalBars * barSec, ladderWhy) : null;
   const styles = scoreStyles({
     outSection, inSection: sectionAt(incoming, incoming.cuePoints.bestMixIn ?? 0), outgoing, incoming,
     vocalRisk: vocal.overlapRisk, outgoingVocalEnding, drumScore: drums.score, bothBassHeavy: bass.bothHeavy, energyDelta,
     clashRisk: clash.clashRisk, tempoBand: tempoPlan.band, tempoMethod: tempoPlan.method, style, creativeRisk: input.creativeRisk,
     memory, smartCuts: input.smartCuts, outroRoomBars, incomingHasDrumIntro, confidence, setPhaseIsPeak,
+    juggleMode, ladderFits: !!ladder,
   }).sort((a, b) => b.score - a.score);
   const chosen = styles[0];
   const transitionStyle: TransitionStyle = chosen.style;
@@ -523,21 +614,25 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     clashRisk: clash.clashRisk, drumScore: drums.score, setPhase: input.setPhase, risk: prelimRisk.overall,
     outgoingRoomBars: Math.max(2, outroRoomBars), incomingIntroBars, memory,
   });
-  let durationBars = transitionStyle === 'hardCut' ? 1 : length.bars;
+  // A juggle transition: the ladder runs from the start, the release is one bar after it.
+  const juggle = transitionStyle === 'juggleTransition' && ladder ? { ladderBars: ladder.ladderBars, tradeBeats: ladder.tradeBeats } : undefined;
+  let durationBars = transitionStyle === 'hardCut' || juggle ? 1 : length.bars;
   if (tempoPlan.method === 'avoid') durationBars = Math.min(durationBars, 4);
   // Final mix points with the real length; when the outgoing has less room than
   // the length, halve the length (never below 2 bars) and look again.
-  let mixOut = chooseMixOut(outgoing, input.outgoingPosition, durationBars * barSec, leadSec, style.phraseStrictness);
+  let mixOut = juggle ? ladder!.mixOut : chooseMixOut(outgoing, input.outgoingPosition, durationBars * barSec, leadSec, style.phraseStrictness);
   const finalBeatSec = outgoing.cuePoints.finalBeat ?? outgoing.durationSec;
-  while (durationBars > 2 && mixOut.time + durationBars * barSec > finalBeatSec + 0.5) {
+  while (!juggle && durationBars > 2 && mixOut.time + durationBars * barSec > finalBeatSec + 0.5) {
     durationBars = Math.max(2, Math.floor(durationBars / 2));
     mixOut = chooseMixOut(outgoing, input.outgoingPosition, durationBars * barSec, leadSec, style.phraseStrictness);
   }
   const durationBeats = durationBars * beatsPerBar;
   const lengthSec = durationBars * barSec;
-  const mixIn = chooseMixIn(incoming, transitionStyle, lengthSec);
+  const mixIn = juggle ? ladder!.mixIn : chooseMixIn(incoming, transitionStyle, lengthSec);
+  // The incoming starts with the ladder, the trade length before its mix-in.
+  const incomingPosition = juggle ? ladder!.incomingPosition : mixIn.time;
   const startBeat = beatIndexAt(outgoing, mixOut.time);
-  const endBeat = startBeat + durationBeats;
+  const endBeat = startBeat + (juggle?.tradeBeats ?? 0) + durationBeats;
 
   // Curves.
   const toward: 0 | 1 = input.incomingDeck === 'A' ? 0 : 1;
@@ -593,7 +688,8 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
 
   // Humanize (plan section 31): deterministic from the seed, tiny, never on the grid itself.
   const humanize: HumanizePlan = {
-    startOffsetMs: Math.round(hash(seed, 1) * 30),
+    // A juggle trades by cuts from the first beat: the incoming starts on the grid, never late.
+    startOffsetMs: juggle ? 0 : Math.round(hash(seed, 1) * 30),
     lengthVariationBars: 0,
     fxOffsetMs: Math.round(hash(seed, 2) * 20),
   };
@@ -614,6 +710,8 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     `gain: overlap ${gainPlan.overlapCompensationDb.toFixed(1)} dB, predicted true peak ${gainPlan.monitor.truePeakDb.toFixed(1)} dB`,
     `risk ${risk.overall.toFixed(2)}, confidence ${confidence.toFixed(2)}, fallback ${fallbackStyle}`,
   ];
+  if (juggle) reasons.push(`juggle: ${juggle.ladderBars.join(' -> ')} bar trades (${juggle.tradeBeats} beats), incoming from ${incomingPosition.toFixed(1)} s`);
+  else if (juggleMode !== 'OFF' && juggleMode !== 'SAFE' && ladderWhy.length) reasons.push(`juggle: ${ladderWhy.join('; ')}`);
   if (loop) reasons.push(`loop: ${loop.reason}`);
   if (cueJump) reasons.push(`cue jump: ${cueJump.reason}`);
 
@@ -625,7 +723,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     startBeat,
     endBeat,
     startTimeSec: mixOut.time,
-    incomingPosition: mixIn.time,
+    incomingPosition,
     durationBars,
     durationBeats,
     beatsPerBar,
@@ -640,6 +738,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     loop,
     cueJump,
     cut,
+    juggle,
     confidence,
     risk,
     quantize,
@@ -678,6 +777,7 @@ export function fallbackPlan(plan: DJTransitionPlan, input: TransitionPlanInput,
     loop: undefined,
     cueJump: undefined,
     cut: undefined,
+    juggle: undefined,
     quantize: level === 'emergency' ? 'bar' : plan.quantize,
     reasons: [`${level}: ${styleName} instead of ${plan.style}`, ...plan.reasons.slice(1)],
   };

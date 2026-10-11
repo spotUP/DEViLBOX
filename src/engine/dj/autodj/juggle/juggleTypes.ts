@@ -13,6 +13,11 @@ export type JuggleMode = 'OFF' | 'SAFE' | 'MUSICAL' | 'PERFORMER' | 'AGGRESSIVE'
 
 export const JUGGLE_MODES: readonly JuggleMode[] = ['OFF', 'SAFE', 'MUSICAL', 'PERFORMER', 'AGGRESSIVE', 'CHAOS'];
 
+/** The stored Auto Juggle setting as a mode: anything unknown is OFF. */
+export function juggleModeOf(value: string | null | undefined): JuggleMode {
+  return (JUGGLE_MODES as readonly string[]).includes(value ?? '') ? (value as JuggleMode) : 'OFF';
+}
+
 export type JugglePhase = 'SETUP' | 'ESTABLISH' | 'INTENSIFY' | 'PEAK' | 'PAYOFF' | 'RELEASE';
 
 export const JUGGLE_PHASES: readonly JugglePhase[] = ['SETUP', 'ESTABLISH', 'INTENSIFY', 'PEAK', 'PAYOFF', 'RELEASE'];

@@ -31,7 +31,7 @@ export interface ExecutionTrace {
   fellBack: 'none' | 'fallback' | 'emergency';
 }
 
-const CREATIVE_STYLES: TransitionStyle[] = ['dropMix', 'breakdownMix', 'drumIntroMix', 'vocalSwap', 'echoOut', 'reverbOut', 'delayThrow', 'loopExit', 'tempoBridge', 'hardCut', 'doubleTimeJump', 'halfTimeJump', 'percussionSwap'];
+const CREATIVE_STYLES: TransitionStyle[] = ['dropMix', 'breakdownMix', 'drumIntroMix', 'vocalSwap', 'echoOut', 'reverbOut', 'delayThrow', 'loopExit', 'tempoBridge', 'hardCut', 'doubleTimeJump', 'halfTimeJump', 'percussionSwap', 'juggleTransition'];
 
 function clamp01(v: number): number { return Math.max(0, Math.min(1, v)); }
 
