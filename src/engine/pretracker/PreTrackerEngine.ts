@@ -7,7 +7,6 @@
  */
 
 import { getDevilboxAudioContext } from "@/utils/audio-context";
-import { getToneEngine } from '@engine/ToneEngine';
 import type { IsolationCapableEngine } from '@/engine/tone/ChannelRoutedEffects';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 import {
@@ -295,13 +294,7 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
           break;
 
         case 'chLevels':
-          try {
-            const engine = getToneEngine();
-            const levels: number[] = data.levels;
-            const noteStarts: number[] | null = data.noteStarts;
-            if (noteStarts) meterFeed.feedCounted(engine, levels, noteStarts);
-            else meterFeed.feed(engine, levels);
-          } catch { /* ToneEngine not ready */ }
+          meterFeed.report(data.levels, data.noteStarts);
           break;
 
         case 'error':

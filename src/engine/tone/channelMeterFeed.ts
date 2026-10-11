@@ -21,6 +21,20 @@ export interface ChannelMeterSink {
   triggerChannelMeter(channelIndex: number, velocity: number): void;
 }
 
+/**
+ * The app's channel meters - ToneEngine registers itself when it is created.
+ *
+ * Format engines report levels through report(), which reads this, instead of
+ * importing ToneEngine for it: that import put every format engine in the
+ * static import cycle ToneEngine -> InstrumentFactory -> the synths -> the
+ * engines -> ToneEngine, where a racing module load meets half-initialised
+ * engine classes. See src/lib/song/__tests__/songPersistenceImportCycle.test.ts.
+ */
+let registeredSink: ChannelMeterSink | null = null;
+
+/** Called once by ToneEngine's constructor (null unregisters, for tests). */
+export function registerChannelMeterSink(sink: ChannelMeterSink | null): void { registeredSink = sink; }
+
 /** True on the frame a level jumps far enough to be a note starting. */
 export function isLevelOnset(level: number, prevLevel: number): boolean {
   return level - prevLevel > VU_ONSET_RISE;
@@ -31,6 +45,18 @@ export class ChannelMeterFeed {
   private prevStarts: number[] = [];
   /** Channels whose counted note has not sounded yet (envelope delay / attack from silence). */
   private pending: boolean[] = [];
+
+  /**
+   * One engine level report to the app's meters: counted when the engine
+   * reports note starts, by level jump otherwise. No meters yet (ToneEngine
+   * not created) - nothing to show, so nothing is fed.
+   */
+  report(levels: ArrayLike<number>, noteStarts?: ArrayLike<number> | null): void {
+    const sink = registeredSink;
+    if (!sink) return;
+    if (noteStarts) this.feedCounted(sink, levels, noteStarts);
+    else this.feed(sink, levels);
+  }
 
   /** Split one frame of per-channel levels into the level feed and the note feed. */
   feed(sink: ChannelMeterSink, levels: ArrayLike<number>): void {

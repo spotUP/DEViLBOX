@@ -34,6 +34,7 @@ import { DJJuggleController, analysisClock, type TickInput } from './autodj/jugg
 import { createDeckJuggleSink } from './autodj/juggle/juggleDeckSink';
 import { JUGGLE_MODES, type JuggleMode } from './autodj/juggle/juggleTypes';
 import { seekDeckAudio, setCrossfader } from './DJActions';
+import { registerAutoDJ } from './autoDJInstance';
 import { phaseAlign, syncBPMToOther } from './DJAutoSync';
 
 // ── Transition Types ────────────────────────────────────────────────────────
@@ -97,6 +98,7 @@ let instance: DJAutoDJ | null = null;
 export function getAutoDJ(): DJAutoDJ {
   if (!instance) {
     instance = new DJAutoDJ();
+    registerAutoDJ(instance);
   }
   return instance;
 }

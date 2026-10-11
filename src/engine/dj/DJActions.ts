@@ -24,7 +24,7 @@ import type { DJSet } from './recording/DJSetFormat';
 import { quantizedEQKill, getQuantizeMode, quantizeAction, cancelAllAutomation } from './DJQuantizedFX';
 import { syncBPMToOther, phaseAlign, snapPositionToBeat } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
-import { getAutoDJ } from './DJAutoDJ';
+import { existingAutoDJ } from './autoDJInstance';
 import type { DeckId, FaderLFODivision } from './DeckEngine';
 
 // ── Batched store writes for continuous controls ───────────────────────
@@ -95,7 +95,7 @@ export async function togglePlay(
     // If Auto DJ is active, pause it so its poll guard doesn't
     // immediately resume the deck the user just paused.
     if (store.autoDJEnabled) {
-      getAutoDJ().pause();
+      existingAutoDJ()?.pause();
     }
     if (spinDownMs > 0) {
       // Spin-down: gradually decelerate then stop
@@ -1052,31 +1052,34 @@ export async function enableAutoDJ(startIndex?: number): Promise<string | null> 
   // The performance order is the session controller's (plan section 10):
   // Auto DJ never re-sorts the user's playlist. Smart Sort stays a manual
   // playlist action.
+  const { getAutoDJ } = await import('./DJAutoDJ');
   return await getAutoDJ().enable(startIndex);
 }
 
 /** Disable Auto DJ — current track keeps playing. */
 export function disableAutoDJ(): void {
-  getAutoDJ().disable();
+  existingAutoDJ()?.disable();
 }
 
 /** Skip to the next Auto DJ track with a short transition. */
 export async function skipAutoDJ(): Promise<void> {
+  const { getAutoDJ } = await import('./DJAutoDJ');
   await getAutoDJ().skip();
 }
 
 /** Pause Auto DJ — stops transitions but keeps current track playing. */
 export function pauseAutoDJ(): void {
-  getAutoDJ().pause();
+  existingAutoDJ()?.pause();
 }
 
 /** Resume Auto DJ after pause. */
 export function resumeAutoDJ(): void {
-  getAutoDJ().resume();
+  existingAutoDJ()?.resume();
 }
 
 /** Jump to a specific track in the playlist and play it. */
 export async function playAutoDJFromIndex(index: number): Promise<void> {
+  const { getAutoDJ } = await import('./DJAutoDJ');
   await getAutoDJ().playFromIndex(index);
 }
 
