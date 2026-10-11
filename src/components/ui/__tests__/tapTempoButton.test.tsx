@@ -39,4 +39,15 @@ describe('the deck Tap button', () => {
     act(() => { vi.advanceTimersByTime(2100); });
     expect(button.textContent).toBe('Tap');
   });
+
+  it('is a standard design-system button, not the dim compact toggle, and lights up while tapping (owner: "looks disabled")', () => {
+    const { getByRole } = render(<DeckTrackInfo deckId="A" />);
+    const button = getByRole('button', { name: /^Tap/ });
+    expect(button.className).toMatch(/(^|\s)btn(\s|$)/);
+    expect(button.className).not.toMatch(/btn-compact/);
+    fireEvent.click(button);
+    act(() => { vi.advanceTimersByTime(400); });
+    fireEvent.click(button);
+    expect(button.className).toMatch(/btn-primary/);
+  });
 });

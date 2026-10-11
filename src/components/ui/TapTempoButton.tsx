@@ -27,10 +27,10 @@ export const TapTempoButton: React.FC<TapTempoButtonProps> = ({ tapRef, classNam
 
   return (
     <Button
-      variant="compact"
+      variant={isActive && bpm !== null ? 'primary' : 'default'}
       size="sm"
       onClick={tap}
-      className={`font-mono tabular-nums ${isActive && bpm !== null ? 'text-accent-primary' : ''} ${className}`}
+      className={`tabular-nums shrink-0 ${className}`}
       title="Tap along with the beat to read its BPM (display only, changes nothing)"
     >
       {isActive && bpm !== null ? `Tap ${bpm}` : 'Tap'}
