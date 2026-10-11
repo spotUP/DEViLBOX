@@ -17,17 +17,19 @@ interface DeckTrackOverviewProps {
   deckId: 'A' | 'B' | 'C';
 }
 
+import { deckAccent } from '@lib/deckIdentity';
 import type { OverviewMsg, OverviewState, DeckColors } from '@engine/renderer/worker-types';
 
 const BAR_HEIGHT = 24;
 
-function snapshotColors(el: HTMLElement): DeckColors {
+function snapshotColors(el: HTMLElement, deckId: string): DeckColors {
   const cs = getComputedStyle(el);
   return {
     bg:          cs.getPropertyValue('--color-bg').trim()           || '#6e1418',
     bgSecondary: cs.getPropertyValue('--color-bg-secondary').trim() || '#7c1a1e',
     bgTertiary:  cs.getPropertyValue('--color-bg-tertiary').trim()  || '#8c2028',
     border:      cs.getPropertyValue('--color-border').trim()       || '#581014',
+    deckAccent:  deckAccent(deckId),
   };
 }
 
@@ -73,7 +75,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
 
     const dpr    = window.devicePixelRatio || 1;
     const w      = Math.max(1, container.clientWidth);
-    const colors = snapshotColors(container);
+    const colors = snapshotColors(container, deckId);
     const deck   = useDJStore.getState().decks[deckId];
     const offscreen = canvas.transferControlToOffscreen();
 
@@ -125,7 +127,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     // Theme subscription
     const unsubTheme = useThemeStore.subscribe(() => {
       if (containerRef.current) {
-        bridgeRef.current?.post({ type: 'colors', colors: snapshotColors(containerRef.current) });
+        bridgeRef.current?.post({ type: 'colors', colors: snapshotColors(containerRef.current, deckId) });
       }
     });
 

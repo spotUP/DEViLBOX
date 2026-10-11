@@ -9,6 +9,7 @@
  * Physics output drives DeckEngine scratch API via DJActions.
  */
 
+import { deckAccent, deckLabelSurface } from '@lib/deckIdentity';
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { platterPositionSec } from './DeckCssTurntable';
@@ -26,8 +27,6 @@ interface DeckVinylViewProps {
 const DEFAULT_SIZE = 250;
 const GROOVE_COUNT = 28;
 
-const DECK_ACCENT: Record<string, string> = { A: '#60a5fa', B: '#f87171', C: '#34d399' };
-const DECK_LABEL_BG: Record<string, string> = { A: '#1e2a3f', B: '#3f1e2a', C: '#1e3f2a' };
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -52,8 +51,8 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
   const patternName = useDJStore((s) => s.decks[deckId].activePatternName);
 
   // Theme colors
-  const accentColor = DECK_ACCENT[deckId] ?? '#60a5fa';
-  const labelBg = DECK_LABEL_BG[deckId] ?? '#1e2a3f';
+  const accentColor = deckAccent(deckId);
+  const labelBg = deckLabelSurface(deckId);
 
   // ── Physics rAF loop — drives scratch velocity to DeckEngine ──────────────
 

@@ -10,9 +10,6 @@ import { clockNowMs, positionAtFrame, type ClockAnchor } from '../engine/audioLa
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const POSITION_COLOR     = '#ef4444';
-const POSITION_GLOW      = 'rgba(239, 68, 68, 0.55)';
-const POSITION_EDGE      = '#7f1d1d'; // dark-red halo edge for extra contrast
 const CUE_COLOR          = '#f59e0b';
 const LOOP_COLOR         = 'rgba(6, 182, 212, 0.25)';
 const LOOP_BORDER        = 'rgba(6, 182, 212, 0.6)';
@@ -35,20 +32,20 @@ function drawPositionMarker(
   h: number,
 ): void {
   // 1. Soft outer glow
-  c.fillStyle = POSITION_GLOW;
+  c.fillStyle = `${colors.deckAccent}8c`; // deck colour at 55 % alpha
   c.fillRect(x - 7, 0, 14, h);
   // 2a. Dark halo edges (crisp against bright-red underlying bars)
-  c.fillStyle = POSITION_EDGE;
+  c.fillStyle = colors.bg; // halo edge in the surface colour, for contrast
   c.fillRect(x - 4, 0, 1, h);
   c.fillRect(x + 3, 0, 1, h);
   // 2b. Bright red body
-  c.fillStyle = POSITION_COLOR;
+  c.fillStyle = colors.deckAccent;
   c.fillRect(x - 3, 0, 6, h);
   // 3. White core
   c.fillStyle = '#ffffff';
   c.fillRect(x - 1, 0, 2, h);
   // 4. Triangle caps (top and bottom), 6 px wide
-  c.fillStyle = POSITION_COLOR;
+  c.fillStyle = colors.deckAccent;
   c.beginPath();
   c.moveTo(x - 5, 0);
   c.lineTo(x + 5, 0);
@@ -69,7 +66,7 @@ let offCanvas: OffscreenCanvas | null = null;
 let ctx: OffscreenCanvasRenderingContext2D | null = null;
 let dpr = 1, width = 400, height = 24;
 let colors: DeckColors = {
-  bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028', border: '#581014',
+  bg: '#6e1418', bgSecondary: '#7c1a1e', bgTertiary: '#8c2028', border: '#581014', deckAccent: '#60a5fa',
 };
 
 let playbackMode    = 'tracker';
