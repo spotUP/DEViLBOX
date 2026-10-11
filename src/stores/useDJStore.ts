@@ -521,7 +521,9 @@ export const useDJStore = create<DJStore>()(
     autoDJCreativeRisk: -1,
     autoDJSessionOrder: [] as number[],
     autoDJTelemetry: null as AutoDJTelemetry | null,
-    autoDJJuggleMode: 'OFF',
+    // Owner decision 2026-10-11 (plan 2026-10-11-dj-juggling, section 8.2): Auto Juggle on, MUSICAL.
+    // Not persisted (no storage middleware, not in the DJ environment snapshot): no migration needed.
+    autoDJJuggleMode: 'MUSICAL',
     autoDJJuggleIntensity: -1,
     autoDJJuggleTelemetry: null as JuggleTelemetry | null,
     djFxActive: {} as Record<string, DeckId | null>,
