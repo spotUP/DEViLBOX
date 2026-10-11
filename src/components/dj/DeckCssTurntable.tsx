@@ -14,10 +14,21 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
 import * as DJActions from '@/engine/dj/DJActions';
+import { clockNowMs, deckPositionAt } from '@/engine/audioLatency';
+import type { DeckId } from '@/engine/dj/DeckEngine';
 import './DeckCssTurntable.css';
 
 interface DeckCssTurntableProps {
   deckId: 'A' | 'B' | 'C';
+}
+
+/**
+ * The position the platter and tonearm show: the HEARD position now (the
+ * deck's clock anchor extrapolated to this moment), never the player's
+ * rendered position, which runs ahead of the ear by the output latency.
+ */
+export function platterPositionSec(deckId: DeckId): number {
+  return deckPositionAt(useDJStore.getState().decks[deckId], clockNowMs());
 }
 
 export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) => {
@@ -115,12 +126,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
           if (isScratchActiveRef.current && !scratchIntegrating) {
             scratchIntegrating = true;
             // Read position directly from engine (no store access)
-            let posSec = 0;
-            if (engineDeck) {
-              try { posSec = engineDeck.playbackMode === 'audio' ? engineDeck.audioPlayer.getPosition() : engineDeck.replayer.getElapsedMs() / 1000; }
-              catch { /* fallback 0 */ }
-            }
-            angleRef.current = posSec * omegaNormal;
+            angleRef.current = platterPositionSec(deckId) * omegaNormal;
           }
 
           if (isScratchActiveRef.current && Math.abs(rate - prevRate) > 0.01) {
@@ -145,11 +151,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
         }
 
         if (!scratchIntegrating && engineDeck) {
-          // Read position directly from engine — avoid useDJStore.getState() in hot loop
-          let posSec = 0;
-          try { posSec = engineDeck.playbackMode === 'audio' ? engineDeck.audioPlayer.getPosition() : engineDeck.replayer.getElapsedMs() / 1000; }
-          catch { /* fallback 0 */ }
-          angleRef.current = posSec * omegaNormal;
+          angleRef.current = platterPositionSec(deckId) * omegaNormal;
         }
       }
 
@@ -169,17 +171,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const ARM_END_DEG = 25;
       const deck = useDJStore.getState().decks[deckId];
       const duration = deck.durationMs > 0 ? deck.durationMs / 1000 : 180;
-      // Get LIVE position from audio player (not stale store value)
-      let pos: number;
-      if (deck.playbackMode === 'audio') {
-        try {
-          pos = getDJEngine().getDeck(deckId).audioPlayer.getPosition();
-        } catch {
-          pos = deck.audioPosition;
-        }
-      } else {
-        pos = deck.elapsedMs / 1000;
-      }
+      const pos = platterPositionSec(deckId);
       const progress = duration > 0 ? Math.min(pos / duration, 1) : 0;
       // Slight wobble when playing
       const wobble = playing && !isScratchActiveRef.current
