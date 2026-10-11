@@ -11,6 +11,7 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { platterPositionSec } from './DeckCssTurntable';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
 import * as DJActions from '@/engine/dj/DJActions';
@@ -95,9 +96,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
           if (isScratchActiveRef.current && !scratchIntegrating) {
             scratchIntegrating = true;
             // Sync angle to current position before integrating
-            const deck = useDJStore.getState().decks[deckId];
-            const posSec = deck.playbackMode === 'audio' ? deck.audioPosition : deck.elapsedMs / 1000;
-            angleRef.current = posSec * omegaNormal;
+            angleRef.current = platterPositionSec(deckId) * omegaNormal;
           }
 
           // Forward physics rate to DeckEngine scratch API via DJActions
@@ -123,13 +122,9 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
           }
         }
 
-        // When NOT scratching, derive angle from store position (authoritative)
+        // When NOT scratching, derive angle from the heard position (clock anchor, per frame)
         if (!scratchIntegrating) {
-          const deck = useDJStore.getState().decks[deckId];
-          const posSec = deck.playbackMode === 'audio'
-            ? deck.audioPosition
-            : deck.elapsedMs / 1000;
-          angleRef.current = posSec * omegaNormal;
+          angleRef.current = platterPositionSec(deckId) * omegaNormal;
         }
       }
       // When not playing (and not scratching), platter is stationary

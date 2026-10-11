@@ -29,6 +29,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
+import { platterPositionSec } from './DeckCssTurntable';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
 import * as DJActions from '@/engine/dj/DJActions';
@@ -115,14 +116,13 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
   const songPos = useDJStore((s) => s.decks[deckId].songPos);
   const totalPositions = useDJStore((s) => s.decks[deckId].totalPositions);
-  const audioPosition = useDJStore((s) => s.decks[deckId].audioPosition);
   const durationMs = useDJStore((s) => s.decks[deckId].durationMs);
   const playbackMode = useDJStore((s) => s.decks[deckId].playbackMode);
   const pitchOffset = useDJStore((s) => s.decks[deckId].pitchOffset);
   const trackName = useDJStore((s) => s.decks[deckId].trackName);
 
-  const playStateRef = useRef({ isPlaying, songPos, totalPositions, audioPosition, durationMs, playbackMode, pitchOffset });
-  playStateRef.current = { isPlaying, songPos, totalPositions, audioPosition, durationMs, playbackMode, pitchOffset };
+  const playStateRef = useRef({ isPlaying, songPos, totalPositions, durationMs, playbackMode, pitchOffset });
+  playStateRef.current = { isPlaying, songPos, totalPositions, durationMs, playbackMode, pitchOffset };
 
   const accentColor = DECK_ACCENT[deckId] ?? '#60a5fa';
 
@@ -298,7 +298,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
   useFrame((_state, delta) => {
     const { isPlaying: playing, songPos: sPos, totalPositions: total,
-      audioPosition: aPos, durationMs: dur, playbackMode: mode } = playStateRef.current;
+      durationMs: dur, playbackMode: mode } = playStateRef.current;
     if (!physicsRef.current) {
       try { physicsRef.current = getDJEngine().getDeck(deckId).physics; } catch { return; }
     }
@@ -357,7 +357,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     if (tonearmMeshes.length > 0) {
       let progress = 0;
       if (mode === 'audio' && dur > 0) {
-        progress = aPos / (dur / 1000);
+        progress = platterPositionSec(deckId) / (dur / 1000);
       } else if (mode === 'tracker' && total > 0) {
         progress = sPos / total;
       }
@@ -583,9 +583,9 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     // Tonearm is mechanical — can always be moved physically, even with power off
     pickupDragRef.current = true;
     pickupDragStartXRef.current = e.nativeEvent.clientY;
-    const { audioPosition: aPos, durationMs: dur, songPos: sPos, totalPositions: total, playbackMode: mode } = playStateRef.current;
+    const { durationMs: dur, songPos: sPos, totalPositions: total, playbackMode: mode } = playStateRef.current;
     pickupDragStartProgressRef.current = mode === 'audio' && dur > 0
-      ? (aPos / (dur / 1000))
+      ? (platterPositionSec(deckId) / (dur / 1000))
       : total > 0 ? sPos / total : 0;
     (e.nativeEvent.target as HTMLElement)?.setPointerCapture?.(e.nativeEvent.pointerId);
   }, []);
