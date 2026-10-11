@@ -182,8 +182,30 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
     this.bufferId     = (options.processorOptions && options.processorOptions.bufferId) ?? 0;
-    this.bufferFrames = Math.round(sampleRate * BUFFER_SECONDS);
-    this.ring         = getOrCreateRing(this.bufferId, sampleRate);
+    // Record mode (scratch record voice, owner scratch plan section 16): the
+    // ring holds a STATIC record written by `load` (sized to the record, not
+    // 120 s), read from `startAt` / `seek`, clamped to `bounds` (the record's
+    // safe range: a hand on a record never runs off the sound), articulated by
+    // a frame-accurate `rateCurve` and `faderWindows`, and reported with
+    // `position` every 128 frames. The deck path below is untouched.
+    this.isRecord     = !!(options.processorOptions && options.processorOptions.record);
+    if (this.isRecord) {
+      this.ring         = null;
+      this.bufferFrames = 0;
+      this.boundLo      = 0;
+      this.boundHi      = 0;
+      this.cuePos       = 0;     // frames: where `seek`/`startAt` put the head; a returning gesture re-cues here
+      this.curve        = null;  // {points:[{frame,rate}], idx, frame, interpolate, loop, cycleFrames, returnToAnchor}
+      this.fader        = null;  // {windows:[[open,close]], frame, cycleFrames, loop, rampStep}
+      this.faderGain    = 1;     // current articulated gain (ramped)
+      this.pendingSeek  = -1;    // frames: a seek waits for a 1 ms fade-out before the jump
+      this.seekFade     = 0;
+      this.clampCount   = 0;
+      this._posSince    = 0;
+    } else {
+      this.bufferFrames = Math.round(sampleRate * BUFFER_SECONDS);
+      this.ring         = getOrCreateRing(this.bufferId, sampleRate);
+    }
 
     this.active      = false;
     this.readPosF    = 0;     // fractional read position (sub-sample precision)
@@ -263,7 +285,8 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           this.active = false;
           this.targetRate = 0;
           this.smoothRate = 0;
-          const bf = this.bufferFrames;
+          if (this.isRecord) { this.curve = null; this.fader = null; this.pendingSeek = -1; this.seekFade = 0; }
+          const bf = Math.max(1, this.bufferFrames);
           const framesBack = Math.round(
             ((this.startPos - this.readPosF) + bf) % bf
           );
@@ -277,8 +300,255 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           this.smoothRate = d.rate;
           this.prevSign   = Math.sign(d.rate);
           break;
+
+        // ── Record mode (section 16) ──
+        case 'load': {
+          const left  = d.left;
+          const right = d.right || d.left;
+          const frames = left.length;
+          const ring = new Float32Array(frames * 2);
+          for (let i = 0; i < frames; i++) { ring[i * 2] = left[i]; ring[i * 2 + 1] = right[i]; }
+          rings[this.bufferId]        = ring;
+          writePoss[this.bufferId]    = 0;
+          totalWritten[this.bufferId] = frames;
+          frozen[this.bufferId]       = true;   // never captured over
+          this.ring         = ring;
+          this.bufferFrames = frames;
+          this.boundLo      = 0;
+          this.boundHi      = Math.max(0, frames - 1);
+          this.active       = false;
+          this.readPosF     = 0;
+          this.cuePos       = 0;
+          this.curve        = null;
+          this.fader        = null;
+          this.faderGain    = 1;
+          this.pendingSeek  = -1;
+          this.seekFade     = 0;
+          this.clampCount   = 0;
+          this.port.postMessage({ type: 'loaded', frames });
+          break;
+        }
+
+        case 'bounds': {
+          const hi = Math.max(0, this.bufferFrames - 1);
+          this.boundLo = Math.max(0, Math.min(hi, Math.round(d.startFrames)));
+          this.boundHi = Math.max(this.boundLo, Math.min(hi, Math.round(d.endFrames)));
+          break;
+        }
+
+        case 'startAt': {
+          // The reader advances by the rate BEFORE it interpolates (P0.6):
+          // start at P - rate so the first sample out is ring[P] in either
+          // direction.
+          const p = this._clampPos(d.positionFrames);
+          this.cuePos      = p;
+          this.startPos    = p;
+          this.readPosF    = p - (d.rate ?? 0);
+          this.targetRate  = d.rate ?? 0;
+          this.smoothRate  = d.rate ?? 0;
+          this.prevSign    = Math.sign(this.smoothRate);
+          this.fadeCounter = ZERO_FADE_SAMPLES;   // fade in: a cue is a needle drop
+          this.pendingSeek = -1;
+          this.seekFade    = 0;
+          this.curve       = null;
+          this.validFrames = this.bufferFrames;
+          this.active      = true;
+          break;
+        }
+
+        case 'seek': {
+          const p = this._clampPos(d.positionFrames);
+          this.cuePos = p;
+          if (this.active) {
+            // fade out over 1 ms, jump, fade in (a click-free re-cue, section 18)
+            this.pendingSeek = p;
+            this.seekFade    = ZERO_FADE_SAMPLES;
+          } else {
+            this.readPosF = p - this.smoothRate;
+            this.startPos = p;
+          }
+          break;
+        }
+
+        case 'rateCurve': {
+          // Frame-accurate rate automation: points relative to this message's
+          // arrival; `loop` repeats every `cycleFrames`; `returnToAnchor`
+          // re-cues to `cuePos` at every cycle end (section 11/18).
+          const points = (d.points || []).map((p) => ({ frame: Math.max(0, Math.round(p.frame)), rate: +p.rate || 0 }));
+          this.curve = {
+            points,
+            idx: 0,
+            frame: 0,
+            interpolate: !!d.interpolate,
+            loop: !!d.loop,
+            cycleFrames: Math.max(1, Math.round(d.cycleFrames || (points.length ? points[points.length - 1].frame : 1))),
+            returnToAnchor: !!d.returnToAnchor,
+          };
+          if (!this.active) {
+            this.startPos    = this.cuePos;
+            this.readPosF    = this.cuePos - this.smoothRate;
+            this.prevSign    = 0;
+            this.fadeCounter = ZERO_FADE_SAMPLES;
+            this.active      = true;
+          }
+          break;
+        }
+
+        case 'faderWindows': {
+          // Open windows in frames relative to arrival; outside them the voice
+          // is cut. Linear ramp of `rampFrames` on every edge (3 ms default).
+          const windows = (d.windows || []).map((w) => [Math.max(0, Math.round(w[0])), Math.max(0, Math.round(w[1]))]).sort((a, b) => a[0] - b[0]);
+          const rampFrames = Math.max(1, Math.round(d.rampFrames || sampleRate * 0.003));
+          this.fader = {
+            windows,
+            frame: 0,
+            cycleFrames: Math.max(1, Math.round(d.cycleFrames || 1)),
+            loop: !!d.loop,
+            rampStep: 1 / rampFrames,
+          };
+          break;
+        }
+
+        case 'faderGain':
+          // One static gain (0/1) with the same ramp; cancels window automation.
+          this.fader = {
+            windows: d.gain > 0.5 ? [[0, 0x7fffffff]] : [],
+            frame: 0, cycleFrames: 0x7fffffff, loop: false,
+            rampStep: 1 / Math.max(1, Math.round(d.rampFrames || sampleRate * 0.003)),
+          };
+          break;
       }
     };
+  }
+
+  _clampPos(p) {
+    const v = Math.round(+p || 0);
+    return Math.max(this.boundLo, Math.min(this.boundHi, v));
+  }
+
+  /** Static-ring sample read: no wrap, silence outside the record. */
+  getRecordSample(idx, ch) {
+    if (idx < 0 || idx >= this.bufferFrames) return 0;
+    return this.ring[idx * 2 + ch];
+  }
+
+  /** Record mode render: rate curve + fader windows + bounds clamp + position reports. */
+  processRecord(outputs) {
+    const out    = outputs[0];
+    const frames = (out[0] && out[0].length) ? out[0].length : 128;
+    if (!this.active || !this.ring) {
+      if (out[0]) out[0].fill(0);
+      if (out[1]) out[1].fill(0);
+      return true;
+    }
+    const alpha  = this.smoothAlpha;
+    let   rate   = this.smoothRate;
+    let   target = this.targetRate;
+    let   fadeCounter = this.fadeCounter;
+    let   prevSign    = this.prevSign;
+    let   faderGain   = this.faderGain;
+    const curve = this.curve;
+    const fader = this.fader;
+
+    for (let i = 0; i < frames; i++) {
+      // ── rate curve ──
+      if (curve) {
+        const pts = curve.points;
+        while (curve.idx < pts.length && pts[curve.idx].frame <= curve.frame) curve.idx++;
+        if (curve.interpolate && curve.idx > 0 && curve.idx < pts.length) {
+          const a = pts[curve.idx - 1], b = pts[curve.idx];
+          const span = b.frame - a.frame;
+          target = span > 0 ? a.rate + (b.rate - a.rate) * ((curve.frame - a.frame) / span) : b.rate;
+        } else if (curve.idx > 0) {
+          target = pts[curve.idx - 1].rate;
+        } else if (pts.length) {
+          target = pts[0].rate;
+        }
+        curve.frame++;
+        if (curve.frame >= curve.cycleFrames) {
+          if (curve.loop) {
+            curve.frame -= curve.cycleFrames;
+            curve.idx = 0;
+            if (curve.returnToAnchor) { this.pendingSeek = this.cuePos; this.seekFade = ZERO_FADE_SAMPLES; }
+          } else {
+            this.curve = null;
+            target = pts.length ? pts[pts.length - 1].rate : 0;
+          }
+        }
+      }
+      // ── fader windows ──
+      let gate = 1;
+      if (fader) {
+        gate = 0;
+        const f = fader.frame;
+        const ws = fader.windows;
+        for (let w = 0; w < ws.length; w++) { if (f >= ws[w][0] && f < ws[w][1]) { gate = 1; break; } }
+        fader.frame++;
+        if (fader.frame >= fader.cycleFrames) {
+          if (fader.loop) fader.frame -= fader.cycleFrames;
+          else fader.frame = fader.cycleFrames; // hold the final state
+        }
+      }
+      if (faderGain < gate) faderGain = Math.min(gate, faderGain + (fader ? fader.rampStep : 1));
+      else if (faderGain > gate) faderGain = Math.max(gate, faderGain - (fader ? fader.rampStep : 1));
+
+      // ── rate smoothing + zero-crossing fade (shared with the deck path) ──
+      rate += (target - rate) * alpha;
+      const curSign = rate > 0.001 ? 1 : (rate < -0.001 ? -1 : 0);
+      if (prevSign !== 0 && curSign !== 0 && curSign !== prevSign) fadeCounter = ZERO_FADE_SAMPLES;
+      if (curSign !== 0) prevSign = curSign;
+      let fadeGain = 1.0;
+      if (fadeCounter > 0) { fadeGain = 1.0 - (fadeCounter / ZERO_FADE_SAMPLES); fadeCounter--; }
+
+      // ── pending seek: fade out, jump, fade in ──
+      if (this.pendingSeek >= 0) {
+        if (this.seekFade > 0) {
+          fadeGain = Math.min(fadeGain, this.seekFade / ZERO_FADE_SAMPLES);
+          this.seekFade--;
+        }
+        if (this.seekFade <= 0) {
+          this.readPosF    = this.pendingSeek - rate;
+          this.startPos    = this.pendingSeek;
+          this.pendingSeek = -1;
+          fadeCounter      = ZERO_FADE_SAMPLES;
+          fadeGain         = 0;
+        }
+      }
+
+      // ── advance + clamp to bounds (never off the sound) ──
+      this.readPosF += rate;
+      if (this.readPosF > this.boundHi) { this.readPosF = this.boundHi; this.clampCount++; }
+      else if (this.readPosF < this.boundLo) { this.readPosF = this.boundLo; this.clampCount++; }
+
+      const posI = Math.floor(this.readPosF);
+      const frac = this.readPosF - posI;
+      const L0 = this.getRecordSample(posI - 1, 0), L1 = this.getRecordSample(posI, 0);
+      const L2 = this.getRecordSample(posI + 1, 0), L3 = this.getRecordSample(posI + 2, 0);
+      const R0 = this.getRecordSample(posI - 1, 1), R1 = this.getRecordSample(posI, 1);
+      const R2 = this.getRecordSample(posI + 1, 1), R3 = this.getRecordSample(posI + 2, 1);
+      const g = fadeGain * faderGain;
+      if (out[0]) out[0][i] = hermite(L0, L1, L2, L3, frac) * g;
+      if (out[1]) out[1][i] = hermite(R0, R1, R2, R3, frac) * g;
+    }
+
+    this.smoothRate  = rate;
+    this.targetRate  = target;
+    this.fadeCounter = fadeCounter;
+    this.prevSign    = prevSign;
+    this.faderGain   = faderGain;
+
+    this._posSince += frames;
+    if (this._posSince >= 128) {
+      this._posSince = 0;
+      this.port.postMessage({
+        type: 'position',
+        frames: this.readPosF,
+        rate: this.smoothRate,
+        fader: this.faderGain,
+        clamped: this.clampCount,
+      });
+    }
+    return true;
   }
 
   /**
@@ -296,6 +566,8 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
   }
 
   process(_inputs, outputs) {
+    if (this.isRecord) return this.processRecord(outputs);
+
     const out    = outputs[0];
     const frames = (out[0] && out[0].length) ? out[0].length : 128;
 
