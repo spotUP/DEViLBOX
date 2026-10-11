@@ -244,6 +244,14 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
   },
+  // Every app worker is a module worker (`new Worker(url, { type: 'module' })`
+  // and `?worker` factories), and several worker graphs reach parsers through
+  // dynamic import(), which code-splits. Vite's default worker.format 'iife'
+  // cannot code-split and fails the production build; 'es' emits module
+  // workers, which chrome90 (build.target) supports.
+  worker: {
+    format: 'es',
+  },
   build: {
     // Target older Chromium for Tesla/embedded browser compatibility
     target: 'chrome90',
