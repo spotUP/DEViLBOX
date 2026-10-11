@@ -250,4 +250,17 @@ describe('the ladder varies its shape (owner plan sections 21, 29)', () => {
     expect(used.slice(-2).map((l) => l.join('-')).sort()).toEqual(['4-2-1-1', '8-4-2-1-1']);
     expect(ladderCandidates(4).every((l) => Math.min(...l) >= 4)).toBe(true);
   });
+
+  it('candidates: a shape whose recorded performances were poor is tried after the others; a good record leads between equally tight shapes (owner plan section 50)', () => {
+    const rec = (bars: number[], successScore: number): DJJuggleHistory => ({ ...history(bars), successScore });
+    const A = [4, 2, 1, 1], B = [8, 4, 2, 1, 1]; // both reach the single-bar rung
+    // Three later ladders of other shapes push A's record out of the "recently used" window.
+    const filler = [rec([4, 4], 0.8), rec([8, 4, 4], 0.8), rec([8, 8], 0.8)];
+    const order = (h: DJJuggleHistory[]): string[] => ladderCandidates(1, h, 1).map((l) => l.join('-')).filter((k) => k === A.join('-') || k === B.join('-'));
+    expect(order([rec(A, 0.1), ...filler])).toEqual([B.join('-'), A.join('-')]);
+    expect(order([rec(A, 0.95), ...filler])).toEqual([A.join('-'), B.join('-')]);
+    expect(order([rec(B, 0.95), ...filler])).toEqual([B.join('-'), A.join('-')]);
+    // A shape with no record is neutral: not demoted below a poor one, not preferred over a good one.
+    expect(order(filler)).toHaveLength(2);
+  });
 });

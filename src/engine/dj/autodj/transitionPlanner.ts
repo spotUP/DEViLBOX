@@ -200,18 +200,34 @@ export function pairConfidence(outgoing: DJTrackAnalysis, incoming: DJTrackAnaly
   };
 }
 
+/** A ladder shape whose recorded performances averaged below this is tried after the shapes without a poor record (owner plan section 50). */
+export const POOR_LADDER_QUALITY = 0.5;
+
 /**
- * The ladders to try, in order (owner plan sections 21, 29, 44): every shape
- * the mode and confidence allow (`minRung`), the tightest first, the ones the
- * last three ladders did not use before the ones they did; ties broken by the
- * seed (pattern variation, never timing).
+ * The ladders to try, in order (owner plan sections 21, 29, 44, 50): every
+ * shape the mode and confidence allow (`minRung`), the tightest first. The
+ * ones the last three ladders did not use come before the ones they did
+ * (section 29, no repeat), and the performance memory (section 50: the quality
+ * the juggle controller recorded per performance, `successScore`) orders the
+ * rest: a shape that performed poorly goes last of its group, and between
+ * equally tight shapes the one that performed better comes first. Ties are
+ * broken by the seed (pattern variation, never timing).
  */
 export function ladderCandidates(minRung: number, recent: readonly DJJuggleHistory[] = [], seed = 0): number[][] {
-  const used = new Set(recent.filter((h) => h.patternType === 'transitionLadder' && h.ladderBars).slice(-3).map((h) => h.ladderBars!.join('-')));
+  const ladders = recent.filter((h) => h.patternType === 'transitionLadder' && h.ladderBars);
+  const used = new Set(ladders.slice(-3).map((h) => h.ladderBars!.join('-')));
+  const scores = new Map<string, number[]>();
+  for (const h of ladders) { const k = h.ladderBars!.join('-'); scores.set(k, [...(scores.get(k) ?? []), h.successScore]); }
+  /** Mean recorded quality of a shape; none recorded = neutral (not poor, not preferred). */
+  const quality = (key: string): number | null => { const v = scores.get(key); return v ? mean(v) : null; };
   return LADDER_SHAPES
-    .map((shape, idx) => ({ bars: [...shape.bars], minRung: shape.minRung, used: used.has(shape.bars.join('-')), tie: hash(seed, 31 + idx) }))
+    .map((shape, idx) => {
+      const key = shape.bars.join('-');
+      const q = quality(key);
+      return { bars: [...shape.bars], minRung: shape.minRung, used: used.has(key), poor: q !== null && q < POOR_LADDER_QUALITY, q: q ?? 0.5, tie: hash(seed, 31 + idx) };
+    })
     .filter((x) => x.minRung >= minRung)
-    .sort((a, b) => Number(a.used) - Number(b.used) || a.minRung - b.minRung || a.tie - b.tie)
+    .sort((a, b) => Number(a.used) - Number(b.used) || Number(a.poor) - Number(b.poor) || a.minRung - b.minRung || b.q - a.q || a.tie - b.tie)
     .map((x) => x.bars);
 }
 
