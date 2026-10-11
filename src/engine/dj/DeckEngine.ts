@@ -760,6 +760,7 @@ export class DeckEngine {
   }
 
   stop(): void {
+    this._endBend();
     if (this._playbackMode === 'audio') {
       if (this._stemMode) {
         this.stemPlayer.stop();
@@ -853,9 +854,67 @@ export class DeckEngine {
     }
   }
 
-  /** Temporary BPM bump for beat matching */
+  /**
+   * Temporary push for beat matching: `offset` is +-% of speed (tracker: BPM
+   * offset), `ticks` its length (one tick ~20 ms). A tracker deck nudges in
+   * the replayer; an audio deck has no replayer running, so it bends its
+   * playback rate.
+   */
   nudge(offset: number, ticks: number = 8): void {
+    if (this._playbackMode === 'audio') {
+      this.bendRate(1 + offset * 0.01, ticks * DeckEngine.NUDGE_TICK_MS);
+      return;
+    }
     this.replayer.setNudge(offset, ticks);
+  }
+
+  /** Length of one nudge tick on an audio deck (a tracker tick at 125 BPM). */
+  private static readonly NUDGE_TICK_MS = 20;
+  /** Largest rate bend either way (a jog-wheel push, not a pitch move). */
+  private static readonly MAX_BEND = 0.06;
+  private _bendTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Temporary rate bend around the rest (fader) rate - a jog-wheel push.
+   * Phase correction of a playing deck rides on this instead of a seek.
+   * The store's pitch is not touched; after `durationMs` the deck returns to
+   * the fader rate through setPitch (the one rate path). With key lock on
+   * the bend keeps the key, like the fader does.
+   */
+  bendRate(ratio: number, durationMs: number): void {
+    if (this._repitchLocked || this._isScratchActive || this.isPatternActive()) return;
+    if (!Number.isFinite(ratio) || ratio <= 0) return;
+    const r = Math.max(1 - DeckEngine.MAX_BEND, Math.min(1 + DeckEngine.MAX_BEND, ratio));
+    this._clearBendTimer();
+    const bent = this.restMultiplier * r;
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.setPlaybackRate(bent);
+      this.stemPlayer.setPlaybackRate(bent);
+      const { pitchCompensate } = computeKeyLockShift(12 * Math.log2(bent), this.keyLockEnabled);
+      this.keyLock.setPitchSemiTones(pitchCompensate);
+    } else {
+      this.replayer.setTempoMultiplier(bent);
+    }
+    this._bendTimer = setTimeout(() => {
+      this._bendTimer = null;
+      // A scratch that took the deck meanwhile returns it to the rest rate itself.
+      if (this._isScratchActive || this.isPatternActive()) return;
+      this.setPitch(this._currentPitchSemitones);
+    }, Math.max(0, durationMs));
+  }
+
+  /** End a bend now: the deck returns to the fader rate. */
+  private _endBend(): void {
+    if (this._bendTimer === null) return;
+    this._clearBendTimer();
+    this.setPitch(this._currentPitchSemitones);
+  }
+
+  private _clearBendTimer(): void {
+    if (this._bendTimer !== null) {
+      clearTimeout(this._bendTimer);
+      this._bendTimer = null;
+    }
   }
 
   /**
@@ -2265,6 +2324,7 @@ export class DeckEngine {
     // fire on disposed audio nodes.
     for (const t of this._stopScratchTimeouts) clearTimeout(t);
     this._stopScratchTimeouts.clear();
+    this._clearBendTimer();
     // Tear down any per-channel FX chains before disposing the replayer
     // (chain disposal calls replayer.setChannelFxRouted which needs the
     // replayer still alive).
