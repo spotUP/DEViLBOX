@@ -20,8 +20,9 @@ import type {
   SessionMemorySnapshot, TransitionRisk, TransitionStyle,
 } from './types';
 import { TRANSITION_STYLES } from './types';
-import { POLICY_MIN } from './juggle/jugglePlanner';
-import type { JuggleMode } from './juggle/juggleTypes';
+import { POLICY_MIN, PHASE_BUDGET, confidencePolicy, type ConfidencePolicy } from './juggle/jugglePlanner';
+import { LADDER_SHAPES, minLadderRung } from './juggle/jugglePatterns';
+import type { DJJuggleHistory, DJJugglePerformanceContext, JuggleMode } from './juggle/juggleTypes';
 
 export interface TransitionPlanInput {
   outgoing: DJTrackAnalysis;
@@ -45,8 +46,15 @@ export interface TransitionPlanInput {
   bridgeAvailable?: boolean;
   /** Deterministic humanization seed (the transition count), never Math.random. */
   seed?: number;
-  /** The Auto Juggle mode: MUSICAL and up may plan a juggle transition (default OFF). */
+  /** The Auto Juggle mode: SAFE and up may plan a juggle transition (default OFF). */
   juggleMode?: JuggleMode;
+  /**
+   * The juggle controller's budget now (owner plan sections 24, 28): whether
+   * the set arc, the cooldown and the juggled fraction allow a juggle, why
+   * not, and the recent juggles (the ladder varies its shape against them,
+   * section 29). Without it only the set phase gates.
+   */
+  juggleState?: { allowed: boolean; reasons: string[]; recent: DJJuggleHistory[] };
 }
 
 export const LENGTH_CANDIDATES = [2, 4, 8, 16, 32] as const;
@@ -172,59 +180,125 @@ export function chooseMixIn(a: DJTrackAnalysis, style: TransitionStyle, lengthSe
   }
 }
 
-// ── Juggle-transition ladder (juggling plan section 26) ─────────────────────
+// ── Juggle-transition ladder (juggling plan sections 9, 26, 29, 31, 41, 44) ──
 
 /**
- * The trading ladders a juggle transition tries, in order: a beat-level grid
- * trades down to one bar, a phrase-level grid stops at four; each is followed
- * by its halved ladder when the first does not fit.
+ * The pair's confidences in the juggle layer's terms (owner plan section 31):
+ * beat = both grids and both downbeat grids; sync = how well two beatmatched
+ * decks on these grids hold; phrase = both tracks' phrase confidence;
+ * material = both analyses. The juggle layer's confidencePolicy reads them.
  */
-export function laddersFor(gridConf: number): number[][] {
-  return gridConf >= POLICY_MIN.beat.beat ? [[4, 2, 1], [2, 1]] : [[8, 4], [4, 2]];
+export function pairConfidence(outgoing: DJTrackAnalysis, incoming: DJTrackAnalysis): Pick<DJJugglePerformanceContext, 'beatConfidence' | 'phraseConfidence' | 'deckSyncConfidence' | 'materialConfidence'> {
+  const o = outgoing.analysisConfidence, i = incoming.analysisConfidence;
+  const phraseOf = (a: DJTrackAnalysis) => (a.phrases.length ? mean(a.phrases.map((p) => p.confidence)) : a.analysisConfidence.downbeat * 0.8);
+  return {
+    beatConfidence: Math.min(o.beatGrid, i.beatGrid, o.downbeat, i.downbeat),
+    deckSyncConfidence: Math.min(o.beatGrid, i.beatGrid),
+    phraseConfidence: Math.min(phraseOf(outgoing), phraseOf(incoming)),
+    materialConfidence: Math.min(o.overall, i.overall),
+  };
+}
+
+/**
+ * The ladders to try, in order (owner plan sections 21, 29, 44): every shape
+ * the mode and confidence allow (`minRung`), the tightest first, the ones the
+ * last three ladders did not use before the ones they did; ties broken by the
+ * seed (pattern variation, never timing).
+ */
+export function ladderCandidates(minRung: number, recent: readonly DJJuggleHistory[] = [], seed = 0): number[][] {
+  const used = new Set(recent.filter((h) => h.patternType === 'transitionLadder' && h.ladderBars).slice(-3).map((h) => h.ladderBars!.join('-')));
+  return LADDER_SHAPES
+    .map((shape, idx) => ({ bars: [...shape.bars], minRung: shape.minRung, used: used.has(shape.bars.join('-')), tie: hash(seed, 31 + idx) }))
+    .filter((x) => x.minRung >= minRung)
+    .sort((a, b) => Number(a.used) - Number(b.used) || a.minRung - b.minRung || a.tie - b.tie)
+    .map((x) => x.bars);
+}
+
+/** Is `t` a bar start that begins a 4-bar group of the track's phrase grid (owner plan section 9: trades respect phrase boundaries)? */
+export function onPhraseGroup(a: DJTrackAnalysis, t: number): boolean {
+  const bars = a.downbeats.bars;
+  if (bars.length === 0) return false;
+  const tol = 0.1 * (60 / (a.bpm > 0 ? a.bpm : 125));
+  let idx = barIndexAt(a.downbeats, t + tol);
+  if (Math.abs(bars[idx].start - t) > tol) return false;
+  idx = bars[idx].index;
+  const phrase = a.phrases.find((p) => p.startBar <= idx && idx < p.startBar + p.lengthBars);
+  return (idx - (phrase?.startBar ?? 0)) % 4 === 0;
+}
+
+/** Is a cut at `t` inside a sung phrase of the track (vocals on both sides of it)? Owner plan section 9: never switch halfway through a vocal phrase. */
+function midVocalPhrase(a: DJTrackAnalysis, t: number, beatSec: number): boolean {
+  if (!(a.vocalActivity.confidence > 0)) return false;
+  return activity(a.vocalActivity, Math.max(0, t - beatSec), t) >= 0.25 && activity(a.vocalActivity, t, t + beatSec) >= 0.25;
+}
+
+/** The bar offsets where the ladder switches decks (each rung's answer and next call, and the release). */
+export function ladderCutBars(ladderBars: readonly number[]): number[] {
+  const cuts: number[] = [];
+  let bar = 0;
+  for (const r of ladderBars) { if (bar > 0) cuts.push(bar); bar += r; cuts.push(bar); bar += r; }
+  cuts.push(bar);
+  return cuts;
 }
 
 export interface LadderChoice { ladderBars: number[]; tradeBeats: number; mixOut: MixOutChoice; mixIn: MixInChoice; incomingPosition: number }
 
 /**
- * The first ladder that fits: the outgoing keeps its trade bars + 2 bars of
- * room after the mix-out, and the incoming has the trade length before its
- * mix-in (the drop when known), so the last trade lands on it. Each rung is
- * outgoing then incoming: `tradeBeats = 2 * sum(ladderBars) * beatsPerBar`.
- * The ladder ends where an ordinary transition would hand over (`handOverSec`,
- * the outgoing's mix-out plus its length) or as close before it as the room
- * allows - never at the first phrase that fits, which would leave the
- * outgoing track half played. Null when no ladder fits (reasons in `why`).
+ * The first ladder from `ladders` that fits both tracks musically:
+ * - the outgoing starts it on one of its phrase boundaries, with the trades
+ *   plus 2 bars left, as close as possible to where an ordinary transition
+ *   would hand over (`handOverSec`) - never a bare bar boundary (section 9);
+ * - the incoming starts on a 4-bar group of its own phrase grid and the
+ *   release lands on one (its drop when the drop sits there), so both tracks'
+ *   phrases run together through every trade (sections 9, 41);
+ * - no cut falls inside a sung phrase of either deck (section 9).
+ * `tradeBeats = 2 * sum(ladderBars) * beatsPerBar`. Null when none fits (reasons in `why`).
  */
 export function chooseLadder(
-  outgoing: DJTrackAnalysis, incoming: DJTrackAnalysis, gridConf: number, outgoingPosition: number, leadSec: number, strictness: number,
+  outgoing: DJTrackAnalysis, incoming: DJTrackAnalysis, ladders: readonly number[][], outgoingPosition: number, leadSec: number,
   handOverSec: number, why: string[] = [],
 ): LadderChoice | null {
   const beatsPerBar = outgoing.meter.beatsPerBar || 4;
   const bpm = outgoing.bpm > 0 ? outgoing.bpm : 125;
-  const barSec = (60 / bpm) * beatsPerBar;
+  const beatSec = 60 / bpm;
+  const barSec = beatSec * beatsPerBar;
   // The incoming plays beatmatched: a master beat is one incoming beat of its own track time.
   const inBeatSec = 60 / (incoming.bpm > 0 ? incoming.bpm : bpm);
   const finalBeat = outgoing.cuePoints.finalBeat ?? outgoing.durationSec;
-  for (const ladderBars of laddersFor(gridConf)) {
+  const c = incoming.cuePoints;
+  const fits = (t: number | undefined, len: number) => t !== undefined && t >= 0 && t < incoming.durationSec - len;
+  const usable = fits(c.bestMixIn, 0) ? c.bestMixIn! : fits(c.firstDrums, 0) ? c.firstDrums! : incoming.landmarks.firstUsableMixPoint;
+  for (const ladderBars of ladders) {
+    const name = ladderBars.join('-');
     const tradeBars = 2 * ladderBars.reduce((x, y) => x + y, 0);
     const tradeBeats = tradeBars * beatsPerBar;
+    const phraseBars = Math.max(1, outgoing.phraseLengthBars);
+    if (tradeBars % phraseBars !== 0 && phraseBars % tradeBars !== 0) { why.push(`${name} ladder: ${tradeBars} bars is not a whole phrase of ${phraseBars}`); continue; }
     const roomSec = (tradeBars + 2) * barSec;
     const earliest = outgoingPosition + leadSec;
     const latest = finalBeat - roomSec;
-    if (latest < earliest - 1e-6) { why.push(`${ladderBars.join('-')} ladder: the outgoing has no ${tradeBars + 2} bars left`); continue; }
-    // Aim the ladder's end (trades + release) at the hand-over, inside the room.
-    const aim = Math.max(earliest, Math.min(latest, handOverSec - (tradeBars + 1) * barSec));
-    let mixOut = chooseMixOut(outgoing, aim - leadSec - 0.05, roomSec, leadSec, strictness);
-    if (mixOut.time + roomSec > finalBeat + 0.5) {
-      // No boundary from the aim on: the latest bar start that still fits.
-      const bar = [...outgoing.downbeats.bars].reverse().find((x) => x.start >= earliest - 1e-6 && x.start <= latest + 1e-6);
-      if (!bar) { why.push(`${ladderBars.join('-')} ladder: no bar boundary leaves ${tradeBars + 2} bars`); continue; }
-      mixOut = { time: bar.start, bar: bar.index, reasons: ['latest bar boundary the ladder fits from'], score: 0, phrase: null };
-    }
+    if (latest < earliest - 1e-6) { why.push(`${name} ladder: the outgoing has no ${tradeBars + 2} bars left`); continue; }
+    // The incoming: where the release lands and the ladder starts, both on its phrase grid.
     const tradeSec = tradeBeats * inBeatSec;
-    const mixIn = chooseMixIn(incoming, 'juggleTransition', tradeSec);
-    const incomingPosition = mixIn.time - tradeSec;
-    if (incomingPosition < 0 || mixIn.time + barSec > incoming.durationSec) { why.push(`${ladderBars.join('-')} ladder: the incoming has no ${tradeBars + 1} bars from its mix-in`); continue; }
+    const lands: MixInChoice[] = [];
+    if (c.firstDrop !== undefined) lands.push({ time: c.firstDrop, reasons: ['the ladder lands on the incoming drop'] });
+    lands.push({ time: usable, reasons: ['no drop in reach: the ladder lands on the best mix-in'] });
+    lands.push({ time: usable + tradeSec, reasons: ['the ladder trades from the incoming mix-in'] });
+    for (const p of incoming.phrases) if (p.start > usable) lands.push({ time: p.start, reasons: ['the ladder lands on an incoming phrase'] });
+    const mixIn = lands.find((l) => l.time - tradeSec >= -1e-6 && l.time + barSec <= incoming.durationSec
+      && onPhraseGroup(incoming, l.time) && onPhraseGroup(incoming, Math.max(0, l.time - tradeSec)));
+    if (!mixIn) { why.push(`${name} ladder: the incoming has no ${tradeBars} bars between two of its phrase groups`); continue; }
+    const incomingPosition = Math.max(0, mixIn.time - tradeSec);
+    // The outgoing: its phrase starts in the room, nearest the hand-over aim first.
+    const aim = Math.max(earliest, Math.min(latest, handOverSec - (tradeBars + 1) * barSec));
+    const starts = outgoing.phrases.filter((p) => p.start >= earliest - 1e-6 && p.start <= latest + 1e-6)
+      .sort((x, y) => Math.abs(x.start - aim) - Math.abs(y.start - aim));
+    if (starts.length === 0) { why.push(`${name} ladder: no outgoing phrase boundary leaves ${tradeBars + 2} bars`); continue; }
+    const cuts = ladderCutBars(ladderBars);
+    const sung = (p: DJPhrase) => cuts.some((bar) => midVocalPhrase(outgoing, p.start + bar * barSec, beatSec) || midVocalPhrase(incoming, incomingPosition + bar * beatsPerBar * inBeatSec, inBeatSec));
+    const phrase = starts.find((p) => !sung(p));
+    if (!phrase) { why.push(`${name} ladder: every cut point falls inside a sung phrase`); continue; }
+    const mixOut: MixOutChoice = { time: phrase.start, bar: phrase.startBar, reasons: ['phrase boundary', 'no cut inside a sung phrase'], score: 1, phrase };
     return { ladderBars, tradeBeats, mixOut, mixIn, incomingPosition };
   }
   return null;
@@ -340,7 +414,7 @@ export function scoreStyles(ctx: {
   // A juggle transition (juggling plan section 26): trade the two tracks down a ladder into the incoming drop.
   // The juggle layer's own gates (POLICY_MIN, HARMONIC_CLASH_REJECT): one gate vocabulary.
   const mode = ctx.juggleMode ?? 'OFF';
-  const juggleOk = mode !== 'OFF' && mode !== 'SAFE'
+  const juggleOk = mode !== 'OFF'
     && (ctx.tempoBand === 'none' || ctx.tempoBand === 'normal')
     && ctx.clashRisk <= HARMONIC_CLASH_REJECT && ctx.vocalRisk < 0.5 && ctx.drumScore >= 0.5
     && gridConf >= POLICY_MIN.phrase.beat && !!ctx.ladderFits;
@@ -589,8 +663,18 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   const setPhaseIsPeak = () => input.setPhase === 'PEAK' || input.setPhase === 'PEAKING';
   const juggleMode: JuggleMode = input.juggleMode ?? 'OFF';
   const ladderWhy: string[] = [];
-  const ladder = juggleMode !== 'OFF' && juggleMode !== 'SAFE'
-    ? chooseLadder(outgoing, incoming, gridConf, input.outgoingPosition, leadSec, style.phraseStrictness, prelimOut.time + provisionalBars * barSec, ladderWhy) : null;
+  // A juggle transition is budgeted (owner plan sections 24, 28): the set arc, the cooldown, the juggled
+  // fraction - and confidence-aware (section 31): the mode's shortest rung only at the pair's confidence.
+  const policy: ConfidencePolicy = confidencePolicy(pairConfidence(outgoing, incoming));
+  const minRung = minLadderRung(juggleMode, policy);
+  const phaseAllowed = (PHASE_BUDGET as Record<string, { allowed: boolean }>)[input.setPhase]?.allowed !== false;
+  if (juggleMode !== 'OFF') {
+    if (!phaseAllowed) ladderWhy.push(`set phase ${input.setPhase}: normal mixing`);
+    if (input.juggleState && !input.juggleState.allowed) ladderWhy.push(...input.juggleState.reasons);
+    if (minRung === null) ladderWhy.push(`${policy} confidence: normal transition`);
+  }
+  const ladder = minRung !== null && phaseAllowed && (input.juggleState?.allowed ?? true)
+    ? chooseLadder(outgoing, incoming, ladderCandidates(minRung, input.juggleState?.recent, seed), input.outgoingPosition, leadSec, prelimOut.time + provisionalBars * barSec, ladderWhy) : null;
   const styles = scoreStyles({
     outSection, inSection: sectionAt(incoming, incoming.cuePoints.bestMixIn ?? 0), outgoing, incoming,
     vocalRisk: vocal.overlapRisk, outgoingVocalEnding, drumScore: drums.score, bothBassHeavy: bass.bothHeavy, energyDelta,
@@ -711,7 +795,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     `risk ${risk.overall.toFixed(2)}, confidence ${confidence.toFixed(2)}, fallback ${fallbackStyle}`,
   ];
   if (juggle) reasons.push(`juggle: ${juggle.ladderBars.join(' -> ')} bar trades (${juggle.tradeBeats} beats), incoming from ${incomingPosition.toFixed(1)} s`);
-  else if (juggleMode !== 'OFF' && juggleMode !== 'SAFE' && ladderWhy.length) reasons.push(`juggle: ${ladderWhy.join('; ')}`);
+  else if (juggleMode !== 'OFF' && ladderWhy.length) reasons.push(`juggle: ${ladderWhy.join('; ')}`);
   if (loop) reasons.push(`loop: ${loop.reason}`);
   if (cueJump) reasons.push(`cue jump: ${cueJump.reason}`);
 

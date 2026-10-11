@@ -14,6 +14,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore, type PlaylistTrack } from '@/stores/useDJPlaylistStore';
 import { getAutoDJ } from '../DJAutoDJ';
 import { corpusAnalysis, corpusPipelineAnalysis, corpusTrack, type CorpusId } from '../autodj/testing/corpus';
+import { computeExtendedAnalysis } from '../autodj/activityTimelines';
 import { setSessionController, DJSessionController } from '../autodj/sessionController';
 import type { DJTrackAnalysis, DJTransitionPlan } from '../autodj/types';
 import type { DJJuggleController } from '../autodj/juggle/juggleController';
@@ -165,7 +166,9 @@ export async function setupJuggleTransition(holder: HarnessHolder, opts: { mode:
   dj.preRenderedTrack = { track: tracks[1], data: new ArrayBuffer(8) };
   // Auto DJ's own anticipation: the incoming analysis from the pre-render, the plan from it.
   const t = corpusTrack(INCOMING);
-  dj.anticipate(tracks[1], 1, { duration: t.durationSec, analysis: corpusPipelineAnalysis(t) });
+  // The pre-render's analysis carries the extended timelines, as the real worker's does (phrases, sections, vocals).
+  const extended = computeExtendedAnalysis(t.pcm, t.sampleRate, { beats: t.beats });
+  dj.anticipate(tracks[1], 1, { duration: t.durationSec, analysis: { ...corpusPipelineAnalysis(t), extended } });
   // Read through a function: the assignment above narrowed `dj.plan` to null for the compiler.
   const planOf = (d: AutoDJInternals): DJTransitionPlan | null => d.plan;
   return { dj, decks, anticipated: planOf(dj) };
@@ -176,6 +179,8 @@ export function teardownJuggleTransition(): void {
   dj.stopPolling();
   try { dj.transitionCancel?.(); } catch { /* */ }
   dj.getJuggle().abort('test end');
+  // A fresh juggle controller per test: its cooldown and history belong to one set, not to the next test.
+  (dj as unknown as { juggle: unknown }).juggle = null;
   dj.plan = null; dj.preRenderedTrack = null; dj.preloadedDeck = null; dj.execution = null; dj.transitionCancel = null;
   useDJStore.getState().setAutoDJEnabled(false);
   useDJStore.getState().setAutoDJStatus('idle');

@@ -26,12 +26,14 @@ export type DJJuggleActionType =
   | 'CutIn' | 'CutOut' | 'CrossfadeTo' | 'CrossfadeFrom' | 'TriggerCue' | 'JumpToBeat' | 'JumpToBar'
   | 'StartLoop' | 'ExitLoop' | 'LoopResize' | 'LoopRoll' | 'HoldDeck' | 'ReleaseDeck'
   | 'FilterIn' | 'FilterOut' | 'EQCut' | 'EQRestore' | 'BassSwap' | 'EchoThrow' | 'ReverbThrow'
-  | 'ResetDeck' | 'ResyncDeck';
+  | 'ResetDeck' | 'ResyncDeck'
+  /** Lock a deck to the other deck's bars before it is heard (owner plan section 16): a bend, or one re-cue while silent. */
+  | 'PhaseLock';
 
 export const JUGGLE_ACTION_TYPES: readonly DJJuggleActionType[] = [
   'CutIn', 'CutOut', 'CrossfadeTo', 'CrossfadeFrom', 'TriggerCue', 'JumpToBeat', 'JumpToBar', 'StartLoop', 'ExitLoop',
   'LoopResize', 'LoopRoll', 'HoldDeck', 'ReleaseDeck', 'FilterIn', 'FilterOut', 'EQCut', 'EQRestore', 'BassSwap',
-  'EchoThrow', 'ReverbThrow', 'ResetDeck', 'ResyncDeck',
+  'EchoThrow', 'ReverbThrow', 'ResetDeck', 'ResyncDeck', 'PhaseLock',
 ];
 
 export type JuggleQuantization = 'beat' | 'halfBeat' | 'bar' | 'phrase';
@@ -87,6 +89,8 @@ export interface DJJugglePattern {
   requiresDouble?: boolean;
   /** The roles each deck plays over the pattern. */
   roles: Array<{ beat: number; A: JuggleDeckRole; B: JuggleDeckRole }>;
+  /** A transition ladder's rungs in bars (memory: the next ladder varies the shape, owner plan section 29). */
+  ladderBars?: number[];
 }
 
 export type MaterialClass =
@@ -161,6 +165,8 @@ export interface DJJuggleHistory {
   sectionKind?: string;
   setPhase?: SetEnergyPhase;
   energy?: number;
+  /** A transition ladder's rungs in bars. */
+  ladderBars?: number[];
 }
 
 export interface DJJugglePerformanceContext {

@@ -10,7 +10,7 @@ import {
   clearDeckAudioLoop, seekDeckAudio, setCrossfader, setDeckAudioLoop, setDeckEQKill, setDeckFilter,
 } from '../../DJActions';
 import { beatJump, triggerHotCue } from '../../DJBeatJump';
-import { bendToPhase, syncBPMToOther } from '../../DJAutoSync';
+import { bendToPhase, lockBarPhase, phaseErrorSec, syncBPMToOther } from '../../DJAutoSync';
 import { fireDjFx, releaseDjFx } from '../../../drumpad/DjFxActions';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DJJuggleAction } from './juggleTypes';
@@ -79,6 +79,9 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
   };
   return {
     restore(): void { for (const d of ['A', 'B'] as const) if (filterBefore[d] !== undefined) restoreFilter(d); },
+    phaseError(deck: AB): number | null {
+      try { return phaseErrorSec(deck, deck === 'A' ? 'B' : 'A', 'bar'); } catch { return null; }
+    },
     lastCrossfader: () => lastCrossfader,
     state(): SinkState {
       const s = useDJStore.getState();
@@ -115,6 +118,15 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
         case 'EchoThrow': if (d) fireDjFx('fx_deck_echo_throw', { deck: d, beats: action.durationBeats ?? 2, amount: action.strength ?? 0.6, source: 'autodj' }); break;
         case 'ReverbThrow': if (d) fireDjFx('fx_deck_reverb_out', { deck: d, beats: action.durationBeats ?? 4, amount: action.strength ?? 0.5, source: 'autodj' }); break;
         case 'ResetDeck': if (d) reset(d); else { reset('A'); reset('B'); } break;
+        // Owner plan section 16 (audit row 9): the incoming locks to the master's bars while it is not heard -
+        // a bend within half a beat, else one exact re-cue (an audible deck is only ever bent).
+        case 'PhaseLock': {
+          if (!d) break;
+          const cf = useDJStore.getState().crossfaderPosition;
+          const heard = d === 'A' ? cf < 0.999 : cf > 0.001;
+          lockBarPhase(d, d === 'A' ? 'B' : 'A', !heard);
+          break;
+        }
         case 'ResyncDeck': {
           // A double's copy sits `beats` ahead of the other deck, measured from where that deck is now
           // (the planned position is stale by the time the pattern starts). Within half a beat the

@@ -9,11 +9,13 @@
  * finish stop the outgoing, the poll loop completes the transition.
  *
  * Sentinel: the transitionLadder builder's call count (1) and the executed
- * plan's style. Numbers: the mixer crossfader receives 0 / 1 / 0 / 1 / 0 / 1
- * and the release 1 on master beats L+0, 16, 32, 40, 48, 52, 56 (+-1 juggle
- * tick, 15 ms), L the bar the incoming started on; final crossfader on the
- * incoming; outgoing stopped; zero seeks on a playing deck; the executed plan
- * is the anticipated one (C4).
+ * plan's style. Numbers (owner juggling plan sections 9, 41, 44: a whole
+ * 16-bar phrase, single-bar trades only at beat-level confidence): the mixer
+ * crossfader receives 0 / 1 / 0 / 1 / 0 / 1 / 0 / 1 and the release 1 on
+ * master beats L+0, 16, 32, 40, 48, 52, 56, 60, 64 (+-1 juggle tick, 15 ms),
+ * L the bar the incoming started on; final crossfader on the incoming;
+ * outgoing stopped; zero seeks on a playing deck; the executed plan is the
+ * anticipated one (C4).
  *
  * Also here, where the fakes are: the executor never seeks an incoming deck
  * that already plays, and the juggle sink's ResyncDeck / JumpToBar keep a
@@ -30,6 +32,8 @@ const holder = vi.hoisted(() => ({
   ladderBuilds: 0,
   /** When set, the incoming analysis Auto DJ builds carries this grid confidence (a phrase-level grid). */
   incomingGridConfidence: undefined as number | undefined,
+  /** When set, the incoming analysis Auto DJ builds carries this phrase confidence (the corpus track reads 0.5). */
+  incomingPhraseConfidence: undefined as number | undefined,
 }));
 
 vi.mock('@/engine/dj/DJEngine', () => ({
@@ -63,6 +67,7 @@ vi.mock('../autodj/trackAnalysis', async (orig) => {
     buildDJTrackAnalysis: (...args: Parameters<typeof actual.buildDJTrackAnalysis>) => {
       const a = actual.buildDJTrackAnalysis(...args);
       if (holder.incomingGridConfidence !== undefined) a.analysisConfidence.beatGrid = holder.incomingGridConfidence;
+      if (holder.incomingPhraseConfidence !== undefined) for (const p of a.phrases) p.confidence = holder.incomingPhraseConfidence;
       return a;
     },
   };
@@ -73,7 +78,8 @@ vi.mock('../autodj/juggle/jugglePatterns', async (orig) => {
 });
 
 import { useDJStore } from '@/stores/useDJStore';
-import { BEAT, setupJuggleTransition, teardownJuggleTransition, gridOf, OUTGOING, INCOMING } from './juggleTransitionHarness';
+import { BEAT, barPhaseErrorSec, loadIncoming, setupJuggleTransition, teardownJuggleTransition, gridOf, OUTGOING, INCOMING } from './juggleTransitionHarness';
+import type { DJTransitionPlan } from '../autodj/types';
 import { corpusTrack } from '../autodj/testing/corpus';
 import { executeTransition } from '../autodj/transitionExecutor';
 import { createDeckJuggleSink } from '../autodj/juggle/juggleDeckSink';
@@ -82,13 +88,14 @@ import { createDeckJuggleSink } from '../autodj/juggle/juggleDeckSink';
 const masterBeat = (pos: number): number => (pos - corpusTrack(OUTGOING).beats[0]) / BEAT;
 
 describe('R3: Auto DJ plans and performs a juggle transition through the decks', () => {
-  beforeEach(() => { holder.ladderBuilds = 0; holder.incomingGridShiftSec = 0; holder.incomingGridConfidence = undefined; });
+  beforeEach(() => { holder.ladderBuilds = 0; holder.incomingGridShiftSec = 0; holder.incomingGridConfidence = undefined; holder.incomingPhraseConfidence = undefined; });
   afterEach(() => teardownJuggleTransition());
 
-  it('the ladder trades 4-2-1 bars into the incoming on the master grid, and the transition completes', async () => {
+  it('the ladder trades 4-2-1-1 bars into the incoming on the master grid, and the transition completes', async () => {
+    holder.incomingPhraseConfidence = 0.9;
     const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER' });
     expect(anticipated?.style, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toBe('juggleTransition');
-    expect(anticipated!.juggle).toEqual({ ladderBars: [4, 2, 1], tradeBeats: 56 });
+    expect(anticipated!.juggle).toEqual({ ladderBars: [4, 2, 1, 1], tradeBeats: 64 });
     let executedId: string | null = null;
     let executedStyle: string | null = null;
     dj.startPolling();
@@ -109,14 +116,14 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
     // The ladder on the mixer, in master beats.
     expect(decks.B.startedAt).not.toBeNull();
     const ladderCuts = j.events.filter((e) => e.kind === 'juggleActionExecuted' && (e.action?.type === 'CutIn' || e.action?.type === 'ReleaseDeck'));
-    expect(ladderCuts.map((e) => e.action!.deck)).toEqual(['A', 'B', 'A', 'B', 'A', 'B', 'B']);
+    expect(ladderCuts.map((e) => e.action!.deck)).toEqual(['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'B']);
     const L = ladderCuts[0].beat;
     const startBeat = Math.round(L);
     expect(startBeat % 4, 'the ladder starts on a bar').toBe(0);
     // ... the bar the incoming started on: the plan's start.
     expect(startBeat).toBe(Math.round(masterBeat(anticipated!.startTimeSec)));
-    const offsets = [0, 16, 32, 40, 48, 52, 56];
-    const values = [0, 1, 0, 1, 0, 1, 1];
+    const offsets = [0, 16, 32, 40, 48, 52, 56, 60, 64];
+    const values = [0, 1, 0, 1, 0, 1, 0, 1, 1];
     const tick = 0.015 / BEAT;
     ladderCuts.forEach((e, i) => expect(e.beat - (startBeat + offsets[i]), `cut ${i} at beat ${e.beat.toFixed(3)}`).toBeGreaterThanOrEqual(-1e-6));
     ladderCuts.forEach((e, i) => expect(e.beat - (startBeat + offsets[i]), `cut ${i} at beat ${e.beat.toFixed(3)}`).toBeLessThanOrEqual(tick + 1e-6));
@@ -137,12 +144,10 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
     expect(decks.B.seeksWhilePlaying).toBe(0);
   }, 60_000);
 
-  it('an 8-4 ladder on phrase-level grids runs past 45 s and still completes (the watchdog covers the ladder)', async () => {
+  it('phrase-level grids trade no single bars: 4-2-2 in PERFORMER, and the transition completes', async () => {
     holder.incomingGridConfidence = 0.7;
     const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER', startSec: 0, outgoingGridConfidence: 0.7 });
-    expect(anticipated?.juggle, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toEqual({ ladderBars: [8, 4], tradeBeats: 96 });
-    const longest = (anticipated!.juggle!.tradeBeats + anticipated!.durationBeats) * BEAT;
-    expect(longest).toBeGreaterThan(45);
+    expect(anticipated?.juggle, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toEqual({ ladderBars: [4, 2, 2], tradeBeats: 64 });
     // The juggle controller is Auto DJ's own and outlives a test: count from here.
     const j = dj.getJuggle();
     const completedBefore = j.counts.completed;
@@ -156,9 +161,41 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
     }
     expect(j.counts.completed - completedBefore, `aborted: ${j.events.filter((e) => e.kind === 'juggleAborted').map((e) => e.reason).join('; ') || '-'}`).toBe(1);
     const cuts = j.events.slice(eventsBefore).filter((e) => e.kind === 'juggleActionExecuted' && (e.action?.type === 'CutIn' || e.action?.type === 'ReleaseDeck'));
-    expect(cuts.map((e) => Math.round(e.beat - cuts[0].beat))).toEqual([0, 32, 64, 80, 96]);
+    expect(cuts.map((e) => Math.round(e.beat - cuts[0].beat))).toEqual([0, 16, 32, 40, 48, 56, 64]);
     expect(useDJStore.getState().crossfaderPosition).toBe(1);
     expect(decks.B.isPlaying()).toBe(true);
+  }, 60_000);
+});
+
+describe('owner plan section 16: the incoming is locked and verified before it is heard (audit row 9)', () => {
+  beforeEach(() => { holder.ladderBuilds = 0; holder.incomingGridConfidence = undefined; });
+  afterEach(() => { teardownJuggleTransition(); holder.incomingGridShiftSec = 0; holder.incomingPhraseConfidence = undefined; });
+
+  it('an incoming 0.9 s off the master\'s bars is re-cued once while silent, and is within 5 ms when its first bar is heard', async () => {
+    holder.incomingGridShiftSec = 0.9;
+    holder.incomingPhraseConfidence = 0.9;
+    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER' });
+    expect(anticipated?.style, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toBe('juggleTransition');
+    // Auto DJ's own execution of the anticipated plan (the poll loop's trigger is R3's; this is its trade stage).
+    loadIncoming(holder);
+    (dj as unknown as { executePlan(p: DJTransitionPlan): () => void }).executePlan(anticipated!);
+    const a0 = corpusTrack(OUTGOING).beats[0];
+    const error = () => barPhaseErrorSec(decks.A.position() - a0, decks.B.position() - holder.incomingGridShiftSec);
+    const j = dj.getJuggle();
+    let errorAtFirstAnswer: number | null = null;
+    let crossfaderBeforeAnswer: number[] = [];
+    for (let t = 0; t < 120_000; t += 20) {
+      await vi.advanceTimersByTimeAsync(20);
+      const answered = j.events.some((e) => e.kind === 'juggleActionExecuted' && e.action?.type === 'CutIn' && e.action.deck === 'B');
+      if (answered && errorAtFirstAnswer === null) { errorAtFirstAnswer = error(); crossfaderBeforeAnswer = holder.crossfader.slice(0, -1).map((c) => c.v); }
+      if (j.counts.completed + j.counts.aborted > 0 && !decks.A.isPlaying()) break;
+    }
+    expect(j.counts.completed, `aborted: ${j.events.filter((e) => e.kind === 'juggleAborted').map((e) => e.reason).join('; ') || '-'}`).toBe(1);
+    // One re-cue, landed while the crossfader still held the outgoing only.
+    expect(decks.B.seeksWhilePlaying).toBe(1);
+    expect(crossfaderBeforeAnswer.every((v) => v === 0)).toBe(true);
+    expect(Math.abs(errorAtFirstAnswer!)).toBeLessThan(0.005);
+    expect(decks.A.seeksWhilePlaying).toBe(0);
   }, 60_000);
 });
 
