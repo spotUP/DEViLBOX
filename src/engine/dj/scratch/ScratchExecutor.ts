@@ -16,9 +16,13 @@
  * its beat, after the deck is re-cued to its anchor while the fader window
  * is closed.
  *
- * Every run snapshots {rate, channelGain, captureFrozen, suppressNotes,
- * crossfader, busLevel} when the first scratch starts and restores exactly
- * those values when the last one ends, on every exit path (release, cancel).
+ * A run gives back what its gestures changed (section 60, audit SA-M4): each
+ * field a gesture touches (`fieldsTouchedBy`: a deck gesture its deck's rate,
+ * scratch fader and ring; the crossfader only when its windows name it; a
+ * record gesture none of them) is captured when the first gesture touching it
+ * starts, and only those fields are restored when the last one ends, on every
+ * exit path (release, cancel). Fields no gesture touched belong to whoever
+ * moves them (the Auto DJ's crossfade, the user's pitch).
  */
 
 import type { JuggleClock } from '../autodj/juggle/juggleExecutor';
@@ -26,7 +30,8 @@ import { realTimers, type ExecutorTimers } from '../autodj/transitionExecutor';
 import type { DjFxActionId, DjFxFireOptions, DjFxSource } from '../../drumpad/DjFxActions';
 import type { DeckRecueResult } from './deckRecue';
 import { recueDeck } from './deckRecue';
-import type { ScratchSnapshot, ScratchStateProbe } from './scratchSnapshot';
+import { fieldsTouchedBy, type ScratchField, type ScratchSnapshot, type ScratchStateProbe } from './scratchSnapshot';
+import { getGesture } from './scratchGestureCatalog';
 import type { DeckScratchAnchor, ScratchEvent } from './scratchTypes';
 import type { ScratchCue } from './ScratchRecordVoice';
 
@@ -83,8 +88,10 @@ export class ScratchExecutor {
   private entries: Entry[] = [];
   private interval: unknown = null;
   private snapshot: ScratchSnapshot | null = null;
-  /** The snapshot taken at the start of the last run, and what was restored (tests, telemetry). */
+  private touched = new Set<ScratchField>();
+  /** The before-values of the last run and the fields given back (tests, telemetry). */
   lastRestored: ScratchSnapshot | null = null;
+  lastRestoredFields: ScratchField[] = [];
 
   constructor(deps: ScratchExecutorDeps) {
     this.deps = deps;
@@ -163,8 +170,15 @@ export class ScratchExecutor {
 
   private start(e: Entry, dueSec: number, beat: number): void {
     const ev = e.event;
-    if (this.snapshot === null && !this.entries.some((x) => x !== e && (x.state === 'running' || x.state === 'ending'))) {
-      this.snapshot = this.deps.probe.capture();
+    // the before-value of each field this gesture changes, taken when the first gesture touching it starts
+    const fresh = fieldsTouchedBy(ev.source.type, getGesture(ev.gesture).faderWindows).filter((f) => !this.touched.has(f));
+    if (fresh.length) {
+      const now = this.deps.probe.capture();
+      if (!this.snapshot) this.snapshot = now;
+      for (const f of fresh) {
+        (this.snapshot as unknown as Record<ScratchField, number | boolean>)[f] = now[f];
+        this.touched.add(f);
+      }
     }
     if (ev.source.type === 'CRATE') {
       e.at = this.deps.contextTime() + dueSec;
@@ -204,14 +218,17 @@ export class ScratchExecutor {
     this.drop(e);
   }
 
-  /** Remove an entry; the last one out restores the snapshot (section 60). */
+  /** Remove an entry; the last one out gives back the fields the run touched (section 60). */
   private drop(e: Entry): void {
     this.entries = this.entries.filter((x) => x !== e);
     if (!this.entries.some((x) => x.state === 'running' || x.state === 'ending') && this.snapshot) {
       const snap = this.snapshot;
+      const fields = [...this.touched];
       this.snapshot = null;
-      this.deps.probe.restore(snap);
+      this.touched.clear();
+      this.deps.probe.restore(snap, fields);
       this.lastRestored = snap;
+      this.lastRestoredFields = fields;
       scratchExecutorStats.restores++;
       this.emit('restored', e.event.gesture);
     }
