@@ -15,7 +15,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf-8');
 describe('companion discovery reaches the resolver', () => {
   it('MCP load_file: lists the directory and asks the resolver; the rule table is gone', () => {
     const server = read('server/src/mcp/mcpServer.ts');
-    expect(server).toContain("from '../../../src/lib/import/companionResolver.ts'");
+    expect(server).toContain("from '../../../src/lib/import/companionResolver'");
     expect(server).toContain('const resolved = resolveCompanions(filename, listing);');
     expect(server).toContain('await listDirectoryForCompanions(dir, filename)');
     expect(server).not.toContain("['mdat.', 'smpl.'], ['smpl.', 'mdat.'],");

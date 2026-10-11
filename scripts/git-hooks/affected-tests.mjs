@@ -46,7 +46,7 @@ const changed = filesArg >= 0
 const staged = changed
   .map((s) => s.trim())
   .filter(Boolean)
-  .filter((f) => /\.(ts|tsx)$/.test(f) && f.startsWith('src/'));
+  .filter((f) => /\.(ts|tsx)$/.test(f) && (f.startsWith('src/') || f.startsWith('server/src/')));
 
 const isTest = (f) => /\.test\.(ts|tsx)$/.test(f);
 
@@ -90,7 +90,8 @@ for (const f of staged) {
     if (existsSync(join(root, f))) set.add(f);
   } else {
     sources.push(f);
-    for (const t of siblingTests(f)) set.add(t);
+    // server/ suites are not in the vitest CI glob; only src/ tests read server code.
+    if (f.startsWith('src/')) for (const t of siblingTests(f)) set.add(t);
   }
 }
 for (const t of sourceTextTests(sources)) set.add(t);
