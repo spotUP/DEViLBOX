@@ -11,7 +11,7 @@
  */
 
 import { useDJStore } from '@/stores/useDJStore';
-import { getDJEngine } from './DJEngine';
+import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import { setDeckPitch } from './DJActions';
 import type { DeckId } from './DeckEngine';
 import type { BeatGridData } from './DJAudioCache';
@@ -92,15 +92,25 @@ export function syncBPMToOther(deckId: DeckId, otherDeckId: DeckId): number {
 }
 
 /**
- * Phase-align this deck to the other deck's beat grid.
- * Seeks to a position that aligns beats (or downbeats for bar sync).
+ * How a phase correction moves the deck: 'auto' bends the rate of a playing
+ * deck (never a seek - a seek of a playing deck is an audible skip and a
+ * platter jump) and seeks a stopped one; 'seek' always snaps (the user's own
+ * sync key).
+ */
+export type PhaseAlignMethod = 'auto' | 'seek';
+
+/**
+ * Phase-align this deck to the other deck's beat grid: beats (or downbeats
+ * for bar sync) of this deck land on the other deck's.
  *
  * @param mode - 'beat' aligns to nearest beat, 'bar' aligns to nearest downbeat
+ * @param method - 'auto': bend a playing deck, seek a stopped one; 'seek': always seek
  */
 export function phaseAlign(
   deckId: DeckId,
   otherDeckId: DeckId,
   mode: SyncMode = 'beat',
+  method: PhaseAlignMethod = 'auto',
 ): void {
   const store = useDJStore.getState();
   const otherState = store.decks[otherDeckId];
@@ -127,10 +137,43 @@ export function phaseAlign(
   if (phaseDiff > 0.5) phaseDiff -= 1;
   if (phaseDiff < -0.5) phaseDiff += 1;
 
-  const seekTarget = thisPosition + phaseDiff * period;
+  const errorSec = phaseDiff * period;
+  if (method === 'auto' && isDeckPlaying(deckId)) {
+    bendToPhase(deckId, errorSec);
+    return;
+  }
+
+  const seekTarget = thisPosition + errorSec;
   if (seekTarget < 0) return; // don't seek before start
 
   seekDeck(deckId, seekTarget);
+}
+
+/** Phase errors below this are inaudible and left alone (seconds). */
+const BEND_DEADBAND_SEC = 0.003;
+/** Bend amount bounds (fraction of the rest rate) and the time a small error takes to close. */
+const BEND_MIN = 0.01;
+const BEND_MAX = 0.06;
+const BEND_TARGET_SEC = 2;
+
+/**
+ * Close a phase error on a playing deck with a rate bend: `errorSec` (in this
+ * deck's track time, positive = this deck is behind) is gained back by
+ * playing up to 6 % faster or slower - at least 1 %, finished in about 2 s for
+ * small errors. The bend length accounts for the deck's fader rate, since a
+ * bend of `amount` gains `rest * amount` track seconds per second.
+ */
+export function bendToPhase(deckId: DeckId, errorSec: number): void {
+  if (!Number.isFinite(errorSec) || Math.abs(errorSec) < BEND_DEADBAND_SEC) return;
+  const amount = Math.min(BEND_MAX, Math.max(BEND_MIN, Math.abs(errorSec) / BEND_TARGET_SEC));
+  const rest = Math.pow(2, (useDJStore.getState().decks[deckId].pitchOffset || 0) / 12);
+  const durationMs = (Math.abs(errorSec) / (rest * amount)) * 1000;
+  getDJEngine().getDeck(deckId).bendRate(errorSec > 0 ? 1 + amount : 1 - amount, durationMs);
+}
+
+/** Whether a deck is audibly playing: the engine first, the store when the engine is not up. */
+function isDeckPlaying(deckId: DeckId): boolean {
+  try { return getDJEngine().getDeck(deckId).isPlaying(); } catch { return useDJStore.getState().decks[deckId].isPlaying; }
 }
 
 /**
@@ -361,12 +404,24 @@ function getBestBPM(deckState: { beatGrid: BeatGridData | null; detectedBPM: num
 }
 
 /**
- * The heard position now: the deck's clock anchor extrapolated to this
- * moment (audio: audioPosition; tracker: elapsedMs / 1000), so beat events
- * land on the frame they are heard instead of the next 20 Hz store write.
+ * The heard position now. An audio deck answers itself
+ * (DeckEngine.getHeardPosition: played position minus output and key-lock
+ * latency) - the store anchor lags a seek until the next 20 Hz deck-state
+ * write, so a phase correction right after a seek + play measured the deck
+ * where it was before the seek. Otherwise (tracker decks, engine not up) the
+ * deck's clock anchor extrapolated to this moment, so beat events land on the
+ * frame they are heard instead of the next store write.
  */
 function getCurrentPosition(deckId: DeckId): number {
-  return deckPositionAt(useDJStore.getState().decks[deckId], clockNowMs());
+  const state = useDJStore.getState().decks[deckId];
+  try {
+    const deck = getDJEngineIfActive()?.getDeck(deckId);
+    if (deck?.playbackMode === 'audio') {
+      const pos = deck.getHeardPosition();
+      if (Number.isFinite(pos)) return state.durationMs > 0 ? Math.min(pos, state.durationMs / 1000) : pos;
+    }
+  } catch { /* engine not ready: the store anchor */ }
+  return deckPositionAt(state, clockNowMs());
 }
 
 export function getPhaseInfo(deckId: DeckId): PhaseInfo | null {

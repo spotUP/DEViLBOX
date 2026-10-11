@@ -313,7 +313,7 @@ export function useDJKeyboardHandler(): void {
           const stateB = store.decks.B;
           if (stateA.beatGrid && stateB.beatGrid) {
             const semitones = syncBPMToOther('B', 'A');
-            phaseAlign('B', 'A', 'beat');
+            phaseAlign('B', 'A', 'beat', 'seek');
             setDeckPitch('B', semitones);
           } else {
             const semitones = DJBeatSync.syncBPM(engine.deckA, engine.deckB);
@@ -389,7 +389,7 @@ export function useDJKeyboardHandler(): void {
       case 'y': { // Quick sync: Deck A syncs to B (phase-locked if available)
         if (store.decks.A.beatGrid && store.decks.B.beatGrid) {
           const sem = syncBPMToOther('A', 'B');
-          phaseAlign('A', 'B', 'beat');
+          phaseAlign('A', 'B', 'beat', 'seek');
           setDeckPitch('A', sem);
         } else {
           const sem = DJBeatSync.syncBPM(engine.deckB, engine.deckA);
