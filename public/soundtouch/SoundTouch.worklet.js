@@ -18,6 +18,8 @@
  *
  * Worklet → main thread:
  *   { type: 'ready' }        after init succeeds
+ *   { type: 'latency', seconds } after init and after every parameter change:
+ *                            the processing latency at the current setting
  *   { type: 'error', error } on init failure
  *
  * Shares a single WASM module across processors (matching DattorroPlate
@@ -173,6 +175,16 @@ class SoundTouchKeyLockProcessor extends AudioWorkletProcessor {
       default:
         break;
     }
+    this.reportLatency();
+  }
+
+  /** Tell the main thread how far the processed signal lags its input (DeckKeyLock.latencySec). */
+  reportLatency() {
+    if (!this.st || typeof this.st.getLatencyFrames !== 'function') return;
+    const frames = this.st.getLatencyFrames();
+    if (Number.isFinite(frames) && frames >= 0) {
+      this.port.postMessage({ type: 'latency', seconds: frames / sampleRate });
+    }
   }
 
   cleanup() {
@@ -243,6 +255,7 @@ class SoundTouchKeyLockProcessor extends AudioWorkletProcessor {
       this.pendingMessages = [];
 
       this.port.postMessage({ type: 'ready' });
+      this.reportLatency();
 
     } catch (error) {
       console.error('SoundTouch initialization error:', error);

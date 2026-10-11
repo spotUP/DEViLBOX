@@ -1018,14 +1018,17 @@ export class DeckEngine {
 
   /**
    * Audio mode: the position the listener hears now - the player's position
-   * minus the output latency at the current playback rate (audioLatency.ts).
+   * minus the latency behind it at the current playback rate (audioLatency.ts):
+   * the output latency plus, with key lock on, the SoundTouch processing
+   * latency (~91 ms; a key-locked deck sounds that much later than it plays).
    * Every DJ visual (waveform playhead, beat grid, overview, turntable, lights
-   * derived from the time index) reads this through the DJ store.
+   * derived from the time index) reads this through the DJ store, and phase
+   * correction (DJAutoSync) locks on it.
    */
   getHeardPosition(): number {
     const player = this._stemMode ? this.stemPlayer : this.audioPlayer;
     const ctx = Tone.getContext().rawContext as AudioContext;
-    return heardPositionSec(player.getPosition(), player.getPlaybackRate(), outputLatencySec(ctx));
+    return heardPositionSec(player.getPosition(), player.getPlaybackRate(), outputLatencySec(ctx) + this.keyLock.latencySec());
   }
 
   /**
