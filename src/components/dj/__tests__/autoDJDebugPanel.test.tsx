@@ -64,10 +64,11 @@ describe('Auto DJ debug view', () => {
       deckA: { material: ['FULL_GROOVE'], confidence: 0.9, role: 'VOICE' }, deckB: { material: ['DRUM_FILL'], confidence: 0.8, role: 'RESPONSE' },
       nextActions: [{ deck: 'B', type: 'CutIn', beat: 41 }], reason: 'beatTrade (A B A B) at 0.85 intensity: strong beat confidence', confidence: 0.9, safety: 'clear',
       budget: { juggledFraction: 0.1, secondsSinceLastJuggle: 120, cooldownSec: 90 }, lastQuality: null, history: [{ type: 'phraseTrade', bars: 16, score: 0.8 }],
+      standalone: { trigger: 'build', source: 'double', phase: 'running', deck: 'B' },
     });
     const { getByTestId } = render(<DJAutoDJDebugPanel telemetry={null} />);
     const text = getByTestId('autodj-juggle').textContent ?? '';
-    for (const label of ['Juggle Mode', 'Juggle Active', 'Pattern', 'Pattern Phase', 'Intensity', 'Active Deck', 'Deck A', 'Deck B', 'Next Actions', 'Confidence', 'Safety', 'Budget']) {
+    for (const label of ['Juggle Mode', 'Juggle Active', 'Pattern', 'Pattern Phase', 'Intensity', 'Active Deck', 'Deck A', 'Deck B', 'Next Actions', 'Confidence', 'Safety', 'Stand-alone', 'Budget']) {
       expect(text, label).toContain(label);
     }
     expect(text).toContain('PERFORMER');
@@ -78,6 +79,7 @@ describe('Auto DJ debug view', () => {
     expect(text).toContain('CutIn B @ 41.0');
     expect(text).toContain('strong beat confidence');
     expect(text).toContain('10 % juggled, cooldown 90 s');
+    expect(text).toContain('double on B (build), running');
     useDJStore.getState().setAutoDJJuggleTelemetry(null);
   });
 

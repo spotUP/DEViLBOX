@@ -222,6 +222,19 @@ export interface JuggleCandidate {
   blocked: string[];
 }
 
+/** What makes Auto DJ set up a stand-alone juggle (plan 2026-10-11-dj-juggling, P4.1). */
+export type JuggleTrigger = 'break' | 'build' | 'phraseEnd' | 'energy';
+/** The idle deck's material for a stand-alone juggle: a double of the playing track, or the pre-rendered next track. */
+export type StandaloneSource = 'double' | 'next';
+
+/** Auto DJ's stand-alone juggle as the telemetry shows it (P4.5). */
+export interface StandaloneTelemetry {
+  trigger: JuggleTrigger;
+  source: StandaloneSource;
+  phase: 'loading' | 'cued' | 'running';
+  deck: 'A' | 'B';
+}
+
 export interface JuggleTelemetry {
   mode: JuggleMode;
   active: boolean;
@@ -239,4 +252,6 @@ export interface JuggleTelemetry {
   budget: { juggledFraction: number; secondsSinceLastJuggle: number; cooldownSec: number };
   lastQuality: JuggleQualityScore | null;
   history: Array<{ type: DJJugglePatternType; bars: number; score: number }>;
+  /** The stand-alone juggle Auto DJ is setting up or performing; null when none. */
+  standalone: StandaloneTelemetry | null;
 }

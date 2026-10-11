@@ -19,7 +19,7 @@ import { budgetFor, confidencePolicy, intensityFor, planJuggle, releasePattern, 
 import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
 import type {
   DJDeckPerformanceState, DJJuggleHistory, DJJugglePerformanceContext, DJPerformanceMode, JuggleMode, JuggleQualityScore,
-  JuggleTelemetry, DJJugglePatternType,
+  JuggleTelemetry, DJJugglePatternType, StandaloneTelemetry,
 } from './juggleTypes';
 
 type AB = 'A' | 'B';
@@ -86,6 +86,8 @@ export class DJJuggleController {
   private lastCtx: DJJugglePerformanceContext | null = null;
   private pendingAbort: string | null = null;
   private counter = 0;
+  private standalone: StandaloneTelemetry | null = null;
+  private standaloneNote: string | null = null;
   readonly events: JuggleEvent[] = [];
   readonly counts: Record<string, number> = { ticks: 0, started: 0, completed: 0, aborted: 0, fallbacks: 0 };
 
@@ -107,6 +109,19 @@ export class DJJuggleController {
   currentExecution(): JuggleExecution | null { return this.execution; }
   /** Pending timers and executions: the leak check for long sets. */
   openWork(): number { return this.execution?.active() ? 1 : 0; }
+
+  /**
+   * Auto DJ's stand-alone juggle (plan 2026-10-11-dj-juggling, P4.5): shown
+   * with the telemetry. `note` says why none is set up while only one deck
+   * plays (the planner's own "both decks must play" says nothing then).
+   */
+  setStandalone(standalone: StandaloneTelemetry | null, note: string | null = null): void {
+    const nextNote = standalone ? null : note;
+    const same = JSON.stringify(standalone) === JSON.stringify(this.standalone) && nextNote === this.standaloneNote;
+    this.standalone = standalone ? { ...standalone } : null;
+    this.standaloneNote = nextNote;
+    if (!same) this.deps.onTelemetry?.(this.telemetry());
+  }
 
   /** Section 43: a manual override yields at once; the rest of the pattern is released. */
   noteUserControl(what: string): void { if (this.execution?.active()) this.pendingAbort = `user control: ${what}`; }
@@ -333,10 +348,19 @@ export class DJJuggleController {
       deckA: { material: ctx ? materialOf(ctx.deckA) : [], confidence: ctx?.deckA.analysisConfidence ?? 0, role: roles.A },
       deckB: { material: ctx ? materialOf(ctx.deckB) : [], confidence: ctx?.deckB.analysisConfidence ?? 0, role: roles.B },
       nextActions: exec ? exec.nextActions(6) : [], reason: d?.reason ?? 'no decision yet', confidence: d ? Math.min(ctx?.beatConfidence ?? 0, ctx?.deckSyncConfidence ?? 0) : 0,
-      safety: this.pendingAbort ? `aborting: ${this.pendingAbort}` : d?.blocked.length ? `blocked: ${d.blocked[0]}` : 'clear',
+      safety: this.safety(exec !== null, d),
       budget: { juggledFraction: budget?.fraction ?? 0, secondsSinceLastJuggle: ctx?.secondsSinceLastJuggle ?? Infinity, cooldownSec: budget?.cooldownSec ?? 0 },
       lastQuality: this.lastQuality, history: this.history.slice(-5).map((h) => ({ type: h.patternType, bars: h.durationBars, score: h.successScore })),
+      standalone: this.standalone,
     };
+  }
+
+  private safety(performing: boolean, d: JuggleDecision | null): string {
+    if (this.pendingAbort) return `aborting: ${this.pendingAbort}`;
+    const sa = this.standalone;
+    if (!performing && sa && sa.phase !== 'running') return `setting up: ${sa.source} on ${sa.deck} (${sa.trigger})`;
+    if (!performing && !sa && this.standaloneNote) return `stand-alone: ${this.standaloneNote}`;
+    return d?.blocked.length ? `blocked: ${d.blocked[0]}` : 'clear';
   }
 
   private publish(ctx: DJJugglePerformanceContext): void { this.deps.onTelemetry?.(this.telemetry(ctx)); }
