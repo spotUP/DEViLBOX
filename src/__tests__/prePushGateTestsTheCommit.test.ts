@@ -94,6 +94,29 @@ describe('scripts/git-hooks/pre-push gates the pushed commit, not the working tr
     expect(r.code).toBe(0);
   });
 
+  it('with a known remote base it runs the affected tests, not the whole suite', () => {
+    // Owner 2026-10-11: the whole-suite gate took 25 min quiet and 1 h 52 min
+    // under load. test:ci here always fails, so reaching it fails the push.
+    mkdirSync(join(repo, 'scripts/git-hooks'), { recursive: true });
+    writeFileSync(join(repo, 'scripts/git-hooks/affected-tests.mjs'), 'process.stdout.write("");\n');
+    writeFileSync(join(repo, 'package.json'), JSON.stringify({
+      name: 'fake', version: '0.0.0', scripts: { 'type-check': 'true', 'test:ci': 'exit 1', 'test:compliance': 'true' },
+    }));
+    git('add', '.');
+    const base = commitCheck('ok\n');
+    writeFileSync(join(repo, 'src/a.ts'), 'export const a = 1;\n');
+    git('add', 'src/a.ts');
+    git('commit', '-q', '-m', 'change');
+    const sha = git('rev-parse', 'HEAD');
+    const r = spawnSync('bash', [HOOK], {
+      cwd: repo, encoding: 'utf8', env: { ...env, TMPDIR: scratch },
+      input: `refs/heads/main ${sha} refs/heads/main ${base}\n`,
+    });
+    expect(r.stderr).toContain('affected tests ok');
+    expect(r.stderr).not.toContain('test:ci');
+    expect(r.status).toBe(0);
+  });
+
   it('leaves no snapshot directory behind, after a pass or a failure', () => {
     runHook(commitCheck('ok\n'));
     expect(snapshots()).toEqual([]);

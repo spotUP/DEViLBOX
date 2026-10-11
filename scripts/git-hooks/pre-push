@@ -148,21 +148,61 @@ materialise() {
 
 # Commits to test: every distinct non-delete local sha of the push; HEAD when
 # invoked by hand with no ref list.
+# The push gate runs what the pushed commits can reach, not the whole suite:
+# type-check, then the tests affected by the files changed since the remote
+# ref (scripts/git-hooks/affected-tests.mjs: sibling suites + tests that read
+# a changed file's source). The fast tier (test:ci) and the nightly heavy tier
+# run in CI, which blocks the deploy. A ref with no known remote base (new
+# branch, interactive run) falls back to the fast tier.
+# Owner 2026-10-11: a gate that ran the whole suite on the laptop took 25 min
+# quiet and 1 h 52 min under load, and failed on load-only timeouts.
+ZERO=0000000000000000000000000000000000000000
 SHAS=""
+BASES=""   # "local_sha:remote_sha" pairs (bash 3.2 has no associative arrays)
 if [ -n "$PUSH_REFS" ]; then
-  while read -r _l lsha _r _rs; do
+  while read -r _l lsha _r rsha; do
     [ -n "${lsha:-}" ] || continue
-    [ "$lsha" = "0000000000000000000000000000000000000000" ] && continue
+    [ "$lsha" = "$ZERO" ] && continue
     case " $SHAS " in *" $lsha "*) ;; *) SHAS="$SHAS $lsha" ;; esac
+    if [ -n "${rsha:-}" ] && [ "$rsha" != "$ZERO" ] && git rev-parse -q --verify "${rsha}^{commit}" >/dev/null 2>&1; then
+      BASES="$BASES $lsha:$rsha"
+    fi
   done <<< "$PUSH_REFS"
 else
   SHAS="$(git rev-parse HEAD)"
 fi
 
+base_of() {
+  local pair
+  for pair in $BASES; do
+    [ "${pair%%:*}" = "$1" ] && { echo "${pair#*:}"; return 0; }
+  done
+  return 0
+}
+
+affected_tests() {
+  local base=$1 sha=$2 changed files
+  changed="$(git diff --name-only "$base" "$sha")"
+  # shellcheck disable=SC2086
+  files="$(cd "$SNAP" && node scripts/git-hooks/affected-tests.mjs --files $changed)"
+  if [ -z "$files" ]; then
+    echo "no test suite reads the changed files"
+    return 0
+  fi
+  echo "$files"
+  # shellcheck disable=SC2086
+  (cd "$SNAP" && VITEST_TIER=fast npx vitest run --config vite.config.ts --passWithNoTests $files)
+}
+
 for sha in $SHAS; do
   materialise "$sha"
+  base="$(base_of "$sha")"
   run_step "type-check"      in_snapshot npm run --silent type-check
-  run_step "test:ci"         in_snapshot npm run --silent test:ci
+  if [ -n "$base" ]; then
+    run_step "affected tests"  affected_tests "$base" "$sha"
+  else
+    run_step "test:ci (no remote base)" in_snapshot npm run --silent test:ci
+  fi
   run_step "test:compliance" in_snapshot npm run --silent test:compliance
   cleanup_snapshot
 done

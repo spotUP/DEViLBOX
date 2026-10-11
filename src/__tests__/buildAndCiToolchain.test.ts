@@ -15,7 +15,7 @@
  *    version that strips TypeScript types natively.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '../..');
@@ -48,4 +48,17 @@ describe('CI toolchain', () => {
     const [major, minor = 0] = v.split('.').map(Number);
     expect(major > 22 || (major === 22 && minor >= 18)).toBe(true);
   });
+
+  it('the heavy offline-render suites run nightly, not on every push', () => {
+    const heavy = JSON.parse(readFileSync(join(ROOT, 'tools/test-tiers/heavy.json'), 'utf8')) as { files: { file: string }[] };
+    expect(heavy.files.length).toBeGreaterThan(0);
+    for (const { file } of heavy.files) expect(existsSync(join(ROOT, file)), file).toBe(true);
+    const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+    expect(pkg.scripts['test:ci']).toMatch(/^VITEST_TIER=fast /);
+    expect(pkg.scripts['test:heavy']).toMatch(/^VITEST_TIER=heavy /);
+    expect(readFileSync(join(ROOT, '.github/workflows/nightly.yml'), 'utf8')).toContain('npm run test:heavy');
+    const config = readFileSync(join(ROOT, 'vite.config.ts'), 'utf8');
+    expect(config).toContain("testTier === 'fast' ? heavyTestFiles");
+  });
 });
+
