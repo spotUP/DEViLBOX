@@ -13,7 +13,7 @@ import { getToneEngine } from '@/engine/ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
-import { ScratchPlayback, getPatternByName } from './DJScratchEngine';
+import { ScratchPlayback, getPatternByName, type PatternStart } from './DJScratchEngine';
 import { snapPositionToBeat, snapLoopLength, phaseAlign } from './DJAutoSync';
 import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
@@ -1728,8 +1728,8 @@ export class DeckEngine {
     }, anchorSec);
   }
 
-  /** Play a named scratch pattern (with optional beat quantization) */
-  playPattern(name: string, onWaiting?: (ms: number) => void): void {
+  /** Play a named scratch pattern (with optional beat quantization); `start` = a planned stroke (phase, cycles, velocity). */
+  playPattern(name: string, onWaiting?: (ms: number) => void, start?: PatternStart): void {
     const pattern = getPatternByName(name);
     if (!pattern) return;
 
@@ -1748,14 +1748,14 @@ export class DeckEngine {
     // and note processing stays enabled so forward phases produce the full mix.
     // deckGain stays at 1 until the first backward phase.
 
-    this.scratchPlayback.play(pattern, onWaiting);
+    this.scratchPlayback.play(pattern, onWaiting, start);
 
     // Cut-grid gestures (Transformer / Crab / Eight-Finger Crab) schedule
     // their fader windows on the AudioParam — must run AFTER `play()`
     // because `play()` begins with a stopPattern() that cancels all
     // scheduled gain values. Scheduling before play would leave the fader
     // stuck at 1 (no chopping) — they would sound like normal playback.
-    this.scratchPlayback.schedulePatternFader(pattern, this.getEffectiveBPM());
+    this.scratchPlayback.schedulePatternFader(pattern, this.getEffectiveBPM(), start);
 
     this._enableReverbSend();
   }

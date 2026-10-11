@@ -26,6 +26,7 @@ import { syncBPMToOther, phaseAlign, snapPositionToBeat, pitchedBpm } from './DJ
 import { DJBeatSync } from './DJBeatSync';
 import { existingAutoDJ } from './autoDJInstance';
 import type { DeckId, FaderLFODivision } from './DeckEngine';
+import type { PatternStart } from './DJScratchEngine';
 
 // ── Batched store writes for continuous controls ───────────────────────
 // Audio engine calls happen immediately. Only the Zustand state write
@@ -982,15 +983,17 @@ export function seekDeckAudio(deckId: DeckId, seconds: number): void {
 // ============================================================================
 
 /**
- * Start a named scratch pattern on a deck.
+ * Start a named scratch pattern on a deck; `start` = a planned stroke (the Auto
+ * Scratch executor: phase 0 on its beat, whole cycles, the plan's velocity).
  */
 export function playDeckPattern(
   deckId: DeckId,
   name: string,
   onWaiting?: (ms: number) => void,
+  start?: PatternStart,
 ): void {
   try {
-    getDJEngine().getDeck(deckId).playPattern(name, onWaiting);
+    getDJEngine().getDeck(deckId).playPattern(name, onWaiting, start);
   } catch { /* engine not ready */ }
 }
 
