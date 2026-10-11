@@ -16,6 +16,7 @@ import type { DJTrackAnalysis, SetEnergyPhase } from '../types';
 import { classifyWindow, materialRefs } from './juggleMaterial';
 import { PATTERN_INTENSITY, coarsenLadder, minLadderRung, phaseAt, rolesAt, transitionLadder } from './jugglePatterns';
 import { budgetFor, conditions, confidencePolicy, intensityFor, lowConfidenceReason, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
+import { phaseUnverified, PHASE_VERIFIED_SEC } from './phaseVerification';
 import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
 import type {
   DJDeckPerformanceState, DJJuggleHistory, DJJugglePerformanceContext, DJPerformanceMode, JuggleMode, JuggleQualityScore,
@@ -70,8 +71,6 @@ export interface JuggleTickResult {
 }
 
 const RECENT = 6;
-/** The incoming's heard bar phase within this of the master's counts as verified (the R2 tolerance, owner plan section 16). */
-export const LADDER_PHASE_VERIFIED_SEC = 0.005;
 
 export class DJJuggleController {
   private mode: JuggleMode = 'OFF';
@@ -326,9 +325,10 @@ export class DJJuggleController {
   }
 
   /**
-   * Start a decision. `verify`: the deck whose heard bar phase must be within
-   * LADDER_PHASE_VERIFIED_SEC of the master's before `beforeBeat` (its first
-   * audible bar), or the pattern releases gracefully (owner plan section 16).
+   * Start a decision. `verify`: the deck whose heard bar phase must pass the
+   * juggle layer's one verification rule (phaseUnverified) before
+   * `beforeBeat` (its first audible bar), or the pattern releases gracefully
+   * (owner plan section 16).
    */
   private start(decision: JuggleDecision, ctx: DJJugglePerformanceContext, input: TickInput, verify?: { deck: AB; beforeBeat: number }): void {
     const pattern = decision.pattern!;
@@ -338,14 +338,14 @@ export class DJJuggleController {
     let verified = !verify || !sink.phaseError;
     const phaseGate = (): string | null => {
       if (verified) return null;
-      const err = sink.phaseError!(verify!.deck);
-      if (err !== null && Math.abs(err) <= LADDER_PHASE_VERIFIED_SEC) {
+      const off = phaseUnverified(sink, verify!.deck);
+      if (off === null) {
         verified = true;
-        this.record({ kind: 'juggleActionExecuted', beat: clock.beatNow(), reason: `phase verified: deck ${verify!.deck} ${(err * 1000).toFixed(1)} ms from the master's bars`, pattern: pattern.id });
+        this.record({ kind: 'juggleActionExecuted', beat: clock.beatNow(), reason: `phase verified: deck ${verify!.deck} within ${(PHASE_VERIFIED_SEC * 1000).toFixed(0)} ms of the master's bars`, pattern: pattern.id });
         return null;
       }
       if (clock.beatNow() < verify!.beforeBeat - 0.25) return null;
-      return err === null ? `deck ${verify!.deck} phase cannot be measured before its first bar` : `deck ${verify!.deck} phase not verified before its first bar (${(err * 1000).toFixed(0)} ms off)`;
+      return `phase not verified before its first bar: ${off}`;
     };
     this.execCtx = ctx;
     this.counts.started++;
