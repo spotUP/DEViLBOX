@@ -577,7 +577,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
         </Button>
       </div>
       {showDebug && (
-        <div className="mt-2">
+        <div className="mt-2 max-h-[60vh] overflow-y-auto" data-testid="autodj-debug-scroll">
           <DJAutoDJDebugPanel />
         </div>
       )}
