@@ -41,7 +41,7 @@ export const ChannelShapeSelect: React.FC<ChannelShapeSlotProps> = React.memo(({
       className={
         'flex-1 min-w-0 text-[9px] font-mono rounded border ' +
         (kind !== 'off'
-          ? 'bg-accent-warning/20 border-accent-warning text-accent-warning'
+          ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
           : 'bg-dark-bgTertiary border-dark-borderLight text-text-muted')
       }
       title={`Ch ${channel + 1} sound shaping — one effect on this channel's dub send, before it joins the bus. Echo, spring, plate, sweep and width stay on the bus.`}

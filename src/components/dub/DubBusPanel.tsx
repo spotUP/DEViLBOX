@@ -397,7 +397,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
               type="checkbox"
               checked={dubBus.glueBypass ?? false}
               onChange={(e) => patch({ glueBypass: e.target.checked })}
-              className="w-3.5 h-3.5 accent-accent-secondary"
+              className="w-3.5 h-3.5 accent-accent-primary"
             />
             <span className="text-text-muted">
               {dubBus.glueBypass ? 'Scientist mode — no bus compression (1:1 ratio)' : '3:1 glue compression active'}
@@ -525,7 +525,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
               type="checkbox"
               checked={dubBus.pingPongSyncToBpm ?? false}
               onChange={(e) => patch({ pingPongSyncToBpm: e.target.checked })}
-              className="w-3.5 h-3.5 accent-accent-highlight"
+              className="w-3.5 h-3.5 accent-accent-primary"
             />
             <span className="text-text-muted">
               {dubBus.pingPongSyncToBpm ? 'BPM synced (3/8 L, 1/2 R — Ariwa SDE-3000)' : 'fixed ms values'}
