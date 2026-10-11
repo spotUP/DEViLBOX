@@ -34,10 +34,16 @@ jobs:
       - name: Type check
         run: npm run type-check
 
+      # Two workers on the 4-core runner, as the local gate runs two on eight:
+      # an offline audio render holds the worker, its render thread and its
+      # worklet thread, so four workers oversubscribed the four cores and the
+      # dub-bus rig renders ran 9-10x their local time (dubBus.behaviour 265 s
+      # against 29 s, madProfessorTrebleBursts past 180 s against 22 s) and hit
+      # their timeouts.
       - name: CI regression gate
         run: npm run test:ci
         env:
-          VITEST_MAX_WORKERS: '4'
+          VITEST_MAX_WORKERS: '2'
 
       - name: Effects compliance
         run: npm run test:compliance
