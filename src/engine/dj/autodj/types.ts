@@ -304,7 +304,10 @@ export interface TrackerOrderPosition {
   patternIndex: number;
   start: number;
   end: number;
+  /** Rows played: from startRow to the pattern end or the row of a Dxx / Bxx. */
   rows: number;
+  /** First row played (a Dxx in the position before can start a pattern mid-way). */
+  startRow: number;
 }
 
 export interface TrackerMixAnalysis {
