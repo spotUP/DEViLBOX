@@ -1,41 +1,41 @@
 /**
- * DeckNudge - Nudge buttons for temporary BPM bumps during beat matching
+ * DeckNudge - Nudge buttons for beat matching
  *
- * Soft nudge: +/-2 BPM for 8 ticks
- * Hard nudge (Shift+click): +/-5 BPM for 16 ticks
+ * Press and hold: the deck stays bent while the button is down, like a CDJ
+ * pitch-bend button. Soft: +/-2 %; hard (Shift held on press): +/-5 %.
  */
 
 import React, { useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { getDJEngine } from '@/engine/dj/DJEngine';
+import { holdNudgeDeck, releaseNudgeDeck } from '@/engine/dj/DJActions';
 
 interface DeckNudgeProps {
   deckId: 'A' | 'B' | 'C';
 }
 
 const SOFT_OFFSET = 2;
-const SOFT_TICKS = 8;
 const HARD_OFFSET = 5;
-const HARD_TICKS = 16;
 
 export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
-  const handleNudge = useCallback(
-    (direction: -1 | 1, e: React.MouseEvent) => {
-      const isHard = e.shiftKey;
-      const offset = direction * (isHard ? HARD_OFFSET : SOFT_OFFSET);
-      const ticks = isHard ? HARD_TICKS : SOFT_TICKS;
-
-      const engine = getDJEngine();
-      engine.getDeck(deckId).nudge(offset, ticks);
+  const handlePress = useCallback(
+    (direction: -1 | 1, e: React.PointerEvent<HTMLButtonElement>) => {
+      // Capture so the release arrives even when the pointer leaves the button.
+      e.currentTarget.setPointerCapture(e.pointerId);
+      holdNudgeDeck(deckId, direction * (e.shiftKey ? HARD_OFFSET : SOFT_OFFSET));
     },
     [deckId]
   );
+
+  const handleRelease = useCallback(() => releaseNudgeDeck(deckId), [deckId]);
 
   return (
     <div className="flex items-center gap-1">
       {/* Slower (nudge left / minus) */}
       <button
-        onClick={(e) => handleNudge(-1, e)}
+        onPointerDown={(e) => handlePress(-1, e)}
+        onPointerUp={handleRelease}
+        onPointerCancel={handleRelease}
+        onLostPointerCapture={handleRelease}
         className="
           flex items-center justify-center w-10 h-10 rounded-lg
           bg-dark-bgTertiary text-text-secondary border border-dark-border
@@ -50,7 +50,10 @@ export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
 
       {/* Faster (nudge right / plus) */}
       <button
-        onClick={(e) => handleNudge(1, e)}
+        onPointerDown={(e) => handlePress(1, e)}
+        onPointerUp={handleRelease}
+        onPointerCancel={handleRelease}
+        onLostPointerCapture={handleRelease}
         className="
           flex items-center justify-center w-10 h-10 rounded-lg
           bg-dark-bgTertiary text-text-secondary border border-dark-border

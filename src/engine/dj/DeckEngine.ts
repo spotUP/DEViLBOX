@@ -868,20 +868,45 @@ export class DeckEngine {
     this.replayer.setNudge(offset, ticks);
   }
 
+  /**
+   * Press-and-hold nudge (the nudge buttons): the deck stays bent by `offset`
+   * until releaseNudge(), like holding a CDJ pitch-bend button. A click-length
+   * nudge() is too short to hear on a held button.
+   */
+  holdNudge(offset: number): void {
+    if (this._playbackMode === 'audio') {
+      this.bendRate(1 + offset * 0.01, null);
+      return;
+    }
+    this.replayer.setNudge(offset, Number.MAX_SAFE_INTEGER);
+  }
+
+  /** End a held nudge: the deck returns to the fader rate. */
+  releaseNudge(): void {
+    if (this._playbackMode === 'audio') {
+      this._endBend();
+      return;
+    }
+    this.replayer.setNudge(0, 0);
+  }
+
   /** Length of one nudge tick on an audio deck (a tracker tick at 125 BPM). */
   private static readonly NUDGE_TICK_MS = 20;
   /** Largest rate bend either way (a jog-wheel push, not a pitch move). */
   private static readonly MAX_BEND = 0.06;
   private _bendTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A bend with no end time is in force (a held nudge button). */
+  private _bendHeld = false;
 
   /**
    * Temporary rate bend around the rest (fader) rate - a jog-wheel push.
    * Phase correction of a playing deck rides on this instead of a seek.
    * The store's pitch is not touched; after `durationMs` the deck returns to
    * the fader rate through setPitch (the one rate path). With key lock on
-   * the bend keeps the key, like the fader does.
+   * the bend keeps the key, like the fader does. `durationMs` null holds the
+   * bend until _endBend (a held nudge button).
    */
-  bendRate(ratio: number, durationMs: number): void {
+  bendRate(ratio: number, durationMs: number | null): void {
     if (this._repitchLocked || this._isScratchActive || this.isPatternActive()) return;
     if (!Number.isFinite(ratio) || ratio <= 0) return;
     const r = Math.max(1 - DeckEngine.MAX_BEND, Math.min(1 + DeckEngine.MAX_BEND, ratio));
@@ -895,6 +920,10 @@ export class DeckEngine {
     } else {
       this.replayer.setTempoMultiplier(bent);
     }
+    if (durationMs === null) {
+      this._bendHeld = true;
+      return;
+    }
     this._bendTimer = setTimeout(() => {
       this._bendTimer = null;
       // A scratch that took the deck meanwhile returns it to the rest rate itself.
@@ -905,12 +934,13 @@ export class DeckEngine {
 
   /** End a bend now: the deck returns to the fader rate. */
   private _endBend(): void {
-    if (this._bendTimer === null) return;
+    if (this._bendTimer === null && !this._bendHeld) return;
     this._clearBendTimer();
     this.setPitch(this._currentPitchSemitones);
   }
 
   private _clearBendTimer(): void {
+    this._bendHeld = false;
     if (this._bendTimer !== null) {
       clearTimeout(this._bendTimer);
       this._bendTimer = null;
