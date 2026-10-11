@@ -27,7 +27,7 @@ import { detectDrumBreakTail, isChordChangeImminent } from './smartCuts';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { getSessionController, type SessionTrack } from './autodj/sessionController';
 import { executeTransition, releaseAutoKeyLock, type ExecutionHandle } from './autodj/transitionExecutor';
-import { buildDJTrackAnalysis, summaryFromPipeline } from './autodj/trackAnalysis';
+import { buildDJTrackAnalysis, summarizeTrack } from './autodj/trackAnalysis';
 import { getDecisionLog } from './autodj/decisionLog';
 import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
 import { DJJuggleController, analysisClock, type TickInput } from './autodj/juggle/juggleController';
@@ -1518,9 +1518,12 @@ class DJAutoDJ {
         id: track.fileName, durationSec: preRendered.duration, analysis: preRendered.analysis,
         extended: preRendered.analysis.extended ?? null, song: preRendered.song ?? null,
       });
-      const summary = summaryFromPipeline(preRendered, track.id, preRendered.song ?? null);
+      // The playlist converges on the deck's numbers: the same analysis the
+      // deck gets on load (one tempo per track), written every time, not only
+      // when the track had no summary yet.
+      const summary = summarizeTrack(this.incomingAnalysis);
       const plId = useDJPlaylistStore.getState().activePlaylistId;
-      if (summary && plId && !track.djSummary) useDJPlaylistStore.getState().updateTrackMeta(plId, index, { djSummary: summary });
+      if (plId) useDJPlaylistStore.getState().updateTrackMeta(plId, index, { bpm: summary.bpm, djSummary: summary });
       const outgoing = useDJStore.getState().decks[this.activeDeck].trackAnalysis;
       this.plan = controller.planTransitionFor(outgoing, this.incomingAnalysis, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition());
     } catch (err) {

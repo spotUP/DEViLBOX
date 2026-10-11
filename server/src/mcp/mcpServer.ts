@@ -11,7 +11,7 @@ import { config as loadEnv } from 'dotenv';
 import { readFile, readdir, stat as fsStat } from 'fs/promises';
 import { basename, dirname, join, resolve } from 'path';
 import { callBrowser } from './wsRelay';
-import { resolveCompanions, modlandListing, type CompanionListing } from '../../../src/lib/import/companionResolver.ts';
+import { resolveCompanions, modlandListing, type CompanionListing } from '../../../src/lib/import/companionResolver';
 
 /** Sample subdirectories a module may own. Listed when present, by their name as on disk. */
 const COMPANION_SUBDIRS = ['instr', 'instruments', 'samples'];

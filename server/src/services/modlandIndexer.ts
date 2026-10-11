@@ -9,6 +9,7 @@ import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
 import db from '../db/database';
+import { isSupportedFormat } from '../../../src/lib/import/formatFilenameMatcher';
 
 const MODLAND_INDEX_SCHEMA_VERSION = '2';
 
@@ -233,8 +234,6 @@ const PLAYABLE_FORMATS: Record<string, string> = {
 
 let indexingStatus: 'ready' | 'indexing' | 'not_initialized' = 'not_initialized';
 let updateTimer: ReturnType<typeof setInterval> | null = null;
-let isSupportedModlandFilename: ((filename: string) => boolean) | null = null;
-let modlandFilenameMatcherPromise: Promise<void> | null = null;
 
 // Cached format counts (refreshed on index update)
 let cachedFormats: { format: string; count: number }[] | null = null;
@@ -265,21 +264,6 @@ interface ParsedEntry {
   extension: string;
 }
 
-async function ensureModlandFilenameMatcher(): Promise<void> {
-  if (isSupportedModlandFilename) return;
-  if (!modlandFilenameMatcherPromise) {
-    modlandFilenameMatcherPromise = import('../../../src/lib/import/FormatRegistry.ts')
-      .then((mod) => {
-        isSupportedModlandFilename = mod.isSupportedFormat;
-      })
-      .catch((err) => {
-        modlandFilenameMatcherPromise = null;
-        throw err;
-      });
-  }
-  await modlandFilenameMatcherPromise;
-}
-
 function parseAllmodsLine(line: string): ParsedEntry | null {
   const match = line.match(LINE_REGEX);
   if (!match) return null;
@@ -287,7 +271,7 @@ function parseAllmodsLine(line: string): ParsedEntry | null {
   const [, format, author, filename] = match;
   const lowerFilename = filename.toLowerCase();
   const mappedExt = PLAYABLE_FORMATS[format];
-  if (!mappedExt && !isSupportedModlandFilename?.(lowerFilename)) return null;
+  if (!mappedExt && !isSupportedFormat(lowerFilename)) return null;
 
   const ext = mappedExt ?? path.extname(lowerFilename).slice(1);
   if (!ext) return null;
@@ -479,7 +463,6 @@ export async function forceReindex(): Promise<number> {
     const zipBuffer = await downloadAllmods();
     fs.writeFileSync(ALLMODS_PATH, zipBuffer);
     const text = extractAllmodsText(zipBuffer);
-    await ensureModlandFilenameMatcher();
     const count = indexEntries(text);
     setMeta('last_index_update', Date.now().toString());
     setMeta('index_schema_version', MODLAND_INDEX_SCHEMA_VERSION);
@@ -522,7 +505,6 @@ async function runIndexUpdate(): Promise<void> {
   console.log('[Modland] Starting index update...');
 
   try {
-    await ensureModlandFilenameMatcher();
     const zipBuffer = await downloadAllmods();
 
     // Save zip for potential debugging
