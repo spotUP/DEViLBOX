@@ -5,6 +5,8 @@
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
 import { normalizeUrl } from '@utils/urlUtils';
 import { FAIRLIGHT_CMI_PACK } from './fairlightCMISamples';
+// The pack's own file list (names + durations), served next to the WAVs.
+import scratchManifest from '../../public/data/samples/packs/scratch-originals/manifest.json';
 
 /**
  * Helper to create SampleInfo from filename
@@ -487,29 +489,36 @@ export const ST02_PACK: SamplePack = {
 
 // ============================================================================
 // SCRATCH ORIGINALS SAMPLE PACK
-// Chopped from ScratchOriginals_Phase.wav — 52 DJ scratch sounds
+// Chopped from ScratchOriginals_Phase.wav. The file list comes from the pack's
+// manifest.json so every scratch_NNN.wav on disk reaches the pack (SCR-P0.3:
+// a hard-coded count 001-053 hid 054-057). Provenance: PROVENANCE.md in the
+// pack directory.
 // ============================================================================
 
 const SCRATCH_BASE_PATH = 'data/samples/packs/scratch-originals';
 
+/** Pack files that exist but are kept out of the browser (click artifact). */
+export const SCRATCH_SKIPPED: readonly string[] = ['scratch_052.wav'];
+
+const SCRATCH_FILE = /^scratch_(\d{3})\.wav$/;
+
 // Build flat sample list (files live in root of pack dir, not in category subdirs)
-const SCRATCH_FX: SampleInfo[] = Array.from({ length: 53 }, (_, i) => {
-  const num = i + 1;
-  if (num === 52) return null; // Removed click artifact
-  const padded = String(num).padStart(3, '0');
-  return {
-    filename: `scratch_${padded}.wav`,
-    name: `Scratch ${padded}`,
+const SCRATCH_FX: SampleInfo[] = scratchManifest
+  .map(entry => entry.name)
+  .filter(filename => SCRATCH_FILE.test(filename) && !SCRATCH_SKIPPED.includes(filename))
+  .sort()
+  .map(filename => ({
+    filename,
+    name: `Scratch ${SCRATCH_FILE.exec(filename)![1]}`,
     category: 'fx' as SampleCategory,
-    url: normalizeUrl(`${SCRATCH_BASE_PATH}/scratch_${padded}.wav`),
-  };
-}).filter((x): x is SampleInfo => x !== null);
+    url: normalizeUrl(`${SCRATCH_BASE_PATH}/${filename}`),
+  }));
 
 export const SCRATCH_ORIGINALS_PACK: SamplePack = {
   id: 'scratch-originals',
   name: 'Scratch Originals',
   author: 'Phase',
-  description: '52 DJ scratch sounds chopped from a continuous scratch performance. Turntablist moves including babies, transforms, flares, crabs and more.',
+  description: `${SCRATCH_FX.length} DJ scratch sounds chopped from a continuous scratch performance. Turntablist moves including babies, transforms, flares, crabs and more.`,
   basePath: SCRATCH_BASE_PATH,
   categories: ['fx'],
   samples: {
