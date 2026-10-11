@@ -10,7 +10,7 @@ import {
   clearDeckAudioLoop, seekDeckAudio, setCrossfader, setDeckAudioLoop, setDeckEQKill, setDeckFilter,
 } from '../../DJActions';
 import { beatJump, triggerHotCue } from '../../DJBeatJump';
-import { phaseAlign, syncBPMToOther } from '../../DJAutoSync';
+import { bendToPhase, syncBPMToOther } from '../../DJAutoSync';
 import { fireDjFx, releaseDjFx } from '../../../drumpad/DjFxActions';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DJJuggleAction } from './juggleTypes';
@@ -30,6 +30,19 @@ function barStartBefore(deck: AB, pos: number): number {
   let lo = 0, hi = downbeats.length - 1;
   while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (downbeats[mid] <= pos) lo = mid; else hi = mid - 1; }
   return downbeats[lo] <= pos ? downbeats[lo] : pos;
+}
+
+function deckPlaying(deck: AB): boolean {
+  try { return getDJEngine().getDeck(deck).isPlaying(); } catch { return useDJStore.getState().decks[deck].isPlaying; }
+}
+
+/**
+ * Where a cue jump lands so the deck stays on the master's beat: the action
+ * fires a hair before the beat it cuts on (or a tick late), so the deck lands
+ * the same distance before (after) its target as the master is from that beat.
+ */
+export function phaseKeptTarget(targetSec: number, patternBeat: number, beatSec: number): number {
+  return targetSec + (patternBeat - Math.round(patternBeat)) * beatSec;
 }
 
 export function crossfaderFor(deck: 'A' | 'B' | 'BOTH'): number { return deck === 'A' ? 0 : deck === 'B' ? 1 : 0.5; }
@@ -87,7 +100,9 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
         case 'ReleaseDeck': move(crossfaderFor(action.deck)); break;
         case 'TriggerCue': if (d) triggerHotCue(d, Math.round(action.targetPosition ?? 0)); break;
         case 'JumpToBeat': if (d) beatJump(d, action.beats ?? 0); break;
-        case 'JumpToBar': if (d && action.targetPosition !== undefined) seekDeckAudio(d, action.targetPosition); break;
+        // A cue jump to the call / response / fill material: musically a jump (a needle drop on the bar
+        // the deck is cut in on, the deck silent until then), so a seek - landed on the master's phase.
+        case 'JumpToBar': if (d && action.targetPosition !== undefined) seekDeckAudio(d, Math.max(0, phaseKeptTarget(action.targetPosition, info.patternBeat, info.beatSec))); break;
         case 'StartLoop': if (d) { loopStart[d] = null; loop(d, action.beats ?? 4, info.beatSec); } break;
         case 'LoopResize': if (d) loop(d, action.beats ?? 4, info.beatSec); break;
         case 'LoopRoll': if (d) { loopStart[d] = null; loop(d, action.beats ?? 1, info.beatSec); } break;
@@ -101,10 +116,18 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
         case 'ReverbThrow': if (d) fireDjFx('fx_deck_reverb_out', { deck: d, beats: action.durationBeats ?? 4, amount: action.strength ?? 0.5, source: 'autodj' }); break;
         case 'ResetDeck': if (d) reset(d); else { reset('A'); reset('B'); } break;
         case 'ResyncDeck': {
+          // A double's copy sits `beats` ahead of the other deck, measured from where that deck is now
+          // (the planned position is stale by the time the pattern starts). Within half a beat the
+          // playing copy is bent there (never a seek); further is a re-cue of the silent copy - a cue
+          // jump by intent - and lands exactly.
           if (!d) break;
           const o = d === 'A' ? 'B' : 'A';
-          if (action.targetPosition !== undefined) seekDeckAudio(d, action.targetPosition + (action.beats ?? 0) * info.beatSec);
-          try { syncBPMToOther(d, o); phaseAlign(d, o, 'bar'); } catch { /* grid missing: the governor blocks doubles without a grid */ }
+          try { syncBPMToOther(d, o); } catch { /* grid missing: the governor blocks doubles without a grid */ }
+          if (action.targetPosition === undefined) break;
+          const want = deckPosition(o) + (action.beats ?? 0) * info.beatSec;
+          const error = want - deckPosition(d);
+          if (deckPlaying(d) && Math.abs(error) <= info.beatSec / 2) bendToPhase(d, error);
+          else seekDeckAudio(d, Math.max(0, want));
           break;
         }
       }

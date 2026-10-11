@@ -12,6 +12,7 @@ import {
   setDeckKeyLock, setDeckPitch, setDeckReverbSend, setDeckVolume,
 } from '../DJActions';
 import { useDJStore } from '@/stores/useDJStore';
+import { phaseAlign } from '../DJAutoSync';
 import { fireDjFx, releaseDjFx, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
 import { sampleCurve, type ExecutionTrace } from './transitionQuality';
 import type { AutomationCurve, AutomationTarget, DJEffectEvent, DJTransitionPlan, FilterPlanKind } from './types';
@@ -53,6 +54,13 @@ export interface ExecuteOptions {
   beatSec?: number;
   /** Milliseconds the start actually landed after the planned moment (for the trace). */
   startOffsetMs?: number;
+  /**
+   * juggleTransition: perform the plan's trading ladder between the incoming
+   * start and the release (juggling plan section 26). Resolves when the
+   * ladder released onto the incoming or was aborted; the release curves run
+   * after it either way.
+   */
+  performTrade?: (juggle: NonNullable<DJTransitionPlan['juggle']>) => Promise<{ completed: boolean }>;
 }
 
 export interface ExecutionHandle {
@@ -234,7 +242,12 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
   const run = async () => {
     try {
       // ── Prepare the incoming deck (plan sections 7, 12, 13) ─────────────
-      seekDeckAudio(inc, Math.max(0, plan.incomingPosition));
+      // The incoming is cued while stopped. One that already plays (the user
+      // started it) is never seeked - an audible skip and a platter jump - it
+      // keeps its place and is bent into phase once the transition starts.
+      const incomingAlreadyPlaying = (() => { try { return getDJEngine().getDeck(inc).isPlaying(); } catch { return false; } })();
+      if (incomingAlreadyPlaying) trace.events.push('incoming already playing: kept its position, bent into phase');
+      else seekDeckAudio(inc, Math.max(0, plan.incomingPosition));
       setDeckPitch(inc, plan.tempoPlan.incomingSemitones);
       engageAutoKeyLock(inc, plan.keyPlan.keyLock);
       setDeckFilterResonance(inc, plan.filterPlan.resonance);
@@ -260,6 +273,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       const incomingDeck = getDJEngine().getDeck(inc);
       await incomingDeck.play();
       useDJStore.getState().setDeckPlaying(inc, true);
+      if (incomingAlreadyPlaying) { try { phaseAlign(inc, out, 'bar'); } catch { /* grid missing */ } }
       if (plan.loop && plan.loop.deck === 'incoming') {
         const len = Math.min(plan.loop.lengthBeats, 16) * beatSec;
         try { incomingDeck.setAudioLoop(plan.loop.startSec, plan.loop.startSec + len); trace.events.push(`loop incoming ${plan.loop.purpose}`); } catch { /* */ }
@@ -271,6 +285,15 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
         trace.events.push(`fx ${f.action} on ${deck} (${f.beats} beats)`);
       }
       opts.onSweepStarted?.();
+
+      // ── Trade stage (juggleTransition): the ladder runs before the release curves ──
+      if (plan.style === 'juggleTransition' && plan.juggle && opts.performTrade) {
+        trace.events.push(`juggle ladder ${plan.juggle.ladderBars.join('-')}`);
+        let traded = false;
+        try { traded = (await opts.performTrade(plan.juggle)).completed; } catch { traded = false; }
+        if (cancelled) return;
+        if (!traded) trace.events.push('ladder aborted: release now');
+      }
 
       const startedAt = timers.now();
       const beatMs = beatSec * 1000;
