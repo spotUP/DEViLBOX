@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell } from '@/types/tracker';
 import { timeOrderPositions, rowSeconds } from '../trackerMixAnalysis';
-import { moduleBeatGrid, musicalBpm, MODULE_GRID_TOLERANCE } from '../moduleBeatGrid';
+import { moduleBeatGrid, modulePhrases, musicalBpm, MODULE_GRID_TOLERANCE } from '../moduleBeatGrid';
 import { buildBeatGrids } from '../beatGrid';
 
 const empty = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
@@ -242,9 +242,28 @@ describe('the module grid confidence reflects its evidence (owner plan section 3
       beats: g.beats, downbeats: g.downbeats, bpm: g.bpm, bpmConfidence: g.confidence, timeSignature: g.beatsPerBar,
       extended: null, durationSec: walkEnd(s), fixed: { beatsPerBar: g.beatsPerBar, confidence: g.confidence, meterConfidence: g.meterConfidence },
     });
-    expect(r.beatGrid.confidence).toBe(g.confidence);
-    expect(r.meter.confidence).toBe(g.meterConfidence);
-    expect(r.downbeats.confidence).toBe(Math.min(g.confidence, g.meterConfidence));
+    // Concrete numbers (audit 2026-10-11 M8): the convention's 0.7, and the meter from the pattern lengths
+    // alone (16 beats a pattern: whole 4/4 bars, not whole 3/4 bars) at 0.65.
+    expect(g.confidence).toBe(0.7);
+    expect(g.meterConfidence).toBe(0.65);
+    expect(r.beatGrid.confidence).toBe(0.7);
+    expect(r.meter.confidence).toBe(0.65);
+    expect(r.downbeats.confidence).toBe(0.65);
+  });
+
+  it('a meter nothing reads (48-row patterns fit 4/4 and 3/4, no drums) is assumed: 4/4 at 0.5', () => {
+    const s = song([pattern('a', 48), pattern('b', 48)], [0, 1]);
+    const g = moduleBeatGrid(s, walkEnd(s))!;
+    expect(g.beatsPerBar).toBe(4);
+    expect(g.meterConfidence).toBe(0.5);
+  });
+
+  it('drums that do not confirm the beat (all off the beat, the finer level implausible) leave it at the convention: 0.7', () => {
+    // Speed 6 / tempo 125: 2 rows a beat would be 250 BPM, so only the 4-row level is judged, and no drum hit lands on it.
+    const s = drumSong([notes('o', 64, [{ ...every(64, 8, KICK, 2), ...every(64, 8, SNARE, 6) }])], [0, 0, 0]);
+    const g = moduleBeatGrid(s, walkEnd(s))!;
+    expect(g.rowsPerBeat).toBe(4);
+    expect(g.confidence).toBe(0.7);
   });
 
   it('a backbeat on the conventional level confirms the beat: confidence 1', () => {
@@ -265,5 +284,29 @@ describe('the drums that set the beat are found per order position (owner plan s
     expect(g.rowsPerBeat).toBe(2);
     expect(g.bpm).toBe(160);
     expect(g.confidence).toBe(1);
+  });
+});
+
+describe('the module phrase grid is read from the order list (audit 2026-10-11 M1, owner plan section 37)', () => {
+  it('pattern changes every 8 bars count in 8-bar phrases at full confidence; a repeated pattern continues its phrase', () => {
+    // Order a a b b a a b b, 4 bars each: changes at bars 8, 16, 24.
+    expect(modulePhrases([0, 0, 1, 1, 0, 0, 1, 1], [0, 4, 8, 12, 16, 20, 24, 28], 32)).toEqual({ lengthBars: 8, confidence: 1, startBars: [0, 8, 16, 24] });
+  });
+
+  it('3-bar patterns sit on no 4/8/16 grid: counted in 4s at the unaligned confidence, restarted at every change', () => {
+    expect(modulePhrases([0, 1, 2, 3], [0, 3, 6, 9], 12)).toEqual({ lengthBars: 4, confidence: 0.3, startBars: [0, 3, 6, 9] });
+  });
+
+  it('a pattern break that shortens a position moves the phrases with the next pattern change', () => {
+    // Patterns of 4 bars, the second cut to 2 bars (D00): the changes fall on bars 4, 6, 10, 14.
+    const g = modulePhrases([0, 1, 2, 3, 4], [0, 4, 6, 10, 14], 18)!;
+    expect(g.lengthBars).toBe(4);
+    expect(g.confidence).toBe(0.75);
+    expect(g.startBars).toEqual([0, 4, 6, 10, 14]);
+  });
+
+  it('one pattern repeated: every position start is a boundary; one boundary is too little to count', () => {
+    expect(modulePhrases([0, 0, 0, 0], [0, 4, 8, 12], 16)).toEqual({ lengthBars: 4, confidence: 1, startBars: [0, 4, 8, 12] });
+    expect(modulePhrases([0, 1], [0, 4], 8)).toBeNull();
   });
 });
