@@ -273,7 +273,7 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
             ? 'bg-accent-primary text-text-inverse border-accent-primary'
             : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:bg-dark-bgHover'}
         `}
-        style={{ width: 28, height: size, fontSize: 9, letterSpacing: '0.1em' }}
+        style={{ width: 28, height: Math.min(size, 20), fontSize: 9, letterSpacing: '0.1em' }}
         title={`Click-mode: ${isFxMode ? 'FX TARGET (click = pick FX channels)' : 'MUTE (click = mute/unmute)'} — toggle to switch`}
       >
         {isFxMode ? 'FX' : 'MUT'}
