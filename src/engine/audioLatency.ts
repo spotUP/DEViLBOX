@@ -99,3 +99,19 @@ export function heardAnchorMs(ctx: OutputClockSource | null | undefined): number
 export function deckPositionAt(deck: { positionAnchor: ClockAnchor; durationMs: number }, frameMs: number): number {
   return positionAtFrame(deck.positionAnchor, frameMs, deck.durationMs > 0 ? deck.durationMs / 1000 : Infinity);
 }
+
+/** Longest output latency a heard-signal delay covers, seconds. */
+export const HEARD_DELAY_MAX_SEC = 1;
+
+/**
+ * A delay line that feeds a meter or analyser the signal the listener hears
+ * now: the graph's signal delayed by the output latency. An analyser tapped
+ * straight off the graph shows what was just rendered - outputLatency ahead
+ * of the ear - so meters and scopes led the audio. Create it with
+ * ctx.createDelay(HEARD_DELAY_MAX_SEC); call this whenever the visual reads
+ * (the latency is known only once the context runs, and it can change).
+ */
+export function syncHeardDelay(delay: { delayTime: { value: number } }, ctx: LatencySource | null | undefined): void {
+  const want = Math.min(outputLatencySec(ctx), HEARD_DELAY_MAX_SEC);
+  if (Math.abs(delay.delayTime.value - want) > 0.0005) delay.delayTime.value = want;
+}

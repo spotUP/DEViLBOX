@@ -28,6 +28,7 @@ import type { DJCueEngine } from './DJCueEngine';
 import type { DeckId } from './DeckEngine';
 import { effectiveBassLock } from './bassLockDefaults';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
+import { HEARD_DELAY_MAX_SEC, syncHeardDelay, type LatencySource } from '../audioLatency';
 
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 
@@ -77,6 +78,7 @@ export class DJMixerEngine {
   private duckGain: Tone.Gain; // separate from masterGain — for mic ducking
   private limiter: SafetyLimiter;
   readonly masterMeter: Tone.Meter;
+  private readonly masterMeterDelay: DelayNode;
 
   // Master FX chain (inserted between masterGain and duckGain)
   // Each chain is wrapped in a chainGain for crossfading:
@@ -117,6 +119,8 @@ export class DJMixerEngine {
     this.limiter = createSafetyLimiter(Tone.getContext().rawContext as unknown as BaseAudioContext);
 
     this.masterMeter = new Tone.Meter({ smoothing: 0.8 });
+    this.masterMeterDelay = (Tone.getContext().rawContext as unknown as BaseAudioContext).createDelay(HEARD_DELAY_MAX_SEC);
+    syncHeardDelay(this.masterMeterDelay, Tone.getContext().rawContext as unknown as LatencySource);
 
     // Wire: inputs → masterGain → limiter → destination + meter
     try {
@@ -135,7 +139,9 @@ export class DJMixerEngine {
       // Connect limiter to Destination INPUT (not .toDestination())
       // This allows DJ FX to tap from Destination OUTPUT
       Tone.connect(this.limiter.output, Tone.getDestination().input as any);
-      Tone.connect(this.limiter.output, this.masterMeter);
+      // The master meter reads the heard signal (delayed by the output latency).
+      Tone.connect(this.limiter.output, this.masterMeterDelay);
+      Tone.connect(this.masterMeterDelay, this.masterMeter);
     } catch (err) {
       console.error('[DJMixerEngine] audio graph wiring failed:', err);
     }
@@ -206,6 +212,7 @@ export class DJMixerEngine {
   }
 
   getMasterLevel(): number | number[] {
+    syncHeardDelay(this.masterMeterDelay, Tone.getContext().rawContext as unknown as LatencySource);
     return this.masterMeter.getValue();
   }
 
@@ -553,5 +560,6 @@ export class DJMixerEngine {
     this.duckGain.dispose();
     this.limiter.disconnect();
     this.masterMeter.dispose();
+    try { this.masterMeterDelay.disconnect(); } catch { /* already disconnected */ }
   }
 }
