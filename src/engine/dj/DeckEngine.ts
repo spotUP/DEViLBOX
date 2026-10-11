@@ -17,6 +17,7 @@ import { ScratchPlayback, getPatternByName } from './DJScratchEngine';
 import { snapPositionToBeat, snapLoopLength, phaseAlign } from './DJAutoSync';
 import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
+import { createReverbIR } from './reverbIR';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
@@ -308,7 +309,7 @@ export class DeckEngine {
       this._reverbSend = ctx.createGain();
       this._reverbSend.gain.value = 0;
       this._reverbNode = ctx.createConvolver();
-      this._reverbNode.buffer = DeckEngine._createReverbIR(ctx, 0.6, 4000);
+      this._reverbNode.buffer = createReverbIR(ctx, 0.6, 4000);
       this._reverbWet = ctx.createGain();
       this._reverbWet.gain.value = 0.25; // 25% wet level
 
@@ -1711,19 +1712,6 @@ export class DeckEngine {
   // ── Scratch/LFO reverb send ────────────────────────────────────────
 
   /** Generate a short exponentially-decaying noise impulse response for reverb. */
-  static _createReverbIR(ctx: AudioContext, durationSec: number, decayHz: number): AudioBuffer {
-    const len = Math.floor(ctx.sampleRate * durationSec);
-    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const data = ir.getChannelData(ch);
-      for (let i = 0; i < len; i++) {
-        // Exponential decay × white noise
-        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate / decayHz));
-      }
-    }
-    return ir;
-  }
-
   /** Fade in the reverb send (called when scratch/LFO effects activate). */
   private _enableReverbSend(): void {
     if (this._reverbActive || !this._reverbSend) return;

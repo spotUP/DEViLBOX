@@ -347,51 +347,67 @@ export class DeckScratchBuffer {
     this.playbackNode.port.postMessage({ type: 'bounds', startFrames: startSec * sr, endFrames: endSec * sr });
   }
 
-  /** Drop the needle at `sec` and play at `rate` (gain ramps up over 3 ms). */
-  startAt(sec: number, rate: number): void {
+  /** Ramp the voice gain to `value` over 3 ms at `at` (context seconds; now when omitted). */
+  private rampGain(value: number, at?: number): void {
+    const t = at ?? this.ctx.currentTime;
+    const g = this.playbackGain.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(at === undefined ? g.value : 1 - value, t);
+    g.linearRampToValueAtTime(value, t + GAIN_RAMP_SEC);
+  }
+
+  /**
+   * Drop the needle at `sec` and play at `rate` (gain ramps up over 3 ms).
+   * Every record-mode command takes an optional `at` (context seconds): the
+   * worklet applies it sample-accurately at that time, so a planner can
+   * schedule a gesture ahead of the beat.
+   */
+  startAt(sec: number, rate: number, at?: number): void {
     this.requireRecord();
     if (!this.initialized) return;
     const positionFrames = Math.round(sec * this.ctx.sampleRate);
     scratchRingStats.startAtFrames.push(positionFrames);
-    const now = this.ctx.currentTime;
-    this.playbackGain.gain.cancelScheduledValues(now);
-    this.playbackGain.gain.setValueAtTime(this.playbackGain.gain.value, now);
-    this.playbackGain.gain.linearRampToValueAtTime(1, now + GAIN_RAMP_SEC);
-    this.playbackNode.port.postMessage({ type: 'startAt', positionFrames, rate });
+    this.rampGain(1, at);
+    this.playbackNode.port.postMessage({ type: 'startAt', positionFrames, rate, at });
   }
 
   /** Re-cue (click-free: 1 ms out, jump, 1 ms in). Sets the return anchor. */
-  seek(sec: number): void {
+  seek(sec: number, at?: number): void {
     this.requireRecord();
     if (!this.initialized) return;
-    this.playbackNode.port.postMessage({ type: 'seek', positionFrames: Math.round(sec * this.ctx.sampleRate) });
+    this.playbackNode.port.postMessage({ type: 'seek', positionFrames: Math.round(sec * this.ctx.sampleRate), at });
   }
 
-  /** Frame-accurate rate automation relative to now (see `RingRateCurveOptions`). */
-  rateCurve(points: readonly RingRatePoint[], opts: RingRateCurveOptions = {}): void {
+  /** Frame-accurate rate automation relative to `at` / now (see `RingRateCurveOptions`). */
+  rateCurve(points: readonly RingRatePoint[], opts: RingRateCurveOptions = {}, at?: number): void {
     this.requireRecord();
     if (!this.initialized) return;
     scratchRingStats.rateCurves++;
-    const now = this.ctx.currentTime;
-    this.playbackGain.gain.cancelScheduledValues(now);
-    this.playbackGain.gain.setValueAtTime(this.playbackGain.gain.value, now);
-    this.playbackGain.gain.linearRampToValueAtTime(1, now + GAIN_RAMP_SEC);
-    this.playbackNode.port.postMessage({ type: 'rateCurve', points, ...opts });
+    this.rampGain(1, at);
+    this.playbackNode.port.postMessage({ type: 'rateCurve', points, ...opts, at });
   }
 
-  /** Open windows in frames relative to now; cut outside them. */
-  faderWindows(windows: ReadonlyArray<readonly [number, number]>, opts: RingFaderWindowsOptions): void {
+  /** Open windows in frames relative to `at` / now; cut outside them. */
+  faderWindows(windows: ReadonlyArray<readonly [number, number]>, opts: RingFaderWindowsOptions, at?: number): void {
     this.requireRecord();
     if (!this.initialized) return;
     scratchRingStats.faderWindows++;
-    this.playbackNode.port.postMessage({ type: 'faderWindows', windows, ...opts });
+    this.playbackNode.port.postMessage({ type: 'faderWindows', windows, ...opts, at });
   }
 
   /** One static articulated gain (0 or 1) with the 3 ms ramp; cancels window automation. */
-  faderGain(gain: 0 | 1, rampFrames?: number): void {
+  faderGain(gain: 0 | 1, at?: number, rampFrames?: number): void {
     this.requireRecord();
     if (!this.initialized) return;
-    this.playbackNode.port.postMessage({ type: 'faderGain', gain, rampFrames });
+    this.playbackNode.port.postMessage({ type: 'faderGain', gain, rampFrames, at });
+  }
+
+  /** Scheduled release: gain ramps to 0 over 3 ms at `at`, the worklet stops 1 ms later. */
+  stopAt(at: number): void {
+    this.requireRecord();
+    if (!this.initialized) return;
+    this.rampGain(0, at);
+    this.playbackNode.port.postMessage({ type: 'stop', at: at + GAIN_RAMP_SEC + 0.001 });
   }
 
   // ==========================================================================
