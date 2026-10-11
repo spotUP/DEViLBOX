@@ -129,8 +129,9 @@ describe('R4: Auto DJ juggles anywhere in the set, not only in a transition', ()
     const during = holder.crossfader.filter((c) => c.at > startedAt && c.at <= decks.B.stoppedAt!);
     const moves = during.filter((c, i) => i > 0 && c.v !== during[i - 1].v).length;
     expect(moves).toBeGreaterThanOrEqual(2);
-    const lastPatternMove = during.filter((c) => c.v !== 0).at(-1)!;
-    const release = during.find((c) => c.at > lastPatternMove.at && c.v === 0)!;
+    // By write order, not by ms: the release sweep's first write and the hand-back can share a millisecond.
+    const lastPatternMove = during.map((c, i) => ({ ...c, i })).filter((c) => c.v !== 0).at(-1)!;
+    const release = during.find((c, i) => i > lastPatternMove.i && c.v === 0)!;
     expect(release).toBeDefined();
 
     // Hand-back: idle stopped within a bar of the pattern's end, crossfader on the master, telemetry clear.

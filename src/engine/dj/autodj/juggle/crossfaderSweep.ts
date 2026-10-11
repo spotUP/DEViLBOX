@@ -39,13 +39,18 @@ export function createCrossfaderSweeper(read: () => number, write: (v: number) =
       const from = read();
       if (!(ms > 0) || from === to) { write(to); return; }
       const start = clock.now();
+      let written = from;
+      const put = (v: number): void => { written = v; write(v); };
       const step = (): void => {
+        // Another writer moved the fader since this sweep's last frame (the user's hand, a hand-back):
+        // the sweep yields and never writes over it.
+        if (Math.abs(read() - written) > 1e-6) { cancelFrame = null; return; }
         const t = Math.min(1, (clock.now() - start) / ms);
-        if (t >= 1) { cancelFrame = null; write(to); return; }
-        write(from + (to - from) * t);
+        if (t >= 1) { cancelFrame = null; put(to); return; }
+        put(from + (to - from) * t);
         cancelFrame = clock.frame(step);
       };
-      write(from);
+      put(from);
       cancelFrame = clock.frame(step);
     },
   };

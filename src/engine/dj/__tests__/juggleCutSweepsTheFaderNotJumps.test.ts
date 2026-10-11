@@ -31,4 +31,15 @@ describe('a juggle cut sweeps the crossfader through its positions instead of ju
     sw.sweepTo(1, 0);
     expect(pos).toBe(1);
   });
+
+  it('a stand-alone hand-back that sets the fader while the release sweep runs is never written over (the sweep yields)', () => {
+    const { clock, tick } = fakeClock();
+    let pos = 0.5; const written: number[] = [];
+    const sw = createCrossfaderSweeper(() => pos, (v) => { pos = v; written.push(v); }, clock);
+    sw.sweepTo(0, JUGGLE_CUT_SWEEP_MS);
+    pos = 0.2; // another writer (the hand-back, the user's hand) moves the fader directly
+    for (let i = 0; i < 6; i++) tick(8);
+    expect(pos).toBe(0.2);
+    expect(written).toEqual([0.5]);
+  });
 });
