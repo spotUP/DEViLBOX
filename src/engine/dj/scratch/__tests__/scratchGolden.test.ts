@@ -59,7 +59,8 @@ describe('golden performances (SCR-P4.14, section 69)', () => {
   });
 
   it('Test 1 Boom Bap 92 BPM hook (routine auto): baby, stab, chirp, and the hook call answered in the next bar', () => {
-    const allowed = new Set<ScratchGestureId>(['baby', 'forwardStab', 'chirp', 'chirpDouble', 'tearForward']);
+    // MUSICAL plays the demo's whole ladder (owner 2026-10-12): the hook's phrase ending reaches transformer8 (L3)
+    const allowed = new Set<ScratchGestureId>(['baby', 'forwardStab', 'chirp', 'chirpDouble', 'tearForward', 'transformer8']);
     for (const seed of SEEDS) {
       const p = plan('boomBap', seed);
       for (const g of gestures(p)) expect(allowed.has(g), `seed ${seed}: ${g}`).toBe(true);
@@ -90,7 +91,8 @@ describe('golden performances (SCR-P4.14, section 69)', () => {
       const p = plan('house', seed);
       expect(emptyBars(p), `seed ${seed}`).toBeGreaterThanOrEqual(8);
       expect(p.events.length, `seed ${seed}`).toBeLessThanOrEqual(16);
-      expect([...gestures(p)].some((x) => x === 'transformer4' || x === 'transformer8'), `seed ${seed}`).toBe(true);
+      // the transform-cut glides: transformer, or hydroplane (12 transform cuts) now the demo's whole ladder plays
+      expect([...gestures(p)].some((x) => x === 'transformer4' || x === 'transformer8' || x === 'hydroplane'), `seed ${seed}`).toBe(true);
       // never two busy bars running for more than a 2-bar routine
       let run = 0, longest = 0;
       for (const b of p.bars) { run = b.length ? run + 1 : 0; longest = Math.max(longest, run); }
@@ -136,11 +138,11 @@ describe('golden performances (SCR-P4.14, section 69)', () => {
     expect(seen.has('chirp')).toBe(true);
   });
 
-  it('Test 7 Drop: electro under PERFORMER is busy (the high state), inside level 3, at most 4 a bar, one hand', () => {
+  it('Test 7 Drop: electro under PERFORMER is busy (the high state), inside the ladder (level 4), at most 4 a bar, one hand', () => {
     for (const seed of SEEDS) {
       const p = plan('drop', seed);
       expect(p.events.length, `seed ${seed}`).toBeGreaterThanOrEqual(1);
-      for (const e of p.events) expect(level(e.gesture), `seed ${seed} ${e.gesture}`).toBeLessThanOrEqual(3);
+      for (const e of p.events) expect(level(e.gesture), `seed ${seed} ${e.gesture}`).toBeLessThanOrEqual(4);
       for (const b of p.bars) expect(b.length).toBeLessThanOrEqual(4);
     }
   });

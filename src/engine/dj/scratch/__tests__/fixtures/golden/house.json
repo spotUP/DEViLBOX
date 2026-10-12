@@ -8,7 +8,7 @@
    "bar": 19,
    "step": 15,
    "beat": 79.75,
-   "gesture": "chirp",
+   "gesture": "orbit",
    "velocity": 0.9187960631723507,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -17,7 +17,7 @@
    "bar": 23,
    "step": 15,
    "beat": 95.75,
-   "gesture": "transformer4",
+   "gesture": "hydroplane",
    "velocity": 1,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -26,7 +26,7 @@
    "bar": 31,
    "step": 15,
    "beat": 127.75,
-   "gesture": "chirp",
+   "gesture": "transformer8",
    "velocity": 0.9069062333104448,
    "placementRole": "turnaround",
    "role": "FILL"

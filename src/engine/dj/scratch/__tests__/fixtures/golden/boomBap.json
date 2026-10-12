@@ -53,7 +53,7 @@
    "bar": 31,
    "step": 14,
    "beat": 127.5,
-   "gesture": "forwardStab",
+   "gesture": "transformer8",
    "velocity": 0.9,
    "placementRole": "answer",
    "role": "ANSWER"
