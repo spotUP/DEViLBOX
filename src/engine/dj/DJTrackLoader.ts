@@ -259,7 +259,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
     const cached = await getCachedAudioByFilename(track.fileName);
     if (cached && cached.audioData.byteLength > 0) {
       console.log(`[DJTrackLoader] Pre-render cache hit: ${track.fileName}`);
-      const cachedSong = getCachedSong(track.fileName);
+      const cachedSong = await deckSongFor(track.fileName, cached.sourceData);
       return {
         wavData: cached.audioData,
         filename: track.fileName,
@@ -331,6 +331,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
       const filename = hvscPath.split('/').pop() || 'download.sid';
 
       console.log(`[DJTrackLoader] Pre-rendering HVSC ${filename} in background...`);
+      const song = await deckSongFor(track.fileName, buffer);
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'high');
       console.log(`[DJTrackLoader] Pre-render complete: ${filename}`);
 
@@ -339,6 +340,7 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
         filename: track.fileName,
         trackName: track.trackName || filename,
         bpm: result.analysis?.bpm || 125,
+        song,
         waveformPeaks: result.waveformPeaks,
         duration: result.duration || 0,
         analysis: result.analysis,
@@ -510,7 +512,7 @@ async function loadPlaylistTrackToDeckInternal(
       // is empty after a reload, so a track played from the audio cache got
       // the oscilloscope instead (owner 2026-10-08: Auto DJ's second deck).
       // The audio cache keeps the module's own bytes: parse those, one open.
-      const cachedSong = getCachedSong(track.fileName) ?? await songFromCachedSource(track.fileName, cached.sourceData, deckId);
+      const cachedSong = await deckSongFor(track.fileName, cached.sourceData, deckId);
       await engine.loadAudioToDeck(
         deckId, cached.audioData, track.fileName,
         track.trackName || cached.filename,
@@ -600,7 +602,7 @@ async function loadPlaylistTrackToDeckInternal(
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-      await loadRenderToDeck(engine, deckId, result, { fileName: track.fileName, trackName: track.trackName || filename, interimBpm: 125 });
+      await loadRenderToDeck(engine, deckId, result, { fileName: track.fileName, trackName: track.trackName || filename, source: buffer, interimBpm: 125 });
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -716,7 +718,9 @@ function applyLoadedAnalysis(deckId: DeckId, analysis: PipelineResult['analysis'
  * UADE pre-render). The deck's one tempo - detectedBPM, effectiveBPM and the
  * beat grid - is written by applyAnalysisToDeck from the track analysis (a
  * module's own song walk); `interimBpm` is only what the load shows while no
- * analysis exists. Never pass the analysis' raw `bpm`: for a module that is
+ * analysis exists. The deck holds the track's song (its pattern display) by
+ * one rule, deckSongFor: the given song, else the session's parse, else the
+ * `source` bytes parsed. Never pass the analysis' raw `bpm`: for a module that is
  * the audio detector's reading ('suggestive vibes' 184.57 against the walk's
  * 93.75), and a load that wrote it after the analysis left the deck with two
  * tempos (DECK-BPM-TWO-VALUES).
@@ -725,11 +729,29 @@ export async function loadRenderToDeck(
   engine: Pick<DJEngine, 'loadAudioToDeck'>,
   deckId: DeckId,
   result: Pick<PipelineResult, 'wavData' | 'analysis'>,
-  meta: { fileName: string; trackName?: string; song?: TrackerSong; interimBpm?: number },
+  meta: {
+    fileName: string; trackName?: string; song?: TrackerSong; interimBpm?: number;
+    /** The module's own bytes: a load that has no parsed song yet gets one from them (deckSongFor). */
+    source?: ArrayBuffer;
+  },
 ): Promise<AudioFileInfo> {
-  const info = await engine.loadAudioToDeck(deckId, result.wavData, meta.fileName, meta.trackName, meta.interimBpm, meta.song);
+  const song = meta.song ?? await deckSongFor(meta.fileName, meta.source, deckId);
+  const info = await engine.loadAudioToDeck(deckId, result.wavData, meta.fileName, meta.trackName, meta.interimBpm, song);
   applyLoadedAnalysis(deckId, result.analysis);
   return info;
+}
+
+/**
+ * The deck's song for a tracker file - the one rule every deck load follows,
+ * whatever the source (audio cache, HVSC, modland, local): the in-memory song
+ * if the file was parsed this session, else the module bytes parsed now. The
+ * song drives the deck's pattern display; a load without it showed the
+ * oscilloscope instead (SID-DECK-AUDIT: HVSC loads never parsed, so one deck
+ * showed a SID's patterns and the other its oscilloscope). Undefined for an
+ * audio file or bytes that do not parse.
+ */
+export async function deckSongFor(fileName: string, bytes: ArrayBuffer | undefined, deckId?: DeckId): Promise<TrackerSong | undefined> {
+  return getCachedSong(fileName) ?? await songFromCachedSource(fileName, bytes, deckId);
 }
 
 /**
