@@ -8,6 +8,7 @@
  * Pure.
  */
 import { hash } from '../transitionPlanner';
+import { barStartBeat } from '../beatGrid';
 import { harmonicCompatibility, HARMONIC_CLASH_REJECT } from '../compatibility';
 import { findCallAndResponse, upcomingWindows } from './juggleMaterial';
 import { doubleBars, minLadderRung, MODE_PATTERNS, PATTERN_BUILDERS, PATTERN_INTENSITY, type PatternParams } from './jugglePatterns';
@@ -69,27 +70,41 @@ export const MODE_SHAPE: Record<JuggleMode, { intensityCap: number; cooldownScal
   CHAOS: { intensityCap: 1, cooldownScale: 0.3, fractionScale: 2.5 },
 };
 
-export function budgetFor(ctx: DJJugglePerformanceContext, mode: JuggleMode): PhaseBudget & { fraction: number; reasons: string[] } {
+/**
+ * The timing gates (owner decision 2026-10-12, Juggle Now): the set phase, the cooldown, the juggled
+ * fraction, a juggle within the last 45 s and the stand-alone musical moment decide WHEN to juggle. A
+ * Juggle Now request skips them; every safety gate (confidence, sync, meters, keys, vocals, the user's
+ * control) still decides WHETHER.
+ */
+export interface JuggleTiming { skipTiming?: boolean }
+
+export function budgetFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, timing: JuggleTiming = {}): PhaseBudget & { fraction: number; reasons: string[] } {
   const base = PHASE_BUDGET[ctx.setPhase];
   const shape = MODE_SHAPE[mode];
   const cooldownSec = Math.min(3600, base.cooldownSec * shape.cooldownScale);
   const maxFraction = Math.min(0.6, base.maxFraction * shape.fractionScale);
   const fraction = ctx.elapsedSec > 0 ? ctx.juggledSec / ctx.elapsedSec : 0;
   const reasons: string[] = [];
+  const maxIntensity = Math.min(base.maxIntensity, shape.intensityCap);
+  if (timing.skipTiming) {
+    if (mode === 'OFF') reasons.push('Auto Juggle off');
+    // The set arc's intensity cap is timing too: a requested juggle plays at the mode's cap.
+    return { cooldownSec, maxIntensity: shape.intensityCap, maxFraction, allowed: mode !== 'OFF', fraction, reasons };
+  }
   let allowed = base.allowed && mode !== 'OFF';
   if (!base.allowed) reasons.push(`set phase ${ctx.setPhase}: normal mixing`);
   if (mode === 'OFF') reasons.push('Auto Juggle off');
   if (allowed && ctx.secondsSinceLastJuggle < cooldownSec) { allowed = false; reasons.push(`cooldown ${Math.round(cooldownSec - ctx.secondsSinceLastJuggle)} s left`); }
   if (allowed && ctx.elapsedSec > 120 && fraction > maxFraction) { allowed = false; reasons.push(`juggle budget used (${(fraction * 100).toFixed(0)} % of the set, limit ${(maxFraction * 100).toFixed(0)} %)`); }
-  return { cooldownSec, maxIntensity: Math.min(base.maxIntensity, shape.intensityCap), maxFraction, allowed, fraction, reasons };
+  return { cooldownSec, maxIntensity, maxFraction, allowed, fraction, reasons };
 }
 
 /** Section 23: the intensity ladder; the set decides unless the user overrides. */
-export function intensityFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, override: number, seed = 0): number {
+export function intensityFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, override: number, seed = 0, timing: JuggleTiming = {}): number {
   // The user's override is the user's: only the mode's own cap bounds it. The
   // set arc's cap shapes the intensity the set decides, not the one chosen.
   if (override >= 0) return Math.min(MODE_SHAPE[mode].intensityCap, override);
-  const cap = Math.min(PHASE_BUDGET[ctx.setPhase].maxIntensity, MODE_SHAPE[mode].intensityCap);
+  const cap = budgetFor(ctx, mode, timing).maxIntensity;
   const fromEnergy = 0.2 + 0.6 * ctx.energy + 0.2 * Math.max(0, ctx.targetEnergy - ctx.energy);
   const tension = ctx.tension * 0.2;
   // Humanization (section 30): small intensity variation, never timing.
@@ -111,7 +126,7 @@ export function meterMismatch(a: Pick<DJTrackAnalysis, 'meter'>, b: Pick<DJTrack
 }
 
 /** Section 25: good and bad conditions. Any bad condition blocks. */
-export function conditions(ctx: DJJugglePerformanceContext): Conditions {
+export function conditions(ctx: DJJugglePerformanceContext, timing: JuggleTiming = {}): Conditions {
   const good: string[] = [];
   const bad: string[] = [];
   if (ctx.beatConfidence >= 0.8) good.push('strong beat confidence'); else if (ctx.beatConfidence < 0.6) bad.push('low beat confidence');
@@ -142,7 +157,7 @@ export function conditions(ctx: DJJugglePerformanceContext): Conditions {
   // A juggle transition performs INTO the transition: its start is the goal, not a threat.
   if (ctx.performanceMode !== 'JUGGLE_TRANSITION' && ctx.transitionApproachingSec !== null && ctx.transitionApproachingSec <= 20) bad.push('transition imminent');
   if (ctx.targetEnergy > ctx.energy + 0.1) good.push('set needs energy');
-  if (ctx.lastJuggle && ctx.secondsSinceLastJuggle < 45) bad.push('similar recent juggle');
+  if (!timing.skipTiming && ctx.lastJuggle && ctx.secondsSinceLastJuggle < 45) bad.push('similar recent juggle');
   if (ctx.deckA.analysis?.tracker?.repeatedPhrases.length || ctx.deckB.analysis?.tracker?.repeatedPhrases.length) good.push('repeated phrase (tracker)');
   return { good, bad };
 }
@@ -156,6 +171,8 @@ export interface PlannerOptions {
   seed?: number;
   /** Bars of the incoming deck available before the transition start (JUGGLE_TRANSITION). */
   barsAvailable?: number;
+  /** Juggle Now: the timing gates are skipped (JuggleTiming). */
+  skipTiming?: boolean;
 }
 
 export interface JuggleDecision {
@@ -181,10 +198,21 @@ export function nextPhraseStartBeat(ctx: DJJugglePerformanceContext, minLeadBeat
   return next;
 }
 
+/**
+ * The master's first downbeat at or after `fromBeat`, on the master's own bar grid (barStartBeat: the
+ * grid's phaseOffset included) - beat 0 is not a downbeat when the track's first detected beat is not
+ * beat 1 (the scratch audit's SA-M1, the same assumption). Without bars: whole bars from beat 0.
+ */
+export function downbeatAtOrAfter(ctx: Pick<DJJugglePerformanceContext, 'masterDeck' | 'deckA' | 'deckB' | 'masterBar' | 'beatsPerBar'>, fromBeat: number): number {
+  const grid = (ctx.masterDeck === 'A' ? ctx.deckA : ctx.deckB).analysis?.downbeats;
+  if (!grid?.bars.length) return Math.ceil(fromBeat / ctx.beatsPerBar) * ctx.beatsPerBar;
+  let bar = Math.max(0, ctx.masterBar - 1);
+  for (let i = 0; i < 4096 && barStartBeat(grid, bar) < fromBeat; i++) bar++;
+  return barStartBeat(grid, bar);
+}
+
 export function nextBarStartBeat(ctx: DJJugglePerformanceContext, minLeadBeats = 2): number {
-  let next = Math.ceil(ctx.masterBeat / ctx.beatsPerBar) * ctx.beatsPerBar;
-  while (next - ctx.masterBeat < minLeadBeats) next += ctx.beatsPerBar;
-  return next;
+  return downbeatAtOrAfter(ctx, ctx.masterBeat + minLeadBeats);
 }
 
 export function scorePattern(type: LibraryPatternType, ctx: DJJugglePerformanceContext, intensity: number, policy: ConfidencePolicy, opts: PlannerOptions, material: JuggleDecision['material']): JuggleCandidate {
@@ -231,7 +259,7 @@ export function scorePattern(type: LibraryPatternType, ctx: DJJugglePerformanceC
   c.novelty = ctx.recentPatterns.some((h) => h.patternType === type) ? 0.3 : 1;
   c.repetition = Math.max(0, 1 - recentSame * 0.35);
   c.risk = 1 - Math.max(0, pi - MODE_SHAPE[opts.mode].intensityCap);
-  c.setPosition = Math.min(1, PHASE_BUDGET[ctx.setPhase].maxIntensity + 0.2 - Math.max(0, pi - PHASE_BUDGET[ctx.setPhase].maxIntensity));
+  c.setPosition = opts.skipTiming ? 1 : Math.min(1, PHASE_BUDGET[ctx.setPhase].maxIntensity + 0.2 - Math.max(0, pi - PHASE_BUDGET[ctx.setPhase].maxIntensity));
   c.budget = 1;
   c.transitionOpportunity = ctx.transitionApproachingSec !== null && ctx.transitionApproachingSec < 90 ? (patternBars(type, ctx) <= 8 ? 1 : 0.5) : 0.7;
   const learned = opts.learned?.(type, ctx);
@@ -288,9 +316,10 @@ export function releasePattern(primary: 'A' | 'B', beatsPerBar: number): DJJuggl
 export function planJuggle(ctx: DJJugglePerformanceContext, opts: PlannerOptions): JuggleDecision {
   const policy = confidencePolicy(ctx);
   const seed = opts.seed ?? 0;
-  const intensity = intensityFor(ctx, opts.mode, opts.intensityOverride, seed);
-  const budget = budgetFor(ctx, opts.mode);
-  const cond = conditions(ctx);
+  const timing: JuggleTiming = { skipTiming: opts.skipTiming };
+  const intensity = intensityFor(ctx, opts.mode, opts.intensityOverride, seed, timing);
+  const budget = budgetFor(ctx, opts.mode, timing);
+  const cond = conditions(ctx, timing);
   const blocked = [...budget.reasons, ...cond.bad];
   if (policy === 'none') blocked.push(lowConfidenceReason(ctx));
   const none = (reason: string): JuggleDecision => ({ pattern: null, candidates: [], reason, blocked, policy, intensity, startBeat: nextPhraseStartBeat(ctx) });

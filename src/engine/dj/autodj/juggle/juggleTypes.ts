@@ -234,8 +234,8 @@ export interface JuggleCandidate {
   blocked: string[];
 }
 
-/** What makes Auto DJ set up a stand-alone juggle (plan 2026-10-11-dj-juggling, P4.1). */
-export type JuggleTrigger = 'break' | 'build' | 'phraseEnd' | 'energy';
+/** What makes Auto DJ set up a stand-alone juggle (plan 2026-10-11-dj-juggling, P4.1); `request` is the user's Juggle Now (owner decision 2026-10-12). */
+export type JuggleTrigger = 'break' | 'build' | 'phraseEnd' | 'energy' | 'request';
 /** The idle deck's material for a stand-alone juggle: a double of the playing track, or the pre-rendered next track. */
 export type StandaloneSource = 'double' | 'next';
 
@@ -266,4 +266,9 @@ export interface JuggleTelemetry {
   history: Array<{ type: DJJugglePatternType; bars: number; score: number }>;
   /** The stand-alone juggle Auto DJ is setting up or performing; null when none. */
   standalone: StandaloneTelemetry | null;
+  /** The last Juggle Now request: pending while its juggle is set up, then started or refused with the reason. */
+  juggleNow: JuggleNowState | null;
 }
+
+/** A Juggle Now request (owner decision 2026-10-12): the timing gates skipped, the safety gates kept. */
+export interface JuggleNowState { state: 'pending' | 'started' | 'refused'; reason: string }

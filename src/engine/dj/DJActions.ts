@@ -1088,6 +1088,16 @@ export function disableAutoDJ(): void {
   existingAutoDJ()?.disable();
 }
 
+/**
+ * Juggle Now (owner decision 2026-10-12): Auto DJ asks its juggle controller for a juggle at once,
+ * timing gates skipped, safety gates kept. The state - and a refusal's reason - is returned and is
+ * in the juggle telemetry.
+ */
+export async function juggleNowAutoDJ(): Promise<import('./autodj/juggle/juggleTypes').JuggleNowState> {
+  const { getAutoDJ } = await import('./DJAutoDJ');
+  return getAutoDJ().juggleNow();
+}
+
 /** Skip to the next Auto DJ track with a short transition. */
 export async function skipAutoDJ(): Promise<void> {
   const { getAutoDJ } = await import('./DJAutoDJ');

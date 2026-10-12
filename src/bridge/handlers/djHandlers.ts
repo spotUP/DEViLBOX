@@ -250,6 +250,13 @@ export async function djAutoDJSkip(): Promise<Record<string, unknown>> {
   return { ok: true };
 }
 
+/** Juggle Now (owner decision 2026-10-12): the debug panel button's path - one juggle tick now, timing gates skipped. */
+export async function djAutoDJJuggleNow(): Promise<Record<string, unknown>> {
+  const actions = await getActions();
+  const request = await actions.juggleNowAutoDJ();
+  return { request, telemetry: useDJStore.getState().autoDJJuggleTelemetry };
+}
+
 // ─── Write: Ducking ─────────────────────────────────────────────────────────
 
 export async function djDuck(): Promise<Record<string, unknown>> {

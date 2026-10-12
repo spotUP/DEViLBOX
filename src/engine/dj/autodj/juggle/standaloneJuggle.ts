@@ -140,7 +140,8 @@ export class StandaloneJuggle {
     if (note === null) {
       const why: string[] = [];
       const ctx = j.buildContext(input);
-      const op = juggleOpportunity(ctx, j.getMode(), this.deps.nextOption(input), why, { intensityOverride: useDJStore.getState().autoDJJuggleIntensity });
+      // A pending Juggle Now skips the timing gates (owner decision 2026-10-12); the safety gates decide.
+      const op = juggleOpportunity(ctx, j.getMode(), this.deps.nextOption(input), why, { intensityOverride: useDJStore.getState().autoDJJuggleIntensity, skipTiming: j.nowPending() });
       if (op) {
         const master = ctx.masterDeck === 'A' ? ctx.deckA : ctx.deckB;
         void this.start(op, (ctx.phraseLengthBars * ctx.beatsPerBar * 60) / Math.max(60, master.bpm || 120));
@@ -148,6 +149,7 @@ export class StandaloneJuggle {
       }
       note = why[0] ?? null;
     }
+    if (note !== null) j.refuseNow(`stand-alone: ${note}`);
     j.setStandalone(null, note);
   }
 
@@ -264,6 +266,7 @@ export class StandaloneJuggle {
     const s = this.state;
     if (!s) return;
     this.state = null;
+    this.deps.controller().refuseNow(`stand-alone ${s.source} let go: ${outcome}`);
     this.log(s, outcome);
     this.publish();
   }
@@ -279,6 +282,7 @@ export class StandaloneJuggle {
     if (!s) return;
     this.state = null;
     const j = this.deps.controller();
+    j.refuseNow(`stand-alone ${s.source} ended before a pattern: ${outcome}`);
     if (j.isActive() && j.currentExecution()?.pattern.type !== 'transitionLadder') j.abort(`stand-alone juggle ended: ${outcome}`);
     const idle = s.deck;
     const ab = idle === 'B' ? 'B' : 'A';

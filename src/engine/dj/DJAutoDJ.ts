@@ -32,7 +32,7 @@ import { getDecisionLog } from './autodj/decisionLog';
 import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
 import { DJJuggleController, analysisClock, type TickInput } from './autodj/juggle/juggleController';
 import { createDeckJuggleSink } from './autodj/juggle/juggleDeckSink';
-import { juggleModeOf, type DJPerformanceMode } from './autodj/juggle/juggleTypes';
+import { juggleModeOf, type DJPerformanceMode, type JuggleNowState } from './autodj/juggle/juggleTypes';
 import type { NextTrackOption } from './autodj/juggle/juggleOpportunity';
 import { StandaloneJuggle, mixInPhraseStartOf } from './autodj/juggle/standaloneJuggle';
 import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
@@ -1713,12 +1713,12 @@ class DJAutoDJ {
     const j = this.getJuggle();
     j.setMode(mode);
     j.setIntensity(s.autoDJJuggleIntensity);
-    if (mode === 'OFF' && !j.isActive()) { this.endStandalone('Auto Juggle off'); return; }
+    if (mode === 'OFF' && !j.isActive()) { j.refuseNow('Auto Juggle off'); this.endStandalone('Auto Juggle off'); return; }
     const standalone = this.getStandalone();
     standalone.hold();
     // Owner plan section 16: a double is juggled only once its phase is verified.
     if (standalone.verifying() && !j.isActive()) return;
-    if (!j.isActive() && this.pollCount % 2 === 1) return;
+    if (!j.isActive() && this.pollCount % 2 === 1 && !j.nowPending()) return;
     try {
       const transitioning = status === 'transitioning';
       const last = this.juggleSink?.lastCrossfader() ?? null;
@@ -1728,6 +1728,7 @@ class DJAutoDJ {
       // Owner plan section 43: the idle deck plays outside a transition and outside this layer's own
       // stand-alone juggle: the user started it. They decide; the controller plans only with decks it was lent.
       if (!transitioning && !j.isActive() && !standalone.active() && this.deckPlaying(this.idleDeck)) {
+        j.refuseNow('user control: the idle deck was started by hand');
         j.setStandalone(null, 'user control: the idle deck was started by hand');
         return;
       }
@@ -1737,6 +1738,24 @@ class DJAutoDJ {
     } catch (err) {
       console.warn('[AutoDJ] juggle tick failed:', err instanceof Error ? err.message : err);
     }
+  }
+
+  /**
+   * Juggle Now (owner decision 2026-10-12; the Auto DJ debug panel's button
+   * and the MCP's dj_auto_dj_juggle_now): one juggle tick now, through the
+   * poll loop's own entry, with the timing gates skipped (set phase,
+   * cooldown, budget, the musical moment) and every safety gate kept. With
+   * one deck playing the stand-alone setup makes the double first; the
+   * request stays pending until its pattern starts or a gate refuses it. The
+   * state (and a refusal's reason) is in the juggle telemetry.
+   */
+  juggleNow(): JuggleNowState {
+    const s = useDJStore.getState();
+    const j = this.getJuggle();
+    j.requestNow();
+    if (!s.autoDJEnabled) j.refuseNow('Auto DJ is off');
+    else this.juggleTick(s.autoDJStatus, this.getTimeRemaining());
+    return j.nowState() ?? { state: 'refused', reason: 'no request' };
   }
 
   // ── Stand-alone juggles (plan 2026-10-11-dj-juggling, P4.3, P4.4) ──────────

@@ -74,17 +74,18 @@ function longestPatternBars(ctx: DJJugglePerformanceContext, mode: JuggleMode): 
  */
 export function juggleOpportunity(
   ctx: DJJugglePerformanceContext, mode: JuggleMode, next: NextTrackOption | null, why: string[],
-  opts: { intensityOverride?: number; seed?: number } = {},
+  opts: { intensityOverride?: number; seed?: number; skipTiming?: boolean } = {},
 ): JuggleOpportunity | null {
+  const timing = { skipTiming: opts.skipTiming };
   const master = ctx.masterDeck === 'A' ? ctx.deckA : ctx.deckB;
   if (!master.analysis) { why.push('the playing deck has no analysis'); return null; }
   if (!master.playing) { why.push('the master deck is not playing'); return null; }
 
   // The planner's own gates, on the context a double would make.
   const h = asDoubleContext(ctx);
-  const budget = budgetFor(h, mode);
+  const budget = budgetFor(h, mode, timing);
   if (!budget.allowed) { why.push(...budget.reasons); return null; }
-  const cond = conditions(h);
+  const cond = conditions(h, timing);
   if (cond.bad.length) { why.push(...cond.bad); return null; }
   if (confidencePolicy(h) === 'none') { why.push(lowConfidenceReason(h)); return null; }
 
@@ -113,10 +114,12 @@ export function juggleOpportunity(
   else if (nx && (nx.kind === 'build' || nx.kind === 'pre-drop') && ahead(nx)) trigger = 'build';
   else if (ctx.phrasePosition >= 0.75 && ctx.phraseConfidence >= POLICY_MIN.phrase.phrase) trigger = 'phraseEnd';
   else if (ctx.targetEnergy - ctx.energy >= 0.15) trigger = 'energy';
+  // Juggle Now: the moment is the user's request (a timing gate, skipped).
+  else if (opts.skipTiming) trigger = 'request';
   if (!trigger) { why.push('no musical moment ahead (break, build, phrase end or energy lift)'); return null; }
 
   // The planner must have a pattern for the double, or loading one is for nothing.
-  const decision = planJuggle(h, { mode, intensityOverride: opts.intensityOverride ?? -1, seed: opts.seed });
+  const decision = planJuggle(h, { mode, intensityOverride: opts.intensityOverride ?? -1, seed: opts.seed, skipTiming: opts.skipTiming });
   if (!decision.pattern) { why.push(`no pattern fits a double: ${decision.reason}`); return null; }
 
   let tease = !!next && next.compatible && ctx.transitionApproachingSec !== null && ctx.transitionApproachingSec <= NEXT_TEASE_MAX_SEC;
@@ -127,6 +130,6 @@ export function juggleOpportunity(
   }
   const source: StandaloneSource = tease ? 'next' : 'double';
   const what = source === 'double' ? 'a double of the playing track' : 'a tease of the next track';
-  const moment = trigger === 'break' ? 'a breakdown ahead' : trigger === 'build' ? 'a build ahead' : trigger === 'phraseEnd' ? 'the phrase ends' : 'the set needs energy';
+  const moment = trigger === 'break' ? 'a breakdown ahead' : trigger === 'build' ? 'a build ahead' : trigger === 'phraseEnd' ? 'the phrase ends' : trigger === 'request' ? 'Juggle Now' : 'the set needs energy';
   return { trigger, source, startBeat, reason: `${trigger}: ${moment}, ${what} (${decision.pattern.type} fits)` };
 }

@@ -64,7 +64,7 @@ describe('Auto DJ debug view', () => {
       deckA: { material: ['FULL_GROOVE'], confidence: 0.9, role: 'VOICE' }, deckB: { material: ['DRUM_FILL'], confidence: 0.8, role: 'RESPONSE' },
       nextActions: [{ deck: 'B', type: 'CutIn', beat: 41 }], reason: 'beatTrade (A B A B) at 0.85 intensity: strong beat confidence', confidence: 0.9, safety: 'clear',
       budget: { juggledFraction: 0.1, secondsSinceLastJuggle: 120, cooldownSec: 90 }, lastQuality: null, history: [{ type: 'phraseTrade', bars: 16, score: 0.8 }],
-      standalone: { trigger: 'build', source: 'double', phase: 'running', deck: 'B' },
+      standalone: { trigger: 'build', source: 'double', phase: 'running', deck: 'B' }, juggleNow: null,
     });
     const { getByTestId } = render(<DJAutoDJDebugPanel telemetry={null} />);
     const text = getByTestId('autodj-juggle').textContent ?? '';

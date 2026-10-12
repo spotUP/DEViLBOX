@@ -2598,6 +2598,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'dj_auto_dj_juggle_now',
+    'Juggle Now: ask the Auto DJ juggle controller for a beat juggle at once (the Auto DJ debug panel button). Skips the timing gates (set phase, cooldown, juggle budget, the musical moment) and keeps every safety gate (beat/phrase/sync confidence, meters, keys, vocals, user control). With one deck playing it first sets up a double or tease on the idle deck. Returns the request state - pending, started, or refused with the reason - and the juggle telemetry.',
+    {},
+    (p) => call('dj_auto_dj_juggle_now', p),
+  );
+
+  server.tool(
     'dj_auto_dj_explain',
     'Why did the Auto DJ do that: the debug telemetry (current track, next track, planned transition, confidence, risk, why this track, why this transition), the beat-juggling telemetry (mode, pattern, phase, intensity, per-deck material and roles, next actions, reason, safety, budget), the structured decision log (SELECT_NEXT_TRACK, PLAN_TRANSITION, FALLBACK, EXECUTE_TRANSITION, ADAPT ...) and the DJ FX actions it fired.',
     { limit: z.number().int().min(1).max(400).optional().describe('How many decisions / FX fires to return (default 30)') },

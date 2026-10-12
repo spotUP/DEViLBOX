@@ -15,12 +15,12 @@ import { shiftedKeyName } from '../tempoKeySolver';
 import type { DJTrackAnalysis, SetEnergyPhase } from '../types';
 import { classifyWindow, materialRefs } from './juggleMaterial';
 import { PATTERN_INTENSITY, coarsenLadder, minLadderRung, phaseAt, rolesAt, transitionLadder } from './jugglePatterns';
-import { budgetFor, conditions, confidencePolicy, intensityFor, lowConfidenceReason, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
+import { budgetFor, conditions, downbeatAtOrAfter, confidencePolicy, intensityFor, lowConfidenceReason, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
 import { phaseUnverified, PHASE_VERIFIED_SEC } from './phaseVerification';
 import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
 import type {
   DJDeckPerformanceState, DJJuggleHistory, DJJugglePerformanceContext, DJPerformanceMode, JuggleMode, JuggleQualityScore,
-  JuggleTelemetry, DJJugglePatternType, StandaloneTelemetry,
+  JuggleTelemetry, DJJugglePatternType, JuggleNowState, StandaloneTelemetry,
 } from './juggleTypes';
 
 type AB = 'A' | 'B';
@@ -89,6 +89,7 @@ export class DJJuggleController {
   private counter = 0;
   private standalone: StandaloneTelemetry | null = null;
   private standaloneNote: string | null = null;
+  private nowRequest: JuggleNowState | null = null;
   readonly events: JuggleEvent[] = [];
   readonly counts: Record<string, number> = { ticks: 0, started: 0, completed: 0, aborted: 0, fallbacks: 0 };
 
@@ -122,6 +123,30 @@ export class DJJuggleController {
     this.standalone = standalone ? { ...standalone } : null;
     this.standaloneNote = nextNote;
     if (!same) this.deps.onTelemetry?.(this.telemetry());
+  }
+
+  // ── Juggle Now (owner decision 2026-10-12) ─────────────────────────────────
+
+  /**
+   * The user asks for a juggle now. The poll loop's own entry (tick, and the
+   * stand-alone setup it drives) plans it with the timing gates skipped - the
+   * set phase, the cooldown, the juggled fraction, a recent juggle, the
+   * musical moment - and every safety gate kept. The request stays pending
+   * until a pattern starts or a gate refuses it; the refusal is shown.
+   */
+  requestNow(): void {
+    this.nowRequest = { state: 'pending', reason: 'Juggle Now: planning' };
+    this.deps.onTelemetry?.(this.telemetry());
+  }
+  /** A Juggle Now request is waiting for its juggle: the timing gates are skipped. */
+  nowPending(): boolean { return this.nowRequest?.state === 'pending'; }
+  nowState(): JuggleNowState | null { return this.nowRequest ? { ...this.nowRequest } : null; }
+  /** A pending Juggle Now is refused: a safety gate, or the decks are not Auto DJ's to juggle now. */
+  refuseNow(reason: string): void {
+    if (!this.nowPending()) return;
+    this.nowRequest = { state: 'refused', reason };
+    this.record({ kind: 'juggleAborted', beat: 0, reason: `Juggle Now refused: ${reason}` });
+    this.deps.onTelemetry?.(this.telemetry());
   }
 
   /** Section 43: a manual override yields at once; the rest of the pattern is released. */
@@ -263,7 +288,8 @@ export class DJJuggleController {
       primary: input.masterDeck, beatsPerBar: bpb, intensity: PATTERN_INTENSITY.transitionLadder, phraseBars: ctx.phraseLengthBars,
       confidence: Math.min(ctx.beatConfidence, ctx.deckSyncConfidence), seed: (this.deps.seed ?? 0) + this.counter++, ladderBars, target: ladder.target,
     });
-    const startBeat = Math.ceil((ctx.masterBeat - 0.25) / bpb) * bpb;
+    // The bar the incoming started on (within a quarter beat), on the master's own bar grid.
+    const startBeat = downbeatAtOrAfter(ctx, ctx.masterBeat - 0.25);
     const coarsened = ladderBars.join('-') !== ladder.ladderBars.join('-') ? ` (${policy} confidence: ${ladder.ladderBars.join('-')} traded as ${ladderBars.join('-')})` : '';
     const decision: JuggleDecision = {
       pattern, candidates: [], reason: `juggle transition: ${pattern.reason}${coarsened}`, blocked: [], policy, intensity: pattern.intensity, startBeat,
@@ -289,28 +315,37 @@ export class DJJuggleController {
       // Section 42: abort conditions while performing.
       const reason = this.pendingAbort ?? this.abortReason(ctx, input);
       if (reason) { this.pendingAbort = null; this.execution.abort(reason); }
+      this.refuseNow('a juggle is already playing');
       this.publish(ctx);
       return { started: false, active: this.execution.active(), decision: this.lastDecision, aborted: reason };
     }
-    if (input.userControl) { this.lastJuggleAt = this.now(); this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
-    if (this.mode === 'OFF') { this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
+    if (input.userControl) { this.lastJuggleAt = this.now(); this.refuseNow(`user control: ${input.userControl}`); this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
+    if (this.mode === 'OFF') { this.refuseNow('Auto Juggle off'); this.publish(ctx); return { started: false, active: false, decision: null, aborted: null }; }
     if (input.performanceMode !== 'JUGGLE' && input.performanceMode !== 'JUGGLE_TRANSITION') {
       // Not this layer's turn: say so, instead of publishing the reasons of a
       // decision made before the transition took the decks.
       this.lastDecision = this.idleDecision(ctx, `${input.performanceMode}: the transition owns the decks`);
+      this.refuseNow(this.lastDecision.reason);
       this.publish(ctx);
       return { started: false, active: false, decision: null, aborted: null };
     }
-    const decision = planJuggle(ctx, { mode: this.mode, intensityOverride: this.intensityOverride, learned: (t, c) => this.learnedFor(t, c), seed: (this.deps.seed ?? 0) + this.counter++ });
+    const skipTiming = this.nowPending();
+    const decision = planJuggle(ctx, { mode: this.mode, intensityOverride: this.intensityOverride, learned: (t, c) => this.learnedFor(t, c), seed: (this.deps.seed ?? 0) + this.counter++, skipTiming });
     this.lastDecision = decision;
-    if (!decision.pattern) { this.publish(ctx); return { started: false, active: false, decision, aborted: null }; }
+    if (!decision.pattern) {
+      // With one deck playing the stand-alone setup answers a Juggle Now (it makes the second deck); with two the planner did.
+      if (skipTiming && ctx.deckA.playing && ctx.deckB.playing) this.refuseNow(decision.reason);
+      this.publish(ctx);
+      return { started: false, active: false, decision, aborted: null };
+    }
+    if (skipTiming) this.nowRequest = { state: 'started', reason: decision.reason };
     this.start(decision, ctx, input);
     this.publish(ctx);
     return { started: true, active: true, decision, aborted: null };
   }
 
   private idleDecision(ctx: DJJugglePerformanceContext, reason: string): JuggleDecision {
-    return { pattern: null, candidates: [], reason, blocked: [reason], policy: confidencePolicy(ctx), intensity: intensityFor(ctx, this.mode, this.intensityOverride), startBeat: ctx.masterBeat };
+    return { pattern: null, candidates: [], reason, blocked: [reason], policy: confidencePolicy(ctx), intensity: intensityFor(ctx, this.mode, this.intensityOverride, 0, { skipTiming: this.nowPending() }), startBeat: ctx.masterBeat };
   }
 
   private abortReason(ctx: DJJugglePerformanceContext, input: TickInput): string | null {
@@ -320,7 +355,7 @@ export class DJJuggleController {
     if (ctx.deckSyncConfidence < 0.5) return 'decks drifted apart';
     if (input.performanceMode !== 'JUGGLE' && input.performanceMode !== 'JUGGLE_TRANSITION') return 'transition took over';
     if (this.execCtx && (ctx.deckA.trackId !== this.execCtx.deckA.trackId || ctx.deckB.trackId !== this.execCtx.deckB.trackId)) return 'track changed';
-    if (ctx.deckA.vocalsActive && ctx.deckB.vocalsActive && this.execution && rolesAt(this.execution.pattern, ctx.masterBeat - this.execution.startBeat).A === 'LAYER') return 'vocal collision';
+    if (ctx.deckA.vocalsActive && ctx.deckB.vocalsActive && this.execution && rolesAt(this.execution.pattern, this.execution.beatNow() - this.execution.startBeat).A === 'LAYER') return 'vocal collision';
     return null;
   }
 
@@ -398,10 +433,11 @@ export class DJJuggleController {
 
   telemetry(ctx: DJJugglePerformanceContext | null = this.lastCtx): JuggleTelemetry {
     const exec = this.execution?.active() ? this.execution : null;
-    const beat = ctx ? ctx.masterBeat - (exec?.startBeat ?? 0) : 0;
+    // A running pattern's own clock: continuous across its seeks of the master (juggleExecutor).
+    const beat = exec ? exec.beatNow() - exec.startBeat : ctx ? ctx.masterBeat : 0;
     const roles = exec ? rolesAt(exec.pattern, beat) : { A: 'PRIMARY' as const, B: 'SILENT' as const };
     const materialOf = (d: DJDeckPerformanceState): string[] => d.analysis ? classifyWindow(d.analysis, d.deck, d.position, 1).classes : [];
-    const budget = ctx ? budgetFor(ctx, this.mode) : null;
+    const budget = ctx ? budgetFor(ctx, this.mode, { skipTiming: this.nowPending() }) : null;
     const d = this.lastDecision;
     return {
       mode: this.mode, active: !!exec, pattern: exec?.pattern.type ?? null, sequence: exec?.pattern.sequence ?? null, phase: exec ? phaseAt(exec.pattern, beat) : null,
@@ -412,7 +448,7 @@ export class DJJuggleController {
       safety: this.safety(exec !== null, d),
       budget: { juggledFraction: budget?.fraction ?? 0, secondsSinceLastJuggle: ctx?.secondsSinceLastJuggle ?? Infinity, cooldownSec: budget?.cooldownSec ?? 0 },
       lastQuality: this.lastQuality, history: this.history.slice(-5).map((h) => ({ type: h.patternType, bars: h.durationBars, score: h.successScore })),
-      standalone: this.standalone,
+      standalone: this.standalone, juggleNow: this.nowState(),
     };
   }
 
