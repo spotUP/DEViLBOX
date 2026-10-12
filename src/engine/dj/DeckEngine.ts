@@ -372,6 +372,9 @@ export class DeckEngine {
     // replayer has native pitch/tempo decoupling.
     this.keyLock = new DeckKeyLock();
     this.keyLock.output.connect(this.deckGain);
+    // The store owns the setting (default on); the engine follows it from the first frame.
+    this.keyLockEnabled = useDJStore.getState().decks[this.id]?.keyLockEnabled ?? false;
+    this.syncKeyLockInsert();
 
     // Create AudioPlayer for audio file playback (MP3/WAV/FLAC etc.)
     // Output threads through the channel mute (stems of a rendered module)
@@ -514,6 +517,7 @@ export class DeckEngine {
     // In DJ view, we ALWAYS use audio mode for sound output.
     // Tracker replayer is only used for position tracking and visual feedback.
     this._playbackMode = 'audio';
+    this.syncKeyLockInsert();
     // The previous track's scope signal goes with it; the audio load that
     // follows brings this song's.
     this.setChannelScopes(undefined);
@@ -711,6 +715,7 @@ export class DeckEngine {
       stemSeparationProgress: null,
     });
     this._playbackMode = 'audio';
+    this.syncKeyLockInsert();
 
     // Clear pattern-scratch state from previous track (see loadSong).
     this.patternScratchActive = false;
@@ -1103,12 +1108,16 @@ export class DeckEngine {
   setKeyLock(enabled: boolean): void {
     if (this.keyLockEnabled === enabled) return;
     this.keyLockEnabled = enabled;
-    // The SoundTouch insert only matters on the audio (WAV) path. When
-    // bypassed it's a zero-latency direct wire.
-    this.keyLock.setActive(enabled && this._playbackMode === 'audio');
+    this.syncKeyLockInsert();
     this.setPitch(this._currentPitchSemitones);
   }
   getKeyLock(): boolean { return this.keyLockEnabled; }
+
+  /** The stretcher insert follows (key lock on AND audio path). The one place keyLock.setActive runs:
+   *  called on every setKeyLock and wherever the playback mode is set (module load, audio load, hot swap). */
+  private syncKeyLockInsert(): void {
+    this.keyLock.setActive(this.keyLockEnabled && this._playbackMode === 'audio');
+  }
 
   /**
    * Enable / disable repitch lock.

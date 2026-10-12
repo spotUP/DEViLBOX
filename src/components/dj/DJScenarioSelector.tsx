@@ -15,6 +15,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { getScenarioById, getScenariosByCategory } from '@/midi/djScenarioPresets';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
 import { useDJStore } from '@/stores/useDJStore';
+import { setDeckKeyLock } from '@/engine/dj/DJActions';
 import { CustomSelect } from '@components/common/CustomSelect';
 
 const STORAGE_KEY = 'devilbox-dj-scenario-preset';
@@ -52,8 +53,8 @@ export const DJScenarioSelector: React.FC = () => {
 
     if (scenario.keyLockDefault !== undefined) {
       // Apply key lock to both decks
-      store.setDeckKeyLock('A', scenario.keyLockDefault);
-      store.setDeckKeyLock('B', scenario.keyLockDefault);
+      setDeckKeyLock('A', scenario.keyLockDefault);
+      setDeckKeyLock('B', scenario.keyLockDefault);
     }
 
     // If using a generic controller, apply scenario knob/pad mappings
