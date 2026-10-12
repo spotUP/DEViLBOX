@@ -101,6 +101,9 @@ async function initDB(): Promise<IDBDatabase> {
     request.onsuccess = () => {
       db = request.result;
       resolve(db!);
+      // A cache over its cap (entries written while sizes counted the WAV only) trims on open,
+      // not first on the next write.
+      void trimCacheToCap();
     };
 
     request.onupgradeneeded = (event) => {
@@ -411,6 +414,11 @@ export async function clearAudioCache(): Promise<void> {
     console.error('[DJAudioCache] Failed to clear cache:', err);
     throw err;
   }
+}
+
+/** Evict the oldest entries until the cache's real total fits its cap. */
+export async function trimCacheToCap(): Promise<void> {
+  try { await evictIfNeeded(0); } catch (err) { console.warn('[DJAudioCache] Trim to cap failed:', err); }
 }
 
 /** Bytes the cache can still take before it evicts (real total, entryStoredBytes). */
