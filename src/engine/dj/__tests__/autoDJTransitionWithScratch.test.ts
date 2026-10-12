@@ -6,8 +6,8 @@
  * Sentinel `autoScratchRuntimeStats.transitionScratches`: 5 performed - echoOut, a risky pair
  * whose throw shares the echo bar, carries none. Every performed event ends before the plan's end;
  * no scratch gesture writes the crossfader (the transition's curve owns it).
- * Not through getAutoDJ (deviation): DJAutoDJ.executePlan's performScratch is the one-line call of
- * performTransitionScratch; R7 drives the Auto DJ poll loop.
+ * The per-style behaviour lives here; the wiring through getAutoDJ (anticipate -> poll -> executor
+ * -> the Auto DJ's performScratch) is autoDJTransitionScratchThroughTheAutoDJ.test.ts.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 
