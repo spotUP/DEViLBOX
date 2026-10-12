@@ -21,6 +21,7 @@ vi.mock('@/engine/ToneEngine', () => ({
   getToneEngine: () => ({ setInstrumentOutputOverride: () => {}, preloadInstruments: async () => {}, ensureWASMSynthsReady: async () => {}, rerouteNativeEngine: () => {} }),
 }));
 
+import { installInProcessDJRenderWorker } from '@/test/audio/inProcessDJRenderWorker';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch, audioLoadsSettled } from '@/test/audio/realWebAudio';
 
 const SONG = 'a sleep so deep.mod';
@@ -29,42 +30,6 @@ const AT_SEC = 8;       // a stretch where all four Paula channels play
 const WINDOW_SEC = 1;
 
 afterEach(cleanup);
-
-/** The render worker in-process (as djChannelScopesShowNativeEngineChannels.test.ts runs it). */
-function installInProcessWorkers(): () => void {
-  type Handler = ((e: { data: unknown }) => void) | null;
-  const scope = globalThis.self as unknown as { onmessage: Handler; postMessage: (m: unknown) => void };
-  const originalPost = scope.postMessage;
-  let workerModule: Promise<unknown> | null = null;
-  class InProcessWorker {
-    onmessage: Handler = null;
-    onerror: Handler = null;
-    private readonly render: boolean;
-    constructor(url: URL | string) {
-      this.render = String(url).includes('dj-render');
-      if (this.render) {
-        scope.postMessage = (m: unknown) => this.onmessage?.({ data: m });
-        workerModule ??= import('@/workers/dj-render.worker');
-      }
-    }
-    postMessage(msg: { type: string; id?: string }) {
-      if (this.render) {
-        void workerModule!.then(() => scope.onmessage?.({ data: msg }));
-      } else if (msg.type !== 'init') {
-        setTimeout(() => this.onmessage?.({ data: { type: 'analysisError', id: msg.id, error: 'not under test' } }), 0);
-      }
-    }
-    terminate() {}
-  }
-  vi.stubGlobal('Worker', InProcessWorker);
-  vi.stubGlobal('importScripts', () => {});
-  const versions = Object.getOwnPropertyDescriptor(process, 'versions');
-  Object.defineProperty(process, 'versions', { value: {}, configurable: true });
-  return () => {
-    if (versions) Object.defineProperty(process, 'versions', versions);
-    scope.postMessage = originalPost; scope.onmessage = null; vi.unstubAllGlobals();
-  };
-}
 
 function rms(x: Float32Array, from = 0, to = x.length): number {
   let s = 0;
@@ -82,7 +47,7 @@ describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
     // The render worker encodes the stems as FLAC; load the encoder while process.versions is real
     // (the in-process worker stubs it for the Emscripten glue, which the FLAC loader would trip on).
     await (await import('@/lib/export/audioEncoders')).encodeFlac([new Float32Array(16)], 44100);
-    const restoreWorkers = installInProcessWorkers();
+    const restoreWorkers = installInProcessDJRenderWorker();
     const { getDJPipeline } = await import('../DJPipeline');
     const bytes = readFileSync(join(process.cwd(), 'public/data/songs/formats', SONG));
     const source = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;

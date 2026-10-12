@@ -20,51 +20,10 @@ vi.mock('@/engine/ToneEngine', () => ({
   getToneEngine: () => ({ setInstrumentOutputOverride: () => {}, preloadInstruments: async () => {}, ensureWASMSynthsReady: async () => {}, rerouteNativeEngine: () => {} }),
 }));
 
+import { installInProcessDJRenderWorker } from '@/test/audio/inProcessDJRenderWorker';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch, audioLoadsSettled } from '@/test/audio/realWebAudio';
 
 const SONG = 'a sleep so deep.mod';
-
-/**
- * The render worker runs in-process on the test window standing in for the
- * worker scope (its onmessage / postMessage); the analysis worker answers
- * with an error (analysis is not under test).
- */
-function installInProcessWorkers(): () => void {
-  type Handler = ((e: { data: unknown }) => void) | null;
-  const scope = globalThis.self as unknown as { onmessage: Handler; postMessage: (m: unknown) => void };
-  const originalPost = scope.postMessage;
-  let workerModule: Promise<unknown> | null = null;
-  class InProcessWorker {
-    onmessage: Handler = null;
-    onerror: Handler = null;
-    private readonly render: boolean;
-    constructor(url: URL | string) {
-      this.render = String(url).includes('dj-render');
-      if (this.render) {
-        scope.postMessage = (m: unknown) => this.onmessage?.({ data: m });
-        workerModule ??= import('@/workers/dj-render.worker');
-      }
-    }
-    postMessage(msg: { type: string; id?: string }) {
-      if (this.render) {
-        void workerModule!.then(() => scope.onmessage?.({ data: msg }));
-      } else if (msg.type !== 'init') {
-        setTimeout(() => this.onmessage?.({ data: { type: 'analysisError', id: msg.id, error: 'not under test' } }), 0);
-      }
-    }
-    terminate() {}
-  }
-  vi.stubGlobal('Worker', InProcessWorker);
-  // The worker glue (forced to its worker branch) checks it runs in a worker scope.
-  vi.stubGlobal('importScripts', () => {});
-  // Emscripten glue under node picks its node branch; the worker expects a worker one (as uadeWorkletHost does).
-  const versions = Object.getOwnPropertyDescriptor(process, 'versions');
-  Object.defineProperty(process, 'versions', { value: {}, configurable: true });
-  return () => {
-    if (versions) Object.defineProperty(process, 'versions', versions);
-    scope.postMessage = originalPost; scope.onmessage = null; vi.unstubAllGlobals();
-  };
-}
 
 describe('DJ deck channel scopes show a native engine\'s channels', () => {
   it('a module rendered through UADE reaches the deck scope getter with signal on its channels', async () => {
@@ -77,7 +36,7 @@ describe('DJ deck channel scopes show a native engine\'s channels', () => {
     // The render worker encodes the stems as FLAC; load the encoder while process.versions is real
     // (the in-process worker stubs it for the Emscripten glue, which the FLAC loader would trip on).
     await (await import('@/lib/export/audioEncoders')).encodeFlac([new Float32Array(16)], 44100);
-    const restoreWorkers = installInProcessWorkers();
+    const restoreWorkers = installInProcessDJRenderWorker();
     const { getDJPipeline } = await import('../DJPipeline');
     const bytes = readFileSync(join(process.cwd(), 'public/data/songs/formats', SONG));
     const source = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;

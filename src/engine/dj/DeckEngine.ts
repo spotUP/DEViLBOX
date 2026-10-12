@@ -628,7 +628,7 @@ export class DeckEngine {
   private setChannelScopes(track: ChannelScopeTrack | undefined): void {
     this._channelScopes = track;
     useDJStore.getState().setDeckState(this.id, {
-      channelScopeCount: track ? Math.min(DECK_SCOPE_CHANNELS, track.channels.length) : 0,
+      channelScopeCount: track ? Math.min(DECK_SCOPE_CHANNELS, track.channels.length) : 0, // every channel the song has (the render caps the track)
     });
   }
 

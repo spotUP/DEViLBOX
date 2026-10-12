@@ -12,6 +12,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { getBeatPhaseInfo, type PhaseInfo } from '@/engine/dj/DJAutoSync';
 import type { DeckId } from '@/engine/dj/DeckEngine';
+import { DECK_SCOPE_CHANNELS } from '@/engine/dj/channelScopeTrack';
 
 export interface DeckVizData {
   waveform: Float32Array | null;
@@ -42,7 +43,7 @@ function startLoop(deckId: DeckId, entry: DeckCacheEntry): void {
     try {
       const deck = getDJEngine().getDeck(deckId);
       entry.data.waveform = deck.getWaveform();
-      entry.data.channelWaveforms = deck.getChannelWaveforms(4);
+      entry.data.channelWaveforms = deck.getChannelWaveforms(DECK_SCOPE_CHANNELS);
       entry.data.fft = deck.getFFT();
       entry.data.level = deck.getLevel();
     } catch {
