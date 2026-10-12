@@ -13,6 +13,7 @@ import { resolveSongChannelRoles } from '@/engine/dub/songChannelIdentity';
 import { getRoleAtPosition } from '@/bridge/analysis/SongRoleTimeline';
 import { rowsPerBeat as speedRowsPerBeat, DEFAULT_BEATS_PER_BAR } from '@/lib/dub/musicalClock';
 import { PHRASE_BOUNDARY_SUPPORT, PHRASE_LENGTHS, PHRASE_UNALIGNED_CONFIDENCE } from './structure';
+import { classifyInstrument } from '@/bridge/analysis/ChannelNaming';
 
 /**
  * Confidence of a beat level the song's own drums confirm, and of one that
@@ -189,9 +190,11 @@ export function dominantTempo(song: TrackerSong, walk: OrderWalk): { speed: numb
 /**
  * Backbeat fit of a beat level: for each drum sound, the share of its hits
  * that land on a beat, times the share of those on beats 2 and 4. A snare on
- * the backbeat scores 1 at the right level and 0 at half of it.
+ * the backbeat scores 1 at the right level and 0 at half of it. Also the
+ * sound that fits best (its `${channel}:${instrument}` key): the one carrying
+ * the backbeat at that level.
  */
-function backbeatScore(walk: OrderWalk, hits: Array<Array<string[]>>, rowsPerBeat: number): number {
+function backbeatScore(walk: OrderWalk, hits: Array<Array<string[]>>, rowsPerBeat: number): { score: number; carrier: string | null } {
   const sounds = new Map<string, { hits: number; onBeat: number; odd: number }>();
   walk.positions.forEach((pos, p) => {
     hits[p].forEach((rowHits, i) => {
@@ -206,9 +209,30 @@ function backbeatScore(walk: OrderWalk, hits: Array<Array<string[]>>, rowsPerBea
       }
     });
   });
-  let best = 0;
-  for (const s of sounds.values()) best = Math.max(best, (s.onBeat / s.hits) * (s.onBeat > 0 ? s.odd / s.onBeat : 0));
-  return best;
+  let best = 0, carrier: string | null = null;
+  for (const [key, s] of sounds) {
+    const fit = (s.onBeat / s.hits) * (s.onBeat > 0 ? s.odd / s.onBeat : 0);
+    if (fit > best) { best = fit; carrier = key; }
+  }
+  return { score: best, carrier };
+}
+
+/**
+ * Whether a drum sound (a `${channel}:${instrument}` key of drumHits) is a
+ * snare or clap to the instrument classifier (classifyInstrument: drum type,
+ * sample spectrum, name) - the sound a backbeat belongs to.
+ */
+function isSnareSound(song: TrackerSong, key: string | null): boolean {
+  if (!key) return false;
+  const id = Number(key.slice(key.indexOf(':') + 1));
+  const inst = Array.isArray(song.instruments) ? song.instruments.find((i) => i?.id === id) : undefined;
+  if (!inst) return false;
+  try {
+    const c = classifyInstrument(inst);
+    return c.role === 'percussion' && (c.subrole === 'snare' || c.subrole === 'clap');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -267,7 +291,14 @@ export function songRowsPerBeat(song: TrackerSong, walk: OrderWalk = timeOrderPo
   const hits = drumHits(song, walk, perc);
   const anyDrums = hits.some((rows) => rows.some((h) => h.length > 0));
   if (!anyDrums) return { rowsPerBeat: conventional, source: levelSource, confidence: BEAT_CONVENTION_CONFIDENCE };
-  const base = backbeatScore(walk, hits, conventional);
+  const { score: base, carrier: baseCarrier } = backbeatScore(walk, hits, conventional);
+  // A backbeat is the snare's. When the default level's backbeat is a snare,
+  // a level whose backbeat is some other sound does not replace it: an
+  // off-beat hat on rows 2, 6, 10, 14 sits on beats 2 and 4 of a level twice
+  // as fast (Mortimer Twang 'suggestive vibes 5': that sound scored 1 at 2
+  // rows a beat, 187.5 BPM, while the snare plays rows 4 and 12, 0.75 at 4
+  // rows, 93.75; owner taps ~94).
+  const snareBackbeat = base >= BACKBEAT_CONFIRMS && isSnareSound(song, baseCarrier);
   let pick = { rowsPerBeat: conventional, source: levelSource as 'drums' | 'speed' | 'patterns', score: base };
   let rival = 0;
   // Only a finer beat can replace the convention: a composer at speed 3 may
@@ -278,7 +309,8 @@ export function songRowsPerBeat(song: TrackerSong, walk: OrderWalk = timeOrderPo
   // side is the exception: there the convention is no beat at all.
   for (const rpb of new Set([conventional / 2, ...rivals])) {
     if (!Number.isInteger(rpb) || rpb < 1 || !plausible(rpb)) continue;
-    const score = backbeatScore(walk, hits, rpb);
+    const { score, carrier } = backbeatScore(walk, hits, rpb);
+    if (snareBackbeat && carrier !== baseCarrier && !isSnareSound(song, carrier)) continue;
     rival = Math.max(rival, score);
     if (score >= base + DRUM_EVIDENCE_MARGIN && score > pick.score) pick = { rowsPerBeat: rpb, source: 'drums', score };
   }
