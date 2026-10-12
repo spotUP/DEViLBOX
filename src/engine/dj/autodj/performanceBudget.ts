@@ -46,6 +46,28 @@ export function juggleCost(level: number): number {
   return HAND_COSTS.aggressiveJuggle;
 }
 
+/**
+ * The juggle level an intensity plays at (the juggle planner's 0..1 ladder onto section 27's
+ * three juggle costs): up to SAFE's cap 0.4 phrase juggles, up to 0.75 beat juggles (MUSICAL's
+ * 0.65 included), above that the aggressive patterns (PERFORMER 0.9, AGGRESSIVE / CHAOS 1).
+ */
+export const JUGGLE_LEVEL_INTENSITY = [0, 0.4, 0.75, 1] as const;
+
+export function juggleLevelForIntensity(intensity: number): number {
+  if (!(intensity > 0)) return 0;
+  if (intensity <= JUGGLE_LEVEL_INTENSITY[1]) return 1;
+  if (intensity <= JUGGLE_LEVEL_INTENSITY[2]) return 2;
+  return 3;
+}
+
+/** The most intense juggle the hands left over allow (the inverse of `juggleCost`): 0 when not even a phrase juggle fits. */
+export function juggleIntensityCap(handsLeft: number): number {
+  if (handsLeft >= HAND_COSTS.aggressiveJuggle) return JUGGLE_LEVEL_INTENSITY[3];
+  if (handsLeft >= HAND_COSTS.beatJuggle) return JUGGLE_LEVEL_INTENSITY[2];
+  if (handsLeft >= HAND_COSTS.phraseJuggle) return JUGGLE_LEVEL_INTENSITY[1];
+  return 0;
+}
+
 /** availableScratch = budget - juggleCost - transitionCost - FXCost, in 0..4. */
 export function scratchPermission(opts: { juggleCost?: number; transitionCost?: number; fxCost?: number }): number {
   const left = HANDS_BUDGET - (opts.juggleCost ?? 0) - (opts.transitionCost ?? 0) - (opts.fxCost ?? 0);

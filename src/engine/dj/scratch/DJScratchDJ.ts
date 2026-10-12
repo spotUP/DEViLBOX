@@ -26,6 +26,8 @@ import { ScratchStateMachine, type ScratchState } from './scratchStateMachine';
 import { evaluatePhrase, type PhraseDecision, type PhraseEvaluation, type PhraseTrace } from './scratchEvaluate';
 import { findOpportunity, type ScratchOpportunity } from './scratchOpportunity';
 import { checkScratch, checkStuck, type SafetyRule, type SafetyState } from './ScratchSafety';
+import { scratchCost } from '../autodj/performanceBudget';
+import { GESTURE_LEVELS } from './scratchGestureCatalog';
 import { arcForSection, phaseAt, planArc, type ArcPhaseName, type ArcTemplate } from './scratchArc';
 import type { ScratchGenreHint } from './scratchStyles';
 import type { ScratchGestureId, ScratchDJStyle, ScratchEvent, ScratchSource, ScratchAnchor, DeckScratchAnchor } from './scratchTypes';
@@ -206,6 +208,20 @@ export class DJScratchDJ {
     this.currentArcPhase = null;
     this.deckBusyUntil = {};
     this.lastEventBar = null;
+  }
+
+  /**
+   * Hands the scratch holds now (section 27): 0 while idle, listening or resting; else the cost of the
+   * hardest gesture in the windows being performed (short 1, complex / feature 2, a battle feature 4).
+   * The juggle planner gets what is left (`TickInput.otherHands`).
+   */
+  handsInUse(): number {
+    const st = this.states.state;
+    if (st === 'IDLE' || st === 'LISTENING' || st === 'REST' || st === 'ABORTING' || !this.windows.length) return 0;
+    let maxLevel = 0;
+    for (const w of this.windows) for (const e of w.entries) maxLevel = Math.max(maxLevel, GESTURE_LEVELS[e.event.gesture] ?? 0);
+    const feature = st === 'FEATURE' || st === 'ESCALATING';
+    return scratchCost({ maxLevel, feature, battle: feature && this.lastMode === 'BATTLE' });
   }
 
   telemetry(): ScratchDJTelemetry {

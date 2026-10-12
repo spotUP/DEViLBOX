@@ -223,6 +223,8 @@ export interface DJJugglePerformanceContext {
   elapsedSec: number;
   juggledSec: number;
   secondsSinceLastJuggle: number;
+  /** Hands (of the section 27 budget of 6) the scratch, the transition and the FX hold now; the juggle gets the rest. */
+  otherHands?: number;
 }
 
 export interface JuggleQualityScore {

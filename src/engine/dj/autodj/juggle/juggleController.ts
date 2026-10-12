@@ -47,6 +47,8 @@ export interface TickInput {
   transitionApproachingSec: number | null;
   /** The user moved something (crossfader, deck, cue, FX, tempo) since the last tick. */
   userControl?: string | null;
+  /** Hands the scratch, the transition and the FX hold now (scratch plan section 27, the shared budget of 6). */
+  otherHands?: number;
 }
 
 export interface JuggleControllerDeps {
@@ -237,6 +239,7 @@ export class DJJuggleController {
       lastJuggle: last, recentPatterns: this.history.slice(-RECENT), intensity: this.lastDecision?.intensity ?? 0,
       tension: Math.max(0, input.targetEnergy - input.energy), fallbackAvailable: A.playing || B.playing, sameTrackOnBothDecks: sameTrack,
       transitionApproachingSec: input.transitionApproachingSec, elapsedSec: nowSec - this.startedAt / 1000, juggledSec: this.juggledSec, secondsSinceLastJuggle,
+      otherHands: input.otherHands ?? 0,
     };
   }
 

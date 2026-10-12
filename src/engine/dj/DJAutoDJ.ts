@@ -44,7 +44,7 @@ import { getScratchVoicePoolIfActive } from './scratch/scratchVoicePool';
 import { subscribeDjFxFires } from '@/engine/drumpad/DjFxActions';
 import { scratchModeOf, scratchStyleFor } from './scratch/scratchStyles';
 import { trackerSampleInfos, type TrackerSampleInstrument } from './scratch/trackerSampleSource';
-import { HAND_COSTS, scratchPermission, transitionCost } from './autodj/performanceBudget';
+import { HAND_COSTS, juggleCost, juggleLevelForIntensity, scratchPermission, transitionCost } from './autodj/performanceBudget';
 
 // ── Transition Types ────────────────────────────────────────────────────────
 
@@ -1785,7 +1785,8 @@ class DJAutoDJ {
       const track = s.decks[this.activeDeck].trackAnalysis;
       const choice = scratchStyleFor(s.autoDJScratchStyle, track?.genre ?? s.autoDJStyle);
       const permission = scratchPermission({
-        juggleCost: juggling ? HAND_COSTS.beatJuggle : 0,
+        // a running juggle holds at least a phrase juggle's hands; more as its intensity rises
+        juggleCost: juggling ? Math.max(HAND_COSTS.phraseJuggle, juggleCost(juggleLevelForIntensity(this.juggle?.getLastDecision()?.intensity ?? 0))) : 0,
         transitionCost: transitioning ? transitionCost(this.execution?.plan.style) : 0,
       });
       // the user's hand on the crossfader outside a transition and a juggle (section 63)
@@ -1843,6 +1844,8 @@ class DJAutoDJ {
         return;
       }
       const input = this.tickInput(performanceMode, timeRemaining, userControl);
+      // Section 27: the juggle gets the hands the scratch and the transition leave.
+      input.otherHands = (this.scratch?.handsInUse() ?? 0) + (transitioning ? transitionCost(this.execution?.plan.style) : 0);
       j.tick(input);
       if (performanceMode === 'JUGGLE' && !j.isActive()) standalone.consider(status, input);
     } catch (err) {
