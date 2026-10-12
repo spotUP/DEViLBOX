@@ -65,6 +65,28 @@ function cutGrid(cuts: number, duty: number): ScratchFaderWindow[] {
 
 const OPEN = deck([0, 1]);
 
+/**
+ * The reference named cut patterns (`turntable.py cut_pattern` :320-338) as open windows over the
+ * gesture, owner decision O3 (the demo's values for every gesture), ledger SCR-PG-A3.
+ */
+export type ReferenceCutPattern = 'open' | 'click' | 'doubleClick' | 'tripleClick' | 'transform' | 'flare1' | 'flare2' | 'crab';
+
+export function referenceCutPattern(name: ReferenceCutPattern, cuts = 4): ScratchFaderWindow[] {
+  switch (name) {
+    case 'open': return OPEN;
+    case 'click': return deck([0, 0.42], [0.5, 1]);
+    case 'doubleClick': return deck([0, 0.22], [0.28, 0.5], [0.56, 0.78], [0.84, 1]);
+    case 'tripleClick': return deck(...Array.from({ length: 3 }, (_, i) => [i / 3 + 0.02, i / 3 + 0.28] as const));
+    case 'transform': return deck(...Array.from({ length: cuts }, (_, i) => [i / cuts, i / cuts + 0.5 / cuts] as const));
+    case 'flare1': return deck([0, 0.45], [0.55, 1]);
+    case 'flare2': return deck([0, 0.3], [0.37, 0.63], [0.7, 1]);
+    case 'crab': {
+      const edges = [0, 0.12, 0.19, 0.34, 0.4, 0.58, 0.63, 0.8, 0.85, 1];
+      return deck(...Array.from({ length: edges.length / 2 }, (_, i) => [edges[2 * i]!, edges[2 * i + 1]!] as const));
+    }
+  }
+}
+
 function v(points: ReadonlyArray<readonly [t: number, velocity: number]>): ScratchVelocityPoint[] {
   return points.map(([t, velocity]) => ({ t, velocity }));
 }
@@ -122,7 +144,6 @@ const BABY_CURVE = v([
   [0.40, 0.2], [0.44, 0.8], [0.60, 1.8], [0.76, 0.8],
   [0.80, 0.2],
 ]);
-const BABY_WINDOWS = deck([0.04, 0.40], [0.44, 0.80]);
 const FLARE_CURVE = v([
   [0, 0], [0.10, 2.2], [0.15, 2.2], [0.19, 2.2], [0.33, 2.0], [0.37, 1.5],
   [0.50, 0], [0.65, -1.0], [0.90, -0.3],
@@ -143,7 +164,7 @@ const SEEDS: readonly GestureSeed[] = [
     id: 'baby', name: 'Baby Scratch', durationSteps: 4,
     styles: ['oldSchool', 'boomBap', 'battle'],
     handPath: hand([[0, 0], [0.25, 1], [0.5, 0], [0.75, -1], [1, 0]]),
-    velocityCurve: BABY_CURVE, faderWindows: BABY_WINDOWS,
+    velocityCurve: BABY_CURVE, faderWindows: referenceCutPattern('open'),
     trueReverse: false, returnsToAnchor: true, allowsSampleSource: true,
     interpolateVelocity: true, loop: true,
   },
@@ -153,7 +174,7 @@ const SEEDS: readonly GestureSeed[] = [
     styles: ['loFi', 'battle'],
     handPath: hand([[0, 0], [0.25, 0.6], [0.5, 0], [0.75, -0.6], [1, 0]]),
     velocityCurve: BABY_CURVE.map((p) => ({ t: p.t, velocity: p.velocity * 0.6 })),
-    faderWindows: BABY_WINDOWS,
+    faderWindows: referenceCutPattern('open'),
     trueReverse: false, returnsToAnchor: true, allowsSampleSource: true,
     interpolateVelocity: true, loop: true,
   },
@@ -204,14 +225,14 @@ const SEEDS: readonly GestureSeed[] = [
     // (reference transformer4 glide 1.0; DEViLBOX 40 % open duty).
     id: 'transformer4', name: 'Transformer', durationSteps: 4,
     styles: ['electro', 'battle'],
-    velocityCurve: GLIDE_CURVE, faderWindows: cutGrid(4, 0.40),
+    velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('transform', 4),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
     interpolateVelocity: false, loop: true,
   },
   {
     id: 'transformer8', name: 'Eight-Cut Transformer', durationSteps: 4,
     styles: ['electro', 'battle'],
-    velocityCurve: GLIDE_CURVE, faderWindows: cutGrid(8, 0.40),
+    velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('transform', 8),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
     interpolateVelocity: false, loop: true,
   },
@@ -220,7 +241,7 @@ const SEEDS: readonly GestureSeed[] = [
     id: 'flare1', name: 'One-Click Flare', durationSteps: 4,
     styles: ['electro', 'battle'],
     handPath: hand([[0, 0], [1, 1.6]]),
-    velocityCurve: FLARE_CURVE, faderWindows: deck([0, 0.15], [0.19, 1]),
+    velocityCurve: FLARE_CURVE, faderWindows: referenceCutPattern('flare1'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
     interpolateVelocity: true, loop: true,
   },
@@ -229,7 +250,7 @@ const SEEDS: readonly GestureSeed[] = [
     id: 'flare2', name: 'Two-Click Flare', durationSteps: 4,
     styles: ['electro', 'battle'],
     handPath: hand([[0, 0], [0.5, 1.8], [1, 0]]),
-    velocityCurve: FLARE_CURVE, faderWindows: deck([0, 0.15], [0.19, 0.33], [0.37, 1]),
+    velocityCurve: FLARE_CURVE, faderWindows: referenceCutPattern('flare2'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
     interpolateVelocity: true, loop: true,
   },
@@ -250,7 +271,7 @@ const SEEDS: readonly GestureSeed[] = [
     // Record plays forward under rapid finger clicks (reference crab glide; DEViLBOX 28 % duty).
     id: 'crab', name: 'Crab', durationSteps: 4,
     styles: ['electro', 'battle'],
-    velocityCurve: GLIDE_CURVE, faderWindows: cutGrid(4, 0.28),
+    velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('crab'),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
     interpolateVelocity: false, loop: true,
   },
@@ -267,15 +288,12 @@ const SEEDS: readonly GestureSeed[] = [
     interpolateVelocity: true, loop: true,
   },
   {
-    // DEViLBOX hydroplane is the faderless wiki technique (opposing-hand flutter);
-    // the reference's 12-cut variant is not it (see the ledger "P1 as built").
+    // Reference hydroplane (O3): the finger rides the record, a slightly slower forward glide
+    // (0.7) under 12 fast tiny cuts (`transform`, cuts 12).
     id: 'hydroplane', name: 'Hydroplane', durationSteps: 4,
     styles: ['electro', 'battle'],
-    velocityCurve: v([
-      [0, 1.0], [0.14, 0.15], [0.26, 1.1], [0.38, 0.15],
-      [0.50, 1.0], [0.62, 0.2], [0.74, 1.0], [0.86, 0.25],
-    ]),
-    faderWindows: OPEN,
+    velocityCurve: v([[0, 0.7]]),
+    faderWindows: referenceCutPattern('transform', 12),
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: false,
     interpolateVelocity: true, loop: true,
   },
@@ -284,7 +302,7 @@ const SEEDS: readonly GestureSeed[] = [
     id: 'tearForward', name: 'Forward Tear', durationSteps: 4,
     styles: ['boomBap', 'battle'],
     handPath: hand([[0, 0], [0.34, 0.9], [0.5, 1.0], [0.67, 1.7], [1, 2.0]]),
-    velocityCurve: TEAR_CURVE, faderWindows: deck([0.03, 0.53], [0.58, 0.90]),
+    velocityCurve: TEAR_CURVE, faderWindows: referenceCutPattern('open'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
     interpolateVelocity: true, loop: true,
   },

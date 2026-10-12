@@ -21,7 +21,7 @@ const EXPECTED_NAMES: readonly string[] = [
   'Baby Scratch',    // 0 — djScratchBaby
   'Transformer',     // 1 — djScratchTrans (single-frame: fader-chop at constant velocity)
   'Flare',           // 2 — djScratchFlare
-  'Hydroplane',      // 3 — djScratchHydro
+  'Hydroplane',      // 3 — djScratchHydro (single-frame: 0.7 glide under 12 cuts)
   'Crab',            // 4 — djScratchCrab (single-frame like Transformer)
   'Orbit',           // 5 — djScratchOrbit
   'Chirp',           // 6 — djScratchChirp
@@ -43,7 +43,7 @@ const EXPECTED_NAMES: readonly string[] = [
 // fader-chop timing applied externally via the playback loop). Any NEW
 // pattern with one frame should be added here explicitly so the default
 // "≥ 2 frames" guard catches accidentally-truncated tables.
-const SINGLE_FRAME_PATTERNS: readonly string[] = ['Transformer', 'Crab', '8-Finger Crab'];
+const SINGLE_FRAME_PATTERNS: readonly string[] = ['Transformer', 'Crab', '8-Finger Crab', 'Hydroplane']; // Hydroplane: the reference 0.7 glide under 12 cuts (SCR-PG-A3)
 
 describe('SCRATCH_PATTERNS registry', () => {
   it('contains exactly 19 patterns', () => {

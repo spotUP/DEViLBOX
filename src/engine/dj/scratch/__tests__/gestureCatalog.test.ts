@@ -64,9 +64,13 @@ describe('scratch gesture catalogue (SCR-P1.2)', () => {
     expect(getGesture('backwardStab').faderWindows.map((w) => w.open)).toEqual([[0.45, 1]]);
     expect(getGesture('transformer4').faderWindows).toHaveLength(4);
     expect(getGesture('transformer8').faderWindows).toHaveLength(8);
-    expect(getGesture('crab').faderWindows).toHaveLength(4);
-    expect(getGesture('flare1').faderWindows).toHaveLength(2);
-    expect(getGesture('flare2').faderWindows).toHaveLength(3);
+    // the reference cut patterns (O3, SCR-PG-A3): crab's uneven edges, the flares, transform duty 0.5, hydroplane 12 cuts
+    expect(getGesture('crab').faderWindows.map((w) => w.open)).toEqual([[0, 0.12], [0.19, 0.34], [0.4, 0.58], [0.63, 0.8], [0.85, 1]]);
+    expect(getGesture('flare1').faderWindows.map((w) => w.open)).toEqual([[0, 0.45], [0.55, 1]]);
+    expect(getGesture('flare2').faderWindows.map((w) => w.open)).toEqual([[0, 0.3], [0.37, 0.63], [0.7, 1]]);
+    expect(getGesture('transformer4').faderWindows.map((w) => w.open)).toEqual([[0, 0.125], [0.25, 0.375], [0.5, 0.625], [0.75, 0.875]]);
+    expect(getGesture('hydroplane').faderWindows).toHaveLength(12);
+    for (const id of ['baby', 'babySlow', 'tearForward', 'tearReverse', 'scribble', 'drag'] as const) expect(getGesture(id).faderWindows.map((w) => w.open), id).toEqual([[0, 1]]);
     // SA-B2: one length per gesture = the tuned stroke (cycle x strokes), not the reference
     // `_GESTURE_STEPS` (baby 2, babySlow 3, stabs 1, chirp 2, transformer4 2, tears 2, flares 2,
     // orbit 3, crab 2, hydroplane 3, drag 4), which overlap when one hand performs them
