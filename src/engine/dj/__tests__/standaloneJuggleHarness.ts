@@ -31,10 +31,11 @@ export interface StandaloneRig {
 
 export async function setupStandalone(
   holder: StandaloneHolder,
-  opts: { track: CorpusId; bpm: number; startSec: number; analysis?: DJTrackAnalysis; durationSec?: number },
+  opts: { track: CorpusId; bpm: number; startSec: number; analysis?: DJTrackAnalysis; durationSec?: number; clockMs?: number },
 ): Promise<StandaloneRig> {
   await import('../DJTrackLoader');
-  vi.useFakeTimers();
+  // clockMs pins the fake wall clock's start: DJAutoDJ seeds scratch plans with Date.now(), so an unpinned start is a different set every run
+  vi.useFakeTimers(opts.clockMs === undefined ? undefined : { now: opts.clockMs });
   holder.doubles = 0;
   holder.crossfader.length = 0;
   getDecisionLog().clear();

@@ -69,6 +69,7 @@ import type { ScratchMode } from '../scratch/scratchStyles';
 const TRACK = 'drops';
 const BPM = 130;
 const MINUTES = 10;
+const PINNED_CLOCK_MS = Date.UTC(2026, 0, 1);
 
 /** The corpus track repeated for `seconds` (as the long-set juggle test tiles it). */
 function tiledAnalysis(seconds: number) {
@@ -105,7 +106,7 @@ async function tenMinutes(mode: ScratchMode) {
   const seconds = MINUTES * 60;
   const analysis = tiledAnalysis(seconds + 120);
   const startSec = 5;
-  const rig = await setupStandalone(holder, { track: TRACK, bpm: BPM, startSec, analysis, durationSec: analysis.durationSec });
+  const rig = await setupStandalone(holder, { track: TRACK, bpm: BPM, startSec, analysis, durationSec: analysis.durationSec, clockMs: PINNED_CLOCK_MS });
   useDJStore.getState().setAutoDJConfig({ juggleMode: 'OFF', scratchMode: mode, scratchStyle: 'auto' });
   (rig.dj as unknown as { preloadNextTrack: () => Promise<void> }).preloadNextTrack = async () => {};
   const events: ScratchEvent[] = [];
