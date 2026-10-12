@@ -19,7 +19,11 @@
  * 22,050 Hz render as a good playback resampler hears it. At the bus rate (the null test) it is the bus. The demo's two whole-render gains (peak 0.75 in scratch_channel, the RMS match
  * to the beat) cancel into one: the layer at 0.60 x the beat's RMS over the whole render. Live, the
  * main thread posts the programme's RMS ({ type: 'programme', rms }) and the bus holds its layer at
- * 0.60 x it, both RMS followed over ~8 s; with no programme the level stays at `level` (the null test).
+ * 0.60 x it: the layer's RMS is its mean square since its first stroke (the demo's whole-render mean,
+ * as far as it has played), the level glides to the ratio over ~1 s; with no programme the level
+ * stays at `level` (the null test). A routine planned whole is shaped exactly instead ({ type: 'shape',
+ * start, level, duck }): three_deck's level and its duck on the beat's transients, computed from the
+ * planned layer and the deck's own audio over the routine before it plays (`deckCShape`).
  *
  * Messages: { type: 'stroke', start, samples } - a rendered stroke from bus sample `start`
  * (bus sample n = context time n / busRate); { type: 'level', value }; { type: 'clear' }.
@@ -116,10 +120,10 @@ class TapeDelay {
 }
 
 /** The upsampler's kernel: TAPS-tap windowed sinc at PHASES fractional offsets (Kaiser beta 8, cutoff 0.95 x the bus Nyquist). */
-const TAPS = 32, PHASES = 512, CUT = 0.95;
+const TAPS = 64, PHASES = 512, CUT = 0.95;
 function besselI0(x) { let s = 1, t = 1; for (let k = 1; k < 40; k++) { t *= (x / (2 * k)) ** 2; s += t; if (t < 1e-17 * s) break; } return s; }
 const KERNEL = (() => {
-  const k = new Float64Array((PHASES + 1) * TAPS), beta = 8, i0b = besselI0(beta), half = TAPS / 2;
+  const k = new Float64Array((PHASES + 1) * TAPS), beta = 9, i0b = besselI0(beta), half = TAPS / 2;
   for (let p = 0; p <= PHASES; p++) {
     const fr = p / PHASES;
     let sum = 0;
@@ -157,8 +161,11 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
     this.strokes = [];
     // the demo's level: 0.60 x the beat's RMS / the layer's RMS, followed live over ~8 s
     this.programme = null;
-    this.layerMs = 0;
-    this.msCoef = Math.exp(-1 / (8 * this.busRate));
+    // the demo's whole-render level and duck for a planned span (three_deck.render), when the routine was shaped
+    this.shapes = [];
+    this.layerSum = 0; this.layerN = 0;
+    this.levelCoef = Math.exp(-1 / (1 * this.busRate));
+    this.started = false;
     // the bus clock: bus sample n is context time n / busRate
     this.bus = -1;
     // the last TAPS bus samples (the upsampler's window), newest at hist[(hi - 1) % TAPS]
@@ -168,6 +175,8 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
       if (m.type === 'stroke') this.strokes.push({ start: m.start, samples: m.samples });
       else if (m.type === 'level') this.level = m.value;
       else if (m.type === 'programme') this.programme = m.rms;
+      else if (m.type === 'shape') this.shapes.push({ start: m.start, level: null, duck: m.duck });
+      else if (m.type === 'shapeLevel') { for (const sh of this.shapes) if (sh.start === m.start) sh.level = m.level; }
       else if (m.type === 'clear') this.strokes = [];
     };
   }
@@ -209,12 +218,34 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
     // the tail
     if (this.tail) y = y + this.tail * f.tailLp.f(this.tailRoom.step(y));
     if (tap === 8) return y;
-    if (this.programme !== null) {
-      this.layerMs = this.msCoef * this.layerMs + (1 - this.msCoef) * y * y;
-      const layer = Math.sqrt(this.layerMs);
-      if (layer > 1e-6 && this.programme > 1e-6) this.level = Math.min(8, 0.60 * this.programme / layer);
+    // a shaped span: the demo's level and duck, exactly; past its end the level holds and the duck lets go
+    // (the duck arrives with the plan; until the planned layer's level does, the level follows the programme)
+    for (let s = this.shapes.length - 1; s >= 0; s--) {
+      const sh = this.shapes[s], j = i - sh.start;
+      if (j < 0) continue;
+      if (sh.level !== null) { this.level = sh.level; this.programme = null; }
+      else y = y * this.followProgramme(y, x);
+      const g = sh.level !== null ? sh.level : 1;
+      return j < sh.duck.length ? y * g * sh.duck[j] : y * g;
     }
+    if (this.programme !== null) return y * this.followProgramme(y, x);
     return y * this.level;
+  }
+
+  /** The unshaped level: the layer at 0.60 x the programme's RMS, the layer's mean square since its first stroke. */
+  followProgramme(y, x) {
+    if (this.programme !== null) {
+      if (!this.started && x !== 0) this.started = true;
+      if (this.started) {
+        this.layerSum += y * y; this.layerN++;
+        const layer = Math.sqrt(this.layerSum / this.layerN);
+        if (layer > 1e-6 && this.programme > 1e-6) {
+          const target = 0.60 * this.programme / layer;
+          this.level = this.levelCoef * this.level + (1 - this.levelCoef) * target;
+        }
+      }
+    }
+    return this.level;
   }
 
   process(_inputs, outputs) {

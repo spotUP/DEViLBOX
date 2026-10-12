@@ -1800,6 +1800,11 @@ class DJAutoDJ {
         hasRecord: (id) => getScratchVoicePoolIfActive()?.hasRecord(id) ?? false,
         prepareSource: (chosen) => prepareScratchSource(chosen),
         prepareRecords: (ids) => getScratchVoicePool().prepareRecords(ids),
+        // three_deck's level and duck against the deck's own audio (a module deck has none: it follows the programme)
+        shapeRoutine: (shape) => {
+          const audio = getDJEngine().getDeck(shape.deck).audioPlayer.getAudioBuffer();
+          if (audio) void getScratchVoicePool().shapeRoutinePlan(shape, audio).catch((err) => console.warn('[AutoDJ] scratch routine not shaped:', err));
+        },
         // One decision per performed phrase (scratch plan section 65): source, gestures, placement, length.
         onPlan: (plan, events) => this.recordScratchPhrase(plan.reasons, events, this.scratch?.telemetry().source ?? null),
         seed: Date.now() & 0xffff,

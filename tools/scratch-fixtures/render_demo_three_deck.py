@@ -4,7 +4,8 @@ line for line) over the same track span DEViLBOX rendered, from the plan it wrot
   three_deck.build_scratch_events(seed) -> each event's record from the role pools (a clean 'drop' advances its
   role) -> scratch.render_gesture with the boombap deck profile, a +-4 ms human offset -> deck_c_eq ->
   scratch_routine.scratch_channel(room .42, delay .28, drive .09) + 0.22 dark-room tail -> 0.60 x the beat's
-  RMS -> ducked 0.25 on the beat's transients -> 0.72 x beat + Deck C, headroom 0.98.
+  RMS -> ducked 0.25 on the beat's transients (both over the routine's 32 bars, three_deck's render length)
+  -> 0.72 x beat + Deck C, headroom 0.98.
 
 The beat is the track (not the demo's juggled hip-hop records): the grid is the track's downbeats from plan.json.
 Run: /opt/homebrew/bin/python3.11 -I tools/scratch-fixtures/render_demo_three_deck.py \
@@ -36,9 +37,14 @@ sb = load("scratch_bank")
 dsp = load("synth_dsp")
 
 plan = json.load(open(os.path.join(DIR, "plan.json")))
-with wave.open(os.path.join(DIR, "track_drops.wav")) as w:
-    sr, n = w.getframerate(), w.getnframes()
-    x = np.frombuffer(w.readframes(n), "<i2").astype(float) / 32768.0
+if os.path.exists(os.path.join(DIR, "track_drops.f32")):
+    # the track as DEViLBOX plays it (float32); the WAV is peak-normalised to 16 bits for listening
+    sr = plan.get("trackRate", RATE)
+    x = np.fromfile(os.path.join(DIR, "track_drops.f32"), "<f4").astype(float)
+else:
+    with wave.open(os.path.join(DIR, "track_drops.wav")) as w:
+        sr, n = w.getframerate(), w.getnframes()
+        x = np.frombuffer(w.readframes(n), "<i2").astype(float) / 32768.0
 beat = dsp.resample_rate(x, sr, RATE)
 
 bank = sb.load_bank(rate=RATE, with_audio=True)
@@ -75,11 +81,17 @@ m = min(len(cbus), len(tail))
 cbus = np.asarray(cbus, float)
 cbus[:m] = cbus[:m] + 0.22 * tail[:m]
 cbus = cbus[:len(beat)]
-j_rms = float(np.sqrt(np.mean(beat ** 2))) + 1e-9
-c_rms = float(np.sqrt(np.mean(cbus ** 2))) + 1e-9
-cbus = cbus * (td.DECK_C_LEVEL_SCALE * j_rms / c_rms)
-duck = dsp.lp(np.abs(beat), 40, RATE)
-duck = 1.0 - td.DUCK_DEPTH * np.clip(duck / (duck.max() + 1e-9), 0, 1)
+# three_deck.render's level and duck are over its own 32 bars (the beat it renders): the routine's span
+# here, from its first downbeat; before it the layer is silent, after it the tail keeps the level, no duck
+s0, s1 = int(down[first] * RATE), int(down[first + 32] * RATE)
+span_beat, span_c = beat[s0:s1], cbus[s0:s1]
+j_rms = float(np.sqrt(np.mean(span_beat ** 2))) + 1e-9
+c_rms = float(np.sqrt(np.mean(span_c ** 2))) + 1e-9
+level = td.DECK_C_LEVEL_SCALE * j_rms / c_rms
+duck_span = dsp.lp(np.abs(span_beat), 40, RATE)
+duck_span = 1.0 - td.DUCK_DEPTH * np.clip(duck_span / (duck_span.max() + 1e-9), 0, 1)
+duck = np.ones(len(beat)); duck[s0:s1] = duck_span
+cbus = cbus * level
 k = min(len(beat), len(cbus))
 mix = plan["trackGain"] * beat[:k] + cbus[:k] * duck[:k]
 peak = float(np.max(np.abs(mix))) + 1e-9

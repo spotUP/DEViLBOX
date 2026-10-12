@@ -19,7 +19,7 @@ import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } fr
 import fixture from '@/engine/dj/scratch/__tests__/fixtures/scratch_null.json';
 
 interface FixtureEvent { record: string; gesture: string; velocity: number; seed: number; steps: number; start: number; n: number; out: number[] }
-const F = fixture as unknown as { rate: number; keep: number; stepSec: number; events: FixtureEvent[]; busN: number; threeDeck: number[]; scratchDj: number[] };
+const F = fixture as unknown as { rate: number; keep: number; stepSec: number; events: FixtureEvent[]; busN: number; threeDeck: number[]; scratchDj: number[]; level: number; duck: number[] };
 
 /** Residual of `x` (sampled every `keep`) against `ref`, in dB below the reference's RMS. */
 function residualDb(ref: readonly number[], x: ArrayLike<number>, keep: number): number {
@@ -61,5 +61,27 @@ describe('the scratch nulls against the Up Rough demo', () => {
     await new Promise((r) => setTimeout(r, 20));
     const out = (await ctx.startRendering()).getChannelData(0);
     expect(residualDb(F[chain], out, F.keep)).toBeLessThan(-130);
+  }, 120_000);
+
+  it('three_deck\'s level (0.60 x the beat\'s RMS) and its duck on the beat\'s transients are the demo\'s', async () => {
+    const { deckCDuck, deckCLevel } = await import('@/engine/dj/scratch/scratchDeckC');
+    const { NumpyRandomState } = await import('@/engine/turntable/turntableSim');
+    // the fixture's beat, drawn again: RandomState(5).uniform(-1, 1) x exp(-12 x beat phase) x 0.5 at 130 BPM
+    const rng = new NumpyRandomState(5);
+    const beat = new Float64Array(F.busN);
+    for (let i = 0; i < F.busN; i++) { const t = i / F.rate; beat[i] = rng.uniform(-1, 1) * Math.exp(-((t * 130 / 60) % 1.0) * 12) * 0.5; }
+    // the three_deck layer whole (the RMS needs every sample), from the same strokes on the same bus
+    const { renderGesture, DEMO_DECK_PROFILES } = await import('@/engine/dj/scratch/scratchRender');
+    const { createDeckCBus, DECK_C_TAPS } = await import('@/engine/dj/scratch/scratchDeckC');
+    const ctx = new OfflineAudioContext(1, F.busN, F.rate);
+    const bus = await createDeckCBus(ctx, ctx.destination, { chain: 'threeDeck', tap: DECK_C_TAPS.tail, planned: true });
+    for (const e of F.events) {
+      const src = await recordPcm(e.record);
+      bus.stroke(e.start, renderGesture(src, e.gesture, e.steps * F.stepSec, F.rate, { velocity: e.velocity, profile: DEMO_DECK_PROFILES.boombap, seed: e.seed }).out);
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    const layer = (await ctx.startRendering()).getChannelData(0);
+    expect(Math.abs(deckCLevel(layer, beat) / F.level - 1)).toBeLessThan(1e-6);
+    expect(residualDb(F.duck, deckCDuck(beat), F.keep)).toBeLessThan(-130);
   }, 120_000);
 });

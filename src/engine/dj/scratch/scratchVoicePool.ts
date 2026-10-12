@@ -16,7 +16,8 @@ import * as Tone from 'tone';
 import { getDJEngine } from '../DJEngine';
 import { DeckScratchBuffer, SCRATCH_RECORD_RING_BASE } from '../DeckScratchBuffer';
 import { gritRecord, demoRecordPcm } from './scratchGrit';
-import { createDeckCBus, type DeckCBus, type DeckCChainName } from './scratchDeckC';
+import { createDeckCBus, deckCDuck, deckCLevel, programmeSpan, DECK_C_TAPS, type DeckCBus, type DeckCChainName } from './scratchDeckC';
+import { getGesture } from './scratchGestureCatalog';
 import { renderGesture, demoGestureName, demoGestureSteps, DEMO_DECK_PROFILES, DEMO_RATE } from './scratchRender';
 import { needleDrop as ttNeedleDrop, needleLift as ttNeedleLift } from '@/engine/turntable/turntableSim';
 import type { ScratchRenderSpec } from './scratchTypes';
@@ -30,7 +31,7 @@ import { realTimers } from '../autodj/executorTimers';
 import { useDJStore } from '@/stores/useDJStore';
 
 /** Reachability sentinels (SCR-P2.R2). */
-export const scratchPoolStats = { performs: 0, loads: 0, styleFx: 0, rendered: 0 };
+export const scratchPoolStats = { performs: 0, loads: 0, styleFx: 0, rendered: 0, shaped: 0 };
 
 export const SCRATCH_VOICE_COUNT = 2;
 
@@ -229,25 +230,69 @@ export class ScratchVoicePool {
    * summed into the routine's bus at the planned beat's bus sample plus the demo's human timing. It plays
    * out whole, as in the demo: there is nothing to release.
    */
+  /** One stroke as the demo renders it (three_deck / scratch_dj `render`): the needle, or render_gesture on the record. */
+  async renderStroke(gesture: ScratchGesture, record: ScratchRecord | null, spec: ScratchRenderSpec, bpm: number, velocity: number | undefined): Promise<Float64Array | Float32Array | null> {
+    if (gesture.needle) return gesture.needle === 'drop' ? ttNeedleDrop(DEMO_RATE, 'battle', spec.seed) : ttNeedleLift(DEMO_RATE, spec.seed);
+    const name = demoGestureName(gesture.id);
+    if (!name || !record) return null;
+    const sig = await this.recordPcm(record);
+    // three_deck: steps x 60 / (bpm x 4); scratch_dj: steps x int(rate x 60 / (bpm x 4)) / rate
+    const stepSec = spec.chain === 'scratchDj' ? Math.trunc(DEMO_RATE * 60.0 / (bpm * 4)) / DEMO_RATE : 60.0 / (bpm * 4);
+    return renderGesture({ sig, anchor: record.demoCue.anchor, safe: record.demoCue.safe }, name, demoGestureSteps(name) * stepSec, DEMO_RATE, {
+      velocity: velocity ?? 1.0, profile: DEMO_DECK_PROFILES.boombap, seed: spec.seed,
+    }).out;
+  }
+
+  /**
+   * three_deck.render's level and duck for a routine planned whole, before it plays: its strokes rendered
+   * offline through the routine's chain (the same worklet), then `deckCShape` with the deck's beat over the
+   * routine's span; the live bus applies them from the span's first bus sample.
+   */
+  async shapeRoutine(input: { chain: DeckCChainName; spanStart: number; beat: Float64Array; strokes: ReadonlyArray<{ start: number; gesture: ScratchGesture; record: ScratchRecord | null; spec: ScratchRenderSpec; bpm: number; velocity?: number }> }): Promise<{ level: number } | null> {
+    const n = input.beat.length;
+    if (!n) return null;
+    const live = await this.deckCBus(input.chain);
+    // the duck needs only the beat: on the bus at once; the level when the planned layer is rendered
+    live.shape(input.spanStart, deckCDuck(input.beat));
+    const off = new OfflineAudioContext(1, n + Math.trunc(0.6 * DEMO_RATE), DEMO_RATE);
+    const layerBus = await createDeckCBus(off, off.destination, { chain: input.chain, tap: DECK_C_TAPS.tail, planned: true });
+    for (const s of input.strokes) {
+      const samples = await this.renderStroke(s.gesture, s.record, s.spec, s.bpm, s.velocity);
+      if (samples) layerBus.stroke(Math.max(0, s.start - input.spanStart), samples);
+    }
+    await new Promise((r) => setTimeout(r, 0));
+    const layer = (await off.startRendering()).getChannelData(0);
+    const level = deckCLevel(layer, input.beat);
+    live.shapeLevel(input.spanStart, level);
+    scratchPoolStats.shaped++;
+    return { level };
+  }
+
+  /**
+   * The routine's shape from the controller's plan (`ScratchDJDeps.shapeRoutine`) and the deck's audio: the
+   * span's bus samples, the beat read the demo's way, each stroke at its bus sample (+ its human timing).
+   */
+  shapeRoutinePlan(shape: import('./DJScratchDJ').ScratchRoutineShape, deckAudio: Pick<AudioBuffer, 'sampleRate' | 'numberOfChannels' | 'length' | 'getChannelData'>): Promise<{ level: number } | null> {
+    const spanStart = Math.trunc(shape.startSec * DEMO_RATE);
+    const n = Math.trunc(shape.endSec * DEMO_RATE) - spanStart;
+    const beat = programmeSpan(deckAudio, shape.trackFromSec, n);
+    const strokes = shape.strokes.filter((s) => s.event.render).map((s) => ({
+      start: Math.max(0, Math.trunc(s.at * DEMO_RATE) + s.event.render!.humanizeSamples),
+      gesture: getGesture(s.event.gesture),
+      record: s.event.source.type === 'CRATE' ? getScratchRecord(s.event.source.recordId) ?? null : null,
+      spec: s.event.render!, bpm: shape.bpm, velocity: s.event.velocity,
+    }));
+    return this.shapeRoutine({ chain: shape.chain, spanStart, beat, strokes });
+  }
+
   private performRendered(gesture: ScratchGesture, record: ScratchRecord | null, opts: PerformOptions & { render: ScratchRenderSpec }): PerformHandle {
     scratchPoolStats.rendered++;
     const spec = opts.render;
     const started = (async (): Promise<StrokeResult> => {
       const bus = await this.deckCBus(spec.chain);
-      let samples: Float64Array | Float32Array;
-      if (gesture.needle) {
-        samples = gesture.needle === 'drop' ? ttNeedleDrop(DEMO_RATE, 'battle', spec.seed) : ttNeedleLift(DEMO_RATE, spec.seed);
-      } else {
-        const name = demoGestureName(gesture.id);
-        if (!name || !record) return { ok: false, reason: `the demo has no ${gesture.id}${record ? '' : ' without a record'}` };
-        const sig = await this.recordPcm(record);
-        // three_deck: steps x 60 / (bpm x 4); scratch_dj: steps x int(rate x 60 / (bpm x 4)) / rate
-        const stepSec = spec.chain === 'scratchDj' ? Math.trunc(DEMO_RATE * 60.0 / (opts.bpm * 4)) / DEMO_RATE : 60.0 / (opts.bpm * 4);
-        samples = renderGesture({ sig, anchor: record.demoCue.anchor, safe: record.demoCue.safe }, name, demoGestureSteps(name) * stepSec, DEMO_RATE, {
-          velocity: opts.velocity ?? 1.0, profile: DEMO_DECK_PROFILES.boombap, seed: spec.seed,
-        }).out;
-      }
-      // the demo's level: the layer at 0.60 x the programme's RMS
+      const samples = await this.renderStroke(gesture, record, spec, opts.bpm, opts.velocity);
+      if (!samples) return { ok: false, reason: `the demo has no ${gesture.id}${record ? '' : ' without a record'}` };
+      // an unshaped routine: the layer follows the programme at the demo's 0.60 ratio
       const prog = this.programme?.rms ?? null;
       if (prog !== null) bus.setProgramme(prog);
       const at = opts.at ?? this.ctx.currentTime;
