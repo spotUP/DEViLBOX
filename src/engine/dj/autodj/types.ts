@@ -759,6 +759,11 @@ export interface DJTransitionPlan {
    * whole ladder before its drop (owner juggling plan sections 31, 33, 42).
    */
   juggle?: { ladderBars: number[]; tradeBeats: number; fallback?: DJTransitionPlan };
+  /**
+   * Scratch in this transition (scratch plan D8, sections 44-48): accent, outgoing-deck feature,
+   * the scratch as the transition, or a battle burst; performed by the executor's `performScratch`.
+   */
+  scratch?: import('../scratch/transitionScratch').TransitionScratchPlan;
 
   confidence: number;
   risk: TransitionRisk;
