@@ -14,9 +14,10 @@ let createScratchBus: typeof import('../scratchBus').createScratchBus;
 let ambienceFor: typeof import('../scratchBus').ambienceFor;
 let SCRATCH_BUS: typeof import('../scratchBus').SCRATCH_BUS;
 
+/** The band alone: the reference channel with room 0 and delay 0 (its own parameters). */
 async function renderTone(hz: number, ambience: number, amplitude = 0.1, seconds = 0.6): Promise<Float32Array> {
   const ctx = new OfflineAudioContext(2, Math.round(SR * seconds), SR);
-  const bus = createScratchBus(ctx, ctx.destination);
+  const bus = createScratchBus(ctx, ctx.destination, { room: 0, delayMix: 0 });
   bus.setAmbience(ambience);
   const osc = ctx.createOscillator();
   osc.frequency.value = hz;
@@ -34,9 +35,9 @@ function rms(x: Float32Array, from: number, to: number): number {
 }
 const dB = (a: number, b: number) => 20 * Math.log10(a / Math.max(b, 1e-12));
 
-async function renderImpulse(ambience: number, seconds = 0.5): Promise<Float32Array> {
+async function renderImpulse(ambience: number, seconds = 0.5, opts: { room?: number; delayMix?: number } = { room: 0 }): Promise<Float32Array> {
   const ctx = new OfflineAudioContext(2, Math.round(SR * seconds), SR);
-  const bus = createScratchBus(ctx, ctx.destination);
+  const bus = createScratchBus(ctx, ctx.destination, opts);
   bus.setAmbience(ambience);
   const buf = ctx.createBuffer(1, 128, SR);
   buf.getChannelData(0)[0] = 0.5;
@@ -57,11 +58,12 @@ describe('scratch bus (section 42, SCR-P2.6)', () => {
 
   it('carries the reference numbers', () => {
     expect(SCRATCH_BUS.hpHz).toBe(160);
-    expect(SCRATCH_BUS.drive).toBe(0.09);
+    expect(SCRATCH_BUS.drive).toBe(0.10);
     expect(SCRATCH_BUS.delaySec).toBe(0.20);
     expect(SCRATCH_BUS.feedback).toBe(0.32);
-    expect(SCRATCH_BUS.delayMix).toBe(0.14);
-    expect(SCRATCH_BUS.reverbMix).toBe(0.28);
+    expect(SCRATCH_BUS.delayMix).toBe(0.16);
+    expect(SCRATCH_BUS.tailDelayMix).toBe(0.35);
+    expect(SCRATCH_BUS.reverbMix).toBe(0.30);
     expect(SCRATCH_BUS.lpHz).toBe(5000);
     expect(SCRATCH_BUS.headroom).toBe(0.75);
     expect(SCRATCH_BUS.presenceBand).toEqual([1500, 3000]);
@@ -74,7 +76,7 @@ describe('scratch bus (section 42, SCR-P2.6)', () => {
     const r8k = rms(await renderTone(8000, 0), from, to);
     expect(dB(r1k, r100)).toBeGreaterThanOrEqual(12);
     expect(dB(r1k, r8k)).toBeGreaterThanOrEqual(12);
-    // 1 kHz passes near unity: the small-signal tanh slope (1 + 3 x 0.09) times 0.75 headroom
+    // 1 kHz passes near unity: the small-signal tanh slope (1 + 3 x 0.10) times 0.75 headroom
     const expected = 0.1 / Math.SQRT2 * (1 + 3 * SCRATCH_BUS.drive) * SCRATCH_BUS.headroom;
     expect(r1k).toBeGreaterThan(expected * 0.8);
     expect(r1k).toBeLessThan(expected * 1.2);
@@ -88,9 +90,10 @@ describe('scratch bus (section 42, SCR-P2.6)', () => {
     expect(dB(r2k, r1k)).toBeLessThan(2.5);
   });
 
-  it('ambience 1: an impulse echoes at 0.20 s (+-5 ms, >= 6 dB over the neighbouring windows); ambience 0: nothing there', async () => {
+  it('the channel echoes at 0.20 s at every ambience (louder at 1); the reference dry preset (delay 0) does not', async () => {
     const wet = await renderImpulse(1);
-    const dry = await renderImpulse(0);
+    const ordinary = await renderImpulse(0);
+    const dry = await renderImpulse(0, 0.5, { room: 0, delayMix: 0 });
     const win = (x: Float32Array, a: number, b: number) => rms(x, Math.round(SR * a), Math.round(SR * b));
     const echo = win(wet, 0.195, 0.205);
     const before = win(wet, 0.17, 0.19);
@@ -99,6 +102,8 @@ describe('scratch bus (section 42, SCR-P2.6)', () => {
     expect(dB(echo, before)).toBeGreaterThanOrEqual(6);
     expect(dB(echo, after)).toBeGreaterThanOrEqual(6);
     expect(win(dry, 0.195, 0.205)).toBeLessThan(1e-6);
+    expect(win(ordinary, 0.195, 0.205)).toBeGreaterThan(1e-5);
+    expect(win(ordinary, 0.195, 0.205)).toBeLessThan(echo);
     // the second echo at 0.40 s carries the feedback (0.32, minus the loop damping)
     const echo2 = win(wet, 0.395, 0.405);
     expect(echo2).toBeGreaterThan(1e-5);
@@ -123,7 +128,7 @@ describe('ambience by role (section 43, SCR-P2.7)', () => {
     ({ ambienceFor } = await import('../scratchBus'));
   });
 
-  it('ordinary <= 0.2, FEATURE 0.5, the final event 1.0', () => {
+  it('ordinary <= 0.2 (on top of the always-wet channel), FEATURE 0.5, the final event 1.0', () => {
     for (const role of ['INTRO', 'THEME', 'ANSWER', 'ACCENT', 'FILL', 'TRANSITION', 'OUTRO'] as const) {
       expect(ambienceFor(role)).toBeGreaterThanOrEqual(0);
       expect(ambienceFor(role), role).toBeLessThanOrEqual(0.2);

@@ -35,6 +35,8 @@ export type ScratchVoiceRing = Pick<DeckScratchBuffer,
 export interface ScratchVoiceBus {
   readonly input: AudioNode;
   setAmbience(amount: number, rampSec?: number): void;
+  /** The stroke's velocity tone (the scratch bus, reference render_gesture). */
+  setTone?(velocity: number, at?: number): void;
 }
 
 export type ScratchCue = 'attack' | 'vowel' | 'tail' | number | { word: string };
@@ -284,6 +286,8 @@ export class ScratchRecordVoice {
     // section 41: any clean record can be thrown; everything else follows the record's list
     if (!(isThrow && r.clean) && !r.gestures.includes(gesture.id)) return { ok: false, reason: `${gesture.id} is not a compatible gesture for ${r.id}` };
     if (opts.ambience !== undefined) this.bus.setAmbience(opts.ambience);
+    // a throw is the word as recorded; a hand stroke gets its velocity tone
+    this.bus.setTone?.(isThrow ? 0.7 : (opts.velocity ?? 0.7), opts.at);
     this.cue(opts.cue ?? (isThrow ? 'attack' : 'vowel'), opts.at);
     let durationSec = cycleMs(gesture, bpm) / 1000;
     if (isThrow) {

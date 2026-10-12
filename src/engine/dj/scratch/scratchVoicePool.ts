@@ -19,6 +19,9 @@ import { createScratchBus, type ScratchBus } from './scratchBus';
 import { ScratchRecordVoice, type ScratchCue, type StrokeResult } from './ScratchRecordVoice';
 import { getScratchRecord, findRecords, type ScratchRecord } from './scratchCatalogue';
 import type { ScratchGesture, ScratchRole } from './scratchTypes';
+import { matchedBusLevel, recordRms, ProgrammeMeter } from './scratchLevel';
+import { realTimers } from '../autodj/executorTimers';
+import { useDJStore } from '@/stores/useDJStore';
 
 /** Reachability sentinels (SCR-P2.R2). */
 export const scratchPoolStats = { performs: 0, loads: 0 };
@@ -71,9 +74,17 @@ export class ScratchVoicePool {
   private pending = new Set<Promise<unknown>>();
   private rings: DeckScratchBuffer[] = [];
 
-  constructor(ctx: BaseAudioContext, destination: AudioNode, opts: { size?: number; fetcher?: RecordFetcher } = {}) {
+  /** The programme's RMS now (the music the scratch sits in); null = unknown: the bus stays at unity. */
+  private readonly programme: (() => number | null) | null;
+  /** RMS of each loaded record over its safe range (the level match's reference). */
+  private readonly recordLevels = new Map<string, number>();
+  /** Reachability sentinel: strokes whose bus level was matched to the programme. */
+  readonly levelStats = { matched: 0, lastLevel: 1 };
+
+  constructor(ctx: BaseAudioContext, destination: AudioNode, opts: { size?: number; fetcher?: RecordFetcher; programme?: () => number | null } = {}) {
     this.ctx = ctx;
     this.fetcher = opts.fetcher ?? fetchRecord;
+    this.programme = opts.programme ?? null;
     this.ready = this.init(destination, opts.size ?? SCRATCH_VOICE_COUNT);
   }
 
@@ -157,6 +168,23 @@ export class ScratchVoicePool {
         await voice.load(record, buffer);
       }
       if (cancelled) return { ok: false, reason: 'released before the gesture started' };
+      // the scratch sits in the music (owner 2026-10-12): its bus follows the programme to the reference ratio
+      const prog = this.programme?.() ?? null;
+      if (prog !== null) {
+        let rms = this.recordLevels.get(record.id);
+        if (rms === undefined) {
+          const buffer = await this.buffer(record);
+          rms = recordRms(buffer, record.safe[0], record.safe[1]);
+          this.recordLevels.set(record.id, rms);
+        }
+        const level = matchedBusLevel(prog, rms, gesture);
+        const param = this.buses[voice.index]!.level;
+        const t = Math.max(this.ctx.currentTime, opts.at ?? this.ctx.currentTime);
+        param.cancelScheduledValues(t);
+        param.setValueAtTime(level, t);
+        this.levelStats.matched++;
+        this.levelStats.lastLevel = level;
+      }
       const result = voice.playGesture(gesture, opts.bpm, {
         cue: opts.cue ?? this.anchor ?? undefined,
         ambience: opts.ambience,
@@ -230,10 +258,31 @@ let pool: ScratchVoicePool | null = null;
 export function getScratchVoicePool(): ScratchVoicePool {
   if (!pool) {
     const ctx = Tone.getContext().rawContext as BaseAudioContext;
-    const destination = getDJEngine().mixer.samplerInput;
-    pool = new ScratchVoicePool(ctx, destination);
+    const engine = getDJEngine();
+    const destination = engine.mixer.samplerInput;
+    // the programme the scratch sits in: the decks' channel signal through the crossfader, followed over 2 s
+    const meter = new ProgrammeMeter(() => deckProgrammeRms(engine));
+    realTimers.setInterval(() => meter.sample(0.1), 100);
+    pool = new ScratchVoicePool(ctx, destination, { programme: () => meter.rms });
   }
   return pool;
+}
+
+/** RMS of the decks as the crossfader sends them (linear weights; their channel analysers). */
+function deckProgrammeRms(engine: ReturnType<typeof getDJEngine>): number | null {
+  try {
+    const x = useDJStore.getState().crossfaderPosition;
+    let power = 0;
+    for (const [id, w] of [['A', 1 - x], ['B', x]] as const) {
+      const v = engine.getDeck(id).waveformAnalyser.getValue() as Float32Array;
+      let s = 0;
+      for (let i = 0; i < v.length; i++) s += v[i]! * v[i]!;
+      power += w * w * (s / Math.max(1, v.length));
+    }
+    return Math.sqrt(power);
+  } catch {
+    return null;
+  }
 }
 
 export function getScratchVoicePoolIfActive(): ScratchVoicePool | null {

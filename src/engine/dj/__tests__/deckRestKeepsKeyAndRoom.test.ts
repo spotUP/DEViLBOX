@@ -8,7 +8,8 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { DeckEngine } from '../DeckEngine';
-import { createScratchRoomIR, SCRATCH_BUS } from '../scratch/scratchBus';
+import { createScratchRoomIR } from '../scratch/scratchBus';
+import { SCRATCH_ROOM } from '../scratch/scratchRoom';
 
 interface St { tempo: number; pitch: number; rest: number; keyLock: boolean }
 
@@ -69,17 +70,23 @@ describe('deck scratch reverb is the scratch bus room (SA-m2)', () => {
       return { length: len, sampleRate: rate, numberOfChannels: n, getChannelData: (c: number) => d[c] };
     } } as unknown as BaseAudioContext;
     const ir = createScratchRoomIR(ctx);
-    expect(ir.length).toBe(Math.floor(sr * SCRATCH_BUS.reverbSec));
+    expect(ir.length).toBe(Math.round(sr * SCRATCH_ROOM.seconds));
     const d = ir.getChannelData(0);
-    const rms = (a: number, b: number) => Math.sqrt(d.slice(a, b).reduce((s, v) => s + v * v, 0) / (b - a));
-    // envelope exp(-t x 6.7): 100 ms in, still 51 % of the start; the old 4000 Hz decay was at 0.1 %
-    const ratio = rms(Math.floor(0.1 * sr), Math.floor(0.11 * sr)) / rms(0, Math.floor(0.01 * sr));
-    expect(ratio).toBeGreaterThan(0.4);
+    // the reference room's decay (RT60 0.33 s from its Schroeder backward integration), not 0.25 ms
+    const e = new Float64Array(d.length);
+    let acc = 0;
+    for (let i = d.length - 1; i >= 0; i--) { acc += d[i]! * d[i]!; e[i] = acc; }
+    const at = (db: number) => e.findIndex((v) => 10 * Math.log10(v / e[0]!) <= db);
+    const rt60 = 3 * (at(-25) - at(-5)) / sr;
+    expect(rt60).toBeGreaterThan(0.25);
+    expect(rt60).toBeLessThan(0.45);
   });
 
-  it('DeckEngine builds its reverb from createScratchRoomIR', async () => {
-    const src = (await import('node:fs')).readFileSync('src/engine/dj/DeckEngine.ts', 'utf8');
-    expect(src).toContain('createScratchRoomIR(ctx)');
+  it('DeckEngine sends its scratch into the scratch bus (wet part), whose room is createScratchRoomIR', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync('src/engine/dj/DeckEngine.ts', 'utf8');
+    expect(src).toContain('createScratchBus(ctx, limiter, { wetOnly: true })');
+    expect(fs.readFileSync('src/engine/dj/scratch/scratchBus.ts', 'utf8')).toContain('opts.reverbIR ?? createScratchRoomIR(ctx)');
     expect(src).not.toMatch(/createReverbIR\(ctx, 0\.6, 4000\)/);
   });
 });

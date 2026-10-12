@@ -52,7 +52,8 @@ async function perform(record: ScratchRecord): Promise<Verdict> {
   merger.connect(ctx.destination);
   const ring = new DeckScratchBuffer(ctx as unknown as AudioContext, SCRATCH_RECORD_RING_BASE, { record: true });
   await ring.init();
-  const bus = createScratchBus(ctx, merger);
+  // the voice under test: the bus band without its space (the wet channel has its own test)
+  const bus = createScratchBus(ctx, merger, { room: 0, delayMix: 0 });
   const voice = new ScratchRecordVoice(0, ring, bus);
   await voice.load(record, buffer);
   ring.playbackGain.connect(merger, 0, 2);
