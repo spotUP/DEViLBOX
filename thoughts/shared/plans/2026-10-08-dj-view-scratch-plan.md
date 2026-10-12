@@ -67,6 +67,9 @@ The ultimate goal is an Auto DJ that can make a listener think:
 
 # 1. IMPORTANT ARCHITECTURAL DECISION
 
+> **Owner decision O1 (2026-10-12) overturns this section:** the Up Rough turntable simulation IS ported, as a TypeScript function turning each gesture into a platter speed curve for the existing worklet. See `2026-10-11-scratch-dj-progress.md` "Port of the Up Rough Demo System scratch engine".
+
+
 ## Do not rebuild DEViLBOX's scratch engine.
 
 The current DEViLBOX engine already provides:
@@ -143,6 +146,9 @@ This is the central architectural change.
 ---
 
 # 3. USE THE UP ROUGH GENERATOR AS THE REFERENCE IMPLEMENTATION
+
+> **Owner decision O1 (2026-10-12) overturns this section:** the Up Rough turntable simulation IS ported, as a TypeScript function turning each gesture into a platter speed curve for the existing worklet. See `2026-10-11-scratch-dj-progress.md` "Port of the Up Rough Demo System scratch engine".
+
 
 Do not copy the Python renderer into TypeScript.
 
@@ -2821,6 +2827,9 @@ performance
 ---
 
 # 79. DO NOT PORT THE OFFLINE PHYSICS LITERALLY
+
+> **Owner decision O1 (2026-10-12) overturns this section:** the Up Rough turntable simulation IS ported, as a TypeScript function turning each gesture into a platter speed curve for the existing worklet. See `2026-10-11-scratch-dj-progress.md` "Port of the Up Rough Demo System scratch engine".
+
 
 The Up Rough turntable simulator is useful reference material, but DEViLBOX already has real-time platter physics and signed-rate playback.
 
