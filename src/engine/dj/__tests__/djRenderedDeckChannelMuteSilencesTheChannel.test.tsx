@@ -89,6 +89,8 @@ describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
     const { DeckEngine } = await import('../DeckEngine');
     const { DeckChannelToggles } = await import('@/components/dj/DeckChannelToggles');
     const { useDJStore } = await import('@/stores/useDJStore');
+    const { getCachedAudio } = await import('../DJAudioCache');
+    expect(result.wavData.byteLength).toBeGreaterThan(0);
 
     /** The deck output (left) over the window, with the given CH buttons clicked after the load. */
     async function deckOutput(clickChannels: number[]): Promise<{ out: Float32Array; deck: InstanceType<typeof DeckEngine> }> {
@@ -100,7 +102,9 @@ describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
       deck.setFilterPosition(0);
       for (const band of ['low', 'mid', 'high'] as const) deck.setEQ(band, 0, 0);
       await audioLoadsSettled(400, 20000);
-      await deck.loadAudioFile(result.wavData, SONG);
+      // Every load reads the cache entry afresh, as the app's loads do: a loaded deck releases its int16 stems.
+      const entry = await getCachedAudio(source);
+      await deck.loadAudioFile(entry!.audioData, SONG);
       useDJStore.getState().setChannelMode('A', 'mute');
       const { getByTitle, unmount } = render(<DeckChannelToggles deckId="A" />);
       for (const ch of clickChannels) fireEvent.click(getByTitle(`Channel ${ch + 1} (Shift+click to solo)`));

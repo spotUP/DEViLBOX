@@ -593,6 +593,7 @@ export class DeckEngine {
     this.setChannelScopes(channelScopesFor(buffer));
     const info = await this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
     this.applyChannelStems();
+    releaseChannelStems(this._channelScopes);
     // Fire-and-forget prime so the scratch ring buffer has content even
     // before the user presses play. Mirrors a real turntable: a loaded
     // record is scratch-audible regardless of motor state.
@@ -611,6 +612,7 @@ export class DeckEngine {
     this.setChannelScopes(channelScopes);
     const info = await this.audioPlayer.loadDecodedBuffer(audioBuffer, originalBytes, precomputedPeaks);
     this.applyChannelStems();
+    releaseChannelStems(this._channelScopes);
     void this._primeScratchBuffer();
     return info;
   }
@@ -633,10 +635,11 @@ export class DeckEngine {
    * track yet, so a deck that moved on to another track is left alone.
    */
   attachLateChannelScopes(wav: ArrayBuffer, track: ChannelScopeTrack): boolean {
-    if (this._loadedWav !== wav || (this._channelScopes?.stems && this._channelScopes.stems.length > 0)) return false;
+    if (this._loadedWav !== wav || this.channelMute.stemCount > 0) return false;
     attachChannelScopes(wav, track);
     this.setChannelScopes(track);
     // A playing source keeps the buffer it started with; the stems sound from its next start (seek, cue, loop, play).
+    // The caller releases the int16 stems once every deck holding `wav` has its buffer (DJChannelScopeRerender).
     this.applyChannelStems();
     return true;
   }

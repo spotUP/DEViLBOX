@@ -11,7 +11,7 @@
  * gains the scope track, and a deck still holding that WAV gets the track
  * attached (DeckEngine.attachLateChannelScopes) while it plays.
  */
-import { scopelessOriginOf, type ChannelScopeTrack, type ScopelessOrigin } from './channelScopeTrack';
+import { scopelessOriginOf, releaseChannelStems, type ChannelScopeTrack, type ScopelessOrigin } from './channelScopeTrack';
 import { getCachedEntryByHash, listScopelessEntries } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
 import { getDJEngineIfActive } from './DJEngine';
@@ -56,6 +56,9 @@ export async function requestChannelScopeRerender(wav: ArrayBuffer): Promise<boo
   for (const id of DECK_IDS) {
     try { if (engine?.getDeck(id).attachLateChannelScopes(wav, track)) attached = true; } catch { /* no such deck */ }
   }
+  // Every deck holding the WAV has its stem buffer now; the cache entry keeps the int16 copy
+  // (the session map of renders would otherwise hold it for good).
+  releaseChannelStems(track);
   return attached;
 }
 
