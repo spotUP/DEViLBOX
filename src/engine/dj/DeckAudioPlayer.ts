@@ -21,6 +21,11 @@ export interface AudioFileInfo {
   waveformPeaks: Float32Array;  // pre-computed overview peaks
 }
 
+/** A deck load overtaken by a newer load of the same deck: its audio never reached the player. */
+export class DeckLoadSuperseded extends Error {
+  constructor(filename: string) { super(`load of ${filename} superseded by a newer load`); }
+}
+
 export class DeckAudioPlayer {
   /** De-click fade on every start and stop, in seconds. */
   static readonly FADE_S = PLAYER_FADE_S;
@@ -96,15 +101,12 @@ export class DeckAudioPlayer {
     const audioContext = Tone.getContext().rawContext as AudioContext;
     const result: DecodeResult = await decodeAudio(audioContext, buffer, { filename });
 
-    // Guard: if another load started while we were decoding, discard this result
+    // Another load started while we were decoding: this one never reaches the
+    // player, so it is not a successful load (a caller that took it for one
+    // went on to play() a deck whose buffer the newer load had just released).
     if (myVersion !== this._loadVersion) {
       console.log(`[DeckAudioPlayer] Discarding stale decode for ${filename} (version ${myVersion} != ${this._loadVersion})`);
-      return {
-        duration: result.audioBuffer.duration,
-        sampleRate: result.audioBuffer.sampleRate,
-        numberOfChannels: result.audioBuffer.numberOfChannels,
-        waveformPeaks: new Float32Array(0),
-      };
+      throw new DeckLoadSuperseded(filename);
     }
 
     const audioBuffer = result.audioBuffer;

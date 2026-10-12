@@ -311,7 +311,10 @@ class DJAutoDJ {
               await deck.play();
               useDJStore.getState().setDeckPlaying(this.activeDeck, true);
             } catch (err) {
+              // A deck that will not start is a failed enable, said to the caller - not a silent "enabled".
               console.error('[AutoDJ] Failed to start playback:', err);
+              this.disable();
+              return `Could not start playback: ${err instanceof Error ? err.message : String(err)}`;
             }
             break;
           }

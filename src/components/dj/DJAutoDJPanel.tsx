@@ -10,6 +10,7 @@ import { SkipForward, Shuffle, SlidersHorizontal, Scissors, Zap, Pause, Play, La
 import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useUIStore } from '@/stores/useUIStore';
+import { notify } from '@/stores/useNotificationStore';
 import { enableAutoDJ, disableAutoDJ, skipAutoDJ, pauseAutoDJ, resumeAutoDJ, playAutoDJFromIndex } from '@/engine/dj/DJActions';
 import { analyzePlaylist, playlistNeedsAnalysis, trackHasRemoteSource, type AnalysisProgress, type ModlandFixCandidate } from '@/engine/dj/DJPlaylistAnalyzer';
 import { Modal } from '@/components/ui/Modal';
@@ -78,9 +79,14 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const [analyzeProgress, setAnalyzeProgress] = useState<AnalysisProgress | null>(null);
 
   const actuallyEnable = useCallback(async () => {
-    const error = await enableAutoDJ(0);
+    let error: string | null;
+    try {
+      error = await enableAutoDJ(0);
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
     if (error) {
-      useUIStore.getState().setStatusMessage(`Auto DJ: ${error}`, false, 4000);
+      notify.error(`Auto DJ: ${error}`);
     } else {
       setPaused(false);
       onClose?.();
