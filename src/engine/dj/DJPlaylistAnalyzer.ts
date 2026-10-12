@@ -329,8 +329,8 @@ export async function analyzePlaylist(
             const curr = resolveCurrent(trackId);
             if (curr) {
               queueMetaUpdate(curr.index, {
-                ...(summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm }),
-                duration: pipelineResult.duration,
+                // The row's length is the summary's (trackLengthSec: the song's, past the preview cap).
+                ...(summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm, duration: pipelineResult.duration }),
                 analysisSkipped: false,
                 djSummary: summary ?? undefined,
               });
@@ -347,8 +347,8 @@ export async function analyzePlaylist(
             const curr = resolveCurrent(trackId);
             if (curr) {
               queueMetaUpdate(curr.index, {
-                ...(summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm }),
-                duration: pipelineResult.duration,
+                // The row's length is the summary's (trackLengthSec: the song's, past the preview cap).
+                ...(summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm, duration: pipelineResult.duration }),
                 analysisSkipped: false,
                 djSummary: summary ?? undefined,
               });
@@ -518,12 +518,12 @@ export async function analyzePlaylist(
           }
           const song = await songForAnalysis(track, buffer, filename);
           const summary = summaryFromPipeline(pipelineResult, track.id, song, ANALYSIS_RENDER_CAP_SEC);
-          const meta: { bpm: number; musicalKey?: string; energy?: number } = summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm };
+          const meta: { bpm: number; musicalKey?: string; energy?: number; duration?: number } = summary ? playlistMetaFromSummary(summary) : { bpm: pipelineResult.analysis.bpm };
           result = {
             bpm: meta.bpm,
             musicalKey: meta.musicalKey ?? '',
             energy: meta.energy ?? null,
-            duration: pipelineResult.duration,
+            duration: meta.duration ?? pipelineResult.duration,
             rmsDb: pipelineResult.analysis.rmsDb,
             peakDb: pipelineResult.analysis.peakDb,
             djSummary: summary,
@@ -634,6 +634,8 @@ export async function analyzePlaylist(
                   peakDb: piggybackResult.analysis.peakDb,
                   // One producer: tempo, key and energy all from this summary; an unknown key writes none (never `musicalKey: undefined`).
                   ...(summary ? { ...playlistMetaFromSummary(summary), djSummary: summary } : {}),
+                  // The server rendered the whole song: its length stands over the preview's.
+                  ...(result.duration > 0 ? { duration: result.duration } : {}),
                 });
               }
             }

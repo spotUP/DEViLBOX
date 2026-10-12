@@ -18,7 +18,7 @@ import type {
 import { buildBeatGrids, timelineAt } from './beatGrid';
 import { arrangementEvents, barFeatures, buildPhrases, detectPhraseLength, labelSections, perceivedIntensity, segmentBoundaries, type BarFeatures } from './structure';
 import { deriveCuePoints } from './cuePoints';
-import { analyzeTrackerSong } from './trackerMixAnalysis';
+import { analyzeTrackerSong, timeOrderPositions } from './trackerMixAnalysis';
 import { moduleBeatGrid, type ModuleBeatGrid } from './moduleBeatGrid';
 import { smooth } from './activityTimelines';
 
@@ -412,13 +412,36 @@ function profile(values: number[], parts = 8): number[] {
 
 /** The compact summary stored on a playlist track. */
 /**
- * A playlist row's tempo, key and energy, from the track's one analysis (the
- * same DJTrackAnalysis the deck and the planners read; owner juggling plan
- * sections 2 and 31: one producer, and the key's confidence travels in the
- * summary). An unknown key writes none.
+ * A playlist row's tempo, key, energy and length, from the track's one
+ * analysis (the same DJTrackAnalysis the deck and the planners read; owner
+ * juggling plan sections 2 and 31: one producer, and the key's confidence
+ * travels in the summary). An unknown key or length writes none.
  */
-export function playlistMetaFromSummary(summary: DJTrackSummary): { bpm: number; musicalKey?: string; energy: number } {
-  return { bpm: summary.bpm, ...(summary.key ? { musicalKey: summary.key } : {}), energy: summary.energy.perceivedIntensity };
+export function playlistMetaFromSummary(summary: DJTrackSummary): { bpm: number; musicalKey?: string; energy: number; duration?: number } {
+  return {
+    bpm: summary.bpm, ...(summary.key ? { musicalKey: summary.key } : {}), energy: summary.energy.perceivedIntensity,
+    ...(summary.durationSec > 0 ? { duration: summary.durationSec } : {}),
+  };
+}
+
+/**
+ * A track's real length in seconds from a render of `renderedSec`: the render
+ * itself, unless it was capped (`renderCapSec`, the playlist analyser's
+ * preview) and the module's own order walk (timeOrderPositions, the walk the
+ * module grid reads) plays longer - then the walk's end. The one producer of
+ * a track's length for its playlist row (JUGGLE-FOLLOWUPS c: rows of 0 s made
+ * the set plan count 240 s per module).
+ */
+export function trackLengthSec(renderedSec: number, song?: TrackerSong | null, renderCapSec?: number): number {
+  const capped = renderCapSec !== undefined && renderedSec >= renderCapSec - 0.5;
+  if (!capped || !song || !Array.isArray(song.patterns) || song.patterns.length === 0) return renderedSec;
+  try {
+    const walk = timeOrderPositions(song);
+    const end = walk.positions[walk.positions.length - 1]?.end ?? 0;
+    return end > renderedSec ? end : renderedSec;
+  } catch {
+    return renderedSec;
+  }
 }
 
 export function summarizeTrack(a: DJTrackAnalysis): DJTrackSummary {
@@ -460,7 +483,8 @@ export function summarizeTrack(a: DJTrackAnalysis): DJTrackSummary {
 export function summaryFromPipeline(result: { duration: number; analysis?: PipelineResult['analysis'] }, id = 'track', song?: TrackerSong | null, renderCapSec?: number): DJTrackSummary | null {
   if (!result.analysis) return null;
   try {
-    return summarizeTrack(buildDJTrackAnalysis({ id, durationSec: result.duration, analysis: result.analysis, extended: result.analysis.extended ?? null, song: song ?? null, renderCapSec }));
+    const summary = summarizeTrack(buildDJTrackAnalysis({ id, durationSec: result.duration, analysis: result.analysis, extended: result.analysis.extended ?? null, song: song ?? null, renderCapSec }));
+    return { ...summary, durationSec: trackLengthSec(result.duration, song, renderCapSec) };
   } catch {
     return null;
   }
