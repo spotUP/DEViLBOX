@@ -110,8 +110,15 @@ export function detectPhraseLength(features: BarFeatures[], boundaries: number[]
   return { lengthBars: best.lag, confidence: Math.max(0.2, Math.min(1, 0.5 + margin * 5)) };
 }
 
-/** Boundaries where consecutive bars differ more than usual (plus silence edges). */
-export function segmentBoundaries(features: BarFeatures[], minBars = 4): number[] {
+/**
+ * Boundaries where consecutive bars differ more than usual (plus silence edges).
+ * The end of the track is no arrangement boundary: neither the music stopping
+ * for good (every bar after it silent) nor the bar a capped render cuts off
+ * (it ends past `trackEndSec`, its missing part reads as silence). Counted as
+ * boundaries they put a "section" on the track's length, which says nothing
+ * about the phrase grid the music is written on (La Mer: bars 91 and 93).
+ */
+export function segmentBoundaries(features: BarFeatures[], minBars = 4, trackEndSec = Infinity): number[] {
   if (features.length === 0) return [];
   const nov: number[] = [0];
   for (let i = 1; i < features.length; i++) nov.push(distance(features[i - 1], features[i]));
@@ -142,7 +149,12 @@ export function segmentBoundaries(features: BarFeatures[], minBars = 4): number[
       if (i - last >= 2 || silentEdge) { bounds.push(i); firm.add(i); last = i; }
     } else if (nov[i] > threshold && i - last >= minBars) { bounds.push(i); last = i; }
   }
-  return bounds;
+  // The last whole bar that sounds: a boundary after it is the track ending, not the arrangement.
+  let lastSounding = -1;
+  for (let i = features.length - 1; i >= 0; i--) {
+    if (features[i].loudnessDb >= SILENCE_DB && features[i].end <= trackEndSec + 1e-3) { lastSounding = i; break; }
+  }
+  return bounds.filter((b) => b === 0 || b <= lastSounding);
 }
 
 interface SegmentStats {

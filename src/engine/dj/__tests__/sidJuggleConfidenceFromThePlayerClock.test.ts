@@ -13,10 +13,13 @@
  * Now a SID beat is a whole number of player calls (sidPlayerBeatGrid; both
  * tunes: 24 PAL frames = 125.31 BPM, the beats lock at 0.98 / 0.89), the bar
  * search runs on those exact beats, and sync is the grids' confidence. Beat and
- * sync no longer refuse. Phrase (0.30) still does, on evidence: the arrangement
- * boundaries the audio finds (Venus bars 15 and 70, La Mer 40 and 88 plus the
- * tune's end at 91) do not sit on one 4 / 8 / 16-bar phrase grid - an owner
- * decision, not part of this fix.
+ * sync no longer refuse. Phrase (0.30) still did: La Mer's boundaries were bars
+ * 40 and 88 plus the tune's end (91, silence to the end) and the bar the 180 s
+ * render cap cuts off (93). Owner decision 2026-10-13 (SID-FOLLOWUP-2 b): the
+ * track end and the render cut-off are no section boundaries - La Mer's 40 and
+ * 88 sit on an 8-bar grid (phrase 8, confidence 1.00) and it juggles. Venus
+ * keeps refusing on its own arrangement: bars 15 and 70 sit on no 4 / 8 / 16-bar
+ * grid (phrase 0.30), accepted by the owner.
  *
  * Inputs: the real renders' analysis (fixtures *.analysis.json: WebSID render +
  * essentia RhythmExtractor2013 as the analysis worker runs it + the extended
@@ -70,6 +73,17 @@ describe('steady four-on-the-floor SIDs juggle', () => {
     expect(reason).not.toContain('sync');
     // Phrase alone decides now (see the header): with phrase evidence on the grid the pair juggles.
     expect(confidencePolicy({ ...pair, phraseConfidence: 0.6 })).not.toBe('none');
+  });
+
+  it('the track end and the render cut-off are no phrase boundaries: La Mer juggles (8-bar phrases), Venus keeps refusing on bars 15 / 70', () => {
+    expect(laMer.sections.map((x) => x.startBar)).toEqual([0, 40, 88]);
+    const lm = pairConfidence(laMer, laMer);
+    expect(lm.phraseConfidence).toBe(1);
+    expect(confidencePolicy(lm)).toBe('beat');
+    expect(venus.sections.map((x) => x.startBar)).toEqual([0, 15, 70]);
+    const v = pairConfidence(venus, venus);
+    expect(v.phraseConfidence).toBeCloseTo(0.3, 6);
+    expect(confidencePolicy(v)).toBe('none');
   });
 
   it('the live juggle context: with one deck playing, sync is the grids\' confidence, not 0', () => {
