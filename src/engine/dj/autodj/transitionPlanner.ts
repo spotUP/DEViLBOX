@@ -24,6 +24,9 @@ import { crossfadeFor, curve, filterFor, stepCurve } from './transitionCurves';
 import { POLICY_MIN, PHASE_BUDGET, confidencePolicy, lowConfidenceReason, meterMismatch, type ConfidencePolicy } from './juggle/jugglePlanner';
 import { LADDER_SHAPES, minLadderRung } from './juggle/jugglePatterns';
 import type { DJJuggleHistory, DJJugglePerformanceContext, JuggleMode } from './juggle/juggleTypes';
+import { planTransitionScratch } from '../scratch/transitionScratch';
+import { scratchPermission, transitionCost } from './performanceBudget';
+import type { ScratchMode } from '../scratch/scratchStyles';
 
 export interface TransitionPlanInput {
   outgoing: DJTrackAnalysis;
@@ -56,6 +59,10 @@ export interface TransitionPlanInput {
    * section 29). Without it only the set phase gates.
    */
   juggleState?: { allowed: boolean; reasons: string[]; recent: DJJuggleHistory[] };
+  /** Auto Scratch mode (scratch plan section 62); OFF or absent = no scratch in the transition. */
+  scratchMode?: ScratchMode;
+  /** Hands left for a scratch (scratch plan section 27); from the transition's own cost when absent. */
+  scratchPermission?: number;
 }
 
 export const LENGTH_CANDIDATES = [2, 4, 8, 16, 32] as const;
@@ -805,6 +812,18 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   if (loop) reasons.push(`loop: ${loop.reason}`);
   if (cueJump) reasons.push(`cue jump: ${cueJump.reason}`);
 
+  // Scratch in the transition (scratch plan D8, sections 44-48): additive, never changes the curves.
+  let scratch: DJTransitionPlan['scratch'];
+  if (input.scratchMode && input.scratchMode !== 'OFF') {
+    const permission = input.scratchPermission ?? scratchPermission({ transitionCost: transitionCost(transitionStyle), fxCost: Math.min(2, effects.length) });
+    const s = planTransitionScratch({
+      plan: { style: transitionStyle, startBeat, endBeat, durationBeats, beatsPerBar, outgoingDeck: input.outgoingDeck, incomingDeck: input.incomingDeck, incomingPosition, effects },
+      outgoing, incoming, mode: input.scratchMode, permission, creativeRisk: input.creativeRisk, setPhase: input.setPhase, seed,
+    });
+    scratch = s.scratch;
+    reasons.push(`scratch: ${s.scratch ? `${s.scratch.kind}, ${s.scratch.events.length} events (${s.reason})` : s.reason}`);
+  }
+
   return {
     id: `t${seed}`,
     style: transitionStyle,
@@ -829,6 +848,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     cueJump,
     cut,
     juggle,
+    scratch,
     confidence,
     risk,
     quantize,
@@ -868,6 +888,7 @@ export function fallbackPlan(plan: DJTransitionPlan, input: TransitionPlanInput,
     cueJump: undefined,
     cut: undefined,
     juggle: undefined,
+    scratch: undefined,
     quantize: level === 'emergency' ? 'bar' : plan.quantize,
     reasons: [`${level}: ${styleName} instead of ${plan.style}`, ...plan.reasons.slice(1)],
   };
