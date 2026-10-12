@@ -24,6 +24,7 @@ import type { DeckEngine } from './DeckEngine';
 import type { ScratchGesture, ScratchGestureId } from './scratch/scratchTypes';
 import { getGesture } from './scratch/scratchGestureCatalog';
 import { faderGainAt, faderRampSec, applyFaderGain } from './scratch/scratchFaderModel';
+import { realTimers } from './autodj/executorTimers';
 
 // ============================================================================
 // TYPES
@@ -175,12 +176,12 @@ function gestureCurves(gesture: ScratchGesture): Array<'deck' | 'crossfader'> {
  *  - Beat quantization for pattern start
  */
 export class ScratchPlayback {
-  private patternIntervalId: ReturnType<typeof setInterval> | null = null;
-  private patternTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  private patternFaderTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private patternIntervalId: unknown = null;
+  private patternTimeoutId: unknown = null;
+  private patternFaderTimeoutId: unknown = null;
   private readonly getDeck: () => DeckEngine;
   private readonly getEffectiveBPM: () => number;
-  private faderLFOTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private faderLFOTimeoutId: unknown = null;
   private faderLFOActive = false;
   private currentLFODivision: FaderLFODivision | null = null;
   private scheduledLFOBPM = 0;
@@ -283,7 +284,7 @@ export class ScratchPlayback {
       const delay = this.msUntilNextBeat(pattern.quantize);
       if (delay > 20) {
         onWaiting?.(delay);
-        this.patternTimeoutId = setTimeout(startLoop, delay);
+        this.patternTimeoutId = realTimers.setTimeout(startLoop, delay);
         return;
       }
     }
@@ -292,8 +293,8 @@ export class ScratchPlayback {
   }
 
   private _startPatternInterval(): void {
-    if (this.patternIntervalId !== null) clearInterval(this.patternIntervalId);
-    this.patternIntervalId = setInterval(() => this._tickPattern(), 10);
+    if (this.patternIntervalId !== null) realTimers.clearInterval(this.patternIntervalId);
+    this.patternIntervalId = realTimers.setInterval(() => this._tickPattern(), 10);
   }
 
   private _tickPattern(): void {
@@ -400,15 +401,15 @@ export class ScratchPlayback {
 
   stopPattern(): void {
     if (this.patternTimeoutId !== null) {
-      clearTimeout(this.patternTimeoutId);
+      realTimers.clearTimeout(this.patternTimeoutId);
       this.patternTimeoutId = null;
     }
     if (this.patternIntervalId !== null) {
-      clearInterval(this.patternIntervalId);
+      realTimers.clearInterval(this.patternIntervalId);
       this.patternIntervalId = null;
     }
     if (this.patternFaderTimeoutId !== null) {
-      clearTimeout(this.patternFaderTimeoutId);
+      realTimers.clearTimeout(this.patternFaderTimeoutId);
       this.patternFaderTimeoutId = null;
     }
     this.activePattern = null;
@@ -516,7 +517,7 @@ export class ScratchPlayback {
       }
 
       const totalMs = (offsetSec + totalDivisions * periodSec) * 1000;
-      this.faderLFOTimeoutId = setTimeout(() => {
+      this.faderLFOTimeoutId = realTimers.setTimeout(() => {
         if (this.faderLFOActive && this.currentLFODivision === division) {
           // Always use fresh BPM on reschedule so LFO stays synced
           const freshBPM = this.getEffectiveBPM();
@@ -531,7 +532,7 @@ export class ScratchPlayback {
     this.faderLFOActive = false;
     this.currentLFODivision = null;
     if (this.faderLFOTimeoutId !== null) {
-      clearTimeout(this.faderLFOTimeoutId);
+      realTimers.clearTimeout(this.faderLFOTimeoutId);
       this.faderLFOTimeoutId = null;
     }
     try {
@@ -554,7 +555,7 @@ export class ScratchPlayback {
       Math.abs(newBPM - this.scheduledLFOBPM) / this.scheduledLFOBPM > 0.02
     ) {
       if (this.faderLFOTimeoutId !== null) {
-        clearTimeout(this.faderLFOTimeoutId);
+        realTimers.clearTimeout(this.faderLFOTimeoutId);
         this.faderLFOTimeoutId = null;
       }
       this._scheduleFaderLFO(newBPM, this.currentLFODivision);
@@ -573,7 +574,7 @@ export class ScratchPlayback {
 
   schedulePatternFader(pattern: ScratchPattern, bpm: number, start?: PatternStart): void {
     if (this.patternFaderTimeoutId !== null) {
-      clearTimeout(this.patternFaderTimeoutId);
+      realTimers.clearTimeout(this.patternFaderTimeoutId);
       this.patternFaderTimeoutId = null;
     }
     const gesture = getGesture(pattern.gestureId);
@@ -605,7 +606,7 @@ export class ScratchPlayback {
       }
       if (start?.cycles !== undefined) return; // a planned stroke is scheduled whole: nothing to extend
       const totalMs = (offsetSec + PATTERN_FADER_LOOKAHEAD * cycleSec) * 1000;
-      this.patternFaderTimeoutId = setTimeout(() => {
+      this.patternFaderTimeoutId = realTimers.setTimeout(() => {
         this.patternFaderTimeoutId = null;
         if (this.activePattern === pattern) {
           this.schedulePatternFader(pattern, this.getEffectiveBPM());
