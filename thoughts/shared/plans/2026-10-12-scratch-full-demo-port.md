@@ -34,6 +34,8 @@ OWNER DECISIONS 2026-10-12 (phase-0 questions):
 
 Running count: 22 of 81 closed (phase 0 re-verification 2026-10-12, against main at 61ae1abcf; 59 open). The 22 are rows the gap doc had as open that current code already ports exactly, with a fixture test against the demo; their revert checks were not re-run in phase 0.
 
+Null-test oracle and per-stage residual table: thoughts/shared/research/2026-10-12_scratch-null-test.md (render path: record -306 dB, strokes -240..-307 dB, Deck C chain -152 dB, shaped layer -71 dB, 48 kHz read -104 dB vs ideal). Every PG phase checks against it.
+
 ## Phase 0 findings (2026-10-12)
 
 ### The decisive finding: two stroke paths
@@ -206,8 +208,8 @@ Status: yes = DEViLBOX matches the demo exactly (evidence given); partial / no =
 | X3 | PG-J | Per-gesture `fx` | partial | Render path: `scratchRender.ts:289`. Voice path: `setGestureFx`. | open |
 | X4 | - | Three-deck wet bus room .42, delay .28, dark_room tail .22 | yes | `scratchDeckC.ts:23`; `scratch-deck-c.worklet.js:148-156, 204-210`; null < -130 dB (`scratchNullsTheDemo.test.ts:52-63`). | yes (phase 0) |
 | X5 | - | Deck C EQ high-pass 200, presence .2 at 1-3 kHz, 4-pole low-pass 6 kHz | yes | `scratchDeckC.ts:15, 37`; same null test. | yes (phase 0) |
-| X6 | PG-F | Level match 0.60 x the juggle-bus RMS | partial | Live 8 s follower on the programme (`scratch-deck-c.worklet.js:158, 212-215`). Owner question 1. | open (owner) |
-| X7 | PG-F | Duck on juggle transients: 40 Hz envelope, depth .25 | no | There is no duck in the Deck C worklet or the pool. | open |
+| X6 | PG-F | Level match 0.60 x the juggle-bus RMS | partial | 1ed8ce5d8: a planned routine is shaped ahead - `deckCLevel` = 0.60 x rms(the routine deck's own audio over its 32 bars) / rms(the planned layer, rendered offline through the same worklet) (`scratchVoicePool.shapeRoutine`, `scratchDeckC.ts`); level within 1e-6 of the demo (scratchNullsTheDemo); A/B shaped layer -70.9 dB with no gain fit (research/2026-10-12_scratch-null-test.md). Missing vs the X6 decision: deck B not summed in; a module deck (no buffer) falls back to the follower (layer mean square since its first stroke, 1 s glide). | open |
+| X7 | PG-F | Duck on juggle transients: 40 Hz envelope, depth .25 | partial | 1ed8ce5d8: `deckCDuck` (lp(abs(beat), 40) / max, depth 0.25) on the Deck C bus from the routine's first bus sample, sent when the routine is planned; duck < -130 dB vs the demo (scratchNullsTheDemo). Same beat source gap as X6. | open |
 | X8 | PG-F | NEW: juggle bus + small_room 0.06; mix 0.72 x juggle + duck x Deck C; peak cap 0.98 (three_deck.py :375, :455-462, :606) | no | Absent. | open |
 | J1 | PG-I | Break grammar, 8 patterns + `JUGGLE_ROLES`, `MG_VEL`, `SR_VEL`, `_alt` (beat_juggle.py :287-374) | no | grep `machineGun|snareRoll|kickStutter`: none. | open |
 | J2 | PG-I | Reset planner: `rewind_time`, `plan_resets`, `MAX_REWIND_SPEED` 3 (:230, :275-280, :380-404) | no | grep `rewind`: no model. | open |
