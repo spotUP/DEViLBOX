@@ -55,7 +55,7 @@ export async function loadUADEToDeck(
   // Check cache first
   const cached = await getCachedAudio(fileBuffer);
 
-  if (cached) {
+  if (cached && cached.audioData.byteLength > 0) {
     // Load from cache (audio file mode)
     console.log(`[DJPrerender] Loading cached audio for ${filename} as ${identity}`);
     const info = await engine.loadAudioToDeck(deckId, cached.audioData, identity, trackName || cached.filename, bpm || cached.bpm);

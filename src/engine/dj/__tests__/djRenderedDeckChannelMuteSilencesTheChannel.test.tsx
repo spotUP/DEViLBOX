@@ -95,7 +95,8 @@ describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
     const { getCachedAudio } = await import('../DJAudioCache');
     expect(result.wavData.byteLength).toBeGreaterThan(0);
     // The cache holds the stems as lossless FLAC (channelStemCodec.ts), not raw int16 (4x the WAV).
-    const cachedEntry = await getCachedAudio(source);
+    // The render is a 12 s preview (test time); a deck load in the app never gets a preview (isPreviewRender), so this one asks for it.
+    const cachedEntry = await getCachedAudio(source, { allowPreview: true });
     const flacBytes = (cachedEntry!.channelScopes?.flacStems ?? []).reduce((n, f) => n + f.byteLength, 0);
     expect(cachedEntry!.channelScopes?.stems, 'raw int16 stems in the cache').toBeUndefined();
     expect(flacBytes, 'FLAC stems cached').toBeGreaterThan(0);
@@ -112,7 +113,7 @@ describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
       for (const band of ['low', 'mid', 'high'] as const) deck.setEQ(band, 0, 0);
       await audioLoadsSettled(400, 20000);
       // Every load reads the cache entry afresh, as the app's loads do: a loaded deck releases its int16 stems.
-      const entry = await getCachedAudio(source);
+      const entry = await getCachedAudio(source, { allowPreview: true });
       await deck.loadAudioFile(entry!.audioData, SONG);
       useDJStore.getState().setChannelMode('A', 'mute');
       const { getByTitle, unmount } = render(<DeckChannelToggles deckId="A" />);

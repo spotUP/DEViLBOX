@@ -59,6 +59,48 @@ export interface CachedAudio {
   channelScopes?: ChannelScopeTrack;
   /** Set by a render that knew about scope tracks (CHANNEL_SCOPE_RENDER_VERSION), with or without a per-channel tap. */
   scopeRenderVersion?: number;
+
+  /**
+   * The render stopped at this many seconds before the song ended (a preview,
+   * the playlist analyser's PREVIEW_RENDER_CAP_SEC); null = the whole song.
+   * Absent on entries written before the field existed (isPreviewRender).
+   */
+  renderCapSec?: number | null;
+}
+
+/** The playlist analyser renders a preview of this many seconds (its BPM, key and energy need no more). */
+export const PREVIEW_RENDER_CAP_SEC = 90;
+
+/**
+ * Whether the entry's audio is a capped preview, not the whole song. Entries
+ * from before renderCapSec was recorded are previews when they end at the
+ * preview cap (a capped render overshoots it by under one render chunk); a
+ * whole song of that exact length is rendered again once, then recorded.
+ */
+export function isPreviewRender(entry: Pick<CachedAudio, 'renderCapSec' | 'duration'>): boolean {
+  if (entry.renderCapSec !== undefined) return entry.renderCapSec !== null;
+  return entry.duration >= PREVIEW_RENDER_CAP_SEC - 0.01 && entry.duration < PREVIEW_RENDER_CAP_SEC + 0.5;
+}
+
+export interface CacheReadOptions {
+  /** Hand out a preview render's audio too (the playlist analyser); every deck load wants the whole song. */
+  allowPreview?: boolean;
+}
+
+/**
+ * A cache entry as a reader gets it: a preview render's audio is left out
+ * unless the reader takes previews, so no deck ever plays (or analyses as
+ * the track) a song cut at the preview cap. The source bytes stay, and the
+ * reader renders the whole song from them.
+ */
+function asRead<T extends CachedAudio | null | undefined>(entry: T, opts: CacheReadOptions = {}): T {
+  if (!entry || opts.allowPreview || !entry.audioData || entry.audioData.byteLength === 0 || !isPreviewRender(entry)) {
+    return withChannelScopes(entry);
+  }
+  return {
+    ...entry, audioData: new ArrayBuffer(0), waveformPeaks: [], channelScopes: undefined,
+    beatGrid: undefined, bpm: undefined, bpmConfidence: undefined, analysisVersion: undefined, extended: undefined,
+  } as T;
 }
 
 /**
@@ -135,7 +177,7 @@ export async function hashFile(buffer: ArrayBuffer): Promise<string> {
 }
 
 /** Get cached audio by file hash */
-export async function getCachedAudio(fileBuffer: ArrayBuffer): Promise<CachedAudio | null> {
+export async function getCachedAudio(fileBuffer: ArrayBuffer, opts: CacheReadOptions = {}): Promise<CachedAudio | null> {
   try {
     const database = await initDB();
     const hash = await hashFile(fileBuffer);
@@ -150,7 +192,7 @@ export async function getCachedAudio(fileBuffer: ArrayBuffer): Promise<CachedAud
         if (entry) {
           // Update access time (LRU)
           void touchCacheEntry(hash);
-          resolve(withChannelScopes(entry));
+          resolve(asRead(entry, opts));
         } else {
           resolve(null);
         }
@@ -228,6 +270,7 @@ export async function cacheAudio(
   sampleRate: number,
   numberOfChannels: number,
   channelScopes?: ChannelScopeTrack,
+  renderCapSec: number | null = null,
 ): Promise<void> {
   try {
     const database = await initDB();
@@ -257,6 +300,7 @@ export async function cacheAudio(
       sourceData: existingSource || sourceFile.slice(0), // preserve or store source
       channelScopes,
       scopeRenderVersion: CHANNEL_SCOPE_RENDER_VERSION,
+      renderCapSec,
     };
     entry.sizeBytes = entryStoredBytes(entry);
 
@@ -719,10 +763,10 @@ export async function getCachedFilenames(): Promise<Set<string>> {
  * decode/render themselves. Filtering purely on audioData.byteLength would
  * make those stubs invisible and force a file picker re-prompt.
  */
-export async function getCachedAudioByFilename(filename: string): Promise<CachedAudio | null> {
+export async function getCachedAudioByFilename(filename: string, opts: CacheReadOptions = {}): Promise<CachedAudio | null> {
   try {
     const database = await initDB();
-    return withChannelScopes(await new Promise<CachedAudio | null>((resolve) => {
+    return asRead(await new Promise<CachedAudio | null>((resolve) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       // Use the filename index (v2+) to load ONE matching record instead of getAll().
@@ -760,7 +804,7 @@ export async function getCachedAudioByFilename(filename: string): Promise<Cached
         };
         request.onerror = () => resolve(null);
       }
-    }));
+    }), opts);
   } catch {
     return null;
   }
