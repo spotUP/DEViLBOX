@@ -113,6 +113,8 @@ export interface DjFxFireOptions {
   scratchSource?: ScratchSource;
   /** Musical role of the event (ambience by role, voice choice). */
   role?: ScratchRole;
+  /** The planned style's FX on the scratch bus (SCR-PG-A5). */
+  scratchFx?: import('@/engine/dj/scratch/scratchTypes').ScratchEventFx;
   /** Record gestures: context time (seconds) the gesture starts at, sample-accurate (the executor's planned beat). */
   at?: number;
   /** Release: let the running pattern cycle finish instead of a hard stop. */
@@ -1808,6 +1810,7 @@ function engageRecordGesture(id: string, gestureId: ScratchGestureId, opts?: DjF
     velocity: opts?.amount,
     cue: opts?.anchor,
     at: opts?.at,
+    fx: opts?.scratchFx,
   });
   if (handle) scratchVoiceHandles.set(id, handle);
 }

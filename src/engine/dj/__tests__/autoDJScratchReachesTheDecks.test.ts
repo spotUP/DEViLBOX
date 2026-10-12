@@ -186,6 +186,12 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
       expect(offMs).toBeLessThanOrEqual(10 + 6);
       expect(Math.abs(offMs - r.event.humanizeMs)).toBeLessThanOrEqual(6);
     }
+    // the style's FX rides on every planned event (SCR-PG-A5): Boom Bap, its FX amount 0.1 x the genre's scale
+    for (const { run: r } of runs) {
+      expect(r.event.fx?.style).toBe('boomBap');
+      expect(r.event.fx!.amount).toBeGreaterThan(0);
+      expect(r.event.fx!.amount).toBeLessThanOrEqual(0.1 * 2);
+    }
     // the planned beats sit on the track's own downbeat grid (1/16 steps of a bar)
     for (const { run: r } of runs) {
       const t = timeAtBeat(track.beatGrid, r.event.executeAtBeat);

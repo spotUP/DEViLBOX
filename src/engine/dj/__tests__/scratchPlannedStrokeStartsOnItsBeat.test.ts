@@ -58,10 +58,11 @@ describe('a planned deck stroke starts on its beat and plays its length (SA-M2, 
     const deck = fakeDeck(120);
     holder.deck = deck;
     fireDjFx('fx_scratch_baby', { deck: 'A', source: 'autodj', beats: 1 });
-    vi.advanceTimersByTime(10);
-    // the baby curve (1-beat cycle = 500 ms) rises from 0.2 at the start to 2.4 at 20 %: 10 ms in is 0.5,
-    // 100 ms in (where elapsed-time phase puts it) is the 2.4 peak
-    expect(deck.velocities[0]!).toBeCloseTo(0.5, 6);
+    vi.advanceTimersByTime(80);
+    // the reference baby (1-beat cycle = 500 ms) pushes forward (+3.2) for its first quarter and pulls
+    // back (-3.2) for the next half: 80 ms in is still the push (phase 0.16); an elapsed-time phase
+    // (100 ms ahead, phase 0.36) would already pull back
+    expect(deck.velocities[deck.velocities.length - 1]!).toBeCloseTo(3.2, 6);
     releaseDjFx('fx_scratch_baby', { deck: 'A', source: 'autodj', finishCycle: true });
     deck.stopPattern();
   });

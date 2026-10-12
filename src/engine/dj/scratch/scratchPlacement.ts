@@ -136,7 +136,7 @@ export function planVocabulary(style: ScratchDJStyle, mode: ScratchMode, genreBi
   const cap = maxLevelFor(mode, style);
   if (cap === 0) return [];
   const allowed = (id: ScratchGestureId): boolean => {
-    if (isThrowGesture(id)) return false;
+    if (isThrowGesture(id) || getGesture(id).flourish) return false;
     const g = getGesture(id);
     return g.difficulty <= cap || (mode === 'SAFE' && id === 'chirp');
   };

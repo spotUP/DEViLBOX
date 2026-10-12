@@ -79,7 +79,8 @@ export function maxLevelFor(mode: ScratchMode, style: ScratchDJStyle): ScratchLe
 export function styleVocabulary(style: ScratchDJStyle, mode: ScratchMode = 'BATTLE'): ScratchGestureId[] {
   const cap = maxLevelFor(mode, style);
   const palette = SCRATCH_STYLES[style];
-  const allowed = SCRATCH_GESTURES.filter((g) => g.difficulty <= cap).map((g) => g.id);
+  // a record flourish (brake, spin-up) is placed on purpose, never drawn from the vocabulary
+  const allowed = SCRATCH_GESTURES.filter((g) => g.difficulty <= cap && !g.flourish).map((g) => g.id);
   const biased = palette.bias.filter((id) => allowed.includes(id));
   return [...biased, ...allowed.filter((id) => !biased.includes(id))];
 }

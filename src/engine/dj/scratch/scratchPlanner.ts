@@ -39,7 +39,7 @@ export interface ScratchPlanOptions {
   record?: Pick<ScratchRecord, 'id' | 'durationSec' | 'clean'> & Partial<Pick<ScratchRecord, 'safe' | 'anchors'>>;
   throwMemory?: ThrowMemory;
   /** Genre modifiers (section 33): density multiplier, rest multiplier, extra bias, level cap. */
-  genre?: { densityScale?: number; restScale?: number; bias?: readonly ScratchGestureId[]; levelCap?: number; durationCapSteps?: number };
+  genre?: { densityScale?: number; restScale?: number; bias?: readonly ScratchGestureId[]; levelCap?: number; durationCapSteps?: number; fxScale?: number };
   /** Vocal activity per bar of the plan; every bar takes the context's reading when omitted. */
   vocalByBar?: readonly number[];
   routines?: boolean;
@@ -122,7 +122,7 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   if (genre.durationCapSteps) {
     const fits = (id: ScratchGestureId): boolean => getGesture(id).durationSteps <= genre.durationCapSteps! && id !== 'drag';
     // short strokes only (section 34) - but never a one-gesture vocabulary: the nearest short ones in the level join
-    gestures = fillVocabulary(gestures.filter(fits), SCRATCH_GESTURE_IDS.filter((id) => fits(id) && getGesture(id).difficulty <= levelCap));
+    gestures = fillVocabulary(gestures.filter(fits), SCRATCH_GESTURE_IDS.filter((id) => fits(id) && !getGesture(id).flourish && getGesture(id).difficulty <= levelCap));
   }
   if (opts.allowed) {
     const playable = gestures.filter((id) => opts.allowed!.includes(id));
@@ -247,7 +247,7 @@ export function toScratchEvents(
   events: readonly PlacedScratch[],
   source: ScratchSource,
   anchor: ScratchAnchor | DeckScratchAnchor,
-  opts: { bpm: number; seed: number; downbeats: Parameters<typeof barStartBeat>[0]; deck?: 'A' | 'B'; humanize?: boolean },
+  opts: { bpm: number; seed: number; downbeats: Parameters<typeof barStartBeat>[0]; deck?: 'A' | 'B'; humanize?: boolean; fx?: ScratchEvent['fx'] },
 ): ScratchEvent[] {
   const offsets = opts.humanize === false ? events.map(() => 0) : humanizeAll(events, opts.bpm, opts.seed);
   return events.map((e, i) => {
@@ -264,6 +264,7 @@ export function toScratchEvents(
       intensity: g.intensity,
       deck: opts.deck,
       returnToAnchor: g.returnsToAnchor && !isThrowGesture(e.gesture),
+      ...(opts.fx ? { fx: opts.fx } : {}),
     };
   });
 }

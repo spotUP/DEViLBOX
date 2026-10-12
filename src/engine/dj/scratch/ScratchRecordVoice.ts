@@ -37,6 +37,8 @@ export interface ScratchVoiceBus {
   setAmbience(amount: number, rampSec?: number): void;
   /** The stroke's velocity tone (the scratch bus, reference render_gesture). */
   setTone?(velocity: number, at?: number): void;
+  /** A gesture's own echo while it plays (reference echo fx); null = the channel's. */
+  setGestureFx?(fx: ScratchGesture['fx'] | null, at?: number): void;
 }
 
 export type ScratchCue = 'attack' | 'vowel' | 'tail' | number | { word: string };
@@ -64,7 +66,7 @@ export interface ScratchVoiceSafetyEvent {
 }
 
 /** Reachability sentinels (SCR-P2.R2, P2.8). */
-export const scratchVoiceStats = { strokes: 0, clamps: 0, refused: 0, releases: 0, cues: 0 };
+export const scratchVoiceStats = { strokes: 0, clamps: 0, refused: 0, releases: 0, cues: 0, gestureFx: 0 };
 
 /** Minimum safe reverse room (seconds) a reverse stroke needs behind the needle. */
 export const MIN_REVERSE_ROOM_SEC = 0.001;
@@ -290,6 +292,9 @@ export class ScratchRecordVoice {
     if (opts.ambience !== undefined) this.bus.setAmbience(opts.ambience);
     // a throw is the word as recorded; a hand stroke gets its velocity tone
     this.bus.setTone?.(isThrow ? 0.7 : (opts.velocity ?? 0.7), opts.at);
+    // the gesture's own effect (the echo scratch's delay), or the channel's again
+    this.bus.setGestureFx?.(gesture.fx ?? null, opts.at);
+    if (gesture.fx) scratchVoiceStats.gestureFx++;
     this.cue(opts.cue ?? (isThrow ? 'attack' : 'vowel'), opts.at);
     let durationSec = cycleMs(gesture, bpm) / 1000;
     if (isThrow) {

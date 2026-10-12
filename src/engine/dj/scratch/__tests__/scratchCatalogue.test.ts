@@ -35,7 +35,7 @@ describe('the catalogue converts the Up Rough metadata (SCR-P2.1)', () => {
     expect(one.file).toBe('scratch_024.wav');
     expect(one.url).toMatch(/data\/samples\/packs\/scratch-originals\/scratch_024\.wav$/);
     expect(one.category).toBe('COUNT');
-    expect(one.gestures).toEqual(['forwardStab', 'transformer8']);
+    expect(one.gestures).toEqual(['forwardStab', 'transformer8', 'cut', 'echo']); // a stab brings its variants (SCR-PG-A4)
     expect(one.styles).toEqual(['oldSchool', 'electro']);
     expect(one.roles).toContain('INTRO');
     expect(one.voicedAmount).toBe(1);
