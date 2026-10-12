@@ -9,9 +9,10 @@
 import type { DeckId } from './DeckEngine';
 import type { DJEngine } from './DJEngine';
 import { getCachedAudio, isCached } from './DJAudioCache';
-import { getDJPipeline } from './DJPipeline';
+import { getDJPipeline, analysisFromCachedAudio } from './DJPipeline';
 import type { TaskPriority } from './DJPipeline';
 import { useDJStore } from '@/stores/useDJStore';
+import { loadRenderToDeck } from './DJTrackLoader';
 
 /**
  * Load a tracker module to a DJ deck, using cached pre-rendered audio if available.
@@ -58,7 +59,10 @@ export async function loadUADEToDeck(
   if (cached && cached.audioData.byteLength > 0) {
     // Load from cache (audio file mode)
     console.log(`[DJPrerender] Loading cached audio for ${filename} as ${identity}`);
-    const info = await engine.loadAudioToDeck(deckId, cached.audioData, identity, trackName || cached.filename, bpm || cached.bpm);
+    // The cached analysis is the deck's tempo and grid (one write, applyAnalysisToDeck); none yet -> the pipeline below applies it.
+    const info = await loadRenderToDeck(engine, deckId, { wavData: cached.audioData, analysis: analysisFromCachedAudio(cached) }, {
+      fileName: identity, trackName: trackName || cached.filename, interimBpm: bpm || cached.bpm,
+    });
 
     // If cached but not yet analyzed, trigger analysis in background
     if (!cached.beatGrid) {
@@ -93,7 +97,7 @@ export async function loadUADEToDeck(
       const result = await getDJPipeline().loadOrEnqueue(fileBuffer, filename, deckId, 'high', companions);
 
       // Load the resulting WAV directly into audio mode
-      const info = await engine.loadAudioToDeck(deckId, result.wavData, identity, trackName || filename, result.analysis?.bpm || bpm || 125);
+      const info = await loadRenderToDeck(engine, deckId, result, { fileName: identity, trackName: trackName || filename, interimBpm: bpm || 125 });
 
       return { cached: true, duration: info.duration };
     } catch (err) {

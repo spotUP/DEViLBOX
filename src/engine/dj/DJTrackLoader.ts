@@ -9,6 +9,8 @@ import type { PlaylistTrack } from '@/stores/useDJPlaylistStore';
 import type { DeckId } from './DeckEngine';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from './DJEngine';
+import type { DJEngine } from './DJEngine';
+import type { AudioFileInfo } from './DeckAudioPlayer';
 import { getDJPipeline, analysisFromCachedAudio } from './DJPipeline';
 import type { PipelineResult } from './DJPipeline';
 import { openDeckTrack } from '@/lib/song/openSong';
@@ -569,15 +571,9 @@ async function loadPlaylistTrackToDeckInternal(
 
       // Use .wav filename to avoid UADE re-init on decode
       const wavFilename = track.fileName.replace(/\.[^.]+$/, '.wav');
-      await engine.loadAudioToDeck(
-        deckId,
-        result.wavData,
-        wavFilename,
-        song.name || track.trackName || filename,
-        result.analysis?.bpm || bpmResult.bpm,
-        song,
-      );
-      applyLoadedAnalysis(deckId, result.analysis);
+      await loadRenderToDeck(engine, deckId, result, {
+        fileName: wavFilename, trackName: song.name || track.trackName || filename, song, interimBpm: bpmResult.bpm,
+      });
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -604,14 +600,7 @@ async function loadPlaylistTrackToDeckInternal(
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-      await engine.loadAudioToDeck(
-        deckId,
-        result.wavData,
-        track.fileName,
-        track.trackName || filename,
-        result.analysis?.bpm || 125,
-      );
-      applyLoadedAnalysis(deckId, result.analysis);
+      await loadRenderToDeck(engine, deckId, result, { fileName: track.fileName, trackName: track.trackName || filename, interimBpm: 125 });
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -654,15 +643,9 @@ async function loadPlaylistTrackToDeckInternal(
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-      await engine.loadAudioToDeck(
-        deckId,
-        result.wavData,
-        track.fileName,
-        song.name || track.trackName || filename,
-        result.analysis?.bpm || bpmResult.bpm,
-        song,
-      );
-      applyLoadedAnalysis(deckId, result.analysis);
+      await loadRenderToDeck(engine, deckId, result, {
+        fileName: track.fileName, trackName: song.name || track.trackName || filename, song, interimBpm: bpmResult.bpm,
+      });
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -703,15 +686,9 @@ async function loadPlaylistTrackToDeckInternal(
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-      await engine.loadAudioToDeck(
-        deckId,
-        result.wavData,
-        filename,
-        song.name || track.trackName || filename,
-        result.analysis?.bpm || bpmResult.bpm,
-        song,
-      );
-      applyLoadedAnalysis(deckId, result.analysis);
+      await loadRenderToDeck(engine, deckId, result, {
+        fileName: filename, trackName: song.name || track.trackName || filename, song, interimBpm: bpmResult.bpm,
+      });
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -731,6 +708,28 @@ async function loadPlaylistTrackToDeckInternal(
  */
 function applyLoadedAnalysis(deckId: DeckId, analysis: PipelineResult['analysis'] | undefined): void {
   if (analysis) getDJPipeline().applyAnalysisToDeck(deckId, analysis);
+}
+
+/**
+ * Put a pipeline render on a deck: the audio, then its analysis. Every deck
+ * load of a render goes through here (playlist, browsers, file drop, Serato,
+ * UADE pre-render). The deck's one tempo - detectedBPM, effectiveBPM and the
+ * beat grid - is written by applyAnalysisToDeck from the track analysis (a
+ * module's own song walk); `interimBpm` is only what the load shows while no
+ * analysis exists. Never pass the analysis' raw `bpm`: for a module that is
+ * the audio detector's reading ('suggestive vibes' 184.57 against the walk's
+ * 93.75), and a load that wrote it after the analysis left the deck with two
+ * tempos (DECK-BPM-TWO-VALUES).
+ */
+export async function loadRenderToDeck(
+  engine: Pick<DJEngine, 'loadAudioToDeck'>,
+  deckId: DeckId,
+  result: Pick<PipelineResult, 'wavData' | 'analysis'>,
+  meta: { fileName: string; trackName?: string; song?: TrackerSong; interimBpm?: number },
+): Promise<AudioFileInfo> {
+  const info = await engine.loadAudioToDeck(deckId, result.wavData, meta.fileName, meta.trackName, meta.interimBpm, meta.song);
+  applyLoadedAnalysis(deckId, result.analysis);
+  return info;
 }
 
 /**

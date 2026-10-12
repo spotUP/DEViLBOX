@@ -32,6 +32,7 @@ import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+import { loadRenderToDeck } from '@/engine/dj/DJTrackLoader';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import {
   batchGetRatings,
@@ -373,7 +374,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
             isPlaying: false,
           });
           const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, file.filename.replace(/\.sid$/i, ''), result.analysis?.bpm || 125);
+          await loadRenderToDeck(engine, deckId, result, { fileName: cacheKey, trackName: file.filename.replace(/\.sid$/i, ''), interimBpm: 125 });
           if (useDJStore.getState().deckViewMode !== '3d') {
             useDJStore.getState().setDeckViewMode('visualizer');
           }
@@ -403,7 +404,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
           });
 
           const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high', companions);
-          await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
+          await loadRenderToDeck(engine, deckId, result, { fileName: cacheKey, trackName: song.name || file.filename, song, interimBpm: bpmResult.bpm });
 
           if (useDJStore.getState().deckViewMode !== '3d') {
             useDJStore.getState().setDeckViewMode('visualizer');
