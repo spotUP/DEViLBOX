@@ -14,7 +14,7 @@ import { JSSIDEngine } from './deepsid/engines/JSSIDEngine';
 import { ScriptNodePlayerEngine } from './deepsid/engines/ScriptNodePlayerEngine';
 import { JSIDPlay2Engine } from './deepsid/engines/JSIDPlay2Engine';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { parseSIDHeader, sidPlaybackModel } from '@/lib/sid/SIDHeaderParser';
+import { parseSIDHeader, sidPlaybackModel, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 
 type EngineInstance = JSSIDEngine | ScriptNodePlayerEngine | JSIDPlay2Engine;
 
@@ -48,6 +48,8 @@ export class C64SIDEngine {
   private engineType: SIDEngineType | null = null;
   private audioContext: AudioContext | null = null;
   private metadata: C64SIDMetadata | null = null;
+  private header: SIDHeaderInfo | null = null;
+  private unsubscribeChipModel: (() => void) | null = null;
   private sidData: Uint8Array;
   private gainNode: GainNode | null = null;
   private masterVolume = 1.0; // 0-1 linear
@@ -84,6 +86,7 @@ export class C64SIDEngine {
   private extractMetadata(): void {
     const info = parseSIDHeader(this.sidData);
     if (!info) throw new Error('Invalid SID file: missing PSID/RSID magic');
+    this.header = info;
     this.metadata = {
       title: info.title.trim(),
       author: info.author.trim(),
@@ -140,10 +143,14 @@ export class C64SIDEngine {
     const engineGain = ENGINE_GAIN[engineType] ?? 1.0;
     this.gainNode.gain.value = engineGain;
     
+    // The chip model every backend plays: SID Settings' forced model, else the header's.
+    const chipSetting = useSettingsStore.getState().sidChipModel ?? 'auto';
+    const chipModel = sidPlaybackModel(this.header, chipSetting);
+
     switch (engineType) {
       case 'jssid':
         this.engine = new JSSIDEngine(this.sidData, {
-          chipModel: this.metadata?.chipModel,
+          chipModel,
           sampleRate: audioContext.sampleRate,
         });
         break;
@@ -152,7 +159,8 @@ export class C64SIDEngine {
       case 'tinyrsid':
       case 'websidplay':
         this.engine = new ScriptNodePlayerEngine(this.sidData, engineType, {
-          chipModel: this.metadata?.chipModel,
+          chipModel,
+          forceChipModel: chipSetting === 'auto' ? undefined : chipModel,
           sampleRate: audioContext.sampleRate,
         });
         break;
@@ -160,7 +168,7 @@ export class C64SIDEngine {
       case 'jsidplay2':
         // JSIDPlay2 uses its own worker-based architecture (not ScriptNodePlayer)
         this.engine = new JSIDPlay2Engine(this.sidData, {
-          chipModel: this.metadata?.chipModel,
+          chipModel,
           sampleRate: audioContext.sampleRate,
         });
         break;
@@ -175,6 +183,12 @@ export class C64SIDEngine {
     }
     
     console.log('[C64SIDEngine] Engine initialized:', engineType);
+
+    // A change in SID Settings reaches the playing engine.
+    this.unsubscribeChipModel?.();
+    this.unsubscribeChipModel = useSettingsStore.subscribe((state, prev) => {
+      if (state.sidChipModel !== prev.sidChipModel) this.engine?.setChipModel(sidPlaybackModel(this.header, state.sidChipModel));
+    });
   }
 
   /**
@@ -708,6 +722,8 @@ export class C64SIDEngine {
    * Cleanup
    */
   dispose(): void {
+    this.unsubscribeChipModel?.();
+    this.unsubscribeChipModel = null;
     this.disconnectDubSend();
     if (this.engine) {
       this.engine.dispose();

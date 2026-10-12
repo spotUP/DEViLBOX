@@ -252,6 +252,12 @@ export class JSSIDEngine {
    * Set volume (0-1 linear). jsSID uses its own AudioContext so volume
    * is controlled via its internal setvolume() API.
    */
+  /** Synthesise as this model from now on (jsSID setmodel). */
+  setChipModel(model: '6581' | '8580'): void {
+    this.config.chipModel = model;
+    this.jsSID?.setmodel?.(model === '8580' ? 8580 : 6581);
+  }
+
   setVolume(vol: number): void {
     if (this.jsSID?.setvolume) {
       this.jsSID.setvolume(Math.max(0, Math.min(1, vol)));
