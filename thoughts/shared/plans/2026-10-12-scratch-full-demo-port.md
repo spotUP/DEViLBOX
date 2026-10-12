@@ -32,6 +32,9 @@ OWNER DECISIONS 2026-10-12 (phase-0 questions):
 - X6 (main-session call under "demo everywhere"): Deck C level = 0.60 x RMS of the A/B juggle decks only (live: running RMS over the A+B deck buses), not the programme meter.
 - T6 (main-session call under "demo everywhere"): the demo never calls cartridge_response, so the stroke path must not apply it. Port it as an available function, applied nowhere, same as the demo.
 
+OWNER DECISION 2026-10-13: section end follows the demo's render_scratch_section: about 0.12 s of room tail rides into the next section (not the hip-hop mix's hard cut). Keep as built by PG-J.
+NEXT PHASE (after PG-J 7b6a338f3 3ef4c16ec b5b48e111, 48 of 81): P13 first (PG-E). MUSICAL caps the demo's density and gesture level, the vocal rule thins it, and the one-hand rule drops the demo's second step-15 stroke; extras must sit ON TOP of the exact demo plan. Measured with P13 open: MUSICAL scratches 1.7 % of a 10-minute set (1.16 strokes per phrase); the demo overlay scratches 15.1 % (3.09 per phrase). Then C11/C15 (PG-F) plus arc gating (today the 32-bar routine plays only at PEAK in PERFORMER or BATTLE). Also delete the dead old-voice stages in scratchBus.ts (one-path rule).
+
 Running count: 48 of 81 closed (PG-J 2026-10-12: +26 - the 25 PG-J rows and X6 - at 7b6a338f3 / 3ef4c16ec; 33 open). Before PG-J: 22 of 81 (phase 0 re-verification, against main at 61ae1abcf). The 22 are rows the gap doc had as open that current code already ports exactly, with a fixture test against the demo; their revert checks were not re-run in phase 0.
 
 Null-test oracle and per-stage residual table: thoughts/shared/research/2026-10-12_scratch-null-test.md (render path: record -306 dB, strokes -240..-307 dB, Deck C chain -152 dB, shaped layer -71 dB, 48 kHz read -104 dB vs ideal). Every PG phase checks against it.
