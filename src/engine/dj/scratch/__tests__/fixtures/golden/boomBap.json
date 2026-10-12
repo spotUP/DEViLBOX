@@ -35,7 +35,7 @@
    "bar": 23,
    "step": 14,
    "beat": 95.5,
-   "gesture": "tearForward",
+   "gesture": "baby",
    "velocity": 0.9,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -80,7 +80,7 @@
    "bar": 31,
    "step": 14,
    "beat": 127.5,
-   "gesture": "tearForward",
+   "gesture": "baby",
    "velocity": 0.9,
    "placementRole": "answer",
    "role": "ANSWER"

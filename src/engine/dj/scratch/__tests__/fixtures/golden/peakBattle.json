@@ -170,7 +170,7 @@
    "bar": 27,
    "step": 15,
    "beat": 111.75,
-   "gesture": "hydroplane",
+   "gesture": "crab",
    "velocity": 0.6983535761486722,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -215,7 +215,7 @@
    "bar": 29,
    "step": 15,
    "beat": 119.75,
-   "gesture": "crab",
+   "gesture": "orbit",
    "velocity": 0.8052080026186452,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -287,7 +287,7 @@
    "bar": 32,
    "step": 15,
    "beat": 131.75,
-   "gesture": "crab",
+   "gesture": "orbit",
    "velocity": 0.8297331763130759,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -296,7 +296,7 @@
    "bar": 33,
    "step": 8,
    "beat": 134,
-   "gesture": "crab",
+   "gesture": "orbit",
    "velocity": 0.8822875734955713,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -305,7 +305,7 @@
    "bar": 33,
    "step": 15,
    "beat": 135.75,
-   "gesture": "orbit",
+   "gesture": "threeClickFlare",
    "velocity": 0.6646328851610935,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -314,7 +314,7 @@
    "bar": 34,
    "step": 8,
    "beat": 138,
-   "gesture": "orbit",
+   "gesture": "threeClickFlare",
    "velocity": 0.6446703066817288,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -323,7 +323,7 @@
    "bar": 34,
    "step": 15,
    "beat": 139.75,
-   "gesture": "eightFingerCrab",
+   "gesture": "hydroplane",
    "velocity": 0.6828239650322285,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -332,7 +332,7 @@
    "bar": 35,
    "step": 8,
    "beat": 142,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.751082947550804,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -341,7 +341,7 @@
    "bar": 35,
    "step": 15,
    "beat": 143.75,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.8181921258524748,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -350,7 +350,7 @@
    "bar": 36,
    "step": 8,
    "beat": 146,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.981038733304292,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -359,7 +359,7 @@
    "bar": 36,
    "step": 15,
    "beat": 147.75,
-   "gesture": "orbit",
+   "gesture": "threeClickFlare",
    "velocity": 0.841852039171386,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -368,7 +368,7 @@
    "bar": 37,
    "step": 8,
    "beat": 150,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 1,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -377,7 +377,7 @@
    "bar": 37,
    "step": 15,
    "beat": 151.75,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.7240669231166799,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -440,7 +440,7 @@
    "bar": 40,
    "step": 8,
    "beat": 162,
-   "gesture": "eightFingerCrab",
+   "gesture": "hydroplane",
    "velocity": 1,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -449,7 +449,7 @@
    "bar": 40,
    "step": 15,
    "beat": 163.75,
-   "gesture": "eightFingerCrab",
+   "gesture": "hydroplane",
    "velocity": 0.745344472419318,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -458,7 +458,7 @@
    "bar": 41,
    "step": 8,
    "beat": 166,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.7188120851453422,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -467,7 +467,7 @@
    "bar": 41,
    "step": 15,
    "beat": 167.75,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 1,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -476,7 +476,7 @@
    "bar": 42,
    "step": 8,
    "beat": 170,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.7599992370489052,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -485,7 +485,7 @@
    "bar": 42,
    "step": 15,
    "beat": 171.75,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.6884222171358816,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -494,7 +494,7 @@
    "bar": 43,
    "step": 8,
    "beat": 174,
-   "gesture": "eightFingerCrab",
+   "gesture": "hydroplane",
    "velocity": 0.7334668497749295,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -503,7 +503,7 @@
    "bar": 43,
    "step": 15,
    "beat": 175.75,
-   "gesture": "eightFingerCrab",
+   "gesture": "hydroplane",
    "velocity": 0.8491790646219578,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -512,7 +512,7 @@
    "bar": 44,
    "step": 8,
    "beat": 178,
-   "gesture": "eightFingerCrab",
+   "gesture": "hydroplane",
    "velocity": 0.8962256809338521,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -521,7 +521,7 @@
    "bar": 44,
    "step": 15,
    "beat": 179.75,
-   "gesture": "eightFingerCrab",
+   "gesture": "hydroplane",
    "velocity": 0.8433928435187305,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -530,7 +530,7 @@
    "bar": 45,
    "step": 8,
    "beat": 182,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.7565018692301824,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -539,7 +539,7 @@
    "bar": 45,
    "step": 15,
    "beat": 183.75,
-   "gesture": "threeClickFlare",
+   "gesture": "eightFingerCrab",
    "velocity": 0.9206034943160144,
    "placementRole": "turnaround",
    "role": "FILL"

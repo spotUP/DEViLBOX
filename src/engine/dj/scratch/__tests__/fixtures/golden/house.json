@@ -44,7 +44,7 @@
    "bar": 23,
    "step": 9,
    "beat": 94.25,
-   "gesture": "tearForward",
+   "gesture": "chirp",
    "velocity": 0.9,
    "placementRole": "accent",
    "role": "FEATURE"
@@ -53,7 +53,7 @@
    "bar": 23,
    "step": 14,
    "beat": 95.5,
-   "gesture": "chirp",
+   "gesture": "tearForward",
    "velocity": 0.95,
    "placementRole": "accent",
    "role": "OUTRO"
@@ -98,7 +98,7 @@
    "bar": 31,
    "step": 9,
    "beat": 126.25,
-   "gesture": "tearForward",
+   "gesture": "chirp",
    "velocity": 0.9,
    "placementRole": "accent",
    "role": "FEATURE"
@@ -107,7 +107,7 @@
    "bar": 31,
    "step": 14,
    "beat": 127.5,
-   "gesture": "chirp",
+   "gesture": "tearForward",
    "velocity": 0.95,
    "placementRole": "accent",
    "role": "OUTRO"
