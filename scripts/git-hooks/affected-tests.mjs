@@ -70,11 +70,23 @@ function siblingTests(sourceFile) {
   return out;
 }
 
-/** Tests that name any of these source files (`foo.ts`) in their text. */
+/**
+ * Tests that name any of these source files in their text: `foo.ts` (source-text
+ * tests), or an import of the module, `/foo'` / `/foo"` - a test that imports
+ * '../Foo' from another directory, or under another name than Foo.test.tsx, is
+ * no sibling. 70a57efa2 changed DeckPatternDisplay.tsx; its commit and push ran
+ * no test, and renderedDeckPatternViewMetersEachChannel (which imports
+ * '../DeckPatternDisplay') failed only in CI. Generic module names (index,
+ * types) would select half the suite and are left to CI.
+ */
 function sourceTextTests(sourceFiles) {
   const names = [...new Set(sourceFiles.map((f) => basename(f)))];
   if (names.length === 0) return [];
-  const patterns = names.flatMap((n) => ['-e', n]);
+  const stems = [...new Set(names.map((n) => basename(n, extname(n))))].filter((st) => st !== 'index' && st !== 'types');
+  const patterns = [
+    ...names.flatMap((n) => ['-e', n]),
+    ...stems.flatMap((st) => ['-e', `/${st}'`, '-e', `/${st}"`]),
+  ];
   try {
     return execFileSync(
       'git',

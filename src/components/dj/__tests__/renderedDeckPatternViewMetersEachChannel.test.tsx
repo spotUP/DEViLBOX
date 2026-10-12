@@ -63,7 +63,10 @@ describe('a rendered module deck\'s pattern view meters each channel', () => {
   beforeEach(() => {
     holder.song = {
       songPositions: [0], numChannels: 4,
-      patterns: [{ id: 'p0', length: 64, channels: Array.from({ length: 4 }, (_, c) => ({ id: `c${c}`, rows: [] })) }],
+      // Channel 2's note: a deck shows the pattern view only for a song with notes (70a57efa2).
+      patterns: [{ id: 'p0', length: 64, channels: Array.from({ length: 4 }, (_, c) => ({
+        id: `c${c}`, rows: c === 1 ? [{ note: 49, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }] : [],
+      })) }],
     } as unknown as TrackerSong;
     holder.track = scopeTrack();
     holder.positionSec = 0.5;
