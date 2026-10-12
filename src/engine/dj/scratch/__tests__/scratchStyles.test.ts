@@ -23,11 +23,12 @@ describe('levels (section 31, SCR-P1.6)', () => {
   });
 
   it('maxLevelFor is the smaller of the mode and the style ceiling', () => {
-    expect(MODE_MAX_LEVEL).toEqual({ OFF: 0, SAFE: 1, MUSICAL: 2, PERFORMER: 3, BATTLE: 4 });
+    // the demo's whole ladder for every playing mode but SAFE (owner 2026-10-12, the demo's version wins)
+    expect(MODE_MAX_LEVEL).toEqual({ OFF: 0, SAFE: 1, MUSICAL: 4, PERFORMER: 4, BATTLE: 4 });
     expect(maxLevelFor('BATTLE', 'battle')).toBe(4);
     expect(maxLevelFor('BATTLE', 'oldSchool')).toBe(2);
     expect(maxLevelFor('SAFE', 'battle')).toBe(1);
-    expect(maxLevelFor('MUSICAL', 'electro')).toBe(2);
+    expect(maxLevelFor('MUSICAL', 'electro')).toBe(4);
     expect(maxLevelFor('OFF', 'electro')).toBe(0);
   });
 });

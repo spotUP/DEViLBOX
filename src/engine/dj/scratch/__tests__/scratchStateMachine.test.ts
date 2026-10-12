@@ -69,13 +69,16 @@ describe('scratch performance states (SCR-P6.4)', () => {
 });
 
 describe('peak performance mode (SCR-P6.9)', () => {
-  it('PEAK with the budget >= 75 unlocks level 4 and 1/32 for PERFORMER; outside the peak it does not', () => {
+  // level 4 is every playing mode's since the demo's ladder decision (MODE_MAX_LEVEL); the peak still unlocks 1/32
+  it('PEAK with the budget >= 75 unlocks 1/32 for PERFORMER; outside the peak it does not', () => {
     const peak = performancePermissions({ setPhase: 'PEAK', budgetTotal: 80, mode: 'PERFORMER' });
     expect(peak).toMatchObject({ peak: true, maxLevel: 4, juggle: true, doubles: true, callResponse: true, throws: true });
     expect(peak.grids).toContain('1/32');
-    expect(performancePermissions({ setPhase: 'PEAK', budgetTotal: 60, mode: 'PERFORMER' })).toMatchObject({ peak: false, maxLevel: 3 });
+    const noPeak = performancePermissions({ setPhase: 'PEAK', budgetTotal: 60, mode: 'PERFORMER' });
+    expect(noPeak).toMatchObject({ peak: false, maxLevel: 4 });
+    expect(noPeak.grids).not.toContain('1/32');
     expect(performancePermissions({ setPhase: 'CRUISING', budgetTotal: 90, mode: 'BATTLE' }).grids).not.toContain('1/32');
-    expect(performancePermissions({ setPhase: 'PEAK', budgetTotal: 90, mode: 'MUSICAL' })).toMatchObject({ peak: false, maxLevel: 2 });
+    expect(performancePermissions({ setPhase: 'PEAK', budgetTotal: 90, mode: 'MUSICAL' })).toMatchObject({ peak: false, maxLevel: 4 });
   });
 
   it('the safety check still refuses a 20 cuts-per-beat request at the peak, and passes the catalogue at 1/16', () => {

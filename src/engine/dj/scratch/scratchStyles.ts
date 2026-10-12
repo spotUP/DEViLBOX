@@ -28,8 +28,13 @@ export { GESTURE_LEVELS };
 /** Section 62 Auto Scratch modes; the level each may reach. */
 export type ScratchMode = 'OFF' | 'SAFE' | 'MUSICAL' | 'PERFORMER' | 'BATTLE';
 
+/**
+ * The demo has no modes: its overlay plays the profile's whole gesture ladder (owner 2026-10-12,
+ * SCR-PHRASING-PARITY / full demo port decision 1 "the demo's version wins"), so MUSICAL and PERFORMER
+ * reach level 4 like BATTLE; a mode keeps only its density cap (`MODE_MAX_DENSITY`). SAFE stays level 1.
+ */
 export const MODE_MAX_LEVEL: Readonly<Record<ScratchMode, ScratchLevel | 0>> = {
-  OFF: 0, SAFE: 1, MUSICAL: 2, PERFORMER: 3, BATTLE: 4,
+  OFF: 0, SAFE: 1, MUSICAL: 4, PERFORMER: 4, BATTLE: 4,
 };
 
 export interface ScratchStylePalette {
