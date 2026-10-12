@@ -410,6 +410,12 @@ MAME is licensed under **GPL-2.0+** (with BSD-3-Clause for certain components).
 
 ## DSP & Audio Libraries
 
+### Signalsmith Stretch
+- **Author:** Geraint Luff / Signalsmith Audio Ltd.
+- **Source:** https://github.com/Signalsmith-Audio/signalsmith-stretch - official JS/WASM AudioWorklet release, npm `signalsmith-stretch` 1.3.2, vendored unmodified as `public/signalsmith-stretch/SignalsmithStretch.mjs` (licence text in `public/signalsmith-stretch/LICENSE.txt`)
+- **License:** MIT - Copyright (c) 2022 Geraint Luff / Signalsmith Audio Ltd.
+- **Used for:** DJ deck Key Lock (pitch compensation of the playbackRate pitch shift, `src/engine/dj/DeckKeyLock.ts`)
+
 ### demucs.cpp
 - **Source:** https://github.com/sevagh/demucs.cpp (vendored as `third-party/demucs.cpp-main`)
 - **License:** MIT

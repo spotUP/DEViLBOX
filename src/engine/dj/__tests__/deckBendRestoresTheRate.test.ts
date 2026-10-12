@@ -98,7 +98,7 @@ describe('a rate bend returns the deck to the fader rate', () => {
     expect(audioPlayer.rate).toBe(1);
   });
 
-  it('key lock on: the bend keeps the key, and the restore keeps the SoundTouch compensation', () => {
+  it('key lock on: the bend keeps the key, and the restore keeps the Key Lock pitch compensation', () => {
     const { d, audioPlayer, keyLock } = deck('audio');
     (d as unknown as { keyLockEnabled: boolean }).keyLockEnabled = true;
     d.setPitch(1);

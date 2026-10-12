@@ -4,7 +4,7 @@
  * The DJ pitch fader scales `playbackRate` by a factor of 2^(semis/12).
  * On an `AudioBufferSourceNode` this couples pitch and tempo: both shift
  * together (vinyl-like chipmunk). Key Lock breaks the coupling by having
- * a SoundTouch insert compensate for the pitch change — applying
+ * the Key Lock stretcher (DeckKeyLock) compensate for the pitch change — applying
  * -semis of pitch shift undoes the playbackRate's pitch effect, leaving
  * only the tempo change.
  *
@@ -18,7 +18,7 @@
 export interface KeyLockShift {
   /** Native playbackRate to apply to AudioBufferSourceNode. Always 2^(s/12). */
   playbackRate: number;
-  /** Pitch compensation in semitones to push into SoundTouch. 0 when key-lock
+  /** Pitch compensation in semitones to push into the Key Lock stretcher. 0 when key-lock
    *  is OFF (vinyl coupling), -semitones when ON (cancels playbackRate's
    *  pitch shift so only tempo remains audible). */
   pitchCompensate: number;

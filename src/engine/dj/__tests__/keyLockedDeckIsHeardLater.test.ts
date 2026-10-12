@@ -1,12 +1,15 @@
 /**
- * A key-locked audio deck sounds ~91 ms after it plays (SoundTouch's WSOLA
- * window; field measurement 103 vs 12 ms, thoughts/lars/todos.md:166). The
+ * A key-locked audio deck sounds later than it plays by the Key Lock
+ * stretcher's latency (100 ms for Signalsmith Stretch in DeckKeyLock's
+ * configuration; it was ~91 ms with SoundTouch, field measurement 103 vs
+ * 12 ms, thoughts/lars/todos.md:166). The
  * heard position subtracted only the output latency, so a phase lock against
  * a key-locked deck was 91 ms off - double kicks in a mix (plan
  * 2026-10-11-dj-juggling C10).
  *
- * The worklet reports its latency; DeckKeyLock.latencySec() hands it on while
- * the signal runs through the worklet; DeckEngine.getHeardPosition subtracts
+ * The stretcher reports its latency; DeckKeyLock.latencySec() hands it on while
+ * the signal runs through the stretcher (keyLockKeepsTransientsSharp proves the
+ * report equals the heard delay); DeckEngine.getHeardPosition subtracts
  * it; phase correction (DJAutoSync) locks on that heard position. Real
  * DeckKeyLock / DeckEngine methods on stand-in objects (no AudioContext).
  */
@@ -33,14 +36,12 @@ import { phaseAlign } from '../DJAutoSync';
 import { useDJStore } from '@/stores/useDJStore';
 
 const OUTPUT_LATENCY = 0.012;
-const KEY_LOCK_LATENCY = 0.0917; // what the worklet reports at 0 semitones, 48 kHz (DeckKeyLockWASM.cpp probe)
+const KEY_LOCK_LATENCY = 0.1; // what Signalsmith reports for STRETCH_CONFIG at 48 kHz, = the measured click delay
 
 function keyLock(routed: boolean): DeckKeyLock {
-  const k = Object.assign(Object.create(DeckKeyLock.prototype), {
-    routedThroughWorklet: routed, reportedLatencySec: 0, isActive: routed, isWasmReady: true, workletNode: null, pendingPitchSemis: 0,
+  return Object.assign(Object.create(DeckKeyLock.prototype), {
+    routedThroughStretch: routed, stretchLatencySec: KEY_LOCK_LATENCY, isActive: routed, stretchNode: null, pitchSemis: 0,
   }) as DeckKeyLock;
-  (k as unknown as { _onWorkletMessage(d: unknown): void })._onWorkletMessage({ type: 'latency', seconds: KEY_LOCK_LATENCY });
-  return k;
 }
 
 function audioDeck(id: 'A' | 'B', position: number, lock: DeckKeyLock): DeckEngine {
@@ -66,7 +67,7 @@ describe('a key-locked deck is heard later by its processing latency', () => {
     }
   });
 
-  it('latencySec is the worklet-reported latency while the signal runs through it, 0 on the bypass wire', () => {
+  it('latencySec is the stretcher-reported latency while the signal runs through it, 0 on the bypass wire', () => {
     expect(keyLock(true).latencySec()).toBeCloseTo(KEY_LOCK_LATENCY, 9);
     expect(keyLock(false).latencySec()).toBe(0);
   });
@@ -77,7 +78,7 @@ describe('a key-locked deck is heard later by its processing latency', () => {
   });
 
   it('phase correction locks what the listener hears: a key-locked deck played on the grid is pushed ahead by its latency', () => {
-    // Both decks have PLAYED exactly to the same beat; B is key-locked and so sounds 91.7 ms later.
+    // Both decks have PLAYED exactly to the same beat; B is key-locked and so sounds 100 ms later.
     h.decks.A = audioDeck('A', 40, keyLock(false));
     h.decks.B = audioDeck('B', 40, keyLock(true));
     phaseAlign('B', 'A', 'beat');

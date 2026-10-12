@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
 // DeckEngine is heavy — instead of constructing one (full AudioContext +
-// WASM replayer + SoundTouch), test the two pure-logic pieces directly:
+// WASM replayer + Key Lock stretcher), test the two pure-logic pieces directly:
 //   1. The pitch-gate logic (setPitch early-returns when locked).
 //   2. The setRepitchLock unlock re-sync.
 //
