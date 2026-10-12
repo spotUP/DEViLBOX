@@ -19,7 +19,7 @@
  */
 
 import { barSeed, lfsr, type ScratchRandom } from './scratchRandom';
-import { getGesture, gestureBeats, isScratchGestureId, REFERENCE_GESTURE_IDS, SCRATCH_GESTURES } from './scratchGestureCatalog';
+import { getGesture, gestureBeats, isScratchGestureId, isThrowGesture, REFERENCE_GESTURE_IDS, SCRATCH_GESTURES } from './scratchGestureCatalog';
 import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
 import { DEFAULT_GRID, stepToBeat, STEPS_PER_BEAT, type ScratchGrid } from './scratchAnchor';
 import type { ScratchDJStyle, ScratchGestureId, ScratchRole } from './scratchTypes';
@@ -100,8 +100,7 @@ export const SCRATCH_ROLE_OF: Readonly<Record<PlacementRole, ScratchRole>> = {
 
 // ─── Vocabulary (section 22) ─────────────────────────────────────────────
 
-const THROWS: ReadonlySet<ScratchGestureId> = new Set<ScratchGestureId>(['drop', 'dropPhrase']);
-export const isThrowGesture = (id: ScratchGestureId): boolean => THROWS.has(id);
+export { isThrowGesture };
 
 /**
  * How demanding a gesture is: its level first (section 31), then its activity. Used to FILL a vocabulary a

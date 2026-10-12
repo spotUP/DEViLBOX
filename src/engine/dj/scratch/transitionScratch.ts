@@ -102,7 +102,7 @@ function toEvents(placed: ReadonlyArray<PlacedScratch & { beatAbs: number }>, so
     const g = getGesture(p.gesture);
     const off = humanizeMs(p, rnd, bpm, prev);
     prev = off;
-    const anchor = source.type === 'CRATE' ? (anchorFor(source, p.role) ?? source.anchor) : source.type === 'DECK' ? source.anchor : { position: 0, safe: [0, 1] as const, safeForward: [0, 1] as const, safeReverse: [0, 0] as const };
+    const anchor = source.type === 'CRATE' ? (anchorFor(source, p.gesture) ?? source.anchor) : source.type === 'DECK' ? source.anchor : { position: 0, safe: [0, 1] as const, safeForward: [0, 1] as const, safeReverse: [0, 0] as const };
     return {
       executeAtBeat: p.beatAbs, durationBeats: p.beats ?? gestureBeats(p.gesture), role: p.role, source, anchor, gesture: p.gesture,
       velocity: p.velocity, humanizeMs: off, intensity: g.intensity, deck: source.type === 'DECK' ? source.deck : deck,

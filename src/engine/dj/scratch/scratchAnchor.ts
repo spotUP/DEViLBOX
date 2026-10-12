@@ -12,25 +12,22 @@
  */
 
 import { getScratchRecord } from './scratchCatalogue';
-import type { ScratchCue } from './ScratchRecordVoice';
+import { isThrowGesture } from './scratchGestureCatalog';
 import type {
-  DeckAnchorKind, DeckScratchAnchor, ScratchAnchor, ScratchGesture, ScratchRole, ScratchSource,
+  DeckAnchorKind, DeckScratchAnchor, ScratchAnchor, ScratchGesture, ScratchGestureId, ScratchRole, ScratchSource,
 } from './scratchTypes';
 
 // ─── Anchors (section 11) ────────────────────────────────────────────────
 
-/** Which point of a record a role scratches from: the sung vowel for the
- *  melodic roles, the attack for hits and counts, the tail for endings. */
-export const CRATE_CUE_BY_ROLE: Readonly<Record<ScratchRole, 'attack' | 'vowel' | 'tail'>> = {
-  INTRO: 'attack',
-  THEME: 'vowel',
-  ANSWER: 'vowel',
-  ACCENT: 'attack',
-  FILL: 'attack',
-  FEATURE: 'vowel',
-  TRANSITION: 'tail',
-  OUTRO: 'tail',
-};
+/**
+ * The one point of a record a hand gesture scratches from: the vowel, for every role. The demo's records
+ * carry one anchor (scratch_bank: `source.anchor = cues["vowel"]`, "the strong anchor, survives fwd+reverse")
+ * and every gesture on them cues it (SCR-PHRASING-PARITY). The attack sits on the safe start: a stroke cued
+ * there has no reverse room - an orbit or a baby lost its back half or was refused outright.
+ */
+export const CRATE_SCRATCH_CUE = 'vowel' as const;
+/** A throw rides the whole word from its attack (section 41). */
+export const CRATE_THROW_CUE = 'attack' as const;
 
 /** The deck anchor kind a role prefers (first match among the candidates wins). */
 export const DECK_ANCHOR_BY_ROLE: Readonly<Record<ScratchRole, readonly DeckAnchorKind[]>> = {
@@ -55,15 +52,15 @@ export interface ResolvedCrateAnchor extends ScratchAnchor {
 }
 
 /**
- * The anchor a role scratches from on a source. A CRATE source resolves to the
- * record's attack / vowel / tail (position in seconds of record); a DECK
- * source keeps its own anchor (picked among candidates by `pickDeckAnchor`).
+ * The anchor a gesture scratches from on a source. A CRATE source resolves to the record's vowel (a throw:
+ * its attack; position in seconds of record); a DECK source keeps its own anchor (picked among candidates
+ * by `pickDeckAnchor`, by role).
  */
-export function anchorFor(source: ScratchSource, role: ScratchRole): ResolvedCrateAnchor | DeckScratchAnchor | null {
+export function anchorFor(source: ScratchSource, gesture?: ScratchGestureId): ResolvedCrateAnchor | DeckScratchAnchor | null {
   if (source.type === 'CRATE') {
     const record = getScratchRecord(source.recordId);
     if (!record) return null;
-    const cue = CRATE_CUE_BY_ROLE[role];
+    const cue = gesture && isThrowGesture(gesture) ? CRATE_THROW_CUE : CRATE_SCRATCH_CUE;
     return {
       cue,
       // a cue the catalogue marks before the safe start (an attack at 0) sits on the safe edge, as the voice plays it
@@ -75,11 +72,6 @@ export function anchorFor(source: ScratchSource, role: ScratchRole): ResolvedCra
   }
   if (source.type === 'DECK') return source.anchor;
   return null;
-}
-
-/** The cue the voice takes for a role on a record (`ScratchRecordVoice.cue`). */
-export function cueForRole(role: ScratchRole): ScratchCue {
-  return CRATE_CUE_BY_ROLE[role];
 }
 
 /** Seconds of one beat at `bpm`. */

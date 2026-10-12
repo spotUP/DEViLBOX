@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   anchorFor, deckAnchor, pickDeckAnchor, stepToBeat, beatToStep,
-  allowedGrids, CRATE_CUE_BY_ROLE, type ResolvedCrateAnchor,
+  allowedGrids, type ResolvedCrateAnchor,
 } from '../scratchAnchor';
 import { getScratchRecord } from '../scratchCatalogue';
 import { getGesture } from '../scratchGestureCatalog';
@@ -15,26 +15,26 @@ import type { DeckScratchAnchor, ScratchSource } from '../scratchTypes';
 
 const crate = (recordId: string): ScratchSource => ({ type: 'CRATE', recordId, anchor: { position: 0, safe: [0, 1], safeForward: [0, 1], safeReverse: [0, 1] } });
 
-describe('anchors by role (SCR-P3.1)', () => {
+describe('anchors (SCR-P3.1, SCR-PHRASING-PARITY: the demo cues one anchor)', () => {
   const rec = getScratchRecord('AH_STANDARD')!;
 
-  it('a THEME scratches from the vowel, an ACCENT from the attack, an OUTRO from the tail', () => {
-    const theme = anchorFor(crate('AH_STANDARD'), 'THEME') as ResolvedCrateAnchor;
-    const accent = anchorFor(crate('AH_STANDARD'), 'ACCENT') as ResolvedCrateAnchor;
-    const outro = anchorFor(crate('AH_STANDARD'), 'OUTRO') as ResolvedCrateAnchor;
-    expect(theme.cue).toBe('vowel');
-    expect(theme.position).toBeCloseTo(3300 / 22050, 9);
-    expect(accent.cue).toBe('attack');
+  it('every hand gesture scratches a record from its vowel, as the demo does; a throw rides from the attack', () => {
+    const baby = anchorFor(crate('AH_STANDARD'), 'baby') as ResolvedCrateAnchor;
+    const orbit = anchorFor(crate('AH_STANDARD'), 'orbit') as ResolvedCrateAnchor;
+    const drop = anchorFor(crate('AH_STANDARD'), 'drop') as ResolvedCrateAnchor;
+    expect(baby.cue).toBe('vowel');
+    expect(baby.position).toBeCloseTo(3300 / 22050, 9);
+    expect(orbit.position).toBe(baby.position);
+    // the vowel leaves reverse room: an orbit cued there is never refused at the safe start
+    expect(orbit.position - rec.safeReverse[0]).toBeGreaterThan(0.01);
+    expect(drop.cue).toBe('attack');
     // the attack is marked at 0, before the safe start: the anchor sits on the safe edge, as the voice plays it
-    expect(accent.position).toBe(Math.max(rec.safe[0], rec.anchors.attack));
-    expect(outro.cue).toBe('tail');
-    expect(outro.position).toBe(rec.anchors.tail);
-    expect(theme.safeForward).toEqual(rec.safeForward);
-    expect(Object.keys(CRATE_CUE_BY_ROLE)).toHaveLength(8);
+    expect(drop.position).toBe(Math.max(rec.safe[0], rec.anchors.attack));
+    expect(baby.safeForward).toEqual(rec.safeForward);
   });
 
   it('an unknown record has no anchor', () => {
-    expect(anchorFor(crate('NO_SUCH_RECORD'), 'THEME')).toBeNull();
+    expect(anchorFor(crate('NO_SUCH_RECORD'), 'baby')).toBeNull();
   });
 
   it('a deck anchor keeps +1 beat forward and -0.5 beat reverse: 0.5 s and 0.25 s at 120 BPM', () => {
@@ -48,7 +48,7 @@ describe('anchors by role (SCR-P3.1)', () => {
 
   it('a deck source returns its own anchor; a role picks its preferred kind among candidates', () => {
     const cands: DeckScratchAnchor[] = [deckAnchor(1, 2, 'downbeat', 120), deckAnchor(1.5, 3, 'snare', 120), deckAnchor(2, 4, 'vocalOnset', 120)];
-    expect(anchorFor({ type: 'DECK', deck: 'A', anchor: cands[0]! }, 'THEME')).toBe(cands[0]);
+    expect(anchorFor({ type: 'DECK', deck: 'A', anchor: cands[0]! }, 'baby')).toBe(cands[0]);
     expect(pickDeckAnchor(cands, 'ACCENT')!.kind).toBe('snare');
     expect(pickDeckAnchor(cands, 'FEATURE')!.kind).toBe('vocalOnset');
     expect(pickDeckAnchor(cands, 'THEME')!.kind).toBe('downbeat');
