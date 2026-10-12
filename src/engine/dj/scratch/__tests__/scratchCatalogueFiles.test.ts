@@ -62,15 +62,26 @@ describe('catalogue files (section 70, SCR-P2.3)', () => {
     }
   });
 
-  it('the 7 pack files without a record are FX pack only: 020, 040, 049, 053, 054, 055, 056', () => {
+  it('the 6 pack files without a record are FX pack only: 040, 049, 053, 054, 055, 056 (020 is AH_LONG)', () => {
     const onDisk = readdirSync(packDir).filter((f) => /^scratch_\d{3}\.wav$/.test(f));
     expect(onDisk).toHaveLength(57);
     expect(fxOnlyPackFiles(onDisk)).toEqual([
-      'scratch_020.wav', 'scratch_040.wav', 'scratch_049.wav', 'scratch_053.wav',
+      'scratch_040.wav', 'scratch_049.wav', 'scratch_053.wav',
       'scratch_054.wav', 'scratch_055.wav', 'scratch_056.wav',
     ]);
     const referenced = new Set(SCRATCH_RECORDS.map((r) => r.file));
-    expect(referenced.size).toBe(50);
+    expect(referenced.size).toBe(51);
     for (const f of fxOnlyPackFiles(onDisk)) expect(referenced.has(f)).toBe(false);
+  });
+
+  it('AH_LONG (SCR-PG-A1): scratch_020.wav with the demo analyser\'s anchors (load_bank: vowel 440, safe 27-14467 at 22,050 Hz)', () => {
+    const r = SCRATCH_RECORDS.find((x) => x.id === 'AH_LONG')!;
+    expect(r.file).toBe('scratch_020.wav');
+    expect(r.category).toBe('AH_VOWEL');
+    expect(r.clean).toBe(true);
+    expect(r.anchors.vowel).toBeCloseTo(440 / 22050, 9);
+    expect(r.safe[0]).toBeCloseTo(27 / 22050, 9);
+    expect(r.safe[1]).toBeCloseTo(14467 / 22050, 9);
+    expect(r.durationSec).toBeCloseTo(0.6709, 4);
   });
 });

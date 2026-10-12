@@ -180,7 +180,7 @@ function convert(raw: RawRecord): ScratchRecord {
   };
 }
 
-/** The 50 records, in the metadata's order. */
+/** The 51 records, in the metadata's order (AH_LONG last, SCR-PG-A1). */
 export const SCRATCH_RECORDS: readonly ScratchRecord[] = Object.values(metadata as unknown as Record<string, RawRecord>).map(convert);
 
 const BY_ID: ReadonlyMap<string, ScratchRecord> = new Map(SCRATCH_RECORDS.map((r) => [r.id, r]));
