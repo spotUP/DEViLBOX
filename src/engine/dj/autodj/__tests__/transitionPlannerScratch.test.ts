@@ -58,6 +58,9 @@ describe('section 45 compatibility (SCR-P7.2)', () => {
       const performed = r.scratch!.events.filter((e) => e.gesture !== 'drop' && e.role !== 'ANSWER');
       expect(performed.length, style).toBeGreaterThan(0);
       for (const e of performed) expect(gestures, `${style} ${e.gesture}`).toContain(e.gesture);
+      // section 28: nothing lands on the transition start itself
+      const start = basePlan('OFF').startBeat;
+      for (const e of r.scratch!.events) expect(Math.abs(e.executeAtBeat - start), `${style} ${e.gesture} on the start`).toBeGreaterThan(1e-9);
     }
   });
 

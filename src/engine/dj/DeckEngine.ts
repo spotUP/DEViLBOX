@@ -1777,6 +1777,7 @@ export class DeckEngine {
         return true;
       },
       resetRing: () => this.scratchBuffer?.resetCapture(),
+      isBending: () => this._bendTimer !== null || this._bendHeld,
     }, anchorSec);
   }
 
