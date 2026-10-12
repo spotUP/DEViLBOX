@@ -8,7 +8,7 @@
    "bar": 19,
    "step": 15,
    "beat": 79.75,
-   "gesture": "chirp",
+   "gesture": "chirpDouble",
    "velocity": 0.8383016708628976,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -26,7 +26,7 @@
    "bar": 22,
    "step": 9,
    "beat": 90.25,
-   "gesture": "chirp",
+   "gesture": "vibrato",
    "velocity": 0.85,
    "placementRole": "accent",
    "role": "THEME"
@@ -35,7 +35,7 @@
    "bar": 23,
    "step": 1,
    "beat": 92.25,
-   "gesture": "chirp",
+   "gesture": "chirpDouble",
    "velocity": 0.9,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -53,7 +53,7 @@
    "bar": 23,
    "step": 14,
    "beat": 95.5,
-   "gesture": "chirp",
+   "gesture": "chirpDouble",
    "velocity": 0.95,
    "placementRole": "accent",
    "role": "OUTRO"
@@ -62,7 +62,7 @@
    "bar": 27,
    "step": 15,
    "beat": 111.75,
-   "gesture": "chirp",
+   "gesture": "vibrato",
    "velocity": 0.9216830701152056,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -80,7 +80,7 @@
    "bar": 30,
    "step": 9,
    "beat": 122.25,
-   "gesture": "chirp",
+   "gesture": "vibrato",
    "velocity": 0.85,
    "placementRole": "accent",
    "role": "THEME"
@@ -89,7 +89,7 @@
    "bar": 31,
    "step": 1,
    "beat": 124.25,
-   "gesture": "chirp",
+   "gesture": "chirpDouble",
    "velocity": 0.9,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -107,7 +107,7 @@
    "bar": 31,
    "step": 14,
    "beat": 127.5,
-   "gesture": "chirp",
+   "gesture": "chirpDouble",
    "velocity": 0.95,
    "placementRole": "accent",
    "role": "OUTRO"

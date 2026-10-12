@@ -168,13 +168,13 @@ const ROLE_OF: Readonly<Record<ArcPhaseName, ScratchRole>> = {
  * (the climb is audible), one hand performs it all, and the phases that allow silence keep
  * their empty bars. Deterministic for a seed.
  */
-export function planArc(opts: { arc: ArcTemplate; startBar: number; style: ScratchDJStyle; mode: ScratchMode; seed: number; densityScale?: number; beatsPerBar?: number; levelCap?: ScratchLevel; exclude?: readonly ScratchGestureId[] }): ArcPlan {
+export function planArc(opts: { arc: ArcTemplate; startBar: number; style: ScratchDJStyle; mode: ScratchMode; seed: number; densityScale?: number; beatsPerBar?: number; levelCap?: ScratchLevel; exclude?: readonly ScratchGestureId[]; allowed?: readonly ScratchGestureId[]; cooling?: (g: ScratchGestureId, bar: number) => boolean }): ArcPlan {
   const { arc, style, mode } = opts;
   const bpb = opts.beatsPerBar ?? 4;
   const modeMax = opts.levelCap ?? (maxLevelFor(mode, style) || 1);
   // a peak lifts the cap above the mode (section 56): the vocabulary is the battle palette's then
   const base = planVocabulary(style, opts.levelCap && opts.levelCap > (maxLevelFor(mode, style) || 0) ? 'BATTLE' : mode)
-    .filter((g) => getGesture(g).difficulty <= modeMax && !opts.exclude?.includes(g));
+    .filter((g) => getGesture(g).difficulty <= modeMax && !opts.exclude?.includes(g) && (!opts.allowed || opts.allowed.includes(g)));
   const rnd = lfsr(opts.seed * 131 + 7);
   const events: ArcEvent[] = [];
   const phaseByBar: ArcPhaseName[] = [];
@@ -185,7 +185,7 @@ export function planArc(opts: { arc: ArcTemplate; startBar: number; style: Scrat
     phaseByBar.push(p.name);
     const cap = Math.min(p.level, modeMax) as ScratchLevel;
     // the style's gestures inside the cap, plus the cap level's own when the palette has none there
-    const atCap = SCRATCH_GESTURES.filter((g) => g.difficulty === cap && g.id !== 'drop' && g.id !== 'dropPhrase' && !opts.exclude?.includes(g.id)).map((g) => g.id);
+    const atCap = SCRATCH_GESTURES.filter((g) => g.difficulty === cap && g.id !== 'drop' && g.id !== 'dropPhrase' && !opts.exclude?.includes(g.id) && (!opts.allowed || opts.allowed.includes(g.id))).map((g) => g.id);
     const pool = vocabulary([...base.filter((g) => getGesture(g).difficulty <= cap), ...(base.some((g) => getGesture(g).difficulty === cap) ? [] : atCap)]);
     const inPhase = b - p.startBar;
     const steps = phaseSteps(p.name, inPhase, rnd, p.densityScale * (opts.densityScale ?? 1));
@@ -193,10 +193,14 @@ export function planArc(opts: { arc: ArcTemplate; startBar: number; style: Scrat
     steps.forEach((step, i) => {
       const placementRole: PlacementRole = step >= 14 ? 'turnaround' : step >= 6 && step <= 8 ? 'answer' : 'accent';
       const signature = lastBarOfPhase && i === steps.length - 1;
-      const band = signature ? pool.filter((g) => getGesture(g).difficulty === cap) : pool;
-      const gesture = pickGesture(band.length ? band : pool, p.energy, placementRole, rnd, last);
-      last = gesture;
       const bar = opts.startBar + b;
+      // cooldowns at this bar (section 54), the record's own gestures (allowed)
+      const fresh = opts.cooling ? pool.filter((g) => !opts.cooling!(g, bar)) : pool;
+      const usable = fresh.length ? fresh : pool;
+      if (!usable.length) return;
+      const band = signature ? usable.filter((g) => getGesture(g).difficulty === cap) : usable;
+      const gesture = pickGesture(band.length ? band : usable, p.energy, placementRole, rnd, last);
+      last = gesture;
       events.push({
         bar, step, beat: stepToBeat({ bar, step }, '1/16', bpb), gesture,
         velocity: Math.min(1, PLAN_VEL.base + PLAN_VEL.rand * rnd() + PLAN_VEL.energy * p.energy),
