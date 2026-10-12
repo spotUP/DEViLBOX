@@ -175,7 +175,7 @@ export function sourceCandidates(req: SourceRequest, classes = materialAt(req.tr
   for (const record of SCRATCH_RECORDS) {
     if (!record.clean) continue;
     const source: ScratchSource = { type: 'CRATE', recordId: record.id, anchor: { position: record.anchors.vowel, safe: record.safe, safeForward: record.safeForward, safeReverse: record.safeReverse } };
-    const anchor = anchorFor(source, role);
+    const anchor = anchorFor(source);
     if (!anchor) continue;
     out.push({
       key: `crate:${record.id}`, origin: 'crate', material: CATEGORY_MATERIAL[record.category], source, anchor, record,

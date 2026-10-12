@@ -457,7 +457,7 @@ export class DJScratchDJ {
     }).map((e, i) => {
       const own = perEvent && plan.events[i]?.record ? crateSource(plan.events[i]!.record!) : null;
       const source = own ?? e.source;
-      return source.type === 'CRATE' ? { ...e, source, anchor: anchorFor(source, e.role) ?? source.anchor } : e;
+      return source.type === 'CRATE' ? { ...e, source, anchor: anchorFor(source, e.gesture) ?? source.anchor } : e;
     });
     // only what is still ahead of the clock
     const now = ctx.masterBeat;
@@ -520,7 +520,7 @@ export class DJScratchDJ {
     if (!source) return null;
     this.lastSource = `crate:${first!.record}`;
     void ctx;
-    return { source, anchor: anchorFor(source, first!.role) ?? source.anchor, record: getScratchRecord(first!.record!) };
+    return { source, anchor: anchorFor(source, first!.gesture) ?? source.anchor, record: getScratchRecord(first!.record!) };
   }
 
   /**

@@ -473,6 +473,9 @@ export const SCRATCH_GESTURES: readonly ScratchGesture[] = SEEDS.map((seed) => {
 
 const BY_ID: ReadonlyMap<ScratchGestureId, ScratchGesture> = new Map(SCRATCH_GESTURES.map((g) => [g.id, g]));
 
+/** A throw (section 41): the record rides forward from its attack with the fader open - the word as recorded. */
+export const isThrowGesture = (id: ScratchGestureId): boolean => id === 'drop' || id === 'dropPhrase';
+
 export function getGesture(id: ScratchGestureId): ScratchGesture {
   const g = BY_ID.get(id);
   if (!g) throw new Error(`[scratch] unknown gesture ${id}`);
