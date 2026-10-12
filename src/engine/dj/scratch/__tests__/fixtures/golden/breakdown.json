@@ -11,7 +11,8 @@
    "gesture": "drop",
    "velocity": 0.8,
    "placementRole": "accent",
-   "role": "INTRO"
+   "role": "INTRO",
+   "beats": 1
   },
   {
    "bar": 19,

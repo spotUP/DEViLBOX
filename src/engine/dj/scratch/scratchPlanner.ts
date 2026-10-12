@@ -35,7 +35,7 @@ export interface ScratchPlanOptions {
   fromBar: number;
   bars: number;
   /** The record the phrase is scratched on (opens with a throw). */
-  record?: Pick<ScratchRecord, 'id' | 'durationSec' | 'clean'>;
+  record?: Pick<ScratchRecord, 'id' | 'durationSec' | 'clean'> & Partial<Pick<ScratchRecord, 'safe' | 'anchors'>>;
   throwMemory?: ThrowMemory;
   /** Genre modifiers (section 33): density multiplier, rest multiplier, extra bias, level cap. */
   genre?: { densityScale?: number; restScale?: number; bias?: readonly ScratchGestureId[]; levelCap?: number; durationCapSteps?: number };
@@ -152,7 +152,7 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
 
   let events = bars.flat().sort((a, b) => a.beat - b.beat);
   if (opts.record && opts.throwMemory && events.length) {
-    events = withThrow(events, opts.record, opts.throwMemory, { firstBar: opts.fromBar, beatsPerBar: ctx.meter });
+    events = withThrow(events, opts.record, opts.throwMemory, { firstBar: opts.fromBar, beatsPerBar: ctx.meter, bpm: ctx.bpm });
   }
   // the final plan is what one hand performs: routines and the throw included (SA-B1)
   events = oneHand(events);
@@ -190,7 +190,7 @@ export function toScratchEvents(
     const g = getGesture(e.gesture);
     return {
       executeAtBeat: barStartBeat(opts.downbeats, e.bar) + e.step / STEPS_PER_BEAT[DEFAULT_GRID],
-      durationBeats: gestureBeats(e.gesture),
+      durationBeats: e.beats ?? gestureBeats(e.gesture),
       role: e.role,
       source,
       anchor,

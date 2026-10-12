@@ -167,7 +167,7 @@ export function pickGesture(vocab: readonly ScratchGestureId[], energy: number, 
 // ─── One hand (sections 8, 21, 83; audit SA-B1) ──────────────────────────
 
 /** Where a placed gesture ends, in beats: its start plus its one length (`gestureBeats`). */
-export const placedEnd = (e: Pick<PlacedScratch, 'beat' | 'gesture'>): number => e.beat + gestureBeats(e.gesture);
+export const placedEnd = (e: Pick<PlacedScratch, 'beat' | 'gesture'> & { beats?: number }): number => e.beat + (e.beats ?? gestureBeats(e.gesture));
 
 /** One hand on one record performs one gesture at a time: does `e` start before `other` ends (or vice versa)? */
 export function overlapsOneHand(a: Pick<PlacedScratch, 'beat' | 'gesture'>, b: Pick<PlacedScratch, 'beat' | 'gesture'>): boolean {
@@ -213,6 +213,9 @@ export interface PlacedScratch {
   velocity: number;
   placementRole: PlacementRole;
   role: ScratchRole;
+  /** The event's length in beats when it is not the gesture's own: a throw plays its whole word or
+   *  phrase (section 41), however long the record (`throwBeats`). */
+  beats?: number;
 }
 
 export interface PlanPhraseInput {
@@ -504,7 +507,7 @@ export interface ThrowMemory { [recordId: string]: number }
  * chop is at least four steps in. Not repeated for the same record within 8 bars (`memory`:
  * record -> bar of its last throw). Returns the events with the throw first.
  */
-export function withThrow(events: readonly PlacedScratch[], record: Pick<ScratchRecord, 'id' | 'durationSec' | 'clean'>, memory: ThrowMemory, opts: { firstBar?: number; beatsPerBar?: number; grid?: ScratchGrid } = {}): PlacedScratch[] {
+export function withThrow(events: readonly PlacedScratch[], record: Pick<ScratchRecord, 'id' | 'durationSec' | 'clean'> & Partial<Pick<ScratchRecord, 'safe' | 'anchors'>>, memory: ThrowMemory, opts: { firstBar?: number; beatsPerBar?: number; grid?: ScratchGrid; bpm?: number } = {}): PlacedScratch[] {
   const sorted = [...events].sort((a, b) => a.beat - b.beat);
   const first = sorted[0];
   if (!first || !record.clean) return sorted;
@@ -514,20 +517,34 @@ export function withThrow(events: readonly PlacedScratch[], record: Pick<Scratch
   const beatsPerBar = opts.beatsPerBar ?? 4;
   const grid = opts.grid ?? DEFAULT_GRID;
   const phrase = record.durationSec > DROP_PHRASE_MIN_SEC;
-  let bar = first.bar - 1;
   let gesture: ScratchGestureId = phrase ? 'dropPhrase' : 'drop';
+  // the whole word / phrase is heard (section 41): the throw is as long as the record from its attack,
+  // and ends before the first chop
+  const beats = opts.bpm ? throwBeats(record, opts.bpm, gesture) : gestureBeats(gesture);
+  let bar = Math.min(first.bar - 1, Math.floor((first.beat - beats) / beatsPerBar + 1e-9));
   if (bar < (opts.firstBar ?? 0)) {
-    // nothing before the run: a short throw ahead of the first chop, if it fits
-    if (first.step < 4 || phrase) return sorted;
+    // nothing before the run: a short throw ahead of the first chop, if the whole word fits
+    const dropBeats = opts.bpm ? throwBeats(record, opts.bpm, 'drop') : gestureBeats('drop');
+    if (phrase || first.beat - stepToBeat({ bar: first.bar, step: 0 }, grid, beatsPerBar) < dropBeats - 1e-9) return sorted;
     bar = first.bar;
     gesture = 'drop';
   }
   const t: PlacedScratch = {
     bar, step: 0, beat: stepToBeat({ bar, step: 0 }, grid, beatsPerBar), gesture, velocity: 0.8,
-    placementRole: 'accent', role: 'INTRO',
+    placementRole: 'accent', role: 'INTRO', ...(opts.bpm ? { beats: throwBeats(record, opts.bpm, gesture) } : {}),
   };
   memory[record.id] = bar;
   return [t, ...sorted];
+}
+
+/**
+ * A throw's length in beats at `bpm` (section 41 "the full word"): the record from its attack to
+ * the end of its safe range, rounded up to a 1/16 step, never shorter than the gesture.
+ */
+export function throwBeats(record: Pick<ScratchRecord, 'durationSec'> & Partial<Pick<ScratchRecord, 'safe' | 'anchors'>>, bpm: number, gesture: ScratchGestureId = 'drop'): number {
+  const sec = (record.safe?.[1] ?? record.durationSec) - (record.anchors?.attack ?? 0);
+  const beats = Math.ceil((sec / (60 / Math.max(1, bpm))) * 4 - 1e-9) / 4;
+  return Math.max(gestureBeats(gesture), beats);
 }
 
 /** Steps in a bar for a grid (4/4). */
