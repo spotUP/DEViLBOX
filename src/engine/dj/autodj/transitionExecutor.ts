@@ -17,21 +17,8 @@ import { fireDjFx, releaseDjFx, type DjFxActionId } from '@/engine/drumpad/DjFxA
 import { sampleCurve, type ExecutionTrace } from './transitionQuality';
 import type { AutomationCurve, AutomationTarget, DJEffectEvent, DJTransitionPlan, FilterPlanKind } from './types';
 
-export interface ExecutorTimers {
-  now(): number;
-  setInterval(fn: () => void, ms: number): unknown;
-  clearInterval(id: unknown): void;
-  setTimeout(fn: () => void, ms: number): unknown;
-  clearTimeout(id: unknown): void;
-}
-
-export const realTimers: ExecutorTimers = {
-  now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
-  setInterval: (fn, ms) => setInterval(fn, ms),
-  clearInterval: (id) => clearInterval(id as ReturnType<typeof setInterval>),
-  setTimeout: (fn, ms) => setTimeout(fn, ms),
-  clearTimeout: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
-};
+export { realTimers, type ExecutorTimers } from './executorTimers';
+import { realTimers, type ExecutorTimers } from './executorTimers';
 
 export interface ExecutionResult {
   completed: boolean;

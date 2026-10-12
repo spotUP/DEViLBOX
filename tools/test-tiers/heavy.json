@@ -153,21 +153,6 @@
     {
       "file": "src/engine/dj/__tests__/autoDJStandaloneJuggleLongSet.test.ts",
       "ciSeconds": 390
-    },
-    {
-      "file": "src/engine/dj/scratch/__tests__/scratchRecordVoiceAudio.test.ts",
-      "ciSeconds": 24,
-      "note": "measured locally 2026-10-11 at load 29 (4.6 s unloaded); 12 offline worklet renders"
-    },
-    {
-      "file": "src/engine/dj/__tests__/scratchRecordVoiceReachesTheBus.test.ts",
-      "ciSeconds": 42,
-      "note": "measured locally 2026-10-11 at load ~29; offline worklet render through pool, voice and two buses"
-    },
-    {
-      "file": "src/engine/dj/__tests__/scratchRecueReachesTheRecord.test.ts",
-      "ciSeconds": 30,
-      "note": "measured locally 2026-10-11 at 15 s; 1.3 s offline worklet render, four stabs through the executor"
     }
   ]
 }

@@ -28,7 +28,7 @@
  */
 
 import type { JuggleClock } from '../autodj/juggle/juggleExecutor';
-import { realTimers, type ExecutorTimers } from '../autodj/transitionExecutor';
+import { realTimers, type ExecutorTimers } from '../autodj/executorTimers';
 import type { DjFxActionId, DjFxFireOptions, DjFxSource } from '../../drumpad/DjFxActions';
 import type { DeckRecueResult } from './deckRecue';
 import { fieldsTouchedBy, type ScratchField, type ScratchSnapshot, type ScratchStateProbe } from './scratchSnapshot';
