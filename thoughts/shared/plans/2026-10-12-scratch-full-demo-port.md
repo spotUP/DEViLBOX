@@ -26,6 +26,12 @@ OWNER DECISIONS 2026-10-12:
 - Owner 2026-10-12: activated deck 3 and saw no animated scratching. Today's Auto Scratch plays on record voices on the scratch bus, and nothing reads their positions (gap D1). Row D1 must deliver: Auto Scratch strokes drive deck C's platter, fader and slip animation from the same physics, as in the demo's dj_viz / three_deck. Reachability: an Auto Scratch stroke moves the deck C platter angle (sentinel on the view's position consumer).
 
 
+OWNER DECISIONS 2026-10-12 (phase-0 questions):
+- P13: KEEP the DEViLBOX live extras (vocal scaling, call/answer, mode caps, one-hand filter, short arc features, juggle response, transition scratch) as a layer ON TOP of the exact demo overlay. The demo overlay is ported exactly and is what the null test checks; the extras never change what the demo plans.
+- J3/J6: SHIP the amen break and the hip-hop juggle records; owner owns/cleared them.
+- X6 (main-session call under "demo everywhere"): Deck C level = 0.60 x RMS of the A/B juggle decks only (live: running RMS over the A+B deck buses), not the programme meter.
+- T6 (main-session call under "demo everywhere"): the demo never calls cartridge_response, so the stroke path must not apply it. Port it as an available function, applied nowhere, same as the demo.
+
 Running count: 22 of 81 closed (phase 0 re-verification 2026-10-12, against main at 61ae1abcf; 59 open). The 22 are rows the gap doc had as open that current code already ports exactly, with a fixture test against the demo; their revert checks were not re-run in phase 0.
 
 ## Phase 0 findings (2026-10-12)
