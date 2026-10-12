@@ -187,6 +187,8 @@ class DJAutoDJ {
   private plan: DJTransitionPlan | null = null;
   private incomingAnalysis: DJTrackAnalysis | null = null;
   private execution: ExecutionHandle | null = null;
+  /** A plan's rewind is running on the active deck (the tune is pulled back and plays again). */
+  private rewinding = false;
   /** Stand-alone juggles on the idle deck (plan 2026-10-11-dj-juggling, P4): created with the juggle controller. */
   private standaloneJuggle: StandaloneJuggle | null = null;
 
@@ -600,6 +602,8 @@ class DJAutoDJ {
       }
 
       case 'transition-pending': {
+        // A rewind holds the active deck's platter: neither paused nor stale, and no transition yet.
+        if (this.rewinding) break;
         // ── Pause guard: if active deck got paused externally, resume it ──
         if (!this.isActiveDeckPlaying(store)) {
           console.warn(`[AutoDJ] Active deck ${this.activeDeck} paused during transition-pending — resuming`);
@@ -641,6 +645,10 @@ class DJAutoDJ {
           const lead = getSessionController().loadLeadSec;
           if (this.pollCount % 4 === 0) this.publishTelemetry(timeRemaining);
           if (position >= this.plan.startTimeSec - lead || timeRemaining <= Math.max(transitionDuration, lead)) {
+            if (this.plan.rewind) {
+              this.triggerRewind(this.plan);
+              break;
+            }
             console.log(`[AutoDJ] Triggering planned ${this.plan.style} at ${position.toFixed(1)}s (plan start ${this.plan.startTimeSec.toFixed(1)}s)`);
             this.patternDeferCount = 0;
             this.triggerTransition(store.autoDJTransitionBars);
@@ -1639,6 +1647,46 @@ class DJAutoDJ {
     return () => handle.cancel();
   }
 
+  /**
+   * The plan's rewind (owner 2026-10-12): the playing tune is pulled back on the
+   * planned mix-out and plays again from its first downbeat instead of the
+   * transition. The executor performs it on the grid moment (the deck's Rewind
+   * action, the pad's); the controller remembers it (never twice for one tune,
+   * the set plan counts the replayed time). Then the transition is planned
+   * again from the restart. A refused rewind leaves the plan's transition.
+   */
+  private triggerRewind(plan: DJTransitionPlan): void {
+    this.rewinding = true;
+    const out = this.activeDeck;
+    console.log(`[AutoDJ] REWIND deck ${out} at ${plan.startTimeSec.toFixed(1)}s: ${plan.rewind?.reason ?? ''}`);
+    const handle = executeTransition(plan, {
+      waitForStart: (p) => this.waitForDeckPosition(out, p.startTimeSec),
+      outgoingPosition: () => this.getOutgoingPosition(),
+      onComplete: (result) => {
+        if (this.execution === handle) this.execution = null;
+        this.transitionCancel = null;
+        this.rewinding = false;
+        try { getSessionController().onTransitionComplete(result, plan); } catch { /* */ }
+        this.plan = result.rewound ? this.planAfterRewind() : { ...plan, rewind: undefined };
+      },
+    });
+    this.execution = handle;
+    this.transitionCancel = () => handle.cancel();
+  }
+
+  /** The transition planned again once a rewound tune plays again: from its restart, to the incoming already chosen. */
+  private planAfterRewind(): DJTransitionPlan | null {
+    try {
+      const decks = useDJStore.getState().decks;
+      const outgoing = decks[this.activeDeck].trackAnalysis;
+      const incoming = this.incomingAnalysis ?? decks[this.idleDeck].trackAnalysis;
+      return getSessionController().planTransitionFor(outgoing, incoming, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition(), this.juggleBudget());
+    } catch (err) {
+      console.warn('[AutoDJ] plan after the rewind failed:', err);
+      return null;
+    }
+  }
+
   /** Resolve when the deck reaches `targetSec` (the planned grid moment), or on a safety timeout. */
   private waitForDeckPosition(deck: DeckId, targetSec: number): Promise<void> {
     return new Promise((resolve) => {
@@ -1789,7 +1837,7 @@ class DJAutoDJ {
     if (mode === 'OFF' && !this.scratch) return;
     try {
       const c = this.getScratch();
-      const transitioning = status === 'transitioning';
+      const transitioning = status === 'transitioning' || this.rewinding;
       const juggling = !!this.juggle?.isActive();
       const track = s.decks[this.activeDeck].trackAnalysis;
       const choice = scratchStyleFor(s.autoDJScratchStyle, track?.genre ?? s.autoDJStyle);
@@ -1841,7 +1889,7 @@ class DJAutoDJ {
     if (standalone.verifying() && !j.isActive()) return;
     if (!j.isActive() && this.pollCount % 2 === 1 && !j.nowPending()) return;
     try {
-      const transitioning = status === 'transitioning';
+      const transitioning = status === 'transitioning' || this.rewinding;
       const last = this.juggleSink?.lastCrossfader() ?? null;
       const userControl = j.isActive() && last !== null && Math.abs(s.crossfaderPosition - last) > 0.05 ? 'crossfader' : null;
       const performanceMode: DJPerformanceMode = this.execution?.plan.style === 'juggleTransition' && j.isActive() ? 'JUGGLE_TRANSITION'

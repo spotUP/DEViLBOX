@@ -723,6 +723,19 @@ export interface HumanizePlan {
   fxOffsetMs: number;
 }
 
+/** A peak tune played again (the reggae sound-system rewind): the crowd demands it once. */
+export interface RewindPlan {
+  /** The tune played again (the outgoing analysis id). */
+  trackId: string;
+  /** The outgoing track's position the rewind fires on (the plan's mix-out). */
+  atSec: number;
+  /** Where the tune restarts: its first downbeat. */
+  restartSec: number;
+  /** Track time played again: atSec - restartSec (the set plan adds it to the set's length). */
+  replaySec: number;
+  reason: string;
+}
+
 export interface DJTransitionPlan {
   id: string;
   style: TransitionStyle;
@@ -770,6 +783,12 @@ export interface DJTransitionPlan {
    * the scratch as the transition, or a battle burst; performed by the executor's `performScratch`.
    */
   scratch?: import('../scratch/transitionScratch').TransitionScratchPlan;
+  /**
+   * A rewind instead of this transition (owner 2026-10-12): on the planned mix-out the
+   * outgoing record is pulled back and the same tune plays again from its first downbeat
+   * (the deck's Rewind, fx_deck_rewind). The transition is planned again afterwards.
+   */
+  rewind?: RewindPlan;
 
   confidence: number;
   risk: TransitionRisk;
@@ -825,7 +844,9 @@ export type DecisionKind =
   /** A stand-alone juggle: trigger, source and how it ended (plan 2026-10-11-dj-juggling, P4.3). */
   | 'JUGGLE'
   /** An Auto Scratch phrase: source, gesture, placement, duration and why (scratch plan section 65). */
-  | 'SCRATCH';
+  | 'SCRATCH'
+  /** A peak tune rewound and played again from its first downbeat instead of moving on (owner 2026-10-12). */
+  | 'REWIND';
 
 export interface DecisionLogEntry {
   seq: number;
@@ -888,4 +909,8 @@ export interface SessionMemorySnapshot {
   scratchPhrases: number;
   /** Gestures of the last scratch phrases, oldest first (the transition scratch's variety term). */
   recentScratchGestures: string[];
+  /** Tracks rewound this session (a tune is rewound at most once). */
+  rewoundTracks: string[];
+  /** Track time played again by rewinds this session, seconds. */
+  replayedSec: number;
 }

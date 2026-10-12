@@ -67,7 +67,7 @@ export class DJSessionController {
   private currentEnergy: number | undefined;
   readonly loadLeadSec: number;
   /** Reachability sentinels: how often each stage ran this session. */
-  readonly counts = { sessionPlans: 0, transitionPlans: 0, executions: 0, fallbacks: 0, emergencies: 0, adaptations: 0 };
+  readonly counts = { sessionPlans: 0, transitionPlans: 0, executions: 0, fallbacks: 0, emergencies: 0, adaptations: 0, rewinds: 0 };
 
   constructor(opts: ControllerOptions = {}) {
     this.now = opts.now ?? (() => Date.now());
@@ -157,7 +157,8 @@ export class DJSessionController {
   }
 
   private plannedDurationSec(): number {
-    const total = this.tracks.reduce((a, t) => a + (t.track.duration > 0 ? t.track.duration : 240), 0);
+    // A rewound tune plays part of itself again: the set is that much longer (owner 2026-10-12).
+    const total = this.tracks.reduce((a, t) => a + (t.track.duration > 0 ? t.track.duration : 240), 0) + this.memory.replayedSec();
     return Math.max(1800, total);
   }
 
@@ -279,6 +280,22 @@ export class DJSessionController {
   // ── After execution (plan sections 41, 69: hear the consequence, adapt) ──
 
   onTransitionComplete(result: ExecutionResult, plan: DJTransitionPlan | null = this.plan): TransitionQuality | null {
+    if (plan?.rewind) {
+      // A rewind plan performs the rewind, never the transition: the caller plans the transition again.
+      this.plan = null;
+      this.planInputs = null;
+      if (!result.rewound) {
+        getDecisionLog().record('REWIND', [`rewind not performed (${result.error ?? 'refused'}): the transition plays without it`], { time: this.now() });
+        return null;
+      }
+      // The tune plays again (owner 2026-10-12): remembered (once per tune; the set's length grows by the replay).
+      this.counts.rewinds++;
+      this.memory.recordRewind({ trackId: plan.rewind.trackId, replaySec: plan.rewind.replaySec, time: this.now() });
+      getDecisionLog().record('REWIND', [plan.rewind.reason, `set plan: ${plan.rewind.replaySec.toFixed(0)} s played again, ${this.memory.replayedSec().toFixed(0)} s this session`], {
+        time: this.now(), details: { atSec: plan.rewind.atSec, restartSec: plan.rewind.restartSec, replaySec: plan.rewind.replaySec, plannedDurationSec: this.plannedDurationSec(), events: result.trace.events.slice(0, 12) },
+      });
+      return null;
+    }
     this.counts.executions++;
     if (result.fellBack === 'emergency') this.counts.emergencies++;
     const inputs = this.planInputs;

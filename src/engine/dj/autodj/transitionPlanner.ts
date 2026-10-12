@@ -17,7 +17,7 @@ import { timelineAt, barIndexAt, trackBeatConfidence } from './beatGrid';
 import type {
   AutomationCurve, BassHandoverPlan, BassOwner, CutCandidate, CueJumpPlan, DJEffectEvent, DJPhrase,
   DJSection, DJStyleProfile, DJTrackAnalysis, DJTransitionPlan, EQPlan, HumanizePlan, LoopPlan,
-  SessionMemorySnapshot, TransitionRisk, TransitionStyle,
+  RewindPlan, SessionMemorySnapshot, TransitionRisk, TransitionStyle,
 } from './types';
 import { TRANSITION_STYLES } from './types';
 import { crossfadeFor, curve, filterFor, stepCurve } from './transitionCurves';
@@ -596,6 +596,40 @@ export function impactExit(outSection: DJSection | undefined, inSection: DJSecti
   return { kind: 'brake', deck: 'outgoing', beat: 0, lengthBeats: 2, amount: 1, reason: 'impact cut: brake the outgoing deck into the cut' };
 }
 
+/** The least track time a rewind plays again: a tune rewound in its first half minute is not a crowd moment. */
+export const REWIND_MIN_REPLAY_SEC = 30;
+/** No rewind while a rewound tune is among the last tracks: the rewind stays a moment, not a habit. */
+export const REWIND_TRACK_GAP = 4;
+
+/**
+ * A rewind instead of moving on (owner 2026-10-12, the reggae sound-system
+ * rewind): at the peak of the set, on a high-energy tune, with the creative risk
+ * a spinback asks for, the selector pulls the record back on the mix-out and
+ * plays the same tune again from its first downbeat. Once per tune, and not
+ * while a rewound tune is among the last few. Undefined otherwise; `why`
+ * collects the reasons for the plan's explanation.
+ */
+export function planRewind(ctx: {
+  outgoing: Pick<DJTrackAnalysis, 'id' | 'energy' | 'landmarks'>; outSection: DJSection | undefined; atSec: number;
+  setPhase: string; creativeRisk: number; memory: SessionMemorySnapshot;
+}, why: string[] = []): RewindPlan | undefined {
+  const { outgoing, outSection, atSec, memory } = ctx;
+  const peak = ctx.setPhase === 'PEAK' || ctx.setPhase === 'PEAKING';
+  const energy = Math.max(outSection?.energy ?? 0, outgoing.energy.perceivedIntensity);
+  const restartSec = Math.max(0, outgoing.landmarks.firstDownbeat || 0);
+  const replaySec = atSec - restartSec;
+  if (!peak) { why.push(`set phase ${ctx.setPhase}: no rewind`); return undefined; }
+  if (energy < 0.8) { why.push(`energy ${energy.toFixed(2)} below a peak tune's 0.80: no rewind`); return undefined; }
+  if (ctx.creativeRisk < 0.7) { why.push(`creative risk ${ctx.creativeRisk.toFixed(2)} below 0.70: no rewind`); return undefined; }
+  if (memory.rewoundTracks.includes(outgoing.id)) { why.push('this tune was rewound already: moving on'); return undefined; }
+  if (memory.recentTracks.slice(-REWIND_TRACK_GAP).some((id) => memory.rewoundTracks.includes(id))) { why.push(`a rewind within the last ${REWIND_TRACK_GAP} tunes: no rewind`); return undefined; }
+  if (replaySec < REWIND_MIN_REPLAY_SEC) { why.push(`only ${replaySec.toFixed(0)} s to play again: no rewind`); return undefined; }
+  return {
+    trackId: outgoing.id, atSec, restartSec, replaySec,
+    reason: `peak tune (energy ${energy.toFixed(2)}, set phase ${ctx.setPhase}): pull it back on the mix-out at ${atSec.toFixed(1)} s and play it again from the first downbeat at ${restartSec.toFixed(1)} s (${replaySec.toFixed(0)} s again)`,
+  };
+}
+
 // ── Risk and confidence (plan sections 35, 36) ──────────────────────────────
 
 export function assessRisk(ctx: {
@@ -826,6 +860,10 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   else if (juggleMode !== 'OFF' && ladderWhy.length) reasons.push(`juggle: ${ladderWhy.join('; ')}`);
   if (loop) reasons.push(`loop: ${loop.reason}`);
   if (cueJump) reasons.push(`cue jump: ${cueJump.reason}`);
+  // A rewind instead of this transition (owner 2026-10-12): never on a juggle, whose ladder starts before the mix-out.
+  const rewindWhy: string[] = [];
+  const rewind = juggle ? undefined : planRewind({ outgoing, outSection: sectionAt(outgoing, mixOut.time), atSec: mixOut.time, setPhase: input.setPhase, creativeRisk: input.creativeRisk, memory }, rewindWhy);
+  reasons.push(rewind ? `rewind: ${rewind.reason}; the transition is planned again after the replay` : `rewind: ${rewindWhy[0] ?? 'juggle transition'}`);
 
   // Scratch in the transition (scratch plan D8, sections 44-48): additive, never changes the curves.
   let scratch: DJTransitionPlan['scratch'];
@@ -865,6 +903,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     cut,
     juggle,
     scratch,
+    rewind,
     confidence,
     risk,
     quantize,
@@ -905,6 +944,7 @@ export function fallbackPlan(plan: DJTransitionPlan, input: TransitionPlanInput,
     cut: undefined,
     juggle: undefined,
     scratch: undefined,
+    rewind: undefined,
     quantize: level === 'emergency' ? 'bar' : plan.quantize,
     reasons: [`${level}: ${styleName} instead of ${plan.style}`, ...plan.reasons.slice(1)],
   };
