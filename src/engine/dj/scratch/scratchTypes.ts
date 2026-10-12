@@ -133,8 +133,8 @@ export interface DeckScratchAnchor {
   kind?: DeckAnchorKind;
 }
 
-/** What the deck anchor marks (section 84). */
-export type DeckAnchorKind = 'downbeat' | 'snare' | 'vocalOnset' | 'hit';
+/** What the deck anchor marks (section 84; the extracted song material of section 87). */
+export type DeckAnchorKind = 'downbeat' | 'snare' | 'vocalOnset' | 'hit' | 'kick' | 'stab' | 'fill' | 'phraseHit';
 
 /** Section 84 source model. */
 export type ScratchSource =
