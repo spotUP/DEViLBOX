@@ -244,6 +244,8 @@ export interface PlacedScratch {
   /** The crate record the event scratches, when the plan chose it per event or per section (the demo's
    *  `pick_source` / role pools); the window's chosen source otherwise. */
   record?: string;
+  /** A demo routine's stroke: how the demo renders it (seed, human timing, bus chain). */
+  render?: import('./scratchTypes').ScratchRenderSpec;
 }
 
 export interface PlanPhraseInput {

@@ -191,6 +191,19 @@ export interface ScratchEvent {
   returnToAnchor: boolean;
   /** The style's FX on the bus (SCR-PG-A5). */
   fx?: ScratchEventFx;
+  /** A demo routine's stroke: rendered as the demo renders it, on the routine's Deck C bus (scratch null test). */
+  render?: ScratchRenderSpec;
+}
+
+/**
+ * How the demo renders one planned stroke (`scratch.render_gesture` + its routine's placement): the
+ * physics seed, the human timing in whole 22,050 Hz samples (the event's `humanizeMs` is then 0) and
+ * the routine's bus chain.
+ */
+export interface ScratchRenderSpec {
+  seed: number;
+  humanizeSamples: number;
+  chain: 'threeDeck' | 'scratchDj';
 }
 
 /** The slice of a crate record the gesture compatibility rule needs

@@ -118,6 +118,8 @@ export interface DjFxFireOptions {
   at?: number;
   /** Record gestures: the tempo the stroke is timed at - the planner's beat clock (the executor's); none = the deck's effectiveBPM (a pad). */
   bpm?: number;
+  /** Record gestures of a demo routine: render the stroke as the demo does, on the routine's Deck C bus. */
+  render?: import('@/engine/dj/scratch/scratchTypes').ScratchRenderSpec;
   /** Release: let the running pattern cycle finish instead of a hard stop. */
   finishCycle?: boolean;
   /** Deck gestures: called with the quantize wait when the start is deferred. */
@@ -1812,6 +1814,7 @@ function engageRecordGesture(id: string, gestureId: ScratchGestureId, opts?: DjF
     cue: opts?.anchor,
     at: opts?.at,
     fx: opts?.scratchFx,
+    render: opts?.render,
   });
   if (handle) scratchVoiceHandles.set(id, handle);
 }

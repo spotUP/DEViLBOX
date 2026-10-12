@@ -287,11 +287,13 @@ export function toScratchEvents(
       anchor,
       gesture: e.gesture,
       velocity: e.velocity,
-      humanizeMs: offsets[i]!,
+      // a demo routine's stroke carries the demo's own human timing, in samples, on the bus
+      humanizeMs: e.render ? 0 : offsets[i]!,
       intensity: g.intensity,
       deck: opts.deck,
       returnToAnchor: g.returnsToAnchor && !isThrowGesture(e.gesture),
       ...(opts.fx ? { fx: opts.fx } : {}),
+      ...(e.render ? { render: e.render } : {}),
     };
   });
 }

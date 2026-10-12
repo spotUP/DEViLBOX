@@ -18,7 +18,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
 
-const SR = 48000;
+const SR_DEFAULT = 48000;
 const OUT = join(process.cwd(), 'thoughts', 'spot', 'renders', 'scratch-parity');
 const TRACK_GAIN = 0.72; // the demo's mix: 0.72 x the beat
 const holder = vi.hoisted(() => ({ ctx: null as unknown, samplerInput: null as unknown, programme: null as null | ((n: number) => Float32Array) }));
@@ -58,7 +58,9 @@ function wav16(channels: Float32Array[], rate: number): Buffer {
 interface Fired { at: number; beats: number; gesture: string; record?: string }
 
 /** The three-deck routine at the PEAK over the drops track, offline, from one bar before the drop for `bars` bars. */
-async function renderRoutine(opts: { bars: number; withTrack: boolean }) {
+/** `layers`: channel 0 = the scratch bus's output (mono), channel 1 = the voices' dry output (the bus input). */
+async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: boolean; rate?: number; programme?: boolean }) {
+  const SR = opts.rate ?? SR_DEFAULT;
   const { corpusTrack, corpusAnalysis } = await import('../autodj/testing/corpus');
   const { DJScratchDJ } = await import('../scratch/DJScratchDJ');
   const { ScratchExecutor } = await import('../scratch/ScratchExecutor');
@@ -81,7 +83,8 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean }) {
   const ctx = new OfflineAudioContext(2, len, SR);
   holder.ctx = ctx;
   const samplerInput = ctx.createGain();
-  samplerInput.connect(ctx.destination);
+  const merger = opts.layers ? ctx.createChannelMerger(2) : null;
+  if (merger) { samplerInput.connect(merger, 0, 0); merger.connect(ctx.destination); } else samplerInput.connect(ctx.destination);
   holder.samplerInput = samplerInput;
   if (opts.withTrack) {
     // the track, from one bar before the drop, at the demo's beat gain
@@ -92,12 +95,14 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean }) {
     src.connect(g).connect(ctx.destination); src.start(0);
   }
   // the programme meter reads the track either way: the scratch level follows it
-  holder.programme = (n) => {
+  // no programme: the scratch bus keeps its own level (the null test - the demo's level is one whole-render gain)
+  holder.programme = opts.programme === false ? null : (n) => {
     const at = Math.round((t0 + ctx.currentTime) * track.sampleRate);
     return Float32Array.from({ length: n }, (_, i) => TRACK_GAIN * (track.pcm[at + i] ?? 0));
   };
   resetScratchVoicePool();
   await getScratchVoicePool().ready;
+  if (merger) for (const v of getScratchVoicePool().voices) v.ring.playbackGain.connect(merger, 0, 1);
 
   const intervals: Array<() => void> = [];
   const timers = {
@@ -125,6 +130,8 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean }) {
       timers, tickMs: 5, lookaheadSec: 0.1,
     }),
     onPlan: (p) => { if (p.routine === 'threeDeck') plannedSeed = seed + fromBar; },
+    // as the Auto DJ wires it: the routine's records are read before their first stroke
+    prepareRecords: (ids) => getScratchVoicePool().prepareRecords(ids),
   });
   const perf = (): Perf => ({ currentDeck: 'A', currentTrack: analysis, incomingTrack: null, currentPosition: pos(), setPhase: 'PEAK', setEnergy: 0.9, targetEnergy: 0.95, creativeRisk: 0.6 } as unknown as Perf);
   // the poll: every 10 ms of the render the controller ticks and the executor's interval runs
@@ -157,7 +164,11 @@ describe('the A/B routine: every stroke the executor plays is heard (SCR-PHRASIN
   beforeAll(() => { installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch(); });
 
   it('eight bars of the three-deck routine: at least 90 % of the strokes handed to the voice are heard in their own window', async () => {
+    const { deckCStats } = await import('../scratch/scratchDeckC');
+    const before = deckCStats.strokes;
     const r = await renderRoutine({ bars: 9, withTrack: false });
+    // every stroke the executor fired is the demo's render on the routine's Deck C bus (SCR-NULL-TEST)
+    expect(deckCStats.strokes - before, 'strokes summed on the Deck C bus').toBe(r.fired.length);
     const strokes = r.fired.filter((f) => f.gesture !== 'needleDrop' && f.gesture !== 'needleLift' && f.at < r.out.duration - 0.3);
     expect(strokes.length, 'the routine fired its strokes').toBeGreaterThan(40);
     // a stroke is heard when its own first 60 ms (the attack of the move, before the next one can start)
@@ -176,11 +187,25 @@ describe.skipIf(process.env.SCRATCH_AB_RENDER !== '1')('the A/B render pair (SCR
     console.log(`[A/B] strokes ${r.strokes}, refused ${r.refused}`);
     mkdirSync(OUT, { recursive: true });
     const name = process.env.SCRATCH_AB_NAME ?? 'devilbox_three_deck_drops';
-    writeFileSync(join(OUT, `${name}.wav`), wav16([r.out.getChannelData(0), r.out.getChannelData(1)], SR));
+    writeFileSync(join(OUT, `${name}.wav`), wav16([r.out.getChannelData(0), r.out.getChannelData(1)], r.out.sampleRate));
     // the same span of the track, and the plan the demo side renders from
     const { track, t0, t1 } = r;
     writeFileSync(join(OUT, 'track_drops.wav'), wav16([track.pcm.subarray(Math.round(t0 * track.sampleRate), Math.round(t1 * track.sampleRate))], track.sampleRate));
     const downbeats = Array.from({ length: 34 }, (_, k) => r.barT(r.fromBar - 1 + k) - t0);
     writeFileSync(join(OUT, 'plan.json'), JSON.stringify({ seed: r.plannedSeed, bpm: r.analysis.bpm, routineStartBar: 1, downbeatsSec: downbeats, trackGain: TRACK_GAIN }, null, 1));
+  }, 600_000);
+});
+
+describe.skipIf(process.env.SCRATCH_AB_LAYERS !== '1')('the isolated scratch layers for per-stroke comparison with the demo (SCR-AB-TAIL)', () => {
+  beforeAll(() => { installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch(); });
+
+  it('writes the bus output and the voices\' dry output (no track) and the strokes the executor fired', async () => {
+    const r = await renderRoutine({ bars: 33, withTrack: false, layers: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT), programme: false });
+    mkdirSync(OUT, { recursive: true });
+    const name = process.env.SCRATCH_AB_NAME ?? 'devilbox_layers';
+    writeFileSync(join(OUT, `${name}.wav`), wav16([r.out.getChannelData(0), r.out.getChannelData(1)], r.out.sampleRate));
+    writeFileSync(join(OUT, `${name}.json`), JSON.stringify({ fired: r.fired, rate: r.out.sampleRate }, null, 1));
+    // the bus output as float32, unscaled: the null test's input (a 16-bit WAV floors it at -90 dB)
+    writeFileSync(join(OUT, `${name}.bus.f32`), Buffer.from(r.out.getChannelData(0).slice().buffer));
   }, 600_000);
 });
