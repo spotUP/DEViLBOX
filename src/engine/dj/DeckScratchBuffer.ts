@@ -24,55 +24,9 @@ const GAIN_RAMP_SEC = 0.003;
 /** Ring id of the tracker view's scratch buffer — never a DJ deck's (0..2). */
 export const TRACKER_SCRATCH_BUFFER_ID = 3;
 
-/** First ring id of the scratch record voices (owner scratch plan section 16,
- *  D4): voice `i` owns ring `SCRATCH_RECORD_RING_BASE + i`. */
-export const SCRATCH_RECORD_RING_BASE = 4;
-
-/** Reachability sentinels for the record mode (SCR-P2.R2). */
-export const scratchRingStats = { loads: 0, startAtFrames: [] as number[], seekFrames: [] as number[], rateCurves: 0, faderWindows: 0, surfaces: 0, cartridges: 0 };
-
-/** A frame-accurate rate point relative to the message's arrival. */
-export interface RingRatePoint { frame: number; rate: number }
-
-export interface RingRateCurveOptions {
-  interpolate?: boolean;
-  loop?: boolean;
-  cycleFrames?: number;
-  /** Re-cue to the last `seek`/`startAt` position at every cycle end. */
-  returnToAnchor?: boolean;
-}
-
-export interface RingFaderWindowsOptions {
-  cycleFrames: number;
-  loop?: boolean;
-  rampFrames?: number;
-  /** Fader transfer-curve exponent applied to the window gain (1 linear; reference battle 12). */
-  curveExp?: number;
-}
-
-export interface RingPositionReport {
-  /** Read head in frames of the record. */
-  frames: number;
-  sec: number;
-  rate: number;
-  /** Articulated fader gain 0..1 inside the worklet. */
-  fader: number;
-  /** Cumulative count of samples the bounds clamp caught. */
-  clamped: number;
-}
-
-export interface DeckScratchBufferOptions {
-  /** Record mode: no capture node; the ring is a static record written by `loadRecord`. */
-  record?: boolean;
-}
-
 export class DeckScratchBuffer {
   private captureNode: AudioWorkletNode | null = null;
   private playbackNode!: AudioWorkletNode;
-  private readonly record: boolean;
-  private recordFrames = 0;
-  /** Record mode: called on every `position` report from the worklet (every 128 frames). */
-  onPosition: ((report: RingPositionReport) => void) | null = null;
   /** GainNode (0 = silent, 1 = active). Wired to master input. */
   playbackGain!: GainNode;
 
@@ -85,17 +39,14 @@ export class DeckScratchBuffer {
   private readonly ctx: AudioContext;
   private readonly bufferId: number;
 
-  constructor(ctx: AudioContext, bufferId: number, opts: DeckScratchBufferOptions = {}) {
+  constructor(ctx: AudioContext, bufferId: number) {
     this.ctx = ctx;
     this.bufferId = bufferId;
-    this.record = !!opts.record;
   }
 
   get sampleRate(): number { return this.ctx.sampleRate; }
-  /** The capture node other sources tap into (null in record mode, which never captures). */
+  /** The capture node other sources tap into. */
   get captureInput(): AudioWorkletNode | null { return this.captureNode; }
-  /** Record mode: frames of the loaded record (0 before `loadRecord`). */
-  get loadedFrames(): number { return this.recordFrames; }
 
   async init(): Promise<void> {
     if (!DeckScratchBuffer.loadedCtxs.has(this.ctx)) {
@@ -110,19 +61,17 @@ export class DeckScratchBuffer {
     }
 
     const sharedOpts: AudioWorkletNodeOptions = {
-      processorOptions: { bufferId: this.bufferId, record: this.record },
+      processorOptions: { bufferId: this.bufferId },
       channelCount: 2,
       channelCountMode: 'explicit' as ChannelCountMode,
     };
 
-    if (!this.record) {
-      this.captureNode = new AudioWorkletNode(this.ctx, 'scratch-capture', {
-        ...sharedOpts,
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
-        outputChannelCount: [2],
-      });
-    }
+    this.captureNode = new AudioWorkletNode(this.ctx, 'scratch-capture', {
+      ...sharedOpts,
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
+    });
 
     this.playbackNode = new AudioWorkletNode(this.ctx, 'scratch-reverse', {
       ...sharedOpts,
@@ -133,9 +82,7 @@ export class DeckScratchBuffer {
 
     this.playbackNode.port.onmessage = (e: MessageEvent) => {
       const d = e.data;
-      if (d.type === 'position') {
-        this.onPosition?.({ frames: d.frames, sec: d.frames / this.ctx.sampleRate, rate: d.rate, fader: d.fader, clamped: d.clamped });
-      } else if (d.type === 'debug-playback') {
+      if (d.type === 'debug-playback') {
         console.log(
           `[ScratchPlayback ${this.bufferId}] readPos=${Math.floor(d.readPos)} ` +
           `rate=${d.smoothRate.toFixed(3)} target=${d.targetRate.toFixed(3)}`
@@ -313,157 +260,6 @@ export class DeckScratchBuffer {
     this.playbackGain.gain.setValueAtTime(0, now);
     this.playbackNode.port.postMessage({ type: 'stop' });
     this.unfreezeCapture();
-  }
-
-  // ==========================================================================
-  // RECORD MODE (owner scratch plan section 16, D4): a static record in its
-  // own ring, read by the same signed-rate Hermite reader. Positions in
-  // seconds of the record at the context's sample rate (the loader resamples
-  // the record to it).
-  // ==========================================================================
-
-  private requireRecord(): void {
-    if (!this.record) throw new Error('[DeckScratchBuffer] record API on a capture ring');
-  }
-
-  /** Write a decoded record into the ring. Resolves with its frame count. */
-  loadRecord(buffer: AudioBuffer): Promise<number> {
-    this.requireRecord();
-    if (!this.initialized) return Promise.resolve(0);
-    const left = new Float32Array(buffer.length);
-    const right = new Float32Array(buffer.length);
-    buffer.copyFromChannel(left, 0);
-    buffer.copyFromChannel(right, buffer.numberOfChannels > 1 ? 1 : 0);
-    scratchRingStats.loads++;
-    return new Promise<number>((resolve) => {
-      const handler = (e: MessageEvent) => {
-        if (e.data?.type === 'loaded') {
-          this.playbackNode.port.removeEventListener('message', handler);
-          this.recordFrames = e.data.frames as number;
-          resolve(this.recordFrames);
-        }
-      };
-      this.playbackNode.port.addEventListener('message', handler);
-      this.playbackNode.port.postMessage({ type: 'load', left, right }, [left.buffer, right.buffer]);
-    });
-  }
-
-  private syncId = 0;
-
-  /**
-   * Resolves once the worklet has applied every message posted before this call (port messages
-   * are ordered): a barrier instead of a guessed delay (audit SA-m10: a 50 ms wait lost the race
-   * under load and the drop was missed).
-   */
-  sync(): Promise<void> {
-    if (!this.initialized) return Promise.resolve();
-    const id = ++this.syncId;
-    return new Promise<void>((resolve) => {
-      const handler = (e: MessageEvent) => {
-        if (e.data?.type === 'synced' && e.data.id === id) {
-          this.playbackNode.port.removeEventListener('message', handler);
-          resolve();
-        }
-      };
-      this.playbackNode.port.addEventListener('message', handler);
-      this.playbackNode.port.postMessage({ type: 'sync', id });
-    });
-  }
-
-  /** Clamp the read head to [start, end] seconds (the record's safe range). */
-  setBounds(startSec: number, endSec: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    const sr = this.ctx.sampleRate;
-    this.playbackNode.port.postMessage({ type: 'bounds', startFrames: startSec * sr, endFrames: endSec * sr });
-  }
-
-  /** Ramp the voice gain to `value` over 3 ms at `at` (context seconds; now when omitted). */
-  private rampGain(value: number, at?: number): void {
-    const t = at ?? this.ctx.currentTime;
-    const g = this.playbackGain.gain;
-    g.cancelScheduledValues(t);
-    g.setValueAtTime(at === undefined ? g.value : 1 - value, t);
-    g.linearRampToValueAtTime(value, t + GAIN_RAMP_SEC);
-  }
-
-  /**
-   * Drop the needle at `sec` and play at `rate` (gain ramps up over 3 ms).
-   * Every record-mode command takes an optional `at` (context seconds): the
-   * worklet applies it sample-accurately at that time, so a planner can
-   * schedule a gesture ahead of the beat.
-   */
-  startAt(sec: number, rate: number, at?: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    const positionFrames = Math.round(sec * this.ctx.sampleRate);
-    scratchRingStats.startAtFrames.push(positionFrames);
-    this.rampGain(1, at);
-    this.playbackNode.port.postMessage({ type: 'startAt', positionFrames, rate, at });
-  }
-
-  /** Re-cue (click-free: 1 ms out, jump, 1 ms in). Sets the return anchor. */
-  seek(sec: number, at?: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    const positionFrames = Math.round(sec * this.ctx.sampleRate);
-    scratchRingStats.seekFrames.push(positionFrames);
-    this.playbackNode.port.postMessage({ type: 'seek', positionFrames, at });
-  }
-
-  /** Frame-accurate rate automation relative to `at` / now (see `RingRateCurveOptions`). */
-  rateCurve(points: readonly RingRatePoint[], opts: RingRateCurveOptions = {}, at?: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    scratchRingStats.rateCurves++;
-    this.rampGain(1, at);
-    this.playbackNode.port.postMessage({ type: 'rateCurve', points, ...opts, at });
-  }
-
-  /** The record's surface-noise bed (reference rate samples), read at the record position (SCR-PG-C1, T13). */
-  setSurface(bed: Float32Array, bedRate: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    scratchRingStats.surfaces++;
-    this.playbackNode.port.postMessage({ type: 'surface', bed, bedRate });
-  }
-
-  /** Surface-noise level from `at` / now (cartridge surface x stroke velocity; 0 = none). */
-  setSurfaceLevel(level: number, at?: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    this.playbackNode.port.postMessage({ type: 'surfaceLevel', level, at });
-  }
-
-  /** The cartridge's response (one-pole low pass at its bandwidth; worn: tanh drive + a darker pole). 0 = none. */
-  setCartridge(bw: number, worn: boolean): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    scratchRingStats.cartridges++;
-    this.playbackNode.port.postMessage({ type: 'cartridge', bw, worn });
-  }
-
-  /** Open windows in frames relative to `at` / now; cut outside them. */
-  faderWindows(windows: ReadonlyArray<readonly [number, number]>, opts: RingFaderWindowsOptions, at?: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    scratchRingStats.faderWindows++;
-    this.playbackNode.port.postMessage({ type: 'faderWindows', windows, ...opts, at });
-  }
-
-  /** One static articulated gain (0 or 1) with the 3 ms ramp; cancels window automation. */
-  faderGain(gain: 0 | 1, at?: number, rampFrames?: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    this.playbackNode.port.postMessage({ type: 'faderGain', gain, rampFrames, at });
-  }
-
-  /** Scheduled release: gain ramps to 0 over 3 ms at `at`, the worklet stops 1 ms later. */
-  stopAt(at: number): void {
-    this.requireRecord();
-    if (!this.initialized) return;
-    this.rampGain(0, at);
-    this.playbackNode.port.postMessage({ type: 'stop', at: at + GAIN_RAMP_SEC + 0.001 });
   }
 
   // ==========================================================================
