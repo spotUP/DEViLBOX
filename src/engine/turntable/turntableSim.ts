@@ -299,6 +299,43 @@ export function simulateRepaired(handPath: readonly TtHandPoint[], durSec: numbe
   return { ...simulate(handPath, durSec, rate, repairParams(sim, opts)), repaired: true };
 }
 
+// ── surface noise, needle drop / lift (turntable.py :363-402) ─────────────
+
+/** The surface-noise bed (reference `surface_noise`: RandomState(seed + 99).uniform(-1, 1, n)). */
+export function surfaceBed(lengthSamples: number, seed = 0): Float32Array {
+  const rng = new NumpyRandomState((seed + 99) >>> 0);
+  const bed = new Float32Array(Math.max(1, Math.trunc(lengthSamples)));
+  for (let i = 0; i < bed.length; i++) bed[i] = rng.uniform(-1, 1);
+  return bed;
+}
+
+/** A needle drop (physics s.48): a click, the cartridge settling at 90 Hz, the surface coming in; 120 ms. */
+export function needleDrop(rate: number, cartridge: TtCartridge = 'battle', seed = 0): Float32Array {
+  const n = Math.trunc(0.12 * rate);
+  const rng = new NumpyRandomState(seed >>> 0);
+  const click = new Float64Array(n), surfRand = new Float64Array(n);
+  for (let t = 0; t < n; t++) click[t] = rng.uniform(-1, 1);
+  for (let t = 0; t < n; t++) surfRand[t] = rng.uniform(-1, 1);
+  const out = new Float32Array(n);
+  const surface = TT_CARTRIDGES[cartridge].surface;
+  for (let t = 0; t < n; t++) {
+    const c = click[t]! * Math.exp(-t / (0.002 * rate));
+    const settle = Math.sin(2 * Math.PI * 90 * t / rate) * Math.exp(-t / (0.03 * rate)) * 0.4;
+    const surf = surface * surfRand[t]! * (1 - Math.exp(-t / (0.02 * rate)));
+    out[t] = 0.6 * c + settle + surf;
+  }
+  return out;
+}
+
+/** A needle lift (physics s.48): a small click, then silence; 40 ms. */
+export function needleLift(rate: number, seed = 0): Float32Array {
+  const n = Math.trunc(0.04 * rate);
+  const rng = new NumpyRandomState((seed + 1) >>> 0);
+  const out = new Float32Array(n);
+  for (let t = 0; t < n; t++) out[t] = 0.5 * rng.uniform(-1, 1) * Math.exp(-t / (0.0015 * rate));
+  return out;
+}
+
 // ── deck actions (turntable.py :344-361) ──────────────────────────────────
 
 /** Platter-only speed effect: start ramps up, stop / brake ramp down, power-off coasts. Value at fraction t of the action. */
