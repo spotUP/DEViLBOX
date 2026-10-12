@@ -2,7 +2,7 @@
  * DeckEngine - One DJ deck: owns a TrackerReplayer + audio chain
  *
  * Audio chain: TrackerReplayer.masterGain → deckGain → isolator EQ → filter → channelGain → output
- *                                                                  ↘ reverbSend → reverb → output (bypasses fader gate)
+ *                                                                  ↘ reverbSend → scratch bus (wet part) → output (bypasses fader gate)
  *
  * The output node is provided by the DJMixerEngine (crossfader input).
  */
@@ -17,7 +17,7 @@ import { ScratchPlayback, getPatternByName, type PatternStart } from './DJScratc
 import { snapPositionToBeat, snapLoopLength, phaseAlign } from './DJAutoSync';
 import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
-import { createScratchRoomIR } from './scratch/scratchBus';
+import { createScratchBus, type ScratchBus } from './scratch/scratchBus';
 import { DeckAudioPlayer, DeckLoadSuperseded, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
@@ -215,8 +215,8 @@ export class DeckEngine {
   // reverb that bypasses the channelGain gate, creating a reverb tail that
   // bleeds through during fader chops.
   private _reverbSend: GainNode | null = null;
-  private _reverbNode: ConvolverNode | null = null;
-  private _reverbWet: GainNode | null = null;
+  /** The deck scratch send's space: the scratch bus, wet part only (one scratch channel, owner 2026-10-12). */
+  private _scratchSpace: ScratchBus | null = null;
   private _reverbActive = false;
   // Auto DJ echo send (pre-fader feedback delay, returned past the channel gain).
   private _echoSend: GainNode | null = null;
@@ -322,18 +322,14 @@ export class DeckEngine {
     try {
       this._reverbSend = ctx.createGain();
       this._reverbSend.gain.value = 0;
-      this._reverbNode = ctx.createConvolver();
-      this._reverbNode.buffer = createScratchRoomIR(ctx);
-      this._reverbWet = ctx.createGain();
-      this._reverbWet.gain.value = 0.25; // 25% wet level
+      // the scratch channel's tape delay and room (wet part only: the deck is the dry signal)
+      this._scratchSpace = createScratchBus(ctx, limiter, { wetOnly: true });
 
       const nativeLPF = getNativeAudioNode(this.filterLPF as unknown as Record<string, unknown>);
       if (nativeLPF) {
         nativeLPF.connect(this._reverbSend);
       }
-      this._reverbSend.connect(this._reverbNode);
-      this._reverbNode.connect(this._reverbWet);
-      this._reverbWet.connect(limiter);
+      this._reverbSend.connect(this._scratchSpace.input);
     } catch (err) {
       console.warn('[DeckEngine] reverb send setup failed:', err);
     }
@@ -2563,7 +2559,6 @@ export class DeckEngine {
     try { this._scopeDelay?.disconnect(); } catch { /* already disconnected */ }
     try { this._meterDelay?.disconnect(); } catch { /* already disconnected */ }
     try { this._reverbSend?.disconnect(); } catch { /* already disconnected */ }
-    try { this._reverbNode?.disconnect(); } catch { /* already disconnected */ }
-    try { this._reverbWet?.disconnect(); } catch { /* already disconnected */ }
+    try { this._scratchSpace?.dispose(); } catch { /* already disconnected */ }
   }
 }
