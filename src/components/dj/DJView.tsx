@@ -37,6 +37,7 @@ import { getPhaseInfo } from '@/engine/dj/DJAutoSync';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+import { loadRenderToDeck } from '@/engine/dj/DJTrackLoader';
 import { useDeckStateSync } from '@/hooks/dj/useDeckStateSync';
 import { useDJHealth } from '@/hooks/dj/useDJHealth';
 import type { DeckId } from '@/engine/dj/DeckEngine';
@@ -380,7 +381,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           });
 
           const result = await getDJPipeline().loadOrEnqueue(buffer.slice(0), filename, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || filename, result.analysis?.bpm || bpmResult.bpm, song);
+          await loadRenderToDeck(engine, deckId, result, { fileName: cacheKey, trackName: song.name || filename, song, interimBpm: track.bpm > 0 ? track.bpm : bpmResult.bpm });
           useDJStore.getState().setDeckViewMode('visualizer');
         }
       }

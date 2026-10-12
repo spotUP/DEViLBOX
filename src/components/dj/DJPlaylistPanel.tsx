@@ -52,6 +52,7 @@ import { cacheSong } from '@/engine/dj/DJSongCache';
 import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
 import { camelotDisplay, camelotColor } from '@/engine/dj/DJKeyUtils';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+import { loadRenderToDeck } from '@/engine/dj/DJTrackLoader';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { cacheSourceFile } from '@/engine/dj/DJAudioCache';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
@@ -836,7 +837,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
         try {
           const result = await getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm, song);
+          await loadRenderToDeck(engine, deckId, result, { fileName, trackName: song.name || fileName, song, interimBpm: bpmResult.bpm });
           useDJStore.getState().setDeckViewMode('visualizer');
         } catch (err) {
           console.error(`[DJPlaylistPanel] Pipeline failed for ${fileName}:`, err);

@@ -66,7 +66,7 @@ import { useDJStore, type DeckId } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { seekDeckAudio, cueDeck } from '@/engine/dj/DJActions';
-import { subscribeRendering, isRenderingFileName } from '@/engine/dj/DJTrackLoader';
+import { subscribeRendering, isRenderingFileName, loadRenderToDeck } from '@/engine/dj/DJTrackLoader';
 import { markSeek } from './seekGuard';
 import { openDeckTrack } from '@/lib/song/openSong';
 import { acquireForDeck } from '@/lib/song/acquireSource';
@@ -1848,7 +1848,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
         try {
           const result = await getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm, song);
+          await loadRenderToDeck(engine, deckId, result, { fileName, trackName: song.name || fileName, song, interimBpm: bpmResult.bpm });
           useDJStore.getState().setDeckViewMode('visualizer');
         } catch (err) {
           console.error(`[DJPlaylistModal] Pipeline failed for ${fileName}:`, err);
@@ -1913,7 +1913,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
           });
 
           const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, track.fileName, trackName, result.analysis?.bpm || track.bpm || 125);
+          await loadRenderToDeck(engine, deckId, result, { fileName: track.fileName, trackName, interimBpm: track.bpm || 125 });
           if (useDJStore.getState().deckViewMode !== '3d') {
             useDJStore.getState().setDeckViewMode('visualizer');
           }

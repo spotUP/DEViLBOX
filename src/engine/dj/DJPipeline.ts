@@ -594,45 +594,18 @@ export class DJPipeline {
       // Fully cached + analyzed — return immediately
       console.log(`[DJPipeline] Full cache hit for ${filename}`);
 
-      // Update deck state immediately
-      if (deckId) {
-        // Auto-gain: target -6 dB RMS
-        const { rmsDb, peakDb } = cachedLoudness(cached);
-        const autoTrimDb = computeAutoTrim(rmsDb, peakDb);
-        const deckState = useDJStore.getState().decks[deckId];
-        const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
-        console.warn(`[DJ auto-gain] deck=${deckId} rms=${rmsDb.toFixed(1)}dB peak=${peakDb.toFixed(1)}dB → trim=${trimGain.toFixed(1)}dB (autoGain=${deckState.autoGainEnabled})`);
-
-        useDJStore.getState().setDeckState(deckId, {
-          analysisState: 'ready',
-          beatGrid: cached.beatGrid as BeatGridData,
-          musicalKey: cached.musicalKey ?? null,
-          keyConfidence: cached.keyConfidence ?? 0,
-          frequencyPeaks: cached.frequencyPeaks
-            ? cached.frequencyPeaks.map(b => new Float32Array(b))
-            : null,
-          rmsDb,
-          peakDb,
-          trimGain,
-          // Genre from cache
-          genrePrimary: cached.genrePrimary ?? null,
-          genreSubgenre: cached.genreSubgenre ?? null,
-          genreConfidence: cached.genreConfidence ?? 0,
-          mood: cached.mood ?? null,
-          energy: cached.energy ?? 0.5,
-          danceability: cached.danceability ?? 0.5,
-        });
-
-        // Auto-match BPM + phase to the master if the other deck is playing.
-        autoMatchOnLoad(deckId);
-      }
+      // The deck's analysis, tempo and grid in one write - the same call every
+      // load ends with (never the cached grid alone: its BPM is the audio
+      // reading, the deck's tempo is the track analysis', DECK-BPM-TWO-VALUES).
+      const cachedAnalysis = analysisFromCachedAudio(cached);
+      if (deckId) this.applyAnalysisToDeck(deckId, cachedAnalysis);
 
       return {
         wavData: cached.audioData,
         duration: cached.duration,
         sampleRate: cached.sampleRate,
         waveformPeaks: new Float32Array(cached.waveformPeaks),
-        analysis: analysisFromCachedAudio(cached),
+        analysis: cachedAnalysis,
       };
     }
 

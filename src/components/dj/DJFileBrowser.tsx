@@ -16,6 +16,7 @@ import { cacheSong } from '@/engine/dj/DJSongCache';
 import { loadUADEToDeck, isUADECached } from '@/engine/dj/DJUADEPrerender';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+import { loadRenderToDeck } from '@/engine/dj/DJTrackLoader';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -145,7 +146,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
           });
 
           const result = await getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, file.name, file.song.name || file.name, result.analysis?.bpm || file.bpm, file.song);
+          await loadRenderToDeck(engine, deckId, result, { fileName: file.name, trackName: file.song.name || file.name, song: file.song, interimBpm: file.bpm });
           useDJStore.getState().setDeckViewMode('visualizer');
           console.log(`[DJFileBrowser] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
         }
