@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const pool = vi.hoisted(() => ({
   handles: [] as Array<{ released: number; release: () => void }>,
+  releaseAlls: 0,
 }));
 
 vi.mock('tone', async (orig) => {
@@ -26,14 +27,14 @@ vi.mock('@/engine/dj/scratch/scratchVoicePool', () => {
     pool.handles.push(h);
     return h;
   };
-  const instance = { perform, releaseAll() {}, panic() {}, resolveRecord: () => null };
+  const instance = { perform, releaseAll() { pool.releaseAlls++; }, panic() {}, resolveRecord: () => null };
   return { getScratchVoicePool: () => instance, getScratchVoicePoolIfActive: () => instance };
 });
 
 import { fireDjFx, releaseDjFx } from '@/engine/drumpad/DjFxActions';
 
 describe('a held record-voice gesture never leaves an unstoppable voice', () => {
-  beforeEach(() => { pool.handles.length = 0; });
+  beforeEach(() => { pool.handles.length = 0; pool.releaseAlls = 0; });
 
   it('a second fire of the chirp releases the voice it replaces, and one release stops the new one', () => {
     fireDjFx('fx_scratch_chirp', { source: 'mcp', record: 'AH_STANDARD' });
@@ -42,6 +43,15 @@ describe('a held record-voice gesture never leaves an unstoppable voice', () => 
     expect(pool.handles[0].released).toBe(1);
     releaseDjFx('fx_scratch_chirp', { source: 'mcp' });
     expect(pool.handles[1].released).toBe(1);
+  });
+
+  it('Scratch Stop ends a running throw (it keeps no handle), the same set Scratch Release ends (audit SA-m1)', () => {
+    fireDjFx('fx_scratch_throw', { source: 'mcp', record: 'FRESH_STANDARD', beats: 4 });
+    fireDjFx('fx_scratch_stop', { source: 'mcp' });
+    expect(pool.releaseAlls).toBe(1);
+    fireDjFx('fx_scratch_throw', { source: 'mcp', record: 'FRESH_STANDARD', beats: 4 });
+    fireDjFx('fx_scratch_release', { source: 'mcp' });
+    expect(pool.releaseAlls).toBe(2);
   });
 
   it('Scratch Stop releases a chirp held on the record voice', () => {

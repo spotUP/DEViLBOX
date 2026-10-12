@@ -123,6 +123,8 @@ export class ScratchVoicePool {
     let voice: ScratchRecordVoice | null = null;
     let cancelled = false;
     let stopAt: number | undefined;
+    /** The voice's stroke this performance launched: a later performance on the voice is not ours to stop. */
+    let mine: number | null = null;
     scratchPoolStats.performs++;
     const started = (async (): Promise<StrokeResult> => {
       await this.ready;
@@ -139,6 +141,7 @@ export class ScratchVoicePool {
         velocity: opts.velocity,
         at: opts.at,
       });
+      if (result.ok) mine = voice.generation;
       // a scheduled stop that arrived while the record was still loading
       if (stopAt !== undefined && result.ok) voice.release(stopAt);
       return result;
@@ -148,9 +151,12 @@ export class ScratchVoicePool {
       get voice() { return voice; },
       started,
       release: (at?: number) => {
-        if (at !== undefined) { if (voice?.busy) voice.release(at); else stopAt = at; return; }
+        const own = voice !== null && mine !== null && voice.generation === mine;
+        if (at !== undefined) { if (own && voice!.busy) voice!.release(at); else if (mine === null) stopAt = at; return; }
         cancelled = true;
-        if (voice?.busy) voice.release();
+        // stop now - also a stroke whose stop is only scheduled (audit SA-m7) - but never a later
+        // performance that has taken the voice since
+        if (own) voice!.release();
       },
     };
   }

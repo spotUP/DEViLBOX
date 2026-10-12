@@ -1748,10 +1748,15 @@ function engageRecordGesture(id: string, gestureId: ScratchGestureId, opts?: DjF
   if (handle) scratchVoiceHandles.set(id, handle);
 }
 
-/** Release every gesture playing on the scratch record voice. */
+/**
+ * Release every gesture playing on the scratch record voice: the held ones by their handles and
+ * every busy voice (a throw rides out without a handle). Scratch Stop and Scratch Release end
+ * this same set (audit SA-m1).
+ */
 function releaseRecordGestures(): void {
   for (const handle of scratchVoiceHandles.values()) handle.release();
   scratchVoiceHandles.clear();
+  getScratchVoicePoolIfActive()?.releaseAll();
 }
 
 function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
@@ -1777,7 +1782,12 @@ function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
     },
     disengage(opts) {
       const handle = scratchVoiceHandles.get(this.id);
-      if (handle) { scratchVoiceHandles.delete(this.id); handle.release(opts?.at); return; }
+      if (handle) {
+        // a scheduled stop keeps the handle: an immediate release (cancel, Stop) can still end it now
+        if (opts?.at === undefined) scratchVoiceHandles.delete(this.id);
+        handle.release(opts?.at);
+        return;
+      }
       const deckId = opts?.deck ?? scratchDeck.get(this.id) ?? getActiveDeckId();
       scratchDeck.delete(this.id);
       if (opts?.finishCycle) finishDeckPatternCycle(deckId); else stopDeckPattern(deckId);
@@ -1892,8 +1902,7 @@ function createScratchRelease(): DjFxAction {
     category: 'scratch',
     mode: 'oneshot',
     engage(opts) {
-      getScratchVoicePoolIfActive()?.releaseAll();
-      for (const [id, handle] of scratchVoiceHandles) { handle.release(); scratchVoiceHandles.delete(id); }
+      releaseRecordGestures();
       const deckId = opts?.deck ?? getActiveDeckId();
       stopDeckPattern(deckId);
       try { useDJStore.getState().setDeckPattern(deckId, null); } catch { /* store not ready */ }

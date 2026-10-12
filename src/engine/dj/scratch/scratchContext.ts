@@ -67,7 +67,7 @@ export interface ScratchContextInput {
   position?: number;
   juggleIntensity?: number;
   transitionIntensity?: number;
-  /** P7.11: how much scratching the Auto DJ allows now (0..1). */
+  /** P7.11: how much scratching the Auto DJ allows now (0..1); absent = 0, nothing is scratched. */
   scratchPermission?: number;
   scratchIntensity?: number;
   memory?: { recentGestures?: readonly string[]; recentSources?: readonly string[]; recentRoutines?: readonly string[] };
@@ -131,7 +131,8 @@ export function buildScratchContext(input: ScratchContextInput): ScratchPerforma
     transitionType: transition?.style,
     juggleIntensity: input.juggleIntensity ?? 0,
     transitionIntensity: input.transitionIntensity ?? 0,
-    scratchPermission: input.scratchPermission ?? 1,
+    // no hands budget given = no permission (section 27; the Auto DJ grants it at P7.11, audit SA-m8)
+    scratchPermission: input.scratchPermission ?? 0,
     scratchIntensity: input.scratchIntensity ?? 0,
     recentGestures: [...(input.memory?.recentGestures ?? [])],
     recentSources: [...(input.memory?.recentSources ?? [])],
