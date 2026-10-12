@@ -9,7 +9,7 @@
  * level, whatever the music: here the voice's bus level follows the programme to that ratio.
  */
 
-import { SCRATCH_BUS } from './scratchBus';
+import { SCRATCH_BUS, VELOCITY_RESPONSE } from './scratchBus';
 import type { ScratchGesture } from './scratchTypes';
 
 /** Reference: scratch short-term RMS against the programme while the scratch sounds (dB). */
@@ -18,24 +18,43 @@ export const SCRATCH_TO_PROGRAMME_DB = -0.55;
 /** The bus level never leaves this range (a near-silent programme must not mute or blow up a scratch). */
 export const SCRATCH_LEVEL_RANGE = [0.05, 1.5] as const;
 
-/** RMS of a record from its attack to the end of its safe range (all channels). */
-export function recordRms(buffer: Pick<AudioBuffer, 'numberOfChannels' | 'length' | 'sampleRate' | 'getChannelData'>, fromSec = 0, toSec = buffer.length / buffer.sampleRate): number {
-  const a = Math.max(0, Math.floor(fromSec * buffer.sampleRate)), b = Math.min(buffer.length, Math.ceil(toSec * buffer.sampleRate));
-  let sum = 0, n = 0;
-  for (let c = 0; c < buffer.numberOfChannels; c++) {
-    const d = buffer.getChannelData(c);
-    for (let i = a; i < b; i++) { sum += d[i]! * d[i]!; n++; }
+
+/**
+ * The record's RMS as a stroke reads it: the record sampled (linear) along the motion curve's
+ * positions from `cueSec`, clamped to the safe range like the ring - what the voice actually plays
+ * before the fader and the bus. `motion` is the stroke's speed over its fraction (interpolated).
+ */
+export function strokeRms(
+  buffer: Pick<AudioBuffer, 'numberOfChannels' | 'length' | 'sampleRate' | 'getChannelData'>,
+  cueSec: number, motion: ReadonlyArray<{ t: number; velocity: number }>, durSec: number, safe: readonly [number, number],
+): number {
+  const sr = buffer.sampleRate;
+  const n = Math.max(1, Math.round(durSec * sr));
+  const chans = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c));
+  let pos = cueSec * sr, k = 0, sum = 0, count = 0;
+  const lo = safe[0] * sr, hi = Math.min(safe[1] * sr, buffer.length - 2);
+  for (let i = 0; i < n; i++) {
+    const f = i / n;
+    while (k + 1 < motion.length && motion[k + 1]!.t <= f) k++;
+    const a = motion[k]!, b = motion[k + 1] ?? a;
+    const v = b.t > a.t ? a.velocity + (b.velocity - a.velocity) * (f - a.t) / (b.t - a.t) : a.velocity;
+    pos = Math.max(lo, Math.min(hi, pos + v));
+    const i0 = Math.floor(pos), fr = pos - i0;
+    for (const d of chans) { const x = d[i0]! * (1 - fr) + d[i0 + 1]! * fr; sum += x * x; count++; }
   }
-  return n ? Math.sqrt(sum / n) : 0;
+  return count ? Math.sqrt(sum / count) : 0;
 }
 
 /**
  * The bus level that puts a record of `recordRmsValue` at the reference ratio against a programme of
- * `programmeRms`: the bus passes a record at its headroom and the small-signal drive slope.
+ * `programmeRms`: the bus's dry path passes a record at the velocity stage's level for the reference
+ * velocity 0.7 (velocity is dynamics around it, O2), the room's dry share (1 - room), its headroom
+ * and the small-signal drive slope.
  */
-export function matchedBusLevel(programmeRms: number, recordRmsValue: number, gesture?: Pick<ScratchGesture, 'faderWindows'>): number {
+export function matchedBusLevel(programmeRms: number, recordRmsValue: number, gesture?: Pick<ScratchGesture, 'faderWindows'>, room: number = SCRATCH_BUS.reverbMix): number {
+  const velocityStage = VELOCITY_RESPONSE.gainBase + VELOCITY_RESPONSE.gainSpan * 0.7;
   // a cut gesture is heard only while its fader is open: its RMS is the record's x sqrt(open share)
-  const passed = recordRmsValue * SCRATCH_BUS.headroom * (1 + 3 * SCRATCH_BUS.drive) * Math.sqrt(openShare(gesture));
+  const passed = recordRmsValue * velocityStage * (1 - room) * SCRATCH_BUS.headroom * (1 + 3 * SCRATCH_BUS.drive) * Math.sqrt(openShare(gesture));
   if (!(programmeRms > 1e-4) || !(passed > 1e-6)) return 1;
   const level = Math.pow(10, SCRATCH_TO_PROGRAMME_DB / 20) * programmeRms / passed;
   return Math.max(SCRATCH_LEVEL_RANGE[0], Math.min(SCRATCH_LEVEL_RANGE[1], level));

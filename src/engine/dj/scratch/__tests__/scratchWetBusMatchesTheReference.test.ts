@@ -83,19 +83,22 @@ describe('the scratch bus runs wet like the Up Rough scratch channel', () => {
     expect(bus.scratchBusStats.created).toBeGreaterThanOrEqual(2);
   });
 
-  it('the stroke velocity shapes the tone: under 0.5 a low-pass at 2500 + 6000 v, over 0.85 a 3 kHz edge added', async () => {
+  it('the stroke velocity shapes the tone and the level: under 0.5 a low-pass at 2500 + 6000 v, over 0.85 a 3 kHz edge added, level 0.70 + 0.50 v', async () => {
     const tone = async (hz: number, v: number) => {
       const ctx = new OfflineAudioContext(1, Math.round(SR * 0.4), SR);
       const b = bus.createScratchBus(ctx, ctx.destination, { room: 0, delayMix: 0 });
-      b.setTone(v, 0);
+      b.setVelocity(v, 0);
       const osc = ctx.createOscillator(); osc.frequency.value = hz;
       const g = ctx.createGain(); g.gain.value = 0.05; osc.connect(g); g.connect(b.input); osc.start(0);
       const y = (await ctx.startRendering()).getChannelData(0);
       let e = 0; for (let i = Math.round(0.2 * SR); i < y.length; i++) e += y[i]! * y[i]!;
       return 10 * Math.log10(e);
     };
-    expect(await tone(4000, 0.7) - await tone(4000, 0.2)).toBeGreaterThan(3); // 2500 + 1200 Hz low-pass at v 0.2
-    expect(await tone(4000, 0.95) - await tone(4000, 0.7)).toBeGreaterThan(0.3); // + 0.15 x high-pass 3 kHz (about +0.5 dB at 4 kHz)
-    expect(Math.abs(await tone(500, 0.95) - await tone(500, 0.7))).toBeLessThan(0.5);
+    // the tone relative to 500 Hz at the same velocity (the level stage moves both alike)
+    const rel = async (hz: number, v: number) => await tone(hz, v) - await tone(500, v);
+    expect(await rel(4000, 0.7) - await rel(4000, 0.2)).toBeGreaterThan(3); // 2500 + 1200 Hz low-pass at v 0.2
+    expect(await rel(4000, 0.95) - await rel(4000, 0.7)).toBeGreaterThan(0.3); // + 0.15 x high-pass 3 kHz (about +0.5 dB at 4 kHz)
+    // SCR-PG-D1: the level 0.70 + 0.50 v (500 Hz, below every tone stage)
+    expect(Math.abs((await tone(500, 0.95) - await tone(500, 0.7)) - 20 * Math.log10((0.7 + 0.475) / (0.7 + 0.35)))).toBeLessThan(0.2);
   });
 });

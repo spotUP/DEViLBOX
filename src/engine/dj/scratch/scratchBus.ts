@@ -64,6 +64,20 @@ export const SCRATCH_BUS = {
   headroom: 0.75,
 } as const;
 
+/** The reference routine presets (`scratch_routine.py` :331-334, `scratch_channel` arguments). */
+interface ChannelPreset { room: number; delayMix: number; drive?: number; lpHz?: number }
+export const CHANNEL_PRESETS = {
+  dry: { room: 0.06, delayMix: 0, drive: 0.09 },
+  dark: { room: 0.25, delayMix: 0.06, lpHz: 3800 },
+  delay: { room: 0.18, delayMix: 0.28 },
+} as const satisfies Record<string, ChannelPreset>;
+
+/** Reference `VEL` (scratch.py :210-216): the velocity response of a stroke. */
+export const VELOCITY_RESPONSE = {
+  gainBase: 0.70, gainSpan: 0.50, throwBase: 0.8, throwSpan: 0.4,
+  lpThresh: 0.50, lpBase: 2500, lpSpan: 6000, hpThresh: 0.85, hpFreq: 3000, hpMix: 0.15,
+} as const;
+
 /** Butterworth 4th order as two biquads (linear Q). The Web Audio lowpass /
  *  highpass `Q` is in dB: 20 log10(Q) is what the node takes. */
 const BUTTERWORTH_4 = [0.5412, 1.3066] as const;
@@ -77,16 +91,27 @@ export interface ScratchBus {
   readonly ambience: number;
   setAmbience(amount: number, rampSec?: number): void;
   /**
-   * The stroke's tone by velocity (reference `render_gesture`): under 0.5 low-passed at
-   * 2500 + 6000 v Hz, over 0.85 with 0.15 of a 3 kHz high-pass added; now or at context time `at`.
+   * The stroke's velocity response (reference `render_gesture` + `VEL`, scratch.py :205-216,
+   * :303-307; SCR-PG-D1): level 0.70 + 0.50 v (a throw 0.8 + 0.4 v); a stroke under 0.5 low-passed
+   * at 2500 + 6000 v Hz, over 0.85 with 0.15 of a 3 kHz high pass added; now or at context time `at`.
    */
-  setTone(velocity: number, at?: number): void;
+  setVelocity(velocity: number, at?: number, kind?: 'stroke' | 'throw'): void;
+  /** The level the last velocity set (tests, telemetry). */
+  readonly velocityLevel: number;
+  /** The tone the last velocity set: the low pass (Hz) and the 3 kHz edge's share. */
+  readonly velocityTone: { lpHz: number; edge: number };
   /**
    * The style's tone stages (reference style FX preset): high pass, low pass and drive; the
    * channel stays wet (owner 2026-10-12), a preset's own delay only lifts the echo (electro, west).
    * null = the channel's own stages.
    */
   setStyleFx(profile: ScratchFxProfile | null, at?: number): void;
+  /**
+   * The channel's routine preset (reference `scratch_routine.py` :331-334): Dry room 0.06, no delay,
+   * drive 0.09; Dark low pass 3800 Hz, room 0.25, delay 0.06; Delay room 0.18, delay 0.28. null = the
+   * wet channel (room 0.30, delay 0.16).
+   */
+  setChannelPreset(preset: keyof typeof CHANNEL_PRESETS | null, at?: number): void;
   /** A gesture's own echo (reference `echo`): delay mix and time while it plays; null = the channel's. */
   setGestureFx(fx: ScratchGestureFx | null, at?: number): void;
   /** The delay stage now: echo mix and time (telemetry, tests). */
@@ -108,7 +133,7 @@ function tanhCurve(drive: number, points = 4096): Float32Array<ArrayBuffer> {
 }
 
 /** Reachability sentinel: scratch buses built (record voices and deck sends). */
-export const scratchBusStats = { created: 0, wetOnly: 0 };
+export const scratchBusStats = { created: 0, wetOnly: 0, presets: 0 };
 
 /** The scratch room: the reference wet channel's 0.6 plate + 0.4 dark room (`scratchRoomResponse`),
  *  the one impulse response for the scratch bus AND the deck's own scratch send (SA-m2). */
@@ -132,6 +157,9 @@ export function createScratchBus(ctx: BaseAudioContext, destination: AudioNode, 
   const wetOnly = !!opts.wetOnly;
   const input = ctx.createGain();
   // velocity tone (reference render_gesture): a low-pass that opens with the hand, a 3 kHz edge on hard cuts
+  const velGain = ctx.createGain();
+  let velocityLevel = 1;
+  const velocityTone = { lpHz: 20000, edge: 0 };
   const velLp = ctx.createBiquadFilter();
   velLp.type = 'lowpass'; velLp.frequency.value = 20000; velLp.Q.value = qDb(0.7071);
   const edge = ctx.createBiquadFilter();
@@ -194,7 +222,7 @@ export function createScratchBus(ctx: BaseAudioContext, destination: AudioNode, 
   const output = ctx.createGain();
   output.gain.value = 1;
 
-  input.connect(velLp); velLp.connect(toned); velLp.connect(edge); edge.connect(edgeGain); edgeGain.connect(toned);
+  input.connect(velGain); velGain.connect(velLp); velLp.connect(toned); velLp.connect(edge); edge.connect(edgeGain); edgeGain.connect(toned);
   toned.connect(hp[0]!); hp[0]!.connect(hp[1]!); hp[1]!.connect(presence); presence.connect(driveIn); driveIn.connect(shaper);
   shaper.connect(delayDry); delayDry.connect(delaySum);
   shaper.connect(loopSum); loopSum.connect(delay); delay.connect(damp); damp.connect(loopSat); loopSat.connect(feedback);
@@ -209,19 +237,20 @@ export function createScratchBus(ctx: BaseAudioContext, destination: AudioNode, 
   let ambience = 0;
   let style: ScratchFxProfile | null = null;
   let gestureFx: ScratchGestureFx | null = null;
+  let preset: ChannelPreset | null = null;
   const delayNow: { mix: number; sec: number } = { mix: 0, sec: SCRATCH_BUS.delaySec };
   let delaySecSet: number = SCRATCH_BUS.delaySec;
   const apply = (amount: number, rampSec: number, at?: number) => {
     // the channel runs wet (room 0.30, delay 0.16); `amount` lengthens the echo tail toward 0.35
     // `room` / `delayMix` are the reference channel's own parameters (its RoutineDry / Dark / Delay presets)
-    const channel = opts.delayMix ?? SCRATCH_BUS.delayMix;
+    const channel = preset?.delayMix ?? opts.delayMix ?? SCRATCH_BUS.delayMix;
     const base = channel > 0 ? Math.max(channel, style?.delayMix ?? 0) : 0;
     const tail = base > 0 ? base + (SCRATCH_BUS.tailDelayMix - base) * amount : 0;
     // a gesture's own echo (reference echo fx) sets the stage while it plays
     const m = gestureFx ? gestureFx.delayMix : tail;
     const sec = gestureFx ? gestureFx.delaySec : style && style.delayMix > 0 ? style.delaySec : SCRATCH_BUS.delaySec;
     delayNow.mix = m; delayNow.sec = sec;
-    const r = opts.room ?? SCRATCH_BUS.reverbMix;
+    const r = preset?.room ?? opts.room ?? SCRATCH_BUS.reverbMix;
     const now = Math.max(ctx.currentTime, at ?? ctx.currentTime);
     // the echo time moves only when a style or a gesture asks for another one
     if (sec !== delaySecSet) { delay.delayTime.setValueAtTime(sec, now); delaySecSet = sec; }
@@ -233,7 +262,7 @@ export function createScratchBus(ctx: BaseAudioContext, destination: AudioNode, 
   };
   apply(0, 0);
 
-  const nodes: AudioNode[] = [input, velLp, edge, edgeGain, toned, ...hp, presence, driveIn, shaper, delayDry, delayWet, delay, damp, loopSat, feedback, loopSum, delaySum, roomDry, roomWet, convolver, roomSum, ...lp, headroom, output];
+  const nodes: AudioNode[] = [input, velGain, velLp, edge, edgeGain, toned, ...hp, presence, driveIn, shaper, delayDry, delayWet, delay, damp, loopSat, feedback, loopSum, delaySum, roomDry, roomWet, convolver, roomSum, ...lp, headroom, output];
 
   return {
     input,
@@ -249,19 +278,37 @@ export function createScratchBus(ctx: BaseAudioContext, destination: AudioNode, 
       style = profile;
       const t = Math.max(ctx.currentTime, at ?? ctx.currentTime);
       hp.forEach((f) => f.frequency.setValueAtTime(profile?.hpHz ?? SCRATCH_BUS.hpHz, t));
-      lp.forEach((f) => f.frequency.setValueAtTime(profile?.lpHz ?? SCRATCH_BUS.lpHz, t));
-      driveIn.gain.setValueAtTime((1 + 3 * (profile?.drive ?? SCRATCH_BUS.drive)) / DRIVE_K, t);
+      lp.forEach((f) => f.frequency.setValueAtTime(preset?.lpHz ?? profile?.lpHz ?? SCRATCH_BUS.lpHz, t));
+      driveIn.gain.setValueAtTime((1 + 3 * (preset?.drive ?? profile?.drive ?? SCRATCH_BUS.drive)) / DRIVE_K, t);
+      apply(ambience, 0, at);
+    },
+    setChannelPreset(name: keyof typeof CHANNEL_PRESETS | null, at?: number) {
+      preset = name ? CHANNEL_PRESETS[name] : null;
+      scratchBusStats.presets++;
+      const t = Math.max(ctx.currentTime, at ?? ctx.currentTime);
+      lp.forEach((f) => f.frequency.setValueAtTime(preset?.lpHz ?? style?.lpHz ?? SCRATCH_BUS.lpHz, t));
+      driveIn.gain.setValueAtTime((1 + 3 * (preset?.drive ?? style?.drive ?? SCRATCH_BUS.drive)) / DRIVE_K, t);
       apply(ambience, 0, at);
     },
     setGestureFx(fx: ScratchGestureFx | null, at?: number) {
       gestureFx = fx;
       apply(ambience, 0, at);
     },
-    setTone(velocity: number, at?: number) {
+    get velocityLevel() { return velocityLevel; },
+    get velocityTone() { return { ...velocityTone }; },
+    setVelocity(velocity: number, at?: number, kind: 'stroke' | 'throw' = 'stroke') {
       const t = Math.max(ctx.currentTime, at ?? ctx.currentTime);
       const v = Math.max(0, Math.min(1, velocity));
-      velLp.frequency.setValueAtTime(v < 0.5 ? 2500 + 6000 * v : 20000, t);
-      edgeGain.gain.setValueAtTime(v > 0.85 ? 0.15 : 0, t);
+      const r = VELOCITY_RESPONSE;
+      // level (V1): a stroke 0.70 + 0.50 v, a throw 0.8 + 0.4 v (render_gesture's play path)
+      velocityLevel = kind === 'throw' ? r.throwBase + r.throwSpan * v : r.gainBase + r.gainSpan * v;
+      velGain.gain.setValueAtTime(velocityLevel, t);
+      // tone (V2, V3): a stroke only - a throw is the word as recorded
+      const toneV = kind === 'throw' ? 0.7 : v;
+      velocityTone.lpHz = toneV < r.lpThresh ? r.lpBase + r.lpSpan * toneV : 20000;
+      velocityTone.edge = toneV > r.hpThresh ? r.hpMix : 0;
+      velLp.frequency.setValueAtTime(velocityTone.lpHz, t);
+      edgeGain.gain.setValueAtTime(velocityTone.edge, t);
     },
     dispose() {
       for (const n of nodes) { try { n.disconnect(); } catch { /* already */ } }

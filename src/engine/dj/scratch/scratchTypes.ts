@@ -38,9 +38,12 @@ export interface ScratchGestureFx {
 
 /** The style's FX on the scratch bus for an event (reference style FX presets, scratch.py :341-345). */
 export interface ScratchEventFx {
-  style: ScratchDJStyle;
+  /** The planned style (its turntable and tone stages); absent = the channel's own. */
+  style?: ScratchDJStyle;
   /** The style's FX amount x the genre's FX scale, 0..1: the wet tail floor. */
   amount: number;
+  /** The channel's routine preset (reference RoutineDry / RoutineDark / RoutineDelay, SCR-PG-D3). */
+  preset?: 'dry' | 'dark' | 'delay';
 }
 
 /** Musical role of a planned scratch event (section 83). */
