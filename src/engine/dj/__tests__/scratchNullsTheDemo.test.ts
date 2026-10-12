@@ -288,6 +288,26 @@ describe('every entry point plays the demo\'s render on a Deck C bus (PG-J: one 
     expect(sameDb(ref, out)).toBeLessThan(-200);
   }, 120_000);
 
+  // G11: the MCP fires the demo's macro language through the registry: render_macro on the record (proven = the
+  // demo's in scratchMacroIsTheDemos), one stroke on the one-off Deck C bus
+  it('a scratch macro (MCP): render_macro on the record, one stroke on Deck C - sentinels 1, the bus = the macro on its chain', async () => {
+    const { fireDjFx } = await import('@/engine/drumpad/DjFxActions');
+    const { scratchMacroStats, renderMacro } = await import('@/engine/dj/scratch/scratchRender');
+    const { scratchPoolStats } = await import('@/engine/dj/scratch/scratchVoicePool');
+    const { ctx, pool } = await appPool(1.2);
+    const macro = 'ANCHOR 440\nMOVE_FWD 1 2\nMOVE_REV 1 2\nCUT 4 2';
+    const before = { m: scratchMacroStats.rendered, r: scratchPoolStats.rendered };
+    expect(fireDjFx('fx_scratch_macro', { source: 'mcp', record: 'AH_YEAH', macro, bpm: 92, at: AT })).toBe(true);
+    await pool.settled();
+    expect(scratchMacroStats.rendered - before.m).toBe(1);
+    expect(scratchPoolStats.rendered - before.r).toBe(1);
+    await new Promise((r) => setTimeout(r, 20));
+    const out = (await ctx.startRendering()).getChannelData(0);
+    const src = await recordPcm('AH_YEAH');
+    const ref = await referenceBus(1.2, 'threeDeck', START, renderMacro(src, macro, 22050, { tempo: 92 }));
+    expect(sameDb(ref, out)).toBeLessThan(-200);
+  }, 120_000);
+
   it('a DEViLBOX gesture the demo lacks (twiddle) renders on the same renderer from its catalogue definition', async () => {
     const { fireDjFx } = await import('@/engine/drumpad/DjFxActions');
     const { scratchRenderStats, renderGesture, catalogueDemoGesture, DEMO_DECK_PROFILES } = await import('@/engine/dj/scratch/scratchRender');

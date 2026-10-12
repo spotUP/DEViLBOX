@@ -131,18 +131,18 @@ describe('every scratch trigger fires the registry (SCR-P2.9)', () => {
     expect(useDJStore.getState().decks.A.activePatternName ?? null).toBeNull();
   });
 
-  it('the registry carries all 33 gestures, stop, throw, cue, anchor, loop, record and release in the scratch category', () => {
+  it('the registry carries all 33 gestures, stop, throw, cue, anchor, loop, record, release and macro in the scratch category', () => {
     for (const g of SCRATCH_GESTURE_IDS) {
       const a = DJ_FX_ACTION_MAP[`fx_scratch_${g}` as keyof typeof DJ_FX_ACTION_MAP];
       expect(a, g).toBeDefined();
       expect(a.category).toBe('scratch');
       expect(a.mode).toBe('momentary');
     }
-    for (const id of ['fx_scratch_stop', 'fx_scratch_throw', 'fx_scratch_cue', 'fx_scratch_anchor', 'fx_scratch_record', 'fx_scratch_release'] as const) {
+    for (const id of ['fx_scratch_stop', 'fx_scratch_throw', 'fx_scratch_cue', 'fx_scratch_anchor', 'fx_scratch_record', 'fx_scratch_release', 'fx_scratch_macro'] as const) {
       expect(DJ_FX_ACTION_MAP[id].mode, id).toBe('oneshot');
     }
     expect(DJ_FX_ACTION_MAP.fx_scratch_loop.mode).toBe('momentary');
-    expect(SCRATCH_FX_ACTIONS).toHaveLength(33 + 7);
+    expect(SCRATCH_FX_ACTIONS).toHaveLength(33 + 8);
   });
 
   it('a release with finishCycle lets the cycle end instead of a hard stop (the DJ view buttons)', () => {

@@ -21,7 +21,7 @@ import { demoRecordPcm } from './scratchGrit';
 import { createDeckCBus, deckCDuck, deckCLevel, programmeSpan, DECK_C_TAPS, PRESET_CHAIN, type DeckCBus, type DeckCChainName } from './scratchDeckC';
 import { getGesture } from './scratchGestureCatalog';
 import {
-  renderGesture, renderFromMotion, catalogueDemoGesture, demoGestureName, demoGestureSteps, demoStepSamples, routineEndingDelay,
+  renderGesture, renderFromMotion, renderMacro, parseMacro, catalogueDemoGesture, demoGestureName, demoGestureSteps, demoStepSamples, routineEndingDelay,
   DEMO_DECK_PROFILES, DEMO_RATE, type DemoSource,
 } from './scratchRender';
 import { needleDrop as ttNeedleDrop, needleLift as ttNeedleLift, linspace } from '@/engine/turntable/turntableSim';
@@ -271,6 +271,28 @@ export class ScratchVoicePool {
     })();
     this.track(started);
     return { started, release: () => undefined };
+  }
+
+  /**
+   * A scratch macro (the demo's `render_macro`, G11): the script's hand path on a record (named, the current
+   * one, or the catalogue's), read from its cue - the script's ANCHOR moves it - at the tempo, as a one-off
+   * stroke on Deck C. Lines the demo's parser skips are reported, never thrown.
+   */
+  performMacro(text: string, opts: { record?: string; bpm: number; velocity?: number; at?: number; cue?: ScratchCue | null }): (PerformHandle & { errors: string[] }) | null {
+    const record = this.resolveRecord(getGesture('baby'), { record: opts.record });
+    if (!record) return null;
+    const errors = parseMacro(text, opts.bpm).errors;
+    scratchPoolStats.rendered++;
+    const started = (async (): Promise<StrokeResult> => {
+      const bus = await this.deckCBus(ONE_OFF.chain);
+      const sig = await this.recordPcm(record);
+      const source: DemoSource = { sig, anchor: this.cueSample(record, opts.cue ?? this.anchor), safe: record.demoCue.safe };
+      const samples = renderMacro(source, text, DEMO_RATE, { tempo: opts.bpm, velocity: opts.velocity ?? 1.0 });
+      bus.stroke(Math.max(0, bus.busSampleAt(opts.at ?? this.ctx.currentTime)), samples);
+      return { ok: true };
+    })();
+    this.track(started);
+    return { started, release: () => undefined, errors };
   }
 
   /**

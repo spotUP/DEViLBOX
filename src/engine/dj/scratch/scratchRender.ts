@@ -359,3 +359,97 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
   if (g.fx) out = applyFx(out, rate, g.fx);
   return { out, recordVel, fade };
 }
+
+// ─── The macro language (scratch.py `parse_macro` / `render_macro`, crossfader s.40; ledger G11) ───
+
+/** Python's `int(s)` on a whitespace-split token (digits with single underscores, a sign); null where it raises. */
+function pyInt(s: string): number | null {
+  return /^[+-]?\d(?:_?\d)*$/.test(s) ? Number(s.replace(/_/g, '')) : null;
+}
+
+/** Python's `float(s)` on a whitespace-split token (decimal, exponent, underscores, inf / nan); null where it raises. */
+function pyFloat(s: string): number | null {
+  const d = String.raw`\d(?:_?\d)*`;
+  if (new RegExp(`^[+-]?(?:${d}(?:\\.(?:${d})?)?|\\.${d})(?:[eE][+-]?${d})?$`).test(s)) return Number(s.replace(/_/g, ''));
+  const m = /^([+-]?)(inf|infinity|nan)$/i.exec(s);
+  if (!m) return null;
+  if (m[2]!.toLowerCase() === 'nan') return NaN;
+  return m[1] === '-' ? -Infinity : Infinity;
+}
+
+/** A parsed macro: motion segments (seconds, cumulative hand angle in source samples, fader open), the CUT, the anchor and the skipped lines. */
+export interface ParsedMacro { segs: Array<[dur: number, angle: number, open: boolean]>; cut: [count: number, sec: number] | null; anchor: number; errors: string[]; stepS: number }
+
+/**
+ * scratch.py `parse_macro`: ANCHOR n / FADER_OPEN / FADER_CLOSE / MOVE_FWD spd ticks / MOVE_REV spd ticks /
+ * CUT count ticks; a tick is a 16th at `tempo`. A malformed line is skipped and listed in `errors`, never thrown.
+ */
+export function parseMacro(text: string | null | undefined, tempo = 92, anchor = 0, rate: number = DEMO_RATE): ParsedMacro {
+  const stepS = 60.0 / (tempo * 4);
+  const segs: ParsedMacro['segs'] = [];
+  const errors: string[] = [];
+  let ang = 0.0, faderOpen = true, cut: ParsedMacro['cut'] = null;
+  for (const line of (text ?? '').trim().split(/\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/)) {
+    const p = line.split(/\s+/).filter((w) => w.length > 0);
+    if (!p.length) continue;
+    const op = p[0]!.toUpperCase();
+    let ok = true;
+    if (op === 'ANCHOR' && p.length > 1) {
+      const v = pyInt(p[1]!);
+      if (v === null) ok = false; else anchor = v;
+    } else if (op === 'FADER_OPEN') faderOpen = true;
+    else if (op === 'FADER_CLOSE') faderOpen = false;
+    else if ((op === 'MOVE_FWD' || op === 'MOVE_REV') && p.length > 2) {
+      const s = pyFloat(p[1]!), t = s === null ? null : pyFloat(p[2]!);
+      if (s === null || t === null) ok = false;
+      else {
+        const spd = s * (op === 'MOVE_FWD' ? 1 : -1);
+        const dur = t * stepS;
+        ang += spd * dur * rate * 0.5;
+        segs.push([dur, ang, faderOpen]);
+      }
+    } else if (op === 'CUT' && p.length > 2) {
+      const c = pyInt(p[1]!), t = c === null ? null : pyFloat(p[2]!);
+      if (c === null || t === null) ok = false; else cut = [c, t * stepS];
+    } else ok = false;
+    if (!ok) errors.push(line.trim());
+  }
+  return { segs, cut, anchor, errors, stepS };
+}
+
+/** Reachability sentinel: macros rendered. */
+export const scratchMacroStats = { rendered: 0 };
+
+/**
+ * scratch.py `render_macro`: the macro's hand path through the turntable physics (the battle deck by default,
+ * the offline tier, no warp), the record read at the record's motion, the fader from the open windows (or
+ * the CUT's transform pattern), times the velocity. The script's ANCHOR moves the read point.
+ */
+export function renderMacro(source: DemoSource, text: string, rate: number, opts: { tempo?: number; velocity?: number; profile?: DemoDeckProfile } = {}): Float64Array {
+  scratchMacroStats.rendered++;
+  const tempo = opts.tempo ?? 92, velocity = opts.velocity ?? 1.0;
+  const stepS = 60.0 / (tempo * 4);
+  const parsed = parseMacro(text, tempo, source.anchor, rate);
+  const hand: TtHandPoint[] = [[0.0, 0.0, 1.0]];
+  let windows: Array<[number, number]> = [];
+  const total = parsed.segs.reduce((s, [d]) => s + d, 0) || stepS;
+  let tc = 0.0;
+  for (const [dur, a, open] of parsed.segs) {
+    tc += dur;
+    hand.push([tc / total, a, 1.0]);
+    if (open) windows.push([(tc - dur) / total, tc / total]);
+  }
+  if (parsed.cut) windows = cutPattern('transform', parsed.cut[0]);
+  const prof = opts.profile ?? DEMO_DECK_PROFILES.default;
+  const sim = simulate(hand, total, rate, { deck: prof.deck, slipmat: prof.slipmat, record: prof.record, performer: prof.performer, cartridge: prof.cartridge });
+  // turntable.simulate's audio-rate track (np.interp over linspace(0, 1, n))
+  const nAud = Math.max(1, Math.trunc(total * rate));
+  const ta = linspace(0, 1, nAud);
+  const recordVel = new Float64Array(nAud);
+  for (let i = 0; i < nAud; i++) recordVel[i] = interp(ta[i]!, sim.t, sim.recordVel);
+  const plat = renderFromMotion(source.sig, parsed.anchor, source.safe, recordVel);
+  const fade = faderFromPattern(windows.length ? windows : [[0.0, 1.0]], plat.length, rate);
+  const out = new Float64Array(plat.length);
+  for (let i = 0; i < out.length; i++) out[i] = plat[i]! * fade[i]! * velocity;
+  return out;
+}
