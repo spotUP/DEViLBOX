@@ -1,0 +1,80 @@
+{
+ "scenario": "vocal",
+ "seed": 1,
+ "mode": "MUSICAL",
+ "routine": "phraseEnd",
+ "events": [
+  {
+   "bar": 18,
+   "step": 8,
+   "beat": 74,
+   "gesture": "chirp",
+   "velocity": 0.8889997711146717,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 22,
+   "step": 8,
+   "beat": 90,
+   "gesture": "tearForward",
+   "velocity": 0.9429922941939423,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 23,
+   "step": 14,
+   "beat": 95.5,
+   "gesture": "forwardStab",
+   "velocity": 0.9,
+   "placementRole": "accent",
+   "role": "ACCENT"
+  },
+  {
+   "bar": 23,
+   "step": 16,
+   "beat": 96,
+   "gesture": "chirp",
+   "velocity": 0.85,
+   "placementRole": "turnaround",
+   "role": "OUTRO"
+  },
+  {
+   "bar": 26,
+   "step": 8,
+   "beat": 106,
+   "gesture": "chirp",
+   "velocity": 0.692439154650187,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 30,
+   "step": 8,
+   "beat": 122,
+   "gesture": "tearForward",
+   "velocity": 0.7918425268940262,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 31,
+   "step": 14,
+   "beat": 127.5,
+   "gesture": "forwardStab",
+   "velocity": 0.9,
+   "placementRole": "accent",
+   "role": "ACCENT"
+  },
+  {
+   "bar": 31,
+   "step": 16,
+   "beat": 128,
+   "gesture": "chirp",
+   "velocity": 0.85,
+   "placementRole": "turnaround",
+   "role": "OUTRO"
+  }
+ ]
+}

@@ -1,0 +1,89 @@
+{
+ "scenario": "boomBap",
+ "seed": 1,
+ "mode": "MUSICAL",
+ "routine": "hookCallResponse",
+ "events": [
+  {
+   "bar": 22,
+   "step": 11,
+   "beat": 90.75,
+   "gesture": "forwardStab",
+   "velocity": 0.9,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 22,
+   "step": 15,
+   "beat": 91.75,
+   "gesture": "baby",
+   "velocity": 0.8,
+   "placementRole": "turnaround",
+   "role": "THEME"
+  },
+  {
+   "bar": 23,
+   "step": 7,
+   "beat": 93.75,
+   "gesture": "chirp",
+   "velocity": 0.85,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 23,
+   "step": 14,
+   "beat": 95.5,
+   "gesture": "tearForward",
+   "velocity": 0.9,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 24,
+   "step": 15,
+   "beat": 99.75,
+   "gesture": "baby",
+   "velocity": 0.8183016708628977,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 30,
+   "step": 11,
+   "beat": 122.75,
+   "gesture": "forwardStab",
+   "velocity": 0.9,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 30,
+   "step": 15,
+   "beat": 123.75,
+   "gesture": "baby",
+   "velocity": 0.8,
+   "placementRole": "turnaround",
+   "role": "THEME"
+  },
+  {
+   "bar": 31,
+   "step": 7,
+   "beat": 125.75,
+   "gesture": "chirp",
+   "velocity": 0.85,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 31,
+   "step": 14,
+   "beat": 127.5,
+   "gesture": "tearForward",
+   "velocity": 0.9,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  }
+ ]
+}

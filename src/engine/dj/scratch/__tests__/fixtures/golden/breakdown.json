@@ -1,0 +1,152 @@
+{
+ "scenario": "breakdown",
+ "seed": 1,
+ "mode": "MUSICAL",
+ "routine": "phraseReconstruction",
+ "events": [
+  {
+   "bar": 18,
+   "step": 0,
+   "beat": 72,
+   "gesture": "drop",
+   "velocity": 0.8,
+   "placementRole": "accent",
+   "role": "INTRO"
+  },
+  {
+   "bar": 19,
+   "step": 15,
+   "beat": 79.75,
+   "gesture": "chirp",
+   "velocity": 0.6737964446478981,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 20,
+   "step": 15,
+   "beat": 83.75,
+   "gesture": "baby",
+   "velocity": 0.9451506828412299,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 22,
+   "step": 1,
+   "beat": 88.25,
+   "gesture": "forwardStab",
+   "velocity": 0.8,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 22,
+   "step": 6,
+   "beat": 89.5,
+   "gesture": "forwardStab",
+   "velocity": 0.8,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 22,
+   "step": 11,
+   "beat": 90.75,
+   "gesture": "forwardStab",
+   "velocity": 0.8,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 23,
+   "step": 1,
+   "beat": 92.25,
+   "gesture": "forwardStab",
+   "velocity": 0.85,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 23,
+   "step": 6,
+   "beat": 93.5,
+   "gesture": "forwardStab",
+   "velocity": 0.85,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 23,
+   "step": 12,
+   "beat": 95,
+   "gesture": "forwardStab",
+   "velocity": 0.9,
+   "placementRole": "accent",
+   "role": "OUTRO"
+  },
+  {
+   "bar": 28,
+   "step": 15,
+   "beat": 115.75,
+   "gesture": "tearForward",
+   "velocity": 0.8450453955901427,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 30,
+   "step": 1,
+   "beat": 120.25,
+   "gesture": "forwardStab",
+   "velocity": 0.8,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 30,
+   "step": 6,
+   "beat": 121.5,
+   "gesture": "forwardStab",
+   "velocity": 0.8,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 30,
+   "step": 11,
+   "beat": 122.75,
+   "gesture": "forwardStab",
+   "velocity": 0.8,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 31,
+   "step": 1,
+   "beat": 124.25,
+   "gesture": "forwardStab",
+   "velocity": 0.85,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 31,
+   "step": 6,
+   "beat": 125.5,
+   "gesture": "forwardStab",
+   "velocity": 0.85,
+   "placementRole": "accent",
+   "role": "THEME"
+  },
+  {
+   "bar": 31,
+   "step": 12,
+   "beat": 127,
+   "gesture": "forwardStab",
+   "velocity": 0.9,
+   "placementRole": "accent",
+   "role": "OUTRO"
+  }
+ ]
+}
