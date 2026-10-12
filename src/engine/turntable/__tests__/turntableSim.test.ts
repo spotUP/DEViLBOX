@@ -45,6 +45,15 @@ describe('the ported turntable model replays the reference (SCR-PG-B1)', () => {
     expect(Math.min(...sim.platterVel)).toBeGreaterThan(0);
   });
 
+  it('simulateGesture(baby) at velocity 0.7, 2 steps at 92 BPM, on the default turntable is the render_gesture fixture (SCR-PG-BR)', async () => {
+    const { simulateGesture } = await import('@/engine/dj/scratch/scratchPhysics');
+    const { getGesture } = await import('@/engine/dj/scratch/scratchGestureCatalog');
+    const c = fixture.cases.find((x) => x.name === 'baby_render_gesture')!;
+    const { sim } = simulateGesture(getGesture('baby'), c.dur, { velocity: 0.7, seed: 0 });
+    c.idx.forEach((i, k) => expect(Math.abs(audioRateSample(sim, sim.recordVel, i, c.n) - c.record_vel[k]!), `record_vel[${i}]`).toBeLessThan(1e-3));
+    expect(Math.min(...sim.platterVel)).toBeGreaterThan(0);
+  });
+
   it('deck motion: brake exp(-3 t), start 1 - exp(-5 t) on the classic deck', () => {
     expect(deckMotionAt('brake', 1)).toBeCloseTo(Math.exp(-3), 12);
     expect(deckMotionAt('start', 1)).toBeCloseTo(1 - Math.exp(-5), 12);
