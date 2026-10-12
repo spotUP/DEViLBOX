@@ -312,7 +312,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
         style={{ opacity: isFullscreen ? 0.7 : 0.4, color: 'var(--color-text-muted)' }}
       >
         {modeLabel}
-        {slideshowActive && ' ⟳'}
+        {slideshowActive && ' (slideshow)'}
       </div>
 
       {/* Navigation buttons — top-right, visible on hover */}

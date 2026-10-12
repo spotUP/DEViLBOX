@@ -2,7 +2,7 @@
  * DeckScratch - Scratch preset buttons and fader LFO controls.
  *
  * Layout:
- *   [Baby Scratch] [Transformer] [Two-Click Flare] ...    LFO: [OFF] [¼] [⅛] [⅟₁₆] [⅟₃₂]
+ *   Pattern pad grid (wraps, every pattern reachable), then: Fader LFO: [Off] [1/4] [1/8] [1/16] [1/32]
  *   Button labels are the gesture's full English name (CLAUDE.md, ledger SCR-P1.12).
  *
  * Pattern buttons toggle looping scratch routines that combine velocity curves
@@ -32,10 +32,10 @@ interface DeckScratchProps {
 type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
 
 const LFO_LABELS: { division: FaderLFODivision; label: string }[] = [
-  { division: '1/4',  label: '¼' },
-  { division: '1/8',  label: '⅛' },
-  { division: '1/16', label: '⅟₁₆' },
-  { division: '1/32', label: '⅟₃₂' },
+  { division: '1/4',  label: '1/4' },
+  { division: '1/8',  label: '1/8' },
+  { division: '1/16', label: '1/16' },
+  { division: '1/32', label: '1/32' },
 ];
 
 export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
@@ -118,9 +118,9 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
   }, [deckId, faderLFOActive, faderLFODivision]);
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {/* Pattern buttons */}
-      <div className="flex items-center gap-1">
+    <div className="flex flex-col gap-2 min-w-0">
+      {/* Pattern pad grid: wraps so every pattern is reachable at any deck width */}
+      <div className="grid gap-1 min-w-0" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))' }}>
         {SCRATCH_PATTERNS.map((pattern) => {
           const isActive = activePatternName === pattern.name;
           const isWaiting = waitingPattern === pattern.name;
@@ -131,7 +131,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
               onPointerUp={() => handlePatternPointerUp(pattern.name)}
               onContextMenu={(e) => e.preventDefault()}
               className={`
-                px-2 py-0.5 rounded border font-mono text-xs tracking-wider transition-all select-none
+                min-w-0 px-1 py-1.5 rounded border font-mono text-[11px] leading-tight transition-all select-none
                 ${isActive
                   ? `${deckActiveBg} ${deckColor}`
                   : isWaiting
@@ -143,7 +143,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
               `}
               title={pattern.name}
             >
-              {isWaiting ? 'WAIT' : getGesture(pattern.gestureId).name}
+              {isWaiting ? 'Waiting' : getGesture(pattern.gestureId).name}
             </button>
           );
         })}
@@ -178,11 +178,11 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
       )}
 
       {/* Divider */}
-      <div className="w-px h-4 bg-white/10 flex-shrink-0" />
+      <div className="h-px bg-white/10 flex-shrink-0" />
 
       {/* Fader LFO */}
       <div className="flex items-center gap-1">
-        <span className="text-xs font-mono text-white/30 mr-0.5">LFO</span>
+        <span className="text-xs font-mono text-white/30 mr-0.5">Fader LFO</span>
 
         {/* OFF button */}
         <button
@@ -195,7 +195,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
             }
           `}
         >
-          OFF
+          Off
         </button>
 
         {LFO_LABELS.map(({ division, label }) => {

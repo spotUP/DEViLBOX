@@ -308,12 +308,17 @@ const makeDefaultDeckState = (): DeckState => ({
 
 export type DeckViewMode = 'visualizer' | 'vinyl' | '3d';
 
+/** The open tab of a deck's lower panel (Pads, Scratch, Loop & Cue, Mix). */
+export type DeckPanelTab = 'pads' | 'scratch' | 'loopcue' | 'mix';
+
 export type AutoDJStatus = 'idle' | 'playing' | 'preloading' | 'preload-failed' | 'transition-pending' | 'transitioning';
 
 interface DJState {
   // Global
   djModeActive: boolean;
   deckViewMode: DeckViewMode;
+  /** Open lower-panel tab per deck; survives deck re-renders and view switches. */
+  deckPanelTab: Record<'A' | 'B' | 'C', DeckPanelTab>;
   thirdDeckActive: boolean;
   crossfaderPosition: number;
   crossfaderCurve: CrossfaderCurve;
@@ -399,6 +404,7 @@ interface DJActions {
   setDJModeActive: (active: boolean) => void;
   cycleDeckViewMode: () => void;
   setDeckViewMode: (mode: DeckViewMode) => void;
+  setDeckPanelTab: (deck: 'A' | 'B' | 'C', tab: DeckPanelTab) => void;
   setThirdDeckActive: (active: boolean) => void;
   setCrossfader: (position: number) => void;
   setCrossfaderCurve: (curve: CrossfaderCurve) => void;
@@ -501,6 +507,7 @@ export const useDJStore = create<DJStore>()(
     // Initial state
     djModeActive: false,
     deckViewMode: 'visualizer' as DeckViewMode,
+    deckPanelTab: { A: 'pads', B: 'pads', C: 'pads' } as Record<'A' | 'B' | 'C', DeckPanelTab>,
     thirdDeckActive: false,
     crossfaderPosition: 0.5,
     crossfaderCurve: 'smooth' as CrossfaderCurve,
@@ -575,6 +582,11 @@ export const useDJStore = create<DJStore>()(
     setDeckViewMode: (mode) =>
       set((state) => {
         state.deckViewMode = mode;
+      }),
+
+    setDeckPanelTab: (deck, tab) =>
+      set((state) => {
+        state.deckPanelTab[deck] = tab;
       }),
 
     setThirdDeckActive: (active) =>

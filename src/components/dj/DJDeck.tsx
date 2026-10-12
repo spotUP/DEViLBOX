@@ -24,14 +24,9 @@ import { DeckTrackOverview } from './DeckTrackOverview';
 import { DeckVisualizer } from './DeckVisualizer';
 import { DeckTurntable } from './DeckTurntable';
 import { DeckCssTurntable } from './DeckCssTurntable';
-import { DeckLoopControls } from './DeckLoopControls';
 import { DeckScopes } from './DeckScopes';
-import { DeckScratch } from './DeckScratch';
-import { DeckFXPads } from './DeckFXPads';
-import { DeckQuickEQ } from './DeckQuickEQ';
-import { DeckStemControls } from './DeckStemControls';
-import { DeckCuePoints } from './DeckCuePoints';
 import { DeckBeatGrid } from './DeckBeatGrid';
+import { DeckPanelTabs } from './DeckPanelTabs';
 // DeckAudioWaveform moved to full-width strip in DJView
 import { DeckPatternDisplay } from './DeckPatternDisplay';
 
@@ -455,27 +450,14 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         </div>
       </div>
 
-      {/* Cue points (audio mode only) */}
-      <DeckCuePoints deckId={deckId} />
-
-      {/* Transport + Nudge + Loop */}
-      <div className="flex items-center gap-2">
+      {/* Transport + Nudge (loop, quantize and slip live in the Loop & Cue tab) */}
+      <div className="flex items-center gap-2 flex-wrap">
         <DeckTransport deckId={deckId} />
         <DeckNudge deckId={deckId} />
-        <DeckLoopControls deckId={deckId} />
       </div>
 
-      {/* Quick EQ presets */}
-      <DeckQuickEQ deckId={deckId} />
-
-      {/* Stem controls (visible when stems available) */}
-      <DeckStemControls deckId={deckId} />
-
-      {/* Performance FX Pads */}
-      <DeckFXPads deckId={deckId} />
-
-      {/* Scratch presets + Fader LFO */}
-      <DeckScratch deckId={deckId} />
+      {/* Lower panel: Pads | Scratch | Loop & Cue | Mix */}
+      <DeckPanelTabs deckId={deckId} />
     </div>
   );
 };

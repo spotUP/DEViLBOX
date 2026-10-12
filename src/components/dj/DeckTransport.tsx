@@ -8,7 +8,6 @@ import React, { useCallback, useState } from 'react';
 import { Play, Pause, Disc3, Link, Lock } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
-import { getQuantizeMode, setQuantizeMode, type QuantizeMode } from '@/engine/dj/DJQuantizedFX';
 import * as DJActions from '@/engine/dj/DJActions';
 
 interface DeckTransportProps {
@@ -31,7 +30,6 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   const otherBPM = useDJStore((s) => Math.round(s.decks[otherDeckId].effectiveBPM * 10) / 10);
   const isSynced = Math.abs(thisBPM - otherBPM) < 0.5;
 
-  const [qMode, setQMode] = useState<QuantizeMode>(getQuantizeMode);
   const [isStartingPlay, setIsStartingPlay] = useState(false);
 
   // The play button shows pending only while waiting for a deferred PLAY.
@@ -57,14 +55,6 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   const handleKeyLock = useCallback(() => {
     DJActions.setDeckKeyLock(deckId, !keyLockEnabled);
   }, [deckId, keyLockEnabled]);
-
-  const handleQuantizeCycle = useCallback(() => {
-    const modes: QuantizeMode[] = ['off', 'beat', 'bar'];
-    const nextIdx = (modes.indexOf(qMode) + 1) % modes.length;
-    const next = modes[nextIdx];
-    setQuantizeMode(next);
-    setQMode(next);
-  }, [qMode]);
 
   const handleSync = useCallback(() => {
     DJActions.syncDeckBPM(deckId, otherDeckId);
@@ -127,27 +117,6 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
         title="Sync"
       >
         <Link size={16} />
-      </button>
-
-      {/* Quantize */}
-      <button
-        onClick={handleQuantizeCycle}
-        className={`
-          flex items-center justify-center h-10 px-2.5 rounded-lg
-          border text-[11px] font-bold tracking-wide
-          active:translate-y-[1px]
-          transition-all duration-100
-          ${
-            qMode === 'off'
-              ? 'bg-dark-bgTertiary text-text-muted border-dark-border hover:bg-dark-bgHover'
-              : qMode === 'beat'
-                ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60 shadow-glow-sm'
-                : 'bg-dark-bgTertiary/40 text-text-secondary border-dark-borderLight/60 shadow-glow-sm'
-          }
-        `}
-        title={`Quantize: ${qMode.toUpperCase()}\nOFF = free play\nBEAT = snap to beat\nBAR = snap to bar\n(click to cycle)`}
-      >
-        {qMode === 'off' ? 'Q' : qMode === 'beat' ? 'Q:BT' : 'Q:BR'}
       </button>
 
       {/* Key Lock (master tempo) — pitch fader drives tempo only when ON */}

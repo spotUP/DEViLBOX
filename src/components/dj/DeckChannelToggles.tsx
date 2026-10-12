@@ -133,7 +133,7 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
         style={{ width: BUTTON_SIZE + 8, height: BUTTON_SIZE, fontSize: 9 }}
         title={isFxMode ? 'Clear FX target set (applies to all)' : 'Enable all channels'}
       >
-        ALL
+        All
       </button>
 
       {/* Mode chip */}
@@ -146,10 +146,10 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
             ? 'bg-accent-primary text-text-inverse border-accent-primary'
             : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:bg-dark-bgHover'}
         `}
-        style={{ width: 32, height: BUTTON_SIZE, fontSize: 9, letterSpacing: '0.1em' }}
-        title={`Click-mode: ${isFxMode ? 'FX TARGET' : 'MUTE'} — toggle to switch`}
+        style={{ width: 40, height: BUTTON_SIZE, fontSize: 9, letterSpacing: '0.05em' }}
+        title={`Click-mode: ${isFxMode ? 'FX target' : 'Mute'} — toggle to switch`}
       >
-        {isFxMode ? 'FX' : 'MUT'}
+        {isFxMode ? 'FX' : 'Mute'}
       </button>
     </div>
   );
