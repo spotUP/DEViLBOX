@@ -586,8 +586,10 @@ export class DJPipeline {
     companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
     maxRenderSeconds?: number,
   ): Promise<PipelineResult> {
-    // Check cache
-    const cached = await getCachedAudio(fileBuffer);
+    // Check cache. A preview render (capped) serves only a preview request;
+    // a deck load gets the whole song, rendered now if the cache has a preview.
+    const preview = maxRenderSeconds !== undefined;
+    const cached = await getCachedAudio(fileBuffer, { allowPreview: preview });
     if (cached && isCacheFullyAnalyzed(cached) && cached.audioData.byteLength > 0) {
       // Fully cached + analyzed — return immediately
       console.log(`[DJPipeline] Full cache hit for ${filename}`);
@@ -640,7 +642,8 @@ export class DJPipeline {
       // The server carries no extended analysis, so an old local entry goes
       // straight to the local analysis below.
       const hash = await hashFile(fileBuffer);
-      const serverAnalysis = cached.beatGrid ? null : await lookupServerAnalysis(hash);
+      // Only audio the cache holds can carry a server analysis: a source-only entry (a stub, or a preview a deck may not play) renders below.
+      const serverAnalysis = cached.beatGrid || cached.audioData.byteLength === 0 ? null : await lookupServerAnalysis(hash);
 
       if (serverAnalysis && serverAnalysis.bpm > 0 && serverAnalysis.beats.length > 0) {
         // Server cache hit — merge analysis into local cache
@@ -747,7 +750,8 @@ export class DJPipeline {
     // No local audio cache at all — check server for analysis before full render
     // (analysis will be applied after render completes)
     const hash = await hashFile(fileBuffer);
-    const existing = this.inflight.get(hash);
+    // A preview request may ride a whole-song render in flight; a whole-song request never rides a preview.
+    const existing = this.inflight.get(hash) ?? (preview ? this.inflight.get(`${hash}:preview`) : undefined);
     if (existing) {
       console.log(`[DJPipeline] In-flight dedup hit for ${filename} — waiting for existing render`);
       const result = await existing;
@@ -760,8 +764,9 @@ export class DJPipeline {
 
     // Full render + analysis needed
     const promise = this.renderAndAnalyze(fileBuffer, filename, deckId, priority, companions, maxRenderSeconds);
-    this.inflight.set(hash, promise);
-    promise.finally(() => this.inflight.delete(hash));
+    const inflightKey = preview ? `${hash}:preview` : hash;
+    this.inflight.set(inflightKey, promise);
+    promise.finally(() => this.inflight.delete(inflightKey));
     return promise;
   }
 
@@ -1027,6 +1032,8 @@ export class DJPipeline {
         sampleRate,
         2, // stereo
         renderResult.channelScopes,
+        // A render that ran into its cap is a preview, not the song (isPreviewRender).
+        task.maxRenderSeconds !== undefined && duration >= task.maxRenderSeconds - 0.5 ? task.maxRenderSeconds : null,
       );
 
       console.log(

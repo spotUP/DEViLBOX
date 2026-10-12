@@ -9,7 +9,7 @@
  */
 
 import { useDJPlaylistStore, type PlaylistTrack, type DJPlaylist } from '@/stores/useDJPlaylistStore';
-import { cacheSourceFile, getCachedAudioByFilename } from './DJAudioCache';
+import { cacheSourceFile, getCachedAudioByFilename, PREVIEW_RENDER_CAP_SEC } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
 import { summaryFromPipeline, moduleTempo, playlistMetaFromSummary } from './autodj/trackAnalysis';
 import { songFromCachedSource } from './DJTrackLoader';
@@ -25,7 +25,7 @@ import { isAudioFile } from '@/lib/audioFileUtils';
 const inflightAnalyses = new Set<string>();
 
 /** The playlist analyser renders a preview of this many seconds. */
-const ANALYSIS_RENDER_CAP_SEC = 90;
+const ANALYSIS_RENDER_CAP_SEC = PREVIEW_RENDER_CAP_SEC;
 
 /**
  * The tracker song of a playlist track, for its tempo (one tempo per track:
@@ -313,7 +313,7 @@ export async function analyzePlaylist(
           const filename = track.fileName.startsWith('local:')
             ? track.fileName.slice('local:'.length)
             : track.fileName;
-          const cached = await getCachedAudioByFilename(filename).catch(() => null);
+          const cached = await getCachedAudioByFilename(filename, { allowPreview: true }).catch(() => null);
           const sourceBuffer = cached?.sourceData;
           const audioBuffer = cached?.audioData;
 
@@ -388,7 +388,7 @@ export async function analyzePlaylist(
         ].includes(ext) || lcFilename.startsWith('mdat.');  // TFMX needs companion (smpl.*) — local pipeline handles it
 
         // Cache check before throttling — skip the 4s delay if bytes are local.
-        const cached = await getCachedAudioByFilename(filename).catch(() => null);
+        const cached = await getCachedAudioByFilename(filename, { allowPreview: true }).catch(() => null);
         const cachedBuffer = cached?.sourceData && cached.sourceData.byteLength > 0
           ? cached.sourceData
           : null;
