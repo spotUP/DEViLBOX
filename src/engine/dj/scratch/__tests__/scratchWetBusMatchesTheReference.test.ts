@@ -30,11 +30,10 @@ function burst(n: number): Float32Array {
   return x;
 }
 
-async function renderBurst(make: (ctx: OfflineAudioContext) => { input: AudioNode; setAmbience(a: number): void }, ambience = 0, rate = SR): Promise<Float32Array> {
+async function renderBurst(make: (ctx: OfflineAudioContext) => { input: AudioNode }, rate = SR): Promise<Float32Array> {
   const SR = rate;
   const ctx = new OfflineAudioContext(1, Math.round(SR * 1.2), SR);
   const b = make(ctx);
-  b.setAmbience(ambience);
   const n = Math.round(0.03 * SR);
   const buf = ctx.createBuffer(1, n, SR);
   buf.getChannelData(0).set(burst(n));
@@ -73,8 +72,8 @@ describe('the scratch bus runs wet like the Up Rough scratch channel', () => {
   it('a burst through the bus: tail-to-burst energy within 1.5 dB of the reference channel at its rate', async () => {
     // the bus before 2026-10-12 measured -32.83 dB here (room 0.28 x ambience 0.15, a noise room): 15 dB drier
     const old = -32.83;
-    const now = tailToBurstDb(await renderBurst((ctx) => bus.createScratchBus(ctx, ctx.destination), bus.ambienceFor('ACCENT')));
-    const at22 = tailToBurstDb(await renderBurst((ctx) => bus.createScratchBus(ctx, ctx.destination), bus.ambienceFor('ACCENT'), 22050), 22050);
+    const now = tailToBurstDb(await renderBurst((ctx) => bus.createScratchBus(ctx, ctx.destination)));
+    const at22 = tailToBurstDb(await renderBurst((ctx) => bus.createScratchBus(ctx, ctx.destination), 22050), 22050);
     console.log(`[wet bus] tail-to-burst: reference ${REF.tailToBurstDb} dB, before ${old.toFixed(2)} dB, now ${now.toFixed(2)} dB (48 kHz), ${at22.toFixed(2)} dB (22.05 kHz)`);
     // the same signal at the reference's own rate: the chain is the reference's (a 48 kHz burst carries
     // energy the 22.05 kHz one cannot, so the 48 kHz figure is reported, not compared)
@@ -82,23 +81,5 @@ describe('the scratch bus runs wet like the Up Rough scratch channel', () => {
     expect(now - old).toBeGreaterThan(10); // the old bus was 15 dB drier
     expect(bus.scratchBusStats.created).toBeGreaterThanOrEqual(2);
   });
-
-  it('the stroke velocity shapes the tone and the level: under 0.5 a low-pass at 2500 + 6000 v, over 0.85 a 3 kHz edge added, level 0.70 + 0.50 v', async () => {
-    const tone = async (hz: number, v: number) => {
-      const ctx = new OfflineAudioContext(1, Math.round(SR * 0.4), SR);
-      const b = bus.createScratchBus(ctx, ctx.destination, { room: 0, delayMix: 0 });
-      b.setVelocity(v, 0);
-      const osc = ctx.createOscillator(); osc.frequency.value = hz;
-      const g = ctx.createGain(); g.gain.value = 0.05; osc.connect(g); g.connect(b.input); osc.start(0);
-      const y = (await ctx.startRendering()).getChannelData(0);
-      let e = 0; for (let i = Math.round(0.2 * SR); i < y.length; i++) e += y[i]! * y[i]!;
-      return 10 * Math.log10(e);
-    };
-    // the tone relative to 500 Hz at the same velocity (the level stage moves both alike)
-    const rel = async (hz: number, v: number) => await tone(hz, v) - await tone(500, v);
-    expect(await rel(4000, 0.7) - await rel(4000, 0.2)).toBeGreaterThan(3); // 2500 + 1200 Hz low-pass at v 0.2
-    expect(await rel(4000, 0.95) - await rel(4000, 0.7)).toBeGreaterThan(0.3); // + 0.15 x high-pass 3 kHz (about +0.5 dB at 4 kHz)
-    // SCR-PG-D1: the level 0.70 + 0.50 v (500 Hz, below every tone stage)
-    expect(Math.abs((await tone(500, 0.95) - await tone(500, 0.7)) - 20 * Math.log10((0.7 + 0.475) / (0.7 + 0.35)))).toBeLessThan(0.2);
-  });
+  // the stroke's velocity response (V1-V3) is the renderer's now (render_gesture, nulled in scratchNullsTheDemo)
 });
