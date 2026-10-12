@@ -225,7 +225,9 @@ export class DJEngine {
     this.afterAudioLoaded(id, info, { fileName: filename, trackName, bpm, fileBytes: buffer }, song);
     // A WAV read from a cache entry rendered before scope tracks gets its track re-rendered
     // in the background (low priority) and attached here, without reloading the audio.
-    void import('./DJChannelScopeRerender').then((m) => m.requestChannelScopeRerender(buffer)).catch(() => {});
+    void loadChannelScopeRerender()
+      .then((m) => m.requestChannelScopeRerender(buffer))
+      .catch((err) => console.warn(`[DJEngine] Channel scope re-render of ${filename} failed:`, err));
     return info;
   }
 
@@ -358,6 +360,25 @@ export class DJEngine {
 // ============================================================================
 // SINGLETON (separate from TrackerReplayer singleton)
 // ============================================================================
+
+let channelScopeRerenderModule: Promise<typeof import('./DJChannelScopeRerender')> | null = null;
+
+/**
+ * The background scope re-render module (DJChannelScopeRerender), imported
+ * ONCE: every deck load and the DJ view share that one import. A second
+ * import() issued while the first is still evaluating the module is not safe:
+ * Vite's module runner (vitest) treats the module as part of an import cycle
+ * and hands it the half-evaluated module - "Cannot access 'renders' before
+ * initialization" on the second deck of two quick loads (CI run 38186067547).
+ * A failed import is forgotten so the next load retries it.
+ */
+export function loadChannelScopeRerender(): Promise<typeof import('./DJChannelScopeRerender')> {
+  channelScopeRerenderModule ??= import('./DJChannelScopeRerender').catch((err: unknown) => {
+    channelScopeRerenderModule = null;
+    throw err;
+  });
+  return channelScopeRerenderModule;
+}
 
 let djEngineInstance: DJEngine | null = null;
 
