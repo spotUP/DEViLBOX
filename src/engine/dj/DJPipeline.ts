@@ -20,6 +20,7 @@ import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile, setCacheChan
 import type { CachedAudio } from './DJAudioCache';
 import { lookupServerAnalysis, storeServerAnalysis } from '@/lib/analysisCache';
 import { useDJStore, type DeckState } from '@/stores/useDJStore';
+import { notify } from '@/stores/useNotificationStore';
 import type { DeckId } from './DeckEngine';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { getDJEngineIfActive } from './DJEngine';
@@ -739,7 +740,11 @@ export class DJPipeline {
     const promise = this.renderAndAnalyze(fileBuffer, filename, deckId, priority, companions, maxRenderSeconds);
     const inflightKey = preview ? `${hash}:preview` : hash;
     this.inflight.set(inflightKey, promise);
-    promise.finally(() => this.inflight.delete(inflightKey));
+    // Both outcomes clear the entry, and this side branch settles either way: a .finally() here
+    // re-threw a failed render as a second, never-handled rejection (the unhandledrejection on a
+    // timed-out 3SID render). The caller handles the failure on `promise` itself.
+    const forget = (): void => { this.inflight.delete(inflightKey); };
+    promise.then(forget, forget);
     return promise;
   }
 
@@ -922,6 +927,7 @@ export class DJPipeline {
         this.updateStoreQueue();
       } else {
         console.error(`[DJPipeline] Task failed: ${task.filename}`, err);
+        this.reportDeckTaskFailure(task, err);
         reject(err instanceof Error ? err : new Error(String(err)));
       }
     } finally {
@@ -939,6 +945,17 @@ export class DJPipeline {
         useDJStore.getState().setPipelineState(0, null);
       }
     }
+  }
+
+  /**
+   * A failed render or analysis for a deck, said once, here: the deck leaves its
+   * 'rendering' state (its view falls back to the oscilloscope / the parsed song)
+   * and the user is told. Background tasks (no deck) only log.
+   */
+  private reportDeckTaskFailure(task: PipelineTask, err: unknown): void {
+    if (!task.deckId) return;
+    useDJStore.getState().setDeckState(task.deckId, { analysisState: 'none' });
+    notify.error(`Could not render ${task.filename}: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   private async executeTask(task: PipelineTask): Promise<PipelineResult> {

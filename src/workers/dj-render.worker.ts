@@ -25,6 +25,7 @@ import {
   ChannelScopeTrackBuilder, ChannelStemsBuilder, DECK_SCOPE_CHANNELS, DECK_STEM_CHANNELS, channelScopeTransferables,
   type ChannelScopeTrack,
 } from '@/engine/dj/channelScopeTrack';
+import { steadyPlayerCallHz, type PlayerCallSample } from '@/engine/dj/sidPlayerClock';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,8 @@ interface RenderResult {
   right: Float32Array;
   sampleRate: number;
   channelScopes?: ChannelScopeTrack;
+  /** A SID's steady player call rate (sidPlayerClock.ts); undefined for every other format. */
+  playerCallHz?: number;
 }
 
 interface RenderRequest {
@@ -1098,35 +1101,6 @@ function sidTraceStreamOfVoice(voice: number): number {
   return Math.floor(voice / 3) * 4 + (voice % 3);
 }
 
-/**
- * One SID voice's stem: reload, silence every other voice on every chip
- * (emu_enable_voice(chip, voice, on), as renderSidVoices does) and render `frames` frames.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderSidSoloPass(mod: any, fileBuffer: ArrayBuffer, filename: string, subsong: number, sampleRate: number, voice: number, frames: number): Int16Array {
-  loadSidFile(mod, fileBuffer, filename, subsong, sampleRate, false);
-  const chips: number = mod._emu_sid_count();
-  for (let c = 0; c < chips; c++) {
-    for (let v = 0; v < 3; v++) mod.ccall('emu_enable_voice', 'number', ['number', 'number', 'number'], [c, v, c * 3 + v === voice ? 1 : 0]);
-  }
-  const stem = new ChannelStemsBuilder(1);
-  let done = 0;
-  while (done < frames) {
-    const ended = mod._emu_compute_audio_samples();
-    const p = mod._emu_get_audio_buffer() >> 1;
-    const num = mod._emu_get_audio_buffer_length();
-    if (num > 0) {
-      const heap16 = mod.HEAP16 as Int16Array;
-      const n = Math.min(num, frames - done);
-      stem.push(n, (_c, i) => heap16[p + i * 2] / 32768, (_c, i) => heap16[p + i * 2 + 1] / 32768);
-      done += n;
-    }
-    if (ended) break;
-  }
-  mod._emu_teardown();
-  return stem.finish(frames)[0];
-}
-
 async function renderWithSID(
   fileBuffer: ArrayBuffer,
   filename: string,
@@ -1160,6 +1134,14 @@ async function renderWithSID(
     ? Math.min(DECK_SCOPE_CHANNELS, mod._emu_sid_count() * 3, Math.floor(mod._emu_number_trace_streams() / 4) * 3)
     : 0;
   const scopes = voices > 0 ? new ChannelScopeTrackBuilder(voices, sampleRate) : null;
+  // Every voice's stem from this same pass (WebSID emu_enable_stems: each voice's share of the
+  // output, so the stems sum to the mix). One solo re-render per voice made a 3SID render
+  // 1 + 8 full emulations and ran into the pipeline's 180 s task timeout.
+  const stemVoices = withStems && scopes && typeof mod._emu_enable_stems === 'function' ? Math.min(voices, DECK_STEM_CHANNELS) : 0;
+  if (stemVoices > 0) mod._emu_enable_stems(1);
+  const stems = stemVoices > 0 ? new ChannelStemsBuilder(stemVoices) : null;
+  const clock: PlayerCallSample[] = [];
+  const hasClock = typeof mod._emu_get_irq_calls === 'function';
 
   while (totalFrames < maxFrames && !songEnded) {
     // emu_compute_audio_samples returns >0 when song ends
@@ -1188,6 +1170,16 @@ async function renderWithSID(
 
     chunks.push({ left: chunkL, right: chunkR });
     totalFrames += framesThisChunk;
+    if (hasClock) clock.push({ calls: mod._emu_get_irq_calls() >>> 0, lastCallCycle: mod._emu_get_irq_last_cycle() >>> 0 });
+
+    if (stems) {
+      // One interleaved stereo Int16 buffer per voice (chip c voice k at c*3+k = the song channel).
+      const table = mod._emu_get_stem_buffers() >> 2;
+      const heap32 = mod.HEAP32 as Int32Array;
+      const heap16 = mod.HEAP16 as Int16Array;
+      const bases = Array.from({ length: stemVoices }, (_, v) => heap32[table + v] >> 1);
+      stems.push(framesThisChunk, (v, i) => heap16[bases[v] + i * 2] / 32768, (v, i) => heap16[bases[v] + i * 2 + 1] / 32768);
+    }
 
     if (scopes) {
       // An array of pointers to one Int16 stream per voice, numSamples long.
@@ -1215,7 +1207,9 @@ async function renderWithSID(
     }
   }
 
+  const playerCallHz = hasClock ? steadyPlayerCallHz(clock, mod._emu_get_clock_rate() >>> 0) : undefined;
   // Teardown the SID instance
+  if (stemVoices > 0) mod._emu_enable_stems(0);
   mod._emu_teardown();
 
   if (totalFrames === 0) {
@@ -1235,19 +1229,12 @@ async function renderWithSID(
   postProgress(id, 85);
   console.log(`[DJRenderWorker/WebSID] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames, songEnded: ${songEnded}`);
   const track = scopes?.finish();
-  if (track && withStems) {
-    // Each voice's stem: a solo pass per voice, on every chip, up to DECK_STEM_CHANNELS
-    // (the mix pass's instance is torn down, so each pass reloads).
-    const t1 = Date.now();
-    track.stems = [];
-    for (let v = 0; v < Math.min(DECK_STEM_CHANNELS, track.channels.length); v++) {
-      track.stems.push(track.scales[v] > 0
-        ? renderSidSoloPass(mod, fileBuffer, filename, subsong, sampleRate, v, totalFrames)
-        : new Int16Array(0));
-    }
-    console.log(`[DJRenderWorker/WebSID] stems: mix pass ${t1 - t0} ms, solo passes ${Date.now() - t1} ms`);
+  if (track && stems) {
+    const voiceStems = stems.finish(totalFrames);
+    track.stems = voiceStems.map((st, v) => (track.scales[v] > 0 ? st : new Int16Array(0)));
   }
-  return { left, right, sampleRate, channelScopes: track };
+  console.log(`[DJRenderWorker/WebSID] one pass with ${stemVoices} stems: ${Date.now() - t0} ms, player ${playerCallHz?.toFixed(4) ?? '-'} Hz`);
+  return { left, right, sampleRate, channelScopes: track, playerCallHz };
 }
 
 /**
@@ -1614,6 +1601,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             sampleRate: result.sampleRate,
             duration,
             channelScopes: result.channelScopes,
+            playerCallHz: result.playerCallHz,
           },
           [result.left.buffer, result.right.buffer, ...channelScopeTransferables(result.channelScopes)],
         );
