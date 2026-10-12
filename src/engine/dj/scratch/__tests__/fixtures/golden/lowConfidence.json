@@ -1,0 +1,26 @@
+{
+ "scenario": "lowConfidence",
+ "seed": 1,
+ "mode": "SAFE",
+ "routine": null,
+ "events": [
+  {
+   "bar": 19,
+   "step": 15,
+   "beat": 79.75,
+   "gesture": "babySlow",
+   "velocity": 0.7147318226901656,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 29,
+   "step": 15,
+   "beat": 119.75,
+   "gesture": "babySlow",
+   "velocity": 0.8287563897154193,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  }
+ ]
+}
