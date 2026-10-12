@@ -2,23 +2,68 @@
  "scenario": "peakBattle",
  "seed": 1,
  "mode": "BATTLE",
- "routine": "chirpFlareShowcase",
+ "routine": null,
  "events": [
   {
-   "bar": 19,
-   "step": 7,
-   "beat": 77.75,
-   "gesture": "uzi",
-   "velocity": 0.8974285840858247,
+   "bar": 16,
+   "step": 8,
+   "beat": 66,
+   "gesture": "chirpDouble",
+   "velocity": 0.8572396429388877,
    "placementRole": "answer",
    "role": "ANSWER"
+  },
+  {
+   "bar": 16,
+   "step": 15,
+   "beat": 67.75,
+   "gesture": "scribble",
+   "velocity": 0.7803036545357442,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 17,
+   "step": 8,
+   "beat": 70,
+   "gesture": "scribble",
+   "velocity": 0.7965148393987945,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 17,
+   "step": 15,
+   "beat": 71.75,
+   "gesture": "transformer8",
+   "velocity": 0.8493110551613642,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 18,
+   "step": 8,
+   "beat": 74,
+   "gesture": "hydroplane",
+   "velocity": 1,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 18,
+   "step": 15,
+   "beat": 75.75,
+   "gesture": "hydroplane",
+   "velocity": 0.8581490806439307,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
    "bar": 19,
    "step": 8,
    "beat": 78,
-   "gesture": "flare2",
-   "velocity": 0.73781921504638,
+   "gesture": "hydroplane",
+   "velocity": 0.8230777447165637,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -26,8 +71,26 @@
    "bar": 19,
    "step": 15,
    "beat": 79.75,
-   "gesture": "uzi",
-   "velocity": 0.7069898872062946,
+   "gesture": "hydroplane",
+   "velocity": 0.8267887388418402,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 20,
+   "step": 8,
+   "beat": 82,
+   "gesture": "transformer8",
+   "velocity": 1,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 20,
+   "step": 15,
+   "beat": 83.75,
+   "gesture": "hydroplane",
+   "velocity": 0.8304509040970474,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -35,8 +98,8 @@
    "bar": 21,
    "step": 8,
    "beat": 86,
-   "gesture": "flare2",
-   "velocity": 0.6688164659613062,
+   "gesture": "scribble",
+   "velocity": 0.6468909742885481,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -44,80 +107,53 @@
    "bar": 21,
    "step": 15,
    "beat": 87.75,
-   "gesture": "laser",
-   "velocity": 0.8341571236251499,
+   "gesture": "chirpDouble",
+   "velocity": 0.8991653315022508,
    "placementRole": "turnaround",
    "role": "FILL"
   },
   {
    "bar": 22,
-   "step": 1,
-   "beat": 88.25,
-   "gesture": "chirp",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "step": 8,
+   "beat": 90,
+   "gesture": "hydroplane",
+   "velocity": 0.8806775005722133,
+   "placementRole": "answer",
+   "role": "ANSWER"
   },
   {
    "bar": 22,
-   "step": 5,
-   "beat": 89.25,
-   "gesture": "chirpDouble",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 22,
-   "step": 9,
-   "beat": 90.25,
-   "gesture": "flare1",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 22,
-   "step": 13,
-   "beat": 91.25,
-   "gesture": "orbit",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 23,
-   "step": 1,
-   "beat": 92.25,
-   "gesture": "flare2",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "step": 15,
+   "beat": 91.75,
+   "gesture": "scribble",
+   "velocity": 0.9082963302052339,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
    "bar": 23,
    "step": 8,
    "beat": 94,
-   "gesture": "chirp",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "gesture": "hydroplane",
+   "velocity": 0.8976760509651333,
+   "placementRole": "answer",
+   "role": "ANSWER"
   },
   {
    "bar": 23,
-   "step": 13,
-   "beat": 95.25,
-   "gesture": "orbit",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "OUTRO"
+   "step": 15,
+   "beat": 95.75,
+   "gesture": "hydroplane",
+   "velocity": 0.9125749599450675,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
    "bar": 24,
    "step": 8,
    "beat": 98,
-   "gesture": "scribble",
-   "velocity": 0.8872044610488855,
+   "gesture": "transformer8",
+   "velocity": 0.8610360875867857,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -125,8 +161,8 @@
    "bar": 24,
    "step": 15,
    "beat": 99.75,
-   "gesture": "uzi",
-   "velocity": 0.8216150813281257,
+   "gesture": "hydroplane",
+   "velocity": 0.9152544441901275,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -134,8 +170,8 @@
    "bar": 25,
    "step": 8,
    "beat": 102,
-   "gesture": "flare2",
-   "velocity": 0.8029281570793249,
+   "gesture": "chirpDouble",
+   "velocity": 0.7724849317158771,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -143,8 +179,8 @@
    "bar": 25,
    "step": 15,
    "beat": 103.75,
-   "gesture": "flare2",
-   "velocity": 0.7453833337025033,
+   "gesture": "scribble",
+   "velocity": 0.8005676356145571,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -152,8 +188,8 @@
    "bar": 26,
    "step": 8,
    "beat": 106,
-   "gesture": "flare2",
-   "velocity": 0.968985262738207,
+   "gesture": "transformer8",
+   "velocity": 1,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -161,8 +197,8 @@
    "bar": 26,
    "step": 15,
    "beat": 107.75,
-   "gesture": "flare2",
-   "velocity": 0.7550537757465231,
+   "gesture": "scribble",
+   "velocity": 0.7939024948500801,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -170,8 +206,8 @@
    "bar": 27,
    "step": 8,
    "beat": 110,
-   "gesture": "scribble",
-   "velocity": 0.8916365547097465,
+   "gesture": "hydroplane",
+   "velocity": 0.8637888151369497,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -179,8 +215,8 @@
    "bar": 27,
    "step": 15,
    "beat": 111.75,
-   "gesture": "twiddle",
-   "velocity": 0.6983535761486722,
+   "gesture": "hydroplane",
+   "velocity": 0.6486976424811169,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -188,8 +224,8 @@
    "bar": 28,
    "step": 8,
    "beat": 114,
-   "gesture": "uzi",
-   "velocity": 0.9472610670978572,
+   "gesture": "chirpDouble",
+   "velocity": 1,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -197,26 +233,17 @@
    "bar": 28,
    "step": 15,
    "beat": 115.75,
-   "gesture": "uzi",
-   "velocity": 0.8811467770238508,
+   "gesture": "scribble",
+   "velocity": 0.8650095368886854,
    "placementRole": "turnaround",
    "role": "FILL"
   },
   {
    "bar": 29,
-   "step": 7,
-   "beat": 117.75,
-   "gesture": "uzi",
-   "velocity": 0.8387412291388252,
-   "placementRole": "answer",
-   "role": "ANSWER"
-  },
-  {
-   "bar": 29,
    "step": 8,
    "beat": 118,
-   "gesture": "transformer8",
-   "velocity": 0.6629817113239171,
+   "gesture": "chirpDouble",
+   "velocity": 0.7220813305867094,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -224,80 +251,53 @@
    "bar": 29,
    "step": 15,
    "beat": 119.75,
-   "gesture": "crab",
-   "velocity": 0.8052080026186452,
+   "gesture": "hydroplane",
+   "velocity": 0.7508110170138095,
    "placementRole": "turnaround",
    "role": "FILL"
   },
   {
    "bar": 30,
-   "step": 1,
-   "beat": 120.25,
-   "gesture": "chirp",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "step": 8,
+   "beat": 122,
+   "gesture": "hydroplane",
+   "velocity": 0.8844739452201115,
+   "placementRole": "answer",
+   "role": "ANSWER"
   },
   {
    "bar": 30,
-   "step": 5,
-   "beat": 121.25,
-   "gesture": "chirpDouble",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 30,
-   "step": 9,
-   "beat": 122.25,
-   "gesture": "flare1",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 30,
-   "step": 13,
-   "beat": 123.25,
-   "gesture": "orbit",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 31,
-   "step": 1,
-   "beat": 124.25,
-   "gesture": "flare2",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "step": 15,
+   "beat": 123.75,
+   "gesture": "hydroplane",
+   "velocity": 0.7436575875486382,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
    "bar": 31,
    "step": 8,
    "beat": 126,
-   "gesture": "chirp",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "gesture": "transformer8",
+   "velocity": 0.8940505073624782,
+   "placementRole": "answer",
+   "role": "ANSWER"
   },
   {
    "bar": 31,
-   "step": 13,
-   "beat": 127.25,
-   "gesture": "orbit",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "OUTRO"
+   "step": 15,
+   "beat": 127.75,
+   "gesture": "transformer8",
+   "velocity": 0.7518181124589914,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
    "bar": 32,
    "step": 8,
    "beat": 130,
-   "gesture": "crab",
-   "velocity": 0.682337128399747,
+   "gesture": "hydroplane",
+   "velocity": 0.7352529182879378,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -305,8 +305,8 @@
    "bar": 32,
    "step": 15,
    "beat": 131.75,
-   "gesture": "crab",
-   "velocity": 0.8297331763130759,
+   "gesture": "chirpDouble",
+   "velocity": 0.7555779354543374,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -314,8 +314,8 @@
    "bar": 33,
    "step": 8,
    "beat": 134,
-   "gesture": "crab",
-   "velocity": 0.8822875734955713,
+   "gesture": "hydroplane",
+   "velocity": 0.9374837872892349,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -323,8 +323,8 @@
    "bar": 33,
    "step": 15,
    "beat": 135.75,
-   "gesture": "threeClickFlare",
-   "velocity": 0.6646328851610935,
+   "gesture": "transformer8",
+   "velocity": 0.7004623483634699,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -332,8 +332,8 @@
    "bar": 34,
    "step": 8,
    "beat": 138,
-   "gesture": "threeClickFlare",
-   "velocity": 0.6446703066817288,
+   "gesture": "transformer8",
+   "velocity": 0.6900129701686122,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -342,7 +342,7 @@
    "step": 15,
    "beat": 139.75,
    "gesture": "hydroplane",
-   "velocity": 0.6828239650322285,
+   "velocity": 0.7038315403982605,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -350,8 +350,8 @@
    "bar": 35,
    "step": 8,
    "beat": 142,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.751082947550804,
+   "gesture": "hydroplane",
+   "velocity": 0.7986938277256428,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -359,8 +359,8 @@
    "bar": 35,
    "step": 15,
    "beat": 143.75,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.8181921258524748,
+   "gesture": "chirpDouble",
+   "velocity": 0.7491813534752423,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -368,8 +368,8 @@
    "bar": 36,
    "step": 8,
    "beat": 146,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.981038733304292,
+   "gesture": "scribble",
+   "velocity": 1,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -377,8 +377,8 @@
    "bar": 36,
    "step": 15,
    "beat": 147.75,
-   "gesture": "threeClickFlare",
-   "velocity": 0.841852039171386,
+   "gesture": "scribble",
+   "velocity": 0.7580193789578088,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -386,8 +386,8 @@
    "bar": 37,
    "step": 8,
    "beat": 150,
-   "gesture": "eightFingerCrab",
-   "velocity": 1,
+   "gesture": "chirpDouble",
+   "velocity": 0.9870817120622569,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -395,71 +395,53 @@
    "bar": 37,
    "step": 15,
    "beat": 151.75,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.7240669231166799,
+   "gesture": "chirpDouble",
+   "velocity": 0.6503150988021668,
    "placementRole": "turnaround",
    "role": "FILL"
   },
   {
    "bar": 38,
-   "step": 5,
-   "beat": 153.25,
+   "step": 8,
+   "beat": 154,
    "gesture": "chirpDouble",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "velocity": 0.7403921568627451,
+   "placementRole": "answer",
+   "role": "ANSWER"
   },
   {
    "bar": 38,
-   "step": 9,
-   "beat": 154.25,
-   "gesture": "flare1",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 38,
-   "step": 13,
-   "beat": 155.25,
-   "gesture": "orbit",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 39,
-   "step": 1,
-   "beat": 156.25,
-   "gesture": "flare2",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "step": 15,
+   "beat": 155.75,
+   "gesture": "scribble",
+   "velocity": 0.6539772640573739,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
    "bar": 39,
    "step": 8,
    "beat": 158,
-   "gesture": "chirp",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "gesture": "transformer8",
+   "velocity": 0.8378606851300832,
+   "placementRole": "answer",
+   "role": "ANSWER"
   },
   {
    "bar": 39,
-   "step": 13,
-   "beat": 159.25,
-   "gesture": "orbit",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "OUTRO"
+   "step": 15,
+   "beat": 159.75,
+   "gesture": "hydroplane",
+   "velocity": 0.6606363012130922,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
    "bar": 40,
    "step": 8,
    "beat": 162,
    "gesture": "hydroplane",
-   "velocity": 1,
+   "velocity": 0.9749599450675211,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -468,7 +450,7 @@
    "step": 15,
    "beat": 163.75,
    "gesture": "hydroplane",
-   "velocity": 0.745344472419318,
+   "velocity": 0.6548989089799344,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -476,8 +458,8 @@
    "bar": 41,
    "step": 8,
    "beat": 166,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.7188120851453422,
+   "gesture": "scribble",
+   "velocity": 0.6648233768215458,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -485,8 +467,8 @@
    "bar": 41,
    "step": 15,
    "beat": 167.75,
-   "gesture": "eightFingerCrab",
-   "velocity": 1,
+   "gesture": "scribble",
+   "velocity": 0.9890470740825513,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -494,8 +476,8 @@
    "bar": 42,
    "step": 8,
    "beat": 170,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.7599992370489052,
+   "gesture": "scribble",
+   "velocity": 0.7986877241168842,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -503,8 +485,8 @@
    "bar": 42,
    "step": 15,
    "beat": 171.75,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.6884222171358816,
+   "gesture": "chirpDouble",
+   "velocity": 0.7089158464942398,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -512,8 +494,8 @@
    "bar": 43,
    "step": 8,
    "beat": 174,
-   "gesture": "hydroplane",
-   "velocity": 0.7334668497749295,
+   "gesture": "chirpDouble",
+   "velocity": 0.6751689936675059,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -521,8 +503,8 @@
    "bar": 43,
    "step": 15,
    "beat": 175.75,
-   "gesture": "hydroplane",
-   "velocity": 0.8491790646219578,
+   "gesture": "transformer8",
+   "velocity": 0.7586846723125048,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -530,8 +512,8 @@
    "bar": 44,
    "step": 8,
    "beat": 178,
-   "gesture": "hydroplane",
-   "velocity": 0.8962256809338521,
+   "gesture": "chirpDouble",
+   "velocity": 0.9376363775082018,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -539,8 +521,8 @@
    "bar": 44,
    "step": 15,
    "beat": 179.75,
-   "gesture": "hydroplane",
-   "velocity": 0.8433928435187305,
+   "gesture": "transformer8",
+   "velocity": 0.763884946974899,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -548,8 +530,8 @@
    "bar": 45,
    "step": 8,
    "beat": 182,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.7565018692301824,
+   "gesture": "chirpDouble",
+   "velocity": 0.8021118486305028,
    "placementRole": "answer",
    "role": "ANSWER"
   },
@@ -557,64 +539,46 @@
    "bar": 45,
    "step": 15,
    "beat": 183.75,
-   "gesture": "eightFingerCrab",
-   "velocity": 0.9206034943160144,
+   "gesture": "chirpDouble",
+   "velocity": 0.8800610360875868,
    "placementRole": "turnaround",
    "role": "FILL"
   },
   {
    "bar": 46,
-   "step": 5,
-   "beat": 185.25,
-   "gesture": "chirpDouble",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "step": 8,
+   "beat": 186,
+   "gesture": "scribble",
+   "velocity": 0.6490638590066377,
+   "placementRole": "answer",
+   "role": "ANSWER"
   },
   {
    "bar": 46,
-   "step": 9,
-   "beat": 186.25,
-   "gesture": "flare1",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 46,
-   "step": 13,
-   "beat": 187.25,
-   "gesture": "orbit",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 47,
-   "step": 1,
-   "beat": 188.25,
-   "gesture": "flare2",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "step": 15,
+   "beat": 187.75,
+   "gesture": "transformer8",
+   "velocity": 0.6590615701533532,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
    "bar": 47,
    "step": 8,
    "beat": 190,
-   "gesture": "chirp",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
+   "gesture": "hydroplane",
+   "velocity": 0.732457465476463,
+   "placementRole": "answer",
+   "role": "ANSWER"
   },
   {
    "bar": 47,
-   "step": 13,
-   "beat": 191.25,
-   "gesture": "orbit",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "OUTRO"
+   "step": 15,
+   "beat": 191.75,
+   "gesture": "chirpDouble",
+   "velocity": 0.655551995117113,
+   "placementRole": "turnaround",
+   "role": "FILL"
   }
  ]
 }

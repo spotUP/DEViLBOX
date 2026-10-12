@@ -5,47 +5,20 @@
  "routine": "hookCallResponse",
  "events": [
   {
-   "bar": 22,
-   "step": 11,
-   "beat": 90.75,
-   "gesture": "forwardStab",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "THEME"
-  },
-  {
-   "bar": 22,
+   "bar": 19,
    "step": 15,
-   "beat": 91.75,
-   "gesture": "baby",
-   "velocity": 0.8,
-   "placementRole": "turnaround",
-   "role": "THEME"
-  },
-  {
-   "bar": 23,
-   "step": 7,
-   "beat": 93.75,
+   "beat": 79.75,
    "gesture": "chirp",
-   "velocity": 0.85,
-   "placementRole": "answer",
-   "role": "ANSWER"
+   "velocity": 0.9239147020675975,
+   "placementRole": "turnaround",
+   "role": "FILL"
   },
   {
-   "bar": 23,
-   "step": 14,
-   "beat": 95.5,
-   "gesture": "baby",
-   "velocity": 0.9,
-   "placementRole": "answer",
-   "role": "ANSWER"
-  },
-  {
-   "bar": 24,
+   "bar": 28,
    "step": 15,
-   "beat": 99.75,
-   "gesture": "baby",
-   "velocity": 0.8183016708628977,
+   "beat": 115.75,
+   "gesture": "chirp",
+   "velocity": 0.9974021515220874,
    "placementRole": "turnaround",
    "role": "FILL"
   },
@@ -80,7 +53,7 @@
    "bar": 31,
    "step": 14,
    "beat": 127.5,
-   "gesture": "baby",
+   "gesture": "forwardStab",
    "velocity": 0.9,
    "placementRole": "answer",
    "role": "ANSWER"

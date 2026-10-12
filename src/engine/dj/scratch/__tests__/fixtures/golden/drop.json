@@ -2,52 +2,16 @@
  "scenario": "drop",
  "seed": 1,
  "mode": "PERFORMER",
- "routine": "electroTransformer",
+ "routine": null,
  "events": [
   {
-   "bar": 22,
-   "step": 1,
-   "beat": 88.25,
-   "gesture": "transformer8",
-   "velocity": 0.8,
-   "placementRole": "accent",
-   "role": "THEME"
-  },
-  {
-   "bar": 22,
-   "step": 9,
-   "beat": 90.25,
-   "gesture": "transformer8",
-   "velocity": 0.85,
-   "placementRole": "accent",
-   "role": "THEME"
-  },
-  {
    "bar": 23,
-   "step": 1,
-   "beat": 92.25,
+   "step": 15,
+   "beat": 95.75,
    "gesture": "transformer8",
-   "velocity": 0.9,
-   "placementRole": "answer",
-   "role": "ANSWER"
-  },
-  {
-   "bar": 23,
-   "step": 9,
-   "beat": 94.25,
-   "gesture": "flare1",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 23,
-   "step": 14,
-   "beat": 95.5,
-   "gesture": "transformer8",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "OUTRO"
+   "velocity": 0.9125749599450675,
+   "placementRole": "turnaround",
+   "role": "FILL"
   }
  ]
 }

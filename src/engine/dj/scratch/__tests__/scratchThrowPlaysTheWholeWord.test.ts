@@ -7,38 +7,28 @@
  * at that end, and the voice plays to the end of the safe range.
  */
 import { describe, it, expect } from 'vitest';
-import { planScratch } from '../scratchPlanner';
-import { throwBeats, oneHandConflicts } from '../scratchPlacement';
-import { toScratchEvents } from '../scratchPlanner';
+import { throwBeats } from '../scratchPlacement';
+import { buildThreeDeckRoutine } from '../scratchDemoRoutines';
+import { ScratchVoicePool } from '../scratchVoicePool';
 import { ScratchRecordVoice, type ScratchVoiceRing, type ScratchVoiceBus } from '../ScratchRecordVoice';
 import { getScratchRecord } from '../scratchCatalogue';
 import { getGesture } from '../scratchGestureCatalog';
-import { scenarioContext } from './fixtures/scenarioContext';
-import { fixtureAnalysis } from './fixtures/analysisFixture';
 
 const SR = 48000;
 const PHRASE = getScratchRecord('AH_FRESH_FULL_PHRASE')!; // "aaaah fresh that was fresh"
 const wordSec = (r: typeof PHRASE) => r.safe[1] - r.anchors.attack;
 
 describe('a throw plays the whole word (section 41)', () => {
-  it('the planner reserves the whole phrase: the throw event lasts >= the record from its attack, nothing starts inside it', () => {
-    let throws = 0;
-    for (const bpm of [92, 125, 140]) {
-      for (let seed = 1; seed <= 10; seed++) {
-        const ctx = scenarioContext({ style: 'boomBap', kind: 'breakdown', bpm, energy: 0.5 });
-        const p = planScratch(ctx, { mode: 'MUSICAL', seed, fromBar: 16, bars: 16, record: PHRASE, throwMemory: {} });
-        const t = p.events.find((e) => e.gesture === 'dropPhrase' || e.gesture === 'drop');
-        if (!t) continue;
-        throws++;
-        expect(t.gesture).toBe('dropPhrase');
-        const events = toScratchEvents(p.events, { type: 'CRATE', recordId: PHRASE.id, anchor: PHRASE.anchor }, PHRASE.anchor, { bpm, seed, downbeats: fixtureAnalysis().downbeats });
-        const te = events.find((e) => e.gesture === 'dropPhrase')!;
-        expect(te.durationBeats * 60 / bpm, `bpm ${bpm} seed ${seed}`).toBeGreaterThanOrEqual(wordSec(PHRASE) - 1e-9);
-        expect(oneHandConflicts(p.events)).toBe(0);
-        for (const e of events) if (e !== te) expect(e.executeAtBeat >= te.executeAtBeat + te.durationBeats - 1e-9 || e.executeAtBeat + e.durationBeats <= te.executeAtBeat + 1e-9, `${e.gesture} inside the throw`).toBe(true);
-      }
-    }
-    expect(throws).toBeGreaterThanOrEqual(10);
+  it('the three-deck throw rides on its own voice: the chops after it (on the theme voice) never cut the word', () => {
+    // the demo's throw sums under the scratches that follow it in the same bar (three_deck); one voice
+    // would stop the word at the first chop ("that was fr")
+    const routine = buildThreeDeckRoutine(1);
+    const drops = routine.filter((e) => e.gesture === 'drop');
+    expect(drops.length).toBeGreaterThan(5);
+    for (const d of drops) expect(routine.some((e) => e.bar === d.bar && e.step > d.step && e.gesture !== 'drop')).toBe(true);
+    const pool = Object.create(ScratchVoicePool.prototype) as ScratchVoicePool;
+    (pool as unknown as { voices: unknown[] }).voices = [{ busy: false }, { busy: false }];
+    expect(pool.acquire('INTRO')).not.toBe(pool.acquire('THEME'));
     expect(throwBeats(PHRASE, 125, 'dropPhrase') * 60 / 125).toBeGreaterThan(getGesture('dropPhrase').durationSteps / 4 * 60 / 125);
   });
 

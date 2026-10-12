@@ -170,11 +170,12 @@ describe('ScratchRecordVoice (section 16, SCR-P2.5)', () => {
     expect(last(ring, 'faderGain')!.args[0]).toBe(1);
   });
 
-  it('a pre-scratched record refuses every gesture but drop (section 39)', async () => {
+  it('every record takes every gesture, a pre-scratched one too: the demo scratches its FX pool (SCR-PHRASING-PARITY D5)', async () => {
     const pre = getScratchRecord('SCRATCH_005')!;
     const v = new ScratchRecordVoice(1, fakeRing(), fakeBus());
     await v.load(pre, fakeBuffer(pre.durationSec));
-    expect(v.playGesture(getGesture('chirp'), 120, {}).ok).toBe(false);
+    expect(pre.gestures).toEqual(['drop']);
+    expect(v.playGesture(getGesture('chirp'), 120, {}).ok).toBe(true);
     expect(v.playGesture(getGesture('drop'), 120, {}).ok).toBe(true);
   });
 

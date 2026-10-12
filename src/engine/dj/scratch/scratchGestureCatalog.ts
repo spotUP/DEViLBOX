@@ -229,7 +229,8 @@ loop: true,
     // DEViLBOX Flare: two clicks on the forward stroke, direction changes on an open fader.
     id: 'flare2', name: 'Two-Click Flare', durationSteps: 2,
     styles: ['electro', 'battle'],
-    handPath: hand([[0, 0], [0.5, 1.8], [1, 0]]),
+    // the demo's flare2 hand (scratch.py :159): one forward stroke, the fader making the two clicks (O3)
+    handPath: hand([[0, 0], [1, 1.8]]),
     faderWindows: referenceCutPattern('flare2'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
 loop: true,
@@ -446,7 +447,8 @@ loop: false,
 const THROWS: ReadonlySet<ScratchGestureId> = new Set(['drop', 'dropPhrase']);
 
 function activityOf(seed: GestureSeed): number {
-  if (THROWS.has(seed.id)) return 0; // reference: `play` gestures are the calm end by construction
+  // reference: `play` (throws) and `deck` (brake / spin-up) gestures are the calm end by construction
+  if (THROWS.has(seed.id) || seed.deckAction) return 0;
   return seed.faderWindows.length + handPathReversals(seed.handPath);
 }
 

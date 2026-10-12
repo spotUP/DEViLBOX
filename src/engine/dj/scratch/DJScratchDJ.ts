@@ -13,13 +13,15 @@
 
 import { barStartBeat, timeAtBeat, timelineAt } from '../autodj/beatGrid';
 import type { DJPerformanceContext, DJTrackAnalysis } from '../autodj/types';
-import { buildScratchContext, type ScratchPerformanceContext } from './scratchContext';
-import { planJuggleResponse, planScratch, toScratchEvents, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
-import type { ThrowMemory } from './scratchPlacement';
+import { buildScratchContext, scratchSectionFor, type ScratchPerformanceContext } from './scratchContext';
+import { planJuggleResponse, planScratch, toScratchEvents, type OverlaySection, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
+import { buildScratchDjRoutine, buildThreeDeckRoutine, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, validateScratchDjRoutine } from './scratchDemoRoutines';
+import type { RoutineName } from './scratchRoutines';
+import type { ScratchProfileId } from './scratchStyles';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
 import { SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
 import { anchorFor } from './scratchAnchor';
-import type { ScratchRecord } from './scratchCatalogue';
+import { getScratchRecord, type ScratchRecord } from './scratchCatalogue';
 import { selectScratchSource, type SourceDecision, type SourceRequest, type TrackerSampleInfo } from './ScratchSourceSelector';
 import { ScratchMemory } from './scratchMemory';
 import { PerformanceBudget, performancePermissions } from './scratchBudget';
@@ -60,9 +62,14 @@ export interface ScratchTickInput {
   /** Hands budget grant (section 27); 0 = nothing is scratched. */
   scratchPermission: number;
   genre?: ScratchPlanOptions['genre'];
-  /** Section 33 genre the source selector reads (house / techno favour the live deck). */
+  /** The demo profile the overlay plays (the subgenre's, else the palette's). */
+  profile?: ScratchProfileId;
+  /** The overlay's routine option (the demo's default: none; 'auto' = `routine_for` closes each section). */
+  routine?: 'auto' | RoutineName | null;
+  /** Section 33 genre the source selector reads. */
   genreHint?: ScratchGenreHint | 'unknown';
-  /** Scratchable instruments of a tracker deck's song (P5.6). */
+  /** Scratchable instruments of a tracker deck's song (P5.6). The Auto DJ scratches crate records only
+   *  (the demo never scratches the music, SCR-PHRASING-PARITY D1): a selector override may still read them. */
   trackerSamples?: readonly TrackerSampleInfo[];
   juggleIntensity?: number;
   transitionIntensity?: number;
@@ -173,7 +180,6 @@ export class DJScratchDJ {
   private plannedThroughBar = -1;
   private trackKey = '';
   private lastBar = -1;
-  private readonly throwMemory: ThrowMemory = {};
   readonly memory = new ScratchMemory();
   readonly budget = new PerformanceBudget();
   readonly states = new ScratchStateMachine();
@@ -362,22 +368,40 @@ export class DJScratchDJ {
     let arc: ArcTemplate | null = null;
     // cooldowns are checked at each event's own bar (section 54), not for the whole window
     const cooling = (g: ScratchGestureId, bar: number): boolean => !this.memory.gestureReady(g, bar);
-    let arcOpts: Parameters<typeof planArc>[0] | null = null;
     if (wantsFeature) {
       arc = shape.template!;
       toBar = fromBar + arc.bars;
       this.budget.feature();
       const perm = performancePermissions({ setPhase, budgetTotal: this.budget.total, mode: input.mode });
       this.lastPeak = perm.peak;
-      arcOpts = { arc, startBar: fromBar, style: ctx.style, mode: input.mode, seed: seed + fromBar, levelCap: perm.maxLevel || undefined, cooling, beatsPerBar: ctx.meter };
-      const a = planArc(arcOpts);
       // the feature's cooldown runs from its end (section 54)
       this.memory.recordPerformance(shape.role === 'peakBurst' ? 'battle' : 'feature', toBar);
       this.arcPhases = [];
-      plan = {
-        mode: input.mode, events: a.events, bars: Array.from({ length: arc.bars }, (_, k) => a.events.filter((e) => e.bar === fromBar + k)),
-        rests: [], issues: [], reasons: [`${shape.role}: ${arc.name} arc over ${arc.bars} bars`, perm.reason],
-      };
+      if (arc.bars === 32) {
+        // the 32-bar feature is the demo's own routine (SCR-PHRASING-PARITY D8): BATTLE the scratch_dj
+        // showcase (A-A-B-A hook, varied endings, validated), PERFORMER the three-deck flow (a throw per
+        // phrase, the word chopped, rests by energy, the words rotating); needles open and close it
+        const battle = input.mode === 'BATTLE';
+        arc = battle ? SCRATCH_DJ_TEMPLATE : THREE_DECK_TEMPLATE;
+        scratchDJStats.bookends++;
+        const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar);
+        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter);
+        plan = {
+          mode: input.mode, events, bars: Array.from({ length: arc.bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
+          rests: [], issues: battle ? validateScratchDjRoutine(demo) : [], routine: battle ? 'scratchDj' : 'threeDeck',
+          reasons: [`${shape.role}: the demo's ${battle ? 'scratch_dj showcase' : 'three-deck routine'} over 32 bars`, perm.reason],
+        };
+      } else {
+        const a = planArc({ arc, startBar: fromBar, style: ctx.style, mode: input.mode, seed: seed + fromBar, levelCap: perm.maxLevel || undefined, cooling, beatsPerBar: ctx.meter });
+        // the section's record, as the overlay's (the demo's one record per section)
+        const sec = overlaySectionAt(track, fromBar);
+        const record = overlayRecord(sec.name, seed + sec.startBar);
+        const events = record ? a.events.map((e) => ({ ...e, record })) : a.events;
+        plan = {
+          mode: input.mode, events, bars: Array.from({ length: arc.bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
+          rests: [], issues: [], reasons: [`${shape.role}: ${arc.name} arc over ${arc.bars} bars`, perm.reason],
+        };
+      }
     } else {
       this.lastPeak = false;
       const vocalByBar = Array.from({ length: toBar - fromBar }, (_, k) => {
@@ -385,7 +409,11 @@ export class DJScratchDJ {
         return b ? timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, b.start) : ctx.vocalActivity;
       });
       const densityShift = this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0;
-      const opts = { mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, cooling, densityShift };
+      // the demo's overlay: section by section, one crate record per section (SCR-PHRASING-PARITY)
+      const opts: ScratchPlanOptions = {
+        mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, densityShift,
+        sectionAt: (bar) => overlaySectionAt(track, bar), profile: input.profile, routine: input.routine ?? null, records: true,
+      };
       // a planned rest after a phrase that collided with the vocal (section 52)
       plan = this.intent === 'rest'
         ? { mode: input.mode, events: [], bars: [], rests: [], issues: [], reasons: [`rest: ${this.lastEvaluation?.reason ?? 'evaluation'}`] }
@@ -398,27 +426,20 @@ export class DJScratchDJ {
     if (response) plan = planJuggleResponse(ctx, { mode: input.mode, seed, fromBar, phases: responsePhases! });
     this.plannedThroughBar = toBar;
     if (input.juggleActive && !response) plan = juggleSafe(plan);
-
-    // the source is chosen before the throw: a crate record opens its phrase with one (section 41)
-    const chosen = plan.events.length ? this.chooseSource(ctx, plan, input, fromBar, decksStill) : null;
-    // a crate record plays only its own gestures (sections 38/39): the plan is made again from them,
-    // or the voice would refuse the rest and the listener hears only what the record happens to take
-    if (chosen?.record && response) {
-      plan = planJuggleResponse(ctx, { mode: input.mode, seed, fromBar, phases: responsePhases!, allowed: chosen.record.gestures });
-    } else if (chosen?.record && !arc) {
-      const vocalByBar = Array.from({ length: toBar - fromBar }, (_, k) => {
-        const b = track.downbeats.bars[fromBar + k];
-        return b ? timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, b.start) : ctx.vocalActivity;
-      });
-      plan = planScratch(ctx, { mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, cooling, allowed: chosen.record.gestures, densityShift: this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0, record: chosen.record, throwMemory: this.throwMemory });
-    } else if (chosen?.record && arc && arcOpts) {
-      const a = planArc({ ...arcOpts, allowed: chosen.record.gestures });
-      plan = { ...plan, events: a.events, bars: Array.from({ length: arc.bars }, (_, k) => a.events.filter((e) => e.bar === fromBar + k)) };
-    }
-    if (input.juggleActive && !response) plan = juggleSafe(plan);
     if (response) scratchDJStats.juggleResponses++;
-    // a feature is a routine: the needle drops on its first downbeat and lifts at its end (C8)
-    if (arc && plan.events.length) plan = withNeedleBookends(plan, fromBar, arc.bars, ctx.meter);
+    // a feature is a routine: the needle drops on its first downbeat and lifts at its end (C8); the demo's own routines carry theirs
+    if (arc && plan.events.length && !plan.events.some((e) => e.gesture === 'needleDrop')) plan = withNeedleBookends(plan, fromBar, arc.bars, ctx.meter);
+
+    // the record: the plan's own per event (the demo's choice); a juggle response takes its section's record
+    // too (one record per section, `pick_source`); never the music (D1). A `chooseSource` dependency overrides.
+    if (!this.deps.chooseSource && plan.events.some((e) => !e.record)) {
+      const sec = overlaySectionAt(track, fromBar);
+      const record = overlayRecord(sec.name, seed + sec.startBar);
+      if (record) plan = { ...plan, events: plan.events.map((e) => (e.record ? e : { ...e, record })), bars: plan.bars.map((b) => b.map((e) => (e.record ? e : { ...e, record }))) };
+    }
+    const performed = plan.events.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
+    const perEvent = !this.deps.chooseSource && performed.length > 0 && performed.every((e) => !!e.record);
+    const chosen = plan.events.length ? (perEvent ? this.planRecords(plan, ctx) : this.chooseSource(ctx, plan, input, fromBar)) : null;
     scratchDJStats.plans++;
     this.lastPlan = plan;
     const intent = this.intent;
@@ -428,15 +449,20 @@ export class DJScratchDJ {
       return { planned: true, scheduled: 0, reason: chosen ? 'a planned rest' : plan.events.length ? 'no source' : 'a planned rest' };
     }
 
+    const fx = { style: ctx.style, amount: SCRATCH_STYLES[ctx.style].fxAmount * (input.genre?.fxScale ?? 1) };
     const events = toScratchEvents(plan.events, chosen.source, chosen.anchor, {
       bpm: ctx.bpm, seed: seed + fromBar, downbeats: track.downbeats, deck: input.deck,
       // the style's FX on the bus: its preset, at its FX amount x the genre's FX scale (SCR-PG-A5)
-      fx: { style: ctx.style, amount: SCRATCH_STYLES[ctx.style].fxAmount * (input.genre?.fxScale ?? 1) },
-    }).map((e) => (chosen.source.type === 'CRATE' ? { ...e, anchor: anchorFor(chosen.source, e.role) ?? e.anchor } : e));
+      fx,
+    }).map((e, i) => {
+      const own = perEvent && plan.events[i]?.record ? crateSource(plan.events[i]!.record!) : null;
+      const source = own ?? e.source;
+      return source.type === 'CRATE' ? { ...e, source, anchor: anchorFor(source, e.role) ?? source.anchor } : e;
+    });
     // only what is still ahead of the clock
     const now = ctx.masterBeat;
     const firstBeat = barStartBeat(track.downbeats, fromBar) - 1e-9;
-    const sourceKey = chosen.decision?.candidate.key ?? sourceKeyOf(chosen.source);
+    const windowKey = chosen.decision?.candidate.key ?? sourceKeyOf(chosen.source);
     const bassSource = chosen.decision?.candidate.material === 'bass';
     const anchorQuality = chosen.decision?.candidate.anchorQuality ?? 1;
     const entries: WindowEntry[] = [];
@@ -449,6 +475,7 @@ export class DJScratchDJ {
     };
     plan.events.forEach((p, i) => {
       const e = events[i]!;
+      const sourceKey = perEvent && p.record ? `crate:${p.record}` : windowKey;
       if (e.executeAtBeat < now || e.executeAtBeat < firstBeat) return;
       // section 59: the governor has the last word on every event
       const verdict = checkScratch(e, safety);
@@ -483,14 +510,31 @@ export class DJScratchDJ {
     else m.go('SCRATCHING', 'phrase', bar);
   }
 
-  private chooseSource(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, bar: number, decksStill: boolean): ChosenScratchSource | null {
+  /**
+   * The crate record for a plan whose events name their own (the demo's `pick_source` per section, its role
+   * pools per routine event): the window's source is the first record, for the decision log and telemetry.
+   */
+  private planRecords(plan: ScratchPlan, ctx: ScratchPerformanceContext): ChosenScratchSource | null {
+    const first = plan.events.find((e) => e.record);
+    const source = first?.record ? crateSource(first.record) : null;
+    if (!source) return null;
+    this.lastSource = `crate:${first!.record}`;
+    void ctx;
+    return { source, anchor: anchorFor(source, first!.role) ?? source.anchor, record: getScratchRecord(first!.record!) };
+  }
+
+  /**
+   * The crate's best record for a plan without its own (a short feature, a juggle response): the section 13
+   * selector over crate records only - the Auto DJ never scratches the music (the demo never does,
+   * SCR-PHRASING-PARITY D1; the deck pads stay the user's).
+   */
+  private chooseSource(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, bar: number): ChosenScratchSource | null {
     const recent = this.memory.recent().recentSources;
     const leading = plan.events.find((e) => e.gesture !== 'drop' && e.gesture !== 'dropPhrase')?.gesture;
     const chosen = this.deps.chooseSource
       ? this.deps.chooseSource(ctx, plan, input, recent)
       : selectorSource(ctx, plan, input, recent, {
-          // under a juggle the decks are the juggle's: crate records only (sections 26, 49)
-          blocked: (key) => !this.memory.sourceReady(key, bar) || (decksStill && !key.startsWith('crate:')),
+          blocked: (key) => !key.startsWith('crate:') || !this.memory.sourceReady(key, bar),
           preference: (c) => (leading ? this.memory.preference(c.key, leading, ctx.sectionName, ctx.nextSection?.kind) : 0),
         });
     if (chosen?.decision) this.deps.onSourceDecision?.(chosen.decision, ctx);
@@ -500,6 +544,20 @@ export class DJScratchDJ {
     }
     return chosen;
   }
+}
+
+/** A crate record as a scratch source (its vowel the home anchor). */
+export function crateSource(recordId: string): Extract<ScratchSource, { type: 'CRATE' }> | null {
+  const r = getScratchRecord(recordId);
+  if (!r) return null;
+  return { type: 'CRATE', recordId: r.id, anchor: { position: r.anchors.vowel, safe: r.safe, safeForward: r.safeForward, safeReverse: r.safeReverse } };
+}
+
+/** The section a bar sits in, as the overlay reads it (the whole track as one section when the analysis has none). */
+export function overlaySectionAt(track: Pick<DJTrackAnalysis, 'sections' | 'downbeats'>, bar: number): OverlaySection {
+  const s = track.sections.find((x) => bar >= x.startBar && bar < x.endBar);
+  if (s) return { name: scratchSectionFor(s.kind), startBar: s.startBar, bars: Math.max(1, s.endBar - s.startBar) };
+  return { name: scratchSectionFor(undefined), startBar: 0, bars: Math.max(bar + 1, track.downbeats.bars.length) };
 }
 
 /** Under a running juggle a scratch only answers or accents (sections 26, 49). */

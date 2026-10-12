@@ -105,9 +105,14 @@ export class ScratchVoicePool {
     }
   }
 
-  /** The voice for a role: THEME keeps voice 0, ANSWER voice 1, otherwise the first idle one. */
+  /**
+   * The voice for a role: THEME keeps voice 0, ANSWER voice 1, a throw (INTRO) the last voice - the word
+   * rides out under the chops that follow it, as the demo's throw sums under its scratches (three_deck) -
+   * otherwise the first idle one.
+   */
   acquire(role?: ScratchRole): ScratchRecordVoice {
     if (role === 'THEME') return this.voices[0]!;
+    if (role === 'INTRO' && this.voices.length > 1) return this.voices[this.voices.length - 1]!;
     if (role === 'ANSWER' && this.voices.length > 1) return this.voices[1]!;
     return this.voices.find((v) => !v.busy) ?? this.voices[0]!;
   }

@@ -5,20 +5,29 @@
  "routine": null,
  "events": [
   {
-   "bar": 19,
+   "bar": 23,
    "step": 15,
-   "beat": 79.75,
+   "beat": 95.75,
    "gesture": "babySlow",
-   "velocity": 0.7147318226901656,
+   "velocity": 0.9125749599450675,
    "placementRole": "turnaround",
    "role": "FILL"
   },
   {
-   "bar": 29,
+   "bar": 25,
    "step": 15,
-   "beat": 119.75,
-   "gesture": "babySlow",
-   "velocity": 0.8287563897154193,
+   "beat": 103.75,
+   "gesture": "baby",
+   "velocity": 0.8005676356145571,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
+  {
+   "bar": 31,
+   "step": 15,
+   "beat": 127.75,
+   "gesture": "baby",
+   "velocity": 0.7518181124589914,
    "placementRole": "turnaround",
    "role": "FILL"
   }

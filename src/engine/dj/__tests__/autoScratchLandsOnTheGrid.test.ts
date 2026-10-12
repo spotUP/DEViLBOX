@@ -15,8 +15,11 @@ import type { ScratchEvent } from '../scratch/scratchTypes';
 import { fixtureAnalysis, fixturePerf } from '../scratch/__tests__/fixtures/analysisFixture';
 
 describe('Auto Scratch lands on the grid (SCR-P4.R4)', () => {
-  it('MUSICAL boom bap over 24 bars: every planned event is executed within [-8, +10] ms of its grid beat', () => {
+  it('MUSICAL boom bap over 24 bars of an instrumental and a breakdown: every planned event is executed within [-8, +10] ms of its grid beat', () => {
     const track = fixtureAnalysis();
+    // an instrumental section (the demo's showcase state, capped to medium by MUSICAL): its phrase-end bars always scratch
+    track.sections[1]!.kind = 'instrumental';
+    track.vocalActivity = { ...track.vocalActivity, values: track.vocalActivity.values.map(() => 0) };
     let sec = 0.18 + 15 * 2 + 0.05; // bar 15, the bar before the chorus
     const intervals: Array<() => void> = [];
     const timers: ExecutorTimers = {

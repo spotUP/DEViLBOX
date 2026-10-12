@@ -12,6 +12,7 @@ import { fireDjFx, releaseDjFx, type DjFxActionId } from '@/engine/drumpad/DjFxA
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '../DJEngine';
 import { setCrossfader } from '../DJActions';
+import { pitchedBpm } from '../DJAutoSync';
 import { analysisClock } from '../autodj/juggle/juggleController';
 import { realTimers } from '../autodj/executorTimers';
 import type { DJTrackAnalysis } from '../autodj/types';
@@ -28,12 +29,22 @@ type AB = 'A' | 'B';
 /** Reachability sentinels (SCR-P7.6 / P7.R8). */
 export const autoScratchRuntimeStats = { transitionScratches: 0, fxRequests: 0 };
 
-/** The executor on a live deck: its grid (`analysisClock` at the deck's effective tempo) and the registry. */
+/**
+ * The tempo a deck plays `analysis` at: the analysis' own tempo (the one deck tempo, written by
+ * `applyAnalysisToDeck`) at the deck's pitch. Never the store's `effectiveBPM` on its own: seven UI
+ * loaders still write that from the audio detector (184.57 for a 93.75 module), and a clock at the
+ * wrong tempo lands every scratch late or early by a growing margin (SCR-PHRASING-PARITY D9).
+ */
+export function deckTempoBpm(deck: AB, analysis: Pick<DJTrackAnalysis, 'bpm'>): number {
+  return pitchedBpm(analysis.bpm, useDJStore.getState().decks[deck].pitchOffset || 0);
+}
+
+/** The executor on a live deck: its grid (`analysisClock` at the deck's tempo, `deckTempoBpm`) and the registry. */
 export function createDeckScratchExecutor(deck: AB, analysis: DJTrackAnalysis, onEvent?: (e: ScratchExecutorEvent) => void, onError?: (err: unknown) => void): ScratchExecutor {
   const engine = getDJEngine();
   const position = (): number => { try { return engine.getDeck(deck).audioPlayer.getPosition(); } catch { return useDJStore.getState().decks[deck].audioPosition; } };
   return new ScratchExecutor({
-    clock: analysisClock(analysis, position, () => useDJStore.getState().decks[deck].effectiveBPM || 0),
+    clock: analysisClock(analysis, position, () => deckTempoBpm(deck, analysis)),
     contextTime: () => (Tone.getContext().rawContext as BaseAudioContext).currentTime,
     fire: (id, opts) => fireDjFx(id, opts),
     release: (id, opts) => releaseDjFx(id, opts),

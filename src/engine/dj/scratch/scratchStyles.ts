@@ -38,7 +38,8 @@ export interface ScratchStylePalette {
   maxLevel: ScratchLevel;
   /** Multiplier on the density state rate (section 22). */
   densityScale: number;
-  /** Preferred gestures; empty = no bias (battle). */
+  /** Preferred gestures (`scratch_dj.STYLE_PALETTE[...].bias`, exact); empty = no bias (battle). The
+   *  32-bar showcase picks with it; the overlay's vocabulary is the style's profile (`SCRATCH_PROFILES`). */
   bias: readonly ScratchGestureId[];
   /** 0..1 FX amount (delay / reverb ambience, section 43). */
   fxAmount: number;
@@ -49,11 +50,11 @@ export interface ScratchStylePalette {
 export const SCRATCH_STYLES: Readonly<Record<ScratchDJStyle, ScratchStylePalette>> = {
   oldSchool: {
     id: 'oldSchool', name: 'Old School', maxLevel: 2, densityScale: 0.5,
-    bias: ['baby', 'forwardStab', 'drag', 'chirp'], fxAmount: 0, restScale: 1.2,
+    bias: ['baby', 'forwardStab', 'drag'], fxAmount: 0, restScale: 1.2,
   },
   boomBap: {
     id: 'boomBap', name: 'Boom Bap', maxLevel: 3, densityScale: 0.6,
-    bias: ['forwardStab', 'baby', 'chirp', 'tearForward'], fxAmount: 0.1, restScale: 1.0,
+    bias: ['forwardStab', 'baby', 'chirp'], fxAmount: 0.1, restScale: 1.0,
   },
   electro: {
     id: 'electro', name: 'Electro', maxLevel: 4, densityScale: 0.75,
@@ -65,9 +66,62 @@ export const SCRATCH_STYLES: Readonly<Record<ScratchDJStyle, ScratchStylePalette
   },
   loFi: {
     id: 'loFi', name: 'Lo-Fi', maxLevel: 2, densityScale: 0.35,
-    bias: ['drag', 'babySlow', 'chirp'], fxAmount: 0.05, restScale: 1.4,
+    bias: ['drag', 'babySlow'], fxAmount: 0.05, restScale: 1.4,
   },
 };
+
+// ── The demo's scratch profiles (scratch.py PROFILES, STYLE_TO_PROFILE; SCR-PG-E3) ─────────────
+
+/** The demo's nine scratch profiles; the overlay plays a profile's gestures (`plan_phrase`). */
+export type ScratchProfileId = 'oldSchool' | 'boomBap' | 'eastCoast' | 'westCoast' | 'electro' | 'loFi' | 'trap' | 'memphis' | 'battle';
+
+export interface ScratchProfile {
+  id: ScratchProfileId;
+  /** The demo's profile key. */
+  reference: string;
+  /** The overlay vocabulary (`PROFILES[...]['gestures']`, exact, demo order). */
+  gestures: readonly ScratchGestureId[];
+  /** The density ladder input (`PROFILES[...]['scale']`). */
+  scale: number;
+}
+
+const ALL_REFERENCE_GESTURES: readonly ScratchGestureId[] = [
+  'baby', 'babySlow', 'forwardStab', 'backwardStab', 'chirp', 'chirpDouble', 'transformer4', 'transformer8', 'tearForward', 'tearReverse',
+  'flare1', 'flare2', 'orbit', 'scribble', 'drag', 'cut', 'crab', 'hydroplane', 'echo', 'brake', 'spinup', 'drop', 'dropPhrase',
+];
+
+export const SCRATCH_PROFILES: Readonly<Record<ScratchProfileId, ScratchProfile>> = {
+  oldSchool: { id: 'oldSchool', reference: 'old_school', gestures: ['baby', 'forwardStab', 'backwardStab', 'cut'], scale: 0.6 },
+  boomBap: { id: 'boomBap', reference: 'boombap', gestures: ['forwardStab', 'baby', 'chirp', 'tearForward', 'echo'], scale: 0.8 },
+  eastCoast: { id: 'eastCoast', reference: 'east_coast', gestures: ['forwardStab', 'chirp', 'flare1', 'baby', 'crab', 'cut'], scale: 0.9 },
+  westCoast: { id: 'westCoast', reference: 'west_coast', gestures: ['drag', 'forwardStab', 'babySlow'], scale: 0.45 },
+  electro: { id: 'electro', reference: 'electro', gestures: ['transformer4', 'transformer8', 'chirp', 'flare1', 'flare2', 'orbit', 'crab', 'hydroplane'], scale: 1.1 },
+  loFi: { id: 'loFi', reference: 'lofi', gestures: ['babySlow', 'drag', 'backwardStab'], scale: 0.35 },
+  trap: { id: 'trap', reference: 'trap', gestures: ['forwardStab', 'backwardStab', 'cut'], scale: 0.3 },
+  memphis: { id: 'memphis', reference: 'memphis', gestures: ['backwardStab', 'cut', 'scribble', 'baby'], scale: 0.6 },
+  // the battle profile is every gesture the demo has (`list(GESTURES)`), throws and flourishes included
+  battle: { id: 'battle', reference: 'battle', gestures: ALL_REFERENCE_GESTURES, scale: 1.4 },
+};
+
+/** The profile each palette is (the five palettes are five of the nine profiles). */
+export const PALETTE_PROFILE: Readonly<Record<ScratchDJStyle, ScratchProfileId>> = {
+  oldSchool: 'oldSchool', boomBap: 'boomBap', electro: 'electro', battle: 'battle', loFi: 'loFi',
+};
+
+/** `STYLE_TO_PROFILE`: the demo's 19 hip-hop subgenres -> their scratch profile (placement s.22). */
+export const SUBGENRE_PROFILE: Readonly<Record<string, ScratchProfileId>> = {
+  old_school: 'oldSchool', golden_era: 'boomBap', east_coast: 'eastCoast', jazz_rap: 'boomBap', abstract: 'boomBap',
+  instrumental: 'boomBap', alternative: 'electro', lofi: 'loFi', g_funk: 'westCoast', southern: 'trap',
+  dirty_south: 'memphis', crunk: 'electro', trap: 'trap', drill: 'trap', memphis: 'memphis', miami_bass: 'electro',
+  electro_hiphop: 'electro', industrial: 'electro', jungle_hybrid: 'eastCoast',
+};
+
+/** A subgenre name as the analysis writes it ("G-Funk", "east coast") -> the demo's key (`g_funk`). */
+export function subgenreProfile(text: string | undefined): ScratchProfileId | undefined {
+  if (!text) return undefined;
+  const key = text.trim().toLowerCase().replace(/[\s-]+/g, '_').replace(/hip_?hop$/, 'hiphop');
+  return SUBGENRE_PROFILE[key] ?? SUBGENRE_PROFILE[key.replace(/_?hiphop$/, '')];
+}
 
 /** Section 31/62: the level a mode and a style together allow. */
 export function maxLevelFor(mode: ScratchMode, style: ScratchDJStyle): ScratchLevel | 0 {
@@ -107,6 +161,8 @@ export interface ScratchGenreModifiers {
 
 export interface ScratchStyleChoice {
   style: ScratchDJStyle;
+  /** The overlay's profile: the subgenre's (`STYLE_TO_PROFILE`) when the analysis names one, else the palette's. */
+  profile: ScratchProfileId;
   genre: ScratchGenreHint | 'unknown';
   modifiers: ScratchGenreModifiers;
 }
@@ -162,12 +218,14 @@ export function genreToScratchStyle(genre: GenreAnalysis | DJStyleName | Scratch
     hint = genreHintFrom(genre.subgenre ?? '') ?? genreHintFrom(genre.primary ?? '');
   } else if (typeof genre === 'string') {
     if (genre in GENRE_TABLE) hint = genre as ScratchGenreHint;
-    else if (genre in DJ_STYLE_TABLE) return { style: DJ_STYLE_TABLE[genre as DJStyleName], genre: 'unknown', modifiers: { ...NEUTRAL } };
+    else if (genre in DJ_STYLE_TABLE) { const style = DJ_STYLE_TABLE[genre as DJStyleName]; return { style, profile: PALETTE_PROFILE[style], genre: 'unknown', modifiers: { ...NEUTRAL } }; }
     else hint = genreHintFrom(genre);
   }
-  if (!hint) return { style: 'boomBap', genre: 'unknown', modifiers: { ...NEUTRAL } };
+  // the subgenre names one of the demo's profiles (placement s.22): its vocabulary and ladder, the palette stays
+  const sub = genre && typeof genre === 'object' ? subgenreProfile(genre.subgenre) : typeof genre === 'string' ? subgenreProfile(genre) : undefined;
+  if (!hint) return { style: 'boomBap', profile: sub ?? 'boomBap', genre: 'unknown', modifiers: { ...NEUTRAL } };
   const row = GENRE_TABLE[hint];
-  return { style: row.style, genre: hint, modifiers: { ...NEUTRAL, ...row.modifiers } };
+  return { style: row.style, profile: sub ?? PALETTE_PROFILE[row.style], genre: hint, modifiers: { ...NEUTRAL, ...row.modifiers } };
 }
 
 // ── Section 34 BPM-aware suitability ───────────────────────────────────────
@@ -220,6 +278,6 @@ export function scratchModeOf(value: string | undefined): ScratchMode {
 
 /** The store's Auto Scratch style ('auto' or a palette id) for a track: Auto reads its genre (section 33). */
 export function scratchStyleFor(setting: string | undefined, genre: Parameters<typeof genreToScratchStyle>[0]): ScratchStyleChoice {
-  if (setting && setting !== 'auto' && setting in SCRATCH_STYLES) return { style: setting as ScratchDJStyle, genre: 'unknown', modifiers: genreToScratchStyle(undefined).modifiers };
+  if (setting && setting !== 'auto' && setting in SCRATCH_STYLES) return { style: setting as ScratchDJStyle, profile: PALETTE_PROFILE[setting as ScratchDJStyle], genre: 'unknown', modifiers: genreToScratchStyle(undefined).modifiers };
   return genreToScratchStyle(genre);
 }

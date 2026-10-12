@@ -1,20 +1,19 @@
 /**
- * The placement brain (owner scratch plan sections 21-24, 35, 41; ledger
- * SCR-P4.4 - P4.9, P4.12): density states, the calm -> busy vocabulary, one
- * bar of the reference `plan_phrase` (byte-checked against Python output),
- * rests, validation and repair, humanize, vocal awareness and the throw.
+ * The placement brain (owner scratch plan sections 21-24, 35; ledger SCR-P4.4 - P4.9): density
+ * states, the calm -> busy vocabulary (ranked as the demo ranks it), one bar of `plan_phrase` (the
+ * demo's own output over whole tracks is `scratchPhrasingParity.test.ts`), validation, humanize and
+ * vocal awareness.
  */
 import { describe, it, expect } from 'vitest';
-import planFixture from './fixtures/plan_phrase.json';
 import {
-  sectionDensity, DENSITY_RATE, vocabulary, pickGesture, planVocabulary, planPhrase, planBars, validatePhrase, repairPhrase,
-  humanizeMs, restProbability, effortKey, withThrow, pyRound, overlapsOneHand, type PlacedScratch, type ScratchSection,
+  sectionDensity, DENSITY_RATE, vocabulary, pickGesture, planVocabulary, planPhrase, validatePhrase,
+  humanizeMs, pyRound, referenceName, type PlacedScratch,
 } from '../scratchPlacement';
+import { planScratch } from '../scratchPlanner';
 import { lfsr } from '../scratchRandom';
 import { getGesture } from '../scratchGestureCatalog';
-import { getScratchRecord } from '../scratchCatalogue';
-import type { ScratchDJStyle, ScratchGestureId } from '../scratchTypes';
-import type { ScratchMode } from '../scratchStyles';
+import { scenarioContext } from './fixtures/scenarioContext';
+import type { ScratchGestureId } from '../scratchTypes';
 
 const ev = (bar: number, step: number, gesture: ScratchGestureId = 'baby'): PlacedScratch => ({
   bar, step, beat: bar * 4 + step / 4, gesture, velocity: 0.7, placementRole: 'accent', role: 'ACCENT',
@@ -33,13 +32,16 @@ describe('density states and vocabulary (sections 21, 22, SCR-P4.4)', () => {
     expect(pyRound(-0.5)).toBeCloseTo(0); expect(pyRound(0.5)).toBe(0); expect(pyRound(1.5)).toBe(2); expect(pyRound(2.5)).toBe(2);
   });
 
-  it('the vocabulary ranks calm to busy and thins to evenly spaced entries', () => {
+  it('the vocabulary ranks calm to busy as the demo does (activity, then the demo name) and thins to evenly spaced entries', () => {
     const all = planVocabulary('battle', 'BATTLE');
     const v = vocabulary(all);
-    for (let i = 1; i < v.length; i++) expect(effortKey(v[i]!)).toBeGreaterThanOrEqual(effortKey(v[i - 1]!));
-    // the ladder leads: a level 1 gesture never ranks above a level 4 one
-    const levels = v.map((g) => getGesture(g).difficulty);
-    expect(levels).toEqual([...levels].sort());
+    for (let i = 1; i < v.length; i++) {
+      const [a, b] = [v[i - 1]!, v[i]!];
+      expect(getGesture(b).activity > getGesture(a).activity || (getGesture(b).activity === getGesture(a).activity && referenceName(b) > referenceName(a))).toBe(true);
+    }
+    // the demo's own order of the electro profile (scratch.vocabulary): glide-heavy hydroplane is the busiest
+    expect(vocabulary(['transformer4', 'transformer8', 'chirp', 'flare1', 'flare2', 'orbit', 'crab', 'hydroplane']))
+      .toEqual(['flare1', 'chirp', 'flare2', 'transformer4', 'crab', 'orbit', 'transformer8', 'hydroplane']);
     const three = vocabulary(all, 3);
     expect(three).toHaveLength(3);
     expect(three[0]).toBe(v[0]);
@@ -67,41 +69,13 @@ describe('density states and vocabulary (sections 21, 22, SCR-P4.4)', () => {
   });
 });
 
-describe('planPhrase equals the Python reference (section 21, SCR-P4.5)', () => {
-  for (const c of planFixture) {
-    it(`${c.name}: ${c.bars} bars, step / gesture / role exact, velocity to 1e-12 (density ${c.density})`, () => {
-      expect(sectionDensity(c.style as ScratchDJStyle, c.section)).toBe(
-        ({ veryLow: 'veryLow', very_low: 'veryLow' } as Record<string, string>)[c.density] ?? c.density);
-      c.plan.forEach((bar, i) => {
-        const got = planPhrase({ style: c.style as ScratchDJStyle, section: c.section, bar: i, bars: c.bars, seed: c.seed, gestures: c.gestures as ScratchGestureId[] });
-        // the reference output, minus what one hand cannot play (SA-B1): its second step-15 entry
-        // is its clamped 16 (the next bar's downbeat), and a gesture that would start inside a
-        // placed one is dropped in the reference's priority order
-        const kept: Array<(typeof bar)[number]> = [];
-        bar.forEach((x, k) => {
-          if (k === 1 && x[0] === 15 && bar[0]![0] === 15) return;
-          const e = { beat: (x[0] as number) / 4, gesture: x[1] as ScratchGestureId };
-          if (kept.some((y) => overlapsOneHand({ beat: (y[0] as number) / 4, gesture: y[1] as ScratchGestureId }, e))) return;
-          kept.push(x);
-        });
-        expect(got.map((g) => [g.step, g.gesture, g.velocity, g.placementRole]).map(([s, g, v, r]) => [s, g, Math.round((v as number) * 1e12), r]))
-          .toEqual(kept.map(([s, g, v, r]) => [s, g, Math.round((v as number) * 1e12), r]));
-      });
-    });
-  }
-
-  it('the fixtures are not trivially empty: showcase carries events, the quiet hook has some', () => {
-    const total = (n: string) => planFixture.find((c) => c.name === n)!.plan.reduce((a, b) => a + b.length, 0);
-    expect(total('boomBap-showcase')).toBeGreaterThan(30);
-    expect(total('boomBap-hook')).toBeGreaterThan(0);
-  });
-
-  it('a phrase-end bar carries at least 3x the events of a mid bar (64 bars, 20 seeds)', () => {
+describe('planPhrase (section 21, SCR-P4.5)', () => {
+  it("a section's bars 3, 7, 15 and its last carry at least 3x the events of a mid bar; a long section has no 16-bar cycle", () => {
     let endEvents = 0, endBars = 0, midEvents = 0, midBars = 0;
-    for (let seed = 1; seed <= 20; seed++) {
+    for (let seed = 1; seed <= 40; seed++) {
       for (let bar = 0; bar < 64; bar++) {
         const n = planPhrase({ style: 'boomBap', section: 'call', bar, bars: 64, seed, gestures: planVocabulary('boomBap', 'MUSICAL') }).length;
-        if ([3, 7, 15].includes(bar % 16)) { endEvents += n; endBars++; } else { midEvents += n; midBars++; }
+        if ([3, 7, 15, 63].includes(bar)) { endEvents += n; endBars++; } else { midEvents += n; midBars++; }
       }
     }
     expect(endEvents / endBars).toBeGreaterThanOrEqual(3 * (midEvents / midBars));
@@ -116,58 +90,19 @@ describe('planPhrase equals the Python reference (section 21, SCR-P4.5)', () => 
   });
 });
 
-describe('rests (section 23, SCR-P4.6)', () => {
-  it('1000 bars of musical boom bap leave at least a quarter of the bars empty', () => {
-    const r = planBars({ style: 'boomBap', section: 'call', fromBar: 0, count: 1000, bars: 1000, seed: 6, gestures: planVocabulary('boomBap', 'MUSICAL') });
-    const empty = r.bars.filter((b) => b.length === 0).length;
-    expect(empty / 1000).toBeGreaterThanOrEqual(0.25);
-    // every 16-bar window keeps its quarter
-    for (let w = 0; w + 16 <= 1000; w += 16) expect(r.bars.slice(w, w + 16).filter((b) => b.length === 0).length).toBeGreaterThanOrEqual(4);
-  });
-
-  it('a feature rests at most 10 % of its bars', () => {
-    const r = planBars({ style: 'boomBap', section: 'showcase', barRole: 'FEATURE', fromBar: 0, count: 1000, bars: 1000, seed: 5, gestures: planVocabulary('boomBap', 'MUSICAL') });
-    const drawn = r.rests.filter((x) => x.reason === 'rest-probability');
-    expect(drawn.length / 1000).toBeLessThanOrEqual(0.10);
-    expect(drawn.length).toBeGreaterThan(0);
-    // and a showcase still keeps four empty bars in every 32
-    for (let w = 0; w + 32 <= 1000; w += 32) expect(r.bars.slice(w, w + 32).filter((b) => b.length === 0).length).toBeGreaterThanOrEqual(4);
-  });
-
-  it('role probabilities: feature 0.06, theme 0.18, answer 0.20, intro 0.30; a transition takes the transition risk', () => {
-    expect([restProbability('FEATURE'), restProbability('THEME'), restProbability('ANSWER'), restProbability('INTRO'), restProbability('ACCENT')]).toEqual([0.06, 0.18, 0.2, 0.3, 0.2]);
-    expect(restProbability('TRANSITION', { transitionRisk: 0.45 })).toBe(0.45);
-  });
-});
-
-describe('validate and repair (section 21, SCR-P4.7)', () => {
+describe('validate (section 21, SCR-P4.7)', () => {
   const varied: ScratchGestureId[] = ['baby', 'chirp', 'forwardStab', 'tearForward', 'drag'];
 
-  it('scratching every bar fails validation, and repair empties the odd bars', () => {
-    const bars = [0, 1, 2, 3].map((b) => [ev(b, 15, varied[b]!)]);
-    expect(validatePhrase(bars)).toContain('scratches every bar (placement s.30)');
-    const fixed = repairPhrase(bars);
-    expect(fixed.map((b) => b.length)).toEqual([1, 0, 1, 0]);
-    expect(validatePhrase(fixed)).toEqual([]);
+  it('scratching every bar fails validation', () => {
+    expect(validatePhrase([0, 1, 2, 3].map((b) => [ev(b, 15, varied[b]!)]))).toContain('scratches every bar (placement s.30)');
   });
 
-  it('a five-event bar is rejected and cut to one', () => {
-    const bars = [[0, 1, 2, 3, 4].map((s) => ev(0, s * 3, varied[s]!)), [], []];
-    expect(validatePhrase(bars)).toContain('too busy (>4 gestures/bar)');
-    const fixed = repairPhrase(bars);
-    expect(fixed[0]).toHaveLength(1);
-    expect(validatePhrase(fixed)).toEqual([]);
+  it('a five-event bar is rejected', () => {
+    expect(validatePhrase([[0, 1, 2, 3, 4].map((s) => ev(0, s * 3, varied[s]!)), [], []])).toContain('too busy (>4 gestures/bar)');
   });
 
   it('one gesture over more than three events is rejected', () => {
     expect(validatePhrase([[ev(0, 0), ev(0, 4)], [ev(1, 0), ev(1, 4)], []])).toContain('every scratch uses the same gesture (s.30)');
-  });
-
-  it('planBars output always validates', () => {
-    for (let seed = 0; seed < 40; seed++) {
-      const r = planBars({ style: 'battle', section: 'showcase', fromBar: 0, count: 16, bars: 16, seed, gestures: planVocabulary('battle', 'BATTLE') });
-      expect(validatePhrase(r.bars)).toEqual([]);
-    }
   });
 });
 
@@ -195,73 +130,30 @@ describe('humanize (section 35, SCR-P4.8)', () => {
 });
 
 describe('vocal awareness (section 24, SCR-P4.9)', () => {
-  const base = { style: 'battle' as ScratchDJStyle, section: 'showcase' as ScratchSection, bars: 8, gestures: planVocabulary('battle', 'BATTLE' as ScratchMode), restScale: 0 };
+  const plan = (seed: number, vocalByBar: number[]) => planScratch(scenarioContext({ style: 'battle', kind: 'instrumental', bpm: 100, energy: 0.8, permission: 4 }), {
+    mode: 'BATTLE', seed, fromBar: 16, bars: vocalByBar.length, vocalByBar, sectionAt: () => ({ name: 'instrumental', startBar: 16, bars: 16 }),
+  });
 
   it('a bar over 0.7 vocal activity holds at most one event unless it is an answer', () => {
     for (let seed = 0; seed < 30; seed++) {
-      const r = planBars({ ...base, seed, fromBar: 0, count: 8, vocalByBar: Array(8).fill(0.9) });
-      for (const bar of r.bars) {
-        const answers = bar.filter((e) => e.role === 'ANSWER');
-        if (answers.length === 0) expect(bar.length).toBeLessThanOrEqual(1);
+      for (const bar of plan(seed, Array(8).fill(0.9)).bars) {
+        if (!bar.some((e) => e.role === 'ANSWER')) expect(bar.length).toBeLessThanOrEqual(1);
       }
     }
-  });
-
-  it('a busy bar under a 0.9 vocal is cut to one event, an answer bar keeps its answers (bars the vocal rate cannot thin, SA-M5)', () => {
-    const answer = (bar: number, step: number): PlacedScratch => ({ ...ev(bar, step, 'chirp'), placementRole: 'answer', role: 'ANSWER' });
-    const fixedBars = new Map<number, PlacedScratch[]>([
-      [1, [ev(1, 0, 'chirp'), ev(1, 4, 'chirp'), ev(1, 8, 'laser')]],
-      [2, [answer(2, 0), ev(2, 4, 'laser'), answer(2, 8)]],
-    ]);
-    const r = planBars({ ...base, seed: 1, fromBar: 0, count: 4, vocalByBar: Array(4).fill(0.9), fixedBars });
-    expect(r.bars[1]!.map((e) => e.step)).toEqual([0]);
-    expect(r.bars[2]!.map((e) => e.role)).toEqual(['ANSWER', 'ANSWER']);
   });
 
   it('density follows the vocal: a bar at 0.9 plans far fewer events than a bar at 0', () => {
     let quiet = 0, vocal = 0;
     for (let seed = 0; seed < 60; seed++) {
-      quiet += planBars({ ...base, seed, fromBar: 0, count: 8, vocalByBar: Array(8).fill(0) }).bars.flat().length;
-      vocal += planBars({ ...base, seed, fromBar: 0, count: 8, vocalByBar: Array(8).fill(0.9) }).bars.flat().length;
+      quiet += plan(seed, Array(8).fill(0)).events.length;
+      vocal += plan(seed, Array(8).fill(0.9)).events.length;
     }
     expect(vocal).toBeLessThan(quiet * 0.4);
   });
 
   it('a vocal call is answered in the following bar', () => {
     for (let seed = 0; seed < 30; seed++) {
-      const r = planBars({ ...base, seed, fromBar: 0, count: 8, vocalByBar: [0, 0.9, 0.9, 0.1, 0, 0, 0, 0] });
-      expect(r.bars[3]!.some((e) => e.role === 'ANSWER'), `seed ${seed}`).toBe(true);
+      expect(plan(seed, [0, 0.9, 0.9, 0.1, 0, 0, 0, 0]).bars[3]!.some((e) => e.role === 'ANSWER'), `seed ${seed}`).toBe(true);
     }
-  });
-});
-
-describe('throw then scratch (section 41, SCR-P4.12)', () => {
-  const chop = [ev(4, 15, 'forwardStab')];
-
-  it('the first phrase on a FRESH record opens with a drop in the bar before', () => {
-    const fresh = getScratchRecord('FRESH_STANDARD')!;
-    const out = withThrow(chop, fresh, {});
-    expect(out.map((e) => e.gesture)).toEqual(['drop', 'forwardStab']);
-    expect(out[0]).toMatchObject({ bar: 3, step: 0, beat: 12 });
-  });
-
-  it('a record over 1.5 s gets a dropPhrase', () => {
-    const long = getScratchRecord('AH_FRESH_FULL_PHRASE')!;
-    expect(long.durationSec).toBeGreaterThan(1.5);
-    expect(withThrow(chop, long, {})[0]!.gesture).toBe('dropPhrase');
-  });
-
-  it('a repeat within 8 bars has no drop; after 8 bars it does', () => {
-    const fresh = getScratchRecord('FRESH_STANDARD')!;
-    const memory = {};
-    expect(withThrow(chop, fresh, memory)).toHaveLength(2);
-    expect(withThrow([ev(9, 15, 'baby')], fresh, memory)).toHaveLength(1); // 6 bars after the throw in bar 3
-    expect(withThrow([ev(12, 15, 'baby')], fresh, memory)).toHaveLength(2);
-  });
-
-  it('a run that starts on the chop gets a short drop at step 0 when the chop is at least four steps in', () => {
-    const fresh = getScratchRecord('FRESH_STANDARD')!;
-    expect(withThrow([ev(0, 8, 'baby')], fresh, {})[0]).toMatchObject({ gesture: 'drop', bar: 0, step: 0 });
-    expect(withThrow([ev(0, 2, 'baby')], fresh, {})).toHaveLength(1);
   });
 });

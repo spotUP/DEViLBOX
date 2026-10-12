@@ -262,9 +262,8 @@ export class ScratchRecordVoice {
   }
 
   /**
-   * Cue + stroke + fader for a catalogue gesture at `bpm`: the record's
-   * compatible gestures only (section 38/39; a pre-scratched record takes
-   * `drop` alone). Throws cue the attack and ride forward with the fader
+   * Cue + stroke + fader for a catalogue gesture at `bpm`, on any record
+   * (the demo's rule, SCR-PHRASING-PARITY D5). Throws cue the attack and ride forward with the fader
    * open; hand gestures cue the vowel and loop with a return to the anchor.
    */
   playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number; style?: ScratchDJStyle; seed?: number } = {}): StrokeResult {
@@ -278,8 +277,9 @@ export class ScratchRecordVoice {
     const worn = cartridge === TT_CARTRIDGES.worn_stylus || cartridge === TT_CARTRIDGES.heavy_tracking;
     if (this.cartridgeBw !== cartridge.bw) { this.ring.setCartridge?.(cartridge.bw, worn); this.cartridgeBw = cartridge.bw; }
     this.ring.setSurfaceLevel?.(isThrow ? 0 : cartridge.surface * (opts.velocity ?? 0.7), opts.at);
-    // section 41: any clean record can be thrown; everything else follows the record's list
-    if (!(isThrow && r.clean) && !r.gestures.includes(gesture.id)) return { ok: false, reason: `${gesture.id} is not a compatible gesture for ${r.id}` };
+    // every record takes every gesture, as the demo's records do: render_gesture plays any gesture on any
+    // source, the bank's recommended gestures are advice, and the three-deck FX pool scratches the
+    // pre-scratched records too (SCR-PHRASING-PARITY D5; it overturns sections 38/39's refusal)
     if (opts.ambience !== undefined) this.bus.setAmbience(opts.ambience);
     // the velocity response: a stroke's level and tone, a throw's level (the word as recorded)
     this.bus.setVelocity?.(opts.velocity ?? 0.7, opts.at, isThrow ? 'throw' : 'stroke');

@@ -19,7 +19,10 @@ import type { ScratchDJStyle, ScratchGestureId, ScratchLevel, ScratchRole } from
 
 export type ArcPhaseName =
   | 'establish' | 'build' | 'call' | 'response' | 'develop' | 'intensify' | 'callResponse'
-  | 'feature' | 'peak' | 'burst' | 'resolution';
+  | 'feature' | 'peak' | 'burst' | 'resolution'
+  // the demo's own 32-bar routines (scratch_dj.ARC, three_deck.ARC_3DECK)
+  | 'intro' | 'theme' | 'variation' | 'call_response' | 'showcase' | 'breathing' | 'climax'
+  | 'half_bar' | 'reorder' | 'scratch_feat' | 'juggle_feat' | 'combined' | 'final_burst';
 
 /** The reference's four cue roles (HOME = the long vowel, SECONDARY = fresh, ACCENT = yeah, FX). */
 export type ArcSourceRole = 'HOME' | 'SECONDARY' | 'ACCENT' | 'FX';
@@ -154,10 +157,12 @@ function phaseSteps(name: ArcPhaseName, b: number, rnd: () => number, dens: numb
       return steps.length ? steps : [2];
     }
     case 'resolution': return [6];
+    // the demo's routines are planned whole (scratchDemoRoutines), never phase by phase here
+    default: return [];
   }
 }
 
-const ROLE_OF: Readonly<Record<ArcPhaseName, ScratchRole>> = {
+const ROLE_OF: Readonly<Partial<Record<ArcPhaseName, ScratchRole>>> = {
   establish: 'INTRO', build: 'THEME', call: 'THEME', response: 'ANSWER', callResponse: 'ANSWER', develop: 'THEME',
   intensify: 'THEME', feature: 'FEATURE', peak: 'FEATURE', burst: 'FEATURE', resolution: 'OUTRO',
 };
@@ -204,7 +209,7 @@ export function planArc(opts: { arc: ArcTemplate; startBar: number; style: Scrat
       events.push({
         bar, step, beat: stepToBeat({ bar, step }, '1/16', bpb), gesture,
         velocity: Math.min(1, PLAN_VEL.base + PLAN_VEL.rand * rnd() + PLAN_VEL.energy * p.energy),
-        placementRole, role: ROLE_OF[p.name], phase: p.name,
+        placementRole, role: ROLE_OF[p.name] ?? 'FEATURE', phase: p.name,
       });
     });
   }

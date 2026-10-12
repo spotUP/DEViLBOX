@@ -52,6 +52,8 @@ export interface ScratchRecord {
   literalPhrase: string;
   /** Pack file name (`scratch_024.wav`). */
   file: string;
+  /** The demo bank's own file name (`aaaaah.wav`): its load order (`scratch_bank.load_bank`) is the crate's. */
+  sourceFile: string;
   /** URL the voice fetches. */
   url: string;
   category: ScratchRecordCategory;
@@ -156,6 +158,7 @@ function convert(raw: RawRecord): ScratchRecord {
     canonicalName: raw.canonical_name,
     literalPhrase: raw.literal_phrase,
     file: raw.packFile,
+    sourceFile: raw.filename,
     url: normalizeUrl(`${SCRATCH_BASE_PATH}/${raw.packFile}`),
     category: raw.category as ScratchRecordCategory,
     referenceRoles: raw.recommended_roles,
@@ -182,6 +185,38 @@ function convert(raw: RawRecord): ScratchRecord {
 
 /** The 51 records, in the metadata's order (AH_LONG last, SCR-PG-A1). */
 export const SCRATCH_RECORDS: readonly ScratchRecord[] = Object.values(metadata as unknown as Record<string, RawRecord>).map(convert);
+
+/**
+ * The crate in the demo bank's load order (`scratch_bank.load_bank`: sorted file names) - the order
+ * the demo's record pools and record sets list records in (SCR-PHRASING-PARITY).
+ */
+export const CRATE_LOAD_ORDER: readonly ScratchRecord[] = [...SCRATCH_RECORDS].sort((a, b) => (a.sourceFile < b.sourceFile ? -1 : a.sourceFile > b.sourceFile ? 1 : 0));
+
+/** The demo's `record_set('clean')`: the canonical names of every record that is not pre-scratched, sorted. */
+export const CLEAN_CRATE_POOL: readonly string[] = SCRATCH_RECORDS.filter((r) => r.category !== 'PRE_RENDERED_SCRATCH').map((r) => r.id).sort();
+
+/** The demo routine's four cue roles (scratch_dj.py s.22). */
+export type CueRole = 'HOME' | 'SECONDARY' | 'ACCENT' | 'FX';
+
+/** `scratch_dj._ROLE_CATEGORIES`: each cue role draws from a family of bank categories. */
+export const CUE_ROLE_CATEGORIES: Readonly<Record<CueRole, readonly ScratchRecordCategory[]>> = {
+  HOME: ['AH_VOWEL', 'LONG_VOWEL_OR_HYPE'],
+  SECONDARY: ['FRESH', 'DJ_COMMAND'],
+  ACCENT: ['YEAH_RESPONSE', 'SHORT_EXCLAMATION', 'HIP_HOP_TAG'],
+  FX: ['FX', 'COUNT', 'INTRO_ANNOUNCEMENT', 'PRE_RENDERED_SCRATCH', 'LONG_SPECIALTY_PHRASE'],
+};
+
+/** `scratch_dj.cue_pools_from_bank`: per cue role, every record of its categories, in the bank's load order. */
+export const CUE_ROLE_POOLS: Readonly<Record<CueRole, readonly string[]>> = {
+  HOME: rolePool('HOME'), SECONDARY: rolePool('SECONDARY'), ACCENT: rolePool('ACCENT'), FX: rolePool('FX'),
+};
+
+function rolePool(role: CueRole): string[] {
+  return CRATE_LOAD_ORDER.filter((r) => CUE_ROLE_CATEGORIES[role].includes(r.category)).map((r) => r.id);
+}
+
+/** `scratch_dj.cues_from_bank`: the single record per cue role the 32-bar showcase scratches. */
+export const CUE_ROLE_RECORD: Readonly<Record<CueRole, string>> = { HOME: 'AH_STANDARD', SECONDARY: 'FRESH_STANDARD', ACCENT: 'YEAH_STANDARD', FX: 'LASER_FX' };
 
 const BY_ID: ReadonlyMap<string, ScratchRecord> = new Map(SCRATCH_RECORDS.map((r) => [r.id, r]));
 

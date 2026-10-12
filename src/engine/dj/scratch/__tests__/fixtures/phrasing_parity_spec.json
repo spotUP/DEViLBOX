@@ -1,0 +1,36 @@
+{
+  "note": "SCR-PHRASING-PARITY: the tracks both planners plan. kind = the Auto DJ section kind, name = the demo section it maps to (SECTION_OF_KIND). Regenerate phrasing_parity.json with tools/scratch-fixtures/gen_phrasing_parity.py.",
+  "routineSeeds": [0, 1, 5],
+  "tracks": [
+    { "name": "hipHop", "style": "boomBap", "profile": "boombap", "seed": 3, "routines": [null, "auto"],
+      "sections": [
+        { "kind": "intro", "name": "intro", "startBar": 0, "bars": 4 },
+        { "kind": "verse", "name": "verse", "startBar": 4, "bars": 8 },
+        { "kind": "chorus", "name": "hook", "startBar": 12, "bars": 8 },
+        { "kind": "verse", "name": "verse", "startBar": 20, "bars": 8 },
+        { "kind": "breakdown", "name": "breakdown", "startBar": 28, "bars": 4 },
+        { "kind": "chorus", "name": "hook", "startBar": 32, "bars": 8 },
+        { "kind": "outro", "name": "outro", "startBar": 40, "bars": 4 }
+      ] },
+    { "name": "club", "style": "electro", "profile": "electro", "seed": 11, "routines": [null, "auto"],
+      "sections": [
+        { "kind": "intro", "name": "intro", "startBar": 0, "bars": 16 },
+        { "kind": "groove", "name": "A", "startBar": 16, "bars": 16 },
+        { "kind": "build", "name": "call", "startBar": 32, "bars": 8 },
+        { "kind": "drop", "name": "break", "startBar": 40, "bars": 16 },
+        { "kind": "breakdown", "name": "breakdown", "startBar": 56, "bars": 16 },
+        { "kind": "build", "name": "call", "startBar": 72, "bars": 8 },
+        { "kind": "drop", "name": "break", "startBar": 80, "bars": 32 },
+        { "kind": "outro", "name": "outro", "startBar": 112, "bars": 16 }
+      ] },
+    { "name": "instrumental", "style": "battle", "profile": "battle", "seed": 7, "routines": [null],
+      "sections": [
+        { "kind": "intro", "name": "intro", "startBar": 0, "bars": 8 },
+        { "kind": "instrumental", "name": "instrumental", "startBar": 8, "bars": 16 },
+        { "kind": "drum-only", "name": "dj_break", "startBar": 24, "bars": 8 },
+        { "kind": "groove", "name": "A", "startBar": 32, "bars": 16 },
+        { "kind": "bridge", "name": "bridge", "startBar": 48, "bars": 8 },
+        { "kind": "outro", "name": "outro", "startBar": 56, "bars": 8 }
+      ] }
+  ]
+}

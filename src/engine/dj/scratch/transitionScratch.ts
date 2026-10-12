@@ -4,10 +4,12 @@
  * scratch belongs in it and what kind:
  *
  *   scratchAccent      decoration on a normal blend (section 46), the section 45 good pairs
- *   scratchFeature     the outgoing deck performed at its phrase end, then reduced while the
+ *   scratchFeature     a crate record performed at the outgoing's phrase end, then reduced while the
  *                      incoming drops (section 47)
- *   scratchTransition  the scratch IS the transition: a 4-bar transformer feature on the
- *                      outgoing material into the incoming drop, then the release (section 46)
+ *   scratchTransition  the scratch IS the transition: a 4-bar transformer feature on a crate
+ *                      record into the incoming drop, then the release (section 46)
+ *
+ * Every source is a crate record: the demo never scratches the music (SCR-PHRASING-PARITY D1).
  *   scratchBattle      the set's peak in BATTLE mode
  *
  * plus a vocal response: an incoming vocal onset in the first two bars is answered (section 48).
@@ -16,8 +18,8 @@
  */
 
 import type { DJTrackAnalysis, DJTransitionPlan, TransitionStyle } from '../autodj/types';
-import { findRecords, getScratchRecord } from './scratchCatalogue';
-import { deckAnchor, anchorFor } from './scratchAnchor';
+import { findRecords, getScratchRecord, VOCAL_CATEGORIES } from './scratchCatalogue';
+import { anchorFor } from './scratchAnchor';
 import { getGesture, gestureBeats } from './scratchGestureCatalog';
 import { humanizeMs, throwBeats, type PlacedScratch } from './scratchPlacement';
 import { lfsr } from './scratchRandom';
@@ -83,17 +85,14 @@ export interface TransitionScratchInput {
 
 export interface TransitionScratchResult { scratch?: TransitionScratchPlan; reason: string }
 
+/** The crate's best clean record for a gesture and role; `vocal` false = a record that is not a voice (FX). */
 function crateSource(gesture: ScratchGestureId, role: ScratchRole, vocal: boolean): ScratchSource | null {
-  const r = findRecords({ gesture, role, clean: true, vocal })[0] ?? findRecords({ role, clean: true, vocal })[0];
+  const pick = (q: Parameters<typeof findRecords>[0]) => findRecords(q).find((r) => vocal || !VOCAL_CATEGORIES.includes(r.category));
+  const r = pick({ gesture, role, clean: true, vocal }) ?? pick({ role, clean: true, vocal }) ?? pick({ clean: true });
   if (!r) return null;
   return { type: 'CRATE', recordId: r.id, anchor: { position: r.anchors.vowel, safe: r.safe, safeForward: r.safeForward, safeReverse: r.safeReverse } };
 }
 
-function outgoingSource(plan: TransitionScratchInput['plan'], outgoing: DJTrackAnalysis, beat: number): ScratchSource {
-  const b = outgoing.beatGrid.beats[Math.max(0, Math.min(outgoing.beatGrid.beats.length - 1, Math.round(beat)))];
-  const a = deckAnchor(b?.time ?? 0, Math.round(beat), 'downbeat', outgoing.bpm);
-  return { type: 'DECK', deck: plan.outgoingDeck, anchor: a };
-}
 
 /** Placed (bar, step) -> executor events on the outgoing clock, humanized from the seed. */
 function toEvents(placed: ReadonlyArray<PlacedScratch & { beatAbs: number }>, source: ScratchSource, deck: 'A' | 'B', bpm: number, seed: number): ScratchEvent[] {
@@ -165,14 +164,15 @@ export function planTransitionScratch(input: TransitionScratchInput): Transition
       for (const step of steps[k]!) out.push(placed(plan.startBeat, firstBar + k, step, battle && k >= 2 ? 'crab' : cut, 'FEATURE', bpb, 0.85));
     }
     out.push(placed(plan.startBeat, firstBar + Math.min(4, bars) - 1, 12, 'forwardStab', 'OUTRO', bpb, 0.9));
-    source = outgoingSource(plan, outgoing, plan.startBeat + firstBar * bpb);
+    // a crate record, never the outgoing music (the demo never scratches the music, SCR-PHRASING-PARITY D1)
+    source = crateSource(cut, 'FEATURE', true);
     fx = battle ? 'dry' : 'transition';
     reasons.push(`${kind}: ${Math.min(4, bars)} bars on the outgoing into the incoming drop`);
   } else if (compat.fit === 'good' && rank >= MODE_RANK.MUSICAL && compat.source === 'crate' && plan.style !== 'hardCut') {
     // section 47: perform the outgoing at its phrase end (the bar before the incoming), then reduce it
     kind = 'scratchFeature';
     const g = compat.gestures[0]!;
-    source = outgoingSource(plan, outgoing, plan.startBeat - bpb);
+    source = crateSource(g, 'THEME', true);
     out.push(placed(plan.startBeat - bpb, 0, 8, g, 'THEME', bpb));
     out.push(placed(plan.startBeat - bpb, 0, 12, compat.gestures[1] ?? g, 'FILL', bpb));
     reasons.push(`${kind}: the outgoing's phrase end before the incoming enters`);
@@ -185,8 +185,8 @@ export function planTransitionScratch(input: TransitionScratchInput): Transition
       const g = leastRecent(compat.gestures, [...(input.recentGestures ?? []), ...out.map((p) => p.gesture)], rnd);
       out.push(placed(plan.startBeat, bar, i % 2 === 0 ? 14 : 6, g, 'ACCENT', bpb));
     }
-    source = compat.source === 'outgoing' ? outgoingSource(plan, outgoing, plan.startBeat)
-      : crateSource(out[0]!.gesture, 'ACCENT', plan.style !== 'vocalSwap');
+    // a vocal swap's accent stays off the voice (its 'outgoing' material was a drum hit): a non-vocal record
+    source = crateSource(out[0]!.gesture, 'ACCENT', compat.source !== 'outgoing' && plan.style !== 'vocalSwap');
     // section 41: a run on a crate record opens with a throw of the word, in the first accent's bar
     // the whole word is heard (throwBeats): only when it ends before the first accent
     if (source?.type === 'CRATE' && out.length) {
