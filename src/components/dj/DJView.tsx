@@ -12,6 +12,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getDJEngine, disposeDJEngine, loadChannelScopeRerender } from '@/engine/dj/DJEngine';
+import { reanalyzeOutdatedTracks } from '@/engine/dj/DJPlaylistAnalyzer';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
 import type { DJEngine } from '@/engine/dj/DJEngine';
 import { useTransportStore } from '@/stores';
@@ -133,11 +134,16 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
 
   // Cached tracks rendered before the per-channel scopes existed gain them in the
   // background (low priority, once per session). Delayed so it never competes with the view's own boot.
+  // Then playlist rows analysed before the current DJ_ANALYSIS_VERSION are analysed
+  // again, one at a time on the same LOW-priority queue (reanalyzeOutdatedTracks).
   useEffect(() => {
+    const abort = new AbortController();
     const timer = setTimeout(() => {
-      void loadChannelScopeRerender().then((m) => m.rerenderPlaylistChannelScopes()).catch(() => {});
+      void loadChannelScopeRerender().then((m) => m.rerenderPlaylistChannelScopes()).catch(() => {})
+        .then(() => (abort.signal.aborted ? 0 : reanalyzeOutdatedTracks({ signal: abort.signal })))
+        .catch((err) => console.warn('[DJView] Background re-analysis failed:', err));
     }, 15_000);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); abort.abort(); };
   }, []);
 
   // Initialize DJEngine on mount, silence tracker + dispose on unmount

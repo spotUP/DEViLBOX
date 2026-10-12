@@ -11,7 +11,7 @@
 import { useDJPlaylistStore, type PlaylistTrack, type DJPlaylist } from '@/stores/useDJPlaylistStore';
 import { cacheSourceFile, getCachedAudioByFilename, PREVIEW_RENDER_CAP_SEC } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
-import { summaryFromPipeline, moduleTempo, playlistMetaFromSummary } from './autodj/trackAnalysis';
+import { summaryFromPipeline, moduleTempo, playlistMetaFromSummary, DJ_ANALYSIS_VERSION } from './autodj/trackAnalysis';
 import { songFromCachedSource } from './DJTrackLoader';
 import { getCachedSong } from './DJSongCache';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -159,6 +159,53 @@ function trackShouldAnalyzeOnClick(track: PlaylistTrack): boolean {
 }
 
 /**
+ * A track analysed before the current DJ_ANALYSIS_VERSION (a tempo from an
+ * older analysis: 'suggestive vibes' kept the audio detector's 184.57 after
+ * the module tempo was fixed). Not a missing analysis - the row is usable and
+ * the Analyze actions and the Auto DJ warning ignore it - it is analysed again
+ * once, in the background (reanalyzeOutdatedTracks).
+ */
+export function trackAnalysisOutdated(track: PlaylistTrack): boolean {
+  if (track.analysisSkipped || !track.bpm) return false;
+  if ((track.analysisVersion ?? 0) >= DJ_ANALYSIS_VERSION) return false;
+  return trackHasRemoteSource(track) || trackIsLocal(track);
+}
+
+let outdatedPassRunning = false;
+/** The pass ran to its end this session (a row it could not write is tried again next session, not on every view mount). */
+let outdatedPassDone = false;
+
+/**
+ * Analyse again, in the background, every playlist row whose analysis is
+ * older than DJ_ANALYSIS_VERSION: playlist by playlist through analyzePlaylist
+ * (one track at a time, LOW priority on the one DJPipeline queue, a
+ * playlist an Analyze click is already running is left to it). Each row is
+ * written at the current version, so a row is analysed once; a row the
+ * analysis fails is marked skipped, as on any run. One pass at a time and
+ * one completed pass per session; an aborted pass runs again on the next
+ * call. Returns the rows analysed.
+ */
+export async function reanalyzeOutdatedTracks(opts?: { signal?: AbortSignal }): Promise<number> {
+  if (outdatedPassRunning || outdatedPassDone) return 0;
+  outdatedPassRunning = true;
+  let analyzed = 0;
+  try {
+    for (const { id } of useDJPlaylistStore.getState().playlists) {
+      if (opts?.signal?.aborted) break;
+      const playlist = useDJPlaylistStore.getState().playlists.find((p) => p.id === id);
+      const trackIds = playlist?.tracks.filter(trackAnalysisOutdated).map((t) => t.id) ?? [];
+      if (trackIds.length === 0 || isAnalysisInflight(id)) continue;
+      const result = await analyzePlaylist(id, undefined, undefined, { trackIds, signal: opts?.signal });
+      analyzed += result.analyzed;
+    }
+    if (!opts?.signal?.aborted) outdatedPassDone = true;
+  } finally {
+    outdatedPassRunning = false;
+  }
+  return analyzed;
+}
+
+/**
  * Check if any track in a playlist needs analysis.
  */
 export function playlistNeedsAnalysis(playlist: DJPlaylist): boolean {
@@ -266,7 +313,8 @@ export async function analyzePlaylist(
       useDJPlaylistStore.getState().batchUpdateTrackMeta(playlistId, batch as never);
     };
     const queueMetaUpdate = (index: number, meta: Record<string, unknown>) => {
-      pendingMetaUpdates.push({ index, meta: { ...meta, keyConfidenceStale: false } });
+      // A write of the tempo is an analysis at the current version (trackAnalysisOutdated).
+      pendingMetaUpdates.push({ index, meta: { ...meta, keyConfidenceStale: false, ...('bpm' in meta ? { analysisVersion: DJ_ANALYSIS_VERSION } : {}) } });
       if (!metaFlushTimer) {
         metaFlushTimer = setTimeout(flushMetaUpdates, 500);
       }
