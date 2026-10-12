@@ -250,7 +250,11 @@ export function expectedPerBar(density: DensityState, rate: number, phraseEnd: b
  * inside (or run into) an already placed gesture is dropped, in the reference's priority
  * order (turnaround, answer, accent). The draws are the reference's either way.
  */
+/** Reachability sentinel (SCR-P4.R4): bars `planPhrase` drew. */
+export const scratchPlacementStats = { planPhrase: 0 };
+
 export function planPhrase(input: PlanPhraseInput): PlacedScratch[] {
+  scratchPlacementStats.planPhrase++;
   const pv = { ...PLAN_VEL, ...input.planVel };
   const density = input.density ?? sectionDensity(input.style, input.section, input.scale);
   let rate = DENSITY_RATE[density];
