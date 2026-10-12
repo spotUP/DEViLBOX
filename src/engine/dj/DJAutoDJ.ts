@@ -38,6 +38,11 @@ import type { NextTrackOption } from './autodj/juggle/juggleOpportunity';
 import { StandaloneJuggle, mixInPhraseStartOf } from './autodj/juggle/standaloneJuggle';
 import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
 import { registerAutoDJ } from './autoDJInstance';
+import { DJScratchDJ } from './scratch/DJScratchDJ';
+import { createDeckScratchExecutor, performTransitionScratch, prepareScratchSource } from './scratch/autoScratchRuntime';
+import { scratchModeOf, scratchStyleFor } from './scratch/scratchStyles';
+import { trackerSampleInfos, type TrackerSampleInstrument } from './scratch/trackerSampleSource';
+import { HAND_COSTS, scratchPermission, transitionCost } from './autodj/performanceBudget';
 
 // ── Transition Types ────────────────────────────────────────────────────────
 
@@ -137,6 +142,8 @@ class DJAutoDJ {
   /** Beat-juggling layer (juggling plan section 53): created on first use, performs through the DJ actions. */
   private juggle: DJJuggleController | null = null;
   private juggleSink: ReturnType<typeof createDeckJuggleSink> | null = null;
+  /** The Auto Scratch performer (scratch plan section 4: DJAutoDJ only ticks it). */
+  private scratch: DJScratchDJ | null = null;
   /**
    * Pattern-aware deferral counter. When a chord change is imminent on
    * the outgoing track, `triggerTransition` is deferred by one poll tick
@@ -352,6 +359,7 @@ class DJAutoDJ {
     this.cancelTransition();
     this.endStandalone('Auto DJ off');
     this.juggle?.abort('Auto DJ off');
+    this.scratch?.reset('Auto DJ off');
     this.preloading = false;
     this.preloadedDeck = null;
     this.preRenderedTrack = null;
@@ -369,6 +377,7 @@ class DJAutoDJ {
     this.cancelTransition();
     // Without the poll loop nothing would hold the double in phase or hand it back.
     this.endStandalone('Auto DJ paused');
+    this.scratch?.reset('Auto DJ paused');
 
     if (wasTransitioning) {
       // Don't leave the decks mid-mixed with the crossfader frozen partway.
@@ -545,6 +554,7 @@ class DJAutoDJ {
     }
 
     this.juggleTick(status, timeRemaining);
+    this.scratchTick(status, timeRemaining);
 
     switch (status) {
       case 'playing': {
@@ -1604,6 +1614,12 @@ class DJAutoDJ {
       // A juggle transition's trade stage: the juggle controller locks the incoming to the outgoing's
       // bars while it is silent, verifies the phase, and trades the planned ladder.
       performTrade: (j) => this.getJuggle().performLadder(this.tickInput('JUGGLE_TRANSITION', this.getTimeRemaining()), { ladderBars: j.ladderBars, target: planned.incomingDeck }),
+      // The plan's scratch (scratch plan D8): on the outgoing deck's grid, alongside the curves.
+      performScratch: (sc) => {
+        const analysis = useDJStore.getState().decks[out].trackAnalysis;
+        if (!analysis) throw new Error('the outgoing deck has no analysis');
+        return performTransitionScratch(sc, this.ab(out), analysis);
+      },
       onComplete: (result) => {
         if (this.execution === handle) this.execution = null;
         try { getSessionController().onTransitionComplete(result, result.executedPlan ?? planned); } catch { /* */ }
@@ -1686,20 +1702,86 @@ class DJAutoDJ {
   private tickInput(performanceMode: DJPerformanceMode, timeRemaining: number, userControl: string | null = null): TickInput {
     const outgoingPosition = this.getOutgoingPosition();
     const transitionApproachingSec = this.plan ? Math.max(0, this.plan.startTimeSec - outgoingPosition) : Number.isFinite(timeRemaining) ? timeRemaining : null;
-    const decks = useDJStore.getState().decks;
-    const ctx = getSessionController().context({
-      currentDeck: this.ab(this.activeDeck), incomingDeck: this.preloadedDeck ? this.ab(this.preloadedDeck) : undefined,
-      currentTrack: decks[this.activeDeck].trackAnalysis,
-      // A double on the idle deck is the playing track again, not the next one.
-      incomingTrack: this.standaloneJuggle?.source() === 'double' ? this.incomingAnalysis : decks[this.idleDeck].trackAnalysis ?? this.incomingAnalysis,
-      currentPosition: outgoingPosition, timeRemainingSec: Number.isFinite(timeRemaining) ? timeRemaining : -1,
-    });
+    const ctx = this.performanceContext(timeRemaining);
     return {
       masterDeck: this.ab(this.activeDeck),
       decks: { A: this.deckInput('A'), B: this.deckInput('B') },
       setPhase: ctx.setPhase, energy: ctx.setEnergy, targetEnergy: ctx.targetEnergy,
       performanceMode, transitionApproachingSec, userControl,
     };
+  }
+
+  /** The session's performance context now (set phase, energy, both tracks): what the juggle and scratch layers read. */
+  private performanceContext(timeRemaining: number): ReturnType<ReturnType<typeof getSessionController>['context']> {
+    const decks = useDJStore.getState().decks;
+    return getSessionController().context({
+      currentDeck: this.ab(this.activeDeck), incomingDeck: this.preloadedDeck ? this.ab(this.preloadedDeck) : undefined,
+      currentTrack: decks[this.activeDeck].trackAnalysis,
+      // A double on the idle deck is the playing track again, not the next one.
+      incomingTrack: this.standaloneJuggle?.source() === 'double' ? this.incomingAnalysis : decks[this.idleDeck].trackAnalysis ?? this.incomingAnalysis,
+      currentPosition: this.getOutgoingPosition(), timeRemainingSec: Number.isFinite(timeRemaining) ? timeRemaining : -1,
+    });
+  }
+
+  // ── Auto Scratch (scratch plan sections 4, 26-28, 62) ───────────────────────
+
+  /** Test/MCP access: the scratch performer (created on first use). */
+  getScratch(): DJScratchDJ {
+    if (!this.scratch) {
+      this.scratch = new DJScratchDJ({
+        executorFor: (deck, track) => createDeckScratchExecutor(deck, track),
+        prepareSource: (chosen) => prepareScratchSource(chosen),
+        // One decision per performed phrase (scratch plan section 65): source, gestures, placement, length.
+        onPlan: (plan, events) => {
+          if (!events.length) return;
+          const first = events[0]!, last = events[events.length - 1]!;
+          getDecisionLog().record('SCRATCH', plan.reasons, {
+            selectedTrack: this.scratch?.telemetry().source ?? undefined,
+            details: {
+              source: this.scratch?.telemetry().source ?? null, gestures: [...new Set(events.map((e) => e.gesture))], gesture: first.gesture,
+              placementBeat: first.executeAtBeat, durationBeats: last.executeAtBeat + last.durationBeats - first.executeAtBeat, events: events.length,
+              roles: [...new Set(events.map((e) => e.role))],
+            },
+          });
+        },
+        seed: Date.now() & 0xffff,
+      });
+    }
+    return this.scratch;
+  }
+
+  /**
+   * One scratch tick per poll (scratch plan D1: next to the juggle tick). The performer plans its
+   * next phrase on the master deck's grid; the hands budget (section 27) is what the juggle and the
+   * transition leave; during a transition it holds (the transition's own scratch is the plan's),
+   * under a running juggle it only answers and accents with crate records.
+   */
+  private scratchTick(status: string, timeRemaining: number): void {
+    const s = useDJStore.getState();
+    const mode = scratchModeOf(s.autoDJScratchMode);
+    if (mode === 'OFF' && !this.scratch) return;
+    try {
+      const c = this.getScratch();
+      const transitioning = status === 'transitioning';
+      const juggling = !!this.juggle?.isActive();
+      const track = s.decks[this.activeDeck].trackAnalysis;
+      const choice = scratchStyleFor(s.autoDJScratchStyle, track?.genre ?? s.autoDJStyle);
+      const permission = scratchPermission({
+        juggleCost: juggling ? HAND_COSTS.beatJuggle : 0,
+        transitionCost: transitioning ? transitionCost(this.execution?.plan.style) : 0,
+      });
+      const song = track?.tracker ? (getDJEngine().getDeck(this.activeDeck).replayer.getSong() as { instruments?: TrackerSampleInstrument[] } | null) : null;
+      c.tick({
+        perf: this.performanceContext(timeRemaining), deck: this.ab(this.activeDeck), mode, style: choice.style,
+        genre: choice.modifiers, genreHint: choice.genre, scratchPermission: permission,
+        hold: transitioning, juggleActive: juggling,
+        transitionInSec: this.plan ? Math.max(0, this.plan.startTimeSec - this.getOutgoingPosition()) : null,
+        trackerSamples: song?.instruments ? trackerSampleInfos(song.instruments, this.ab(this.activeDeck)) : undefined,
+      });
+      s.setAutoDJScratchTelemetry(c.telemetry());
+    } catch (err) {
+      console.warn('[AutoDJ] scratch tick failed:', err instanceof Error ? err.message : err);
+    }
   }
 
   /**

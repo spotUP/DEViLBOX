@@ -43,7 +43,7 @@ const onRecordVoice = (ev: ScratchEvent): boolean => ev.source.type === 'CRATE' 
 const onDeck = (ev: ScratchEvent): boolean => ev.source.type === 'DECK' || ev.source.type === 'TRACKER_CHANNEL';
 
 /** Reachability sentinels (SCR-P3.R3). */
-export const scratchExecutorStats = { started: 0, released: 0, restores: 0, recuesUnavailable: 0 };
+export const scratchExecutorStats = { started: 0, released: 0, restores: 0, recuesUnavailable: 0, errors: 0 };
 
 export interface ScratchExecutorEvent {
   kind: 'started' | 'released' | 'restored' | 'recueUnavailable' | 'refused' | 'cancelled';
@@ -70,6 +70,8 @@ export interface ScratchExecutorDeps {
   /** How far ahead (seconds) a record gesture is handed to the worklet. */
   lookaheadSec?: number;
   onEvent?(e: ScratchExecutorEvent): void;
+  /** An engine call threw: the run was released and restored (the emergency path, section 59); the DJ goes on. */
+  onError?(err: unknown): void;
 }
 
 export interface ScratchRun {
@@ -135,7 +137,7 @@ export class ScratchExecutor {
 
   private ensureTicking(): void {
     if (this.interval !== null) return;
-    this.interval = this.timers.setInterval(() => this.tick(), this.deps.tickMs ?? 5);
+    this.interval = this.timers.setInterval(() => this.safeTick(), this.deps.tickMs ?? 5);
   }
 
   private stopTicking(): void {
@@ -146,6 +148,18 @@ export class ScratchExecutor {
 
   private emit(kind: ScratchExecutorEvent['kind'], gesture: string, reason?: string): void {
     this.deps.onEvent?.({ kind, beat: this.deps.clock.beatNow(), gesture, reason });
+  }
+
+  /** A failing engine call ends the run - released, restored as far as possible - and never escapes the timer. */
+  private safeTick(): void {
+    try {
+      this.tick();
+    } catch (err) {
+      scratchExecutorStats.errors++;
+      this.emit('cancelled', 'all', `engine error: ${err instanceof Error ? err.message : String(err)}`);
+      try { this.cancel(); } catch { this.entries = []; this.snapshot = null; this.touched.clear(); this.stopTicking(); }
+      this.deps.onError?.(err);
+    }
   }
 
   private tick(): void {

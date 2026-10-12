@@ -67,6 +67,9 @@ export interface ScratchTickInput {
   hold?: boolean;
   /** A juggle is running (sections 26, 49): only crate accents and answers, never a deck, never a feature. */
   juggleActive?: boolean;
+  /** Seconds until the planned transition starts (null: none planned). A transition inside the window
+   *  keeps the decks still: crate records only, no feature (section 28: deck sync before a scratch). */
+  transitionInSec?: number | null;
 }
 
 export interface ScratchDJDeps {
@@ -310,7 +313,9 @@ export class DJScratchDJ {
     const shape = arcForSection(ctx.nextSection && ctx.nextSection.startBar === fromBar ? ctx.nextSection.kind : ctx.section?.kind, setPhase);
     const featureMode = input.mode === 'PERFORMER' || input.mode === 'BATTLE';
     const onPhrase = (fromBar - phraseStart) % phraseBars === 0;
-    const wantsFeature = !!shape.template && featureMode && !input.juggleActive && onPhrase && this.memory.featureReady(fromBar) && this.intent !== 'rest'
+    const barSec = (60 / Math.max(1, ctx.bpm)) * Math.max(1, ctx.meter);
+    const decksStill = !!input.juggleActive || (input.transitionInSec != null && input.transitionInSec < (toBar - ctx.masterBar + 1) * barSec);
+    const wantsFeature = !!shape.template && featureMode && !decksStill && onPhrase && this.memory.featureReady(fromBar) && this.intent !== 'rest'
       && (shape.role !== 'peakBurst' || this.memory.battleReady(fromBar) || input.mode !== 'BATTLE');
     let plan: ScratchPlan;
     let arc: ArcTemplate | null = null;
@@ -346,7 +351,7 @@ export class DJScratchDJ {
     if (input.juggleActive) plan = juggleSafe(plan);
 
     // the source is chosen before the throw: a crate record opens its phrase with one (section 41)
-    const chosen = plan.events.length ? this.chooseSource(ctx, plan, input, fromBar) : null;
+    const chosen = plan.events.length ? this.chooseSource(ctx, plan, input, fromBar, decksStill) : null;
     if (chosen?.record && !arc) {
       const vocalByBar = Array.from({ length: toBar - fromBar }, (_, k) => {
         const b = track.downbeats.bars[fromBar + k];
@@ -404,14 +409,14 @@ export class DJScratchDJ {
     else m.go('SCRATCHING', 'phrase', bar);
   }
 
-  private chooseSource(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, bar: number): ChosenScratchSource | null {
+  private chooseSource(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, bar: number, decksStill: boolean): ChosenScratchSource | null {
     const recent = this.memory.recent().recentSources;
     const leading = plan.events.find((e) => e.gesture !== 'drop' && e.gesture !== 'dropPhrase')?.gesture;
     const chosen = this.deps.chooseSource
       ? this.deps.chooseSource(ctx, plan, input, recent)
       : selectorSource(ctx, plan, input, recent, {
           // under a juggle the decks are the juggle's: crate records only (sections 26, 49)
-          blocked: (key) => !this.memory.sourceReady(key, bar) || (!!input.juggleActive && !key.startsWith('crate:')),
+          blocked: (key) => !this.memory.sourceReady(key, bar) || (decksStill && !key.startsWith('crate:')),
           preference: (c) => (leading ? this.memory.preference(c.key, leading, ctx.sectionName, ctx.nextSection?.kind) : 0),
         });
     if (chosen?.decision) this.deps.onSourceDecision?.(chosen.decision, ctx);
