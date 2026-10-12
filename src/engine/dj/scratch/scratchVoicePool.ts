@@ -66,6 +66,8 @@ export class ScratchVoicePool {
   private readonly ctx: BaseAudioContext;
   private readonly fetcher: RecordFetcher;
   private readonly buffers = new Map<string, Promise<AudioBuffer>>();
+  /** Records that are not in the crate: a tracker deck's samples (P5.6), with their decoded audio. */
+  private readonly transient = new Map<string, ScratchRecord>();
   private pending = new Set<Promise<unknown>>();
   private rings: DeckScratchBuffer[] = [];
 
@@ -93,6 +95,26 @@ export class ScratchVoicePool {
     return this.voices.find((v) => !v.busy) ?? this.voices[0]!;
   }
 
+  /** Add a record that is not in the crate (a tracker sample) with its audio, decoded at the context's rate. */
+  registerTransientRecord(record: ScratchRecord, buffer: AudioBuffer): void {
+    this.transient.set(record.id, record);
+    this.buffers.set(record.id, Promise.resolve(buffer));
+  }
+
+  /** A crate record or a registered transient one. */
+  hasRecord(id: string): boolean {
+    return this.transient.has(id) || !!getScratchRecord(id);
+  }
+
+  /** Forget the transient records whose id starts with `prefix` (a deck's song changed). */
+  forgetTransientRecords(prefix: string): void {
+    for (const id of [...this.transient.keys()]) {
+      if (!id.startsWith(prefix)) continue;
+      this.transient.delete(id);
+      this.buffers.delete(id);
+    }
+  }
+
   /** Decode once per record (at the context's sample rate). */
   buffer(record: ScratchRecord): Promise<AudioBuffer> {
     let p = this.buffers.get(record.id);
@@ -107,7 +129,7 @@ export class ScratchVoicePool {
 
   /** Resolve the record a gesture plays: named, current, or the catalogue's best fit. */
   resolveRecord(gesture: ScratchGesture, opts: Pick<PerformOptions, 'record' | 'role'>): ScratchRecord | undefined {
-    if (opts.record) return getScratchRecord(opts.record);
+    if (opts.record) return this.transient.get(opts.record) ?? getScratchRecord(opts.record);
     if (this.currentRecordId) {
       const current = getScratchRecord(this.currentRecordId);
       if (current && (current.gestures.includes(gesture.id) || (current.clean && (gesture.id === 'drop' || gesture.id === 'dropPhrase')))) return current;
