@@ -335,12 +335,12 @@ Gap-agent findings to fix: `faderCurve` (scratchFaderModel.ts) has no caller - t
 Already landed that the port builds on: SCR-WET-BUS baec575cf (reference room, echo line, velocity tone, level match - gap rows X1 and part of V/X), SCR-PHRASE-CUT 17242580d, SCR-VARIETY 948353719.
 
 Phase PG-A - data parity, no audio architecture change
-- [ ] SCR-PG-A1 R2: AH_LONG (scratch_020.wav) catalogue entry 51 (anchors from the demo analyser; PROVENANCE note).
-- [ ] SCR-PG-A2 F1: `faderCurve` applied in the worklet window gain (the battle response); sentinel count.
-- [ ] SCR-PG-A3 F7: the demo cut patterns as data (O3).
-- [ ] SCR-PG-A4 G2/G3/G4: cut, echo, brake / spinup as plannable gestures (the last two through the existing deck FX actions).
-- [ ] SCR-PG-A5 X2/X3: `fxAmount` / `fxScale` wired; the 5 style profiles (scratch.py:341-345) and per-gesture fx onto the bus.
-- [ ] SCR-PG-AR reachability: `fireDjFx('fx_scratch_echo', {record: 'AH_LONG', source: 'mcp'})` offline: `faderCurve` count >= 2, the worklet gets AH_LONG, bus delay mix 0.35 +-0.02, delay 0.16 s +-5 ms.
+- [x] SCR-PG-A1 R2: AH_LONG (scratch_020.wav) catalogue entry 51 (anchors from the demo analyser; PROVENANCE note). - 9f29d1ec6: record 51 from the demo's own `scratch_bank.load_bank` (vowel 440, safe 27-14467 @ 22,050); `scratchCatalogueFiles.test.ts`.
+- [x] SCR-PG-A2 F1: `faderCurve` applied in the worklet window gain (the battle response); sentinel count. - 7997806fd: the ring worklet shapes the window gain with 1 - (1 - g)^12 (`faderCurveShape`, sentinel `faderCurveCalls`), ramp `cutRampSec` = 1 + 2 (1 - v) ms (O7); `scratchFaderCurveShapesTheCut.test.ts` offline, revert-checked.
+- [x] SCR-PG-A3 F7: the demo cut patterns as data (O3). - 907f22039 + 30f468995: `referenceCutPattern` (open / click / double / triple / transform duty .5 / flare1 / flare2 / crab edges); baby and slow baby the reference motion (true reverse, open); hydroplane 0.7 glide under 12 cuts; golden fixtures regenerated.
+- [x] SCR-PG-A4 G2/G3/G4: cut, echo, brake / spinup as plannable gestures (the last two through the existing deck FX actions). - 30f468995: `cut`, `echo` (fx delay .35 / .16 s / reverb .05), `brake` exp(-3t), `spinup` 1 - exp(-5t) (scratch.py :168-179); a forward-stab record takes cut + echo. Deviation: brake / spin-up are the scratch record's own motion (the demo's `deck_motion` on the scratch deck), not the music deck's FX actions; flourishes (never drawn from a style vocabulary) - placed on purpose by PG-E endings / routines, pads, MCP.
+- [x] SCR-PG-A5 X2/X3: `fxAmount` / `fxScale` wired; the 5 style profiles (scratch.py:341-345) and per-gesture fx onto the bus. - 30f468995: `SCRATCH_FX_PROFILES` (the 5 presets) + `STYLE_FX_PROFILE` set the bus HP / LP / drive per style; fxAmount x fxScale = the wet tail floor; events carry `fx` planner -> executor -> registry (`scratchFx`) -> pool; the echo's own fx via `setGestureFx`. Fixed: a WaveShaper curve set twice threw; drive is now a gain before a fixed tanh(2.5 x).
+- [x] SCR-PG-AR reachability: `fireDjFx('fx_scratch_echo', {record: 'AH_LONG', source: 'mcp'})` offline: `faderCurve` count >= 2, the worklet gets AH_LONG, bus delay mix 0.35 +-0.02, delay 0.16 s +-5 ms. - 30f468995: `scratchEchoAndStyleFxReachTheBus.test.ts` - echo bus delay 0.35 at 0.16 s, the echo heard 0.16 s after the window (> gap + 3 dB), AH_LONG loaded into the worklet, faderCurve >= 2, electro style lifts the tail to 0.255 at 0.14 s; revert-checked. Echo fired on ONE (AH_LONG's reference gestures do not include a stab).
 
 Phase PG-B - physics-driven gestures (O1)
 - [ ] SCR-PG-B1 T1-T10 tables + `simulate` as pure `simulateGesture`; G5 accelerating glide; T8 grip; T16 validate / repair; the hand drives by default (G8).
