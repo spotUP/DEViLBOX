@@ -62,15 +62,15 @@ export const UADEDebuggerPanel: React.FC<Props> = ({ instruments }) => {
 
   if (!channels) {
     return (
-      <div className="rounded-lg border border-blue-900/20 bg-[#000e1a] p-2 text-[9px] font-mono text-blue-900/50 select-none">
+      <div className="rounded-lg border border-dark-border bg-dark-bg p-2 text-[10px] font-mono text-text-muted select-none">
         Paula debugger — waiting for playback…
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-blue-900/30 bg-[#000e1a] p-2 select-none">
-      <div className="text-[9px] font-bold uppercase tracking-widest text-blue-400/60 mb-2">
+    <div className="rounded-lg border border-dark-border bg-dark-bg p-2 select-none">
+      <div className="text-[10px] font-mono font-bold uppercase tracking-widest text-text-secondary mb-2">
         Paula Debugger
       </div>
       <div className="grid grid-cols-4 gap-1">
@@ -82,56 +82,55 @@ export const UADEDebuggerPanel: React.FC<Props> = ({ instruments }) => {
           return (
             <div
               key={idx}
-              className="flex flex-col gap-1 rounded border border-blue-900/20 bg-[#000a14] p-1.5"
+              className="flex flex-col gap-1 rounded border border-dark-border bg-dark-bgSecondary p-1.5"
             >
               {/* Channel label + DMA dot */}
               <div className="flex items-center justify-between">
-                <span className="text-[9px] font-bold text-blue-400/70">
+                <span className="text-[10px] font-mono font-bold text-text-secondary">
                   {CHANNEL_LABELS[idx]}
                 </span>
                 <span
-                  className="w-2 h-2 rounded-full"
-                  style={{
-                    background: ch.dma ? '#22dd88' : '#223344',
-                    boxShadow: ch.dma ? '0 0 4px #22dd88' : 'none',
-                  }}
+                  className={`w-2 h-2 rounded-full ${
+                    ch.dma
+                      ? 'bg-accent-success text-accent-success shadow-[0_0_4px_currentColor]'
+                      : 'bg-dark-bgActive'
+                  }`}
                   title={ch.dma ? 'DMA active' : 'DMA off'}
                 />
               </div>
 
               {/* Note name */}
               <div
-                className="text-[13px] font-mono font-bold leading-none"
-                style={{ color: ch.dma ? '#44aaff' : '#224466' }}
+                className={`text-[13px] font-mono font-bold leading-none ${
+                  ch.dma ? 'text-accent-primary' : 'text-text-muted'
+                }`}
               >
                 {noteInfo ? noteInfo.name : (ch.period > 0 ? `P${ch.period}` : '---')}
               </div>
 
               {/* Volume bar */}
-              <div className="w-full h-1.5 rounded-full bg-blue-900/30 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-dark-bgTertiary overflow-hidden">
                 <div
-                  className="h-full rounded-full transition-none"
-                  style={{
-                    width: `${volPct}%`,
-                    background: ch.volume > 48
-                      ? '#22cc66'
+                  className={`h-full rounded-full transition-none ${
+                    ch.volume > 48
+                      ? 'bg-accent-success'
                       : ch.volume > 24
-                        ? '#44aaff'
-                        : '#224466',
-                  }}
+                        ? 'bg-accent-primary'
+                        : 'bg-accent-primary/40'
+                  }`}
+                  style={{ width: `${volPct}%` }}
                 />
               </div>
 
               {/* Period + volume numbers */}
-              <div className="flex justify-between text-[8px] font-mono text-blue-400/40">
+              <div className="flex justify-between text-[10px] font-mono text-text-muted">
                 <span>{ch.period > 0 ? ch.period : '—'}</span>
                 <span>{ch.volume}/64</span>
               </div>
 
               {/* Instrument name */}
               <div
-                className="text-[8px] font-mono truncate"
-                style={{ color: '#334455' }}
+                className="text-[10px] font-mono truncate text-text-muted"
                 title={instrName}
               >
                 {instrName}
