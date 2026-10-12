@@ -217,7 +217,7 @@ const makeDefaultDeckState = (): DeckState => ({
   pitchOffset: 0,
   effectiveBPM: 125,
   repitchLock: false,
-  keyLockEnabled: false,
+  keyLockEnabled: true,
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,

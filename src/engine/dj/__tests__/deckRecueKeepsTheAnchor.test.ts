@@ -24,6 +24,8 @@ function engine(mode: 'audio' | 'tracker', fake: Fake): DeckEngine {
   const e = Object.create(DeckEngine.prototype) as Record<string, unknown>;
   e._playbackMode = mode;
   e._stemMode = false;
+  e._bendTimer = null; // a field initialised in the class body: always null on a real deck
+  e._bendHeld = false;
   e.audioPlayer = { seek: (s: number) => { fake.seeks.push(s); } };
   e.stemPlayer = { seek: vi.fn() };
   e.scratchPlayback = { get currentFaderGain() { return fake.faderGain; } };
