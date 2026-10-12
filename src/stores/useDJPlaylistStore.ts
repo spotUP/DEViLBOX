@@ -71,6 +71,12 @@ export interface PlaylistTrack {
    * analysed again. Any analysis write clears it.
    */
   keyConfidenceStale?: boolean;
+  /**
+   * DJ_ANALYSIS_VERSION of the analysis that last wrote this row's tempo. A row
+   * below the current version (or without it: analysed before the field) is
+   * analysed again once, in the background (DJPlaylistAnalyzer.reanalyzeOutdatedTracks).
+   */
+  analysisVersion?: number;
 }
 
 export interface DJPlaylist {
@@ -127,9 +133,9 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary' | 'keyConfidenceStale'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary' | 'keyConfidenceStale' | 'analysisVersion'>>) => void;
   /** Batch-update multiple tracks in a single Immer transaction (single re-render). */
-  batchUpdateTrackMeta: (playlistId: string, updates: Array<{ index: number; meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary' | 'keyConfidenceStale'>> }>) => void;
+  batchUpdateTrackMeta: (playlistId: string, updates: Array<{ index: number; meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset' | 'djSummary' | 'keyConfidenceStale' | 'analysisVersion'>> }>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   /** Remember the last track loaded to a deck from this playlist.
    *  Modal uses it to scroll-restore on open and after search clear. */

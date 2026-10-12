@@ -28,10 +28,15 @@ import { smooth } from './activityTimelines';
  * (tempoSource). 4: a module's phrases and phrase confidence come from its
  * order list (pattern changes), not the audio. 5: a module whose 24-tick
  * beat its patterns do not hold takes the beat level they hold (whole bars,
- * a different BPM for some modules). Not the audio-cache gate: the cached audio analysis did not
- * change, so DJ_AUDIO_ANALYSIS_VERSION stays and no cached track is re-analysed.
+ * a different BPM for some modules). 6: the module walk follows pattern
+ * loops, pattern delay and swing (one song walk), and an off-beat sound no
+ * longer outvotes the snare for the beat level ('suggestive vibes' 184.57 ->
+ * 93.75). A playlist row below this version is analysed again once in the
+ * background (DJPlaylistAnalyzer.reanalyzeOutdatedTracks). Not the audio-cache
+ * gate: the cached audio analysis did not change, so DJ_AUDIO_ANALYSIS_VERSION
+ * stays and a re-analysis rebuilds the summary from the cached audio.
  */
-export const DJ_ANALYSIS_VERSION = 5;
+export const DJ_ANALYSIS_VERSION = 6;
 /** Version of the cached audio analysis (extended worker data); a cache entry below it is re-analysed. */
 export const DJ_AUDIO_ANALYSIS_VERSION = 2;
 
