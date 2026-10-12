@@ -581,6 +581,21 @@ function effectsFor(style: TransitionStyle, beats: number, fxUsage: number, outS
   return events;
 }
 
+/**
+ * The impact exit of a hard cut: a spinback or a brake. A spinback yanks the
+ * outgoing record back on the phrase end and the incoming drops on the next
+ * downbeat (effect beat -beatsPerBar: one bar before the incoming starts) -
+ * the move for a high-energy exit or a cut onto a drop, not twice in a row.
+ * Otherwise the brake into the cut.
+ */
+export function impactExit(outSection: DJSection | undefined, inSection: DJSection | undefined, beatsPerBar: number, memory: SessionMemorySnapshot): DJEffectEvent {
+  const highEnergy = (outSection?.energy ?? 0) >= 0.7 || inSection?.kind === 'drop';
+  if (highEnergy && !memory.recentFX.slice(-2).includes('spinback')) {
+    return { kind: 'spinback', deck: 'outgoing', beat: -beatsPerBar, lengthBeats: beatsPerBar, amount: 1, reason: 'impact exit: spin the outgoing back on the phrase end, drop the incoming on the next downbeat' };
+  }
+  return { kind: 'brake', deck: 'outgoing', beat: 0, lengthBeats: 2, amount: 1, reason: 'impact cut: brake the outgoing deck into the cut' };
+}
+
 // ── Risk and confidence (plan sections 35, 36) ──────────────────────────────
 
 export function assessRisk(ctx: {
@@ -740,7 +755,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   // the plan carries them as effect events and the filter kind, not as
   // private curves (one path, plan sections 17-19, 53).
   if (transitionStyle === 'hardCut' && input.smartCuts && input.creativeRisk >= 0.7 && style.cutFrequency >= 0.3) {
-    effects.push({ kind: 'brake', deck: 'outgoing', beat: 0, lengthBeats: 2, amount: 1, reason: 'impact cut: brake the outgoing deck into the cut' });
+    effects.push(impactExit(outSection, sectionAt(incoming, mixIn.time), beatsPerBar, memory));
   }
 
   // Loops and cue jumps (plan sections 51, 52).

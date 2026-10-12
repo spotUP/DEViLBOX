@@ -89,7 +89,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
       if (playing || isScratchActiveRef.current) {
         // Tick physics for scratch velocity forwarding
         if (physics && (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive)) {
-          const rate = physics.tick(dt);
+          const rate = physics.rateFor(dt);
 
           // When scratch starts, switch to integration mode
           if (isScratchActiveRef.current && !scratchIntegrating) {
@@ -104,8 +104,8 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
             prevRate = rate;
           }
 
-          // Integrate angle from physics rate (smooth, follows hand exactly)
-          if (scratchIntegrating) {
+          // Integrate angle from physics rate (smooth, follows hand exactly; a spinback spins it back)
+          if (scratchIntegrating || physics.spinbackActive) {
             angleRef.current += rate * omegaNormal * dt;
           }
 
@@ -122,7 +122,7 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
         }
 
         // When NOT scratching, derive angle from the heard position (clock anchor, per frame)
-        if (!scratchIntegrating) {
+        if (!scratchIntegrating && !physics?.spinbackActive) {
           angleRef.current = platterPositionSec(deckId) * omegaNormal;
         }
       }

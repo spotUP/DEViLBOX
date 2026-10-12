@@ -121,7 +121,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
       if (playing || isScratchActiveRef.current) {
         if (physics && (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive)) {
-          const rate = physics.tick(dt);
+          const rate = physics.rateFor(dt);
 
           if (isScratchActiveRef.current && !scratchIntegrating) {
             scratchIntegrating = true;
@@ -135,7 +135,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
             prevRate = rate;
           }
 
-          if (scratchIntegrating) {
+          if (scratchIntegrating || physics.spinbackActive) {
             angleRef.current += rate * omegaNormal * dt;
           }
 
@@ -150,7 +150,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
           }
         }
 
-        if (!scratchIntegrating && engineDeck) {
+        if (!scratchIntegrating && !physics?.spinbackActive && engineDeck) {
           angleRef.current = platterPositionSec(deckId) * omegaNormal;
         }
       }

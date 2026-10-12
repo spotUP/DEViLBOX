@@ -27,7 +27,7 @@ import type { ScratchCue } from '../dj/scratch/ScratchRecordVoice';
 import { getScratchVoicePool, getScratchVoicePoolIfActive, type PerformHandle } from '../dj/scratch/scratchVoicePool';
 import { ambienceFor } from '../dj/scratch/scratchBus';
 import { handSpeedFactor } from '../dj/scratch/scratchHandSpeed';
-import { playDeckPattern, stopDeckPattern, finishDeckPatternCycle } from '../dj/DJActions';
+import { playDeckPattern, stopDeckPattern, finishDeckPatternCycle, spinbackDeck } from '../dj/DJActions';
 import type { DeckId } from '../dj/DeckEngine';
 import type { DubBusSettings } from '../../types/dub';
 import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
@@ -57,6 +57,7 @@ export type DjFxActionId =
   | 'fx_deck_filter_rise' | 'fx_deck_filter_release'
   | 'fx_deck_kill_lo' | 'fx_deck_kill_mid' | 'fx_deck_kill_hi'
   | 'fx_deck_brake'
+  | 'fx_deck_spinback'
   | 'fx_deck_jump_m16' | 'fx_deck_jump_m4' | 'fx_deck_jump_m1'
   | 'fx_deck_jump_p1' | 'fx_deck_jump_p4' | 'fx_deck_jump_p16'
   // Hot Cues (trigger/set on active deck)
@@ -114,6 +115,8 @@ export interface DjFxFireOptions {
   finishCycle?: boolean;
   /** Deck gestures: called with the quantize wait when the start is deferred. */
   onWaiting?: (ms: number) => void;
+  /** Spinback: stop the deck once the reverse ends (a spinback exit: the record is pulled out). */
+  stopAfter?: boolean;
 }
 
 export interface DjFxAction {
@@ -1368,6 +1371,28 @@ function createDeckEQKill(band: 'low' | 'mid' | 'high'): DjFxAction {
   };
 }
 
+/**
+ * Spinback: the deck's own platter physics yanks the record back and the
+ * audio follows (DJActions.spinbackDeck - the tracker's spinback, one
+ * physics path). The pad's record plays on afterwards; Auto DJ's spinback
+ * exit (opts.stopAfter: the record is pulled out) stops the deck once the
+ * reverse ends.
+ */
+function createDeckSpinback(): DjFxAction {
+  return {
+    id: 'fx_deck_spinback',
+    name: 'Spinback',
+    category: 'deck',
+    mode: 'oneshot',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      if (!spinbackDeck(deckId, { stopAfter: !!opts?.stopAfter, onComplete: () => setDjFxActive('fx_deck_spinback', null) })) return;
+      setDjFxActive('fx_deck_spinback', deckId);
+    },
+    disengage() { /* the platter runs its own arc */ },
+  };
+}
+
 function createDeckBrake(): DjFxAction {
   let brakeRaf = 0;
   return {
@@ -1965,6 +1990,7 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   createDeckEQKill('mid'),
   createDeckEQKill('high'),
   createDeckBrake(),
+  createDeckSpinback(),
   createDeckBeatJump(-16),
   createDeckBeatJump(-4),
   createDeckBeatJump(-1),
