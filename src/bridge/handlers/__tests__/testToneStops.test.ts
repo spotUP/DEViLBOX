@@ -27,7 +27,7 @@ describe('test_tone', () => {
     const tool = server.slice(server.indexOf("'test_tone',"), server.indexOf("'test_tone',") + 900);
     expect(tool).toContain("action: z.enum(['start', 'stop']).optional()");
     expect(tool).toContain('level: z.number().optional()');
-    expect(tool).toContain("mode: z.enum(['sine', 'rich']).optional()");
+    expect(tool).toContain("mode: z.enum(['sine', 'rich', 'pink']).optional()");
     expect(handler).toContain('20 * Math.log10(gainLinear)');
   });
 });
