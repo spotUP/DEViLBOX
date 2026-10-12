@@ -56,6 +56,7 @@ function fakeDeck() {
   const deck = Object.assign(Object.create(DeckEngine.prototype), {
     // a real deck has its id: loads write deck state (channel scopes) under it
     id: 'A',
+    keyLock: { setActive: () => {}, setPitchSemiTones: () => {}, latencySec: () => 0 }, // the stretcher insert a real deck always owns
     _loadedSong: null,
     _playbackMode: 'audio',
     audioPlayer: { stop: () => {} },
