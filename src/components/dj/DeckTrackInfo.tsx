@@ -91,8 +91,8 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
     switch (keyCompat) {
       case 'perfect':      return 'MATCH';
       case 'compatible':   return 'COMPAT';
-      case 'energy-boost': return 'ENERGY↑';
-      case 'energy-drop':  return 'ENERGY↓';
+      case 'energy-boost': return 'ENERGY UP';
+      case 'energy-drop':  return 'ENERGY DOWN';
       case 'mood-change':  return 'MOOD';
       case 'clash':        return 'CLASH';
       default:             return null;

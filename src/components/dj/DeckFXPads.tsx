@@ -1,9 +1,9 @@
 /**
  * DeckFXPads - Performance pads for one DJ deck
  *
- * Four pages, toggled by header tabs:
- *   FX Pads (2×4): HPF sweep, LPF sweep, Filter reset, Echo out, Kill Lo/Mid/Hi, Brake
- *   Beat Jump (2×4): ◄◄16, ◄◄4, ◄◄1, ◄1 | ►1, ►►1, ►►4, ►►16
+ * Pages, toggled by header tabs:
+ *   FX (10 pads): high/low pass sweep, filter reset, echo out, kill low/mid/high, brake, spinback, rewind
+ *   Beat Jump (2x4): back 16/4/1/half | forward half/1/4/16 beats
  *   Dub 1 (2×4): springSlam, filterDrop, dubSiren, reverseEcho, tapeWobble,
  *                echoThrow, delayTimeThrow, masterDrop
  *   Dub 2 (2×4): dubStab, snareCrack, backwardReverb, tubbyScream,
@@ -21,6 +21,8 @@ import { useDJStore } from '@/stores/useDJStore';
 import { fireDjFx, releaseDjFx, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
 import { beatJump } from '@/engine/dj/DJBeatJump';
 import { fire as fireDubMove } from '@/engine/dub/DubRouter';
+import { TabStrip, type TabStripTab } from '@components/ui/TabStrip';
+import { ArrowUp, ArrowDown, RotateCcw, ChevronLeft, ChevronsLeft, ChevronRight, ChevronsRight, type LucideIcon } from 'lucide-react';
 
 interface DeckFXPadsProps {
   deckId: 'A' | 'B' | 'C';
@@ -32,19 +34,25 @@ interface PadDef {
   id: string;
   label: string;
   sublabel?: string;
+  /** Icon shown in front of the label (replaces glyph characters). */
+  labelIcon?: LucideIcon;
+  /** Icon shown in front of the sublabel. */
+  sublabelIcon?: LucideIcon;
+  /** Full-English description for the tooltip when label/sublabel alone do not read as words. */
+  hint?: string;
   mode: 'momentary' | 'toggle' | 'instant';
 }
 
 const FX_PADS: PadDef[] = [
-  { id: 'hpf-sweep', label: 'High Pass', sublabel: '▲', mode: 'momentary' },
-  { id: 'lpf-sweep', label: 'Low Pass', sublabel: '▼', mode: 'momentary' },
+  { id: 'hpf-sweep', label: 'High Pass', sublabelIcon: ArrowUp, hint: 'sweep up', mode: 'momentary' },
+  { id: 'lpf-sweep', label: 'Low Pass', sublabelIcon: ArrowDown, hint: 'sweep down', mode: 'momentary' },
   { id: 'filter-reset', label: 'Filter', sublabel: 'reset', mode: 'momentary' },
   { id: 'echo-out', label: 'Echo', sublabel: 'out', mode: 'toggle' },
   { id: 'kill-low', label: 'Kill', sublabel: 'low', mode: 'momentary' },
   { id: 'kill-mid', label: 'Kill', sublabel: 'mid', mode: 'momentary' },
   { id: 'kill-hi', label: 'Kill', sublabel: 'high', mode: 'momentary' },
-  { id: 'brake', label: 'Brake', sublabel: '⏎', mode: 'momentary' },
-  { id: 'spinback', label: 'Spinback', sublabel: '⟲', mode: 'toggle' },
+  { id: 'brake', label: 'Brake', sublabel: 'stop', mode: 'momentary' },
+  { id: 'spinback', label: 'Spinback', sublabelIcon: RotateCcw, hint: 'spin back', mode: 'toggle' },
   { id: 'rewind', label: 'Rewind', sublabel: 'replay', mode: 'toggle' },
 ];
 
@@ -142,14 +150,14 @@ const DUB4_PADS: PadDef[] = [
 ];
 
 const JUMP_PADS: PadDef[] = [
-  { id: 'jump-back-16', label: '◄◄', sublabel: '16', mode: 'instant' },
-  { id: 'jump-back-4', label: '◄◄', sublabel: '4', mode: 'instant' },
-  { id: 'jump-back-1', label: '◄', sublabel: '1', mode: 'instant' },
-  { id: 'jump-back-half', label: '◄', sublabel: '½', mode: 'instant' },
-  { id: 'jump-fwd-half', label: '►', sublabel: '½', mode: 'instant' },
-  { id: 'jump-fwd-1', label: '►', sublabel: '1', mode: 'instant' },
-  { id: 'jump-fwd-4', label: '►►', sublabel: '4', mode: 'instant' },
-  { id: 'jump-fwd-16', label: '►►', sublabel: '16', mode: 'instant' },
+  { id: 'jump-back-16', label: 'Back', labelIcon: ChevronsLeft, sublabel: '16 beats', mode: 'instant' },
+  { id: 'jump-back-4', label: 'Back', labelIcon: ChevronsLeft, sublabel: '4 beats', mode: 'instant' },
+  { id: 'jump-back-1', label: 'Back', labelIcon: ChevronLeft, sublabel: '1 beat', mode: 'instant' },
+  { id: 'jump-back-half', label: 'Back', labelIcon: ChevronLeft, sublabel: '1/2 beat', mode: 'instant' },
+  { id: 'jump-fwd-half', label: 'Forward', labelIcon: ChevronRight, sublabel: '1/2 beat', mode: 'instant' },
+  { id: 'jump-fwd-1', label: 'Forward', labelIcon: ChevronRight, sublabel: '1 beat', mode: 'instant' },
+  { id: 'jump-fwd-4', label: 'Forward', labelIcon: ChevronsRight, sublabel: '4 beats', mode: 'instant' },
+  { id: 'jump-fwd-16', label: 'Forward', labelIcon: ChevronsRight, sublabel: '16 beats', mode: 'instant' },
 ];
 
 /** Deck FX pad -> DJ FX registry action (one path for the pad, MIDI, keyboard and the Auto DJ). */
@@ -341,6 +349,19 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     return activePads.has(padId);
   };
 
+  const dubTitleSuffix = (page: string) => fxTargetCount > 0
+    ? `${page} - targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
+    : page;
+  const chSuffix = fxTargetCount > 0 ? ` (${fxTargetCount} ch)` : '';
+  const pageTabs: TabStripTab<PadPage>[] = [
+    { id: 'fx', label: 'FX' },
+    { id: 'jump', label: 'Beat Jump' },
+    { id: 'dub', label: `Dub${chSuffix}`, title: dubTitleSuffix('Dub bus sends: throws, holds, drops, wobble, echo, siren') },
+    { id: 'dub2', label: `Dub 2${chSuffix}`, title: dubTitleSuffix('Dub bus sends page 2: stabs, reverse/tape, bass drones') },
+    { id: 'dub3', label: `Dub 3${chSuffix}`, title: dubTitleSuffix('Dub bus sends page 3: atmospheric (wide, ping, riser, sub, presets, mic)') },
+    { id: 'dub4', label: `Dub 4${chSuffix}`, title: dubTitleSuffix('Dub bus sends page 4: channel and transport edge cases') },
+  ];
+
   const pads =
     page === 'fx'   ? FX_PADS   :
     page === 'jump' ? JUMP_PADS :
@@ -353,88 +374,9 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
     <div className="flex flex-col gap-1">
       {/* Page tabs */}
       <div className="flex items-center gap-1">
-        <button
-          onClick={() => setPage('fx')}
-          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
-            page === 'fx'
-              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
-              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
-          }`}
-        >
-          FX PADS
-        </button>
-        <button
-          onClick={() => setPage('jump')}
-          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
-            page === 'jump'
-              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
-              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
-          }`}
-        >
-          BEAT JUMP
-        </button>
-        <button
-          onClick={() => setPage('dub')}
-          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
-            page === 'dub'
-              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
-              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
-          }`}
-          title={
-            fxTargetCount > 0
-              ? `Dub bus sends — targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
-              : 'Dub bus sends — throws, holds, drops, wobble, echo, siren'
-          }
-        >
-          DUB{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
-        </button>
-        <button
-          onClick={() => setPage('dub2')}
-          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
-            page === 'dub2'
-              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
-              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
-          }`}
-          title={
-            fxTargetCount > 0
-              ? `Dub bus sends page 2 — targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
-              : 'Dub bus sends page 2 — stabs, reverse/tape, bass drones'
-          }
-        >
-          DUB 2{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
-        </button>
-        <button
-          onClick={() => setPage('dub3')}
-          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
-            page === 'dub3'
-              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
-              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
-          }`}
-          title={
-            fxTargetCount > 0
-              ? `Dub bus sends page 3 — targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
-              : 'Dub bus sends page 3 — atmospheric (wide, ping, riser, sub, presets, mic)'
-          }
-        >
-          DUB 3{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
-        </button>
-        <button
-          onClick={() => setPage('dub4')}
-          className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
-            page === 'dub4'
-              ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
-              : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
-          }`}
-          title={
-            fxTargetCount > 0
-              ? `Dub bus sends page 4 — targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
-              : 'Dub bus sends page 4 — channel + transport edge cases'
-          }
-        >
-          DUB 4{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
-        </button>
+        <TabStrip tabs={pageTabs} active={page} onChange={setPage} ariaLabel="Pad pages" className="flex-1" />
         {page === 'jump' && hasBeatGrid && (
-          <span className="text-[9px] text-text-secondary ml-auto">● GRID</span>
+          <span className="text-[9px] text-text-secondary flex-shrink-0">Beat grid</span>
         )}
       </div>
 
@@ -453,7 +395,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               onPointerLeave={() => (pad.mode === 'momentary') && handlePadUp(pad)}
               className="relative flex flex-col items-center justify-center rounded-md select-none touch-none overflow-hidden transform-gpu will-change-transform"
               style={{
-                height: 48,
+                height: 40,
                 transition: pressed ? 'transform 50ms' : 'transform 120ms ease-out',
                 transform: pressed ? 'scale(0.92)' : 'scale(1)',
                 backgroundColor: look.backgroundColor,
@@ -462,7 +404,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                 boxShadow: look.boxShadow ?? `inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.3)`,
                 opacity: active ? 1 : 0.85,
               }}
-              title={`${pad.label} ${pad.sublabel ?? ''} (${pad.mode})`}
+              title={`${`${pad.label} ${pad.sublabel ?? pad.hint ?? ''}`.trim()} (${pad.mode})`}
             >
               {/* Press flash */}
               {pressed && (
@@ -473,13 +415,17 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                   }}
                 />
               )}
-              <span className="relative text-[11px] font-bold">{pad.label}</span>
+              <span className="relative flex items-center gap-0.5 text-[11px] font-bold">
+                {pad.labelIcon && <pad.labelIcon size={12} aria-hidden />}
+                {pad.label}
+              </span>
               {/* DUB 4 pads (channelMute + channelThrow) replace their
                   static "ch 0" sublabel with the currently-armed fx
                   target channels. When nothing is armed, the static
                   placeholder stays so the user knows to arm a channel. */}
-              {pad.sublabel && (
-                <span className="relative text-[9px] opacity-60">
+              {(pad.sublabel || pad.sublabelIcon) && (
+                <span className="relative flex items-center text-[9px] opacity-60">
+                  {pad.sublabelIcon && <pad.sublabelIcon size={10} aria-hidden />}
                   {page === 'dub4' && (pad.id === 'dub4-mute' || pad.id === 'dub4-cthrow') && fxTargetLabel
                     ? fxTargetLabel
                     : pad.sublabel}
@@ -501,7 +447,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                     lineHeight: '10px',
                   }}
                 >
-                  {fxTargetCount}CH
+                  {fxTargetCount} ch
                 </span>
               )}
             </button>

@@ -183,7 +183,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
         style={{ width: 40, height: 40 }}
         title={loopActive ? 'Disable loop' : isAudio ? (audioLoopReady ? 'Enable loop' : 'Set IN/OUT first') : 'Enable loop'}
       >
-        LOOP
+        Loop
       </button>
 
       {isAudio ? (
@@ -199,10 +199,10 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
                 : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
               }
             `}
-            style={{ height: 40, fontSize: 10, width: 28, minWidth: 28 }}
+            style={{ height: 40, fontSize: 10, width: 32, minWidth: 32 }}
             title={audioLoopIn !== null ? `Loop IN: ${formatSec(audioLoopIn)}` : 'Set loop IN at current position'}
           >
-            IN
+            In
           </button>
           <button
             onClick={handleSetLoopOut}
@@ -214,10 +214,10 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
                 : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
               }
             `}
-            style={{ height: 40, fontSize: 10, width: 32, minWidth: 32 }}
+            style={{ height: 40, fontSize: 10, width: 36, minWidth: 36 }}
             title={audioLoopOut !== null ? `Loop OUT: ${formatSec(audioLoopOut)}` : 'Set loop OUT at current position'}
           >
-            OUT
+            Out
           </button>
           {/* Auto-loop bar sizes (beat-snapped) */}
           {AUTO_LOOP_BARS.map((bars) => {
@@ -246,10 +246,10 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
             onClick={handleClearAudioLoop}
             className="flex items-center justify-center font-mono font-bold rounded-r-sm
               transition-all duration-75 select-none bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-primary"
-            style={{ height: 40, width: 28, fontSize: 8 }}
+            style={{ height: 40, minWidth: 40, paddingInline: 4, fontSize: 9 }}
             title="Clear loop"
           >
-            CLR
+            Clear
           </button>
         </div>
       ) : (
@@ -301,7 +301,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
         style={{ width: 40, height: 40 }}
         title={slipEnabled ? 'Disable slip mode' : 'Enable slip mode'}
       >
-        SLIP
+        Slip
       </button>
     </div>
   );
