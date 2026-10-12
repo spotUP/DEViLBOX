@@ -245,7 +245,7 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
   if (ext && grids.downbeats.bars.length > 0) {
     features = barFeatures(grids.downbeats, ext);
     trackVocal = meanOf(features.map((f) => f.vocal));
-    const bounds = segmentBoundaries(features);
+    const bounds = segmentBoundaries(features, undefined, durationSec);
     sections = labelSections(features, bounds, trackVocal);
     // A module's phrases come from its order list (pattern changes are exact); the audio guesses them otherwise.
     const mp = mg?.phrase ?? null;
