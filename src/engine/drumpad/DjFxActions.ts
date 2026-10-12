@@ -116,6 +116,8 @@ export interface DjFxFireOptions {
   scratchFx?: import('@/engine/dj/scratch/scratchTypes').ScratchEventFx;
   /** Record gestures: context time (seconds) the gesture starts at, sample-accurate (the executor's planned beat). */
   at?: number;
+  /** Record gestures: the tempo the stroke is timed at - the planner's beat clock (the executor's); none = the deck's effectiveBPM (a pad). */
+  bpm?: number;
   /** Release: let the running pattern cycle finish instead of a hard stop. */
   finishCycle?: boolean;
   /** Deck gestures: called with the quantize wait when the start is deferred. */
@@ -1804,7 +1806,7 @@ function engageRecordGesture(id: string, gestureId: ScratchGestureId, opts?: DjF
   const handle = getScratchVoicePool().perform(getGesture(gestureId), {
     record: opts?.record ?? (opts?.scratchSource?.type === 'CRATE' ? opts.scratchSource.recordId : undefined),
     role,
-    bpm: deckBpm(deckId),
+    bpm: opts?.bpm ?? deckBpm(deckId),
     ambience: ambienceFor(role ?? 'ACCENT'),
     velocity: opts?.amount,
     cue: opts?.anchor,

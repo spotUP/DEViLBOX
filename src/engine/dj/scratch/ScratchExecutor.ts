@@ -211,6 +211,9 @@ export class ScratchExecutor {
     if (onRecordVoice(ev)) {
       e.at = this.deps.contextTime() + dueSec;
       e.opts.at = e.at;
+      // the stroke is timed on the clock that placed it (the deck's analysis tempo), never the store's
+      // detector-written effectiveBPM: a planned 2-step baby lasts 2 steps of the beat it starts on
+      e.opts.bpm = 60 / Math.max(1e-9, this.deps.clock.beatSec());
     }
     const ok = this.deps.fire(e.id, e.opts);
     if (!ok) {
