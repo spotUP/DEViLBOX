@@ -63,6 +63,9 @@ export interface ScratchDJDeps {
   executorFor(deck: AB, track: DJTrackAnalysis): ScratchEventSink;
   /** Source selection; `selectScratchSource` (section 13) when omitted. */
   chooseSource?(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, recent: readonly string[]): ChosenScratchSource | null;
+  /** Get a chosen source ready before its first event (a TRACKER_SAMPLE is decoded into the voice pool:
+   *  `loadTrackerSample`); the plan is a bar ahead, so the load lands before the stroke. */
+  prepareSource?(chosen: ChosenScratchSource, input: ScratchTickInput): void | Promise<unknown>;
   /** Every source decision, with its score terms (the Auto DJ decision log, P7.12). */
   onSourceDecision?(decision: SourceDecision, ctx: ScratchPerformanceContext): void;
   seed?: number;
@@ -163,6 +166,9 @@ export class DJScratchDJ {
       this.recentSources.push(chosen.decision.candidate.key);
       if (this.recentSources.length > RECENT_SOURCES) this.recentSources.shift();
       this.deps.onSourceDecision?.(chosen.decision, ctx);
+    }
+    if (chosen && this.deps.prepareSource) {
+      void Promise.resolve(this.deps.prepareSource(chosen, input)).catch((err) => console.warn('[DJScratchDJ] source not ready:', err));
     }
     const plan = chosen?.record
       ? planScratch(ctx, { mode: input.mode, seed, fromBar, bars, vocalByBar, genre: input.genre, record: chosen.record, throwMemory: this.throwMemory })

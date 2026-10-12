@@ -39,8 +39,10 @@ const DECK_FIELDS: readonly ScratchField[] = ['rate', 'channelGain', 'captureFro
  * it (section 20); a record gesture plays on its own voice and changes none of these.
  */
 export function fieldsTouchedBy(source: 'DECK' | 'CRATE' | string, faderWindows: readonly { curve: string }[]): ScratchField[] {
-  const out: ScratchField[] = source === 'CRATE' ? [] : [...DECK_FIELDS];
-  if (source !== 'CRATE' && faderWindows.some((w) => w.curve === 'crossfader')) out.push('crossfader');
+  // a crate record and a tracker sample both play on a record voice
+  const voice = source === 'CRATE' || source === 'TRACKER_SAMPLE';
+  const out: ScratchField[] = voice ? [] : [...DECK_FIELDS];
+  if (!voice && faderWindows.some((w) => w.curve === 'crossfader')) out.push('crossfader');
   return out;
 }
 

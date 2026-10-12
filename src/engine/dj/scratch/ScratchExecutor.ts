@@ -35,6 +35,12 @@ import { fieldsTouchedBy, type ScratchField, type ScratchSnapshot, type ScratchS
 import { getGesture } from './scratchGestureCatalog';
 import type { DeckScratchAnchor, ScratchEvent } from './scratchTypes';
 import type { ScratchCue } from './ScratchRecordVoice';
+import { trackerSampleRecordId } from './trackerSampleSource';
+
+/** Sources that play on a scratch record voice (a crate record, a tracker deck's sample). */
+const onRecordVoice = (ev: ScratchEvent): boolean => ev.source.type === 'CRATE' || ev.source.type === 'TRACKER_SAMPLE';
+/** Sources stroked on a deck (the live deck, its extracted material, a tracker channel's segment). */
+const onDeck = (ev: ScratchEvent): boolean => ev.source.type === 'DECK' || ev.source.type === 'TRACKER_CHANNEL';
 
 /** Reachability sentinels (SCR-P3.R3). */
 export const scratchExecutorStats = { started: 0, released: 0, restores: 0, recuesUnavailable: 0 };
@@ -114,6 +120,9 @@ export class ScratchExecutor {
     if (event.source.type === 'CRATE') {
       opts.record = event.source.recordId;
       opts.anchor = event.anchor.position as ScratchCue;
+    } else if (event.source.type === 'TRACKER_SAMPLE') {
+      opts.record = trackerSampleRecordId(event.source.deck, event.source.sampleId);
+      opts.anchor = event.anchor.position as ScratchCue;
     }
     const entry: Entry = { event, id, opts, startedBeat: null, at: null, recue: null, recuePending: false, state: 'pending' };
     this.entries.push(entry);
@@ -149,13 +158,13 @@ export class ScratchExecutor {
       if (e.state === 'pending') {
         const humanize = ev.humanizeMs / 1000;
         const dueSec = (ev.executeAtBeat - beat) * beatSec + humanize;
-        const isRecord = ev.source.type === 'CRATE';
+        const isRecord = onRecordVoice(ev);
         if (isRecord ? dueSec <= lookahead : dueSec <= 1e-4) this.start(e, Math.max(0, dueSec), beat);
       } else if (e.state === 'running') {
         if (e.recuePending) this.tryRecue(e);
         const endBeat = ev.executeAtBeat + ev.durationBeats;
         const endSec = (endBeat - beat) * beatSec + ev.humanizeMs / 1000;
-        if (ev.source.type === 'CRATE') {
+        if (onRecordVoice(ev)) {
           // a record gesture's stop is handed to the worklet ahead of time, at the end beat's context time
           if (endSec <= lookahead) {
             this.deps.release(e.id, { ...e.opts, at: this.deps.contextTime() + Math.max(0, endSec), finishCycle: false });
@@ -184,7 +193,7 @@ export class ScratchExecutor {
         this.touched.add(f);
       }
     }
-    if (ev.source.type === 'CRATE') {
+    if (onRecordVoice(ev)) {
       e.at = this.deps.contextTime() + dueSec;
       e.opts.at = e.at;
     }
@@ -196,7 +205,7 @@ export class ScratchExecutor {
       return;
     }
     e.state = 'running';
-    e.recuePending = ev.source.type === 'DECK' && ev.returnToAnchor;
+    e.recuePending = onDeck(ev) && ev.returnToAnchor;
     e.startedBeat = beat + dueSec / Math.max(1e-9, this.deps.clock.beatSec());
     scratchExecutorStats.started++;
     this.emit('started', ev.gesture);
@@ -205,7 +214,7 @@ export class ScratchExecutor {
   /** Re-cue a returns-to-anchor deck gesture once its fader window is closed (section 18). */
   private tryRecue(e: Entry): void {
     const ev = e.event;
-    if (ev.source.type !== 'DECK') { e.recuePending = false; return; }
+    if (ev.source.type !== 'DECK' && ev.source.type !== 'TRACKER_CHANNEL') { e.recuePending = false; return; }
     const r = this.deps.recueDeck(ev.deck ?? ev.source.deck, (ev.anchor as DeckScratchAnchor).position);
     if (r.mode === 'waiting') return;
     e.recuePending = false;
@@ -229,7 +238,7 @@ export class ScratchExecutor {
     if (e.state === 'running') {
       // a deck stroke at its end beat finishes the cycle it is in (it plays whole cycles and ends
       // itself); a cancel stops it now
-      this.deps.release(e.id, { ...e.opts, at: undefined, finishCycle: state === 'released' && e.event.source.type !== 'CRATE' });
+      this.deps.release(e.id, { ...e.opts, at: undefined, finishCycle: state === 'released' && !onRecordVoice(e.event) });
       scratchExecutorStats.released++;
     }
     e.state = state;
