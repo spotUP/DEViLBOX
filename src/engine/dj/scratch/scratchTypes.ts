@@ -23,7 +23,23 @@ export type ScratchGestureId =
   | 'laser' | 'phaser'
   | 'tweak' | 'vibrato'
   | 'uzi' | 'eightFingerCrab' | 'threeClickFlare'
-  | 'drop' | 'dropPhrase';
+  | 'drop' | 'dropPhrase'
+  // the reference's own (scratch.py :168-179, SCR-PG-A4): a cut, a stab with its echo, record flourishes
+  | 'cut' | 'echo' | 'brake' | 'spinup';
+
+/** A gesture's own effect (reference `echo` fx, scratch.py :175-176): the bus echo while it plays. */
+export interface ScratchGestureFx {
+  delayMix: number;
+  delaySec: number;
+  reverbMix: number;
+}
+
+/** The style's FX on the scratch bus for an event (reference style FX presets, scratch.py :341-345). */
+export interface ScratchEventFx {
+  style: ScratchDJStyle;
+  /** The style's FX amount x the genre's FX scale, 0..1: the wet tail floor. */
+  amount: number;
+}
 
 /** Musical role of a planned scratch event (section 83). */
 export type ScratchRole =
@@ -112,6 +128,11 @@ export interface ScratchGesture {
   interpolateVelocity: boolean;
   /** One-shot (throws): the pattern does not loop. */
   loop: boolean;
+  /** The gesture's own effect (echo). */
+  fx?: ScratchGestureFx;
+  /** A record flourish (brake, spin-up): placed on purpose (an ending, a routine, a pad), never
+   *  drawn at random from a style's vocabulary. */
+  flourish?: boolean;
 }
 
 /** Scratch anchor on a source (section 11): seconds into the record. */
@@ -157,6 +178,8 @@ export interface ScratchEvent {
   intensity: number;
   deck?: 'A' | 'B';
   returnToAnchor: boolean;
+  /** The style's FX on the bus (SCR-PG-A5). */
+  fx?: ScratchEventFx;
 }
 
 /** The slice of a crate record the gesture compatibility rule needs

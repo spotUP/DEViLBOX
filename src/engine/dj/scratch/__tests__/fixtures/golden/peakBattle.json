@@ -6,9 +6,18 @@
  "events": [
   {
    "bar": 19,
+   "step": 7,
+   "beat": 77.75,
+   "gesture": "uzi",
+   "velocity": 0.8974285840858247,
+   "placementRole": "answer",
+   "role": "ANSWER"
+  },
+  {
+   "bar": 19,
    "step": 8,
    "beat": 78,
-   "gesture": "scribble",
+   "gesture": "flare2",
    "velocity": 0.73781921504638,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -17,7 +26,7 @@
    "bar": 19,
    "step": 15,
    "beat": 79.75,
-   "gesture": "transformer8",
+   "gesture": "uzi",
    "velocity": 0.7069898872062946,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -26,7 +35,7 @@
    "bar": 21,
    "step": 8,
    "beat": 86,
-   "gesture": "scribble",
+   "gesture": "flare2",
    "velocity": 0.6688164659613062,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -35,7 +44,7 @@
    "bar": 21,
    "step": 15,
    "beat": 87.75,
-   "gesture": "phaser",
+   "gesture": "laser",
    "velocity": 0.8341571236251499,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -107,7 +116,7 @@
    "bar": 24,
    "step": 8,
    "beat": 98,
-   "gesture": "flare2",
+   "gesture": "scribble",
    "velocity": 0.8872044610488855,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -116,7 +125,7 @@
    "bar": 24,
    "step": 15,
    "beat": 99.75,
-   "gesture": "transformer8",
+   "gesture": "uzi",
    "velocity": 0.8216150813281257,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -125,7 +134,7 @@
    "bar": 25,
    "step": 8,
    "beat": 102,
-   "gesture": "scribble",
+   "gesture": "flare2",
    "velocity": 0.8029281570793249,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -134,7 +143,7 @@
    "bar": 25,
    "step": 15,
    "beat": 103.75,
-   "gesture": "scribble",
+   "gesture": "flare2",
    "velocity": 0.7453833337025033,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -143,7 +152,7 @@
    "bar": 26,
    "step": 8,
    "beat": 106,
-   "gesture": "scribble",
+   "gesture": "flare2",
    "velocity": 0.968985262738207,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -152,7 +161,7 @@
    "bar": 26,
    "step": 15,
    "beat": 107.75,
-   "gesture": "scribble",
+   "gesture": "flare2",
    "velocity": 0.7550537757465231,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -170,7 +179,7 @@
    "bar": 27,
    "step": 15,
    "beat": 111.75,
-   "gesture": "crab",
+   "gesture": "twiddle",
    "velocity": 0.6983535761486722,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -179,7 +188,7 @@
    "bar": 28,
    "step": 8,
    "beat": 114,
-   "gesture": "transformer8",
+   "gesture": "uzi",
    "velocity": 0.9472610670978572,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -215,7 +224,7 @@
    "bar": 29,
    "step": 15,
    "beat": 119.75,
-   "gesture": "orbit",
+   "gesture": "crab",
    "velocity": 0.8052080026186452,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -278,7 +287,7 @@
    "bar": 32,
    "step": 8,
    "beat": 130,
-   "gesture": "twiddle",
+   "gesture": "crab",
    "velocity": 0.682337128399747,
    "placementRole": "answer",
    "role": "ANSWER"
@@ -287,7 +296,7 @@
    "bar": 32,
    "step": 15,
    "beat": 131.75,
-   "gesture": "orbit",
+   "gesture": "crab",
    "velocity": 0.8297331763130759,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -296,7 +305,7 @@
    "bar": 33,
    "step": 8,
    "beat": 134,
-   "gesture": "orbit",
+   "gesture": "crab",
    "velocity": 0.8822875734955713,
    "placementRole": "answer",
    "role": "ANSWER"

@@ -33,6 +33,7 @@ export const SCRATCH_GESTURE_IDS: readonly ScratchGestureId[] = [
   'transformer4', 'transformer8', 'flare1', 'flare2', 'orbit', 'crab', 'scribble',
   'hydroplane', 'tearForward', 'tearReverse', 'twiddle', 'drag', 'laser', 'phaser',
   'tweak', 'vibrato', 'uzi', 'eightFingerCrab', 'threeClickFlare', 'drop', 'dropPhrase',
+  'cut', 'echo', 'brake', 'spinup',
 ];
 
 /** Section 31 difficulty ladder; the extras rank as level-3 accents, the
@@ -43,6 +44,8 @@ export const GESTURE_LEVELS: Readonly<Record<ScratchGestureId, ScratchLevel>> = 
   flare1: 3, flare2: 3, transformer8: 3, scribble: 3, tearReverse: 3,
   uzi: 3, laser: 3, phaser: 3, tweak: 3, twiddle: 3, vibrato: 3,
   orbit: 4, crab: 4, hydroplane: 4, threeClickFlare: 4, eightFingerCrab: 4,
+  // the reference's cut and echo are stabs (level 1); brake / spin-up are record flourishes (level-3 accents)
+  cut: 1, echo: 1, brake: 3, spinup: 3,
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -116,7 +119,7 @@ function rolesFor(id: ScratchGestureId, durationSteps: number, windows: number):
   return ['THEME', 'ANSWER', 'FEATURE', 'FILL'];
 }
 
-// ── the 27 definitions (before the computed fields) ────────────────────────
+// ── the 31 definitions (before the computed fields) ────────────────────────
 
 interface GestureSeed {
   id: ScratchGestureId;
@@ -131,6 +134,8 @@ interface GestureSeed {
   returnsToAnchor: boolean;
   recommendedBpm?: { min?: number; max?: number };
   allowsSampleSource: boolean;
+  fx?: ScratchGesture['fx'];
+  flourish?: boolean;
   /** Strokes of the curve inside the gesture's length (flutter textures: 2); default 1. */
   strokes?: number;
   interpolateVelocity: boolean;
@@ -139,11 +144,7 @@ interface GestureSeed {
 
 // Legacy DEViLBOX velocity curves (the frames of `DJScratchEngine.ts` before
 // SCR-P1.3, velocities only; the fader lives in `faderWindows`).
-const BABY_CURVE = v([
-  [0, 0.2], [0.04, 0.8], [0.20, 2.4], [0.36, 0.8],
-  [0.40, 0.2], [0.44, 0.8], [0.60, 1.8], [0.76, 0.8],
-  [0.80, 0.2],
-]);
+const BABY_CURVE = v([[0, 3.2], [0.25, -3.2], [0.75, 3.2]]);
 const FLARE_CURVE = v([
   [0, 0], [0.10, 2.2], [0.15, 2.2], [0.19, 2.2], [0.33, 2.0], [0.37, 1.5],
   [0.50, 0], [0.65, -1.0], [0.90, -0.3],
@@ -163,10 +164,12 @@ const SEEDS: readonly GestureSeed[] = [
   {
     id: 'baby', name: 'Baby Scratch', durationSteps: 4,
     styles: ['oldSchool', 'boomBap', 'battle'],
+    // reference baby (O3): out to A and back through the anchor to -A, fader open; the keyframes are
+    // the hand path's slopes at forwardStab's scale (4 A/cycle -> 3.2), a true reverse
     handPath: hand([[0, 0], [0.25, 1], [0.5, 0], [0.75, -1], [1, 0]]),
     velocityCurve: BABY_CURVE, faderWindows: referenceCutPattern('open'),
-    trueReverse: false, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+    trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
+    interpolateVelocity: false, loop: true,
   },
   {
     // Reference baby_slow: the same stroke at 0.6 A.
@@ -175,8 +178,8 @@ const SEEDS: readonly GestureSeed[] = [
     handPath: hand([[0, 0], [0.25, 0.6], [0.5, 0], [0.75, -0.6], [1, 0]]),
     velocityCurve: BABY_CURVE.map((p) => ({ t: p.t, velocity: p.velocity * 0.6 })),
     faderWindows: referenceCutPattern('open'),
-    trueReverse: false, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+    trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
+    interpolateVelocity: false, loop: true,
   },
   {
     // Reference forward_stab: audible on the forward push only, fader (0, 0.42).
@@ -423,6 +426,49 @@ const SEEDS: readonly GestureSeed[] = [
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: true,
     interpolateVelocity: false, loop: false,
   },
+  {
+    // Reference cut (scratch.py :168): out to 1.5 A at half the stroke and back, open (0, 0.42), 1 step.
+    // The velocity keyframes are the hand path's slopes at forwardStab's scale (3.1 A/cycle -> 2.5).
+    id: 'cut', name: 'Cut', durationSteps: 1,
+    styles: ['oldSchool', 'battle'],
+    handPath: hand([[0, 0], [0.5, 1.5], [1, 0]]),
+    velocityCurve: v([[0, 2.4], [0.5, -2.4]]),
+    faderWindows: deck([0, 0.42]),
+    trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
+    interpolateVelocity: false, loop: true,
+  },
+  {
+    // Reference echo (scratch.py :175-176): a forward stab, open (0, 0.4), whose tail feeds the
+    // bus echo (delay mix 0.35, 0.16 s, reverb 0.05), 2 steps.
+    id: 'echo', name: 'Echo Scratch', durationSteps: 2,
+    styles: ['boomBap', 'battle'],
+    handPath: hand([[0, 0], [0.42, 1.3], [1, 0]]),
+    velocityCurve: v([[0, 2.5], [0.50, -1.0]]),
+    faderWindows: deck([0, 0.4]),
+    fx: { delayMix: 0.35, delaySec: 0.16, reverbMix: 0.05 },
+    trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
+    interpolateVelocity: false, loop: false,
+  },
+  {
+    // Reference brake (scratch.py :178, turntable.py deck_motion 'brake', classic_stop strength 3):
+    // the record slows as exp(-3 t) over the gesture, fader open, 4 steps.
+    id: 'brake', name: 'Record Brake', durationSteps: 4,
+    styles: ['battle'], flourish: true,
+    velocityCurve: v(Array.from({ length: 9 }, (_, k) => [k / 8, Math.exp(-3 * (k / 8))] as const)),
+    faderWindows: OPEN,
+    trueReverse: false, returnsToAnchor: false, allowsSampleSource: true,
+    interpolateVelocity: true, loop: false,
+  },
+  {
+    // Reference spin-up (scratch.py :179, deck_motion 'start' on classic_sl1200, kp 9):
+    // the record comes up to speed as 1 - exp(-5 t), fader open, 4 steps.
+    id: 'spinup', name: 'Record Spin-Up', durationSteps: 4,
+    styles: ['battle'], flourish: true,
+    velocityCurve: v(Array.from({ length: 9 }, (_, k) => [k / 8, 1 - Math.exp(-5 * (k / 8))] as const)),
+    faderWindows: OPEN,
+    trueReverse: false, returnsToAnchor: false, allowsSampleSource: true,
+    interpolateVelocity: true, loop: false,
+  },
 ];
 
 // ── computed fields ────────────────────────────────────────────────────────
@@ -485,12 +531,10 @@ export function rankByActivity(ids: readonly ScratchGestureId[]): ScratchGesture
 
 // ── source compatibility (sections 38, 39) ─────────────────────────────────
 
-/** Up Rough reference ids -> catalogue ids. `cut` and `echo` are forward
- *  stabs (echo = a stab with a delay tail, section 43); `brake`/`spinup` are
- *  deck flourishes with no gesture here. */
+/** Up Rough reference ids -> catalogue ids (cut, echo, brake and spin-up are their own since SCR-PG-A4). */
 export const REFERENCE_GESTURE_IDS: Readonly<Record<string, ScratchGestureId>> = {
   baby: 'baby', baby_slow: 'babySlow',
-  forward_stab: 'forwardStab', backward_stab: 'backwardStab', cut: 'forwardStab', echo: 'forwardStab',
+  forward_stab: 'forwardStab', backward_stab: 'backwardStab', cut: 'cut', echo: 'echo', brake: 'brake', spinup: 'spinup',
   chirp: 'chirp', chirp_double: 'chirpDouble',
   transformer4: 'transformer4', transformer8: 'transformer8',
   flare1: 'flare1', flare2: 'flare2', orbit: 'orbit',
@@ -498,6 +542,8 @@ export const REFERENCE_GESTURE_IDS: Readonly<Record<string, ScratchGestureId>> =
   tear_fwd: 'tearForward', tear_rev: 'tearReverse', drag: 'drag',
   drop: 'drop', drop_phrase: 'dropPhrase',
 };
+
+const STAB_VARIANTS: readonly ScratchGestureId[] = ['cut', 'echo'];
 
 /**
  * Gestures a record may carry (section 38) and the clean / pre-scratched
@@ -511,5 +557,8 @@ export function compatibleGestures(record: ScratchRecordGestureHints): ScratchGe
     const id = REFERENCE_GESTURE_IDS[ref];
     if (id && !out.includes(id) && getGesture(id).allowsSampleSource) out.push(id);
   }
+  // the reference's cut and echo are forward stabs (scratch.py :168, :175: the stab's hand, a
+  // shorter window, the echo's tail): a record that takes the stab takes them (SCR-PG-A4)
+  if (out.includes('forwardStab')) for (const id of STAB_VARIANTS) if (!out.includes(id)) out.push(id);
   return out;
 }

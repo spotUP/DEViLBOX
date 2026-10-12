@@ -1,6 +1,6 @@
 /**
  * Gesture catalogue (owner scratch plan sections 9, 10, 38, 39, 67, Gate B;
- * ledger SCR-P1.2, P1.3, P1.10, P1.11): the 27 gestures, their computed
+ * ledger SCR-P1.2, P1.3, P1.10, P1.11): the 31 gestures, their computed
  * ranking, the legacy pattern mapping, the structural validity rules and the
  * source compatibility rule, read from the data the engine executes.
  */
@@ -22,10 +22,10 @@ const REQUIRED_FIELDS: ReadonlyArray<keyof ScratchGesture> = [
 ];
 
 describe('scratch gesture catalogue (SCR-P1.2)', () => {
-  it('holds the 27 ids of section 9 + throws + the DEViLBOX extras, each once', () => {
-    expect(SCRATCH_GESTURES).toHaveLength(27);
-    expect(SCRATCH_GESTURE_IDS).toHaveLength(27);
-    expect(new Set(SCRATCH_GESTURES.map((g) => g.id)).size).toBe(27);
+  it('holds the 31 ids: section 9 + throws + the DEViLBOX extras + the reference cut, echo, brake and spin-up (SCR-PG-A4), each once', () => {
+    expect(SCRATCH_GESTURES).toHaveLength(31);
+    expect(SCRATCH_GESTURE_IDS).toHaveLength(31);
+    expect(new Set(SCRATCH_GESTURES.map((g) => g.id)).size).toBe(31);
     expect(SCRATCH_GESTURES.map((g) => g.id)).toEqual(SCRATCH_GESTURE_IDS);
   });
 
@@ -133,7 +133,7 @@ describe('pattern data validity (section 67, SCR-P1.11)', () => {
       expect([1, 2, 3, 4]).toContain(g.difficulty);
       expect(GESTURE_LEVELS[g.id]).toBe(g.difficulty);
     }
-    expect(Object.keys(GESTURE_LEVELS)).toHaveLength(27);
+    expect(Object.keys(GESTURE_LEVELS)).toHaveLength(31);
   });
 
   it('fader window validity: 0 <= start < end <= 1, windows of one curve never overlap', () => {
@@ -179,9 +179,11 @@ describe('source + gesture compatibility (sections 38, 39, SCR-P1.10)', () => {
   it('every reference gesture id in the crate resolves to a catalogue id', () => {
     const refs = new Set(Object.values(metadata).flatMap((r) => r.recommended_gestures));
     for (const ref of refs) {
-      expect(compatibleGestures({ recommendedGestures: [ref], preScratched: false }), ref).toHaveLength(1);
+      // a stab brings its variants (cut, echo); everything else maps one to one
+      expect(compatibleGestures({ recommendedGestures: [ref], preScratched: false }), ref).toHaveLength(ref === 'forward_stab' ? 3 : 1);
     }
-    expect(compatibleGestures({ recommendedGestures: ['cut', 'forward_stab', 'echo'], preScratched: false })).toEqual(['forwardStab']);
+    // the reference's cut and echo are their own gestures since SCR-PG-A4
+    expect(compatibleGestures({ recommendedGestures: ['cut', 'forward_stab', 'echo'], preScratched: false })).toEqual(['cut', 'forwardStab', 'echo']);
     expect(compatibleGestures({ recommendedGestures: ['tear_fwd'], preScratched: false })).toEqual(['tearForward']);
   });
 });

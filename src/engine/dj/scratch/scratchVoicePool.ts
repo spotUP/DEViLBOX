@@ -15,7 +15,7 @@
 import * as Tone from 'tone';
 import { getDJEngine } from '../DJEngine';
 import { DeckScratchBuffer, SCRATCH_RECORD_RING_BASE } from '../DeckScratchBuffer';
-import { createScratchBus, type ScratchBus } from './scratchBus';
+import { createScratchBus, SCRATCH_FX_PROFILES, STYLE_FX_PROFILE, type ScratchBus } from './scratchBus';
 import { ScratchRecordVoice, type ScratchCue, type StrokeResult } from './ScratchRecordVoice';
 import { getScratchRecord, findRecords, type ScratchRecord } from './scratchCatalogue';
 import type { ScratchGesture, ScratchRole } from './scratchTypes';
@@ -24,7 +24,7 @@ import { realTimers } from '../autodj/executorTimers';
 import { useDJStore } from '@/stores/useDJStore';
 
 /** Reachability sentinels (SCR-P2.R2). */
-export const scratchPoolStats = { performs: 0, loads: 0 };
+export const scratchPoolStats = { performs: 0, loads: 0, styleFx: 0 };
 
 export const SCRATCH_VOICE_COUNT = 2;
 
@@ -38,6 +38,8 @@ export interface PerformOptions {
   cue?: ScratchCue;
   /** Context time to start at (a planner's beat); now when omitted. */
   at?: number;
+  /** The style's FX on the bus (reference style preset; amount = the wet tail floor), SCR-PG-A5. */
+  fx?: import('./scratchTypes').ScratchEventFx;
 }
 
 export interface PerformHandle {
@@ -185,9 +187,16 @@ export class ScratchVoicePool {
         this.levelStats.matched++;
         this.levelStats.lastLevel = level;
       }
+      // the style's preset on this voice's bus; its FX amount is the wet tail's floor
+      let ambience = opts.ambience;
+      if (opts.fx) {
+        this.buses[voice.index]!.setStyleFx(SCRATCH_FX_PROFILES[STYLE_FX_PROFILE[opts.fx.style]], opts.at);
+        ambience = Math.max(ambience ?? 0, Math.max(0, Math.min(1, opts.fx.amount)));
+        scratchPoolStats.styleFx++;
+      }
       const result = voice.playGesture(gesture, opts.bpm, {
         cue: opts.cue ?? this.anchor ?? undefined,
-        ambience: opts.ambience,
+        ambience,
         velocity: opts.velocity,
         at: opts.at,
       });

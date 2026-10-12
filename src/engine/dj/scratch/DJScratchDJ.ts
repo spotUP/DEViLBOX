@@ -17,7 +17,7 @@ import { buildScratchContext, type ScratchPerformanceContext } from './scratchCo
 import { planJuggleResponse, planScratch, toScratchEvents, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
 import type { ThrowMemory } from './scratchPlacement';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
-import type { ScratchMode } from './scratchStyles';
+import { SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
 import { anchorFor } from './scratchAnchor';
 import type { ScratchRecord } from './scratchCatalogue';
 import { selectScratchSource, type SourceDecision, type SourceRequest, type TrackerSampleInfo } from './ScratchSourceSelector';
@@ -428,6 +428,8 @@ export class DJScratchDJ {
 
     const events = toScratchEvents(plan.events, chosen.source, chosen.anchor, {
       bpm: ctx.bpm, seed: seed + fromBar, downbeats: track.downbeats, deck: input.deck,
+      // the style's FX on the bus: its preset, at its FX amount x the genre's FX scale (SCR-PG-A5)
+      fx: { style: ctx.style, amount: SCRATCH_STYLES[ctx.style].fxAmount * (input.genre?.fxScale ?? 1) },
     }).map((e) => (chosen.source.type === 'CRATE' ? { ...e, anchor: anchorFor(chosen.source, e.role) ?? e.anchor } : e));
     // only what is still ahead of the clock
     const now = ctx.masterBeat;
