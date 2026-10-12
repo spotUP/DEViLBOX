@@ -23,7 +23,7 @@ import type { DeckScratchBuffer, RingRatePoint, RingRateCurveOptions, RingFaderW
 import type { ScratchRecord } from './scratchCatalogue';
 import type { ScratchGesture, ScratchHandPath, ScratchVelocityPoint } from './scratchTypes';
 import { positionCurveToRateCurve } from './scratchAnchor';
-import { faderWindowsMs, faderRampSec, cycleMs } from './scratchFaderModel';
+import { faderWindowsMs, faderCurveShape, cutRampSec, cycleMs } from './scratchFaderModel';
 import { handSpeedFactor } from './scratchHandSpeed';
 
 /** The ring surface the voice uses (DeckScratchBuffer in record mode; a fake in tests). */
@@ -256,14 +256,16 @@ export class ScratchRecordVoice {
     return { ok: true, clamped };
   }
 
-  /** The gesture's fader windows (section 19), frame-accurate in the ring, 3-8 ms ramps. */
+  /** The gesture's fader windows (section 19), frame-accurate in the ring: the reference battle
+   *  transfer curve on a 1-3 ms ramp, sharper as the velocity rises (O7). */
   fader(gesture: Pick<ScratchGesture, 'faderWindows' | 'cutLeadMs' | 'cycleBeats'>, bpm: number, opts: { loop?: boolean; velocity?: number; at?: number } = {}): void {
     const sr = this.ring.sampleRate;
     const windows = faderWindowsMs(gesture, bpm).map((w) => [w.open[0] / 1000 * sr, w.open[1] / 1000 * sr] as const);
     const ringOpts: RingFaderWindowsOptions = {
       cycleFrames: Math.max(1, Math.round(cycleMs(gesture, bpm) / 1000 * sr)),
       loop: !!opts.loop,
-      rampFrames: Math.max(1, Math.round(faderRampSec(opts.velocity ?? 1) * sr)),
+      rampFrames: Math.max(1, Math.round(cutRampSec(opts.velocity ?? 0.7) * sr)),
+      curveExp: faderCurveShape('battle').exponent,
     };
     this.ring.faderWindows(windows, ringOpts, opts.at);
   }

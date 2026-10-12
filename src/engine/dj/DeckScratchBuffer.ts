@@ -46,6 +46,8 @@ export interface RingFaderWindowsOptions {
   cycleFrames: number;
   loop?: boolean;
   rampFrames?: number;
+  /** Fader transfer-curve exponent applied to the window gain (1 linear; reference battle 12). */
+  curveExp?: number;
 }
 
 export interface RingPositionReport {

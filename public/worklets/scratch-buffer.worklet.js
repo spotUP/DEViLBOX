@@ -434,6 +434,9 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
             cycleFrames: Math.max(1, Math.round(d.cycleFrames || 1)),
             loop: !!d.loop,
             rampStep: 1 / rampFrames,
+            // the fader's transfer curve (reference fader_curve, cut_in 0 on the
+            // envelope): gain = 1 - (1 - g)^exp; 1 = linear
+            curveExp: Math.max(1, +d.curveExp || 1),
           };
           break;
         }
@@ -572,7 +575,8 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
       const L2 = this.getRecordSample(posI + 1, 0), L3 = this.getRecordSample(posI + 2, 0);
       const R0 = this.getRecordSample(posI - 1, 1), R1 = this.getRecordSample(posI, 1);
       const R2 = this.getRecordSample(posI + 1, 1), R3 = this.getRecordSample(posI + 2, 1);
-      const g = fadeGain * faderGain;
+      const shaped = fader && fader.curveExp > 1 ? 1 - Math.pow(1 - faderGain, fader.curveExp) : faderGain;
+      const g = fadeGain * shaped;
       if (out[0]) out[0][i] = hermite(L0, L1, L2, L3, frac) * g;
       if (out[1]) out[1][i] = hermite(R0, R1, R2, R3, frac) * g;
     }
