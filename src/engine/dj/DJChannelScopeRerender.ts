@@ -12,7 +12,7 @@
  * attached (DeckEngine.attachLateChannelScopes) while it plays.
  */
 import { scopelessOriginOf, releaseChannelStems, type ChannelScopeTrack, type ScopelessOrigin } from './channelScopeTrack';
-import { getCachedEntryByHash, listScopelessEntries } from './DJAudioCache';
+import { cacheFreeBytes, getCachedEntryByHash, listScopelessEntries } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
 import { getDJEngineIfActive } from './DJEngine';
 import type { DeckId } from './DeckEngine';
@@ -83,6 +83,13 @@ export async function rerenderPlaylistChannelScopes(): Promise<number> {
   let done = 0;
   for (const entry of await listScopelessEntries()) {
     if (!wanted.has(entry.filename)) continue;
+    // A background pass never evicts: the stems (up to ~4x the WAV, 16-bit stereo at 44.1 kHz)
+    // must fit in the room the cache has, or the pass stops. A deck load still re-renders its own track.
+    const stemBytes = 4 * entry.duration * 44100 * 4;
+    if ((await cacheFreeBytes()) < stemBytes) {
+      console.log(`[DJChannelScopeRerender] cache full, background pass stops before ${entry.filename}`);
+      break;
+    }
     if (await renderOnce(entry)) done++;
   }
   return done;

@@ -28,7 +28,8 @@ export interface CachedAudio {
   sampleRate: number;
   numberOfChannels: number;
   timestamp: number;      // Cache insertion time (for LRU)
-  sizeBytes: number;      // Audio data size
+  /** Every byte the entry stores (entryStoredBytes) as of its last write. Never trusted for eviction: recomputed on read. */
+  sizeBytes: number;
 
   // ── Analysis results (populated asynchronously after render) ──
   beatGrid?: BeatGridData;         // Computed beat positions + downbeats
@@ -178,6 +179,41 @@ export async function isCached(fileBuffer: ArrayBuffer): Promise<boolean> {
   }
 }
 
+const NUMBER_BYTES = 8; // a stored JS number
+
+function arrayBytes(a: ArrayBuffer | ArrayBufferView | undefined): number {
+  return a ? a.byteLength : 0;
+}
+
+/**
+ * Every byte a cache entry stores: the WAV, the module source, the channel
+ * track (scopes and stems - the stems alone are about 4x the WAV) and the
+ * peak and analysis arrays. The cap and eviction count this, never the
+ * stored sizeBytes (entries written before 2026-10-12 count the WAV only).
+ */
+export function entryStoredBytes(entry: Partial<CachedAudio>): number {
+  let n = arrayBytes(entry.audioData) + arrayBytes(entry.sourceData);
+  const track = entry.channelScopes;
+  if (track) {
+    for (const c of track.channels ?? []) n += arrayBytes(c);
+    for (const st of track.stems ?? []) n += arrayBytes(st);
+  }
+  n += (entry.waveformPeaks?.length ?? 0) * NUMBER_BYTES;
+  n += (entry.onsets?.length ?? 0) * NUMBER_BYTES;
+  for (const band of entry.frequencyPeaks ?? []) n += band.length * NUMBER_BYTES;
+  n += ((entry.beatGrid?.beats.length ?? 0) + (entry.beatGrid?.downbeats.length ?? 0)) * NUMBER_BYTES;
+  return n;
+}
+
+/** The cache's byte cap. */
+export const MAX_CACHE_SIZE_BYTES = MAX_CACHE_SIZE_MB * 1024 * 1024;
+let cacheCapBytes = MAX_CACHE_SIZE_BYTES;
+
+/** Set the byte cap (tests use a small one); the default is MAX_CACHE_SIZE_BYTES. */
+export function setCacheCapBytes(bytes: number = MAX_CACHE_SIZE_BYTES): void {
+  cacheCapBytes = bytes;
+}
+
 /** Store pre-rendered audio in cache */
 export async function cacheAudio(
   sourceFile: ArrayBuffer,
@@ -192,8 +228,6 @@ export async function cacheAudio(
   try {
     const database = await initDB();
     const hash = await hashFile(sourceFile);
-    const sizeBytes = audioData.byteLength;
-
     // Check if a stub entry exists (from cacheSourceFile) — preserve its sourceData
     let existingSource: ArrayBuffer | undefined;
     try {
@@ -215,14 +249,15 @@ export async function cacheAudio(
       sampleRate,
       numberOfChannels,
       timestamp: Date.now(),
-      sizeBytes,
+      sizeBytes: 0,
       sourceData: existingSource || sourceFile.slice(0), // preserve or store source
       channelScopes,
       scopeRenderVersion: CHANNEL_SCOPE_RENDER_VERSION,
     };
+    entry.sizeBytes = entryStoredBytes(entry);
 
-    // Check if adding this entry would exceed limits
-    await evictIfNeeded(sizeBytes);
+    // Make room for the whole entry (it replaces any stub of the same hash).
+    await evictIfNeeded(entry.sizeBytes, hash);
 
     return new Promise((resolve, reject) => {
       const tx = database.transaction(STORE_NAME, 'readwrite');
@@ -258,8 +293,8 @@ async function touchCacheEntry(hash: string): Promise<void> {
   }
 }
 
-/** Get cache metadata (total size, entry count) */
-async function getCacheMetadata(): Promise<CacheMetadata> {
+/** Get cache metadata (real total size, entry count), leaving out `excludeHash`. */
+async function getCacheMetadata(excludeHash?: string): Promise<CacheMetadata> {
   try {
     const database = await initDB();
 
@@ -277,7 +312,8 @@ async function getCacheMetadata(): Promise<CacheMetadata> {
           return;
         }
         const entry = cursor.value as CachedAudio;
-        totalSizeBytes += entry.sizeBytes;
+        if (entry.hash === excludeHash) { cursor.continue(); return; }
+        totalSizeBytes += entryStoredBytes(entry);
         entryCount++;
         cursor.continue();
       };
@@ -288,25 +324,30 @@ async function getCacheMetadata(): Promise<CacheMetadata> {
   }
 }
 
-/** Evict oldest entries if cache limits would be exceeded */
-async function evictIfNeeded(newEntrySizeBytes: number): Promise<void> {
-  const metadata = await getCacheMetadata();
-  const maxSizeBytes = MAX_CACHE_SIZE_MB * 1024 * 1024;
+/**
+ * Evict oldest entries so the cache's real total (entryStoredBytes), with the
+ * entry `keepHash` about to be written at `newEntrySizeBytes`, fits the cap.
+ * The entry being written is never evicted for itself, and its current
+ * stored bytes are not counted twice.
+ */
+async function evictIfNeeded(newEntrySizeBytes: number, keepHash?: string): Promise<void> {
+  const metadata = await getCacheMetadata(keepHash);
+  const maxSizeBytes = cacheCapBytes;
 
   // Check size limit
   if (metadata.totalSizeBytes + newEntrySizeBytes > maxSizeBytes) {
     const bytesToFree = (metadata.totalSizeBytes + newEntrySizeBytes) - maxSizeBytes;
-    await evictOldestEntries(bytesToFree);
+    await evictOldestEntries(bytesToFree, 0, keepHash);
   }
 
   // Check entry count limit
   if (metadata.entryCount >= MAX_CACHE_ENTRIES) {
-    await evictOldestEntries(0, metadata.entryCount - MAX_CACHE_ENTRIES + 1);
+    await evictOldestEntries(0, metadata.entryCount - MAX_CACHE_ENTRIES + 1, keepHash);
   }
 }
 
 /** Evict oldest entries (LRU) until freeing at least `bytesToFree` or `countToFree` entries */
-async function evictOldestEntries(bytesToFree = 0, countToFree = 0): Promise<void> {
+async function evictOldestEntries(bytesToFree = 0, countToFree = 0, keepHash?: string): Promise<void> {
   try {
     const database = await initDB();
 
@@ -333,10 +374,11 @@ async function evictOldestEntries(bytesToFree = 0, countToFree = 0): Promise<voi
           resolve();
           return;
         }
+        if (entry.hash === keepHash) { cursor.continue(); return; }
 
         // Delete this entry
         cursor.delete();
-        bytesFreed += entry.sizeBytes;
+        bytesFreed += entryStoredBytes(entry);
         entriesFreed++;
 
         cursor.continue();
@@ -369,6 +411,11 @@ export async function clearAudioCache(): Promise<void> {
     console.error('[DJAudioCache] Failed to clear cache:', err);
     throw err;
   }
+}
+
+/** Bytes the cache can still take before it evicts (real total, entryStoredBytes). */
+export async function cacheFreeBytes(): Promise<number> {
+  return cacheCapBytes - (await getCacheMetadata()).totalSizeBytes;
 }
 
 /** Get cache statistics for UI display */
@@ -425,6 +472,7 @@ export async function updateCacheAnalysis(
         // Merge analysis fields
         Object.assign(entry, analysis);
         entry.timestamp = Date.now();
+        entry.sizeBytes = entryStoredBytes(entry);
         const putReq = store.put(entry);
         putReq.onsuccess = () => resolve();
         putReq.onerror = () => reject(putReq.error);
@@ -460,6 +508,12 @@ export async function getCachedEntryByHash(hash: string): Promise<CachedAudio | 
 export async function setCacheChannelScopes(hash: string, track: ChannelScopeTrack | undefined): Promise<void> {
   try {
     const database = await initDB();
+    // The track (its stems about 4x the WAV) grows the entry: make room for its new size first.
+    if (track) {
+      const current = await getCachedEntryByHash(hash);
+      if (!current) return;
+      await evictIfNeeded(entryStoredBytes({ ...current, channelScopes: track }), hash);
+    }
     await new Promise<void>((resolve, reject) => {
       const tx = database.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
@@ -469,6 +523,7 @@ export async function setCacheChannelScopes(hash: string, track: ChannelScopeTra
         if (!entry) { resolve(); return; }
         if (track) entry.channelScopes = track;
         entry.scopeRenderVersion = CHANNEL_SCOPE_RENDER_VERSION;
+        entry.sizeBytes = entryStoredBytes(entry);
         const putReq = store.put(entry);
         putReq.onsuccess = () => resolve();
         putReq.onerror = () => reject(putReq.error);
@@ -523,6 +578,7 @@ export async function cacheSourceFile(fileBuffer: ArrayBuffer, filename: string)
           // Add source to existing entry
           existing.sourceData = fileBuffer.slice(0);
           existing.timestamp = Date.now();
+          existing.sizeBytes = entryStoredBytes(existing);
           store.put(existing);
         } else {
           // Create stub entry with just the source (no rendered audio yet)
