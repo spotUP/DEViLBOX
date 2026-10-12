@@ -17,10 +17,10 @@ import { classifyWindow, materialRefs } from './juggleMaterial';
 import { PATTERN_INTENSITY, coarsenLadder, minLadderRung, phaseAt, rolesAt, transitionLadder } from './jugglePatterns';
 import { budgetFor, conditions, downbeatAtOrAfter, confidencePolicy, intensityFor, lowConfidenceReason, planJuggle, releasePattern, scoreJuggleQuality, type JuggleDecision } from './jugglePlanner';
 import { phaseUnverified, PHASE_VERIFIED_SEC } from './phaseVerification';
-import { executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
+import { cutTimings, executeJuggle, type JuggleActionSink, type JuggleClock, type JuggleEvent, type JuggleExecution, type JuggleExecutionResult } from './juggleExecutor';
 import type {
   DJDeckPerformanceState, DJJuggleHistory, DJJugglePerformanceContext, DJPerformanceMode, JuggleMode, JuggleQualityScore,
-  JuggleTelemetry, DJJugglePatternType, JuggleNowState, StandaloneTelemetry,
+  JuggleTelemetry, DJJugglePatternType, JuggleNowState, StandaloneTelemetry, JuggleCutTiming,
 } from './juggleTypes';
 
 type AB = 'A' | 'B';
@@ -397,10 +397,10 @@ export class DJJuggleController {
       abortCheck: () => this.pendingAbort ?? phaseGate(),
     });
     this.execution = exec;
-    exec.done.then((result) => this.finish(pattern, result, ctx, startedAt, decision)).catch(() => { /* never throws */ });
+    exec.done.then((result) => this.finish(pattern, result, ctx, startedAt, decision, cutTimings(result.trace, exec.startBeat, clock.beatSec()))).catch(() => { /* never throws */ });
   }
 
-  private finish(pattern: JuggleExecution['pattern'], result: JuggleExecutionResult, ctx: DJJugglePerformanceContext, startedAt: number, decision: JuggleDecision): void {
+  private finish(pattern: JuggleExecution['pattern'], result: JuggleExecutionResult, ctx: DJJugglePerformanceContext, startedAt: number, decision: JuggleDecision, cuts: JuggleCutTiming[]): void {
     this.pendingAbort = null;
     this.juggledSec += (this.now() - startedAt) / 1000;
     this.lastJuggleAt = this.now();
@@ -411,7 +411,7 @@ export class DJJuggleController {
     const entry: DJJuggleHistory = {
       patternType: pattern.type, durationBars: pattern.durationBars, intensity: pattern.intensity, sourceTracks: [ctx.deckA.trackId, ctx.deckB.trackId],
       successScore: quality.overall, timestamp: this.now(), sequence: pattern.sequence, sectionKind: ctx.currentSection?.kind, setPhase: ctx.setPhase, energy: ctx.energy,
-      ladderBars: pattern.ladderBars,
+      ladderBars: pattern.ladderBars, cuts,
     };
     this.history.push(entry);
     if (this.history.length > 64) this.history.splice(0, this.history.length - 64);
@@ -453,7 +453,7 @@ export class DJJuggleController {
       nextActions: exec ? exec.nextActions(6) : [], reason: d?.reason ?? 'no decision yet', confidence: d ? Math.min(ctx?.beatConfidence ?? 0, ctx?.deckSyncConfidence ?? 0) : 0,
       safety: this.safety(exec !== null, d),
       budget: { juggledFraction: budget?.fraction ?? 0, secondsSinceLastJuggle: ctx?.secondsSinceLastJuggle ?? Infinity, cooldownSec: budget?.cooldownSec ?? 0 },
-      lastQuality: this.lastQuality, history: this.history.slice(-5).map((h) => ({ type: h.patternType, bars: h.durationBars, score: h.successScore })),
+      lastQuality: this.lastQuality, history: this.history.slice(-5).map((h) => ({ type: h.patternType, bars: h.durationBars, score: h.successScore, ...(h.cuts ? { cuts: h.cuts } : {}) })),
       standalone: this.standalone, juggleNow: this.nowState(),
     };
   }

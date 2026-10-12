@@ -172,8 +172,18 @@ export class DJMixerEngine {
     return this.curve;
   }
 
+  /**
+   * The context time the last crossfader move has fully landed. A move is a Tone ramp, scheduled one
+   * lookAhead after it is set (Tone.now()), while a deck stop acts at the context's current time: a deck
+   * stopped "after" a fader move would fall silent before the fader closed it (JUGGLE-LAST-CUT-LATE).
+   */
+  crossfaderSettledAt(): number { return this.crossfaderLandsAt; }
+  private crossfaderLandsAt = 0;
+
   private applyCrossfader(): void {
     const [gainA, gainB] = computeCrossfaderGains(this.position, this.curve);
+    // The longest ramp below (0.01 s), from Tone.now() (currentTime + lookAhead) where rampTo starts.
+    this.crossfaderLandsAt = Tone.now() + 0.01;
 
     // Smooth ramp to avoid clicks — use a very short ramp even for zero
     // (2ms is fast enough to feel instant but avoids audible clicks during fast scratches)

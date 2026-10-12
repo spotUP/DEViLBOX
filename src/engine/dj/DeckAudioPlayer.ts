@@ -243,9 +243,10 @@ export class DeckAudioPlayer {
     return at;
   }
 
-  stop(): void {
+  /** Stop now, or at a later context time (`atContextTime`, see stopPlayerNow). */
+  stop(atContextTime?: number): void {
     if (this.player.state === 'started') {
-      stopPlayerNow(this.player);
+      stopPlayerNow(this.player, atContextTime);
     }
     this._pendingOffset = null;
     this._rateTrackingActive = false;

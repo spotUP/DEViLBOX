@@ -829,13 +829,17 @@ export class DeckEngine {
     }
   }
 
-  stop(): void {
+  /**
+   * Stop the deck now, or at a later context time (`atContextTime`): a deck handed back behind the
+   * crossfader stops when the fader's move lands (DJMixerEngine.crossfaderSettledAt), not before it.
+   */
+  stop(atContextTime?: number): void {
     this._endBend();
     if (this._playbackMode === 'audio') {
       if (this._stemMode) {
-        this.stemPlayer.stop();
+        this.stemPlayer.stop(atContextTime);
       } else {
-        this.audioPlayer.stop();
+        this.audioPlayer.stop(atContextTime);
       }
     } else if (this._playbackMode === 'tracker') {
       this.replayer.stop();

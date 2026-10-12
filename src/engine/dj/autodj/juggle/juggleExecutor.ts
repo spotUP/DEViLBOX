@@ -9,7 +9,7 @@
  * conflicting loops, runaway FX, stuck patterns.
  */
 import { realTimers, type ExecutorTimers } from '../transitionExecutor';
-import type { DJJuggleAction, DJJugglePattern, JuggleEventKind } from './juggleTypes';
+import type { DJJuggleAction, DJJugglePattern, JuggleCutTiming, JuggleEventKind } from './juggleTypes';
 import { phaseUnverified } from './phaseVerification';
 
 /** The one musical clock: fractional master beats and the current beat period. */
@@ -93,6 +93,19 @@ export interface JuggleExecution {
 }
 
 const CUT_TYPES = new Set<DJJuggleAction['type']>(['CutIn', 'CutOut', 'HoldDeck', 'ReleaseDeck']);
+
+/** The crossfader moves of a finished trace, planned against fired (beats from `startBeat`, error in ms). */
+export function cutTimings(trace: readonly JuggleTraceEntry[], startBeat: number, beatSec: number): JuggleCutTiming[] {
+  return trace.filter((t) => CUT_TYPES.has(t.action.type)).map((t) => ({
+    type: t.action.type as JuggleCutTiming['type'],
+    deck: t.action.deck,
+    plannedBeat: t.scheduledBeat - startBeat,
+    executedBeat: t.firedBeat === null ? null : t.firedBeat - startBeat,
+    errorMs: t.firedBeat === null ? null : Math.round((t.firedBeat - t.scheduledBeat) * beatSec * 1000 * 10) / 10,
+    status: t.status,
+    ...(t.reason ? { reason: t.reason } : {}),
+  }));
+}
 const FX_TYPES = new Set<DJJuggleAction['type']>(['EchoThrow', 'ReverbThrow', 'FilterIn', 'FilterOut']);
 
 export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts: JuggleExecutionOptions): JuggleExecution {

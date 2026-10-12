@@ -51,7 +51,7 @@ export async function setupStandalone(
   const record = (v: number) => { holder.crossfader.push({ at: Date.now(), v, masterPos: rig.decks.A.position() }); };
   holder.engine = Object.assign(Object.create(DJEngine.prototype), {
     getDeck: (id: 'A' | 'B') => rig.decks[id], remapInstrumentIds: () => {}, tryAutoLoadStems: async () => {}, recorder: null, _pendingTrackSource: null,
-    mixer: { setCrossfader: record }, setCrossfader: record,
+    mixer: { setCrossfader: record, crossfaderSettledAt: () => 0 }, setCrossfader: record,
   });
   const pl = useDJPlaylistStore.getState();
   const id = `standalone-${Date.now()}`;

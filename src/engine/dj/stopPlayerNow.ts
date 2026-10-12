@@ -17,8 +17,10 @@ export function contextNow(): number {
  * tenth of a second, and a caller that held the deck muted around a pause
  * (scratch-buffer priming on load) unmuted while it was still sounding.
  */
-export function stopPlayerNow(player: Tone.Player): number {
-  const now = contextNow();
+export function stopPlayerNow(player: Tone.Player, atContextTime?: number): number {
+  // `atContextTime`: a stop that must wait for something scheduled ahead (a crossfader move lands one
+  // lookAhead after it is set): the player stops then, never earlier than now.
+  const now = Math.max(contextNow(), atContextTime ?? 0);
   player.fadeOut = PLAYER_FADE_S;
   player.stop(now);
   return now + PLAYER_FADE_S;
