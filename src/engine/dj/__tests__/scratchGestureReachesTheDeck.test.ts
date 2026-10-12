@@ -110,8 +110,8 @@ describe('a scratch gesture fired through the DJ FX registry reaches the deck (S
     deck.dispose();
   });
 
-  it('the registry carries one momentary action per catalogue gesture (33) plus stop, throw, cue, anchor, loop, record, release, in the scratch category', () => {
-    expect(SCRATCH_FX_ACTIONS).toHaveLength(33 + 7);
+  it('the registry carries one momentary action per catalogue gesture (33) plus stop, throw, cue, anchor, loop, record, release, macro, in the scratch category', () => {
+    expect(SCRATCH_FX_ACTIONS).toHaveLength(33 + 8);
     for (const a of SCRATCH_FX_ACTIONS) {
       expect(a.category).toBe('scratch');
       expect(DJ_FX_ACTION_MAP[a.id]).toBe(a);

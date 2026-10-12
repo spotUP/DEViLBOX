@@ -87,7 +87,7 @@ export type DjFxActionId =
   // a CRATE source - on the scratch record voice (section 16).
   | `fx_scratch_${ScratchGestureId}`
   | 'fx_scratch_stop' | 'fx_scratch_throw' | 'fx_scratch_cue' | 'fx_scratch_anchor'
-  | 'fx_scratch_loop' | 'fx_scratch_record' | 'fx_scratch_release';
+  | 'fx_scratch_loop' | 'fx_scratch_record' | 'fx_scratch_release' | 'fx_scratch_macro';
 
 /**
  * Options a caller may pass when firing an action. Deck actions default to
@@ -125,6 +125,8 @@ export interface DjFxFireOptions {
   onWaiting?: (ms: number) => void;
   /** Spinback: stop the deck once the reverse ends (a spinback exit: the record is pulled out). */
   stopAfter?: boolean;
+  /** Scratch Macro: the demo's macro script (ANCHOR n / FADER_OPEN / FADER_CLOSE / MOVE_FWD spd ticks / MOVE_REV spd ticks / CUT count ticks). */
+  macro?: string;
 }
 
 export interface DjFxAction {
@@ -1936,6 +1938,22 @@ function createScratchLoop(): DjFxAction {
   };
 }
 
+/** The demo's macro language (scratch.py `render_macro`, G11): a script played on a record as one stroke on Deck C. */
+function createScratchMacro(): DjFxAction {
+  return {
+    id: 'fx_scratch_macro',
+    name: 'Scratch Macro',
+    category: 'scratch',
+    mode: 'oneshot',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      const h = getScratchVoicePool().performMacro(opts?.macro ?? '', { record: opts?.record, bpm: opts?.bpm ?? deckBpm(deckId), velocity: opts?.amount, at: opts?.at, cue: opts?.anchor });
+      if (h?.errors.length) console.warn('[DjFx] scratch macro: skipped lines', h.errors);
+    },
+    disengage() {},
+  };
+}
+
 /** Select the record the next gesture takes (`record` = catalogue id; none = the catalogue's fit). */
 function createScratchRecord(): DjFxAction {
   return {
@@ -1972,6 +1990,7 @@ export const SCRATCH_FX_ACTIONS: DjFxAction[] = [
   createScratchCue(),
   createScratchAnchor(),
   createScratchLoop(),
+  createScratchMacro(),
   createScratchRecord(),
   createScratchRelease(),
 ];
