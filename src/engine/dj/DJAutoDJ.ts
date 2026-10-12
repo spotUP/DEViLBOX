@@ -27,6 +27,7 @@ import { detectDrumBreakTail, isChordChangeImminent } from './smartCuts';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { getSessionController, type SessionTrack } from './autodj/sessionController';
 import { executeTransition, releaseAutoKeyLock, type ExecutionHandle } from './autodj/transitionExecutor';
+import { realTimers } from './autodj/executorTimers';
 import { buildDJTrackAnalysis, playlistMetaFromSummary, summarizeTrack } from './autodj/trackAnalysis';
 import { getDecisionLog } from './autodj/decisionLog';
 import type { DJTrackAnalysis, DJTransitionPlan } from './autodj/types';
@@ -109,7 +110,7 @@ export function getAutoDJ(): DJAutoDJ {
 class DJAutoDJ {
   private activeDeck: DeckId = 'A';
   private idleDeck: DeckId = 'B';
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: unknown = null;
   private transitionCancel: (() => void) | null = null;
   private preloading = false;
   private preloadedDeck: DeckId | null = null;
@@ -510,12 +511,12 @@ class DJAutoDJ {
 
   private startPolling(): void {
     this.stopPolling();
-    this.pollTimer = setInterval(() => this.pollLoop(), POLL_INTERVAL_MS);
+    this.pollTimer = realTimers.setInterval(() => this.pollLoop(), POLL_INTERVAL_MS);
   }
 
   private stopPolling(): void {
     if (this.pollTimer !== null) {
-      clearInterval(this.pollTimer);
+      realTimers.clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
   }
@@ -1624,7 +1625,7 @@ class DJAutoDJ {
         const remaining = targetSec - pos;
         if (deadline === Infinity) deadline = Date.now() + Math.max(3000, remaining * 1500 + 3000);
         if (remaining <= 0.008 || Date.now() > deadline) { resolve(); return; }
-        setTimeout(check, Math.min(15, Math.max(1, remaining * 1000 - 5)));
+        realTimers.setTimeout(check, Math.min(15, Math.max(1, remaining * 1000 - 5)));
       };
       check();
     });
