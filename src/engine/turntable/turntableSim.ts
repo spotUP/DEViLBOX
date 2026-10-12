@@ -125,11 +125,12 @@ export class NumpyRandomState {
 
 // ── numpy helpers ──────────────────────────────────────────────────────────
 
-function linspace(a: number, b: number, n: number): Float64Array {
+/** `np.linspace(a, b, n)`: i x step + a, the last point exactly b. */
+export function linspace(a: number, b: number, n: number): Float64Array {
   const out = new Float64Array(n);
   if (n === 1) { out[0] = a; return out; }
   const step = (b - a) / (n - 1);
-  for (let i = 0; i < n; i++) out[i] = a + i * step;
+  for (let i = 0; i < n; i++) out[i] = i * step + a;
   out[n - 1] = b;
   return out;
 }
@@ -143,7 +144,10 @@ export function interp(x: number, xp: ArrayLike<number>, fp: ArrayLike<number>):
   while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (xp[mid]! <= x) lo = mid; else hi = mid; }
   const x0 = xp[lo]!, x1 = xp[hi]!;
   if (x1 === x0) return fp[hi]!;
-  return fp[lo]! + (fp[hi]! - fp[lo]!) * (x - x0) / (x1 - x0);
+  // numpy's arr_interp: an exact knot returns its value, else slope x (x - x0) + y0
+  if (x === x0) return fp[lo]!;
+  const slope = (fp[hi]! - fp[lo]!) / (x1 - x0);
+  return slope * (x - x0) + fp[lo]!;
 }
 
 /** `np.gradient(y)` with unit spacing: central differences, one-sided at the ends. */

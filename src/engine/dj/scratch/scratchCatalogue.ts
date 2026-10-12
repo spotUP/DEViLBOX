@@ -70,6 +70,8 @@ export interface ScratchRecord {
   safeForward: readonly [number, number];
   safeReverse: readonly [number, number];
   wordSlices: readonly ScratchWordSlice[];
+  /** The demo's cue source (`entry["source"]`), in samples at 22,050 Hz: the vowel anchor and the safe range. */
+  demoCue: { anchor: number; safe: readonly [number, number] };
   /** `source_is_clean`: unscratched vinyl the engine may stroke. */
   clean: boolean;
   /** `source_is_pre_scratched`: a rendered scratch, a one-shot (`drop`) only. */
@@ -180,6 +182,7 @@ function convert(raw: RawRecord): ScratchRecord {
     transientCount: raw.transient_count,
     centroidHz: raw.centroid,
     anchor: { position: anchors.vowel, safe, safeForward, safeReverse },
+    demoCue: { anchor: raw.anchor_vowel, safe: [raw.safe[0] ?? 0, raw.safe[1] ?? 0] },
   };
 }
 
