@@ -26,11 +26,15 @@ export const OPPORTUNITY_MIN_BEAT_CONFIDENCE = 0.6;
 export const OPPORTUNITY_MIN_PHRASE_CONFIDENCE = 0.5;
 const VOCAL_BUSY = 0.7;
 
+/** Reachability sentinel (SCR-P7.R7). */
+export const scratchOpportunityStats = { find: 0 };
+
 /**
  * The opportunity at the context's bar, or null. `previousBarVocal` is the vocal activity of the
  * bar before (a call that just ended).
  */
 export function findOpportunity(ctx: ScratchPerformanceContext, opts: { previousBarVocal?: number } = {}): ScratchOpportunity | null {
+  scratchOpportunityStats.find++;
   const trusted = ctx.beatConfidence >= OPPORTUNITY_MIN_BEAT_CONFIDENCE && ctx.phraseConfidence >= OPPORTUNITY_MIN_PHRASE_CONFIDENCE;
   const bar = ctx.masterBar;
   const lastBarOfPhrase = ctx.barInPhrase === ctx.phraseBars - 1;
