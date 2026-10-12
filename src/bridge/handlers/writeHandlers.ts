@@ -11,6 +11,7 @@ import { useCursorStore } from '../../stores/useCursorStore';
 import { useHistoryStore } from '../../stores/useHistoryStore';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { useUIStore } from '../../stores/useUIStore';
+import { resolveViewTarget, VIEW_TARGETS } from '../../stores/uiViews';
 import {
   isRecoveryPromptOpen,
   describeRecoveryPrompt,
@@ -1214,8 +1215,12 @@ export function setFollowPlayback(params: Record<string, unknown>): Record<strin
 // ─── UI Control ────────────────────────────────────────────────────────────────
 
 export function setActiveView(params: Record<string, unknown>): Record<string, unknown> {
-  useUIStore.getState().setActiveView(params.view as 'tracker' | 'dj' | 'drumpad' | 'vj');
-  return { ok: true };
+  const target = resolveViewTarget(params.view);
+  if (!target) return { error: `Unknown view "${String(params.view)}". Views: ${VIEW_TARGETS.join(', ')}` };
+  const ui = useUIStore.getState();
+  ui.setActiveView(target.activeView);
+  if (target.trackerViewMode) ui.setTrackerViewMode(target.trackerViewMode);
+  return { ok: true, activeView: target.activeView, trackerViewMode: target.trackerViewMode ?? null };
 }
 
 export function setStatusMessage(params: Record<string, unknown>): Record<string, unknown> {
