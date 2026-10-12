@@ -18,11 +18,12 @@ import { snapPositionToBeat, snapLoopLength, phaseAlign } from './DJAutoSync';
 import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { createScratchRoomIR } from './scratch/scratchBus';
-import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
+import { DeckAudioPlayer, DeckLoadSuperseded, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
 import { attachChannelScopes, channelScopesFor, channelScopeWindow, releaseChannelStems, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
 import { DeckChannelMute, bufferWithStems, stemCountOf } from './DeckChannelMute';
+import { decodeStemsFlac } from './channelStemCodec';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
@@ -592,7 +593,7 @@ export class DeckEngine {
     this._loadedWav = buffer;
     this.setChannelScopes(channelScopesFor(buffer));
     const info = await this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
-    this.applyChannelStems();
+    await this.applyChannelStems();
     releaseChannelStems(this._channelScopes);
     // Fire-and-forget prime so the scratch ring buffer has content even
     // before the user presses play. Mirrors a real turntable: a loaded
@@ -611,7 +612,7 @@ export class DeckEngine {
     this._loadedWav = sourceWav ?? null;
     this.setChannelScopes(channelScopes);
     const info = await this.audioPlayer.loadDecodedBuffer(audioBuffer, originalBytes, precomputedPeaks);
-    this.applyChannelStems();
+    await this.applyChannelStems();
     releaseChannelStems(this._channelScopes);
     void this._primeScratchBuffer();
     return info;
@@ -634,13 +635,13 @@ export class DeckEngine {
    * audio or playback. Only when this deck still holds exactly `wav` and has no
    * track yet, so a deck that moved on to another track is left alone.
    */
-  attachLateChannelScopes(wav: ArrayBuffer, track: ChannelScopeTrack): boolean {
+  async attachLateChannelScopes(wav: ArrayBuffer, track: ChannelScopeTrack): Promise<boolean> {
     if (this._loadedWav !== wav || this.channelMute.stemCount > 0) return false;
     attachChannelScopes(wav, track);
     this.setChannelScopes(track);
     // A playing source keeps the buffer it started with; the stems sound from its next start (seek, cue, loop, play).
     // The caller releases the int16 stems once every deck holding `wav` has its buffer (DJChannelScopeRerender).
-    this.applyChannelStems();
+    await this.applyChannelStems();
     return true;
   }
 
@@ -648,12 +649,17 @@ export class DeckEngine {
    * Put the loaded track's channel stems behind its mix (bufferWithStems) and
    * wire the channel mute for them; the deck's current mask applies at once.
    */
-  private applyChannelStems(): void {
+  private async applyChannelStems(): Promise<void> {
     let buffer = this.audioPlayer.getAudioBuffer();
-    // A double shares its source's buffer, stems and all; otherwise build it from the WAV.
-    if (stemCountOf(buffer) === 0) {
+    // A double shares its source's buffer, stems and all; otherwise build it from the WAV and the
+    // track's FLAC stems (decoded off the main thread).
+    const flac = this._channelScopes?.flacStems;
+    if (stemCountOf(buffer) === 0 && flac && flac.length > 0) {
+      const wav = this._loadedWav;
+      const decoded = await decodeStemsFlac(flac);
+      if (this._loadedWav !== wav) throw new DeckLoadSuperseded('channel stems'); // another track loaded meanwhile
       const ctx = Tone.getContext().rawContext as unknown as BaseAudioContext;
-      const withStems = bufferWithStems(ctx, this._loadedWav, this._channelScopes?.stems);
+      const withStems = bufferWithStems(ctx, wav, decoded);
       if (withStems) { this.audioPlayer.replaceBuffer(withStems); buffer = withStems; }
     }
     const n = stemCountOf(buffer);

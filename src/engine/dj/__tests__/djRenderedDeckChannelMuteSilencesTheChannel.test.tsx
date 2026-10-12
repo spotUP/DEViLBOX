@@ -79,6 +79,9 @@ describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
     const Tone = await import('tone');
     Tone.setContext(new OfflineAudioContext(2, SR, SR) as never);
 
+    // The render worker encodes the stems as FLAC; load the encoder while process.versions is real
+    // (the in-process worker stubs it for the Emscripten glue, which the FLAC loader would trip on).
+    await (await import('@/lib/export/audioEncoders')).encodeFlac([new Float32Array(16)], 44100);
     const restoreWorkers = installInProcessWorkers();
     const { getDJPipeline } = await import('../DJPipeline');
     const bytes = readFileSync(join(process.cwd(), 'public/data/songs/formats', SONG));
@@ -91,6 +94,12 @@ describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
     const { useDJStore } = await import('@/stores/useDJStore');
     const { getCachedAudio } = await import('../DJAudioCache');
     expect(result.wavData.byteLength).toBeGreaterThan(0);
+    // The cache holds the stems as lossless FLAC (channelStemCodec.ts), not raw int16 (4x the WAV).
+    const cachedEntry = await getCachedAudio(source);
+    const flacBytes = (cachedEntry!.channelScopes?.flacStems ?? []).reduce((n, f) => n + f.byteLength, 0);
+    expect(cachedEntry!.channelScopes?.stems, 'raw int16 stems in the cache').toBeUndefined();
+    expect(flacBytes, 'FLAC stems cached').toBeGreaterThan(0);
+    expect(flacBytes, `stems ${flacBytes} B vs WAV ${result.wavData.byteLength} B`).toBeLessThan(2 * result.wavData.byteLength);
 
     /** The deck output (left) over the window, with the given CH buttons clicked after the load. */
     async function deckOutput(clickChannels: number[]): Promise<{ out: Float32Array; deck: InstanceType<typeof DeckEngine> }> {
@@ -129,13 +138,13 @@ describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
     const fullDb = db(rms(full.out, from));
     const allDb = db(rms(all.out, from));
     expect(fullDb, 'the unmuted deck plays').toBeGreaterThan(-40);
-    expect(allDb - fullDb, `all channels muted: ${allDb.toFixed(1)} dB vs ${fullDb.toFixed(1)} dB`).toBeLessThan(-40);
+    expect(allDb - fullDb, `all channels muted: ${allDb.toFixed(1)} dB vs ${fullDb.toFixed(1)} dB`).toBeLessThan(-49);
 
     // CH1 muted = the unmuted output minus CH1 alone (CH1 soloed = everything else muted).
     const solo1 = await deckOutput([1, 2, 3]);
     const expected = full.out.map((v, i) => v - solo1.out[i]);
     const diff = ch1.out.map((v, i) => v - expected[i]);
     expect(db(rms(ch1.out, from)), 'muting CH1 changes the output').not.toBeCloseTo(fullDb, 1);
-    expect(db(rms(diff, from)) - fullDb, 'CH1 muted = mix minus CH1').toBeLessThan(-40);
+    expect(db(rms(diff, from)) - fullDb, 'CH1 muted = mix minus CH1').toBeLessThan(-49);
   }, 600_000);
 });

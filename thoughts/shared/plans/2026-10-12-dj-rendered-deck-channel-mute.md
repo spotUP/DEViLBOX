@@ -170,3 +170,31 @@ Questions:
 
 The int16 stems also stay resident while the track object lives (the cache
 column's stem figure). SID stems are built but not measured.
+
+## Cached stems compressed (owner decision 2026-10-12)
+
+Measured on full-length renders (int16 stems from the render, FLAC = the
+app's encoder, lib/export/audioEncoders):
+
+| Song | Engine | L/R of each stem | int16 stereo | mono | FLAC stereo | FLAC mono |
+|---|---|---|---|---|---|---|
+| a sleep so deep.mod | UADE | L == R exactly (-227 dB) | 194.2 MB | 97.1 MB | 46.1 MB | 46.1 MB |
+| aquarivs.bp | UADE | L == R (-162 dB) | 176.0 MB | 88.0 MB | 40.3 MB | 40.3 MB |
+| flo boarding - level 1.xm | libopenmpt | L == R (-161 dB) | 92.7 MB | 46.4 MB | 15.3 MB | 15.3 MB |
+| aces_high.ahx | Hively | constant pan k 0.41, only to -75 dB | 198.0 MB | 99.0 MB | 100.6 MB | 55.8 MB |
+| hexplosion.hvl (8 of 16 ch) | Hively | pans move (-7 dB) | 316.1 MB | 158.1 MB | 44.6 MB | 36.9 MB |
+
+SID: no SID file in the format corpus; not measured.
+
+Decision as built: one stereo FLAC per channel for every engine. FLAC's
+stereo decorrelation stores an L == R stem at exactly the mono size, so
+mono-plus-pan would save nothing where it is exact (UADE, libopenmpt) and is
+not exact for Hively (AHX -75 dB, HVL -7 dB). Encoded in the render worker
+(the encoder's wasm build loads in the worker scope), decoded on deck load by
+the wasm FLAC decoder in its own Web Worker. Track version 3: version-2
+entries (raw int16 stems) re-render at low priority.
+
+Per 4.6-min MOD cache entry: 243 MB (WAV 48.6 + int16 stems 194.2) -> 95 MB
+(WAV 48.6 + FLAC stems 46.1): about 8 -> 21 such tracks under the 2000 MB cap.
+Stems alone: 4.2x smaller. Mute residual unchanged (reachability test asserts
+-49 dB); the decoder's 1/32767 scale vs the WAV's 1/32768 adds about -90 dB.

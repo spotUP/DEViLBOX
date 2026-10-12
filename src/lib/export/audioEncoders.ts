@@ -39,7 +39,29 @@ interface FlacApi {
 
 let flacReadyPromise: Promise<FlacApi> | null = null;
 
-const isNode = typeof process !== 'undefined' && !!process.versions?.node;
+/** Node / vitest. Read at load time, not import time: a test may stub process.versions while modules import. */
+function isNode(): boolean {
+  return typeof process !== 'undefined' && (!!process.versions?.node || typeof process.cwd === 'function');
+}
+
+/** A Web Worker (the DJ render worker encodes channel stems): no window, no document. */
+function isWorkerScope(): boolean {
+  return typeof window === 'undefined' && typeof self !== 'undefined' && typeof (self as { postMessage?: unknown }).postMessage === 'function';
+}
+
+/** Worker path: the same wasm UMD build, fetched and run in the worker scope (its UMD sets self.Flac). */
+async function loadFlacWorker(): Promise<FlacApi> {
+  const w = self as unknown as { Flac?: FlacApi; FLAC_SCRIPT_LOCATION?: string; location: { origin: string } };
+  if (!w.Flac) {
+    w.FLAC_SCRIPT_LOCATION = `${w.location.origin}/flac/`;
+    const code = await (await fetch(`${w.location.origin}/flac/libflac.min.wasm.js`)).text();
+    new Function(code)();
+  }
+  const Flac = w.Flac;
+  if (!Flac) throw new Error('libflac.min.wasm.js ran but self.Flac is missing');
+  if (!Flac.isReady()) await new Promise<void>((resolve) => Flac.on('ready', () => resolve()));
+  return Flac;
+}
 
 /** Browser path: load the self-contained wasm UMD build from /flac/ (public
  * static asset). The libflacjs npm entry point is a NODE factory (uses
@@ -78,7 +100,8 @@ async function loadFlacNode(): Promise<FlacApi> {
 async function loadFlac(): Promise<FlacApi> {
   if (!flacReadyPromise) {
     flacReadyPromise = (async () => {
-      if (isNode) {
+      if (isWorkerScope() && !isNode()) return loadFlacWorker();
+      if (isNode()) {
         // vitest runs jsdom (window exists), so detect node by process, and in
         // ambiguous environments fall back to the browser loader on throw.
         try {

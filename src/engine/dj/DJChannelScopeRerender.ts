@@ -54,7 +54,7 @@ export async function requestChannelScopeRerender(wav: ArrayBuffer): Promise<boo
   const engine = getDJEngineIfActive();
   let attached = false;
   for (const id of DECK_IDS) {
-    try { if (engine?.getDeck(id).attachLateChannelScopes(wav, track)) attached = true; } catch { /* no such deck */ }
+    try { if (await engine?.getDeck(id).attachLateChannelScopes(wav, track)) attached = true; } catch { /* no such deck */ }
   }
   // Every deck holding the WAV has its stem buffer now; the cache entry keeps the int16 copy
   // (the session map of renders would otherwise hold it for good).
