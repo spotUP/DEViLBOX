@@ -159,10 +159,10 @@ describe('ScratchRecordVoice (section 16, SCR-P2.5)', () => {
     expect(voice.busy).toBe(true);
   });
 
-  it('a throw (drop) cues the attack and rides forward at rate 1 with the fader open, once', () => {
+  it('a throw (drop) cues the vowel and rides forward at rate 1 with the fader open, once (SCR-THROW-DEMO)', () => {
     const drop = getGesture('drop');
     voice.playGesture(drop, 90, {});
-    expect(last(ring, 'seek')!.args[0]).toBeCloseTo(AH.safe[0], 9);
+    expect(last(ring, 'seek')!.args[0]).toBeCloseTo(AH.anchors.vowel, 9);
     const rc = last(ring, 'rateCurve')!;
     expect(rc.args[1]).toMatchObject({ loop: false, returnToAnchor: false });
     const points = rc.args[0] as RingRatePoint[];

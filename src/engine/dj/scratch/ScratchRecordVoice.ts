@@ -263,7 +263,7 @@ export class ScratchRecordVoice {
 
   /**
    * Cue + stroke + fader for a catalogue gesture at `bpm`, on any record
-   * (the demo's rule, SCR-PHRASING-PARITY D5). Throws cue the attack and ride forward with the fader
+   * (the demo's rule, SCR-PHRASING-PARITY D5). Throws cue the vowel (SCR-THROW-DEMO) and ride forward with the fader
    * open; hand gestures cue the vowel and loop with a return to the anchor.
    */
   playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number; style?: ScratchDJStyle; seed?: number } = {}): StrokeResult {
@@ -286,12 +286,12 @@ export class ScratchRecordVoice {
     // the gesture's own effect (the echo scratch's delay), or the channel's again
     this.bus.setGestureFx?.(gesture.fx ?? null, opts.at);
     if (gesture.fx) scratchVoiceStats.gestureFx++;
-    this.cue(opts.cue ?? (isThrow ? 'attack' : 'vowel'), opts.at);
+    this.cue(opts.cue ?? 'vowel', opts.at);
     let durationSec = cycleMs(gesture, bpm) / 1000;
     if (isThrow) {
-      // the whole word or phrase is heard (section 41): from the cue to the end of the safe range,
-      // whatever the gesture's nominal length; the planner reserves that length (`throwBeats`)
-      durationSec = Math.max(0.01, r.safe[1] - this.cuePosition);
+      // the demo's throw (render_gesture's play path): from the vowel at natural speed for the gesture's
+      // steps, at least 0.5 s, never past the record's end (SCR-THROW-DEMO)
+      durationSec = Math.max(0.01, Math.min(r.durationSec - this.cuePosition, Math.max(durationSec, 0.5)));
       this.faderGain(1, opts.at);
     } else {
       this.fader(gesture, bpm, { loop: gesture.loop, velocity: opts.velocity, at: opts.at });

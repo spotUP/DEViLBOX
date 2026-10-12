@@ -18,7 +18,7 @@ const crate = (recordId: string): ScratchSource => ({ type: 'CRATE', recordId, a
 describe('anchors (SCR-P3.1, SCR-PHRASING-PARITY: the demo cues one anchor)', () => {
   const rec = getScratchRecord('AH_STANDARD')!;
 
-  it('every hand gesture scratches a record from its vowel, as the demo does; a throw rides from the attack', () => {
+  it('every gesture scratches a record from its vowel, as the demo does - a throw too (SCR-THROW-DEMO)', () => {
     const baby = anchorFor(crate('AH_STANDARD'), 'baby') as ResolvedCrateAnchor;
     const orbit = anchorFor(crate('AH_STANDARD'), 'orbit') as ResolvedCrateAnchor;
     const drop = anchorFor(crate('AH_STANDARD'), 'drop') as ResolvedCrateAnchor;
@@ -27,9 +27,8 @@ describe('anchors (SCR-P3.1, SCR-PHRASING-PARITY: the demo cues one anchor)', ()
     expect(orbit.position).toBe(baby.position);
     // the vowel leaves reverse room: an orbit cued there is never refused at the safe start
     expect(orbit.position - rec.safeReverse[0]).toBeGreaterThan(0.01);
-    expect(drop.cue).toBe('attack');
-    // the attack is marked at 0, before the safe start: the anchor sits on the safe edge, as the voice plays it
-    expect(drop.position).toBe(Math.max(rec.safe[0], rec.anchors.attack));
+    expect(drop.cue).toBe('vowel');
+    expect(drop.position).toBe(baby.position);
     expect(baby.safeForward).toEqual(rec.safeForward);
   });
 
