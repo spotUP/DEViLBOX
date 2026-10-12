@@ -11,7 +11,26 @@
    "gesture": "flare2",
    "velocity": 0.6617059586480507,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 66,
+    "humanizeSamples": -200,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 15,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   }
   },
   {
    "bar": 19,
@@ -20,7 +39,26 @@
    "gesture": "flare2",
    "velocity": 0.9187960631723507,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 114,
+    "humanizeSamples": -108,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 63,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   }
   },
   {
    "bar": 23,
@@ -29,7 +67,26 @@
    "gesture": "transformer4",
    "velocity": 1,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 178,
+    "humanizeSamples": 150,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 127,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   }
   },
   {
    "bar": 31,
@@ -38,7 +95,26 @@
    "gesture": "flare2",
    "velocity": 0.9069062333104448,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 306,
+    "humanizeSamples": -29,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 255,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   }
   }
  ]
 }

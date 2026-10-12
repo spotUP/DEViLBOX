@@ -8,7 +8,7 @@
 
 import { barSeed, lfsr } from './scratchRandom';
 import {
-  DENSITY_RATE, planPhrase, pickGesture, vocabulary, humanizeMs, isThrowGesture, sectionDensity, SECTION_ENERGY, PLAN_VEL,
+  DENSITY_RATE, planPhrase, demoPhraseSteps, pickGesture, vocabulary, humanizeMs, isThrowGesture, sectionDensity, SECTION_ENERGY, PLAN_VEL,
   DENSITY_ORDER, oneHand, fillVocabulary, validatePhrase, VOCAL_BUSY, type DensityState, type PlacedScratch, type PlannedRest, type ScratchSection,
 } from './scratchPlacement';
 import { juggleResponseRoutine, routineFor, routineToPlaced, SCRATCH_ROUTINES, validateRoutine, type RoutineName } from './scratchRoutines';
@@ -19,7 +19,9 @@ import { DEFAULT_GRID, STEPS_PER_BEAT, stepToBeat } from './scratchAnchor';
 import { barStartBeat } from '../autodj/beatGrid';
 import { overlayRecord } from './scratchDemoRoutines';
 import type { ScratchPerformanceContext } from './scratchContext';
-import type { ScratchAnchor, ScratchEvent, ScratchGestureId, ScratchSource, DeckScratchAnchor } from './scratchTypes';
+import { DEMO_PROFILES, DEMO_RATE, type DemoProfileName } from './scratchRender';
+import { CLEAN_CRATE_POOL } from './scratchCatalogue';
+import type { ScratchAnchor, ScratchEvent, ScratchGestureId, ScratchRenderSpec, ScratchSource, DeckScratchAnchor } from './scratchTypes';
 
 /** Below this beat confidence the planner plays safe: level 1, no routine. */
 export const LOW_BEAT_CONFIDENCE = 0.5;
@@ -111,6 +113,61 @@ export function planJuggleResponse(ctx: ScratchPerformanceContext, opts: { mode:
   };
 }
 
+/** How the overlay renders a section's strokes (scratch.render_scratch_section; ledger P10, P11, C2). */
+export interface OverlayRender {
+  /** A stroke at (section-local bar, step): the profile's deck, the physics seed `seed x 3 + bar x 16 + step`, the
+   *  section's bus chain; matched to one of the demo's own slots, the demo's human timing `int((-10 + 25 x lfsr)
+   *  ms)` from LFSR(seed x 999 + 5), drawn once per slot in the demo's order (DEViLBOX's own strokes: none). */
+  stroke(bar: number, step: number, demo?: boolean): ScratchRenderSpec;
+  /** A routine event (render_routine(channel=False)): the boom-bap deck, seed + bar x 16 + step on the routine's
+   *  own (bar, step), no human timing, the ending's one-step delay; summed into the section from `firstBar`. */
+  routine(routineBar: number, step: number, firstBar: number, ending: boolean): ScratchRenderSpec;
+}
+
+export function overlayRender(o: { key: string; bars: number; seed: number; profile: DemoProfileName; demoSteps: (bar: number) => readonly number[]; routineBars?: ReadonlySet<number> }): OverlayRender {
+  const prof = DEMO_PROFILES[o.profile];
+  const rnd = lfsr(o.seed * 999 + 5);
+  const draws: number[] = [];
+  const draw = (i: number): number => { while (draws.length <= i) draws.push(rnd()); return draws[i]!; };
+  const counts: number[] = [];
+  const before = (bar: number): number => {
+    while (counts.length <= bar) {
+      const b = counts.length;
+      const prev = b === 0 ? 0 : counts[b - 1]! + (o.routineBars?.has(b - 1) ? 0 : o.demoSteps(b - 1).length);
+      counts.push(prev);
+    }
+    return counts[bar]!;
+  };
+  const used = new Map<number, Set<number>>();
+  const section = (step: number): NonNullable<ScratchRenderSpec['section']> => ({ key: o.key, step, bars: o.bars, fx: prof.fx });
+  return {
+    stroke(bar, step, demo = true) {
+      let humanizeSamples = 0;
+      if (demo && !o.routineBars?.has(bar)) {
+        const slots = o.demoSteps(bar);
+        const u = used.get(bar) ?? new Set<number>();
+        const j = slots.findIndex((x, i) => x === step && !u.has(i));
+        if (j >= 0) {
+          u.add(j); used.set(bar, u);
+          humanizeSamples = Math.trunc((-10 + 25 * draw(before(bar) + j)) * 1e-3 * DEMO_RATE);
+        }
+      }
+      return { seed: o.seed * 3 + bar * 16 + step, humanizeSamples, chain: 'overlay', deck: prof.deck, section: section(bar * 16 + step) };
+    },
+    routine(routineBar, step, firstBar, ending) {
+      return { seed: o.seed + routineBar * 16 + step, humanizeSamples: 0, chain: 'overlay', deck: 'boombap', ...(ending ? { ending } : {}), section: section((firstBar + routineBar) * 16 + step) };
+    },
+  };
+}
+
+/** `_routine_cues` with a record set (R12): slot i of (ROCK, FUNKY, BEAT, IF, YOU, REALLY, PHRASE) is the i-th sorted record. */
+const ROUTINE_SLOTS = ['ROCK', 'FUNKY', 'BEAT', 'IF', 'YOU', 'REALLY', 'PHRASE'] as const;
+export function routineSlotRecord(slot: string, records: readonly string[] = CLEAN_CRATE_POOL): string | undefined {
+  const picked = [...records].sort();
+  const i = ROUTINE_SLOTS.indexOf(slot as typeof ROUTINE_SLOTS[number]);
+  return picked.length && i >= 0 ? picked[i % picked.length] : undefined;
+}
+
 /** Reachability sentinel: sections the overlay planned bar by bar on section-local coordinates. */
 export const scratchOverlayStats = { sectionBars: 0 };
 
@@ -163,7 +220,8 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   const grid = DEFAULT_GRID;
   const bpb = ctx.meter;
 
-  interface SectionPlan { state: DensityState; rate: number; routineBars: Map<number, PlacedScratch[]>; record?: string }
+  interface SectionPlan { state: DensityState; rate: number; routineBars: Map<number, PlacedScratch[]>; record?: string; render: OverlayRender }
+  const demoProfile = profile.reference as DemoProfileName;
   const sections = new Map<string, SectionPlan>();
   const sectionPlan = (sec: OverlaySection): SectionPlan => {
     const key = `${sec.startBar}:${sec.name}`;
@@ -176,21 +234,35 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
     const rate = DENSITY_RATE[state] * (genre.densityScale ?? 1);
     reasons.push(`${sec.name} (bars ${sec.startBar}-${sec.startBar + sec.bars - 1}): ${natural}${shifted !== natural ? ` -> ${shifted}` : ''}${state !== shifted ? ` capped to ${state} by ${eff.mode}` : ''}`);
     const routineBars = new Map<number, PlacedScratch[]>();
+    // the demo renders the section from its own seed (the track seed + the bars before it)
+    const sectionSeed = opts.seed + sec.startBar;
+    const demoName = opts.routine ? (opts.routine === 'auto' ? routineFor(profile.id, sec.name) : opts.routine) : null;
+    const demoRb = demoName ? Math.min(SCRATCH_ROUTINES[demoName].bars, sec.bars) : 0;
+    const render = overlayRender({
+      key: `${sec.startBar}:${sec.name}`, bars: sec.bars, seed: sectionSeed, profile: demoProfile,
+      demoSteps: (b) => demoPhraseSteps({ style, section: sec.name, bar: b, bars: sec.bars, seed: sectionSeed, gestures: profile.gestures, scale: profile.scale }),
+      routineBars: new Set(Array.from({ length: demoRb }, (_, k) => sec.bars - demoRb + k)),
+    });
     // the demo's routine option: the routine takes the section's closing bars; a step past the section is trimmed
     if (opts.routine && !eff.levelCap && eff.mode !== 'SAFE' && state !== 'none') {
-      const name = opts.routine === 'auto' ? routineFor(profile.id, sec.name) : opts.routine;
+      const name = demoName!;
       const r = SCRATCH_ROUTINES[name];
       const rb = Math.min(r.bars, sec.bars);
       const first = sec.bars - rb;
       const placed = routineInLevel(r.events.filter((ev) => ev.bar * 16 + ev.step < rb * 16).map((ev) => {
         const bar = sec.startBar + first + ev.bar + Math.floor(ev.step / 16);
         const step = ev.step % 16;
-        return { bar, step, beat: stepToBeat({ bar, step }, grid, bpb), gesture: ev.gesture, velocity: ev.velocity, placementRole: ev.role === 'ANSWER' ? 'answer' as const : step >= 15 ? 'turnaround' as const : 'accent' as const, role: ev.role };
+        // with a record set each word slot scratches its own record (`_routine_cues`, R12)
+        const record = opts.records ? routineSlotRecord(ev.sourceRole) : undefined;
+        return {
+          bar, step, beat: stepToBeat({ bar, step }, grid, bpb), gesture: ev.gesture, velocity: ev.velocity, placementRole: ev.role === 'ANSWER' ? 'answer' as const : step >= 15 ? 'turnaround' as const : 'accent' as const, role: ev.role,
+          render: render.routine(ev.bar, ev.step, first, ev.tail), routineSlot: ev.sourceRole, ...(record ? { record } : {}),
+        };
       }), gestures, levelCap, opts.seed, sec.name);
       for (let k = 0; k < rb; k++) routineBars.set(sec.startBar + first + k, placed.filter((p) => p.bar === sec.startBar + first + k));
       reasons.push(`routine ${name} closes ${sec.name} at bar ${sec.startBar + first}`);
     }
-    const plan: SectionPlan = { state, rate, routineBars, record: opts.records ? overlayRecord(sec.name, opts.seed + sec.startBar) : undefined };
+    const plan: SectionPlan = { state, rate, routineBars, record: opts.records ? overlayRecord(sec.name, opts.seed + sec.startBar) : undefined, render };
     sections.set(key, plan);
     return plan;
   };
@@ -214,7 +286,7 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
       events = planPhrase({
         style, section: sec.name, bar: local, bars: sec.bars, seed: opts.seed + sec.startBar, gestures, scale: profile.scale,
         density: sp.state, rateOverride: sp.rate * (1 - Math.max(0, Math.min(1, vocal))), beatsPerBar: bpb, grid,
-      }).map((e) => ({ ...e, bar, beat: stepToBeat({ bar, step: e.step }, grid, bpb) }));
+      }).map((e) => ({ ...e, bar, beat: stepToBeat({ bar, step: e.step }, grid, bpb), render: sp.render.stroke(local, e.step) }));
     }
     // section 24: a vocal call just ended - answer it; a busy vocal bar keeps its answers (or one event)
     const afterCall = k > 0 && vocalAt(k - 1) > VOCAL_BUSY && vocal <= VOCAL_BUSY;
@@ -222,14 +294,14 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
       const rnd = lfsr(barSeed(opts.seed + sec.startBar, local, sec.name) + 0x5a);
       const energy = SECTION_ENERGY[sec.name as ScratchSection] ?? 0.4;
       const g = pickGesture(vocabulary(gestures), energy, 'answer', rnd, null);
-      events = [{ bar, step: 8, beat: stepToBeat({ bar, step: 8 }, grid, bpb), gesture: g, velocity: Math.min(1, PLAN_VEL.base + PLAN_VEL.rand * rnd() + PLAN_VEL.energy * energy), placementRole: 'answer', role: 'ANSWER' }];
+      events = [{ bar, step: 8, beat: stepToBeat({ bar, step: 8 }, grid, bpb), gesture: g, velocity: Math.min(1, PLAN_VEL.base + PLAN_VEL.rand * rnd() + PLAN_VEL.energy * energy), placementRole: 'answer', role: 'ANSWER', render: sp.render.stroke(local, 8, false) }];
     } else if (vocal > VOCAL_BUSY && events.length) {
       const answers = events.filter((e) => e.role === 'ANSWER');
       const kept = answers.length ? answers.slice(0, 2) : events.slice(0, 1);
       if (kept.length < events.length) rests.push({ bar, reason: 'vocal', role: events[0]!.role });
       events = kept;
     }
-    bars.push(sp.record ? events.map((e) => ({ ...e, record: sp.record })) : events);
+    bars.push(sp.record ? events.map((e) => ({ ...e, record: e.record ?? sp.record })) : events);
   }
 
   // the final plan is what one hand performs (SA-B1): a later stroke inside a sounding one is dropped

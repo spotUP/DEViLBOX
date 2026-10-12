@@ -36,14 +36,13 @@ export interface ScratchGestureFx {
   reverbMix: number;
 }
 
-/** The style's FX on the scratch bus for an event (reference style FX presets, scratch.py :341-345). */
+/**
+ * A stroke's channel choice. The style's FX are not here: the overlay applies its profile's `apply_fx` on the
+ * section's sum (X2, `ScratchRenderSpec.section`), as the demo does.
+ */
 export interface ScratchEventFx {
-  /** The planned style (its turntable and tone stages); absent = the channel's own. */
-  style?: ScratchDJStyle;
-  /** The style's FX amount x the genre's FX scale, 0..1: the wet tail floor. */
-  amount: number;
-  /** The channel's routine preset (reference RoutineDry / RoutineDark / RoutineDelay, SCR-PG-D3). */
-  preset?: 'dry' | 'dark' | 'delay';
+  /** The routine's stored version (reference render_versions: RoutineDry / RoutineDark / RoutineDelay / RoutinePhraseEnd, C3). */
+  preset?: 'dry' | 'dark' | 'delay' | 'phraseEnd';
 }
 
 /** Musical role of a planned scratch event (section 83). */
@@ -195,15 +194,25 @@ export interface ScratchEvent {
   render?: ScratchRenderSpec;
 }
 
+/** A record position a user's stroke reads from: a named anchor, seconds of record, or a word's vowel. */
+export type ScratchCue = 'attack' | 'vowel' | 'tail' | number | { word: string };
+
 /**
- * How the demo renders one planned stroke (`scratch.render_gesture` + its routine's placement): the
- * physics seed, the human timing in whole 22,050 Hz samples (the event's `humanizeMs` is then 0) and
- * the routine's bus chain.
+ * How the demo renders one stroke (`scratch.render_gesture` + its caller's placement): the physics seed, the
+ * human timing in whole 22,050 Hz samples (the event's `humanizeMs` is then 0), the deck physics, and the bus -
+ * a routine's chain (three_deck, scratch_dj, a stored version) or the overlay's section (render_scratch_section).
  */
 export interface ScratchRenderSpec {
   seed: number;
   humanizeSamples: number;
-  chain: 'threeDeck' | 'scratchDj';
+  chain: import('./scratchDeckC').DeckCChainName;
+  /** scratch.py `PROFILES[...]['deck']`; the boom-bap deck (three_deck, scratch_dj, render_routine) when omitted. */
+  deck?: import('./scratchRender').DemoDeckProfileName;
+  /** scratch_routine.render_routine's ending: the one-step tape delay (C2). */
+  ending?: boolean;
+  /** The overlay section the stroke sums into: its key, the stroke's 16th step from the section's start, the
+   *  section's bars, its profile's `apply_fx`. */
+  section?: { key: string; step: number; bars: number; fx: import('./scratchRender').DemoFx };
 }
 
 /** The slice of a crate record the gesture compatibility rule needs

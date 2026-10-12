@@ -11,7 +11,24 @@
    "gesture": "babySlow",
    "velocity": 0.9125749599450675,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 178,
+    "humanizeSamples": -132,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 127,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 25,
@@ -20,7 +37,24 @@
    "gesture": "baby",
    "velocity": 0.8005676356145571,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 210,
+    "humanizeSamples": 52,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 159,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 31,
@@ -29,7 +63,24 @@
    "gesture": "baby",
    "velocity": 0.7518181124589914,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 306,
+    "humanizeSamples": -137,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 255,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   }
  ]
 }

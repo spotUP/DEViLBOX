@@ -2,7 +2,7 @@
  * The A/B render pair for the owner's ear (SCR-PHRASING-PARITY): the 32-bar feature the Auto DJ plays at a
  * set's PEAK in PERFORMER - the demo's three-deck routine - rendered by DEViLBOX over the corpus 'drops'
  * track, through the controller (`DJScratchDJ.tick`), the real `ScratchExecutor`, the one action path
- * (`fireDjFx`) and the real voice pool, worklets and bus, offline. It writes the track, this render and
+ * (`fireDjFx`) and the real pool, worklet and Deck C bus, offline. It writes the track, this render and
  * the plan the demo side needs; `tools/scratch-fixtures/render_demo_three_deck.py` renders the demo's Deck C
  * from the same plan over the same track.
  *
@@ -21,7 +21,7 @@ import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } fr
 const SR_DEFAULT = 48000;
 const OUT = join(process.cwd(), 'thoughts', 'spot', 'renders', 'scratch-parity');
 const TRACK_GAIN = 0.72; // the demo's mix: 0.72 x the beat
-const holder = vi.hoisted(() => ({ ctx: null as unknown, samplerInput: null as unknown, programme: null as null | ((n: number) => Float32Array) }));
+const holder = vi.hoisted(() => ({ ctx: null as unknown, samplerInput: null as unknown }));
 
 vi.mock('tone', async (orig) => {
   const actual = await orig<typeof import('tone')>();
@@ -35,8 +35,8 @@ vi.mock('@/engine/dj/DJBeatJump', async () => (await import('@/test/audio/scratc
 vi.mock('@/engine/dj/DJAutoSync', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/engine/dj/DJAutoSync']());
 vi.mock('@/hooks/drumpad/useMIDIPadRouting', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/hooks/drumpad/useMIDIPadRouting']());
 vi.mock('@engine/ToneEngine', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@engine/ToneEngine']());
-/** Deck A plays the track: the scratch level follows its programme meter. */
-const deck = { waveformAnalyser: { getValue: () => holder.programme?.(256) ?? new Float32Array(256) }, getEffectiveBPM: () => 130 };
+/** Deck A plays the track (its level is the routine's shape, read from the track's audio). */
+const deck = { getEffectiveBPM: () => 130 };
 vi.mock('@/engine/dj/DJEngine', () => ({
   getDJEngine: () => ({ getDeck: () => deck, mixer: { samplerInput: holder.samplerInput } }),
   getDJEngineIfActive: () => ({ getDeck: () => deck, mixer: { samplerInput: holder.samplerInput } }),
@@ -58,15 +58,14 @@ function wav16(channels: Float32Array[], rate: number): Buffer {
 interface Fired { at: number; beats: number; gesture: string; record?: string }
 
 /** The three-deck routine at the PEAK over the drops track, offline, from one bar before the drop for `bars` bars. */
-/** `layers`: channel 0 = the scratch bus's output (mono), channel 1 = the voices' dry output (the bus input). */
-async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: boolean; rate?: number; programme?: boolean }) {
+/** `layers`: channel 0 = the scratch bus's output (mono), channel 1 silent. */
+async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: boolean; rate?: number }) {
   const SR = opts.rate ?? SR_DEFAULT;
   const { corpusTrack, corpusAnalysis } = await import('../autodj/testing/corpus');
   const { DJScratchDJ } = await import('../scratch/DJScratchDJ');
   const { ScratchExecutor } = await import('../scratch/ScratchExecutor');
   const { fireDjFx, releaseDjFx } = await import('@/engine/drumpad/DjFxActions');
   const { getScratchVoicePool, resetScratchVoicePool } = await import('../scratch/scratchVoicePool');
-  const { scratchVoiceStats } = await import('../scratch/ScratchRecordVoice');
   const { fractionalBeatAt, timeAtBeat, barStartBeat } = await import('../autodj/beatGrid');
   type Perf = import('../autodj/types').DJPerformanceContext;
 
@@ -94,15 +93,7 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: 
     const g = ctx.createGain(); g.gain.value = TRACK_GAIN;
     src.connect(g).connect(ctx.destination); src.start(0);
   }
-  // the programme meter reads the track either way: the scratch level follows it
-  // no programme: the scratch bus keeps its own level (the null test - the demo's level is one whole-render gain)
-  holder.programme = opts.programme === false ? null : (n) => {
-    const at = Math.round((t0 + ctx.currentTime) * track.sampleRate);
-    return Float32Array.from({ length: n }, (_, i) => TRACK_GAIN * (track.pcm[at + i] ?? 0));
-  };
   resetScratchVoicePool();
-  await getScratchVoicePool().ready;
-  if (merger) for (const v of getScratchVoicePool().voices) v.ring.playbackGain.connect(merger, 0, 1);
 
   const intervals: Array<() => void> = [];
   const timers = {
@@ -134,7 +125,7 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: 
     // as the Auto DJ wires it: the routine's records are read before their first stroke
     prepareRecords: (ids) => getScratchVoicePool().prepareRecords(ids),
     // as the Auto DJ wires it: three_deck's level and duck against the deck's audio (here the track, deck A)
-    shapeRoutine: (shape) => { shaped.push(getScratchVoicePool().shapeRoutinePlan(shape, { sampleRate: track.sampleRate, numberOfChannels: 1, length: track.pcm.length, getChannelData: () => track.pcm as Float32Array<ArrayBuffer> })); },
+    shapeRoutine: (shape) => { shaped.push(getScratchVoicePool().shapeRoutinePlan(shape, [{ audio: { sampleRate: track.sampleRate, numberOfChannels: 1, length: track.pcm.length, getChannelData: () => track.pcm as Float32Array<ArrayBuffer> }, trackFromSec: shape.trackFromSec, gain: 1 }])); },
   });
   const perf = (): Perf => ({ currentDeck: 'A', currentTrack: analysis, incomingTrack: null, currentPosition: pos(), setPhase: 'PEAK', setEnergy: 0.9, targetEnergy: 0.95, creativeRisk: 0.6 } as unknown as Perf);
   // the poll: every 10 ms of the render the controller ticks and the executor's interval runs
@@ -148,13 +139,9 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: 
       return Promise.all(shaped).then(() => ctx.resume());
     });
   }
-  const strokes0 = scratchVoiceStats.strokes, refused0 = scratchVoiceStats.refused;
   const out = await ctx.startRendering();
   expect(plannedSeed).not.toBeNull();
-  return {
-    out, fired, track, analysis, t0, t1, plannedSeed: plannedSeed!, barT, fromBar,
-    strokes: scratchVoiceStats.strokes - strokes0, refused: scratchVoiceStats.refused - refused0,
-  };
+  return { out, fired, track, analysis, t0, t1, plannedSeed: plannedSeed!, barT, fromBar };
 }
 
 /** RMS of both channels over [from, to) seconds. */
@@ -191,7 +178,7 @@ describe.skipIf(process.env.SCRATCH_AB_RENDER !== '1')('the A/B render pair (SCR
     const { deckCStats } = await import('../scratch/scratchDeckC');
     const before = deckCStats.strokes;
     const r = await renderRoutine({ bars: 33, withTrack: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT) });
-    console.log(`[A/B] Deck C strokes ${deckCStats.strokes - before}, voice strokes ${r.strokes}, refused ${r.refused}`);
+    console.log(`[A/B] Deck C strokes ${deckCStats.strokes - before}`);
     mkdirSync(OUT, { recursive: true });
     const name = process.env.SCRATCH_AB_NAME ?? 'devilbox_three_deck_drops';
     writeFileSync(join(OUT, `${name}.wav`), wav16([r.out.getChannelData(0), r.out.getChannelData(1)], r.out.sampleRate));
@@ -209,8 +196,8 @@ describe.skipIf(process.env.SCRATCH_AB_RENDER !== '1')('the A/B render pair (SCR
 describe.skipIf(process.env.SCRATCH_AB_LAYERS !== '1')('the isolated scratch layers for per-stroke comparison with the demo (SCR-AB-TAIL)', () => {
   beforeAll(() => { installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch(); });
 
-  it('writes the bus output and the voices\' dry output (no track) and the strokes the executor fired', async () => {
-    const r = await renderRoutine({ bars: 33, withTrack: false, layers: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT), programme: false });
+  it('writes the bus output (no track) and the strokes the executor fired', async () => {
+    const r = await renderRoutine({ bars: 33, withTrack: false, layers: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT) });
     mkdirSync(OUT, { recursive: true });
     const name = process.env.SCRATCH_AB_NAME ?? 'devilbox_layers';
     writeFileSync(join(OUT, `${name}.wav`), wav16([r.out.getChannelData(0), r.out.getChannelData(1)], r.out.sampleRate));

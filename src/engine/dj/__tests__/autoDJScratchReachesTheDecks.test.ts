@@ -3,12 +3,13 @@
  * with Auto DJ playing the corpus `breakdowns` track and Auto Scratch MUSICAL, the Auto DJ's own
  * poll loop (`startPolling`, the loop `enable()` starts) ticks the scratch performer, which finds
  * the opportunity, selects the source, plans phrases with `planPhrase`, and every planned event
- * is executed by the real `ScratchExecutor` within [-8, +10] ms of its grid beat; the record
- * voice strokes (a crate source never touches the deck). The Auto DJ decides WHETHER: the same
- * run with Auto Scratch OFF leaves every count at 0.
+ * is executed by the real `ScratchExecutor` within [-8, +10] ms of its grid beat; every stroke is
+ * the demo's render (`renderGesture`) summed on its section's overlay bus (PG-J: the one stroke
+ * renderer; a crate source never touches the deck). The Auto DJ decides WHETHER: the same run with
+ * Auto Scratch OFF leaves every count at 0.
  *
  * Fake timers drive the poll and the executor; the deck is a fake whose position runs on the
- * fake clock; the record voice renders through the real worklet on an offline context.
+ * fake clock; the strokes render through the real worklet on an offline context.
  */
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
@@ -49,12 +50,11 @@ import { ScratchExecutor, scratchExecutorStats, type ScratchRun } from '../scrat
 import { scratchOpportunityStats } from '../scratch/scratchOpportunity';
 import { demoRoutineStats } from '../scratch/scratchDemoRoutines';
 import { scratchPlacementStats } from '../scratch/scratchPlacement';
-import { scratchVoiceStats } from '../scratch/ScratchRecordVoice';
-import { getScratchVoicePool, resetScratchVoicePool } from '../scratch/scratchVoicePool';
+import { getScratchVoicePool, resetScratchVoicePool, scratchPoolStats } from '../scratch/scratchVoicePool';
+import { scratchRenderStats, DEMO_PROFILES } from '../scratch/scratchRender';
+import { deckCStats } from '../scratch/scratchDeckC';
 import { timeAtBeat, barStartBeat, fractionalBeatAt } from '../autodj/beatGrid';
 import { getDecisionLog } from '../autodj/decisionLog';
-import { scratchPhysicsStats, isPhysical } from '../scratch/scratchPhysics';
-import { getGesture } from '../scratch/scratchGestureCatalog';
 
 type Internals = {
   activeDeck: 'A' | 'B'; idleDeck: 'A' | 'B'; preloadedDeck: 'A' | 'B' | null; plan: unknown; execution: unknown; transitionCancel: unknown;
@@ -86,7 +86,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
   const idle = fakeDeck('B', 0, false);
   holder.engine = { getDeck: (id: 'A' | 'B') => (id === 'A' ? deck : idle), mixer: { samplerInput, setCrossfader: () => {} }, setCrossfader: () => {} };
   resetScratchVoicePool();
-  await getScratchVoicePool().ready; // the ring worklets load before the fake clock runs
+  await getScratchVoicePool().deckCBus('overlay'); // the bus worklet loads before the fake clock runs
 
   const pl = useDJPlaylistStore.getState();
   const id = `scratch-r7-${Date.now()}`;
@@ -118,8 +118,8 @@ async function run(mode: 'MUSICAL' | 'OFF') {
   });
   const before = {
     find: scratchOpportunityStats.find, select: demoRoutineStats.overlayRecord, phrase: scratchPlacementStats.planPhrase,
-    started: scratchExecutorStats.started, strokes: scratchVoiceStats.strokes, decisions: getDecisionLog().counts.SCRATCH ?? 0,
-    simulations: scratchPhysicsStats.performed,
+    started: scratchExecutorStats.started, rendered: scratchPoolStats.rendered, decisions: getDecisionLog().counts.SCRATCH ?? 0,
+    gestures: scratchRenderStats.gestures, strokes: deckCStats.strokes,
   };
 
   vi.useFakeTimers();
@@ -137,9 +137,9 @@ async function run(mode: 'MUSICAL' | 'OFF') {
     track, deck, runs, decisions: newDecisions > 0 ? getDecisionLog().list(newDecisions, 'SCRATCH') : [], memory: controller.memory.snapshot(),
     counts: {
       find: scratchOpportunityStats.find - before.find, select: demoRoutineStats.overlayRecord - before.select, phrase: scratchPlacementStats.planPhrase - before.phrase,
-      started: scratchExecutorStats.started - before.started, strokes: scratchVoiceStats.strokes - before.strokes,
+      started: scratchExecutorStats.started - before.started, rendered: scratchPoolStats.rendered - before.rendered,
       decisions: (getDecisionLog().counts.SCRATCH ?? 0) - before.decisions,
-      simulations: scratchPhysicsStats.performed - before.simulations,
+      gestures: scratchRenderStats.gestures - before.gestures, strokes: deckCStats.strokes - before.strokes,
     },
   };
 }
@@ -157,7 +157,7 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
     vi.restoreAllMocks();
   });
 
-  it('MUSICAL into a breakdown: opportunity, source, planPhrase, every planned event executed on the grid, the voice strokes', async () => {
+  it('MUSICAL into a breakdown: opportunity, source, planPhrase, every planned event executed on the grid, each stroke the demo render on the overlay bus', async () => {
     const { counts, runs, deck, track, decisions, memory } = await run('MUSICAL');
     expect(counts.find).toBeGreaterThanOrEqual(1);
     // the record is the demo's pick for the section (pick_source), never the music (SCR-PHRASING-PARITY D1, D4)
@@ -176,14 +176,12 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
     }
     expect(memory.scratchPhrases).toBe(counts.decisions);
     expect(memory.recentScratchGestures).toContain(decisions[decisions.length - 1]!.details!.gesture);
-    const crate = runs.filter((r) => r.run.event.source.type === 'CRATE');
-    if (crate.length === runs.length) {
-      // a crate source plays on the record voice and never touches the deck (section 16)
-      expect(counts.strokes).toBeGreaterThan(0);
-      expect(deck.touched.velocity + deck.touched.pattern).toBe(0);
-    } else {
-      expect(deck.touched.velocity + deck.touched.pattern + counts.strokes).toBeGreaterThan(0);
-    }
+    // PG-J: every crate stroke is rendered by the demo's renderer and summed on its section's overlay bus - the
+    // sentinels count one per fired stroke - and no stroke touches the deck
+    expect(counts.rendered).toBe(runs.length);
+    expect(counts.gestures).toBe(runs.length);
+    expect(counts.strokes).toBe(runs.length);
+    expect(deck.touched.velocity + deck.touched.pattern).toBe(0);
     // the stroke was handed to the engine for its grid beat plus its humanize offset, inside [-8, +10] ms
     for (const { run: r, beatSec } of runs) {
       expect(r.startedBeat).not.toBeNull();
@@ -191,16 +189,14 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
       expect(offMs, `${r.event.gesture} at beat ${r.event.executeAtBeat}`).toBeGreaterThanOrEqual(-8 - 6); // + one 5 ms tick for a deck stroke
       expect(offMs).toBeLessThanOrEqual(10 + 6);
       expect(Math.abs(offMs - r.event.humanizeMs)).toBeLessThanOrEqual(6);
+      // the demo's human timing rides in whole bus samples (-10..+15 ms), not on the executor's clock
+      expect(r.event.humanizeMs).toBe(0);
+      expect(Math.abs(r.event.render!.humanizeSamples)).toBeLessThanOrEqual(Math.trunc(0.015 * 22050));
     }
-    // SCR-PG-BR: every record stroke the model performs (not throws, not flourishes) is one turntable simulation
-    const physical = runs.filter((r) => r.run.event.source.type === 'CRATE' && isPhysical(getGesture(r.run.event.gesture))).length;
-    expect(physical).toBeGreaterThan(0);
-    expect(counts.simulations).toBe(physical);
-    // the style's FX rides on every planned event (SCR-PG-A5): Battle, its FX amount 0.25 x the genre's scale
+    // the overlay's render (P10, X2): the battle palette's profile deck and FX on the section's bus
     for (const { run: r } of runs) {
-      expect(r.event.fx?.style).toBe('battle');
-      expect(r.event.fx!.amount).toBeGreaterThan(0);
-      expect(r.event.fx!.amount).toBeLessThanOrEqual(0.25 * 2);
+      expect(r.event.render?.chain).toBe('overlay');
+      expect(r.event.render!.section!.fx).toEqual(DEMO_PROFILES.battle.fx);
     }
     // the planned beats sit on the track's own downbeat grid (1/16 steps of a bar)
     for (const { run: r } of runs) {
@@ -211,7 +207,7 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
 
   it('Auto Scratch OFF: the same run plans and performs nothing', async () => {
     const { counts, runs, deck } = await run('OFF');
-    expect(counts).toEqual({ find: 0, select: 0, phrase: 0, started: 0, strokes: 0, decisions: 0, simulations: 0 });
+    expect(counts).toEqual({ find: 0, select: 0, phrase: 0, started: 0, rendered: 0, decisions: 0, gestures: 0, strokes: 0 });
     expect(runs).toHaveLength(0);
     expect(deck.touched.velocity + deck.touched.pattern).toBe(0);
   }, 180_000);

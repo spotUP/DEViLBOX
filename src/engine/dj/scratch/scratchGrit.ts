@@ -84,7 +84,7 @@ export function demoRecordPcm(bytes: ArrayBuffer, rate = TT_RATE, opts: { grit?:
   }
   if (!fmt || !data) throw new Error('demoRecordPcm: not a PCM WAV');
   const sw = fmt.bits / 8, frames = Math.floor(data[1] / (sw * fmt.ch));
-  let d: Float64Array = new Float64Array(frames);
+  const d = new Float64Array(frames);
   for (let f = 0; f < frames; f++) {
     let sum = 0;
     for (let c = 0; c < fmt.ch; c++) {
@@ -99,23 +99,32 @@ export function demoRecordPcm(bytes: ArrayBuffer, rate = TT_RATE, opts: { grit?:
     // numpy mean(1): the sum over the channels, divided by their count
     d[f] = fmt.ch > 1 ? sum / fmt.ch : sum;
   }
+  return demoMonoPcm(d, fmt.sr, rate, opts);
+}
+
+/**
+ * A mono signal at `srcRate` read the way the demo's bank reads a WAV after decoding (`_read_wav`): resampled
+ * to `rate` (`resample_ratio`: resample_poly by the rational, trimmed to n, float32), peak-normalised in
+ * float32, then the S950 unless `grit` is false. A tracker deck's sample takes this path without the grit.
+ */
+export function demoMonoPcm(mono: ArrayLike<number>, srcRate: number, rate = TT_RATE, opts: { grit?: boolean } = {}): Float64Array {
   let d32: Float32Array;
-  if (fmt.sr !== rate) {
+  if (srcRate !== rate) {
     // synth_dsp.resample_ratio(x, sr_in / sr_out): resample_poly by the rational, trimmed to n, float32
-    const ratio = fmt.sr / rate;
-    const n = Math.max(1, Math.trunc(d.length / ratio));
+    const ratio = srcRate / rate;
+    const n = Math.max(1, Math.trunc(mono.length / ratio));
     const [up, down] = limitDenominator(1.0 / ratio, 2000);
-    const y = resamplePoly(d, up, down);
+    const y = resamplePoly(mono, up, down);
     d32 = new Float32Array(n);
     for (let i = 0; i < n && i < y.length; i++) d32[i] = y[i]!;
   } else {
-    d32 = Float32Array.from(d);
+    d32 = Float32Array.from(mono);
   }
   // d / (max|d| + 1e-9), in float32 (numpy keeps the array's type)
   let m = 0;
   for (let i = 0; i < d32.length; i++) m = Math.max(m, Math.abs(d32[i]!));
   const den = Math.fround(m + Math.fround(1e-9));
-  d = new Float64Array(d32.length);
+  const d = new Float64Array(d32.length);
   for (let i = 0; i < d32.length; i++) d[i] = Math.fround(d32[i]! / den);
   if (opts.grit === false) return d;
   scratchGritStats.transforms++;

@@ -11,7 +11,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.8572396429388877,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 59,
+    "humanizeSamples": 179,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 8,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 16,
@@ -20,7 +37,24 @@
    "gesture": "scribble",
    "velocity": 0.7803036545357442,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 66,
+    "humanizeSamples": -200,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 15,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 17,
@@ -29,7 +63,24 @@
    "gesture": "scribble",
    "velocity": 0.7965148393987945,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 75,
+    "humanizeSamples": -70,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 24,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 17,
@@ -38,7 +89,24 @@
    "gesture": "transformer8",
    "velocity": 0.8493110551613642,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 82,
+    "humanizeSamples": 150,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 31,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 18,
@@ -47,7 +115,24 @@
    "gesture": "hydroplane",
    "velocity": 1,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 91,
+    "humanizeSamples": -87,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 40,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 18,
@@ -56,7 +141,24 @@
    "gesture": "hydroplane",
    "velocity": 0.8581490806439307,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 98,
+    "humanizeSamples": 325,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 47,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 19,
@@ -65,7 +167,24 @@
    "gesture": "hydroplane",
    "velocity": 0.8230777447165637,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 107,
+    "humanizeSamples": 77,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 56,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 19,
@@ -74,7 +193,24 @@
    "gesture": "hydroplane",
    "velocity": 0.8267887388418402,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 114,
+    "humanizeSamples": 2,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 63,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 20,
@@ -83,7 +219,24 @@
    "gesture": "transformer8",
    "velocity": 1,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 123,
+    "humanizeSamples": -136,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 72,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 20,
@@ -92,7 +245,24 @@
    "gesture": "hydroplane",
    "velocity": 0.8304509040970474,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 130,
+    "humanizeSamples": 284,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 79,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 21,
@@ -101,7 +271,24 @@
    "gesture": "scribble",
    "velocity": 0.6468909742885481,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 139,
+    "humanizeSamples": 28,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 88,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 21,
@@ -110,7 +297,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.8991653315022508,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 146,
+    "humanizeSamples": 309,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 95,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 22,
@@ -119,7 +323,24 @@
    "gesture": "hydroplane",
    "velocity": 0.8806775005722133,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 155,
+    "humanizeSamples": 296,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 104,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 22,
@@ -128,7 +349,24 @@
    "gesture": "scribble",
    "velocity": 0.9082963302052339,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 162,
+    "humanizeSamples": -138,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 111,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 23,
@@ -137,7 +375,24 @@
    "gesture": "hydroplane",
    "velocity": 0.8976760509651333,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 171,
+    "humanizeSamples": 274,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 120,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 23,
@@ -146,7 +401,24 @@
    "gesture": "hydroplane",
    "velocity": 0.9125749599450675,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 178,
+    "humanizeSamples": -132,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 127,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 24,
@@ -155,7 +427,24 @@
    "gesture": "transformer8",
    "velocity": 0.8610360875867857,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 187,
+    "humanizeSamples": 152,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 136,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 24,
@@ -164,7 +453,24 @@
    "gesture": "hydroplane",
    "velocity": 0.9152544441901275,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 194,
+    "humanizeSamples": -28,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 143,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 25,
@@ -173,7 +479,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.7724849317158771,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 203,
+    "humanizeSamples": -179,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 152,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 25,
@@ -182,7 +505,24 @@
    "gesture": "scribble",
    "velocity": 0.8005676356145571,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 210,
+    "humanizeSamples": 52,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 159,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 26,
@@ -191,7 +531,24 @@
    "gesture": "transformer8",
    "velocity": 1,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 219,
+    "humanizeSamples": -192,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 168,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 26,
@@ -200,7 +557,24 @@
    "gesture": "scribble",
    "velocity": 0.7939024948500801,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 226,
+    "humanizeSamples": -100,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 175,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 27,
@@ -209,7 +583,24 @@
    "gesture": "hydroplane",
    "velocity": 0.8637888151369497,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 235,
+    "humanizeSamples": 123,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 184,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 27,
@@ -218,7 +609,24 @@
    "gesture": "hydroplane",
    "velocity": 0.6486976424811169,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 242,
+    "humanizeSamples": 277,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 191,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 28,
@@ -227,7 +635,24 @@
    "gesture": "chirpDouble",
    "velocity": 1,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 251,
+    "humanizeSamples": -58,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 200,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 28,
@@ -236,7 +661,24 @@
    "gesture": "scribble",
    "velocity": 0.8650095368886854,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 258,
+    "humanizeSamples": 9,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 207,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 29,
@@ -245,7 +687,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.7220813305867094,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 267,
+    "humanizeSamples": 215,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 216,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 29,
@@ -254,7 +713,24 @@
    "gesture": "hydroplane",
    "velocity": 0.7508110170138095,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 274,
+    "humanizeSamples": 296,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 223,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 30,
@@ -263,7 +739,24 @@
    "gesture": "hydroplane",
    "velocity": 0.8844739452201115,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 283,
+    "humanizeSamples": 273,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 232,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 30,
@@ -272,7 +765,24 @@
    "gesture": "hydroplane",
    "velocity": 0.7436575875486382,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 290,
+    "humanizeSamples": 24,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 239,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 31,
@@ -281,7 +791,24 @@
    "gesture": "transformer8",
    "velocity": 0.8940505073624782,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 299,
+    "humanizeSamples": 93,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 248,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 31,
@@ -290,7 +817,24 @@
    "gesture": "transformer8",
    "velocity": 0.7518181124589914,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 306,
+    "humanizeSamples": -137,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 255,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 32,
@@ -299,7 +843,24 @@
    "gesture": "hydroplane",
    "velocity": 0.7352529182879378,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 315,
+    "humanizeSamples": -121,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 264,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 32,
@@ -308,7 +869,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.7555779354543374,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 322,
+    "humanizeSamples": 298,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 271,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 33,
@@ -317,7 +895,24 @@
    "gesture": "hydroplane",
    "velocity": 0.9374837872892349,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 331,
+    "humanizeSamples": 146,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 280,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 33,
@@ -326,7 +921,24 @@
    "gesture": "transformer8",
    "velocity": 0.7004623483634699,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 338,
+    "humanizeSamples": -174,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 287,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 34,
@@ -335,7 +947,24 @@
    "gesture": "transformer8",
    "velocity": 0.6900129701686122,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 347,
+    "humanizeSamples": 32,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 296,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 34,
@@ -344,7 +973,24 @@
    "gesture": "hydroplane",
    "velocity": 0.7038315403982605,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 354,
+    "humanizeSamples": 30,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 303,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 35,
@@ -353,7 +999,24 @@
    "gesture": "hydroplane",
    "velocity": 0.7986938277256428,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 363,
+    "humanizeSamples": -84,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 312,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 35,
@@ -362,7 +1025,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.7491813534752423,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 370,
+    "humanizeSamples": 166,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 319,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 36,
@@ -371,7 +1051,24 @@
    "gesture": "scribble",
    "velocity": 1,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 379,
+    "humanizeSamples": -194,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 328,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 36,
@@ -380,7 +1077,24 @@
    "gesture": "scribble",
    "velocity": 0.7580193789578088,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 386,
+    "humanizeSamples": -6,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 335,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 37,
@@ -389,7 +1103,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.9870817120622569,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 395,
+    "humanizeSamples": 93,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 344,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 37,
@@ -398,7 +1129,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.6503150988021668,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 402,
+    "humanizeSamples": -196,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 351,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 38,
@@ -407,7 +1155,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.7403921568627451,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 411,
+    "humanizeSamples": 192,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 360,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 38,
@@ -416,7 +1181,24 @@
    "gesture": "scribble",
    "velocity": 0.6539772640573739,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 418,
+    "humanizeSamples": -9,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 367,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 39,
@@ -425,7 +1207,24 @@
    "gesture": "transformer8",
    "velocity": 0.8378606851300832,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 427,
+    "humanizeSamples": -164,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 376,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 39,
@@ -434,7 +1233,24 @@
    "gesture": "hydroplane",
    "velocity": 0.6606363012130922,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 434,
+    "humanizeSamples": 194,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 383,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 40,
@@ -443,7 +1259,24 @@
    "gesture": "hydroplane",
    "velocity": 0.9749599450675211,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 443,
+    "humanizeSamples": 244,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 392,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 40,
@@ -452,7 +1285,24 @@
    "gesture": "hydroplane",
    "velocity": 0.6548989089799344,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 450,
+    "humanizeSamples": -82,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 399,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 41,
@@ -461,7 +1311,24 @@
    "gesture": "scribble",
    "velocity": 0.6648233768215458,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 459,
+    "humanizeSamples": -209,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 408,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 41,
@@ -470,7 +1337,24 @@
    "gesture": "scribble",
    "velocity": 0.9890470740825513,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 466,
+    "humanizeSamples": 152,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 415,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 42,
@@ -479,7 +1363,24 @@
    "gesture": "scribble",
    "velocity": 0.7986877241168842,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 475,
+    "humanizeSamples": 154,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 424,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 42,
@@ -488,7 +1389,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.7089158464942398,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 482,
+    "humanizeSamples": 119,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 431,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 43,
@@ -497,7 +1415,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.6751689936675059,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 491,
+    "humanizeSamples": 135,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 440,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 43,
@@ -506,7 +1441,24 @@
    "gesture": "transformer8",
    "velocity": 0.7586846723125048,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 498,
+    "humanizeSamples": -164,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 447,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 44,
@@ -515,7 +1467,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.9376363775082018,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 507,
+    "humanizeSamples": 320,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 456,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 44,
@@ -524,7 +1493,24 @@
    "gesture": "transformer8",
    "velocity": 0.763884946974899,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 514,
+    "humanizeSamples": -26,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 463,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 45,
@@ -533,7 +1519,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.8021118486305028,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 523,
+    "humanizeSamples": 322,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 472,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 45,
@@ -542,7 +1545,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.8800610360875868,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 530,
+    "humanizeSamples": -197,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 479,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 46,
@@ -551,7 +1571,24 @@
    "gesture": "scribble",
    "velocity": 0.6490638590066377,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 539,
+    "humanizeSamples": 250,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 488,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 46,
@@ -560,7 +1597,24 @@
    "gesture": "transformer8",
    "velocity": 0.6590615701533532,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 546,
+    "humanizeSamples": 178,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 495,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 47,
@@ -569,7 +1623,24 @@
    "gesture": "hydroplane",
    "velocity": 0.732457465476463,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 555,
+    "humanizeSamples": -55,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 504,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 47,
@@ -578,7 +1649,24 @@
    "gesture": "chirpDouble",
    "velocity": 0.655551995117113,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 562,
+    "humanizeSamples": 245,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 511,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   }
  ]
 }

@@ -20,7 +20,9 @@ import { ScratchExecutor, type ScratchExecutorEvent } from './ScratchExecutor';
 import { createScratchStateProbe } from './scratchSnapshot';
 import { getScratchVoicePool, getScratchVoicePoolIfActive } from './scratchVoicePool';
 import { loadTrackerSample, type TrackerSampleInstrument } from './trackerSampleSource';
-import type { ChosenScratchSource } from './DJScratchDJ';
+import type { ChosenScratchSource, ScratchRoutineShape } from './DJScratchDJ';
+import { routineShapeDecks } from './scratchDeckC';
+import { computeCrossfaderGains } from '../DJMixerEngine';
 import type { TransitionScratchPlan } from './transitionScratch';
 import type { ScratchEvent } from './scratchTypes';
 
@@ -69,7 +71,6 @@ export async function prepareScratchSource(chosen: ChosenScratchSource): Promise
   const instrument = song?.instruments?.find((i) => String(i.id) === sampleId);
   if (!instrument) return;
   const pool = getScratchVoicePool();
-  await pool.ready;
   await loadTrackerSample(pool, Tone.getContext().rawContext as BaseAudioContext, deck, instrument);
 }
 
@@ -117,4 +118,15 @@ export function performTransitionScratch(
     done,
     cancel: () => { if (cancelled) return; cancelled = true; exec.cancel(); },
   };
+}
+
+/** The decks a planned scratch routine's level reads (X6), from the live decks and the mixer (`routineShapeDecks`). */
+export function scratchShapeDecks(shape: Pick<ScratchRoutineShape, 'deck' | 'startSec' | 'trackFromSec'>): Array<{ audio: AudioBuffer; trackFromSec: number; gain: number }> | null {
+  const engine = getDJEngine();
+  const st = useDJStore.getState();
+  const deck = (d: AB) => {
+    const player = engine.getDeck(d).audioPlayer;
+    return { playing: st.decks[d].isPlaying, audio: player.getAudioBuffer(), position: player.getPosition(), rate: player.getPlaybackRate() };
+  };
+  return routineShapeDecks(shape, { A: deck('A'), B: deck('B') }, computeCrossfaderGains(st.crossfaderPosition, st.crossfaderCurve), (Tone.getContext().rawContext as BaseAudioContext).currentTime);
 }

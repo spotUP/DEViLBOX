@@ -40,7 +40,7 @@ import { StandaloneJuggle, mixInPhraseStartOf } from './autodj/juggle/standalone
 import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
 import { registerAutoDJ } from './autoDJInstance';
 import { DJScratchDJ } from './scratch/DJScratchDJ';
-import { createDeckScratchExecutor, deckTempoBpm, emergencyRelease, performTransitionScratch, prepareScratchSource } from './scratch/autoScratchRuntime';
+import { createDeckScratchExecutor, deckTempoBpm, emergencyRelease, performTransitionScratch, prepareScratchSource, scratchShapeDecks } from './scratch/autoScratchRuntime';
 import { getScratchVoicePool, getScratchVoicePoolIfActive } from './scratch/scratchVoicePool';
 import { subscribeDjFxFires } from '@/engine/drumpad/DjFxActions';
 import { scratchModeOf, scratchStyleFor } from './scratch/scratchStyles';
@@ -1800,10 +1800,11 @@ class DJAutoDJ {
         hasRecord: (id) => getScratchVoicePoolIfActive()?.hasRecord(id) ?? false,
         prepareSource: (chosen) => prepareScratchSource(chosen),
         prepareRecords: (ids) => getScratchVoicePool().prepareRecords(ids),
-        // three_deck's level and duck against the deck's own audio (a module deck has none: it follows the programme)
+        // three_deck's level and duck against decks A + B (X6); a module deck has no buffer to read ahead:
+        // the bus then hears it live on its input (the A + B tap)
         shapeRoutine: (shape) => {
-          const audio = getDJEngine().getDeck(shape.deck).audioPlayer.getAudioBuffer();
-          if (audio) void getScratchVoicePool().shapeRoutinePlan(shape, audio).catch((err) => console.warn('[AutoDJ] scratch routine not shaped:', err));
+          const decks = scratchShapeDecks(shape);
+          if (decks) void getScratchVoicePool().shapeRoutinePlan(shape, decks).catch((err) => console.warn('[AutoDJ] scratch routine not shaped:', err));
         },
         // One decision per performed phrase (scratch plan section 65): source, gestures, placement, length.
         onPlan: (plan, events) => this.recordScratchPhrase(plan.reasons, events, this.scratch?.telemetry().source ?? null),
@@ -2027,3 +2028,4 @@ class DJAutoDJ {
 function juggleShapeOf(exec: { startBeat: number; pattern: { phases: Array<{ phase: import('./autodj/juggle/juggleTypes').JugglePhase; startBeat: number; endBeat: number }> } } | null) {
   return exec ? { startBeat: exec.startBeat, phases: exec.pattern.phases } : null;
 }
+

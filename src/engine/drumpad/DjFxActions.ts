@@ -23,9 +23,8 @@ import { syncBPMToOther } from '../dj/DJAutoSync';
 import { SCRATCH_PATTERNS, type ScratchPattern } from '../dj/DJScratchEngine';
 import { getGesture, SCRATCH_GESTURES } from '../dj/scratch/scratchGestureCatalog';
 import type { ScratchGestureId, ScratchRole, ScratchSource } from '../dj/scratch/scratchTypes';
-import type { ScratchCue } from '../dj/scratch/ScratchRecordVoice';
+import type { ScratchCue } from '../dj/scratch/scratchTypes';
 import { getScratchVoicePool, getScratchVoicePoolIfActive, type PerformHandle } from '../dj/scratch/scratchVoicePool';
-import { ambienceFor } from '../dj/scratch/scratchBus';
 import { playDeckPattern, stopDeckPattern, finishDeckPatternCycle, spinbackDeck, rewindDeck } from '../dj/DJActions';
 import { realTimers } from '../dj/autodj/executorTimers';
 import type { DeckId } from '../dj/DeckEngine';
@@ -1777,16 +1776,19 @@ const stutterActions = [
 
 // ─── Scratch gestures (owner scratch plan sections 81, 82) ─────────────
 //
-// One action per catalogue gesture (27). Engage plays it on the active deck
+// One action per catalogue gesture. Engage plays it on the active deck
 // (`DJActions.playDeckPattern`, the one deck seam) or - when the fire names a
-// `record` / a CRATE source, or the gesture has no deck pattern - on the
-// scratch record voice (section 16: the deck keeps its musical role).
+// `record` / a CRATE source, or the gesture has no deck pattern - as the demo's
+// render of the stroke on a Deck C bus (`ScratchVoicePool.perform`, PG-J; the
+// deck keeps its musical role).
 // Disengage releases whichever was engaged. The Auto DJ, pads, keyboard,
 // MIDI, MCP, tracker `Xnn` and the set player all fire these through
 // `fireDjFx`.
 
 const scratchDeck = new Map<string, DeckId>();
 const scratchVoiceHandles = new Map<string, PerformHandle>();
+/** Gesture actions whose last engage played on a record (their release is the stroke's own end). */
+const onRecord = new Set<string>();
 const PATTERN_BY_GESTURE = new Map<ScratchGestureId, ScratchPattern>(SCRATCH_PATTERNS.map((p) => [p.gestureId, p]));
 
 function deckBpm(deckId: DeckId): number {
@@ -1800,30 +1802,21 @@ function wantsRecordVoice(gestureId: ScratchGestureId, opts?: DjFxFireOptions): 
 
 function engageRecordGesture(id: string, gestureId: ScratchGestureId, opts?: DjFxFireOptions): void {
   const deckId = opts?.deck ?? getActiveDeckId();
-  const role = opts?.role;
-  // A second fire of the same gesture replaces its voice: release the old
-  // one first, or it loops on with no handle left to stop it.
-  scratchVoiceHandles.get(id)?.release(opts?.at);
+  // every stroke on a record renders the demo's way onto its Deck C bus and plays out whole (PG-J)
   scratchVoiceHandles.delete(id);
-  const handle = getScratchVoicePool().perform(getGesture(gestureId), {
+  getScratchVoicePool().perform(getGesture(gestureId), {
     record: opts?.record ?? (opts?.scratchSource?.type === 'CRATE' ? opts.scratchSource.recordId : undefined),
-    role,
+    role: opts?.role,
     bpm: opts?.bpm ?? deckBpm(deckId),
-    ambience: ambienceFor(role ?? 'ACCENT'),
     velocity: opts?.amount,
     cue: opts?.anchor,
     at: opts?.at,
     fx: opts?.scratchFx,
     render: opts?.render,
   });
-  if (handle) scratchVoiceHandles.set(id, handle);
 }
 
-/**
- * Release every gesture playing on the scratch record voice: the held ones by their handles and
- * every busy voice (a throw rides out without a handle). Scratch Stop and Scratch Release end
- * this same set (audit SA-m1).
- */
+/** Release every held record gesture (a loop) - Scratch Stop and Scratch Release end this same set (audit SA-m1). */
 function releaseRecordGestures(): void {
   for (const handle of scratchVoiceHandles.values()) handle.release();
   scratchVoiceHandles.clear();
@@ -1839,7 +1832,8 @@ function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
     category: 'scratch',
     mode: 'momentary',
     engage(opts) {
-      if (wantsRecordVoice(gestureId, opts) || !pattern) { engageRecordGesture(this.id, gestureId, opts); return; }
+      if (wantsRecordVoice(gestureId, opts) || !pattern) { onRecord.add(this.id); engageRecordGesture(this.id, gestureId, opts); return; }
+      onRecord.delete(this.id);
       const deckId = opts?.deck ?? getActiveDeckId();
       scratchDeck.set(this.id, deckId);
       // a planned event (`beats` = its length): the stroke starts at its beginning now and plays
@@ -1852,13 +1846,8 @@ function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
       try { useDJStore.getState().setDeckPattern(deckId, pattern.name); } catch { /* store not ready */ }
     },
     disengage(opts) {
-      const handle = scratchVoiceHandles.get(this.id);
-      if (handle) {
-        // a scheduled stop keeps the handle: an immediate release (cancel, Stop) can still end it now
-        if (opts?.at === undefined) scratchVoiceHandles.delete(this.id);
-        handle.release(opts?.at);
-        return;
-      }
+      // a record stroke plays out whole on its bus (the demo's render): nothing to stop
+      if (onRecord.has(this.id)) { onRecord.delete(this.id); return; }
       const deckId = opts?.deck ?? scratchDeck.get(this.id) ?? getActiveDeckId();
       scratchDeck.delete(this.id);
       if (opts?.finishCycle) finishDeckPatternCycle(deckId); else stopDeckPattern(deckId);
@@ -1894,20 +1883,19 @@ function createScratchThrow(): DjFxAction {
     engage(opts) {
       const gestureId: ScratchGestureId = opts?.beats !== undefined && opts.beats >= 4 ? 'dropPhrase' : 'drop';
       engageRecordGesture(this.id, gestureId, { ...opts, record: opts?.record });
-      scratchVoiceHandles.delete(this.id); // a throw rides out on its own
     },
     disengage() {},
   };
 }
 
-/** Section 82 ScratchCue: re-cue the record voice to an anchor. */
+/** Section 82 ScratchCue: the next record gesture reads from this anchor. */
 function createScratchCue(): DjFxAction {
   return {
     id: 'fx_scratch_cue',
     name: 'Scratch Cue',
     category: 'scratch',
     mode: 'oneshot',
-    engage(opts) { getScratchVoicePoolIfActive()?.cue(opts?.anchor ?? 'vowel', opts?.role); },
+    engage(opts) { getScratchVoicePool().anchor = opts?.anchor ?? 'vowel'; },
     disengage() {},
   };
 }
@@ -1919,10 +1907,7 @@ function createScratchAnchor(): DjFxAction {
     name: 'Scratch Anchor',
     category: 'scratch',
     mode: 'oneshot',
-    engage(opts) {
-      const pool = getScratchVoicePool();
-      pool.anchor = opts?.anchor ?? (pool.voices.find((v) => v.busy)?.position ?? null);
-    },
+    engage(opts) { getScratchVoicePool().anchor = opts?.anchor ?? null; },
     disengage() {},
   };
 }
@@ -1935,15 +1920,11 @@ function createScratchLoop(): DjFxAction {
     category: 'scratch',
     mode: 'momentary',
     engage(opts) {
-      const deckId = opts?.deck ?? getActiveDeckId();
       const pool = getScratchVoicePool();
-      const gesture = getGesture('drop');
-      const record = pool.resolveRecord(gesture, { record: opts?.record, role: opts?.role });
+      const record = pool.resolveRecord(getGesture('drop'), { record: opts?.record, role: opts?.role });
       if (!record) return;
-      const handle = pool.perform({ ...gesture, loop: true, returnsToAnchor: true, cycleBeats: Math.max(0.25, (record.safe[1] - record.safe[0]) * deckBpm(deckId) / 60) }, {
-        record: record.id, role: opts?.role, bpm: deckBpm(deckId), ambience: ambienceFor(opts?.role ?? 'THEME'), cue: 'attack',
-      });
-      if (handle) scratchVoiceHandles.set(this.id, handle);
+      scratchVoiceHandles.get(this.id)?.release();
+      scratchVoiceHandles.set(this.id, pool.loop(record, { at: opts?.at }));
     },
     disengage() {
       const handle = scratchVoiceHandles.get(this.id);
