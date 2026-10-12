@@ -12,7 +12,7 @@
 import { simulate, linspace, interp, NumpyRandomState, TT_DECKS, type TtHandPoint, type TtDeck, type TtSlipmat, type TtRecord, type TtCartridge, type TtPerformer } from '@/engine/turntable/turntableSim';
 import { lp, hp, tapeDelay, reverb } from './refDsp';
 import { REFERENCE_GESTURE_IDS } from './scratchGestureCatalog';
-import type { ScratchGestureId } from './scratchTypes';
+import type { ScratchGesture, ScratchGestureId } from './scratchTypes';
 
 /** The demo's render rate. */
 export const DEMO_RATE = 22050;
@@ -30,9 +30,12 @@ export interface DemoGesture {
   off?: number;
   curve?: 'smooth' | 'sharp' | 'battle';
   hamster?: boolean;
-  fx?: { hp?: number; lp?: number; drive?: number; delay_mix?: number; delay_s?: number; reverb_mix?: number };
+  fx?: DemoFx;
   deck?: 'brake' | 'start' | 'stop' | 'power_off';
   play?: boolean;
+  /** DEViLBOX's own gestures only (tweak, vibrato): the glide's record speed over the gesture, integrated into
+   *  the hand path (the demo's glide is the 0 -> 0.32 -> 1.35 ramp). */
+  glideProfile?: ReadonlyArray<readonly [number, number]>;
 }
 
 /** scratch.py `GESTURES`, verbatim. */
@@ -74,6 +77,24 @@ const DEMO_NAME: Partial<Record<ScratchGestureId, string>> = Object.fromEntries(
 /** The demo's name for a catalogue gesture (`tearForward` -> `tear_fwd`); undefined when the demo has none. */
 export const demoGestureName = (id: ScratchGestureId): string | undefined => DEMO_NAME[id];
 
+/**
+ * A catalogue gesture the demo does not have (twiddle, laser, phaser, tweak, vibrato, uzi, the eight-finger crab,
+ * the three-click flare) as a `render_gesture` definition, so it plays on the demo's renderer like every other
+ * stroke: its hand path (record samples, repeated `strokes` times inside the gesture), its glide, its fader
+ * windows (per stroke) and its fader lead.
+ */
+export function catalogueDemoGesture(g: Pick<ScratchGesture, 'handPath' | 'glide' | 'faderWindows' | 'cutLeadMs' | 'durationSteps' | 'cycleBeats' | 'fx'>): DemoGesture {
+  const k = Math.max(1, Math.round(g.durationSteps / 4 / g.cycleBeats));
+  const rep = <T,>(xs: readonly T[], f: (x: T, i: number) => T): T[] => Array.from({ length: k }, (_, i) => xs.map((x) => f(x, i))).flat();
+  const fader = rep(g.faderWindows.map((w): [number, number] => [w.open[0], w.open[1]]), ([a, b], i): [number, number] => [(a + i) / k, (b + i) / k]);
+  const out: DemoGesture = { fader, ...(g.cutLeadMs ? { off: -g.cutLeadMs } : {}), ...(g.fx ? { fx: { delay_mix: g.fx.delayMix, delay_s: g.fx.delaySec, reverb_mix: g.fx.reverbMix } } : {}) };
+  if (g.glide) return { ...out, glide: g.glide.ratio, grip: g.glide.grip, ...(g.glide.profile ? { glideProfile: g.glide.profile } : {}) };
+  const path = g.handPath ?? [{ t: 0, position: 0, grip: 1 }, { t: 1, position: 0, grip: 1 }];
+  const hand: Array<readonly [number, number, number]> = [];
+  for (let i = 0; i < k; i++) for (const p of path) if (i === 0 || p.t > 0) hand.push([(p.t + i) / k, p.position, p.grip]);
+  return { ...out, hand };
+}
+
 /** scratch.py `VEL`: the velocity response. */
 export const DEMO_VEL = { amp_base: 0.55, amp_span: 0.70, gain_base: 0.70, gain_span: 0.50, lp_thresh: 0.50, lp_base: 2500.0, lp_span: 6000.0, hp_thresh: 0.85, hp_freq: 3000.0, hp_mix: 0.15 } as const;
 
@@ -85,7 +106,34 @@ export const DEMO_DECK_PROFILES = {
   boombap: { deck: 'classic_sl1200', slipmat: 'thin_battle', record: 'light_battle', performer: 'tight_battle', cartridge: 'battle' },
   west_coast: { deck: 'classic_sl1200', slipmat: 'felt_standard', record: 'light_battle', performer: 'light_touch', cartridge: 'battle' },
   electro: { deck: 'tight_direct_drive', slipmat: 'thin_battle', record: 'light_battle', performer: 'electro_grid', cartridge: 'battle' },
+  east_coast: { deck: 'classic_sl1200', slipmat: 'thin_battle', record: 'light_battle', performer: 'tight_battle', cartridge: 'battle' },
+  lofi: { deck: 'worn_club_deck', slipmat: 'worn_felt', record: 'light_battle', performer: 'lofi_drag', cartridge: 'worn_stylus' },
+  trap: { deck: 'modern_high_torque', slipmat: 'thin_battle', record: 'light_battle', performer: 'tight_battle', cartridge: 'battle' },
+  memphis: { deck: 'worn_club_deck', slipmat: 'worn_felt', record: 'light_battle', performer: 'heavy_hand', cartridge: 'worn_stylus' },
+  battle: { deck: 'tight_direct_drive', slipmat: 'thin_battle', record: 'light_battle', performer: 'tight_battle', cartridge: 'battle' },
 } as const satisfies Record<string, DemoDeckProfile>;
+export type DemoDeckProfileName = keyof typeof DEMO_DECK_PROFILES;
+
+/** scratch.py `apply_fx` profile keys (`_FX_*`, a gesture's own `fx`). */
+export interface DemoFx { hp?: number; lp?: number; drive?: number; delay_mix?: number; delay_s?: number; reverb_mix?: number }
+const FX_BOOMBAP: DemoFx = { hp: 150, lp: 4500, drive: 0.10, reverb_mix: 0.05 };
+const FX_ELECTRO: DemoFx = { hp: 200, lp: 7000, drive: 0.05, delay_mix: 0.12, delay_s: 0.14, reverb_mix: 0.04 };
+const FX_LOFI: DemoFx = { hp: 120, lp: 3000, drive: 0.08, reverb_mix: 0.10 };
+const FX_MEMPHIS: DemoFx = { hp: 180, lp: 3800, drive: 0.18, reverb_mix: 0.06 };
+const FX_WEST: DemoFx = { hp: 150, lp: 5500, drive: 0.06, delay_mix: 0.08, delay_s: 0.2, reverb_mix: 0.05 };
+/** scratch.py `PROFILES[...]`: each profile's deck physics and section FX (scratch.py :341-392). */
+export const DEMO_PROFILES: Readonly<Record<'old_school' | 'boombap' | 'east_coast' | 'west_coast' | 'electro' | 'lofi' | 'trap' | 'memphis' | 'battle', { deck: DemoDeckProfileName; fx: DemoFx }>> = {
+  old_school: { deck: 'old_school', fx: FX_BOOMBAP },
+  boombap: { deck: 'boombap', fx: FX_BOOMBAP },
+  east_coast: { deck: 'east_coast', fx: FX_BOOMBAP },
+  west_coast: { deck: 'west_coast', fx: FX_WEST },
+  electro: { deck: 'electro', fx: FX_ELECTRO },
+  lofi: { deck: 'lofi', fx: FX_LOFI },
+  trap: { deck: 'trap', fx: FX_ELECTRO },
+  memphis: { deck: 'memphis', fx: FX_MEMPHIS },
+  battle: { deck: 'battle', fx: FX_BOOMBAP },
+};
+export type DemoProfileName = keyof typeof DEMO_PROFILES;
 
 /** A record as the demo's cue source: the signal, the anchor (sample) and the safe range (samples). */
 export interface DemoSource { sig: Float64Array; anchor: number; safe: readonly [number, number] }
@@ -204,8 +252,8 @@ export function deckMotion(action: string, durSec: number, rate: number, deck: T
   return out;
 }
 
-/** scratch.py `apply_fx` (a gesture's own effect: the echo scratch). */
-function applyFx(x: Float64Array, rate: number, fx: NonNullable<DemoGesture['fx']>): Float64Array {
+/** scratch.py `apply_fx`: a gesture's own effect (the echo scratch), and a section's profile FX on its sum (X2). */
+export function applyFx(x: Float64Array, rate: number, fx: DemoFx): Float64Array {
   let y = x;
   if (fx.hp) y = hp(y, fx.hp, rate);
   if (fx.lp) y = lp(y, fx.lp, rate);
@@ -214,6 +262,17 @@ function applyFx(x: Float64Array, rate: number, fx: NonNullable<DemoGesture['fx'
   if (fx.reverb_mix) y = reverb(y, rate, 'room', fx.reverb_mix, 0.5);
   return y;
 }
+
+/**
+ * scratch_routine.render_routine's ending (C2): the routine's last event gets a one-step tape delay
+ * (`delay(g, kind="tape", delay_s=step_samp / rate, fb=0.18, mix=0.16, damp=0.5)`), four steps longer.
+ */
+export function routineEndingDelay(g: Float64Array, stepSamples: number, rate: number): Float64Array {
+  return tapeDelay(g, rate, stepSamples / rate, 0.18, 0.16, 0.5);
+}
+
+/** The demo's 16th-step length in whole samples (`int(rate x 60 / (bpm x 4))`: scratch_dj, the overlay, render_routine). */
+export const demoStepSamples = (bpm: number, rate: number = DEMO_RATE): number => Math.trunc(rate * 60.0 / (bpm * 4));
 
 /** Reachability sentinel: strokes rendered by the demo's renderer. */
 export const scratchRenderStats = { gestures: 0 };
@@ -225,11 +284,11 @@ export interface RenderedGesture { out: Float64Array; recordVel?: Float64Array; 
  * scratch.py `render_gesture` (offline tier, the `VEL` defaults): one gesture through the turntable
  * physics and the crossfader, `durSec` long, at `rate`.
  */
-export function renderGesture(source: DemoSource, name: string, durSec: number, rate: number, opts: { velocity?: number; profile?: DemoDeckProfile; seed?: number } = {}): RenderedGesture {
+export function renderGesture(source: DemoSource, name: string | DemoGesture, durSec: number, rate: number, opts: { velocity?: number; profile?: DemoDeckProfile; seed?: number } = {}): RenderedGesture {
   scratchRenderStats.gestures++;
   const velocity = opts.velocity ?? 1.0;
   const vc = DEMO_VEL;
-  const g = DEMO_GESTURES[name] ?? DEMO_GESTURES.baby!;
+  const g = typeof name === 'string' ? DEMO_GESTURES[name] ?? DEMO_GESTURES.baby! : name;
   const prof = opts.profile ?? DEMO_DECK_PROFILES.default;
   const seed = opts.seed ?? 0;
   const n = Math.max(8, Math.trunc(durSec * rate));
@@ -259,7 +318,18 @@ export function renderGesture(source: DemoSource, name: string, durSec: number, 
     return { out, recordVel: vel, fade };
   }
   let hand: TtHandPoint[];
-  if (g.glide) {
+  if (g.glide && g.glideProfile) {
+    // a speed profile integrated (trapezoid) into hand positions at its knots
+    const dist = g.glide * durSec * rate;
+    const grip = g.grip ?? 0.7;
+    const p = g.glideProfile;
+    let pos = 0;
+    hand = [[p[0]![0], 0.0, grip]];
+    for (let k = 1; k < p.length; k++) {
+      pos += (p[k]![0] - p[k - 1]![0]) * (p[k]![1] + p[k - 1]![1]) / 2;
+      hand.push([p[k]![0], pos * dist, grip]);
+    }
+  } else if (g.glide) {
     const dist = g.glide * durSec * rate;
     const grip = g.grip ?? 0.7;
     hand = [[0.0, 0.0, grip], [0.5, 0.32 * dist, grip], [1.0, 1.35 * dist, grip]];

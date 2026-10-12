@@ -75,6 +75,9 @@ describe('Auto Scratch lands on the grid (SCR-P4.R4)', () => {
     });
     // every event sits on a 1/16 step of a bar's downbeat on the deck clock
     for (const e of scheduled) expect(Math.abs(e.executeAtBeat * 4 - Math.round(e.executeAtBeat * 4))).toBeLessThan(1e-9);
-    expect(new Set(offsetsMs.map((o) => o.toFixed(3))).size).toBeGreaterThan(1);
+    // the human timing is the demo's, in whole bus samples on the render (-10..+15 ms, PG-J), not on the clock
+    const human = scheduled.map((e) => e.render?.humanizeSamples ?? NaN);
+    for (const h of human) { expect(h).toBeGreaterThanOrEqual(Math.trunc(-0.010 * 22050)); expect(h).toBeLessThanOrEqual(Math.trunc(0.015 * 22050)); }
+    expect(new Set(human).size).toBeGreaterThan(1);
   });
 });

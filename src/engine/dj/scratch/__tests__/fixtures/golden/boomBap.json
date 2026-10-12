@@ -11,7 +11,24 @@
    "gesture": "chirp",
    "velocity": 0.9239147020675975,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 114,
+    "humanizeSamples": -200,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:hook",
+     "step": 63,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 28,
@@ -20,7 +37,24 @@
    "gesture": "chirp",
    "velocity": 0.9974021515220874,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 258,
+    "humanizeSamples": -108,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:hook",
+     "step": 207,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   }
   },
   {
    "bar": 30,
@@ -29,7 +63,25 @@
    "gesture": "forwardStab",
    "velocity": 0.9,
    "placementRole": "accent",
-   "role": "THEME"
+   "role": "THEME",
+   "render": {
+    "seed": 28,
+    "humanizeSamples": 0,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:hook",
+     "step": 235,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "routineSlot": "ROCK"
   },
   {
    "bar": 30,
@@ -38,7 +90,25 @@
    "gesture": "baby",
    "velocity": 0.8,
    "placementRole": "turnaround",
-   "role": "THEME"
+   "role": "THEME",
+   "render": {
+    "seed": 32,
+    "humanizeSamples": 0,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:hook",
+     "step": 239,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "routineSlot": "FUNKY"
   },
   {
    "bar": 31,
@@ -47,7 +117,25 @@
    "gesture": "chirp",
    "velocity": 0.85,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 40,
+    "humanizeSamples": 0,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:hook",
+     "step": 247,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "routineSlot": "BEAT"
   },
   {
    "bar": 31,
@@ -56,7 +144,26 @@
    "gesture": "transformer8",
    "velocity": 0.9,
    "placementRole": "answer",
-   "role": "ANSWER"
+   "role": "ANSWER",
+   "render": {
+    "seed": 47,
+    "humanizeSamples": 0,
+    "chain": "overlay",
+    "deck": "boombap",
+    "ending": true,
+    "section": {
+     "key": "16:hook",
+     "step": 254,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "routineSlot": "BEAT"
   }
  ]
 }

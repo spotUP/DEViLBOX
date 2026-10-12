@@ -2,7 +2,7 @@
  * Scratch beside a running juggle (owner scratch plan sections 26, 49; ledger SCR-P7.9), through
  * the controller's entry `DJScratchDJ.tick()` with `juggleActive` (what DJAutoDJ.scratchTick passes
  * while the juggle controller performs): the decks are the juggle's - every scratch event is a crate
- * record on the record voice, only answers and accents, never a feature; no scratch gesture touches
+ * record rendered the demo's way on its section's overlay bus (PG-J), only answers and accents, never a feature; no scratch gesture touches
  * the crossfader (the juggle sink owns it); the same set without a juggle plays its full phrases.
  */
 import { describe, it, expect } from 'vitest';
@@ -14,6 +14,7 @@ import { getGesture } from '../scratch/scratchGestureCatalog';
 import type { DJPerformanceContext } from '../autodj/types';
 import type { ScratchEvent } from '../scratch/scratchTypes';
 import { scratchDJStats } from '../scratch/DJScratchDJ';
+import { DEMO_PROFILES } from '../scratch/scratchRender';
 
 type Shape = Parameters<DJScratchDJ['tick']>[0]['juggleShape'];
 
@@ -63,8 +64,19 @@ describe('scratch beside a juggle (SCR-P7.9)', () => {
 
   it('juggleResponse: the scratch vocal over the loops, a response per trade bar, nothing in the payoff', () => {
     const before = scratchDJStats.juggleResponses;
-    const { plans } = run(true, { shape: shapeAt(corpusAnalysis('steady')) });
+    const { plans, events, track } = run(true, { shape: shapeAt(corpusAnalysis('steady')) });
     expect(scratchDJStats.juggleResponses - before).toBeGreaterThanOrEqual(1);
+    // PG-J: every response stroke renders the demo's way on its section's overlay bus - the electro profile's deck and
+    // FX, the physics seed (seed + section start) x 3 + bar x 16 + step, no human timing (DEViLBOX's own strokes)
+    const response = events.filter((e) => e.executeAtBeat >= barStartBeat(track.downbeats, 8) - 1e-9 && e.executeAtBeat < barStartBeat(track.downbeats, 16));
+    expect(response.length).toBeGreaterThan(0);
+    for (const e of response) {
+      expect(e.render?.chain, e.gesture).toBe('overlay');
+      expect(e.render!.deck).toBe('electro');
+      expect(e.render!.section!.fx).toEqual(DEMO_PROFILES.electro.fx);
+      expect(e.render!.humanizeSamples).toBe(0);
+      expect(e.humanizeMs).toBe(0);
+    }
     const evs = plans.flatMap((p) => p.events).filter((e) => e.bar >= 8 && e.bar < 16);
     const at = (bar: number) => evs.filter((e) => e.bar === bar);
     for (const bar of [8, 9]) expect(at(bar).map((e) => [e.step, e.role])).toEqual([[2, 'THEME'], [10, 'THEME']]);

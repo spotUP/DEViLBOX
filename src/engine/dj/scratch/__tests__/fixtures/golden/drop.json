@@ -11,7 +11,26 @@
    "gesture": "hydroplane",
    "velocity": 0.9125749599450675,
    "placementRole": "turnaround",
-   "role": "FILL"
+   "role": "FILL",
+   "render": {
+    "seed": 178,
+    "humanizeSamples": -132,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 127,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   }
   }
  ]
 }

@@ -3,13 +3,15 @@
  * `thoughts/shared/plans/2026-10-08-dj-view-scratch-plan.md` sections 84, 85, 88 "tracker demo:
  * tracker sample"; ledger SCR-P5.6).
  *
- * A sample instrument of a tracker deck's song becomes a TRACKER_SAMPLE source: its bytes are
- * decoded at the context's rate and written into a scratch record voice's ring like any crate
- * record (the record voice, section 16 - no second transport). The record is transient: it
- * lives in the voice pool for the deck's song, never in the crate catalogue.
+ * A sample instrument of a tracker deck's song becomes a TRACKER_SAMPLE source: its audio is read at
+ * 22,050 Hz the way the demo reads a record (`demoRecordPcm` from WAV bytes, `demoMonoPcm` from decoded
+ * audio; no S950 - it stays the module's own sound) and its strokes render on the one stroke renderer like
+ * any crate record's (PG-J). The record is transient: it lives in the pool for the deck's song, never in
+ * the crate catalogue.
  */
 
 import { SCRATCH_GESTURE_IDS } from './scratchGestureCatalog';
+import { demoMonoPcm, demoRecordPcm } from './scratchGrit';
 import type { ScratchRecord } from './scratchCatalogue';
 import type { TrackerSampleInfo } from './ScratchSourceSelector';
 import type { ScratchGestureId } from './scratchTypes';
@@ -74,19 +76,34 @@ export function trackerSampleRecord(deck: AB, info: Pick<TrackerSampleInfo, 'sam
   };
 }
 
-/** What the loader needs of the voice pool. */
+/** What the loader needs of the pool. */
 export interface TransientRecordHost {
-  registerTransientRecord(record: ScratchRecord, buffer: AudioBuffer): void;
+  registerTransientRecord(record: ScratchRecord, pcm: Float64Array): void;
   hasRecord(id: string): boolean;
 }
 
 /** Reachability sentinel (SCR-P5.6). */
 export const trackerSampleStats = { loads: 0 };
 
+/** A sample's audio at 22,050 Hz, mono, peak-normalised, no grit: from its WAV bytes, else decoded (any format). */
+async function samplePcm(bytes: ArrayBuffer, ctx: Pick<BaseAudioContext, 'decodeAudioData'>): Promise<Float64Array> {
+  try {
+    return demoRecordPcm(bytes, 22050, { grit: false });
+  } catch {
+    const buffer = await ctx.decodeAudioData(bytes);
+    const mono = new Float64Array(buffer.length);
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const d = buffer.getChannelData(c);
+      for (let i = 0; i < mono.length; i++) mono[i] = mono[i]! + d[i]! / buffer.numberOfChannels;
+    }
+    return demoMonoPcm(mono, buffer.sampleRate, 22050, { grit: false });
+  }
+}
+
 /**
- * Decode a tracker deck's sample instrument at the context's rate and register it with the pool
- * as a transient record; resolves with the record (null when the instrument has no sample).
- * Loading the same deck + sample twice reuses the first.
+ * Read a tracker deck's sample instrument at 22,050 Hz and register it with the pool as a transient record;
+ * resolves with the record (null when the instrument has no sample). Loading the same deck + sample twice
+ * reuses the first.
  */
 export async function loadTrackerSample(
   host: TransientRecordHost,
@@ -101,10 +118,10 @@ export async function loadTrackerSample(
   const bytes = instrument.sample!.audioBuffer && instrument.sample!.audioBuffer.byteLength > 44
     ? instrument.sample!.audioBuffer.slice(0)
     : await fetcher(instrument.sample!.url!);
-  const buffer = await ctx.decodeAudioData(bytes);
-  const record = trackerSampleRecord(deck, info, buffer);
+  const pcm = await samplePcm(bytes, ctx);
+  const record = trackerSampleRecord(deck, info, { length: pcm.length, sampleRate: 22050 });
   if (!host.hasRecord(id)) {
-    host.registerTransientRecord(record, buffer);
+    host.registerTransientRecord(record, pcm);
     trackerSampleStats.loads++;
   }
   return record;

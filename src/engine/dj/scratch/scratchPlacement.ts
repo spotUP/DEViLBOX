@@ -243,8 +243,10 @@ export interface PlacedScratch {
   /** The crate record the event scratches, when the plan chose it per event or per section (the demo's
    *  `pick_source` / role pools); the window's chosen source otherwise. */
   record?: string;
-  /** A demo routine's stroke: how the demo renders it (seed, human timing, bus chain). */
+  /** How the demo renders the stroke (seed, human timing, deck, bus). */
   render?: import('./scratchTypes').ScratchRenderSpec;
+  /** An overlay routine's stroke: the word slot it scratches (its record is the slot's, `_routine_cues`). */
+  routineSlot?: import('./scratchRoutines').WordSlot;
 }
 
 export interface PlanPhraseInput {
@@ -285,13 +287,12 @@ export function expectedPerBar(density: DensityState, rate: number, phraseEnd: b
 /** Reachability sentinel (SCR-P4.R4): bars `planPhrase` drew. */
 export const scratchPlacementStats = { planPhrase: 0 };
 
-export function planPhrase(input: PlanPhraseInput): PlacedScratch[] {
-  scratchPlacementStats.planPhrase++;
-  const pv = { ...PLAN_VEL, ...input.planVel };
+/** plan_phrase's count for a bar - k (floor + the first draw's fractional rounding, at most 4) - and its generator. */
+function phraseCount(input: PlanPhraseInput): { k: number; rnd: ScratchRandom; energy: number; phraseEnd: boolean } | null {
   const density = input.density ?? sectionDensity(input.style, input.section, input.scale);
   let rate = DENSITY_RATE[density];
   if (input.rateOverride !== undefined) rate = input.rateOverride;
-  if (rate <= 0) return [];
+  if (rate <= 0) return null;
   const rnd = lfsr(barSeed(input.seed, input.bar, input.section));
   const energy = input.energy ?? SECTION_ENERGY[input.section as ScratchSection] ?? 0.4;
   // the demo's bars 3, 7, 15 of the SECTION and its last bar (`bar` is section-local, `bars` the
@@ -300,8 +301,24 @@ export function planPhrase(input: PlanPhraseInput): PlacedScratch[] {
   const expected = expectedPerBar(density, rate, phraseEnd);
   let k = Math.trunc(expected);
   if (rnd() < expected - k) k++;
-  k = Math.min(k, MAX_PER_BAR);
-  if (k <= 0) return [];
+  return { k: Math.min(k, MAX_PER_BAR), rnd, energy, phraseEnd };
+}
+
+/**
+ * The steps the demo's `plan_phrase` places in a bar, in its order (`min(step, 15)`: both of its first two land
+ * on 15): one human-timing draw each in `render_scratch_section`, whatever DEViLBOX keeps of them.
+ */
+export function demoPhraseSteps(input: PlanPhraseInput): number[] {
+  const c = phraseCount(input);
+  return c && c.k > 0 ? PREFERRED_STEPS.slice(0, c.k).map((s) => Math.min(s, 15)) : [];
+}
+
+export function planPhrase(input: PlanPhraseInput): PlacedScratch[] {
+  scratchPlacementStats.planPhrase++;
+  const pv = { ...PLAN_VEL, ...input.planVel };
+  const c = phraseCount(input);
+  if (!c || c.k <= 0) return [];
+  const { k, rnd, energy, phraseEnd } = c;
   const vocab = vocabulary(input.gestures, input.gestureCount);
   const beatsPerBar = input.beatsPerBar ?? 4;
   const grid = input.grid ?? DEFAULT_GRID;

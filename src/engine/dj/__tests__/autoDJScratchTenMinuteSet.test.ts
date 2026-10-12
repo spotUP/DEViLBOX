@@ -61,6 +61,8 @@ import fixture from '../scratch/__tests__/fixtures/phrasing_parity.json';
 import type { ScratchEvent } from '../scratch/scratchTypes';
 import { overlaySectionAt } from '../scratch/DJScratchDJ';
 import { planScratch } from '../scratch/scratchPlanner';
+import { buildThreeDeckRoutine } from '../scratch/scratchDemoRoutines';
+import { gestureBeats } from '../scratch/scratchGestureCatalog';
 import { buildScratchContext } from '../scratch/scratchContext';
 import { scratchStyleFor } from '../scratch/scratchStyles';
 import type { DJPerformanceContext } from '../autodj/types';
@@ -132,7 +134,23 @@ async function tenMinutes(mode: ScratchMode) {
   const ctx = buildScratchContext({ perf: { currentDeck: 'A', currentTrack: analysis, currentPosition: startSec, setEnergy: 0.6, targetEnergy: 0.7 } as unknown as DJPerformanceContext, style: choice.style, scratchPermission: 4 })!;
   const demo = planScratch(ctx, { mode: 'BATTLE', seed: ctrl.deps.seed, fromBar: firstBar, bars, sectionAt: (b) => overlaySectionAt(analysis, b), profile: choice.profile, records: true });
   const demoDuty = new Set(demo.events.map((e) => e.bar)).size / bars;
+  // density and repetition (the owner, 2026-10-12: "repetitive sparse boring"): strokes per phrase with a
+  // scratch, distinct gestures per phrase, the share of the set a stroke sounds, the roles; against the demo's
+  // overlay here and the demo's three-deck routine (its Deck C performance, 32 bars, `build_scratch_events`)
+  const perWindow = (evs: ReadonlyArray<{ bar: number; gesture: string }>) => {
+    const w = new Map<number, Array<{ gesture: string }>>();
+    for (const e of evs) { const k = Math.floor(e.bar / 4); w.set(k, [...(w.get(k) ?? []), e]); }
+    const rows = [...w.values()];
+    return { strokes: rows.reduce((n, r) => n + r.length, 0) / Math.max(1, rows.length), gestures: rows.reduce((n, r) => n + new Set(r.map((e) => e.gesture)).size, 0) / Math.max(1, rows.length) };
+  };
+  const mine = perWindow(performed.map((e) => ({ bar: barOf(e) - firstBar, gesture: e.gesture })));
+  const sounding = performed.reduce((n, e) => n + e.durationBeats, 0) / (bars * 4);
+  const roles = Object.entries(performed.reduce<Record<string, number>>((m, e) => ({ ...m, [e.role]: (m[e.role] ?? 0) + 1 }), {})).map(([k, v]) => `${k} ${v}`).join(', ');
+  const demoOverlay = perWindow(demo.events);
+  const three = buildThreeDeckRoutine(ctrl.deps.seed).filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
+  const threeDeck = { duty: new Set(three.map((e) => e.bar)).size / 32, ...perWindow(three), sounding: three.reduce((n, e) => n + gestureBeats(e.gesture), 0) / (32 * 4) };
   return {
+    density: { mine, sounding, roles, demoOverlay, demoOverlaySounding: demo.events.reduce((n, e) => n + (e.beats ?? gestureBeats(e.gesture)), 0) / (bars * 4), threeDeck },
     demoDuty, style: choice.style,
     bars, events: performed.length, duty: busyBars.size / bars, windowShare: windows.size / Math.ceil(bars / 4), records, gestures,
     plans: scratchDJStats.plans - before.plans, recordPicks: demoRoutineStats.overlayRecord - before.records, sources: new Set(performed.map((e) => e.source.type)),
@@ -147,6 +165,8 @@ describe('ten minutes of Auto Scratch through getAutoDJ (SCR-PHRASING-PARITY acc
       const r = await tenMinutes(mode);
       const [lo, hi] = demoDutyRange();
       console.log(`[10-min set ${mode}] style ${r.style}, bars ${r.bars}, events ${r.events}, duty ${(r.duty * 100).toFixed(1)} % (the demo on this track ${(r.demoDuty * 100).toFixed(1)} %, on the parity tracks ${(lo * 100).toFixed(0)}-${(hi * 100).toFixed(0)} %), 4-bar windows with a scratch ${(r.windowShare * 100).toFixed(0)} %, records ${r.records.size} [${[...r.records].join(', ')}], gestures ${r.gestures.size} [${[...r.gestures].join(', ')}]`);
+      const d = r.density;
+      console.log(`[10-min set ${mode}] per 4-bar phrase with a scratch: ${d.mine.strokes.toFixed(2)} strokes, ${d.mine.gestures.toFixed(2)} gestures; a stroke sounds ${(d.sounding * 100).toFixed(1)} % of the set; roles ${d.roles} | the demo's overlay here: ${d.demoOverlay.strokes.toFixed(2)} strokes, ${d.demoOverlay.gestures.toFixed(2)} gestures, sounding ${(d.demoOverlaySounding * 100).toFixed(1)} % | the demo's three-deck routine: duty ${(d.threeDeck.duty * 100).toFixed(1)} %, ${d.threeDeck.strokes.toFixed(2)} strokes, ${d.threeDeck.gestures.toFixed(2)} gestures per phrase, sounding ${(d.threeDeck.sounding * 100).toFixed(1)} %`);
       expect(r.plans).toBeGreaterThan(0);
       expect(r.recordPicks).toBeGreaterThan(0);
       expect([...r.sources]).toEqual(['CRATE']);

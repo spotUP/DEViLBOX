@@ -247,6 +247,6 @@ function finish(kind: TransitionScratchKind, events: ScratchEvent[], source: Scr
   // the request is the channel's routine preset on every event (SCR-PG-D3): dry -> Dry, dubbed -> Delay,
   // transition -> Dark (the channel darkens as the incoming takes over)
   const preset = FX_REQUEST_PRESET[fxRequest];
-  const withPreset = clipped.map((e) => ({ ...e, fx: { ...e.fx, amount: e.fx?.amount ?? 0, preset } }));
+  const withPreset = clipped.map((e) => ({ ...e, fx: { ...e.fx, preset } }));
   return { kind, events: withPreset, source, startBeat, endBeat: Math.min(endBeat, Math.max(startBeat, input.plan.endBeat)), fxRequest, reasons };
 }

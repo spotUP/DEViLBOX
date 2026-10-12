@@ -14,12 +14,14 @@
 import { barStartBeat, timeAtBeat, timelineAt } from '../autodj/beatGrid';
 import type { DJPerformanceContext, DJTrackAnalysis } from '../autodj/types';
 import { buildScratchContext, scratchSectionFor, type ScratchPerformanceContext } from './scratchContext';
-import { planJuggleResponse, planScratch, toScratchEvents, type OverlaySection, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
+import { overlayRender, planJuggleResponse, planScratch, toScratchEvents, type OverlayRender, type OverlaySection, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
+import type { PlacedScratch } from './scratchPlacement';
+import type { DemoProfileName } from './scratchRender';
 import { buildScratchDjRoutine, buildThreeDeckRoutine, demoRoutineRenderSpecs, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, validateScratchDjRoutine } from './scratchDemoRoutines';
 import type { RoutineName } from './scratchRoutines';
 import type { ScratchProfileId } from './scratchStyles';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
-import { SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
+import { PALETTE_PROFILE, SCRATCH_PROFILES, type ScratchMode } from './scratchStyles';
 import { anchorFor } from './scratchAnchor';
 import { getScratchRecord, type ScratchRecord } from './scratchCatalogue';
 import { selectScratchSource, type SourceDecision, type SourceRequest, type TrackerSampleInfo } from './ScratchSourceSelector';
@@ -33,7 +35,7 @@ import { scratchCost } from '../autodj/performanceBudget';
 import { GESTURE_LEVELS } from './scratchGestureCatalog';
 import { arcForSection, phaseAt, planArc, type ArcPhaseName, type ArcTemplate } from './scratchArc';
 import type { ScratchGenreHint } from './scratchStyles';
-import type { ScratchGestureId, ScratchDJStyle, ScratchEvent, ScratchSource, ScratchAnchor, DeckScratchAnchor } from './scratchTypes';
+import type { ScratchGestureId, ScratchDJStyle, ScratchEvent, ScratchRenderSpec, ScratchSource, ScratchAnchor, DeckScratchAnchor } from './scratchTypes';
 
 type AB = 'A' | 'B';
 
@@ -472,11 +474,19 @@ export class DJScratchDJ {
       return { planned: true, scheduled: 0, reason: chosen ? 'a planned rest' : plan.events.length ? 'no source' : 'a planned rest' };
     }
 
-    const fx = { style: ctx.style, amount: SCRATCH_STYLES[ctx.style].fxAmount * (input.genre?.fxScale ?? 1) };
+    // every stroke renders the demo's way (PG-J): DEViLBOX's own strokes (a short feature, the juggle response,
+    // their needles) on their section's overlay bus with the profile's deck and FX, the demo's seed convention
+    const profileRef = SCRATCH_PROFILES[input.profile ?? PALETTE_PROFILE[ctx.style]].reference as DemoProfileName;
+    const extras = new Map<number, OverlayRender>();
+    const extraRender = (e: PlacedScratch): ScratchRenderSpec => {
+      const sec = overlaySectionAt(track, e.bar);
+      let r = extras.get(sec.startBar);
+      if (!r) { r = overlayRender({ key: `${sec.startBar}:${sec.name}`, bars: sec.bars, seed: seed + sec.startBar, profile: profileRef, demoSteps: () => [] }); extras.set(sec.startBar, r); }
+      return r.stroke(e.bar - sec.startBar, e.step, false);
+    };
+    plan = { ...plan, events: plan.events.map((e) => (e.render ? e : { ...e, render: extraRender(e) })) };
     const events = toScratchEvents(plan.events, chosen.source, chosen.anchor, {
       bpm: ctx.bpm, seed: seed + fromBar, downbeats: track.downbeats, deck: input.deck,
-      // the style's FX on the bus: its preset, at its FX amount x the genre's FX scale (SCR-PG-A5)
-      fx,
     }).map((e, i) => {
       const own = perEvent && plan.events[i]?.record ? crateSource(plan.events[i]!.record!) : null;
       const source = own ?? e.source;

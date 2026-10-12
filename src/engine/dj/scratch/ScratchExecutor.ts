@@ -34,7 +34,7 @@ import type { DeckRecueResult } from './deckRecue';
 import { fieldsTouchedBy, type ScratchField, type ScratchSnapshot, type ScratchStateProbe } from './scratchSnapshot';
 import { getGesture } from './scratchGestureCatalog';
 import type { DeckScratchAnchor, ScratchEvent } from './scratchTypes';
-import type { ScratchCue } from './ScratchRecordVoice';
+import type { ScratchCue } from './scratchTypes';
 import { trackerSampleRecordId } from './trackerSampleSource';
 
 /** Sources that play on a scratch record voice (a crate record, a tracker deck's sample). */

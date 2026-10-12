@@ -12,6 +12,23 @@
    "velocity": 0.9287991149767301,
    "placementRole": "turnaround",
    "role": "FILL",
+   "render": {
+    "seed": 178,
+    "humanizeSamples": -200,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:breakdown",
+     "step": 127,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
    "record": "FRESH_STANDARD"
   },
   {
@@ -22,6 +39,23 @@
    "velocity": 0.8240245670252537,
    "placementRole": "turnaround",
    "role": "FILL",
+   "render": {
+    "seed": 194,
+    "humanizeSamples": -108,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:breakdown",
+     "step": 143,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
    "record": "FRESH_STANDARD"
   },
   {
@@ -32,6 +66,23 @@
    "velocity": 0.8285107194628825,
    "placementRole": "turnaround",
    "role": "FILL",
+   "render": {
+    "seed": 306,
+    "humanizeSamples": 179,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:breakdown",
+     "step": 255,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
    "record": "FRESH_STANDARD"
   }
  ]

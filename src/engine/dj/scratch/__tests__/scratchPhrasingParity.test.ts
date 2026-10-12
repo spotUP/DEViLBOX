@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import spec from './fixtures/phrasing_parity_spec.json';
 import fixture from './fixtures/phrasing_parity.json';
-import { planScratch, type OverlaySection } from '../scratchPlanner';
+import { planScratch, routineSlotRecord, type OverlaySection } from '../scratchPlanner';
 import { oneHand, overlapsOneHand, type PlacedScratch } from '../scratchPlacement';
 import { REFERENCE_GESTURE_IDS, getGesture } from '../scratchGestureCatalog';
 import { CLEAN_CRATE_POOL, CRATE_LOAD_ORDER, CUE_ROLE_POOLS, type CueRole } from '../scratchCatalogue';
@@ -91,10 +91,11 @@ describe('the scratch planners plan what the Up Rough demo plans (SCR-PHRASING-P
       const key = (e: { bar: number; step: number; gesture: ScratchGestureId }): string => `${e.bar}:${e.step}:${e.gesture}`;
       expect(mine.map(key)).toEqual(demo.map(key));
       mine.forEach((e, i) => expect(e.velocity).toBeCloseTo(demo[i]!.velocity, 9));
-      // one record per section, the demo's pick
+      // one record per section, the demo's pick; a routine's strokes scratch their word slots' records
+      // (`_routine_cues` with a record set, R12: slot i = the i-th sorted record), rendered from the routine's seed
       for (const r of row.records) {
         const inSection = mine.filter((e) => e.bar >= r.startBar && e.bar < r.startBar + (track.sections.find((s) => s.startBar === r.startBar)!.bars));
-        for (const e of inSection) expect([e.bar, e.record]).toEqual([e.bar, r.record]);
+        for (const e of inSection) expect([e.bar, e.record]).toEqual([e.bar, e.routineSlot ? routineSlotRecord(e.routineSlot) : r.record]);
       }
     });
   }

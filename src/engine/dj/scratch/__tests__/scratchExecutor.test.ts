@@ -31,7 +31,7 @@ function rig(opts: { suppressNotes?: boolean } = {}) {
     setTimeout: () => null, clearTimeout: () => undefined,
   };
   const state: ScratchSnapshot = { rate: 1, channelGain: 1, captureFrozen: false, suppressNotes: opts.suppressNotes ?? false, crossfader: 0.3, busLevel: 0.8 };
-  const fires: Array<{ id: string; at?: number; beat: number; record?: string; role?: string; scratchFx?: ScratchEvent['fx'] }> = [];
+  const fires: Array<{ id: string; at?: number; beat: number; record?: string; role?: string; scratchFx?: ScratchEvent['fx']; render?: ScratchEvent['render'] }> = [];
   const releases: string[] = [];
   const releaseAt: Array<number | undefined> = [];
   const releaseFinish: Array<boolean | undefined> = [];
@@ -41,7 +41,7 @@ function rig(opts: { suppressNotes?: boolean } = {}) {
     clock: { beatNow: () => sec / 0.5, beatSec: () => 0.5 },
     contextTime: () => sec,
     fire: (id, o) => {
-      fires.push({ id, at: o.at, beat: sec / 0.5, record: o.record, role: o.role, scratchFx: o.scratchFx });
+      fires.push({ id, at: o.at, beat: sec / 0.5, record: o.record, role: o.role, scratchFx: o.scratchFx, render: o.render });
       // a deck gesture dirties its deck (rate, scratch fader, ring); a record gesture plays on its own voice
       if (!o.record) { state.rate = 0.4; state.channelGain = 0; state.captureFrozen = true; }
       return true;
@@ -93,11 +93,13 @@ describe('the executor fires an event on the deck beat clock (SCR-P3.5)', () => 
     expect(r.fires[0]!.beat).toBeLessThan(8); // scheduled ahead, not on the beat
   });
 
-  it('the planned style FX rides with the fire (SCR-PG-A5): electro at amount 0.5 reaches the registry', () => {
+  it('a transition\'s stored-version preset (C3) and the demo\'s render spec ride with the fire', () => {
     const r = rig();
-    new ScratchExecutor(r.deps).schedule(recordEvent(8, { fx: { style: 'electro', amount: 0.5 } }));
+    const render = { seed: 7, humanizeSamples: -40, chain: 'overlay' as const };
+    new ScratchExecutor(r.deps).schedule(recordEvent(8, { fx: { preset: 'delay' }, render }));
     r.advance(4.0);
-    expect(r.fires[0]!.scratchFx).toEqual({ style: 'electro', amount: 0.5 });
+    expect(r.fires[0]!.scratchFx).toEqual({ preset: 'delay' });
+    expect(r.fires[0]!.render).toEqual(render);
   });
 
   it('a record gesture stops sample-accurately: the release carries the context time of the end beat', () => {

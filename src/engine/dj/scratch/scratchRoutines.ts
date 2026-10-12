@@ -11,7 +11,7 @@ import { getScratchRecord, type ScratchRecord } from './scratchCatalogue';
 import { REFERENCE_GESTURE_IDS } from './scratchGestureCatalog';
 import { DEFAULT_GRID, stepToBeat, type ScratchGrid } from './scratchAnchor';
 import type { PlacedScratch } from './scratchPlacement';
-import type { ScratchCue } from './ScratchRecordVoice';
+import type { ScratchCue } from './scratchTypes';
 import type { ScratchDJStyle, ScratchGestureId, ScratchRole } from './scratchTypes';
 import { lfsr, type ScratchRandom } from './scratchRandom';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
