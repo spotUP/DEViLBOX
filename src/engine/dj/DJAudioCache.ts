@@ -62,13 +62,13 @@ export interface CachedAudio {
 
 /**
  * A cache entry as read: its scope track attached to its WAV bytes, so the deck that loads them finds it.
- * An old-shape entry (no track, never scope-rendered) is noted on its WAV so the load that follows can
- * ask for the background re-render (DJChannelScopeRerender).
+ * An old-shape entry (no track, or a track without the channel stems) is noted on its WAV so the load
+ * that follows can ask for the background re-render (DJChannelScopeRerender).
  */
 function withChannelScopes<T extends CachedAudio | null | undefined>(entry: T): T {
   if (!entry?.audioData) return entry;
   if (entry.channelScopes) attachChannelScopes(entry.audioData, entry.channelScopes);
-  else if (needsChannelScopeRerender(entry)) {
+  if (needsChannelScopeRerender(entry)) {
     noteScopelessWav(entry.audioData, { hash: entry.hash, filename: entry.filename, duration: entry.duration });
   }
   return entry;

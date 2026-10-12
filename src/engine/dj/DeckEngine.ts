@@ -22,6 +22,7 @@ import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
 import { attachChannelScopes, channelScopesFor, channelScopeWindow, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
+import { DeckChannelMute, bufferWithStems, stemCountOf } from './DeckChannelMute';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
@@ -85,6 +86,9 @@ export class DeckEngine {
    *  deckGain on the WAV-playback path. Bypassed by default; engaged only
    *  when keyLockEnabled is true. Zero added latency when bypassed. */
   private keyLock: DeckKeyLock;
+  /** Per-channel mute of rendered audio (DeckChannelMute): between the audio player and keyLock. */
+  readonly channelMute: DeckChannelMute;
+  private unsubscribeChannelMask: (() => void) | null = null;
 
   // Audio chain nodes
   private deckGain: Tone.Gain;
@@ -372,8 +376,20 @@ export class DeckEngine {
     this.keyLock.output.connect(this.deckGain);
 
     // Create AudioPlayer for audio file playback (MP3/WAV/FLAC etc.)
-    // Output threads through keyLock.input (bypass wire if key-lock is off).
-    this.audioPlayer = new DeckAudioPlayer(this.keyLock.input);
+    // Output threads through the channel mute (stems of a rendered module)
+    // into keyLock.input (bypass wire if key-lock is off).
+    this.channelMute = new DeckChannelMute();
+    this.channelMute.output.connect(this.keyLock.input);
+    this.audioPlayer = new DeckAudioPlayer(this.channelMute.input);
+
+    // The deck's channel mask (useDJStore decks[id].channelMask, written by the
+    // deck buttons, keys and pads) is the one mute path: it reaches the
+    // replayer and the rendered audio's channel mute from here.
+    this.applyChannelMask(useDJStore.getState().decks[this.id]?.channelMask ?? 0xFFFF);
+    this.unsubscribeChannelMask = useDJStore.subscribe(
+      (state) => state.decks[this.id]?.channelMask,
+      (mask) => { if (mask !== undefined) this.applyChannelMask(mask); },
+    );
 
     // Create StemPlayer for multi-stem playback (same output point).
     // Starts muted — only audible when stem mode is explicitly enabled.
@@ -575,6 +591,7 @@ export class DeckEngine {
     this._loadedWav = buffer;
     this.setChannelScopes(channelScopesFor(buffer));
     const info = await this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
+    this.applyChannelStems();
     // Fire-and-forget prime so the scratch ring buffer has content even
     // before the user presses play. Mirrors a real turntable: a loaded
     // record is scratch-audible regardless of motor state.
@@ -592,6 +609,7 @@ export class DeckEngine {
     this._loadedWav = sourceWav ?? null;
     this.setChannelScopes(channelScopes);
     const info = await this.audioPlayer.loadDecodedBuffer(audioBuffer, originalBytes, precomputedPeaks);
+    this.applyChannelStems();
     void this._primeScratchBuffer();
     return info;
   }
@@ -614,10 +632,41 @@ export class DeckEngine {
    * track yet, so a deck that moved on to another track is left alone.
    */
   attachLateChannelScopes(wav: ArrayBuffer, track: ChannelScopeTrack): boolean {
-    if (this._channelScopes || this._loadedWav !== wav) return false;
+    if (this._loadedWav !== wav || (this._channelScopes?.stems && this._channelScopes.stems.length > 0)) return false;
     attachChannelScopes(wav, track);
     this.setChannelScopes(track);
+    // A playing source keeps the buffer it started with; the stems sound from its next start (seek, cue, loop, play).
+    this.applyChannelStems();
     return true;
+  }
+
+  /**
+   * Put the loaded track's channel stems behind its mix (bufferWithStems) and
+   * wire the channel mute for them; the deck's current mask applies at once.
+   */
+  private applyChannelStems(): void {
+    let buffer = this.audioPlayer.getAudioBuffer();
+    // A double shares its source's buffer, stems and all; otherwise build it from the WAV.
+    if (stemCountOf(buffer) === 0) {
+      const ctx = Tone.getContext().rawContext as unknown as BaseAudioContext;
+      const withStems = bufferWithStems(ctx, this._loadedWav, this._channelScopes?.stems);
+      if (withStems) { this.audioPlayer.replaceBuffer(withStems); buffer = withStems; }
+    }
+    const n = stemCountOf(buffer);
+    this.channelMute.setStemCount(n);
+    this.channelMute.setMask(useDJStore.getState().decks[this.id]?.channelMask ?? 0xFFFF);
+    useDJStore.getState().setDeckState(this.id, { channelStemCount: n });
+  }
+
+  /** The deck's channel mask (bit k set = channel k audible) on the replayer and the rendered audio. */
+  private applyChannelMask(mask: number): void {
+    this.replayer.setChannelMuteMask(mask);
+    this.channelMute.setMask(mask);
+  }
+
+  /** Channels of the loaded rendered audio a mute reaches (stems behind the mix); 0 = none. */
+  get channelStemCount(): number {
+    return this.channelMute.stemCount;
   }
 
   /** The rendered WAV bytes the deck's audio came from (a double is loaded with its source's). */
@@ -641,8 +690,10 @@ export class DeckEngine {
       this.stemPlayer.disable();
       this._stemMode = false;
     }
-    // Clear all stem-related store state (mutes, dub sends) for new track
+    // Clear all stem-related store state (mutes, dub sends) for new track;
+    // a new track starts with every channel audible.
     useDJStore.getState().setDeckState(this.id, {
+      channelMask: 0xFFFF,
       stemsAvailable: false,
       stemNames: [],
       stemMode: false,
@@ -2465,6 +2516,9 @@ export class DeckEngine {
   }
 
   dispose(): void {
+    this.unsubscribeChannelMask?.();
+    this.unsubscribeChannelMask = null;
+    this.channelMute.dispose();
     this.unregisterOutputOverrides();
     this.restoreNativeRouting();
     this.scratchPlayback.dispose();

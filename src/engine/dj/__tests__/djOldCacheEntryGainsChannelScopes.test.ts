@@ -76,6 +76,7 @@ async function realDeck(id: 'A' | 'B') {
   return Object.assign(Object.create(DeckEngine.prototype), {
     id, audioPlayer, replayer: { stop: () => {} }, stemPlayer: { stop: () => {}, disable: () => {} }, _stemMode: false,
     patternScratchActive: false, patternScratchDir: 1, _primeScratchBuffer: async () => {}, _channelScopes: undefined, _loadedWav: null,
+    channelMute: { setStemCount: () => {}, setMask: () => {}, stemCount: 0 },
     loadSong: async () => {}, clearLoadedSong: () => {},
   }) as InstanceType<typeof DeckEngine>;
 }
