@@ -142,31 +142,34 @@ function wavPcm16(wav: ArrayBuffer): { sampleRate: number; channels: number; dat
 
 /**
  * The buffer a deck plays for a rendered track with stems: the WAV's stereo
- * mix followed by each channel's stereo stem, all at the render rate and
- * decoded alike (x / 32768), each stem cut or zero-padded to the mix. Built
+ * mix followed by each channel's stereo stem (decoded from its FLAC,
+ * channelStemCodec.ts), all at the render rate and decoded alike (x / 32768),
+ * each stem cut or zero-padded to the mix. Built
  * from the WAV itself, not the context-rate decode of it, so mix and stems
  * share one timeline (the context resamples them all the same way). Null when
  * there are no stems or the bytes are not a 16-bit PCM WAV.
  */
-export function bufferWithStems(ctx: BaseAudioContext, wav: ArrayBuffer | null, stems: Int16Array[] | undefined): AudioBuffer | null {
+export function bufferWithStems(ctx: BaseAudioContext, wav: ArrayBuffer | null, stems: (Float32Array[] | null)[] | undefined): AudioBuffer | null {
   if (!wav || !stems || stems.length === 0) return null;
   const pcm = wavPcm16(wav);
   if (!pcm || pcm.channels !== 2) return null;
   const len = pcm.data.length >> 1;
   const out = ctx.createBuffer(2 + 2 * stems.length, len, pcm.sampleRate);
-  const put = (src: Int16Array, chL: number) => {
-    const l = new Float32Array(len);
-    const r = new Float32Array(len);
-    const n = Math.min(len, src.length >> 1);
-    for (let i = 0; i < n; i++) {
-      l[i] = src[2 * i] / 32768;
-      r[i] = src[2 * i + 1] / 32768;
+  const l = new Float32Array(len);
+  const r = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    l[i] = pcm.data[2 * i] / 32768;
+    r[i] = pcm.data[2 * i + 1] / 32768;
+  }
+  out.copyToChannel(l, 0);
+  out.copyToChannel(r, 1);
+  stems.forEach((stem, k) => {
+    if (!stem) return; // a channel that never sounds: zeros
+    for (let side = 0; side < 2; side++) {
+      const src = stem[Math.min(side, stem.length - 1)];
+      out.copyToChannel((src.length > len ? src.subarray(0, len) : src) as Float32Array<ArrayBuffer>, 2 + 2 * k + side);
     }
-    out.copyToChannel(l, chL);
-    out.copyToChannel(r, chL + 1);
-  };
-  put(pcm.data, 0);
-  stems.forEach((stem, k) => { if (stem.length > 0) put(stem, 2 + 2 * k); }); // a channel that never sounds: zeros
+  });
   return out;
 }
 

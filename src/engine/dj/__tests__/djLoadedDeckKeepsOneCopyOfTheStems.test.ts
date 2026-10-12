@@ -36,13 +36,15 @@ describe('a loaded rendered deck keeps one copy of its channel stems', () => {
     const ctx = new OfflineAudioContext(2, 4800, 48000);
     Tone.setContext(ctx as never);
     const { attachChannelScopes, channelScopesFor } = await import('../channelScopeTrack');
+    const { encodeStemFlac } = await import('../channelStemCodec');
     const { DeckEngine } = await import('../DeckEngine');
 
     const stem = (k: number) => Int16Array.from({ length: FRAMES * 2 }, (_, i) => Math.round(4000 * Math.sin((i >> 1) * (k + 1) / 50)));
     const stems = [stem(0), stem(1)];
     const mix = stems[0].map((v, i) => v + stems[1][i]);
     const wav = wav16(mix);
-    attachChannelScopes(wav, { sampleRate: RATE / 4, channels: [new Int8Array(10), new Int8Array(10)], scales: [1, 1], stems });
+    const flacStems = [await encodeStemFlac(stems[0], RATE), await encodeStemFlac(stems[1], RATE)];
+    attachChannelScopes(wav, { sampleRate: RATE / 4, channels: [new Int8Array(10), new Int8Array(10)], scales: [1, 1], flacStems });
 
     const out = new Tone.Gain(1);
     out.connect(Tone.getDestination().input as never);
@@ -53,8 +55,8 @@ describe('a loaded rendered deck keeps one copy of its channel stems', () => {
 
     expect(deckA.channelStemCount, 'the deck buffer carries the stems').toBe(2);
     expect(deckA.audioPlayer.getAudioBuffer()?.numberOfChannels).toBe(6);
-    expect(deckA.channelScopes?.stems, 'the deck still holds the int16 stems').toBeUndefined();
-    expect(channelScopesFor(wav)?.stems, 'the WAV\'s track still holds the int16 stems').toBeUndefined();
+    expect(deckA.channelScopes?.flacStems, 'the deck still holds the encoded stems').toBeUndefined();
+    expect(channelScopesFor(wav)?.flacStems, 'the WAV\'s track still holds the encoded stems').toBeUndefined();
 
     const buffer = deckA.audioPlayer.getAudioBuffer()!;
     await deckB.loadDecodedAudio(buffer, null, undefined, deckA.channelScopes, deckA.loadedWav);

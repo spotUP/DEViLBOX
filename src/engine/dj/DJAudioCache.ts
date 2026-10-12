@@ -200,6 +200,7 @@ export function entryStoredBytes(entry: Partial<CachedAudio>): number {
   if (track) {
     for (const c of track.channels ?? []) n += arrayBytes(c);
     for (const st of track.stems ?? []) n += arrayBytes(st);
+    for (const st of track.flacStems ?? []) n += arrayBytes(st);
   }
   n += (entry.waveformPeaks?.length ?? 0) * NUMBER_BYTES;
   n += (entry.onsets?.length ?? 0) * NUMBER_BYTES;

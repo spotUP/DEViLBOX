@@ -20,6 +20,7 @@
  *   Worker → Main:   { type: 'ready' }
  */
 
+import { encodeStemFlac } from '@/engine/dj/channelStemCodec';
 import {
   ChannelScopeTrackBuilder, ChannelStemsBuilder, DECK_SCOPE_CHANNELS, DECK_STEM_CHANNELS, channelScopeTransferables,
   type ChannelScopeTrack,
@@ -1574,6 +1575,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
 
         const duration = result.left.length / result.sampleRate;
+
+        // The stems ship and cache as lossless FLAC (channelStemCodec.ts), encoded here, off the main thread.
+        const track = result.channelScopes;
+        if (track?.stems) {
+          const flac: Uint8Array[] = [];
+          for (const st of track.stems) flac.push(await encodeStemFlac(st, result.sampleRate));
+          track.flacStems = flac;
+          delete track.stems;
+        }
 
         postProgress(id, 95);
 

@@ -31,11 +31,15 @@ export interface ChannelScopeTrack {
   scales: number[];
   /**
    * Each channel's contribution to the rendered mix, rendered through the engine's whole output
-   * chain (solo instance, split render or a solo pass), stereo interleaved int16 at the render
-   * rate, encoded like the WAV. One per channel the module has, up to DECK_STEM_CHANNELS; an empty
-   * array is a channel that never sounds. The deck subtracts a muted channel's stem from the mix
-   * (DeckChannelMute) - the per-channel mute of a rendered deck.
+   * chain (solo instance, split render or a solo pass): the render worker builds it as stereo
+   * interleaved int16 at the render rate, encoded like the WAV (`stems`, worker only), and ships
+   * and caches it as one lossless stereo FLAC per channel (`flacStems`, channelStemCodec.ts).
+   * One per channel the module has, up to DECK_STEM_CHANNELS; an empty one is a channel that never
+   * sounds. The deck subtracts a muted channel's stem from the mix (DeckChannelMute) - the
+   * per-channel mute of a rendered deck.
    */
+  flacStems?: Uint8Array[];
+  /** The raw int16 stems: the render worker's working form (and cache entries of track version 2). */
   stems?: Int16Array[];
 }
 
@@ -46,7 +50,7 @@ export interface ChannelScopeTrack {
  * load), so keeping them here would hold every loaded track's stems twice.
  */
 export function releaseChannelStems(track: ChannelScopeTrack | undefined): void {
-  if (track) delete track.stems;
+  if (track) { delete track.flacStems; delete track.stems; }
 }
 
 /** Most channels a deck can mute: the deck buttons show CH1-4, the pads Mute Ch 1-8. */
@@ -213,7 +217,8 @@ export function channelScopeWindow(track: ChannelScopeTrack, positionSec: number
 /** The ArrayBuffers a track holds, for postMessage transfer lists. */
 export function channelScopeTransferables(track: ChannelScopeTrack | undefined): ArrayBuffer[] {
   if (!track) return [];
-  return [...track.channels, ...(track.stems ?? [])].map((c) => c.buffer as ArrayBuffer).filter((b) => b.byteLength > 0);
+  return [...track.channels, ...(track.stems ?? []), ...(track.flacStems ?? [])]
+    .map((c) => c.buffer as ArrayBuffer).filter((b) => b.byteLength > 0);
 }
 
 // The scope track of each rendered WAV, keyed by the WAV bytes the deck loads.
@@ -245,7 +250,7 @@ export function showsAllScope(channelScopeCount: number): boolean {
  * version 1: scopes but no stems) is re-rendered once, in the background, for
  * its track.
  */
-export const CHANNEL_SCOPE_RENDER_VERSION = 2; // 2: the track carries the channel stems (SCOPE-MUTE)
+export const CHANNEL_SCOPE_RENDER_VERSION = 3; // 2: the track carries the channel stems (SCOPE-MUTE); 3: as FLAC
 
 /** What a re-render for scopes needs from a cache entry. */
 export interface ScopelessOrigin {

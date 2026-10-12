@@ -74,6 +74,9 @@ describe('DJ deck channel scopes show a native engine\'s channels', () => {
     const ctx = new OfflineAudioContext(2, SR, SR);
     Tone.setContext(ctx as never);
 
+    // The render worker encodes the stems as FLAC; load the encoder while process.versions is real
+    // (the in-process worker stubs it for the Emscripten glue, which the FLAC loader would trip on).
+    await (await import('@/lib/export/audioEncoders')).encodeFlac([new Float32Array(16)], 44100);
     const restoreWorkers = installInProcessWorkers();
     const { getDJPipeline } = await import('../DJPipeline');
     const bytes = readFileSync(join(process.cwd(), 'public/data/songs/formats', SONG));
