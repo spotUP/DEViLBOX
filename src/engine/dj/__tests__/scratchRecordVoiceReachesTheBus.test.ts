@@ -21,6 +21,15 @@ vi.mock('tone', async (orig) => {
   const actual = await orig<typeof import('tone')>();
   return { ...actual, now: () => (holder.ctx as BaseAudioContext).currentTime, getContext: () => ({ rawContext: holder.ctx, state: 'running' }) };
 });
+// The app graph a record gesture never touches is stubbed (SA-M7): see scratchRegistryStubs.ts.
+vi.mock('@/stores/useTransportStore', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/stores/useTransportStore']());
+vi.mock('@/stores/useDJStore', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/stores/useDJStore']());
+vi.mock('@/engine/dj/DJActions', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/engine/dj/DJActions']());
+vi.mock('@/engine/dj/DJQuantizedFX', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/engine/dj/DJQuantizedFX']());
+vi.mock('@/engine/dj/DJBeatJump', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/engine/dj/DJBeatJump']());
+vi.mock('@/engine/dj/DJAutoSync', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/engine/dj/DJAutoSync']());
+vi.mock('@/hooks/drumpad/useMIDIPadRouting', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@/hooks/drumpad/useMIDIPadRouting']());
+vi.mock('@engine/ToneEngine', async () => (await import('@/test/audio/scratchRegistryStubs')).scratchRegistryStubModules['@engine/ToneEngine']());
 vi.mock('@/engine/dj/DJEngine', () => ({
   getDJEngine: () => ({ getDeck: () => holder.deck, mixer: { samplerInput: holder.samplerInput } }),
   getDJEngineIfActive: () => ({ getDeck: () => holder.deck, mixer: { samplerInput: holder.samplerInput } }),
@@ -95,5 +104,5 @@ describe('a record gesture fired through the DJ FX registry reaches the scratch 
     releaseDjFx('fx_scratch_forwardStab', { source: 'mcp' });
     expect(voice.busy).toBe(false);
     expect(getScratchRecord('ONE')!.anchors.vowel).toBeCloseTo(3300 / 22050, 9);
-  }, 240_000); // heavy tier: the 0.6 s offline render takes 20-40 s on a loaded machine (open: SCR-P2 handoff)
+  }, 60_000); // ~2 s with the app graph stubbed (SA-M7); was 20-26 s loading ~700 modules
 });
