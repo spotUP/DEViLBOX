@@ -22,6 +22,8 @@ export interface DeckRecueTarget {
   cueTracker(sec: number): boolean;
   /** Reset the capture ring so a backward stroke reads from the new position. */
   resetRing(): void;
+  /** A phase correction (a rate bend) is running: deck sync outranks a scratch (section 28). */
+  isBending?(): boolean;
 }
 
 export type DeckRecueMode = 'audio' | 'tracker' | 'waiting' | 'unavailable';
@@ -39,6 +41,10 @@ export interface DeckRecueResult {
 export const deckRecueStats = { recues: 0, waits: 0, unavailable: 0 };
 
 export function recueDeck(target: DeckRecueTarget, anchorSec: number): DeckRecueResult {
+  if (target.isBending?.()) {
+    deckRecueStats.waits++;
+    return { recued: false, mode: 'waiting', returnsToAnchor: false, reason: 'a phase correction is bending the deck: deck sync first (section 28)' };
+  }
   if (!target.isFaderWindowClosed()) {
     deckRecueStats.waits++;
     return { recued: false, mode: 'waiting', returnsToAnchor: false, reason: 'the fader window is open: the listener hears the deck; re-cue in the next closed window' };

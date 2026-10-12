@@ -23,6 +23,7 @@ import { humanizeMs, throwBeats, type PlacedScratch } from './scratchPlacement';
 import { lfsr } from './scratchRandom';
 import { isThrowGesture } from './scratchPlacement';
 import type { ScratchMode } from './scratchStyles';
+import { resolveConflicts } from './ScratchSafety';
 import type { ScratchEvent, ScratchGestureId, ScratchRole, ScratchSource } from './scratchTypes';
 
 export type TransitionScratchKind = 'scratchAccent' | 'scratchFeature' | 'scratchTransition' | 'scratchBattle';
@@ -217,6 +218,16 @@ export function planTransitionScratch(input: TransitionScratchInput): Transition
 }
 
 function finish(kind: TransitionScratchKind, events: ScratchEvent[], source: ScratchSource, fxRequest: ScratchFxRequest, reasons: string[], input: TransitionScratchInput): TransitionScratchPlan {
+  // section 28: the transition's start is the mix's moment - a scratch on it moves to the next step after
+  const startMoment = { kind: 'transition' as const, startBeat: input.plan.startBeat, endBeat: input.plan.startBeat + 0.25 };
+  const resolved = resolveConflicts([startMoment, ...events.map((e, i) => ({
+    kind: 'scratchFeature' as const, startBeat: e.executeAtBeat, endBeat: e.executeAtBeat + e.durationBeats, id: String(i),
+    latestStartBeat: input.plan.endBeat - e.durationBeats,
+  }))]);
+  const moved = new Map(resolved.moved.map((m) => [m.request.id, m.request.startBeat]));
+  const refused = new Set(resolved.refused.map((r) => r.request.id));
+  if (moved.size) reasons.push(`${moved.size} event(s) moved off the transition start (section 28)`);
+  events = events.flatMap((e, i) => (refused.has(String(i)) ? [] : [moved.has(String(i)) ? { ...e, executeAtBeat: moved.get(String(i))! } : e]));
   const startBeat = Math.min(...events.map((e) => e.executeAtBeat));
   const endBeat = Math.max(...events.map((e) => e.executeAtBeat + e.durationBeats));
   // never past the plan's end (section 46: the incoming enters, then the release)
