@@ -116,7 +116,7 @@ uade-wasm/src/player_registry.c
 uade-wasm/src/basedir_data.c
 
 # Turntable source models (GLB already in public/models/)
-Turntable/
+/Turntable/
 turntable.glb
 
 # Session context — split commit policy per ~/.claude/CLAUDE.md:
