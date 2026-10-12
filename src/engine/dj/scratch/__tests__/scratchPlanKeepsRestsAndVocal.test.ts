@@ -11,28 +11,28 @@ import { describe, it, expect } from 'vitest';
 import { planScratch } from '../scratchPlanner';
 import { scenarioContext } from './fixtures/scenarioContext';
 
+// P13 (owner 2026-10-12): the demo's own rests and strokes are the demo's to keep (electro's drop is its 'high'
+// state, every bar busy in some windows, as the demo plays it); the rules govern what DEViLBOX adds on top
 describe('the final plan keeps rests and vocal space (SA-M6)', () => {
-  it('electro drop under PERFORMER keeps at least a quarter of every 16 bars empty (40 seeds)', () => {
-    let windows = 0;
+  it('the extras never fill a bar the demo leaves empty unless the evaluation escalates (40 seeds)', () => {
     for (let seed = 1; seed <= 40; seed++) {
-      const plan = planScratch(scenarioContext({ style: 'electro', kind: 'drop', bpm: 128, energy: 0.9 }), { mode: 'PERFORMER', seed, fromBar: 16, bars: 32 });
-      for (let w = 0; w < 32; w += 16) {
-        const empty = plan.bars.slice(w, w + 16).filter((b) => b.length === 0).length;
-        expect(empty, `seed ${seed} window ${w}`).toBeGreaterThanOrEqual(4);
-        windows++;
+      for (const [style, kind, mode] of [['electro', 'drop', 'PERFORMER'], ['boomBap', 'verse', 'PERFORMER'], ['boomBap', 'chorus', 'MUSICAL']] as const) {
+        const ctx = scenarioContext({ style, kind, bpm: 128, energy: 0.9 });
+        const p = planScratch(ctx, { mode, seed, fromBar: 16, bars: 32 });
+        const alone = planScratch(ctx, { mode, seed, fromBar: 16, bars: 32, extras: false });
+        expect(p.bars.map((b) => b.length === 0), `${style} ${kind} seed ${seed}`).toEqual(alone.bars.map((b) => b.length === 0));
       }
     }
-    expect(windows).toBe(80);
   });
 
-  it('a vocal at 0.9 thins the whole plan, routines included: boomBap chorus MUSICAL plans under half the events', () => {
-    let quiet = 0, vocal = 0;
+  it('a vocal at 0.9 never thins the demo\'s strokes, routines included: boomBap chorus MUSICAL plays the same demo plan', () => {
+    let n = 0;
     for (let seed = 1; seed <= 40; seed++) {
-      const at = (v: number) => planScratch(scenarioContext({ style: 'boomBap', kind: 'chorus', bpm: 92, energy: 0.6, vocal: v }), { mode: 'MUSICAL', seed, fromBar: 16, bars: 32 });
-      quiet += at(0).events.length;
-      vocal += at(0.9).events.length;
+      const at = (v: number) => planScratch(scenarioContext({ style: 'boomBap', kind: 'chorus', bpm: 92, energy: 0.6, vocal: v }), { mode: 'MUSICAL', seed, fromBar: 16, bars: 32, routine: 'auto' })
+        .events.filter((e) => e.layer === 'demo').map((e) => `${e.bar}:${e.step}:${e.gesture}`);
+      expect(at(0.9), `seed ${seed}`).toEqual(at(0));
+      n += at(0).length;
     }
-    expect(quiet).toBeGreaterThan(100);
-    expect(vocal).toBeLessThan(quiet * 0.5);
+    expect(n).toBeGreaterThan(100);
   });
 });

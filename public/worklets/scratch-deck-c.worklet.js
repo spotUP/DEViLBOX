@@ -169,10 +169,15 @@ class Section {
         if (j >= 0 && j < k.samples.length) x = x + k.samples[j];
       }
     }
-    let y = x;
-    if (this.hp) y = this.hp.f(y);
-    if (this.lp) y = this.lp.f(y);
-    if (this.k) y = Math.tanh(this.k * y);
+    // hp, lp and the drive run on the cut section (`out[:bars x bar_len]`): their output ends with it - a filter
+    // ringing past the end (a stroke that runs over it) is not the demo's; the delay and the room ring on
+    let y = 0;
+    if (i < this.end) {
+      y = x;
+      if (this.hp) y = this.hp.f(y);
+      if (this.lp) y = this.lp.f(y);
+      if (this.k) y = Math.tanh(this.k * y);
+    }
     if (this.delay) y = this.delay.step(y, i - this.start);
     if (this.rev) y = (1 - this.revMix) * y + this.revMix * this.rev.step(y);
     return { x, y };

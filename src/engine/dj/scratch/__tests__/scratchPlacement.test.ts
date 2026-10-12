@@ -129,25 +129,28 @@ describe('humanize (section 35, SCR-P4.8)', () => {
   });
 });
 
-describe('vocal awareness (section 24, SCR-P4.9)', () => {
-  const plan = (seed: number, vocalByBar: number[]) => planScratch(scenarioContext({ style: 'battle', kind: 'instrumental', bpm: 100, energy: 0.8, permission: 4 }), {
-    mode: 'BATTLE', seed, fromBar: 16, bars: vocalByBar.length, vocalByBar, sectionAt: () => ({ name: 'instrumental', startBar: 16, bars: 16 }),
+describe('vocal awareness (section 24, SCR-P4.9): the DEViLBOX extras on top of the demo (P13)', () => {
+  const plan = (seed: number, vocalByBar: number[]) => planScratch(scenarioContext({ style: 'boomBap', kind: 'verse', bpm: 92, energy: 0.5, permission: 4 }), {
+    mode: 'PERFORMER', seed, fromBar: 16, bars: vocalByBar.length, vocalByBar, densityShift: 1, sectionAt: () => ({ name: 'verse', startBar: 16, bars: 16 }),
   });
+  const extras = (p: ReturnType<typeof plan>) => p.events.filter((e) => e.layer === 'extra');
+  const demo = (p: ReturnType<typeof plan>) => p.events.filter((e) => e.layer === 'demo').map((e) => `${e.bar}:${e.step}:${e.gesture}`);
 
-  it('a bar over 0.7 vocal activity holds at most one event unless it is an answer', () => {
+  it('a bar over 0.7 vocal activity keeps only the extras\' answers; the demo\'s strokes stay', () => {
     for (let seed = 0; seed < 30; seed++) {
-      for (const bar of plan(seed, Array(8).fill(0.9)).bars) {
-        if (!bar.some((e) => e.role === 'ANSWER')) expect(bar.length).toBeLessThanOrEqual(1);
-      }
+      const p = plan(seed, Array(8).fill(0.9));
+      expect(demo(p), `seed ${seed}`).toEqual(demo(plan(seed, Array(8).fill(0))));
+      for (const e of extras(p)) expect(e.role, `seed ${seed}`).toBe('ANSWER');
     }
   });
 
-  it('density follows the vocal: a bar at 0.9 plans far fewer events than a bar at 0', () => {
+  it('the extras\' density follows the vocal: a bar at 0.9 adds far fewer than a bar at 0', () => {
     let quiet = 0, vocal = 0;
     for (let seed = 0; seed < 60; seed++) {
-      quiet += plan(seed, Array(8).fill(0)).events.length;
-      vocal += plan(seed, Array(8).fill(0.9)).events.length;
+      quiet += extras(plan(seed, Array(8).fill(0))).length;
+      vocal += extras(plan(seed, Array(8).fill(0.9))).length;
     }
+    expect(quiet).toBeGreaterThan(0);
     expect(vocal).toBeLessThan(quiet * 0.4);
   });
 

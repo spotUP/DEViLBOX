@@ -14,7 +14,7 @@
 import { barStartBeat, timeAtBeat, timelineAt } from '../autodj/beatGrid';
 import type { DJPerformanceContext, DJTrackAnalysis } from '../autodj/types';
 import { buildScratchContext, scratchSectionFor, type ScratchPerformanceContext } from './scratchContext';
-import { overlayRender, planJuggleResponse, planScratch, toScratchEvents, type OverlayRender, type OverlaySection, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
+import { onTopOfTheDemo, overlayRender, planJuggleResponse, planScratch, toScratchEvents, type OverlayRender, type OverlaySection, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
 import type { PlacedScratch } from './scratchPlacement';
 import type { DemoProfileName } from './scratchRender';
 import { buildScratchDjRoutine, buildThreeDeckRoutine, demoRoutineRenderSpecs, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, validateScratchDjRoutine } from './scratchDemoRoutines';
@@ -392,6 +392,20 @@ export class DJScratchDJ {
     let arc: ArcTemplate | null = null;
     // cooldowns are checked at each event's own bar (section 54), not for the whole window
     const cooling = (g: ScratchGestureId, bar: number): boolean => !this.memory.gestureReady(g, bar);
+    const densityShift = this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0;
+    // the demo's overlay for bars [from, from + bars) (SCR-PHRASING-PARITY): section by section, one crate record
+    // per section; every stroke it plans plays (P13), DEViLBOX's extras only on top
+    const overlay = (from: number, bars: number, extras: boolean): ScratchPlan => {
+      const vocalByBar = Array.from({ length: bars }, (_, k) => {
+        const b = track.downbeats.bars[from + k];
+        return b ? timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, b.start) : ctx.vocalActivity;
+      });
+      const opts: ScratchPlanOptions = {
+        mode: input.mode, seed, fromBar: from, bars, vocalByBar, genre: input.genre, densityShift,
+        sectionAt: (bar) => overlaySectionAt(track, bar), profile: input.profile, routine: input.routine ?? null, records: true, extras,
+      };
+      return planScratch(ctx, opts);
+    };
     if (wantsFeature) {
       arc = shape.template!;
       toBar = fromBar + arc.bars;
@@ -410,7 +424,7 @@ export class DJScratchDJ {
         scratchDJStats.bookends++;
         const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar);
         // every stroke rendered as the demo renders it, on the routine's own bus (scratch null test)
-        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck'));
+        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck')).map((e) => ({ ...e, layer: 'demo' as const }));
         plan = {
           mode: input.mode, events, bars: Array.from({ length: arc.bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
           rests: [], issues: battle ? validateScratchDjRoutine(demo) : [], routine: battle ? 'scratchDj' : 'threeDeck',
@@ -422,38 +436,30 @@ export class DJScratchDJ {
         const sec = overlaySectionAt(track, fromBar);
         const record = overlayRecord(sec.name, seed + sec.startBar);
         const events = record ? a.events.map((e) => ({ ...e, record })) : a.events;
-        plan = {
+        let feature: ScratchPlan = {
           mode: input.mode, events, bars: Array.from({ length: arc.bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
           rests: [], issues: [], reasons: [`${shape.role}: ${arc.name} arc over ${arc.bars} bars`, perm.reason],
         };
+        // a feature is a routine: the needle drops on its first downbeat and lifts at its end (C8)
+        if (feature.events.length) feature = withNeedleBookends(feature, fromBar, arc.bars, ctx.meter);
+        // P13: a DEViLBOX feature plays on top of the demo's overlay, never instead of it
+        plan = onTheOverlay(overlay(fromBar, arc.bars, false), feature, fromBar, arc.bars);
       }
     } else {
       this.lastPeak = false;
-      const vocalByBar = Array.from({ length: toBar - fromBar }, (_, k) => {
-        const b = track.downbeats.bars[fromBar + k];
-        return b ? timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, b.start) : ctx.vocalActivity;
-      });
-      const densityShift = this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0;
-      // the demo's overlay: section by section, one crate record per section (SCR-PHRASING-PARITY)
-      const opts: ScratchPlanOptions = {
-        mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, densityShift,
-        sectionAt: (bar) => overlaySectionAt(track, bar), profile: input.profile, routine: input.routine ?? null, records: true,
-      };
-      // a planned rest after a phrase that collided with the vocal (section 52)
-      plan = this.intent === 'rest'
-        ? { mode: input.mode, events: [], bars: [], rests: [], issues: [], reasons: [`rest: ${this.lastEvaluation?.reason ?? 'evaluation'}`] }
-        : planScratch(ctx, opts);
+      // a phrase that collided with the vocal is followed by a rest (section 52): of the DEViLBOX extras only -
+      // the demo's strokes play (P13)
+      plan = overlay(fromBar, toBar - fromBar, this.intent !== 'rest');
+      if (this.intent === 'rest') plan = { ...plan, reasons: [...plan.reasons, `rest (extras): ${this.lastEvaluation?.reason ?? 'evaluation'}`] };
     }
-    // section 49: over a running juggle with two hands free, the juggle response replaces the phrase
+    // section 49: over a running juggle with two hands free, the juggle response plays - on top of the demo's overlay
     const responsePhases = !arc && input.juggleActive && input.juggleShape && input.scratchPermission >= 2
       ? juggleBarPhases(input.juggleShape, track, fromBar, toBar) : null;
     const response = !!responsePhases && responsePhases.some((p) => p === 'PEAK');
-    if (response) plan = planJuggleResponse(ctx, { mode: input.mode, seed, fromBar, phases: responsePhases! });
+    if (response) plan = onTheOverlay(overlay(fromBar, toBar - fromBar, false), planJuggleResponse(ctx, { mode: input.mode, seed, fromBar, phases: responsePhases! }), fromBar, toBar - fromBar);
     this.plannedThroughBar = toBar;
     if (input.juggleActive && !response) plan = juggleSafe(plan);
     if (response) scratchDJStats.juggleResponses++;
-    // a feature is a routine: the needle drops on its first downbeat and lifts at its end (C8); the demo's own routines carry theirs
-    if (arc && plan.events.length && !plan.events.some((e) => e.gesture === 'needleDrop')) plan = withNeedleBookends(plan, fromBar, arc.bars, ctx.meter);
 
     // the record: the plan's own per event (the demo's choice); a juggle response takes its section's record
     // too (one record per section, `pick_source`); never the music (D1). A `chooseSource` dependency overrides.
@@ -485,6 +491,7 @@ export class DJScratchDJ {
       return r.stroke(e.bar - sec.startBar, e.step, false);
     };
     plan = { ...plan, events: plan.events.map((e) => (e.render ? e : { ...e, render: extraRender(e) })) };
+    this.lastPlan = plan;
     const events = toScratchEvents(plan.events, chosen.source, chosen.anchor, {
       bpm: ctx.bpm, seed: seed + fromBar, downbeats: track.downbeats, deck: input.deck,
     }).map((e, i) => {
@@ -514,7 +521,7 @@ export class DJScratchDJ {
       const sourceKey = perEvent && p.record ? `crate:${p.record}` : windowKey;
       if (e.executeAtBeat < now || e.executeAtBeat < firstBeat) return;
       // section 59: the governor has the last word on every event
-      const verdict = checkScratch(e, safety);
+      const verdict = checkScratch(e, safety, { demo: p.layer === 'demo' });
       if (!verdict.ok) { this.deps.onRefused?.(e, verdict.rule, verdict.reason); plan.reasons.push(`refused ${e.gesture}: ${verdict.rule}`); return; }
       const d = e.source.type === 'DECK' || e.source.type === 'TRACKER_CHANNEL' ? (e.deck ?? e.source.deck) : undefined;
       if (d) this.deckBusyUntil[d] = Math.max(this.deckBusyUntil[d] ?? -Infinity, e.executeAtBeat + e.durationBeats);
@@ -634,8 +641,24 @@ export function juggleBarPhases(shape: NonNullable<ScratchTickInput['juggleShape
   });
 }
 
+/**
+ * P13: a DEViLBOX plan (a short feature, the juggle response) on top of the demo's overlay for the same bars:
+ * every demo stroke plays, the DEViLBOX strokes are extras one hand adds (`onTopOfTheDemo`).
+ */
+export function onTheOverlay(base: ScratchPlan, extra: ScratchPlan, fromBar: number, bars: number): ScratchPlan {
+  const demo = base.events.filter((e) => e.layer === 'demo');
+  const extras = [...base.events.filter((e) => e.layer !== 'demo'), ...extra.events].map((e) => ({ ...e, layer: 'extra' as const }));
+  const events = onTopOfTheDemo(demo, extras);
+  return {
+    mode: extra.mode, events, bars: Array.from({ length: bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
+    rests: [...base.rests, ...extra.rests], issues: extra.issues, routine: extra.routine ?? base.routine,
+    reasons: [...base.reasons, ...extra.reasons, 'on top of the demo\'s overlay'],
+  };
+}
+
+/** A running juggle (section 26): the DEViLBOX extras keep only answers and accents; the demo's strokes play (P13). */
 function juggleSafe(plan: ScratchPlan): ScratchPlan {
-  const events = plan.events.filter((e) => e.role === 'ANSWER' || e.role === 'ACCENT');
+  const events = plan.events.filter((e) => e.layer === 'demo' || e.role === 'ANSWER' || e.role === 'ACCENT');
   if (events.length === plan.events.length) return plan;
   return { ...plan, events, bars: plan.bars.map((b) => b.filter((e) => events.includes(e))), reasons: [...plan.reasons, 'a juggle runs: answers and accents only'] };
 }

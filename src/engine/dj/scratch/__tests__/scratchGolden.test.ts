@@ -86,44 +86,47 @@ describe('golden performances (SCR-P4.14, section 69)', () => {
     }
   });
 
-  it('Test 3 House 124 BPM: sparse, transformer accents, never a constant stream', () => {
+  // P13 (owner 2026-10-12): the genre's modifiers, the vocal rule and the low-confidence gate govern the
+  // DEViLBOX extras on top; the demo's own strokes play as the demo plans them in every scenario
+  const demoKeys = (p: ScratchPlan) => p.events.filter((e) => e.layer === 'demo').map((e) => `${e.bar}:${e.step}:${e.gesture}:${e.velocity}`);
+  const alone = (name: ScenarioName, seed: number) => planScratch(scenarioContext({ permission: 4, ...SCENARIOS[name].ctx }), { ...SCENARIOS[name].opts, seed, extras: false });
+
+  it('Test 3 House 124 BPM: the demo\'s strokes as planned, the extras inside the genre\'s level cap', () => {
     for (const seed of SEEDS) {
       const p = plan('house', seed);
-      expect(emptyBars(p), `seed ${seed}`).toBeGreaterThanOrEqual(8);
-      expect(p.events.length, `seed ${seed}`).toBeLessThanOrEqual(16);
-      // the transform-cut glides: transformer, or hydroplane (12 transform cuts) now the demo's whole ladder plays
-      expect([...gestures(p)].some((x) => x === 'transformer4' || x === 'transformer8' || x === 'hydroplane'), `seed ${seed}`).toBe(true);
-      // never two busy bars running for more than a 2-bar routine
-      let run = 0, longest = 0;
-      for (const b of p.bars) { run = b.length ? run + 1 : 0; longest = Math.max(longest, run); }
-      expect(longest, `seed ${seed}`).toBeLessThanOrEqual(2);
+      expect(demoKeys(p), `seed ${seed}`).toEqual(demoKeys(alone('house', seed)));
+      for (const e of p.events.filter((x) => x.layer === 'extra')) expect(level(e.gesture), `seed ${seed} ${e.gesture}`).toBeLessThanOrEqual(house.modifiers.levelCap ?? 4);
     }
   });
 
-  it('Test 4 Drum & Bass 174 BPM: short gestures only (<= 2 steps), no drag', () => {
+  it('Test 4 Drum & Bass 174 BPM: the demo\'s strokes as planned, the extras short (<= 2 steps), no drag', () => {
+    let demo = 0;
     for (const seed of SEEDS) {
       const p = plan('drumAndBass', seed);
-      expect(p.events.length, `seed ${seed}`).toBeGreaterThan(0);
-      for (const e of p.events) {
+      expect(demoKeys(p), `seed ${seed}`).toEqual(demoKeys(alone('drumAndBass', seed)));
+      demo += demoKeys(p).length;
+      for (const e of p.events.filter((x) => x.layer === 'extra')) {
         expect(getGesture(e.gesture).durationSteps, `seed ${seed} ${e.gesture}`).toBeLessThanOrEqual(2);
         expect(e.gesture).not.toBe('drag');
       }
     }
+    expect(demo).toBeGreaterThan(0);
   });
 
-  // section 69 "density reduction OR intentional vocal response": each strong vocal bar carries answers only,
-  // and what is not an answer to the vocal is thinner than the same verse without it
-  it('Test 5 Vocal track: bars under a strong vocal carry answers only; everything else thins out', () => {
-    let withVocal = 0, without = 0;
+  // section 69 "density reduction OR intentional vocal response": the extras under a strong vocal are answers
+  // only, and a call that ends gets one; the demo's strokes play under the vocal
+  it('Test 5 Vocal track: the demo\'s strokes play; the extras under a strong vocal are answers only', () => {
+    let answers = 0;
     for (const seed of SEEDS) {
       const p = plan('vocal', seed);
+      expect(demoKeys(p), `seed ${seed}`).toEqual(demoKeys(alone('vocal', seed)));
       p.bars.forEach((b, i) => {
-        if (VOCAL_CALLS[i]! > 0.7) for (const e of b) expect(e.role, `seed ${seed} bar ${i}`).toBe('ANSWER');
+        const extras = b.filter((e) => e.layer === 'extra');
+        answers += extras.filter((e) => e.role === 'ANSWER').length;
+        if (VOCAL_CALLS[i]! > 0.7) for (const e of extras) expect(e.role, `seed ${seed} bar ${i}`).toBe('ANSWER');
       });
-      withVocal += p.events.filter((e) => e.role !== 'ANSWER').length;
-      without += planScratch(scenarioContext(SCENARIOS.vocal.ctx), { ...SCENARIOS.vocal.opts, vocalByBar: undefined, seed }).events.length;
     }
-    expect(withVocal).toBeLessThan(without);
+    expect(answers).toBeGreaterThan(0);
   });
 
   it('Test 6 Breakdown: one crate record for the section, baby, chirp and rests', () => {
@@ -147,12 +150,12 @@ describe('golden performances (SCR-P4.14, section 69)', () => {
     }
   });
 
-  it('Test 8 Low confidence: no level 3/4 scratch, plays as SAFE', () => {
+  it('Test 8 Low confidence: plays as SAFE - the extras at level 1, the demo\'s strokes as planned', () => {
     for (const seed of SEEDS) {
       const p = plan('lowConfidence', seed);
       expect(p.mode).toBe('SAFE');
-      expect(p.routine).toBeUndefined();
-      for (const e of p.events) expect(level(e.gesture), `seed ${seed} ${e.gesture}`).toBeLessThanOrEqual(2);
+      expect(demoKeys(p), `seed ${seed}`).toEqual(demoKeys(plan('lowConfidence', seed, { beatConfidence: 1 })));
+      for (const e of p.events.filter((x) => x.layer === 'extra')) expect(level(e.gesture), `seed ${seed} ${e.gesture}`).toBeLessThanOrEqual(1);
     }
   });
 });

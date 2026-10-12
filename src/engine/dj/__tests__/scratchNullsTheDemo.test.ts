@@ -47,6 +47,7 @@ const O = overlayFixture as unknown as {
   rate: number; keep: number; bpm: number; bars: number; seed: number; record: string; plan: Array<{ bar: number; step: number; gesture: string; velocity: number }>;
   overlayN: number; overlay: number[]; routineSeed: number; routineRecord: string; routineN: number; routine: number[];
   profiles: Record<string, { n: number; out: number[] }>;
+  denseBars: number; denseSeed: number; denseRecord: string; densePlan: Array<{ bar: number; step: number; gesture: string; velocity: number }>; denseN: number; dense: number[];
   versionKeep: number; versions: Record<'RoutineDry' | 'RoutineDark' | 'RoutineDelay' | 'RoutinePhraseEnd', { n: number; out: number[] }>;
 };
 
@@ -162,6 +163,35 @@ describe('the scratch nulls against the Up Rough demo', () => {
     expect(deckCStats.strokes - before.strokes).toBe(plan.events.length);
     const out = (await off.startRendering()).getChannelData(0);
     expect(residualDb(O.overlay, out, O.keep)).toBeLessThan(-120);
+  }, 180_000);
+
+  // P13: the demo's plan, all of it - two strokes on step 15 of a bar (plan_phrase clamps its 16) and strokes
+  // inside sounding ones, summed - in MUSICAL under a strong vocal: no mode cap, vocal rule or one-hand rule thins it
+  it('a dense overlay (golden_era showcase) nulls render_scratch_section with both step-15 strokes summed, MUSICAL under a vocal', async () => {
+    const { planScratch } = await import('@/engine/dj/scratch/scratchPlanner');
+    const { ScratchVoicePool, scratchPoolStats } = await import('@/engine/dj/scratch/scratchVoicePool');
+    const { getGesture, REFERENCE_GESTURE_IDS } = await import('@/engine/dj/scratch/scratchGestureCatalog');
+    const { demoStepSamples } = await import('@/engine/dj/scratch/scratchRender');
+    const ctx = { beatConfidence: 1, scratchPermission: 1, style: 'boomBap', meter: 4, sectionName: 'showcase', vocalActivity: 0.95 } as unknown as import('@/engine/dj/scratch/scratchContext').ScratchPerformanceContext;
+    const plan = planScratch(ctx, {
+      mode: 'MUSICAL', seed: O.denseSeed, fromBar: 0, bars: O.denseBars, sectionAt: () => ({ name: 'showcase', startBar: 0, bars: O.denseBars }),
+      profile: 'boomBap', records: true, vocalByBar: Array(O.denseBars).fill(0.95),
+    });
+    const demo = plan.events.filter((e) => e.layer === 'demo');
+    const inTime = [...O.densePlan].sort((a, b) => (a.bar * 16 + a.step) - (b.bar * 16 + b.step));
+    expect(demo.map((e) => [e.bar, e.step, e.gesture, e.velocity])).toEqual(inTime.map((p) => [p.bar, p.step, REFERENCE_GESTURE_IDS[p.gesture], p.velocity]));
+    expect(demo.filter((e) => e.step === 15).length).toBeGreaterThan(O.denseBars);
+    expect(new Set(demo.map((e) => e.record))).toEqual(new Set([O.denseRecord]));
+    const off = new OfflineAudioContext(1, O.denseN, O.rate);
+    const pool = new ScratchVoicePool(off, off.destination, { bytes: packBytes });
+    const step = demoStepSamples(O.bpm);
+    const before = scratchPoolStats.rendered;
+    for (const e of demo) pool.perform(getGesture(e.gesture), { record: e.record, bpm: O.bpm, velocity: e.velocity, at: ((e.bar * 16 + e.step) * step + 0.25) / O.rate, render: e.render });
+    await pool.settled();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(scratchPoolStats.rendered - before).toBe(O.densePlan.length);
+    const out = (await off.startRendering()).getChannelData(0);
+    expect(residualDb(O.dense, out, O.keep)).toBeLessThan(-120);
   }, 180_000);
 
   it('a phrase_end routine alone is render_routine(channel=False): its strokes, seeds and the ending\'s tape-delay tail', async () => {

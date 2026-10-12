@@ -5,15 +5,14 @@
  * DEViLBOX planners run on them and every event must match: gesture per bar and step, velocity, the
  * record, the routine's bars - and the demo's 32-bar routines event for event.
  *
- * The one rule both sides share on top of the demo: one hand (an event that would start inside a
- * sounding one is dropped - inside a bar in the demo's priority order, across bars in time; the demo
- * sums both strokes) - applied to the demo's list here.
+ * P13 (owner 2026-10-12): nothing DEViLBOX adds changes what the demo plans - every event of the demo's list,
+ * the second step-15 stroke and the overlapping ones included, is in the DEViLBOX plan, in every mode.
  */
 import { describe, it, expect } from 'vitest';
 import spec from './fixtures/phrasing_parity_spec.json';
 import fixture from './fixtures/phrasing_parity.json';
 import { planScratch, routineSlotRecord, type OverlaySection } from '../scratchPlanner';
-import { oneHand, overlapsOneHand, type PlacedScratch } from '../scratchPlacement';
+import type { PlacedScratch } from '../scratchPlacement';
 import { REFERENCE_GESTURE_IDS, getGesture } from '../scratchGestureCatalog';
 import { CLEAN_CRATE_POOL, CRATE_LOAD_ORDER, CUE_ROLE_POOLS, type CueRole } from '../scratchCatalogue';
 import { SCRATCH_PROFILES, type ScratchProfileId } from '../scratchStyles';
@@ -28,17 +27,17 @@ const profileOf = (reference: string): ScratchProfileId => (Object.values(SCRATC
 interface SpecTrack { name: string; style: string; profile: string; seed: number; sections: Array<{ kind: string; name: string; startBar: number; bars: number }> }
 interface OverlayRow { track: string; routine: string | null; events: Array<{ bar: number; step: number; gesture: string; velocity: number; kind: string }>; records: Array<{ startBar: number; record: string }> }
 
-function ctxFor(track: SpecTrack): ScratchPerformanceContext {
+function ctxFor(track: SpecTrack, vocal = 0, beatConfidence = 1): ScratchPerformanceContext {
   return {
-    masterBeat: 0, masterBar: 0, phrasePosition: 0, barInPhrase: 0, phraseBars: 4, bpm: 92, meter: 4, beatConfidence: 1, phraseConfidence: 1,
-    section: undefined, sectionName: 'A', energy: 0.5, targetEnergy: 0.5, activeDeck: 'A', vocalActivity: 0, drumActivity: 0.5, bassActivity: 0.3,
+    masterBeat: 0, masterBar: 0, phrasePosition: 0, barInPhrase: 0, phraseBars: 4, bpm: 92, meter: 4, beatConfidence, phraseConfidence: 1,
+    section: undefined, sectionName: 'A', energy: 0.5, targetEnergy: 0.5, activeDeck: 'A', vocalActivity: vocal, drumActivity: 0.5, bassActivity: 0.3,
     melodicActivity: 0.5, juggleIntensity: 0, transitionIntensity: 0, scratchPermission: 4, scratchIntensity: 0,
     recentGestures: [], recentSources: [], recentRoutines: [], style: track.style as ScratchDJStyle,
   };
 }
 
 /** The DEViLBOX overlay over the whole track, planned window by window (4 bars) as the controller plans it. */
-function devilboxOverlay(track: SpecTrack, routine: string | null): PlacedScratch[] {
+function devilboxOverlay(track: SpecTrack, routine: string | null, mode: 'SAFE' | 'MUSICAL' | 'PERFORMER' | 'BATTLE' = 'BATTLE', ctx = ctxFor(track)): PlacedScratch[] {
   const last = track.sections[track.sections.length - 1]!;
   const total = last.startBar + last.bars;
   const sectionAt = (bar: number): OverlaySection => {
@@ -47,13 +46,13 @@ function devilboxOverlay(track: SpecTrack, routine: string | null): PlacedScratc
   };
   const out: PlacedScratch[] = [];
   for (let from = 0; from < total; from += 4) {
-    const plan = planScratch(ctxFor(track), {
-      mode: 'BATTLE', seed: track.seed, fromBar: from, bars: Math.min(4, total - from), sectionAt,
+    const plan = planScratch(ctx, {
+      mode, seed: track.seed, fromBar: from, bars: Math.min(4, total - from), sectionAt,
       profile: profileOf(track.profile), routine: routine as 'auto' | null, records: true,
     });
     out.push(...plan.events);
   }
-  return oneHand(out);
+  return out;
 }
 
 describe('the scratch planners plan what the Up Rough demo plans (SCR-PHRASING-PARITY)', () => {
@@ -79,14 +78,9 @@ describe('the scratch planners plan what the Up Rough demo plans (SCR-PHRASING-P
   for (const row of fixture.overlay as OverlayRow[]) {
     it(`the overlay on track ${row.track} (routine ${row.routine ?? 'none'}): every event, velocity and record`, () => {
       const track = spec.tracks.find((t) => t.name === row.track)! as SpecTrack;
-      // one hand, as DEViLBOX performs it: inside a bar in the demo's own priority order (turnaround, answer,
-      // accent - the clamped step 16 is a second stroke on step 15), then across bars in time
-      const kept: Array<{ bar: number; step: number; beat: number; gesture: ScratchGestureId; velocity: number }> = [];
-      for (const e of row.events) {
-        const ev = { bar: e.bar, step: e.step, beat: e.bar * 4 + e.step / 4, gesture: gid(e.gesture), velocity: e.velocity };
-        if (!kept.some((k) => k.bar === ev.bar && overlapsOneHand(k, ev))) kept.push(ev);
-      }
-      const demo = oneHand(kept);
+      // the demo's list in time order (a stable sort: its two step-15 strokes keep the demo's order)
+      const demo = row.events.map((e) => ({ bar: e.bar, step: e.step, gesture: gid(e.gesture), velocity: e.velocity }))
+        .sort((a, b) => (a.bar * 16 + a.step) - (b.bar * 16 + b.step));
       const mine = devilboxOverlay(track, row.routine);
       const key = (e: { bar: number; step: number; gesture: ScratchGestureId }): string => `${e.bar}:${e.step}:${e.gesture}`;
       expect(mine.map(key)).toEqual(demo.map(key));
@@ -96,6 +90,15 @@ describe('the scratch planners plan what the Up Rough demo plans (SCR-PHRASING-P
       for (const r of row.records) {
         const inSection = mine.filter((e) => e.bar >= r.startBar && e.bar < r.startBar + (track.sections.find((s) => s.startBar === r.startBar)!.bars));
         for (const e of inSection) expect([e.bar, e.record]).toEqual([e.bar, e.routineSlot ? routineSlotRecord(e.routineSlot) : r.record]);
+      }
+      // P13: no mode cap, vocal rule, low-confidence gate or one-hand rule changes the demo's strokes - every
+      // mode plays all of them (its own extras, if any, on top)
+      for (const [mode, vocal, confidence] of [['MUSICAL', 0.95, 1], ['MUSICAL', 0, 1], ['PERFORMER', 0.5, 1], ['SAFE', 0, 1], ['MUSICAL', 0, 0.2]] as const) {
+        const layered = devilboxOverlay(track, row.routine, mode, ctxFor(track, vocal, confidence));
+        const base = layered.filter((e) => e.layer === 'demo');
+        expect([mode, vocal, confidence, base.map(key)]).toEqual([mode, vocal, confidence, demo.map(key)]);
+        base.forEach((e, i) => expect(e.velocity).toBeCloseTo(demo[i]!.velocity, 9));
+        expect(layered.filter((e) => e.layer !== 'demo').every((e) => e.layer === 'extra')).toBe(true);
       }
     });
   }

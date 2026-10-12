@@ -28,7 +28,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 16,
@@ -54,7 +55,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 16,
+   "step": 15,
+   "beat": 67.75,
+   "gesture": "transformer8",
+   "velocity": 0.7704280155642024,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 66,
+    "humanizeSamples": -108,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 15,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 17,
@@ -80,7 +109,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 17,
@@ -106,7 +136,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 17,
+   "step": 15,
+   "beat": 71.75,
+   "gesture": "hydroplane",
+   "velocity": 0.7740779736018921,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 82,
+    "humanizeSamples": 67,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 31,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 18,
@@ -132,7 +190,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 18,
@@ -158,7 +217,62 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 18,
+   "step": 15,
+   "beat": 75.75,
+   "gesture": "chirpDouble",
+   "velocity": 0.7646723125047684,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 98,
+    "humanizeSamples": -29,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 47,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 19,
+   "step": 7,
+   "beat": 77.75,
+   "gesture": "transformer8",
+   "velocity": 0.8372198062104219,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 106,
+    "humanizeSamples": 88,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 55,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 19,
@@ -184,7 +298,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 19,
@@ -210,7 +325,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 19,
+   "step": 15,
+   "beat": 79.75,
+   "gesture": "transformer8",
+   "velocity": 0.9244403753719387,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 114,
+    "humanizeSamples": 132,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 63,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 20,
@@ -236,7 +379,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 20,
@@ -262,7 +406,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 20,
+   "step": 15,
+   "beat": 83.75,
+   "gesture": "scribble",
+   "velocity": 0.908845654993515,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 130,
+    "humanizeSamples": 11,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 79,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 21,
@@ -288,7 +460,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 21,
@@ -314,7 +487,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 21,
+   "step": 15,
+   "beat": 87.75,
+   "gesture": "transformer8",
+   "velocity": 0.9067582207980468,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 146,
+    "humanizeSamples": 327,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 95,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 22,
@@ -340,7 +541,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 22,
@@ -366,7 +568,62 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 22,
+   "step": 15,
+   "beat": 91.75,
+   "gesture": "transformer8",
+   "velocity": 0.9161516746776531,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 162,
+    "humanizeSamples": 108,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 111,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 23,
+   "step": 7,
+   "beat": 93.75,
+   "gesture": "transformer8",
+   "velocity": 0.9626245517662319,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 170,
+    "humanizeSamples": 5,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 119,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 23,
@@ -392,7 +649,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 23,
@@ -418,7 +676,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 23,
+   "step": 15,
+   "beat": 95.75,
+   "gesture": "transformer8",
+   "velocity": 0.8847241931792172,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 178,
+    "humanizeSamples": 322,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 127,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 24,
@@ -444,7 +730,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 24,
@@ -470,7 +757,62 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 24,
+   "step": 15,
+   "beat": 99.75,
+   "gesture": "scribble",
+   "velocity": 0.8421637293049515,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 194,
+    "humanizeSamples": -177,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 143,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 25,
+   "step": 7,
+   "beat": 101.75,
+   "gesture": "scribble",
+   "velocity": 0.9359945067521173,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 202,
+    "humanizeSamples": -51,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 151,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 25,
@@ -496,7 +838,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 25,
@@ -522,7 +865,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 25,
+   "step": 15,
+   "beat": 103.75,
+   "gesture": "transformer8",
+   "velocity": 0.9204547188525215,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 210,
+    "humanizeSamples": -164,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 159,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 26,
@@ -548,7 +919,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 26,
@@ -574,7 +946,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 26,
+   "step": 15,
+   "beat": 107.75,
+   "gesture": "hydroplane",
+   "velocity": 0.8865918974593728,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 226,
+    "humanizeSamples": -160,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 175,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 27,
@@ -600,7 +1000,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 27,
@@ -626,7 +1027,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 27,
+   "step": 15,
+   "beat": 111.75,
+   "gesture": "transformer8",
+   "velocity": 0.939967956054017,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 242,
+    "humanizeSamples": 183,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 191,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 28,
@@ -652,7 +1081,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 28,
@@ -678,7 +1108,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 28,
+   "step": 15,
+   "beat": 115.75,
+   "gesture": "hydroplane",
+   "velocity": 0.8370000762951095,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 258,
+    "humanizeSamples": 187,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 207,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 29,
@@ -704,7 +1162,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 29,
@@ -730,7 +1189,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 29,
+   "step": 15,
+   "beat": 119.75,
+   "gesture": "transformer8",
+   "velocity": 0.7588189517051958,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 274,
+    "humanizeSamples": -193,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 223,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 30,
@@ -756,7 +1243,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 30,
@@ -782,7 +1270,62 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 30,
+   "step": 15,
+   "beat": 123.75,
+   "gesture": "scribble",
+   "velocity": 0.7941466392004273,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 290,
+    "humanizeSamples": 91,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 239,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 31,
+   "step": 7,
+   "beat": 125.75,
+   "gesture": "hydroplane",
+   "velocity": 0.9489463645380332,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 298,
+    "humanizeSamples": 69,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 247,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 31,
@@ -808,7 +1351,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 31,
@@ -834,7 +1378,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 31,
+   "step": 15,
+   "beat": 127.75,
+   "gesture": "hydroplane",
+   "velocity": 0.7626825360494393,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 306,
+    "humanizeSamples": 212,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 255,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 32,
@@ -860,7 +1432,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 32,
@@ -886,7 +1459,62 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 32,
+   "step": 15,
+   "beat": 131.75,
+   "gesture": "transformer8",
+   "velocity": 0.7720393682764936,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 322,
+    "humanizeSamples": -25,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 271,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 33,
+   "step": 7,
+   "beat": 133.75,
+   "gesture": "scribble",
+   "velocity": 0.7928770885786222,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 330,
+    "humanizeSamples": -189,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 279,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 33,
@@ -912,7 +1540,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 33,
@@ -938,7 +1567,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 33,
+   "step": 15,
+   "beat": 135.75,
+   "gesture": "chirpDouble",
+   "velocity": 0.6518348973830778,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 338,
+    "humanizeSamples": 298,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 287,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 34,
@@ -964,7 +1621,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 34,
@@ -990,7 +1648,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 34,
+   "step": 15,
+   "beat": 139.75,
+   "gesture": "scribble",
+   "velocity": 0.6862287327382315,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 354,
+    "humanizeSamples": -150,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 303,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 35,
@@ -1016,7 +1702,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 35,
@@ -1042,7 +1729,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 35,
+   "step": 15,
+   "beat": 143.75,
+   "gesture": "scribble",
+   "velocity": 0.6573098344396124,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 370,
+    "humanizeSamples": 232,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 319,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 36,
@@ -1068,7 +1783,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 36,
@@ -1094,7 +1810,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 36,
+   "step": 15,
+   "beat": 147.75,
+   "gesture": "hydroplane",
+   "velocity": 0.6666666666666666,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 386,
+    "humanizeSamples": -12,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 335,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 37,
@@ -1120,7 +1864,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 37,
@@ -1146,7 +1891,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 37,
+   "step": 15,
+   "beat": 151.75,
+   "gesture": "transformer8",
+   "velocity": 1,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 402,
+    "humanizeSamples": 299,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 351,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 38,
@@ -1172,7 +1945,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 38,
@@ -1198,7 +1972,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 38,
+   "step": 15,
+   "beat": 155.75,
+   "gesture": "transformer8",
+   "velocity": 0.9944975967040514,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 418,
+    "humanizeSamples": -40,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 367,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 39,
@@ -1224,7 +2026,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 39,
@@ -1250,7 +2053,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 39,
+   "step": 15,
+   "beat": 159.75,
+   "gesture": "scribble",
+   "velocity": 0.9630701152056154,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 434,
+    "humanizeSamples": -62,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 383,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 40,
@@ -1276,7 +2107,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 40,
@@ -1302,7 +2134,62 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 40,
+   "step": 15,
+   "beat": 163.75,
+   "gesture": "chirpDouble",
+   "velocity": 0.9906828412298773,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 450,
+    "humanizeSamples": -129,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 399,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 41,
+   "step": 7,
+   "beat": 165.75,
+   "gesture": "transformer8",
+   "velocity": 0.7055710688944838,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 458,
+    "humanizeSamples": 120,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 407,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 41,
@@ -1328,7 +2215,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 41,
@@ -1354,7 +2242,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 41,
+   "step": 15,
+   "beat": 167.75,
+   "gesture": "hydroplane",
+   "velocity": 0.9688136110475319,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 466,
+    "humanizeSamples": 301,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 415,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 42,
@@ -1380,7 +2296,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 42,
@@ -1406,7 +2323,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 42,
+   "step": 15,
+   "beat": 171.75,
+   "gesture": "transformer8",
+   "velocity": 0.8848523689631494,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 482,
+    "humanizeSamples": -207,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 431,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 43,
@@ -1432,7 +2377,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 43,
@@ -1458,7 +2404,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 43,
+   "step": 15,
+   "beat": 175.75,
+   "gesture": "scribble",
+   "velocity": 0.9378500038147556,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 498,
+    "humanizeSamples": 49,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 447,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 44,
@@ -1484,7 +2458,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 44,
@@ -1510,7 +2485,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 44,
+   "step": 15,
+   "beat": 179.75,
+   "gesture": "hydroplane",
+   "velocity": 0.8653147173266194,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 514,
+    "humanizeSamples": 279,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 463,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 45,
@@ -1536,7 +2539,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 45,
@@ -1562,7 +2566,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 45,
+   "step": 15,
+   "beat": 183.75,
+   "gesture": "transformer8",
+   "velocity": 0.8933974212252994,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 530,
+    "humanizeSamples": -209,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 479,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 46,
@@ -1588,7 +2620,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 46,
@@ -1614,7 +2647,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 46,
+   "step": 15,
+   "beat": 187.75,
+   "gesture": "chirpDouble",
+   "velocity": 0.7958739604791333,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 546,
+    "humanizeSamples": 45,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 495,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 47,
@@ -1640,7 +2701,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 47,
@@ -1666,7 +2728,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 47,
+   "step": 15,
+   "beat": 191.75,
+   "gesture": "scribble",
+   "velocity": 0.7648126955062181,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 562,
+    "humanizeSamples": 247,
+    "chain": "overlay",
+    "deck": "battle",
+    "section": {
+     "key": "16:break",
+     "step": 511,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   }
  ]
 }

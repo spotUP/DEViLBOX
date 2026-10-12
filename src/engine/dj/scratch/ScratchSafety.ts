@@ -128,8 +128,12 @@ const refuse = (rule: SafetyRule, reason: string): SafetyVerdictFull => {
 /**
  * Section 59: final authority over every planned scratch. The creative modules propose; this
  * refuses what must not be played, with the rule's name.
+ *
+ * `demo`: a stroke of the demo's own plan (P13, `layer: 'demo'`) - the demo has no governor, so only the
+ * structural rules hold it (no deck playing, a source or deck that is not there, an anchor outside the
+ * record); the musical rules (rate, cuts, vocal, bass) govern the DEViLBOX extras alone.
  */
-export function checkScratch(e: ScratchEvent, state: SafetyState): SafetyVerdictFull {
+export function checkScratch(e: ScratchEvent, state: SafetyState, opts: { demo?: boolean } = {}): SafetyVerdictFull {
   scratchSafetyStats.check++;
   const deck = e.deck ?? (e.source.type === 'CRATE' ? undefined : e.source.deck);
   if (!state.decksPlaying.A && !state.decksPlaying.B) return refuse('bothDecksSilent', 'both decks are silent: a scratch alone is not a mix (no-silence rule)');
@@ -147,6 +151,7 @@ export function checkScratch(e: ScratchEvent, state: SafetyState): SafetyVerdict
     const busy = state.deckBusyUntil?.[deck];
     if (busy !== undefined && e.executeAtBeat < busy - 1e-9) return refuse('conflict', `deck ${deck} is already scratched until beat ${busy.toFixed(2)}`);
   }
+  if (opts.demo) return { ok: true };
   const g = getGesture(e.gesture);
   // the fastest the record moves in this gesture: the turntable model's motion at the event's velocity
   const peak = motionPeak(g, g.cycleBeats * 60 / Math.max(30, state.bpm ?? 120), e.velocity);

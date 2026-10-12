@@ -247,6 +247,9 @@ export interface PlacedScratch {
   render?: import('./scratchTypes').ScratchRenderSpec;
   /** An overlay routine's stroke: the word slot it scratches (its record is the slot's, `_routine_cues`). */
   routineSlot?: import('./scratchRoutines').WordSlot;
+  /** P13: 'demo' = a stroke of the demo's own overlay plan (nothing DEViLBOX adds may drop or change it);
+   *  'extra' = a DEViLBOX stroke layered on top (one hand, the vocal rule and the mode's caps apply to it). */
+  layer?: 'demo' | 'extra';
 }
 
 export interface PlanPhraseInput {
@@ -269,6 +272,9 @@ export interface PlanPhraseInput {
   gestureCount?: number;
   beatsPerBar?: number;
   grid?: ScratchGrid;
+  /** The demo's own placement (P13): all k strokes on `min(step, 15)` - two on step 15 when k >= 2 - summed,
+   *  none dropped for one hand. Without it a stroke outside the bar or inside a placed one is left out. */
+  demo?: boolean;
 }
 
 /** Expected scratches this bar from the density rate (phrase ends carry most, section 21). */
@@ -333,12 +339,13 @@ export function planPhrase(input: PlanPhraseInput): PlacedScratch[] {
     const g = pickGesture(vocab, phraseEnd ? Math.min(1.0, energy + 0.15) : energy, placementRole, rnd, last);
     last = g;
     const vel = pv.base + pv.rand * rnd() + pv.energy * energy;
-    if (step >= perBar) continue; // the reference's 16: the next bar's downbeat, not this bar
+    if (!input.demo && step >= perBar) continue; // the reference's 16: the next bar's downbeat, not this bar
+    const at = Math.min(step, perBar - 1);
     const e: PlacedScratch = {
-      bar: input.bar, step, beat: stepToBeat({ bar: input.bar, step }, grid, beatsPerBar), gesture: g,
+      bar: input.bar, step: at, beat: stepToBeat({ bar: input.bar, step: at }, grid, beatsPerBar), gesture: g,
       velocity: Math.min(1.0, vel), placementRole, role: SCRATCH_ROLE_OF[placementRole],
     };
-    if (placed.some((p) => overlapsOneHand(p, e))) continue;
+    if (!input.demo && placed.some((p) => overlapsOneHand(p, e))) continue;
     placed.push(e);
   }
   return placed;
