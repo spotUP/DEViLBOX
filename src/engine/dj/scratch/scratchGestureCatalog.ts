@@ -144,7 +144,13 @@ interface GestureSeed {
 
 // Legacy DEViLBOX velocity curves (the frames of `DJScratchEngine.ts` before
 // SCR-P1.3, velocities only; the fader lives in `faderWindows`).
-const BABY_CURVE = v([[0, 3.2], [0.25, -3.2], [0.75, 3.2]]);
+/**
+ * Reference baby speed (scratch.py :133, :197, :216): the hand moves A x amp = 1500 x (0.55 + 0.70 x 0.7)
+ * = 1560 samples at 22,050 Hz (71 ms of record) in a quarter of the gesture's 2 steps at the demo's
+ * 92 BPM (82 ms): 0.87 x the record's speed - about its own pitch. (3.2, a stab's scale, was a beep.)
+ */
+const BABY_SPEED = 0.87;
+const BABY_CURVE = v([[0, BABY_SPEED], [0.25, -BABY_SPEED], [0.75, BABY_SPEED]]);
 const FLARE_CURVE = v([
   [0, 0], [0.10, 2.2], [0.15, 2.2], [0.19, 2.2], [0.33, 2.0], [0.37, 1.5],
   [0.50, 0], [0.65, -1.0], [0.90, -0.3],
@@ -162,10 +168,10 @@ const GLIDE_CURVE = v([[0, 1.0]]);
 
 const SEEDS: readonly GestureSeed[] = [
   {
-    id: 'baby', name: 'Baby Scratch', durationSteps: 4,
+    id: 'baby', name: 'Baby Scratch', durationSteps: 2,
     styles: ['oldSchool', 'boomBap', 'battle'],
     // reference baby (O3): out to A and back through the anchor to -A, fader open; the keyframes are
-    // the hand path's slopes at forwardStab's scale (4 A/cycle -> 3.2), a true reverse
+    // the reference hand speed (BABY_SPEED), a true reverse
     handPath: hand([[0, 0], [0.25, 1], [0.5, 0], [0.75, -1], [1, 0]]),
     velocityCurve: BABY_CURVE, faderWindows: referenceCutPattern('open'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
@@ -173,10 +179,11 @@ const SEEDS: readonly GestureSeed[] = [
   },
   {
     // Reference baby_slow: the same stroke at 0.6 A.
-    id: 'babySlow', name: 'Slow Baby Scratch', durationSteps: 4,
+    id: 'babySlow', name: 'Slow Baby Scratch', durationSteps: 3,
     styles: ['loFi', 'battle'],
     handPath: hand([[0, 0], [0.25, 0.6], [0.5, 0], [0.75, -0.6], [1, 0]]),
-    velocityCurve: BABY_CURVE.map((p) => ({ t: p.t, velocity: p.velocity * 0.6 })),
+    // reference slow baby: 0.6 A over a quarter of 3 steps (0.35 x speed)
+    velocityCurve: BABY_CURVE.map((p) => ({ t: p.t, velocity: p.velocity * 0.6 * 2 / 3 })),
     faderWindows: referenceCutPattern('open'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
     interpolateVelocity: false, loop: true,
@@ -428,11 +435,11 @@ const SEEDS: readonly GestureSeed[] = [
   },
   {
     // Reference cut (scratch.py :168): out to 1.5 A at half the stroke and back, open (0, 0.42), 1 step.
-    // The velocity keyframes are the hand path's slopes at forwardStab's scale (3.1 A/cycle -> 2.5).
+    // Speed: 1.5 x 1560 samples at 22,050 Hz in half of 1 step at 92 BPM = 1.3 x, back the same.
     id: 'cut', name: 'Cut', durationSteps: 1,
     styles: ['oldSchool', 'battle'],
     handPath: hand([[0, 0], [0.5, 1.5], [1, 0]]),
-    velocityCurve: v([[0, 2.4], [0.5, -2.4]]),
+    velocityCurve: v([[0, 1.3], [0.5, -1.3]]),
     faderWindows: deck([0, 0.42]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
     interpolateVelocity: false, loop: true,
@@ -443,7 +450,8 @@ const SEEDS: readonly GestureSeed[] = [
     id: 'echo', name: 'Echo Scratch', durationSteps: 2,
     styles: ['boomBap', 'battle'],
     handPath: hand([[0, 0], [0.42, 1.3], [1, 0]]),
-    velocityCurve: v([[0, 2.5], [0.50, -1.0]]),
+    // 1.3 x 1560 samples out in 0.42 of 2 steps at 92 BPM (0.67 x), back in 0.58 (0.49 x)
+    velocityCurve: v([[0, 0.67], [0.42, -0.49]]),
     faderWindows: deck([0, 0.4]),
     fx: { delayMix: 0.35, delaySec: 0.16, reverbMix: 0.05 },
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
