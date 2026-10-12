@@ -7,13 +7,15 @@
  * Bus sample n is context time n / 22,050 s: a stroke due at context time t starts at
  * trunc(t x 22,050) plus its humanize in whole bus samples, as the demo places it.
  */
-import { butter, normFc } from './refDsp';
+import { butter, normFc, lp, resamplePoly } from './refDsp';
 import { DEMO_RATE } from './scratchRender';
 
 /** deck_c_eq and scratch_channel's fixed corners. */
 export const DECK_C = {
   eqHpHz: 200, eqPresence: 0.2, eqBand: [1000, 3000] as const, eqLpHz: 6000,
   hpHz: 160, presence: 0.22, band: [1500, 3000] as const, lpHz: 5000, headroom: 0.75,
+  /** three_deck DECK_C_LEVEL_SCALE: the layer's RMS as a fraction of the beat's. */
+  levelScale: 0.60,
 } as const;
 
 /** The routine's bus (the demo renders each routine through its own chain). */
@@ -41,8 +43,8 @@ export function deckCCoefficients(rate: number = DEMO_RATE) {
   };
 }
 
-/** Reachability sentinel: Deck C buses built and strokes handed to one. */
-export const deckCStats = { created: 0, strokes: 0 };
+/** Reachability sentinel: Deck C buses built, strokes handed to a live one, strokes rendered for a routine's shape. */
+export const deckCStats = { created: 0, strokes: 0, plannedStrokes: 0 };
 
 export interface DeckCBus {
   readonly node: AudioWorkletNode;
@@ -51,6 +53,9 @@ export interface DeckCBus {
   /** The bus sample a context time falls on (trunc, as the demo's int()). */
   busSampleAt(contextSec: number): number;
   setLevel(value: number): void;
+  /** three_deck's duck for a span of bus samples from `start` (`deckCDuck`), then its level (`deckCLevel`). */
+  shape(start: number, duck: Float32Array): void;
+  shapeLevel(start: number, level: number): void;
   /** The programme's RMS the layer follows at the demo's 0.60 ratio (live; the null test sends none). */
   setProgramme(rms: number): void;
   clear(): void;
@@ -59,7 +64,7 @@ export interface DeckCBus {
 
 const loaded = new WeakMap<BaseAudioContext, Promise<void>>();
 
-export async function createDeckCBus(ctx: BaseAudioContext, destination: AudioNode, opts: { chain?: DeckCChainName; tap?: number; level?: number } = {}): Promise<DeckCBus> {
+export async function createDeckCBus(ctx: BaseAudioContext, destination: AudioNode, opts: { chain?: DeckCChainName; tap?: number; level?: number; planned?: boolean } = {}): Promise<DeckCBus> {
   const chain = DECK_C_CHAINS[opts.chain ?? 'threeDeck'];
   let p = loaded.get(ctx);
   if (!p) {
@@ -77,14 +82,64 @@ export async function createDeckCBus(ctx: BaseAudioContext, destination: AudioNo
   return {
     node,
     stroke(start, samples) {
-      deckCStats.strokes++;
+      if (opts.planned) deckCStats.plannedStrokes++; else deckCStats.strokes++;
       const copy = Float64Array.from(samples);
       node.port.postMessage({ type: 'stroke', start, samples: copy }, [copy.buffer]);
     },
     busSampleAt: (sec) => Math.trunc(sec * DEMO_RATE),
     setLevel(value) { node.port.postMessage({ type: 'level', value }); },
+    shape(start, duck) { node.port.postMessage({ type: 'shape', start, duck }); },
+    shapeLevel(start, level) { node.port.postMessage({ type: 'shapeLevel', start, level }); },
     setProgramme(rms) { node.port.postMessage({ type: 'programme', rms }); },
     clear() { node.port.postMessage({ type: 'clear' }); },
     dispose() { try { node.disconnect(); } catch { /* gone */ } },
   };
 }
+
+/** three_deck DUCK_DEPTH: how far the scratch layer ducks on the beat's transients. */
+export const DECK_C_DUCK_DEPTH = 0.25;
+
+/**
+ * three_deck.render's two whole-render stages after the bus, over the routine's span (22,050 Hz):
+ *   level = 0.60 x rms(beat) / rms(layer)      (DECK_C_LEVEL_SCALE; the layer at least as long as the beat)
+ *   duck  = 1 - 0.25 x clip(lp(|beat|, 40 Hz) / max, 0, 1)
+ * The layer may be the bus before the demo's peak normalisation: the ratio absorbs it. The duck needs
+ * only the beat (known when the routine is planned); the level needs the whole planned layer.
+ */
+export function deckCDuck(beat: ArrayLike<number>, rate: number = DEMO_RATE): Float32Array {
+  const n = beat.length;
+  const abs = new Float64Array(n);
+  for (let i = 0; i < n; i++) abs[i] = Math.abs(beat[i]!);
+  const env = lp(abs, 40, rate);
+  let mx = 0;
+  for (let i = 0; i < n; i++) mx = Math.max(mx, env[i]!);
+  const duck = new Float32Array(n);
+  for (let i = 0; i < n; i++) duck[i] = 1.0 - DECK_C_DUCK_DEPTH * Math.min(1, Math.max(0, env[i]! / (mx + 1e-9)));
+  return duck;
+}
+export function deckCLevel(layer: ArrayLike<number>, beat: ArrayLike<number>): number {
+  const n = beat.length;
+  let jb = 0, cb = 0;
+  for (let i = 0; i < n; i++) { jb += beat[i]! * beat[i]!; cb += (layer[i] ?? 0) * (layer[i] ?? 0); }
+  return DECK_C.levelScale * (Math.sqrt(jb / n) + 1e-9) / (Math.sqrt(cb / n) + 1e-9);
+}
+
+/**
+ * A deck's programme over a span, as the demo reads a beat: mono (the channels' mean), at 22,050 Hz
+ * (synth_dsp.resample_rate: resample_poly, float32), from `fromSec` for `samples` samples.
+ */
+export function programmeSpan(buffer: Pick<AudioBuffer, 'sampleRate' | 'numberOfChannels' | 'length' | 'getChannelData'>, fromSec: number, samples: number): Float64Array {
+  const sr = buffer.sampleRate;
+  const a = Math.max(0, Math.trunc(fromSec * sr)), b = Math.min(buffer.length, a + Math.ceil(samples * sr / DEMO_RATE) + 64);
+  const mono = new Float64Array(Math.max(0, b - a));
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const d = buffer.getChannelData(c);
+    for (let i = 0; i < mono.length; i++) mono[i] = mono[i]! + d[a + i]!;
+  }
+  if (buffer.numberOfChannels > 1) for (let i = 0; i < mono.length; i++) mono[i] = mono[i]! / buffer.numberOfChannels;
+  const at22 = sr === DEMO_RATE ? mono : resamplePoly(mono, DEMO_RATE / gcdInt(DEMO_RATE, sr), sr / gcdInt(DEMO_RATE, sr));
+  const out = new Float64Array(samples);
+  for (let i = 0; i < samples && i < at22.length; i++) out[i] = Math.fround(at22[i]!);
+  return out;
+}
+function gcdInt(a: number, b: number): number { while (b) { [a, b] = [b, a % b]; } return a; }

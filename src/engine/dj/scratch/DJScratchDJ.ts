@@ -42,6 +42,23 @@ export interface ScratchEventSink {
   schedule(event: ScratchEvent): unknown;
   cancel(): void;
   readonly active: number;
+  /** The context time a beat of the sink's clock falls on (`ScratchExecutor`). */
+  contextTimeAtBeat?(beat: number): number;
+  /** The tempo the sink times a stroke at. */
+  clockBpm?(): number;
+}
+
+/** A routine planned whole, for three_deck's level and duck (`ScratchVoicePool.shapeRoutine`). */
+export interface ScratchRoutineShape {
+  deck: AB;
+  track: DJTrackAnalysis;
+  chain: 'threeDeck';
+  /** Context seconds of the routine's first and last downbeat (32 bars), track seconds of the first. */
+  startSec: number;
+  endSec: number;
+  trackFromSec: number;
+  bpm: number;
+  strokes: ReadonlyArray<{ at: number; event: ScratchEvent }>;
 }
 
 /** A chosen source for a planned window; `record` when it is a crate record (throws, anchors). */
@@ -100,6 +117,8 @@ export interface ScratchDJDeps {
   /** Get the plan's crate records ready the demo's way (fetched, read at 22,050 Hz, the S950) before their
    *  first stroke: a demo routine's stroke is rendered from the record when it is handed to the bus. */
   prepareRecords?(ids: readonly string[]): void;
+  /** three_deck's level and duck for a routine planned whole: the planned layer against the deck's own audio. */
+  shapeRoutine?(shape: ScratchRoutineShape): void;
   /** Every phrase's evaluation (section 52) - quality, decision, reason. */
   onEvaluation?(evaluation: PhraseEvaluation, ctx: ScratchPerformanceContext): void;
   /** A transient record the pool holds (the governor's tracker-sample check). */
@@ -497,6 +516,16 @@ export class DJScratchDJ {
     });
     this.windows.push({ fromBar, toBar, entries, arc, energyBefore: ctx.energy, setEnergyBefore: input.perf.setEnergy, plan, intent, started: false });
     scratchDJStats.scheduled += entries.length;
+    // three_deck's level and duck: the routine is planned whole, so its layer is known before it plays
+    const sink = this.sink!.exec;
+    if (plan.routine === 'threeDeck' && this.deps.shapeRoutine && sink.contextTimeAtBeat && sink.clockBpm && entries.length) {
+      const startBeat = barStartBeat(track.downbeats, fromBar), endBeat = barStartBeat(track.downbeats, fromBar + 32);
+      this.deps.shapeRoutine({
+        deck: input.deck, track, chain: 'threeDeck', bpm: sink.clockBpm(),
+        startSec: sink.contextTimeAtBeat(startBeat), endSec: sink.contextTimeAtBeat(endBeat), trackFromSec: timeAtBeat(track.beatGrid, startBeat),
+        strokes: entries.map((x) => ({ at: sink.contextTimeAtBeat!(x.event.executeAtBeat), event: x.event })),
+      });
+    }
     this.deps.onPlan?.(plan, entries.map((x) => x.event), ctx);
     return { planned: true, scheduled: entries.length };
   }

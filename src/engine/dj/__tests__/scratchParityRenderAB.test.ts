@@ -115,6 +115,7 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: 
   const seed = 11;
   let plannedSeed: number | null = null;
   const fired: Fired[] = [];
+  const shaped: Array<Promise<unknown>> = [];
   const ctrl = new DJScratchDJ({
     seed,
     executorFor: (_d, t) => new ScratchExecutor({
@@ -132,6 +133,8 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: 
     onPlan: (p) => { if (p.routine === 'threeDeck') plannedSeed = seed + fromBar; },
     // as the Auto DJ wires it: the routine's records are read before their first stroke
     prepareRecords: (ids) => getScratchVoicePool().prepareRecords(ids),
+    // as the Auto DJ wires it: three_deck's level and duck against the deck's audio (here the track, deck A)
+    shapeRoutine: (shape) => { shaped.push(getScratchVoicePool().shapeRoutinePlan(shape, { sampleRate: track.sampleRate, numberOfChannels: 1, length: track.pcm.length, getChannelData: () => track.pcm as Float32Array<ArrayBuffer> })); },
   });
   const perf = (): Perf => ({ currentDeck: 'A', currentTrack: analysis, incomingTrack: null, currentPosition: pos(), setPhase: 'PEAK', setEnergy: 0.9, targetEnergy: 0.95, creativeRisk: 0.6 } as unknown as Perf);
   // the poll: every 10 ms of the render the controller ticks and the executor's interval runs
@@ -140,7 +143,9 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: 
     void ctx.suspend(Math.round(t * SR) / SR).then(() => {
       ctrl.tick({ perf: perf(), deck: 'A', mode: 'PERFORMER', style: 'boomBap', profile: 'boomBap', scratchPermission: 2 });
       for (const fn of [...intervals]) fn();
-      return ctx.resume();
+      // the routine's shape (an offline render of the planned layer) lands before the render goes on: live it
+      // has the bar of lookahead the plan is made in
+      return Promise.all(shaped).then(() => ctx.resume());
     });
   }
   const strokes0 = scratchVoiceStats.strokes, refused0 = scratchVoiceStats.refused;
@@ -183,16 +188,21 @@ describe.skipIf(process.env.SCRATCH_AB_RENDER !== '1')('the A/B render pair (SCR
   beforeAll(() => { installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch(); });
 
   it('DEViLBOX plays the three-deck routine at the PEAK over the drops track; the plan and the track go to the demo side', async () => {
-    const r = await renderRoutine({ bars: 33, withTrack: true });
-    console.log(`[A/B] strokes ${r.strokes}, refused ${r.refused}`);
+    const { deckCStats } = await import('../scratch/scratchDeckC');
+    const before = deckCStats.strokes;
+    const r = await renderRoutine({ bars: 33, withTrack: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT) });
+    console.log(`[A/B] Deck C strokes ${deckCStats.strokes - before}, voice strokes ${r.strokes}, refused ${r.refused}`);
     mkdirSync(OUT, { recursive: true });
     const name = process.env.SCRATCH_AB_NAME ?? 'devilbox_three_deck_drops';
     writeFileSync(join(OUT, `${name}.wav`), wav16([r.out.getChannelData(0), r.out.getChannelData(1)], r.out.sampleRate));
     // the same span of the track, and the plan the demo side renders from
     const { track, t0, t1 } = r;
-    writeFileSync(join(OUT, 'track_drops.wav'), wav16([track.pcm.subarray(Math.round(t0 * track.sampleRate), Math.round(t1 * track.sampleRate))], track.sampleRate));
+    const span = track.pcm.subarray(Math.round(t0 * track.sampleRate), Math.round(t1 * track.sampleRate));
+    writeFileSync(join(OUT, 'track_drops.wav'), wav16([span], track.sampleRate));
+    // the demo side reads the track exactly (the WAV is peak-normalised to 16 bits, which moves its RMS)
+    writeFileSync(join(OUT, 'track_drops.f32'), Buffer.from(Float32Array.from(span).buffer));
     const downbeats = Array.from({ length: 34 }, (_, k) => r.barT(r.fromBar - 1 + k) - t0);
-    writeFileSync(join(OUT, 'plan.json'), JSON.stringify({ seed: r.plannedSeed, bpm: r.analysis.bpm, routineStartBar: 1, downbeatsSec: downbeats, trackGain: TRACK_GAIN }, null, 1));
+    writeFileSync(join(OUT, 'plan.json'), JSON.stringify({ seed: r.plannedSeed, bpm: r.analysis.bpm, routineStartBar: 1, downbeatsSec: downbeats, trackGain: TRACK_GAIN, trackRate: track.sampleRate }, null, 1));
   }, 600_000);
 });
 

@@ -109,6 +109,16 @@ export class ScratchExecutor {
     this.timers = deps.timers ?? realTimers;
   }
 
+  /** The context time a beat of this clock falls on, as a stroke's start is computed when it is handed over. */
+  contextTimeAtBeat(beat: number): number {
+    return this.deps.contextTime() + (beat - this.deps.clock.beatNow()) * this.deps.clock.beatSec();
+  }
+
+  /** The tempo a stroke is timed at (the clock's, as `start` hands it to the engine). */
+  clockBpm(): number {
+    return 60 / Math.max(1e-9, this.deps.clock.beatSec());
+  }
+
   /** Queue an event; it starts when its beat comes within the lookahead. */
   schedule(event: ScratchEvent): ScratchRun {
     const id = `fx_scratch_${event.gesture}` as DjFxActionId;

@@ -8,7 +8,11 @@ scratch buses for the null test (owner 2026-10-12 "make the demo and devilbox sc
            room .42 delay .28 drive .09, + 0.22 dark room) and scratch_dj's (scratch_channel room .3
            delay .16 drive .10) - before the whole-render normalisation, which DEViLBOX applies as a level
 
-Every 13th sample is kept (float64 repr).
+  shape    three_deck.render's level (0.60 x rms(beat) / rms(layer)) and duck (40 Hz envelope of the
+           beat, depth .25) for the three_deck bus against a synthetic beat
+
+Every 13th sample is kept (float64 repr). The beat is RandomState(5).uniform(-1, 1) x exp(-12 x beat phase) x 0.5
+at 130 BPM: the test draws it again.
   /opt/homebrew/bin/python3.11 -I tools/scratch-fixtures/gen_scratch_null.py \
     /Users/spot/Code/Up_Rough_Demo_System/tools src/engine/dj/scratch/__tests__/fixtures/scratch_null.json
 """
@@ -81,6 +85,16 @@ three = channel(td.deck_c_eq(bus, RATE), 0.42, 0.28, 0.09)
 tail = sc._sm.reverb(three, RATE, kind="dark_room", mix=1.0)
 three = three + 0.22 * tail[:len(three)]
 dj = channel(bus, 0.30, 0.16, 0.10)
+# three_deck.render's level and duck (DECK_C_LEVEL_SCALE, DUCK_DEPTH) for that layer against a beat
+t = np.arange(n_bus) / RATE
+beat = np.random.RandomState(5).uniform(-1, 1, n_bus) * np.exp(-((t * 130 / 60) % 1.0) * 12) * 0.5
+j_rms = float(np.sqrt(np.mean(beat ** 2))) + 1e-9
+c_rms = float(np.sqrt(np.mean(three[:n_bus] ** 2))) + 1e-9
+duck = dsp.lp(np.abs(beat), 40, RATE)
+duck = 1.0 - td.DUCK_DEPTH * np.clip(duck / (duck.max() + 1e-9), 0, 1)
+
+out["level"] = td.DECK_C_LEVEL_SCALE * j_rms / c_rms
+out["duck"] = [float(v) for v in duck[::KEEP]]
 out["busN"] = n_bus
 out["threeDeck"] = [float(v) for v in three[:n_bus:KEEP]]
 out["scratchDj"] = [float(v) for v in dj[:n_bus:KEEP]]
