@@ -35,6 +35,7 @@ import { DJJuggleController, analysisClock, type TickInput } from './autodj/jugg
 import { createDeckJuggleSink } from './autodj/juggle/juggleDeckSink';
 import { juggleModeOf, type DJPerformanceMode, type JuggleNowState } from './autodj/juggle/juggleTypes';
 import type { NextTrackOption } from './autodj/juggle/juggleOpportunity';
+import type { ScratchEvent } from './scratch/scratchTypes';
 import { StandaloneJuggle, mixInPhraseStartOf } from './autodj/juggle/standaloneJuggle';
 import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
 import { registerAutoDJ } from './autoDJInstance';
@@ -1626,6 +1627,7 @@ class DJAutoDJ {
       performScratch: (sc) => {
         const analysis = useDJStore.getState().decks[out].trackAnalysis;
         if (!analysis) throw new Error('the outgoing deck has no analysis');
+        this.recordScratchPhrase([`transition scratch: ${sc.kind}`, ...sc.reasons], sc.events, sc.source.type === 'CRATE' ? sc.source.recordId : `deck ${this.ab(out)}`);
         return performTransitionScratch(sc, this.ab(out), analysis);
       },
       onComplete: (result) => {
@@ -1750,22 +1752,29 @@ class DJAutoDJ {
         hasRecord: (id) => getScratchVoicePoolIfActive()?.hasRecord(id) ?? false,
         prepareSource: (chosen) => prepareScratchSource(chosen),
         // One decision per performed phrase (scratch plan section 65): source, gestures, placement, length.
-        onPlan: (plan, events) => {
-          if (!events.length) return;
-          const first = events[0]!, last = events[events.length - 1]!;
-          getDecisionLog().record('SCRATCH', plan.reasons, {
-            selectedTrack: this.scratch?.telemetry().source ?? undefined,
-            details: {
-              source: this.scratch?.telemetry().source ?? null, gestures: [...new Set(events.map((e) => e.gesture))], gesture: first.gesture,
-              placementBeat: first.executeAtBeat, durationBeats: last.executeAtBeat + last.durationBeats - first.executeAtBeat, events: events.length,
-              roles: [...new Set(events.map((e) => e.role))],
-            },
-          });
-        },
+        onPlan: (plan, events) => this.recordScratchPhrase(plan.reasons, events, this.scratch?.telemetry().source ?? null),
         seed: Date.now() & 0xffff,
       });
     }
     return this.scratch;
+  }
+
+  /**
+   * One decision per performed scratch phrase (scratch plan section 65: source, gestures, placement,
+   * length) and the set's memory of it (SCR-P7.12: the transition scratch's variety term).
+   */
+  private recordScratchPhrase(reasons: string[], events: readonly ScratchEvent[], source: string | null): void {
+    if (!events.length) return;
+    const first = events[0]!, last = events[events.length - 1]!;
+    try { getSessionController().memory.recordScratch({ gestures: events.map((e) => e.gesture), source }); } catch { /* no session */ }
+    getDecisionLog().record('SCRATCH', reasons, {
+      selectedTrack: source ?? undefined,
+      details: {
+        source, gestures: [...new Set(events.map((e) => e.gesture))], gesture: first.gesture,
+        placementBeat: first.executeAtBeat, durationBeats: last.executeAtBeat + last.durationBeats - first.executeAtBeat, events: events.length,
+        roles: [...new Set(events.map((e) => e.role))],
+      },
+    });
   }
 
   /**

@@ -834,6 +834,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
     const s = planTransitionScratch({
       plan: { style: transitionStyle, startBeat, endBeat, durationBeats, beatsPerBar, outgoingDeck: input.outgoingDeck, incomingDeck: input.incomingDeck, incomingPosition, effects },
       outgoing, incoming, mode: input.scratchMode, permission, creativeRisk: input.creativeRisk, setPhase: input.setPhase, seed,
+      recentGestures: memory.recentScratchGestures,
     });
     scratch = s.scratch;
     reasons.push(`scratch: ${s.scratch ? `${s.scratch.kind}, ${s.scratch.events.length} events (${s.reason})` : s.reason}`);
