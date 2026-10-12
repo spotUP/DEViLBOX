@@ -4,7 +4,8 @@
  *   Pads        DeckFXPads (FX / Beat Jump / Dub pages)
  *   Scratch     DeckScratch (every pattern as a wrapping pad grid, fader LFO)
  *   Loop & Cue  DeckCuePoints, DeckLoopControls, DeckQuantize
- *   Mix         DeckQuickEQ, DeckStemControls, DeckChannelToggles
+ *   Mix         DeckQuickEQ, DeckStemControls (channel mutes live on the
+ *               always-visible deck scopes, not here)
  *
  * The open tab is remembered per deck in useDJStore (deckPanelTab). The panel has
  * a fixed height and scrolls inside, so switching tabs never resizes the pattern
@@ -21,7 +22,6 @@ import { DeckLoopControls } from './DeckLoopControls';
 import { DeckQuantize } from './DeckQuantize';
 import { DeckQuickEQ } from './DeckQuickEQ';
 import { DeckStemControls } from './DeckStemControls';
-import { DeckChannelToggles } from './DeckChannelToggles';
 
 interface DeckPanelTabsProps {
   deckId: 'A' | 'B' | 'C';
@@ -61,7 +61,6 @@ export const DeckPanelTabs: React.FC<DeckPanelTabsProps> = ({ deckId }) => {
           <div className="flex flex-col gap-2 min-w-0">
             <DeckQuickEQ deckId={deckId} />
             <DeckStemControls deckId={deckId} />
-            <DeckChannelToggles deckId={deckId} />
           </div>
         )}
       </div>

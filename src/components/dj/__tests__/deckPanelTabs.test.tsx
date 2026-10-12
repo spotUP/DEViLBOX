@@ -16,7 +16,6 @@ vi.mock('../DeckLoopControls', () => ({ DeckLoopControls: () => <div data-testid
 vi.mock('../DeckQuantize', () => ({ DeckQuantize: () => <div data-testid="quantize" /> }));
 vi.mock('../DeckQuickEQ', () => ({ DeckQuickEQ: () => <div data-testid="eq" /> }));
 vi.mock('../DeckStemControls', () => ({ DeckStemControls: () => <div data-testid="stems" /> }));
-vi.mock('../DeckChannelToggles', () => ({ DeckChannelToggles: () => <div data-testid="channels" /> }));
 // DeckScratch stays real for the layout test; the tab test only needs it to mount.
 vi.mock('@/engine/dj/DJActions', () => ({
   playDeckPattern: () => {}, finishDeckPatternCycle: () => {}, stopDeckPattern: () => {},
@@ -38,9 +37,9 @@ const EXPECTED: Record<string, string[]> = {
   Pads: ['pads'],
   Scratch: [],
   'Loop & Cue': ['cues', 'loops', 'quantize'],
-  Mix: ['eq', 'stems', 'channels'],
+  Mix: ['eq', 'stems'],
 };
-const ALL_IDS = ['pads', 'cues', 'loops', 'quantize', 'eq', 'stems', 'channels'];
+const ALL_IDS = ['pads', 'cues', 'loops', 'quantize', 'eq', 'stems'];
 
 describe('deck lower panel tabs', () => {
   it('each of the four tabs renders its components and only its components', () => {
