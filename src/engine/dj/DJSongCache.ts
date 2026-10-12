@@ -57,3 +57,28 @@ export function clearSongCache(): void {
 export function songCacheSize(): number {
   return cache.size;
 }
+
+const notesBySong = new WeakMap<TrackerSong, boolean>();
+
+/**
+ * Whether the song has a note anywhere (note-off and empty cells do not count).
+ * A deck shows the pattern view only for a song with notes, otherwise the
+ * oscilloscope: an RSID that is a whole C64 program (Venus_Falling, La_Mer)
+ * parses to an empty pattern, which told the owner nothing (SID-DECK-FOLLOWUP b).
+ */
+export function songHasNotes(song: TrackerSong): boolean {
+  const known = notesBySong.get(song);
+  if (known !== undefined) return known;
+  let found = false;
+  for (const pattern of song.patterns ?? []) {
+    for (const channel of pattern?.channels ?? []) {
+      for (const cell of channel?.rows ?? []) {
+        if (cell && cell.note > 0 && cell.note < 97) { found = true; break; }
+      }
+      if (found) break;
+    }
+    if (found) break;
+  }
+  notesBySong.set(song, found);
+  return found;
+}

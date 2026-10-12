@@ -30,7 +30,7 @@ import { cacheSong, clearSongCache } from '@/engine/dj/DJSongCache';
 
 afterEach(() => { cleanup(); clearSongCache(); holder.deckSong = null; });
 
-const songWith = (id: string) => ({ songPositions: [0], patterns: [{ id, length: 64, channels: [] }], numChannels: 4 }) as unknown as TrackerSong;
+const songWith = (id: string) => ({ songPositions: [0], patterns: [{ id, length: 64, channels: [{ rows: [{ note: 49 }] }] }], numChannels: 4 }) as unknown as TrackerSong;
 
 describe('deck pattern view while the incoming track renders', () => {
   it('shows the parsed song as soon as the deck shows its name, not the oscilloscope', () => {
