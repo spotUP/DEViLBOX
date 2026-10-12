@@ -13,6 +13,9 @@ import { DEFAULT_GRID, stepToBeat, type ScratchGrid } from './scratchAnchor';
 import type { PlacedScratch } from './scratchPlacement';
 import type { ScratchCue } from './ScratchRecordVoice';
 import type { ScratchDJStyle, ScratchGestureId, ScratchRole } from './scratchTypes';
+import { lfsr, type ScratchRandom } from './scratchRandom';
+import type { JugglePhase } from '../autodj/juggle/juggleTypes';
+import { SCRATCH_STYLES } from './scratchStyles';
 
 export type RoutineName =
   | 'phraseEnd' | 'hookCallResponse' | 'electroTransformer' | 'chirpFlareShowcase'
@@ -49,7 +52,7 @@ export interface RoutineEvent {
 }
 
 export interface ScratchRoutine {
-  name: RoutineName;
+  name: RoutineName | 'juggleResponse';
   /** Length in bars. */
   bars: number;
   events: readonly RoutineEvent[];
@@ -121,6 +124,59 @@ export function routineToPlaced(routine: ScratchRoutine, startBar: number, grid:
       placementRole: ev.role === 'ANSWER' ? 'answer' : ev.step >= 15 ? 'turnaround' : 'accent', role: ev.role,
     };
   });
+}
+
+// ─── The scratch_dj ladder and the juggle response (sections 26, 49; SCR-P7.9) ──
+
+/** The reference DJ routine's gesture hierarchy (`tools/scratch_dj.py` GESTURE_LEVELS :43-48). */
+export const DJ_ROUTINE_LEVELS: Readonly<Record<1 | 2 | 3 | 4, readonly ScratchGestureId[]>> = {
+  1: ['baby', 'babySlow', 'forwardStab', 'backwardStab', 'drag'],
+  2: ['chirp', 'chirpDouble', 'transformer4', 'transformer8'],
+  3: ['flare1', 'flare2', 'tearForward'],
+  4: ['orbit', 'crab', 'scribble', 'hydroplane'],
+};
+
+/**
+ * `_pick_gesture(level, pal, rnd)` (`scratch_dj.py` :72-82): a gesture at the level, capped to the
+ * style's max level, biased toward the style's preferred gestures half of the time.
+ */
+export function pickRoutineGesture(level: number, style: ScratchDJStyle, rnd: ScratchRandom): ScratchGestureId {
+  const pal = SCRATCH_STYLES[style];
+  const lvl = Math.max(1, Math.min(level, pal.maxLevel)) as 1 | 2 | 3 | 4;
+  const pool = DJ_ROUTINE_LEVELS[lvl];
+  let biased: readonly ScratchGestureId[] = pool.filter((g) => pal.bias.includes(g));
+  if (!biased.length) biased = pool;
+  if (pal.bias.length && rnd() < 0.5) {
+    const cand = pal.bias.filter((g) => ([1, 2, 3, 4] as const).slice(0, lvl).some((l) => DJ_ROUTINE_LEVELS[l].includes(g)));
+    if (cand.length) biased = cand;
+  }
+  return biased[Math.floor(rnd() * biased.length) % biased.length]!;
+}
+
+/**
+ * The juggle response (owner plan section 49): over the juggle's own phases, bar by bar -
+ * A and B loops (SETUP / ESTABLISH / INTENSIFY) + the scratch vocal: the reference hook bar A
+ * (`scratch_dj.py` :113, baby step 2 v 0.7, forward stab step 10 v 0.72);
+ * the A/B trade (PEAK) + the scratch response: the reference call / response (:133-137, even bars
+ * a level-1 answer on step 6 v 0.72, odd bars a level-2 accent on step 14 v 0.75);
+ * the A+B payoff (PAYOFF, RELEASE): the scratch is out, both hands on the juggle (`three_deck.py`
+ * final_burst, deck C silent).
+ */
+export function juggleResponseRoutine(phases: ReadonlyArray<JugglePhase | null>, style: ScratchDJStyle, seed: number): ScratchRoutine {
+  const rnd: ScratchRandom = lfsr(seed * 131 + 7);
+  const events: RoutineEvent[] = [];
+  let trade = 0;
+  phases.forEach((phase, bar) => {
+    if (phase === 'SETUP' || phase === 'ESTABLISH' || phase === 'INTENSIFY') {
+      events.push({ bar, step: 2, role: 'THEME', gesture: 'baby', sourceRole: 'ROCK', velocity: 0.7, tail: false });
+      events.push({ bar, step: 10, role: 'THEME', gesture: 'forwardStab', sourceRole: 'ROCK', velocity: 0.72, tail: false });
+    } else if (phase === 'PEAK') {
+      if (trade % 2 === 0) events.push({ bar, step: 6, role: 'ANSWER', gesture: pickRoutineGesture(1, style, rnd), sourceRole: 'BEAT', velocity: 0.72, tail: false });
+      else events.push({ bar, step: 14, role: 'ACCENT', gesture: pickRoutineGesture(2, style, rnd), sourceRole: 'BEAT', velocity: 0.75, tail: true });
+      trade++;
+    }
+  });
+  return { name: 'juggleResponse', bars: phases.length, events };
 }
 
 /** The reference's own sanity rules for a routine (`validate_routine`): empty = fine. */

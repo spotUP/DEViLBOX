@@ -1809,6 +1809,7 @@ class DJAutoDJ {
         perf: this.performanceContext(timeRemaining), deck: this.ab(this.activeDeck), mode, style: choice.style,
         genre: choice.modifiers, genreHint: choice.genre, scratchPermission: permission,
         hold: transitioning, juggleActive: juggling, userControl,
+        juggleShape: juggling ? juggleShapeOf(this.juggle?.currentExecution() ?? null) : null,
         decksPlaying: { A: this.deckPlaying('A'), B: this.deckPlaying('B') },
         transitionInSec: this.plan ? Math.max(0, this.plan.startTimeSec - this.getOutgoingPosition()) : null,
         trackerSamples: song?.instruments ? trackerSampleInfos(song.instruments, this.ab(this.activeDeck)) : undefined,
@@ -1966,4 +1967,9 @@ class DJAutoDJ {
       return store.decks[this.activeDeck].isPlaying;
     }
   }
+}
+
+/** A running juggle's grammar for the scratch performer (section 49): its start and its phases. */
+function juggleShapeOf(exec: { startBeat: number; pattern: { phases: Array<{ phase: import('./autodj/juggle/juggleTypes').JugglePhase; startBeat: number; endBeat: number }> } } | null) {
+  return exec ? { startBeat: exec.startBeat, phases: exec.pattern.phases } : null;
 }
