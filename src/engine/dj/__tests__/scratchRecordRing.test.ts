@@ -52,8 +52,8 @@ async function renderRecord(rate: number, startSec: number): Promise<{ L: Float3
   const startFrame = quantum(startSec);
   void ctx.suspend(startFrame / SR).then(async () => {
     ring.startAt(START_SEC, rate);
-    // the start message reaches the worklet on a macrotask; resuming before it lands starts the render without the drop (CI: first frame NaN)
-    await new Promise((r) => setTimeout(r, 50));
+    // resume only once the worklet has applied the drop (a fixed 50 ms wait lost the race under load, SA-m10)
+    await ring.sync();
     return ctx.resume();
   });
   const out = await ctx.startRendering();
