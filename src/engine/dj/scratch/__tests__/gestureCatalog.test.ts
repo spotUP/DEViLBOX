@@ -71,10 +71,11 @@ describe('scratch gesture catalogue (SCR-P1.2)', () => {
     expect(getGesture('transformer4').faderWindows.map((w) => w.open)).toEqual([[0, 0.125], [0.25, 0.375], [0.5, 0.625], [0.75, 0.875]]);
     expect(getGesture('hydroplane').faderWindows).toHaveLength(12);
     for (const id of ['baby', 'babySlow', 'tearForward', 'tearReverse', 'scribble', 'drag'] as const) expect(getGesture(id).faderWindows.map((w) => w.open), id).toEqual([[0, 1]]);
-    // SA-B2: one length per gesture = the tuned stroke (cycle x strokes), not the reference
+    // SA-B2: one length per gesture = the tuned stroke (cycle x strokes); baby and slow baby take the
+    // reference lengths since O3 (owner 2026-10-12, the beep fix); the rest are not yet the reference
     // `_GESTURE_STEPS` (baby 2, babySlow 3, stabs 1, chirp 2, transformer4 2, tears 2, flares 2,
     // orbit 3, crab 2, hydroplane 3, drag 4), which overlap when one hand performs them
-    const steps = { baby: 4, babySlow: 4, forwardStab: 2, backwardStab: 2, chirp: 1, chirpDouble: 2, transformer4: 4, transformer8: 4, tearForward: 4, tearReverse: 4, flare1: 4, flare2: 4, orbit: 4, scribble: 2, drag: 8, crab: 4, hydroplane: 4, drop: 4, dropPhrase: 16 } as const;
+    const steps = { baby: 2, babySlow: 3, forwardStab: 2, backwardStab: 2, chirp: 1, chirpDouble: 2, transformer4: 4, transformer8: 4, tearForward: 4, tearReverse: 4, flare1: 4, flare2: 4, orbit: 4, scribble: 2, drag: 8, crab: 4, hydroplane: 4, drop: 4, dropPhrase: 16 } as const;
     for (const [id, n] of Object.entries(steps)) expect(getGesture(id as keyof typeof steps).durationSteps, id).toBe(n);
   });
 });

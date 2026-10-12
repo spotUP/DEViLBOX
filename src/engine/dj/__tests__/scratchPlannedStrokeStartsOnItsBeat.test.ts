@@ -58,11 +58,11 @@ describe('a planned deck stroke starts on its beat and plays its length (SA-M2, 
     const deck = fakeDeck(120);
     holder.deck = deck;
     fireDjFx('fx_scratch_baby', { deck: 'A', source: 'autodj', beats: 1 });
-    vi.advanceTimersByTime(80);
-    // the reference baby (1-beat cycle = 500 ms) pushes forward (+3.2) for its first quarter and pulls
-    // back (-3.2) for the next half: 80 ms in is still the push (phase 0.16); an elapsed-time phase
-    // (100 ms ahead, phase 0.36) would already pull back
-    expect(deck.velocities[deck.velocities.length - 1]!).toBeCloseTo(3.2, 6);
+    vi.advanceTimersByTime(40);
+    // the reference baby (2 steps = 250 ms at 120 BPM) pushes forward (+0.87) for its first quarter and
+    // pulls back for the next half: 40 ms in is still the push (phase 0.16); an elapsed-time phase
+    // (100 ms ahead, phase 0.56) would already pull back
+    expect(deck.velocities[deck.velocities.length - 1]!).toBeCloseTo(0.87, 6);
     releaseDjFx('fx_scratch_baby', { deck: 'A', source: 'autodj', finishCycle: true });
     deck.stopPattern();
   });
@@ -72,7 +72,8 @@ describe('a planned deck stroke starts on its beat and plays its length (SA-M2, 
     holder.deck = deck;
     fireDjFx('fx_scratch_baby', { deck: 'A', source: 'keyboard' });
     vi.advanceTimersByTime(10);
-    expect(deck.velocities[0]!).toBeGreaterThan(1.5);
+    // elapsed-time phase (> a quarter in): the pull back, not a fresh push
+    expect(deck.velocities[0]!).toBeCloseTo(-0.87, 6);
     releaseDjFx('fx_scratch_baby', { deck: 'A', source: 'keyboard' });
   });
 

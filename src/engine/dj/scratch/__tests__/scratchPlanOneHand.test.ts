@@ -52,7 +52,7 @@ describe('one hand performs one gesture at a time (SA-B1)', () => {
 
   it('validation reports overlapping gestures (routines are checked by the same rule)', () => {
     const ev = (step: number): PlacedScratch => ({ bar: 0, step, beat: step / 4, gesture: 'baby', velocity: 0.8, placementRole: 'accent', role: 'ACCENT' });
-    expect(validatePhrase([[ev(6), ev(8)]]).join(' ')).toMatch(/one hand/);
+    expect(validatePhrase([[ev(6), ev(7)]]).join(' ')).toMatch(/one hand/); // baby is 2 steps (the reference)
     expect(validatePhrase([[ev(0), ev(4)]]).join(' ')).not.toMatch(/one hand/);
   });
 });
