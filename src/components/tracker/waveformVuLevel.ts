@@ -19,6 +19,8 @@ export { VU_ONSET_RISE };
 export function waveformVuLevel(
   engineLevel: number | null,
   waveform: ArrayLike<number> | null | undefined,
+  /** The waveform's full scale: 32768 for an engine's int16 capture, 1 for a float window (a DJ deck's channel scopes). */
+  fullScale = 32768,
 ): number {
   if (engineLevel !== null) return engineLevel;
   if (!waveform || waveform.length === 0) return 0;
@@ -27,7 +29,7 @@ export function waveformVuLevel(
     const a = Math.abs(waveform[k]);
     if (a > peak) peak = a;
   }
-  return peak / 32768;
+  return peak / fullScale;
 }
 
 
