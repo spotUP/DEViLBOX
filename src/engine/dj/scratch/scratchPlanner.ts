@@ -42,6 +42,11 @@ export interface ScratchPlanOptions {
   /** Vocal activity per bar of the plan; every bar takes the context's reading when omitted. */
   vocalByBar?: readonly number[];
   routines?: boolean;
+  /** Gestures cooling down (section 54): left out of the vocabulary. */
+  exclude?: readonly ScratchGestureId[];
+  /** Steps up (+) or down (-) the density ladder from the section's state, still capped by the mode
+   *  (section 52: escalate after a phrase that lifted the energy, resolve after a repeated one). */
+  densityShift?: number;
 }
 
 export interface ScratchPlan {
@@ -90,10 +95,18 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   const levelCap = Math.min(eff.levelCap ?? 4, genre.levelCap ?? 4, maxLevelFor(eff.mode, style) || 4);
   gestures = gestures.filter((id) => getGesture(id).difficulty <= levelCap || (eff.mode === 'SAFE' && !eff.levelCap && id === 'chirp'));
   if (genre.durationCapSteps) gestures = gestures.filter((id) => getGesture(id).durationSteps <= genre.durationCapSteps! && id !== 'drag');
+  if (opts.exclude?.length) {
+    const cooling = gestures.filter((id) => opts.exclude!.includes(id));
+    gestures = gestures.filter((id) => !opts.exclude!.includes(id));
+    if (cooling.length) reasons.push(`cooling down: ${cooling.join(', ')}`);
+  }
   if (gestures.length === 0) { reasons.push('no gesture inside the level cap'); return empty; }
 
   // density: the section's state for the style, capped by the mode, scaled by the genre
-  const natural = sectionDensity(style, ctx.sectionName);
+  const sectionState = sectionDensity(style, ctx.sectionName);
+  const shifted = DENSITY_ORDER[Math.max(0, Math.min(DENSITY_ORDER.length - 1, DENSITY_ORDER.indexOf(sectionState) + Math.trunc(opts.densityShift ?? 0)))]!;
+  const natural = sectionState === 'none' ? sectionState : shifted;
+  if (natural !== sectionState) reasons.push(`${(opts.densityShift ?? 0) > 0 ? 'escalate' : 'resolve'}: ${sectionState} -> ${natural}`);
   const capped = minDensity(natural, MODE_MAX_DENSITY[eff.mode]);
   const rate = DENSITY_RATE[capped] * (genre.densityScale ?? 1);
   reasons.push(`${ctx.sectionName}: ${natural}${capped !== natural ? ` capped to ${capped} by ${eff.mode}` : ''}`);
