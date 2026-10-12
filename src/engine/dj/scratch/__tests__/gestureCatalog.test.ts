@@ -1,6 +1,6 @@
 /**
  * Gesture catalogue (owner scratch plan sections 9, 10, 38, 39, 67, Gate B;
- * ledger SCR-P1.2, P1.3, P1.10, P1.11): the 31 gestures, their computed
+ * ledger SCR-P1.2, P1.3, P1.10, P1.11): the 33 gestures, their computed
  * ranking, the legacy pattern mapping, the structural validity rules and the
  * source compatibility rule, read from the data the engine executes.
  */
@@ -22,18 +22,18 @@ const REQUIRED_FIELDS: ReadonlyArray<keyof ScratchGesture> = [
 ];
 
 describe('scratch gesture catalogue (SCR-P1.2)', () => {
-  it('holds the 31 ids: section 9 + throws + the DEViLBOX extras + the reference cut, echo, brake and spin-up (SCR-PG-A4), each once', () => {
-    expect(SCRATCH_GESTURES).toHaveLength(31);
-    expect(SCRATCH_GESTURE_IDS).toHaveLength(31);
-    expect(new Set(SCRATCH_GESTURES.map((g) => g.id)).size).toBe(31);
+  it('holds the 33 ids: section 9 + throws + the DEViLBOX extras + the reference cut, echo, brake, spin-up (SCR-PG-A4) and the needle drop / lift (SCR-PG-C1), each once', () => {
+    expect(SCRATCH_GESTURES).toHaveLength(33);
+    expect(SCRATCH_GESTURE_IDS).toHaveLength(33);
+    expect(new Set(SCRATCH_GESTURES.map((g) => g.id)).size).toBe(33);
     expect(SCRATCH_GESTURES.map((g) => g.id)).toEqual(SCRATCH_GESTURE_IDS);
   });
 
   it('every gesture carries every section 10 field (Gate B completion)', () => {
     for (const g of SCRATCH_GESTURES) {
       for (const f of REQUIRED_FIELDS) expect(g[f], `${g.id}.${String(f)}`).toBeDefined();
-      // one motion (O1): a hand path, a glide, a deck action or a throw - never a keyframe table
-      const motions = [g.handPath?.length ? 'hand' : null, g.glide ? 'glide' : null, g.deckAction ? 'deck' : null, g.id === 'drop' || g.id === 'dropPhrase' ? 'throw' : null].filter(Boolean);
+      // one motion (O1): a hand path, a glide, a deck action, a throw or the needle - never a keyframe table
+      const motions = [g.handPath?.length ? 'hand' : null, g.glide ? 'glide' : null, g.deckAction ? 'deck' : null, g.id === 'drop' || g.id === 'dropPhrase' ? 'throw' : null, g.needle ? 'needle' : null].filter(Boolean);
       expect(motions, `${g.id} motion`).toHaveLength(1);
       expect('velocityCurve' in g, `${g.id} keyframes`).toBe(false);
       expect(g.faderWindows.length, `${g.id} windows`).toBeGreaterThan(0);
@@ -135,7 +135,7 @@ describe('pattern data validity (section 67, SCR-P1.11)', () => {
       expect([1, 2, 3, 4]).toContain(g.difficulty);
       expect(GESTURE_LEVELS[g.id]).toBe(g.difficulty);
     }
-    expect(Object.keys(GESTURE_LEVELS)).toHaveLength(31);
+    expect(Object.keys(GESTURE_LEVELS)).toHaveLength(33);
   });
 
   it('fader window validity: 0 <= start < end <= 1, windows of one curve never overlap', () => {

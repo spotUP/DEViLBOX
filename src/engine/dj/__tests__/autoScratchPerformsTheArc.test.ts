@@ -7,7 +7,7 @@
  * Auto Scratch is switched off the performer ends IDLE with the deck state it touched restored.
  */
 import { describe, it, expect } from 'vitest';
-import { DJScratchDJ } from '../scratch/DJScratchDJ';
+import { DJScratchDJ, scratchDJStats } from '../scratch/DJScratchDJ';
 import { ScratchExecutor } from '../scratch/ScratchExecutor';
 import { scratchArcStats } from '../scratch/scratchArc';
 import { deckAnchor } from '../scratch/scratchAnchor';
@@ -63,6 +63,7 @@ describe('Auto Scratch performs the arc (SCR-P6.R6)', () => {
     });
 
     const phaseReadsBefore = scratchArcStats.phaseAt;
+    const bookendsBefore = scratchDJStats.bookends;
     const end = barT(drop.startBar + 32) + 0.05;
     let nextPoll = sec;
     while (sec < end) {
@@ -76,9 +77,17 @@ describe('Auto Scratch performs the arc (SCR-P6.R6)', () => {
     expect([...new Set(t.arcPhases)]).toEqual(['establish', 'build', 'call', 'response', 'develop', 'feature', 'peak', 'burst', 'resolution']);
     expect(t.arcPhases).toHaveLength(32);
     const featureEvents = scheduled.filter((e) => e.executeAtBeat >= barStartBeat(track.downbeats, drop.startBar) && e.executeAtBeat < barStartBeat(track.downbeats, drop.startBar + 32));
-    const busyBars = new Set(featureEvents.map((e) => Math.floor((e.executeAtBeat - barStartBeat(track.downbeats, drop.startBar)) / 4)));
+    // genuine rests: bars with no scratch (the needle's drop / lift bookends are not scratches)
+    const scratches = featureEvents.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
+    const busyBars = new Set(scratches.map((e) => Math.floor((e.executeAtBeat - barStartBeat(track.downbeats, drop.startBar)) / 4)));
     expect(32 - busyBars.size).toBeGreaterThanOrEqual(4);
     expect(featureEvents.some((e) => e.role === 'OUTRO')).toBe(true);
+    // SCR-PG-CR (C8): the routine opens with the needle drop on its first downbeat and closes with the lift
+    expect(scratchDJStats.bookends - bookendsBefore).toBe(1);
+    const sorted = [...featureEvents].sort((a, b) => a.executeAtBeat - b.executeAtBeat);
+    expect(sorted[0]!.gesture).toBe('needleDrop');
+    expect(sorted[0]!.executeAtBeat).toBe(barStartBeat(track.downbeats, drop.startBar));
+    expect(sorted[sorted.length - 1]!.gesture).toBe('needleLift');
     expect(ctrl.memory.entries).toHaveLength(16);
     // the performer walked the section 51 states into the feature and out to a rest
     const path = ctrl.states.history.map((h) => h.to);

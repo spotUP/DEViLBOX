@@ -33,7 +33,7 @@ export const SCRATCH_GESTURE_IDS: readonly ScratchGestureId[] = [
   'transformer4', 'transformer8', 'flare1', 'flare2', 'orbit', 'crab', 'scribble',
   'hydroplane', 'tearForward', 'tearReverse', 'twiddle', 'drag', 'laser', 'phaser',
   'tweak', 'vibrato', 'uzi', 'eightFingerCrab', 'threeClickFlare', 'drop', 'dropPhrase',
-  'cut', 'echo', 'brake', 'spinup',
+  'cut', 'echo', 'brake', 'spinup', 'needleDrop', 'needleLift',
 ];
 
 /** Section 31 difficulty ladder; the extras rank as level-3 accents, the
@@ -46,6 +46,7 @@ export const GESTURE_LEVELS: Readonly<Record<ScratchGestureId, ScratchLevel>> = 
   orbit: 4, crab: 4, hydroplane: 4, threeClickFlare: 4, eightFingerCrab: 4,
   // the reference's cut and echo are stabs (level 1); brake / spin-up are record flourishes (level-3 accents)
   cut: 1, echo: 1, brake: 3, spinup: 3,
+  needleDrop: 1, needleLift: 1,
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ function rolesFor(id: ScratchGestureId, durationSteps: number, windows: number):
   return ['THEME', 'ANSWER', 'FEATURE', 'FILL'];
 }
 
-// ── the 31 definitions (before the computed fields) ────────────────────────
+// ── the 33 definitions (before the computed fields) ────────────────────────
 
 interface GestureSeed {
   id: ScratchGestureId;
@@ -132,6 +133,7 @@ interface GestureSeed {
   fx?: ScratchGesture['fx'];
   glide?: ScratchGesture['glide'];
   deckAction?: ScratchGesture['deckAction'];
+  needle?: ScratchGesture['needle'];
   flourish?: boolean;
   /** Strokes of the curve inside the gesture's length (flutter textures: 2); default 1. */
   strokes?: number;
@@ -419,6 +421,23 @@ loop: false,
     faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: true,
 loop: false,
+  },
+  {
+    // Reference needle_drop (turntable.py :384-392): the routine opens with it (scratch_dj.py :110);
+    // 2 steps (dj_viz _STEPS).
+    id: 'needleDrop', name: 'Needle Drop', durationSteps: 2,
+    styles: ['oldSchool', 'boomBap', 'electro', 'battle', 'loFi'], flourish: true, needle: 'drop',
+    faderWindows: OPEN,
+    trueReverse: false, returnsToAnchor: false, allowsSampleSource: false,
+    loop: false,
+  },
+  {
+    // Reference needle_lift (turntable.py :395-399): the routine closes with it (scratch_dj.py :161); 1 step.
+    id: 'needleLift', name: 'Needle Lift', durationSteps: 1,
+    styles: ['oldSchool', 'boomBap', 'electro', 'battle', 'loFi'], flourish: true, needle: 'lift',
+    faderWindows: OPEN,
+    trueReverse: false, returnsToAnchor: false, allowsSampleSource: false,
+    loop: false,
   },
 ];
 
