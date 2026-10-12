@@ -53,6 +53,9 @@ export interface PerformHandle {
   release(at?: number): void;
 }
 
+/** The programme level the pool's bus follows (`ProgrammeMeter`); `stop` releases its reads when the pool is disposed. */
+export interface ProgrammeSource { readonly rms: number | null; stop?(): void }
+
 export type RecordFetcher = (record: ScratchRecord, ctx: BaseAudioContext) => Promise<AudioBuffer>;
 
 async function fetchRecord(record: ScratchRecord, ctx: BaseAudioContext): Promise<AudioBuffer> {
@@ -79,12 +82,12 @@ export class ScratchVoicePool {
   private rings: DeckScratchBuffer[] = [];
   private gritOn = true;
 
-  /** The programme's RMS now (the music the scratch sits in); null = unknown: the bus stays at unity. */
-  private readonly programme: (() => number | null) | null;
+  /** The programme the scratch sits in (its RMS; null = unknown: the bus stays at unity). The pool owns it: dispose stops it. */
+  private readonly programme: ProgrammeSource | null;
   /** Reachability sentinel: strokes whose bus level was matched to the programme. */
   readonly levelStats = { matched: 0, lastLevel: 1 };
 
-  constructor(ctx: BaseAudioContext, destination: AudioNode, opts: { size?: number; fetcher?: RecordFetcher; programme?: () => number | null } = {}) {
+  constructor(ctx: BaseAudioContext, destination: AudioNode, opts: { size?: number; fetcher?: RecordFetcher; programme?: ProgrammeSource } = {}) {
     this.ctx = ctx;
     this.fetcher = opts.fetcher ?? fetchRecord;
     this.programme = opts.programme ?? null;
@@ -187,7 +190,7 @@ export class ScratchVoicePool {
       }
       if (cancelled) return { ok: false, reason: 'released before the gesture started' };
       // the scratch sits in the music (owner 2026-10-12): its bus follows the programme to the reference ratio
-      const prog = this.programme?.() ?? null;
+      const prog = this.programme?.rms ?? null;
       if (prog !== null) {
         // the record's level as the stroke reads it: the record sampled along the gesture's own motion
         // from its cue (the turntable model's curve the voice plays) - reversals, slow turns and the
@@ -277,6 +280,7 @@ export class ScratchVoicePool {
 
   dispose(): void {
     this.panic();
+    this.programme?.stop?.();
     for (const r of this.rings) r.dispose();
     for (const b of this.buses) b.dispose();
     this.voices.length = 0; this.rings.length = 0; this.buses.length = 0;
@@ -292,9 +296,8 @@ export function getScratchVoicePool(): ScratchVoicePool {
     const engine = getDJEngine();
     const destination = engine.mixer.samplerInput;
     // the programme the scratch sits in: the decks' channel signal through the crossfader, followed over 2 s
-    const meter = new ProgrammeMeter(() => deckProgrammeRms(engine));
-    realTimers.setInterval(() => meter.sample(0.1), 100);
-    pool = new ScratchVoicePool(ctx, destination, { programme: () => meter.rms });
+    const programme = new ProgrammeMeter(() => deckProgrammeRms(engine)).start(realTimers, 100);
+    pool = new ScratchVoicePool(ctx, destination, { programme });
   }
   return pool;
 }

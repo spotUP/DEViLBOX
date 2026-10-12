@@ -93,4 +93,21 @@ export class ProgrammeMeter {
   }
 
   get rms(): number | null { return this.primed ? Math.sqrt(this.power) : null; }
+
+  private timer: { timers: MeterTimers; id: unknown } | null = null;
+
+  /** Read every `everyMs` on `timers` until `stop()`: the owner of the meter (the voice pool) stops it on dispose. */
+  start(timers: MeterTimers, everyMs = 100): this {
+    if (!this.timer) this.timer = { timers, id: timers.setInterval(() => this.sample(everyMs / 1000), everyMs) };
+    return this;
+  }
+
+  stop(): void {
+    if (!this.timer) return;
+    this.timer.timers.clearInterval(this.timer.id);
+    this.timer = null;
+  }
 }
+
+/** The timer layer the meter reads on (`realTimers` in the app). */
+export interface MeterTimers { setInterval(fn: () => void, ms: number): unknown; clearInterval(id: unknown): void }
