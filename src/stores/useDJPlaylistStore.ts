@@ -926,6 +926,7 @@ let bundledImportAttempted = false;
  * seed's sources changed since the last repair (or an entry has no source at
  * all), bring persisted seed playlists up to the seed's sources. See
  * `repairSourcesFromSeed` in `src/lib/dj/playlistTrackSource.ts`.
+ * Called once at app start (main.tsx), never on import: a store import (a unit test) does not fetch.
  */
 export async function syncBundledPlaylists(): Promise<void> {
   if (bundledImportAttempted) return;
@@ -956,8 +957,6 @@ export async function syncBundledPlaylists(): Promise<void> {
     // Bundled file not available — no problem
   }
 }
-
-setTimeout(syncBundledPlaylists, 100);
 
 // ── Debounced server sync ────────────────────────────────────────────────────
 

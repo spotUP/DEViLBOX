@@ -47,6 +47,9 @@ installIOSAudioUnlock();
 import { installOneProgrammeAtATime } from './lib/playback/oneProgrammeAtATime'
 installOneProgrammeAtATime();
 
+// DJ playlists: import the bundled seed playlists on first launch, repair their sources afterwards.
+setTimeout(() => { void import('./stores/useDJPlaylistStore').then(({ syncBundledPlaylists }) => syncBundledPlaylists()); }, 100);
+
 // MCP Bridge: Connect to MCP server for programmatic tracker control
 // Always initialized so the AI panel's MCP tools work in any browser
 import('./bridge/MCPBridge').then(({ initMCPBridge }) => initMCPBridge());
