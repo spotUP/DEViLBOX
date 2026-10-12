@@ -8,7 +8,7 @@
  * ordinary transitions; this layer only performs between them.
  */
 import { fractionalBeatAt } from '../beatGrid';
-import { timelineAt, barIndexAt, trackBeatConfidence } from '../beatGrid';
+import { timelineAt, barIndexAt, barPhaseAtBeat, trackBeatConfidence } from '../beatGrid';
 import { realTimers, type ExecutorTimers } from '../transitionExecutor';
 import { keyAt } from '../trackAnalysis';
 import { shiftedKeyName } from '../tempoKeySolver';
@@ -189,7 +189,6 @@ export class DJJuggleController {
       return { deck, trackId: input.trackId, position: pos, beatPhase: 0, barPhase: 0, beatIndex: 0, bpm: input.bpm, keyConfidence: 0, energy: 0, drumsActive: false, bassActive: false, vocalsActive: false, melodicActivity: 0, loop: input.loop ?? null, analysisConfidence: 0, playing: input.playing, analysis: null };
     }
     const beat = fractionalBeatAt(a.beatGrid, pos);
-    const bpb = a.meter.beatsPerBar || 4;
     const refs = materialRefs(a);
     const at = (tl: { values: number[]; hopSec: number }, ref: number) => timelineAt(tl.values, tl.hopSec || 0.25, pos) / ref;
     const section = a.sections.find((s) => s.start <= pos && pos < s.end);
@@ -199,7 +198,7 @@ export class DJJuggleController {
     const localName = local.key.mode === 'unknown' ? null : local.key.name;
     const heardKey = shiftedKeyName(localName, input.keyShiftSemitones ?? 0) ?? localName ?? undefined;
     return {
-      deck, trackId: input.trackId, position: pos, beatPhase: beat - Math.floor(beat), barPhase: ((beat % bpb) + bpb) % bpb / bpb, beatIndex: beat,
+      deck, trackId: input.trackId, position: pos, beatPhase: beat - Math.floor(beat), barPhase: barPhaseAtBeat(a.downbeats, beat), beatIndex: beat,
       bpm: input.bpm || a.bpm, key: heardKey, keyConfidence: localName ? local.confidence : 0, section, cuePosition: a.cuePoints.bestMixIn, mixInPosition: a.cuePoints.bestMixIn, mixOutPosition: a.cuePoints.bestMixOut,
       energy: Math.min(1, at(a.intensity, refs.intensity)), drumsActive: at(a.drumActivity, refs.drums) > 0.4, bassActive: at(a.bassActivity, refs.bass) > 0.4,
       vocalsActive: a.vocalActivity.confidence > 0 && at(a.vocalActivity, refs.vocal) > 0.5, melodicActivity: Math.min(1, at(a.harmonicActivity, refs.harmonic)),
