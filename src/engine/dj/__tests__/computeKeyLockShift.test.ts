@@ -5,12 +5,12 @@ import { computeKeyLockShift } from '../computeKeyLockShift';
  * Pitch/tempo coupling invariants for DJ Key Lock.
  *
  * The decoupling math is the single pure layer between the pitch fader and
- * the audio graph (native playbackRate + SoundTouch compensation). Breaking
+ * the audio graph (native playbackRate + Key Lock stretcher compensation). Breaking
  * it silently corrupts key-lock behaviour — the regression this pins down
  * is: "moving the pitch fader with Key Lock ON changes the track's musical
  * key, even though the UI says it shouldn't." Previously caused by
  * Tone.PitchShift's granular delay buffer (removed in commit bff38c6f3).
- * SoundTouch port is the replacement; this math drives the compensation.
+ * Key Lock stretcher (DeckKeyLock) is the replacement; this math drives the compensation.
  */
 describe('computeKeyLockShift', () => {
   it('Key Lock OFF: pitch shift is zero (vinyl coupling)', () => {
@@ -23,11 +23,11 @@ describe('computeKeyLockShift', () => {
 
   it('Key Lock ON: pitch shift cancels playbackRate pitch (tempo-only audible change)', () => {
     // +4 semitones fader → playbackRate > 1 (faster + higher). Compensation
-    // of -4 semitones in SoundTouch drops the pitch back to neutral.
+    // of -4 semitones in the stretcher drops the pitch back to neutral.
     const plus = computeKeyLockShift(4, true);
     expect(plus.pitchCompensate).toBe(-4);
 
-    // -6 fader → slower + lower pitch. SoundTouch pushes +6 to restore key.
+    // -6 fader → slower + lower pitch. The stretcher pushes +6 to restore key.
     const minus = computeKeyLockShift(-6, true);
     expect(minus.pitchCompensate).toBe(6);
   });
@@ -56,13 +56,13 @@ describe('computeKeyLockShift', () => {
     expect(inf.pitchCompensate).toBe(0);
   });
 
-  it('regression — SoundTouch compensation ALWAYS cancels playbackRate to neutral when key-lock is ON', () => {
+  it('regression — Key Lock compensation ALWAYS cancels playbackRate to neutral when key-lock is ON', () => {
     // Property: for any semitone value in the DJ-reachable range (-16..+16),
-    // the net audible pitch (playbackRate's pitch * SoundTouch's pitch) must
+    // the net audible pitch (playbackRate's pitch * the stretcher's pitch) must
     // be 1.0 when Key Lock is ON. This is the "tempo-only change" contract.
     //
     // Equivalent check: playbackRate_pitch_factor = 2^(s/12),
-    //                   soundtouch_pitch_factor   = 2^(compensate/12),
+    //                   stretcher_pitch_factor    = 2^(compensate/12),
     //                   product must be 1.0 within float ε.
     for (let s = -16; s <= 16; s++) {
       const { playbackRate, pitchCompensate } = computeKeyLockShift(s, true);
@@ -72,7 +72,7 @@ describe('computeKeyLockShift', () => {
   });
 
   it('regression — Key Lock OFF does NOT compensate (vinyl behaviour is preserved)', () => {
-    // Opposite property: with Key Lock OFF, SoundTouch compensation is 0
+    // Opposite property: with Key Lock OFF, the compensation is 0
     // so the net pitch factor IS the playbackRate factor (vinyl coupling).
     for (let s of [-12, -6, -1, 0, 1, 6, 12]) {
       const { playbackRate, pitchCompensate } = computeKeyLockShift(s, false);
