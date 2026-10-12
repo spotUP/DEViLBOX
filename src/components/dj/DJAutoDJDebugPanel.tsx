@@ -7,6 +7,8 @@
  */
 import React from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { Button } from '@/components/ui/Button';
+import { juggleNowAutoDJ } from '@/engine/dj/DJActions';
 import type { AutoDJTelemetry } from '@/engine/dj/autodj/telemetry';
 
 const fmt = (v: number | null | undefined, digits = 2): string => (v === null || v === undefined || !Number.isFinite(v) ? '-' : v.toFixed(digits));
@@ -123,18 +125,40 @@ export const DJAutoDJDebugPanel: React.FC<{ telemetry?: AutoDJTelemetry | null }
   );
 };
 
+/**
+ * Juggle Now (owner decision 2026-10-12): asks Auto DJ's juggle controller for a juggle at once through
+ * the poll loop's own entry - timing gates skipped, safety gates kept. The outcome (and a refusal's
+ * reason) comes back through the juggle telemetry, the row below the button.
+ */
+const JuggleNowControl: React.FC = () => {
+  const enabled = useDJStore((s) => s.autoDJEnabled);
+  const now = useDJStore((s) => s.autoDJJuggleTelemetry?.juggleNow ?? null);
+  return (
+    <div className="flex items-center gap-2 mb-1">
+      <Button variant="primary" size="sm" disabled={!enabled} onClick={() => { void juggleNowAutoDJ(); }} data-testid="autodj-juggle-now">
+        Juggle Now
+      </Button>
+      <span className={now?.state === 'refused' ? 'text-accent-error truncate' : 'text-text-secondary truncate'} data-testid="autodj-juggle-now-result">
+        {!enabled ? 'Enable Auto DJ to juggle' : now ? `${now.state === 'pending' ? 'Setting up' : now.state === 'started' ? 'Started' : 'Refused'}: ${now.reason}` : ''}
+      </span>
+    </div>
+  );
+};
+
 /** Juggling plan section 45: mode, pattern, phase, intensity, per-deck material and roles, next actions, reason, safety. */
 const JuggleSection: React.FC = () => {
   const j = useDJStore((s) => s.autoDJJuggleTelemetry);
   if (!j) {
     return (
       <Section title="Beat Juggling">
+        <JuggleNowControl />
         <div className="text-text-muted" data-testid="autodj-juggle-empty">Auto Juggle has not run yet.</div>
       </Section>
     );
   }
   return (
     <Section title="Beat Juggling">
+      <JuggleNowControl />
       <div data-testid="autodj-juggle">
         <Row label="Juggle Mode" value={j.mode} />
         <Row label="Juggle State" value={j.active ? 'Juggling' : j.mode === 'OFF' ? 'Off' : `Waiting - ${j.safety}`} />
