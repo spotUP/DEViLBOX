@@ -25,12 +25,15 @@
  * genuinely depends on a shared change) is caught by the FULL suite at
  * pre-push + CI — this is only the tight-loop commit gate.
  *
+ * Suites listed in tools/test-tiers/push-only.json are never emitted: they
+ * are push-tier (test:ci at pre-push) and too long for a commit gate.
+ *
  * Exit 0 with empty output means "nothing local to run" — the caller skips
  * pre-commit tests and relies on the pre-push full suite.
  */
 
 import { execFileSync, execSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, basename, join, extname } from 'node:path';
 
 const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
@@ -96,6 +99,10 @@ for (const f of staged) {
 }
 for (const t of sourceTextTests(sources)) set.add(t);
 
+// Push-tier suites too long for this gate (tools/test-tiers/push-only.json) run at pre-push, never here.
+const pushOnlyPath = join(root, 'tools/test-tiers/push-only.json');
+const pushOnly = new Set(existsSync(pushOnlyPath) ? JSON.parse(readFileSync(pushOnlyPath, 'utf8')).files.map((f) => f.file) : []);
+
 // Only emit files that still exist on disk (a deleted test can appear staged).
-const files = [...set].filter((f) => existsSync(join(root, f)));
+const files = [...set].filter((f) => existsSync(join(root, f)) && !pushOnly.has(f));
 process.stdout.write(files.join('\n'));

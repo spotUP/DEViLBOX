@@ -1,0 +1,10 @@
+{
+  "note": "Push-tier suites too long for the pre-commit gate: they run in test:ci at pre-push and in CI, never in the affected-only pre-commit run (scripts/git-hooks/affected-tests.mjs). Owner decision 2026-10-12.",
+  "files": [
+    {
+      "file": "src/engine/dj/__tests__/autoDJStandaloneJuggleLongSet.test.ts",
+      "ciSeconds": 390,
+      "note": "one simulated hour + half an hour of stand-alone juggles on fake timers; ~6 min locally"
+    }
+  ]
+}
