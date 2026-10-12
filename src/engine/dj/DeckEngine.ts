@@ -21,13 +21,14 @@ import { createScratchRoomIR } from './scratch/scratchBus';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
-import { attachChannelScopes, channelScopesFor, channelScopeWindow, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
+import { attachChannelScopes, channelScopesFor, channelScopeWindow, releaseChannelStems, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
 import { DeckChannelMute, bufferWithStems, stemCountOf } from './DeckChannelMute';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
 import { HEARD_DELAY_MAX_SEC, syncHeardDelay, type LatencySource } from '../audioLatency';
 import { computeKeyLockShift } from './computeKeyLockShift';
+import { afterPendingMix } from './stopPlayerNow';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
 import { recueDeck, type DeckRecueResult } from './scratch/deckRecue';
@@ -880,17 +881,13 @@ export class DeckEngine {
     }
   }
 
-  /**
-   * Stop the deck now, or at a later context time (`atContextTime`): a deck handed back behind the
-   * crossfader stops when the fader's move lands (DJMixerEngine.crossfaderSettledAt), not before it.
-   */
-  stop(atContextTime?: number): void {
+  stop(): void {
     this._endBend();
     if (this._playbackMode === 'audio') {
       if (this._stemMode) {
-        this.stemPlayer.stop(atContextTime);
+        this.stemPlayer.stop();
       } else {
-        this.audioPlayer.stop(atContextTime);
+        this.audioPlayer.stop();
       }
     } else if (this._playbackMode === 'tracker') {
       this.replayer.stop();
@@ -1906,7 +1903,8 @@ export class DeckEngine {
   setEchoSend(level: number): void {
     if (!this._echoSend) return;
     const v = Math.max(0, Math.min(1, level));
-    const now = Tone.getContext().rawContext.currentTime;
+    // Never ahead of a pending crossfader move (a hand-back resets the sends of a deck still heard).
+    const now = afterPendingMix();
     const g = this._echoSend.gain;
     g.cancelScheduledValues(now);
     g.setValueAtTime(g.value, now);
@@ -1933,7 +1931,8 @@ export class DeckEngine {
   setReverbSend(level: number): void {
     if (!this._reverbSend) return;
     const v = Math.max(0, Math.min(1, level));
-    const now = Tone.getContext().rawContext.currentTime;
+    // Never ahead of a pending crossfader move (a hand-back resets the sends of a deck still heard).
+    const now = afterPendingMix();
     const g = this._reverbSend.gain;
     g.cancelScheduledValues(now);
     g.setValueAtTime(g.value, now);

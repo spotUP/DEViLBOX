@@ -11,7 +11,7 @@
  */
 
 import * as Tone from 'tone';
-import { PLAYER_FADE_S, contextNow, stopPlayerNow } from './stopPlayerNow';
+import { PLAYER_FADE_S, afterPendingMix, contextNow, stopPlayerNow } from './stopPlayerNow';
 import { decodeAudio, type DecodeResult } from '../../lib/audio/UnifiedAudioDecoder';
 
 export interface AudioFileInfo {
@@ -254,10 +254,9 @@ export class DeckAudioPlayer {
     return at;
   }
 
-  /** Stop now, or at a later context time (`atContextTime`, see stopPlayerNow). */
-  stop(atContextTime?: number): void {
+  stop(): void {
     if (this.player.state === 'started') {
-      stopPlayerNow(this.player, atContextTime);
+      stopPlayerNow(this.player);
     }
     this._pendingOffset = null;
     this._rateTrackingActive = false;
@@ -273,9 +272,14 @@ export class DeckAudioPlayer {
     const clamped = Math.max(0, Math.min(seconds, this._duration));
     this._seekCount++;
     this._lastSeekTarget = clamped;
+    // The new audio starts when an untimed start would (Tone.now(), the time base the position clock and
+    // the crossfader use), never before a pending crossfader move lands; the old sources stop at that same
+    // instant. Stopped at currentTime instead, an audible deck went silent for one lookAhead (100 ms) on
+    // every seek (a juggle's call jump of the audible master).
+    const at = afterPendingMix(Tone.now());
     // Reset rate tracking to match new seek position
     this._rateChangePos = clamped;
-    this._rateChangeTime = Tone.now();
+    this._rateChangeTime = at;
     this._rateTrackingActive = wasPlaying;
     if (wasPlaying) {
       // Force-stop every currently-active source at the native AudioContext
@@ -286,8 +290,7 @@ export class DeckAudioPlayer {
       // copies of the track with an offset). Same pattern as setPlaybackRate
       // already uses for multi-source zombie cleanup.
       const activeSources = (this.player as any)._activeSources as Set<any>;
-      const ctx = Tone.getContext().rawContext as AudioContext;
-      const rawNow = ctx.currentTime;
+      const rawNow = at;
       for (const s of activeSources) {
         try {
           // ToneBufferSource: cancel any pending stop, zero the gain envelope
@@ -305,7 +308,7 @@ export class DeckAudioPlayer {
       // as a fresh start instead of queueing behind the just-killed sources.
       try { (this.player as any)._state.setStateAtTime('stopped', rawNow); } catch { /* */ }
 
-      this.player.start(undefined, clamped);
+      this.player.start(at, clamped);
     } else {
       this._pendingOffset = clamped;
       this._rateTrackingActive = false;
