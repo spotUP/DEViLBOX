@@ -123,6 +123,17 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
     // store write the view would re-read on.
   }, [deckId, songPos, fileName, totalPositions, songVersion]);
 
+  // Per-channel VU meters: the deck's channel scopes at the heard position (a
+  // rendered module's scope track; the replayer's analysers when it plays live).
+  const vuFeed = useCallback(() => {
+    const playing = useDJStore.getState().decks[deckId].isPlaying;
+    try {
+      return { playing, waveforms: playing ? getDJEngine().getDeck(deckId).getChannelWaveforms(numChannels) : [] };
+    } catch {
+      return { playing: false, waveforms: [] };
+    }
+  }, [deckId, numChannels]);
+
   // Compute visual row: during backward scratch, subtract offset from pattPos
   const visualRow = activePatternName && visualOffset > 0
     ? ((pattPos - Math.round(visualOffset)) % numRows + numRows) % numRows
@@ -205,6 +216,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
           currentRow={visualRow}
           numChannels={numChannels}
           isPlaying={isPlaying}
+          vuFeed={vuFeed}
         />
       ) : fileName ? (
         <DJOscilloscope />

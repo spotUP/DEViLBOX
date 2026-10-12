@@ -47,6 +47,14 @@ interface MeterState {
   level: number;
 }
 
+/**
+ * A meter source other than the tracker's engine: each channel's waveform
+ * (-1..1) at the time the listener hears it, and whether the source plays.
+ * A DJ deck feeds its channel scopes (DeckEngine.getChannelWaveforms: the
+ * rendered scope track of a rendered module, the replayer's analysers live).
+ */
+export type ChannelMeterFeed = () => { playing: boolean; waveforms: ArrayLike<number>[] };
+
 interface ChannelVUMetersProps {
   channelOffsets?: number[];
   channelWidths?: number[];
@@ -54,9 +62,11 @@ interface ChannelVUMetersProps {
   editRowY?: number;  // CSS-px Y of the edit row center line
   /** Channels drawn. A format editor (GoatTracker) owns its channels; the tracker pattern is a blank. */
   channelCount?: number;
+  /** Meter this source instead of the tracker's engine (a DJ deck). */
+  feed?: ChannelMeterFeed;
 }
 
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowY: editRowYProp, channelCount }) => {
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowY: editRowYProp, channelCount, feed }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
@@ -76,6 +86,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   const channelOffsetsRef = useRef(channelOffsets);
   const channelWidthsRef = useRef(channelWidths);
   const editRowYRef = useRef(editRowYProp ?? 0);
+  const feedRef = useRef(feed);
+  useEffect(() => { feedRef.current = feed; }, [feed]);
   useEffect(() => { numChannelsRef.current = numChannels; }, [numChannels]);
   useEffect(() => { scrollLeftRef.current = scrollLeftProp; }, [scrollLeftProp]);
   useEffect(() => { channelOffsetsRef.current = channelOffsets; }, [channelOffsets]);
@@ -148,28 +160,34 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
 
       const nc = numChannelsRef.current;
       const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
-      let triggerLevels: number[];
-      let triggerGens: number[];
+      // A fed meter (a DJ deck) reads its own source; the tracker reads its engine.
+      const fed = feedRef.current ? feedRef.current() : null;
+      let triggerLevels: number[] = [];
+      let triggerGens: number[] | null = null;
       let realtimeLevels: number[] | null = null;
       let engineLevels: number[] | null = null;
-      try {
-        const engine = getToneEngine();
-        if (isRealtime) {
-          realtimeLevels = engine.getChannelLevels(nc);
+      if (!fed) {
+        try {
+          const engine = getToneEngine();
+          if (isRealtime) {
+            realtimeLevels = engine.getChannelLevels(nc);
+          }
+          engineLevels = engine.getEngineChannelLevels(nc);
+          triggerLevels = engine.getChannelTriggerLevels(nc);
+          triggerGens = engine.getChannelTriggerGenerations(nc);
+        } catch {
+          animationRef.current = requestAnimationFrame(tick);
+          return;
         }
-        engineLevels = engine.getEngineChannelLevels(nc);
-        triggerLevels = engine.getChannelTriggerLevels(nc);
-        triggerGens = engine.getChannelTriggerGenerations(nc);
-      } catch {
-        animationRef.current = requestAnimationFrame(tick);
-        return;
       }
       const sl = scrollLeftRef.current;
       const offsets = channelOffsetsRef.current;
       const widths = channelWidthsRef.current;
-      const isPlaying = useTransportStore.getState().isPlaying;
-      // Per-channel waveforms from a direct-routed WASM engine (Cinter, Furnace, …).
-      const oscChannelData = liveScopeFrame();
+      const isPlaying = fed ? fed.playing : useTransportStore.getState().isPlaying;
+      // Per-channel waveforms: the feed's, or a direct-routed WASM engine's (Cinter, Furnace, …).
+      const oscChannelData = fed ? (fed.playing ? fed.waveforms : null) : liveScopeFrame();
+      // A feed's waveforms are -1..1 floats; an engine's capture is int16.
+      const oscFullScale = fed ? 1 : 32768;
       const swingEnabled = useSettingsStore.getState().vuMeterSwing;
       const mirrorEnabled = useSettingsStore.getState().vuMeterMirror;
       const vuStyle = useSettingsStore.getState().vuMeterStyle;
@@ -206,8 +224,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
           if (meter.level < 0.01) meter.level = 0;
 
           // Always check trigger data (works for all synths including native WASM like DB303)
-          const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
-          if (isNewTrigger) {
+          if (triggerGens && triggerGens[i] !== lastGensRef.current[i]) {
             lastGensRef.current[i] = triggerGens[i];
             if (triggerLevels[i] > meter.level) {
               meter.level = triggerLevels[i];
@@ -229,7 +246,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
           // those: its waveform capture bleeds the neighbouring channels.
           const oscD = oscChannelData ? oscChannelData[i] : null;
           if (oscD && oscD.length > 0) {
-            const level = waveformVuLevel(engineLevels ? (engineLevels[i] || 0) : null, oscD);
+            const level = waveformVuLevel(engineLevels ? (engineLevels[i] || 0) : null, oscD, oscFullScale);
             const target = engineFedMeterTarget(isRealtime ? 'realtime' : 'trigger', level, prevSourceRef.current[i] || 0);
             prevSourceRef.current[i] = level;
             if (target > meter.level) meter.level = target;

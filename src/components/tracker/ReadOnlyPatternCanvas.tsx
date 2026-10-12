@@ -17,6 +17,7 @@ import type {
   ChannelLayoutSnapshot,
 } from '@engine/renderer/worker-types';
 import { useThemeStore } from '@stores';
+import { ChannelVUMeters, type ChannelMeterFeed } from './ChannelVUMeters';
 import ReadOnlyWorkerFactory from '@/workers/readonly-pattern.worker.ts?worker';
 
 const LINE_NUMBER_WIDTH = 40;
@@ -85,6 +86,8 @@ interface ReadOnlyPatternCanvasProps {
   isPlaying?: boolean;
   /** Optional height override (default: fills parent) */
   height?: number;
+  /** Per-channel VU meters over the columns, metered from this source (a DJ deck's channel scopes). */
+  vuFeed?: ChannelMeterFeed;
 }
 
 export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React.memo(({
@@ -93,6 +96,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
   numChannels,
   isPlaying = false,
   height: heightProp,
+  vuFeed,
 }) => {
   // Mutable ref — set imperatively when canvas is created in useEffect
   const canvasRef    = useRef<HTMLCanvasElement | null>(null);
@@ -254,12 +258,27 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
     bridgeRef.current?.post({ type: 'playback', currentRow, isPlaying });
   }, [currentRow, isPlaying]);
 
+  const vuLayout = vuFeed ? buildLayout(dimensions.width, numChannels) : null;
+
   return (
     <div
       ref={containerRef}
-      className="w-full h-full"
+      className="relative w-full h-full"
       style={heightProp ? { height: heightProp } : undefined}
-    />
+    >
+      {vuFeed && vuLayout && (
+        // The tracker's meters (PatternEditorCanvas), over this view's columns and its centre row.
+        <div className="absolute right-0 pointer-events-none overflow-hidden" style={{ top: 0, bottom: 0, left: LINE_NUMBER_WIDTH, zIndex: 1 }}>
+          <ChannelVUMeters
+            channelOffsets={vuLayout.offsets}
+            channelWidths={vuLayout.widths}
+            editRowY={dimensions.height / 2}
+            channelCount={numChannels}
+            feed={vuFeed}
+          />
+        </div>
+      )}
+    </div>
   );
 });
 
