@@ -36,12 +36,12 @@ export const SCRATCH_GESTURE_IDS: readonly ScratchGestureId[] = [
   'cut', 'echo', 'brake', 'spinup', 'needleDrop', 'needleLift',
 ];
 
-/** Section 31 difficulty ladder; the extras rank as level-3 accents, the
- *  throws as foundation (a clean drop is the first thing a DJ learns). */
+/** Section 31 difficulty ladder: the demo's `scratch_dj.GESTURE_LEVELS` for its 16 gestures (P12); the extras
+ *  rank as level-3 accents, the throws as foundation (a clean drop is the first thing a DJ learns). */
 export const GESTURE_LEVELS: Readonly<Record<ScratchGestureId, ScratchLevel>> = {
   baby: 1, babySlow: 1, drag: 1, forwardStab: 1, backwardStab: 1, drop: 1, dropPhrase: 1,
-  chirp: 2, chirpDouble: 2, transformer4: 2, tearForward: 2,
-  flare1: 3, flare2: 3, transformer8: 3, scribble: 3, tearReverse: 3,
+  chirp: 2, chirpDouble: 2, transformer4: 2, transformer8: 2,
+  flare1: 3, flare2: 3, tearForward: 3, tearReverse: 3, scribble: 4,
   uzi: 3, laser: 3, phaser: 3, tweak: 3, twiddle: 3, vibrato: 3,
   orbit: 4, crab: 4, hydroplane: 4, threeClickFlare: 4, eightFingerCrab: 4,
   // the reference's cut and echo are stabs (level 1); brake / spin-up are record flourishes (level-3 accents)

@@ -12,6 +12,7 @@ import {
   rankByActivity, compatibleGestures, handPathReversals,
 } from '../scratchGestureCatalog';
 import { SCRATCH_STYLES } from '../scratchStyles';
+import { DJ_ROUTINE_LEVELS } from '../scratchRoutines';
 import { SCRATCH_PATTERNS } from '../../DJScratchEngine';
 import type { ScratchGesture } from '../scratchTypes';
 
@@ -187,5 +188,19 @@ describe('source + gesture compatibility (sections 38, 39, SCR-P1.10)', () => {
     // the reference's cut and echo are their own gestures since SCR-PG-A4
     expect(compatibleGestures({ recommendedGestures: ['cut', 'forward_stab', 'echo'], preScratched: false })).toEqual(['cut', 'forwardStab', 'echo']);
     expect(compatibleGestures({ recommendedGestures: ['tear_fwd'], preScratched: false })).toEqual(['tearForward']);
+  });
+});
+
+// P12: one ladder - the catalogue's level of each of the demo's 16 ranked gestures is the demo's
+// `scratch_dj.GESTURE_LEVELS` (:43-48; DJ_ROUTINE_LEVELS, played event for event in the scratch_dj parity test).
+// Before: tearForward 2 (demo 3), transformer8 3 (demo 2), scribble 3 (demo 4).
+describe('the catalogue levels are the demo GESTURE_LEVELS (P12)', () => {
+  it('every gesture of the demo ladder has the demo level', () => {
+    const demo = { 1: ['baby', 'babySlow', 'forwardStab', 'backwardStab', 'drag'], 2: ['chirp', 'chirpDouble', 'transformer4', 'transformer8'], 3: ['flare1', 'flare2', 'tearForward'], 4: ['orbit', 'crab', 'scribble', 'hydroplane'] } as const;
+    expect(DJ_ROUTINE_LEVELS).toEqual(demo);
+    for (const [level, ids] of Object.entries(DJ_ROUTINE_LEVELS)) for (const id of ids) {
+      expect([id, GESTURE_LEVELS[id]]).toEqual([id, Number(level)]);
+      expect([id, getGesture(id).difficulty]).toEqual([id, Number(level)]);
+    }
   });
 });
