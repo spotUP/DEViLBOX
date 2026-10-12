@@ -28,7 +28,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "extra"
   },
   {
    "bar": 22,
@@ -54,7 +55,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "extra"
+  },
+  {
+   "bar": 25,
+   "step": 15,
+   "beat": 103.75,
+   "gesture": "forwardStab",
+   "velocity": 0.6304623483634699,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 210,
+    "humanizeSamples": -200,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:verse",
+     "step": 159,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 26,
@@ -80,7 +109,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "extra"
   },
   {
    "bar": 30,
@@ -106,7 +136,35 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "extra"
+  },
+  {
+   "bar": 31,
+   "step": 15,
+   "beat": 127.75,
+   "gesture": "chirp",
+   "velocity": 0.5906363012130923,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 306,
+    "humanizeSamples": -108,
+    "chain": "overlay",
+    "deck": "boombap",
+    "section": {
+     "key": "16:verse",
+     "step": 255,
+     "bars": 16,
+     "fx": {
+      "hp": 150,
+      "lp": 4500,
+      "drive": 0.1,
+      "reverb_mix": 0.05
+     }
+    }
+   },
+   "layer": "demo"
   }
  ]
 }

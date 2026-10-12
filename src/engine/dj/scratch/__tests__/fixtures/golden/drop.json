@@ -5,6 +5,325 @@
  "routine": null,
  "events": [
   {
+   "bar": 20,
+   "step": 8,
+   "beat": 82,
+   "gesture": "orbit",
+   "velocity": 1,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 123,
+    "humanizeSamples": -136,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 72,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 20,
+   "step": 15,
+   "beat": 83.75,
+   "gesture": "hydroplane",
+   "velocity": 0.8304509040970474,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 130,
+    "humanizeSamples": 284,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 79,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 20,
+   "step": 15,
+   "beat": 83.75,
+   "gesture": "transformer8",
+   "velocity": 0.908845654993515,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 130,
+    "humanizeSamples": 11,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 79,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 21,
+   "step": 8,
+   "beat": 86,
+   "gesture": "orbit",
+   "velocity": 0.6468909742885481,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 139,
+    "humanizeSamples": 28,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 88,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 21,
+   "step": 15,
+   "beat": 87.75,
+   "gesture": "transformer8",
+   "velocity": 0.8991653315022508,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 146,
+    "humanizeSamples": 309,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 95,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 21,
+   "step": 15,
+   "beat": 87.75,
+   "gesture": "hydroplane",
+   "velocity": 0.9067582207980468,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 146,
+    "humanizeSamples": 327,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 95,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 22,
+   "step": 8,
+   "beat": 90,
+   "gesture": "transformer8",
+   "velocity": 0.8806775005722133,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 155,
+    "humanizeSamples": 296,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 104,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 22,
+   "step": 15,
+   "beat": 91.75,
+   "gesture": "transformer8",
+   "velocity": 0.9082963302052339,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 162,
+    "humanizeSamples": -138,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 111,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 22,
+   "step": 15,
+   "beat": 91.75,
+   "gesture": "hydroplane",
+   "velocity": 0.9161516746776531,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 162,
+    "humanizeSamples": 108,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 111,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 23,
+   "step": 7,
+   "beat": 93.75,
+   "gesture": "transformer8",
+   "velocity": 0.9626245517662319,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 170,
+    "humanizeSamples": 5,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 119,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 23,
+   "step": 8,
+   "beat": 94,
+   "gesture": "hydroplane",
+   "velocity": 0.8976760509651333,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 171,
+    "humanizeSamples": 274,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 120,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
    "bar": 23,
    "step": 15,
    "beat": 95.75,
@@ -30,7 +349,37 @@
       "reverb_mix": 0.04
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 23,
+   "step": 15,
+   "beat": 95.75,
+   "gesture": "transformer8",
+   "velocity": 0.8847241931792172,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 178,
+    "humanizeSamples": 322,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:break",
+     "step": 127,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
   }
  ]
 }

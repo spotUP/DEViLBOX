@@ -5,6 +5,35 @@
  "routine": null,
  "events": [
   {
+   "bar": 16,
+   "step": 15,
+   "beat": 67.75,
+   "gesture": "crab",
+   "velocity": 0.6617059586480507,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 66,
+    "humanizeSamples": -200,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 15,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
    "bar": 19,
    "step": 15,
    "beat": 79.75,
@@ -30,7 +59,66 @@
       "reverb_mix": 0.04
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 19,
+   "step": 15,
+   "beat": 79.75,
+   "gesture": "hydroplane",
+   "velocity": 0.8604821850919356,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 114,
+    "humanizeSamples": 179,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 63,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 23,
+   "step": 8,
+   "beat": 94,
+   "gesture": "orbit",
+   "velocity": 0.8672266727702754,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 171,
+    "humanizeSamples": -70,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 120,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 23,
@@ -58,7 +146,95 @@
       "reverb_mix": 0.04
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 23,
+   "step": 15,
+   "beat": 95.75,
+   "gesture": "transformer8",
+   "velocity": 0.7641367208361944,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 178,
+    "humanizeSamples": 67,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 127,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 24,
+   "step": 15,
+   "beat": 99.75,
+   "gesture": "hydroplane",
+   "velocity": 1,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 194,
+    "humanizeSamples": 325,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 143,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 31,
+   "step": 8,
+   "beat": 126,
+   "gesture": "transformer8",
+   "velocity": 0.8021316853589685,
+   "placementRole": "answer",
+   "role": "ANSWER",
+   "render": {
+    "seed": 299,
+    "humanizeSamples": 2,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 248,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
   },
   {
    "bar": 31,
@@ -86,7 +262,37 @@
       "reverb_mix": 0.04
      }
     }
-   }
+   },
+   "layer": "demo"
+  },
+  {
+   "bar": 31,
+   "step": 15,
+   "beat": 127.75,
+   "gesture": "orbit",
+   "velocity": 0.9837811856260014,
+   "placementRole": "turnaround",
+   "role": "FILL",
+   "render": {
+    "seed": 306,
+    "humanizeSamples": -87,
+    "chain": "overlay",
+    "deck": "electro",
+    "section": {
+     "key": "16:A",
+     "step": 255,
+     "bars": 16,
+     "fx": {
+      "hp": 200,
+      "lp": 7000,
+      "drive": 0.05,
+      "delay_mix": 0.12,
+      "delay_s": 0.14,
+      "reverb_mix": 0.04
+     }
+    }
+   },
+   "layer": "demo"
   }
  ]
 }

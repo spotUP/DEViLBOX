@@ -9,7 +9,7 @@
 import { barSeed, lfsr } from './scratchRandom';
 import {
   DENSITY_RATE, planPhrase, demoPhraseSteps, pickGesture, vocabulary, humanizeMs, isThrowGesture, sectionDensity, SECTION_ENERGY, PLAN_VEL,
-  DENSITY_ORDER, oneHand, fillVocabulary, validatePhrase, VOCAL_BUSY, type DensityState, type PlacedScratch, type PlannedRest, type ScratchSection,
+  DENSITY_ORDER, overlapsOneHand, fillVocabulary, validatePhrase, VOCAL_BUSY, type DensityState, type PlacedScratch, type PlannedRest, type ScratchSection,
 } from './scratchPlacement';
 import { juggleResponseRoutine, routineFor, routineToPlaced, SCRATCH_ROUTINES, validateRoutine, type RoutineName } from './scratchRoutines';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
@@ -58,6 +58,8 @@ export interface ScratchPlanOptions {
   /** Steps up (+) or down (-) the density ladder from the section's state, still capped by the mode
    *  (section 52: escalate after a phrase that lifted the energy, resolve after a repeated one). */
   densityShift?: number;
+  /** false: the demo's strokes alone, no DEViLBOX extras on top (a planned rest, the bed under a feature). */
+  extras?: boolean;
 }
 
 export interface ScratchPlan {
@@ -176,14 +178,17 @@ export const scratchOverlayStats = { sectionBars: 0 };
  * `hiphop.render_section` runs it; SCR-PHRASING-PARITY D2-D7): every bar is the demo's `plan_phrase` on
  * its SECTION - the bar counted from the section's start, the section's length, the seed + the bars
  * before the section - so the phrase ends are the section's bars 3, 7, 15 and its last, wherever the
- * window falls. The gestures are the profile's (`PROFILES[...]['gestures']`), the energy the section's,
- * one record per section (`pick_source`). A routine closes a section only when asked ('auto' = the
- * demo's `routine_for`). No throws, no drawn rests, no cooldown swaps - the demo has none here.
+ * window falls. The gestures are the profile's (`PROFILES[...]['gestures']`), the density the section's
+ * on the profile's ladder, the energy the section's, one record per section (`pick_source`). A routine
+ * closes a section only when asked ('auto' = the demo's `routine_for`). Every stroke the demo plans is
+ * played - two on step 15 when it plans them, summed as the demo sums them.
  *
- * DEViLBOX on top (inert in the demo's terms, listed in the parity ledger): the mode's level and density
- * caps, the genre modifiers, the vocal rule (section 24: density x (1 - vocal), a busy vocal bar keeps
- * its answers, a call gets an answer), the evaluation's density shift, and one hand (an event that would
- * start inside a sounding one is dropped; the demo sums both strokes).
+ * DEViLBOX on top (owner decision P13, 2026-10-12: the extras never change what the demo plans; they
+ * only add): strokes marked `layer: 'extra'`, planned inside the mode's level and density caps and the
+ * genre modifiers - the evaluation's escalation (a denser phrase: only its strokes on steps the demo left
+ * empty), the vocal rule (the extras' density x (1 - vocal), a busy vocal bar keeps only their answers,
+ * a vocal call that just ended gets an answer) - and one hand (an extra that would start inside any
+ * sounding stroke is dropped). `extras: false` plans the demo's strokes alone.
  */
 export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOptions): ScratchPlan {
   const reasons: string[] = [];
@@ -195,20 +200,21 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   const style = ctx.style;
   const profile = SCRATCH_PROFILES[opts.profile ?? PALETTE_PROFILE[style]];
   const genre = opts.genre ?? {};
+  const extrasOn = opts.extras !== false;
+  // the extras' vocabulary: the profile's gestures inside the mode's level and the genre's modifiers
   const levelCap = Math.min(eff.levelCap ?? 4, genre.levelCap ?? 4, maxLevelFor(eff.mode, style) || 4);
   const inLevel = (id: ScratchGestureId): boolean => getGesture(id).difficulty <= levelCap || (eff.mode === 'SAFE' && !eff.levelCap && id === 'chirp');
-  let gestures = [...new Set([...profile.gestures, ...(genre.bias ?? [])])].filter(inLevel);
+  let extraVocab = [...new Set([...profile.gestures, ...(genre.bias ?? [])])].filter(inLevel);
   if (genre.durationCapSteps) {
     const fits = (id: ScratchGestureId): boolean => getGesture(id).durationSteps <= genre.durationCapSteps! && id !== 'drag';
-    gestures = gestures.filter(fits);
+    extraVocab = extraVocab.filter(fits);
   }
-  if (opts.exclude?.length) gestures = gestures.filter((id) => !opts.exclude!.includes(id));
+  if (opts.exclude?.length) extraVocab = extraVocab.filter((id) => !opts.exclude!.includes(id));
   // a mode cap can leave the profile with fewer than three gestures: the nearest the mode allows join (section 21)
-  if (gestures.length < profile.gestures.length) {
-    gestures = fillVocabulary(gestures, SCRATCH_GESTURE_IDS.filter((id) => inLevel(id) && !getGesture(id).flourish && !isThrowGesture(id) && !getGesture(id).needle));
-    reasons.push(`${eff.mode}: ${profile.reference} gestures inside level ${levelCap}: ${gestures.join(', ')}`);
+  if (extraVocab.length < profile.gestures.length) {
+    extraVocab = fillVocabulary(extraVocab, SCRATCH_GESTURE_IDS.filter((id) => inLevel(id) && !getGesture(id).flourish && !isThrowGesture(id) && !getGesture(id).needle));
+    if (extrasOn) reasons.push(`${eff.mode}: extras inside level ${levelCap}: ${extraVocab.join(', ')}`);
   }
-  if (gestures.length === 0) { reasons.push('no gesture inside the level cap'); return empty; }
 
   const sectionAt = opts.sectionAt ?? ((): OverlaySection => ({
     name: ctx.sectionName,
@@ -220,19 +226,21 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   const grid = DEFAULT_GRID;
   const bpb = ctx.meter;
 
-  interface SectionPlan { state: DensityState; rate: number; routineBars: Map<number, PlacedScratch[]>; record?: string; render: OverlayRender }
+  interface SectionPlan { natural: DensityState; extraState: DensityState; extraRate: number; routineBars: Map<number, PlacedScratch[]>; record?: string; render: OverlayRender }
   const demoProfile = profile.reference as DemoProfileName;
   const sections = new Map<string, SectionPlan>();
   const sectionPlan = (sec: OverlaySection): SectionPlan => {
     const key = `${sec.startBar}:${sec.name}`;
     const known = sections.get(key);
     if (known) return known;
-    // density: the section's state on the profile's ladder, shifted by the evaluation, capped by the mode, scaled by the genre
+    // the demo's density: the section's state on the profile's ladder, nothing else
     const natural = sectionDensity(style, sec.name, profile.scale);
+    // the extras' density: shifted by the evaluation, capped by the mode, scaled by the genre (they add only
+    // where it is denser than the demo's)
     const shifted = natural === 'none' ? natural : DENSITY_ORDER[Math.max(0, Math.min(DENSITY_ORDER.length - 1, DENSITY_ORDER.indexOf(natural) + Math.trunc(opts.densityShift ?? 0)))]!;
-    const state = minDensity(shifted, MODE_MAX_DENSITY[eff.mode]);
-    const rate = DENSITY_RATE[state] * (genre.densityScale ?? 1);
-    reasons.push(`${sec.name} (bars ${sec.startBar}-${sec.startBar + sec.bars - 1}): ${natural}${shifted !== natural ? ` -> ${shifted}` : ''}${state !== shifted ? ` capped to ${state} by ${eff.mode}` : ''}`);
+    const extraState = minDensity(shifted, MODE_MAX_DENSITY[eff.mode]);
+    const extraRate = DENSITY_RATE[extraState] * (genre.densityScale ?? 1);
+    reasons.push(`${sec.name} (bars ${sec.startBar}-${sec.startBar + sec.bars - 1}): the demo's ${natural}${extrasOn && extraRate > DENSITY_RATE[natural] ? `, extras up to ${extraState}` : ''}`);
     const routineBars = new Map<number, PlacedScratch[]>();
     // the demo renders the section from its own seed (the track seed + the bars before it)
     const sectionSeed = opts.seed + sec.startBar;
@@ -243,31 +251,30 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
       demoSteps: (b) => demoPhraseSteps({ style, section: sec.name, bar: b, bars: sec.bars, seed: sectionSeed, gestures: profile.gestures, scale: profile.scale }),
       routineBars: new Set(Array.from({ length: demoRb }, (_, k) => sec.bars - demoRb + k)),
     });
-    // the demo's routine option: the routine takes the section's closing bars; a step past the section is trimmed
-    if (opts.routine && !eff.levelCap && eff.mode !== 'SAFE' && state !== 'none') {
-      const name = demoName!;
-      const r = SCRATCH_ROUTINES[name];
-      const rb = Math.min(r.bars, sec.bars);
-      const first = sec.bars - rb;
-      const placed = routineInLevel(r.events.filter((ev) => ev.bar * 16 + ev.step < rb * 16).map((ev) => {
+    // the demo's routine option: the routine takes the section's closing bars as written; a step past the section is trimmed
+    if (demoName) {
+      const r = SCRATCH_ROUTINES[demoName];
+      const first = sec.bars - demoRb;
+      const placed = r.events.filter((ev) => ev.bar * 16 + ev.step < demoRb * 16).map((ev): PlacedScratch => {
         const bar = sec.startBar + first + ev.bar + Math.floor(ev.step / 16);
         const step = ev.step % 16;
         // with a record set each word slot scratches its own record (`_routine_cues`, R12)
         const record = opts.records ? routineSlotRecord(ev.sourceRole) : undefined;
         return {
           bar, step, beat: stepToBeat({ bar, step }, grid, bpb), gesture: ev.gesture, velocity: ev.velocity, placementRole: ev.role === 'ANSWER' ? 'answer' as const : step >= 15 ? 'turnaround' as const : 'accent' as const, role: ev.role,
-          render: render.routine(ev.bar, ev.step, first, ev.tail), routineSlot: ev.sourceRole, ...(record ? { record } : {}),
+          render: render.routine(ev.bar, ev.step, first, ev.tail), routineSlot: ev.sourceRole, layer: 'demo', ...(record ? { record } : {}),
         };
-      }), gestures, levelCap, opts.seed, sec.name);
-      for (let k = 0; k < rb; k++) routineBars.set(sec.startBar + first + k, placed.filter((p) => p.bar === sec.startBar + first + k));
-      reasons.push(`routine ${name} closes ${sec.name} at bar ${sec.startBar + first}`);
+      });
+      for (let k = 0; k < demoRb; k++) routineBars.set(sec.startBar + first + k, placed.filter((p) => p.bar === sec.startBar + first + k));
+      reasons.push(`routine ${demoName} closes ${sec.name} at bar ${sec.startBar + first}`);
     }
-    const plan: SectionPlan = { state, rate, routineBars, record: opts.records ? overlayRecord(sec.name, opts.seed + sec.startBar) : undefined, render };
+    const plan: SectionPlan = { natural, extraState, extraRate, routineBars, record: opts.records ? overlayRecord(sec.name, opts.seed + sec.startBar) : undefined, render };
     sections.set(key, plan);
     return plan;
   };
 
-  const bars: PlacedScratch[][] = [];
+  const demoEvents: PlacedScratch[] = [];
+  const extraEvents: PlacedScratch[] = [];
   const rests: PlannedRest[] = [];
   let routine: RoutineName | undefined;
   for (let k = 0; k < opts.bars; k++) {
@@ -277,50 +284,59 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
     const local = bar - sec.startBar;
     const vocal = vocalAt(k);
     const fixed = sp.routineBars.get(bar);
-    let events: PlacedScratch[];
+    const withRecord = (e: PlacedScratch): PlacedScratch => (sp.record && !e.record ? { ...e, record: sp.record } : e);
+    let base: PlacedScratch[];
     if (fixed) {
-      events = [...fixed];
+      base = fixed;
       routine = (opts.routine === 'auto' ? routineFor(profile.id, sec.name) : opts.routine) ?? undefined;
     } else {
       scratchOverlayStats.sectionBars++;
-      events = planPhrase({
-        style, section: sec.name, bar: local, bars: sec.bars, seed: opts.seed + sec.startBar, gestures, scale: profile.scale,
-        density: sp.state, rateOverride: sp.rate * (1 - Math.max(0, Math.min(1, vocal))), beatsPerBar: bpb, grid,
-      }).map((e) => ({ ...e, bar, beat: stepToBeat({ bar, step: e.step }, grid, bpb), render: sp.render.stroke(local, e.step) }));
+      base = planPhrase({ style, section: sec.name, bar: local, bars: sec.bars, seed: opts.seed + sec.startBar, gestures: profile.gestures, scale: profile.scale, density: sp.natural, beatsPerBar: bpb, grid, demo: true })
+        .map((e) => ({ ...e, bar, beat: stepToBeat({ bar, step: e.step }, grid, bpb), render: sp.render.stroke(local, e.step), layer: 'demo' as const }));
     }
-    // section 24: a vocal call just ended - answer it; a busy vocal bar keeps its answers (or one event)
+    demoEvents.push(...base.map(withRecord));
+    if (!extrasOn || fixed || extraVocab.length === 0) continue;
+    // the escalation and the genre: a denser phrase than the demo's adds its strokes on the steps the demo left empty
+    let extra: PlacedScratch[] = [];
+    const rate = sp.extraRate * (1 - Math.max(0, Math.min(1, vocal)));
+    if (rate > DENSITY_RATE[sp.natural] + 1e-12) {
+      const taken = new Set(base.map((e) => e.step));
+      extra = planPhrase({ style, section: sec.name, bar: local, bars: sec.bars, seed: opts.seed + sec.startBar, gestures: extraVocab, scale: profile.scale, density: sp.extraState, rateOverride: rate, beatsPerBar: bpb, grid })
+        .filter((e) => !taken.has(e.step))
+        .map((e) => ({ ...e, bar, beat: stepToBeat({ bar, step: e.step }, grid, bpb), render: sp.render.stroke(local, e.step, false), layer: 'extra' as const }));
+    }
+    // section 24: a busy vocal bar keeps only the extras' answers; a vocal call just ended gets an answer
+    if (vocal > VOCAL_BUSY && extra.length) {
+      const answers = extra.filter((e) => e.role === 'ANSWER').slice(0, 2);
+      if (answers.length < extra.length) rests.push({ bar, reason: 'vocal', role: extra[0]!.role });
+      extra = answers;
+    }
     const afterCall = k > 0 && vocalAt(k - 1) > VOCAL_BUSY && vocal <= VOCAL_BUSY;
-    if (afterCall && !events.some((e) => e.role === 'ANSWER') && sp.rate > 0) {
+    if (afterCall && ![...base, ...extra].some((e) => e.role === 'ANSWER') && DENSITY_RATE[sp.natural] > 0) {
       const rnd = lfsr(barSeed(opts.seed + sec.startBar, local, sec.name) + 0x5a);
       const energy = SECTION_ENERGY[sec.name as ScratchSection] ?? 0.4;
-      const g = pickGesture(vocabulary(gestures), energy, 'answer', rnd, null);
-      events = [{ bar, step: 8, beat: stepToBeat({ bar, step: 8 }, grid, bpb), gesture: g, velocity: Math.min(1, PLAN_VEL.base + PLAN_VEL.rand * rnd() + PLAN_VEL.energy * energy), placementRole: 'answer', role: 'ANSWER', render: sp.render.stroke(local, 8, false) }];
-    } else if (vocal > VOCAL_BUSY && events.length) {
-      const answers = events.filter((e) => e.role === 'ANSWER');
-      const kept = answers.length ? answers.slice(0, 2) : events.slice(0, 1);
-      if (kept.length < events.length) rests.push({ bar, reason: 'vocal', role: events[0]!.role });
-      events = kept;
+      const g = pickGesture(vocabulary(extraVocab), energy, 'answer', rnd, null);
+      extra.push({ bar, step: 8, beat: stepToBeat({ bar, step: 8 }, grid, bpb), gesture: g, velocity: Math.min(1, PLAN_VEL.base + PLAN_VEL.rand * rnd() + PLAN_VEL.energy * energy), placementRole: 'answer', role: 'ANSWER', render: sp.render.stroke(local, 8, false), layer: 'extra' });
     }
-    bars.push(sp.record ? events.map((e) => ({ ...e, record: e.record ?? sp.record })) : events);
+    extraEvents.push(...extra.map(withRecord));
   }
 
-  // the final plan is what one hand performs (SA-B1): a later stroke inside a sounding one is dropped
-  // (no thinning of a one-gesture run: the demo's phrase reconstruction is six stabs on six words on purpose)
-  const events = oneHand(bars.flat());
+  const events = onTopOfTheDemo(demoEvents, extraEvents);
   const finalBars = Array.from({ length: opts.bars }, (_, k) => events.filter((e) => e.bar === opts.fromBar + k));
   return { mode: eff.mode, events, bars: finalBars, rests, routine, issues: validatePhrase(finalBars), reasons };
 }
 
-/** A routine's gestures above the mode's level are replaced from the vocabulary (role and step kept); the rest play as written. */
-function routineInLevel(placed: PlacedScratch[], vocab: readonly ScratchGestureId[], levelCap: number, seed: number, section: string): PlacedScratch[] {
-  const ranked = vocabulary(vocab);
-  const rnd = lfsr(barSeed(seed, 0, section) + 0x77);
-  let last: ScratchGestureId | null = null;
-  return placed.map((p) => {
-    const g = getGesture(p.gesture).difficulty <= levelCap ? p.gesture : pickGesture(ranked, getGesture(p.gesture).intensity, p.placementRole, rnd, last);
-    last = g;
-    return g === p.gesture ? p : { ...p, gesture: g };
-  });
+/**
+ * P13: the demo's strokes, all of them, plus the DEViLBOX extras one hand can add - an extra that would
+ * start inside a sounding stroke (the demo's or an extra already kept), or run into one, is dropped. Time order.
+ */
+export function onTopOfTheDemo<T extends Pick<PlacedScratch, 'beat' | 'gesture'> & { beats?: number }>(demo: readonly T[], extras: readonly T[]): T[] {
+  const kept: T[] = [];
+  for (const e of [...extras].sort((x, y) => x.beat - y.beat)) {
+    if (demo.some((d) => overlapsOneHand(d, e)) || kept.some((d) => overlapsOneHand(d, e))) continue;
+    kept.push(e);
+  }
+  return [...demo, ...kept].sort((x, y) => x.beat - y.beat);
 }
 
 /** Humanize offsets for a plan (section 35), drawn once from the seed so a plan replays exactly. */

@@ -1846,8 +1846,10 @@ function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
       try { useDJStore.getState().setDeckPattern(deckId, pattern.name); } catch { /* store not ready */ }
     },
     disengage(opts) {
-      // a record stroke plays out whole on its bus (the demo's render): nothing to stop
-      if (onRecord.has(this.id)) { onRecord.delete(this.id); return; }
+      // a record stroke plays out whole on its bus (the demo's render): nothing to stop. A release that names its
+      // record is a record stroke's whatever the set says: the demo's plan overlaps two strokes of one gesture (P13),
+      // and the first one's release must not turn the second one's into a deck stop
+      if (opts?.record || opts?.scratchSource?.type === 'CRATE' || onRecord.has(this.id)) { onRecord.delete(this.id); return; }
       const deckId = opts?.deck ?? scratchDeck.get(this.id) ?? getActiveDeckId();
       scratchDeck.delete(this.id);
       if (opts?.finishCycle) finishDeckPatternCycle(deckId); else stopDeckPattern(deckId);

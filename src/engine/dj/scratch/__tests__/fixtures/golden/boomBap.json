@@ -28,7 +28,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 28,
@@ -54,7 +55,8 @@
       "reverb_mix": 0.05
      }
     }
-   }
+   },
+   "layer": "demo"
   },
   {
    "bar": 30,
@@ -81,7 +83,8 @@
      }
     }
    },
-   "routineSlot": "ROCK"
+   "routineSlot": "ROCK",
+   "layer": "demo"
   },
   {
    "bar": 30,
@@ -108,7 +111,8 @@
      }
     }
    },
-   "routineSlot": "FUNKY"
+   "routineSlot": "FUNKY",
+   "layer": "demo"
   },
   {
    "bar": 31,
@@ -135,7 +139,8 @@
      }
     }
    },
-   "routineSlot": "BEAT"
+   "routineSlot": "BEAT",
+   "layer": "demo"
   },
   {
    "bar": 31,
@@ -163,7 +168,8 @@
      }
     }
    },
-   "routineSlot": "BEAT"
+   "routineSlot": "BEAT",
+   "layer": "demo"
   }
  ]
 }

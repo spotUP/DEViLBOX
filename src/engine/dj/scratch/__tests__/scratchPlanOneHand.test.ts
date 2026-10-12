@@ -5,41 +5,56 @@
  * sixteenths 6/7/8 under gestures 2-4 steps long: boomBap MUSICAL 13 same-beat and 160
  * overlapping pairs over 40 seeds x 32 bars, battle 811 same-beat. The executor would fire both
  * and the first one's disengage would stop the second mid-stroke.
+ *
+ * P13 (owner 2026-10-12): the demo sums both strokes and its plan is played as it is (every stroke is a
+ * render on the bus now, PG-J: two strokes overlap as the demo's do). One hand governs the DEViLBOX
+ * extras on top: an extra never starts inside, or runs into, any sounding stroke.
  */
 import { describe, it, expect } from 'vitest';
 import { planScratch } from '../scratchPlanner';
-import { planPhrase, planVocabulary, oneHandConflicts, validatePhrase, placedEnd, type PlacedScratch } from '../scratchPlacement';
+import { planPhrase, planVocabulary, overlapsOneHand, validatePhrase, type PlacedScratch } from '../scratchPlacement';
 import { scenarioContext } from './fixtures/scenarioContext';
 import type { SectionKind } from '../../autodj/types';
 import type { ScratchDJStyle } from '../scratchTypes';
 import type { ScratchMode } from '../scratchStyles';
 
-const CASES: Array<{ style: ScratchDJStyle; kind: SectionKind; mode: ScratchMode }> = [
+const CASES: Array<{ style: ScratchDJStyle; kind: SectionKind; mode: ScratchMode; extras?: true }> = [
   { style: 'boomBap', kind: 'groove', mode: 'MUSICAL' },
+  { style: 'boomBap', kind: 'verse', mode: 'PERFORMER', extras: true },
   { style: 'electro', kind: 'drop', mode: 'PERFORMER' },
   { style: 'battle', kind: 'instrumental', mode: 'BATTLE' },
 ];
 
-function sameBeatPairs(events: readonly PlacedScratch[]): number {
-  let n = 0;
-  for (let i = 0; i < events.length; i++) for (let j = i + 1; j < events.length; j++) if (Math.abs(events[i]!.beat - events[j]!.beat) < 1e-9) n++;
-  return n;
-}
-
 describe('one hand performs one gesture at a time (SA-B1)', () => {
   for (const c of CASES) {
-    it(`${c.style} ${c.kind} ${c.mode}: no two planned scratches start together or overlap (40 seeds x 32 bars)`, () => {
-      let events = 0;
+    it(`${c.style} ${c.kind} ${c.mode}: every demo stroke plays; no extra starts with or inside another stroke (40 seeds x 32 bars)`, () => {
+      let demo = 0, extras = 0;
       for (let seed = 1; seed <= 40; seed++) {
-        const plan = planScratch(scenarioContext({ style: c.style, kind: c.kind, bpm: 100, energy: 0.8 }), { mode: c.mode, seed, fromBar: 16, bars: 32 });
-        events += plan.events.length;
-        expect(sameBeatPairs(plan.events), `seed ${seed}`).toBe(0);
-        expect(oneHandConflicts(plan.events), `seed ${seed}`).toBe(0);
-        for (let k = 1; k < plan.events.length; k++) expect(plan.events[k]!.beat).toBeGreaterThanOrEqual(placedEnd(plan.events[k - 1]!) - 1e-9);
+        const ctx = scenarioContext({ style: c.style, kind: c.kind, bpm: 100, energy: 0.8 });
+        const plan = planScratch(ctx, { mode: c.mode, seed, fromBar: 16, bars: 32, densityShift: 1 });
+        const alone = planScratch(ctx, { mode: c.mode, seed, fromBar: 16, bars: 32, extras: false });
+        const key = (e: PlacedScratch) => `${e.bar}:${e.step}:${e.gesture}:${e.velocity}`;
+        expect(plan.events.filter((e) => e.layer === 'demo').map(key), `seed ${seed}`).toEqual(alone.events.map(key));
+        for (const e of plan.events.filter((x) => x.layer === 'extra')) {
+          extras++;
+          expect(plan.events.filter((o) => o !== e && overlapsOneHand(o, e)).length, `seed ${seed} bar ${e.bar} step ${e.step}`).toBe(0);
+        }
+        demo += alone.events.length;
       }
-      expect(events).toBeGreaterThan(40); // the plans are not trivially empty
+      expect(demo).toBeGreaterThan(40); // the plans are not trivially empty
+      if (c.extras) expect(extras).toBeGreaterThan(0); // the escalation adds strokes on top of a sparse section
     });
   }
+
+  it('the demo\'s own placement sums two strokes on step 15 when it plans two (plan_phrase clamps its 16)', () => {
+    const gestures = planVocabulary('battle', 'BATTLE');
+    let doubled = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const bar = planPhrase({ style: 'battle', section: 'showcase', bar: 15, bars: 16, seed, gestures, demo: true });
+      if (bar.length >= 2) { expect(bar.slice(0, 2).map((e) => e.step)).toEqual([15, 15]); doubled++; }
+    }
+    expect(doubled).toBeGreaterThan(0);
+  });
 
   it('the reference step 16 is never planned onto step 15: a showcase phrase end places one turnaround', () => {
     const gestures = planVocabulary('battle', 'BATTLE');

@@ -10,7 +10,13 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
-const holder = vi.hoisted(() => ({ deck: null as unknown }));
+const holder = vi.hoisted(() => ({ deck: null as unknown, performs: 0 }));
+
+vi.mock('@/engine/dj/scratch/scratchVoicePool', async (orig) => {
+  const actual = await orig<typeof import('@/engine/dj/scratch/scratchVoicePool')>();
+  const pool = { perform: () => { holder.performs++; return { release: () => {} }; }, releaseAll: () => {} };
+  return { ...actual, getScratchVoicePool: () => pool, getScratchVoicePoolIfActive: () => pool };
+});
 
 vi.mock('tone', async (orig) => {
   const actual = await orig<typeof import('tone')>();
@@ -109,6 +115,20 @@ describe('every scratch trigger fires the registry (SCR-P2.9)', () => {
       const param = i < 15 ? i + 1 : 0x20 + (i - 15);
       expect(scratchEffectToFx(param), `slot ${i}`).toEqual({ id: `fx_scratch_${SCRATCH_PATTERNS[i]!.gestureId}`, kind: 'fire' });
     }
+  });
+
+  // P13: the demo's plan overlaps two strokes of one gesture (two on step 15, a stroke inside a sounding one);
+  // each plays out whole on its bus, and the first one's release must not become a deck stop for the second
+  it('two overlapping record strokes of one gesture: both render, neither release stops the deck', () => {
+    const performs = holder.performs;
+    expect(fireDjFx('fx_scratch_transformer8', { source: 'autodj', record: 'AH_STANDARD', anchor: 0.2, beats: 2 })).toBe(true);
+    expect(fireDjFx('fx_scratch_transformer8', { source: 'autodj', record: 'AH_STANDARD', anchor: 0.2, beats: 2 })).toBe(true);
+    expect(holder.performs - performs).toBe(2);
+    releaseDjFx('fx_scratch_transformer8', { source: 'autodj', record: 'AH_STANDARD', anchor: 0.2 });
+    releaseDjFx('fx_scratch_transformer8', { source: 'autodj', record: 'AH_STANDARD', anchor: 0.2 });
+    expect(deck.stopCalls).toBe(0);
+    expect(deck.finishCalls).toBe(0);
+    expect(useDJStore.getState().decks.A.activePatternName ?? null).toBeNull();
   });
 
   it('the registry carries all 33 gestures, stop, throw, cue, anchor, loop, record and release in the scratch category', () => {

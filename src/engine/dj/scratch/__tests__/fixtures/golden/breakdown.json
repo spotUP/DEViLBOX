@@ -29,6 +29,7 @@
      }
     }
    },
+   "layer": "demo",
    "record": "FRESH_STANDARD"
   },
   {
@@ -56,6 +57,7 @@
      }
     }
    },
+   "layer": "demo",
    "record": "FRESH_STANDARD"
   },
   {
@@ -83,6 +85,7 @@
      }
     }
    },
+   "layer": "demo",
    "record": "FRESH_STANDARD"
   }
  ]

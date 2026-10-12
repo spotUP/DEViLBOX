@@ -1,13 +1,16 @@
-/** Deterministic planner (owner scratch plan section 66; SCR-P4.13). */
+/**
+ * Deterministic planner (owner scratch plan section 66; SCR-P4.13). The conservative rules (the vocal, a
+ * low beat confidence) govern the DEViLBOX extras only: the demo's own strokes play as planned (P13).
+ */
 import { describe, it, expect } from 'vitest';
 import { planScratch } from '../scratchPlanner';
-import { oneHandConflicts } from '../scratchPlacement';
 import { getGesture } from '../scratchGestureCatalog';
 import { scenarioContext } from './fixtures/scenarioContext';
 
 const base = { style: 'battle' as const, kind: 'instrumental' as const, bpm: 100, energy: 0.8 };
-const run = (ctxOver: Partial<Parameters<typeof scenarioContext>[0]>, seed: number, mode: 'MUSICAL' | 'BATTLE' = 'BATTLE', bars = 16, routine: 'auto' | null = 'auto') =>
-  planScratch(scenarioContext({ permission: 4, ...base, ...ctxOver }), { mode, seed, fromBar: 16, bars, routine });
+const run = (ctxOver: Partial<Parameters<typeof scenarioContext>[0]>, seed: number, mode: 'MUSICAL' | 'PERFORMER' | 'BATTLE' = 'BATTLE', bars = 16, routine: 'auto' | null = 'auto', densityShift = 0) =>
+  planScratch(scenarioContext({ permission: 4, ...base, ...ctxOver }), { mode, seed, fromBar: 16, bars, routine, densityShift });
+const demoKeys = (p: ReturnType<typeof run>) => p.events.filter((e) => e.layer === 'demo').map((e) => `${e.bar}:${e.step}:${e.gesture}:${e.velocity}`);
 const level = (events: { gesture: Parameters<typeof getGesture>[0] }[]) => Math.max(0, ...events.map((e) => getGesture(e.gesture).difficulty));
 
 describe('the planner is deterministic and conservative (SCR-P4.13)', () => {
@@ -16,8 +19,8 @@ describe('the planner is deterministic and conservative (SCR-P4.13)', () => {
     expect(a.events.length).toBeGreaterThan(0);
     expect(a).toEqual(b);
     expect(c.events).not.toEqual(a.events);
-    // valid: one hand, never more than 4 a bar (a showcase may scratch every bar, as the demo does)
-    for (const p of [a, c]) { expect(oneHandConflicts(p.events)).toBe(0); for (const bar of p.bars) expect(bar.length).toBeLessThanOrEqual(4); }
+    // valid: the demo's own validation finds nothing it would repair
+    for (const p of [a, c]) expect(p.issues.filter((i) => /too busy|same gesture/.test(i))).toEqual([]);
   });
 
   it('a high-energy section (showcase 1.0) reaches a higher maximum level than a low one (verse 0.2), from the demo section energy', () => {
@@ -31,21 +34,24 @@ describe('the planner is deterministic and conservative (SCR-P4.13)', () => {
     expect(hi / 60).toBeGreaterThan(lo / loBars);
   });
 
-  it('a vocal-heavy bar plans fewer events', () => {
+  it('a vocal-heavy bar thins the extras only: the demo\'s strokes play under the vocal', () => {
     let quiet = 0, vocal = 0;
     for (let seed = 1; seed <= 30; seed++) {
-      quiet += run({ vocal: 0 }, seed).events.length;
-      vocal += run({ vocal: 0.9 }, seed).events.length;
+      const q = run({ style: 'boomBap', kind: 'verse', vocal: 0 }, seed, 'PERFORMER', 16, null, 1), v = run({ style: 'boomBap', kind: 'verse', vocal: 0.9 }, seed, 'PERFORMER', 16, null, 1);
+      expect(demoKeys(v), `seed ${seed}`).toEqual(demoKeys(q));
+      quiet += q.events.filter((e) => e.layer === 'extra').length;
+      vocal += v.events.filter((e) => e.layer === 'extra').length;
     }
+    expect(quiet).toBeGreaterThan(0);
     expect(vocal).toBeLessThan(quiet * 0.5);
   });
 
-  it('beat confidence 0.4 plays level 1 only, no routine, and behaves as SAFE', () => {
+  it('beat confidence 0.4 plays as SAFE: extras at level 1 only, the demo\'s strokes and routine as planned', () => {
     for (let seed = 1; seed <= 20; seed++) {
-      const p = run({ beatConfidence: 0.4 }, seed);
+      const p = run({ beatConfidence: 0.4 }, seed, 'BATTLE', 16, 'auto', 1);
       expect(p.mode).toBe('SAFE');
-      expect(p.routine).toBeUndefined();
-      for (const e of p.events) expect(getGesture(e.gesture).difficulty, e.gesture).toBe(1);
+      expect(demoKeys(p)).toEqual(demoKeys(run({}, seed)));
+      for (const e of p.events.filter((x) => x.layer === 'extra')) expect(getGesture(e.gesture).difficulty, e.gesture).toBe(1);
     }
     expect(run({ beatConfidence: 0.4 }, 3).reasons.join(' ')).toMatch(/beat confidence 0\.40/);
   });

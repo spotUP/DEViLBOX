@@ -8,11 +8,12 @@
  * One long track (the corpus 'drops' track tiled through the real analysis builder) plays for ten
  * minutes on the fake clock, the set CRUISING, the juggle off, in MUSICAL (the default) and PERFORMER.
  * Measured from every event the controller hands the real ScratchExecutor: the scratch duty cycle (bars
- * with a scratch / bars), the 4-bar windows with a scratch, distinct records, gestures and routines.
- * The demo's own overlay on the parity tracks (`fixtures/phrasing_parity.json`) has a duty cycle of
- * 16 % (hip-hop arrangement) to 70 % (an instrumental battle set), and on this very track (the same
- * planner without the mode's caps - the parity test proves it is the demo's plan) 50.9 %: the run never
- * exceeds the demo on the track, stays near the parity span, and never scratches every 4-bar window.
+ * with a scratch / bars), strokes and gestures per 4-bar phrase, the share of the set a stroke sounds, the
+ * gesture mix, distinct records. P13 (owner 2026-10-12): the demo's overlay is the base - every stroke the
+ * demo plans on this track (`planScratch(..., extras: false)`, the demo's plan: the parity test) reaches the
+ * executor, and the set matches the demo on the same seed within the demo's own seed variance on this track.
+ * Measured 2026-10-13: MUSICAL = the demo exactly (52.5 % duty, 4.91 strokes per phrase, sounding 24.6 %;
+ * before P13 13.6 %, 1.16, 1.7 %); PERFORMER the demo + 13 feature strokes.
  * Fake timers, fake decks, no audio.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -51,7 +52,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { corpusPipelineAnalysis, corpusTrack, CORPUS_SPECS } from '../autodj/testing/corpus';
 import { computeExtendedAnalysis } from '../autodj/activityTimelines';
 import { buildDJTrackAnalysis } from '../autodj/trackAnalysis';
-import { barIndexAt, timeAtBeat } from '../autodj/beatGrid';
+import { barIndexAt, barStartBeat, timeAtBeat } from '../autodj/beatGrid';
 import { setupStandalone, teardownStandalone, runStandalone } from './standaloneJuggleHarness';
 import { resetScratchVoicePool } from '../scratch/scratchVoicePool';
 import { ScratchExecutor } from '../scratch/ScratchExecutor';
@@ -121,8 +122,9 @@ async function tenMinutes(mode: ScratchMode) {
   const firstBar = barIndexAt(analysis.downbeats, startSec) + 1;
   const lastBar = barIndexAt(analysis.downbeats, startSec + seconds);
   const bars = lastBar - firstBar;
-  const performed = events.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
   const barOf = (e: ScratchEvent) => barIndexAt(analysis.downbeats, timeAtBeat(analysis.beatGrid, e.executeAtBeat) + 1e-6);
+  // the strokes of the ten minutes (the controller plans a phrase ahead: the window past the end is not the set's)
+  const performed = events.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift' && barOf(e) < lastBar);
   const busyBars = new Set(performed.map(barOf));
   const windows = new Set([...busyBars].map((b) => Math.floor((b - firstBar) / 4)));
   const records = new Set(performed.map((e) => (e.source.type === 'CRATE' ? e.source.recordId : `not a record: ${e.source.type}`)));
@@ -132,7 +134,8 @@ async function tenMinutes(mode: ScratchMode) {
   const ctrl = (rig.dj as unknown as { scratch: { deps: { seed: number } } }).scratch;
   const choice = scratchStyleFor('auto', analysis.genre);
   const ctx = buildScratchContext({ perf: { currentDeck: 'A', currentTrack: analysis, currentPosition: startSec, setEnergy: 0.6, targetEnergy: 0.7 } as unknown as DJPerformanceContext, style: choice.style, scratchPermission: 4 })!;
-  const demo = planScratch(ctx, { mode: 'BATTLE', seed: ctrl.deps.seed, fromBar: firstBar, bars, sectionAt: (b) => overlaySectionAt(analysis, b), profile: choice.profile, records: true });
+  const demoAt = (seed: number) => planScratch(ctx, { mode: mode === 'OFF' ? 'MUSICAL' : mode, seed, fromBar: firstBar, bars, sectionAt: (b) => overlaySectionAt(analysis, b), profile: choice.profile, records: true, extras: false });
+  const demo = demoAt(ctrl.deps.seed);
   const demoDuty = new Set(demo.events.map((e) => e.bar)).size / bars;
   // density and repetition (the owner, 2026-10-12: "repetitive sparse boring"): strokes per phrase with a
   // scratch, distinct gestures per phrase, the share of the set a stroke sounds, the roles; against the demo's
@@ -143,15 +146,33 @@ async function tenMinutes(mode: ScratchMode) {
     const rows = [...w.values()];
     return { strokes: rows.reduce((n, r) => n + r.length, 0) / Math.max(1, rows.length), gestures: rows.reduce((n, r) => n + new Set(r.map((e) => e.gesture)).size, 0) / Math.max(1, rows.length) };
   };
-  const mine = perWindow(performed.map((e) => ({ bar: barOf(e) - firstBar, gesture: e.gesture })));
-  const sounding = performed.reduce((n, e) => n + e.durationBeats, 0) / (bars * 4);
+  // one measure for the set and for the demo: bars counted from the set's first bar
+  const measure = (evs: ReadonlyArray<{ bar: number; gesture: string; beats: number }>) => {
+    const mix: Record<string, number> = {};
+    for (const e of evs) mix[e.gesture] = (mix[e.gesture] ?? 0) + 1 / Math.max(1, evs.length);
+    return { duty: new Set(evs.map((e) => e.bar)).size / bars, ...perWindow(evs), sounding: evs.reduce((n, e) => n + e.beats, 0) / (bars * 4), mix, count: evs.length };
+  };
+  const ofPlan = (p: ReturnType<typeof demoAt>) => p.events.map((e) => ({ bar: e.bar - firstBar, gesture: e.gesture, beats: e.beats ?? gestureBeats(e.gesture) }));
+  const set = measure(performed.map((e) => ({ bar: barOf(e) - firstBar, gesture: e.gesture, beats: e.durationBeats })));
+  // every stroke of the demo's plan reached the executor (bar, step, gesture), and what the set added on top
+  const keyOf = (bar: number, step: number, gesture: string) => `${bar}:${step}:${gesture}`;
+  const scheduled = performed.map((e) => { const b = barOf(e); return keyOf(b, Math.round((e.executeAtBeat - barStartBeat(analysis.downbeats, b)) * 4), e.gesture); });
+  const left = [...scheduled];
+  const missing: string[] = [];
+  for (const e of demo.events) { const i = left.indexOf(keyOf(e.bar, e.step, e.gesture)); if (i < 0) missing.push(keyOf(e.bar, e.step, e.gesture)); else left.splice(i, 1); }
+  const added = left;
+  const demoMeasure = measure(ofPlan(demo));
+  // the demo's seed variance on this track (seeds 1-20): the tolerance the set is held to
+  const seeds = Array.from({ length: 20 }, (_, i) => measure(ofPlan(demoAt(i + 1))));
+  const spread = (f: (m: typeof set) => number) => { const v = seeds.map(f); const mean = v.reduce((a, b) => a + b, 0) / v.length; return { mean, sd: Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / (v.length - 1)), min: Math.min(...v), max: Math.max(...v) }; };
   const roles = Object.entries(performed.reduce<Record<string, number>>((m, e) => ({ ...m, [e.role]: (m[e.role] ?? 0) + 1 }), {})).map(([k, v]) => `${k} ${v}`).join(', ');
-  const demoOverlay = perWindow(demo.events);
   const three = buildThreeDeckRoutine(ctrl.deps.seed).filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
   const threeDeck = { duty: new Set(three.map((e) => e.bar)).size / 32, ...perWindow(three), sounding: three.reduce((n, e) => n + gestureBeats(e.gesture), 0) / (32 * 4) };
+  const gestureNames = [...new Set([...Object.keys(set.mix), ...Object.keys(demoMeasure.mix)])];
+  const mixSd = Object.fromEntries(gestureNames.map((g) => [g, spread((m) => m.mix[g] ?? 0).sd]));
   return {
-    density: { mine, sounding, roles, demoOverlay, demoOverlaySounding: demo.events.reduce((n, e) => n + (e.beats ?? gestureBeats(e.gesture)), 0) / (bars * 4), threeDeck },
-    demoDuty, style: choice.style,
+    set, demo: demoMeasure, mixSd, spread: { duty: spread((m) => m.duty), strokes: spread((m) => m.strokes), sounding: spread((m) => m.sounding) },
+    roles, threeDeck, demoDuty, style: choice.style, missing, added,
     bars, events: performed.length, duty: busyBars.size / bars, windowShare: windows.size / Math.ceil(bars / 4), records, gestures,
     plans: scratchDJStats.plans - before.plans, recordPicks: demoRoutineStats.overlayRecord - before.records, sources: new Set(performed.map((e) => e.source.type)),
   };
@@ -161,22 +182,32 @@ describe('ten minutes of Auto Scratch through getAutoDJ (SCR-PHRASING-PARITY acc
   afterEach(() => { teardownStandalone(); resetScratchVoicePool(); });
 
   for (const mode of ['MUSICAL', 'PERFORMER'] as const) {
-    it(`${mode}: duty cycle inside the demo's range, never every 4-bar window, several records and gestures, crate records only`, async () => {
+    it(`${mode}: every demo overlay stroke plays; duty, strokes per phrase and gesture mix match the demo within its seed variance; crate records only`, async () => {
       const r = await tenMinutes(mode);
       const [lo, hi] = demoDutyRange();
       console.log(`[10-min set ${mode}] style ${r.style}, bars ${r.bars}, events ${r.events}, duty ${(r.duty * 100).toFixed(1)} % (the demo on this track ${(r.demoDuty * 100).toFixed(1)} %, on the parity tracks ${(lo * 100).toFixed(0)}-${(hi * 100).toFixed(0)} %), 4-bar windows with a scratch ${(r.windowShare * 100).toFixed(0)} %, records ${r.records.size} [${[...r.records].join(', ')}], gestures ${r.gestures.size} [${[...r.gestures].join(', ')}]`);
-      const d = r.density;
-      console.log(`[10-min set ${mode}] per 4-bar phrase with a scratch: ${d.mine.strokes.toFixed(2)} strokes, ${d.mine.gestures.toFixed(2)} gestures; a stroke sounds ${(d.sounding * 100).toFixed(1)} % of the set; roles ${d.roles} | the demo's overlay here: ${d.demoOverlay.strokes.toFixed(2)} strokes, ${d.demoOverlay.gestures.toFixed(2)} gestures, sounding ${(d.demoOverlaySounding * 100).toFixed(1)} % | the demo's three-deck routine: duty ${(d.threeDeck.duty * 100).toFixed(1)} %, ${d.threeDeck.strokes.toFixed(2)} strokes, ${d.threeDeck.gestures.toFixed(2)} gestures per phrase, sounding ${(d.threeDeck.sounding * 100).toFixed(1)} %`);
+      const f = (m: { duty: number; strokes: number; gestures: number; sounding: number }) => `duty ${(m.duty * 100).toFixed(1)} %, ${m.strokes.toFixed(2)} strokes / ${m.gestures.toFixed(2)} gestures per phrase, sounding ${(m.sounding * 100).toFixed(1)} %`;
+      const mix = (m: Record<string, number>) => Object.entries(m).sort((a, b) => b[1] - a[1]).map(([g, v]) => `${g} ${(v * 100).toFixed(0)}`).join(' ');
+      console.log(`[10-min set ${mode}] set: ${f(r.set)}, ${r.set.count} strokes; roles ${r.roles}; mix ${mix(r.set.mix)}`);
+      console.log(`[10-min set ${mode}] demo (same seed): ${f(r.demo)}, ${r.demo.count} strokes; mix ${mix(r.demo.mix)}`);
+      const sp = r.spread;
+      console.log(`[10-min set ${mode}] demo seeds 1-20: duty ${(sp.duty.mean * 100).toFixed(1)} +- ${(sp.duty.sd * 100).toFixed(1)} % [${(sp.duty.min * 100).toFixed(1)}-${(sp.duty.max * 100).toFixed(1)}], strokes ${sp.strokes.mean.toFixed(2)} +- ${sp.strokes.sd.toFixed(2)} [${sp.strokes.min.toFixed(2)}-${sp.strokes.max.toFixed(2)}], sounding ${(sp.sounding.mean * 100).toFixed(1)} +- ${(sp.sounding.sd * 100).toFixed(1)} % | three-deck ${f(r.threeDeck)}`);
+      console.log(`[10-min set ${mode}] demo strokes missing ${r.missing.length} [${r.missing.slice(0, 12).join(' ')}], added on top ${r.added.length} [${r.added.slice(0, 12).join(' ')}]`);
+      // P13: every stroke the demo's overlay plans on this track reaches the executor, in every mode
+      expect(r.missing).toEqual([]);
+      // the set against the demo on the same track and seed, held to the demo's own seed variance (one standard
+      // deviation over seeds 1-20 on this track: duty 1.5 %, 0.18 strokes per phrase, sounding 0.3 %, each
+      // gesture's share): MUSICAL adds only the vocal rule's answers (none here), PERFORMER its short features on top
+      const tol = mode === 'MUSICAL' ? 1 : 3;
+      expect(Math.abs(r.set.duty - r.demo.duty)).toBeLessThanOrEqual(tol * r.spread.duty.sd);
+      expect(Math.abs(r.set.strokes - r.demo.strokes)).toBeLessThanOrEqual(tol * r.spread.strokes.sd);
+      expect(Math.abs(r.set.sounding - r.demo.sounding)).toBeLessThanOrEqual(tol * r.spread.sounding.sd);
+      // (PERFORMER's features play gestures the demo's profile does not: the demo's own gestures keep their share)
+      for (const [g, sd] of Object.entries(r.mixSd).filter(([g]) => mode === 'MUSICAL' || g in r.demo.mix)) expect([g, Math.abs((r.set.mix[g] ?? 0) - (r.demo.mix[g] ?? 0)) <= tol * Math.max(sd, 0.005)]).toEqual([g, true]);
       expect(r.plans).toBeGreaterThan(0);
       expect(r.recordPicks).toBeGreaterThan(0);
       expect([...r.sources]).toEqual(['CRATE']);
       expect(r.events).toBeGreaterThan(0);
-      // never denser than the demo on this very track (a mode only caps it: MUSICAL to the medium state and
-      // level 2, PERFORMER to high and level 3), and inside the demo's span on the parity tracks (16-70 %)
-      // give or take the mode: measured 2026-10-12 MUSICAL 15.4 %, PERFORMER 24.4 %, the demo here 50.9 %
-      expect(r.duty).toBeLessThanOrEqual(r.demoDuty + 1e-9);
-      expect(r.duty).toBeGreaterThanOrEqual(lo * 0.75);
-      expect(r.duty).toBeLessThanOrEqual(hi);
       expect(r.windowShare).toBeLessThan(1);
       expect(r.records.size).toBeGreaterThanOrEqual(3);
       expect(r.gestures.size).toBeGreaterThanOrEqual(2);
