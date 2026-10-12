@@ -23,7 +23,6 @@ import { getGesture, gestureBeats, isScratchGestureId, isThrowGesture, REFERENCE
 import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
 import { DEFAULT_GRID, stepToBeat, STEPS_PER_BEAT, type ScratchGrid } from './scratchAnchor';
 import type { ScratchDJStyle, ScratchGestureId, ScratchRole } from './scratchTypes';
-import type { ScratchRecord } from './scratchCatalogue';
 
 // ─── Density (sections 21, 22) ───────────────────────────────────────────
 
@@ -378,13 +377,13 @@ export const VOCAL_BUSY = 0.7;
 // ─── Throws (section 41) ─────────────────────────────────────────────────
 
 /**
- * A throw's length in beats at `bpm` (section 41 "the full word"): the record from its attack to
- * the end of its safe range, rounded up to a 1/16 step, never shorter than the gesture.
+ * A throw's length in beats: the gesture's own step length, as the demo plans it (`_GESTURE_STEPS`:
+ * drop 4, drop_phrase 16; owner SCR-THROW-DEMO 2026-10-12, overturning section 41's whole word). The
+ * word rides at least 0.5 s from its vowel however short the steps (`render_gesture`'s play path), so
+ * a fast throw sums under the stroke after it, as in the demo.
  */
-export function throwBeats(record: Pick<ScratchRecord, 'durationSec'> & Partial<Pick<ScratchRecord, 'safe' | 'anchors'>>, bpm: number, gesture: ScratchGestureId = 'drop'): number {
-  const sec = (record.safe?.[1] ?? record.durationSec) - (record.anchors?.attack ?? 0);
-  const beats = Math.ceil((sec / (60 / Math.max(1, bpm))) * 4 - 1e-9) / 4;
-  return Math.max(gestureBeats(gesture), beats);
+export function throwBeats(_record: unknown, _bpm: number, gesture: ScratchGestureId = 'drop'): number {
+  return gestureBeats(gesture);
 }
 
 /** Steps in a bar for a grid (4/4). */

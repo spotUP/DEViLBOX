@@ -289,8 +289,9 @@ export class ScratchVoicePool {
         // safe-range clamp included; a throw reads from its cue at natural speed
         const buffer = await this.buffer(record);
         const isThrow = gesture.id === 'drop' || gesture.id === 'dropPhrase';
-        const cueSec = voice.resolveCue(opts.cue ?? this.anchor ?? (isThrow ? 'attack' : 'vowel'));
-        const durSec = isThrow ? Math.max(0.01, record.safe[1] - cueSec) : gesture.cycleBeats * 60 / Math.max(30, opts.bpm);
+        const cueSec = voice.resolveCue(opts.cue ?? this.anchor ?? 'vowel');
+        const strokeSec = gesture.cycleBeats * 60 / Math.max(30, opts.bpm);
+        const durSec = isThrow ? Math.max(0.01, Math.min(record.durationSec - cueSec, Math.max(strokeSec, 0.5))) : strokeSec;
         const motion = isThrow ? [{ t: 0, velocity: 1 }, { t: 1, velocity: 1 }] : gestureMotion(gesture, durSec, { velocity: opts.velocity, style: opts.fx?.style });
         const rms = strokeRms(buffer, cueSec, motion, durSec, record.safe);
         const level = matchedBusLevel(prog, rms, gesture, opts.fx?.preset ? CHANNEL_PRESETS[opts.fx.preset].room : SCRATCH_BUS.reverbMix);

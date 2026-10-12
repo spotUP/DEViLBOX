@@ -26,8 +26,9 @@ import type {
  * there has no reverse room - an orbit or a baby lost its back half or was refused outright.
  */
 export const CRATE_SCRATCH_CUE = 'vowel' as const;
-/** A throw rides the whole word from its attack (section 41). */
-export const CRATE_THROW_CUE = 'attack' as const;
+/** A throw rides from the vowel too, as the demo's does (`render_gesture` plays from `source.anchor`;
+ *  owner SCR-THROW-DEMO 2026-10-12, overturning section 41's whole word from the attack). */
+export const CRATE_THROW_CUE = 'vowel' as const;
 
 /** The deck anchor kind a role prefers (first match among the candidates wins). */
 export const DECK_ANCHOR_BY_ROLE: Readonly<Record<ScratchRole, readonly DeckAnchorKind[]>> = {
