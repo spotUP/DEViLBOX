@@ -64,6 +64,11 @@ function tanhCurve(drive: number, points = 4096): Float32Array<ArrayBuffer> {
   return curve;
 }
 
+/** The scratch room: the one impulse response for the scratch bus AND the deck's own scratch reverb (SA-m2). */
+export function createScratchRoomIR(ctx: BaseAudioContext): AudioBuffer {
+  return createReverbIR(ctx, SCRATCH_BUS.reverbSec, SCRATCH_BUS.reverbDecayHz);
+}
+
 export function createScratchBus(ctx: BaseAudioContext, destination: AudioNode, opts: { reverbIR?: AudioBuffer } = {}): ScratchBus {
   const input = ctx.createGain();
 
@@ -98,7 +103,7 @@ export function createScratchBus(ctx: BaseAudioContext, destination: AudioNode, 
   const roomDry = ctx.createGain();
   const roomWet = ctx.createGain();
   const convolver = ctx.createConvolver();
-  convolver.buffer = opts.reverbIR ?? createReverbIR(ctx, SCRATCH_BUS.reverbSec, SCRATCH_BUS.reverbDecayHz);
+  convolver.buffer = opts.reverbIR ?? createScratchRoomIR(ctx);
   const roomSum = ctx.createGain();
 
   const lp = BUTTERWORTH_4.map((q) => {
