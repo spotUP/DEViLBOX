@@ -104,7 +104,7 @@ function fakeRing(): ScratchVoiceRing & { calls: Call[] } {
 }
 
 describe('record voice: a harder planned stroke is faster, the fader windows are the same', () => {
-  async function play(velocity: number, drive?: 'hand') {
+  async function play(velocity: number, drive?: 'hand' | 'velocity') {
     const ring = fakeRing();
     const bus = { input: {} as AudioNode, setAmbience: () => {} } as unknown as ScratchVoiceBus;
     const voice = new ScratchRecordVoice(0, ring, bus);
@@ -117,8 +117,14 @@ describe('record voice: a harder planned stroke is faster, the fader windows are
     return { peak: Math.max(...pts.map((p) => Math.abs(p.rate))), frames: pts.map((p) => p.frame), windows: fw.args[0] };
   }
 
-  it('velocity curve path: peak rate scales by the factor, timing and windows do not move', async () => {
+  it('the turntable model (the default since O1/O2): a harder stroke moves the record further and faster, the windows stay', async () => {
     const soft = await play(0.3), hard = await play(1.0);
+    expect(hard.peak).toBeGreaterThan(soft.peak * 1.2);
+    expect(hard.windows).toEqual(soft.windows);
+  });
+
+  it('velocity curve path: peak rate scales by the factor, timing and windows do not move', async () => {
+    const soft = await play(0.3, 'velocity'), hard = await play(1.0, 'velocity');
     expect(hard.peak).toBeGreaterThan(soft.peak);
     expect(hard.peak / soft.peak).toBeCloseTo(handSpeedFactor(1.0) / handSpeedFactor(0.3), 6);
     expect(hard.frames).toEqual(soft.frames);

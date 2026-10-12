@@ -53,6 +53,8 @@ import { scratchVoiceStats } from '../scratch/ScratchRecordVoice';
 import { getScratchVoicePool, resetScratchVoicePool } from '../scratch/scratchVoicePool';
 import { timeAtBeat, barStartBeat, fractionalBeatAt } from '../autodj/beatGrid';
 import { getDecisionLog } from '../autodj/decisionLog';
+import { scratchPhysicsStats, isPhysical } from '../scratch/scratchPhysics';
+import { getGesture } from '../scratch/scratchGestureCatalog';
 
 type Internals = {
   activeDeck: 'A' | 'B'; idleDeck: 'A' | 'B'; preloadedDeck: 'A' | 'B' | null; plan: unknown; execution: unknown; transitionCancel: unknown;
@@ -117,6 +119,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
   const before = {
     find: scratchOpportunityStats.find, select: scratchSourceStats.select, phrase: scratchPlacementStats.planPhrase,
     started: scratchExecutorStats.started, strokes: scratchVoiceStats.strokes, decisions: getDecisionLog().counts.SCRATCH ?? 0,
+    simulations: scratchPhysicsStats.simulations,
   };
 
   vi.useFakeTimers();
@@ -136,6 +139,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
       find: scratchOpportunityStats.find - before.find, select: scratchSourceStats.select - before.select, phrase: scratchPlacementStats.planPhrase - before.phrase,
       started: scratchExecutorStats.started - before.started, strokes: scratchVoiceStats.strokes - before.strokes,
       decisions: (getDecisionLog().counts.SCRATCH ?? 0) - before.decisions,
+      simulations: scratchPhysicsStats.simulations - before.simulations,
     },
   };
 }
@@ -186,6 +190,10 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
       expect(offMs).toBeLessThanOrEqual(10 + 6);
       expect(Math.abs(offMs - r.event.humanizeMs)).toBeLessThanOrEqual(6);
     }
+    // SCR-PG-BR: every record stroke the model performs (not throws, not flourishes) is one turntable simulation
+    const physical = runs.filter((r) => r.run.event.source.type === 'CRATE' && isPhysical(getGesture(r.run.event.gesture))).length;
+    expect(physical).toBeGreaterThan(0);
+    expect(counts.simulations).toBe(physical);
     // the style's FX rides on every planned event (SCR-PG-A5): Boom Bap, its FX amount 0.1 x the genre's scale
     for (const { run: r } of runs) {
       expect(r.event.fx?.style).toBe('boomBap');
@@ -201,7 +209,7 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
 
   it('Auto Scratch OFF: the same run plans and performs nothing', async () => {
     const { counts, runs, deck } = await run('OFF');
-    expect(counts).toEqual({ find: 0, select: 0, phrase: 0, started: 0, strokes: 0, decisions: 0 });
+    expect(counts).toEqual({ find: 0, select: 0, phrase: 0, started: 0, strokes: 0, decisions: 0, simulations: 0 });
     expect(runs).toHaveLength(0);
     expect(deck.touched.velocity + deck.touched.pattern).toBe(0);
   }, 180_000);

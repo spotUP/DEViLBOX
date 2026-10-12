@@ -130,6 +130,9 @@ export interface ScratchGesture {
   loop: boolean;
   /** The gesture's own effect (echo). */
   fx?: ScratchGestureFx;
+  /** A steady-platter gesture (reference `glide`, scratch.py :147-150, :287-294): the record plays
+   *  forward at `ratio` x and accelerates across the gesture under the cuts, the hand at `grip`. */
+  glide?: { ratio: number; grip: number };
   /** A record flourish (brake, spin-up): placed on purpose (an ending, a routine, a pad), never
    *  drawn at random from a style's vocabulary. */
   flourish?: boolean;
