@@ -20,12 +20,12 @@
       "electro"
     ],
     "duration_ms": 434.9,
-    "centroid": 1519.0,
+    "centroid": 1441.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 5,
     "onset_rate": 11.5,
-    "pitch_flip_rate": 55.2,
+    "pitch_flip_rate": 50.6,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 3300,
@@ -67,18 +67,18 @@
       "electro"
     ],
     "duration_ms": 721.8,
-    "centroid": 2062.0,
+    "centroid": 1994.0,
     "voiced_amount": 0.9,
     "noise_amount": 0.1,
     "transient_count": 4,
     "onset_rate": 5.5,
-    "pitch_flip_rate": 44.3,
+    "pitch_flip_rate": 38.8,
     "pre_scratched": false,
     "anchor_attack": 1320,
     "anchor_vowel": 1980,
     "anchor_tail": 14353,
     "safe": [
-      797,
+      798,
       14353
     ],
     "safe_forward": [
@@ -86,7 +86,7 @@
       14353
     ],
     "safe_reverse": [
-      797,
+      798,
       1980
     ],
     "word_slices": [],
@@ -114,12 +114,12 @@
       "electro"
     ],
     "duration_ms": 1816.3,
-    "centroid": 1819.0,
+    "centroid": 1744.0,
     "voiced_amount": 0.97,
     "noise_amount": 0.03,
     "transient_count": 14,
     "onset_rate": 7.7,
-    "pitch_flip_rate": 45.7,
+    "pitch_flip_rate": 46.8,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 33880,
@@ -146,14 +146,14 @@
       {
         "name": "2",
         "start": 3072,
-        "end": 31232,
+        "end": 19968,
         "vowel": 16052
       },
       {
         "name": "1",
-        "start": 31232,
+        "start": 19968,
         "end": 37864,
-        "vowel": 33872
+        "vowel": 33828
       }
     ],
     "factory_safe": true,
@@ -180,7 +180,7 @@
       "electro"
     ],
     "duration_ms": 697.3,
-    "centroid": 1866.0,
+    "centroid": 1783.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 6,
@@ -189,14 +189,14 @@
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 1980,
-    "anchor_tail": 14876,
+    "anchor_tail": 14875,
     "safe": [
       55,
-      14876
+      14875
     ],
     "safe_forward": [
       1980,
-      14876
+      14875
     ],
     "safe_reverse": [
       55,
@@ -228,7 +228,7 @@
       "boombap"
     ],
     "duration_ms": 922.4,
-    "centroid": 2210.0,
+    "centroid": 2202.0,
     "voiced_amount": 0.91,
     "noise_amount": 0.09,
     "transient_count": 17,
@@ -282,9 +282,9 @@
       "lofi"
     ],
     "duration_ms": 892.0,
-    "centroid": 1762.0,
-    "voiced_amount": 1.0,
-    "noise_amount": 0.0,
+    "centroid": 1752.0,
+    "voiced_amount": 0.99,
+    "noise_amount": 0.01,
     "transient_count": 15,
     "onset_rate": 16.8,
     "pitch_flip_rate": 50.4,
@@ -336,14 +336,14 @@
       "lofi"
     ],
     "duration_ms": 892.0,
-    "centroid": 1762.0,
-    "voiced_amount": 1.0,
-    "noise_amount": 0.0,
+    "centroid": 1752.0,
+    "voiced_amount": 0.98,
+    "noise_amount": 0.02,
     "transient_count": 15,
     "onset_rate": 16.8,
     "pitch_flip_rate": 50.4,
     "pre_scratched": true,
-    "anchor_attack": 0,
+    "anchor_attack": 220,
     "anchor_vowel": 3300,
     "anchor_tail": 19399,
     "safe": [
@@ -385,12 +385,12 @@
       "electro"
     ],
     "duration_ms": 2207.1,
-    "centroid": 2990.0,
-    "voiced_amount": 0.59,
-    "noise_amount": 0.41,
+    "centroid": 2914.0,
+    "voiced_amount": 0.58,
+    "noise_amount": 0.42,
     "transient_count": 31,
     "onset_rate": 14.0,
-    "pitch_flip_rate": 49.4,
+    "pitch_flip_rate": 51.2,
     "pre_scratched": true,
     "anchor_attack": 440,
     "anchor_vowel": 1980,
@@ -439,12 +439,12 @@
       "lofi"
     ],
     "duration_ms": 936.6,
-    "centroid": 1757.0,
+    "centroid": 1747.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 15,
     "onset_rate": 16.0,
-    "pitch_flip_rate": 47.0,
+    "pitch_flip_rate": 49.1,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 3300,
@@ -493,14 +493,14 @@
       "lofi"
     ],
     "duration_ms": 760.4,
-    "centroid": 2239.0,
-    "voiced_amount": 0.89,
-    "noise_amount": 0.11,
+    "centroid": 2195.0,
+    "voiced_amount": 0.93,
+    "noise_amount": 0.07,
     "transient_count": 12,
     "onset_rate": 15.8,
-    "pitch_flip_rate": 65.8,
+    "pitch_flip_rate": 57.9,
     "pre_scratched": true,
-    "anchor_attack": 1760,
+    "anchor_attack": 880,
     "anchor_vowel": 2860,
     "anchor_tail": 16383,
     "safe": [
@@ -541,7 +541,7 @@
       "boombap"
     ],
     "duration_ms": 876.7,
-    "centroid": 2525.0,
+    "centroid": 2507.0,
     "voiced_amount": 0.77,
     "noise_amount": 0.23,
     "transient_count": 14,
@@ -587,7 +587,7 @@
       "boombap"
     ],
     "duration_ms": 923.4,
-    "centroid": 2682.0,
+    "centroid": 2603.0,
     "voiced_amount": 0.77,
     "noise_amount": 0.23,
     "transient_count": 10,
@@ -648,12 +648,12 @@
       "boombap"
     ],
     "duration_ms": 736.2,
-    "centroid": 1705.0,
+    "centroid": 1680.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 14,
     "onset_rate": 19.0,
-    "pitch_flip_rate": 40.8,
+    "pitch_flip_rate": 43.5,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 9020,
@@ -694,7 +694,7 @@
       "old_school"
     ],
     "duration_ms": 449.7,
-    "centroid": 2076.0,
+    "centroid": 2047.0,
     "voiced_amount": 0.98,
     "noise_amount": 0.02,
     "transient_count": 6,
@@ -740,7 +740,7 @@
       "boombap"
     ],
     "duration_ms": 808.6,
-    "centroid": 2986.0,
+    "centroid": 2928.0,
     "voiced_amount": 0.68,
     "noise_amount": 0.32,
     "transient_count": 7,
@@ -805,12 +805,12 @@
       "boombap"
     ],
     "duration_ms": 789.1,
-    "centroid": 2514.0,
+    "centroid": 2429.0,
     "voiced_amount": 0.93,
     "noise_amount": 0.07,
     "transient_count": 11,
     "onset_rate": 13.9,
-    "pitch_flip_rate": 39.3,
+    "pitch_flip_rate": 41.8,
     "pre_scratched": true,
     "anchor_attack": 220,
     "anchor_vowel": 660,
@@ -831,14 +831,14 @@
       {
         "name": "DO",
         "start": 0,
-        "end": 3840,
+        "end": 4096,
         "vowel": 660
       },
       {
         "name": "IT",
-        "start": 3840,
+        "start": 4096,
         "end": 9728,
-        "vowel": 4940
+        "vowel": 4976
       },
       {
         "name": "AGAIN",
@@ -870,12 +870,12 @@
       "old_school"
     ],
     "duration_ms": 603.2,
-    "centroid": 3044.0,
+    "centroid": 2943.0,
     "voiced_amount": 0.81,
     "noise_amount": 0.19,
     "transient_count": 11,
     "onset_rate": 18.2,
-    "pitch_flip_rate": 38.1,
+    "pitch_flip_rate": 34.8,
     "pre_scratched": true,
     "anchor_attack": 220,
     "anchor_vowel": 6820,
@@ -932,23 +932,23 @@
       "electro"
     ],
     "duration_ms": 1277.3,
-    "centroid": 3584.0,
-    "voiced_amount": 0.25,
-    "noise_amount": 0.75,
+    "centroid": 3459.0,
+    "voiced_amount": 0.24,
+    "noise_amount": 0.76,
     "transient_count": 19,
     "onset_rate": 14.9,
-    "pitch_flip_rate": 49.3,
+    "pitch_flip_rate": 50.9,
     "pre_scratched": true,
     "anchor_attack": 2420,
     "anchor_vowel": 17600,
-    "anchor_tail": 26356,
+    "anchor_tail": 26354,
     "safe": [
       65,
-      26356
+      26354
     ],
     "safe_forward": [
       17600,
-      26356
+      26354
     ],
     "safe_reverse": [
       65,
@@ -981,12 +981,12 @@
       "electro"
     ],
     "duration_ms": 967.8,
-    "centroid": 3742.0,
+    "centroid": 3714.0,
     "voiced_amount": 0.08,
     "noise_amount": 0.92,
     "transient_count": 14,
     "onset_rate": 14.5,
-    "pitch_flip_rate": 46.5,
+    "pitch_flip_rate": 44.4,
     "pre_scratched": true,
     "anchor_attack": 3520,
     "anchor_vowel": 4180,
@@ -1030,12 +1030,12 @@
       "electro"
     ],
     "duration_ms": 627.6,
-    "centroid": 3761.0,
-    "voiced_amount": 0.22,
-    "noise_amount": 0.78,
+    "centroid": 3613.0,
+    "voiced_amount": 0.23,
+    "noise_amount": 0.77,
     "transient_count": 9,
     "onset_rate": 14.3,
-    "pitch_flip_rate": 47.8,
+    "pitch_flip_rate": 46.2,
     "pre_scratched": true,
     "anchor_attack": 660,
     "anchor_vowel": 1100,
@@ -1079,7 +1079,7 @@
       "electro"
     ],
     "duration_ms": 931.1,
-    "centroid": 3913.0,
+    "centroid": 3850.0,
     "voiced_amount": 0.12,
     "noise_amount": 0.88,
     "transient_count": 11,
@@ -1088,17 +1088,17 @@
     "pre_scratched": true,
     "anchor_attack": 2200,
     "anchor_vowel": 2860,
-    "anchor_tail": 16103,
+    "anchor_tail": 16104,
     "safe": [
-      48,
-      16103
+      49,
+      16104
     ],
     "safe_forward": [
       2860,
-      16103
+      16104
     ],
     "safe_reverse": [
-      48,
+      49,
       2860
     ],
     "word_slices": [],
@@ -1123,14 +1123,14 @@
       "boombap"
     ],
     "duration_ms": 2285.2,
-    "centroid": 2030.0,
+    "centroid": 2020.0,
     "voiced_amount": 0.82,
     "noise_amount": 0.18,
     "transient_count": 30,
     "onset_rate": 13.1,
-    "pitch_flip_rate": 39.8,
+    "pitch_flip_rate": 38.9,
     "pre_scratched": true,
-    "anchor_attack": 0,
+    "anchor_attack": 220,
     "anchor_vowel": 6160,
     "anchor_tail": 50218,
     "safe": [
@@ -1206,12 +1206,12 @@
       "boombap"
     ],
     "duration_ms": 898.7,
-    "centroid": 1535.0,
+    "centroid": 1486.0,
     "voiced_amount": 0.99,
     "noise_amount": 0.01,
     "transient_count": 11,
     "onset_rate": 12.2,
-    "pitch_flip_rate": 36.7,
+    "pitch_flip_rate": 32.3,
     "pre_scratched": true,
     "anchor_attack": 220,
     "anchor_vowel": 1540,
@@ -1231,9 +1231,9 @@
     "word_slices": [
       {
         "name": "HERE",
-        "start": 79,
+        "start": 80,
         "end": 3072,
-        "vowel": 739
+        "vowel": 740
       },
       {
         "name": "WE",
@@ -1277,14 +1277,14 @@
       "old_school"
     ],
     "duration_ms": 1010.8,
-    "centroid": 2521.0,
-    "voiced_amount": 0.82,
-    "noise_amount": 0.18,
+    "centroid": 2463.0,
+    "voiced_amount": 0.81,
+    "noise_amount": 0.19,
     "transient_count": 11,
     "onset_rate": 10.9,
     "pitch_flip_rate": 52.4,
     "pre_scratched": true,
-    "anchor_attack": 0,
+    "anchor_attack": 220,
     "anchor_vowel": 2200,
     "anchor_tail": 21764,
     "safe": [
@@ -1323,7 +1323,7 @@
       "old_school"
     ],
     "duration_ms": 647.1,
-    "centroid": 2136.0,
+    "centroid": 2130.0,
     "voiced_amount": 0.81,
     "noise_amount": 0.19,
     "transient_count": 9,
@@ -1368,18 +1368,18 @@
       "boombap"
     ],
     "duration_ms": 408.3,
-    "centroid": 2297.0,
+    "centroid": 2225.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 7,
     "onset_rate": 17.1,
-    "pitch_flip_rate": 31.8,
+    "pitch_flip_rate": 36.7,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 1540,
     "anchor_tail": 8674,
     "safe": [
-      91,
+      92,
       8674
     ],
     "safe_forward": [
@@ -1387,7 +1387,7 @@
       8674
     ],
     "safe_reverse": [
-      91,
+      92,
       1540
     ],
     "word_slices": [],
@@ -1415,7 +1415,7 @@
       "electro"
     ],
     "duration_ms": 297.9,
-    "centroid": 3240.0,
+    "centroid": 3183.0,
     "voiced_amount": 0.14,
     "noise_amount": 0.86,
     "transient_count": 5,
@@ -1424,14 +1424,14 @@
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 440,
-    "anchor_tail": 6336,
+    "anchor_tail": 6337,
     "safe": [
       48,
-      6336
+      6337
     ],
     "safe_forward": [
       440,
-      6336
+      6337
     ],
     "safe_reverse": [
       48,
@@ -1459,7 +1459,7 @@
       "boombap"
     ],
     "duration_ms": 2442.9,
-    "centroid": 2585.0,
+    "centroid": 2544.0,
     "voiced_amount": 0.81,
     "noise_amount": 0.19,
     "transient_count": 21,
@@ -1468,14 +1468,14 @@
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 17380,
-    "anchor_tail": 53832,
+    "anchor_tail": 53834,
     "safe": [
       112,
-      53832
+      53834
     ],
     "safe_forward": [
       17380,
-      53832
+      53834
     ],
     "safe_reverse": [
       112,
@@ -1533,7 +1533,7 @@
       {
         "name": "BEAT",
         "start": 49408,
-        "end": 53679,
+        "end": 53684,
         "vowel": 49628
       }
     ],
@@ -1560,12 +1560,12 @@
       "old_school"
     ],
     "duration_ms": 1277.5,
-    "centroid": 1915.0,
+    "centroid": 1868.0,
     "voiced_amount": 0.9,
     "noise_amount": 0.1,
     "transient_count": 8,
     "onset_rate": 6.3,
-    "pitch_flip_rate": 39.1,
+    "pitch_flip_rate": 40.7,
     "pre_scratched": true,
     "anchor_attack": 220,
     "anchor_vowel": 15180,
@@ -1585,9 +1585,9 @@
     "word_slices": [
       {
         "name": "LADIES",
-        "start": 504,
+        "start": 503,
         "end": 5120,
-        "vowel": 4024
+        "vowel": 4023
       },
       {
         "name": "AND",
@@ -1598,7 +1598,7 @@
       {
         "name": "GENTLEMEN",
         "start": 13056,
-        "end": 23664,
+        "end": 23663,
         "vowel": 15256
       }
     ],
@@ -1626,27 +1626,27 @@
       "electro"
     ],
     "duration_ms": 865.4,
-    "centroid": 4237.0,
-    "voiced_amount": 0.06,
-    "noise_amount": 0.94,
+    "centroid": 4075.0,
+    "voiced_amount": 0.22,
+    "noise_amount": 0.78,
     "transient_count": 17,
     "onset_rate": 19.6,
-    "pitch_flip_rate": 57.8,
+    "pitch_flip_rate": 55.5,
     "pre_scratched": true,
-    "anchor_attack": 660,
-    "anchor_vowel": 4620,
+    "anchor_attack": 440,
+    "anchor_vowel": 5280,
     "anchor_tail": 18837,
     "safe": [
-      35,
+      36,
       18837
     ],
     "safe_forward": [
-      4620,
+      5280,
       18837
     ],
     "safe_reverse": [
-      35,
-      4620
+      36,
+      5280
     ],
     "word_slices": [],
     "factory_safe": true,
@@ -1675,12 +1675,12 @@
       "battle"
     ],
     "duration_ms": 978.1,
-    "centroid": 1756.0,
+    "centroid": 1749.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 17,
     "onset_rate": 17.4,
-    "pitch_flip_rate": 45.0,
+    "pitch_flip_rate": 49.1,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 3080,
@@ -1724,7 +1724,7 @@
       "battle"
     ],
     "duration_ms": 495.9,
-    "centroid": 1956.0,
+    "centroid": 1892.0,
     "voiced_amount": 0.98,
     "noise_amount": 0.02,
     "transient_count": 9,
@@ -1770,12 +1770,12 @@
       "boombap"
     ],
     "duration_ms": 539.1,
-    "centroid": 2001.0,
+    "centroid": 1985.0,
     "voiced_amount": 0.96,
     "noise_amount": 0.04,
     "transient_count": 10,
     "onset_rate": 18.5,
-    "pitch_flip_rate": 48.2,
+    "pitch_flip_rate": 44.5,
     "pre_scratched": true,
     "anchor_attack": 220,
     "anchor_vowel": 5940,
@@ -1822,7 +1822,7 @@
     ],
     "recommended_styles": [],
     "duration_ms": 960.8,
-    "centroid": 1809.0,
+    "centroid": 1780.0,
     "voiced_amount": 0.97,
     "noise_amount": 0.03,
     "transient_count": 12,
@@ -1861,12 +1861,12 @@
     ],
     "recommended_styles": [],
     "duration_ms": 571.1,
-    "centroid": 2897.0,
+    "centroid": 2814.0,
     "voiced_amount": 0.54,
     "noise_amount": 0.46,
     "transient_count": 11,
     "onset_rate": 19.3,
-    "pitch_flip_rate": 57.8,
+    "pitch_flip_rate": 54.3,
     "pre_scratched": true,
     "anchor_attack": 2640,
     "anchor_vowel": 5940,
@@ -1900,12 +1900,12 @@
     ],
     "recommended_styles": [],
     "duration_ms": 621.2,
-    "centroid": 2569.0,
+    "centroid": 2539.0,
     "voiced_amount": 0.49,
     "noise_amount": 0.51,
     "transient_count": 9,
     "onset_rate": 14.5,
-    "pitch_flip_rate": 59.6,
+    "pitch_flip_rate": 53.1,
     "pre_scratched": true,
     "anchor_attack": 5720,
     "anchor_vowel": 7260,
@@ -1939,12 +1939,12 @@
     ],
     "recommended_styles": [],
     "duration_ms": 1143.0,
-    "centroid": 2150.0,
+    "centroid": 2128.0,
     "voiced_amount": 0.9,
     "noise_amount": 0.1,
     "transient_count": 11,
     "onset_rate": 9.6,
-    "pitch_flip_rate": 56.0,
+    "pitch_flip_rate": 57.7,
     "pre_scratched": true,
     "anchor_attack": 440,
     "anchor_vowel": 3080,
@@ -1978,9 +1978,9 @@
     ],
     "recommended_styles": [],
     "duration_ms": 632.2,
-    "centroid": 1417.0,
-    "voiced_amount": 1.0,
-    "noise_amount": 0.0,
+    "centroid": 1401.0,
+    "voiced_amount": 0.98,
+    "noise_amount": 0.02,
     "transient_count": 4,
     "onset_rate": 6.3,
     "pitch_flip_rate": 60.1,
@@ -2017,14 +2017,14 @@
     ],
     "recommended_styles": [],
     "duration_ms": 753.9,
-    "centroid": 2084.0,
-    "voiced_amount": 1.0,
-    "noise_amount": 0.0,
+    "centroid": 2080.0,
+    "voiced_amount": 0.99,
+    "noise_amount": 0.01,
     "transient_count": 13,
     "onset_rate": 17.2,
     "pitch_flip_rate": 41.1,
     "pre_scratched": true,
-    "anchor_attack": 0,
+    "anchor_attack": 220,
     "anchor_vowel": 5280,
     "anchor_tail": 16174,
     "safe": [
@@ -2056,12 +2056,12 @@
     ],
     "recommended_styles": [],
     "duration_ms": 2000.0,
-    "centroid": 2001.0,
+    "centroid": 1982.0,
     "voiced_amount": 0.97,
     "noise_amount": 0.03,
     "transient_count": 34,
     "onset_rate": 17.0,
-    "pitch_flip_rate": 47.0,
+    "pitch_flip_rate": 45.0,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 3300,
@@ -2095,7 +2095,7 @@
     ],
     "recommended_styles": [],
     "duration_ms": 278.7,
-    "centroid": 2070.0,
+    "centroid": 2035.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 6,
@@ -2141,18 +2141,18 @@
       "boombap"
     ],
     "duration_ms": 808.6,
-    "centroid": 3248.0,
-    "voiced_amount": 0.75,
-    "noise_amount": 0.25,
-    "transient_count": 10,
-    "onset_rate": 12.4,
-    "pitch_flip_rate": 44.5,
+    "centroid": 3154.0,
+    "voiced_amount": 0.76,
+    "noise_amount": 0.24,
+    "transient_count": 9,
+    "onset_rate": 11.1,
+    "pitch_flip_rate": 47.0,
     "pre_scratched": true,
     "anchor_attack": 4180,
     "anchor_vowel": 4620,
     "anchor_tail": 17297,
     "safe": [
-      708,
+      709,
       17297
     ],
     "safe_forward": [
@@ -2160,20 +2160,20 @@
       17297
     ],
     "safe_reverse": [
-      708,
+      709,
       4620
     ],
     "word_slices": [
       {
         "name": "STOP",
-        "start": 757,
+        "start": 772,
         "end": 3584,
-        "vowel": 2170
+        "vowel": 2178
       },
       {
         "name": "THAT",
         "start": 3584,
-        "end": 16871,
+        "end": 16872,
         "vowel": 4464
       }
     ],
@@ -2199,12 +2199,12 @@
       "boombap"
     ],
     "duration_ms": 2712.8,
-    "centroid": 2258.0,
+    "centroid": 2243.0,
     "voiced_amount": 0.89,
     "noise_amount": 0.11,
     "transient_count": 32,
     "onset_rate": 11.8,
-    "pitch_flip_rate": 50.1,
+    "pitch_flip_rate": 50.9,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 17380,
@@ -2247,7 +2247,7 @@
       "boombap"
     ],
     "duration_ms": 561.5,
-    "centroid": 2564.0,
+    "centroid": 2553.0,
     "voiced_amount": 0.45,
     "noise_amount": 0.55,
     "transient_count": 10,
@@ -2293,18 +2293,18 @@
       "old_school"
     ],
     "duration_ms": 252.3,
-    "centroid": 2560.0,
-    "voiced_amount": 0.6,
-    "noise_amount": 0.4,
+    "centroid": 2506.0,
+    "voiced_amount": 0.55,
+    "noise_amount": 0.45,
     "transient_count": 4,
     "onset_rate": 15.9,
     "pitch_flip_rate": 35.7,
     "pre_scratched": true,
-    "anchor_attack": 0,
+    "anchor_attack": 220,
     "anchor_vowel": 440,
     "anchor_tail": 4281,
     "safe": [
-      35,
+      36,
       4281
     ],
     "safe_forward": [
@@ -2312,7 +2312,7 @@
       4281
     ],
     "safe_reverse": [
-      35,
+      36,
       440
     ],
     "word_slices": [],
@@ -2339,12 +2339,12 @@
       "old_school"
     ],
     "duration_ms": 1950.2,
-    "centroid": 2029.0,
+    "centroid": 1995.0,
     "voiced_amount": 0.92,
     "noise_amount": 0.08,
     "transient_count": 12,
     "onset_rate": 6.2,
-    "pitch_flip_rate": 34.9,
+    "pitch_flip_rate": 32.8,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 1540,
@@ -2419,7 +2419,7 @@
       "battle"
     ],
     "duration_ms": 413.9,
-    "centroid": 1117.0,
+    "centroid": 1110.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 5,
@@ -2467,12 +2467,12 @@
       "boombap"
     ],
     "duration_ms": 1740.9,
-    "centroid": 2602.0,
-    "voiced_amount": 0.62,
-    "noise_amount": 0.38,
+    "centroid": 2538.0,
+    "voiced_amount": 0.63,
+    "noise_amount": 0.37,
     "transient_count": 23,
     "onset_rate": 13.2,
-    "pitch_flip_rate": 46.0,
+    "pitch_flip_rate": 48.3,
     "pre_scratched": true,
     "anchor_attack": 1100,
     "anchor_vowel": 24640,
@@ -2515,12 +2515,12 @@
       "boombap"
     ],
     "duration_ms": 509.8,
-    "centroid": 2122.0,
+    "centroid": 2072.0,
     "voiced_amount": 1.0,
     "noise_amount": 0.0,
     "transient_count": 5,
     "onset_rate": 9.8,
-    "pitch_flip_rate": 27.5,
+    "pitch_flip_rate": 29.4,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 1540,
@@ -2563,12 +2563,12 @@
       "boombap"
     ],
     "duration_ms": 550.9,
-    "centroid": 1232.0,
-    "voiced_amount": 1.0,
-    "noise_amount": 0.0,
+    "centroid": 1209.0,
+    "voiced_amount": 0.98,
+    "noise_amount": 0.02,
     "transient_count": 10,
     "onset_rate": 18.2,
-    "pitch_flip_rate": 59.9,
+    "pitch_flip_rate": 56.3,
     "pre_scratched": true,
     "anchor_attack": 0,
     "anchor_vowel": 1100,

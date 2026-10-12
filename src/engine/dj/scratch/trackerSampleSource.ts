@@ -62,6 +62,7 @@ export function trackerSampleRecord(deck: AB, info: Pick<TrackerSampleInfo, 'sam
   const anchor = { position: vowel, safe: [0, durationSec] as const, safeForward: [vowel, durationSec] as const, safeReverse: [0, vowel] as const };
   return {
     id, canonicalName: id, literalPhrase: info.name, file: '', sourceFile: '', url: '',
+    demoCue: { anchor: Math.round(vowel * 22050), safe: [0, Math.round(durationSec * 22050)] },
     category: info.kind === 'voice' ? 'SHORT_EXCLAMATION' : 'FX',
     referenceRoles: [], roles: ['ACCENT', 'ANSWER', 'FILL', 'THEME'], styles: [],
     recommendedGestures: [], gestures: SAMPLE_GESTURES,
