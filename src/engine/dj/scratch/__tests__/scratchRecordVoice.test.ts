@@ -241,7 +241,7 @@ describe('position-driven stroke (section 17, SCR-P3.2)', () => {
     expect(call.args[1]).toMatchObject({ interpolate: false });
   });
 
-  it('playGesture drive "hand" performs the hand path; the default keeps the tuned velocity keyframes', async () => {
+  it('playGesture drive "hand" performs the hand path; the default is the turntable model (O1); "velocity" keeps the keyframes', async () => {
     const mk = async () => {
       const ring = fakeRing();
       const voice = new ScratchRecordVoice(0, ring, fakeBus());
@@ -250,8 +250,11 @@ describe('position-driven stroke (section 17, SCR-P3.2)', () => {
       return { ring, voice };
     };
     const a = await mk(); a.voice.playGesture(getGesture('forwardStab'), 120, { drive: 'hand' });
-    const b = await mk(); b.voice.playGesture(getGesture('forwardStab'), 120);
+    const b = await mk(); b.voice.playGesture(getGesture('forwardStab'), 120, { drive: 'velocity' });
+    const c = await mk(); c.voice.playGesture(getGesture('forwardStab'), 120);
     expect((last(a.ring, 'rateCurve')!.args[0] as unknown[]).length).toBeGreaterThan(50);
     expect((last(b.ring, 'rateCurve')!.args[0] as unknown[]).length).toBeLessThan(5);
+    // the model's record speed at ~1 kHz over the 2-step stab (250 ms at 120 BPM)
+    expect((last(c.ring, 'rateCurve')!.args[0] as unknown[]).length).toBeGreaterThan(200);
   });
 });

@@ -21,8 +21,9 @@
 
 import type { DeckScratchBuffer, RingRatePoint, RingRateCurveOptions, RingFaderWindowsOptions, RingPositionReport } from '../DeckScratchBuffer';
 import type { ScratchRecord } from './scratchCatalogue';
-import type { ScratchGesture, ScratchHandPath, ScratchVelocityPoint } from './scratchTypes';
+import type { ScratchDJStyle, ScratchGesture, ScratchHandPath, ScratchVelocityPoint } from './scratchTypes';
 import { positionCurveToRateCurve } from './scratchAnchor';
+import { isPhysical, simulateGesture } from './scratchPhysics';
 import { faderWindowsMs, faderCurveShape, cutRampSec, cycleMs } from './scratchFaderModel';
 import { handSpeedFactor } from './scratchHandSpeed';
 
@@ -283,7 +284,7 @@ export class ScratchRecordVoice {
    * `drop` alone). Throws cue the attack and ride forward with the fader
    * open; hand gestures cue the vowel and loop with a return to the anchor.
    */
-  playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number; drive?: 'velocity' | 'hand' } = {}): StrokeResult {
+  playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number; drive?: 'physics' | 'velocity' | 'hand'; style?: ScratchDJStyle; seed?: number } = {}): StrokeResult {
     const r = this.record;
     if (!r) return { ok: false, reason: 'no record loaded' };
     const isThrow = gesture.id === 'drop' || gesture.id === 'dropPhrase';
@@ -311,11 +312,18 @@ export class ScratchRecordVoice {
       interpolate: gesture.interpolateVelocity,
       at: opts.at,
     };
-    // `drive: 'hand'` performs the gesture's hand path (section 17, D5); the default keeps the
-    // tuned velocity keyframes the owner has heard (the hand path's reference strokes are small).
-    // The plan velocity is the hand's speed (SA-m5): every rate scales, timing and fader stay.
+    // The default (O1, G8): the gesture is a hand on the record in the turntable model - the
+    // velocity sets the stroke length (O2), the style the turntable; its record speed is the stroke.
+    const drive = opts.drive ?? 'physics';
+    if (drive === 'physics' && !isThrow && isPhysical(gesture)) {
+      const simulated = simulateGesture(gesture, durationSec, { velocity: opts.velocity, style: opts.style, seed: opts.seed });
+      return this.stroke(simulated.curve, durationSec, { ...strokeOpts, interpolate: true });
+    }
+    // `drive: 'hand'` performs the gesture's hand path kinematically (section 17, D5); 'velocity'
+    // (and the gestures the model does not perform) keeps the velocity keyframes, the plan
+    // velocity as the hand's speed (SA-m5).
     const speed = isThrow ? 1 : handSpeedFactor(opts.velocity);
-    if (opts.drive === 'hand' && gesture.handPath && !isThrow) {
+    if (drive === 'hand' && gesture.handPath && !isThrow) {
       return this.strokePath(gesture.handPath.map((p) => ({ ...p, position: p.position * speed })), durationSec, strokeOpts);
     }
     return this.stroke(gesture.velocityCurve.map((p) => ({ ...p, velocity: p.velocity * speed })), durationSec, strokeOpts);

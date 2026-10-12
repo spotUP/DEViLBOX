@@ -199,6 +199,7 @@ export class ScratchVoicePool {
         ambience,
         velocity: opts.velocity,
         at: opts.at,
+        style: opts.fx?.style,
       });
       if (result.ok) mine = voice.generation;
       // a scheduled stop that arrived while the record was still loading

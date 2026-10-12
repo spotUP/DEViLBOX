@@ -135,6 +135,7 @@ interface GestureSeed {
   recommendedBpm?: { min?: number; max?: number };
   allowsSampleSource: boolean;
   fx?: ScratchGesture['fx'];
+  glide?: ScratchGesture['glide'];
   flourish?: boolean;
   /** Strokes of the curve inside the gesture's length (flutter textures: 2); default 1. */
   strokes?: number;
@@ -234,6 +235,7 @@ const SEEDS: readonly GestureSeed[] = [
     // The record plays forward at natural speed under 4 cuts per beat
     // (reference transformer4 glide 1.0; DEViLBOX 40 % open duty).
     id: 'transformer4', name: 'Transformer', durationSteps: 4,
+    glide: { ratio: 1.0, grip: 0.7 },
     styles: ['electro', 'battle'],
     velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('transform', 4),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
@@ -241,6 +243,7 @@ const SEEDS: readonly GestureSeed[] = [
   },
   {
     id: 'transformer8', name: 'Eight-Cut Transformer', durationSteps: 4,
+    glide: { ratio: 1.0, grip: 0.7 },
     styles: ['electro', 'battle'],
     velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('transform', 8),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
@@ -280,6 +283,7 @@ const SEEDS: readonly GestureSeed[] = [
   {
     // Record plays forward under rapid finger clicks (reference crab glide; DEViLBOX 28 % duty).
     id: 'crab', name: 'Crab', durationSteps: 4,
+    glide: { ratio: 1.0, grip: 0.7 },
     styles: ['electro', 'battle'],
     velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('crab'),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
@@ -301,6 +305,7 @@ const SEEDS: readonly GestureSeed[] = [
     // Reference hydroplane (O3): the finger rides the record, a slightly slower forward glide
     // (0.7) under 12 fast tiny cuts (`transform`, cuts 12).
     id: 'hydroplane', name: 'Hydroplane', durationSteps: 4,
+    glide: { ratio: 0.7, grip: 0.6 },
     styles: ['electro', 'battle'],
     velocityCurve: v([[0, 0.7]]),
     faderWindows: referenceCutPattern('transform', 12),
@@ -400,6 +405,7 @@ const SEEDS: readonly GestureSeed[] = [
   {
     // Both hands on the fader: 8 taps per beat (DEViLBOX 20 % duty).
     id: 'eightFingerCrab', name: 'Eight-Finger Crab', durationSteps: 4,
+    glide: { ratio: 1.0, grip: 0.7 },
     styles: ['electro', 'battle'],
     velocityCurve: GLIDE_CURVE, faderWindows: cutGrid(8, 0.20),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
