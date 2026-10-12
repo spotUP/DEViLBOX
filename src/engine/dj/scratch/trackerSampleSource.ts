@@ -61,7 +61,7 @@ export function trackerSampleRecord(deck: AB, info: Pick<TrackerSampleInfo, 'sam
   const id = trackerSampleRecordId(deck, info.sampleId);
   const anchor = { position: vowel, safe: [0, durationSec] as const, safeForward: [vowel, durationSec] as const, safeReverse: [0, vowel] as const };
   return {
-    id, canonicalName: id, literalPhrase: info.name, file: '', url: '',
+    id, canonicalName: id, literalPhrase: info.name, file: '', sourceFile: '', url: '',
     category: info.kind === 'voice' ? 'SHORT_EXCLAMATION' : 'FX',
     referenceRoles: [], roles: ['ACCENT', 'ANSWER', 'FILL', 'THEME'], styles: [],
     recommendedGestures: [], gestures: SAMPLE_GESTURES,

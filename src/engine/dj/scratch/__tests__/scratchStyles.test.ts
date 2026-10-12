@@ -42,7 +42,8 @@ describe('style palettes (section 32, SCR-P1.7)', () => {
     expect(SCRATCH_STYLES.oldSchool.fxAmount).toBe(0);
     expect(SCRATCH_STYLES.electro.fxAmount).toBe(0.5);
     expect(styleVocabulary('oldSchool')).not.toContain('crab');
-    expect(styleVocabulary('oldSchool').slice(0, 4)).toEqual(['baby', 'forwardStab', 'drag', 'chirp']);
+    // the demo's scratch_dj palette bias, exact (SCR-PHRASING-PARITY)
+    expect(styleVocabulary('oldSchool').slice(0, 3)).toEqual(['baby', 'forwardStab', 'drag']);
     expect(styleVocabulary('battle')).toContain('crab');
     expect(styleVocabulary('battle', 'SAFE')).not.toContain('chirp');
     for (const style of Object.values(SCRATCH_STYLES)) {

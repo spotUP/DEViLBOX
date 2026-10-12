@@ -15,7 +15,7 @@ import type { ScratchCue } from './ScratchRecordVoice';
 import type { ScratchDJStyle, ScratchGestureId, ScratchRole } from './scratchTypes';
 import { lfsr, type ScratchRandom } from './scratchRandom';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
-import { SCRATCH_STYLES } from './scratchStyles';
+import { SCRATCH_STYLES, type ScratchProfileId } from './scratchStyles';
 
 export type RoutineName =
   | 'phraseEnd' | 'hookCallResponse' | 'electroTransformer' | 'chirpFlareShowcase'
@@ -108,10 +108,10 @@ export const SECTION_ROUTINE: Readonly<Record<string, RoutineName>> = {
   outro: 'introDrag', A: 'phraseEnd', B: 'hookCallResponse', A2: 'hookCallResponse', bridge: 'snareAnswer',
 };
 
-/** The routine a section gets; the two palettes whose identity is a routine win over the section. */
-export function routineFor(style: ScratchDJStyle, section: string): RoutineName {
-  if (style === 'electro') return 'electroTransformer';
-  if (style === 'battle') return 'chirpFlareShowcase';
+/** `routine_for`: the routine a section gets; the two profiles whose identity is a routine win over the section. */
+export function routineFor(profile: ScratchDJStyle | ScratchProfileId, section: string): RoutineName {
+  if (profile === 'electro') return 'electroTransformer';
+  if (profile === 'battle') return 'chirpFlareShowcase';
   return SECTION_ROUTINE[section] ?? 'phraseEnd';
 }
 

@@ -1,15 +1,17 @@
 /**
  * Reachability (ledger SCR-P6.R6; owner scratch plan sections 29, 30, 50-56, 74): the Auto
  * Scratch controller `DJScratchDJ.tick()`, driven by a fake clock at the set's PEAK in PERFORMER
- * mode on the corpus `drops` track, performs a 32-bar feature from the drop: the arc's phase is
- * read once per bar (sentinel `scratchArcStats.phaseAt` +32), the telemetry shows the nine phase
- * labels in order, at least 4 bars stay empty, the memory ring is full (16 entries), and when
+ * mode on the corpus `drops` track, performs a 32-bar feature from the drop - the demo's own
+ * three-deck routine (SCR-PHRASING-PARITY D8, sentinel `demoRoutineStats.threeDeck`): the arc's phase
+ * is read once per bar (sentinel `scratchArcStats.phaseAt` +32), the telemetry shows the routine's
+ * nine section labels in order, its silent sections stay empty (at least 4 bars), the memory ring is full (16 entries), and when
  * Auto Scratch is switched off the performer ends IDLE with the deck state it touched restored.
  */
 import { describe, it, expect } from 'vitest';
 import { DJScratchDJ, scratchDJStats } from '../scratch/DJScratchDJ';
 import { ScratchExecutor } from '../scratch/ScratchExecutor';
 import { scratchArcStats } from '../scratch/scratchArc';
+import { demoRoutineStats } from '../scratch/scratchDemoRoutines';
 import { deckAnchor } from '../scratch/scratchAnchor';
 import { corpusAnalysis } from '../autodj/testing/corpus';
 import { fractionalBeatAt, timeAtBeat, barStartBeat } from '../autodj/beatGrid';
@@ -63,6 +65,7 @@ describe('Auto Scratch performs the arc (SCR-P6.R6)', () => {
     });
 
     const phaseReadsBefore = scratchArcStats.phaseAt;
+    const threeDeckBefore = demoRoutineStats.threeDeck;
     const bookendsBefore = scratchDJStats.bookends;
     const end = barT(drop.startBar + 32) + 0.05;
     let nextPoll = sec;
@@ -74,7 +77,8 @@ describe('Auto Scratch performs the arc (SCR-P6.R6)', () => {
 
     expect(scratchArcStats.phaseAt - phaseReadsBefore).toBe(32);
     const t = ctrl.telemetry();
-    expect([...new Set(t.arcPhases)]).toEqual(['establish', 'build', 'call', 'response', 'develop', 'feature', 'peak', 'burst', 'resolution']);
+    expect(demoRoutineStats.threeDeck - threeDeckBefore).toBe(1);
+    expect([...new Set(t.arcPhases)]).toEqual(['establish', 'build', 'half_bar', 'reorder', 'scratch_feat', 'juggle_feat', 'combined', 'final_burst', 'resolution']);
     expect(t.arcPhases).toHaveLength(32);
     const featureEvents = scheduled.filter((e) => e.executeAtBeat >= barStartBeat(track.downbeats, drop.startBar) && e.executeAtBeat < barStartBeat(track.downbeats, drop.startBar + 32));
     // genuine rests: bars with no scratch (the needle's drop / lift bookends are not scratches)

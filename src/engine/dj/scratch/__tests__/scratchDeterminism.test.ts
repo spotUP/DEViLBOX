@@ -1,13 +1,13 @@
 /** Deterministic planner (owner scratch plan section 66; SCR-P4.13). */
 import { describe, it, expect } from 'vitest';
 import { planScratch } from '../scratchPlanner';
-import { validatePhrase } from '../scratchPlacement';
+import { oneHandConflicts } from '../scratchPlacement';
 import { getGesture } from '../scratchGestureCatalog';
 import { scenarioContext } from './fixtures/scenarioContext';
 
 const base = { style: 'battle' as const, kind: 'instrumental' as const, bpm: 100, energy: 0.8 };
-const run = (ctxOver: Partial<Parameters<typeof scenarioContext>[0]>, seed: number, mode: 'MUSICAL' | 'BATTLE' = 'BATTLE', bars = 16, routines = true) =>
-  planScratch(scenarioContext({ ...base, ...ctxOver }), { mode, seed, fromBar: 16, bars, routines });
+const run = (ctxOver: Partial<Parameters<typeof scenarioContext>[0]>, seed: number, mode: 'MUSICAL' | 'BATTLE' = 'BATTLE', bars = 16, routine: 'auto' | null = 'auto') =>
+  planScratch(scenarioContext({ permission: 4, ...base, ...ctxOver }), { mode, seed, fromBar: 16, bars, routine });
 const level = (events: { gesture: Parameters<typeof getGesture>[0] }[]) => Math.max(0, ...events.map((e) => getGesture(e.gesture).difficulty));
 
 describe('the planner is deterministic and conservative (SCR-P4.13)', () => {
@@ -16,17 +16,19 @@ describe('the planner is deterministic and conservative (SCR-P4.13)', () => {
     expect(a.events.length).toBeGreaterThan(0);
     expect(a).toEqual(b);
     expect(c.events).not.toEqual(a.events);
-    expect(validatePhrase(c.bars)).toEqual([]);
-    expect(validatePhrase(a.bars)).toEqual([]);
+    // valid: one hand, never more than 4 a bar (a showcase may scratch every bar, as the demo does)
+    for (const p of [a, c]) { expect(oneHandConflicts(p.events)).toBe(0); for (const bar of p.bars) expect(bar.length).toBeLessThanOrEqual(4); }
   });
 
-  it('high energy reaches a higher maximum level than low energy', () => {
-    let hi = 0, lo = 0;
-    for (let seed = 1; seed <= 30; seed++) {
-      hi += level(run({ energy: 1.0 }, seed, 'BATTLE', 16, false).events);
-      lo += level(run({ energy: 0.1 }, seed, 'BATTLE', 16, false).events);
+  it('a high-energy section (showcase 1.0) reaches a higher maximum level than a low one (verse 0.2), from the demo section energy', () => {
+    let hi = 0, lo = 0, loBars = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      hi += level(run({ kind: 'instrumental' }, seed, 'BATTLE', 16, null).events);
+      const v = run({ kind: 'verse' }, seed, 'BATTLE', 16, null).events;
+      if (v.length) { lo += level(v); loBars++; }
     }
-    expect(hi).toBeGreaterThan(lo);
+    expect(loBars).toBeGreaterThan(0);
+    expect(hi / 60).toBeGreaterThan(lo / loBars);
   });
 
   it('a vocal-heavy bar plans fewer events', () => {

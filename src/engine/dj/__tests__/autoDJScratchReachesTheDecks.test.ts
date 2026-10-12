@@ -47,7 +47,7 @@ import { setSessionController, DJSessionController } from '../autodj/sessionCont
 import { fakeDeck } from './juggleTransitionHarness';
 import { ScratchExecutor, scratchExecutorStats, type ScratchRun } from '../scratch/ScratchExecutor';
 import { scratchOpportunityStats } from '../scratch/scratchOpportunity';
-import { scratchSourceStats } from '../scratch/ScratchSourceSelector';
+import { demoRoutineStats } from '../scratch/scratchDemoRoutines';
 import { scratchPlacementStats } from '../scratch/scratchPlacement';
 import { scratchVoiceStats } from '../scratch/ScratchRecordVoice';
 import { getScratchVoicePool, resetScratchVoicePool } from '../scratch/scratchVoicePool';
@@ -94,7 +94,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
   pl.importPlaylists([{ id, name: 'scratch r7', createdAt: Date.now(), updatedAt: Date.now(), tracks }]);
   pl.setActivePlaylist(id);
   const s = useDJStore.getState();
-  s.setAutoDJConfig({ shuffle: false, style: 'Club', juggleMode: 'OFF', scratchMode: mode, scratchStyle: 'boomBap' });
+  s.setAutoDJConfig({ shuffle: false, style: 'Club', juggleMode: 'OFF', scratchMode: mode, scratchStyle: 'battle' });
   s.setDeckState('A', { fileName: 'breakdowns.wav', trackName: 'breakdowns', isPlaying: true, detectedBPM: 125, effectiveBPM: 125, durationMs: 600_000, audioPosition: startSec, pitchOffset: 0, trackAnalysis: track });
   s.setDeckState('B', { fileName: null, trackName: '', isPlaying: false, trackAnalysis: null, beatGrid: null, audioPosition: 0 });
   s.setAutoDJEnabled(true);
@@ -117,7 +117,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
     return r;
   });
   const before = {
-    find: scratchOpportunityStats.find, select: scratchSourceStats.select, phrase: scratchPlacementStats.planPhrase,
+    find: scratchOpportunityStats.find, select: demoRoutineStats.overlayRecord, phrase: scratchPlacementStats.planPhrase,
     started: scratchExecutorStats.started, strokes: scratchVoiceStats.strokes, decisions: getDecisionLog().counts.SCRATCH ?? 0,
     simulations: scratchPhysicsStats.performed,
   };
@@ -136,7 +136,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
   return {
     track, deck, runs, decisions: newDecisions > 0 ? getDecisionLog().list(newDecisions, 'SCRATCH') : [], memory: controller.memory.snapshot(),
     counts: {
-      find: scratchOpportunityStats.find - before.find, select: scratchSourceStats.select - before.select, phrase: scratchPlacementStats.planPhrase - before.phrase,
+      find: scratchOpportunityStats.find - before.find, select: demoRoutineStats.overlayRecord - before.select, phrase: scratchPlacementStats.planPhrase - before.phrase,
       started: scratchExecutorStats.started - before.started, strokes: scratchVoiceStats.strokes - before.strokes,
       decisions: (getDecisionLog().counts.SCRATCH ?? 0) - before.decisions,
       simulations: scratchPhysicsStats.performed - before.simulations,
@@ -160,8 +160,10 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
   it('MUSICAL into a breakdown: opportunity, source, planPhrase, every planned event executed on the grid, the voice strokes', async () => {
     const { counts, runs, deck, track, decisions, memory } = await run('MUSICAL');
     expect(counts.find).toBeGreaterThanOrEqual(1);
+    // the record is the demo's pick for the section (pick_source), never the music (SCR-PHRASING-PARITY D1, D4)
     expect(counts.select).toBeGreaterThanOrEqual(1);
     expect(counts.phrase).toBeGreaterThanOrEqual(1);
+    expect(runs.every((r) => r.run.event.source.type === 'CRATE')).toBe(true);
     expect(runs.length).toBeGreaterThanOrEqual(1);
     expect(counts.started).toBe(runs.length);
     expect(counts.decisions).toBeGreaterThanOrEqual(1);
@@ -194,11 +196,11 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
     const physical = runs.filter((r) => r.run.event.source.type === 'CRATE' && isPhysical(getGesture(r.run.event.gesture))).length;
     expect(physical).toBeGreaterThan(0);
     expect(counts.simulations).toBe(physical);
-    // the style's FX rides on every planned event (SCR-PG-A5): Boom Bap, its FX amount 0.1 x the genre's scale
+    // the style's FX rides on every planned event (SCR-PG-A5): Battle, its FX amount 0.25 x the genre's scale
     for (const { run: r } of runs) {
-      expect(r.event.fx?.style).toBe('boomBap');
+      expect(r.event.fx?.style).toBe('battle');
       expect(r.event.fx!.amount).toBeGreaterThan(0);
-      expect(r.event.fx!.amount).toBeLessThanOrEqual(0.1 * 2);
+      expect(r.event.fx!.amount).toBeLessThanOrEqual(0.25 * 2);
     }
     // the planned beats sit on the track's own downbeat grid (1/16 steps of a bar)
     for (const { run: r } of runs) {

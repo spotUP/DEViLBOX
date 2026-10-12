@@ -35,8 +35,11 @@ function run(juggleActive: boolean, opts: { shape?: Shape; permission?: number }
 
 describe('scratch beside a juggle (SCR-P7.9)', () => {
   it('under a juggle: crate records only, answers and accents only, no feature, never the crossfader', () => {
+    // the demo plays no scratch while the hands juggle (three_deck: Deck C is out); the overlay keeps only
+    // its answers and accents, so a sparse set may keep none at all - the controller still plans every window
+    const plans = scratchDJStats.plans;
     const { events, ctrl } = run(true);
-    expect(events.length).toBeGreaterThan(0);
+    expect(scratchDJStats.plans).toBeGreaterThan(plans);
     for (const e of events) {
       expect(e.source.type, e.gesture).toBe('CRATE');
       if (e.gesture !== 'drop' && e.gesture !== 'dropPhrase') expect(['ANSWER', 'ACCENT']).toContain(e.role);

@@ -2,115 +2,43 @@
  "scenario": "drumAndBass",
  "seed": 1,
  "mode": "PERFORMER",
- "routine": "electroTransformer",
+ "routine": null,
  "events": [
+  {
+   "bar": 16,
+   "step": 15,
+   "beat": 67.75,
+   "gesture": "flare2",
+   "velocity": 0.6617059586480507,
+   "placementRole": "turnaround",
+   "role": "FILL"
+  },
   {
    "bar": 19,
    "step": 15,
    "beat": 79.75,
-   "gesture": "chirpDouble",
-   "velocity": 0.8383016708628976,
+   "gesture": "flare2",
+   "velocity": 0.9187960631723507,
    "placementRole": "turnaround",
    "role": "FILL"
   },
   {
-   "bar": 22,
-   "step": 1,
-   "beat": 88.25,
-   "gesture": "chirp",
-   "velocity": 0.8,
-   "placementRole": "accent",
-   "role": "THEME"
-  },
-  {
-   "bar": 22,
-   "step": 9,
-   "beat": 90.25,
-   "gesture": "flare1",
-   "velocity": 0.85,
-   "placementRole": "accent",
-   "role": "THEME"
-  },
-  {
    "bar": 23,
-   "step": 1,
-   "beat": 92.25,
-   "gesture": "chirp",
-   "velocity": 0.9,
-   "placementRole": "answer",
-   "role": "ANSWER"
-  },
-  {
-   "bar": 23,
-   "step": 9,
-   "beat": 94.25,
-   "gesture": "chirpDouble",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 23,
-   "step": 14,
-   "beat": 95.5,
-   "gesture": "chirp",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "OUTRO"
-  },
-  {
-   "bar": 27,
    "step": 15,
-   "beat": 111.75,
-   "gesture": "flare1",
-   "velocity": 0.9216830701152056,
+   "beat": 95.75,
+   "gesture": "transformer4",
+   "velocity": 1,
    "placementRole": "turnaround",
    "role": "FILL"
   },
   {
-   "bar": 30,
-   "step": 1,
-   "beat": 120.25,
-   "gesture": "chirp",
-   "velocity": 0.8,
-   "placementRole": "accent",
-   "role": "THEME"
-  },
-  {
-   "bar": 30,
-   "step": 9,
-   "beat": 122.25,
-   "gesture": "flare1",
-   "velocity": 0.85,
-   "placementRole": "accent",
-   "role": "THEME"
-  },
-  {
    "bar": 31,
-   "step": 1,
-   "beat": 124.25,
-   "gesture": "chirp",
-   "velocity": 0.9,
-   "placementRole": "answer",
-   "role": "ANSWER"
-  },
-  {
-   "bar": 31,
-   "step": 9,
-   "beat": 126.25,
-   "gesture": "chirpDouble",
-   "velocity": 0.9,
-   "placementRole": "accent",
-   "role": "FEATURE"
-  },
-  {
-   "bar": 31,
-   "step": 14,
-   "beat": 127.5,
-   "gesture": "chirp",
-   "velocity": 0.95,
-   "placementRole": "accent",
-   "role": "OUTRO"
+   "step": 15,
+   "beat": 127.75,
+   "gesture": "flare2",
+   "velocity": 0.9069062333104448,
+   "placementRole": "turnaround",
+   "role": "FILL"
   }
  ]
 }

@@ -11,6 +11,7 @@ import { planTransition, type TransitionPlanInput } from '../transitionPlanner';
 import { getStyle } from '../styleProfiles';
 import { DJSessionMemory } from '../sessionMemory';
 import { planTransitionScratch, type TransitionScratchInput } from '../../scratch/transitionScratch';
+import { getScratchRecord, VOCAL_CATEGORIES } from '../../scratch/scratchCatalogue';
 import { scratchPermission, juggleCost, transitionCost, checkHands, HAND_COSTS } from '../performanceBudget';
 import type { DJTransitionPlan, TransitionStyle } from '../types';
 import type { ScratchMode } from '../../scratch/scratchStyles';
@@ -70,9 +71,13 @@ describe('section 45 compatibility (SCR-P7.2)', () => {
       expect(r.reason, style).toMatch(/risky|echo/);
       if (r.scratch) expect(r.scratch.events.filter((e) => e.gesture !== 'drop' && e.role !== 'ANSWER').length, style).toBeLessThanOrEqual(1);
     }
-    // a vocal swap never scratches a voice
+    // a vocal swap never scratches a voice: a crate record outside the voice categories (never the music, SCR-PHRASING-PARITY D1)
     const vs = scratchFor('vocalSwap');
-    if (vs.scratch) expect(vs.scratch.source.type).not.toBe('CRATE');
+    if (vs.scratch) {
+      expect(vs.scratch.source.type).toBe('CRATE');
+      const id = vs.scratch.source.type === 'CRATE' ? vs.scratch.source.recordId : '';
+      expect(VOCAL_CATEGORIES).not.toContain(getScratchRecord(id)!.category);
+    }
   });
 });
 
@@ -86,7 +91,8 @@ describe('scratch as the transition, outgoing performance, vocal response (SCR-P
     for (const e of s.events) expect(e.executeAtBeat).toBeGreaterThanOrEqual(lastFour - 1e-9);
     expect(s.events.some((e) => e.gesture === 'transformer4' || e.gesture === 'transformer8')).toBe(true);
     expect(s.events.at(-1)!.role).toBe('OUTRO');
-    expect(s.source.type).toBe('DECK');
+    // a crate record, never the outgoing music (the demo never scratches the music, SCR-PHRASING-PARITY D1)
+    expect(s.source.type).toBe('CRATE');
     expect(s.fxRequest).toBe('transition');
   });
 
