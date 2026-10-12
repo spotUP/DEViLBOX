@@ -73,6 +73,19 @@ describe('a SID render is one emulation pass', () => {
     expect(withStems.ms, `stems ${withStems.ms} ms vs plain ${plain.ms} ms`).toBeLessThan(plain.ms * 4);
   }, 600_000);
 
+  it('a deck load keeps the player call rate with the render (cache entry), and an entry rendered before it is rendered again', async () => {
+    const { getDJPipeline } = await import('../DJPipeline');
+    const { getCachedAudio, lacksPlayerClock } = await import('../DJAudioCache');
+    const b = readFileSync(join(process.cwd(), 'src/lib/sid/__tests__/fixtures/Commando.sid'));
+    const bytes = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+    await getDJPipeline().loadOrEnqueue(bytes, 'Commando.sid', undefined, 'high', undefined, 20).catch(() => undefined);
+    const entry = await getCachedAudio(bytes, { allowPreview: true });
+    expect(entry?.playerCallHz).toBeCloseTo(985249 / 19656, 4);
+    expect(lacksPlayerClock(entry!)).toBe(false);
+    expect(lacksPlayerClock({ sourceData: bytes, playerCallHz: undefined })).toBe(true);
+    expect(lacksPlayerClock({ sourceData: bytes, playerCallHz: null })).toBe(false);
+  }, 300_000);
+
   it('the render reports the player call rate: a VBI tune runs at the PAL frame rate', async () => {
     const r = await render('Commando.sid', 30, false);
     expect(r.playerCallHz).toBeCloseTo(985249 / 19656, 4);

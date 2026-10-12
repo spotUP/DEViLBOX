@@ -221,7 +221,13 @@ export class DJJuggleController {
     const bpmA = A.bpm || 1, bpmB = B.bpm || 1;
     const tempoMatch = Math.abs(bpmA - bpmB) / Math.max(bpmA, bpmB);
     const bothPlaying = A.playing && B.playing && !!A.analysis && !!B.analysis;
-    const deckSyncConfidence = bothPlaying ? Math.max(0, 1 - tempoMatch * 20) * Math.min(A.analysis!.beatGrid.confidence, B.analysis!.beatGrid.confidence) : 0;
+    // Sync = how well beatmatched decks on these grids hold: the grids' own confidence (as the
+    // transition planner's pairConfidence reads it), times the live tempo match while both play.
+    // A stopped or empty deck is the 'both decks must play' / 'need analysis' condition, not a
+    // sync of 0 - that made every one-deck refusal read 'sync 0.00 < 0.6' (SID juggle report).
+    const grids = [A, B].filter((d) => d.analysis).map((d) => d.analysis!.beatGrid.confidence);
+    const gridSync = grids.length ? Math.min(...grids) : 0;
+    const deckSyncConfidence = bothPlaying ? Math.max(0, 1 - tempoMatch * 20) * gridSync : gridSync;
     const sameTrack = !!A.analysis && !!B.analysis && A.trackId === B.trackId;
     const nowSec = this.now() / 1000;
     const last = this.history[this.history.length - 1];

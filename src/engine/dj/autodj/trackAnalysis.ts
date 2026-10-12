@@ -20,6 +20,7 @@ import { arrangementEvents, barFeatures, buildPhrases, detectPhraseLength, label
 import { deriveCuePoints } from './cuePoints';
 import { analyzeTrackerSong, timeOrderPositions } from './trackerMixAnalysis';
 import { moduleBeatGrid, type ModuleBeatGrid } from './moduleBeatGrid';
+import { sidPlayerBeatGrid } from '../sidPlayerClock';
 import { smooth } from './activityTimelines';
 
 /**
@@ -220,9 +221,15 @@ export function buildDJTrackAnalysis(input: BuildAnalysisInput): DJTrackAnalysis
 
   // One tempo source: the module's own timing when its walk matches the render, else the audio analysis.
   const mg = moduleTempo(song, input.durationSec, input.renderCapSec);
+  // A SID (no song walk that matches the render) gets its beat from the player clock: whole player
+  // calls per beat, locked to the detected beats (sidPlayerBeatGrid). Its bars come from the phase
+  // search over the exact beats, as an audio track's do.
+  const sg = !mg && analysis.playerCallHz ? sidPlayerBeatGrid(analysis, analysis.playerCallHz, durationSec) : null;
   const tempo = mg
     ? { beats: mg.beats, downbeats: mg.downbeats, bpm: mg.bpm, bpmConfidence: mg.confidence, timeSignature: mg.beatsPerBar }
-    : { beats: analysis.beats, downbeats: analysis.downbeats, bpm: analysis.bpm, bpmConfidence: analysis.bpmConfidence, timeSignature: analysis.timeSignature };
+    : sg
+      ? { beats: sg.beats, downbeats: [], bpm: sg.bpm, bpmConfidence: sg.coherence, timeSignature: analysis.timeSignature }
+      : { beats: analysis.beats, downbeats: analysis.downbeats, bpm: analysis.bpm, bpmConfidence: analysis.bpmConfidence, timeSignature: analysis.timeSignature };
   const grids = buildBeatGrids({
     ...tempo, extended: ext, durationSec,
     fixed: mg ? { beatsPerBar: mg.beatsPerBar, confidence: mg.confidence, meterConfidence: mg.meterConfidence } : undefined,
