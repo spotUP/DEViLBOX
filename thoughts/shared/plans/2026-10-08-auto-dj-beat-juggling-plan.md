@@ -1179,6 +1179,14 @@ throughout the entire set.
 
 That sounds like a demo, not a DJ.
 
+**Owner decision 2026-10-12 (JUGGLE-FOLLOWUPS a): the budget decides.** How often a juggle happens is set by
+this budget alone (the set phase, cooldown and juggled fraction of section 28, scaled by the Auto Juggle mode
+of section 44). When the budget allows a juggle and a trading ladder fits both tracks, the juggle transition
+outranks the blends in every DJ style; the transition planner's style score is not a second frequency gate.
+The safety gates are unchanged (tempo band, key clash, vocals, drums, phase and grid confidence, meter).
+Before: Classic (risk 0.35) at MUSICAL outside PEAK scored 0.605 against 0.70 for a bass swap, and a live
+37-minute set juggled 3 times.
+
 ---
 
 # 25. WHEN TO JUGGLE

@@ -461,9 +461,13 @@ export function scoreStyles(ctx: {
     && (ctx.tempoBand === 'none' || ctx.tempoBand === 'normal')
     && ctx.clashRisk <= HARMONIC_CLASH_REJECT && ctx.vocalRisk < 0.5 && ctx.drumScore >= 0.5
     && gridConf >= POLICY_MIN.phrase.beat && !!ctx.ladderFits;
+  // The juggle budget decides how often (owner decision 2026-10-12, JUGGLE-FOLLOWUPS a; owner plan sections
+  // 24, 28, 44): a ladder fits only when the set phase, the cooldown and the juggled fraction allow a juggle,
+  // so with the gates above held the juggle transition outranks every other style, in every DJ style.
+  // The style score is not a second, hidden frequency gate.
   if (juggleOk) {
-    const performer = mode === 'PERFORMER' || mode === 'AGGRESSIVE' || mode === 'CHAOS';
-    add('juggleTransition', 0.5 + ctx.creativeRisk * 0.3 + (ctx.setPhaseIsPeak() ? 0.2 : 0) + (performer ? 0.15 : 0), 'compatible grids, keys and drums: trade the tracks into the drop');
+    const top = out.reduce((m, s) => Math.max(m, s.score), 0);
+    out.push({ style: 'juggleTransition', score: top + 0.05, reason: 'compatible grids, keys and drums, juggle budget open: trade the tracks into the drop' });
   }
   return out;
 }
