@@ -5,12 +5,14 @@
  * stand-alone layer stops the idle deck. A crossfader move is a Tone ramp, scheduled one lookAhead
  * (100 ms, measured live) after it is set; the deck stop acted at the context's current time. The idle
  * deck the crowd still heard fell silent 100 ms before the fader reached the master: a hole before the
- * master's downbeat. The idle deck now stops when the fader move has landed.
+ * master's downbeat. The hand-back moves the fader first; every deck stop takes its time from the one
+ * rule (stopPlayerNow.afterPendingMix) and lands when that move has.
  *
  * Entry: getAutoDJ()'s poll loop, a stand-alone double to the pattern's end. The fake mixer models the
  * audio clock: a move set at t lands at t + lookAhead + its ramp. Sentinel: the idle deck's stop time.
  * Numbers: the stop is no earlier than the hand-back's fader landing; the history carries every cut's
- * planned and executed beat and its error in ms.
+ * planned and executed beat and its error in ms. The time rule itself, on the real mixer and player code,
+ * is proven (and revert-checked) in deckActionsLandWithTheFader.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -51,6 +53,7 @@ vi.mock('../DJPerSongFx', () => ({ applyPerSongMasterFx: () => {} }));
 import { useDJStore } from '@/stores/useDJStore';
 import { getAutoDJ } from '../DJAutoDJ';
 import { getDecisionLog } from '../autodj/decisionLog';
+import { afterPendingMix, noteMixMoveLands } from '../stopPlayerNow';
 import type { AutoDJInternals } from './juggleTransitionHarness';
 import { setupStandalone, teardownStandalone, runStandalone, type StandaloneRig } from './standaloneJuggleHarness';
 
@@ -66,18 +69,18 @@ describe('JUGGLE-LAST-CUT-LATE: the hand-back stops the idle deck only once the 
   afterEach(() => { teardownStandalone(); });
 
   it('the last cut of a stand-alone juggle has no hole: the idle deck stops after the fader move lands', async () => {
-    // The fake mixer on the audio clock: a move set now lands one lookAhead plus its ramp later.
+    // The fake mixer on the audio clock: a move set now lands one lookAhead plus its ramp later, and reports
+    // it to the deck-action time rule as the real mixer does.
     let landsAt = 0;
-    const engine = holder.engine as { setCrossfader: (v: number) => void; mixer: { setCrossfader: (v: number) => void; crossfaderSettledAt?: () => number } };
+    const engine = holder.engine as { setCrossfader: (v: number) => void; mixer: { setCrossfader: (v: number) => void } };
     const recordMove = engine.mixer.setCrossfader;
-    const move = (v: number) => { landsAt = contextNow() + LOOKAHEAD_SEC + RAMP_SEC; recordMove(v); };
+    const move = (v: number) => { landsAt = contextNow() + LOOKAHEAD_SEC + RAMP_SEC; noteMixMoveLands(landsAt); recordMove(v); };
     engine.setCrossfader = move;
     engine.mixer.setCrossfader = move;
-    engine.mixer.crossfaderSettledAt = () => landsAt;
-    // The idle deck's stop: now, or at the context time it was given.
+    // The idle deck's stop takes its time from the one rule (stopPlayerNow.afterPendingMix), as the real player does.
     const stops: Array<{ stopSec: number; faderLandsSec: number }> = [];
     const stop = rig.decks.B.stop;
-    rig.decks.B.stop = ((at?: number) => { stops.push({ stopSec: Math.max(contextNow(), at ?? 0), faderLandsSec: landsAt }); stop(); }) as typeof stop;
+    rig.decks.B.stop = (() => { stops.push({ stopSec: afterPendingMix(contextNow()), faderLandsSec: landsAt }); stop(); }) as typeof stop;
 
     const dj = getAutoDJ() as unknown as AutoDJInternals;
     const j = dj.getJuggle();
