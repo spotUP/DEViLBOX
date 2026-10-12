@@ -14,6 +14,7 @@ import { JSSIDEngine } from './deepsid/engines/JSSIDEngine';
 import { ScriptNodePlayerEngine } from './deepsid/engines/ScriptNodePlayerEngine';
 import { JSIDPlay2Engine } from './deepsid/engines/JSIDPlay2Engine';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { parseSIDHeader, sidPlaybackModel } from '@/lib/sid/SIDHeaderParser';
 
 type EngineInstance = JSSIDEngine | ScriptNodePlayerEngine | JSIDPlay2Engine;
 
@@ -78,75 +79,20 @@ export class C64SIDEngine {
   }
 
   /**
-   * Extract basic metadata from SID header (PSID/RSID format)
+   * Metadata from the SID header, read by the one header parser (SIDHeaderParser).
    */
   private extractMetadata(): void {
-    const view = new DataView(this.sidData.buffer, this.sidData.byteOffset);
-    
-    // Check magic
-    const magic = String.fromCharCode(
-      this.sidData[0], this.sidData[1], this.sidData[2], this.sidData[3]
-    );
-    
-    if (magic !== 'PSID' && magic !== 'RSID') {
-      throw new Error('Invalid SID file: missing PSID/RSID magic');
-    }
-    
-    // Version (offset 4, 2 bytes BE)
-    const version = view.getUint16(4, false);
-    
-    // Data offset (offset 6, 2 bytes BE)
-    const dataOffset = view.getUint16(6, false);
-    
-    // Songs count (offset 14, 2 bytes BE)
-    const songs = view.getUint16(14, false);
-    
-    // Default song (offset 16, 2 bytes BE, 1-based)
-    const startSong = view.getUint16(16, false);
-    
-    // Title, author, copyright (offset 22, 32 bytes each)
-    const title = this.readStr(22, 32);
-    const author = this.readStr(54, 32);
-    const copyright = this.readStr(86, 32);
-    
-    // Flags (offset 118, 2 bytes BE) - for PSID v2+
-    let chipModel: '6581' | '8580' = '6581';
-    let clockSpeed = 985248; // PAL default
-    
-    if (version >= 2 && dataOffset >= 0x7C) {
-      const flags = view.getUint16(118, false);
-      
-      // Bits 4-5: SID model (00=unknown, 01=6581, 10=8580, 11=both)
-      const sidModel = (flags >> 4) & 0x03;
-      if (sidModel === 0x02) chipModel = '8580';
-      
-      // Bits 2-3: Clock speed (00=unknown, 01=PAL, 10=NTSC, 11=both)
-      const clock = (flags >> 2) & 0x03;
-      if (clock === 0x02) clockSpeed = 1022727; // NTSC
-    }
-    
+    const info = parseSIDHeader(this.sidData);
+    if (!info) throw new Error('Invalid SID file: missing PSID/RSID magic');
     this.metadata = {
-      title,
-      author,
-      copyright,
-      subsongs: songs,
-      defaultSubsong: startSong - 1, // Convert to 0-based
-      chipModel,
-      clockSpeed,
+      title: info.title.trim(),
+      author: info.author.trim(),
+      copyright: info.copyright.trim(),
+      subsongs: info.subsongs,
+      defaultSubsong: info.defaultSubsong,
+      chipModel: sidPlaybackModel(info),
+      clockSpeed: info.clockSpeed === 'NTSC' ? 1022727 : 985248,
     };
-    
-    console.log('[C64SIDEngine] Metadata:', this.metadata);
-  }
-
-  /**
-   * Read null-terminated string from SID header
-   */
-  private readStr(offset: number, maxLen: number): string {
-    let str = '';
-    for (let i = 0; i < maxLen && this.sidData[offset + i] !== 0; i++) {
-      str += String.fromCharCode(this.sidData[offset + i]);
-    }
-    return str.trim();
   }
 
   /**
