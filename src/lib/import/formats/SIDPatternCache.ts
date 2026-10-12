@@ -10,7 +10,7 @@ import type { Pattern } from '@/types';
 const DB_NAME = 'DEViLBOX_SIDPatternCache';
 const DB_VERSION = 1;
 const STORE_NAME = 'patterns';
-const CACHE_VERSION = 1; // bump when parser algorithm changes
+const CACHE_VERSION = 2; // bump when parser algorithm changes (2: every chip's voices of a 2SID/3SID)
 const MAX_ENTRIES = 500;
 
 export interface CachedSIDPatterns {

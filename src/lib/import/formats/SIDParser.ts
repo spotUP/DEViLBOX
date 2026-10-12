@@ -9,6 +9,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
 import { Cpu6502, type MemoryMap } from '@/lib/import/cpu/Cpu6502';
 import { getCachedPatterns, cachePatterns } from '@/lib/import/formats/SIDPatternCache';
+import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -18,12 +19,6 @@ function readStr(buf: Uint8Array, off: number, len: number): string {
   let s = '';
   for (let i = 0; i < len && buf[off + i] !== 0; i++) s += String.fromCharCode(buf[off + i]);
   return s.trim();
-}
-
-/** Detect SID model from flags for display purposes (not used for synthesis). */
-function sidModelLabel(flags: number, shift: number): string {
-  const model = (flags >> shift) & 0x03;
-  return model === 0x02 ? '8580' : '6581';
 }
 
 // SID frequency: freq_hz = freqReg * clock / 16777216
@@ -43,8 +38,9 @@ interface FrameState {
 function runSIDEmulation(
   buf: Uint8Array,
   loadAddr: number, initAddr: number, playAddr: number,
-  dataOffset: number, numVoices: number, sidClock: number
+  dataOffset: number, chipBases: number[], sidClock: number
 ): FrameState[] {
+  const numVoices = chipBases.length * 3;
   // 18000 frames ≈ 6 min PAL / 5 min NTSC — covers most SID tunes
   const FRAMES = 18000;
   const MAX_TOTAL_CYCLES = 80_000_000; // safety budget
@@ -54,7 +50,9 @@ function runSIDEmulation(
   const codeLen = Math.min(code.length, 0x10000 - loadAddr);
   ram.set(code.subarray(0, codeLen), loadAddr);
 
-  const sidRegs = new Uint8Array(0x20);
+  // One 32-byte register window per chip, at the chip's base address.
+  const sidRegs = new Uint8Array(0x20 * chipBases.length);
+  const chipOf = (addr: number): number => chipBases.findIndex((b) => addr >= b && addr < b + 0x20);
 
   let ciaTimerA = 0x4025; // PAL default
   let ciaTimerACycles = 0;
@@ -77,7 +75,7 @@ function runSIDEmulation(
   const mem: MemoryMap = {
     read(addr) {
       addr &= 0xFFFF;
-      if (addr >= 0xD400 && addr < 0xD420) return sidRegs[addr - 0xD400];
+      if ((addr >= 0xD400 && addr < 0xD800) || addr >= 0xDE00) { const c = chipOf(addr); if (c >= 0) return sidRegs[c * 0x20 + addr - chipBases[c]]; }
       if (addr === 0xDC04) return ciaTimerA & 0xFF;
       if (addr === 0xDC05) return (ciaTimerA >> 8) & 0xFF;
       if (addr === 0xDC0D) return 0x01;
@@ -88,7 +86,7 @@ function runSIDEmulation(
     write(addr, val) {
       addr &= 0xFFFF;
       ram[addr] = val;
-      if (addr >= 0xD400 && addr < 0xD420) sidRegs[addr - 0xD400] = val;
+      if ((addr >= 0xD400 && addr < 0xD800) || addr >= 0xDE00) { const c = chipOf(addr); if (c >= 0) sidRegs[c * 0x20 + addr - chipBases[c]] = val; }
       if (addr === 0xDC04) ciaTimerA = (ciaTimerA & 0xFF00) | val;
       if (addr === 0xDC05) ciaTimerA = (ciaTimerA & 0x00FF) | (val << 8);
     },
@@ -120,8 +118,8 @@ function runSIDEmulation(
     const notes: (number | null)[] = new Array(numVoices).fill(null);
     const regs: number[] = [];
 
-    for (let v = 0; v < Math.min(numVoices, 3); v++) {
-      const base = v * 7;
+    for (let v = 0; v < numVoices; v++) {
+      const base = Math.floor(v / 3) * 0x20 + (v % 3) * 7;
       const freqLo  = sidRegs[base + 0];
       const freqHi  = sidRegs[base + 1];
       const control = sidRegs[base + 4];
@@ -361,20 +359,19 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
   const buf = new Uint8Array(buffer);
   const dv  = new DataView(buffer);
 
-  const version    = dv.getUint16(4, false);
   const dataOffset = dv.getUint16(6, false);
   const loadAddrField = dv.getUint16(8, false);
   const initAddr   = dv.getUint16(10, false);
   const playAddr   = dv.getUint16(12, false);
   const title      = readStr(buf, 22, 32);
   const author     = readStr(buf, 54, 32);
-  const flags      = version >= 2 && buf.length > 119 ? dv.getUint16(118, false) : 0;
-  const has2ndSID  = version >= 2 && buf.length > 120 && buf[120] !== 0;
-  const has3rdSID  = version >= 3 && buf.length > 121 && buf[121] !== 0;
-
-  // PAL/NTSC detection from flags bits 2-3
-  const clockFlag = (flags >> 2) & 0x03;
-  const isNTSC = clockFlag === 2;
+  // Chips, models and clock from the one header reader (SIDHeaderParser).
+  const header = parseSIDHeader(buf);
+  const chipModels = header?.chipModels ?? ['Unknown'];
+  const chipBases = [0xD400];
+  if (header?.secondSID) chipBases.push(0xD000 + buf[0x7A] * 16);
+  if (header?.thirdSID) chipBases.push(0xD000 + buf[0x7B] * 16);
+  const isNTSC = header?.clockSpeed === 'NTSC';
   const frameRate = isNTSC ? 60 : 50;
 
   let loadAddr = loadAddrField;
@@ -382,14 +379,11 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
     loadAddr = buf[dataOffset] | (buf[dataOffset + 1] << 8);
   }
 
-  const model1 = sidModelLabel(flags, 2);
-  const model2 = has2ndSID ? sidModelLabel(flags, 6) : model1;
-
   const instruments: InstrumentConfig[] = [];
-  const chips = 1 + (has2ndSID ? 1 : 0) + (has3rdSID ? 1 : 0);
+  const chips = chipBases.length;
   let id = 1;
   for (let chip = 0; chip < chips; chip++) {
-    const model = chip === 0 ? model1 : model2;
+    const model = chipModels[chip] === '8580' ? '8580' : '6581';
     const label = chip > 0 ? `SID${chip + 1}` : 'SID';
     for (let v = 1; v <= 3; v++) {
       instruments.push({
@@ -433,7 +427,7 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
 
     if (loadAddr > 0 && initAddr > 0) {
       try {
-        const frameStates = runSIDEmulation(buf, loadAddr, initAddr, playAddr, codeOffset, numCh, sidClock);
+        const frameStates = runSIDEmulation(buf, loadAddr, initAddr, playAddr, codeOffset, chipBases, sidClock);
 
         if (frameStates.length > 0) {
           speed = detectSpeed(frameStates);
