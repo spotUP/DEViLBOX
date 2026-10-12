@@ -84,10 +84,13 @@ export function scaleArc(template: ArcTemplate, bars: number): ArcTemplate {
 /** Reachability sentinel (SCR-P6.R6): bars resolved to their phase. */
 export const scratchArcStats = { phaseAt: 0 };
 
-/** The phase a bar of the arc falls in (bar counted from the arc's start). */
+const phaseOf = (arc: ArcTemplate, barInArc: number): ArcPhase | null =>
+  arc.phases.find((p) => barInArc >= p.startBar && barInArc < p.startBar + p.bars) ?? null;
+
+/** The phase a bar of the arc falls in (bar counted from the arc's start): the performer's per-bar read. */
 export function phaseAt(arc: ArcTemplate, barInArc: number): ArcPhase | null {
   scratchArcStats.phaseAt++;
-  return arc.phases.find((p) => barInArc >= p.startBar && barInArc < p.startBar + p.bars) ?? null;
+  return phaseOf(arc, barInArc);
 }
 
 /** What section 30 asks of a section of the set. */
@@ -165,22 +168,24 @@ const ROLE_OF: Readonly<Record<ArcPhaseName, ScratchRole>> = {
  * (the climb is audible), one hand performs it all, and the phases that allow silence keep
  * their empty bars. Deterministic for a seed.
  */
-export function planArc(opts: { arc: ArcTemplate; startBar: number; style: ScratchDJStyle; mode: ScratchMode; seed: number; densityScale?: number; beatsPerBar?: number }): ArcPlan {
+export function planArc(opts: { arc: ArcTemplate; startBar: number; style: ScratchDJStyle; mode: ScratchMode; seed: number; densityScale?: number; beatsPerBar?: number; levelCap?: ScratchLevel; exclude?: readonly ScratchGestureId[] }): ArcPlan {
   const { arc, style, mode } = opts;
   const bpb = opts.beatsPerBar ?? 4;
-  const modeMax = maxLevelFor(mode, style) || 1;
-  const base = planVocabulary(style, mode);
+  const modeMax = opts.levelCap ?? (maxLevelFor(mode, style) || 1);
+  // a peak lifts the cap above the mode (section 56): the vocabulary is the battle palette's then
+  const base = planVocabulary(style, opts.levelCap && opts.levelCap > (maxLevelFor(mode, style) || 0) ? 'BATTLE' : mode)
+    .filter((g) => getGesture(g).difficulty <= modeMax && !opts.exclude?.includes(g));
   const rnd = lfsr(opts.seed * 131 + 7);
   const events: ArcEvent[] = [];
   const phaseByBar: ArcPhaseName[] = [];
   let last: ScratchGestureId | null = null;
   for (let b = 0; b < arc.bars; b++) {
-    const p = phaseAt(arc, b);
+    const p = phaseOf(arc, b);
     if (!p) { phaseByBar.push('resolution'); continue; }
     phaseByBar.push(p.name);
     const cap = Math.min(p.level, modeMax) as ScratchLevel;
     // the style's gestures inside the cap, plus the cap level's own when the palette has none there
-    const atCap = SCRATCH_GESTURES.filter((g) => g.difficulty === cap && g.id !== 'drop' && g.id !== 'dropPhrase').map((g) => g.id);
+    const atCap = SCRATCH_GESTURES.filter((g) => g.difficulty === cap && g.id !== 'drop' && g.id !== 'dropPhrase' && !opts.exclude?.includes(g.id)).map((g) => g.id);
     const pool = vocabulary([...base.filter((g) => getGesture(g).difficulty <= cap), ...(base.some((g) => getGesture(g).difficulty === cap) ? [] : atCap)]);
     const inPhase = b - p.startBar;
     const steps = phaseSteps(p.name, inPhase, rnd, p.densityScale * (opts.densityScale ?? 1));

@@ -78,6 +78,10 @@ export interface SourceRequest {
   trackerSamples?: readonly TrackerSampleInfo[];
   /** Keys of recently used sources, most recent last. */
   recent?: readonly string[];
+  /** A source cooling down (section 54) is not a candidate. */
+  blocked?(key: string): boolean;
+  /** Memory's preference for a candidate (section 90: +0.1 / -0.2 / -1), added to its score. */
+  preference?(candidate: SourceCandidate): number;
 }
 
 export const SOURCE_TERMS = [
@@ -222,7 +226,7 @@ export function sourceCandidates(req: SourceRequest, classes = materialAt(req.tr
   return out;
 }
 
-export interface SourceScore { candidate: SourceCandidate; score: number; terms: Record<SourceTerm, number> }
+export interface SourceScore { candidate: SourceCandidate; score: number; terms: Record<SourceTerm, number>; memoryPreference?: number }
 
 /** Section 13 terms of one candidate, each 0..1. */
 export function scoreSource(c: SourceCandidate, req: SourceRequest, context: SourceContextKind): SourceScore {
@@ -271,7 +275,12 @@ export function selectScratchSource(req: SourceRequest): SourceDecision | null {
   const classes = materialAt(req.track, req.deck, req.bar);
   const context = sourceContext(req, classes);
   const scored = sourceCandidates(req, classes)
-    .map((c) => scoreSource(c, req, context))
+    .filter((c) => !req.blocked?.(c.key))
+    .map((c) => {
+      const sc = scoreSource(c, req, context);
+      const pref = req.preference?.(c) ?? 0;
+      return pref ? { ...sc, score: sc.score + pref, memoryPreference: pref } : sc;
+    })
     .filter((s) => s.terms.bassConflict === 0)
     .sort((a, b) => b.score - a.score || (a.candidate.key < b.candidate.key ? -1 : 1));
   const best = scored[0];
@@ -281,6 +290,7 @@ export function selectScratchSource(req: SourceRequest): SourceDecision | null {
     `${context}: ${best.candidate.origin} ${best.candidate.material} (${best.candidate.key})`,
     `score ${best.score.toFixed(2)}; strongest ${top.map((t) => `${t} ${best.terms[t].toFixed(2)}`).join(', ')}`,
     ...SOURCE_TERMS.filter((t) => NEGATIVE.has(t) && best.terms[t] > 0).map((t) => `minus ${t} ${best.terms[t].toFixed(2)}`),
+    ...(best.memoryPreference ? [`memory ${best.memoryPreference > 0 ? '+' : ''}${best.memoryPreference.toFixed(2)}`] : []),
   ];
   return { ...best, context, reasons, alternative: scored[1] };
 }
