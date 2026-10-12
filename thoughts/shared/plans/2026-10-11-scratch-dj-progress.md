@@ -12,7 +12,7 @@ Research (how it works today): `thoughts/shared/research/2026-10-08_scratch-syst
 Ledger entry: `thoughts/shared/plans/2026-10-06-fix-all-open.md` SCRP.
 Protocol: `~/.claude/REACHABILITY_PROTOCOL.md` (ID, red first, reachability with a sentinel, ratchet, N of M).
 
-**Count: 91 of 126 done, 0 exempted, 34 open, 0 owner check `[o]`, 1 owner decision `[?]` (SCR-P3.6)** (canonical count = `grep -c '^- \[ \] SCR-'` over this file; recompute on every tick)
+**Count: 90 of 125 done, 0 exempted, 34 open, 0 owner check `[o]`, 1 owner decision `[?]` (SCR-P3.6)** (canonical count = `grep -c '^- \[ \] SCR-'` over this file; recompute on every tick)
 
 Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` built around an open owner decision. An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll, `fireDjFx(..., {source})`, the DJ view panel, the MCP bridge) and proves the new code ran (call count or sentinel) with the stated numbers.
 
