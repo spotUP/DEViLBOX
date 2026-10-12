@@ -8,6 +8,7 @@
  * its own: the planners decide, the executor executes.
  */
 import { useDJStore } from '@/stores/useDJStore';
+import { scratchModeOf } from '../scratch/scratchStyles';
 import type { PlaylistTrack } from '@/stores/useDJPlaylistStore';
 import { getDecisionLog } from './decisionLog';
 import { DJSessionMemory } from './sessionMemory';
@@ -241,6 +242,7 @@ export class DJSessionController {
       withFilter: s.autoDJWithFilter, smartCuts: s.autoDJSmartCuts, setPhase: this.setPhase, targetEnergy: this.targetEnergy,
       leadSec: this.loadLeadSec, bridgeAvailable: this.bridgeAvailable(incoming), seed: this.memory.transitionCount + this.counts.transitionPlans * 7,
       juggleMode: juggleModeOf(s.autoDJJuggleMode), juggleState,
+      scratchMode: scratchModeOf(s.autoDJScratchMode),
     });
     const invariants = checkInvariants(plan, outgoing, incoming);
     const broken = invariants.filter((i) => !i.ok);

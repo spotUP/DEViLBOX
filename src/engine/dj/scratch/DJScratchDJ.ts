@@ -63,6 +63,10 @@ export interface ScratchTickInput {
   trackerSamples?: readonly TrackerSampleInfo[];
   juggleIntensity?: number;
   transitionIntensity?: number;
+  /** A transition owns the decks (performance mode NORMAL_MIX): plan nothing new, let what runs finish. */
+  hold?: boolean;
+  /** A juggle is running (sections 26, 49): only crate accents and answers, never a deck, never a feature. */
+  juggleActive?: boolean;
 }
 
 export interface ScratchDJDeps {
@@ -224,6 +228,8 @@ export class DJScratchDJ {
     this.lastBar = ctx.masterBar;
     if (!this.sink || this.sink.key !== key) this.sink = { key, exec: this.deps.executorFor(input.deck, track) };
 
+    // a transition owns the decks: nothing new is planned (what runs finishes on its own)
+    if (input.hold) return { planned: false, scheduled: 0, reason: 'a transition owns the decks' };
     // plan the window that starts on the next bar
     const fromBar = Math.max(ctx.masterBar + 1, this.plannedThroughBar);
     if (fromBar > ctx.masterBar + 1) return { planned: false, scheduled: 0 };
@@ -304,7 +310,7 @@ export class DJScratchDJ {
     const shape = arcForSection(ctx.nextSection && ctx.nextSection.startBar === fromBar ? ctx.nextSection.kind : ctx.section?.kind, setPhase);
     const featureMode = input.mode === 'PERFORMER' || input.mode === 'BATTLE';
     const onPhrase = (fromBar - phraseStart) % phraseBars === 0;
-    const wantsFeature = !!shape.template && featureMode && onPhrase && this.memory.featureReady(fromBar) && this.intent !== 'rest'
+    const wantsFeature = !!shape.template && featureMode && !input.juggleActive && onPhrase && this.memory.featureReady(fromBar) && this.intent !== 'rest'
       && (shape.role !== 'peakBurst' || this.memory.battleReady(fromBar) || input.mode !== 'BATTLE');
     let plan: ScratchPlan;
     let arc: ArcTemplate | null = null;
@@ -337,6 +343,7 @@ export class DJScratchDJ {
         : planScratch(ctx, opts);
     }
     this.plannedThroughBar = toBar;
+    if (input.juggleActive) plan = juggleSafe(plan);
 
     // the source is chosen before the throw: a crate record opens its phrase with one (section 41)
     const chosen = plan.events.length ? this.chooseSource(ctx, plan, input, fromBar) : null;
@@ -347,6 +354,7 @@ export class DJScratchDJ {
       });
       plan = planScratch(ctx, { mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, exclude, densityShift: this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0, record: chosen.record, throwMemory: this.throwMemory });
     }
+    if (input.juggleActive) plan = juggleSafe(plan);
     scratchDJStats.plans++;
     this.lastPlan = plan;
     const intent = this.intent;
@@ -402,7 +410,8 @@ export class DJScratchDJ {
     const chosen = this.deps.chooseSource
       ? this.deps.chooseSource(ctx, plan, input, recent)
       : selectorSource(ctx, plan, input, recent, {
-          blocked: (key) => !this.memory.sourceReady(key, bar),
+          // under a juggle the decks are the juggle's: crate records only (sections 26, 49)
+          blocked: (key) => !this.memory.sourceReady(key, bar) || (!!input.juggleActive && !key.startsWith('crate:')),
           preference: (c) => (leading ? this.memory.preference(c.key, leading, ctx.sectionName, ctx.nextSection?.kind) : 0),
         });
     if (chosen?.decision) this.deps.onSourceDecision?.(chosen.decision, ctx);
@@ -412,6 +421,13 @@ export class DJScratchDJ {
     }
     return chosen;
   }
+}
+
+/** Under a running juggle a scratch only answers or accents (sections 26, 49). */
+function juggleSafe(plan: ScratchPlan): ScratchPlan {
+  const events = plan.events.filter((e) => e.role === 'ANSWER' || e.role === 'ACCENT');
+  if (events.length === plan.events.length) return plan;
+  return { ...plan, events, bars: plan.bars.map((b) => b.filter((e) => events.includes(e))), reasons: [...plan.reasons, 'a juggle runs: answers and accents only'] };
 }
 
 /** A stable key for a source chosen without the selector. */
