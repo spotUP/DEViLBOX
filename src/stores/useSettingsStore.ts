@@ -7,6 +7,7 @@ import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 
 import type { FormatEngineChoice, UADEImportMode, FormatEnginePreferences } from '@/types/formatEngine';
+import type { SidChipModelSetting } from '@/lib/sid/SIDHeaderParser';
 export type { FormatEngineChoice, UADEImportMode, FormatEnginePreferences };
 
 
@@ -27,6 +28,8 @@ interface SettingsStore {
   
   // C64 SID Engine
   sidEngine: SIDEngineType;  // Default SID player engine (websid recommended)
+  /** SID Settings chip model: the header's ('auto') or a forced 6581 / 8580, for every SID engine. */
+  sidChipModel: SidChipModelSetting;
   
   // SID Hardware Output
   sidHardwareMode: 'off' | 'asid' | 'webusb';  // Hardware output transport
@@ -71,6 +74,7 @@ interface SettingsStore {
   setMasterTuning: (hz: number) => void;
   setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice | UADEImportMode) => void;
   setSidEngine: (engine: SIDEngineType) => void;
+  setSidChipModel: (model: SidChipModelSetting) => void;
   setSidHardwareMode: (mode: 'off' | 'asid' | 'webusb') => void;
   setAsidEnabled: (enabled: boolean) => void;
   setAsidDeviceId: (deviceId: string | null) => void;
@@ -106,6 +110,7 @@ export const useSettingsStore = create<SettingsStore>()(
       linearInterpolation: true,
       masterTuning: 440,
       sidEngine: 'websid',  // Recommended default: fast + accurate WASM reSID
+      sidChipModel: 'auto',
       formatEngine: {
         mod: 'native',      // libopenmpt — full sample extraction + effects
         hvl: 'native',      // HivelyParser — WebAudio synthesis
@@ -312,6 +317,11 @@ export const useSettingsStore = create<SettingsStore>()(
     setSidEngine: (engine) =>
       set((state) => {
         state.sidEngine = engine;
+      }),
+
+    setSidChipModel: (model) =>
+      set((state) => {
+        state.sidChipModel = model;
       }),
       
     setSidHardwareMode: (sidHardwareMode) =>
@@ -570,6 +580,8 @@ export const useSettingsStore = create<SettingsStore>()(
         maxHeadroomMode: state.maxHeadroomMode,
         sidHardwareMode: state.sidHardwareMode,
         sidEngine: state.sidEngine,
+        // Additive: a save without it merges in the default ('auto'), no version bump.
+        sidChipModel: state.sidChipModel,
         welcomeJingleEnabled: state.welcomeJingleEnabled,
         // Additive: a save without it merges in the default (on), no version bump.
         autoAdvanceSubsongs: state.autoAdvanceSubsongs,

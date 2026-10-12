@@ -16,6 +16,8 @@ import { BASIC_ROM, KERNAL_ROM, CHAR_ROM } from '../c64roms';
 
 export interface ScriptNodePlayerConfig {
   chipModel?: '6581' | '8580';
+  /** A model the user forced (SID Settings): applied after the load, over the one the backend reads from the header. */
+  forceChipModel?: '6581' | '8580';
   sampleRate?: number;
 }
 
@@ -53,16 +55,19 @@ export class ScriptNodePlayerEngine {
   private playing = false;
   private subsong = 0;
   private numSubsongs = 1;
+  /** The model SID Settings forces (null = the backend plays the header's). */
+  private forcedChipModel: '6581' | '8580' | null = null;
   private voiceMask = 0x1FF; // bitmask: bit N=1 → voice N enabled
   private _originalOnaudioprocess: ((e: AudioProcessingEvent) => void) | null = null;
 
   constructor(
     sidData: Uint8Array,
     engineType: SIDEngineType,
-    _config: ScriptNodePlayerConfig = {},
+    config: ScriptNodePlayerConfig = {},
   ) {
     this.sidData = sidData;
     this.engineType = engineType;
+    this.forcedChipModel = config.forceChipModel ?? null;
   }
 
   /**
@@ -260,11 +265,18 @@ export class ScriptNodePlayerEngine {
       throw new Error(`[${this.engineType}] Failed to load SID data into WASM backend`);
     }
 
+    if (this.forcedChipModel) this.setChipModel(this.forcedChipModel);
     this.playing = true;
     console.log(`[${this.engineType}] Playback started, subsong:`, this.subsong,
       'isSongReady:', this.player._isSongReady,
       'isPaused:', this.player._isPaused,
       'ctxState:', (window as any)._gPlayerAudioCtx?.state);
+  }
+
+  /** Play the chip as this model from now on (WebSID emu_set_6581; the backend reads the header's on load). */
+  setChipModel(model: '6581' | '8580'): void {
+    this.forcedChipModel = model;
+    this.adapter?.setSID6581?.(model === '6581' ? 1 : 0);
   }
 
   /**

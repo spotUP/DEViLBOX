@@ -9,12 +9,12 @@ import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { notify } from '@stores/useNotificationStore';
 import { CustomSelect } from '@components/common/CustomSelect';
+import type { SidChipModelSetting } from '@/lib/sid/SIDHeaderParser';
 
 interface SIDSettingsTabProps {
   className?: string;
 }
 
-type ChipModelOverride = 'auto' | '6581' | '8580';
 type ClockSpeedOverride = 'auto' | 'PAL' | 'NTSC';
 type BufferSize = 4096 | 8192 | 16384;
 
@@ -23,7 +23,8 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
   const setSidEngine = useSettingsStore((s) => s.setSidEngine);
   const sidHwMode = useSettingsStore((s) => s.sidHardwareMode);
 
-  const [chipModel, setChipModel] = useState<ChipModelOverride>('auto');
+  const chipModel = useSettingsStore((s) => s.sidChipModel);
+  const setChipModel = useSettingsStore((s) => s.setSidChipModel);
   const [clockSpeed, setClockSpeed] = useState<ClockSpeedOverride>('auto');
   const [asidEnabled, setAsidEnabled] = useState(false);
   const [voiceMask, setVoiceMask] = useState([true, true, true]);
@@ -78,7 +79,7 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
           <label className={labelClass}>Chip Model Override</label>
           <CustomSelect
             value={chipModel}
-            onChange={(v) => setChipModel(v as ChipModelOverride)}
+            onChange={(v) => setChipModel(v as SidChipModelSetting)}
             options={[
               { value: 'auto', label: 'Auto (use file header)' },
               { value: '6581', label: 'MOS 6581' },

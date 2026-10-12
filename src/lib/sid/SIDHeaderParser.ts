@@ -120,7 +120,14 @@ export function parseSIDHeader(data: Uint8Array): SIDHeaderInfo | null {
   };
 }
 
-/** The model a SID emulator plays the first chip as: the header's, 6581 when the header does not say. */
-export function sidPlaybackModel(info: Pick<SIDHeaderInfo, 'chipModel'> | null | undefined): '6581' | '8580' {
+/** The SID Settings chip model choice: the header's model, or one the user forces. */
+export type SidChipModelSetting = 'auto' | '6581' | '8580';
+
+/**
+ * The model a SID emulator plays the first chip as: the user's forced model
+ * (SID Settings), else the header's, 6581 when the header does not say.
+ */
+export function sidPlaybackModel(info: Pick<SIDHeaderInfo, 'chipModel'> | null | undefined, setting: SidChipModelSetting = 'auto'): '6581' | '8580' {
+  if (setting !== 'auto') return setting;
   return info?.chipModel === '8580' ? '8580' : '6581';
 }

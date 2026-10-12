@@ -351,6 +351,12 @@ export class JSIDPlay2Engine {
     });
   }
 
+  /** Play the chip as this model from now on (the C64SIDEngine engine contract). */
+  setChipModel(model: '6581' | '8580'): void {
+    this.config.chipModel = model;
+    this.forceSIDModel(model);
+  }
+
   /**
    * Force SID chip model
    */
