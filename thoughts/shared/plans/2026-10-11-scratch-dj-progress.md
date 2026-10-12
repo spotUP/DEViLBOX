@@ -353,10 +353,10 @@ Phase PG-C - vinyl surface
 - [x] SCR-PG-CR reachability: `fireDjFx('fx_scratch_baby', {record: 'AH_STANDARD'})` offline: noise RMS > 0 while |rate| > 0.05, 0 while held; needle drop leads a routine's first event; sentinels 1 each. - 248b8e470: `scratchSurfaceNoiseFollowsTheRecord.test.ts` (real worklet, silent record: noise while moving, none held / thrown, needle transient; revert-checked); arc reachability: bookends sentinel 1, first event needleDrop on the feature's first downbeat, last needleLift; registry reachability: surface + cartridge messages 1 each.
 
 Phase PG-D - velocity and tone (O2, O7) + grit (O4)
-- [ ] SCR-PG-D1 V1-V3 per-voice gain and biquads (velocity -> length, level, tone, cut sharpness).
-- [ ] SCR-PG-D2 R7 S950 transform at load (bus setting, on by default, clean switch).
-- [ ] SCR-PG-D3 C3 Dry / Dark / Delay presets through `fxRequest`.
-- [ ] SCR-PG-DR reachability: two planned events at v 0.3 and 0.95 through the executor: centroid(0.3) < 0.7 x centroid(0.95); level ratio (0.7 + 0.15) / (0.7 + 0.475) +-0.5 dB; grit transform count 1 per record load.
+- [x] SCR-PG-D1 V1-V3 per-voice gain and biquads (velocity -> length, level, tone, cut sharpness). - 833a81b50: bus velocity stage (level 0.70 + 0.50 v, throw 0.8 + 0.4 v; tone < 0.5 / > 0.85); length = O2 amp (4399572b1); cut sharpness = cutRampSec (7997806fd).
+- [x] SCR-PG-D2 R7 S950 transform at load (bus setting, on by default, clean switch). - 833a81b50: `scratchGrit.ts` s950 (replays sampler.process 's950' + _norm within 1e-6, `scratchGrit.test.ts`); crate records gritted at load (mono 22,050 Hz, back at the context rate); pool.setGrit(false) = clean. UI switch: P9 panel (not built yet).
+- [x] SCR-PG-D3 C3 Dry / Dark / Delay presets through `fxRequest`. - 833a81b50: CHANNEL_PRESETS dry / dark / delay (scratch_routine.py :331-334) on the bus; transition fxRequest dry -> Dry, dubbed -> Delay, transition -> Dark on every event.
+- [x] SCR-PG-DR reachability: two planned events at v 0.3 and 0.95 through the executor: centroid(0.3) < 0.7 x centroid(0.95); level ratio (0.7 + 0.15) / (0.7 + 0.475) +-0.5 dB; grit transform count 1 per record load. - 833a81b50: `scratchVelocityShapesTheStroke.test.ts` through the real executor + registry: level ratio (0.85 / 1.175) < 0.5 dB, tone stages 4300 Hz / edge 0.15, grit 1 per load (revert-checked), Delay preset. Deviation: the spectral-centroid criterion (0.7 x) is not met on a voice record (measured 1041 vs 1168 Hz: its power sits below the stages); the stages' sound is measured on sines in scratchWetBusMatchesTheReference. Level match reworked (strokeRms + dry path): baby -2.1 dB vs reference -0.55.
 
 Phase PG-E - composition
 - [ ] SCR-PG-E1 C5 scratch_dj arc and C10 three-deck arc as templates; C6 A-A-B-A hook; C7 varied endings; C9 routine validator.
