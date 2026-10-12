@@ -30,10 +30,12 @@ describe('Auto Scratch picks the source by context (SCR-P5.R5)', () => {
   it('breakdown -> a crate voice record; house transition -> the live deck; each decision carries its score terms', () => {
     const scheduled: ScratchEvent[][] = [];
     const decisions: SourceDecision[] = [];
+    const refused: string[] = [];
     const ctrl = new DJScratchDJ({
       seed: 3,
       executorFor: () => ({ schedule: (e) => { scheduled[scheduled.length - 1]!.push(e); }, cancel: () => undefined, active: 0 }),
       onSourceDecision: (d) => decisions.push(d),
+      onRefused: (_e, rule) => refused.push(rule),
     });
     const before = scratchSourceStats.select;
 
@@ -52,6 +54,7 @@ describe('Auto Scratch picks the source by context (SCR-P5.R5)', () => {
     expect(r1.scheduled, r1.reason).toBeGreaterThan(0);
     expect(r2.scheduled, r2.reason).toBeGreaterThan(0);
     expect(scratchSourceStats.select - before).toBe(2);
+    expect(refused, 'the governor refuses none of these phrases').toEqual([]);
     expect(decisions).toHaveLength(2);
 
     const [crate, deck] = decisions;

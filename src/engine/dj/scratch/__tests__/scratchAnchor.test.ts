@@ -25,7 +25,8 @@ describe('anchors by role (SCR-P3.1)', () => {
     expect(theme.cue).toBe('vowel');
     expect(theme.position).toBeCloseTo(3300 / 22050, 9);
     expect(accent.cue).toBe('attack');
-    expect(accent.position).toBe(rec.anchors.attack);
+    // the attack is marked at 0, before the safe start: the anchor sits on the safe edge, as the voice plays it
+    expect(accent.position).toBe(Math.max(rec.safe[0], rec.anchors.attack));
     expect(outro.cue).toBe('tail');
     expect(outro.position).toBe(rec.anchors.tail);
     expect(theme.safeForward).toEqual(rec.safeForward);

@@ -7,7 +7,10 @@
 
 import { getGesture } from './scratchGestureCatalog';
 import { STEPS_PER_BEAT, DEFAULT_GRID, type ScratchGrid } from './scratchAnchor';
-import type { ScratchGestureId } from './scratchTypes';
+import type { ScratchEvent, ScratchGestureId } from './scratchTypes';
+import { getScratchRecord } from './scratchCatalogue';
+import { handSpeedFactor } from './scratchHandSpeed';
+import { MAX_RATE } from './scratchAnchor';
 
 /** Section 56 "maximum cut rate": crossfader cuts per beat a request may ask for. */
 export const MAX_CUTS_PER_BEAT = 16;
@@ -88,4 +91,73 @@ export function resolveConflicts(requests: readonly PerformanceRequest[]): Confl
     out.accepted.push(req);
   }
   return out;
+}
+
+// ─── The governor (section 59; ledger SCR-P8.1) ──────────────────────────
+
+export type SafetyRule =
+  | 'bothDecksSilent' | 'invalidDeck' | 'invalidSource' | 'unsafeRange' | 'conflict'
+  | 'excessiveRate' | 'excessiveCuts' | 'vocalCollision' | 'bassCollision' | 'stuck';
+
+/** What the governor knows of the moment (read by the caller from the decks and the analysis). */
+export interface SafetyState {
+  decksPlaying: Readonly<Record<'A' | 'B', boolean>>;
+  /** Vocal / bass activity of the master track at a beat (0..1). */
+  vocalAt(beat: number): number;
+  bassAt(beat: number): number;
+  /** The source is bass material (a bass channel / hit). */
+  bassSource?: boolean;
+  /** Beat each deck is busy with an accepted scratch until (one hand per deck). */
+  deckBusyUntil?: Partial<Record<'A' | 'B', number>>;
+  /** A transient record (tracker sample) the pool holds. */
+  hasRecord?(id: string): boolean;
+}
+
+export type SafetyVerdictFull = { ok: true } | { ok: false; rule: SafetyRule; reason: string };
+
+/** Reachability sentinel: every check and every refusal by rule. */
+export const scratchSafetyStats: { check: number; refused: Partial<Record<SafetyRule, number>> } = { check: 0, refused: {} };
+
+const refuse = (rule: SafetyRule, reason: string): SafetyVerdictFull => {
+  scratchSafetyStats.refused[rule] = (scratchSafetyStats.refused[rule] ?? 0) + 1;
+  return { ok: false, rule, reason };
+};
+
+/**
+ * Section 59: final authority over every planned scratch. The creative modules propose; this
+ * refuses what must not be played, with the rule's name.
+ */
+export function checkScratch(e: ScratchEvent, state: SafetyState): SafetyVerdictFull {
+  scratchSafetyStats.check++;
+  const deck = e.deck ?? (e.source.type === 'CRATE' ? undefined : e.source.deck);
+  if (!state.decksPlaying.A && !state.decksPlaying.B) return refuse('bothDecksSilent', 'both decks are silent: a scratch alone is not a mix (no-silence rule)');
+  if (deck !== undefined && deck !== 'A' && deck !== 'B') return refuse('invalidDeck', `deck ${String(deck)}`);
+  if ((e.source.type === 'DECK' || e.source.type === 'TRACKER_CHANNEL') && deck && !state.decksPlaying[deck]) return refuse('invalidDeck', `deck ${deck} is not playing`);
+  const throwG = e.gesture === 'drop' || e.gesture === 'dropPhrase';
+  if (e.source.type === 'CRATE') {
+    const r = getScratchRecord(e.source.recordId);
+    if (!r) return refuse('invalidSource', `no record ${e.source.recordId}`);
+    if (!throwG && !r.clean) return refuse('invalidSource', `${r.id} is pre-scratched: a throw only`);
+    if (e.anchor.position < r.safe[0] - 1e-9 || e.anchor.position > r.safe[1] + 1e-9) return refuse('unsafeRange', `anchor ${e.anchor.position.toFixed(3)} s outside ${r.id}'s safe range`);
+  }
+  if (e.source.type === 'TRACKER_SAMPLE' && state.hasRecord && !state.hasRecord(`TRACKER_${e.source.deck}_${e.source.sampleId}`)) return refuse('invalidSource', 'the tracker sample is not loaded');
+  if (deck && (e.source.type === 'DECK' || e.source.type === 'TRACKER_CHANNEL')) {
+    const busy = state.deckBusyUntil?.[deck];
+    if (busy !== undefined && e.executeAtBeat < busy - 1e-9) return refuse('conflict', `deck ${deck} is already scratched until beat ${busy.toFixed(2)}`);
+  }
+  const g = getGesture(e.gesture);
+  const peak = Math.max(0, ...g.velocityCurve.map((p) => Math.abs(p.velocity))) * handSpeedFactor(e.velocity);
+  if (peak > MAX_RATE + 1e-9) return refuse('excessiveRate', `peak rate ${peak.toFixed(2)} > ${MAX_RATE}`);
+  const cuts = checkCutRate({ gesture: e.gesture });
+  if (!cuts.ok) return refuse('excessiveCuts', cuts.reason!);
+  if (state.vocalAt(e.executeAtBeat) > 0.7 && e.role !== 'ANSWER' && !throwG) return refuse('vocalCollision', 'over a strong vocal, only an answer');
+  if (state.bassSource && state.bassAt(e.executeAtBeat) > 0.6) return refuse('bassCollision', 'a bass source over a bass-heavy bar');
+  return { ok: true };
+}
+
+/** A performing state with no event for more than 8 bars is stuck (the controller aborts it). */
+export const STUCK_BARS = 8;
+export function checkStuck(performing: boolean, currentBar: number, lastEventBar: number | null): SafetyVerdictFull {
+  if (performing && lastEventBar !== null && currentBar - lastEventBar > STUCK_BARS) return refuse('stuck', `no scratch for ${currentBar - lastEventBar} bars while performing`);
+  return { ok: true };
 }
