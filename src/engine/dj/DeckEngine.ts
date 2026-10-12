@@ -17,7 +17,7 @@ import { ScratchPlayback, getPatternByName, type PatternStart } from './DJScratc
 import { snapPositionToBeat, snapLoopLength, phaseAlign } from './DJAutoSync';
 import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
-import { createReverbIR } from './reverbIR';
+import { createScratchRoomIR } from './scratch/scratchBus';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
@@ -317,7 +317,7 @@ export class DeckEngine {
       this._reverbSend = ctx.createGain();
       this._reverbSend.gain.value = 0;
       this._reverbNode = ctx.createConvolver();
-      this._reverbNode.buffer = createReverbIR(ctx, 0.6, 4000);
+      this._reverbNode.buffer = createScratchRoomIR(ctx);
       this._reverbWet = ctx.createGain();
       this._reverbWet.gain.value = 0.25; // 25% wet level
 
@@ -398,8 +398,7 @@ export class DeckEngine {
           cancelAnimationFrame(this.decayRafId);
           this.decayRafId = null;
         }
-        this.replayer.setPitchMultiplier(this.restMultiplier);
-        this.replayer.setTempoMultiplier(this.restMultiplier);
+        this._applyRestRate();
       }
     };
 
@@ -1391,8 +1390,7 @@ export class DeckEngine {
         this.audioPlayer.setPlaybackRate(this.restMultiplier);
       } else {
         try { this.replayer.pause(); } catch { /* ok */ }
-        this.replayer.setPitchMultiplier(this.restMultiplier);
-        this.replayer.setTempoMultiplier(this.restMultiplier);
+        this._applyRestRate();
       }
       // Hard-set gain back to 1.0 — the channel is gated by play-state now.
       this._setDeckGain(1);
@@ -1426,8 +1424,7 @@ export class DeckEngine {
       if (this._playbackMode === 'audio') {
         this.audioPlayer.setPlaybackRate(this.restMultiplier);
       } else {
-        this.replayer.setPitchMultiplier(this.restMultiplier);
-        this.replayer.setTempoMultiplier(this.restMultiplier);
+        this._applyRestRate();
       }
     };
     const resetTimer = setTimeout(() => {
@@ -1614,8 +1611,7 @@ export class DeckEngine {
       if (isAudio) {
         this.audioPlayer.setPlaybackRate(targetVal);
       } else {
-        this.replayer.setPitchMultiplier(targetVal);
-        this.replayer.setTempoMultiplier(targetVal);
+        this._applyRestRate();
       }
       return;
     }
@@ -1628,7 +1624,7 @@ export class DeckEngine {
       if (isAudio) {
         this.audioPlayer.setPlaybackRate(val);
       } else {
-        this.replayer.setPitchMultiplier(val);
+        this.replayer.setPitchMultiplier(this.keyLockEnabled ? 1 : val);
         this.replayer.setTempoMultiplier(val);
       }
       if (t < 1) {
