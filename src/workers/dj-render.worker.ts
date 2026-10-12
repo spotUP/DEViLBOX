@@ -829,11 +829,12 @@ async function renderWithHively(
     && typeof wasm._hively_render_frame === 'function'
     && typeof wasm._hively_set_channel_gain === 'function';
   const tuneChannels: number = wasm._hively_get_channels ? wasm._hively_get_channels() : 4;
-  // The split renders are each channel's stem too (stereo): one per channel, up to DECK_STEM_CHANNELS.
-  const soloChannels = hasSplit ? Math.min(tuneChannels, withStems ? DECK_STEM_CHANNELS : DECK_SCOPE_CHANNELS) : 0;
-  const scopeChannels = Math.min(soloChannels, DECK_SCOPE_CHANNELS);
-  const scopes = scopeChannels > 0 ? new ChannelScopeTrackBuilder(scopeChannels, sampleRate) : null;
-  const stems = withStems && soloChannels > 0 ? new ChannelStemsBuilder(soloChannels) : null;
+  // One split render per channel the tune has (up to DECK_SCOPE_CHANNELS): its scope, and its
+  // stem (stereo) for the first DECK_STEM_CHANNELS.
+  const soloChannels = hasSplit ? Math.min(tuneChannels, DECK_SCOPE_CHANNELS) : 0;
+  const scopes = soloChannels > 0 ? new ChannelScopeTrackBuilder(soloChannels, sampleRate) : null;
+  const stemChannels = withStems ? Math.min(soloChannels, DECK_STEM_CHANNELS) : 0;
+  const stems = stemChannels > 0 ? new ChannelStemsBuilder(stemChannels) : null;
   const soloL: Float32Array[] = Array.from({ length: soloChannels }, () => new Float32Array(frameSamples * 2));
   const soloR: Float32Array[] = Array.from({ length: soloChannels }, () => new Float32Array(frameSamples * 2));
   const setGains = (only: number): void => {
@@ -1089,13 +1090,25 @@ function loadSidFile(mod: any, fileBuffer: ArrayBuffer, filename: string, subson
 }
 
 /**
- * One SID voice's stem: reload, silence the first chip's other voices
- * (emu_enable_voice, as renderSidVoices does) and render `frames` frames.
+ * The WebSID trace stream of a song voice. WebSID traces 4 streams per chip -
+ * its 3 voices and the chip's digi (volume-register sample) output - so song
+ * voice k (3 per chip: chip k / 3, voice k % 3) is stream (k / 3) * 4 + k % 3.
+ */
+function sidTraceStreamOfVoice(voice: number): number {
+  return Math.floor(voice / 3) * 4 + (voice % 3);
+}
+
+/**
+ * One SID voice's stem: reload, silence every other voice on every chip
+ * (emu_enable_voice(chip, voice, on), as renderSidVoices does) and render `frames` frames.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function renderSidSoloPass(mod: any, fileBuffer: ArrayBuffer, filename: string, subsong: number, sampleRate: number, voice: number, frames: number): Int16Array {
   loadSidFile(mod, fileBuffer, filename, subsong, sampleRate, false);
-  for (let v = 0; v < 3; v++) mod.ccall('emu_enable_voice', 'number', ['number', 'number', 'number'], [0, v, v === voice ? 1 : 0]);
+  const chips: number = mod._emu_sid_count();
+  for (let c = 0; c < chips; c++) {
+    for (let v = 0; v < 3; v++) mod.ccall('emu_enable_voice', 'number', ['number', 'number', 'number'], [c, v, c * 3 + v === voice ? 1 : 0]);
+  }
   const stem = new ChannelStemsBuilder(1);
   let done = 0;
   while (done < frames) {
@@ -1120,6 +1133,7 @@ async function renderWithSID(
   subsong: number,
   id: string,
   withStems = true,
+  maxSeconds?: number,
 ): Promise<RenderResult> {
   await initSID();
   const mod = sidModule;
@@ -1134,14 +1148,17 @@ async function renderWithSID(
 
   // Render audio: each compute call produces ~1 frame (50/60Hz).
   // SIDs loop forever, so render for a fixed duration (3 minutes default, up to 5 if still playing).
-  const maxDuration = 180; // 3 minutes
+  const maxDuration = Math.min(180, maxSeconds ?? 180); // 3 minutes, or a preview's cap
   const maxFrames = sampleRate * maxDuration;
   const chunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
   let lastProgressPct = 10;
   let songEnded = false;
   const hasTrace = typeof mod._emu_get_trace_streams === 'function' && typeof mod._emu_number_trace_streams === 'function';
-  const voices = hasTrace ? Math.min(DECK_SCOPE_CHANNELS, mod._emu_number_trace_streams()) : 0;
+  // One scope per voice the song has: 3 per SID chip (the chip's digi stream is not a voice).
+  const voices = hasTrace
+    ? Math.min(DECK_SCOPE_CHANNELS, mod._emu_sid_count() * 3, Math.floor(mod._emu_number_trace_streams() / 4) * 3)
+    : 0;
   const scopes = voices > 0 ? new ChannelScopeTrackBuilder(voices, sampleRate) : null;
 
   while (totalFrames < maxFrames && !songEnded) {
@@ -1177,7 +1194,7 @@ async function renderWithSID(
       const table = mod._emu_get_trace_streams() >> 2;
       const heap32 = mod.HEAP32 as Int32Array;
       const heap16 = mod.HEAP16 as Int16Array;
-      const bases = Array.from({ length: voices }, (_, v) => heap32[table + v] >> 1);
+      const bases = Array.from({ length: voices }, (_, v) => heap32[table + sidTraceStreamOfVoice(v)] >> 1);
       scopes.push(framesThisChunk, (v, i) => heap16[bases[v] + i] / 32768);
     }
 
@@ -1219,11 +1236,11 @@ async function renderWithSID(
   console.log(`[DJRenderWorker/WebSID] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames, songEnded: ${songEnded}`);
   const track = scopes?.finish();
   if (track && withStems) {
-    // Each voice's stem: a solo pass per voice of the first chip (the mix
-    // pass's instance is torn down, so each pass reloads).
+    // Each voice's stem: a solo pass per voice, on every chip, up to DECK_STEM_CHANNELS
+    // (the mix pass's instance is torn down, so each pass reloads).
     const t1 = Date.now();
     track.stems = [];
-    for (let v = 0; v < Math.min(3, track.channels.length); v++) {
+    for (let v = 0; v < Math.min(DECK_STEM_CHANNELS, track.channels.length); v++) {
       track.stems.push(track.scales[v] > 0
         ? renderSidSoloPass(mod, fileBuffer, filename, subsong, sampleRate, v, totalFrames)
         : new Int16Array(0));
@@ -1406,12 +1423,12 @@ async function renderWithLibopenmpt(
   // Each channel's own signal: one solo instance per channel, the way the
   // libopenmpt worklet feeds its scopes (chiptune3.worklet.js createOscInstance_),
   // rendered in lockstep with the main module.
-  // The solos are each channel's stem too (stereo, the whole output chain): one per channel the
-  // module has, up to DECK_STEM_CHANNELS; the scopes show the first DECK_SCOPE_CHANNELS.
-  const solos = createLibopenmptSolos(lib, fileBytes, ext, CHUNK, withStems ? DECK_STEM_CHANNELS : DECK_SCOPE_CHANNELS);
-  const scopeChannels = Math.min(solos.length, DECK_SCOPE_CHANNELS);
-  const scopes = scopeChannels > 0 ? new ChannelScopeTrackBuilder(scopeChannels, sampleRate) : null;
-  const stems = withStems && solos.length > 0 ? new ChannelStemsBuilder(solos.length) : null;
+  // One solo per channel the module has (up to DECK_SCOPE_CHANNELS): its scope, and its stem
+  // (stereo, the whole output chain) for the first DECK_STEM_CHANNELS.
+  const solos = createLibopenmptSolos(lib, fileBytes, ext, CHUNK, DECK_SCOPE_CHANNELS);
+  const scopes = solos.length > 0 ? new ChannelScopeTrackBuilder(solos.length, sampleRate) : null;
+  const stemChannels = withStems ? Math.min(solos.length, DECK_STEM_CHANNELS) : 0;
+  const stems = stemChannels > 0 ? new ChannelStemsBuilder(stemChannels) : null;
 
   const chunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
@@ -1553,7 +1570,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         // 8. Everything else (libopenmpt fallback)
 
         if (isC64SID(fileBuffer)) {
-          result = await renderWithSID(fileBuffer, filename, subsong, id, stems);
+          result = await renderWithSID(fileBuffer, filename, subsong, id, stems, maxSeconds);
         } else if (isHivelyFormat(filename)) {
           result = await renderWithHively(fileBuffer, filename, subsong, id, stems);
         } else if (isAdLibFormat(filename)) {

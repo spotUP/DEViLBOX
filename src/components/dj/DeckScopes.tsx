@@ -1,7 +1,9 @@
 /**
  * DeckScopes - Per-channel waveform oscilloscope display + mute/fx-target toggles
  *
- * 4 per-channel scopes + MUTE/FX mode chip, horizontally stacked. A deck with
+ * One scope per channel the song has (a module's channels, 3 voices per SID chip; the deck's
+ * scope track carries them, up to DECK_SCOPE_CHANNELS) + MUTE/FX mode chip, horizontally
+ * stacked; past four the scopes shrink so the row keeps the width of four. A deck with
  * no per-channel signal (an audio file, an old cache entry) shows one combined
  * "ALL" scope instead; a deck with channel scopes has no ALL. Click semantics branch on `channelModeUI`:
  *   'mute' → click toggles mute, shift=solo. Muted channels dim red.
@@ -24,11 +26,14 @@ interface DeckScopesProps {
   size?: number;
 }
 
-const NUM_CHANNELS = DECK_SCOPE_CHANNELS;
+/** Each scope's size: `size` up to four channels, then shrunk so n scopes span the width of four. */
+export function deckScopeSize(size: number, channels: number): number {
+  return channels <= 4 ? size : Math.floor((size * 4) / channels);
+}
 
 interface ScopeCanvasProps {
   deckId: 'A' | 'B' | 'C';
-  /** Channel index 0-3, or -1 for ALL */
+  /** Channel index, or -1 for ALL */
   channel: number;
   size: number;
   muted: boolean;
@@ -241,12 +246,12 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
       {/* One scope per channel the deck has a signal for; a deck with none (an audio file, an old cache entry) shows ALL only. */}
-      {Array.from({ length: Math.min(NUM_CHANNELS, channelScopeCount) }, (_, i) => (
+      {Array.from({ length: Math.min(DECK_SCOPE_CHANNELS, channelScopeCount) }, (_, i) => (
         <ScopeCanvas
           key={i}
           deckId={deckId}
           channel={i}
-          size={size}
+          size={deckScopeSize(size, channelScopeCount)}
           muted={!isChannelEnabled(i)}
           fxTargeted={isFxTargeted(i)}
           mode={mode}

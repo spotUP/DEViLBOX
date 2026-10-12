@@ -15,8 +15,13 @@
  * and onto the deck, so no load path has to carry it separately.
  */
 
-/** Channels a deck shows scopes for (DeckScopes draws CH1..CH4). */
-export const DECK_SCOPE_CHANNELS = 4;
+/**
+ * Most channels a deck carries a scope for. A deck shows one scope (and one pattern-view
+ * meter) per channel the song has - a module's channel count, 3 voices per SID chip - up to
+ * this ceiling, which bounds the render work (one solo pass / instance per channel) and the
+ * track's size (int8 at 11025 Hz: ~2 MB per channel for 3 minutes).
+ */
+export const DECK_SCOPE_CHANNELS = 16;
 /** The render rate is divided by this for storage (44100 -> 11025 Hz). */
 export const DECK_SCOPE_DECIMATION = 4;
 /** Stored samples per drawn scope window (~23 ms at 11025 Hz). */
@@ -53,7 +58,7 @@ export function releaseChannelStems(track: ChannelScopeTrack | undefined): void 
   if (track) { delete track.flacStems; delete track.stems; }
 }
 
-/** Most channels a deck can mute: the deck buttons show CH1-4, the pads Mute Ch 1-8. */
+/** Most channels a deck can mute (the pads Mute Ch 1-8); a channel past it has a scope but no stem. */
 export const DECK_STEM_CHANNELS = 8;
 
 /** One sample encoded the way the rendered WAV encodes it (DJPipeline encodeWAV), so stem and mix decode alike. */
@@ -250,7 +255,7 @@ export function showsAllScope(channelScopeCount: number): boolean {
  * version 1: scopes but no stems) is re-rendered once, in the background, for
  * its track.
  */
-export const CHANNEL_SCOPE_RENDER_VERSION = 3; // 2: the track carries the channel stems (SCOPE-MUTE); 3: as FLAC
+export const CHANNEL_SCOPE_RENDER_VERSION = 4; // 2: the track carries the channel stems (SCOPE-MUTE); 3: as FLAC; 4: every channel of the song (was 4), SID = 3 voices per chip
 
 /** What a re-render for scopes needs from a cache entry. */
 export interface ScopelessOrigin {
