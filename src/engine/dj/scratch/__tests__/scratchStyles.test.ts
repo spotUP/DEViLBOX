@@ -17,7 +17,7 @@ describe('levels (section 31, SCR-P1.6)', () => {
     expect(GESTURE_LEVELS.forwardStab).toBe(1);
     expect(GESTURE_LEVELS.baby).toBe(1);
     expect(GESTURE_LEVELS.chirp).toBe(2);
-    expect(GESTURE_LEVELS.transformer8).toBe(3);
+    expect(GESTURE_LEVELS.transformer8).toBe(2); // the demo's GESTURE_LEVELS (P12)
     expect(GESTURE_LEVELS.orbit).toBe(4);
     expect(GESTURE_LEVELS.eightFingerCrab).toBe(4);
   });
