@@ -10,6 +10,7 @@
 import { hash } from '../transitionPlanner';
 import { barStartBeat } from '../beatGrid';
 import { harmonicCompatibility, HARMONIC_CLASH_REJECT } from '../compatibility';
+import { HANDS_BUDGET, juggleIntensityCap } from '../performanceBudget';
 import { findCallAndResponse, upcomingWindows } from './juggleMaterial';
 import { doubleBars, minLadderRung, MODE_PATTERNS, PATTERN_BUILDERS, PATTERN_INTENSITY, type PatternParams } from './jugglePatterns';
 import type {
@@ -78,6 +79,11 @@ export const MODE_SHAPE: Record<JuggleMode, { intensityCap: number; cooldownScal
  */
 export interface JuggleTiming { skipTiming?: boolean }
 
+/** The juggle intensity the hands left by the scratch, the transition and the FX allow (performanceBudget.ts). */
+export function handsIntensityCap(ctx: Pick<DJJugglePerformanceContext, 'otherHands'>): number {
+  return juggleIntensityCap(HANDS_BUDGET - (ctx.otherHands ?? 0));
+}
+
 export function budgetFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, timing: JuggleTiming = {}): PhaseBudget & { fraction: number; reasons: string[] } {
   const base = PHASE_BUDGET[ctx.setPhase];
   const shape = MODE_SHAPE[mode];
@@ -85,13 +91,19 @@ export function budgetFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, tim
   const maxFraction = Math.min(0.6, base.maxFraction * shape.fractionScale);
   const fraction = ctx.elapsedSec > 0 ? ctx.juggledSec / ctx.elapsedSec : 0;
   const reasons: string[] = [];
-  const maxIntensity = Math.min(base.maxIntensity, shape.intensityCap);
+  // Section 27 (scratch plan): two hands, one budget shared with the scratch, the transition and the FX.
+  // Physical, not timing: a Juggle Now request is bound by it too.
+  const handsCap = handsIntensityCap(ctx);
+  const handsReason = handsCap <= 0 ? `hands budget: ${ctx.otherHands} of ${HANDS_BUDGET} hands busy (scratch / transition / FX)` : null;
+  const maxIntensity = Math.min(base.maxIntensity, shape.intensityCap, handsCap);
   if (timing.skipTiming) {
     if (mode === 'OFF') reasons.push('Auto Juggle off');
+    if (handsReason) reasons.push(handsReason);
     // The set arc's intensity cap is timing too: a requested juggle plays at the mode's cap.
-    return { cooldownSec, maxIntensity: shape.intensityCap, maxFraction, allowed: mode !== 'OFF', fraction, reasons };
+    return { cooldownSec, maxIntensity: Math.min(shape.intensityCap, handsCap), maxFraction, allowed: mode !== 'OFF' && !handsReason, fraction, reasons };
   }
   let allowed = base.allowed && mode !== 'OFF';
+  if (allowed && handsReason) { allowed = false; reasons.push(handsReason); }
   if (!base.allowed) reasons.push(`set phase ${ctx.setPhase}: normal mixing`);
   if (mode === 'OFF') reasons.push('Auto Juggle off');
   if (allowed && ctx.secondsSinceLastJuggle < cooldownSec) { allowed = false; reasons.push(`cooldown ${Math.round(cooldownSec - ctx.secondsSinceLastJuggle)} s left`); }
@@ -103,7 +115,7 @@ export function budgetFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, tim
 export function intensityFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, override: number, seed = 0, timing: JuggleTiming = {}): number {
   // The user's override is the user's: only the mode's own cap bounds it. The
   // set arc's cap shapes the intensity the set decides, not the one chosen.
-  if (override >= 0) return Math.min(MODE_SHAPE[mode].intensityCap, override);
+  if (override >= 0) return Math.min(MODE_SHAPE[mode].intensityCap, handsIntensityCap(ctx), override);
   const cap = budgetFor(ctx, mode, timing).maxIntensity;
   const fromEnergy = 0.2 + 0.6 * ctx.energy + 0.2 * Math.max(0, ctx.targetEnergy - ctx.energy);
   const tension = ctx.tension * 0.2;
