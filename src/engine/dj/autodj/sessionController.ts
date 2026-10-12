@@ -12,7 +12,7 @@ import type { PlaylistTrack } from '@/stores/useDJPlaylistStore';
 import { getDecisionLog } from './decisionLog';
 import { DJSessionMemory } from './sessionMemory';
 import { getStyle } from './styleProfiles';
-import { planSet, type PlannerTrack } from './setPlanner';
+import { energyArc, planSet, type EnergyArcState, type PlannerTrack } from './setPlanner';
 import { fallbackPlan, planTransition, type TransitionPlanInput } from './transitionPlanner';
 import { juggleModeOf } from './juggle/juggleTypes';
 import { evaluateTransition, checkInvariants } from './transitionQuality';
@@ -62,6 +62,8 @@ export class DJSessionController {
   private tracks: SessionTrack[] = [];
   private candidates: DJTrackCandidate[] = [];
   private sessionStartedAt: number;
+  /** The playing track's energy, as the last replan read it: the arc's "energy now". */
+  private currentEnergy: number | undefined;
   readonly loadLeadSec: number;
   /** Reachability sentinels: how often each stage ran this session. */
   readonly counts = { sessionPlans: 0, transitionPlans: 0, executions: 0, fallbacks: 0, emergencies: 0, adaptations: 0 };
@@ -85,6 +87,7 @@ export class DJSessionController {
     this.planInputs = null;
     this.lastQuality = null;
     this.tracks = tracks;
+    this.currentEnergy = undefined;
     this.sessionStartedAt = this.now();
     const s = useDJStore.getState();
     this.style = getStyle(s.autoDJStyle);
@@ -98,8 +101,19 @@ export class DJSessionController {
   get currentCreativeRisk(): number { return this.creativeRisk; }
   get currentPlan(): DJTransitionPlan | null { return this.plan; }
   get currentSetPlan(): SetPlan | null { return this.setPlan; }
-  get setPhase(): SetEnergyPhase { return this.setPlan?.phase ?? 'OPENING'; }
-  get targetEnergy(): number { return this.setPlan?.targetEnergy ?? 0.5; }
+  /**
+   * The set arc now (plan section 11; juggling plan section 28): a function of
+   * the set's progress, so it is read when asked. The snapshot the last
+   * replan took holds the phase of the track's START - a track that started
+   * inside the opening stayed OPENING (no juggling) to its end, minutes past
+   * the opening's 8 %. Before the first plan: the opening.
+   */
+  private arcNow(): EnergyArcState | null {
+    if (!this.setPlan) return null;
+    return energyArc(this.memory.snapshot(), (this.now() - this.sessionStartedAt) / 1000, this.plannedDurationSec(), this.style, this.currentEnergy);
+  }
+  get setPhase(): SetEnergyPhase { return this.arcNow()?.phase ?? 'OPENING'; }
+  get targetEnergy(): number { return this.arcNow()?.targetEnergy ?? 0.5; }
 
   setTracks(tracks: SessionTrack[]): void { this.tracks = tracks; }
 
@@ -158,6 +172,7 @@ export class DJSessionController {
     if (!this.played.includes(index)) this.played.push(index);
     const t = this.tracks.find((x) => x.index === index);
     this.memory.recordTrackStart(t?.id ?? String(index), { artist: info.artist ?? t?.artist ?? null, energy: analysis?.energy.perceivedIntensity ?? info.energy, key: info.key, bpm: info.bpm, time: this.now() });
+    this.currentEnergy = analysis?.energy.perceivedIntensity;
     this.plan = null;
     this.planInputs = null;
     this.replanSession(analysis?.energy.perceivedIntensity);
