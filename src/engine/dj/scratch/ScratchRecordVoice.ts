@@ -287,8 +287,9 @@ export class ScratchRecordVoice {
     this.cue(opts.cue ?? (isThrow ? 'attack' : 'vowel'), opts.at);
     let durationSec = cycleMs(gesture, bpm) / 1000;
     if (isThrow) {
-      // play the word up to the gesture length (reference render_gesture "play")
-      durationSec = Math.min(durationSec, Math.max(0.01, r.safe[1] - this.cuePosition));
+      // the whole word or phrase is heard (section 41): from the cue to the end of the safe range,
+      // whatever the gesture's nominal length; the planner reserves that length (`throwBeats`)
+      durationSec = Math.max(0.01, r.safe[1] - this.cuePosition);
       this.faderGain(1, opts.at);
     } else {
       this.fader(gesture, bpm, { loop: gesture.loop, velocity: opts.velocity, at: opts.at });

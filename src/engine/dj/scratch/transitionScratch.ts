@@ -16,10 +16,10 @@
  */
 
 import type { DJTrackAnalysis, DJTransitionPlan, TransitionStyle } from '../autodj/types';
-import { findRecords } from './scratchCatalogue';
+import { findRecords, getScratchRecord } from './scratchCatalogue';
 import { deckAnchor, anchorFor } from './scratchAnchor';
 import { getGesture, gestureBeats } from './scratchGestureCatalog';
-import { humanizeMs, type PlacedScratch } from './scratchPlacement';
+import { humanizeMs, throwBeats, type PlacedScratch } from './scratchPlacement';
 import { lfsr } from './scratchRandom';
 import { isThrowGesture } from './scratchPlacement';
 import type { ScratchMode } from './scratchStyles';
@@ -102,7 +102,7 @@ function toEvents(placed: ReadonlyArray<PlacedScratch & { beatAbs: number }>, so
     prev = off;
     const anchor = source.type === 'CRATE' ? (anchorFor(source, p.role) ?? source.anchor) : source.type === 'DECK' ? source.anchor : { position: 0, safe: [0, 1] as const, safeForward: [0, 1] as const, safeReverse: [0, 0] as const };
     return {
-      executeAtBeat: p.beatAbs, durationBeats: gestureBeats(p.gesture), role: p.role, source, anchor, gesture: p.gesture,
+      executeAtBeat: p.beatAbs, durationBeats: p.beats ?? gestureBeats(p.gesture), role: p.role, source, anchor, gesture: p.gesture,
       velocity: p.velocity, humanizeMs: off, intensity: g.intensity, deck: source.type === 'DECK' ? source.deck : deck,
       returnToAnchor: g.returnsToAnchor && !isThrowGesture(p.gesture),
     };
@@ -177,9 +177,12 @@ export function planTransitionScratch(input: TransitionScratchInput): Transition
     source = compat.source === 'outgoing' ? outgoingSource(plan, outgoing, plan.startBeat)
       : crateSource(out[0]!.gesture, 'ACCENT', plan.style !== 'vocalSwap');
     // section 41: a run on a crate record opens with a throw of the word, in the first accent's bar
+    // the whole word is heard (throwBeats): only when it ends before the first accent
     if (source?.type === 'CRATE' && out.length) {
       const first = out[0]!;
-      out.unshift(placed(plan.startBeat, first.bar, 0, 'drop', 'INTRO', bpb, 0.8));
+      const record = getScratchRecord(source.recordId);
+      const t = { ...placed(plan.startBeat, first.bar, 0, 'drop', 'INTRO', bpb, 0.8), beats: record ? throwBeats(record, outgoing.bpm, 'drop') : undefined };
+      if (t.beatAbs + (t.beats ?? gestureBeats('drop')) <= first.beatAbs + 1e-9) out.unshift(t);
     }
     if (compat.fit === 'risky') reasons.push(`reduced: ${plan.style} is a risky pair (section 45)`);
   }
