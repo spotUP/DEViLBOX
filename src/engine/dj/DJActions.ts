@@ -13,6 +13,7 @@
 
 import * as Tone from 'tone';
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
+import { spinbackTrack, rewindTrack, type PlatterTrack } from '@/engine/turntable/platterGestures';
 import { realTimers } from './autodj/executorTimers';
 import type { DjEqPreset } from '@/constants/djEqPresets';
 import { useDJSetStore } from '@/stores/useDJSetStore';
@@ -609,37 +610,36 @@ export function stopScratch(deckId: DeckId, decayMs = 200): void {
 // PLATTER GESTURES (one physics path)
 // ============================================================================
 
-/** Platter gestures running, per deck (a spinback or a rewind): the physics driver's timer. */
+/** Platter gestures running, per deck (a spinback or a rewind): the driver's timer. */
 const platterGestures = new Map<DeckId, { kind: 'spinback' | 'rewind'; timer: unknown }>();
-/** Physics ticks of every spinback driver (reachability sentinel). */
-export const spinbackStats = { ticks: 0, minRate: 1 };
+/** Driver ticks of every spinback, its lowest rate and how long it ran backward (reachability sentinel). */
+export const spinbackStats = { ticks: 0, minRate: 1, reverseMs: 0 };
 
 type DeckHandle = ReturnType<ReturnType<typeof getDJEngine>['getDeck']>;
 
 /**
- * The one physics path of the deck gestures (spinback, rewind): the deck's own
- * TurntablePhysics is ticked by an engine driver on the DJ timer layer
- * (realTimers, alive in a hidden tab) and the deck audio follows its rate
- * through the scratch path. Views read the rate (TurntablePhysics.rateFor)
- * and never tick it. `step` sees each tick's rate and the gesture's elapsed
- * milliseconds and returns true when the gesture is over; `finish` then hands
- * the deck back.
+ * The one physics path of the deck gestures (spinback, rewind): the gesture is a hand on the
+ * record in the ported two-body turntable model (turntableSim.ts, platterGestures.ts), computed
+ * when the gesture starts; an engine driver on the DJ timer layer (realTimers, alive in a hidden
+ * tab) plays its record speed to the deck audio through the scratch path, and the deck's own
+ * TurntablePhysics follows it so the platter view shows what is heard (views read the rate,
+ * TurntablePhysics.rateFor, and never tick it). `step` sees each tick's rate and the gesture's
+ * elapsed milliseconds and returns true when the gesture is over; `finish` then hands the deck back.
  */
 function drivePlatter(
-  deckId: DeckId, deck: DeckHandle, kind: 'spinback' | 'rewind',
+  deckId: DeckId, deck: DeckHandle, kind: 'spinback' | 'rewind', motion: PlatterTrack,
   step: (rate: number, elapsedMs: number) => boolean, finish: () => void,
 ): void {
   const physics = deck.physics;
   startScratch(deckId);
   physics.externallyDriven = true;
-  let last = realTimers.now();
-  const startedAt = last;
+  const startedAt = realTimers.now();
   const timer = realTimers.setInterval(() => {
-    const now = realTimers.now();
-    const rate = physics.tick((now - last) / 1000);
-    last = now;
+    const elapsedMs = realTimers.now() - startedAt;
+    const rate = motion.rateAt(elapsedMs / 1000);
+    physics.followRate(rate);
     setScratchVelocity(deckId, rate);
-    if (!step(rate, now - startedAt)) return;
+    if (!step(rate, elapsedMs)) return;
     realTimers.clearInterval(platterGestures.get(deckId)?.timer);
     platterGestures.delete(deckId);
     physics.externallyDriven = false;
@@ -653,28 +653,28 @@ function drivePlatter(
 // ============================================================================
 
 /**
- * Spinback: the DJ yanks the record backward (TurntablePhysics.triggerSpinback,
- * the tracker's spinback). The deck's own platter physics runs the arc - decel,
- * reverse, the motor pulling it back - and the deck audio follows its rate
- * (drivePlatter), so the platter visibly spins back and the audio rewinds.
- *
- * Like the tracker, the record plays on once the motor has it back at speed.
- * `stopAfter` (Auto DJ's spinback exit) stops the deck when the reverse ends
- * instead: the record is pulled out, nothing plays until the next track drops.
- * False when the deck is not playing or a gesture already holds its platter.
+ * Spinback: the DJ's hand flicks the record backward and lets go (platterGestures.spinbackTrack:
+ * a hand on the record in the two-body model); the slipmat and the motor bring it round. About
+ * 0.6 s is heard backward, then the record plays on at speed. `stopAfter` (Auto DJ's spinback
+ * exit) stops the deck when the reverse ends instead: the record is pulled out, nothing plays
+ * until the next track drops. False when the deck is not playing or a gesture already holds its
+ * platter.
  */
 export function spinbackDeck(deckId: DeckId, opts: { stopAfter?: boolean; onComplete?: () => void } = {}): boolean {
   let deck: DeckHandle;
   try { deck = getDJEngine().getDeck(deckId); } catch { return false; }
   if (platterGestures.has(deckId) || !deck.isPlaying()) return false;
   const physics = deck.physics;
-  physics.triggerSpinback();
+  const motion = spinbackTrack();
   let wentReverse = false;
-  drivePlatter(deckId, deck, 'spinback', (rate, elapsedMs) => {
+  let lastMs = 0;
+  drivePlatter(deckId, deck, 'spinback', motion, (rate, elapsedMs) => {
     spinbackStats.ticks++;
     spinbackStats.minRate = Math.min(spinbackStats.minRate, rate);
-    if (rate < -0.05) wentReverse = true;
-    return !physics.spinbackActive || (!!opts.stopAfter && wentReverse && rate >= 0) || elapsedMs > 6000;
+    if (rate < -0.05) { wentReverse = true; spinbackStats.reverseMs += elapsedMs - lastMs; }
+    lastMs = elapsedMs;
+    // over: the record is back at speed after the reverse (or the model's time is up)
+    return (wentReverse && rate >= 0.97) || (!!opts.stopAfter && wentReverse && rate >= 0) || elapsedMs >= motion.durSec * 1000;
   }, () => {
     if (opts.stopAfter) {
       physics.reset();
@@ -702,8 +702,6 @@ export function isDeckSpinningBack(deckId: DeckId): boolean {
 export const REWIND_PULL_SEC = 1.2;
 /** The shortest wait before the restart: the pull-back must be heard. */
 export const REWIND_MIN_PULL_SEC = 0.8;
-/** The hand's backward speed during the pull-back, in deck rates (fast and audible, never fading out). */
-export const REWIND_HAND_RATE = -3;
 /** Rewind reachability sentinel: physics ticks, the lowest rate, the restarts and where they landed. */
 export const rewindStats = {
   ticks: 0, minRate: 1, restarts: 0,
@@ -750,13 +748,14 @@ export function rewindRestartTiming(deckId: DeckId): { waitSec: number; alignedT
 }
 
 /**
- * Rewind: the selector's hand drags the record back fast - an audible backward
- * scrub, about a second - then lets go and the SAME tune plays again from its
- * first downbeat at full speed. Not a spinback: a spinback ends a tune, a
- * rewind replays it. The hand is TurntablePhysics' own hand (setTouching +
- * setHandRate) on the one physics path (drivePlatter). With another deck
- * heard, the hand holds the record still after the pull-back and lets go on
- * that deck's next bar.
+ * Rewind: the selector's hand catches the record and drags it back one
+ * revolution in two uneven strokes - an audible backward scrub, about a second -
+ * holds it, then lets go and the SAME tune plays again from its first downbeat at
+ * full speed. Not a spinback: a spinback ends a tune, a rewind replays it. The
+ * pull is a hand in the two-body turntable model (platterGestures.rewindTrack)
+ * on the one physics path (drivePlatter): it ramps through 0, never a constant
+ * rate. With another deck heard, the hand holds the record until that deck's
+ * next bar.
  *
  * `onRestart` runs on the restart (the downbeat the tune drops on). False when
  * the deck is not playing or a gesture already holds its platter.
@@ -768,15 +767,13 @@ export function rewindDeck(deckId: DeckId, opts: { onRestart?: () => void } = {}
   const physics = deck.physics;
   const restartSec = firstDownbeatSec(deckId);
   const { waitSec, alignedTo } = rewindRestartTiming(deckId);
-  const pullMs = Math.min(waitSec, REWIND_PULL_SEC) * 1000;
+  // the selector's hand on the record in the two-body model: the pull, then held until the restart
+  const motion = rewindTrack(Math.min(waitSec, REWIND_PULL_SEC), waitSec);
   const restartMs = waitSec * 1000;
   physics.setTouching(true);
-  physics.setHandRate(REWIND_HAND_RATE);
-  let holding = false;
-  drivePlatter(deckId, deck, 'rewind', (rate, elapsedMs) => {
+  drivePlatter(deckId, deck, 'rewind', motion, (rate, elapsedMs) => {
     rewindStats.ticks++;
     rewindStats.minRate = Math.min(rewindStats.minRate, rate);
-    if (!holding && elapsedMs >= pullMs) { holding = true; physics.setHandRate(0); }
     return elapsedMs >= restartMs;
   }, () => {
     // Let go: the record is back on its first downbeat, at speed.

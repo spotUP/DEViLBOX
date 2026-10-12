@@ -1,10 +1,12 @@
 /**
  * Owner decision 2026-10-12: the reggae sound-system Rewind on the DJ deck.
  * Reachability: the deck's Rewind pad (DeckFXPads) -> the DJ FX registry
- * (fx_deck_rewind) -> DJActions.rewindDeck -> the deck's own TurntablePhysics
- * hand (setTouching + setHandRate) ticked by the platter driver -> the deck's
- * scratch rate. Sentinel: the driver's physics ticks, the rate the deck was
- * given went backward, then the deck was cued to the tune's first downbeat at
+ * (fx_deck_rewind) -> DJActions.rewindDeck -> the selector's hand in the ported
+ * two-body turntable model (turntableSim.simulate, one run) played by the platter
+ * driver -> the deck's scratch rate. Owner 2026-10-12: the old constant -3 pull
+ * "sounds weird and pitched up": the rate now ramps through 0 (the catch), pulls in
+ * uneven strokes and never sits on one value. Sentinel: the model's run, the driver's
+ * ticks, the rate went backward, then the deck was cued to the tune's first downbeat at
  * rate 1, on the other (heard) deck's next bar; the Dub Siren wailed through
  * the pull-back and the Air Horn blew on the restart.
  */
@@ -35,7 +37,6 @@ describe('the deck Rewind pad', () => {
     const cues: Array<{ sec: number; t: number; rate: number }> = [];
     let scratching = false;
     const physics = new TurntablePhysics();
-    const hand = vi.spyOn(physics, 'setHandRate');
     const deckA = {
       physics, playbackMode: 'audio' as const,
       isPlaying: () => true,
@@ -55,6 +56,8 @@ describe('the deck Rewind pad', () => {
 
     const { DeckFXPads } = await import('@/components/dj/DeckFXPads');
     const { rewindStats } = await import('../DJActions');
+    const { turntableSimStats } = await import('@/engine/turntable/turntableSim');
+    const simsBefore = turntableSimStats.runs;
     const { djFxFireCounts } = await import('@/engine/drumpad/DjFxActions');
     const ticksBefore = rewindStats.ticks;
     const restartsBefore = rewindStats.restarts;
@@ -64,13 +67,18 @@ describe('the deck Rewind pad', () => {
     const pressedAt = Date.now();
     fireEvent.pointerDown(getByTitle(/^Rewind/));
 
-    expect(hand, 'the selector\'s hand pulls the record back').toHaveBeenCalledWith(-3);
+    expect(turntableSimStats.runs - simsBefore, 'the selector\'s hand in the turntable model').toBe(1);
     expect(scratching, 'the deck audio follows the platter').toBe(true);
     expect(djFxFireCounts.fx_dub_siren, 'the Dub Siren wails through the pull-back').toBe(sirenBefore + 1);
     for (let i = 0; i < 600 && scratching; i++) vi.advanceTimersByTime(8);
 
     expect(rewindStats.ticks - ticksBefore, 'driver ticks').toBeGreaterThan(50);
-    expect(Math.min(...rates), 'the deck rate went backward, fast').toBeLessThan(-2);
+    expect(Math.min(...rates), 'the deck rate went backward, fast').toBeLessThan(-1.5);
+    // a hand, not a constant: the pull passes through 0 from the catch, changes every tick, no jumps
+    const pull = rates.slice(0, rates.findIndex((r) => r < -0.05) + 60);
+    expect(pull.some((r) => r > 0 && r < 0.6), 'the catch slows the record before it reverses').toBe(true);
+    expect(new Set(rates.filter((r) => r < -0.3).map((r) => r.toFixed(2))).size, 'no constant pull rate').toBeGreaterThan(20);
+    for (let i = 1; i < rates.length; i++) expect(Math.abs(rates[i]! - rates[i - 1]!), `smooth at tick ${i}`).toBeLessThan(0.6);
     expect(scratching, 'the hand let go').toBe(false);
     expect(rewindStats.restarts - restartsBefore).toBe(1);
     expect(cues, 'one restart').toHaveLength(1);

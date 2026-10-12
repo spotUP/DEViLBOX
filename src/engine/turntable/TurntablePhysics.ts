@@ -202,6 +202,15 @@ export class TurntablePhysics {
    */
   externallyDriven = false;
 
+  /**
+   * An engine driver sets the record's speed from the two-body model (DJActions' platter gestures,
+   * turntableSim.ts): the view shows what the listener hears. Only while `externallyDriven`.
+   */
+  followRate(rate: number): void {
+    if (!this.externallyDriven) return;
+    this._omega = rate * OMEGA_33;
+  }
+
   /** The rate for a view's frame: ticks the platter, unless an engine driver already does. */
   rateFor(dt: number): number {
     return this.externallyDriven ? this.playbackRate : this.tick(dt);
