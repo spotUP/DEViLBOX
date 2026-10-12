@@ -2588,5 +2588,59 @@
     "word_slices": [],
     "factory_safe": true,
     "packFile": "scratch_023.wav"
+  },
+  "AH_LONG": {
+    "filename": "aaaaah.wav",
+    "canonical_name": "AH_LONG",
+    "literal_phrase": "aaaaah",
+    "category": "AH_VOWEL",
+    "source_is_clean": true,
+    "source_is_pre_scratched": false,
+    "recommended_gestures": [
+      "baby",
+      "chirp",
+      "flare1",
+      "orbit",
+      "tear_fwd",
+      "scribble",
+      "drag",
+      "transformer8"
+    ],
+    "recommended_roles": [
+      "hook",
+      "showcase",
+      "phrase_end"
+    ],
+    "recommended_styles": [
+      "boombap",
+      "battle",
+      "lofi"
+    ],
+    "duration_ms": 670.9,
+    "centroid": 3196.0,
+    "voiced_amount": 0.59,
+    "noise_amount": 0.41,
+    "transient_count": 8,
+    "onset_rate": 11.9,
+    "pitch_flip_rate": 61.1,
+    "pre_scratched": true,
+    "anchor_attack": 220,
+    "anchor_vowel": 440,
+    "anchor_tail": 14467,
+    "safe": [
+      27,
+      14467
+    ],
+    "safe_forward": [
+      440,
+      14467
+    ],
+    "safe_reverse": [
+      27,
+      440
+    ],
+    "word_slices": [],
+    "factory_safe": true,
+    "packFile": "scratch_020.wav"
   }
 }

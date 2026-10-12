@@ -13,12 +13,12 @@ import {
 import { GESTURE_LEVELS } from '../scratchGestureCatalog';
 
 describe('the catalogue converts the Up Rough metadata (SCR-P2.1)', () => {
-  it('holds 50 records keyed by canonical name, 12 categories, 8 pre-scratched', () => {
-    expect(SCRATCH_RECORDS).toHaveLength(50);
-    expect(new Set(SCRATCH_RECORDS.map((r) => r.id)).size).toBe(50);
+  it('holds 51 records keyed by canonical name, 12 categories, 8 pre-scratched', () => {
+    expect(SCRATCH_RECORDS).toHaveLength(51);
+    expect(new Set(SCRATCH_RECORDS.map((r) => r.id)).size).toBe(51);
     expect(SCRATCH_RECORD_CATEGORIES).toHaveLength(12);
     expect(SCRATCH_RECORDS.filter((r) => r.preScratched)).toHaveLength(8);
-    expect(SCRATCH_RECORDS.filter((r) => r.clean)).toHaveLength(42);
+    expect(SCRATCH_RECORDS.filter((r) => r.clean)).toHaveLength(43);
     expect(SCRATCH_METADATA_RATE).toBe(22050);
   });
 

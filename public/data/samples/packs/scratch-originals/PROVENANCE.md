@@ -11,7 +11,10 @@ Owner-plan section 15 (licensing check) and ledger item SCR-P0.4
 - The same recordings are the record crate of the Up Rough Demo System
   (`Up_Rough_Demo_System/scratch-originals/`, named files such as `1.wav`,
   `fresh.wav`). `scratch_bank_metadata.json` here is that crate's analysis
-  (50 records); each record's `packFile` names the byte-identical pack file.
+  (51 records); each record's `packFile` names the byte-identical pack file.
+  AH_LONG (`aaaaah.wav` = `scratch_020.wav`, sha1 6ca25799) was added 2026-10-12
+  from the demo's own `scratch_bank.load_bank` (the demo's JSON lacked it; its
+  live bank has it), ledger SCR-PG-A1.
 - Not copied from the Up Rough crate: `if-you-really-like-to-rock-the-funky-beat.wav`
   (a sampled phrase of unknown origin; stays out until its source is known).
 
@@ -22,7 +25,7 @@ They are committed in this public repository and deployed with `public/`.
 
 ## Files without a catalogue record
 
-`scratch_020`, `scratch_040`, `scratch_049`, `scratch_053`, `scratch_054`,
+`scratch_040`, `scratch_049`, `scratch_053`, `scratch_054`,
 `scratch_055`, `scratch_056` have no entry in `scratch_bank_metadata.json`.
 Owner decision 3 (2026-10-11): FX pack only; never a performer source until
 records are produced for them with the Up Rough analyser.
