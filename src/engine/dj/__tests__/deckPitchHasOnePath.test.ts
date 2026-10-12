@@ -69,7 +69,9 @@ describe('no source file writes deck pitch to the store except DJActions', () =>
       'store\\.setDeckPitch\\(|getState\\(\\)\\.setDeckPitch\\(|decks(\\.[A-Za-z]+|\\[[^]]+\\])\\.pitchOffset *=[^=]|setDeckState\\([^)]*pitchOffset *:';
     let out = '';
     try {
-      out = execFileSync('grep', ['-rnE', '--include=*.ts', '--include=*.tsx', '--exclude-dir=__tests__', pattern, root], { encoding: 'utf-8' });
+      // git grep reads the index (tracked + untracked, never ignored) instead of
+      // walking the tree: a full-tree grep took over 30 s inside the push gate.
+      out = execFileSync('git', ['grep', '--untracked', '-nE', pattern, '--', 'src/*.ts', 'src/*.tsx', ':!**/__tests__/**'], { encoding: 'utf-8', cwd: join(root, '..') });
     } catch { /* grep exits 1 on no match */ }
     const offenders = out.split('\n').filter((l) => l && !l.includes(join('engine', 'dj', 'DJActions.ts')));
     expect(offenders, 'deck pitch must go through DJActions.setDeckPitch (engine + store)').toEqual([]);
