@@ -55,6 +55,12 @@ export interface ExecuteOptions {
   performTrade?: (juggle: NonNullable<DJTransitionPlan['juggle']>) => Promise<{ completed: boolean; refused?: boolean; reason?: string }>;
   /** The outgoing deck's position now (seconds of its track): where a heard ladder abort's blend is placed. */
   outgoingPosition?: () => number;
+  /**
+   * The plan's scratch (scratch plan D8): started once, before the wait for the grid (an outgoing-deck
+   * feature plays the bar before the start), alongside the curves - never delaying the start or the
+   * release (section 28). Cancelled with the transition.
+   */
+  performScratch?: (scratch: NonNullable<DJTransitionPlan['scratch']>) => { done: Promise<{ completed: boolean; reason?: string }>; cancel(): void };
 }
 
 /** Scale a curve's keyframe beats by `k` (a blend run over a shorter length keeps its shape). */
@@ -213,6 +219,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
   let intervalId: unknown = null;
   /** A refused juggle's normal blend, executed in this one's place. */
   let fallbackHandle: ExecutionHandle | null = null;
+  let scratchHandle: { cancel(): void } | null = null;
   let resolveDone: (r: ExecutionResult) => void = () => {};
   const promise = new Promise<ExecutionResult>((resolve) => { resolveDone = resolve; });
   const curves = planCurves(plan);
@@ -308,6 +315,19 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
         try { getDJEngine().getDeck(out).setAudioLoop(plan.loop.startSec, plan.loop.startSec + len); trace.events.push(`loop outgoing ${plan.loop.purpose}`); } catch { /* */ }
       }
       if (cancelled) return;
+
+      // ── Scratch (scratch plan D8): on its own beats, alongside everything below ──
+      if (plan.scratch && opts.performScratch) {
+        const s = plan.scratch;
+        trace.events.push(`scratch ${s.kind} ${s.events.length} events`);
+        try {
+          const h = opts.performScratch(s);
+          scratchHandle = h;
+          void h.done.then((r) => { trace.events.push(`scratch ${r.completed ? 'released' : `ended: ${r.reason ?? 'not completed'}`}`); }, () => undefined);
+        } catch (err) {
+          trace.events.push(`scratch refused: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
 
       // ── Wait for the grid ───────────────────────────────────────────────
       if (opts.waitForStart) await opts.waitForStart(plan);
@@ -455,6 +475,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       // release the incoming deck's effects mid-track.
       if (finished) return;
       cancelled = true;
+      try { scratchHandle?.cancel(); } catch { /* the transition's cancel must complete */ }
       if (fallbackHandle) { fallbackHandle.cancel(); return; }
       if (intervalId !== null) { timers.clearInterval(intervalId); intervalId = null; }
       try { setDeckEchoSend(out, 0); setDeckReverbSend(out, 0); } catch { /* */ }

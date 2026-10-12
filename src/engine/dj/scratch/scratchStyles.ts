@@ -206,3 +206,16 @@ export function gestureSuitability(gesture: ScratchGesture | ScratchGestureId, b
 export function phraseBarsFor(bpm: number, base = 4): number {
   return bpm <= BPM_SUITABILITY.slowBpm ? base * 2 : base;
 }
+
+const SCRATCH_MODES: readonly ScratchMode[] = ['OFF', 'SAFE', 'MUSICAL', 'PERFORMER', 'BATTLE'];
+
+/** The store's Auto Scratch mode string as a mode (an unknown value plays safe: OFF). */
+export function scratchModeOf(value: string | undefined): ScratchMode {
+  return SCRATCH_MODES.includes(value as ScratchMode) ? (value as ScratchMode) : 'OFF';
+}
+
+/** The store's Auto Scratch style ('auto' or a palette id) for a track: Auto reads its genre (section 33). */
+export function scratchStyleFor(setting: string | undefined, genre: Parameters<typeof genreToScratchStyle>[0]): ScratchStyleChoice {
+  if (setting && setting !== 'auto' && setting in SCRATCH_STYLES) return { style: setting as ScratchDJStyle, genre: 'unknown', modifiers: genreToScratchStyle(undefined).modifiers };
+  return genreToScratchStyle(genre);
+}
