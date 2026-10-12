@@ -275,7 +275,7 @@ export class StandaloneJuggle {
    * Hand back to the playing deck: the pattern still running releases, the
    * idle deck stops and gets its own key lock and a clean channel back, the
    * crossfader sits on the master. A double stays loaded but stopped (the
-   * next preload loads over it); a teased next track stays for its transition.
+   * next preload loads over it); a teased next track stays loaded, and the transition loads it from its pre-render.
    */
   end(outcome: string): void {
     const s = this.state;

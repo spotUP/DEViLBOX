@@ -1808,14 +1808,18 @@ class DJAutoDJ {
     return { analysis: this.incomingAnalysis, compatible, pair };
   }
 
-  /** The tease loads the pre-rendered next track now; the transition later finds it on the deck ("already loaded"). */
+  /**
+   * The tease loads the pre-rendered next track on the idle deck it borrows. The pre-render stays the
+   * transition's source (triggerTransition loads it): the tease does not make the idle deck the next
+   * track's only copy, so after the tease the deck is lendable again for the rest of the track
+   * (JUGGLE-FOLLOWUPS b: short modules pre-render at once, and a spent pre-render blocked every later
+   * stand-alone juggle with "the next track waits on the idle deck").
+   */
   private async loadNextForTease(deck: DeckId): Promise<boolean> {
     const pre = this.preRenderedTrack;
     if (!pre) return false;
     const { loadPreRenderedTrackToDeck } = await import('./DJTrackLoader');
-    const loaded = await loadPreRenderedTrackToDeck(pre.data, pre.track, deck);
-    if (loaded && this.preRenderedTrack === pre) { this.preRenderedTrack = null; this.preloadedDeck = deck; }
-    return loaded;
+    return loadPreRenderedTrackToDeck(pre.data, pre.track, deck);
   }
 
   private publishTelemetry(timeRemaining: number): void {
