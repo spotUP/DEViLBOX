@@ -222,6 +222,10 @@ export class ScratchExecutor {
       scratchExecutorStats.recuesUnavailable++;
       this.emit('recueUnavailable', e.event.gesture, 'the gesture had no closed fader window to re-cue in');
     }
+    if (e.state === 'ending' && state === 'cancelled') {
+      // a record stroke whose stop is scheduled ahead: cancel stops it now (audit SA-m7)
+      this.deps.release(e.id, { ...e.opts, at: undefined, finishCycle: false });
+    }
     if (e.state === 'running') {
       // a deck stroke at its end beat finishes the cycle it is in (it plays whole cycles and ends
       // itself); a cancel stops it now

@@ -29,10 +29,16 @@ describe('buildScratchContext (SCR-P4.1)', () => {
     expect(ctx.phraseConfidence).toBe(0.85);
   });
 
+  it('without a hands budget from the Auto DJ the context grants no permission and the planner plays nothing (SA-m8)', () => {
+    const ctx = buildScratchContext({ perf: fixturePerf(track, 0.18 + 68 * 0.5 + 0.01), style: 'battle' })!;
+    expect(ctx.scratchPermission).toBe(0);
+    expect(planScratch(ctx, { mode: 'BATTLE', seed: 1, fromBar: ctx.masterBar, bars: 16 }).mode).toBe('OFF');
+  });
+
   it('a module with sure beats but an assumed meter plans as SAFE: beat confidence is the beats AND the bars (SA-M8)', () => {
     const t0 = fixtureAnalysis();
     const assumed = { ...t0, analysisConfidence: { ...t0.analysisConfidence, beatGrid: 1, downbeat: 0.4 } };
-    const ctx = buildScratchContext({ perf: fixturePerf(assumed, 0.18 + 68 * 0.5 + 0.01), style: 'battle' })!;
+    const ctx = buildScratchContext({ perf: fixturePerf(assumed, 0.18 + 68 * 0.5 + 0.01), style: 'battle', scratchPermission: 1 })!;
     expect(ctx.beatConfidence).toBe(0.4);
     const plan = planScratch(ctx, { mode: 'BATTLE', seed: 3, fromBar: ctx.masterBar, bars: 16 });
     expect(plan.mode).toBe('SAFE');

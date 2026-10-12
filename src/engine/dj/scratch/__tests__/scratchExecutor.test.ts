@@ -237,6 +237,17 @@ describe('release restores exactly the state the run started from (section 60)',
     expect(r.releaseFinish).toEqual([true, false]);
   });
 
+  it('cancel stops a record stroke whose stop is already scheduled ahead, now (audit SA-m7)', () => {
+    const r = rig();
+    const ex = new ScratchExecutor(r.deps);
+    ex.schedule(recordEvent(8, { durationBeats: 1 }));
+    r.advance(4.45); // end beat 9 = 4.5 s is inside the lookahead: its stop is handed over
+    expect(r.releaseAt).toEqual([4.5]);
+    ex.cancel();
+    expect(r.releaseAt).toEqual([4.5, undefined]);
+    expect(ex.active).toBe(0);
+  });
+
   it('cancel releases what runs, drops what waits, and restores', () => {
     const r = rig();
     const before = { ...r.state };

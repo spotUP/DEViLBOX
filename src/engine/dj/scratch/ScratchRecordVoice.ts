@@ -113,6 +113,8 @@ export class ScratchRecordVoice {
   /** The anchor the current gesture returns to (seconds of record). */
   cuePosition = 0;
   busy = false;
+  /** Counts the strokes launched on this voice: a performance stops only its own stroke (audit SA-m7). */
+  generation = 0;
   readonly safetyLog: ScratchVoiceSafetyEvent[] = [];
   private lastClamped = 0;
   private lastRate = 0;
@@ -245,6 +247,7 @@ export class ScratchRecordVoice {
     };
     this.ring.rateCurve(points, ringOpts, opts.at);
     scratchVoiceStats.strokes++;
+    this.generation++;
     this.busy = true;
     if (!opts.loop) this.position = this.clampToSafe(start + ex.end);
     return { ok: true, clamped };
