@@ -180,3 +180,8 @@ export function isSidFileBytes(data: ArrayBuffer | Uint8Array): boolean {
   const b = data instanceof Uint8Array ? data : new Uint8Array(data, 0, Math.min(4, data.byteLength));
   return b.length >= 4 && (b[0] === 0x50 || b[0] === 0x52) && b[1] === 0x53 && b[2] === 0x49 && b[3] === 0x44;
 }
+
+/** Voices of a SID: 3 per chip (a 2SID / 3SID has 6 / 9); 3 when no SID is loaded. */
+export function sidVoiceCount(meta: Pick<SIDHeaderInfo, 'secondSID' | 'thirdSID'> | null | undefined): number {
+  return 3 * (1 + (meta?.secondSID ? 1 : 0) + (meta?.thirdSID ? 1 : 0));
+}

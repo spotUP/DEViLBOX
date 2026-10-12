@@ -3,20 +3,20 @@
  * Engine selection, chip model, clock speed, ASID toggle, voice mask, buffer size.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useMixerStore } from '@stores/useMixerStore';
+import { useFormatStore } from '@stores/useFormatStore';
 import { notify } from '@stores/useNotificationStore';
 import { CustomSelect } from '@components/common/CustomSelect';
-import type { SidChipModelSetting } from '@/lib/sid/SIDHeaderParser';
+import { Toggle } from '@components/controls/Toggle';
+import { sidVoiceCount, type SidBufferSizeSetting, type SidChipModelSetting, type SidClockSetting } from '@/lib/sid/SIDHeaderParser';
 
 interface SIDSettingsTabProps {
   className?: string;
 }
-
-type ClockSpeedOverride = 'auto' | 'PAL' | 'NTSC';
-type BufferSize = 4096 | 8192 | 16384;
 
 export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => {
   const sidEngine = useSettingsStore((s) => s.sidEngine);
@@ -25,10 +25,17 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
 
   const chipModel = useSettingsStore((s) => s.sidChipModel);
   const setChipModel = useSettingsStore((s) => s.setSidChipModel);
-  const [clockSpeed, setClockSpeed] = useState<ClockSpeedOverride>('auto');
-  const [asidEnabled, setAsidEnabled] = useState(false);
-  const [voiceMask, setVoiceMask] = useState([true, true, true]);
-  const [bufferSize, setBufferSize] = useState<BufferSize>(8192);
+  const clockSpeed = useSettingsStore((s) => s.sidClockSpeed);
+  const setClockSpeed = useSettingsStore((s) => s.setSidClockSpeed);
+  const bufferSize = useSettingsStore((s) => s.sidBufferSize);
+  const setBufferSize = useSettingsStore((s) => s.setSidBufferSize);
+  // ASID: the same setting the toolbar's ASID button writes (jsSID reads it when the tune starts).
+  const asidEnabled = useSettingsStore((s) => s.asidEnabled);
+  const setAsidEnabled = useSettingsStore((s) => s.setAsidEnabled);
+  // Voice Mask: the song's channel mutes (one channel per SID voice) - the mixer's, not a second copy.
+  const voiceCount = useFormatStore((s) => sidVoiceCount(s.sidMetadata));
+  const voiceMuted = useMixerStore((s) => s.channels.slice(0, voiceCount).map((c) => c.muted).join(','));
+  const setChannelMute = useMixerStore((s) => s.setChannelMute);
 
   const handleEngineChange = useCallback((value: string) => {
     const engine = value as SIDEngineType;
@@ -36,17 +43,9 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
     notify.success(`SID engine changed to ${SID_ENGINES[engine].name}`);
   }, [setSidEngine]);
 
-  const handleVoiceToggle = useCallback((index: number) => {
-    setVoiceMask((prev) => {
-      const next = [...prev];
-      next[index] = !next[index];
-      return next;
-    });
-  }, []);
-
   const sectionClass = 'bg-dark-bgSecondary/50 border border-dark-border/50 rounded-lg p-4 space-y-3';
   const labelClass = 'text-xs font-medium text-text-muted';
-  const selectClass = 'w-full text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1.5 text-text-primary';
+  const selectClass = 'w-full text-sm bg-dark-bg border border-dark-borderLight rounded px-2 py-1.5 text-text-primary';
 
   return (
     <div className={className}>
@@ -101,7 +100,7 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
           <label className={labelClass}>Clock Speed Override</label>
           <CustomSelect
             value={clockSpeed}
-            onChange={(v) => setClockSpeed(v as ClockSpeedOverride)}
+            onChange={(v) => setClockSpeed(v as SidClockSetting)}
             options={[
               { value: 'auto', label: 'Auto (use file header)' },
               { value: 'PAL', label: 'PAL (50 Hz)' },
@@ -115,41 +114,24 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
               : clockSpeed === 'PAL'
                 ? 'European PAL timing (985248 Hz CPU). Most C64 music is composed for PAL.'
                 : 'American NTSC timing (1022727 Hz CPU). Slightly faster playback.'}
+            {' '}Takes effect from the next play, and the next DJ deck load renders the tune on it.
           </p>
         </div>
 
         {/* ASID Hardware Output */}
         <div className={sectionClass}>
-          <div className="flex items-center justify-between">
-            <div>
-              <label className={labelClass}>ASID Hardware Output</label>
-              <p className="text-[10px] text-text-muted/60 leading-tight mt-1">
-                Send SID register writes to real hardware via MIDI (jsSID only).
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={asidEnabled}
-                onChange={(e) => setAsidEnabled(e.target.checked)}
-                disabled={sidEngine !== 'jssid'}
-                className="sr-only peer"
-              />
-              <div className={`w-9 h-5 rounded-full transition-colors ${
-                sidEngine !== 'jssid'
-                  ? 'bg-dark-border/30 cursor-not-allowed'
-                  : asidEnabled
-                    ? 'bg-blue-600'
-                    : 'bg-dark-border peer-hover:bg-dark-border/80'
-              }`}>
-                <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                  asidEnabled && sidEngine === 'jssid' ? 'translate-x-4' : ''
-                }`} />
-              </div>
-            </label>
-          </div>
+          <Toggle
+            label="ASID Hardware Output"
+            value={asidEnabled}
+            onChange={setAsidEnabled}
+            disabled={sidEngine !== 'jssid'}
+            size="sm"
+          />
+          <p className="text-[10px] text-text-muted/60 leading-tight">
+            Send SID register writes to real hardware via MIDI (jsSID only). Takes effect from the next play.
+          </p>
           {sidEngine !== 'jssid' && (
-            <p className="text-[10px] text-yellow-400/60 leading-tight">
+            <p className="text-[10px] text-accent-warning leading-tight">
               Switch to jsSID engine to enable ASID hardware output.
             </p>
           )}
@@ -158,21 +140,19 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
         {/* Voice Mask */}
         <div className={sectionClass}>
           <label className={labelClass}>Voice Mask</label>
-          <div className="flex items-center gap-4">
-            {[0, 1, 2].map((i) => (
-              <label key={i} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={voiceMask[i]}
-                  onChange={() => handleVoiceToggle(i)}
-                  className="w-3.5 h-3.5 rounded border-dark-border bg-dark-bg text-blue-500 focus:ring-blue-500/30"
-                />
-                <span className="text-xs text-text-secondary">Voice {i + 1}</span>
-              </label>
+          <div className="flex flex-wrap items-center gap-4">
+            {voiceMuted.split(',').map((muted, i) => (
+              <Toggle
+                key={i}
+                label={voiceCount > 3 ? `Chip ${Math.floor(i / 3) + 1} Voice ${(i % 3) + 1}` : `Voice ${i + 1}`}
+                value={muted !== 'true'}
+                onChange={(on) => setChannelMute(i, !on)}
+                size="sm"
+              />
             ))}
           </div>
           <p className="text-[10px] text-text-muted/60 leading-tight">
-            Mute individual SID voices for analysis or remixing.
+            Mute individual SID voices for analysis or remixing (the song&apos;s channel mutes).
           </p>
         </div>
 
@@ -181,8 +161,11 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
           <label className={labelClass}>Audio Buffer Size</label>
           <CustomSelect
             value={String(bufferSize)}
-            onChange={(v) => setBufferSize(Number(v) as BufferSize)}
+            onChange={(v) => setBufferSize((v === 'auto' ? 'auto' : Number(v)) as SidBufferSizeSetting)}
             options={[
+              { value: 'auto', label: 'Auto (each engine\'s own)' },
+              { value: '1024', label: '1024 samples (~23ms)' },
+              { value: '2048', label: '2048 samples (~46ms)' },
               { value: '4096', label: '4096 samples (~93ms)' },
               { value: '8192', label: '8192 samples (~186ms)' },
               { value: '16384', label: '16384 samples (~372ms)' },
@@ -190,7 +173,7 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
             className={selectClass}
           />
           <p className="text-[10px] text-text-muted/60 leading-tight">
-            Smaller buffers reduce latency but may cause audio glitches on slower devices.
+            Smaller buffers reduce latency but may cause audio glitches on slower devices. Takes effect from the next play.
           </p>
         </div>
 

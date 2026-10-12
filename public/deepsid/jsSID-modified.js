@@ -221,6 +221,7 @@ function asidSend(chip) {
 function onMIDISuccess(midiAccess) {
  midiAccessObj = midiAccess;
  const select = document.getElementById('asid-midi-outputs');
+ if (!select) return; // DEViLBOX: no DeepSID port picker - the host hands the port over (setmidioutput)
  const outputs = Array.from(midiAccessObj.outputs.values());
  
  // Remove any previous ports from dropdown
@@ -629,6 +630,14 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
  this.readregister = function(register) { return memory[register]; } // Added by JCH
  this.enableVoices = function(mask) { voiceMask = mask; } // Added by JCH
  this.setmodel = function(model) { SID_model = model; }
+ // DEViLBOX: run the tune on an NTSC (or PAL) C64 from its next start: CPU clock, frame rate, default CIA timer
+ this.setclock = function(ntsc) {
+  C64_CPUCLK = ntsc ? 1022727 : C64_PAL_CPUCLK; FRAMERATE = ntsc ? 60 : PAL_FRAMERATE; CIA_DEFAULT_TIMER = ntsc ? 0x4295 : 0x4024;
+  clk_ratio = (C64_CPUCLK*(typeof multi === 'number' ? multi : 1))/samplerate;
+ }
+ this.getclock = function() { return C64_CPUCLK; }
+ // DEViLBOX: the MIDI output ASID writes go to (the host's port; DeepSID picked it from its own page)
+ this.setmidioutput = function(port) { selectedMidiOutput = port; }
  this.setvolume = function(vol) { volume = vol; }
  this.setloadcallback = function(fname) { loadcallback=fname; }
  this.setstartcallback = function(fname) { startcallback=fname; }
@@ -643,7 +652,10 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
 
  var //emulated machine constants
  C64_PAL_CPUCLK = 985248, //Hz
- PAL_FRAMERATE = 50, //NTSC_FRAMERATE = 60;
+ PAL_FRAMERATE = 50; //NTSC_FRAMERATE = 60;
+ // DEViLBOX: the machine the tune runs on (setclock): CPU clock, VBI frame rate, the kernal's default CIA timer
+ var C64_CPUCLK = C64_PAL_CPUCLK, FRAMERATE = PAL_FRAMERATE, CIA_DEFAULT_TIMER = 0x4024;
+ var
  SID_CHANNEL_AMOUNT = 3,
  OUTPUT_SCALEDOWN = 0x10000 * SID_CHANNEL_AMOUNT * 16;
  var SIDamount_vol=[0,  1, 0.6, 0.4]; //how much to attenuate with more 2SID/3SID to avoid master-output overflows
@@ -654,8 +666,8 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
  var preferred_SID_model=[8580.0,8580.0,8580.0]; var SID_model=8580.0;
  var memory = new Uint8Array(65536); //for(var i=0;i<memory.length;i++) memory[i]=0;
  var loaded=0, initialized=0, finished=0, loadcallback=null, startcallback=null; endcallback=null, playtime=0, ended=0;
- var clk_ratio = C64_PAL_CPUCLK/samplerate;
- var frame_sampleperiod = samplerate/PAL_FRAMERATE; //samplerate/(PAL_FRAMERATE*framespeed);
+ var clk_ratio = C64_CPUCLK/samplerate;
+ var frame_sampleperiod = samplerate/FRAMERATE; //samplerate/(PAL_FRAMERATE*framespeed);
  var framecnt=1, volume=1.0, CPUtime=0, pPC;
  var SIDamount=1, mix=0;
  var voiceMask=0x1FF; // Added by JCH
@@ -673,16 +685,14 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
    }
   }
 
-  if (asid_enabled) {
+  if (asid_enabled && !selectedMidiOutput) { // DEViLBOX: a port the host handed over (setmidioutput) is kept
    const select = document.getElementById('asid-midi-outputs');
-   const outputs = Array.from(midiAccessObj.outputs.values());
-   if (typeof outputs !== 'undefined' && outputs.length) {
+   const outputs = midiAccessObj ? Array.from(midiAccessObj.outputs.values()) : [];
+   if (select && outputs.length) {
     selectedMidiOutput = outputs[select.value];
    }
    else {
-    alert("No MIDI devices found.");
-    asid_enabled = false;
-    return;
+    asid_enabled = false; // no port: play in software
    }
   }
 
@@ -705,8 +715,8 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
     }
    }
    if (timermode[subtune] || memory[0xDC05]) { //&& playaddf {   //CIA timing
-    if (!memory[0xDC05]) {memory[0xDC04]=0x24; memory[0xDC05]=0x40;} frame_sampleperiod = (memory[0xDC04]+memory[0xDC05]*256)/clk_ratio; }
-   else frame_sampleperiod = samplerate/PAL_FRAMERATE; //Vsync timing
+    if (!memory[0xDC05]) {memory[0xDC04]=CIA_DEFAULT_TIMER&0xFF; memory[0xDC05]=CIA_DEFAULT_TIMER>>8;} frame_sampleperiod = (memory[0xDC04]+memory[0xDC05]*256)/clk_ratio; }
+   else frame_sampleperiod = samplerate/FRAMERATE; //Vsync timing
    //frame_sampleperiod = (memory[0xDC05]!=0 || (!timermode[subtune] && playaddf))? samplerate/PAL_FRAMERATE : (memory[0xDC04] + memory[0xDC05]*256) / clk_ratio; 
    if(playaddf==0) playaddr = ((memory[1]&3)<2)? memory[0xFFFE]+memory[0xFFFF]*256 : memory[0x314]+memory[0x315]*256; 
    else { playaddr=playaddf; if (playaddr>=0xE000 && memory[1]==0x37) memory[1]=0x35; } //player under KERNAL (Crystal Kingdom Dizzy)
@@ -805,10 +815,10 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
  function speed(multiplier) { // Added by JCH
   multi = multiplier;
   if (timermode[subtune] || memory[0xDC05]) { // CIA timing
-    clk_ratio = (C64_PAL_CPUCLK*multi)/samplerate;
+    clk_ratio = (C64_CPUCLK*multi)/samplerate;
     frame_sampleperiod = (memory[0xDC04]+memory[0xDC05]*256)/clk_ratio;
   } else
-    frame_sampleperiod = samplerate/(PAL_FRAMERATE*multi);
+    frame_sampleperiod = samplerate/(FRAMERATE*multi);
 }
 
  var //CPU (and CIA/VIC-IRQ) emulation constants and variables - avoiding internal/automatic variables to retain speed
