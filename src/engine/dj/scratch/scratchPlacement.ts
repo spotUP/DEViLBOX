@@ -142,7 +142,27 @@ export function planVocabulary(style: ScratchDJStyle, mode: ScratchMode, genreBi
   };
   const wanted = [...SCRATCH_STYLES[style].bias, ...genreBias];
   const pool = wanted.length ? wanted : SCRATCH_GESTURES.map((g) => g.id);
-  return [...new Set(pool)].filter(allowed);
+  const core = [...new Set(pool)].filter(allowed);
+  // a palette's bias inside a restrained mode can leave one gesture (electro in MUSICAL: chirp
+  // alone): the vocabulary is filled with the nearest gestures the mode allows (section 22)
+  return fillVocabulary(core, SCRATCH_GESTURES.map((g) => g.id).filter(allowed));
+}
+
+/** The smallest vocabulary a phrase is planned from (section 21: no phrase of one gesture). */
+export const MIN_VOCABULARY = 3;
+
+/**
+ * `core` filled up to `min` gestures from `candidates`, nearest in effort (level, then activity)
+ * to the core first, so the palette keeps its character.
+ */
+export function fillVocabulary(core: readonly ScratchGestureId[], candidates: readonly ScratchGestureId[], min = MIN_VOCABULARY): ScratchGestureId[] {
+  const out = [...new Set(core)];
+  if (out.length >= min) return out;
+  const centre = out.length ? out.reduce((sum, g) => sum + effortKey(g), 0) / out.length : 0;
+  const rest = [...new Set(candidates)].filter((g) => !out.includes(g) && !isThrowGesture(g))
+    .sort((a, b) => Math.abs(effortKey(a) - centre) - Math.abs(effortKey(b) - centre) || (a < b ? -1 : 1));
+  for (const g of rest) { if (out.length >= min) break; out.push(g); }
+  return out;
 }
 
 /**

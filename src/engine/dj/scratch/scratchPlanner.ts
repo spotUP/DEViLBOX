@@ -9,11 +9,11 @@
 import { barSeed, lfsr } from './scratchRandom';
 import {
   DENSITY_RATE, planBars, planVocabulary, pickGesture, vocabulary, humanizeMs, withThrow, isThrowGesture, sectionDensity,
-  DENSITY_ORDER, oneHand, validatePhrase, VOCAL_BUSY, type DensityState, type PlacedScratch, type PlannedRest, type ThrowMemory,
+  DENSITY_ORDER, oneHand, fillVocabulary, validatePhrase, VOCAL_BUSY, type DensityState, type PlacedScratch, type PlannedRest, type ThrowMemory,
 } from './scratchPlacement';
 import { routineFor, routineToPlaced, SCRATCH_ROUTINES, type RoutineName } from './scratchRoutines';
 import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
-import { getGesture, gestureBeats } from './scratchGestureCatalog';
+import { getGesture, gestureBeats, SCRATCH_GESTURE_IDS } from './scratchGestureCatalog';
 import { DEFAULT_GRID, STEPS_PER_BEAT } from './scratchAnchor';
 import { barStartBeat } from '../autodj/beatGrid';
 import type { ScratchPerformanceContext } from './scratchContext';
@@ -44,6 +44,10 @@ export interface ScratchPlanOptions {
   routines?: boolean;
   /** Gestures cooling down (section 54): left out of the vocabulary. */
   exclude?: readonly ScratchGestureId[];
+  /** The source's playable gestures (a crate record's list, sections 38/39); throws stay allowed on a clean record. */
+  allowed?: readonly ScratchGestureId[];
+  /** A gesture cooling down at a bar (section 54): checked per event, not for the whole window. */
+  cooling?: (gesture: ScratchGestureId, bar: number) => boolean;
   /** Steps up (+) or down (-) the density ladder from the section's state, still capped by the mode
    *  (section 52: escalate after a phrase that lifted the energy, resolve after a repeated one). */
   densityShift?: number;
@@ -75,10 +79,12 @@ export function effectiveMode(ctx: Pick<ScratchPerformanceContext, 'beatConfiden
 function routineInVocabulary(placed: PlacedScratch[], vocab: readonly ScratchGestureId[], seed: number, section: string): PlacedScratch[] {
   const ranked = vocabulary(vocab);
   const rnd = lfsr(barSeed(seed, 0, section) + 0x77);
+  // a replaced gesture never repeats the one before it (section 21: no one-gesture phrase)
+  let last: ScratchGestureId | null = null;
   return placed.map((p) => {
-    if (ranked.includes(p.gesture)) return p;
-    const g = pickGesture(ranked, getGesture(p.gesture).intensity, p.placementRole, rnd, null);
-    return { ...p, gesture: g };
+    const g = ranked.includes(p.gesture) ? p.gesture : pickGesture(ranked, getGesture(p.gesture).intensity, p.placementRole, rnd, last);
+    last = g;
+    return g === p.gesture ? p : { ...p, gesture: g };
   });
 }
 
@@ -94,7 +100,18 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   let gestures = planVocabulary(style, eff.mode, genre.bias ?? []);
   const levelCap = Math.min(eff.levelCap ?? 4, genre.levelCap ?? 4, maxLevelFor(eff.mode, style) || 4);
   gestures = gestures.filter((id) => getGesture(id).difficulty <= levelCap || (eff.mode === 'SAFE' && !eff.levelCap && id === 'chirp'));
-  if (genre.durationCapSteps) gestures = gestures.filter((id) => getGesture(id).durationSteps <= genre.durationCapSteps! && id !== 'drag');
+  if (genre.durationCapSteps) {
+    const fits = (id: ScratchGestureId): boolean => getGesture(id).durationSteps <= genre.durationCapSteps! && id !== 'drag';
+    // short strokes only (section 34) - but never a one-gesture vocabulary: the nearest short ones in the level join
+    gestures = fillVocabulary(gestures.filter(fits), SCRATCH_GESTURE_IDS.filter((id) => fits(id) && getGesture(id).difficulty <= levelCap));
+  }
+  if (opts.allowed) {
+    const playable = gestures.filter((id) => opts.allowed!.includes(id));
+    // the style's gestures the record plays; none in common = the record's own inside the level
+    // the record's other gestures in the level join when too few are left (never a one-gesture phrase)
+    gestures = fillVocabulary(playable, opts.allowed.filter((id) => !isThrowGesture(id) && getGesture(id).difficulty <= levelCap));
+    if (playable.length < gestures.length || playable.length === 0) reasons.push(`the record plays ${gestures.join(', ') || 'nothing in the level'}`);
+  }
   if (opts.exclude?.length) {
     const cooling = gestures.filter((id) => opts.exclude!.includes(id));
     gestures = gestures.filter((id) => !opts.exclude!.includes(id));
@@ -154,10 +171,38 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   if (opts.record && opts.throwMemory && events.length) {
     events = withThrow(events, opts.record, opts.throwMemory, { firstBar: opts.fromBar, beatsPerBar: ctx.meter, bpm: ctx.bpm });
   }
+  // cooldowns (section 54) at each event's own bar: a cooling gesture is swapped for one that is not
+  if (opts.cooling) events = swapCooling(events, gestures, opts.cooling, opts.seed, ctx.energy, opts.allowed, reasons);
+  // a routine's gestures follow the record too
+  if (opts.allowed) events = events.filter((e) => isThrowGesture(e.gesture) || opts.allowed!.includes(e.gesture));
   // the final plan is what one hand performs: routines and the throw included (SA-B1)
   events = oneHand(events);
+  // section 21: never more than 3 events on one gesture in a phrase (a record that plays one
+  // gesture in the level): the first and the last two stay - the call and the turnaround
+  const performed = events.filter((e) => !isThrowGesture(e.gesture));
+  if (performed.length > 3 && new Set(performed.map((e) => e.gesture)).size === 1) {
+    const keep = new Set([performed[0]!, ...performed.slice(-2)]);
+    events = events.filter((e) => isThrowGesture(e.gesture) || keep.has(e));
+    reasons.push(`one gesture (${performed[0]!.gesture}) on this source: ${performed.length} events thinned to 3`);
+  }
   const finalBars = Array.from({ length: opts.bars }, (_, k) => events.filter((e) => e.bar === opts.fromBar + k));
   return { mode: eff.mode, events, bars: finalBars, rests: planned.rests, routine, issues: validatePhrase(finalBars), reasons };
+}
+
+/** Swap every event whose gesture cools down at its bar for the nearest gesture that does not (never the one before it). */
+function swapCooling(events: PlacedScratch[], vocab: readonly ScratchGestureId[], cooling: (g: ScratchGestureId, bar: number) => boolean, seed: number, energy: number, allowed: readonly ScratchGestureId[] | undefined, reasons: string[]): PlacedScratch[] {
+  const rnd = lfsr(seed * 53 + 17);
+  const out: PlacedScratch[] = [];
+  let swapped = 0;
+  for (const e of events) {
+    if (isThrowGesture(e.gesture) || !cooling(e.gesture, e.bar)) { out.push(e); continue; }
+    const free = vocabulary(vocab.filter((g) => !cooling(g, e.bar) && (!allowed || allowed.includes(g))));
+    if (!free.length) continue; // everything cools: the event becomes a rest
+    out.push({ ...e, gesture: pickGesture(free, energy, e.placementRole, rnd, out.at(-1)?.gesture ?? null) });
+    swapped++;
+  }
+  if (swapped) reasons.push(`cooldowns: ${swapped} gesture(s) varied`);
+  return out;
 }
 
 /** Humanize offsets for a plan (section 35), drawn once from the seed so a plan replays exactly. */

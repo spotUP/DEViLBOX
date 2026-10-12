@@ -26,9 +26,8 @@ import { ScratchStateMachine, type ScratchState } from './scratchStateMachine';
 import { evaluatePhrase, type PhraseDecision, type PhraseEvaluation, type PhraseTrace } from './scratchEvaluate';
 import { findOpportunity, type ScratchOpportunity } from './scratchOpportunity';
 import { arcForSection, phaseAt, planArc, type ArcPhaseName, type ArcTemplate } from './scratchArc';
-import { SCRATCH_GESTURE_IDS } from './scratchGestureCatalog';
 import type { ScratchGenreHint } from './scratchStyles';
-import type { ScratchDJStyle, ScratchEvent, ScratchSource, ScratchAnchor, DeckScratchAnchor } from './scratchTypes';
+import type { ScratchGestureId, ScratchDJStyle, ScratchEvent, ScratchSource, ScratchAnchor, DeckScratchAnchor } from './scratchTypes';
 
 type AB = 'A' | 'B';
 
@@ -319,14 +318,17 @@ export class DJScratchDJ {
       && (shape.role !== 'peakBurst' || this.memory.battleReady(fromBar) || input.mode !== 'BATTLE');
     let plan: ScratchPlan;
     let arc: ArcTemplate | null = null;
-    const exclude = this.memory.coolingGestures(fromBar, SCRATCH_GESTURE_IDS);
+    // cooldowns are checked at each event's own bar (section 54), not for the whole window
+    const cooling = (g: ScratchGestureId, bar: number): boolean => !this.memory.gestureReady(g, bar);
+    let arcOpts: Parameters<typeof planArc>[0] | null = null;
     if (wantsFeature) {
       arc = shape.template!;
       toBar = fromBar + arc.bars;
       this.budget.feature();
       const perm = performancePermissions({ setPhase, budgetTotal: this.budget.total, mode: input.mode });
       this.lastPeak = perm.peak;
-      const a = planArc({ arc, startBar: fromBar, style: ctx.style, mode: input.mode, seed: seed + fromBar, levelCap: perm.maxLevel || undefined, exclude, beatsPerBar: ctx.meter });
+      arcOpts = { arc, startBar: fromBar, style: ctx.style, mode: input.mode, seed: seed + fromBar, levelCap: perm.maxLevel || undefined, cooling, beatsPerBar: ctx.meter };
+      const a = planArc(arcOpts);
       // the feature's cooldown runs from its end (section 54)
       this.memory.recordPerformance(shape.role === 'peakBurst' ? 'battle' : 'feature', toBar);
       this.arcPhases = [];
@@ -341,7 +343,7 @@ export class DJScratchDJ {
         return b ? timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, b.start) : ctx.vocalActivity;
       });
       const densityShift = this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0;
-      const opts = { mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, exclude, densityShift };
+      const opts = { mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, cooling, densityShift };
       // a planned rest after a phrase that collided with the vocal (section 52)
       plan = this.intent === 'rest'
         ? { mode: input.mode, events: [], bars: [], rests: [], issues: [], reasons: [`rest: ${this.lastEvaluation?.reason ?? 'evaluation'}`] }
@@ -352,12 +354,17 @@ export class DJScratchDJ {
 
     // the source is chosen before the throw: a crate record opens its phrase with one (section 41)
     const chosen = plan.events.length ? this.chooseSource(ctx, plan, input, fromBar, decksStill) : null;
+    // a crate record plays only its own gestures (sections 38/39): the plan is made again from them,
+    // or the voice would refuse the rest and the listener hears only what the record happens to take
     if (chosen?.record && !arc) {
       const vocalByBar = Array.from({ length: toBar - fromBar }, (_, k) => {
         const b = track.downbeats.bars[fromBar + k];
         return b ? timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, b.start) : ctx.vocalActivity;
       });
-      plan = planScratch(ctx, { mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, exclude, densityShift: this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0, record: chosen.record, throwMemory: this.throwMemory });
+      plan = planScratch(ctx, { mode: input.mode, seed, fromBar, bars: toBar - fromBar, vocalByBar, genre: input.genre, cooling, allowed: chosen.record.gestures, densityShift: this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0, record: chosen.record, throwMemory: this.throwMemory });
+    } else if (chosen?.record && arc && arcOpts) {
+      const a = planArc({ ...arcOpts, allowed: chosen.record.gestures });
+      plan = { ...plan, events: a.events, bars: Array.from({ length: arc.bars }, (_, k) => a.events.filter((e) => e.bar === fromBar + k)) };
     }
     if (input.juggleActive) plan = juggleSafe(plan);
     scratchDJStats.plans++;

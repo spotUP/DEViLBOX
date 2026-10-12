@@ -24,7 +24,7 @@ import { SCRATCH_RECORDS, VOCAL_CATEGORIES, type ScratchRecord, type ScratchReco
 import { extractedAnchors, trackerScratchMaterial, type ExtractedAnchor } from './scratchMaterial';
 import type { ScratchPerformanceContext } from './scratchContext';
 import type { ScratchGenreHint } from './scratchStyles';
-import { VOCAL_BUSY } from './scratchPlacement';
+import { MIN_VOCABULARY, VOCAL_BUSY } from './scratchPlacement';
 import type { DeckAnchorKind, DeckScratchAnchor, ScratchAnchor, ScratchGestureId, ScratchRole, ScratchSource } from './scratchTypes';
 
 type AB = 'A' | 'B';
@@ -274,8 +274,14 @@ export function selectScratchSource(req: SourceRequest): SourceDecision | null {
   scratchSourceStats.select++;
   const classes = materialAt(req.track, req.deck, req.bar);
   const context = sourceContext(req, classes);
-  const scored = sourceCandidates(req, classes)
-    .filter((c) => !req.blocked?.(c.key))
+  // a source must be able to perform the phrase (sections 38/39): a record that plays fewer of the
+  // planned gestures than the phrase's variety needs would turn it into one gesture (owner report
+  // 2026-10-12, "only baby scratches")
+  const wanted = new Set(req.gestures.filter((g) => g !== 'drop' && g !== 'dropPhrase'));
+  const need = Math.min(MIN_VOCABULARY - 1, wanted.size);
+  const all = sourceCandidates(req, classes).filter((c) => !req.blocked?.(c.key));
+  const performs = all.filter((c) => !c.gestures || [...wanted].filter((g) => c.gestures!.includes(g)).length >= need);
+  const scored = (performs.length ? performs : all)
     .map((c) => {
       const sc = scoreSource(c, req, context);
       const pref = req.preference?.(c) ?? 0;
