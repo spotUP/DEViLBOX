@@ -445,18 +445,27 @@ export async function loadPlaylistTrackToDeck(
   track: PlaylistTrack,
   deckId: DeckId,
 ): Promise<boolean> {
-  // Timeout wrapper - abort if loading takes too long (UADE crash, network hang, etc.)
-  const LOAD_TIMEOUT_MS = 30000; // 30 seconds
+  // Timeout - a load that takes too long (UADE crash, network hang, a slow
+  // render) is given up AND cancelled: its render may still finish, but it
+  // never reaches the deck. Uncancelled, a timed-out load landed on the deck
+  // after the caller had moved on and loaded (and started) another track -
+  // the deck began a new load under it and play() found no buffer (Auto DJ
+  // enable, owner 2026-10-12).
+  const abort = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<boolean>((_, reject) => {
-    setTimeout(() => reject(new Error('Track load timeout')), LOAD_TIMEOUT_MS);
+    timer = setTimeout(() => {
+      abort.abort();
+      reject(new Error('Track load timeout'));
+    }, LOAD_TIMEOUT_MS);
   });
+  const load = loadPlaylistTrackToDeckInternal(track, deckId, abort.signal);
+  // Settled after the timeout (cancelled, or failed): nothing waits for it any more.
+  load.catch((err) => { if (!abort.signal.aborted) return; console.log(`[DJTrackLoader] Cancelled load of ${track.fileName} ended:`, err instanceof Error ? err.message : err); });
 
   try {
-    const result = await Promise.race([
-      loadPlaylistTrackToDeckInternal(track, deckId),
-      timeoutPromise,
-    ]);
-    
+    const result = await Promise.race([load, timeoutPromise]);
+
     await recordLoad(track, result ? { ok: true } : { ok: false, reason: 'load failed' });
     return result;
   } catch (err) {
@@ -465,13 +474,31 @@ export async function loadPlaylistTrackToDeck(
     
     await recordLoad(track, { ok: false, reason });
     return false;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/** How long a playlist track may take to reach the deck before it is given up and cancelled. */
+export const LOAD_TIMEOUT_MS = 30000;
+
+/** Thrown into a load cancelled by its timeout: it must not reach the deck. */
+export class TrackLoadCancelled extends Error {
+  constructor(fileName: string) { super(`load of ${fileName} cancelled (timed out)`); }
 }
 
 async function loadPlaylistTrackToDeckInternal(
   track: PlaylistTrack,
   deckId: DeckId,
+  signal: AbortSignal,
 ): Promise<boolean> {
+  // Every way this function reaches the deck goes through here: a cancelled load stops at the door.
+  const engine = {
+    loadAudioToDeck: (...args: Parameters<ReturnType<typeof getDJEngine>['loadAudioToDeck']>) => {
+      if (signal.aborted) throw new TrackLoadCancelled(track.fileName);
+      return getDJEngine().loadAudioToDeck(...args);
+    },
+  };
   // Try cached audio first (from pre-caching) — works offline
   try {
     const cached = await getCachedAudioByFilename(track.fileName);
@@ -482,7 +509,7 @@ async function loadPlaylistTrackToDeckInternal(
       // the oscilloscope instead (owner 2026-10-08: Auto DJ's second deck).
       // The audio cache keeps the module's own bytes: parse those, one open.
       const cachedSong = getCachedSong(track.fileName) ?? await songFromCachedSource(track.fileName, cached.sourceData, deckId);
-      await getDJEngine().loadAudioToDeck(
+      await engine.loadAudioToDeck(
         deckId, cached.audioData, track.fileName,
         track.trackName || cached.filename,
         cached.bpm || 125,
@@ -516,7 +543,7 @@ async function loadPlaylistTrackToDeckInternal(
       const filename = remote.name;
 
       if (isAudioFile(filename)) {
-        await getDJEngine().loadAudioToDeck(deckId, await remote.fetchBytes(), track.fileName);
+        await engine.loadAudioToDeck(deckId, await remote.fetchBytes(), track.fileName);
         return true;
       }
 
@@ -542,7 +569,7 @@ async function loadPlaylistTrackToDeckInternal(
 
       // Use .wav filename to avoid UADE re-init on decode
       const wavFilename = track.fileName.replace(/\.[^.]+$/, '.wav');
-      await getDJEngine().loadAudioToDeck(
+      await engine.loadAudioToDeck(
         deckId,
         result.wavData,
         wavFilename,
@@ -577,7 +604,7 @@ async function loadPlaylistTrackToDeckInternal(
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-      await getDJEngine().loadAudioToDeck(
+      await engine.loadAudioToDeck(
         deckId,
         result.wavData,
         track.fileName,
@@ -607,7 +634,7 @@ async function loadPlaylistTrackToDeckInternal(
       }
 
       if (isAudioFile(filename)) {
-        await getDJEngine().loadAudioToDeck(deckId, buffer, track.fileName, track.trackName);
+        await engine.loadAudioToDeck(deckId, buffer, track.fileName, track.trackName);
         return true;
       }
 
@@ -627,7 +654,7 @@ async function loadPlaylistTrackToDeckInternal(
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-      await getDJEngine().loadAudioToDeck(
+      await engine.loadAudioToDeck(
         deckId,
         result.wavData,
         track.fileName,
@@ -657,7 +684,7 @@ async function loadPlaylistTrackToDeckInternal(
       }
 
       if (isAudioFile(filename)) {
-        await getDJEngine().loadAudioToDeck(deckId, buffer, filename, track.trackName);
+        await engine.loadAudioToDeck(deckId, buffer, filename, track.trackName);
         return true;
       }
 
@@ -676,7 +703,7 @@ async function loadPlaylistTrackToDeckInternal(
       });
 
       const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-      await getDJEngine().loadAudioToDeck(
+      await engine.loadAudioToDeck(
         deckId,
         result.wavData,
         filename,
