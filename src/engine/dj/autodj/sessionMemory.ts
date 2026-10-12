@@ -12,6 +12,8 @@ export class DJSessionMemory {
   private peaks: number[] = [];
   /** Performed scratch phrases: their gestures, source and time (scratch plan D9). */
   private scratches: Array<{ time: number; gestures: string[]; source: string | null }> = [];
+  /** Rewinds performed: the track and the time it played again. */
+  private rewinds: Array<{ time: number; trackId: string; replaySec: number }> = [];
   readonly startedAt: number;
   private now: () => number;
 
@@ -39,6 +41,15 @@ export class DJSessionMemory {
   }
 
   get scratchCount(): number { return this.scratches.length; }
+
+  /** A tune was rewound and plays again from its first downbeat: `replaySec` of it is heard twice. */
+  recordRewind(info: { trackId: string; replaySec: number; time?: number }): void {
+    this.rewinds.push({ time: info.time ?? this.now(), trackId: info.trackId, replaySec: Math.max(0, info.replaySec) });
+    if (this.rewinds.length > KEEP) this.rewinds.splice(0, this.rewinds.length - KEEP);
+  }
+
+  /** Track time played again by rewinds this session, seconds. */
+  replayedSec(): number { return this.rewinds.reduce((a, r) => a + r.replaySec, 0); }
 
   /** Gestures of the last `n` scratch phrases, oldest first. */
   recentScratchGestures(n = 4): string[] { return this.scratches.slice(-n).flatMap((s) => s.gestures); }
@@ -126,6 +137,8 @@ export class DJSessionMemory {
       elapsedSec: this.elapsedSec(),
       scratchPhrases: this.scratches.length,
       recentScratchGestures: this.recentScratchGestures(),
+      rewoundTracks: this.rewinds.map((r) => r.trackId),
+      replayedSec: this.replayedSec(),
     };
   }
 
@@ -134,5 +147,6 @@ export class DJSessionMemory {
     this.tracks = [];
     this.peaks = [];
     this.scratches = [];
+    this.rewinds = [];
   }
 }

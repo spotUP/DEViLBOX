@@ -9,7 +9,7 @@
 import { getDJEngine } from '../DJEngine';
 import {
   seekDeckAudio, setCrossfader, setDeckEQ, setDeckEQKillNow, setDeckEchoSend, setDeckFilter, setDeckFilterResonance,
-  setDeckKeyLock, setDeckPitch, setDeckReverbSend, setDeckVolume,
+  setDeckKeyLock, setDeckPitch, setDeckReverbSend, setDeckVolume, isDeckRewinding,
 } from '../DJActions';
 import { useDJStore } from '@/stores/useDJStore';
 import { phaseAlign } from '../DJAutoSync';
@@ -29,6 +29,8 @@ export interface ExecutionResult {
   incomingPlaying: boolean;
   /** The plan that actually played when it is not the one executed: a refused juggle's normal-blend fallback. */
   executedPlan?: DJTransitionPlan;
+  /** The plan's rewind ran instead of the transition: the outgoing plays again, the incoming never started. */
+  rewound?: boolean;
 }
 
 export interface ExecuteOptions {
@@ -293,8 +295,35 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
     }, tickMs);
   };
 
+  /**
+   * A rewind instead of the transition (plan.rewind): on the grid moment the
+   * outgoing deck's Rewind (fx_deck_rewind, the pad's) pulls the record back and
+   * the same tune plays again; the incoming is never touched. A plan with a
+   * rewind performs only the rewind: the transition is planned again from the
+   * restart. When the deck refuses (not playing, or its platter already in a
+   * gesture) the result says so (`rewound` false) and nothing else happens.
+   */
+  const performRewind = async (): Promise<void> => {
+    if (opts.waitForStart) await opts.waitForStart(plan);
+    if (cancelled) return;
+    fireDjFx('fx_deck_rewind', { deck: out, source: 'autodj' });
+    if (!isDeckRewinding(out)) {
+      trace.events.push(`rewind refused on deck ${out}`);
+      finish({ completed: false, fellBack: 'none', error: 'rewind refused: the deck is not playing or its platter is busy', trace, incomingPlaying: false, rewound: false });
+      return;
+    }
+    trace.events.push(`rewind ${out}: from ${plan.rewind!.atSec.toFixed(1)} s back to ${plan.rewind!.restartSec.toFixed(1)} s`);
+    await new Promise<void>((resolve) => {
+      const id = timers.setInterval(() => { if (!isDeckRewinding(out)) { timers.clearInterval(id); resolve(); } }, tickMs);
+    });
+    trace.events.push('rewind: the tune plays again');
+    trace.completed = true;
+    finish({ completed: true, fellBack: 'none', trace, incomingPlaying: false, rewound: true });
+  };
+
   const run = async () => {
     try {
+      if (plan.rewind) { await performRewind(); return; }
       // ── Prepare the incoming deck (plan sections 7, 12, 13) ─────────────
       // The incoming is cued while stopped. One that already plays (the user
       // started it) is never seeked - an audible skip and a platter jump - it
