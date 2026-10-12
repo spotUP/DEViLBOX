@@ -148,9 +148,14 @@ describe('failure resilience (Gates R, M): playback never stops', () => {
     const log = getDecisionLog();
     expect((log.counts.EMERGENCY ?? 0) + (log.counts.FALLBACK ?? 0) + (log.counts.EXECUTE_TRANSITION ?? 0)).toBeGreaterThan(0);
     // Missing key / grid / cue tracks got conservative plans (no creative style on low confidence).
+    // A track without cues, sections and phrases keeps a trusted beat grid and downbeats: the juggle gates
+    // (grid and phrase confidence, ladder fit on the downbeat phrase grid) hold, and with the juggle budget
+    // open the juggle transition outranks the blends (owner decision 2026-10-12, JUGGLE-FOLLOWUPS a, juggling
+    // plan section 24). A missing grid fails those gates: blends only.
     for (const t of r.transitions) {
       const to = tracks.find((x) => x.id === t.to);
-      if (to?.failure === 'missingGrid' || to?.failure === 'noCue') expect(['longBlend', 'shortBlend', 'legacy'], t.to).toContain(t.style);
+      if (to?.failure === 'missingGrid') expect(['longBlend', 'shortBlend', 'legacy'], t.to).toContain(t.style);
+      if (to?.failure === 'noCue') expect(['longBlend', 'shortBlend', 'legacy', 'juggleTransition'], t.to).toContain(t.style);
     }
     // The player state is sane at the end: one deck playing, crossfader on its side.
     const playing = (engine.decks.A.playing ? 1 : 0) + (engine.decks.B.playing ? 1 : 0);
