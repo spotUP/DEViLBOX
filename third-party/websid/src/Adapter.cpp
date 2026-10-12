@@ -171,6 +171,16 @@ namespace websid {
 
 		void setNTSC(uint8_t is_ntsc)
 		{
+			// DEViLBOX: a clock set after the load is the tune's clock from now on: the
+			// next track start (emu_set_subsong -> initTune) sets CIA / VIC / SID up on it,
+			// the kernal's PAL/NTSC flag ($02A6, as memResetRAM writes it) says it and
+			// emu_get_clock_rate reports it. Upstream only re-timed the SID and VIC, so
+			// the track start that follows every load put the header's clock back.
+			// Only on a change: the load's own call must not poke the tune's loaded bytes.
+			if (FileLoader::getNTSCMode() != is_ntsc) {
+				FileLoader::setNTSCMode(is_ntsc);
+				memWriteRAM(0x02a6, (!is_ntsc) & 0x1);
+			}
 			Core::resetTimings(_sample_rate, is_ntsc);
 			reset();
 		}

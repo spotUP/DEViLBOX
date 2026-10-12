@@ -51,6 +51,12 @@ public:
 	static uint8_t getNTSCMode();	
 	static const char**  getInfoStrings();
 	static uint8_t getCurrentSongSpeed();
+
+	/**
+	* Manually override original "video mode" setting from music file.
+	* DEViLBOX: public - the adapter's emu_set_ntsc forces the clock after a load.
+	*/
+	static void setNTSCMode(uint8_t is_ntsc);
 		
 protected:
 	FileLoader();
@@ -68,10 +74,6 @@ protected:
 
 	static void setRsidMode(uint8_t is_rsid);
 
-	/**
-	* Manually override original "video mode" setting from music file.
-	*/
-	static void setNTSCMode(uint8_t is_ntsc);
 };
 
 #endif
