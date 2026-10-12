@@ -204,9 +204,10 @@ export class DeckStemPlayer {
     this.onRunningChange?.();
   }
 
-  stop(): void {
+  /** Stop now, or at a later context time (`atContextTime`, see stopPlayerNow). */
+  stop(atContextTime?: number): void {
     for (const { player } of this.stems.values()) {
-      if (player.state === 'started') stopPlayerNow(player);
+      if (player.state === 'started') stopPlayerNow(player, atContextTime);
     }
     this._pendingOffset = null;
     this._rateTrackingActive = false;

@@ -286,13 +286,17 @@ export class StandaloneJuggle {
     if (j.isActive() && j.currentExecution()?.pattern.type !== 'transitionLadder') j.abort(`stand-alone juggle ended: ${outcome}`);
     const idle = s.deck;
     const ab = idle === 'B' ? 'B' : 'A';
-    try { getDJEngine().getDeck(idle).stop(); } catch { /* engine not ready */ }
-    useDJStore.getState().setDeckPlaying(idle, false);
-    releaseAutoKeyLock(ab);
-    try { resetDeckAfterTransition(ab); } catch { /* engine not ready */ }
+    // The fader first, then the idle deck stops when that move has landed. A fader move is scheduled one
+    // lookAhead (100 ms) ahead, a deck stop acts now: stopped first, the idle deck fell silent while the
+    // crowd still heard it, a hole before the master's downbeat - the pattern's last cut heard late
+    // (JUGGLE-LAST-CUT-LATE, live 2026-10-12).
     const cf = idle === 'A' ? 1 : 0;
     try { getDJEngine().setCrossfader(cf); } catch { /* engine not ready */ }
     useDJStore.getState().setCrossfader(cf);
+    try { const engine = getDJEngine(); engine.getDeck(idle).stop(engine.mixer.crossfaderSettledAt()); } catch { /* engine not ready */ }
+    useDJStore.getState().setDeckPlaying(idle, false);
+    releaseAutoKeyLock(ab);
+    try { resetDeckAfterTransition(ab); } catch { /* engine not ready */ }
     this.log(s, outcome);
     this.publish();
   }

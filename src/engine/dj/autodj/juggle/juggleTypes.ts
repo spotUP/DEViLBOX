@@ -173,6 +173,23 @@ export interface DJJuggleHistory {
   energy?: number;
   /** A transition ladder's rungs in bars. */
   ladderBars?: number[];
+  /** Every crossfader move of the performance, as it played (JUGGLE-LAST-CUT-LATE): the evidence of a live report. */
+  cuts?: JuggleCutTiming[];
+}
+
+/**
+ * One crossfader move of a juggle: where the pattern planned it, where the executor fired it (beats from
+ * the pattern start, on the pattern's own clock), and the error in ms (positive = late). Null = not fired
+ * (blocked or skipped, with the reason).
+ */
+export interface JuggleCutTiming {
+  type: 'CutIn' | 'CutOut' | 'HoldDeck' | 'ReleaseDeck';
+  deck: 'A' | 'B' | 'BOTH';
+  plannedBeat: number;
+  executedBeat: number | null;
+  errorMs: number | null;
+  status: 'executed' | 'blocked' | 'skipped';
+  reason?: string;
 }
 
 export interface DJJugglePerformanceContext {
@@ -263,7 +280,7 @@ export interface JuggleTelemetry {
   safety: string;
   budget: { juggledFraction: number; secondsSinceLastJuggle: number; cooldownSec: number };
   lastQuality: JuggleQualityScore | null;
-  history: Array<{ type: DJJugglePatternType; bars: number; score: number }>;
+  history: Array<{ type: DJJugglePatternType; bars: number; score: number; cuts?: JuggleCutTiming[] }>;
   /** The stand-alone juggle Auto DJ is setting up or performing; null when none. */
   standalone: StandaloneTelemetry | null;
   /** The last Juggle Now request: pending while its juggle is set up, then started or refused with the reason. */
