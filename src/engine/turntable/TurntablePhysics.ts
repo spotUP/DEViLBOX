@@ -195,6 +195,18 @@ export class TurntablePhysics {
   /** Current playback rate: 1.0 = normal 33⅓, 0 = stopped, negative = backward */
   get playbackRate(): number { return this._omega / OMEGA_33; }
 
+  /**
+   * Set while an engine-side driver ticks this platter (a DJ deck's spinback,
+   * DJActions.spinbackDeck): the deck audio follows that driver, and views
+   * read the rate instead of ticking a second time (rateFor).
+   */
+  externallyDriven = false;
+
+  /** The rate for a view's frame: ticks the platter, unless an engine driver already does. */
+  rateFor(dt: number): number {
+    return this.externallyDriven ? this.playbackRate : this.tick(dt);
+  }
+
   /** Whether hand is on the platter */
   get touching(): boolean { return this._touching; }
 

@@ -13,6 +13,7 @@
 
 import * as Tone from 'tone';
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
+import { realTimers } from './autodj/executorTimers';
 import type { DjEqPreset } from '@/constants/djEqPresets';
 import { useDJSetStore } from '@/stores/useDJSetStore';
 import { useAudioStore } from '@/stores/useAudioStore';
@@ -601,6 +602,72 @@ export function stopScratch(deckId: DeckId, decayMs = 200): void {
   try {
     getDJEngine().getDeck(deckId).stopScratch(decayMs);
   } catch { /* engine not ready */ }
+}
+
+// ============================================================================
+// SPINBACK
+// ============================================================================
+
+/** Spinbacks running, per deck: the physics driver's timer. */
+const spinbacks = new Map<DeckId, unknown>();
+/** Physics ticks of every spinback driver (reachability sentinel). */
+export const spinbackStats = { ticks: 0, minRate: 1 };
+
+/**
+ * Spinback: the DJ yanks the record backward (TurntablePhysics.triggerSpinback,
+ * the tracker's spinback). The deck's own platter physics runs the arc - decel,
+ * reverse, the motor pulling it back - and the deck audio follows its rate
+ * through the scratch path, so the platter visibly spins back and the audio
+ * rewinds. The driver ticks on the DJ timer layer (realTimers, alive in a
+ * hidden tab); views read the rate (TurntablePhysics.rateFor) and never tick it.
+ *
+ * Like the tracker, the record plays on once the motor has it back at speed.
+ * `stopAfter` (Auto DJ's spinback exit) stops the deck when the reverse ends
+ * instead: the record is pulled out, nothing plays until the next track drops.
+ * False when the deck is not playing or already spinning back.
+ */
+export function spinbackDeck(deckId: DeckId, opts: { stopAfter?: boolean; onComplete?: () => void } = {}): boolean {
+  let deck: ReturnType<ReturnType<typeof getDJEngine>['getDeck']>;
+  try { deck = getDJEngine().getDeck(deckId); } catch { return false; }
+  if (spinbacks.has(deckId) || !deck.isPlaying()) return false;
+  const physics = deck.physics;
+  startScratch(deckId);
+  physics.externallyDriven = true;
+  physics.triggerSpinback();
+  let last = realTimers.now();
+  const startedAt = last;
+  let wentReverse = false;
+  const finish = (): void => {
+    realTimers.clearInterval(spinbacks.get(deckId));
+    spinbacks.delete(deckId);
+    physics.externallyDriven = false;
+    if (opts.stopAfter) {
+      physics.reset();
+      stopScratch(deckId, 0);
+      try { deck.pause(); } catch { /* */ }
+      useDJStore.getState().setDeckPlaying(deckId, false);
+    } else {
+      stopScratch(deckId, 50);
+    }
+    opts.onComplete?.();
+  };
+  spinbacks.set(deckId, realTimers.setInterval(() => {
+    const now = realTimers.now();
+    const rate = physics.tick((now - last) / 1000);
+    last = now;
+    spinbackStats.ticks++;
+    spinbackStats.minRate = Math.min(spinbackStats.minRate, rate);
+    setScratchVelocity(deckId, rate);
+    if (rate < -0.05) wentReverse = true;
+    const done = !physics.spinbackActive || (opts.stopAfter && wentReverse && rate >= 0) || now - startedAt > 6000;
+    if (done) finish();
+  }, 8));
+  return true;
+}
+
+/** Whether a deck is spinning back. */
+export function isDeckSpinningBack(deckId: DeckId): boolean {
+  return spinbacks.has(deckId);
 }
 
 // ============================================================================

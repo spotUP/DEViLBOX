@@ -309,7 +309,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       if (playing || physicsActive) {
         let rate = 1;
         if (physicsActive) {
-          rate = physics.tick(delta);
+          rate = physics.rateFor(delta);
         }
 
         platterAngleRef.current -= rps * rate * 2 * Math.PI * delta;

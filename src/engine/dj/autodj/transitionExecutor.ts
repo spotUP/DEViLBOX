@@ -146,6 +146,7 @@ export const EFFECT_ACTIONS: Partial<Record<DJEffectEvent['kind'], DjFxActionId>
   'delay-throw': 'fx_deck_echo_throw',
   'filter-rise': 'fx_deck_filter_rise',
   brake: 'fx_deck_brake',
+  spinback: 'fx_deck_spinback',
 };
 
 /** Filter plan kinds the registry performs; their plan curves are then descriptive, not driven. */
@@ -335,6 +336,23 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
       if (plan.humanize.startOffsetMs > 2) await new Promise<void>((r) => { timers.setTimeout(r, plan.humanize.startOffsetMs); });
       if (cancelled) return;
 
+      // ── Exits before the start (a spinback on the phrase end) ──────────────
+      // An effect with a negative beat fires on the grid moment; the incoming
+      // starts that many beats later (the next downbeat).
+      const leadIns = plan.effects.filter((e) => e.beat < 0);
+      if (leadIns.length > 0) {
+        for (const e of leadIns) {
+          const action = EFFECT_ACTIONS[e.kind];
+          if (!action) continue;
+          const deck = e.deck === 'outgoing' ? out : inc;
+          fireDjFx(action, { deck, beats: e.lengthBeats, amount: e.amount, stopAfter: e.kind === 'spinback', source: 'autodj' });
+          trace.events.push(`fx ${e.kind} ${-e.beat} beats before the start`);
+        }
+        const leadBeats = Math.max(...leadIns.map((e) => -e.beat));
+        await new Promise<void>((r) => { timers.setTimeout(r, leadBeats * beatSec * 1000); });
+        if (cancelled) return;
+      }
+
       // ── Start ───────────────────────────────────────────────────────────
       const incomingDeck = getDJEngine().getDeck(inc);
       await incomingDeck.play();
@@ -405,6 +423,7 @@ export function executeTransition(plan: DJTransitionPlan, opts: ExecuteOptions =
         try {
           for (const c of curves) if (!registryOwned.has(c.target)) apply(c.target, sampleCurve(c.keyframes, Math.min(beat, plan.durationBeats)));
           plan.effects.forEach((e, i) => {
+            if (e.beat < 0) return; // fired before the start
             if (firedEffects.has(i) || beat + plan.humanize.fxOffsetMs / beatMs < e.beat) return;
             firedEffects.add(i);
             trace.events.push(`fx ${e.kind} at beat ${e.beat}`);

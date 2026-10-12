@@ -655,11 +655,17 @@ export interface GainPlan {
   };
 }
 
-export type EffectKind = 'echo-out' | 'reverb-out' | 'delay-throw' | 'filter-rise' | 'clean-release' | 'reverb-expansion' | 'brake';
+export type EffectKind = 'echo-out' | 'reverb-out' | 'delay-throw' | 'filter-rise' | 'clean-release' | 'reverb-expansion' | 'brake' | 'spinback';
 
 export interface DJEffectEvent {
   kind: EffectKind;
   deck: 'outgoing' | 'incoming';
+  /**
+   * Beat of the transition the effect starts on. Negative: that many beats
+   * before the incoming starts - the effect fires on the plan's grid moment
+   * and the incoming drops |beat| beats later (a spinback exit: spin back on
+   * the phrase end, drop the incoming on the next downbeat).
+   */
   beat: number;
   lengthBeats: number;
   amount: number;
