@@ -235,6 +235,13 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
 
     this.port.onmessage = (e) => {
       const d = e.data;
+      // Record mode: a new stroke supersedes the stop scheduled for the stroke before it. The voice
+      // schedules each stroke's stop ahead (`stopAt`); the next stroke on the voice is often handed
+      // over after that stop and starts at (or before) it - the old stop must not end the new stroke.
+      if (this.isRecord && (d.type === 'rateCurve' || d.type === 'startAt')) {
+        const from = typeof d.at === 'number' ? Math.max(currentFrame, Math.round(d.at * sampleRate)) : currentFrame;
+        this.queue = this.queue.filter((q) => q.d.type !== 'stop' || q.atFrame < from);
+      }
       // Record mode: a message with `at` (context seconds) is applied at that
       // frame by processRecord, sample-accurately; without `at`, now.
       if (this.isRecord && typeof d.at === 'number' && d.at * sampleRate > currentFrame) {
@@ -372,6 +379,7 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           // start at P - rate so the first sample out is ring[P] in either
           // direction.
           const p = this._clampPos(d.positionFrames);
+          this.stopAfter   = 0;   // a stop applied earlier in this quantum belonged to the stroke this one replaces
           this.cuePos      = p;
           this.startPos    = p;
           this.readPosF    = p - (d.rate ?? 0);
@@ -407,6 +415,8 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           // Frame-accurate rate automation: points relative to this message's
           // arrival; `loop` repeats every `cycleFrames`; `returnToAnchor`
           // re-cues to `cuePos` at every cycle end (section 11/18).
+          // a stop applied earlier in this quantum belonged to the stroke this one replaces
+          this.stopAfter = 0;
           const points = (d.points || []).map((p) => ({ frame: Math.max(0, Math.round(p.frame)), rate: +p.rate || 0 }));
           this.curve = {
             points,
