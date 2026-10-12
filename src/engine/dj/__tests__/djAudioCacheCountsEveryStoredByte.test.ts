@@ -45,4 +45,18 @@ describe('the DJ audio cache counts every byte an entry stores', () => {
     expect(kept, 'the new entry is kept').not.toBeNull();
     expect(kept!.sizeBytes).toBe(entryStoredBytes(kept!));
   });
+
+  it('a cache already over its cap (old WAV-only sizes) trims to the cap', async () => {
+    const { cacheAudio, getCacheStats, setCacheCapBytes, trimCacheToCap } = await import('../DJAudioCache');
+    setCacheCapBytes(1e9);
+    for (let i = 3; i < 6; i++) {
+      await cacheAudio(source(i), `n${i}.mod`, new ArrayBuffer(5000), 1, new Float32Array(0), 44100, 2, track(10_000));
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    setCacheCapBytes(20_000);
+    await trimCacheToCap();
+    const stats = await getCacheStats();
+    expect(stats.sizeMB * 1024 * 1024).toBeLessThanOrEqual(20_000);
+    expect(stats.entryCount).toBe(1);
+  });
 });
