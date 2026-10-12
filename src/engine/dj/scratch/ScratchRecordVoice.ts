@@ -36,7 +36,7 @@ export interface ScratchVoiceBus {
   readonly input: AudioNode;
   setAmbience(amount: number, rampSec?: number): void;
   /** The stroke's velocity tone (the scratch bus, reference render_gesture). */
-  setTone?(velocity: number, at?: number): void;
+  setVelocity?(velocity: number, at?: number, kind?: 'stroke' | 'throw'): void;
   /** A gesture's own echo while it plays (reference echo fx); null = the channel's. */
   setGestureFx?(fx: ScratchGesture['fx'] | null, at?: number): void;
 }
@@ -155,6 +155,11 @@ export class ScratchRecordVoice {
     this.record = record;
     this.lastClamped = 0;
     this.moveNeedle('vowel');
+  }
+
+  /** Forget the loaded record (the next gesture loads it again, e.g. in another sound). */
+  unload(): void {
+    this.record = null;
   }
 
   private clampToSafe(sec: number): number {
@@ -276,8 +281,8 @@ export class ScratchRecordVoice {
     // section 41: any clean record can be thrown; everything else follows the record's list
     if (!(isThrow && r.clean) && !r.gestures.includes(gesture.id)) return { ok: false, reason: `${gesture.id} is not a compatible gesture for ${r.id}` };
     if (opts.ambience !== undefined) this.bus.setAmbience(opts.ambience);
-    // a throw is the word as recorded; a hand stroke gets its velocity tone
-    this.bus.setTone?.(isThrow ? 0.7 : (opts.velocity ?? 0.7), opts.at);
+    // the velocity response: a stroke's level and tone, a throw's level (the word as recorded)
+    this.bus.setVelocity?.(opts.velocity ?? 0.7, opts.at, isThrow ? 'throw' : 'stroke');
     // the gesture's own effect (the echo scratch's delay), or the channel's again
     this.bus.setGestureFx?.(gesture.fx ?? null, opts.at);
     if (gesture.fx) scratchVoiceStats.gestureFx++;

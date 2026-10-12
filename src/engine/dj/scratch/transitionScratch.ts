@@ -227,6 +227,8 @@ export function planTransitionScratch(input: TransitionScratchInput): Transition
   return { scratch: finish(kind, events, source, fx, reasons, input), reason: reasons.join('; ') };
 }
 
+export const FX_REQUEST_PRESET: Readonly<Record<ScratchFxRequest, 'dry' | 'dark' | 'delay'>> = { dry: 'dry', dubbed: 'delay', transition: 'dark' };
+
 function finish(kind: TransitionScratchKind, events: ScratchEvent[], source: ScratchSource, fxRequest: ScratchFxRequest, reasons: string[], input: TransitionScratchInput): TransitionScratchPlan {
   // section 28: the transition's start is the mix's moment - a scratch on it moves to the next step after
   const startMoment = { kind: 'transition' as const, startBeat: input.plan.startBeat, endBeat: input.plan.startBeat + 0.25 };
@@ -242,5 +244,9 @@ function finish(kind: TransitionScratchKind, events: ScratchEvent[], source: Scr
   const endBeat = Math.max(...events.map((e) => e.executeAtBeat + e.durationBeats));
   // never past the plan's end (section 46: the incoming enters, then the release)
   const clipped = events.filter((e) => e.executeAtBeat + e.durationBeats <= input.plan.endBeat + 1e-9 || kind === 'scratchFeature');
-  return { kind, events: clipped, source, startBeat, endBeat: Math.min(endBeat, Math.max(startBeat, input.plan.endBeat)), fxRequest, reasons };
+  // the request is the channel's routine preset on every event (SCR-PG-D3): dry -> Dry, dubbed -> Delay,
+  // transition -> Dark (the channel darkens as the incoming takes over)
+  const preset = FX_REQUEST_PRESET[fxRequest];
+  const withPreset = clipped.map((e) => ({ ...e, fx: { ...e.fx, amount: e.fx?.amount ?? 0, preset } }));
+  return { kind, events: withPreset, source, startBeat, endBeat: Math.min(endBeat, Math.max(startBeat, input.plan.endBeat)), fxRequest, reasons };
 }

@@ -15,11 +15,13 @@
 import * as Tone from 'tone';
 import { getDJEngine } from '../DJEngine';
 import { DeckScratchBuffer, SCRATCH_RECORD_RING_BASE } from '../DeckScratchBuffer';
-import { createScratchBus, SCRATCH_FX_PROFILES, STYLE_FX_PROFILE, type ScratchBus } from './scratchBus';
+import { gritRecord } from './scratchGrit';
+import { CHANNEL_PRESETS, createScratchBus, SCRATCH_BUS, SCRATCH_FX_PROFILES, STYLE_FX_PROFILE, type ScratchBus } from './scratchBus';
 import { ScratchRecordVoice, type ScratchCue, type StrokeResult } from './ScratchRecordVoice';
 import { getScratchRecord, findRecords, type ScratchRecord } from './scratchCatalogue';
 import type { ScratchGesture, ScratchRole } from './scratchTypes';
-import { matchedBusLevel, recordRms, ProgrammeMeter } from './scratchLevel';
+import { matchedBusLevel, strokeRms, ProgrammeMeter } from './scratchLevel';
+import { gestureMotion } from './scratchPhysics';
 import { realTimers } from '../autodj/executorTimers';
 import { useDJStore } from '@/stores/useDJStore';
 
@@ -75,11 +77,10 @@ export class ScratchVoicePool {
   private readonly transient = new Map<string, ScratchRecord>();
   private pending = new Set<Promise<unknown>>();
   private rings: DeckScratchBuffer[] = [];
+  private gritOn = true;
 
   /** The programme's RMS now (the music the scratch sits in); null = unknown: the bus stays at unity. */
   private readonly programme: (() => number | null) | null;
-  /** RMS of each loaded record over its safe range (the level match's reference). */
-  private readonly recordLevels = new Map<string, number>();
   /** Reachability sentinel: strokes whose bus level was matched to the programme. */
   readonly levelStats = { matched: 0, lastLevel: 1 };
 
@@ -129,11 +130,26 @@ export class ScratchVoicePool {
   }
 
   /** Decode once per record (at the context's sample rate). */
+  /**
+   * The S950 grit on the crate's records (owner decision O4: a scratch-bus setting, on by default,
+   * switchable to the clean record). Tracker samples stay the module's own sound.
+   */
+  get grit(): boolean { return this.gritOn; }
+
+  setGrit(on: boolean): void {
+    if (on === this.gritOn) return;
+    this.gritOn = on;
+    // the crate's records load again in the new sound; a voice reloads its record on its next gesture
+    for (const id of [...this.buffers.keys()]) if (!this.transient.has(id)) this.buffers.delete(id);
+    for (const v of this.voices) if (v.record && !this.transient.has(v.record.id)) v.unload();
+  }
+
   buffer(record: ScratchRecord): Promise<AudioBuffer> {
     let p = this.buffers.get(record.id);
     if (!p) {
       scratchPoolStats.loads++;
-      p = this.fetcher(record, this.ctx);
+      const fetched = this.fetcher(record, this.ctx);
+      p = this.gritOn ? fetched.then((b) => gritRecord(b, this.ctx.sampleRate)) : fetched;
       this.buffers.set(record.id, p);
       p.catch(() => this.buffers.delete(record.id));
     }
@@ -173,13 +189,16 @@ export class ScratchVoicePool {
       // the scratch sits in the music (owner 2026-10-12): its bus follows the programme to the reference ratio
       const prog = this.programme?.() ?? null;
       if (prog !== null) {
-        let rms = this.recordLevels.get(record.id);
-        if (rms === undefined) {
-          const buffer = await this.buffer(record);
-          rms = recordRms(buffer, record.safe[0], record.safe[1]);
-          this.recordLevels.set(record.id, rms);
-        }
-        const level = matchedBusLevel(prog, rms, gesture);
+        // the record's level as the stroke reads it: the record sampled along the gesture's own motion
+        // from its cue (the turntable model's curve the voice plays) - reversals, slow turns and the
+        // safe-range clamp included; a throw reads from its cue at natural speed
+        const buffer = await this.buffer(record);
+        const isThrow = gesture.id === 'drop' || gesture.id === 'dropPhrase';
+        const cueSec = voice.resolveCue(opts.cue ?? this.anchor ?? (isThrow ? 'attack' : 'vowel'));
+        const durSec = isThrow ? Math.max(0.01, record.safe[1] - cueSec) : gesture.cycleBeats * 60 / Math.max(30, opts.bpm);
+        const motion = isThrow ? [{ t: 0, velocity: 1 }, { t: 1, velocity: 1 }] : gestureMotion(gesture, durSec, { velocity: opts.velocity, style: opts.fx?.style });
+        const rms = strokeRms(buffer, cueSec, motion, durSec, record.safe);
+        const level = matchedBusLevel(prog, rms, gesture, opts.fx?.preset ? CHANNEL_PRESETS[opts.fx.preset].room : SCRATCH_BUS.reverbMix);
         const param = this.buses[voice.index]!.level;
         const t = Math.max(this.ctx.currentTime, opts.at ?? this.ctx.currentTime);
         param.cancelScheduledValues(t);
@@ -190,7 +209,9 @@ export class ScratchVoicePool {
       // the style's preset on this voice's bus; its FX amount is the wet tail's floor
       let ambience = opts.ambience;
       if (opts.fx) {
-        this.buses[voice.index]!.setStyleFx(SCRATCH_FX_PROFILES[STYLE_FX_PROFILE[opts.fx.style]], opts.at);
+        // the routine's preset first (it outranks the style's tone stages), then the style
+        this.buses[voice.index]!.setChannelPreset(opts.fx.preset ?? null, opts.at);
+        this.buses[voice.index]!.setStyleFx(opts.fx.style ? SCRATCH_FX_PROFILES[STYLE_FX_PROFILE[opts.fx.style]] : null, opts.at);
         ambience = Math.max(ambience ?? 0, Math.max(0, Math.min(1, opts.fx.amount)));
         scratchPoolStats.styleFx++;
       }
