@@ -15,6 +15,7 @@ import { clockNowMs, positionAtFrame, type ClockAnchor } from '@/engine/audioLat
 import type { DJTrackAnalysis } from '@/engine/dj/autodj/types';
 import type { AutoDJTelemetry } from '@/engine/dj/autodj/telemetry';
 import type { JuggleTelemetry } from '@/engine/dj/autodj/juggle/juggleTypes';
+import type { ScratchDJTelemetry } from '@/engine/dj/scratch/DJScratchDJ';
 
 // Immer needs MapSet support to draft `Set<number>` fields (fxTargetChannels).
 // Calling at module load is idempotent — main.tsx calls it too, but tests
@@ -371,6 +372,14 @@ interface DJState {
   autoDJJuggleIntensity: number;
   /** Juggle telemetry (juggling plan section 45), written by the juggle controller. */
   autoDJJuggleTelemetry: JuggleTelemetry | null;
+  /** Auto Scratch mode (scratch plan section 62): OFF, SAFE, MUSICAL, PERFORMER, BATTLE. */
+  autoDJScratchMode: string;
+  /** Auto Scratch intensity 0..1; -1 = the set decides. */
+  autoDJScratchIntensity: number;
+  /** Auto Scratch style: 'auto' (from the track's genre and the Auto DJ style) or a palette id. */
+  autoDJScratchStyle: string;
+  /** Scratch telemetry (scratch plan section 64), written by the scratch controller. */
+  autoDJScratchTelemetry: ScratchDJTelemetry | null;
   /** DJ FX actions engaged right now, by action id -> deck (the pad lights from this, whoever fired it). */
   djFxActive: Record<string, DeckId | null>;
   /** Pre-separate stems for upcoming playlist tracks in the background */
@@ -457,11 +466,12 @@ interface DJActions {
   setAutoDJEnabled: (enabled: boolean) => void;
   setAutoDJStatus: (status: AutoDJStatus) => void;
   setAutoDJTrackIndices: (current: number, next: number) => void;
-  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number; juggleMode: string; juggleIntensity: number }>) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number; juggleMode: string; juggleIntensity: number; scratchMode: string; scratchIntensity: number; scratchStyle: string }>) => void;
   setAutoDJSessionOrder: (order: number[]) => void;
   setDjFxActive: (id: string, deck: DeckId | null) => void;
   setAutoDJTelemetry: (telemetry: AutoDJTelemetry | null) => void;
   setAutoDJJuggleTelemetry: (telemetry: JuggleTelemetry | null) => void;
+  setAutoDJScratchTelemetry: (telemetry: ScratchDJTelemetry | null) => void;
 }
 
 type DJStore = DJState & DJActions;
@@ -533,6 +543,11 @@ export const useDJStore = create<DJStore>()(
     autoDJJuggleMode: 'MUSICAL',
     autoDJJuggleIntensity: -1,
     autoDJJuggleTelemetry: null as JuggleTelemetry | null,
+    // Owner decision 2026-10-11 (scratch ledger, decision 1): Auto Scratch on, MUSICAL; style Auto. Not persisted.
+    autoDJScratchMode: 'MUSICAL',
+    autoDJScratchIntensity: -1,
+    autoDJScratchStyle: 'auto',
+    autoDJScratchTelemetry: null as ScratchDJTelemetry | null,
     djFxActive: {} as Record<string, DeckId | null>,
     stemPreSeparation: false,
     streamAutoDub: false,
@@ -875,6 +890,11 @@ export const useDJStore = create<DJStore>()(
         state.autoDJJuggleTelemetry = telemetry;
       }),
 
+    setAutoDJScratchTelemetry: (telemetry) =>
+      set((state) => {
+        state.autoDJScratchTelemetry = telemetry;
+      }),
+
     setAutoDJTelemetry: (telemetry) =>
       set((state) => {
         state.autoDJTelemetry = telemetry;
@@ -896,6 +916,9 @@ export const useDJStore = create<DJStore>()(
         if (config.creativeRisk !== undefined) state.autoDJCreativeRisk = config.creativeRisk;
         if (config.juggleMode !== undefined) state.autoDJJuggleMode = config.juggleMode;
         if (config.juggleIntensity !== undefined) state.autoDJJuggleIntensity = config.juggleIntensity;
+        if (config.scratchMode !== undefined) state.autoDJScratchMode = config.scratchMode;
+        if (config.scratchIntensity !== undefined) state.autoDJScratchIntensity = config.scratchIntensity;
+        if (config.scratchStyle !== undefined) state.autoDJScratchStyle = config.scratchStyle;
         if (config.stemPreSeparation !== undefined) state.stemPreSeparation = config.stemPreSeparation;
         if (config.streamAutoDub !== undefined) state.streamAutoDub = config.streamAutoDub;
         if (config.stemModel !== undefined) state.stemModel = config.stemModel;
