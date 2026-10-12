@@ -8,14 +8,13 @@
  *
  *   anchorFor(source, role)              which home point a role scratches from
  *   deckAnchor(...)                      a deck anchor with its safe range in beats
- *   positionCurveToRateCurve(path, ...)  hand position (strokes) -> playback rate (D5)
  *   stepToBeat({bar, step}, grid)        planner grid -> beat
  */
 
 import { getScratchRecord } from './scratchCatalogue';
 import type { ScratchCue } from './ScratchRecordVoice';
 import type {
-  DeckAnchorKind, DeckScratchAnchor, ScratchAnchor, ScratchGesture, ScratchHandPath, ScratchRole, ScratchSource,
+  DeckAnchorKind, DeckScratchAnchor, ScratchAnchor, ScratchGesture, ScratchRole, ScratchSource,
 } from './scratchTypes';
 
 // ─── Anchors (section 11) ────────────────────────────────────────────────
@@ -114,95 +113,10 @@ export function pickDeckAnchor(candidates: readonly DeckScratchAnchor[], role: S
   return candidates[0]!;
 }
 
-// ─── Position to rate (section 17, D5) ───────────────────────────────────
+// ─── The rate clamp ──────────────────────────────────────────────────────
 
-/** One stroke unit "A" in seconds of record: 1500 samples at 22,050 Hz (reference `tools/scratch.py`). */
-export const STROKE_SEC = 1500 / 22050;
 /** Rate clamp of the record voice and the decks (`setScratchVelocity`). */
 export const MAX_RATE = 4;
-/** Rate curve resolution: one rate per 5 ms. */
-export const RATE_STEP_SEC = 0.005;
-
-export interface RatePoint { t: number; rate: number }
-
-export interface PositionCurveResult {
-  /** Piecewise-constant rate, `t` in seconds from the stroke start, in units of natural speed. */
-  points: RatePoint[];
-  /** The fastest rate the hand path asked for, before the clamp. */
-  requestedPeak: number;
-  /** The clamp bit: some rate exceeded +-MAX_RATE. */
-  clamped: boolean;
-  /** Record seconds travelled net (end position - start position) after smoothing and clamping. */
-  netTravelSec: number;
-}
-
-function positionAt(path: ScratchHandPath, t: number): number {
-  const pts = [...path].sort((a, b) => a.t - b.t);
-  if (pts.length === 0) return 0;
-  if (t <= pts[0]!.t) return pts[0]!.position;
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1]!, b = pts[i]!;
-    if (t <= b.t) return b.t === a.t ? b.position : a.position + (b.position - a.position) * (t - a.t) / (b.t - a.t);
-  }
-  return pts[pts.length - 1]!.position;
-}
-
-/**
- * Hand position (stroke units over a cycle) -> playback rate, rate = d(position)/dt
- * in seconds of record per second. The velocity is sampled every 5 ms; where the
- * hand reverses, the position is smoothed (a [1 2 1]/4 kernel, two passes, the
- * end points pinned) so the rate bends through zero instead of flipping (the
- * grip: a hand holds the record while it turns). Pinned end points keep the net
- * travel exact: a stroke that returns home integrates to zero.
- */
-export function positionCurveToRateCurve(handPath: ScratchHandPath, durationSec: number, sampleRate: number): PositionCurveResult {
-  const stepFrames = Math.max(1, Math.round(RATE_STEP_SEC * sampleRate));
-  const step = stepFrames / sampleRate;
-  const n = Math.max(1, Math.ceil(durationSec / step - 1e-9));
-  const times: number[] = [];
-  for (let i = 0; i <= n; i++) times.push(Math.min(i * step, durationSec));
-  const pos = times.map((t) => positionAt(handPath, durationSec > 0 ? t / durationSec : 0) * STROKE_SEC);
-  // smooth near reversals
-  const reversalAt = (i: number): boolean => {
-    if (i < 1 || i >= n) return false;
-    const before = pos[i]! - pos[i - 1]!, after = pos[i + 1]! - pos[i]!;
-    return before * after < 0 || (before !== 0 && after === 0) || (before === 0 && after !== 0);
-  };
-  for (let pass = 0; pass < 2; pass++) {
-    const marks = new Set<number>();
-    for (let i = 1; i < n; i++) if (reversalAt(i)) { marks.add(i - 1); marks.add(i); marks.add(i + 1); }
-    const next = pos.slice();
-    for (const i of marks) {
-      if (i < 1 || i >= n) continue;
-      next[i] = 0.25 * pos[i - 1]! + 0.5 * pos[i]! + 0.25 * pos[i + 1]!;
-    }
-    for (let i = 0; i <= n; i++) pos[i] = next[i]!;
-  }
-  const points: RatePoint[] = [];
-  let requestedPeak = 0;
-  let clamped = false;
-  let travel = 0;
-  for (let i = 0; i < n; i++) {
-    const dt = times[i + 1]! - times[i]!;
-    const raw = dt > 0 ? (pos[i + 1]! - pos[i]!) / dt : 0;
-    if (Math.abs(raw) > Math.abs(requestedPeak)) requestedPeak = raw;
-    const rate = Math.max(-MAX_RATE, Math.min(MAX_RATE, raw));
-    if (rate !== raw) clamped = true;
-    points.push({ t: times[i]!, rate });
-    travel += rate * dt;
-  }
-  return { points, requestedPeak, clamped, netTravelSec: travel };
-}
-
-/** Integral of a rate curve over `durationSec` (seconds of record). */
-export function integrateRateCurve(points: readonly RatePoint[], durationSec: number): number {
-  let sum = 0;
-  for (let i = 0; i < points.length; i++) {
-    const end = i + 1 < points.length ? points[i + 1]!.t : durationSec;
-    sum += points[i]!.rate * (end - points[i]!.t);
-  }
-  return sum;
-}
 
 // ─── Step grid (section 8) ───────────────────────────────────────────────
 

@@ -26,7 +26,7 @@
    "bar": 22,
    "step": 9,
    "beat": 90.25,
-   "gesture": "vibrato",
+   "gesture": "flare1",
    "velocity": 0.85,
    "placementRole": "accent",
    "role": "THEME"
@@ -62,7 +62,7 @@
    "bar": 27,
    "step": 15,
    "beat": 111.75,
-   "gesture": "vibrato",
+   "gesture": "flare1",
    "velocity": 0.9216830701152056,
    "placementRole": "turnaround",
    "role": "FILL"
@@ -80,7 +80,7 @@
    "bar": 30,
    "step": 9,
    "beat": 122.25,
-   "gesture": "vibrato",
+   "gesture": "flare1",
    "velocity": 0.85,
    "placementRole": "accent",
    "role": "THEME"

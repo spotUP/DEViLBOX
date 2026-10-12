@@ -176,10 +176,13 @@ export function genreToScratchStyle(genre: GenreAnalysis | DJStyleName | Scratch
  *  most strokes are one beat, so "long" is what does not fit a beat at speed: drag, tweak). */
 export const BPM_SUITABILITY = {
   fastBpm: 160, slowBpm: 85,
-  longGestureAtFast: 0.3, longGestureSteps: 5, busyHandAtFast: 0.6, slowFavouriteAtSlow: 1.2,
+  longGestureAtFast: 0.3, busyHandAtFast: 0.6, slowFavouriteAtSlow: 1.2,
 } as const;
 
 const BUSY_HAND: ReadonlySet<ScratchGestureId> = new Set(['crab', 'scribble', 'eightFingerCrab', 'uzi']);
+/** Slow-hand gestures (the long drags of section 34): damped at fast tempos. By what the hand does,
+ *  not by step count - the reference lengths (O3) made drag a 4-step gesture like a transformer. */
+const SLOW_HAND: ReadonlySet<ScratchGestureId> = new Set(['drag', 'babySlow', 'tweak']);
 const SLOW_FAVOURITES: ReadonlySet<ScratchGestureId> = new Set(['baby', 'babySlow', 'drag', 'chirp']);
 
 /**
@@ -195,7 +198,7 @@ export function gestureSuitability(gesture: ScratchGesture | ScratchGestureId, b
   }
   let s = 1;
   if (bpm >= BPM_SUITABILITY.fastBpm) {
-    if (g.durationSteps >= BPM_SUITABILITY.longGestureSteps) s *= BPM_SUITABILITY.longGestureAtFast;
+    if (SLOW_HAND.has(g.id)) s *= BPM_SUITABILITY.longGestureAtFast;
     if (BUSY_HAND.has(g.id)) s *= BPM_SUITABILITY.busyHandAtFast;
   } else if (bpm <= BPM_SUITABILITY.slowBpm) {
     if (SLOW_FAVOURITES.has(g.id)) s *= BPM_SUITABILITY.slowFavouriteAtSlow;

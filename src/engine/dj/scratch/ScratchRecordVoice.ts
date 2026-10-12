@@ -21,11 +21,9 @@
 
 import type { DeckScratchBuffer, RingRatePoint, RingRateCurveOptions, RingFaderWindowsOptions, RingPositionReport } from '../DeckScratchBuffer';
 import type { ScratchRecord } from './scratchCatalogue';
-import type { ScratchDJStyle, ScratchGesture, ScratchHandPath, ScratchVelocityPoint } from './scratchTypes';
-import { positionCurveToRateCurve } from './scratchAnchor';
-import { isPhysical, simulateGesture } from './scratchPhysics';
+import type { ScratchDJStyle, ScratchGesture, ScratchVelocityPoint } from './scratchTypes';
+import { gestureMotion } from './scratchPhysics';
 import { faderWindowsMs, faderCurveShape, cutRampSec, cycleMs } from './scratchFaderModel';
-import { handSpeedFactor } from './scratchHandSpeed';
 
 /** The ring surface the voice uses (DeckScratchBuffer in record mode; a fake in tests). */
 export type ScratchVoiceRing = Pick<DeckScratchBuffer,
@@ -202,31 +200,6 @@ export class ScratchRecordVoice {
     return this.launch(ex, points, durationSec, interpolate, opts);
   }
 
-  /**
-   * The position-driven stroke (section 17, D5): a hand path in stroke units
-   * becomes a rate curve by `positionCurveToRateCurve` (rate = d(position)/dt,
-   * smoothed at reversals, clamped at +-4 and reported), then runs through the
-   * same safety checks and the same ring message as `stroke`.
-   */
-  strokePath(handPath: ScratchHandPath, durationSec: number, opts: StrokeOptions = {}): StrokeResult & { requestedPeak?: number } {
-    if (!this.record) return { ok: false, reason: 'no record loaded' };
-    if (handPath.length === 0 || durationSec <= 0) return { ok: false, reason: 'empty stroke' };
-    const sr = this.ring.sampleRate;
-    const conv = positionCurveToRateCurve(handPath, durationSec, sr);
-    // excursion in seconds of record from the held rates
-    let pos = 0, min = 0, max = 0;
-    for (let i = 0; i < conv.points.length; i++) {
-      const end = i + 1 < conv.points.length ? conv.points[i + 1]!.t : durationSec;
-      pos += conv.points[i]!.rate * (end - conv.points[i]!.t);
-      min = Math.min(min, pos); max = Math.max(max, pos);
-    }
-    const cycleFrames = Math.max(1, Math.round(durationSec * sr));
-    const points: RingRatePoint[] = conv.points.map((p) => ({ frame: Math.round(p.t * sr), rate: p.rate }));
-    points.push({ frame: cycleFrames, rate: opts.loop ? (conv.points[0]?.rate ?? 0) : 0 });
-    const res = this.launch({ min, max, end: pos }, points, durationSec, false, opts);
-    return { ...res, requestedPeak: conv.requestedPeak };
-  }
-
   /** Safety checks (section 11) and the ring message shared by both stroke kinds. */
   private launch(ex: { min: number; max: number; end: number }, points: RingRatePoint[], durationSec: number, interpolate: boolean, opts: StrokeOptions): StrokeResult {
     const r = this.record!;
@@ -284,7 +257,7 @@ export class ScratchRecordVoice {
    * `drop` alone). Throws cue the attack and ride forward with the fader
    * open; hand gestures cue the vowel and loop with a return to the anchor.
    */
-  playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number; drive?: 'physics' | 'velocity' | 'hand'; style?: ScratchDJStyle; seed?: number } = {}): StrokeResult {
+  playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number; style?: ScratchDJStyle; seed?: number } = {}): StrokeResult {
     const r = this.record;
     if (!r) return { ok: false, reason: 'no record loaded' };
     const isThrow = gesture.id === 'drop' || gesture.id === 'dropPhrase';
@@ -306,27 +279,15 @@ export class ScratchRecordVoice {
     } else {
       this.fader(gesture, bpm, { loop: gesture.loop, velocity: opts.velocity, at: opts.at });
     }
-    const strokeOpts: StrokeOptions = {
+    // One motion path (O1): the turntable model's record speed - the velocity sets the stroke
+    // length (O2), the style the turntable; a throw rides at natural speed.
+    const motion = isThrow ? [{ t: 0, velocity: 1 }, { t: 1, velocity: 1 }] : gestureMotion(gesture, durationSec, { velocity: opts.velocity, style: opts.style, seed: opts.seed, perform: true });
+    return this.stroke(motion, durationSec, {
       loop: gesture.loop,
       returnToAnchor: gesture.loop && gesture.returnsToAnchor,
-      interpolate: gesture.interpolateVelocity,
+      interpolate: true,
       at: opts.at,
-    };
-    // The default (O1, G8): the gesture is a hand on the record in the turntable model - the
-    // velocity sets the stroke length (O2), the style the turntable; its record speed is the stroke.
-    const drive = opts.drive ?? 'physics';
-    if (drive === 'physics' && !isThrow && isPhysical(gesture)) {
-      const simulated = simulateGesture(gesture, durationSec, { velocity: opts.velocity, style: opts.style, seed: opts.seed });
-      return this.stroke(simulated.curve, durationSec, { ...strokeOpts, interpolate: true });
-    }
-    // `drive: 'hand'` performs the gesture's hand path kinematically (section 17, D5); 'velocity'
-    // (and the gestures the model does not perform) keeps the velocity keyframes, the plan
-    // velocity as the hand's speed (SA-m5).
-    const speed = isThrow ? 1 : handSpeedFactor(opts.velocity);
-    if (drive === 'hand' && gesture.handPath && !isThrow) {
-      return this.strokePath(gesture.handPath.map((p) => ({ ...p, position: p.position * speed })), durationSec, strokeOpts);
-    }
-    return this.stroke(gesture.velocityCurve.map((p) => ({ ...p, velocity: p.velocity * speed })), durationSec, strokeOpts);
+    });
   }
 
   /** Silence within the ring's 3 ms gain ramp, worklet stopped, voice free; now or at context time `at`. */

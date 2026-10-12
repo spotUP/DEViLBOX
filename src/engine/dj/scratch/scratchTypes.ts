@@ -91,7 +91,9 @@ export interface ScratchVelocityPoint {
 }
 
 /** Section 10 gesture data model, extended with the execution fields the
- *  DEViLBOX pattern player needs (`cycleBeats`, `interpolateVelocity`). */
+ *  DEViLBOX pattern player needs (`cycleBeats`). Its motion is one of: a hand path, a glide, a
+ *  deck action, or a throw (`drop` / `dropPhrase`, natural speed) - performed by the turntable
+ *  model (`scratchPhysics.gestureMotion`, owner decision O1: one motion path). */
 export interface ScratchGesture {
   id: ScratchGestureId;
   /** Full English UI label (CLAUDE.md: never an abbreviation). */
@@ -105,12 +107,11 @@ export interface ScratchGesture {
   styles: readonly ScratchDJStyle[];
   roles: readonly ScratchRole[];
   handPath?: ScratchHandPath;
-  velocityCurve: readonly ScratchVelocityPoint[];
   faderWindows: readonly ScratchFaderWindow[];
   /** Fader offset in ms; negative = the cut leads the hand (chirp/flare timing). */
   cutLeadMs?: number;
   /** true = backward phases really read the record backward (ring buffer);
-   *  false = negative velocity is a slow forward (speed modulation only). */
+   *  false = the deck plays a backward phase as a slow forward (speed modulation only). */
   trueReverse: boolean;
   /** The gesture is a stroke from a musical home point the executor re-cues
    *  to (section 11/18); false for continuous-platter techniques and throws. */
@@ -124,15 +125,15 @@ export interface ScratchGesture {
   allowsSampleSource: boolean;
   /** Derived: durationSteps / 4 / strokes - one stroke cycle of the pattern player. */
   cycleBeats: number;
-  /** Linear interpolation between velocity keyframes. */
-  interpolateVelocity: boolean;
   /** One-shot (throws): the pattern does not loop. */
   loop: boolean;
   /** The gesture's own effect (echo). */
   fx?: ScratchGestureFx;
   /** A steady-platter gesture (reference `glide`, scratch.py :147-150, :287-294): the record plays
    *  forward at `ratio` x and accelerates across the gesture under the cuts, the hand at `grip`. */
-  glide?: { ratio: number; grip: number };
+  glide?: { ratio: number; grip: number; profile?: ReadonlyArray<readonly [t: number, speed: number]> };
+  /** A record flourish the deck's motor performs (reference `deck_motion`): brake or start. */
+  deckAction?: 'brake' | 'start';
   /** A record flourish (brake, spin-up): placed on purpose (an ending, a routine, a pad), never
    *  drawn at random from a style's vocabulary. */
   flourish?: boolean;

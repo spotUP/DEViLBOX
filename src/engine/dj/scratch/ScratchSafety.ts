@@ -9,7 +9,7 @@ import { getGesture } from './scratchGestureCatalog';
 import { STEPS_PER_BEAT, DEFAULT_GRID, type ScratchGrid } from './scratchAnchor';
 import type { ScratchEvent, ScratchGestureId } from './scratchTypes';
 import { getScratchRecord } from './scratchCatalogue';
-import { handSpeedFactor } from './scratchHandSpeed';
+import { motionPeak } from './scratchPhysics';
 import { MAX_RATE } from './scratchAnchor';
 
 /** Section 56 "maximum cut rate": crossfader cuts per beat a request may ask for. */
@@ -111,6 +111,8 @@ export interface SafetyState {
   deckBusyUntil?: Partial<Record<'A' | 'B', number>>;
   /** A transient record (tracker sample) the pool holds. */
   hasRecord?(id: string): boolean;
+  /** The master tempo: the gesture's real length, so its motion's real peak (120 when unknown). */
+  bpm?: number;
 }
 
 export type SafetyVerdictFull = { ok: true } | { ok: false; rule: SafetyRule; reason: string };
@@ -146,7 +148,8 @@ export function checkScratch(e: ScratchEvent, state: SafetyState): SafetyVerdict
     if (busy !== undefined && e.executeAtBeat < busy - 1e-9) return refuse('conflict', `deck ${deck} is already scratched until beat ${busy.toFixed(2)}`);
   }
   const g = getGesture(e.gesture);
-  const peak = Math.max(0, ...g.velocityCurve.map((p) => Math.abs(p.velocity))) * handSpeedFactor(e.velocity);
+  // the fastest the record moves in this gesture: the turntable model's motion at the event's velocity
+  const peak = motionPeak(g, g.cycleBeats * 60 / Math.max(30, state.bpm ?? 120), e.velocity);
   if (peak > MAX_RATE + 1e-9) return refuse('excessiveRate', `peak rate ${peak.toFixed(2)} > ${MAX_RATE}`);
   const cuts = checkCutRate({ gesture: e.gesture });
   if (!cuts.ok) return refuse('excessiveCuts', cuts.reason!);

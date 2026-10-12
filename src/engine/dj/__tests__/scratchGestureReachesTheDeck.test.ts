@@ -27,11 +27,12 @@ import { fireDjFx, releaseDjFx, djFxFireCounts, clearDjFxFireLog, DJ_FX_ACTION_M
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckEngine } from '../DeckEngine';
 
-interface Tick { velocity: number; gain: number | null }
+interface Tick { velocity: number; gain: number | null; ms: number }
 
 function fakeDeck(bpm: number) {
   const ticks: Tick[] = [];
   let lastGain: number | null = null;
+  let t0 = 0;
   const gainParam = {
     cancelScheduledValues: () => {},
     setValueAtTime: (v: number) => { lastGain = v; ticks[ticks.length - 1]!.gain = v; },
@@ -42,7 +43,7 @@ function fakeDeck(bpm: number) {
     id: 'A',
     playbackMode: 'tracker',
     replayer: { getElapsedMs: () => 0 },
-    setScratchVelocity: (v: number) => { ticks.push({ velocity: v, gain: lastGain }); },
+    setScratchVelocity: (v: number) => { ticks.push({ velocity: v, gain: lastGain, ms: performance.now() - t0 }); },
     getChannelGainParam: () => gainParam,
     releaseChannelGainParam: () => {},
   };
@@ -54,6 +55,7 @@ function fakeDeck(bpm: number) {
     stopCalls: 0,
     playPattern(name: string) {
       this.patternCalls.push(name);
+      t0 = performance.now();
       const pattern = getPatternByName(name);
       if (!pattern) return;
       playback.play(pattern);
@@ -83,7 +85,7 @@ describe('a scratch gesture fired through the DJ FX registry reaches the deck (S
     expect(useDJStore.getState().decks.A.activePatternName).toBe('Chirp');
     expect(useDJStore.getState().djFxActive.fx_scratch_chirp).toBe('A');
 
-    vi.advanceTimersByTime(500); // one beat at 120 BPM = four chirp cycles
+    vi.advanceTimersByTime(500); // one beat at 120 BPM = two chirp cycles (the reference 2 steps)
 
     expect(scratchFaderModelStats.faderGainAtCalls).toBeGreaterThanOrEqual(4);
     const velocities = deck.ticks.map((t) => t.velocity);
@@ -93,11 +95,12 @@ describe('a scratch gesture fired through the DJ FX registry reaches the deck (S
     const gains = deck.ticks.map((t) => t.gain);
     expect(gains).toContain(0);
     expect(gains).toContain(1);
-    // the chirp's velocity peak (2.0 at 0.25 of the cycle) lies inside the open
-    // window (0.06, 0.44); its turnarounds (velocity ~0 at 0 and 0.5) inside cuts
+    // the fader follows the chirp's windows (0.06, 0.44), (0.56, 0.94) of the 250 ms cycle, whatever
+    // the turntable model does with the record: a tick in a window is open, between them cut
     for (const t of deck.ticks) {
-      if (Math.abs(t.velocity) > 1.5) expect(t.gain, `open window at v=${t.velocity}`).toBe(1);
-      if (Math.abs(t.velocity) < 0.15) expect(t.gain, `cut window at v=${t.velocity}`).toBe(0);
+      const f = (t.ms % 250) / 250 + 0.002 * 120 / 60 / 0.5; // the -2 ms lead, in cycle fractions
+      if ((f > 0.08 && f < 0.42) || (f > 0.58 && f < 0.92)) expect(t.gain, `open at ${f.toFixed(3)}`).toBe(1);
+      if (f < 0.04 || (f > 0.46 && f < 0.54) || f > 0.96) expect(t.gain, `cut at ${f.toFixed(3)}`).toBe(0);
     }
 
     releaseDjFx('fx_scratch_chirp', { deck: 'A', source: 'keyboard' });

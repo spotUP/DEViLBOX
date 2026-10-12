@@ -33,12 +33,12 @@
   },
   {
    "bar": 23,
-   "step": 16,
-   "beat": 96,
-   "gesture": "chirp",
-   "velocity": 0.85,
+   "step": 15,
+   "beat": 95.75,
+   "gesture": "baby",
+   "velocity": 0.8,
    "placementRole": "turnaround",
-   "role": "OUTRO"
+   "role": "FILL"
   },
   {
    "bar": 26,
@@ -69,12 +69,12 @@
   },
   {
    "bar": 31,
-   "step": 16,
-   "beat": 128,
-   "gesture": "chirp",
-   "velocity": 0.85,
+   "step": 15,
+   "beat": 127.75,
+   "gesture": "baby",
+   "velocity": 0.8,
    "placementRole": "turnaround",
-   "role": "OUTRO"
+   "role": "FILL"
   }
  ]
 }

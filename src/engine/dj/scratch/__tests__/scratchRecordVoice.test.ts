@@ -140,13 +140,13 @@ describe('ScratchRecordVoice (section 16, SCR-P2.5)', () => {
     expect(voice.safetyLog.at(-1)).toMatchObject({ kind: 'clampReverse' });
   });
 
-  it('a gesture with a deck pattern plays as its velocity curve + fader windows, looping with a return to the anchor', () => {
+  it('a gesture plays as the turntable model\'s motion + fader windows, looping with a return to the anchor', () => {
     const chirp = getGesture('chirp');
     const res = voice.playGesture(chirp, 120, { ambience: 0.5 });
     expect(res.ok).toBe(true);
     const rc = last(ring, 'rateCurve')!;
     const cycleFrames = Math.round(chirp.cycleBeats * 60 / 120 * SR);
-    expect(rc.args[1]).toMatchObject({ loop: true, cycleFrames, returnToAnchor: true, interpolate: chirp.interpolateVelocity });
+    expect(rc.args[1]).toMatchObject({ loop: true, cycleFrames, returnToAnchor: true, interpolate: true });
     const fw = last(ring, 'faderWindows')!;
     const windows = fw.args[0] as Array<[number, number]>;
     expect(windows).toHaveLength(chirp.faderWindows.length);
@@ -217,44 +217,21 @@ describe('true re-cue before every stab (section 18, SCR-P3.3)', () => {
     const starts: number[] = [];
     for (let i = 0; i < 4; i++) {
       starts.push(voice.position); // where the head is when the next stab begins
-      voice.stroke(stab.velocityCurve, 0.5, { interpolate: stab.interpolateVelocity });
+      voice.stroke([{ t: 0, velocity: 2.5 }, { t: 0.5, velocity: -1 }], 0.5);
     }
     expect(ring.calls.filter((c) => c.type === 'seek')).toHaveLength(1);
     expect(starts[3]! - starts[0]!).toBeGreaterThan(0.001);
   });
 });
 
-describe('position-driven stroke (section 17, SCR-P3.2)', () => {
-  it('strokePath posts the converted rate curve, held steps, ending at rate 0', async () => {
+describe('the turntable model is the one motion (O1, SCR-PG-B2)', () => {
+  it('playGesture posts the model\'s record speed at ~1 kHz over the gesture', async () => {
     const ring = fakeRing();
     const voice = new ScratchRecordVoice(0, ring, fakeBus());
     const ONE = getScratchRecord('ONE')!;
     await voice.load(ONE, fakeBuffer(ONE.durationSec));
-    const res = voice.strokePath(getGesture('forwardStab').handPath!, 0.5, {});
-    expect(res.ok).toBe(true);
-    expect(res.requestedPeak).toBeGreaterThan(0);
-    const call = last(ring, 'rateCurve')!;
-    const pts = call.args[0] as RingRatePoint[];
-    expect(pts[0]).toEqual({ frame: 0, rate: expect.any(Number) });
-    expect(pts.at(-1)).toEqual({ frame: 24000, rate: 0 });
-    expect(pts.length).toBeGreaterThan(90); // 0.5 s in 5 ms steps
-    expect(call.args[1]).toMatchObject({ interpolate: false });
-  });
-
-  it('playGesture drive "hand" performs the hand path; the default is the turntable model (O1); "velocity" keeps the keyframes', async () => {
-    const mk = async () => {
-      const ring = fakeRing();
-      const voice = new ScratchRecordVoice(0, ring, fakeBus());
-      const ONE = getScratchRecord('ONE')!;
-      await voice.load(ONE, fakeBuffer(ONE.durationSec));
-      return { ring, voice };
-    };
-    const a = await mk(); a.voice.playGesture(getGesture('forwardStab'), 120, { drive: 'hand' });
-    const b = await mk(); b.voice.playGesture(getGesture('forwardStab'), 120, { drive: 'velocity' });
-    const c = await mk(); c.voice.playGesture(getGesture('forwardStab'), 120);
-    expect((last(a.ring, 'rateCurve')!.args[0] as unknown[]).length).toBeGreaterThan(50);
-    expect((last(b.ring, 'rateCurve')!.args[0] as unknown[]).length).toBeLessThan(5);
-    // the model's record speed at ~1 kHz over the 2-step stab (250 ms at 120 BPM)
-    expect((last(c.ring, 'rateCurve')!.args[0] as unknown[]).length).toBeGreaterThan(200);
+    voice.playGesture(getGesture('forwardStab'), 120);
+    // the reference 1-step stab = 125 ms at 120 BPM: ~1 point per ms
+    expect((last(ring, 'rateCurve')!.args[0] as unknown[]).length).toBeGreaterThan(100);
   });
 });

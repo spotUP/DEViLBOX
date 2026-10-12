@@ -443,7 +443,7 @@ export class DJScratchDJ {
       decksPlaying: input.decksPlaying ?? { A: input.deck === 'A', B: input.deck === 'B' },
       vocalAt: (b) => timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, at(b)),
       bassAt: (b) => timelineAt(track.bassActivity.values, track.bassActivity.hopSec, at(b)),
-      bassSource, deckBusyUntil: this.deckBusyUntil, hasRecord: this.deps.hasRecord,
+      bassSource, deckBusyUntil: this.deckBusyUntil, hasRecord: this.deps.hasRecord, bpm: ctx.bpm,
     };
     plan.events.forEach((p, i) => {
       const e = events[i]!;
