@@ -50,6 +50,8 @@ export interface PatternStart {
   phase?: number;
   /** Whole cycles to play, then end (the gesture's one length). */
   cycles?: number;
+  /** Hand speed: every stroke rate is multiplied by it (`handSpeedFactor` of the plan velocity; SA-m5). */
+  speed?: number;
 }
 
 export interface ScratchPattern {
@@ -189,6 +191,8 @@ export class ScratchPlayback {
   private pendingStop = false; // set by finishCurrentCycle() to stop after this cycle completes
   /** Whole cycles left before a planned pattern ends itself (null = loop until stopped). */
   private cyclesLeft: number | null = null;
+  /** Multiplier on every stroke rate for the running pattern (PatternStart.speed). */
+  private handSpeed = 1;
 
   /** Current scratch velocity (updated every tick). UI reads this for turntable spin + pattern scroll. */
   currentVelocity = 0;
@@ -248,6 +252,7 @@ export class ScratchPlayback {
       this.activePattern = pattern;
       this.patternLastTick = performance.now();
       this.cyclesLeft = start?.cycles !== undefined ? Math.max(1, Math.round(start.cycles)) : null;
+      this.handSpeed = start?.speed !== undefined && Number.isFinite(start.speed) && start.speed > 0 ? start.speed : 1;
 
       if (start) {
         // a planned stroke begins where the plan says, on the beat it was fired on
@@ -348,6 +353,7 @@ export class ScratchPlayback {
     }
 
     // Expose current state for UI (turntable spin, pattern display, fader indicators)
+    velocity *= this.handSpeed;
     this.currentVelocity = velocity;
     const gesture = getGesture(pattern.gestureId);
     const bpm = this.getEffectiveBPM();
@@ -409,6 +415,7 @@ export class ScratchPlayback {
     this.patternElapsedMs = 0;
     this.pendingStop = false;
     this.cyclesLeft = null;
+    this.handSpeed = 1;
     this.currentVelocity = 0;
     this.currentFaderGain = 1;
 

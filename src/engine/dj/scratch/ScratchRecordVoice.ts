@@ -24,6 +24,7 @@ import type { ScratchRecord } from './scratchCatalogue';
 import type { ScratchGesture, ScratchHandPath, ScratchVelocityPoint } from './scratchTypes';
 import { positionCurveToRateCurve } from './scratchAnchor';
 import { faderWindowsMs, faderRampSec, cycleMs } from './scratchFaderModel';
+import { handSpeedFactor } from './scratchHandSpeed';
 
 /** The ring surface the voice uses (DeckScratchBuffer in record mode; a fake in tests). */
 export type ScratchVoiceRing = Pick<DeckScratchBuffer,
@@ -300,8 +301,12 @@ export class ScratchRecordVoice {
     };
     // `drive: 'hand'` performs the gesture's hand path (section 17, D5); the default keeps the
     // tuned velocity keyframes the owner has heard (the hand path's reference strokes are small).
-    if (opts.drive === 'hand' && gesture.handPath && !isThrow) return this.strokePath(gesture.handPath, durationSec, strokeOpts);
-    return this.stroke(gesture.velocityCurve, durationSec, strokeOpts);
+    // The plan velocity is the hand's speed (SA-m5): every rate scales, timing and fader stay.
+    const speed = isThrow ? 1 : handSpeedFactor(opts.velocity);
+    if (opts.drive === 'hand' && gesture.handPath && !isThrow) {
+      return this.strokePath(gesture.handPath.map((p) => ({ ...p, position: p.position * speed })), durationSec, strokeOpts);
+    }
+    return this.stroke(gesture.velocityCurve.map((p) => ({ ...p, velocity: p.velocity * speed })), durationSec, strokeOpts);
   }
 
   /** Silence within the ring's 3 ms gain ramp, worklet stopped, voice free; now or at context time `at`. */
