@@ -27,7 +27,8 @@ import type { ScratchCue } from '../dj/scratch/ScratchRecordVoice';
 import { getScratchVoicePool, getScratchVoicePoolIfActive, type PerformHandle } from '../dj/scratch/scratchVoicePool';
 import { ambienceFor } from '../dj/scratch/scratchBus';
 import { handSpeedFactor } from '../dj/scratch/scratchHandSpeed';
-import { playDeckPattern, stopDeckPattern, finishDeckPatternCycle, spinbackDeck } from '../dj/DJActions';
+import { playDeckPattern, stopDeckPattern, finishDeckPatternCycle, spinbackDeck, rewindDeck } from '../dj/DJActions';
+import { realTimers } from '../dj/autodj/executorTimers';
 import type { DeckId } from '../dj/DeckEngine';
 import type { DubBusSettings } from '../../types/dub';
 import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
@@ -58,6 +59,7 @@ export type DjFxActionId =
   | 'fx_deck_kill_lo' | 'fx_deck_kill_mid' | 'fx_deck_kill_hi'
   | 'fx_deck_brake'
   | 'fx_deck_spinback'
+  | 'fx_deck_rewind'
   | 'fx_deck_jump_m16' | 'fx_deck_jump_m4' | 'fx_deck_jump_m1'
   | 'fx_deck_jump_p1' | 'fx_deck_jump_p4' | 'fx_deck_jump_p16'
   // Hot Cues (trigger/set on active deck)
@@ -96,6 +98,8 @@ export type DjFxActionId =
  */
 export interface DjFxFireOptions {
   deck?: DeckId;
+  /** Who fired it (fireDjFx passes it on): a gesture that fires other actions fires them as the same source. */
+  source?: DjFxSource;
   /** Length of the move in beats (sweeps, echo tails). */
   beats?: number;
   /** Amount 0..1 (send level, depth). */
@@ -1393,6 +1397,40 @@ function createDeckSpinback(): DjFxAction {
   };
 }
 
+/**
+ * Rewind (the reggae sound-system rewind): the selector drags the deck's record
+ * back and the SAME tune plays again from its first downbeat
+ * (DJActions.rewindDeck, the deck's own platter physics). The Dub Siren wails
+ * through the pull-back and the Air Horn blasts on the restart downbeat - the
+ * registry's own one-shots, fired as their pads fire them. Not a spinback: the
+ * spinback ends a tune, the rewind replays it.
+ */
+function createDeckRewind(): DjFxAction {
+  return {
+    id: 'fx_deck_rewind',
+    name: 'Rewind',
+    category: 'deck',
+    mode: 'oneshot',
+    engage(opts) {
+      const deckId = opts?.deck ?? getActiveDeckId();
+      const source = opts?.source ?? 'pad';
+      const started = rewindDeck(deckId, {
+        onRestart: () => {
+          releaseDjFx('fx_dub_siren', { source });
+          fireDjFx('fx_air_horn', { source });
+          const beatMs = 60_000 / Math.max(60, useDJStore.getState().decks[deckId].effectiveBPM || 120);
+          realTimers.setTimeout(() => releaseDjFx('fx_air_horn', { source }), beatMs);
+          setDjFxActive('fx_deck_rewind', null);
+        },
+      });
+      if (!started) return;
+      setDjFxActive('fx_deck_rewind', deckId);
+      fireDjFx('fx_dub_siren', { source });
+    },
+    disengage() { /* the hand runs its own gesture */ },
+  };
+}
+
 function createDeckBrake(): DjFxAction {
   let brakeRaf = 0;
   return {
@@ -1991,6 +2029,7 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   createDeckEQKill('high'),
   createDeckBrake(),
   createDeckSpinback(),
+  createDeckRewind(),
   createDeckBeatJump(-16),
   createDeckBeatJump(-4),
   createDeckBeatJump(-1),

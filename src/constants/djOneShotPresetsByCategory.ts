@@ -63,7 +63,7 @@ export const ONE_SHOT_PRESETS_BY_CATEGORY: Record<string, OneShotPresetInfo[]> =
   ],
   'Transitions': [
     { index: 30, name: 'Echo Washout', category: 'Transitions', color: TRANSITION_COLOR },
-    { index: 31, name: 'Rewind', category: 'Transitions', color: TRANSITION_COLOR },
+    { index: 31, name: 'Rewind Sound', category: 'Transitions', color: TRANSITION_COLOR },
     { index: 32, name: 'Tape Stop', category: 'Transitions', color: TRANSITION_COLOR },
     { index: 33, name: 'Splash', category: 'Transitions', color: TRANSITION_COLOR },
   ],

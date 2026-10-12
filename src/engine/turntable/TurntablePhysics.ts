@@ -299,6 +299,15 @@ export class TurntablePhysics {
   }
 
   /**
+   * The hand's target speed as a playback rate (1 = normal forward, negative =
+   * backward, 0 = holding the record still): a hand gesture spoken in deck
+   * rates, such as the DJ deck's rewind pull-back (DJActions.rewindDeck).
+   */
+  setHandRate(rate: number): void {
+    this._handOmega = OMEGA_33 * rate;
+  }
+
+  /**
    * Trigger spinback: DJ yanks the record backward.
    *
    * The motor stays ON throughout — it fights the reverse impulse,
