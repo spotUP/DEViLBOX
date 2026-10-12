@@ -1913,7 +1913,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
           });
 
           const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-          await loadRenderToDeck(engine, deckId, result, { fileName: track.fileName, trackName, interimBpm: track.bpm || 125 });
+          await loadRenderToDeck(engine, deckId, result, { fileName: track.fileName, trackName, source: buffer, interimBpm: track.bpm || 125 });
           if (useDJStore.getState().deckViewMode !== '3d') {
             useDJStore.getState().setDeckViewMode('visualizer');
           }

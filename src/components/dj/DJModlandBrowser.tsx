@@ -374,7 +374,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
             isPlaying: false,
           });
           const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
-          await loadRenderToDeck(engine, deckId, result, { fileName: cacheKey, trackName: file.filename.replace(/\.sid$/i, ''), interimBpm: 125 });
+          await loadRenderToDeck(engine, deckId, result, { fileName: cacheKey, trackName: file.filename.replace(/\.sid$/i, ''), source: buffer, interimBpm: 125 });
           if (useDJStore.getState().deckViewMode !== '3d') {
             useDJStore.getState().setDeckViewMode('visualizer');
           }
