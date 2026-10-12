@@ -39,6 +39,16 @@ export interface ChannelScopeTrack {
   stems?: Int16Array[];
 }
 
+/**
+ * Drop a track's int16 stems once the deck has decoded them into its buffer
+ * (DeckChannelMute.bufferWithStems): the persistent copy is the audio cache
+ * entry (written before any deck loads the track, and read afresh on every
+ * load), so keeping them here would hold every loaded track's stems twice.
+ */
+export function releaseChannelStems(track: ChannelScopeTrack | undefined): void {
+  if (track) delete track.stems;
+}
+
 /** Most channels a deck can mute: the deck buttons show CH1-4, the pads Mute Ch 1-8. */
 export const DECK_STEM_CHANNELS = 8;
 
