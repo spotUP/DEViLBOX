@@ -66,6 +66,13 @@ export interface CachedAudio {
    * Absent on entries written before the field existed (isPreviewRender).
    */
   renderCapSec?: number | null;
+
+  /**
+   * A SID render's player call rate (sidPlayerClock.ts), the unit of its beat grid; null = the
+   * render measured none (not a SID, or no steady player). Absent = rendered before renders
+   * recorded it: a SID entry like that is read as needing a render (asRead), like a preview.
+   */
+  playerCallHz?: number | null;
 }
 
 /** The playlist analyser renders a preview of this many seconds (its BPM, key and energy need no more). */
@@ -94,7 +101,8 @@ export interface CacheReadOptions {
  * reader renders the whole song from them.
  */
 function asRead<T extends CachedAudio | null | undefined>(entry: T, opts: CacheReadOptions = {}): T {
-  if (!entry || opts.allowPreview || !entry.audioData || entry.audioData.byteLength === 0 || !isPreviewRender(entry)) {
+  if (!entry || !entry.audioData || entry.audioData.byteLength === 0) return withChannelScopes(entry);
+  if (!lacksPlayerClock(entry) && (opts.allowPreview || !isPreviewRender(entry))) {
     return withChannelScopes(entry);
   }
   return {
@@ -115,6 +123,16 @@ function withChannelScopes<T extends CachedAudio | null | undefined>(entry: T): 
     noteScopelessWav(entry.audioData, { hash: entry.hash, filename: entry.filename, duration: entry.duration });
   }
   return entry;
+}
+
+/**
+ * A SID entry rendered before renders recorded the player call rate: its beat grid would fall back
+ * to the audio detector, so a reader renders it again (once) instead of using the audio.
+ */
+export function lacksPlayerClock(entry: Pick<CachedAudio, 'sourceData' | 'playerCallHz'>): boolean {
+  if (entry.playerCallHz !== undefined || !entry.sourceData || entry.sourceData.byteLength < 4) return false;
+  const m = new Uint8Array(entry.sourceData, 0, 4);
+  return (m[0] === 0x50 || m[0] === 0x52) && m[1] === 0x53 && m[2] === 0x49 && m[3] === 0x44; // PSID / RSID
 }
 
 /** Beat grid data — compatible with Serato beat markers */
@@ -271,6 +289,7 @@ export async function cacheAudio(
   numberOfChannels: number,
   channelScopes?: ChannelScopeTrack,
   renderCapSec: number | null = null,
+  playerCallHz?: number,
 ): Promise<void> {
   try {
     const database = await initDB();
@@ -301,6 +320,7 @@ export async function cacheAudio(
       channelScopes,
       scopeRenderVersion: CHANNEL_SCOPE_RENDER_VERSION,
       renderCapSec,
+      playerCallHz: playerCallHz ?? null,
     };
     entry.sizeBytes = entryStoredBytes(entry);
 

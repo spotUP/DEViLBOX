@@ -62,6 +62,8 @@ interface RenderOutput {
   sampleRate: number;
   duration: number;
   channelScopes?: ChannelScopeTrack;
+  /** A SID render's player call rate (sidPlayerClock.ts). */
+  playerCallHz?: number;
 }
 
 /** A scope re-render must be this close in length to the cached WAV for its track to line up with it. */
@@ -87,6 +89,8 @@ export interface PipelineTask {
   pcmLeft?: Float32Array;
   pcmRight?: Float32Array;
   sampleRate?: number;
+  /** The player call rate the cached render recorded (a SID), carried to its analysis. */
+  playerCallHz?: number;
   /** Pre-existing WAV data (skip render, just load + analyze) */
   wavData?: ArrayBuffer;
   duration?: number;
@@ -144,6 +148,8 @@ export interface PipelineResult {
     };
     /** Auto DJ extended analysis (activity timelines, loudness set, spectral, chroma); null for legacy entries. */
     extended?: ExtendedAnalysis | null;
+    /** A SID's player call rate from its render (sidPlayerClock.ts): its beat grid is whole calls per beat. */
+    playerCallHz?: number;
   } | null;
 }
 
@@ -189,6 +195,7 @@ export function analysisFromCachedAudio(cached: CachedAudio): PipelineResult['an
       danceability: cached.danceability ?? 0.5,
     },
     extended: cached.extended ?? null,
+    playerCallHz: cached.playerCallHz ?? undefined,
   };
 }
 
@@ -402,11 +409,11 @@ export class DJPipeline {
       }
 
       case 'renderComplete': {
-        const { id, left, right, sampleRate, duration, channelScopes } = msg;
+        const { id, left, right, sampleRate, duration, channelScopes, playerCallHz } = msg;
         const cb = this.renderCallbacks.get(id);
         if (cb) {
           this.renderCallbacks.delete(id);
-          cb.resolve({ left, right, sampleRate, duration, channelScopes });
+          cb.resolve({ left, right, sampleRate, duration, channelScopes, playerCallHz });
         }
         break;
       }
@@ -546,6 +553,7 @@ export class DJPipeline {
     sampleRate: number,
     deckId?: DeckId,
     priority: TaskPriority = 'normal',
+    playerCallHz?: number,
   ): Promise<PipelineResult> {
     const id = `analyze-${filename}-${Date.now()}`;
     return this.enqueue({
@@ -558,6 +566,7 @@ export class DJPipeline {
       pcmLeft,
       pcmRight,
       sampleRate,
+      playerCallHz,
     });
   }
 
@@ -713,7 +722,7 @@ export class DJPipeline {
           const decoded = await audioCtx.decodeAudioData(cached.audioData.slice(0));
           const left = decoded.getChannelData(0);
           const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : left;
-          return this.analyzeOnly(fileBuffer, filename, left, right, decoded.sampleRate, deckId, priority);
+          return this.analyzeOnly(fileBuffer, filename, left, right, decoded.sampleRate, deckId, priority, cached.playerCallHz ?? undefined);
         } catch (err) {
           console.warn(`[DJPipeline] Failed to decode cached audio for analysis, re-rendering: ${filename}`, err);
           // Fall through to full render
@@ -969,6 +978,8 @@ export class DJPipeline {
     let waveformPeaks: Float32Array;
 
     if (task.scopesOnly) return this.executeScopesOnly(task, task.scopesOnly.expectedDuration);
+    // A SID's player call rate: from this render, or the one the cached render recorded.
+    let playerCallHz = task.playerCallHz;
 
     if (task.analysisOnly && task.pcmLeft) {
       // Skip render — PCM already provided
@@ -999,6 +1010,7 @@ export class DJPipeline {
       right = renderResult.right;
       sampleRate = renderResult.sampleRate;
       duration = renderResult.duration;
+      playerCallHz = renderResult.playerCallHz;
 
       // Encode to WAV
       this.emitTaskProgress(task.id, 48);
@@ -1024,6 +1036,7 @@ export class DJPipeline {
         renderResult.channelScopes,
         // A render that ran into its cap is a preview, not the song (isPreviewRender).
         task.maxRenderSeconds !== undefined && duration >= task.maxRenderSeconds - 0.5 ? task.maxRenderSeconds : null,
+        playerCallHz,
       );
 
       console.log(
@@ -1041,6 +1054,7 @@ export class DJPipeline {
     let analysis: PipelineResult['analysis'] = null;
     try {
       analysis = await this.doAnalysis(task.id, left, right, sampleRate);
+      if (analysis && playerCallHz) analysis.playerCallHz = playerCallHz;
 
       // Persist analysis results in cache
       if (analysis) {
