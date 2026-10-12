@@ -21,7 +21,7 @@
  */
 
 import {
-  ChannelScopeTrackBuilder, DECK_SCOPE_CHANNELS, channelScopeTransferables,
+  ChannelScopeTrackBuilder, ChannelStemsBuilder, DECK_SCOPE_CHANNELS, DECK_STEM_CHANNELS, channelScopeTransferables,
   type ChannelScopeTrack,
 } from '@/engine/dj/channelScopeTrack';
 
@@ -43,6 +43,8 @@ interface RenderRequest {
   subsong?: number;
   /** Max render duration in seconds (default: 600). Use shorter for analysis-only. */
   maxSeconds?: number;
+  /** Render each channel's stem beside the mix (default true; the deck's channel mute needs them). */
+  stems?: boolean;
   /**
    * Optional companion files to register in UADE's virtual filesystem BEFORE
    * loading the main module. Required for multi-file formats like TFMX
@@ -408,7 +410,38 @@ async function renderWithUADE(
   id: string,
   companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
   maxSeconds = 600,
+  withStems = true,
 ): Promise<RenderResult> {
+  const t0 = Date.now();
+  const loaded = await loadUADE(fileBuffer, filename, companions);
+  const result = await renderWithUADEContinue(loaded.wasm, loaded.safeFilename, subsong, id, maxSeconds);
+  const track = result.channelScopes;
+  if (!withStems || !track) return result;
+
+  // Each Paula channel's stem: a solo pass per channel on a fresh instance
+  // (one UADE instance cannot render twice), muted with the emulator's own
+  // mask - applied before the A500 filter, so the stem is the channel as the
+  // mix carries it. A channel the scope tap never heard is not rendered.
+  const t1 = Date.now();
+  const frames = result.left.length;
+  const stems: Int16Array[] = [];
+  for (let ch = 0; ch < 4; ch++) {
+    if (!(track.scales[ch] > 0)) { stems.push(new Int16Array(0)); continue; }
+    const solo = await loadUADE(fileBuffer, filename, companions);
+    stems.push(await renderUADESoloPass(solo.wasm, subsong, 1 << ch, frames));
+  }
+  track.stems = stems;
+  console.log(`[DJRenderWorker/UADE] stems: mix pass ${t1 - t0} ms, 4 solo passes ${Date.now() - t1} ms`);
+  return result;
+}
+
+/** A fresh UADE instance with `fileBuffer` loaded (companions registered first). */
+async function loadUADE(
+  fileBuffer: ArrayBuffer,
+  filename: string,
+  companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<{ wasm: any; safeFilename: string }> {
   // Force fresh UADE instance for each render — the IPC state machine
   // gets corrupted after a render cycle and cannot be reused.
   uadeReady = false;
@@ -512,13 +545,43 @@ async function renderWithUADE(
     }
 
     // Continue with the new wasm instance
-    return renderWithUADEContinue(wasm2, safeFilename, subsong, id);
+    return { wasm: wasm2, safeFilename };
   }
 
   wasm._free(filePtr);
   wasm._free(fnamePtr);
 
-  return renderWithUADEContinue(wasm, safeFilename, subsong, id, maxSeconds);
+  return { wasm, safeFilename };
+}
+
+/**
+ * One channel's stem: render `frames` frames with only the channels of
+ * `activeMask` sounding, set up exactly like the mix pass.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function renderUADESoloPass(wasm: any, subsong: number, activeMask: number, frames: number): Promise<Int16Array> {
+  if (subsong > 0) wasm._uade_wasm_set_subsong(subsong);
+  wasm._uade_wasm_set_looping(0);
+  await new Promise(resolve => setTimeout(resolve, 350)); // the mix pass's eagleplayer settle
+  wasm._uade_wasm_mute_channels(activeMask);
+  const CHUNK = 4096;
+  const tmpL = wasm._malloc(CHUNK * 4);
+  const tmpR = wasm._malloc(CHUNK * 4);
+  const stem = new ChannelStemsBuilder(1);
+  let done = 0;
+  while (done < frames) {
+    const ret = wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
+    if (ret <= 0) break;
+    const heap = wasm.HEAPF32 as Float32Array;
+    const l = tmpL >> 2;
+    const r = tmpR >> 2;
+    const n = Math.min(CHUNK, frames - done);
+    stem.push(n, (_c, i) => heap[l + i], (_c, i) => heap[r + i]);
+    done += n;
+  }
+  wasm._free(tmpL);
+  wasm._free(tmpR);
+  return stem.finish(frames)[0];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -719,6 +782,7 @@ async function renderWithHively(
   filename: string,
   subsong: number,
   id: string,
+  withStems = true,
 ): Promise<RenderResult> {
   await initHively();
   const wasm = hivelyInstance;
@@ -764,9 +828,13 @@ async function renderWithHively(
     && typeof wasm._hively_render_frame === 'function'
     && typeof wasm._hively_set_channel_gain === 'function';
   const tuneChannels: number = wasm._hively_get_channels ? wasm._hively_get_channels() : 4;
-  const scopeChannels = hasSplit ? Math.min(tuneChannels, DECK_SCOPE_CHANNELS) : 0;
+  // The split renders are each channel's stem too (stereo): one per channel, up to DECK_STEM_CHANNELS.
+  const soloChannels = hasSplit ? Math.min(tuneChannels, withStems ? DECK_STEM_CHANNELS : DECK_SCOPE_CHANNELS) : 0;
+  const scopeChannels = Math.min(soloChannels, DECK_SCOPE_CHANNELS);
   const scopes = scopeChannels > 0 ? new ChannelScopeTrackBuilder(scopeChannels, sampleRate) : null;
-  const solo: Float32Array[] = Array.from({ length: scopeChannels }, () => new Float32Array(frameSamples * 2));
+  const stems = withStems && soloChannels > 0 ? new ChannelStemsBuilder(soloChannels) : null;
+  const soloL: Float32Array[] = Array.from({ length: soloChannels }, () => new Float32Array(frameSamples * 2));
+  const soloR: Float32Array[] = Array.from({ length: soloChannels }, () => new Float32Array(frameSamples * 2));
   const setGains = (only: number): void => {
     for (let c = 0; c < tuneChannels; c++) wasm._hively_set_channel_gain(c, only < 0 || c === only ? 1.0 : 0.0);
   };
@@ -786,7 +854,7 @@ async function renderWithHively(
         const mixL = heap.slice(decodePtrL >> 2, (decodePtrL >> 2) + samples);
         const mixR = heap.slice(decodePtrR >> 2, (decodePtrR >> 2) + samples);
         let n = samples;
-        for (let ch = 0; ch < scopeChannels; ch++) {
+        for (let ch = 0; ch < soloChannels; ch++) {
           wasm._hively_restore_voice_positions();
           setGains(ch);
           const got = wasm._hively_render_frame(decodePtrL, decodePtrR);
@@ -794,13 +862,14 @@ async function renderWithHively(
           const oL = decodePtrL >> 2;
           const oR = decodePtrR >> 2;
           n = Math.min(n, Math.max(0, got));
-          if (solo[ch].length < got) solo[ch] = new Float32Array(got);
-          for (let i = 0; i < got; i++) solo[ch][i] = (h[oL + i] + h[oR + i]) * 0.5;
+          if (soloL[ch].length < got) { soloL[ch] = new Float32Array(got); soloR[ch] = new Float32Array(got); }
+          for (let i = 0; i < got; i++) { soloL[ch][i] = h[oL + i]; soloR[ch][i] = h[oR + i]; }
         }
         setGains(-1);
         (wasm.HEAPF32 as Float32Array).set(mixL, decodePtrL >> 2);
         (wasm.HEAPF32 as Float32Array).set(mixR, decodePtrR >> 2);
-        scopes.push(samples, (ch, i) => (i < n ? solo[ch][i] : 0));
+        scopes.push(samples, (ch, i) => (i < n ? (soloL[ch][i] + soloR[ch][i]) * 0.5 : 0));
+        stems?.push(samples, (ch, i) => (i < n ? soloL[ch][i] : 0), (ch, i) => (i < n ? soloR[ch][i] : 0));
       }
     } else {
       samples = wasm._hively_decode_frame(decodePtrL, decodePtrR);
@@ -848,7 +917,9 @@ async function renderWithHively(
 
   postProgress(id, 85);
   console.log(`[DJRenderWorker/Hively] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames`);
-  return { left, right, sampleRate, channelScopes: scopes?.finish() };
+  const track = scopes?.finish();
+  if (track && stems) track.stems = stems.finish(totalFrames);
+  return { left, right, sampleRate, channelScopes: track };
 }
 
 // ── WebSID (C64 SID) Engine State ────────────────────────────────────────────
@@ -960,22 +1031,18 @@ async function initSID(): Promise<void> {
   console.log('[DJRenderWorker] WebSID engine initialized');
 }
 
-async function renderWithSID(
-  fileBuffer: ArrayBuffer,
-  filename: string,
-  subsong: number,
-  id: string,
-): Promise<RenderResult> {
-  await initSID();
-  const mod = sidModule;
-  const sampleRate = 44100;
-
+/**
+ * Load a SID file into the WebSID instance (with the C64 ROMs when present).
+ * scopeEnabled: WebSID records each voice's output as a trace stream beside
+ * the audio buffer (the DeepSID scopes' source).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loadSidFile(mod: any, fileBuffer: ArrayBuffer, filename: string, subsong: number, sampleRate: number, scopeEnabled: boolean): void {
   // Copy SID file data to WASM heap
   const data = new Uint8Array(fileBuffer);
   const buf = mod._malloc(data.length);
   mod.HEAPU8.set(data, buf);
 
-  // Load the SID file:
   // emu_load_file(filename, buf, len, sampleRate, procBufSize, scopeEnabled, basicBuf, charBuf, kernalBuf, enableMd5)
   // ROMs: decode from base64 globals if available
   let basicBuf = 0, charBuf = 0, kernalBuf = 0;
@@ -1003,9 +1070,7 @@ async function renderWithSID(
   const procBufSize = 8192; // processing buffer size (samples per compute call)
   const ret = mod.ccall('emu_load_file', 'number',
     ['string', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-    // scopeEnabled = 1: WebSID records each voice's output as a trace stream
-    // beside the audio buffer (the DeepSID scopes' source).
-    [filename, buf, data.length, sampleRate, procBufSize, 1, basicBuf, charBuf, kernalBuf, 0]);
+    [filename, buf, data.length, sampleRate, procBufSize, scopeEnabled ? 1 : 0, basicBuf, charBuf, kernalBuf, 0]);
 
   mod._free(buf);
   if (kernalBuf) mod._free(kernalBuf);
@@ -1020,6 +1085,46 @@ async function renderWithSID(
   if (subsong >= 0) {
     mod.ccall('emu_set_subsong', 'number', ['number'], [subsong]);
   }
+}
+
+/**
+ * One SID voice's stem: reload, silence the first chip's other voices
+ * (emu_enable_voice, as renderSidVoices does) and render `frames` frames.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderSidSoloPass(mod: any, fileBuffer: ArrayBuffer, filename: string, subsong: number, sampleRate: number, voice: number, frames: number): Int16Array {
+  loadSidFile(mod, fileBuffer, filename, subsong, sampleRate, false);
+  for (let v = 0; v < 3; v++) mod.ccall('emu_enable_voice', 'number', ['number', 'number', 'number'], [0, v, v === voice ? 1 : 0]);
+  const stem = new ChannelStemsBuilder(1);
+  let done = 0;
+  while (done < frames) {
+    const ended = mod._emu_compute_audio_samples();
+    const p = mod._emu_get_audio_buffer() >> 1;
+    const num = mod._emu_get_audio_buffer_length();
+    if (num > 0) {
+      const heap16 = mod.HEAP16 as Int16Array;
+      const n = Math.min(num, frames - done);
+      stem.push(n, (_c, i) => heap16[p + i * 2] / 32768, (_c, i) => heap16[p + i * 2 + 1] / 32768);
+      done += n;
+    }
+    if (ended) break;
+  }
+  mod._emu_teardown();
+  return stem.finish(frames)[0];
+}
+
+async function renderWithSID(
+  fileBuffer: ArrayBuffer,
+  filename: string,
+  subsong: number,
+  id: string,
+  withStems = true,
+): Promise<RenderResult> {
+  await initSID();
+  const mod = sidModule;
+  const sampleRate = 44100;
+  const t0 = Date.now();
+  loadSidFile(mod, fileBuffer, filename, subsong, sampleRate, true);
 
   postProgress(id, 10);
 
@@ -1111,7 +1216,20 @@ async function renderWithSID(
 
   postProgress(id, 85);
   console.log(`[DJRenderWorker/WebSID] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames, songEnded: ${songEnded}`);
-  return { left, right, sampleRate, channelScopes: scopes?.finish() };
+  const track = scopes?.finish();
+  if (track && withStems) {
+    // Each voice's stem: a solo pass per voice of the first chip (the mix
+    // pass's instance is torn down, so each pass reloads).
+    const t1 = Date.now();
+    track.stems = [];
+    for (let v = 0; v < Math.min(3, track.channels.length); v++) {
+      track.stems.push(track.scales[v] > 0
+        ? renderSidSoloPass(mod, fileBuffer, filename, subsong, sampleRate, v, totalFrames)
+        : new Int16Array(0));
+    }
+    console.log(`[DJRenderWorker/WebSID] stems: mix pass ${t1 - t0} ms, solo passes ${Date.now() - t1} ms`);
+  }
+  return { left, right, sampleRate, channelScopes: track };
 }
 
 /**
@@ -1241,6 +1359,7 @@ async function renderWithLibopenmpt(
   filename: string,
   id: string,
   maxSeconds = 600,
+  withStems = true,
 ): Promise<RenderResult> {
   await initLibopenmpt();
   const lib = openmptLib;
@@ -1286,8 +1405,12 @@ async function renderWithLibopenmpt(
   // Each channel's own signal: one solo instance per channel, the way the
   // libopenmpt worklet feeds its scopes (chiptune3.worklet.js createOscInstance_),
   // rendered in lockstep with the main module.
-  const solos = createLibopenmptSolos(lib, fileBytes, ext, CHUNK);
-  const scopes = solos.length > 0 ? new ChannelScopeTrackBuilder(solos.length, sampleRate) : null;
+  // The solos are each channel's stem too (stereo, the whole output chain): one per channel the
+  // module has, up to DECK_STEM_CHANNELS; the scopes show the first DECK_SCOPE_CHANNELS.
+  const solos = createLibopenmptSolos(lib, fileBytes, ext, CHUNK, withStems ? DECK_STEM_CHANNELS : DECK_SCOPE_CHANNELS);
+  const scopeChannels = Math.min(solos.length, DECK_SCOPE_CHANNELS);
+  const scopes = scopeChannels > 0 ? new ChannelScopeTrackBuilder(scopeChannels, sampleRate) : null;
+  const stems = withStems && solos.length > 0 ? new ChannelStemsBuilder(solos.length) : null;
 
   const chunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
@@ -1311,6 +1434,9 @@ async function renderWithLibopenmpt(
       scopes.push(rendered, (ch, i) => (i < counts[ch]
         ? (heap[(solos[ch].leftPtr >> 2) + i] + heap[(solos[ch].rightPtr >> 2) + i]) * 0.5
         : 0));
+      stems?.push(rendered,
+        (ch, i) => (i < counts[ch] ? heap[(solos[ch].leftPtr >> 2) + i] : 0),
+        (ch, i) => (i < counts[ch] ? heap[(solos[ch].rightPtr >> 2) + i] : 0));
     }
 
     if (totalFrames % (sampleRate * 5) < CHUNK) {
@@ -1343,7 +1469,9 @@ async function renderWithLibopenmpt(
   }
 
   postProgress(id, 85);
-  return { left, right, sampleRate, channelScopes: scopes?.finish() };
+  const track = scopes?.finish();
+  if (track && stems) track.stems = stems.finish(totalFrames);
+  return { left, right, sampleRate, channelScopes: track };
 }
 
 interface LibopenmptSolo { extPtr: number; modulePtr: number; leftPtr: number; rightPtr: number }
@@ -1354,11 +1482,11 @@ interface LibopenmptSolo { extPtr: number; modulePtr: number; leftPtr: number; r
  * the main render. Empty when the build has no ext API.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function createLibopenmptSolos(lib: any, fileBytes: Uint8Array, ext: string, chunk: number): LibopenmptSolo[] {
+function createLibopenmptSolos(lib: any, fileBytes: Uint8Array, ext: string, chunk: number, maxChannels: number): LibopenmptSolo[] {
   if (!lib._openmpt_module_ext_create_from_memory || !lib._openmpt_module_ext_get_interface || !lib.wasmTable) return [];
   const solos: LibopenmptSolo[] = [];
   let numChannels = 0;
-  for (let ch = 0; ch < DECK_SCOPE_CHANNELS; ch++) {
+  for (let ch = 0; ch < maxChannels; ch++) {
     if (numChannels > 0 && ch >= numChannels) break;
     const filePtr = lib._malloc(fileBytes.length);
     lib.HEAPU8.set(fileBytes, filePtr);
@@ -1409,7 +1537,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
 
     case 'render': {
-      const { id, fileBuffer, filename, subsong = 0, companions, maxSeconds } = msg;
+      const { id, fileBuffer, filename, subsong = 0, companions, maxSeconds, stems = true } = msg;
       try {
         let result: RenderResult;
 
@@ -1424,9 +1552,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         // 8. Everything else (libopenmpt fallback)
 
         if (isC64SID(fileBuffer)) {
-          result = await renderWithSID(fileBuffer, filename, subsong, id);
+          result = await renderWithSID(fileBuffer, filename, subsong, id, stems);
         } else if (isHivelyFormat(filename)) {
-          result = await renderWithHively(fileBuffer, filename, subsong, id);
+          result = await renderWithHively(fileBuffer, filename, subsong, id, stems);
         } else if (isAdLibFormat(filename)) {
           // TODO: Implement renderWithAdPlug()
           throw new Error('AdLib/OPL formats not yet supported in DJ renderer (use main tracker)');
@@ -1440,9 +1568,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           // TODO: Implement synthesizer renderers (SunVox, V2, WaveSabre, etc.)
           throw new Error('Synthesizer formats not yet supported in DJ renderer (use main tracker)');
         } else if (isAmigaFormat(filename)) {
-          result = await renderWithUADE(fileBuffer, filename, subsong, id, companions, maxSeconds);
+          result = await renderWithUADE(fileBuffer, filename, subsong, id, companions, maxSeconds, stems);
         } else {
-          result = await renderWithLibopenmpt(fileBuffer, filename, id, maxSeconds);
+          result = await renderWithLibopenmpt(fileBuffer, filename, id, maxSeconds, stems);
         }
 
         const duration = result.left.length / result.sampleRate;

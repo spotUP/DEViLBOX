@@ -29,6 +29,78 @@ export interface ChannelScopeTrack {
   channels: Int8Array[];
   /** Peak of each channel over the whole render (0 = silent channel). */
   scales: number[];
+  /**
+   * Each channel's contribution to the rendered mix, rendered through the engine's whole output
+   * chain (solo instance, split render or a solo pass), stereo interleaved int16 at the render
+   * rate, encoded like the WAV. One per channel the module has, up to DECK_STEM_CHANNELS; an empty
+   * array is a channel that never sounds. The deck subtracts a muted channel's stem from the mix
+   * (DeckChannelMute) - the per-channel mute of a rendered deck.
+   */
+  stems?: Int16Array[];
+}
+
+/** Most channels a deck can mute: the deck buttons show CH1-4, the pads Mute Ch 1-8. */
+export const DECK_STEM_CHANNELS = 8;
+
+/** One sample encoded the way the rendered WAV encodes it (DJPipeline encodeWAV), so stem and mix decode alike. */
+function encodeSample(v: number): number {
+  const s = v > 1 ? 1 : v < -1 ? -1 : v;
+  return s < 0 ? Math.trunc(s * 0x8000) : Math.trunc(s * 0x7FFF);
+}
+
+/**
+ * Collects stems: push every rendered frame of every channel in render order (L and R), then
+ * finish with the mix's frame count.
+ */
+export class ChannelStemsBuilder {
+  private static readonly BLOCK = 1 << 16; // frames per block
+  private readonly blocks: Int16Array[][];
+  private readonly sounds: boolean[];
+  private fill = 0;
+  private frames = 0;
+  readonly numChannels: number;
+
+  constructor(numChannels: number) {
+    this.numChannels = numChannels;
+    this.blocks = Array.from({ length: numChannels }, () => [new Int16Array(ChannelStemsBuilder.BLOCK * 2)]);
+    this.sounds = new Array<boolean>(numChannels).fill(false);
+  }
+
+  push(n: number, readL: (ch: number, i: number) => number, readR: (ch: number, i: number) => number): void {
+    const BLOCK = ChannelStemsBuilder.BLOCK;
+    for (let i = 0; i < n; i++) {
+      if (this.fill === BLOCK) {
+        for (const list of this.blocks) list.push(new Int16Array(BLOCK * 2));
+        this.fill = 0;
+      }
+      const o = this.fill * 2;
+      for (let ch = 0; ch < this.numChannels; ch++) {
+        const block = this.blocks[ch][this.blocks[ch].length - 1];
+        const l = encodeSample(readL(ch, i));
+        const r = encodeSample(readR(ch, i));
+        block[o] = l;
+        block[o + 1] = r;
+        if (l !== 0 || r !== 0) this.sounds[ch] = true;
+      }
+      this.fill++;
+      this.frames++;
+    }
+  }
+
+  /** The stems, each exactly `totalFrames` long (cut or zero-padded to the mix). */
+  finish(totalFrames: number): Int16Array[] {
+    const BLOCK = ChannelStemsBuilder.BLOCK;
+    const take = Math.min(this.frames, totalFrames);
+    return this.blocks.map((list, ch) => {
+      if (!this.sounds[ch]) return new Int16Array(0);
+      const flat = new Int16Array(totalFrames * 2);
+      for (let b = 0, off = 0; b < list.length && off < take; b++, off += BLOCK) {
+        const n = Math.min(BLOCK, take - off);
+        flat.set(list[b].subarray(0, n * 2), off * 2);
+      }
+      return flat;
+    });
+  }
 }
 
 /**
@@ -130,7 +202,8 @@ export function channelScopeWindow(track: ChannelScopeTrack, positionSec: number
 
 /** The ArrayBuffers a track holds, for postMessage transfer lists. */
 export function channelScopeTransferables(track: ChannelScopeTrack | undefined): ArrayBuffer[] {
-  return track ? track.channels.map((c) => c.buffer as ArrayBuffer) : [];
+  if (!track) return [];
+  return [...track.channels, ...(track.stems ?? [])].map((c) => c.buffer as ArrayBuffer).filter((b) => b.byteLength > 0);
 }
 
 // The scope track of each rendered WAV, keyed by the WAV bytes the deck loads.
@@ -158,10 +231,11 @@ export function showsAllScope(channelScopeCount: number): boolean {
 /**
  * Cache entries written by a render that knew about scope tracks carry this
  * version (CachedAudio.scopeRenderVersion), whether or not the engine had a
- * per-channel tap. An entry without it was rendered before e193fc143 and is
- * re-rendered once, in the background, for its scope track.
+ * per-channel tap. An entry with an older one (before e193fc143: no track;
+ * version 1: scopes but no stems) is re-rendered once, in the background, for
+ * its track.
  */
-export const CHANNEL_SCOPE_RENDER_VERSION = 1;
+export const CHANNEL_SCOPE_RENDER_VERSION = 2; // 2: the track carries the channel stems (SCOPE-MUTE)
 
 /** What a re-render for scopes needs from a cache entry. */
 export interface ScopelessOrigin {
@@ -177,7 +251,6 @@ export function needsChannelScopeRerender(entry: {
 }): boolean {
   return !!entry.audioData && entry.audioData.byteLength > 0
     && !!entry.sourceData && entry.sourceData.byteLength > 0
-    && !entry.channelScopes
     && (entry.scopeRenderVersion ?? 0) < CHANNEL_SCOPE_RENDER_VERSION;
 }
 

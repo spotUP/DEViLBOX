@@ -8,7 +8,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { setDeckChannelMuteMask, setDeckRepitchLock } from '@/engine/dj/DJActions';
+import { setDeckRepitchLock } from '@/engine/dj/DJActions';
 import { openDeckTrack } from '@/lib/song/openSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
@@ -57,16 +57,6 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     const unsubscribe = useDJStore.subscribe(
       (state) => state.decks[deckId].repitchLock,
       (next) => { setDeckRepitchLock(deckId, next); },
-    );
-    return unsubscribe;
-  }, [deckId]);
-
-  // Subscribe to channel mute mask changes and push to the deck's replayer.
-  // Each deck owns its own mask so Deck A and Deck B are fully independent.
-  useEffect(() => {
-    const unsubscribe = useDJStore.subscribe(
-      (state) => state.decks[deckId].channelMask,
-      (newMask) => { setDeckChannelMuteMask(deckId, newMask); },
     );
     return unsubscribe;
   }, [deckId]);

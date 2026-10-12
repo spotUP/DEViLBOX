@@ -18,7 +18,7 @@ import { useDJStore } from '../../stores/useDJStore';
 import { getDJEngine } from '../dj/DJEngine';
 import { filterSweep, filterReset, echoOut, instantEQKill, quantizedEQKill, cancelAllAutomation, getQuantizeMode, setQuantizeMode, type QuantizeMode } from '../dj/DJQuantizedFX';
 import { beatJump, triggerHotCue } from '../dj/DJBeatJump';
-import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, getDeckChannelMuteMask, setDeckSlipEnabled, setDeckKeyLock, setDeckEchoSend, setDeckEchoParams, setDeckReverbSend, setDeckFilter } from '../dj/DJActions';
+import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, getDeckChannelMuteMask, deckChannelMutable, setDeckSlipEnabled, setDeckKeyLock, setDeckEchoSend, setDeckEchoParams, setDeckReverbSend, setDeckFilter } from '../dj/DJActions';
 import { syncBPMToOther } from '../dj/DJAutoSync';
 import { SCRATCH_PATTERNS, type ScratchPattern } from '../dj/DJScratchEngine';
 import { getGesture, SCRATCH_GESTURES } from '../dj/scratch/scratchGestureCatalog';
@@ -1601,12 +1601,11 @@ function createXfaderCut(side: 'a' | 'b'): DjFxAction {
 
 // ─── Channel Mute Toggle Actions ──────────────────────────────────
 
-/* TrackerReplayer.setChannelMuteMask convention: bit N = 1 → channel N is
- * audible; bit N = 0 → channel N is muted. Read the mask straight from the
- * deck's replayer on every press — no local cache — so reloading a song
- * or switching decks never leaves stale mute bits for channels the new
- * content doesn't have. The replayer defaults to 0xFFFF (16 channels on)
- * on construction and is reset by loadSong for each new deck content. */
+/* Channel mask convention: bit N = 1 → channel N is audible; bit N = 0 →
+ * channel N is muted. The pad toggles the deck's one mask (useDJStore
+ * decks[id].channelMask, the same the deck buttons write; every deck load
+ * resets it to all audible). A channel the loaded song does not have, or a
+ * render without channel stems, leaves the pad without effect. */
 function createChannelMuteToggle(channel: number): DjFxAction {
   return {
     id: `fx_ch_mute_${channel}` as DjFxActionId,
@@ -1615,6 +1614,7 @@ function createChannelMuteToggle(channel: number): DjFxAction {
     mode: 'oneshot',
     engage() {
       const deckId = getActiveDeckId();
+      if (!deckChannelMutable(deckId, channel - 1)) return;
       const current = getDeckChannelMuteMask(deckId);
       const bit = 1 << (channel - 1);
       const newMask = (current ^ bit) >>> 0; // toggle bit, keep as uint32

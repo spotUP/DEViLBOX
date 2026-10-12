@@ -2,7 +2,7 @@
 date: 2026-10-12
 topic: DJ rendered-deck channel mute (SCOPE-MUTE)
 tags: [dj, deck, mute, render-worker, stems, memory]
-status: draft
+status: implemented
 ---
 
 # DJ rendered-deck channel mute (SCOPE-MUTE)
@@ -92,7 +92,7 @@ from the extra lockstep instances).
 N is capped at 4 (deck UI and keyboard expose CH1-4; DECK_SCOPE_CHANNELS); the
 FX pads offer Mute Ch 5-8, which would stay no-ops on rendered decks.
 
-## Decision needed from the owner
+## Decision needed from the owner (answered 2026-10-12, see Owner decisions)
 
 Recommended: **A with N = 4 stereo stems**, because it is the only design that
 is immediate, exact when unmuted, structurally sample-locked, and touches no
@@ -126,3 +126,47 @@ Questions:
 7. Reachability test: DeckChannelToggles click -> rendered deck with a 2-channel
    synthetic stem buffer -> OfflineAudioContext level of the muted channel = 0,
    other channel unchanged; sentinel on `DeckChannelMute.setMask`.
+
+## Owner decisions (2026-10-12)
+
+1. **Option A**: per-channel stems rendered in the same pass; the deck splitter
+   (DeckChannelMute) subtracts a muted channel on a 3 ms ramp.
+2. **One stem per channel the module actually has** (up to the 8 the mute
+   controls reach). Pads for channels the song does not have stay disabled on
+   rendered decks, so only songs with more channels pay for more stems.
+3. The pads' Mute Ch 1-8 (DjFxActions) go through the one store mute path.
+
+## As built
+
+- Worker (`src/workers/dj-render.worker.ts`): libopenmpt solo instances and
+  Hively split renders keep L/R as stems (up to 8 channels); UADE and SID get
+  one solo pass per sounding channel/voice on a fresh instance (mute mask /
+  emu_enable_voice), exactly the mix's frame count. Request flag `stems`
+  (default true).
+- Track (`channelScopeTrack.ts`): `ChannelScopeTrack.stems` (int16 stereo,
+  encoded like the WAV), so the stems ride every path the scopes ride (cache,
+  pipeline, deck, doubles, re-render). `CHANNEL_SCOPE_RENDER_VERSION` 2: older
+  cache entries re-render at low priority through DJChannelScopeRerender.
+- Deck: `DeckChannelMute` between DeckAudioPlayer and Key Lock;
+  `bufferWithStems` builds the 2+2N buffer from the WAV bytes at the render
+  rate (not the context-rate decode, which put the stems off the mix's
+  timeline). A late stem track swaps the buffer; a playing source picks it up
+  at its next start.
+- One mute path: `useDJStore decks[id].channelMask` (buttons, keys, pads,
+  panic) -> DeckEngine subscription -> replayer + DeckChannelMute. Every
+  deck load resets the mask to all audible. Panic used to write mask 0 (all
+  muted); it now writes all audible.
+- `deckChannelMutable`: a pad for a channel without a stem does nothing.
+
+## Measured (2026-10-12, node in-process worker, full-length renders)
+
+| Song | Engine | Length | Render mix -> with stems | Deck buffer | Cache (WAV + stems) | mix - sum(stems) |
+|---|---|---|---|---|---|---|
+| a sleep so deep.mod | UADE | 4.6 min | 4.8 s -> 19.9 s | 97 -> 486 MB | 49 + 194 MB | -65.5 dB |
+| aquarivs.bp | UADE | 4.2 min | 3.4 s -> 17.6 s | 88 -> 440 MB | 44 + 176 MB | -49.4 dB |
+| flo boarding - level 1.xm | libopenmpt | 2.2 min | 3.5 s total | 46 -> 232 MB | 23 + 93 MB | -75.4 dB |
+| aces_high.ahx | Hively | 4.7 min | 3.4 s total | 99 -> 495 MB | 50 + 198 MB | -71.6 dB |
+| hexplosion.hvl (16 ch, 8 stems) | Hively | 3.7 min | 10.8 s total | 79 -> 711 MB | 40 + 316 MB | n/a (ch 9-16 unstemmed) |
+
+The int16 stems also stay resident while the track object lives (the cache
+column's stem figure). SID stems are built but not measured.

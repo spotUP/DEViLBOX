@@ -129,6 +129,17 @@ export class DeckAudioPlayer {
     return this.adoptDecodedBuffer(audioBuffer, precomputedPeaks);
   }
 
+  /**
+   * Swap the loaded buffer for one with the same mix and length (the mix with
+   * its channel stems, DeckChannelMute). A playing source keeps the buffer it
+   * started with; the next start (play, seek, loop) plays the new one.
+   */
+  replaceBuffer(audioBuffer: AudioBuffer): void {
+    if (!this._loaded) return;
+    this.player.buffer = new Tone.ToneAudioBuffer(audioBuffer);
+    this._numberOfChannels = audioBuffer.numberOfChannels;
+  }
+
   /** A new load supersedes any in flight: release the previous track and keep the new file's bytes. */
   private beginLoad(originalBytes: ArrayBuffer | null): number {
     const version = ++this._loadVersion;

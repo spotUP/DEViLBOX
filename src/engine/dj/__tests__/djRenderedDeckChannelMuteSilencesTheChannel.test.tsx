@@ -1,0 +1,137 @@
+/**
+ * Reachability (SCOPE-MUTE): "muting channels does nothing in dj view" (owner,
+ * 2026-10-11 and 2026-10-12). A DJ deck plays the WAV the render worker
+ * pre-rendered; the deck's CH mute only reached the JS replayer, which makes
+ * no sound in the DJ view.
+ *
+ * Drives the real path: DJPipeline.loadOrEnqueue -> the real render worker
+ * (run in-process) rendering a ProTracker module through the real UADE WASM,
+ * mix and per-channel stems -> DeckEngine.loadAudioFile -> the deck's CH
+ * buttons (DeckChannelToggles) clicked -> useDJStore channelMask -> the
+ * deck's DeckChannelMute -> the deck output, rendered offline. Sentinel: the
+ * mute node took the mask with stems behind the mix.
+ */
+import 'fake-indexeddb/auto';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { render, cleanup, fireEvent } from '@testing-library/react';
+
+vi.mock('@/engine/ToneEngine', () => ({
+  getToneEngine: () => ({ setInstrumentOutputOverride: () => {}, preloadInstruments: async () => {}, ensureWASMSynthsReady: async () => {}, rerouteNativeEngine: () => {} }),
+}));
+
+import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch, audioLoadsSettled } from '@/test/audio/realWebAudio';
+
+const SONG = 'a sleep so deep.mod';
+const SR = 48000;
+const AT_SEC = 8;       // a stretch where all four Paula channels play
+const WINDOW_SEC = 1;
+
+afterEach(cleanup);
+
+/** The render worker in-process (as djChannelScopesShowNativeEngineChannels.test.ts runs it). */
+function installInProcessWorkers(): () => void {
+  type Handler = ((e: { data: unknown }) => void) | null;
+  const scope = globalThis.self as unknown as { onmessage: Handler; postMessage: (m: unknown) => void };
+  const originalPost = scope.postMessage;
+  let workerModule: Promise<unknown> | null = null;
+  class InProcessWorker {
+    onmessage: Handler = null;
+    onerror: Handler = null;
+    private readonly render: boolean;
+    constructor(url: URL | string) {
+      this.render = String(url).includes('dj-render');
+      if (this.render) {
+        scope.postMessage = (m: unknown) => this.onmessage?.({ data: m });
+        workerModule ??= import('@/workers/dj-render.worker');
+      }
+    }
+    postMessage(msg: { type: string; id?: string }) {
+      if (this.render) {
+        void workerModule!.then(() => scope.onmessage?.({ data: msg }));
+      } else if (msg.type !== 'init') {
+        setTimeout(() => this.onmessage?.({ data: { type: 'analysisError', id: msg.id, error: 'not under test' } }), 0);
+      }
+    }
+    terminate() {}
+  }
+  vi.stubGlobal('Worker', InProcessWorker);
+  vi.stubGlobal('importScripts', () => {});
+  const versions = Object.getOwnPropertyDescriptor(process, 'versions');
+  Object.defineProperty(process, 'versions', { value: {}, configurable: true });
+  return () => {
+    if (versions) Object.defineProperty(process, 'versions', versions);
+    scope.postMessage = originalPost; scope.onmessage = null; vi.unstubAllGlobals();
+  };
+}
+
+function rms(x: Float32Array, from = 0, to = x.length): number {
+  let s = 0;
+  for (let i = from; i < to; i++) s += x[i] * x[i];
+  return Math.sqrt(s / Math.max(1, to - from));
+}
+const db = (v: number): number => 20 * Math.log10(Math.max(v, 1e-12));
+
+describe('a rendered DJ deck mutes the channels its CH buttons mute', () => {
+  it('muting every channel silences the deck; muting CH1 removes exactly CH1', async () => {
+    installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch();
+    const Tone = await import('tone');
+    Tone.setContext(new OfflineAudioContext(2, SR, SR) as never);
+
+    const restoreWorkers = installInProcessWorkers();
+    const { getDJPipeline } = await import('../DJPipeline');
+    const bytes = readFileSync(join(process.cwd(), 'public/data/songs/formats', SONG));
+    const source = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const result = await getDJPipeline().loadOrEnqueue(source, SONG, undefined, 'high', undefined, 12);
+    restoreWorkers();
+
+    const { DeckEngine } = await import('../DeckEngine');
+    const { DeckChannelToggles } = await import('@/components/dj/DeckChannelToggles');
+    const { useDJStore } = await import('@/stores/useDJStore');
+
+    /** The deck output (left) over the window, with the given CH buttons clicked after the load. */
+    async function deckOutput(clickChannels: number[]): Promise<{ out: Float32Array; deck: InstanceType<typeof DeckEngine> }> {
+      const ctx = new OfflineAudioContext(2, Math.round(SR * WINDOW_SEC), SR);
+      Tone.setContext(ctx as never);
+      const out = new Tone.Gain(1);
+      out.connect(Tone.getDestination().input as never);
+      const deck = new DeckEngine({ id: 'A', outputNode: out });
+      deck.setFilterPosition(0);
+      for (const band of ['low', 'mid', 'high'] as const) deck.setEQ(band, 0, 0);
+      await audioLoadsSettled(400, 20000);
+      await deck.loadAudioFile(result.wavData, SONG);
+      useDJStore.getState().setChannelMode('A', 'mute');
+      const { getByTitle, unmount } = render(<DeckChannelToggles deckId="A" />);
+      for (const ch of clickChannels) fireEvent.click(getByTitle(`Channel ${ch + 1} (Shift+click to solo)`));
+      unmount();
+      deck.audioPlayer.seek(AT_SEC);
+      await deck.play();
+      const rendered = await ctx.startRendering();
+      const left = rendered.getChannelData(0).slice();
+      deck.dispose();
+      return { out: left, deck };
+    }
+
+    const from = Math.round(SR * 0.3); // past the start lookahead and de-click fade
+    const full = await deckOutput([]);
+    const all = await deckOutput([0, 1, 2, 3]);
+    const ch1 = await deckOutput([0]);
+
+    // Sentinel: the rendered deck carried four stems and the mute node took the clicks.
+    expect(all.deck.channelStemCount).toBe(4);
+    expect(all.deck.channelMute.stemMaskWrites).toBeGreaterThan(0);
+
+    const fullDb = db(rms(full.out, from));
+    const allDb = db(rms(all.out, from));
+    expect(fullDb, 'the unmuted deck plays').toBeGreaterThan(-40);
+    expect(allDb - fullDb, `all channels muted: ${allDb.toFixed(1)} dB vs ${fullDb.toFixed(1)} dB`).toBeLessThan(-40);
+
+    // CH1 muted = the unmuted output minus CH1 alone (CH1 soloed = everything else muted).
+    const solo1 = await deckOutput([1, 2, 3]);
+    const expected = full.out.map((v, i) => v - solo1.out[i]);
+    const diff = ch1.out.map((v, i) => v - expected[i]);
+    expect(db(rms(ch1.out, from)), 'muting CH1 changes the output').not.toBeCloseTo(fullDb, 1);
+    expect(db(rms(diff, from)) - fullDb, 'CH1 muted = mix minus CH1').toBeLessThan(-40);
+  }, 600_000);
+});

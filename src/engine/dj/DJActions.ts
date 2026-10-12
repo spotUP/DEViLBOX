@@ -779,7 +779,7 @@ export function djPanic(): void {
     setDeckEQKill(d, 'high', false);
     setDeckFilter(d, 0);
     clearDeckLineLoop(d);
-    setDeckChannelMuteMask(d, 0);
+    setDeckChannelMuteMask(d, 0xFFFF); // every channel audible (bit set = audible)
     setDeckSlipEnabled(d, false);
     setDeckPitch(d, 0);
     stopScratch(d, 50);
@@ -933,25 +933,27 @@ export function setDeckRepitchLock(deckId: DeckId, locked: boolean): void {
 // ============================================================================
 
 /**
- * Set the channel mute mask on a deck's replayer.
+ * Set a deck's channel mask (bit N = 1: channel N audible). The store's
+ * decks[id].channelMask is the one mute path: the deck buttons, keys and pads
+ * all write it, and DeckEngine applies it to the replayer and to the rendered
+ * audio's channel mute (DeckChannelMute).
  */
 export function setDeckChannelMuteMask(deckId: DeckId, mask: number): void {
-  try {
-    getDJEngine().getDeck(deckId).replayer.setChannelMuteMask(mask);
-  } catch { /* engine not ready */ }
+  useDJStore.getState().setDeckState(deckId, { channelMask: mask >>> 0 });
+}
+
+/** A deck's channel mask (bit N = 1: channel N audible). */
+export function getDeckChannelMuteMask(deckId: DeckId): number {
+  return useDJStore.getState().decks[deckId].channelMask >>> 0;
 }
 
 /**
- * Read the current channel mute mask from a deck's replayer. Bit N = 1
- * means channel N is audible. Returns 0xFFFFFFFF (all audible) if the
- * engine is not yet ready so callers default to the safe "all on" state.
+ * Whether a deck's channel `channel` (0-based) can be muted: the DJ deck plays
+ * rendered audio, so only the channels its render carries stems for. A channel
+ * the song does not have (or a render without stems) has none.
  */
-export function getDeckChannelMuteMask(deckId: DeckId): number {
-  try {
-    return getDJEngine().getDeck(deckId).replayer.getChannelMuteMask() >>> 0;
-  } catch {
-    return 0xFFFFFFFF;
-  }
+export function deckChannelMutable(deckId: DeckId, channel: number): boolean {
+  return channel >= 0 && channel < useDJStore.getState().decks[deckId].channelStemCount;
 }
 
 // ============================================================================

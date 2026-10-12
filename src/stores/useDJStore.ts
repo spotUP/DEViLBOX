@@ -174,6 +174,8 @@ export interface DeckState {
 
   /** Channels the deck has a per-channel scope signal for (channelScopeTrack.ts); 0 = none (an audio file, or a render without a per-channel tap). */
   channelScopeCount: number;
+  /** Channels of the loaded rendered audio a channel mute reaches (DeckChannelMute stems); 0 = none, the mute pads stay off. */
+  channelStemCount: number;
 
   // Stem separation
   stemsAvailable: boolean;          // stems loaded and ready for playback
@@ -282,6 +284,7 @@ const makeDefaultDeckState = (): DeckState => ({
   danceability: 0.5,
   trackAnalysis: null,
   channelScopeCount: 0,
+  channelStemCount: 0,
 
   // Stems
   stemsAvailable: false,
