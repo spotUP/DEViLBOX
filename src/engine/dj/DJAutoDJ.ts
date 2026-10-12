@@ -1542,6 +1542,8 @@ class DJAutoDJ {
       const summary = summarizeTrack(this.incomingAnalysis);
       const plId = useDJPlaylistStore.getState().activePlaylistId;
       if (plId) useDJPlaylistStore.getState().updateTrackMeta(plId, index, { ...playlistMetaFromSummary(summary), djSummary: summary });
+      // The set plan reads the rows as written: the next track's real length, not 0 s counted as 240 s.
+      controller.setTracks(this.sessionTracks());
       const outgoing = useDJStore.getState().decks[this.activeDeck].trackAnalysis;
       this.plan = controller.planTransitionFor(outgoing, this.incomingAnalysis, { outgoing: this.ab(this.activeDeck), incoming: this.ab(this.idleDeck) }, this.getOutgoingPosition(), this.juggleBudget());
     } catch (err) {
