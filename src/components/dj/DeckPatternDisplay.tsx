@@ -13,6 +13,7 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { getCachedSong } from '@/engine/dj/DJSongCache';
 import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanvas';
 import { DJOscilloscope } from '@/components/visualization/DJOscilloscope';
@@ -30,6 +31,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
   const fileName = useDJStore((s) => s.decks[deckId].fileName);
   const totalPositions = useDJStore((s) => s.decks[deckId].totalPositions);
   const activePatternName = useDJStore((s) => s.decks[deckId].activePatternName);
+  const songVersion = useDJStore((s) => s.decks[deckId].songVersion);
 
   // While the deck plays, the row is the one heard at each frame (the store
   // row is a 20 Hz sample, up to 50 ms late). Re-renders only on a row change.
@@ -100,7 +102,10 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
     try {
       const engine = getDJEngine();
       const deck = engine.getDeck(deckId);
-      const song = deck.replayer.getSong();
+      // The song the load parsed for this file (DJSongCache), from the moment
+      // the deck shows its name: the deck itself takes the song only after the
+      // render, and until then held nothing or the previous track's song.
+      const song = (fileName ? getCachedSong(fileName) : undefined) ?? deck.replayer.getSong();
       if (!song || !song.songPositions || song.songPositions.length === 0) {
         return { patternData: null, numChannels: 4, numRows: 64 };
       }
@@ -114,7 +119,9 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
     } catch {
       return { patternData: null, numChannels: 4, numRows: 64 };
     }
-  }, [deckId, songPos, fileName, totalPositions]);
+    // songVersion: the deck took a song (DeckEngine.loadSong) with no other
+    // store write the view would re-read on.
+  }, [deckId, songPos, fileName, totalPositions, songVersion]);
 
   // Compute visual row: during backward scratch, subtract offset from pattPos
   const visualRow = activePatternName && visualOffset > 0

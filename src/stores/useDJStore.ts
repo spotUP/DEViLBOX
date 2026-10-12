@@ -56,6 +56,8 @@ export interface DeckState {
   songPos: number;
   pattPos: number;
   totalPositions: number;
+  /** Bumped each time the deck's replayer takes a song (DeckEngine.loadSong): what reads the deck's song re-reads it. */
+  songVersion: number;
   elapsedMs: number;
 
   // Pitch / BPM
@@ -210,6 +212,7 @@ const makeDefaultDeckState = (): DeckState => ({
   songPos: 0,
   pattPos: 0,
   totalPositions: 0,
+  songVersion: 0,
   elapsedMs: 0,
   pitchOffset: 0,
   effectiveBPM: 125,
