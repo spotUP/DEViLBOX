@@ -4,8 +4,13 @@
  * Stores rendered audio buffers (encoded as WAV) keyed by file content hash.
  * Persistent across sessions, evicts oldest entries when storage limit reached.
  *
- * Cache key = SHA-256 hash of file content (handles renamed files, identical content).
+ * Cache key = SHA-256 hash of file content (handles renamed files, identical content),
+ * plus what SID Settings forces on a SID's render (renderCacheKey): a forced
+ * chip model or clock sounds different, so it is a different render.
  */
+
+import { isSidFileBytes, sidForcedPlayback, type SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 const DB_NAME = 'DEViLBOX_AudioCache';
 const DB_VERSION = 2;
@@ -102,7 +107,7 @@ export interface CacheReadOptions {
  */
 function asRead<T extends CachedAudio | null | undefined>(entry: T, opts: CacheReadOptions = {}): T {
   if (!entry || !entry.audioData || entry.audioData.byteLength === 0) return withChannelScopes(entry);
-  if (!lacksPlayerClock(entry) && (opts.allowPreview || !isPreviewRender(entry))) {
+  if (!lacksPlayerClock(entry) && rendersUnderCurrentSettings(entry) && (opts.allowPreview || !isPreviewRender(entry))) {
     return withChannelScopes(entry);
   }
   return {
@@ -130,9 +135,8 @@ function withChannelScopes<T extends CachedAudio | null | undefined>(entry: T): 
  * to the audio detector, so a reader renders it again (once) instead of using the audio.
  */
 export function lacksPlayerClock(entry: Pick<CachedAudio, 'sourceData' | 'playerCallHz'>): boolean {
-  if (entry.playerCallHz !== undefined || !entry.sourceData || entry.sourceData.byteLength < 4) return false;
-  const m = new Uint8Array(entry.sourceData, 0, 4);
-  return (m[0] === 0x50 || m[0] === 0x52) && m[1] === 0x53 && m[2] === 0x49 && m[3] === 0x44; // PSID / RSID
+  if (entry.playerCallHz !== undefined || !entry.sourceData) return false;
+  return isSidFileBytes(entry.sourceData);
 }
 
 /** Beat grid data — compatible with Serato beat markers */
@@ -194,11 +198,50 @@ export async function hashFile(buffer: ArrayBuffer): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Get cached audio by file hash */
+/**
+ * What SID Settings forces on a render of `source` (a forced chip model or
+ * clock); {} = the header decides, and always {} for a file that is no SID.
+ */
+export function sidRenderOverrides(source: ArrayBuffer | undefined): SidForcedPlayback {
+  if (!source || !isSidFileBytes(source)) return {};
+  const s = useSettingsStore.getState();
+  return sidForcedPlayback({ chipModel: s.sidChipModel, clock: s.sidClockSpeed });
+}
+
+/** The part of a cache key that names the forced SID playback ('' = the header's). */
+export function renderKeySuffix(sid: SidForcedPlayback): string {
+  if (!sid.chipModel && !sid.clock) return '';
+  return `#sid=${sid.chipModel ?? '-'}/${sid.clock ?? '-'}`;
+}
+
+/** The forced SID playback a cache key was rendered with (renderKeySuffix read back). */
+export function sidOverridesOfKey(key: string): SidForcedPlayback {
+  const m = /#sid=([^/]+)\/(.+)$/.exec(key);
+  if (!m) return {};
+  const out: SidForcedPlayback = {};
+  if (m[1] === '6581' || m[1] === '8580') out.chipModel = m[1];
+  if (m[2] === 'PAL' || m[2] === 'NTSC') out.clock = m[2];
+  return out;
+}
+
+/**
+ * The cache key of a render of `source`: its content hash, plus the SID
+ * Settings forced on it (the current settings unless the render's own are given).
+ */
+export async function renderCacheKey(source: ArrayBuffer, sid: SidForcedPlayback = sidRenderOverrides(source)): Promise<string> {
+  return (await hashFile(source)) + renderKeySuffix(sid);
+}
+
+/** Whether an entry's audio is what a render of its source gives under the current SID Settings. */
+function rendersUnderCurrentSettings(entry: Pick<CachedAudio, 'hash' | 'sourceData'>): boolean {
+  return entry.hash.slice(64) === renderKeySuffix(sidRenderOverrides(entry.sourceData));
+}
+
+/** Get cached audio by file hash (the render key under the current settings) */
 export async function getCachedAudio(fileBuffer: ArrayBuffer, opts: CacheReadOptions = {}): Promise<CachedAudio | null> {
   try {
     const database = await initDB();
-    const hash = await hashFile(fileBuffer);
+    const hash = await renderCacheKey(fileBuffer);
 
     return new Promise((resolve, reject) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
@@ -227,7 +270,7 @@ export async function getCachedAudio(fileBuffer: ArrayBuffer, opts: CacheReadOpt
 export async function isCached(fileBuffer: ArrayBuffer): Promise<boolean> {
   try {
     const database = await initDB();
-    const hash = await hashFile(fileBuffer);
+    const hash = await renderCacheKey(fileBuffer);
 
     return new Promise((resolve) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
@@ -290,10 +333,12 @@ export async function cacheAudio(
   channelScopes?: ChannelScopeTrack,
   renderCapSec: number | null = null,
   playerCallHz?: number,
+  /** The SID Settings the audio was rendered with ({} = the header's); default: the current ones. */
+  sid: SidForcedPlayback = sidRenderOverrides(sourceFile),
 ): Promise<void> {
   try {
     const database = await initDB();
-    const hash = await hashFile(sourceFile);
+    const hash = await renderCacheKey(sourceFile, sid);
     // Check if a stub entry exists (from cacheSourceFile) — preserve its sourceData
     let existingSource: ArrayBuffer | undefined;
     try {
@@ -526,10 +571,12 @@ export async function updateCacheAnalysis(
     energy?: number;
     danceability?: number;
   },
+  /** The SID Settings the analysed audio was rendered with; default: the current ones. */
+  sid: SidForcedPlayback = sidRenderOverrides(fileBuffer),
 ): Promise<void> {
   try {
     const database = await initDB();
-    const hash = await hashFile(fileBuffer);
+    const hash = await renderCacheKey(fileBuffer, sid);
 
     return new Promise((resolve, reject) => {
       const tx = database.transaction(STORE_NAME, 'readwrite');
@@ -638,7 +685,7 @@ export async function listScopelessEntries(): Promise<Array<{ hash: string; file
 export async function cacheSourceFile(fileBuffer: ArrayBuffer, filename: string): Promise<void> {
   try {
     const database = await initDB();
-    const hash = await hashFile(fileBuffer);
+    const hash = await renderCacheKey(fileBuffer);
 
     const tx = database.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
@@ -685,7 +732,7 @@ export async function cacheSourceFile(fileBuffer: ArrayBuffer, filename: string)
 export async function getSourceFile(fileBuffer: ArrayBuffer): Promise<ArrayBuffer | null> {
   try {
     const database = await initDB();
-    const hash = await hashFile(fileBuffer);
+    const hash = await renderCacheKey(fileBuffer);
 
     return new Promise((resolve) => {
       const tx = database.transaction(STORE_NAME, 'readonly');
@@ -796,10 +843,12 @@ export async function getCachedAudioByFilename(filename: string, opts: CacheRead
         const index = store.index('filename');
         const request = index.getAll(filename);
         request.onsuccess = () => {
-          const entries = request.result as CachedAudio[];
-          const match = entries.find(e =>
+          const entries = (request.result as CachedAudio[]).filter(e =>
             e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0)
           );
+          // A SID can have one render per forced chip model / clock: the one the current SID Settings
+          // give first (asRead leaves any other's audio out, so the reader renders it).
+          const match = entries.find(e => e.audioData.byteLength > 0 && rendersUnderCurrentSettings(e)) ?? entries[0];
           if (match) void touchCacheEntry(match.hash);
           resolve(match ?? null);
         };
@@ -833,7 +882,7 @@ export async function getCachedAudioByFilename(filename: string, opts: CacheRead
 export async function evictCachedAudio(fileBuffer: ArrayBuffer): Promise<void> {
   try {
     const database = await initDB();
-    const hash = await hashFile(fileBuffer);
+    const hash = await renderCacheKey(fileBuffer);
 
     return new Promise((resolve, reject) => {
       const tx = database.transaction(STORE_NAME, 'readwrite');

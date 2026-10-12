@@ -16,7 +16,8 @@
  * @module DJPipeline
  */
 
-import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile, setCacheChannelScopes } from './DJAudioCache';
+import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile, setCacheChannelScopes, renderCacheKey, sidRenderOverrides } from './DJAudioCache';
+import type { SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
 import type { CachedAudio } from './DJAudioCache';
 import { lookupServerAnalysis, storeServerAnalysis } from '@/lib/analysisCache';
 import { useDJStore, type DeckState } from '@/stores/useDJStore';
@@ -111,6 +112,11 @@ export interface PipelineTask {
    * different length cannot line up with it and is discarded.
    */
   scopesOnly?: { expectedDuration: number };
+  /**
+   * A SID: the chip model / clock SID Settings force on this render ({} = the header's), taken when
+   * the task is queued - the render, its cache entry and its analysis all carry the same one.
+   */
+  sid?: SidForcedPlayback;
 }
 
 interface QueueEntry {
@@ -473,6 +479,7 @@ export class DJPipeline {
    * Returns a promise that resolves when the full pipeline completes.
    */
   enqueue(task: PipelineTask): Promise<PipelineResult> {
+    task.sid ??= sidRenderOverrides(task.fileBuffer);
     return new Promise((resolve, reject) => {
       const entry: QueueEntry = { task, resolve, reject };
 
@@ -533,10 +540,12 @@ export class DJPipeline {
     filename: string,
     expectedDuration: number,
     companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
+    /** The SID Settings the cached audio was rendered with (DJAudioCache.sidOverridesOfKey of its key). */
+    sid?: SidForcedPlayback,
   ): Promise<ChannelScopeTrack | undefined> {
     const id = `scopes-${filename}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const result = await this.enqueue({
-      id, fileBuffer: source, filename, priority: 'low', companions, scopesOnly: { expectedDuration },
+      id, fileBuffer: source, filename, priority: 'low', companions, scopesOnly: { expectedDuration }, sid,
     });
     return result.channelScopes;
   }
@@ -732,7 +741,8 @@ export class DJPipeline {
 
     // No local audio cache at all — check server for analysis before full render
     // (analysis will be applied after render completes)
-    const hash = await hashFile(fileBuffer);
+    // One render per source and SID Settings: a forced chip model / clock is another render.
+    const hash = await renderCacheKey(fileBuffer);
     // A preview request may ride a whole-song render in flight; a whole-song request never rides a preview.
     const existing = this.inflight.get(hash) ?? (preview ? this.inflight.get(`${hash}:preview`) : undefined);
     if (existing) {
@@ -1037,6 +1047,7 @@ export class DJPipeline {
         // A render that ran into its cap is a preview, not the song (isPreviewRender).
         task.maxRenderSeconds !== undefined && duration >= task.maxRenderSeconds - 0.5 ? task.maxRenderSeconds : null,
         playerCallHz,
+        task.sid,
       );
 
       console.log(
@@ -1085,11 +1096,12 @@ export class DJPipeline {
           mood: analysis.genre.mood,
           energy: analysis.genre.energy,
           danceability: analysis.genre.danceability,
-        });
+        }, task.sid);
 
-        // Store to server cache (fire-and-forget) for other users
+        // Store to server cache (fire-and-forget) for other users - the header's playback only:
+        // the server keys on the file alone, and a forced clock moves every beat.
         const taskHash = await hashFile(task.fileBuffer);
-        storeServerAnalysis({
+        if (!task.sid?.chipModel && !task.sid?.clock) storeServerAnalysis({
           hash: taskHash,
           bpm: analysis.bpm,
           bpmConfidence: analysis.bpmConfidence,
@@ -1199,7 +1211,7 @@ export class DJPipeline {
    * cannot render is not retried on every load.
    */
   private async executeScopesOnly(task: PipelineTask, expectedDuration: number): Promise<PipelineResult> {
-    const hash = await hashFile(task.fileBuffer);
+    const hash = await renderCacheKey(task.fileBuffer, task.sid);
     let track: ChannelScopeTrack | undefined;
     try {
       const out = await this.doRender(task);
@@ -1249,6 +1261,7 @@ export class DJPipeline {
             subsong: task.subsong,
             companions,
             maxSeconds: task.maxRenderSeconds,
+            sid: task.sid,
           },
           transferables,
         );

@@ -131,3 +131,52 @@ export function sidPlaybackModel(info: Pick<SIDHeaderInfo, 'chipModel'> | null |
   if (setting !== 'auto') return setting;
   return info?.chipModel === '8580' ? '8580' : '6581';
 }
+
+/** The SID Settings clock choice: the header's, or a PAL / NTSC the user forces. */
+export type SidClockSetting = 'auto' | 'PAL' | 'NTSC';
+
+/**
+ * The machine a SID emulator runs the tune on: the user's forced clock (SID
+ * Settings), else the header's, PAL when the header does not say (or says both).
+ */
+export function sidPlaybackClock(info: Pick<SIDHeaderInfo, 'clockSpeed'> | null | undefined, setting: SidClockSetting = 'auto'): 'PAL' | 'NTSC' {
+  if (setting !== 'auto') return setting;
+  return info?.clockSpeed === 'NTSC' ? 'NTSC' : 'PAL';
+}
+
+/** The SID Settings audio buffer: each engine's own size ('auto'), or a ScriptProcessor size in frames. */
+export type SidBufferSizeSetting = 'auto' | 1024 | 2048 | 4096 | 8192 | 16384;
+
+/** The ScriptProcessor buffer an engine plays through: the forced size, else the engine's own. */
+export function sidBufferFrames(setting: SidBufferSizeSetting | undefined, engineDefault: number): number {
+  return setting === undefined || setting === 'auto' ? engineDefault : setting;
+}
+
+/** What SID Settings forces on every tune, over its header (an undefined field = the header decides). */
+export interface SidForcedPlayback {
+  chipModel?: '6581' | '8580';
+  clock?: 'PAL' | 'NTSC';
+}
+
+/**
+ * The SID Settings that override a tune's header: a forced model or clock.
+ * Applied whenever the setting is not 'auto', even when it names what the
+ * header says: the emulators read some header codes their own way (WebSID
+ * plays a "PAL and NTSC" tune as NTSC), so "same as the header" is the
+ * emulator's call, not this one's.
+ */
+export function sidForcedPlayback(settings: { chipModel?: SidChipModelSetting; clock?: SidClockSetting }): SidForcedPlayback {
+  const out: SidForcedPlayback = {};
+  if (settings.chipModel && settings.chipModel !== 'auto') out.chipModel = settings.chipModel;
+  if (settings.clock && settings.clock !== 'auto') out.clock = settings.clock;
+  return out;
+}
+
+/**
+ * A C64 SID file (PSID / RSID magic at offset 0). The extension alone is no
+ * proof: .sid is also SIDMon on the Amiga.
+ */
+export function isSidFileBytes(data: ArrayBuffer | Uint8Array): boolean {
+  const b = data instanceof Uint8Array ? data : new Uint8Array(data, 0, Math.min(4, data.byteLength));
+  return b.length >= 4 && (b[0] === 0x50 || b[0] === 0x52) && b[1] === 0x53 && b[2] === 0x49 && b[3] === 0x44;
+}

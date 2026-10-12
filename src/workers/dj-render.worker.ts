@@ -26,6 +26,7 @@ import {
   type ChannelScopeTrack,
 } from '@/engine/dj/channelScopeTrack';
 import { steadyPlayerCallHz, type PlayerCallSample } from '@/engine/dj/sidPlayerClock';
+import { isSidFileBytes, type SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,8 @@ interface RenderRequest {
    * is passed to uade_wasm_add_extra_file() as-is.
    */
   companions?: Array<{ filename: string; buffer: ArrayBuffer }>;
+  /** A SID: the chip model / clock SID Settings forces over the header (DJPipeline keys the cache on it). */
+  sid?: SidForcedPlayback;
 }
 
 interface InitRequest {
@@ -258,15 +261,7 @@ const AMIGA_PREFIXES = new Set([
  *  .sid extension is ambiguous: could be SIDMon (Amiga) or C64 PSID/RSID.
  *  C64 SID files have 'PSID' or 'RSID' at bytes 0-3. */
 function isC64SID(fileBuffer: ArrayBuffer): boolean {
-  if (fileBuffer.byteLength < 4) return false;
-  const magic = new Uint8Array(fileBuffer, 0, 4);
-  // PSID = 0x50 0x53 0x49 0x44, RSID = 0x52 0x53 0x49 0x44
-  return (
-    (magic[0] === 0x50 || magic[0] === 0x52) && // P or R
-    magic[1] === 0x53 && // S
-    magic[2] === 0x49 && // I
-    magic[3] === 0x44    // D
-  );
+  return isSidFileBytes(fileBuffer);
 }
 
 /** Check if a filename should use UADE (Amiga formats) vs libopenmpt (PC formats) */
@@ -1042,7 +1037,7 @@ async function initSID(): Promise<void> {
  * the audio buffer (the DeepSID scopes' source).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function loadSidFile(mod: any, fileBuffer: ArrayBuffer, filename: string, subsong: number, sampleRate: number, scopeEnabled: boolean): void {
+function loadSidFile(mod: any, fileBuffer: ArrayBuffer, filename: string, subsong: number, sampleRate: number, scopeEnabled: boolean, forced: SidForcedPlayback = {}): void {
   // Copy SID file data to WASM heap
   const data = new Uint8Array(fileBuffer);
   const buf = mod._malloc(data.length);
@@ -1086,10 +1081,16 @@ function loadSidFile(mod: any, fileBuffer: ArrayBuffer, filename: string, subson
     throw new Error(`WebSID failed to load ${filename} (code ${ret})`);
   }
 
+  // A forced clock before the track starts: the start (emu_set_subsong) sets CIA / VIC / SID up on it.
+  if (forced.clock) mod.ccall('emu_set_ntsc', null, ['number'], [forced.clock === 'NTSC' ? 1 : 0]);
+
   // Set subsong
   if (subsong >= 0) {
     mod.ccall('emu_set_subsong', 'number', ['number'], [subsong]);
   }
+
+  // A forced model after the track start, as the live WebSID engine applies it (ScriptNodePlayerEngine.setChipModel).
+  if (forced.chipModel) mod.ccall('emu_set_6581', 'number', ['number'], [forced.chipModel === '6581' ? 1 : 0]);
 }
 
 /**
@@ -1108,12 +1109,13 @@ async function renderWithSID(
   id: string,
   withStems = true,
   maxSeconds?: number,
+  forced: SidForcedPlayback = {},
 ): Promise<RenderResult> {
   await initSID();
   const mod = sidModule;
   const sampleRate = 44100;
   const t0 = Date.now();
-  loadSidFile(mod, fileBuffer, filename, subsong, sampleRate, true);
+  loadSidFile(mod, fileBuffer, filename, subsong, sampleRate, true, forced);
 
   postProgress(id, 10);
 
@@ -1542,7 +1544,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
 
     case 'render': {
-      const { id, fileBuffer, filename, subsong = 0, companions, maxSeconds, stems = true } = msg;
+      const { id, fileBuffer, filename, subsong = 0, companions, maxSeconds, stems = true, sid } = msg;
       try {
         let result: RenderResult;
 
@@ -1557,7 +1559,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         // 8. Everything else (libopenmpt fallback)
 
         if (isC64SID(fileBuffer)) {
-          result = await renderWithSID(fileBuffer, filename, subsong, id, stems, maxSeconds);
+          result = await renderWithSID(fileBuffer, filename, subsong, id, stems, maxSeconds, sid);
         } else if (isHivelyFormat(filename)) {
           result = await renderWithHively(fileBuffer, filename, subsong, id, stems);
         } else if (isAdLibFormat(filename)) {

@@ -7,7 +7,7 @@ import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 
 import type { FormatEngineChoice, UADEImportMode, FormatEnginePreferences } from '@/types/formatEngine';
-import type { SidChipModelSetting } from '@/lib/sid/SIDHeaderParser';
+import type { SidChipModelSetting, SidClockSetting, SidBufferSizeSetting } from '@/lib/sid/SIDHeaderParser';
 export type { FormatEngineChoice, UADEImportMode, FormatEnginePreferences };
 
 
@@ -30,6 +30,10 @@ interface SettingsStore {
   sidEngine: SIDEngineType;  // Default SID player engine (websid recommended)
   /** SID Settings chip model: the header's ('auto') or a forced 6581 / 8580, for every SID engine. */
   sidChipModel: SidChipModelSetting;
+  /** SID Settings clock: the header's ('auto') or a forced PAL / NTSC, for every SID engine and the DJ deck renders. */
+  sidClockSpeed: SidClockSetting;
+  /** SID Settings audio buffer: each engine's own size ('auto') or a forced ScriptProcessor size in frames. */
+  sidBufferSize: SidBufferSizeSetting;
   
   // SID Hardware Output
   sidHardwareMode: 'off' | 'asid' | 'webusb';  // Hardware output transport
@@ -75,6 +79,8 @@ interface SettingsStore {
   setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice | UADEImportMode) => void;
   setSidEngine: (engine: SIDEngineType) => void;
   setSidChipModel: (model: SidChipModelSetting) => void;
+  setSidClockSpeed: (clock: SidClockSetting) => void;
+  setSidBufferSize: (size: SidBufferSizeSetting) => void;
   setSidHardwareMode: (mode: 'off' | 'asid' | 'webusb') => void;
   setAsidEnabled: (enabled: boolean) => void;
   setAsidDeviceId: (deviceId: string | null) => void;
@@ -111,6 +117,8 @@ export const useSettingsStore = create<SettingsStore>()(
       masterTuning: 440,
       sidEngine: 'websid',  // Recommended default: fast + accurate WASM reSID
       sidChipModel: 'auto',
+      sidClockSpeed: 'auto',
+      sidBufferSize: 'auto',
       formatEngine: {
         mod: 'native',      // libopenmpt — full sample extraction + effects
         hvl: 'native',      // HivelyParser — WebAudio synthesis
@@ -322,6 +330,16 @@ export const useSettingsStore = create<SettingsStore>()(
     setSidChipModel: (model) =>
       set((state) => {
         state.sidChipModel = model;
+      }),
+
+    setSidClockSpeed: (clock) =>
+      set((state) => {
+        state.sidClockSpeed = clock;
+      }),
+
+    setSidBufferSize: (size) =>
+      set((state) => {
+        state.sidBufferSize = size;
       }),
       
     setSidHardwareMode: (sidHardwareMode) =>
@@ -582,6 +600,8 @@ export const useSettingsStore = create<SettingsStore>()(
         sidEngine: state.sidEngine,
         // Additive: a save without it merges in the default ('auto'), no version bump.
         sidChipModel: state.sidChipModel,
+        sidClockSpeed: state.sidClockSpeed,
+        sidBufferSize: state.sidBufferSize,
         welcomeJingleEnabled: state.welcomeJingleEnabled,
         // Additive: a save without it merges in the default (on), no version bump.
         autoAdvanceSubsongs: state.autoAdvanceSubsongs,
