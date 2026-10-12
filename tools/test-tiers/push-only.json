@@ -5,6 +5,11 @@
       "file": "src/engine/dj/__tests__/autoDJStandaloneJuggleLongSet.test.ts",
       "ciSeconds": 390,
       "note": "one simulated hour + half an hour of stand-alone juggles on fake timers; ~6 min locally"
+    },
+    {
+      "file": "src/engine/dj/__tests__/djSpinbackIsHeardBackward.test.ts",
+      "ciSeconds": 30,
+      "note": "a real DeckEngine renders 3.4 s offline with ~190 suspend/resume steps (the platter driver's 8 ms ticks); ~17 s locally"
     }
   ]
 }
