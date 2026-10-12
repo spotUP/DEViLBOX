@@ -13,7 +13,7 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { getCachedSong } from '@/engine/dj/DJSongCache';
+import { getCachedSong, songHasNotes } from '@/engine/dj/DJSongCache';
 import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanvas';
 import { DJOscilloscope } from '@/components/visualization/DJOscilloscope';
@@ -106,7 +106,9 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
       // the deck shows its name: the deck itself takes the song only after the
       // render, and until then held nothing or the previous track's song.
       const song = (fileName ? getCachedSong(fileName) : undefined) ?? deck.replayer.getSong();
-      if (!song || !song.songPositions || song.songPositions.length === 0) {
+      // One rule for every deck: the pattern view only for a song with notes,
+      // otherwise the oscilloscope (an RSID program parses to an empty song).
+      if (!song || !song.songPositions || song.songPositions.length === 0 || !songHasNotes(song)) {
         return { patternData: null, numChannels: 4, numRows: 64 };
       }
       const patternIndex = song.songPositions[songPos] ?? 0;
