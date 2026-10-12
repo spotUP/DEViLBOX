@@ -173,11 +173,11 @@ describe('trueReverse vs interpolateVelocity semantics', () => {
     }
   });
 
-  it('patterns that set interpolateVelocity=true still work at any BPM', () => {
+  it('every pattern (the turntable model\'s motion, interpolated) works at any BPM', () => {
     // Interpolation must produce finite values for any (from, to) pair —
     // protects against a future frame entry that would divide by zero in
     // the linear interp.
-    const interpolated = SCRATCH_PATTERNS.filter((p) => p.interpolateVelocity);
+    const interpolated = SCRATCH_PATTERNS;
     expect(interpolated.length, 'expected at least one interpolated pattern').toBeGreaterThan(0);
     for (const p of interpolated) {
       for (let i = 1; i < p.frames.length; i++) {

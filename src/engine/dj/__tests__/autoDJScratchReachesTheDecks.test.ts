@@ -119,7 +119,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
   const before = {
     find: scratchOpportunityStats.find, select: scratchSourceStats.select, phrase: scratchPlacementStats.planPhrase,
     started: scratchExecutorStats.started, strokes: scratchVoiceStats.strokes, decisions: getDecisionLog().counts.SCRATCH ?? 0,
-    simulations: scratchPhysicsStats.simulations,
+    simulations: scratchPhysicsStats.performed,
   };
 
   vi.useFakeTimers();
@@ -139,7 +139,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
       find: scratchOpportunityStats.find - before.find, select: scratchSourceStats.select - before.select, phrase: scratchPlacementStats.planPhrase - before.phrase,
       started: scratchExecutorStats.started - before.started, strokes: scratchVoiceStats.strokes - before.strokes,
       decisions: (getDecisionLog().counts.SCRATCH ?? 0) - before.decisions,
-      simulations: scratchPhysicsStats.simulations - before.simulations,
+      simulations: scratchPhysicsStats.performed - before.simulations,
     },
   };
 }

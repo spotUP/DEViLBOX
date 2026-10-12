@@ -23,6 +23,7 @@ import * as Tone from 'tone';
 import type { DeckEngine } from './DeckEngine';
 import type { ScratchGesture, ScratchGestureId } from './scratch/scratchTypes';
 import { getGesture } from './scratch/scratchGestureCatalog';
+import { gestureMotion } from './scratch/scratchPhysics';
 import { faderGainAt, faderRampSec, applyFaderGain } from './scratch/scratchFaderModel';
 import { realTimers } from './autodj/executorTimers';
 
@@ -51,8 +52,8 @@ export interface PatternStart {
   phase?: number;
   /** Whole cycles to play, then end (the gesture's one length). */
   cycles?: number;
-  /** Hand speed: every stroke rate is multiplied by it (`handSpeedFactor` of the plan velocity; SA-m5). */
-  speed?: number;
+  /** The plan velocity 0..1: the turntable model's stroke length (owner decision O2). */
+  velocity?: number;
 }
 
 export interface ScratchPattern {
@@ -64,8 +65,6 @@ export interface ScratchPattern {
   durationMs: number | null;    // null = BPM-synced (use durationBeats)
   loop: boolean;
   quantize: '1/4' | '1/8' | false; // beat division to snap trigger to
-  /** Linearly interpolate velocity between keyframes for smooth, human-feel curves. */
-  interpolateVelocity?: boolean;
   /** When false, negative velocity = slow forward (no ring-buffer reverse). Use for rapid-oscillation patterns. */
   trueReverse?: boolean;
   frames: ScratchFrame[];
@@ -103,27 +102,33 @@ const PATTERN_SLOTS: ReadonlyArray<readonly [name: string, shortName: string, ge
   ['Vibrato',       'Vibr',  'vibrato'],         // 18
 ];
 
-/** A pattern's frames are the gesture's velocity keyframes with the fader
- *  read from its windows (the fader model is the one source for both). */
-export function patternFromGesture(gesture: ScratchGesture, name: string, shortName: string): ScratchPattern {
-  const glide = gesture.velocityCurve.length === 1;
-  const frames: ScratchFrame[] = gesture.velocityCurve.map((p) => ({
-    ...(glide ? { timeMs: 0 } : { timeFraction: p.t }),
+/**
+ * A pattern's frames are the gesture's motion through the turntable model (one motion path, owner
+ * decision O1: `scratchPhysics.gestureMotion`) with the fader read from its windows (the fader
+ * model is the one source for both). `bpm` and `velocity` set the stroke's real length and its
+ * hand (O2); the player rebuilds the frames for the deck's tempo and the plan's velocity at start.
+ */
+export function motionFrames(gesture: ScratchGesture, bpm: number, velocity?: number, perform = false): ScratchFrame[] {
+  const cycleSec = gesture.cycleBeats * 60 / Math.max(30, bpm);
+  return gestureMotion(gesture, cycleSec, { velocity, perform }).map((p) => ({
+    timeFraction: p.t,
     velocity: p.velocity,
-    faderGain: faderGainAt(gesture, p.t, PATTERN_FRAME_BPM),
+    faderGain: faderGainAt(gesture, p.t, bpm),
   }));
+}
+
+export function patternFromGesture(gesture: ScratchGesture, name: string, shortName: string): ScratchPattern {
   return {
     name, shortName, gestureId: gesture.id,
     durationBeats: gesture.cycleBeats, durationMs: null,
     loop: gesture.loop, quantize: false,
-    interpolateVelocity: gesture.interpolateVelocity,
     trueReverse: gesture.trueReverse,
-    frames,
+    frames: motionFrames(gesture, PATTERN_FRAME_BPM),
   };
 }
 
-/** Tempo the static frame table is rendered at; a 2 ms cut lead is below
- *  one frame at any tempo, so the frames are tempo-independent in practice. */
+/** Tempo the static frame table (the registry's view of a pattern) is built at; a playing pattern
+ *  rebuilds its frames at the deck's tempo. */
 const PATTERN_FRAME_BPM = 120;
 
 /** Original 6 at front (indices 0–5) for backward-compatible keyboard commands */
@@ -157,7 +162,7 @@ const PATTERN_FADER_LOOKAHEAD = 128;
 /** Cut-grid gestures (a glide under fader cuts) are scheduled on the
  *  AudioParam for sub-millisecond cuts; frame-driven gestures step in the tick. */
 function isAudioParamScheduled(gesture: ScratchGesture): boolean {
-  return gesture.velocityCurve.length === 1 && gesture.faderWindows.length > 1;
+  return !!gesture.glide && gesture.faderWindows.length > 1;
 }
 
 function gestureCurves(gesture: ScratchGesture): Array<'deck' | 'crossfader'> {
@@ -192,8 +197,8 @@ export class ScratchPlayback {
   private pendingStop = false; // set by finishCurrentCycle() to stop after this cycle completes
   /** Whole cycles left before a planned pattern ends itself (null = loop until stopped). */
   private cyclesLeft: number | null = null;
-  /** Multiplier on every stroke rate for the running pattern (PatternStart.speed). */
-  private handSpeed = 1;
+  /** The running pattern's motion at the deck's tempo and the plan's velocity (the turntable model). */
+  private activeFrames: ScratchFrame[] = [];
 
   /** Current scratch velocity (updated every tick). UI reads this for turntable spin + pattern scroll. */
   currentVelocity = 0;
@@ -253,7 +258,7 @@ export class ScratchPlayback {
       this.activePattern = pattern;
       this.patternLastTick = performance.now();
       this.cyclesLeft = start?.cycles !== undefined ? Math.max(1, Math.round(start.cycles)) : null;
-      this.handSpeed = start?.speed !== undefined && Number.isFinite(start.speed) && start.speed > 0 ? start.speed : 1;
+      this.activeFrames = motionFrames(getGesture(pattern.gestureId), bpm, start?.velocity, true);
 
       if (start) {
         // a planned stroke begins where the plan says, on the beat it was fired on
@@ -316,7 +321,7 @@ export class ScratchPlayback {
       this.patternElapsedMs = this.patternElapsedMs % this.patternDurationMs;
     }
 
-    const frames = pattern.frames;
+    const frames = this.activeFrames.length ? this.activeFrames : pattern.frames;
     const dur = this.patternDurationMs;
 
     // Resolve a frame's time position within the cycle
@@ -332,7 +337,7 @@ export class ScratchPlayback {
     const frame = frames[frameIdx]!;
     let velocity: number;
 
-    if (pattern.interpolateVelocity && frames.length > 1) {
+    if (frames.length > 1) {
       // Linear interpolation between current frame and next frame
       const nextIdx = (frameIdx + 1) % frames.length;
       const nextFrame = frames[nextIdx]!;
@@ -354,7 +359,6 @@ export class ScratchPlayback {
     }
 
     // Expose current state for UI (turntable spin, pattern display, fader indicators)
-    velocity *= this.handSpeed;
     this.currentVelocity = velocity;
     const gesture = getGesture(pattern.gestureId);
     const bpm = this.getEffectiveBPM();
@@ -416,7 +420,7 @@ export class ScratchPlayback {
     this.patternElapsedMs = 0;
     this.pendingStop = false;
     this.cyclesLeft = null;
-    this.handSpeed = 1;
+    this.activeFrames = [];
     this.currentVelocity = 0;
     this.currentFaderGain = 1;
 

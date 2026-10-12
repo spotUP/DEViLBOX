@@ -25,7 +25,7 @@
 
 import type {
   ScratchDJStyle, ScratchFaderWindow, ScratchGesture, ScratchGestureId, ScratchHandPath,
-  ScratchLevel, ScratchRecordGestureHints, ScratchRole, ScratchVelocityPoint,
+  ScratchLevel, ScratchRecordGestureHints, ScratchRole,
 } from './scratchTypes';
 
 export const SCRATCH_GESTURE_IDS: readonly ScratchGestureId[] = [
@@ -90,10 +90,6 @@ export function referenceCutPattern(name: ReferenceCutPattern, cuts = 4): Scratc
   }
 }
 
-function v(points: ReadonlyArray<readonly [t: number, velocity: number]>): ScratchVelocityPoint[] {
-  return points.map(([t, velocity]) => ({ t, velocity }));
-}
-
 /** Reversals of a hand path (reference `gesture_activity`): sign changes of
  *  the stroke direction, zero-length moves ignored. */
 export function handPathReversals(path: ScratchHandPath | undefined): number {
@@ -127,7 +123,6 @@ interface GestureSeed {
   durationSteps: number;
   styles: readonly ScratchDJStyle[];
   handPath?: ScratchHandPath;
-  velocityCurve: readonly ScratchVelocityPoint[];
   faderWindows: readonly ScratchFaderWindow[];
   cutLeadMs?: number;
   trueReverse: boolean;
@@ -136,47 +131,24 @@ interface GestureSeed {
   allowsSampleSource: boolean;
   fx?: ScratchGesture['fx'];
   glide?: ScratchGesture['glide'];
+  deckAction?: ScratchGesture['deckAction'];
   flourish?: boolean;
   /** Strokes of the curve inside the gesture's length (flutter textures: 2); default 1. */
   strokes?: number;
-  interpolateVelocity: boolean;
   loop: boolean;
 }
 
-// Legacy DEViLBOX velocity curves (the frames of `DJScratchEngine.ts` before
-// SCR-P1.3, velocities only; the fader lives in `faderWindows`).
-/**
- * Reference baby speed (scratch.py :133, :197, :216): the hand moves A x amp = 1500 x (0.55 + 0.70 x 0.7)
- * = 1560 samples at 22,050 Hz (71 ms of record) in a quarter of the gesture's 2 steps at the demo's
- * 92 BPM (82 ms): 0.87 x the record's speed - about its own pitch. (3.2, a stab's scale, was a beep.)
- */
-const BABY_SPEED = 0.87;
-const BABY_CURVE = v([[0, BABY_SPEED], [0.25, -BABY_SPEED], [0.75, BABY_SPEED]]);
-const FLARE_CURVE = v([
-  [0, 0], [0.10, 2.2], [0.15, 2.2], [0.19, 2.2], [0.33, 2.0], [0.37, 1.5],
-  [0.50, 0], [0.65, -1.0], [0.90, -0.3],
-]);
-const CHIRP_CURVE = v([
-  [0, 0], [0.06, 0.5], [0.25, 2.0], [0.44, 0.3],
-  [0.50, 0], [0.56, -0.3], [0.75, -1.2], [0.94, -0.3],
-]);
 const CHIRP_WINDOWS = deck([0.06, 0.44], [0.56, 0.94]);
-const TEAR_CURVE = v([
-  [0, 0], [0.03, 0.5], [0.12, 2.0], [0.25, 0], [0.32, 0], [0.45, 2.0],
-  [0.53, 0.3], [0.58, -0.3], [0.70, -1.2], [0.90, 0],
-]);
-const GLIDE_CURVE = v([[0, 1.0]]);
 
 const SEEDS: readonly GestureSeed[] = [
   {
     id: 'baby', name: 'Baby Scratch', durationSteps: 2,
     styles: ['oldSchool', 'boomBap', 'battle'],
-    // reference baby (O3): out to A and back through the anchor to -A, fader open; the keyframes are
-    // the reference hand speed (BABY_SPEED), a true reverse
+    // reference baby (O3): out to A and back through the anchor to -A, fader open, a true reverse
     handPath: hand([[0, 0], [0.25, 1], [0.5, 0], [0.75, -1], [1, 0]]),
-    velocityCurve: BABY_CURVE, faderWindows: referenceCutPattern('open'),
+    faderWindows: referenceCutPattern('open'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     // Reference baby_slow: the same stroke at 0.6 A.
@@ -184,260 +156,227 @@ const SEEDS: readonly GestureSeed[] = [
     styles: ['loFi', 'battle'],
     handPath: hand([[0, 0], [0.25, 0.6], [0.5, 0], [0.75, -0.6], [1, 0]]),
     // reference slow baby: 0.6 A over a quarter of 3 steps (0.35 x speed)
-    velocityCurve: BABY_CURVE.map((p) => ({ t: p.t, velocity: p.velocity * 0.6 * 2 / 3 })),
     faderWindows: referenceCutPattern('open'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     // Reference forward_stab: audible on the forward push only, fader (0, 0.42).
-    id: 'forwardStab', name: 'Forward Stab', durationSteps: 2,
+    id: 'forwardStab', name: 'Forward Stab', durationSteps: 1,
     styles: ['oldSchool', 'boomBap', 'battle'],
     handPath: hand([[0, 0], [0.42, 1.3], [1, 0]]),
-    velocityCurve: v([[0, 2.5], [0.50, -1.0]]),
     faderWindows: deck([0, 0.42]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     // Reference backward_stab: silent forward setup, audible reverse pull (0.45, 1).
-    id: 'backwardStab', name: 'Backward Stab', durationSteps: 2,
+    id: 'backwardStab', name: 'Backward Stab', durationSteps: 1,
     styles: ['oldSchool', 'loFi', 'battle'],
     handPath: hand([[0, 0], [0.4, 1.2], [1, -0.2]]),
-    velocityCurve: v([[0, 1.0], [0.45, -2.5]]),
     faderWindows: deck([0.45, 1]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     // Section 32: every palette but battle names the chirp (lo-fi: "slow chirp").
-    id: 'chirp', name: 'Chirp', durationSteps: 1,
+    id: 'chirp', name: 'Chirp', durationSteps: 2,
     styles: ['oldSchool', 'boomBap', 'electro', 'loFi', 'battle'],
     handPath: hand([[0, 0], [0.5, 1.2], [1, -1.2]]),
-    velocityCurve: CHIRP_CURVE, faderWindows: CHIRP_WINDOWS, cutLeadMs: -2,
+    faderWindows: CHIRP_WINDOWS, cutLeadMs: -2,
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Reference chirp_double: two chirps in one cycle, four windows.
     id: 'chirpDouble', name: 'Double Chirp', durationSteps: 2,
     styles: ['boomBap', 'electro', 'battle'],
     handPath: hand([[0, 0], [0.25, 1], [0.5, -1], [0.75, 1], [1, -1]]),
-    velocityCurve: [
-      ...CHIRP_CURVE.map((p) => ({ t: p.t / 2, velocity: p.velocity })),
-      ...CHIRP_CURVE.map((p) => ({ t: 0.5 + p.t / 2, velocity: p.velocity })),
-    ],
     faderWindows: deck([0.03, 0.22], [0.28, 0.47], [0.53, 0.72], [0.78, 0.97]), cutLeadMs: -2,
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // The record plays forward at natural speed under 4 cuts per beat
     // (reference transformer4 glide 1.0; DEViLBOX 40 % open duty).
-    id: 'transformer4', name: 'Transformer', durationSteps: 4,
+    id: 'transformer4', name: 'Transformer', durationSteps: 2,
     glide: { ratio: 1.0, grip: 0.7 },
     styles: ['electro', 'battle'],
-    velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('transform', 4),
+    faderWindows: referenceCutPattern('transform', 4),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     id: 'transformer8', name: 'Eight-Cut Transformer', durationSteps: 4,
     glide: { ratio: 1.0, grip: 0.7 },
     styles: ['electro', 'battle'],
-    velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('transform', 8),
+    faderWindows: referenceCutPattern('transform', 8),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     // One click on the forward stroke, open return (reference flare1 = one cut).
-    id: 'flare1', name: 'One-Click Flare', durationSteps: 4,
+    id: 'flare1', name: 'One-Click Flare', durationSteps: 2,
     styles: ['electro', 'battle'],
     handPath: hand([[0, 0], [1, 1.6]]),
-    velocityCurve: FLARE_CURVE, faderWindows: referenceCutPattern('flare1'),
+    faderWindows: referenceCutPattern('flare1'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // DEViLBOX Flare: two clicks on the forward stroke, direction changes on an open fader.
-    id: 'flare2', name: 'Two-Click Flare', durationSteps: 4,
+    id: 'flare2', name: 'Two-Click Flare', durationSteps: 2,
     styles: ['electro', 'battle'],
     handPath: hand([[0, 0], [0.5, 1.8], [1, 0]]),
-    velocityCurve: FLARE_CURVE, faderWindows: referenceCutPattern('flare2'),
+    faderWindows: referenceCutPattern('flare2'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Reference orbit: forward flare + reverse flare, four windows.
-    id: 'orbit', name: 'Orbit', durationSteps: 4,
+    id: 'orbit', name: 'Orbit', durationSteps: 3,
     styles: ['electro', 'battle'],
     handPath: hand([[0, 0], [0.5, 1.4], [1, -1.4]]),
-    velocityCurve: v([
-      [0, 0], [0.12, 2.2], [0.20, 2.2], [0.24, 2.0], [0.42, 0.5],
-      [0.50, 0], [0.62, -1.2], [0.70, -1.2], [0.74, -1.0], [0.92, -0.3],
-    ]),
     faderWindows: deck([0, 0.22], [0.28, 0.47], [0.53, 0.72], [0.78, 1]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Record plays forward under rapid finger clicks (reference crab glide; DEViLBOX 28 % duty).
-    id: 'crab', name: 'Crab', durationSteps: 4,
+    id: 'crab', name: 'Crab', durationSteps: 2,
     glide: { ratio: 1.0, grip: 0.7 },
     styles: ['electro', 'battle'],
-    velocityCurve: GLIDE_CURVE, faderWindows: referenceCutPattern('crab'),
+    faderWindows: referenceCutPattern('crab'),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     id: 'scribble', name: 'Scribble', durationSteps: 2, strokes: 2,
     styles: ['battle'],
     handPath: hand([[0, 0], [0.2, 0.4], [0.4, -0.4], [0.6, 0.4], [0.8, -0.4], [1, 0]]),
-    velocityCurve: v([
-      [0, 1.5], [0.125, 0.3], [0.25, 1.5], [0.375, 0.3],
-      [0.50, 1.5], [0.625, 0.3], [0.75, 1.5], [0.875, 0.3],
-    ]),
     faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Reference hydroplane (O3): the finger rides the record, a slightly slower forward glide
     // (0.7) under 12 fast tiny cuts (`transform`, cuts 12).
-    id: 'hydroplane', name: 'Hydroplane', durationSteps: 4,
+    id: 'hydroplane', name: 'Hydroplane', durationSteps: 3,
     glide: { ratio: 0.7, grip: 0.6 },
     styles: ['electro', 'battle'],
-    velocityCurve: v([[0, 0.7]]),
     faderWindows: referenceCutPattern('transform', 12),
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: false,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Reference tear_fwd: one forward stroke split into speed segments.
-    id: 'tearForward', name: 'Forward Tear', durationSteps: 4,
+    id: 'tearForward', name: 'Forward Tear', durationSteps: 2,
     styles: ['boomBap', 'battle'],
     handPath: hand([[0, 0], [0.34, 0.9], [0.5, 1.0], [0.67, 1.7], [1, 2.0]]),
-    velocityCurve: TEAR_CURVE, faderWindows: referenceCutPattern('open'),
+    faderWindows: referenceCutPattern('open'),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Reference tear_rev: the same segments pulled backward; DEViLBOX curve mirrored.
-    id: 'tearReverse', name: 'Reverse Tear', durationSteps: 4,
+    id: 'tearReverse', name: 'Reverse Tear', durationSteps: 2,
     styles: ['boomBap', 'battle'],
     handPath: hand([[0, 0], [0.34, -0.5], [0.5, -0.6], [0.67, -1.4], [1, -2.0]]),
-    velocityCurve: TEAR_CURVE.map((p) => ({ t: p.t, velocity: -p.velocity })),
     faderWindows: OPEN,
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     id: 'twiddle', name: 'Twiddle', durationSteps: 4,
     styles: ['electro', 'battle'],
     handPath: hand([[0, 0], [0.25, 1], [0.5, 0], [0.75, -1], [1, 0]]),
-    velocityCurve: v([
-      [0, 0], [0.05, 1.0], [0.09, 1.5], [0.12, 1.8], [0.18, 2.2], [0.21, 2.2],
-      [0.30, 1.8], [0.33, 1.5], [0.45, 0.3], [0.50, 0], [0.55, -0.5], [0.59, -0.8],
-      [0.62, -1.0], [0.68, -1.2], [0.71, -1.0], [0.80, -0.6], [0.83, -0.4], [0.95, -0.1],
-    ]),
     faderWindows: deck([0, 0.09], [0.12, 0.18], [0.21, 0.30], [0.33, 0.59], [0.62, 0.68], [0.71, 0.80], [0.83, 1]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Reference drag: slow move, fader open.
-    id: 'drag', name: 'Drag', durationSteps: 8,
+    id: 'drag', name: 'Drag', durationSteps: 4,
     styles: ['oldSchool', 'loFi', 'battle'],
     handPath: hand([[0, 0], [1, 0.7]]),
-    velocityCurve: v([[0, 1.0], [0.20, 0.7], [0.40, 0.4], [0.60, 0.2], [0.75, 0.15], [0.90, 0.8]]),
     faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     id: 'laser', name: 'Laser', durationSteps: 1,
     styles: ['boomBap', 'battle'],
     handPath: hand([[0, 0], [0.6, 1.3], [1, 0]]),
-    velocityCurve: v([[0, 5.0], [0.20, 2.5], [0.40, 0.8], [0.60, 0.2], [0.73, -1.0]]),
     faderWindows: deck([0, 0.73]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     id: 'phaser', name: 'Phaser', durationSteps: 1,
     styles: ['boomBap', 'battle'],
     handPath: hand([[0, 0], [0.29, 1.2], [0.46, 1.2], [1, 0]]),
-    velocityCurve: v([[0, 5.0], [0.17, 2.0], [0.29, 0], [0.46, 0], [0.67, -0.8]]),
     faderWindows: deck([0, 0.67]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     id: 'tweak', name: 'Tweak', durationSteps: 8,
+    // the record rides forward under the hand, its speed wobbling (the tuned profile, now a hand on the model)
+    glide: { ratio: 1, grip: 1, profile: [[0, 1.0], [0.12, 1.5], [0.25, 0.6], [0.37, 1.3], [0.50, 0.7], [0.62, 1.6], [0.75, 0.5], [0.87, 1.4], [1, 1.0]] },
     styles: ['loFi', 'battle'],
-    velocityCurve: v([
-      [0, 1.0], [0.12, 1.5], [0.25, 0.6], [0.37, 1.3], [0.50, 0.7], [0.62, 1.6], [0.75, 0.5], [0.87, 1.4],
-    ]),
     faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: false,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     id: 'vibrato', name: 'Vibrato', durationSteps: 1,
+    // a fast hand wobble on a forward-riding record
+    glide: { ratio: 1, grip: 1, profile: [[0, 1.25], [0.25, 0.75], [0.50, 1.25], [0.75, 0.75], [1, 1.25]] },
     styles: ['loFi', 'battle'],
-    velocityCurve: v([[0, 1.25], [0.25, 0.75], [0.50, 1.25], [0.75, 0.75]]),
     faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: false,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     id: 'uzi', name: 'Uzi', durationSteps: 1, strokes: 2,
     styles: ['electro', 'battle'],
     handPath: hand([[0, 0], [0.2, 0.2], [0.4, -0.2], [0.6, 0.2], [0.8, -0.2], [1, 0]]),
-    velocityCurve: v([
-      [0, 1.4], [0.125, 0.6], [0.25, 1.4], [0.375, 0.6],
-      [0.50, 1.4], [0.625, 0.6], [0.75, 1.4], [0.875, 0.6],
-    ]),
     faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Both hands on the fader: 8 taps per beat (DEViLBOX 20 % duty).
     id: 'eightFingerCrab', name: 'Eight-Finger Crab', durationSteps: 4,
     glide: { ratio: 1.0, grip: 0.7 },
     styles: ['electro', 'battle'],
-    velocityCurve: GLIDE_CURVE, faderWindows: cutGrid(8, 0.20),
+    faderWindows: cutGrid(8, 0.20),
     trueReverse: true, returnsToAnchor: false, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     id: 'threeClickFlare', name: 'Three-Click Flare', durationSteps: 4,
     styles: ['electro', 'battle'],
     handPath: hand([[0, 0], [0.5, 1.6], [1, 0]]),
-    velocityCurve: v([
-      [0, 0], [0.06, 2.4], [0.09, 2.4], [0.12, 2.4], [0.18, 2.2], [0.21, 2.0],
-      [0.28, 1.8], [0.31, 1.5], [0.42, 0.5], [0.50, 0], [0.65, -1.0], [0.90, -0.3],
-    ]),
     faderWindows: deck([0, 0.09], [0.12, 0.18], [0.21, 0.28], [0.31, 1]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: true, loop: true,
+loop: true,
   },
   {
     // Section 41 throw: the word rides clean, forward at natural speed, fader open.
     id: 'drop', name: 'Drop', durationSteps: 4,
     styles: ['oldSchool', 'boomBap', 'electro', 'battle', 'loFi'],
-    velocityCurve: GLIDE_CURVE, faderWindows: OPEN,
+    faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: true,
-    interpolateVelocity: false, loop: false,
+loop: false,
   },
   {
     // A whole phrase thrown clean: a full bar of steps (reference drop_phrase).
     id: 'dropPhrase', name: 'Phrase Drop', durationSteps: 16,
     styles: ['oldSchool', 'boomBap', 'electro', 'battle', 'loFi'],
-    velocityCurve: GLIDE_CURVE, faderWindows: OPEN,
+    faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: true,
-    interpolateVelocity: false, loop: false,
+loop: false,
   },
   {
     // Reference cut (scratch.py :168): out to 1.5 A at half the stroke and back, open (0, 0.42), 1 step.
@@ -445,10 +384,9 @@ const SEEDS: readonly GestureSeed[] = [
     id: 'cut', name: 'Cut', durationSteps: 1,
     styles: ['oldSchool', 'battle'],
     handPath: hand([[0, 0], [0.5, 1.5], [1, 0]]),
-    velocityCurve: v([[0, 1.3], [0.5, -1.3]]),
     faderWindows: deck([0, 0.42]),
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: false, loop: true,
+loop: true,
   },
   {
     // Reference echo (scratch.py :175-176): a forward stab, open (0, 0.4), whose tail feeds the
@@ -457,31 +395,30 @@ const SEEDS: readonly GestureSeed[] = [
     styles: ['boomBap', 'battle'],
     handPath: hand([[0, 0], [0.42, 1.3], [1, 0]]),
     // 1.3 x 1560 samples out in 0.42 of 2 steps at 92 BPM (0.67 x), back in 0.58 (0.49 x)
-    velocityCurve: v([[0, 0.67], [0.42, -0.49]]),
     faderWindows: deck([0, 0.4]),
     fx: { delayMix: 0.35, delaySec: 0.16, reverbMix: 0.05 },
     trueReverse: true, returnsToAnchor: true, allowsSampleSource: true,
-    interpolateVelocity: false, loop: false,
+loop: false,
   },
   {
     // Reference brake (scratch.py :178, turntable.py deck_motion 'brake', classic_stop strength 3):
     // the record slows as exp(-3 t) over the gesture, fader open, 4 steps.
     id: 'brake', name: 'Record Brake', durationSteps: 4,
+    deckAction: 'brake',
     styles: ['battle'], flourish: true,
-    velocityCurve: v(Array.from({ length: 9 }, (_, k) => [k / 8, Math.exp(-3 * (k / 8))] as const)),
     faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: true,
-    interpolateVelocity: true, loop: false,
+loop: false,
   },
   {
     // Reference spin-up (scratch.py :179, deck_motion 'start' on classic_sl1200, kp 9):
     // the record comes up to speed as 1 - exp(-5 t), fader open, 4 steps.
     id: 'spinup', name: 'Record Spin-Up', durationSteps: 4,
+    deckAction: 'start',
     styles: ['battle'], flourish: true,
-    velocityCurve: v(Array.from({ length: 9 }, (_, k) => [k / 8, 1 - Math.exp(-5 * (k / 8))] as const)),
     faderWindows: OPEN,
     trueReverse: false, returnsToAnchor: false, allowsSampleSource: true,
-    interpolateVelocity: true, loop: false,
+loop: false,
   },
 ];
 
@@ -509,8 +446,7 @@ export const SCRATCH_GESTURES: readonly ScratchGesture[] = SEEDS.map((seed) => {
     difficulty: GESTURE_LEVELS[seed.id],
     roles: rolesFor(seed.id, seed.durationSteps, seed.faderWindows.length),
     intensity: MAX_ACTIVITY > 0 ? activity / MAX_ACTIVITY : 0,
-    requiresReverse: (seed.handPath ?? []).some((p) => p.position < 0)
-      || seed.velocityCurve.some((p) => p.velocity < 0 && seed.trueReverse),
+    requiresReverse: (seed.handPath ?? []).some((p) => p.position < 0),
   };
 });
 

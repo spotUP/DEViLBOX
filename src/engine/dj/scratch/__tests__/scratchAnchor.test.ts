@@ -6,12 +6,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  anchorFor, deckAnchor, pickDeckAnchor, positionCurveToRateCurve, integrateRateCurve, stepToBeat, beatToStep,
-  allowedGrids, STROKE_SEC, MAX_RATE, CRATE_CUE_BY_ROLE, type ResolvedCrateAnchor,
+  anchorFor, deckAnchor, pickDeckAnchor, stepToBeat, beatToStep,
+  allowedGrids, CRATE_CUE_BY_ROLE, type ResolvedCrateAnchor,
 } from '../scratchAnchor';
 import { getScratchRecord } from '../scratchCatalogue';
 import { getGesture } from '../scratchGestureCatalog';
-import type { DeckScratchAnchor, ScratchHandPath, ScratchSource } from '../scratchTypes';
+import type { DeckScratchAnchor, ScratchSource } from '../scratchTypes';
 
 const crate = (recordId: string): ScratchSource => ({ type: 'CRATE', recordId, anchor: { position: 0, safe: [0, 1], safeForward: [0, 1], safeReverse: [0, 1] } });
 
@@ -53,56 +53,6 @@ describe('anchors by role (SCR-P3.1)', () => {
     expect(pickDeckAnchor(cands, 'FEATURE')!.kind).toBe('vocalOnset');
     expect(pickDeckAnchor(cands, 'THEME')!.kind).toBe('downbeat');
     expect(pickDeckAnchor([], 'THEME')).toBeNull();
-  });
-});
-
-describe('hand position to playback rate (section 17, SCR-P3.2)', () => {
-  const SR = 48000;
-
-  it('a baby over one beat at 120 BPM returns home: the rate integrates to 0 within 1 ms', () => {
-    const baby = getGesture('baby');
-    const dur = 0.5; // one beat at 120 BPM
-    const r = positionCurveToRateCurve(baby.handPath!, dur, SR);
-    expect(Math.abs(integrateRateCurve(r.points, dur))).toBeLessThan(0.001);
-    expect(Math.abs(r.netTravelSec)).toBeLessThan(0.001);
-    expect(r.clamped).toBe(false);
-    expect(r.points.some((p) => p.rate > 0.1) && r.points.some((p) => p.rate < -0.1)).toBe(true);
-  });
-
-  it('a forward stab travels 1.3 strokes out, then returns', () => {
-    const stab = getGesture('forwardStab');
-    const dur = 0.5;
-    const r = positionCurveToRateCurve(stab.handPath!, dur, SR);
-    // cumulative travel peaks at the apex (t = 0.42 of the cycle)
-    let cum = 0, peak = -Infinity;
-    for (let i = 0; i < r.points.length; i++) {
-      const end = i + 1 < r.points.length ? r.points[i + 1]!.t : dur;
-      cum += r.points[i]!.rate * (end - r.points[i]!.t);
-      peak = Math.max(peak, cum);
-    }
-    expect(peak).toBeCloseTo(1.3 * STROKE_SEC, 2);
-    expect(Math.abs(peak - 1.3 * STROKE_SEC)).toBeLessThan(0.0015);
-    expect(Math.abs(cum)).toBeLessThan(0.001);
-  });
-
-  it('a laser asked for rate 5 is clamped to 4 and reported', () => {
-    // 1 stroke-unit path fast enough to need rate 5: STROKE_SEC x p / dur = 5
-    const dur = 0.1;
-    const p = 5 * dur / STROKE_SEC;
-    const path: ScratchHandPath = [{ t: 0, position: 0, grip: 1 }, { t: 1, position: p, grip: 1 }];
-    const r = positionCurveToRateCurve(path, dur, SR);
-    expect(r.requestedPeak).toBeCloseTo(5, 3);
-    expect(r.clamped).toBe(true);
-    expect(Math.max(...r.points.map((x) => Math.abs(x.rate)))).toBe(MAX_RATE);
-  });
-
-  it('the rate bends through zero at a reversal instead of flipping', () => {
-    const r = positionCurveToRateCurve(getGesture('baby').handPath!, 0.5, SR);
-    let maxJump = 0;
-    for (let i = 1; i < r.points.length; i++) maxJump = Math.max(maxJump, Math.abs(r.points[i]!.rate - r.points[i - 1]!.rate));
-    // unsmoothed: a flip from +x to -x is 2x; smoothed it is at most ~a third of that per step
-    const peak = Math.max(...r.points.map((p) => Math.abs(p.rate)));
-    expect(maxJump).toBeLessThan(peak * 1.2);
   });
 });
 

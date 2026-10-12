@@ -20,10 +20,10 @@ describe('faderGainAt (SCR-P1.4)', () => {
     expect(faderGainAt(chirp, 1.2, 120)).toBe(1); // wraps into the cycle
   });
 
-  it('transformer8 at 120 BPM has 8 cuts per beat, transformer4 has 4, crab 4, eight-finger crab 8', () => {
+  it('transformer8 at 120 BPM has 8 cuts per beat, transformer4 4 cuts in its 2 steps (8 per beat), crab 5 taps = 4 cuts in 2 steps (8), eight-finger crab 8', () => {
     expect(cutsPerBeat(getGesture('transformer8'))).toBe(8);
-    expect(cutsPerBeat(getGesture('transformer4'))).toBe(4);
-    expect(cutsPerBeat(getGesture('crab'))).toBe(4);
+    expect(cutsPerBeat(getGesture('transformer4'))).toBe(8);
+    expect(cutsPerBeat(getGesture('crab'))).toBe(8);
     expect(cutsPerBeat(getGesture('eightFingerCrab'))).toBe(8);
     // count the gain edges over one beat directly
     const t8 = getGesture('transformer8');
@@ -38,13 +38,13 @@ describe('faderGainAt (SCR-P1.4)', () => {
 
   it('a -2 ms cut lead shifts a window by -2 ms at any tempo', () => {
     const chirp = getGesture('chirp');
-    const ms = cycleMs(chirp, 120); // 0.25 beat = 125 ms
-    expect(ms).toBeCloseTo(125, 6);
+    const ms = cycleMs(chirp, 120); // the reference 2 steps = 0.5 beat = 250 ms
+    expect(ms).toBeCloseTo(250, 6);
     const [first] = faderWindowsMs(chirp, 120);
     expect(first!.open[0]).toBeCloseTo(0.06 * ms - 2, 6);
     expect(first!.open[1]).toBeCloseTo(0.44 * ms - 2, 6);
     const [slow] = faderWindowsMs(chirp, 60);
-    expect(slow!.open[0]).toBeCloseTo(0.06 * 250 - 2, 6);
+    expect(slow!.open[0]).toBeCloseTo(0.06 * 500 - 2, 6);
     // without a lead the window sits where the gesture says
     const [stab] = faderWindowsMs(getGesture('forwardStab'), 120);
     expect(stab!.open).toEqual([0, 0.42 * cycleMs(getGesture('forwardStab'), 120)]);

@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { installRealWebAudio, resolveWorkletsFromPublic } from '@/test/audio/realWebAudio';
 import { getScratchRecord, SCRATCH_PACK_DIR } from '../scratchCatalogue';
 import { getGesture } from '../scratchGestureCatalog';
+import { motionPeak } from '../scratchPhysics';
 
 const SR = 48000;
 const T0 = 0.05;
@@ -61,9 +62,10 @@ describe('the Baby Scratch is the record at about its own pitch, not a beep (own
     ({ createScratchBus } = await import('../scratchBus'));
   });
 
-  it('the stroke reads the record at most 1 x (the reference 0.87 x), and the render pitch is within 1.4 x of the record straight', async () => {
-    const peak = Math.max(...getGesture('baby').velocityCurve.map((p) => Math.abs(p.velocity)));
-    expect(peak).toBeLessThanOrEqual(1);
+  it('the stroke reads the record at about its own speed, and the render pitch is within 1.4 x of the record straight', async () => {
+    // the turntable model's baby at velocity 0.7, 2 steps at 92 BPM: about the record's own speed
+    const peak = motionPeak(getGesture('baby'), 2 * 60 / (92 * 4), 0.7);
+    expect(peak).toBeLessThanOrEqual(1.6);
     expect(peak).toBeGreaterThan(0.5);
     const baby = zcr(await render('baby'), T0, T0 + 0.6);
     const straight = zcr(await render('straight'), T0, T0 + 0.6);

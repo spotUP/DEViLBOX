@@ -22,6 +22,8 @@ vi.mock('@/engine/dj/DJEngine', () => ({
 }));
 
 import { ScratchPlayback, getPatternByName, type PatternStart } from '../DJScratchEngine';
+import { gestureMotion } from '../scratch/scratchPhysics';
+import { getGesture } from '../scratch/scratchGestureCatalog';
 import { fireDjFx, releaseDjFx } from '@/engine/drumpad/DjFxActions';
 import type { DeckEngine } from '../DeckEngine';
 
@@ -50,6 +52,13 @@ function fakeDeck(bpm: number) {
   };
 }
 
+/** The model's baby (velocity 0.7 default, 0.25 s) at a fraction of the stroke, as the player interpolates it. */
+function babyAt(frac: number): number {
+  const c = gestureMotion(getGesture('baby'), 0.25, {});
+  for (let i = 1; i < c.length; i++) if (frac <= c[i]!.t) return c[i - 1]!.velocity + (c[i]!.velocity - c[i - 1]!.velocity) * (frac - c[i - 1]!.t) / (c[i]!.t - c[i - 1]!.t);
+  return c[c.length - 1]!.velocity;
+}
+
 describe('a planned deck stroke starts on its beat and plays its length (SA-M2, SA-m5)', () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance'] }); });
   afterEach(() => { vi.useRealTimers(); });
@@ -59,10 +68,10 @@ describe('a planned deck stroke starts on its beat and plays its length (SA-M2, 
     holder.deck = deck;
     fireDjFx('fx_scratch_baby', { deck: 'A', source: 'autodj', beats: 1 });
     vi.advanceTimersByTime(40);
-    // the reference baby (2 steps = 250 ms at 120 BPM) pushes forward (+0.87) for its first quarter and
-    // pulls back for the next half: 40 ms in is still the push (phase 0.16); an elapsed-time phase
-    // (100 ms ahead, phase 0.56) would already pull back
-    expect(deck.velocities[deck.velocities.length - 1]!).toBeCloseTo(0.87, 6);
+    // the baby (2 steps = 250 ms at 120 BPM) through the turntable model: 40 ms in is phase 0.16 of
+    // the stroke; an elapsed-time phase (100 ms ahead) would be phase 0.56, a different motion
+    expect(Math.abs(babyAt(0.16) - babyAt(0.56))).toBeGreaterThan(0.3);
+    expect(deck.velocities[deck.velocities.length - 1]!).toBeCloseTo(babyAt(0.16), 6);
     releaseDjFx('fx_scratch_baby', { deck: 'A', source: 'autodj', finishCycle: true });
     deck.stopPattern();
   });
@@ -72,8 +81,8 @@ describe('a planned deck stroke starts on its beat and plays its length (SA-M2, 
     holder.deck = deck;
     fireDjFx('fx_scratch_baby', { deck: 'A', source: 'keyboard' });
     vi.advanceTimersByTime(10);
-    // elapsed-time phase (> a quarter in): the pull back, not a fresh push
-    expect(deck.velocities[0]!).toBeCloseTo(-0.87, 6);
+    // elapsed-time phase: (90 + 10) ms of a 250 ms cycle = 0.4, not a fresh stroke
+    expect(deck.velocities[0]!).toBeCloseTo(babyAt(0.4), 6);
     releaseDjFx('fx_scratch_baby', { deck: 'A', source: 'keyboard' });
   });
 

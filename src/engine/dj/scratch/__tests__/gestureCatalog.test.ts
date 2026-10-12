@@ -16,9 +16,9 @@ import { SCRATCH_PATTERNS } from '../../DJScratchEngine';
 import type { ScratchGesture } from '../scratchTypes';
 
 const REQUIRED_FIELDS: ReadonlyArray<keyof ScratchGesture> = [
-  'id', 'name', 'durationSteps', 'activity', 'difficulty', 'styles', 'roles', 'velocityCurve',
+  'id', 'name', 'durationSteps', 'activity', 'difficulty', 'styles', 'roles',
   'faderWindows', 'trueReverse', 'returnsToAnchor', 'intensity', 'requiresReverse',
-  'allowsSampleSource', 'cycleBeats', 'interpolateVelocity', 'loop',
+  'allowsSampleSource', 'cycleBeats', 'loop',
 ];
 
 describe('scratch gesture catalogue (SCR-P1.2)', () => {
@@ -32,7 +32,10 @@ describe('scratch gesture catalogue (SCR-P1.2)', () => {
   it('every gesture carries every section 10 field (Gate B completion)', () => {
     for (const g of SCRATCH_GESTURES) {
       for (const f of REQUIRED_FIELDS) expect(g[f], `${g.id}.${String(f)}`).toBeDefined();
-      expect(g.velocityCurve.length, `${g.id} velocity`).toBeGreaterThan(0);
+      // one motion (O1): a hand path, a glide, a deck action or a throw - never a keyframe table
+      const motions = [g.handPath?.length ? 'hand' : null, g.glide ? 'glide' : null, g.deckAction ? 'deck' : null, g.id === 'drop' || g.id === 'dropPhrase' ? 'throw' : null].filter(Boolean);
+      expect(motions, `${g.id} motion`).toHaveLength(1);
+      expect('velocityCurve' in g, `${g.id} keyframes`).toBe(false);
       expect(g.faderWindows.length, `${g.id} windows`).toBeGreaterThan(0);
       expect(g.styles.length, `${g.id} styles`).toBeGreaterThan(0);
       expect(g.roles.length, `${g.id} roles`).toBeGreaterThan(0);
@@ -55,7 +58,7 @@ describe('scratch gesture catalogue (SCR-P1.2)', () => {
     expect(Math.max(...SCRATCH_GESTURES.map((g) => g.intensity))).toBe(1);
   });
 
-  it('ports the reference timings: chirp windows (0.06,0.44),(0.56,0.94) lead -2 ms; forwardStab (0,0.42); backwardStab (0.45,1); steps = the tuned stroke (SA-B2)', () => {
+  it('ports the reference timings: chirp windows (0.06,0.44),(0.56,0.94) lead -2 ms; forwardStab (0,0.42); backwardStab (0.45,1); steps = the reference lengths (O3)', () => {
     expect(getGesture('chirp').faderWindows.map((w) => w.open)).toEqual([[0.06, 0.44], [0.56, 0.94]]);
     expect(getGesture('chirp').cutLeadMs).toBe(-2);
     expect(getGesture('chirpDouble').faderWindows).toHaveLength(4);
@@ -71,11 +74,9 @@ describe('scratch gesture catalogue (SCR-P1.2)', () => {
     expect(getGesture('transformer4').faderWindows.map((w) => w.open)).toEqual([[0, 0.125], [0.25, 0.375], [0.5, 0.625], [0.75, 0.875]]);
     expect(getGesture('hydroplane').faderWindows).toHaveLength(12);
     for (const id of ['baby', 'babySlow', 'tearForward', 'tearReverse', 'scribble', 'drag'] as const) expect(getGesture(id).faderWindows.map((w) => w.open), id).toEqual([[0, 1]]);
-    // SA-B2: one length per gesture = the tuned stroke (cycle x strokes); baby and slow baby take the
-    // reference lengths since O3 (owner 2026-10-12, the beep fix); the rest are not yet the reference
-    // `_GESTURE_STEPS` (baby 2, babySlow 3, stabs 1, chirp 2, transformer4 2, tears 2, flares 2,
-    // orbit 3, crab 2, hydroplane 3, drag 4), which overlap when one hand performs them
-    const steps = { baby: 2, babySlow: 3, forwardStab: 2, backwardStab: 2, chirp: 1, chirpDouble: 2, transformer4: 4, transformer8: 4, tearForward: 4, tearReverse: 4, flare1: 4, flare2: 4, orbit: 4, scribble: 2, drag: 8, crab: 4, hydroplane: 4, drop: 4, dropPhrase: 16 } as const;
+    // O3 (owner 2026-10-12): every gesture the reference has takes its `_GESTURE_STEPS` length
+    // (scratch.py :194-198) - the turntable model performs the reference hand over the reference time
+    const steps = { baby: 2, babySlow: 3, forwardStab: 1, backwardStab: 1, chirp: 2, chirpDouble: 2, transformer4: 2, transformer8: 4, tearForward: 2, tearReverse: 2, flare1: 2, flare2: 2, orbit: 3, scribble: 2, drag: 4, crab: 2, hydroplane: 3, cut: 1, echo: 2, brake: 4, spinup: 4, drop: 4, dropPhrase: 16 } as const;
     for (const [id, n] of Object.entries(steps)) expect(getGesture(id as keyof typeof steps).durationSteps, id).toBe(n);
   });
 });
@@ -87,7 +88,7 @@ describe('SCRATCH_PATTERNS is derived from the catalogue (SCR-P1.3, D3)', () => 
     expect(new Set(ids).size).toBe(19);
     for (const p of SCRATCH_PATTERNS) {
       const g = getGesture(p.gestureId);
-      expect(p.frames.map((f) => f.velocity)).toEqual(g.velocityCurve.map((v) => v.velocity));
+      expect(p.frames.length, `${g.id} frames from the model`).toBeGreaterThan(1);
       expect(p.durationBeats).toBe(g.cycleBeats);
       expect(p.trueReverse).toBe(g.trueReverse);
     }
