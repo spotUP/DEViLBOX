@@ -26,6 +26,7 @@ import type { ScratchGestureId, ScratchRole, ScratchSource } from '../dj/scratch
 import type { ScratchCue } from '../dj/scratch/ScratchRecordVoice';
 import { getScratchVoicePool, getScratchVoicePoolIfActive, type PerformHandle } from '../dj/scratch/scratchVoicePool';
 import { ambienceFor } from '../dj/scratch/scratchBus';
+import { handSpeedFactor } from '../dj/scratch/scratchHandSpeed';
 import { playDeckPattern, stopDeckPattern, finishDeckPatternCycle } from '../dj/DJActions';
 import type { DeckId } from '../dj/DeckEngine';
 import type { DubBusSettings } from '../../types/dub';
@@ -1772,10 +1773,10 @@ function createScratchGesture(gestureId: ScratchGestureId): DjFxAction {
       const deckId = opts?.deck ?? getActiveDeckId();
       scratchDeck.set(this.id, deckId);
       // a planned event (`beats` = its length): the stroke starts at its beginning now and plays
-      // whole cycles (SA-M2, SA-m5); a pressed pattern loops phase-aligned. `role` and `at` are
+      // whole cycles (SA-M2, SA-m5); `amount` (plan velocity) is the hand speed; a pressed pattern loops phase-aligned. `role` and `at` are
       // record-voice only (bus ambience; sample-accurate worklet start).
       const planned = opts?.beats !== undefined && opts.beats > 0
-        ? { phase: 0, cycles: Math.max(1, Math.round(opts.beats / gesture.cycleBeats)) }
+        ? { phase: 0, cycles: Math.max(1, Math.round(opts.beats / gesture.cycleBeats)), speed: handSpeedFactor(opts.amount) }
         : undefined;
       playDeckPattern(deckId, pattern.name, opts?.onWaiting, planned);
       try { useDJStore.getState().setDeckPattern(deckId, pattern.name); } catch { /* store not ready */ }
