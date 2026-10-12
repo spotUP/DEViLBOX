@@ -39,7 +39,9 @@ import { StandaloneJuggle, mixInPhraseStartOf } from './autodj/juggle/standalone
 import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
 import { registerAutoDJ } from './autoDJInstance';
 import { DJScratchDJ } from './scratch/DJScratchDJ';
-import { createDeckScratchExecutor, performTransitionScratch, prepareScratchSource } from './scratch/autoScratchRuntime';
+import { createDeckScratchExecutor, emergencyRelease, performTransitionScratch, prepareScratchSource } from './scratch/autoScratchRuntime';
+import { getScratchVoicePoolIfActive } from './scratch/scratchVoicePool';
+import { subscribeDjFxFires } from '@/engine/drumpad/DjFxActions';
 import { scratchModeOf, scratchStyleFor } from './scratch/scratchStyles';
 import { trackerSampleInfos, type TrackerSampleInstrument } from './scratch/trackerSampleSource';
 import { HAND_COSTS, scratchPermission, transitionCost } from './autodj/performanceBudget';
@@ -144,6 +146,9 @@ class DJAutoDJ {
   private juggleSink: ReturnType<typeof createDeckJuggleSink> | null = null;
   /** The Auto Scratch performer (scratch plan section 4: DJAutoDJ only ticks it). */
   private scratch: DJScratchDJ | null = null;
+  /** A user's hand on a control the scratch performer uses since the last tick (section 63). */
+  private scratchUserControl: string | null = null;
+  private scratchLastCrossfader: number | null = null;
   /**
    * Pattern-aware deferral counter. When a chord change is imminent on
    * the outgoing track, `triggerTransition` is deferred by one poll tick
@@ -1731,8 +1736,18 @@ class DJAutoDJ {
   /** Test/MCP access: the scratch performer (created on first use). */
   getScratch(): DJScratchDJ {
     if (!this.scratch) {
+      // a scratch pad, key or MIDI fire by the user (anything but the Auto DJ) takes the scratch back (section 63)
+      subscribeDjFxFires((entry) => {
+        if (entry.kind === 'fire' && entry.source !== 'autodj' && entry.id.startsWith('fx_scratch')) this.scratchUserControl = 'a scratch control';
+      });
       this.scratch = new DJScratchDJ({
-        executorFor: (deck, track) => createDeckScratchExecutor(deck, track),
+        // an engine error mid-scratch: released, restored, every voice stopped, the performer IDLE; the DJ goes on
+        executorFor: (deck, track) => createDeckScratchExecutor(deck, track, undefined, (err) => {
+          console.warn('[AutoDJ] scratch engine error, released:', err instanceof Error ? err.message : err);
+          emergencyRelease();
+          this.scratch?.reset('engine error');
+        }),
+        hasRecord: (id) => getScratchVoicePoolIfActive()?.hasRecord(id) ?? false,
         prepareSource: (chosen) => prepareScratchSource(chosen),
         // One decision per performed phrase (scratch plan section 65): source, gestures, placement, length.
         onPlan: (plan, events) => {
@@ -1773,11 +1788,18 @@ class DJAutoDJ {
         juggleCost: juggling ? HAND_COSTS.beatJuggle : 0,
         transitionCost: transitioning ? transitionCost(this.execution?.plan.style) : 0,
       });
+      // the user's hand on the crossfader outside a transition and a juggle (section 63)
+      const cf = s.crossfaderPosition;
+      if (!transitioning && !juggling && this.scratchLastCrossfader !== null && Math.abs(cf - this.scratchLastCrossfader) > 0.05) this.scratchUserControl = 'the crossfader';
+      this.scratchLastCrossfader = transitioning || juggling ? null : cf;
+      const userControl = this.scratchUserControl;
+      this.scratchUserControl = null;
       const song = track?.tracker ? (getDJEngine().getDeck(this.activeDeck).replayer.getSong() as { instruments?: TrackerSampleInstrument[] } | null) : null;
       c.tick({
         perf: this.performanceContext(timeRemaining), deck: this.ab(this.activeDeck), mode, style: choice.style,
         genre: choice.modifiers, genreHint: choice.genre, scratchPermission: permission,
-        hold: transitioning, juggleActive: juggling,
+        hold: transitioning, juggleActive: juggling, userControl,
+        decksPlaying: { A: this.deckPlaying('A'), B: this.deckPlaying('B') },
         transitionInSec: this.plan ? Math.max(0, this.plan.startTimeSec - this.getOutgoingPosition()) : null,
         trackerSamples: song?.instruments ? trackerSampleInfos(song.instruments, this.ab(this.activeDeck)) : undefined,
       });

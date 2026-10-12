@@ -25,6 +25,7 @@ import { PerformanceBudget, performancePermissions } from './scratchBudget';
 import { ScratchStateMachine, type ScratchState } from './scratchStateMachine';
 import { evaluatePhrase, type PhraseDecision, type PhraseEvaluation, type PhraseTrace } from './scratchEvaluate';
 import { findOpportunity, type ScratchOpportunity } from './scratchOpportunity';
+import { checkScratch, checkStuck, type SafetyRule, type SafetyState } from './ScratchSafety';
 import { arcForSection, phaseAt, planArc, type ArcPhaseName, type ArcTemplate } from './scratchArc';
 import type { ScratchGenreHint } from './scratchStyles';
 import type { ScratchGestureId, ScratchDJStyle, ScratchEvent, ScratchSource, ScratchAnchor, DeckScratchAnchor } from './scratchTypes';
@@ -66,6 +67,10 @@ export interface ScratchTickInput {
   hold?: boolean;
   /** A juggle is running (sections 26, 49): only crate accents and answers, never a deck, never a feature. */
   juggleActive?: boolean;
+  /** Which decks play now (the governor's no-silence rule); the master deck alone when omitted. */
+  decksPlaying?: Readonly<Record<AB, boolean>>;
+  /** The user touched a control the performer uses (platter, crossfader, a scratch pad): yield (section 63). */
+  userControl?: string | null;
   /** Seconds until the planned transition starts (null: none planned). A transition inside the window
    *  keeps the decks still: crate records only, no feature (section 28: deck sync before a scratch). */
   transitionInSec?: number | null;
@@ -81,6 +86,10 @@ export interface ScratchDJDeps {
   prepareSource?(chosen: ChosenScratchSource, input: ScratchTickInput): void | Promise<unknown>;
   /** Every phrase's evaluation (section 52) - quality, decision, reason. */
   onEvaluation?(evaluation: PhraseEvaluation, ctx: ScratchPerformanceContext): void;
+  /** A transient record the pool holds (the governor's tracker-sample check). */
+  hasRecord?(id: string): boolean;
+  /** Every event the governor refused, with its rule (section 59). */
+  onRefused?(event: ScratchEvent, rule: SafetyRule, reason: string): void;
   /** Every source decision, with its score terms (the Auto DJ decision log, P7.12). */
   onSourceDecision?(decision: SourceDecision, ctx: ScratchPerformanceContext): void;
   seed?: number;
@@ -172,6 +181,9 @@ export class DJScratchDJ {
   private lastEvaluation: PhraseEvaluation | null = null;
   private lastPeak = false;
   private arcPhases: ArcPhaseName[] = [];
+  /** Beat each deck is scratched until (the governor's one-hand-per-deck rule). */
+  private deckBusyUntil: Partial<Record<AB, number>> = {};
+  private lastEventBar: number | null = null;
   private currentArcPhase: ArcPhaseName | null = null;
   /** Last plan (telemetry, P9.5). */
   lastPlan: ScratchPlan | null = null;
@@ -192,6 +204,8 @@ export class DJScratchDJ {
     this.windows = [];
     this.intent = 'continue';
     this.currentArcPhase = null;
+    this.deckBusyUntil = {};
+    this.lastEventBar = null;
   }
 
   telemetry(): ScratchDJTelemetry {
@@ -209,6 +223,11 @@ export class DJScratchDJ {
     this.lastMode = input.mode;
     this.lastStyle = input.style;
     const track = input.perf.currentTrack;
+    // section 63: the user's hand wins - yield now, listen again next tick (never resume the phrase)
+    if (input.userControl && this.states.state !== 'IDLE') {
+      this.reset(`user control: ${input.userControl}`);
+      return { planned: false, scheduled: 0, reason: `user control: ${input.userControl}` };
+    }
     if (input.mode === 'OFF' || input.scratchPermission <= 0 || !track) {
       if (this.states.state !== 'IDLE') this.reset(!track ? 'no track' : input.mode === 'OFF' ? 'mode off' : 'no scratch permission');
       return { planned: false, scheduled: 0, reason: !track ? 'no track' : input.mode === 'OFF' ? 'mode off' : 'no scratch permission' };
@@ -242,6 +261,9 @@ export class DJScratchDJ {
   private onBar(ctx: ScratchPerformanceContext, track: DJTrackAnalysis, input: ScratchTickInput): void {
     if (this.lastBar >= 0) this.budget.tickBar(Math.max(1, ctx.masterBar - this.lastBar));
     for (const done of this.windows.filter((x) => ctx.masterBar >= x.toBar)) this.finishWindow(done, ctx, track, input);
+    // section 59: a performing state with nothing played for 8 bars is stuck
+    const performing = !['IDLE', 'LISTENING', 'REST', 'ABORTING'].includes(this.states.state);
+    if (!checkStuck(performing, ctx.masterBar, this.lastEventBar).ok) { this.reset('stuck: no scratch for 8 bars'); this.states.go('LISTENING', 'after a stuck phrase', ctx.masterBar); return; }
     // a window starts on its first bar: the performer sets up and plays it (section 51)
     for (const next of this.windows.filter((x) => !x.started && ctx.masterBar >= x.fromBar)) {
       next.started = true;
@@ -386,9 +408,22 @@ export class DJScratchDJ {
     const bassSource = chosen.decision?.candidate.material === 'bass';
     const anchorQuality = chosen.decision?.candidate.anchorQuality ?? 1;
     const entries: WindowEntry[] = [];
+    const at = (beat: number): number => timeAtBeat(track.beatGrid, beat);
+    const safety: SafetyState = {
+      decksPlaying: input.decksPlaying ?? { A: input.deck === 'A', B: input.deck === 'B' },
+      vocalAt: (b) => timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, at(b)),
+      bassAt: (b) => timelineAt(track.bassActivity.values, track.bassActivity.hopSec, at(b)),
+      bassSource, deckBusyUntil: this.deckBusyUntil, hasRecord: this.deps.hasRecord,
+    };
     plan.events.forEach((p, i) => {
       const e = events[i]!;
       if (e.executeAtBeat < now || e.executeAtBeat < firstBeat) return;
+      // section 59: the governor has the last word on every event
+      const verdict = checkScratch(e, safety);
+      if (!verdict.ok) { this.deps.onRefused?.(e, verdict.rule, verdict.reason); plan.reasons.push(`refused ${e.gesture}: ${verdict.rule}`); return; }
+      const d = e.source.type === 'DECK' || e.source.type === 'TRACKER_CHANNEL' ? (e.deck ?? e.source.deck) : undefined;
+      if (d) this.deckBusyUntil[d] = Math.max(this.deckBusyUntil[d] ?? -Infinity, e.executeAtBeat + e.durationBeats);
+      this.lastEventBar = Math.max(this.lastEventBar ?? p.bar, p.bar);
       const run = this.sink!.exec.schedule(e);
       entries.push({ event: e, run, sourceKey, bar: p.bar, bassSource, anchorQuality });
       this.memory.record({ bar: p.bar, gesture: e.gesture, sourceKey, intensity: e.intensity, transitionType: ctx.transitionType, section: ctx.sectionName, nextSection: ctx.nextSection?.kind, routine: plan.routine });

@@ -17,10 +17,11 @@ import { realTimers } from '../autodj/executorTimers';
 import type { DJTrackAnalysis } from '../autodj/types';
 import { ScratchExecutor, type ScratchExecutorEvent } from './ScratchExecutor';
 import { createScratchStateProbe } from './scratchSnapshot';
-import { getScratchVoicePool } from './scratchVoicePool';
+import { getScratchVoicePool, getScratchVoicePoolIfActive } from './scratchVoicePool';
 import { loadTrackerSample, type TrackerSampleInstrument } from './trackerSampleSource';
 import type { ChosenScratchSource } from './DJScratchDJ';
 import type { TransitionScratchPlan } from './transitionScratch';
+import type { ScratchEvent } from './scratchTypes';
 
 type AB = 'A' | 'B';
 
@@ -28,7 +29,7 @@ type AB = 'A' | 'B';
 export const autoScratchRuntimeStats = { transitionScratches: 0, fxRequests: 0 };
 
 /** The executor on a live deck: its grid (`analysisClock` at the deck's effective tempo) and the registry. */
-export function createDeckScratchExecutor(deck: AB, analysis: DJTrackAnalysis, onEvent?: (e: ScratchExecutorEvent) => void): ScratchExecutor {
+export function createDeckScratchExecutor(deck: AB, analysis: DJTrackAnalysis, onEvent?: (e: ScratchExecutorEvent) => void, onError?: (err: unknown) => void): ScratchExecutor {
   const engine = getDJEngine();
   const position = (): number => { try { return engine.getDeck(deck).audioPlayer.getPosition(); } catch { return useDJStore.getState().decks[deck].audioPosition; } };
   return new ScratchExecutor({
@@ -40,7 +41,13 @@ export function createDeckScratchExecutor(deck: AB, analysis: DJTrackAnalysis, o
     recueDeck: (d, anchorSec) => engine.getDeck(d).recueScratch(anchorSec),
     timers: realTimers,
     onEvent,
+    onError,
   });
+}
+
+/** Section 59 / P8.8: an engine error mid-scratch - every voice stopped now (the executor already released and restored its run). */
+export function emergencyRelease(): void {
+  try { getScratchVoicePoolIfActive()?.releaseAll(); } catch { /* the DJ goes on */ }
 }
 
 /** Get a chosen source ready: a tracker deck's sample is decoded into the voice pool (P5.6). */
@@ -76,7 +83,7 @@ export function performTransitionScratch(
   scratch: TransitionScratchPlan,
   deck: AB,
   analysis: DJTrackAnalysis,
-  deps: { executorFor?: (deck: AB, analysis: DJTrackAnalysis) => Pick<ScratchExecutor, 'schedule' | 'cancel' | 'active'>; fire?: typeof fireDjFx } = {},
+  deps: { executorFor?: (deck: AB, analysis: DJTrackAnalysis) => { schedule(e: ScratchEvent): unknown; cancel(): void; readonly active: number }; fire?: typeof fireDjFx } = {},
 ): TransitionScratchHandle {
   autoScratchRuntimeStats.transitionScratches++;
   const exec = (deps.executorFor ?? createDeckScratchExecutor)(deck, analysis);

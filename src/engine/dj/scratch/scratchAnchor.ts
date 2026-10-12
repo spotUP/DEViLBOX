@@ -67,7 +67,8 @@ export function anchorFor(source: ScratchSource, role: ScratchRole): ResolvedCra
     const cue = CRATE_CUE_BY_ROLE[role];
     return {
       cue,
-      position: record.anchors[cue],
+      // a cue the catalogue marks before the safe start (an attack at 0) sits on the safe edge, as the voice plays it
+      position: Math.max(record.safe[0], Math.min(record.safe[1], record.anchors[cue])),
       safe: record.safe,
       safeForward: record.safeForward,
       safeReverse: record.safeReverse,

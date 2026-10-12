@@ -1,6 +1,8 @@
 /** Priority order (owner scratch plan section 28; ledger SCR-P7.10): timing and sync before a scratch trick. */
 import { describe, it, expect } from 'vitest';
-import { resolveConflicts, PRIORITY_ORDER } from '../ScratchSafety';
+import { resolveConflicts, PRIORITY_ORDER, checkScratch, checkStuck, scratchSafetyStats, type SafetyState } from '../ScratchSafety';
+import { getScratchRecord } from '../scratchCatalogue';
+import type { ScratchEvent } from '../scratchTypes';
 import { recueDeck, type DeckRecueTarget } from '../deckRecue';
 
 describe('section 28 priority order (SCR-P7.10)', () => {
@@ -41,4 +43,40 @@ describe('section 28 priority order (SCR-P7.10)', () => {
     expect(seeks).toBe(0);
     expect(recueDeck({ ...target, isBending: () => false }, 12).recued).toBe(true);
   });
+});
+
+describe('the governor (SCR-P8.1, section 59): one case per rule, each named', () => {
+  const ah = getScratchRecord('AH_STANDARD')!;
+  const crate = (over: Partial<ScratchEvent> = {}): ScratchEvent => ({
+    executeAtBeat: 16, durationBeats: 1, role: 'ACCENT', source: { type: 'CRATE', recordId: ah.id, anchor: ah.anchor }, anchor: ah.anchor,
+    gesture: 'baby', velocity: 0.7, humanizeMs: 0, intensity: 0.4, returnToAnchor: true, ...over,
+  });
+  const deckEv = (over: Partial<ScratchEvent> = {}): ScratchEvent => {
+    const anchor = { position: 10, safe: [9.5, 11] as const };
+    return { ...crate(), source: { type: 'DECK', deck: 'A', anchor }, anchor, deck: 'A', ...over };
+  };
+  const state = (over: Partial<SafetyState> = {}): SafetyState => ({ decksPlaying: { A: true, B: false }, vocalAt: () => 0, bassAt: () => 0, ...over });
+  const rule = (e: ScratchEvent, s: SafetyState) => { const v = checkScratch(e, s); return v.ok ? 'ok' : v.rule; };
+
+  it('every rule refuses its case and passes a sound one', () => {
+    const before = scratchSafetyStats.check;
+    expect(rule(crate(), state())).toBe('ok');
+    expect(rule(crate(), state({ decksPlaying: { A: false, B: false } }))).toBe('bothDecksSilent');
+    expect(rule(deckEv({ deck: 'B', source: { type: 'DECK', deck: 'B', anchor: { position: 10, safe: [9.5, 11] } } }), state())).toBe('invalidDeck');
+    expect(rule(crate({ source: { type: 'CRATE', recordId: 'NOPE', anchor: ah.anchor } }), state())).toBe('invalidSource');
+    expect(rule(crate({ source: { type: 'CRATE', recordId: 'SCRATCH_005', anchor: ah.anchor } }), state())).toBe('invalidSource');
+    expect(rule(crate({ anchor: { ...ah.anchor, position: ah.safe[1] + 0.5 } }), state())).toBe('unsafeRange');
+    expect(rule(deckEv(), state({ deckBusyUntil: { A: 17 } }))).toBe('conflict');
+    // excessive rate: every catalogue gesture at the fastest hand stays inside the ring's 4x (the rule guards new gestures)
+    for (const g of ['tweak', 'scribble', 'uzi', 'crab', 'transformer8'] as const) expect(rule(crate({ gesture: g, velocity: 1 }), state()), g).not.toBe('excessiveRate');
+    // excessive cuts: checkCutRate refuses 20 per beat (scratchStateMachine.test.ts); none in the catalogue
+    expect(rule(crate(), state({ vocalAt: () => 0.9 }))).toBe('vocalCollision');
+    expect(rule(crate({ role: 'ANSWER' }), state({ vocalAt: () => 0.9 }))).toBe('ok');
+    expect(rule(crate(), state({ bassSource: true, bassAt: () => 0.8 }))).toBe('bassCollision');
+    const stuck = checkStuck(true, 30, 20);
+    expect(stuck.ok ? 'ok' : stuck.rule).toBe('stuck');
+    expect(checkStuck(true, 27, 20).ok).toBe(true);
+    expect(scratchSafetyStats.check - before).toBeGreaterThanOrEqual(10);
+  });
+
 });
