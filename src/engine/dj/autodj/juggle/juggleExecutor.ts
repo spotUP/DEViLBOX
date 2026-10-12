@@ -87,6 +87,8 @@ export interface JuggleExecution {
   /** Hard: stop the ticker, no further action (emergency path handles the decks). */
   cancel(reason: string): void;
   active(): boolean;
+  /** The pattern's clock now: the master beat, continuous across the pattern's own seeks of the master. */
+  beatNow(): number;
   nextActions(count: number): Array<{ deck: string; type: DJJuggleAction['type']; beat: number }>;
 }
 
@@ -111,13 +113,19 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
   let aborted = false;
   let interval: unknown = null;
   let watchdog: unknown = null;
+  // A pattern may seek the clock's own deck (a call jumps the master to its call material). The clock is
+  // that deck's position on its grid, so the seek would move the pattern's timeline with it: every later
+  // action lands early or is skipped as stale (live 2026-10-12: a call jump of +16 beats skipped the
+  // response). The beats the pattern's seeks moved the clock are added back: the timeline stays the time played.
+  let seekOffset = 0;
+  const beatNow = (): number => opts.clock.beatNow() + seekOffset;
   const cutsInBeat = new Map<number, number>();
   const fxInBar = new Map<number, number>();
   let resolve!: (r: JuggleExecutionResult) => void;
   const done = new Promise<JuggleExecutionResult>((r) => { resolve = r; });
 
   const emit = (kind: JuggleEventKind, reason: string, action?: DJJuggleAction): void => {
-    const e: JuggleEvent = { kind, beat: opts.clock.beatNow(), reason, action, pattern: pattern.id };
+    const e: JuggleEvent = { kind, beat: beatNow(), reason, action, pattern: pattern.id };
     events.push(e);
     opts.onEvent?.(e);
   };
@@ -180,7 +188,7 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
   };
 
   const release = (reason: string): void => {
-    const now = opts.clock.beatNow();
+    const now = beatNow();
     const info = { beatSec: opts.clock.beatSec(), beatNow: now, patternBeat: now - startBeat };
     const st = opts.sink.state();
     const to = st.playing[primary] ? primary : st.playing[other] ? other : primary;
@@ -190,7 +198,7 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
 
   const tick = (): void => {
     if (finished) return;
-    const now = opts.clock.beatNow();
+    const now = beatNow();
     const abortReason = opts.abortCheck?.();
     if (abortReason) { aborted = true; release(abortReason); finish(false, abortReason); return; }
     while (cursor < queue.length && queue[cursor].at <= now) {
@@ -200,7 +208,9 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
       if (now - at > staleBeats) { trace.push({ action, scheduledBeat: at, firedBeat: null, status: 'skipped', reason: 'stale' }); emit('juggleActionBlocked', 'stale action skipped', action); continue; }
       const blocked = govern(action, now);
       if (blocked) { trace.push({ action, scheduledBeat: at, firedBeat: null, status: 'blocked', reason: blocked }); emit('juggleActionBlocked', blocked, action); continue; }
-      try { opts.sink.apply(action, info); } catch (err) { trace.push({ action, scheduledBeat: at, firedBeat: now, status: 'blocked', reason: `sink error: ${err instanceof Error ? err.message : String(err)}` }); emit('juggleActionBlocked', 'sink error', action); continue; }
+      const seeks = action.type === 'JumpToBar';
+      const before = seeks ? opts.clock.beatNow() : 0;
+      try { opts.sink.apply(action, info); if (seeks) seekOffset += before - opts.clock.beatNow(); } catch (err) { trace.push({ action, scheduledBeat: at, firedBeat: now, status: 'blocked', reason: `sink error: ${err instanceof Error ? err.message : String(err)}` }); emit('juggleActionBlocked', 'sink error', action); continue; }
       trace.push({ action, scheduledBeat: at, firedBeat: now, status: 'executed' });
       emit('juggleActionExecuted', action.reason ?? action.type, action);
       noSilenceGuard(now);
@@ -212,7 +222,7 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
   emit('juggleStarted', `${pattern.type} (${pattern.sequence}) from beat ${startBeat.toFixed(2)}`);
   interval = timers.setInterval(tick, tickMs);
   // Section 32: never an infinite pattern - the watchdog is the only ms timer and it only cleans up.
-  const budgetMs = ((endBeat - opts.clock.beatNow()) * opts.clock.beatSec() * 1000) * 1.5 + 4000;
+  const budgetMs = ((endBeat - beatNow()) * opts.clock.beatSec() * 1000) * 1.5 + 4000;
   watchdog = timers.setTimeout(() => { if (!finished) { aborted = true; release('watchdog'); finish(false, 'watchdog: pattern overran'); } }, Math.max(1000, budgetMs));
   tick();
 
@@ -221,6 +231,7 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
     abort(reason) { if (finished) return; aborted = true; release(reason); finish(false, reason); },
     cancel(reason) { if (finished) return; aborted = true; finish(false, reason); },
     active: () => !finished,
+    beatNow,
     nextActions: (count) => queue.slice(cursor, cursor + count).map((q) => ({ deck: q.action.deck, type: q.action.type, beat: q.at })),
   };
 }
