@@ -11,8 +11,9 @@ import {
   DENSITY_RATE, planBars, planVocabulary, pickGesture, vocabulary, humanizeMs, withThrow, isThrowGesture, sectionDensity,
   DENSITY_ORDER, oneHand, fillVocabulary, validatePhrase, VOCAL_BUSY, type DensityState, type PlacedScratch, type PlannedRest, type ThrowMemory,
 } from './scratchPlacement';
-import { routineFor, routineToPlaced, SCRATCH_ROUTINES, type RoutineName } from './scratchRoutines';
-import { maxLevelFor, SCRATCH_STYLES, type ScratchMode } from './scratchStyles';
+import { juggleResponseRoutine, routineFor, routineToPlaced, SCRATCH_ROUTINES, validateRoutine, type RoutineName } from './scratchRoutines';
+import type { JugglePhase } from '../autodj/juggle/juggleTypes';
+import { maxLevelFor, SCRATCH_STYLES, styleVocabulary, type ScratchMode } from './scratchStyles';
 import { getGesture, gestureBeats, SCRATCH_GESTURE_IDS } from './scratchGestureCatalog';
 import { DEFAULT_GRID, STEPS_PER_BEAT } from './scratchAnchor';
 import { barStartBeat } from '../autodj/beatGrid';
@@ -59,7 +60,7 @@ export interface ScratchPlan {
   events: PlacedScratch[];
   bars: PlacedScratch[][];
   rests: PlannedRest[];
-  routine?: RoutineName;
+  routine?: RoutineName | 'juggleResponse';
   issues: string[];
   /** Why the plan is what it is (telemetry). */
   reasons: string[];
@@ -86,6 +87,24 @@ function routineInVocabulary(placed: PlacedScratch[], vocab: readonly ScratchGes
     last = g;
     return g === p.gesture ? p : { ...p, gesture: g };
   });
+}
+
+/**
+ * The juggle response (owner plan section 49, SCR-P7.9): the scratch over a running juggle, bar by
+ * bar on the juggle's own phases (`juggleResponseRoutine`), in the style's vocabulary at the mode's
+ * level and, on a crate record, in the record's own gestures.
+ */
+export function planJuggleResponse(ctx: ScratchPerformanceContext, opts: { mode: ScratchMode; seed: number; fromBar: number; phases: ReadonlyArray<JugglePhase | null>; allowed?: readonly ScratchGestureId[] }): ScratchPlan {
+  const routine = juggleResponseRoutine(opts.phases, ctx.style, opts.seed + opts.fromBar);
+  const styleVocab = styleVocabulary(ctx.style, opts.mode);
+  const vocab = opts.allowed ? styleVocab.filter((g) => opts.allowed!.includes(g)) : styleVocab;
+  const events = routineInVocabulary(routineToPlaced(routine, opts.fromBar, DEFAULT_GRID, ctx.meter), vocab.length ? vocab : styleVocab, opts.seed, ctx.sectionName);
+  const bars = opts.phases.map((_, k) => events.filter((e) => e.bar === opts.fromBar + k));
+  const peaks = opts.phases.filter((p) => p === 'PEAK').length;
+  return {
+    mode: opts.mode, events, bars, rests: [], routine: 'juggleResponse', issues: validateRoutine(routine),
+    reasons: [`juggleResponse: scratch vocal over the loops, ${peaks} trade bar${peaks === 1 ? '' : 's'} answered, out for the payoff`],
+  };
 }
 
 export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOptions): ScratchPlan {

@@ -14,8 +14,9 @@
 import { barStartBeat, timeAtBeat, timelineAt } from '../autodj/beatGrid';
 import type { DJPerformanceContext, DJTrackAnalysis } from '../autodj/types';
 import { buildScratchContext, type ScratchPerformanceContext } from './scratchContext';
-import { planScratch, toScratchEvents, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
+import { planJuggleResponse, planScratch, toScratchEvents, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
 import type { ThrowMemory } from './scratchPlacement';
+import type { JugglePhase } from '../autodj/juggle/juggleTypes';
 import type { ScratchMode } from './scratchStyles';
 import { anchorFor } from './scratchAnchor';
 import type { ScratchRecord } from './scratchCatalogue';
@@ -69,6 +70,9 @@ export interface ScratchTickInput {
   hold?: boolean;
   /** A juggle is running (sections 26, 49): only crate accents and answers, never a deck, never a feature. */
   juggleActive?: boolean;
+  /** The running juggle's grammar on the master's beat clock (section 49): with 2+ hands left the
+   *  scratch plays the juggle response over its phases. Phase beats are relative to `startBeat`. */
+  juggleShape?: { startBeat: number; phases: ReadonlyArray<{ phase: JugglePhase; startBeat: number; endBeat: number }> } | null;
   /** Which decks play now (the governor's no-silence rule); the master deck alone when omitted. */
   decksPlaying?: Readonly<Record<AB, boolean>>;
   /** The user touched a control the performer uses (platter, crossfader, a scratch pad): yield (section 63). */
@@ -105,7 +109,7 @@ export interface ScratchDJTickResult {
 }
 
 /** Reachability sentinels (SCR-P4.R4). */
-export const scratchDJStats = { ticks: 0, plans: 0, scheduled: 0 };
+export const scratchDJStats = { ticks: 0, plans: 0, scheduled: 0, juggleResponses: 0 };
 
 /** The section 13 selector over the plan's roles and gestures (the default `chooseSource`). */
 export function selectorSource(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, recent: readonly string[], memory: Pick<SourceRequest, 'blocked' | 'preference'> = {}): ChosenScratchSource | null {
@@ -387,14 +391,21 @@ export class DJScratchDJ {
         ? { mode: input.mode, events: [], bars: [], rests: [], issues: [], reasons: [`rest: ${this.lastEvaluation?.reason ?? 'evaluation'}`] }
         : planScratch(ctx, opts);
     }
+    // section 49: over a running juggle with two hands free, the juggle response replaces the phrase
+    const responsePhases = !arc && input.juggleActive && input.juggleShape && input.scratchPermission >= 2
+      ? juggleBarPhases(input.juggleShape, track, fromBar, toBar) : null;
+    const response = !!responsePhases && responsePhases.some((p) => p === 'PEAK');
+    if (response) plan = planJuggleResponse(ctx, { mode: input.mode, seed, fromBar, phases: responsePhases! });
     this.plannedThroughBar = toBar;
-    if (input.juggleActive) plan = juggleSafe(plan);
+    if (input.juggleActive && !response) plan = juggleSafe(plan);
 
     // the source is chosen before the throw: a crate record opens its phrase with one (section 41)
     const chosen = plan.events.length ? this.chooseSource(ctx, plan, input, fromBar, decksStill) : null;
     // a crate record plays only its own gestures (sections 38/39): the plan is made again from them,
     // or the voice would refuse the rest and the listener hears only what the record happens to take
-    if (chosen?.record && !arc) {
+    if (chosen?.record && response) {
+      plan = planJuggleResponse(ctx, { mode: input.mode, seed, fromBar, phases: responsePhases!, allowed: chosen.record.gestures });
+    } else if (chosen?.record && !arc) {
       const vocalByBar = Array.from({ length: toBar - fromBar }, (_, k) => {
         const b = track.downbeats.bars[fromBar + k];
         return b ? timelineAt(track.vocalActivity.values, track.vocalActivity.hopSec, b.start) : ctx.vocalActivity;
@@ -404,7 +415,8 @@ export class DJScratchDJ {
       const a = planArc({ ...arcOpts, allowed: chosen.record.gestures });
       plan = { ...plan, events: a.events, bars: Array.from({ length: arc.bars }, (_, k) => a.events.filter((e) => e.bar === fromBar + k)) };
     }
-    if (input.juggleActive) plan = juggleSafe(plan);
+    if (input.juggleActive && !response) plan = juggleSafe(plan);
+    if (response) scratchDJStats.juggleResponses++;
     scratchDJStats.plans++;
     this.lastPlan = plan;
     const intent = this.intent;
@@ -487,6 +499,14 @@ export class DJScratchDJ {
 }
 
 /** Under a running juggle a scratch only answers or accents (sections 26, 49). */
+/** The juggle phase at each bar's downbeat of [fromBar, toBar) on the track's grid (null outside the pattern). */
+export function juggleBarPhases(shape: NonNullable<ScratchTickInput['juggleShape']>, track: Pick<DJTrackAnalysis, 'downbeats'>, fromBar: number, toBar: number): Array<JugglePhase | null> {
+  return Array.from({ length: Math.max(0, toBar - fromBar) }, (_, k) => {
+    const rel = barStartBeat(track.downbeats, fromBar + k) - shape.startBeat;
+    return shape.phases.find((p) => p.startBeat <= rel + 1e-6 && rel < p.endBeat - 1e-6)?.phase ?? null;
+  });
+}
+
 function juggleSafe(plan: ScratchPlan): ScratchPlan {
   const events = plan.events.filter((e) => e.role === 'ANSWER' || e.role === 'ACCENT');
   if (events.length === plan.events.length) return plan;
