@@ -1,0 +1,72 @@
+name: WebSID
+
+# public/deepsid/websid.wasm + backend_websid.js were a prebuilt DeepSID binary with no
+# sources in the repo, so nothing could change the emulator (player call rate, one-pass
+# voice stems). Its sources now live in third-party/websid (upstream bitbucket wothke/websid
+# 52822db plus "DEViLBOX:" changes) and third-party/websid/build.sh builds both files.
+#
+# This workflow compiles them from the committed sources, so a source change that no
+# longer builds cannot sit on main, and fails when the sources changed without the
+# artifacts being rebuilt. It does not diff the built wasm against the committed one:
+# emcc output is not reproducible across toolchain versions.
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'third-party/websid/**'
+      - 'public/deepsid/websid.wasm'
+      - 'public/deepsid/backend_websid.js'
+      - '.github/workflows/websid.yml'
+  pull_request:
+    paths:
+      - 'third-party/websid/**'
+      - 'public/deepsid/websid.wasm'
+      - 'public/deepsid/backend_websid.js'
+      - '.github/workflows/websid.yml'
+  workflow_dispatch:
+
+jobs:
+  websid:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify the committed artifacts are not stale
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No usable base commit - skipping the staleness check."
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          if echo "$CHANGED" | grep -q '^third-party/websid/' \
+             && ! echo "$CHANGED" | grep -qx 'public/deepsid/websid.wasm'; then
+            echo "third-party/websid changed but public/deepsid/websid.wasm was not rebuilt."
+            echo "Run: third-party/websid/build.sh (emcc on PATH) and commit public/deepsid/websid.wasm + backend_websid.js"
+            exit 1
+          fi
+
+      - name: Install Emscripten
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+          ~/emsdk/emsdk install latest
+          ~/emsdk/emsdk activate latest
+
+      - name: Build from committed sources
+        run: |
+          set -euo pipefail
+          source ~/emsdk/emsdk_env.sh
+          third-party/websid/build.sh
+
+      - name: Report whether the build changed the artifacts
+        # Toolchain drift alone can change the bytes, so this reports rather than fails.
+        run: |
+          set -euo pipefail
+          git status --porcelain -- public/deepsid || true
+          git checkout -- public/deepsid || true
