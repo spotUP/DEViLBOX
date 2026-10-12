@@ -912,6 +912,19 @@ export class DeckEngine {
   // CUE / SEEK
   // ==========================================================================
 
+  /**
+   * Cue the deck to a time in the track, seconds, in either playback mode: an
+   * audio deck (or its stems) seeks, a tracker deck jumps to the row playing at
+   * that time. False when a tracker deck has no row at that time.
+   */
+  cueSeconds(sec: number): boolean {
+    if (this._playbackMode === 'audio') { this.cue(sec); return true; }
+    const at = this.getPositionAtTime(sec * 1000);
+    if (!at) return false;
+    this.cue(at.songPos, at.pattPos);
+    return true;
+  }
+
   cue(songPos: number, pattPos: number = 0): void {
     if (this._playbackMode === 'audio') {
       // In audio mode, songPos is treated as seconds
@@ -1769,13 +1782,8 @@ export class DeckEngine {
     return recueDeck({
       playbackMode: this._playbackMode === 'audio' ? 'audio' : 'tracker',
       isFaderWindowClosed: () => this.scratchPlayback.currentFaderGain === 0,
-      seekAudio: (sec) => { if (this._stemMode) this.stemPlayer.seek(sec); else this.audioPlayer.seek(sec); },
-      cueTracker: (sec) => {
-        const at = this.getPositionAtTime(sec * 1000);
-        if (!at) return false;
-        this.cue(at.songPos, at.pattPos);
-        return true;
-      },
+      seekAudio: (sec) => { this.cueSeconds(sec); },
+      cueTracker: (sec) => this.cueSeconds(sec),
       resetRing: () => this.scratchBuffer?.resetCapture(),
       isBending: () => this._bendTimer !== null || this._bendHeld,
     }, anchorSec);

@@ -27,8 +27,18 @@ export interface DjFxPadMapping extends ModePadMapping {
   actionId: DjFxActionId;
 }
 
-export interface OneShotPadMapping extends ModePadMapping {
+/** A one-shot pad: a canned sound from the one-shot library (presetIndex), or a deck move (actionId). */
+export type OneShotPadMapping = OneShotSoundPadMapping | OneShotMovePadMapping;
+
+export interface OneShotSoundPadMapping extends ModePadMapping {
   presetIndex: number;
+  actionId?: undefined;
+}
+
+/** A one-shot pad that performs a DJ FX action on the deck (the real Rewind), not a canned sound. */
+export interface OneShotMovePadMapping extends ModePadMapping {
+  actionId: DjFxActionId;
+  presetIndex?: undefined;
 }
 
 export interface ScratchPadMapping extends ModePadMapping {
@@ -65,8 +75,12 @@ function fxPad(label: string, category: string, colorNum: number, actionId: DjFx
   return { label, category, color: colorToHex(colorNum), colorNum, actionId };
 }
 
-function osPad(label: string, category: string, colorNum: number, presetIndex: number): OneShotPadMapping {
+function osPad(label: string, category: string, colorNum: number, presetIndex: number): OneShotSoundPadMapping {
   return { label, category, color: colorToHex(colorNum), colorNum, presetIndex };
+}
+
+function osMovePad(label: string, category: string, colorNum: number, actionId: DjFxActionId): OneShotMovePadMapping {
+  return { label, category, color: colorToHex(colorNum), colorNum, actionId };
 }
 
 function scPad(label: string, category: string, colorNum: number, actionId: ScratchActionId): ScratchPadMapping {
@@ -125,7 +139,9 @@ export const DEFAULT_ONESHOT_PADS: OneShotPadMapping[] = [
   osPad('Noise Riser',   'Risers',      DJ_FILTER,      6),   // WHITE_NOISE_RISER
   osPad('Euphoria',      'Risers',      DJ_FILTER,      10),  // EUPHORIA_RISER
   // Row 4: Classic sound-system moves + big drop
-  osPad('Rewind',        'Transitions', DJ_TAPE,        31),  // REWIND — the reggae classic
+  // Rewind: the real deck move (fx_deck_rewind) - the record is pulled back and the tune plays again.
+  // The canned sound it used to play stays in the one-shot library as 'Rewind Sound' (preset 31).
+  osMovePad('Rewind',    'Transitions', DJ_TAPE,        'fx_deck_rewind'),
   osPad('Tape Stop',     'Transitions', DJ_TAPE,        32),  // TAPE_STOP
   osPad('Sub Drop',      'Impacts',     DJ_MODULATION,  11),  // SUB_DROP — one iconic drop, not three of them
   osPad('Splash',        'Transitions', DJ_TAPE,        33),  // SPLASH

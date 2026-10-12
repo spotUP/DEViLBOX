@@ -70,6 +70,12 @@ function applyOneShotPads(program: DrumProgram, startPad: number, count: number)
     if (!pad) continue;
     pad.name = mapping.label;
     pad.color = mapping.color;
+    if (mapping.actionId !== undefined) {
+      // A deck move (the Rewind): the pad fires the DJ FX action, no canned sound.
+      pad.djFxAction = mapping.actionId;
+      pad.playMode = 'sustain';
+      continue;
+    }
     const preset = DJ_ONE_SHOT_PRESETS[mapping.presetIndex];
     if (preset) {
       // Keep the SHAPE-defining FX (AutoFilter for riser sweeps, Compressor,

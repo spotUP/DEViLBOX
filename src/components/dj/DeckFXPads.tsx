@@ -45,6 +45,7 @@ const FX_PADS: PadDef[] = [
   { id: 'kill-hi', label: 'Kill', sublabel: 'high', mode: 'momentary' },
   { id: 'brake', label: 'Brake', sublabel: '⏎', mode: 'momentary' },
   { id: 'spinback', label: 'Spinback', sublabel: '⟲', mode: 'toggle' },
+  { id: 'rewind', label: 'Rewind', sublabel: 'replay', mode: 'toggle' },
 ];
 
 // Dub-send pads — fire dub moves straight onto the bus from the deck,
@@ -162,6 +163,7 @@ const DECK_PAD_ACTIONS: Record<string, DjFxActionId> = {
   'kill-hi': 'fx_deck_kill_hi',
   'brake': 'fx_deck_brake',
   'spinback': 'fx_deck_spinback',
+  'rewind': 'fx_deck_rewind',
 };
 
 const BEAT_JUMPS: Record<string, number> = {

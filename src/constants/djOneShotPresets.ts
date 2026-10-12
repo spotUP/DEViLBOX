@@ -628,7 +628,7 @@ const ECHO_WASHOUT: InstrumentPreset['config'] = {
 
 const REWIND: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Acid Sweep',
+  name: 'Rewind Sound',
   synthType: 'MonoSynth',
   oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
   envelope: { attack: 5, decay: 400, sustain: 0.1, release: 100 },

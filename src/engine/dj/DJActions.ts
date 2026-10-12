@@ -23,7 +23,8 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import type { DJSet } from './recording/DJSetFormat';
 import { quantizedEQKill, getQuantizeMode, quantizeAction, cancelAllAutomation } from './DJQuantizedFX';
-import { syncBPMToOther, phaseAlign, snapPositionToBeat, pitchedBpm } from './DJAutoSync';
+import { syncBPMToOther, phaseAlign, snapPositionToBeat, pitchedBpm, timeToNextDownbeat } from './DJAutoSync';
+import { computeCrossfaderGains } from './DJMixerEngine';
 import { DJBeatSync } from './DJBeatSync';
 import { existingAutoDJ } from './autoDJInstance';
 import type { DeckId, FaderLFODivision } from './DeckEngine';
@@ -605,42 +606,76 @@ export function stopScratch(deckId: DeckId, decayMs = 200): void {
 }
 
 // ============================================================================
-// SPINBACK
+// PLATTER GESTURES (one physics path)
 // ============================================================================
 
-/** Spinbacks running, per deck: the physics driver's timer. */
-const spinbacks = new Map<DeckId, unknown>();
+/** Platter gestures running, per deck (a spinback or a rewind): the physics driver's timer. */
+const platterGestures = new Map<DeckId, { kind: 'spinback' | 'rewind'; timer: unknown }>();
 /** Physics ticks of every spinback driver (reachability sentinel). */
 export const spinbackStats = { ticks: 0, minRate: 1 };
+
+type DeckHandle = ReturnType<ReturnType<typeof getDJEngine>['getDeck']>;
+
+/**
+ * The one physics path of the deck gestures (spinback, rewind): the deck's own
+ * TurntablePhysics is ticked by an engine driver on the DJ timer layer
+ * (realTimers, alive in a hidden tab) and the deck audio follows its rate
+ * through the scratch path. Views read the rate (TurntablePhysics.rateFor)
+ * and never tick it. `step` sees each tick's rate and the gesture's elapsed
+ * milliseconds and returns true when the gesture is over; `finish` then hands
+ * the deck back.
+ */
+function drivePlatter(
+  deckId: DeckId, deck: DeckHandle, kind: 'spinback' | 'rewind',
+  step: (rate: number, elapsedMs: number) => boolean, finish: () => void,
+): void {
+  const physics = deck.physics;
+  startScratch(deckId);
+  physics.externallyDriven = true;
+  let last = realTimers.now();
+  const startedAt = last;
+  const timer = realTimers.setInterval(() => {
+    const now = realTimers.now();
+    const rate = physics.tick((now - last) / 1000);
+    last = now;
+    setScratchVelocity(deckId, rate);
+    if (!step(rate, now - startedAt)) return;
+    realTimers.clearInterval(platterGestures.get(deckId)?.timer);
+    platterGestures.delete(deckId);
+    physics.externallyDriven = false;
+    finish();
+  }, 8);
+  platterGestures.set(deckId, { kind, timer });
+}
+
+// ============================================================================
+// SPINBACK
+// ============================================================================
 
 /**
  * Spinback: the DJ yanks the record backward (TurntablePhysics.triggerSpinback,
  * the tracker's spinback). The deck's own platter physics runs the arc - decel,
  * reverse, the motor pulling it back - and the deck audio follows its rate
- * through the scratch path, so the platter visibly spins back and the audio
- * rewinds. The driver ticks on the DJ timer layer (realTimers, alive in a
- * hidden tab); views read the rate (TurntablePhysics.rateFor) and never tick it.
+ * (drivePlatter), so the platter visibly spins back and the audio rewinds.
  *
  * Like the tracker, the record plays on once the motor has it back at speed.
  * `stopAfter` (Auto DJ's spinback exit) stops the deck when the reverse ends
  * instead: the record is pulled out, nothing plays until the next track drops.
- * False when the deck is not playing or already spinning back.
+ * False when the deck is not playing or a gesture already holds its platter.
  */
 export function spinbackDeck(deckId: DeckId, opts: { stopAfter?: boolean; onComplete?: () => void } = {}): boolean {
-  let deck: ReturnType<ReturnType<typeof getDJEngine>['getDeck']>;
+  let deck: DeckHandle;
   try { deck = getDJEngine().getDeck(deckId); } catch { return false; }
-  if (spinbacks.has(deckId) || !deck.isPlaying()) return false;
+  if (platterGestures.has(deckId) || !deck.isPlaying()) return false;
   const physics = deck.physics;
-  startScratch(deckId);
-  physics.externallyDriven = true;
   physics.triggerSpinback();
-  let last = realTimers.now();
-  const startedAt = last;
   let wentReverse = false;
-  const finish = (): void => {
-    realTimers.clearInterval(spinbacks.get(deckId));
-    spinbacks.delete(deckId);
-    physics.externallyDriven = false;
+  drivePlatter(deckId, deck, 'spinback', (rate, elapsedMs) => {
+    spinbackStats.ticks++;
+    spinbackStats.minRate = Math.min(spinbackStats.minRate, rate);
+    if (rate < -0.05) wentReverse = true;
+    return !physics.spinbackActive || (!!opts.stopAfter && wentReverse && rate >= 0) || elapsedMs > 6000;
+  }, () => {
     if (opts.stopAfter) {
       physics.reset();
       stopScratch(deckId, 0);
@@ -650,24 +685,117 @@ export function spinbackDeck(deckId: DeckId, opts: { stopAfter?: boolean; onComp
       stopScratch(deckId, 50);
     }
     opts.onComplete?.();
-  };
-  spinbacks.set(deckId, realTimers.setInterval(() => {
-    const now = realTimers.now();
-    const rate = physics.tick((now - last) / 1000);
-    last = now;
-    spinbackStats.ticks++;
-    spinbackStats.minRate = Math.min(spinbackStats.minRate, rate);
-    setScratchVelocity(deckId, rate);
-    if (rate < -0.05) wentReverse = true;
-    const done = !physics.spinbackActive || (opts.stopAfter && wentReverse && rate >= 0) || now - startedAt > 6000;
-    if (done) finish();
-  }, 8));
+  });
   return true;
 }
 
 /** Whether a deck is spinning back. */
 export function isDeckSpinningBack(deckId: DeckId): boolean {
-  return spinbacks.has(deckId);
+  return platterGestures.get(deckId)?.kind === 'spinback';
+}
+
+// ============================================================================
+// REWIND (the reggae sound-system rewind)
+// ============================================================================
+
+/** How long the selector's hand drags the record back, seconds. */
+export const REWIND_PULL_SEC = 1.2;
+/** The shortest wait before the restart: the pull-back must be heard. */
+export const REWIND_MIN_PULL_SEC = 0.8;
+/** The hand's backward speed during the pull-back, in deck rates (fast and audible, never fading out). */
+export const REWIND_HAND_RATE = -3;
+/** Rewind reachability sentinel: physics ticks, the lowest rate, the restarts and where they landed. */
+export const rewindStats = {
+  ticks: 0, minRate: 1, restarts: 0,
+  lastRestartSec: Number.NaN, lastWaitSec: Number.NaN, lastAlignedTo: null as DeckId | null,
+};
+
+/** A deck's first downbeat, seconds: the deck's beat grid, else the track analysis, else the top. */
+export function firstDownbeatSec(deckId: DeckId): number {
+  const d = useDJStore.getState().decks[deckId];
+  const fromGrid = d.beatGrid?.downbeats[0];
+  if (fromGrid !== undefined && Number.isFinite(fromGrid)) return Math.max(0, fromGrid);
+  const fromAnalysis = d.trackAnalysis?.landmarks.firstDownbeat;
+  return fromAnalysis !== undefined && Number.isFinite(fromAnalysis) ? Math.max(0, fromAnalysis) : 0;
+}
+
+/** Whether a deck is heard: playing, its channel fader up, and the crossfader letting it through (deck C bypasses the crossfader). */
+export function isDeckAudible(deckId: DeckId): boolean {
+  let playing: boolean;
+  try { playing = getDJEngine().getDeck(deckId).isPlaying(); } catch { playing = useDJStore.getState().decks[deckId].isPlaying; }
+  if (!playing) return false;
+  const s = useDJStore.getState();
+  if (s.decks[deckId].volume <= 0.05) return false;
+  if (deckId === 'C') return true;
+  const [a, b] = computeCrossfaderGains(s.crossfaderPosition, s.crossfaderCurve);
+  return (deckId === 'A' ? a : b) > 0.05;
+}
+
+/**
+ * When the rewound tune restarts, seconds from now, and on whose bar: on the
+ * next bar of another deck that is heard (never sooner than the shortest
+ * pull-back: whole bars are added), otherwise right after the pull-back.
+ */
+export function rewindRestartTiming(deckId: DeckId): { waitSec: number; alignedTo: DeckId | null } {
+  for (const other of (['A', 'B', 'C'] as DeckId[]).filter((d) => d !== deckId)) {
+    if (!isDeckAudible(other)) continue;
+    const grid = useDJStore.getState().decks[other].beatGrid;
+    if (!grid || grid.bpm <= 0 || grid.beats.length === 0) continue;
+    const barSec = (60 / grid.bpm) * (grid.timeSignature || 4);
+    let wait = timeToNextDownbeat(other);
+    while (wait < REWIND_MIN_PULL_SEC) wait += barSec;
+    return { waitSec: wait, alignedTo: other };
+  }
+  return { waitSec: REWIND_PULL_SEC, alignedTo: null };
+}
+
+/**
+ * Rewind: the selector's hand drags the record back fast - an audible backward
+ * scrub, about a second - then lets go and the SAME tune plays again from its
+ * first downbeat at full speed. Not a spinback: a spinback ends a tune, a
+ * rewind replays it. The hand is TurntablePhysics' own hand (setTouching +
+ * setHandRate) on the one physics path (drivePlatter). With another deck
+ * heard, the hand holds the record still after the pull-back and lets go on
+ * that deck's next bar.
+ *
+ * `onRestart` runs on the restart (the downbeat the tune drops on). False when
+ * the deck is not playing or a gesture already holds its platter.
+ */
+export function rewindDeck(deckId: DeckId, opts: { onRestart?: () => void } = {}): boolean {
+  let deck: DeckHandle;
+  try { deck = getDJEngine().getDeck(deckId); } catch { return false; }
+  if (platterGestures.has(deckId) || !deck.isPlaying()) return false;
+  const physics = deck.physics;
+  const restartSec = firstDownbeatSec(deckId);
+  const { waitSec, alignedTo } = rewindRestartTiming(deckId);
+  const pullMs = Math.min(waitSec, REWIND_PULL_SEC) * 1000;
+  const restartMs = waitSec * 1000;
+  physics.setTouching(true);
+  physics.setHandRate(REWIND_HAND_RATE);
+  let holding = false;
+  drivePlatter(deckId, deck, 'rewind', (rate, elapsedMs) => {
+    rewindStats.ticks++;
+    rewindStats.minRate = Math.min(rewindStats.minRate, rate);
+    if (!holding && elapsedMs >= pullMs) { holding = true; physics.setHandRate(0); }
+    return elapsedMs >= restartMs;
+  }, () => {
+    // Let go: the record is back on its first downbeat, at speed.
+    physics.setTouching(false);
+    physics.reset();
+    stopScratch(deckId, 0);
+    try { deck.cueSeconds(restartSec); } catch { /* engine not ready */ }
+    rewindStats.restarts++;
+    rewindStats.lastRestartSec = restartSec;
+    rewindStats.lastWaitSec = waitSec;
+    rewindStats.lastAlignedTo = alignedTo;
+    opts.onRestart?.();
+  });
+  return true;
+}
+
+/** Whether a deck is being rewound. */
+export function isDeckRewinding(deckId: DeckId): boolean {
+  return platterGestures.get(deckId)?.kind === 'rewind';
 }
 
 // ============================================================================
