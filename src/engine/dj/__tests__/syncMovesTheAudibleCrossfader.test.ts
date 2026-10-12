@@ -38,6 +38,9 @@ vi.mock('../DeckEngine', () => ({
     stop() {}
     dispose() {}
     play() { return Promise.resolve(); }
+    // The DJEngine constructor wires the scratch sinks on every deck (351a0cf29).
+    setScratchCrossfaderSink() {}
+    setScratchEffectSink() {}
   },
 }));
 
