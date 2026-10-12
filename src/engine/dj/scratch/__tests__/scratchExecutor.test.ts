@@ -16,6 +16,9 @@ import type { ExecutorTimers } from '../../autodj/transitionExecutor';
 import { analysisClock } from '../../autodj/juggle/juggleController';
 import { fixtureAnalysis } from './fixtures/analysisFixture';
 import { stepToBeat } from '../scratchAnchor';
+import { recueDeck, type DeckRecueTarget } from '../deckRecue';
+import { getGesture } from '../scratchGestureCatalog';
+import { faderGainAt } from '../scratchFaderModel';
 
 /** A manual clock: time in seconds, 120 BPM (0.5 s per beat), beat = seconds / 0.5. */
 function rig(opts: { suppressNotes?: boolean } = {}) {
@@ -112,7 +115,7 @@ describe('the executor fires an event on the deck beat clock (SCR-P3.5)', () => 
     expect(r.fires[0]!.at!).toBeCloseTo(4.012, 3);
   });
 
-  it('a deck event re-cues to its anchor, then starts on the tick that reaches its beat', () => {
+  it('a deck event starts on the tick that reaches its beat, then re-cues to its anchor', () => {
     const r = rig();
     const anchor = deckAnchor(31.5, 63, 'downbeat', 120);
     const ex = new ScratchExecutor(r.deps);
@@ -123,23 +126,71 @@ describe('the executor fires an event on the deck beat clock (SCR-P3.5)', () => 
     r.advance(31.9);
     expect(r.fires).toHaveLength(0);
     r.advance(32.0);
-    expect(r.recues).toEqual([['A', 31.5]]);
     expect(r.fires).toHaveLength(1);
+    r.advance(32.01);
+    expect(r.recues).toEqual([['A', 31.5]]);
     expect(Math.abs(r.fires[0]!.beat - 64)).toBeLessThanOrEqual(0.01);
     expect(r.fires[0]!.at).toBeUndefined();
   });
 
   it('a refused re-cue is reported and does not block the stroke', () => {
     const r = rig();
-    r.deps.recueDeck = () => ({ recued: false, mode: 'ring-only', returnsToAnchor: false, reason: 'the fader window is open' });
+    r.deps.recueDeck = () => ({ recued: false, mode: 'unavailable', returnsToAnchor: false, reason: 'the tracker song has no time index to cue by' });
     const anchor = deckAnchor(10, 20, 'snare', 120);
     new ScratchExecutor(r.deps).schedule({
       executeAtBeat: 4, durationBeats: 1, role: 'ACCENT', source: { type: 'DECK', deck: 'B', anchor }, anchor,
       gesture: 'forwardStab', velocity: 1, humanizeMs: 0, intensity: 0.5, deck: 'B', returnToAnchor: true,
     });
-    r.advance(2.0);
+    r.advance(2.01);
     expect(r.events.some((e) => e.kind === 'recueUnavailable')).toBe(true);
     expect(r.fires).toHaveLength(1);
+  });
+});
+
+describe('the true re-cue is reachable through the executor (section 18, SA-M3)', () => {
+  /** A deck whose fader follows the fired gesture's real windows (`faderGainAt`), open at rest. */
+  function liveDeck(r: ReturnType<typeof rig>, gesture: 'forwardStab' | 'scribble') {
+    const g = getGesture(gesture);
+    const cycleSec = g.cycleBeats * 0.5;
+    const seeks: Array<{ sec: number; phase: number }> = [];
+    let ringResets = 0;
+    const phase = () => {
+      const fired = r.fires.at(-1);
+      if (!fired || r.releases.length >= r.fires.length) return null;
+      return ((r.now() - fired.beat * 0.5) / cycleSec) % 1;
+    };
+    const target: DeckRecueTarget = {
+      playbackMode: 'audio',
+      isFaderWindowClosed: () => { const p = phase(); return p !== null && faderGainAt(g, p, 120) === 0; },
+      seekAudio: (sec) => { seeks.push({ sec, phase: phase() ?? -1 }); },
+      cueTracker: () => false,
+      resetRing: () => { ringResets++; },
+    };
+    r.deps.recueDeck = (_deck, a) => recueDeck(target, a);
+    return { seeks, ringResets: () => ringResets };
+  }
+
+  it('four Auto Scratch stabs re-cue the deck four times, each inside the stroke\'s closed window, never on the audible deck', () => {
+    const r = rig();
+    const live = liveDeck(r, 'forwardStab');
+    const ex = new ScratchExecutor(r.deps);
+    for (const beat of [8, 10, 12, 14]) ex.schedule(deckEvent(beat, { gesture: 'forwardStab', durationBeats: 0.5, returnToAnchor: true }));
+    r.advance(8);
+    expect(live.seeks.map((s) => s.sec)).toEqual([10, 10, 10, 10]);
+    for (const s of live.seeks) expect(s.phase).toBeGreaterThanOrEqual(0.42); // forwardStab is open on (0, 0.42)
+    expect(live.ringResets()).toBe(4);
+    expect(r.events.filter((e) => e.kind === 'recueUnavailable')).toHaveLength(0);
+  });
+
+  it('a gesture with no closed window is never re-cued and is reported, the deck and ring untouched', () => {
+    const r = rig();
+    const live = liveDeck(r, 'scribble');
+    const ex = new ScratchExecutor(r.deps);
+    ex.schedule(deckEvent(8, { gesture: 'scribble', durationBeats: 0.5, returnToAnchor: true }));
+    r.advance(5);
+    expect(live.seeks).toHaveLength(0);
+    expect(live.ringResets()).toBe(0);
+    expect(r.events.filter((e) => e.kind === 'recueUnavailable')).toHaveLength(1);
   });
 });
 

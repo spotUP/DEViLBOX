@@ -35,7 +35,7 @@ function fakeDeck() {
 describe('four planned stabs re-cue the record through the executor and the registry (SCR-P3.R3)', () => {
   beforeAll(() => { installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch(); });
 
-  it('cue x4 on one frame, restore x4, bus > -40 dBFS in each open window, deck untouched', async () => {
+  it('cue x4 on one frame, nothing to restore (a record gesture changes no deck state), bus > -40 dBFS in each open window, deck untouched', async () => {
     const LENGTH_SEC = 1.3;
     const ctx = new OfflineAudioContext(2, Math.round(SR * LENGTH_SEC), SR);
     holder.ctx = ctx;
@@ -70,6 +70,7 @@ describe('four planned stabs re-cue the record through the executor and the regi
       fire: (id, o) => fireDjFx(id, o),
       release: (id, o) => releaseDjFx(id, o),
       probe: { capture: () => { captures++; return { ...snapshot }; }, restore: () => { restoresSeen++; } },
+      recueDeck: () => { throw new Error('a record gesture never re-cues a deck'); },
       timers: {
         now: () => sec * 1000,
         setInterval: (fn) => { intervals.push(fn); return fn; },
@@ -106,9 +107,11 @@ describe('four planned stabs re-cue the record through the executor and the regi
     const drops = scratchRingStats.seekFrames.filter((f) => Math.abs(f - vowelFrames) <= 1);
     expect(drops.length, `needle drops at ${vowelFrames} +-1 (got ${scratchRingStats.seekFrames.join(',')})`).toBeGreaterThanOrEqual(4);
     expect(new Set(drops).size, 'identical positionFrames on every stab').toBe(1);
-    expect(captures).toBe(4);
-    expect(restoresSeen, 'restore once per release').toBe(4);
-    expect(scratchExecutorStats.restores).toBe(4);
+    // a record gesture plays on its own voice: it changes no deck, crossfader or bus field, so
+    // there is nothing to capture or give back (section 60, SA-M4)
+    expect(captures).toBe(0);
+    expect(restoresSeen).toBe(0);
+    expect(scratchExecutorStats.restores).toBe(0);
     expect(scratchExecutorStats.released).toBe(4);
 
     const out = (await ctx.startRendering()).getChannelData(0);

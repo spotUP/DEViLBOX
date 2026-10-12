@@ -1709,8 +1709,8 @@ export class DeckEngine {
 
   /**
    * True re-cue (owner scratch plan section 18): put the deck's play position
-   * back on `anchorSec` before a returns-to-anchor stroke. Only while the
-   * fader window is closed; see `recueDeck` for the rule and the result.
+   * back on `anchorSec` inside a returns-to-anchor gesture's closed fader
+   * window; see `recueDeck` for the rule and the result.
    */
   recueScratch(anchorSec: number): DeckRecueResult {
     return recueDeck({
@@ -1724,7 +1724,6 @@ export class DeckEngine {
         return true;
       },
       resetRing: () => this.scratchBuffer?.resetCapture(),
-      rearmRing: () => this.scratchBuffer?.startScratch(0, 'write'),
     }, anchorSec);
   }
 
