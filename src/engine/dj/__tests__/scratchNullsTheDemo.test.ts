@@ -5,6 +5,7 @@
  *
  *   the record    the pack WAV read the demo's way (resample_poly, float32 normalise, the S950)
  *   each stroke   `renderGesture` = scratch.render_gesture (physics, Catmull-Rom reader, surface, fader, tone, FX)
+ *   each bus      the Deck C worklet = three_deck's deck_c_eq + scratch_channel + tail, scratch_dj's channel
  *
  * The residual is float64 rounding against the Python render (a stroke) and the worklet's float32 output
  * (a bus); anything else - a filter coefficient, an interpolation, a random draw, a sample of onset - shows
@@ -48,4 +49,17 @@ describe('the scratch nulls against the Up Rough demo', () => {
     }
   }, 120_000);
 
+  it.each(['threeDeck', 'scratchDj'] as const)('the %s bus (the Deck C worklet) is the demo\'s chain to float32', async (chain) => {
+    const { renderGesture, DEMO_DECK_PROFILES } = await import('@/engine/dj/scratch/scratchRender');
+    const { createDeckCBus, DECK_C_TAPS } = await import('@/engine/dj/scratch/scratchDeckC');
+    const ctx = new OfflineAudioContext(1, F.busN, F.rate);
+    const bus = await createDeckCBus(ctx, ctx.destination, { chain, tap: chain === 'threeDeck' ? DECK_C_TAPS.tail : -1 });
+    for (const e of F.events) {
+      const src = await recordPcm(e.record);
+      bus.stroke(e.start, renderGesture(src, e.gesture, e.steps * F.stepSec, F.rate, { velocity: e.velocity, profile: DEMO_DECK_PROFILES.boombap, seed: e.seed }).out);
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    const out = (await ctx.startRendering()).getChannelData(0);
+    expect(residualDb(F[chain], out, F.keep)).toBeLessThan(-130);
+  }, 120_000);
 });

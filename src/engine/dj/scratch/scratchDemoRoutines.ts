@@ -17,6 +17,9 @@
  */
 
 import { lfsr, type ScratchRandom } from './scratchRandom';
+import { NumpyRandomState } from '@/engine/turntable/turntableSim';
+import { DEMO_RATE } from './scratchRender';
+import type { ScratchRenderSpec } from './scratchTypes';
 import { pickRoutineGesture, DJ_ROUTINE_LEVELS } from './scratchRoutines';
 import { SCRATCH_STYLES } from './scratchStyles';
 import { CLEAN_CRATE_POOL, CUE_ROLE_POOLS, CUE_ROLE_RECORD, type CueRole } from './scratchCatalogue';
@@ -260,11 +263,27 @@ const isNeedle = (g: ScratchGestureId): boolean => g === 'needleDrop' || g === '
 export const CUE_ROLE_SCRATCH_ROLE: Readonly<Record<CueRole, ScratchRole>> = { HOME: 'THEME', SECONDARY: 'FEATURE', ACCENT: 'ACCENT', FX: 'FILL' };
 
 /** A demo routine laid from `startBar` as placed events the executor plays (needles open / close it). */
-export function demoRoutineToPlaced(events: readonly DemoRoutineEvent[], startBar: number, beatsPerBar = 4): PlacedScratch[] {
-  return events.map((e) => {
+export function demoRoutineToPlaced(events: readonly DemoRoutineEvent[], startBar: number, beatsPerBar = 4, render?: readonly ScratchRenderSpec[]): PlacedScratch[] {
+  return events.map((e, i) => {
     const bar = startBar + e.bar;
     const placementRole: PlacementRole = e.step >= 15 ? 'turnaround' : e.step >= 6 && e.step <= 8 ? 'answer' : 'accent';
     const role: ScratchRole = e.gesture === 'needleDrop' ? 'INTRO' : e.gesture === 'needleLift' ? 'OUTRO' : e.gesture === 'drop' ? 'INTRO' : CUE_ROLE_SCRATCH_ROLE[e.cueRole];
-    return { bar, step: e.step, beat: stepToBeat({ bar, step: e.step }, '1/16', beatsPerBar), gesture: e.gesture, velocity: e.velocity, placementRole, role, ...(e.record ? { record: e.record } : {}) };
+    return { bar, step: e.step, beat: stepToBeat({ bar, step: e.step }, '1/16', beatsPerBar), gesture: e.gesture, velocity: e.velocity, placementRole, role, ...(e.record ? { record: e.record } : {}), ...(render?.[i] ? { render: render[i] } : {}) };
+  });
+}
+
+/**
+ * How the demo renders each event of its routine (`three_deck.render`, `scratch_dj.render`): the
+ * physics seed `seed + bar x 16 + step` (a needle: `seed`), and the human timing in whole samples -
+ * three_deck draws int((-4 + 8 rand) ms) from RandomState(seed), scratch_dj int((-8 + 18 lfsr) ms)
+ * from the LFSR(seed x 999 + 3) - once per stroke, in event order, none for a needle.
+ */
+export function demoRoutineRenderSpecs(events: readonly DemoRoutineEvent[], seed: number, routine: 'threeDeck' | 'scratchDj'): ScratchRenderSpec[] {
+  const mt = routine === 'threeDeck' ? new NumpyRandomState(seed >>> 0) : null;
+  const lf = routine === 'scratchDj' ? lfsr(seed * 999 + 3) : null;
+  return events.map((e) => {
+    if (isNeedle(e.gesture)) return { seed, humanizeSamples: 0, chain: routine };
+    const ms = mt ? -4 + 8 * mt.rand() : -8 + 18 * lf!();
+    return { seed: seed + e.bar * 16 + e.step, humanizeSamples: Math.trunc(ms * 1e-3 * DEMO_RATE), chain: routine };
   });
 }

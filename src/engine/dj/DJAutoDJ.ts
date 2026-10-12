@@ -41,7 +41,7 @@ import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
 import { registerAutoDJ } from './autoDJInstance';
 import { DJScratchDJ } from './scratch/DJScratchDJ';
 import { createDeckScratchExecutor, deckTempoBpm, emergencyRelease, performTransitionScratch, prepareScratchSource } from './scratch/autoScratchRuntime';
-import { getScratchVoicePoolIfActive } from './scratch/scratchVoicePool';
+import { getScratchVoicePool, getScratchVoicePoolIfActive } from './scratch/scratchVoicePool';
 import { subscribeDjFxFires } from '@/engine/drumpad/DjFxActions';
 import { scratchModeOf, scratchStyleFor } from './scratch/scratchStyles';
 import { trackerSampleInfos, type TrackerSampleInstrument } from './scratch/trackerSampleSource';
@@ -1799,6 +1799,7 @@ class DJAutoDJ {
         }),
         hasRecord: (id) => getScratchVoicePoolIfActive()?.hasRecord(id) ?? false,
         prepareSource: (chosen) => prepareScratchSource(chosen),
+        prepareRecords: (ids) => getScratchVoicePool().prepareRecords(ids),
         // One decision per performed phrase (scratch plan section 65): source, gestures, placement, length.
         onPlan: (plan, events) => this.recordScratchPhrase(plan.reasons, events, this.scratch?.telemetry().source ?? null),
         seed: Date.now() & 0xffff,

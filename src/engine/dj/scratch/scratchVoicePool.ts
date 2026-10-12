@@ -15,7 +15,11 @@
 import * as Tone from 'tone';
 import { getDJEngine } from '../DJEngine';
 import { DeckScratchBuffer, SCRATCH_RECORD_RING_BASE } from '../DeckScratchBuffer';
-import { gritRecord } from './scratchGrit';
+import { gritRecord, demoRecordPcm } from './scratchGrit';
+import { createDeckCBus, type DeckCBus, type DeckCChainName } from './scratchDeckC';
+import { renderGesture, demoGestureName, demoGestureSteps, DEMO_DECK_PROFILES, DEMO_RATE } from './scratchRender';
+import { needleDrop as ttNeedleDrop, needleLift as ttNeedleLift } from '@/engine/turntable/turntableSim';
+import type { ScratchRenderSpec } from './scratchTypes';
 import { CHANNEL_PRESETS, createScratchBus, SCRATCH_BUS, SCRATCH_FX_PROFILES, STYLE_FX_PROFILE, type ScratchBus } from './scratchBus';
 import { ScratchRecordVoice, type ScratchCue, type StrokeResult } from './ScratchRecordVoice';
 import { getScratchRecord, findRecords, type ScratchRecord } from './scratchCatalogue';
@@ -26,7 +30,7 @@ import { realTimers } from '../autodj/executorTimers';
 import { useDJStore } from '@/stores/useDJStore';
 
 /** Reachability sentinels (SCR-P2.R2). */
-export const scratchPoolStats = { performs: 0, loads: 0, styleFx: 0 };
+export const scratchPoolStats = { performs: 0, loads: 0, styleFx: 0, rendered: 0 };
 
 export const SCRATCH_VOICE_COUNT = 2;
 
@@ -42,6 +46,8 @@ export interface PerformOptions {
   at?: number;
   /** The style's FX on the bus (reference style preset; amount = the wet tail floor), SCR-PG-A5. */
   fx?: import('./scratchTypes').ScratchEventFx;
+  /** A demo routine's stroke: rendered whole as the demo renders it, summed on the routine's Deck C bus. */
+  render?: ScratchRenderSpec;
 }
 
 export interface PerformHandle {
@@ -57,6 +63,12 @@ export interface PerformHandle {
 export interface ProgrammeSource { readonly rms: number | null; stop?(): void }
 
 export type RecordFetcher = (record: ScratchRecord, ctx: BaseAudioContext) => Promise<AudioBuffer>;
+
+async function fetchRecordBytes(record: ScratchRecord): Promise<ArrayBuffer> {
+  const res = await fetch(record.url);
+  if (!res.ok) throw new Error(`[ScratchVoicePool] ${record.id}: ${res.status} fetching ${record.url}`);
+  return res.arrayBuffer();
+}
 
 async function fetchRecord(record: ScratchRecord, ctx: BaseAudioContext): Promise<AudioBuffer> {
   const res = await fetch(record.url);
@@ -87,8 +99,15 @@ export class ScratchVoicePool {
   /** Reachability sentinel: strokes whose bus level was matched to the programme. */
   readonly levelStats = { matched: 0, lastLevel: 1 };
 
-  constructor(ctx: BaseAudioContext, destination: AudioNode, opts: { size?: number; fetcher?: RecordFetcher; programme?: ProgrammeSource } = {}) {
+  private readonly destination: AudioNode;
+  private readonly deckC = new Map<DeckCChainName, Promise<DeckCBus>>();
+  private readonly demoPcm = new Map<string, Promise<Float64Array>>();
+  private readonly bytesFetcher: (record: ScratchRecord) => Promise<ArrayBuffer>;
+
+  constructor(ctx: BaseAudioContext, destination: AudioNode, opts: { size?: number; fetcher?: RecordFetcher; programme?: ProgrammeSource; bytes?: (record: ScratchRecord) => Promise<ArrayBuffer> } = {}) {
     this.ctx = ctx;
+    this.destination = destination;
+    this.bytesFetcher = opts.bytes ?? fetchRecordBytes;
     this.fetcher = opts.fetcher ?? fetchRecord;
     this.programme = opts.programme ?? null;
     this.ready = this.init(destination, opts.size ?? SCRATCH_VOICE_COUNT);
@@ -175,10 +194,78 @@ export class ScratchVoicePool {
     return findRecords(isThrow ? { clean: true, vocal: true, role: opts.role } : { gesture: gesture.id, clean: true, vocal: true, role: opts.role })[0];
   }
 
+  /** The routine's Deck C bus (the demo's chain for that routine), built once. */
+  deckCBus(chain: DeckCChainName): Promise<DeckCBus> {
+    let p = this.deckC.get(chain);
+    if (!p) { p = createDeckCBus(this.ctx, this.destination, { chain }); this.deckC.set(chain, p); }
+    return p;
+  }
+
+  /** A crate record as the demo reads it (22,050 Hz, the S950 when the grit is on), decoded once. */
+  recordPcm(record: ScratchRecord): Promise<Float64Array> {
+    const key = `${record.id}:${this.gritOn ? 'grit' : 'clean'}`;
+    let p = this.demoPcm.get(key);
+    if (!p) {
+      scratchPoolStats.loads++;
+      const grit = this.gritOn;
+      p = this.bytesFetcher(record).then((b) => demoRecordPcm(b, DEMO_RATE, { grit }));
+      this.demoPcm.set(key, p);
+      p.catch(() => this.demoPcm.delete(key));
+    }
+    return p;
+  }
+
+  /** Read these crate records the demo's way now, so their strokes render on time. */
+  prepareRecords(ids: readonly string[]): void {
+    for (const id of ids) {
+      const r = getScratchRecord(id);
+      if (r) void this.recordPcm(r).catch((err) => console.warn('[ScratchVoicePool] record not ready:', id, err));
+    }
+  }
+
+  /**
+   * A demo routine's stroke, the demo's way (three_deck / scratch_dj `render`): the gesture rendered whole
+   * by `render_gesture` (boom-bap deck, the routine's seed, the event's velocity, the demo's step length),
+   * summed into the routine's bus at the planned beat's bus sample plus the demo's human timing. It plays
+   * out whole, as in the demo: there is nothing to release.
+   */
+  private performRendered(gesture: ScratchGesture, record: ScratchRecord | null, opts: PerformOptions & { render: ScratchRenderSpec }): PerformHandle {
+    scratchPoolStats.rendered++;
+    const spec = opts.render;
+    const started = (async (): Promise<StrokeResult> => {
+      const bus = await this.deckCBus(spec.chain);
+      let samples: Float64Array | Float32Array;
+      if (gesture.needle) {
+        samples = gesture.needle === 'drop' ? ttNeedleDrop(DEMO_RATE, 'battle', spec.seed) : ttNeedleLift(DEMO_RATE, spec.seed);
+      } else {
+        const name = demoGestureName(gesture.id);
+        if (!name || !record) return { ok: false, reason: `the demo has no ${gesture.id}${record ? '' : ' without a record'}` };
+        const sig = await this.recordPcm(record);
+        // three_deck: steps x 60 / (bpm x 4); scratch_dj: steps x int(rate x 60 / (bpm x 4)) / rate
+        const stepSec = spec.chain === 'scratchDj' ? Math.trunc(DEMO_RATE * 60.0 / (opts.bpm * 4)) / DEMO_RATE : 60.0 / (opts.bpm * 4);
+        samples = renderGesture({ sig, anchor: record.demoCue.anchor, safe: record.demoCue.safe }, name, demoGestureSteps(name) * stepSec, DEMO_RATE, {
+          velocity: opts.velocity ?? 1.0, profile: DEMO_DECK_PROFILES.boombap, seed: spec.seed,
+        }).out;
+      }
+      // the demo's level: the layer at 0.60 x the programme's RMS
+      const prog = this.programme?.rms ?? null;
+      if (prog !== null) bus.setProgramme(prog);
+      const at = opts.at ?? this.ctx.currentTime;
+      bus.stroke(Math.max(0, bus.busSampleAt(at) + spec.humanizeSamples), samples);
+      return { ok: true };
+    })();
+    this.track(started);
+    return { voice: null, started, release: () => undefined };
+  }
+
   /** Load (if needed) and play a gesture on a voice. Never touches a deck. */
   perform(gesture: ScratchGesture, opts: PerformOptions): PerformHandle | null {
+    // a demo routine's needle is a transient on its bus: no record moves
+    if (opts.render && gesture.needle) return this.performRendered(gesture, null, { ...opts, render: opts.render });
     const record = this.resolveRecord(gesture, opts);
     if (!record) return null;
+    // a demo routine's crate stroke is the demo's render on its bus; a tracker sample stays on the voice
+    if (opts.render && !this.transient.has(record.id)) return this.performRendered(gesture, record, { ...opts, render: opts.render });
     let voice: ScratchRecordVoice | null = null;
     let cancelled = false;
     let stopAt: number | undefined;
@@ -270,6 +357,7 @@ export class ScratchVoicePool {
 
   panic(): void {
     for (const v of this.voices) v.panic();
+    for (const p of this.deckC.values()) void p.then((b) => b.clear(), () => undefined);
   }
 
   private track(p: Promise<unknown>): void {
@@ -288,6 +376,8 @@ export class ScratchVoicePool {
     this.programme?.stop?.();
     for (const r of this.rings) r.dispose();
     for (const b of this.buses) b.dispose();
+    for (const p of this.deckC.values()) void p.then((b) => b.dispose(), () => undefined);
+    this.deckC.clear();
     this.voices.length = 0; this.rings.length = 0; this.buses.length = 0;
   }
 }

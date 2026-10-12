@@ -120,6 +120,7 @@ export class ScratchExecutor {
     };
     if (event.deck) opts.deck = event.deck;
     if (event.fx) opts.scratchFx = event.fx;
+    if (event.render) opts.render = event.render;
     if (event.source.type === 'CRATE') {
       opts.record = event.source.recordId;
       opts.anchor = event.anchor.position as ScratchCue;

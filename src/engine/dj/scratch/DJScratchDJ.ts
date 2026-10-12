@@ -15,7 +15,7 @@ import { barStartBeat, timeAtBeat, timelineAt } from '../autodj/beatGrid';
 import type { DJPerformanceContext, DJTrackAnalysis } from '../autodj/types';
 import { buildScratchContext, scratchSectionFor, type ScratchPerformanceContext } from './scratchContext';
 import { planJuggleResponse, planScratch, toScratchEvents, type OverlaySection, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
-import { buildScratchDjRoutine, buildThreeDeckRoutine, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, validateScratchDjRoutine } from './scratchDemoRoutines';
+import { buildScratchDjRoutine, buildThreeDeckRoutine, demoRoutineRenderSpecs, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, validateScratchDjRoutine } from './scratchDemoRoutines';
 import type { RoutineName } from './scratchRoutines';
 import type { ScratchProfileId } from './scratchStyles';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
@@ -97,6 +97,9 @@ export interface ScratchDJDeps {
   /** Get a chosen source ready before its first event (a TRACKER_SAMPLE is decoded into the voice pool:
    *  `loadTrackerSample`); the plan is a bar ahead, so the load lands before the stroke. */
   prepareSource?(chosen: ChosenScratchSource, input: ScratchTickInput): void | Promise<unknown>;
+  /** Get the plan's crate records ready the demo's way (fetched, read at 22,050 Hz, the S950) before their
+   *  first stroke: a demo routine's stroke is rendered from the record when it is handed to the bus. */
+  prepareRecords?(ids: readonly string[]): void;
   /** Every phrase's evaluation (section 52) - quality, decision, reason. */
   onEvaluation?(evaluation: PhraseEvaluation, ctx: ScratchPerformanceContext): void;
   /** A transient record the pool holds (the governor's tracker-sample check). */
@@ -385,7 +388,8 @@ export class DJScratchDJ {
         arc = battle ? SCRATCH_DJ_TEMPLATE : THREE_DECK_TEMPLATE;
         scratchDJStats.bookends++;
         const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar);
-        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter);
+        // every stroke rendered as the demo renders it, on the routine's own bus (scratch null test)
+        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck'));
         plan = {
           mode: input.mode, events, bars: Array.from({ length: arc.bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
           rests: [], issues: battle ? validateScratchDjRoutine(demo) : [], routine: battle ? 'scratchDj' : 'threeDeck',
@@ -459,6 +463,9 @@ export class DJScratchDJ {
       const source = own ?? e.source;
       return source.type === 'CRATE' ? { ...e, source, anchor: anchorFor(source, e.gesture) ?? source.anchor } : e;
     });
+    // the routine's records read before their first stroke (the routine is planned whole, 32 bars ahead)
+    const rendered = [...new Set(events.filter((e) => e.render && e.source.type === 'CRATE').map((e) => (e.source as { recordId: string }).recordId))];
+    if (rendered.length) this.deps.prepareRecords?.(rendered);
     // only what is still ahead of the clock
     const now = ctx.masterBeat;
     const firstBeat = barStartBeat(track.downbeats, fromBar) - 1e-9;
