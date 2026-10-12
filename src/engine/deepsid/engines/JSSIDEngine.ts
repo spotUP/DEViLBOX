@@ -111,6 +111,9 @@ export class JSSIDEngine {
 
     // Load SID data
     await this.loadSIDData();
+    // jsSID reads the header's model into preferred_SID_model but never applies it:
+    // SID_model stays at its 8580 default until setmodel() is called.
+    this.jsSID.setmodel?.(this.config.chipModel === '8580' ? 8580 : 6581);
 
     const hwStatus = this.webusbEnabled ? 'WebUSB' : this.asidEnabled ? 'ASID' : 'software';
     console.log('[jsSID] Initialized:', {
