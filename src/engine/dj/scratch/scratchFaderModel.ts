@@ -7,10 +7,12 @@
  * - open/cut windows: the gesture's `faderWindows` (section 19);
  * - cut lead: `cutLeadMs` shifts every window in time (reference `off`,
  *   chirp/flare timing);
- * - ramp: DEViLBOX's 3 ms anti-click ramp at rest, growing to 8 ms at a
- *   4x stroke (a faster-moving record carries a steeper pitch under the cut);
+ * - ramp (deck pattern path): DEViLBOX's 3 ms anti-click ramp at rest, growing
+ *   to 8 ms at a 4x stroke; the record voice uses the reference ramp
+ *   `cutRampSec` (1 + 2 (1 - v) ms, sharper as the velocity rises, O7);
  * - battle response: reference `turntable.py fader_curve` - exponents
- *   smooth 2, sharp 6, battle 12, cut-in 0.03 (closed zone of a battle fader).
+ *   smooth 2, sharp 6, battle 12, cut-in 0.03 (closed zone of a battle fader);
+ *   the record voice's worklet shapes every cut with it (`faderCurveShape`).
  * - section 20: a window's `curve` names the fader it is performed on;
  *   `applyFaderGain` routes to that sink only, never to the other.
  */
@@ -18,7 +20,7 @@
 import type { ScratchFaderWindow, ScratchGesture } from './scratchTypes';
 
 /** Reachability sentinel: how many times the model was asked for a gain. */
-export const scratchFaderModelStats = { faderGainAtCalls: 0 };
+export const scratchFaderModelStats = { faderGainAtCalls: 0, faderCurveCalls: 0 };
 
 export const FADER_RAMP_MS = { rest: 3, max: 8 } as const;
 export const FADER_CURVES = { smooth: 2, sharp: 6, battle: 12 } as const;
@@ -82,6 +84,22 @@ export function faderRampSec(velocity = 1): number {
 export function faderCurve(position: number, mode: FaderCurveMode = 'battle', cutIn = BATTLE_CUT_IN): number {
   const p = Math.max(0, Math.min(1, (position - cutIn) / Math.max(1e-6, 1 - cutIn)));
   return 1 - Math.pow(1 - p, FADER_CURVES[mode]);
+}
+
+/**
+ * The transfer curve a record-voice cut is performed with (reference `render_gesture`, scratch.py
+ * :300-302: every gesture's `curve` defaults to battle, the envelope shaped with cut_in 0): the
+ * worklet raises the window gain through `1 - (1 - g)^exponent`. Counted (reachability sentinel).
+ */
+export function faderCurveShape(mode: FaderCurveMode = 'battle'): { exponent: number; cutIn: number } {
+  scratchFaderModelStats.faderCurveCalls++;
+  return { exponent: FADER_CURVES[mode], cutIn: 0 };
+}
+
+/** Reference cut ramp (scratch.py :299, owner decision O7): 1 + 2 (1 - v) ms - harder hits cut sharper. */
+export function cutRampSec(velocity: number): number {
+  const v = Math.max(0, Math.min(1, velocity));
+  return (1 + 2 * (1 - v)) / 1000;
 }
 
 /** Crossfader position that opens (`gain` 1) or closes (0) the given deck:
