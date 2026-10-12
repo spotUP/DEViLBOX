@@ -222,6 +222,9 @@ Files the juggling agent is editing now: `DJAutoDJ.ts`, `transitionExecutor.ts`,
 - [x] SA-m8 `buildScratchContext` without `scratchPermission` = 0 (no hands budget until P7.11 grants one), the planner plays OFF. The 0..4 hands-budget scale of section 27 / D7 is P7.11's. Test `scratchContext.test.ts` "without a hands budget ...", revert-checked.
 - [x] SA-m9 SCR-P3.6 set to `[?]` (its test asserts 71.5 against the owner's 68.875 example; owner to confirm); SCR-P4.TC ticked on a clean type-check. Count line updated (54 done, 70 open, 1 `[?]`; open count by `grep -c '^- \[ \] SCR-'`).
 - [x] SA-m10 Flaky `scratchRecordRing.test.ts` (fast tier): the test resumed the offline render after a guessed 50 ms for the `startAt` message to reach the worklet; under load the drop was missed. The worklet answers a `sync` barrier (`DeckScratchBuffer.sync()`, port messages are ordered) and the test resumes after it. Not revert-checkable (a race); 3 consecutive passes.
+- [ ] SA-M7 OPEN: the record voice's reachability/audio tests (`scratchRecordVoiceReachesTheBus` 19 s, `scratchRecueReachesTheRecord` 22 s, `scratchRecordVoiceAudio`) stay in `tools/test-tiers/heavy.json`; moving them to the fast tier needs a render-performance hunt on an idle machine (measured at load 55; suspects: two convolvers per pool, `queue.sort` per message, position reports). Not started: open-ended, needs a cost go-ahead.
+- [ ] SA-m4 OPEN: 5 ms / 10 ms main-thread `setInterval` ticks clamp to >= 1 s in a hidden tab. The executor uses `realTimers` from `transitionExecutor.ts`, shared with the Auto DJ transitions and juggles: the fix is that shared timer layer (e.g. a worker clock), not a scratch-only patch. Unreachable until P7.
+- [ ] SA-m2 OPEN (owner decision, P10.O): deck scratch reverb IR decays in 0.25 ms; unchanged.
 
 ## Phase P5 - Source selection: crate, deck, tracker-native (Gates G, K; sections 12, 13, 38, 39, 84-88)
 
