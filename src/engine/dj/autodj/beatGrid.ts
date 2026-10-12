@@ -257,6 +257,29 @@ export function barStartBeat(grid: { bars: readonly Pick<Bar, 'beats'>[]; meter?
 }
 
 /**
+ * How far into its bar the fractional beat `beat` is (0 = on the downbeat, up to 1), on the grid's own
+ * bars (barStartBeat): a grid whose first downbeat is not beat 0 (`phaseOffset`) has its downbeats there,
+ * not on multiples of the meter. Before the first bar and past the last the bars continue at the meter.
+ */
+export function barPhaseAtBeat(grid: { bars: readonly Pick<Bar, 'beats'>[]; meter?: Pick<Meter, 'beatsPerBar'>; phaseOffset?: number }, beat: number): number {
+  const bpb = grid.meter?.beatsPerBar || 4;
+  const wrap = (from: number) => ((((beat - from) % bpb) + bpb) % bpb) / bpb;
+  const bars = grid.bars;
+  if (bars.length === 0) return wrap(grid.phaseOffset ?? 0);
+  const first = barStartBeat(grid, 0);
+  if (beat < first) return wrap(first);
+  let lo = 0, hi = bars.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (barStartBeat(grid, mid) <= beat) lo = mid; else hi = mid - 1;
+  }
+  const start = barStartBeat(grid, lo);
+  if (lo === bars.length - 1) return wrap(start);
+  const len = barStartBeat(grid, lo + 1) - start;
+  return len > 0 ? Math.min(1 - 1e-9, (beat - start) / len) : 0;
+}
+
+/**
  * Fractional beat index at time `t` on a beat grid: 3.25 = a quarter past
  * beat 3. Before the first beat / after the last the local period extends
  * the grid. The one mapping from a deck position to musical time.
