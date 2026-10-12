@@ -24,6 +24,8 @@ export function fixtureAnalysis(): DJTrackAnalysis {
     phraseLengthBars: 8,
     vocalActivity: { hopSec: hop, values: ramp, confidence: 0.9 },
     drumActivity: flat(0.7), bassActivity: flat(0.6), harmonicActivity: flat(0.2), intensity: flat(0.55),
+    rhythmic: { onsetsPerBeat: 2, fourOnFloorScore: 0.5, syncopation: 0.3, drumPattern: 'breakbeat', tempoHypotheses: [], tempoStability: 1 },
+    arrangementEvents: [],
   } as unknown as DJTrackAnalysis;
 }
 

@@ -18,7 +18,9 @@ import { planScratch, toScratchEvents, type ScratchPlan, type ScratchPlanOptions
 import type { ThrowMemory } from './scratchPlacement';
 import type { ScratchMode } from './scratchStyles';
 import { anchorFor } from './scratchAnchor';
-import { findRecords, type ScratchRecord } from './scratchCatalogue';
+import type { ScratchRecord } from './scratchCatalogue';
+import { selectScratchSource, type SourceDecision, type TrackerSampleInfo } from './ScratchSourceSelector';
+import type { ScratchGenreHint } from './scratchStyles';
 import type { ScratchDJStyle, ScratchEvent, ScratchSource, ScratchAnchor, DeckScratchAnchor } from './scratchTypes';
 
 type AB = 'A' | 'B';
@@ -35,6 +37,8 @@ export interface ChosenScratchSource {
   source: ScratchSource;
   anchor: ScratchAnchor | DeckScratchAnchor;
   record?: ScratchRecord;
+  /** The selector's decision: score terms and reasons (decision log). */
+  decision?: SourceDecision;
 }
 
 export interface ScratchTickInput {
@@ -46,6 +50,10 @@ export interface ScratchTickInput {
   /** Hands budget grant (section 27); 0 = nothing is scratched. */
   scratchPermission: number;
   genre?: ScratchPlanOptions['genre'];
+  /** Section 33 genre the source selector reads (house / techno favour the live deck). */
+  genreHint?: ScratchGenreHint | 'unknown';
+  /** Scratchable instruments of a tracker deck's song (P5.6). */
+  trackerSamples?: readonly TrackerSampleInfo[];
   juggleIntensity?: number;
   transitionIntensity?: number;
 }
@@ -53,8 +61,10 @@ export interface ScratchTickInput {
 export interface ScratchDJDeps {
   /** The executor on `deck`'s beat clock for `track` (cached by the controller per deck + track). */
   executorFor(deck: AB, track: DJTrackAnalysis): ScratchEventSink;
-  /** Source selection (P5 `ScratchSourceSelector`); a crate record by style and role when omitted. */
-  chooseSource?(ctx: ScratchPerformanceContext, plan: ScratchPlan): ChosenScratchSource | null;
+  /** Source selection; `selectScratchSource` (section 13) when omitted. */
+  chooseSource?(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, recent: readonly string[]): ChosenScratchSource | null;
+  /** Every source decision, with its score terms (the Auto DJ decision log, P7.12). */
+  onSourceDecision?(decision: SourceDecision, ctx: ScratchPerformanceContext): void;
   seed?: number;
   onPlan?(plan: ScratchPlan, events: readonly ScratchEvent[], ctx: ScratchPerformanceContext): void;
 }
@@ -68,15 +78,23 @@ export interface ScratchDJTickResult {
 /** Reachability sentinels (SCR-P4.R4). */
 export const scratchDJStats = { ticks: 0, plans: 0, scheduled: 0 };
 
-/** The best clean vocal record for the style and the plan's leading role (pre-P5 default). */
-export function defaultCrateSource(ctx: ScratchPerformanceContext, plan: ScratchPlan): ChosenScratchSource | null {
-  const role = plan.events.find((e) => e.gesture !== 'drop' && e.gesture !== 'dropPhrase')?.role ?? 'THEME';
-  const record = findRecords({ style: ctx.style, role, clean: true, vocal: true, recent: ctx.recentSources })[0];
-  if (!record) return null;
-  const source: ScratchSource = { type: 'CRATE', recordId: record.id, anchor: { position: record.anchors.vowel, safe: record.safe, safeForward: record.safeForward, safeReverse: record.safeReverse } };
-  const anchor = anchorFor(source, role);
-  return anchor ? { source, anchor, record } : null;
+/** The section 13 selector over the plan's roles and gestures (the default `chooseSource`). */
+export function selectorSource(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, recent: readonly string[]): ChosenScratchSource | null {
+  const track = input.perf.currentTrack;
+  if (!track) return null;
+  const performed = plan.events.filter((e) => e.gesture !== 'drop' && e.gesture !== 'dropPhrase');
+  const roles = [...new Set(performed.map((e) => e.role))];
+  const decision = selectScratchSource({
+    ctx, track, deck: input.deck, roles: roles.length ? roles : ['THEME'], gestures: performed.map((e) => e.gesture),
+    bar: plan.events[0]?.bar ?? ctx.masterBar + 1, genre: input.genreHint, trackerSamples: input.trackerSamples, recent,
+  });
+  if (!decision) return null;
+  const c = decision.candidate;
+  return { source: c.source, anchor: c.anchor, record: c.record, decision };
 }
+
+/** Source keys remembered for novelty / repetition (section 13; the full memory is P6.6). */
+const RECENT_SOURCES = 8;
 
 export class DJScratchDJ {
   private readonly deps: ScratchDJDeps;
@@ -86,6 +104,7 @@ export class DJScratchDJ {
   private trackKey = '';
   private lastBar = -1;
   private readonly throwMemory: ThrowMemory = {};
+  private readonly recentSources: string[] = [];
   /** Last plan (telemetry, P9.5). */
   lastPlan: ScratchPlan | null = null;
 
@@ -139,7 +158,12 @@ export class DJScratchDJ {
     const seed = this.deps.seed ?? 1;
     // the source is chosen before the throw: a crate record opens its phrase with one (section 41)
     const probe = planScratch(ctx, { mode: input.mode, seed, fromBar, bars, vocalByBar, genre: input.genre });
-    const chosen = probe.events.length ? (this.deps.chooseSource ?? defaultCrateSource)(ctx, probe) : null;
+    const chosen = probe.events.length ? (this.deps.chooseSource ?? selectorSource)(ctx, probe, input, this.recentSources) : null;
+    if (chosen?.decision) {
+      this.recentSources.push(chosen.decision.candidate.key);
+      if (this.recentSources.length > RECENT_SOURCES) this.recentSources.shift();
+      this.deps.onSourceDecision?.(chosen.decision, ctx);
+    }
     const plan = chosen?.record
       ? planScratch(ctx, { mode: input.mode, seed, fromBar, bars, vocalByBar, genre: input.genre, record: chosen.record, throwMemory: this.throwMemory })
       : probe;
