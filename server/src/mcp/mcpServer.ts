@@ -1029,7 +1029,7 @@ export function createMcpServer(): McpServer {
   server.tool(
     'set_active_view',
     'Switch the main view',
-    { view: z.enum(['tracker', 'arrangement', 'dj', 'drumpad', 'pianoroll', 'vj', 'mixer', 'studio', 'split']).describe('View to activate') },
+    { view: z.enum(['tracker', 'dj', 'drumpad', 'vj', 'grid', 'pianoroll', 'matrix', 'sunvox']).describe('Main view, or a tracker sub-view (grid, pianoroll, matrix, sunvox) which opens the tracker in that mode') },
     (p) => call('set_active_view', p),
   );
 

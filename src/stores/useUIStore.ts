@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 import type { PanelType } from '@typedefs/project';
+import type { MainView } from './uiViews';
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
@@ -84,7 +85,7 @@ interface UIStore {
   scratchAcceleration: boolean; // Scroll acceleration for scratch (true = smoothed, false = raw 1:1)
   platterMass: number; // Turntable platter mass 0-1 (0=CDJ light, 0.5=Technics 1200, 1=heavy)
 
-  activeView: 'tracker' | 'dj' | 'drumpad' | 'vj';
+  activeView: MainView;
 
   // Tracker sub-view state (shared between DOM and GL renderers)
   trackerViewMode: TrackerViewMode;
@@ -174,7 +175,7 @@ interface UIStore {
   setPlatterMass: (mass: number) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'dj' | 'drumpad' | 'vj') => void;
+  setActiveView: (view: MainView) => void;
   toggleActiveView: () => void;
 
   // Tracker sub-view actions
