@@ -129,8 +129,9 @@ async function run(mode: 'MUSICAL' | 'OFF') {
   vi.useRealTimers();
   await getScratchVoicePool().settled();
 
+  const newDecisions = (getDecisionLog().counts.SCRATCH ?? 0) - before.decisions;
   return {
-    track, deck, runs,
+    track, deck, runs, decisions: newDecisions > 0 ? getDecisionLog().list(newDecisions, 'SCRATCH') : [], memory: controller.memory.snapshot(),
     counts: {
       find: scratchOpportunityStats.find - before.find, select: scratchSourceStats.select - before.select, phrase: scratchPlacementStats.planPhrase - before.phrase,
       started: scratchExecutorStats.started - before.started, strokes: scratchVoiceStats.strokes - before.strokes,
@@ -153,13 +154,22 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
   });
 
   it('MUSICAL into a breakdown: opportunity, source, planPhrase, every planned event executed on the grid, the voice strokes', async () => {
-    const { counts, runs, deck, track } = await run('MUSICAL');
+    const { counts, runs, deck, track, decisions, memory } = await run('MUSICAL');
     expect(counts.find).toBeGreaterThanOrEqual(1);
     expect(counts.select).toBeGreaterThanOrEqual(1);
     expect(counts.phrase).toBeGreaterThanOrEqual(1);
     expect(runs.length).toBeGreaterThanOrEqual(1);
     expect(counts.started).toBe(runs.length);
     expect(counts.decisions).toBeGreaterThanOrEqual(1);
+    // SCR-P7.12: one decision per performed phrase with the section 65 fields; the set remembers each phrase
+    for (const d of decisions) {
+      expect(d.details?.source, 'source').toBeTruthy();
+      expect(typeof d.details?.gesture).toBe('string');
+      expect(Number.isFinite(d.details?.placementBeat as number)).toBe(true);
+      expect(d.details?.durationBeats as number).toBeGreaterThan(0);
+    }
+    expect(memory.scratchPhrases).toBe(counts.decisions);
+    expect(memory.recentScratchGestures).toContain(decisions[decisions.length - 1]!.details!.gesture);
     const crate = runs.filter((r) => r.run.event.source.type === 'CRATE');
     if (crate.length === runs.length) {
       // a crate source plays on the record voice and never touches the deck (section 16)

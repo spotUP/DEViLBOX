@@ -884,4 +884,8 @@ export interface SessionMemorySnapshot {
   repeatedTransitionPatterns: string[];
   transitionCount: number;
   elapsedSec: number;
+  /** Scratch phrases performed this session (scratch plan D9 / SCR-P7.12). */
+  scratchPhrases: number;
+  /** Gestures of the last scratch phrases, oldest first (the transition scratch's variety term). */
+  recentScratchGestures: string[];
 }

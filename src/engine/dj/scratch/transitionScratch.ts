@@ -77,6 +77,8 @@ export interface TransitionScratchInput {
   creativeRisk: number;
   setPhase: string;
   seed: number;
+  /** Gestures the set scratched lately (session memory, SCR-P7.12): the accents rotate away from them. */
+  recentGestures?: readonly string[];
 }
 
 export interface TransitionScratchResult { scratch?: TransitionScratchPlan; reason: string }
@@ -128,6 +130,14 @@ export function incomingVocalCallBeat(input: TransitionScratchInput): number | n
 }
 
 /** The scratch a transition carries, or why none. */
+/** The gesture of `pool` the set used least lately (section 29 variety); ties broken by the seeded draw. */
+export function leastRecent(pool: readonly ScratchGestureId[], recent: readonly string[], rnd: () => number): ScratchGestureId {
+  const uses = pool.map((g) => recent.filter((r) => r === g).length);
+  const min = Math.min(...uses);
+  const fewest = pool.filter((_, i) => uses[i] === min);
+  return fewest[Math.floor(rnd() * fewest.length)]!;
+}
+
 export function planTransitionScratch(input: TransitionScratchInput): TransitionScratchResult {
   const { plan, mode, permission, outgoing } = input;
   const rank = MODE_RANK[mode];
@@ -172,7 +182,7 @@ export function planTransitionScratch(input: TransitionScratchInput): Transition
     const rnd = lfsr(input.seed * 13 + 5);
     for (let i = 0; i < n; i++) {
       const bar = compat.fit === 'risky' ? 0 : Math.min(bars - 1, Math.floor((i + 0.5) * bars / n));
-      const g = compat.gestures[Math.floor(rnd() * compat.gestures.length)]!;
+      const g = leastRecent(compat.gestures, [...(input.recentGestures ?? []), ...out.map((p) => p.gesture)], rnd);
       out.push(placed(plan.startBeat, bar, i % 2 === 0 ? 14 : 6, g, 'ACCENT', bpb));
     }
     source = compat.source === 'outgoing' ? outgoingSource(plan, outgoing, plan.startBeat)

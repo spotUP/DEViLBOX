@@ -10,6 +10,8 @@ export class DJSessionMemory {
   private records: TransitionRecord[] = [];
   private tracks: Array<{ id: string; artist: string | null; time: number; energy: number; key: string | null; bpm: number }> = [];
   private peaks: number[] = [];
+  /** Performed scratch phrases: their gestures, source and time (scratch plan D9). */
+  private scratches: Array<{ time: number; gestures: string[]; source: string | null }> = [];
   readonly startedAt: number;
   private now: () => number;
 
@@ -29,6 +31,17 @@ export class DJSessionMemory {
     if (rec.energyAfter >= 0.8) this.peaks.push(rec.time);
     if (this.peaks.length > KEEP) this.peaks.splice(0, this.peaks.length - KEEP);
   }
+
+  /** One performed scratch phrase (the Auto DJ's SCRATCH decision). */
+  recordScratch(info: { gestures: readonly string[]; source: string | null; time?: number }): void {
+    this.scratches.push({ time: info.time ?? this.now(), gestures: [...info.gestures], source: info.source });
+    if (this.scratches.length > KEEP) this.scratches.splice(0, this.scratches.length - KEEP);
+  }
+
+  get scratchCount(): number { return this.scratches.length; }
+
+  /** Gestures of the last `n` scratch phrases, oldest first. */
+  recentScratchGestures(n = 4): string[] { return this.scratches.slice(-n).flatMap((s) => s.gestures); }
 
   get transitionCount(): number { return this.records.length; }
 
@@ -111,6 +124,8 @@ export class DJSessionMemory {
       repeatedTransitionPatterns: this.repeatedPatterns(),
       transitionCount: this.records.length,
       elapsedSec: this.elapsedSec(),
+      scratchPhrases: this.scratches.length,
+      recentScratchGestures: this.recentScratchGestures(),
     };
   }
 
@@ -118,5 +133,6 @@ export class DJSessionMemory {
     this.records = [];
     this.tracks = [];
     this.peaks = [];
+    this.scratches = [];
   }
 }
