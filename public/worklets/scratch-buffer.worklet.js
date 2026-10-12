@@ -351,6 +351,11 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           break;
         }
 
+        case 'sync':
+          // a barrier: every message posted before it has been applied (tests, scheduling)
+          this.port.postMessage({ type: 'synced', id: d.id });
+          break;
+
         case 'bounds': {
           const hi = Math.max(0, this.bufferFrames - 1);
           this.boundLo = Math.max(0, Math.min(hi, Math.round(d.startFrames)));

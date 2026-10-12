@@ -346,6 +346,28 @@ export class DeckScratchBuffer {
     });
   }
 
+  private syncId = 0;
+
+  /**
+   * Resolves once the worklet has applied every message posted before this call (port messages
+   * are ordered): a barrier instead of a guessed delay (audit SA-m10: a 50 ms wait lost the race
+   * under load and the drop was missed).
+   */
+  sync(): Promise<void> {
+    if (!this.initialized) return Promise.resolve();
+    const id = ++this.syncId;
+    return new Promise<void>((resolve) => {
+      const handler = (e: MessageEvent) => {
+        if (e.data?.type === 'synced' && e.data.id === id) {
+          this.playbackNode.port.removeEventListener('message', handler);
+          resolve();
+        }
+      };
+      this.playbackNode.port.addEventListener('message', handler);
+      this.playbackNode.port.postMessage({ type: 'sync', id });
+    });
+  }
+
   /** Clamp the read head to [start, end] seconds (the record's safe range). */
   setBounds(startSec: number, endSec: number): void {
     this.requireRecord();
