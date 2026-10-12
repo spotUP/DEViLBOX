@@ -27,7 +27,9 @@ const CASES = [
   { file: 'Virgill&Maze-national waffle day.mod', speed: 5, rowsPerBeat: 6, beatsPerBar: 4, bpm: 100, phrase: 0.73 },
   { file: 'Virgill-mothership.mod', speed: 4, rowsPerBeat: 8, beatsPerBar: 4, bpm: 93.75, phrase: 0.75 },
   { file: "nah-kolor 'on fire'.mod", speed: 4, rowsPerBeat: 8, beatsPerBar: 4, bpm: 93.75, phrase: 0.75 },
-  { file: 'Virgill-amigahub.mod', speed: 8, rowsPerBeat: 4, beatsPerBar: 4, bpm: 93.75, phrase: 1 },
+  // amigahub swings 8 / 4 ticks a row (mean 6): 4 rows a beat are 24 ticks, 125 BPM. It read 93.75
+  // while the walk counted the swing as speed 8; its beats were 0.48 s apart all along (DECK-BPM-MODULE).
+  { file: 'Virgill-amigahub.mod', speed: 6, rowsPerBeat: 4, beatsPerBar: 4, bpm: 125, phrase: 1 },
   { file: 'Virgill-redrum redrum.mod', speed: 8, rowsPerBeat: 4, beatsPerBar: 4, bpm: 93.75, phrase: 0.91 },
 ];
 
@@ -42,6 +44,9 @@ describe('a module whose 24-tick beat misses its pattern lengths', () => {
       expect(grid.rowsPerBeat).toBe(c.rowsPerBeat);
       expect(grid.beatsPerBar).toBe(c.beatsPerBar);
       expect(grid.bpm).toBe(c.bpm);
+      // The BPM is the beats' own spacing (a swing counted as one tempo, not its longer row).
+      const gaps = grid.beats.slice(1).map((b, i) => b - grid.beats[i]).sort((a, b) => a - b);
+      expect(60 / gaps[gaps.length >> 1]).toBeCloseTo(c.bpm, 1);
       // The bars divide the patterns: most played positions are a whole number of bars.
       const rowsPerBar = grid.rowsPerBeat * grid.beatsPerBar;
       const whole = walk.positions.filter((p) => p.rows % rowsPerBar === 0).length / walk.positions.length;

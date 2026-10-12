@@ -21,6 +21,7 @@ import { createScratchBus, type ScratchBus } from './scratch/scratchBus';
 import { DeckAudioPlayer, DeckLoadSuperseded, type AudioFileInfo } from './DeckAudioPlayer';
 import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
+import { songRowTimeline, rowAtTime, timeAtRow, EMPTY_ROW_TIMELINE, type SongRowTimeline } from './songRowTimeline';
 import { attachChannelScopes, channelScopesFor, channelScopeWindow, releaseChannelStems, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
 import { DeckChannelMute, bufferWithStems, stemCountOf } from './DeckChannelMute';
 import { decodeStemsFlac } from './channelStemCodec';
@@ -178,9 +179,8 @@ export class DeckEngine {
   // Direction-switch cooldown: prevents gain accumulation from rapid back/forth jog gestures
   private _lastJogDirSwitchTime = 0;
   private static readonly JOG_DIR_SWITCH_COOLDOWN_MS = 20;
-  private songTimeIndex: number[] = [];
-  /** Per-song-position rowMs value (accounts for Fxx speed/BPM changes) */
-  private songRowMs: number[] = [];
+  /** When each played row of the loaded song starts (songRowTimeline: the one order walk). */
+  private songTimeline: SongRowTimeline = EMPTY_ROW_TIMELINE;
 
   // EQ kill state (stored separately from gain values)
   private eqKillState = { low: false, mid: false, high: false };
@@ -553,7 +553,10 @@ export class DeckEngine {
       FurnaceDispatchEngine.getInstance().setCompatFlags(song.compatFlags as any);
     }
 
-    this.songTimeIndex = this._buildTimeIndex(song);
+    this.songTimeline = songRowTimeline(song);
+    // The deck holds this song from here: the pattern view reads it now, not
+    // when the audio load that follows writes the file name.
+    useDJStore.getState().setDeckState(this.id, { songVersion: (useDJStore.getState().decks[this.id]?.songVersion ?? 0) + 1 });
     await engine.preloadInstruments(song.instruments);
     await engine.ensureWASMSynthsReady(song.instruments);
 
@@ -1135,54 +1138,6 @@ export class DeckEngine {
   // SCRATCH
   // ==========================================================================
 
-  /**
-   * Build a cumulative time index (ms) for each song position boundary.
-   * Index[i] = time in ms when song position i starts.
-   * Used to estimate seek position after a backward scratch.
-   */
-  private _buildTimeIndex(song: TrackerSong): number[] {
-    let bpm   = song.initialBPM   ?? 125;
-    let speed = song.initialSpeed ?? 6;
-    const times: number[] = [0];
-    const rowMsArr: number[] = [];
-
-    for (let i = 0; i < song.songLength; i++) {
-      const patternIdx = song.songPositions[i];
-      const pattern    = song.patterns[patternIdx];
-      const numRows    = pattern?.length ?? 64;
-      let patternMs = 0;
-
-      // Walk each row to detect Fxx speed/BPM changes
-      for (let row = 0; row < numRows; row++) {
-        const rowMs = (speed * 2500 / bpm);
-        patternMs += rowMs;
-
-        if (!pattern) continue;
-        // Scan all channels for Fxx (effect type 0xF)
-        for (const ch of pattern.channels) {
-          const cell = ch.rows[row];
-          if (!cell) continue;
-          // Check primary effect column
-          if (cell.effTyp === 0xF && cell.eff > 0) {
-            if (cell.eff < 0x20) speed = cell.eff;
-            else bpm = cell.eff;
-          }
-          // Check second effect column
-          if (cell.effTyp2 === 0xF && cell.eff2 > 0) {
-            if (cell.eff2 < 0x20) speed = cell.eff2;
-            else bpm = cell.eff2;
-          }
-        }
-      }
-
-      // Store the rowMs at the END of this pattern (for row interpolation)
-      rowMsArr.push(speed * 2500 / bpm);
-      times.push(times[i]! + patternMs);
-    }
-
-    this.songRowMs = rowMsArr;
-    return times;
-  }
 
   // ── Heard position (the one source for every DJ visual) ──────────────────
 
@@ -1212,31 +1167,15 @@ export class DeckEngine {
     if (!state) return null;
     const songPos = state.position;
     const pattPos = state.row;
-    let elapsedMs: number | null = null;
-    if (this.songTimeIndex.length > songPos) {
-      const rowMs = this.songRowMs[songPos];
-      const into = state.duration > 0 ? Math.max(0, Math.min(1, (ctx.currentTime - state.time) / state.duration)) : 0;
-      elapsedMs = (this.songTimeIndex[songPos] ?? 0) + (rowMs ? (pattPos + into) * rowMs : 0);
-    }
+    const into = state.duration > 0 ? (ctx.currentTime - state.time) / state.duration : 0;
+    const elapsedMs = timeAtRow(this.songTimeline, songPos, pattPos, into);
     return { songPos, pattPos, elapsedMs };
   }
 
   /** Map elapsed ms to { songPos, pattPos } using the pre-built time index */
   getPositionAtTime(ms: number): { songPos: number; pattPos: number } | null {
-    const song = this.replayer.getSong();
-    if (!song || this.songTimeIndex.length <= 1) return null;
-    let lo = 0, hi = this.songTimeIndex.length - 2;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if ((this.songTimeIndex[mid] ?? 0) <= ms) lo = mid; else hi = mid - 1;
-    }
-    const songPos = lo;
-    const rowMs = this.songRowMs[songPos] ?? ((song.initialSpeed ?? 6) * 2500 / (song.initialBPM ?? 125));
-    const rowsIn = Math.max(0, Math.floor((ms - (this.songTimeIndex[songPos] ?? 0)) / rowMs));
-    const patternIdx = song.songPositions[songPos];
-    const pattern = song.patterns[patternIdx];
-    const pattPos = Math.min(rowsIn, (pattern?.length ?? 64) - 1);
-    return { songPos, pattPos };
+    if (!this.replayer.getSong()) return null;
+    return rowAtTime(this.songTimeline, ms);
   }
 
   /** Returns effective BPM: replayer BPM × tempo multiplier */
@@ -1633,21 +1572,9 @@ export class DeckEngine {
       }
     } else {
       const song = this.replayer.getSong();
-      if (song && this.songTimeIndex.length > 1) {
-        let lo = 0, hi = this.songTimeIndex.length - 2;
-        while (lo < hi) {
-          const mid = (lo + hi + 1) >> 1;
-          if ((this.songTimeIndex[mid] ?? 0) <= targetMs) lo = mid; else hi = mid - 1;
-        }
-        const songPos = lo;
-        const rowMs   = this.songRowMs[songPos] ?? ((song.initialSpeed ?? 6) * 2500 / (song.initialBPM ?? 125));
-        const rowsIn  = Math.max(0,
-          Math.floor((targetMs - (this.songTimeIndex[songPos] ?? 0)) / rowMs),
-        );
-        const patternIdx = song.songPositions[songPos];
-        const pattern    = song.patterns[patternIdx];
-        const pattPos    = Math.min(rowsIn, (pattern?.length ?? 64) - 1);
-        this.replayer.seekTo(songPos, pattPos);
+      const at = song ? rowAtTime(this.songTimeline, targetMs) : null;
+      if (at) {
+        this.replayer.seekTo(at.songPos, at.pattPos);
       } else {
         this.replayer.seekTo(this.backwardStartSongPos, this.backwardStartPattPos);
       }

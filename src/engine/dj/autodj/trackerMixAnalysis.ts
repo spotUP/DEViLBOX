@@ -42,6 +42,11 @@ export function rowSeconds(speed: number, bpm: number): number {
 const EFF_POSITION_JUMP = 0x0b;
 const EFF_PATTERN_BREAK = 0x0d;
 const EFF_SPEED_TEMPO = 0x0f;
+const EFF_EXTENDED = 0x0e;
+const EXT_PATTERN_LOOP = 0x6;
+const EXT_PATTERN_DELAY = 0xe;
+/** Rows a swing cycle fits in (periods of 1, 2 and 4 rows): tempo is counted at the mean speed of each such group. */
+const TEMPO_GROUP_ROWS = 4;
 
 function cellEffects(cell: TrackerCell): Array<[number, number]> {
   return [
@@ -67,9 +72,13 @@ export interface OrderWalk {
  * Walk the order list as the replayer plays it and time every played row:
  * Fxx speed / tempo, Dxx pattern break (BCD on Amiga-period formats, as the
  * replayer reads it), Bxx position jump (a backward jump is the song loop
- * and ends the walk), F00 stop. Pattern loops (E6x) and pattern delay (EEx)
- * are not followed; a walk that misses them disagrees with the render and
- * the caller's agreement check rejects it.
+ * and ends the walk), F00 stop, E6x pattern loop (each pass back to the loop
+ * start is a new played segment of the same order position) and EEx pattern
+ * delay (the row lasts x more rows).
+ *
+ * Tempo time is counted per group of TEMPO_GROUP_ROWS pattern rows at the
+ * group's mean speed: a swing (speed alternating row by row, F0B / F05)
+ * is one tempo of 8 ticks a row, not two tempos of 11 and 5.
  */
 export function timeOrderPositions(song: TrackerSong): OrderWalk {
   const positions: TrackerOrderPosition[] = [];
@@ -85,10 +94,28 @@ export function timeOrderPositions(song: TrackerSong): OrderWalk {
   let pos = 0;
   let startRow = 0;
   let stop = false;
+  // Pattern loop state per channel (E60 start, E6x count), reset on each new order position.
+  let loopStart: number[] = [];
+  let loopCount: number[] = [];
+  let loopPass = false;
+  // The tempo group being counted: its rows' tick seconds at the tick tempo.
+  let group = { key: -1, ticks: 0, rows: 0, seconds: 0, bpm };
+  const flushGroup = () => {
+    if (group.rows === 0) return;
+    const s = Math.round((group.ticks / group.rows) * 1000) / 1000;
+    const k = `${s}/${group.bpm}`;
+    const e = spent.get(k);
+    if (e) e.seconds += group.seconds; else spent.set(k, { speed: s, bpm: group.bpm, seconds: group.seconds });
+    group = { key: -1, ticks: 0, rows: 0, seconds: 0, bpm };
+  };
   while (!stop && pos < length) {
     const key = `${pos}:${startRow}`;
-    if (visited.has(key)) break;
-    visited.add(key);
+    if (!loopPass) {
+      if (visited.has(key)) break;
+      visited.add(key);
+      loopStart = [];
+      loopCount = [];
+    }
     const patternIndex = song.songPositions[pos];
     const pattern = song.patterns[patternIndex];
     const rows = pattern?.channels[0]?.rows.length ?? pattern?.length ?? 64;
@@ -97,12 +124,14 @@ export function timeOrderPositions(song: TrackerSong): OrderWalk {
     const times: number[] = [];
     let nextPos = pos + 1;
     let nextRow = 0;
+    let loopTo: number | null = null;
     for (let r = startRow; r < rows; r++) {
       let jump: number | null = null;
       let brk: number | null = null;
+      let delay = 0;
       if (pattern) {
-        for (const ch of pattern.channels) {
-          const cell = ch.rows[r];
+        for (let c = 0; c < pattern.channels.length; c++) {
+          const cell = pattern.channels[c].rows[r];
           if (!cell) continue;
           for (const [typ, v] of cellEffects(cell)) {
             if (typ === EFF_SPEED_TEMPO) {
@@ -112,17 +141,25 @@ export function timeOrderPositions(song: TrackerSong): OrderWalk {
               jump = v;
             } else if (typ === EFF_PATTERN_BREAK) {
               brk = bcdBreaks ? (v >> 4) * 10 + (v & 0x0f) : v;
+            } else if (typ === EFF_EXTENDED && v >> 4 === EXT_PATTERN_DELAY) {
+              delay = Math.max(delay, v & 0x0f);
+            } else if (typ === EFF_EXTENDED && v >> 4 === EXT_PATTERN_LOOP) {
+              const x = v & 0x0f;
+              if (x === 0) { loopStart[c] = r; continue; }
+              if (!loopCount[c]) { loopCount[c] = x; loopTo = loopStart[c] ?? 0; }
+              else if (--loopCount[c] > 0) loopTo = loopStart[c] ?? 0;
             }
           }
         }
       }
       if (stop) break; // F00: the song stops at this row
-      const dt = rowSeconds(speed, bpm);
+      const rowDt = rowSeconds(speed, bpm);
       times.push(t);
-      t += dt;
-      const k = `${speed}/${bpm}`;
-      const e = spent.get(k);
-      if (e) e.seconds += dt; else spent.set(k, { speed, bpm, seconds: dt });
+      t += rowDt * (1 + delay);
+      const g = Math.floor(r / TEMPO_GROUP_ROWS);
+      if (g !== group.key || bpm !== group.bpm) { flushGroup(); group.key = g; group.bpm = bpm; }
+      group.ticks += speed; group.rows++; group.seconds += rowDt;
+      if (loopTo !== null) break; // E6x: the loop goes back before any break or jump of the row
       if (jump !== null || brk !== null) {
         if (jump !== null) {
           if (jump <= pos) stop = true; // song loop
@@ -132,10 +169,17 @@ export function timeOrderPositions(song: TrackerSong): OrderWalk {
         break;
       }
     }
+    flushGroup();
     if (times.length > 0) {
       rowTimes.push(times);
       positions.push({ index: pos, patternIndex, start, end: t, rows: times.length, startRow });
     }
+    if (loopTo !== null && !stop) {
+      loopPass = true;
+      startRow = loopTo;
+      continue;
+    }
+    loopPass = false;
     pos = nextPos;
     startRow = nextRow;
   }
