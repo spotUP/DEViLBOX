@@ -26,6 +26,12 @@ describe('pre-commit affected-test selection', () => {
       .toContain('src/engine/dj/__tests__/djViewRegressions.test.ts');
   });
 
+  it('a change to DeckPatternDisplay.tsx runs the test that imports it from elsewhere by module path', () => {
+    // 70a57efa2 changed it; renderedDeckPatternViewMetersEachChannel (import '../DeckPatternDisplay') failed only in CI.
+    expect(affected('src/components/dj/DeckPatternDisplay.tsx'))
+      .toContain('src/components/dj/__tests__/renderedDeckPatternViewMetersEachChannel.test.tsx');
+  });
+
   it('a changed test file still runs itself', () => {
     const self = 'src/__tests__/preCommitRunsSourceTextTests.test.ts';
     expect(affected(self)).toContain(self);
