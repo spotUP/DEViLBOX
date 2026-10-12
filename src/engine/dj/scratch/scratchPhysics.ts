@@ -43,6 +43,7 @@ export function strokeAmp(velocity: number | undefined): number {
 /** Whether the model performs this gesture (a hand path or a glide; not a throw, not a flourish). */
 export function isPhysical(gesture: Pick<ScratchGesture, 'id' | 'handPath' | 'glide' | 'flourish' | 'deckAction'>): boolean {
   if (gesture.id === 'drop' || gesture.id === 'dropPhrase' || gesture.flourish || gesture.deckAction) return false;
+  if (gesture.id === 'needleDrop' || gesture.id === 'needleLift') return false;
   return !!gesture.glide || !!gesture.handPath?.length;
 }
 

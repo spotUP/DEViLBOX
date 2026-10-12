@@ -25,7 +25,9 @@ export type ScratchGestureId =
   | 'uzi' | 'eightFingerCrab' | 'threeClickFlare'
   | 'drop' | 'dropPhrase'
   // the reference's own (scratch.py :168-179, SCR-PG-A4): a cut, a stab with its echo, record flourishes
-  | 'cut' | 'echo' | 'brake' | 'spinup';
+  | 'cut' | 'echo' | 'brake' | 'spinup'
+  // the routine's bookends (scratch_dj.py :110, :161; turntable.py needle_drop / needle_lift)
+  | 'needleDrop' | 'needleLift';
 
 /** A gesture's own effect (reference `echo` fx, scratch.py :175-176): the bus echo while it plays. */
 export interface ScratchGestureFx {
@@ -134,6 +136,8 @@ export interface ScratchGesture {
   glide?: { ratio: number; grip: number; profile?: ReadonlyArray<readonly [t: number, speed: number]> };
   /** A record flourish the deck's motor performs (reference `deck_motion`): brake or start. */
   deckAction?: 'brake' | 'start';
+  /** The needle itself (reference `needle_drop` / `needle_lift`): a transient, no record motion. */
+  needle?: 'drop' | 'lift';
   /** A record flourish (brake, spin-up): placed on purpose (an ending, a routine, a pad), never
    *  drawn at random from a style's vocabulary. */
   flourish?: boolean;

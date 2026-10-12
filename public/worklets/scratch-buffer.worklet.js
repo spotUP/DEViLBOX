@@ -203,6 +203,10 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
       this.clampCount   = 0;
       this._posSince    = 0;
       this.queue        = [];    // [{atFrame, d}] record-mode messages scheduled ahead (sample-accurate)
+      this.surfBed      = null;  // Float32Array noise bed indexed by the record position (reference rate)
+      this.surfScale    = 1;
+      this.surfLevel    = 0;
+      this.cart         = null;  // cartridge low pass state
       this.seekDelay    = 0;
       this.stopAfter    = 0;
     } else {
@@ -441,6 +445,23 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           break;
         }
 
+        case 'surface':
+          // the record's noise bed (uniform -1..1 at the reference's 22,050 Hz), its level 0 until a stroke sets it
+          this.surfBed   = d.bed instanceof Float32Array && d.bed.length ? d.bed : null;
+          this.surfScale = (d.bedRate || 22050) / sampleRate;
+          this.surfLevel = 0;
+          break;
+
+        case 'surfaceLevel':
+          this.surfLevel = Math.max(0, +d.level || 0);
+          break;
+
+        case 'cartridge': {
+          const lp = (fc) => Math.exp(-2 * Math.PI * Math.min(fc, sampleRate * 0.45) / sampleRate);
+          this.cart = d.bw > 0 ? { a: lp(d.bw), a2: lp(d.bw * 0.8), worn: !!d.worn, yL: 0, yR: 0, zL: 0, zR: 0 } : null;
+          break;
+        }
+
         case 'faderGain':
           // One static gain (0/1) with the same ramp; cancels window automation.
           this.fader = {
@@ -577,8 +598,28 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
       const R2 = this.getRecordSample(posI + 1, 1), R3 = this.getRecordSample(posI + 2, 1);
       const shaped = fader && fader.curveExp > 1 ? 1 - Math.pow(1 - faderGain, fader.curveExp) : faderGain;
       const g = fadeGain * shaped;
-      if (out[0]) out[0][i] = hermite(L0, L1, L2, L3, frac) * g;
-      if (out[1]) out[1][i] = hermite(R0, R1, R2, R3, frac) * g;
+      let sL = hermite(L0, L1, L2, L3, frac), sR = hermite(R0, R1, R2, R3, frac);
+      // surface noise (reference surface_noise, physics s.47): a static noise bed read at the
+      // record's position - it stops when the record stops and reverses with it
+      const bed = this.surfBed;
+      if (bed && this.surfLevel > 0) {
+        const n = this.surfLevel * bed[Math.floor(Math.abs(this.readPosF) * this.surfScale) % bed.length];
+        sL += n; sR += n;
+      }
+      // cartridge (reference cartridge_response, physics s.49): one-pole low pass at its bandwidth;
+      // a worn / heavy stylus adds tracking distortion and a darker second pole
+      const cart = this.cart;
+      if (cart) {
+        cart.yL = cart.a * cart.yL + (1 - cart.a) * sL; sL = cart.yL;
+        cart.yR = cart.a * cart.yR + (1 - cart.a) * sR; sR = cart.yR;
+        if (cart.worn) {
+          sL = Math.tanh(sL * 1.3) / 1.3; sR = Math.tanh(sR * 1.3) / 1.3;
+          cart.zL = cart.a2 * cart.zL + (1 - cart.a2) * sL; sL = cart.zL;
+          cart.zR = cart.a2 * cart.zR + (1 - cart.a2) * sR; sR = cart.zR;
+        }
+      }
+      if (out[0]) out[0][i] = sL * g;
+      if (out[1]) out[1][i] = sR * g;
     }
 
     this.smoothRate  = rate;

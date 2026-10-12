@@ -71,6 +71,7 @@ describe('a record gesture fired through the DJ FX registry reaches the scratch 
     clearDjFxFireLog();
     scratchVoiceStats.strokes = 0;
     scratchRingStats.loads = 0; scratchRingStats.seekFrames.length = 0;
+    const surfacesBefore = scratchRingStats.surfaces, cartridgesBefore = scratchRingStats.cartridges;
     scratchPoolStats.performs = 0;
 
     expect(fireDjFx('fx_scratch_forwardStab', { source: 'mcp', record: 'ONE' })).toBe(true);
@@ -82,6 +83,9 @@ describe('a record gesture fired through the DJ FX registry reaches the scratch 
     const vowelFrames = Math.round(3300 / 22050 * SR);
     expect(scratchRingStats.seekFrames.some((f) => Math.abs(f - vowelFrames) <= 1), `needle at ${vowelFrames} +-1 (got ${scratchRingStats.seekFrames.join(',')})`).toBe(true);
     expect(scratchVoiceStats.strokes).toBe(1);
+    // SCR-PG-CR: the record's surface bed goes to the worklet with the record, the cartridge with the stroke
+    expect(scratchRingStats.surfaces - surfacesBefore).toBe(1);
+    expect(scratchRingStats.cartridges - cartridgesBefore).toBe(1);
     const voice = getScratchVoicePool().voices[0]!;
     expect(voice.record?.id).toBe('ONE');
     expect(voice.busy).toBe(true);

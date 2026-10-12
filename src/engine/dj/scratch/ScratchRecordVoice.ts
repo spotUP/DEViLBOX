@@ -22,13 +22,14 @@
 import type { DeckScratchBuffer, RingRatePoint, RingRateCurveOptions, RingFaderWindowsOptions, RingPositionReport } from '../DeckScratchBuffer';
 import type { ScratchRecord } from './scratchCatalogue';
 import type { ScratchDJStyle, ScratchGesture, ScratchVelocityPoint } from './scratchTypes';
-import { gestureMotion } from './scratchPhysics';
+import { gestureMotion, STYLE_TURNTABLE, DEFAULT_TURNTABLE } from './scratchPhysics';
+import { needleDrop, needleLift, surfaceBed, TT_CARTRIDGES, TT_RATE } from '@/engine/turntable/turntableSim';
 import { faderWindowsMs, faderCurveShape, cutRampSec, cycleMs } from './scratchFaderModel';
 
 /** The ring surface the voice uses (DeckScratchBuffer in record mode; a fake in tests). */
 export type ScratchVoiceRing = Pick<DeckScratchBuffer,
   'sampleRate' | 'playbackGain' | 'loadRecord' | 'setBounds' | 'startAt' | 'seek' | 'rateCurve' | 'faderWindows' | 'faderGain' | 'stopScratch' | 'stopAt' | 'silenceAndStop'
-> & { onPosition: ((report: RingPositionReport) => void) | null };
+> & Partial<Pick<DeckScratchBuffer, 'setSurface' | 'setSurfaceLevel' | 'setCartridge'>> & { onPosition: ((report: RingPositionReport) => void) | null };
 
 /** The bus surface the voice uses (`scratchBus.ts`). */
 export interface ScratchVoiceBus {
@@ -65,7 +66,7 @@ export interface ScratchVoiceSafetyEvent {
 }
 
 /** Reachability sentinels (SCR-P2.R2, P2.8). */
-export const scratchVoiceStats = { strokes: 0, clamps: 0, refused: 0, releases: 0, cues: 0, gestureFx: 0 };
+export const scratchVoiceStats = { strokes: 0, clamps: 0, refused: 0, releases: 0, cues: 0, gestureFx: 0, needles: 0 };
 
 /** Minimum safe reverse room (seconds) a reverse stroke needs behind the needle. */
 export const MIN_REVERSE_ROOM_SEC = 0.001;
@@ -121,6 +122,8 @@ export class ScratchRecordVoice {
   generation = 0;
   readonly safetyLog: ScratchVoiceSafetyEvent[] = [];
   private lastClamped = 0;
+  /** The cartridge bandwidth last set on the ring (set once per change). */
+  private cartridgeBw = 0;
   private lastRate = 0;
 
   constructor(index: number, ring: ScratchVoiceRing, bus: ScratchVoiceBus) {
@@ -147,6 +150,8 @@ export class ScratchRecordVoice {
   async load(record: ScratchRecord, buffer: AudioBuffer): Promise<void> {
     await this.ring.loadRecord(buffer);
     this.ring.setBounds(record.safe[0], record.safe[1]);
+    // the record's grooves: its surface-noise bed, read at the record position (T13)
+    this.ring.setSurface?.(surfaceBed(Math.ceil((buffer.length / buffer.sampleRate + 1) * TT_RATE)), TT_RATE);
     this.record = record;
     this.lastClamped = 0;
     this.moveNeedle('vowel');
@@ -258,9 +263,16 @@ export class ScratchRecordVoice {
    * open; hand gestures cue the vowel and loop with a return to the anchor.
    */
   playGesture(gesture: ScratchGesture, bpm: number, opts: { cue?: ScratchCue; ambience?: number; velocity?: number; at?: number; style?: ScratchDJStyle; seed?: number } = {}): StrokeResult {
+    // the needle (the routine's bookends): a transient on the bus, the record does not move
+    if (gesture.needle) return this.playNeedle(gesture.needle, opts.style, opts.seed, opts.at);
     const r = this.record;
     if (!r) return { ok: false, reason: 'no record loaded' };
     const isThrow = gesture.id === 'drop' || gesture.id === 'dropPhrase';
+    // the style's cartridge (T6) and its surface noise at the stroke's velocity (T13; a throw is the word as recorded)
+    const cartridge = TT_CARTRIDGES[(opts.style ? STYLE_TURNTABLE[opts.style] : DEFAULT_TURNTABLE).cartridge];
+    const worn = cartridge === TT_CARTRIDGES.worn_stylus || cartridge === TT_CARTRIDGES.heavy_tracking;
+    if (this.cartridgeBw !== cartridge.bw) { this.ring.setCartridge?.(cartridge.bw, worn); this.cartridgeBw = cartridge.bw; }
+    this.ring.setSurfaceLevel?.(isThrow ? 0 : cartridge.surface * (opts.velocity ?? 0.7), opts.at);
     // section 41: any clean record can be thrown; everything else follows the record's list
     if (!(isThrow && r.clean) && !r.gestures.includes(gesture.id)) return { ok: false, reason: `${gesture.id} is not a compatible gesture for ${r.id}` };
     if (opts.ambience !== undefined) this.bus.setAmbience(opts.ambience);
@@ -288,6 +300,24 @@ export class ScratchRecordVoice {
       interpolate: true,
       at: opts.at,
     });
+  }
+
+  /** A needle drop / lift (reference turntable.py :384-399) on the voice's bus at `at` / now. */
+  private playNeedle(kind: 'drop' | 'lift', style?: ScratchDJStyle, seed = 0, at?: number): StrokeResult {
+    const input = this.bus.input;
+    const ctx = input.context;
+    const sr = ctx.sampleRate;
+    const cartridge = (style ? STYLE_TURNTABLE[style] : DEFAULT_TURNTABLE).cartridge;
+    const samples = kind === 'drop' ? needleDrop(sr, cartridge, seed) : needleLift(sr, seed);
+    const buffer = ctx.createBuffer(1, samples.length, sr);
+    buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(input);
+    src.start(Math.max(ctx.currentTime, at ?? ctx.currentTime));
+    src.onended = () => { try { src.disconnect(); } catch { /* gone */ } };
+    scratchVoiceStats.needles++;
+    return { ok: true };
   }
 
   /** Silence within the ring's 3 ms gain ramp, worklet stopped, voice free; now or at context time `at`. */

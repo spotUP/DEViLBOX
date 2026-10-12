@@ -29,7 +29,7 @@ export const TRACKER_SCRATCH_BUFFER_ID = 3;
 export const SCRATCH_RECORD_RING_BASE = 4;
 
 /** Reachability sentinels for the record mode (SCR-P2.R2). */
-export const scratchRingStats = { loads: 0, startAtFrames: [] as number[], seekFrames: [] as number[], rateCurves: 0, faderWindows: 0 };
+export const scratchRingStats = { loads: 0, startAtFrames: [] as number[], seekFrames: [] as number[], rateCurves: 0, faderWindows: 0, surfaces: 0, cartridges: 0 };
 
 /** A frame-accurate rate point relative to the message's arrival. */
 export interface RingRatePoint { frame: number; rate: number }
@@ -418,6 +418,29 @@ export class DeckScratchBuffer {
     scratchRingStats.rateCurves++;
     this.rampGain(1, at);
     this.playbackNode.port.postMessage({ type: 'rateCurve', points, ...opts, at });
+  }
+
+  /** The record's surface-noise bed (reference rate samples), read at the record position (SCR-PG-C1, T13). */
+  setSurface(bed: Float32Array, bedRate: number): void {
+    this.requireRecord();
+    if (!this.initialized) return;
+    scratchRingStats.surfaces++;
+    this.playbackNode.port.postMessage({ type: 'surface', bed, bedRate });
+  }
+
+  /** Surface-noise level from `at` / now (cartridge surface x stroke velocity; 0 = none). */
+  setSurfaceLevel(level: number, at?: number): void {
+    this.requireRecord();
+    if (!this.initialized) return;
+    this.playbackNode.port.postMessage({ type: 'surfaceLevel', level, at });
+  }
+
+  /** The cartridge's response (one-pole low pass at its bandwidth; worn: tanh drive + a darker pole). 0 = none. */
+  setCartridge(bw: number, worn: boolean): void {
+    this.requireRecord();
+    if (!this.initialized) return;
+    scratchRingStats.cartridges++;
+    this.playbackNode.port.postMessage({ type: 'cartridge', bw, worn });
   }
 
   /** Open windows in frames relative to `at` / now; cut outside them. */

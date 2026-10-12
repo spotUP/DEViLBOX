@@ -111,7 +111,7 @@ describe('every scratch trigger fires the registry (SCR-P2.9)', () => {
     }
   });
 
-  it('the registry carries all 31 gestures, stop, throw, cue, anchor, loop, record and release in the scratch category', () => {
+  it('the registry carries all 33 gestures, stop, throw, cue, anchor, loop, record and release in the scratch category', () => {
     for (const g of SCRATCH_GESTURE_IDS) {
       const a = DJ_FX_ACTION_MAP[`fx_scratch_${g}` as keyof typeof DJ_FX_ACTION_MAP];
       expect(a, g).toBeDefined();
@@ -122,7 +122,7 @@ describe('every scratch trigger fires the registry (SCR-P2.9)', () => {
       expect(DJ_FX_ACTION_MAP[id].mode, id).toBe('oneshot');
     }
     expect(DJ_FX_ACTION_MAP.fx_scratch_loop.mode).toBe('momentary');
-    expect(SCRATCH_FX_ACTIONS).toHaveLength(31 + 7);
+    expect(SCRATCH_FX_ACTIONS).toHaveLength(33 + 7);
   });
 
   it('a release with finishCycle lets the cycle end instead of a hard stop (the DJ view buttons)', () => {

@@ -109,13 +109,13 @@ export interface ScratchDJTickResult {
 }
 
 /** Reachability sentinels (SCR-P4.R4). */
-export const scratchDJStats = { ticks: 0, plans: 0, scheduled: 0, juggleResponses: 0 };
+export const scratchDJStats = { ticks: 0, plans: 0, scheduled: 0, juggleResponses: 0, bookends: 0 };
 
 /** The section 13 selector over the plan's roles and gestures (the default `chooseSource`). */
 export function selectorSource(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, recent: readonly string[], memory: Pick<SourceRequest, 'blocked' | 'preference'> = {}): ChosenScratchSource | null {
   const track = input.perf.currentTrack;
   if (!track) return null;
-  const performed = plan.events.filter((e) => e.gesture !== 'drop' && e.gesture !== 'dropPhrase');
+  const performed = plan.events.filter((e) => e.gesture !== 'drop' && e.gesture !== 'dropPhrase' && e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
   const roles = [...new Set(performed.map((e) => e.role))];
   const decision = selectScratchSource({
     ctx, track, deck: input.deck, roles: roles.length ? roles : ['THEME'], gestures: performed.map((e) => e.gesture),
@@ -417,6 +417,8 @@ export class DJScratchDJ {
     }
     if (input.juggleActive && !response) plan = juggleSafe(plan);
     if (response) scratchDJStats.juggleResponses++;
+    // a feature is a routine: the needle drops on its first downbeat and lifts at its end (C8)
+    if (arc && plan.events.length) plan = withNeedleBookends(plan, fromBar, arc.bars, ctx.meter);
     scratchDJStats.plans++;
     this.lastPlan = plan;
     const intent = this.intent;
@@ -501,6 +503,25 @@ export class DJScratchDJ {
 }
 
 /** Under a running juggle a scratch only answers or accents (sections 26, 49). */
+/**
+ * The routine's bookends (reference scratch_dj.py :110, :161): a needle drop on the first bar's
+ * step 0 (velocity 0.6) and a needle lift on the last bar's step 15 (velocity 0.5).
+ */
+export function withNeedleBookends(plan: ScratchPlan, fromBar: number, bars: number, beatsPerBar = 4): ScratchPlan {
+  const at = (bar: number, step: number, gesture: 'needleDrop' | 'needleLift', role: 'INTRO' | 'OUTRO', velocity: number) => ({
+    bar, step, beat: bar * beatsPerBar + step / 4, gesture, velocity, placementRole: 'accent' as const, role,
+  });
+  const drop = at(fromBar, 0, 'needleDrop', 'INTRO', 0.6);
+  const lift = at(fromBar + bars - 1, 15, 'needleLift', 'OUTRO', 0.5);
+  scratchDJStats.bookends++;
+  return {
+    ...plan,
+    events: [drop, ...plan.events, lift],
+    bars: plan.bars.map((b, k) => (k === 0 ? [drop, ...b] : k === bars - 1 ? [...b, lift] : b)),
+    reasons: [...plan.reasons, 'needle drop / lift bookend the routine'],
+  };
+}
+
 /** The juggle phase at each bar's downbeat of [fromBar, toBar) on the track's grid (null outside the pattern). */
 export function juggleBarPhases(shape: NonNullable<ScratchTickInput['juggleShape']>, track: Pick<DJTrackAnalysis, 'downbeats'>, fromBar: number, toBar: number): Array<JugglePhase | null> {
   return Array.from({ length: Math.max(0, toBar - fromBar) }, (_, k) => {
