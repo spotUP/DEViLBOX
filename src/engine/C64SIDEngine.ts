@@ -14,7 +14,7 @@ import { JSSIDEngine } from './deepsid/engines/JSSIDEngine';
 import { ScriptNodePlayerEngine } from './deepsid/engines/ScriptNodePlayerEngine';
 import { JSIDPlay2Engine } from './deepsid/engines/JSIDPlay2Engine';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { parseSIDHeader, sidPlaybackModel, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
+import { parseSIDHeader, sidPlaybackModel, sidPlaybackClock, sidBufferFrames, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 
 type EngineInstance = JSSIDEngine | ScriptNodePlayerEngine | JSIDPlay2Engine;
 
@@ -143,14 +143,22 @@ export class C64SIDEngine {
     const engineGain = ENGINE_GAIN[engineType] ?? 1.0;
     this.gainNode.gain.value = engineGain;
     
-    // The chip model every backend plays: SID Settings' forced model, else the header's.
-    const chipSetting = useSettingsStore.getState().sidChipModel ?? 'auto';
+    // SID Settings every backend plays by: the forced chip model, else the header's; the forced
+    // clock, else the header's; the forced audio buffer, else the engine's own. Clock and buffer
+    // are the engine's at its construction: a change reaches the tune from its next play.
+    const settings = useSettingsStore.getState();
+    const chipSetting = settings.sidChipModel ?? 'auto';
     const chipModel = sidPlaybackModel(this.header, chipSetting);
+    const clockSetting = settings.sidClockSpeed ?? 'auto';
+    const forceClock = clockSetting === 'auto' ? undefined : clockSetting;
 
     switch (engineType) {
       case 'jssid':
         this.engine = new JSSIDEngine(this.sidData, {
           chipModel,
+          // jsSID reads no clock from the header: it runs the header's (or the forced) one.
+          clock: sidPlaybackClock(this.header, clockSetting),
+          bufferSize: sidBufferFrames(settings.sidBufferSize, 16384),
           sampleRate: audioContext.sampleRate,
         });
         break;
@@ -161,6 +169,8 @@ export class C64SIDEngine {
         this.engine = new ScriptNodePlayerEngine(this.sidData, engineType, {
           chipModel,
           forceChipModel: chipSetting === 'auto' ? undefined : chipModel,
+          forceClock,
+          bufferSize: sidBufferFrames(settings.sidBufferSize, 1024),
           sampleRate: audioContext.sampleRate,
         });
         break;
@@ -169,6 +179,9 @@ export class C64SIDEngine {
         // JSIDPlay2 uses its own worker-based architecture (not ScriptNodePlayer)
         this.engine = new JSIDPlay2Engine(this.sidData, {
           chipModel,
+          forceChipModel: chipSetting === 'auto' ? undefined : chipModel,
+          forceClock,
+          bufferSize: sidBufferFrames(settings.sidBufferSize, 4096),
           sampleRate: audioContext.sampleRate,
         });
         break;
@@ -214,7 +227,9 @@ export class C64SIDEngine {
    */
   setMuteMask(mask: number): void {
     if (!this.engine) return;
-    for (let v = 0; v < 3; v++) {
+    // Every chip's voices: the song's channel k is chip k / 3, voice k % 3.
+    const voices = 3 * (this.header?.chipCount ?? 1);
+    for (let v = 0; v < voices; v++) {
       const muted = (mask & (1 << v)) === 0;
       this.engine.setVoiceMask(v, muted);
     }

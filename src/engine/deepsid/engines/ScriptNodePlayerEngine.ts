@@ -18,6 +18,10 @@ export interface ScriptNodePlayerConfig {
   chipModel?: '6581' | '8580';
   /** A model the user forced (SID Settings): applied after the load, over the one the backend reads from the header. */
   forceChipModel?: '6581' | '8580';
+  /** A clock the user forced (SID Settings): the track restarts on it after the load. */
+  forceClock?: 'PAL' | 'NTSC';
+  /** ScriptProcessor buffer, frames (SID Settings; default 1024). */
+  bufferSize?: number;
   sampleRate?: number;
 }
 
@@ -57,6 +61,8 @@ export class ScriptNodePlayerEngine {
   private numSubsongs = 1;
   /** The model SID Settings forces (null = the backend plays the header's). */
   private forcedChipModel: '6581' | '8580' | null = null;
+  private readonly forcedClock: 'PAL' | 'NTSC' | null;
+  private readonly bufferSize: number;
   private voiceMask = 0x1FF; // bitmask: bit N=1 → voice N enabled
   private _originalOnaudioprocess: ((e: AudioProcessingEvent) => void) | null = null;
 
@@ -68,6 +74,8 @@ export class ScriptNodePlayerEngine {
     this.sidData = sidData;
     this.engineType = engineType;
     this.forcedChipModel = config.forceChipModel ?? null;
+    this.forcedClock = config.forceClock ?? null;
+    this.bufferSize = config.bufferSize ?? 1024;
   }
 
   /**
@@ -169,8 +177,9 @@ export class ScriptNodePlayerEngine {
     // Reduce ScriptProcessorNode buffer from default 2048 to 1024 samples.
     // 2048 samples @ 44.1kHz = ~46ms between emulator advances, causing
     // visibly jerky pattern scrolling. 1024 = ~23ms = smoother without underruns.
+    // SID Settings' Audio Buffer Size overrides it.
     if (this.adapter?.setProcessorBufSize) {
-      this.adapter.setProcessorBufSize(1024);
+      this.adapter.setProcessorBufSize(this.bufferSize);
     }
 
     // Use the Promise-based initialize API
@@ -265,7 +274,13 @@ export class ScriptNodePlayerEngine {
       throw new Error(`[${this.engineType}] Failed to load SID data into WASM backend`);
     }
 
+    // A forced clock: WebSID's emu_set_ntsc makes it the tune's clock, the track restart sets CIA / VIC / SID up on it.
+    if (this.forcedClock && this.adapter?.setNTSC) {
+      this.adapter.setNTSC(this.forcedClock === 'NTSC' ? 1 : 0);
+      this.adapter.Module?.ccall?.('emu_set_subsong', 'number', ['number'], [this.subsong]);
+    }
     if (this.forcedChipModel) this.setChipModel(this.forcedChipModel);
+    this.applyVoiceMask();
     this.playing = true;
     console.log(`[${this.engineType}] Playback started, subsong:`, this.subsong,
       'isSongReady:', this.player._isSongReady,
@@ -461,9 +476,15 @@ export class ScriptNodePlayerEngine {
     } else {
       this.voiceMask |= (1 << voice);
     }
-    // tinyrsid backend exposes enableVoices on its adapter
+    this.applyVoiceMask();
+  }
+
+  /** The voice mask on the backend: tinyrsid's enableVoices(mask), WebSID's enableVoice(chip, voice, on). */
+  private applyVoiceMask(): void {
     if (this.adapter?.enableVoices) {
       this.adapter.enableVoices(this.voiceMask);
+    } else if (this.adapter?.enableVoice) {
+      for (let v = 0; v < 9; v++) this.adapter.enableVoice(Math.floor(v / 3), v % 3, (this.voiceMask >> v) & 1);
     }
   }
 

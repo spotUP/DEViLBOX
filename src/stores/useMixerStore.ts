@@ -435,7 +435,7 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
     try {
       const sidEngine = _trackerReplayerMod.getTrackerReplayer().getC64SIDEngine();
       if (sidEngine) {
-        sidEngine.setMuteMask(mask & 0x07); // 3 SID voices
+        sidEngine.setMuteMask(mask); // 3 voices per SID chip (C64SIDEngine takes the song's)
       }
     } catch { /* replayer not initialized */ }
   }

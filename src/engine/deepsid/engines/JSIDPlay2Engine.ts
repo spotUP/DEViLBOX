@@ -19,6 +19,12 @@
 
 export interface JSIDPlay2Config {
   chipModel?: '6581' | '8580';
+  /** A model the user forced (SID Settings); JSIDPlay2 applies it at the tune's open. */
+  forceChipModel?: '6581' | '8580';
+  /** A clock the user forced (SID Settings); JSIDPlay2 applies it at the tune's open. */
+  forceClock?: 'PAL' | 'NTSC';
+  /** ScriptProcessor buffer, frames (SID Settings; default 4096). */
+  bufferSize?: number;
   sampleRate?: number;
   forceSIDModel?: boolean;
   enableStereo?: boolean;
@@ -104,30 +110,19 @@ export class JSIDPlay2Engine {
     await this.workerCall('INITIALISE', {}, 'INITIALISED', 30000);
     console.log('[JSIDPlay2] WASM runtime ready');
 
-    // Open the SID file first — WASM internals may not be ready for config before OPEN
+    // SID Settings first: JSIDPlay2 applies the user chip model and clock when a tune opens.
     console.log('[JSIDPlay2] Opening SID file (%d bytes)...', this.sidData.byteLength);
-    const contents = new Int8Array(this.sidData.buffer, this.sidData.byteOffset, this.sidData.byteLength);
-    await this.workerCall('OPEN', {
-      contents,
-      tuneName: 'loaded.sid',
-      startSong: this.subsong,
-      nthFrame: 2,
-      sidWrites: false,
-      songLength: 0,
-      sfxSoundExpander: false,
-      sfxSoundExpanderType: 0,
-    }, 'OPENED', 15000);
+    await this.workerCall('SET_USER_CHIP_MODEL', chipModelEvent(this.config.forceChipModel), 'USER_CHIP_MODEL_SET', 5000);
+    if (this.config.forceClock) {
+      await this.workerCall('SET_USER_CLOCK_SPEED', { userClockSpeed: this.config.forceClock }, 'USER_CLOCK_SPEED_SET', 5000);
+    }
+    await this.workerCall('OPEN', this.openEvent(), 'OPENED', 15000);
+    this.applyMutes();
     console.log('[JSIDPlay2] SID file opened');
 
     // NOTE: SET_SAMPLING_RATE crashes the jsidplay2 WASM GC worker with "illegal cast"
     // (RuntimeError in wasm_gc reference type handling). Skipped intentionally — the
     // default sample rate (44100) works correctly, and no resampling is needed.
-
-    // Fire-and-forget: try setting SID model
-    if (this.config.chipModel && this.worker) {
-      const model = this.config.chipModel === '8580' ? 1 : 0;
-      this.worker.postMessage({ eventType: 'SET_USER_CHIP_MODEL', eventData: { sidNum: 0, chipModel: model } });
-    }
 
     // Get tune info
     try {
@@ -155,7 +150,7 @@ export class JSIDPlay2Engine {
     this.sampleReadOffset = 0;
 
     // Create ScriptProcessor to pull samples from ring buffer
-    const bufferSize = 4096;
+    const bufferSize = this.config.bufferSize ?? 4096;
     this.scriptNode = audioContext.createScriptProcessor(bufferSize, 0, 2);
     this.scriptNode.onaudioprocess = (event) => {
       const outL = event.outputBuffer.getChannelData(0);
@@ -270,22 +265,7 @@ export class JSIDPlay2Engine {
     if (subsong >= 0 && subsong < this.numSubsongs) {
       this.subsong = subsong;
       // Re-open with new start song
-      if (this.worker && this.isPlaying) {
-        const contents = new Int8Array(this.sidData.buffer, this.sidData.byteOffset, this.sidData.byteLength);
-        this.worker.postMessage({
-          eventType: 'OPEN',
-          eventData: {
-            contents,
-            tuneName: 'loaded.sid',
-            startSong: subsong,
-            nthFrame: 2,
-            sidWrites: false,
-            songLength: 0,
-            sfxSoundExpander: false,
-            sfxSoundExpanderType: 0,
-          },
-        });
-      }
+      if (this.worker && this.isPlaying) this.reopen();
       this.currentTime = 0;
       console.log('[JSIDPlay2] Subsong changed to:', subsong);
     }
@@ -344,11 +324,37 @@ export class JSIDPlay2Engine {
    * Mute/unmute a voice
    */
   setVoiceMask(voice: number, muted: boolean): void {
-    if (!this.worker) return;
-    this.worker.postMessage({
-      eventType: 'SET_MUTE',
-      eventData: { sidNum: 0, voice, mute: muted },
-    });
+    if (muted) this.mutedVoices |= 1 << voice; else this.mutedVoices &= ~(1 << voice);
+    // The worker reads SET_MUTE { sidNum, voice, value } (chip voice; value = muted).
+    this.worker?.postMessage({ eventType: 'SET_MUTE', eventData: { sidNum: Math.floor(voice / 3), voice: voice % 3, value: muted } });
+  }
+
+  /** Song voices muted (bit k = voice k, 3 per chip). */
+  private mutedVoices = 0;
+
+  /** The mutes on the worker again (a tune open starts with every voice on). */
+  private applyMutes(): void {
+    for (let v = 0; v < 9; v++) if ((this.mutedVoices >> v) & 1) this.setVoiceMask(v, true);
+  }
+
+  /** The OPEN event of the tune at the current subsong. */
+  private openEvent(): Record<string, unknown> {
+    return {
+      contents: new Int8Array(this.sidData.buffer, this.sidData.byteOffset, this.sidData.byteLength),
+      tuneName: 'loaded.sid',
+      startSong: this.subsong,
+      nthFrame: 2,
+      sidWrites: false,
+      songLength: 0,
+      sfxSoundExpander: false,
+      sfxSoundExpanderType: 0,
+    };
+  }
+
+  /** Open the tune again (subsong change, chip model change: JSIDPlay2 applies those at the open). */
+  private reopen(): void {
+    this.worker?.postMessage({ eventType: 'OPEN', eventData: this.openEvent() });
+    this.applyMutes();
   }
 
   /** Play the chip as this model from now on (the C64SIDEngine engine contract). */
@@ -362,11 +368,10 @@ export class JSIDPlay2Engine {
    */
   forceSIDModel(model: '6581' | '8580'): void {
     if (!this.worker) return;
-    const chipModel = model === '8580' ? 1 : 0;
-    this.worker.postMessage({
-      eventType: 'SET_USER_CHIP_MODEL',
-      eventData: { sidNum: 0, chipModel },
-    });
+    this.config.forceChipModel = model;
+    // The worker reads { userSidModel, stereoSidModel, thirdSIDModel } (ChipModel enum names); a tune open applies it.
+    this.worker.postMessage({ eventType: 'SET_USER_CHIP_MODEL', eventData: chipModelEvent(model) });
+    if (this.isPlaying) this.reopen();
     console.log('[JSIDPlay2] Forced SID model to:', model);
   }
 
@@ -397,4 +402,10 @@ export class JSIDPlay2Engine {
 
     this.audioContext = null;
   }
+}
+
+/** SET_USER_CHIP_MODEL's event: every chip as the forced model, or AUTO (each chip's header model). */
+function chipModelEvent(model: '6581' | '8580' | undefined): { userSidModel: string; stereoSidModel: string; thirdSIDModel: string } {
+  const m = model ? `MOS${model}` : 'AUTO';
+  return { userSidModel: m, stereoSidModel: m, thirdSIDModel: m };
 }

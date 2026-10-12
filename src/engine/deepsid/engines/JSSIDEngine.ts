@@ -17,6 +17,8 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 
 export interface JSSIDConfig {
   chipModel?: '6581' | '8580';
+  /** The machine the tune runs on (SID Settings clock, else the header's). jsSID itself always ran PAL. */
+  clock?: 'PAL' | 'NTSC';
   sampleRate?: number;
   bufferSize?: number;
   enableASID?: boolean;
@@ -43,6 +45,8 @@ export class JSSIDEngine {
   private subsong = 0;
   private numSubsongs = 1;
   private asidEnabled = false;
+  /** The MIDI output ASID register writes go to (handed to jsSID: setmidioutput). */
+  private asidPort: unknown = null;
   private webusbEnabled = false;
   private blobUrl: string | null = null;
   private voiceMask = 0x1FF; // bitmask: bit N=1 → voice N enabled (all on)
@@ -86,7 +90,7 @@ export class JSSIDEngine {
       await asidManager.init();
       const port = asidManager.getSelectedPort();
       if (port) {
-        (window as any).selectedMidiOutput = port;
+        this.asidPort = port;
         this.asidEnabled = true;
         console.log('[jsSID] ASID hardware enabled, output:', port.name);
       } else {
@@ -108,6 +112,11 @@ export class JSSIDEngine {
     if (externalCtx && this.jsSID.hasPerVoiceOutput?.()) {
       this._setupPerVoiceRouting(externalCtx);
     }
+
+    // The ASID port before the load: jsSID's start() looks for one (DeepSID took it from its own page).
+    if (this.asidEnabled) this.jsSID.setmidioutput?.(this.asidPort);
+    // The machine the tune runs on, before its first start (CPU clock, frame rate, default CIA timer).
+    this.jsSID.setclock?.(this.config.clock === 'NTSC');
 
     // Load SID data
     await this.loadSIDData();
@@ -224,6 +233,8 @@ export class JSSIDEngine {
     if (!this.jsSID) throw new Error('jsSID not initialized');
 
     this.jsSID.start(this.subsong);
+    // start() resets jsSID's voice mask to all voices: the muted ones stay muted.
+    this.jsSID.enableVoices?.(this.voiceMask);
 
     // If using external AudioContext, route ScriptProcessor to the provided output node
     if (this._externalCtx && outputNode) {
@@ -329,6 +340,7 @@ export class JSSIDEngine {
       if (this.jsSID && this.playing) {
         // start() reinitializes with new subtune and resumes playback
         this.jsSID.start(subsong);
+        this.jsSID.enableVoices?.(this.voiceMask);
       }
       console.log('[jsSID] Subsong changed to:', subsong);
     }
@@ -448,7 +460,7 @@ export class JSSIDEngine {
     }
 
     if (this.asidEnabled) {
-      (window as any).selectedMidiOutput = null;
+      this.jsSID?.setmidioutput?.(null);
     }
 
     if (this.webusbEnabled) {
