@@ -11,7 +11,7 @@ import * as Tone from 'tone';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useShallow } from 'zustand/react/shallow';
-import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
+import { getDJEngine, disposeDJEngine, loadChannelScopeRerender } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
 import type { DJEngine } from '@/engine/dj/DJEngine';
 import { useTransportStore } from '@/stores';
@@ -135,7 +135,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   // background (low priority, once per session). Delayed so it never competes with the view's own boot.
   useEffect(() => {
     const timer = setTimeout(() => {
-      void import('@/engine/dj/DJChannelScopeRerender').then((m) => m.rerenderPlaylistChannelScopes()).catch(() => {});
+      void loadChannelScopeRerender().then((m) => m.rerenderPlaylistChannelScopes()).catch(() => {});
     }, 15_000);
     return () => clearTimeout(timer);
   }, []);

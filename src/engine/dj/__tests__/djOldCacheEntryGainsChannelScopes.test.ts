@@ -108,6 +108,23 @@ describe('an old cache entry without channel scopes gains them in the background
     });
     const { getDJPipeline } = await import('../DJPipeline');
     const enqueue = vi.spyOn(getDJPipeline(), 'enqueue');
+    // Deck B's load asks for the re-render module while deck A's first import
+    // of it is still evaluating (held at its last dependency here, as a busy CI
+    // worker did by chance). Vite's module runner sees the module in an import
+    // cycle and hands a second, concurrent import() the half-evaluated module:
+    // "Cannot access 'renders' before initialization", swallowed, and deck B
+    // never gained its scopes (CI run 38186067547). Every load shares the one
+    // import (loadChannelScopeRerender). doMock: only the re-render module,
+    // loaded after this line, gets the held dependency.
+    let reached!: () => void;
+    const evaluating = new Promise<void>((r) => { reached = r; });
+    let release!: () => void;
+    const released = new Promise<void>((r) => { release = r; });
+    vi.doMock('@/stores/useDJPlaylistStore', async (orig) => {
+      reached();
+      await released;
+      return orig();
+    });
 
     // The entry as an older build wrote it: audio + analysis, no scope track.
     const source = new Uint8Array(512).fill(7).buffer;
@@ -124,7 +141,10 @@ describe('an old cache entry without channel scopes gains them in the background
     const bufferBefore = decks.A.audioPlayer.getAudioBuffer();
     expect(useDJStore.getState().decks.A.channelScopeCount).toBe(0);
     const second = (await getCachedAudio(source))!;
+    await evaluating;
     await (holder.engine as InstanceType<typeof DJEngine>).loadAudioToDeck('B', second.audioData, 'old.wav', undefined, undefined, undefined, PEAKS);
+    await new Promise((r) => setTimeout(r, 20)); // deck B's import() is under way
+    release();
 
     await vi.waitFor(() => {
       expect(useDJStore.getState().decks.A.channelScopeCount).toBeGreaterThan(0);
