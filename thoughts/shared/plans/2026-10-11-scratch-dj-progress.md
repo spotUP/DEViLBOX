@@ -12,7 +12,7 @@ Research (how it works today): `thoughts/shared/research/2026-10-08_scratch-syst
 Ledger entry: `thoughts/shared/plans/2026-10-06-fix-all-open.md` SCRP.
 Protocol: `~/.claude/REACHABILITY_PROTOCOL.md` (ID, red first, reachability with a sentinel, ratchet, N of M).
 
-**Count: 95 of 125 done, 0 exempted, 29 open, 0 owner check `[o]`, 1 owner decision `[?]` (SCR-P3.6)** (canonical count = `grep -c '^- \[ \] SCR-'` over this file; recompute on every tick)
+**Count: 96 of 125 done, 0 exempted, 28 open, 0 owner check `[o]`, 1 owner decision `[?]` (SCR-P3.6)** (canonical count = `grep -c '^- \[ \] SCR-'` over this file; recompute on every tick)
 
 Legend: `[ ]` open, `[x]` done (commit + test named), `[o]` owner check (automated part built; only a human can confirm), `[?]` built around an open owner decision. An item is done only when a test drives the product's top-level entry (`getAutoDJ()` enable / poll, `fireDjFx(..., {source})`, the DJ view panel, the MCP bridge) and proves the new code ran (call count or sentinel) with the stated numbers.
 
@@ -292,7 +292,7 @@ Files the juggling agent is editing now: `DJAutoDJ.ts`, `transitionExecutor.ts`,
 
 ## Phase P9 - DJ view UX, debug view, decision log view, MCP (Gate N; sections 61, 62, 64, 65)
 
-- [ ] SCR-P9.1 Store (`useDJStore.ts`, additive, no persistence): `autoDJScratchMode: 'OFF'|'SAFE'|'MUSICAL'|'PERFORMER'|'BATTLE'` (default per owner decision 1), `autoDJScratchIntensity` (-1 = set), `autoDJScratchStyle` ('auto' | 5 styles), `autoDJScratchSource` ('auto'|'sample'|'deck'|'both'), `autoDJScratchLevel` (-1 = auto, 1-4), `autoDJScratchTelemetry`; `setAutoDJConfig` accepts them. Test: `src/stores/__tests__/useDJStoreScratchConfig.test.ts`.
+- [x] SCR-P9.1 Store (`useDJStore.ts`, additive, no persistence): `autoDJScratchMode: 'OFF'|'SAFE'|'MUSICAL'|'PERFORMER'|'BATTLE'` (default per owner decision 1), `autoDJScratchIntensity` (-1 = set), `autoDJScratchStyle` ('auto' | 5 styles), `autoDJScratchSource` ('auto'|'sample'|'deck'|'both'), `autoDJScratchLevel` (-1 = auto, 1-4), `autoDJScratchTelemetry`; `setAutoDJConfig` accepts them. Test: `src/stores/__tests__/useDJStoreScratchConfig.test.ts`. - 1cc7a1078; `autoDJScratchMode` (MUSICAL), `autoDJScratchIntensity` (-1), `autoDJScratchStyle` (auto), `autoDJScratchTelemetry` + setter, setAutoDJConfig keys; not persisted. Read by DJAutoDJ.scratchTick and the session planner.
 - [ ] SCR-P9.2 Modes (section 62): `scratchModeShape(mode)` -> allowed gestures and density cap per the Spec numbers; BATTLE still runs the governor. Test: `scratchStyles.test.ts` - SAFE never yields transformer; BATTLE yields crab but the governor still rejects 20 cuts/beat.
 - [ ] SCR-P9.3 Panel (`DJAutoDJPanel.tsx`, next to Auto Juggle :551): "Auto Scratch" (`CustomSelect` Off/Safe/Musical/Performer/Battle), "Scratch Intensity", "Scratch Style" (Auto/Old School/Boom Bap/Electro/Battle/Lo-Fi), "Scratch Source" (Auto/Sample/Deck/Both), "Scratch Level" (Auto/1-4); design-system components, token classes, full English labels, no implementation knobs. Test: `src/components/dj/__tests__/autoDJPanelScratch.test.tsx` - changing each control writes the store field; labels full words.
 - [ ] SCR-P9.4 Debug view (section 64): `DJAutoDJDebugPanel.tsx` `ScratchSection` showing state, style, level, energy, source, anchor, gesture, role, bar, step, next, reason, confidence, scratch budget n/6, juggle budget n/6 from `autoDJScratchTelemetry`. Test: `autoDJDebugPanel.test.tsx` extended - renders the 15 rows from a fixture telemetry.
@@ -321,6 +321,65 @@ Files the juggling agent is editing now: `DJAutoDJ.ts`, `transitionExecutor.ts`,
 - [ ] SCR-P10.O4 Scratch bus tone (section 42 numbers) on the owner's monitors; adjust the chain constants only from this listening, in one commit.
 
 ---
+
+## Port of the Up Rough Demo System scratch engine (owner scope 2026-10-12)
+
+Gap analysis: `thoughts/shared/research/2026-10-12_demo-scratch-engine-port-gap.md` (89 items: 25 yes / 31 partial / 33 no; item letters T/F/G/V/R/P/C/X/J/D refer to its section 1+2 rows). IDs `SCR-PG-<phase><n>`, counted separately from the SCR-P total.
+
+Owner decisions 2026-10-12 (they override the owner plan where they differ):
+- O1 the turntable simulation is ported as a TypeScript function turning each gesture into a platter speed curve for the existing worklet. **Overturns plan sections 1, 3 and 79** (no physics port) - note there.
+- O2 velocity drives hand speed, stroke length, level and tone, as in the demo. **Supersedes the hand-speed-only rule of af8190842 (SA-m5).**
+- O3 the demo's values for every gesture. O4 the S950 grit (12-bit, 22.05 kHz) as a scratch-bus setting, on by default, switchable to clean. O5 port everything, incl. the amen break, the 7 synthesized sources, the demo juggle grammar - merged into the existing juggle engine, never a second engine. O6 the demo ladder (no one-click flare). O7 cuts get sharper as velocity rises.
+
+Gap-agent findings to fix: `faderCurve` (scratchFaderModel.ts) has no caller - the P1.4 battle-response claim is false (PG-A2); `fxAmount` / `fxScale` are read nowhere (PG-A5); scratch_020.wav (AH_LONG) has no catalogue entry (PG-A1); ledger staleness: fixed 2026-10-12 (P7.1-P7.8, P7.R7, P7.R8, P9.1 ticked; P7.11 / P7.12 partial).
+Already landed that the port builds on: SCR-WET-BUS baec575cf (reference room, echo line, velocity tone, level match - gap rows X1 and part of V/X), SCR-PHRASE-CUT 17242580d, SCR-VARIETY 948353719.
+
+Phase PG-A - data parity, no audio architecture change
+- [ ] SCR-PG-A1 R2: AH_LONG (scratch_020.wav) catalogue entry 51 (anchors from the demo analyser; PROVENANCE note).
+- [ ] SCR-PG-A2 F1: `faderCurve` applied in the worklet window gain (the battle response); sentinel count.
+- [ ] SCR-PG-A3 F7: the demo cut patterns as data (O3).
+- [ ] SCR-PG-A4 G2/G3/G4: cut, echo, brake / spinup as plannable gestures (the last two through the existing deck FX actions).
+- [ ] SCR-PG-A5 X2/X3: `fxAmount` / `fxScale` wired; the 5 style profiles (scratch.py:341-345) and per-gesture fx onto the bus.
+- [ ] SCR-PG-AR reachability: `fireDjFx('fx_scratch_echo', {record: 'AH_LONG', source: 'mcp'})` offline: `faderCurve` count >= 2, the worklet gets AH_LONG, bus delay mix 0.35 +-0.02, delay 0.16 s +-5 ms.
+
+Phase PG-B - physics-driven gestures (O1)
+- [ ] SCR-PG-B1 T1-T10 tables + `simulate` as pure `simulateGesture`; G5 accelerating glide; T8 grip; T16 validate / repair; the hand drives by default (G8).
+- [ ] SCR-PG-BR reachability: `getAutoDJ()` Auto Scratch MUSICAL on the corpus: `simulateGesture` count = executed record events; baby's rate curve = Python `simulate` fixture (classic_sl1200 / thin_battle / light_battle / tight_battle, seed 0) within 1e-3; platter velocity > 0 throughout.
+
+Phase PG-C - vinyl surface
+- [ ] SCR-PG-C1 T13 surface noise in the worklet; T14 needle drop / lift buffers; T6 cartridge filters; C8 routine bookends.
+- [ ] SCR-PG-CR reachability: `fireDjFx('fx_scratch_baby', {record: 'AH_STANDARD'})` offline: noise RMS > 0 while |rate| > 0.05, 0 while held; needle drop leads a routine's first event; sentinels 1 each.
+
+Phase PG-D - velocity and tone (O2, O7) + grit (O4)
+- [ ] SCR-PG-D1 V1-V3 per-voice gain and biquads (velocity -> length, level, tone, cut sharpness).
+- [ ] SCR-PG-D2 R7 S950 transform at load (bus setting, on by default, clean switch).
+- [ ] SCR-PG-D3 C3 Dry / Dark / Delay presets through `fxRequest`.
+- [ ] SCR-PG-DR reachability: two planned events at v 0.3 and 0.95 through the executor: centroid(0.3) < 0.7 x centroid(0.95); level ratio (0.7 + 0.15) / (0.7 + 0.475) +-0.5 dB; grit transform count 1 per record load.
+
+Phase PG-E - composition
+- [ ] SCR-PG-E1 C5 scratch_dj arc and C10 three-deck arc as templates; C6 A-A-B-A hook; C7 varied endings; C9 routine validator.
+- [ ] SCR-PG-E2 C12 energetic ladder (O6); C13 flow builder with energy-scaled rests; C14 word rotation.
+- [ ] SCR-PG-E3 P6/P7 19 subgenres, the 4 missing profiles with their deck physics; G11 scratch macro and J4 juggle macro parsers; R8 bulk selector.
+- [ ] SCR-PG-ER reachability: `getAutoDJ()` style battle, 32-bar PEAK: trace starts needle_drop, ends needle_lift; bars 4, 5, 7 equal (A-A-B-A); HOME >= 40 %; >= 2 silent bars; `planArc('scratchDj')` count 1.
+
+Phase PG-F - Deck C in the mix
+- [ ] SCR-PG-F1 X4 feature wetness (room .42 / delay .28 / dark tail .22); X5 Deck C EQ; X6 RMS level match 0.60 (reconcile with SCR-WET-BUS's -0.55 dB during-scratch match); X7 duck depth .25; C15 two-hands alternation (with SCR-P7.9).
+- [ ] SCR-PG-FR reachability: Auto DJ with a juggle + Auto Scratch: bus gain dips 0.25 +-0.03 on kick transients; long-run scratch / deck RMS 0.60 +-0.05; no juggle event during a Deck C feature.
+
+Phase PG-G - source analysis
+- [ ] SCR-PG-G1 R3 analyser Worker port; R5 auto-cue for user WAVs; R9 role pools.
+- [ ] SCR-PG-GR reachability: a tracker song on a deck -> TRACKER_SAMPLE with the voiced-vowel anchor within 10 ms of Python `_cue_points`; `analyzeRecord` count 1.
+
+Phase PG-H - visuals and UI
+- [ ] SCR-PG-H1 D1 record-voice position -> platter view, fader and slip lanes; D2 exposure in the P9 panel.
+- [ ] SCR-PG-HR reachability: DJ view render test: the platter angle follows the voice's position reports during an Auto Scratch event; subscription count 1.
+
+Phase PG-I - juggle grammar and synthesized sources (O5)
+- [ ] SCR-PG-I1 J1-J3, J5 break-level juggle grammar with the rewind planner, merged into the existing juggle engine; the amen break.
+- [ ] SCR-PG-I2 R6 the 7 synthesized sources.
+- [ ] SCR-PG-IR reachability (to define from the gap doc's J rows when the phase starts).
+
+Interleave: PG-A and PG-D before the remaining P8.2-P8.4 (release / re-entry / restore build on the per-voice gain); PG-E with P8.7 (long set) and P9 (panel); PG-H with P9.3-P9.4; P10 last.
 
 ## Reachability tests (one per feature, through the real entry point)
 
