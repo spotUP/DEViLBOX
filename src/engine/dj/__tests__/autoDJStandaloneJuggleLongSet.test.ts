@@ -130,7 +130,9 @@ async function expectNothingLeft(r: Awaited<ReturnType<typeof longSet>>) {
 
 function expectBudgetAndHandBacks(r: Awaited<ReturnType<typeof longSet>>, seconds: number) {
   expect(r.starts.length, r.why).toBeLessThanOrEqual(Math.floor(seconds / r.budget.cooldownSec));
-  expect(r.j.counts.started, r.why).toBe(r.starts.length);
+  // Every setup either started a pattern or gave up before one (and spent the cooldown, JUGGLE-FOLLOWUPS d).
+  const failedSetups = r.log.filter((e) => e.reasons[0].includes('could not be corrected') || e.reasons[0].includes('no pattern within two phrases')).length;
+  expect(r.j.counts.started + failedSetups, r.why).toBe(r.starts.length);
   // The cooldown holds between one hand-back and the next start.
   for (let i = 1; i < r.starts.length; i++) expect((r.starts[i] - r.stops[i - 1].at) / 1000, r.why).toBeGreaterThanOrEqual(r.budget.cooldownSec);
   expect(useDJStore.getState().autoDJJuggleTelemetry!.budget.juggledFraction).toBeLessThanOrEqual(r.budget.maxFraction);

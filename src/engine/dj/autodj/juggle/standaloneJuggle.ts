@@ -178,7 +178,7 @@ export class StandaloneJuggle {
       console.warn('[StandaloneJuggle] load failed:', err);
     }
     if (!this.is(gen)) return;
-    if (!loaded) { this.end('load failed'); return; }
+    if (!loaded) { this.fail('load failed'); return; }
     this.state!.fileName = useDJStore.getState().decks[idle].fileName;
 
     // Owner plan section 16 steps 1-3: a reliable beat (the master's grid), the same beat, the bar phase.
@@ -231,7 +231,7 @@ export class StandaloneJuggle {
     if (s.phase !== 'running') return;
     if (!this.deps.deckPlaying(s.deck)) { this.end('the idle deck stopped'); return; }
     const started = j.counts.started > s.startedCount;
-    if (!started && !j.isActive() && Date.now() - s.runningSince > 2 * s.phraseSec * 1000) { this.end('no pattern within two phrases'); return; }
+    if (!started && !j.isActive() && Date.now() - s.runningSince > 2 * s.phraseSec * 1000) { this.fail('no pattern within two phrases'); return; }
     const master: DeckId = s.deck === 'A' ? 'B' : 'A';
     if (!s.verified) {
       if (Date.now() - s.lastRecueAt < RECUE_SETTLE_MS) return;
@@ -243,7 +243,7 @@ export class StandaloneJuggle {
       try { did = lockBarPhase(s.deck, master, Math.abs(useDJStore.getState().crossfaderPosition - masterCf) < 0.001); } catch { /* grid missing */ }
       if (did === 'recue') {
         s.lastRecueAt = Date.now();
-        if (++s.recues > DOUBLE_MAX_RECUES) this.end(`the double's bar phase could not be corrected (${DOUBLE_MAX_RECUES} re-cues)`);
+        if (++s.recues > DOUBLE_MAX_RECUES) this.fail(`the double's bar phase could not be corrected (${DOUBLE_MAX_RECUES} re-cues)`);
       }
       return;
     }
@@ -295,6 +295,17 @@ export class StandaloneJuggle {
     useDJStore.getState().setCrossfader(cf);
     this.log(s, outcome);
     this.publish();
+  }
+
+  /**
+   * The setup itself gave up (load failed, the bar phase could not be locked,
+   * no pattern within two phrases): the attempt spends the juggle cooldown
+   * (owner plan section 24), then hands back like any end. An end Auto DJ asks
+   * for (a transition, the user, Auto DJ off) is not a failed setup.
+   */
+  private fail(outcome: string): void {
+    this.deps.controller().noteFailedSetup();
+    this.end(outcome);
   }
 
   /** Auto DJ's swap completed: whatever this layer held is the transition's now. */

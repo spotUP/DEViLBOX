@@ -149,6 +149,13 @@ export class DJJuggleController {
     this.deps.onTelemetry?.(this.telemetry());
   }
 
+  /**
+   * A stand-alone setup gave up before any pattern (owner plan section 24: the
+   * budget counts the attempt): the cooldown runs from now, as after a juggle,
+   * so a double that could not be locked is not set up again on the next poll.
+   */
+  noteFailedSetup(): void { this.lastJuggleAt = this.now(); }
+
   /** Section 43: a manual override yields at once; the rest of the pattern is released. */
   noteUserControl(what: string): void { if (this.execution?.active()) this.pendingAbort = `user control: ${what}`; }
 
