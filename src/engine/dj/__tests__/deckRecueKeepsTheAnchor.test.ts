@@ -2,9 +2,9 @@
  * A deck stab returns to its anchor (owner scratch plan section 18; ledger
  * SCR-P3.4): with the fader window closed `DeckEngine.recueScratch` seeks the
  * player to the anchor every time (4 stabs: 4 seeks, one argument) and resets
- * the ring; on a deck the listener hears (window open) the deck is not
- * touched - the ring is re-armed and the planner is told `returnsToAnchor`
- * is not available. Tracker mode cues the replayer by row and leaves
+ * the ring; on a deck the listener hears (window open) nothing is touched,
+ * neither the deck nor its ring (SA-M3), and the caller waits for the next
+ * closed window. Tracker mode cues the replayer by row and leaves
  * `suppressNotes` alone.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -49,13 +49,13 @@ describe('a deck stab re-cues to its anchor (SCR-P3.4)', () => {
     expect(fake.ringRearms).toBe(0);
   });
 
-  it('on a deck the listener hears (window open) the player is not sought; the ring is re-armed and returnsToAnchor is withdrawn', () => {
+  it('on a deck the listener hears (window open) neither the player nor its ring is touched; the caller waits', () => {
     const fake = fresh(1);
     const r = engine('audio', fake).recueScratch(32.5);
     expect(fake.seeks).toHaveLength(0);
     expect(fake.ringResets).toBe(0);
-    expect(fake.ringRearms).toBe(1);
-    expect(r).toMatchObject({ recued: false, mode: 'ring-only', returnsToAnchor: false });
+    expect(fake.ringRearms).toBe(0);
+    expect(r).toMatchObject({ recued: false, mode: 'waiting', returnsToAnchor: false });
     expect(r.reason).toMatch(/window is open/);
   });
 
@@ -69,12 +69,14 @@ describe('a deck stab re-cues to its anchor (SCR-P3.4)', () => {
     }
   });
 
-  it('a tracker song without a time index falls back to the ring only', () => {
+  it('a tracker song without a time index cannot be cued: reported, nothing touched', () => {
+    const resetRing = vi.fn();
     const target: DeckRecueTarget = {
-      playbackMode: 'tracker', isFaderWindowClosed: () => true, seekAudio: () => {}, cueTracker: () => false, resetRing: () => {}, rearmRing: vi.fn(),
+      playbackMode: 'tracker', isFaderWindowClosed: () => true, seekAudio: () => {}, cueTracker: () => false, resetRing,
     };
     const r = recueDeck(target, 1);
-    expect(r).toMatchObject({ recued: false, mode: 'ring-only', returnsToAnchor: false });
-    expect(deckRecueStats.ringOnly).toBeGreaterThan(0);
+    expect(r).toMatchObject({ recued: false, mode: 'unavailable', returnsToAnchor: false });
+    expect(resetRing).not.toHaveBeenCalled();
+    expect(deckRecueStats.unavailable).toBeGreaterThan(0);
   });
 });
