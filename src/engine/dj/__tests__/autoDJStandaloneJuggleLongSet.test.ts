@@ -53,6 +53,7 @@ import { getDecisionLog } from '../autodj/decisionLog';
 import { MODE_SHAPE, PHASE_BUDGET } from '../autodj/juggle/jugglePlanner';
 import type { JuggleMode } from '../autodj/juggle/juggleTypes';
 import { setupStandalone, teardownStandalone, runStandalone } from './standaloneJuggleHarness';
+import { resetScratchVoicePool } from '../scratch/scratchVoicePool';
 
 const TRACK = 'drops';
 const BPM = 130;
@@ -125,6 +126,10 @@ async function expectNothingLeft(r: Awaited<ReturnType<typeof longSet>>) {
   expect(r.j.openWork()).toBe(0);
   expect(useDJStore.getState().autoDJJuggleTelemetry?.standalone ?? null).toBeNull();
   expect(useDJStore.getState().crossfaderPosition).toBe(0);
+  // Auto Scratch plays in the set too (MUSICAL by default, owner 2026-10-11, SCR-P9.1). Its voice pool is the
+  // DJ's, not the Auto DJ's (the scratch pads play through it), and follows the decks' level while it lives
+  // (SCR-WET-BUS): Auto DJ off leaves it up. Released, its programme meter goes with it - then nothing is left.
+  resetScratchVoicePool();
   expect(vi.getTimerCount()).toBe(0);
 }
 
