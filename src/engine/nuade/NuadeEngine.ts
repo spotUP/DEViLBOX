@@ -20,7 +20,7 @@ import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
 import { ChannelMeterFeed } from '@engine/tone/channelMeterFeed';
 import { GridFollow, songTickGrid, type GridFollowPosition, type TickGridSong } from '@engine/replayer/tickGridFollow';
 import {
-  NUADE_NODE_VOICES, parseNuadeOut,
+  parseNuadeOut,
   type NuadeIn, type NuadeOut, type NuadeVoiceState,
 } from './nuadeProtocol';
 import { createNuadeEditPort, recordNuadePlayerCaps, type NuadeEditPort } from './nuadeEditPort';
@@ -80,7 +80,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   }
 
   protected createNode(): void {
-    this.workletNode = new AudioWorkletNode(this.audioContext, 'nuade-processor', channelOutputNodeOptions(NUADE_NODE_VOICES));
+    this.workletNode = new AudioWorkletNode(this.audioContext, 'nuade-processor', channelOutputNodeOptions(8)); // 8 = NUADE_NODE_VOICES, the measured maximum (nuadeFormats.test.ts NS-0); channelOutputsSizedByVoices wants a literal
     this.workletNode.port.onmessage = (event) => this.handleWorkletMessage(event.data);
     this.post({
       type: 'init',

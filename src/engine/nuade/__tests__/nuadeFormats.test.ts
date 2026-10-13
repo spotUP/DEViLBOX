@@ -15,6 +15,14 @@ const ROOT = join(__dirname, '../../../..');
 const REPLACE_WAVES = `amcomposer amos andrewparton aprosys artandmagic ashleyhogg audiosculpture cinemaware dariuszendeh davidhanney desire dirkbialluch dsc dynamicsynthesizer earache ems emsv6 fashiontracker fcbsi forgottenworlds fredgray gluemon gmc hippelhip howiedavies infogrames jankomrsicflogel jasonbrooke jasonpage jeroentel jesperolsen kimchristensen krishatlelid laxity legglessmusiceditor majortom maniacsofnoise markcooksey markcooksey_old markii maximumeffect mcmd medley mikedavies mmdc musicalenlightenment ntsp onescapee paulrobotham paulshields paulsummers peterverswyvelen pierreadane pokeynoise professionalsoundartists protracker4 quartet richardjoseph riffraff robhubbard robhubbardst scumm seanconnolly seanconran silmarils soundfx soundimages soundmaster specialfx speedya1system speedysystem spl stevebarrett synthdream synthpack syntracker thomashermann timetracker timfollin tomytracker tronic ufo voodoo zoundmonitor`.split(' ');
 const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis`.split(' ');
 
+describe('the node declares the measured voice maximum', () => {
+  it('NuadeEngine passes the literal NUADE_NODE_VOICES to channelOutputNodeOptions (channelOutputsSizedByVoices needs a literal)', () => {
+    const src = readFileSync(join(ROOT, 'src/engine/nuade/NuadeEngine.ts'), 'utf8');
+    const m = /channelOutputNodeOptions\((\d+)\)/.exec(src);
+    expect(Number(m?.[1])).toBe(NUADE_NODE_VOICES);
+  });
+});
+
 describe('a fresh user keeps the pre-nuade engine of every format', () => {
   // preNuadeDefaults.json = the formatEngine defaults of useSettingsStore at 57e7803be, before the table (91 of the 114 rows had one;
   // the other 23 keys are new with the table and defaulted to UADE in their routes).
