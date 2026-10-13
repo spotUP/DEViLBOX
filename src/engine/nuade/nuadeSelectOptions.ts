@@ -29,6 +29,7 @@ export function selectedEngine(row: NuadeFormat, effective: FormatEngineChoice):
 
 /** The line under the select: why a held row stays on UADE, or what is measured. */
 export function engineNote(row: NuadeFormat): string {
+  if (row.ownerDecision) return `Default by decision: ${row.ownerDecision}. ${score(row.uadeEnvelopeCorrelation) ? `Measured like UADE: nuade ${score(row.uadeEnvelopeCorrelation)}, our engine ${score(row.ownEnvelopeCorrelation) ?? 'n/a'}.` : ''}`;
   if (row.heldBecause) return `Held on ${row.role === 'dual' ? 'our engine' : 'UADE'}: ${row.heldBecause}`;
   const n = score(row.uadeEnvelopeCorrelation);
   return n ? `nuade matches UADE at ${n} on ${row.corpus.length} song${row.corpus.length === 1 ? '' : 's'}` : 'Not measured yet';

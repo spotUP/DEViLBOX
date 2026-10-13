@@ -30,7 +30,7 @@ vi.mock('@lib/import/formats/UADEParser', () => ({
 }));
 
 const SECONDS = 30;
-const ROWS = NUADE_FORMAT_LIST.filter((f) => (f.role === 'replace' || f.defaultEngine === 'nuade') && f.uadeEnvelopeCorrelation !== null && f.corpus.length > 0);
+const ROWS = NUADE_FORMAT_LIST.filter((f) => (f.role === 'replace' || f.defaultEngine === 'nuade') && f.uadeEnvelopeCorrelation !== null && f.corpus.length > 0 && !f.ownerDecision); // owner-decided rows: nuadeEaglePlayerRows.test.ts
 
 describe('the table has recorded verdicts to test', () => {
   it('at least the five wave-1 rows are measured', () => {

@@ -22,6 +22,10 @@ import { resolve } from 'node:path';
 import { startWorklet, stereoOutputs, ROOT } from './workletHarness';
 import { SP_PERIODS, encodeSPCell } from '@/lib/import/formats/soundPlayerCodec';
 
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+// These tests guard the EaglePlayer runner; the seven formats default to nuade by owner decision (NUADE-EAGLEPLAYER-7), so pin it.
+pinEditPathEngine('andersoland', 'beathoven', 'bendaglishsid', 'coredesign', 'davelowe', 'scottjohnston', 'wallybeben');
+
 // The importer and the engine registry are large; their first import is slow.
 const writeModule = vi.fn();
 vi.mock('@/engine/eagleplayer/EaglePlayerEngine', () => ({

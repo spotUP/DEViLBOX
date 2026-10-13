@@ -71,7 +71,10 @@ describe('NS-4 nuade format table', () => {
   it('a row plays today\'s way unless its recorded verdict moved it: nuade only for a measured replace row, a held row names why, no dual row moves without our engine measured (DN-1)', () => {
     for (const f of NUADE_FORMAT_LIST) {
       expect(f.legacyEngine, f.id).not.toBe('nuade');
-      if (f.defaultEngine === 'nuade') {
+      if (f.defaultEngine === 'nuade' && f.ownerDecision) {
+        // the owner's decision (verdictRules.OWNER_PREFERS_NUADE) sets the default; the scores are still recorded
+        expect(f.uadeEnvelopeCorrelation, `${f.id}: measured`).not.toBeNull();
+      } else if (f.defaultEngine === 'nuade') {
         expect(f.uadeEnvelopeCorrelation, `${f.id}: moved to nuade without a measurement`).toBeGreaterThanOrEqual(0.95);
         expect(f.heldBecause, f.id).toBeUndefined();
         // A dual row moves only by DN-1: it beats our own engine by 0.01 on the mean.

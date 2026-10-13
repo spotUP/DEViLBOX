@@ -43,6 +43,8 @@ export interface NuadeFormat {
   defaultEngine: FormatEngineChoice;
   /** Why a replace row stays on UADE: the failing measurement. */
   heldBecause?: string;
+  /** The owner's decision that made nuade this row's default whatever the scores say (verdictRules.OWNER_PREFERS_NUADE). */
+  ownerDecision?: string;
   /** Dual rows: why our engine has no score, so the default stays ours (DN-1 needs both numbers). */
   ownNote?: string;
   /**
