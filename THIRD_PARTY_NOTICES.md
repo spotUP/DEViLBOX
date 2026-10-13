@@ -193,6 +193,77 @@ All third-party components are compatible with GPL-3.0-or-later.
 - **Used for:** Universal Amiga Delitracker Emulator — plays 200+ Amiga music formats (compiled to WASM)
 - **Also used by** `eagleplayer-wasm` (`public/eagleplayer/`): UADE's sound core `score` (`amigasrc/score/score`, LGPL) runs on the Musashi host and drives eagleplayers copied from `players/` (`public/eagleplayer/players/`: Anders_0land, BenDaglish, CoreDesign, DaveLowe, DaveLoweNew, WallyBeben - Wanted Team / UADE eagleplayers, distributed with UADE)
 
+### nuade
+- **Author:** Daniel Collin (emoon)
+- **Source:** https://github.com/emoon/nuade at commit `4900e597e6718d523e50bbaf6e1fc6ca41ebe683` (vendored unmodified in `third-party/nuade/`, with its `LICENSE` and its own `THIRD_PARTY_NOTICES.md`)
+- **License:** MIT (full text below)
+- **Used for:** native C ports of the UADE players, compiled to `public/nuade/Nuade.wasm` (`nuade-wasm/`). One engine for the Amiga formats listed here, which play through it by default:
+<!-- nuade-formats:begin -->
+  - AM-Composer
+  - Art and Magic
+  - Ashley Hogg
+  - BP SoundMon
+  - Darius Zendeh
+  - David Hanney
+  - EarAche
+  - EMS (Editeur Musical Sequentiel)
+  - Fashion Tracker
+  - Howie Davies
+  - InStereo! 1.0
+  - Janko Mrsic-Flogel
+  - Jason C. Brooke
+  - Jeroen Tel
+  - Jochen Hippel COSO
+  - Maniacs of Noise
+  - Mark II
+  - MCMD
+  - Mike Davies
+  - OctaMED MMDC
+  - Paul Shields
+  - Peter Verswyvelen
+  - Professional Sound Artists
+  - Riff Raff
+  - Rob Hubbard
+  - SCUMM
+  - Sean Connolly
+  - Sean Conran
+  - SidMon II
+  - Silmarils
+  - Sound Programming Language
+  - Speedy A1 System
+  - Speedy System
+  - SynTracker
+  - The Musical Enlightenment
+  - Tim Follin
+  - Tomy Tracker
+  - Tronic
+<!-- nuade-formats:end -->
+- **Also in nuade:** 28 of its players are ports of NostalgicPlayer (Thomas Neumann, MIT) and three eagleplayer data files carry no licence; both are listed verbatim in `third-party/nuade/THIRD_PARTY_NOTICES.md`.
+
+```
+MIT License
+
+Copyright (c) 2026 Daniel Collin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### Hively Tracker
 - **Author:** Pete Gordon (Dexter / Abyss)
 - **Source:** https://github.com/pete-gordon/hivelytracker

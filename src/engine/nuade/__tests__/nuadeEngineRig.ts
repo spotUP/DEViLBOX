@@ -29,11 +29,12 @@ export function installNuadeRig(): Rig {
   let proc: WorkletProc | null = null;
   const processorSource = readFileSync(resolve(ROOT, 'public/nuade/Nuade.worklet.js'), 'utf8');
 
-  const gain = () => ({ gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, disconnect() {} });
-  const ctx = {
+  const gain = (): Record<string, unknown> => ({ context: ctx, gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, disconnect() {} });
+  const ctx: Record<string, unknown> & { outputLatency: number; baseLatency: number } = {
     sampleRate: 48000, outputLatency: 0, baseLatency: 0, currentTime: 0, state: 'running',
     audioWorklet: { addModule: async () => undefined },
     createGain: gain,
+    createAnalyser: () => ({ fftSize: 2048, context: ctx, getFloatTimeDomainData(b: Float32Array) { b.fill(0); }, connect() {}, disconnect() {} }),
     destination: {},
   };
   setDevilboxAudioContext(ctx as unknown as AudioContext);
