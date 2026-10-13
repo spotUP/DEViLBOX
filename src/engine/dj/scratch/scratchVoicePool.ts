@@ -26,7 +26,7 @@ import {
 } from './scratchRender';
 import { needleDrop as ttNeedleDrop, needleLift as ttNeedleLift, linspace } from '@/engine/turntable/turntableSim';
 import type { ScratchCue, ScratchEventFx, ScratchGesture, ScratchRenderSpec, ScratchRole } from './scratchTypes';
-import { getScratchRecord, findRecords, lastWordSlice, type ScratchRecord } from './scratchCatalogue';
+import { getScratchRecord, findRecords, lastWordSlice, registerExtraRecord, forgetExtraRecords, type ScratchRecord } from './scratchCatalogue';
 import { realTimers, type ExecutorTimers } from '../autodj/executorTimers';
 
 /** Reachability sentinels: strokes rendered and handed to a bus, records read, routines shaped, loops. */
@@ -100,6 +100,7 @@ export class ScratchVoicePool {
   /** Add a record that is not in the crate (a tracker sample) with its audio read at 22,050 Hz (`demoMonoPcm`). */
   registerTransientRecord(record: ScratchRecord, pcm: Float64Array): void {
     this.transient.set(record.id, { record, pcm });
+    registerExtraRecord(record);
   }
 
   /** A crate record or a registered transient one. */
@@ -110,6 +111,7 @@ export class ScratchVoicePool {
   /** Forget the transient records whose id starts with `prefix` (a deck's song changed). */
   forgetTransientRecords(prefix: string): void {
     for (const id of [...this.transient.keys()]) if (id.startsWith(prefix)) this.transient.delete(id);
+    forgetExtraRecords(prefix);
   }
 
   /**
@@ -366,6 +368,7 @@ export class ScratchVoicePool {
 
   dispose(): void {
     this.panic();
+    this.forgetTransientRecords('');
     for (const p of this.deckC.values()) void p.then((b) => b.dispose(), () => undefined);
     this.deckC.clear();
     try { this.beat?.disconnect(); } catch { /* gone */ }

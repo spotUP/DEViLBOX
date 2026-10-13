@@ -24,6 +24,7 @@ import type { ChosenScratchSource, ScratchRoutineShape } from './DJScratchDJ';
 import { routineShapeDecks } from './scratchDeckC';
 import { computeCrossfaderGains } from '../DJMixerEngine';
 import { getCachedAudioByFilename } from '../DJAudioCache';
+import { loadScratchPhrase, type ScratchPhrase } from './scratchPhrase';
 import type { TransitionScratchPlan } from './transitionScratch';
 import type { ScratchEvent } from './scratchTypes';
 
@@ -119,6 +120,16 @@ export function performTransitionScratch(
     done,
     cancel: () => { if (cancelled) return; cancelled = true; exec.cancel(); },
   };
+}
+
+/**
+ * R5 (owner decision 2026-10-13): a phrase WAV dropped on Deck C becomes Deck C's scratch records with the demo's
+ * word cues (`loadScratchPhrase`) and the Auto Scratch phrase setting; the three-deck routine scratches it.
+ */
+export function loadDeckCPhrase(bytes: ArrayBuffer, fileName: string): ScratchPhrase {
+  const phrase = loadScratchPhrase(getScratchVoicePool(), bytes, fileName);
+  useDJStore.getState().setAutoDJConfig({ scratchPhrase: phrase });
+  return phrase;
 }
 
 /** A module deck's render, decoded once per file (the DJ pipeline's render, cached by file name). */

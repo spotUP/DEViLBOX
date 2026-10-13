@@ -17,6 +17,7 @@ import type { AutoDJTelemetry } from '@/engine/dj/autodj/telemetry';
 import type { JuggleTelemetry } from '@/engine/dj/autodj/juggle/juggleTypes';
 import type { ScratchDJTelemetry } from '@/engine/dj/scratch/DJScratchDJ';
 import { DEFAULT_SCRATCH_RENDER } from '@/engine/dj/scratch/scratchStyles';
+import type { ScratchPhrase } from '@/engine/dj/scratch/scratchPhrase';
 
 // Immer needs MapSet support to draft `Set<number>` fields (fxTargetChannels).
 // Calling at module load is idempotent — main.tsx calls it too, but tests
@@ -391,6 +392,8 @@ interface DJState {
   autoDJScratchRecords: string | string[];
   /** Auto Scratch "Render" (the demo's Render mode, owner S2 2026-10-13): 'section', 'three_deck' (default), 'dj_routine'. */
   autoDJScratchRender: string;
+  /** The spoken phrase dropped on Deck C (R5): its cue records by role; Deck C's three-deck routine scratches them. Null = the crate. */
+  autoDJScratchPhrase: ScratchPhrase | null;
   /** Scratch telemetry (scratch plan section 64), written by the scratch controller. */
   autoDJScratchTelemetry: ScratchDJTelemetry | null;
   /** DJ FX actions engaged right now, by action id -> deck (the pad lights from this, whoever fired it). */
@@ -480,7 +483,7 @@ interface DJActions {
   setAutoDJEnabled: (enabled: boolean) => void;
   setAutoDJStatus: (status: AutoDJStatus) => void;
   setAutoDJTrackIndices: (current: number, next: number) => void;
-  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number; juggleMode: string; juggleIntensity: number; scratchMode: string; scratchIntensity: number; scratchStyle: string; scratchRecords: string | string[]; scratchRender: string }>) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number; juggleMode: string; juggleIntensity: number; scratchMode: string; scratchIntensity: number; scratchStyle: string; scratchRecords: string | string[]; scratchRender: string; scratchPhrase: ScratchPhrase | null }>) => void;
   setAutoDJSessionOrder: (order: number[]) => void;
   setDjFxActive: (id: string, deck: DeckId | null) => void;
   setAutoDJTelemetry: (telemetry: AutoDJTelemetry | null) => void;
@@ -564,6 +567,7 @@ export const useDJStore = create<DJStore>()(
     autoDJScratchStyle: 'auto',
     autoDJScratchRecords: 'style',
     autoDJScratchRender: DEFAULT_SCRATCH_RENDER as string,
+    autoDJScratchPhrase: null,
     autoDJScratchTelemetry: null as ScratchDJTelemetry | null,
     djFxActive: {} as Record<string, DeckId | null>,
     stemPreSeparation: false,
@@ -943,6 +947,7 @@ export const useDJStore = create<DJStore>()(
         if (config.scratchStyle !== undefined) state.autoDJScratchStyle = config.scratchStyle;
         if (config.scratchRecords !== undefined) state.autoDJScratchRecords = config.scratchRecords;
         if (config.scratchRender !== undefined) state.autoDJScratchRender = config.scratchRender;
+        if (config.scratchPhrase !== undefined) state.autoDJScratchPhrase = config.scratchPhrase;
         if (config.stemPreSeparation !== undefined) state.stemPreSeparation = config.stemPreSeparation;
         if (config.streamAutoDub !== undefined) state.streamAutoDub = config.streamAutoDub;
         if (config.stemModel !== undefined) state.stemModel = config.stemModel;
