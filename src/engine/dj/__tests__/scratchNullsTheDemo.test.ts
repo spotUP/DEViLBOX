@@ -332,8 +332,17 @@ describe('every entry point plays the demo\'s render on a Deck C bus (PG-J: one 
     const { scratchRenderStats, renderGesture, DEMO_DECK_PROFILES } = await import('@/engine/dj/scratch/scratchRender');
     const { ctx, pool } = await appPool(1.2);
     const bytes = await packBytes(getScratchRecord('ONE')!);
+    const { bankAnalysisStats } = await import('@/engine/dj/scratch/scratchBankAnalysis');
+    const analysed = bankAnalysisStats.analyzeRecord;
     const rec = (await loadTrackerSample(pool, ctx, 'A', { id: 3, name: 'vox one', sample: { audioBuffer: bytes } }))!;
     expect(rec.id).toBe(trackerSampleRecordId('A', '3'));
+    // R3: analysed at load the bank's way - the home is the voiced vowel of `_cue_points`, not the attack (the demo's
+    // metadata for the same audio: vowel 3300, safe 289..8459), sentinel one analysis
+    expect(bankAnalysisStats.analyzeRecord - analysed).toBe(1);
+    const meta = getScratchRecord('ONE')!.demoCue;
+    expect(Math.abs(rec.demoCue.anchor - meta.anchor) / 22050).toBeLessThanOrEqual(0.010);
+    expect(rec.demoCue.anchor).toBe(3300);
+    expect(rec.demoCue.safe).toEqual([289, 8459]);
     const before = scratchRenderStats.gestures;
     expect(fireDjFx('fx_scratch_forwardStab', { source: 'pad', record: rec.id, bpm: 92, at: AT })).toBe(true);
     await pool.settled();
