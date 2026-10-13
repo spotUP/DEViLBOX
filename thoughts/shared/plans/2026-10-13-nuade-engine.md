@@ -785,21 +785,26 @@ gate), hippel 0.9827 (ours 0.9722), instereo1 0.9728 (ours 0.9438), sidmon2 0.98
   (reopen + silent seek) is ~1 ms per second already played: measured headless 8-23 ms at 10 s, 49-67 ms at 60 s,
   93-135 ms at 120 s, 130-230 ms at 180 s, all inside one audio-thread call -> see NUADE-SWAP-DROPOUT.
   EDIT_SOUNDS_ON_NUADE no longer exists in tools/nuade/verdictRules.ts (removed with the hold, c20c5c8ba): recorded here only.
-- [ ] NUADE-SWAP-DROPOUT (found 2026-10-14): the swap reopens the module and renders silently to the played frame inside
-  one worklet process() call; late in a song that blocks the audio thread for 100-230 ms (a dropout per edit). Fix
-  level: the worklet (catch-up on a second nuade instance spread over quanta while the old one keeps playing, then
-  switch), or emoon's cell write (DN-3) which removes the swap. Owner hears it at: a song played past 2 minutes, type a note.
-- [ ] NUADE-PREVIEW keyboard preview on nuade songs. Legacy: preview never ran on the song engine except for two formats.
-  Runs on the instrument's own synth through ToneEngine (unaffected by nuade): robhubbard (RobHubbardSynth), hippel
-  (HippelCoSoSynth), soundmaster (Sampler), instereo1 (InStereo1Synth loads its own keyboard copy of
-  useFormatStore.inStereo1FileData: previewLoad + preview handle). Depends on the song replayer holding the module:
-  soundmon (SoundMonSynth -> SoundMonEngine.previewNoteOn needs the song handle from loadTune; output = engine.output)
-  and sidmon2 (SidMonSynth song slot -> Sd2Engine.noteOn -> sd2_note_on on the loaded song; Sd2Engine.output routed only
-  when Sd2 plays the song). On nuade neither replayer is loaded: preview of song instruments is expected silent (not
-  measured in a browser). Right level: the InStereo1 keyboard-copy pattern in SoundMonSynth / SidMonSynth (load the song's
-  module into the idle replayer for preview, from the format store, nuadeModuleFields-aware), plus Sd2 output routing
-  when Sd2 is not the song engine. Not built: the audio-graph routing (Sd2 output into the synth vs NativeEngineRouting's
-  route when Sd2 plays the song) needs a browser check before it can be done without doubling legacy playback.
+- [x] NUADE-SWAP-DROPOUT (found 2026-10-14, DONE 4a0f7fb27): the swap reopened the module and rendered silently to the
+  played frame inside one worklet call (165-184 ms at 180 s, measured). Level: nuade has no player-state copy (no
+  save/restore in include/nuade/nuade.h; state is opaque user_data), so neither a native snapshot nor a worker hand-off
+  exists; the work can only be scheduled. Shim: a "next song" slot (nw_next_open/advance/commit/start/close/position)
+  sharing the file table and settings. Worklet: open the edited module there, advance a slice sized to 0.75 ms (rate
+  measured on the machine) per process() after the live quantum, hand over at the same frame. Measured at 180 s
+  (antidust.bp3, bruno_time.sid2): most silent rendering in one call 39-46 k frames = 0.8-1.4 ms (was 8.64 M frames in
+  one call); hand-over after 220-255 quanta = 0.59-0.68 s of audio (~3.7 ms per second played); output equal to an
+  unswapped run sample for sample. Early edits: hand-over 8-53 ms of audio at 2-15 s; nuadeEditsAreHeard 6 of 6 still
+  heard at their row. An edit to a row inside the hand-over window is heard from its next pass. Rebuilt Nuade.wasm
+  renders the same samples (8 songs hashed); instrument check refreshed in nuade-compare.json (apb.dw 0.847 now vs 0.406
+  recorded, still a fail as it must be; the nuade side is identical, so the move is on the UADE side - unexplained).
+  Test nuadeEditLateInSongHasNoDropout.test.ts (counts silent frames per call; wall time is preemption noise at load 26).
+- [x] NUADE-PREVIEW (DONE 7b8073b3d): measured silent on nuade (key level 0.0000 for antidust.bp3 / bruno_time.sid2;
+  0.2151 / 0.3357 on their own replayers). Fix: keyboard copy (InStereo1 pattern) when useFormatStore.nuadeFileData is
+  set (nuadeKeyboard.ts). SoundMon: loadModule keyboardOnly (worklet never plays it). SidMon II: same, worklet renders a
+  keyboard copy only while a key is down, and the key leaves via Sd2Engine.keyboardTo(synth output), a gain open only
+  while a keyboard copy is held (loadTune closes it: no second path when Sd2 plays the song). After: same levels on nuade
+  as on the own replayer; own-replayer path unchanged (no copy, no extra path). Test keyboardPreviewOnNuadeSongs.test.ts.
+  Not checked in a browser: the real ToneEngine chain (the test stops at the synth output).
   Other nuade-default rows have no LIVE_EDIT 'pass' entry, so they lose nothing they had.
 
 ## NUADE-EAGLEPLAYER-7: the seven EaglePlayer formats as dual rows (AE01-AE07, owner 2026-10-14)
