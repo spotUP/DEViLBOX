@@ -28,6 +28,10 @@ import type { TrackerCell } from '@/types';
 const scanGrid = vi.hoisted(() => ({ name: 'uade-scan-grid', patterns: [], instruments: [] }));
 vi.mock('@lib/import/formats/UADEParser', () => ({ parseUADEFile: vi.fn(async () => scanGrid) }));
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 const ROOT = join(process.cwd(), 'public/data/songs');
 const CORPUS = [

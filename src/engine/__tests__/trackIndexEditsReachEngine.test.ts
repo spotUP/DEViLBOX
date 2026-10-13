@@ -20,6 +20,10 @@ import { join } from 'node:path';
 import { loadSharedWorkletScripts, startWorklet } from './workletHarness';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { trackCellWrite, moduleCellFields } from '@/engine/replayer/trackIndexCellEdits';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 interface Spec {
   name: string; key: string; file: string; dir: string; stem: string; mod: string; cls: string; prefix: string;

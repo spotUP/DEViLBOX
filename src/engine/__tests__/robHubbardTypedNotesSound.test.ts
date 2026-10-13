@@ -13,6 +13,10 @@ import { readFileSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { openUade, PaulaSession, PaulaNoteOns, PAULA_REG, chipRamEngine } from './gridOracle';
 import { noteToPeriod } from '@/lib/amiga/periodNotes';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });

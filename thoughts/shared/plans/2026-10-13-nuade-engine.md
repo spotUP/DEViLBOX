@@ -336,7 +336,7 @@ Phase 4 - Rollout (84): R01-R84 per the table above. Each row: measure (batch `-
 `withNuade` if it passes, its `nuadePlaysFormats` row green, `playingEngineFor` proven. Pre-step:
 - [x] NR-0 Re-verify the engine column of all 84 rows from the router (see Rollout order note); move mismatches. -- 89b866fcc, nuadeEngineColumn.test.ts (57 rows with a song: 54 UADE, 3 moved to dual)
 - [x] R01 mmdc -- DONE: default nuade, 0.990 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
-- [x] R02 robhubbard -- HELD on UADE (changed 2026-10-13 by the CI failures): 0.990 like UADE, but a typed note is written into UADE's chip RAM and heard at once; nuade has no cell write and its module swap is not proven to sound a typed note at its pitch (robHubbardTypedNotesSound). Default flips back to nuade when a test proves it (verdictRules EDIT_SOUNDS_ON_NUADE); 08242a402
+- [x] R02 robhubbard -- ON NUADE since 2026-10-13 (hold lifted by owner; was held by the CI failures): 0.990 like UADE, but a typed note is written into UADE's chip RAM and heard at once; nuade has no cell write and its module swap is not proven to sound a typed note at its pitch (robHubbardTypedNotesSound). Default flips back to nuade when a test proves it (verdictRules EDIT_SOUNDS_ON_NUADE); 08242a402
 - [x] R03 timfollin -- DONE: default nuade, 0.986 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
 - [x] R04 earache -- DONE: default nuade, 0.965 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
 - [x] R05 musicalenlightenment -- DONE: default nuade, 0.962 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
@@ -714,8 +714,59 @@ Commits: b3f582c8d (CR-1..4, NV-6), 73107dffb (ND-1..3), 08242a402 (CI fix, NAB-
 
 1. Ten replace rows have no song (amos, andrewparton, cinemaware, kimchristensen, laxity, ntsp, onescapee, quartet, timetracker, ufo): Modland has none that nuade accepts. They play as before.
 2. facethemusic and sonix: no reference exists (UADE lacks the player / dies on the corpus), so neither engine can be scored; fcbsi: no headless render of the TypeScript scheduler.
+3. Edit-path hold LIFTED (owner, 2026-10-13: "audio quality/playback first; editability is ported to all formats later"): the five rows below moved to nuade on their playback numbers; see NUADE-EDIT-PATH.
+4. Held rows whose only failure is the reference (UADE.wasm refused the song, ret=-1): audiosculpture, dirkbialluch, dynamicsynthesizer, infogrames, jasonpage, jesperolsen, maximumeffect, paulrobotham, pierreadane, pokeynoise, richardjoseph, synthdream, synthpack, thomashermann, zoundmonitor.
+   nuade may play them; there is no comparison. A different reference (uade123 native, or the Musashi runner) would settle them.
+5. Phases 6-8 (DJ render, credits, the reachability test, close) are untouched.
+
+## Phases 6-8, the CI failures and what is left (2026-10-13 evening)
+
+Commits: b3f582c8d (CR-1..4, NV-6), 73107dffb (ND-1..3), 08242a402 (CI fix, NAB-2, 4 dual rows measured, node sizing).
+
+- **DJ (ND)**: nuade formats render through nuade on a deck: one `nw_render` pass gives the mix and each voice (scopes, mono stems, pans from `nw_pans`).
+  The engine is resolved once on the main thread (`djRenderEngine.resolveRenderPlayer`, the one resolver `nuadePlayerFor`) and is part of the cache key
+  (`#nuade=<id>`), so a switch re-renders. `NuadeDriver` (node-free) is shared by the worker, the tooling and the voice counter.
+- **Node sizing**: `NuadeEngine.loadTune` asks the main-thread Nuade.wasm for the player's voice count and recreates the node when it differs
+  (`resizeNode`, mute mask kept; isolation and dub sends are re-posted by afterPlay). No other engine did this. `channelOutputsSizedByVoices` accepts an
+  engine listed with its proving test (`nuadeNodeVoices.test.ts`: 4, 6, 7, 4 voices, outputs = 1 + 4 + voices).
+- **The 17 CI failures** (Live stuck on ad4e6c9a): (1) 12 tests import songs through `parseModuleToSong`; nuade's probe fetched `/nuade/Nuade.js`, which no test serves:
+  `src/test/nuadeNodeProbe.setup.ts` (vitest setupFiles) answers the probe and the voice count from the Node loader. (2) Owner rule "no lost edit path":
+  Rob Hubbard (replace row) goes back to UADE until a test proves a typed note is audible through nuade's module swap (`EDIT_SOUNDS_ON_NUADE`, empty);
+  hippel, instereo1, sidmon2 and soundmon (dual rows) stay on our engine whatever nuade scores, because nuade has no cell write (CELL_WRITE off at the pin).
+  `ownEditPath` in apply-verdicts, guard in nuadeFormats.test.ts. (3) The registry imported `nuadeFormats`; `NuadeEngine.setGrid` now reads `followBy`.
+  Why the local gate missed them: the pre-push gate selects tests by file proximity, and the flipped defaults live in `nuadeVerdicts.ts`, whose only importers
+  are table readers; the 17 suites reach it through `parseModuleToSong`. pre-push now runs `test:ci` when `nuadeVerdicts.ts`, `useSettingsStore.ts` or
+  `parseModuleToSong.ts` changes.
+- **Found**: table extensions `SUN_EXTENSION` and `SBR_EXTENSION` were unexpanded C macro names (SUN-Tronic and Steve Barrett could never route by name); fixed, guarded.
+  MMDC and Tim Follin open in the scope view because their grid is a UADE scan (`gridEstimated`), before and after nuade (owner confirmed live): they belong to the DN-2 decoder plan.
+
+### What is left
+
+1. Ten replace rows have no song (amos, andrewparton, cinemaware, kimchristensen, laxity, ntsp, onescapee, quartet, timetracker, ufo): Modland has none that nuade accepts. They play as before.
+2. facethemusic and sonix: no reference exists (UADE lacks the player / dies on the corpus), so neither engine can be scored; fcbsi: no headless render of the TypeScript scheduler.
 3. Rob Hubbard back to nuade, and the four held dual rows: when a nuade player publishes a cell write (DN-3, the owner contacts emoon) or a test proves typed notes audible through the module swap
    (add the row to `EDIT_SOUNDS_ON_NUADE`, rerun apply-verdicts).
 4. Held rows whose only failure is a reference UADE refuses (list under "What is next" 4); the DN-2 decoder plan; the rows of `nuadePlaysFormats` are the standing test for all of them.
 5. Not pushed. Owner checks: LOCAL http://localhost:5174, `npm run dev:fullstack`: load `captain planet and the planeteers - title.mmdc`, Settings > Playback Engines shows nuade; instrument panel names Daniel Collin / emoon;
    a DJ deck loads it and shows 4 moving scopes; load `almighty.sa` (plays on nuade) and `mega end.sa` (our engine); `get_format_engines` shows hippel/instereo1/sidmon2/soundmon/robhubbard held with the reason.
+
+## NUADE-EDIT-PATH (owner decision 2026-10-13: playback quality first, editability ported later)
+
+The hold (`EDIT_SOUNDS_ON_NUADE`, the `liveEditToday`/`swapMs` gate of `replaceVerdict`, `ownEditPath`/`editHeld` of `dualDefault`) is removed from
+`tools/nuade/verdictRules.ts` and `apply-verdicts.ts`; verdicts regenerated from the recorded results (no re-measuring). Rob Hubbard follows D8, the four
+dual rows follow DN-1 with the KEPT floor. Edit-path tests pin the row's legacy engine (`src/engine/__tests__/helpers/pinEditPathEngine.ts`), so they guard
+the old edit path independent of the default.
+
+Moved to nuade (playback mean correlation against UADE): robhubbard 0.9896 (replace), soundmaster 0.9805 (replace, also live-edit; it was held by the same
+gate), hippel 0.9827 (ours 0.9722), instereo1 0.9728 (ours 0.9438), sidmon2 0.9809 (ours 0.9443), soundmon 0.9656 (ours 0.9338).
+
+- [ ] NUADE-EDIT-PATH typed notes, keyboard preview and live edits audible on nuade, per format: a module-swap proof (the edited module reopened, heard at
+  its pitch) or emoon's cell write when it ships (DN-3). Per format:
+  - [ ] robhubbard: typed notes / live edit were UADE chip-RAM writes; on nuade NOT audible while playing
+  - [ ] soundmaster: same (UADE chip RAM)
+  - [ ] hippel: own engine took cell edits; on nuade NOT audible until the swap is proven
+  - [ ] instereo1: own track-index engine took cell edits (trackIndexEditsReachEngine); same
+  - [ ] sidmon2: own engine live swap (sidMon2LiveSwap); same
+  - [ ] soundmon: own track-index engine; same
+  Constraint: the edit-path tests keep guarding the legacy engine until a nuade proof exists; a proof test pins nuade explicitly.
+  Other nuade-default rows have no LIVE_EDIT 'pass' entry, so they lose nothing they had.

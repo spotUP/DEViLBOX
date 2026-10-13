@@ -19,6 +19,10 @@ import { FORMAT_REGISTRY } from '@/lib/import/FormatRegistry';
 import { WALK_GRIDS, DIRECT_GRIDS, LIVE_EDIT, LIVE_WHILE_PLAYING, LIVE_WHILE_PLAYING_WHY, ADD_ON_EMPTY_ROW, type LiveEditStatus } from '@/lib/import/gridProvenance';
 import { pickDscNote } from './helpers/pickDscNote';
 import { openUade, PaulaSession, chipRamEngine } from './gridOracle';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });

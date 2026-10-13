@@ -44,19 +44,6 @@ describe('a fresh user keeps the pre-nuade engine of every format', () => {
   });
 });
 
-describe('no lost edit path: the table never moves a live-edit format to a path that cannot sound its edits', () => {
-  it('no dual row whose own engine takes cell edits defaults to nuade, and no live-edit replace row does until a test proves its typed notes sound on nuade', async () => {
-    const { ownEditPath } = await import('../../../../tools/nuade/apply-verdicts');
-    const { EDIT_SOUNDS_ON_NUADE } = await import('../../../../tools/nuade/verdictRules');
-    const { LIVE_EDIT } = await import('@/lib/import/gridProvenance');
-    for (const r of Object.values(NUADE_FORMATS)) {
-      if (r.defaultEngine !== 'nuade') continue;
-      if (r.role === 'dual') expect(ownEditPath(r), `${r.id}: our engine takes cell edits, nuade does not (CELL_WRITE off)`).toBe(false);
-      else if (r.registryKeys.some((k) => LIVE_EDIT[k] === 'pass')) expect(EDIT_SOUNDS_ON_NUADE.has(r.id), `${r.id}: live edit must be proven audible on nuade`).toBe(true);
-    }
-  });
-});
-
 describe('NS-4 nuade format table', () => {
   it('lists real file extensions: no row carries an unexpanded C macro name (SUN_EXTENSION made SUN-Tronic unroutable)', () => {
     for (const r of Object.values(NUADE_FORMATS)) for (const e of r.extensions) expect(e, `${r.id}: ${e}`).not.toMatch(/[A-Z]/);

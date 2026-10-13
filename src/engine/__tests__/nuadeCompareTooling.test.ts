@@ -24,7 +24,7 @@ const song = (over: Partial<SongMeasure> = {}): SongMeasure => ({
 describe('NC-4 the replace pass rule (D8)', () => {
   it('passes a song that is audible, correlates, and plays on where UADE plays on', () => {
     expect(songFailures(song())).toEqual([]);
-    expect(replaceVerdict({ songs: [song(), song({ correlation: 0.96 })], liveEditToday: false, swapMs: null })).toMatchObject({ pass: true, endAgrees: true });
+    expect(replaceVerdict({ songs: [song(), song({ correlation: 0.96 })] })).toMatchObject({ pass: true, endAgrees: true });
   });
 
   it('(a) a silent or erroring render fails', () => {
@@ -34,8 +34,8 @@ describe('NC-4 the replace pass rule (D8)', () => {
   });
 
   it('(b) the mean must reach 0.95 and no song may fall under 0.90', () => {
-    expect(replaceVerdict({ songs: [song({ correlation: 0.94 }), song({ correlation: 0.95 })], liveEditToday: false, swapMs: null }).heldBecause).toContain('mean correlation 0.945');
-    const v = replaceVerdict({ songs: [song({ correlation: 0.89 }), song({ correlation: 1 })], liveEditToday: false, swapMs: null });
+    expect(replaceVerdict({ songs: [song({ correlation: 0.94 }), song({ correlation: 0.95 })] }).heldBecause).toContain('mean correlation 0.945');
+    const v = replaceVerdict({ songs: [song({ correlation: 0.89 }), song({ correlation: 1 })] });
     expect(v.pass).toBe(false);
     expect(v.heldBecause).toContain('correlation 0.890 < 0.9');
   });
@@ -54,23 +54,8 @@ describe('NC-4 the replace pass rule (D8)', () => {
     expect(songFailures(song({ lagMs: 200 })).join()).toContain('lag 200 ms');
   });
 
-  it('(d) a format whose live edit works today keeps an edit path: the swap to the 120 s mark must take <= 100 ms', () => {
-    const base = { songs: [song()], liveEditToday: true, editSoundsOnNuade: true };
-    expect(replaceVerdict({ ...base, swapMs: 88 }).pass).toBe(true);
-    expect(replaceVerdict({ ...base, swapMs: 143 }).heldBecause).toContain('swap to the 120 s mark takes 143 ms');
-    expect(replaceVerdict({ ...base, swapMs: null }).heldBecause).toContain('edit path not measured');
-    expect(replaceVerdict({ songs: [song()], liveEditToday: false, swapMs: 5000 }).pass).toBe(true);
-  });
-
-  it('a typed note must be proven to sound through nuade before a live-edit format defaults to it (17 suites broke on 2026-10-13)', () => {
-    const r = replaceVerdict({ songs: [song()], liveEditToday: true, swapMs: 50 });
-    expect(r.pass).toBe(false);
-    expect(r.heldBecause).toContain('chip RAM');
-    expect(replaceVerdict({ songs: [song()], liveEditToday: false, swapMs: null }).pass).toBe(true);
-  });
-
   it('a format with no measured song is not passed', () => {
-    expect(replaceVerdict({ songs: [], liveEditToday: false, swapMs: null }).pass).toBe(false);
+    expect(replaceVerdict({ songs: [] }).pass).toBe(false);
   });
 });
 
@@ -99,9 +84,6 @@ describe('NC-4 the dual rule (DN-1, owner decision b)', () => {
     expect(dualDefault([pair(0.955, 0.95), refused])?.defaultEngine).toBe('native');
     expect(dualDefault([pair(0.97, 0.95), { ...refused, correlation: 0.5 }])?.defaultEngine).toBe('native'); // nuade fails the refused song: the floor
     expect(dualDefault([refused])).toBeNull(); // nothing of ours to compare
-    // No lost edit path: a row whose own engine takes cell edits stays ours however much better nuade scores.
-    expect(dualDefault([pair(0.99, 0.9)], { ownEditPath: true })).toMatchObject({ defaultEngine: 'native', editHeld: true });
-    expect(dualDefault([pair(0.99, 0.9)], { ownEditPath: false })?.defaultEngine).toBe('nuade');
   });
 });
 

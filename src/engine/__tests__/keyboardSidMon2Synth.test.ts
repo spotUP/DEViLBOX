@@ -28,6 +28,10 @@ vi.mock('@/engine/sidmon2/Sd2Engine', () => ({
   }) },
 }));
 import { SidMonSynth } from '@/engine/sidmon/SidMonSynth';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 describe('SidMon II keys play the replayer voice of the song instrument', () => {
   const buf = songBuffer('public/data/songs/formats/bruno_time.sid2');

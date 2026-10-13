@@ -20,6 +20,10 @@ import { renderTicks, rmsPerTick, fundamentalHz, FPT } from './keyboardPreviewHa
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 vi.mock('@/utils/audio-context', async (orig) => {
   const actual = await orig<typeof import('@/utils/audio-context')>();
