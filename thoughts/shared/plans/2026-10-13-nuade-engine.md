@@ -304,20 +304,20 @@ Phase 1 - Engine adapter (10)
       faked caps value proves the switch, and the real WASM reports `CELL_WRITE` off.
 
 Phase 2 - Registry, routing, selector (12)
-- [x] NS-0 Measure max `nw_voice_count` over the 84 corpus songs; set the node's declared voices. -- commit "NS-0..NS-11", nuadeFormats.test.ts NS-0 (measured max 8 voices)
-- [x] NS-1 `Nuade` descriptor in `wasmEngineRegistry.ts` (ahead of UADEEditable, after EaglePlayer). -- commit "NS-0..NS-11", nuadeRegistry.test.ts NS-1
-- [x] NS-2 Song + format-store fields, `FILE_DATA_FIELDS`, `exporters.ts` meta, `nativeExportRouter.ts` branch, -- commit "NS-0..NS-11", nuadeRegistry.test.ts NS-2
+- [x] NS-0 Measure max `nw_voice_count` over the 84 corpus songs; set the node's declared voices. -- b4372a2d2, nuadeFormats.test.ts NS-0 (measured max 8 voices)
+- [x] NS-1 `Nuade` descriptor in `wasmEngineRegistry.ts` (ahead of UADEEditable, after EaglePlayer). -- b4372a2d2, nuadeRegistry.test.ts NS-1
+- [x] NS-2 Song + format-store fields, `FILE_DATA_FIELDS`, `exporters.ts` meta, `nativeExportRouter.ts` branch, -- b4372a2d2, nuadeRegistry.test.ts NS-2
       `nativeSubsongs.ts` reports nuade subsongs.
-- [x] NS-3 `FormatEngineChoice` gains `'nuade'`; settings v14 migration + test (re-check no writer exists first). -- commit "NS-0..NS-11", useSettingsStore.migration.test.ts v14
-- [x] NS-4 `src/engine/nuade/nuadeFormats.ts` table (84 replace + 30 dual rows, `defaultEngine: 'uade'` / `'native'` -- commit "NS-0..NS-11", nuadeFormats.test.ts NS-4 (84+30 rows)
+- [x] NS-3 `FormatEngineChoice` gains `'nuade'`; settings v14 migration + test (re-check no writer exists first). -- b4372a2d2, useSettingsStore.migration.test.ts v14
+- [x] NS-4 `src/engine/nuade/nuadeFormats.ts` table (84 replace + 30 dual rows, `defaultEngine: 'uade'` / `'native'` -- b4372a2d2, nuadeFormats.test.ts NS-4 (84+30 rows)
       until the batch writes verdicts).
-- [x] NS-5 `src/engine/nuade/nuadeRouting.ts` `effectiveFormatEngine` + `nuadePlayerFor(filename, bytes, prefs)`. -- commit "NS-0..NS-11", withNuade.test.ts NS-5
-- [x] NS-6 `src/lib/import/parsers/withNuade.ts` (`playOnNuade`, `withNuade`) + unit tests next to it. -- commit "NS-0..NS-11", withNuade.test.ts NS-6 + reachability parseModuleToSong -> Nuade
-- [x] NS-7 `src/lib/song/switchFormatEngine.ts` (store + re-open through `openSong` from `editedModuleForPlay`). -- commit "NS-0..NS-11", switchFormatEngine.test.ts
-- [x] NS-8 `FormatEngineSelect.tsx` mounted in `WasmInfoEditor` (loaded format). -- commit "NS-0..NS-11", formatEngineSelect.test.tsx
-- [x] NS-9 Settings tab "Playback Engines" listing all rows. -- commit "NS-0..NS-11", playbackEnginesPanel.test.tsx
-- [x] NS-10 MCP `get_format_engines` + `set_format_engine` (server tool + bridge handler, one handler each). -- commit "NS-0..NS-11", formatEngineTools.test.ts NS-10
-- [x] NS-11 `get_format_state` gains `nuadePlayerId`, `engineCredit`. -- commit "NS-0..NS-11", formatEngineTools.test.ts NS-11
+- [x] NS-5 `src/engine/nuade/nuadeRouting.ts` `effectiveFormatEngine` + `nuadePlayerFor(filename, bytes, prefs)`. -- b4372a2d2, withNuade.test.ts NS-5
+- [x] NS-6 `src/lib/import/parsers/withNuade.ts` (`playOnNuade`, `withNuade`) + unit tests next to it. -- b4372a2d2, withNuade.test.ts NS-6 + reachability parseModuleToSong -> Nuade
+- [x] NS-7 `src/lib/song/switchFormatEngine.ts` (store + re-open through `openSong` from `editedModuleForPlay`). -- b4372a2d2, switchFormatEngine.test.ts
+- [x] NS-8 `FormatEngineSelect.tsx` mounted in `WasmInfoEditor` (loaded format). -- b4372a2d2, formatEngineSelect.test.tsx
+- [x] NS-9 Settings tab "Playback Engines" listing all rows. -- b4372a2d2, playbackEnginesPanel.test.tsx
+- [x] NS-10 MCP `get_format_engines` + `set_format_engine` (server tool + bridge handler, one handler each). -- b4372a2d2, formatEngineTools.test.ts NS-10
+- [x] NS-11 `get_format_state` gains `nuadePlayerId`, `engineCredit`. -- b4372a2d2, formatEngineTools.test.ts NS-11
 
 Phase 3 - Comparison tooling (5)
 - [ ] NC-1 `tools/nuade/nuadeCompare.ts` (reuses eagleCompare + uadeRenderCore).
