@@ -1,7 +1,7 @@
 /*
  * nuade_wasm.c - the C exports the Nuade worklet and the node tests call.
  *
- * One song at a time per instance. The pristine upstream tree is third-party/nuade; this file is only ours.
+ * One playing song per instance, plus the next song an edit swaps in (nw_next_*). The pristine upstream tree is third-party/nuade; this file is only ours.
  * Plan: thoughts/shared/plans/2026-10-13-nuade-engine.md (D3).
  *
  * Voice mask: bit N set = voice N audible (same sense as the EaglePlayer mask). A muted voice is taken out of the
@@ -32,10 +32,12 @@
 
 static uint32_t s_rate = 48000;
 static NuadeSong* s_song = NULL;
+static NuadeSong* s_next = NULL; /* the song an edit swaps in, see nw_next_open */
 static char s_error[160] = "";
 static uint32_t s_flags = 0;
 static uint32_t s_mask = 0xFFFFFFFFu;
 static float s_separation = 1.0f;
+static int s_repeat = -1; /* nw_set_repeat value, -1 = never set (nuade default) */
 static uint32_t s_subsong_count = 0, s_default_subsong = 0, s_voice_count = 0;
 
 /* ---- companion files in memory (the NuadeIo the player reads samples / instruments through) ---- */
@@ -114,6 +116,8 @@ EMSCRIPTEN_KEEPALIVE void nw_clear_files(void) {
 }
 
 EMSCRIPTEN_KEEPALIVE void nw_close(void) {
+  if (s_next) nuade_close(s_next);
+  s_next = NULL;
   if (s_song) nuade_close(s_song);
   s_song = NULL;
   s_voice_count = s_subsong_count = s_default_subsong = 0;
@@ -121,9 +125,8 @@ EMSCRIPTEN_KEEPALIVE void nw_close(void) {
 
 EMSCRIPTEN_KEEPALIVE const char *nw_last_error(void) { return s_error; }
 
-/* 0 ok, -1 bad arguments, -2 open failed (nw_last_error). `playerId` forces one player ("" or NULL probes all). */
-EMSCRIPTEN_KEEPALIVE int nw_open(const uint8_t *data, int len, const char *name, const char *playerId) {
-  nw_close();
+/* Opens `data` into `*slot` (which must be empty). 0 ok, -1 bad arguments, -2 open failed (nw_last_error). */
+static int open_into(NuadeSong **slot, const uint8_t *data, int len, const char *name, const char *playerId) {
   s_error[0] = 0;
   if (!data || len <= 0) {
     strcpy(s_error, "empty module");
@@ -152,13 +155,78 @@ EMSCRIPTEN_KEEPALIVE int nw_open(const uint8_t *data, int len, const char *name,
     snprintf(s_error, sizeof s_error, "%s", r.error.message[0] ? r.error.message : "nuade open failed");
     return -2;
   }
-  s_song = r.song;
+  *slot = r.song;
+  nuade_set_stereo_separation(r.song, s_separation);
+  return 0;
+}
+
+static void adopt_info(void) {
   const NuadeSongInfo *info = nuade_info(s_song);
   s_voice_count = info->voice_count > NW_MAX_VOICES ? NW_MAX_VOICES : info->voice_count;
   s_subsong_count = info->subsong_count;
   s_default_subsong = info->default_subsong;
-  nuade_set_stereo_separation(s_song, s_separation);
+}
+
+/* 0 ok, -1 bad arguments, -2 open failed (nw_last_error). `playerId` forces one player ("" or NULL probes all). */
+EMSCRIPTEN_KEEPALIVE int nw_open(const uint8_t *data, int len, const char *name, const char *playerId) {
+  nw_close();
+  s_repeat = -1; /* a new song starts on nuade's default repeat count */
+  const int r = open_into(&s_song, data, len, name, playerId);
+  if (r == 0) adopt_info();
+  return r;
+}
+
+/* ---- the next song: an edited module caught up to the playing one's position while that one keeps playing ----
+ * nuade has no copy of a player's state, so the only way to a position is to render forward to it (nuade_seek, about
+ * 1 ms per second of song). A host that must not block its audio thread opens the edited module here, advances it a
+ * bounded number of frames per render call (nw_next_advance) until it stands at the playing song's position, then
+ * hands over (nw_next_commit): the next nw_render continues from the same frame on the new module. The playing song
+ * and every nw_* call on it are untouched until the commit. The next song shares the file table and the settings. */
+EMSCRIPTEN_KEEPALIVE void nw_next_close(void) {
+  if (s_next) nuade_close(s_next);
+  s_next = NULL;
+}
+
+/* Opens the next song and starts `subsong` on it. 0 ok, -1 bad arguments, -2 open failed, -3 start failed. */
+EMSCRIPTEN_KEEPALIVE int nw_next_open(const uint8_t *data, int len, const char *name, const char *playerId, int subsong) {
+  nw_next_close();
+  const int r = open_into(&s_next, data, len, name, playerId);
+  if (r != 0) return r;
+  if (s_repeat >= 0) nuade_set_repeat_count(s_next, (uint32_t)s_repeat); /* as the playing song */
+  if (!nuade_start(s_next, (uint32_t)subsong, s_rate)) {
+    snprintf(s_error, sizeof s_error, "start failed for subsong %d", subsong);
+    nw_next_close();
+    return -3;
+  }
   return 0;
+}
+
+/* Restart the next song on `subsong` (the playing song changed subsong or rewound). 1 ok. */
+EMSCRIPTEN_KEEPALIVE int nw_next_start(int subsong) {
+  return s_next && nuade_start(s_next, (uint32_t)subsong, s_rate) ? 1 : 0;
+}
+
+/* Render the next song forward toward `target` without output, at most `maxFrames` frames (a target behind it
+ * restarts it first). Returns its position afterwards, -1 without a next song. */
+EMSCRIPTEN_KEEPALIVE double nw_next_advance(double target, int maxFrames) {
+  if (!s_next) return -1.0;
+  uint64_t to = (uint64_t)target;
+  const uint64_t at = nuade_position(s_next);
+  if (to > at && maxFrames > 0 && to - at > (uint64_t)maxFrames) to = at + (uint64_t)maxFrames;
+  nuade_seek(s_next, to);
+  return (double)nuade_position(s_next);
+}
+
+EMSCRIPTEN_KEEPALIVE double nw_next_position(void) { return s_next ? (double)nuade_position(s_next) : -1.0; }
+
+/* The next song becomes the playing one (the playing one is closed). 1 ok, 0 without a next song. */
+EMSCRIPTEN_KEEPALIVE int nw_next_commit(void) {
+  if (!s_next) return 0;
+  if (s_song) nuade_close(s_song);
+  s_song = s_next;
+  s_next = NULL;
+  adopt_info();
+  return 1;
 }
 
 EMSCRIPTEN_KEEPALIVE int nw_start(int subsong) {
@@ -174,7 +242,8 @@ EMSCRIPTEN_KEEPALIVE double nw_position(void) { return s_song ? (double)nuade_po
 EMSCRIPTEN_KEEPALIVE int nw_seek(double frame) { return s_song && nuade_seek(s_song, (uint64_t)frame) ? 1 : 0; }
 
 EMSCRIPTEN_KEEPALIVE void nw_set_repeat(int n) {
-  if (s_song) nuade_set_repeat_count(s_song, n < 0 ? 0 : (uint32_t)n);
+  s_repeat = n < 0 ? 0 : n;
+  if (s_song) nuade_set_repeat_count(s_song, (uint32_t)s_repeat);
 }
 EMSCRIPTEN_KEEPALIVE int nw_set_separation(float x) {
   if (x < 0.0f || x > 1.0f) return 0;

@@ -110,13 +110,14 @@ describe('an edit on a song playing on nuade is heard where it was made', () => 
       await until(() => rig.posted.some((m) => m.type === 'moduleLoaded'), 20_000);
       const engine = NuadeEngine.getInstance();
       const outputs = rig.nodeOptions.at(-1)?.numberOfOutputs ?? 9;
-      const render = (seconds: number): Float32Array => {
+      const render = (seconds: number, onQuantum?: (q: number) => void): Float32Array => {
         const quanta = Math.round((seconds * SR) / 128);
         const pcm = new Float32Array(quanta * 256);
         for (let q = 0; q < quanta; q++) {
           const out = stereoOutputs(outputs);
           rig.proc().process([], out);
           for (let i = 0; i < 128; i++) { pcm[q * 256 + 2 * i] = out[0]![0]![i]!; pcm[q * 256 + 2 * i + 1] = out[0]![1]![i]!; }
+          onQuantum?.(q);
         }
         return pcm;
       };
@@ -140,14 +141,19 @@ describe('an edit on a song playing on nuade is heard where it was made', () => 
       useTrackerStore.getState().setCurrentPattern(c.pattern);
       const editedAt = Date.now();
       useTrackerStore.getState().setCell(c.channel, c.row, { note: before.note + 2 });
-      await until(() => rig.posted.slice(swapped).some((m) => m.type === 'swapDone' || m.type === 'error'), 60_000);
+      // The worklet takes the edited module at once and hands over while it renders (it catches the module up to the
+      // played frame across render quanta), so the swap completes inside the render below.
+      await until(() => swap.mock.calls.length > 0 || rig.posted.slice(swapped).some((m) => m.type === 'error'), 60_000);
       const editToSwapMs = Date.now() - editedAt;
       expect(rig.posted.slice(swapped).filter((m) => m.type === 'error'), 'the worklet refused the edited module').toEqual([]);
       expect(swap, 'the edit reached the engine once').toHaveBeenCalledTimes(1);
       const handed = new Uint8Array(swap.mock.calls[0]![0] as ArrayBuffer);
       expect(handed.length === bytes.length && handed.every((v, i) => v === bytes[i]), 'the module handed over carries the edit').toBe(false);
       expect(headless.probeWith(c.id, handed, basename(c.file)), 'nuade opens the module it is handed').toBe(0);
-      const b2 = render(c.endAt - c.swapAt);
+      let handoverQuanta = -1;
+      const b2 = render(c.endAt - c.swapAt, (q) => { if (handoverQuanta < 0 && rig.posted.slice(swapped).some((m) => m.type === 'swapDone')) handoverQuanta = q + 1; });
+      expect(rig.posted.slice(swapped).filter((m) => m.type === 'error'), 'the worklet refused the edited module').toEqual([]);
+      expect(handoverQuanta, 'the edited module took over').toBeGreaterThan(0);
       const posB = positions(mark);
       swap.mockRestore();
       engine.stop();
@@ -169,7 +175,7 @@ describe('an edit on a song playing on nuade is heard where it was made', () => 
       const deltas = diff!.voices.map((v, i) => v.note - voicesA.get(diff!.frame)![i]!);
       expect(deltas).toEqual(deltas.map((_, i) => (i === c.channel ? 2 : 0)));
       expect(diff!.frame).toBeGreaterThanOrEqual(Math.floor(c.swapAt * SR) - 128);
-      console.info(`[nuadeEditsAreHeard] ${c.id}: edit to swapDone ${editToSwapMs} ms (worklet swap ${engine.lastSwapMs} ms) at ${c.swapAt} s, heard from ${(first / SR).toFixed(2)} s, voice ${c.channel + 1} +2`);
+      console.info(`[nuadeEditsAreHeard] ${c.id}: edit to swapModule ${editToSwapMs} ms, handed over after ${((handoverQuanta * 128 * 1000) / SR).toFixed(0)} ms of audio, at ${c.swapAt} s, heard from ${(first / SR).toFixed(2)} s, voice ${c.channel + 1} +2`);
     }, 240_000);
   }
 });

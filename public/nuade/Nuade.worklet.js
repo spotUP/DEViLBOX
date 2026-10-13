@@ -11,6 +11,12 @@ const MAX_VOICES = 64;
 const QUANTUM = 128;
 const SNAPSHOT_WORDS = 10 + 32 * 5;
 const VU_EVERY = 16; // quanta between vu messages: about 23 Hz at 48 kHz
+// An edited module is caught up to the playing position at most this long per render quantum (128 frames = 2.67 ms
+// at 48 kHz), see stepNext.
+const CATCH_UP_MS_PER_QUANTUM = 0.75;
+const CATCH_UP_MIN_FRAMES = 1024;
+const CATCH_UP_MAX_FRAMES = 4 * 48000;
+const now = () => (globalThis.performance && typeof globalThis.performance.now === 'function' ? globalThis.performance.now() : Date.now());
 
 class NuadeProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -37,6 +43,10 @@ class NuadeProcessor extends AudioWorkletProcessor {
     this.fileName = 'song';
     this.lastRowKey = '';
     this.quanta = 0;
+    // The edited module being caught up to the playing position (see swap / stepNext), null when none.
+    this.next = null;
+    // Measured cost of rendering forward without output, ms per frame (starts at 1 ms per second of song).
+    this.catchUpMsPerFrame = 1 / 48000;
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
@@ -114,6 +124,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
     const m = this.module;
     if (!m || !this.loaded || index < 0 || index >= m._nw_subsong_count()) return -1;
     if (!m._nw_start(index)) return -1;
+    if (this.next) m._nw_next_start(index);
     this.subsong = index;
     this.songEndSent = false;
     this.lastRowKey = '';
@@ -137,6 +148,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
     try {
       this.loaded = false;
       this.playing = false;
+      this.next = null; // nw_close drops the next song too
       this.songEndSent = false;
       this.lastRowKey = '';
       m._nw_close();
@@ -182,23 +194,55 @@ class NuadeProcessor extends AudioWorkletProcessor {
     }
   }
 
-  /** The edited module while it plays: opened again, sought to the frame already played. */
+  /**
+   * The edited module while it plays. nuade has no copy of a player's state: the edited module reaches the played frame
+   * only by rendering forward to it without output (about 1 ms per second already played). That runs here as the next
+   * song (nw_next_*), a bounded slice per render quantum (stepNext), while the playing module keeps playing; at the
+   * frame where both stand the next song takes over, so the output continues sample for sample. A newer edit replaces
+   * a next song still catching up.
+   */
   swap(bytes) {
     const m = this.module;
     if (!m || !this.loaded || !bytes) return;
-    const t0 = Date.now();
     try {
-      const frame = m._nw_position();
-      const playerId = m.UTF8ToString(m._nw_player_id());
-      // Reopen under the same player and file name; the companions stay in the file table.
-      this.openModule(bytes, playerId, this.fileName || 'song');
-      this.voices = Math.min(m._nw_voice_count(), MAX_VOICES);
-      this.appliedMask = -1;
-      if (!m._nw_start(this.subsong)) throw new Error('nuade start failed after swap');
-      m._nw_seek(frame);
-      this.port.postMessage({ type: 'swapDone', ms: Date.now() - t0 });
+      const data = new Uint8Array(bytes);
+      const ptr = this.writeBytes(data, false);
+      const name = this.cstr(this.fileName || 'song');
+      const id = this.cstr(m.UTF8ToString(m._nw_player_id())); // the same player; the companions stay in the file table
+      const r = m._nw_next_open(ptr, data.length, name, id, this.subsong);
+      m._free(ptr); m._free(name); m._free(id);
+      if (r !== 0) {
+        this.next = null;
+        throw new Error('nuade open failed (' + r + '): ' + m.UTF8ToString(m._nw_last_error()));
+      }
+      this.next = { t0: Date.now(), quanta: 0, frames: 0, ms: 0 };
     } catch (error) {
       this.port.postMessage({ type: 'error', message: 'swapModule: ' + error.message });
+    }
+  }
+
+  /** One slice of the next song's catch-up; hands over when it stands at the playing song's frame. */
+  stepNext() {
+    const m = this.module, next = this.next;
+    if (!next) return;
+    const target = m._nw_position();
+    const before = m._nw_next_position();
+    const frames = Math.max(CATCH_UP_MIN_FRAMES, Math.min(CATCH_UP_MAX_FRAMES,
+      Math.floor(CATCH_UP_MS_PER_QUANTUM / this.catchUpMsPerFrame)));
+    const t = now();
+    const at = m._nw_next_advance(target, frames);
+    next.ms += now() - t;
+    next.frames += Math.abs(at - before);
+    next.quanta++;
+    // The rate this machine renders forward at, once the slices add up to a measurable time.
+    if (next.ms >= 5 && next.frames > 0) this.catchUpMsPerFrame = next.ms / next.frames;
+    // Handed over at the same frame, or where the edited module ends when it ends before it (nothing more to reach).
+    if (at === target || (at === before && at < target) || at < 0) {
+      m._nw_next_commit();
+      this.next = null;
+      this.voices = Math.min(m._nw_voice_count(), MAX_VOICES);
+      this.appliedMask = -1;
+      this.port.postMessage({ type: 'swapDone', ms: Date.now() - next.t0 });
     }
   }
 
@@ -303,6 +347,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
     this.initialized = false;
     this.loaded = false;
     this.playing = false;
+    this.next = null;
     this.lastHeapBuffer = null;
   }
 
@@ -333,7 +378,8 @@ class NuadeProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
-    if (!this.initialized || !this.module || !this.loaded || !this.playing) return true;
+    if (!this.initialized || !this.module || !this.loaded) return true;
+    if (!this.playing) { this.stepNext(); return true; }
     const output = outputs[0];
     if (!output || output.length < 2) return true;
     const m = this.module;
@@ -369,6 +415,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
       this.songEndSent = true;
       this.port.postMessage({ type: 'songEnd' });
     }
+    this.stepNext();
     return true;
   }
 }

@@ -21,7 +21,7 @@ set_target_properties(Nuade PROPERTIES
 )
 target_compile_options(Nuade PRIVATE -O2 -Wall)
 
-set(EXPORTED_FUNCS "_malloc,_free,_nw_init,_nw_add_file,_nw_clear_files,_nw_open,_nw_close,_nw_last_error,_nw_start,_nw_render,_nw_last_flags,_nw_voice_count,_nw_subsong_count,_nw_default_subsong,_nw_position,_nw_seek,_nw_snapshot,_nw_vu,_nw_pans,_nw_set_repeat,_nw_set_mute_mask,_nw_set_separation,_nw_meta,_nw_instrument_count,_nw_instrument_name,_nw_instrument_index,_nw_player_id,_nw_player_name,_nw_player_count,_nw_player_id_at,_nw_probe,_nw_probe_with,_nw_caps,_nw_state_size,_nw_state_read,_nw_cell_write,_nw_instrument_write")
+set(EXPORTED_FUNCS "_malloc,_free,_nw_init,_nw_add_file,_nw_clear_files,_nw_open,_nw_close,_nw_last_error,_nw_start,_nw_render,_nw_last_flags,_nw_voice_count,_nw_subsong_count,_nw_default_subsong,_nw_position,_nw_seek,_nw_snapshot,_nw_vu,_nw_pans,_nw_set_repeat,_nw_set_mute_mask,_nw_set_separation,_nw_meta,_nw_instrument_count,_nw_instrument_name,_nw_instrument_index,_nw_player_id,_nw_player_name,_nw_player_count,_nw_player_id_at,_nw_probe,_nw_probe_with,_nw_caps,_nw_state_size,_nw_state_read,_nw_cell_write,_nw_instrument_write,_nw_next_open,_nw_next_start,_nw_next_advance,_nw_next_position,_nw_next_commit,_nw_next_close")
 
 target_link_options(Nuade PRIVATE
     "SHELL:-s MODULARIZE=1"

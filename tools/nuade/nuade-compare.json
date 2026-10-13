@@ -1,7 +1,7 @@
 {
  "version": 1,
  "instrument": {
-  "wasm": "6bdcea540196",
+  "wasm": "f309c249f91d",
   "known_good": {
    "song": "public/data/songs/formats/antidust.bp3",
    "correlation": 0.9739122364298693,
@@ -9,7 +9,7 @@
   },
   "known_bad": {
    "song": "public/data/songs/formats/apb.dw",
-   "correlation": 0.4063970659509885,
+   "correlation": 0.8472068002914434,
    "pass": false
   },
   "ok": true
