@@ -1,5 +1,8 @@
 /**
- * The cached form of a channel stem: lossless FLAC, stereo.
+ * The cached form of a channel stem: lossless FLAC, mono since render
+ * version 5 (channelScopeTrack monoStem: one channel and a pan; 16 stems fit a
+ * deck's 32-channel buffer). The measurements below chose stereo FLAC for the
+ * stereo stems that version 4 cached.
  *
  * Measured 2026-10-12 (plan 2026-10-12-dj-rendered-deck-channel-mute.md):
  * UADE and libopenmpt stems have L == R exactly and Hively 16-channel stems pan
@@ -16,20 +19,18 @@
 import { encodeFlac } from '@/lib/export/audioEncoders';
 
 /**
- * One stem (stereo interleaved int16, encoded like the WAV) as FLAC. The
- * encoder rounds float x 0x7FFF, so x = v / 0x7FFF gives back v exactly
- * (-32768 alone lands on -32767). A silent stem stays empty.
+ * One stem (int16 encoded like the WAV: mono, or interleaved stereo with
+ * channels = 2) as FLAC. The encoder rounds float x 0x7FFF, so x = v / 0x7FFF
+ * gives back v exactly (-32768 alone lands on -32767). A silent stem stays empty.
  */
-export async function encodeStemFlac(stem: Int16Array, sampleRate: number): Promise<Uint8Array> {
+export async function encodeStemFlac(stem: Int16Array, sampleRate: number, channels: 1 | 2 = 1): Promise<Uint8Array> {
   if (stem.length === 0) return new Uint8Array(0);
-  const n = stem.length >> 1;
-  const l = new Float32Array(n);
-  const r = new Float32Array(n);
+  const n = Math.floor(stem.length / channels);
+  const planes = Array.from({ length: channels }, () => new Float32Array(n));
   for (let i = 0; i < n; i++) {
-    l[i] = stem[2 * i] / 0x7FFF;
-    r[i] = stem[2 * i + 1] / 0x7FFF;
+    for (let c = 0; c < channels; c++) planes[c][i] = stem[channels * i + c] / 0x7FFF;
   }
-  return encodeFlac([l, r], sampleRate, 16);
+  return encodeFlac(planes, sampleRate, 16);
 }
 
 /** Node / jsdom (tests): no real Web Worker for the decoder. */
@@ -43,8 +44,8 @@ interface FlacDecoded { channelData: Float32Array[]; samplesDecoded: number }
 interface FlacDecoderLike { ready: Promise<void>; decodeFile(data: Uint8Array): Promise<FlacDecoded>; free(): void | Promise<void> }
 
 /**
- * Decode FLAC stems to [left, right] float channels (v / 32767, the decoder's
- * scale). Off the main thread when Web Workers exist; an empty stem decodes
+ * Decode FLAC stems to their float channels (v / 32767, the decoder's scale):
+ * [mono] for a render-version-5 stem, [left, right] for an older one. Off the main thread when Web Workers exist; an empty stem decodes
  * to null (a channel that never sounds).
  */
 export async function decodeStemsFlac(stems: Uint8Array[]): Promise<(Float32Array[] | null)[]> {

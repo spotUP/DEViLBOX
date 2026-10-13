@@ -1,14 +1,17 @@
 /**
  * DeckChannelMute - the per-channel mute of a deck that plays rendered audio.
  *
- * A rendered module deck plays one buffer of 2 + 2N channels: the stereo mix,
- * then each channel's stereo stem (channelScopeTrack.ts stems, rendered in the
- * same worker pass through the engine's whole output chain). One source plays
- * them all, so the stems stay sample-locked to the mix through seek, loop,
- * pitch, nudge, scratch and doubles by construction.
+ * A rendered module deck plays one buffer of 2 + N channels: the stereo mix,
+ * then each channel's stem as one channel (channelScopeTrack.ts monoStem,
+ * rendered in the same worker pass through the engine's whole output chain)
+ * with its pan (L / R gain, stemPansOf). One source plays them all, so the
+ * stems stay sample-locked to the mix through seek, loop, pitch, nudge,
+ * scratch and doubles by construction. Mono keeps 16 stems inside an
+ * AudioBuffer's 32 channels.
  *
- *   input (2+2N ch) -> splitter -> mix L/R ------------------------> merger -> output (stereo)
- *                               -> stem k L/R -> gain k (0 | -1) -/
+ *   input (2+N ch) -> splitter -> mix L/R ----------------------------------> merger -> output (stereo)
+ *                              -> stem k -> gain k L (0 | -panL) -> merger L /
+ *                                        -> gain k R (0 | -panR) -> merger R
  *
  * Output = mix - sum of the muted channels' stems. Nothing muted = every gain
  * 0 = the mix exactly as before. A mute is a 3 ms ramp: immediate, no click.
@@ -19,6 +22,7 @@
  */
 
 import * as Tone from 'tone';
+import { monoStem } from './channelScopeTrack';
 
 /** Anti-click ramp of a channel mute, seconds. */
 export const CHANNEL_MUTE_RAMP_S = 0.003;
@@ -35,6 +39,7 @@ export class DeckChannelMute {
   private splitter: ChannelSplitterNode | null = null;
   private merger: ChannelMergerNode | null = null;
   private gains: GainNode[] = []; // [ch0L, ch0R, ch1L, ch1R, ...]
+  private pans: Array<[number, number]> = [];
   private _stemCount = 0;
   private _mask = 0xFFFFFFFF;
   /** Calls to setMask that reached a deck with stems (reachability sentinel). */
@@ -53,11 +58,16 @@ export class DeckChannelMute {
   /** The mask last written (bit k set = channel k audible). */
   get mask(): number { return this._mask; }
 
-  /** Rewire for audio with `n` stems after its mix (n = 0: straight through). Keeps the current mask. */
-  setStemCount(n: number): void {
-    if (n === this._stemCount) return;
+  /**
+   * Rewire for audio whose mix is followed by one mono stem per entry of `pans` (its L / R gain;
+   * none: straight through). Keeps the current mask.
+   */
+  setStems(pans: Array<[number, number]>): void {
+    const n = pans.length;
+    if (n === this._stemCount && pans.every((p, k) => p[0] === this.pans[k]?.[0] && p[1] === this.pans[k]?.[1])) return;
     this.teardown();
     this._stemCount = n;
+    this.pans = pans.map((p) => [p[0], p[1]]);
     if (n === 0) {
       this.input.connect(this.output);
       return;
@@ -65,7 +75,7 @@ export class DeckChannelMute {
     this.input.disconnect();
     const inNode = this.input.output as unknown as AudioNode;
     const outNode = this.output.input as unknown as AudioNode;
-    const splitter = this.ctx.createChannelSplitter(2 + 2 * n);
+    const splitter = this.ctx.createChannelSplitter(2 + n);
     const merger = this.ctx.createChannelMerger(2);
     inNode.connect(splitter);
     splitter.connect(merger, 0, 0);
@@ -73,8 +83,8 @@ export class DeckChannelMute {
     for (let k = 0; k < n; k++) {
       for (let side = 0; side < 2; side++) {
         const g = this.ctx.createGain();
-        g.gain.value = channelAudible(this._mask, k) ? 0 : -1;
-        splitter.connect(g, 2 + 2 * k + side);
+        g.gain.value = channelAudible(this._mask, k) ? 0 : -this.pans[k][side];
+        splitter.connect(g, 2 + k);
         g.connect(merger, 0, side);
         this.gains.push(g);
       }
@@ -91,11 +101,12 @@ export class DeckChannelMute {
     this.stemMaskWrites++;
     const now = this.ctx.currentTime;
     for (let k = 0; k < this._stemCount; k++) {
-      const target = channelAudible(this._mask, k) ? 0 : -1;
-      for (const g of [this.gains[2 * k], this.gains[2 * k + 1]]) {
+      const audible = channelAudible(this._mask, k);
+      for (let side = 0; side < 2; side++) {
+        const g = this.gains[2 * k + side];
         g.gain.cancelScheduledValues(now);
         g.gain.setValueAtTime(g.gain.value, now);
-        g.gain.linearRampToValueAtTime(target, now + CHANNEL_MUTE_RAMP_S);
+        g.gain.linearRampToValueAtTime(audible ? 0 : -this.pans[k][side], now + CHANNEL_MUTE_RAMP_S);
       }
     }
   }
@@ -103,6 +114,7 @@ export class DeckChannelMute {
   private teardown(): void {
     for (const g of this.gains) { try { g.disconnect(); } catch { /* */ } }
     this.gains = [];
+    this.pans = [];
     try { this.splitter?.disconnect(); } catch { /* */ }
     try { this.merger?.disconnect(); } catch { /* */ }
     this.splitter = null;
@@ -140,21 +152,44 @@ function wavPcm16(wav: ArrayBuffer): { sampleRate: number; channels: number; dat
   return null;
 }
 
+// The pan of each stem a deck buffer carries after its mix, keyed by the buffer (a double shares it).
+const stemPans = new WeakMap<AudioBuffer, Array<[number, number]>>();
+
+/** One decoded stem as one channel and its pan: a mono stem with its gains, or a stereo one (render version 4) fitted. */
+function monoOf(stem: Float32Array[], gains: [number, number] | undefined): { mono: Float32Array; pan: [number, number] } {
+  if (stem.length === 1) return { mono: stem[0], pan: gains ?? [1, 1] };
+  // A stereo stem of an older cache entry: the same one-channel fit the render worker makes now.
+  const [l, r] = stem;
+  const n = Math.min(l.length, r.length);
+  const pcm = new Int16Array(n * 2);
+  for (let i = 0; i < n; i++) {
+    pcm[2 * i] = Math.max(-32768, Math.min(32767, Math.round(l[i] * 32767)));
+    pcm[2 * i + 1] = Math.max(-32768, Math.min(32767, Math.round(r[i] * 32767)));
+  }
+  const m = monoStem(pcm);
+  const mono = new Float32Array(m.mono.length);
+  for (let i = 0; i < mono.length; i++) mono[i] = m.mono[i] / 32767;
+  return { mono, pan: m.gains };
+}
+
 /**
  * The buffer a deck plays for a rendered track with stems: the WAV's stereo
- * mix followed by each channel's stereo stem (decoded from its FLAC,
+ * mix followed by each channel's stem as one channel (decoded from its FLAC,
  * channelStemCodec.ts), all at the render rate and decoded alike (x / 32768),
- * each stem cut or zero-padded to the mix. Built
+ * each stem cut or zero-padded to the mix; the stems' pans (`gains`, the
+ * track's stemGains) are kept with the buffer (stemPansOf). Built
  * from the WAV itself, not the context-rate decode of it, so mix and stems
  * share one timeline (the context resamples them all the same way). Null when
  * there are no stems or the bytes are not a 16-bit PCM WAV.
  */
-export function bufferWithStems(ctx: BaseAudioContext, wav: ArrayBuffer | null, stems: (Float32Array[] | null)[] | undefined): AudioBuffer | null {
+export function bufferWithStems(
+  ctx: BaseAudioContext, wav: ArrayBuffer | null, stems: (Float32Array[] | null)[] | undefined, gains?: Array<[number, number]>,
+): AudioBuffer | null {
   if (!wav || !stems || stems.length === 0) return null;
   const pcm = wavPcm16(wav);
   if (!pcm || pcm.channels !== 2) return null;
   const len = pcm.data.length >> 1;
-  const out = ctx.createBuffer(2 + 2 * stems.length, len, pcm.sampleRate);
+  const out = ctx.createBuffer(2 + stems.length, len, pcm.sampleRate);
   const l = new Float32Array(len);
   const r = new Float32Array(len);
   for (let i = 0; i < len; i++) {
@@ -163,17 +198,23 @@ export function bufferWithStems(ctx: BaseAudioContext, wav: ArrayBuffer | null, 
   }
   out.copyToChannel(l, 0);
   out.copyToChannel(r, 1);
+  const pans: Array<[number, number]> = [];
   stems.forEach((stem, k) => {
-    if (!stem) return; // a channel that never sounds: zeros
-    for (let side = 0; side < 2; side++) {
-      const src = stem[Math.min(side, stem.length - 1)];
-      out.copyToChannel((src.length > len ? src.subarray(0, len) : src) as Float32Array<ArrayBuffer>, 2 + 2 * k + side);
-    }
+    if (!stem || stem.length === 0) { pans.push([0, 0]); return; } // a channel that never sounds: zeros
+    const { mono, pan } = monoOf(stem, gains?.[k]);
+    pans.push(pan);
+    out.copyToChannel((mono.length > len ? mono.subarray(0, len) : mono) as Float32Array<ArrayBuffer>, 2 + k);
   });
+  stemPans.set(out, pans);
   return out;
+}
+
+/** The pan (L / R gain) of each stem a deck buffer carries after its mix; empty for any other buffer. */
+export function stemPansOf(buffer: AudioBuffer | null): Array<[number, number]> {
+  return (buffer && stemPans.get(buffer)) ?? [];
 }
 
 /** Stems a deck buffer carries after its mix. */
 export function stemCountOf(buffer: AudioBuffer | null): number {
-  return buffer && buffer.numberOfChannels > 2 ? (buffer.numberOfChannels - 2) >> 1 : 0;
+  return stemPansOf(buffer).length;
 }

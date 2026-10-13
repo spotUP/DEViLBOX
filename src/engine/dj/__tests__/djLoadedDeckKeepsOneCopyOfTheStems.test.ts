@@ -43,7 +43,7 @@ describe('a loaded rendered deck keeps one copy of its channel stems', () => {
     const stems = [stem(0), stem(1)];
     const mix = stems[0].map((v, i) => v + stems[1][i]);
     const wav = wav16(mix);
-    const flacStems = [await encodeStemFlac(stems[0], RATE), await encodeStemFlac(stems[1], RATE)];
+    const flacStems = [await encodeStemFlac(stems[0], RATE, 2), await encodeStemFlac(stems[1], RATE, 2)]; // stereo (render version 4)
     attachChannelScopes(wav, { sampleRate: RATE / 4, channels: [new Int8Array(10), new Int8Array(10)], scales: [1, 1], flacStems });
 
     const out = new Tone.Gain(1);
@@ -54,7 +54,7 @@ describe('a loaded rendered deck keeps one copy of its channel stems', () => {
     await deckA.loadAudioFile(wav, 'two-channel.mod');
 
     expect(deckA.channelStemCount, 'the deck buffer carries the stems').toBe(2);
-    expect(deckA.audioPlayer.getAudioBuffer()?.numberOfChannels).toBe(6);
+    expect(deckA.audioPlayer.getAudioBuffer()?.numberOfChannels).toBe(4); // the mix + one channel per stem
     expect(deckA.channelScopes?.flacStems, 'the deck still holds the encoded stems').toBeUndefined();
     expect(channelScopesFor(wav)?.flacStems, 'the WAV\'s track still holds the encoded stems').toBeUndefined();
 

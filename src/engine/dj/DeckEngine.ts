@@ -23,7 +23,7 @@ import { DeckStemPlayer } from './DeckStemPlayer';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';
 import { songRowTimeline, rowAtTime, timeAtRow, EMPTY_ROW_TIMELINE, type SongRowTimeline } from './songRowTimeline';
 import { attachChannelScopes, channelScopesFor, channelScopeWindow, releaseChannelStems, DECK_SCOPE_CHANNELS, type ChannelScopeTrack } from './channelScopeTrack';
-import { DeckChannelMute, bufferWithStems, stemCountOf } from './DeckChannelMute';
+import { DeckChannelMute, bufferWithStems, stemCountOf, stemPansOf } from './DeckChannelMute';
 import { decodeStemsFlac } from './channelStemCodec';
 import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
@@ -662,11 +662,11 @@ export class DeckEngine {
       const decoded = await decodeStemsFlac(flac);
       if (this._loadedWav !== wav) throw new DeckLoadSuperseded('channel stems'); // another track loaded meanwhile
       const ctx = Tone.getContext().rawContext as unknown as BaseAudioContext;
-      const withStems = bufferWithStems(ctx, wav, decoded);
+      const withStems = bufferWithStems(ctx, wav, decoded, this._channelScopes?.stemGains);
       if (withStems) { this.audioPlayer.replaceBuffer(withStems); buffer = withStems; }
     }
     const n = stemCountOf(buffer);
-    this.channelMute.setStemCount(n);
+    this.channelMute.setStems(stemPansOf(buffer));
     this.channelMute.setMask(useDJStore.getState().decks[this.id]?.channelMask ?? 0xFFFF);
     useDJStore.getState().setDeckState(this.id, { channelStemCount: n });
   }
