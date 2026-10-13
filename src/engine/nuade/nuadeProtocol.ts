@@ -14,7 +14,8 @@ export const NuadeCap = { StateRead: 1, CellWrite: 2, InstrumentWrite: 4, Module
 export type NuadeIn =
   | { type: 'init'; wasmBinary: ArrayBuffer | null; jsCode: string | null; sampleRate?: number }
   | { type: 'loadModule'; bytes: ArrayBuffer; playerId: string; fileName: string; subsong: number | undefined; companions: NuadeCompanion[] }
-  | { type: 'play' }
+  /** latencyFrames: output latency, so `position` is read at the frame being heard. */
+  | { type: 'play'; latencyFrames?: number }
   | { type: 'stop' }
   | { type: 'pause' }
   | { type: 'setSubsong'; index: number }

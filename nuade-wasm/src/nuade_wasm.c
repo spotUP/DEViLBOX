@@ -183,23 +183,40 @@ EMSCRIPTEN_KEEPALIVE int nw_set_separation(float x) {
 }
 EMSCRIPTEN_KEEPALIVE void nw_set_mute_mask(int mask) { s_mask = (uint32_t)mask; }
 
-/* Take the muted voices' contribution out of the stereo mix. A tick player's mixer pans each voice with the pan the
- * snapshot reports; a self-rendering player has no per-voice pan to read, so the Amiga's L R R L is assumed. */
-static void remove_muted(float *stereo, float *const *voices, uint32_t frames) {
+/* The pan each voice has in the stereo mix right now (-1 left .. 1 right, separation applied). A tick player's mixer
+ * pans each voice with the pan its snapshot reports; a self-rendering player has no per-voice pan to read, so the
+ * Amiga's L R R L is assumed. */
+static void current_pans(float *out, uint32_t count) {
   NuadeVoiceView views[NW_SNAPSHOT_MAX_VOICES];
   memset(views, 0, sizeof views);
   const NuadePlayer *pl = nuade_player(s_song);
   const bool ticked = pl && pl->tick != NULL;
-  NuadeSnapshotResult snap = {0};
+  NuadeSnapshotResult snap;
+  memset(&snap, 0, sizeof snap);
   if (ticked) snap = nuade_snapshot(s_song, nuade_position(s_song), views, NW_SNAPSHOT_MAX_VOICES);
-  for (uint32_t v = 0; v < s_voice_count; v++) {
-    if (v < 32 && (s_mask >> v) & 1u) continue;
+  for (uint32_t v = 0; v < count; v++) {
     float pan = (v == 0 || v == 3) ? -1.0f : 1.0f;
     if (ticked && snap.valid && v < NW_SNAPSHOT_MAX_VOICES) pan = views[v].pan;
     if (pan < -1.0f) pan = -1.0f;
     if (pan > 1.0f) pan = 1.0f;
-    pan *= s_separation;
-    const float gl = 0.5f * (1.0f - pan), gr = 0.5f * (1.0f + pan);
+    out[v] = pan * s_separation;
+  }
+}
+
+EMSCRIPTEN_KEEPALIVE int nw_pans(float *out, int cap) {
+  if (!s_song || !out || cap <= 0) return 0;
+  uint32_t n = s_voice_count < (uint32_t)cap ? s_voice_count : (uint32_t)cap;
+  current_pans(out, n);
+  return (int)n;
+}
+
+/* Take the muted voices' contribution out of the stereo mix. */
+static void remove_muted(float *stereo, float *const *voices, uint32_t frames) {
+  float pans[NW_MAX_VOICES];
+  current_pans(pans, s_voice_count);
+  for (uint32_t v = 0; v < s_voice_count; v++) {
+    if (v < 32 && (s_mask >> v) & 1u) continue;
+    const float gl = 0.5f * (1.0f - pans[v]), gr = 0.5f * (1.0f + pans[v]);
     const float *src = voices[v];
     for (uint32_t i = 0; i < frames; i++) {
       stereo[i * 2] -= src[i] * gl;
