@@ -116,7 +116,7 @@ fi
 # reuses this checkout's node_modules, and removed again on every exit path.
 SNAP_LABEL=pre-push
 # shellcheck source=snapshot.sh
-. scripts/git-hooks/snapshot.sh
+. "$(dirname "$0")/snapshot.sh"
 install_snapshot_traps
 
 # Commits to test: every distinct non-delete local sha of the push; HEAD when

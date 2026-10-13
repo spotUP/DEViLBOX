@@ -51,7 +51,7 @@ if printf '%s' " $STAGED" | grep -Eq ' (src|server/src)/[^ ]*\.tsx?( |$)'; then
   # edits must not block (or falsely pass) this commit. Same mechanism as pre-push.
   SNAP_LABEL=pre-commit
   # shellcheck source=snapshot.sh
-  . scripts/git-hooks/snapshot.sh
+  . "$(dirname "$0")/snapshot.sh"
   install_snapshot_traps
   materialise_reusable "$(git rev-parse HEAD)" "$(git write-tree)"
   # shellcheck disable=SC2086
