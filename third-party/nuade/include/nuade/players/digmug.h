@@ -165,7 +165,6 @@ typedef struct DmChannel {
     uint16_t volume;      // Amiga volume 0-64
     uint32_t period;
     bool active;
-    bool muted;
     bool play_pending;  // a new sample starts
     bool latch_pending; // the loop registers were rewritten while the old sample keeps playing
 } DmChannel;
@@ -193,6 +192,9 @@ struct DmModule {
 
     DmInstrument* instruments;
     int8_t** waveforms; // each is 128 bytes
+    // What playback uses: copies of the instruments and waveforms, made at start
+    DmInstrument* play_instruments;
+    int8_t** play_waveforms;
     DmSample* samples;
 
     // Playing state
@@ -256,7 +258,6 @@ uint32_t dm_tick_length(const DmModule* module);
 
 // 4 for Digital Mugician, 7 for Digital Mugician 2.
 int dm_channel_count(const DmModule* module);
-void dm_set_channel_mask(DmModule* module, uint32_t mask);
 
 // Run one player tick and set the voices. Returns true when the song passed its loop point during the tick.
 bool dm_tick(DmModule* module);

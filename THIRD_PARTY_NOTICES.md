@@ -200,10 +200,15 @@ All third-party components are compatible with GPL-3.0-or-later.
 - **Used for:** native C ports of the UADE players, compiled to `public/nuade/Nuade.wasm` (`nuade-wasm/`). One engine for the Amiga formats listed here, which play through it by default:
 <!-- nuade-formats:begin -->
   - AM-Composer
+  - Anders 0land
   - Art and Magic
   - Ashley Hogg
+  - Beathoven Synthesizer
+  - Ben Daglish SID
   - BP SoundMon
+  - Core Design
   - Darius Zendeh
+  - Dave Lowe
   - David Hanney
   - EarAche
   - EMS (Editeur Musical Sequentiel)
@@ -224,6 +229,7 @@ All third-party components are compatible with GPL-3.0-or-later.
   - Professional Sound Artists
   - Riff Raff
   - Rob Hubbard
+  - Scott Johnston (Sound Player)
   - SCUMM
   - Sean Connolly
   - Sean Conran
@@ -238,6 +244,7 @@ All third-party components are compatible with GPL-3.0-or-later.
   - Tim Follin
   - Tomy Tracker
   - Tronic
+  - Wally Beben
 <!-- nuade-formats:end -->
 - **Also in nuade:** 28 of its players are ports of NostalgicPlayer (Thomas Neumann, MIT) and three eagleplayer data files carry no licence; both are listed verbatim in `third-party/nuade/THIRD_PARTY_NOTICES.md`.
 
