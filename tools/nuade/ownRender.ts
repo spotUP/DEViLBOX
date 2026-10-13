@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { loadSharedWorkletScripts, startWorklet, songBuffer } from '../../src/engine/__tests__/workletHarness';
 import { levelOf, sha1, ROOT } from './nuadeCompare';
 
-interface OwnEngine { dir: string; stem: string; wasmStem?: string; load?: 'tune' }
+interface OwnEngine { dir: string; stem: string; wasmStem?: string; load?: 'tune' | 'tfmx' }
 
 /** Dual row id -> the worklet that plays it. */
 export const OWN_ENGINES: Readonly<Record<string, OwnEngine>> = {
@@ -30,6 +30,10 @@ export const OWN_ENGINES: Readonly<Record<string, OwnEngine>> = {
   gmc: { dir: 'gmc', stem: 'Gmc' },
   instereo1: { dir: 'instereo1', stem: 'InStereo1' },
   instereo2: { dir: 'instereo2', stem: 'InStereo2' },
+  // Jochen Hippel's formats are decoded by libtfmxaudiodecoder inside the TFMX worklet (wasmEngineRegistry 'Hippel').
+  hippel: { dir: 'tfmx', stem: 'TFMX', load: 'tfmx' },
+  hippel7v: { dir: 'tfmx', stem: 'TFMX', load: 'tfmx' },
+  hippelhip: { dir: 'tfmx', stem: 'TFMX', load: 'tfmx' },
   jamcracker: { dir: 'jamcracker', stem: 'JamCracker', load: 'tune' },
   musicassembler: { dir: 'ma', stem: 'Ma' },
   oktalyzer: { dir: 'oktalyzer', stem: 'Oktalyzer' },
@@ -53,10 +57,11 @@ export async function renderOwn(rowId: string, songPath: string, seconds: number
   const empty = { samples: new Float32Array(0), peak: 0, rms: 0 };
   try {
     loadSharedWorkletScripts();
-    const { proc, send, posted } = await startWorklet(e.dir, e.stem, undefined, e.wasmStem ?? e.stem);
+    const transform = e.load === 'tfmx' ? (await import('../../src/engine/tfmx/TFMXEngine')).tfmxTransform : undefined;
+    const { proc, send, posted } = await startWorklet(e.dir, e.stem, transform, e.wasmStem ?? e.stem);
     const module = songBuffer(songPath);
-    await send(e.load === 'tune' ? { type: 'loadTune', buffer: module } : { type: 'loadModule', moduleData: module });
-    await send({ type: 'play' });
+    if (e.load === 'tfmx') { await send({ type: 'loadModule', mdatBuffer: module, smplBuffer: null, subsong: 0 }); await send({ type: 'modulePlay' }); }
+    else { await send(e.load === 'tune' ? { type: 'loadTune', buffer: module } : { type: 'loadModule', moduleData: module }); await send({ type: 'play' }); }
     const frames = 48000 * seconds, out = new Float32Array(frames * 2);
     const L = new Float32Array(128), R = new Float32Array(128);
     for (let f = 0; f < frames; f += 128) {
