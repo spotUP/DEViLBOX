@@ -198,6 +198,7 @@ import {
 } from './handlers/writeHandlers';
 import { analyzeSongHandler } from './handlers/analysisHandlers';
 import { generatePattern, transformPattern } from './handlers/generatorHandlers';
+import { getFormatEngines, setFormatEngine } from './handlers/engineHandlers';
 import {
   getDJState, getDJPlaylistState,
   djTogglePlay, djStop, djCue, djSync,
@@ -268,6 +269,8 @@ const handlers: Record<string, Handler> = {
   get_channel_segments: getChannelSegments,
   get_synth_errors: getSynthErrors,
   get_format_state: getFormatState,
+  get_format_engines: getFormatEngines,
+  set_format_engine: setFormatEngine,
   get_midi_state: getMIDIState,
   get_clipboard_state: getClipboardState,
   get_command_list: getCommandList,

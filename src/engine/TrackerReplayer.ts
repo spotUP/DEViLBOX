@@ -378,6 +378,14 @@ export interface TrackerSong {
   stoneTrackerFileData?: ArrayBuffer;
   /** The SPS sample bank beside it (DeltaHuffman packed or not) */
   stoneTrackerSampleData?: ArrayBuffer;
+  /** Module for NuadeEngine: nuade (emoon/nuade) plays it; which player runs is nuadePlayerId */
+  nuadeFileData?: ArrayBuffer;
+  /** The nuade player id (NUADE_FORMATS key), forced at load */
+  nuadePlayerId?: string;
+  /** The module's own file name, which the player opens it and its companions by */
+  nuadeFileName?: string;
+  /** Subsong to start (0-based), the native subsong model's start field */
+  nuadeSubsong?: number;
   /** Module for EaglePlayerEngine: its eagleplayer runs on the Musashi host (eagleplayer-wasm) */
   eaglePlayerFileData?: ArrayBuffer;
   /** Which eagleplayer (EAGLE_PLAYER_FORMATS key, src/engine/eagleplayer/eaglePlayerFormats.ts) */

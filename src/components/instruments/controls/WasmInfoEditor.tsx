@@ -8,6 +8,9 @@
 import React from 'react';
 import type { SynthType } from '@/types/instrument/base';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
+import { useFormatStore } from '@stores/useFormatStore';
+import { NUADE_FORMATS } from '@/engine/nuade/nuadeFormats';
+import { FormatEngineSelect } from '@components/common/FormatEngineSelect';
 
 interface WasmInfoEditorProps {
   synthType: SynthType;
@@ -120,6 +123,11 @@ const FORMAT_INFO: Record<string, { name: string; description: string; color: st
     description: 'Capcom QSound format. Z80 CPU + QSound DSP emulation for CPS1/CPS2 arcade music.',
     color: '#cc4488',
   },
+  NuadeSynth: {
+    name: 'nuade',
+    description: 'nuade (emoon/nuade): native C ports of the UADE players, one engine for the whole song. The player that runs is named by the loaded format.',
+    color: '#66ddaa',
+  },
   UADESynth: {
     name: 'UADE',
     description: 'Unix Amiga Delitracker Emulator. Playback-only engine for 130+ exotic Amiga tracker formats — load a file to play, instruments are managed by the underlying replayer.',
@@ -129,6 +137,9 @@ const FORMAT_INFO: Record<string, { name: string; description: string; color: st
 
 export const WasmInfoEditor: React.FC<WasmInfoEditorProps> = ({ synthType, instrumentName }) => {
   const info = FORMAT_INFO[synthType];
+  // The loaded song's format, when nuade has a player for it: its engine choice is made here.
+  const nuadePlayerId = useFormatStore((s) => s.nuadePlayerId);
+  const nuadeRow = nuadePlayerId ? NUADE_FORMATS[nuadePlayerId] ?? null : null;
   const { panelStyle } = useInstrumentColors(info?.color ?? '#888888');
 
   if (!info) {
@@ -146,6 +157,12 @@ export const WasmInfoEditor: React.FC<WasmInfoEditorProps> = ({ synthType, instr
         <div className="text-text-muted text-xs">Instrument: {instrumentName}</div>
       )}
       <div className="text-text-muted text-xs leading-relaxed">{info.description}</div>
+      {nuadeRow && (
+        <div className="flex flex-col gap-1 mt-1">
+          <div className="text-text-muted text-[10px] font-mono">{nuadeRow.label} plays on</div>
+          <FormatEngineSelect row={nuadeRow} />
+        </div>
+      )}
       <div className="text-text-muted text-[10px] mt-2 border-t border-dark-border/30 pt-2">
         Playback-only format — instrument parameters are handled internally by the WASM replayer engine.
       </div>

@@ -154,6 +154,8 @@ export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
   // ASAP chooses its player by extension: an RMT saved without its name came back as 'tune.sap'.
   if (state.asapFilename) result.asapFilename = state.asapFilename;
   // The eagleplayer is chosen by id: the module bytes alone do not name it.
+  if (state.nuadePlayerId) result.nuadePlayerId = state.nuadePlayerId;
+  if (state.nuadeFileName) result.nuadeFileName = state.nuadeFileName;
   if (state.eaglePlayerId) result.eaglePlayerId = state.eaglePlayerId;
   if (state.eaglePlayerFileName) result.eaglePlayerFileName = state.eaglePlayerFileName;
   if (state.uadeEditableSubsongs) result.uadeEditableSubsongs = state.uadeEditableSubsongs;

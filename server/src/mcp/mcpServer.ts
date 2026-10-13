@@ -1210,6 +1210,20 @@ export function createMcpServer(): McpServer {
   // ═══════════════════════════════════════════════════════════════════════════════
 
   server.tool(
+    'get_format_engines',
+    'List the formats whose playback engine can be chosen (Our Engine, UADE, nuade): the engine each resolves to, its default, the choices it offers and the measured scores. format filters by preference key or nuade player id.',
+    { format: z.string().optional().describe('Preference key (soundmon) or nuade player id (mmdc)') },
+    (p) => call('get_format_engines', p),
+  );
+
+  server.tool(
+    'set_format_engine',
+    'Choose the engine one format plays on: native (Our Engine, dual formats only), uade or nuade. When the loaded song is of that format it is opened again on the new engine at the same position.',
+    { format: z.string().describe('Preference key (soundmon) or nuade player id (mmdc)'), engine: z.enum(['native', 'uade', 'nuade']) },
+    (p) => call('set_format_engine', p),
+  );
+
+  server.tool(
     'get_format_state',
     'Get format-specific state: editor mode, loaded WASM engines, Furnace/Hively/SID metadata, SongDB info',
     {},
@@ -2184,6 +2198,8 @@ export function createMcpServer(): McpServer {
           { tool: 'get_synth_errors', description: 'Get synth error log' },
           { tool: 'dismiss_errors', description: 'Dismiss error notifications' },
           { tool: 'get_format_state', description: 'Format-specific state' },
+          { tool: 'get_format_engines', description: 'Per-format engine choice (Our Engine, UADE, nuade)' },
+          { tool: 'set_format_engine', description: 'Choose the engine a format plays on' },
           { tool: 'get_midi_state', description: 'MIDI device state' },
           { tool: 'get_oscilloscope_info', description: 'Oscilloscope state' },
           { tool: 'get_arrangement_state', description: 'Arrangement timeline state' },

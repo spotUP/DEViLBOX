@@ -18,6 +18,8 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { UADEEngine, UADEMetadata } from '@/engine/uade/UADEEngine';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { resolvedFormatEngines } from '@/engine/nuade/nuadeRouting';
+import { applyNuadeChoice } from './parsers/withNuade';
 
 // Re-export state accessors from PatternExtractor for backwards compatibility
 export { getLastPatternHash, getLastLibOpenMPTMetadata } from './parsers/PatternExtractor';
@@ -50,7 +52,9 @@ export async function parseModuleToSong(file: File, requestedSubsong?: number, p
   // Absent: the format picks (a command-stream file opens on its first tune that sounds); UADE counts from 0.
   const subsong = requestedSubsong ?? 0;
   let buffer = await file.arrayBuffer();
-  const prefs = getFormatEngine();
+  const explicitPrefs = getFormatEngine();
+  // The routes read plain native/uade values for every key; the table's keys resolve through the one resolver.
+  const prefs = resolvedFormatEngines(explicitPrefs);
 
   // ── Gzip auto-detection ────────────────────────────────────────────────────
   // Many Amiga archives are gzip-compressed (magic bytes 0x1f 0x8b).
@@ -107,7 +111,7 @@ export async function parseModuleToSong(file: File, requestedSubsong?: number, p
 
   const { tryRouteFormat } = await import('./parsers/AmigaFormatParsers');
   const routed = await tryRouteFormat(buffer, filename, file.name, prefs, subsong, preScannedMeta, companionFiles, uadeEngine, requestedSubsong);
-  if (routed) return routed;
+  if (routed) return await applyNuadeChoice(routed, { registryKey: fmt?.key, buffer, fileName: file.name, companions: companionFiles, prefs: explicitPrefs });
 
   // ── Final fallback: libopenmpt + UADE ──────────────────────────────────────
   // MOD files can be routed to UADE for authentic Amiga playback

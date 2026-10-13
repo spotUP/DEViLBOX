@@ -69,7 +69,7 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   if (desc?.key === 'ActionamicsReplayer') return at('actionamics-module');
   if (desc?.key === 'ActivisionProReplayer') return at('activisionPro-module');
   if (desc && isTrackIndexEngine(desc.key)) return at('track-index');
-  if (desc?.gridCellEdits) return at('grid-cell');
+  if (desc?.gridCellEdits || desc?.gridCellEditsWhen?.(song)) return at('grid-cell');
   if (desc?.liveSwap) return at('engine-swap');
   if (desc?.key === 'HippelSt') return at('hippelst-module');
   if (desc?.key === 'EaglePlayer' && song.eaglePlayerId && hasModuleEncoder(song)) return at('eagleplayer-module');

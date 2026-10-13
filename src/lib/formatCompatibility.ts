@@ -264,7 +264,7 @@ export function getActiveFormatLimits(): FormatConstraints | null {
       fmt.organyaFileData || fmt.sawteethFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData ||
       fmt.pumaTrackerFileData || fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData ||
       fmt.sd2FileData || fmt.symphonieFileData || fmt.v2mFileData || fmt.ayFileData || fmt.piyoPiyoFileData ||
-      fmt.tfmFileData || fmt.sndhFileData || fmt.hippelStFileData || fmt.gmeFileData || fmt.s98FileData || fmt.stoneTrackerFileData || fmt.musicMakerFileData || fmt.eaglePlayerFileData
+      fmt.tfmFileData || fmt.sndhFileData || fmt.hippelStFileData || fmt.gmeFileData || fmt.s98FileData || fmt.stoneTrackerFileData || fmt.musicMakerFileData || fmt.eaglePlayerFileData || fmt.nuadeFileData
     );
     if (!hasNative) return null;
 
@@ -272,7 +272,7 @@ export function getActiveFormatLimits(): FormatConstraints | null {
     // data model - 192-row MIDI bars, 3-voice row walks - and their own
     // encoders. The MOD 'safe default' below warned 'Format Compatibility' on
     // merely loading MIDI.Cartoons 1 (2026-10-06): no MOD limits for them.
-    if (fmt.eaglePlayerFileData) return null;
+    if (fmt.eaglePlayerFileData || fmt.nuadeFileData) return null;
 
     // Detect format from editorMode or fileData
     if (fmt.hivelyFileData) return FORMAT_LIMITS.HVL ?? null;

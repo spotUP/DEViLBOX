@@ -21,6 +21,8 @@ import { useAudioStore } from '../../stores/useAudioStore';
 import { useMixerStore } from '../../stores/useMixerStore';
 import { useHistoryStore } from '../../stores/useHistoryStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { effectiveFormatEngine } from '../../engine/nuade/nuadeRouting';
+import { NUADE_ENGINE_CREDIT } from '../../engine/nuade/nuadeFormats';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useOscilloscopeStore } from '../../stores/useOscilloscopeStore';
 import { useInstrumentTypeStore } from '../../stores/useInstrumentTypeStore';
@@ -1543,6 +1545,9 @@ export function getFormatState(): Record<string, unknown> {
     editorMode: format.editorMode,
     // What plays the loaded song, by the router's rule (see playingEngineFor).
     playingEngine: playingEngineFromStores(format as unknown as Record<string, unknown>, useInstrumentStore.getState().instruments),
+    // The nuade player and credit of a song that plays through nuade (NuadeEngine); null for any other.
+    nuadePlayerId: format.nuadePlayerId,
+    engineCredit: format.nuadePlayerId ? NUADE_ENGINE_CREDIT : null,
     hasFurnaceNative: !!format.furnaceNative,
     hasHivelyNative: !!format.hivelyNative,
     hivelyMeta: format.hivelyMeta,
@@ -1552,7 +1557,7 @@ export function getFormatState(): Record<string, unknown> {
     sidMetadata: format.sidMetadata,
     hasOriginalModuleData: !!format.originalModuleData,
     originalModuleFormat: format.originalModuleData?.format ?? null,
-    sunTronicEnginePref: useSettingsStore.getState().formatEngine.suntronic,
+    sunTronicEnginePref: effectiveFormatEngine(useSettingsStore.getState().formatEngine, 'suntronic'),
     // The companion files registered for UADE, by the name the player opens.
     // What the resolver found is otherwise invisible from outside; a two-file
     // format that fails needs this to say whether the samples arrived.
