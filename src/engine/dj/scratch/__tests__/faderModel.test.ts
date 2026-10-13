@@ -5,9 +5,11 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  faderGainAt, faderWindowsMs, cutsPerBeat, faderRampSec, faderCurve, applyFaderGain,
+  faderGainAt, faderWindowsMs, cutsPerBeat, faderRampSec, applyFaderGain,
   crossfaderPositionFor, cycleMs, BATTLE_CUT_IN, FADER_RAMP_MS,
 } from '../scratchFaderModel';
+// the transfer curve is the demo port's (turntable.py fader_curve, PG-K F5): one curve, not a second copy here
+import { faderCurve } from '../scratchRender';
 import { getGesture } from '../scratchGestureCatalog';
 
 describe('faderGainAt (SCR-P1.4)', () => {

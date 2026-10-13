@@ -59,6 +59,12 @@ export const TT_PERFORMERS = {
   lofi_drag: { stiffness: 35.0, damping: 12.0, strength: 0.7, radius: 0.75 },
 } as const;
 
+/**
+ * `GRIP_STATES` (turntable.py :99, T8): the hand's grip per state. The demo defines the table and reads it nowhere
+ * (a hand path carries its own grip per point); kept as the demo has it.
+ */
+export const TT_GRIP_STATES = { free: 0.0, touch: 0.35, grip: 1.0, drag: 0.6, release: 0.0 } as const;
+
 export type TtDeck = keyof typeof TT_DECKS;
 export type TtSlipmat = keyof typeof TT_SLIPMATS;
 export type TtRecord = keyof typeof TT_RECORDS;
@@ -171,6 +177,9 @@ export interface TtSimOptions {
   tier?: 'a500' | 'a1200' | 'offline';
   platterTarget?: number; warp?: number; eccentricity?: number; quartz?: boolean;
   grooveDrag?: number; motorNoise?: number; seed?: number;
+  /** Needle skip (T10, turntable.py :164-175): a hand over-acceleration (|alpha_r| > 8) may jump a groove for 6 ms,
+   *  with probability skip x 0.02 per control step. 0 = never (the demo's renders never set it). */
+  skip?: number;
   /** The record's starting velocity (the reference starts it locked to the platter: `platter_target`). */
   recordStart?: number;
 }
@@ -189,7 +198,7 @@ export interface TtSimResult {
 }
 
 /** Reachability sentinel: simulations run. */
-export const turntableSimStats = { runs: 0 };
+export const turntableSimStats = { runs: 0, cartridgeResponses: 0 };
 
 export function simulate(handPath: readonly TtHandPoint[], durSec: number, rate: number = TT_RATE, opts: TtSimOptions = {}): TtSimResult {
   turntableSimStats.runs++;
@@ -200,7 +209,7 @@ export function simulate(handPath: readonly TtHandPoint[], durSec: number, rate:
   const ct = TT_CARTRIDGES[opts.cartridge ?? 'battle'];
   const platterTarget = opts.platterTarget ?? TT_NOMINAL;
   const warp = opts.warp ?? 0, eccentricity = opts.eccentricity ?? 0, quartz = !!opts.quartz;
-  const grooveDrag = opts.grooveDrag ?? 0, motorNoise = opts.motorNoise ?? 0;
+  const grooveDrag = opts.grooveDrag ?? 0, motorNoise = opts.motorNoise ?? 0, skip = opts.skip ?? 0;
   const cr = controlRate(opts.tier);
   const nCtrl = Math.max(4, Math.trunc(durSec * cr));
   const dt = 1.0 / cr;
@@ -232,6 +241,8 @@ export function simulate(handPath: readonly TtHandPoint[], durSec: number, rate:
   for (let k = 0; k < nCtrl; k++) mnoise[k] = rng.uniform(-1, 1);
   for (let k = 0; k < nCtrl; k++) mnoise[k] = motorNoise * (0.004 * mnoise[k]! + 0.003 * Math.sin(2 * Math.PI * 8.0 * tc[k]! * durSec));
   const clip = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+  let skipLeft = 0;
+  let alphaRPrev = 0;
   for (let k = 0; k < nCtrl; k++) {
     // motor servo
     const err = platterTarget * warpMod[k]! - pv;
@@ -247,15 +258,50 @@ export function simulate(handPath: readonly TtHandPoint[], durSec: number, rate:
     const hand = clip(g * (pf.stiffness * (tgtAngle[k]! - ra) / rate + pf.damping * (tgtVel[k]! - rv)), -maxHt, maxHt);
     // stylus drag
     const stylus = ct.stylus_drag * Math.tanh(rv / 0.05) * (1.0 + grooveDrag * Math.abs(rv));
+    // the needle skip (opt-in): the generator is drawn only when the earlier terms hold (Python's `and`)
+    if (skip > 0 && skipLeft === 0 && Math.abs(k ? alphaRPrev : 0.0) > 8.0 && rng.rand() < skip * 0.02) {
+      skipLeft = Math.trunc(0.006 * cr);
+    }
     // integrate record + platter
     const alphaR = (hand + fric - stylus) / Ir;
     const alphaP = (motor - dk.bearing * pv - fric) / Ip;
+    alphaRPrev = alphaR;
     rv += alphaR * dt;
+    if (skipLeft > 0) {
+      // jump the groove briefly: np.sign(rv or 1)
+      ra += 0.02 * rate * dt * (rv === 0 ? 1 : Math.sign(rv));
+      skipLeft -= 1;
+    }
     pv += alphaP * dt;
     ra += rv * rate * dt;
     recV[k] = rv; plaV[k] = pv; slipV[k] = pv - rv; recA[k] = ra;
   }
   return { t: tc, recordVel: recV, platterVel: plaV, slipVel: slipV, recordAngle: recA, surface: ct.surface, bw: ct.bw, durSec, controlRate: cr };
+}
+
+/** turntable.py `_lp`: a one-pole low-pass, cutoff capped at 0.45 x the rate. */
+export function cartridgeLp(x: ArrayLike<number>, fc: number, rate: number): Float64Array {
+  const a = Math.exp(-2 * Math.PI * Math.min(fc, rate * 0.45) / rate);
+  const y = new Float64Array(x.length);
+  let acc = 0.0;
+  for (let i = 0; i < x.length; i++) { acc = a * acc + (1 - a) * x[i]!; y[i] = acc; }
+  return y;
+}
+
+/**
+ * turntable.py `cartridge_response` (T6): band-limit to the cartridge's bandwidth; a worn or heavy-tracking stylus
+ * adds tracking distortion and a darker top. The demo never calls it in a render (owner decision 2026-10-12, T6:
+ * ported as an available function, applied nowhere).
+ */
+export function cartridgeResponse(x: ArrayLike<number>, rate: number, cartridge: TtCartridge = 'battle'): Float64Array {
+  turntableSimStats.cartridgeResponses++;
+  const ct = TT_CARTRIDGES[cartridge];
+  let y = cartridgeLp(x, ct.bw, rate);
+  if (cartridge === 'worn_stylus' || cartridge === 'heavy_tracking') {
+    for (let i = 0; i < y.length; i++) y[i] = Math.tanh(y[i]! * 1.3) / 1.3;
+    y = cartridgeLp(y, ct.bw * 0.8, rate);
+  }
+  return y;
 }
 
 /** A track at audio-rate index `i` of `n` (the reference's `np.interp(linspace(0, 1, n), tc, track)`). */

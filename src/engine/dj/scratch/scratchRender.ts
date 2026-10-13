@@ -204,12 +204,45 @@ export function cutPattern(name: string, cuts = 4): Array<[number, number]> {
 }
 
 /** turntable.py `fader_from_pattern` (no contact bounce, no lag, right deck) through `fader_curve`. */
-export function faderFromPattern(pattern: ReadonlyArray<readonly [number, number]>, n: number, rate: number, opts: { curve?: keyof typeof FADER_CURVES; hamster?: boolean; rampMs?: number; offsetMs?: number } = {}): Float64Array {
-  const g = new Float64Array(n);
+/**
+ * turntable.py `fader_curve` (F5): fader position 0..1 -> gain. Below `cutIn` silent, then concave to full; `hamster`
+ * flips the direction. An unknown curve name is the sharp curve (exponent 6), as the demo's `.get(mode, 6.0)`.
+ */
+export function faderCurve(position: number, mode: string = 'battle', cutIn = 0.03, hamster = false): number {
+  let p = hamster ? 1.0 - position : position;
+  p = (p - cutIn) / Math.max(1e-6, 1.0 - cutIn);
+  p = Math.min(Math.max(p, 0.0), 1.0);
+  const exp = (FADER_CURVES as Record<string, number>)[mode] ?? 6.0;
+  return 1.0 - (1.0 - p) ** exp;
+}
+
+/** three_deck.py `FADER_ASSIGN` (F6): each deck's fader side. */
+export const FADER_ASSIGN = { A: 'XFADER_LEFT', B: 'XFADER_RIGHT', C: 'SCRATCH_CUT' } as const;
+
+/** Options of `fader_from_pattern` past the ones `render_gesture` passes (F6; the demo's renders never set them). */
+export interface FaderPatternOptions {
+  curve?: string; hamster?: boolean; rampMs?: number; offsetMs?: number;
+  /** `cut_in`: accepted and unused, as in the demo (the envelope is shaped with cut_in 0). */
+  cutIn?: number;
+  /** Worn-fader flutter at each cut edge (0..1). */
+  contactBounce?: number;
+  /** Mechanical fader lag, ms. */
+  lagMs?: number;
+  /** Which side of the throw is the open deck: 'left' inverts open and closed. */
+  deck?: 'left' | 'right';
+  seed?: number;
+}
+
+export function faderFromPattern(pattern: ReadonlyArray<readonly [number, number]>, n: number, rate: number, opts: FaderPatternOptions = {}): Float64Array {
+  let g = new Float64Array(n);
   const off = Math.trunc((opts.offsetMs ?? 0) * 1e-3 * rate);
   const r = Math.max(1, Math.trunc((opts.rampMs ?? 1.0) * 1e-3 * rate));
+  const bounce = opts.contactBounce ?? 0;
+  const rng = bounce > 0 ? new NumpyRandomState((opts.seed ?? 0) >>> 0) : null;
+  // left-deck assignment (s.43): the open side flips
+  const hamster = opts.deck === 'left' ? !opts.hamster : !!opts.hamster;
   let windows: ReadonlyArray<readonly [number, number]> = pattern;
-  if (opts.hamster) {
+  if (hamster) {
     const comp: Array<[number, number]> = [];
     let cur = 0.0;
     for (const [a, b] of [...pattern].sort((p, q) => p[0] - q[0] || p[1] - q[1])) {
@@ -230,10 +263,24 @@ export function faderFromPattern(pattern: ReadonlyArray<readonly [number, number
     const up = linspace(0, 1, rr), down = linspace(1, 0, rr);
     for (let i = 0; i < rr; i++) g[s + i] = up[i]!;
     for (let i = 0; i < rr; i++) g[e - rr + i] = down[i]!;
+    if (rng) {
+      // worn-fader flutter at the edges: the generator draws the offset, then the depth only when it lands inside
+      for (const edge of [s, e]) {
+        const bp = edge + Math.trunc(rng.uniform(-1, 1) * rr);
+        if (bp >= 0 && bp < n) g[bp] = g[bp]! * (1.0 - bounce * rng.rand());
+      }
+    }
   }
-  // fader_curve(g, curve, cut_in = 0): 1 - (1 - clip(p, 0, 1)) ** exp
-  const exp = FADER_CURVES[opts.curve ?? 'battle'];
-  for (let i = 0; i < n; i++) g[i] = 1.0 - (1.0 - clip01(g[i]! / Math.max(1e-6, 1.0))) ** exp;
+  if ((opts.lagMs ?? 0) > 0) {
+    // mechanical fader lag: the envelope arrives L samples late
+    const L = Math.max(1, Math.trunc(opts.lagMs! * 1e-3 * rate));
+    const lagged = new Float64Array(n);
+    for (let i = L; i < n; i++) lagged[i] = g[i - L]!;
+    g = lagged;
+  }
+  // shape the whole envelope through the transfer curve (cut_in 0, no flip)
+  const curve = opts.curve ?? 'battle';
+  for (let i = 0; i < n; i++) g[i] = faderCurve(g[i]!, curve, 0.0, false);
   return g;
 }
 
