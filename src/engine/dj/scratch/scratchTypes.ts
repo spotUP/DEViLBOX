@@ -216,6 +216,9 @@ export interface ScratchRenderSpec {
   /** Statement and chop (C16, `cues_with_word_emphasis`): 'phrase' reads the whole record from its first sample,
    *  'word' its last word (`word_source`). */
   slice?: 'phrase' | 'word';
+  /** three_deck.render's own grid (the Three Deck Showcase): a gesture lasts steps x int(rate x 60 / (bpm x 4))
+   *  samples. Omitted: the chain's rule (the live three-deck routine on the track's float step). */
+  stepSamples?: number;
 }
 
 /** The slice of a crate record the gesture compatibility rule needs

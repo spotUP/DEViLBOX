@@ -17,7 +17,7 @@ import * as DJActions from '@/engine/dj/DJActions';
 import { clockNowMs, deckPositionAt } from '@/engine/audioLatency';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import * as Tone from 'tone';
-import { deckCMotionNow, angleToRevolutions, subscribeDeckCMotion } from '@/engine/dj/scratch/deckCMotion';
+import { deckCPlatterRadians, subscribeDeckCMotion } from '@/engine/dj/scratch/deckCMotion';
 import './DeckCssTurntable.css';
 
 interface DeckCssTurntableProps {
@@ -123,9 +123,9 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
       // D1: Deck C's platter follows the Auto Scratch strokes (the demo's viz capture): their record velocity
       // integrated, nominal between strokes; the deck's own clock otherwise
-      const strokeMotion = deckId === 'C' && !isScratchActiveRef.current ? deckCMotionNow(Tone.getContext().rawContext.currentTime) : null;
-      if (strokeMotion) {
-        angleRef.current = angleToRevolutions(strokeMotion.angle) * 2 * Math.PI;
+      const strokeAngle = deckId === 'C' && !isScratchActiveRef.current ? deckCPlatterRadians(Tone.getContext().rawContext.currentTime) : null;
+      if (strokeAngle !== null) {
+        angleRef.current = strokeAngle;
       } else if (playing || isScratchActiveRef.current) {
         if (physics && (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive)) {
           const rate = physics.rateFor(dt);

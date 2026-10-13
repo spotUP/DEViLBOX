@@ -10,6 +10,8 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useViewActive } from '@hooks/useFrameGate';
 import { platterPositionSec } from './DeckCssTurntable';
+import * as Tone from 'tone';
+import { deckCPlatterRadians, onDeckCMotionPlaced, subscribeDeckCMotion } from '@/engine/dj/scratch/deckCMotion';
 import { useThemeStore } from '@stores';
 import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
@@ -116,7 +118,22 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     wakePositionRef.current = wakePosition;
     wakePosition();
     const unsubAnchor = useDJStore.subscribe((s) => s.decks[deckId].positionAnchor, wakePosition);
-    const unsubPos = () => { cancelAnimationFrame(posRaf); unsubAnchor(); wakePositionRef.current = null; };
+    // D1: Deck C's platter follows the strokes it plays (Auto Scratch, the Three Deck Showcase) - the same angle
+    // the CSS turntable shows - every frame while they drive it; asleep otherwise, woken by a placed stroke.
+    let motionRaf = 0;
+    const followMotion = () => {
+      motionRaf = 0;
+      if (!viewActiveRef.current) return;
+      const rad = deckCPlatterRadians(Tone.getContext().rawContext.currentTime);
+      bridgeRef.current?.post({ type: 'angle', rad });
+      if (rad !== null) motionRaf = requestAnimationFrame(followMotion);
+      else wakePosition();
+    };
+    const wakeMotion = () => { if (!motionRaf) motionRaf = requestAnimationFrame(followMotion); };
+    const unsubMotion = deckId === 'C' ? onDeckCMotionPlaced(wakeMotion) : () => undefined;
+    const unsubMotionView = deckId === 'C' ? subscribeDeckCMotion() : () => undefined;
+    if (deckId === 'C') { wakeMotion(); wakePositionRef.current = () => { wakePosition(); wakeMotion(); }; }
+    const unsubPos = () => { cancelAnimationFrame(posRaf); cancelAnimationFrame(motionRaf); unsubAnchor(); unsubMotion(); unsubMotionView(); wakePositionRef.current = null; };
 
     // Pattern scratch velocity → turntable spin.
     // When a scratch pattern is active, forward velocity to the worker so the

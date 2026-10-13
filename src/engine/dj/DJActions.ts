@@ -1292,6 +1292,62 @@ export async function juggleNowAutoDJ(): Promise<import('./autodj/juggle/juggleT
   return getAutoDJ().juggleNow();
 }
 
+// ============================================================================
+// THREE DECK SHOWCASE (owner decision 2026-10-13)
+// ============================================================================
+
+let showcasePlayer: import('./scratch/threeDeckShowcasePlayer').ThreeDeckShowcasePlayer | null = null;
+const showcaseRenders = new Map<string, Promise<import('./scratch/threeDeckShowcase').ShowcaseRender>>();
+
+/**
+ * The Three Deck Showcase player: the demo's whole three_deck render (Deck C's routine and its own A/B juggle
+ * layer) on the mixer's sampler input while the set holds - the playing decks paused (instantly, the Auto DJ with
+ * them) and resumed where they stopped when it ends. The DJ mixer is never touched.
+ */
+export async function getThreeDeckShowcase(): Promise<import('./scratch/threeDeckShowcasePlayer').ThreeDeckShowcasePlayer> {
+  if (showcasePlayer) return showcasePlayer;
+  const { ThreeDeckShowcasePlayer, appShowcaseRenderIO } = await import('./scratch/threeDeckShowcasePlayer');
+  const { renderThreeDeckShowcase } = await import('./scratch/threeDeckShowcase');
+  const { getScratchVoicePool } = await import('./scratch/scratchVoicePool');
+  const decks: readonly DeckId[] = ['A', 'B', 'C'];
+  showcasePlayer ??= new ThreeDeckShowcasePlayer({
+    ctx: () => Tone.getContext().rawContext as BaseAudioContext,
+    destination: () => getDJEngine().mixer.samplerInput,
+    playingDecks: () => decks.filter((id) => useDJStore.getState().decks[id].isPlaying),
+    autoDJTransitioning: () => { const s = useDJStore.getState(); return s.autoDJEnabled && s.autoDJStatus === 'transitioning'; },
+    autoDJTransitionDone: () => new Promise<void>((resolve) => {
+      const unsubscribe = useDJStore.subscribe((s) => { if (s.autoDJStatus !== 'transitioning') { unsubscribe(); resolve(); } });
+    }),
+    hold: async (ids) => { for (const id of ids) await togglePlay(id, { spinDownMs: 0 }); },
+    resume: async (ids) => {
+      for (const id of ids) if (!useDJStore.getState().decks[id].isPlaying) await togglePlay(id, { quantize: false });
+      if (useDJStore.getState().autoDJEnabled) existingAutoDJ()?.resume();
+    },
+    render: (params) => {
+      // one render per parameter set and record reading (the S950 grit switch reads the crate differently)
+      const key = JSON.stringify({ ...params, grit: getScratchVoicePool().grit });
+      let r = showcaseRenders.get(key);
+      if (!r) {
+        r = appShowcaseRenderIO().then((io) => renderThreeDeckShowcase(io, params));
+        showcaseRenders.set(key, r);
+        r.catch(() => showcaseRenders.delete(key));
+      }
+      return r;
+    },
+  });
+  return showcasePlayer;
+}
+
+/** Start the Three Deck Showcase, or end it (the set resumes at once). */
+export async function toggleThreeDeckShowcase(): Promise<import('./scratch/threeDeckShowcasePlayer').ShowcaseState> {
+  return (await getThreeDeckShowcase()).toggle();
+}
+
+/** The showcase player if it has been created (views read it without creating one). */
+export function threeDeckShowcaseIfCreated(): import('./scratch/threeDeckShowcasePlayer').ThreeDeckShowcasePlayer | null {
+  return showcasePlayer;
+}
+
 /** Skip to the next Auto DJ track with a short transition. */
 export async function skipAutoDJ(): Promise<void> {
   const { getAutoDJ } = await import('./DJAutoDJ');

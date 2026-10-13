@@ -2605,6 +2605,13 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'dj_three_deck_showcase',
+    "Three Deck Showcase (the DJ view's button): plays the Up Rough demo's whole three-deck render - Deck C's 32-bar scratch routine and its own A/B beat-juggle layer on two hip-hop records - while the set holds. The playing decks pause instantly (the Auto DJ with them) and resume where they stopped when the render ends; the DJ mixer is not touched and only one beat sounds. Waits for an Auto DJ transition to finish first. Call again to end it early. Returns the state: status (rendering, waiting, playing, idle), the held decks, the duration, or the reason it did not play.",
+    {},
+    (p) => call('dj_three_deck_showcase', p),
+  );
+
+  server.tool(
     'set_auto_dj_config',
     "Set the Auto DJ's performer settings (the Auto DJ panel's selects). scratchRender is the demo's Render mode: 'section' scratches the overlay over each section, 'three_deck' (default) plays the 32-bar three-deck routine back to back (the A/B juggle only while Deck C is out), 'dj_routine' plays the 32-bar scratch DJ routine back to back. Returns the settings now in force.",
     {

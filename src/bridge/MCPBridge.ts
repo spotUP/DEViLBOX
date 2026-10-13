@@ -206,7 +206,7 @@ import {
   djVolume, djMasterVolume,
   djPitch, djKeyLock, djNudge,
   djLoop, djLoopClear,
-  djAutoDJEnable, djAutoDJDisable, djAutoDJSkip, djAutoDJJuggleNow, setAutoDJConfig,
+  djAutoDJEnable, djAutoDJDisable, djAutoDJSkip, djAutoDJJuggleNow, djThreeDeckShowcase, setAutoDJConfig,
   djDuck, djUnduck,
   getAutoDJExplain,
 } from './handlers/djHandlers';
@@ -530,6 +530,7 @@ const handlers: Record<string, Handler> = {
   dj_auto_dj_disable: djAutoDJDisable,
   dj_auto_dj_skip: djAutoDJSkip,
   dj_auto_dj_juggle_now: djAutoDJJuggleNow,
+  dj_three_deck_showcase: djThreeDeckShowcase,
   set_auto_dj_config: setAutoDJConfig,
   dj_auto_dj_explain: getAutoDJExplain,
   dj_duck: djDuck,

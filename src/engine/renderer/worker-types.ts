@@ -232,6 +232,8 @@ export type TurntableMsg =
   | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; colors: DeckColorsExt; deckId: 'A' | 'B' | 'C'; isPlaying: boolean; effectiveBPM: number }
   | { type: 'playback'; isPlaying: boolean; effectiveBPM: number }
   | { type: 'position'; posSec: number }
+  /** The platter angle set from outside (Deck C's strokes, D1); null hands it back to the deck's own clock. */
+  | { type: 'angle'; rad: number | null }
   | { type: 'velocity'; v: number }
   | { type: 'scratchActive'; active: boolean }
   | { type: 'resize'; w: number; h: number; dpr: number }
