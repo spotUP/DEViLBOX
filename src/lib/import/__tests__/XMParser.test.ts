@@ -628,9 +628,9 @@ function createXMWithDeltaEncodedSample(): ArrayBuffer {
 
 // ── Integration tests against real XM files ───────────────────────────────────
 
-const MODLAND = resolve(import.meta.dirname, '../../../../server/data/modland-cache/files');
-const BIOHAZARD = resolve(MODLAND, 'pub__modules__Fasttracker 2__Loonie__biohazard.xm');
-const CLOUDBERRY = resolve(MODLAND, 'pub__modules__Fasttracker 2__Boo__coop-Loonie__cloudberry fields.xm');
+const MODLAND = resolve(import.meta.dirname, '../../../__tests__/fixtures/classifier-corpus');
+const BIOHAZARD = resolve(MODLAND, 'airwolf-jogeir liljedahl.xm');
+const CLOUDBERRY = resolve(MODLAND, 'banana boat ii-jogeir liljedahl.xm');
 
 function loadXMFile(path: string): ArrayBuffer {
   const buf = readFileSync(path);
@@ -654,15 +654,15 @@ describe('isXMFormat', () => {
   });
 });
 
-describe('parseXMFile — biohazard.xm (Loonie)', () => {
+describe('parseXMFile — airwolf-jogeir liljedahl.xm', () => {
   it('parses without throwing', async () => {
     const ab = loadXMFile(BIOHAZARD);
-    await expect(parseXMFile(ab, 'biohazard.xm')).resolves.toBeDefined();
+    await expect(parseXMFile(ab, 'airwolf-jogeir liljedahl.xm')).resolves.toBeDefined();
   });
 
   it('returns correct format and metadata', async () => {
     const ab = loadXMFile(BIOHAZARD);
-    const song = await parseXMFile(ab, 'biohazard.xm');
+    const song = await parseXMFile(ab, 'airwolf-jogeir liljedahl.xm');
     expect(song.format).toBe('XM');
     expect(song.name.length).toBeGreaterThan(0);
     expect(song.initialBPM).toBeGreaterThan(0);
@@ -673,26 +673,26 @@ describe('parseXMFile — biohazard.xm (Loonie)', () => {
 
   it('has a valid song order list', async () => {
     const ab = loadXMFile(BIOHAZARD);
-    const song = await parseXMFile(ab, 'biohazard.xm');
+    const song = await parseXMFile(ab, 'airwolf-jogeir liljedahl.xm');
     expect(song.songPositions.length).toBeGreaterThan(0);
     expect(song.songLength).toBe(song.songPositions.length);
   });
 
   it('has instruments with PCM sample data', async () => {
     const ab = loadXMFile(BIOHAZARD);
-    const song = await parseXMFile(ab, 'biohazard.xm');
+    const song = await parseXMFile(ab, 'airwolf-jogeir liljedahl.xm');
     const withPcm = song.instruments.filter(
       i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
     );
     expect(withPcm.length).toBeGreaterThan(0);
     let totalPcm = 0;
     for (const inst of withPcm) totalPcm += inst.sample!.audioBuffer!.byteLength;
-    console.log(`biohazard: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
+    console.log(`airwolf: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
   });
 
   it('has patterns with note data', async () => {
     const ab = loadXMFile(BIOHAZARD);
-    const song = await parseXMFile(ab, 'biohazard.xm');
+    const song = await parseXMFile(ab, 'airwolf-jogeir liljedahl.xm');
     expect(song.patterns.length).toBeGreaterThan(0);
     const nonEmpty = song.patterns.some(p =>
       p.channels.some(ch => ch.rows.some(r => r.note > 0))
@@ -701,15 +701,15 @@ describe('parseXMFile — biohazard.xm (Loonie)', () => {
   });
 });
 
-describe('parseXMFile — cloudberry fields.xm (Boo/Loonie)', () => {
+describe('parseXMFile — banana boat ii-jogeir liljedahl.xm (Boo/Loonie)', () => {
   it('parses without throwing', async () => {
     const ab = loadXMFile(CLOUDBERRY);
-    await expect(parseXMFile(ab, 'cloudberry fields.xm')).resolves.toBeDefined();
+    await expect(parseXMFile(ab, 'banana boat ii-jogeir liljedahl.xm')).resolves.toBeDefined();
   });
 
   it('has instruments with PCM sample data', async () => {
     const ab = loadXMFile(CLOUDBERRY);
-    const song = await parseXMFile(ab, 'cloudberry fields.xm');
+    const song = await parseXMFile(ab, 'banana boat ii-jogeir liljedahl.xm');
     const withPcm = song.instruments.filter(
       i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
     );
@@ -717,6 +717,6 @@ describe('parseXMFile — cloudberry fields.xm (Boo/Loonie)', () => {
     let totalPcm = 0;
     for (const inst of withPcm) totalPcm += inst.sample!.audioBuffer!.byteLength;
     expect(totalPcm).toBeGreaterThan(0);
-    console.log(`cloudberry: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
+    console.log(`banana boat: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
   });
 });

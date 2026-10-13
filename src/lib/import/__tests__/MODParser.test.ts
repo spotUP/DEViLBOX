@@ -556,9 +556,10 @@ function createMODWithPatternOrder(order: number[]): ArrayBuffer {
 
 // ── Integration tests against real MOD files ──────────────────────────────────
 
-const MODLAND = resolve(import.meta.dirname, '../../../../server/data/modland-cache/files');
-const AXEL_MOD = resolve(MODLAND, 'pub__modules__Protracker__Axel__axel goes funkey!.mod');
-const SUPERNOVA = resolve(MODLAND, 'pub__modules__Fasttracker__Radix__supernova.mod');
+// Tracked fixtures (src/__tests__/fixtures), so the suite passes in a clean checkout.
+const FIXTURES = resolve(import.meta.dirname, '../../../__tests__/fixtures');
+const AXEL_MOD = resolve(FIXTURES, 'ultraux-vision.mod');
+const SUPERNOVA = resolve(FIXTURES, 'classifier-corpus/space_debris-captain.mod');
 
 function loadMODFile(path: string): ArrayBuffer {
   const buf = readFileSync(path);
@@ -582,15 +583,15 @@ describe('isMODFormat', () => {
   });
 });
 
-describe('parseMODFile — axel goes funkey!.mod (Axel)', () => {
+describe('parseMODFile — ultraux-vision.mod', () => {
   it('parses without throwing', async () => {
     const ab = loadMODFile(AXEL_MOD);
-    await expect(parseMODFile(ab, 'axel goes funkey!.mod')).resolves.toBeDefined();
+    await expect(parseMODFile(ab, 'ultraux-vision.mod')).resolves.toBeDefined();
   });
 
   it('returns correct format and metadata', async () => {
     const ab = loadMODFile(AXEL_MOD);
-    const song = await parseMODFile(ab, 'axel goes funkey!.mod');
+    const song = await parseMODFile(ab, 'ultraux-vision.mod');
     expect(song.format).toBe('MOD');
     expect(song.name.length).toBeGreaterThan(0);
     expect(song.initialBPM).toBeGreaterThan(0);
@@ -601,26 +602,26 @@ describe('parseMODFile — axel goes funkey!.mod (Axel)', () => {
 
   it('has a valid song order list', async () => {
     const ab = loadMODFile(AXEL_MOD);
-    const song = await parseMODFile(ab, 'axel goes funkey!.mod');
+    const song = await parseMODFile(ab, 'ultraux-vision.mod');
     expect(song.songPositions.length).toBeGreaterThan(0);
     expect(song.songLength).toBe(song.songPositions.length);
   });
 
   it('has instruments with PCM sample data', async () => {
     const ab = loadMODFile(AXEL_MOD);
-    const song = await parseMODFile(ab, 'axel goes funkey!.mod');
+    const song = await parseMODFile(ab, 'ultraux-vision.mod');
     const withPcm = song.instruments.filter(
       i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
     );
     expect(withPcm.length).toBeGreaterThan(0);
     let totalPcm = 0;
     for (const inst of withPcm) totalPcm += inst.sample!.audioBuffer!.byteLength;
-    console.log(`axel: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
+    console.log(`ultraux: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
   });
 
   it('has patterns with note data', async () => {
     const ab = loadMODFile(AXEL_MOD);
-    const song = await parseMODFile(ab, 'axel goes funkey!.mod');
+    const song = await parseMODFile(ab, 'ultraux-vision.mod');
     expect(song.patterns.length).toBeGreaterThan(0);
     const nonEmpty = song.patterns.some(p =>
       p.channels.some(ch => ch.rows.some(r => r.note > 0))
@@ -629,15 +630,15 @@ describe('parseMODFile — axel goes funkey!.mod (Axel)', () => {
   });
 });
 
-describe('parseMODFile — supernova.mod (Radix)', () => {
+describe('parseMODFile — space_debris-captain.mod', () => {
   it('parses without throwing', async () => {
     const ab = loadMODFile(SUPERNOVA);
-    await expect(parseMODFile(ab, 'supernova.mod')).resolves.toBeDefined();
+    await expect(parseMODFile(ab, 'space_debris-captain.mod')).resolves.toBeDefined();
   });
 
   it('has instruments with PCM sample data', async () => {
     const ab = loadMODFile(SUPERNOVA);
-    const song = await parseMODFile(ab, 'supernova.mod');
+    const song = await parseMODFile(ab, 'space_debris-captain.mod');
     const withPcm = song.instruments.filter(
       i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
     );
@@ -645,6 +646,6 @@ describe('parseMODFile — supernova.mod (Radix)', () => {
     let totalPcm = 0;
     for (const inst of withPcm) totalPcm += inst.sample!.audioBuffer!.byteLength;
     expect(totalPcm).toBeGreaterThan(0);
-    console.log(`supernova: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
+    console.log(`space_debris: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
   });
 });
