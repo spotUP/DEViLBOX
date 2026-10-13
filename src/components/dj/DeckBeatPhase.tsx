@@ -14,6 +14,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
+import { getBeatPhaseInfo } from '@/engine/dj/DJAutoSync';
+import { useViewActive } from '@/hooks/useFrameGate';
 
 interface DeckBeatPhaseProps {
   deckId: DeckId;
@@ -42,15 +44,23 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
   const rafRef = useRef<number>(0);
   const mountedRef = useRef(true);
 
+  // The lights move with the heard position: every frame while the deck's
+  // clock runs; stopped, once per new position (a seek, a cue), then asleep.
+  // Off screen (DJ view hidden behind another view) nothing runs.
+  const viewActive = useViewActive();
   useEffect(() => {
+    if (!viewActive) return;
     mountedRef.current = true;
+    const moving = () => useDJStore.getState().decks[deckId].positionAnchor.rate !== 0;
 
     const tick = () => {
+      rafRef.current = 0;
       if (!mountedRef.current) return;
-      rafRef.current = requestAnimationFrame(tick);
       // Perf: no polling while the tab is hidden.
-      if (document.hidden) return;
-      const phase = viz.getBeatPhase();
+      if (document.hidden) { rafRef.current = requestAnimationFrame(tick); return; }
+      // Running, the shared per-deck loop has this frame's phase; stopped,
+      // that loop sleeps, so read the new position's phase directly.
+      const phase = moving() ? viz.getBeatPhase() : getBeatPhaseInfo(deckId);
       // The beat in progress (the last beat the heard position crossed).
       const beat = phase && phase.beatInBar >= 0 ? phase.beatInBar % BEAT_COUNT : -1;
       const fraction = phase ? phase.beatFraction : 0;
@@ -59,15 +69,19 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
       brightnessRef.current = beatLightBrightness(fraction);
       const el = beat >= 0 ? overlayRefs.current[beat] : null;
       if (el) el.style.opacity = String(brightnessRef.current);
+      if (moving()) rafRef.current = requestAnimationFrame(tick);
     };
-
-    rafRef.current = requestAnimationFrame(tick);
+    const wake = () => { if (!rafRef.current) rafRef.current = requestAnimationFrame(tick); };
+    const unsub = useDJStore.subscribe((s) => s.decks[deckId].positionAnchor, wake);
+    wake();
 
     return () => {
       mountedRef.current = false;
+      unsub();
       cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
     };
-  }, [deckId, viz]);
+  }, [deckId, viz, viewActive]);
 
   const accentColor = deckAccent(deckId);
   const dimColor = 'rgba(255,255,255,0.08)';

@@ -13,7 +13,8 @@
  * - Skips animation entirely when idle
  */
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { useFrameGate, useViewActive } from './useFrameGate';
 
 // 30fps = ~33.33ms per frame
 export const FRAME_INTERVAL = 1000 / 30;
@@ -42,16 +43,35 @@ interface UseVisualizationAnimationOptions {
    * Default: 10 (after 10 idle frames, check less frequently)
    */
   idleThreshold?: number;
+
+  /**
+   * What the picture follows (hooks/useFrameGate.ts). 'signal' (default): a
+   * meter, scope or spectrum - it stops while the app is silent. 'time': a
+   * playhead, an LFO, a beat flash - it moves without sound, so only the
+   * view being off screen stops it.
+   */
+  follows?: 'signal' | 'time';
+
+  /**
+   * Store subscriptions whose changes alter the picture without sound (a
+   * mute, a label, a theme). While the loop sleeps, each change draws one
+   * frame. Read once, on mount.
+   */
+  redrawOn?: ReadonlyArray<(listener: () => void) => () => void>;
 }
 
 export function useVisualizationAnimation({
   onFrame,
-  enabled = true,
+  enabled: wanted = true,
   fps = 30,
   idleThreshold = 10,
+  follows = 'signal',
+  redrawOn,
 }: UseVisualizationAnimationOptions): {
   isAnimating: React.MutableRefObject<boolean>;
   idleFrames: React.MutableRefObject<number>;
+  /** Draw one frame now if the loop is asleep (a resize cleared the canvas). */
+  invalidate: () => void;
 } {
   const animationRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
@@ -60,12 +80,24 @@ export function useVisualizationAnimation({
   const onFrameRef = useRef(onFrame);
   const frameIntervalRef = useRef(1000 / fps);
   const idleThresholdRef = useRef(idleThreshold);
+  const signalGate = useFrameGate();
+  const viewActive = useViewActive();
+  const enabled = wanted && (follows === 'signal' ? signalGate : viewActive);
 
   // Keep refs up to date via effects (not during render)
   useEffect(() => { onFrameRef.current = onFrame; }, [onFrame]);
   useEffect(() => { frameIntervalRef.current = 1000 / fps; }, [fps]);
   useEffect(() => { idleThresholdRef.current = idleThreshold; }, [idleThreshold]);
 
+  // One frame on demand while the loop sleeps; a running loop draws anyway.
+  const oneShotRef = useRef<number | null>(null);
+  const invalidate = useCallback(() => {
+    if (isAnimatingRef.current || oneShotRef.current !== null) return;
+    oneShotRef.current = requestAnimationFrame((t) => {
+      oneShotRef.current = null;
+      if (!isAnimatingRef.current) onFrameRef.current(t);
+    });
+  }, []);
   // Start/stop animation based on enabled state
   // The animation loop function is defined inside the effect to avoid
   // self-referencing useCallback issues with the React compiler.
@@ -76,6 +108,9 @@ export function useVisualizationAnimation({
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
+      // The picture as it stands now: a mount while asleep, or the last
+      // frame once the signal fell silent.
+      invalidate();
       return;
     }
 
@@ -143,11 +178,22 @@ export function useVisualizationAnimation({
       document.removeEventListener('visibilitychange', onVisibility);
       stopLoop();
     };
-  }, [enabled]);
+  }, [enabled, invalidate]);
+
+  const redrawOnRef = useRef(redrawOn);
+  useEffect(() => {
+    const unsubs = (redrawOnRef.current ?? []).map((subscribe) => subscribe(invalidate));
+    return () => {
+      unsubs.forEach((u) => u());
+      if (oneShotRef.current !== null) cancelAnimationFrame(oneShotRef.current);
+      oneShotRef.current = null;
+    };
+  }, [invalidate]);
 
   return {
     isAnimating: isAnimatingRef,
     idleFrames: idleFramesRef,
+    invalidate,
   };
 }
 
@@ -157,11 +203,14 @@ export function useVisualizationAnimation({
  */
 export function useHighFpsAnimation({
   onFrame,
-  enabled = true,
+  enabled: wanted = true,
 }: {
   onFrame: (timestamp: number) => boolean;
   enabled?: boolean;
 }): React.MutableRefObject<boolean> {
+  // A playback cursor follows sound: it stops with the signal (useFrameGate).
+  const gate = useFrameGate();
+  const enabled = wanted && gate;
   const animationRef = useRef<number | null>(null);
   const isAnimatingRef = useRef<boolean>(false);
   const onFrameRef = useRef(onFrame);

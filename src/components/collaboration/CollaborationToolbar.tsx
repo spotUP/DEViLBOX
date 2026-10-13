@@ -129,7 +129,7 @@ export const CollaborationToolbar: React.FC = () => {
 
       {/* Collab indicator */}
       <div className="flex items-center gap-1.5 text-xs text-accent-success">
-        <div className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse" />
+        <div className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse-brief" />
         <span>Connected</span>
       </div>
 

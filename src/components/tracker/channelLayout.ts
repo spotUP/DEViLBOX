@@ -19,6 +19,18 @@ export const channelLayout: ChannelLayout = {
   numChannels: 0,
 };
 
+const layoutListeners = new Set<() => void>();
+
+/** Writers call this after changing channelLayout, so a sleeping reader redraws. */
+export function notifyChannelLayout(): void {
+  for (const fn of layoutListeners) fn();
+}
+
+export function subscribeChannelLayout(fn: () => void): () => void {
+  layoutListeners.add(fn);
+  return () => { layoutListeners.delete(fn); };
+}
+
 export interface ScopeCell { x: number; w: number }
 
 /**

@@ -8,7 +8,8 @@
  * no forced reflows, no style recalculations.
  */
 
-import React, { useEffect, useRef, memo } from 'react';
+import React, { useCallback, useEffect, useRef, memo } from 'react';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { useTrackerStore, useSettingsStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -76,7 +77,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const meterStates = useRef<MeterState[]>([]);
-  const animationRef = useRef<number | null>(null);
+  const lastTickRef = useRef(0);
   const lastGensRef = useRef<number[]>([]);
   const prevSourceRef = useRef<number[]>([]);
 
@@ -124,32 +125,24 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
     return () => observer.disconnect();
   }, []);
 
-  // Animation loop — always runs (VU meters are lightweight canvas ops,
-  // no need to gate on performanceQuality which can oscillate and kill the loop)
-  useEffect(() => {
-    let lastTickTime = 0;
-
-    const tick = () => {
-      // Perf: no draw work while the tab is hidden; loop stays armed and
-      // resumes on the next visible frame.
-      if (document.hidden) { animationRef.current = requestAnimationFrame(tick); return; }
+  // Meters move only with sound: the shared gated loop (useFrameGate) runs
+  // while the app sounds, through the ~2 s fall-off after it stops.
+  const drawFrame = useCallback((): boolean => {
 
       const canvas = canvasRef.current;
       if (!canvas) {
-        animationRef.current = requestAnimationFrame(tick);
-        return;
+        return false;
       }
 
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        animationRef.current = requestAnimationFrame(tick);
-        return;
+        return false;
       }
 
       // Compute frame delta for time-based decay
       const now = performance.now();
-      const dt = lastTickTime > 0 ? Math.min(now - lastTickTime, 100) : REFERENCE_FRAME_MS; // cap at 100ms to avoid huge jumps
-      lastTickTime = now;
+      const dt = lastTickRef.current > 0 ? Math.min(now - lastTickRef.current, 100) : REFERENCE_FRAME_MS; // cap at 100ms to avoid huge jumps
+      lastTickRef.current = now;
 
       const dpr = window.devicePixelRatio || 1;
       const cw = canvas.width / dpr;
@@ -176,8 +169,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
           triggerLevels = engine.getChannelTriggerLevels(nc);
           triggerGens = engine.getChannelTriggerGenerations(nc);
         } catch {
-          animationRef.current = requestAnimationFrame(tick);
-          return;
+          return false;
         }
       }
       const sl = scrollLeftRef.current;
@@ -319,17 +311,9 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         }
       }
 
-      animationRef.current = requestAnimationFrame(tick);
-    };
-
-    animationRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
-      }
-    };
+      return true;
   }, []);
+  useVisualizationAnimation({ onFrame: drawFrame, fps: 60 });
 
   return (
     <canvas

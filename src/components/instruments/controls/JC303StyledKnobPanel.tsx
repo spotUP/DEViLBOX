@@ -190,7 +190,7 @@ const DB303Scope: React.FC<{ config: TB303Config; instrumentId: number }> = memo
   // 30fps animation via the shared gated hook — pauses when the tab is hidden
   // and backs off when onFrame reports no audio activity (idle scope shows the
   // static filter curve; no need to redraw it every frame).
-  useVisualizationAnimation({ onFrame, fps: 30 });
+  useVisualizationAnimation({ onFrame, fps: 30, follows: 'time' });
 
   return (
     <div ref={containerRef} className="w-full" style={{ height: `${HEIGHT}px` }}>

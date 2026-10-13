@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useUIStore } from '@stores/useUIStore';
 import { notify } from '@stores/useNotificationStore';
+import { isSounding, subscribeSounding } from '@engine/audio/signalPresence';
 
 export type QualityLevel = 'high' | 'medium' | 'low';
 
@@ -78,6 +79,23 @@ function tick(now: number) {
   rafId = requestAnimationFrame(tick);
 }
 
+// The frame rate matters while something plays; with the app silent nothing
+// animates, and counting frames would itself wake the page every frame. The
+// counter runs while the app sounds (engine/audio/signalPresence.ts).
+let unsubSounding: (() => void) | null = null;
+
+function runWhileSounding(): void {
+  if (isSounding() && refCount > 0) {
+    if (rafId) return;
+    lastTime = 0;
+    frameCount = 0;
+    rafId = requestAnimationFrame(tick);
+  } else if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+}
+
 function startCounter() {
   refCount++;
   if (refCount === 1) {
@@ -88,7 +106,8 @@ function startCounter() {
     currentAvgFps = 60;
     counterStartTime = performance.now();
     lastWarningTime = 0;
-    rafId = requestAnimationFrame(tick);
+    unsubSounding = subscribeSounding(runWhileSounding);
+    runWhileSounding();
   }
 }
 
@@ -96,6 +115,8 @@ function stopCounter() {
   refCount--;
   if (refCount <= 0) {
     refCount = 0;
+    unsubSounding?.();
+    unsubSounding = null;
     cancelAnimationFrame(rafId);
     rafId = 0;
   }

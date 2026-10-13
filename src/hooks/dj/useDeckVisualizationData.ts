@@ -13,6 +13,9 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { getBeatPhaseInfo, type PhaseInfo } from '@/engine/dj/DJAutoSync';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import { DECK_SCOPE_CHANNELS } from '@/engine/dj/channelScopeTrack';
+import { useDJStore } from '@/stores/useDJStore';
+import { isSounding, subscribeSounding } from '@/engine/audio/signalPresence';
+import { useViewActive } from '@/hooks/useFrameGate';
 
 export interface DeckVizData {
   waveform: Float32Array | null;
@@ -26,39 +29,65 @@ interface DeckCacheEntry {
   data: DeckVizData;
   refCount: number;
   rafId: number;
+  /** Stops the loop and its wake subscriptions. */
+  stop: () => void;
 }
 
 // Module-level cache: one entry per active deckId
 const deckCaches = new Map<string, DeckCacheEntry>();
 
+function sample(deckId: DeckId, entry: DeckCacheEntry): void {
+  try {
+    const deck = getDJEngine().getDeck(deckId);
+    entry.data.waveform = deck.getWaveform();
+    entry.data.channelWaveforms = deck.getChannelWaveforms(DECK_SCOPE_CHANNELS);
+    entry.data.fft = deck.getFFT();
+    entry.data.level = deck.getLevel();
+  } catch {
+    // Engine not ready — leave previous values (or nulls)
+  }
+
+  try {
+    entry.data.beatPhase = getBeatPhaseInfo(deckId);
+  } catch {
+    entry.data.beatPhase = null;
+  }
+}
+
+/**
+ * The loop reads the deck's analysers every frame while their picture can
+ * change: the deck plays (its beat phase moves even through a silent bar) or
+ * the app sounds (a scratch, a cue, an effect tail on a stopped deck). Else
+ * it takes one last reading and sleeps until either wakes it
+ * (hooks/useFrameGate.ts) - no analyser is read in an idle app.
+ */
 function startLoop(deckId: DeckId, entry: DeckCacheEntry): void {
+  let asleep = false;
+  const live = () => isSounding() || useDJStore.getState().decks[deckId].isPlaying;
   const tick = () => {
     // Perf: skip work while the tab is hidden; loop stays armed.
     if (document.hidden) { entry.rafId = requestAnimationFrame(tick); return; }
-    if (entry.refCount <= 0) {
-      // Don't schedule another frame — loop is done
-      return;
-    }
-
-    try {
-      const deck = getDJEngine().getDeck(deckId);
-      entry.data.waveform = deck.getWaveform();
-      entry.data.channelWaveforms = deck.getChannelWaveforms(DECK_SCOPE_CHANNELS);
-      entry.data.fft = deck.getFFT();
-      entry.data.level = deck.getLevel();
-    } catch {
-      // Engine not ready — leave previous values (or nulls)
-    }
-
-    try {
-      entry.data.beatPhase = getBeatPhaseInfo(deckId);
-    } catch {
-      entry.data.beatPhase = null;
-    }
-
+    if (entry.refCount <= 0) return;
+    sample(deckId, entry);
+    if (live()) entry.rafId = requestAnimationFrame(tick);
+    else asleep = true;
+  };
+  // Wakes for one reading at least (a seek moves the beat phase while
+  // stopped); the tick decides whether to keep going.
+  const wake = () => {
+    if (!asleep) return;
+    asleep = false;
     entry.rafId = requestAnimationFrame(tick);
   };
-
+  const unsubs = [
+    subscribeSounding(wake),
+    useDJStore.subscribe((s) => s.decks[deckId].isPlaying, wake),
+    useDJStore.subscribe((s) => s.decks[deckId].positionAnchor, wake),
+  ];
+  entry.stop = () => {
+    cancelAnimationFrame(entry.rafId);
+    unsubs.forEach((u) => u());
+  };
   entry.rafId = requestAnimationFrame(tick);
 }
 
@@ -78,7 +107,11 @@ export function useDeckVisualizationData(deckId: DeckId): {
   const deckIdRef = useRef(deckId);
   deckIdRef.current = deckId;
 
+  // A DJ view kept mounted behind another view reads nothing.
+  const viewActive = useViewActive();
+
   useEffect(() => {
+    if (!viewActive) return;
     let existing = deckCaches.get(deckId);
     if (!existing) {
       existing = {
@@ -91,6 +124,7 @@ export function useDeckVisualizationData(deckId: DeckId): {
         },
         refCount: 0,
         rafId: 0,
+        stop: () => {},
       };
       deckCaches.set(deckId, existing);
     }
@@ -107,11 +141,11 @@ export function useDeckVisualizationData(deckId: DeckId): {
       if (!entry) return;
       entry.refCount--;
       if (entry.refCount <= 0) {
-        cancelAnimationFrame(entry.rafId);
+        entry.stop();
         deckCaches.delete(deckId);
       }
     };
-  }, [deckId]);
+  }, [deckId, viewActive]);
 
   const getWaveform = useCallback(
     () => deckCaches.get(deckIdRef.current)?.data.waveform ?? null,

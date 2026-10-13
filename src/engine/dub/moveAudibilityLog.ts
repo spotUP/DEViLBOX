@@ -15,6 +15,7 @@
  *   [DubMoveAudit] SILENT combSweep ch0 (ai): input -31.2 -> -30.8, return -38.0 -> -37.5, master -22.1 -> -22.0 dBFS
  */
 import { subscribeDubRouter, subscribeDubRelease } from './DubRouter';
+import { isSounding, subscribeSounding } from '../audio/signalPresence';
 
 type Levels = { input: number; ret: number; master: number };
 export type MoveAuditResult = {
@@ -90,6 +91,23 @@ function tick(): void {
     p.masterSum += lv.master; p.masterN++;
     if (now >= p.endAtMs || (p.held && !p.released && now - p.atMs > HELD_CAP_MS)) { pending.delete(id); finish(p); }
   }
+  runTimer();
+}
+
+/**
+ * The meters are read while the app sounds or a move is being audited. In a
+ * silent app the baseline is silence, so the history is dropped and nothing
+ * reads an analyser (engine/audio/signalPresence.ts).
+ */
+function runTimer(): void {
+  const want = !!meters && (isSounding() || pending.size > 0);
+  if (want && !timer) {
+    timer = setInterval(tick, TICK_MS);
+  } else if (!want && timer) {
+    clearInterval(timer);
+    timer = null;
+    if (meters) { meters.input.hist = []; meters.ret.hist = []; meters.master.hist = []; }
+  }
 }
 
 /** Meter a bus's input and return and the master output, and audit every move fire. */
@@ -101,7 +119,8 @@ export function installMoveAudibilityLog(nodes: { input: AudioNode; ret: AudioNo
   meters = null;
   if (!nodes) return;
   meters = { input: meter(nodes.input), ret: meter(nodes.ret), master: meter(nodes.master) };
-  timer = setInterval(tick, TICK_MS);
+  unsubs.push(subscribeSounding(runTimer));
+  runTimer();
   unsubs.push(subscribeDubRouter((ev) => {
     if (!meters) return;
     const atMs = performance.now();
@@ -111,6 +130,7 @@ export function installMoveAudibilityLog(nodes: { input: AudioNode; ret: AudioNo
       beforeRetPeak: db(Math.max(0, ...meters.ret.hist)), masterSum: 0, masterN: 0,
       endAtMs: ev.isHold ? atMs + HELD_CAP_MS : atMs + ONE_SHOT_MS, held: !!ev.isHold, released: false,
     });
+    runTimer();
   }));
   unsubs.push(subscribeDubRelease((ev) => {
     const p = pending.get(ev.invocationId);

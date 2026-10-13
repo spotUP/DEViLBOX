@@ -10,6 +10,7 @@
 
 import { useUIStore } from '../stores/useUIStore';
 import { useDJStore } from '../stores/useDJStore';
+import { isSounding, subscribeSounding } from '../engine/audio/signalPresence';
 
 // ─── Frame-time ring buffer ──────────────────────────────────────────────────
 
@@ -30,10 +31,28 @@ function frameTick(now: number): void {
   rafId = requestAnimationFrame(frameTick);
 }
 
+/**
+ * Frames are recorded while the app sounds: a silent app draws nothing, and a
+ * recorder that asked for every frame would itself keep the page drawing
+ * (engine/audio/signalPresence.ts).
+ */
+function recordWhileSounding(): void {
+  if (isSounding()) {
+    if (rafId) return;
+    lastFrameTime = 0;
+    rafId = requestAnimationFrame(frameTick);
+  } else if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+}
+
+let recorderInstalled = false;
 function startFrameRecorder(): void {
-  if (rafId) return;
-  lastFrameTime = 0;
-  rafId = requestAnimationFrame(frameTick);
+  if (recorderInstalled) return;
+  recorderInstalled = true;
+  subscribeSounding(recordWhileSounding);
+  recordWhileSounding();
 }
 
 /**
