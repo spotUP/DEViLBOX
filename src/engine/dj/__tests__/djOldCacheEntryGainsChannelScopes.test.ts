@@ -76,7 +76,7 @@ async function realDeck(id: 'A' | 'B') {
   return Object.assign(Object.create(DeckEngine.prototype), {
     id, audioPlayer, replayer: { stop: () => {} }, stemPlayer: { stop: () => {}, disable: () => {} }, _stemMode: false,
     patternScratchActive: false, patternScratchDir: 1, _primeScratchBuffer: async () => {}, _channelScopes: undefined, _loadedWav: null,
-    channelMute: { setStemCount: () => {}, setMask: () => {}, stemCount: 0 },
+    channelMute: { setStems: () => {}, setMask: () => {}, stemCount: 0 },
     keyLock: { setActive: () => {}, setPitchSemiTones: () => {}, latencySec: () => 0 }, // the stretcher insert a real deck always owns
     loadSong: async () => {}, clearLoadedSong: () => {},
   }) as InstanceType<typeof DeckEngine>;

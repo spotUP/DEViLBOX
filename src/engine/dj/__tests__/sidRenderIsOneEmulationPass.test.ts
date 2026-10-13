@@ -52,11 +52,13 @@ describe('a SID render is one emulation pass', () => {
   it('a 2SID (Sparkster - Lakeside) has a stem per voice from the mix pass: the 6 stems sum to the mix', async () => {
     const r = await render('Sparkster-Lakeside_2SID.sid', 20, true);
     const stems = await decodeStemsFlac(r.channelScopes?.flacStems ?? []);
+    const gains = r.channelScopes?.stemGains ?? [];
     expect(stems.length).toBe(6);
     let err = 0, sig = 0;
     for (let i = 0; i < r.left.length; i++) {
       let sum = 0;
-      for (const st of stems) sum += st ? st[0][i] ?? 0 : 0;
+      // A stem is one channel and its pan: its left side is gains[0] x the channel.
+      stems.forEach((st, k) => { sum += st ? (st[0][i] ?? 0) * gains[k][0] : 0; });
       err += (sum - r.left[i]) ** 2;
       sig += r.left[i] ** 2;
     }
@@ -64,11 +66,11 @@ describe('a SID render is one emulation pass', () => {
     expect(10 * Math.log10(err / sig)).toBeLessThan(-40);
   }, 300_000);
 
-  it('a 3SID (Arcade_Memories) renders its 8 stems at a fraction of a pass each, not a pass each', async () => {
+  it('a 3SID (Arcade_Memories) renders its 9 stems at a fraction of a pass each, not a pass each', async () => {
     await render('Commando.sid', 2, false); // warm the WebSID module
     const plain = await render('Arcade_Memories_3SID.sid', 30, false);
     const withStems = await render('Arcade_Memories_3SID.sid', 30, true);
-    expect(withStems.channelScopes?.flacStems?.length).toBe(8);
+    expect(withStems.channelScopes?.flacStems?.length).toBe(9); // every voice (16 stems a deck; 8 before SID-FOLLOWUP-2 a)
     // Eight solo re-renders took ~9x the plain render; one pass with stems (their FLAC encode included) stays well under half of that.
     expect(withStems.ms, `stems ${withStems.ms} ms vs plain ${plain.ms} ms`).toBeLessThan(plain.ms * 4);
   }, 600_000);

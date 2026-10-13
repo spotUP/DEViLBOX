@@ -37,13 +37,19 @@ export interface ChannelScopeTrack {
   /**
    * Each channel's contribution to the rendered mix, rendered through the engine's whole output
    * chain (solo instance, split render or a solo pass): the render worker builds it as stereo
-   * interleaved int16 at the render rate, encoded like the WAV (`stems`, worker only), and ships
-   * and caches it as one lossless stereo FLAC per channel (`flacStems`, channelStemCodec.ts).
+   * interleaved int16 at the render rate, encoded like the WAV (`stems`, worker only), stores it
+   * as ONE channel plus its pan (monoStem: the best one-channel fit, exact for a mono, hard- or
+   * constant-panned channel) and ships and caches it as one lossless mono FLAC per channel
+   * (`flacStems`, channelStemCodec.ts; entries of render version 4 hold stereo FLACs).
    * One per channel the module has, up to DECK_STEM_CHANNELS; an empty one is a channel that never
    * sounds. The deck subtracts a muted channel's stem from the mix (DeckChannelMute) - the
-   * per-channel mute of a rendered deck.
+   * per-channel mute of a rendered deck. Mono, because a deck plays the mix and every stem from
+   * one AudioBuffer (sample-locked through seek, scratch and pitch) and a buffer holds at most 32
+   * channels: 2 + 16 stereo stems would be 34.
    */
   flacStems?: Uint8Array[];
+  /** Each mono stem's pan: its left and right gain (stem L = gains[0] x stem, R = gains[1] x stem). */
+  stemGains?: Array<[number, number]>;
   /** The raw int16 stems: the render worker's working form (and cache entries of track version 2). */
   stems?: Int16Array[];
 }
@@ -55,11 +61,50 @@ export interface ChannelScopeTrack {
  * load), so keeping them here would hold every loaded track's stems twice.
  */
 export function releaseChannelStems(track: ChannelScopeTrack | undefined): void {
-  if (track) { delete track.flacStems; delete track.stems; }
+  if (track) { delete track.flacStems; delete track.stems; } // stemGains stay: a few numbers, read with the buffer
 }
 
-/** Most channels a deck can mute (the pads Mute Ch 1-8); a channel past it has a scope but no stem. */
-export const DECK_STEM_CHANNELS = 8;
+/** Most channels a deck can mute: every channel a deck shows (one mono stem each behind the stereo mix: 2 + 16 <= 32). */
+export const DECK_STEM_CHANNELS = DECK_SCOPE_CHANNELS;
+
+/** A stem as one channel and its pan: L = gains[0] x mono, R = gains[1] x mono. */
+export interface MonoStem {
+  /** int16, encoded like the WAV; empty for a channel that never sounds. */
+  mono: Int16Array;
+  gains: [number, number];
+  /** What the one-channel fit misses, relative to the stem (-Infinity = exact). */
+  residualDb: number;
+}
+
+/**
+ * A stereo stem (interleaved int16) as one channel and a constant pan: the
+ * best rank-one fit (the principal axis of its L/R samples). Exact for a mono
+ * channel (L == R), a hard-panned one (Paula, libopenmpt's MOD channels) and
+ * any constant pan; a channel whose pan moves keeps what the fit misses
+ * (residualDb). The channel is scaled so it cannot clip.
+ */
+export function monoStem(stereo: Int16Array): MonoStem {
+  const n = stereo.length >> 1;
+  let sll = 0, srr = 0, slr = 0;
+  for (let i = 0; i < n; i++) { const l = stereo[2 * i], r = stereo[2 * i + 1]; sll += l * l; srr += r * r; slr += l * r; }
+  if (n === 0 || sll + srr === 0) return { mono: new Int16Array(0), gains: [0, 0], residualDb: -Infinity };
+  const theta = 0.5 * Math.atan2(2 * slr, sll - srr);
+  let a = Math.cos(theta), b = Math.sin(theta);
+  if (a + b < 0) { a = -a; b = -b; }
+  // |a L + b R| <= (|a| + |b|) x 32768: scaled by k it stays in int16.
+  const k = 1 / (Math.abs(a) + Math.abs(b));
+  const mono = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const v = Math.round(k * (a * stereo[2 * i] + b * stereo[2 * i + 1]));
+    mono[i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
+  }
+  const gains: [number, number] = [a / k, b / k];
+  let err = 0;
+  for (let i = 0; i < n; i++) {
+    err += (stereo[2 * i] - gains[0] * mono[i]) ** 2 + (stereo[2 * i + 1] - gains[1] * mono[i]) ** 2;
+  }
+  return { mono, gains, residualDb: err > 0 ? 10 * Math.log10(err / (sll + srr)) : -Infinity };
+}
 
 /** One sample encoded the way the rendered WAV encodes it (DJPipeline encodeWAV), so stem and mix decode alike. */
 function encodeSample(v: number): number {
@@ -67,13 +112,35 @@ function encodeSample(v: number): number {
   return s < 0 ? Math.trunc(s * 0x8000) : Math.trunc(s * 0x7FFF);
 }
 
+/** One full block of a stem: both sides, or one side when the other is silent or the same. */
+interface StemBlock { data: Int16Array; layout: 'lr' | 'same' | 'l' | 'r' }
+
+/** A full stereo block in its smallest exact form (a mono or hard-panned channel keeps one side). */
+function packBlock(stereo: Int16Array): StemBlock {
+  const n = stereo.length >> 1;
+  let same = true, lZero = true, rZero = true;
+  for (let i = 0; i < n && (same || lZero || rZero); i++) {
+    const l = stereo[2 * i], r = stereo[2 * i + 1];
+    if (l !== r) same = false;
+    if (l !== 0) lZero = false;
+    if (r !== 0) rZero = false;
+  }
+  if (!same && !lZero && !rZero) return { data: stereo, layout: 'lr' };
+  const side = lZero && !rZero ? 1 : 0;
+  const one = new Int16Array(n);
+  for (let i = 0; i < n; i++) one[i] = stereo[2 * i + side];
+  return { data: one, layout: lZero && !rZero ? 'r' : rZero && !lZero ? 'l' : 'same' };
+}
+
 /**
  * Collects stems: push every rendered frame of every channel in render order (L and R), then
- * finish with the mix's frame count.
+ * finish with the mix's frame count. A full block is kept in its smallest exact form (one side
+ * for a mono or hard-panned channel), so 16 channels of a long module stay affordable in memory.
  */
 export class ChannelStemsBuilder {
   private static readonly BLOCK = 1 << 16; // frames per block
-  private readonly blocks: Int16Array[][];
+  private readonly blocks: StemBlock[][];
+  private readonly current: Int16Array[];
   private readonly sounds: boolean[];
   private fill = 0;
   private frames = 0;
@@ -81,20 +148,18 @@ export class ChannelStemsBuilder {
 
   constructor(numChannels: number) {
     this.numChannels = numChannels;
-    this.blocks = Array.from({ length: numChannels }, () => [new Int16Array(ChannelStemsBuilder.BLOCK * 2)]);
+    this.blocks = Array.from({ length: numChannels }, () => []);
+    this.current = Array.from({ length: numChannels }, () => new Int16Array(ChannelStemsBuilder.BLOCK * 2));
     this.sounds = new Array<boolean>(numChannels).fill(false);
   }
 
   push(n: number, readL: (ch: number, i: number) => number, readR: (ch: number, i: number) => number): void {
     const BLOCK = ChannelStemsBuilder.BLOCK;
     for (let i = 0; i < n; i++) {
-      if (this.fill === BLOCK) {
-        for (const list of this.blocks) list.push(new Int16Array(BLOCK * 2));
-        this.fill = 0;
-      }
+      if (this.fill === BLOCK) this.closeBlocks();
       const o = this.fill * 2;
       for (let ch = 0; ch < this.numChannels; ch++) {
-        const block = this.blocks[ch][this.blocks[ch].length - 1];
+        const block = this.current[ch];
         const l = encodeSample(readL(ch, i));
         const r = encodeSample(readR(ch, i));
         block[o] = l;
@@ -106,19 +171,51 @@ export class ChannelStemsBuilder {
     }
   }
 
-  /** The stems, each exactly `totalFrames` long (cut or zero-padded to the mix). */
-  finish(totalFrames: number): Int16Array[] {
+  private closeBlocks(): void {
+    for (let ch = 0; ch < this.numChannels; ch++) {
+      this.blocks[ch].push(packBlock(this.current[ch]));
+      this.current[ch] = new Int16Array(ChannelStemsBuilder.BLOCK * 2);
+    }
+    this.fill = 0;
+  }
+
+  /** Channel ch as interleaved stereo, `totalFrames` long (cut or zero-padded to the mix); empty when it never sounds. */
+  private stereoOf(ch: number, totalFrames: number): Int16Array {
+    if (!this.sounds[ch]) return new Int16Array(0);
     const BLOCK = ChannelStemsBuilder.BLOCK;
     const take = Math.min(this.frames, totalFrames);
-    return this.blocks.map((list, ch) => {
-      if (!this.sounds[ch]) return new Int16Array(0);
-      const flat = new Int16Array(totalFrames * 2);
-      for (let b = 0, off = 0; b < list.length && off < take; b++, off += BLOCK) {
-        const n = Math.min(BLOCK, take - off);
-        flat.set(list[b].subarray(0, n * 2), off * 2);
+    const flat = new Int16Array(totalFrames * 2);
+    const all: StemBlock[] = [...this.blocks[ch], { data: this.current[ch], layout: 'lr' as const }];
+    for (let b = 0, off = 0; b < all.length && off < take; b++, off += BLOCK) {
+      const n = Math.min(BLOCK, take - off);
+      const { data, layout } = all[b];
+      if (layout === 'lr') { flat.set(data.subarray(0, n * 2), off * 2); continue; }
+      for (let i = 0; i < n; i++) {
+        const v = data[i];
+        flat[(off + i) * 2] = layout === 'r' ? 0 : v;
+        flat[(off + i) * 2 + 1] = layout === 'l' ? 0 : v;
       }
-      return flat;
+    }
+    return flat;
+  }
+
+  /**
+   * The stems as one channel and a pan each (monoStem), `totalFrames` long; one channel at a
+   * time, its blocks released as it goes, so only one stereo copy is ever held. `keep(ch)` false
+   * = an empty stem (a channel the scopes never heard).
+   */
+  finishMono(totalFrames: number, keep: (ch: number) => boolean = () => true): MonoStem[] {
+    return Array.from({ length: this.numChannels }, (_, ch) => {
+      const stem = keep(ch) ? monoStem(this.stereoOf(ch, totalFrames)) : monoStem(new Int16Array(0));
+      this.blocks[ch] = [];
+      this.current[ch] = new Int16Array(0);
+      return stem;
     });
+  }
+
+  /** The stems as interleaved stereo, each exactly `totalFrames` long (cut or zero-padded to the mix). */
+  finish(totalFrames: number): Int16Array[] {
+    return Array.from({ length: this.numChannels }, (_, ch) => this.stereoOf(ch, totalFrames));
   }
 }
 
@@ -255,7 +352,7 @@ export function showsAllScope(channelScopeCount: number): boolean {
  * version 1: scopes but no stems) is re-rendered once, in the background, for
  * its track.
  */
-export const CHANNEL_SCOPE_RENDER_VERSION = 4; // 2: the track carries the channel stems (SCOPE-MUTE); 3: as FLAC; 4: every channel of the song (was 4), SID = 3 voices per chip
+export const CHANNEL_SCOPE_RENDER_VERSION = 5; // 2: the track carries the channel stems (SCOPE-MUTE); 3: as FLAC; 4: every channel of the song (was 4), SID = 3 voices per chip; 5: a mono stem per channel up to 16 (was stereo, 8)
 
 /** What a re-render for scopes needs from a cache entry. */
 export interface ScopelessOrigin {

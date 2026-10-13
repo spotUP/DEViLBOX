@@ -52,6 +52,9 @@ async function realDeck(id: 'A' | 'B') {
     id, audioPlayer, replayer: { stop: () => {} }, stemPlayer: { stop: () => {}, disable: () => {} }, _stemMode: false,
     patternScratchActive: false, patternScratchDir: 1, _primeScratchBuffer: async () => {},
     loadSong: async () => {}, clearLoadedSong: () => {},
+    // The deck parts a load touches since Key Lock moved onto the deck (842297281) and the channel mute (stems).
+    keyLock: { setActive: () => {} }, keyLockEnabled: false,
+    channelMute: { setStems: () => {}, setMask: () => {}, stemCount: 0 },
   }) as InstanceType<typeof DeckEngine>;
 }
 

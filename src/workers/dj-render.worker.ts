@@ -22,8 +22,8 @@
 
 import { encodeStemFlac } from '@/engine/dj/channelStemCodec';
 import {
-  ChannelScopeTrackBuilder, ChannelStemsBuilder, DECK_SCOPE_CHANNELS, DECK_STEM_CHANNELS, channelScopeTransferables,
-  type ChannelScopeTrack,
+  ChannelScopeTrackBuilder, ChannelStemsBuilder, DECK_SCOPE_CHANNELS, DECK_STEM_CHANNELS, channelScopeTransferables, monoStem,
+  type ChannelScopeTrack, type MonoStem,
 } from '@/engine/dj/channelScopeTrack';
 import { steadyPlayerCallHz, type PlayerCallSample } from '@/engine/dj/sidPlayerClock';
 import { isSidFileBytes, type SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
@@ -38,6 +38,8 @@ interface RenderResult {
   channelScopes?: ChannelScopeTrack;
   /** A SID's steady player call rate (sidPlayerClock.ts); undefined for every other format. */
   playerCallHz?: number;
+  /** The channel stems as one channel and a pan each (from a stems builder; UADE's are channelScopes.stems). */
+  monoStems?: MonoStem[];
 }
 
 interface RenderRequest {
@@ -918,8 +920,8 @@ async function renderWithHively(
   postProgress(id, 85);
   console.log(`[DJRenderWorker/Hively] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames`);
   const track = scopes?.finish();
-  if (track && stems) track.stems = stems.finish(totalFrames);
-  return { left, right, sampleRate, channelScopes: track };
+  const monoStems = track && stems ? stems.finishMono(totalFrames) : undefined;
+  return { left, right, sampleRate, channelScopes: track, monoStems };
 }
 
 // ── WebSID (C64 SID) Engine State ────────────────────────────────────────────
@@ -1231,12 +1233,9 @@ async function renderWithSID(
   postProgress(id, 85);
   console.log(`[DJRenderWorker/WebSID] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames, songEnded: ${songEnded}`);
   const track = scopes?.finish();
-  if (track && stems) {
-    const voiceStems = stems.finish(totalFrames);
-    track.stems = voiceStems.map((st, v) => (track.scales[v] > 0 ? st : new Int16Array(0)));
-  }
+  const monoStems = track && stems ? stems.finishMono(totalFrames, (v) => track.scales[v] > 0) : undefined;
   console.log(`[DJRenderWorker/WebSID] one pass with ${stemVoices} stems: ${Date.now() - t0} ms, player ${playerCallHz?.toFixed(4) ?? '-'} Hz`);
-  return { left, right, sampleRate, channelScopes: track, playerCallHz };
+  return { left, right, sampleRate, channelScopes: track, playerCallHz, monoStems };
 }
 
 /**
@@ -1334,14 +1333,15 @@ async function initLibopenmpt(): Promise<void> {
 
   const baseUrl = self.location.origin;
 
-  // Fetch the libopenmpt emscripten glue (which embeds the WASM as data URL)
-  const jsResponse = await fetch(`${baseUrl}/chiptune3/libopenmpt.worklet.js`);
+  // Fetch the libopenmpt emscripten glue (which embeds the WASM as data URL): libopenmpt 0.8.4 like the
+  // tracker's worklet, built with per-channel taps (third-party/libopenmpt-render).
+  const jsResponse = await fetch(`${baseUrl}/chiptune3/libopenmpt.render.js`);
   let jsCode = await jsResponse.text();
 
   // Transform for worker scope — strip ESM syntax
   jsCode = jsCode.replace(/export\s+default\s+/g, 'var createLibopenmpt = ');
   jsCode = jsCode.replace(/export\s*\{[^}]*\}/g, '');
-  jsCode = jsCode.replace(/import\.meta\.url/g, `"${baseUrl}/chiptune3/libopenmpt.worklet.js"`);
+  jsCode = jsCode.replace(/import\.meta\.url/g, `"${baseUrl}/chiptune3/libopenmpt.render.js"`);
 
   // Execute to get factory
   const factory = new Function(jsCode + '\n;return typeof createLibopenmpt !== "undefined" ? createLibopenmpt : Module;')();
@@ -1409,19 +1409,23 @@ async function renderWithLibopenmpt(
   const leftPtr = lib._malloc(CHUNK * 4);
   const rightPtr = lib._malloc(CHUNK * 4);
 
-  // Each channel's own signal: one solo instance per channel, the way the
-  // libopenmpt worklet feeds its scopes (chiptune3.worklet.js createOscInstance_),
-  // rendered in lockstep with the main module.
-  // One solo per channel the module has (up to DECK_SCOPE_CHANNELS): its scope, and its stem
-  // (stereo, the whole output chain) for the first DECK_STEM_CHANNELS.
-  const solos = createLibopenmptSolos(lib, fileBytes, ext, CHUNK, DECK_SCOPE_CHANNELS);
-  const scopes = solos.length > 0 ? new ChannelScopeTrackBuilder(solos.length, sampleRate) : null;
-  const stemChannels = withStems ? Math.min(solos.length, DECK_STEM_CHANNELS) : 0;
-  const stems = stemChannels > 0 ? new ChannelStemsBuilder(stemChannels) : null;
+  // Each channel's own signal from this same pass: the mixer's per-channel taps (each pattern channel's
+  // share of the mix, its NNA voices included) - its scope, and its stem. One solo instance per channel
+  // re-rendered the whole module once per channel (17 renders for a 16-channel module).
+  const numChannels: number = lib._openmpt_module_get_num_channels(modulePtr);
+  const tapCount = typeof lib._openmpt_module_enable_channel_taps === 'function' ? Math.min(numChannels, DECK_SCOPE_CHANNELS) : 0;
+  if (tapCount > 0) lib._openmpt_module_enable_channel_taps(modulePtr, tapCount);
+  const tapL = tapCount > 0 ? lib._malloc(CHUNK * 4) : 0;
+  const tapR = tapCount > 0 ? lib._malloc(CHUNK * 4) : 0;
+  const tapsL: Float32Array[] = Array.from({ length: tapCount }, () => new Float32Array(CHUNK));
+  const tapsR: Float32Array[] = Array.from({ length: tapCount }, () => new Float32Array(CHUNK));
+  const scopes = tapCount > 0 ? new ChannelScopeTrackBuilder(tapCount, sampleRate) : null;
+  const stems = withStems && tapCount > 0 ? new ChannelStemsBuilder(tapCount) : null;
 
   const chunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
   const MAX_FRAMES = sampleRate * maxSeconds;
+  const tPass = Date.now();
 
   while (totalFrames < MAX_FRAMES) {
     const rendered = lib._openmpt_module_read_float_stereo(modulePtr, sampleRate, CHUNK, leftPtr, rightPtr);
@@ -1436,14 +1440,15 @@ async function renderWithLibopenmpt(
     totalFrames += rendered;
 
     if (scopes) {
-      const counts = solos.map((solo) => Math.max(0, lib._openmpt_module_read_float_stereo(solo.modulePtr, sampleRate, rendered, solo.leftPtr, solo.rightPtr)));
-      const heap = lib.HEAPF32 as Float32Array;
-      scopes.push(rendered, (ch, i) => (i < counts[ch]
-        ? (heap[(solos[ch].leftPtr >> 2) + i] + heap[(solos[ch].rightPtr >> 2) + i]) * 0.5
-        : 0));
-      stems?.push(rendered,
-        (ch, i) => (i < counts[ch] ? heap[(solos[ch].leftPtr >> 2) + i] : 0),
-        (ch, i) => (i < counts[ch] ? heap[(solos[ch].rightPtr >> 2) + i] : 0));
+      for (let ch = 0; ch < tapCount; ch++) {
+        const got = lib._openmpt_module_read_channel_tap(modulePtr, ch, rendered, tapL, tapR);
+        const heap = lib.HEAPF32 as Float32Array;
+        tapsL[ch].fill(0); tapsR[ch].fill(0);
+        tapsL[ch].set(heap.subarray(tapL >> 2, (tapL >> 2) + got));
+        tapsR[ch].set(heap.subarray(tapR >> 2, (tapR >> 2) + got));
+      }
+      scopes.push(rendered, (ch, i) => (tapsL[ch][i] + tapsR[ch][i]) * 0.5);
+      stems?.push(rendered, (ch, i) => tapsL[ch][i], (ch, i) => tapsR[ch][i]);
     }
 
     if (totalFrames % (sampleRate * 5) < CHUNK) {
@@ -1455,11 +1460,8 @@ async function renderWithLibopenmpt(
   lib._free(leftPtr);
   lib._free(rightPtr);
   lib._openmpt_module_destroy(modulePtr);
-  for (const solo of solos) {
-    lib._openmpt_module_ext_destroy(solo.extPtr);
-    lib._free(solo.leftPtr);
-    lib._free(solo.rightPtr);
-  }
+  if (tapL) lib._free(tapL);
+  if (tapR) lib._free(tapR);
 
   if (totalFrames === 0) {
     throw new Error(`libopenmpt rendered 0 frames for ${filename}`);
@@ -1477,54 +1479,10 @@ async function renderWithLibopenmpt(
 
   postProgress(id, 85);
   const track = scopes?.finish();
-  if (track && stems) track.stems = stems.finish(totalFrames);
-  return { left, right, sampleRate, channelScopes: track };
-}
-
-interface LibopenmptSolo { extPtr: number; modulePtr: number; leftPtr: number; rightPtr: number }
-
-/**
- * One libopenmpt instance per shown channel, every other channel muted
- * through the 'interactive' interface before the first tick, configured like
- * the main render. Empty when the build has no ext API.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function createLibopenmptSolos(lib: any, fileBytes: Uint8Array, ext: string, chunk: number, maxChannels: number): LibopenmptSolo[] {
-  if (!lib._openmpt_module_ext_create_from_memory || !lib._openmpt_module_ext_get_interface || !lib.wasmTable) return [];
-  const solos: LibopenmptSolo[] = [];
-  let numChannels = 0;
-  for (let ch = 0; ch < maxChannels; ch++) {
-    if (numChannels > 0 && ch >= numChannels) break;
-    const filePtr = lib._malloc(fileBytes.length);
-    lib.HEAPU8.set(fileBytes, filePtr);
-    const extPtr = lib._openmpt_module_ext_create_from_memory(filePtr, fileBytes.length, 0, 0, 0, 0, 0, 0, 0);
-    lib._free(filePtr);
-    if (!extPtr) break;
-    const modulePtr = lib._openmpt_module_ext_get_module(extPtr);
-    // set_channel_mute_status is the 11th pointer of the 'interactive' interface struct (16 pointers).
-    const ifacePtr = lib._malloc(64);
-    lib.HEAPU8.fill(0, ifacePtr, ifacePtr + 64);
-    const stack = lib.stackSave();
-    const ok = lib._openmpt_module_ext_get_interface(extPtr, asciiToStack(lib, 'interactive'), ifacePtr, 64);
-    lib.stackRestore(stack);
-    const muteFunc = ok ? lib.HEAPU32[(ifacePtr + 40) >> 2] : 0;
-    lib._free(ifacePtr);
-    if (!modulePtr || !muteFunc) { lib._openmpt_module_ext_destroy(extPtr); break; }
-    numChannels = lib._openmpt_module_get_num_channels(modulePtr);
-    if (ch >= numChannels) { lib._openmpt_module_ext_destroy(extPtr); break; }
-    const mute = lib.wasmTable.get(muteFunc);
-    for (let c = 0; c < numChannels; c++) mute(extPtr, c, c === ch ? 0 : 1);
-    lib._openmpt_module_set_repeat_count(modulePtr, 0);
-    lib._openmpt_module_set_render_param(modulePtr, 2 /* SEPARATION */, 100);
-    if (ext === 'mod' || ext === 'nst' || ext === 'stk' || ext === 'm15') {
-      const st = lib.stackSave();
-      lib._openmpt_module_ctl_set(modulePtr, asciiToStack(lib, 'render.resampler.emulate_amiga'), asciiToStack(lib, '1'));
-      lib._openmpt_module_ctl_set(modulePtr, asciiToStack(lib, 'render.resampler.emulate_amiga_type'), asciiToStack(lib, 'a1200'));
-      lib.stackRestore(st);
-    }
-    solos.push({ extPtr, modulePtr, leftPtr: lib._malloc(chunk * 4), rightPtr: lib._malloc(chunk * 4) });
-  }
-  return solos;
+  const tStems = Date.now();
+  const monoStems = track && stems ? stems.finishMono(totalFrames) : undefined;
+  console.log(`[DJRenderWorker/libopenmpt] ${filename}: one pass with ${tapCount} channel taps ${tStems - tPass} ms, ${monoStems?.length ?? 0} mono stems ${Date.now() - tStems} ms`);
+  return { left, right, sampleRate, channelScopes: track, monoStems };
 }
 
 // ── Message Handling ─────────────────────────────────────────────────────────
@@ -1582,13 +1540,25 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         const duration = result.left.length / result.sampleRate;
 
-        // The stems ship and cache as lossless FLAC (channelStemCodec.ts), encoded here, off the main thread.
+        // The stems ship and cache as one channel and a pan each (monoStem), as lossless mono FLAC
+        // (channelStemCodec.ts), encoded here, off the main thread.
         const track = result.channelScopes;
-        if (track?.stems) {
+        const mono = result.monoStems ?? track?.stems?.map(monoStem);
+        if (track && mono) {
+          const tEncode = Date.now();
           const flac: Uint8Array[] = [];
-          for (const st of track.stems) flac.push(await encodeStemFlac(st, result.sampleRate));
+          const gains: Array<[number, number]> = [];
+          const misses: string[] = [];
+          for (const m of mono) {
+            flac.push(await encodeStemFlac(m.mono, result.sampleRate));
+            gains.push(m.gains);
+            misses.push(Number.isFinite(m.residualDb) ? m.residualDb.toFixed(0) : '-inf');
+          }
           track.flacStems = flac;
+          track.stemGains = gains;
+          console.log(`[DJRenderWorker] ${filename}: stems encoded in ${Date.now() - tEncode} ms`);
           delete track.stems;
+          console.log(`[DJRenderWorker] ${filename}: ${flac.length} mono stems, one-channel fit misses (dB) ${misses.join(' ')}`);
         }
 
         postProgress(id, 95);

@@ -1,7 +1,8 @@
 /**
  * DeckChannelToggles - Channel mute/fx-target buttons for one DJ deck
  *
- * Row of 4 toggle buttons (1-4) + ALL + MUTE/FX mode chip.
+ * One toggle per channel the song has (4 when the deck has no channel signal; up to 16, in rows
+ * of 8) + ALL + MUTE/FX mode chip.
  * Click semantic branches on `channelModeUI` (mirrors DeckScopes):
  *   'mute' → lit=bg-accent-primary. Click = mute/unmute.
  *            Shift+click = solo (mute everything else).
@@ -17,13 +18,20 @@ interface DeckChannelTogglesProps {
   deckId: 'A' | 'B' | 'C';
 }
 
-const NUM_CHANNELS = 4;
+/** Channel buttons when the deck carries no per-channel signal (an audio file). */
+const DEFAULT_CHANNELS = 4;
 const BUTTON_SIZE = 40;
+/** Button size when the song has more than 4 channels: 8 per row, two rows for 16. */
+const SMALL_BUTTON_SIZE = 20;
 
 export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }) => {
   const channelMask = useDJStore((s) => s.decks[deckId].channelMask);
   const fxTargetChannels = useDJStore((s) => s.decks[deckId].fxTargetChannels);
   const mode = useDJStore((s) => s.decks[deckId].channelModeUI);
+  // One button per channel the song has: every one of them has a mute stem (up to 16).
+  const scopeCount = useDJStore((s) => s.decks[deckId].channelScopeCount);
+  const numChannels = scopeCount > 0 ? scopeCount : DEFAULT_CHANNELS;
+  const size = numChannels > DEFAULT_CHANNELS ? SMALL_BUTTON_SIZE : BUTTON_SIZE;
 
   const handleChannelClick = useCallback(
     (channelIndex: number, e: React.MouseEvent) => {
@@ -70,7 +78,7 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
   const isFxTargeted = (index: number): boolean => fxTargetChannels.has(index);
 
   const allEnabled = (() => {
-    for (let i = 0; i < NUM_CHANNELS; i++) {
+    for (let i = 0; i < numChannels; i++) {
       if (!isChannelEnabled(i)) return false;
     }
     return true;
@@ -81,7 +89,8 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
   return (
     <div className="flex items-center gap-1">
       {/* Channel toggle buttons — colour depends on mode */}
-      {Array.from({ length: NUM_CHANNELS }, (_, i) => {
+      <div className={numChannels > DEFAULT_CHANNELS ? 'grid grid-cols-8 gap-0.5' : 'flex items-center gap-1'}>
+      {Array.from({ length: numChannels }, (_, i) => {
         const enabled = isChannelEnabled(i);
         const targeted = isFxTargeted(i);
         const active = isFxMode ? targeted : enabled;
@@ -101,7 +110,7 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
                   : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
               }
             `}
-            style={{ width: BUTTON_SIZE, height: BUTTON_SIZE }}
+            style={{ width: size, height: size }}
             title={
               isFxMode
                 ? `Channel ${i + 1} — FX target ${targeted ? 'on' : 'off'} (Shift+click to solo-in-set)`
@@ -112,6 +121,7 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
           </button>
         );
       })}
+      </div>
 
       {/* ALL button — meaning depends on mode */}
       <button

@@ -18,7 +18,7 @@ describe('channel stem FLAC', () => {
       stem[2 * i] = v; stem[2 * i + 1] = v;
     }
     stem[0] = 32767; stem[1] = 32767; stem[2] = -32767; stem[3] = -32767;
-    const flac = await encodeStemFlac(stem, 44100);
+    const flac = await encodeStemFlac(stem, 44100, 2); // a stereo stem (render version 4)
     expect(flac.byteLength).toBeLessThan(stem.byteLength / 3);
     const [decoded, silent] = await decodeStemsFlac([flac, new Uint8Array(0)]);
     expect(silent).toBeNull();
@@ -28,5 +28,12 @@ describe('channel stem FLAC', () => {
         throw new Error(`sample ${i}: ${decoded![0][i] * 32767} / ${decoded![1][i] * 32767} vs ${stem[2 * i]}`);
       }
     }
+  });
+
+  it('round-trips a mono stem (render version 5: one channel per stem) exactly', async () => {
+    const mono = Int16Array.from({ length: 4410 }, (_, i) => Math.round(12000 * Math.sin(i / 7)));
+    const [decoded] = await decodeStemsFlac([await encodeStemFlac(mono, 44100)]);
+    expect(decoded!.length).toBe(1);
+    expect(Array.from(decoded![0], (v) => Math.round(v * 32767))).toEqual(Array.from(mono));
   });
 });
