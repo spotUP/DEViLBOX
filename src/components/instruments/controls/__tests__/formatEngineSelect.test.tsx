@@ -44,6 +44,15 @@ describe('NS-8 WasmInfoEditor mounts the selector for the loaded format', () => 
     await waitFor(() => expect(switchSpy).toHaveBeenCalledWith('mmdc', 'nuade'));
   });
 
+  it('offers Reset to Default only while a choice is stored, and it asks for the default', async () => {
+    const { queryByText, getByText, rerender } = render(<WasmInfoEditor synthType={'NuadeSynth' as never} />);
+    expect(queryByText('Reset to Default')).toBeNull();
+    useSettingsStore.getState().setFormatEngine('mmdc', 'nuade');
+    rerender(<WasmInfoEditor synthType={'NuadeSynth' as never} />);
+    fireEvent.click(getByText('Reset to Default'));
+    await waitFor(() => expect(switchSpy).toHaveBeenCalledWith('mmdc', 'default'));
+  });
+
   it('shows no selector when the loaded song has no nuade player', () => {
     useFormatStore.getState().applyEditorMode({ format: 'MOD' } as unknown as TrackerSong);
     const { queryByText } = render(<WasmInfoEditor synthType={'GmeSynth' as never} />);

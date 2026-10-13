@@ -5,11 +5,12 @@
  */
 import React, { useState } from 'react';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { Button } from '@components/ui/Button';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { notify } from '@stores/useNotificationStore';
 import type { FormatEngineChoice } from '@/types/formatEngine';
 import type { NuadeFormat } from '@/engine/nuade/nuadeFormats';
-import { effectiveFormatEngine } from '@/engine/nuade/nuadeRouting';
+import { explicitFormatEngine, effectiveFormatEngine } from '@/engine/nuade/nuadeRouting';
 import { engineNote, engineOptionsFor, selectedEngine } from '@/engine/nuade/nuadeSelectOptions';
 import { switchFormatEngine } from '@/lib/song/switchFormatEngine';
 
@@ -21,13 +22,13 @@ export interface FormatEngineSelectProps {
 }
 
 export const FormatEngineSelect: React.FC<FormatEngineSelectProps> = ({ row, showNote = true }) => {
-  const explicit = useSettingsStore((s) => (s.formatEngine as unknown as Record<string, FormatEngineChoice | undefined>)[row.prefKey]);
+  const explicit = useSettingsStore((s) => explicitFormatEngine(s.formatEngine, row.prefKey));
   const [busy, setBusy] = useState(false);
   const effective = explicit ?? effectiveFormatEngine({}, row.prefKey) ?? row.defaultEngine;
 
   const onChange = async (value: string): Promise<void> => {
     setBusy(true);
-    const r = await switchFormatEngine(row.prefKey, value as FormatEngineChoice);
+    const r = await switchFormatEngine(row.prefKey, value as FormatEngineChoice | 'default');
     setBusy(false);
     if (!r.switched) notify.error(r.error);
   };
@@ -42,6 +43,11 @@ export const FormatEngineSelect: React.FC<FormatEngineSelectProps> = ({ row, sho
         title={`The engine ${row.label} plays on`}
         className="bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs"
       />
+      {explicit !== undefined && (
+        <Button variant="ghost" size="sm" disabled={busy} onClick={() => { void onChange('default'); }}>
+          Reset to Default
+        </Button>
+      )}
       {showNote && <div className="text-text-muted text-[10px] font-mono">{engineNote(row)}</div>}
     </div>
   );

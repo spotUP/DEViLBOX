@@ -14,6 +14,7 @@ function rig(song: Partial<TrackerSong>, opts: { playing?: boolean; module?: Arr
     moduleFor: async () => (opts.module === undefined ? new Uint8Array([9, 8, 7]).buffer : opts.module),
     open: async (name, bytes, companions, start) => { calls.open!.push({ name, len: bytes.byteLength, companions, start }); return opts.openOk === false ? { ok: false, error: 'boom' } : { ok: true }; },
     setChoice: (k, c) => calls.choice!.push([k, c]),
+    clearChoice: (k) => calls.choice!.push([k, 'cleared']),
   };
   return { deps, calls };
 }
@@ -26,6 +27,13 @@ describe('NS-7 switchFormatEngine', () => {
     expect(calls.choice).toEqual([['soundmon', 'native']]);
     expect(calls.open).toEqual([{ name: 'antidust.bp3', len: 3, companions: undefined, start: 'song' }]);
     expect(calls.restore).toEqual([{ pattern: 3, row: 17 }]);
+  });
+
+  it('default forgets the stored choice, reopens the loaded song, and reports the engine the row plays on by default', async () => {
+    const { deps, calls } = rig({ nuadePlayerId: 'mmdc', nuadeFileName: 'a.mmdc' }, { playing: true });
+    expect(await switchFormatEngine('mmdc', 'default', deps)).toEqual({ switched: true, reopened: true, stored: NUADE_FORMATS.mmdc!.defaultEngine });
+    expect(calls.choice).toEqual([['mmdc', 'cleared']]);
+    expect(calls.open).toHaveLength(1);
   });
 
   it('a stopped song reopens stopped; a song of another format only stores the choice', async () => {

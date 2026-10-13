@@ -7,11 +7,33 @@ import { join } from 'node:path';
 import { NUADE_FORMAT_LIST, NUADE_FORMATS, nuadeFormatsByPrefKey } from '../nuadeFormats';
 import { NUADE_NODE_VOICES } from '../nuadeProtocol';
 import { NuadeHeadless } from '../nuadeHeadless';
+import preNuadeDefaults from './preNuadeDefaults.json';
+import { resolvedFormatEngines } from '../nuadeRouting';
 
 const ROOT = join(__dirname, '../../../..');
 
 const REPLACE_WAVES = `amcomposer amos andrewparton aprosys artandmagic ashleyhogg audiosculpture cinemaware dariuszendeh davidhanney desire dirkbialluch dsc dynamicsynthesizer earache ems emsv6 fashiontracker fcbsi forgottenworlds fredgray gluemon gmc hippelhip howiedavies infogrames jankomrsicflogel jasonbrooke jasonpage jeroentel jesperolsen kimchristensen krishatlelid laxity legglessmusiceditor majortom maniacsofnoise markcooksey markcooksey_old markii maximumeffect mcmd medley mikedavies mmdc musicalenlightenment ntsp onescapee paulrobotham paulshields paulsummers peterverswyvelen pierreadane pokeynoise professionalsoundartists protracker4 quartet richardjoseph riffraff robhubbard robhubbardst scumm seanconnolly seanconran silmarils soundfx soundimages soundmaster specialfx speedya1system speedysystem spl stevebarrett synthdream synthpack syntracker thomashermann timetracker timfollin tomytracker tronic ufo voodoo zoundmonitor`.split(' ');
 const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis`.split(' ');
+
+describe('a fresh user keeps the pre-nuade engine of every format', () => {
+  // preNuadeDefaults.json = the formatEngine defaults of useSettingsStore at 57e7803be, before the table (91 of the 114 rows had one;
+  // the other 23 keys are new with the table and defaulted to UADE in their routes).
+  it('the table\'s legacy engine is the old default, and the route reads it unless a recorded verdict moved the row to nuade', () => {
+    const old = preNuadeDefaults as Record<string, string>;
+    let checked = 0;
+    for (const f of NUADE_FORMAT_LIST) {
+      if (!(f.prefKey in old)) continue;
+      checked++;
+      expect(f.legacyEngine, `${f.id}: legacy engine vs the old default`).toBe(old[f.prefKey]);
+      const route = (resolvedFormatEngines({} as never) as unknown as Record<string, string>)[f.prefKey];
+      // nuade reads as native in the route (our parser draws the grid, playback is switched afterwards)
+      const expected = f.defaultEngine === 'nuade' ? 'native' : old[f.prefKey];
+      expect(route, `${f.id}: what a fresh user's import route is told`).toBe(expected);
+      if (f.defaultEngine === 'nuade') expect(f.uadeEnvelopeCorrelation, `${f.id}: moved to nuade without a measurement`).not.toBeNull();
+    }
+    expect(checked).toBeGreaterThan(85);
+  });
+});
 
 describe('NS-4 nuade format table', () => {
   it('holds exactly the 84 replace rows R01-R84 and the 30 dual rows AB01-AB30 of the plan', () => {

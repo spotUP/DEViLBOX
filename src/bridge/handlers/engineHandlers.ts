@@ -5,7 +5,7 @@
  */
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { NUADE_FORMAT_LIST, nuadeFormatsByPrefKey, NUADE_FORMATS } from '../../engine/nuade/nuadeFormats';
-import { effectiveFormatEngine, engineChoicesFor } from '../../engine/nuade/nuadeRouting';
+import { displayChoiceFor, effectiveFormatEngine, engineChoicesFor, explicitFormatEngine } from '../../engine/nuade/nuadeRouting';
 import { switchFormatEngine } from '../../lib/song/switchFormatEngine';
 import type { FormatEngineChoice } from '../../types/formatEngine';
 
@@ -20,8 +20,10 @@ export function getFormatEngines(params: Record<string, unknown> = {}): Record<s
       prefKey: f.prefKey,
       role: f.role,
       choices: engineChoicesFor(f),
-      effective: effectiveFormatEngine(prefs, f.prefKey) ?? f.defaultEngine,
-      default: f.defaultEngine,
+      // Shown in the vocabulary of `choices`: a replace row whose stored legacy engine is 'native' (our parser, UADE playing) is 'uade'.
+      effective: displayChoiceFor(f, effectiveFormatEngine(prefs, f.prefKey) ?? f.defaultEngine),
+      default: displayChoiceFor(f, f.defaultEngine),
+      explicit: explicitFormatEngine(prefs, f.prefKey) !== undefined,
       scores: { nuade: f.uadeEnvelopeCorrelation, own: f.ownEnvelopeCorrelation ?? null, endAgrees: f.endAgrees },
       heldBecause: f.heldBecause ?? null,
       corpusSongs: f.corpus.length,
@@ -29,10 +31,10 @@ export function getFormatEngines(params: Record<string, unknown> = {}): Record<s
   return { count: rows.length, rows };
 }
 
-/** format: a preference key (`soundmon`) or a nuade player id (`mmdc`); engine: native | uade | nuade. */
+/** format: a preference key (`soundmon`) or a nuade player id (`mmdc`); engine: native | uade | nuade, or `default` to forget the stored choice. */
 export async function setFormatEngine(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const format = String(params.format ?? '');
-  const engine = String(params.engine ?? '') as FormatEngineChoice;
+  const engine = String(params.engine ?? '') as FormatEngineChoice | 'default';
   const prefKey = NUADE_FORMATS[format]?.prefKey ?? (nuadeFormatsByPrefKey(format).length > 0 ? format : null);
   if (!prefKey) return { error: `unknown format ${format}: use a preference key or a nuade player id (get_format_engines lists them)` };
   const r = await switchFormatEngine(prefKey, engine);

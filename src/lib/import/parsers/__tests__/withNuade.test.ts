@@ -33,6 +33,13 @@ describe('NS-5 choice resolver', () => {
     expect(effectiveFormatEngine({}, 'mod')).toBeUndefined();
   });
 
+  it('ignores a stored value the row cannot honour: never effective, never the default (a replace row has no engine of ours)', () => {
+    expect(effectiveFormatEngine({ mmdc: 'native' } as never, 'mmdc')).toBe('uade');   // mmdc plays on UADE or nuade only
+    expect(effectiveFormatEngine({ earAche: 'uade' } as never, 'earAche')).toBe('native'); // its UADE option is stored as its legacy 'native'
+    expect(effectiveFormatEngine({ earAche: 'nuade' } as never, 'earAche')).toBe('nuade');
+    expect(effectiveFormatEngine({ soundmon: 'uade' } as never, 'soundmon')).toBe('uade'); // a dual row honours all three
+  });
+
   it('shows the routes plain native/uade for every key of the table: nuade reads as native (our parser draws the grid)', () => {
     const resolved = resolvedFormatEngines({ mmdc: 'nuade', soundmon: 'uade' } as never) as unknown as Record<string, string>;
     expect(resolved.mmdc).toBe('native');

@@ -16,11 +16,25 @@ export type FormatEngineMap = Partial<Record<string, FormatEngineChoice>>;
 /** Every preference key of the table. */
 export const NUADE_PREF_KEYS: readonly string[] = Array.from(new Set(NUADE_FORMAT_LIST.map((f) => f.prefKey)));
 
-/** The choice for `key`: the explicit one, else the table's default; undefined for a key the table does not own. */
+/**
+ * The stored values a row can honour: replace rows play on UADE (stored as their legacy engine) or nuade; dual rows on
+ * all three. Anything else in the store (a value from an older build, or a hand edit) is not a choice of this row.
+ */
+export function honourableChoices(row: NuadeFormat): FormatEngineChoice[] {
+  return row.role === 'dual' ? ['native', 'uade', 'nuade'] : [row.legacyEngine, 'nuade'];
+}
+
+/** The explicit stored choice of `key` when its row can honour it, else undefined (the table default applies). */
+export function explicitFormatEngine(prefs: FormatEngineMap | FormatEnginePreferences, key: string): FormatEngineChoice | undefined {
+  const stored = (prefs as FormatEngineMap)[key];
+  const row = nuadeFormatsByPrefKey(key)[0];
+  if (!stored) return undefined;
+  return row && !honourableChoices(row).includes(stored) ? undefined : stored; // a key the table does not own keeps its stored value
+}
+
+/** The choice for `key`: the explicit one the row can honour, else the table's default; undefined for a key the table does not own. */
 export function effectiveFormatEngine(prefs: FormatEngineMap | FormatEnginePreferences, key: string): FormatEngineChoice | undefined {
-  const explicit = (prefs as FormatEngineMap)[key];
-  if (explicit) return explicit;
-  return nuadeFormatsByPrefKey(key)[0]?.defaultEngine;
+  return explicitFormatEngine(prefs, key) ?? nuadeFormatsByPrefKey(key)[0]?.defaultEngine;
 }
 
 /**
