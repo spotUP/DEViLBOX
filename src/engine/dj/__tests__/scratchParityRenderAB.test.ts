@@ -132,7 +132,7 @@ async function renderRoutine(opts: { bars: number; withTrack: boolean; layers?: 
   const step = 0.01;
   for (let t = step; t < (t1 - t0) - 0.05; t += step) {
     void ctx.suspend(Math.round(t * SR) / SR).then(() => {
-      ctrl.tick({ perf: perf(), deck: 'A', mode: 'PERFORMER', style: 'boomBap', profile: 'boomBap', scratchPermission: 2 });
+      ctrl.tick({ perf: perf(), deck: 'A', mode: 'PERFORMER', style: 'boomBap', profile: 'boomBap', scratchPermission: 2, render: 'three_deck' });
       for (const fn of [...intervals]) fn();
       // the routine's shape (an offline render of the planned layer) lands before the render goes on: live it
       // has the bar of lookahead the plan is made in

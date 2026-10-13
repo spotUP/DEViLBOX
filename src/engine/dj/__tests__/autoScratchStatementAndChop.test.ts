@@ -26,7 +26,7 @@ function run(records: readonly string[] | null) {
   const ctrl = new DJScratchDJ({ seed: 5, executorFor: () => ({ schedule: (e) => { events.push(e); }, cancel: () => {}, active: 0 }) });
   let plan: DJScratchDJ['lastPlan'] = null;
   for (let b = drop.startBar - 1; b < drop.startBar + 2; b++) for (const f of [0.05, 0.5]) {
-    ctrl.tick({ perf: perfAt(track, barT(b) + f), deck: 'A', mode: 'PERFORMER', style: 'electro', scratchPermission: 2, records });
+    ctrl.tick({ perf: perfAt(track, barT(b) + f), deck: 'A', mode: 'PERFORMER', style: 'electro', scratchPermission: 2, records, render: 'three_deck' });
     if (ctrl.lastPlan?.routine === 'threeDeck') plan = ctrl.lastPlan;
   }
   return { events, plan, fromBar: drop.startBar, track };

@@ -17,11 +17,11 @@ import { buildScratchContext, scratchSectionFor, type ScratchPerformanceContext 
 import { onTopOfTheDemo, overlayRender, planJuggleResponse, planScratch, toScratchEvents, type OverlayRender, type OverlaySection, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
 import type { PlacedScratch } from './scratchPlacement';
 import type { DemoProfileName } from './scratchRender';
-import { buildScratchDjRoutine, buildThreeDeckRoutine, demoRoutineRenderSpecs, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, validateScratchDjRoutine } from './scratchDemoRoutines';
+import { buildScratchDjRoutine, buildThreeDeckRoutine, demoRoutineRenderSpecs, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, threeDeckJuggleAllowed, validateScratchDjRoutine } from './scratchDemoRoutines';
 import type { RoutineName } from './scratchRoutines';
 import type { ScratchProfileId } from './scratchStyles';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
-import { PALETTE_PROFILE, SCRATCH_PROFILES, type ScratchMode } from './scratchStyles';
+import { PALETTE_PROFILE, SCRATCH_PROFILES, type ScratchMode, type ScratchRenderMode } from './scratchStyles';
 import { anchorFor } from './scratchAnchor';
 import { CLEAN_CRATE_POOL, cuePoolsFor, getScratchRecord, sourcePool, wordEmphasisRecord, type ScratchRecord } from './scratchCatalogue';
 import { selectScratchSource, type SourceDecision, type SourceRequest, type TrackerSampleInfo } from './ScratchSourceSelector';
@@ -31,7 +31,7 @@ import { ScratchStateMachine, type ScratchState } from './scratchStateMachine';
 import { evaluatePhrase, type PhraseDecision, type PhraseEvaluation, type PhraseTrace } from './scratchEvaluate';
 import { findOpportunity, type ScratchOpportunity } from './scratchOpportunity';
 import { checkScratch, checkStuck, type SafetyRule, type SafetyState } from './ScratchSafety';
-import { scratchCost } from '../autodj/performanceBudget';
+import { HANDS_BUDGET, scratchCost } from '../autodj/performanceBudget';
 import { GESTURE_LEVELS } from './scratchGestureCatalog';
 import { arcForSection, phaseAt, planArc, type ArcPhaseName, type ArcTemplate } from './scratchArc';
 import type { ScratchGenreHint } from './scratchStyles';
@@ -83,6 +83,10 @@ export interface ScratchTickInput {
   genre?: ScratchPlanOptions['genre'];
   /** The demo profile the overlay plays (the subgenre's, else the palette's). */
   profile?: ScratchProfileId;
+  /** The demo's Render mode (owner S2): 'section' the overlay with DEViLBOX's extras on top, 'three_deck' /
+   *  'dj_routine' the demo's 32-bar routine back to back from the next phrase. The Auto DJ passes the store's
+   *  setting (default three_deck); omitted = 'section' (a controller driven without the setting). */
+  render?: ScratchRenderMode;
   /** The overlay's routine option (the demo's default: none; 'auto' = `routine_for` closes each section). */
   routine?: 'auto' | RoutineName | null;
   /** The Records selector resolved (R8, `record_set`): the checked records; [] = off; null / none = 'style' (the
@@ -143,7 +147,7 @@ export interface ScratchDJTickResult {
 }
 
 /** Reachability sentinels (SCR-P4.R4). */
-export const scratchDJStats = { ticks: 0, plans: 0, scheduled: 0, juggleResponses: 0, bookends: 0 };
+export const scratchDJStats = { ticks: 0, plans: 0, scheduled: 0, juggleResponses: 0, bookends: 0, routines: 0 };
 
 /** The section 13 selector over the plan's roles and gestures (the default `chooseSource`). */
 export function selectorSource(ctx: ScratchPerformanceContext, plan: ScratchPlan, input: ScratchTickInput, recent: readonly string[], memory: Pick<SourceRequest, 'blocked' | 'preference'> = {}): ChosenScratchSource | null {
@@ -255,10 +259,36 @@ export class DJScratchDJ {
   handsInUse(): number {
     const st = this.states.state;
     if (st === 'IDLE' || st === 'LISTENING' || st === 'REST' || st === 'ABORTING' || !this.windows.length) return 0;
+    // C15: inside the three-deck routine the hands follow its sections - all of them on Deck C, none where it is out
+    const two = this.twoHands();
+    if (two !== null) return two ? HANDS_BUDGET : 0;
     let maxLevel = 0;
     for (const w of this.windows) for (const e of w.entries) maxLevel = Math.max(maxLevel, GESTURE_LEVELS[e.event.gesture] ?? 0);
     const feature = st === 'FEATURE' || st === 'ESCALATING';
-    return scratchCost({ maxLevel, feature, battle: feature && this.lastMode === 'BATTLE' });
+    return scratchCost({ maxLevel, feature, battle: feature && (this.lastMode === 'BATTLE' || this.windows.some((w) => w.plan.routine === 'scratchDj')) });
+  }
+
+  /** The three-deck routine playing at the current bar, if any. */
+  private threeDeckWindow(): PerformedWindow | undefined {
+    return this.windows.find((w) => w.plan.routine === 'threeDeck' && w.entries.length > 0 && this.lastBar >= w.fromBar && this.lastBar < w.toBar);
+  }
+
+  /** C15 at the current bar: true = Deck C holds the hands (no juggle), false = it is out (the A/B decks may juggle),
+   *  null = no three-deck routine plays. */
+  private twoHands(): boolean | null {
+    const w = this.threeDeckWindow();
+    if (!w) return null;
+    const allowed = threeDeckJuggleAllowed(this.lastBar - w.fromBar);
+    return allowed === null ? null : !allowed;
+  }
+
+  /**
+   * C15 (three_deck `_perf_events`, the two hands): while the three-deck routine's Deck C plays, the A/B decks only
+   * play and fade - the reason the juggle must hold (and a running one release); null when the hands are free.
+   */
+  deckCHoldsTheJuggle(): string | null {
+    const w = this.threeDeckWindow();
+    return w && this.twoHands() ? `two hands: Deck C plays the three-deck routine (bar ${this.lastBar - w.fromBar + 1} of 32)` : null;
   }
 
   telemetry(): ScratchDJTelemetry {
@@ -320,6 +350,8 @@ export class DJScratchDJ {
     // a window starts on its first bar: the performer sets up and plays it (section 51)
     for (const next of this.windows.filter((x) => !x.started && ctx.masterBar >= x.fromBar)) {
       next.started = true;
+      // a feature's phase labels run from its own first bar (a routine back to back is planned a bar before)
+      if (next.arc) this.arcPhases = [];
       if (next.entries.length) this.enterPerforming(next.plan, next.arc, next.intent, ctx.masterBar);
       else if (this.states.state === 'LISTENING') this.states.go('REST', next.plan.reasons.at(-1) ?? 'a planned rest', ctx.masterBar);
     }
@@ -389,8 +421,21 @@ export class DJScratchDJ {
     const onPhrase = (fromBar - phraseStart) % phraseBars === 0;
     const barSec = (60 / Math.max(1, ctx.bpm)) * Math.max(1, ctx.meter);
     const decksStill = !!input.juggleActive || (input.transitionInSec != null && input.transitionInSec < (toBar - ctx.masterBar + 1) * barSec);
-    const wantsFeature = !!shape.template && featureMode && !decksStill && onPhrase && this.memory.featureReady(fromBar) && this.intent !== 'rest'
-      && (shape.role !== 'peakBurst' || this.memory.battleReady(fromBar) || input.mode !== 'BATTLE');
+    // the demo's Render mode (owner S2): three_deck / dj_routine play their 32-bar routine back to back from the next
+    // phrase - no set phase, mode or cooldown gate (the demo has none); 'section' plays the overlay, DEViLBOX's short
+    // features on top of it in PERFORMER / BATTLE (a 32-bar arc is the routine modes' alone)
+    const render = input.render ?? 'section';
+    const routineRender = render === 'three_deck' || render === 'dj_routine';
+    if (routineRender && !onPhrase) {
+      // Deck C waits for the phrase: the routine's needle drops on its first downbeat
+      this.plannedThroughBar = toBar;
+      const plan: ScratchPlan = { mode: input.mode, events: [], bars: [], rests: [], issues: [], reasons: [`${render}: the routine starts on the next phrase`] };
+      this.lastPlan = plan;
+      this.windows.push({ fromBar, toBar, entries: [], arc: null, energyBefore: ctx.energy, setEnergyBefore: input.perf.setEnergy, plan, intent: this.intent, started: false });
+      return { planned: true, scheduled: 0, reason: 'waiting for the phrase' };
+    }
+    const wantsFeature = routineRender || (!!shape.template && shape.template.bars !== 32 && featureMode && !decksStill && onPhrase && this.memory.featureReady(fromBar) && this.intent !== 'rest'
+      && (shape.role !== 'peakBurst' || this.memory.battleReady(fromBar) || input.mode !== 'BATTLE'));
     let plan: ScratchPlan;
     let arc: ArcTemplate | null = null;
     // cooldowns are checked at each event's own bar (section 54), not for the whole window
@@ -412,19 +457,19 @@ export class DJScratchDJ {
       return planScratch(ctx, opts);
     };
     if (wantsFeature) {
-      arc = shape.template!;
+      arc = routineRender ? (render === 'dj_routine' ? SCRATCH_DJ_TEMPLATE : THREE_DECK_TEMPLATE) : shape.template!;
       toBar = fromBar + arc.bars;
       this.budget.feature();
       const perm = performancePermissions({ setPhase, budgetTotal: this.budget.total, mode: input.mode });
       this.lastPeak = perm.peak;
       // the feature's cooldown runs from its end (section 54)
-      this.memory.recordPerformance(shape.role === 'peakBurst' ? 'battle' : 'feature', toBar);
-      this.arcPhases = [];
-      if (arc.bars === 32) {
-        // the 32-bar feature is the demo's own routine (SCR-PHRASING-PARITY D8): BATTLE the scratch_dj
-        // showcase (A-A-B-A hook, varied endings, validated), PERFORMER the three-deck flow (a throw per
+      this.memory.recordPerformance(routineRender ? (render === 'dj_routine' ? 'battle' : 'feature') : shape.role === 'peakBurst' ? 'battle' : 'feature', toBar);
+      if (routineRender) {
+        // the demo's own routine (SCR-PHRASING-PARITY D8), by the Render mode: dj_routine the scratch_dj
+        // showcase (A-A-B-A hook, varied endings, validated), three_deck the three-deck flow (a throw per
         // phrase, the word chopped, rests by energy, the words rotating); needles open and close it
-        const battle = input.mode === 'BATTLE';
+        const battle = render === 'dj_routine';
+        scratchDJStats.routines++;
         arc = battle ? SCRATCH_DJ_TEMPLATE : THREE_DECK_TEMPLATE;
         scratchDJStats.bookends++;
         // three_deck's crate (R8, C16): the checked records narrow its role pools; ONE spoken phrase plays statement
@@ -440,7 +485,7 @@ export class DJScratchDJ {
         plan = {
           mode: input.mode, events, bars: Array.from({ length: arc.bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
           rests: [], issues: battle ? validateScratchDjRoutine(demo) : [], routine: battle ? 'scratchDj' : 'threeDeck',
-          reasons: [`${shape.role}: the demo's ${battle ? 'scratch_dj showcase' : 'three-deck routine'} over 32 bars`, perm.reason],
+          reasons: [`Render ${render}: the demo's ${battle ? 'scratch_dj showcase' : 'three-deck routine'} over 32 bars`, perm.reason],
         };
       } else {
         const a = planArc({ arc, startBar: fromBar, style: ctx.style, mode: input.mode, seed: seed + fromBar, levelCap: perm.maxLevel || undefined, cooling, beatsPerBar: ctx.meter });

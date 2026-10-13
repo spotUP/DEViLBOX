@@ -281,6 +281,25 @@ export function scratchModeOf(value: string | undefined): ScratchMode {
   return SCRATCH_MODES.includes(value as ScratchMode) ? (value as ScratchMode) : 'OFF';
 }
 
+/**
+ * The demo's Render mode (scratch.py `param_schema` "mode", :1067-1068; owner S2 2026-10-13) as an Auto Scratch
+ * setting: 'section' the overlay (`render_scratch_section`, DEViLBOX's extras on top), 'three_deck' the three-deck
+ * 32-bar routine back to back (the demo's default), 'dj_routine' scratch_dj's 32-bar routine back to back.
+ * The demo's 'juggle' and 'macro' modes are the juggle engine (PG-I) and the macro action (`fx_scratch_macro`).
+ */
+export type ScratchRenderMode = 'section' | 'three_deck' | 'dj_routine';
+export const SCRATCH_RENDER_MODES: readonly ScratchRenderMode[] = ['section', 'three_deck', 'dj_routine'];
+/** The demo's default Render mode (owner S2: DEFAULT three_deck). */
+export const DEFAULT_SCRATCH_RENDER: ScratchRenderMode = 'three_deck';
+export const SCRATCH_RENDER_LABELS: Readonly<Record<ScratchRenderMode, string>> = {
+  section: 'Section Overlay', three_deck: 'Three Deck Routine', dj_routine: 'DJ Routine',
+};
+
+/** The store's Render setting as a mode (an unknown value is the demo's default). */
+export function scratchRenderModeOf(value: string | undefined): ScratchRenderMode {
+  return SCRATCH_RENDER_MODES.includes(value as ScratchRenderMode) ? (value as ScratchRenderMode) : DEFAULT_SCRATCH_RENDER;
+}
+
 /** The store's Auto Scratch style ('auto' or a palette id) for a track: Auto reads its genre (section 33). */
 export function scratchStyleFor(setting: string | undefined, genre: Parameters<typeof genreToScratchStyle>[0]): ScratchStyleChoice {
   if (setting && setting !== 'auto' && setting in SCRATCH_STYLES) return { style: setting as ScratchDJStyle, profile: PALETTE_PROFILE[setting as ScratchDJStyle], genre: 'unknown', modifiers: genreToScratchStyle(undefined).modifiers };

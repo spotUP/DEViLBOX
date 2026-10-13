@@ -20,6 +20,7 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { DJ_STYLE_NAMES } from '@/engine/dj/autodj/types';
 import { DJAutoDJDebugPanel } from './DJAutoDJDebugPanel';
 import { JUGGLE_MODES, type JuggleMode } from '@/engine/dj/autodj/juggle/juggleTypes';
+import { SCRATCH_RENDER_LABELS, SCRATCH_RENDER_MODES, scratchRenderModeOf } from '@/engine/dj/scratch/scratchStyles';
 
 const JUGGLE_MODE_LABELS: Record<JuggleMode, string> = { OFF: 'Off', SAFE: 'Safe', MUSICAL: 'Musical', PERFORMER: 'Performer', AGGRESSIVE: 'Aggressive', CHAOS: 'Chaos' };
 
@@ -64,6 +65,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const juggleMode = useDJStore((s) => s.autoDJJuggleMode);
   const juggleIntensity = useDJStore((s) => s.autoDJJuggleIntensity);
   const creativeRisk = useDJStore((s) => s.autoDJCreativeRisk);
+  const scratchRender = useDJStore((s) => s.autoDJScratchRender);
   const [showDebug, setShowDebug] = useState(false);
 
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
@@ -576,6 +578,14 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           ]}
           className="text-[10px]"
           title="Juggle intensity ladder: phrase trading, two-bar trading, one-bar trading, beat juggling, peak"
+        />
+        <span className="text-text-muted whitespace-nowrap">Scratch Render:</span>
+        <CustomSelect
+          value={scratchRenderModeOf(scratchRender)}
+          onChange={(v) => setConfig({ scratchRender: v })}
+          options={SCRATCH_RENDER_MODES.map((m) => ({ value: m, label: SCRATCH_RENDER_LABELS[m] }))}
+          className="text-[10px]"
+          title="What Auto Scratch plays, as the demo's Render setting: Section Overlay scratches each section of the track, Three Deck Routine plays the 32-bar three-deck routine back to back, DJ Routine plays the 32-bar scratch DJ routine back to back"
         />
         <div className="flex-1" />
         <Button variant="ghost" onClick={() => setShowDebug((v) => !v)} title="Show the Auto DJ plan, confidence, risk and the reasons for every decision">

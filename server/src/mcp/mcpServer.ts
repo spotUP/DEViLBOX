@@ -2605,6 +2605,19 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'set_auto_dj_config',
+    "Set the Auto DJ's performer settings (the Auto DJ panel's selects). scratchRender is the demo's Render mode: 'section' scratches the overlay over each section, 'three_deck' (default) plays the 32-bar three-deck routine back to back (the A/B juggle only while Deck C is out), 'dj_routine' plays the 32-bar scratch DJ routine back to back. Returns the settings now in force.",
+    {
+      scratchRender: z.enum(['section', 'three_deck', 'dj_routine']).optional().describe('Auto Scratch Render mode'),
+      scratchMode: z.enum(['OFF', 'SAFE', 'MUSICAL', 'PERFORMER', 'BATTLE']).optional().describe('Auto Scratch mode'),
+      scratchStyle: z.string().optional().describe("Auto Scratch style: 'auto' or a palette id (oldSchool, boomBap, electro, battle, loFi)"),
+      scratchRecords: z.union([z.string(), z.array(z.string())]).optional().describe("Records: a record_set choice ('style', 'clean', 'bank', 'cat:fresh', 'off', ...) or record ids"),
+      juggleMode: z.enum(['OFF', 'SAFE', 'MUSICAL', 'PERFORMER', 'AGGRESSIVE', 'CHAOS']).optional().describe('Auto Juggle mode'),
+    },
+    (p) => call('set_auto_dj_config', p),
+  );
+
+  server.tool(
     'dj_auto_dj_explain',
     'Why did the Auto DJ do that: the debug telemetry (current track, next track, planned transition, confidence, risk, why this track, why this transition), the beat-juggling telemetry (mode, pattern, phase, intensity, per-deck material and roles, next actions, reason, safety, budget), the structured decision log (SELECT_NEXT_TRACK, PLAN_TRANSITION, FALLBACK, EXECUTE_TRANSITION, ADAPT ...) and the DJ FX actions it fired.',
     { limit: z.number().int().min(1).max(400).optional().describe('How many decisions / FX fires to return (default 30)') },

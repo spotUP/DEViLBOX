@@ -31,7 +31,7 @@ export interface StandaloneRig {
 
 export async function setupStandalone(
   holder: StandaloneHolder,
-  opts: { track: CorpusId; bpm: number; startSec: number; analysis?: DJTrackAnalysis; durationSec?: number; clockMs?: number },
+  opts: { track: CorpusId; bpm: number; startSec: number; analysis?: DJTrackAnalysis; durationSec?: number; clockMs?: number; scratchRender?: 'section' | 'three_deck' | 'dj_routine' },
 ): Promise<StandaloneRig> {
   await import('../DJTrackLoader');
   // clockMs pins the fake wall clock's start: DJAutoDJ seeds scratch plans with Date.now(), so an unpinned start is a different set every run
@@ -60,7 +60,9 @@ export async function setupStandalone(
   pl.importPlaylists([{ id, name: 'standalone juggle', createdAt: Date.now(), updatedAt: Date.now(), tracks }]);
   pl.setActivePlaylist(id);
   const s = useDJStore.getState();
-  s.setAutoDJConfig({ shuffle: false, style: 'Club', transitionBars: 8, juggleIntensity: -1 });
+  // the overlay (Render 'section'): these rigs test the juggle's mechanics; under three_deck C15 holds the juggle to the
+  // routine's silent sections (autoDJThreeDeckTwoHands.test.ts)
+  s.setAutoDJConfig({ shuffle: false, style: 'Club', transitionBars: 8, juggleIntensity: -1, scratchRender: opts.scratchRender ?? 'section' });
   const analysis = opts.analysis ?? corpusAnalysis(opts.track);
   const grid = { beats: analysis.beatGrid.beats.map((b) => b.time), downbeats: analysis.downbeats.bars.map((b) => b.start), bpm: opts.bpm, timeSignature: 4 };
   if (!opts.analysis) { const t = corpusTrack(opts.track); grid.beats = t.beats; grid.downbeats = t.downbeats; }

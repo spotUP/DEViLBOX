@@ -49,6 +49,9 @@ export interface TickInput {
   userControl?: string | null;
   /** Hands the scratch, the transition and the FX hold now (scratch plan section 27, the shared budget of 6). */
   otherHands?: number;
+  /** C15 (three_deck `_perf_events`, two hands): Deck C plays its routine, so the A/B decks only play and fade -
+   *  no juggle starts and a running one releases. The reason, or null when the hands are free. */
+  deckCHolds?: string | null;
 }
 
 export interface JuggleControllerDeps {
@@ -365,6 +368,7 @@ export class DJJuggleController {
 
   private abortReason(ctx: DJJugglePerformanceContext, input: TickInput): string | null {
     if (this.mode === 'OFF') return 'Auto Juggle off';
+    if (input.deckCHolds) return input.deckCHolds;
     if (!ctx.deckA.playing || !ctx.deckB.playing) return 'deck failure: a deck stopped';
     if (ctx.beatConfidence < 0.5) return 'beat confidence dropped';
     if (ctx.deckSyncConfidence < 0.5) return 'decks drifted apart';

@@ -7,6 +7,7 @@
 
 import { useDJStore, type DeckState } from '../../stores/useDJStore';
 import { useDJPlaylistStore } from '../../stores/useDJPlaylistStore';
+import { scratchRenderModeOf } from '../../engine/dj/scratch/scratchStyles';
 
 // Lazy-import DJ actions to avoid loading DJEngine at bridge init
 async function getActions() {
@@ -248,6 +249,20 @@ export async function djAutoDJSkip(): Promise<Record<string, unknown>> {
   const actions = await getActions();
   await actions.skipAutoDJ();
   return { ok: true };
+}
+
+/** The Auto DJ performer settings (the panel's selects): Auto Scratch Render / mode / style / Records, Auto Juggle mode. */
+export async function setAutoDJConfig(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const keys = ['scratchRender', 'scratchMode', 'scratchStyle', 'scratchRecords', 'juggleMode'] as const;
+  const config: Partial<Record<(typeof keys)[number], string | string[]>> = {};
+  for (const k of keys) if (params[k] !== undefined) config[k] = params[k] as string | string[];
+  const s = useDJStore.getState();
+  s.setAutoDJConfig(config as Parameters<typeof s.setAutoDJConfig>[0]);
+  const n = useDJStore.getState();
+  return {
+    scratchRender: scratchRenderModeOf(n.autoDJScratchRender), scratchMode: n.autoDJScratchMode, scratchStyle: n.autoDJScratchStyle,
+    scratchRecords: n.autoDJScratchRecords, juggleMode: n.autoDJJuggleMode,
+  };
 }
 
 /** Juggle Now (owner decision 2026-10-12): the debug panel button's path - one juggle tick now, timing gates skipped. */

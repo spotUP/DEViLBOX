@@ -110,7 +110,7 @@ async function tenMinutes(mode: ScratchMode) {
   const analysis = tiledAnalysis(seconds + 120);
   const startSec = 5;
   const rig = await setupStandalone(holder, { track: TRACK, bpm: BPM, startSec, analysis, durationSec: analysis.durationSec, clockMs: PINNED_CLOCK_MS });
-  useDJStore.getState().setAutoDJConfig({ juggleMode: 'OFF', scratchMode: mode, scratchStyle: 'auto' });
+  useDJStore.getState().setAutoDJConfig({ juggleMode: 'OFF', scratchMode: mode, scratchStyle: 'auto', scratchRender: 'section' });
   (rig.dj as unknown as { preloadNextTrack: () => Promise<void> }).preloadNextTrack = async () => {};
   const events: ScratchEvent[] = [];
   const original = ScratchExecutor.prototype.schedule;

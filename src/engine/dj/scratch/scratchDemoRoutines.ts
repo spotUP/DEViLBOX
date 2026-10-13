@@ -190,6 +190,23 @@ export const THREE_DECK_BUDGET = 6;
 /** The word rotation: each 2-bar phrase throws the next cue role's word. */
 const CUE_CYCLE: readonly CueRole[] = ['HOME', 'SECONDARY', 'ACCENT', 'FX', 'SECONDARY', 'HOME', 'ACCENT', 'FX'];
 
+/** `JUGGLE_JL_MIN`: only sections at or above this juggle level hand-juggle (three_deck.py :198). */
+export const THREE_DECK_JUGGLE_JL_MIN = 3;
+
+/** `_section_juggles(jl, role)`: a section beat-juggles only at JUGGLE_JL_MIN and with Deck C silent (C15). */
+export const sectionJuggles = (jl: number, role: string): boolean => jl >= THREE_DECK_JUGGLE_JL_MIN && role === 'silent';
+
+/**
+ * C15, the two hands (three_deck `_perf_events` :201-224): the A/B decks hand-juggle ONLY while Deck C is out -
+ * the routine's sections where `_section_juggles` holds (juggle_feat bars 20-23, final_burst 28-29). Everywhere
+ * else in the routine a hand is on Deck C and the A/B decks only play and fade. `bar` counts from the routine's
+ * first bar; outside [0, 32) the routine has no say (null).
+ */
+export function threeDeckJuggleAllowed(bar: number): boolean | null {
+  const sec = THREE_DECK_ARC.find(([, b0, bars]) => bar >= b0 && bar < b0 + bars);
+  return sec ? sectionJuggles(sec[3], sec[5]) : null;
+}
+
 /** `scratch_permission(juggle_level, budget)`: the scratch level two hands leave. */
 export const scratchPermissionFor = (juggleLevel: number, budget = THREE_DECK_BUDGET): number => Math.max(0, Math.min(4, budget - juggleLevel));
 
