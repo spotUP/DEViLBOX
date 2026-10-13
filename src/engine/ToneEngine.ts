@@ -5,9 +5,9 @@
 
 import { AnalyserHolds } from '@/lib/audio/analyserHolds';
 import { isWholeSongSynth } from './wholeSongSynths';
-import { installWorkletProfiler } from './audio/workletProfiler';
+import { installWorkletProfiler, installNodeCensus } from './audio/workletProfiler';
 import { installIdleGate } from './audio/idleGate';
-import { watchSignal } from './audio/signalPresence';
+import { watchSignal, isSounding, subscribeSounding } from './audio/signalPresence';
 import { EngineGainDuck } from './engineGainDuck';
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
@@ -285,7 +285,7 @@ export class ToneEngine {
   private masterEffectConfigs: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }> = new Map();
   private masterEffectsRebuildVersion = 0;
   // Pre/post AnalyserNode taps for each master effect (for visualizers)
-  private masterEffectAnalysers: Map<string, { pre: AnalyserNode; post: AnalyserNode }> = new Map();
+  private masterEffectAnalysers: Map<string, { pre: AnalyserNode; post: AnalyserNode; untap?: () => void }> = new Map();
   private _isPlaying = false;
 
   // Track native engine routing destinations (engine key → gain node + connected destinations)
@@ -421,6 +421,9 @@ export class ToneEngine {
     // without this shim Tone.setContext throws "param must be an AudioParam"
     // and the whole app crashes at boot on Firefox.
     shimAudioListenerParams(this._nativeContext);
+    // Dev: census every node and edge (MCP get_audio_worklet_profile) before
+    // Tone wires its destination, so the census sees that edge too.
+    if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) installNodeCensus();
     Tone.setContext(this._nativeContext);
     // Register globally so WAM/WASM synths can access it without importing ToneEngine
     setDevilboxAudioContext(this._nativeContext);
@@ -5302,7 +5305,8 @@ export class ToneEngine {
     this.masterEffectsNodes = [];
     this.masterEffectConfigs.clear();
     // Disconnect and clear analyser taps
-    this.masterEffectAnalysers.forEach(({ pre, post }) => {
+    this.masterEffectAnalysers.forEach(({ pre, post, untap }) => {
+      untap?.();
       try { pre.disconnect(); } catch { /* */ }
       try { post.disconnect(); } catch { /* */ }
     });
@@ -5578,11 +5582,7 @@ export class ToneEngine {
    */
   public enableAnalysers(owner: object | string = 'default'): void {
     this.analyserHolds.acquire(owner);
-    if (!this.analysersConnected) {
-      this.masterChannel.connect(this.analyser);
-      this.masterChannel.connect(this.fft);
-      this.analysersConnected = true;
-    }
+    this.syncAnalysers();
   }
 
   /**
@@ -5593,12 +5593,32 @@ export class ToneEngine {
    */
   public disableAnalysers(owner: object | string = 'default'): void {
     this.analyserHolds.release(owner);
-    if (this.analysersConnected && !this.analyserHolds.held) {
+    this.syncAnalysers();
+  }
+
+  /**
+   * The master analysers are connected while a visualizer holds them AND the
+   * app sounds. Chrome processes an AnalyserNode every quantum with the whole
+   * graph upstream of it - the tracker's scope strip holds them for as long
+   * as it is mounted, which kept every instrument chain running in a silent
+   * app (measured 2026-10-12). Silent, they would read silence anyway.
+   */
+  private syncAnalysers(): void {
+    if (!this.unsubAnalyserSounding) {
+      this.unsubAnalyserSounding = subscribeSounding(() => this.syncAnalysers());
+    }
+    const want = this.analyserHolds.held && isSounding();
+    if (want === this.analysersConnected) return;
+    if (want) {
+      this.masterChannel.connect(this.analyser);
+      this.masterChannel.connect(this.fft);
+    } else {
       this.masterChannel.disconnect(this.analyser);
       this.masterChannel.disconnect(this.fft);
-      this.analysersConnected = false;
     }
+    this.analysersConnected = want;
   }
+  private unsubAnalyserSounding: (() => void) | null = null;
 
   // ── Level meter connect/disconnect (idle CPU savings) ─────────────────
   private metersConnected = false;

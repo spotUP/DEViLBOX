@@ -30,6 +30,7 @@ import { effectiveBassLock } from './bassLockDefaults';
 import { noteMixMoveLands } from './stopPlayerNow';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
 import { HEARD_DELAY_MAX_SEC, syncHeardDelay, type LatencySource } from '../audioLatency';
+import { tapWhileSounding } from '../audio/signalPresence';
 
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 
@@ -80,6 +81,7 @@ export class DJMixerEngine {
   private limiter: SafetyLimiter;
   readonly masterMeter: Tone.Meter;
   private readonly masterMeterDelay: DelayNode;
+  private untapMasterMeter: (() => void) | null = null;
 
   // Master FX chain (inserted between masterGain and duckGain)
   // Each chain is wrapped in a chainGain for crossfading:
@@ -141,8 +143,12 @@ export class DJMixerEngine {
       // This allows DJ FX to tap from Destination OUTPUT
       Tone.connect(this.limiter.output, Tone.getDestination().input as any);
       // The master meter reads the heard signal (delayed by the output latency).
-      Tone.connect(this.limiter.output, this.masterMeterDelay);
       Tone.connect(this.masterMeterDelay, this.masterMeter);
+      // The meter joins only while the app sounds (tapWhileSounding).
+      this.untapMasterMeter = tapWhileSounding(
+        () => Tone.connect(this.limiter.output, this.masterMeterDelay),
+        () => Tone.disconnect(this.limiter.output, this.masterMeterDelay),
+      );
     } catch (err) {
       console.error('[DJMixerEngine] audio graph wiring failed:', err);
     }
@@ -563,6 +569,7 @@ export class DJMixerEngine {
     this.chainGain.dispose();
     this.duckGain.dispose();
     this.limiter.disconnect();
+    this.untapMasterMeter?.();
     this.masterMeter.dispose();
     try { this.masterMeterDelay.disconnect(); } catch { /* already disconnected */ }
   }

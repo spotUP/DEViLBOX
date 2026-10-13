@@ -504,12 +504,12 @@ export async function profileMainThread(params: Record<string, unknown>): Promis
 
 /** Audio-thread time per worklet processor over a window (dev builds). */
 export async function getAudioWorkletProfile(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { readWorkletProfile, readNodeCensus } = await import('../../engine/audio/workletProfiler');
+  const { readWorkletProfile, readNodeCensus, readPullCensus } = await import('../../engine/audio/workletProfiler');
   const windowMs = typeof params.windowMs === 'number' ? Math.min(10000, Math.max(250, params.windowMs)) : 2000;
   const entries = await readWorkletProfile(windowMs);
   if (!entries) return { installed: false, note: 'profiler not installed (dev build and cross-origin isolation needed; reload after first install)' };
   const total = entries.reduce((s, e) => s + e.msPerSecond, 0);
-  return { installed: true, windowMs, totalMsPerSecond: +total.toFixed(1), processors: entries, nodes: readNodeCensus() };
+  return { installed: true, windowMs, totalMsPerSecond: +total.toFixed(1), processors: entries, nodes: readNodeCensus(), pull: readPullCensus() };
 }
 
 // ─── Oscilloscope Data ─────────────────────────────────────────────────────────

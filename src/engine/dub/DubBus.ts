@@ -134,6 +134,7 @@ import { detectLowFundamental, SubPitchTracker } from '@/lib/dub/lowFundamental'
 import { lowBandGainsFor, LOW_SAT_KNEE } from '@/lib/dub/lowBandCrossover';
 import { rideTrim, spendRide, bufferPeak } from '@/lib/dub/trimRide';
 import { RIDER_REST, type RiderState } from '@/lib/dub/gainRider';
+import { tapWhileSounding, isSounding, subscribeSounding } from '@/engine/audio/signalPresence';
 
 /**
  * Loudest sample in a captured ring, so a capture can tell whether it caught
@@ -2334,11 +2335,11 @@ export class DubBus {
     this.phaserOutProbe = this.context.createAnalyser();
     this.phaserInProbe.fftSize = 2048;
     this.phaserOutProbe.fftSize = 2048;
-    this.sweepInput.connect(this.phaserInProbe);
-    this.phaserOutput.connect(this.phaserOutProbe);
+    this._tap(this.sweepInput, this.phaserInProbe);
+    this._tap(this.phaserOutput, this.phaserOutProbe);
     this.sweepOutProbe = this.context.createAnalyser();
     this.sweepOutProbe.fftSize = 2048;
-    this.sweepOutput.connect(this.sweepOutProbe);
+    this._tap(this.sweepOutput, this.sweepOutProbe);
 
     // Return EQ — 4-band WASM parametric inserted between midScoop and LPF.
     // Always 100% wet (series insert). Bands start flat unless a character
@@ -2619,10 +2620,10 @@ export class DubBus {
     try {
       this._inputProbe = this.context.createAnalyser();
       this._inputProbe.fftSize = 1024;
-      this.input.connect(this._inputProbe);
+      this._tap(this.input, this._inputProbe);
       this._returnProbe = this.context.createAnalyser();
       this._returnProbe.fftSize = 1024;
-      this.return_.connect(this._returnProbe);
+      this._tap(this.return_, this._returnProbe);
       // And the stages in between, which is where the mix has been going missing.
       this._wireProbeTaps();
     } catch { /* probes are diagnostics only — never fail construction */ }
@@ -2803,16 +2804,18 @@ export class DubBus {
     this._clipInProbe = this.context.createAnalyser();
     this._clipInProbe.fftSize = 32768;
     this._clipInProbe.smoothingTimeConstant = 0;
-    this.masterLowMidDip.connect(this._clipInProbe);
-    this.returnTrim.connect(this._clipInProbe);
+    this._tap(this.masterLowMidDip, this._clipInProbe);
+    this._tap(this.returnTrim, this._clipInProbe);
     this._clipRefProbe = this.context.createAnalyser();
     this._clipRefProbe.fftSize = 32768;
     this._clipRefProbe.smoothingTimeConstant = 0;
-    this.masterHpf.connect(this._clipRefProbe);
-    this.returnTrim.connect(this._clipRefProbe);
+    this._tap(this.masterHpf, this._clipRefProbe);
+    this._tap(this.returnTrim, this._clipRefProbe);
     this.clubDry.connect(this.returnSum);
     this.clubWet.connect(this.returnSum);
     this.returnSum.connect(this.master);
+    this._unsubReturnAttach = subscribeSounding(() => this._syncReturnAttached());
+    this._syncReturnAttached();
     if (clubEnabled) {
       this.return_.connect(this.clubConvolver);
       this.clubConvolver.connect(this.clubWet);
@@ -4223,10 +4226,23 @@ export class DubBus {
    * SIGNAL, not the settings. Three diagnoses have now been argued from gain
    * values alone and none survived contact with a measurement.
    *
-   * An AnalyserNode is passive: it costs nothing until read and does not alter
-   * what passes it. Called once the whole graph exists, since `return_` is
-   * built late.
+   * An AnalyserNode does not alter what passes it, but Chrome processes it
+   * every quantum, so each tap joins only while the app sounds (`_tap`).
+   * Called once the whole graph exists, since `return_` is built late.
    */
+  /**
+   * A measuring tap that joins the graph only while the app sounds. Chrome
+   * processes every AnalyserNode each quantum, with everything upstream of it,
+   * read or not - fifteen of them kept a switched-off bus running in a silent
+   * app (measured 2026-10-12). Silent, every probe would read silence anyway.
+   */
+  private _tap(source: AudioNode, probe: AudioNode, into: Array<() => void> = this._probeUntaps): void {
+    into.push(tapWhileSounding(() => source.connect(probe), () => source.disconnect(probe)));
+  }
+  private _probeUntaps: Array<() => void> = [];
+  private _stageUntaps: Array<() => void> = [];
+  private _preInsertUntap: (() => void) | null = null;
+
   private _wireProbeTaps(): void {
     const points: Array<[string, AudioNode | undefined]> = [
       ['insertIn', this.masterToneTrim],
@@ -4242,15 +4258,17 @@ export class DubBus {
       ['busInput', undefined],
       ['busReturn', undefined],
     ];
+    // A rewire (the sub bed starting) replaces the taps: the old analysers
+    // leave the graph instead of staying pulled for the rest of the session.
+    this._stageUntaps.forEach((u) => u());
+    this._stageUntaps = [];
     this._probeTaps = [];
     for (const [name, node] of points) {
       if (!node) continue;
       const analyser = this.context.createAnalyser();
       analyser.fftSize = 2048;
-      try {
-        node.connect(analyser);
-        this._probeTaps.push({ name, analyser });
-      } catch { /* a tap must never break the chain it measures */ }
+      this._tap(node, analyser, this._stageUntaps);
+      this._probeTaps.push({ name, analyser });
     }
     // The Sub Bass Bed's own output, registered for as long as it runs.
     //
@@ -4406,6 +4424,7 @@ export class DubBus {
       // how a siren survived the bus being switched off.
       if (!settings.enabled) this.silenceGeneratedSynths();
       this.enabled = settings.enabled;
+      this._syncReturnAttached();
       // A song analysed while the bus was off gets its auto EQ now.
       if (settings.enabled) this._applyReadyAnalysis();
       // The master insert follows the bus, and only the bus. Re-derived here
@@ -5184,7 +5203,7 @@ export class DubBus {
       const probe = this.context.createAnalyser();
       probe.fftSize = 2048;
       probe.smoothingTimeConstant = 0.4;
-      source.connect(probe);
+      this._preInsertUntap = tapWhileSounding(() => source.connect(probe), () => source.disconnect(probe));
       this._preInsertProbe = probe;
       this._preInsertLevel = null;
     } catch {
@@ -5195,17 +5214,43 @@ export class DubBus {
 
   private _joinReturnAtInsert(): void {
     if (this._returnJoinedAtInsert) return;
-    try { this.returnSum.disconnect(this.master); } catch { /* ok */ }
-    try { this.returnSum.connect(this.returnTrim); } catch { /* ok */ }
+    if (!this._returnDetached) {
+      try { this.returnSum.disconnect(this.master); } catch { /* ok */ }
+      try { this.returnSum.connect(this.returnTrim); } catch { /* ok */ }
+    }
     this._returnJoinedAtInsert = true;
   }
 
   private _joinReturnAtMaster(): void {
     if (!this._returnJoinedAtInsert) return;
-    try { this.returnSum.disconnect(this.returnTrim); } catch { /* ok */ }
-    try { this.returnSum.connect(this.master); } catch { /* ok */ }
+    if (!this._returnDetached) {
+      try { this.returnSum.disconnect(this.returnTrim); } catch { /* ok */ }
+      try { this.returnSum.connect(this.master); } catch { /* ok */ }
+    }
     this._returnJoinedAtInsert = false;
   }
+
+  /**
+   * A switched-off bus in a silent app leaves the graph: its return is
+   * unplugged, so Chrome stops processing the echo, spring, filters and
+   * everything else behind it (measured 2026-10-12: the off bus ran with the
+   * app idle). Nothing audible can be cut - the app is silent, which includes
+   * the bus's own tail. It plugs back in on the first sound
+   * (engine/audio/signalPresence.ts) and, synchronously, when the bus is
+   * switched on.
+   */
+  private _returnDetached = false;
+  private _syncReturnAttached(): void {
+    const detach = !this.enabled && !isSounding() && !this._disposed;
+    if (detach === this._returnDetached) return;
+    const target = this._returnJoinedAtInsert ? this.returnTrim : this.master;
+    try {
+      if (detach) this.returnSum.disconnect(target);
+      else this.returnSum.connect(target);
+    } catch { /* ok */ }
+    this._returnDetached = detach;
+  }
+  private _unsubReturnAttach: (() => void) | null = null;
 
   /** Read by the MCP probe: does the return skip the low-end stages right now? */
   get returnBypassesLowEnd(): boolean { return this._returnJoinedAtInsert; }
@@ -5288,7 +5333,8 @@ export class DubBus {
     const probe = this._preInsertProbe;
     if (!probe) return;
     this._preInsertProbe = null;
-    try { this.masterInsertPoints?.source.disconnect(probe); } catch { /* already gone */ }
+    this._preInsertUntap?.();
+    this._preInsertUntap = null;
   }
 
   /**
@@ -6978,12 +7024,19 @@ export class DubBus {
         });
         const silencer = this.context.createGain();
         silencer.gain.value = 0;
-        this.input.connect(node);
         // Used to tell "the ring has not filled yet" from "nothing is reaching
         // the bus", which look identical in the captured samples.
         this._reverseCaptureReadyAtMs = Date.now() + CAPTURE_RING_FILL_MS;
         node.connect(silencer);
-        silencer.connect(this.context.destination);
+        // The capture records the bus input while the app sounds. Wired to
+        // the output for good, it kept the bus input and every channel send
+        // behind it running in a silent app (2026-10-12); silent, it would
+        // only record silence.
+        const destination = this.context.destination;
+        this._probeUntaps.push(tapWhileSounding(
+          () => { this.input.connect(node); silencer.connect(destination); },
+          () => { this.input.disconnect(node); silencer.disconnect(destination); },
+        ));
         this.reverseCapture = node;
         this.reverseCaptureSilencer = silencer;
       } catch (e) {
@@ -8609,7 +8662,20 @@ export class DubBus {
   }
 
   /** Dispose and release all bus resources. */
+  /** Unsubscribe every tap and the return's idle unplug (signalPresence). */
+  private _releaseIdleTaps(): void {
+    this._unsubReturnAttach?.();
+    this._unsubReturnAttach = null;
+    this._probeUntaps.forEach((u) => u());
+    this._stageUntaps.forEach((u) => u());
+    this._preInsertUntap?.();
+    this._probeUntaps = [];
+    this._stageUntaps = [];
+    this._preInsertUntap = null;
+  }
+
   dispose(): void {
+    this._releaseIdleTaps();
     this._stopTrimWatch();
     this._releasePreInsertProbe();
     for (const timer of this._heldAnnouncements.values()) clearInterval(timer);

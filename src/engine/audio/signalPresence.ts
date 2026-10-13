@@ -58,3 +58,25 @@ export function watchSignal(ctx: AudioContext, source: AudioNode): Promise<void>
 export function _setSoundingForTest(next: boolean): void {
   set(next);
 }
+
+/**
+ * A measuring tap - an analyser or meter and the delay that feeds it - joined
+ * to the graph only while the app sounds. Chrome pulls every AnalyserNode each
+ * quantum, with everything upstream of it, whether anything reads it or not;
+ * in a silent app nothing reads it (hooks/useFrameGate.ts) and a disconnected
+ * analyser keeps its last, silent, block. Returns the disposer.
+ */
+export function tapWhileSounding(connect: () => void, disconnect: () => void): () => void {
+  let joined = false;
+  const sync = () => {
+    if (sounding === joined) return;
+    joined = sounding;
+    try { if (joined) connect(); else disconnect(); } catch { /* node already gone */ }
+  };
+  sync();
+  const unsub = subscribeSounding(sync);
+  return () => {
+    unsub();
+    if (joined) { joined = false; try { disconnect(); } catch { /* already gone */ } }
+  };
+}

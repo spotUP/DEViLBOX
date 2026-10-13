@@ -121,6 +121,19 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
     const isFrozen = frozen[this.bufferId] || sourceStopped[this.bufferId];
     let   wp     = writePoss[this.bufferId];
 
+    // Frozen (the deck stopped, or a scratch holds the tape) nothing is
+    // written and the needle does not move: pass the input through and do no
+    // per-sample work. Idle decks cost 8 ms of every second of the audio thread
+    // here before (measured 2026-10-12), and posted a report every 50 ms that
+    // nothing reads.
+    if (isFrozen) {
+      for (let c = 0; c < out.length; c++) {
+        if (inp[c]) out[c].set(inp[c]); else out[c].fill(0);
+      }
+      this._framesSinceReport = 0;
+      return true;
+    }
+
     let blockPeak = 0;
     for (let i = 0; i < frames; i++) {
       const L = (inp[0] && inp[0][i] !== undefined) ? inp[0][i] : 0;
