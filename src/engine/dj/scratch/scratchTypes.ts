@@ -213,6 +213,9 @@ export interface ScratchRenderSpec {
   /** The overlay section the stroke sums into: its key, the stroke's 16th step from the section's start, the
    *  section's bars, its profile's `apply_fx`. */
   section?: { key: string; step: number; bars: number; fx: import('./scratchRender').DemoFx };
+  /** Statement and chop (C16, `cues_with_word_emphasis`): 'phrase' reads the whole record from its first sample,
+   *  'word' its last word (`word_source`). */
+  slice?: 'phrase' | 'word';
 }
 
 /** The slice of a crate record the gesture compatibility rule needs

@@ -20,7 +20,7 @@ import { barStartBeat } from '../autodj/beatGrid';
 import { overlayRecord } from './scratchDemoRoutines';
 import type { ScratchPerformanceContext } from './scratchContext';
 import { DEMO_PROFILES, DEMO_RATE, type DemoProfileName } from './scratchRender';
-import { CLEAN_CRATE_POOL } from './scratchCatalogue';
+import { ALL_SOURCE_NAMES, CLEAN_CRATE_POOL, SYNTH_SOURCE_NAMES, sourcePool } from './scratchCatalogue';
 import type { ScratchAnchor, ScratchEvent, ScratchGestureId, ScratchRenderSpec, ScratchSource, DeckScratchAnchor } from './scratchTypes';
 
 /** Below this beat confidence the planner plays safe: level 1, no routine. */
@@ -47,8 +47,9 @@ export interface ScratchPlanOptions {
   profile?: ScratchProfileId;
   /** The demo's routine option: none (the demo's default), 'auto' (`routine_for` closes each section), or one routine. */
   routine?: 'auto' | RoutineName | null;
-  /** One crate record per section (`pick_source` over the clean crate) on every event. */
-  records?: boolean;
+  /** One record per section (`pick_source`) on every event: true = the clean crate (`record_set('clean')`), a list =
+   *  the checked records (R8: `record_set(sel)` or the per-record boxes), [] = 'off' (no overlay at all, as the demo). */
+  records?: boolean | readonly string[];
   /** Genre modifiers (section 33): density multiplier, extra bias, level cap. */
   genre?: { densityScale?: number; restScale?: number; bias?: readonly ScratchGestureId[]; levelCap?: number; durationCapSteps?: number; fxScale?: number };
   /** Vocal activity per bar of the plan; every bar takes the context's reading when omitted. */
@@ -162,10 +163,12 @@ export function overlayRender(o: { key: string; bars: number; seed: number; prof
   };
 }
 
-/** `_routine_cues` with a record set (R12): slot i of (ROCK, FUNKY, BEAT, IF, YOU, REALLY, PHRASE) is the i-th sorted record. */
+/** `_routine_cues` with a record set (R12): slot i of (ROCK, FUNKY, BEAT, IF, YOU, REALLY, PHRASE) is the i-th sorted checked
+ *  bank record (none checked: the synthesized word cues, R6). */
 const ROUTINE_SLOTS = ['ROCK', 'FUNKY', 'BEAT', 'IF', 'YOU', 'REALLY', 'PHRASE'] as const;
 export function routineSlotRecord(slot: string, records: readonly string[] = CLEAN_CRATE_POOL): string | undefined {
-  const picked = [...records].sort();
+  const want = new Set(records);
+  const picked = ALL_SOURCE_NAMES.filter((n) => !SYNTH_SOURCE_NAMES.includes(n) && want.has(n));
   const i = ROUTINE_SLOTS.indexOf(slot as typeof ROUTINE_SLOTS[number]);
   return picked.length && i >= 0 ? picked[i % picked.length] : undefined;
 }
@@ -196,6 +199,10 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   if (eff.reason) reasons.push(eff.reason);
   const empty: ScratchPlan = { mode: eff.mode, events: [], bars: Array.from({ length: opts.bars }, () => []), rests: [], issues: [], reasons };
   if (eff.mode === 'OFF' || opts.bars <= 0) return empty;
+  // the Records selector (R8): the checked records in `pick_source`'s order; 'off' skips the overlay (render_scratch_section)
+  const allowed = opts.records === true ? CLEAN_CRATE_POOL : Array.isArray(opts.records) ? opts.records as readonly string[] : null;
+  if (allowed && allowed.length === 0) { reasons.push('Records off: no overlay'); return empty; }
+  const pool = allowed ? sourcePool(allowed) : null;
 
   const style = ctx.style;
   const profile = SCRATCH_PROFILES[opts.profile ?? PALETTE_PROFILE[style]];
@@ -259,7 +266,7 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
         const bar = sec.startBar + first + ev.bar + Math.floor(ev.step / 16);
         const step = ev.step % 16;
         // with a record set each word slot scratches its own record (`_routine_cues`, R12)
-        const record = opts.records ? routineSlotRecord(ev.sourceRole) : undefined;
+        const record = allowed ? routineSlotRecord(ev.sourceRole, allowed) : undefined;
         return {
           bar, step, beat: stepToBeat({ bar, step }, grid, bpb), gesture: ev.gesture, velocity: ev.velocity, placementRole: ev.role === 'ANSWER' ? 'answer' as const : step >= 15 ? 'turnaround' as const : 'accent' as const, role: ev.role,
           render: render.routine(ev.bar, ev.step, first, ev.tail), routineSlot: ev.sourceRole, layer: 'demo', ...(record ? { record } : {}),
@@ -268,7 +275,7 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
       for (let k = 0; k < demoRb; k++) routineBars.set(sec.startBar + first + k, placed.filter((p) => p.bar === sec.startBar + first + k));
       reasons.push(`routine ${demoName} closes ${sec.name} at bar ${sec.startBar + first}`);
     }
-    const plan: SectionPlan = { natural, extraState, extraRate, routineBars, record: opts.records ? overlayRecord(sec.name, opts.seed + sec.startBar) : undefined, render };
+    const plan: SectionPlan = { natural, extraState, extraRate, routineBars, record: pool ? overlayRecord(sec.name, opts.seed + sec.startBar, pool) : undefined, render };
     sections.set(key, plan);
     return plan;
   };

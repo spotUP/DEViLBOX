@@ -1,0 +1,728 @@
+{
+ "allNames": [
+  "vocal_ah",
+  "vocal_fresh",
+  "vocal_yeah",
+  "robot",
+  "horn",
+  "snare",
+  "noise",
+  "AH_ALT",
+  "AH_ALT_2",
+  "AH_ALT_3",
+  "AH_FRESH_FULL_PHRASE",
+  "AH_LONG",
+  "AH_STANDARD",
+  "AH_YEAH",
+  "ALRIGHT_STOP",
+  "A_YEAH",
+  "BOY",
+  "CHECK_THIS_OUT",
+  "DO_IT_AGAIN",
+  "EY_YO",
+  "FRESH_ALT",
+  "FRESH_ALT_4",
+  "FRESH_STANDARD",
+  "FRESH_YEAH",
+  "GENERIC_HIT",
+  "HERE_WE_GO_AGAIN",
+  "HEY",
+  "HEY_HEY",
+  "HE_CUT_THE_MUSIC",
+  "HIP_HOP",
+  "IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT",
+  "LADIES_AND_GENTLEMEN",
+  "LASER_FX",
+  "LONG_AH_YEAH",
+  "NOW_LONG",
+  "ONE",
+  "OOH_LONG",
+  "SAY_WHAT",
+  "SCRATCH_005",
+  "SCRATCH_006",
+  "SCRATCH_013",
+  "SCRATCH_027",
+  "SCRATCH_028",
+  "SCRATCH_039",
+  "SCRATCH_048",
+  "SCRATCH_051",
+  "STOP_THAT",
+  "THE_LIKS",
+  "THREE",
+  "THREE_TWO_ONE",
+  "TWO",
+  "UH_HAH",
+  "UH_SHORT",
+  "WELCOME_TO_THE_NEXT_LEVEL",
+  "WHOO_LONG",
+  "YEAH_ALT",
+  "YEAH_BOY",
+  "YEAH_STANDARD"
+ ],
+ "choices": [
+  "style",
+  "all",
+  "synth",
+  "bank",
+  "clean",
+  "pre_scratched",
+  "cat:ah_vowel",
+  "cat:count",
+  "cat:dj_command",
+  "cat:fresh",
+  "cat:fx",
+  "cat:hip_hop_tag",
+  "cat:intro_announcement",
+  "cat:long_specialty_phrase",
+  "cat:long_vowel_or_hype",
+  "cat:pre_rendered_scratch",
+  "cat:short_exclamation",
+  "cat:yeah_response",
+  "off"
+ ],
+ "sets": {
+  "style": null,
+  "all": [
+   "vocal_ah",
+   "vocal_fresh",
+   "vocal_yeah",
+   "robot",
+   "horn",
+   "snare",
+   "noise",
+   "AH_ALT",
+   "AH_ALT_2",
+   "AH_ALT_3",
+   "AH_FRESH_FULL_PHRASE",
+   "AH_LONG",
+   "AH_STANDARD",
+   "AH_YEAH",
+   "ALRIGHT_STOP",
+   "A_YEAH",
+   "BOY",
+   "CHECK_THIS_OUT",
+   "DO_IT_AGAIN",
+   "EY_YO",
+   "FRESH_ALT",
+   "FRESH_ALT_4",
+   "FRESH_STANDARD",
+   "FRESH_YEAH",
+   "GENERIC_HIT",
+   "HERE_WE_GO_AGAIN",
+   "HEY",
+   "HEY_HEY",
+   "HE_CUT_THE_MUSIC",
+   "HIP_HOP",
+   "IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT",
+   "LADIES_AND_GENTLEMEN",
+   "LASER_FX",
+   "LONG_AH_YEAH",
+   "NOW_LONG",
+   "ONE",
+   "OOH_LONG",
+   "SAY_WHAT",
+   "SCRATCH_005",
+   "SCRATCH_006",
+   "SCRATCH_013",
+   "SCRATCH_027",
+   "SCRATCH_028",
+   "SCRATCH_039",
+   "SCRATCH_048",
+   "SCRATCH_051",
+   "STOP_THAT",
+   "THE_LIKS",
+   "THREE",
+   "THREE_TWO_ONE",
+   "TWO",
+   "UH_HAH",
+   "UH_SHORT",
+   "WELCOME_TO_THE_NEXT_LEVEL",
+   "WHOO_LONG",
+   "YEAH_ALT",
+   "YEAH_BOY",
+   "YEAH_STANDARD"
+  ],
+  "synth": [
+   "vocal_ah",
+   "vocal_fresh",
+   "vocal_yeah",
+   "robot",
+   "horn",
+   "snare",
+   "noise"
+  ],
+  "bank": [
+   "AH_ALT",
+   "AH_ALT_2",
+   "AH_ALT_3",
+   "AH_FRESH_FULL_PHRASE",
+   "AH_LONG",
+   "AH_STANDARD",
+   "AH_YEAH",
+   "ALRIGHT_STOP",
+   "A_YEAH",
+   "BOY",
+   "CHECK_THIS_OUT",
+   "DO_IT_AGAIN",
+   "EY_YO",
+   "FRESH_ALT",
+   "FRESH_ALT_4",
+   "FRESH_STANDARD",
+   "FRESH_YEAH",
+   "GENERIC_HIT",
+   "HERE_WE_GO_AGAIN",
+   "HEY",
+   "HEY_HEY",
+   "HE_CUT_THE_MUSIC",
+   "HIP_HOP",
+   "IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT",
+   "LADIES_AND_GENTLEMEN",
+   "LASER_FX",
+   "LONG_AH_YEAH",
+   "NOW_LONG",
+   "ONE",
+   "OOH_LONG",
+   "SAY_WHAT",
+   "SCRATCH_005",
+   "SCRATCH_006",
+   "SCRATCH_013",
+   "SCRATCH_027",
+   "SCRATCH_028",
+   "SCRATCH_039",
+   "SCRATCH_048",
+   "SCRATCH_051",
+   "STOP_THAT",
+   "THE_LIKS",
+   "THREE",
+   "THREE_TWO_ONE",
+   "TWO",
+   "UH_HAH",
+   "UH_SHORT",
+   "WELCOME_TO_THE_NEXT_LEVEL",
+   "WHOO_LONG",
+   "YEAH_ALT",
+   "YEAH_BOY",
+   "YEAH_STANDARD"
+  ],
+  "clean": [
+   "AH_ALT",
+   "AH_ALT_2",
+   "AH_ALT_3",
+   "AH_FRESH_FULL_PHRASE",
+   "AH_LONG",
+   "AH_STANDARD",
+   "AH_YEAH",
+   "ALRIGHT_STOP",
+   "A_YEAH",
+   "BOY",
+   "CHECK_THIS_OUT",
+   "DO_IT_AGAIN",
+   "EY_YO",
+   "FRESH_ALT",
+   "FRESH_ALT_4",
+   "FRESH_STANDARD",
+   "FRESH_YEAH",
+   "GENERIC_HIT",
+   "HERE_WE_GO_AGAIN",
+   "HEY",
+   "HEY_HEY",
+   "HE_CUT_THE_MUSIC",
+   "HIP_HOP",
+   "IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT",
+   "LADIES_AND_GENTLEMEN",
+   "LASER_FX",
+   "LONG_AH_YEAH",
+   "NOW_LONG",
+   "ONE",
+   "OOH_LONG",
+   "SAY_WHAT",
+   "STOP_THAT",
+   "THE_LIKS",
+   "THREE",
+   "THREE_TWO_ONE",
+   "TWO",
+   "UH_HAH",
+   "UH_SHORT",
+   "WELCOME_TO_THE_NEXT_LEVEL",
+   "WHOO_LONG",
+   "YEAH_ALT",
+   "YEAH_BOY",
+   "YEAH_STANDARD"
+  ],
+  "pre_scratched": [
+   "SCRATCH_005",
+   "SCRATCH_006",
+   "SCRATCH_013",
+   "SCRATCH_027",
+   "SCRATCH_028",
+   "SCRATCH_039",
+   "SCRATCH_048",
+   "SCRATCH_051"
+  ],
+  "cat:ah_vowel": [
+   "AH_ALT",
+   "AH_ALT_2",
+   "AH_ALT_3",
+   "AH_LONG",
+   "AH_STANDARD"
+  ],
+  "cat:count": [
+   "ONE",
+   "THREE",
+   "THREE_TWO_ONE",
+   "TWO"
+  ],
+  "cat:dj_command": [
+   "ALRIGHT_STOP",
+   "CHECK_THIS_OUT",
+   "DO_IT_AGAIN",
+   "HERE_WE_GO_AGAIN",
+   "SAY_WHAT",
+   "STOP_THAT"
+  ],
+  "cat:fresh": [
+   "AH_FRESH_FULL_PHRASE",
+   "FRESH_ALT",
+   "FRESH_ALT_4",
+   "FRESH_STANDARD",
+   "FRESH_YEAH"
+  ],
+  "cat:fx": [
+   "GENERIC_HIT",
+   "LASER_FX"
+  ],
+  "cat:hip_hop_tag": [
+   "HIP_HOP",
+   "THE_LIKS"
+  ],
+  "cat:intro_announcement": [
+   "EY_YO",
+   "LADIES_AND_GENTLEMEN",
+   "WELCOME_TO_THE_NEXT_LEVEL"
+  ],
+  "cat:long_specialty_phrase": [
+   "HE_CUT_THE_MUSIC",
+   "IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT"
+  ],
+  "cat:long_vowel_or_hype": [
+   "NOW_LONG",
+   "OOH_LONG",
+   "WHOO_LONG"
+  ],
+  "cat:pre_rendered_scratch": [
+   "SCRATCH_005",
+   "SCRATCH_006",
+   "SCRATCH_013",
+   "SCRATCH_027",
+   "SCRATCH_028",
+   "SCRATCH_039",
+   "SCRATCH_048",
+   "SCRATCH_051"
+  ],
+  "cat:short_exclamation": [
+   "BOY",
+   "HEY",
+   "HEY_HEY",
+   "UH_SHORT"
+  ],
+  "cat:yeah_response": [
+   "AH_YEAH",
+   "A_YEAH",
+   "LONG_AH_YEAH",
+   "UH_HAH",
+   "YEAH_ALT",
+   "YEAH_BOY",
+   "YEAH_STANDARD"
+  ],
+  "off": [],
+  "": null,
+  "nonsense": null,
+  "CLEAN": null
+ },
+ "picks": [
+  {
+   "sel": "clean",
+   "section": "hook",
+   "seed": 0,
+   "pick": "AH_FRESH_FULL_PHRASE"
+  },
+  {
+   "sel": "clean",
+   "section": "hook",
+   "seed": 7,
+   "pick": "AH_LONG"
+  },
+  {
+   "sel": "clean",
+   "section": "hook",
+   "seed": 30,
+   "pick": "CHECK_THIS_OUT"
+  },
+  {
+   "sel": "clean",
+   "section": "hook",
+   "seed": 101,
+   "pick": "ONE"
+  },
+  {
+   "sel": "clean",
+   "section": "verse",
+   "seed": 0,
+   "pick": "THREE"
+  },
+  {
+   "sel": "clean",
+   "section": "verse",
+   "seed": 7,
+   "pick": "THREE_TWO_ONE"
+  },
+  {
+   "sel": "clean",
+   "section": "verse",
+   "seed": 30,
+   "pick": "YEAH_ALT"
+  },
+  {
+   "sel": "clean",
+   "section": "verse",
+   "seed": 101,
+   "pick": "FRESH_STANDARD"
+  },
+  {
+   "sel": "clean",
+   "section": "showcase",
+   "seed": 0,
+   "pick": "AH_ALT_2"
+  },
+  {
+   "sel": "clean",
+   "section": "showcase",
+   "seed": 7,
+   "pick": "AH_ALT_3"
+  },
+  {
+   "sel": "clean",
+   "section": "showcase",
+   "seed": 30,
+   "pick": "A_YEAH"
+  },
+  {
+   "sel": "clean",
+   "section": "showcase",
+   "seed": 101,
+   "pick": "LONG_AH_YEAH"
+  },
+  {
+   "sel": "clean",
+   "section": "A",
+   "seed": 0,
+   "pick": "HIP_HOP"
+  },
+  {
+   "sel": "clean",
+   "section": "A",
+   "seed": 7,
+   "pick": "IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT"
+  },
+  {
+   "sel": "clean",
+   "section": "A",
+   "seed": 30,
+   "pick": "OOH_LONG"
+  },
+  {
+   "sel": "clean",
+   "section": "A",
+   "seed": 101,
+   "pick": "AH_LONG"
+  },
+  {
+   "sel": "all",
+   "section": "hook",
+   "seed": 0,
+   "pick": "HEY_HEY"
+  },
+  {
+   "sel": "all",
+   "section": "hook",
+   "seed": 7,
+   "pick": "HE_CUT_THE_MUSIC"
+  },
+  {
+   "sel": "all",
+   "section": "hook",
+   "seed": 30,
+   "pick": "NOW_LONG"
+  },
+  {
+   "sel": "all",
+   "section": "hook",
+   "seed": 101,
+   "pick": "UH_SHORT"
+  },
+  {
+   "sel": "all",
+   "section": "verse",
+   "seed": 0,
+   "pick": "HEY_HEY"
+  },
+  {
+   "sel": "all",
+   "section": "verse",
+   "seed": 7,
+   "pick": "HE_CUT_THE_MUSIC"
+  },
+  {
+   "sel": "all",
+   "section": "verse",
+   "seed": 30,
+   "pick": "NOW_LONG"
+  },
+  {
+   "sel": "all",
+   "section": "verse",
+   "seed": 101,
+   "pick": "UH_SHORT"
+  },
+  {
+   "sel": "all",
+   "section": "showcase",
+   "seed": 0,
+   "pick": "THREE_TWO_ONE"
+  },
+  {
+   "sel": "all",
+   "section": "showcase",
+   "seed": 7,
+   "pick": "TWO"
+  },
+  {
+   "sel": "all",
+   "section": "showcase",
+   "seed": 30,
+   "pick": "YEAH_BOY"
+  },
+  {
+   "sel": "all",
+   "section": "showcase",
+   "seed": 101,
+   "pick": "BOY"
+  },
+  {
+   "sel": "all",
+   "section": "A",
+   "seed": 0,
+   "pick": "AH_ALT"
+  },
+  {
+   "sel": "all",
+   "section": "A",
+   "seed": 7,
+   "pick": "AH_ALT_2"
+  },
+  {
+   "sel": "all",
+   "section": "A",
+   "seed": 30,
+   "pick": "ALRIGHT_STOP"
+  },
+  {
+   "sel": "all",
+   "section": "A",
+   "seed": 101,
+   "pick": "LASER_FX"
+  },
+  {
+   "sel": "bank",
+   "section": "hook",
+   "seed": 0,
+   "pick": "LASER_FX"
+  },
+  {
+   "sel": "bank",
+   "section": "hook",
+   "seed": 7,
+   "pick": "LONG_AH_YEAH"
+  },
+  {
+   "sel": "bank",
+   "section": "hook",
+   "seed": 30,
+   "pick": "SCRATCH_006"
+  },
+  {
+   "sel": "bank",
+   "section": "hook",
+   "seed": 101,
+   "pick": "YEAH_STANDARD"
+  },
+  {
+   "sel": "bank",
+   "section": "verse",
+   "seed": 0,
+   "pick": "STOP_THAT"
+  },
+  {
+   "sel": "bank",
+   "section": "verse",
+   "seed": 7,
+   "pick": "THE_LIKS"
+  },
+  {
+   "sel": "bank",
+   "section": "verse",
+   "seed": 30,
+   "pick": "WELCOME_TO_THE_NEXT_LEVEL"
+  },
+  {
+   "sel": "bank",
+   "section": "verse",
+   "seed": 101,
+   "pick": "FRESH_ALT"
+  },
+  {
+   "sel": "bank",
+   "section": "showcase",
+   "seed": 0,
+   "pick": "UH_SHORT"
+  },
+  {
+   "sel": "bank",
+   "section": "showcase",
+   "seed": 7,
+   "pick": "WELCOME_TO_THE_NEXT_LEVEL"
+  },
+  {
+   "sel": "bank",
+   "section": "showcase",
+   "seed": 30,
+   "pick": "AH_ALT_2"
+  },
+  {
+   "sel": "bank",
+   "section": "showcase",
+   "seed": 101,
+   "pick": "HEY"
+  },
+  {
+   "sel": "bank",
+   "section": "A",
+   "seed": 0,
+   "pick": "FRESH_ALT_4"
+  },
+  {
+   "sel": "bank",
+   "section": "A",
+   "seed": 7,
+   "pick": "FRESH_STANDARD"
+  },
+  {
+   "sel": "bank",
+   "section": "A",
+   "seed": 30,
+   "pick": "HE_CUT_THE_MUSIC"
+  },
+  {
+   "sel": "bank",
+   "section": "A",
+   "seed": 101,
+   "pick": "STOP_THAT"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "hook",
+   "seed": 0,
+   "pick": "FRESH_STANDARD"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "hook",
+   "seed": 7,
+   "pick": "FRESH_YEAH"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "hook",
+   "seed": 30,
+   "pick": "AH_FRESH_FULL_PHRASE"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "hook",
+   "seed": 101,
+   "pick": "FRESH_STANDARD"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "verse",
+   "seed": 0,
+   "pick": "FRESH_YEAH"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "verse",
+   "seed": 7,
+   "pick": "AH_FRESH_FULL_PHRASE"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "verse",
+   "seed": 30,
+   "pick": "FRESH_ALT"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "verse",
+   "seed": 101,
+   "pick": "FRESH_YEAH"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "showcase",
+   "seed": 0,
+   "pick": "FRESH_ALT"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "showcase",
+   "seed": 7,
+   "pick": "FRESH_ALT_4"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "showcase",
+   "seed": 30,
+   "pick": "FRESH_STANDARD"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "showcase",
+   "seed": 101,
+   "pick": "FRESH_ALT"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "A",
+   "seed": 0,
+   "pick": "AH_FRESH_FULL_PHRASE"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "A",
+   "seed": 7,
+   "pick": "FRESH_ALT"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "A",
+   "seed": 30,
+   "pick": "FRESH_ALT_4"
+  },
+  {
+   "sel": "cat:fresh",
+   "section": "A",
+   "seed": 101,
+   "pick": "AH_FRESH_FULL_PHRASE"
+  }
+ ]
+}

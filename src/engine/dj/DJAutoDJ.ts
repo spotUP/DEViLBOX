@@ -40,6 +40,7 @@ import { StandaloneJuggle, mixInPhraseStartOf } from './autodj/juggle/standalone
 import { HARMONIC_CLASH_REJECT } from './autodj/compatibility';
 import { registerAutoDJ } from './autoDJInstance';
 import { DJScratchDJ } from './scratch/DJScratchDJ';
+import { scratchRecordsFor } from './scratch/scratchCatalogue';
 import { createDeckScratchExecutor, deckTempoBpm, emergencyRelease, performTransitionScratch, prepareScratchSource, scratchShapeDecks } from './scratch/autoScratchRuntime';
 import { getScratchVoicePool, getScratchVoicePoolIfActive } from './scratch/scratchVoicePool';
 import { subscribeDjFxFires } from '@/engine/drumpad/DjFxActions';
@@ -1862,7 +1863,7 @@ class DJAutoDJ {
       const song = track?.tracker ? (getDJEngine().getDeck(this.activeDeck).replayer.getSong() as { instruments?: TrackerSampleInstrument[] } | null) : null;
       c.tick({
         perf: this.performanceContext(timeRemaining), deck: this.ab(this.activeDeck), mode, style: choice.style,
-        genre: choice.modifiers, genreHint: choice.genre, profile: choice.profile, scratchPermission: permission,
+        genre: choice.modifiers, genreHint: choice.genre, profile: choice.profile, scratchPermission: permission, records: scratchRecordsFor(s.autoDJScratchRecords),
         hold: transitioning, juggleActive: juggling, userControl,
         juggleShape: juggling ? juggleShapeOf(this.juggle?.currentExecution() ?? null) : null,
         decksPlaying: { A: this.deckPlaying('A'), B: this.deckPlaying('B') },
