@@ -79,13 +79,6 @@ export function faderRampSec(velocity = 1): number {
   return (FADER_RAMP_MS.rest + (FADER_RAMP_MS.max - FADER_RAMP_MS.rest) * k) / 1000;
 }
 
-/** Reference transfer curve: fader position 0..1 -> gain (section 19
- *  "battle-style response"): below `cutIn` silent, then concave to full. */
-export function faderCurve(position: number, mode: FaderCurveMode = 'battle', cutIn = BATTLE_CUT_IN): number {
-  const p = Math.max(0, Math.min(1, (position - cutIn) / Math.max(1e-6, 1 - cutIn)));
-  return 1 - Math.pow(1 - p, FADER_CURVES[mode]);
-}
-
 /**
  * The transfer curve a record-voice cut is performed with (reference `render_gesture`, scratch.py
  * :300-302: every gesture's `curve` defaults to battle, the envelope shaped with cut_in 0): the
