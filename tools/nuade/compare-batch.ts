@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { NuadeHeadless } from '../../src/engine/nuade/nuadeHeadless';
 import { NUADE_FORMAT_LIST, NUADE_FORMATS } from '../../src/engine/nuade/nuadeFormats';
 import { compareSong, measureSwapMs, companionsOf, sha1, ROOT } from './nuadeCompare';
+import { ownSha } from './ownRender';
 import { runBatch, loadResults, saveResults, type Job, type InstrumentCheck, type ResultsFile } from './batch';
 import { songFailures } from './verdictRules';
 
@@ -26,12 +27,12 @@ export const RESULTS_PATH = join(ROOT, 'tools/nuade/nuade-compare.json');
 const KNOWN_GOOD = { format: 'soundmon', song: 'public/data/songs/formats/antidust.bp3' };
 const KNOWN_BAD = { format: 'davidwhittaker', song: 'public/data/songs/formats/apb.dw' };
 
-const wasmSha = (): string => sha1(new Uint8Array(readFileSync(join(ROOT, 'public/nuade/Nuade.wasm'))));
+export const wasmSha = (): string => sha1(new Uint8Array(readFileSync(join(ROOT, 'public/nuade/Nuade.wasm'))));
 
 export function jobsFor(): Job[] {
   const wasm = wasmSha();
   return NUADE_FORMAT_LIST.flatMap((f) => f.corpus.map((song, i) => ({
-    format: f.id, song, first: i === 0, sha: sha1(new Uint8Array(readFileSync(join(ROOT, song)))) + wasm,
+    format: f.id, song, first: i === 0, sha: sha1(new Uint8Array(readFileSync(join(ROOT, song)))) + wasm + (f.role === 'dual' ? ownSha(f.id) : ''),
   })));
 }
 

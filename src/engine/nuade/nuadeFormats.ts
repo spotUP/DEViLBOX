@@ -42,6 +42,8 @@ export interface NuadeFormat {
   defaultEngine: FormatEngineChoice;
   /** Why a replace row stays on UADE: the failing measurement. */
   heldBecause?: string;
+  /** Dual rows: why our engine has no score, so the default stays ours (DN-1 needs both numbers). */
+  ownNote?: string;
   /** 'orderRow': the player's order and row are our grid's; 'tick': follow by player tick (reconstructed grids). */
   followBy: 'orderRow' | 'tick';
 }

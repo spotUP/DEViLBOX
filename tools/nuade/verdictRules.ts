@@ -89,12 +89,18 @@ export function replaceVerdict(i: ReplaceInput): ReplaceVerdict {
 /**
  * DN-1 (owner decision b): nuade is the default of a dual row only if its mean correlation beats ours by >= 0.01 AND no
  * song is worse than ours by more than 0.01; otherwise ours stays. Needs `own` on every song.
+ * Added floor (not in the decision, on the safe side): nuade must itself pass the replace rule's per-song checks (audible,
+ * correlation, lag, song end) with a mean of 0.95. Two engines that both sit far from UADE (instereo2: nuade 0.31, ours
+ * 0.03) say nothing about which one is right, and an end that differs from UADE's (deltamusic2, futurecomposer) changes
+ * what a song-end does. The owner can drop the floor by deleting the two clauses.
  */
 export function dualDefault(songs: SongMeasure[]): { defaultEngine: FormatEngineChoice; nuadeMean: number; ownMean: number } | null {
   const both = songs.filter((s) => !s.error && s.own != null && Number.isFinite(s.correlation));
   if (both.length === 0 || both.length !== songs.length) return null;
   const nuadeMean = mean(both.map((s) => s.correlation)), ownMean = mean(both.map((s) => s.own as number));
-  const beats = nuadeMean - ownMean >= THRESHOLDS.dualMargin - 1e-12;
+  const valid = nuadeMean >= THRESHOLDS.meanCorrelation && songs.every((s) => songFailures(s).length === 0);
+  const beats = nuadeMean - ownMean >= THRESHOLDS.dualMargin - 1e-12 && valid;
   const noneWorse = both.every((s) => (s.own as number) - s.correlation <= THRESHOLDS.dualMargin + 1e-12);
+  // 'native' here means ours stays: the caller maps it to the row's legacy engine.
   return { defaultEngine: beats && noneWorse ? 'nuade' : 'native', nuadeMean, ownMean };
 }

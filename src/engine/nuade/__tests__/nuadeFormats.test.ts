@@ -58,18 +58,19 @@ describe('NS-4 nuade format table', () => {
     for (const f of NUADE_FORMAT_LIST) expect(have.has(f.id), f.id).toBe(true);
   });
 
-  it('a row plays today\'s way unless its recorded verdict moved it: nuade only for a measured replace row, a held row names why, no dual row moves without our engine measured', () => {
+  it('a row plays today\'s way unless its recorded verdict moved it: nuade only for a measured replace row, a held row names why, no dual row moves without our engine measured (DN-1)', () => {
     for (const f of NUADE_FORMAT_LIST) {
       expect(f.legacyEngine, f.id).not.toBe('nuade');
       if (f.defaultEngine === 'nuade') {
-        expect(f.role, f.id).toBe('replace');
         expect(f.uadeEnvelopeCorrelation, `${f.id}: moved to nuade without a measurement`).toBeGreaterThanOrEqual(0.95);
         expect(f.heldBecause, f.id).toBeUndefined();
+        // A dual row moves only by DN-1: it beats our own engine by 0.01 on the mean.
+        if (f.role === 'dual') expect(f.uadeEnvelopeCorrelation! - (f.ownEnvelopeCorrelation ?? Infinity), `${f.id}: DN-1`).toBeGreaterThanOrEqual(0.01 - 1e-9);
       } else {
         expect(f.defaultEngine, `${f.id}: a row that is not on nuade plays its legacy engine`).toBe(f.legacyEngine);
       }
       if (f.heldBecause) expect(f.role, f.id).toBe('replace');
-      if (f.role === 'dual') expect(f.defaultEngine, `${f.id}: our engine is the default until it is measured against nuade`).toBe(f.legacyEngine);
+      if (f.role === 'dual' && f.ownEnvelopeCorrelation == null) expect(f.defaultEngine, `${f.id}: our engine stays the default until it is measured against nuade`).toBe(f.legacyEngine);
     }
   });
 

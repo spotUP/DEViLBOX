@@ -17,6 +17,8 @@ export interface ResultRow extends SongMeasure {
   player: string;
   /** nuade open + seek to the 120 s mark in ms, measured on the format's first corpus song only. */
   swapMs?: number;
+  /** Dual rows: why our engine could not be rendered for this song. */
+  ownError?: string;
   /** Pass for this song alone (the per-song part of the rule). */
   songPass: boolean;
   ms: number;
