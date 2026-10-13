@@ -5,7 +5,7 @@
  * Each handler maps to a DJActions function or reads from useDJStore.
  */
 
-import { useDJStore, type DeckState } from '../../stores/useDJStore';
+import { setMasterDeck, useDJStore, type DeckState } from '../../stores/useDJStore';
 import { useDJPlaylistStore } from '../../stores/useDJPlaylistStore';
 import { scratchRenderModeOf } from '../../engine/dj/scratch/scratchStyles';
 
@@ -22,7 +22,10 @@ export function getDJState(): Record<string, unknown> {
     decks: {
       A: deckSnapshot(s.decks.A),
       B: deckSnapshot(s.decks.B),
+      C: deckSnapshot(s.decks.C),
     },
+    /** The set's master clock (the deck Deck C's tempo follows while it has no track of its own). */
+    masterDeck: setMasterDeck(s),
     crossfaderPosition: s.crossfaderPosition,
     crossfaderCurve: s.crossfaderCurve,
     masterVolume: s.masterVolume,

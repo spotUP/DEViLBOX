@@ -2452,7 +2452,7 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'dj_get_state',
-    'DJ mixer state: decks (playing, BPM, pitch, loaded track, volume, EQ, filter), crossfader, master.',
+    'DJ mixer state: decks A, B and C (playing, BPM, pitch, loaded track, position, volume, EQ, filter; Deck C without a track of its own follows the master deck\'s tempo), masterDeck (the set\'s master clock), crossfader, master.',
     {},
     (p) => call('dj_get_state', p),
   );
