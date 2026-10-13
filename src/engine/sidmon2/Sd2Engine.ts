@@ -101,7 +101,48 @@ export class Sd2Engine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('Sd2Engine not initialized');
+    this.setKeyboardCopy(null);
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+  }
+
+  /** The module the keyboard copy was made from (see keyboardCopy), null while the replayer holds the song or nothing. */
+  private _keyboardFrom: ArrayBuffer | null = null;
+  /** The keyboard voice's own way to the synth that plays the key: open only while the replayer holds a keyboard copy. */
+  private _keyboardOut: GainNode | null = null;
+  private _keyboardDest: AudioNode | null = null;
+
+  private setKeyboardCopy(buffer: ArrayBuffer | null): void {
+    this._keyboardFrom = buffer;
+    if (this._keyboardOut) this._keyboardOut.gain.value = buffer ? 1 : 0;
+  }
+
+  /**
+   * The song's module as a keyboard copy, when the song plays on another engine (nuade): sd2_note_on runs on the module
+   * the replayer holds, and this replayer holds no song then. The worklet renders a keyboard copy only while a key is
+   * down. Its sound leaves through `keyboardTo`: the engine output is routed to the master only while this replayer
+   * plays the song (NativeEngineRouting). Once per module; playback loading the song here replaces it.
+   */
+  keyboardCopy(buffer: ArrayBuffer): void {
+    if (!this.workletNode || this._keyboardFrom === buffer) return;
+    this.setKeyboardCopy(buffer);
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer.slice(0), keyboardOnly: true });
+  }
+
+  /**
+   * Route the keyboard voice to `dest` (the output of the synth that plays the key; one destination at a time, so a
+   * key is heard once). Silent while the replayer plays the song: its output reaches the master then, and a second
+   * path would double the song.
+   */
+  keyboardTo(dest: AudioNode): void {
+    if (!this._keyboardOut) {
+      this._keyboardOut = this.output.context.createGain();
+      this._keyboardOut.gain.value = this._keyboardFrom ? 1 : 0;
+      this.output.connect(this._keyboardOut);
+    }
+    if (this._keyboardDest === dest) return;
+    if (this._keyboardDest) { try { this._keyboardOut.disconnect(this._keyboardDest); } catch { /* already gone */ } }
+    this._keyboardOut.connect(dest);
+    this._keyboardDest = dest;
   }
 
   setChannelGain(channel: number, gain: number): void {
@@ -109,8 +150,9 @@ export class Sd2Engine extends WASMSingletonBase {
   }
 
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
-  stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
-  pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+  // The worklet's stop destroys the module (player_stop): a keyboard copy goes with it.
+  stop(): void { this.setKeyboardCopy(null); this.workletNode?.port.postMessage({ type: 'stop' }); }
+  pause(): void { this.setKeyboardCopy(null); this.workletNode?.port.postMessage({ type: 'stop' }); }
 
   noteOn(instrument: number, note: number, velocity: number): void {
     this.workletNode?.port.postMessage({ type: 'noteOn', instrument, note, velocity });

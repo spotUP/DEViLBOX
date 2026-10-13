@@ -61,6 +61,8 @@ class Sd2Processor extends AudioWorkletProcessor {
 
             heapU8.set(uint8Data, wasmPtr);
             this.module._player_init(wasmPtr, uint8Data.length);
+            // A keyboard copy (the song plays on another engine): only a held key renders, never the song.
+            this.keyboardOnly = !!data.keyboardOnly;
             this.framesPlayed = 0;
             this.subsong = data.subsong > 0 ? data.subsong : 0;
             const free = this.module._free || this.module.free;
@@ -358,6 +360,7 @@ class Sd2Processor extends AudioWorkletProcessor {
 
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.module) return true;
+    if (this.keyboardOnly && !this.previewActive) return true;
     const output = outputs[0];
     if (!output || output.length < 2) return true;
     const outputL = output[0];

@@ -37,6 +37,7 @@ import type { SidMonConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { SidMonEngine } from './SidMonEngine';
 import { Sd2Engine } from '../sidmon2/Sd2Engine';
+import { keyboardModuleOnNuade } from '@/engine/nuade/nuadeKeyboard';
 
 /** A keyboard key (MIDI) to the replayer's note index: grid note = key - 11 (xmConversions), index = grid note - 12. */
 export const sd2NoteForKey = (key: number): number => key - 11 - 12;
@@ -108,10 +109,18 @@ export class SidMonSynth implements DevilboxSynth {
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
     if (this._disposed) return;
     if (this._songSlot > 0) {
-      // The module's replayer (sd2_note_on) plays the instrument exactly as the song does.
+      // The module's replayer (sd2_note_on) plays the instrument exactly as the song does. A song on nuade is not in
+      // that replayer: the key runs on a keyboard copy of its module, heard through this synth's output.
       const key = typeof note === 'string' ? noteToMidi(note) : (note ?? 48);
       const sd2 = Sd2Engine.getInstance();
-      void sd2.ready().then(() => sd2.noteOn(this._songSlot - 1, sd2NoteForKey(key), Math.round((velocity ?? 0.8) * 127)));
+      void sd2.ready().then(() => {
+        const copy = keyboardModuleOnNuade('sd2FileData');
+        if (copy) {
+          sd2.keyboardCopy(copy);
+          sd2.keyboardTo(this.output);
+        }
+        sd2.noteOn(this._songSlot - 1, sd2NoteForKey(key), Math.round((velocity ?? 0.8) * 127));
+      });
       return;
     }
     if (this._playerHandle < 0) return;
