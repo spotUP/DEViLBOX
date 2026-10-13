@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # DEViLBOX pre-commit — affected-only fast gate.
 #
+# Tests the STAGED snapshot (scripts/git-hooks/snapshot.sh, shared with pre-push),
+# never the working tree, so another agent's unfinished edits cannot block a commit.
 # Runs ONLY the test suites that sit next to the staged files (a source file's
 # sibling `__tests__` suite, plus any staged `*.test.ts` directly). This keeps
 # tight-loop commits fast — seconds, not the ~2 min the full `test:ci` glob
@@ -38,8 +40,23 @@ else
 fi
 
 # Resolve the proximity-affected test set for the staged changes.
-# (Kept portable — no `mapfile`, so this works on macOS system bash 3.2 too.)
-FILES_RAW="$(node scripts/git-hooks/affected-tests.mjs || true)"
+# A file that many suites name or import is a shared module: its importers are
+# left to pre-push (--max-importers), or one commit ran 100-200 suites, ~15 min.
+MAX_IMPORTERS="${DEVILBOX_PRECOMMIT_MAX_IMPORTERS:-8}"
+STAGED="$(git diff --cached --name-only --diff-filter=ACMR | tr '\n' ' ')"
+FILES_RAW=""
+# Only src/ and server/src/ TypeScript selects suites; otherwise skip the clone.
+if printf '%s' " $STAGED" | grep -Eq ' (src|server/src)/[^ ]*\.tsx?( |$)'; then
+  # Test the STAGED snapshot, never the working tree: another agent's unfinished
+  # edits must not block (or falsely pass) this commit. Same mechanism as pre-push.
+  SNAP_LABEL=pre-commit
+  # shellcheck source=snapshot.sh
+  . scripts/git-hooks/snapshot.sh
+  install_snapshot_traps
+  materialise "$(git rev-parse HEAD)" "$(git write-tree)"
+  # shellcheck disable=SC2086
+  FILES_RAW="$(in_snapshot node scripts/git-hooks/affected-tests.mjs --max-importers "$MAX_IMPORTERS" --files $STAGED || true)"
+fi
 
 # CRITICAL: an empty list must NEVER reach `vitest run` — with no path args
 # vitest runs the ENTIRE default suite. Bail before that can happen.
@@ -65,7 +82,7 @@ fi
 echo "${YLW}[pre-commit] running ${#FILES[@]} affected test suite(s):${RST}" >&2
 printf '  %s\n' "${FILES[@]}" >&2
 
-if ! npx vitest run --config vite.config.ts "${FILES[@]}"; then
+if ! in_snapshot npx vitest run --config vite.config.ts "${FILES[@]}"; then
   echo "${RED}[pre-commit] affected tests failed — commit aborted.${RST}" >&2
   echo "${RED}  Fix the failures above, or bypass with 'git commit --no-verify'.${RST}" >&2
   exit 1

@@ -114,37 +114,10 @@ fi
 # falsely pass) the push. Each pushed commit is materialised into a temporary
 # directory (a throwaway --shared clone: no worktree, no index or ref changes here) that
 # reuses this checkout's node_modules, and removed again on every exit path.
-SNAP=""
-cleanup_snapshot() { [ -n "$SNAP" ] && rm -rf "$SNAP"; SNAP=""; }
-trap cleanup_snapshot EXIT
-# On a signal the running step (npm/tsc/vitest) is stopped first, or it would keep running in a directory
-# that is being deleted.
-stop_children() { pkill -TERM -P $$ 2>/dev/null || true; }
-trap 'stop_children; cleanup_snapshot; exit 130' INT
-trap 'stop_children; cleanup_snapshot; exit 143' TERM
-
-in_snapshot() { ( cd "$SNAP" && "$@" ); }
-
-materialise() {
-  local sha=$1 top nm
-  top="$(pwd)"
-  SNAP="$(mktemp -d "${TMPDIR:-/tmp}/devilbox-prepush.XXXXXX")"
-  echo "${YLW}[pre-push] testing commit ${sha:0:9} (snapshot, not the working tree)…${RST}" >&2
-  # A throwaway clone checked out at the pushed commit, not a bare file tree:
-  # tests may ask git which files the commit tracks (softwarePaulaSingleCopy),
-  # and a git-archive tree has no repository to answer. --shared borrows this
-  # repo's object store (no copy), --no-checkout writes nothing until the
-  # commit is checked out; the clone is not a worktree and registers nothing
-  # here. Rule 2 for tests: read only TRACKED fixtures, or the snapshot (and
-  # any clean checkout) lacks them.
-  git clone --quiet --shared --no-checkout "$top" "$SNAP"
-  git -C "$SNAP" -c advice.detachedHead=false checkout --quiet "$sha"
-  for nm in node_modules server/node_modules; do
-    if [ -d "$top/$nm" ] && [ -d "$SNAP/$(dirname "$nm")" ]; then
-      ln -s "$top/$nm" "$SNAP/$nm"
-    fi
-  done
-}
+SNAP_LABEL=pre-push
+# shellcheck source=snapshot.sh
+. scripts/git-hooks/snapshot.sh
+install_snapshot_traps
 
 # Commits to test: every distinct non-delete local sha of the push; HEAD when
 # invoked by hand with no ref list.
@@ -184,14 +157,14 @@ affected_tests() {
   local base=$1 sha=$2 changed files
   changed="$(git diff --name-only "$base" "$sha")"
   # shellcheck disable=SC2086
-  files="$(cd "$SNAP" && node scripts/git-hooks/affected-tests.mjs --files $changed)"
+  files="$(in_snapshot node scripts/git-hooks/affected-tests.mjs --files $changed)"
   if [ -z "$files" ]; then
     echo "no test suite reads the changed files"
     return 0
   fi
   echo "$files"
   # shellcheck disable=SC2086
-  (cd "$SNAP" && VITEST_TIER=fast npx vitest run --config vite.config.ts --passWithNoTests $files)
+  in_snapshot env VITEST_TIER=fast npx vitest run --config vite.config.ts --passWithNoTests $files
 }
 
 for sha in $SHAS; do

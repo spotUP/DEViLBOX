@@ -40,7 +40,7 @@ const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).tri
 
 const filesArg = process.argv.indexOf('--files');
 const changed = filesArg >= 0
-  ? process.argv.slice(filesArg + 1)
+  ? process.argv.slice(filesArg + 1).filter((a, i, all) => a !== '--max-importers' && all[i - 1] !== '--max-importers')
   : execSync('git diff --cached --name-only --diff-filter=ACMR', {
     encoding: 'utf8',
     cwd: root,
@@ -79,14 +79,7 @@ function siblingTests(sourceFile) {
  * '../DeckPatternDisplay') failed only in CI. Generic module names (index,
  * types) would select half the suite and are left to CI.
  */
-function sourceTextTests(sourceFiles) {
-  const names = [...new Set(sourceFiles.map((f) => basename(f)))];
-  if (names.length === 0) return [];
-  const stems = [...new Set(names.map((n) => basename(n, extname(n))))].filter((st) => st !== 'index' && st !== 'types');
-  const patterns = [
-    ...names.flatMap((n) => ['-e', n]),
-    ...stems.flatMap((st) => ['-e', `/${st}'`, '-e', `/${st}"`]),
-  ];
+function grepTests(patterns) {
   try {
     return execFileSync(
       'git',
@@ -96,6 +89,29 @@ function sourceTextTests(sourceFiles) {
   } catch {
     return []; // git grep exits 1 when nothing matches
   }
+}
+
+/**
+ * `--max-importers N` (the pre-commit gate): a file that more than N suites
+ * name in their text or import by module path is a shared module (a store, a registry). Selecting all
+ * of its importers made one commit run 100-200 suites (~15 min); for such a
+ * file only its sibling suite runs (staged tests run too), and the rest is left to pre-push, which passes no cap and so selects every importer.
+ */
+const capArg = process.argv.indexOf('--max-importers');
+const maxImporters = capArg >= 0 ? Number(process.argv[capArg + 1]) : Infinity;
+
+function sourceTextTests(sourceFiles) {
+  const out = new Set();
+  for (const f of sourceFiles) {
+    const name = basename(f);
+    const stem = basename(name, extname(name));
+    const named = grepTests(['-e', name]);
+    if (named.length <= maxImporters) for (const t of named) out.add(t);
+    if (stem === 'index' || stem === 'types') continue;
+    const importers = grepTests(['-e', `/${stem}'`, '-e', `/${stem}"`]);
+    if (importers.length <= maxImporters) for (const t of importers) out.add(t);
+  }
+  return [...out];
 }
 
 const set = new Set();
