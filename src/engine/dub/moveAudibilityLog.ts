@@ -50,10 +50,21 @@ const pending = new Map<string, Pending>();
 let unsubs: Array<() => void> = [];
 
 const db = (p: number) => Math.round(10 * Math.log10(Math.max(p, 1e-12)) * 10) / 10;
+// The meters join the graph only while they are read (runTimer): an
+// analyser is processed every quantum with everything upstream of it.
+let meterSources: Array<[AudioNode, AnalyserNode]> = [];
+let metersJoined = false;
+function joinMeters(join: boolean): void {
+  if (join === metersJoined) return;
+  metersJoined = join;
+  for (const [node, an] of meterSources) {
+    try { if (join) node.connect(an); else node.disconnect(an); } catch { /* node gone */ }
+  }
+}
 function meter(node: AudioNode): Meter {
   const an = node.context.createAnalyser();
   an.fftSize = 2048;
-  node.connect(an);
+  meterSources.push([node, an]);
   return { an, buf: new Float32Array(2048), hist: [] };
 }
 function read(m: Meter): number {
@@ -101,6 +112,7 @@ function tick(): void {
  */
 function runTimer(): void {
   const want = !!meters && (isSounding() || pending.size > 0);
+  joinMeters(want);
   if (want && !timer) {
     timer = setInterval(tick, TICK_MS);
   } else if (!want && timer) {
@@ -116,6 +128,8 @@ export function installMoveAudibilityLog(nodes: { input: AudioNode; ret: AudioNo
   unsubs = [];
   if (timer) { clearInterval(timer); timer = null; }
   pending.clear();
+  joinMeters(false);
+  meterSources = [];
   meters = null;
   if (!nodes) return;
   meters = { input: meter(nodes.input), ret: meter(nodes.ret), master: meter(nodes.master) };

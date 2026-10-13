@@ -11,6 +11,7 @@ import * as Tone from 'tone';
 import { TrackerReplayer, type TrackerSong } from '@/engine/TrackerReplayer';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
+import { tapWhileSounding, isSounding, subscribeSounding } from '@/engine/audio/signalPresence';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { ScratchPlayback, getPatternByName, type PatternStart } from './DJScratchEngine';
@@ -35,6 +36,35 @@ import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
 import { recueDeck, type DeckRecueResult } from './scratch/deckRecue';
 import type { DeckScratchSnapshot } from './scratch/scratchSnapshot';
+
+
+/** Past the signal gate's ~2 s hangover: a deck woken by a silent action unplugs again. */
+const IDLE_RECHECK_MS = 2500;
+
+/**
+ * The deck actions that only read (get*, is*, has*) or tear down (dispose):
+ * they never make sound, and the per-frame readers must not keep a deck
+ * plugged in. Every other method - play, cue, scratch, a pattern, a loop,
+ * a nudge, any method added later - wakes the deck first.
+ */
+export function deckActionIsSilent(name: string): boolean {
+  return /^(get|is|has)[A-Z]/.test(name) || name === 'dispose' || name === 'wake';
+}
+
+/** Route every sound-capable public method of a deck through deck.wake(). */
+function wakeOnEveryAction(deck: DeckEngine): void {
+  const proto = Object.getPrototypeOf(deck) as Record<string, unknown>;
+  for (const name of Object.getOwnPropertyNames(proto)) {
+    if (name === 'constructor' || name.startsWith('_') || deckActionIsSilent(name)) continue;
+    const desc = Object.getOwnPropertyDescriptor(proto, name);
+    if (!desc || typeof desc.value !== 'function') continue;
+    const action = desc.value as (...a: unknown[]) => unknown;
+    Object.defineProperty(deck, name, {
+      configurable: true, writable: true,
+      value: function (this: DeckEngine, ...args: unknown[]) { deck.wake(); return action.apply(this, args); },
+    });
+  }
+}
 
 export type PlaybackMode = 'tracker' | 'audio';
 
@@ -210,6 +240,8 @@ export class DeckEngine {
   /** Delays feeding the scopes / the meter the heard signal (output latency). */
   private _scopeDelay: DelayNode | null = null;
   private _meterDelay: DelayNode | null = null;
+  private _untapScope: (() => void) | null = null;
+  private _untapMeter: (() => void) | null = null;
 
   // Scratch/LFO reverb send — taps audio pre-fader, feeds through a short
   // reverb that bypasses the channelGain gate, creating a reverb tail that
@@ -286,12 +318,15 @@ export class DeckEngine {
     const nativeOutput = getNativeAudioNode(options.outputNode as unknown as Record<string, unknown>);
     if (nativeChannelGain && nativeOutput) {
       nativeChannelGain.connect(limiter);
-      safety.output.connect(nativeOutput);
+      this._plugOutput = () => safety.output.connect(nativeOutput);
+      this._unplugOutput = () => safety.output.disconnect(nativeOutput);
     } else {
       // Fallback to Tone-level wiring when either node has no native handle
       // (e.g., test doubles) — bypasses the limiter but keeps audio flowing.
-      this.channelGain.connect(options.outputNode);
+      this._plugOutput = () => this.channelGain.connect(options.outputNode);
+      this._unplugOutput = () => this.channelGain.disconnect(options.outputNode);
     }
+    this._plugOutput();
     // Visual taps read the HEARD signal: each goes through a delay of the
     // output latency (audioLatency.syncHeardDelay), else scopes and meters
     // lead the audio by outputLatency.
@@ -299,10 +334,16 @@ export class DeckEngine {
     this._scopeDelay = ctx.createDelay(HEARD_DELAY_MAX_SEC);
     this._meterDelay = ctx.createDelay(HEARD_DELAY_MAX_SEC);
     this._syncHeardDelays();
+    // The taps join the graph only while the app sounds (tapWhileSounding):
+    // an idle deck's analysers and their delays are not processed.
     if (nativeChannelGain) {
-      nativeChannelGain.connect(this._scopeDelay);
-      Tone.connect(this._scopeDelay, this.waveformAnalyser);
-      Tone.connect(this._scopeDelay, this.fftAnalyser);
+      const scopeDelay = this._scopeDelay;
+      Tone.connect(scopeDelay, this.waveformAnalyser);
+      Tone.connect(scopeDelay, this.fftAnalyser);
+      this._untapScope = tapWhileSounding(
+        () => nativeChannelGain.connect(scopeDelay),
+        () => nativeChannelGain.disconnect(scopeDelay),
+      );
     } else {
       this.channelGain.connect(this.waveformAnalyser);
       this.channelGain.connect(this.fftAnalyser);
@@ -310,8 +351,12 @@ export class DeckEngine {
     // VU meter taps post-limiter to show actual output level
     const nativeMeterInput = getNativeAudioNode(this.meter as unknown as Record<string, unknown>);
     if (nativeMeterInput) {
-      safety.output.connect(this._meterDelay);
-      this._meterDelay.connect(nativeMeterInput);
+      const meterDelay = this._meterDelay;
+      meterDelay.connect(nativeMeterInput);
+      this._untapMeter = tapWhileSounding(
+        () => safety.output.connect(meterDelay),
+        () => safety.output.disconnect(meterDelay),
+      );
     } else {
       this.channelGain.connect(this.meter);
     }
@@ -424,6 +469,51 @@ export class DeckEngine {
 
     // Kick off async worklet init (non-blocking)
     void this._initScratchBuffer();
+
+    wakeOnEveryAction(this);
+    this._unsubIdle = subscribeSounding(() => this._unplugIfIdle());
+  }
+
+  // ── Idle unplug ─────────────────────────────────────────────────────────
+  //
+  // A stopped deck in a silent app leaves the graph: its output edge to the
+  // mixer is cut, so Chrome stops processing its player, isolator EQ,
+  // filters, Key Lock and limiter (an idle DJ view cost ~15 % of a core of
+  // audio thread, measured 2026-10-12). A cut deck cannot make the sound
+  // that would wake the signal gate, so the wake comes from intent: every
+  // action on the deck runs through wakeOnEveryAction, which plugs the deck
+  // back in synchronously, before the action starts anything - the first
+  // quantum it renders reaches the mixer, no added latency.
+
+  private _plugOutput: () => void = () => {};
+  private _unplugOutput: () => void = () => {};
+  private _plugged = true;
+  private _unsubIdle: (() => void) | null = null;
+  private _idleRecheck: ReturnType<typeof setTimeout> | null = null;
+
+  /** Whether the deck's output reaches the mixer right now (tests, MCP). */
+  get isPluggedIn(): boolean { return this._plugged; }
+
+  /** Plug the deck back in. The single wake every deck action passes through. */
+  wake(): void {
+    if (!this._plugged) {
+      try { this._plugOutput(); } catch { /* disposed */ }
+      this._plugged = true;
+    }
+    // A knob turned on a silent, stopped deck plugs it in; unplug it again
+    // once the app has stayed silent past the signal gate's hangover.
+    if (this._idleRecheck) clearTimeout(this._idleRecheck);
+    this._idleRecheck = setTimeout(() => { this._idleRecheck = null; this._unplugIfIdle(); }, IDLE_RECHECK_MS);
+  }
+
+  private _deckIdle(): boolean {
+    return !this.isPlaying() && !this._isScratchActive && !this.isPatternActive();
+  }
+
+  private _unplugIfIdle(): void {
+    if (!this._plugged || isSounding() || !this._deckIdle()) return;
+    try { this._unplugOutput(); } catch { /* disposed */ }
+    this._plugged = false;
   }
 
   /**
@@ -2465,6 +2555,9 @@ export class DeckEngine {
   }
 
   dispose(): void {
+    this._unsubIdle?.();
+    this._unsubIdle = null;
+    if (this._idleRecheck) clearTimeout(this._idleRecheck);
     this.unsubscribeChannelMask?.();
     this.unsubscribeChannelMask = null;
     this.channelMute.dispose();
@@ -2502,6 +2595,7 @@ export class DeckEngine {
     this.deckGain.dispose();
     try { this._brickwallLimiter?.disconnect(); } catch { /* already disconnected */ }
     try { this._scopeDelay?.disconnect(); } catch { /* already disconnected */ }
+    this._untapScope?.(); this._untapMeter?.();
     try { this._meterDelay?.disconnect(); } catch { /* already disconnected */ }
     try { this._reverbSend?.disconnect(); } catch { /* already disconnected */ }
     try { this._scratchSpace?.dispose(); } catch { /* already disconnected */ }

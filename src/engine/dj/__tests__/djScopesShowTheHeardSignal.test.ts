@@ -31,6 +31,11 @@ describe('DJ scopes and meters show the heard signal', () => {
     const { DeckEngine } = await import('../DeckEngine');
     const out = new Tone.Gain(1);
     out.connect(Tone.getDestination().input as never);
+    // The deck plays, so the app sounds: the signal-presence listener (not
+    // built in an offline render) would report it, and the scope taps join
+    // the graph only then (engine/audio/signalPresence.ts).
+    const { _setSoundingForTest } = await import('@/engine/audio/signalPresence');
+    _setSoundingForTest(true);
     const deck = new DeckEngine({ id: 'A', outputNode: out });
     await audioLoadsSettled(400, 20000);
 
@@ -50,6 +55,7 @@ describe('DJ scopes and meters show the heard signal', () => {
     void at(q(ONSET + LATENCY / 2), 'renderedNotHeard');
     void at(q(ONSET + LATENCY * 1.5), 'heard');
     await ctx.startRendering();
+    _setSoundingForTest(false);
 
     expect(readings.renderedNotHeard, JSON.stringify(readings)).toBeLessThan(0.01);
     expect(readings.heard, JSON.stringify(readings)).toBeGreaterThan(0.3);

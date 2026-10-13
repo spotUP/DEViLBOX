@@ -31,19 +31,106 @@ function creator(): string {
     const m = line.match(/\/src\/([^?:)]+)/);
     if (m && !m[1].includes('workletProfiler')) return m[1];
   }
-  const tone = stack.includes('/tone') ? 'tone.js' : '?';
-  return tone;
+  if (stack.includes('/tone')) return 'tone.js';
+  // A built bundle has no source paths: name the first app frame by its asset
+  // and position, which the build's source maps (or the bundle) resolve.
+  // Frames: Error, creator, countNode, the create/constructor wrapper, then the caller.
+  for (const line of stack.split('\n').slice(4)) {
+    const m = line.match(/\/assets\/([^/?:)]+):(\d+):(\d+)/);
+    if (m && !line.includes('workletProfiler')) return `${m[1]}:${m[3]}`;
+  }
+  return '?';
 }
+
+/** Who made each live node, and its edges: enough to say what keeps a part of the graph running. */
+const nodeKey = new WeakMap<object, string>();
+const nodeRefs = new Set<WeakRef<AudioNode>>();
+const outEdges = new WeakMap<AudioNode, Set<AudioNode>>();
+const inEdges = new WeakMap<AudioNode, Set<AudioNode>>();
 
 function countNode(type: string, node: object): void {
   const key = `${type} ${creator()}`;
+  nodeKey.set(node, key);
+  if (typeof WeakRef !== 'undefined' && node instanceof AudioNode) nodeRefs.add(new WeakRef(node));
   created.set(key, (created.get(key) ?? 0) + 1);
   alive.set(key, (alive.get(key) ?? 0) + 1);
   finalizer?.register(node, key);
 }
 
-function installNodeCensus(): void {
+function edgeSet(map: WeakMap<AudioNode, Set<AudioNode>>, n: AudioNode): Set<AudioNode> {
+  let set = map.get(n);
+  if (!set) { set = new Set(); map.set(n, set); }
+  return set;
+}
+
+/** Record node-to-node edges (AudioParam targets are not tracked). */
+function installEdgeCensus(): void {
+  const proto = AudioNode.prototype as unknown as Record<string, unknown>;
+  const connect = proto.connect as (this: AudioNode, ...a: unknown[]) => unknown;
+  const disconnect = proto.disconnect as (this: AudioNode, ...a: unknown[]) => unknown;
+  proto.connect = function (this: AudioNode, ...args: unknown[]) {
+    const r = connect.apply(this, args);
+    const dst = args[0];
+    if (dst instanceof AudioNode) { edgeSet(outEdges, this).add(dst); edgeSet(inEdges, dst).add(this); }
+    return r;
+  };
+  proto.disconnect = function (this: AudioNode, ...args: unknown[]) {
+    const r = disconnect.apply(this, args);
+    const dst = args[0];
+    const outs = outEdges.get(this);
+    if (dst instanceof AudioNode) {
+      // A connection with output/input indices may remain; good enough for a census.
+      outs?.delete(dst); inEdges.get(dst)?.delete(this);
+    } else if (dst === undefined || typeof dst === 'number') {
+      for (const d of outs ?? []) inEdges.get(d)?.delete(this);
+      outs?.clear();
+    }
+    return r;
+  };
+}
+
+function upstream(from: AudioNode, into: Set<AudioNode>): void {
+  const stack = [from];
+  while (stack.length) {
+    const n = stack.pop()!;
+    for (const src of inEdges.get(n) ?? []) {
+      if (!into.has(src)) { into.add(src); stack.push(src); }
+    }
+  }
+}
+
+/**
+ * What keeps the audio thread busy besides the output: Chrome processes
+ * every AnalyserNode and every AudioWorkletNode with inputs each quantum,
+ * with everything upstream of it, whether or not the output hears it. For
+ * each such node, how many nodes it alone keeps running (not already pulled
+ * by the destination), by creator, largest first.
+ */
+export function readPullCensus(): { pulledByDestination: number; extraPullers: Array<{ node: string; keepsRunning: number }> } {
+  const live: AudioNode[] = [];
+  for (const ref of nodeRefs) { const n = ref.deref(); if (n) live.push(n); else nodeRefs.delete(ref); }
+  const destPulled = new Set<AudioNode>();
+  for (const n of live) {
+    for (const d of outEdges.get(n) ?? []) if (d instanceof AudioDestinationNode) { destPulled.add(n); upstream(n, destPulled); }
+  }
+  const pullers: Array<{ node: string; keepsRunning: number }> = [];
+  for (const n of live) {
+    if (destPulled.has(n)) continue;
+    const auto = n instanceof AnalyserNode || (n instanceof AudioWorkletNode && (inEdges.get(n)?.size ?? 0) > 0);
+    if (!auto) continue;
+    const up = new Set<AudioNode>();
+    upstream(n, up);
+    let extra = 1;
+    for (const u of up) if (!destPulled.has(u)) extra++;
+    pullers.push({ node: nodeKey.get(n) ?? n.constructor.name, keepsRunning: extra });
+  }
+  pullers.sort((a, b) => b.keepsRunning - a.keepsRunning);
+  return { pulledByDestination: destPulled.size, extraPullers: pullers.slice(0, 25) };
+}
+
+export function installNodeCensus(): void {
   if (finalizer || typeof FinalizationRegistry === 'undefined') return;
+  installEdgeCensus();
   finalizer = new FinalizationRegistry((type: string) => alive.set(type, (alive.get(type) ?? 1) - 1));
   const proto = BaseAudioContext.prototype as unknown as Record<string, unknown>;
   for (const key of Object.getOwnPropertyNames(proto)) {

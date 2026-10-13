@@ -89,7 +89,7 @@ describe('the BASS crossover', () => {
 describe('the trim meters the programme before the insert', () => {
   it('taps the insert source when the insert point is registered', () => {
     const body = methodBody('registerMasterInsertPoint(source: AudioNode, dest: AudioNode): void {');
-    expect(body).toContain('source.connect(probe);');
+    expect(body).toContain('tapWhileSounding(() => source.connect(probe), () => source.disconnect(probe))');
     expect(body).toContain('this._preInsertProbe = probe;');
   });
 
@@ -158,8 +158,8 @@ describe('the trim is ridden from the clipper input', () => {
   // The predictive trim was short on a tune whose energy is all under the
   // corner; the clipper paid — "clips/dists" (2026-09-22).
   it('meters both clipper feeds in one analyser, over a whole tick', () => {
-    expect(source).toContain('this.masterLowMidDip.connect(this._clipInProbe);');
-    expect(source).toContain('this.returnTrim.connect(this._clipInProbe);');
+    expect(source).toContain('this._tap(this.masterLowMidDip, this._clipInProbe);');
+    expect(source).toContain('this._tap(this.returnTrim, this._clipInProbe);');
     expect(source).toContain('this._clipInProbe.fftSize = 32768;');
   });
 
@@ -168,8 +168,8 @@ describe('the trim is ridden from the clipper input', () => {
     expect(watch).toContain('this._trimRide = rideTrim(this._trimRide, this._clipInputPeak(), this._clipReferencePeak());');
     // The reference: the same sum without the shelf — dry before the shelf
     // plus the return — so the ride answers only for what the boost adds.
-    expect(source).toContain('this.masterHpf.connect(this._clipRefProbe);');
-    expect(source).toContain('this.returnTrim.connect(this._clipRefProbe);');
+    expect(source).toContain('this._tap(this.masterHpf, this._clipRefProbe);');
+    expect(source).toContain('this._tap(this.returnTrim, this._clipRefProbe);');
     expect(methodBody('private _applyMasterTrim(')).not.toContain('rideTrim(');
   });
 

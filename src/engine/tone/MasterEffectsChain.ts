@@ -7,13 +7,14 @@ import { getEffectGainCompensation } from '../factories/effectGainCompensation';
 import { applyWetGain } from '../factories/EffectFactory';
 import { refreshChannelIsolation, getChannelIsolationSnapshot } from './ChannelRoutedEffects';
 import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel, channelRoleTargets, onSongChange } from './sidechainKey';
+import { tapWhileSounding } from '../audio/signalPresence';
 
 export interface MasterEffectsContext {
   masterEffectsInput: Tone.Gain;
   blepInput: Tone.Gain;
   masterEffectsNodes: Tone.ToneAudioNode[];
   masterEffectConfigs: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }>;
-  masterEffectAnalysers: Map<string, { pre: AnalyserNode; post: AnalyserNode }>;
+  masterEffectAnalysers: Map<string, { pre: AnalyserNode; post: AnalyserNode; untap?: () => void }>;
   masterEffectsRebuildVersion: number;
   _isPlaying: boolean;
   _notifyNoiseEffectsPlaying: (playing: boolean) => void;
@@ -260,7 +261,8 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
     ctx.masterEffectsNodes = ctx.masterEffectsNodes.filter(n => !oldNodes.includes(n));
     // Clear the OLD config map (snapshotted), not the current one
     oldConfigs.clear();
-    oldAnalysers.forEach(({ pre, post }) => {
+    oldAnalysers.forEach(({ pre, post, untap }) => {
+      untap?.();
       try { pre.disconnect(); } catch { /* */ }
       try { post.disconnect(); } catch { /* */ }
     });
@@ -423,11 +425,11 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
     const preNative = preOutputNode
       ? getNativeAudioNode(preOutputNode)
       : getNativeAudioNode(preSourceToneNode);
+    // Both taps join the graph only while the app sounds (tapWhileSounding):
+    // an analyser is processed every quantum whether its scope is open or not.
+    const untaps: Array<() => void> = [];
     if (preNative) {
-      try { preNative.connect(pre); } catch (e) {
-        // Non-fatal: analyser just won't show data for this effect
-        console.debug('[ToneEngine] Pre-analyser tap failed for effect', config.id, e);
-      }
+      untaps.push(tapWhileSounding(() => preNative.connect(pre), () => preNative.disconnect(pre)));
     } else {
       // Some effect types don't expose their internal AudioNode — analyser won't display
       console.debug('[ToneEngine] Pre-analyser: could not get native node for effect', config.id);
@@ -439,14 +441,12 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
       ? getNativeAudioNode(postOutputNode)
       : getNativeAudioNode(successNodes[i]);
     if (postNative) {
-      try { postNative.connect(post); } catch (e) {
-        console.debug('[ToneEngine] Post-analyser tap failed for effect', config.id, e);
-      }
+      untaps.push(tapWhileSounding(() => postNative.connect(post), () => postNative.disconnect(post)));
     } else {
       console.debug('[ToneEngine] Post-analyser: could not get native node for effect', config.id);
     }
 
-    ctx.masterEffectAnalysers.set(config.id, { pre, post });
+    ctx.masterEffectAnalysers.set(config.id, { pre, post, untap: () => untaps.forEach((u) => u()) });
   }
 
   // Sync playback state into freshly created noise-generating nodes
