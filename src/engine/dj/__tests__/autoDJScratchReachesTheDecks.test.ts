@@ -50,6 +50,8 @@ import { ScratchExecutor, scratchExecutorStats, type ScratchRun } from '../scrat
 import { scratchOpportunityStats } from '../scratch/scratchOpportunity';
 import { demoRoutineStats } from '../scratch/scratchDemoRoutines';
 import { scratchPlacementStats } from '../scratch/scratchPlacement';
+import { scratchDJStats } from '../scratch/DJScratchDJ';
+import { DEFAULT_SCRATCH_RENDER } from '../scratch/scratchStyles';
 import { getScratchVoicePool, resetScratchVoicePool, scratchPoolStats } from '../scratch/scratchVoicePool';
 import { scratchRenderStats, DEMO_PROFILES } from '../scratch/scratchRender';
 import { deckCStats } from '../scratch/scratchDeckC';
@@ -74,7 +76,7 @@ function scratchDeck(startSec: number) {
   });
 }
 
-async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style') {
+async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style', render: string | null = 'section', bars = 8) {
   const track = corpusAnalysis('breakdowns');
   const breakdown = track.sections.find((s) => s.kind === 'breakdown')!;
   const startSec = timeAtBeat(track.beatGrid, barStartBeat(track.downbeats, breakdown.startBar - 2)) + 0.05;
@@ -95,6 +97,8 @@ async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style'
   pl.setActivePlaylist(id);
   const s = useDJStore.getState();
   s.setAutoDJConfig({ shuffle: false, style: 'Club', juggleMode: 'OFF', scratchMode: mode, scratchStyle: 'battle', scratchRecords: records });
+  // null: the store's own default Render (the demo's three_deck)
+  s.setAutoDJConfig({ scratchRender: render ?? DEFAULT_SCRATCH_RENDER });
   s.setDeckState('A', { fileName: 'breakdowns.wav', trackName: 'breakdowns', isPlaying: true, detectedBPM: 125, effectiveBPM: 125, durationMs: 600_000, audioPosition: startSec, pitchOffset: 0, trackAnalysis: track });
   s.setDeckState('B', { fileName: null, trackName: '', isPlaying: false, trackAnalysis: null, beatGrid: null, audioPosition: 0 });
   s.setAutoDJEnabled(true);
@@ -119,14 +123,17 @@ async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style'
   const before = {
     find: scratchOpportunityStats.find, select: demoRoutineStats.overlayRecord, phrase: scratchPlacementStats.planPhrase,
     started: scratchExecutorStats.started, rendered: scratchPoolStats.rendered, decisions: getDecisionLog().counts.SCRATCH ?? 0,
-    gestures: scratchRenderStats.gestures, strokes: deckCStats.strokes,
+    gestures: scratchRenderStats.gestures, strokes: deckCStats.strokes, routines: scratchDJStats.routines, threeDeck: demoRoutineStats.threeDeck,
   };
 
   vi.useFakeTimers();
   dj.startPolling();
-  const endSec = timeAtBeat(track.beatGrid, barStartBeat(track.downbeats, breakdown.startBar + 8));
+  const endSec = timeAtBeat(track.beatGrid, barStartBeat(track.downbeats, breakdown.startBar + bars));
   while (deck.position() < endSec) await vi.advanceTimersByTimeAsync(20);
   dj.stopPolling();
+  const lastPlan = (dj.scratch as { lastPlan: { routine?: string; events: Array<{ layer?: string; render?: { chain?: string } }> } | null } | null)?.lastPlan ?? null;
+  // a routine planned whole is cancelled here (its 32 bars are not waited for); an overlay window plays out
+  if (render !== 'section' && mode !== 'OFF') (dj.scratch as { reset(r: string): void } | null)?.reset('test end');
   // the window already planned plays out (the performer plans a phrase ahead)
   for (let t = 0; t < 60_000 && runs.some((r) => r.run.state === 'pending' || r.run.state === 'running' || r.run.state === 'ending'); t += 20) await vi.advanceTimersByTimeAsync(20);
   vi.useRealTimers();
@@ -134,12 +141,13 @@ async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style'
 
   const newDecisions = (getDecisionLog().counts.SCRATCH ?? 0) - before.decisions;
   return {
-    track, deck, runs, decisions: newDecisions > 0 ? getDecisionLog().list(newDecisions, 'SCRATCH') : [], memory: controller.memory.snapshot(),
+    track, deck, runs, lastPlan, decisions: newDecisions > 0 ? getDecisionLog().list(newDecisions, 'SCRATCH') : [], memory: controller.memory.snapshot(),
     counts: {
       find: scratchOpportunityStats.find - before.find, select: demoRoutineStats.overlayRecord - before.select, phrase: scratchPlacementStats.planPhrase - before.phrase,
       started: scratchExecutorStats.started - before.started, rendered: scratchPoolStats.rendered - before.rendered,
       decisions: (getDecisionLog().counts.SCRATCH ?? 0) - before.decisions,
       gestures: scratchRenderStats.gestures - before.gestures, strokes: deckCStats.strokes - before.strokes,
+      routines: scratchDJStats.routines - before.routines, threeDeck: demoRoutineStats.threeDeck - before.threeDeck,
     },
   };
 }
@@ -151,7 +159,7 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
     dj.stopPolling();
     useDJStore.getState().setAutoDJEnabled(false);
     useDJStore.getState().setAutoDJStatus('idle');
-    useDJStore.getState().setAutoDJConfig({ scratchMode: 'MUSICAL', scratchStyle: 'auto', scratchRecords: 'style' });
+    useDJStore.getState().setAutoDJConfig({ scratchMode: 'MUSICAL', scratchStyle: 'auto', scratchRecords: 'style', scratchRender: DEFAULT_SCRATCH_RENDER });
     setSessionController(null);
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -218,9 +226,33 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
     expect(off.counts.rendered).toBe(0);
   }, 240_000);
 
+  // S2 (owner 2026-10-13): the demo's Render mode is an Auto Scratch setting, DEFAULT three_deck; the 32-bar routine
+  // plays back to back from the next phrase with no set-phase / mode gate - here MUSICAL while the set CRUISES
+  it('Render (default three_deck): MUSICAL while cruising plays the three-deck routine from the next phrase; dj_routine the scratch_dj routine', async () => {
+    const three = await run('MUSICAL', 'style', null, 6);
+    expect(useDJStore.getState().autoDJScratchRender).toBe('three_deck');
+    expect(three.counts.routines).toBe(1);
+    expect(three.counts.threeDeck).toBe(1);
+    expect(three.lastPlan?.routine).toBe('threeDeck');
+    expect(three.lastPlan!.events.every((e) => e.layer === 'demo' && e.render?.chain === 'threeDeck')).toBe(true);
+    // what fired before the end is the routine's, rendered and summed on its Deck C bus
+    expect(three.runs.length).toBeGreaterThanOrEqual(1);
+    expect(three.runs.every((r) => r.run.event.render?.chain === 'threeDeck')).toBe(true);
+    expect(three.counts.gestures).toBeGreaterThanOrEqual(1);
+    vi.restoreAllMocks();
+    // the MCP's set_auto_dj_config sets the same store field the panel's Scratch Render select does
+    const { setAutoDJConfig } = await import('@/bridge/handlers/djHandlers');
+    expect(await setAutoDJConfig({ scratchRender: 'dj_routine' })).toMatchObject({ scratchRender: 'dj_routine' });
+    expect(useDJStore.getState().autoDJScratchRender).toBe('dj_routine');
+    const dj = await run('MUSICAL', 'style', 'dj_routine', 6);
+    expect(dj.counts.routines).toBe(1);
+    expect(dj.lastPlan?.routine).toBe('scratchDj');
+    expect(dj.runs.every((r) => r.run.event.render?.chain === 'scratchDj')).toBe(true);
+  }, 240_000);
+
   it('Auto Scratch OFF: the same run plans and performs nothing', async () => {
     const { counts, runs, deck } = await run('OFF');
-    expect(counts).toEqual({ find: 0, select: 0, phrase: 0, started: 0, rendered: 0, decisions: 0, gestures: 0, strokes: 0 });
+    expect(counts).toEqual({ find: 0, select: 0, phrase: 0, started: 0, rendered: 0, decisions: 0, gestures: 0, strokes: 0, routines: 0, threeDeck: 0 });
     expect(runs).toHaveLength(0);
     expect(deck.touched.velocity + deck.touched.pattern).toBe(0);
   }, 180_000);

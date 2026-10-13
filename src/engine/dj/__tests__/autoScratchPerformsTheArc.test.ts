@@ -67,17 +67,22 @@ describe('Auto Scratch performs the arc (SCR-P6.R6)', () => {
     const phaseReadsBefore = scratchArcStats.phaseAt;
     const threeDeckBefore = demoRoutineStats.threeDeck;
     const bookendsBefore = scratchDJStats.bookends;
-    const end = barT(drop.startBar + 32) + 0.05;
+    // to the routine's last moment: the next one (Render three_deck, back to back) is planned a bar ahead
+    const end = barT(drop.startBar + 32) - 0.01;
     let nextPoll = sec;
-    while (sec < end) {
-      if (sec >= nextPoll) { ctrl.tick({ perf: perfAt(track, sec), deck: 'A', mode: 'PERFORMER', style: 'electro', scratchPermission: 1 }); nextPoll += 0.02; }
-      sec += 0.005;
-      for (const fn of [...intervals]) fn();
-    }
+    const runTo = (until: number): void => {
+      while (sec < until) {
+        if (sec >= nextPoll) { ctrl.tick({ perf: perfAt(track, sec), deck: 'A', mode: 'PERFORMER', style: 'electro', scratchPermission: 1, render: 'three_deck' }); nextPoll += 0.02; }
+        sec += 0.005;
+        for (const fn of [...intervals]) fn();
+      }
+    };
+    runTo(end);
 
     expect(scratchArcStats.phaseAt - phaseReadsBefore).toBe(32);
     const t = ctrl.telemetry();
-    expect(demoRoutineStats.threeDeck - threeDeckBefore).toBe(1);
+    // S2: the Render mode plays the routine back to back - the next one is already planned from bar 32
+    expect(demoRoutineStats.threeDeck - threeDeckBefore).toBe(2);
     expect([...new Set(t.arcPhases)]).toEqual(['establish', 'build', 'half_bar', 'reorder', 'scratch_feat', 'juggle_feat', 'combined', 'final_burst', 'resolution']);
     expect(t.arcPhases).toHaveLength(32);
     const featureEvents = scheduled.filter((e) => e.executeAtBeat >= barStartBeat(track.downbeats, drop.startBar) && e.executeAtBeat < barStartBeat(track.downbeats, drop.startBar + 32));
@@ -87,17 +92,19 @@ describe('Auto Scratch performs the arc (SCR-P6.R6)', () => {
     expect(32 - busyBars.size).toBeGreaterThanOrEqual(4);
     expect(featureEvents.some((e) => e.role === 'OUTRO')).toBe(true);
     // SCR-PG-CR (C8): the routine opens with the needle drop on its first downbeat and closes with the lift
-    expect(scratchDJStats.bookends - bookendsBefore).toBe(1);
+    expect(scratchDJStats.bookends - bookendsBefore).toBe(2);
     const sorted = [...featureEvents].sort((a, b) => a.executeAtBeat - b.executeAtBeat);
     expect(sorted[0]!.gesture).toBe('needleDrop');
     expect(sorted[0]!.executeAtBeat).toBe(barStartBeat(track.downbeats, drop.startBar));
     expect(sorted[sorted.length - 1]!.gesture).toBe('needleLift');
     expect(ctrl.memory.entries).toHaveLength(16);
-    // the performer walked the section 51 states into the feature and out to a rest
+    // the performer walked the section 51 states into the feature and out to a rest, then into the next routine
+    runTo(barT(drop.startBar + 32) + 0.05);
     const path = ctrl.states.history.map((h) => h.to);
     expect(path).toEqual(expect.arrayContaining(['LISTENING', 'SETUP', 'FEATURE', 'REST']));
     expect(path.indexOf('SETUP')).toBeLessThan(path.indexOf('FEATURE'));
-    expect(ctrl.budget.total).toBeLessThan(75); // back toward zero after the feature (section 55)
+    // (section 55's decay after a feature no longer shows here: Render three_deck lifts the budget again for the
+    // next routine, back to back)
 
     // switch Auto Scratch off: IDLE, and what the strokes changed is back
     ctrl.tick({ perf: perfAt(track, sec), deck: 'A', mode: 'OFF', style: 'electro', scratchPermission: 1 });

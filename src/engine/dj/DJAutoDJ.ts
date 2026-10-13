@@ -44,7 +44,7 @@ import { scratchRecordsFor } from './scratch/scratchCatalogue';
 import { createDeckScratchExecutor, deckTempoBpm, emergencyRelease, performTransitionScratch, prepareScratchSource, scratchShapeDecks } from './scratch/autoScratchRuntime';
 import { getScratchVoicePool, getScratchVoicePoolIfActive } from './scratch/scratchVoicePool';
 import { subscribeDjFxFires } from '@/engine/drumpad/DjFxActions';
-import { scratchModeOf, scratchStyleFor } from './scratch/scratchStyles';
+import { scratchModeOf, scratchRenderModeOf, scratchStyleFor } from './scratch/scratchStyles';
 import { trackerSampleInfos, type TrackerSampleInstrument } from './scratch/trackerSampleSource';
 import { HAND_COSTS, juggleCost, juggleLevelForIntensity, scratchPermission, transitionCost } from './autodj/performanceBudget';
 
@@ -1863,7 +1863,7 @@ class DJAutoDJ {
       const song = track?.tracker ? (getDJEngine().getDeck(this.activeDeck).replayer.getSong() as { instruments?: TrackerSampleInstrument[] } | null) : null;
       c.tick({
         perf: this.performanceContext(timeRemaining), deck: this.ab(this.activeDeck), mode, style: choice.style,
-        genre: choice.modifiers, genreHint: choice.genre, profile: choice.profile, scratchPermission: permission, records: scratchRecordsFor(s.autoDJScratchRecords),
+        genre: choice.modifiers, genreHint: choice.genre, profile: choice.profile, scratchPermission: permission, records: scratchRecordsFor(s.autoDJScratchRecords), render: scratchRenderModeOf(s.autoDJScratchRender),
         hold: transitioning, juggleActive: juggling, userControl,
         juggleShape: juggling ? juggleShapeOf(this.juggle?.currentExecution() ?? null) : null,
         decksPlaying: { A: this.deckPlaying('A'), B: this.deckPlaying('B') },
@@ -1912,6 +1912,8 @@ class DJAutoDJ {
       const input = this.tickInput(performanceMode, timeRemaining, userControl);
       // Section 27: the juggle gets the hands the scratch and the transition leave.
       input.otherHands = (this.scratch?.handsInUse() ?? 0) + (transitioning ? transitionCost(this.execution?.plan.style) : 0);
+      // C15: while the three-deck routine's Deck C plays, the A/B decks only play and fade (a running juggle releases)
+      input.deckCHolds = this.scratch?.deckCHoldsTheJuggle() ?? null;
       j.tick(input);
       if (performanceMode === 'JUGGLE' && !j.isActive()) standalone.consider(status, input);
     } catch (err) {
