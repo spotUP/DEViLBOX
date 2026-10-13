@@ -5,7 +5,7 @@ import { isS3MFormat, parseS3MFile } from '../formats/S3MParser';
 
 const S3M_FILE = resolve(
   import.meta.dirname,
-  '../../../../server/data/modland-cache/files/pub__modules__Screamtracker 3__- unknown__1 (1).s3m'
+  '../../../__tests__/fixtures/classifier-corpus/a touch of spring-purple motion.s3m'
 );
 
 function loadFile(path: string): ArrayBuffer {
@@ -30,15 +30,15 @@ describe('isS3MFormat', () => {
   });
 });
 
-describe('parseS3MFile — 1 (1).s3m (- unknown)', () => {
+describe('parseS3MFile — a touch of spring-purple motion.s3m', () => {
   it('parses without throwing', () => {
     const ab = loadFile(S3M_FILE);
-    expect(() => parseS3MFile(ab, '1 (1).s3m')).not.toThrow();
+    expect(() => parseS3MFile(ab, 'a touch of spring-purple motion.s3m')).not.toThrow();
   });
 
   it('returns correct format and basic metadata', () => {
     const ab = loadFile(S3M_FILE);
-    const song = parseS3MFile(ab, '1 (1).s3m');
+    const song = parseS3MFile(ab, 'a touch of spring-purple motion.s3m');
     expect(song.format).toBe('S3M');
     expect(song.numChannels).toBeGreaterThan(0);
     expect(song.initialBPM).toBeGreaterThan(0);
@@ -47,24 +47,24 @@ describe('parseS3MFile — 1 (1).s3m (- unknown)', () => {
 
   it('has a valid song order list', () => {
     const ab = loadFile(S3M_FILE);
-    const song = parseS3MFile(ab, '1 (1).s3m');
+    const song = parseS3MFile(ab, 'a touch of spring-purple motion.s3m');
     expect(song.songPositions.length).toBeGreaterThan(0);
     expect(song.songLength).toBe(song.songPositions.length);
   });
 
   it('has patterns', () => {
     const ab = loadFile(S3M_FILE);
-    const song = parseS3MFile(ab, '1 (1).s3m');
+    const song = parseS3MFile(ab, 'a touch of spring-purple motion.s3m');
     expect(song.patterns.length).toBeGreaterThan(0);
   });
 
   it('has instruments', () => {
     const ab = loadFile(S3M_FILE);
-    const song = parseS3MFile(ab, '1 (1).s3m');
+    const song = parseS3MFile(ab, 'a touch of spring-purple motion.s3m');
     expect(song.instruments.length).toBeGreaterThan(0);
     const withPcm = song.instruments.filter(
       i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
     );
-    console.log(`1 (1).s3m: ${song.instruments.length} instruments, ${withPcm.length} with PCM`);
+    console.log(`a touch of spring-purple motion.s3m: ${song.instruments.length} instruments, ${withPcm.length} with PCM`);
   });
 });
