@@ -224,7 +224,10 @@ describe('NAB-1 our own engine rendered headless', () => {
     expect(r?.error).toBeUndefined();
     expect(r!.peak).toBeGreaterThan(0.05);
     expect(r!.rms).toBeGreaterThan(0.02);
-    expect(await renderOwn('hippel', 'public/data/songs/formats/prehistoric_tale.hipc', 2)).toBeNull();
+    const h = await renderOwn('hippel', 'public/data/songs/formats/prehistoric_tale.hipc', 5);
+    expect(h?.error).toBeUndefined();
+    expect(h!.peak).toBeGreaterThan(0.05);
+    expect(await renderOwn('suntronic', 'public/data/songs/formats/msx-cracktro 2.sun', 2)).toBeNull();
     expect(Object.keys(OWN_ENGINES).every((id) => NUADE_FORMATS[id]?.role === 'dual')).toBe(true);
   }, 60_000);
 
