@@ -117,4 +117,36 @@ describe('pre-commit gate stays fast and isolated', () => {
       fs.rmSync(repo, { recursive: true, force: true });
     }
   });
+  it('the kept snapshot is reused between commits, follows the new staged content, drops leftovers and releases its lock', () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'precommit-kept-'));
+    const env = cleanEnv();
+    const git = (...a: string[]) => execFileSync('git', a, { cwd: repo, encoding: 'utf8', env }).trim();
+    try {
+      git('init', '-q');
+      git('config', 'user.email', 't@t');
+      git('config', 'user.name', 't');
+      fs.writeFileSync(path.join(repo, 'a.txt'), 'base\n');
+      git('add', 'a.txt');
+      git('commit', '-q', '-m', 'base');
+      const run = (content: string) => {
+        fs.writeFileSync(path.join(repo, 'a.txt'), content);
+        git('add', 'a.txt');
+        const script = `. ${path.join(root, 'scripts/git-hooks/snapshot.sh')}
+          SNAP_LABEL=test; YLW=; RST=
+          materialise_reusable "$(git rev-parse HEAD)" "$(git write-tree)" 2>/dev/null
+          echo "$SNAP"; cat "$SNAP/a.txt"; [ -e "$SNAP/leftover.txt" ] && echo LEFT || echo CLEAN; touch "$SNAP/leftover.txt"
+          cleanup_snapshot`;
+        return execFileSync('bash', ['-c', script], { cwd: repo, encoding: 'utf8', env }).split('\n');
+      };
+      const first = run('one\n');
+      const second = run('two\n');
+      expect(first[0]).toBe(second[0]); // same directory: reused, not re-cloned
+      expect(first[1]).toBe('one');
+      expect(second[1]).toBe('two');
+      expect(second[2]).toBe('CLEAN'); // run one's untracked leftover was cleaned before run two
+      expect(fs.existsSync(`${second[0]}.lock`)).toBe(false); // released
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  });
 });
