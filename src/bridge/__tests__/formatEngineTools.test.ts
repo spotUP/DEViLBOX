@@ -22,7 +22,11 @@ beforeEach(() => {
 describe('NS-10 get_format_engines / set_format_engine', () => {
   it('lists the table with choices, effective engine and default, and filters by key or player id', () => {
     const all = getFormatEngines() as { count: number; rows: { id: string }[] };
-    expect(all.count).toBe(114);
+    expect(all.count).toBe(121);
+    // the seven EaglePlayer rows (NUADE-EAGLEPLAYER-7) are listed, choose between Our Engine and nuade, and set_format_engine refuses UADE for them
+    const eagle = (getFormatEngines({ format: 'daveLowe' }) as { rows: Record<string, unknown>[] }).rows;
+    expect(eagle.map((r) => r.id)).toEqual(['davelowe']);
+    expect(eagle[0]).toMatchObject({ role: 'dual', choices: ['native', 'nuade'], effective: NUADE_FORMATS.davelowe!.defaultEngine });
     const one = (getFormatEngines({ format: 'soundmon' }) as { rows: Record<string, unknown>[] }).rows;
     expect(one).toHaveLength(1);
     // effective / default are rollout data (nuadeVerdicts.ts): read them from the table
@@ -35,6 +39,7 @@ describe('NS-10 get_format_engines / set_format_engine', () => {
     expect((getFormatEngines({ format: 'mmdc' }) as { rows: { effective: string }[] }).rows[0]!.effective).toBe('nuade');
     expect(await setFormatEngine({ format: 'nonsense', engine: 'nuade' })).toMatchObject({ error: expect.stringContaining('unknown format') });
     expect(await setFormatEngine({ format: 'mmdc', engine: 'native' })).toMatchObject({ error: expect.stringContaining('cannot play') });
+    expect(await setFormatEngine({ format: 'davelowe', engine: 'uade' })).toMatchObject({ error: expect.stringContaining('cannot play') });
   });
 
   it('reports a row in the vocabulary of its choices, and a choice can always be undone (live MCP report: Rob Hubbard said native, offered uade|nuade, refused native)', async () => {

@@ -21,7 +21,7 @@ export const NUADE_PREF_KEYS: readonly string[] = Array.from(new Set(NUADE_FORMA
  * all three. Anything else in the store (a value from an older build, or a hand edit) is not a choice of this row.
  */
 export function honourableChoices(row: NuadeFormat): FormatEngineChoice[] {
-  return row.role === 'dual' ? ['native', 'uade', 'nuade'] : [row.legacyEngine, 'nuade'];
+  return row.role === 'dual' ? (row.eagleRunner ? ['native', 'nuade'] : ['native', 'uade', 'nuade']) : [row.legacyEngine, 'nuade'];
 }
 
 /** The explicit stored choice of `key` when its row can honour it, else undefined (the table default applies). */
@@ -42,7 +42,7 @@ export function effectiveFormatEngine(prefs: FormatEngineMap | FormatEnginePrefe
  * three. 'uade' on a replace row means what plays today (its legacyEngine), so the route keeps its behaviour.
  */
 export function engineChoicesFor(row: NuadeFormat): FormatEngineChoice[] {
-  return row.role === 'dual' ? ['native', 'uade', 'nuade'] : ['uade', 'nuade'];
+  return row.role === 'dual' ? (row.eagleRunner ? ['native', 'nuade'] : ['native', 'uade', 'nuade']) : ['uade', 'nuade'];
 }
 
 /** The value the store keeps for a choice on a row: a replace row's 'uade' is its legacy engine. */
@@ -113,7 +113,14 @@ export async function nuadePlayerFor(filename: string, bytes: Uint8Array, prefs:
 }
 
 /** Settings v14: the store keeps only explicit choices for the table's keys, so persisted defaults are dropped. */
-export function dropPersistedNuadeDefaults(formatEngine: Record<string, unknown> | undefined): void {
+export function dropPersistedNuadeDefaults(formatEngine: Record<string, unknown> | undefined, keys: readonly string[] = NUADE_PREF_KEYS): void {
   if (!formatEngine) return;
-  for (const key of NUADE_PREF_KEYS) delete formatEngine[key];
+  for (const key of keys) delete formatEngine[key];
 }
+
+/**
+ * Settings v15: the seven EaglePlayer rows joined the table (NUADE-EAGLEPLAYER-7). Their keys still held the store's old
+ * default ('uade' or 'native', never an explicit choice: the routes ignored it), which would pin the measured default.
+ * Only these keys are dropped: every other key of the table may hold a real choice made since v14.
+ */
+export const EAGLE_RUNNER_PREF_KEYS: readonly string[] = Array.from(new Set(NUADE_FORMAT_LIST.filter((f) => f.eagleRunner).map((f) => f.prefKey)));

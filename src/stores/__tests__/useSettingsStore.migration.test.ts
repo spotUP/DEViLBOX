@@ -162,9 +162,26 @@ describe('useSettingsStore - v14 nuade format keys', () => {
     expect((fresh.formatEngine as unknown as Record<string, unknown>).mmdc).toBeUndefined();
     fresh.setFormatEngine('mmdc', 'nuade');
     const raw = JSON.parse(localStorage.getItem(STORE_KEY)!) as { version: number; state: { formatEngine: Record<string, string> } };
-    expect(raw.version).toBe(14);
+    expect(raw.version).toBe(15);
     expect(raw.state.formatEngine.mmdc).toBe('nuade');
     const again = await freshLoad();
     expect((again.formatEngine as unknown as Record<string, unknown>).mmdc).toBe('nuade');
+  });
+});
+
+/**
+ * v15 (NUADE-EAGLEPLAYER-7): the seven EaglePlayer formats joined the table. A v14 store still holds their old defaults
+ * (daveLowe 'uade', anders0land 'native' ...), which would pin the measured default; only those keys go, a real choice
+ * made on another key since v14 stays.
+ */
+describe('useSettingsStore - v15 EaglePlayer format keys', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('drops the stored defaults of the seven EaglePlayer keys and keeps an explicit choice on any other table key', async () => {
+    seed(14, { formatEngine: { daveLowe: 'uade', anders0land: 'native', coreDesign: 'uade', soundPlayer: 'uade', wallyBeben: 'uade', benDaglishSID: 'uade', beathovenSynthesizer: 'native', mmdc: 'nuade', mod: 'native' } });
+    const fe = (await freshLoad()).formatEngine as unknown as Record<string, unknown>;
+    for (const k of ['daveLowe', 'anders0land', 'coreDesign', 'soundPlayer', 'wallyBeben', 'benDaglishSID', 'beathovenSynthesizer']) expect(fe[k], k).toBeUndefined();
+    expect(fe.mmdc).toBe('nuade');
+    expect(fe.mod).toBe('native');
   });
 });

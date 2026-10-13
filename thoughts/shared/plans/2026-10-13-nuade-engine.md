@@ -801,3 +801,25 @@ gate), hippel 0.9827 (ours 0.9722), instereo1 0.9728 (ours 0.9438), sidmon2 0.98
   when Sd2 is not the song engine. Not built: the audio-graph routing (Sd2 output into the synth vs NativeEngineRouting's
   route when Sd2 plays the song) needs a browser check before it can be done without doubling legacy playback.
   Other nuade-default rows have no LIVE_EDIT 'pass' entry, so they lose nothing they had.
+
+## NUADE-EAGLEPLAYER-7: the seven EaglePlayer formats as dual rows (AE01-AE07, owner 2026-10-14)
+
+Owner: nuade's C players are the future (more editable), so the seven formats that stayed on the Musashi runner get nuade
+too; research doc line ~152 ("Keep ours") is superseded for them. Procedure = the other dual rows (D8 + DN-1 floor,
+`tools/nuade` batch, apply-verdicts writes the defaults). All seven players are in the committed Nuade.wasm (121 players
+= 81 replace + 40 dual rows). Legacy engine = the EaglePlayer runner, stored as `native` ("Our Engine"); `eagleRunner: true`
+on the row removes UADE from its choices (the routes never hand playback to UADE, so that option would do nothing).
+Measured 2026-10-14, 30 s, 20 ms envelope, best lag, against UADE (nuade / EaglePlayer -> default):
+
+- [x] AE01 andersoland -- 0.985 / 0.993 -> ours (EaglePlayer)
+- [x] AE02 beathoven -- 0.884 / 0.976 -> ours; nuade fails the floor (tristar cracktro.bss 0.883 < 0.90)
+- [x] AE03 bendaglishsid -- 0.915 / 0.948 -> ours; nuade mean 0.915 < 0.95 floor
+- [x] AE04 coredesign -- 0.984 / 0.9995 -> ours; nuade ends at 23.1 s where UADE plays on (end agreement fails)
+- [x] AE05 davelowe -- 0.985 / 0.997 -> ours (corpus: incredibleshrinkingsphere.dl and m-bison.dln, the player lists dln too)
+- [x] AE06 scottjohnston -- 0.892 / 0.990 -> ours; nuade fails the floor (sjs.tune1 0.854 < 0.90)
+- [x] AE07 wallybeben -- 0.956 / 0.991 -> ours
+- [x] AE-1 `ownRender.ts` renders the EaglePlayer runner headless (`load: 'eagle'`, player picked by the song's prefix) so DN-1 has both numbers.
+- [x] AE-2 Settings v15 drops the stored old defaults of the seven keys (a stored `native` would pin the measured default); keys made optional in `FormatEnginePreferences`, store defaults removed. Test: useSettingsStore.migration.test.ts v15.
+- [x] AE-3 Reachability: src/engine/__tests__/nuadeEaglePlayerRows.test.ts (parseModuleToSong -> EaglePlayer on `native`, Nuade on `nuade`, live scores = recorded, DN-1 = table default; 16 tests); DJ deck through nuade: src/engine/dj/__tests__/djNuadeEaglePlayerRowRenders.test.ts (wallybeben, 4 voice scopes). Both in test:ci.
+- [x] AE-4 Settings > Playback Engines (121 rows) and get_format_engines list the rows; set_format_engine refuses UADE for them (playbackEnginesPanel.test.tsx, formatEngineTools.test.ts).
+- [x] AE-5 nuadeFormats.test.ts: 40 dual rows; the pre-nuade default test knows an EaglePlayer row's old stored default was never read.

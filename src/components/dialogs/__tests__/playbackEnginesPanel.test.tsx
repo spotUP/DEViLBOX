@@ -11,11 +11,11 @@ vi.mock('@/lib/song/switchFormatEngine', () => ({ switchFormatEngine: async () =
 afterEach(cleanup);
 
 describe('NS-9 Playback Engines tab', () => {
-  it('is a tab of the settings dialog and lists all 114 rows, filterable by name', () => {
+  it('is a tab of the settings dialog and lists all 121 rows, filterable by name', () => {
     expect(SETTINGS_TABS.find((t) => t.id === 'engines')?.label).toBe('Playback Engines');
-    expect(NUADE_FORMAT_LIST.length).toBe(114);
+    expect(NUADE_FORMAT_LIST.length).toBe(121);
     const { container, getByLabelText } = render(<PlaybackEnginesPanel />);
-    expect(container.querySelectorAll('[data-testid^="engine-row-"]').length).toBe(114);
+    expect(container.querySelectorAll('[data-testid^="engine-row-"]').length).toBe(121);
     fireEvent.change(getByLabelText('Filter formats'), { target: { value: 'hubbard' } });
     const ids = Array.from(container.querySelectorAll('[data-testid^="engine-row-"]')).map((e) => e.getAttribute('data-testid'));
     expect(ids).toEqual(['engine-row-robhubbard', 'engine-row-robhubbardst']);
