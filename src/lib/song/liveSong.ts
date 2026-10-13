@@ -83,6 +83,7 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     nuadePlayerId: fmt.nuadePlayerId ?? undefined,
     nuadeFileName: fmt.nuadeFileName ?? undefined,
     nuadeSubsong: fmt.nuadeSubsong ?? undefined,
+    nuadeModuleFields: fmt.nuadeModuleFields ?? undefined,
     eaglePlayerId: fmt.eaglePlayerId ?? undefined,
     eaglePlayerFileName: fmt.eaglePlayerFileName ?? undefined,
     eaglePlayerSubsong: fmt.eaglePlayerSubsong ?? undefined,

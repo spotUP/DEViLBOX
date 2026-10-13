@@ -36,6 +36,7 @@ import { walkDavidWhittaker } from '@/lib/import/formats/DavidWhittakerWasmExtra
 import { buildDWGridFromWalk, fitEffectColumns } from '@/lib/import/formats/davidWhittakerGrid';
 import { DW_FX } from '@/lib/import/formats/davidWhittakerEffectGlyphs';
 import type { Pattern } from '@/types';
+import { pinEditPathEngine } from '@/engine/__tests__/helpers/pinEditPathEngine';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const bytesOf = (rel: string): ArrayBuffer => {
@@ -277,6 +278,8 @@ describe('Hippel TFMX: lethalxcess-intro.hip7 (2 subsongs) and warp (ingame 2).h
 
 describe('Rob Hubbard budokan.rh: 6 songs, played by UADE', { timeout: 180_000 }, () => {
   const REL = 'public/data/songs/rob-hubbard/budokan.rh';
+  // Played by UADE: pinned, the table's default for this row follows the playback verdicts (nuade since c20c5c8ba).
+  beforeAll(() => pinEditPathEngine('robhubbard'));
 
   it('scans six, opens song 3 with the grid of the player walk of it, and its export keeps the bytes and takes an edit', async () => {
     const bytes = bytesOf(REL);

@@ -149,6 +149,8 @@ export interface FormatStore {
   nuadeFileName: string | null;
   /** Subsong NuadeEngine starts (0-based; nativeSubsongs start field) */
   nuadeSubsong: number | null;
+  /** The own-route fields that held the module (TrackerSong.nuadeModuleFields) */
+  nuadeModuleFields: string[] | null;
   /** Module + eagleplayer for EaglePlayerEngine (eaglePlayerFormats.ts) */
   eaglePlayerFileData: ArrayBuffer | null;
   eaglePlayerId: string | null;
@@ -570,6 +572,7 @@ export const useFormatStore = create<FormatStore>()(
     nuadePlayerId: null,
     nuadeFileName: null,
     nuadeSubsong: null,
+    nuadeModuleFields: null,
     eaglePlayerFileData: null,
     eaglePlayerId: null,
     eaglePlayerFileName: null,
@@ -1157,6 +1160,7 @@ export const useFormatStore = create<FormatStore>()(
         state.nuadePlayerId = (song as any).nuadePlayerId ?? null;
         state.nuadeFileName = (song as any).nuadeFileName ?? null;
         state.nuadeSubsong = (song as any).nuadeSubsong ?? null;
+        state.nuadeModuleFields = (song as any).nuadeModuleFields ?? null;
         state.eaglePlayerFileData = (song as any).eaglePlayerFileData ?? null;
         state.eaglePlayerId = (song as any).eaglePlayerId ?? null;
         state.eaglePlayerFileName = (song as any).eaglePlayerFileName ?? null;
@@ -1507,6 +1511,7 @@ export const useFormatStore = create<FormatStore>()(
       state.nuadePlayerId = null;
       state.nuadeFileName = null;
       state.nuadeSubsong = null;
+      state.nuadeModuleFields = null;
       state.eaglePlayerFileData = null;
       state.eaglePlayerId = null;
       state.eaglePlayerFileName = null;

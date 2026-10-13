@@ -386,6 +386,12 @@ export interface TrackerSong {
   nuadeFileName?: string;
   /** Subsong to start (0-based), the native subsong model's start field */
   nuadeSubsong?: number;
+  /**
+   * The fields of the format's own route that held this same module (hippelFileData, uadeEditableFileData ...). playOnNuade
+   * takes them off (they would start another engine); the native export puts the module back under them, so the format's
+   * exporter reads it where it always has.
+   */
+  nuadeModuleFields?: string[];
   /** Module for EaglePlayerEngine: its eagleplayer runs on the Musashi host (eagleplayer-wasm) */
   eaglePlayerFileData?: ArrayBuffer;
   /** Which eagleplayer (EAGLE_PLAYER_FORMATS key, src/engine/eagleplayer/eaglePlayerFormats.ts) */
