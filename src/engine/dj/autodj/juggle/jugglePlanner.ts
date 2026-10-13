@@ -119,8 +119,10 @@ export function intensityFor(ctx: DJJugglePerformanceContext, mode: JuggleMode, 
   const cap = budgetFor(ctx, mode, timing).maxIntensity;
   const fromEnergy = 0.2 + 0.6 * ctx.energy + 0.2 * Math.max(0, ctx.targetEnergy - ctx.energy);
   const tension = ctx.tension * 0.2;
-  // Humanization (section 30): small intensity variation, never timing.
-  const wobble = (hash(seed, 11) - 0.5) * 0.1;
+  // Humanization (section 30): small intensity variation, never timing. A pressed Juggle Now
+  // (owner 2026-10-13) skips it: the user's request plays the set's own intensity, so whether a
+  // pattern fits never hangs on the seed. The Auto DJ's own juggles keep it.
+  const wobble = timing.skipTiming ? 0 : (hash(seed, 11) - 0.5) * 0.1;
   return Math.max(0, Math.min(cap, fromEnergy + tension + wobble));
 }
 
