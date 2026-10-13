@@ -392,12 +392,20 @@ export class ScratchVoicePool {
 }
 
 let pool: ScratchVoicePool | null = null;
+let poolEngine: unknown = null;
 
-/** The app's pool: the DJ mixer's sampler input on the live context (lazy), hearing decks A + B for its level. */
+/**
+ * The app's pool: the DJ mixer's sampler input on the live context (lazy), hearing decks A + B for its level. Built
+ * again when the DJ engine is (leaving the DJ view with nothing playing disposes it): a pool on the old mixer would
+ * play into a disposed sampler input and measure its level on disposed deck inputs.
+ */
 export function getScratchVoicePool(): ScratchVoicePool {
+  const engine = getDJEngine();
+  // the engine's mixer is the pool's world: its sampler input (where the buses play) names it
+  if (pool && poolEngine !== engine.mixer.samplerInput) { pool.dispose(); pool = null; }
   if (!pool) {
     const ctx = Tone.getContext().rawContext as BaseAudioContext;
-    const engine = getDJEngine();
+    poolEngine = engine.mixer.samplerInput;
     // decks A and B as the crossfader sends them (X6: the level is 0.60 x their RMS, a module deck's too)
     let beat: GainNode | null = null;
     try {
@@ -417,4 +425,5 @@ export function getScratchVoicePoolIfActive(): ScratchVoicePool | null {
 export function resetScratchVoicePool(): void {
   pool?.dispose();
   pool = null;
+  poolEngine = null;
 }
