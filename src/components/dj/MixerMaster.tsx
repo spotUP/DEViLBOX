@@ -5,12 +5,13 @@
  * with a dual L/R LED-style VU meter and a toggleable limiter.
  */
 
-import React, { useCallback, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import * as DJActions from '@/engine/dj/DJActions';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 
 const VU_SEGMENTS = 12;
 
@@ -39,14 +40,12 @@ export const MixerMaster: React.FC = () => {
   const [levelL, setLevelL] = useState(-Infinity);
   const [levelR, setLevelR] = useState(-Infinity);
   const [limiterActive, setLimiterActive] = useState(false);
-  const rafRef = useRef<number>(0);
-  const mountedRef = useRef(true);
 
   const handleVolumeChange = useCallback((value: number) => {
     DJActions.setMasterVolume(value);
   }, []);
 
-  // Animate stereo VU meter via requestAnimationFrame.
+  // Animate the stereo VU meter.
   // Perf: this loop used to setState L/R/limiter EVERY frame (60fps) even when
   // the tab was hidden or the level hadn't changed — forcing a full re-render of
   // the master strip 60×/s. Now it (a) pauses when the tab is hidden, (b) polls
@@ -56,16 +55,11 @@ export const MixerMaster: React.FC = () => {
   const lastLRef = useRef(-Infinity);
   const lastRRef = useRef(-Infinity);
   const lastLimRef = useRef(false);
-  useEffect(() => {
-    mountedRef.current = true;
+  // The shared gated loop (useFrameGate): 60 fps while the app sounds and
+  // the DJ view is on screen; silent, one reading of the fallen level, then
+  // no analyser read at all.
+  const readMeter = useCallback((): boolean => {
     const EPSILON_DB = 0.25;      // ignore sub-segment jitter (below visible resolution)
-
-    const tick = () => {
-      if (!mountedRef.current) return;
-      rafRef.current = requestAnimationFrame(tick);
-
-      // Skip all work while the tab is hidden. Visible = full 60 fps polling.
-      if (document.hidden) return;
 
       try {
         const raw = getDJEngine().mixer.getMasterLevel();
@@ -83,15 +77,10 @@ export const MixerMaster: React.FC = () => {
       } catch {
         // Engine not ready yet
       }
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      mountedRef.current = false;
-      cancelAnimationFrame(rafRef.current);
-    };
+    return true;
   }, []);
+  useVisualizationAnimation({ onFrame: readMeter, fps: 60 });
+
 
   const segmentsL = levelToSegments(levelL);
   const segmentsR = levelToSegments(levelR);

@@ -547,7 +547,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
                 className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-accent-primary transition-colors"
                 title={showKnobBar ? "Hide knob bank" : "Show knob bank"}
               >
-                {hasMIDIDevice && <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></span>}
+                {hasMIDIDevice && <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse-brief"></span>}
                 <span className="font-bold uppercase">{hasMIDIDevice ? deviceName : 'Knobs'}</span>
                 {showKnobBar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
               </button>
@@ -586,7 +586,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
           {collabStatus === 'connected' && collabRoomCode && (
             <>
               <span className="flex items-center gap-1.5 text-accent-success">
-                <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse-brief" />
                 <span className="font-bold">Collab</span>
                 <span className="font-mono text-[10px] text-text-muted">{collabRoomCode}</span>
               </span>

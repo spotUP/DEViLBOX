@@ -75,6 +75,7 @@ import { reportLoadFailure } from '@/lib/song/reportLoadFailure';
 import { DJErrorBoundary } from './components/dj/DJErrorBoundary';
 import { TourOverlay } from './components/tour/TourOverlay';
 import { useTourStore } from '@stores/useTourStore';
+import { ViewActiveContext } from '@hooks/useFrameGate';
 
 // Lazy-loaded components for better startup performance
 const HelpModal = lazy(() => import('./components/help/HelpModal').then(m => ({ default: m.HelpModal })));
@@ -1129,7 +1130,11 @@ function App() {
               <DJErrorBoundary viewName="DJ">
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading DJ mode...</div>}>
                   <div style={{ display: activeView === 'dj' ? 'contents' : 'none' }}>
-                    <DJView />
+                    {/* Kept mounted while DJ mode plays behind another view; its
+                        picture loops stop while it is off screen (useFrameGate). */}
+                    <ViewActiveContext.Provider value={activeView === 'dj'}>
+                      <DJView />
+                    </ViewActiveContext.Provider>
                   </div>
                 </Suspense>
               </DJErrorBoundary>

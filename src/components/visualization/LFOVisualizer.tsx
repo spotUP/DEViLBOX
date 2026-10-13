@@ -195,7 +195,7 @@ export const LFOVisualizer: React.FC<LFOVisualizerProps> = ({
      padding, setLFOPhase]
   );
 
-  useVisualizationAnimation({ onFrame, enabled: depth > 0, fps: 60 });
+  useVisualizationAnimation({ onFrame, enabled: depth > 0, fps: 60, follows: 'time' });
 
   const canvas = (
     <canvas

@@ -359,6 +359,7 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
     onFrame,
     enabled: true,
     fps: 60,
+    follows: 'time',
   });
 
   const canvas = (

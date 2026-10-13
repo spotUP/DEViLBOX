@@ -191,7 +191,7 @@ const LaneCurveCanvas: React.FC<{
   useEffect(() => { renderFrame(); }, [renderFrame]);
 
   // Continuous playhead animation only while playing (0 CPU when stopped).
-  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 60 });
+  useVisualizationAnimation({ onFrame: renderFrame, enabled: isPlaying, fps: 60, follows: 'time' });
 
   const getMousePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;

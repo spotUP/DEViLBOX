@@ -8,6 +8,7 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { useViewActive } from '@hooks/useFrameGate';
 import { platterPositionSec } from './DeckCssTurntable';
 import { useThemeStore } from '@stores';
 import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
@@ -52,6 +53,14 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
 
   const [isScratchActive, setIsScratchActive] = useState(false);
   const jogActiveRef = useRef(false); // Ref mirror of isScratchActive for subscription closures
+  // Off screen (the DJ view kept mounted behind another view) the platter posts nothing.
+  const viewActive = useViewActive();
+  const viewActiveRef = useRef(viewActive);
+  const wakePositionRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    viewActiveRef.current = viewActive;
+    if (viewActive) wakePositionRef.current?.();
+  }, [viewActive]);
 
   // ── Bridge init ────────────────────────────────────────────────────────────
   // Canvas created imperatively — prevents StrictMode double-transferControlToOffscreen error.
@@ -91,14 +100,23 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     );
 
     // Position: the HEARD position, sampled every frame (the store's 20 Hz
-    // position is held between writes and the raw player runs ahead of the ear).
+    // position is held between writes and the raw player runs ahead of the ear)
+    // - while it moves, which is while the deck's clock anchor has a rate.
+    // Stopped, it changes only with a new anchor (a seek, a cue): one post per
+    // anchor, then the loop sleeps. Off screen (DJ view hidden) it posts nothing.
     let posRaf = 0;
+    const moving = () => useDJStore.getState().decks[deckId].positionAnchor.rate !== 0;
     const postPosition = () => {
+      posRaf = 0;
+      if (!viewActiveRef.current) return;
       bridgeRef.current?.post({ type: 'position', posSec: platterPositionSec(deckId) });
-      posRaf = requestAnimationFrame(postPosition);
+      if (moving()) posRaf = requestAnimationFrame(postPosition);
     };
-    posRaf = requestAnimationFrame(postPosition);
-    const unsubPos = () => cancelAnimationFrame(posRaf);
+    const wakePosition = () => { if (!posRaf) posRaf = requestAnimationFrame(postPosition); };
+    wakePositionRef.current = wakePosition;
+    wakePosition();
+    const unsubAnchor = useDJStore.subscribe((s) => s.decks[deckId].positionAnchor, wakePosition);
+    const unsubPos = () => { cancelAnimationFrame(posRaf); unsubAnchor(); wakePositionRef.current = null; };
 
     // Pattern scratch velocity → turntable spin.
     // When a scratch pattern is active, forward velocity to the worker so the

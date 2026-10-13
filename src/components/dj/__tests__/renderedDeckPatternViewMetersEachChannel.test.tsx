@@ -37,6 +37,7 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { DeckPatternDisplay } from '../DeckPatternDisplay';
 import { useDJStore } from '@/stores/useDJStore';
 import { ChannelScopeTrackBuilder } from '@/engine/dj/channelScopeTrack';
+import { _setSoundingForTest } from '@/engine/audio/signalPresence';
 
 const RATE = 44100;
 const ONSET_SEC = 1;
@@ -52,10 +53,13 @@ function scopeTrack() {
 let frames: FrameRequestCallback[] = [];
 const fills: number[] = [];
 
+/** Display frames, 1/60 s apart (the meters draw at up to 60 fps). */
+let frameTime = 0;
 function runFrames(count: number) {
   for (let k = 0; k < count; k++) {
+    frameTime += 1000 / 60;
     const due = frames; frames = [];
-    for (const f of due) f(performance.now());
+    for (const f of due) f(frameTime);
   }
 }
 
@@ -72,7 +76,11 @@ describe('a rendered module deck\'s pattern view meters each channel', () => {
     holder.positionSec = 0.5;
     holder.waveformCalls = 0;
     frames = [];
+    frameTime = 0;
     fills.length = 0;
+    // The deck plays, so the app sounds: the signal-presence listener reports
+    // it, which is what lets meters draw (hooks/useFrameGate.ts).
+    _setSoundingForTest(true);
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { frames.push(cb); return frames.length; });
     vi.stubGlobal('cancelAnimationFrame', () => {});
     const ctx = {
@@ -86,6 +94,7 @@ describe('a rendered module deck\'s pattern view meters each channel', () => {
   });
   afterEach(() => {
     cleanup();
+    _setSoundingForTest(false);
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     useDJStore.getState().setDeckState('A', { isPlaying: false, fileName: null });

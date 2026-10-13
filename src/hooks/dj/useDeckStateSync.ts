@@ -15,6 +15,7 @@ import type { DeckId } from '@/engine/dj/DeckEngine';
 import * as Tone from 'tone';
 import { heardDeckRow, trackerRowFrom } from './heardDeckRow';
 import { heardAnchorMs, type ClockAnchor, type OutputClockSource } from '@/engine/audioLatency';
+import { subscribeSounding } from '@/engine/audio/signalPresence';
 
 export function useDeckStateSync(deckId: DeckId): void {
   const animFrameRef = useRef<number>(0);
@@ -152,13 +153,42 @@ export function useDeckStateSync(deckId: DeckId): void {
         console.warn('[useDeckStateSync] poll error:', err);
       }
 
+      if (deckBusy(deckId)) animFrameRef.current = requestAnimationFrame(poll);
+      else asleep = true;
+    };
+
+    // A deck that is stopped, still and not scratching has nothing to sync:
+    // the loop sleeps until the deck's store state changes (play, cue, load,
+    // a pattern) or the app sounds (an engine started some other way).
+    let asleep = false;
+    const wake = () => {
+      if (!asleep || !running) return;
+      asleep = false;
       animFrameRef.current = requestAnimationFrame(poll);
     };
+    const unsubs = [
+      useDJStore.subscribe((s) => s.decks[deckId], wake),
+      subscribeSounding(wake),
+    ];
 
     animFrameRef.current = requestAnimationFrame(poll);
     return () => {
       running = false;
+      unsubs.forEach((u) => u());
       cancelAnimationFrame(animFrameRef.current);
     };
   }, [deckId]);
+}
+
+/** Whether a deck's position, play state or scratch can change without a store write. */
+function deckBusy(deckId: DeckId): boolean {
+  const state = useDJStore.getState().decks[deckId];
+  if (state.isPlaying || state.positionAnchor.rate !== 0 || state.activePatternName !== null || state.scratchActive) return true;
+  try {
+    const deck = getDJEngine().getDeck(deckId);
+    if (deck.isScratchActive || deck.isPatternActive()) return true;
+    return deck.playbackMode === 'audio' ? deck.audioPlayer.isCurrentlyPlaying() : deck.replayer.isPlaying();
+  } catch {
+    return true; // engine not ready yet: keep polling until it is
+  }
 }

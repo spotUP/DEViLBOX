@@ -21,6 +21,10 @@ if (!globalThis.__dbxIdleGate) {
     're201-processor', 'fil4-processor', 'aelapse-processor', 'tonearm-processor',
     'calf-phaser-processor', 'dattorro-plate-processor', 'ring-mod-processor',
     'bitta-processor', 'vinyl-noise-processor',
+    // Measured 2026-10-12 with nothing playing: the master reverb and delay,
+    // the DJ decks' Key Lock stretchers and the synth-bus pitch resampler ran
+    // 46 ms of every second of the audio thread between them.
+    'mverb-processor', 'another-delay-processor', 'signalsmith-stretch', 'pitch-resampler',
   ]);
   // -80 dBFS. Not lower: the dub bus's external feedback loop keeps a floor
   // near -91 dBFS circulating with nothing playing (measured), which would
@@ -82,5 +86,32 @@ if (!globalThis.__dbxIdleGate) {
     };
     return originalRegister.call(this, name, Gated);
   };
+  /**
+   * signal-presence: the main thread's view of the same idle state. One node
+   * listens to the context's output; it posts { sounding: true } on the first
+   * quantum above the threshold and { sounding: false } once the output has
+   * stayed under it for HANGOVER_QUANTA, so a reverb or echo tail rings out,
+   * and a meter's fall-off is drawn, before anything stops drawing.
+   * src/engine/audio/signalPresence.ts creates it.
+   */
+  const HANGOVER_QUANTA = 750;  // ~2 s at 48 kHz
+  class SignalPresence extends AudioWorkletProcessor {
+    constructor() {
+      super();
+      this.sounding = false;
+      this.quiet = 0;
+    }
+    process(inputs) {
+      if (!silent(inputs)) {
+        this.quiet = 0;
+        if (!this.sounding) { this.sounding = true; this.port.postMessage({ sounding: true }); }
+      } else if (this.sounding && ++this.quiet >= HANGOVER_QUANTA) {
+        this.sounding = false;
+        this.port.postMessage({ sounding: false });
+      }
+      return true;
+    }
+  }
+  originalRegister.call(globalThis, 'signal-presence', SignalPresence);
   globalThis.__dbxIdleGate = true;
 }

@@ -410,7 +410,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Status Message (ProTracker Style) */}
         {c.statusMessage && (
           <div className="flex items-center px-3 ml-2 pl-3 border-l border-dark-border">
-            <span className="text-accent-primary font-bold tracking-[0.3em] text-[11px] animate-pulse font-mono">
+            <span key={c.statusMessage} className="text-accent-primary font-bold tracking-[0.3em] text-[11px] animate-pulse-brief font-mono">
               {c.statusMessage.toUpperCase()}
             </span>
           </div>
@@ -448,7 +448,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           quality === 'low' ? 'bg-accent-error' :
           quality === 'medium' ? 'bg-orange-400' :
           'bg-green-400'
-        } animate-pulse`} />
+        } animate-pulse-brief`} />
       </div>
       </div>
     </div>

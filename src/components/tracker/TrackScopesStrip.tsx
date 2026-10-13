@@ -13,7 +13,8 @@ import { useOscilloscopeStore, liveScopeFrame } from '@stores/useOscilloscopeSto
 import { useMixerStore } from '@stores/useMixerStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
-import { channelLayout, scopeCells, originShiftFor } from './channelLayout';
+import { channelLayout, scopeCells, originShiftFor, subscribeChannelLayout } from './channelLayout';
+import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 
 const STRIP_HEIGHT = 72;
 
@@ -33,11 +34,11 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
   const oscActive = useOscilloscopeStore(s => s.isActive);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>(0);
   const numChRef = useRef(numChannels);
   const isPlayingRef = useRef(isPlaying);
   const oscActiveRef = useRef(oscActive);
   const analysersEnabledRef = useRef(false);
+  const invalidateRef = useRef<() => void>(() => {});
 
   useEffect(() => { numChRef.current = numChannels; }, [numChannels]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -70,6 +71,7 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
       if (canvas.width !== bw || canvas.height !== bh) {
         canvas.width = bw;
         canvas.height = bh;
+        invalidateRef.current();
       }
     });
     ro.observe(parent);
@@ -99,30 +101,18 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
     ctx.stroke();
   }, []);
 
-  // Animation loop
-  useEffect(() => {
-    let lastTime = 0;
-    const FPS_INTERVAL = 1000 / 30;
-
-    const tick = (now: number) => {
-      // Perf: no draw work while the tab is hidden; loop stays armed and
-      // resumes on the next visible frame.
-      if (document.hidden) { animRef.current = requestAnimationFrame(tick); return; }
-
-      animRef.current = requestAnimationFrame(tick);
-
-      if (now - lastTime < FPS_INTERVAL) return;
-      lastTime = now;
-
+  // One frame of the strip. Driven by the shared gated loop at 30 fps while
+  // the app sounds; asleep, a mute, a label, a colour or a scroll draws one.
+  const drawFrame = useCallback((): boolean => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas) return false;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) return false;
 
       const dpr = window.devicePixelRatio || 1;
       const cw = canvas.width / dpr;
       const ch = canvas.height / dpr;
-      if (cw < 10 || ch < 10) return;
+      if (cw < 10 || ch < 10) return false;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -215,11 +205,22 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
       ctx.moveTo(0, ch - 0.5);
       ctx.lineTo(cw, ch - 0.5);
       ctx.stroke();
-    };
-
-    animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
+      return true;
   }, [drawWaveform]);
+
+  const { invalidate } = useVisualizationAnimation({
+    onFrame: drawFrame,
+    fps: 30,
+    redrawOn: [
+      useMixerStore.subscribe,
+      useTrackerStore.subscribe,
+      useThemeStore.subscribe,
+      useOscilloscopeStore.subscribe,
+      useTransportStore.subscribe,
+      subscribeChannelLayout,
+    ],
+  });
+  useEffect(() => { invalidateRef.current = invalidate; }, [invalidate]);
 
   // Click a channel scope to toggle its mute (solo with modifier): the cell
   // under the pointer, laid out like the drawing (scopeCells).

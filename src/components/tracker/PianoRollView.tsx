@@ -406,15 +406,17 @@ export const PianoRollView: React.FC<PianoRollViewProps> = ({
     ctx.stroke();
   }, [containerSize, scrollX, scrollY, noteBars, noteRange, patternLength, isPlaying, currentRow, allChannels]);
 
-  // Render loop
+  // Render loop. The playhead moves every frame while the song plays;
+  // stopped, the picture changes only with what render() reads, and each such
+  // change makes a new render() - one frame, then the loop sleeps.
   useEffect(() => {
     const frame = () => {
       render();
-      animFrameRef.current = requestAnimationFrame(frame);
+      if (isPlaying) animFrameRef.current = requestAnimationFrame(frame);
     };
     animFrameRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [render]);
+  }, [render, isPlaying]);
 
   // ── Scroll handling ────────────────────────────────────────────────────
 

@@ -11,10 +11,12 @@ import { resolve } from 'node:path';
 
 type Proc = { port: { onmessage: ((e: { data: unknown }) => void) | null }; process(i: Float32Array[][], o: Float32Array[][]): boolean; dsp: number; tail: number };
 const registered = new Map<string, new () => Proc>();
+const posted: unknown[] = [];
 
 beforeAll(() => {
   const g = globalThis as unknown as Record<string, unknown>;
   g.registerProcessor = (name: string, cls: new () => Proc) => { registered.set(name, cls); };
+  g.AudioWorkletProcessor = class { port = { postMessage: (m: unknown) => { posted.push(m); }, onmessage: null }; };
   new Function(readFileSync(resolve(__dirname, '../../../public/worklets/idle-gate.js'), 'utf8'))();
   // An echo-like effect: copies input to output, plus a decaying tail.
   class Echo {
@@ -34,6 +36,9 @@ beforeAll(() => {
   }
   (g.registerProcessor as (n: string, c: unknown) => void)('re201-processor', Echo);
   (g.registerProcessor as (n: string, c: unknown) => void)('tfmx-processor', Echo);
+  for (const name of ['mverb-processor', 'another-delay-processor', 'signalsmith-stretch', 'pitch-resampler']) {
+    (g.registerProcessor as (n: string, c: unknown) => void)(name, Echo);
+  }
 });
 
 const run = (p: Proc, n: number, level = 0) => {
@@ -75,5 +80,46 @@ describe('the effect idle gate', () => {
     const p = new (registered.get('tfmx-processor')!)();
     run(p, 1000);
     expect(p.dsp).toBe(1000);
+  });
+
+  it('skips the master reverb, delay, Key Lock and pitch resampler once idle (46 ms/s with nothing playing, 2026-10-12)', () => {
+    for (const name of ['mverb-processor', 'another-delay-processor', 'signalsmith-stretch', 'pitch-resampler']) {
+      const p = new (registered.get(name)!)();
+      run(p, 20, 0.3);
+      run(p, 500);
+      const idleAt = p.dsp;
+      run(p, 1000);
+      expect(p.dsp, name).toBe(idleAt);
+    }
+  });
+});
+
+describe('signal presence', () => {
+  type Presence = { process(i: Float32Array[][]): boolean };
+  const feed = (p: Presence, n: number, level = 0) => {
+    for (let q = 0; q < n; q++) p.process([[new Float32Array(128).fill(level)]]);
+  };
+
+  it('reports sound on the first audible quantum and silence only ~2 s after it stops', () => {
+    const p = new (registered.get('signal-presence') as unknown as new () => Presence)();
+    posted.length = 0;
+    feed(p, 100);
+    expect(posted).toEqual([]);              // silent from the start: nothing to say
+    feed(p, 1, 0.01);
+    expect(posted).toEqual([{ sounding: true }]);
+    feed(p, 749);                            // an effect tail still has time to ring
+    expect(posted).toEqual([{ sounding: true }]);
+    feed(p, 1);
+    expect(posted).toEqual([{ sounding: true }, { sounding: false }]);
+    feed(p, 2000);                           // silence: no message, no work on the main thread
+    expect(posted).toHaveLength(2);
+  });
+
+  it('a tail above -80 dBFS keeps it sounding', () => {
+    const p = new (registered.get('signal-presence') as unknown as new () => Presence)();
+    posted.length = 0;
+    feed(p, 1, 0.5);
+    feed(p, 2000, 0.0002);
+    expect(posted).toEqual([{ sounding: true }]);
   });
 });

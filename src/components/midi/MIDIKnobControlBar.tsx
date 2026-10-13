@@ -38,7 +38,7 @@ export const MIDIKnobControlBar: React.FC = () => {
       {!showKnobBar && (
         <div className="px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[9px] text-text-muted">
-            <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse-brief"></span>
             <span className="font-bold uppercase">{deviceName}</span>
           </div>
           <button
@@ -80,7 +80,7 @@ export const MIDIKnobControlBar: React.FC = () => {
         })}
             <div className="ml-auto flex items-center gap-2">
               <div className="flex items-center gap-2 text-[9px] text-text-muted bg-dark-bgSecondary px-2 py-1 rounded border border-dark-border">
-                <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></span>
+                <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse-brief"></span>
                 {deviceName.toUpperCase()}
               </div>
               <button

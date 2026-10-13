@@ -7,6 +7,7 @@ import { AnalyserHolds } from '@/lib/audio/analyserHolds';
 import { isWholeSongSynth } from './wholeSongSynths';
 import { installWorkletProfiler } from './audio/workletProfiler';
 import { installIdleGate } from './audio/idleGate';
+import { watchSignal } from './audio/signalPresence';
 import { EngineGainDuck } from './engineGainDuck';
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
@@ -442,6 +443,12 @@ export class ToneEngine {
       pan: 0,
       channelCount: 2,
     }).toDestination();
+
+    // Everything the context plays passes Tone's destination: one listener
+    // there tells every picture loop whether the app is sounding
+    // (engine/audio/signalPresence.ts, hooks/useFrameGate.ts).
+    const destinationOut = getNativeAudioNode((Tone.getDestination() as unknown as { output: unknown }).output);
+    if (destinationOut) void watchSignal(this._nativeContext, destinationOut);
 
     // Analyzers for visualization (created but not connected by default)
     this.analyser = new Tone.Analyser('waveform', 1024);

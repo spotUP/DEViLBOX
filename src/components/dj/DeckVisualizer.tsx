@@ -103,7 +103,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
 
   // Beat-flash loop runs only while the deck plays. Clear any lingering glow
   // and reset beat tracking when playback stops.
-  useVisualizationAnimation({ onFrame: beatFlashFrame, enabled: isPlaying, fps: 60 });
+  useVisualizationAnimation({ onFrame: beatFlashFrame, enabled: isPlaying, fps: 60, follows: 'time' });
   useEffect(() => {
     if (!isPlaying) {
       flashDecayRef.current = 0;

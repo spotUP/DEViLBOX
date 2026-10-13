@@ -137,6 +137,10 @@ export default {
       },
       animation: {
         'indeterminate': 'indeterminate 1.2s ease-in-out infinite',
+        // A state that holds (connected, a status message) pulses three times
+        // to be noticed, then rests: a pulse that never ends keeps the
+        // compositor and GPU drawing frames in an otherwise idle app.
+        'pulse-brief': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) 3',
       },
     },
   },
