@@ -28,9 +28,21 @@ export interface NuadeVerdict {
   endAgrees: boolean;
   defaultEngine: FormatEngineChoice;
   heldBecause?: string;
+  /** Dual rows: why our engine has no score (so DN-1 cannot move the default off ours). */
+  ownNote?: string;
 }
 
 const round = (x: number): number => Math.round(x * 10000) / 10000;
+
+function ownNoteFor(f: NuadeFormat, recs: ResultRow[]): string {
+  const errs = Array.from(new Set(recs.map((r) => r.ownError).filter(Boolean)));
+  const bad = recs.find((r) => r.error);
+  if (bad) return `not comparable: ${bad.error}`;
+  if (recs.some((r) => r.own === undefined)) return 'our engine not measured yet';
+  if (errs.length) return `our engine could not be rendered headless: ${errs.join('; ')}`;
+  if (recs.some((r) => r.own === null)) return `no headless render of ${f.label}'s own engine (it is not driven through the shared worklet protocol)`;
+  return 'our engine not measured';
+}
 
 /** The verdicts the recorded rows give, by format id. Pure over the results file and the table. */
 export function computeVerdicts(file: ResultsFile, rows: readonly NuadeFormat[] = NUADE_FORMAT_LIST): Record<string, NuadeVerdict> {
@@ -54,7 +66,8 @@ export function computeVerdicts(file: ResultsFile, rows: readonly NuadeFormat[] 
         uadeEnvelopeCorrelation: round(m ?? 0),
         ...(dd ? { ownEnvelopeCorrelation: round(dd.ownMean) } : {}),
         endAgrees: recs.every((r) => replaceVerdict({ songs: [r], liveEditToday: false, swapMs: null }).endAgrees === true),
-        defaultEngine: dd ? dd.defaultEngine : f.legacyEngine,
+        defaultEngine: dd?.defaultEngine === 'nuade' ? 'nuade' : f.legacyEngine,
+        ...(dd ? {} : { ownNote: ownNoteFor(f, recs) }),
       };
     }
   }
@@ -92,6 +105,8 @@ export interface NuadeVerdict {
   defaultEngine: FormatEngineChoice;
   /** The failing measurements of a replace row that stays on UADE. */
   heldBecause?: string;
+  /** Dual rows: why our engine has no score. */
+  ownNote?: string;
 }
 
 export const NUADE_VERDICTS: Readonly<Record<string, NuadeVerdict>> = {

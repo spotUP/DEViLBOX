@@ -110,6 +110,9 @@ export interface SongComparison {
   voices: number;
   player: string;
   uadeRms: number;
+  /** Dual rows: our engine against UADE (same windows and metric); null when the engine has no headless render. */
+  own?: number | null;
+  ownError?: string;
   error?: string;
 }
 
@@ -163,7 +166,18 @@ export async function compareSong(nu: NuadeHeadless, row: NuadeFormat, song: str
   const ends = [nuadeEndAt, uadeEndAt].filter((e) => e > 0);
   const windows = Math.floor(((ends.length ? Math.min(seconds, Math.min(...ends) - 0.5) : seconds) * 1000) / ENV_MS);
   const best = windows > 40 ? bestLagCorrelation(envelope20(mine.samples, SR), envelope20(uade.samples, SR), windows) : { correlation: NaN, lagWindows: 0 };
+  let own: number | null | undefined;
+  let ownError: string | undefined;
+  if (row.role === 'dual') {
+    const { renderOwn } = await import('./ownRender');
+    const o = await renderOwn(row.id, song, seconds);
+    if (!o) own = null;
+    else if (o.error || windows <= 40) { own = null; ownError = o.error ?? 'too little music to compare'; }
+    else own = bestLagCorrelation(envelope20(o.samples, SR), envelope20(uade.samples, SR), windows).correlation;
+    if (own !== null && !Number.isFinite(own)) { own = null; ownError = 'no correlation'; }
+  }
   return {
+    ...(row.role === 'dual' ? { own, ...(ownError ? { ownError } : {}) } : {}),
     correlation: best.correlation, lagMs: best.lagWindows * ENV_MS, windowSecs: (windows * ENV_MS) / 1000, uadeEndAt, nuadeEndAt,
     peak: mine.peak, rms: mine.rms, voices: mine.voices, player: mine.player, uadeRms: levelOf(uade.samples).rms,
     ...(mine.error ? { error: mine.error } : {}),

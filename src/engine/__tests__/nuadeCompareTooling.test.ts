@@ -13,7 +13,7 @@ import { runBatch, pendingJobs, loadResults, emptyResults, type Job, type Result
 import { bestLagCorrelation, envelope20, songEndOf, compareSong, renderNuade } from '../../../tools/nuade/nuadeCompare';
 import { computeVerdicts, render } from '../../../tools/nuade/apply-verdicts';
 import { rolledOutRows } from '../../../tools/nuade/rollout';
-import { instrumentCheck, jobsFor, RESULTS_PATH } from '../../../tools/nuade/compare-batch';
+import { instrumentCheck, wasmSha, RESULTS_PATH } from '../../../tools/nuade/compare-batch';
 import { NuadeHeadless } from '../nuade/nuadeHeadless';
 import { NUADE_FORMATS } from '../nuade/nuadeFormats';
 
@@ -72,6 +72,14 @@ describe('NC-4 the dual rule (DN-1, owner decision b)', () => {
   it('nuade is the default only when its mean beats ours by >= 0.01 and no song is worse than ours by more than 0.01', () => {
     expect(dualDefault([pair(0.987, 0.949)])?.defaultEngine).toBe('nuade');   // SoundMon, today's single-song numbers
     expect(dualDefault([pair(0.99, 0.985)])?.defaultEngine).toBe('native');   // a tie keeps the live edit API
+  });
+  it('the floor: nuade must itself reach 0.95 against UADE (two far-off engines say nothing about which is right)', () => {
+    expect(dualDefault([pair(0.31, 0.03)])?.defaultEngine).toBe('native');
+    expect(dualDefault([pair(0.949, 0.90)])?.defaultEngine).toBe('native');
+    expect(dualDefault([pair(0.951, 0.90)])?.defaultEngine).toBe('nuade');
+  });
+  it('the end must agree too: a nuade that ends where UADE plays on does not become the default', () => {
+    expect(dualDefault([{ ...pair(0.99, 0.9), uadeEndAt: 5.7, nuadeEndAt: -1 }])?.defaultEngine).toBe('native');
   });
   it('one song worse than ours by more than 0.01 keeps ours even when the mean wins', () => {
     expect(dualDefault([pair(1, 0.9), pair(0.9, 0.95)])?.defaultEngine).toBe('native');
@@ -209,6 +217,27 @@ describe('NC-4 verdicts for the table', () => {
   });
 });
 
+describe('NAB-1 our own engine rendered headless', () => {
+  it('renders a dual row\'s song through its real worklet, audibly; a row without a headless engine is null', async () => {
+    const { renderOwn, OWN_ENGINES } = await import('../../../tools/nuade/ownRender');
+    const r = await renderOwn('soundmon', 'public/data/songs/formats/antidust.bp3', 5);
+    expect(r?.error).toBeUndefined();
+    expect(r!.peak).toBeGreaterThan(0.05);
+    expect(r!.rms).toBeGreaterThan(0.02);
+    expect(await renderOwn('hippel', 'public/data/songs/formats/prehistoric_tale.hipc', 2)).toBeNull();
+    expect(Object.keys(OWN_ENGINES).every((id) => NUADE_FORMATS[id]?.role === 'dual')).toBe(true);
+  }, 60_000);
+
+  it('compareSong on a dual row measures both engines against UADE with the same metric', async () => {
+    const nu = await NuadeHeadless.create();
+    const c = await compareSong(nu, NUADE_FORMATS.soundmon!, 'public/data/songs/formats/antidust.bp3', 10);
+    expect(c.correlation).toBeGreaterThan(0.9);
+    expect(c.own).toBeGreaterThan(0.85);
+    const d = await compareSong(nu, NUADE_FORMATS.mmdc!, NUADE_FORMATS.mmdc!.corpus[0]!, 5);
+    expect(d.own).toBeUndefined();
+  }, 60_000);
+});
+
 describe('NC-3 the instrument check (real Nuade.wasm and UADE.wasm)', () => {
   it('reproduces the two known answers: antidust.bp3 passes, apb.dw does not', async () => {
     const nu = await NuadeHeadless.create();
@@ -224,7 +253,7 @@ describe('NC-3 the instrument check (real Nuade.wasm and UADE.wasm)', () => {
     const file = loadResults(RESULTS_PATH);
     expect(existsSync(RESULTS_PATH)).toBe(true);
     expect(file.instrument?.ok).toBe(true);
-    expect(file.instrument?.wasm).toBe(jobsFor()[0]!.sha.slice(-12));
+    expect(file.instrument?.wasm).toBe(wasmSha());
   });
 
   it('a render of a module the player refuses is an error row, not a throw', async () => {

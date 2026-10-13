@@ -13,7 +13,7 @@ import { NUADE_FORMAT_LIST, type NuadeFormat } from '../nuade/nuadeFormats';
 import { NuadeHeadless } from '../nuade/nuadeHeadless';
 import { setNuadeProbe } from '../nuade/nuadeProbe';
 import { compareSong } from '../../../tools/nuade/nuadeCompare';
-import { replaceVerdict, mean, THRESHOLDS, type SongMeasure } from '../../../tools/nuade/verdictRules';
+import { replaceVerdict, dualDefault, mean, THRESHOLDS, type SongMeasure } from '../../../tools/nuade/verdictRules';
 import { loadResults } from '../../../tools/nuade/batch';
 import { RESULTS_PATH } from '../../../tools/nuade/compare-batch';
 import { ROOT } from './workletHarness';
@@ -33,7 +33,7 @@ vi.mock('@lib/import/formats/UADEParser', () => ({
 }));
 
 const SECONDS = 30;
-const ROWS = NUADE_FORMAT_LIST.filter((f) => f.role === 'replace' && f.uadeEnvelopeCorrelation !== null && f.corpus.length > 0);
+const ROWS = NUADE_FORMAT_LIST.filter((f) => (f.role === 'replace' || f.defaultEngine === 'nuade') && f.uadeEnvelopeCorrelation !== null && f.corpus.length > 0);
 
 /** The swap time is a timing measurement: it comes from the recorded batch row (headless, at the 120 s mark), not a live render. */
 function recordedSwap(row: NuadeFormat): number | null {
@@ -74,6 +74,12 @@ describe.each(ROWS)('$label on nuade', (row) => {
   });
 
   it('the verdict the rule gives on the live measurement is the one the table holds', () => {
+    if (row.role === 'dual') {
+      // DN-1: the dual rule over the live numbers of both engines.
+      const dd = dualDefault(live);
+      expect(dd?.defaultEngine, `${row.label}: nuade ${dd?.nuadeMean.toFixed(3)} vs ours ${dd?.ownMean.toFixed(3)}`).toBe('nuade');
+      return;
+    }
     const v = replaceVerdict({ songs: live, liveEditToday: row.registryKeys.some((k) => LIVE_EDIT[k] === 'pass'), swapMs: recordedSwap(row) });
     if (row.defaultEngine === 'nuade') {
       expect(v.heldBecause, `${row.label} is on nuade but fails: ${v.heldBecause}`).toBe('');
