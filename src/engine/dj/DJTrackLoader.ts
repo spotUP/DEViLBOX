@@ -741,6 +741,71 @@ export async function loadRenderToDeck(
   return info;
 }
 
+/** A file the DJ file browser holds, as `loadFileToDeck` takes it. */
+export interface DeckFile {
+  name: string;
+  rawBuffer: ArrayBuffer;
+  /** The parsed module; absent for a plain audio file. */
+  song?: TrackerSong;
+  bpm: number;
+  isUADE?: boolean;
+}
+
+/**
+ * The file browser's parse step for one file: an audio file stays bytes
+ * (bpm 0, analysed on load); a module is parsed (openDeckTrack), its tempo
+ * read, and its song cached for the deck-loading that follows.
+ */
+export async function parseDeckFile(name: string, rawBuffer: ArrayBuffer): Promise<DeckFile> {
+  if (isAudioFile(name)) return { name, rawBuffer, bpm: 0 };
+  const { isUADEFormat } = await import('@/lib/import/formats/UADEParser');
+  const { song } = await openDeckTrack({ kind: 'bytes', name, bytes: rawBuffer });
+  const bpmResult = detectBPM(song);
+  cacheSong(name, song);
+  return { name, rawBuffer, song, bpm: bpmResult.bpm, isUADE: isUADEFormat(name) };
+}
+
+/**
+ * Put a file the DJ file browser holds on a deck: an audio file straight to the
+ * deck, a UADE module through its pre-render, any other module through the
+ * pipeline render and `loadRenderToDeck`. The one body of the browser's
+ * "load to deck" button; the MCP `dj_load_file` calls the same function.
+ * `cached` is the UADE pre-render's cache verdict (false for the other paths).
+ */
+export async function loadFileToDeck(
+  engine: DJEngine,
+  deckId: DeckId,
+  file: DeckFile,
+): Promise<{ cached: boolean }> {
+  const store = useDJStore.getState();
+  if (!file.song) {
+    await engine.loadAudioToDeck(deckId, file.rawBuffer, file.name);
+    store.setDeckViewMode('vinyl');
+    return { cached: false };
+  }
+  if (file.isUADE) {
+    // loadUADEToDeck handles the full render + wait cycle. Dynamic: DJUADEPrerender imports this module.
+    const { loadUADEToDeck } = await import('./DJUADEPrerender');
+    const result = await loadUADEToDeck(engine, deckId, file.rawBuffer, file.name, true, file.bpm, file.song.name);
+    store.setDeckViewMode('visualizer');
+    return { cached: result.cached };
+  }
+  // Non-UADE tracker (XM/IT/S3M/etc.): render first, then load the audio.
+  store.setDeckState(deckId, {
+    fileName: file.name,
+    trackName: file.song.name || file.name,
+    detectedBPM: file.bpm,
+    effectiveBPM: file.bpm,
+    totalPositions: file.song.songLength,
+    analysisState: 'rendering',
+    isPlaying: false,
+  });
+  const result = await getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high');
+  await loadRenderToDeck(engine, deckId, result, { fileName: file.name, trackName: file.song.name || file.name, song: file.song, interimBpm: file.bpm });
+  store.setDeckViewMode('visualizer');
+  return { cached: false };
+}
+
 /**
  * The deck's song for a tracker file - the one rule every deck load follows,
  * whatever the source (audio cache, HVSC, modland, local): the in-memory song

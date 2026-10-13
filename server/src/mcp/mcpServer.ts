@@ -2144,6 +2144,7 @@ export function createMcpServer(): McpServer {
         ],
         'File Loading': [
           { tool: 'load_file', description: 'Load a music file from disk (188+ formats)' },
+          { tool: 'dj_load_file', description: 'Load a music file from disk onto DJ deck A, B or C (the file browser\'s load); dj_get_state reports channelScopeCount per deck' },
         ],
         'Modland Archive': [
           { tool: 'search_modland', description: 'Search 190K+ tracker modules' },
@@ -2468,9 +2469,30 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'dj_get_state',
-    'DJ mixer state: decks A, B and C (playing, BPM, pitch, loaded track, position, volume, EQ, filter; Deck C without a track of its own follows the master deck\'s tempo), masterDeck (the set\'s master clock), crossfader, master.',
+    'DJ mixer state: decks A, B and C (playing, BPM, channelScopeCount = per-channel scopes shown, pitch, loaded track, position, volume, EQ, filter; Deck C without a track of its own follows the master deck\'s tempo), masterDeck (the set\'s master clock), crossfader, master.',
     {},
     (p) => call('dj_get_state', p),
+  );
+
+  server.tool(
+    'dj_load_file',
+    'Load a music file from disk onto a DJ deck, through the same load the DJ file browser uses (parse, render, analysis). Returns the deck, file name, the render engine, and channelScopeCount (the per-channel scopes the deck shows; also in dj_get_state). The file is read server-side and sent to the browser.',
+    {
+      deck: z.enum(['A', 'B', 'C']).describe('Deck to load onto'),
+      path: z.string().describe('Absolute path to the music file on disk'),
+    },
+    async (p) => {
+      try {
+        const fileData = await readFile(p.path);
+        return textResult(await callBrowser('dj_load_file', {
+          deck: p.deck,
+          filename: basename(p.path),
+          data: fileData.toString('base64'),
+        }));
+      } catch (e) {
+        return textResult({ error: `Failed to read file: ${(e as Error).message}` });
+      }
+    },
   );
 
   server.tool(

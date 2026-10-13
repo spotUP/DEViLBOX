@@ -9,6 +9,48 @@ import { setMasterDeck, useDJStore, type DeckState } from '../../stores/useDJSto
 import { useDJPlaylistStore } from '../../stores/useDJPlaylistStore';
 import { scratchRenderModeOf } from '../../engine/dj/scratch/scratchStyles';
 
+/**
+ * dj_load_file: put a file's bytes on a deck through the DJ file browser's own
+ * load (parseDeckFile + loadFileToDeck in DJTrackLoader). The server reads the
+ * file from disk and sends base64. Returns the deck's resulting state: the
+ * render engine (a nuade player id, else the default render path) and the
+ * number of per-channel scopes the deck now shows.
+ */
+export async function djLoadFile(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const deck = params.deck as string;
+  const fileName = params.filename as string;
+  const data = params.data as string;
+  if (deck !== 'A' && deck !== 'B' && deck !== 'C') return { error: "deck must be 'A', 'B' or 'C'" };
+  if (!fileName || !data) return { error: 'Missing required params: filename, data (base64)' };
+  try {
+    const bin = atob(data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const buffer = bytes.buffer as ArrayBuffer;
+    const [{ getDJEngine }, loader, { hashFile }, { renderPlayerOf }] = await Promise.all([
+      import('../../engine/dj/DJEngine'),
+      import('../../engine/dj/DJTrackLoader'),
+      import('../../engine/dj/DJAudioCache'),
+      import('../../engine/dj/djRenderEngine'),
+    ]);
+    const file = await loader.parseDeckFile(fileName, buffer);
+    await loader.loadFileToDeck(getDJEngine(), deck, file);
+    const nuadePlayer = file.song ? renderPlayerOf(await hashFile(buffer)) : null;
+    const d = useDJStore.getState().decks[deck];
+    return {
+      ok: true,
+      deck,
+      fileName: d.fileName || fileName,
+      engine: !file.song ? 'audio file' : nuadePlayer ? `nuade:${nuadePlayer}` : file.isUADE ? 'uade' : 'default render',
+      channelScopeCount: d.channelScopeCount,
+      detectedBPM: d.detectedBPM,
+      durationMs: d.durationMs,
+    };
+  } catch (e) {
+    return { error: `dj_load_file failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 // Lazy-import DJ actions to avoid loading DJEngine at bridge init
 async function getActions() {
   return import('../../engine/dj/DJActions');
@@ -58,6 +100,8 @@ function deckSnapshot(d: DeckState) {
     keyLockEnabled: d.keyLockEnabled,
     playbackMode: d.playbackMode,
     musicalKey: d.musicalKey,
+    /** Channels the deck has a moving per-channel scope for (0 = the deck shows its one all-channel scope). */
+    channelScopeCount: d.channelScopeCount,
   };
 }
 
