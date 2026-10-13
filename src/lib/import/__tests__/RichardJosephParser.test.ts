@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isRJPFormat, parseRJPFile } from '../formats/RichardJosephParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
@@ -12,6 +12,8 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 // sets EPS_Adr, EPS_Length, EPS_Volume, EPS_Type, EPS_Flags but never EPS_Name.
 
 const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+// Reference Music is a local-only corpus (gitignored, absent from a clean checkout): skip, do not fail.
+const HAS_CORPUS = existsSync(REF);
 const FILE_AQUATIC_SNG = resolve(REF, 'Richard Joseph/Richard Joseph/aquatic games.sng');
 const FILE_BLOB_SNG = resolve(REF, 'Richard Joseph/Richard Joseph/blob.sng');
 
@@ -24,14 +26,14 @@ function loadBuf(path: string): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
-describe('isRJPFormat', () => {
+describe.skipIf(!HAS_CORPUS)('isRJPFormat', () => {
   it('detects aquatic games.sng', () => expect(isRJPFormat(loadU8(FILE_AQUATIC_SNG))).toBe(true));
   it('detects blob.sng', () => expect(isRJPFormat(loadU8(FILE_BLOB_SNG))).toBe(true));
   it('rejects a zeroed buffer', () => expect(isRJPFormat(new Uint8Array(64))).toBe(false));
   it('rejects a buffer that is too short', () => expect(isRJPFormat(new Uint8Array(8))).toBe(false));
 });
 
-describe('parseRJPFile — aquatic games.sng', () => {
+describe.skipIf(!HAS_CORPUS)('parseRJPFile — aquatic games.sng', () => {
   it('reports format capabilities', async () => {
     let song;
     try { song = await parseRJPFile(loadBuf(FILE_AQUATIC_SNG), 'aquatic games.sng'); } catch (e) { console.log('threw:', e); return; }
@@ -48,10 +50,10 @@ describe('parseRJPFile — aquatic games.sng', () => {
     expect(song.instruments).toHaveLength(63);
   });
 
-  it('names instruments Sample 1..N (no names in format)', async () => {
+  it('leaves instruments unnamed (the format stores no names) and keeps every slot', async () => {
     const song = await parseRJPFile(loadBuf(FILE_AQUATIC_SNG), 'aquatic games.sng');
-    expect(song.instruments[0].name).toBe('Sample 1');
-    expect(song.instruments[62].name).toBe('Sample 63');
+    expect(song.instruments[0].name).toBe('');
+    expect(song.instruments[62].name).toBe('');
   });
 
   it('detects 6 subsongs', async () => {
@@ -76,7 +78,7 @@ describe('parseRJPFile — aquatic games.sng', () => {
   });
 });
 
-describe('parseRJPFile — blob.sng', () => {
+describe.skipIf(!HAS_CORPUS)('parseRJPFile — blob.sng', () => {
   it('reports format capabilities', async () => {
     let song;
     try { song = await parseRJPFile(loadBuf(FILE_BLOB_SNG), 'blob.sng'); } catch (e) { console.log('threw:', e); return; }
