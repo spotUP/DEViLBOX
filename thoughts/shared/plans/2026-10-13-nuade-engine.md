@@ -280,6 +280,9 @@ The 7 EaglePlayer (Musashi) rows stay on EaglePlayer: they run UADE's own player
 
 ## Checklist
 
+Running count: 134 of 162 (2026-10-13; 159 planned items + AB31-AB33 found by NR-0). Open: 10 replace rows with no song anywhere, 7 dual rows
+whose own engine could not be measured, NAB-2, ND-1..3, CR-1..4, NV-6..8.
+
 Phase 0 - Vendor and build (5)
 - [x] NV-1 Fetch tarball of `4900e597e` into `third-party/nuade/` (pristine), write `UPSTREAM.md`, `update.sh`. -- dcd93a0d4, nuadeVendored.test.ts
 - [x] NV-2 `nuade-wasm/CMakeLists.txt`, `nuade-wasm/build.sh`, `.gitignore` for `nuade-wasm/build/`. -- a2235f76e, nuadeWasmBuild.test.ts NV-2
@@ -320,138 +323,141 @@ Phase 2 - Registry, routing, selector (12)
 - [x] NS-11 `get_format_state` gains `nuadePlayerId`, `engineCredit`. -- b4372a2d2, formatEngineTools.test.ts NS-11
 
 Phase 3 - Comparison tooling (5)
-- [ ] NC-1 `tools/nuade/nuadeCompare.ts` (reuses eagleCompare + uadeRenderCore).
-- [ ] NC-2 `tools/nuade/compare-batch.ts` resumable batch + `npm run nuade-compare`; results file committed.
-- [ ] NC-3 Instrument check: known-good `antidust.bp3` >= 0.95, known-bad `apb.dw` < 0.95, filter-off confirmed both
+- [x] NC-1 `tools/nuade/nuadeCompare.ts` (reuses eagleCompare + uadeRenderCore). -- 89b866fcc, nuadeCompareTooling.test.ts (metric, ends, lag)
+- [x] NC-2 `tools/nuade/compare-batch.ts` resumable batch + `npm run nuade-compare`; results file committed. -- 89b866fcc, nuadeCompareTooling.test.ts NC-2 (resume after a kill, --only, --failed, --fresh, stale sha); results file is tools/nuade/nuade-compare.json (test-data/ is git-ignored)
+- [x] NC-3 Instrument check: known-good `antidust.bp3` >= 0.95, known-bad `apb.dw` < 0.95, filter-off confirmed both -- 89b866fcc, nuadeCompareTooling.test.ts NC-3 (antidust.bp3 0.974 pass, apb.dw 0.406 fail; UADE wasm keeps the A500 filter on, see Adaptations)
       sides; printed before any verdict is used.
-- [ ] NC-4 `tools/nuade/apply-verdicts.ts` writes table fields from the results (pass rule D8, dual rule DN-1).
-- [ ] NC-5 `src/engine/__tests__/nuadePlaysFormats.test.ts`: per table row (`describe.each`) the watchdog render, the
+- [x] NC-4 `tools/nuade/apply-verdicts.ts` writes table fields from the results (pass rule D8, dual rule DN-1). -- 1122f5b89, 2534ff05c, nuadeCompareTooling.test.ts (D8 rule, DN-1 + floor, verdict file = results)
+- [x] NC-5 `src/engine/__tests__/nuadePlaysFormats.test.ts`: per table row (`describe.each`) the watchdog render, the -- 89b866fcc 1122f5b89, 2534ff05c, nuadePlaysFormats.test.ts (per row: watchdog, UADE comparison, ends, verdict, default load)
       UADE comparison against the row's threshold, the end agreement, and (rows with `defaultEngine: 'nuade'`) the
       default-load route. This is "each format's own UADE comparison test"; lives in `src/engine/__tests__/` (in
       `test:ci`).
 
 Phase 4 - Rollout (84): R01-R84 per the table above. Each row: measure (batch `--only <id>`), apply verdict, route via
 `withNuade` if it passes, its `nuadePlaysFormats` row green, `playingEngineFor` proven. Pre-step:
-- [ ] NR-0 Re-verify the engine column of all 84 rows from the router (see Rollout order note); move mismatches.
-- [ ] R01 mmdc (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R02 robhubbard (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R03 timfollin (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R04 earache (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R05 musicalenlightenment (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R06 amos (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R07 dsc (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R08 fashiontracker (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R09 gmc (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R10 jeroentel (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R11 peterverswyvelen (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R12 richardjoseph (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R13 robhubbardst (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R14 soundfx (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R15 soundmaster (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R16 zoundmonitor (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R17 gluemon (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R18 infogrames (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R19 paulrobotham (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R20 paulshields (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R21 scumm (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R22 syntracker (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R23 tomytracker (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R24 davidhanney (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R25 ems (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R26 laxity (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R27 majortom (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R28 timetracker (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R29 tronic (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R30 maniacsofnoise (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R31 paulsummers (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R32 pokeynoise (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R33 soundimages (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R34 stevebarrett (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R35 thomashermann (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R36 ufo (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R37 andrewparton (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R38 aprosys (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R39 artandmagic (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R40 ashleyhogg (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R41 cinemaware (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R42 dariuszendeh (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R43 desire (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R44 dynamicsynthesizer (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R45 emsv6 (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R46 fcbsi (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R47 fredgray (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R48 hippelhip (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R49 howiedavies (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R50 jankomrsicflogel (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R51 jasonbrooke (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R52 jasonpage (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R53 jesperolsen (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R54 kimchristensen (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R55 krishatlelid (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R56 legglessmusiceditor (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R57 markcooksey (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R58 markcooksey_old (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R59 markii (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R60 maximumeffect (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R61 mcmd (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R62 medley (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R63 mikedavies (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R64 pierreadane (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R65 professionalsoundartists (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R66 quartet (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R67 riffraff (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R68 seanconnolly (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R69 silmarils (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R70 specialfx (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R71 speedya1system (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R72 speedysystem (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R73 synthdream (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R74 synthpack (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R75 voodoo (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R76 ntsp (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R77 onescapee (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R78 seanconran (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R79 spl (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R80 forgottenworlds (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R81 amcomposer (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R82 audiosculpture (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R83 dirkbialluch (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
-- [ ] R84 protracker4 (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [x] NR-0 Re-verify the engine column of all 84 rows from the router (see Rollout order note); move mismatches. -- 89b866fcc, nuadeEngineColumn.test.ts (57 rows with a song: 54 UADE, 3 moved to dual)
+- [x] R01 mmdc -- DONE: default nuade, 0.990 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R02 robhubbard -- DONE: default nuade, 0.990 like UADE over 3 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R03 timfollin -- DONE: default nuade, 0.986 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R04 earache -- DONE: default nuade, 0.965 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R05 musicalenlightenment -- DONE: default nuade, 0.962 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [ ] R06 amos -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [x] R07 dsc -- HELD on UADE: dragon'sbreath_fanfares.dsc: UADE plays on, nuade ends at 6.9 s; dragon'sbreath dbfx.dsc: UADE ends at 8.7 s, nuade ends at 1.5 s; live edit would lose its path: swap to the 120 s mark takes 244 ms > 100 ms; 89b866fcc, nuadePlaysFormats row
+- [x] R08 fashiontracker -- DONE: default nuade, 0.989 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R09 gmc -- MOVED to dual AB33: plays on libopenmpt (TypeScript scheduler), not UADE (NR-0, nuadeEngineColumn.test.ts); 89b866fcc
+- [x] R10 jeroentel -- DONE: default nuade, 0.968 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R11 peterverswyvelen -- DONE: default nuade, 0.978 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R12 richardjoseph -- HELD on our parser + UADE playback: cannon fodder (intro).sng: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R13 robhubbardst -- HELD on UADE: battleships.rho: correlation 0.803 < 0.9; battleships.rho: correlation 0.803 < 0.9; mean correlation 0.803 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R14 soundfx -- HELD on our parser + UADE playback: operation_stealth.sfx: UADE ends at 9.9 s, nuade ends at 19.8 s; 89b866fcc, nuadePlaysFormats row
+- [x] R15 soundmaster -- HELD on UADE: live edit would lose its path: swap to the 120 s mark takes 203 ms > 100 ms; 89b866fcc, nuadePlaysFormats row
+- [x] R16 zoundmonitor -- HELD on UADE: sonjavanveen.sng: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R17 gluemon -- HELD on UADE: gnu-song.glue: correlation 0.738 < 0.9; mean correlation 0.821 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R18 infogrames -- HELD on UADE: bob4e.dum: _uade_wasm_load failed (ret=-1); advantage tennis-intro.dum: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R19 paulrobotham -- HELD on UADE: dawnpatrol-sad.dat: _uade_wasm_load failed (ret=-1); dawnpatrol-sad.dat: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R20 paulshields -- DONE: default nuade, 0.993 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R21 scumm -- DONE: default nuade, 0.991 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R22 syntracker -- DONE: default nuade, 0.987 like UADE over 3 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R23 tomytracker -- DONE: default nuade, 0.981 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R24 davidhanney -- DONE: default nuade, 0.956 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R25 ems -- DONE: default nuade, 0.975 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [ ] R26 laxity -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [x] R27 majortom -- HELD on UADE: mean correlation 0.945 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [ ] R28 timetracker -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [x] R29 tronic -- DONE: default nuade, 0.985 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R30 maniacsofnoise -- DONE: default nuade, 0.982 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R31 paulsummers -- HELD on our parser + UADE playback: everton_fc_-_jingles.snk: UADE plays on, nuade ends at 4.0 s; everton fc - jingles.snk: UADE plays on, nuade ends at 4.0 s; 89b866fcc, nuadePlaysFormats row
+- [x] R32 pokeynoise -- HELD on UADE: pn.tetris: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R33 soundimages -- HELD on UADE: blinkys scary school-sfx.tw: UADE ends at 9.7 s, nuade ends at 1.9 s; 89b866fcc, nuadePlaysFormats row
+- [x] R34 stevebarrett -- HELD on UADE: street_fighter.sb: correlation 0.631 < 0.9; street fighter.sb: correlation 0.631 < 0.9; mean correlation 0.631 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R35 thomashermann -- HELD on UADE: thm.blueangel69: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [ ] R36 ufo -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [ ] R37 andrewparton -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [x] R38 aprosys -- HELD on our parser + UADE playback: action.aps: correlation 0.481 < 0.9; action.aps: UADE plays on, nuade ends at 25.6 s; actionfiltersound.aps: UADE plays on, nuade ends at 25.6 s; mean correlation 0.739 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R39 artandmagic -- DONE: default nuade, 0.983 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R40 ashleyhogg -- DONE: default nuade, 1.000 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [ ] R41 cinemaware -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [x] R42 dariuszendeh -- DONE: default nuade, 0.992 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R43 desire -- HELD on UADE: batmanreturns.dsr: peak 0.000 <= 0.05; batmanreturns.dsr: RMS 0.000 <= 0.02; batmanreturns.dsr: correlation -2.000 < 0.9; batmanreturns.dsr: peak 0.000 <= 0.05; batmanreturns.dsr: RMS 0.000 <= 0.02; batmanreturns.dsr: correlation -2.000 < 0.9; mean correlation -2.000 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R44 dynamicsynthesizer -- HELD on UADE: dns.ptc: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R45 emsv6 -- HELD on UADE: perception.ems: RMS 0.011 <= 0.02; perception.ems: correlation 0.408 < 0.9; mean correlation 0.408 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R46 fcbsi -- MOVED to dual AB32: plays on the TypeScript scheduler, not UADE (NR-0, nuadeEngineColumn.test.ts); 89b866fcc
+- [x] R47 fredgray -- HELD on UADE: eco.gray: peak 0.000 <= 0.05; eco.gray: RMS 0.000 <= 0.02; eco.gray: no correlation (less than 1 s of music to compare before a song end); eco.gray: UADE plays on, nuade ends at 0.0 s; eco.gray: peak 0.000 <= 0.05; eco.gray: RMS 0.000 <= 0.02; eco.gray: no correlation (less than 1 s of music to compare before a song end); eco.gray: UADE plays on, nuade ends at 0.0 s; mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R48 hippelhip -- MOVED to dual AB31: plays on the Hippel engine, not UADE (NR-0, nuadeEngineColumn.test.ts); 89b866fcc
+- [x] R49 howiedavies -- DONE: default nuade, 0.992 like UADE over 3 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R50 jankomrsicflogel -- DONE: default nuade, 0.975 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R51 jasonbrooke -- DONE: default nuade, 0.984 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R52 jasonpage -- HELD on UADE: jpn.virocop-14: _uade_wasm_load failed (ret=-1); jpn.fire and ice-1: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R53 jesperolsen -- HELD on UADE: lollypop-subgame_01.jo: _uade_wasm_load failed (ret=-1); JO.GeorgGlaxo title: _uade_wasm_load failed (ret=-1); guldkornsexpressen ingame.jo: no correlation (less than 1 s of music to compare before a song end); guldkornsexpressen ingame.jo: UADE plays on, nuade ends at 1.0 s; mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [ ] R54 kimchristensen -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [x] R55 krishatlelid -- HELD on UADE: hatlelid_smallest.kh: nuade open failed (-2): the driver file "songplay" is missing; fiendish freddys - songs.kh: nuade open failed (-2): the driver file "songplay" is missing; mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R56 legglessmusiceditor -- HELD on UADE: the punisher gameover.lme: correlation 0.627 < 0.9; mean correlation 0.627 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R57 markcooksey -- HELD on UADE: mighty bombjack.mc: correlation 0.881 < 0.9; mighty bombjack.mc: UADE plays on, nuade ends at 26.9 s; mean correlation 0.922 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R58 markcooksey_old -- HELD on UADE: sibling markcooksey is held; 89b866fcc, nuadePlaysFormats row
+- [x] R59 markii -- DONE: default nuade, 0.979 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R60 maximumeffect -- HELD on UADE: MAX.DinosaurDetective gamedat: _uade_wasm_load failed (ret=-1); MAX.DinosaurDetective jingle1: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R61 mcmd -- DONE: default nuade, 0.963 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R62 medley -- HELD on UADE: combat.mso: UADE plays on, nuade ends at 7.7 s; 89b866fcc, nuadePlaysFormats row
+- [x] R63 mikedavies -- DONE: default nuade, 0.967 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R64 pierreadane -- HELD on UADE: Ivanhoe_ivanhoe - bonus.pap: _uade_wasm_load failed (ret=-1); Ivanhoe_ivanhoe - hiscore.pap: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R65 professionalsoundartists -- DONE: default nuade, 0.984 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [ ] R66 quartet -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [x] R67 riffraff -- DONE: default nuade, 0.959 like UADE over 3 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R68 seanconnolly -- DONE: default nuade, 0.970 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R69 silmarils -- DONE: default nuade, 0.991 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R70 specialfx -- HELD on UADE: wildwheels_ingame.jd: UADE ends at 16.9 s, nuade ends at 4.3 s; striker ingame.jd: RMS 0.008 <= 0.02; striker ingame.jd: UADE plays on, nuade ends at 5.6 s; 89b866fcc, nuadePlaysFormats row
+- [x] R71 speedya1system -- DONE: default nuade, 0.976 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R72 speedysystem -- DONE: default nuade, 0.987 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R73 synthdream -- HELD on UADE: sdr.monsterbusiness_5: _uade_wasm_load failed (ret=-1); sdr.nobuddiesland_jigsaw: _uade_wasm_load failed (ret=-1); sdr.monsterbusiness 1: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R74 synthpack -- HELD on UADE: centerbase_soft.osp: _uade_wasm_load failed (ret=-1); centerbase soft.osp: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R75 voodoo -- HELD on UADE: silkworm.vss: correlation 0.855 < 0.9; voo8.vss: correlation 0.514 < 0.9; mean correlation 0.685 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [ ] R76 ntsp -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [ ] R77 onescapee -- OPEN, UNMEASURED: no song of the format in the repo or on Modland (searched by extension and by Modland format name); plays as before
+- [x] R78 seanconran -- DONE: default nuade, 0.991 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R79 spl -- DONE: default nuade, 0.964 like UADE over 1 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R80 forgottenworlds -- HELD on UADE: forgotten worlds intro.fw: correlation -2.000 < 0.9; mean correlation -0.017 < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R81 amcomposer -- DONE: default nuade, 0.985 like UADE over 2 song(s), ends agree; 89b866fcc, nuadePlaysFormats row + default load reaches Nuade
+- [x] R82 audiosculpture -- HELD on UADE: turtle-ready.adsc: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R83 dirkbialluch -- HELD on UADE: tpu.timelock ingame: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95; 89b866fcc, nuadePlaysFormats row
+- [x] R84 protracker4 -- HELD on UADE: the drainer.ptm: correlation 0.860 < 0.9; the drainer.ptm: lag 200 ms > 100; mean correlation 0.860 < 0.95; 89b866fcc, nuadePlaysFormats row
 
-Phase 5 - Dual A/B (30 + 2)
-- [ ] NAB-1 Batch renders our engine AND nuade for AB01-AB30 (up to 3 songs each) into the same results file.
+Phase 5 - Dual A/B (33 + 2)
+- [x] NAB-1 Batch renders our engine AND nuade for AB01-AB30 (up to 3 songs each) into the same results file. -- 1122f5b89, 2534ff05c, nuadeCompareTooling.test.ts NAB-1 (26 of 33 dual rows render their own engine headless)
 - [ ] NAB-2 SA 0x4EFA variant: `SonicArrangerParser.ts:1006` (`useOffsetTable`) routes that variant to `withNuade`
       instead of UADE; `almighty.sa` plays on nuade (research 0.997).
-- [ ] AB01 actionamics (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB02 activisionpro (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB03 bendaglish (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB04 davidwhittaker (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB05 deltamusic1 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB06 deltamusic2 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB07 digmug (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB08 dss (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB09 facethemusic (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB10 fred_np (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB11 futurecomposer (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB12 hippel (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB13 hippel7v (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB14 instereo1 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB15 instereo2 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB16 jamcracker (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB17 musicassembler (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB18 musicmaker (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB19 oktalyzer (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB20 pumatracker (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB21 quadracomposer (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB22 ronklaren (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB23 sidmon2 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB24 sonix (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB25 soundcontrol (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB26 soundfactory (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB27 soundmon (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB28 suntronic (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB29 synthesis (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
-- [ ] AB30 sonicarranger (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [x] AB01 actionamics -- nuade 0.993 vs ours 0.993 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB02 activisionpro -- nuade 0.925 vs ours 0.881 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB03 bendaglish -- nuade 0.993 vs ours 0.992 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB04 davidwhittaker -- nuade 0.904 vs ours 0.907 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB05 deltamusic1 -- nuade 0.912 vs ours 0.902 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB06 deltamusic2 -- nuade 0.974 vs ours 0.610 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB07 digmug -- nuade 0.847 vs ours 0.650 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB08 dss -- nuade 0.976 vs ours 0.974 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [ ] AB09 facethemusic -- OPEN: nuade 0.000 like UADE, ours NOT MEASURED (not comparable: _uade_wasm_load failed (ret=-1)); default stays ours
+- [ ] AB10 fred_np -- OPEN: nuade -0.538 like UADE, ours NOT MEASURED (not comparable: _uade_wasm_load failed (ret=-1)); default stays ours
+- [x] AB11 futurecomposer -- nuade 0.966 vs ours 0.945 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB12 hippel -- nuade 0.983 vs ours 0.972 like UADE: default nuade; 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB13 hippel7v -- nuade 0.880 vs ours 0.565 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB14 instereo1 -- nuade 0.973 vs ours 0.944 like UADE: default nuade; 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB15 instereo2 -- nuade 0.306 vs ours 0.035 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB16 jamcracker -- nuade 0.970 vs ours 0.987 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB17 musicassembler -- nuade 0.834 vs ours 0.749 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [ ] AB18 musicmaker -- OPEN: nuade 0.947 like UADE, ours NOT MEASURED (not comparable: _uade_wasm_load failed (ret=-1)); default stays ours
+- [x] AB19 oktalyzer -- nuade 0.561 vs ours 0.781 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB20 pumatracker -- nuade 0.992 vs ours 0.996 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB21 quadracomposer -- nuade 0.373 vs ours 0.374 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB22 ronklaren -- nuade 0.368 vs ours 0.364 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB23 sidmon2 -- nuade 0.981 vs ours 0.944 like UADE: default nuade; 1122f5b89, 2534ff05c, selector offers all three
+- [ ] AB24 sonix -- OPEN: nuade 0.000 like UADE, ours NOT MEASURED (not comparable: _uade_wasm_load failed (ret=-1)); default stays ours
+- [x] AB25 soundcontrol -- nuade 0.995 vs ours 0.995 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB26 soundfactory -- nuade 0.925 vs ours 0.890 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [x] AB27 soundmon -- nuade 0.966 vs ours 0.934 like UADE: default nuade; 1122f5b89, 2534ff05c, selector offers all three
+- [ ] AB28 suntronic -- OPEN: nuade 0.969 like UADE, ours NOT MEASURED (no headless render of SUN-Tronic's own engine (it is not driven through the shared worklet protocol)); default stays ours
+- [x] AB29 synthesis -- nuade 0.815 vs ours 0.939 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+- [ ] AB30 sonicarranger -- OPEN: nuade 0.975 like UADE, ours NOT MEASURED (our engine could not be rendered headless: sa_create failed (unsupported format)); default stays ours
+- [x] AB31 hippelhip -- added by NR-0
+- [ ] AB32 fcbsi -- OPEN (added by NR-0, was a replace row): nuade 0.784 like UADE, ours NOT MEASURED (no headless render of Future Composer BSI's own engine (it is not driven through the shared worklet protocol)); default stays ours
+- [x] AB33 gmc -- added by NR-0
 
 Phase 6 - DJ (3)
 - [ ] ND-1 `dj-render.worker.ts` `renderWithNuade` (stereo + per-voice -> `channelScopes` + monoStem stems), dispatched
@@ -480,8 +486,8 @@ Phase 8 - Reachability and close (3)
       open).
 - [ ] NV-8 Handoff + memory note; NUADE-ENGINE entry in `thoughts/spot/todos.md` updated with the final counts.
 
-**Totals:** 9 phases (0-8), 159 items: Phase 0 5, Phase 1 10, Phase 2 12, Phase 3 5, Phase 4 85 (NR-0 + R01-R84),
-Phase 5 32 (NAB-1, NAB-2, AB01-AB30), Phase 6 3, Phase 7 4, Phase 8 3, plus DN decisions (not items).
+**Totals:** 9 phases (0-8), 162 items (159 planned + AB31-AB33 added by NR-0): Phase 0 5, Phase 1 10, Phase 2 12, Phase 3 5, Phase 4 85 (NR-0 + R01-R84),
+Phase 5 35 (NAB-1, NAB-2, AB01-AB33), Phase 6 3, Phase 7 4, Phase 8 3, plus DN decisions (not items).
 
 ## The one reachability test (NV-6)
 
@@ -575,3 +581,123 @@ repeat check 1.
   shape so `NuadeEditPort` matches it, and offering our edit API; (b) only credit, no contact; (c) wait until he
   publishes the poke API. **Recommended: (a)** - the edit slot is designed blind until his API shape is known, and the
   issue tracker is empty, so this would be the first contact on record.
+
+
+## Phase 3-4 results and adaptations (2026-10-13)
+
+Commits: 89b866fcc (tooling, verdicts, NR-0, 17 Modland rows), 1122f5b89 (dual rows measured), 2534ff05c (Hippel dual rows); fixes found on the way
+657554f73 (selector, edit path, defaults audit) and 48e104450 (node voice count).
+
+### Wave 1 verdicts (replace rule D8, 30 s, 20 ms envelope at best lag, vs the UADE wasm)
+
+| Row | Songs | Mean correlation | Ends | Live edit swap | Verdict |
+|---|---|---|---|---|---|
+| mmdc | 2 | 0.990 | agree | no edit path today | DONE, default nuade |
+| robhubbard | 3 | 0.990 | agree | 88 ms (gate d, <= 100) | DONE, default nuade |
+| timfollin | 2 | 0.986 | agree | no edit path today | DONE, default nuade |
+| earache | 2 | 0.965 | agree | no edit path today | DONE, default nuade |
+| musicalenlightenment | 2 | 0.962 | agree | no edit path today | DONE, default nuade |
+
+Rob Hubbard: the first run (nuade at its default repeat count 0, which plays on through loop points) disagreed with UADE's
+song end on centurion_battle.rh (UADE 5.7 s, nuade never ended) and on mmdc knightmare (3.7 s); UADE is rendered with
+looping off, so nuade is rendered with its matching setting (end at the first loop point, nw_set_repeat(1)). Both then end
+within 0.1 s of UADE and pass. Tim Follin: UADE ends 11.4 s, nuade 11.8 s, agree.
+
+### Whole table (owner asked for every format on 2026-10-13)
+
+114 rows: 38 default to nuade (34 replace, 4 dual by DN-1),
+37 replace rows are HELD on their current engine with the failing measurement, 10 have no song anywhere (unmeasured).
+
+Held replace rows (the measured reason is also in `heldBecause` and shown in the selector):
+
+| Row | Reason |
+|---|---|
+| aprosys | action.aps: correlation 0.481 < 0.9; action.aps: UADE plays on, nuade ends at 25.6 s; actionfiltersound.aps: UADE plays on, nuade ends at 25.6 s; mean correlation 0.739 < |
+| audiosculpture | turtle-ready.adsc: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| desire | batmanreturns.dsr: peak 0.000 <= 0.05; batmanreturns.dsr: RMS 0.000 <= 0.02; batmanreturns.dsr: correlation -2.000 < 0.9; batmanreturns.dsr: peak 0.000 <= 0.05; batmanret |
+| dirkbialluch | tpu.timelock ingame: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| dsc | dragon'sbreath_fanfares.dsc: UADE plays on, nuade ends at 6.9 s; dragon'sbreath dbfx.dsc: UADE ends at 8.7 s, nuade ends at 1.5 s; live edit would lose its path: swap to  |
+| dynamicsynthesizer | dns.ptc: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| emsv6 | perception.ems: RMS 0.011 <= 0.02; perception.ems: correlation 0.408 < 0.9; mean correlation 0.408 < 0.95 |
+| forgottenworlds | forgotten worlds intro.fw: correlation -2.000 < 0.9; mean correlation -0.017 < 0.95 |
+| fredgray | eco.gray: peak 0.000 <= 0.05; eco.gray: RMS 0.000 <= 0.02; eco.gray: no correlation (less than 1 s of music to compare before a song end); eco.gray: UADE plays on, nuade  |
+| gluemon | gnu-song.glue: correlation 0.738 < 0.9; mean correlation 0.821 < 0.95 |
+| infogrames | bob4e.dum: _uade_wasm_load failed (ret=-1); advantage tennis-intro.dum: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| jasonpage | jpn.virocop-14: _uade_wasm_load failed (ret=-1); jpn.fire and ice-1: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| jesperolsen | lollypop-subgame_01.jo: _uade_wasm_load failed (ret=-1); JO.GeorgGlaxo title: _uade_wasm_load failed (ret=-1); guldkornsexpressen ingame.jo: no correlation (less than 1 s |
+| krishatlelid | hatlelid_smallest.kh: nuade open failed (-2): the driver file "songplay" is missing; fiendish freddys - songs.kh: nuade open failed (-2): the driver file "songplay" is mi |
+| legglessmusiceditor | the punisher gameover.lme: correlation 0.627 < 0.9; mean correlation 0.627 < 0.95 |
+| majortom | mean correlation 0.945 < 0.95 |
+| markcooksey | mighty bombjack.mc: correlation 0.881 < 0.9; mighty bombjack.mc: UADE plays on, nuade ends at 26.9 s; mean correlation 0.922 < 0.95 |
+| markcooksey_old | sibling markcooksey is held |
+| maximumeffect | MAX.DinosaurDetective gamedat: _uade_wasm_load failed (ret=-1); MAX.DinosaurDetective jingle1: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| medley | combat.mso: UADE plays on, nuade ends at 7.7 s |
+| paulrobotham | dawnpatrol-sad.dat: _uade_wasm_load failed (ret=-1); dawnpatrol-sad.dat: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| paulsummers | everton_fc_-_jingles.snk: UADE plays on, nuade ends at 4.0 s; everton fc - jingles.snk: UADE plays on, nuade ends at 4.0 s |
+| pierreadane | Ivanhoe_ivanhoe - bonus.pap: _uade_wasm_load failed (ret=-1); Ivanhoe_ivanhoe - hiscore.pap: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| pokeynoise | pn.tetris: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| protracker4 | the drainer.ptm: correlation 0.860 < 0.9; the drainer.ptm: lag 200 ms > 100; mean correlation 0.860 < 0.95 |
+| richardjoseph | cannon fodder (intro).sng: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| robhubbardst | battleships.rho: correlation 0.803 < 0.9; battleships.rho: correlation 0.803 < 0.9; mean correlation 0.803 < 0.95 |
+| soundfx | operation_stealth.sfx: UADE ends at 9.9 s, nuade ends at 19.8 s |
+| soundimages | blinkys scary school-sfx.tw: UADE ends at 9.7 s, nuade ends at 1.9 s |
+| soundmaster | live edit would lose its path: swap to the 120 s mark takes 203 ms > 100 ms |
+| specialfx | wildwheels_ingame.jd: UADE ends at 16.9 s, nuade ends at 4.3 s; striker ingame.jd: RMS 0.008 <= 0.02; striker ingame.jd: UADE plays on, nuade ends at 5.6 s |
+| stevebarrett | street_fighter.sb: correlation 0.631 < 0.9; street fighter.sb: correlation 0.631 < 0.9; mean correlation 0.631 < 0.95 |
+| synthdream | sdr.monsterbusiness_5: _uade_wasm_load failed (ret=-1); sdr.nobuddiesland_jigsaw: _uade_wasm_load failed (ret=-1); sdr.monsterbusiness 1: _uade_wasm_load failed (ret=-1); |
+| synthpack | centerbase_soft.osp: _uade_wasm_load failed (ret=-1); centerbase soft.osp: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| thomashermann | thm.blueangel69: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+| voodoo | silkworm.vss: correlation 0.855 < 0.9; voo8.vss: correlation 0.514 < 0.9; mean correlation 0.685 < 0.95 |
+| zoundmonitor | sonjavanveen.sng: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95 |
+
+Unmeasured (no song of the format in public/data/songs, none found on Modland by extension or Modland format name; they play as before):
+amos, andrewparton, cinemaware, kimchristensen, laxity, ntsp, onescapee, quartet, timetracker, ufo.
+
+Dual rows, DN-1 (nuade beats ours by >= 0.01 on the mean, no song worse by more than 0.01, plus the floor below):
+actionamics 0.993/0.993; activisionpro 0.925/0.881; bendaglish 0.993/0.992; davidwhittaker 0.904/0.907; deltamusic1 0.912/0.902; deltamusic2 0.974/0.610; digmug 0.847/0.650; dss 0.976/0.974; facethemusic 0.000/ours n/a; fcbsi 0.784/ours n/a; fred_np -0.538/ours n/a; futurecomposer 0.966/0.945; gmc 0.928/0.929; hippel 0.983/0.972 NUADE; hippel7v 0.880/0.565; hippelhip 0.984/0.991; instereo1 0.973/0.944 NUADE; instereo2 0.306/0.035; jamcracker 0.970/0.987; musicassembler 0.834/0.749; musicmaker 0.947/ours n/a; oktalyzer 0.561/0.781; pumatracker 0.992/0.996; quadracomposer 0.373/0.374; ronklaren 0.368/0.364; sidmon2 0.981/0.944 NUADE; sonicarranger 0.975/ours n/a; sonix 0.000/ours n/a; soundcontrol 0.995/0.995; soundfactory 0.925/0.890; soundmon 0.966/0.934 NUADE; suntronic 0.969/ours n/a; synthesis 0.815/0.939.
+Our engine could not be measured for: facethemusic, fcbsi, fred_np, musicmaker, sonicarranger, sonix, suntronic (reasons in `ownNote`): their default stays ours and their AB items are open.
+
+### Adaptations
+
+- **Metric.** The 100 ms eagleCompare metric scored the known-good pair antidust.bp3 at 0.896: the UADE wasm render starts about 20 ms
+  after nuade's, which 100 ms windows turn into a miss. The research's metric (20 ms envelope, best lag) gives 0.974. The lag is
+  in every row (-20 ms for all passing songs) and a lag above 100 ms fails the song. Instrument check: antidust.bp3 0.974 passes,
+  apb.dw 0.406 fails; the batch refuses to run its verdicts if either answer changes.
+- **A500 filter.** The shipped UADE.wasm renders with the A500 filter on and exports no switch (entry.c sends no filter command, libuade
+  defaults to A500), so "filter off on both sides" is not possible without rebuilding the shipped binary. Measured instead: the wasm
+  against native uade123 --filter=NONE is 0.992 and against --filter=A500 0.996 (antidust, 100 ms), so the filter moves a score by about 0.005.
+- **Results file** is tools/nuade/nuade-compare.json (tracked): test-data/ is git-ignored. No --jobs: one process, a row takes about a second.
+- **Song end** of a side: its flagged end, else the start of a silent tail of 2 s or more (apb.dw stops sounding without a flag).
+- **UADE cannot be the reference** for some corpus songs: UADE.wasm refuses them (ret=-1: module check failed, a missing .info companion,
+  FTM is not a UADE format at all). Those rows record the UADE error as the reason and stay held / on ours.
+- **DN-1 floor** (not in the decision, on the safe side): nuade must itself pass the per-song rule (audible, correlation >= 0.90 per song,
+  lag, song end) and reach a 0.95 mean before it can beat ours. Without it instereo2 (nuade 0.31, ours 0.03) and deltamusic2 / futurecomposer
+  (nuade's song end differs from UADE's) would move on noise. The owner can drop the clause in verdictRules.dualDefault.
+- **A dual verdict's "ours stays"** maps to the row's legacy engine (bendaglish defaulted to UADE before the table).
+- **NR-0**: 57 replace rows have a corpus song; 54 play on UADE (UADEEditable), hippelhip on the Hippel engine (libtfmxaudiodecoder in the TFMX
+  worklet), fcbsi on the TypeScript scheduler, gmc on libopenmpt. The three moved to dual as AB31-AB33 (the total is 162 items). A fresh user's
+  pre-nuade default is held by a test against the settings defaults of 57e7803be (all 91 pre-existing keys match).
+- **Accidental full run**: `--fresh <id>` ran every format once (a selection bug, fixed: --fresh now implies --only). It cost about three minutes and
+  its rows are the recorded data of the later waves. The owner then asked for a full run anyway.
+- **Modland**: 17 of the 27 rows without a song got 1-2 real songs from the server's /api/modland route (kept only when the row's own nuade player
+  accepts them); 10 have none anywhere: amos, andrewparton, cinemaware, kimchristensen, laxity, ntsp, onescapee, quartet, timetracker, ufo.
+- **Live bugs fixed in between** (coordinator, localhost MCP): (1) an edit on a nuade Rob Hubbard song swapped in a 2080-byte MOD: the export router
+  dispatched on `uadeEditableFileData`, which a nuade song does not carry, and Rob Hubbard's exporter fell back to a ProTracker serializer; the router
+  now hands exporters the engine's module (nativeExportRouter.ts, nuadeEditReachesThePlayingSong.test.ts). (2) The selector reported a legacy
+  'native' as effective/default for a row whose choices were uade|nuade and refused the way back: values are now reported in the vocabulary of the
+  choices, an unhonourable stored value is ignored, and a stored choice can be reset (store, "Reset to Default" in the selector, engine 'default' in
+  set_format_engine). Rob Hubbard's old 'native' was RobHubbardParser with UADEEditable playback, not an engine of ours: it stays a replace row.
+- **Node voice count (not done as asked)**: the coordinator asked for the AudioWorkletNode to be sized from the loaded player's channel count.
+  channelOutputsSizedByVoices.test.ts reads a numeric literal from every channelOutputNodeOptions(...) call and the voice count is known only inside
+  the worklet after nw_open, so NuadeEngine declares the literal 8 (corpus maximum, and FTM_MAX_CHANNELS 8 the largest constant in the player
+  sources; paulrobotham and musicmaker read theirs from the module). Per-song sizing needs the node recreated on load and the literal rule relaxed.
+
+### What is next
+
+1. NAB-2: route the Sonic Arranger 0x4EFA variant (SonicArrangerParser.ts useOffsetTable) to withNuade; sonicarranger's AB30 stays open until then.
+2. Dual rows with no own-engine score: facethemusic, fred_np, musicmaker, sonix (UADE cannot render the corpus song, so no reference), suntronic (engine not on the
+   shared worklet protocol), sonicarranger (refuses the 0x4EFA variant). Each needs a reference or a harness.
+3. The 10 unmeasured replace rows need a real song of the format (none on Modland); the owner may know where to find one.
+4. Held rows whose only failure is the reference (UADE.wasm refused the song, ret=-1): audiosculpture, dirkbialluch, dynamicsynthesizer, infogrames, jasonpage, jesperolsen, maximumeffect, paulrobotham, pierreadane, pokeynoise, richardjoseph, synthdream, synthpack, thomashermann, zoundmonitor.
+   nuade may play them; there is no comparison. A different reference (uade123 native, or the Musashi runner) would settle them.
+5. Phases 6-8 (DJ render, credits, the reachability test, close) are untouched.
