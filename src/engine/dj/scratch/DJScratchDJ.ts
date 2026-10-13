@@ -23,7 +23,7 @@ import type { ScratchProfileId } from './scratchStyles';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
 import { PALETTE_PROFILE, SCRATCH_PROFILES, type ScratchMode } from './scratchStyles';
 import { anchorFor } from './scratchAnchor';
-import { getScratchRecord, type ScratchRecord } from './scratchCatalogue';
+import { CLEAN_CRATE_POOL, cuePoolsFor, getScratchRecord, sourcePool, wordEmphasisRecord, type ScratchRecord } from './scratchCatalogue';
 import { selectScratchSource, type SourceDecision, type SourceRequest, type TrackerSampleInfo } from './ScratchSourceSelector';
 import { ScratchMemory } from './scratchMemory';
 import { PerformanceBudget, performancePermissions } from './scratchBudget';
@@ -85,6 +85,9 @@ export interface ScratchTickInput {
   profile?: ScratchProfileId;
   /** The overlay's routine option (the demo's default: none; 'auto' = `routine_for` closes each section). */
   routine?: 'auto' | RoutineName | null;
+  /** The Records selector resolved (R8, `record_set`): the checked records; [] = off; null / none = 'style' (the
+   *  overlay's clean crate until the synthesized sources exist, three_deck's whole bank). */
+  records?: readonly string[] | null;
   /** Section 33 genre the source selector reads. */
   genreHint?: ScratchGenreHint | 'unknown';
   /** Scratchable instruments of a tracker deck's song (P5.6). The Auto DJ scratches crate records only
@@ -393,6 +396,8 @@ export class DJScratchDJ {
     // cooldowns are checked at each event's own bar (section 54), not for the whole window
     const cooling = (g: ScratchGestureId, bar: number): boolean => !this.memory.gestureReady(g, bar);
     const densityShift = this.intent === 'escalate' ? 1 : this.intent === 'resolve' ? -1 : 0;
+    // the section's record for DEViLBOX's own strokes: the overlay's pick from the same checked records (R8)
+    const crate = input.records ? sourcePool(input.records) : CLEAN_CRATE_POOL;
     // the demo's overlay for bars [from, from + bars) (SCR-PHRASING-PARITY): section by section, one crate record
     // per section; every stroke it plans plays (P13), DEViLBOX's extras only on top
     const overlay = (from: number, bars: number, extras: boolean): ScratchPlan => {
@@ -402,7 +407,7 @@ export class DJScratchDJ {
       });
       const opts: ScratchPlanOptions = {
         mode: input.mode, seed, fromBar: from, bars, vocalByBar, genre: input.genre, densityShift,
-        sectionAt: (bar) => overlaySectionAt(track, bar), profile: input.profile, routine: input.routine ?? null, records: true, extras,
+        sectionAt: (bar) => overlaySectionAt(track, bar), profile: input.profile, routine: input.routine ?? null, records: input.records ?? true, extras,
       };
       return planScratch(ctx, opts);
     };
@@ -422,7 +427,14 @@ export class DJScratchDJ {
         const battle = input.mode === 'BATTLE';
         arc = battle ? SCRATCH_DJ_TEMPLATE : THREE_DECK_TEMPLATE;
         scratchDJStats.bookends++;
-        const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar);
+        // three_deck's crate (R8, C16): the checked records narrow its role pools; ONE spoken phrase plays statement
+        // and chop (`cues_with_word_emphasis`); 'style' (none checked) is the whole bank
+        const picked = input.records ? input.records.filter((id) => !!getScratchRecord(id)) : [];
+        const emphasis = wordEmphasisRecord(picked);
+        const threeDeckOpts = emphasis
+          ? { pools: { HOME: [emphasis], SECONDARY: [emphasis], ACCENT: [emphasis], FX: [emphasis] }, phraseEmphasis: true }
+          : picked.length ? { pools: cuePoolsFor(picked) } : {};
+        const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar, threeDeckOpts);
         // every stroke rendered as the demo renders it, on the routine's own bus (scratch null test)
         const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck')).map((e) => ({ ...e, layer: 'demo' as const }));
         plan = {
@@ -434,7 +446,7 @@ export class DJScratchDJ {
         const a = planArc({ arc, startBar: fromBar, style: ctx.style, mode: input.mode, seed: seed + fromBar, levelCap: perm.maxLevel || undefined, cooling, beatsPerBar: ctx.meter });
         // the section's record, as the overlay's (the demo's one record per section)
         const sec = overlaySectionAt(track, fromBar);
-        const record = overlayRecord(sec.name, seed + sec.startBar);
+        const record = overlayRecord(sec.name, seed + sec.startBar, crate);
         const events = record ? a.events.map((e) => ({ ...e, record })) : a.events;
         let feature: ScratchPlan = {
           mode: input.mode, events, bars: Array.from({ length: arc.bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
@@ -465,7 +477,7 @@ export class DJScratchDJ {
     // too (one record per section, `pick_source`); never the music (D1). A `chooseSource` dependency overrides.
     if (!this.deps.chooseSource && plan.events.some((e) => !e.record)) {
       const sec = overlaySectionAt(track, fromBar);
-      const record = overlayRecord(sec.name, seed + sec.startBar);
+      const record = overlayRecord(sec.name, seed + sec.startBar, crate);
       if (record) plan = { ...plan, events: plan.events.map((e) => (e.record ? e : { ...e, record })), bars: plan.bars.map((b) => b.map((e) => (e.record ? e : { ...e, record }))) };
     }
     const performed = plan.events.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');

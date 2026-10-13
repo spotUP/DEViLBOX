@@ -386,6 +386,8 @@ interface DJState {
   autoDJScratchIntensity: number;
   /** Auto Scratch style: 'auto' (from the track's genre and the Auto DJ style) or a palette id. */
   autoDJScratchStyle: string;
+  /** Auto Scratch "Records" (the demo's selector, R8): a `record_set` choice ('style' - the demo's default -, 'clean', 'bank', 'cat:fresh', 'off', ...) or the checked record ids. */
+  autoDJScratchRecords: string | string[];
   /** Scratch telemetry (scratch plan section 64), written by the scratch controller. */
   autoDJScratchTelemetry: ScratchDJTelemetry | null;
   /** DJ FX actions engaged right now, by action id -> deck (the pad lights from this, whoever fired it). */
@@ -475,7 +477,7 @@ interface DJActions {
   setAutoDJEnabled: (enabled: boolean) => void;
   setAutoDJStatus: (status: AutoDJStatus) => void;
   setAutoDJTrackIndices: (current: number, next: number) => void;
-  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number; juggleMode: string; juggleIntensity: number; scratchMode: string; scratchIntensity: number; scratchStyle: string }>) => void;
+  setAutoDJConfig: (config: Partial<{ transitionBars: number; shuffle: boolean; withFilter: boolean; smartCuts: boolean; stemPreSeparation: boolean; streamAutoDub: boolean; stemModel: '4s' | '6s'; style: string; creativeRisk: number; juggleMode: string; juggleIntensity: number; scratchMode: string; scratchIntensity: number; scratchStyle: string; scratchRecords: string | string[] }>) => void;
   setAutoDJSessionOrder: (order: number[]) => void;
   setDjFxActive: (id: string, deck: DeckId | null) => void;
   setAutoDJTelemetry: (telemetry: AutoDJTelemetry | null) => void;
@@ -557,6 +559,7 @@ export const useDJStore = create<DJStore>()(
     autoDJScratchMode: 'MUSICAL',
     autoDJScratchIntensity: -1,
     autoDJScratchStyle: 'auto',
+    autoDJScratchRecords: 'style',
     autoDJScratchTelemetry: null as ScratchDJTelemetry | null,
     djFxActive: {} as Record<string, DeckId | null>,
     stemPreSeparation: false,
@@ -934,6 +937,7 @@ export const useDJStore = create<DJStore>()(
         if (config.scratchMode !== undefined) state.autoDJScratchMode = config.scratchMode;
         if (config.scratchIntensity !== undefined) state.autoDJScratchIntensity = config.scratchIntensity;
         if (config.scratchStyle !== undefined) state.autoDJScratchStyle = config.scratchStyle;
+        if (config.scratchRecords !== undefined) state.autoDJScratchRecords = config.scratchRecords;
         if (config.stemPreSeparation !== undefined) state.stemPreSeparation = config.stemPreSeparation;
         if (config.streamAutoDub !== undefined) state.streamAutoDub = config.streamAutoDub;
         if (config.stemModel !== undefined) state.stemModel = config.stemModel;

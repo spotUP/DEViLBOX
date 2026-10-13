@@ -37,6 +37,8 @@ export interface DemoRoutineEvent {
   gesture: ScratchGestureId;
   velocity: number;
   record?: string;
+  /** Statement and chop (C16): 'phrase' = the whole record thrown from its first sample, 'word' = its last word. */
+  slice?: 'phrase' | 'word';
 }
 
 /** Reachability sentinels: which demo planner ran. */
@@ -194,11 +196,16 @@ export const scratchPermissionFor = (juggleLevel: number, budget = THREE_DECK_BU
 /**
  * `build_scratch_events(seed)` + the record each event plays (`render`: a clean throw advances its role's
  * pool, the scratches after it chop that word). `pools` defaults to the crate's role pools.
+ *
+ * `phraseEmphasis` (C16, three_deck `phrase_emphasis`): STATEMENT AND CHOP for a crate of one spoken phrase - each
+ * phrase throws the whole phrase clean (HOME, drop_phrase), every scratch after it chops ONE word (ACCENT); the
+ * record's statement plays from its first sample, the scratches read its last word (`cues_with_word_emphasis`).
  */
-export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; pools?: Readonly<Record<CueRole, readonly string[]>> } = {}): DemoRoutineEvent[] {
+export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; pools?: Readonly<Record<CueRole, readonly string[]>>; phraseEmphasis?: boolean } = {}): DemoRoutineEvent[] {
   demoRoutineStats.threeDeck++;
   const budget = opts.budget ?? THREE_DECK_BUDGET;
   const pools = opts.pools ?? CUE_ROLE_POOLS;
+  const emphasis = !!opts.phraseEmphasis;
   const rnd: ScratchRandom = lfsr(seed * 71 + 5);
   const ev: Array<Omit<DemoRoutineEvent, 'record'>> = [{ bar: 0, step: 0, cueRole: 'HOME', gesture: 'needleDrop', velocity: 0.6 }];
   let phraseI = 0;
@@ -211,16 +218,18 @@ export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; poo
     for (let b = 0; b < bars; b++) {
       const newPhrase = b % 2 === 0;
       if (newPhrase) phraseI++;
-      const phraseCue = CUE_CYCLE[phraseI % CUE_CYCLE.length]!;
+      const phraseCue: CueRole = emphasis ? 'HOME' : CUE_CYCLE[phraseI % CUE_CYCLE.length]!;
       let st = 0;
       if (newPhrase) {
-        ev.push({ bar: b0 + b, step: 0, cueRole: phraseCue, gesture: 'drop', velocity: Math.min(1, 0.65 + 0.35 * energy) });
-        st = getGesture('drop').durationSteps;
+        const g: ScratchGestureId = emphasis ? 'dropPhrase' : 'drop';
+        ev.push({ bar: b0 + b, step: 0, cueRole: phraseCue, gesture: g, velocity: Math.min(1, 0.65 + 0.35 * energy) });
+        st = getGesture(g).durationSteps;
       }
       while (st < 15) {
         let g = gestures[Math.trunc(rnd() * gestures.length) % gestures.length]!;
         if (role === 'intro' && rnd() > 0.6) g = 'baby';
-        const cue: CueRole = rnd() > 0.78 ? 'ACCENT' : phraseCue;
+        // chop the word, never the statement; the occasional bark accent draws only in the rotation
+        const cue: CueRole = emphasis ? 'ACCENT' : rnd() > 0.78 ? 'ACCENT' : phraseCue;
         const velocity = Math.min(1, 0.55 + 0.4 * energy + 0.12 * (rnd() - 0.5));
         ev.push({ bar: b0 + b, step: st, cueRole: cue, gesture: g, velocity });
         st += getGesture(g).durationSteps;
@@ -230,11 +239,14 @@ export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; poo
   });
   ev.push({ bar: 31, step: 15, cueRole: 'HOME', gesture: 'needleLift', velocity: 0.5 });
   const roleI: Partial<Record<CueRole, number>> = {};
+  // `pools.get(role) or pools.get("HOME")`, else the first record of any pool
+  const anyRecord = (['HOME', 'SECONDARY', 'ACCENT', 'FX'] as const).map((r) => pools[r][0]).find((x) => x !== undefined);
   return ev.map((e) => {
     if (isNeedle(e.gesture)) return e;
     if (e.gesture === 'drop') roleI[e.cueRole] = (roleI[e.cueRole] ?? 0) + 1;
     const pool = pools[e.cueRole].length ? pools[e.cueRole] : pools.HOME;
-    return { ...e, record: pool[(roleI[e.cueRole] ?? 0) % pool.length] };
+    const record = pool.length ? pool[(roleI[e.cueRole] ?? 0) % pool.length] : anyRecord;
+    return { ...e, ...(record ? { record } : {}), ...(emphasis ? { slice: e.cueRole === 'HOME' || e.cueRole === 'SECONDARY' ? 'phrase' as const : 'word' as const } : {}) };
   });
 }
 
@@ -284,6 +296,6 @@ export function demoRoutineRenderSpecs(events: readonly DemoRoutineEvent[], seed
   return events.map((e) => {
     if (isNeedle(e.gesture)) return { seed, humanizeSamples: 0, chain: routine };
     const ms = mt ? -4 + 8 * mt.rand() : -8 + 18 * lf!();
-    return { seed: seed + e.bar * 16 + e.step, humanizeSamples: Math.trunc(ms * 1e-3 * DEMO_RATE), chain: routine };
+    return { seed: seed + e.bar * 16 + e.step, humanizeSamples: Math.trunc(ms * 1e-3 * DEMO_RATE), chain: routine, ...(e.slice ? { slice: e.slice } : {}) };
   });
 }

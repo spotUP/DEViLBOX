@@ -195,8 +195,61 @@ export const SCRATCH_RECORDS: readonly ScratchRecord[] = Object.values(metadata 
  */
 export const CRATE_LOAD_ORDER: readonly ScratchRecord[] = [...SCRATCH_RECORDS].sort((a, b) => (a.sourceFile < b.sourceFile ? -1 : a.sourceFile > b.sourceFile ? 1 : 0));
 
+/** scratch.py `_SOURCE_NAMES`: the seven synthesized sources (their audio is R6, `build_sources`). */
+export const SYNTH_SOURCE_NAMES: readonly string[] = ['vocal_ah', 'vocal_fresh', 'vocal_yeah', 'robot', 'horn', 'snare', 'noise'];
+
+/** The bank's canonical names, sorted (`sorted(bank_index())`). */
+const BANK_NAMES: readonly string[] = SCRATCH_RECORDS.map((r) => r.id).sort();
+
+/** scratch.py `all_source_names`: every selectable record - the synthesized sources first, then the bank. */
+export const ALL_SOURCE_NAMES: readonly string[] = [...SYNTH_SOURCE_NAMES, ...BANK_NAMES];
+
+/**
+ * scratch.py `record_set(sel)` (R8): the "Records" bulk selector as a list of source names - 'style' (or none)
+ * null (the profile's own pool), 'all', 'synth', 'bank', 'clean', 'pre_scratched', 'cat:<category>', 'off' [].
+ * An unknown selector is null, as in the demo.
+ */
+export function recordSet(sel: string | null | undefined): string[] | null {
+  if (!sel || sel === 'style') return null;
+  if (sel === 'off') return [];
+  if (sel === 'all') return [...ALL_SOURCE_NAMES];
+  if (sel === 'synth') return [...SYNTH_SOURCE_NAMES];
+  if (sel === 'bank') return [...BANK_NAMES];
+  if (sel === 'clean' || sel === 'pre_scratched') {
+    const wantPre = sel === 'pre_scratched';
+    return SCRATCH_RECORDS.filter((r) => (r.category === 'PRE_RENDERED_SCRATCH') === wantPre).map((r) => r.id).sort();
+  }
+  if (sel.startsWith('cat:')) {
+    const cat = sel.slice(4).toUpperCase();
+    return SCRATCH_RECORDS.filter((r) => r.category.toUpperCase() === cat).map((r) => r.id).sort();
+  }
+  return null;
+}
+
+/** scratch.py `record_set_choices`: the selector's choices, one per bank category. */
+export function recordSetChoices(): string[] {
+  const cats = [...new Set(SCRATCH_RECORDS.map((r) => r.category.toLowerCase()))].sort();
+  return ['style', 'all', 'synth', 'bank', 'clean', 'pre_scratched', ...cats.map((c) => `cat:${c}`), 'off'];
+}
+
+/** `pick_source`'s pool for a checked record set: `all_source_names()` order, the checked ones only. */
+export function sourcePool(allowed: readonly string[]): string[] {
+  const want = new Set(allowed);
+  return ALL_SOURCE_NAMES.filter((n) => want.has(n));
+}
+
 /** The demo's `record_set('clean')`: the canonical names of every record that is not pre-scratched, sorted. */
-export const CLEAN_CRATE_POOL: readonly string[] = SCRATCH_RECORDS.filter((r) => r.category !== 'PRE_RENDERED_SCRATCH').map((r) => r.id).sort();
+export const CLEAN_CRATE_POOL: readonly string[] = recordSet('clean')!;
+
+/**
+ * The Auto Scratch "Records" setting (R8) as the checked records: a list (the per-record boxes, which override
+ * the bulk control in the demo) or a `record_set` selector; null = 'style' (the demo's default: the overlay's
+ * profile pool of synthesized sources - the clean crate stands in until R6 - and three_deck's whole bank).
+ */
+export function scratchRecordsFor(setting: string | readonly string[] | null | undefined): readonly string[] | null {
+  if (Array.isArray(setting)) return setting as readonly string[];
+  return recordSet(setting as string | null | undefined);
+}
 
 /** The demo routine's four cue roles (scratch_dj.py s.22). */
 export type CueRole = 'HOME' | 'SECONDARY' | 'ACCENT' | 'FX';
@@ -216,6 +269,42 @@ export const CUE_ROLE_POOLS: Readonly<Record<CueRole, readonly string[]>> = {
 
 function rolePool(role: CueRole): string[] {
   return CRATE_LOAD_ORDER.filter((r) => CUE_ROLE_CATEGORIES[role].includes(r.category)).map((r) => r.id);
+}
+
+/**
+ * `scratch_dj.cue_pools_from_bank` over a narrowed crate (three_deck's `allowed_records`, R8): per cue role the
+ * checked records of its categories in the bank's load order; a role none of them fills takes the role's single
+ * cue (`cues_from_bank`: its mapped record if checked, else the first checked record).
+ */
+export function cuePoolsFor(ids: readonly string[]): Record<CueRole, readonly string[]> {
+  const want = new Set(ids);
+  const bank = CRATE_LOAD_ORDER.filter((r) => want.has(r.id));
+  const out = {} as Record<CueRole, readonly string[]>;
+  for (const role of ['HOME', 'SECONDARY', 'ACCENT', 'FX'] as const) {
+    const pool = bank.filter((r) => CUE_ROLE_CATEGORIES[role].includes(r.category)).map((r) => r.id);
+    const single = want.has(CUE_ROLE_RECORD[role]) ? CUE_ROLE_RECORD[role] : bank[0]?.id;
+    out[role] = pool.length ? pool : single ? [single] : [];
+  }
+  return out;
+}
+
+/**
+ * `scratch_bank.word_source` (the last word: the one a turntablist chops) in the demo bank's samples: the slice's
+ * start and end and its vowel re-based onto the slice and clamped; null without slices or under two samples.
+ */
+export function lastWordSlice(record: ScratchRecord, rate = 22050): { start: number; end: number; vowel: number } | null {
+  const w = record.wordSlices[record.wordSlices.length - 1];
+  if (!w) return null;
+  const start = Math.round(w.start * rate), end = Math.round(w.end * rate);
+  if (end - start < 2) return null;
+  return { start, end, vowel: Math.min(Math.max(Math.round(w.vowel * rate) - start, 0), end - start - 1) };
+}
+
+/** `scratch_dj.cues_with_word_emphasis`: a crate narrowed to ONE record with word slices plays statement and chop. */
+export function wordEmphasisRecord(ids: readonly string[]): string | null {
+  if (ids.length !== 1) return null;
+  const r = getScratchRecord(ids[0]!);
+  return r && lastWordSlice(r) ? r.id : null;
 }
 
 /** `scratch_dj.cues_from_bank`: the single record per cue role the 32-bar showcase scratches. */

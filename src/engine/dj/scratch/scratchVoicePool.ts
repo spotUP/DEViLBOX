@@ -26,7 +26,7 @@ import {
 } from './scratchRender';
 import { needleDrop as ttNeedleDrop, needleLift as ttNeedleLift, linspace } from '@/engine/turntable/turntableSim';
 import type { ScratchCue, ScratchEventFx, ScratchGesture, ScratchRenderSpec, ScratchRole } from './scratchTypes';
-import { getScratchRecord, findRecords, type ScratchRecord } from './scratchCatalogue';
+import { getScratchRecord, findRecords, lastWordSlice, type ScratchRecord } from './scratchCatalogue';
 import { realTimers, type ExecutorTimers } from '../autodj/executorTimers';
 
 /** Reachability sentinels: strokes rendered and handed to a bus, records read, routines shaped, loops. */
@@ -187,7 +187,13 @@ export class ScratchVoicePool {
     if (!record) return null;
     const name = demoGestureName(gesture.id);
     const sig = await this.recordPcm(record);
-    const source: DemoSource = { sig, anchor: this.cueSample(record, cue), safe: record.demoCue.safe };
+    let source: DemoSource = { sig, anchor: this.cueSample(record, cue), safe: record.demoCue.safe };
+    // statement and chop (C16): the phrase thrown from its first sample, the scratches on its last word
+    if (spec.slice === 'phrase') source = { ...source, anchor: 0 };
+    else if (spec.slice === 'word') {
+      const w = lastWordSlice(record, DEMO_RATE);
+      if (w) source = { sig: sig.slice(w.start, w.end), anchor: w.vowel, safe: [0, w.end - w.start - 1] };
+    }
     const stepSec = spec.chain === 'threeDeck' ? 60.0 / (bpm * 4) : demoStepSamples(bpm) / DEMO_RATE;
     const steps = name ? demoGestureSteps(name) : gesture.durationSteps;
     let out = renderGesture(source, name ?? catalogueDemoGesture(gesture), steps * stepSec, DEMO_RATE, {

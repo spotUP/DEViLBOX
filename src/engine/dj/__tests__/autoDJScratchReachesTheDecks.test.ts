@@ -74,7 +74,7 @@ function scratchDeck(startSec: number) {
   });
 }
 
-async function run(mode: 'MUSICAL' | 'OFF') {
+async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style') {
   const track = corpusAnalysis('breakdowns');
   const breakdown = track.sections.find((s) => s.kind === 'breakdown')!;
   const startSec = timeAtBeat(track.beatGrid, barStartBeat(track.downbeats, breakdown.startBar - 2)) + 0.05;
@@ -94,7 +94,7 @@ async function run(mode: 'MUSICAL' | 'OFF') {
   pl.importPlaylists([{ id, name: 'scratch r7', createdAt: Date.now(), updatedAt: Date.now(), tracks }]);
   pl.setActivePlaylist(id);
   const s = useDJStore.getState();
-  s.setAutoDJConfig({ shuffle: false, style: 'Club', juggleMode: 'OFF', scratchMode: mode, scratchStyle: 'battle' });
+  s.setAutoDJConfig({ shuffle: false, style: 'Club', juggleMode: 'OFF', scratchMode: mode, scratchStyle: 'battle', scratchRecords: records });
   s.setDeckState('A', { fileName: 'breakdowns.wav', trackName: 'breakdowns', isPlaying: true, detectedBPM: 125, effectiveBPM: 125, durationMs: 600_000, audioPosition: startSec, pitchOffset: 0, trackAnalysis: track });
   s.setDeckState('B', { fileName: null, trackName: '', isPlaying: false, trackAnalysis: null, beatGrid: null, audioPosition: 0 });
   s.setAutoDJEnabled(true);
@@ -151,7 +151,7 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
     dj.stopPolling();
     useDJStore.getState().setAutoDJEnabled(false);
     useDJStore.getState().setAutoDJStatus('idle');
-    useDJStore.getState().setAutoDJConfig({ scratchMode: 'MUSICAL', scratchStyle: 'auto' });
+    useDJStore.getState().setAutoDJConfig({ scratchMode: 'MUSICAL', scratchStyle: 'auto', scratchRecords: 'style' });
     setSessionController(null);
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -204,6 +204,19 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
       expect(Math.abs(fractionalBeatAt(track.beatGrid, t) - r.event.executeAtBeat)).toBeLessThan(1e-6);
     }
   }, 180_000);
+
+  // R8: the demo's Records selector reaches the set - every stroke scratches a checked record (`pick_source`
+  // over `record_set(sel)`, the routine slots included); 'off' skips the overlay as render_scratch_section does
+  it('Records: a category scratches only its records; off scratches nothing', async () => {
+    const fresh = await run('MUSICAL', 'cat:fresh');
+    expect(fresh.runs.length).toBeGreaterThanOrEqual(1);
+    const ids = new Set(fresh.runs.map((r) => (r.run.event.source.type === 'CRATE' ? r.run.event.source.recordId : 'not a record')));
+    for (const id of ids) expect(['AH_FRESH_FULL_PHRASE', 'FRESH_ALT', 'FRESH_ALT_4', 'FRESH_STANDARD', 'FRESH_YEAH']).toContain(id);
+    vi.restoreAllMocks();
+    const off = await run('MUSICAL', 'off');
+    expect(off.runs).toHaveLength(0);
+    expect(off.counts.rendered).toBe(0);
+  }, 240_000);
 
   it('Auto Scratch OFF: the same run plans and performs nothing', async () => {
     const { counts, runs, deck } = await run('OFF');
