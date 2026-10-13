@@ -967,3 +967,35 @@ export const useThirdDeckActive = () => useDJStore((s) => s.thirdDeckActive);
 export const useDeckState = (deck: DeckId) => useDJStore((s) => s.decks[deck]);
 export const useCrossfader = () => useDJStore((s) => s.crossfaderPosition);
 export const useCrossfaderCurve = () => useDJStore((s) => s.crossfaderCurve);
+
+// ============================================================================
+// DECK C'S TEMPO (owner report 2026-10-13: Deck C showed 125 - the store default - while A and B played at 100)
+// ============================================================================
+
+/**
+ * The set's master clock: the beat deck the set is heard on - the one playing A/B deck, or with both playing the
+ * one the crossfader favours (A at the centre). Null when neither plays.
+ */
+export function setMasterDeck(s: Pick<DJStore, 'decks' | 'crossfaderPosition'>): 'A' | 'B' | null {
+  const a = s.decks.A.isPlaying, b = s.decks.B.isPlaying;
+  if (a && b) return s.crossfaderPosition > 0.5 ? 'B' : 'A';
+  return a ? 'A' : b ? 'B' : null;
+}
+
+/**
+ * The one writer of Deck C's tempo while it is the scratch deck (no track of its own): the master deck's tempo,
+ * as that deck shows it. Every reader - the display, a pad's or the MCP's scratch stroke on Deck C - reads
+ * `decks.C.effectiveBPM`. A track loaded on Deck C keeps its own tempo.
+ */
+function followSetTempo(s: DJStore): void {
+  if (s.decks.C.fileName) return;
+  const m = setMasterDeck(s);
+  if (!m) return;
+  const bpm = s.decks[m].effectiveBPM;
+  if (bpm > 0 && (s.decks.C.effectiveBPM !== bpm || s.decks.C.detectedBPM !== bpm)) s.setDeckState('C', { effectiveBPM: bpm, detectedBPM: bpm });
+}
+useDJStore.subscribe(
+  (s) => [s.decks.A.isPlaying, s.decks.B.isPlaying, s.decks.A.effectiveBPM, s.decks.B.effectiveBPM, s.crossfaderPosition, s.decks.C.fileName, s.decks.C.effectiveBPM] as const,
+  () => followSetTempo(useDJStore.getState()),
+  { equalityFn: (x, y) => x.every((v, i) => v === y[i]) },
+);
