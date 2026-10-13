@@ -281,43 +281,43 @@ The 7 EaglePlayer (Musashi) rows stay on EaglePlayer: they run UADE's own player
 ## Checklist
 
 Phase 0 - Vendor and build (5)
-- [ ] NV-1 Fetch tarball of `4900e597e` into `third-party/nuade/` (pristine), write `UPSTREAM.md`, `update.sh`.
-- [ ] NV-2 `nuade-wasm/CMakeLists.txt`, `nuade-wasm/build.sh`, `.gitignore` for `nuade-wasm/build/`.
-- [ ] NV-3 Shim `nuade-wasm/src/nuade_wasm.c` (D3 exports incl. `nw_caps`, edit stubs returning -ENOSYS).
-- [ ] NV-4 Build; commit `public/nuade/Nuade.{js,wasm}`; size <= 2.5 MB; node render of `antidust.bp3` byte-identical
+- [x] NV-1 Fetch tarball of `4900e597e` into `third-party/nuade/` (pristine), write `UPSTREAM.md`, `update.sh`. -- dcd93a0d4, nuadeVendored.test.ts
+- [x] NV-2 `nuade-wasm/CMakeLists.txt`, `nuade-wasm/build.sh`, `.gitignore` for `nuade-wasm/build/`. -- a2235f76e, nuadeWasmBuild.test.ts NV-2
+- [x] NV-3 Shim `nuade-wasm/src/nuade_wasm.c` (D3 exports incl. `nw_caps`, edit stubs returning -ENOSYS). -- a2235f76e, nuadeWasmBuild.test.ts NV-3
+- [x] NV-4 Build; commit `public/nuade/Nuade.{js,wasm}`; size <= 2.5 MB; node render of `antidust.bp3` byte-identical -- a2235f76e, nuadeWasmBuild.test.ts NV-4 (1.75 MB, byte-identical antidust.bp3)
       to the research's native render (`scratchpad/ab/antidust.bp3.raw` if still present, else to a fresh native build).
-- [ ] NV-5 `.github/workflows/nuade.yml` (websid.yml copy); `src/__tests__/buildAndCiToolchain.test.ts` extended so
+- [x] NV-5 `.github/workflows/nuade.yml` (websid.yml copy); `src/__tests__/buildAndCiToolchain.test.ts` extended so -- e89e80dfb, buildAndCiToolchain.test.ts NV-5
       the workflow's paths and build command are asserted.
 
 Phase 1 - Engine adapter (10)
-- [ ] NE-1 `src/engine/nuade/nuadeProtocol.ts` message types (D4).
-- [ ] NE-2 `public/nuade/Nuade.worklet.js` (render loop, per-voice buffers to channel-outputs, mute mask, pause).
-- [ ] NE-3 `src/engine/nuade/NuadeEngine.ts` (WASMChannelOutputsEngine; load, play, stop, pause, subsongs).
-- [ ] NE-4 Extract `src/engine/replayer/tickGridFollow.ts` from `EaglePlayerEngine.setGrid`; both engines use it
+- [x] NE-1 `src/engine/nuade/nuadeProtocol.ts` message types (D4). -- e83f8d6b0, nuadeProtocol.test.ts
+- [x] NE-2 `public/nuade/Nuade.worklet.js` (render loop, per-voice buffers to channel-outputs, mute mask, pause). -- 4ed48e051, nuadeWorklet.test.ts
+- [x] NE-3 `src/engine/nuade/NuadeEngine.ts` (WASMChannelOutputsEngine; load, play, stop, pause, subsongs). -- d8a527733, nuadeEngine.test.ts
+- [x] NE-4 Extract `src/engine/replayer/tickGridFollow.ts` from `EaglePlayerEngine.setGrid`; both engines use it -- 110e5103f, tickGridFollow.test.ts
       (EaglePlayer tests stay green unchanged).
-- [ ] NE-5 Position messages from `nw_snapshot(heardFrame)`; orderRow/tick follow.
-- [ ] NE-6 Scopes: `oscData` into `useOscilloscopeStore`, `setChipInfo(voices, ..., 'Voice N')`.
-- [ ] NE-7 Isolation slots and dub sends (afterPlay), `setMuteMask` (bit set = voice audible).
-- [ ] NE-8 `swapModule` (liveSwap) with `swapDone.ms`; measured at 120 s on R02.
-- [ ] NE-9 VU into the meter store; `get_audio_level` reads non-zero while a nuade song plays (headless store test).
-- [ ] NE-10 `NuadeEditPort` + `nw_caps` probe; descriptor sets `gridCellEdits` only when `CELL_WRITE`; test with a
+- [x] NE-5 Position messages from `nw_snapshot(heardFrame)`; orderRow/tick follow. -- d8a527733, nuadePosition.test.ts
+- [x] NE-6 Scopes: `oscData` into `useOscilloscopeStore`, `setChipInfo(voices, ..., 'Voice N')`. -- d8a527733, nuadeEngineFeatures.test.ts NE-6
+- [x] NE-7 Isolation slots and dub sends (afterPlay), `setMuteMask` (bit set = voice audible). -- d8a527733, nuadeEngineFeatures.test.ts NE-7
+- [x] NE-8 `swapModule` (liveSwap) with `swapDone.ms`; measured at 120 s on R02. -- d8a527733, nuadeEngineFeatures.test.ts NE-8
+- [x] NE-9 VU into the meter store; `get_audio_level` reads non-zero while a nuade song plays (headless store test). -- d8a527733, nuadeEngineFeatures.test.ts NE-9 (meter feed; get_audio_level itself not driven headless)
+- [x] NE-10 `NuadeEditPort` + `nw_caps` probe; descriptor sets `gridCellEdits` only when `CELL_WRITE`; test with a -- d8a527733, nuadeEngineFeatures.test.ts NE-10
       faked caps value proves the switch, and the real WASM reports `CELL_WRITE` off.
 
 Phase 2 - Registry, routing, selector (12)
-- [ ] NS-0 Measure max `nw_voice_count` over the 84 corpus songs; set the node's declared voices.
-- [ ] NS-1 `Nuade` descriptor in `wasmEngineRegistry.ts` (ahead of UADEEditable, after EaglePlayer).
-- [ ] NS-2 Song + format-store fields, `FILE_DATA_FIELDS`, `exporters.ts` meta, `nativeExportRouter.ts` branch,
+- [x] NS-0 Measure max `nw_voice_count` over the 84 corpus songs; set the node's declared voices. -- commit "NS-0..NS-11", nuadeFormats.test.ts NS-0 (measured max 8 voices)
+- [x] NS-1 `Nuade` descriptor in `wasmEngineRegistry.ts` (ahead of UADEEditable, after EaglePlayer). -- commit "NS-0..NS-11", nuadeRegistry.test.ts NS-1
+- [x] NS-2 Song + format-store fields, `FILE_DATA_FIELDS`, `exporters.ts` meta, `nativeExportRouter.ts` branch, -- commit "NS-0..NS-11", nuadeRegistry.test.ts NS-2
       `nativeSubsongs.ts` reports nuade subsongs.
-- [ ] NS-3 `FormatEngineChoice` gains `'nuade'`; settings v14 migration + test (re-check no writer exists first).
-- [ ] NS-4 `src/engine/nuade/nuadeFormats.ts` table (84 replace + 30 dual rows, `defaultEngine: 'uade'` / `'native'`
+- [x] NS-3 `FormatEngineChoice` gains `'nuade'`; settings v14 migration + test (re-check no writer exists first). -- commit "NS-0..NS-11", useSettingsStore.migration.test.ts v14
+- [x] NS-4 `src/engine/nuade/nuadeFormats.ts` table (84 replace + 30 dual rows, `defaultEngine: 'uade'` / `'native'` -- commit "NS-0..NS-11", nuadeFormats.test.ts NS-4 (84+30 rows)
       until the batch writes verdicts).
-- [ ] NS-5 `src/engine/nuade/nuadeRouting.ts` `effectiveFormatEngine` + `nuadePlayerFor(filename, bytes, prefs)`.
-- [ ] NS-6 `src/lib/import/parsers/withNuade.ts` (`playOnNuade`, `withNuade`) + unit tests next to it.
-- [ ] NS-7 `src/lib/song/switchFormatEngine.ts` (store + re-open through `openSong` from `editedModuleForPlay`).
-- [ ] NS-8 `FormatEngineSelect.tsx` mounted in `WasmInfoEditor` (loaded format).
-- [ ] NS-9 Settings tab "Playback Engines" listing all rows.
-- [ ] NS-10 MCP `get_format_engines` + `set_format_engine` (server tool + bridge handler, one handler each).
-- [ ] NS-11 `get_format_state` gains `nuadePlayerId`, `engineCredit`.
+- [x] NS-5 `src/engine/nuade/nuadeRouting.ts` `effectiveFormatEngine` + `nuadePlayerFor(filename, bytes, prefs)`. -- commit "NS-0..NS-11", withNuade.test.ts NS-5
+- [x] NS-6 `src/lib/import/parsers/withNuade.ts` (`playOnNuade`, `withNuade`) + unit tests next to it. -- commit "NS-0..NS-11", withNuade.test.ts NS-6 + reachability parseModuleToSong -> Nuade
+- [x] NS-7 `src/lib/song/switchFormatEngine.ts` (store + re-open through `openSong` from `editedModuleForPlay`). -- commit "NS-0..NS-11", switchFormatEngine.test.ts
+- [x] NS-8 `FormatEngineSelect.tsx` mounted in `WasmInfoEditor` (loaded format). -- commit "NS-0..NS-11", formatEngineSelect.test.tsx
+- [x] NS-9 Settings tab "Playback Engines" listing all rows. -- commit "NS-0..NS-11", playbackEnginesPanel.test.tsx
+- [x] NS-10 MCP `get_format_engines` + `set_format_engine` (server tool + bridge handler, one handler each). -- commit "NS-0..NS-11", formatEngineTools.test.ts NS-10
+- [x] NS-11 `get_format_state` gains `nuadePlayerId`, `engineCredit`. -- commit "NS-0..NS-11", formatEngineTools.test.ts NS-11
 
 Phase 3 - Comparison tooling (5)
 - [ ] NC-1 `tools/nuade/nuadeCompare.ts` (reuses eagleCompare + uadeRenderCore).
@@ -333,14 +333,125 @@ Phase 3 - Comparison tooling (5)
 Phase 4 - Rollout (84): R01-R84 per the table above. Each row: measure (batch `--only <id>`), apply verdict, route via
 `withNuade` if it passes, its `nuadePlaysFormats` row green, `playingEngineFor` proven. Pre-step:
 - [ ] NR-0 Re-verify the engine column of all 84 rows from the router (see Rollout order note); move mismatches.
-- [ ] R01 ... [ ] R84 (one checkbox per row, ticked in `thoughts/shared/plans/2026-10-13-nuade-engine-progress.md`).
+- [ ] R01 mmdc (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R02 robhubbard (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R03 timfollin (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R04 earache (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R05 musicalenlightenment (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R06 amos (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R07 dsc (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R08 fashiontracker (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R09 gmc (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R10 jeroentel (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R11 peterverswyvelen (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R12 richardjoseph (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R13 robhubbardst (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R14 soundfx (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R15 soundmaster (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R16 zoundmonitor (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R17 gluemon (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R18 infogrames (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R19 paulrobotham (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R20 paulshields (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R21 scumm (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R22 syntracker (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R23 tomytracker (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R24 davidhanney (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R25 ems (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R26 laxity (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R27 majortom (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R28 timetracker (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R29 tronic (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R30 maniacsofnoise (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R31 paulsummers (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R32 pokeynoise (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R33 soundimages (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R34 stevebarrett (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R35 thomashermann (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R36 ufo (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R37 andrewparton (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R38 aprosys (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R39 artandmagic (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R40 ashleyhogg (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R41 cinemaware (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R42 dariuszendeh (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R43 desire (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R44 dynamicsynthesizer (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R45 emsv6 (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R46 fcbsi (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R47 fredgray (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R48 hippelhip (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R49 howiedavies (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R50 jankomrsicflogel (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R51 jasonbrooke (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R52 jasonpage (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R53 jesperolsen (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R54 kimchristensen (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R55 krishatlelid (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R56 legglessmusiceditor (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R57 markcooksey (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R58 markcooksey_old (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R59 markii (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R60 maximumeffect (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R61 mcmd (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R62 medley (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R63 mikedavies (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R64 pierreadane (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R65 professionalsoundartists (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R66 quartet (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R67 riffraff (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R68 seanconnolly (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R69 silmarils (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R70 specialfx (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R71 speedya1system (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R72 speedysystem (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R73 synthdream (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R74 synthpack (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R75 voodoo (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R76 ntsp (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R77 onescapee (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R78 seanconran (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R79 spl (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R80 forgottenworlds (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R81 amcomposer (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R82 audiosculpture (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R83 dirkbialluch (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
+- [ ] R84 protracker4 (gate D8, route, nuadePlaysFormats row, playingEngineFor proven)
 
 Phase 5 - Dual A/B (30 + 2)
 - [ ] NAB-1 Batch renders our engine AND nuade for AB01-AB30 (up to 3 songs each) into the same results file.
 - [ ] NAB-2 SA 0x4EFA variant: `SonicArrangerParser.ts:1006` (`useOffsetTable`) routes that variant to `withNuade`
       instead of UADE; `almighty.sa` plays on nuade (research 0.997).
-- [ ] AB01 ... [ ] AB30 (one checkbox per row: default written by `apply-verdicts`, selector offers both, switching
-      re-opens and plays on the other engine).
+- [ ] AB01 actionamics (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB02 activisionpro (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB03 bendaglish (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB04 davidwhittaker (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB05 deltamusic1 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB06 deltamusic2 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB07 digmug (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB08 dss (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB09 facethemusic (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB10 fred_np (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB11 futurecomposer (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB12 hippel (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB13 hippel7v (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB14 instereo1 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB15 instereo2 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB16 jamcracker (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB17 musicassembler (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB18 musicmaker (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB19 oktalyzer (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB20 pumatracker (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB21 quadracomposer (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB22 ronklaren (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB23 sidmon2 (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB24 sonix (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB25 soundcontrol (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB26 soundfactory (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB27 soundmon (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB28 suntronic (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB29 synthesis (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
+- [ ] AB30 sonicarranger (default written by apply-verdicts, selector offers both, switching re-opens and plays on the other engine)
 
 Phase 6 - DJ (3)
 - [ ] ND-1 `dj-render.worker.ts` `renderWithNuade` (stereo + per-voice -> `channelScopes` + monoStem stems), dispatched
@@ -421,6 +532,28 @@ repeat check 1.
 - `apb.dw` stopping at 4.2 s in both nuade and our engine (UADE 8.5 s): affects AB04 only through its measurement;
   root cause belongs to a separate investigation.
 - Moving the 7 EaglePlayer formats.
+
+## Adaptations while implementing Phases 0-2 (2026-10-13)
+
+- Choice is applied once, after the route: `parseModuleToSong` calls `applyNuadeChoice` (withNuade.ts) on the routed song, so
+  the ~190 route call sites stay untouched; the table's keys reach the routes through `resolvedFormatEngines` (nuade reads
+  as native there). Identification is by the registry key or the player's extension/prefix, confirmed by nuade's own
+  probe (`nuadeProbe.ts`, Nuade.wasm loaded on the main thread only when some format's choice is nuade). FormatRegistry
+  keys alone did not work: MMDC files detect as `med`.
+- The table has `legacyEngine` (what the key defaulted to before): defaultEngine starts as it, a held row returns to it,
+  and a replace row's "UADE" option is stored as it (earAche legacy 'native' = our parser + UADE playback).
+- 112 preference keys belong to the table (23 new, optional); the store no longer holds their defaults; settings v14.
+- 27 table rows have no corpus song in public/data/songs (listed by `corpus: []`); Phase 3 can only measure the other 87.
+- Mute and the main mix: nuade's voice buffers are mono L+R sums, so the shim takes muted/isolated voices out of the
+  stereo mix using the mixer's pan per voice (`nw_pans`); worklet isolation/dub sends use side = (1+pan)/2, gain 1.
+- `followBy 'tick'` = row * speed + tick of the position snapshot (exact only for grid_ticks players, where nuade reports
+  one pattern of all scanned ticks); players with real orders follow by order/row.
+- NE-9: VU reaches the channel meter feed (what the meters read); `get_audio_level` itself reads the master analyser and
+  is not drivable headless, so the MCP getter is left to the manual check.
+- NV-5: the workflow could not be run (no push yet); its paths/commands are asserted by test.
+- Dual rows with an own engine keep the other engines' file data except those ahead of Nuade in the registry.
+- Settings tab and instrument panel mount the same `FormatEngineSelect`; the panel mount shows for songs carrying
+  `nuadePlayerId` (nuade-played). A dual-row song on its own engine is switched from the Settings tab.
 
 ## Decisions taken (owner, 2026-10-13)
 

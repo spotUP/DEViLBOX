@@ -14,6 +14,8 @@
 
 import type { TrackerSong } from '../TrackerReplayer';
 import { FILE_DATA_FIELDS } from '../formatFileDataFields';
+import { nuadeSongHasCellWrite } from '../nuade/nuadeCaps';
+import { nuadeFormatForPlayer } from '../nuade/nuadeFormats';
 
 // ---------------------------------------------------------------------------
 // Engine registry types
@@ -76,6 +78,11 @@ export interface NativeEngineDescriptor {
    * edit (set, clear, bulk) of a song this engine plays there.
    */
   gridCellEdits?: true;
+  /**
+   * Like `gridCellEdits`, decided per song when the route is chosen: the engine's player reports a cell write
+   * (nuade: nw_caps CELL_WRITE, recorded at load). False/absent: the descriptor's other routes (liveSwap) apply.
+   */
+  gridCellEditsWhen?: (song: TrackerSong) => boolean;
   /**
    * The engine's instance has swapModule(module, ...loadArgs): it takes the edited module while it plays and runs on from the
    * position already played (engineModuleSwap.ts). sendCellEditsToEngine hands every grid edit of a song this engine plays there.
@@ -504,6 +511,28 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/eagleplayer/EaglePlayerEngine')).EaglePlayerEngine as unknown as WASMSingletonStatic,
     // The player reports its tick count; the grid it maps onto is this song's.
     onStarted: (instance, song) => (instance as unknown as import('@/engine/eagleplayer/EaglePlayerEngine').EaglePlayerEngine).setGrid(song),
+  },
+  {
+    // Any format nuade (emoon/nuade, native C ports of the UADE players) plays: nuade-wasm forces the player named by
+    // the song's nuadePlayerId (nuadeFormats.ts). After EaglePlayer and ahead of UADEEditable: a song carrying both plays
+    // here. Edits reach it by swapping the edited module in (liveSwap); a grid cell is written into the player only for
+    // a player whose caps report CELL_WRITE (none at the pinned upstream), decided per song.
+    key: 'Nuade',
+    synthType: 'NuadeSynth',
+    suppressNotes: true,
+    fileDataKey: 'nuadeFileData',
+    loadMethod: 'loadTune',
+    // The subsong rides as a load arg (0-based), then the files the player opens beside the module.
+    getLoadArgs: (song: TrackerSong) => [song.nuadePlayerId, song.nuadeFileName ?? song.name, song.nuadeSubsong, song.uadeCompanionFiles],
+    supportsPause: true,
+    supportsResume: true,
+    needsDirectRouting: true,
+    liveSwap: true,
+    gridCellEditsWhen: (song: TrackerSong) => nuadeSongHasCellWrite(song),
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/nuade/NuadeEngine')).NuadeEngine as unknown as WASMSingletonStatic,
+    // The player reports its order and row (or tick count); the grid it maps onto is this song's.
+    onStarted: (instance, song) => (instance as unknown as import('@/engine/nuade/NuadeEngine').NuadeEngine).setGrid(song as never, nuadeFormatForPlayer(song.nuadePlayerId)?.followBy ?? 'orderRow'),
   },
   {
     // MusicMaker V8 (.sdata + .ip, Amiga): a worklet replayer built from the

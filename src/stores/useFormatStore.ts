@@ -143,6 +143,12 @@ export interface FormatStore {
   stoneTrackerFileData: ArrayBuffer | null;
   musicMakerFileData: ArrayBuffer | null;
   stoneTrackerSampleData: ArrayBuffer | null;
+  /** Module + player id for NuadeEngine (nuadeFormats.ts) */
+  nuadeFileData: ArrayBuffer | null;
+  nuadePlayerId: string | null;
+  nuadeFileName: string | null;
+  /** Subsong NuadeEngine starts (0-based; nativeSubsongs start field) */
+  nuadeSubsong: number | null;
   /** Module + eagleplayer for EaglePlayerEngine (eaglePlayerFormats.ts) */
   eaglePlayerFileData: ArrayBuffer | null;
   eaglePlayerId: string | null;
@@ -560,6 +566,10 @@ export const useFormatStore = create<FormatStore>()(
     stoneTrackerFileData: null,
     musicMakerFileData: null,
     stoneTrackerSampleData: null,
+    nuadeFileData: null,
+    nuadePlayerId: null,
+    nuadeFileName: null,
+    nuadeSubsong: null,
     eaglePlayerFileData: null,
     eaglePlayerId: null,
     eaglePlayerFileName: null,
@@ -1143,6 +1153,10 @@ export const useFormatStore = create<FormatStore>()(
         state.stoneTrackerFileData = (song as any).stoneTrackerFileData ?? null;
         state.musicMakerFileData = (song as any).musicMakerFileData ?? null;
         state.stoneTrackerSampleData = (song as any).stoneTrackerSampleData ?? null;
+        state.nuadeFileData = (song as any).nuadeFileData ?? null;
+        state.nuadePlayerId = (song as any).nuadePlayerId ?? null;
+        state.nuadeFileName = (song as any).nuadeFileName ?? null;
+        state.nuadeSubsong = (song as any).nuadeSubsong ?? null;
         state.eaglePlayerFileData = (song as any).eaglePlayerFileData ?? null;
         state.eaglePlayerId = (song as any).eaglePlayerId ?? null;
         state.eaglePlayerFileName = (song as any).eaglePlayerFileName ?? null;
@@ -1489,6 +1503,10 @@ export const useFormatStore = create<FormatStore>()(
       state.stoneTrackerFileData = null;
       state.musicMakerFileData = null;
       state.stoneTrackerSampleData = null;
+      state.nuadeFileData = null;
+      state.nuadePlayerId = null;
+      state.nuadeFileName = null;
+      state.nuadeSubsong = null;
       state.eaglePlayerFileData = null;
       state.eaglePlayerId = null;
       state.eaglePlayerFileName = null;

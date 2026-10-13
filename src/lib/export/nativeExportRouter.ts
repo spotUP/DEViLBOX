@@ -341,7 +341,7 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
   // A format with a fixed cell layout and no exporter of its own (Dave Lowe, Sound Player ...): the module the song was loaded from with
   // each edited cell's bytes written where the layout puts it - the file Stop and Play would load, and the one a reload reads.
   if (!result && layoutFormatId && song.uadePatternLayout?.encodeCell && !song.uadePatternLayout.writeCell) {
-    const source = song.uadeEditableFileData ?? song.eaglePlayerFileData;
+    const source = song.uadeEditableFileData ?? song.eaglePlayerFileData ?? song.nuadeFileData;
     if (source) {
       const { patchModuleByLayout } = await import('./layoutPatch');
       const patched = patchModuleByLayout(source, song.uadePatternLayout, song.patterns);

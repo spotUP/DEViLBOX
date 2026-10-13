@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 
+import { dropPersistedNuadeDefaults } from '@/engine/nuade/nuadeRouting';
 import type { FormatEngineChoice, UADEImportMode, FormatEnginePreferences } from '@/types/formatEngine';
 import type { SidChipModelSetting, SidClockSetting, SidBufferSizeSetting } from '@/lib/sid/SIDHeaderParser';
 export type { FormatEngineChoice, UADEImportMode, FormatEnginePreferences };
@@ -123,28 +124,10 @@ export const useSettingsStore = create<SettingsStore>()(
         mod: 'native',      // libopenmpt — full sample extraction + effects
         hvl: 'native',      // HivelyParser — WebAudio synthesis
         med: 'native',      // MEDParser — dedicated OctaMED support
-        fc: 'native',       // FCParser — full sample extraction + effects
-        okt: 'native',      // OktalyzerParser — dedicated Oktalyzer support
         digi: 'native',     // DigiBoosterParser — dedicated DigiBooster support
-        soundmon: 'native', // SoundMonParser — dedicated SoundMon support
-        sidmon2: 'native',  // SidMon2Parser — dedicated SidMon II support
-        fred: 'native',     // FredEditorParser — dedicated Fred Editor support
-        soundfx: 'native',  // SoundFXParser — dedicated Sound-FX support
-        mugician: 'native', // DigitalMugicianParser — dedicated Digital Mugician support
         tfmx: 'native',         // TFMXParser — dedicated Jochen Hippel TFMX support
-        hippelCoso: 'native',   // HippelCoSoParser — dedicated Jochen Hippel CoSo support
         sidmon1: 'native',      // SidMon1Parser — dedicated SidMon 1.0 support
-        davidWhittaker: 'native', // DavidWhittakerParser — dedicated David Whittaker support
-        deltaMusic2: 'native',  // DeltaMusic2Parser — dedicated Delta Music 2.0 support
         artOfNoise: 'native',   // ArtOfNoiseParser — dedicated Art of Noise support
-        benDaglish: 'uade',   // BenDaglishParser — dedicated Ben Daglish support
-        sonicArranger: 'native', // SonicArrangerParser — dedicated Sonic Arranger support
-        inStereo1: 'uade',    // InStereo1Parser — dedicated InStereo! 1.0 support
-        inStereo2: 'uade',    // InStereo2Parser — dedicated InStereo! 2.0 support
-        pumaTracker: 'native',      // PumaTrackerParser — dedicated PumaTracker support
-        synthesis: 'uade',        // SynthesisParser — dedicated Synthesis support
-        musicAssembler: 'native',   // MusicAssemblerParser — dedicated Music Assembler support
-        digitalSoundStudio: 'native', // DigitalSoundStudioParser — dedicated Digital Sound Studio support
         digitalSymphony: 'native',    // DigitalSymphonyParser — dedicated Digital Symphony support
         imagoOrpheus: 'native',     // ImagoOrpheusParser — dedicated Imago Orpheus support  // PC format: UADE cannot play it (2026-10-05)
         cdfm67: 'native',           // CDFM67Parser — dedicated CDFM Composer 670 support  // PC format: UADE cannot play it (2026-10-05)
@@ -157,119 +140,48 @@ export const useSettingsStore = create<SettingsStore>()(
         graoumfTracker2: 'uade',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
         symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
         chuckBiscuits: 'native',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support  // Atari ST format: UADE (Amiga) cannot play it
-        speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
-        tronic: 'uade',             // TronicParser — no native parser; always UADE
-        suntronic: 'native',        // SunTronicV13Parser — native editable engine (V1.3); UADE = offline oracle only
         digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
-        gameMusicCreator: 'uade',   // GameMusicCreatorParser — prefer UADE (complex synthesis)
-        faceTheMusic: 'native',     // FaceTheMusicParser — native parser available
-        soundControl: 'uade',     // SoundControlParser — native parser available
-        soundFactory: 'native',   // SoundFactoryParser — native + UADE injection for 1:1 audio
-        actionamics: 'native',      // ActionamicsParser — native parser available
-        activisionPro: 'native',    // ActivisionProParser — native parser available
-        ronKlaren: 'uade',        // RonKlarenParser — native parser available
-        deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
         pt36: 'uade',         // PT36Parser — native parser available
         musicLine: 'native',      // MusicLineParser — native parser (magic-byte gated)
-        medley: 'uade',         // MedleyParser — dedicated Medley support
-        markCooksey: 'uade',    // MarkCookseyParser — dedicated Mark Cooksey support
-        jeroenTel: 'uade',      // JeroenTelParser — dedicated Jeroen Tel support
-        quartet: 'uade',        // QuartetParser — dedicated Quartet support
-        soundMaster: 'uade',    // SoundMasterParser — dedicated SoundMaster support
-        amosMusicBank: 'uade',  // AmosMusicBankParser — native only
         iceTracker: 'native',     // IceTrackerParser — native only
-        zoundMonitor: 'uade',   // ZoundMonitorParser — dedicated ZoundMonitor support
-        synthPack: 'uade',      // SynthPackParser — dedicated SynthPack support
         tcbTracker: 'uade',     // TCBTrackerParser — dedicated TCB Tracker support
-        mmdc: 'uade',           // MMDCParser — dedicated MMDC support
-        psa: 'uade',            // PSAParser — dedicated PSA support
         steveTurner: 'native',  // SteveTurnerParser — native parses patterns + subsongs, UADE handles audio
-        tme: 'uade',            // TMEParser — dedicated TME support
-        jasonBrooke: 'uade',    // JasonBrookeParser — dedicated Jason Brooke support
-        laxity: 'uade',         // LaxityParser — dedicated Laxity support
-        fredGray: 'uade',       // FredGrayParser — dedicated Fred Gray support
         musicMaker4V: 'uade',   // MusicMakerParser — dedicated Music Maker 4V support
         musicMaker8V: 'uade',   // MusicMakerParser — dedicated Music Maker 8V support
-        maniacsOfNoise: 'native', // ManiacsOfNoiseParser — filename title + UADE classic audio
-        ufo: 'uade',            // UFOParser — dedicated UFO/MicroProse support
-        iffSmus: 'native',        // IffSmusParser — dedicated IFF SMUS support
         magneticFieldsPacker: 'uade', // MagneticFieldsPackerParser — dedicated MFP support
-        richardJoseph: 'native',  // RichardJosephParser — dedicated Richard Joseph support
         daveLowe: 'uade',       // DaveLoweParser — dedicated Dave Lowe support
-        lme: 'uade',            // LMEParser — dedicated Leggless Music Editor support
         jochenHippelST: 'native', // .hip/.mcmd: Amiga SOG/MCMD stub (libtfmxaudiodecoder) vs UADE; ST songs always decode
-        specialFX: 'uade',      // SpecialFXParser — dedicated Special FX ST support
-        timeTracker: 'uade',          // TimeTrackerParser — dedicated TimeTracker support
         kris: 'native',                 // KRISParser — dedicated ChipTracker/KRIS support
-        cinemaware: 'uade',           // CinemawareParser — dedicated Cinemaware support
         novoTradePacker: 'uade',      // NovoTradePackerParser — dedicated NovoPacker support
         alcatrazPacker: 'uade',       // AlcatrazPackerParser — dedicated Alcatraz Packer support
         bladePacker: 'uade',          // BladePackerParser — dedicated Blade Packer support
-        tomyTracker: 'uade',          // TomyTrackerParser — dedicated Tomy Tracker support
         imagesMusicSystem: 'uade',    // ImagesMusicSystemParser — dedicated IMS prefix support
-        fashionTracker: 'uade',       // FashionTrackerParser — dedicated Fashion Tracker support
         multiMediaSound: 'uade',      // MultiMediaSoundParser — dedicated MultiMedia Sound support
-        seanConran: 'uade',           // SeanConranParser — dedicated Sean Conran support
-        thomasHermann: 'uade',        // ThomasHermannParser — dedicated Thomas Hermann support
         titanicsPacker: 'uade',       // TitanicsPackerParser — dedicated Titanics Packer support
-        krisHatlelid: 'uade',         // KrisHatlelidParser — dedicated Kris Hatlelid support
-        ntsp: 'uade',                 // NTSPParser — dedicated NTSP System support
         moshPacker: 'uade',           // MoshPackerParser — dedicated Mosh Packer support
         coreDesign: 'uade',           // CoreDesignParser — dedicated Core Design support
-        jankoMrsicFlogel: 'uade',     // JankoMrsicFlogelParser — dedicated JMF support
         soundPlayer: 'uade',          // SoundPlayerParser — dedicated Sound Player support
         nickPellingPacker: 'uade',    // NickPellingPackerParser — dedicated NPP support
-        peterVerswyvelenPacker: 'uade', // PeterVerswyvelenPackerParser — dedicated PVP support
         wallyBeben: 'uade',           // WallyBebenParser — dedicated Wally Beben support
-        steveBarrett: 'uade',         // SteveBarrettParser — dedicated Steve Barrett support
-        paulSummers: 'native',          // PaulSummersParser — dedicated Paul Summers support
-        desire: 'uade',               // DesireParser — dedicated Desire support
         martinWalker: 'native',         // MartinWalkerParser — dedicated Martin Walker support
-        paulShields: 'uade',          // PaulShieldsParser — dedicated Paul Shields support
-        paulRobotham: 'uade',         // PaulRobothamParser — dedicated Paul Robotham support
-        pierreAdane: 'uade',          // PierreAdaneParser — dedicated Pierre Adane support
         anders0land: 'native',          // Anders0landParser — dedicated Anders 0land support
-        andrewParton: 'uade',         // AndrewPartonParser — dedicated Andrew Parton support
         customMade: 'uade',           // CustomMadeParser — dedicated Custom Made support
         benDaglishSID: 'uade',        // BenDaglishSIDParser — dedicated Ben Daglish SID support
-        digitalSonixChrome: 'uade',   // DigitalSonixChromeParser — dedicated DSC support
-        jesperOlsen: 'uade',          // JesperOlsenParser — dedicated Jesper Olsen support
-        kimChristensen: 'uade',       // KimChristensenParser — dedicated Kim Christensen support
-        ashleyHogg: 'uade',           // AshleyHoggParser — dedicated Ashley Hogg support
         adpcmMono: 'uade',            // ADPCMmonoParser — dedicated ADPCM Mono support
         janneSalmijarvi: 'uade',      // JanneSalmijarviParser — dedicated Janne Salmijarvi support
-        jochenHippel7V: 'native',       // JochenHippel7VParser — Hippel WASM engine (libtfmxaudiodecoder)
-        maximumEffect: 'uade',        // MaximumEffectParser — dedicated Maximum Effect support
         midiLoriciel: 'native',         // MIDILoricielParser — dedicated MIDI Loriciel support
-        onEscapee: 'uade',            // OnEscapeeParser — dedicated onEscapee support
         paulTonge: 'uade',            // PaulTongeParser — dedicated Paul Tonge support
-        robHubbardST: 'uade',         // RobHubbardSTParser — dedicated Rob Hubbard ST support
-        robHubbard: 'native',           // RobHubbardParser — dedicated Rob Hubbard support
         glueMonParser: 'uade',        // GlueMonParser — detection-only, UADE handles audio
-        davidHanney: 'uade',          // DavidHanneyParser — detection-only, UADE handles audio
         futurePlayer: 'native',       // Native WASM replayer (transpiled 68k)
-        jasonPage: 'uade',          // JasonPageParser — dedicated Jason Page support
-        infogrames: 'uade',         // InfogramesParser — dedicated Infogrames support
         sawteeth: 'uade',           // SawteethParser — dedicated Sawteeth support
         fmTracker: 'native',        // FMTrackerParser — dedicated FM Tracker support (UADE can't play PC OPL formats)
         madTracker2: 'native',        // MadTracker2Parser — dedicated MadTracker 2 support
         psm: 'native',              // PSMParser — dedicated PSM/PSM16 support
         composer667: 'native',        // Composer667Parser — dedicated Composer 667 support  // PC format: UADE cannot play it (2026-10-05)
         kt: 'native',                // KlysParser — native klystrack engine
-        earAche: 'native',           // EarAcheParser — native pattern display + UADE classic audio
-        scumm: 'native',             // SCUMMParser — native pattern display + UADE classic audio
         soprol: 'native',            // WantedTeamDaveLoweParser — SOPROL title + UADE classic audio
-        riffRaff: 'native',          // WantedTeamDaveLoweParser — Riff Raff title + UADE classic audio
-        howieDavies: 'native',       // WantedTeamDaveLoweParser — Howie Davies title + UADE classic audio
         beathovenSynthesizer: 'native', // WantedTeamDaveLoweParser — BSS title + UADE classic audio
-        seanConnolly: 'native',      // SeanConnollyParser — title from embedded header + UADE classic audio
-        dariusZendeh: 'native',      // SimpleAmigaStubParser — filename title + UADE classic audio
-        silmarils: 'native',         // SimpleAmigaStubParser — filename title + UADE classic audio
-        markII: 'native',            // SimpleAmigaStubParser — filename title + UADE classic audio
-        artAndMagic: 'native',       // SimpleAmigaStubParser — filename title + UADE classic audio
         sonicArrangerSas: 'native',  // SimpleAmigaStubParser — filename title + UADE classic audio
-        mikeDavies: 'native',        // SimpleAmigaStubParser — filename title + UADE classic audio
-        aProSys: 'native',           // SimpleAmigaStubParser — filename title + UADE classic audio
         leggless: 'native',          // SimpleAmigaStubParser — filename title + UADE classic audio
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
@@ -479,7 +391,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 13,
+      version: 14,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -560,6 +472,12 @@ export const useSettingsStore = create<SettingsStore>()(
           // through libtfmxaudiodecoder, and UADE is the last resort.
           const fe = s.formatEngine as Record<string, unknown> | undefined;
           if (fe && fe.jochenHippel7V === 'uade') fe.jochenHippel7V = 'native';
+        }
+        if (version < 14) {
+          // v14: the keys of the nuade format table (src/engine/nuade/nuadeFormats.ts) hold only an explicit choice; their
+          // persisted values were the old defaults (no UI or tool ever wrote one), and a stored default would keep the
+          // measured table default from applying.
+          dropPersistedNuadeDefaults(s.formatEngine as Record<string, unknown> | undefined);
         }
         return s;
       },

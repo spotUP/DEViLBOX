@@ -10,49 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-/** The nw_* exports (nuade-wasm/src/nuade_wasm.c). */
-export interface NuadeModule {
-  HEAPU8: Uint8Array;
-  HEAPF32: Float32Array;
-  HEAP32: Int32Array;
-  UTF8ToString(p: number): string;
-  _malloc(n: number): number;
-  _free(p: number): void;
-  _nw_init(rate: number): void;
-  _nw_add_file(name: number, data: number, len: number): number;
-  _nw_clear_files(): void;
-  _nw_open(data: number, len: number, name: number, playerId: number): number;
-  _nw_close(): void;
-  _nw_last_error(): number;
-  _nw_start(subsong: number): number;
-  _nw_render(stereo: number, voices: number, frames: number, stride: number): number;
-  _nw_last_flags(): number;
-  _nw_voice_count(): number;
-  _nw_subsong_count(): number;
-  _nw_default_subsong(): number;
-  _nw_position(): number;
-  _nw_seek(frame: number): number;
-  _nw_snapshot(frame: number, out: number): number;
-  _nw_vu(out: number, cap: number): number;
-  _nw_pans(out: number, cap: number): number;
-  _nw_set_repeat(n: number): void;
-  _nw_set_mute_mask(mask: number): void;
-  _nw_set_separation(x: number): number;
-  _nw_meta(key: number): number;
-  _nw_instrument_count(): number;
-  _nw_instrument_name(n: number): number;
-  _nw_instrument_index(n: number): number;
-  _nw_player_id(): number;
-  _nw_player_name(): number;
-  _nw_player_count(): number;
-  _nw_player_id_at(i: number): number;
-  _nw_probe(data: number, len: number, name: number): number;
-  _nw_caps(): number;
-  _nw_state_size(): number;
-  _nw_state_read(offset: number, len: number, out: number): number;
-  _nw_cell_write(pattern: number, row: number, channel: number, values: number, count: number): number;
-  _nw_instrument_write(instrument: number, param: number, value: number): number;
-}
+import { cstr, heapBytes, probeWith, type NuadeModule } from './nuadeModule';
+export type { NuadeModule } from './nuadeModule';
 
 export const NUADE_CAP_STATE_READ = 1;
 export const NUADE_CAP_CELL_WRITE = 2;
@@ -95,18 +54,8 @@ export class NuadeHeadless {
     return new NuadeHeadless(m, sampleRate);
   }
 
-  private cstr(s: string): number {
-    const b = new TextEncoder().encode(s);
-    const p = this.m._malloc(b.length + 1);
-    this.m.HEAPU8.set(b, p);
-    this.m.HEAPU8[p + b.length] = 0;
-    return p;
-  }
-  private bytes(data: Uint8Array): number {
-    const p = this.m._malloc(data.length || 1);
-    this.m.HEAPU8.set(data, p);
-    return p;
-  }
+  private cstr(s: string): number { return cstr(this.m, s); }
+  private bytes(data: Uint8Array): number { return heapBytes(this.m, data); }
 
   clearFiles(): void { this.m._nw_clear_files(); }
   addFile(name: string, data: Uint8Array): void {
@@ -141,6 +90,8 @@ export class NuadeHeadless {
     this.m._free(k);
     return v;
   }
+  /** One player's probe on these bytes: 0 supported, 1 unsupported, 2 unsure, -1 no such player. */
+  probeWith(playerId: string, data: Uint8Array, fileName: string): number { return probeWith(this.m, playerId, data, fileName); }
   playerIds(): string[] {
     return Array.from({ length: this.m._nw_player_count() }, (_, i) => this.m.UTF8ToString(this.m._nw_player_id_at(i)));
   }

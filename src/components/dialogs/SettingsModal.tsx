@@ -28,6 +28,7 @@ import {
 import { KeyBindingEditor } from '@components/dialogs/KeyBindingEditor';
 import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { PlaybackEnginesPanel } from '@components/dialogs/PlaybackEnginesPanel';
 
 /** Normalize any CSS color to #RRGGBB for <input type="color"> */
 function normalizeToHex6(color: string | undefined): string {
@@ -790,6 +791,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           {/* ═══════════════════════════════════════════════════════════════════
               ABOUT TAB
               ═══════════════════════════════════════════════════════════════════ */}
+          {s.activeTab === 'engines' && <PlaybackEnginesPanel />}
+
           {s.activeTab === 'about' && (
             <>
               <section>

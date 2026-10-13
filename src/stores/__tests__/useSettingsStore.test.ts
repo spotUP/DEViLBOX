@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore } from '../useSettingsStore';
+import { effectiveFormatEngine } from '@/engine/nuade/nuadeRouting';
 import { resetStore } from './_harness';
 
 describe('useSettingsStore — format engine preferences', () => {
@@ -12,7 +13,8 @@ describe('useSettingsStore — format engine preferences', () => {
     // must exist. If someone deletes one, downstream code (parseModuleToSong,
     // NativeEngineRouting) silently falls back to defaults.
     for (const key of ['mod', 'hvl', 'med', 'fc', 'okt', 'tfmx'] as const) {
-      expect(s.formatEngine[key], `formatEngine.${key}`).toMatch(/^(native|uade)$/);
+      // Keys of the nuade table hold only explicit choices; the resolver supplies the default.
+      expect(effectiveFormatEngine(s.formatEngine, key), `formatEngine.${key}`).toMatch(/^(native|uade)$/);
     }
   });
 

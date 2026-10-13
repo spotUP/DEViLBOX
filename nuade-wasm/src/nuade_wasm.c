@@ -333,6 +333,13 @@ EMSCRIPTEN_KEEPALIVE const char *nw_probe(const uint8_t *data, int len, const ch
   return "";
 }
 
+/* One named player's probe: 0 supported, 1 unsupported, 2 unsure, -1 no such player. */
+EMSCRIPTEN_KEEPALIVE int nw_probe_with(const char *playerId, const uint8_t *data, int len, const char *name) {
+  const NuadePlayer *p = playerId ? nuade_player_find(playerId) : NULL;
+  if (!p || !p->probe || !data || len <= 0) return -1;
+  return (int)p->probe(data, (size_t)len, name);
+}
+
 /* ---- edit slot ---- */
 static void *state_ptr(void) { return s_song ? nuade_player_data(s_song) : NULL; }
 

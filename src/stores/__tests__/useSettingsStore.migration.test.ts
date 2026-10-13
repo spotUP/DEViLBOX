@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { effectiveFormatEngine } from '@/engine/nuade/nuadeRouting';
 
 const STORE_KEY = 'devilbox-settings';
 
@@ -99,8 +100,9 @@ describe('useSettingsStore — persist migration', () => {
   it('v11: Jochen Hippel 7V left on UADE by the 2026-09-22 build plays natively again', async () => {
     seed(10, { formatEngine: { jochenHippel7V: 'uade', suntronic: 'native' } });
     const s = await freshLoad();
-    expect(s.formatEngine.jochenHippel7V).toBe('native');
-    expect(s.formatEngine.suntronic).toBe('native');
+    // jochenHippel7V is a key of the nuade table now: the stored 'uade' is dropped and the table default (native) applies.
+    expect(effectiveFormatEngine(s.formatEngine, 'jochenHippel7V')).toBe('native');
+    expect(effectiveFormatEngine(s.formatEngine, 'suntronic')).toBe('native');
   });
 
   it('unknown future version (version > current) loads without crashing', async () => {
@@ -128,9 +130,41 @@ describe('useSettingsStore — persist migration', () => {
   });
 
   it('v13: a stored uade for Chuck Biscuits (Atari ST, UADE cannot play it) becomes native', async () => {
-    seed(12, { formatEngine: { chuckBiscuits: 'uade', synthesis: 'uade' } });
+    seed(12, { formatEngine: { chuckBiscuits: 'uade', med: 'uade' } });
     const s = await freshLoad();
     expect(s.formatEngine.chuckBiscuits).toBe('native');
-    expect(s.formatEngine.synthesis, 'unrelated engine choices survive').toBe('uade');
+    expect(s.formatEngine.med, 'unrelated engine choices survive').toBe('uade');
+  });
+});
+
+/**
+ * v14 (NS-3): the keys of the nuade format table hold only an explicit choice. No UI or tool ever wrote one (setFormatEngine
+ * has no caller outside the store), so every persisted value below was an old default: dropping them lets the table's
+ * defaults apply, and a user's other settings stay.
+ */
+describe('useSettingsStore - v14 nuade format keys', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('drops persisted defaults of table keys (mmdc, benDaglish, fc) and keeps the others', async () => {
+    seed(13, { formatEngine: { mmdc: 'uade', benDaglish: 'uade', fc: 'native', mod: 'native', med: 'uade' }, masterTuning: 432 });
+    const s = await freshLoad();
+    const fe = s.formatEngine as unknown as Record<string, unknown>;
+    expect(fe.mmdc).toBeUndefined();
+    expect(fe.benDaglish).toBeUndefined();
+    expect(fe.fc).toBeUndefined();
+    expect(fe.mod).toBe('native');
+    expect(fe.med).toBe('uade');
+    expect(s.masterTuning).toBe(432);
+  });
+
+  it('a v14 store keeps an explicit nuade choice across a reload, and a fresh boot holds none for table keys', async () => {
+    const fresh = await freshLoad();
+    expect((fresh.formatEngine as unknown as Record<string, unknown>).mmdc).toBeUndefined();
+    fresh.setFormatEngine('mmdc', 'nuade');
+    const raw = JSON.parse(localStorage.getItem(STORE_KEY)!) as { version: number; state: { formatEngine: Record<string, string> } };
+    expect(raw.version).toBe(14);
+    expect(raw.state.formatEngine.mmdc).toBe('nuade');
+    const again = await freshLoad();
+    expect((again.formatEngine as unknown as Record<string, unknown>).mmdc).toBe('nuade');
   });
 });

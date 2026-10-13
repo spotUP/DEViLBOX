@@ -79,6 +79,7 @@ export const FILE_DATA_FIELDS = [
   's98FileData',              // S98 register log for S98Engine (ymfm)
   'stoneTrackerFileData',
   'stoneTrackerSampleData',   // companion SPS sample bank for StoneTracker
+  'nuadeFileData',            // module for NuadeEngine (nuade player named by nuadePlayerId)
   'eaglePlayerFileData',      // module for EaglePlayerEngine (eagleplayer on the Musashi host)
   'musicMakerFileData',       // MusicMaker V8 song + instruments (FORM/MMV8)
   'asapFileData',
