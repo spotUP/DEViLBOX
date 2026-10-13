@@ -53,7 +53,7 @@ if printf '%s' " $STAGED" | grep -Eq ' (src|server/src)/[^ ]*\.tsx?( |$)'; then
   # shellcheck source=snapshot.sh
   . scripts/git-hooks/snapshot.sh
   install_snapshot_traps
-  materialise "$(git rev-parse HEAD)" "$(git write-tree)"
+  materialise_reusable "$(git rev-parse HEAD)" "$(git write-tree)"
   # shellcheck disable=SC2086
   FILES_RAW="$(in_snapshot node scripts/git-hooks/affected-tests.mjs --max-importers "$MAX_IMPORTERS" --files $STAGED || true)"
 fi
