@@ -46,6 +46,13 @@ export interface NuadeModule {
   _nw_state_read(offset: number, len: number, out: number): number;
   _nw_cell_write(pattern: number, row: number, channel: number, values: number, count: number): number;
   _nw_instrument_write(instrument: number, param: number, value: number): number;
+  // The next song: an edited module caught up to the playing position across render calls (Nuade.worklet.js swap).
+  _nw_next_open(data: number, len: number, name: number, playerId: number, subsong: number): number;
+  _nw_next_start(subsong: number): number;
+  _nw_next_advance(target: number, maxFrames: number): number;
+  _nw_next_position(): number;
+  _nw_next_commit(): number;
+  _nw_next_close(): void;
 }
 
 

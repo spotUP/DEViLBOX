@@ -245,7 +245,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
     this.post({ type: 'swapModule', bytes: moduleData }, [moduleData]);
   }
 
-  /** The time the last swapModule took (worklet-side, ms), null before any. */
+  /** From the worklet taking the last swapModule to the edited module playing (ms; it is caught up across render quanta), null before any. */
   get lastSwapMs(): number | null { return this._lastSwapMs; }
   onSwapDone(cb: (ms: number) => void): () => void {
     this.swapCallbacks.add(cb);

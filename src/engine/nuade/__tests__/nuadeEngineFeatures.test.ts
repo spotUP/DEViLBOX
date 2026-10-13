@@ -60,18 +60,23 @@ describe('nuade engine features', () => {
     engine.stop();
   });
 
-  it('NE-8 swapModule: the edited module is opened, sought to the frame already played and played on; swapDone.ms reports it', async () => {
+  it('NE-8 swapModule: the edited module is caught up to the played frame while the old one plays, then takes over; swapDone.ms reports it', async () => {
     engine.play();
     rig.render(3750); // 10 s
-    const before = (rig.proc() as unknown as { module: { _nw_position(): number } }).module._nw_position();
-    const done = new Promise<number>((r) => engine.onSwapDone(r));
+    const pos = (): number => (rig.proc() as unknown as { module: { _nw_position(): number } }).module._nw_position();
+    const before = pos();
+    let ms = -1;
+    const off = engine.onSwapDone((v) => { ms = v; });
     engine.swapModule(songBuffer(MMDC));
-    const ms = await done;
+    // The catch-up runs a slice per render quantum (NUADE-SWAP-DROPOUT): the swap completes while it renders.
+    let quanta = 0;
+    while (ms < 0 && quanta < 2000) { rig.render(1); quanta++; }
+    off();
     expect(ms).toBeGreaterThanOrEqual(0);
     expect(ms).toBeLessThan(2000);
     expect(engine.lastSwapMs).toBe(ms);
-    const after = (rig.proc() as unknown as { module: { _nw_position(): number } }).module._nw_position();
-    expect(Math.abs(after - before)).toBeLessThan(2048);
+    // Handed over at the frame the old module had reached: no frame skipped or repeated.
+    expect(pos()).toBe(before + quanta * 128);
     expect(rig.render(200).peaks[0]).toBeGreaterThan(0.001);
     engine.stop();
   });
