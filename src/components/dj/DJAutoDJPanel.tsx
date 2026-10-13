@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { DJ_STYLE_NAMES } from '@/engine/dj/autodj/types';
 import { DJAutoDJDebugPanel } from './DJAutoDJDebugPanel';
+import { ThreeDeckShowcasePanel } from './ThreeDeckShowcasePanel';
 import { JUGGLE_MODES, type JuggleMode } from '@/engine/dj/autodj/juggle/juggleTypes';
 import { SCRATCH_RENDER_LABELS, SCRATCH_RENDER_MODES, scratchRenderModeOf } from '@/engine/dj/scratch/scratchStyles';
 
@@ -591,6 +592,9 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
         <Button variant="ghost" onClick={() => setShowDebug((v) => !v)} title="Show the Auto DJ plan, confidence, risk and the reasons for every decision">
           {showDebug ? 'Hide Debug' : 'Debug'}
         </Button>
+      </div>
+      <div className="mt-2">
+        <ThreeDeckShowcasePanel />
       </div>
       <Modal isOpen={showDebug} onClose={() => setShowDebug(false)} size="2xl">
         <ModalHeader title="Auto DJ Debug" onClose={() => setShowDebug(false)} />

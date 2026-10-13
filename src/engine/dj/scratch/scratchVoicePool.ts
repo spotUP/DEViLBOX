@@ -204,7 +204,9 @@ export class ScratchVoicePool {
     }
     const stepSec = spec.chain === 'threeDeck' ? 60.0 / (bpm * 4) : demoStepSamples(bpm) / DEMO_RATE;
     const steps = name ? demoGestureSteps(name) : gesture.durationSteps;
-    const r = renderGesture(source, name ?? catalogueDemoGesture(gesture), steps * stepSec, DEMO_RATE, {
+    // three_deck.render: `steps * step / rate` (whole samples a step, the product first)
+    const durSec = spec.stepSamples ? steps * spec.stepSamples / DEMO_RATE : steps * stepSec;
+    const r = renderGesture(source, name ?? catalogueDemoGesture(gesture), durSec, DEMO_RATE, {
       velocity: velocity ?? 1.0, profile: DEMO_DECK_PROFILES[spec.deck ?? 'boombap'], seed: spec.seed,
     });
     const out = spec.ending ? routineEndingDelay(r.out, demoStepSamples(bpm), DEMO_RATE) : r.out;

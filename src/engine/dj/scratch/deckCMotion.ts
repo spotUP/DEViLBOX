@@ -19,7 +19,7 @@ export const PLATTER_RPM = 33.3333;
 /** Source samples per platter revolution (dj_viz `_angle_to_bytes`: rate x 60 / PLATTER_RPM). */
 export const SAMPLES_PER_REV = DECK_C_MOTION_RATE * 60.0 / PLATTER_RPM;
 
-interface Segment { start: number; end: number; viz: GestureViz | null; order: number }
+interface Segment { start: number; end: number; viz: GestureViz | null; order: number; owner?: string }
 
 /** Reachability sentinels: strokes and needles placed, samples read by a view. */
 export const deckCMotionStats = { strokes: 0, needles: 0, reads: 0, consumers: 0 };
@@ -48,15 +48,20 @@ export class DeckCMotion {
   private angleAtCursor = 0;
 
   /** A stroke summed into a Deck C bus at `start` with its viz capture (three_deck: rv_c / slip / fader). */
-  addStroke(start: number, viz: GestureViz): void {
+  addStroke(start: number, viz: GestureViz, owner?: string): void {
     deckCMotionStats.strokes++;
-    this.insert({ start: Math.max(0, Math.trunc(start)), end: Math.max(0, Math.trunc(start)) + viz.recordVel.length, viz, order: this.order++ });
+    this.insert({ start: Math.max(0, Math.trunc(start)), end: Math.max(0, Math.trunc(start)) + viz.recordVel.length, viz, order: this.order++, owner });
   }
 
   /** A needle flourish (drop / lift): the fader open over its length, the platter untouched. */
-  addNeedle(start: number, length: number): void {
+  addNeedle(start: number, length: number, owner?: string): void {
     deckCMotionStats.needles++;
-    this.insert({ start: Math.max(0, Math.trunc(start)), end: Math.max(0, Math.trunc(start)) + Math.max(0, Math.trunc(length)), viz: null, order: this.order++ });
+    this.insert({ start: Math.max(0, Math.trunc(start)), end: Math.max(0, Math.trunc(start)) + Math.max(0, Math.trunc(length)), viz: null, order: this.order++, owner });
+  }
+
+  /** End `owner`'s performance at bus sample `from` (ended early): its later strokes will not sound. */
+  endOwner(owner: string, from: number): void {
+    this.segs = this.segs.filter((g) => g.owner !== owner || g.start < from);
   }
 
   private insert(seg: Segment): void {
@@ -68,6 +73,7 @@ export class DeckCMotion {
       this.angleAtCursor += d;
     }
     this.segs.push(seg);
+    for (const l of [...strokeListeners]) l();
   }
 
   /** rv_c at one sample: the last-placed stroke covering it (the demo's overwrite order), else 1. */
@@ -130,6 +136,10 @@ export class DeckCMotion {
   }
 }
 
+const strokeListeners = new Set<() => void>();
+/** Called whenever a stroke or needle is placed on Deck C (a sleeping view wakes up). */
+export function onDeckCMotionPlaced(fn: () => void): () => void { strokeListeners.add(fn); return () => { strokeListeners.delete(fn); }; }
+
 let motion: DeckCMotion | null = null;
 
 /** The app's Deck C motion (one timeline for every Deck C bus). */
@@ -163,3 +173,12 @@ export function subscribeDeckCMotion(): () => void {
 
 /** Revolutions of the platter for an angle in source samples (dj_viz: rate x 60 / 33 1/3 per revolution). */
 export const angleToRevolutions = (angle: number): number => angle / SAMPLES_PER_REV;
+
+/**
+ * Deck C's platter angle in radians at a context time while its strokes drive it, else null (the deck's own clock).
+ * Every Deck C platter view reads this one value (the CSS turntable and the canvas turntable).
+ */
+export function deckCPlatterRadians(contextSec: number): number | null {
+  const m = deckCMotionNow(contextSec);
+  return m ? angleToRevolutions(m.angle) * 2 * Math.PI : null;
+}

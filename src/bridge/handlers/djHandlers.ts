@@ -272,6 +272,16 @@ export async function djAutoDJJuggleNow(): Promise<Record<string, unknown>> {
   return { request, telemetry: useDJStore.getState().autoDJJuggleTelemetry };
 }
 
+/**
+ * Three Deck Showcase (owner decision 2026-10-13): the DJ view button's path - the demo's whole three_deck render
+ * (Deck C's routine and its own A/B juggle layer) while the set holds; a second call ends it and the set resumes.
+ */
+export async function djThreeDeckShowcase(): Promise<Record<string, unknown>> {
+  const actions = await getActions();
+  const state = await actions.toggleThreeDeckShowcase();
+  return { ...state };
+}
+
 // ─── Write: Ducking ─────────────────────────────────────────────────────────
 
 export async function djDuck(): Promise<Record<string, unknown>> {

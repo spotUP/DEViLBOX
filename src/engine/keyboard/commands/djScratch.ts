@@ -14,6 +14,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { SCRATCH_PATTERNS } from '@engine/dj/DJScratchEngine';
 import { fireDjFx, releaseDjFx } from '@engine/drumpad/DjFxActions';
 import { fxIdForPattern } from '@engine/dj/scratch/scratchActionMap';
+import { toggleThreeDeckShowcase } from '@engine/dj/DJActions';
 
 type DeckId = 'A' | 'B' | 'C';
 type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
@@ -223,3 +224,13 @@ export function djFaderLFO14():   boolean { return triggerFaderLFO('1/4'); }
 export function djFaderLFO18():   boolean { return triggerFaderLFO('1/8'); }
 export function djFaderLFO116():  boolean { return triggerFaderLFO('1/16'); }
 export function djFaderLFO132():  boolean { return triggerFaderLFO('1/32'); }
+
+// ── Three Deck Showcase (owner decision 2026-10-13) ──────────────────────────
+/** Start or end the Three Deck Showcase - the demo's whole three-deck render while the set holds. */
+export function djThreeDeckShowcase(): boolean {
+  void toggleThreeDeckShowcase().then((s) => {
+    const msg = s.status === 'idle' ? (s.reason ? `Three Deck Showcase: ${s.reason}` : 'Three Deck Showcase: ended') : `Three Deck Showcase: ${s.status}`;
+    useUIStore.getState().setStatusMessage(msg, false, 1500);
+  });
+  return true;
+}

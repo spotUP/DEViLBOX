@@ -29,6 +29,8 @@ let colors: DeckColors = {
 let isPlaying = false, effectiveBPM = 120;
 let scratchVelocity = 1, isScratchActive = false;
 let angle = 0, posSec = 0, dirty = true;
+/** Deck C's strokes drive the platter (D1): the angle they set, or null for the deck's own clock. */
+let drivenAngle: number | null = null;
 let scratchIntegrating = false;
 let lastScratchAngle = 0;  // Saved angle when scratch ends (for stopped decks)
 
@@ -69,6 +71,11 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
       dirty = true;
       break;
     }
+    case 'angle':
+      drivenAngle = msg.rad;
+      if (msg.rad !== null) lastScratchAngle = msg.rad;
+      dirty = true;
+      break;
     case 'velocity':
       scratchVelocity = msg.v;
       dirty = true;
@@ -124,7 +131,9 @@ function renderFrame(dt: number): void {
   const rps = (effectiveBPM / BASE_BPM) * BASE_RPS;
   const omegaNormal = rps * 2 * Math.PI;
 
-  if (scratchIntegrating) {
+  if (drivenAngle !== null && !scratchIntegrating) {
+    angle = drivenAngle;
+  } else if (scratchIntegrating) {
     // During scratch: integrate from velocity (smooth, no store jitter)
     angle += scratchVelocity * omegaNormal * dt;
   } else if (isPlaying) {

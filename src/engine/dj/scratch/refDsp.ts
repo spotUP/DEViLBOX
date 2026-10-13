@@ -266,11 +266,16 @@ export function reverb(x: ArrayLike<number>, rate: number, kind: RefReverbKind, 
   return out;
 }
 
-/** sampler.py `reverb` kinds the scratch channel uses: the input's length, (1 - mix) x + mix wet. */
-export function samplerReverb(x: ArrayLike<number>, rate: number, kind: 'short_plate' | 'dark_room', mix = 1.0): Float64Array {
+/**
+ * sampler.py `reverb` kinds the scratch channel and the three-deck juggle bus use (small_room: X8): the input's
+ * length, (1 - mix) x + mix wet.
+ */
+export function samplerReverb(x: ArrayLike<number>, rate: number, kind: 'short_plate' | 'dark_room' | 'small_room', mix = 1.0): Float64Array {
   const wet = kind === 'dark_room'
     ? lp(reverb(x, rate, 'room', 1.0, 0.8), 2400, rate)
-    : hp(lp(reverb(x, rate, 'plate', 1.0, 0.7), 6000, rate), 350, rate);
+    : kind === 'small_room'
+      ? hp(lp(reverb(x, rate, 'room', 1.0, 0.5), 5000, rate), 250, rate)
+      : hp(lp(reverb(x, rate, 'plate', 1.0, 0.7), 6000, rate), 350, rate);
   const out = Float64Array.from(x);
   const n = Math.min(x.length, wet.length);
   for (let i = 0; i < n; i++) out[i] = (1 - mix) * out[i]! + mix * wet[i]!;

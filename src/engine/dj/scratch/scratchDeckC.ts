@@ -140,7 +140,7 @@ export const DECK_C_DUCK_DEPTH = 0.25;
  * The layer may be the bus before the demo's peak normalisation: the ratio absorbs it. The duck needs
  * only the beat (known when the routine is planned); the level needs the whole planned layer.
  */
-export function deckCDuck(beat: ArrayLike<number>, rate: number = DEMO_RATE): Float32Array {
+export function deckCDuck(beat: ArrayLike<number>, rate: number = DEMO_RATE, depth: number = DECK_C_DUCK_DEPTH): Float32Array {
   const n = beat.length;
   const abs = new Float64Array(n);
   for (let i = 0; i < n; i++) abs[i] = Math.abs(beat[i]!);
@@ -148,14 +148,14 @@ export function deckCDuck(beat: ArrayLike<number>, rate: number = DEMO_RATE): Fl
   let mx = 0;
   for (let i = 0; i < n; i++) mx = Math.max(mx, env[i]!);
   const duck = new Float32Array(n);
-  for (let i = 0; i < n; i++) duck[i] = 1.0 - DECK_C_DUCK_DEPTH * Math.min(1, Math.max(0, env[i]! / (mx + 1e-9)));
+  for (let i = 0; i < n; i++) duck[i] = 1.0 - depth * Math.min(1, Math.max(0, env[i]! / (mx + 1e-9)));
   return duck;
 }
-export function deckCLevel(layer: ArrayLike<number>, beat: ArrayLike<number>): number {
+export function deckCLevel(layer: ArrayLike<number>, beat: ArrayLike<number>, scale: number = DECK_C.levelScale): number {
   const n = beat.length;
   let jb = 0, cb = 0;
   for (let i = 0; i < n; i++) { jb += beat[i]! * beat[i]!; cb += (layer[i] ?? 0) * (layer[i] ?? 0); }
-  return DECK_C.levelScale * (Math.sqrt(jb / n) + 1e-9) / (Math.sqrt(cb / n) + 1e-9);
+  return scale * (Math.sqrt(jb / n) + 1e-9) / (Math.sqrt(cb / n) + 1e-9);
 }
 
 /**
