@@ -23,13 +23,14 @@ import { loadTrackerSample, type TrackerSampleInstrument } from './trackerSample
 import type { ChosenScratchSource, ScratchRoutineShape } from './DJScratchDJ';
 import { routineShapeDecks } from './scratchDeckC';
 import { computeCrossfaderGains } from '../DJMixerEngine';
+import { getCachedAudioByFilename } from '../DJAudioCache';
 import type { TransitionScratchPlan } from './transitionScratch';
 import type { ScratchEvent } from './scratchTypes';
 
 type AB = 'A' | 'B';
 
 /** Reachability sentinels (SCR-P7.6 / P7.R8). */
-export const autoScratchRuntimeStats = { transitionScratches: 0, fxRequests: 0 };
+export const autoScratchRuntimeStats = { transitionScratches: 0, fxRequests: 0, moduleRenders: 0 };
 
 /**
  * The tempo a deck plays `analysis` at: the analysis' own tempo (the one deck tempo, written by
@@ -120,13 +121,48 @@ export function performTransitionScratch(
   };
 }
 
-/** The decks a planned scratch routine's level reads (X6), from the live decks and the mixer (`routineShapeDecks`). */
-export function scratchShapeDecks(shape: Pick<ScratchRoutineShape, 'deck' | 'startSec' | 'trackFromSec'>): Array<{ audio: AudioBuffer; trackFromSec: number; gain: number }> | null {
+/** A module deck's render, decoded once per file (the DJ pipeline's render, cached by file name). */
+const moduleRenders = new Map<string, Promise<AudioBuffer | null>>();
+
+/**
+ * X7 (owner decision 2026-10-13): a module deck (tracker playback, no buffer of its own) is read from its audio as
+ * the DJ pipeline rendered it ahead - the render cached under its file name - so three_deck's exact duck and level
+ * apply to it as to any deck. Null when the pipeline has not rendered it.
+ */
+export function moduleDeckRender(fileName: string, ctx: BaseAudioContext, read: (fileName: string) => Promise<{ audioData: ArrayBuffer } | null> = getCachedAudioByFilename): Promise<AudioBuffer | null> {
+  let p = moduleRenders.get(fileName);
+  if (!p) {
+    p = read(fileName).then((c) => {
+      if (!c || !c.audioData.byteLength) return null;
+      autoScratchRuntimeStats.moduleRenders++;
+      return ctx.decodeAudioData(c.audioData.slice(0));
+    });
+    moduleRenders.set(fileName, p);
+    p.then((b) => { if (!b) moduleRenders.delete(fileName); }, () => moduleRenders.delete(fileName));
+  }
+  return p;
+}
+
+/**
+ * The decks a planned scratch routine's level and duck read (X6), from the live decks and the mixer
+ * (`routineShapeDecks`): a deck's own buffer, or a module deck's render read at the row the listener hears, at the
+ * tempo it plays (X7).
+ */
+export async function scratchShapeDecks(shape: Pick<ScratchRoutineShape, 'deck' | 'startSec' | 'trackFromSec'>): Promise<Array<{ audio: AudioBuffer; trackFromSec: number; gain: number }> | null> {
   const engine = getDJEngine();
-  const st = useDJStore.getState();
-  const deck = (d: AB) => {
-    const player = engine.getDeck(d).audioPlayer;
-    return { playing: st.decks[d].isPlaying, audio: player.getAudioBuffer(), position: player.getPosition(), rate: player.getPlaybackRate() };
+  const ctx = Tone.getContext().rawContext as BaseAudioContext;
+  const deck = async (d: AB) => {
+    const st = useDJStore.getState().decks[d];
+    const de = engine.getDeck(d);
+    const player = de.audioPlayer;
+    const own = player.getAudioBuffer();
+    if (own || st.playbackMode !== 'tracker' || !st.fileName) return { playing: st.isPlaying, audio: own, position: player.getPosition(), rate: player.getPlaybackRate() };
+    const audio = await moduleDeckRender(st.fileName, ctx);
+    const heard = de.getHeardTrackerState();
+    const rate = st.detectedBPM > 0 && st.effectiveBPM > 0 ? st.effectiveBPM / st.detectedBPM : 1;
+    return { playing: useDJStore.getState().decks[d].isPlaying, audio, position: (heard?.elapsedMs ?? 0) / 1000, rate };
   };
-  return routineShapeDecks(shape, { A: deck('A'), B: deck('B') }, computeCrossfaderGains(st.crossfaderPosition, st.crossfaderCurve), (Tone.getContext().rawContext as BaseAudioContext).currentTime);
+  const [a, b] = await Promise.all([deck('A'), deck('B')]);
+  const st = useDJStore.getState();
+  return routineShapeDecks(shape, { A: a, B: b }, computeCrossfaderGains(st.crossfaderPosition, st.crossfaderCurve), ctx.currentTime);
 }

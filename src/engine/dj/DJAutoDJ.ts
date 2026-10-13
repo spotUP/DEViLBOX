@@ -1801,11 +1801,12 @@ class DJAutoDJ {
         hasRecord: (id) => getScratchVoicePoolIfActive()?.hasRecord(id) ?? false,
         prepareSource: (chosen) => prepareScratchSource(chosen),
         prepareRecords: (ids) => getScratchVoicePool().prepareRecords(ids),
-        // three_deck's level and duck against decks A + B (X6); a module deck has no buffer to read ahead:
-        // the bus then hears it live on its input (the A + B tap)
+        // three_deck's level and duck against decks A + B (X6); a module deck is read from its render (X7). A deck
+        // the pipeline has not rendered leaves the shape to the bus, which hears it live on its input (the A + B tap)
         shapeRoutine: (shape) => {
-          const decks = scratchShapeDecks(shape);
-          if (decks) void getScratchVoicePool().shapeRoutinePlan(shape, decks).catch((err) => console.warn('[AutoDJ] scratch routine not shaped:', err));
+          void scratchShapeDecks(shape)
+            .then((decks) => (decks ? getScratchVoicePool().shapeRoutinePlan(shape, decks) : null))
+            .catch((err) => console.warn('[AutoDJ] scratch routine not shaped:', err));
         },
         // One decision per performed phrase (scratch plan section 65): source, gestures, placement, length.
         onPlan: (plan, events) => this.recordScratchPhrase(plan.reasons, events, this.scratch?.telemetry().source ?? null),
