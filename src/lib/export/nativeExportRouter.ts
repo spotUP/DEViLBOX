@@ -137,6 +137,17 @@ export async function exportNativeSong(
       resolvedSong = { ...resolvedSong, uadeEditableFileData: fmtData } as TrackerSong;
     }
   }
+  // A song played by nuade holds its module in nuadeFileData; the fields its own route kept it in (named by playOnNuade) are
+  // what the format's exporter reads: Hippel CoSo on nuade had no hippelFileData and fell through to a from-scratch CoSo
+  // writer (2489 bytes for a 24340-byte module, refused by nuade). Put the module back under those names.
+  if (resolvedSong.nuadeFileData && resolvedSong.nuadeModuleFields?.length) {
+    const restored: Record<string, unknown> = {};
+    for (const field of resolvedSong.nuadeModuleFields) {
+      if (!(resolvedSong as unknown as Record<string, unknown>)[field]) restored[field] = resolvedSong.nuadeFileData;
+    }
+    if (restored.uadeEditableFileData && !resolvedSong.uadeEditableFileName) restored.uadeEditableFileName = resolvedSong.nuadeFileName;
+    resolvedSong = { ...resolvedSong, ...restored } as TrackerSong;
+  }
   // A song played by nuade or EaglePlayer holds its module in that engine's field, not in uadeEditableFileData, and the
   // exporters read the module from uadeEditableFileData (Rob Hubbard wrote a 2080-byte ProTracker fallback for a 24590-byte
   // module, which nuade then refused to open). The bytes are the same module: hand them over under the name exporters read.

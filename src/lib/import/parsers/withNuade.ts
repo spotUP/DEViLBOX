@@ -21,6 +21,13 @@ function outrankingFields(): string[] {
   return WASM_ENGINES.slice(0, at).map((d) => d.fileDataKey as string);
 }
 
+function sameBytes(value: unknown, module: ArrayBuffer): boolean {
+  if (!(value instanceof ArrayBuffer) && !(value instanceof Uint8Array)) return false;
+  const a = value instanceof Uint8Array ? value : new Uint8Array(value);
+  const b = new Uint8Array(module);
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
 /**
  * Hand `song` to NuadeEngine: the module bytes and the player id ride on it, UADE's playback fields come off, engines
  * that would outrank nuade (our own replayers of a dual row) lose their file data, and instruments that would start
@@ -29,6 +36,10 @@ function outrankingFields(): string[] {
 export function playOnNuade(song: TrackerSong, playerId: string, module: ArrayBuffer, fileName: string, companions?: Map<string, ArrayBuffer>): TrackerSong {
   if (!NUADE_FORMATS[playerId]) throw new Error(`withNuade: unknown player ${playerId}`);
   const bag = song as unknown as Record<string, unknown>;
+  // The fields that come off and held this module are named on the song: the native export puts the module back under
+  // them, so the format's own exporter (which reads hippelFileData, uadeEditableFileData ...) still finds it.
+  const held = [...outrankingFields(), 'uadeEditableFileData'].filter((f) => sameBytes(bag[f], module));
+  if (held.length > 0) song.nuadeModuleFields = held;
   for (const field of outrankingFields()) delete bag[field];
   song.nuadeFileData = module.slice(0);
   song.nuadePlayerId = playerId;
