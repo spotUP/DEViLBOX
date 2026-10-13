@@ -55,6 +55,32 @@ import { setupStandalone, teardownStandalone, runStandalone, type StandaloneRig 
 
 let rig: StandaloneRig;
 
+// Owner 2026-10-13: a pressed juggle skips the random intensity wobble (the Auto DJ's own juggles keep
+// it). Before, the seed's wobble (+-0.05) refused the double in about one run in three. The clock seeds
+// below span the wall clock's 16-bit seed range.
+const CLOCK_SEEDS = [0, 4099, 8191, 12288, 16411, 20480, 24593, 28672, 32771, 36864, 40973, 45056, 49157, 53248, 57347, 61440];
+
+describe('Juggle Now in a mid-energy opening loads the double on every clock seed', () => {
+  afterEach(() => { cleanup(); teardownStandalone(); });
+  it.each(CLOCK_SEEDS)('clock seed %i', async (seed) => {
+    holder.doubles = 0;
+    rig = await setupStandalone(holder, { track: 'drops', bpm: 130, startSec: 20, clockMs: Date.UTC(2026, 9, 13, 0) - (Date.UTC(2026, 9, 13, 0) & 0xffff) + seed });
+    vi.spyOn(DJSessionController.prototype, 'setPhase', 'get').mockReturnValue('OPENING');
+    const j = rig.dj.getJuggle();
+    rig.dj.startPolling();
+    await act(async () => { await runStandalone(rig, 2_000); });
+    const view = render(<DJAutoDJDebugPanel telemetry={null} />);
+    await act(async () => {
+      fireEvent.click(view.getByTestId('autodj-juggle-now'));
+      await runStandalone(rig, 40_000, () => j.counts.started >= 1);
+    });
+    const tel = useDJStore.getState().autoDJJuggleTelemetry;
+    const why = `seed ${seed}: juggleNow ${JSON.stringify(tel?.juggleNow)}`;
+    expect(holder.doubles, why).toBe(1);
+    expect(j.counts.started, why).toBe(1);
+  }, 120_000);
+});
+
 describe('Juggle Now: the debug panel button juggles at once, safety gates kept', () => {
   beforeEach(async () => {
     // A pinned wall clock: DJAutoDJ seeds the juggle with Date.now() (& 0xffff), and the seed's intensity
