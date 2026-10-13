@@ -80,7 +80,12 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   }
 
   protected createNode(): void {
-    this.workletNode = new AudioWorkletNode(this.audioContext, 'nuade-processor', channelOutputNodeOptions(8)); // 8 = NUADE_NODE_VOICES, the measured maximum (nuadeFormats.test.ts NS-0); channelOutputsSizedByVoices wants a literal
+    this.workletNode = new AudioWorkletNode(this.audioContext, 'nuade-processor', channelOutputNodeOptions(8));
+    // 8 = NUADE_NODE_VOICES: the node exists before any song is open and the voice count is known only inside the worklet
+    // after nw_open, so it is declared for nuade's largest count. Counted two ways: nw_voice_count over the corpus (NS-0,
+    // nuadeFormats.test.ts: max 8, Face The Music) and the players' sources (third-party/nuade/players/*: the largest
+    // *_VOICES / *_CHANNELS constant is FTM_MAX_CHANNELS 8; paulrobotham and musicmaker read their count from the module).
+    // channelOutputsSizedByVoices needs a literal here, so per-song sizing would mean recreating the node on load.
     this.workletNode.port.onmessage = (event) => this.handleWorkletMessage(event.data);
     this.post({
       type: 'init',

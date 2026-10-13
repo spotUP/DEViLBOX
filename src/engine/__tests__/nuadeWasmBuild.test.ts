@@ -35,7 +35,7 @@ describe('NV-2 nuade-wasm build files', () => {
 describe('NV-3 shim exports', () => {
   it('the CMake export list names every nw_* function the shim defines, and nothing else', () => {
     const c = read('nuade-wasm/src/nuade_wasm.c');
-    const defined = [...c.matchAll(/EMSCRIPTEN_KEEPALIVE\s+[\w\s\*]+?\b(nw_\w+)\s*\(/g)].map((m) => `_${m[1]}`).sort();
+    const defined = [...c.matchAll(/EMSCRIPTEN_KEEPALIVE\s+[\w\s*]+?\b(nw_\w+)\s*\(/g)].map((m) => `_${m[1]}`).sort();
     const exported = (read('nuade-wasm/CMakeLists.txt').match(/EXPORTED_FUNCS "([^"]+)"/)![1]!.split(',')).filter((f) => f.startsWith('_nw_')).sort();
     expect(defined.length).toBeGreaterThan(30);
     expect(exported).toEqual(defined);

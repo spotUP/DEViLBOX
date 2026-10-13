@@ -1,5 +1,5 @@
 /**
- * NS-4 the format table (84 replace + 30 dual rows) and NS-0 the declared voice count, measured over its corpus.
+ * NS-4 the format table (81 replace + 33 dual rows) and NS-0 the declared voice count, measured over its corpus.
  */
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
@@ -12,8 +12,8 @@ import { resolvedFormatEngines } from '../nuadeRouting';
 
 const ROOT = join(__dirname, '../../../..');
 
-const REPLACE_WAVES = `amcomposer amos andrewparton aprosys artandmagic ashleyhogg audiosculpture cinemaware dariuszendeh davidhanney desire dirkbialluch dsc dynamicsynthesizer earache ems emsv6 fashiontracker fcbsi forgottenworlds fredgray gluemon gmc hippelhip howiedavies infogrames jankomrsicflogel jasonbrooke jasonpage jeroentel jesperolsen kimchristensen krishatlelid laxity legglessmusiceditor majortom maniacsofnoise markcooksey markcooksey_old markii maximumeffect mcmd medley mikedavies mmdc musicalenlightenment ntsp onescapee paulrobotham paulshields paulsummers peterverswyvelen pierreadane pokeynoise professionalsoundartists protracker4 quartet richardjoseph riffraff robhubbard robhubbardst scumm seanconnolly seanconran silmarils soundfx soundimages soundmaster specialfx speedya1system speedysystem spl stevebarrett synthdream synthpack syntracker thomashermann timetracker timfollin tomytracker tronic ufo voodoo zoundmonitor`.split(' ');
-const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis`.split(' ');
+const REPLACE_WAVES = `amcomposer amos andrewparton aprosys artandmagic ashleyhogg audiosculpture cinemaware dariuszendeh davidhanney desire dirkbialluch dsc dynamicsynthesizer earache ems emsv6 fashiontracker forgottenworlds fredgray gluemon howiedavies infogrames jankomrsicflogel jasonbrooke jasonpage jeroentel jesperolsen kimchristensen krishatlelid laxity legglessmusiceditor majortom maniacsofnoise markcooksey markcooksey_old markii maximumeffect mcmd medley mikedavies mmdc musicalenlightenment ntsp onescapee paulrobotham paulshields paulsummers peterverswyvelen pierreadane pokeynoise professionalsoundartists protracker4 quartet richardjoseph riffraff robhubbard robhubbardst scumm seanconnolly seanconran silmarils soundfx soundimages soundmaster specialfx speedya1system speedysystem spl stevebarrett synthdream synthpack syntracker thomashermann timetracker timfollin tomytracker tronic ufo voodoo zoundmonitor`.split(' ');
+const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis hippelhip fcbsi gmc`.split(' ');
 
 describe('the node declares the measured voice maximum', () => {
   it('NuadeEngine passes the literal NUADE_NODE_VOICES to channelOutputNodeOptions (channelOutputsSizedByVoices needs a literal)', () => {
@@ -44,11 +44,11 @@ describe('a fresh user keeps the pre-nuade engine of every format', () => {
 });
 
 describe('NS-4 nuade format table', () => {
-  it('holds exactly the 84 replace rows R01-R84 and the 30 dual rows AB01-AB30 of the plan', () => {
+  it('holds exactly the 81 replace rows (R01-R84 less R09 gmc, R46 fcbsi, R48 hippelhip) and the 33 dual rows AB01-AB33 of the plan', () => {
     const replace = NUADE_FORMAT_LIST.filter((f) => f.role === 'replace').map((f) => f.id).sort();
     const dual = NUADE_FORMAT_LIST.filter((f) => f.role === 'dual').map((f) => f.id).sort();
-    expect(REPLACE_WAVES.length).toBe(84);
-    expect(DUAL.length).toBe(30);
+    expect(REPLACE_WAVES.length).toBe(81);
+    expect(DUAL.length).toBe(33);
     expect(replace).toEqual([...REPLACE_WAVES].sort());
     expect(dual).toEqual([...DUAL].sort());
   });
@@ -58,13 +58,18 @@ describe('NS-4 nuade format table', () => {
     for (const f of NUADE_FORMAT_LIST) expect(have.has(f.id), f.id).toBe(true);
   });
 
-  it('plays today\'s way until the batch writes a verdict: defaultEngine is the legacy engine, no row is held yet', () => {
+  it('a row plays today\'s way unless its recorded verdict moved it: nuade only for a measured replace row, a held row names why, no dual row moves without our engine measured', () => {
     for (const f of NUADE_FORMAT_LIST) {
-      expect(f.defaultEngine, f.id).toBe(f.legacyEngine);
       expect(f.legacyEngine, f.id).not.toBe('nuade');
-      expect(f.uadeEnvelopeCorrelation, f.id).toBeNull();
-      expect(f.heldBecause, f.id).toBeUndefined();
-      if (f.role === 'replace') expect(f.legacyEngine).toMatch(/^(uade|native)$/);
+      if (f.defaultEngine === 'nuade') {
+        expect(f.role, f.id).toBe('replace');
+        expect(f.uadeEnvelopeCorrelation, `${f.id}: moved to nuade without a measurement`).toBeGreaterThanOrEqual(0.95);
+        expect(f.heldBecause, f.id).toBeUndefined();
+      } else {
+        expect(f.defaultEngine, `${f.id}: a row that is not on nuade plays its legacy engine`).toBe(f.legacyEngine);
+      }
+      if (f.heldBecause) expect(f.role, f.id).toBe('replace');
+      if (f.role === 'dual') expect(f.defaultEngine, `${f.id}: our engine is the default until it is measured against nuade`).toBe(f.legacyEngine);
     }
   });
 
@@ -78,13 +83,15 @@ describe('NS-4 nuade format table', () => {
     expect(NUADE_FORMATS.speedysystem!.prefKey).toBe(NUADE_FORMATS.speedya1system!.prefKey);
   });
 
-  it('follows by order and row only where the grid is DIRECT Rows; the corpus songs exist (27 formats have none yet)', () => {
+  it('follows by order and row only where the grid is DIRECT Rows; the corpus songs exist (10 formats have none)', () => {
     let noCorpus = 0;
     for (const f of NUADE_FORMAT_LIST) {
       for (const song of f.corpus) expect(existsSync(join(ROOT, song)), song).toBe(true);
       if (f.corpus.length === 0) noCorpus++;
     }
-    expect(noCorpus).toBe(27);
+    // No song of these exists in the repo or on Modland (searched 2026-10-13 by extension and by Modland format name): unmeasured.
+    expect(NUADE_FORMAT_LIST.filter((f) => f.corpus.length === 0).map((f) => f.id).sort()).toEqual(['amos', 'andrewparton', 'cinemaware', 'kimchristensen', 'laxity', 'ntsp', 'onescapee', 'quartet', 'timetracker', 'ufo']);
+    expect(noCorpus).toBe(10);
     expect(NUADE_FORMATS.amos!.followBy).toBe('orderRow');
     expect(NUADE_FORMATS.mmdc!.followBy).toBe('tick');
   });
