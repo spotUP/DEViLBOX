@@ -57,7 +57,10 @@ let rig: StandaloneRig;
 
 describe('Juggle Now: the debug panel button juggles at once, safety gates kept', () => {
   beforeEach(async () => {
-    rig = await setupStandalone(holder, { track: 'drops', bpm: 130, startSec: 20 });
+    // A pinned wall clock: DJAutoDJ seeds the juggle with Date.now() (& 0xffff), and the seed's intensity
+    // wobble (+-0.05) decides whether a double (intensity 0.75) fits this mid-energy opening's budget
+    // (intensity + 0.3). Unpinned, about one run in three drew a low wobble and the double was refused.
+    rig = await setupStandalone(holder, { track: 'drops', bpm: 130, startSec: 20, clockMs: Date.UTC(2026, 9, 13, 12) });
     vi.spyOn(DJSessionController.prototype, 'setPhase', 'get').mockReturnValue('OPENING');
   });
   afterEach(() => { cleanup(); teardownStandalone(); });
