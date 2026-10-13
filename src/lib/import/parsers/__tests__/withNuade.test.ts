@@ -27,15 +27,18 @@ const fileOf = (path: string) => {
 
 describe('NS-5 choice resolver', () => {
   it('an explicit choice wins, else the table default; a key the table does not own has none', () => {
-    expect(effectiveFormatEngine({}, 'mmdc')).toBe('uade');          // legacy default of MMDC
-    expect(effectiveFormatEngine({}, 'soundmon')).toBe('native');    // dual row, ours
+    // The defaults are rollout data (nuadeVerdicts.ts): read them from the table, never assume them.
+    expect(effectiveFormatEngine({}, 'mmdc')).toBe(NUADE_FORMATS.mmdc!.defaultEngine);
+    expect(effectiveFormatEngine({}, 'soundmon')).toBe(NUADE_FORMATS.soundmon!.defaultEngine);
+    expect(effectiveFormatEngine({ mmdc: 'uade' }, 'mmdc')).toBe('uade');
     expect(effectiveFormatEngine({ mmdc: 'nuade' }, 'mmdc')).toBe('nuade');
     expect(effectiveFormatEngine({}, 'mod')).toBeUndefined();
   });
 
   it('ignores a stored value the row cannot honour: never effective, never the default (a replace row has no engine of ours)', () => {
-    expect(effectiveFormatEngine({ mmdc: 'native' } as never, 'mmdc')).toBe('uade');   // mmdc plays on UADE or nuade only
-    expect(effectiveFormatEngine({ earAche: 'uade' } as never, 'earAche')).toBe('native'); // its UADE option is stored as its legacy 'native'
+    expect(effectiveFormatEngine({ mmdc: 'native' } as never, 'mmdc')).toBe(NUADE_FORMATS.mmdc!.defaultEngine);   // mmdc plays on UADE or nuade only
+    expect(effectiveFormatEngine({ earAche: 'native' } as never, 'earAche')).toBe('native'); // its UADE option is stored as its legacy 'native'
+    expect(effectiveFormatEngine({ earAche: 'uade' } as never, 'earAche')).toBe(NUADE_FORMATS.earache!.defaultEngine); // 'uade' is not a value this row stores
     expect(effectiveFormatEngine({ earAche: 'nuade' } as never, 'earAche')).toBe('nuade');
     expect(effectiveFormatEngine({ soundmon: 'uade' } as never, 'soundmon')).toBe('uade'); // a dual row honours all three
   });
@@ -87,7 +90,7 @@ describe('NS-6 playOnNuade / applyNuadeChoice', () => {
     const probed: string[] = [];
     const probe = async (id: string) => { probed.push(id); return id === 'mmdc' ? 0 : 1; };
     const ctx = { registryKey: 'mmdc', buffer: new ArrayBuffer(8), fileName: 'cp.mmdc', probe };
-    expect((await applyNuadeChoice(song(), { ...ctx, prefs: {} })).nuadeFileData).toBeUndefined();
+    expect((await applyNuadeChoice(song(), { ...ctx, prefs: { mmdc: 'uade' } })).nuadeFileData).toBeUndefined();
     expect(probed).toEqual([]);                     // nothing chose nuade: nothing is probed
     expect((await applyNuadeChoice(song(), { ...ctx, prefs: { mmdc: 'nuade' } })).nuadePlayerId).toBe('mmdc');
     expect((await applyNuadeChoice(song(), { ...ctx, fileName: 'other.xyz', registryKey: 'mod', prefs: { mmdc: 'nuade' } })).nuadeFileData).toBeUndefined();

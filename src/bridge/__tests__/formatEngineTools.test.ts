@@ -9,7 +9,7 @@ import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { getFormatEngines, setFormatEngine } from '../handlers/engineHandlers';
 import { getFormatState } from '../handlers/readHandlers';
-import { NUADE_ENGINE_CREDIT } from '@/engine/nuade/nuadeFormats';
+import { NUADE_ENGINE_CREDIT, NUADE_FORMATS } from '@/engine/nuade/nuadeFormats';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const ROOT = join(__dirname, '../../..');
@@ -25,7 +25,8 @@ describe('NS-10 get_format_engines / set_format_engine', () => {
     expect(all.count).toBe(114);
     const one = (getFormatEngines({ format: 'soundmon' }) as { rows: Record<string, unknown>[] }).rows;
     expect(one).toHaveLength(1);
-    expect(one[0]).toMatchObject({ id: 'soundmon', role: 'dual', choices: ['native', 'uade', 'nuade'], effective: 'native', default: 'native', heldBecause: null });
+    // effective / default are rollout data (nuadeVerdicts.ts): read them from the table
+    expect(one[0]).toMatchObject({ id: 'soundmon', role: 'dual', choices: ['native', 'uade', 'nuade'], effective: NUADE_FORMATS.soundmon!.defaultEngine, default: NUADE_FORMATS.soundmon!.defaultEngine, heldBecause: null });
   });
 
   it('set_format_engine stores the choice (no song of the format loaded: nothing reopens) and get_format_engines shows it', async () => {
@@ -49,7 +50,7 @@ describe('NS-10 get_format_engines / set_format_engine', () => {
     // a stored value the row cannot honour (a replace row has no engine of ours) is not reported as effective
     useSettingsStore.setState((st) => { (st.formatEngine as unknown as Record<string, unknown>).mmdc = 'native'; });
     const mm = (getFormatEngines({ format: 'mmdc' }) as { rows: { effective: string; explicit: boolean }[] }).rows[0]!;
-    expect(mm).toMatchObject({ effective: 'uade', explicit: false });
+    expect(mm).toMatchObject({ effective: (getFormatEngines({ format: 'mmdc' }) as { rows: { default: string }[] }).rows[0]!.default, explicit: false });
     useSettingsStore.setState((st) => { delete (st.formatEngine as unknown as Record<string, unknown>).mmdc; });
     // and the way back by name works too
     await setFormatEngine({ format: 'robHubbard', engine: 'nuade' });
