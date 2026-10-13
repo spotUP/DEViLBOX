@@ -22,8 +22,9 @@ import { createDeckCBus, deckCDuck, deckCLevel, programmeSpan, DECK_C_TAPS, PRES
 import { getGesture } from './scratchGestureCatalog';
 import {
   renderGesture, renderFromMotion, renderMacro, parseMacro, catalogueDemoGesture, demoGestureName, demoGestureSteps, demoStepSamples, routineEndingDelay,
-  DEMO_DECK_PROFILES, DEMO_RATE, type DemoSource,
+  DEMO_DECK_PROFILES, DEMO_RATE, type DemoSource, type GestureViz,
 } from './scratchRender';
+import { getDeckCMotion } from './deckCMotion';
 import { needleDrop as ttNeedleDrop, needleLift as ttNeedleLift, linspace } from '@/engine/turntable/turntableSim';
 import type { ScratchCue, ScratchEventFx, ScratchGesture, ScratchRenderSpec, ScratchRole } from './scratchTypes';
 import { getScratchRecord, findRecords, lastWordSlice, registerExtraRecord, forgetExtraRecords, type ScratchRecord } from './scratchCatalogue';
@@ -185,7 +186,12 @@ export class ScratchVoicePool {
    * is its catalogue definition on the same renderer.
    */
   async renderStroke(gesture: ScratchGesture, record: ScratchRecord | null, spec: ScratchRenderSpec, bpm: number, velocity: number | undefined, cue?: ScratchCue | null): Promise<Float64Array | Float32Array | null> {
-    if (gesture.needle) return gesture.needle === 'drop' ? ttNeedleDrop(DEMO_RATE, 'battle', spec.seed) : ttNeedleLift(DEMO_RATE, spec.seed);
+    return (await this.renderStrokeViz(gesture, record, spec, bpm, velocity, cue))?.out ?? null;
+  }
+
+  /** `renderStroke` with the stroke's viz capture (D1: Deck C's platter, fader and slip); a needle has none. */
+  async renderStrokeViz(gesture: ScratchGesture, record: ScratchRecord | null, spec: ScratchRenderSpec, bpm: number, velocity: number | undefined, cue?: ScratchCue | null): Promise<{ out: Float64Array | Float32Array; viz: GestureViz | null } | null> {
+    if (gesture.needle) return { out: gesture.needle === 'drop' ? ttNeedleDrop(DEMO_RATE, 'battle', spec.seed) : ttNeedleLift(DEMO_RATE, spec.seed), viz: null };
     if (!record) return null;
     const name = demoGestureName(gesture.id);
     const sig = await this.recordPcm(record);
@@ -198,11 +204,11 @@ export class ScratchVoicePool {
     }
     const stepSec = spec.chain === 'threeDeck' ? 60.0 / (bpm * 4) : demoStepSamples(bpm) / DEMO_RATE;
     const steps = name ? demoGestureSteps(name) : gesture.durationSteps;
-    let out = renderGesture(source, name ?? catalogueDemoGesture(gesture), steps * stepSec, DEMO_RATE, {
+    const r = renderGesture(source, name ?? catalogueDemoGesture(gesture), steps * stepSec, DEMO_RATE, {
       velocity: velocity ?? 1.0, profile: DEMO_DECK_PROFILES[spec.deck ?? 'boombap'], seed: spec.seed,
-    }).out;
-    if (spec.ending) out = routineEndingDelay(out, demoStepSamples(bpm), DEMO_RATE);
-    return out;
+    });
+    const out = spec.ending ? routineEndingDelay(r.out, demoStepSamples(bpm), DEMO_RATE) : r.out;
+    return { out, viz: r.viz };
   }
 
   /**
@@ -263,18 +269,25 @@ export class ScratchVoicePool {
     scratchPoolStats.rendered++;
     const started = (async (): Promise<StrokeResult> => {
       const bus = await this.deckCBus(spec.chain);
-      const samples = await this.renderStroke(gesture, record ?? null, spec, opts.bpm, opts.velocity, cue);
-      if (!samples) return { ok: false, reason: `no ${gesture.id} without a record` };
+      const rendered = await this.renderStrokeViz(gesture, record ?? null, spec, opts.bpm, opts.velocity, cue);
+      if (!rendered) return { ok: false, reason: `no ${gesture.id} without a record` };
+      const samples = rendered.out;
       const at = bus.busSampleAt(opts.at ?? this.ctx.currentTime);
+      let placed: number;
       if (spec.section) {
         // the overlay: the stroke's section on the demo's grid from the stroke's own step
         // (render_scratch_section: o = max(0, bar x bar_len + step x step_samp + off) from the section's start)
         const stepSamp = demoStepSamples(opts.bpm);
         const start = at - spec.section.step * stepSamp;
-        bus.stroke(Math.max(start, at + spec.humanizeSamples), samples, { key: spec.section.key, start, end: start + spec.section.bars * 16 * stepSamp, fx: spec.section.fx });
+        placed = Math.max(start, at + spec.humanizeSamples);
+        bus.stroke(placed, samples, { key: spec.section.key, start, end: start + spec.section.bars * 16 * stepSamp, fx: spec.section.fx });
       } else {
-        bus.stroke(Math.max(0, at + spec.humanizeSamples), samples);
+        placed = Math.max(0, at + spec.humanizeSamples);
+        bus.stroke(placed, samples);
       }
+      // D1: Deck C's platter, fader and slip follow the same render (three_deck's viz capture)
+      if (rendered.viz) getDeckCMotion().addStroke(placed, rendered.viz);
+      else getDeckCMotion().addNeedle(placed, samples.length);
       return { ok: true };
     })();
     this.track(started);
@@ -354,6 +367,7 @@ export class ScratchVoicePool {
   panic(): void {
     this.releaseAll();
     for (const p of this.deckC.values()) void p.then((b) => b.clear(), () => undefined);
+    getDeckCMotion().clear();
   }
 
   private track(p: Promise<unknown>): void {

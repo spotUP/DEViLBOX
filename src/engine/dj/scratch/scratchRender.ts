@@ -325,7 +325,18 @@ export const demoStepSamples = (bpm: number, rate: number = DEMO_RATE): number =
 export const scratchRenderStats = { gestures: 0 };
 
 /** One stroke's stages (the null test's taps). */
-export interface RenderedGesture { out: Float64Array; recordVel?: Float64Array; fade?: Float64Array }
+/** The demo's `collect_viz` capture of a stroke (scratch.render_gesture): the record velocity, the slip, the fader, at audio rate. */
+export interface GestureViz { recordVel: Float64Array; slipVel: Float64Array; fade: Float64Array }
+export interface RenderedGesture { out: Float64Array; recordVel?: Float64Array; fade?: Float64Array; viz: GestureViz }
+
+/** scratch.py `_viz_resize(a, n)`: np.interp onto n points. */
+export function vizResize(a: ArrayLike<number>, n: number): Float64Array {
+  if (a.length === n) return Float64Array.from(a);
+  if (a.length === 0) return new Float64Array(n);
+  const xp = linspace(0, 1, a.length), x = linspace(0, 1, n), out = new Float64Array(n);
+  for (let i = 0; i < n; i++) out[i] = interp(x[i]!, xp, a);
+  return out;
+}
 
 /**
  * scratch.py `render_gesture` (offline tier, the `VEL` defaults): one gesture through the turntable
@@ -344,7 +355,7 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
     const out = renderFromMotion(source.sig, source.anchor, source.safe, vel);
     const k = 0.7 + 0.4 * velocity;
     for (let i = 0; i < out.length; i++) out[i] = out[i]! * k;
-    return { out, recordVel: vel };
+    return { out, recordVel: vel, viz: { recordVel: vizResize(vel, out.length), slipVel: new Float64Array(out.length), fade: new Float64Array(out.length).fill(1) } };
   }
   const amp = vc.amp_base + vc.amp_span * velocity;
   if (g.play) {
@@ -362,7 +373,8 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
     for (let i = 0; i < k && fade.length - k + i >= 0; i++) fade[fade.length - k + i] = down[i]!;
     const gain = 0.8 + 0.4 * velocity;
     for (let i = 0; i < out.length; i++) out[i] = out[i]! * fade[i]! * gain;
-    return { out, recordVel: vel, fade };
+    // the viz: the word plays forward, fader open
+    return { out, recordVel: vel, fade, viz: { recordVel: new Float64Array(out.length).fill(1), slipVel: new Float64Array(out.length), fade: new Float64Array(out.length).fill(1) } };
   }
   let hand: TtHandPoint[];
   if (g.glide && g.glideProfile) {
@@ -387,8 +399,8 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
   // the control-rate tracks at audio rate (np.interp over linspace(0, 1, n))
   const nAud = Math.max(1, Math.trunc(durSec * rate));
   const ta = linspace(0, 1, nAud);
-  const recordVel = new Float64Array(nAud), recordAngle = new Float64Array(nAud);
-  for (let i = 0; i < nAud; i++) { recordVel[i] = interp(ta[i]!, sim.t, sim.recordVel); recordAngle[i] = interp(ta[i]!, sim.t, sim.recordAngle); }
+  const recordVel = new Float64Array(nAud), recordAngle = new Float64Array(nAud), slipVel = new Float64Array(nAud);
+  for (let i = 0; i < nAud; i++) { recordVel[i] = interp(ta[i]!, sim.t, sim.recordVel); recordAngle[i] = interp(ta[i]!, sim.t, sim.recordAngle); slipVel[i] = interp(ta[i]!, sim.t, sim.slipVel); }
   const plat = renderFromMotion(source.sig, source.anchor, source.safe, recordVel);
   const noise = surfaceNoise(recordAngle, sim.surface * velocity, rate, seed);
   for (let i = 0; i < plat.length; i++) plat[i] = plat[i]! + noise[i]!;
@@ -404,7 +416,8 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
     for (let i = 0; i < out.length; i++) out[i] = out[i]! + vc.hp_mix * h[i]!;
   }
   if (g.fx) out = applyFx(out, rate, g.fx);
-  return { out, recordVel, fade };
+  // the real two-body motion (collect_viz)
+  return { out, recordVel, fade, viz: { recordVel: vizResize(recordVel, out.length), slipVel: vizResize(slipVel, out.length), fade: vizResize(fade, out.length) } };
 }
 
 // ─── The macro language (scratch.py `parse_macro` / `render_macro`, crossfader s.40; ledger G11) ───
