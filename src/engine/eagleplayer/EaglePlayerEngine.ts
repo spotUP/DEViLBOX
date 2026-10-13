@@ -25,23 +25,16 @@ import { eaglePlayerFormat, eaglePlayerModuleName, eaglePlayerUrl } from './eagl
 import { SubsongRequests, reportSubsongs } from '@engine/wasm/subsongRequests';
 import { advanceNativeSubsong } from '@engine/replayer/nativeSubsongPlayback';
 import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
-import { tickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
+import type { TickGrid } from '@/lib/tracker/tickGridPosition';
+import { GridFollow, songTickGrid, type GridFollowPosition } from '@engine/replayer/tickGridFollow';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 
 /** What the grid follow gets: the order position and row the player is at. */
-export interface EaglePlayerPosition { songPos: number; row: number; ticks: number }
+export type EaglePlayerPosition = GridFollowPosition;
 
 /** The grid geometry the player's tick count maps onto (tickGridPosition). */
 export function eaglePlayerGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition' | 'eaglePlayerTickGrid'>): TickGrid {
-  return {
-    // Where the parser measured it: the tick of row 0 and the pass length.
-    ...song.eaglePlayerTickGrid,
-    speed: song.initialSpeed || 6,
-    songPositions: song.songPositions,
-    patternLengths: song.patterns.map((p) => p.length),
-    // The player loops its song; the grid goes round with it.
-    loopFrom: song.restartPosition ?? 0,
-  };
+  return songTickGrid(song, song.eaglePlayerTickGrid);
 }
 
 export class EaglePlayerEngine extends WASMChannelOutputsEngine implements SubsongPlayer {
@@ -51,8 +44,9 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
   private static players = new Map<string, Promise<ArrayBuffer>>();
 
   private _songEndCallback: (() => void) | null = null;
-  private _positionCallbacks = new Set<(p: EaglePlayerPosition) => void>();
-  private _grid: TickGrid | null = null;
+  // Lazy: the engine tests build the instance without its constructor.
+  private _follow?: GridFollow;
+  private get follow(): GridFollow { return (this._follow ??= new GridFollow()); }
   private readonly subsongRequests = new SubsongRequests();
 
   private constructor() {
@@ -111,10 +105,7 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
           this.subsongRequests.settle(data.index as number);
           break;
         case 'position':
-          if (this._grid && this._positionCallbacks.size > 0) {
-            const at = { ...tickGridPosition(data.ticks as number, this._grid), ticks: data.ticks as number };
-            for (const cb of this._positionCallbacks) cb(at);
-          }
+          this.follow.followTicks(data.ticks as number);
           break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
@@ -208,13 +199,12 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
    * (speed ticks per row, patterns in order). Set by the route on start.
    */
   setGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition' | 'eaglePlayerTickGrid'>): void {
-    this._grid = eaglePlayerGrid(song);
+    this.follow.setGrid(eaglePlayerGrid(song));
   }
 
   /** The player's grid position as it plays (each player tick). */
   onPositionUpdate(cb: (p: EaglePlayerPosition) => void): () => void {
-    this._positionCallbacks.add(cb);
-    return () => this._positionCallbacks.delete(cb);
+    return this.follow.onPosition(cb);
   }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
