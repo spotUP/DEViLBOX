@@ -158,9 +158,27 @@ uint32_t nuade_scope(NuadeSong* song, uint32_t voice, float* out, uint32_t cap);
 // is rendered in short slices, and the slice that reaches it is the last.
 void nuade_set_repeat_count(NuadeSong* song, uint32_t count);
 
-// Stereo width, 0..1: 1 (the default) keeps each voice's pan, the Amiga's hard left/right for most players; 0 is mono.
-// Returns false (and changes nothing) outside 0..1.
+// Stereo width, 0..2: 1 (the default) keeps each voice's pan, the Amiga's hard left/right for most players; 0 is mono.
+// Above 1 widens: each side also gets an inverted copy of the other (at 2 a hard-left voice is 1.5 left, -0.5 right).
+// The mono sum (L + R) is the same at every value. Returns false (and changes nothing) outside 0..2.
 bool nuade_set_stereo_separation(NuadeSong* song, float separation);
+
+// Leave a voice out of the stereo mix, as the song's own voice numbering (0..voice_count-1). The voice still plays on:
+// the song's timing, seek and duration do not change, and the `voices` buffers of nuade_render, nuade_vu and
+// nuade_scope still carry it. A mute stays through nuade_start and nuade_seek. Returns false (and changes nothing)
+// for a voice outside the song, a self-rendering player (NuadePlayer.render_raw), or a player with display voices of
+// its own that does not apply mutes itself (NuadeSongInfo.player_mutes).
+bool nuade_mute_voice(NuadeSong* song, uint32_t voice, bool mute);
+// Leave out of the stereo mix every sound that `instrument` started: the number a voice reports in
+// NuadeVoiceInfo.instrument (the `index` of nuade_instrument_name). Like a voice mute the sound plays on, and the voice
+// buffers still carry it. A sound belongs to the instrument its voice reports right after the tick that started it, so
+// set the mute before nuade_start; it stays through nuade_start and nuade_seek. Returns false for a player that
+// reports no instruments, one whose display voices are not the song's voices and that does not apply mutes itself, a
+// self-rendering player, or an instrument
+// number past 65535.
+bool nuade_mute_instrument(NuadeSong* song, uint32_t instrument, bool mute);
+// Unmute every voice and instrument.
+void nuade_mute_clear(NuadeSong* song);
 
 // Metadata
 

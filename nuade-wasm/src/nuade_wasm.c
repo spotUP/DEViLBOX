@@ -252,6 +252,15 @@ EMSCRIPTEN_KEEPALIVE int nw_set_separation(float x) {
 }
 EMSCRIPTEN_KEEPALIVE void nw_set_mute_mask(int mask) { s_mask = (uint32_t)mask; }
 
+/* The app numbers voices by the song's own voice (the tracker column). SoundMon's voice n plays on Paula channel 3 - n,
+ * and nuade (since 111c9657965f) numbers its mixer voices, voice info, snapshots and meters by Paula channel, so for that
+ * player the column of mixer voice v is voice_count - 1 - v. Every per-voice export below goes through this. */
+static uint32_t column_of(uint32_t v) {
+  const NuadePlayer *pl = s_song ? nuade_player(s_song) : NULL;
+  if (pl && pl->id && strcmp(pl->id, "soundmon") == 0 && s_voice_count > v) return s_voice_count - 1 - v;
+  return v;
+}
+
 /* The pan each voice has in the stereo mix right now (-1 left .. 1 right, separation applied). A tick player's mixer
  * pans each voice with the pan its snapshot reports; a self-rendering player has no per-voice pan to read, so the
  * Amiga's L R R L is assumed. */
@@ -275,7 +284,9 @@ static void current_pans(float *out, uint32_t count) {
 EMSCRIPTEN_KEEPALIVE int nw_pans(float *out, int cap) {
   if (!s_song || !out || cap <= 0) return 0;
   uint32_t n = s_voice_count < (uint32_t)cap ? s_voice_count : (uint32_t)cap;
-  current_pans(out, n);
+  float pans[NW_MAX_VOICES];
+  current_pans(pans, s_voice_count);
+  for (uint32_t v = 0; v < s_voice_count; v++) { const uint32_t c = column_of(v); if (c < n) out[c] = pans[v]; }
   return (int)n;
 }
 
@@ -284,7 +295,7 @@ static void remove_muted(float *stereo, float *const *voices, uint32_t frames) {
   float pans[NW_MAX_VOICES];
   current_pans(pans, s_voice_count);
   for (uint32_t v = 0; v < s_voice_count; v++) {
-    if (v < 32 && (s_mask >> v) & 1u) continue;
+    if (column_of(v) < 32 && (s_mask >> column_of(v)) & 1u) continue;
     const float gl = 0.5f * (1.0f - pans[v]), gr = 0.5f * (1.0f + pans[v]);
     const float *src = voices[v];
     for (uint32_t i = 0; i < frames; i++) {
@@ -318,7 +329,7 @@ EMSCRIPTEN_KEEPALIVE int nw_render(float *stereo, float *voices, int frames, int
     st = n;
   }
   if (base)
-    for (uint32_t v = 0; v < s_voice_count; v++) ptrs[v] = base + (size_t)v * st;
+    for (uint32_t v = 0; v < s_voice_count; v++) ptrs[v] = base + (size_t)column_of(v) * st;
   NuadeRenderResult r = nuade_render(s_song, stereo, base ? ptrs : NULL, n);
   s_flags = r.flags;
   if (muting && base && r.frames) remove_muted(stereo, ptrs, r.frames);
@@ -347,7 +358,7 @@ EMSCRIPTEN_KEEPALIVE int nw_snapshot(double frame, int32_t *out) {
   out[8] = (int32_t)p->mode;
   out[9] = (int32_t)p->rows;
   for (uint32_t v = 0; v < nv; v++) {
-    int32_t *w = out + 10 + v * 5;
+    int32_t *w = out + 10 + column_of(v) * 5;
     w[0] = views[v].info.note;
     w[1] = views[v].info.instrument;
     memcpy(&w[2], &views[v].volume, 4);
@@ -359,7 +370,11 @@ EMSCRIPTEN_KEEPALIVE int nw_snapshot(double frame, int32_t *out) {
 
 EMSCRIPTEN_KEEPALIVE int nw_vu(float *out, int cap) {
   if (!s_song || !out || cap <= 0) return 0;
-  return (int)nuade_vu(s_song, out, (uint32_t)cap);
+  float raw[NW_MAX_VOICES];
+  const uint32_t n = nuade_vu(s_song, raw, NW_MAX_VOICES);
+  uint32_t wrote = 0;
+  for (uint32_t v = 0; v < n; v++) { const uint32_t c = column_of(v); if (c < (uint32_t)cap) { out[c] = raw[v]; if (c + 1 > wrote) wrote = c + 1; } }
+  return (int)wrote;
 }
 
 EMSCRIPTEN_KEEPALIVE const char *nw_meta(const char *key) {

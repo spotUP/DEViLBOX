@@ -59,6 +59,7 @@ struct NuadeSong {
     u32 loops;
     u32 repeat_count;
     f32 stereo_separation;
+    NuadeVoiceInfo* tag_info; // scratch for tagging started sounds with their instrument, voice_count long
 
     // The scan behind the row grid (NuadePlayer.grid_ticks) and the subsong it was made for.
     NuadeScan* grid_scan;
@@ -157,6 +158,7 @@ static void free_song(NuadeSong* song) {
     free_meter_buffers(song);
     nuade_viz_destroy(song->viz);
     nuade_mixer_destroy(song->voices);
+    free(song->tag_info);
     free(song->tags);
     free(song->instruments);
     free(song->path);
@@ -288,7 +290,8 @@ NuadeSongResult nuade_open_ex(const NuadeOpenParams* params) {
 
     if (song->player->tick != nullptr) {
         if (song->info.timebase_hz != 0) {
-            song->voices = nuade_mixer_create(song->info.voice_count);
+            song->voices
+                = nuade_mixer_create(song->info.voice_count, song->info.display_voices, !song->info.player_mutes);
         }
         if (song->voices == nullptr) {
             NuadeSongResult result = fail(song->info.timebase_hz ? NuadeStatus_OutOfMemory : NuadeStatus_InvalidData,
@@ -382,6 +385,20 @@ static NuadeGridClock grid_clock(const NuadeSong* song) {
                               .ticks_run = song->ticks_run };
 }
 
+// After a tick, while an instrument is muted: the sounds the tick started belong to the instrument their voice reports.
+static void tag_started_sounds(NuadeSong* song) {
+    if (song->player->voice_info == nullptr || song->info.player_mutes
+        || !nuade_mixer_has_instrument_mutes(song->voices)) {
+        return;
+    }
+    const u32 count = song->info.voice_count;
+    for (u32 i = 0; i < count; i++) {
+        song->tag_info[i] = (NuadeVoiceInfo) { .note = -1, .instrument = -1 };
+    }
+    song->player->voice_info(song->user_data, song->tag_info, count);
+    nuade_mixer_tag_starts(song->voices, song->tag_info, count);
+}
+
 static NuadeRenderResult render_ticked(NuadeSong* song, float* stereo, float* const* voices, uint32_t frames) {
     memset(stereo, 0, (size_t)frames * 2 * sizeof(float));
     for (u32 v = 0; voices != nullptr && v < song->info.voice_count; v++) {
@@ -398,6 +415,7 @@ static NuadeRenderResult render_ticked(NuadeSong* song, float* stereo, float* co
             }
             const NuadeTickResult tick = song->player->tick(song->user_data, song->voices);
             song->ticks_run++;
+            tag_started_sounds(song);
             nuade_viz_record(song->viz, song->position + result.frames, song->player, song->user_data,
                              song->own_display ? nullptr : song->voices, grid_clock(song));
             if (tick.flags & NuadeTick_Looped) {
@@ -494,8 +512,8 @@ static float* const* meter_buffers(NuadeSong* song, u32 frames) {
 }
 
 // Stereo separation for a self-rendering player, on its finished mix: keeps the mid (L + R) and scales the side
-// (L - R). For voices panned hard left or right this is the same as scaling their pans, as the mixer does.
-static void narrow_stereo(float* stereo, u32 frames, f32 separation) {
+// (L - R). This is the same as scaling every voice's pan, as the mixer does.
+static void apply_separation(float* stereo, u32 frames, f32 separation) {
     if (separation == 1.0f) {
         return;
     }
@@ -521,7 +539,7 @@ NuadeRenderResult nuade_render(NuadeSong* song, float* stereo, float* const* voi
         result = render_ticked(song, stereo, metered, frames);
     } else {
         result = render_raw_sliced(song, stereo, metered, frames);
-        narrow_stereo(stereo, result.frames, song->stereo_separation);
+        apply_separation(stereo, result.frames, song->stereo_separation);
         if (result.frames != 0) {
             // A self-rendering player is stamped once per call; its state is read after the call.
             nuade_viz_record(song->viz, song->position, song->player, song->user_data, nullptr, (NuadeGridClock) { 0 });
@@ -873,7 +891,7 @@ void nuade_set_repeat_count(NuadeSong* song, uint32_t count) {
 }
 
 bool nuade_set_stereo_separation(NuadeSong* song, float separation) {
-    if (song == nullptr || !(separation >= 0.0f && separation <= 1.0f)) {
+    if (song == nullptr || !(separation >= 0.0f && separation <= 2.0f)) {
         return false;
     }
     song->stereo_separation = separation;
@@ -881,6 +899,34 @@ bool nuade_set_stereo_separation(NuadeSong* song, float separation) {
         nuade_mixer_set_separation(song->voices, separation);
     }
     return true;
+}
+
+bool nuade_mute_voice(NuadeSong* song, uint32_t voice, bool mute) {
+    if (song == nullptr || song->voices == nullptr || (song->own_display && !song->info.player_mutes)) {
+        return false;
+    }
+    return nuade_mixer_set_muted(song->voices, voice, mute);
+}
+
+bool nuade_mute_instrument(NuadeSong* song, uint32_t instrument, bool mute) {
+    const bool framework_tags = song != nullptr && song->player->voice_info != nullptr && !song->own_display;
+    if (song == nullptr || song->voices == nullptr || !(framework_tags || song->info.player_mutes)) {
+        return false;
+    }
+    if (mute && framework_tags && song->tag_info == nullptr) {
+        song->tag_info
+            = (NuadeVoiceInfo*)calloc(song->info.voice_count ? song->info.voice_count : 1, sizeof(NuadeVoiceInfo));
+        if (song->tag_info == nullptr) {
+            return false;
+        }
+    }
+    return nuade_mixer_set_instrument_muted(song->voices, instrument, mute);
+}
+
+void nuade_mute_clear(NuadeSong* song) {
+    if (song != nullptr && song->voices != nullptr) {
+        nuade_mixer_clear_mutes(song->voices);
+    }
 }
 
 const char* nuade_meta(const NuadeSong* song, const char* key) {

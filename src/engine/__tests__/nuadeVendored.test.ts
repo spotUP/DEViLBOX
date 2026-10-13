@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 const ROOT = join(__dirname, '../../..');
 const NUADE = join(ROOT, 'third-party/nuade');
-const PIN = '4900e597e6718d523e50bbaf6e1fc6ca41ebe683';
+const PIN = '111c9657965f00e9a94fec3545ce238d43af57f4';
 
 describe('NV-1 vendored nuade', () => {
   it('records the pinned upstream commit, repo and tarball hash in UPSTREAM.md', () => {
