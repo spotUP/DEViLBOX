@@ -59,20 +59,7 @@ export const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs
 
 export interface ReplaceInput {
   songs: SongMeasure[];
-  /** LIVE_EDIT is 'pass' for one of the format's registry keys today: it must keep an edit path (gate d). */
-  liveEditToday: boolean;
-  /** nuade open + seek to the 120 s mark, ms (the worklet's swapModule). Null when not measured. */
-  swapMs: number | null;
-  /**
-   * A test proves that a note typed in the grid is heard at its pitch on nuade (not only that the edited module opens). Today's
-   * live edit of these formats writes the note into UADE's chip RAM; nuade has no cell write (CELL_WRITE is off at the pin), so
-   * its only edit path is the module swap, and a row keeps its live edit on UADE until that path is proven to sound the edit.
-   */
-  editSoundsOnNuade?: boolean;
 }
-
-/** Rows whose typed notes are proven audible through nuade's module swap. Empty: no test drives that yet. */
-export const EDIT_SOUNDS_ON_NUADE: ReadonlySet<string> = new Set<string>();
 
 export interface ReplaceVerdict {
   pass: boolean;
@@ -89,11 +76,6 @@ export function replaceVerdict(i: ReplaceInput): ReplaceVerdict {
   const good = i.songs.filter((s) => !s.error && Number.isFinite(s.correlation));
   const m = good.length ? mean(good.map((s) => s.correlation)) : null;
   if (m === null || m < THRESHOLDS.meanCorrelation) why.push(`mean correlation ${m === null ? 'n/a' : m.toFixed(3)} < ${THRESHOLDS.meanCorrelation}`);
-  if (i.liveEditToday) {
-    if (!i.editSoundsOnNuade) why.push('live edit would lose its path: today a typed note is written into UADE\'s chip RAM and heard at once; nuade has no cell write (CELL_WRITE off) and its module swap is not yet proven to sound a typed note at its pitch');
-    if (i.swapMs === null) why.push('edit path not measured');
-    else if (i.swapMs > THRESHOLDS.swapMs) why.push(`live edit would lose its path: swap to the 120 s mark takes ${Math.round(i.swapMs)} ms > ${THRESHOLDS.swapMs} ms`);
-  }
   const ends = i.songs.every((s) => endAgrees(s.uadeEndAt, s.nuadeEndAt));
   return { pass: why.length === 0, meanCorrelation: m, endAgrees: ends, heldBecause: why.join('; ') };
 }
@@ -106,7 +88,7 @@ export function replaceVerdict(i: ReplaceInput): ReplaceVerdict {
  * 0.03) say nothing about which one is right, and an end that differs from UADE's (deltamusic2, futurecomposer) changes
  * what a song-end does. The owner can drop the floor by deleting the two clauses.
  */
-export function dualDefault(songs: SongMeasure[], opts: { ownEditPath?: boolean } = {}): { defaultEngine: FormatEngineChoice; nuadeMean: number; ownMean: number; editHeld?: boolean } | null {
+export function dualDefault(songs: SongMeasure[]): { defaultEngine: FormatEngineChoice; nuadeMean: number; ownMean: number } | null {
   const both = songs.filter((s) => !s.error && s.own != null && Number.isFinite(s.correlation));
   // A song our engine refuses by design is not one it can lose or win; nuade still has to pass it (the floor below).
   if (both.length === 0 || both.length !== songs.filter((s) => !s.ownRefused).length) return null;
@@ -115,9 +97,7 @@ export function dualDefault(songs: SongMeasure[], opts: { ownEditPath?: boolean 
   const beats = nuadeMean - ownMean >= THRESHOLDS.dualMargin - 1e-12 && valid;
   const noneWorse = both.every((s) => (s.own as number) - s.correlation <= THRESHOLDS.dualMargin + 1e-12);
   // 'native' here means ours stays: the caller maps it to the row's legacy engine.
-  // Owner rule: no lost edit path. A dual row whose own engine takes grid edits cell by cell stays ours: nuade has no cell
-  // write at the pin, only a module swap (see ReplaceInput.editSoundsOnNuade), so a better score alone cannot move it.
+  // Owner decision 2026-10-13: playback quality decides; editability is ported to nuade rows later (plan NUADE-EDIT-PATH).
   const wins = beats && noneWorse;
-  if (wins && opts.ownEditPath) return { defaultEngine: 'native', nuadeMean, ownMean, editHeld: true };
   return { defaultEngine: wins ? 'nuade' : 'native', nuadeMean, ownMean };
 }

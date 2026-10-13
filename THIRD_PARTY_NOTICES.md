@@ -202,15 +202,18 @@ All third-party components are compatible with GPL-3.0-or-later.
   - AM-Composer
   - Art and Magic
   - Ashley Hogg
+  - BP SoundMon
   - Darius Zendeh
   - David Hanney
   - EarAche
   - EMS (Editeur Musical Sequentiel)
   - Fashion Tracker
   - Howie Davies
+  - InStereo! 1.0
   - Janko Mrsic-Flogel
   - Jason C. Brooke
   - Jeroen Tel
+  - Jochen Hippel COSO
   - Maniacs of Noise
   - Mark II
   - MCMD
@@ -220,10 +223,13 @@ All third-party components are compatible with GPL-3.0-or-later.
   - Peter Verswyvelen
   - Professional Sound Artists
   - Riff Raff
+  - Rob Hubbard
   - SCUMM
   - Sean Connolly
   - Sean Conran
+  - SidMon II
   - Silmarils
+  - Sound Master
   - Sound Programming Language
   - Speedy A1 System
   - Speedy System

@@ -9,15 +9,12 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
-import { NUADE_FORMAT_LIST, type NuadeFormat } from '../nuade/nuadeFormats';
+import { NUADE_FORMAT_LIST } from '../nuade/nuadeFormats';
 import { NuadeHeadless } from '../nuade/nuadeHeadless';
 import { setNuadeProbe } from '../nuade/nuadeProbe';
 import { compareSong } from '../../../tools/nuade/nuadeCompare';
 import { replaceVerdict, dualDefault, mean, THRESHOLDS, type SongMeasure } from '../../../tools/nuade/verdictRules';
-import { loadResults } from '../../../tools/nuade/batch';
-import { RESULTS_PATH } from '../../../tools/nuade/compare-batch';
 import { ROOT } from './workletHarness';
-import { LIVE_EDIT } from '@/lib/import/gridProvenance';
 
 // UADE's scan needs a browser; a format whose parser draws no grid hands the grid to it. Stand in for it with a song
 // shaped as UADEParser's classic path builds it, so the route's retargeting is what is tested.
@@ -34,11 +31,6 @@ vi.mock('@lib/import/formats/UADEParser', () => ({
 
 const SECONDS = 30;
 const ROWS = NUADE_FORMAT_LIST.filter((f) => (f.role === 'replace' || f.defaultEngine === 'nuade') && f.uadeEnvelopeCorrelation !== null && f.corpus.length > 0);
-
-/** The swap time is a timing measurement: it comes from the recorded batch row (headless, at the 120 s mark), not a live render. */
-function recordedSwap(row: NuadeFormat): number | null {
-  return loadResults(RESULTS_PATH).rows.find((r) => r.format === row.id && r.swapMs !== undefined)?.swapMs ?? null;
-}
 
 describe('the table has recorded verdicts to test', () => {
   it('at least the five wave-1 rows are measured', () => {
@@ -80,7 +72,7 @@ describe.each(ROWS)('$label on nuade', (row) => {
       expect(dd?.defaultEngine, `${row.label}: nuade ${dd?.nuadeMean.toFixed(3)} vs ours ${dd?.ownMean.toFixed(3)}`).toBe('nuade');
       return;
     }
-    const v = replaceVerdict({ songs: live, liveEditToday: row.registryKeys.some((k) => LIVE_EDIT[k] === 'pass'), swapMs: recordedSwap(row) });
+    const v = replaceVerdict({ songs: live });
     if (row.defaultEngine === 'nuade') {
       expect(v.heldBecause, `${row.label} is on nuade but fails: ${v.heldBecause}`).toBe('');
       expect(row.heldBecause).toBeUndefined();

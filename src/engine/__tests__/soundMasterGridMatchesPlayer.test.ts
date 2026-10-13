@@ -36,6 +36,10 @@ vi.mock('@/engine/uade/UADEEngine', () => ({ UADEEngine: { hasInstance: () => tr
 const scanGrid = vi.hoisted(() => ({ name: 'uade-scan-grid', patterns: [], instruments: [] }));
 vi.mock('@lib/import/formats/UADEParser', () => ({ parseUADEFile: vi.fn(async () => scanGrid) }));
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('soundmaster');
 
 const SONGS = 'public/data/songs';
 const CORPUS = [

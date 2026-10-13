@@ -19,6 +19,10 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { keyboardPeriod, gridNoteOfName } from '@/engine/keyboardPeriod';
 import { cellPeriod } from '@/lib/amiga/periodNotes';
 import { xmNoteToToneJS } from '@/lib/xmConversions';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 // One song per Sampler-based format family and stored sample rate.
 const SONGS = [

@@ -32,6 +32,10 @@ import { parseTFMXFile } from '@/lib/import/formats/TFMXParser';
 import { tfmxNoteForKey } from '@/engine/tfmx/tfmxKeyNote';
 import { parseSteveTurnerFile } from '@/lib/import/formats/SteveTurnerParser';
 import { renderTicks, rmsPerTick, fundamentalHz, totalRms, db, FPT, fromOnset } from './keyboardPreviewHarness';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 const corpus = (n: string) => {
   const f = readFileSync(resolve(ROOT, 'public/data/songs', n));

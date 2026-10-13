@@ -5,6 +5,10 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { assertLiveSwap, importSong, type LiveSwapSpec, type LiveCell } from './helpers/liveSwapCheck';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });

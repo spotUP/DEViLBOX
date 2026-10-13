@@ -23,6 +23,10 @@ import { parseSidMon1File } from '@/lib/import/formats/SidMon1Parser';
 import { parseSidMon2File } from '@/lib/import/formats/SidMon2Parser';
 import { serializeSidMon1Config } from '@/engine/sidmon1/SidMon1Synth';
 import { sm1IndexToXM } from '@/engine/uade/encoders/SidMon1Encoder';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 const bytes = (n: string) => new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/formats', n)));
 const ab = (u: Uint8Array) => u.slice().buffer as ArrayBuffer;

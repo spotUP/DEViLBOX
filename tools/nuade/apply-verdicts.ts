@@ -15,12 +15,11 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NUADE_FORMAT_LIST, type NuadeFormat } from '../../src/engine/nuade/nuadeFormats';
-import { LIVE_EDIT } from '../../src/lib/import/gridProvenance';
 import type { FormatEngineChoice } from '../../src/types/formatEngine';
 import { loadResults, type ResultRow, type ResultsFile } from './batch';
 import { ROOT } from './nuadeCompare';
 import { rolledOutRows } from './rollout';
-import { dualDefault, replaceVerdict, mean, EDIT_SOUNDS_ON_NUADE, type SongMeasure } from './verdictRules';
+import { dualDefault, replaceVerdict, mean, type SongMeasure } from './verdictRules';
 
 export interface NuadeVerdict {
   uadeEnvelopeCorrelation: number;
@@ -45,13 +44,6 @@ function ownNoteFor(f: NuadeFormat, recs: ResultRow[]): string {
   return 'our engine not measured';
 }
 
-/**
- * Whether the row's own engine takes grid edits cell by cell today: LIVE_EDIT is 'pass' for one of its registry keys, or
- * the engine is known to (InStereo 1: trackIndexEditsReachEngine.test.ts proves it, its LIVE_EDIT entry is unset).
- */
-const OWN_CELL_EDITS_EXTRA: ReadonlySet<string> = new Set(['instereo1']);
-export const ownEditPath = (f: NuadeFormat): boolean => f.registryKeys.some((k) => LIVE_EDIT[k] === 'pass') || OWN_CELL_EDITS_EXTRA.has(f.id);
-
 /** The verdicts the recorded rows give, by format id. Pure over the results file and the table. */
 export function computeVerdicts(file: ResultsFile, rows: readonly NuadeFormat[] = NUADE_FORMAT_LIST): Record<string, NuadeVerdict> {
   const out: Record<string, NuadeVerdict> = {};
@@ -62,21 +54,18 @@ export function computeVerdicts(file: ResultsFile, rows: readonly NuadeFormat[] 
     const recs = measured(f);
     if (recs.length === 0 || recs.length !== f.corpus.length) continue;
     if (f.role === 'replace') {
-      const swap = recs.find((r) => r.swapMs !== undefined)?.swapMs ?? null;
-      const liveEditToday = f.registryKeys.some((k) => LIVE_EDIT[k] === 'pass');
-      const v = replaceVerdict({ songs: recs, liveEditToday, swapMs: swap, editSoundsOnNuade: EDIT_SOUNDS_ON_NUADE.has(f.id) });
+      const v = replaceVerdict({ songs: recs });
       decided[f.id] = { pass: v.pass, v };
     } else {
       const good = recs.filter((r) => !r.error && Number.isFinite(r.correlation));
       const m = good.length ? mean(good.map((r) => r.correlation)) : null;
-      const dd = dualDefault(recs as SongMeasure[], { ownEditPath: ownEditPath(f) });
+      const dd = dualDefault(recs as SongMeasure[]);
       out[f.id] = {
         uadeEnvelopeCorrelation: round(m ?? 0),
         ...(dd ? { ownEnvelopeCorrelation: round(dd.ownMean) } : {}),
-        endAgrees: recs.every((r) => replaceVerdict({ songs: [r], liveEditToday: false, swapMs: null }).endAgrees === true),
+        endAgrees: recs.every((r) => replaceVerdict({ songs: [r] }).endAgrees === true),
         defaultEngine: dd?.defaultEngine === 'nuade' ? 'nuade' : f.legacyEngine,
         ...(dd ? {} : { ownNote: ownNoteFor(f, recs) }),
-        ...(dd?.editHeld ? { heldBecause: `nuade scores ${round(dd.nuadeMean)} against our ${round(dd.ownMean)}, but our engine takes grid edits cell by cell and nuade has none at the pin (CELL_WRITE off): the live edit path stays ours` } : {}),
       };
     }
   }

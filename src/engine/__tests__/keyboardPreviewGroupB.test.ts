@@ -29,6 +29,10 @@ import { parseHippelCoSoFile } from '@/lib/import/formats/HippelCoSoParser';
 import { serializeHippelCoSoConfig } from '@/engine/hippelcoso/HippelCoSoSynth';
 import type { HippelCoSoConfig } from '@/types/instrument';
 import type { OctaMEDConfig } from '@/types/instrument';
+import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+
+// Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
+pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 const PAULA_CLOCK = 3546895;
 const cents = (a: number, b: number) => 1200 * Math.log2(a / b);
