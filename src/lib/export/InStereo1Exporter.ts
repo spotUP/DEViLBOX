@@ -22,6 +22,9 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { Pattern, TrackerCell } from '@/types';
+import { isInStereo1Format, parseInStereo1File } from '@/lib/import/formats/InStereo1Parser';
+import { sampleIsEdited } from '@/lib/song/gridBaseline';
 
 // ── Write helpers (big-endian) ──────────────────────────────────────────────
 
@@ -112,9 +115,177 @@ export interface InStereo1ExportResult {
   warnings: string[];
 }
 
+// ── Edits written into the loaded module ────────────────────────────────────
+
+const sameGridCell = (a: TrackerCell | undefined, b: TrackerCell | undefined): boolean =>
+  (a?.note ?? 0) === (b?.note ?? 0) && (a?.instrument ?? 0) === (b?.instrument ?? 0) && (a?.volume ?? 0) === (b?.volume ?? 0)
+  && (a?.effTyp ?? 0) === (b?.effTyp ?? 0) && (a?.eff ?? 0) === (b?.eff ?? 0);
+
+interface IS10PositionEntry { startTrackRow: number; soundTranspose: number; noteTranspose: number }
+
+/**
+ * One edited track line, field by field: what the grid changed is encoded (the note less the position's note transpose,
+ * the instrument less its sound transpose, as the player adds them back), what it did not change keeps the module's
+ * bytes (the arpeggio number and the effects the grid does not show).
+ */
+function writeEditedLine(lines: Uint8Array, at: number, now: TrackerCell, was: TrackerCell, pos: IS10PositionEntry, warn: (m: string) => void): void {
+  if ((now.note ?? 0) !== (was.note ?? 0)) {
+    if ((now.note ?? 0) === 0) lines[at] = 0;
+    else if (now.note === 97) lines[at] = 0x7f;
+    else {
+      const value = xmNoteToIS10(now.note) - pos.noteTranspose;
+      if (value < 1 || value > 0x7e) warn(`note ${now.note} has no value under this position's transpose ${pos.noteTranspose}`);
+      else lines[at] = value;
+    }
+  }
+  if ((now.instrument ?? 0) !== (was.instrument ?? 0) || ((was.note ?? 0) === 0 && (now.note ?? 0) !== 0)) {
+    const value = (now.instrument ?? 0) > 0 ? now.instrument - pos.soundTranspose : 0;
+    if (value < 0 || value > 255) warn(`instrument ${now.instrument} has no value under this position's sound transpose ${pos.soundTranspose}`);
+    else lines[at + 1] = value;
+  }
+  if ((now.effTyp ?? 0) !== (was.effTyp ?? 0) || (now.eff ?? 0) !== (was.eff ?? 0)) {
+    const { effect, effectArg } = xmEffectToIS10(now.effTyp ?? 0, now.eff ?? 0);
+    lines[at + 2] = (lines[at + 2] & 0xf0) | (effect & 0x0f);
+    lines[at + 3] = effectArg & 0xff;
+  }
+}
+
+/**
+ * The loaded InStereo! 1.0 module with the grid's edits written in: byte-exact where nothing was edited, every section
+ * the grid does not show (samples, waveforms, EGC/ADSR tables, instruments, sub-songs) kept as loaded.
+ *
+ * All notes are one big track; each position points each voice at a run of it (startTrackRow) with a note and a sound
+ * transpose, and runs overlap freely. An edited line that only this position and voice read is rewritten in place; a
+ * run that anything else reads too is copied to the end of the track (before the 64 padding rows) and the position
+ * repointed (copy on write), so the edit sounds where it was made and nowhere else. The from-scratch writer below gave
+ * every position its own run and rebuilt the sample bank (45656 bytes became 117928, and the song sounded different).
+ *
+ * null when the module is not InStereo! 1.0 or the grid is not the one this module reads (restructured): the
+ * from-scratch writer is the one that can build that.
+ */
+export function writeEditsIntoInStereo1Module(
+  module: ArrayBuffer | Uint8Array,
+  patterns: readonly Pattern[],
+  fileName = 'module.is',
+): { bytes: Uint8Array; warnings: string[] } | null {
+  const src = new Uint8Array(module instanceof Uint8Array ? module : new Uint8Array(module)).slice();
+  if (!isInStereo1Format(src)) return null;
+  const original = parseInStereo1File(src, fileName);
+  if (!original?.uadePatternLayout || original.patterns.length !== patterns.length) return null;
+  if (patterns.some((p, i) => p.channels.length !== 4 || p.channels.some((c, ch) => c.rows.length !== original.patterns[i].channels[ch].rows.length))) return null;
+
+  const u16 = (o: number) => (src[o] << 8) | src[o + 1];
+  const s8 = (v: number) => (v << 24) >> 24;
+  const positions = u16(8), trackRows = u16(10);
+  const [samples, waveforms, instruments, subSongs, egc, adsr] = [src[16], src[17], src[18], src[19], src[20], src[21]];
+  // The file's sections (Format_Descriptions/InStereo! 1.0.txt), sizes as the parser reads them.
+  const subOff = 0xcc + samples * 28 + samples * 4 + egc * 128 + adsr * 256 + instruments * 28 + 16 * 16;
+  const posOff = subOff + (subSongs + 1) * 14 + waveforms * 256;
+  const trackOff = posOff + positions * 16;
+  const linesEnd = trackOff + (trackRows + 64) * 4;
+  if (trackOff !== original.uadePatternLayout.patternDataFileOffset || linesEnd > src.length) return null;
+  const firstPos = u16(subOff + 6);
+  const rows0 = Math.max(1, src[subOff + 5]);
+  // A run is read for the longest track length any sub-song plays it with.
+  let runLength = rows0;
+  for (let s = 0; s < subSongs; s++) runLength = Math.max(runLength, src[subOff + s * 14 + 5]);
+
+  const entries: IS10PositionEntry[] = [];
+  for (let i = 0; i < positions * 4; i++) {
+    const o = posOff + i * 4;
+    entries.push({ startTrackRow: u16(o), soundTranspose: s8(src[o + 2]), noteTranspose: s8(src[o + 3]) });
+  }
+  const readers = new Map<number, number>();
+  const read = (e: IS10PositionEntry, delta: number) => {
+    for (let r = 0; r < runLength; r++) readers.set(e.startTrackRow + r, (readers.get(e.startTrackRow + r) ?? 0) + delta);
+  };
+  for (const e of entries) read(e, 1);
+
+  // The track as the file holds it: its rows and the 64 padding rows after them, which a run that starts near the end
+  // reads past into. Copies go after the padding (the padding becomes rows, still read as before) and 64 new padding
+  // rows close the track.
+  let lines = src.slice(trackOff, linesEnd);
+  let appended = false;
+  const warnings: string[] = [];
+  let edited = false;
+  for (let p = 0; p < patterns.length; p++) {
+    for (let ch = 0; ch < 4; ch++) {
+      const now = patterns[p].channels[ch].rows;
+      const was = original.patterns[p].channels[ch].rows;
+      const rows = now.map((_, r) => r).filter((r) => !sameGridCell(now[r], was[r]));
+      if (rows.length === 0) continue;
+      edited = true;
+      const entry = entries[(firstPos + p) * 4 + ch];
+      if (!entry) return null;
+      // In place only on lines nothing else reads, and never on the file's padding rows.
+      const own = rows.every((r) => {
+        const line = entry.startTrackRow + r;
+        return readers.get(line) === 1 && (line < trackRows || line >= trackRows + 64) && (line + 1) * 4 <= lines.length;
+      });
+      if (!own) {
+        const at = lines.length / 4;
+        if (at + rows0 + 64 > 0xffff + 64) return null;
+        const run = new Uint8Array(rows0 * 4);
+        for (let r = 0; r < rows0; r++) {
+          const line = entry.startTrackRow + r;
+          if ((line + 1) * 4 <= lines.length) run.set(lines.subarray(line * 4, line * 4 + 4), r * 4);
+        }
+        const grown = new Uint8Array(lines.length + run.length);
+        grown.set(lines);
+        grown.set(run, lines.length);
+        lines = grown;
+        appended = true;
+        read(entry, -1);
+        entry.startTrackRow = at;
+        read(entry, 1);
+      }
+      for (const r of rows) {
+        writeEditedLine(lines, (entry.startTrackRow + r) * 4, now[r], was[r], entry, (m) => warnings.push(`position ${firstPos + p} voice ${ch + 1} row ${r}: ${m}`));
+      }
+    }
+  }
+  if (!edited) return { bytes: src, warnings };
+  if (appended) {
+    const closed = new Uint8Array(lines.length + 64 * 4);
+    closed.set(lines);
+    lines = closed;
+  }
+
+  const posBytes = new Uint8Array(positions * 16);
+  entries.forEach((e, i) => {
+    writeU16BE(posBytes, i * 4, e.startTrackRow);
+    writeS8(posBytes, i * 4 + 2, e.soundTranspose);
+    writeS8(posBytes, i * 4 + 3, e.noteTranspose);
+  });
+  const tail = src.subarray(linesEnd);
+  const out = new Uint8Array(posOff + posBytes.length + lines.length + tail.length);
+  out.set(src.subarray(0, posOff), 0);
+  writeU16BE(out, 10, lines.length / 4 - 64);
+  out.set(posBytes, posOff);
+  out.set(lines, trackOff);
+  out.set(tail, trackOff + lines.length);
+  return { bytes: out, warnings };
+}
+
 export async function exportInStereo1(song: TrackerSong): Promise<InStereo1ExportResult> {
   const warnings: string[] = [];
   const NUM_CHANNELS = 4;
+
+  // The module the song was loaded from, with the grid's edits (a sample edit needs the writer that rebuilds samples).
+  const loaded = song.inStereo1FileData ?? song.uadeEditableFileData ?? song.nuadeFileData;
+  if (loaded && !sampleIsEdited()) {
+    const name = song.nuadeFileName ?? song.uadeEditableFileName ?? 'module.is';
+    const written = writeEditsIntoInStereo1Module(loaded, song.patterns, name);
+    if (written) {
+      const ext = name.split('.').pop()?.toLowerCase();
+      const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
+      return {
+        data: new Blob([written.bytes as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
+        filename: `${baseName}.${ext === 'is10' ? 'is10' : 'is'}`,
+        warnings: written.warnings,
+      };
+    }
+  }
 
   // ── Gather instruments ──────────────────────────────────────────────────
 
