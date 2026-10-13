@@ -2,7 +2,7 @@
 date: 2026-10-13
 topic: nuade as one WASM engine - replace UADE playback format by format, dual engine for our own replayers
 tags: [nuade, uade, amiga, replayers, wasm, engine-selector, reachability, dj, credits]
-status: draft
+status: final
 ---
 
 # nuade engine
@@ -421,6 +421,12 @@ repeat check 1.
 - `apb.dw` stopping at 4.2 s in both nuade and our engine (UADE 8.5 s): affects AB04 only through its measurement;
   root cause belongs to a separate investigation.
 - Moving the 7 EaglePlayer formats.
+
+## Decisions taken (owner, 2026-10-13)
+
+- DN-1: (b) nuade becomes the default for a dual row only if its mean correlation beats ours by >= 0.01 AND no song is worse than ours by more than 0.01; otherwise ours stays default. Both stay selectable.
+- DN-2: (a) the 14 Rows decoders get a separate plan after wave 1 lands.
+- DN-3: the owner contacts emoon personally (write/poke API, shared lineage). No GitHub issue from us.
 
 ## Decisions needed (owner)
 
