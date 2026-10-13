@@ -34,6 +34,19 @@ type AB = 'A' | 'B';
 export const autoScratchRuntimeStats = { transitionScratches: 0, fxRequests: 0, moduleRenders: 0 };
 
 /**
+ * How loud each beat deck reaches the master, relative to its track's own audio: the crossfader's gain x the
+ * channel fader x the trim (the Auto DJ's loudness match, +-12 dB) - the decks as they are heard, which is what
+ * three_deck's level (X6: Deck C = 0.60 x the beat's RMS) measures. Owner report 2026-10-13 "the scratch is much
+ * louder than the music": the planned level read the raw track audio weighted only by the crossfader, so a track
+ * trimmed down -6 dB to match the set put the scratch 6 dB over the rule.
+ */
+export function heardDeckGains(st: Pick<ReturnType<typeof useDJStore.getState>, 'crossfaderPosition' | 'crossfaderCurve' | 'decks'>): [number, number] {
+  const [xa, xb] = computeCrossfaderGains(st.crossfaderPosition, st.crossfaderCurve);
+  const deck = (d: AB) => Math.max(0, Math.min(1, st.decks[d].volume)) * Math.min(8, Math.pow(10, (st.decks[d].trimGain || 0) / 20));
+  return [xa * deck('A'), xb * deck('B')];
+}
+
+/**
  * The tempo a deck plays `analysis` at: the analysis' own tempo (the one deck tempo, written by
  * `applyAnalysisToDeck`) at the deck's pitch. Never the store's `effectiveBPM` on its own: seven UI
  * loaders still write that from the audio detector (184.57 for a 93.75 module), and a clock at the
@@ -174,6 +187,5 @@ export async function scratchShapeDecks(shape: Pick<ScratchRoutineShape, 'deck' 
     return { playing: useDJStore.getState().decks[d].isPlaying, audio, position: (heard?.elapsedMs ?? 0) / 1000, rate };
   };
   const [a, b] = await Promise.all([deck('A'), deck('B')]);
-  const st = useDJStore.getState();
-  return routineShapeDecks(shape, { A: a, B: b }, computeCrossfaderGains(st.crossfaderPosition, st.crossfaderCurve), ctx.currentTime);
+  return routineShapeDecks(shape, { A: a, B: b }, heardDeckGains(useDJStore.getState()), ctx.currentTime);
 }
