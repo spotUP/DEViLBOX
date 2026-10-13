@@ -760,13 +760,44 @@ the old edit path independent of the default.
 Moved to nuade (playback mean correlation against UADE): robhubbard 0.9896 (replace), soundmaster 0.9805 (replace, also live-edit; it was held by the same
 gate), hippel 0.9827 (ours 0.9722), instereo1 0.9728 (ours 0.9438), sidmon2 0.9809 (ours 0.9443), soundmon 0.9656 (ours 0.9338).
 
-- [ ] NUADE-EDIT-PATH typed notes, keyboard preview and live edits audible on nuade, per format: a module-swap proof (the edited module reopened, heard at
-  its pitch) or emoon's cell write when it ships (DN-3). Per format:
-  - [ ] robhubbard: typed notes / live edit were UADE chip-RAM writes; on nuade NOT audible while playing
-  - [ ] soundmaster: same (UADE chip RAM)
-  - [ ] hippel: own engine took cell edits; on nuade NOT audible until the swap is proven
-  - [ ] instereo1: own track-index engine took cell edits (trackIndexEditsReachEngine); same
-  - [ ] sidmon2: own engine live swap (sidMon2LiveSwap); same
-  - [ ] soundmon: own track-index engine; same
-  Constraint: the edit-path tests keep guarding the legacy engine until a nuade proof exists; a proof test pins nuade explicitly.
+- [x] NUADE-EDIT-PATH live edits (typed notes into the grid, cell edits) audible on nuade, 6 of 6, by module swap
+  (2026-10-14). Proof: `src/engine/__tests__/nuadeEditsAreHeard.test.ts` (in test:ci via src/engine/__tests__/): engine
+  pinned to nuade, song opened by importTrackerModule, started by startNativeEngines on the real NuadeEngine + worklet +
+  WASM (nuadeEngineRig), note raised +2 through useTrackerStore.setCell while it plays. Asserted per format: swapModule
+  called once, swapDone, no worklet error, nuade's probe opens the handed bytes; output identical to the unedited run
+  from the swap to the edited row (|first diff - heardAt| < 0.1 s); the edited voice +2 semitones, every other voice 0.
+  - [x] robhubbard: centurion_battle.rh p0 v1 r48, heard 2.88 s (expected 2.86), 1-byte module diff. Fixed earlier by
+    657554f73 (exporter read uadeEditableFileData only); also covered by nuadeModuleFields (565e0616e).
+  - [x] soundmaster: rackney'sisland_4.sm p12 v2 r0, heard 7.68 s (7.66); layout patch already 1 byte; no fix needed.
+  - [x] hippel: prehistoric_tale.hipc p3 v4 r1, heard 6.88 s (6.84). Fix 565e0616e: playOnNuade removed hippelFileData,
+    export fell to the from-scratch CoSo writer (2489 of 24340 bytes, nuade refused it); now nuadeModuleFields restores
+    the field for the exporter. Revert-checked: no swap.
+  - [x] instereo1: fantasi8.is p8 v2 r0, heard 7.68 s. Fix 0a64251e9: exporter was a lossy rebuild (45656 -> 117928 bytes,
+    render error 0.45); now in-module, copy on write for shared runs, transposes honoured; ratchet byte-exact.
+    Revert-checked: output left run A at the swap (6.50 s).
+  - [x] sidmon2: bruno_time.sid2 p2 v2 r2, heard 15.70 s; SidMon2 exporter already wrote note edits in place; no fix.
+  - [x] soundmon: antidust.bp3 p4 v1 r0 (a block other steps share), heard 7.68 s. Fix a2e295e36: V.3 written as lossy
+    V.2 (13684 -> 13028 bytes, render error 1.42); now in-module, copy on write, transposes honoured; ratchet
+    byte-exact. Revert-checked: output left run A at the swap.
+  Pitch across positions (nuade snapshot, +2 expected on the edited voice): rh 10 sites, sm 9, hipc 7, is 10, sd2 10,
+  bp3 8: all +2 on the right voice.
+  Swap latency: main thread edit -> swapDone 36-96 ms (first edit of a session ~2 s, lazy imports); the worklet swap
+  (reopen + silent seek) is ~1 ms per second already played: measured headless 8-23 ms at 10 s, 49-67 ms at 60 s,
+  93-135 ms at 120 s, 130-230 ms at 180 s, all inside one audio-thread call -> see NUADE-SWAP-DROPOUT.
+  EDIT_SOUNDS_ON_NUADE no longer exists in tools/nuade/verdictRules.ts (removed with the hold, c20c5c8ba): recorded here only.
+- [ ] NUADE-SWAP-DROPOUT (found 2026-10-14): the swap reopens the module and renders silently to the played frame inside
+  one worklet process() call; late in a song that blocks the audio thread for 100-230 ms (a dropout per edit). Fix
+  level: the worklet (catch-up on a second nuade instance spread over quanta while the old one keeps playing, then
+  switch), or emoon's cell write (DN-3) which removes the swap. Owner hears it at: a song played past 2 minutes, type a note.
+- [ ] NUADE-PREVIEW keyboard preview on nuade songs. Legacy: preview never ran on the song engine except for two formats.
+  Runs on the instrument's own synth through ToneEngine (unaffected by nuade): robhubbard (RobHubbardSynth), hippel
+  (HippelCoSoSynth), soundmaster (Sampler), instereo1 (InStereo1Synth loads its own keyboard copy of
+  useFormatStore.inStereo1FileData: previewLoad + preview handle). Depends on the song replayer holding the module:
+  soundmon (SoundMonSynth -> SoundMonEngine.previewNoteOn needs the song handle from loadTune; output = engine.output)
+  and sidmon2 (SidMonSynth song slot -> Sd2Engine.noteOn -> sd2_note_on on the loaded song; Sd2Engine.output routed only
+  when Sd2 plays the song). On nuade neither replayer is loaded: preview of song instruments is expected silent (not
+  measured in a browser). Right level: the InStereo1 keyboard-copy pattern in SoundMonSynth / SidMonSynth (load the song's
+  module into the idle replayer for preview, from the format store, nuadeModuleFields-aware), plus Sd2 output routing
+  when Sd2 is not the song engine. Not built: the audio-graph routing (Sd2 output into the synth vs NativeEngineRouting's
+  route when Sd2 plays the song) needs a browser check before it can be done without doubling legacy playback.
   Other nuade-default rows have no LIVE_EDIT 'pass' entry, so they lose nothing they had.
