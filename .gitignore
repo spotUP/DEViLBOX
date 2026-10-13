@@ -330,3 +330,4 @@ third-party/sonix-music-driver/
 third-party/musicline_playback-main/musicline/asm-version/
 third-party/rtosc-build-wasm/
 nuade-wasm/build/
+!third-party/nuade/docs/
