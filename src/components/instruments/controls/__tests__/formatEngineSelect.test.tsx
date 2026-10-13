@@ -46,6 +46,18 @@ describe('NS-8 WasmInfoEditor mounts the selector for the loaded format', () => 
     await waitFor(() => expect(switchSpy).toHaveBeenCalledWith('mmdc', 'nuade'));
   });
 
+  it('CR-4 credits nuade (emoon) with the row and player for a nuade-played song, and not for any other song', () => {
+    const { getByTestId, unmount } = render(<WasmInfoEditor synthType={'NuadeSynth' as never} />);
+    const text = getByTestId('nuade-credit').textContent ?? '';
+    expect(text).toContain('Daniel Collin / emoon');
+    expect(text).toContain('OctaMED MMDC');
+    expect(text).toContain('"mmdc"');
+    unmount();
+    useFormatStore.getState().applyEditorMode({ format: 'MOD' } as unknown as TrackerSong);
+    const other = render(<WasmInfoEditor synthType={'NuadeSynth' as never} />);
+    expect(other.queryByTestId('nuade-credit')).toBeNull();
+  });
+
   it('offers Reset to Default only while a choice is stored, and it asks for the default', async () => {
     useSettingsStore.setState((s) => { delete (s.formatEngine as unknown as Record<string, unknown>).mmdc; });
     const { queryByText, getByText, rerender } = render(<WasmInfoEditor synthType={'NuadeSynth' as never} />);

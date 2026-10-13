@@ -47,7 +47,10 @@ agent) follows.
 ## Licence
 
 GPL-3.0-or-later, see `LICENSE`. Every vendored component is listed with
-its licence in `THIRD_PARTY_NOTICES.md`; the few original player sources we
+its licence in `THIRD_PARTY_NOTICES.md`. Many Amiga formats play through UADE
+(Heikki Orsila and contributors) or through nuade by Daniel Collin (emoon,
+MIT, https://github.com/emoon/nuade), whose native C ports of the UADE players
+are vendored in `third-party/nuade`; the few original player sources we
 study but may not redistribute are kept out of the tree
 (`third-party/PRIVATE_SOURCES.md`).
 

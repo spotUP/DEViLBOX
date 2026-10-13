@@ -10,6 +10,7 @@ import type { SynthType } from '@/types/instrument/base';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { useFormatStore } from '@stores/useFormatStore';
 import { NUADE_FORMATS } from '@/engine/nuade/nuadeFormats';
+import { nuadeSongCredit } from '@/engine/nuade/nuadeCredits';
 import { FormatEngineSelect } from '@components/common/FormatEngineSelect';
 
 interface WasmInfoEditorProps {
@@ -160,6 +161,7 @@ export const WasmInfoEditor: React.FC<WasmInfoEditorProps> = ({ synthType, instr
       {nuadeRow && (
         <div className="flex flex-col gap-1 mt-1">
           <div className="text-text-muted text-[10px] font-mono">{nuadeRow.label} plays on</div>
+          <div className="text-text-muted text-[10px] leading-relaxed" data-testid="nuade-credit">{nuadeSongCredit(nuadeRow.label, nuadeRow.id)}</div>
           <FormatEngineSelect row={nuadeRow} />
         </div>
       )}
