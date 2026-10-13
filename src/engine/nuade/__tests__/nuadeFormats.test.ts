@@ -1,5 +1,5 @@
 /**
- * NS-4 the format table (81 replace + 33 dual rows) and NS-0 the declared voice count, measured over its corpus.
+ * NS-4 the format table (81 replace + 40 dual rows) and NS-0 the declared voice count, measured over its corpus.
  */
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
@@ -13,7 +13,7 @@ import { resolvedFormatEngines } from '../nuadeRouting';
 const ROOT = join(__dirname, '../../../..');
 
 const REPLACE_WAVES = `amcomposer amos andrewparton aprosys artandmagic ashleyhogg audiosculpture cinemaware dariuszendeh davidhanney desire dirkbialluch dsc dynamicsynthesizer earache ems emsv6 fashiontracker forgottenworlds fredgray gluemon howiedavies infogrames jankomrsicflogel jasonbrooke jasonpage jeroentel jesperolsen kimchristensen krishatlelid laxity legglessmusiceditor majortom maniacsofnoise markcooksey markcooksey_old markii maximumeffect mcmd medley mikedavies mmdc musicalenlightenment ntsp onescapee paulrobotham paulshields paulsummers peterverswyvelen pierreadane pokeynoise professionalsoundartists protracker4 quartet richardjoseph riffraff robhubbard robhubbardst scumm seanconnolly seanconran silmarils soundfx soundimages soundmaster specialfx speedya1system speedysystem spl stevebarrett synthdream synthpack syntracker thomashermann timetracker timfollin tomytracker tronic ufo voodoo zoundmonitor`.split(' ');
-const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis hippelhip fcbsi gmc`.split(' ');
+const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis hippelhip fcbsi gmc andersoland beathoven bendaglishsid coredesign davelowe scottjohnston wallybeben`.split(' ');
 
 describe('the node declares the measured voice maximum', () => {
   it('before a song is open the node is declared for NUADE_NODE_VOICES, the corpus maximum; a song then sizes it (nuadeNodeVoices.test.ts)', () => {
@@ -25,7 +25,7 @@ describe('the node declares the measured voice maximum', () => {
 });
 
 describe('a fresh user keeps the pre-nuade engine of every format', () => {
-  // preNuadeDefaults.json = the formatEngine defaults of useSettingsStore at 57e7803be, before the table (91 of the 114 rows had one;
+  // preNuadeDefaults.json = the formatEngine defaults of useSettingsStore at 57e7803be, before the table (91 of the 114 rows had one; the seven EaglePlayer rows joined later and are told in the next paragraph;
   // the other 23 keys are new with the table and defaulted to UADE in their routes).
   it('the table\'s legacy engine is the old default, and the route reads it unless a recorded verdict moved the row to nuade', () => {
     const old = preNuadeDefaults as Record<string, string>;
@@ -33,10 +33,13 @@ describe('a fresh user keeps the pre-nuade engine of every format', () => {
     for (const f of NUADE_FORMAT_LIST) {
       if (!(f.prefKey in old)) continue;
       checked++;
-      expect(f.legacyEngine, `${f.id}: legacy engine vs the old default`).toBe(old[f.prefKey]);
+      // An EaglePlayer row's old stored default ('uade' for five of the seven) was never read: its route always played
+      // on the EaglePlayer runner, which is the row's 'native' (our engine). The legacy engine says what plays.
+      const was = f.eagleRunner ? 'native' : old[f.prefKey];
+      expect(f.legacyEngine, `${f.id}: legacy engine vs the old default`).toBe(was);
       const route = (resolvedFormatEngines({} as never) as unknown as Record<string, string>)[f.prefKey];
       // nuade reads as native in the route (our parser draws the grid, playback is switched afterwards)
-      const expected = f.defaultEngine === 'nuade' ? 'native' : old[f.prefKey];
+      const expected = f.defaultEngine === 'nuade' ? 'native' : was;
       expect(route, `${f.id}: what a fresh user's import route is told`).toBe(expected);
       if (f.defaultEngine === 'nuade') expect(f.uadeEnvelopeCorrelation, `${f.id}: moved to nuade without a measurement`).not.toBeNull();
     }
@@ -51,11 +54,11 @@ describe('NS-4 nuade format table', () => {
     expect(NUADE_FORMATS.stevebarrett!.extensions).toContain('sb');
   });
 
-  it('holds exactly the 81 replace rows (R01-R84 less R09 gmc, R46 fcbsi, R48 hippelhip) and the 33 dual rows AB01-AB33 of the plan', () => {
+  it('holds exactly the 81 replace rows (R01-R84 less R09 gmc, R46 fcbsi, R48 hippelhip) the 33 dual rows AB01-AB33 of the plan and the seven EaglePlayer dual rows (NUADE-EAGLEPLAYER-7)', () => {
     const replace = NUADE_FORMAT_LIST.filter((f) => f.role === 'replace').map((f) => f.id).sort();
     const dual = NUADE_FORMAT_LIST.filter((f) => f.role === 'dual').map((f) => f.id).sort();
     expect(REPLACE_WAVES.length).toBe(81);
-    expect(DUAL.length).toBe(33);
+    expect(DUAL.length).toBe(40);
     expect(replace).toEqual([...REPLACE_WAVES].sort());
     expect(dual).toEqual([...DUAL].sort());
   });

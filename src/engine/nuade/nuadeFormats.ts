@@ -10,7 +10,8 @@
  * written by tools/nuade/apply-verdicts.ts from the comparison batch, never by hand. Until a row has a verdict its
  * defaultEngine is its legacyEngine: what plays today.
  * Seven EaglePlayer formats (andersoland, beathoven, bendaglishsid, coredesign, davelowe, scottjohnston, wallybeben)
- * stay on the Musashi runner and are not here.
+ * are dual rows too (NUADE-EAGLEPLAYER-7, owner 2026-10-14: nuade's C players are the future, more editable): their
+ * legacy engine is the EaglePlayer runner (UADE's own player on the Musashi host), marked `eagleRunner`.
  *
  * Generated once from thoughts/shared/research/2026-10-13_nuade-for-devilbox.md and the nuade probes
  * (tools/nuade/findCorpus.ts); `corpus` is [] where no song of the format is in public/data/songs.
@@ -49,11 +50,16 @@ export interface NuadeFormat {
    * whatever the row's default is, unless the user chose UADE. Sonic Arranger's 0x4EFA player-binary form (NAB-2).
    */
   ownRefuses?: (bytes: Uint8Array) => boolean;
+  /**
+   * Dual rows whose engine of ours is the EaglePlayer runner (UADE's own eagleplayer on the Musashi host). Their routes
+   * never hand playback to UADE, so UADE is not a choice of these rows: the options are 'native' and 'nuade'.
+   */
+  eagleRunner?: boolean;
   /** 'orderRow': the player's order and row are our grid's; 'tick': follow by player tick (reconstructed grids). */
   followBy: 'orderRow' | 'tick';
 }
 
-type RowInput = Pick<NuadeFormat, 'id' | 'label' | 'prefKey' | 'registryKeys' | 'extensions' | 'role' | 'corpus' | 'followBy' | 'legacyEngine'> & Partial<Pick<NuadeFormat, 'companions' | 'ownRefuses'>>;
+type RowInput = Pick<NuadeFormat, 'id' | 'label' | 'prefKey' | 'registryKeys' | 'extensions' | 'role' | 'corpus' | 'followBy' | 'legacyEngine'> & Partial<Pick<NuadeFormat, 'companions' | 'ownRefuses' | 'eagleRunner'>>;
 /** A row as written plus the verdict the comparison batch recorded for it (nuadeVerdicts.ts, generated). */
 const row = (r: RowInput): NuadeFormat => {
   const base: NuadeFormat = { ...r, defaultEngine: r.legacyEngine, uadeEnvelopeCorrelation: null, endAgrees: null };
@@ -66,14 +72,19 @@ export const NUADE_FORMATS: Readonly<Record<string, NuadeFormat>> = {
   activisionpro: row({ id: 'activisionpro', label: 'Activision Pro', prefKey: 'activisionPro', registryKeys: ['activisionPro'], extensions: ['avp', 'mw'], role: 'dual', corpus: ['public/data/songs/formats/gettysburg.avp', 'public/data/songs/activision-pro/gettysburg.avp'], followBy: 'tick', legacyEngine: 'native' }),
   amcomposer: row({ id: 'amcomposer', label: 'AM-Composer', prefKey: 'amcomposer', registryKeys: [], extensions: ['amc'], role: 'replace', corpus: ['public/data/songs/formats/krymini title.amc','public/data/songs/formats/krymini jingle 1.amc'], followBy: 'tick', legacyEngine: 'uade' }),
   amos: row({ id: 'amos', label: 'AMOS Music AmosBank', prefKey: 'amosMusicBank', registryKeys: ['amosMusicBank', 'uade_abk'], extensions: ['abk'], role: 'replace', corpus: [], followBy: 'orderRow', legacyEngine: 'uade' }),
+  andersoland: row({ id: 'andersoland', label: 'Anders 0land', prefKey: 'anders0land', registryKeys: ['anders0land'], extensions: ['hot'], role: 'dual', corpus: ['public/data/songs/anders-oland/primemover 07.hot'], followBy: 'tick', legacyEngine: 'native', eagleRunner: true }),
   andrewparton: row({ id: 'andrewparton', label: 'Andrew Parton', prefKey: 'andrewParton', registryKeys: ['andrewParton'], extensions: ['bye'], role: 'replace', corpus: [], followBy: 'tick', legacyEngine: 'uade' }),
   aprosys: row({ id: 'aprosys', label: 'AProSys', prefKey: 'aProSys', registryKeys: ['aProSys'], extensions: ['aps'], role: 'replace', corpus: ['public/data/songs/formats/action.aps','public/data/songs/formats/actionfiltersound.aps'], followBy: 'tick', legacyEngine: 'native' }),
   artandmagic: row({ id: 'artandmagic', label: 'Art and Magic', prefKey: 'artAndMagic', registryKeys: ['artAndMagic'], extensions: ['aam'], role: 'replace', corpus: ['public/data/songs/formats/agony-level1.aam','public/data/songs/formats/agony-level2.aam'], followBy: 'tick', legacyEngine: 'native' }),
   ashleyhogg: row({ id: 'ashleyhogg', label: 'Ashley Hogg', prefKey: 'ashleyHogg', registryKeys: ['ashleyHogg'], extensions: ['ash'], role: 'replace', corpus: ['public/data/songs/formats/ash.nobby_the_aardvark', 'public/data/songs/ashley-hogg/ash.nobby the aardvark'], followBy: 'tick', legacyEngine: 'uade' }),
   audiosculpture: row({ id: 'audiosculpture', label: 'Audio Sculpture', prefKey: 'audiosculpture', registryKeys: [], extensions: ['adsc', 'mod_adsc4'], role: 'replace', corpus: ['public/data/songs/audio-sculpture/turtle-ready.adsc'], followBy: 'tick', legacyEngine: 'uade' }),
+  beathoven: row({ id: 'beathoven', label: 'Beathoven Synthesizer', prefKey: 'beathovenSynthesizer', registryKeys: [], extensions: ['bss'], role: 'dual', corpus: ['public/data/songs/beathoven-synthesizer/tristar cracktro.bss'], followBy: 'tick', legacyEngine: 'native', eagleRunner: true }),
   bendaglish: row({ id: 'bendaglish', label: 'Ben Daglish', prefKey: 'benDaglish', registryKeys: ['benDaglish'], extensions: ['bd', 'mth'], role: 'dual', corpus: ['public/data/songs/formats/mickey_mouse.bd', 'public/data/songs/ben-daglish/motorhead-titleandingame.bd'], followBy: 'tick', legacyEngine: 'uade' }),
+  bendaglishsid: row({ id: 'bendaglishsid', label: 'Ben Daglish SID', prefKey: 'benDaglishSID', registryKeys: ['benDaglishSID'], extensions: ['bds'], role: 'dual', corpus: ['public/data/songs/ben-daglish-sid/terramex.bds'], followBy: 'tick', legacyEngine: 'native', eagleRunner: true }),
   cinemaware: row({ id: 'cinemaware', label: 'Cinemaware', prefKey: 'cinemaware', registryKeys: ['cinemaware'], extensions: ['cin'], role: 'replace', corpus: [], followBy: 'tick', legacyEngine: 'uade' }),
+  coredesign: row({ id: 'coredesign', label: 'Core Design', prefKey: 'coreDesign', registryKeys: ['coreDesign'], extensions: ['core'], role: 'dual', corpus: ['public/data/songs/core-design/dynamite dux.core'], followBy: 'tick', legacyEngine: 'native', eagleRunner: true }),
   dariuszendeh: row({ id: 'dariuszendeh', label: 'Darius Zendeh', prefKey: 'dariusZendeh', registryKeys: ['uade_dz', 'uade_mkiio'], extensions: ['dz', 'dzp', 'mkiio'], role: 'replace', corpus: ['public/data/songs/darius-zendeh/crash and burn.dz'], followBy: 'tick', legacyEngine: 'native' }),
+  davelowe: row({ id: 'davelowe', label: 'Dave Lowe', prefKey: 'daveLowe', registryKeys: ['daveLowe'], extensions: ['dl', 'dln'], role: 'dual', corpus: ['public/data/songs/dave-lowe/incredibleshrinkingsphere.dl', 'public/data/songs/dave-lowe-new/m-bison.dln'], followBy: 'tick', legacyEngine: 'native', eagleRunner: true }),
   davidhanney: row({ id: 'davidhanney', label: 'David Hanney', prefKey: 'davidHanney', registryKeys: ['uade_dh'], extensions: ['dh'], role: 'replace', corpus: ['public/data/songs/formats/tearaway_thomas.dh', 'public/data/songs/david-hanney/tearaway thomas unused.dh'], followBy: 'tick', legacyEngine: 'uade' }),
   davidwhittaker: row({ id: 'davidwhittaker', label: 'David Whittaker', prefKey: 'davidWhittaker', registryKeys: ['davidWhittaker'], extensions: ['dw', 'dwold'], role: 'dual', corpus: ['public/data/songs/formats/apb.dw', 'public/data/songs/david-whittaker/garfield2+.dw'], followBy: 'tick', legacyEngine: 'native' }),
   deltamusic1: row({ id: 'deltamusic1', label: 'DeltaMusic 1', prefKey: 'deltaMusic1', registryKeys: ['deltaMusic1'], extensions: ['dm1', 'dlm1', 'dm'], role: 'dual', corpus: ['public/data/songs/formats/crusaders1.dm', 'public/data/songs/delta-music/triplex1.dm'], followBy: 'orderRow', legacyEngine: 'native' }),
@@ -148,6 +159,7 @@ export const NUADE_FORMATS: Readonly<Record<string, NuadeFormat>> = {
   scumm: row({ id: 'scumm', label: 'SCUMM', prefKey: 'scumm', registryKeys: ['scumm'], extensions: ['scumm'], role: 'replace', corpus: ['public/data/songs/formats/zaktitle.scumm'], followBy: 'tick', legacyEngine: 'native' }),
   seanconnolly: row({ id: 'seanconnolly', label: 'Sean Connolly', prefKey: 'seanConnolly', registryKeys: ['seanConnolly'], extensions: ['scn', 's-c'], role: 'replace', corpus: ['public/data/songs/formats/surf_ninjas.scn', 'public/data/songs/sean-connolly/surf ninjas.scn'], followBy: 'tick', legacyEngine: 'native' }),
   seanconran: row({ id: 'seanconran', label: 'Sean Conran', prefKey: 'seanConran', registryKeys: ['seanConran'], extensions: ['scr'], role: 'replace', corpus: ['public/data/songs/formats/count_duckula.scr', 'public/data/songs/sean-conran/count duckula.scr'], followBy: 'tick', legacyEngine: 'uade' }),
+  scottjohnston: row({ id: 'scottjohnston', label: 'Scott Johnston (Sound Player)', prefKey: 'soundPlayer', registryKeys: ['soundPlayer'], extensions: ['sjs'], role: 'dual', corpus: ['public/data/songs/formats/Scott Johnston/sjs.tune1', 'public/data/songs/formats/Scott Johnston/sjs.menace'], companions: { 'public/data/songs/formats/Scott Johnston/sjs.tune1': ['public/data/songs/formats/Scott Johnston/smp.tune1'], 'public/data/songs/formats/Scott Johnston/sjs.menace': ['public/data/songs/formats/Scott Johnston/smp.menace'] }, followBy: 'tick', legacyEngine: 'native', eagleRunner: true }),
   sidmon2: row({ id: 'sidmon2', label: 'SidMon II', prefKey: 'sidmon2', registryKeys: ['sidmon2'], extensions: ['sd2', 'sid2'], role: 'dual', corpus: ['public/data/songs/formats/bruno_time.sid2', 'public/data/songs/sidmon-2/ice7-intro.sid2'], followBy: 'orderRow', legacyEngine: 'native' }),
   silmarils: row({ id: 'silmarils', label: 'Silmarils', prefKey: 'silmarils', registryKeys: ['uade_mok'], extensions: ['mok'], role: 'replace', corpus: ['public/data/songs/silmarils/bostonbombclub.mok'], followBy: 'tick', legacyEngine: 'native' }),
   sonicarranger: row({ id: 'sonicarranger', label: 'Sonic Arranger', prefKey: 'sonicArranger', registryKeys: ['sonicArranger'], extensions: ['sa', 'sonic'], ownRefuses: (b) => b[0] === 0x4e && b[1] === 0xfa, role: 'dual', corpus: ['public/data/songs/formats/almighty.sa', 'public/data/songs/sonic-arranger/mega end.sa'], followBy: 'orderRow', legacyEngine: 'native' }),
@@ -175,6 +187,7 @@ export const NUADE_FORMATS: Readonly<Record<string, NuadeFormat>> = {
   tronic: row({ id: 'tronic', label: 'Tronic', prefKey: 'tronic', registryKeys: ['tronic'], extensions: ['dp', 'trc', 'tro', 'tronic', 'tron'], role: 'replace', corpus: ['public/data/songs/formats/crystal.dp','public/data/songs/formats/locomotion.dp'], followBy: 'tick', legacyEngine: 'uade' }),
   ufo: row({ id: 'ufo', label: 'UFO', prefKey: 'ufo', registryKeys: ['ufo'], extensions: ['mus'], role: 'replace', corpus: [], followBy: 'tick', legacyEngine: 'uade' }),
   voodoo: row({ id: 'voodoo', label: 'Voodoo Supreme Synthesizer', prefKey: 'voodoo', registryKeys: ['uade_vss'], extensions: ['vss'], role: 'replace', corpus: ['public/data/songs/voodoo-supreme/silkworm.vss', 'public/data/songs/voodoo/voo8.vss'], followBy: 'tick', legacyEngine: 'uade' }),
+  wallybeben: row({ id: 'wallybeben', label: 'Wally Beben', prefKey: 'wallyBeben', registryKeys: ['wallyBeben'], extensions: ['wb'], role: 'dual', corpus: ['public/data/songs/wally-beben/wicked.wb'], followBy: 'tick', legacyEngine: 'native', eagleRunner: true }),
   zoundmonitor: row({ id: 'zoundmonitor', label: 'ZoundMonitor', prefKey: 'zoundMonitor', registryKeys: ['zoundMonitor'], extensions: ['sng', 'zm'], role: 'replace', corpus: ['public/data/songs/zoundmonitor/sonjavanveen.sng'], followBy: 'orderRow', legacyEngine: 'uade' }),
 };
 

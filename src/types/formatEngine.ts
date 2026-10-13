@@ -123,7 +123,7 @@ export interface FormatEnginePreferences {
   iffSmus?: FormatEngineChoice;        // .smus/.snx/.tiny → IffSmusParser vs UADE
   magneticFieldsPacker: FormatEngineChoice; // .mfp/mfp.* → MagneticFieldsPackerParser vs UADE
   richardJoseph?: FormatEngineChoice;  // .rjp/rjp.* → RichardJosephParser vs UADE
-  daveLowe: FormatEngineChoice;       // .dl/dl.*/dl_deli → DaveLoweParser vs UADE
+  daveLowe?: FormatEngineChoice;       // .dl/dl.*/dl_deli → DaveLoweParser vs UADE
   lme?: FormatEngineChoice;            // .lme/lme.* → LMEParser vs UADE
   jochenHippelST: FormatEngineChoice; // mdst.* → JochenHippelSTParser vs UADE
   specialFX?: FormatEngineChoice;      // doda.* → SpecialFXParser vs UADE
@@ -144,12 +144,12 @@ export interface FormatEnginePreferences {
   krisHatlelid?: FormatEngineChoice;     // kh.* → KrisHatlelidParser vs UADE
   ntsp?: FormatEngineChoice;             // two.* → NTSPParser vs UADE
   moshPacker: FormatEngineChoice;       // mosh.* → MoshPackerParser vs UADE
-  coreDesign: FormatEngineChoice;       // core.* → CoreDesignParser vs UADE
+  coreDesign?: FormatEngineChoice;       // core.* → CoreDesignParser vs UADE
   jankoMrsicFlogel?: FormatEngineChoice; // jmf.* → JankoMrsicFlogelParser vs UADE
-  soundPlayer: FormatEngineChoice;      // sjs.* → SoundPlayerParser vs UADE
+  soundPlayer?: FormatEngineChoice;      // sjs.* → SoundPlayerParser vs UADE
   nickPellingPacker: FormatEngineChoice; // npp.* → NickPellingPackerParser vs UADE
   peterVerswyvelenPacker?: FormatEngineChoice; // pvp.* → PeterVerswyvelenPackerParser vs UADE
-  wallyBeben: FormatEngineChoice;       // wb.* → WallyBebenParser vs UADE
+  wallyBeben?: FormatEngineChoice;       // wb.* → WallyBebenParser vs UADE
   steveBarrett?: FormatEngineChoice;     // sb.* → SteveBarrettParser vs UADE
   paulSummers?: FormatEngineChoice;      // snk.* → PaulSummersParser vs UADE
   desire?: FormatEngineChoice;           // dsr.* → DesireParser vs UADE
@@ -157,10 +157,10 @@ export interface FormatEnginePreferences {
   paulShields?: FormatEngineChoice;      // ps.* → PaulShieldsParser vs UADE
   paulRobotham?: FormatEngineChoice;     // dat.* → PaulRobothamParser vs UADE
   pierreAdane?: FormatEngineChoice;      // pap.* → PierreAdaneParser vs UADE
-  anders0land: FormatEngineChoice;      // hot.* → Anders0landParser vs UADE
+  anders0land?: FormatEngineChoice;      // hot.* → Anders0landParser vs UADE
   andrewParton?: FormatEngineChoice;     // bye.* → AndrewPartonParser vs UADE
   customMade: FormatEngineChoice;       // cm.*/rk.*/rkb.* → CustomMadeParser vs UADE
-  benDaglishSID: FormatEngineChoice;    // bds.* → BenDaglishSIDParser vs UADE
+  benDaglishSID?: FormatEngineChoice;    // bds.* → BenDaglishSIDParser vs UADE
   digitalSonixChrome?: FormatEngineChoice; // dsc.* → DigitalSonixChromeParser vs UADE
   jesperOlsen?: FormatEngineChoice;      // jo.* → JesperOlsenParser vs UADE
   kimChristensen?: FormatEngineChoice;   // kim.* → KimChristensenParser vs UADE
@@ -192,7 +192,7 @@ export interface FormatEnginePreferences {
   soprol: FormatEngineChoice;           // .spl/spl.* → WantedTeamDaveLoweParser vs UADE
   riffRaff?: FormatEngineChoice;         // .riff/riff.* → WantedTeamDaveLoweParser vs UADE
   howieDavies?: FormatEngineChoice;      // .hd/hd.* → WantedTeamDaveLoweParser vs UADE
-  beathovenSynthesizer: FormatEngineChoice; // .bss/bss.* → WantedTeamDaveLoweParser vs UADE
+  beathovenSynthesizer?: FormatEngineChoice; // .bss/bss.* → WantedTeamDaveLoweParser vs UADE
   seanConnolly?: FormatEngineChoice;     // .scn/scn.* → SeanConnollyParser vs UADE
   // Simple stub parsers (filename-based title, UADE classic audio)
   dariusZendeh?: FormatEngineChoice;     // .dz/dz.* → SimpleAmigaStubParser vs UADE

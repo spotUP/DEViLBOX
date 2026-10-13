@@ -9,10 +9,14 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadSharedWorkletScripts, startWorklet, songBuffer } from '../../src/engine/__tests__/workletHarness';
-import { levelOf, sha1, ROOT } from './nuadeCompare';
+import { loadSharedWorkletScripts, startWorklet, songBuffer, stereoOutputs } from '../../src/engine/__tests__/workletHarness';
+import { levelOf, sha1, ROOT, companionsOf } from './nuadeCompare';
+import { NUADE_FORMATS } from '../../src/engine/nuade/nuadeFormats';
+import { EAGLE_PLAYER_FORMATS, eaglePlayerModuleName, type EaglePlayerFormat } from '../../src/engine/eagleplayer/eaglePlayerFormats';
 
-interface OwnEngine { dir: string; stem: string; wasmStem?: string; load?: 'tune' | 'tfmx' | 'musicmaker' | 'suntronic' }
+interface OwnEngine { dir: string; stem: string; wasmStem?: string; load?: 'tune' | 'tfmx' | 'musicmaker' | 'suntronic' | 'eagle' }
+
+const EAGLE: OwnEngine = { dir: 'eagleplayer', stem: 'EaglePlayer', load: 'eagle' };
 
 /** Dual row id -> the worklet that plays it. */
 export const OWN_ENGINES: Readonly<Record<string, OwnEngine>> = {
@@ -29,6 +33,8 @@ export const OWN_ENGINES: Readonly<Record<string, OwnEngine>> = {
   musicmaker: { dir: 'musicmaker', stem: 'MusicMaker', load: 'musicmaker' },
   // SUN-Tronic: the byte-exact player + Paula render core the browser engine pumps (no worklet, no WASM), 44.1 kHz.
   suntronic: { dir: 'suntronic', stem: 'SunTronicResampler', load: 'suntronic' },
+  // The seven EaglePlayer rows: UADE's own eagleplayer on the Musashi host (EaglePlayerEngine), the player picked by the song's name.
+  andersoland: EAGLE, beathoven: EAGLE, bendaglishsid: EAGLE, coredesign: EAGLE, davelowe: EAGLE, scottjohnston: EAGLE, wallybeben: EAGLE,
   futurecomposer: { dir: 'futurecomposer', stem: 'FutureComposer' },
   gmc: { dir: 'gmc', stem: 'Gmc' },
   instereo1: { dir: 'instereo1', stem: 'InStereo1' },
@@ -126,6 +132,38 @@ async function renderSunTronic(songPath: string, seconds: number): Promise<OwnRe
   return { samples, ...levelOf(samples) };
 }
 
+/** The EaglePlayer entry that plays this file: the one whose prefix is the name's prefix or extension. */
+function eagleFormatFor(songPath: string): EaglePlayerFormat | null {
+  const name = songPath.slice(songPath.lastIndexOf('/') + 1).toLowerCase();
+  const tags = [name.slice(0, name.indexOf('.')), name.slice(name.lastIndexOf('.') + 1)];
+  return Object.values(EAGLE_PLAYER_FORMATS).find((f) => f.prefixes.some((p) => tags.includes(p))) ?? null;
+}
+
+/** EaglePlayer: the module, its eagleplayer binary and the companions, as the engine loads them (EaglePlayerEngine.loadTune). */
+async function renderEagle(rowId: string, songPath: string, seconds: number): Promise<OwnRender> {
+  const fmt = eagleFormatFor(songPath);
+  if (!fmt) return { samples: new Float32Array(0), peak: 0, rms: 0, error: `no EaglePlayer entry plays ${songPath}` };
+  loadSharedWorkletScripts();
+  const { proc, send, posted } = await startWorklet('eagleplayer', 'EaglePlayer');
+  const bytes = songBuffer;
+  const row = NUADE_FORMATS[rowId]!;
+  await send({
+    type: 'loadModule', moduleData: bytes(songPath), playerData: bytes(`public/eagleplayer/players/${fmt.player}`), moduleName: eaglePlayerModuleName(fmt, songPath.slice(songPath.lastIndexOf('/') + 1)),
+    files: companionsOf(row, songPath).map((c) => ({ name: c.name, data: c.data.buffer.slice(c.data.byteOffset, c.data.byteOffset + c.data.byteLength) })),
+  });
+  await send({ type: 'play' });
+  const frames = 48000 * seconds, out = new Float32Array(frames * 2);
+  for (let f = 0; f < frames; f += 128) {
+    const outputs = stereoOutputs(5); // the worklet writes the main mix to output 0 and the voices to the others
+    proc.process([], outputs);
+    const [L, R] = outputs[0]!;
+    const n = Math.min(128, frames - f);
+    for (let i = 0; i < n; i++) { out[2 * (f + i)] = L![i]!; out[2 * (f + i) + 1] = R![i]!; }
+  }
+  const err = posted.find((m) => m.type === 'error');
+  return { samples: out, ...levelOf(out), ...(err ? { error: String(err.message) } : {}) };
+}
+
 /** Render `seconds` of the module with the row's own engine; an error is returned, never thrown. */
 export async function renderOwn(rowId: string, songPath: string, seconds: number): Promise<OwnRender | null> {
   const e = OWN_ENGINES[rowId];
@@ -134,6 +172,7 @@ export async function renderOwn(rowId: string, songPath: string, seconds: number
   try {
     if (e.load === 'musicmaker') return await renderMusicMaker(songPath, seconds);
     if (e.load === 'suntronic') return await renderSunTronic(songPath, seconds);
+    if (e.load === 'eagle') return await renderEagle(rowId, songPath, seconds);
     loadSharedWorkletScripts();
     const transform = e.load === 'tfmx' ? (await import('../../src/engine/tfmx/TFMXEngine')).tfmxTransform : undefined;
     const { proc, send, posted } = await startWorklet(e.dir, e.stem, transform, e.wasmStem ?? e.stem);

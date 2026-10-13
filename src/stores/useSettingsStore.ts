@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 
-import { dropPersistedNuadeDefaults } from '@/engine/nuade/nuadeRouting';
+import { dropPersistedNuadeDefaults, EAGLE_RUNNER_PREF_KEYS } from '@/engine/nuade/nuadeRouting';
 import type { FormatEngineChoice, UADEImportMode, FormatEnginePreferences } from '@/types/formatEngine';
 import type { SidChipModelSetting, SidClockSetting, SidBufferSizeSetting } from '@/lib/sid/SIDHeaderParser';
 export type { FormatEngineChoice, UADEImportMode, FormatEnginePreferences };
@@ -151,7 +151,6 @@ export const useSettingsStore = create<SettingsStore>()(
         musicMaker4V: 'uade',   // MusicMakerParser — dedicated Music Maker 4V support
         musicMaker8V: 'uade',   // MusicMakerParser — dedicated Music Maker 8V support
         magneticFieldsPacker: 'uade', // MagneticFieldsPackerParser — dedicated MFP support
-        daveLowe: 'uade',       // DaveLoweParser — dedicated Dave Lowe support
         jochenHippelST: 'native', // .hip/.mcmd: Amiga SOG/MCMD stub (libtfmxaudiodecoder) vs UADE; ST songs always decode
         kris: 'native',                 // KRISParser — dedicated ChipTracker/KRIS support
         novoTradePacker: 'uade',      // NovoTradePackerParser — dedicated NovoPacker support
@@ -161,14 +160,9 @@ export const useSettingsStore = create<SettingsStore>()(
         multiMediaSound: 'uade',      // MultiMediaSoundParser — dedicated MultiMedia Sound support
         titanicsPacker: 'uade',       // TitanicsPackerParser — dedicated Titanics Packer support
         moshPacker: 'uade',           // MoshPackerParser — dedicated Mosh Packer support
-        coreDesign: 'uade',           // CoreDesignParser — dedicated Core Design support
-        soundPlayer: 'uade',          // SoundPlayerParser — dedicated Sound Player support
         nickPellingPacker: 'uade',    // NickPellingPackerParser — dedicated NPP support
-        wallyBeben: 'uade',           // WallyBebenParser — dedicated Wally Beben support
         martinWalker: 'native',         // MartinWalkerParser — dedicated Martin Walker support
-        anders0land: 'native',          // Anders0landParser — dedicated Anders 0land support
         customMade: 'uade',           // CustomMadeParser — dedicated Custom Made support
-        benDaglishSID: 'uade',        // BenDaglishSIDParser — dedicated Ben Daglish SID support
         adpcmMono: 'uade',            // ADPCMmonoParser — dedicated ADPCM Mono support
         janneSalmijarvi: 'uade',      // JanneSalmijarviParser — dedicated Janne Salmijarvi support
         midiLoriciel: 'native',         // MIDILoricielParser — dedicated MIDI Loriciel support
@@ -182,7 +176,6 @@ export const useSettingsStore = create<SettingsStore>()(
         composer667: 'native',        // Composer667Parser — dedicated Composer 667 support  // PC format: UADE cannot play it (2026-10-05)
         kt: 'native',                // KlysParser — native klystrack engine
         soprol: 'native',            // WantedTeamDaveLoweParser — SOPROL title + UADE classic audio
-        beathovenSynthesizer: 'native', // WantedTeamDaveLoweParser — BSS title + UADE classic audio
         sonicArrangerSas: 'native',  // SimpleAmigaStubParser — filename title + UADE classic audio
         leggless: 'native',          // SimpleAmigaStubParser — filename title + UADE classic audio
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
@@ -398,7 +391,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 14,
+      version: 15,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 3) {
@@ -485,6 +478,10 @@ export const useSettingsStore = create<SettingsStore>()(
           // persisted values were the old defaults (no UI or tool ever wrote one), and a stored default would keep the
           // measured table default from applying.
           dropPersistedNuadeDefaults(s.formatEngine as Record<string, unknown> | undefined);
+        }
+        if (version < 15) {
+          // v15: the seven EaglePlayer formats joined the table; their stored values were old defaults, not choices.
+          dropPersistedNuadeDefaults(s.formatEngine as Record<string, unknown> | undefined, EAGLE_RUNNER_PREF_KEYS);
         }
         return s;
       },
