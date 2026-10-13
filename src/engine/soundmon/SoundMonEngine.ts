@@ -83,6 +83,7 @@ export class SoundMonEngine extends WASMChannelOutputsEngine {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          if (data.keyboardOnly) break; // the keyboard copy: the scopes belong to the engine playing the song
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[SoundMonEngine] Module loaded, subsongs:', data.subsongCount);
           break;
@@ -111,7 +112,22 @@ export class SoundMonEngine extends WASMChannelOutputsEngine {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SoundMonEngine not initialized');
+    this._keyboardFrom = null;
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+  }
+
+  /** The module the keyboard copy was made from (see keyboardCopy), null while the replayer holds the song or nothing. */
+  private _keyboardFrom: ArrayBuffer | null = null;
+
+  /**
+   * The song's module as a keyboard copy, when the song plays on another engine (nuade): the preview voice
+   * (previewNoteOn) runs on the module the replayer holds, and this replayer holds no song then. The worklet never
+   * plays a keyboard copy, so only keys sound. Once per module; playback loading the song here replaces it.
+   */
+  keyboardCopy(buffer: ArrayBuffer): void {
+    if (!this.workletNode || this._keyboardFrom === buffer) return;
+    this._keyboardFrom = buffer;
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer.slice(0), keyboardOnly: true });
   }
 
   play(): void {

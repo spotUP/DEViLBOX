@@ -5,6 +5,7 @@
 import { SoundMonEngine } from './SoundMonEngine';
 import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
 import { noteToMidi } from '@/utils/audio-context';
+import { keyboardModuleOnNuade } from '@/engine/nuade/nuadeKeyboard';
 
 export class SoundMonSynth {
   private engine: SoundMonEngine;
@@ -62,12 +63,15 @@ export class SoundMonSynth {
    * (soundmon.c sm_preview_note_on): the same note start, envelope, LFO, EG and
    * FX tables the song runs. A key is a MIDI note; the grid cell of that key is
    * note - 11 (xmConversions.noteToMidi), which the player holds as a note value.
+   * A song on nuade is not in this replayer: the key runs on a keyboard copy of its module.
    */
   triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
     if (this._slot < 1) return;
     const midi = typeof note === 'number' ? note : noteToMidi(note ?? 'C-4');
     const value = noteToBpNote(midi - 11);
     if (value === 0) return;
+    const copy = keyboardModuleOnNuade('soundMonFileData');
+    if (copy) this.engine.keyboardCopy(copy);
     this.engine.previewNoteOn(this._slot, value);
   }
   triggerRelease(): void { this.engine.previewNoteOff(); }

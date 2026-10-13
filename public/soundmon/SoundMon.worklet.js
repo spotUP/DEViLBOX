@@ -41,17 +41,19 @@ class SoundMonProcessor extends AudioWorkletProcessor {
           const subsongCount = this.module._sm_subsong_count(this.handle);
           if (typeof data.subsong === 'number' && data.subsong > 0) this.module._sm_select_subsong(this.handle, data.subsong);
           this.playing = false;
-          this.port.postMessage({ type: 'moduleLoaded', subsongCount, channels: 4 });
+          // A keyboard copy (the song plays on another engine): only the preview voice sounds; play never starts it.
+          this.keyboardOnly = !!data.keyboardOnly;
+          this.port.postMessage({ type: 'moduleLoaded', subsongCount, channels: 4, keyboardOnly: this.keyboardOnly });
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
+      case 'play': if (this.keyboardOnly) break; this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._sm_select_subsong(this.handle, 0);
         this.port.postMessage({ type: 'stopped' });
         break;
-      case 'pause': this.playing = !this.playing; break;
+      case 'pause': if (!this.keyboardOnly) this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._sm_select_subsong(this.handle, data.subsong); break;
       case 'setChannelMask': if (this.handle) this.module._sm_set_channel_mask(this.handle, data.mask); break;
       case 'setTrackCell': { if (this.handle && this.module._sm_set_cell) { this.module._sm_set_cell(this.handle, data.index, data.row, data.note, data.instrument, data.effect, data.effectArg); } break; }      case 'setInstrumentParam': {        if (this.handle && this.module._sm_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._sm_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      // Keyboard preview: the replayer's own fifth voice (sm_preview_note_on).
