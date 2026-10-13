@@ -1,0 +1,71 @@
+name: nuade
+
+# public/nuade/Nuade.{js,wasm} is emoon/nuade (third-party/nuade, pristine, pinned in UPSTREAM.md) plus our C shim
+# (nuade-wasm/src/nuade_wasm.c), built by nuade-wasm/build.sh.
+#
+# This workflow compiles them from the committed sources, so a source change that no longer builds cannot sit on
+# main, and fails when the sources changed without the artifacts being rebuilt. It does not diff the built wasm
+# against the committed one: emcc output is not reproducible across toolchain versions.
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'third-party/nuade/**'
+      - 'nuade-wasm/**'
+      - 'public/nuade/Nuade.wasm'
+      - 'public/nuade/Nuade.js'
+      - '.github/workflows/nuade.yml'
+  pull_request:
+    paths:
+      - 'third-party/nuade/**'
+      - 'nuade-wasm/**'
+      - 'public/nuade/Nuade.wasm'
+      - 'public/nuade/Nuade.js'
+      - '.github/workflows/nuade.yml'
+  workflow_dispatch:
+
+jobs:
+  nuade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify the committed artifacts are not stale
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No usable base commit - skipping the staleness check."
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          if echo "$CHANGED" | grep -qE '^(third-party/nuade|nuade-wasm)/' \
+             && ! echo "$CHANGED" | grep -qx 'public/nuade/Nuade.wasm'; then
+            echo "third-party/nuade or nuade-wasm changed but public/nuade/Nuade.wasm was not rebuilt."
+            echo "Run: nuade-wasm/build.sh (emcc on PATH) and commit public/nuade/Nuade.wasm + Nuade.js"
+            exit 1
+          fi
+
+      - name: Install Emscripten
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+          ~/emsdk/emsdk install latest
+          ~/emsdk/emsdk activate latest
+
+      - name: Build from committed sources
+        run: |
+          set -euo pipefail
+          source ~/emsdk/emsdk_env.sh
+          nuade-wasm/build.sh
+
+      - name: Report whether the build changed the artifacts
+        # Toolchain drift alone can change the bytes, so this reports rather than fails.
+        run: |
+          set -euo pipefail
+          git status --porcelain -- public/nuade || true
+          git checkout -- public/nuade || true

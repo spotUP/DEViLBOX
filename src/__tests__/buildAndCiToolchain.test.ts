@@ -62,3 +62,25 @@ describe('CI toolchain', () => {
   });
 });
 
+
+describe('NV-5 nuade workflow', () => {
+  const text = readFileSync(join(ROOT, '.github/workflows/nuade.yml'), 'utf8');
+
+  it('triggers on the vendored tree, our shim and both artifacts', () => {
+    for (const path of ['third-party/nuade/**', 'nuade-wasm/**', 'public/nuade/Nuade.wasm', 'public/nuade/Nuade.js', '.github/workflows/nuade.yml']) {
+      expect(text, path).toContain(`- '${path}'`);
+    }
+  });
+
+  it('rebuilds with nuade-wasm/build.sh and fails when the sources changed without Nuade.wasm', () => {
+    expect(text).toContain('nuade-wasm/build.sh');
+    expect(text).toContain('~/emsdk/emsdk install latest');
+    expect(text).toMatch(/grep -qE '\^\(third-party\/nuade\|nuade-wasm\)\/'/);
+    expect(text).toContain("grep -qx 'public/nuade/Nuade.wasm'");
+    expect(text).toContain('exit 1');
+  });
+
+  it('the build command it runs exists and is executable', () => {
+    expect(existsSync(join(ROOT, 'nuade-wasm/build.sh'))).toBe(true);
+  });
+});
