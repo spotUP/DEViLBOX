@@ -34,6 +34,7 @@ export interface NuadeModule {
   _nw_seek(frame: number): number;
   _nw_snapshot(frame: number, out: number): number;
   _nw_vu(out: number, cap: number): number;
+  _nw_pans(out: number, cap: number): number;
   _nw_set_repeat(n: number): void;
   _nw_set_mute_mask(mask: number): void;
   _nw_set_separation(x: number): number;
@@ -168,6 +169,15 @@ export class NuadeHeadless {
         out.voices.push({ note: w[i], instrument: w[i + 1], volume: f[i + 2], pan: f[i + 3], active: w[i + 4] === 1 });
       }
     }
+    m._free(p);
+    return out;
+  }
+
+  /** The pan each voice has in the stereo mix now, -1 left .. 1 right. */
+  pans(): number[] {
+    const m = this.m, vc = this.voiceCount, p = m._malloc(vc * 4);
+    const n = m._nw_pans(p, vc);
+    const out = Array.from(m.HEAPF32.slice(p >> 2, (p >> 2) + n));
     m._free(p);
     return out;
   }
