@@ -26,6 +26,7 @@ import { DeckTrackOverview } from './DeckTrackOverview';
 import { DeckVisualizer } from './DeckVisualizer';
 import { DeckTurntable } from './DeckTurntable';
 import { DeckCssTurntable } from './DeckCssTurntable';
+import { DeckCScratchLanes } from './DeckCScratchLanes';
 import { DeckScopes } from './DeckScopes';
 import { DeckBeatGrid } from './DeckBeatGrid';
 import { DeckPanelTabs } from './DeckPanelTabs';
@@ -437,6 +438,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       )}
 
       {/* Waveform moved to full-width strip at top of DJView */}
+
+      {/* Deck C: the Auto Scratch strokes' crossfader and slip (D1) */}
+      {deckId === 'C' && <DeckCScratchLanes />}
 
       {/* Main controls area: pattern display / vinyl + pitch slider */}
       <div className={`flex gap-2 flex-1 min-h-0 ${isB ? 'flex-row-reverse' : ''}`}>
