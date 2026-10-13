@@ -2,12 +2,14 @@
  * JasonPageParser Tests - Format capability analysis
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isJasonPageFormat, parseJasonPageFile } from '../formats/JasonPageParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+// Reference Music is a local-only corpus (gitignored, absent from a clean checkout): skip, do not fail.
+const HAS_CORPUS = existsSync(REF);
 const JP_DIR = resolve(REF, 'Jason Page/Jason Page');
 const JP_OLD_DIR = resolve(REF, 'Jason Page Old/Jason Page');
 const FILE1 = resolve(JP_DIR, 'jpn.fire and ice-1');
@@ -18,7 +20,7 @@ function loadBuf(p: string): ArrayBuffer {
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 }
 
-describe('isJasonPageFormat', () => {
+describe.skipIf(!HAS_CORPUS)('isJasonPageFormat', () => {
   it('detects jpn.fire and ice-1', () => {
     expect(isJasonPageFormat(loadBuf(FILE1), 'jpn.fire and ice-1')).toBe(true);
   });
@@ -30,7 +32,7 @@ describe('isJasonPageFormat', () => {
   });
 });
 
-describe('parseJasonPageFile — jpn.fire and ice-1', () => {
+describe.skipIf(!HAS_CORPUS)('parseJasonPageFile — jpn.fire and ice-1', () => {
   it('parses without throwing', async () => {
     await expect(parseJasonPageFile(loadBuf(FILE1), 'jpn.fire and ice-1')).resolves.toBeDefined();
   });
@@ -48,10 +50,10 @@ describe('parseJasonPageFile — jpn.fire and ice-1', () => {
     expect(song.instruments).toHaveLength(32);
   });
 
-  it('names instruments Sample 1..N (no names in format)', async () => {
+  it('leaves instruments unnamed (the format stores no names) and keeps every slot', async () => {
     const song = await parseJasonPageFile(loadBuf(FILE1), 'jpn.fire and ice-1');
-    expect(song.instruments[0].name).toBe('Sample 1');
-    expect(song.instruments[31].name).toBe('Sample 32');
+    expect(song.instruments[0].name).toBe('');
+    expect(song.instruments[31].name).toBe('');
   });
 
   it('has 4 channels', async () => {
@@ -60,7 +62,7 @@ describe('parseJasonPageFile — jpn.fire and ice-1', () => {
   });
 });
 
-describe('parseJasonPageFile — offroad.jpo', () => {
+describe.skipIf(!HAS_CORPUS)('parseJasonPageFile — offroad.jpo', () => {
   it('parses without throwing', async () => {
     await expect(parseJasonPageFile(loadBuf(FILE2), 'offroad.jpo')).resolves.toBeDefined();
   });

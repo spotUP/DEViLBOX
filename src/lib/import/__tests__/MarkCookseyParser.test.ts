@@ -2,12 +2,14 @@
  * MarkCookseyParser Tests - Format capability analysis
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isMarkCookseyFormat, parseMarkCookseyFile } from '../formats/MarkCookseyParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+// Reference Music is a local-only corpus (gitignored, absent from a clean checkout): skip, do not fail.
+const HAS_CORPUS = existsSync(REF);
 const MC_DIR = resolve(REF, 'Mark Cooksey/Mark Cooksey');
 const MC_OLD_DIR = resolve(REF, 'Mark Cooksey Old/Mark Cooksey');
 const FILE1 = resolve(MC_DIR, 'commando.mc');
@@ -18,7 +20,7 @@ function loadBuf(p: string): ArrayBuffer {
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 }
 
-describe('isMarkCookseyFormat', () => {
+describe.skipIf(!HAS_CORPUS)('isMarkCookseyFormat', () => {
   it('detects commando.mc', () => {
     expect(isMarkCookseyFormat(loadBuf(FILE1), 'commando.mc')).toBe(true);
   });
@@ -33,7 +35,7 @@ describe('isMarkCookseyFormat', () => {
   });
 });
 
-describe('parseMarkCookseyFile — commando.mc', () => {
+describe.skipIf(!HAS_CORPUS)('parseMarkCookseyFile — commando.mc', () => {
   it('parses without throwing', async () => {
     await expect(parseMarkCookseyFile(loadBuf(FILE1), 'commando.mc')).resolves.toBeDefined();
   });
@@ -51,10 +53,10 @@ describe('parseMarkCookseyFile — commando.mc', () => {
     expect(song.instruments).toHaveLength(64);
   });
 
-  it('names instruments Sample 1..N (no names in format)', async () => {
+  it('leaves instruments unnamed (the format stores no names) and keeps every slot', async () => {
     const song = await parseMarkCookseyFile(loadBuf(FILE1), 'commando.mc');
-    expect(song.instruments[0].name).toBe('Sample 1');
-    expect(song.instruments[63].name).toBe('Sample 64');
+    expect(song.instruments[0].name).toBe('');
+    expect(song.instruments[63].name).toBe('');
   });
 
   it('has 4 channels', async () => {
@@ -68,7 +70,7 @@ describe('parseMarkCookseyFile — commando.mc', () => {
   });
 });
 
-describe('parseMarkCookseyFile — mco.a question of sport', () => {
+describe.skipIf(!HAS_CORPUS)('parseMarkCookseyFile — mco.a question of sport', () => {
   it('parses without throwing', async () => {
     await expect(parseMarkCookseyFile(loadBuf(FILE2), 'mco.a question of sport')).resolves.toBeDefined();
   });

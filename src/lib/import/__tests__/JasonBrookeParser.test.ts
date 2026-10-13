@@ -2,12 +2,14 @@
  * JasonBrookeParser Tests - Format capability analysis
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isJasonBrookeFormat, parseJasonBrookeFile } from '../formats/JasonBrookeParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+// Reference Music is a local-only corpus (gitignored, absent from a clean checkout): skip, do not fail.
+const HAS_CORPUS = existsSync(REF);
 const JB_DIR = resolve(REF, 'Jason Brooke/Jason Brooke');
 const FILE1 = resolve(JB_DIR, '1943.jb');
 const FILE2 = resolve(JB_DIR, 'afterburner ii.jb');
@@ -17,7 +19,7 @@ function loadBuf(p: string): ArrayBuffer {
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 }
 
-describe('isJasonBrookeFormat', () => {
+describe.skipIf(!HAS_CORPUS)('isJasonBrookeFormat', () => {
   it('detects 1943.jb', () => {
     expect(isJasonBrookeFormat(loadBuf(FILE1), '1943.jb')).toBe(true);
   });
@@ -32,7 +34,7 @@ describe('isJasonBrookeFormat', () => {
   });
 });
 
-describe('parseJasonBrookeFile — 1943.jb', () => {
+describe.skipIf(!HAS_CORPUS)('parseJasonBrookeFile — 1943.jb', () => {
   it('parses without throwing', () => {
     expect(() => parseJasonBrookeFile(loadBuf(FILE1), '1943.jb')).not.toThrow();
   });
@@ -48,7 +50,7 @@ describe('parseJasonBrookeFile — 1943.jb', () => {
     const song = parseJasonBrookeFile(loadBuf(FILE1), '1943.jb');
     // Jason Brooke is a compiled 68k executable — single placeholder instrument
     expect(song.instruments).toHaveLength(1);
-    expect(song.instruments[0].name).toBe('Sample 1');
+    expect(song.instruments[0].name).toBe('');
   });
 
   it('has 4 channels', () => {
@@ -62,7 +64,7 @@ describe('parseJasonBrookeFile — 1943.jb', () => {
   });
 });
 
-describe('parseJasonBrookeFile — afterburner ii.jb', () => {
+describe.skipIf(!HAS_CORPUS)('parseJasonBrookeFile — afterburner ii.jb', () => {
   it('parses without throwing', () => {
     expect(() => parseJasonBrookeFile(loadBuf(FILE2), 'afterburner ii.jb')).not.toThrow();
   });

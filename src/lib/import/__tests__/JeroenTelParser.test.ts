@@ -31,11 +31,11 @@ describe('isJeroenTelFormat', () => {
 
 describe('parseJeroenTelFile', () => {
   for (const f of FILES) {
-    it(`${f}: 4 channels, instruments named Sample 1..N`, async () => {
+    it(`${f}: 4 channels, instruments unnamed`, async () => {
       const song = await parseJeroenTelFile(loadBuf(f), f.split('/').pop()!);
       expect(song.numChannels).toBe(4);
       expect(song.instruments.length).toBeGreaterThanOrEqual(1);
-      expect(song.instruments[0].name).toBe('Sample 1');
+      expect(song.instruments[0].name).toBe('');
     });
   }
 });

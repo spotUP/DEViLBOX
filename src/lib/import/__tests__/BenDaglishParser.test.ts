@@ -6,12 +6,14 @@
  *   parseBenDaglishFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong>
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isBenDaglishFormat, parseBenDaglishFile } from '../formats/BenDaglishParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+// Reference Music is a local-only corpus (gitignored, absent from a clean checkout): skip, do not fail.
+const HAS_CORPUS = existsSync(REF);
 const FILE1 = resolve(REF, 'Ben Daglish/Ben Daglish/corporation.bd');
 const FILE2 = resolve(REF, 'Ben Daglish/Ben Daglish/rick dangerous 2 patched.bd');
 const FILE3 = resolve(REF, 'Ben Daglish/Ben Daglish/motorhead-titleandingame.bd');
@@ -21,7 +23,7 @@ function loadBuf(path: string): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
-describe('isBenDaglishFormat', () => {
+describe.skipIf(!HAS_CORPUS)('isBenDaglishFormat', () => {
   it('detects corporation.bd', () => {
     expect(isBenDaglishFormat(loadBuf(FILE1), 'corporation.bd')).toBe(true);
   });
@@ -39,7 +41,7 @@ describe('isBenDaglishFormat', () => {
   });
 });
 
-describe('parseBenDaglishFile — corporation.bd', () => {
+describe.skipIf(!HAS_CORPUS)('parseBenDaglishFile — corporation.bd', () => {
   it('reports format capabilities', async () => {
     const song = await parseBenDaglishFile(loadBuf(FILE1), 'corporation.bd');
     const report = analyzeFormat(song, 'corporation.bd');
@@ -54,10 +56,10 @@ describe('parseBenDaglishFile — corporation.bd', () => {
     expect(song.instruments).toHaveLength(8);
   });
 
-  it('names instruments Sample 1..N (no names in format)', async () => {
+  it('leaves instruments unnamed (the format stores no names) and keeps every slot', async () => {
     const song = await parseBenDaglishFile(loadBuf(FILE1), 'corporation.bd');
-    expect(song.instruments[0].name).toBe('Sample 1');
-    expect(song.instruments[7].name).toBe('Sample 8');
+    expect(song.instruments[0].name).toBe('');
+    expect(song.instruments[7].name).toBe('');
   });
 
   it('has 4 channels', async () => {
@@ -72,7 +74,7 @@ describe('parseBenDaglishFile — corporation.bd', () => {
   });
 });
 
-describe('parseBenDaglishFile — rick dangerous 2 patched.bd', () => {
+describe.skipIf(!HAS_CORPUS)('parseBenDaglishFile — rick dangerous 2 patched.bd', () => {
   it('reports format capabilities', async () => {
     const song = await parseBenDaglishFile(loadBuf(FILE2), 'rick dangerous 2 patched.bd');
     const report = analyzeFormat(song, 'rick dangerous 2 patched.bd');
@@ -82,7 +84,7 @@ describe('parseBenDaglishFile — rick dangerous 2 patched.bd', () => {
   });
 });
 
-describe('parseBenDaglishFile — motorhead-titleandingame.bd', () => {
+describe.skipIf(!HAS_CORPUS)('parseBenDaglishFile — motorhead-titleandingame.bd', () => {
   it('reports format capabilities', async () => {
     const song = await parseBenDaglishFile(loadBuf(FILE3), 'motorhead-titleandingame.bd');
     const report = analyzeFormat(song, 'motorhead-titleandingame.bd');
