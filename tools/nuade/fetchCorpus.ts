@@ -18,10 +18,15 @@ const OUT = 'public/data/songs/formats';
 const MAX_BYTES = 1_500_000;
 const WANT = 2;
 /** Downloads tried per row before giving up (the server rate-limits them). */
-const MAX_TRIES = 10;
+const MAX_TRIES = Number(process.env.NUADE_FETCH_TRIES ?? 10);
 /** Modland's own name for a format where a suffix search finds nothing. */
-const MODLAND_FORMAT: Record<string, string> = {
-  maximumeffect: 'Maximum Effect', soundimages: 'Sound Images', pierreadane: 'Pierre Adane Packer', quartet: 'Quartet ST', spl: 'Sound Programming Language',
+const MODLAND_FORMAT: Record<string, string[]> = {
+  maximumeffect: ['Maximum Effect'], soundimages: ['Sound Images'], pierreadane: ['Pierre Adane Packer'], quartet: ['Quartet ST', 'Quartet PSG'], spl: ['Sound Programming Language'],
+};
+/** Second pass (2026-10-13): the row's label and the player's own name as free-text queries, for formats Modland files under another name. */
+const NAME_QUERIES: Record<string, string[]> = {
+  amos: ['amos', 'abk'], andrewparton: ['parton', 'bye'], cinemaware: ['cinemaware', 'cin.'], kimchristensen: ['kim.', 'christensen'], laxity: ['laxity', 'powt'],
+  ntsp: ['ntsp'], onescapee: ['escapee'], quartet: ['quartet', 'qpa'], timetracker: ['timetracker', 'tmk'], ufo: ['ufo'],
 };
 
 interface Hit { filename: string; full_path: string; extension: string; format: string }
@@ -85,10 +90,17 @@ async function main(): Promise<void> {
         }
       }
     }
-    for (const hit of got.length < WANT && MODLAND_FORMAT[row.id] ? await search('', `&format=${encodeURIComponent(MODLAND_FORMAT[row.id]!)}`) : []) {
+    const candidates: Hit[] = [];
+    if (got.length < WANT) {
+      for (const fmt of MODLAND_FORMAT[row.id] ?? []) candidates.push(...await search('', `&format=${encodeURIComponent(fmt)}`));
+      for (const q of NAME_QUERIES[row.id] ?? []) candidates.push(...await search(q));
+    }
+    for (const hit of candidates) {
       if (got.length >= WANT || ++tries > MAX_TRIES) break;
+      if (seen.has(hit.full_path)) continue;
+      seen.add(hit.full_path);
       const bytes = await download(hit.full_path);
-          if (!bytes) continue;
+      if (!bytes) continue;
       if (bytes.length > MAX_BYTES || bytes.length < 64 || !accepts(nu, row.id, bytes, hit.filename)) continue;
       const rel = `${OUT}/${flat(hit.filename)}`;
       if (!existsSync(join(ROOT, rel))) writeFileSync(join(ROOT, rel), bytes);
