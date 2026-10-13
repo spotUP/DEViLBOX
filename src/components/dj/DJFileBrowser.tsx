@@ -9,14 +9,9 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Upload, Music, X, Loader2, ListPlus } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
-import { openDeckTrack } from '@/lib/song/openSong';
-import { isUADEFormat } from '@/lib/import/formats/UADEParser';
-import { cacheSong } from '@/engine/dj/DJSongCache';
-import { loadUADEToDeck, isUADECached } from '@/engine/dj/DJUADEPrerender';
-import { isAudioFile } from '@/lib/audioFileUtils';
-import { getDJPipeline } from '@/engine/dj/DJPipeline';
-import { loadRenderToDeck } from '@/engine/dj/DJTrackLoader';
+import { estimateSongDuration } from '@/engine/dj/DJBeatDetector';
+import { isUADECached } from '@/engine/dj/DJUADEPrerender';
+import { loadFileToDeck, parseDeckFile } from '@/engine/dj/DJTrackLoader';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -55,39 +50,21 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
       try {
         const buffer = await file.arrayBuffer();
         const fileExt = file.name.split('.').pop()?.toLowerCase() ?? '';
-        const isAudio = isAudioFile(file.name);
-        
-        if (isAudio) {
+        const parsed = await parseDeckFile(file.name, buffer);
+        if (!parsed.song) {
           // Regular audio file (MP3, WAV, etc.)
-          newFiles.push({
-            name: file.name,
-            bpm: 0, // Will be analyzed on load
-            duration: 0,
-            format: fileExt.toUpperCase(),
-            rawBuffer: buffer,
-          });
+          newFiles.push({ name: file.name, bpm: 0, duration: 0, format: fileExt.toUpperCase(), rawBuffer: buffer });
         } else {
-          // Tracker module
-          const isUADE = isUADEFormat(file.name);
-          const { song } = await openDeckTrack({ kind: 'bytes', name: file.name, bytes: buffer });
-          const bpmResult = detectBPM(song);
-          const duration = estimateSongDuration(song);
-
-          // Cache the parsed song for playlist deck-loading
-          cacheSong(file.name, song);
-
-          // Check if module is already pre-rendered in cache
-          const cached = await isUADECached(buffer);
-
+          // Tracker module; flag whether it is already pre-rendered in cache
           newFiles.push({
             name: file.name,
-            song,
-            bpm: bpmResult.bpm,
-            duration,
+            song: parsed.song,
+            bpm: parsed.bpm,
+            duration: estimateSongDuration(parsed.song),
             format: fileExt.toUpperCase(),
             rawBuffer: buffer,
-            isUADE,
-            isCached: cached,
+            isUADE: parsed.isUADE,
+            isCached: await isUADECached(buffer),
           });
         }
       } catch (err) {
@@ -117,38 +94,13 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
 
     try {
       if (file.rawBuffer) {
-        if (!file.song) {
-          // Regular audio file path
-          await engine.loadAudioToDeck(deckId, file.rawBuffer, file.name);
-          useDJStore.getState().setDeckViewMode('vinyl');
-          console.log(`[DJFileBrowser] Loaded ${file.name} as audio file`);
-          return;
-        }
-
+        const { cached } = await loadFileToDeck(engine, deckId, {
+          name: file.name, rawBuffer: file.rawBuffer, song: file.song, bpm: file.bpm, isUADE: file.isUADE,
+        });
         if (file.isUADE) {
-          // UADE path — loadUADEToDeck now handles the full render + wait cycle
-          const result = await loadUADEToDeck(
-            engine, deckId, file.rawBuffer, file.name, true, file.bpm, file.song.name
-          );
-          useDJStore.getState().setDeckViewMode('visualizer');
           setFiles(prev => prev.map(f =>
-            f.name === file.name ? { ...f, isCached: result.cached } : f
+            f.name === file.name ? { ...f, isCached: cached } : f
           ));
-        } else {
-          // Non-UADE tracker (XM/IT/S3M/etc.) — also render FIRST, then load audio directly
-          useDJStore.getState().setDeckState(deckId, {
-            fileName: file.name,
-            trackName: file.song.name || file.name,
-            detectedBPM: file.bpm,
-            effectiveBPM: file.bpm,
-            analysisState: 'rendering',
-            isPlaying: false,
-          });
-
-          const result = await getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high');
-          await loadRenderToDeck(engine, deckId, result, { fileName: file.name, trackName: file.song.name || file.name, song: file.song, interimBpm: file.bpm });
-          useDJStore.getState().setDeckViewMode('visualizer');
-          console.log(`[DJFileBrowser] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
         }
       } else {
         // This should not happen if rawBuffer is captured during selection

@@ -200,7 +200,7 @@ import { analyzeSongHandler } from './handlers/analysisHandlers';
 import { generatePattern, transformPattern } from './handlers/generatorHandlers';
 import { getFormatEngines, setFormatEngine } from './handlers/engineHandlers';
 import {
-  getDJState, getDJPlaylistState,
+  getDJState, getDJPlaylistState, djLoadFile,
   djTogglePlay, djStop, djCue, djSync,
   djCrossfader, djCrossfaderCurve,
   djEQ, djEQKill, djFilter,
@@ -513,6 +513,7 @@ const handlers: Record<string, Handler> = {
   // ─── DJ Remote Control ─────────────────────────────────────────────────
   dj_get_state: getDJState,
   dj_get_playlist_state: getDJPlaylistState,
+  dj_load_file: djLoadFile,
   dj_toggle_play: djTogglePlay,
   dj_stop: djStop,
   dj_cue: djCue,
