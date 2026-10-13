@@ -55,6 +55,19 @@ export function songFailures(m: SongMeasure): string[] {
   return why;
 }
 
+/**
+ * Owner decisions that set a dual row's default to nuade whatever the measurement says (DN-1 and its floor still run and
+ * their numbers are still recorded and shown). Rows are listed with the decision's words, which the table shows.
+ *
+ * 2026-10-14, the seven EaglePlayer rows (NUADE-EAGLEPLAYER-7): "nuade for all. emoon said this is a beta and he will fix
+ * them and we should update". Revisit when the upstream fixes land (ledger NUADE-UPSTREAM-UPDATE): delete an id here and
+ * the row falls back to the measured rule.
+ */
+const BETA = 'owner 2026-10-14: nuade is a beta that emoon will fix; default by decision, not by score (nuade for all)';
+export const OWNER_PREFERS_NUADE: Readonly<Record<string, string>> = {
+  andersoland: BETA, beathoven: BETA, bendaglishsid: BETA, coredesign: BETA, davelowe: BETA, scottjohnston: BETA, wallybeben: BETA,
+};
+
 export const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
 
 export interface ReplaceInput {

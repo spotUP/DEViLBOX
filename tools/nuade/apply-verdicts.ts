@@ -19,7 +19,7 @@ import type { FormatEngineChoice } from '../../src/types/formatEngine';
 import { loadResults, type ResultRow, type ResultsFile } from './batch';
 import { ROOT } from './nuadeCompare';
 import { rolledOutRows } from './rollout';
-import { dualDefault, replaceVerdict, mean, type SongMeasure } from './verdictRules';
+import { dualDefault, replaceVerdict, mean, OWNER_PREFERS_NUADE, type SongMeasure } from './verdictRules';
 
 export interface NuadeVerdict {
   uadeEnvelopeCorrelation: number;
@@ -29,6 +29,7 @@ export interface NuadeVerdict {
   heldBecause?: string;
   /** Dual rows: why our engine has no score (so DN-1 cannot move the default off ours). */
   ownNote?: string;
+  ownerDecision?: string;
 }
 
 const round = (x: number): number => Math.round(x * 10000) / 10000;
@@ -64,7 +65,8 @@ export function computeVerdicts(file: ResultsFile, rows: readonly NuadeFormat[] 
         uadeEnvelopeCorrelation: round(m ?? 0),
         ...(dd ? { ownEnvelopeCorrelation: round(dd.ownMean) } : {}),
         endAgrees: recs.every((r) => replaceVerdict({ songs: [r] }).endAgrees === true),
-        defaultEngine: dd?.defaultEngine === 'nuade' ? 'nuade' : f.legacyEngine,
+        defaultEngine: dd?.defaultEngine === 'nuade' || f.id in OWNER_PREFERS_NUADE ? 'nuade' : f.legacyEngine,
+        ...(f.id in OWNER_PREFERS_NUADE ? { ownerDecision: OWNER_PREFERS_NUADE[f.id] } : {}),
         ...(dd ? {} : { ownNote: ownNoteFor(f, recs) }),
       };
     }
@@ -105,6 +107,8 @@ export interface NuadeVerdict {
   heldBecause?: string;
   /** Dual rows: why our engine has no score. */
   ownNote?: string;
+  /** The owner's decision that made nuade the default whatever the scores say (verdictRules.OWNER_PREFERS_NUADE). */
+  ownerDecision?: string;
 }
 
 export const NUADE_VERDICTS: Readonly<Record<string, NuadeVerdict>> = {

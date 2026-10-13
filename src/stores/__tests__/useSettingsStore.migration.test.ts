@@ -183,5 +183,8 @@ describe('useSettingsStore - v15 EaglePlayer format keys', () => {
     for (const k of ['daveLowe', 'anders0land', 'coreDesign', 'soundPlayer', 'wallyBeben', 'benDaglishSID', 'beathovenSynthesizer']) expect(fe[k], k).toBeUndefined();
     expect(fe.mmdc).toBe('nuade');
     expect(fe.mod).toBe('native');
+    // no stale pin: a user who stored 'native' before v15 gets the table's default, which is nuade by the owner decision
+    const { effectiveFormatEngine } = await import('@/engine/nuade/nuadeRouting');
+    for (const k of ['daveLowe', 'anders0land', 'beathovenSynthesizer']) expect(effectiveFormatEngine(fe as never, k), k).toBe('nuade');
   });
 });

@@ -15,23 +15,25 @@ export interface NuadeVerdict {
   heldBecause?: string;
   /** Dual rows: why our engine has no score. */
   ownNote?: string;
+  /** The owner's decision that made nuade the default whatever the scores say (verdictRules.OWNER_PREFERS_NUADE). */
+  ownerDecision?: string;
 }
 
 export const NUADE_VERDICTS: Readonly<Record<string, NuadeVerdict>> = {
   actionamics: {"uadeEnvelopeCorrelation":0.9931,"ownEnvelopeCorrelation":0.993,"endAgrees":false,"defaultEngine":"native"},
   activisionpro: {"uadeEnvelopeCorrelation":0.9246,"ownEnvelopeCorrelation":0.8811,"endAgrees":true,"defaultEngine":"native"},
   amcomposer: {"uadeEnvelopeCorrelation":0.9852,"endAgrees":true,"defaultEngine":"nuade"},
-  andersoland: {"uadeEnvelopeCorrelation":0.9852,"ownEnvelopeCorrelation":0.9932,"endAgrees":true,"defaultEngine":"native"},
+  andersoland: {"uadeEnvelopeCorrelation":0.9852,"ownEnvelopeCorrelation":0.9932,"endAgrees":true,"defaultEngine":"nuade","ownerDecision":"owner 2026-10-14: nuade is a beta that emoon will fix; default by decision, not by score (nuade for all)"},
   aprosys: {"uadeEnvelopeCorrelation":0.7391,"endAgrees":false,"defaultEngine":"native","heldBecause":"action.aps: correlation 0.481 < 0.9; action.aps: UADE plays on, nuade ends at 25.6 s; actionfiltersound.aps: UADE plays on, nuade ends at 25.6 s; mean correlation 0.739 < 0.95"},
   artandmagic: {"uadeEnvelopeCorrelation":0.983,"endAgrees":true,"defaultEngine":"nuade"},
   ashleyhogg: {"uadeEnvelopeCorrelation":0.9996,"endAgrees":true,"defaultEngine":"nuade"},
   audiosculpture: {"uadeEnvelopeCorrelation":0,"endAgrees":true,"defaultEngine":"uade","heldBecause":"turtle-ready.adsc: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95"},
-  beathoven: {"uadeEnvelopeCorrelation":0.8835,"ownEnvelopeCorrelation":0.976,"endAgrees":true,"defaultEngine":"native"},
+  beathoven: {"uadeEnvelopeCorrelation":0.8835,"ownEnvelopeCorrelation":0.976,"endAgrees":true,"defaultEngine":"nuade","ownerDecision":"owner 2026-10-14: nuade is a beta that emoon will fix; default by decision, not by score (nuade for all)"},
   bendaglish: {"uadeEnvelopeCorrelation":0.9925,"ownEnvelopeCorrelation":0.9918,"endAgrees":true,"defaultEngine":"uade"},
-  bendaglishsid: {"uadeEnvelopeCorrelation":0.9153,"ownEnvelopeCorrelation":0.9476,"endAgrees":true,"defaultEngine":"native"},
-  coredesign: {"uadeEnvelopeCorrelation":0.9839,"ownEnvelopeCorrelation":0.9995,"endAgrees":false,"defaultEngine":"native"},
+  bendaglishsid: {"uadeEnvelopeCorrelation":0.9153,"ownEnvelopeCorrelation":0.9476,"endAgrees":true,"defaultEngine":"nuade","ownerDecision":"owner 2026-10-14: nuade is a beta that emoon will fix; default by decision, not by score (nuade for all)"},
+  coredesign: {"uadeEnvelopeCorrelation":0.9839,"ownEnvelopeCorrelation":0.9995,"endAgrees":false,"defaultEngine":"nuade","ownerDecision":"owner 2026-10-14: nuade is a beta that emoon will fix; default by decision, not by score (nuade for all)"},
   dariuszendeh: {"uadeEnvelopeCorrelation":0.9918,"endAgrees":true,"defaultEngine":"nuade"},
-  davelowe: {"uadeEnvelopeCorrelation":0.9849,"ownEnvelopeCorrelation":0.997,"endAgrees":true,"defaultEngine":"native"},
+  davelowe: {"uadeEnvelopeCorrelation":0.9849,"ownEnvelopeCorrelation":0.997,"endAgrees":true,"defaultEngine":"nuade","ownerDecision":"owner 2026-10-14: nuade is a beta that emoon will fix; default by decision, not by score (nuade for all)"},
   davidhanney: {"uadeEnvelopeCorrelation":0.9558,"endAgrees":true,"defaultEngine":"nuade"},
   davidwhittaker: {"uadeEnvelopeCorrelation":0.9043,"ownEnvelopeCorrelation":0.9069,"endAgrees":false,"defaultEngine":"native"},
   deltamusic1: {"uadeEnvelopeCorrelation":0.9123,"ownEnvelopeCorrelation":0.9021,"endAgrees":true,"defaultEngine":"native"},
@@ -98,7 +100,7 @@ export const NUADE_VERDICTS: Readonly<Record<string, NuadeVerdict>> = {
   robhubbard: {"uadeEnvelopeCorrelation":0.9896,"endAgrees":true,"defaultEngine":"nuade"},
   robhubbardst: {"uadeEnvelopeCorrelation":0.8032,"endAgrees":true,"defaultEngine":"uade","heldBecause":"battleships.rho: correlation 0.803 < 0.9; battleships.rho: correlation 0.803 < 0.9; mean correlation 0.803 < 0.95"},
   ronklaren: {"uadeEnvelopeCorrelation":0.3684,"ownEnvelopeCorrelation":0.3636,"endAgrees":true,"defaultEngine":"uade"},
-  scottjohnston: {"uadeEnvelopeCorrelation":0.8917,"ownEnvelopeCorrelation":0.9902,"endAgrees":true,"defaultEngine":"native"},
+  scottjohnston: {"uadeEnvelopeCorrelation":0.8917,"ownEnvelopeCorrelation":0.9902,"endAgrees":true,"defaultEngine":"nuade","ownerDecision":"owner 2026-10-14: nuade is a beta that emoon will fix; default by decision, not by score (nuade for all)"},
   scumm: {"uadeEnvelopeCorrelation":0.9908,"endAgrees":true,"defaultEngine":"nuade"},
   seanconnolly: {"uadeEnvelopeCorrelation":0.9699,"endAgrees":true,"defaultEngine":"nuade"},
   seanconran: {"uadeEnvelopeCorrelation":0.9907,"endAgrees":true,"defaultEngine":"nuade"},
@@ -127,6 +129,6 @@ export const NUADE_VERDICTS: Readonly<Record<string, NuadeVerdict>> = {
   tomytracker: {"uadeEnvelopeCorrelation":0.9807,"endAgrees":true,"defaultEngine":"nuade"},
   tronic: {"uadeEnvelopeCorrelation":0.9854,"endAgrees":true,"defaultEngine":"nuade"},
   voodoo: {"uadeEnvelopeCorrelation":0.6846,"endAgrees":true,"defaultEngine":"uade","heldBecause":"silkworm.vss: correlation 0.855 < 0.9; voo8.vss: correlation 0.514 < 0.9; mean correlation 0.685 < 0.95"},
-  wallybeben: {"uadeEnvelopeCorrelation":0.9558,"ownEnvelopeCorrelation":0.9913,"endAgrees":true,"defaultEngine":"native"},
+  wallybeben: {"uadeEnvelopeCorrelation":0.9558,"ownEnvelopeCorrelation":0.9913,"endAgrees":true,"defaultEngine":"nuade","ownerDecision":"owner 2026-10-14: nuade is a beta that emoon will fix; default by decision, not by score (nuade for all)"},
   zoundmonitor: {"uadeEnvelopeCorrelation":0,"endAgrees":true,"defaultEngine":"uade","heldBecause":"sonjavanveen.sng: _uade_wasm_load failed (ret=-1); mean correlation n/a < 0.95"},
 };
