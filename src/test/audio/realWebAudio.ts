@@ -83,7 +83,29 @@ function blockRealtimeAudio(): void {
   }
 }
 
+/**
+ * node-web-audio-api's `AudioBuffer.getChannelData` returns a Float32Array over memory the AudioBuffer owns, and
+ * the array does not keep its owner alive: `(await ctx.startRendering()).getChannelData(0)` keeps only the array,
+ * the garbage collector frees the buffer, and the array then reads freed memory - other data, NaN runs (the
+ * scratchNullsTheDemo "NaN" flake, 2026-10-13: a dropped buffer read back changed in 5 of 20 renders once a GC
+ * ran; held, 0 of 20). Every array handed out holds its AudioBuffer for as long as the array lives.
+ */
+const channelDataOwners = new WeakMap<object, object>();
+let channelDataPinned = false;
+function pinChannelDataOwners(): void {
+  if (channelDataPinned) return;
+  channelDataPinned = true;
+  const proto = (webAudio as unknown as { AudioBuffer: { prototype: { getChannelData(ch: number): Float32Array } } }).AudioBuffer.prototype;
+  const original = proto.getChannelData;
+  proto.getChannelData = function getChannelData(this: object, ch: number): Float32Array {
+    const data = original.call(this, ch);
+    channelDataOwners.set(data, this);
+    return data;
+  };
+}
+
 export function installRealWebAudio(): void {
+  pinChannelDataOwners();
   const g = globalThis as unknown as Record<string, unknown>;
   const src = webAudio as unknown as Record<string, unknown>;
   for (const name of GLOBALS) {
