@@ -12,6 +12,7 @@
 
 import { SCRATCH_GESTURE_IDS } from './scratchGestureCatalog';
 import { demoMonoPcm, demoRecordPcm } from './scratchGrit';
+import { analyzeRecord } from './scratchBankAnalysis';
 import type { ScratchRecord } from './scratchCatalogue';
 import type { TrackerSampleInfo } from './ScratchSourceSelector';
 import type { ScratchGestureId } from './scratchTypes';
@@ -53,25 +54,29 @@ export function trackerSampleInfos(instruments: readonly TrackerSampleInstrument
 const SAMPLE_GESTURES: readonly ScratchGestureId[] = SCRATCH_GESTURE_IDS;
 
 /**
- * A transient scratch record for a decoded sample: attack at 0, the home (vowel) 15 ms in or a
- * quarter of a short sample, the whole sample safe, forward room from the home to the end,
- * reverse room back to the attack. `durationSec` = frames / the buffer's rate.
+ * A transient scratch record for a sample read at 22,050 Hz (`pcm`), analysed at load the way the demo's bank
+ * analyses a record it has no name for (R3: `analyze` + `_cue_points`): the attack at the first voiced onset, the
+ * home on the loudest voiced frame (the vowel), the safe range where the envelope passes 6 % of its peak, forward
+ * room from the vowel to the tail, reverse room back to the safe start; the acoustic fields from `analyze`.
  */
-export function trackerSampleRecord(deck: AB, info: Pick<TrackerSampleInfo, 'sampleId' | 'name' | 'kind'>, buffer: Pick<AudioBuffer, 'length' | 'sampleRate'>): ScratchRecord {
-  const durationSec = buffer.length / buffer.sampleRate;
-  const vowel = Math.min(0.015, durationSec / 4);
+export function trackerSampleRecord(deck: AB, info: Pick<TrackerSampleInfo, 'sampleId' | 'name' | 'kind'>, pcm: ArrayLike<number>): ScratchRecord {
+  const R = 22050;
+  const durationSec = pcm.length / R;
+  const { info: a, cues } = analyzeRecord(pcm, R);
+  const sec = (i: number) => i / R;
+  const vowel = sec(cues.vowel);
   const id = trackerSampleRecordId(deck, info.sampleId);
-  const anchor = { position: vowel, safe: [0, durationSec] as const, safeForward: [vowel, durationSec] as const, safeReverse: [0, vowel] as const };
+  const anchor = { position: vowel, safe: [sec(cues.safe[0]), sec(cues.safe[1])] as const, safeForward: [vowel, sec(cues.safeForward[1])] as const, safeReverse: [sec(cues.safeReverse[0]), vowel] as const };
   return {
     id, canonicalName: id, literalPhrase: info.name, file: '', sourceFile: '', url: '',
-    demoCue: { anchor: Math.round(vowel * 22050), safe: [0, Math.round(durationSec * 22050)] },
+    demoCue: { anchor: cues.vowel, safe: cues.safe },
     category: info.kind === 'voice' ? 'SHORT_EXCLAMATION' : 'FX',
     referenceRoles: [], roles: ['ACCENT', 'ANSWER', 'FILL', 'THEME'], styles: [],
     recommendedGestures: [], gestures: SAMPLE_GESTURES,
-    anchors: { attack: 0, vowel, tail: durationSec },
+    anchors: { attack: sec(cues.attack), vowel, tail: sec(cues.tail) },
     safe: anchor.safe, safeForward: anchor.safeForward, safeReverse: anchor.safeReverse,
-    wordSlices: [], clean: true, preScratched: false, durationSec,
-    voicedAmount: info.kind === 'voice' ? 0.8 : 0.3, noiseAmount: 0, onsetRate: 0, transientCount: 1, centroidHz: 0,
+    wordSlices: [], clean: !a.preScratched, preScratched: a.preScratched, durationSec,
+    voicedAmount: a.voicedAmount, noiseAmount: a.noiseAmount, onsetRate: a.onsetRate, transientCount: a.transientCount, centroidHz: a.centroid,
     anchor,
   };
 }
@@ -119,7 +124,7 @@ export async function loadTrackerSample(
     ? instrument.sample!.audioBuffer.slice(0)
     : await fetcher(instrument.sample!.url!);
   const pcm = await samplePcm(bytes, ctx);
-  const record = trackerSampleRecord(deck, info, { length: pcm.length, sampleRate: 22050 });
+  const record = trackerSampleRecord(deck, info, pcm);
   if (!host.hasRecord(id)) {
     host.registerTransientRecord(record, pcm);
     trackerSampleStats.loads++;

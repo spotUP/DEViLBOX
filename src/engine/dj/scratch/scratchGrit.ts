@@ -108,18 +108,7 @@ export function demoRecordPcm(bytes: ArrayBuffer, rate = TT_RATE, opts: { grit?:
  * float32, then the S950 unless `grit` is false. A tracker deck's sample takes this path without the grit.
  */
 export function demoMonoPcm(mono: ArrayLike<number>, srcRate: number, rate = TT_RATE, opts: { grit?: boolean } = {}): Float64Array {
-  let d32: Float32Array;
-  if (srcRate !== rate) {
-    // synth_dsp.resample_ratio(x, sr_in / sr_out): resample_poly by the rational, trimmed to n, float32
-    const ratio = srcRate / rate;
-    const n = Math.max(1, Math.trunc(mono.length / ratio));
-    const [up, down] = limitDenominator(1.0 / ratio, 2000);
-    const y = resamplePoly(mono, up, down);
-    d32 = new Float32Array(n);
-    for (let i = 0; i < n && i < y.length; i++) d32[i] = y[i]!;
-  } else {
-    d32 = Float32Array.from(mono);
-  }
+  const d32 = srcRate !== rate ? demoResample(mono, srcRate, rate) : Float32Array.from(mono);
   // d / (max|d| + 1e-9), in float32 (numpy keeps the array's type)
   let m = 0;
   for (let i = 0; i < d32.length; i++) m = Math.max(m, Math.abs(d32[i]!));
@@ -129,6 +118,18 @@ export function demoMonoPcm(mono: ArrayLike<number>, srcRate: number, rate = TT_
   if (opts.grit === false) return d;
   scratchGritStats.transforms++;
   return s950(d, rate);
+}
+
+/** synth_dsp.resample_ratio(x, sr_in / sr_out) for sr_in != sr_out: resample_poly by the rational, trimmed to n, float32. */
+export function demoResample(mono: ArrayLike<number>, srcRate: number, rate = TT_RATE): Float32Array {
+  const ratio = srcRate / rate;
+  if (mono.length < 2 || ratio === 1.0) return Float32Array.from(mono);
+  const n = Math.max(1, Math.trunc(mono.length / ratio));
+  const [up, down] = limitDenominator(1.0 / ratio, 2000);
+  const y = resamplePoly(mono, up, down);
+  const d32 = new Float32Array(n);
+  for (let i = 0; i < n && i < y.length; i++) d32[i] = y[i]!;
+  return d32;
 }
 
 /** Python `Fraction(x).limit_denominator(maxDen)` as [numerator, denominator]. */
