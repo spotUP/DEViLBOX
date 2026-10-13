@@ -21,7 +21,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import type { TrackerCell } from '@/types';
+import type { TrackerCell, Pattern } from '@/types';
 import type { SoundMonConfig } from '@/types/instrument/exotic';
 import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
 
@@ -170,6 +170,135 @@ function generateBuiltinWave(waveType: number): Uint8Array {
     wave[i] = val < 0 ? (val + 256) & 0xFF : val & 0xFF;
   }
   return wave;
+}
+
+// ── Edits written into the loaded module ────────────────────────────────
+
+const sameGridCell = (a: TrackerCell | undefined, b: TrackerCell | undefined): boolean =>
+  (a?.note ?? 0) === (b?.note ?? 0) && (a?.instrument ?? 0) === (b?.instrument ?? 0) && (a?.volume ?? 0) === (b?.volume ?? 0)
+  && (a?.effTyp ?? 0) === (b?.effTyp ?? 0) && (a?.eff ?? 0) === (b?.eff ?? 0);
+
+const s8 = (v: number): number => (v << 24) >> 24;
+
+interface BPStepEntry { pattern: number; soundTranspose: number; transpose: number }
+
+/**
+ * One edited row of a block, field by field: what the grid changed is encoded (the note less the step's transpose, the
+ * instrument less its sound transpose, as the player adds them back - Soundmon2.2.s bpnext), what it did not change
+ * keeps the module's bytes (effects the grid does not show, the option-10 transpose switches, the raw note value).
+ */
+function writeEditedRow(block: Uint8Array, at: number, now: TrackerCell, was: TrackerCell, step: BPStepEntry, warn: (m: string) => void): void {
+  let note = s8(block[at]);
+  let sample = block[at + 1] >> 4;
+  let option = block[at + 1] & 0x0f;
+  let param = s8(block[at + 2]);
+  const transposeOff = option === 10 && (param & 0xf0) !== 0;
+  const soundTransposeOff = option === 10 && (param & 0x0f) !== 0;
+  if ((now.note ?? 0) !== (was.note ?? 0)) {
+    if ((now.note ?? 0) === 0 || now.note === 97) note = 0;
+    else {
+      const value = noteToBpNote(now.note) - (transposeOff ? 0 : step.transpose);
+      if (value === 0 || value < -128 || value > 127) warn(`note ${now.note} has no value under this step's transpose ${step.transpose}`);
+      else note = value;
+    }
+  }
+  if ((now.instrument ?? 0) !== (was.instrument ?? 0)) {
+    const value = (now.instrument ?? 0) > 0 ? now.instrument - (soundTransposeOff ? 0 : step.soundTranspose) : 0;
+    if (value < 0 || value > 15) warn(`instrument ${now.instrument} has no value under this step's sound transpose ${step.soundTranspose}`);
+    else sample = value;
+  }
+  if ((now.effTyp ?? 0) !== (was.effTyp ?? 0) || (now.eff ?? 0) !== (was.eff ?? 0) || (now.volume ?? 0) !== (was.volume ?? 0)) {
+    const enc = new Uint8Array(3);
+    encodeCell(now, enc, 0);
+    option = enc[1] & 0x0f;
+    param = s8(enc[2]);
+  }
+  block[at] = note & 0xff;
+  block[at + 1] = ((sample & 0x0f) << 4) | (option & 0x0f);
+  block[at + 2] = param & 0xff;
+}
+
+/**
+ * The loaded SoundMon module with the grid's edits written in: byte-exact where nothing was edited, every section the
+ * grid does not show (the V.3 header, instruments, synth tables, samples) kept as loaded.
+ *
+ * A SoundMon step points each voice at a 16-row block of a shared pool, with a note and a sound transpose. An edited
+ * block that only this step plays is rewritten in place; one that other steps play too is copied to a new block at the
+ * end of the pool and this step repointed (copy on write), so the edit sounds where it was made and nowhere else - the
+ * from-scratch writer below regenerated the synth waveforms from their type and wrote every V.3 module as V.2.
+ *
+ * null when the module is not SoundMon or the grid no longer has one pattern per step (the song was restructured):
+ * the from-scratch writer is the one that can build that.
+ */
+export async function writeEditsIntoSoundMonModule(
+  module: ArrayBuffer | Uint8Array,
+  patterns: readonly Pattern[],
+  fileName = 'module.bp',
+): Promise<{ bytes: Uint8Array; warnings: string[] } | null> {
+  const src = new Uint8Array(module instanceof Uint8Array ? module : new Uint8Array(module)).slice();
+  const { isSoundMonFormat, parseSoundMonFile } = await import('@/lib/import/formats/SoundMonParser');
+  if (!isSoundMonFormat(src.buffer)) return null;
+  const original = await parseSoundMonFile(src.slice().buffer, fileName);
+  const blocksOff = original.uadePatternLayout?.patternDataFileOffset;
+  const songLength = (src[30] << 8) | src[31];
+  if (blocksOff === undefined || original.patterns.length !== songLength || patterns.length !== songLength) return null;
+  if (patterns.some((p, i) => p.channels.length !== 4 || p.channels.some((c, ch) => c.rows.length !== original.patterns[i].channels[ch].rows.length))) return null;
+
+  const stepsOff = blocksOff - songLength * 16;
+  const steps: BPStepEntry[] = [];
+  let higher = 0;
+  for (let i = 0; i < songLength * 4; i++) {
+    const o = stepsOff + i * 4;
+    const step = { pattern: (src[o] << 8) | src[o + 1], soundTranspose: s8(src[o + 2]), transpose: s8(src[o + 3]) };
+    higher = Math.max(higher, step.pattern);
+    steps.push(step);
+  }
+  const blocksEnd = blocksOff + higher * 48;
+  if (blocksEnd > src.length) return null;
+  const blocks: Uint8Array[] = Array.from({ length: higher }, (_, b) => src.slice(blocksOff + b * 48, blocksOff + (b + 1) * 48));
+  const refs = new Map<number, number>();
+  for (const s of steps) refs.set(s.pattern, (refs.get(s.pattern) ?? 0) + 1);
+
+  const warnings: string[] = [];
+  let edited = false;
+  for (let p = 0; p < songLength; p++) {
+    for (let ch = 0; ch < 4; ch++) {
+      const now = patterns[p].channels[ch].rows;
+      const was = original.patterns[p].channels[ch].rows;
+      const rows = now.map((_, r) => r).filter((r) => !sameGridCell(now[r], was[r]));
+      if (rows.length === 0) continue;
+      edited = true;
+      const step = steps[p * 4 + ch];
+      const block = step.pattern > 0 ? blocks[step.pattern - 1].slice() : new Uint8Array(48);
+      for (const r of rows) writeEditedRow(block, r * 3, now[r], was[r], step, (m) => warnings.push(`position ${p} voice ${ch + 1} row ${r}: ${m}`));
+      if (step.pattern > 0 && refs.get(step.pattern) === 1) {
+        blocks[step.pattern - 1] = block;
+        continue;
+      }
+      // Shared (or no block at all): this step gets its own copy.
+      let at = blocks.findIndex((b, i) => i >= higher && b.every((v, k) => v === block[k]));
+      if (at < 0) { blocks.push(block); at = blocks.length - 1; }
+      refs.set(step.pattern, (refs.get(step.pattern) ?? 1) - 1);
+      step.pattern = at + 1;
+      refs.set(step.pattern, (refs.get(step.pattern) ?? 0) + 1);
+    }
+  }
+  if (!edited) return { bytes: src, warnings };
+  if (blocks.length > 0xffff) return null;
+
+  const stepBytes = new Uint8Array(songLength * 16);
+  steps.forEach((s, i) => {
+    writeU16BE(stepBytes, i * 4, s.pattern);
+    writeS8(stepBytes, i * 4 + 2, s.soundTranspose);
+    writeS8(stepBytes, i * 4 + 3, s.transpose);
+  });
+  const tail = src.subarray(blocksEnd);
+  const out = new Uint8Array(stepsOff + stepBytes.length + blocks.length * 48 + tail.length);
+  out.set(src.subarray(0, stepsOff), 0);
+  out.set(stepBytes, stepsOff);
+  blocks.forEach((b, i) => out.set(b, blocksOff + i * 48));
+  out.set(tail, blocksOff + blocks.length * 48);
+  return { bytes: out, warnings };
 }
 
 // ── Main export ─────────────────────────────────────────────────────────
