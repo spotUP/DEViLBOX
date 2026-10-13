@@ -16,6 +16,8 @@ export interface Rig {
   proc: () => WorkletProc;
   /** The fake AudioContext (outputLatency can be set). */
   ctx: { outputLatency: number; baseLatency: number };
+  /** The options of every AudioWorkletNode the engine created, in order (a resized node is a second entry). */
+  nodeOptions: { numberOfOutputs?: number }[];
   /** Everything the worklet posted to the main thread, in order. */
   posted: { type?: string; [k: string]: unknown }[];
   /** Pull `quanta` render quanta (128 frames); peaks per output over the run. */
@@ -26,6 +28,7 @@ export interface Rig {
 export function installNuadeRig(): Rig {
   loadSharedWorkletScripts();
   const posted: Rig['posted'] = [];
+  const nodeOptions: Rig['nodeOptions'] = [];
   let proc: WorkletProc | null = null;
   const processorSource = readFileSync(resolve(ROOT, 'public/nuade/Nuade.worklet.js'), 'utf8');
 
@@ -46,7 +49,8 @@ export function installNuadeRig(): Rig {
   class FakeNode {
     port: Port;
     onprocessorerror: unknown = null;
-    constructor(_ctx: unknown, _name: string, _opts: unknown) {
+    constructor(_ctx: unknown, _name: string, _opts: { numberOfOutputs?: number }) {
+      nodeOptions.push(_opts);
       let Processor!: new () => WorkletProc;
       const scope: Record<string, unknown> = {
         AudioWorkletProcessor: class {
@@ -84,6 +88,7 @@ export function installNuadeRig(): Rig {
     ctx,
     proc: () => proc!,
     posted,
+    nodeOptions,
     render(quanta, outputs = 9) {
       const peaks = new Array<number>(outputs).fill(0);
       let frames = 0;

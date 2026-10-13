@@ -26,7 +26,7 @@ describe('NS-10 get_format_engines / set_format_engine', () => {
     const one = (getFormatEngines({ format: 'soundmon' }) as { rows: Record<string, unknown>[] }).rows;
     expect(one).toHaveLength(1);
     // effective / default are rollout data (nuadeVerdicts.ts): read them from the table
-    expect(one[0]).toMatchObject({ id: 'soundmon', role: 'dual', choices: ['native', 'uade', 'nuade'], effective: NUADE_FORMATS.soundmon!.defaultEngine, default: NUADE_FORMATS.soundmon!.defaultEngine, heldBecause: null });
+    expect(one[0]).toMatchObject({ id: 'soundmon', role: 'dual', choices: ['native', 'uade', 'nuade'], effective: NUADE_FORMATS.soundmon!.defaultEngine, default: NUADE_FORMATS.soundmon!.defaultEngine, heldBecause: NUADE_FORMATS.soundmon!.heldBecause ?? null });
   });
 
   it('set_format_engine stores the choice (no song of the format loaded: nothing reopens) and get_format_engines shows it', async () => {

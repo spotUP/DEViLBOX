@@ -295,6 +295,11 @@ export abstract class WASMChannelOutputsEngine extends WASMSingletonBase {
     this._nodeReady = true;
   }
 
+  /** Called by a subclass that replaces its node: the new one is not ready until it reports. */
+  protected markNodeNotReady(): void {
+    this._nodeReady = false;
+  }
+
   getWorkletNode(): AudioWorkletNode | null {
     return this.workletNode;
   }

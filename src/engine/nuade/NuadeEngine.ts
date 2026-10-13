@@ -21,8 +21,10 @@ import { ChannelMeterFeed } from '@engine/tone/channelMeterFeed';
 import { GridFollow, songTickGrid, type GridFollowPosition, type TickGridSong } from '@engine/replayer/tickGridFollow';
 import {
   parseNuadeOut,
-  type NuadeIn, type NuadeOut, type NuadeVoiceState,
+  NUADE_NODE_VOICES, type NuadeIn, type NuadeOut, type NuadeVoiceState,
 } from './nuadeProtocol';
+import { nuadeVoiceCounter } from './nuadeProbe';
+import { nuadeFormatForPlayer } from './nuadeFormats';
 import { createNuadeEditPort, recordNuadePlayerCaps, type NuadeEditPort } from './nuadeEditPort';
 
 export type NuadePosition = GridFollowPosition;
@@ -49,6 +51,9 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   private readonly subsongRequests = new SubsongRequests();
   private readonly meterFeed = new ChannelMeterFeed();
   private _loaded: NuadeLoaded | null = null;
+  /** The voices the audio node is declared for (outputs 1 + 4 + voices): the loaded song's, NUADE_NODE_VOICES before one. */
+  private _nodeVoices = NUADE_NODE_VOICES;
+  private _muteMask: number | null = null;
   private _editPort: NuadeEditPort | null = null;
   private _lastSwapMs: number | null = null;
   private readonly swapCallbacks = new Set<(ms: number) => void>();
@@ -79,13 +84,11 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
     return { dir: 'nuade', workletFile: 'Nuade.worklet.js', wasmFile: 'Nuade.wasm', jsFile: 'Nuade.js' };
   }
 
+  /** The voices the node is declared for. A song's own count once one is loaded (see resizeNode). */
+  get nodeVoices(): number { return this._nodeVoices; }
+
   protected createNode(): void {
-    this.workletNode = new AudioWorkletNode(this.audioContext, 'nuade-processor', channelOutputNodeOptions(8));
-    // 8 = NUADE_NODE_VOICES: the node exists before any song is open and the voice count is known only inside the worklet
-    // after nw_open, so it is declared for nuade's largest count. Counted two ways: nw_voice_count over the corpus (NS-0,
-    // nuadeFormats.test.ts: max 8, Face The Music) and the players' sources (third-party/nuade/players/*: the largest
-    // *_VOICES / *_CHANNELS constant is FTM_MAX_CHANNELS 8; paulrobotham and musicmaker read their count from the module).
-    // channelOutputsSizedByVoices needs a literal here, so per-song sizing would mean recreating the node on load.
+    this.workletNode = new AudioWorkletNode(this.audioContext, 'nuade-processor', channelOutputNodeOptions(this._nodeVoices));
     this.workletNode.port.onmessage = (event) => this.handleWorkletMessage(event.data);
     this.post({
       type: 'init',
@@ -93,6 +96,33 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
       sampleRate: this.audioContext.sampleRate,
     });
     this.workletNode.connect(this.output, 0);
+  }
+
+  /**
+   * Replace the audio node with one declared for exactly `voices` voices: each declared output costs audio-thread time
+   * whether it is connected or not (channelOutputsSizedByVoices.test.ts), and nuade's voice count differs per player (2 to 8).
+   * The old node is disposed and disconnected; the new one boots like the first (init message, ready) and the engine
+   * state a node holds (the mute mask) is posted again. Isolation slots and dub sends are the mixer's: they are re-posted
+   * by afterPlay when the song plays, to the node that is there then.
+   */
+  private async resizeNode(voices: number): Promise<void> {
+    const old = this.workletNode;
+    if (old) {
+      try { old.port.postMessage({ type: 'dispose' }); } catch { /* port closed */ }
+      old.port.onmessage = null;
+      try { old.disconnect(); } catch { /* already disconnected */ }
+    }
+    this.workletNode = null;
+    this.markNodeNotReady();
+    this._initPromise = new Promise((resolve) => { this._resolveInit = resolve; });
+    this._nodeVoices = voices;
+    this.createNode();
+    const node = this.workletNode as AudioWorkletNode | null;
+    if (node) {
+      node.onprocessorerror = (event) => console.error('[NuadeEngine] worklet processor error - the engine stopped:', event);
+    }
+    await this._initPromise;
+    if (this._muteMask !== null) this.post({ type: 'setMuteMask', mask: this._muteMask });
   }
 
   private post(msg: NuadeIn, transfer?: Transferable[]): void {
@@ -168,6 +198,10 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
     await this._initPromise;
     if (!this.workletNode) throw new Error('NuadeEngine not initialized');
     if (!playerId) throw new Error('NuadeEngine: no player id');
+    // The node is sized for this song: ask the player how many voices it has before the module goes to the worklet.
+    const voices = await nuadeVoiceCounter()(new Uint8Array(moduleData), fileName || playerId, playerId, companions);
+    if (voices !== null && voices >= 1 && voices <= NUADE_NODE_VOICES && voices !== this._nodeVoices) await this.resizeNode(voices);
+    if (!this.workletNode) throw new Error('NuadeEngine not initialized');
     this._editPort = null;
     this._loaded = null;
     this.post({
@@ -188,7 +222,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   pause(): void { this.post({ type: 'pause' }); }
 
   /** Bit N set = voice N audible - the mixer's solo/mute. */
-  setMuteMask(mask: number): void { this.post({ type: 'setMuteMask', mask }); }
+  setMuteMask(mask: number): void { this._muteMask = mask; this.post({ type: 'setMuteMask', mask }); }
 
   setStereoSeparation(value: number): void { this.post({ type: 'setStereoSeparation', value }); }
 
@@ -254,8 +288,9 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
    * The grid the player's position maps onto. `followBy`: 'orderRow' for a player whose order and row are the grid's,
    * 'tick' for a reconstructed grid (the position's row * speed + tick is the player's tick count).
    */
-  setGrid(song: TickGridSong & { eaglePlayerTickGrid?: undefined }, followBy: NuadeFollowBy = 'orderRow'): void {
-    this.followBy = followBy;
+  setGrid(song: TickGridSong & { eaglePlayerTickGrid?: undefined; nuadePlayerId?: string }, followBy?: NuadeFollowBy): void {
+    // The table says how the player's position maps onto the grid (the registry may not import the table: dedicatedEngineFromRegistry).
+    this.followBy = followBy ?? nuadeFormatForPlayer(song.nuadePlayerId)?.followBy ?? 'orderRow';
     this.follow.setGrid(songTickGrid(song));
   }
 

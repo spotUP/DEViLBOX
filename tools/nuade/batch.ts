@@ -19,6 +19,8 @@ export interface ResultRow extends SongMeasure {
   swapMs?: number;
   /** Dual rows: why our engine could not be rendered for this song. */
   ownError?: string;
+  /** Our engine refuses this song by design (see SongMeasure.ownRefused). */
+  ownRefused?: boolean;
   /** Pass for this song alone (the per-song part of the rule). */
   songPass: boolean;
   ms: number;

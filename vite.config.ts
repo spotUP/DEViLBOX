@@ -134,6 +134,7 @@ export default defineConfig({
     include: testTier === 'heavy' ? heavyTestFiles : ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'Reference Code/**', 'dist', 'src/__tests__/ci/**', ...(testTier === 'fast' ? heavyTestFiles : [])],
     environment: 'happy-dom',
+    setupFiles: ['src/test/nuadeNodeProbe.setup.ts'],
     // Cap worker pool HARD. Each worker is a full-core node process; on an
     // 8-core dev machine the old cap of 4 pinned half the CPU on every run
     // (and every commit/push hook), which "grinds the computer" during normal
