@@ -1,0 +1,100 @@
+/**
+ * The pass rules of the nuade comparison (plan D8 + DN-1), as pure functions: the batch records measurements, these
+ * decide. Nothing here reads a file or renders audio, so the rules are tested alone (nuadeVerdictRules.test.ts) and
+ * the render test (nuadePlaysFormats.test.ts) applies the same functions to a live measurement.
+ */
+import type { FormatEngineChoice } from '../../src/types/formatEngine';
+
+/** What one (format, song) render recorded. */
+export interface SongMeasure {
+  song: string;
+  error?: string;
+  peak: number;
+  rms: number;
+  correlation: number;
+  lagMs: number;
+  /** Seconds, -1 = plays on to the end of the render. */
+  uadeEndAt: number;
+  nuadeEndAt: number;
+  /** Our own engine against UADE for dual rows (same song, same metric). */
+  own?: number | null;
+}
+
+export const THRESHOLDS = {
+  peak: 0.05,
+  rms: 0.02,
+  meanCorrelation: 0.95,
+  songCorrelation: 0.90,
+  endToleranceSecs: 1.0,
+  maxLagMs: 100,
+  swapMs: 100,
+  dualMargin: 0.01,
+} as const;
+
+/** (c) end agreement: UADE ends -> nuade ends within +-1.0 s; UADE runs on -> nuade runs on. */
+export function endAgrees(uadeEndAt: number, nuadeEndAt: number): boolean {
+  if (uadeEndAt > 0) return nuadeEndAt > 0 && Math.abs(nuadeEndAt - uadeEndAt) <= THRESHOLDS.endToleranceSecs;
+  return nuadeEndAt <= 0;
+}
+
+/** The reasons one song fails the per-song part of the rule ((a), the per-song floor of (b), (c) and the lag bound). */
+export function songFailures(m: SongMeasure): string[] {
+  const why: string[] = [];
+  const name = m.song.slice(m.song.lastIndexOf('/') + 1);
+  if (m.error) return [`${name}: ${m.error}`];
+  if (!(m.peak > THRESHOLDS.peak)) why.push(`${name}: peak ${m.peak.toFixed(3)} <= ${THRESHOLDS.peak}`);
+  if (!(m.rms > THRESHOLDS.rms)) why.push(`${name}: RMS ${m.rms.toFixed(3)} <= ${THRESHOLDS.rms}`);
+  if (!Number.isFinite(m.correlation)) why.push(`${name}: no correlation (less than 1 s of music to compare before a song end)`);
+  else if (!(m.correlation >= THRESHOLDS.songCorrelation)) why.push(`${name}: correlation ${m.correlation.toFixed(3)} < ${THRESHOLDS.songCorrelation}`);
+  if (Math.abs(m.lagMs) > THRESHOLDS.maxLagMs) why.push(`${name}: lag ${m.lagMs} ms > ${THRESHOLDS.maxLagMs}`);
+  if (!endAgrees(m.uadeEndAt, m.nuadeEndAt)) {
+    why.push(`${name}: ${m.uadeEndAt > 0 ? `UADE ends at ${m.uadeEndAt.toFixed(1)} s` : 'UADE plays on'}, nuade ${m.nuadeEndAt > 0 ? `ends at ${m.nuadeEndAt.toFixed(1)} s` : 'plays on'}`);
+  }
+  return why;
+}
+
+export const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+export interface ReplaceInput {
+  songs: SongMeasure[];
+  /** LIVE_EDIT is 'pass' for one of the format's registry keys today: it must keep an edit path (gate d). */
+  liveEditToday: boolean;
+  /** nuade open + seek to the 120 s mark, ms (the worklet's swapModule). Null when not measured. */
+  swapMs: number | null;
+}
+
+export interface ReplaceVerdict {
+  pass: boolean;
+  meanCorrelation: number | null;
+  endAgrees: boolean | null;
+  /** The failing measurements, joined; empty on a pass. */
+  heldBecause: string;
+}
+
+/** D8 replace rule over one format's corpus songs. Gate (e), the default-load route, is proven by the render test. */
+export function replaceVerdict(i: ReplaceInput): ReplaceVerdict {
+  if (i.songs.length === 0) return { pass: false, meanCorrelation: null, endAgrees: null, heldBecause: 'no corpus song measured' };
+  const why = i.songs.flatMap(songFailures);
+  const good = i.songs.filter((s) => !s.error && Number.isFinite(s.correlation));
+  const m = good.length ? mean(good.map((s) => s.correlation)) : null;
+  if (m === null || m < THRESHOLDS.meanCorrelation) why.push(`mean correlation ${m === null ? 'n/a' : m.toFixed(3)} < ${THRESHOLDS.meanCorrelation}`);
+  if (i.liveEditToday) {
+    if (i.swapMs === null) why.push('edit path not measured');
+    else if (i.swapMs > THRESHOLDS.swapMs) why.push(`live edit would lose its path: swap to the 120 s mark takes ${Math.round(i.swapMs)} ms > ${THRESHOLDS.swapMs} ms`);
+  }
+  const ends = i.songs.every((s) => endAgrees(s.uadeEndAt, s.nuadeEndAt));
+  return { pass: why.length === 0, meanCorrelation: m, endAgrees: ends, heldBecause: why.join('; ') };
+}
+
+/**
+ * DN-1 (owner decision b): nuade is the default of a dual row only if its mean correlation beats ours by >= 0.01 AND no
+ * song is worse than ours by more than 0.01; otherwise ours stays. Needs `own` on every song.
+ */
+export function dualDefault(songs: SongMeasure[]): { defaultEngine: FormatEngineChoice; nuadeMean: number; ownMean: number } | null {
+  const both = songs.filter((s) => !s.error && s.own != null && Number.isFinite(s.correlation));
+  if (both.length === 0 || both.length !== songs.length) return null;
+  const nuadeMean = mean(both.map((s) => s.correlation)), ownMean = mean(both.map((s) => s.own as number));
+  const beats = nuadeMean - ownMean >= THRESHOLDS.dualMargin - 1e-12;
+  const noneWorse = both.every((s) => (s.own as number) - s.correlation <= THRESHOLDS.dualMargin + 1e-12);
+  return { defaultEngine: beats && noneWorse ? 'nuade' : 'native', nuadeMean, ownMean };
+}
