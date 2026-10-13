@@ -137,6 +137,16 @@ export async function exportNativeSong(
       resolvedSong = { ...resolvedSong, uadeEditableFileData: fmtData } as TrackerSong;
     }
   }
+  // A song played by nuade or EaglePlayer holds its module in that engine's field, not in uadeEditableFileData, and the
+  // exporters read the module from uadeEditableFileData (Rob Hubbard wrote a 2080-byte ProTracker fallback for a 24590-byte
+  // module, which nuade then refused to open). The bytes are the same module: hand them over under the name exporters read.
+  if (!resolvedSong.uadeEditableFileData && (resolvedSong.nuadeFileData || resolvedSong.eaglePlayerFileData)) {
+    resolvedSong = {
+      ...resolvedSong,
+      uadeEditableFileData: (resolvedSong.nuadeFileData ?? resolvedSong.eaglePlayerFileData) as ArrayBuffer,
+      uadeEditableFileName: resolvedSong.nuadeFileName ?? resolvedSong.eaglePlayerFileName,
+    } as TrackerSong;
+  }
   // MaxTrax is native-played (not UADE-routed), so its bytes live in maxTraxFileData.
   if (!resolvedSong.maxTraxFileData) {
     const { useFormatStore } = await import('@stores/useFormatStore');

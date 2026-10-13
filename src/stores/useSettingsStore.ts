@@ -78,6 +78,8 @@ interface SettingsStore {
   setLinearInterpolation: (enabled: boolean) => void;
   setMasterTuning: (hz: number) => void;
   setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice | UADEImportMode) => void;
+  /** Forget the stored choice of one format: it plays on its table default again. */
+  resetFormatEngine: (format: keyof FormatEnginePreferences) => void;
   setSidEngine: (engine: SIDEngineType) => void;
   setSidChipModel: (model: SidChipModelSetting) => void;
   setSidClockSpeed: (clock: SidClockSetting) => void;
@@ -232,6 +234,11 @@ export const useSettingsStore = create<SettingsStore>()(
     setFormatEngine: (format, engine) =>
       set((state) => {
         (state.formatEngine as Record<string, string>)[format] = engine;
+      }),
+
+    resetFormatEngine: (format) =>
+      set((state) => {
+        delete (state.formatEngine as Record<string, unknown>)[format];
       }),
 
     setSidEngine: (engine) =>

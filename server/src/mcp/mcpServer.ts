@@ -1218,8 +1218,8 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'set_format_engine',
-    'Choose the engine one format plays on: native (Our Engine, dual formats only), uade or nuade. When the loaded song is of that format it is opened again on the new engine at the same position.',
-    { format: z.string().describe('Preference key (soundmon) or nuade player id (mmdc)'), engine: z.enum(['native', 'uade', 'nuade']) },
+    'Choose the engine one format plays on: native (Our Engine, dual formats only), uade or nuade, or default to clear the stored choice. When the loaded song is of that format it is opened again on the new engine at the same position.',
+    { format: z.string().describe('Preference key (soundmon) or nuade player id (mmdc)'), engine: z.enum(['native', 'uade', 'nuade', 'default']).describe('default = forget the stored choice; the format plays on its measured default again') },
     (p) => call('set_format_engine', p),
   );
 

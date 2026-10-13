@@ -15,7 +15,7 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 const ROOT = join(__dirname, '../../..');
 
 beforeEach(() => {
-  useSettingsStore.setState((s) => { delete (s.formatEngine as unknown as Record<string, unknown>).soundmon; delete (s.formatEngine as unknown as Record<string, unknown>).mmdc; });
+  useSettingsStore.setState((s) => { delete (s.formatEngine as unknown as Record<string, unknown>).soundmon; delete (s.formatEngine as unknown as Record<string, unknown>).robHubbard; delete (s.formatEngine as unknown as Record<string, unknown>).mmdc; });
   useFormatStore.getState().applyEditorMode({ format: 'MOD' } as unknown as TrackerSong);
 });
 
@@ -34,6 +34,26 @@ describe('NS-10 get_format_engines / set_format_engine', () => {
     expect((getFormatEngines({ format: 'mmdc' }) as { rows: { effective: string }[] }).rows[0]!.effective).toBe('nuade');
     expect(await setFormatEngine({ format: 'nonsense', engine: 'nuade' })).toMatchObject({ error: expect.stringContaining('unknown format') });
     expect(await setFormatEngine({ format: 'mmdc', engine: 'native' })).toMatchObject({ error: expect.stringContaining('cannot play') });
+  });
+
+  it('reports a row in the vocabulary of its choices, and a choice can always be undone (live MCP report: Rob Hubbard said native, offered uade|nuade, refused native)', async () => {
+    const rh = () => (getFormatEngines({ format: 'robHubbard' }) as { rows: { choices: string[]; effective: string; default: string; explicit: boolean }[] }).rows[0]!;
+    expect(rh().choices).toContain(rh().effective);
+    expect(rh().choices).toContain(rh().default);
+    expect(rh().explicit).toBe(false);
+    expect(await setFormatEngine({ format: 'robHubbard', engine: 'nuade' })).toMatchObject({ ok: true });
+    expect(rh()).toMatchObject({ effective: 'nuade', explicit: true });
+    expect(await setFormatEngine({ format: 'robHubbard', engine: 'default' })).toMatchObject({ ok: true, prefKey: 'robHubbard' });
+    expect(rh()).toMatchObject({ effective: rh().default, explicit: false });
+    expect((useSettingsStore.getState().formatEngine as unknown as Record<string, unknown>).robHubbard).toBeUndefined();
+    // a stored value the row cannot honour (a replace row has no engine of ours) is not reported as effective
+    useSettingsStore.setState((st) => { (st.formatEngine as unknown as Record<string, unknown>).mmdc = 'native'; });
+    const mm = (getFormatEngines({ format: 'mmdc' }) as { rows: { effective: string; explicit: boolean }[] }).rows[0]!;
+    expect(mm).toMatchObject({ effective: 'uade', explicit: false });
+    useSettingsStore.setState((st) => { delete (st.formatEngine as unknown as Record<string, unknown>).mmdc; });
+    // and the way back by name works too
+    await setFormatEngine({ format: 'robHubbard', engine: 'nuade' });
+    expect(await setFormatEngine({ format: 'robHubbard', engine: rh().default as never })).toMatchObject({ ok: true });
   });
 
   it('is registered: a server tool for each, and the bridge dispatch table', () => {

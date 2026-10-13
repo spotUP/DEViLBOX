@@ -20,6 +20,8 @@ export interface SwitchDeps {
   moduleFor(song: TrackerSong): Promise<ArrayBuffer | Uint8Array | null>;
   open(name: string, bytes: ArrayBuffer, companions: Map<string, ArrayBuffer> | undefined, start: false | 'song'): Promise<{ ok: boolean; error?: string }>;
   setChoice(prefKey: string, choice: FormatEngineChoice): void;
+  /** Forget the stored choice: the key plays on its table default. */
+  clearChoice(prefKey: string): void;
 }
 
 export type SwitchResult =
@@ -39,12 +41,18 @@ export function songBelongsTo(song: TrackerSong, row: NuadeFormat): boolean {
   return row.extensions.some((e) => tags.includes(e));
 }
 
-export async function switchFormatEngine(prefKey: string, choice: FormatEngineChoice, deps: SwitchDeps = defaultDeps()): Promise<SwitchResult> {
+export async function switchFormatEngine(prefKey: string, choice: FormatEngineChoice | 'default', deps: SwitchDeps = defaultDeps()): Promise<SwitchResult> {
   const rows = nuadeFormatsByPrefKey(prefKey);
   if (rows.length === 0) return { switched: false, error: `no format engine choice named ${prefKey}` };
-  if (!engineChoicesFor(rows[0]!).includes(choice)) return { switched: false, error: `${rows[0]!.label} cannot play on ${choice}` };
-  const stored = storedChoiceFor(rows[0]!, choice);
-  deps.setChoice(prefKey, stored);
+  let stored: FormatEngineChoice;
+  if (choice === 'default') {
+    deps.clearChoice(prefKey);
+    stored = rows[0]!.defaultEngine;
+  } else {
+    if (!engineChoicesFor(rows[0]!).includes(choice)) return { switched: false, error: `${rows[0]!.label} cannot play on ${choice}` };
+    stored = storedChoiceFor(rows[0]!, choice);
+    deps.setChoice(prefKey, stored);
+  }
 
   const song = deps.getSong();
   const row = rows.find((r) => songBelongsTo(song, r));
@@ -86,5 +94,6 @@ function defaultDeps(): SwitchDeps {
       return r.ok ? { ok: true } : { ok: false, error: r.error };
     },
     setChoice: (key, choice) => useSettingsStore.getState().setFormatEngine(key as never, choice),
+    clearChoice: (key) => useSettingsStore.getState().resetFormatEngine(key as never),
   };
 }
