@@ -17,6 +17,7 @@
  */
 
 import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile, setCacheChannelScopes, renderCacheKey, sidRenderOverrides } from './DJAudioCache';
+import { resolveRenderPlayer } from './djRenderEngine';
 import type { SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
 import type { CachedAudio } from './DJAudioCache';
 import { lookupServerAnalysis, storeServerAnalysis } from '@/lib/analysisCache';
@@ -117,6 +118,11 @@ export interface PipelineTask {
    * the task is queued - the render, its cache entry and its analysis all carry the same one.
    */
   sid?: SidForcedPlayback;
+  /**
+   * The nuade player that renders this file (the engine choice resolved on the main thread, once, when the task is
+   * queued: nuadeRouting.nuadePlayerFor); null = not nuade. The worker never resolves a choice itself.
+   */
+  nuadePlayerId?: string | null;
 }
 
 interface QueueEntry {
@@ -478,8 +484,9 @@ export class DJPipeline {
    * Enqueue a file for render + analysis.
    * Returns a promise that resolves when the full pipeline completes.
    */
-  enqueue(task: PipelineTask): Promise<PipelineResult> {
+  async enqueue(task: PipelineTask): Promise<PipelineResult> {
     task.sid ??= sidRenderOverrides(task.fileBuffer);
+    if (task.nuadePlayerId === undefined) task.nuadePlayerId = await resolveRenderPlayer(await hashFile(task.fileBuffer), task.filename, task.fileBuffer);
     return new Promise((resolve, reject) => {
       const entry: QueueEntry = { task, resolve, reject };
 
@@ -542,10 +549,12 @@ export class DJPipeline {
     companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
     /** The SID Settings the cached audio was rendered with (DJAudioCache.sidOverridesOfKey of its key). */
     sid?: SidForcedPlayback,
+    /** The nuade player the cached audio was rendered with (djRenderEngine.nuadePlayerOfKey of its key), null = another engine. */
+    nuadePlayerId?: string | null,
   ): Promise<ChannelScopeTrack | undefined> {
     const id = `scopes-${filename}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const result = await this.enqueue({
-      id, fileBuffer: source, filename, priority: 'low', companions, scopesOnly: { expectedDuration }, sid,
+      id, fileBuffer: source, filename, priority: 'low', companions, scopesOnly: { expectedDuration }, sid, nuadePlayerId,
     });
     return result.channelScopes;
   }
@@ -608,6 +617,8 @@ export class DJPipeline {
     // Check cache. A preview render (capped) serves only a preview request;
     // a deck load gets the whole song, rendered now if the cache has a preview.
     const preview = maxRenderSeconds !== undefined;
+    // The engine this file renders on under the current settings: part of its cache key, so a switch re-renders.
+    await resolveRenderPlayer(await hashFile(fileBuffer), filename, fileBuffer);
     const cached = await getCachedAudio(fileBuffer, { allowPreview: preview });
     if (cached && isCacheFullyAnalyzed(cached) && cached.audioData.byteLength > 0) {
       // Fully cached + analyzed — return immediately
@@ -1211,7 +1222,7 @@ export class DJPipeline {
    * cannot render is not retried on every load.
    */
   private async executeScopesOnly(task: PipelineTask, expectedDuration: number): Promise<PipelineResult> {
-    const hash = await renderCacheKey(task.fileBuffer, task.sid);
+    const hash = await renderCacheKey(task.fileBuffer, task.sid, task.nuadePlayerId);
     let track: ChannelScopeTrack | undefined;
     try {
       const out = await this.doRender(task);
@@ -1262,6 +1273,7 @@ export class DJPipeline {
             companions,
             maxSeconds: task.maxRenderSeconds,
             sid: task.sid,
+            ...(task.nuadePlayerId ? { engine: 'nuade' as const, playerId: task.nuadePlayerId } : {}),
           },
           transferables,
         );

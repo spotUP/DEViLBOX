@@ -12,6 +12,7 @@
  * attached (DeckEngine.attachLateChannelScopes) while it plays.
  */
 import { scopelessOriginOf, releaseChannelStems, type ChannelScopeTrack, type ScopelessOrigin } from './channelScopeTrack';
+import { nuadePlayerOfKey } from './djRenderEngine';
 import { cacheFreeBytes, getCachedEntryByHash, listScopelessEntries, sidOverridesOfKey } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
 import { getDJEngineIfActive } from './DJEngine';
@@ -31,7 +32,7 @@ function renderOnce(origin: ScopelessOrigin): Promise<ChannelScopeTrack | undefi
       const entry = await getCachedEntryByHash(origin.hash);
       if (!entry?.sourceData || !needsChannelScopeRerender(entry)) return undefined;
       // The entry's own SID Settings (its key), so the track lines up with the audio it was rendered with.
-      return getDJPipeline().renderChannelScopes(entry.sourceData, entry.filename, entry.duration, undefined, sidOverridesOfKey(entry.hash));
+      return getDJPipeline().renderChannelScopes(entry.sourceData, entry.filename, entry.duration, undefined, sidOverridesOfKey(entry.hash), nuadePlayerOfKey(entry.hash) ?? null);
     })().catch((err) => {
       console.warn(`[DJChannelScopeRerender] ${origin.filename}:`, err);
       return undefined;

@@ -11,6 +11,7 @@
 
 import { isSidFileBytes, sidForcedPlayback, type SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { renderEngineSuffix } from './djRenderEngine';
 
 const DB_NAME = 'DEViLBOX_AudioCache';
 const DB_VERSION = 2;
@@ -228,13 +229,20 @@ export function sidOverridesOfKey(key: string): SidForcedPlayback {
  * The cache key of a render of `source`: its content hash, plus the SID
  * Settings forced on it (the current settings unless the render's own are given).
  */
-export async function renderCacheKey(source: ArrayBuffer, sid: SidForcedPlayback = sidRenderOverrides(source)): Promise<string> {
-  return (await hashFile(source)) + renderKeySuffix(sid);
+export async function renderCacheKey(
+  source: ArrayBuffer,
+  sid: SidForcedPlayback = sidRenderOverrides(source),
+  /** The nuade player that renders it: a name, null for the other engines, undefined = as resolved for this file now. */
+  nuadePlayerId?: string | null,
+): Promise<string> {
+  const hash = await hashFile(source);
+  const engine = nuadePlayerId === undefined ? renderEngineSuffix(hash) : nuadePlayerId ? `#nuade=${nuadePlayerId}` : '';
+  return hash + renderKeySuffix(sid) + engine;
 }
 
 /** Whether an entry's audio is what a render of its source gives under the current SID Settings. */
 function rendersUnderCurrentSettings(entry: Pick<CachedAudio, 'hash' | 'sourceData'>): boolean {
-  return entry.hash.slice(64) === renderKeySuffix(sidRenderOverrides(entry.sourceData));
+  return entry.hash.slice(64) === renderKeySuffix(sidRenderOverrides(entry.sourceData)) + renderEngineSuffix(entry.hash.slice(0, 64));
 }
 
 /** Get cached audio by file hash (the render key under the current settings) */
