@@ -81,7 +81,12 @@ function loadModule(): Promise<NuadeModule> {
 }
 
 export class NuadeHeadless {
-  private constructor(readonly m: NuadeModule, readonly sampleRate: number) {}
+  readonly m: NuadeModule;
+  readonly sampleRate: number;
+  private constructor(m: NuadeModule, sampleRate: number) {
+    this.m = m;
+    this.sampleRate = sampleRate;
+  }
 
   /** One instance per call shares the WASM module's single song slot: use one at a time. */
   static async create(sampleRate = 48000): Promise<NuadeHeadless> {

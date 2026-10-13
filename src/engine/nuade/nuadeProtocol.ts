@@ -32,7 +32,10 @@ export type NuadeIn =
   | { type: 'seek'; frame: number }
   | { type: 'setStereoSeparation'; value: number }
   /** Read bytes of the player's typed state (answered with `state`). */
-  | { type: 'requestState'; offset: number; len: number };
+  | { type: 'requestState'; offset: number; len: number }
+  /** Edit slot: forwarded to nw_cell_write / nw_instrument_write, which answer -ENOSYS until upstream publishes a write API. */
+  | { type: 'cellWrite'; pattern: number; row: number; channel: number; values: number[] }
+  | { type: 'instrumentWrite'; instrument: number; param: number; value: number };
 
 export interface NuadeVoiceState { note: number; instrument: number; volume: number; pan: number; active: boolean }
 
@@ -55,6 +58,8 @@ export type NuadeOut =
   | { type: 'oscData'; channels: Int16Array[]; frame: number; sampleRate: number }
   | { type: 'songEnd' }
   | { type: 'swapDone'; ms: number }
+  /** The answer to a cellWrite / instrumentWrite: 0 ok, negative errno (-52 = no write API). */
+  | { type: 'writeResult'; op: 'cell' | 'instrument'; status: number }
   | { type: 'state'; offset: number; bytes: ArrayBuffer }
   | { type: 'stopped' }
   | { type: 'error'; message: string };
@@ -62,7 +67,7 @@ export type NuadeOut =
 /** Every message type the worklet handles itself (the isolation / dub kinds go through channel-outputs.js). */
 export const NUADE_IN_MESSAGES = [
   'init', 'loadModule', 'play', 'stop', 'pause', 'setSubsong', 'setMuteMask',
-  'swapModule', 'seek', 'setStereoSeparation', 'requestState',
+  'swapModule', 'seek', 'setStereoSeparation', 'requestState', 'cellWrite', 'instrumentWrite',
 ] as const satisfies readonly NuadeIn['type'][];
 
 /** The dub / isolation kinds handled by DevilboxChannelOutputs. */
@@ -71,8 +76,14 @@ export const NUADE_CHANNEL_OUTPUT_MESSAGES = [
 ] as const satisfies readonly NuadeIn['type'][];
 
 export const NUADE_OUT_MESSAGES = [
-  'ready', 'moduleLoaded', 'subsongStarted', 'position', 'vu', 'oscData', 'songEnd', 'swapDone', 'state', 'stopped', 'error',
+  'ready', 'moduleLoaded', 'subsongStarted', 'position', 'vu', 'oscData', 'songEnd', 'swapDone', 'writeResult', 'state', 'stopped', 'error',
 ] as const satisfies readonly NuadeOut['type'][];
+
+/**
+ * Voices the engine's AudioWorkletNode declares outputs for (dub sends are outputs 5..), at least the largest voice
+ * count of any nuade player in the corpus (nuadeVoiceCount.test.ts measures it).
+ */
+export const NUADE_NODE_VOICES = 8;
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isStr = (v: unknown): v is string => typeof v === 'string';
@@ -97,6 +108,8 @@ export function parseNuadeOut(data: unknown): NuadeOut | null {
       return Array.isArray(d.levels) ? { type: 'vu', levels: d.levels as number[] } : null;
     case 'oscData':
       return Array.isArray(d.channels) && isNum(d.frame) && isNum(d.sampleRate) ? (d as unknown as NuadeOut) : null;
+    case 'writeResult':
+      return (d.op === 'cell' || d.op === 'instrument') && isNum(d.status) ? { type: 'writeResult', op: d.op, status: d.status } : null;
     case 'swapDone':
       return isNum(d.ms) ? { type: 'swapDone', ms: d.ms } : null;
     case 'state':

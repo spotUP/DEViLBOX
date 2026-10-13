@@ -14,6 +14,7 @@ describe('NE-1 nuade protocol', () => {
       vu: { levels: [0, 0.5] },
       oscData: { channels: [new Int16Array(4)], frame: 0, sampleRate: 48000 },
       swapDone: { ms: 12 },
+      writeResult: { op: 'cell', status: -52 },
       state: { offset: 0, bytes: new ArrayBuffer(4) },
       error: { message: 'x' },
     };

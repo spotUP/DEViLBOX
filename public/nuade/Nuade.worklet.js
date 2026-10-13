@@ -84,6 +84,14 @@ class NuadeProcessor extends AudioWorkletProcessor {
       case 'requestState':
         this.readState(data.offset | 0, data.len | 0);
         break;
+      case 'cellWrite':
+        this.writeCell(data);
+        break;
+      case 'instrumentWrite':
+        if (this.module && this.loaded) {
+          this.port.postMessage({ type: 'writeResult', op: 'instrument', status: this.module._nw_instrument_write(data.instrument | 0, data.param | 0, data.value | 0) });
+        }
+        break;
       case 'dispose':
         this.cleanup();
         break;
@@ -192,6 +200,17 @@ class NuadeProcessor extends AudioWorkletProcessor {
     } catch (error) {
       this.port.postMessage({ type: 'error', message: 'swapModule: ' + error.message });
     }
+  }
+
+  writeCell(data) {
+    const m = this.module;
+    if (!m || !this.loaded) return;
+    const values = Int32Array.from(data.values || []);
+    const ptr = m._malloc(values.length * 4 || 4);
+    new Int32Array(m.HEAPU8.buffer, ptr, values.length).set(values);
+    const status = m._nw_cell_write(data.pattern | 0, data.row | 0, data.channel | 0, ptr, values.length);
+    m._free(ptr);
+    this.port.postMessage({ type: 'writeResult', op: 'cell', status });
   }
 
   readState(offset, len) {
