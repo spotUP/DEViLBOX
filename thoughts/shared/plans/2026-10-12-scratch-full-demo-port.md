@@ -75,6 +75,7 @@ Causes, by row: P13 (PG-E) - MUSICAL caps the demo's density state (high -> medi
 ## Render-mode progress (agent RENDER, 2026-10-13; started at 02c916994)
 
 Checklist: [x] S2 Render mode (section / three_deck / dj_routine, default three_deck; PEAK / PERFORMER / BATTLE gate removed; panel "Scratch Render", store `autoDJScratchRender`, MCP `set_auto_dj_config`) - [x] C15 (the two hands; J10 stays open, below) - [x] the "Dark preset" NaN flake (harness, see FLAKE above) - [x] PG-K (T6, T8, T10, F5, F6) - [x] PG-G R3 - [ ] R5 (ported, no entry point: owner) - [ ] remaining rows. Running count: 60 of 81.
+Stopped here (handoff thoughts/shared/handoffs/2026-10-13_scratch-render-mode.md): open X7, X8 (owner), R5 (entry point), R12 (R6), PG-H 6, PG-I 11.
 
 PG-K (built): exact ports with fixtures from turntable.py (tools/scratch-fixtures/gen_pg_k.py -> src/engine/turntable/__tests__/fixtures/pg_k.json). The demo's renders pass none of skip / contact_bounce / lag_ms / deck / cartridge_response / GRIP_STATES (render_gesture passes curve, cut_in (unused), hamster, ramp, offset), so - as the owner's T6 decision - they are available and applied nowhere; the ledger's planned D2 exposure and the fireDjFx reachability with those options would add what the demo does not have: owner question (report).
 
