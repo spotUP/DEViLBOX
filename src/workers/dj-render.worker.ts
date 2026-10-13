@@ -27,6 +27,8 @@ import {
 } from '@/engine/dj/channelScopeTrack';
 import { steadyPlayerCallHz, type PlayerCallSample } from '@/engine/dj/sidPlayerClock';
 import { isSidFileBytes, type SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
+import { NuadeDriver } from '@/engine/nuade/nuadeDriver';
+import { loadNuadeModuleFromPublic } from '@/engine/nuade/nuadeModule';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,12 @@ interface RenderRequest {
   companions?: Array<{ filename: string; buffer: ArrayBuffer }>;
   /** A SID: the chip model / clock SID Settings forces over the header (DJPipeline keys the cache on it). */
   sid?: SidForcedPlayback;
+  /**
+   * 'nuade': render with the nuade player `playerId` (the engine choice made on the main thread, DJPipeline); absent =
+   * the format routing below. The worker never decides between engines itself.
+   */
+  engine?: 'nuade';
+  playerId?: string;
 }
 
 interface InitRequest {
@@ -1485,6 +1493,75 @@ async function renderWithLibopenmpt(
   return { left, right, sampleRate, channelScopes: track, monoStems };
 }
 
+// ── nuade ────────────────────────────────────────────────────────────────────
+
+let nuadeDriver: Promise<NuadeDriver> | null = null;
+
+/**
+ * Render with nuade: ONE pass gives the stereo mix and every voice's own mono signal (nw_render with voice buffers), so the
+ * deck's channel scopes and stems come from the same pass as the audio, as with libopenmpt's taps. A voice sits in the
+ * mix where the mixer put it (nw_pans: left (1 - pan) / 2, right (1 + pan) / 2 of its signal), which is what the stem
+ * is written with, so the stems add up to the mix.
+ */
+async function renderWithNuade(
+  fileBuffer: ArrayBuffer,
+  filename: string,
+  playerId: string,
+  subsong: number,
+  id: string,
+  companions: RenderRequest['companions'],
+  maxSeconds = 600,
+  withStems = true,
+): Promise<RenderResult> {
+  const sampleRate = 44100;
+  nuadeDriver ??= loadNuadeModuleFromPublic().then((m) => NuadeDriver.fromModule(m, sampleRate));
+  const nu = await nuadeDriver;
+  postProgress(id, 10);
+  nu.clearFiles();
+  for (const c of companions ?? []) nu.addFile(c.filename, new Uint8Array(c.buffer));
+  nu.open(new Uint8Array(fileBuffer), filename, playerId);
+  try {
+    if (!nu.start(subsong > 0 ? subsong : nu.defaultSubsong)) throw new Error(`nuade refused subsong ${subsong} of ${filename}`);
+    // The deck plays the song once: end at the first loop point, as UADE's render does.
+    nu.m._nw_set_repeat(1);
+    const voices = nu.voiceCount;
+    const tapCount = Math.min(voices, DECK_SCOPE_CHANNELS);
+    const scopes = tapCount > 0 ? new ChannelScopeTrackBuilder(tapCount, sampleRate) : null;
+    const stems = withStems && tapCount > 0 ? new ChannelStemsBuilder(tapCount) : null;
+    const CHUNK = 4096;
+    const MAX_FRAMES = sampleRate * maxSeconds;
+    const chunks: { left: Float32Array; right: Float32Array }[] = [];
+    let totalFrames = 0;
+    const tPass = Date.now();
+    while (totalFrames < MAX_FRAMES) {
+      const r = nu.render(Math.min(CHUNK, MAX_FRAMES - totalFrames), tapCount > 0);
+      if (r.frames <= 0) break;
+      const left = new Float32Array(r.frames), right = new Float32Array(r.frames);
+      for (let i = 0; i < r.frames; i++) { left[i] = r.stereo[2 * i]; right[i] = r.stereo[2 * i + 1]; }
+      chunks.push({ left, right });
+      totalFrames += r.frames;
+      if (scopes) {
+        const pans = nu.pans();
+        scopes.push(r.frames, (ch, i) => r.voices[ch][i] * 0.5);
+        stems?.push(r.frames, (ch, i) => r.voices[ch][i] * 0.5 * (1 - (pans[ch] ?? 0)), (ch, i) => r.voices[ch][i] * 0.5 * (1 + (pans[ch] ?? 0)));
+      }
+      if (totalFrames % (sampleRate * 5) < CHUNK) postProgress(id, Math.min(80, 15 + (totalFrames / MAX_FRAMES) * 65));
+      if (r.flags & 2) break; // the song ended
+    }
+    if (totalFrames === 0) throw new Error(`nuade rendered 0 frames for ${filename}`);
+    const left = new Float32Array(totalFrames), right = new Float32Array(totalFrames);
+    let offset = 0;
+    for (const c of chunks) { left.set(c.left, offset); right.set(c.right, offset); offset += c.left.length; }
+    postProgress(id, 85);
+    const track = scopes?.finish();
+    const monoStems = track && stems ? stems.finishMono(totalFrames) : undefined;
+    console.log(`[DJRenderWorker/nuade] ${filename}: ${playerId}, one pass with ${tapCount} voice taps ${Date.now() - tPass} ms, ${monoStems?.length ?? 0} mono stems`);
+    return { left, right, sampleRate, channelScopes: track, monoStems };
+  } finally {
+    nu.close();
+  }
+}
+
 // ── Message Handling ─────────────────────────────────────────────────────────
 
 function postProgress(id: string, progress: number): void {
@@ -1502,7 +1579,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
 
     case 'render': {
-      const { id, fileBuffer, filename, subsong = 0, companions, maxSeconds, stems = true, sid } = msg;
+      const { id, fileBuffer, filename, subsong = 0, companions, maxSeconds, stems = true, sid, engine, playerId } = msg;
       try {
         let result: RenderResult;
 
@@ -1516,7 +1593,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         // 7. Amiga formats (UADE)
         // 8. Everything else (libopenmpt fallback)
 
-        if (isC64SID(fileBuffer)) {
+        if (engine === 'nuade' && playerId) {
+          result = await renderWithNuade(fileBuffer, filename, playerId, subsong, id, companions, maxSeconds, stems);
+        } else if (isC64SID(fileBuffer)) {
           result = await renderWithSID(fileBuffer, filename, subsong, id, stems, maxSeconds, sid);
         } else if (isHivelyFormat(filename)) {
           result = await renderWithHively(fileBuffer, filename, subsong, id, stems);
