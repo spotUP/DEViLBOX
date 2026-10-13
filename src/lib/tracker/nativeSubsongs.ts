@@ -12,7 +12,7 @@
  */
 
 /** The engines that play one subsong of a file - their `NativeEngineRouting` keys. */
-export type NativeSubsongEngine = 'Gme' | 'Asap' | 'Psgplay' | 'EaglePlayer';
+export type NativeSubsongEngine = 'Gme' | 'Asap' | 'Psgplay' | 'EaglePlayer' | 'Nuade';
 
 export interface NativeSubsongs {
   engine: NativeSubsongEngine;
@@ -60,12 +60,13 @@ export function subsongLabel(s: NativeSubsongs, index: number): string {
  * The format-store field that tells the engine which subsong to start when
  * the song is (re)loaded - play after a stop starts the subsong last heard.
  */
-export function subsongStartField(s: NativeSubsongs): { gmeTrack: number } | { sndhSubtune: number } | { asapSong: number } | { eaglePlayerSubsong: number } {
+export function subsongStartField(s: NativeSubsongs): { gmeTrack: number } | { sndhSubtune: number } | { asapSong: number } | { eaglePlayerSubsong: number } | { nuadeSubsong: number } {
   switch (s.engine) {
     case 'Gme': return { gmeTrack: s.current };
     case 'Psgplay': return { sndhSubtune: s.current + 1 };
     case 'Asap': return { asapSong: s.current };
     case 'EaglePlayer': return { eaglePlayerSubsong: s.current };
+    case 'Nuade': return { nuadeSubsong: s.current };
   }
 }
 
