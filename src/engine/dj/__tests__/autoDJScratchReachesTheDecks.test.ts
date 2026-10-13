@@ -76,7 +76,28 @@ function scratchDeck(startSec: number) {
   });
 }
 
-async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style', render: string | null = 'section', bars = 8) {
+/** A 16-bit mono WAV at 44.1 kHz shaped like a spoken phrase: voiced syllables at the reference take's word windows. */
+function phraseWav(): ArrayBuffer {
+  const sr = 44100, n = Math.trunc(2.44 * sr);
+  const pcm = new Int16Array(n);
+  const words: Array<[number, number, number]> = [[0.02, 0.28, 140], [0.4, 0.6, 160], [0.72, 0.96, 150], [1.1, 1.3, 170], [1.42, 1.7, 130], [1.77, 2.1, 180], [2.14, 2.42, 120]];
+  for (const [a, b, f] of words) {
+    for (let i = Math.trunc(a * sr); i < Math.trunc(b * sr); i++) {
+      const t = (i - a * sr) / sr, env = Math.sin(Math.PI * t / (b - a));
+      let v = 0;
+      for (let h = 1; h <= 8; h++) v += Math.sin(2 * Math.PI * f * h * t) / h;
+      pcm[i] = Math.round(0.3 * env * v * 32767);
+    }
+  }
+  const buf = new ArrayBuffer(44 + 2 * n), v = new DataView(buf);
+  const w = (o: number, s: string) => { for (let i = 0; i < 4; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + 2 * n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, 2 * n, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, pcm[i]!, true);
+  return buf;
+}
+
+async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style', render: string | null = 'section', bars = 8, setup?: () => void) {
   const track = corpusAnalysis('breakdowns');
   const breakdown = track.sections.find((s) => s.kind === 'breakdown')!;
   const startSec = timeAtBeat(track.beatGrid, barStartBeat(track.downbeats, breakdown.startBar - 2)) + 0.05;
@@ -89,6 +110,7 @@ async function run(mode: 'MUSICAL' | 'OFF', records: string | string[] = 'style'
   holder.engine = { getDeck: (id: 'A' | 'B') => (id === 'A' ? deck : idle), mixer: { samplerInput, setCrossfader: () => {} }, setCrossfader: () => {} };
   resetScratchVoicePool();
   await getScratchVoicePool().deckCBus('overlay'); // the bus worklet loads before the fake clock runs
+  setup?.();
 
   const pl = useDJPlaylistStore.getState();
   const id = `scratch-r7-${Date.now()}`;
@@ -159,7 +181,7 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
     dj.stopPolling();
     useDJStore.getState().setAutoDJEnabled(false);
     useDJStore.getState().setAutoDJStatus('idle');
-    useDJStore.getState().setAutoDJConfig({ scratchMode: 'MUSICAL', scratchStyle: 'auto', scratchRecords: 'style', scratchRender: DEFAULT_SCRATCH_RENDER });
+    useDJStore.getState().setAutoDJConfig({ scratchMode: 'MUSICAL', scratchStyle: 'auto', scratchRecords: 'style', scratchRender: DEFAULT_SCRATCH_RENDER, scratchPhrase: null });
     setSessionController(null);
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -248,6 +270,26 @@ describe('Auto DJ scratches through the decks (SCR-P7.R7)', () => {
     expect(dj.counts.routines).toBe(1);
     expect(dj.lastPlan?.routine).toBe('scratchDj');
     expect(dj.runs.every((r) => r.run.event.render?.chain === 'scratchDj')).toBe(true);
+  }, 240_000);
+
+  // R5 (owner 2026-10-13): a phrase WAV dropped on Deck C (DJDeck's drop -> loadDeckCPhrase) is the demo's
+  // `--wav`: its word cues (load_wav_cues) by cues_from_wav's roles; the three-deck routine scratches only them
+  it('R5: a phrase WAV dropped on Deck C - the three-deck routine scratches its word cues', async () => {
+    const { loadDeckCPhrase } = await import('@/engine/dj/scratch/autoScratchRuntime');
+    const { scratchPhraseStats, phraseRecordId } = await import('@/engine/dj/scratch/scratchPhrase');
+    const loads = scratchPhraseStats.loads;
+    const r = await run('MUSICAL', 'style', null, 10, () => { loadDeckCPhrase(phraseWav(), 'my phrase.wav'); });
+    expect(scratchPhraseStats.loads - loads).toBe(1);
+    expect(useDJStore.getState().autoDJScratchPhrase?.roles).toEqual({
+      HOME: phraseRecordId('my phrase', 'ROCK'), SECONDARY: phraseRecordId('my phrase', 'FUNKY'), ACCENT: phraseRecordId('my phrase', 'BEAT'), FX: phraseRecordId('my phrase', 'BEAT'),
+    });
+    expect(r.lastPlan?.routine).toBe('threeDeck');
+    // the needles bookend the routine (their sound is the needle's); every stroke between plays a phrase cue
+    const strokes = r.runs.filter((x) => x.run.event.source.type === 'CRATE' && x.run.event.gesture !== 'needleDrop' && x.run.event.gesture !== 'needleLift');
+    expect(strokes.length).toBeGreaterThanOrEqual(1);
+    for (const x of strokes) expect(x.run.event.source.type === 'CRATE' && x.run.event.source.recordId).toMatch(/^PHRASE:my phrase:(ROCK|FUNKY|BEAT)$/);
+    // the strokes that came due before the run's end were rendered from the phrase's cues
+    expect(r.counts.gestures).toBeGreaterThanOrEqual(1);
   }, 240_000);
 
   it('Auto Scratch OFF: the same run plans and performs nothing', async () => {

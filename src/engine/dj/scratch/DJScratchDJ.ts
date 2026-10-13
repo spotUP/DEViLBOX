@@ -23,7 +23,7 @@ import type { ScratchProfileId } from './scratchStyles';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
 import { PALETTE_PROFILE, SCRATCH_PROFILES, type ScratchMode, type ScratchRenderMode } from './scratchStyles';
 import { anchorFor } from './scratchAnchor';
-import { CLEAN_CRATE_POOL, cuePoolsFor, getScratchRecord, sourcePool, wordEmphasisRecord, type ScratchRecord } from './scratchCatalogue';
+import { CLEAN_CRATE_POOL, cuePoolsFor, getScratchRecord, sourcePool, wordEmphasisRecord, type CueRole, type ScratchRecord } from './scratchCatalogue';
 import { selectScratchSource, type SourceDecision, type SourceRequest, type TrackerSampleInfo } from './ScratchSourceSelector';
 import { ScratchMemory } from './scratchMemory';
 import { PerformanceBudget, performancePermissions } from './scratchBudget';
@@ -92,6 +92,9 @@ export interface ScratchTickInput {
   /** The Records selector resolved (R8, `record_set`): the checked records; [] = off; null / none = 'style' (the
    *  overlay's clean crate until the synthesized sources exist, three_deck's whole bank). */
   records?: readonly string[] | null;
+  /** The phrase dropped on Deck C (R5, the demo's `--wav`): its cue record per role; the three-deck routine
+   *  scratches it (`cues_from_wav`) instead of the crate. */
+  phrase?: Readonly<Record<CueRole, string>> | null;
   /** Section 33 genre the source selector reads. */
   genreHint?: ScratchGenreHint | 'unknown';
   /** Scratchable instruments of a tracker deck's song (P5.6). The Auto DJ scratches crate records only
@@ -476,9 +479,13 @@ export class DJScratchDJ {
         // and chop (`cues_with_word_emphasis`); 'style' (none checked) is the whole bank
         const picked = input.records ? input.records.filter((id) => !!getScratchRecord(id)) : [];
         const emphasis = wordEmphasisRecord(picked);
-        const threeDeckOpts = emphasis
-          ? { pools: { HOME: [emphasis], SECONDARY: [emphasis], ACCENT: [emphasis], FX: [emphasis] }, phraseEmphasis: true }
-          : picked.length ? { pools: cuePoolsFor(picked) } : {};
+        // a phrase on Deck C (R5) is the demo's deck_c_wav: its cues by role, the bank (and its emphasis) unused
+        const ph = input.phrase;
+        const threeDeckOpts = ph
+          ? { pools: { HOME: [ph.HOME], SECONDARY: [ph.SECONDARY], ACCENT: [ph.ACCENT], FX: [ph.FX] } }
+          : emphasis
+            ? { pools: { HOME: [emphasis], SECONDARY: [emphasis], ACCENT: [emphasis], FX: [emphasis] }, phraseEmphasis: true }
+            : picked.length ? { pools: cuePoolsFor(picked) } : {};
         const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar, threeDeckOpts);
         // every stroke rendered as the demo renders it, on the routine's own bus (scratch null test)
         const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck')).map((e) => ({ ...e, layer: 'demo' as const }));

@@ -312,8 +312,22 @@ export const CUE_ROLE_RECORD: Readonly<Record<CueRole, string>> = { HOME: 'AH_ST
 
 const BY_ID: ReadonlyMap<string, ScratchRecord> = new Map(SCRATCH_RECORDS.map((r) => [r.id, r]));
 
+/** Records that are not in the crate (a tracker deck's samples, a phrase dropped on Deck C), registered by the pool. */
+const EXTRA = new Map<string, ScratchRecord>();
+
+/** A crate record, or a registered extra one: the one lookup every reader of a record id uses. */
 export function getScratchRecord(id: string): ScratchRecord | undefined {
-  return BY_ID.get(id);
+  return BY_ID.get(id) ?? EXTRA.get(id);
+}
+
+/** Make a record outside the crate known by its id (`ScratchVoicePool.registerTransientRecord`). */
+export function registerExtraRecord(record: ScratchRecord): void {
+  if (!BY_ID.has(record.id)) EXTRA.set(record.id, record);
+}
+
+/** Forget the extra records whose id starts with `prefix`. */
+export function forgetExtraRecords(prefix: string): void {
+  for (const id of [...EXTRA.keys()]) if (id.startsWith(prefix)) EXTRA.delete(id);
 }
 
 export const SCRATCH_RECORD_CATEGORIES: readonly ScratchRecordCategory[] = [...new Set(SCRATCH_RECORDS.map((r) => r.category))];

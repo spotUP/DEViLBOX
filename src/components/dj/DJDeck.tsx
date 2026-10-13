@@ -13,6 +13,7 @@ import { openDeckTrack } from '@/lib/song/openSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { notify } from '@stores/useNotificationStore';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
@@ -296,6 +297,16 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       if (isAudioFile(file.name)) {
         // Audio file mode (MP3, WAV, FLAC, etc.)
         const buffer = await file.arrayBuffer();
+        // A WAV dropped on Deck C is also its scratch phrase (R5): the demo's word cues, scratched by the routine
+        if (deckId === 'C' && /\.wav$/i.test(file.name)) {
+          try {
+            const { loadDeckCPhrase } = await import('@/engine/dj/scratch/autoScratchRuntime');
+            const phrase = loadDeckCPhrase(buffer.slice(0), file.name);
+            notify.success(`Scratch phrase: ${phrase.name}`);
+          } catch (err) {
+            notify.error(`Scratch phrase not loaded: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
         const info = await engine.loadAudioToDeck(deckId, buffer, file.name);
 
         // Switch to turntable view for audio files

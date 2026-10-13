@@ -1864,7 +1864,7 @@ class DJAutoDJ {
       const song = track?.tracker ? (getDJEngine().getDeck(this.activeDeck).replayer.getSong() as { instruments?: TrackerSampleInstrument[] } | null) : null;
       c.tick({
         perf: this.performanceContext(timeRemaining), deck: this.ab(this.activeDeck), mode, style: choice.style,
-        genre: choice.modifiers, genreHint: choice.genre, profile: choice.profile, scratchPermission: permission, records: scratchRecordsFor(s.autoDJScratchRecords), render: scratchRenderModeOf(s.autoDJScratchRender),
+        genre: choice.modifiers, genreHint: choice.genre, profile: choice.profile, scratchPermission: permission, records: scratchRecordsFor(s.autoDJScratchRecords), phrase: s.autoDJScratchPhrase?.roles ?? null, render: scratchRenderModeOf(s.autoDJScratchRender),
         hold: transitioning, juggleActive: juggling, userControl,
         juggleShape: juggling ? juggleShapeOf(this.juggle?.currentExecution() ?? null) : null,
         decksPlaying: { A: this.deckPlaying('A'), B: this.deckPlaying('B') },
