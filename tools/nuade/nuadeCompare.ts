@@ -113,6 +113,7 @@ export interface SongComparison {
   /** Dual rows: our engine against UADE (same windows and metric); null when the engine has no headless render. */
   own?: number | null;
   ownError?: string;
+  ownRefused?: boolean;
   error?: string;
 }
 
@@ -168,16 +169,21 @@ export async function compareSong(nu: NuadeHeadless, row: NuadeFormat, song: str
   const best = windows > 40 ? bestLagCorrelation(envelope20(mine.samples, SR), envelope20(uade.samples, SR), windows) : { correlation: NaN, lagWindows: 0 };
   let own: number | null | undefined;
   let ownError: string | undefined;
+  let ownRefused = false;
   if (row.role === 'dual') {
     const { renderOwn } = await import('./ownRender');
     const o = await renderOwn(row.id, song, seconds);
     if (!o) own = null;
-    else if (o.error || windows <= 40) { own = null; ownError = o.error ?? 'too little music to compare'; }
+    else if (o.error || windows <= 40) {
+      own = null; ownError = o.error ?? 'too little music to compare';
+      // A variant our engine refuses by design: Sonic Arranger's 0x4EFA form (NAB-2 routes it to nuade); SUN-Tronic's compiled .sun files (the engine plays V1.3 score modules).
+      ownRefused = !!o.error && /unsupported format|not a hunk executable/.test(o.error);
+    }
     else own = bestLagCorrelation(envelope20(o.samples, SR), envelope20(uade.samples, SR), windows).correlation;
     if (own !== null && !Number.isFinite(own)) { own = null; ownError = 'no correlation'; }
   }
   return {
-    ...(row.role === 'dual' ? { own, ...(ownError ? { ownError } : {}) } : {}),
+    ...(row.role === 'dual' ? { own, ...(ownError ? { ownError } : {}), ...(ownRefused ? { ownRefused } : {}) } : {}),
     correlation: best.correlation, lagMs: best.lagWindows * ENV_MS, windowSecs: (windows * ENV_MS) / 1000, uadeEndAt, nuadeEndAt,
     peak: mine.peak, rms: mine.rms, voices: mine.voices, player: mine.player, uadeRms: levelOf(uade.samples).rms,
     ...(mine.error ? { error: mine.error } : {}),

@@ -68,6 +68,15 @@ describe('NS-6 playOnNuade / applyNuadeChoice', () => {
     ...extra,
   } as unknown as TrackerSong);
 
+  it('keeps the grid the route drew, with its scope-view flags: a scan grid (gridEstimated) still opens in the scope view, as on UADE', () => {
+    const grid = [{ importMetadata: { sourceFormat: 'UADE' }, channels: [{ rows: [{ note: 49 }] }] }];
+    const s = playOnNuade(song({ patterns: grid, gridEstimated: true, gridUnmatchedReason: 'scan' } as never), 'mmdc', new ArrayBuffer(8), 'cp.mmdc');
+    expect(s.patterns).toBe(grid);
+    expect(s.patterns.length).toBe(1);
+    expect((s as { gridEstimated?: boolean }).gridEstimated).toBe(true);
+    expect(s.gridUnmatchedReason).toBe('scan');
+  });
+
   it('puts the module, player and name on the song and takes UADE\'s playback fields and outranking engines off it', () => {
     const s = playOnNuade(song({ hivelyFileData: new ArrayBuffer(2) } as never), 'mmdc', new ArrayBuffer(8), 'cp.mmdc');
     expect(s.nuadeFileData?.byteLength).toBe(8);
@@ -123,5 +132,21 @@ describe('withNuade reachability: parseModuleToSong -> Nuade descriptor', () => 
     expect(song.nuadeFileName).toBe('centurion_battle.rh');
     expect(song.uadeEditableFileData).toBeUndefined();
     expect(playingEngineFor(song)).toBe('Nuade');
+  });
+
+  // NAB-2: Sonic Arranger's 0x4EFA player-binary form has no engine of ours (its loader refuses it); it plays on nuade.
+  it('a Sonic Arranger 0x4EFA file plays on nuade at the row\'s own default, the SOARV1.0 file stays on our engine, and UADE can still be chosen', async () => {
+    const SA4 = 'public/data/songs/formats/almighty.sa', SA1 = 'public/data/songs/sonic-arranger/mega end.sa';
+    useSettingsStore.getState().setFormatEngine('sonicArranger', 'native');
+    const variant = await parseModuleToSong(fileOf(SA4));
+    expect(variant.nuadePlayerId).toBe('sonicarranger');
+    expect(variant.nuadeFileData?.byteLength).toBe(readFileSync(join(ROOT, SA4)).length);
+    expect(playingEngineFor(variant)).toBe('Nuade');
+    const chunked = await parseModuleToSong(fileOf(SA1));
+    expect(chunked.nuadePlayerId).toBeUndefined();
+    expect(playingEngineFor(chunked)).toBe('SonicArranger');
+    useSettingsStore.getState().setFormatEngine('sonicArranger', 'uade');
+    expect((await parseModuleToSong(fileOf(SA4))).nuadePlayerId).toBeUndefined();
+    useSettingsStore.getState().setFormatEngine('sonicArranger', 'native');
   });
 });

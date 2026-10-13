@@ -16,10 +16,11 @@ const REPLACE_WAVES = `amcomposer amos andrewparton aprosys artandmagic ashleyho
 const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis hippelhip fcbsi gmc`.split(' ');
 
 describe('the node declares the measured voice maximum', () => {
-  it('NuadeEngine passes the literal NUADE_NODE_VOICES to channelOutputNodeOptions (channelOutputsSizedByVoices needs a literal)', () => {
+  it('before a song is open the node is declared for NUADE_NODE_VOICES, the corpus maximum; a song then sizes it (nuadeNodeVoices.test.ts)', () => {
     const src = readFileSync(join(ROOT, 'src/engine/nuade/NuadeEngine.ts'), 'utf8');
-    const m = /channelOutputNodeOptions\((\d+)\)/.exec(src);
-    expect(Number(m?.[1])).toBe(NUADE_NODE_VOICES);
+    expect(src).toMatch(/_nodeVoices = NUADE_NODE_VOICES/);
+    expect(src).toMatch(/channelOutputNodeOptions\(this\._nodeVoices\)/);
+    expect(NUADE_NODE_VOICES).toBe(8);
   });
 });
 
@@ -43,7 +44,26 @@ describe('a fresh user keeps the pre-nuade engine of every format', () => {
   });
 });
 
+describe('no lost edit path: the table never moves a live-edit format to a path that cannot sound its edits', () => {
+  it('no dual row whose own engine takes cell edits defaults to nuade, and no live-edit replace row does until a test proves its typed notes sound on nuade', async () => {
+    const { ownEditPath } = await import('../../../../tools/nuade/apply-verdicts');
+    const { EDIT_SOUNDS_ON_NUADE } = await import('../../../../tools/nuade/verdictRules');
+    const { LIVE_EDIT } = await import('@/lib/import/gridProvenance');
+    for (const r of Object.values(NUADE_FORMATS)) {
+      if (r.defaultEngine !== 'nuade') continue;
+      if (r.role === 'dual') expect(ownEditPath(r), `${r.id}: our engine takes cell edits, nuade does not (CELL_WRITE off)`).toBe(false);
+      else if (r.registryKeys.some((k) => LIVE_EDIT[k] === 'pass')) expect(EDIT_SOUNDS_ON_NUADE.has(r.id), `${r.id}: live edit must be proven audible on nuade`).toBe(true);
+    }
+  });
+});
+
 describe('NS-4 nuade format table', () => {
+  it('lists real file extensions: no row carries an unexpanded C macro name (SUN_EXTENSION made SUN-Tronic unroutable)', () => {
+    for (const r of Object.values(NUADE_FORMATS)) for (const e of r.extensions) expect(e, `${r.id}: ${e}`).not.toMatch(/[A-Z]/);
+    expect(NUADE_FORMATS.suntronic!.extensions).toContain('sun');
+    expect(NUADE_FORMATS.stevebarrett!.extensions).toContain('sb');
+  });
+
   it('holds exactly the 81 replace rows (R01-R84 less R09 gmc, R46 fcbsi, R48 hippelhip) and the 33 dual rows AB01-AB33 of the plan', () => {
     const replace = NUADE_FORMAT_LIST.filter((f) => f.role === 'replace').map((f) => f.id).sort();
     const dual = NUADE_FORMAT_LIST.filter((f) => f.role === 'dual').map((f) => f.id).sort();
@@ -69,7 +89,8 @@ describe('NS-4 nuade format table', () => {
       } else {
         expect(f.defaultEngine, `${f.id}: a row that is not on nuade plays its legacy engine`).toBe(f.legacyEngine);
       }
-      if (f.heldBecause) expect(f.role, f.id).toBe('replace');
+      // A held replace row stays on UADE; a held dual row (nuade scores better, our engine keeps the live edit path) stays ours.
+      if (f.heldBecause) expect(f.defaultEngine, f.id).toBe(f.legacyEngine);
       if (f.role === 'dual' && f.ownEnvelopeCorrelation == null) expect(f.defaultEngine, `${f.id}: our engine stays the default until it is measured against nuade`).toBe(f.legacyEngine);
     }
   });

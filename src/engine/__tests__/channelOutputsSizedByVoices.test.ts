@@ -24,6 +24,15 @@ function engineSources(dir: string): string[] {
   });
 }
 
+/**
+ * Engines whose node is sized by the song they loaded, not by a literal: the source file -> the test that proves, with the
+ * real engine and worklet, that the node has exactly the loaded song's voice count (outputs 1 + 4 + voices).
+ */
+const SIZED_BY_THE_LOADED_SONG: Readonly<Record<string, string>> = {
+  'nuade/NuadeEngine.ts': 'nuade/__tests__/nuadeNodeVoices.test.ts',
+};
+const PROOF_TITLE = "describe('NuadeEngine node is sized by the loaded song'";
+
 describe('engine worklet nodes declare only the outputs their voices fill', () => {
   it('a 4-voice engine gets main + 4 isolation slots + 4 dub sends', () => {
     expect(channelOutputNodeOptions(4).numberOfOutputs).toBe(9);
@@ -38,6 +47,12 @@ describe('engine worklet nodes declare only the outputs their voices fill', () =
       .flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/channelOutputNodeOptions\(([^)]*)\)/g)].map((m) => ({ f, arg: m[1] })));
     expect(calls.length).toBeGreaterThanOrEqual(27);
     for (const { f, arg } of calls) {
+      const proof = Object.entries(SIZED_BY_THE_LOADED_SONG).find(([file]) => f.endsWith(file))?.[1];
+      if (proof) {
+        // Not a literal: the engine must prove the node is the loaded song's size, and never above the 8-voice cap.
+        expect(readFileSync(join(__dirname, '..', proof), 'utf8'), `${f} is sized per song: ${proof} must prove it`).toContain(PROOF_TITLE);
+        continue;
+      }
       expect(arg, f).toMatch(/^\d+$/);
       expect(Number(arg), f).toBeLessThanOrEqual(8);
     }

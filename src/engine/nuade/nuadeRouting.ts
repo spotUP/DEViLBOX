@@ -88,7 +88,11 @@ export async function nuadeRowFor(
   registryKey?: string | null,
   probe: NuadeProbe = nuadeProbe(),
 ): Promise<NuadeFormat | null> {
-  const wanted = NUADE_FORMAT_LIST.filter((f) => (effectiveFormatEngine(prefs, f.prefKey) ?? f.defaultEngine) === 'nuade');
+  const wanted = NUADE_FORMAT_LIST.filter((f) => {
+    const choice = effectiveFormatEngine(prefs, f.prefKey) ?? f.defaultEngine;
+    // A file our own engine refuses plays on nuade unless the user chose UADE (the variant has no engine of ours to fall back to).
+    return choice === 'nuade' || (choice === 'native' && f.role === 'dual' && f.ownRefuses?.(bytes) === true);
+  });
   if (wanted.length === 0) return null;
   const tags = fileTags(filename);
   const byKey = registryKey ? wanted.filter((f) => f.registryKeys.includes(registryKey)) : [];

@@ -5,6 +5,7 @@
  * Nuade.wasm is loaded here once, on first use, and only when a format's choice is 'nuade' and its extension matches.
  * Tests inject the Node loader (NuadeHeadless) with `setNuadeProbe`.
  */
+import { NuadeDriver } from './nuadeDriver';
 import { loadNuadeModuleFromPublic, probeWith, type NuadeModule } from './nuadeModule';
 
 /** 0 supported, 1 unsupported, 2 unsure, -1 no such player. */
@@ -23,5 +24,36 @@ export function nuadeProbe(): NuadeProbe { return probe; }
 export function setNuadeProbe(next: NuadeProbe): NuadeProbe {
   const previous = probe;
   probe = next;
+  return previous;
+}
+
+/**
+ * How many voices `playerId` gives this module: the answer the audio node is sized from, known only after the player
+ * opens the file. Asked of the same main-thread Nuade.wasm as the probe, one song slot, closed again. null when the
+ * player refuses the module.
+ */
+export type NuadeVoiceCounter = (bytes: Uint8Array, fileName: string, playerId: string, companions?: Map<string, ArrayBuffer>) => Promise<number | null>;
+
+let counter: NuadeVoiceCounter = async (bytes, fileName, playerId, companions) => {
+  module ??= loadNuadeModuleFromPublic();
+  const nu = NuadeDriver.fromModule(await module);
+  try {
+    nu.clearFiles();
+    for (const [name, data] of companions ?? []) nu.addFile(name, new Uint8Array(data));
+    nu.open(bytes, fileName, playerId);
+    const voices = nu.voiceCount;
+    nu.close();
+    return voices;
+  } catch {
+    return null;
+  }
+};
+
+export function nuadeVoiceCounter(): NuadeVoiceCounter { return counter; }
+
+/** Replace the voice counter (tests); returns the previous one. */
+export function setNuadeVoiceCounter(next: NuadeVoiceCounter): NuadeVoiceCounter {
+  const previous = counter;
+  counter = next;
   return previous;
 }

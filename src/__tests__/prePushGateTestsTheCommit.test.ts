@@ -117,6 +117,29 @@ describe('scripts/git-hooks/pre-push gates the pushed commit, not the working tr
     expect(r.status).toBe(0);
   });
 
+  it('a change to the per-format engine defaults runs the whole fast tier even with a known base (17 suites broke unseen on 2026-10-13)', () => {
+    mkdirSync(join(repo, 'scripts/git-hooks'), { recursive: true });
+    writeFileSync(join(repo, 'scripts/git-hooks/affected-tests.mjs'), 'process.stdout.write("");\n');
+    writeFileSync(join(repo, 'package.json'), JSON.stringify({
+      name: 'fake', version: '0.0.0', scripts: { 'type-check': 'true', 'test:ci': 'exit 1', 'test:compliance': 'true' },
+    }));
+    mkdirSync(join(repo, 'src/engine/nuade'), { recursive: true });
+    writeFileSync(join(repo, 'src/engine/nuade/nuadeVerdicts.ts'), 'export const NUADE_VERDICTS = {};\n');
+    git('add', '.');
+    const base = commitCheck('ok\n');
+    writeFileSync(join(repo, 'src/engine/nuade/nuadeVerdicts.ts'), 'export const NUADE_VERDICTS = { mmdc: 1 };\n');
+    git('add', 'src/engine/nuade/nuadeVerdicts.ts');
+    git('commit', '-q', '-m', 'flip a default');
+    const sha = git('rev-parse', 'HEAD');
+    const r = spawnSync('bash', [HOOK], {
+      cwd: repo, encoding: 'utf8', env: { ...env, TMPDIR: scratch },
+      input: `refs/heads/main ${sha} refs/heads/main ${base}\n`,
+    });
+    expect(r.stderr).toContain('whole fast tier runs');
+    expect(r.stderr).toContain('affected tests failed'); // test:ci is the failing script of this fake repo
+    expect(r.status).toBe(1);
+  });
+
   it('leaves no snapshot directory behind, after a pass or a failure', () => {
     runHook(commitCheck('ok\n'));
     expect(snapshots()).toEqual([]);

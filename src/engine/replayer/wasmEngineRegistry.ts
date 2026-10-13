@@ -15,7 +15,6 @@
 import type { TrackerSong } from '../TrackerReplayer';
 import { FILE_DATA_FIELDS } from '../formatFileDataFields';
 import { nuadeSongHasCellWrite } from '../nuade/nuadeCaps';
-import { nuadeFormatForPlayer } from '../nuade/nuadeFormats';
 
 // ---------------------------------------------------------------------------
 // Engine registry types
@@ -532,7 +531,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/nuade/NuadeEngine')).NuadeEngine as unknown as WASMSingletonStatic,
     // The player reports its order and row (or tick count); the grid it maps onto is this song's.
-    onStarted: (instance, song) => (instance as unknown as import('@/engine/nuade/NuadeEngine').NuadeEngine).setGrid(song as never, nuadeFormatForPlayer(song.nuadePlayerId)?.followBy ?? 'orderRow'),
+    onStarted: (instance, song) => (instance as unknown as import('@/engine/nuade/NuadeEngine').NuadeEngine).setGrid(song as never),
   },
   {
     // MusicMaker V8 (.sdata + .ip, Amiga): a worklet replayer built from the
