@@ -35,8 +35,8 @@ export const DJ_SIZES = {
   tabStrip: 26,
   /** Gap between the tab strip and the docked panel body. */
   tabGap: 4,
-  /** Deck header row = title + scopes + track info; platter (<= this) sits beside it. */
-  headerExtra: 76,
+  /** Deck header row = title + scopes + track info (title, BPM row, and the genre/mood row once the track is analysed); platter (<= this) sits beside it. */
+  headerExtra: 99,
   /** Text column of the scratch-only Deck C header (no scopes); the platter beside it can be taller. */
   scratchOnlyText: 71,
   overview: 24,
@@ -53,7 +53,7 @@ export const DJ_SIZES = {
   mixer: {
     knobRows: { large: 315, regular: 245, compact: 207 },
     crossfader: { large: 65, regular: 65, compact: 40 },
-    camelot: { large: 180, regular: 148, compact: 148 },
+    camelot: { large: 195, regular: 164, compact: 164 },
     transition: 37,
     camelotWheel: { large: 140, regular: 108, compact: 108 },
     fxWet: 29,

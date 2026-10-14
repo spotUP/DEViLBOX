@@ -33,18 +33,21 @@ const SCREENS: ReadonlyArray<readonly [number, number]> = [
   [1280, 720], [1366, 768], [1440, 900], [1536, 864], [1512, 982], [1728, 1117], [1920, 1080], [2560, 1440],
 ];
 
-interface Cell { id: string; width: number; height: number; decks: 2 | 3; deckC: 'none' | 'scratch' | 'track' }
+interface Cell { id: string; width: number; height: number; decks: 2 | 3; deckC: 'none' | 'scratch' | 'track'; dub?: boolean }
 
 const CELLS: Cell[] = [
   ...SCREENS.flatMap(([w, h]): Cell[] => [
     { id: `${w}x${h}-2d`, width: w, height: h - CHROME - STATUS_BAR, decks: 2, deckC: 'none' },
     { id: `${w}x${h}-3d`, width: w, height: h - CHROME - STATUS_BAR, decks: 3, deckC: 'scratch' },
   ]),
+  // The tightest cells with the dub bus on (the FX WET row): it must still fit.
+  { id: '1280x720-2d-dub', width: 1280, height: 720 - CHROME - STATUS_BAR, decks: 2, deckC: 'none', dub: true },
+  { id: '1280x720-3d-dub', width: 1280, height: 720 - CHROME - STATUS_BAR, decks: 3, deckC: 'scratch', dub: true },
   { id: '1280x720-3d-ctrack', width: 1280, height: 720 - CHROME - STATUS_BAR, decks: 3, deckC: 'track' },
   { id: '1920x1080-3d-ctrack', width: 1920, height: 1080 - CHROME - STATUS_BAR, decks: 3, deckC: 'track' },
 ];
 
-interface Verdict { id: string; pass: boolean; at: string; tier: string | null; steps: string[]; problems: string[]; fit?: unknown }
+interface Verdict { id: string; pass: boolean; at: string; solverInput?: unknown; tier: string | null; steps: string[]; problems: string[]; fit?: unknown }
 
 function call(method: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
   const attempt = (): Promise<Record<string, unknown>> => new Promise((resolve) => {
@@ -116,14 +119,18 @@ async function main(): Promise<void> {
   for (const cell of [...todo].sort((a, b) => Number(a.deckC === 'track') - Number(b.deckC === 'track'))) {
     await setDeckC(cell.decks === 3);
     if (cell.deckC === 'track') await loadTrack('C');
+    // The dub bus is part of the cell: Auto Dub can switch it back on after a track loads, so state it every time.
+    await call('set_dub_bus_enabled', { enabled: cell.dub === true });
     const zoom = Math.min(1, 1500 / cell.width);
     const set = await call('set_dj_layout_frame', { width: cell.width, height: cell.height, zoom });
     if (set.error) throw new Error(`frame ${cell.id}: ${String(set.error)}`);
     const fit = await call('get_dj_layout_fit');
     const problems = judge(fit);
+    const solved = fit.solverInput as { dubBusOn?: boolean } | null;
+    if (solved && solved.dubBusOn !== (cell.dub === true)) problems.push(`dub bus is ${solved.dubBusOn ? 'on' : 'off'}, the cell wants ${cell.dub === true ? 'on' : 'off'}`);
     const verdict: Verdict = {
       id: cell.id, pass: problems.length === 0, at: new Date().toISOString(),
-      tier: (fit.tier as string | null) ?? null, steps: (fit.steps as string[]) ?? [], problems,
+      solverInput: fit.solverInput, tier: (fit.tier as string | null) ?? null, steps: (fit.steps as string[]) ?? [], problems,
       fit: problems.length ? fit : undefined,
     };
     recorded[cell.id] = verdict;
@@ -131,6 +138,7 @@ async function main(): Promise<void> {
     console.log(`${verdict.pass ? 'PASS' : 'FAIL'}  ${cell.id}  ${verdict.tier} [${verdict.steps.join(',')}]${problems.length ? '\n   ' + problems.join('\n   ') : ''}`);
   }
   await call('set_dj_layout_frame', {});
+  await call('set_dub_bus_enabled', { enabled: false });
   await call('stop');
   const all = CELLS.map((c) => recorded[c.id]).filter(Boolean);
   console.log(`${all.filter((v) => v.pass).length} of ${CELLS.length} cells PASS (${all.length} recorded)`);
