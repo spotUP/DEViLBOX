@@ -7,7 +7,8 @@ import { NUADE_OUT_MESSAGES, NUADE_IN_MESSAGES, NUADE_CHANNEL_OUTPUT_MESSAGES, N
 describe('NE-1 nuade protocol', () => {
   it('accepts a well-formed message of every type the worklet posts', () => {
     const samples: Record<string, unknown> = {
-      ready: {}, songEnd: {}, stopped: {},
+      ready: {}, songEnd: {}, stopped: {}, rowClipDone: {},
+      rowClipStarted: { frames: 5760 },
       moduleLoaded: { voices: 4, subsongs: 1, defaultSubsong: 0, playerId: 'mmdc', playerName: 'OctaMED MMDC', meta: {}, instruments: [], caps: 1 },
       subsongStarted: { index: 0 },
       position: { frame: 0, order: 1, pattern: 2, row: 3, tick: 0, speed: 6, tempo: 125, voices: [] },
@@ -30,6 +31,7 @@ describe('NE-1 nuade protocol', () => {
     expect(parseNuadeOut({ type: 'moduleLoaded', voices: 4 })).toBeNull();
     expect(parseNuadeOut({ type: 'position', frame: NaN, order: 0, pattern: 0, row: 0, tick: 0, speed: 6, tempo: 125, voices: [] })).toBeNull();
     expect(parseNuadeOut({ type: 'swapDone' })).toBeNull();
+    expect(parseNuadeOut({ type: 'rowClipStarted' })).toBeNull();
   });
 
   it('lists inbound messages without overlap between the worklet-handled and channel-output kinds', () => {

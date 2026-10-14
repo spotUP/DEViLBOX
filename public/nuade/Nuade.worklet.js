@@ -6,6 +6,9 @@
  * sends and isolation slots (worklets/channel-outputs.js) and the scopes (worklets/channel-stream.js). A voice that is
  * muted or isolated leaves the main mix inside the shim (nw_set_mute_mask); its buffer stays full out of the shim, and a
  * muted one is kept off the isolation slots and dub sends, drawn flat on its scope and read as silence on its meter here.
+ *
+ * A row clip (src/engine/rowPreview, worklets/row-clip.js) is a grid row rendered elsewhere by a private instance of the
+ * player; while the song is not playing it comes out through the same emit() playback uses.
  */
 
 const MAX_VOICES = 64;
@@ -49,6 +52,10 @@ class NuadeProcessor extends AudioWorkletProcessor {
     // Measured cost of rendering forward without output, ms per frame (starts at 1 ms per second of song).
     this.catchUpMsPerFrame = 1 / 48000;
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
+    // The row preview's clip player, and the per-voice peak of the clip since the last vu post.
+    this.clip = globalThis.DevilboxRowClip ? new globalThis.DevilboxRowClip(this.port, sampleRate) : null;
+    this.clipPeaks = [];
+    this.clipQuanta = 0;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
@@ -60,9 +67,15 @@ class NuadeProcessor extends AudioWorkletProcessor {
         await this.initModule(data.wasmBinary, data.jsCode, data.sampleRate);
         break;
       case 'loadModule':
+        if (this.clip) this.clip.drop();
         this.load(data);
         break;
+      case 'playRowClip':
+        // The song playing already sounds the grid: a clip would double it (plan D1).
+        if (this.clip && !this.playing && data.clip) { this.clipPeaks = []; this.clip.play(data.clip); }
+        break;
       case 'play':
+        if (this.clip) this.clip.drop();
         if (typeof data.latencyFrames === 'number') this.latencyFrames = Math.max(0, data.latencyFrames | 0);
         this.playing = this.loaded;
         break;
@@ -81,6 +94,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
         this.userMask = data.mask >>> 0;
         break;
       case 'setSubsong':
+        if (this.clip) this.clip.drop();
         this.port.postMessage({ type: 'subsongStarted', index: this.startSubsong(data.index | 0) });
         break;
       case 'seek':
@@ -104,6 +118,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
         }
         break;
       case 'dispose':
+        if (this.clip) this.clip.drop();
         this.cleanup();
         break;
     }
@@ -372,43 +387,38 @@ class NuadeProcessor extends AudioWorkletProcessor {
     });
   }
 
+  /** A muted (or not soloed) voice reads silence on its meter, like every other engine; its scope draws flat too. */
+  maskedLevels(levels) {
+    const mask = this.userMask >>> 0;
+    for (let v = 0; v < levels.length && v < 32; v++) if (!((mask >>> v) & 1)) levels[v] = 0;
+    return levels;
+  }
+
   postVu() {
     const m = this.module;
     const n = m._nw_vu(this.vuPtr, this.voices);
     const levels = Array.from(new Float32Array(m.HEAPU8.buffer, this.vuPtr, n));
-    // A muted (or not soloed) voice reads silence on its meter, like every other engine; its scope draws flat too.
-    const mask = this.userMask >>> 0;
-    for (let v = 0; v < levels.length && v < 32; v++) if (!((mask >>> v) & 1)) levels[v] = 0;
-    this.port.postMessage({ type: 'vu', levels });
+    this.port.postMessage({ type: 'vu', levels: this.maskedLevels(levels) });
   }
 
-  process(inputs, outputs) {
-    if (!this.initialized || !this.module || !this.loaded) return true;
-    if (!this.playing) { this.stepNext(); return true; }
-    const output = outputs[0];
-    if (!output || output.length < 2) return true;
-    const m = this.module;
+  /**
+   * One quantum to the outputs: the main mix, each voice to the isolation slots and dub sends (where the mixer put it),
+   * every voice to the scope stream. `stereo` is interleaved, `voices` one mono buffer per voice, `pans` each voice's
+   * pan in the mix; `rendered` frames of the `n` the host asked for are real, the rest is silence. Playback and the
+   * row clip both come through here.
+   */
+  emit(output, outputs, stereo, voices, pans, n, rendered) {
     const outL = output[0], outR = output[1];
-    const n = Math.min(outL.length, QUANTUM);
-    this.updateBufferViews();
-    if (!this.outBuf) return true;
-    const o = this._outs;
-    // A voice in an isolation slot leaves the main mix like a muted one.
-    const mask = (o && o.isolatedMask ? this.userMask & ~o.isolatedMask : this.userMask) >>> 0;
-    if (mask !== this.appliedMask) { m._nw_set_mute_mask(mask | 0); this.appliedMask = mask; }
-    const rendered = m._nw_render(this.outPtr, this.voicePtr, n, QUANTUM);
     for (let i = 0; i < rendered; i++) {
-      outL[i] = this.outBuf[i * 2];
-      outR[i] = this.outBuf[i * 2 + 1];
+      outL[i] = stereo[i * 2];
+      outR[i] = stereo[i * 2 + 1];
     }
     for (let i = rendered; i < n; i++) { outL[i] = 0; outR[i] = 0; }
-    const voices = this.voiceBufs.slice(0, this.voices).map((b) => b.subarray(0, rendered));
+    const o = this._outs;
     if (o && rendered > 0) {
       // Each voice sits where the mixer put it: side = (1 + pan) / 2, at its level in the mix. A voice the mixer muted
       // (mute or another channel's solo) feeds no isolation slot and no dub send: its buffer stays full for the scopes,
       // so it is left out here, or a solo is undone for every channel an effect isolates.
-      m._nw_pans(this.panPtr, this.voices);
-      const pans = new Float32Array(m.HEAPU8.buffer, this.panPtr, Math.max(1, this.voices));
       const audible = voices.map((b, v) => (v >= 32 || (this.userMask >>> v) & 1 ? b : null));
       o.write(outputs, audible, rendered, (ch) => (1 + (pans[ch] || 0)) / 2, 1);
     }
@@ -420,6 +430,50 @@ class NuadeProcessor extends AudioWorkletProcessor {
       const flat = um === 0xFFFFFFFF ? voices : voices.map((b, v) => (v < 32 && !((um >>> v) & 1) ? new Float32Array(rendered) : b));
       this._stream.writeFloat32(flat, rendered);
     }
+  }
+
+  /** The next quantum of the sounding row clip, through emit(); its voices' peaks go out as meter levels. */
+  processClip(output, outputs) {
+    const n = Math.min(output[0].length, QUANTUM);
+    const q = this.clip.pull(n);
+    if (!q) return;
+    const voices = q.voices.map((b) => b.subarray(0, q.n));
+    this.emit(output, outputs, q.stereo, voices, q.pans || [], n, q.n);
+    for (let v = 0; v < voices.length; v++) {
+      let peak = this.clipPeaks[v] || 0;
+      for (let i = 0; i < q.n; i++) { const a = Math.abs(voices[v][i]); if (a > peak) peak = a; }
+      this.clipPeaks[v] = peak;
+    }
+    if ((++this.clipQuanta % VU_EVERY) === 0 || !this.clip.active) {
+      this.port.postMessage({ type: 'vu', levels: this.maskedLevels(this.clipPeaks.slice()) });
+      this.clipPeaks = [];
+    }
+  }
+
+  process(inputs, outputs) {
+    if (!this.playing && this.clip && this.clip.active) {
+      const out = outputs[0];
+      if (out && out.length >= 2) this.processClip(out, outputs);
+      if (this.module && this.loaded) this.stepNext();
+      return true;
+    }
+    if (!this.initialized || !this.module || !this.loaded) return true;
+    if (!this.playing) { this.stepNext(); return true; }
+    const output = outputs[0];
+    if (!output || output.length < 2) return true;
+    const m = this.module;
+    const n = Math.min(output[0].length, QUANTUM);
+    this.updateBufferViews();
+    if (!this.outBuf) return true;
+    const o = this._outs;
+    // A voice in an isolation slot leaves the main mix like a muted one.
+    const mask = (o && o.isolatedMask ? this.userMask & ~o.isolatedMask : this.userMask) >>> 0;
+    if (mask !== this.appliedMask) { m._nw_set_mute_mask(mask | 0); this.appliedMask = mask; }
+    const rendered = m._nw_render(this.outPtr, this.voicePtr, n, QUANTUM);
+    const voices = this.voiceBufs.slice(0, this.voices).map((b) => b.subarray(0, rendered));
+    m._nw_pans(this.panPtr, this.voices);
+    const pans = new Float32Array(m.HEAPU8.buffer, this.panPtr, Math.max(1, this.voices));
+    this.emit(output, outputs, this.outBuf, voices, pans, n, rendered);
     if (rendered > 0) this.postPosition();
     if ((++this.quanta % VU_EVERY) === 0) this.postVu();
     if (!this.songEndSent && (m._nw_last_flags() & 2)) {
