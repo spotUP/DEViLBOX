@@ -27,7 +27,7 @@ import { getActiveDubBus } from '../dub/DubBus';
 import { asIsolationCapable, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
 import { needsPaulaOutputStage } from '@engine/paulaOutput';
 import { editedModuleForPlay } from './editedModuleForPlay';
-import { WASM_ENGINES, shouldActivate, songFromStores, type NativeEngineDescriptor, type WASMSingletonStatic } from './wasmEngineRegistry';
+import { WASM_ENGINES, shouldActivate, songFromStores, type NativeEngineDescriptor, type WASMSingletonStatic, type WASMSingletonEngine } from './wasmEngineRegistry';
 
 export { WASM_ENGINES, shouldActivate, playsOnDedicatedEngine } from './wasmEngineRegistry';
 
@@ -287,6 +287,103 @@ let _activeC64SidEngine: C64SIDEngine | null = null;
 /** Get the currently active C64SIDEngine instance (null when no SID is playing). */
 export function getActiveC64SidEngine(): C64SIDEngine | null { return _activeC64SidEngine; }
 
+/**
+ * What an engine is loaded with for `song`: the module bytes (a copy the engine may keep or transfer) and the engine's
+ * own load arguments. A grid edited since the load plays as the module its native export writes (G19). The one place
+ * both the play path (startNativeEngines) and the row preview (previewNativeRow) read it from, so a preview renders the
+ * bytes playback would load.
+ */
+export async function engineLoadArgs(
+  song: TrackerSong,
+  desc: NativeEngineDescriptor,
+  isDJDeck: boolean,
+): Promise<{ data: ArrayBuffer | Uint8Array; args: unknown[] }> {
+  const fileData = (isDJDeck ? null : await editedModuleForPlay(song, desc))
+    ?? song[desc.fileDataKey] as ArrayBuffer | Uint8Array;
+  const data = fileData instanceof Uint8Array ? fileData.slice(0) : (fileData as ArrayBuffer).slice(0);
+  return { data, args: desc.getLoadArgs?.(song) ?? [] };
+}
+
+/** Restore the output gain in case a previous stopNativeEngines muted it. */
+function openEngineOutputGain(instance: { output?: unknown }): void {
+  const output = (instance as { output?: { gain?: AudioParam } }).output;
+  if (output?.gain) {
+    try { output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
+  }
+}
+
+/** Direct routing for engines without a synth in song.instruments (the master path, dub tap, isolation). */
+function openEngineRouting(
+  desc: NativeEngineDescriptor,
+  instance: WASMSingletonEngine,
+  separationInputTone: Tone.ToneAudioNode,
+  isDJDeck: boolean,
+  routedNativeEngines: Set<string>,
+): void {
+  const toneEngine = getToneEngine();
+  if (desc.needsDirectRouting && !isDJDeck && !routedNativeEngines.has(desc.synthType)) {
+    const nativeInput = getNativeAudioNode(separationInputTone as any);
+    // Everything bound for the master goes through `dry`; the dub tap
+    // and the silence detector stay on `instance.output` (see attachDryGain).
+    const dry = attachDryGain(`native:${desc.synthType}`, instance.output);
+    if (nativeInput) {
+      // Handle cross-context routing (stale AudioContext from HMR)
+      if (instance.output.context !== nativeInput.context) {
+        try {
+          const msDest = (instance.output.context as AudioContext).createMediaStreamDestination();
+          dry.connect(msDest);
+          const msSource = (nativeInput.context as AudioContext).createMediaStreamSource(msDest.stream);
+          msSource.connect(nativeInput);
+          console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation (cross-context bridge)`);
+        } catch (bridgeErr) {
+          console.error(`[NativeEngineRouting] ${desc.key} cross-context bridge failed:`, bridgeErr);
+          // Fallback: connect to engine's own context destination
+          dry.connect(instance.output.context.destination);
+        }
+      } else {
+        // An engine that emulates Paula hands over its DAC output raw —
+        // no Amiga 500 ever did. The stage goes IN FRONT of the same
+        // destination, so isolation, the dub tap and everything else
+        // downstream are untouched. `engine/paulaOutput.ts` holds the
+        // survey that decides membership.
+        const viaPaula = needsPaulaOutputStage(desc.synthType)
+          && toneEngine.routeThroughPaulaStage(dry, nativeInput);
+        if (!viaPaula) dry.connect(nativeInput);
+        console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation${viaPaula ? ' (via Amiga output stage)' : ''}`);
+      }
+      routedNativeEngines.add(desc.synthType);
+      registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
+      registerPlayingEngine(instance);
+      void reportPlaybackIsolation(undefined, async () => asIsolationCapable(instance));
+    } else {
+      // Fallback: connect directly to audio context destination
+      const ctx = instance.output.context;
+      dry.connect(ctx.destination);
+      routedNativeEngines.add(desc.synthType);
+      registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
+      registerPlayingEngine(instance);
+      void reportPlaybackIsolation(undefined, async () => asIsolationCapable(instance));
+      console.log(`[NativeEngineRouting] ${desc.key} output → destination (fallback)`);
+    }
+  }
+}
+
+/**
+ * Make an engine's output audible and routed as startNativeEngines does after a load: output gain restored, and the
+ * direct route to the master (with its dub tap and isolation registration) built once per engine. The play path and the
+ * row preview both open the output through this, so a previewed row goes the way playback goes.
+ */
+export function openEngineOutput(
+  desc: NativeEngineDescriptor,
+  instance: WASMSingletonEngine,
+  separationInputTone: Tone.ToneAudioNode,
+  isDJDeck: boolean,
+  routedNativeEngines: Set<string>,
+): void {
+  openEngineOutputGain(instance);
+  openEngineRouting(desc, instance, separationInputTone, isDJDeck, routedNativeEngines);
+}
+
 export async function startNativeEngines(
   song: TrackerSong,
   separationInputTone: Tone.ToneAudioNode,
@@ -345,12 +442,7 @@ export async function startNativeEngines(
       await instance.ready();
 
       // Load file data into the engine
-      // A grid edited since the load plays as the module its native export writes (G19).
-      const fileData = (isDJDeck ? null : await editedModuleForPlay(song, desc))
-        ?? song[desc.fileDataKey] as ArrayBuffer | Uint8Array;
-      const dataCopy = fileData instanceof Uint8Array
-        ? fileData.slice(0) : (fileData as ArrayBuffer).slice(0);
-      const extraArgs = desc.getLoadArgs?.(song) ?? [];
+      const { data: dataCopy, args: extraArgs } = await engineLoadArgs(song, desc, isDJDeck);
 
       if (desc.loadMethod === 'loadTune') {
         await instance.loadTune!(dataCopy, ...extraArgs);
@@ -376,11 +468,7 @@ export async function startNativeEngines(
       _runningEngineKeys.add(desc.key);
 
       if (!muted) {
-        // Restore gain in case it was muted by a previous stopNativeEngines
-        const output = (instance as unknown as { output?: { gain?: AudioParam } }).output;
-        if (output?.gain) {
-          try { output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
-        }
+        openEngineOutputGain(instance);
         instance.play();
         console.log(`[NativeEngineRouting] ${desc.key} loaded & playing`);
 
@@ -510,52 +598,7 @@ export async function startNativeEngines(
           console.log(`[NativeEngineRouting] ${desc.key} position sync wired`);
         }
 
-        // Direct routing for engines without a synth in song.instruments
-        if (desc.needsDirectRouting && !isDJDeck && !routedNativeEngines.has(desc.synthType)) {
-          const nativeInput = getNativeAudioNode(separationInputTone as any);
-          // Everything bound for the master goes through `dry`; the dub tap
-          // and the silence detector stay on `instance.output` (see attachDryGain).
-          const dry = attachDryGain(`native:${desc.synthType}`, instance.output);
-          if (nativeInput) {
-            // Handle cross-context routing (stale AudioContext from HMR)
-            if (instance.output.context !== nativeInput.context) {
-              try {
-                const msDest = (instance.output.context as AudioContext).createMediaStreamDestination();
-                dry.connect(msDest);
-                const msSource = (nativeInput.context as AudioContext).createMediaStreamSource(msDest.stream);
-                msSource.connect(nativeInput);
-                console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation (cross-context bridge)`);
-              } catch (bridgeErr) {
-                console.error(`[NativeEngineRouting] ${desc.key} cross-context bridge failed:`, bridgeErr);
-                // Fallback: connect to engine's own context destination
-                dry.connect(instance.output.context.destination);
-              }
-            } else {
-              // An engine that emulates Paula hands over its DAC output raw —
-              // no Amiga 500 ever did. The stage goes IN FRONT of the same
-              // destination, so isolation, the dub tap and everything else
-              // downstream are untouched. `engine/paulaOutput.ts` holds the
-              // survey that decides membership.
-              const viaPaula = needsPaulaOutputStage(desc.synthType)
-                && toneEngine.routeThroughPaulaStage(dry, nativeInput);
-              if (!viaPaula) dry.connect(nativeInput);
-              console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation${viaPaula ? ' (via Amiga output stage)' : ''}`);
-            }
-            routedNativeEngines.add(desc.synthType);
-            registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
-            registerPlayingEngine(instance);
-            void reportPlaybackIsolation(undefined, async () => asIsolationCapable(instance));
-          } else {
-            // Fallback: connect directly to audio context destination
-            const ctx = instance.output.context;
-            dry.connect(ctx.destination);
-            routedNativeEngines.add(desc.synthType);
-            registerWholeMixDubSend(`native:${desc.synthType}`, instance.output);
-            registerPlayingEngine(instance);
-            void reportPlaybackIsolation(undefined, async () => asIsolationCapable(instance));
-            console.log(`[NativeEngineRouting] ${desc.key} output → destination (fallback)`);
-          }
-        }
+        openEngineRouting(desc, instance, separationInputTone, isDJDeck, routedNativeEngines);
         // Start silence detection for looping formats
         if (desc.needsDirectRouting) {
           const detector = new SilenceDetector(instance.output.context);
