@@ -8,6 +8,7 @@ import { persist } from 'zustand/middleware';
 import type { PanelType } from '@typedefs/project';
 import type { MainView } from './uiViews';
 import { useSettingsStore } from './useSettingsStore';
+import { clampZoomPercent, ZOOM_DEFAULT_PERCENT } from '@/lib/tracker/patternZoom';
 
 /** DJ view debug frame: exact CSS size of the DJ root, optionally CSS-zoomed so a large frame fits the window. */
 export interface DjLayoutFrame {
@@ -56,9 +57,9 @@ export interface LayoutPreset {
 interface UIStore {
   // State
   visiblePanels: PanelType[];
-  trackerZoom: number; // 80-200%
-  /** Scale (0.5-1) the tracker pattern is drawn at so every channel fits the width; 1 = no shrink. Published by PatternEditorCanvas, never persisted. */
-  trackerFitScale: number;
+  trackerZoom: number; // 50-200%: the scale the pattern is drawn at while fit all channels is off
+  /** The scale the tracker pattern is drawn at now: the fit scale while fit all channels is on, else trackerZoom / 100 (1 = the base font). Published by PatternEditorCanvas, never persisted. */
+  trackerScale: number;
   trackWidthZoom: number; // 0=narrowest (more channels), 6=widest (fewer channels)
   activePanel: PanelType;
   modalOpen: string | null;
@@ -146,7 +147,7 @@ interface UIStore {
   togglePanel: (panel: PanelType) => void;
   setActivePanel: (panel: PanelType) => void;
   setTrackerZoom: (zoom: number) => void;
-  setTrackerFitScale: (scale: number) => void;
+  setTrackerScale: (scale: number) => void;
   increaseTrackZoom: () => void;
   decreaseTrackZoom: () => void;
   openModal: (modalId: string, data?: Record<string, unknown>) => void;
@@ -259,7 +260,7 @@ export const useUIStore = create<UIStore>()(
       // Initial state
       visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'],
       trackerZoom: 100,
-      trackerFitScale: 1,
+      trackerScale: 1,
       trackWidthZoom: 3,
       activePanel: 'tracker',
       modalOpen: null,
@@ -374,21 +375,20 @@ export const useUIStore = create<UIStore>()(
         }),
 
       setTrackerZoom: (zoom) => {
-        const next = Math.max(80, Math.min(200, zoom));
-        // A manual zoom change takes the pattern size into the user's hands: fit
-        // stays off for the tracker until it is switched back on in Settings.
-        if (next !== useUIStore.getState().trackerZoom) {
-          useSettingsStore.getState().setFitAllChannelsTracker(false);
-        }
+        const next = clampZoomPercent(zoom);
+        // A manual zoom takes the pattern size into the user's hands: fit all
+        // channels goes off for the tracker until the Fit control (or Settings)
+        // switches it back on. Also when the value equals the stored one: with
+        // fit on, the slider shows the fit result, which may differ from it.
+        useSettingsStore.getState().setFitAllChannelsTracker(false);
         set((state) => {
-          // Clamp between 80-200%
           state.trackerZoom = next;
         });
       },
 
-      setTrackerFitScale: (scale) =>
+      setTrackerScale: (scale) =>
         set((state) => {
-          if (state.trackerFitScale !== scale) state.trackerFitScale = scale;
+          if (state.trackerScale !== scale) state.trackerScale = scale;
         }),
 
       increaseTrackZoom: () =>
@@ -821,8 +821,15 @@ export const useUIStore = create<UIStore>()(
     })),
     {
       name: 'devilbox-ui-settings',
-      version: 1,
-      migrate: (persistedState) => persistedState ?? {},
+      // v2 (2026-10-14): trackerZoom scales the whole pattern (fonts and columns),
+      // where v1 scaled only the row height. A v1 value would now read as a
+      // different size, so it starts again at the default.
+      version: 2,
+      migrate: (persistedState, version) => {
+        const state = (persistedState ?? {}) as Record<string, unknown>;
+        if (version < 2 && 'trackerZoom' in state) state.trackerZoom = ZOOM_DEFAULT_PERCENT;
+        return state;
+      },
       merge: (persisted, current) => {
         const merged = { ...current, ...(persisted as Record<string, unknown>) };
         // Validate activeView — reset to 'tracker' if persisted value is invalid

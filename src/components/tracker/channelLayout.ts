@@ -117,8 +117,15 @@ export function stretchChannelWidths(
 
 /** Pattern font size at scale 1 (px); the renderers draw at this size. */
 export const PATTERN_FONT_PX = 14;
-/** Smallest pattern font the fit will shrink to (px). Below it the view scrolls sideways. */
-export const FIT_MIN_FONT_PX = 7;
+/**
+ * Smallest pattern font the fit will shrink to (px). Below it the view scrolls sideways.
+ * 10 px is the smallest text the app already sets for reading (compact panel labels are
+ * 10 px; 9 px is kept for badges nobody reads in a row), and 7 px glyphs of a 14 px
+ * monospace font (the old floor) smear into each other: the owner called fit-all
+ * "too small to be useful" (2026-10-14). A song too wide for 10 px scrolls sideways
+ * or the zoom slider goes lower by hand.
+ */
+export const FIT_MIN_FONT_PX = 10;
 /** The smallest scale the fit will use: FIT_MIN_FONT_PX / PATTERN_FONT_PX. */
 export const FIT_SCALE_FLOOR = FIT_MIN_FONT_PX / PATTERN_FONT_PX;
 
@@ -152,6 +159,7 @@ export interface FittedChannelWidths {
 /**
  * Fit first, then stretch: shrink the channels (when `fit` is on) so all of
  * them fit the canvas, then share any spare width out with stretchChannelWidths.
+ * With fit off the pattern is drawn at `manualScale` (the zoom slider) instead.
  * Shrunk widths are floored so their sum never passes the canvas width.
  */
 export function fitAndStretchChannelWidths(
@@ -160,8 +168,10 @@ export function fitAndStretchChannelWidths(
   availableWidth: number,
   fit: boolean,
   floor: number = FIT_SCALE_FLOOR,
+  manualScale: number = 1,
 ): FittedChannelWidths {
-  const scale = fit ? fitChannelScale(minWidths, leftEdge, availableWidth, floor) : 1;
+  // Fit on: the scale that fits. Fit off: the hand-set zoom (1 = the base font).
+  const scale = fit ? fitChannelScale(minWidths, leftEdge, availableWidth, floor) : manualScale;
   const scaled = scale === 1 ? [...minWidths] : minWidths.map(w => Math.floor(w * scale));
   const edge = Math.floor(leftEdge * scale);
   return { scale, leftEdge: edge, widths: stretchChannelWidths(scaled, edge, availableWidth) };

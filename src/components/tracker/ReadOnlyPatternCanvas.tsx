@@ -93,6 +93,8 @@ interface ReadOnlyPatternCanvasProps {
   channelMask?: readonly boolean[];
   /** Per-channel VU meters over the columns, metered from this source (a DJ deck's channel scopes). */
   vuFeed?: ChannelMeterFeed;
+  /** Told the scale the pattern is drawn at (the fit result, or the deck zoom while fit is off). */
+  onScale?: (scale: number) => void;
 }
 
 export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React.memo(({
@@ -103,6 +105,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
   height: heightProp,
   vuFeed,
   channelMask,
+  onScale,
 }) => {
   // Mutable ref — set imperatively when canvas is created in useEffect
   const canvasRef    = useRef<HTMLCanvasElement | null>(null);
@@ -169,6 +172,10 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
   const fitDeck = useSettingsStore((s) => s.fitAllChannelsDeck);
   const fitDeckRef = useRef(fitDeck);
   fitDeckRef.current = fitDeck;
+  // Fit off: the deck zoom slider's scale (useSettingsStore.deckPatternZoom, 1 = the base font).
+  const zoomDeck = useSettingsStore((s) => s.deckPatternZoom);
+  const zoomDeckRef = useRef(zoomDeck);
+  zoomDeckRef.current = zoomDeck;
 
   const maskRef = useRef(channelMask);
   maskRef.current = channelMask;
@@ -179,7 +186,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
     const paramWidth  = CHAR_WIDTH * 4 + 8 + 2 * (CHAR_WIDTH * 3 + 4);
     const contentWidth = noteWidth + 4 + paramWidth;
     const minWidths   = Array.from({ length: nc }, (_, i) => (isChannelVisible(maskRef.current, i) ? contentWidth + 16 : 0));
-    const fitted      = fitAndStretchChannelWidths(minWidths, LINE_NUMBER_WIDTH, w, fitDeckRef.current);
+    const fitted      = fitAndStretchChannelWidths(minWidths, LINE_NUMBER_WIDTH, w, fitDeckRef.current, undefined, zoomDeckRef.current / 100);
     const offsets: number[] = [];
     let x = fitted.leftEdge;
     for (const cw of fitted.widths) { offsets.push(x); x += cw; }
@@ -269,8 +276,12 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
     () => buildLayout(dimensions.width, numChannels),
     // fitDeck and the mask are read through refs inside buildLayout; they are dependencies here so a change relays out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buildLayout, dimensions.width, numChannels, fitDeck, maskKey],
+    [buildLayout, dimensions.width, numChannels, fitDeck, zoomDeck, maskKey],
   );
+
+  const onScaleRef = useRef(onScale);
+  onScaleRef.current = onScale;
+  useEffect(() => { onScaleRef.current?.(layoutNow.scale); }, [layoutNow.scale]);
 
   // The worker owns the canvas size: tell it the canvas at the fitted scale.
   useEffect(() => {

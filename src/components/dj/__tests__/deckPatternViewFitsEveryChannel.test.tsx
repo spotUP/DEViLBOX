@@ -54,12 +54,12 @@ describe('a deck pattern view fits every channel to its width', () => {
       unobserve() {}
       disconnect() {}
     } as never;
-    useSettingsStore.setState({ fitAllChannelsDeck: true });
+    useSettingsStore.setState({ fitAllChannelsDeck: true, deckPatternZoom: 100 });
   });
   afterEach(cleanup);
 
-  it('8 channels shrink to fit, 4 keep their size, and the setting off clips as before', async () => {
-    let view = await mount(8);
+  it('6 channels shrink to fit, 4 keep their size, and the setting off clips as before', async () => {
+    let view = await mount(6);
     let v = workerView();
     expect(v.scale).toBeLessThan(1);
     expect(v.end).toBeLessThanOrEqual(v.canvasWidth); // the worker's last channel ends inside its canvas
@@ -71,9 +71,19 @@ describe('a deck pattern view fits every channel to its width', () => {
     view.unmount(); cleanup();
 
     useSettingsStore.setState({ fitAllChannelsDeck: false });
-    view = await mount(8);
+    view = await mount(6);
     v = workerView();
     expect(v.scale).toBe(1);
     expect(v.end).toBeGreaterThan(v.canvasWidth);
+    view.unmount(); cleanup();
+
+    // Fit off: the deck zoom slider's scale draws the pattern (and is reported to the slider).
+    useSettingsStore.setState({ fitAllChannelsDeck: false, deckPatternZoom: 150 });
+    const reported: number[] = [];
+    posted.length = 0;
+    view = render(<div style={{ width: WIDTH, height: 300 }}><ReadOnlyPatternCanvas pattern={pattern(4)} currentRow={0} numChannels={4} onScale={(sc) => reported.push(sc)} /></div>);
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(workerView().scale).toBeCloseTo(1.5, 6);
+    expect(reported.at(-1)).toBe(1.5);
   });
 });

@@ -18,6 +18,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { getCachedSong, songHasNotes } from '@/engine/dj/DJSongCache';
 import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanvas';
+import { PatternZoomControl } from '@/components/tracker/PatternZoomControl';
 import { DJOscilloscope } from '@/components/visualization/DJOscilloscope';
 import { heardDeckRow, type DeckRow } from '@/hooks/dj/heardDeckRow';
 import { clockNowMs } from '@/engine/audioLatency';
@@ -99,6 +100,12 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
       lastTickRef.current = 0;
     };
   }, [deckId, activePatternName]);
+
+  // Zoom slider: shared by the decks (one setting beside fit all channels); shows the scale in use.
+  const [drawnScale, setDrawnScale] = useState(1);
+  const fitDeck = useSettingsStore((st) => st.fitAllChannelsDeck);
+  const setDeckPatternZoom = useSettingsStore((st) => st.setDeckPatternZoom);
+  const setFitDeck = useSettingsStore((st) => st.setFitAllChannelsDeck);
 
   const showUnused = useSettingsStore((st) => st.showUnusedChannels);
   const { patternData, numChannels, numRows, channelMask } = useMemo(() => {
@@ -210,7 +217,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
 
   return (
     <div
-      className="bg-dark-bg border border-dark-border rounded-sm overflow-hidden w-full h-full"
+      className="relative bg-dark-bg border border-dark-border rounded-sm overflow-hidden w-full h-full"
       style={{ cursor: patternData ? 'grab' : 'default', touchAction: 'none' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -225,10 +232,23 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
           isPlaying={isPlaying}
           vuFeed={vuFeed}
           channelMask={channelMask}
+          onScale={setDrawnScale}
         />
       ) : fileName ? (
         <DJOscilloscope />
       ) : null}
+      {patternData && (
+        // Own pointer events: dragging the slider must not start a scratch.
+        <div
+          className="absolute top-0.5 right-0.5 z-[2] px-1.5 py-0.5 rounded bg-dark-bg/80 border border-dark-border"
+          style={{ cursor: 'default' }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerMove={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
+          <PatternZoomControl scale={drawnScale} fit={fitDeck} onZoom={setDeckPatternZoom} onFit={() => setFitDeck(true)} />
+        </div>
+      )}
     </div>
   );
 };
