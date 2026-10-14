@@ -12,6 +12,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { getPatternScheduler } from '@engine/PatternScheduler';
 import { useTransportStore } from '@stores/useTransportStore';
+import { Toggle } from '@components/controls/Toggle';
 
 interface DJPitchSliderProps {
   className?: string;
@@ -31,6 +32,8 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   // Read from global store (updated by W commands)
   const globalPitch = useTransportStore((state) => state.globalPitch);
   const setGlobalPitch = useTransportStore((state) => state.setGlobalPitch);
+
+  const trackerKeyLock = useTransportStore((state) => state.trackerKeyLock);
 
   const [pitch, setPitch] = useState(globalPitch);
   const [isDragging, setIsDragging] = useState(false);
@@ -65,6 +68,13 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
 
     onPitchChange?.(clamped);
   }, [onPitchChange, setGlobalPitch]);
+
+  // Key Lock: re-apply the current slider position with the new tempo/pitch split
+  const handleKeyLock = useCallback((enabled: boolean) => {
+    const transport = useTransportStore.getState();
+    transport.setTrackerKeyLock(enabled);
+    getPatternScheduler().setGlobalPitchOffset(transport.globalPitch);
+  }, []);
 
   const resetPitch = useCallback(() => {
     setPitch(0);
@@ -247,6 +257,15 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       </div>{/* Housing */}
       </div>{/* Scale + Housing */}
 
+      <div className="flex-shrink-0">
+        <Toggle
+          label="Key Lock"
+          size="sm"
+          value={trackerKeyLock}
+          onChange={handleKeyLock}
+          title={trackerKeyLock ? 'Key Lock ON — pitch slider changes tempo only' : 'Key Lock OFF — pitch and tempo coupled'}
+        />
+      </div>
     </div>
   );
 };

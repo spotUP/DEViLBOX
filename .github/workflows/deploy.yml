@@ -25,9 +25,19 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      # test:ci exercises server code (the analysis cache round trip opens the
+      # real SQLite database), so the server's own dependencies must exist here
+      # as they do in every local checkout. Without them better-sqlite3 does not
+      # resolve and the suite fails before it runs.
+      - name: Install server dependencies
+        run: npm ci --prefix server
 
       # CI-safe tests only. Fixture-dependent parser tests (that read from the
       # local `Reference Music/` tree) still run locally via `npm test`, not here.

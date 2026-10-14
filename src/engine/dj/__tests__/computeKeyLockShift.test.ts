@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeKeyLockShift } from '../computeKeyLockShift';
+import { computeKeyLockShift, computeTempoPitchSplit } from '../computeKeyLockShift';
 
 /**
  * Pitch/tempo coupling invariants for DJ Key Lock.
@@ -79,6 +79,33 @@ describe('computeKeyLockShift', () => {
       expect(pitchCompensate).toBe(0);
       const netPitchFactor = playbackRate * Math.pow(2, pitchCompensate / 12);
       expect(netPitchFactor).toBeCloseTo(playbackRate, 6);
+    }
+  });
+});
+
+/**
+ * The tempo/pitch split shared by a tracker-mode DJ deck (DeckEngine.setPitch)
+ * and the tracker view's pitch slider (PatternScheduler.setGlobalPitchOffset).
+ */
+describe('computeTempoPitchSplit', () => {
+  it('Key Lock OFF: tempo, sample rate and detune all follow the fader (varispeed)', () => {
+    const r = computeTempoPitchSplit(4, false);
+    expect(r.tempoMultiplier).toBeCloseTo(Math.pow(2, 4 / 12), 10);
+    expect(r.pitchMultiplier).toBe(r.tempoMultiplier);
+    expect(r.detuneCents).toBe(400);
+  });
+
+  it('Key Lock ON: tempo follows the fader, pitch stays at the song key', () => {
+    const r = computeTempoPitchSplit(-6, true);
+    expect(r.tempoMultiplier).toBeCloseTo(Math.pow(2, -6 / 12), 10);
+    expect(r.pitchMultiplier).toBe(1);
+    expect(r.detuneCents).toBe(0);
+  });
+
+  it('a centred fader is neutral either way, and a non-number reads as centred', () => {
+    for (const k of [false, true]) {
+      expect(computeTempoPitchSplit(0, k)).toEqual({ tempoMultiplier: 1, pitchMultiplier: 1, detuneCents: 0 });
+      expect(computeTempoPitchSplit(Number.NaN, k)).toEqual({ tempoMultiplier: 1, pitchMultiplier: 1, detuneCents: 0 });
     }
   });
 });
