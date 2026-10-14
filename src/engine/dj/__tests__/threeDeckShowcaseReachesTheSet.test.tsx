@@ -1,16 +1,18 @@
 /**
  * The Three Deck Showcase (owner decision 2026-10-13; ledger J1-J10, X8, D1 rest, D3-D6) through its entry points:
  *
- *   DJ view   the Auto DJ panel's "Three Deck Showcase" button -> DJActions.toggleThreeDeckShowcase -> the player:
+ *   MCP       dj_three_deck_showcase -> DJActions.toggleThreeDeckShowcase -> the player:
  *             the demo render (renderThreeDeckShowcase, sentinel 1) plays on the mixer's sampler input; the buffer
  *             it plays nulls three_deck.render_from_params({}) (fixture gen_three_deck_showcase.py); the playing
  *             decks are paused (held), the DJ mixer is untouched; the view draws the render's 50 Hz streams (the
  *             gesture on Deck C at the playing tick = the demo's gesture_id stream)
- *   MCP       dj_three_deck_showcase ends it: the held decks resume where they stopped
- *   keyboard  the registry's dj_three_deck_showcase command starts it again (the render is reused) and ends it
+ *   MCP       dj_three_deck_showcase ends it: the held decks resume where they stopped, and starts it again (the
+ *             render is reused)
+ *   DJ view   the Auto DJ panel has no showcase button (owner decision 2026-10-14) and shows nothing while it is
+ *             idle; while it plays it shows the view
  */
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
-import { render, fireEvent, cleanup, act, waitFor } from '@testing-library/react';
+import { render, cleanup, act, waitFor } from '@testing-library/react';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
 import fixture from '@/engine/dj/scratch/__tests__/fixtures/three_deck_showcase.json';
 
@@ -50,7 +52,7 @@ function residualDb(ours: ArrayLike<number>, ref: Sub): number {
   return 10 * Math.log10(e / s + 1e-300);
 }
 
-describe('the Three Deck Showcase reaches the set from the DJ view, the MCP and the keyboard', () => {
+describe('the Three Deck Showcase reaches the set from the MCP and shows in the DJ view without a button', () => {
   beforeAll(() => {
     installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch();
     const off = new OfflineAudioContext(1, 22050, 22050);
@@ -74,7 +76,7 @@ describe('the Three Deck Showcase reaches the set from the DJ view, the MCP and 
   });
   afterEach(() => cleanup());
 
-  it('button -> the demo render while the set holds -> MCP ends it and the set resumes -> keyboard starts and ends it again', async () => {
+  it('MCP -> the demo render while the set holds, no showcase button in the Auto DJ panel -> MCP ends it and the set resumes -> MCP starts and ends it again', async () => {
     // a pause stops the deck's stream auto dub (DJActions imports it on demand): loaded whole first, as in the app
     await import('@/engine/dub/StreamAutoDub');
     const { useDJStore } = await import('@/stores/useDJStore');
@@ -90,11 +92,18 @@ describe('the Three Deck Showcase reaches the set from the DJ view, the MCP and 
     const mixerBefore = JSON.stringify({ x: useDJStore.getState().crossfaderPosition, a: useDJStore.getState().decks.A.volume, b: useDJStore.getState().decks.B.volume });
     const renders0 = showcaseStats.renders;
 
-    // --- the DJ view's button ---
+    // --- idle: the Auto DJ panel shows no showcase and no button to start one (owner decision 2026-10-14) ---
     const view = render(<ThreeDeckShowcasePanel />);
     const player = await getThreeDeckShowcase();
-    await act(async () => { fireEvent.click(view.getByTestId('three-deck-showcase-button')); });
+    expect(view.queryByTestId('three-deck-showcase')).toBeNull();
+    expect(view.queryByRole('button', { name: /showcase/i })).toBeNull();
+
+    // --- the MCP tool starts it ---
+    const { djThreeDeckShowcase } = await import('@/bridge/handlers/djHandlers');
+    await act(async () => { await djThreeDeckShowcase(); });
     await waitFor(() => expect(player.state.status).toBe('playing'), { timeout: 120_000, interval: 200 });
+    expect(view.getByTestId('three-deck-showcase')).toBeTruthy();
+    expect(view.queryByRole('button', { name: /showcase/i })).toBeNull();
 
     expect(showcaseStats.renders - renders0).toBe(1);
     expect(showcasePlayerStats.played).toBe(1);
@@ -138,7 +147,6 @@ describe('the Three Deck Showcase reaches the set from the DJ view, the MCP and 
     expect(deckCMotionNow(sec(silentBar))!.fade).toBe(0);
 
     // --- the MCP tool ends it: the held decks resume where they stopped ---
-    const { djThreeDeckShowcase } = await import('@/bridge/handlers/djHandlers');
     const ended = await djThreeDeckShowcase();
     expect(ended.status).toBe('idle');
     // ended early: its later strokes leave the Deck C timeline (the platter goes back to the deck's own clock)
@@ -148,13 +156,12 @@ describe('the Three Deck Showcase reaches the set from the DJ view, the MCP and 
     expect(useDJStore.getState().decks.B.isPlaying).toBe(true);
     expect(showcasePlayerStats.resumes).toBe(1);
 
-    // --- the keyboard command registry's command starts and ends it (the same render reused) ---
-    const { djThreeDeckShowcase: keyCommand } = await import('@/engine/keyboard/commands/djScratch');
-    expect(keyCommand()).toBe(true);
+    // --- the MCP tool starts and ends it again (the same render reused) ---
+    void djThreeDeckShowcase();
     await waitFor(() => expect(player.state.status).toBe('playing'), { timeout: 30_000 });
     expect(showcaseStats.renders - renders0).toBe(1);
     expect(holder.pauses).toEqual(['A', 'B', 'A', 'B']);
-    keyCommand();
+    await djThreeDeckShowcase();
     await waitFor(() => expect(holder.plays).toEqual(['A', 'B', 'A', 'B']));
 
     // never the DJ mixer

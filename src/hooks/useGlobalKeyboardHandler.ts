@@ -126,7 +126,7 @@ import { setStep10, setStep11, setStep12, setStep13, setStep14, setStep15, setSt
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
-  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132, djThreeDeckShowcase
+  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132
 } from '@engine/keyboard/commands/djScratch';
 import {
   dubEchoThrow, dubStab, dubChannelThrow, dubSpringSlam, dubSnareCrack,
@@ -729,7 +729,6 @@ function initializeRegistry() {
     { name: 'dj_scratch_scrbl', contexts: ['global'], handler: djScratchScrbl, description: 'DJ Scratch: Scribble' },
     { name: 'dj_scratch_tear',  contexts: ['global'], handler: djScratchTear,  description: 'DJ Scratch: Tear' },
     { name: 'dj_scratch_stop',   contexts: ['global'], handler: djScratchStop,  description: 'DJ Scratch: Stop pattern' },
-    { name: 'dj_three_deck_showcase', contexts: ['global'], handler: djThreeDeckShowcase, description: 'DJ: Three Deck Showcase (start or end)' },
     { name: 'dj_fader_lfo_off',  contexts: ['global'], handler: djFaderLFOOff,  description: 'DJ Fader LFO: Off' },
     { name: 'dj_fader_lfo_14',   contexts: ['global'], handler: djFaderLFO14,   description: 'DJ Fader LFO: 1/4 note' },
     { name: 'dj_fader_lfo_18',   contexts: ['global'], handler: djFaderLFO18,   description: 'DJ Fader LFO: 1/8 note' },

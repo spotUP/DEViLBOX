@@ -1,7 +1,8 @@
 /**
- * The Three Deck Showcase control and its performance view (owner decision 2026-10-13; ledger J1-J10, X8, D1, D3-D6).
+ * The Three Deck Showcase's performance view (owner decision 2026-10-13; ledger J1-J10, X8, D1, D3-D6).
  *
- * The button starts the demo's whole three-deck render while the set holds (and ends it early). While it plays, the
+ * The showcase has no button (owner decision 2026-10-14): the MCP tool dj_three_deck_showcase starts the demo's whole
+ * three-deck render while the set holds (and ends it early). Nothing renders while it is idle; while it plays, the
  * view draws dj_viz's 50 Hz streams of that same render: each deck's platter angle (Deck C scratching, A and B
  * pushed and rewound on the juggle bursts - D5), the tonearms (D4), the channel faders and the crossfader (D3),
  * which decks are audible and the gesture on Deck C (D1), and the energy, beat, juggle level and scratch
@@ -9,8 +10,7 @@
  */
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import * as Tone from 'tone';
-import { Button } from '@/components/ui/Button';
-import { getThreeDeckShowcase, toggleThreeDeckShowcase } from '@/engine/dj/DJActions';
+import { getThreeDeckShowcase } from '@/engine/dj/DJActions';
 import type { ShowcaseState, ThreeDeckShowcasePlayer } from '@/engine/dj/scratch/threeDeckShowcasePlayer';
 import { gestureNameForId, type DjVizStreamName } from '@/engine/dj/scratch/djViz';
 import { REFERENCE_GESTURE_IDS, getGesture } from '@/engine/dj/scratch/scratchGestureCatalog';
@@ -148,21 +148,14 @@ export const ThreeDeckShowcasePanel: React.FC = () => {
     (fn) => (player ? player.subscribe(fn) : () => undefined),
     () => (player ? player.state : IDLE),
   );
-  const running = state.status !== 'idle';
+  // No start button (owner decision 2026-10-14): the showcase starts and ends through the MCP tool
+  // dj_three_deck_showcase; the Auto DJ panel only shows it while it runs.
+  if (state.status === 'idle') return null;
   return (
-    <div className="flex flex-col gap-1" data-testid="three-deck-showcase">
-      <div className="flex items-center gap-2">
-        <Button
-          variant={running ? 'danger' : 'primary'} size="sm" data-testid="three-deck-showcase-button"
-          onClick={() => { void toggleThreeDeckShowcase(); }}
-          title="Plays the Up Rough demo's whole three-deck routine - Deck C scratching over its own two-record beat juggle - while the set holds; the playing decks pause and resume where they stopped when it ends. The DJ mixer is not touched."
-        >
-          {running ? 'End Showcase' : 'Three Deck Showcase'}
-        </Button>
-        <span className="text-[10px] font-mono text-text-muted" data-testid="three-deck-showcase-status">
-          {state.reason && !running ? `Not played: ${state.reason}` : STATUS_LABEL[state.status]}
-        </span>
-      </div>
+    <div className="flex flex-col gap-1 mt-2" data-testid="three-deck-showcase">
+      <span className="text-[10px] font-mono text-text-muted" data-testid="three-deck-showcase-status">
+        Three Deck Showcase: {STATUS_LABEL[state.status]}
+      </span>
       {state.status === 'playing' && player && <ShowcaseStreams player={player} />}
     </div>
   );
