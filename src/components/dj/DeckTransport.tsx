@@ -61,13 +61,13 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   }, [deckId, otherDeckId]);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-1 items-center gap-2">
       {/* Play / Pause */}
       <button
         onClick={handlePlayPause}
         disabled={isPending}
         className={`
-          flex items-center justify-center w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
           transition-all duration-100 border border-dark-border
           active:translate-y-[1px]
           ${
@@ -87,7 +87,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       <button
         onClick={handleCue}
         className={`
-          flex items-center justify-center w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
           border border-dark-border
           active:translate-y-[1px]
           transition-all duration-100
@@ -104,7 +104,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       <button
         onClick={handleSync}
         className={`
-          flex items-center justify-center w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
           border border-dark-border
           active:translate-y-[1px]
           transition-all duration-100
@@ -123,7 +123,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       <button
         onClick={handleKeyLock}
         className={`
-          flex items-center justify-center w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
           border border-dark-border
           active:translate-y-[1px]
           transition-all duration-100

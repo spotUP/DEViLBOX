@@ -31,7 +31,7 @@ export function TabStrip<Id extends string>({ tabs, active, onChange, ariaLabel,
             aria-selected={selected}
             onClick={() => onChange(tab.id)}
             title={tab.title}
-            className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
+            className={`flex-1 whitespace-nowrap px-2.5 py-1 rounded text-xs font-bold transition-colors ${
               selected
                 ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
                 : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
