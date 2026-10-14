@@ -9,6 +9,7 @@
  */
 import { useFormatStore, type FormatStore } from '@stores/useFormatStore';
 import { notify } from '@stores/useNotificationStore';
+import { rewindPlayhead } from '@/lib/tracker/playhead';
 
 export type SubsongSource = 'furnace' | 'uade' | 'sid' | 'activisionPro' | 'native' | 'file';
 
@@ -58,6 +59,8 @@ export async function switchSubsong(index: number): Promise<void> {
   const fmt = useFormatStore.getState();
   const status = subsongStatus(fmt);
   if (!status || index < 0 || index >= status.count || index === status.current) return;
+  // The new tune plays from its start, whichever source holds it.
+  rewindPlayhead();
   switch (status.source) {
     case 'furnace': {
       const sub = fmt.furnaceSubsongs![index];

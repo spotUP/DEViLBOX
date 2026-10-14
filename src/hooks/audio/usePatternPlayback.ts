@@ -7,6 +7,7 @@
  * - Ticks 1+: process continuous effects
  */
 
+import { reloadResumePoint } from '@/lib/tracker/playhead';
 import { masterChainKey } from '@utils/masterChainKey';
 import { useEffect, useMemo, useRef, startTransition } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -505,8 +506,10 @@ export const usePatternPlayback = () => {
           } else {
             // Restore position after structural reload in song mode.
             // If the position is out of bounds (e.g. pattern order shrunk), seekTo handles clamping.
-            replayer.seekTo(currentSongPos, currentRow);
-            seekCinter4(effectiveSongPositions[currentSongPos] ?? currentSongPos, currentRow);
+            // (a subsong switch resumes at the start of its tune: lib/tracker/playhead)
+            const resume = reloadResumePoint(currentSongPos, currentRow);
+            replayer.seekTo(resume.songPos, resume.row);
+            seekCinter4(effectiveSongPositions[resume.songPos] ?? resume.songPos, resume.row);
           }
         } else if (isLooping) {
           // Pattern-loop initial start: begin at the top of the looped song
