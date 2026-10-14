@@ -433,6 +433,7 @@ Phase 5 - Dual A/B (33 + 2)
 - [x] AB08 dss -- nuade 0.976 vs ours 0.974 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
 - [ ] AB09 facethemusic -- OPEN, no reference: UADE has no Face The Music player (uade123 native: "Unknown format"), so neither engine can be scored against it; default stays ours
 - [x] AB10 fred_np -- measured: ours 0.855 like UADE (2 songs; fuzzball-title.fred dropped, UADE itself refuses it: module check failed); nuade fails its floor (bomb jack.fred renders silent, mean -0.538): default ours; 08242a402, nuadeCompareTooling.test.ts (ownRender), nuadeFormats.test.ts
+  - Recheck 2026-10-14: fuzzball-title.fred (census-accepted by nuade) re-tried and dropped again: UADE refuses it (_uade_wasm_load ret=-1), so it has no reference. No change.
 - [x] AB11 futurecomposer -- nuade 0.966 vs ours 0.945 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
 - [x] AB12 hippel -- nuade 0.983 vs ours 0.972 like UADE beats ours by DN-1, but HELD on our engine: it takes grid edits cell by cell and nuade has none at the pin (owner rule: no lost edit path); 08242a402, nuadeFormats.test.ts (no lost edit path)
 - [x] AB13 hippel7v -- nuade 0.880 vs ours 0.565 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
@@ -448,6 +449,7 @@ Phase 5 - Dual A/B (33 + 2)
 - [x] AB23 sidmon2 -- nuade 0.981 vs ours 0.944 like UADE beats ours by DN-1, but HELD on our engine: it takes grid edits cell by cell and nuade has none at the pin (owner rule: no lost edit path); 08242a402, nuadeFormats.test.ts (no lost edit path)
 - [ ] AB24 sonix -- OPEN, no reference: UADE.wasm and native uade123 both fail on all three corpus songs (score died: the instrument files are not in the corpus); default stays ours
 - [x] AB25 soundcontrol -- nuade 0.995 vs ours 0.995 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
+  - Recheck 2026-10-14: the census missed this row's corpus because nuade's probe returns Unsure (2), not Supported (0), for it (structural check only, no magic number); same for gmc and soundfactory. Corpus files are right (all 7 probe 2); verdicts unchanged.
 - [x] AB26 soundfactory -- nuade 0.925 vs ours 0.890 like UADE: default ours (DN-1); 1122f5b89, 2534ff05c, selector offers all three
 - [x] AB27 soundmon -- nuade 0.966 vs ours 0.934 like UADE beats ours by DN-1, but HELD on our engine: it takes grid edits cell by cell and nuade has none at the pin (owner rule: no lost edit path); 08242a402, nuadeFormats.test.ts (no lost edit path)
 - [x] AB28 suntronic -- measured: our engine plays V1.3 score modules and refuses all three corpus songs (compiled .sun), nothing to compare: default ours (nuade 0.969 like UADE); 08242a402, nuadeCompareTooling.test.ts (ownRender), nuadeFormats.test.ts
@@ -817,11 +819,14 @@ on the row removes UADE from its choices (the routes never hand playback to UADE
 Measured 2026-10-14, 30 s, 20 ms envelope, best lag, against UADE (nuade / EaglePlayer -> default):
 
 - [x] AE01 andersoland -- 0.985 / 0.993 -> ours (EaglePlayer)
+  - Re-measured 2026-10-14 (NUADE-10 recheck): corpus 1 -> 3 songs (primemover_01.hot, primemover_09.hot added; 0.976, 0.988): nuade 0.985 -> 0.983, ours 0.993 -> 0.994; default unchanged (owner: nuade).
 - [x] AE02 beathoven -- 0.884 / 0.976 -> ours; nuade fails the floor (tristar cracktro.bss 0.883 < 0.90)
 - [x] AE03 bendaglishsid -- 0.915 / 0.948 -> ours; nuade mean 0.915 < 0.95 floor
 - [x] AE04 coredesign -- 0.984 / 0.9995 -> ours; nuade ends at 23.1 s where UADE plays on (end agreement fails)
 - [x] AE05 davelowe -- 0.985 / 0.997 -> ours (corpus: incredibleshrinkingsphere.dl and m-bison.dln, the player lists dln too)
 - [x] AE06 scottjohnston -- 0.892 / 0.990 -> ours; nuade fails the floor (sjs.tune1 0.854 < 0.90)
+  - Re-measured 2026-10-14: corpus 2 -> 31 songs (every sjs.* with its smp.* companion; 30 of 31 pass, sjs.tune4 0.897 and sjs.tune1 0.854 fail): nuade 0.892 -> 0.955, ours 0.990 -> 0.990; default unchanged (owner: nuade).
+  - Recheck of the other AE rows: beathoven, bendaglishsid, coredesign, davelowe, wallybeben had no missing songs; the census' extra files (formats/tristar_cracktro.bss, terramex.bds, dynamite_dux.core, m-bison.dln, wicked.wb) are byte-identical (md5) to corpus entries; beathoven_smallest.bss is a stub, excluded. No change.
 - [x] AE07 wallybeben -- 0.956 / 0.991 -> ours
 - [x] AE-1 `ownRender.ts` renders the EaglePlayer runner headless (`load: 'eagle'`, player picked by the song's prefix) so DN-1 has both numbers.
 - [x] AE-2 Settings v15 drops the stored old defaults of the seven keys (a stored `native` would pin the measured default); keys made optional in `FormatEnginePreferences`, store defaults removed. Test: useSettingsStore.migration.test.ts v15.
