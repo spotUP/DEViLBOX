@@ -28,11 +28,13 @@ export function setNuadeProbe(next: NuadeProbe): NuadeProbe {
 }
 
 /**
- * How many voices `playerId` gives this module: the answer the audio node is sized from, known only after the player
+ * How many voices `playerId` gives this module (the answer the audio node is sized from) and how many subsongs it holds
+ * (the answer the subsong control is shown from at import, before any engine has loaded), known only after the player
  * opens the file. Asked of the same main-thread Nuade.wasm as the probe, one song slot, closed again. null when the
  * player refuses the module.
  */
-export type NuadeVoiceCounter = (bytes: Uint8Array, fileName: string, playerId: string, companions?: Map<string, ArrayBuffer>) => Promise<number | null>;
+export interface NuadeSongInfo { voices: number; subsongs: number; defaultSubsong: number }
+export type NuadeVoiceCounter = (bytes: Uint8Array, fileName: string, playerId: string, companions?: Map<string, ArrayBuffer>) => Promise<NuadeSongInfo | null>;
 
 let counter: NuadeVoiceCounter = async (bytes, fileName, playerId, companions) => {
   module ??= loadNuadeModuleFromPublic();
@@ -41,9 +43,9 @@ let counter: NuadeVoiceCounter = async (bytes, fileName, playerId, companions) =
     nu.clearFiles();
     for (const [name, data] of companions ?? []) nu.addFile(name, new Uint8Array(data));
     nu.open(bytes, fileName, playerId);
-    const voices = nu.voiceCount;
+    const info = { voices: nu.voiceCount, subsongs: nu.subsongCount, defaultSubsong: nu.defaultSubsong };
     nu.close();
-    return voices;
+    return info;
   } catch {
     return null;
   }

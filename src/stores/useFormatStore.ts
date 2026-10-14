@@ -25,7 +25,7 @@ import type { SF2LoadPayload } from './useSF2Store';
 import type { MaxTraxData, MaxTraxScore } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { locateMaxTraxSampleInTailRaw } from '@/lib/import/formats/maxtrax/maxtraxFormat';
 import { useSF2Store } from './useSF2Store';
-import { subsongStartField, type NativeSubsongs } from '@/lib/tracker/nativeSubsongs';
+import { subsongStartField, normalizeSubsongs, type NativeSubsongs } from '@/lib/tracker/nativeSubsongs';
 import { useCheeseCutterStore } from './useCheeseCutterStore';
 import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
@@ -1150,7 +1150,11 @@ export const useFormatStore = create<FormatStore>()(
         state.gmeTrack = (song as any).gmeTrack ?? null;
         state.asapSong = (song as any).asapSong ?? null;
         // The new song's engine reports its subsongs once it has loaded.
-        state.nativeSubsongs = null;
+        // A song on nuade already knows its count (asked of the player at import): the control shows before play.
+        const nuadeSubs = (song as { nuadeSubsongs?: { count: number; defaultSubsong: number } }).nuadeSubsongs;
+        state.nativeSubsongs = nuadeSubs && (song as { nuadePlayerId?: string }).nuadePlayerId
+          ? normalizeSubsongs('Nuade', nuadeSubs.count, (song as { nuadeSubsong?: number }).nuadeSubsong ?? nuadeSubs.defaultSubsong)
+          : null;
         state.fileSubsongs = (song as any).fileSubsongs ?? null;
         state.s98FileData = (song as any).s98FileData ?? null;
         state.stoneTrackerFileData = (song as any).stoneTrackerFileData ?? null;

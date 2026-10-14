@@ -11,7 +11,7 @@ import type { FormatEnginePreferences } from '@/types/formatEngine';
 import { WASM_ENGINES } from '@/engine/replayer/wasmEngineRegistry';
 import { NUADE_FORMATS } from '@/engine/nuade/nuadeFormats';
 import { nuadeRowFor, type FormatEngineMap } from '@/engine/nuade/nuadeRouting';
-import type { NuadeProbe } from '@/engine/nuade/nuadeProbe';
+import { nuadeVoiceCounter, type NuadeProbe } from '@/engine/nuade/nuadeProbe';
 
 const UADE_SYNTHS = new Set(['UADESynth', 'UADEEditableSynth']);
 
@@ -82,5 +82,12 @@ export interface NuadeChoiceContext {
 /** The routed `song`, played on nuade when its format's choice says so; unchanged otherwise. */
 export async function applyNuadeChoice(song: TrackerSong, ctx: NuadeChoiceContext): Promise<TrackerSong> {
   const row = await nuadeRowFor(ctx.fileName, new Uint8Array(ctx.buffer), ctx.prefs, ctx.registryKey, ctx.probe);
-  return row ? playOnNuade(song, row.id, ctx.buffer, ctx.fileName, ctx.companions) : song;
+  if (!row) return song;
+  playOnNuade(song, row.id, ctx.buffer, ctx.fileName, ctx.companions);
+  // The subsong control must show at import, not after the first play loads the engine: ask the player now.
+  try {
+    const info = await nuadeVoiceCounter()(new Uint8Array(ctx.buffer), ctx.fileName, row.id, ctx.companions);
+    if (info && info.subsongs > 1) song.nuadeSubsongs = { count: info.subsongs, defaultSubsong: info.defaultSubsong };
+  } catch { /* the engine reports its subsongs when it loads */ }
+  return song;
 }

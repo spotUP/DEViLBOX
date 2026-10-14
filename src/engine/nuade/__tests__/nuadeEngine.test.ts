@@ -60,6 +60,13 @@ describe('NE-3 NuadeEngine', () => {
     expect(await engine.playSubsong(99)).toBe(-1);
   });
 
+  it('a load asked to start subsong N reports N as the subsong playing (a reopen, a restore and a play after a stop all load at N)', async () => {
+    await engine.loadTune(songBuffer('public/data/songs/ben-daglish/motorhead-titleandingame.bd'), 'bendaglish', 'motorhead-titleandingame.bd', 2, undefined);
+    await until(() => engine.loaded?.playerId === 'bendaglish');
+    expect(useFormatStore.getState().nativeSubsongs).toMatchObject({ engine: 'Nuade', count: 3, current: 2 });
+    expect(useFormatStore.getState().nuadeSubsong).toBe(2);
+  });
+
   it('rejects a load without a player id', async () => {
     await expect(engine.loadTune(songBuffer(MMDC), undefined)).rejects.toThrow('no player id');
   });

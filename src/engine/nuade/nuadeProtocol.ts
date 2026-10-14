@@ -44,6 +44,8 @@ export type NuadeOut =
   | {
       type: 'moduleLoaded';
       voices: number; subsongs: number; defaultSubsong: number;
+      /** The subsong the load started (the asked one, else the default). */
+      startedSubsong?: number;
       playerId: string; playerName: string;
       meta: Record<string, string>;
       instruments: { index: number; name: string }[];
