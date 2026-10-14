@@ -2,7 +2,7 @@
 date: 2026-10-14
 topic: Engine-rendered row preview - Enter on a whole-song-engine song sounds that row as playback renders it, by the engine itself
 tags: [keyboard, row-preview, playback, engines, nuade, uade, eagleplayer, worker]
-status: draft  # wave 0 + 1 implemented 2026-10-14
+status: draft  # wave 0 + 1 implemented 2026-10-14; wave 2: U0-U3 done, U4 open (2 corpus rows)
 ---
 
 # Engine-rendered row preview
@@ -263,20 +263,20 @@ commit hash. Ledger: this file.
 
 ### Wave 2 - UADE family
 
-- [ ] **U0 Measure first.** In Node: UADE.wasm second instance memory (heap size after load) and silent-advance cost
+- [x] **U0 Measure first.** In Node: UADE.wasm second instance memory (heap size after load) and silent-advance cost
   per second of song for 3 corpus songs (UADEEditable), 2 EaglePlayer songs; determinism check as in this plan's
   probe (cold-advance row vs linear). Record the table here. A non-deterministic engine is a bug to fix in the engine,
   not a reason to drop the row.
-- [ ] **U1 UADEEditable adapter** (`adapters/uadeAdapter.ts`): load path of dj-render.worker.ts `initUADE`/`loadUADE`
+- [x] **U1 UADEEditable adapter** (`adapters/uadeAdapter.ts`): load path of dj-render.worker.ts `initUADE`/`loadUADE`
   (reuse: extract the loader into a shared module both workers import; do not copy it). Position: the player tick count
   (`uade_wasm_get_player_tick_count`) mapped with `playerGridRowStartTick` (e3b3dd2fa) when `uadePlayerTickGrid`, CIA
   ticks with `uadeFirstTick` otherwise (rowSeek.ts on e3b3dd2fa). Exact row start: render in tick-sized chunks, or
   add a frames-to-next-tick export to the UADE glue if the probe in U0 shows per-chunk positions only.
   `UADEEngine.playRowClip` + `UADE.worklet.js` emit refactor + row-clip.js.
-- [ ] **U2 UADE classic (UADESynth, opaque).** Its grid follows a fixed frames-per-row estimate (e3b3dd2fa
+- [x] **U2 UADE classic (UADESynth, opaque).** Its grid follows a fixed frames-per-row estimate (e3b3dd2fa
   rowSeek.ts reason); the row IS that frame range, so target = `{ frames: [r * fpr, (r + 1) * fpr) }` (add the third
   `RowTarget` kind here, not earlier). Same adapter as U1.
-- [ ] **U3 EaglePlayer** (Musashi runner): adapter over its WASM (EaglePlayer.worklet.js load path), position = player
+- [x] **U3 EaglePlayer** (Musashi runner): adapter over its WASM (EaglePlayer.worklet.js load path), position = player
   ticks via `eaglePlayerGrid` (e3b3dd2fa); `EaglePlayerEngine.playRowClip`; worklet emit refactor.
 - [ ] **U4 Per-engine row-clip-equals-playback test** for U1-U3 (one test file per engine, corpus songs), in `test:ci`.
 
@@ -480,3 +480,33 @@ Decisions / deviations (append as found):
 - **Prefetch** is mounted in `TrackerView` (`useEffect(() => startRowPreviewPrefetch(), [])`), no new component.
 - **N5:** `npm run type-check` has one error, in another session's uncommitted WIP (`PatternEditorCanvas.tsx` 484, TS6133 `cwPx`);
   nothing of this work. 24 test files / 118 tests of the items named above pass.
+
+## Ledger - wave 2 (UADE family, 5 items), 2026-10-14
+
+Running count: 4 of 5 (U0, U1, U2, U3 done; **U4 open: 2 of 355 UADE corpus songs fail the gate**). Waves 3-4 and M1/M2 open.
+
+| ID | Done | Commit |
+|---|---|---|
+| shared (frames target, mask while advancing, timeline rebuild, adapter prepare) | yes | 98722d296 |
+| U3 EaglePlayer | yes | b7f28bd2c |
+| UADE capture FIFO emptied on load (C fix, wasm rebuilt) | yes | be392ddcb |
+| UADE clock + load args on the live song | yes | fe64737df |
+| U1 UADEEditable | yes | 31ebddf95 |
+| U2 UADE classic | yes | ca81996c8 |
+| U0 measurements | yes | table below |
+| U4 gates + tests | PARTIAL | tests: uadeRowClipEqualsPlayback, eaglePlayerRowClipEqualsPlayback, uadeFamilyEnginesPlayRowClips; gate `npm run uade-row-preview` |
+
+**U0 (Node, 48 kHz).** UADE.wasm instance: 48 MiB (50331648 B) after init, unchanged by a load; EaglePlayer.wasm: 16 MiB. Silent run: UADE ~8-10 ms per song second (6 s in 48-61 ms, 3 songs: skateordie.rh, rackney'sisland 4.sm, crown arabia.hst), EaglePlayer 5-15 ms per second (wicked.wb, incredibleshrinkingsphere.dl). Determinism: render in 1, 16 and 128-frame calls, and after a reset + reload, max diff 0 (all 5 songs). Cold row request over the gates: UADE 2094 rows median 252 ms, p90 657, max 2993; EaglePlayer 10 songs median 246, max 1918.
+
+**Gates.** `npm run uade-row-preview` (UADE, 355 PLAYS songs of test-data/uade-corpus-sweep.json, rows at 10/50/90 % of the first minute, named in frames and, where the interrupt count runs, in player ticks): 353 pass, **2 fail: eco.gray, warlock_the_avenger.sqt** (max diff 0.55 / 0.6 on rows after a restart). `-- --engine eagleplayer`: 10 of 10 pass. Verdicts in test-data/{uade,eagleplayer}-row-preview.json (gitignored); re-run one with `-- --only eco.gray`, the failures with `-- --failed`.
+
+**U4 NEXT STEP.** Find why eco.gray and warlock_the_avenger.sqt differ between a fresh linear render and restart + silent advance (the 0.9 frames row, reached with no restart, is exact; the rows after a restart are not): try a fresh instance for each restart (adapter.newWasm) versus full_reset, and compare the two renders per frame to see where they part. The fix belongs in the engine or the adapter's restart, not in the gate.
+
+Decisions / findings (wave 2):
+- Frames target: the third RowTarget kind (U2). The opaque player's row is 5292 output frames (OPAQUE_UADE_FRAMES_PER_ROW, one constant with usePatternPlayback); a clockless editable song uses the scheduler's 2.5/bpm*speed; TFMX timing tables use the song's own 50 Hz jiffies.
+- UADE mask = audible bits 0-3 | isolated bits 8-11 (uade_wasm_isolate_channels): the emulator renders ahead of what it hands out, so the mask goes in before the run (advanceSilent takes it).
+- UADE capture FIFO (audio.c, 8192 frames) outlived a load: emptied in uade_wasm_load; advance steps are 256 frames because a big call overflows it.
+- A UADE reset keeps state of the song before: a different song gets a clean instance (prepare), a restart of the same song resets in place.
+- FOUND, fixed: the format store kept neither uadeFirstTick nor uadePlayerTickGrid, so the live song never carried them (playhead follow of interrupt-player songs fell to a CIA tick that stays 0).
+- FOUND, not fixed: the TFMX playhead converts frames to jiffies with a fixed 882 frames (right at 44.1 kHz only); the opaque-UADE playback worklet and the worklet reload leave stale capture only if the wasm is older than be392ddcb.
+- Type-check: clean for this work; the tree has an error in another session's src/components/dj/__tests__/djViewFitsEveryCommonResolution.test.tsx (TS6133 act, TS1294).
