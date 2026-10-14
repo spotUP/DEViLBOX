@@ -10,6 +10,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { isExtendedAnalysis } from '../services/extendedAnalysisCodec';
 import { lookupAnalysis, storeAnalysis, getAnalysisCacheStats } from '../services/analysisCache';
 
 const router = Router();
@@ -71,6 +72,10 @@ router.post('/cache', async (req: Request, res: Response) => {
       return res.status(remoteRes.status).json(result);
     }
 
+    if (data.extended != null && !isExtendedAnalysis(data.extended)) {
+      return res.status(400).json({ error: 'Invalid extended analysis' });
+    }
+
     storeAnalysis({
       hash: data.hash.toLowerCase(),
       bpm: data.bpm,
@@ -92,6 +97,7 @@ router.post('/cache', async (req: Request, res: Response) => {
       waveformPeaks: data.waveformPeaks ?? [],
       frequencyPeaks: data.frequencyPeaks ?? [],
       analysisVersion: data.analysisVersion ?? 1,
+      extended: data.extended ?? null,
     });
 
     res.json({ stored: true });

@@ -5,6 +5,8 @@
  * from analysis done by any user. Keyed by SHA-256 of the file content.
  */
 
+import type { ExtendedAnalysis } from '@/engine/dj/autodj/types';
+
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -30,18 +32,40 @@ export interface ServerAnalysis {
   waveformPeaks: number[];
   frequencyPeaks: number[][];
   analysisVersion: number;
+  /**
+   * The Auto DJ extended analysis (activity timelines, loudness set, spectral,
+   * chroma), packed on the server. null/absent = a row written before it
+   * existed: a partial hit, only the extended analysis is left to compute.
+   */
+  extended?: ExtendedAnalysis | null;
 }
 
 // ── API calls ───────────────────────────────────────────────────────────────
 
+/** The lookups in flight, by hash: two loads of one track (two decks, a preview and a load) ask the server once. */
+const lookupsInFlight = new Map<string, Promise<ServerAnalysis | null>>();
+
+/** How long a load waits for the server before analysing locally. A late answer is dropped, never awaited twice. */
+export const LOOKUP_TIMEOUT_MS = 3000;
+
 /**
  * Look up cached analysis by SHA-256 hash.
- * Returns null on cache miss or network error (non-blocking).
+ * Returns null on cache miss, network error or a server slower than
+ * LOOKUP_TIMEOUT_MS (non-blocking): the caller then analyses locally, once,
+ * and uploads the result - it does not ask again for the same load.
  */
-export async function lookupServerAnalysis(hash: string): Promise<ServerAnalysis | null> {
+export function lookupServerAnalysis(hash: string): Promise<ServerAnalysis | null> {
+  const pending = lookupsInFlight.get(hash);
+  if (pending) return pending;
+  const request = fetchServerAnalysis(hash).finally(() => { lookupsInFlight.delete(hash); });
+  lookupsInFlight.set(hash, request);
+  return request;
+}
+
+async function fetchServerAnalysis(hash: string): Promise<ServerAnalysis | null> {
   try {
     const res = await fetch(`${API_URL}/analysis/lookup/${hash}`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const json = await res.json();
