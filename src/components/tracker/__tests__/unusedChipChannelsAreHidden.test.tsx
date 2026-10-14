@@ -129,6 +129,15 @@ describe('unused chip channels are hidden in the tracker', () => {
     const drawn = last.widths.map((w, i) => (w > 0 ? i : -1)).filter((i) => i >= 0);
     expect(drawn).toEqual(withData.map((h, i) => (h ? i : -1)).filter((i) => i >= 0));
 
+    // The order matrix above the grid (one column per channel) shows the same channels: the owner
+    // saw 32 order columns over a 16-channel grid (2026-10-14).
+    const orderLayouts = posted.filter((m) => m.bridge !== gridBridge && m.channelLayout).map((m) => m.channelLayout!);
+    expect(orderLayouts.length).toBeGreaterThan(0);
+    const orderLast = orderLayouts[orderLayouts.length - 1];
+    expect(orderLast.widths.length).toBe(32);
+    const orderDrawn = orderLast.widths.map((w, i) => (w > 0 ? i : -1)).filter((i) => i >= 0);
+    expect(orderDrawn).toEqual(drawn);
+
     // The scope strip reads the same list.
     const { channelLayout, scopeCells } = await import('@/components/tracker/channelLayout');
     const cells = scopeCells(32, 1900, channelLayout).filter((c) => c.w >= 2);

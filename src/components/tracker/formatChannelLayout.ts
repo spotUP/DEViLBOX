@@ -43,6 +43,7 @@ export function formatChannelLayout(input: FormatChannelLayoutInput): FormatChan
   const { formatChannels, formatColumns, charWidth, leftEdge, columnGap, channelPad, availableWidth, fit = false, manualScale = 1 } = input;
   const widths: number[] = [];
   for (const channel of formatChannels) {
+    if (channel.hidden) { widths.push(0); continue; }
     const cols = channel.columns ?? formatColumns;
     const contentWidth = cols.reduce((sum, col) => sum + col.charWidth * charWidth + columnGap, 0) - columnGap;
     widths.push(contentWidth + channelPad);
