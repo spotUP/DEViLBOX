@@ -77,11 +77,14 @@ interface SettingsStore {
   masterFxQuantize: boolean;
   /** Pattern view scrolls per sub-row instead of stepping row by row. User preference, persisted. */
   smoothScrolling: boolean;
+  /** Pattern view shows the neighbouring patterns' rows dimmed above and below. User preference, persisted. */
+  showGhostPatterns: boolean;
 
   // Actions
   setAmigaLimits: (enabled: boolean) => void;
   setLinearInterpolation: (enabled: boolean) => void;
   setMasterTuning: (hz: number) => void;
+  setShowGhostPatterns: (enabled: boolean) => void;
   setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice | UADEImportMode) => void;
   /** Forget the stored choice of one format: it plays on its table default again. */
   resetFormatEngine: (format: keyof FormatEnginePreferences) => void;
@@ -210,6 +213,7 @@ export const useSettingsStore = create<SettingsStore>()(
       maxHeadroomMode: false,
       welcomeJingleEnabled: true,  // Play startup jingle on first interaction
       smoothScrolling: false,      // Default to stepped scrolling (classic tracker feel)
+      showGhostPatterns: true,     // Default on
       masterFxQuantize: true,      // Owner, 2026-10-08: channel on/offs in the master FX are quantized, switch on by default
       autoAdvanceSubsongs: true,   // Owner, 2026-10-05: "just skip to next subsong when it ends"
 
@@ -418,6 +422,8 @@ export const useSettingsStore = create<SettingsStore>()(
       set((state) => { state.masterFxQuantize = v; }),
     setSmoothScrolling: (smooth) =>
       set((state) => { state.smoothScrolling = smooth; }),
+    setShowGhostPatterns: (enabled) =>
+      set((state) => { state.showGhostPatterns = enabled; }),
     })),
     {
       name: 'devilbox-settings',
@@ -563,6 +569,8 @@ export const useSettingsStore = create<SettingsStore>()(
         masterFxQuantize: state.masterFxQuantize,
         // Additive: a save without it merges in the default (off), no version bump.
         smoothScrolling: state.smoothScrolling,
+        showGhostPatterns: state.showGhostPatterns,
+        // Additive: a save without it merges in the default (on), no version bump.
       }),
     }
   )

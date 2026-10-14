@@ -26,10 +26,10 @@ export function useEditorControls(opts?: {
 }) {
   // ── Store state ───────────────────────────────────────────────────────────
 
-  const { recordMode, showGhostPatterns, activeBehavior, copyMask } = useEditorStore(
+  const showGhostPatterns = useSettingsStore((s) => s.showGhostPatterns);
+  const { recordMode, activeBehavior, copyMask } = useEditorStore(
     useShallow((s) => ({
       recordMode: s.recordMode,
-      showGhostPatterns: s.showGhostPatterns,
       activeBehavior: s.activeBehavior,
       copyMask: s.copyMask,
     })),
@@ -77,7 +77,7 @@ export function useEditorControls(opts?: {
   }, []);
 
   const handleToggleGhosts = useCallback(() => {
-    const s = useEditorStore.getState();
+    const s = useSettingsStore.getState();
     s.setShowGhostPatterns(!s.showGhostPatterns);
   }, []);
 

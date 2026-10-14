@@ -204,8 +204,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setRecQuantRes = useEditorStore((s) => s.setRecQuantRes);
   const recReleaseEnabled = useEditorStore((s) => s.recReleaseEnabled);
   const setRecReleaseEnabled = useEditorStore((s) => s.setRecReleaseEnabled);
-  const showGhostPatterns = useEditorStore((s) => s.showGhostPatterns);
-  const setShowGhostPatterns = useEditorStore((s) => s.setShowGhostPatterns);
+  const showGhostPatterns = useSettingsStore((s) => s.showGhostPatterns);
+  const setShowGhostPatterns = useSettingsStore((s) => s.setShowGhostPatterns);
 
   // ── Store: useTransportStore ─────────────────────────────────────────────
   const smoothScrolling = useSettingsStore((s) => s.smoothScrolling);

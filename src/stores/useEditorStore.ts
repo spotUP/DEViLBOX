@@ -50,7 +50,6 @@ interface EditorStore {
 
   // Display preferences
   followPlayback: boolean;
-  showGhostPatterns: boolean;
   columnVisibility: ColumnVisibility;
   bookmarks: number[];
 
@@ -108,7 +107,6 @@ interface EditorStore {
 
   // Actions — display
   setFollowPlayback: (enabled: boolean) => void;
-  setShowGhostPatterns: (enabled: boolean) => void;
   setColumnVisibility: (visibility: Partial<ColumnVisibility>) => void;
   toggleBookmark: (row: number) => void;
   clearBookmarks: () => void;
@@ -168,7 +166,6 @@ export const useEditorStore = create<EditorStore>()(
     // the view freezes on the edit cursor so rows can be repositioned/edited
     // live while the song plays (see resolveScrollRow / isManualRowNavAllowed).
     followPlayback: true,
-    showGhostPatterns: true,
     columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
     bookmarks: [],
 
@@ -242,8 +239,6 @@ export const useEditorStore = create<EditorStore>()(
     setFollowPlayback: (enabled) =>
       set((state) => { state.followPlayback = enabled; }),
 
-    setShowGhostPatterns: (enabled) =>
-      set((state) => { state.showGhostPatterns = enabled; }),
 
     setColumnVisibility: (visibility) =>
       set((state) => { Object.assign(state.columnVisibility, visibility); }),

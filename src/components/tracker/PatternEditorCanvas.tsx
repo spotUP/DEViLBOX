@@ -1515,7 +1515,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const base: UIStateSnapshot = {
       useHex:             ui.useHexNumbers,
       blankEmpty:         ui.blankEmptyCells,
-      showGhostPatterns:  isFormatMode ? false : editor.showGhostPatterns,
+      showGhostPatterns:  isFormatMode ? false : settings.showGhostPatterns,
       columnVisibility:   editor.columnVisibility,
       trackerVisualBg:    settings.trackerVisualBg,
       recordMode:         editor.recordMode,
@@ -2080,7 +2080,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (isFormatModeRef.current) return;
       const b = bridgeRef.current;
       if (!b) return;
-      if (s.columnVisibility !== prev.columnVisibility || s.showGhostPatterns !== prev.showGhostPatterns || s.recordMode !== prev.recordMode || s.bookmarks !== prev.bookmarks) {
+      if (s.columnVisibility !== prev.columnVisibility || s.recordMode !== prev.recordMode || s.bookmarks !== prev.bookmarks) {
         b.post({ type: 'uiState', uiState: snapshotUI() });
       }
     });
@@ -2126,7 +2126,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Subscribe to settings store
     const unsubSettings = useSettingsStore.subscribe((s, prev) => {
       if (isFormatModeRef.current) return;
-      if (s.trackerVisualBg !== prev.trackerVisualBg) {
+      if (s.trackerVisualBg !== prev.trackerVisualBg || s.showGhostPatterns !== prev.showGhostPatterns) {
         bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
       }
     });

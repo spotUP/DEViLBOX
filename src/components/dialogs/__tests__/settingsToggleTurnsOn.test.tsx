@@ -3,7 +3,6 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { SettingsModal } from '../SettingsModal';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { useEditorStore } from '@stores/useEditorStore';
 
 afterEach(cleanup);
 
@@ -43,10 +42,23 @@ describe('Settings dialog toggles', () => {
   });
 
   it('Ghost Patterns turns off and on in the settings dialog', () => {
-    useEditorStore.getState().setShowGhostPatterns(false);
+    useSettingsStore.getState().setShowGhostPatterns(false);
     const { container } = render(<SettingsModal onClose={() => {}} />);
     fireEvent.click(toggleFor(container, 'Ghost Patterns:'));
-    expect(useEditorStore.getState().showGhostPatterns).toBe(true);
+    expect(useSettingsStore.getState().showGhostPatterns).toBe(true);
     expect(toggleFor(container, 'Ghost Patterns:').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('Ghost Patterns stays off after a reload', async () => {
+    useSettingsStore.getState().setShowGhostPatterns(true);
+    const { container } = render(<SettingsModal onClose={() => {}} />);
+    fireEvent.click(toggleFor(container, 'Ghost Patterns:'));
+    expect(useSettingsStore.getState().showGhostPatterns).toBe(false);
+    const saved = localStorage.getItem('devilbox-settings');
+    expect(saved).not.toBeNull();
+    useSettingsStore.setState({ showGhostPatterns: true });
+    localStorage.setItem('devilbox-settings', saved as string);
+    await useSettingsStore.persist.rehydrate();
+    expect(useSettingsStore.getState().showGhostPatterns).toBe(false);
   });
 });
