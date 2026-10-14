@@ -7,7 +7,7 @@
  *
  * Held here:
  *  - TrackerStore slice (pattern, patterns, actions)
- *  - EditorStore (showGhostPatterns, columnVisibility, recordMode)
+ *  - SettingsStore (showGhostPatterns), EditorStore (columnVisibility, recordMode)
  *  - channelMuted / channelSolo derived arrays
  *  - trackerScale (fit result or trackerZoom) → rowHeight + rowHeightRef
  *  - Cursor/selection refs (init from useCursorStore.getState())
@@ -80,7 +80,7 @@ export function usePatternEditor() {
   })));
 
   // ── EditorStore ───────────────────────────────────────────────────────────
-  const showGhostPatterns = useEditorStore((s) => s.showGhostPatterns);
+  const showGhostPatterns = useSettingsStore((s) => s.showGhostPatterns);
   const columnVisibility = useEditorStore((s) => s.columnVisibility);
   const recordMode = useEditorStore((s) => s.recordMode);
 
