@@ -219,7 +219,20 @@ export const scratchPermissionFor = (juggleLevel: number, budget = THREE_DECK_BU
  * phrase throws the whole phrase clean (HOME, drop_phrase), every scratch after it chops ONE word (ACCENT); the
  * record's statement plays from its first sample, the scratches read its last word (`cues_with_word_emphasis`).
  */
-export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; pools?: Readonly<Record<CueRole, readonly string[]>>; phraseEmphasis?: boolean; fold?: number } = {}): DemoRoutineEvent[] {
+/** Where each cue role's record rotation stands (three_deck.render's `role_i`): the pool index its next throw advances from. */
+export type CueRotation = Partial<Record<CueRole, number>>;
+
+/** three_deck.render's rotation rule: a clean 'drop' throws the role's NEXT record (role_i += 1); its scratches reuse it. */
+const throwsNextRecord = (e: Pick<DemoRoutineEvent, 'gesture'>): boolean => e.gesture === 'drop';
+
+/** The rotation after `events` played from `start` (the next routine continues from it: AUTO-SCRATCH-RECORD-VARIETY). */
+export function cueRotationAfter(events: readonly Pick<DemoRoutineEvent, 'gesture' | 'cueRole'>[], start: CueRotation = {}): CueRotation {
+  const out: CueRotation = { ...start };
+  for (const e of events) if (throwsNextRecord(e)) out[e.cueRole] = (out[e.cueRole] ?? 0) + 1;
+  return out;
+}
+
+export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; pools?: Readonly<Record<CueRole, readonly string[]>>; phraseEmphasis?: boolean; fold?: number; rotation?: CueRotation } = {}): DemoRoutineEvent[] {
   demoRoutineStats.threeDeck++;
   const budget = opts.budget ?? THREE_DECK_BUDGET;
   const pools = opts.pools ?? CUE_ROLE_POOLS;
@@ -272,12 +285,15 @@ export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; poo
     }
   });
   ev.push({ bar: 31, step: 15, cueRole: 'HOME', gesture: 'needleLift', velocity: 0.5 });
-  const roleI: Partial<Record<CueRole, number>> = {};
+  // `role_i = {r: 0 for r in pools}` (three_deck.py:423) for one render; a set plays routines back to back, so the
+  // rotation continues where the last routine left it (`rotation`) - restarting at 0 replayed the same first
+  // records of every pool in every routine (AUTO-SCRATCH-RECORD-VARIETY)
+  const roleI: CueRotation = { ...opts.rotation };
   // `pools.get(role) or pools.get("HOME")`, else the first record of any pool
   const anyRecord = (['HOME', 'SECONDARY', 'ACCENT', 'FX'] as const).map((r) => pools[r][0]).find((x) => x !== undefined);
   return ev.map((e) => {
     if (isNeedle(e.gesture)) return e;
-    if (e.gesture === 'drop') roleI[e.cueRole] = (roleI[e.cueRole] ?? 0) + 1;
+    if (throwsNextRecord(e)) roleI[e.cueRole] = (roleI[e.cueRole] ?? 0) + 1;
     const pool = pools[e.cueRole].length ? pools[e.cueRole] : pools.HOME;
     const record = pool.length ? pool[(roleI[e.cueRole] ?? 0) % pool.length] : anyRecord;
     return { ...e, ...(record ? { record } : {}), ...(emphasis ? { slice: e.cueRole === 'HOME' || e.cueRole === 'SECONDARY' ? 'phrase' as const : 'word' as const } : {}) };
