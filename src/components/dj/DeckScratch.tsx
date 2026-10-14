@@ -19,6 +19,8 @@ import { useDJStore } from '@/stores/useDJStore';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
 import { getGesture } from '@/engine/dj/scratch/scratchGestureCatalog';
 import { fireDjFx, releaseDjFx } from '@/engine/drumpad/DjFxActions';
+import { CRATE_LOAD_ORDER } from '@/engine/dj/scratch/scratchCatalogue';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { fxIdForPattern } from '@/engine/dj/scratch/scratchActionMap';
 import {
   startDeckFaderLFO,
@@ -46,6 +48,11 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
   const faderLFODivision = useDJStore((s) => s.decks[deckId].faderLFODivision);
 
   const [waitingPattern, setWaitingPattern] = useState<string | null>(null);
+  // Deck C is the scratch deck: its pads scratch the selected CRATE record on the scratch voice pool (same
+  // voices the Auto DJ's scratch DJ uses); a track loaded on C does not change that.
+  const isDeckC = deckId === 'C';
+  const recordId = useDJStore((s) => s.deckCRecordId);
+  const scratchOnly = useDJStore((s) => isDeckC && !s.decks.C.fileName);
 
 
   const isB = deckId === 'B';
@@ -73,6 +80,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
     const ok = fxId !== null && fireDjFx(fxId, {
       deck: deckId,
       source: 'pad',
+      record: isDeckC ? useDJStore.getState().deckCRecordId : undefined,
       onWaiting: (waitMs) => {
         quantizeWaitMs = waitMs;
         setTimeout(() => {
@@ -90,16 +98,16 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
       setWaitingPattern(null);
       store.setDeckPattern(deckId, patternName);
     }
-  }, [deckId, activePatternName]);
+  }, [deckId, activePatternName, isDeckC]);
 
   const handlePatternPointerUp = useCallback((patternName: string) => {
     // Tap or hold release: let the current cycle finish (no abrupt cut)
     const fxId = fxIdForPattern(patternName);
-    if (fxId) releaseDjFx(fxId, { deck: deckId, source: 'pad', finishCycle: true });
+    if (fxId) releaseDjFx(fxId, { deck: deckId, source: 'pad', finishCycle: true, record: isDeckC ? useDJStore.getState().deckCRecordId : undefined });
     // Always clear active state so button goes inactive immediately
     useDJStore.getState().setDeckPattern(deckId, null);
     setWaitingPattern(null);
-  }, [deckId]);
+  }, [deckId, isDeckC]);
 
   // ── Fader LFO buttons ────────────────────────────────────────────────────
 
@@ -119,6 +127,18 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
+      {isDeckC && (
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-mono text-text-muted">Record</span>
+          <CustomSelect
+            value={recordId}
+            onChange={(id) => useDJStore.getState().setDeckCRecordId(id)}
+            options={CRATE_LOAD_ORDER.map((r) => ({ value: r.id, label: r.canonicalName }))}
+            title="Crate record the scratch pads play"
+            className="min-w-0"
+          />
+        </div>
+      )}
       {/* Pattern pad grid: wraps so every pattern is reachable at any deck width */}
       <div className="grid gap-1 min-w-0" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))' }}>
         {SCRATCH_PATTERNS.map((pattern) => {
@@ -177,11 +197,9 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
         </div>
       )}
 
-      {/* Divider */}
-      <div className="h-px bg-white/10 flex-shrink-0" />
-
-      {/* Fader LFO */}
-      <div className="flex items-center gap-1">
+      {/* Fader LFO acts on a DeckEngine channel: nothing to drive on the scratch-only Deck C */}
+      {!scratchOnly && <div className="h-px bg-white/10 flex-shrink-0" />}
+      {!scratchOnly && <div className="flex items-center gap-1">
         <span className="text-xs font-mono text-white/30 mr-0.5">Fader LFO</span>
 
         {/* OFF button */}
@@ -217,7 +235,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
             </button>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 };
