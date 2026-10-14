@@ -383,7 +383,20 @@ export async function parseJasonPageFile(
       const entryOff = smpTableOff + i * 4;
       if (entryOff + 4 > buf.length) break;
       const smpLen = u32BE(buf, entryOff);
-      if (smpLen === 0) break;
+      // A zero length is an unused slot, not the end of the table: fire and ice-1 has zero entries at 1, 4..22
+      // followed by real samples (the non-zero lengths add up to its companion file's size, 17948 bytes).
+      if (smpLen === 0) {
+        instruments.push({
+          id: i + 1,
+          name: '',
+          type: 'synth' as const,
+          synthType: 'Synth' as const,
+          effects: [],
+          volume: 0,
+          pan: 0,
+        } as InstrumentConfig);
+        continue;
+      }
 
       // Round odd lengths up
       const alignedLen = smpLen + (smpLen & 1);
