@@ -1,8 +1,9 @@
 /**
- * A headless AudioContext for NuadeEngine tests: the engine is the real class, it loads the real Nuade.js / Nuade.wasm
+ * A headless AudioContext for engine tests: the engine is the real class, it loads the real <dir>/<stem>.js / .wasm
  * through the real WASM loader (fetch served from public/), and its AudioWorkletNode is the real
- * public/nuade/Nuade.worklet.js running in-process. Messages cross the "port" both ways; the test pulls audio with
- * `render()`. Only the browser (context, node, fetch) is faked.
+ * public/<dir>/<stem>.worklet.js running in-process. Messages cross the "port" both ways; the test pulls audio with
+ * `render()`. Only the browser (context, node, fetch) is faked. Built for NuadeEngine (installNuadeRig); the same rig
+ * serves any engine whose worklet is one file (the UADE family: installWorkletRig('uade', 'UADE')).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -25,12 +26,14 @@ export interface Rig {
   uninstall(): void;
 }
 
-export function installNuadeRig(): Rig {
+export function installNuadeRig(): Rig { return installWorkletRig('nuade', 'Nuade'); }
+
+export function installWorkletRig(dir: string, stem: string): Rig {
   loadSharedWorkletScripts();
   const posted: Rig['posted'] = [];
   const nodeOptions: Rig['nodeOptions'] = [];
   let proc: WorkletProc | null = null;
-  const processorSource = readFileSync(resolve(ROOT, 'public/nuade/Nuade.worklet.js'), 'utf8');
+  const processorSource = readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8');
 
   const gain = (): Record<string, unknown> => ({ context: ctx, gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, disconnect() {} });
   const ctx: Record<string, unknown> & { outputLatency: number; baseLatency: number } = {
@@ -65,7 +68,7 @@ export function installNuadeRig(): Rig {
       proc = new Processor();
       this.port = {
         onmessage: null,
-        postMessage: (m: unknown) => { void (proc!.handleMessage as (d: unknown) => Promise<void>)(m); },
+        postMessage: (m: unknown) => { void ((proc!.handleMessage ?? proc!._handleMessage) as (d: unknown) => Promise<void>).call(proc, m); },
       };
     }
     connect() {}
@@ -75,7 +78,7 @@ export function installNuadeRig(): Rig {
   const saved = { AudioWorkletNode: g.AudioWorkletNode, fetch: g.fetch };
   g.AudioWorkletNode = FakeNode;
   g.fetch = async (url: string) => {
-    const file = String(url).replace(/^.*\/(nuade\/[^?]+)$/, 'public/$1');
+    const file = String(url).replace(new RegExp(`^.*\\/(${dir}\\/[^?]+)(\\?.*)?$`), 'public/$1');
     const body = readFileSync(resolve(ROOT, file));
     return {
       ok: true,
