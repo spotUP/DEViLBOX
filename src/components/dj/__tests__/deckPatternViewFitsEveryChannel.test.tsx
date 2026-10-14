@@ -16,11 +16,19 @@ vi.mock('@engine/renderer/OffscreenBridge', () => ({
   OffscreenBridge: class { constructor(_f: unknown, _o: unknown) {} post(m: Msg) { posted.push(m); } dispose() {} },
 }));
 vi.mock('@/workers/readonly-pattern.worker.ts?worker', () => ({ default: class {} }));
+// DJ-ZOOM-CONTROLS-REMOVE: the real DeckPatternDisplay is mounted below; its deck is a fake engine.
+const holder = vi.hoisted(() => ({ song: null as unknown }));
+vi.mock('@/engine/dj/DJEngine', () => ({
+  getDJEngine: () => ({ getDeck: () => ({ replayer: { getSong: () => holder.song }, getChannelWaveforms: () => null }) }),
+}));
+vi.mock('@/components/visualization/DJOscilloscope', () => ({ DJOscilloscope: () => null }));
 
 import { render, cleanup, act } from '@testing-library/react';
 import type { Pattern } from '@/types';
 import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanvas';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { DeckPatternDisplay } from '../DeckPatternDisplay';
+import { useDJStore } from '@/stores/useDJStore';
 
 const WIDTH = 900;
 
@@ -54,7 +62,7 @@ describe('a deck pattern view fits every channel to its width', () => {
       unobserve() {}
       disconnect() {}
     } as never;
-    useSettingsStore.setState({ fitAllChannelsDeck: true, deckPatternZoom: 100 });
+    useSettingsStore.setState({ fitAllChannelsDeck: true });
   });
   afterEach(cleanup);
 
@@ -76,14 +84,28 @@ describe('a deck pattern view fits every channel to its width', () => {
     expect(v.scale).toBe(1);
     expect(v.end).toBeGreaterThan(v.canvasWidth);
     view.unmount(); cleanup();
+  });
 
-    // Fit off: the deck zoom slider's scale draws the pattern (and is reported to the slider).
-    useSettingsStore.setState({ fitAllChannelsDeck: false, deckPatternZoom: 150 });
-    const reported: number[] = [];
+  it('the deck pattern view fits all channels with no zoom slider or Fit control on it', async () => {
+    // Decks always fit: the zoom setting is gone from the store, and the view draws no zoom controls.
+    expect('deckPatternZoom' in useSettingsStore.getState()).toBe(false);
+    holder.song = {
+      songPositions: [0], numChannels: 6,
+      patterns: [{ id: 'p0', length: 16, channels: Array.from({ length: 6 }, (_, c) => ({
+        id: `c${c}`, rows: c === 0 ? [{ note: 49, instrument: 1, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }] : [],
+      })) }],
+    };
+    useDJStore.getState().setDeckState('A', { fileName: 'x.mod', playbackMode: 'audio', isPlaying: false, totalPositions: 1, songPos: 0, pattPos: 0 });
+    useSettingsStore.setState({ showUnusedChannels: true });
     posted.length = 0;
-    view = render(<div style={{ width: WIDTH, height: 300 }}><ReadOnlyPatternCanvas pattern={pattern(4)} currentRow={0} numChannels={4} onScale={(sc) => reported.push(sc)} /></div>);
+    const { container, queryByText, queryAllByRole } = render(<div style={{ width: WIDTH, height: 300 }}><DeckPatternDisplay deckId="A" /></div>);
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    expect(workerView().scale).toBeCloseTo(1.5, 6);
-    expect(reported.at(-1)).toBe(1.5);
+    expect(container.querySelector('canvas')).not.toBeNull(); // the pattern view is up, so the absence below means something
+    expect(workerView().scale).toBeLessThan(1);
+    expect(queryByText('Zoom')).toBeNull();
+    expect(queryByText('Fit')).toBeNull();
+    expect(queryAllByRole('slider')).toHaveLength(0);
+    expect(container.querySelector('button')).toBeNull();
+    useDJStore.getState().setDeckState('A', { fileName: null });
   });
 });

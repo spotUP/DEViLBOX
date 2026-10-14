@@ -77,11 +77,4 @@ describe('the pattern zoom slider', () => {
     expect(opts.migrate({ trackerZoom: 150, showPatterns: true }, 1)).toEqual({ trackerZoom: 100, showPatterns: true });
     expect(opts.migrate({ trackerZoom: 150 }, 2)).toEqual({ trackerZoom: 150 });
   });
-
-  it('the deck zoom setting clamps and turns the deck fit off', () => {
-    useSettingsStore.setState({ fitAllChannelsDeck: true, deckPatternZoom: 100 });
-    useSettingsStore.getState().setDeckPatternZoom(999);
-    expect(useSettingsStore.getState().deckPatternZoom).toBe(200);
-    expect(useSettingsStore.getState().fitAllChannelsDeck).toBe(false);
-  });
 });
