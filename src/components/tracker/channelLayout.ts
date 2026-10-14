@@ -51,6 +51,25 @@ export function scopeCells(
     && layout.offsets.length >= numChannels && layout.widths.length >= numChannels;
   const cells: ScopeCell[] = [];
   const gap = 1;
+  // When every channel is on screen (no horizontal scroll), the scopes span the
+  // whole strip edge to edge (owner, 2026-10-14): each keeps its column's share
+  // of the width, so the order of channels and their relative widths still
+  // match the pattern columns below. A scrolled pattern keeps exact alignment.
+  if (aligned && numChannels > 0) {
+    const first = layout.offsets[0];
+    const last = layout.offsets[numChannels - 1] + layout.widths[numChannels - 1];
+    const left = originShift + first - layout.scrollLeft;
+    const right = originShift + last - layout.scrollLeft;
+    if (layout.scrollLeft === 0 && left >= 0 && right <= stripWidth && last > first) {
+      const scale = stripWidth / (last - first);
+      for (let i = 0; i < numChannels; i++) {
+        const x = Math.round((layout.offsets[i] - first) * scale);
+        const end = i === numChannels - 1 ? stripWidth : Math.round((layout.offsets[i + 1] - first) * scale);
+        cells.push({ x, w: Math.max(0, end - x - (i === numChannels - 1 ? 0 : gap)) });
+      }
+      return cells;
+    }
+  }
   for (let i = 0; i < numChannels; i++) {
     if (aligned) {
       cells.push({ x: originShift + layout.offsets[i] - layout.scrollLeft, w: Math.max(0, layout.widths[i] - gap) });
