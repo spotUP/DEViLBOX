@@ -14,4 +14,15 @@ export const ROW_PREVIEW_ADAPTERS: Record<string, AdapterLoader> = {
     ]);
     return createNuadeRowAdapter(await loadNuadeModuleFromPublic(), sampleRate);
   },
+  EaglePlayer: async (sampleRate) => {
+    const [{ loadEaglePlayerModuleFromPublic }, { createEaglePlayerRowAdapter }] = await Promise.all([
+      import('@engine/eagleplayer/eaglePlayerModule'), import('./eaglePlayerAdapter'),
+    ]);
+    const base = import.meta.env.BASE_URL || '/';
+    const fetchPlayer = (url: string) => fetch(url).then((r) => {
+      if (!r.ok) throw new Error(`eagleplayer ${url}: HTTP ${r.status}`);
+      return r.arrayBuffer();
+    });
+    return createEaglePlayerRowAdapter(await loadEaglePlayerModuleFromPublic(), sampleRate, fetchPlayer, base);
+  },
 };

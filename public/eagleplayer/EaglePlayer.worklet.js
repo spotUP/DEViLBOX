@@ -7,6 +7,9 @@
  * sees; ep_wasm_render_voices() renders the stereo mix plus the four Paula
  * voices, which feed the per-channel dub sends / isolation slots
  * (worklets/channel-outputs.js) and the scopes (worklets/channel-stream.js).
+ *
+ * A row clip (src/engine/rowPreview, worklets/row-clip.js) is a grid row rendered elsewhere by a private instance of
+ * the runner; while the song is not playing it comes out through the same emit() playback uses.
  */
 
 class EaglePlayerProcessor extends AudioWorkletProcessor {
@@ -27,6 +30,8 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
     this.lastTicks = -1;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
+    // The row preview's clip player (worklets/row-clip.js).
+    this.clip = globalThis.DevilboxRowClip ? new globalThis.DevilboxRowClip(this.port, sampleRate) : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
@@ -38,15 +43,22 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
         await this.initModule(data.wasmBinary, data.jsCode);
         break;
       case 'loadModule':
+        if (this.clip) this.clip.drop();
         this.load(data);
         break;
+      case 'playRowClip':
+        // The song playing already sounds the grid: a clip would double it (plan D1).
+        if (this.clip && !this.playing && data.clip) this.clip.play(data.clip);
+        break;
       case 'play':
+        if (this.clip) this.clip.drop();
         this.playing = this.loaded;
         break;
       case 'pause':
         this.playing = false;
         break;
       case 'stop':
+        if (this.clip) this.clip.drop();
         this.playing = false;
         this.loaded = false;
         if (this.module) this.module._ep_wasm_stop();
@@ -57,6 +69,7 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
         if (this.module) this.module._ep_wasm_set_voice_mask(data.mask >>> 0);
         break;
       case 'setSubsong':
+        if (this.clip) this.clip.drop();
         // data.index: 0-based into the player's subsong range.
         this.port.postMessage({ type: 'subsongStarted', index: this.startSubsong(data.index | 0), count: this.subsongCount() });
         break;
@@ -66,6 +79,7 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
         this.writeModule(data.offset | 0, data.bytes);
         break;
       case 'dispose':
+        if (this.clip) this.clip.drop();
         this.cleanup();
         break;
     }
@@ -240,32 +254,28 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
   }
 
-  process(inputs, outputs) {
-    if (!this.initialized || !this.module || !this.loaded || !this.playing) return true;
-    const output = outputs[0];
-    if (!output || output.length < 2) return true;
+  /**
+   * One quantum to the outputs: the main mix, each voice to the isolation slots and dub sends, every voice to the scope
+   * stream. `stereo` is the interleaved mix, `voices` one mono buffer per Paula voice; `rendered` frames are real.
+   * Playback and the row clip both come through here.
+   */
+  emit(output, outputs, stereo, voices, rendered) {
     const outL = output[0], outR = output[1];
-    const n = Math.min(outL.length, this.bufferSize);
-    this.updateBufferViews();
-    if (!this.outBuf) return true;
-    const rendered = this.module._ep_wasm_render_voices(this.outPtr, this.voicePtr, n, this.bufferSize);
     const o = this._outs;
     if (o && o.isolatedMask) {
       // A voice in an isolation slot leaves the main mix (Amiga panning:
       // voices 0 and 3 left, 1 and 2 right, halved - as the host mixes).
-      const v = this.voiceBufs;
       const k = [0, 1, 2, 3].map((c) => (o.isIsolated(c) ? 0 : 0.5));
       for (let i = 0; i < rendered; i++) {
-        outL[i] = k[0] * v[0][i] + k[3] * v[3][i];
-        outR[i] = k[1] * v[1][i] + k[2] * v[2][i];
+        outL[i] = k[0] * voices[0][i] + k[3] * voices[3][i];
+        outR[i] = k[1] * voices[1][i] + k[2] * voices[2][i];
       }
     } else {
       for (let i = 0; i < rendered; i++) {
-        outL[i] = this.outBuf[i * 2];
-        outR[i] = this.outBuf[i * 2 + 1];
+        outL[i] = stereo[i * 2];
+        outR[i] = stereo[i * 2 + 1];
       }
     }
-    const voices = this.voiceBufs.map((b) => b.subarray(0, rendered));
     // Dub sends + isolation slots carry each voice at its level in the mix.
     if (o) o.write(outputs, voices, rendered, (ch) => (ch === 1 || ch === 2 ? 1 : 0), 0.5);
     // Every sample of each voice, for the oscilloscopes, VU meters and the
@@ -274,6 +284,31 @@ class EaglePlayerProcessor extends AudioWorkletProcessor {
       this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
       this._stream.writeFloat32(voices, rendered);
     }
+  }
+
+  /** The next quantum of the sounding row clip, through emit(). */
+  processClip(output, outputs) {
+    const q = this.clip.pull(Math.min(output[0].length, this.bufferSize));
+    if (!q) return;
+    this.emit(output, outputs, q.stereo, q.voices.map((b) => b.subarray(0, q.n)), q.n);
+    // The clip is its own stretch of audio: its scope samples go out now and are not joined to what follows.
+    if (!this.clip.active && this._stream) { this._stream.flush(); this._stream.discontinue(); }
+  }
+
+  process(inputs, outputs) {
+    if (!this.playing && this.clip && this.clip.active) {
+      const out = outputs[0];
+      if (out && out.length >= 2) this.processClip(out, outputs);
+      return true;
+    }
+    if (!this.initialized || !this.module || !this.loaded || !this.playing) return true;
+    const output = outputs[0];
+    if (!output || output.length < 2) return true;
+    const n = Math.min(output[0].length, this.bufferSize);
+    this.updateBufferViews();
+    if (!this.outBuf) return true;
+    const rendered = this.module._ep_wasm_render_voices(this.outPtr, this.voicePtr, n, this.bufferSize);
+    this.emit(output, outputs, this.outBuf, this.voiceBufs.map((b) => b.subarray(0, rendered)), rendered);
     // The player's tick count (score's DTP_Interrupt clock) for the grid
     // follow: the engine maps it to a grid row (src/lib/tracker/tickGridPosition.ts).
     const ticks = this.module._ep_wasm_player_ticks() >>> 0;
