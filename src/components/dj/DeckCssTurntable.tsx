@@ -18,7 +18,7 @@ import { clockNowMs, deckPositionAt } from '@/engine/audioLatency';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import * as Tone from 'tone';
 import { deckCPlatterRadians, subscribeDeckCMotion } from '@/engine/dj/scratch/deckCMotion';
-import { tonearmProgress } from '@/lib/dj/tonearm';
+import { tonearmProgress, armAngle, CSS_ARM_RANGE } from '@/lib/dj/tonearm';
 import './DeckCssTurntable.css';
 import { useDJLayoutContext } from './DJLayoutContext';
 
@@ -175,17 +175,15 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       }
 
       // Tonearm: track from outer groove to inner groove
-      // START_DEG = needle at outer groove edge of record
-      // END_DEG   = needle at inner groove near the label
-      const ARM_START_DEG = 5;
-      const ARM_END_DEG = 25;
+      // Start/end angles are solved from the artwork geometry in tonearm.ts
+      // (needle on the lead-in groove at 0, on the run-out groove at 1).
       const deck = useDJStore.getState().decks[deckId];
       const progress = tonearmProgress(deck, platterPositionSec(deckId));
       // Slight wobble when playing
       const wobble = playing && !isScratchActiveRef.current
         ? Math.sin(now * 0.001) * 0.15
         : 0;
-      const armDeg = ARM_START_DEG + progress * (ARM_END_DEG - ARM_START_DEG) + wobble;
+      const armDeg = (armAngle(CSS_ARM_RANGE, progress) * 180) / Math.PI + wobble;
       if (Math.abs(armDeg - lastAppliedRef.current.arm) > 0.005) {
         lastAppliedRef.current.arm = armDeg;
         applyTonearm(armDeg);
