@@ -23,7 +23,7 @@ export type WorkletProc = {
 
 /** Evaluate the shared worklet helpers (channel-stream.js, channel-outputs.js) once. */
 export function loadSharedWorkletScripts(): void {
-  for (const f of ['public/worklets/channel-stream.js', 'public/worklets/channel-outputs.js']) {
+  for (const f of ['public/worklets/channel-stream.js', 'public/worklets/channel-outputs.js', 'public/worklets/row-clip.js']) {
     new Function(readFileSync(resolve(ROOT, f), 'utf8'))();
   }
 }

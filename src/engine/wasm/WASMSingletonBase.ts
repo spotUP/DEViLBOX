@@ -128,6 +128,12 @@ export async function loadWASMAssets(
     } catch {
       /* Already in this scope — not fatal. */
     }
+    // The row-clip player (DevilboxRowClip): a previewed row, played through the engine's own output code.
+    try {
+      await context.audioWorklet.addModule(`${baseUrl}worklets/row-clip.js`);
+    } catch {
+      /* Already in this scope — not fatal. */
+    }
     try {
       await context.audioWorklet.addModule(workletUrl);
     } catch {
