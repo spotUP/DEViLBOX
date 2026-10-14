@@ -8,9 +8,11 @@
  *   beats/downbeats → delta-encoded Uint16 (ms between events)
  *   waveform_peaks  → Uint8 (0-255 quantized from 0.0-1.0)
  *   frequency_peaks → 3 × N Uint8 (low/mid/high bands, same quantization)
+ *   extended        → see extendedAnalysisCodec.ts (Uint8 timelines, Int16 dB, Float32 scalars)
  */
 
 import db from '../db/database';
+import { packExtended, unpackExtended, type ExtendedAnalysisWire } from './extendedAnalysisCodec';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +37,12 @@ export interface SongAnalysis {
   waveformPeaks: number[];
   frequencyPeaks: number[][];
   analysisVersion: number;
+  /**
+   * Auto DJ extended analysis (activity timelines, loudness set, spectral, chroma),
+   * null for a row written before it existed or by a client that had none.
+   * Versioned by its own `version` (EXTENDED_ANALYSIS_VERSION of the writer).
+   */
+  extended?: ExtendedAnalysisWire | null;
 }
 
 // ── Binary packing helpers ──────────────────────────────────────────────────
@@ -134,26 +142,44 @@ let _stmtsReady = false;
 function ensureStatements() {
   if (_stmtsReady) return;
   lookupStmt = db.prepare('SELECT * FROM song_analysis WHERE hash = ?');
+  // Upsert, not REPLACE: a client that only has the base analysis must not wipe
+  // the extended one already stored, and an older extended version never
+  // overwrites a newer one.
   insertStmt = db.prepare(`
-    INSERT OR REPLACE INTO song_analysis (
+    INSERT INTO song_analysis (
       hash, bpm, bpm_confidence, time_signature,
       musical_key, key_confidence, rms_db, peak_db,
       genre_primary, genre_subgenre, genre_confidence,
       mood, energy, danceability, duration,
       beats, downbeats, waveform_peaks, frequency_peaks,
-      analysis_version, created_at
+      analysis_version, created_at, extended, extended_version
     ) VALUES (
       @hash, @bpm, @bpm_confidence, @time_signature,
       @musical_key, @key_confidence, @rms_db, @peak_db,
       @genre_primary, @genre_subgenre, @genre_confidence,
       @mood, @energy, @danceability, @duration,
       @beats, @downbeats, @waveform_peaks, @frequency_peaks,
-      @analysis_version, @created_at
+      @analysis_version, @created_at, @extended, @extended_version
     )
+    ON CONFLICT(hash) DO UPDATE SET
+      bpm = excluded.bpm, bpm_confidence = excluded.bpm_confidence, time_signature = excluded.time_signature,
+      musical_key = excluded.musical_key, key_confidence = excluded.key_confidence,
+      rms_db = excluded.rms_db, peak_db = excluded.peak_db,
+      genre_primary = excluded.genre_primary, genre_subgenre = excluded.genre_subgenre,
+      genre_confidence = excluded.genre_confidence,
+      mood = excluded.mood, energy = excluded.energy, danceability = excluded.danceability,
+      duration = excluded.duration,
+      beats = excluded.beats, downbeats = excluded.downbeats,
+      waveform_peaks = excluded.waveform_peaks, frequency_peaks = excluded.frequency_peaks,
+      analysis_version = excluded.analysis_version, created_at = excluded.created_at,
+      extended = CASE WHEN excluded.extended_version >= COALESCE(song_analysis.extended_version, 0)
+                      THEN excluded.extended ELSE song_analysis.extended END,
+      extended_version = CASE WHEN excluded.extended_version >= COALESCE(song_analysis.extended_version, 0)
+                              THEN excluded.extended_version ELSE song_analysis.extended_version END
   `);
   countStmt = db.prepare('SELECT COUNT(*) as count FROM song_analysis');
   sizeStmt = db.prepare(`
-    SELECT SUM(LENGTH(beats) + LENGTH(downbeats) + LENGTH(waveform_peaks) + LENGTH(frequency_peaks)) as bytes
+    SELECT SUM(LENGTH(beats) + LENGTH(downbeats) + LENGTH(waveform_peaks) + LENGTH(frequency_peaks) + COALESCE(LENGTH(extended), 0)) as bytes
     FROM song_analysis
   `);
   _stmtsReady = true;
@@ -189,6 +215,7 @@ export function lookupAnalysis(hash: string): SongAnalysis | null {
     waveformPeaks: unpackPeaks(row.waveform_peaks as Buffer),
     frequencyPeaks: unpackFrequencyPeaks(row.frequency_peaks as Buffer),
     analysisVersion: row.analysis_version as number,
+    extended: unpackExtended(row.extended as Buffer | null),
   };
 }
 
@@ -219,6 +246,8 @@ export function storeAnalysis(data: SongAnalysis): void {
     frequency_peaks: packFrequencyPeaks(data.frequencyPeaks),
     analysis_version: data.analysisVersion,
     created_at: Date.now(),
+    extended: data.extended ? packExtended(data.extended) : null,
+    extended_version: data.extended ? data.extended.version : null,
   });
 }
 

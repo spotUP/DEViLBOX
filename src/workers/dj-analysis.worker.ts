@@ -15,6 +15,7 @@
 
 import { analyzeKey } from './analyzeKey';
 import { runAnalysisStages } from './djAnalysisStages';
+import { computeExtendedAnalysis } from '@/engine/dj/autodj/activityTimelines';
 import type { ExtendedAnalysis } from '@/engine/dj/autodj/types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -47,7 +48,17 @@ interface InitRequest {
   type: 'init';
 }
 
-type WorkerMessage = AnalyzeRequest | InitRequest;
+/** Only the Auto DJ extended analysis (the base analysis came from the server); no essentia needed. */
+interface AnalyzeExtendedRequest {
+  type: 'analyzeExtended';
+  id: string;
+  pcmLeft: Float32Array;
+  pcmRight: Float32Array | null;
+  sampleRate: number;
+  beats: number[];
+}
+
+type WorkerMessage = AnalyzeRequest | AnalyzeExtendedRequest | InitRequest;
 
 interface GenreResult {
   primary: string;              // Primary genre (e.g. "Electronic", "Rock")
@@ -926,6 +937,17 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           type: 'ready',
           error: err instanceof Error ? err.message : String(err),
         });
+      }
+      break;
+    }
+
+    case 'analyzeExtended': {
+      const { id, pcmLeft, pcmRight, sampleRate, beats } = msg;
+      try {
+        const extended = computeExtendedAnalysis(mixToMono(pcmLeft, pcmRight), sampleRate, { beats });
+        (self as unknown as Worker).postMessage({ type: 'extendedComplete', id, extended });
+      } catch (err) {
+        (self as unknown as Worker).postMessage({ type: 'extendedError', id, error: err instanceof Error ? err.message : String(err) });
       }
       break;
     }

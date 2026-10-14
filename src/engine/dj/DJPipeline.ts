@@ -20,16 +20,16 @@ import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile, setCacheChan
 import { resolveRenderPlayer } from './djRenderEngine';
 import type { SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
 import type { CachedAudio } from './DJAudioCache';
-import { lookupServerAnalysis, storeServerAnalysis } from '@/lib/analysisCache';
+import { lookupServerAnalysis, storeServerAnalysis, type ServerAnalysis } from '@/lib/analysisCache';
 import { useDJStore, type DeckState } from '@/stores/useDJStore';
 import { notify } from '@/stores/useNotificationStore';
 import type { DeckId } from './DeckEngine';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { getDJEngineIfActive } from './DJEngine';
-import type { BeatGridData } from './DJAudioCache';
 import { autoMatchOnLoad, pitchedBpm } from './DJAutoSync';
 import type { ExtendedAnalysis } from './autodj/types';
 import { buildDJTrackAnalysis, DJ_AUDIO_ANALYSIS_VERSION } from './autodj/trackAnalysis';
+import { EXTENDED_ANALYSIS_VERSION } from './autodj/activityTimelines';
 import { DemucsEngine } from '@engine/demucs/DemucsEngine';
 import { attachChannelScopes, type ChannelScopeTrack } from './channelScopeTrack';
 import type { StemResult } from '@engine/demucs/types';
@@ -123,6 +123,11 @@ export interface PipelineTask {
    * queued: nuadeRouting.nuadePlayerFor); null = not nuade. The worker never resolves a choice itself.
    */
   nuadePlayerId?: string | null;
+  /**
+   * The server's answer for this file when the caller already asked (null = it had none, or did not answer in time):
+   * the task then does not ask again. undefined = not asked; the task asks once.
+   */
+  serverAnalysis?: ServerAnalysis | null;
 }
 
 interface QueueEntry {
@@ -214,6 +219,80 @@ export function analysisFromCachedAudio(cached: CachedAudio): PipelineResult['an
 /** A cache entry is fully analysed when it has the beat grid AND the current extended analysis. */
 export function isCacheFullyAnalyzed(cached: CachedAudio): boolean {
   return !!cached.beatGrid && !!cached.bpm && (cached.analysisVersion ?? 1) >= DJ_AUDIO_ANALYSIS_VERSION && !!cached.extended;
+}
+
+// ── Server analysis (shared across browsers, keyed by the file's SHA-256) ────
+
+/** The server row carries a usable base analysis (tempo and a beat grid). */
+export function isServerAnalysisUsable(s: ServerAnalysis | null | undefined): s is ServerAnalysis {
+  return !!s && s.bpm > 0 && s.beats.length > 0;
+}
+
+/**
+ * The server row also carries the current Auto DJ extended analysis: nothing is left to compute.
+ * A row without it, or with an older one, is a partial hit: only the extended analysis is.
+ */
+export function isServerAnalysisFull(s: ServerAnalysis | null | undefined): s is ServerAnalysis & { extended: ExtendedAnalysis } {
+  return isServerAnalysisUsable(s) && !!s.extended && s.extended.version >= EXTENDED_ANALYSIS_VERSION;
+}
+
+/** The server keys on the file alone: a forced chip model or clock is another render, so it neither reads nor writes the server's analysis. */
+export function sharesServerAnalysis(sid: SidForcedPlayback | undefined): boolean {
+  return !sid?.chipModel && !sid?.clock;
+}
+
+/** A server row in the shape the pipeline returns for a fresh analysis. */
+export function analysisFromServer(s: ServerAnalysis): NonNullable<PipelineResult['analysis']> {
+  return {
+    bpm: s.bpm,
+    bpmConfidence: s.bpmConfidence,
+    beats: s.beats,
+    downbeats: s.downbeats,
+    timeSignature: s.timeSignature,
+    musicalKey: s.musicalKey,
+    keyConfidence: s.keyConfidence,
+    frequencyPeaks: s.frequencyPeaks,
+    rmsDb: s.rmsDb,
+    peakDb: s.peakDb,
+    genre: {
+      primary: s.genrePrimary,
+      subgenre: s.genreSubgenre,
+      confidence: s.genreConfidence,
+      mood: s.mood,
+      energy: s.energy,
+      danceability: s.danceability,
+    },
+    extended: isServerAnalysisFull(s) ? s.extended : null,
+  };
+}
+
+/** What a finished analysis writes to its local cache entry: one mapping for a fresh, a server and a partial analysis. */
+export function analysisCacheFields(analysis: NonNullable<PipelineResult['analysis']>): Parameters<typeof updateCacheAnalysis>[1] {
+  return {
+    beatGrid: {
+      beats: analysis.beats,
+      downbeats: analysis.downbeats,
+      bpm: analysis.bpm,
+      timeSignature: analysis.timeSignature,
+    },
+    bpm: analysis.bpm,
+    bpmConfidence: analysis.bpmConfidence,
+    musicalKey: analysis.musicalKey,
+    keyConfidence: analysis.keyConfidence,
+    frequencyPeaks: analysis.frequencyPeaks,
+    // The loudness the trim is computed from: without it every later
+    // cache hit read -100 dB and got the unanalysed trim.
+    rmsDb: analysis.rmsDb,
+    peakDb: analysis.peakDb,
+    analysisVersion: analysis.extended ? DJ_AUDIO_ANALYSIS_VERSION : 1,
+    extended: analysis.extended ?? undefined,
+    genrePrimary: analysis.genre.primary,
+    genreSubgenre: analysis.genre.subgenre,
+    genreConfidence: analysis.genre.confidence,
+    mood: analysis.genre.mood,
+    energy: analysis.genre.energy,
+    danceability: analysis.genre.danceability,
+  };
 }
 
 // ── WAV Encoder ──────────────────────────────────────────────────────────────
@@ -345,6 +424,11 @@ export class DJPipeline {
     reject: (err: Error) => void;
   }>();
 
+  private extendedCallbacks = new Map<string, {
+    resolve: (result: ExtendedAnalysis) => void;
+    reject: (err: Error) => void;
+  }>();
+
   // In-flight render dedup: hash → promise (prevents re-rendering the same file concurrently)
   private inflight = new Map<string, Promise<PipelineResult>>();
 
@@ -397,6 +481,10 @@ export class DJPipeline {
         cb.reject(new Error('Analysis worker crashed: ' + e.message));
       }
       this.analysisCallbacks.clear();
+      for (const [, cb] of this.extendedCallbacks) {
+        cb.reject(new Error('Analysis worker crashed: ' + e.message));
+      }
+      this.extendedCallbacks.clear();
       this.spawnAnalysisWorker();
     };
     worker.postMessage({ type: 'init' });
@@ -462,6 +550,24 @@ export class DJPipeline {
         if (cb) {
           this.analysisCallbacks.delete(id);
           cb.resolve(result);
+        }
+        break;
+      }
+
+      case 'extendedComplete': {
+        const cb = this.extendedCallbacks.get(msg.id);
+        if (cb) {
+          this.extendedCallbacks.delete(msg.id);
+          cb.resolve(msg.extended);
+        }
+        break;
+      }
+
+      case 'extendedError': {
+        const cb = this.extendedCallbacks.get(msg.id);
+        if (cb) {
+          this.extendedCallbacks.delete(msg.id);
+          cb.reject(new Error(msg.error));
         }
         break;
       }
@@ -572,6 +678,7 @@ export class DJPipeline {
     deckId?: DeckId,
     priority: TaskPriority = 'normal',
     playerCallHz?: number,
+    serverAnalysis?: ServerAnalysis | null,
   ): Promise<PipelineResult> {
     const id = `analyze-${filename}-${Date.now()}`;
     return this.enqueue({
@@ -585,6 +692,7 @@ export class DJPipeline {
       pcmRight,
       sampleRate,
       playerCallHz,
+      serverAnalysis,
     });
   }
 
@@ -639,99 +747,32 @@ export class DJPipeline {
       };
     }
 
+    // The server's answer, asked once per load and passed down: a task never asks again.
+    let serverAnalysis: ServerAnalysis | null | undefined;
     if (cached && !isCacheFullyAnalyzed(cached)) {
-      // Audio cached but not analyzed (or analysed before the Auto DJ extended
-      // analysis existed) — check server cache first for a never-analysed entry.
-      // The server carries no extended analysis, so an old local entry goes
-      // straight to the local analysis below.
+      // Audio cached but not (fully) analysed - never analysed, or analysed before the
+      // Auto DJ extended analysis existed. The server may hold the analysis another
+      // browser made: a full row is adopted as it is; a base-only row leaves just the
+      // extended analysis to compute (executeTask). A source-only entry (a stub, or a
+      // preview a deck may not play) holds no audio to analyse: it renders below.
       const hash = await hashFile(fileBuffer);
-      // Only audio the cache holds can carry a server analysis: a source-only entry (a stub, or a preview a deck may not play) renders below.
-      const serverAnalysis = cached.beatGrid || cached.audioData.byteLength === 0 ? null : await lookupServerAnalysis(hash);
+      serverAnalysis = cached.audioData.byteLength === 0 || !sharesServerAnalysis(sidRenderOverrides(fileBuffer)) ? undefined : await lookupServerAnalysis(hash);
 
-      if (serverAnalysis && serverAnalysis.bpm > 0 && serverAnalysis.beats.length > 0) {
-        // Server cache hit — merge analysis into local cache
+      if (isServerAnalysisFull(serverAnalysis)) {
         console.log(`[DJPipeline] Server analysis cache hit for ${filename}`);
-        const beatGrid: BeatGridData = {
-          beats: serverAnalysis.beats,
-          downbeats: serverAnalysis.downbeats,
-          bpm: serverAnalysis.bpm,
-          timeSignature: serverAnalysis.timeSignature,
-        };
-        await updateCacheAnalysis(fileBuffer, {
-          beatGrid,
-          bpm: serverAnalysis.bpm,
-          bpmConfidence: serverAnalysis.bpmConfidence,
-          musicalKey: serverAnalysis.musicalKey,
-          keyConfidence: serverAnalysis.keyConfidence,
-          frequencyPeaks: serverAnalysis.frequencyPeaks,
-          rmsDb: serverAnalysis.rmsDb,
-          peakDb: serverAnalysis.peakDb,
-          analysisVersion: serverAnalysis.analysisVersion,
-          genrePrimary: serverAnalysis.genrePrimary,
-          genreSubgenre: serverAnalysis.genreSubgenre,
-          genreConfidence: serverAnalysis.genreConfidence,
-          mood: serverAnalysis.mood,
-          energy: serverAnalysis.energy,
-          danceability: serverAnalysis.danceability,
-        });
-
-        if (deckId) {
-          const rmsDb = serverAnalysis.rmsDb;
-          const peakDb = serverAnalysis.peakDb;
-          const autoTrimDb = computeAutoTrim(rmsDb, peakDb);
-          const deckState = useDJStore.getState().decks[deckId];
-          const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
-
-          useDJStore.getState().setDeckState(deckId, {
-            analysisState: 'ready',
-            beatGrid,
-            musicalKey: serverAnalysis.musicalKey,
-            keyConfidence: serverAnalysis.keyConfidence,
-            frequencyPeaks: serverAnalysis.frequencyPeaks.map(b => new Float32Array(b)),
-            rmsDb,
-            peakDb,
-            trimGain,
-            genrePrimary: serverAnalysis.genrePrimary,
-            genreSubgenre: serverAnalysis.genreSubgenre,
-            genreConfidence: serverAnalysis.genreConfidence,
-            mood: serverAnalysis.mood,
-            energy: serverAnalysis.energy,
-            danceability: serverAnalysis.danceability,
-          });
-
-          // Auto-match BPM + phase to the master if the other deck is playing.
-          autoMatchOnLoad(deckId);
-        }
-
+        const analysis = analysisFromServer(serverAnalysis);
+        await updateCacheAnalysis(fileBuffer, analysisCacheFields(analysis));
+        if (deckId) this.applyAnalysisToDeck(deckId, analysis);
         return {
           wavData: cached.audioData,
           duration: cached.duration,
           sampleRate: cached.sampleRate,
           waveformPeaks: new Float32Array(cached.waveformPeaks),
-          analysis: {
-            bpm: serverAnalysis.bpm,
-            bpmConfidence: serverAnalysis.bpmConfidence,
-            beats: serverAnalysis.beats,
-            downbeats: serverAnalysis.downbeats,
-            timeSignature: serverAnalysis.timeSignature,
-            musicalKey: serverAnalysis.musicalKey,
-            keyConfidence: serverAnalysis.keyConfidence,
-            frequencyPeaks: serverAnalysis.frequencyPeaks,
-            rmsDb: serverAnalysis.rmsDb,
-            peakDb: serverAnalysis.peakDb,
-            genre: {
-              primary: serverAnalysis.genrePrimary,
-              subgenre: serverAnalysis.genreSubgenre,
-              confidence: serverAnalysis.genreConfidence,
-              mood: serverAnalysis.mood,
-              energy: serverAnalysis.energy,
-              danceability: serverAnalysis.danceability,
-            },
-          },
+          analysis,
         };
       }
 
-      // No server cache — fall through to local analysis.
+      // No full server analysis — analyse here (a base-only server row leaves just the extended analysis).
       // cacheSourceFile stores a stub entry with audioData.byteLength === 0
       // (only sourceData is populated). Attempting decodeAudioData on the
       // stub throws EncodingError; skip straight to re-render in that case.
@@ -742,7 +783,7 @@ export class DJPipeline {
           const decoded = await audioCtx.decodeAudioData(cached.audioData.slice(0));
           const left = decoded.getChannelData(0);
           const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : left;
-          return this.analyzeOnly(fileBuffer, filename, left, right, decoded.sampleRate, deckId, priority, cached.playerCallHz ?? undefined);
+          return this.analyzeOnly(fileBuffer, filename, left, right, decoded.sampleRate, deckId, priority, cached.playerCallHz ?? undefined, serverAnalysis);
         } catch (err) {
           console.warn(`[DJPipeline] Failed to decode cached audio for analysis, re-rendering: ${filename}`, err);
           // Fall through to full render
@@ -1075,44 +1116,32 @@ export class DJPipeline {
 
     let analysis: PipelineResult['analysis'] = null;
     try {
-      analysis = await this.doAnalysis(task.id, left, right, sampleRate);
+      const taskHash = await hashFile(task.fileBuffer);
+      const shared = sharesServerAnalysis(task.sid);
+      // Asked once per task (a caller that asked passes its answer down). A server slower than
+      // the lookup timeout reads as a miss: one local analysis, uploaded when it finishes.
+      const server = !shared ? null : task.serverAnalysis !== undefined ? task.serverAnalysis : await lookupServerAnalysis(taskHash);
+      let uploadNeeded = true;
+      if (isServerAnalysisFull(server)) {
+        // Another browser analysed this file with the current extended analysis: nothing to compute.
+        console.log(`[DJPipeline] Server analysis cache hit for ${task.filename}`);
+        analysis = analysisFromServer(server);
+        uploadNeeded = false;
+      } else if (isServerAnalysisUsable(server)) {
+        // Base analysis on the server, no (or an older) extended one: compute only that, on the server's beats.
+        console.log(`[DJPipeline] Server analysis is partial for ${task.filename}: computing the extended analysis only`);
+        analysis = { ...analysisFromServer(server), extended: await this.doExtendedAnalysis(task.id, left, right, sampleRate, server.beats) };
+      } else {
+        analysis = await this.doAnalysis(task.id, left, right, sampleRate);
+      }
       if (analysis && playerCallHz) analysis.playerCallHz = playerCallHz;
 
       // Persist analysis results in cache
       if (analysis) {
-        const beatGrid: BeatGridData = {
-          beats: analysis.beats,
-          downbeats: analysis.downbeats,
-          bpm: analysis.bpm,
-          timeSignature: analysis.timeSignature,
-        };
+        await updateCacheAnalysis(task.fileBuffer, analysisCacheFields(analysis), task.sid);
 
-        await updateCacheAnalysis(task.fileBuffer, {
-          beatGrid,
-          bpm: analysis.bpm,
-          bpmConfidence: analysis.bpmConfidence,
-          musicalKey: analysis.musicalKey,
-          keyConfidence: analysis.keyConfidence,
-          frequencyPeaks: analysis.frequencyPeaks,
-          // The loudness the trim is computed from: without it every later
-          // cache hit read -100 dB and got the unanalysed trim.
-          rmsDb: analysis.rmsDb,
-          peakDb: analysis.peakDb,
-          analysisVersion: analysis.extended ? DJ_AUDIO_ANALYSIS_VERSION : 1,
-          extended: analysis.extended ?? undefined,
-          // Genre classification
-          genrePrimary: analysis.genre.primary,
-          genreSubgenre: analysis.genre.subgenre,
-          genreConfidence: analysis.genre.confidence,
-          mood: analysis.genre.mood,
-          energy: analysis.genre.energy,
-          danceability: analysis.genre.danceability,
-        }, task.sid);
-
-        // Store to server cache (fire-and-forget) for other users - the header's playback only:
-        // the server keys on the file alone, and a forced clock moves every beat.
-        const taskHash = await hashFile(task.fileBuffer);
-        if (!task.sid?.chipModel && !task.sid?.clock) storeServerAnalysis({
+        // Store to server cache (fire-and-forget) for other users - the header's playback only.
+        if (shared && uploadNeeded) storeServerAnalysis({
           hash: taskHash,
           bpm: analysis.bpm,
           bpmConfidence: analysis.bpmConfidence,
@@ -1133,6 +1162,7 @@ export class DJPipeline {
           waveformPeaks: waveformPeaks ? Array.from(waveformPeaks) : [],
           frequencyPeaks: analysis.frequencyPeaks,
           analysisVersion: 1,
+          extended: analysis.extended ?? null,
         });
       }
     } catch (err) {
@@ -1280,6 +1310,34 @@ export class DJPipeline {
       } catch (err) {
         this.renderCallbacks.delete(task.id);
         reject(new Error(`Render worker postMessage failed: ${err}`));
+      }
+    });
+  }
+
+  /** The extended analysis alone (the server already has the rest): one worker pass over the mono mix, on the given beats. */
+  private doExtendedAnalysis(
+    id: string,
+    left: Float32Array,
+    right: Float32Array,
+    sampleRate: number,
+    beats: number[],
+  ): Promise<ExtendedAnalysis> {
+    return new Promise((resolve, reject) => {
+      if (!this.analysisWorker) {
+        reject(new Error('Analysis worker not initialized'));
+        return;
+      }
+      this.extendedCallbacks.set(id, { resolve, reject });
+      try {
+        const leftCopy = new Float32Array(left);
+        const rightCopy = new Float32Array(right);
+        this.analysisWorker.postMessage(
+          { type: 'analyzeExtended', id, pcmLeft: leftCopy, pcmRight: rightCopy, sampleRate, beats },
+          [leftCopy.buffer, rightCopy.buffer],
+        );
+      } catch (err) {
+        this.extendedCallbacks.delete(id);
+        reject(new Error(`Analysis worker postMessage failed: ${err}`));
       }
     });
   }

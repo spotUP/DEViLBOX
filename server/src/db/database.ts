@@ -19,6 +19,27 @@ const db = new Database(DB_PATH);
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
 
+/**
+ * song_analysis gained the Auto DJ extended analysis (packed blob + the version
+ * that wrote it). Rows from before have both NULL = a partial hit for the client
+ * (base analysis only). Idempotent; exported so a test can migrate an old table.
+ */
+export function migrateSongAnalysisExtended(database: Database.Database = db): boolean {
+  const cols = database.prepare("PRAGMA table_info(song_analysis)").all() as { name: string }[];
+  if (cols.length === 0) return false;
+  let changed = false;
+  if (!cols.some(c => c.name === 'extended')) {
+    database.exec('ALTER TABLE song_analysis ADD COLUMN extended BLOB');
+    changed = true;
+  }
+  if (!cols.some(c => c.name === 'extended_version')) {
+    database.exec('ALTER TABLE song_analysis ADD COLUMN extended_version INTEGER');
+    changed = true;
+  }
+  if (changed) console.log('[DB] Migration: added extended analysis columns to song_analysis');
+  return changed;
+}
+
 // Create tables
 export function initDatabase() {
   db.exec(`
@@ -215,6 +236,8 @@ export function initDatabase() {
     db.exec("ALTER TABLE files ADD COLUMN type TEXT NOT NULL DEFAULT 'songs'");
     console.log('[DB] Migration: added type column to files table');
   }
+
+  migrateSongAnalysisExtended();
 
   console.log('[DB] Database initialized at:', DB_PATH);
 }
