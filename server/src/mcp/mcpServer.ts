@@ -1027,6 +1027,24 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'get_dj_layout_fit',
+    'DJ view fit probe (real browser): layout tier and give-way steps, per-column clipped flags (scroll size over client size) and per-band budgeted vs actual height. Requires the DJ view to be open.',
+    {},
+    () => call('get_dj_layout_fit'),
+  );
+
+  server.tool(
+    'set_dj_layout_frame',
+    'Render the DJ view at an exact CSS size to test a screen resolution without resizing the window. Omit width and height to clear. zoom scales the frame so a large one fits the window.',
+    {
+      width: z.number().min(320).optional().describe('Frame width in CSS px (DJ view root)'),
+      height: z.number().min(240).optional().describe('Frame height in CSS px (DJ view root)'),
+      zoom: z.number().min(0.1).max(2).optional().describe('CSS zoom applied to the frame (default 1)'),
+    },
+    (p) => call('set_dj_layout_frame', p),
+  );
+
+  server.tool(
     'set_active_view',
     'Switch the main view',
     { view: z.enum(['tracker', 'dj', 'drumpad', 'vj', 'grid', 'pianoroll', 'matrix', 'sunvox']).describe('Main view, or a tracker sub-view (grid, pianoroll, matrix, sunvox) which opens the tracker in that mode') },
@@ -2162,6 +2180,8 @@ export function createMcpServer(): McpServer {
           { tool: 'get_selection', description: 'Current selection range' },
           { tool: 'get_editor_state', description: 'Editor settings (octave, step, record mode)' },
           { tool: 'get_ui_state', description: 'UI state (active view, zoom, status)' },
+          { tool: 'get_dj_layout_fit', description: 'DJ view fit probe: tier, steps, clipped columns, band budgets' },
+          { tool: 'set_dj_layout_frame', description: 'Render the DJ view at an exact CSS size (screen-resolution test)' },
           { tool: 'get_channel_state', description: 'Channel visibility and naming' },
           { tool: 'move_cursor', description: 'Move cursor position' },
           { tool: 'select_range', description: 'Select a range of cells' },

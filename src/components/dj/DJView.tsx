@@ -72,6 +72,9 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       autoDJEnabled: s.autoDJEnabled,
     })),
   );
+  const layoutFrame = useUIStore((s) => s.djLayoutFrame);
+  // A debug frame (MCP set_dj_layout_frame) must not outlive the DJ view.
+  useEffect(() => () => useUIStore.getState().setDjLayoutFrame(null), []);
   const setDJModeActive = useDJStore((s) => s.setDJModeActive);
   const setThirdDeckActive = useDJStore((s) => s.setThirdDeckActive);
   const [showCrate, setShowCrate] = useState(false);
@@ -391,7 +394,12 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   }, []);
 
   return (
-    <div ref={djViewRef} className="relative flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono">
+    <div
+      ref={djViewRef}
+      data-dj-view
+      className={`relative flex flex-col overflow-hidden select-none bg-dark-bg font-mono ${layoutFrame ? 'shrink-0' : 'h-full w-full'}`}
+      style={layoutFrame ? { width: layoutFrame.width, height: layoutFrame.height, zoom: layoutFrame.zoom } : undefined}
+    >
       {/* Audio health indicator — only visible when AudioContext is not running */}
       {health && health.audioContext !== 'running' && (
         <div style={{
@@ -563,7 +571,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       {/* MAIN LAYOUT: Deck A | Mixer | Deck B [| Deck C]                   */}
       {/* ================================================================== */}
-      <div className={`relative flex-1 grid gap-2 p-2 overflow-hidden min-h-0 ${
+      <div data-dj-grid data-dj-scale="legacy" className={`relative flex-1 grid gap-2 p-2 overflow-hidden min-h-0 ${
         thirdDeckActive
           ? 'grid-cols-[1fr_400px_1fr_1fr]'
           : 'grid-cols-[1fr_400px_1fr]'
@@ -583,23 +591,23 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           /* ── Standard 2D modes (Visualizer / Vinyl) ──────────────────── */
           <>
             {/* ---- Deck A (left) ---- */}
-            <div className="min-h-0 min-w-0 overflow-hidden">
+            <div data-dj-region="deckA" className="min-h-0 min-w-0 overflow-hidden">
               <DJDeck deckId="A" />
             </div>
 
             {/* ---- Center Mixer ---- */}
-            <div className="min-h-0 min-w-0 overflow-hidden">
+            <div data-dj-region="mixer" className="min-h-0 min-w-0 overflow-hidden">
               <DJMixer />
             </div>
 
             {/* ---- Deck B (right) ---- */}
-            <div className="min-h-0 min-w-0 overflow-hidden">
+            <div data-dj-region="deckB" className="min-h-0 min-w-0 overflow-hidden">
               <DJDeck deckId="B" />
             </div>
 
             {/* ---- Deck C (far right, conditional) ---- */}
             {thirdDeckActive && (
-              <div className="min-h-0 min-w-0 overflow-hidden">
+              <div data-dj-region="deckC" className="min-h-0 min-w-0 overflow-hidden">
                 <DJDeck deckId="C" />
               </div>
             )}
