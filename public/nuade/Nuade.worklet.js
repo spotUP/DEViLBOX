@@ -4,7 +4,8 @@
  *
  * nw_render() mixes the stereo output and fills one mono buffer per voice. The voice buffers feed the per-channel dub
  * sends and isolation slots (worklets/channel-outputs.js) and the scopes (worklets/channel-stream.js). A voice that is
- * muted or isolated leaves the main mix inside the shim (nw_set_mute_mask); its buffer stays full.
+ * muted or isolated leaves the main mix inside the shim (nw_set_mute_mask); its buffer stays full for the scopes, and a
+ * muted one is kept off the isolation slots and dub sends here.
  */
 
 const MAX_VOICES = 64;
@@ -399,10 +400,13 @@ class NuadeProcessor extends AudioWorkletProcessor {
     for (let i = rendered; i < n; i++) { outL[i] = 0; outR[i] = 0; }
     const voices = this.voiceBufs.slice(0, this.voices).map((b) => b.subarray(0, rendered));
     if (o && rendered > 0) {
-      // Each voice sits where the mixer put it: side = (1 + pan) / 2, at its level in the mix.
+      // Each voice sits where the mixer put it: side = (1 + pan) / 2, at its level in the mix. A voice the mixer muted
+      // (mute or another channel's solo) feeds no isolation slot and no dub send: its buffer stays full for the scopes,
+      // so it is left out here, or a solo is undone for every channel an effect isolates.
       m._nw_pans(this.panPtr, this.voices);
       const pans = new Float32Array(m.HEAPU8.buffer, this.panPtr, Math.max(1, this.voices));
-      o.write(outputs, voices, rendered, (ch) => (1 + (pans[ch] || 0)) / 2, 1);
+      const audible = voices.map((b, v) => (v >= 32 || (this.userMask >>> v) & 1 ? b : null));
+      o.write(outputs, audible, rendered, (ch) => (1 + (pans[ch] || 0)) / 2, 1);
     }
     // Every sample of each voice, for the oscilloscopes and per-channel role classifiers (worklets/channel-stream.js).
     if (globalThis.DevilboxChannelStream && rendered > 0) {

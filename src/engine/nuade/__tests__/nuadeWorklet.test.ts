@@ -102,6 +102,31 @@ describe('NE-2 Nuade.worklet.js', () => {
     expect(run(rig, 300).peaks[0]).toBeGreaterThan(0.01);
   });
 
+  // Owner 2026-10-14: channels could not be soloed. A voice in an isolation slot (a per-channel insert effect, or a
+  // master effect aimed at channels) left the main mix by the isolation mask, and its slot and dub send were fed from
+  // the voice buffer, which the shim keeps full for the scopes: the solo's mute never reached it.
+  it('a muted voice stays silent on its isolation slot and dub send, so a solo holds with channel effects on', async () => {
+    await load(rig);
+    await rig.send({ type: 'play' });
+    await rig.send({ type: 'addIsolation', slotIndex: 0, channelMask: 0b1111 });
+    for (const channel of [0, 1, 2, 3]) await rig.send({ type: 'dubChannelEnable', channel });
+    await rig.send({ type: 'setMuteMask', mask: 0 });
+    const muted = run(rig, 600);
+    for (const i of [0, 1, 5, 6, 7, 8]) expect(muted.peaks[i], `output ${i}`).toBeLessThan(1e-6);
+    // The scopes keep every voice: the channel stream still posts it.
+    rig.posted.length = 0;
+    run(rig, 100);
+    const osc = rig.posted.filter((m) => m.type === 'oscData') as Array<WorkletMsg & { channels: Int16Array[] }>;
+    expect(osc.some((m) => m.channels.some((c) => c.some((s) => s !== 0)))).toBe(true);
+    // Unmuted, the same voices are heard on the slot and the sends again.
+    await rig.send({ type: 'setMuteMask', mask: 0xFFFFFFFF });
+    const open = run(rig, 600);
+    expect(open.peaks[1]).toBeGreaterThan(0.01);
+    expect(Math.max(...[5, 6, 7, 8].map((i) => open.peaks[i]!))).toBeGreaterThan(0.01);
+    await rig.send({ type: 'removeIsolation', slotIndex: 0 });
+    await rig.send({ type: 'dubChannelDisableAll' });
+  });
+
   it('stop rewinds to the start of the subsong', async () => {
     await load(rig);
     await rig.send({ type: 'play' });
