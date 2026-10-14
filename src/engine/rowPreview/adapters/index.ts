@@ -7,6 +7,14 @@ import type { RowRenderAdapter } from '../rowPreviewStream';
 
 export type AdapterLoader = (sampleRate: number) => Promise<RowRenderAdapter>;
 
+async function loadUade(sampleRate: number): Promise<RowRenderAdapter> {
+  const [{ loadUadeWasmFromPublic }, { createUadeRowAdapter }] = await Promise.all([
+    import('@engine/uade/uadeWasmInstance'), import('./uadeAdapter'),
+  ]);
+  const make = () => loadUadeWasmFromPublic(sampleRate, 'RowPreview');
+  return createUadeRowAdapter(await make(), sampleRate, make);
+}
+
 export const ROW_PREVIEW_ADAPTERS: Record<string, AdapterLoader> = {
   Nuade: async (sampleRate) => {
     const [{ loadNuadeModuleFromPublic }, { createNuadeRowAdapter }] = await Promise.all([
@@ -25,4 +33,6 @@ export const ROW_PREVIEW_ADAPTERS: Record<string, AdapterLoader> = {
     });
     return createEaglePlayerRowAdapter(await loadEaglePlayerModuleFromPublic(), sampleRate, fetchPlayer, base);
   },
+  // UADEEditable names a row in a UADE clock; the opaque player (U2) runs the same adapter, naming rows in frames.
+  UADEEditable: (sampleRate) => loadUade(sampleRate),
 };

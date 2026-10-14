@@ -55,6 +55,11 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._liveTickDrainBuf = null;     // WASM-heap buffer for draining (allocated once)
     this._lastTickDrain = 0;           // currentTime of last drain
 
+    // The row preview's clip player (worklets/row-clip.js): a grid row rendered elsewhere, sounded while no song plays.
+    this.clip = globalThis.DevilboxRowClip ? new globalThis.DevilboxRowClip(this.port, sampleRate) : null;
+    this._clipPeaks = [];
+    this._clipQuanta = 0;
+
     this.port.onmessage = (event) => this._handleMessage(event.data);
   }
 
@@ -64,7 +69,13 @@ class UADEProcessor extends AudioWorkletProcessor {
         await this._init(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
 
+      case 'playRowClip':
+        // The song playing already sounds the grid: a clip would double it (plan D1).
+        if (this.clip && !(this._playing && !this._paused) && data.clip) { this._clipPeaks = []; this.clip.play(data.clip); }
+        break;
+
       case 'load':
+        if (this.clip) this.clip.drop();
         this._stream?.discontinue(); // a new song is a new stream
         // The call owns the companion set: what it carries replaces whatever the
         // previous load left behind (nothing is written out of band).
@@ -111,6 +122,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'play':
+        if (this.clip) this.clip.drop();
         // If the song was stopped (or ended), reload it from _lastData before playing.
         // _uade_wasm_stop() tears down the WASM player state; just setting _playing=true
         // would cause _uade_wasm_render() to return 0 (ended) immediately → silence.
@@ -140,6 +152,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'stop':
+        if (this.clip) this.clip.drop();
         if (this._wasm && this._ready) {
           this._wasm._uade_wasm_stop();
         }
@@ -153,6 +166,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'setSubsong':
+        if (this.clip) this.clip.drop();
         if (this._wasm && this._ready) {
           this._currentSubsong = data.index;
           this._wasm._uade_wasm_set_subsong(data.index);
@@ -166,6 +180,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'dispose':
+        if (this.clip) this.clip.drop();
         if (this._wasm && this._ready) {
           this._wasm._uade_wasm_cleanup();
         }
@@ -2497,10 +2512,114 @@ class UADEProcessor extends AudioWorkletProcessor {
     });
   }
 
+  /**
+   * One quantum to the outputs: the stereo mix, and - when `chans` (the four Paula channels, mono, `chFrames` real) is given -
+   * each channel to its dub send and isolation slot, and every sample to the scope stream. Playback and the row clip
+   * (worklets/row-clip.js) both come through here.
+   */
+  emit(outputs, outL, outR, left, right, frames, chans, chFrames) {
+    for (let i = 0; i < frames; i++) {
+      outL[i] = left[i];
+      if (outR !== outL) outR[i] = right[i];
+    }
+    if (!chans || chFrames <= 0) return;
+    const hasIsolation = this._isolationSlots && this._isolationSlots.some(s => s !== null);
+    const hasDub = this._dubChannelEnabled && this._dubChannelEnabled.some(Boolean);
+    // DUB_OUTPUT_BASE matches ChannelRoutedEffects.ts (= 1 + MAX_ISOLATION_SLOTS)
+    const DUB_OUTPUT_BASE = 5;
+
+    // Route to dub-send outputs - one output per Paula channel. Mono-
+    // mixed into both stereo sides (the tap is downstream and the
+    // channel's dub send is a mono path through the DubBus anyway).
+    if (hasDub) {
+      for (let ch = 0; ch < 4; ch++) {
+        if (!this._dubChannelEnabled[ch]) continue;
+        const slotOut = outputs[DUB_OUTPUT_BASE + ch];
+        if (!slotOut || slotOut.length === 0) continue;
+        const sL = slotOut[0];
+        const sR = slotOut[1] || slotOut[0];
+        const c = chans[ch];
+        for (let i = 0; i < chFrames; i++) {
+          const sample = c[i];
+          sL[i] = sample;
+          if (sR !== sL) sR[i] = sample;
+        }
+      }
+    }
+
+    // Route to isolation slot outputs
+    if (hasIsolation) {
+      for (let s = 0; s < 4; s++) {
+        const slot = this._isolationSlots[s];
+        if (!slot) continue;
+        const slotOut = outputs[s + 1];
+        if (!slotOut || slotOut.length === 0) continue;
+        const sL = slotOut[0];
+        const sR = slotOut[1] || slotOut[0];
+        sL.fill(0);
+        sR.fill(0);
+        // Mix channels in this slot's mask to stereo using Amiga panning
+        // Paula: ch0+ch3 = left, ch1+ch2 = right
+        for (let ch = 0; ch < 4; ch++) {
+          if (!(slot.channelMask & (1 << ch))) continue;
+          const isLeft = (ch === 0 || ch === 3);
+          const c = chans[ch];
+          for (let i = 0; i < chFrames; i++) {
+            if (isLeft) sL[i] += c[i]; else sR[i] += c[i];
+          }
+        }
+      }
+    }
+
+    // Every sample of the 4 Paula channels, for the oscilloscopes and
+    // the per-channel role classifiers (worklets/channel-stream.js).
+    if (this._oscEnabled && globalThis.DevilboxChannelStream) {
+      this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+      this._stream.write(4, chFrames, (ch, i) => chans[ch][i]);
+    }
+  }
+
+  /**
+   * The next quantum of the sounding row clip through emit(): the clip's four voices are the channel capture, its peaks go
+   * out as the channel meter levels. A muted voice is silent in the clip already (the mute is applied where it was rendered).
+   */
+  processClip(outputs) {
+    const outL = outputs[0][0];
+    const outR = outputs[0][1] || outputs[0][0];
+    const q = this.clip.pull(Math.min(outL.length, 128));
+    if (!q) return;
+    const n = q.n;
+    this._clipL = this._clipL && this._clipL.length >= n ? this._clipL : new Float32Array(128);
+    this._clipR = this._clipR && this._clipR.length >= n ? this._clipR : new Float32Array(128);
+    for (let i = 0; i < n; i++) { this._clipL[i] = q.stereo[i * 2]; this._clipR[i] = q.stereo[i * 2 + 1]; }
+    for (let i = n; i < outL.length; i++) { outL[i] = 0; if (outR !== outL) outR[i] = 0; }
+    this.emit(outputs, outL, outR, this._clipL, this._clipR, n, q.voices.length === 4 ? q.voices : null, n);
+    for (let v = 0; v < 4; v++) {
+      const b = q.voices[v];
+      if (!b) continue;
+      let peak = this._clipPeaks[v] || 0;
+      for (let i = 0; i < n; i++) { const a = Math.abs(b[i]); if (a > peak) peak = a; }
+      this._clipPeaks[v] = peak;
+    }
+    // Meter levels at the playback cadence (~20 Hz), and once more when the clip ends.
+    if ((++this._clipQuanta % 8) === 0 || !this.clip.active) {
+      this.port.postMessage({ type: 'chLevels', levels: Float32Array.from([0, 1, 2, 3].map(v => this._clipPeaks[v] || 0)), noteStarts: null });
+      this._clipPeaks = [];
+    }
+    // The clip is its own stretch of audio: its scope samples go out now and are not joined to what follows.
+    if (!this.clip.active && this._stream) { this._stream.flush(); this._stream.discontinue(); }
+  }
+
   process(_inputs, outputs) {
     const outL = outputs[0][0];
     const outR = outputs[0][1] || outputs[0][0];  // Mono fallback
     const frames = outL.length;  // Usually 128
+
+    // A row clip sounds while the song does not: the song playing already is the grid (plan D1).
+    if (!(this._playing && !this._paused) && this.clip && this.clip.active) {
+      this.processClip(outputs);
+      return true;
+    }
 
     if (!this._ready || !this._playing || this._paused || !this._wasm) {
       // Silence
@@ -2531,82 +2650,23 @@ class UADEProcessor extends AudioWorkletProcessor {
         return true;
       }
 
-      // Copy float32 from WASM heap to Web Audio output buffers
-      const heapF32 = this._wasm.HEAPF32;
-      const baseL = this._ptrL >> 2;  // Convert byte offset to float32 index
-      const baseR = this._ptrR >> 2;
-
-      for (let i = 0; i < frames; i++) {
-        outL[i] = heapF32[baseL + i];
-        if (outR !== outL) outR[i] = heapF32[baseR + i];
-      }
-
-      // --- Per-channel audio capture (isolation + dub + oscilloscope) ---
+      // Per-channel audio (isolation + dub + oscilloscope): the capture is read only while something routes it.
       const hasIsolation = this._isolationSlots && this._isolationSlots.some(s => s !== null);
       const hasDub = this._dubChannelEnabled && this._dubChannelEnabled.some(Boolean);
       const needsPerChannel = hasIsolation || hasDub || this._oscEnabled;
-      // DUB_OUTPUT_BASE matches ChannelRoutedEffects.ts (= 1 + MAX_ISOLATION_SLOTS)
-      const DUB_OUTPUT_BASE = 5;
+      let chans = null;
+      let chFrames = 0;
       if (needsPerChannel && this._wasm._uade_wasm_read_channel_samples && this._chPtrs) {
         // Read per-channel audio captured during the render pass
-        const chFrames = this._wasm._uade_wasm_read_channel_samples(
+        chFrames = this._wasm._uade_wasm_read_channel_samples(
           this._chPtrs[0], this._chPtrs[1], this._chPtrs[2], this._chPtrs[3], frames
         );
-        if (chFrames > 0) {
-          const chBases = this._chPtrs.map(p => p >> 2);
-
-          // Route to dub-send outputs — one output per Paula channel. Mono-
-          // mixed into both stereo sides (the tap is downstream and the
-          // channel's dub send is a mono path through the DubBus anyway).
-          if (hasDub) {
-            for (let ch = 0; ch < 4; ch++) {
-              if (!this._dubChannelEnabled[ch]) continue;
-              const slotOut = outputs[DUB_OUTPUT_BASE + ch];
-              if (!slotOut || slotOut.length === 0) continue;
-              const sL = slotOut[0];
-              const sR = slotOut[1] || slotOut[0];
-              const chBase = chBases[ch];
-              for (let i = 0; i < chFrames; i++) {
-                const sample = heapF32[chBase + i];
-                sL[i] = sample;
-                if (sR !== sL) sR[i] = sample;
-              }
-            }
-          }
-
-          // Route to isolation slot outputs
-          if (hasIsolation) {
-            for (let s = 0; s < 4; s++) {
-              const slot = this._isolationSlots[s];
-              if (!slot) continue;
-              const slotOut = outputs[s + 1];
-              if (!slotOut || slotOut.length === 0) continue;
-              const sL = slotOut[0];
-              const sR = slotOut[1] || slotOut[0];
-              sL.fill(0);
-              sR.fill(0);
-              // Mix channels in this slot's mask to stereo using Amiga panning
-              // Paula: ch0+ch3 = left, ch1+ch2 = right
-              for (let ch = 0; ch < 4; ch++) {
-                if (!(slot.channelMask & (1 << ch))) continue;
-                const isLeft = (ch === 0 || ch === 3);
-                const chBase = chBases[ch];
-                for (let i = 0; i < chFrames; i++) {
-                  const sample = heapF32[chBase + i];
-                  if (isLeft) sL[i] += sample; else sR[i] += sample;
-                }
-              }
-            }
-          }
-
-          // Every sample of the 4 Paula channels, for the oscilloscopes and
-          // the per-channel role classifiers (worklets/channel-stream.js).
-          if (this._oscEnabled && globalThis.DevilboxChannelStream) {
-            this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
-            this._stream.write(4, chFrames, (ch, i) => heapF32[chBases[ch] + i]);
-          }
-        }
+        if (chFrames > 0) chans = this._chPtrs.map(p => new Float32Array(this._wasm.HEAPF32.buffer, p, frames));
       }
+      const heapF32 = this._wasm.HEAPF32;
+      this.emit(outputs, outL, outR,
+        new Float32Array(heapF32.buffer, this._ptrL, frames), new Float32Array(heapF32.buffer, this._ptrR, frames),
+        frames, chans, chFrames);
 
       // Read Paula channel state for live pattern display (~20Hz)
       if (this._channelBuf === undefined) {

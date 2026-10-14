@@ -28,6 +28,7 @@ import {
 import { steadyPlayerCallHz, type PlayerCallSample } from '@/engine/dj/sidPlayerClock';
 import { isSidFileBytes, type SidForcedPlayback } from '@/lib/sid/SIDHeaderParser';
 import { NuadeDriver } from '@/engine/nuade/nuadeDriver';
+import { uadeGlueForWorker, instantiateUadeWasm, addUadeCompanion, type UadeWasm } from '@/engine/uade/uadeWasmInstance';
 import { loadNuadeModuleFromPublic } from '@/engine/nuade/nuadeModule';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -337,37 +338,13 @@ async function initUADE(forceReinit = false): Promise<void> {
     ]);
 
     uadeWasmBinary = await wasmResponse.arrayBuffer();
-    let jsCode = await jsResponse.text();
 
-    // Transform Emscripten glue for worker scope (same pattern as UADEEngine.ts)
-    jsCode = jsCode.replace(/import\.meta\.url/g, `"${baseUrl}/uade/UADE.js"`);
-    jsCode = jsCode.replace(/export\s+default\s+/g, 'var createUADE = ');
-    jsCode = jsCode.replace(/export\s*\{[^}]*\}/g, '');
-
-    // Fix environment detection and mock document for worker scope
-    jsCode = jsCode.replace(/ENVIRONMENT_IS_WEB\s*=\s*!0/g, 'ENVIRONMENT_IS_WEB=false');
-    jsCode = jsCode.replace(/ENVIRONMENT_IS_WORKER\s*=\s*!1/g, 'ENVIRONMENT_IS_WORKER=true');
-    jsCode = 'var document = { currentScript: { src: "' + baseUrl + '/uade/UADE.js" }, title: "" };\n' + jsCode;
-    
-    uadeJsCode = jsCode;
+    // Emscripten glue for worker scope (shared with the row-preview worker).
+    uadeJsCode = uadeGlueForWorker(await jsResponse.text(), baseUrl);
   }
 
-  // Execute the glue code to get factory function - always fresh execution
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const factory = new Function(uadeJsCode + '\n;return typeof createUADE !== "undefined" ? createUADE : Module;')();
-
-  // Instantiate UADE WASM with a COPY of the binary (ensures fresh memory)
-  uadeInstance = await factory({
-    wasmBinary: uadeWasmBinary.slice(0), // Clone to ensure fresh instantiation
-    print: (msg: string) => console.log('[DJRenderWorker/UADE]', msg),
-    printErr: (msg: string) => console.warn('[DJRenderWorker/UADE]', msg),
-  });
-
-  // Initialize UADE engine (CRITICAL: Loading fails if this isn't called)
-  const initRet = uadeInstance._uade_wasm_init(44100);
-  if (initRet !== 0) {
-    throw new Error(`uade_wasm_init failed with code ${initRet}`);
-  }
+  // Always a fresh instance: a copy of the binary, initialised at 44.1 kHz (the shared instantiation).
+  uadeInstance = await instantiateUadeWasm(uadeJsCode, uadeWasmBinary, 44100, 'DJRenderWorker');
 
   // Store compiled module for reference
   if (!uadeWasm) {
@@ -377,38 +354,9 @@ async function initUADE(forceReinit = false): Promise<void> {
   console.log('[DJRenderWorker] UADE engine initialized');
 }
 
-/**
- * Write a companion file into UADE's virtual filesystem.
- * Must be called AFTER initUADE and BEFORE _uade_wasm_load.
- * Pattern mirrors the server-side renderer (server/src/routes/render.ts) and
- * the main-thread worklet's _addCompanionFile.
- */
-function addUADECompanion(wasm: any, filename: string, buffer: ArrayBuffer): void {
-  const data = new Uint8Array(buffer);
-  const dataPtr = wasm._malloc(data.byteLength);
-  if (!dataPtr) {
-    console.warn(`[DJRenderWorker/UADE] malloc failed for companion: ${filename}`);
-    return;
-  }
-  wasm.HEAPU8.set(data, dataPtr);
-
-  const nameLen = filename.length * 3 + 1;
-  const namePtr = wasm._malloc(nameLen);
-  if (!namePtr) {
-    wasm._free(dataPtr);
-    console.warn(`[DJRenderWorker/UADE] malloc failed for companion name: ${filename}`);
-    return;
-  }
-  wasm.stringToUTF8(filename, namePtr, nameLen);
-
-  const ret = wasm._uade_wasm_add_extra_file(namePtr, dataPtr, data.byteLength);
-  wasm._free(dataPtr);
-  wasm._free(namePtr);
-
-  if (ret === 0) {
-    console.log(`[DJRenderWorker/UADE] Companion registered: ${filename} (${data.byteLength} bytes)`);
-  } else {
-    console.warn(`[DJRenderWorker/UADE] Failed to register companion: ${filename} (ret=${ret})`);
+function addUADECompanion(wasm: UadeWasm, filename: string, buffer: ArrayBuffer): void {
+  if (addUadeCompanion(wasm, filename, buffer, 'DJRenderWorker')) {
+    console.log(`[DJRenderWorker/UADE] Companion registered: ${filename} (${buffer.byteLength} bytes)`);
   }
 }
 

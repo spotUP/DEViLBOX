@@ -18,6 +18,11 @@ import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
 import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
+import { GridFollow, songTickGrid } from '@engine/replayer/tickGridFollow';
+import { clipTransferables, type RowClip } from '@engine/rowPreview/rowClip';
+import type { RowTarget } from '@engine/rowPreview/rowTarget';
+import type { RowClipPlayer } from '@engine/rowPreview/rowClipPlayer';
+import { uadeEditableLoadArgs, uadeMask, uadeRowClock, uadeRowFrames, type UadeLoadArgs } from './uadeLoadArgs';
 import { tickGridPosition, playerTickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
@@ -191,7 +196,7 @@ type ChannelCallback = (channels: UADEChannelData[], totalFrames: number) => voi
 /** A song's partner files by the name UADE opens them under (two-file formats: smp.*, .ins, .set). */
 export type UADECompanions = ReadonlyMap<string, ArrayBuffer>;
 
-export class UADEEngine extends WASMSingletonBase implements IsolationCapableEngine {
+export class UADEEngine extends WASMSingletonBase implements IsolationCapableEngine, RowClipPlayer {
   /** The last scan's statistics, for get_format_state (ledger F7). */
   lastScanStats: UADEScanStats | null = null;
   private static readonly MAX_ISOLATION_SLOTS = 4;
@@ -774,19 +779,15 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * loadTune(buffer) — WASM engine registry compatible wrapper for load().
    * Reads the filename hint and current subsong from the format store.
    */
-  async loadTune(buffer: ArrayBuffer): Promise<void> {
-    const { useFormatStore } = await import('@/stores/useFormatStore');
-    const state = useFormatStore.getState();
-    const fileName = state.uadeEditableFileName || 'module.mod';
-
-    // A grid decoded per subsong (uadeEditableSubsongs.orders) shows one
-    // subsong: UADE plays exactly that one, never the first-audible probe's pick.
-    // Its UADE number counts from the player's lowest (`first`; Hippel ST's is 1).
-    const first = state.uadeEditableSubsongs?.first ?? 0;
-    // A command-stream file whose parser drew one tune (state.fileSubsongs, e.g. Rob Hubbard) is played on that tune too.
-    const tune = state.fileSubsongs;
-    const subsong = tune ? first + tune.current : first + state.uadeEditableCurrentSubsong;
-    await this.loadForPlayback(buffer, fileName, subsong, !!state.uadeEditableSubsongs?.orders || !!tune, state.uadeCompanionFiles ?? undefined);
+  async loadTune(buffer: ArrayBuffer, ...args: Partial<UadeLoadArgs>): Promise<void> {
+    // The registry hands the song's own load arguments (uadeEditableLoadArgs); a caller with none gets what the format store holds.
+    let load = args[0] === undefined ? undefined : args as UadeLoadArgs;
+    if (!load) {
+      const { useFormatStore } = await import('@/stores/useFormatStore');
+      load = uadeEditableLoadArgs(useFormatStore.getState() as unknown as Parameters<typeof uadeEditableLoadArgs>[0]);
+    }
+    const [fileName, subsong, pin, companions] = load;
+    await this.loadForPlayback(buffer, fileName, subsong, pin, companions);
   }
 
   /**
@@ -1169,8 +1170,48 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
    * Use 0x0F to unmute all channels.
    */
   setMuteMask(mask: number): void {
+    this._muteMask = mask & 0xF;
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
+  /** The mixer's mute mask as last posted (bit N set = Paula voice N audible). */
+  private _muteMask = 0xF;
+
+  /**
+   * The mask a row clip is rendered with: the voices audible (the mixer's mute and solo) and the voices an isolation slot
+   * holds out of the stereo mix (uadeMask) - the two masks the playing instance holds.
+   */
+  get rowClipMask(): number {
+    const isolated = this._isolationSlotMasks.reduce<number>((a, m) => a | (m ?? 0), 0);
+    return uadeMask(this._muteMask, isolated);
+  }
+
+  /** Where grid row (songPos, row) of `song` is in UADE's terms: ticks of the counter its grid follows, or a stretch of output frames. */
+  targetOf(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition' | 'initialBPM' | 'uadePlayerTickGrid' | 'uadeFirstTick' | 'tfmxTimingTable' | 'uadeEditableFileData'>, songPos: number, row: number): RowTarget {
+    if (uadeRowClock(song).kind === 'frames') {
+      const { from, to } = uadeRowFrames(song, songPos, row, this.audioContext?.sampleRate ?? 48000, !song.uadeEditableFileData);
+      return { kind: 'frames', from, to };
+    }
+    const follow = new GridFollow();
+    follow.setGrid(songTickGrid(song));
+    return follow.targetOf(songPos, row, 'tick');
+  }
+
+  /** The arguments the row-preview player opens with: the play arguments and the clock the grid is named in. */
+  rowLoadArgs(song: Parameters<typeof uadeRowClock>[0], args: unknown[]): unknown[] {
+    return [...args, uadeRowClock(song)];
+  }
+
+  /**
+   * Sound a row clip (a grid row rendered by the row-preview worker) through the worklet's own output code while stopped:
+   * the scope stream is switched on as play() does, so the channels draw the clip.
+   */
+  playRowClip(clip: RowClip): void {
+    if (!this.workletNode) return;
+    useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
+    this.workletNode.port.postMessage({ type: 'enableOsc' });
+    this.workletNode.port.postMessage({ type: 'playRowClip', clip }, clipTransferables(clip));
   }
 
   /**
