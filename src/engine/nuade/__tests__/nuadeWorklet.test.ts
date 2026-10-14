@@ -113,14 +113,16 @@ describe('NE-2 Nuade.worklet.js', () => {
     await rig.send({ type: 'setMuteMask', mask: 0 });
     const muted = run(rig, 600);
     for (const i of [0, 1, 5, 6, 7, 8]) expect(muted.peaks[i], `output ${i}`).toBeLessThan(1e-6);
-    // The scopes keep every voice: the channel stream still posts it.
+    // A muted voice's scope draws flat (one effective mask feeds mix, slots, sends, meter and scope).
     rig.posted.length = 0;
     run(rig, 100);
-    const osc = rig.posted.filter((m) => m.type === 'oscData') as Array<WorkletMsg & { channels: Int16Array[] }>;
-    expect(osc.some((m) => m.channels.some((c) => c.some((s) => s !== 0)))).toBe(true);
-    // Unmuted, the same voices are heard on the slot and the sends again.
+    const oscOf = () => rig.posted.filter((m) => m.type === 'oscData') as Array<WorkletMsg & { channels: Int16Array[] }>;
+    expect(oscOf().some((m) => m.channels.some((c) => c.some((s) => s !== 0)))).toBe(false);
+    // Unmuted (and isolated by channel effects), the same voices are heard on the slot and the sends, and scope again.
     await rig.send({ type: 'setMuteMask', mask: 0xFFFFFFFF });
+    rig.posted.length = 0;
     const open = run(rig, 600);
+    expect(oscOf().some((m) => m.channels.some((c) => c.some((s) => s !== 0)))).toBe(true);
     expect(open.peaks[1]).toBeGreaterThan(0.01);
     expect(Math.max(...[5, 6, 7, 8].map((i) => open.peaks[i]!))).toBeGreaterThan(0.01);
     await rig.send({ type: 'removeIsolation', slotIndex: 0 });
